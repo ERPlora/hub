@@ -38,6 +38,7 @@ from collections.abc import Callable, Iterable, Iterator
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass, field
+from functools import partial
 
 import decouple
 import psycopg
@@ -221,21 +222,36 @@ def migrate_control(*, stdout=None, verbosity: int = 1) -> int:
     return len(after - before)
 
 
-def migrate_apps(ddl_alias: str, app_labels) -> list[str]:
+def migrate_apps(ddl_alias: str, app_labels, *, heartbeat: Callable[[], object] | None = None) -> list[str]:
     """Bring ``app_labels`` of the database behind ``ddl_alias`` to the code's leaf; return what it applied, in order.
 
     Only a migrator's alias (``…__ddl``): every other alias is refused. Their dependencies come along (Django's own
     and control's are recorded, their tables left to control's database by the ``TenantRouter``); with nothing to
-    apply it does not migrate at all, and it never steps back.
+    apply it does not migrate at all, and it never steps back. ``heartbeat()`` is called before each app's first
+    migration (a caller's lease renewed between apps; what it raises stops the run there).
     """
     if not ddl_alias.endswith(names.DDL_SUFFIX):
         raise ValueError(f"migrate_apps runs only on a migrator's alias (…{names.DDL_SUFFIX}), not on {ddl_alias!r}.")
-    executor = MigrationExecutor(connections[ddl_alias])
+    executor = MigrationExecutor(connections[ddl_alias], progress_callback=_beat_per_app(heartbeat))
     targets, plan = _forwards_plan(executor, app_labels, ddl_alias)
     if not plan:
         return []
     executor.migrate(targets, plan=plan)
     return [f"{migration.app_label}.{migration.name}" for migration, _backwards in plan]
+
+
+def _beat_per_app(heartbeat: Callable[[], object] | None) -> Callable[..., None] | None:
+    """Django's ``progress_callback`` that calls ``heartbeat`` when the first migration of each app starts."""
+    if heartbeat is None:
+        return None
+    started: set[str] = set()
+
+    def progress(action: str, migration=None, fake: bool = False) -> None:
+        if action == "apply_start" and migration is not None and migration.app_label not in started:
+            started.add(migration.app_label)
+            heartbeat()
+
+    return progress
 
 
 def _forwards_plan(executor: MigrationExecutor, app_labels, where: str) -> tuple[list, list]:
@@ -349,10 +365,19 @@ def templates(control: str | None = None) -> list[Template]:
     return [platform, *verticals]
 
 
-def is_behind(hub, code: CodeMigrations | None = None) -> bool:
+def apps_every_hub_gets() -> tuple[str, ...]:
+    """The apps whose tables every hub with its own database has: every portable one. Transitional, until S3 makes an
+    app's tables when it is turned on (``base.app.enable``, W6): meanwhile ``provision(apps=None)`` gives them at
+    birth and :func:`migrate_hubs_behind` adds to the hubs already made the ones a later code ports, so turning an app
+    on only changes its row, as in phase 1. The one list both read (:func:`portable_apps`)."""
+    return portable_apps()
+
+
+def is_behind(hub, code: CodeMigrations | None = None, *, wanted: Iterable[str] | None = None) -> bool:
     """Whether ``hub``'s database may lack a migration of this code, as control knows it (``Hub.schema_apps``).
 
-    Behind: marked so, or the platform or any app it has not at the code's leaf (never confirmed counts). A label or a
+    Behind: marked so, or the platform or any app it has not at the code's leaf (never confirmed counts), or, with its
+    own database, one of ``wanted`` (by default :func:`apps_every_hub_gets`, until S3) it does not have. A label or a
     migration the code does not have (a later code's, after a rollback: the database is ahead) is not behind. Opens no
     database.
     """
@@ -360,6 +385,8 @@ def is_behind(hub, code: CodeMigrations | None = None) -> bool:
         return True
     code = code_migrations() if code is None else code
     recorded = hub.schema_apps or {}
+    if hub.db_name and any(label not in recorded for label in (apps_every_hub_gets() if wanted is None else wanted)):
+        return True
     for label in set(platform_apps()) | {label for label in recorded if label in code.leaves}:
         name = recorded.get(label)
         if name is None:
@@ -490,13 +517,20 @@ def _forget_alias(alias: str) -> None:
 # ── Changing a database's schema ───────────────────────────────────────────────────────────────────────────────
 
 
-def ensure_schema(hub, *, add: Iterable[str] = (), lock_wait: float = SCHEMA_LOCK_WAIT) -> list[str]:
+def ensure_schema(
+    hub,
+    *,
+    add: Iterable[str] = (),
+    lock_wait: float = SCHEMA_LOCK_WAIT,
+    heartbeat: Callable[[], object] | None = None,
+) -> list[str]:
     """Bring ``hub``'s own database to the code's leaf; return what it applied, as ``<app>.<migration>`` in order.
 
     The platform, the apps its database already has and ``add`` (with what they require) are migrated; then control's
     row learns what the database has (``schema_apps``, the last migration of each app; the labels of a code that no
     longer has them are kept) and ``schema_state = current``. ``SchemaLocked`` after ``lock_wait`` seconds if another
     run holds the database; ``HubWithoutDatabase`` for a hub still on control's, which is never touched.
+    ``heartbeat``: called between apps (:func:`migrate_apps`), the worker's lease renewed while a hub is made.
     """
     if not hub.db_name:
         raise HubWithoutDatabase(
@@ -505,7 +539,7 @@ def ensure_schema(hub, *, add: Iterable[str] = (), lock_wait: float = SCHEMA_LOC
     added = _with_requires(add) if add else set()
     target = cluster_target(hub.cluster)
     applied, has = _migrate_database(
-        hub.db_name, target, lambda found: set(platform_apps()) | found | added, lock_wait
+        hub.db_name, target, lambda found: set(platform_apps()) | found | added, lock_wait, heartbeat=heartbeat
     )
     installed = {app.label for app in django_apps.get_app_configs()}
     schema_apps = {label: name for label, name in (hub.schema_apps or {}).items() if label not in installed} | has
@@ -567,7 +601,12 @@ def pending_template(template: Template, *, target: ClusterTarget | None = None)
 
 
 def _migrate_database(
-    db_name: str, target: ClusterTarget, targets: Callable[[set[str]], set[str]], lock_wait: float
+    db_name: str,
+    target: ClusterTarget,
+    targets: Callable[[set[str]], set[str]],
+    lock_wait: float,
+    *,
+    heartbeat: Callable[[], object] | None = None,
 ) -> tuple[list[str], dict[str, str]]:
     """Under ``db_name``'s schema lock on ``target``, migrate ``targets(the hub apps it has)``; return what was applied
     and, after, ``{hub app: its last migration}`` from its ``django_migrations``. The connection is closed in any
@@ -580,7 +619,7 @@ def _migrate_database(
                 cursor.execute("SELECT set_config(%s, %s, false)", [setting, value])
         _take_schema_lock(connection, db_name, lock_wait)
         try:
-            applied = migrate_apps(alias, targets(set(_last_migrations(connection))))
+            applied = migrate_apps(alias, targets(set(_last_migrations(connection))), heartbeat=heartbeat)
             return applied, _last_migrations(connection)
         finally:
             try:
@@ -727,13 +766,14 @@ def migrate_hubs_behind(*, workers: int = HUB_WORKERS) -> HubsPass:
     fails is marked ``behind`` (its traceback logged) and the others go on."""
     every = hubs_with_a_database()
     code = code_migrations()
-    behind = [hub for hub in every if is_behind(hub, code)]
+    wanted = apps_every_hub_gets()
+    behind = [hub for hub in every if is_behind(hub, code, wanted=wanted)]
     result = HubsPass(up_to_date=len(every) - len(behind))
     first = [hub for hub in behind if hub.is_platform]
     rest = [hub for hub in behind if not hub.is_platform]
-    outcomes = [(hub, _migrate_hub(hub)) for hub in first]
+    outcomes = [(hub, _migrate_hub(hub, wanted)) for hub in first]
     with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="migrate_hubs") as pool:
-        outcomes += zip(rest, pool.map(_migrate_hub_in_thread, rest), strict=True)
+        outcomes += zip(rest, pool.map(partial(_migrate_hub_in_thread, add=wanted), rest), strict=True)
     for hub, failure in outcomes:
         if failure is None:
             result.migrated.append(hub.slug)
@@ -742,19 +782,20 @@ def migrate_hubs_behind(*, workers: int = HUB_WORKERS) -> HubsPass:
     return result
 
 
-def _migrate_hub_in_thread(hub) -> str | None:
+def _migrate_hub_in_thread(hub, add: Iterable[str] = ()) -> str | None:
     try:
-        return _migrate_hub(hub)
+        return _migrate_hub(hub, add)
     finally:
         connections.close_all()  # this thread's own connections: control's goes back to its pool
 
 
-def _migrate_hub(hub) -> str | None:
-    """``ensure_schema(hub)``, tried again on a lock timeout; ``None`` if done, else why it was left behind."""
+def _migrate_hub(hub, add: Iterable[str] = ()) -> str | None:
+    """``ensure_schema(hub, add=add)`` (until S3, every portable app: :func:`apps_every_hub_gets`), tried again on a
+    lock timeout; ``None`` if done, else why it was left behind."""
     attempt = 1
     while True:
         try:
-            ensure_schema(hub)
+            ensure_schema(hub, add=add)
             return None
         except Exception as error:
             if _is_lock_timeout(error) and attempt < LOCK_TIMEOUT_ATTEMPTS:

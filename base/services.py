@@ -701,9 +701,9 @@ def hub_state_apply(ctx: OperationContext, data: HubStateIn) -> dict:
     was_open = not registry.is_suspended(hub)
     hub.state, hub.state_version = data.photo, data.version
     hub.save(update_fields=["state", "state_version", "updated_at"])
-    # A hub whose database is still being made keeps the photo on its row: its seeding applies the blocks of the apps
-    # it has on (:func:`apply_kept_photo`), as turning an app on does.
-    reachable = not (hub.db_name and registry.is_preparing(hub))
+    # A hub whose database is not made yet (being made, or cancelled or failed before it ever was) keeps the photo on
+    # its row: its seeding applies it (:func:`apply_kept_photo`), as turning an app on does for that app's block.
+    reachable = registry.database_is_made(hub)
     if reachable and (data.verifactu is not None or data.status is not None):
         _sync_verifactu(hub, data)
     if reachable and data.whatsapp is not None:
@@ -1310,13 +1310,20 @@ def provision_ready(
     *,
     tell_saas: bool = True,
     owner: str = LEASE_OWNER,
-) -> Hub:
+    seeded_version: int | None = None,
+) -> Hub | None:
     """``hub_id`` is ready: its schema as the migrator left it; a business's SaaS hears it after the COMMIT (unless
-    ``tell_saas`` is false: the local hubs). ``ProvisioningStopped`` if the lease is no longer ``owner``'s."""
+    ``tell_saas`` is false: the local hubs). ``ProvisioningStopped`` if the lease is no longer ``owner``'s.
+
+    ``seeded_version``: the version of the SaaS's photo its seeding applied. With its row locked (as
+    :func:`hub_state_apply` locks it), a newer photo that came meanwhile, kept on the row only, means it is not ready
+    yet: ``None``, and the seeding applies that one first."""
     with _control_transaction():
         hub = _preparing(hub_id, now)
         if not HubDue.objects.filter(pk=hub_id, lease_owner=owner).exists():
             raise ProvisioningStopped(f"the lease of {hub_id} is no longer {owner}'s: another worker holds it now.")
+        if seeded_version is not None and hub.state_version != seeded_version:
+            return None
         hub.status, hub.ready_at = Hub.Status.READY, now
         hub.attempts, hub.last_error, hub.next_attempt_at = 0, "", None
         hub.schema_apps, hub.schema_state = schema_apps, Hub.SchemaState.CURRENT
