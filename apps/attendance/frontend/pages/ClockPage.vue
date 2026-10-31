@@ -489,6 +489,10 @@ function endOf(day: RecordOut): string {
   font-size: 0.9rem;
   color: var(--ion-color-medium, #6b6b6b);
 }
+/* The note's icon keeps its 1em when the text wraps on a phone: a flex item may shrink, and it shrank to a dot. */
+.attendance-clock__note ion-icon {
+  flex: none;
+}
 .attendance-clock__message {
   margin: 0;
   padding: 10px 12px;
