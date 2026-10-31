@@ -4,10 +4,12 @@
 // («Open on erplora.com»: the business's «Members»). Their PIN: since when, and «Remove the PIN», asked first with its
 // consequence (they keep entering with their account). Their badge: a reader's burst fills the field wherever the focus
 // is (BASE-G56's reader), or the number is typed; «Save badge» and «Remove the badge». What this administrator may not
-// change (the owner's way in, one's own badge) is said instead of offered; a refusal is told from its code.
+// change (the owner's way in, one's own badge) is said instead of offered; a refusal is told from its code. «Open on
+// erplora.com» leaves the Hub by `openExternalLink` (in the installed app, the system browser: gh:hub#439) and, a way to
+// erplora.com's panel, never in the Google Play copy (`managementOffered`, gh:hub#1897).
 import { ConfirmDialog, formatDateTime, InlineFeedback } from '@erplora/ui/components';
 import { ApiError, useCommand, useLive } from '@erplora/ui/sdk';
-import { AppPage, toastSuccess } from '@erplora/ui/shell';
+import { AppPage, openExternalLink, toastSuccess } from '@erplora/ui/shell';
 import { IonButton, IonInput, IonSpinner } from '@ionic/vue';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRoute } from 'vue-router';
@@ -15,12 +17,14 @@ import { useRoute } from 'vue-router';
 import { createBadgeReader } from '../lib/access';
 import { type HubHome, readJsonBlock } from '../lib/home';
 import { useBaseI18n } from '../lib/i18n';
+import { managementOffered } from '../lib/management';
 import { accessKeys, badgeProblem, roleKey } from '../lib/people';
 import '../settings.css';
 
 const { t, locale } = useBaseI18n();
 const route = useRoute();
 const membersUrl = readJsonBlock<HubHome>('hub-home')?.members_url ?? '';
+const offered = managementOffered();
 
 const personId = computed(() => String(route.params.person ?? ''));
 const { data, status, error, refresh } = useLive('base.person.detail', computed(() => ({ person: personId.value })));
@@ -186,12 +190,13 @@ onBeforeUnmount(() => stopReader?.());
             {{ t('base.person.data.managed') }}
           </p>
           <a
-            v-if="membersUrl"
+            v-if="membersUrl && offered"
             class="person-link"
             data-testid="person-open-saas"
             :href="membersUrl"
             target="_blank"
             rel="noopener"
+            @click="openExternalLink(membersUrl, $event)"
           >{{ t('base.person.data.open') }}</a>
         </section>
 

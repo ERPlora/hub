@@ -2,15 +2,18 @@
 // Settings › Business (BASE-G97, G98, G99; APP-BASE-6): the business as erplora.com registered it — name, country,
 // time zone (with the time it is there now), currency and language — read-only: erplora.com owns them and pushes them
 // (`base.business.get` follows each push live). An owner or an administrator changes them there («Change on
-// erplora.com», a new tab); the country never once the business is ready, the currency never (its country's). A demo
-// has nothing to change. «Fiscal data» opens Invoicing's issuer, or Apps while Invoicing is not on.
+// erplora.com», a new tab; in the installed app the system browser, by `openExternalLink`: gh:hub#439; never in the
+// Google Play copy, a way to erplora.com's panel: `managementOffered`, gh:hub#1897); the country never once the business
+// is ready, the currency never (its country's). A demo has nothing to change. «Fiscal data» opens Invoicing's issuer,
+// or Apps while Invoicing is not on.
 import { InlineFeedback } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
-import { HubIcon, useSession } from '@erplora/ui/shell';
+import { HubIcon, openExternalLink, useSession } from '@erplora/ui/shell';
 import { IonButton, IonItem, IonLabel, IonList, IonSpinner } from '@ionic/vue';
 import { computed, onBeforeUnmount, ref } from 'vue';
 
 import { useBaseI18n } from '../../lib/i18n';
+import { managementOffered } from '../../lib/management';
 import SettingsRow from './SettingsRow.vue';
 
 /** How often the time of the business's zone moves on while the screen is open. */
@@ -50,7 +53,8 @@ const where = computed(() => {
   if (data.value?.demo) return t('base.settingsBusiness.whereDemo');
   return admin.value ? t('base.settingsBusiness.whereAdmin') : t('base.settingsBusiness.whereOthers');
 });
-const changeUrl = computed(() => (admin.value && !data.value?.demo ? (data.value?.settings_url ?? '') : ''));
+const offered = managementOffered();
+const changeUrl = computed(() => (admin.value && offered.value && !data.value?.demo ? (data.value?.settings_url ?? '') : ''));
 
 const invoiceOn = computed(() => session.me.value?.apps.some((app) => app.label === 'invoice' && app.state === 'on'));
 /** Invoicing's issuer for whoever may write it; Apps to install it while it is not on; nothing otherwise. */
@@ -156,6 +160,7 @@ const shown = (text: string | undefined) => text || t('base.settingsBusiness.non
             target="_blank"
             rel="noopener"
             data-testid="business-change"
+            @click="openExternalLink(changeUrl, $event)"
           >
             <HubIcon
               slot="start"

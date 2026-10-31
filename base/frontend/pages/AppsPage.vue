@@ -13,7 +13,8 @@
 // which a toast took away before it could be read (hub#2594). The counter says how many of the plan's apps are on
 // (`max_apps`; what came along does not count); at the limit, the notice with «Upgrade plan» (erplora.com's plans,
 // only on the web). The menu of this screen is read again after each change; the other screens of the business
-// follow the live list (AppsFollower).
+// follow the live list (AppsFollower). Both links to erplora.com go the Hub's one way out, `openExternalLink`
+// (gh:hub#439: the installed app opens nothing on a `_blank` link).
 import {
   DataTable,
   EmptyState,
@@ -24,7 +25,7 @@ import {
   useConfirm,
 } from '@erplora/ui/components';
 import { type ApiError, useCommand, useLive } from '@erplora/ui/sdk';
-import { AppPage, HubIcon, type ShellTab, toastSuccess, useSession, useSurface } from '@erplora/ui/shell';
+import { AppPage, HubIcon, openExternalLink, type ShellTab, toastSuccess, useSession, useSurface } from '@erplora/ui/shell';
 import { IonButton } from '@ionic/vue';
 import { computed, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
@@ -317,6 +318,7 @@ const emptyHeading = computed(() => t(`base.appsPage.empty.${tab.value}`));
             :href="planUrl"
             target="_blank"
             rel="noopener"
+            @click="openExternalLink(planUrl, $event)"
           >{{ t('base.plan.upgrade') }}</a>
         </template>
       </InlineFeedback>
@@ -398,6 +400,7 @@ const emptyHeading = computed(() => t(`base.appsPage.empty.${tab.value}`));
                 :href="storeUrl"
                 target="_blank"
                 rel="noopener"
+                @click="openExternalLink(storeUrl, $event)"
               >{{ t('base.appsPage.buy') }}</a>
               <span
                 v-else
