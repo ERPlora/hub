@@ -328,3 +328,16 @@ msgstr "host"
 msgctxt "hub usage"
 msgid "SaaS account"
 msgstr "cuenta de ERPlora"
+
+#: models.py (a hub's move, S7)
+msgid "moving to"
+msgstr "moviéndose a"
+
+msgid "moved at"
+msgstr "movida el"
+
+msgid "copy after a move"
+msgstr "copia tras mover"
+
+msgid "copies after a move"
+msgstr "copias tras mover"

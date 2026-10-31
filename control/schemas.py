@@ -70,3 +70,19 @@ class ClusterSizesOut(Schema):
     """Each own database of a hub on that server, by name, with its size in bytes; one that is not there is absent."""
 
     databases: dict[str, int]
+
+
+class HubMoveIn(Schema):
+    """Which hub moves, and to which cluster (round 2026-10-30b of PLAN-DB, decision 3; tranche S7)."""
+
+    hub: UUID
+    cluster: UUID
+
+
+class HubMoveOut(Schema):
+    """The hub asked to move: the cluster it is on (none: the settings' own server) and the one it is moving to."""
+
+    id: UUID
+    slug: str
+    cluster: UUID | None
+    moving_to: UUID | None

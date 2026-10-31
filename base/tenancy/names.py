@@ -6,7 +6,9 @@ Every name derives from the control database's (``settings.DATABASES["default"][
 - a hub: ``<control>_<hex>``, the whole ``Hub.id.hex`` (never truncated: the first half of a UUIDv7 is its date);
 - a demo: ``<control>_demo_<hex>`` (prod ``hub_demo_<hex>``, pre ``pre_hub_demo_<hex>``: round 2026-10-30 of
   PLAN-DB, proposal (e); before it a demo was ``demo_<hex>`` in every environment, and no such database was ever made);
-- a template: ``<control>_template`` or ``<control>_template_<vertical>``.
+- a template: ``<control>_template`` or ``<control>_template_<vertical>``;
+- the copy a hub leaves behind on the server it moved from: ``<control>_move_<hex>`` (round 2026-10-30b of PLAN-DB,
+  decision 3; ``base.tenancy.move``), as long as a demo's.
 
 PostgreSQL silently truncates an identifier past 63 bytes, so a longer name is refused, never cut. A name reaches SQL
 only through :func:`identifier` (``psycopg.sql.Identifier``, after :func:`validate`): never an f-string.
@@ -20,6 +22,7 @@ from psycopg import sql
 #: Longest identifier PostgreSQL keeps (``NAMEDATALEN - 1``).
 MAX_IDENTIFIER = 63
 DEMO_INFIX = "demo"
+MOVED_INFIX = "move"
 #: Longest control database name its hubs' and demos' fit after: a demo's ``_demo_<hex>`` is the most a name adds.
 MAX_CONTROL = MAX_IDENTIFIER - len(f"_{DEMO_INFIX}_") - 32
 TEMPLATE_SUFFIX = "template"
@@ -38,12 +41,13 @@ class InvalidDatabaseName(ValueError):
 def _patterns(control: str) -> re.Pattern:
     escaped = re.escape(control)
     return re.compile(
-        rf"{escaped}(?:_{DEMO_INFIX})?_{_HEX}|{escaped}_{TEMPLATE_SUFFIX}(?:_{_VERTICAL})?"
+        rf"{escaped}(?:_{DEMO_INFIX}|_{MOVED_INFIX})?_{_HEX}|{escaped}_{TEMPLATE_SUFFIX}(?:_{_VERTICAL})?"
     )
 
 
 def validate(name: str, *, control: str) -> str:
-    """``name`` if it is a hub's, a demo's or a template's database of ``control``; ``InvalidDatabaseName`` if not."""
+    """``name`` if it is a hub's, a demo's, a template's or a moved copy's database of ``control``;
+    ``InvalidDatabaseName`` if not."""
     if not isinstance(name, str) or not _patterns(control).fullmatch(name):
         raise InvalidDatabaseName(f"{name!r} is no hub's, demo's or template's database of {control!r}.")
     if len(name.encode()) > MAX_IDENTIFIER:
@@ -64,6 +68,16 @@ def validate_hub(name: str, *, control: str) -> str:
     return name
 
 
+def validate_moved(name: str, *, control: str) -> str:
+    """``name`` if it is the copy a hub left behind when it moved (``<control>_move_<hex>``); else
+    ``InvalidDatabaseName``. What the move renames a hub's database to and drops after its days
+    (``base.tenancy.move``)."""
+    validate(name, control=control)
+    if not re.fullmatch(rf"{re.escape(control)}_{MOVED_INFIX}_{_HEX}", name):
+        raise InvalidDatabaseName(f"{name!r} is no copy a hub of {control!r} left behind when it moved.")
+    return name
+
+
 def hub_db_name(control: str, hub_id: uuid.UUID) -> str:
     """The database of the hub ``hub_id`` next to the control database ``control``."""
     return validate(f"{control}_{hub_id.hex}", control=control)
@@ -72,6 +86,11 @@ def hub_db_name(control: str, hub_id: uuid.UUID) -> str:
 def demo_db_name(control: str, hub_id: uuid.UUID) -> str:
     """The database of the demo ``hub_id`` next to the control database ``control`` (``<control>_demo_<hex>``)."""
     return validate(f"{control}_{DEMO_INFIX}_{hub_id.hex}", control=control)
+
+
+def moved_db_name(control: str, hub_id: uuid.UUID) -> str:
+    """The copy the hub ``hub_id`` leaves behind on the server it moves from (``<control>_move_<hex>``)."""
+    return validate(f"{control}_{MOVED_INFIX}_{hub_id.hex}", control=control)
 
 
 def template_db_name(control: str, vertical: str | None = None) -> str:

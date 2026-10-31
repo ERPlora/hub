@@ -12,15 +12,24 @@ on control (the registry's scope) and records its event in control's outbox in t
   (``base.services.place_hub``); the hubs on it stay there.
 - Its writer (``host``, ``port``) never changes under the hubs on it: another writer is another server, and the way
   there is moving them (``base.hub.move``). Its PgBouncer, limit, secret and name may change.
-- A cluster any hub's row still points at (a purged demo's included: the foreign key protects it) is never deleted.
+- A cluster any hub's row still points at (a purged demo's included: the foreign key protects it), a hub is moving to,
+  or that still keeps a hub's moved copy, is never deleted.
+- ``control.hub.move`` asks the worker to move a ready hub's own database to another cluster (``base.tenancy.move``):
+  only to an open one with room (as a new hub is placed, counting the hubs on their way there), and only a database
+  small enough for a copy (:data:`MOVE_MAX_BYTES`, measured on its server: ``control.queries``); a larger one needs
+  logical replication, which the Hub does not do yet. Its host answers 503 «maintenance» until the worker is done.
 
 Each locks the cluster's row first, as the placement does, so a hub placed at the same time is either counted or
 placed after.
 """
 
+import datetime as dt
+from contextlib import contextmanager
 from uuid import UUID
 
 from django.db import IntegrityError
+from django.db.models import Q
+from django.utils import timezone
 from django.utils.translation import gettext, ngettext
 from live.context import OperationContext
 from live.errors import Conflict, InvalidPayload, NotFound
@@ -29,14 +38,17 @@ from live.outbox import record_event
 
 from base.registry import internal_only
 from base.tenancy.credentials import APP, CredentialsUnavailable, credentials_for
-from control import events
-from control.models import Cluster, Hub
-from control.schemas import ClusterDeletedOut, ClusterIdIn, ClusterIn, ClusterOut, ClusterUpdateIn
+from control import events, queries
+from control.models import Cluster, Hub, MovedCopy
+from control.schemas import ClusterDeletedOut, ClusterIdIn, ClusterIn, ClusterOut, ClusterUpdateIn, HubMoveIn, HubMoveOut
 
 #: What a cluster is registered with (``ClusterIn``), in the model's own names.
 CLUSTER_FIELDS = tuple(ClusterIn.model_fields)
 #: Which server it is: never changed under the hubs on it.
 WRITER_FIELDS = ("host", "port")
+#: The largest database a move copies (``pg_dump``/``pg_restore``, its hub closed meanwhile): a few seconds' work. A
+#: larger one needs logical replication, which the Hub does not do yet.
+MOVE_MAX_BYTES = 512 * 1024 * 1024
 
 
 def platform_admin_only(ctx: OperationContext) -> None:
@@ -159,7 +171,8 @@ def cluster_delete(ctx: OperationContext, data: ClusterIdIn) -> dict:
     """Delete a cluster that no hub's row points at; one that holds any is refused with how many."""
     platform_admin_only(ctx)
     cluster = _locked(data.id)
-    held = Hub.objects.filter(cluster=cluster).count()
+    held = Hub.objects.filter(Q(cluster=cluster) | Q(moving_to=cluster)).count()
+    held += MovedCopy.objects.filter(cluster=cluster).count()
     if held:
         raise Conflict(
             ngettext(
@@ -173,3 +186,118 @@ def cluster_delete(ctx: OperationContext, data: ClusterIdIn) -> dict:
     cluster.delete()
     _record(ctx, events.CLUSTER_DELETED, cluster, data.id)
     return {"id": data.id}
+
+
+def _move_refused(message: str, code: str) -> Conflict:
+    return Conflict(message, code=code)
+
+
+def _room_for_one_more(cluster: Cluster) -> bool:
+    """Whether ``cluster`` takes one more hub: its living hubs and the ones on their way there, under its limit."""
+    if cluster.max_hubs == 0:
+        return True
+    taken = living_hubs(cluster).count() + Hub.objects.filter(moving_to=cluster).count()
+    return taken < cluster.max_hubs
+
+
+# Not an assistant tool: the platform's admins, in the Hub admin («Move to cluster…»).
+@operation("control.hub.move", kind="command", permission=None, input=HubMoveIn, output=HubMoveOut, ai=INTERNAL)
+def hub_move(ctx: OperationContext, data: HubMoveIn) -> dict:
+    """Ask the worker to move the ready hub ``data.hub``'s own database to the cluster ``data.cluster``."""
+    platform_admin_only(ctx)
+    hub = Hub.objects.select_for_update(of=("self",)).select_related("cluster").filter(pk=data.hub).first()
+    if hub is None:
+        raise NotFound(gettext("No hub has this id."))
+    target = _locked(data.cluster)
+    if hub.status != Hub.Status.READY or not hub.db_name:
+        raise _move_refused(
+            gettext("Only a ready hub with a database of its own moves."), "control.hub_not_movable"
+        )
+    if hub.moving_to_id is not None:
+        raise _move_refused(gettext("This hub is already moving."), "control.hub_moving")
+    if hub.cluster_id == target.pk:
+        raise _move_refused(gettext("This hub is on that cluster already."), "control.hub_already_there")
+    if not target.is_open:
+        raise _move_refused(gettext("That cluster is closed to new hubs."), "control.cluster_closed")
+    if not _room_for_one_more(target):
+        raise _move_refused(gettext("That cluster has no room for another hub."), "control.cluster_full")
+    size = queries._measure(hub.cluster, [hub.db_name]).get(hub.db_name)
+    if size is None:
+        raise _move_refused(
+            gettext("The database of this hub is not on its server: there is nothing to move."),
+            "control.hub_database_missing",
+        )
+    if size > MOVE_MAX_BYTES:
+        raise _move_refused(
+            gettext("This hub's database is too large to move with a copy: it needs logical replication."),
+            "control.hub_too_large",
+        )
+    origin = hub.cluster_id
+    hub.moving_to = target
+    hub.last_error = ""
+    hub.save(update_fields=["moving_to", "last_error", "updated_at"])
+    record_event(
+        ctx,
+        events.HUB_MOVE_REQUESTED,
+        {"id": str(hub.pk), "slug": hub.slug, "from": str(origin) if origin else "", "to": str(target.pk)},
+    )
+    return {"id": hub.pk, "slug": hub.slug, "cluster": origin, "moving_to": target.pk}
+
+
+# ── The worker's side of a move (``base.tenancy.move``): no operations, the platform's own steps on control ─────────
+
+
+@contextmanager
+def _control_transaction():
+    """A transaction of control's own, whatever context the worker runs in."""
+    from base.tenancy.context import use_control
+
+    with use_control(), atomic():
+        yield
+
+
+def hubs_moving() -> list[UUID]:
+    """The hubs asked to move, the longest asked first."""
+    return list(Hub.objects.filter(moving_to__isnull=False).order_by("updated_at", "pk").values_list("pk", flat=True))
+
+
+def moving_row(hub_id: UUID) -> Hub | None:
+    """``hub_id``'s row with the cluster it is on and the one it is moving to, as it is now."""
+    return Hub.objects.select_related("cluster", "moving_to").filter(pk=hub_id).first()
+
+
+def move_finished(hub_id: UUID, origin: UUID | None, copy_name: str, at: dt.datetime) -> None:
+    """Switch ``hub_id`` to the cluster it moved to and keep the copy it left on ``origin`` (none: the settings' own
+    server), in one transaction: before it the hub is still where it was, after it where it moved."""
+    with _control_transaction():
+        hub = Hub.objects.select_for_update().get(pk=hub_id)
+        hub.cluster_id = hub.moving_to_id
+        hub.moving_to = None
+        hub.last_error = ""
+        hub.save(update_fields=["cluster", "moving_to", "last_error", "updated_at"])
+        MovedCopy.objects.update_or_create(
+            cluster_id=origin, db_name=copy_name, defaults={"hub_id": hub_id, "moved_at": at}
+        )
+
+
+def move_failed(hub_id: UUID, error: str) -> None:
+    """The move of ``hub_id`` failed and was undone: ready where it was, with why."""
+    with _control_transaction():
+        Hub.objects.filter(pk=hub_id).update(moving_to=None, last_error=error[:2000], updated_at=timezone.now())
+
+
+def move_stuck(hub_id: UUID, error: str) -> None:
+    """The move of ``hub_id`` failed and could not be undone yet: still moving (its host closed), tried again."""
+    with _control_transaction():
+        Hub.objects.filter(pk=hub_id).update(last_error=error[:2000], updated_at=timezone.now())
+
+
+def copies_due(before: dt.datetime) -> list[MovedCopy]:
+    """The moved copies left behind by ``before``, the oldest first, with their cluster."""
+    return list(MovedCopy.objects.select_related("cluster").filter(moved_at__lte=before).order_by("moved_at", "pk"))
+
+
+def forget_copy(cluster_id: UUID | None, db_name: str) -> None:
+    """The moved copy ``db_name`` on ``cluster_id`` (none: the settings' own server) is gone: its row goes too."""
+    with _control_transaction():
+        MovedCopy.objects.filter(cluster_id=cluster_id, db_name=db_name).delete()

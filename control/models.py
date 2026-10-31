@@ -165,6 +165,17 @@ class Hub(models.Model):
     # keeps what was asked and how it went (``base.services``, «The reset of a business»), shown on Settings › Data.
     reset_requested_at = models.DateTimeField(_("reset asked"), null=True, blank=True)
     reset_sections = models.JSONField(_("reset"), null=True, blank=True)
+    # Its move to another cluster (round 2026-10-30b of PLAN-DB, decision 3; tranche S7): asked in the Hub admin
+    # (``control.hub.move``) and done by the worker (``base.tenancy.move``). Set while it is to do: its host answers 503
+    # «maintenance» meanwhile, and the cluster cannot be deleted.
+    moving_to = models.ForeignKey(
+        Cluster,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="incoming",
+        verbose_name=_("moving to"),
+    )
 
     class Meta:
         db_table = "base_hub"
@@ -344,3 +355,35 @@ class UsageRun(UUIDModel):
 
     def __str__(self) -> str:
         return f"{self.day}"
+
+
+class MovedCopy(UUIDModel):
+    """The database a hub left behind on the server it moved from (round 2026-10-30b of PLAN-DB, decision 3; tranche
+    S7): its ``<control>_move_<hex>`` (``base.tenancy.names``), closed to the app, kept a few days in case the move must
+    be undone by hand, then dropped by the worker with its row (``base.tenancy.move``). ``cluster`` empty: the settings'
+    own server. One per database name and server: a newer move off the same server replaces the older copy."""
+
+    hub = models.ForeignKey(Hub, on_delete=models.CASCADE, related_name="moved_copies", verbose_name=_("hub"))
+    cluster = models.ForeignKey(
+        Cluster,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="moved_copies",
+        verbose_name=_("cluster"),
+    )
+    db_name = models.CharField(_("database"), max_length=63)
+    moved_at = models.DateTimeField(_("moved at"))
+
+    class Meta:
+        verbose_name = _("copy after a move")
+        verbose_name_plural = _("copies after a move")
+        ordering = ["moved_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["cluster", "db_name"], name="control_movedcopy_one_per_server", nulls_distinct=False
+            )
+        ]
+
+    def __str__(self) -> str:
+        return self.db_name

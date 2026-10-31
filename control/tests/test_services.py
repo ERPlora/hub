@@ -339,3 +339,188 @@ def test_every_write_is_an_internal_command_of_control():
     for name in ("control.cluster.create", "control.cluster.update", "control.cluster.close", "control.cluster.delete"):
         op = get_operation(name)
         assert (op.kind, op.app_label, op.ai_spec(), op.fn.__module__) == ("command", "control", INTERNAL, "control.services")
+
+
+# ── A hub's move to another cluster (round 2026-10-30b of PLAN-DB, decision 3; tranche S7) ──────────────────────────
+
+
+class TestMove:
+    """``control.hub.move`` asks the worker to move a ready hub's own database to another cluster (``base.tenancy.move``):
+    its host answers 503 «maintenance» from now until the worker is done. Only an open cluster with room takes it, the
+    way a new hub is placed; a database too large for a copy (``MOVE_MAX_BYTES``) waits for logical replication."""
+
+    @pytest.fixture
+    def small(self, monkeypatch):
+        """The hub's database measures 5 MB on its server (``control.queries._measure``)."""
+        from control import queries
+
+        measured: list[tuple[object, list[str]]] = []
+
+        def measure(cluster, names):
+            measured.append((cluster, names))
+            return {name: 5 * 1024 * 1024 for name in names}
+
+        monkeypatch.setattr(queries, "_measure", measure)
+        return measured
+
+    @staticmethod
+    def a_hub(**fields) -> Hub:
+        row = {"slug": "acme", "status": Hub.Status.READY, "db_name": f"hub_{uuid.uuid7().hex}"}
+        return Hub.objects.create(**(row | fields))
+
+    def test_asks_the_move_and_says_so(self, admin_ctx, small):
+        from control.schemas import HubMoveIn
+
+        old, new = a_cluster(), a_cluster(name="cluster-2", host="writer-2.example")
+        hub = self.a_hub(cluster=old, last_error="schema_failed: an old one")
+
+        out = services.hub_move(admin_ctx, HubMoveIn(hub=hub.pk, cluster=new.pk))
+
+        hub.refresh_from_db()
+        assert (hub.moving_to_id, hub.cluster_id, hub.last_error) == (new.pk, old.pk, "")
+        assert (out.id, out.cluster, out.moving_to) == (hub.pk, old.pk, new.pk)
+        assert small == [(old, [hub.db_name])]
+        assert events("control.hub.move_requested") == [
+            {"id": str(hub.pk), "slug": "acme", "from": str(old.pk), "to": str(new.pk)}
+        ]
+
+    def test_a_hub_on_the_settings_own_server_moves_too(self, admin_ctx, small):
+        from control.schemas import HubMoveIn
+
+        new = a_cluster()
+        hub = self.a_hub()
+
+        out = services.hub_move(admin_ctx, HubMoveIn(hub=hub.pk, cluster=new.pk))
+
+        assert (out.cluster, out.moving_to) == (None, new.pk)
+        assert small == [(None, [hub.db_name])]
+        assert events("control.hub.move_requested")[0]["from"] == ""
+
+    @pytest.mark.parametrize(
+        "fields",
+        [{"status": Hub.Status.REQUESTED}, {"status": Hub.Status.CANCELLED}, {"db_name": ""}],
+    )
+    def test_only_a_ready_hub_with_its_own_database_moves(self, admin_ctx, small, fields):
+        from control.schemas import HubMoveIn
+
+        new = a_cluster()
+        hub = self.a_hub(**fields)
+
+        with pytest.raises(Conflict) as refused:
+            services.hub_move(admin_ctx, HubMoveIn(hub=hub.pk, cluster=new.pk))
+
+        assert refused.value.code == "control.hub_not_movable"
+        hub.refresh_from_db()
+        assert hub.moving_to_id is None
+
+    def test_a_hub_already_moving_or_already_there_is_refused(self, admin_ctx, small):
+        from control.schemas import HubMoveIn
+
+        old, new = a_cluster(), a_cluster(name="cluster-2", host="writer-2.example")
+        moving = self.a_hub(cluster=old, moving_to=new)
+        there = self.a_hub(slug="bistro", cluster=new)
+
+        for hub, code in ((moving, "control.hub_moving"), (there, "control.hub_already_there")):
+            with pytest.raises(Conflict) as refused:
+                services.hub_move(admin_ctx, HubMoveIn(hub=hub.pk, cluster=new.pk))
+            assert refused.value.code == code
+
+    def test_only_an_open_cluster_with_room_takes_it_counting_the_hubs_on_their_way(self, admin_ctx, small):
+        from control.schemas import HubMoveIn
+
+        closed = a_cluster(is_open=False)
+        full = a_cluster(name="full", host="writer-full.example", max_hubs=2)
+        self.a_hub(slug="living", cluster=full)
+        self.a_hub(slug="arriving", moving_to=full)
+        # A purged demo has no database there any more: not counted.
+        self.a_hub(slug="demo-0000beef", is_demo=True, status=Hub.Status.PURGED, cluster=full)
+        hub = self.a_hub()
+
+        for cluster, code in ((closed, "control.cluster_closed"), (full, "control.cluster_full")):
+            with pytest.raises(Conflict) as refused:
+                services.hub_move(admin_ctx, HubMoveIn(hub=hub.pk, cluster=cluster.pk))
+            assert refused.value.code == code
+        full.max_hubs = 3
+        full.save(update_fields=["max_hubs"])
+        assert services.hub_move(admin_ctx, HubMoveIn(hub=hub.pk, cluster=full.pk)).moving_to == full.pk
+
+    def test_a_database_too_large_for_a_copy_waits_for_logical_replication(self, admin_ctx, monkeypatch):
+        from control import queries
+        from control.schemas import HubMoveIn
+
+        new = a_cluster()
+        hub = self.a_hub()
+        monkeypatch.setattr(queries, "_measure", lambda cluster, names: {names[0]: services.MOVE_MAX_BYTES + 1})
+
+        with pytest.raises(Conflict) as refused:
+            services.hub_move(admin_ctx, HubMoveIn(hub=hub.pk, cluster=new.pk))
+
+        assert refused.value.code == "control.hub_too_large"
+        hub.refresh_from_db()
+        assert hub.moving_to_id is None
+
+    def test_a_database_that_is_not_on_its_server_or_cannot_be_measured_does_not_move(self, admin_ctx, monkeypatch):
+        from live.errors import OperationError
+
+        from control import queries
+        from control.schemas import HubMoveIn
+
+        new = a_cluster()
+        hub = self.a_hub()
+        monkeypatch.setattr(queries, "_measure", lambda cluster, names: {})
+        with pytest.raises(Conflict) as refused:
+            services.hub_move(admin_ctx, HubMoveIn(hub=hub.pk, cluster=new.pk))
+        assert refused.value.code == "control.hub_database_missing"
+
+        def unreachable(cluster, names):
+            raise OperationError("The sizes … could not be read: refused", code="control.cluster_unreachable", status=503)
+
+        monkeypatch.setattr(queries, "_measure", unreachable)
+        with pytest.raises(OperationError) as failed:
+            services.hub_move(admin_ctx, HubMoveIn(hub=hub.pk, cluster=new.pk))
+        assert failed.value.code == "control.cluster_unreachable"
+        hub.refresh_from_db()
+        assert hub.moving_to_id is None
+
+    def test_measures_on_the_real_server(self, admin_ctx, hub_databases):
+        from control.schemas import HubMoveIn
+
+        new = a_cluster()
+        hub = self.a_hub(db_name=hub_databases.a)
+
+        assert services.hub_move(admin_ctx, HubMoveIn(hub=hub.pk, cluster=new.pk)).moving_to == new.pk
+
+    def test_support_may_not_and_unknown_ones_are_not_found(self, admin_ctx, small):
+        from control.schemas import HubMoveIn
+
+        new = a_cluster()
+        hub = self.a_hub()
+        with pytest.raises(PermissionDenied):
+            services.hub_move(as_actor(person("support", is_staff=True)), HubMoveIn(hub=hub.pk, cluster=new.pk))
+        for move in (HubMoveIn(hub=uuid.uuid7(), cluster=new.pk), HubMoveIn(hub=hub.pk, cluster=uuid.uuid7())):
+            with pytest.raises(NotFound):
+                services.hub_move(admin_ctx, move)
+        hub.refresh_from_db()
+        assert hub.moving_to_id is None
+
+
+def test_a_cluster_a_hub_is_moving_to_or_that_keeps_a_moved_copy_is_never_deleted(admin_ctx):
+    from control.models import MovedCopy
+
+    target, old = a_cluster(), a_cluster(name="old", host="writer-old.example")
+    hub = Hub.objects.create(slug="acme", status=Hub.Status.READY, db_name=f"hub_{uuid.uuid7().hex}", moving_to=target)
+    MovedCopy.objects.create(hub=hub, cluster=old, db_name=f"hub_move_{hub.id.hex}", moved_at="2026-10-31T10:00Z")
+
+    for cluster in (target, old):
+        with pytest.raises(Conflict) as refused:
+            services.cluster_delete(admin_ctx, ClusterIdIn(id=cluster.pk))
+        assert refused.value.code == "control.cluster_holds_hubs"
+    assert Cluster.objects.count() == 2
+
+
+def test_the_move_is_an_internal_command_of_control():
+    from live.operations import INTERNAL
+    from live.operations import get as get_operation
+
+    op = get_operation("control.hub.move")
+    assert (op.kind, op.app_label, op.ai_spec(), op.fn.__module__) == ("command", "control", INTERNAL, "control.services")
