@@ -12,7 +12,8 @@ business leaves). It keeps a ``control.HubDump`` row for it (``base.services``: 
   that one database: its name and role in ``--dbname``, its password in the subprocess's environment (``PGPASSWORD``)
   and never in its command, nor in a log or an error;
 - within :data:`DUMP_TIMEOUT_SECONDS`: a dump that runs longer is stopped, and every :data:`POLL_SECONDS` meanwhile its
-  ``heartbeat`` runs (the worker's lease of the hub renewed: one that was lost stops the dump at once);
+  ``heartbeat`` runs (the worker's lease of the hub renewed: one that was lost stops the dump at once), also while the
+  copy goes up (boto3's ``Callback``, in this same thread) and once more right after it;
 - to a temporary file first, uploaded only when ``pg_dump`` ended well, so a failed dump leaves nothing in the bucket.
 
 A hub without its own database is never dumped (:class:`HubWithoutDatabase`: phase 1's shared database holds every
@@ -40,6 +41,7 @@ from pathlib import Path
 import boto3
 import decouple
 from boto3.exceptions import S3UploadFailedError
+from boto3.s3.transfer import TransferConfig
 from botocore.config import Config
 from botocore.exceptions import BotoCoreError, ClientError
 from django.utils import timezone
@@ -49,6 +51,9 @@ from base.tenancy import connections as tenancy_connections
 
 logger = logging.getLogger(__name__)
 
+#: How long a copy is kept: the bucket's lifecycle rule deletes it then (aws ``s3_dumps.tf``, PLAN-DB proposal (m)).
+#: The Hub never lists nor links one older (``base.queries``), and the nightly pass forgets its row (``base.usage``).
+RETENTION = dt.timedelta(days=90)
 #: How long a dump may run before it is stopped.
 DUMP_TIMEOUT_SECONDS = 15 * 60
 #: How often a running dump's heartbeat runs (the worker's lease is 60 s).
@@ -157,12 +162,39 @@ def dump_hub(
         _run_pg_dump(hub, path, timeout=timeout, heartbeat=heartbeat, cancelled=cancelled)
         size = path.stat().st_size
         try:
-            client().upload_file(str(path), target, key, ExtraArgs={"ContentType": "application/octet-stream"})
+            client().upload_file(
+                str(path),
+                target,
+                key,
+                ExtraArgs={"ContentType": "application/octet-stream"},
+                Callback=_Progress(heartbeat, cancelled),
+                # In this thread: the heartbeat renews the lease on its own connection, never on boto3's threads.
+                Config=TransferConfig(use_threads=False),
+            )
         except (S3UploadFailedError, BotoCoreError, ClientError) as error:
             raise DumpFailed(f"The copy of {hub.slug} could not be uploaded: {error}") from error
+        if heartbeat is not None:
+            heartbeat()  # the lease, renewed right after the upload: what follows notes it under that lease
     made = services.dump_recorded(hub.id, kind=kind, key=key, size=size, created_at=made_at, requested_by=requested_by)
     logger.info("base.tenancy.dumps.made hub=%s kind=%s key=%s bytes=%d", hub.slug, kind, key, size)
     return made
+
+
+class _Progress:
+    """boto3's ``Callback`` of an upload (called with the bytes of each part sent): the heartbeat every
+    :data:`POLL_SECONDS` meanwhile, and a stop request heard (:class:`DumpStopped`)."""
+
+    def __init__(self, heartbeat: Callable[[], object] | None, cancelled: Callable[[], bool] | None) -> None:
+        self.heartbeat = heartbeat
+        self.cancelled = cancelled
+        self.last_beat = time.monotonic()
+
+    def __call__(self, sent: int) -> None:
+        if self.cancelled is not None and self.cancelled():
+            raise DumpStopped("The upload of a copy was stopped: the worker is stopping.")
+        if self.heartbeat is not None and time.monotonic() - self.last_beat >= POLL_SECONDS:
+            self.heartbeat()
+            self.last_beat = time.monotonic()
 
 
 def _run_pg_dump(

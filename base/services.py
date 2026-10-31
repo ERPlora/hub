@@ -1042,7 +1042,9 @@ def hub_restore(ctx: OperationContext, data: HubRestoreIn) -> dict:
         unfinished = hub.db_name and hub.ready_at is None
         hub.status = Hub.Status.REQUESTED if unfinished else Hub.Status.READY
         hub.cancelled_at = None
-        hub.save(update_fields=["status", "cancelled_at", "updated_at"])
+        # A copy of its leaving that failed is no longer owed: a second leaving starts from the first wait.
+        hub.attempts, hub.last_error, hub.next_attempt_at = 0, "", None
+        hub.save(update_fields=["status", "cancelled_at", "attempts", "last_error", "next_attempt_at", "updated_at"])
         if hub.status == Hub.Status.REQUESTED:
             HubDue.mark_due(hub)
         record_event(ctx, events.HUB_RESTORED, {"id": str(hub.id)})
@@ -1965,6 +1967,13 @@ def usage_recorded(
         slug = Hub.objects.filter(pk=hub_id).values_list("slug", flat=True).first()
     if slug:
         notify(Scope("host", slug), [events.HUB_USAGE_MEASURED])
+
+
+def expired_dumps_forgotten(*, before: dt.datetime) -> int:
+    """Forget the copies made before ``before``: the bucket's lifecycle rule deleted them (90 days)."""
+    with _control_transaction():
+        forgotten, _ = HubDump.objects.filter(created_at__lt=before).delete()
+    return forgotten
 
 
 def visits_forgotten(*, before: dt.date) -> int:

@@ -229,3 +229,33 @@ def test_a_copy_is_stopped_when_the_worker_stops_and_nothing_is_kept(hub_a, dump
     assert not issubclass(dumps.DumpStopped, dumps.DumpError)  # never a failed copy: the reset is not marked failed
     assert objects(moto_s3, dumps_bucket) == {}
     assert not HubDump.objects.exists()
+
+
+def test_a_stopped_copy_kills_pg_dump_at_once_even_while_it_waits_on_a_lock(hub_a, dumps_bucket, moto_s3):
+    """pg_dump waiting on a table someone else locked (review of round 3): the stop is heard and pg_dump killed at
+    once; without the kill the call would wait for the lock (released here after 8 s)."""
+    import threading
+    import time
+
+    import psycopg
+
+    from base.tenancy import connections as tenancy_connections
+
+    holder = psycopg.connect(**tenancy_connections.migrator_conninfo(hub_a.db_name))
+    # A table this test's own transaction never touched (it holds base_hub_identity's), within 5 s or a clean failure.
+    holder.execute("SET lock_timeout = '5s'")
+    holder.execute("LOCK TABLE django_migrations IN ACCESS EXCLUSIVE MODE")
+    released = threading.Timer(8, holder.rollback)
+    released.start()
+    asked = time.monotonic()
+    try:
+        with pytest.raises(dumps.DumpStopped):
+            dumps.dump_hub(hub_a, kind=HubDump.Kind.RESET, now=AT, cancelled=lambda: time.monotonic() - asked > 1.5)
+        took = time.monotonic() - asked
+    finally:
+        released.cancel()
+        holder.rollback()
+        holder.close()
+
+    assert took < 5, f"pg_dump was waited for {took:.1f} s instead of being killed"
+    assert objects(moto_s3, dumps_bucket) == {}

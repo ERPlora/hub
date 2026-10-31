@@ -13,7 +13,8 @@ for every hub with its own database it serves (ready, or a business that left an
 
 A hub that still shares control's database is not measured (decision 3: it never gets control's size) and is logged
 once a night as ``base.usage_shared_database``. Each hub's figures replace that day's (one row per hub and day,
-``control.HubUsageDaily``) and its live queries hear it (``base.hub.usage_measured``). The night itself is a
+``control.HubUsageDaily``) and its live queries hear it; the night also forgets the rows of the copies of the hubs' data
+past their 90 days (``base.tenancy.dumps.RETENTION``), which the bucket no longer keeps (``base.hub.usage_measured``). The night itself is a
 ``control.UsageRun``: the first worker that claims it measures it, a run left unfinished for :data:`RUN_TAKEOVER` is taken
 over, and a finished one is never measured again. ``GET /internal/usage`` (``base.internal``, ``base.usage.list``)
 serves a finished night by pages of :data:`PAGE_SIZE`; before that, the day is not ready.
@@ -30,7 +31,7 @@ from django.core.files.storage import storages
 from django.utils import timezone
 
 from base import files, services
-from base.tenancy import names, ops
+from base.tenancy import dumps, names, ops
 from base.tenancy.connections import control_name
 
 logger = logging.getLogger(__name__)
@@ -82,6 +83,8 @@ def measure(day: dt.date, *, now: dt.datetime | None = None) -> int | None:
         )
         done += 1
     services.visits_forgotten(before=day - dt.timedelta(days=WINDOW_DAYS))
+    # The copies of the hubs' data the bucket's lifecycle rule deleted (90 days): their rows go too.
+    services.expired_dumps_forgotten(before=now - dumps.RETENTION)
     services.usage_run_finished(day, done, now)
     logger.info("base.usage.measured day=%s hubs=%d", day, done)
     return done

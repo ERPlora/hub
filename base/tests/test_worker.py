@@ -646,9 +646,9 @@ def test_relays_the_shared_outbox_then_the_hubs_own_then_makes_the_hubs_due_on_e
 
     assert due.passes == [ten(0), ten(1), ten(2)]
     assert due.contexts == [context.CONTROL] * 3
-    # The apps turned on whose tables a hub lacks (S3) right after its own pass, before the hubs due, whose pass ends
-    # the ring of a ready hub; the data work (a reset, a business that left: test_worker_data.py) before the hubs due,
-    # so the provisioning's pass never takes a reset's row first; the nightly measurement's check after it.
+    # The apps turned on whose tables a hub lacks (S3) right after its own pass, before the hubs due. The slow passes (the data work, the nightly measurement) are started where the loop is in this order, run inline
+    # here (Inline); in the worker they run in threads of their own, so nothing orders them against the hubs due: a
+    # reset's row the provisioning's pass takes first is given back still due (release_hub, test_worker_data.py).
     assert order == ["tasks", "relay", "hubs", "activations", "data", "usage", "due"] * 3
 
 

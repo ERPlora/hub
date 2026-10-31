@@ -133,6 +133,21 @@ def test_the_visits_older_than_the_window_are_forgotten(hub_a):
 
 
 @pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+def test_the_night_forgets_the_copies_the_bucket_no_longer_keeps(hub_a):
+    from control.models import HubDump
+
+    def made(days: int) -> HubDump:
+        at = NIGHT - dt.timedelta(days=days)
+        return HubDump.objects.create(hub=hub_a, kind="reset", key=f"{hub_a.id.hex}/{at:%Y%m%dT%H%M%SZ}-reset.dump", bytes=1, created_at=at)
+
+    kept, _gone = made(89), made(91)
+
+    usage.measure(DAY, now=NIGHT)
+
+    assert list(HubDump.objects.values_list("pk", flat=True)) == [kept.pk]
+
+
+@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
 def test_each_business_measured_hears_it_live(hub_a, monkeypatch):
     told = []
     monkeypatch.setattr(services, "notify", lambda scope, names: told.append((scope.channel, list(names))))
@@ -162,7 +177,7 @@ def test_the_day_to_measure_is_the_last_utc_day_that_ended_a_quarter_of_an_hour_
 def test_the_worker_measures_the_day_that_ended_once(hub_a, monkeypatch):
     monkeypatch.setattr(worker, "_measured", None)
 
-    worker._usage(NIGHT - dt.timedelta(minutes=1))  # 00:14: the 29th, which nobody measured in this test
+    worker._usage(NIGHT - dt.timedelta(minutes=1))  # 00:14: the day before DAY, which nobody measured in this test
     worker._usage(NIGHT)
     worker._usage(NIGHT + dt.timedelta(minutes=1))
 

@@ -71,7 +71,7 @@ from functools import cache
 
 from functools import partial
 
-from django.db import close_old_connections, connections
+from django.db import close_old_connections
 from django.utils import timezone
 
 from live.context import OperationContext, Scope
@@ -80,7 +80,7 @@ from live.operations import get as get_operation
 from base import catalog, outbound, queries, relay, scheduler, services, usage
 from base.services import reap_demos
 from base.tenancy import dumps, migrator, provision
-from base.tenancy.connections import close_hub_aliases
+from base.tenancy.connections import close_hub_aliases, close_this_threads_connections
 from base.schemas import AppActivationSettleIn, HubResetApplyIn
 from base.tenancy.context import use_control, use_hub, use_shared_database
 from control.models import Hub, HubDump
@@ -232,7 +232,7 @@ class Background:
         except Exception:
             logger.exception("worker: the %s pass failed; the next tick starts it again.", self.name)
         finally:
-            connections.close_all()  # this thread's own connections
+            close_this_threads_connections()
 
     def join(self, timeout: float) -> bool:
         """Wait up to ``timeout`` seconds for the piece running; whether none runs after."""

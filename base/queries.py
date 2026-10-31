@@ -671,6 +671,14 @@ def _reset_state(hub: Hub) -> dict | None:
     }
 
 
+def _kept_dumps(hub: Hub):
+    """The copies of ``hub`` still in the bucket, newest first: none past its 90 days (``dumps.RETENTION``), which the
+    bucket's lifecycle rule deleted or is about to."""
+    from base.tenancy import dumps
+
+    return HubDump.objects.filter(hub=hub, created_at__gt=timezone.now() - dumps.RETENTION).order_by("-created_at", "-id")
+
+
 def gets_copies(hub: Hub) -> bool:
     """Whether ``hub`` has, or will have, copies of its data: its own database, made (or being made); never a business
     that shares control's, nor one that left before its database was finished."""
@@ -704,7 +712,7 @@ def hub_dumps(ctx: OperationContext, data: HubDumpsIn) -> dict:
             "reset": _reset_state(hub),
             "dumps": [
                 {"id": dump.pk, "kind": dump.kind, "created_at": dump.created_at, "bytes": dump.bytes}
-                for dump in HubDump.objects.filter(hub=hub).order_by("-created_at", "-id")
+                for dump in _kept_dumps(hub)
             ],
         }
 
@@ -725,7 +733,7 @@ def hub_dump_link(ctx: OperationContext, data: HubDumpLinkIn) -> dict:
 
     with translation.override(ctx.language):
         hub = Hub.objects.filter(slug=ctx.scope.key).first()
-        dump = HubDump.objects.filter(pk=data.id, hub=hub).first() if hub is not None and hub.db_name else None
+        dump = _kept_dumps(hub).filter(pk=data.id).first() if hub is not None and hub.db_name else None
         if dump is None:
             raise NotFound(gettext("This copy is no longer kept."))
         try:
@@ -751,7 +759,10 @@ def hub_dump_list(ctx: OperationContext, data: HubGetIn) -> dict:
         raise NotFound(gettext("No hub has this id."))
     if not gets_copies(hub):
         return {"available": False, "dumps": []}
-    rows = list(HubDump.objects.filter(hub=hub).order_by("-created_at", "-id"))
+    if not dumps.configured():
+        # No bucket: this Hub can make no copy, so «none yet» would promise one (PLAN-SAAS §24: a failure, not «none»).
+        raise _dumps_unavailable()
+    rows = list(_kept_dumps(hub))
     try:
         listed = [
             {
