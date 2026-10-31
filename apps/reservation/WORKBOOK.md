@@ -132,7 +132,7 @@ Menú **Reservas → Lista de espera**. Tabla, en el orden en que se apuntaron (
 Fecha, Hora pref., Cliente, Teléfono (como en Clientes), Pax, Contactado, Estado (En espera, Convertida);
 buscador y filtros (fecha, contactado, convertida). Acción principal **«Añadir cliente»** (Cliente,
 Nombre, Teléfono, Fecha, Hora, Pax, Notas → «Añadir a la lista de espera»); por fila «Contactado»,
-«Convertir» y «Quitar». Vacía: «La lista de espera está vacía.». Cargando: «Cargando…». Error: el mensaje
+«Convertir» y «Quitar». Vacía: «Lista de espera vacía.». Cargando: «Cargando…». Error: el mensaje
 de la tabla con «Reintentar».
 
 ### Disponibilidad
@@ -142,8 +142,8 @@ Menú **Reservas → Disponibilidad**. Tres secciones apiladas:
   fuera del horario del negocio, marcada «Fuera de horario». Encima, el horario del negocio de ese día
   y, si el día está bloqueado, su motivo. Se refresca sola cuando entra, cambia o se cancela una
   reserva. Vacía: «Sin servicio ese día (sin franjas).».
-- **Franjas horarias**: Día, Desde, Hasta, Máx. reservas, Máx. comensales; «Añadir franja» (Día,
-  Desde, Hasta, Máx. reservas, Máx. comensales → «Crear franja») y «Quitar» por fila. Vacía: «Sin
+- **Franjas horarias**: Día, Desde, Hasta, Máx (de reservas), Máx comensales; «Añadir franja» (Día,
+  Desde, Hasta, Máx, Máx comensales (opcional) → «Crear franja») y «Quitar» por fila. Vacía: «Sin
   franjas horarias.».
 - **Fechas bloqueadas**: Fecha, Motivo, Horas (Todo el día, o desde–hasta); «Añadir fecha bloqueada»
   (Fecha, Motivo, Todo el día, Desde, Hasta → «Bloquear fecha») y «Quitar». Vacía: «Sin fechas
@@ -161,7 +161,7 @@ pendiente. «Guardar».
 | Pantalla | Cargando | Vacía | Error | Sin permiso | App apagada |
 |---|---|---|---|---|---|
 | Reservas | «Cargando…», cifras en gris | «No hay reservas este día» + «Nueva reserva» | mensaje + «Reintentar» | aviso en lugar de la tabla | aviso en lugar de la tabla |
-| Lista de espera | «Cargando…» | «La lista de espera está vacía.» | mensaje + «Reintentar» | aviso | aviso |
+| Lista de espera | «Cargando…» | «Lista de espera vacía.» | mensaje + «Reintentar» | aviso | aviso |
 | Disponibilidad | «Cargando…» por sección | un texto por sección | mensaje + «Reintentar» por sección | aviso | aviso |
 | Ajustes | «Cargando…» | — | mensaje + «Reintentar» | aviso | aviso |
 
@@ -421,7 +421,7 @@ Actor: sistema
 Pantalla: ninguna
 Pasos:
 1. Cada cuarto de hora, las reservas que siguen Pendientes pasados los minutos de los ajustes (15) desde
-   su hora se cancelan con el motivo «Sin confirmar» y dejan su hueco libre.
+   su hora se cancelan con el motivo «Liberada: nunca se confirmó» y dejan su hueco libre.
 2. Las confirmadas, sentadas y las de otros días no se tocan.
 Entra: la hora.
 Sale: las reservas liberadas (avisa: `reservation.reservation.unconfirmed_released`, solo si liberó
@@ -471,7 +471,8 @@ Pasos:
    entrada queda Convertida.
 2. La conversión comprueba que la hora no haya pasado, el día bloqueado, el horario del negocio y la
    franja con sitio: es el personal quien la hace, a menudo para ahora mismo (sin antelación, días
-   máximos ni límites de comensales). Con la franja llena, se pregunta «¿Convertir igualmente?».
+   máximos ni límites de comensales). Con la franja llena, avisa «¿Reservar igualmente?» y ofrece
+   «Convertir igualmente».
 Entra: la entrada.
 Sale: la reserva (origen «Lista de espera») y la entrada convertida (avisa:
 `reservation.reservation.created`, `reservation.waitlist.converted`).
