@@ -88,7 +88,7 @@ Plan `docs/plans/2026-10-22-fase-2-tenencia.md` de erplora-next; reglas en PLAN-
   el `Cluster` abierto con menos hubs bajo su `max_hubs`, o en el servidor de los settings si no hay ninguna fila; sin
   sitio, `no_cluster_available`; y clona `<control>_template[_<vertical>]` de ese cluster con `CREATE DATABASE …
   TEMPLATE`, privada: nada a `PUBLIC`, `CONNECT, TEMPORARY` a `hub_app` y `hub_admin`), `migrating` (lleva a la hoja
-  las apps que la plantilla ya tiene, más `base` y, hasta S3, todas las portables, que las plantillas ya traen: el
+  las apps que la plantilla ya tiene, más `base` y todas las portables, que las plantillas traen (también en S3): el
   alta es el clon y no migra nada; cada paso deja en el log `base.tenancy.provision.step` con sus segundos), y anota `schema_apps = {app: su
   última migración}`), `seeding` (la foto del SaaS guardada en la fila: sus personas y los bloques de las apps
   encendidas; si llega otra mientras, se aplica también antes de `ready`) y `ready` (el SaaS lo oye tras el COMMIT).
@@ -137,7 +137,9 @@ Plan `docs/plans/2026-10-22-fase-2-tenencia.md` de erplora-next; reglas en PLAN-
   `node tests/e2e/database.ts` crea la `<BD>_template` de cada BD de e2e (y `--drop` borra sus plantillas); para la
   `hub` de desarrollo, `createdb hub_template` en el Postgres de compose (o `bootstrap_databases`).
 - **`manage.py migrate_hubs`** (la tarea `hub-migrate` de cada despliegue): 1) control, bajo su lock; 2) las
-  plantillas de cada servidor (hasta S3 con todas las apps portables, `migrator.templates`; `clusters_to_migrate`: sin
+  plantillas de cada servidor (con todas las apps portables, también en S3, `migrator.templates`; nunca se reconstruyen:
+  el primer despliegue que les añade las portables migra cada una en caliente, cerca de un minuto, y un alta en ese rato
+  cae en `clone_failed` y se reintenta a los 60 s; `clusters_to_migrate`: sin
   filas de `Cluster`, el del settings; con ellas, los abiertos
   y los cerrados que aún tienen hubs, y el del settings mientras viva en él un hub sin cluster), como canarios: si una
   falla, no se toca ningún hub; 3) los hubs atrasados según `schema_apps` (un despliegue sin migraciones no abre

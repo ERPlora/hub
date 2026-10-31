@@ -18,6 +18,7 @@ import logging
 import threading
 import uuid
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from psycopg import sql
@@ -534,18 +535,22 @@ def test_a_lease_lost_while_its_schema_is_migrated_stops_it_there_without_failin
     assert "provision.stopped" in caplog.text and "provision.failed" not in caplog.text
 
 
-def test_each_step_of_a_preparation_is_logged_with_how_long_it_took(registry, told, caplog):
-    """Verification of hub#471 in pre: only ready/failed were logged, and each step's time had to be guessed."""
+def test_each_step_of_a_preparation_is_logged_with_how_long_it_took(registry, told, caplog, monkeypatch):
+    """Verification of hub#471 in pre: only ready/failed were logged, and each step's time had to be guessed. Each
+    line says its own step's time, not the time since the start, and names the hub by its slug, as ``ready`` does."""
     import re
 
     hub = registry.hub()
+    # Started at 100; creating ends at 103, migrating at 110, seeding at 111, and ``ready`` reads 111.
+    clock = iter([100.0, 103.0, 110.0, 111.0, 111.0])
+    monkeypatch.setattr(provision, "time", SimpleNamespace(monotonic=lambda: next(clock)))
 
     with caplog.at_level(logging.INFO, logger="base.tenancy.provision"):
         assert provision.provision(hub) is True
 
-    steps = re.findall(r"base\.tenancy\.provision\.step hub=\S+ step=(\w+) seconds=(\d+\.\d+)", caplog.text)
-    assert [step for step, _seconds in steps] == ["creating", "migrating", "seeding"]
-    assert all(float(seconds) >= 0 for _step, seconds in steps)
+    steps = re.findall(r"base\.tenancy\.provision\.step hub=(\S+) step=(\w+) seconds=(\S+)", caplog.text)
+    assert steps == [(hub.slug, "creating", "3.00"), (hub.slug, "migrating", "7.00"), (hub.slug, "seeding", "1.00")]
+    assert f"base.tenancy.provision.ready hub={hub.slug} database={fresh(hub).db_name} seconds=11.00" in caplog.text
 
 
 def test_a_hub_held_by_another_worker_is_not_taken(registry, told):
@@ -636,7 +641,7 @@ def small_template(django_db_blocker, hub_databases):
         try:
             migrator.migrate_apps(ddl, ["base"])
         finally:
-            django_connections[ddl].close()
+            migrator._forget_alias(ddl)  # closed and out of the settings: Django's test case unwraps only its own
     yield name
     with hubs._maintenance() as conn:
         hubs._drop(conn, name, control)
@@ -702,7 +707,7 @@ def full_template(django_db_blocker, hub_databases):
         try:
             migrator.migrate_apps(ddl, migrator.templates()[0].apps)
         finally:
-            django_connections[ddl].close()
+            migrator._forget_alias(ddl)  # closed and out of the settings: Django's test case unwraps only its own
     yield name
     with hubs._maintenance() as conn:
         hubs._drop(conn, name, control)
@@ -871,3 +876,4 @@ def test_every_hub_the_services_make_names_its_own_database_but_the_listed_ones(
         "A new hub is born with its own database (round 2026-10-30 of PLAN-DB, decision 1): name its db_name "
         f"(base.tenancy.names) or list the call in SHARED_HUB_CREATES with its reason: {offenders}"
     )
+
