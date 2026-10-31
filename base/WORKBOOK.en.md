@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:b5e272450a2f4f063c5fccdf035bd4fab82f047dde317cfe8fe49631c6eb254c -->
+<!-- generated from WORKBOOK.md sha256:5f6df02e29555d091b5b359b71f2202f6081edd439a65a4b70c3b66233d61592 -->
 
 ## What it is for and who it is for
 
@@ -1465,7 +1465,9 @@ Steps:
      "…or pass your badge: no need to choose your name first." and "Choose your user" with a face per person
      (initials and name; never their email). With a single person, they are already chosen.
   2. They tap their name: "PIN of {name}" and the keypad show, with as many circles as the business's PIN has
-     digits. The arrow ("Change user") goes back to the faces.
+     digits. The arrow ("Change user") goes back to the faces. The keypad shows whole, down to the 0 and the erase
+     key, without scrolling the screen: on a tablet in landscape (in its browser too), a laptop or a low phone, the
+     name shows without the big face and the keys sit a little closer, always the size of a finger.
   3. They type the PIN: it enters by itself at the last digit, with no button.
   4. They come in on the screen they had asked for or on **Home**. The footer says "ERPlora · trusted device".
 In: the business's people with a PIN, read again every minute and on coming back to the screen: whoever gets a
@@ -1525,8 +1527,9 @@ Steps:
   2. The next thing they open takes them to the way in; if the session ended because the device was removed or
      the person left the business, what they have open finds out at once.
   3. On a till with the PIN pad, **Access** says at the top "Your session has ended" — "It expired or it was
-     closed. Enter again." and the next person enters with their PIN. On a device without the PIN pad it goes to
-     erplora.com's sign-in, which brings them back in if their session there is still open.
+     closed. Enter again." and, below it, the whole keypad (also on a tablet in landscape or a low phone): the next
+     person enters with their PIN. On a device without the PIN pad it goes to erplora.com's sign-in, which brings
+     them back in if their session there is still open.
 In: the session that no longer exists.
 Out: nothing saved; the half-made sale is kept by its app.
 If it fails: without a network, the screen does not take the session as ended.
