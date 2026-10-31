@@ -487,6 +487,9 @@ WAIT_REASONS = {
     "hub_not_active": _(
         "your ERPlora account has a pending payment or is suspended"
     ),
+    "hub_unregistered": _(
+        "ERPlora has not linked this business to its account on this server yet"
+    ),
     "aeat_wait": _("the AEAT asked to wait until %(at)s"),
     "unreachable": _("the gateway or the AEAT could not be reached (%(detail)s)"),
     "refused": _(
