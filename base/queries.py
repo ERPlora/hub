@@ -695,11 +695,17 @@ def gets_copies(hub: Hub) -> bool:
     permission=ADMINISTER_HUB,
     input=HubDumpsIn,
     output=HubDumpsOut,
-    ai={
-        "description": "Lists the full copies of this business's data that ERPlora keeps for 90 days (one before each "
-        "reset, one when the business is deleted): when each was made and how big it is, newest first; and how "
-        "the last reset of the business went (copying, emptying, done or failed, and what was removed)."
-    },
+    ai=AI(
+        description=(
+            "Lists the full copies of this business's data that ERPlora keeps for 90 days (one before each reset, one "
+            "when the business is deleted): when each was made and how big it is, newest first; and how the last "
+            "reset of the business went (copying, emptying, done or failed, and what was removed)."
+        ),
+        asks={
+            "en": ("do I have a backup of my data?", "how did the reset of the business go?"),
+            "es": ("¿tengo una copia de seguridad de mis datos?", "¿cómo fue el restablecimiento del negocio?"),
+        },
+    ),
 )
 def hub_dumps(ctx: OperationContext, data: HubDumpsIn) -> dict:
     """Settings › Data's «Copies» (BASE-F37): the copies of the business's own database, without their links
