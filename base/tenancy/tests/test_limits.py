@@ -1,0 +1,349 @@
+"""The plan's limits on a hub's database, per process (PLAN-DB §5 «Límite por plan»; plan 2026-10-22-fase-2-tenencia
+§3 S4 and §2, guardrail 12).
+
+Each hub with a database of its own gets, in each process, as many transactions at once as its plan says
+(``max_db_connections`` of the SaaS's photo, ``Hub.state["plan"]``) and every one of them carries the plan's
+``SET LOCAL statement_timeout`` (``statement_timeout_seconds``). A photo without a plan gets Free's (1 and 5 s), logged.
+A newer photo (a greater ``state_version``) resizes the process's limiter without a restart; an older one changes
+nothing. A transaction that finds no free place waits a bounded time and then answers 503 ``base.hub_busy``.
+
+The end-to-end guardrail (two hubs, an operation, a request, the live executor, the admin) is
+``tests/test_guardrails_limits.py``.
+"""
+
+import logging
+import threading
+import time
+from types import SimpleNamespace
+
+import pytest
+from django.db import connections, transaction
+from django.db.backends.postgresql.base import DatabaseWrapper as PostgresWrapper
+from django.utils import translation
+
+from base.tenancy import context, limits
+from base.tenancy.tests import hubs
+
+HUB_DB_COMMITTED = pytest.mark.django_db(databases=hubs.HUB_DATABASES, transaction=True)
+
+STARTER = {"slug": "starter", "max_db_connections": 3, "statement_timeout_seconds": 15}
+STANDARD = {"slug": "standard", "max_db_connections": 6, "statement_timeout_seconds": 15}
+
+
+@pytest.fixture(autouse=True)
+def fresh_limiters(monkeypatch):
+    """Each test starts with no hub's limiter in the process, and leaves none behind for the next one."""
+    monkeypatch.setattr(limits, "_limiters", {})
+
+
+def photo(plan=None, version: int = 1):
+    return SimpleNamespace(state={} if plan is None else {"plan": plan}, state_version=version)
+
+
+# ── The limits of a photo ─────────────────────────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.parametrize(
+    ("plan", "expected"),
+    [
+        ({"slug": "free", "max_db_connections": 1, "statement_timeout_seconds": 5}, limits.PlanLimits(1, 5)),
+        (STARTER, limits.PlanLimits(3, 15)),
+        (STANDARD, limits.PlanLimits(6, 15)),
+        ({"slug": "pro", "max_db_connections": 12, "statement_timeout_seconds": 15}, limits.PlanLimits(12, 15)),
+    ],
+    ids=["free", "starter", "standard", "pro"],
+)
+def test_the_photos_plan_sets_the_limits(plan, expected):
+    assert limits.plan_limits({"plan": plan}) == expected
+
+
+@pytest.mark.parametrize(
+    "state",
+    [
+        None,
+        {},
+        {"plan": None},
+        {"plan": "standard"},
+        {"plan": {"slug": "x", "statement_timeout_seconds": 15}},
+        {"plan": {"slug": "x", "max_db_connections": 0, "statement_timeout_seconds": 15}},
+        {"plan": {"slug": "x", "max_db_connections": 3, "statement_timeout_seconds": -1}},
+        {"plan": {"slug": "x", "max_db_connections": "3", "statement_timeout_seconds": 15}},
+        {"plan": {"slug": "x", "max_db_connections": True, "statement_timeout_seconds": 15}},
+    ],
+    ids=["no-state", "no-photo", "no-plan", "plan-not-a-dict", "no-connections", "zero", "negative", "text", "bool"],
+)
+def test_a_photo_without_a_usable_plan_has_no_limits_of_its_own(state):
+    assert limits.plan_limits(state) is None
+
+
+def test_free_is_one_transaction_and_five_seconds_and_the_wait_is_bounded():
+    assert limits.FREE == limits.PlanLimits(max_transactions=1, statement_timeout_seconds=5)
+    assert limits.SLOT_WAIT_SECONDS == 2
+
+
+def test_a_hub_without_a_plan_in_its_photo_gets_free_and_says_so_once_per_photo(caplog):
+    caplog.set_level(logging.WARNING, logger="base.tenancy.limits")
+    hub = photo(version=4)
+
+    limiter = limits.configure("hub_" + "a" * 32, hub)
+    limits.configure("hub_" + "a" * 32, hub)
+
+    assert limiter.limits == limits.FREE
+    warnings = [record for record in caplog.records if "base.hub_limits_free" in record.getMessage()]
+    assert len(warnings) == 1
+    assert "hub_" + "a" * 32 in warnings[0].getMessage()
+
+
+def test_a_newer_photo_resizes_the_limiter_without_a_restart_and_an_older_one_changes_nothing():
+    alias = "hub_" + "b" * 32
+    limiter = limits.configure(alias, photo(STARTER, version=1))
+    assert (limiter.limits, limiter.version) == (limits.PlanLimits(3, 15), 1)
+
+    assert limits.configure(alias, photo(STANDARD, version=2)) is limiter
+    assert (limiter.limits, limiter.version) == (limits.PlanLimits(6, 15), 2)
+
+    limits.configure(alias, photo(STARTER, version=1))
+    limits.configure(alias, photo(None, version=2))
+    assert (limiter.limits, limiter.version) == (limits.PlanLimits(6, 15), 2)
+
+
+def test_an_alias_no_hub_configured_gets_free(caplog):
+    caplog.set_level(logging.WARNING, logger="base.tenancy.limits")
+
+    limiter = limits.limiter_for("hub_" + "c" * 32)
+
+    assert limiter.limits == limits.FREE
+    assert limits.limiter_for("hub_" + "c" * 32) is limiter
+    assert any("base.hub_limits_free" in record.getMessage() for record in caplog.records)
+
+
+# ── The limiter ──────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+def test_a_full_limiter_waits_the_bounded_time_and_answers_hub_busy(caplog):
+    caplog.set_level(logging.WARNING, logger="base.tenancy.limits")
+    limiter = limits.Limiter(limits.FREE, version=0, alias="hub_x")
+    held = limiter.take(wait=0)
+
+    started = time.monotonic()
+    with pytest.raises(limits.HubBusy) as busy:
+        limiter.take(wait=0.2)
+
+    assert time.monotonic() - started >= 0.2
+    assert busy.value.status == 503
+    assert busy.value.code == "base.hub_busy"
+    assert busy.value.envelope() == {"error": {"code": "base.hub_busy", "message": busy.value.message}}
+    assert limiter.in_use == 1
+    assert any("base.hub_busy" in record.getMessage() and "hub_x" in record.getMessage() for record in caplog.records)
+    held.release()
+
+
+def test_hub_busy_speaks_the_active_language():
+    limiter = limits.Limiter(limits.FREE, version=0, alias="hub_x")
+    held = limiter.take(wait=0)
+    with translation.override("es"), pytest.raises(limits.HubBusy) as busy:
+        limiter.take(wait=0)
+    held.release()
+
+    assert busy.value.message == "Demasiadas peticiones. Inténtalo de nuevo en un momento."
+
+
+def test_a_place_freed_while_waiting_lets_the_waiting_one_in():
+    limiter = limits.Limiter(limits.FREE, version=0, alias="hub_x")
+    held = limiter.take(wait=0)
+    threading.Timer(0.1, held.release).start()
+
+    second = limiter.take(wait=2)
+
+    assert limiter.in_use == 1
+    second.release()
+    assert limiter.in_use == 0
+
+
+def test_a_slot_released_twice_frees_one_place():
+    limiter = limits.Limiter(limits.PlanLimits(2, 15), version=0, alias="hub_x")
+    first = limiter.take(wait=0)
+    limiter.take(wait=0)
+
+    first.release()
+    first.release()
+
+    assert limiter.in_use == 1
+
+
+def test_a_slot_keeps_the_limits_it_was_taken_with():
+    limiter = limits.Limiter(limits.PlanLimits(3, 15), version=1, alias="hub_x")
+    slot = limiter.take(wait=0)
+
+    limiter.resize(limits.FREE, version=2)
+
+    assert slot.limits == limits.PlanLimits(3, 15)
+    slot.release()
+
+
+def test_growing_lets_the_waiting_in_and_shrinking_waits_for_the_places_in_use():
+    limiter = limits.Limiter(limits.FREE, version=1, alias="hub_x")
+    first = limiter.take(wait=0)
+    threading.Timer(0.1, lambda: limiter.resize(limits.PlanLimits(3, 15), version=2)).start()
+    second = limiter.take(wait=2)
+    third = limiter.take(wait=0)
+
+    assert limiter.resize(limits.FREE, version=3)
+    first.release()
+    second.release()
+    with pytest.raises(limits.HubBusy):
+        limiter.take(wait=0.05)
+    third.release()
+
+    limiter.take(wait=0).release()
+    assert limiter.in_use == 0
+
+
+def test_the_statement_timeout_is_said_in_seconds():
+    sql = limits.statement_timeout_sql(limits.PlanLimits(3, 15))
+
+    assert sql.as_string(None) == "SET LOCAL statement_timeout = '15s'"
+
+
+# ── The hubs' database backend: every transaction of a hub's alias holds a place and carries the timeout ─────────
+
+
+def limiter_of_a(hub_a):
+    """``hub_a``'s limiter in this process (configured by ``use_hub``)."""
+    return limits.limiter_for(hubs.HUB_A_ALIAS)
+
+
+def with_plan(hub, plan, version):
+    hub.state = {"plan": plan}
+    hub.state_version = version
+    return hub
+
+
+def show_statement_timeout(alias: str) -> str:
+    with connections[alias].cursor() as cursor:
+        cursor.execute("SHOW statement_timeout")
+        return cursor.fetchone()[0]
+
+
+def test_a_hubs_alias_runs_on_the_limited_backend_and_its_migrators_and_controls_do_not():
+    from base.tenancy.backend.base import DatabaseWrapper
+
+    assert connections.settings[hubs.HUB_A_ALIAS]["ENGINE"] == limits.ENGINE
+    assert isinstance(connections[hubs.HUB_A_ALIAS], DatabaseWrapper)
+    assert type(connections["default"]) is PostgresWrapper
+
+
+@HUB_DB_COMMITTED
+def test_a_transaction_holds_one_place_from_its_first_statement_to_its_commit(hub_a):
+    seen = []
+    with context.use_hub(hub_a):
+        limiter = limiter_of_a(hub_a)
+        with transaction.atomic(using=hubs.HUB_A_ALIAS):
+            seen.append(limiter.in_use)
+            show_statement_timeout(hubs.HUB_A_ALIAS)
+            seen.append(limiter.in_use)
+            with transaction.atomic(using=hubs.HUB_A_ALIAS):
+                show_statement_timeout(hubs.HUB_A_ALIAS)
+                seen.append(limiter.in_use)
+            show_statement_timeout(hubs.HUB_A_ALIAS)
+            seen.append(limiter.in_use)
+        seen.append(limiter.in_use)
+
+    assert seen == [0, 1, 1, 1, 0]
+
+
+@HUB_DB_COMMITTED
+def test_a_rolled_back_transaction_frees_its_place(hub_a):
+    with context.use_hub(hub_a):
+        limiter = limiter_of_a(hub_a)
+        with pytest.raises(RuntimeError), transaction.atomic(using=hubs.HUB_A_ALIAS):
+            show_statement_timeout(hubs.HUB_A_ALIAS)
+            raise RuntimeError("rolled back")
+
+        assert limiter.in_use == 0
+
+
+@HUB_DB_COMMITTED
+def test_a_connection_closed_in_the_middle_of_a_transaction_frees_its_place(hub_a):
+    with context.use_hub(hub_a):
+        limiter = limiter_of_a(hub_a)
+        transaction.set_autocommit(False, using=hubs.HUB_A_ALIAS)
+        show_statement_timeout(hubs.HUB_A_ALIAS)
+        assert limiter.in_use == 1
+
+        connections[hubs.HUB_A_ALIAS].close()
+
+        assert limiter.in_use == 0
+
+
+@HUB_DB_COMMITTED
+def test_a_statement_outside_any_transaction_holds_a_place_while_it_runs(hub_a):
+    seen = []
+
+    def spy(execute, sql, params, many, context_):
+        seen.append(limiter.in_use)
+        return execute(sql, params, many, context_)
+
+    with context.use_hub(hub_a):
+        limiter = limiter_of_a(hub_a)
+        connection = connections[hubs.HUB_A_ALIAS]
+        connection.ensure_connection()
+        with connection.execute_wrapper(spy):
+            timeout = show_statement_timeout(hubs.HUB_A_ALIAS)
+
+        assert connection.get_autocommit()
+        assert seen == [1]
+        assert limiter.in_use == 0
+        assert timeout == "5s"
+
+
+@HUB_DB_COMMITTED
+@pytest.mark.parametrize(
+    ("plan", "expected"),
+    [(None, "5s"), (STARTER, "15s"), ({"slug": "slow", "max_db_connections": 2, "statement_timeout_seconds": 7}, "7s")],
+    ids=["free", "starter", "seven"],
+)
+def test_every_transaction_carries_the_plans_statement_timeout(hub_a, plan, expected):
+    if plan is not None:
+        with_plan(hub_a, plan, version=1)
+
+    with context.use_hub(hub_a):
+        with transaction.atomic(using=hubs.HUB_A_ALIAS):
+            inside = show_statement_timeout(hubs.HUB_A_ALIAS)
+        alone = show_statement_timeout(hubs.HUB_A_ALIAS)
+
+    assert (inside, alone) == (expected, expected)
+
+
+@HUB_DB_COMMITTED
+def test_the_plans_timeout_never_outlives_its_transaction_on_the_server(hub_a):
+    with context.use_hub(hub_a):
+        connection = connections[hubs.HUB_A_ALIAS]
+        connection.ensure_connection()
+        show_statement_timeout(hubs.HUB_A_ALIAS)
+        # The server session itself, read past the backend: SET LOCAL ended with its transaction.
+        with connection.connection.cursor() as raw:
+            raw.execute("SHOW statement_timeout")
+            assert raw.fetchone()[0] != "5s"
+
+
+@HUB_DB_COMMITTED
+def test_a_newer_photo_resizes_the_limit_of_the_running_process(hub_a):
+    with context.use_hub(hub_a):
+        assert limiter_of_a(hub_a).limits == limits.FREE
+
+    with context.use_hub(with_plan(hub_a, STANDARD, version=9)):
+        with transaction.atomic(using=hubs.HUB_A_ALIAS):
+            inside = show_statement_timeout(hubs.HUB_A_ALIAS)
+
+    assert limiter_of_a(hub_a).limits == limits.PlanLimits(6, 15)
+    assert inside == "15s"
+
+
+@pytest.mark.django_db
+def test_the_control_database_is_never_limited():
+    with context.use_control():
+        timeout = show_statement_timeout("default")
+
+    assert timeout != "5s"
+    assert limits._limiters == {}
