@@ -1,7 +1,8 @@
 # Workbook — Facturación (app)
 Prefijo: INVOICE
 Alcance MVP: núcleo
-Estado de la app: hecha (servidor y páginas); lo que depende de piezas que aún no existen lo dice cada flujo
+Estado de la app: completa (2026-10-31)
+Lo que no entra todavía: ver «Qué queda fuera» (INVOICE-F04, INVOICE-F22 e INVOICE-F23, descartados con su issue).
 
 > Manual de usuario y especificación de la app `invoice`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `Estado: hecho` cuando sus tests están en verde
@@ -9,8 +10,8 @@ Estado de la app: hecha (servidor y páginas); lo que depende de piezas que aún
 > (`modules-workspace/modules/invoice`, `origin/main` `a68c8ae`, v1.2.74) y de sus ficheros
 > `workflow/*.md`. La app hace lo mismo y se ve igual; los números de flujo se conservan
 > (`INVOICE-Fnn`) porque otras apps los citan. Las dudas abiertas del producto actual se han decidido
-> con el mercado (sección «Decisiones») y lo que todavía depende de una pieza que no existe en esta
-> plataforma lo dice su flujo en la línea `Estado:`.
+> con el mercado (sección «Decisiones») y lo que depende de una pieza de otra app que no existe todavía
+> está `descartado` en su flujo, con el motivo y su issue.
 
 ## Para qué sirve y para quién
 
@@ -66,9 +67,8 @@ Aquí manda la especificación oficial sobre el mercado:
   ningún documento** (Facturación → Emisor, INVOICE-F21); hasta entonces, el Inicio lo pide en «Termina de
   configurar tu negocio» con el paso «Los datos de tu negocio» y la píldora «Necesario para facturar», y
   la franja «Todavía no puedes facturar» lo avisa encima de las demás pantallas, también de **Facturas** y **Series**,
-  con «Configurar». Hoy la identidad fiscal del negocio vive en
-  la cuenta de ERPlora (el SaaS); cuando el SaaS la mande en la foto del hub, el emisor se rellenará
-  solo (INVOICE-F22) y la pantalla dirá que viene de la cuenta.
+  con «Configurar». El emisor se escribe aquí, a mano: recibirlo de la cuenta de ERPlora
+  (INVOICE-F22) no entra todavía.
 - **«Hoy» es la hora de Madrid** en la fase 1 (el Hub todavía no guarda la zona horaria del negocio):
   decide la fecha de cada documento y, con ella, el año de su serie. Un cobro a las 00:30 del 1 de enero
   numera en la serie del año nuevo.
@@ -191,7 +191,7 @@ ninguna factura.»; si lo mandó la cuenta de ERPlora, «Datos recibidos de tu c
 | INVOICE-F01 | El tique (factura simplificada) que nace al cobrar | hecho — Ventas lo pide dentro del mismo cobro |
 | INVOICE-F02 | La factura completa al cobrar a un cliente con NIF | hecho — Ventas lo pide dentro del mismo cobro |
 | INVOICE-F03 | Emitir una factura a mano | hecho |
-| INVOICE-F04 | El cliente pide la factura completa de su tique | parcial — falta la página pública de la plataforma donde el cliente escribe sus datos, y el código del tique que la abre; Facturación ya emite la factura completa que esa página pedirá (como en INVOICE-F05) |
+| INVOICE-F04 | El cliente pide la factura completa de su tique | descartado — la página pública donde el cliente escribe sus datos y el código del tique que la abre son de la plataforma y de Ventas; Facturación ya emite la factura completa que esa página pedirá, como en INVOICE-F05 (hub#500) |
 | INVOICE-F05 | Pasar un tique a factura completa desde el mostrador | hecho |
 | INVOICE-F06 | Una venta cobrada que no se ha podido facturar | hecho |
 | INVOICE-F07 | Anular una venta cobrada que ya tiene su tique | hecho — Ventas la pide dentro de la misma anulación |
@@ -209,8 +209,8 @@ ninguna factura.»; si lo mandó la cuenta de ERPlora, «Datos recibidos de tu c
 | INVOICE-F19 | Marcar una factura como pagada | hecho |
 | INVOICE-F20 | Dar a otras apps la factura de una venta | hecho |
 | INVOICE-F21 | Configurar el emisor | hecho |
-| INVOICE-F22 | Recibir el emisor de la cuenta de ERPlora | parcial — la cuenta de ERPlora todavía no manda la identidad fiscal del negocio con los datos del hub, y la plataforma no se la entrega a Facturación; Facturación ya la guarda cuando le llega |
-| INVOICE-F23 | Emitir las facturas de ERPlora (hub de plataforma) | parcial — la parte del hub está hecha y probada, pero el hub de plataforma no se da de alta mientras todos los negocios comparten una sola base de datos (su emisor sería el de todos); llega con una base de datos por hub |
+| INVOICE-F22 | Recibir el emisor de la cuenta de ERPlora | descartado — la cuenta de ERPlora no manda la identidad fiscal del negocio con los datos del hub y la plataforma no se la entrega a Facturación; Facturación ya la guarda cuando le llega (hub#501) |
+| INVOICE-F23 | Emitir las facturas de ERPlora (hub de plataforma) | descartado — la parte de Facturación está hecha y probada, pero el hub de plataforma no se da de alta hasta que nazca con su propia base de datos, como cada negocio (hub#502) |
 
 ### INVOICE-F01 El tique (factura simplificada) que nace al cobrar
 <!-- origen: wf:restaurante-dia#rec_restaurante-f12 fi:modules/invoice#command-invoice-create_from_sale-handler-wasm-create_from_sale fi:modules/invoice#event-listen-sale-completed-invoice-create_from_sale old:invoice/workflow/emision.md#invoice-f01 qa:modules/invoice/simplified-receipt-vs-invoice wf:cadena-fiscal#rec_fiscal-f02 wf:peluqueria-dia#rec_peluqueria-f11 -->
@@ -311,7 +311,7 @@ Implicados: TAX-F18, CUSTOMER-F17, TAX-F11
 
 ### INVOICE-F04 El cliente pide la factura completa de su tique
 <!-- origen: old-hub:HUB-F16 old-hub:HUB-F17 old:invoice/workflow/emision.md#invoice-f04 qa:modules/invoice/convert-receipt-to-invoice wf:cadena-fiscal#rec_fiscal-f10 -->
-Estado: parcial — falta la página pública de la plataforma donde el cliente escribe sus datos, y el código del tique que la abre; Facturación ya emite la factura completa que esa página pedirá (como en INVOICE-F05)
+Estado: descartado — la página pública donde el cliente escribe sus datos y el código del tique que la abre son de la plataforma y de Ventas; Facturación ya emite la factura completa que esa página pedirá, como en INVOICE-F05 (hub#500)
 Actor: cliente
 Pantalla: página pública de la plataforma (aún no existe)
 Pasos:
@@ -714,7 +714,7 @@ Implicados: ninguno
 
 ### INVOICE-F22 Recibir el emisor de la cuenta de ERPlora
 <!-- origen: old-hub:HUB_SHELL-F164 -->
-Estado: parcial — la cuenta de ERPlora todavía no manda la identidad fiscal del negocio con los datos del hub, y la plataforma no se la entrega a Facturación; Facturación ya la guarda cuando le llega
+Estado: descartado — la cuenta de ERPlora no manda la identidad fiscal del negocio con los datos del hub y la plataforma no se la entrega a Facturación; Facturación ya la guarda cuando le llega (hub#501)
 Actor: sistema
 Pantalla: Emisor
 Pasos:
@@ -729,7 +729,7 @@ Implicados: ninguno
 
 ### INVOICE-F23 Emitir las facturas de ERPlora (hub de plataforma)
 <!-- origen: nuevo (PLAN-SAAS §4: las facturas de ERPlora las emite su propio hub de plataforma) -->
-Estado: parcial — la parte del hub está hecha y probada, pero el hub de plataforma no se da de alta mientras todos los negocios comparten una sola base de datos (su emisor sería el de todos); llega con una base de datos por hub
+Estado: descartado — la parte de Facturación está hecha y probada, pero el hub de plataforma no se da de alta hasta que nazca con su propia base de datos, como cada negocio (hub#502)
 Actor: sistema (la cuenta de ERPlora)
 Pantalla: ninguna (nadie entra en el hub de plataforma)
 Pasos:
@@ -995,10 +995,12 @@ Recibir el emisor del SaaS (`invoice.sync_issuer`) no es de ningún papel: solo 
   `seed_company_036` antiguo) y fija VeriFactu al entorno del despliegue
   (`verifactu.config.follow_deployment`). Nunca escribe encima de otro emisor (otra cadena). En AWS se
   lanza una vez por entorno como tarea ECS puntual con la definición del servicio `hub` y el comando
-  `python manage.py create_platform_hub --execute` (primero sin `--execute` para ver lo que hará). En
-  la fase 2 añade la fila del registro (`is_platform`) y su BD, como cualquier alta. ⚠️ **En la fase 1 hay
-  una sola BD**: el emisor que pone sería el de todos los hosts, así que no se lanza en un despliegue donde
-  factura un negocio real hasta que haya una BD por hub (PLAN-HUB §4, ronda 2026-10-15c).
+  `python manage.py create_platform_hub --execute` (primero sin `--execute` para ver lo que hará). Con
+  el alta con BD propia (tajada S2 de la tenencia, que PLAN §35 adelantó a la fase 1) tiene que añadir la
+  fila del registro (`is_platform`) y su BD, como cualquier alta (hub#502). ⚠️ **Mientras los negocios
+  compartan la BD**: el emisor que pone sería el de todos los hosts, así que no se lanza en un despliegue
+  donde factura un negocio real hasta que el hub de plataforma tenga la suya (PLAN-HUB §4, ronda
+  2026-10-15c).
 
 - Anatomía completa: `apps.py`, `models.py` (`InvoiceSeries`, `Issuer`, `Invoice`, `InvoiceLine`),
   `migrations/`, `schemas.py`, `fiscal.py` (aritmética pura: cierre por clave fiscal, prorrateo,
@@ -1036,8 +1038,8 @@ Recibir el emisor del SaaS (`invoice.sync_issuer`) no es de ningún papel: solo 
   desglose y líneas de la original.
 - **Fechas**: `issue_date` es el día del negocio al emitir (Madrid en la fase 1); `operation_date`, el
   del cobro (`Sale.business_day`), el de la devolución o el de la anulación; la F3 conserva el del tique.
-- **El emisor** (`Issuer`, una fila) se copia en cada documento. Contrato con el SaaS (INVOICE-F22, aún
-  sin la foto ni la entrega): el bloque `issuer` (`legal_name`, `tax_id`, `address`, `postal_code`, `city`,
+- **El emisor** (`Issuer`, una fila) se copia en cada documento. Contrato con el SaaS (INVOICE-F22,
+  descartado sin la foto ni la entrega, hub#501): el bloque `issuer` (`legal_name`, `tax_id`, `address`, `postal_code`, `city`,
   `province`, `country`) de `PUT /internal/hubs/{id}/state` → la plataforma llama a
   `invoice.issuer.sync` como sistema con `{legal_name, tax_id, address, postal_code, city, province,
   country, version}`; una `version` menor o igual que la guardada se ignora.
@@ -1205,3 +1207,18 @@ Recibir el emisor del SaaS (`invoice.sync_issuer`) no es de ningún papel: solo 
 - No exporta el libro registro de facturas expedidas para la gestoría.
 - No vigila el techo de la factura simplificada: lo pide Ventas al cobrar.
 - No borra ni anonimiza los datos de un cliente en sus facturas (la ley obliga a conservarlas).
+
+### Qué queda fuera
+
+Al cerrar la app (2026-10-31, `CLOSE-INVOICE`), lo que no entra tiene su issue abierta (`migration-leftover`):
+
+- **hub#500** — El cliente no puede pedir él mismo la factura completa de su tique (INVOICE-F04): faltan la
+  página pública de `base` bajo `/p/` y el código en el tique de Ventas; Facturación ya emite la F3
+  (`invoice.invoice.substitute`).
+- **hub#501** — El emisor de Facturación no se rellena con los datos fiscales de la cuenta de ERPlora
+  (INVOICE-F22): la foto del SaaS no lleva el bloque `issuer` y `base.hub.state_apply` no llama a
+  `invoice.issuer.sync`, que ya existe.
+- **hub#502** — ERPlora todavía no puede emitir sus propias facturas desde su hub de plataforma
+  (INVOICE-F23): el alta del hub de plataforma con su BD propia es de la tenencia (S2, PLAN §35); las
+  operaciones de Facturación y sus puertas `/internal/platform/invoices` ya están.
+- Las piezas compartidas que la app pide a `@erplora/ui` y aún no han llegado: [`UI-REQUESTS.md`](UI-REQUESTS.md).
