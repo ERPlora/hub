@@ -65,7 +65,7 @@ la app apagada en él, 404 `app_inactive` (erplora.com guarda el mensaje y reint
 otro hub), y erplora.com también reintenta; un cuerpo fuera de contrato, 422 con `fields`; y el sobre de cualquier otra
 negativa de la operación, tal cual.
 
-## Tenencia: una BD por hub (fase 1, tajadas S1–S2)
+## Tenencia: una BD por hub (fase 1, tajadas S1–S3)
 
 Plan `docs/plans/2026-10-22-fase-2-tenencia.md` de erplora-next; reglas en PLAN-DB y CLAUDE.md «Tenencia del Hub».
 
@@ -162,6 +162,36 @@ Plan `docs/plans/2026-10-22-fase-2-tenencia.md` de erplora-next; reglas en PLAN-
   de la tenencia y los de cada puerta de entrada la apagan (`no_test_fallback`), como en producción.
 
 
+### Activar una app crea sus tablas (tajada S3)
+
+Un negocio y una demo nacen con las tablas de su plantilla (`<control>_template[_<vertical>]`: la plataforma y las apps de
+su vertical) y todas las apps apagadas (PLAN §33); el alta es el clon. Las tablas de cualquier otra app se crean **la
+primera vez que el negocio la enciende** (PLAN-DB §7, spec 2026-10-11 «tablas al activar»), nunca en el alta ni en
+`migrate_hubs`, y nunca se borran:
+
+- **Encender** (`base.app.enable`, Apps o un blueprint) en un hub con BD propia: si su BD ya tiene las tablas de la app
+  y de lo que necesita (`Hub.schema_apps`, lo que confirmó el migrador), queda `on` al momento (200); si no, todo lo que
+  enciende queda `creating` en un solo plan, la ruta responde **202** con `state: "creating"`, se anota
+  `base.app.activation_requested` y, tras el COMMIT, se llama al worker (`HubDue.mark_due`). Cada fila guarda la última
+  migración de la app en el código que la pidió (`AppActivation.target`).
+- **El worker** (`_activations`, también con `--databases-only`) toma cada tick los hubs llamados y, cada 60 s, todos los
+  listos con BD propia (una llamada perdida se encuentra); en cada uno, lo debido (`creating`, o `failed` cuyo próximo
+  intento llegó) se crea con `migrator.ensure_schema(hub, add=…)` bajo el lock de esquema del hub y
+  `base.app.activation_settle` lo enciende (`base.app.enabled`, aviso vivo: Apps y el menú de todos los dispositivos
+  cambian sin recargar) o lo deja `failed` con `attempts`, `last_error` y `next_attempt_at` (1, 5, 15 min y después cada
+  hora; `base.app.activation_failed`). Esquema ocupado por otra ejecución: +30 s. Una petición de un código más nuevo que
+  el del worker (o una BD por delante de su código, un despliegue a medias): se deja a un worker de ese código, +60 s.
+- **Apps** pinta «Activándose…» (y la pantalla de la app dice que se abre en un momento) y, si falló, «No se ha podido
+  activar» con **«Reintentar»** (`base.app.retry`, 202) o «Desactivar». La sesión (`base.session.me`) da `activating`.
+  Mientras no está `on` sus operaciones responden 404 `app_inactive`, el relevo no le entrega nada y sus tareas no
+  corren. **Apagar** nunca borra tablas; apagada mientras se crean, queda `off` con ellas hechas. Un blueprint que
+  enciende una app que aún se prepara no carga sus datos y su informe dice que se vuelva a cargar en un minuto
+  («Reintentar» del informe trae lo que faltó).
+- Un hub que aún comparte la BD de la fase 1 (`db_name=""`) enciende al momento, como hasta ahora (propuesta (i) de
+  la ronda 2026-10-30, hasta el corte de S5). `seed_local_hubs` da a `a` y `b` las tablas de todas las apps y todas
+  encendidas (`provision(apps=…)`).
+
+
 ### Copias de los datos y uso nocturno (tajada S2b)
 
 PLAN-DB, ronda 2026-10-30: decisión 2 y propuestas (a), (f), (j), (k), (l), (m).
@@ -249,8 +279,9 @@ La e2e de punta a punta es `tests/e2e/demo.spec.ts` (cómo correrla: `tests/e2e/
 `use_hub`, 3 s por tick como mucho y el siguiente tick sigue por el próximo hub), reparte su outbox, escribe una vez por
 proceso el calendario de sus apps en su BD y corre las tareas que tocan de sus apps encendidas en su propio ámbito (su
 aviso vivo sale por su canal); y al final hace las BD de los hubs debidos en `HubDue` y borra las de las demos que
-acabaron (`base/tenancy/provision.py`, «Tenencia», «Alta»). Con `--databases-only` solo hace esto último (las BD y
-las demos que acaban): es el worker del e2e, cuyas specs juegan ellas mismas el reparto y las tareas. El reparto lleva cada evento nuevo a las reacciones de las apps que lo escuchan (el
+acabaron (`base/tenancy/provision.py`, «Tenencia», «Alta»). Antes de eso crea las tablas de las apps que un hub con BD propia encendió (tajada S3, «Activar una app
+crea sus tablas»). Con `--databases-only` solo hace estas dos cosas (las BD, las tablas de las apps encendidas y las
+demos que acaban): es el worker del e2e, cuyas specs juegan ellas mismas el reparto y las tareas. El reparto lleva cada evento nuevo a las reacciones de las apps que lo escuchan (el
 `REACTIONS` de su `events.py`; `"*"` = todo evento de las demás): la venta cobrada baja el stock y cuenta en la ficha
 del cliente, la ronda enviada abre su comanda en cocina, etc. Cada app lo recibe **una vez** (`base.EventDelivery`, en
 la misma transacción que su reacción), como el sistema y en el ámbito del hub que lo anotó (su aviso vivo sale por el
