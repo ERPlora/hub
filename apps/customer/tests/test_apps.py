@@ -4,7 +4,7 @@ its operations, every one usable by the assistant (``ai``)."""
 from django.apps import apps
 from django.utils import translation
 from live.meta import Category, LiveAppConfig, Nav, module_configs, permissions_for_role
-from live.operations import INTERNAL, registry
+from live.operations import AI, INTERNAL, registry
 
 PERMISSIONS = [
     "customer.view",
@@ -69,7 +69,7 @@ OPERATIONS = {
     "customer.purchase.void": "customer.record_purchase",
     "customer.purchase.refund": "customer.record_purchase",
 }
-#: Commands the assistant confirms before running: erasing, deleting, merging, bulk and money.
+#: Commands the assistant confirms before running: erasing, deleting, merging and bulk.
 HIGH_RISK = {
     "customer.customer.import",
     "customer.customer.delete",
@@ -78,9 +78,6 @@ HIGH_RISK = {
     "customer.group.delete",
     "customer.tag.delete",
     "customer.field.delete",
-    "customer.purchase.record",
-    "customer.purchase.void",
-    "customer.purchase.refund",
 }
 #: Open to API keys, as in the product's module.json.
 EXPOSED = {"customer.order.list", "customer.consent.state"}
@@ -90,6 +87,12 @@ SCREEN_ONLY = {
     "customer.health.grant",
     "customer.health.withdraw",
     "customer.health.update",
+}
+#: What only the sale app's reactions run (``customer.record_purchase``, declared by no app): no person's tool.
+SYSTEM_ONLY = {
+    "customer.purchase.record",
+    "customer.purchase.void",
+    "customer.purchase.refund",
 }
 
 
@@ -206,28 +209,29 @@ def test_the_system_only_permission_is_declared_by_no_app():
 
 
 def test_every_operation_tells_the_assistant_what_it_does():
+    """Typed (``AI``), with what it does and how people ask for it in English and Spanish
+    (test_assistant_asks.py); the screen's health data and the sale's reactions are no tool (``INTERNAL``)."""
     for name, op in customer_operations().items():
-        if name in SCREEN_ONLY:
+        if name in SCREEN_ONLY | SYSTEM_ONLY:
             assert op.ai is INTERNAL, name
             continue
-        assert isinstance(op.ai, dict), name
-        assert (
-            isinstance(op.ai.get("description"), str) and len(op.ai["description"]) > 20
-        ), name
+        assert isinstance(op.ai, AI), name
+        assert len(op.ai.description) > 20, name
+        assert set(op.ai.asks) == {"en", "es"}, name
 
 
 def test_commands_declare_their_risk_and_queries_do_not():
     for name, op in customer_operations().items():
-        if name in SCREEN_ONLY:
+        if name in SCREEN_ONLY | SYSTEM_ONLY:
             continue
         if op.kind == "command":
             expected = "high" if name in HIGH_RISK else "normal"
-            assert op.ai.get("risk") == expected, name
+            assert op.ai.risk == expected, name
         elif name == "customer.customer.export":
             # The one query the assistant confirms: it hands out the whole directory's personal data.
-            assert op.ai.get("risk") == "high"
+            assert op.ai.risk == "high"
         else:
-            assert "risk" not in op.ai, name
+            assert op.ai.risk == "normal", name
 
 
 def test_api_keys_reach_what_the_product_exposed():
