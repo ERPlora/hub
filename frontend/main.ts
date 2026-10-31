@@ -69,19 +69,36 @@ export const CHROME: NonNullable<CreateShellOptions['chrome']> = {
   background: defineAsyncComponent(() => import('../base/frontend/components/BackgroundChrome.vue')),
 };
 
-/** Vue's own loader of a `defineAsyncComponent`: once it resolved, the piece mounts in the same render as the screen. */
-type AsyncPiece = { __asyncLoader: () => Promise<unknown> };
+/**
+ * Vue's own loader of a `defineAsyncComponent` (`__asyncLoader`): once it resolved, the wrapper paints its piece in the
+ * same render as the screen. Internal to Vue (no public type), but it is how Vue itself tells an async wrapper
+ * (`isAsyncWrapper`: KeepAlive, hydration) and what vue-router reads too; calling it again returns the same request.
+ * Should a Vue upgrade drop it, the piece is simply not waited for (as before this wait), and main.chrome.test.ts fails.
+ */
+type AsyncPiece = { __asyncLoader?: () => Promise<unknown> };
+
+/** How long the hub waits for its chrome before mounting without it: a chunk left hanging never keeps it blank. */
+export const CHROME_WAIT_MS = 3000;
 
 /**
- * Loads the chrome's pieces, settled whether they load or not. The bell, the apps followed beside the pane and the
- * blocking strip read live queries: mounted with the screen, they go in its one stream; mounted once their chunk
- * arrived, more than 150 ms after the screen's queries on a slow device (the tab's CPU ×6), they cut it and opened it
- * again (FIX-HUB-BASE-HOME-ONE-STREAM-FLAKY). Through each piece's own loader, not another `import()`: a module already
- * here still resolves in a later task, after the stream opened. A piece that does not load never keeps the hub from
- * mounting: it loads again at render, and Vue hands that failure to base's report (`installErrorReport`).
+ * Loads the chrome's pieces, settled whether they load or not, for at most `CHROME_WAIT_MS`. The bell, the apps followed
+ * beside the pane and the blocking strip read live queries: mounted with the screen, they go in its one stream; mounted
+ * once their chunk arrived, more than 150 ms after the screen's queries on a slow device (the tab's CPU ×6), they cut it
+ * and opened it again (FIX-HUB-BASE-HOME-ONE-STREAM-FLAKY). Through each piece's own loader, not another `import()`: a
+ * module already here still resolves in a later task, after the stream opened. A piece that does not load never keeps
+ * the hub from mounting: it loads again at render, and Vue hands that failure to base's report (`installErrorReport`);
+ * one still loading past the wait paints when its chunk comes.
  */
 function chromeLoaded(): Promise<unknown> {
-  return Promise.allSettled(Object.values(CHROME).map((piece) => (piece as unknown as AsyncPiece).__asyncLoader()));
+  const loaded = Promise.allSettled(Object.values(CHROME).map((piece) => (piece as AsyncPiece).__asyncLoader?.()));
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const waited = new Promise<void>((resolve) => {
+    timer = setTimeout(() => {
+      console.warn(`hub: base's chrome did not load within ${CHROME_WAIT_MS} ms; the hub mounts without it`);
+      resolve();
+    }, CHROME_WAIT_MS);
+  });
+  return Promise.race([loaded.finally(() => clearTimeout(timer)), waited]);
 }
 
 /** The Hub's sign out: the assistant's conversation of the tab is forgotten first (BASE-G120), then the shell's. */

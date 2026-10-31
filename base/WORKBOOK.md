@@ -2753,11 +2753,12 @@ Implicados: ACCOUNTS-F38
 - Las piezas de base en el marco (`CHROME` de `frontend/main.ts`: la campana, las apps seguidas junto al panel, la
   franja de bloqueo y «Mejorar plan») van cada una en su trozo, que la SPA carga a la vez que la primera pantalla, y
   monta cuando han llegado (o han fallado: una que no carga lo vuelve a intentar al pintarse y Vue lo pasa al informe
-  de errores de base). Así sus consultas vivas (`base.bell.counters`, `base.app.list`, `base.setup.status`) van en el
+  de errores de base), y como mucho 3 s (`CHROME_WAIT_MS`): un trozo que la red deja colgado nunca deja la página en
+  blanco; monta sin él, lo avisa en la consola y la pieza se pinta cuando llega. Así sus consultas vivas (`base.bell.counters`, `base.app.list`, `base.setup.status`) van en el
   mismo `/api/live` de la pantalla. Antes se montaban al llegar su trozo, y con un equipo lento (la CPU de la pestaña
   ×6) llegaban más de 150 ms después que las de la pantalla y reabrían el flujo (`net::ERR_ABORTED`; 7 de 9 cargas del
   Inicio). Se precargan con el cargador del propio componente de Vue: otro `import()` de un módulo ya cargado se
-  resuelve en otra tarea, cuando el flujo ya ha abierto. Lo comprueban `frontend/main.chrome.test.ts` y
+  resuelve en otra tarea, cuando el flujo ya ha abierto. Lo comprueban `frontend/main.chrome.test.ts`, `frontend/main.chrome-wait.test.ts` y
   `tests/e2e/base-home.spec.ts` («when base's chrome arrives late»: cada pieza llega un segundo tarde)
   (FIX-HUB-BASE-HOME-ONE-STREAM-FLAKY).
 - La SPA responde toda ruta sin URL propia en Django, salvo la que nombra un fichero (`base.spa.NOT_A_FILE`: el
