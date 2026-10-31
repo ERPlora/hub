@@ -1,5 +1,6 @@
-// The printing app's `routes.ts`: its three sections → their pages, behind a session, and nothing else
-// (main.ts reads the default export; menu, permissions and active apps come from the server).
+// The printing app's `routes.ts`: its four sections → their pages, behind a session, and its piece beside the pane (the
+// print host, a background route the shell mounts on every screen, PRINTING-F18); nothing else (main.ts reads the
+// default export; menu, permissions and active apps come from the server).
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -16,6 +17,7 @@ vi.mock('./pages/PrintersPage.vue', () => ({ default: { name: 'PrintersPage' } }
 vi.mock('./pages/DevicesPage.vue', () => ({ default: { name: 'DevicesPage' } }));
 vi.mock('./pages/JobsPage.vue', () => ({ default: { name: 'JobsPage' } }));
 vi.mock('./pages/SettingsPage.vue', () => ({ default: { name: 'SettingsPage' } }));
+vi.mock('./components/PrintHost.vue', () => ({ default: { name: 'PrintHost' } }));
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -24,9 +26,11 @@ async function load(r: RouteRecordRaw): Promise<RouteComponent> {
   return (await loader()).default;
 }
 
+const screens = routes.filter((r) => r.meta?.background !== true);
+
 describe('printing routes.ts', () => {
   it('maps the printers, the devices, the queue and the settings, all behind a session', () => {
-    expect(routes.map((r) => [r.path, r.meta?.auth])).toEqual([
+    expect(screens.map((r) => [r.path, r.meta?.auth])).toEqual([
       ['/printing/printers', true],
       ['/printing/devices', true],
       ['/printing/jobs', true],
@@ -34,8 +38,15 @@ describe('printing routes.ts', () => {
     ]);
   });
 
+  it('has one piece beside the pane, the print host, loaded on demand behind a session (no screen of its own)', async () => {
+    const background = routes.filter((r) => r.meta?.background === true);
+    expect(background.map((r) => [r.path, r.meta?.auth])).toEqual([['/printing/print-host', true]]);
+    expect(typeof background[0].component).toBe('function');
+    expect(await load(background[0])).toEqual({ name: 'PrintHost' });
+  });
+
   it('loads each page on demand (one chunk per page), not at boot', async () => {
-    for (const r of routes) expect(typeof r.component).toBe('function');
+    for (const r of screens) expect(typeof r.component).toBe('function');
     expect(await load(routes[0])).toEqual({ name: 'PrintersPage' });
     expect(await load(routes[1])).toEqual({ name: 'DevicesPage' });
     expect(await load(routes[2])).toEqual({ name: 'JobsPage' });
