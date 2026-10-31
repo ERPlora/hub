@@ -405,10 +405,32 @@ class AppListOut(Schema):
     enabled: int
 
 
-class AppChangeIn(Schema):
-    """``base.app.enable`` and ``base.app.disable``: one app of the business, by its id."""
+#: An app as the person names it (BASE-F23, F24; hub#539): ``base.queries.find_app`` resolves it.
+APP_SAID = (
+    "The app: its name as the person says it (e.g. «Reservas»), or its id. A name that fits several apps is refused "
+    "naming them: ask the person which one."
+)
 
-    app: str = Field(max_length=100, description="The app's id, as base.app.list gives it (e.g. «task»).")
+
+class AppRefIn(Schema):
+    """``base.app.get``: one app of the business, by its name or its id."""
+
+    app: str = Field(max_length=100, description=APP_SAID)
+
+
+class AppRefOut(Schema):
+    """Which app a name names: its id, its name in the reader's language and its state, as the Apps screen says it."""
+
+    id: str
+    name: str
+    state: Literal["on", "off", "blocked"]
+
+
+class AppChangeIn(Schema):
+    """``base.app.enable`` and ``base.app.disable``: one app of the business, by its name or its id; the assistant's
+    card names it as ``base.app.get`` reads it, never by its id."""
+
+    app: str = Field(max_length=100, description=APP_SAID, json_schema_extra=names("base.app.get", by="app"))
 
 
 class AppNameOut(Schema):
@@ -424,6 +446,9 @@ class AppChangeOut(Schema):
     chosen: bool
     #: Turned on with it because it needs them, or off with it because nothing else needs them any more; by name.
     along: list[AppNameOut]
+    already: bool = Field(
+        description="It was on already (turning it on) or off already (turning it off): nothing went on or off."
+    )
 
 
 class PlanUsageIn(Schema):
