@@ -459,6 +459,18 @@ def test_taking_its_app_s_condition_off_is_refused_and_says_whose_it_is(declared
     assert (stored(flow_id).trigger_filter, stored(flow_id).version) == (ONLY_THE_CUSTOMER, before.version)
 
 
+def test_each_condition_its_app_puts_is_refused_on_its_own_like_the_table_answer_s_live_messages_only():
+    # The table answer by WhatsApp has two: inbound messages and, this task's fix, only the live ones. Leaving out
+    # either one while keeping the other is refused, and nothing changes.
+    flow_id = str(run("flow.recipe.enable", {"recipe": "whatsapp_inbox/reservation_from_whatsapp"}, ctx_for("hub_owner")).flow.id)
+    before = stored(flow_id)
+    for kept, gone in (("input.direction", "input.source"), ("input.source", "input.direction")):
+        trigger = {"kind": "event", "event": "whatsapp_inbox.message.received", "filter": {kept: before.trigger_filter[kept]}}
+        error = refused(flow_id, {"trigger": trigger})
+        assert (error.code, f"«{gone}»" in error.fields["trigger.filter"]) == ("flow.recipe_fixed", True)
+    assert (stored(flow_id).trigger_filter, stored(flow_id).version) == (before.trigger_filter, before.version)
+
+
 def test_taking_a_datum_its_app_fixes_off_or_leaving_it_empty_is_refused_and_says_whose_it_is(declared):  # noqa: F811
     flow_id = turned_on_before_the_fix(declared)
     [step] = read(flow_id).steps

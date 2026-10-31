@@ -195,6 +195,14 @@ describe('AssistantStepPanel fixed data', () => {
     expect(m.find('flow-assistant-unpin-s1-reservation.reservation.cancel-on_behalf_of').exists()).toBe(true);
   });
 
+  it('locks nothing of a tool the step may no longer use: its leftover fixed datum still comes off (FLOW-F36)', async () => {
+    const step: Step = { ...TABLE, tools: ['reservation.reservation.update'], pinned: PINNED.pinned };
+    const fixedByApp: FixedByAppOut = { app: 'reservation', app_name: 'Reservations', event: '', filter: [], pinned: { s1: { 'reservation.reservation.cancel': ['on_behalf_of'] } } };
+    const m = await mountFlow(AssistantStepPanel, { props: { step, index: 0, steps: [step], catalog: BOOKING, errors: {}, pick: async () => null, fixedByApp } });
+    expect(m.find('flow-assistant-unpin-s1-reservation.reservation.cancel-on_behalf_of').exists()).toBe(true);
+    expect(m.find('flow-assistant-setbyapp-s1-reservation.reservation.cancel-on_behalf_of').exists()).toBe(false);
+  });
+
   it('keeps the catalog still loading from breaking the fixed data', async () => {
     const m = await mountFlow(AssistantStepPanel, { props: { step: PINNED, index: 0, steps: [PINNED], catalog: null, errors: {}, pick: async () => null } });
     expect(m.find('flow-assistant-pin-s1-reservation.reservation.cancel-on_behalf_of').exists()).toBe(true);
