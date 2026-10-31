@@ -34,12 +34,15 @@ puts it off 30 s, and a request of a newer code than this worker's (``AppActivat
 ahead of this code: a deploy rolling) is left to a worker of that code, 60 s. The ``hub_due`` rung is left to the
 ``hub_due`` pass, which ends it (the hub is ready).
 
-Then two passes of the data (round 2026-10-30 of PLAN-DB, S2b): ``_data`` takes one
-hub with data work due (``base.services.claim_next_data_hub``, under its lease): a reset asked (its database copied by
+Then two slow passes of the data (round 2026-10-30 of PLAN-DB, S2b), each in a
+thread of its own (:class:`Background`, one piece at a time, its own connections closed when it ends; PLAN-DB round
+2026-10-31b, C8): the loop starts them and goes on, so a copy of minutes never holds the relay, the tasks, VeriFactu or
+the hubs due. ``_data`` takes one hub with data work due (``base.services.claim_next_data_hub``, under its lease): a reset asked (its database copied by
 ``base.tenancy.dumps``, then, only if the copy was kept, its sections emptied by ``base.hub.reset_apply`` in its
 database) or the copy of a business that left (tried again later when it fails); ``_usage`` measures the last UTC day
-once it ended (``base.usage``, 00:15 UTC, once a night whichever worker claims it). Neither runs with
-``databases_only``.
+once it ended (``base.usage``, 00:15 UTC, before the SaaS collects it at 01:15; once a night whichever worker claims it).
+Neither runs with ``databases_only``. On the way out the worker waits for them :data:`BACKGROUND_GRACE_SECONDS` at most:
+a copy hears the stop, kills ``pg_dump`` and gives its lease back, and its work stays due.
 
 The order of a tick (review of hub#471): the tasks and the relay of phase 1's shared database first, so a pass that
 makes databases holds back the kitchen, the stock or VeriFactu of the hubs that share it a few seconds at most
@@ -66,7 +69,9 @@ import time
 from collections.abc import Callable
 from functools import cache
 
-from django.db import close_old_connections
+from functools import partial
+
+from django.db import close_old_connections, connections
 from django.utils import timezone
 
 from live.context import OperationContext, Scope
@@ -95,6 +100,9 @@ HUB_PASS_SECONDS = 3.0
 _synced: set = set()
 #: The id of the last hub the pass served: the next pass starts after it, so every hub gets its turn.
 _next_hub = None
+#: How long the worker waits on its way out for its slow passes, all together (ECS kills the task 30 s after SIGTERM,
+#: and the calls in flight get OUTBOUND_GRACE_SECONDS after them).
+BACKGROUND_GRACE_SECONDS = 10.0
 #: The last night this process measured (``base.usage``): the next tick checks the registry again only for a newer one.
 _measured: dt.date | None = None
 #: How long the lease of a hub whose sections are being emptied lasts (its copy renews a lease of a minute while it
@@ -171,6 +179,8 @@ def run(
         registered = f"{result.written} app(s) registered: {', '.join(result.apps)}"
     logger.info("worker: waiting for work (%s).", registered)
     next_reap: dt.datetime | None = None
+    # The slow passes, each in a thread of its own and one at a time: the loop keeps ticking while they run.
+    data_pass, usage_pass = Background("data"), Background("usage")
     while not stop.is_set():
         now = clock()
         if not databases_only:
@@ -179,16 +189,63 @@ def run(
             _hubs(now)
         _activations(now)
         if not databases_only:
-            _data(now)
-            _usage(now)
+            data_pass.start(partial(_data, now, stop))
+            usage_pass.start(partial(_usage, now))
         if next_reap is None or now >= next_reap:
             _reap(now)
             next_reap = now + dt.timedelta(seconds=REAPER_INTERVAL_SECONDS)
         _due(now)
         wait(tick_seconds)
+    # On the way out: a copy hears the stop (pg_dump killed, its lease given back); both get a while, together.
+    deadline = time.monotonic() + BACKGROUND_GRACE_SECONDS
+    for runner in (data_pass, usage_pass):
+        runner.join(max(0.0, deadline - time.monotonic()))
     outbound.stop(OUTBOUND_GRACE_SECONDS)
     logger.info("worker: stopped.")
     return 0
+
+
+class Background:
+    """One slow pass at a time in a thread of its own (PLAN-DB round 2026-10-31b, C8): the data pass, whose copy of a
+    hub's database may take minutes, and the nightly measurement. The loop starts it when it is not running and goes on
+    with its tick; a piece that fails is logged and the next tick starts it again. Each piece opens its own connections
+    (the thread starts with no database context: the passes enter theirs) and closes all of them when it ends."""
+
+    def __init__(self, name: str) -> None:
+        self.name = name
+        self._thread: threading.Thread | None = None
+
+    def busy(self) -> bool:
+        return self._thread is not None and self._thread.is_alive()
+
+    def start(self, piece: Callable[[], object]) -> bool:
+        """Run ``piece`` in a thread of its own unless the last one still runs; whether it started."""
+        if self.busy():
+            return False
+        self._thread = threading.Thread(target=self._run, args=(piece,), name=f"worker-{self.name}", daemon=True)
+        self._thread.start()
+        return True
+
+    def _run(self, piece: Callable[[], object]) -> None:
+        try:
+            piece()
+        except Exception:
+            logger.exception("worker: the %s pass failed; the next tick starts it again.", self.name)
+        finally:
+            connections.close_all()  # this thread's own connections
+
+    def join(self, timeout: float) -> bool:
+        """Wait up to ``timeout`` seconds for the piece running; whether none runs after."""
+        if self._thread is None:
+            return True
+        self._thread.join(timeout)
+        if self._thread.is_alive():
+            logger.warning(
+                "worker: the %s pass is still running on the way out; its lease runs out and another worker takes it.",
+                self.name,
+            )
+            return False
+        return True
 
 
 def _reap(now: dt.datetime) -> None:
@@ -332,10 +389,12 @@ def _code() -> migrator.CodeMigrations:
     return migrator.code_migrations()
 
 
-def _data(now: dt.datetime) -> None:
+def _data(now: dt.datetime, stop: threading.Event | None = None) -> None:
     """The data work of one hub due by ``now``, under its lease (round 2026-10-30 of PLAN-DB, decision 2 and proposal
-    (a)): a reset asked (its database copied, then its sections emptied) or the copy of a business that left. One hub a
-    tick: a copy takes a while. A failure is logged and the work stays due (a lease lost is left to its holder)."""
+    (a)): a reset asked (its database copied, then its sections emptied) or the copy of a business that left. It runs in
+    the worker's data thread (:class:`Background`), one hub at a time: a copy takes a while, and the loop goes on
+    meanwhile. A failure is logged and the work stays due (a lease lost is left to its holder); ``stop`` set stops the
+    copy in course (``pg_dump`` killed), its lease given back and the work left due for the next worker."""
     try:
         with use_control():
             hub_id = services.claim_next_data_hub(now, provision.LEASE)
@@ -348,10 +407,13 @@ def _data(now: dt.datetime) -> None:
     try:
         with use_control():
             hub = services.registry_row(hub_id)
+            cancelled = stop.is_set if stop is not None else None
             if hub is not None and hub.reset_requested_at is not None:
-                _reset(hub)
+                _reset(hub, cancelled)
             elif hub is not None and services.offboarding_due(hub):
-                _offboarding_copy(hub, now)
+                _offboarding_copy(hub, now, cancelled)
+    except dumps.DumpStopped:
+        logger.info("worker: the copy of the hub %s was stopped with the worker; it stays due.", hub_id)
     except Exception:
         logger.exception("worker: the data work of the hub %s failed; it is tried again.", hub_id)
     finally:
@@ -393,7 +455,7 @@ def _heartbeat(hub) -> Callable[[], None]:
     return lambda: services.renew_lease(hub.pk, provision.LEASE)
 
 
-def _reset(hub) -> None:
+def _reset(hub, cancelled: Callable[[], bool] | None = None) -> None:
     """Copy the database of ``hub`` and, only if the copy was kept, empty the sections asked; each step noted."""
     asked = hub.reset_sections or {}
     if hub.status != Hub.Status.READY or not hub.db_name:
@@ -402,7 +464,11 @@ def _reset(hub) -> None:
         return
     try:
         copy = dumps.dump_hub(
-            hub, kind=HubDump.Kind.RESET, requested_by=asked.get("requested_by", ""), heartbeat=_heartbeat(hub)
+            hub,
+            kind=HubDump.Kind.RESET,
+            requested_by=asked.get("requested_by", ""),
+            heartbeat=_heartbeat(hub),
+            cancelled=cancelled,
         )
     except dumps.DumpError as failed:
         logger.warning("worker: the copy before the reset of %s failed, nothing was emptied: %s", hub.slug, failed)
@@ -424,10 +490,10 @@ def _reset(hub) -> None:
     logger.info("worker: the business %s was reset (%s) after its copy %s.", hub.slug, ", ".join(asked.get("apps") or []), copy.key)
 
 
-def _offboarding_copy(hub, now: dt.datetime) -> None:
+def _offboarding_copy(hub, now: dt.datetime, cancelled: Callable[[], bool] | None = None) -> None:
     """Copy the database of the business ``hub`` that left; a failure is tried again at its next attempt."""
     try:
-        dumps.dump_hub(hub, kind=HubDump.Kind.OFFBOARDING, heartbeat=_heartbeat(hub))
+        dumps.dump_hub(hub, kind=HubDump.Kind.OFFBOARDING, heartbeat=_heartbeat(hub), cancelled=cancelled)
     except dumps.DumpError as failed:
         logger.warning("worker: the copy of %s, which left, failed; it is tried again: %s", hub.slug, failed)
         services.offboarding_copy_failed(hub.pk, now, f"{failed.code}: {failed}")

@@ -1478,9 +1478,14 @@ def _demo_full() -> OperationError:
 
 
 def _platform_or_its_admin(ctx: OperationContext) -> None:
-    """The platform, or one of its admins in the Hub admin (staff and superuser, ``platform_admin``); nobody else."""
+    """The platform, or one of its admins in the Hub admin (staff and superuser, ``platform_admin``) on the platform's
+    own scope (``REGISTRY_SCOPE``); nobody else: on a business's host, staff is no more than anyone there (review of
+    hub#490)."""
+    from base.tenancy.context import PLATFORM_SCOPE_KIND
+
     actor = ctx.actor
-    if getattr(actor, "is_staff", False) and getattr(actor, "is_superuser", False):
+    on_the_platform = ctx.scope.kind == PLATFORM_SCOPE_KIND
+    if on_the_platform and getattr(actor, "is_staff", False) and getattr(actor, "is_superuser", False):
         return
     internal_only(ctx)
 
@@ -2163,14 +2168,14 @@ def renew_lease(hub_id: UUID, lease: dt.timedelta, *, owner: str = LEASE_OWNER) 
 def hub_reset_apply(ctx: OperationContext, data: HubResetApplyIn) -> dict:
     """Empty the sections of a reset whose copy was kept (``base.worker``), in the hub's own database, in one
     transaction: every row of them goes, or none (a failure rolls back the rows already removed). Never on phase 1's
-    shared database (PLAN-DB §14.14); only the platform runs it."""
+    shared database (PLAN-DB §14.14); only the platform runs it, refused to anyone else first (review of hub#490)."""
+    internal_only(ctx)
     hub = Hub.objects.filter(slug=ctx.scope.key).first()
     if not has_own_database(hub):
         raise Conflict(
             gettext("Resetting the business is not available yet. Undo a load instead, or remove what you want from each app."),
             code="base.reset_shared_database",
         )
-    internal_only(ctx)
     chosen = list(dict.fromkeys(data.apps))
     with translation.override(ctx.language):
         removed = blueprint.reset(ctx, chosen)
