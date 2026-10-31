@@ -12,10 +12,9 @@ from uuid import UUID
 from django.db.models import Count, F, IntegerField, Q, QuerySet, Sum, Value
 from django.db.models.functions import Coalesce
 from django.utils.translation import gettext_lazy as _
-from live.context import OperationContext, system_context
+from live.context import OperationContext
 from live.errors import Conflict, NotFound
 from live.operations import INTERNAL, operation
-from live.operations import get as get_operation
 
 from apps.customer.models import (
     Activity,
@@ -110,30 +109,20 @@ FORMULA_STARTS = ("=", "+", "-", "@", "\t", "\r")
 
 
 def business_country(ctx: OperationContext | None = None) -> str:
-    """The country a phone without prefix belongs to: the business's, as ``base.business.get`` answers it (the one its
-    currency comes from, ``base.operations.business_currency``), read as the platform. Spain when the business says
-    none (a demo) or there is no business to ask (no context, or a scope with no hub)."""
-    if ctx is None:
-        return DEFAULT_COUNTRY
-    read = get_operation(platform.BUSINESS)
-    try:
-        business = read(system_context(ctx.scope), read.input())
-    except NotFound:
-        return DEFAULT_COUNTRY
-    return business.country or DEFAULT_COUNTRY
+    """The country a phone without prefix belongs to. Phase 1 has no settings per business: Spain."""
+    return DEFAULT_COUNTRY
 
 
 # ── Lookups shared with services.py ─────────────────────────────────────────────────────────────
 
 
-def _matching_ids(reference: str, ctx: OperationContext | None) -> list[UUID]:
-    """The live cards whose email, phone or name is exactly ``reference`` (at most two: one is enough); a phone
-    without prefix is read in ``ctx``'s business's country (Spain without a context)."""
+def _matching_ids(reference: str) -> list[UUID]:
+    """The live cards whose email, phone or name is exactly ``reference`` (at most two: one is enough)."""
     text = reference.strip()
     cards = Customer.objects.live()
     if "@" in text:
         return list(cards.filter(email__iexact=text).values_list("id", flat=True)[:2])
-    numbers = candidates(text, business_country(ctx)) if any(ch.isdigit() for ch in text) else []
+    numbers = candidates(text, business_country())
     if numbers:
         return list(
             cards.filter(phone__in=numbers)
@@ -151,7 +140,6 @@ def find_customer(
     *,
     lock: bool = False,
     live: bool = True,
-    ctx: OperationContext | None = None,
 ) -> Customer:
     """The card ``customer_id`` names or, without it, the one live card ``reference`` names.
 
@@ -161,7 +149,7 @@ def find_customer(
     several cards.
     """
     if customer_id is None:
-        ids = _matching_ids(reference or "", ctx)
+        ids = _matching_ids(reference or "")
         if not ids:
             raise NotFound(
                 NO_CUSTOMER_MATCHES % {"reference": reference},
@@ -385,7 +373,7 @@ def list_customers(ctx: OperationContext, params: CustomerListIn) -> dict:
     },
 )
 def customer_detail(ctx: OperationContext, data: CustomerRefIn) -> dict:
-    return load_detail(find_customer(data.id, data.customer, ctx=ctx))
+    return load_detail(find_customer(data.id, data.customer))
 
 
 @operation(
@@ -568,7 +556,7 @@ def list_fields(ctx: OperationContext, params: FieldListIn) -> dict:
     },
 )
 def list_activity(ctx: OperationContext, params: ActivityListIn) -> dict:
-    customer = find_customer(params.customer_id, params.customer, ctx=ctx)
+    customer = find_customer(params.customer_id, params.customer)
     entries = Activity.objects.filter(customer=customer)
     if params.search:
         entries = entries.filter(
@@ -588,7 +576,7 @@ def list_activity(ctx: OperationContext, params: ActivityListIn) -> dict:
     },
 )
 def list_purchases(ctx: OperationContext, params: PurchaseListIn) -> dict:
-    customer = find_customer(params.customer_id, params.customer, ctx=ctx)
+    customer = find_customer(params.customer_id, params.customer)
     purchases = Purchase.objects.filter(customer=customer)
     if params.search:
         purchases = purchases.filter(sale_id__icontains=params.search.strip())
@@ -647,7 +635,7 @@ def purchase_divergences(ctx: OperationContext, params: DivergencesIn) -> dict:
     },
 )
 def consent_state(ctx: OperationContext, data: ConsentStateIn) -> dict:
-    customer = find_customer(data.customer_id, data.customer, ctx=ctx)
+    customer = find_customer(data.customer_id, data.customer)
     return {"customer_id": customer.id, "rows": consent_states(customer)}
 
 
@@ -662,7 +650,7 @@ def consent_state(ctx: OperationContext, data: ConsentStateIn) -> dict:
     },
 )
 def consent_history(ctx: OperationContext, params: ConsentHistoryIn) -> dict:
-    customer = find_customer(params.customer_id, params.customer, ctx=ctx)
+    customer = find_customer(params.customer_id, params.customer)
     facts = Consent.objects.filter(customer=customer)
     if params.search:
         text = params.search
@@ -708,7 +696,7 @@ def order_customer(ctx: OperationContext, data: OrderIn) -> dict:
     },
 )
 def list_orders(ctx: OperationContext, params: OrderListIn) -> dict:
-    customer = find_customer(params.customer_id, params.customer, ctx=ctx)
+    customer = find_customer(params.customer_id, params.customer)
     links = OrderLink.objects.filter(customer=customer)
     if params.search:
         links = links.filter(order_id__icontains=params.search.strip())
@@ -760,4 +748,4 @@ def load_health(customer: Customer) -> dict:
     ai=INTERNAL,
 )
 def health_detail(ctx: OperationContext, data: HealthDetailIn) -> dict:
-    return load_health(find_customer(data.customer_id, data.customer, ctx=ctx))
+    return load_health(find_customer(data.customer_id, data.customer))
