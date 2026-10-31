@@ -158,9 +158,11 @@ msgctxt "data copy"
 msgid "On leaving"
 msgstr "Al darse de baja"
 
+msgctxt "data copy"
 msgid "kind"
 msgstr "tipo"
 
+msgctxt "data copy"
 msgid "key"
 msgstr "clave"
 
@@ -177,6 +179,7 @@ msgstr "copia de los datos"
 msgid "data copies"
 msgstr "copias de los datos"
 
+msgctxt "hub usage"
 msgid "day"
 msgstr "día"
 
@@ -192,6 +195,7 @@ msgstr "personas ese día"
 msgid "people in 30 days"
 msgstr "personas en 30 días"
 
+msgctxt "hub usage"
 msgid "measured at"
 msgstr "medido el"
 
@@ -207,9 +211,11 @@ msgstr "entrada diaria"
 msgid "daily entries"
 msgstr "entradas diarias"
 
+msgctxt "hub usage"
 msgid "started at"
 msgstr "empezada el"
 
+msgctxt "hub usage"
 msgid "finished at"
 msgstr "terminada el"
 
@@ -225,3 +231,11 @@ msgstr "mediciones nocturnas"
 msgctxt "data copy"
 msgid "asked by"
 msgstr "pedida por"
+
+msgctxt "hub usage"
+msgid "host"
+msgstr "host"
+
+msgctxt "hub usage"
+msgid "SaaS account"
+msgstr "cuenta de ERPlora"

@@ -265,8 +265,8 @@ class HubDump(UUIDModel):
         OFFBOARDING = "offboarding", pgettext_lazy("data copy", "On leaving")
 
     hub = models.ForeignKey(Hub, on_delete=models.CASCADE, related_name="dumps", verbose_name=_("hub"))
-    kind = models.CharField(_("kind"), max_length=16, choices=Kind.choices)
-    key = models.CharField(_("key"), max_length=512, unique=True)
+    kind = models.CharField(pgettext_lazy("data copy", "kind"), max_length=16, choices=Kind.choices)
+    key = models.CharField(pgettext_lazy("data copy", "key"), max_length=512, unique=True)
     bytes = models.PositiveBigIntegerField(_("size (bytes)"))
     created_at = models.DateTimeField(pgettext_lazy("data copy", "made at"))
     requested_by = models.CharField(pgettext_lazy("data copy", "asked by"), max_length=150, blank=True, default="")
@@ -288,12 +288,12 @@ class HubUsageDaily(UUIDModel):
     «Contrato para el Hub»)."""
 
     hub = models.ForeignKey(Hub, on_delete=models.CASCADE, related_name="usage", verbose_name=_("hub"))
-    day = models.DateField(_("day"))
+    day = models.DateField(pgettext_lazy("hub usage", "day"))
     db_bytes = models.PositiveBigIntegerField(_("database (bytes)"), default=0)
     s3_bytes = models.PositiveBigIntegerField(_("files (bytes)"), default=0)
     active_users_1d = models.PositiveIntegerField(_("people that day"), default=0)
     active_users_30d = models.PositiveIntegerField(_("people in 30 days"), default=0)
-    measured_at = models.DateTimeField(_("measured at"))
+    measured_at = models.DateTimeField(pgettext_lazy("hub usage", "measured at"))
 
     class Meta:
         verbose_name = _("daily use of a hub")
@@ -312,9 +312,9 @@ class HubVisit(models.Model):
     measurement counts as the hub's active people (``base.usage``), which keeps the last 31 days only."""
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid7, editable=False)
-    host = models.CharField(_("host"), max_length=63)
-    day = models.DateField(_("day"))
-    saas_user_id = models.CharField(_("SaaS account"), max_length=64)
+    host = models.CharField(pgettext_lazy("hub usage", "host"), max_length=63)
+    day = models.DateField(pgettext_lazy("hub usage", "day"))
+    saas_user_id = models.CharField(pgettext_lazy("hub usage", "SaaS account"), max_length=64)
 
     class Meta:
         verbose_name = _("daily entry")
@@ -327,14 +327,14 @@ class HubVisit(models.Model):
         return f"{self.saas_user_id} @ {self.host} ({self.day})"
 
 
-class UsageRun(models.Model):
+class UsageRun(UUIDModel):
     """One night of measuring (``base.usage``): the day (UTC) measured, when a worker started it and when it finished.
     A day without a finished run is one the Hub has not measured yet (``GET /internal/usage`` answers 409
     ``usage_not_ready``); a run left unfinished (its worker stopped) is taken over after a while."""
 
-    day = models.DateField(_("day"), primary_key=True)
-    started_at = models.DateTimeField(_("started at"))
-    finished_at = models.DateTimeField(_("finished at"), null=True, blank=True)
+    day = models.DateField(pgettext_lazy("hub usage", "day"), unique=True)
+    started_at = models.DateTimeField(pgettext_lazy("hub usage", "started at"))
+    finished_at = models.DateTimeField(pgettext_lazy("hub usage", "finished at"), null=True, blank=True)
     hubs = models.PositiveIntegerField(_("hubs measured"), default=0)
 
     class Meta:

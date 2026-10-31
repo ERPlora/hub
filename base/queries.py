@@ -699,7 +699,7 @@ def hub_dump_link(ctx: OperationContext, data: HubDumpLinkIn) -> dict:
         if dump is None:
             raise NotFound(gettext("This copy is no longer kept."))
         try:
-            url = dumps.presigned_url(dump.key)
+            url = dumps.presigned_url(dump.key, filename=dumps.file_name(hub.slug, dump.key))
         except dumps.DumpsUnavailable:
             raise _dumps_unavailable() from None
         return {"url": url, "expires_at": dumps.link_expires_at(url)}
@@ -729,7 +729,7 @@ def hub_dump_list(ctx: OperationContext, data: HubGetIn) -> dict:
                 "kind": dump.kind,
                 "created_at": dump.created_at,
                 "bytes": dump.bytes,
-                "url": dumps.presigned_url(dump.key),
+                "url": dumps.presigned_url(dump.key, filename=dumps.file_name(hub.slug, dump.key)),
             }
             for dump in rows
         ]

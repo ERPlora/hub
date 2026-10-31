@@ -201,14 +201,21 @@ def link_expires_at(url: str) -> dt.datetime:
     return signed_at + dt.timedelta(seconds=int(query["X-Amz-Expires"][0]))
 
 
-def presigned_url(key: str, *, minutes: int = LINK_MINUTES) -> str:
-    """A link to the copy at ``key`` that works for ``minutes`` (15)."""
+def file_name(slug: str, key: str) -> str:
+    """The name a copy is saved with: ``erplora-<slug>-<AAAAMMDDTHHMMSSZ>-<kind>.dump``."""
+    return f"erplora-{slug}-{key.rsplit('/', 1)[-1]}"
+
+
+def presigned_url(key: str, *, minutes: int = LINK_MINUTES, filename: str = "") -> str:
+    """A link to the copy at ``key`` that works for ``minutes`` (15); with ``filename``, the browser saves it under
+    that name (``Content-Disposition: attachment``) instead of opening it."""
     target = bucket()
     if not target:
         raise DumpsUnavailable("No bucket is named for the copies (HUB_DUMPS_BUCKET).")
+    params = {"Bucket": target, "Key": key}
+    if filename:
+        params["ResponseContentDisposition"] = f'attachment; filename="{filename}"'
     try:
-        return client().generate_presigned_url(
-            "get_object", Params={"Bucket": target, "Key": key}, ExpiresIn=minutes * 60
-        )
+        return client().generate_presigned_url("get_object", Params=params, ExpiresIn=minutes * 60)
     except (BotoCoreError, ClientError) as error:
         raise DumpsUnavailable(f"The link to {key} could not be signed: {error}") from error

@@ -74,6 +74,10 @@ def test_the_saas_gets_the_copies_newest_first_each_with_a_link_of_15_minutes(du
         assert link.scheme in {"http", "https"}
         assert link.path == f"/{dumps_bucket}/{row['id']}"
         assert urllib.parse.parse_qs(link.query)["X-Amz-Expires"] == ["900"]
+        name = row["id"].rsplit("/", 1)[-1]
+        assert urllib.parse.parse_qs(link.query)["response-content-disposition"] == [
+            f'attachment; filename="erplora-acme-{name}"'
+        ]
 
 
 @pytest.mark.parametrize("status", ["cancelled", "archiving"])
@@ -189,6 +193,7 @@ def test_the_link_of_a_copy_is_asked_on_each_click(dumps_bucket):
     query = urllib.parse.parse_qs(urllib.parse.urlsplit(link.url).query)
     assert urllib.parse.urlsplit(link.url).path.endswith(made.key)
     assert query["X-Amz-Expires"] == ["900"]
+    assert query["response-content-disposition"] == [f'attachment; filename="erplora-acme-{made.key.rsplit("/", 1)[-1]}"']
     signed_at = dt.datetime.strptime(query["X-Amz-Date"][0], "%Y%m%dT%H%M%SZ").replace(tzinfo=dt.UTC)
     assert link.expires_at == signed_at + dt.timedelta(minutes=15)
 

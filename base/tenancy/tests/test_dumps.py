@@ -207,3 +207,15 @@ def test_the_link_is_signed_for_15_minutes_and_downloads_the_copy(hub_a, dumps_b
 def test_without_a_bucket_there_is_no_link(no_dumps_bucket):
     with pytest.raises(dumps.DumpsUnavailable):
         dumps.presigned_url("0/20261031T101500Z-reset.dump")
+
+
+def test_the_link_downloads_the_copy_as_a_file_named_after_the_business(hub_a, dumps_bucket, moto_s3):
+    made = dumps.dump_hub(hub_a, kind=HubDump.Kind.RESET, now=AT)
+
+    url = dumps.presigned_url(made.key, filename=dumps.file_name(hub_a.slug, made.key))
+
+    query = urllib.parse.parse_qs(urllib.parse.urlsplit(url).query)
+    wanted = 'attachment; filename="erplora-tenant-a-20261031T101500Z-reset.dump"'
+    assert query["response-content-disposition"] == [wanted]
+    with urllib.request.urlopen(url) as answer:  # the tests' own S3 server
+        assert answer.headers["Content-Disposition"] == wanted

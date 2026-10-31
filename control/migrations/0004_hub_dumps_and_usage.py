@@ -17,7 +17,8 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='UsageRun',
             fields=[
-                ('day', models.DateField(primary_key=True, serialize=False, verbose_name='day')),
+                ('id', models.UUIDField(default=uuid.uuid7, editable=False, primary_key=True, serialize=False)),
+                ('day', models.DateField(unique=True, verbose_name='day')),
                 ('started_at', models.DateTimeField(verbose_name='started at')),
                 ('finished_at', models.DateTimeField(blank=True, null=True, verbose_name='finished at')),
                 ('hubs', models.PositiveIntegerField(default=0, verbose_name='hubs measured')),
