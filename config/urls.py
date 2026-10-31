@@ -15,6 +15,7 @@ from base.admin import open_hub
 from base.auth_views import auth_badge, auth_callback, auth_login, auth_logout, auth_pin
 from base.error_report import error_report
 from base.health import readyz
+from base.image_catalog import catalog_image
 from base.internal import (
     demo_codes,
     demos,
@@ -86,6 +87,8 @@ urlpatterns = [
     path("internal/whatsapp/channel", whatsapp_channel, name="internal-whatsapp-channel"),
     # The hub file store's files (base.media), on the hub's own host; /p is the public pages' prefix.
     path("p/media/<str:hub>/<path:name>", media, name="media"),
+    # The shared image library (base.image_catalog): every hub's, so on any host and to anyone.
+    path("p/catalog/<str:folder>/<str:name>", catalog_image, name="catalog-image"),
     # Last: every other path, save one that names a file (/robots.txt, /favicon.ico), which is a plain 404.
     re_path(spa_route(NON_SPA_PREFIXES), spa, name="spa"),
 ]

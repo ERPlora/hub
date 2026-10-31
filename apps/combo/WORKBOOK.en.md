@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:5f5d62d404be5322461b9d87294d97f5c0d3e2fa3073adc11370ebf2b1d40f1c -->
+<!-- generated from WORKBOOK.md sha256:8ad8dcb8ff062e1378428431f31755fc73493bd9b139d5be8f26e25432cb3c0a -->
 
 ## What it is for and who it is for
 
@@ -70,7 +70,8 @@ Initial setup, step by step:
 
 ### Menus
 Menu **Menus**. Table of menus with the search box "Search a menu…" (it searches by name and by
-kitchen name), table or cards view and columns: Name (sorts and filters), "Closed price" (in the business's currency; sorts), "How
+kitchen name), table or cards view and columns: "Photo" (the thumbnail, or the initials over its colour),
+Name (sorts and filters), "Closed price" (in the business's currency; sorts), "How
 it is sold" ("Eat in" or "Take away"; sorts and filters), "On sale" (Yes or No; sorts and filters) and
 Order (sorts). Pages of 50, by order and name. With the right to manage there is a **+** button and,
 per row, "Edit details" and "Withdraw"; without it, only the list is seen. Tapping a row opens the
@@ -135,6 +136,7 @@ one.
 | COMBO-F11 | Send the menu to the kitchen | done |
 | COMBO-F12 | Mark a choice as sold out | done |
 | COMBO-F13 | When a product leaves the catalogue | done |
+| COMBO-F14 | The menu's photo | done |
 
 ### COMBO-F01 Look up and search the menus
 Status: done
@@ -440,6 +442,31 @@ on the till and the builder's notice says why. If removing the choices fails, Me
 on its own; meanwhile, they stay marked and nobody sells them.
 Involved: INVENTORY-F04, COMBO-F06
 
+### COMBO-F14 The menu's photo
+Status: done
+Actor: owner, administrator, manager, assistant
+Screen: Menus
+Steps:
+1. In the menu's "Edit details", under "Photo", tap "Choose from the library" (the image library opens
+   with the menu's name already searched, as in INVENTORY-F30) or "Upload photo" (a JPG, PNG or WebP of
+   up to 2 MB, as in INVENTORY-F31).
+2. Tap "Save": the menu keeps its photo. "Remove photo" leaves it with its initials.
+3. Through the assistant: "put a photo on the menu of the day". The assistant proposes up to five
+   images of the library by their title and asks which one; it never sets one on its own.
+In: the menu and the image chosen or the photo uploaded.
+Out: the menu with its photo (announces: menu changed); the till shows it on its tile without
+reloading (INVENTORY-F32), and the list of menus, in its row. The photo of its own is kept in the
+business's folder, only the business's people see it and it counts against its plan's space; uploading
+another one, choosing one of the library, "Remove photo" or withdrawing the menu (COMBO-F04) deletes it.
+If it fails: the same notices as the product's photo. Next to "Photo", on choosing it, and nothing is
+uploaded: "The photo weighs more than 2 MB. Choose a lighter one." and "That file is not a photo. Upload
+a JPG, PNG or WebP image.". If the menu was saved and the photo was not, the window says so ("The menu
+has been saved, but the photo has not: <reason>") with "Retry", which only sends the photo again, and
+the menu keeps the photo it had; the reason is "That image is no longer in the library. Choose another
+one.", "There is no space left for that file: your plan includes <space>." or "The photo could not be
+saved. Try again.". A menu without a photo, or whose photo does not load, shows its initials.
+Involved: COMBO-F03, COMBO-F04, COMBO-F07, INVENTORY-F30, INVENTORY-F31, INVENTORY-F32
+
 ## Services: what goes in and what comes out
 
 Everything can be asked for through the screens, the assistant (by voice or by text, with the session of
@@ -456,6 +483,7 @@ fits several, it says which ones and asks to choose (`combo.combo_ambiguous`, `c
 | A menu with its courses and its choices, whether it is on the till and why not (live) | view | F05, F06, F12 | `combo.combo.get` |
 | The till's menu catalogue: the ones that can be sold, with their courses and their available choices (live) | view | F07 | `combo.combo.for_sale` |
 | The line of a menu with what was chosen: amount, components and tax split | view | F08, F09, F10, F11 | `combo.combo.resolve` |
+| Up to five images of the library for a menu's photo, by its name; it sets none | view | F14 | `combo.combo.suggest_image` |
 
 ### What it offers: actions (they change data)
 
@@ -474,6 +502,8 @@ fits several, it says which ones and asks to choose (`combo.combo_ambiguous`, `c
 | Removes a choice | manage | F06 | `combo.option.delete` |
 | Orders the choices of a course, all at once | manage | F06 | `combo.option.reorder` |
 | Removes the choices of a deleted product | the platform only | F13 | `combo.option.drop_product` |
+| Sets or removes a menu's photo, from the library | manage | F14 | `combo.combo.set_image` |
+| Uploads a menu's own photo | manage | F14 | `combo.combo.upload_image` |
 
 ### What it announces
 
@@ -503,6 +533,7 @@ sold out belong to Inventory.
 |---|---|---|---|
 | Inventory (`requires`) | The products that can be a choice, with their name, SKU, price, tax category, whether they are active and whether they are sold out (direct read: it is a required app) | F06, F07, F08, F09, F12 | model `inventory.Product`; the screen's search box uses `inventory.product.list` with `is_active` and `include_sold_out` (the active ones, sold out or not) |
 | Taxes (`requires`) | The tax categories of the selector and that of the menu "eaten in" | F02, F03, F09 | model `tax.TaxCategory`; the selector uses `tax.category.list` |
+| Platform | The image library: searching it and naming by its title the image set on a menu | F14 | `base.catalog_image.search`, `base.catalog_image.get` |
 
 ### Contract with Sales
 
@@ -510,7 +541,8 @@ Sales does not require Menus: it calls it by the operation's name (`call_app`), 
 whoever sells, and if Menus is not active the till offers no menus.
 
 - **Till catalogue**: `useLive('combo.combo.for_sale', {limit: 50})`. Each row: `id`, `name`,
-  `kitchen_name`, `price` (cents), `supply_kind`, `sort_order` and `groups[]` (`id`, `name`,
+  `kitchen_name`, `price` (cents), `supply_kind`, `sort_order`, `image` and `image_url` (its photo, COMBO-F14) and
+  `groups[]` (`id`, `name`,
   `min_choices`, `max_choices` —0 no limit—, `allow_repeat`, `options[]` with `id`, `product_id`,
   `product_name`, `sku`, `price_delta`). Only menus on sale that can be completed and available
   choices.
@@ -553,4 +585,4 @@ whoever sells, and if Menus is not active the till offers no menus.
 | Permission | Owner | Administrator | Manager | Employee | Service |
 |---|---|---|---|---|---|
 | See the menus, the till's catalogue and calculate a menu line | yes | yes | yes | yes | `combo.view` |
-| Create, change, order and withdraw menus, courses and choices | yes | yes | yes | no | `combo.manage` |
+| Create, change, order and withdraw menus, courses and choices, and a menu's photo | yes | yes | yes | no | `combo.manage` |

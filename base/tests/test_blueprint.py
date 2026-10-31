@@ -13,6 +13,7 @@ Every test here runs against the real apps (inventory, service, table, customer)
 import base64
 import io
 import json
+import struct
 import zipfile
 
 import pytest
@@ -146,6 +147,59 @@ def test_a_zip_that_inflates_beyond_the_limit_is_refused_without_inflating_it(mo
         blueprint.read_zip(content)
 
     assert refused.value.reason == "too_big"
+
+
+PHOTO = f"media/inventory/products/{'0' * 32}.webp"
+
+
+def damaged(content: bytes, name: str, how: str) -> bytes:
+    """``content`` with its member ``name`` damaged after it was written, its directory left as it was."""
+    with zipfile.ZipFile(io.BytesIO(content)) as archive:
+        info = archive.getinfo(name)
+    local = info.header_offset
+    central = content.index(b"PK\x01\x02")  # the directory's entry of the first member, ``name`` in these files
+    name_length, extra_length = struct.unpack("<HH", content[local + 26 : local + 30])
+    data = local + 30 + name_length + extra_length
+    broken = bytearray(content)
+    if how == "a_byte_flipped":
+        broken[data + info.compress_size // 2] ^= 0xFF
+    elif how == "a_broken_deflate_block":
+        broken[data] = 0xFF
+    elif how == "cut_short":
+        for at in (local + 18, central + 20):  # the compressed size, in its header and in the directory
+            broken[at : at + 4] = struct.pack("<I", info.compress_size // 2)
+    elif how == "encrypted":
+        broken[local + 6] |= 1
+        broken[central + 8] |= 1
+    elif how == "an_unknown_compression":
+        broken[local + 8 : local + 10] = broken[central + 10 : central + 12] = struct.pack("<H", 77)
+    return bytes(broken)
+
+
+@pytest.mark.parametrize(
+    "member, how",
+    [
+        ("manifest.json", "a_byte_flipped"),
+        ("manifest.json", "a_broken_deflate_block"),
+        ("manifest.json", "cut_short"),
+        ("manifest.json", "encrypted"),
+        ("manifest.json", "an_unknown_compression"),
+        (PHOTO, "a_byte_flipped"),  # stored as it is, as an export writes it: only its CRC tells
+    ],
+)
+def test_a_file_whose_contents_were_damaged_is_refused_as_unreadable(member, how):
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+        if member == PHOTO:
+            webp = b"RIFF" + (1000).to_bytes(4, "little") + b"WEBP" + b"VP8 " * 250
+            archive.writestr(PHOTO, webp, compress_type=zipfile.ZIP_STORED)
+        archive.writestr("manifest.json", json.dumps(manifest()))
+
+    with pytest.raises(blueprint.BlueprintInvalid) as refused:
+        blueprint.read_zip(damaged(buffer.getvalue(), member, how))
+
+    assert refused.value.reason == "unreadable"
+    assert str(refused.value) == "The file is damaged or was changed by hand, so it cannot be read."
 
 
 def test_what_no_dataset_carries_is_left_out_of_the_blueprint():

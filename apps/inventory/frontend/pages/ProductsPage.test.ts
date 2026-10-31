@@ -89,10 +89,11 @@ describe('ProductsPage: the list', () => {
     expect(s.prop('searchPlaceholder')).toBe('Search product…');
   });
 
-  it('paints Name, SKU, Price, Stock («—» without stock control) and Status, sortable but Status', async () => {
+  it('paints Photo, Name, SKU, Price, Stock («—» without stock control) and Status, sortable but Photo and Status', async () => {
     const s = await setup();
     await s.show(LIST);
     expect(s.prop<Array<{ key: string; label: string; sortable?: boolean }>>('columns').map((c) => [c.key, c.label, !!c.sortable])).toEqual([
+      ['photo', 'Photo', false],
       ['name', 'Name', true],
       ['sku', 'SKU', true],
       ['price', 'Price', true],
@@ -102,6 +103,17 @@ describe('ProductsPage: the list', () => {
     expect(s.rows()[0].text()).toContain(formatMoney(220, 'en', { currency: 'EUR', decimals: 2 }));
     // The stock has its own hook, exact: a SKU may contain the same figure.
     expect(s.wrapper.findAll('[data-testid="inventory-product-stock"]').map((c) => c.text())).toEqual(['5', '—', '5']);
+  });
+
+  // INVENTORY-F32: before the name, the photo's thumbnail, or the initials when it has none.
+  it('each row shows the photo’s thumbnail before the name, or its initials', async () => {
+    const s = await setup();
+    const url = '/p/catalog/hospitality/americano.webp';
+    await s.show(page([product({ image: 'catalog:hospitality/americano', image_url: url }), MASSAGE], 2));
+    const img = s.testid('inventory-product-photo-p1').find('img');
+    expect([img.attributes('src'), img.attributes('alt'), img.attributes('loading')]).toEqual([url, 'Coffee', 'lazy']);
+    expect(s.testid('inventory-product-photo-p2').find('img').exists()).toBe(false);
+    expect(s.testid('inventory-product-photo-p2').text()).toBe('M');
   });
 
   it('Status: a switch for whoever can change products; «Not configured» opens the edit form', async () => {
@@ -466,7 +478,7 @@ describe('ProductsPage', () => {
   it('speaks Spanish', async () => {
     const s = await setup({ locale: 'es' });
     await s.show(LIST);
-    expect(s.prop<Array<{ label: string }>>('columns').map((c) => c.label)).toEqual(['Nombre', 'SKU', 'Precio', 'Stock', 'Estado']);
+    expect(s.prop<Array<{ label: string }>>('columns').map((c) => c.label)).toEqual(['Foto', 'Nombre', 'SKU', 'Precio', 'Stock', 'Estado']);
     expect(s.prop('searchPlaceholder')).toBe('Buscar producto…');
     expect(s.testid('inventory-products-unconfigured-p3').find('span').text()).toBe('Sin configurar · Falta la categoría fiscal');
     type Column = { key: string; filter?: { options?: Array<{ label: string }> } };

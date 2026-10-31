@@ -91,6 +91,30 @@ msgstr "Rectificativa: resto de causas (R4)"
 msgid "Rectifying invoice of a simplified invoice (R5)"
 msgstr "Rectificativa de una factura simplificada (R5)"
 
+#: models.py:58
+msgid "EU VAT number"
+msgstr "NIF-IVA de la UE"
+
+#: models.py:59
+msgid "Passport"
+msgstr "Pasaporte"
+
+#: models.py:60
+msgid "Tax ID of their country"
+msgstr "Identificación fiscal de su país"
+
+#: models.py:61
+msgid "Residence certificate"
+msgstr "Certificado de residencia"
+
+#: models.py:62
+msgid "Other document"
+msgstr "Otro documento"
+
+#: models.py:63
+msgid "Not registered"
+msgstr "No censado"
+
 #: models.py:61
 msgid "POS tickets"
 msgstr "Tiques del TPV"
@@ -136,6 +160,7 @@ msgid "current number"
 msgstr "número actual"
 
 #: models.py:94
+msgctxt "invoice"
 msgid "active"
 msgstr "activa"
 
@@ -144,18 +169,28 @@ msgid "default series"
 msgstr "serie predeterminada"
 
 #: models.py:96
+msgctxt "invoice"
 msgid "created at"
 msgstr "creada el"
 
 #: models.py:97 models.py:162 models.py:326
 msgid "updated at"
+msgstr "actualizado el"
+
+msgctxt "invoice"
+msgid "updated at"
 msgstr "actualizada el"
 
 #: models.py:99
+msgctxt "invoice"
 msgid "created by"
 msgstr "creada por"
 
 #: models.py:102 models.py:164
+msgid "updated by"
+msgstr "actualizado por"
+
+msgctxt "invoice"
 msgid "updated by"
 msgstr "actualizada por"
 
@@ -180,10 +215,12 @@ msgid "legal name"
 msgstr "razón social"
 
 #: models.py:149
+msgctxt "invoice"
 msgid "tax ID"
 msgstr "NIF"
 
 #: models.py:150
+msgctxt "invoice"
 msgid "address"
 msgstr "domicilio"
 
@@ -483,6 +520,7 @@ msgid "Equivalence surcharge"
 msgstr "Recargo de equivalencia"
 
 #: queries.py:61
+msgctxt "invoice"
 msgid "Exempt"
 msgstr "Exento"
 
@@ -492,6 +530,7 @@ msgid "Exempt (%(cause)s)"
 msgstr "Exento (%(cause)s)"
 
 #: queries.py:63
+msgctxt "invoice"
 msgid "Not subject"
 msgstr "No sujeto"
 

@@ -117,6 +117,10 @@ ORM_EXCEPTIONS: dict[str, str] = {
         "Pillow's Image.save writes the website's QR as a PNG into a memory buffer: no model and no database "
         "(round 2026-10-21)."
     ),
+    "base/images.py": (
+        "Pillow's Image.save writes a photo into a memory buffer, and the hub file store's save and delete keep and "
+        "remove its file (storages, not the ORM): no model and no database (round 2026-10-30)."
+    ),
     "base/files.py": (
         "Files (APP-BASE-8) writes the business's files with Django's Storage API on STORAGES['hub_files'] (save, "
         "delete) under the hub's prefix: no model and no database (it imports neither, "

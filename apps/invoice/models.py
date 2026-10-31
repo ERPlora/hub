@@ -51,6 +51,18 @@ class InvoiceType(models.TextChoices):
     R5 = "R5", _("Rectifying invoice of a simplified invoice (R5)")
 
 
+class ForeignIdType(models.TextChoices):
+    """The AEAT's kinds of document of a foreign recipient (``IDType``; a Spanish NIF has none), by the words the
+    recipient form gives them: the assistant's card says them so too."""
+
+    EU_VAT = "02", _("EU VAT number")
+    PASSPORT = "03", _("Passport")
+    FOREIGN_TAX_ID = "04", _("Tax ID of their country")
+    RESIDENCE_CERTIFICATE = "05", _("Residence certificate")
+    OTHER = "06", _("Other document")
+    NOT_REGISTERED = "07", _("Not registered")
+
+
 ORDINARY_TYPES = ("F1", "F2", "F3")
 RECTIFYING_TYPES = ("R1", "R2", "R3", "R4", "R5")
 SIMPLIFIED_TYPES = ("F2", "R5")
@@ -91,15 +103,17 @@ class InvoiceSeries(UUIDModel):
     )
     # The last number given; the next document takes current_number + 1.
     current_number = models.IntegerField(_("current number"), default=0)
-    is_active = models.BooleanField(_("active"), default=True)
+    # «activa», «creada el»… (a series): the texts an earlier app translates otherwise in Spanish go with invoice's
+    # own context, since the first catalog that says a message wins (base/tests/test_locale_modules.py).
+    is_active = models.BooleanField(pgettext_lazy("invoice", "active"), default=True)
     is_default = models.BooleanField(_("default series"), default=False)
-    created_at = models.DateTimeField(_("created at"), auto_now_add=True)
-    updated_at = models.DateTimeField(_("updated at"), auto_now=True)
+    created_at = models.DateTimeField(pgettext_lazy("invoice", "created at"), auto_now_add=True)
+    updated_at = models.DateTimeField(pgettext_lazy("invoice", "updated at"), auto_now=True)
     created_by = models.CharField(
-        _("created by"), max_length=ACTOR_MAX_LENGTH, blank=True
+        pgettext_lazy("invoice", "created by"), max_length=ACTOR_MAX_LENGTH, blank=True
     )
     updated_by = models.CharField(
-        _("updated by"), max_length=ACTOR_MAX_LENGTH, blank=True
+        pgettext_lazy("invoice", "updated by"), max_length=ACTOR_MAX_LENGTH, blank=True
     )
 
     class Meta:
@@ -146,8 +160,9 @@ class Issuer(UUIDModel):
 
     singleton = models.BooleanField(_("single row"), default=True, editable=False)
     legal_name = models.CharField(_("legal name"), max_length=NAME_MAX_LENGTH)
-    tax_id = models.CharField(_("tax ID"), max_length=TAX_ID_MAX_LENGTH)
-    address = models.CharField(_("address"), max_length=255)
+    # «NIF» and «domicilio», as the Issuer screen says them, not customer's «NIF/CIF» and «dirección».
+    tax_id = models.CharField(pgettext_lazy("invoice", "tax ID"), max_length=TAX_ID_MAX_LENGTH)
+    address = models.CharField(pgettext_lazy("invoice", "address"), max_length=255)
     postal_code = models.CharField(_("postal code"), max_length=20, blank=True)
     city = models.CharField(_("city"), max_length=100, blank=True)
     province = models.CharField(_("province"), max_length=100, blank=True)
@@ -262,7 +277,7 @@ class Invoice(UUIDModel):
     customer_country = models.CharField(_("customer country"), max_length=2, blank=True)
     # The AEAT's IDType of a foreign document (02 EU VAT number … 07 not registered); empty = a NIF.
     customer_id_type = models.CharField(
-        _("customer document type"), max_length=2, blank=True
+        _("customer document type"), max_length=2, choices=ForeignIdType.choices, blank=True
     )
     # The reason of a rectifying document (DescripcionOperacion); empty otherwise.
     description = models.CharField(_("description"), max_length=500, blank=True)
@@ -328,7 +343,7 @@ class Invoice(UUIDModel):
     created_by = models.CharField(
         _("issued by"), max_length=ACTOR_MAX_LENGTH, blank=True
     )
-    updated_at = models.DateTimeField(_("updated at"), auto_now=True)
+    updated_at = models.DateTimeField(pgettext_lazy("invoice", "updated at"), auto_now=True)
 
     class Meta:
         verbose_name = _("invoice")

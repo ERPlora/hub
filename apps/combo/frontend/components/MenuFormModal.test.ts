@@ -209,3 +209,97 @@ describe('MenuFormModal: in the business’s currency', () => {
     expect(s.sent()).toEqual([{ method: 'POST', path: '/api/combo/combos/update', query: {}, body: { id: 'm1', price: 1500 } }]);
   });
 });
+
+// COMBO-F14: «Photo» in «Edit details» of a menu, like an item's (INVENTORY-F30/F31): a library image (searched by the
+// menu's name) or a photo of its own, sent once the menu is saved; if the menu saved and the photo did not, the dialog
+// says so with «Retry», which sends only the photo, and the menu keeps the photo it had.
+describe('MenuFormModal: photo', () => {
+  const DETAIL = { ...MENU, groups: [], sellable: false, blockers: [] };
+  const MENU_DIA = { reference: 'catalog:hospitality/menu_dia', folder: 'hospitality', name: 'menu_dia', title: 'Menú del día', url: '/p/catalog/hospitality/menu_dia.webp' };
+  const WITH_PHOTO: ComboOut = { ...MENU, image: 'catalog:hospitality/menu_dia', image_url: MENU_DIA.url };
+  const writes = (s: Awaited<ReturnType<typeof setup>>) => s.sent().filter((call) => call.method === 'POST');
+
+  async function chooseFile(s: Awaited<ReturnType<typeof setup>>, file: File) {
+    const input = s.inDoc('combo-menu-form-image-file') as HTMLInputElement;
+    Object.defineProperty(input, 'files', { configurable: true, value: [file] });
+    input.dispatchEvent(new Event('change'));
+    await vi.waitFor(() => expect(s.inDoc('combo-menu-form-image-preview')?.querySelector('img')?.getAttribute('src')).toMatch(/^data:/));
+  }
+
+  it('shows «Photo» with the menu’s photo, or its initials', async () => {
+    const s = await setup(WITH_PHOTO);
+    expect(s.inDoc('combo-menu-form-image-label')?.textContent?.trim()).toBe('Photo');
+    expect(s.inDoc('combo-menu-form-image-preview')?.querySelector('img')?.getAttribute('src')).toBe(MENU_DIA.url);
+  });
+
+  it('a new menu with a library image: searched by its name, set once it is created', async () => {
+    const s = await setup();
+    s.answerBy({
+      '/api/catalog/images': [200, { rows: [MENU_DIA], total: 1, limit: 60, offset: 0 }],
+      '/api/combo/combos': [201, DETAIL],
+      '/api/combo/combos/image': [200, DETAIL],
+    });
+    await ionValue(s.field('name'), 'Menú del día', 'ionInput');
+    await ionValue(s.field('price'), '13,50', 'ionInput');
+    s.tax().vm.$emit('update:modelValue', { id: 'restaurant.food', label: 'Restaurant — food · 10%' });
+    await settle();
+    await click(s.inDoc('combo-menu-form-image-library'));
+    await settle();
+    expect(s.sent().find((call) => call.path === '/api/catalog/images')?.query.query).toBe('Menú del día');
+    await click(s.inDoc('combo-menu-form-image-library-modal-image-hospitality-menu_dia'));
+    await click(s.save());
+    await settle();
+    expect(writes(s).map((call) => [call.path, call.body])).toEqual([
+      ['/api/combo/combos', expect.objectContaining({ name: 'Menú del día' })],
+      ['/api/combo/combos/image', { id: 'm1', image: 'catalog:hospitality/menu_dia' }],
+    ]);
+    expect(s.wrapper.emitted('update:open')?.at(-1)).toEqual([false]);
+  });
+
+  it('a photo of its own that fails: the menu saved, «Retry» sends only the photo; in Spanish', async () => {
+    const s = await setup(WITH_PHOTO, 'es');
+    s.answerBy({
+      '/api/combo/combos/update': [200, DETAIL],
+      '/api/combo/combos/image/upload': [422, { error: { code: 'base.photo_invalid', message: 'Ese archivo no es una foto. Sube una imagen JPG, PNG o WebP.' } }],
+    });
+    await chooseFile(s, new File(['ABC'], 'mine.png', { type: 'image/png' }));
+    await click(s.save());
+    await vi.waitFor(() => expect(s.inDoc('combo-menu-form-photo-failed')).not.toBeNull());
+    expect(s.inDoc('combo-menu-form-photo-failed')?.textContent).toContain(
+      'El menú se ha guardado, pero la foto no: Ese archivo no es una foto. Sube una imagen JPG, PNG o WebP.',
+    );
+    expect(s.save().disabled).toBe(true);
+    s.answerBy({ '/api/combo/combos/image/upload': [200, DETAIL] });
+    await click(s.inDoc('combo-menu-form-photo-retry'));
+    await vi.waitFor(() => expect(s.wrapper.emitted('update:open')?.at(-1)).toEqual([false]));
+    expect(writes(s).map((call) => call.path)).toEqual([
+      '/api/combo/combos/update',
+      '/api/combo/combos/image/upload',
+      '/api/combo/combos/image/upload',
+    ]);
+  });
+
+  it('«Remove photo» clears it when saved', async () => {
+    const s = await setup(WITH_PHOTO);
+    s.answerBy({ '/api/combo/combos/update': [200, DETAIL], '/api/combo/combos/image': [200, DETAIL] });
+    await click(s.inDoc('combo-menu-form-image-remove'));
+    await click(s.save());
+    await settle();
+    expect(writes(s).map((call) => call.body)).toEqual([{ id: 'm1' }, { id: 'm1', image: '' }]);
+  });
+
+  it('closing without saving discards the photo chosen; opening another menu shows its own', async () => {
+    const s = await setup(WITH_PHOTO);
+    await click(s.inDoc('combo-menu-form-image-remove'));
+    expect(s.inDoc('combo-menu-form-image-preview')?.querySelector('img')).toBeNull();
+    await s.wrapper.setProps({ open: false });
+    await s.wrapper.setProps({ open: true });
+    await settle();
+    expect(s.inDoc('combo-menu-form-image-preview')?.querySelector('img')?.getAttribute('src')).toBe(MENU_DIA.url);
+    await s.wrapper.setProps({ open: false });
+    await s.wrapper.setProps({ combo: { ...MENU, id: 'm2', name: 'Kids menu' }, open: true });
+    await settle();
+    expect(s.inDoc('combo-menu-form-image-preview')?.querySelector('img')).toBeNull();
+    expect(s.inDoc('combo-menu-form-image-preview')?.textContent?.trim()).toBe('KM');
+  });
+});

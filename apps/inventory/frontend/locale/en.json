@@ -97,7 +97,8 @@
         "sent": "The label went to the printer «{printer}».",
         "queued": "The label is waiting in the print queue: no printer has the «Label» function. Give it to one in Printing.",
         "error": "Could not print the barcode label: {reason}"
-      }
+      },
+      "photo": "Photo"
     },
     "form": {
       "newTitle": "New product",
@@ -123,7 +124,8 @@
       "categoriesSearch": "Search a category to add",
       "removeCategory": "Remove {name}",
       "categoriesLoadError": "The categories could not be loaded",
-      "cancelEdit": "Cancel editing"
+      "cancelEdit": "Cancel editing",
+      "photoNotSaved": "The product has been saved, but the photo has not: {reason}"
     },
     "stock": {
       "current": "Current stock",

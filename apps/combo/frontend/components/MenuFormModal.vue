@@ -4,12 +4,17 @@
 // answers), «How is it sold?» (both consequences always shown, the chosen one stressed: the merchant must not
 // discover it on an invoice), the VAT category (only eaten in; searched in Taxes), the order on the list
 // and «On sale». A menu eaten in without a VAT category, or an amount that is not one, is refused
-// before anything is sent. «Menu · {name}» sends only what changed. Refusals stay under their field.
-import { Combo, type ComboOption, FormModal } from '@erplora/ui/components';
+// before anything is sent. «Menu · {name}» sends only what changed. Refusals stay under their field. «Photo» (COMBO-F14,
+// like an item's): a library image or a photo of its own, sent once the menu is saved (`set_image`, `upload_image`,
+// «Uploading photo…»); if the menu saved and the photo did not, the dialog says so with «Retry» (only the photo goes
+// again) and the menu keeps the photo it had.
+import { Combo, type ComboOption, FormModal, InlineFeedback } from '@erplora/ui/components';
 import { useCommand, useLiveClient } from '@erplora/ui/sdk';
-import { IonCheckbox, IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
+import { IonButton, IonCheckbox, IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import ImageField from '../../../../base/frontend/components/ImageField.vue';
+import { draftOf, type ImageDraft, useImageSave } from '../../../../base/frontend/lib/item-image';
 import { useLocale, useT } from '../composables/useT';
 import { useBusinessMoney } from '../lib/format';
 import { moneyFieldText, parseMoney } from '../lib/money';
@@ -40,7 +45,13 @@ const money = useBusinessMoney();
 const searchTax = computed(() => searchTaxCategories(client, locale.value));
 const creation = useCommand('combo.combo.create');
 const update = useCommand('combo.combo.update');
-const pending = computed(() => creation.pending.value || update.pending.value);
+const setImage = useCommand('combo.combo.set_image');
+const uploadImage = useCommand('combo.combo.upload_image');
+const photo = useImageSave({
+  set: (id, image) => setImage.run({ id, image }),
+  upload: (id, data) => uploadImage.run({ id, data_base64: data }),
+});
+const pending = computed(() => creation.pending.value || update.pending.value || photo.pending.value);
 const error = computed(() => (props.combo ? update.error.value : creation.error.value));
 const title = computed(() => (props.combo ? t('combo.form.titleEdit', { name: props.combo.name }) : t('combo.form.titleNew')));
 
@@ -58,6 +69,7 @@ function fromCombo(current: ComboOut | null): Form {
 }
 
 const form = ref<Form>(fromCombo(null));
+const image = ref<ImageDraft>(draftOf(props.combo));
 const tried = ref(false);
 
 watch(
@@ -65,6 +77,8 @@ watch(
   ([isOpen]) => {
     if (!isOpen) return;
     form.value = fromCombo(props.combo);
+    image.value = draftOf(props.combo);
+    photo.reset();
     tried.value = false;
     creation.error.value = null;
     update.error.value = null;
@@ -124,13 +138,24 @@ async function save(): Promise<void> {
   const price = parseMoney(form.value.price, { money: money.value });
   if (!price.ok || taxMissing.value) return;
   const full = body(price.cents ?? 0);
+  let saved: { id: string };
   try {
-    if (props.combo) await update.run(patch(props.combo, full));
-    else await creation.run(full);
+    if (props.combo) saved = await update.run(patch(props.combo, full));
+    else saved = await creation.run(full);
   } catch {
     return; // The dialog paints the error; what was typed stays.
   }
-  open.value = false;
+  await savePhoto(saved.id);
+}
+
+/** The photo's step for the saved menu; the dialog closes once the photo is as the form says. */
+async function savePhoto(id: string): Promise<void> {
+  if (await photo.save(id, props.combo?.image ?? '', image.value)) open.value = false;
+}
+
+function retryPhoto(): void {
+  const failed = photo.failure.value;
+  if (failed) void savePhoto(failed.id);
 }
 </script>
 
@@ -139,14 +164,32 @@ async function save(): Promise<void> {
     v-model:open="open"
     testid="combo-menu-form"
     :title="title"
-    :submit-label="$t('combo.save')"
+    :submit-label="photo.uploading.value ? $t('base.imageField.uploading') : $t('combo.save')"
     :pending="pending"
     :error="error"
-    :submit-disabled="!form.name.trim()"
+    :submit-disabled="!form.name.trim() || !!photo.failure.value"
     @submit="save"
   >
     <template #default="{ fieldErrors }">
       <div class="combo-menu-form">
+        <InlineFeedback
+          v-if="photo.failure.value"
+          tone="warning"
+          data-testid="combo-menu-form-photo-failed"
+        >
+          {{ t('combo.form.photoNotSaved', { reason: photo.failure.value.reason || $t('base.imageField.notSaved') }) }}
+          <template #actions>
+            <ion-button
+              data-testid="combo-menu-form-photo-retry"
+              fill="outline"
+              size="small"
+              :disabled="photo.pending.value"
+              @click="retryPhoto"
+            >
+              {{ $t('base.imageField.retry') }}
+            </ion-button>
+          </template>
+        </InlineFeedback>
         <ion-input
           data-testid="combo-menu-form-name"
           :value="form.name"
@@ -245,6 +288,12 @@ async function save(): Promise<void> {
         >
           {{ $t('combo.form.active') }}
         </ion-checkbox>
+        <ImageField
+          v-model="image"
+          testid="combo-menu-form-image"
+          :name="form.name.trim()"
+          :disabled="pending"
+        />
       </div>
     </template>
   </FormModal>

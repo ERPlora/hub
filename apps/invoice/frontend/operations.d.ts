@@ -260,6 +260,23 @@ export interface FromVoidIn {
   sale_id: string;
 }
 
+export interface RefundGetIn {
+  refund_id: string;
+}
+
+/** A refund of the Sales app as Invoicing names it: the sale it gives back and what it gave back. */
+export interface RefundOut {
+  id: string;
+  sale_id: string;
+  sale_number: string;
+  total: number;
+  currency: string;
+  currency_decimals: number;
+  invoice_number: string;
+  /** In the reader's language: «20261014-0003 · €5.00». */
+  label: string;
+}
+
 export type MarkPaidIn = InvoiceRefIn;
 
 /** sealed: its VeriFactu record is sealed in the same commit; unavailable: no VeriFactu in this business;
@@ -328,6 +345,12 @@ export interface SeriesPeekIn {
   series_id?: string;
   code?: string;
   year?: number;
+}
+
+/** One series as the Series screen shows it, and how it is named outside it. */
+export interface SeriesDetailOut extends SeriesOut {
+  /** In the reader's language: «FACT · 2026 · Invoices». */
+  label: string;
 }
 
 export interface SeriesPeekOut {
@@ -428,8 +451,10 @@ declare module '@erplora/ui/sdk' {
     'invoice.invoice.rectify': { input: RectifyIn; output: IssueOut };
     'invoice.invoice.rectify_from_refund': { input: FromRefundIn; output: IssueOut };
     'invoice.invoice.rectify_from_void': { input: FromVoidIn; output: IssueOut };
+    'invoice.refund.get': { input: RefundGetIn; output: RefundOut };
     'invoice.series.list': { input: SeriesListIn; output: Page<SeriesOut> };
     'invoice.series.peek_next': { input: SeriesPeekIn; output: SeriesPeekOut };
+    'invoice.series.get': { input: SeriesPeekIn; output: SeriesDetailOut };
     'invoice.series.create': { input: SeriesCreateIn; output: SeriesOut };
     'invoice.series.update': { input: SeriesUpdateIn; output: SeriesOut };
     'invoice.numbering.status': { input: NumberingStatusIn; output: NumberingStatusOut };

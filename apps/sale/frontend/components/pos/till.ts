@@ -4,28 +4,9 @@
 // say them; the words of a refusal are `lib/refusal.ts`'s.
 import type { OrderLineOut } from '../../operations';
 
-/** The first letters of the first two words, upper case («café con leche» → «CC»). */
-export function initials(name: string): string {
-  return name
-    .trim()
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((word) => word.charAt(0))
-    .join('')
-    .toUpperCase();
-}
-
-function hue(name: string): number {
-  let hash = 0;
-  for (const char of name) hash = (hash * 31 + char.charCodeAt(0)) | 0;
-  return Math.abs(hash) % 360;
-}
-
-/** The tile's stable colour, derived from its name (the same product always looks the same). */
-export function tileGradient(name: string): string {
-  const h = hue(name);
-  return `linear-gradient(135deg, hsl(${h} 42% 38%), hsl(${(h + 38) % 360} 44% 26%))`;
-}
+// The initials over the name's colour are the till's and every list's stand-in for a missing photo (INVENTORY-F32):
+// one source, in base.
+export { initials, tileGradient } from '../../../../../base/frontend/lib/item-image';
 
 const timeFormats = new Map<string, Intl.DateTimeFormat>();
 

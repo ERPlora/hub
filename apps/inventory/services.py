@@ -70,6 +70,8 @@ from apps.inventory.schemas import (
     MAX_CENTS,
     ProductCategoryIn,
     ProductCategoryLinkOut,
+    ProductImageIn,
+    ProductImageUploadIn,
     ProductImportIn,
     ProductIn,
     ProductOut,
@@ -87,6 +89,7 @@ from apps.inventory.schemas import (
     WriteOffIn,
 )
 from apps.tax.models import TaxCategory
+from base import images
 from base import operations as platform
 
 SKU_TAKEN = _("That SKU already exists in the catalog.")
@@ -198,7 +201,7 @@ def create_product(ctx: OperationContext, data: ProductIn) -> dict:
         _record_link(ctx, events.PRODUCT_CATEGORIZED, product.id, category.id)
     if data.initial_stock:
         _move(ctx, product, StockMovement.Type.INITIAL, data.initial_stock)
-    return load_product(product.id)
+    return load_product(product.id, ctx.scope)
 
 
 @operation(
@@ -322,7 +325,7 @@ def update_product(ctx: OperationContext, data: ProductPatchIn) -> dict:
         _record_link(ctx, events.PRODUCT_UNCATEGORIZED, product.id, category_id)
     for category_id in added:
         _record_link(ctx, events.PRODUCT_CATEGORIZED, product.id, category_id)
-    return load_product(product.id)
+    return load_product(product.id, ctx.scope)
 
 
 @operation(
@@ -339,10 +342,14 @@ def update_product(ctx: OperationContext, data: ProductPatchIn) -> dict:
     },
 )
 def delete_product(ctx: OperationContext, data: ProductRefIn) -> dict:
+    """INVENTORY-F04: its movements stay; its photo of its own goes with it (INVENTORY-F31), once this is saved."""
     product = find_product(data.id, data.product, lock=True)
+    photo = product.image
     product.is_deleted, product.is_active, product.deleted_at = True, False, timezone.now()
+    product.image = ""
     product.updated_by = _actor(ctx)
-    product.save(update_fields=["is_deleted", "is_active", "deleted_at", "updated_by", "updated_at"])
+    product.save(update_fields=["is_deleted", "is_active", "deleted_at", "image", "updated_by", "updated_at"])
+    images.let_go(ctx, photo)
     record_event(ctx, events.PRODUCT_DELETED, {"id": str(product.id), "sku": product.sku, "name": product.name})
     return {"id": product.id}
 
@@ -368,7 +375,70 @@ def set_sold_out(ctx: OperationContext, data: ProductSoldOutIn) -> dict:
         product.updated_by = _actor(ctx)
         product.save(update_fields=["is_sold_out", "updated_by", "updated_at"])
         record_event(ctx, events.PRODUCT_UPDATED, _product_payload(product))
-    return load_product(product.id)
+    return load_product(product.id, ctx.scope)
+
+
+# The product's image (round 2026-10-30, base.images)
+
+#: Where a product's own photos are kept under its hub's prefix: the folder ``members_media`` serves (apps.py).
+PHOTOS = "inventory/products/"
+
+
+@operation(
+    "inventory.product.set_image",
+    kind="command",
+    permission="inventory.change_product",
+    input=ProductImageIn,
+    output=ProductOut,
+    expose_api=True,
+    ai={
+        "description": "Set the image («foto») a product shows on the till and in its lists («ponle foto al café con "
+        "leche»), named by its id, SKU or name: an image of ERPlora's shared library by its reference (catalog:<folder>/<name>, from "
+        "inventory.product.suggest_image or base.catalog_image.search), or empty to show none (its initials).",
+        "risk": "normal",
+    },
+)
+def set_image(ctx: OperationContext, data: ProductImageIn) -> dict:
+    """INVENTORY-F30: an image of the library or none; anything else (a photo of its own too, which only its upload
+    writes) is refused before anything changes. The photo of its own it let go is deleted once this is saved."""
+    product = find_product(data.id, data.product, lock=True)
+    images.check(ctx, data.image)
+    _change_image(ctx, product, data.image)
+    return load_product(product.id, ctx.scope)
+
+
+@operation(
+    "inventory.product.upload_image",
+    kind="command",
+    permission="inventory.change_product",
+    input=ProductImageUploadIn,
+    output=ProductOut,
+    expose_api=True,
+    ai={
+        "description": "Not an assistant tool (it takes the photo the person picks in the product's form): keeps a "
+        "photo of the product, a JPG, PNG or WebP of 2 MB at most, as its image.",
+        "risk": "normal",
+    },
+)
+def upload_image(ctx: OperationContext, data: ProductImageUploadIn) -> dict:
+    """INVENTORY-F31: the photo becomes a 512 × 512 WebP of its own (``base.images``), within the plan's space, and
+    takes the place of the one the product had, which is deleted once this is saved."""
+    webp = images.to_webp(images.decode(data.data_base64, language=ctx.language), language=ctx.language)
+    product = find_product(data.id, data.product, lock=True)
+    _change_image(ctx, product, images.keep_photo(ctx, PHOTOS, webp))
+    return load_product(product.id, ctx.scope)
+
+
+def _change_image(ctx: OperationContext, product: Product, image: str) -> None:
+    """Show ``image`` on ``product`` (no change, no event); the photo of its own it let go is deleted once saved."""
+    if product.image == image:
+        return
+    previous = product.image
+    product.image = image
+    product.updated_by = _actor(ctx)
+    product.save(update_fields=["image", "updated_by", "updated_at"])
+    record_event(ctx, events.PRODUCT_UPDATED, _product_payload(product))
+    images.let_go(ctx, previous)
 
 
 @operation(
@@ -630,7 +700,7 @@ def receive_stock(ctx: OperationContext, data: ReceiveIn) -> dict:
         _move(ctx, product, StockMovement.Type.RECEPTION, line.qty, reference=data.reference, unit_cost=line.unit_cost)
     for product_id, product in products.items():
         _crossing(ctx, product, settings, before[product_id], StockMovement.Type.RECEPTION, data.reference)
-    return {"rows": [load_product(product_id) for product_id in dict.fromkeys(product_id for product_id, _ in lines)]}
+    return {"rows": [load_product(product_id, ctx.scope) for product_id in dict.fromkeys(product_id for product_id, _ in lines)]}
 
 
 @operation(
@@ -657,7 +727,7 @@ def count_stock(ctx: OperationContext, data: CountIn) -> dict:
     if difference:
         _move(ctx, product, StockMovement.Type.COUNT, difference, reason=data.reason)
         _crossing(ctx, product, current_settings(), previous, StockMovement.Type.COUNT, "")
-    return load_product(product.id)
+    return load_product(product.id, ctx.scope)
 
 
 @operation(
@@ -687,7 +757,7 @@ def write_off_stock(ctx: OperationContext, data: WriteOffIn) -> dict:
     previous = product.stock
     _move(ctx, product, StockMovement.Type.WRITE_OFF, -data.qty, reason=data.reason)
     _crossing(ctx, product, settings, previous, StockMovement.Type.WRITE_OFF, "")
-    return load_product(product.id)
+    return load_product(product.id, ctx.scope)
 
 
 # Settings (INVENTORY-F19)

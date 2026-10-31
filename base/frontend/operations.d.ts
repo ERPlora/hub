@@ -322,6 +322,38 @@ export interface HubReset {
 // ── Business settings (APP-BASE-6) ──
 
 /** `base.BusinessOut`: the business as erplora.com registered it, each value named in the person's language. */
+
+// ── The shared image library (round 2026-10-30, base/image_catalog.py) ──
+
+/** An image of the library: what a product, a service or a set menu keeps is its `reference`. */
+export interface CatalogImage {
+  /** `catalog:<folder>/<name>`. */
+  reference: string;
+  folder: string;
+  name: string;
+  /** In the business's language (in English when it is not Spanish); in the person's for `.get`. */
+  title: string;
+  /** `/p/catalog/<folder>/<name>.webp`, cached for a year. */
+  url: string;
+}
+
+export interface CatalogImageSearchIn {
+  /** Spanish or English; empty: the whole library (or folder) by title. */
+  query?: string;
+  /** beauty_body, beauty_hair, fitness, hospitality, retail or wellness_spa. */
+  folder?: string | null;
+  /** 1 to 100; 60 by default. */
+  limit?: number;
+  offset?: number;
+}
+
+export interface CatalogImagePage {
+  rows: CatalogImage[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
 export interface Business {
   /** On ERPlora's own hub, its issuer's legal name; empty in a demo. */
   name: string;
@@ -712,6 +744,9 @@ declare module '@erplora/ui/sdk' {
     };
     // ── Business settings (APP-BASE-6) ──
     'base.business.get': { input: NoInput; output: Business };
+    // The shared image library (round 2026-10-30): 503 `base.image_library_unavailable` when it cannot be read.
+    'base.catalog_image.search': { input: CatalogImageSearchIn; output: CatalogImagePage };
+    'base.catalog_image.get': { input: { reference: string }; output: CatalogImage };
     // System (APP-BASE-7)
     'base.system.status': { input: NoInput; output: SystemStatus };
     'base.event.list': { input: NoInput; output: { entries: EventLogEntry[] } };

@@ -1,16 +1,16 @@
 <script setup lang="ts">
-// A service tile of the till's grid (SALE-F38, SERVICE-F09): the initials over a colour derived from the
-// name, the name, the duration and the price; a service without a fixed price says how it is priced
+// A service tile of the till's grid (SALE-F38, SERVICE-F09): its photo (SERVICE-F34), or its initials over a colour
+// derived from the name when it has none or the photo does not load, the name, the duration and the price; a service without a fixed price says how it is priced
 // («From», «per hour», «Variable», «Free»: the till asks the amount). One without VAT is marked «VAT
 // missing» (the business territory's tax: «IGIC missing», «IPSI missing»), looks blocked and still takes the tap (never the native `disabled`), as a product's tile.
 import { HubIcon } from '@erplora/ui/shell';
 import { computed } from 'vue';
 
+import ItemImage from '../../../../../base/frontend/components/ItemImage.vue';
 import type { ServiceSaleOut } from '../../../../service/frontend/operations';
 import { useTaxName } from '../../../../tax/frontend/composables/useTaxName';
 import { useLocale, useT } from '../../composables/useT';
 import { formatMoney, useBusinessMoney } from '../../lib/format';
-import { initials, tileGradient } from './till';
 
 const props = defineProps<{ service: ServiceSaleOut }>();
 const emit = defineEmits<{ pick: [service: ServiceSaleOut] }>();
@@ -22,7 +22,6 @@ const taxName = useTaxName();
 
 const blocked = computed(() => props.service.needs_tax_setup);
 const label = computed(() => (blocked.value ? `${props.service.name} · ${t('sale.pos.notSellableNoTaxCategory', { tax: taxName.value })}` : undefined));
-const thumbStyle = computed(() => ({ background: tileGradient(props.service.name) }));
 const price = computed(() => {
   const money = formatMoney(props.service.price, locale.value, business.value);
   const type = props.service.pricing_type;
@@ -41,19 +40,20 @@ const price = computed(() => {
     :title="label"
     @click="emit('pick', service)"
   >
-    <span
+    <ItemImage
       class="pos-tile__thumb"
-      :style="thumbStyle"
+      fit="contain"
+      :src="service.image_url"
+      :name="service.name"
       aria-hidden="true"
     >
-      {{ initials(service.name) }}
       <span
         v-if="blocked"
         class="pos-tile__warn"
       >
         <HubIcon name="ion:alert-circle" />
       </span>
-    </span>
+    </ItemImage>
     <span class="pos-tile__info">
       <span class="pos-tile__name">{{ service.name }}</span>
       <span
