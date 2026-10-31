@@ -76,13 +76,8 @@ Lo que piden Ventas, el documento de venta, Anular y Devolver (`pages/SalesPage.
 
 Lo que pide la hoja **Cobro** (`frontend/components/checkout/`, `lib/checkout/methods.ts`).
 
-- `ion:swap-horizontal-outline` — botón **Repartir el cobro** y forma de pago de tipo transferencia, los
-  iconos del producto actual. Ya registrado en `@erplora/ui` (`shell/icons.ts`); Ventas aún pinta
-  `ion:swap-vertical-outline`: el cambio es de Ventas (línea `FIX` del cierre).
 - `ion:ellipsis-horizontal-circle-outline` — forma de pago «otra» sin nombre conocido. Hoy:
   `ion:wallet-outline`.
-- `ion:gift-outline` — forma de pago de regalo. Ya registrado en `@erplora/ui`; Ventas aún pinta
-  `ion:ticket-outline`, el de los vales (línea `FIX` del cierre).
 - `ion:document-text-outline` — recuadro de los datos del cliente ya completo («Esta venta sale como
   factura completa»). Hoy: `ion:receipt-outline`.
 - **Marca de Bizum** (el SVG de marca del producto actual) como icono horneado de `@erplora/ui`: nada de
@@ -94,11 +89,10 @@ Lo que pide la pantalla **Vender** (`pages/PosPage.vue`, `frontend/components/po
 
 - `ion:pause-circle-outline` — botón **Aparcar esta cuenta** de la cabecera. Hoy: `ion:time-outline`.
 - `ion:gift-outline` / `ion:gift` — botón **Invitar / quitar invitación** de la línea. Hoy:
-  `ion:sparkles-outline` (en verde cuando está invitada).
+  `ion:sparkles-outline` (en verde cuando está invitada). `ion:gift-outline` ya está registrado; falta el
+  relleno, `ion:gift`, para la línea invitada: se cambian los dos juntos.
 - `ion:chatbox-ellipses-outline` / `ion:chatbox-ellipses` — botón **Nota** de la línea y la nota bajo
   ella. Hoy: `ion:chatbubbles-outline` (en el color primario cuando hay nota).
-- `ion:pricetag` (relleno) — descuento puesto en la línea o en la cuenta. Ya registrado en `@erplora/ui`;
-  Ventas aún pinta `ion:pricetag-outline` en el color de aviso (línea `FIX` del cierre).
 - `ion:print-outline` — botón **Imprimir cuenta** del pie y la impresora de la precuenta. Hoy:
   `ion:receipt-outline`.
 - `ion:expand-outline` / `ion:contract-outline` — **Pantalla completa** / **Salir de pantalla completa**
