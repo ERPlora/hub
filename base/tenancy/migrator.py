@@ -53,7 +53,7 @@ from django.utils import timezone
 from psycopg import errors as pg_errors
 from psycopg import sql
 
-from base import catalog
+from base import catalog, registry
 from base.tenancy import bootstrap, inventory, names
 from base.tenancy import connections as tenancy_connections
 from control.models import Cluster, Hub
@@ -741,10 +741,11 @@ def _grantee(role: str) -> sql.Composable:
 
 
 def hubs_with_a_database() -> list:
-    """The hubs whose own database ``migrate_hubs`` keeps at the leaf: ERPlora's own first, then by slug."""
+    """The hubs whose own database ``migrate_hubs`` keeps at the leaf: ERPlora's own first, then by slug. Only those
+    whose database was made (``base.registry.own_database_made``): one cancelled or expired before it was ever ready
+    has none, and must not stop a deploy."""
     return list(
-        Hub.objects.exclude(db_name="")
-        .filter(status__in=MIGRATED_STATUSES)
+        Hub.objects.filter(registry.own_database_made(), status__in=MIGRATED_STATUSES)
         .select_related("cluster")
         .order_by("-is_platform", "slug")
     )

@@ -486,11 +486,15 @@ def test_a_photo_that_keeps_changing_while_it_is_seeded_leaves_it_failed_and_tri
     asked = []
     monkeypatch.setattr(services, "provision_ready", lambda *args, **kwargs: asked.append(kwargs) or None)
 
+    before = timezone.now()
     assert provision.provision(hub) is False
 
     hub = fresh(hub)
     assert len(asked) == provision.SEED_ROUNDS
     assert hub.status == "failed" and hub.last_error.startswith("photo_moving: ")
+    # Tried again after its wait, like any failed preparation: its next attempt and its due time are the same.
+    assert hub.attempts == 1 and hub.next_attempt_at >= before + services.retry_delay(1)
+    assert HubDue.objects.get(pk=hub.pk).due_at == hub.next_attempt_at
 
 
 def test_its_lease_is_renewed_while_its_schema_is_migrated(registry, monkeypatch, told):
