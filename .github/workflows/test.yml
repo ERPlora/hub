@@ -58,6 +58,13 @@ jobs:
         run: |
           git clone --quiet --depth 1 --filter=blob:none --sparse https://github.com/ERPlora/saas.git ../saas
           git -C ../saas sparse-checkout set public/declaracion
+      # The seeds' images must be in the shared image library's manifest (base/tests/test_seed_images.py), and the
+      # templates load them from it: ERPlora/blueprints is public, so its img/ is fetched beside the Hub
+      # (../blueprints), where config/settings.py looks for it without a bucket (CATALOG_DIR). No token.
+      - name: The shared image library
+        run: |
+          git clone --quiet --depth 1 --filter=blob:none --sparse https://github.com/ERPlora/blueprints.git ../blueprints
+          git -C ../blueprints sparse-checkout set img
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           enable-cache: true

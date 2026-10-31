@@ -290,3 +290,17 @@ export async function chipBesideBadge(
     };
   }, options);
 }
+
+/** A 64 × 64 PNG (a sun over red): the photo a person picks on the device (INVENTORY-F31, SERVICE-F35, COMBO-F14). */
+export const PHOTO_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAIAAAAlC+aJAAABG0lEQVR4nOWZy23EMBBD6YcUk7PPKWJL2NJSQsrY09S0FWQhjT4WrXc1wCFNyRCs4/XzLWeQOcgcZA4yB5mDzEHmIHOQOcgcZM7XCNHz9/Hfo3j+9Z11dDzMffA9LsnRJUCV9b4xjsYAaeu9YnC5e7XpcLn7RjVWcN+iySLu08qs4z6nz1LuE1PsjxKs9vprZ23TwDnx9VdN3KYB7wDn9PVTPnePBlYGmYPMQeYgc5A5aIcA0ftvVCFRMHePBu4QIKavoiibuE0DmltCFM/aqQHNKiFqplQ3MDpDVOpnltC4DFGvnNwDIzJESjO/iftmiKxa01eoV4Zo0Nn+juwmt5Q3uSe+BGQOMgeZg8xB5iBzkDnIHGQOVxto5Q3w1FTbH5ebCwAAAABJRU5ErkJggg==',
+  'base64',
+);
+
+/** Whether the `<img>` in `scope` has loaded its file (a broken one has no natural width). */
+export async function photoLoaded(scope: Locator): Promise<number> {
+  const img = scope.locator('img').first();
+  await expect(img).toBeVisible();
+  await expect.poll(() => img.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth)).toBeGreaterThan(0);
+  return img.evaluate((el: HTMLImageElement) => el.naturalWidth);
+}

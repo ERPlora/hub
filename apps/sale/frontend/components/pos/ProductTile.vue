@@ -1,17 +1,17 @@
 <script setup lang="ts">
-// A product tile of the till's grid: the initials over a colour derived from the name, the name, the
-// unit (when it is not «ud») and the price; never the SKU. A product without VAT (SALE-F07) is marked
+// A product tile of the till's grid: its photo (INVENTORY-F32), or its initials over a colour derived from the name
+// when it has none or the photo does not load, the name, the unit (when it is not «ud») and the price; never the SKU. A product without VAT (SALE-F07) is marked
 // «VAT missing» («IGIC missing», «IPSI missing»: the business territory's tax), looks blocked and still takes the tap (never the native `disabled`: a touchscreen
 // would swallow it and nobody would learn why); the grid answers that tap with the reason. A product sold out
 // in Inventory («86», INVENTORY-F29) is greyed with «Sold out» and takes the tap the same way.
 import { HubIcon } from '@erplora/ui/shell';
 import { computed } from 'vue';
 
+import ItemImage from '../../../../../base/frontend/components/ItemImage.vue';
 import type { ProductOut } from '../../../../inventory/frontend/operations';
 import { useTaxName } from '../../../../tax/frontend/composables/useTaxName';
 import { useLocale, useT } from '../../composables/useT';
 import { formatMoney, useBusinessMoney } from '../../lib/format';
-import { initials, tileGradient } from './till';
 
 const props = defineProps<{ product: ProductOut }>();
 const emit = defineEmits<{ pick: [product: ProductOut] }>();
@@ -27,7 +27,6 @@ const label = computed(() => {
   if (soldOut.value) return `${props.product.name} · ${t('sale.pos.soldOutBadge')}`;
   return blocked.value ? `${props.product.name} · ${t('sale.pos.notSellableNoTaxCategory', { tax: taxName.value })}` : undefined;
 });
-const thumbStyle = computed(() => ({ background: tileGradient(props.product.name) }));
 </script>
 
 <template>
@@ -41,19 +40,20 @@ const thumbStyle = computed(() => ({ background: tileGradient(props.product.name
     :title="label"
     @click="emit('pick', product)"
   >
-    <span
+    <ItemImage
       class="pos-tile__thumb"
-      :style="thumbStyle"
+      fit="contain"
+      :src="product.image_url"
+      :name="product.name"
       aria-hidden="true"
     >
-      {{ initials(product.name) }}
       <span
         v-if="blocked"
         class="pos-tile__warn"
       >
         <HubIcon name="ion:alert-circle" />
       </span>
-    </span>
+    </ItemImage>
     <span class="pos-tile__info">
       <span class="pos-tile__name">{{ product.name }}</span>
       <span

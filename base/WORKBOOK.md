@@ -1001,10 +1001,10 @@ Pasos:
      negocio o una plantilla que exportó otro.
   2. Mientras se lee, el botón gira. Después se abre «Revisa lo que trae» (BASE-F31).
   3. Tras un error se puede elegir el mismo fichero otra vez.
-Entra: el fichero, de 5 MB como mucho.
+Entra: el fichero, de 20 MB como mucho (con las fotos propias de sus artículos y servicios, INVENTORY-F33).
 Sale: nada guardado hasta cargarlo.
 Si falla: «No se pudo leer el fichero: {reason}» con el motivo (no es un .blueprint.zip, está dañado, lo
-hizo una versión más nueva de ERPlora o pasa de 5 MB) y se queda en la elección.
+hizo una versión más nueva de ERPlora o pasa de 20 MB) y se queda en la elección.
 Implicados: ninguno
 
 ### BASE-F31 Revisar y cargar lo que trae el fichero
@@ -2803,7 +2803,9 @@ Implicados: ACCOUNTS-F38
   `test_migrations.py` (relleno de 0008); e2e con el SaaS real `tests/e2e/base-session-revoke.spec.ts`.
 - Plantillas y Ajustes › Datos (BASE-F29–F38, APP-BASE-2): `base/blueprint.py` (sin ORM) tiene el formato
   `.blueprint.zip` (`manifest.json` con `format` `erplora.blueprint` y `format_version` 1, más
-  `data/<app>.<parte>.json`; 5 MB, 50 MB al descomprimir y 200 entradas como mucho; `BlueprintInvalid.reason`),
+  `data/<app>.<parte>.json`, más las fotos propias en `media/<nombre>`, WebP de 2 MB como mucho; 20 MB, 100 MB al
+  descomprimir y 1 000 entradas como mucho desde el 2026-10-30, para que quepan 300 fotos de 60 KB; antes 5 MB, 50 MB y
+  200; `BlueprintInvalid.reason`),
   el catálogo (`base/seeds/<vertical>.<idioma>.json`, sus apps = `catalog.template_apps(vertical)`) y las siete
   partes que viajan (`inventory.category`, `inventory.product`, `service.category`, `service.service`, `table.zone`,
   `table.table` y `customer.customer`, personal: solo en una copia), cada una leída y escrita por las operaciones

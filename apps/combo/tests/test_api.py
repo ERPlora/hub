@@ -14,6 +14,7 @@ from apps.combo.api import router
 from config.api import api
 
 from .conftest import FOOD, make_combo, make_group, make_option, make_product
+from .test_combo_image import IMAGE_ROUTES
 
 ROUTES = {
     ("GET", "/combo/combos", "combo.combo.list"),
@@ -32,7 +33,7 @@ ROUTES = {
     ("POST", "/combo/options/update", "combo.option.update"),
     ("POST", "/combo/options/delete", "combo.option.delete"),
     ("POST", "/combo/options/reorder", "combo.option.reorder"),
-}
+} | IMAGE_ROUTES
 
 
 def get(client, path, host="a.localhost", **params):

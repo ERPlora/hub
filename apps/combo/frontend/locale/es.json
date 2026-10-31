@@ -42,7 +42,8 @@
         "title": "¿Retirar este menú?",
         "message": "«{name}» deja de estar a la venta, junto con sus platos y sus elecciones. Los tiques ya emitidos se siguen leyendo.",
         "confirm": "Retirar"
-      }
+      },
+      "photo": "Foto"
     },
     "form": {
       "titleNew": "Menú nuevo",
@@ -64,7 +65,8 @@
       "order": "Orden en la lista de menús",
       "active": "A la venta",
       "noName": "El menú necesita un nombre.",
-      "noTaxCategory": "Un menú que se consume en el local necesita su propio tipo de IVA: sin él no se puede facturar."
+      "noTaxCategory": "Un menú que se consume en el local necesita su propio tipo de IVA: sin él no se puede facturar.",
+      "photoNotSaved": "El menú se ha guardado, pero la foto no: {reason}"
     },
     "money": {
       "notAmount": "Esto no es un importe. Escribe una cifra, por ejemplo 12,50.",

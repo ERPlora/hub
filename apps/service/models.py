@@ -197,6 +197,10 @@ class Service(UUIDModel):
     sku = models.CharField(_("SKU"), max_length=64, blank=True)
     barcode = models.CharField(_("barcode"), max_length=64, blank=True)
     notes = models.TextField(_("notes"), blank=True)
+    # Its image (SERVICE-F34, F35; round 2026-10-30, base.images): one of the shared library («catalog:<folder>/<name>»)
+    # or a photo of its own («file:service/services/<uuid7 hex>.webp» under its hub's prefix); empty: none, the till
+    # shows its initials. Never a URL. ``db_default``: a process still on the previous code inserts without it.
+    image = models.CharField(_("image"), max_length=200, blank=True, default="", db_default="")
     # Without a live one it cannot be charged (it needs tax setup); tax.TaxCategory is never deleted.
     tax_category = models.ForeignKey(
         "tax.TaxCategory",

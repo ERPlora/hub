@@ -20,6 +20,7 @@ import { type ApiError, useCommand, useLive, useLiveClient } from '@erplora/ui/s
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { computed, ref, watch } from 'vue';
 
+import ItemImage from '../../../../base/frontend/components/ItemImage.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import ServiceFormModal from '../components/ServiceFormModal.vue';
 import { useLiveList } from '../composables/useLiveList';
@@ -95,6 +96,8 @@ const blocked = computed(() => blockingError(error.value));
 const { data: categories } = useLive('service.category.list', { limit: 100 });
 
 const columns = computed<DataTableColumn<ServiceOut>[]>(() => [
+  // SERVICE-F34: the photo's thumbnail before the name (its initials without one), in the list and on the cards.
+  { key: 'photo', label: t('service.services.photo'), sortable: false, cell: 'photo', width: '4rem' },
   { key: 'name', label: t('service.services.columns.name'), sortable: true, priority: 'high', filter: { type: 'text' } },
   {
     key: 'category_name',
@@ -272,6 +275,14 @@ function onRowClick(row: ServiceOut): void {
       @action="onAction"
       @retry="refresh()"
     >
+      <template #photo="{ row }">
+        <ItemImage
+          class="service-photo"
+          :data-testid="`service-photo-${row.id}`"
+          :src="row.image_url"
+          :name="row.name"
+        />
+      </template>
       <template #status="{ row }">
         <span class="service-status">
           <StatusPill
@@ -317,6 +328,12 @@ function onRowClick(row: ServiceOut): void {
 </template>
 
 <style scoped>
+.service-photo {
+  width: 40px;
+  height: 40px;
+  font-size: 0.85rem;
+  border-radius: 8px;
+}
 .service-status {
   display: inline-flex;
   flex-direction: column;

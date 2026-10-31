@@ -28,6 +28,8 @@ class ComboConfig(LiveAppConfig):
     verticals = ["restaurant"]
     # A choice is a product of Inventory; a menu eaten in has a tax category of Taxes.
     requires = ["inventory", "tax"]
+    # The menus' own photos (COMBO-F14; round 2026-10-30, base.images): served by /p/media/ to the hub's sessions only.
+    members_media = ["combo/combos/"]
     default_auto_field = "django.db.models.BigAutoField"
     permissions = ["combo.view", "combo.manage"]
     # Keys are the customer roles as the SaaS sends them (``hub_`` prefix included).

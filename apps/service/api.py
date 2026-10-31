@@ -7,6 +7,7 @@ route, nor do the sessions of the till (``service.session.*``), which Sales runs
 
 from live.ninja import bind, run_operation
 from ninja import Query, Router
+from ninja.decorators import decorate_view
 
 from apps.service import queries, services
 from apps.service.schemas import (
@@ -33,6 +34,9 @@ from apps.service.schemas import (
     RedeemIn,
     ServiceBulkIn,
     ServiceForSaleIn,
+    ServiceImageIn,
+    ServiceImageSuggestIn,
+    ServiceImageUploadIn,
     ServiceIn,
     ServiceListIn,
     ServicePatchIn,
@@ -40,8 +44,12 @@ from apps.service.schemas import (
     SettingsIn,
     VoidIn,
 )
+from base.request_body import accept_body_up_to
 
 router = Router(tags=["service"])
+
+#: A photo's body: 2 MB of photo in base64 (2 796 204 characters) and the JSON around it.
+MAX_PHOTO_BODY = 2_900_000
 
 
 # Services
@@ -250,3 +258,22 @@ async def grant_redeem(request, data: RedeemIn):
 @bind(router, "service.movement.list", "/service/movements")
 async def movement_list(request, params: Query[MovementListIn]):
     return await run_operation(request, queries.list_movements, params)
+
+
+# The service's image (SERVICE-F34, F35; round 2026-10-30, base.images)
+
+
+@bind(router, "service.service.set_image", "/service/services/image")
+async def service_image_set(request, data: ServiceImageIn):
+    return await run_operation(request, services.set_image, data)
+
+
+@bind(router, "service.service.upload_image", "/service/services/image/upload")
+@decorate_view(accept_body_up_to(MAX_PHOTO_BODY))
+async def service_image_upload(request, data: ServiceImageUploadIn):
+    return await run_operation(request, services.upload_image, data)
+
+
+@bind(router, "service.service.suggest_image", "/service/services/image/suggest")
+async def service_image_suggest(request, params: Query[ServiceImageSuggestIn]):
+    return await run_operation(request, queries.suggest_image, params)

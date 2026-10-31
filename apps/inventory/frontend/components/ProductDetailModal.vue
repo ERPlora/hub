@@ -1,5 +1,6 @@
 <script setup lang="ts">
-// The product sheet (WORKBOOK «Ficha del producto»), the old detail modal: SKU, Price, Stock («—» for
+// The product sheet (WORKBOOK «Ficha del producto»), the old detail modal: its photo on top, larger (or its initials,
+// INVENTORY-F32), SKU, Price, Stock («—» for
 // an article without stock control) and Status, and, with the permission to move stock and on a
 // physical product, «Receive stock», «Count stock» and, when it tracks its stock, «Write off stock»
 // (the page opens their dialog). For whoever can change products, «Mark sold out» or «Put back on sale»
@@ -13,6 +14,7 @@ import { HubIcon, useSession } from '@erplora/ui/shell';
 import { IonButton, IonItem, IonLabel, IonList, IonNote } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import ItemImage from '../../../../base/frontend/components/ItemImage.vue';
 import { useT } from '../composables/useT';
 import { formatMoney, formatQuantity, useBusinessMoney } from '../lib/format';
 import { printInBrowser } from '../lib/print-label';
@@ -86,6 +88,13 @@ async function setSoldOut(value: boolean): Promise<void> {
     :title="product?.name ?? ''"
     testid="inventory-product-detail"
   >
+    <ItemImage
+      v-if="product"
+      class="product-detail__photo"
+      data-testid="inventory-product-detail-photo"
+      :src="product.image_url"
+      :name="product.name"
+    />
     <InlineFeedback
       v-if="error"
       tone="danger"
@@ -228,3 +237,14 @@ async function setSoldOut(value: boolean): Promise<void> {
     </template>
   </FormModal>
 </template>
+
+<style scoped>
+.product-detail__photo {
+  width: 128px;
+  height: 128px;
+  margin: 0 auto 12px;
+  font-size: 2.4rem;
+  border: 1px solid var(--ion-border-color, #e6e3db);
+  border-radius: 16px;
+}
+</style>

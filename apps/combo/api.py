@@ -8,9 +8,13 @@ has no route: no person and no API key reaches it.
 
 from live.ninja import bind, run_operation
 from ninja import Query, Router
+from ninja.decorators import decorate_view
 
 from apps.combo import queries, services
 from apps.combo.schemas import (
+    ComboImageIn,
+    ComboImageSuggestIn,
+    ComboImageUploadIn,
     ComboIn,
     ComboListIn,
     ComboPatchIn,
@@ -27,8 +31,12 @@ from apps.combo.schemas import (
     OptionReorderIn,
     ResolveIn,
 )
+from base.request_body import accept_body_up_to
 
 router = Router(tags=["combo"])
+
+#: A photo's body: 2 MB of photo in base64 (2 796 204 characters) and the JSON around it.
+MAX_PHOTO_BODY = 2_900_000
 
 
 # Menus
@@ -118,3 +126,22 @@ async def option_delete(request, data: OptionRefIn):
 @bind(router, "combo.option.reorder", "/combo/options/reorder")
 async def option_reorder(request, data: OptionReorderIn):
     return await run_operation(request, services.reorder_options, data)
+
+
+# The menu's image (COMBO-F14; round 2026-10-30, base.images)
+
+
+@bind(router, "combo.combo.set_image", "/combo/combos/image")
+async def combo_image_set(request, data: ComboImageIn):
+    return await run_operation(request, services.set_image, data)
+
+
+@bind(router, "combo.combo.upload_image", "/combo/combos/image/upload")
+@decorate_view(accept_body_up_to(MAX_PHOTO_BODY))
+async def combo_image_upload(request, data: ComboImageUploadIn):
+    return await run_operation(request, services.upload_image, data)
+
+
+@bind(router, "combo.combo.suggest_image", "/combo/combos/image/suggest")
+async def combo_image_suggest(request, params: Query[ComboImageSuggestIn]):
+    return await run_operation(request, queries.suggest_image, params)

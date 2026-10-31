@@ -70,4 +70,35 @@ describe('ProductTile', () => {
     await click(m.find('pos-product-p1').element);
     expect(m.wrapper.emitted('pick')).toEqual([[product()]]);
   });
+
+  // INVENTORY-F32: the photo over the name, the unit and the price; the initials when it has none or it does not load.
+  it('shows the product’s photo, lazily and named by it, where the initials go', async () => {
+    const url = '/p/catalog/hospitality/cafe_con_leche.webp';
+    const m = await mountSale(ProductTile, { props: { product: product({ image: 'catalog:hospitality/cafe_con_leche', image_url: url }) } });
+    const thumb = m.find('pos-product-p1').find('.pos-tile__thumb');
+    const img = thumb.get('img');
+    expect([img.attributes('src'), img.attributes('alt'), img.attributes('loading')]).toEqual([url, 'Café con leche', 'lazy']);
+    // The library's photos are cut-outs on white: the wide tile shows the whole of it, never a slice.
+    expect(img.classes()).toContain('item-image__photo--contain');
+    expect(thumb.text()).toBe('');
+    expect(m.find('pos-product-p1').find('.pos-tile__name').text()).toBe('Café con leche');
+  });
+
+  it('a photo that does not load leaves the initials, never a broken image', async () => {
+    const m = await mountSale(ProductTile, { props: { product: product({ image_url: '/p/media/a/inventory/products/gone.webp' }) } });
+    const thumb = m.find('pos-product-p1').find('.pos-tile__thumb');
+    await thumb.get('img').trigger('error');
+    expect(thumb.find('img').exists()).toBe(false);
+    expect(thumb.text()).toBe('CC');
+    expect(thumb.attributes('style')).toMatch(/linear-gradient/);
+  });
+
+  it('a sold-out product keeps its photo, greyed, with «Sold out»; one without VAT keeps the warning over it', async () => {
+    const url = '/p/catalog/hospitality/cafe_con_leche.webp';
+    const soldOut = await mountSale(ProductTile, { props: { product: product({ image_url: url, is_sold_out: true }) } });
+    expect(soldOut.find('pos-product-p1').classes()).toContain('pos-tile--sold-out');
+    expect(soldOut.find('pos-product-p1').find('.pos-tile__thumb img').exists()).toBe(true);
+    const blocked = await mountSale(ProductTile, { props: { product: product({ image_url: url, needs_tax_setup: true }) } });
+    expect(blocked.find('pos-product-p1').find('.pos-tile__thumb .pos-tile__warn').exists()).toBe(true);
+  });
 });

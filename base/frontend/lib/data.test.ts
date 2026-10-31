@@ -188,7 +188,7 @@ describe('the import (BASE-G103–G107)', () => {
   it('reads a file in base64, in chunks, whatever its size', () => {
     const bytes = new Uint8Array(100_000).map((_, i) => i % 256);
     expect(bytesToBase64(bytes)).toBe(Buffer.from(bytes).toString('base64'));
-    expect(MAX_FILE_BYTES).toBe(5 * 1024 * 1024);
+    expect(MAX_FILE_BYTES).toBe(20 * 1024 * 1024);
   });
 
   it('finds a template by its name, description or apps, without minding case or accents', () => {

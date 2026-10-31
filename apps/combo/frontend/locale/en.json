@@ -42,7 +42,8 @@
         "title": "Withdraw this menu?",
         "message": "«{name}» stops being on sale, together with its courses and choices. Tickets already issued keep reading it.",
         "confirm": "Withdraw"
-      }
+      },
+      "photo": "Photo"
     },
     "form": {
       "titleNew": "New menu",
@@ -64,7 +65,8 @@
       "order": "Order on the menu list",
       "active": "On sale",
       "noName": "The menu needs a name.",
-      "noTaxCategory": "A menu eaten in needs its own VAT category: without it, it cannot be billed."
+      "noTaxCategory": "A menu eaten in needs its own VAT category: without it, it cannot be billed.",
+      "photoNotSaved": "The menu has been saved, but the photo has not: {reason}"
     },
     "money": {
       "notAmount": "This is not an amount. Type a figure, for example 12.50.",
