@@ -423,7 +423,8 @@ class MessagePage(Page[MessageOut]):
 
 
 class MessageGetOut(MessageOut):
-    """A message with what an automation needs to answer it: its conversation's exact number and her name."""
+    """A message with what an automation needs to answer it: its conversation's exact number, her name and the options
+    last offered to her."""
 
     phone: str = Field(description="Its conversation's number, exactly in international format (+34600111222).")
     display_name: str = Field(
@@ -431,6 +432,10 @@ class MessageGetOut(MessageOut):
     )
     can_send: bool = Field(
         description="Whether anything can be sent now (the number connected and the month's messages not spent)."
+    )
+    options: str = Field(
+        description="What the business last wrote her from the Hub in the 24 hours before this message, where the "
+        "options she may be answering by their number («the 2nd») were offered; empty when it wrote her nothing."
     )
 
 

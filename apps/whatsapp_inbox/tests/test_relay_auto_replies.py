@@ -258,6 +258,45 @@ def test_a_guest_asks_for_a_table_and_after_the_owner_s_yes_it_is_booked_with_th
     assert FlowRun.objects.get().status == FlowRun.Status.SUCCEEDED
 
 
+def test_a_guest_who_answers_the_2nd_of_the_times_offered_is_booked_at_it_after_the_owner_s_yes(
+    gateway, tick, django_capture_on_commit_callbacks  # noqa: F811 - the fixture
+):
+    """F19: with no room at the time asked, the assistant offers a short numbered list; when the guest then writes «el 2»,
+    the assistant hears that list again (what the business last wrote them, between its two lines), so it books the 2nd
+    after the owner's yes instead of asking again."""
+    restaurant()
+    door_takes(gateway, 4)
+    day = timezone.localdate() + dt.timedelta(days=3)
+    offer = "No hay mesa a las 21:00. Tengo:\n1. Sábado a las 20:00\n2. Sábado a las 21:30"
+    gateway.reply(CHAT, json=said(offer))
+    gateway.reply(
+        CHAT,
+        json=wants(
+            "reservation.reservation.create",
+            {"guest_name": "Lucía", "date": day.isoformat(), "time": "21:30", "party_size": 4, "source": "whatsapp"},
+        ),
+    )
+    gateway.reply(CHAT, json=said("¡Listo! Mesa para 4 el sábado a las 21:30."))
+    lucia_writes("Mesa para 4 el sábado a las 21")
+    tick()
+    assert outbound() == [THANKS, offer]
+
+    receive("wamid.IN2", "34600111222", contact_name="Lucía", text="el 2", sent_at=NOW.isoformat())
+    tick()
+
+    first, second = gateway.sent(CHAT)
+    assert "\n———\n\n———\n" in first.body["messages"][0]["content"]  # nothing was offered before her first message
+    prompt = second.body["messages"][0]["content"]
+    assert "\n———\nel 2\n———\n" in prompt
+    assert f"\n———\n{offer}\n———\n" in prompt  # the list she answers, on its own lines
+    answer_yes(django_capture_on_commit_callbacks)
+    tick()
+
+    reservation = Reservation.objects.get()
+    assert (reservation.date, reservation.time, reservation.guest_phone) == (day, dt.time(21, 30), LUCIA)
+    assert outbound()[-1] == "¡Listo! Mesa para 4 el sábado a las 21:30."
+
+
 def test_a_guest_with_no_card_is_booked_on_the_card_whatsapp_made_for_them(
     gateway, tick, django_capture_on_commit_callbacks  # noqa: F811 - the fixture
 ):
