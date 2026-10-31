@@ -215,6 +215,9 @@ def test_a_row_has_everything_the_screen_and_the_form_show(general):
         "is_active": True,
         "is_sold_out": False,
         "category_ids": [drinks.id],
+        # Round 2026-10-30: no image yet, so the till shows its initials.
+        "image": "",
+        "image_url": "",
     }
 
 
@@ -431,6 +434,9 @@ def test_the_sale_catalog_has_only_active_live_products_with_what_prices_them(ge
         "price_quantity": Decimal("100.000"),
         "pricing_unit": "g",
         "tracks_stock": True,
+        # Round 2026-10-30 (INVENTORY-F32): the till's tile shows it, or its initials without one.
+        "image": "",
+        "image_url": "",
     }
     assert [row.tracks_stock for row in page.rows] == [True, False, True]
     assert page.rows[2].needs_tax_setup is True

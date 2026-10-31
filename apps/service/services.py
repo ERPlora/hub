@@ -91,6 +91,8 @@ from apps.service.schemas import (
     ReturnIn,
     ServiceBulkIn,
     ServiceIn,
+    ServiceImageIn,
+    ServiceImageUploadIn,
     ServiceOut,
     ServicePatchIn,
     ServiceRefIn,
@@ -108,6 +110,7 @@ from apps.staff.models import Member
 from apps.staff.queries import resolve_member
 from apps.tax.models import TaxCategory
 from apps.tax.queries import held_categories
+from base import images
 
 TAX_REQUIRED = _("Pick a tax category: without one the service cannot be charged.")
 TAX_UNKNOWN = _("That tax category does not exist in Taxes or is deactivated.")
@@ -356,7 +359,7 @@ def create_service(ctx: OperationContext, data: ServiceIn) -> dict:
         raise refusals[0]
     service.save()
     _announce_created(ctx, service)
-    return load_service(service.id)
+    return load_service(service.id, ctx.scope)
 
 
 @operation(
@@ -444,7 +447,7 @@ def update_service(ctx: OperationContext, data: ServicePatchIn) -> dict:
         _apply(service, changes, ctx)
         service.save()
         record_event(ctx, events.SERVICE_UPDATED, {"id": str(service.id)})
-    return load_service(service.id)
+    return load_service(service.id, ctx.scope)
 
 
 @operation(
@@ -466,7 +469,7 @@ def archive_service(ctx: OperationContext, data: ServiceRefIn) -> dict:
         _apply(service, {"is_active": False, "archived_at": timezone.now()}, ctx)
         service.save()
         record_event(ctx, events.SERVICE_ARCHIVED, {"id": str(service.id)})
-    return load_service(service.id)
+    return load_service(service.id, ctx.scope)
 
 
 @operation(
@@ -487,7 +490,70 @@ def restore_service(ctx: OperationContext, data: ServiceRefIn) -> dict:
         _apply(service, {"is_active": True, "archived_at": None}, ctx)
         service.save()
         record_event(ctx, events.SERVICE_RESTORED, {"id": str(service.id)})
-    return load_service(service.id)
+    return load_service(service.id, ctx.scope)
+
+
+# ── The service's image (SERVICE-F34, F35; round 2026-10-30, base.images) ─────────────────────────────────────
+
+#: Where a service's own photos are kept under its hub's prefix: the folder ``members_media`` serves (apps.py).
+PHOTOS = "service/services/"
+
+
+@operation(
+    "service.service.set_image",
+    kind="command",
+    permission="service.change_service",
+    input=ServiceImageIn,
+    output=ServiceOut,
+    expose_api=True,
+    ai={
+        "description": "Set the image («foto») a service shows on the till («ponle foto al corte de señora»), named by "
+        "its id or its name: an image of ERPlora's shared library by its reference (catalog:<folder>/<name>, from service.service.suggest_image or "
+        "base.catalog_image.search), or empty to show none (its initials).",
+        "risk": "normal",
+    },
+)
+def set_image(ctx: OperationContext, data: ServiceImageIn) -> dict:
+    """SERVICE-F34: an image of the library or none; anything else (a photo of its own too, which only its upload
+    writes) is refused before anything changes. The photo of its own it let go is deleted once this is saved."""
+    service = find_service(data.id, data.service, lock=True)
+    images.check(ctx, data.image)
+    _change_image(ctx, service, data.image)
+    return load_service(service.id, ctx.scope)
+
+
+@operation(
+    "service.service.upload_image",
+    kind="command",
+    permission="service.change_service",
+    input=ServiceImageUploadIn,
+    output=ServiceOut,
+    expose_api=True,
+    ai={
+        "description": "Not an assistant tool (it takes the photo the person picks in the service's form): keeps a "
+        "photo of the service, a JPG, PNG or WebP of 2 MB at most, as its image.",
+        "risk": "normal",
+    },
+)
+def upload_image(ctx: OperationContext, data: ServiceImageUploadIn) -> dict:
+    """SERVICE-F35: the photo becomes a 512 × 512 WebP of its own (``base.images``), within the plan's space, and
+    takes the place of the one the service had, which is deleted once this is saved."""
+    webp = images.to_webp(images.decode(data.data_base64, language=ctx.language), language=ctx.language)
+    service = find_service(data.id, data.service, lock=True)
+    _change_image(ctx, service, images.keep_photo(ctx, PHOTOS, webp))
+    return load_service(service.id, ctx.scope)
+
+
+def _change_image(ctx: OperationContext, service: Service, image: str) -> None:
+    """Show ``image`` on ``service`` (no change, no event); the photo of its own it let go is deleted once saved.
+    Archiving keeps it (SERVICE-F05 restores the service with it)."""
+    if service.image == image:
+        return
+    previous = service.image
+    _apply(service, {"image": image}, ctx)
+    service.save(update_fields=["image", "updated_by", "updated_at"])
+    record_event(ctx, events.SERVICE_UPDATED, {"id": str(service.id)})
+    images.let_go(ctx, previous)
 
 
 # ── Categories (SERVICE-F07, F08) ─────────────────────────────────────────────────────────────

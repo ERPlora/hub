@@ -36,6 +36,8 @@ from apps.combo.schemas import (
     MAX_GROUPS,
     MAX_OPTIONS,
     ComboDetailOut,
+    ComboImageIn,
+    ComboImageUploadIn,
     ComboIn,
     ComboPatchIn,
     ComboRefIn,
@@ -58,6 +60,7 @@ from apps.inventory import queries as inventory
 from apps.inventory.models import Product, Unit
 from apps.inventory.queries import find_product, held
 from apps.tax.models import TaxCategory
+from base import images
 
 TAX_REQUIRED = _(
     "A menu eaten in needs its own VAT category: without it, it cannot be billed."
@@ -243,7 +246,7 @@ def create_combo(ctx: OperationContext, data: ComboIn) -> dict:
         updated_by=_actor(ctx),
     )
     _combo_event(ctx, events.COMBO_CREATED, combo)
-    return load_detail(combo.id)
+    return load_detail(combo.id, ctx.scope)
 
 
 @operation(
@@ -289,7 +292,7 @@ def update_combo(ctx: OperationContext, data: ComboPatchIn) -> dict:
         combo.updated_by = _actor(ctx)
         combo.save(update_fields=[*changed, "updated_by", "updated_at"])
         _combo_event(ctx, events.COMBO_UPDATED, combo)
-    return load_detail(combo.id)
+    return load_detail(combo.id, ctx.scope)
 
 
 @operation(
@@ -306,13 +309,78 @@ def update_combo(ctx: OperationContext, data: ComboPatchIn) -> dict:
     },
 )
 def delete_combo(ctx: OperationContext, data: ComboRefIn) -> dict:
+    """COMBO-F04: its photo of its own goes with it (COMBO-F14), once this is saved."""
     combo = find_combo(data.id, data.combo, lock=True)
     # A choice being added to one of its courses commits first: the cascade then sees it.
     list(combo.groups.select_for_update().values_list("pk", flat=True))
     _combo_event(ctx, events.COMBO_DELETED, combo)
-    combo_id = combo.id
+    combo_id, photo = combo.id, combo.image
     combo.delete()
+    images.let_go(ctx, photo)
     return {"id": combo_id}
+
+
+# --- The menu's image (COMBO-F14; round 2026-10-30, base.images) -------------------------------------
+
+#: Where a menu's own photos are kept under its hub's prefix: the folder ``members_media`` serves (apps.py).
+PHOTOS = "combo/combos/"
+
+
+@operation(
+    "combo.combo.set_image",
+    kind="command",
+    permission="combo.manage",
+    input=ComboImageIn,
+    output=ComboDetailOut,
+    expose_api=True,
+    ai={
+        "description": "Set the image («foto») a menu shows on the till («ponle foto al menú del día»), named by its id "
+        "or its name: an image of ERPlora's shared library by its reference (catalog:<folder>/<name>, from combo.combo.suggest_image or "
+        "base.catalog_image.search), or empty to show none (its initials).",
+        "risk": "normal",
+    },
+)
+def set_image(ctx: OperationContext, data: ComboImageIn) -> dict:
+    """COMBO-F14: an image of the library or none; anything else (a photo of its own too, which only its upload
+    writes) is refused before anything changes. The photo of its own it let go is deleted once this is saved."""
+    combo = find_combo(data.id, data.combo, lock=True)
+    images.check(ctx, data.image)
+    _change_image(ctx, combo, data.image)
+    return load_detail(combo.id, ctx.scope)
+
+
+@operation(
+    "combo.combo.upload_image",
+    kind="command",
+    permission="combo.manage",
+    input=ComboImageUploadIn,
+    output=ComboDetailOut,
+    expose_api=True,
+    ai={
+        "description": "Not an assistant tool (it takes the photo the person picks in the menu's form): keeps a "
+        "photo of the menu, a JPG, PNG or WebP of 2 MB at most, as its image.",
+        "risk": "normal",
+    },
+)
+def upload_image(ctx: OperationContext, data: ComboImageUploadIn) -> dict:
+    """COMBO-F14: the photo becomes a 512 × 512 WebP of its own (``base.images``), within the plan's space, and takes
+    the place of the one the menu had, which is deleted once this is saved."""
+    webp = images.to_webp(images.decode(data.data_base64, language=ctx.language), language=ctx.language)
+    combo = find_combo(data.id, data.combo, lock=True)
+    _change_image(ctx, combo, images.keep_photo(ctx, PHOTOS, webp))
+    return load_detail(combo.id, ctx.scope)
+
+
+def _change_image(ctx: OperationContext, combo: Combo, image: str) -> None:
+    """Show ``image`` on ``combo`` (no change, no event); the photo of its own it let go is deleted once saved."""
+    if combo.image == image:
+        return
+    previous = combo.image
+    combo.image = image
+    combo.updated_by = _actor(ctx)
+    combo.save(update_fields=["image", "updated_by", "updated_at"])
+    _combo_event(ctx, events.COMBO_UPDATED, combo)
+    images.let_go(ctx, previous)
 
 
 # --- Courses (COMBO-F05) ---------------------------------------------------------------------------
@@ -439,7 +507,7 @@ def reorder_groups(ctx: OperationContext, data: GroupReorderIn) -> dict:
     combo = find_combo(data.id, data.combo, lock=True)
     _reordered(combo.groups.select_for_update(), data.group_ids)
     record_event(ctx, events.GROUP_REORDERED, {"combo_id": str(combo.id)})
-    return load_detail(combo.id)
+    return load_detail(combo.id, ctx.scope)
 
 
 # --- Choices (COMBO-F06, F12) --------------------------------------------------------------------

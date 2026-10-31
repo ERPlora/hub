@@ -13,6 +13,8 @@ QUERIES = {
     "combo.combo.get",
     "combo.combo.for_sale",
     "combo.combo.resolve",
+    # The menu's image (COMBO-F14).
+    "combo.combo.suggest_image",
 }
 COMMANDS = {
     "combo.combo.create",
@@ -28,6 +30,8 @@ COMMANDS = {
     "combo.option.delete",
     "combo.option.reorder",
     "combo.option.drop_product",
+    "combo.combo.set_image",
+    "combo.combo.upload_image",
 }
 # What the assistant confirms before running: whatever deletes, and a menu's change, which may change how
 # it is billed (eaten in or to take away, its VAT category): the risk is per operation, not per field.

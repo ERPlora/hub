@@ -4,6 +4,7 @@
 // `frontend/generated/operations.json`. One input per operation (ninja's parity): no path
 // parameters, a product or a category travels in the input. Money is whole cents; quantities and
 // other decimals are JSON strings on the way out («2.500») and a number or its string on the way in.
+import type { CatalogImage } from '../../../base/frontend/operations';
 import type { Page } from '../../../frontend/sdk-types';
 
 export type UnitCode = 'ud' | 'kg' | 'g' | 't' | 'l' | 'ml' | 'min' | 'h';
@@ -105,6 +106,21 @@ export interface ProductRefIn {
 /** INVENTORY-F29: true marks it sold out («86»), false puts it back on sale. */
 export interface ProductSoldOutIn extends ProductRefIn {
   sold_out: boolean;
+}
+
+/** INVENTORY-F30: `catalog:<folder>/<name>` of the shared library, or `''` for none (a `file:` is refused). */
+export interface ProductImageIn extends ProductRefIn {
+  image: string;
+}
+
+/** INVENTORY-F31: a JPG, PNG or WebP of 2 MB at most, in base64; kept as a 512 × 512 WebP. */
+export interface ProductImageUploadIn extends ProductRefIn {
+  data_base64: string;
+}
+
+export interface ProductImageSuggestIn extends ProductRefIn {
+  /** 1 to 20; 5 by default. */
+  limit?: number;
 }
 
 export interface ProductIn {
@@ -275,6 +291,11 @@ export interface ProductOut {
    *  optional only so that the products other apps' tests typed before it still compile. */
   is_sold_out?: boolean;
   category_ids: string[];
+  /** `catalog:<folder>/<name>`, `file:inventory/products/<uuid7 hex>.webp` or `''` (round 2026-10-30). The server
+   *  always sends both; optional only so that the products other apps' tests typed before them still compile. */
+  image?: string;
+  /** `/p/catalog/…` or `/p/media/<hub>/…`; `''`: none, show the initials (INVENTORY-F32). */
+  image_url?: string;
   created_at: string;
   updated_at: string;
 }
@@ -297,6 +318,18 @@ export interface SaleProductOut {
   price_quantity: string;
   pricing_unit: UnitCode;
   tracks_stock: boolean;
+  /** `catalog:<folder>/<name>`, `file:inventory/products/<uuid7 hex>.webp` or `''` (round 2026-10-30). The server
+   *  always sends both; optional only so that the products other apps' tests typed before them still compile. */
+  image?: string;
+  /** `/p/catalog/…` or `/p/media/<hub>/…`; `''`: none, show the initials (INVENTORY-F32). */
+  image_url?: string;
+}
+
+/** INVENTORY-F30: the library's best images for the product's name, titled in the business's language. */
+export interface ProductImageSuggestOut {
+  product_id: string;
+  query: string;
+  rows: CatalogImage[];
 }
 
 export interface LowStockOut {
@@ -427,6 +460,9 @@ declare module '@erplora/ui/sdk' {
     'inventory.product.update': { input: ProductPatchIn; output: ProductOut };
     'inventory.product.delete': { input: ProductRefIn; output: DeletedOut };
     'inventory.product.set_sold_out': { input: ProductSoldOutIn; output: ProductOut };
+    'inventory.product.set_image': { input: ProductImageIn; output: ProductOut };
+    'inventory.product.upload_image': { input: ProductImageUploadIn; output: ProductOut };
+    'inventory.product.suggest_image': { input: ProductImageSuggestIn; output: ProductImageSuggestOut };
     'inventory.product.print_label': { input: ProductRefIn; output: PrintLabelOut };
     'inventory.product_category.list': { input: ProductCategoryListIn; output: Page<ProductCategoryOut> };
     'inventory.product_category.add': { input: ProductCategoryIn; output: ProductCategoryLinkOut };

@@ -187,6 +187,10 @@ class Product(UUIDModel):
     # Sold out («86»): still active, but the till does not offer it until it is back on sale.
     # ``db_default``: a process still on the previous code inserts products without it (expand/contract).
     is_sold_out = models.BooleanField(_("sold out"), default=False, db_default=False)
+    # Its image (round 2026-10-30, base.images): one of the shared library («catalog:<folder>/<name>») or a photo of its
+    # own («file:inventory/products/<uuid7 hex>.webp» under its hub's prefix); empty: none, the till shows its initials.
+    # Never a URL. ``db_default``: a process still on the previous code inserts products without it (expand/contract).
+    image = models.CharField(_("image"), max_length=200, blank=True, default="", db_default="")
     is_deleted = models.BooleanField(_("deleted"), default=False)
     deleted_at = models.DateTimeField(_("deleted at"), null=True, blank=True)
     categories = models.ManyToManyField(

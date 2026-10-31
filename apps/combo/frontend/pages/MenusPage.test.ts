@@ -54,34 +54,45 @@ describe('MenusPage', () => {
     await s.show(page(ROWS));
     expect(s.prop('searchPlaceholder')).toBe('Search a menu…');
     expect(s.prop<Array<{ key: string; label: string }>>('columns').map((c) => [c.key, c.label])).toEqual([
+      ['photo', 'Photo'],
       ['name', 'Name'],
       ['price', 'Closed price'],
       ['supply_kind', 'How it is sold'],
       ['is_active', 'On sale'],
       ['sort_order', 'Order'],
     ]);
-    expect(s.cells(0).slice(0, 5)).toEqual(['Menu of the day', '€13.50', 'Eat in', 'Yes', '1']);
-    expect(s.cells(1).slice(1, 4)).toEqual(['€6.00', 'Take away', 'No']);
+    // The first cell is the photo's thumbnail, here the initials («MO»: no photo).
+    expect(s.cells(0).slice(0, 6)).toEqual(['MO', 'Menu of the day', '€13.50', 'Eat in', 'Yes', '1']);
+    expect(s.cells(1).slice(2, 5)).toEqual(['€6.00', 'Take away', 'No']);
+  });
+
+  // COMBO-F14: the list shows each menu's photo in its row.
+  it('each row shows the menu’s photo thumbnail, lazily and named by it', async () => {
+    const s = await setup();
+    const url = '/p/catalog/hospitality/menu_dia.webp';
+    await s.show(page([menu({ image: 'catalog:hospitality/menu_dia', image_url: url })]));
+    const img = s.wrapper.get('[data-testid="combo-menu-photo-m1"] img');
+    expect([img.attributes('src'), img.attributes('alt'), img.attributes('loading')]).toEqual([url, 'Menu of the day', 'lazy']);
   });
 
   it('a business in Poland reads the closed prices in złoty, and in yen without decimals', async () => {
     const s = await setup({ business: business(POLISH), locale: 'es' });
     await s.show(page(ROWS));
-    expect(s.cells(0)[1].replace(/[\u00a0\u202f]/g, ' ')).toBe('13,50 zł');
-    expect(s.cells(1)[1].replace(/[\u00a0\u202f]/g, ' ')).toBe('6,00 zł');
+    expect(s.cells(0)[2].replace(/[\u00a0\u202f]/g, ' ')).toBe('13,50 zł');
+    expect(s.cells(1)[2].replace(/[\u00a0\u202f]/g, ' ')).toBe('6,00 zł');
     expect(s.wrapper.text()).not.toContain('€');
     const yen = await setup({ business: business(JAPANESE) });
     await yen.show(page(ROWS));
-    expect(yen.cells(0)[1]).toBe('¥1,350');
+    expect(yen.cells(0)[2]).toBe('¥1,350');
   });
 
   it('until the business answers a closed price is a figure without a symbol, never a euro', async () => {
     const s = await setup({ business: null });
     await s.show(page(ROWS));
-    expect(s.cells(0)[1]).toBe('13.50');
+    expect(s.cells(0)[2]).toBe('13.50');
     expect(s.wrapper.text()).not.toContain('€');
     await s.result('base.business.get', business(POLISH));
-    expect(s.cells(0)[1].replace(/[\u00a0\u202f]/g, ' ')).toBe('zł 13.50');
+    expect(s.cells(0)[2].replace(/[\u00a0\u202f]/g, ' ')).toBe('zł 13.50');
   });
 
   it('none at all says how to start; the filters narrow it on the server', async () => {
@@ -165,8 +176,8 @@ describe('MenusPage', () => {
     const s = await setup({ locale: 'es' });
     await s.show(page(ROWS));
     expect(s.prop('searchPlaceholder')).toBe('Buscar un menú…');
-    expect(s.cells(1).slice(2, 4)).toEqual(['Para llevar', 'No']);
-    expect(s.cells(0)[3]).toBe('Sí');
+    expect(s.cells(1).slice(3, 5)).toEqual(['Para llevar', 'No']);
+    expect(s.cells(0)[4]).toBe('Sí');
   });
 });
 

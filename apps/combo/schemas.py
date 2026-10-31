@@ -27,6 +27,8 @@ from pydantic import (
 )
 
 from apps.combo.models import MAX_PICKS, NAME_MAX_LENGTH
+from base.images import MAX_UPLOAD_BASE64
+from base.schemas import CatalogImageOut, names
 
 T = TypeVar("T")
 
@@ -164,6 +166,33 @@ class ComboRefIn(In):
     def _combo_named(self):
         _named(self.id, self.combo, SAY_WHICH_MENU)
         return self
+
+
+# The menu's image (COMBO-F14; round 2026-10-30, base.images): one of the shared library or a photo of its own.
+
+#: An image a write sets: the assistant's card names it by its title in the library, never by its reference.
+AN_IMAGE = names("base.catalog_image.get", by="reference", name=("title",))
+
+
+class ComboImageIn(ComboRefIn):
+    id: UUID | None = Field(None, description=D_COMBO_ID, json_schema_extra=names("combo.combo.get"))
+    image: Annotated[str, StringConstraints(strip_whitespace=True, max_length=200)] = Field(
+        title=gettext_noop("Image"),
+        description="The image the menu shows: an image of the shared library by its reference, "
+        "catalog:<folder>/<name> (base.catalog_image.search, combo.combo.suggest_image), or empty for none.",
+        json_schema_extra=AN_IMAGE,
+    )
+
+
+class ComboImageUploadIn(ComboRefIn):
+    data_base64: str = Field(
+        max_length=MAX_UPLOAD_BASE64,
+        description="The photo, a JPG, PNG or WebP of 2 MB at most, in base64; it is kept as a 512 × 512 WebP.",
+    )
+
+
+class ComboImageSuggestIn(ComboRefIn):
+    limit: int = Field(5, ge=1, le=20, description="How many images to propose (1 to 20).")
 
 
 class _ComboOfIn(In):
@@ -506,11 +535,24 @@ class ComboOut(Schema):
     sort_order: int
     is_active: bool
     group_count: int
+    image: str = Field(
+        description="Its image: catalog:<folder>/<name> of the shared library, file:<name> of a photo of its own, "
+        "or empty."
+    )
+    image_url: str = Field(description="Where the Hub serves its image; empty: it has none (show its initials).")
     created_at: dt.datetime
     updated_at: dt.datetime
 
 
 ComboPage = Page[ComboOut]
+
+
+class ComboImageSuggestOut(Schema):
+    combo_id: UUID = Field(description="The menu the images are proposed for.")
+    query: str = Field(description="What was looked for in the library: the menu's name.")
+    rows: list[CatalogImageOut] = Field(
+        description="The library's images that match its name, the best first; none is set until one is chosen."
+    )
 
 
 class BlockerOut(Schema):
@@ -560,6 +602,11 @@ class SaleComboOut(Schema):
     price: int
     supply_kind: SupplyKind
     sort_order: int
+    image: str = Field(
+        description="Its image: catalog:<folder>/<name> of the shared library, file:<name> of a photo of its own, "
+        "or empty."
+    )
+    image_url: str = Field(description="Where the Hub serves its image; empty: it has none (show its initials).")
     groups: list[SaleGroupOut]
 
 

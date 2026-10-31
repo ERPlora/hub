@@ -31,6 +31,9 @@ class ServiceConfig(LiveAppConfig):
     # The tax category of each service (tax.TaxCategory), the professionals who perform it
     # (staff.Member) and the owner of a voucher (customer.Customer).
     requires = ["tax", "staff", "customer"]
+    # The services' own photos (SERVICE-F35; round 2026-10-30, base.images): served by /p/media/ to the hub's sessions
+    # only.
+    members_media = ["service/services/"]
     default_auto_field = "django.db.models.BigAutoField"
     permissions = [
         "service.view_service",

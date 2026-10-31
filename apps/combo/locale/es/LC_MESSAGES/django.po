@@ -378,3 +378,11 @@ msgstr "Elecciones"
 
 msgid "SKU"
 msgstr "SKU"
+
+#: models.py
+msgid "image"
+msgstr "imagen"
+
+#: schemas.py
+msgid "Image"
+msgstr "Imagen"

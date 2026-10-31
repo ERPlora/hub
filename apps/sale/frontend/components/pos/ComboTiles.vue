@@ -1,17 +1,17 @@
 <script setup lang="ts">
 // The menus on the till's grid (SALE-F12; Menus' COMBO-F07): the menus Menus has on sale and can complete
-// (`combo.combo.for_sale`, live, up to 50), painted first in «All» as tiles of the grid, each marked «Menu» with its
-// name and closed price; a tap hands the menu up (`pick`) and the page opens its sheet. Nothing while it loads (the
+// (`combo.combo.for_sale`, live, up to 50), painted first in «All» as tiles of the grid, each with its photo (or its
+// initials when it has none or it does not load, COMBO-F14), marked «Menu» with its name and closed price; a tap hands the menu up (`pick`) and the page opens its sheet. Nothing while it loads (the
 // products are already there); a failed read says so with «Retry»; Menus off or not readable shows nothing.
 import { InlineFeedback } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
 import { IonButton } from '@ionic/vue';
 import { computed } from 'vue';
 
+import ItemImage from '../../../../../base/frontend/components/ItemImage.vue';
 import type { SaleComboOut } from '../../../../combo/frontend/operations';
 import { useLocale } from '../../composables/useT';
 import { formatMoney, useBusinessMoney } from '../../lib/format';
-import { initials, tileGradient } from './till';
 
 const emit = defineEmits<{ pick: [combo: SaleComboOut] }>();
 
@@ -51,11 +51,13 @@ const failed = computed(() => !!error.value && !['app_inactive', 'permission_den
     :data-testid="`pos-menu-${menu.id}`"
     @click="emit('pick', menu)"
   >
-    <span
+    <ItemImage
       class="pos-menu__thumb"
-      :style="{ background: tileGradient(menu.name) }"
+      fit="contain"
+      :src="menu.image_url"
+      :name="menu.name"
       aria-hidden="true"
-    >{{ initials(menu.name) }}</span>
+    />
     <span class="pos-menu__info">
       <span class="pos-menu__name">{{ menu.name }}</span>
       <span

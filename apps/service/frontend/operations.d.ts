@@ -3,6 +3,7 @@
 // `/api/openapi.json`. Keep it in step with schemas.py and `frontend/generated/operations.json`.
 // One input per operation (ninja's parity): no path parameters, an id travels in the input.
 // On the wire: money in whole minor units of the business's currency, minutes as integers, dates and moments ISO 8601.
+import type { CatalogImage } from '../../../base/frontend/operations';
 import type { Page } from '../../../frontend/sdk-types';
 
 export type PricingType = 'fixed' | 'hourly' | 'from' | 'variable' | 'free';
@@ -49,6 +50,28 @@ export interface DeletedOut {
 export interface ServiceRefIn {
   id?: string | null;
   service?: string | null;
+}
+
+/** SERVICE-F34: `catalog:<folder>/<name>` of the shared library, or `''` for none (a `file:` is refused). */
+export interface ServiceImageIn extends ServiceRefIn {
+  image: string;
+}
+
+/** SERVICE-F35: a JPG, PNG or WebP of 2 MB at most, in base64; kept as a 512 × 512 WebP. */
+export interface ServiceImageUploadIn extends ServiceRefIn {
+  data_base64: string;
+}
+
+export interface ServiceImageSuggestIn extends ServiceRefIn {
+  /** 1 to 20; 5 by default. */
+  limit?: number;
+}
+
+/** SERVICE-F34: the library's best images for the service's name, titled in the business's language. */
+export interface ServiceImageSuggestOut {
+  service_id: string;
+  query: string;
+  rows: CatalogImage[];
 }
 
 export interface ServiceListIn extends PageIn {
@@ -140,6 +163,11 @@ export interface ServiceOut {
   status: ServiceStatus;
   is_active: boolean;
   archived_at: string | null;
+  /** `catalog:<folder>/<name>`, `file:service/services/<uuid7 hex>.webp` or `''` (SERVICE-F34, F35). The server
+   *  always sends both; optional only so that the services other apps' tests typed before them still compile. */
+  image?: string;
+  /** `/p/catalog/…` or `/p/media/<hub>/…`; `''`: none, show the initials. */
+  image_url?: string;
   created_at: string;
   updated_at: string;
 }
@@ -161,6 +189,11 @@ export interface ServiceSaleOut {
   tax_category_id: string | null;
   tax_category_key: string | null;
   needs_tax_setup: boolean;
+  /** `catalog:<folder>/<name>`, `file:service/services/<uuid7 hex>.webp` or `''` (SERVICE-F34, F35). The server
+   *  always sends both; optional only so that the services other apps' tests typed before them still compile. */
+  image?: string;
+  /** `/p/catalog/…` or `/p/media/<hub>/…`; `''`: none, show the initials. */
+  image_url?: string;
 }
 
 export interface ServiceBulkIn {
@@ -565,6 +598,9 @@ declare module '@erplora/ui/sdk' {
     'service.service.update': { input: ServicePatchIn; output: ServiceOut };
     'service.service.archive': { input: ServiceRefIn; output: ServiceOut };
     'service.service.restore': { input: ServiceRefIn; output: ServiceOut };
+    'service.service.set_image': { input: ServiceImageIn; output: ServiceOut };
+    'service.service.upload_image': { input: ServiceImageUploadIn; output: ServiceOut };
+    'service.service.suggest_image': { input: ServiceImageSuggestIn; output: ServiceImageSuggestOut };
     'service.catalog.status': { input: NoInput; output: CatalogStatusOut };
     'service.category.list': { input: CategoryListIn; output: Page<CategoryOut> };
     'service.category.get': { input: CategoryRefIn; output: CategoryOut };

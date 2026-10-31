@@ -299,7 +299,7 @@
         "version": "Versión",
         "brings": "Trae",
         "readError": "No se pudo leer el fichero: {reason}",
-        "tooBig": "el fichero pasa de 5 MB."
+        "tooBig": "el fichero pasa de 20 MB."
       },
       "review": {
         "title": "Revisa lo que trae",
@@ -1275,6 +1275,7 @@
           "set_enabled": "Cambiar",
           "set_groups": "Cambiar",
           "set_guests": "Cambiar",
+          "set_image": "Cambiar",
           "set_label": "Cambiar",
           "set_line_discount": "Cambiar",
           "set_line_discount_over_limit": "Cambiar",
@@ -1339,6 +1340,42 @@
       "setup": {
         "ask": "Pedírselo al asistente"
       }
+    },
+    "imageLibrary": {
+      "title": "Librería de imágenes",
+      "search": "Buscar imagen…",
+      "folders": {
+        "label": "Sectores",
+        "all": "Todas",
+        "hospitality": "Hostelería",
+        "beauty_hair": "Peluquería",
+        "beauty_body": "Estética",
+        "retail": "Comercio",
+        "fitness": "Deporte",
+        "wellness_spa": "Spa y bienestar"
+      },
+      "loading": "Cargando imágenes…",
+      "empty": "Ninguna imagen coincide con tu búsqueda. Prueba con otra palabra o sube una foto.",
+      "error": "No se pudo cargar la librería de imágenes.",
+      "retry": "Reintentar",
+      "close": "Cerrar",
+      "upload": "Subir foto",
+      "loadMore": "Cargar más",
+      "showing": "Mostrando {shown} de {total}"
+    },
+    "imageField": {
+      "label": "Foto",
+      "none": "Sin foto: se ven sus iniciales",
+      "library": "Elegir de la librería",
+      "upload": "Subir foto",
+      "change": "Cambiar",
+      "remove": "Quitar foto",
+      "rules": "JPG, PNG o WebP de hasta 2 MB",
+      "tooBig": "La foto pesa más de 2 MB. Elige una más ligera.",
+      "notAPhoto": "Ese archivo no es una foto. Sube una imagen JPG, PNG o WebP.",
+      "uploading": "Subiendo foto…",
+      "notSaved": "No se pudo guardar la foto. Inténtalo de nuevo.",
+      "retry": "Reintentar"
     }
   }
 }

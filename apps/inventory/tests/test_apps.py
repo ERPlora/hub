@@ -103,7 +103,8 @@ def test_every_operation_is_a_tool_of_the_assistant():
     # The assistant uses the app by voice and text with the user's own session: the operation's
     # permission is its only door. A command says its risk; a read has none.
     operations = [op for name, op in registry.items() if name.startswith("inventory.")]
-    assert len(operations) == 31
+    # 31 + the product's image (INVENTORY-F30, F31): set_image, upload_image, suggest_image.
+    assert len(operations) == 34
     for op in operations:
         assert isinstance(op.ai, dict) and op.ai.get("description"), op.name
         expected = {"description", "risk"} if op.kind == "command" else {"description"}

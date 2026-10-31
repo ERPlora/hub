@@ -299,7 +299,7 @@
         "version": "Version",
         "brings": "It brings",
         "readError": "The file could not be read: {reason}",
-        "tooBig": "the file is larger than 5 MB."
+        "tooBig": "the file is larger than 20 MB."
       },
       "review": {
         "title": "Review what it brings",
@@ -1275,6 +1275,7 @@
           "set_enabled": "Change",
           "set_groups": "Change",
           "set_guests": "Change",
+          "set_image": "Change",
           "set_label": "Change",
           "set_line_discount": "Change",
           "set_line_discount_over_limit": "Change",
@@ -1339,6 +1340,42 @@
       "setup": {
         "ask": "Ask the assistant"
       }
+    },
+    "imageLibrary": {
+      "title": "Image library",
+      "search": "Search image…",
+      "folders": {
+        "label": "Sectors",
+        "all": "All",
+        "hospitality": "Hospitality",
+        "beauty_hair": "Hair",
+        "beauty_body": "Beauty",
+        "retail": "Retail",
+        "fitness": "Fitness",
+        "wellness_spa": "Spa and wellness"
+      },
+      "loading": "Loading images…",
+      "empty": "No image matches your search. Try another word or upload a photo.",
+      "error": "The image library could not be loaded.",
+      "retry": "Retry",
+      "close": "Close",
+      "upload": "Upload photo",
+      "loadMore": "Load more",
+      "showing": "Showing {shown} of {total}"
+    },
+    "imageField": {
+      "label": "Photo",
+      "none": "No photo: its initials are shown",
+      "library": "Choose from the library",
+      "upload": "Upload photo",
+      "change": "Change",
+      "remove": "Remove photo",
+      "rules": "JPG, PNG or WebP of up to 2 MB",
+      "tooBig": "The photo weighs more than 2 MB. Choose a lighter one.",
+      "notAPhoto": "That file is not a photo. Upload a JPG, PNG or WebP image.",
+      "uploading": "Uploading photo…",
+      "notSaved": "The photo could not be saved. Try again.",
+      "retry": "Retry"
     }
   }
 }
