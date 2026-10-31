@@ -137,10 +137,12 @@ def dump_hub(
     target = bucket()
     if not target:
         raise DumpsUnavailable("No bucket is named for the copies (HUB_DUMPS_BUCKET).")
-    at = (now or timezone.now()).astimezone(dt.UTC).replace(microsecond=0)
-    while services.dump_key_taken(key_for(hub, kind, at)):
-        at += dt.timedelta(seconds=1)
-    key = key_for(hub, kind, at)
+    made_at = (now or timezone.now()).astimezone(dt.UTC)
+    # The key's time is to the second; a second copy of the hub in that second takes the next one.
+    stamp = made_at.replace(microsecond=0)
+    while services.dump_key_taken(key_for(hub, kind, stamp)):
+        stamp += dt.timedelta(seconds=1)
+    key = key_for(hub, kind, stamp)
     with tempfile.TemporaryDirectory(prefix="hub-dump-") as folder:
         path = Path(folder) / "copy.dump"
         _run_pg_dump(hub, path, timeout=timeout, heartbeat=heartbeat)
@@ -149,7 +151,7 @@ def dump_hub(
             client().upload_file(str(path), target, key, ExtraArgs={"ContentType": "application/octet-stream"})
         except (S3UploadFailedError, BotoCoreError, ClientError) as error:
             raise DumpFailed(f"The copy of {hub.slug} could not be uploaded: {error}") from error
-    made = services.dump_recorded(hub.id, kind=kind, key=key, size=size, created_at=at, requested_by=requested_by)
+    made = services.dump_recorded(hub.id, kind=kind, key=key, size=size, created_at=made_at, requested_by=requested_by)
     logger.info("base.tenancy.dumps.made hub=%s kind=%s key=%s bytes=%d", hub.slug, kind, key, size)
     return made
 
@@ -162,6 +164,8 @@ def _run_pg_dump(hub, path: Path, *, timeout: float, heartbeat: Callable[[], obj
     # Nothing of the process's own PG* variables: only what the command names, and the password.
     env = {name: value for name, value in os.environ.items() if not name.startswith("PG")}
     env["PGPASSWORD"] = password
+    # No Kerberos anywhere: libpq's first try at a GSSAPI session only adds a line to every failure.
+    env["PGGSSENCMODE"] = "disable"
     with open(path.with_suffix(".err"), "w+", encoding="utf-8", errors="replace") as complaints:
         process = subprocess.Popen(command, env=env, stdout=subprocess.DEVNULL, stderr=complaints)
         started = time.monotonic()
@@ -186,6 +190,15 @@ def _run_pg_dump(hub, path: Path, *, timeout: float, heartbeat: Callable[[], obj
             if password:
                 said = said.replace(password, "***")
             raise DumpFailed(f"pg_dump could not copy {hub.db_name} (exit {process.returncode}): {said}")
+
+
+def link_expires_at(url: str) -> dt.datetime:
+    """When a link :func:`presigned_url` signed stops working: its signing time plus its life."""
+    from urllib.parse import parse_qs, urlsplit
+
+    query = parse_qs(urlsplit(url).query)
+    signed_at = dt.datetime.strptime(query["X-Amz-Date"][0], KEY_TIME).replace(tzinfo=dt.UTC)
+    return signed_at + dt.timedelta(seconds=int(query["X-Amz-Expires"][0]))
 
 
 def presigned_url(key: str, *, minutes: int = LINK_MINUTES) -> str:

@@ -107,6 +107,22 @@ def hubs_pass(monkeypatch) -> list[dt.datetime]:
 
 
 @pytest.fixture(autouse=True)
+def data_pass(monkeypatch) -> list[dt.datetime]:
+    """Stands in for the data pass (``worker._data``: a reset, a business that left; ``test_worker_data.py``)."""
+    passes: list[dt.datetime] = []
+    monkeypatch.setattr(worker, "_data", passes.append)
+    return passes
+
+
+@pytest.fixture(autouse=True)
+def usage_pass(monkeypatch) -> list[dt.datetime]:
+    """Stands in for the nightly measurement's pass (``worker._usage``; ``test_usage.py``)."""
+    passes: list[dt.datetime] = []
+    monkeypatch.setattr(worker, "_usage", passes.append)
+    return passes
+
+
+@pytest.fixture(autouse=True)
 def due(monkeypatch) -> FakeDue:
     fake = FakeDue()
     monkeypatch.setattr(provision, "run_due", fake)
@@ -585,6 +601,8 @@ def test_relays_the_shared_outbox_then_the_hubs_own_then_makes_the_hubs_due_on_e
     monkeypatch.setattr(provision, "run_due", lambda now: order.append("due") or due(now))
     monkeypatch.setattr(relay, "run", lambda now: order.append("relay") or outbox(now))
     monkeypatch.setattr(worker, "_hubs", lambda now: order.append("hubs"))
+    monkeypatch.setattr(worker, "_data", lambda now: order.append("data"))
+    monkeypatch.setattr(worker, "_usage", lambda now: order.append("usage"))
     stop = threading.Event()
     wait, _ = stop_after(stop, 3)
 
@@ -592,7 +610,9 @@ def test_relays_the_shared_outbox_then_the_hubs_own_then_makes_the_hubs_due_on_e
 
     assert due.passes == [ten(0), ten(1), ten(2)]
     assert due.contexts == [context.CONTROL] * 3
-    assert order == ["tasks", "relay", "hubs", "due"] * 3
+    # The data work (a reset, a business that left: test_worker_data.py) before the hubs due, so the provisioning's
+    # pass never takes a reset's row first; the nightly measurement's check after it.
+    assert order == ["tasks", "relay", "hubs", "data", "usage", "due"] * 3
 
 
 def test_with_databases_only_it_makes_and_drops_the_hubs_databases_and_nothing_else(
@@ -606,6 +626,8 @@ def test_with_databases_only_it_makes_and_drops_the_hubs_databases_and_nothing_e
     monkeypatch.setattr(relay, "run", lambda now: order.append("relay") or outbox(now))
     monkeypatch.setattr(worker, "_hubs", lambda now: order.append("hubs"))
     monkeypatch.setattr(worker, "_reap", lambda now: order.append("reap"))
+    monkeypatch.setattr(worker, "_data", lambda now: order.append("data"))
+    monkeypatch.setattr(worker, "_usage", lambda now: order.append("usage"))
     stop = threading.Event()
     wait, _ = stop_after(stop, 2)
 
@@ -613,7 +635,7 @@ def test_with_databases_only_it_makes_and_drops_the_hubs_databases_and_nothing_e
 
     # Every tick makes the databases due; the reaper keeps its own pace; nothing else runs.
     assert [step for step in order if step != "reap"] == ["due", "due"]
-    assert order[0] == "reap" and not {"tasks", "relay", "hubs"} & set(order)
+    assert order[0] == "reap" and not {"tasks", "relay", "hubs", "data", "usage"} & set(order)
 
 
 def test_a_due_pass_that_fails_is_logged_and_the_next_tick_tries_again(caplog, calls, tasks, due, outbox):

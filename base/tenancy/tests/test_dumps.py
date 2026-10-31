@@ -119,7 +119,7 @@ def test_the_password_goes_in_the_environment_never_in_the_command(hub_a, dumps_
     [(command, env)] = seen
     assert command[:4] == [dumps.pg_dump(), "--format=custom", "--no-owner", "--no-acl"]
     assert env["PGPASSWORD"] == settings.DB_MIGRATOR_PASSWORD
-    assert not any(name.startswith("PG") for name in env if name != "PGPASSWORD")
+    assert {name for name in env if name.startswith("PG")} == {"PGPASSWORD", "PGGSSENCMODE"}
     dbname = conninfo_to_dict(command[-1].removeprefix("--dbname="))
     assert "password" not in dbname
     assert (dbname["dbname"], dbname["user"]) == (hub_a.db_name, settings.DB_MIGRATOR_USER)
