@@ -62,6 +62,17 @@ describe('table catalogues (en source + es)', () => {
     }
   });
 
+  it('count things in the singular and the plural: «1 guest», never «1 guests» (hub#462)', () => {
+    // A `{count}` before a noun needs both forms (`one | other`, vue-i18n picks one by `count`). «pax» is
+    // the same for one and many, and «Seat {count} at once» / «Sentar {count} de un toque» count no noun.
+    const SAME_FOR_ONE = new Set(['pax', 'at', 'de']);
+    for (const [key, message] of [...EN, ...ES]) {
+      for (const [, word] of message.matchAll(/\{count\} (\p{L}+)/gu)) {
+        if (!SAME_FOR_ONE.has(word)) expect(message.split('|').length, `${key}: «{count} ${word}»`).toBe(2);
+      }
+    }
+  });
+
   it('cover every key the app’s sources use, literal or built from a known prefix', () => {
     const files = sources(FRONTEND);
     expect(files.length).toBeGreaterThan(0);
