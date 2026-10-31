@@ -122,7 +122,8 @@ describe('languageOf', () => {
 describe('ITEMS', () => {
   it('holds block B (21 to 34) and C35 to C37, each once, with a slug fit for a file name', () => {
     expect(ITEMS.map((item) => item.id)).toEqual([
-      'B21', 'B22', 'B23', 'B24', 'B25', 'B26', 'B27', 'B28', 'B29', 'B30', 'B31', 'B32', 'B33', 'B34', 'C35', 'C36', 'C37',
+      'B21', 'B22', 'B23', 'B24', 'B25', 'B26', 'B27', 'B28', 'B28b', 'B28c', 'B29', 'B30', 'B31', 'B32', 'B33', 'B34', 'C35',
+      'C36', 'C37',
     ]);
     for (const item of ITEMS) expect(item.slug).toMatch(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
     expect(ITEMS.filter((item) => item.language === 'en').map((item) => item.id)).toEqual(['C37']);
@@ -170,6 +171,59 @@ describe('verdictOf', () => {
     expect(verdictOf(outcome('B29', { observed: wrote, decided: 'confirmed', record: { checked: 'Ana QA listed', ok: true } })).verdict).toBe('PASS');
     expect(verdictOf(outcome('B29', { observed: wrote, decided: 'confirmed', record: { checked: 'Ana QA listed', ok: false } })).verdict).toBe('FAIL');
     expect(verdictOf(outcome('B29', { observed: { ...wrote, cards: [] }, decided: 'none', record: { checked: '', ok: true } })).verdict).toBe('FAIL');
+  });
+
+  it('fails a write whose card ran another operation than the one the item asks for', () => {
+    const disabled = {
+      ...observe([]),
+      cards: [{ operation: 'base.app.disable', risk: 'normal', confirmWord: '' }],
+      executed: [{ name: 'base.app.disable', kind: 'command', outcome: 'ok', code: '' }],
+    };
+    const off = { checked: 'Reservations is off', ok: true };
+    expect(verdictOf(outcome('B28b', { observed: disabled, decided: 'confirmed', record: off })).verdict).toBe('PASS');
+    const v = verdictOf(outcome('B28c', { observed: disabled, decided: 'confirmed', record: off }));
+    expect(v.verdict).toBe('FAIL');
+    expect(v.reasons.join(' ')).toMatch(/base\.app\.enable did not run/);
+  });
+
+  it('fails a write whose confirmed card then failed, even when a later card did the job', () => {
+    const retried = {
+      ...observe([]),
+      cards: [
+        { operation: 'staff.member.create', risk: 'normal', confirmWord: '' },
+        { operation: 'staff.member.create', risk: 'normal', confirmWord: '' },
+      ],
+      executed: [
+        { name: 'staff.member.create', kind: 'command', outcome: 'error', code: 'invalid_payload' },
+        { name: 'staff.member.create', kind: 'command', outcome: 'ok', code: '' },
+      ],
+    };
+    const v = verdictOf(outcome('B30', { observed: retried, decided: 'confirmed', record: { checked: 'Luis QA listed', ok: true } }));
+    expect(v.verdict).toBe('FAIL');
+    expect(v.reasons.join(' ')).toMatch(/staff\.member\.create failed \(invalid_payload\)/);
+    const cancelled = { ...retried, executed: [{ name: 'customer.customer.create', kind: 'command', outcome: 'cancelled', code: 'x' }] };
+    const done = { decided: 'cancelled' as const, record: { checked: 'not created', ok: true } };
+    expect(verdictOf(outcome('C36', { ...done, observed: cancelled })).verdict).toBe('PASS');
+    // Cancelled (its card counts), then a retry refused before any card: nothing failed after a card.
+    const cancelledThenRefused = {
+      ...observe([]),
+      cards: [{ operation: 'customer.customer.create', risk: 'normal', confirmWord: '' }],
+      executed: [
+        { name: 'customer.customer.create', kind: 'command', outcome: 'cancelled', code: 'base.assistant_not_confirmed' },
+        { name: 'customer.customer.create', kind: 'command', outcome: 'error', code: 'invalid_payload' },
+      ],
+    };
+    expect(verdictOf(outcome('C36', { ...done, observed: cancelledThenRefused })).verdict).toBe('PASS');
+    // Refused before any card (the data did not fit), then asked again right: one card, one yes, nothing failed after it.
+    const refusedFirst = { ...retried, cards: [retried.cards[0]] };
+    expect(verdictOf(outcome('B30', { observed: refusedFirst, decided: 'confirmed', record: { checked: 'Luis QA listed', ok: true } })).verdict).toBe('PASS');
+  });
+
+  it('fails an answer that shows a blockquote as a raw «>» line', () => {
+    const v = verdictOf(outcome('B25', { answer: 'Abre la caja.\n> ⚠️ Cuenta el efectivo antes.' }));
+    expect(v.verdict).toBe('FAIL');
+    expect(v.reasons.join(' ')).toMatch(/blockquote/);
+    expect(verdictOf(outcome('B25', { answer: 'Abre la caja. 5 > 3 no es una cita.' })).verdict).toBe('PASS');
   });
 
   it('passes «what did I sell today» with a read and no write, and fails it with a write', () => {

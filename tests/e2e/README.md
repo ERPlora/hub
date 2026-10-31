@@ -234,7 +234,8 @@ pila (la documentación de las apps), los proveedores reales por las operaciones
 cero. Cada punto pregunta en una conversación nueva, en `es` (C37 en `en`), guarda lo que pasó por
 `/api/assistant/turn` (herramientas, tarjeta, extractos de `base.docs.search`, errores), confirma la tarjeta de los
 «hazlo» escribiendo la palabra que pide (los demás la cancelan), comprueba el registro por la API del Hub y escribe
-`.artifacts/qa/assistant-battery-B.md` (el informe, punto a punto) y `.artifacts/qa/<punto>-<slug>.png`. Una prueba falla
+`.artifacts/qa/<ejecución>/assistant-battery-B.md` (el informe, punto a punto) y `.artifacts/qa/<ejecución>/<punto>-<slug>.png`:
+cada ejecución en su carpeta, así que repetir puntos nunca pisa la evidencia de otra. Una prueba falla
 si falla su veredicto automático (`verdictOf`, probado con Vitest en `assistant-battery.test.ts`); la redacción de la
 respuesta nunca se comprueba: la lee una persona en el informe. C35 pone el mes de `a` al 80 % para ver moverse el pie
 (solo se pinta desde ahí, BASE-G122) y lo devuelve a lo gastado.

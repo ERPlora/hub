@@ -7,7 +7,7 @@
 // SaaS's operations (assistant-battery.ts, `SEED_PY`), indexes the documentation (`index_docs`) and empties this
 // month's messages of `a`. Each item asks in a new conversation, records what went over the wire
 // (`/api/assistant/turn`), decides the card as a person would, checks the record through the Hub's API and writes
-// `.artifacts/qa/assistant-battery-B.md` (the report) and `.artifacts/qa/<item>-<slug>.png`. The test fails when the
+// `.artifacts/qa/<run>/assistant-battery-B.md` (the report) and `.artifacts/qa/<run>/<item>-<slug>.png`. The test fails when the
 // automatic verdict does; the wording is for a person to read in the report.
 import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -31,11 +31,12 @@ import { STACK } from '../stack';
 
 test.skip(process.env.QA_REAL_PROVIDER !== '1', 'QA with the real model: QA_REAL_PROVIDER=1 (tests/e2e/README.md)');
 
-const QA_DIR = join(ARTIFACTS, 'qa');
+/** The run the report belongs to: Playwright's, or `QA_BATTERY_RUN` to ask some items again into an earlier report. */
+const RUN = (process.env.QA_BATTERY_RUN || process.env.PW_RUN_ID || 'run').replace(/[^A-Za-z0-9._-]/g, '-');
+/** Each run keeps its own report and screenshots: a later run never overwrites an earlier one's evidence. */
+const QA_DIR = join(ARTIFACTS, 'qa', RUN);
 const STATE = join(QA_DIR, 'assistant-battery-B.json');
 const REPORT = join(QA_DIR, 'assistant-battery-B.md');
-/** The run the report belongs to: Playwright's, or `QA_BATTERY_RUN` to ask some items again into an earlier report. */
-const RUN = process.env.QA_BATTERY_RUN || process.env.PW_RUN_ID || 'run';
 const SAAS_DIR = process.env.E2E_SAAS_DIR ?? '';
 const SECRETS = [process.env.QA_QWEN_API_KEY ?? '', process.env.QA_OPENAI_API_KEY ?? ''];
 /** The apps the battery's do-it items write in; Reservations stays as the business has it (B26 asks about it). */
@@ -81,9 +82,9 @@ function saasSql(sql: string): string {
 
 /** Once per run: the apps' docs in the SaaS, the real providers, the index, and `a`'s month of messages emptied. */
 function prepare(): State {
+  mkdirSync(QA_DIR, { recursive: true });
   const kept = readState();
   if (kept) return kept;
-  mkdirSync(QA_DIR, { recursive: true });
   expect(SAAS_DIR, 'E2E_SAAS_DIR: the checkout of the stack\'s SaaS (tests/e2e/README.md)').not.toBe('');
   run('uv', ['run', 'python', 'manage.py', 'register_apps'], HUB_DIR, { ...process.env, SHARED_DB_NAME: STACK.saasDatabase });
   const seed = seedCommand(process.env, STACK.saasDatabase);
@@ -212,10 +213,45 @@ const products = (context: BrowserContext, name: string) => rowsNamed(context, '
 const members = (context: BrowserContext, name: string) =>
   rowsNamed(context, '/staff/members', name, (row) => String(row.full_name ?? '').toLowerCase().includes(name.toLowerCase()));
 
-/** How each item checks its record through the Hub's API: counted before the question, judged after it. */
-const RECORDS: Record<string, { count: (context: BrowserContext) => Promise<number>; ok: (before: number, after: number) => boolean; says: string }> = {
+/** 1 when the app `id` is on in the business, 0 otherwise. */
+async function appOn(context: BrowserContext, id: string): Promise<number> {
+  const apps = await api<{ apps: { id: string; state: string }[] }>(context, A, 'GET', '/apps');
+  expect(apps.status, JSON.stringify(apps.data)).toBe(200);
+  return apps.data.apps.find((app) => app.id === id)?.state === 'on' ? 1 : 0;
+}
+
+/** The roles of the team members named `name`, as the Team screen lists them. */
+async function rolesOf(context: BrowserContext, name: string): Promise<string> {
+  const listed = await api<{ rows: { full_name?: string; role_name?: string | null }[] }>(
+    context,
+    A,
+    'GET',
+    `/staff/members?search=${encodeURIComponent(name)}&limit=50&offset=0`,
+  );
+  const roles = listed.data.rows.filter((row) => (row.full_name ?? '').toLowerCase().includes(name.toLowerCase()));
+  return roles.map((row) => row.role_name || '(no role)').join(', ') || 'none';
+}
+
+/** How each item checks its record through the Hub's API: counted before the question, judged after it (`detail`: what
+ *  else the report says of it). */
+const RECORDS: Record<
+  string,
+  {
+    count: (context: BrowserContext) => Promise<number>;
+    ok: (before: number, after: number) => boolean;
+    says: string;
+    detail?: (context: BrowserContext) => Promise<string>;
+  }
+> = {
+  B28b: { count: (c) => appOn(c, 'reservation'), ok: (b, a) => b === 1 && a === 0, says: 'Reservations on (1) or off (0)' },
+  B28c: { count: (c) => appOn(c, 'reservation'), ok: (b, a) => b === 0 && a === 1, says: 'Reservations on (1) or off (0)' },
   B29: { count: (c) => customers(c, 'Ana QA'), ok: (b, a) => a === b + 1, says: 'customers named «Ana QA»' },
-  B30: { count: (c) => members(c, 'Luis QA'), ok: (b, a) => a === b + 1, says: 'team members named «Luis QA»' },
+  B30: {
+    count: (c) => members(c, 'Luis QA'),
+    ok: (b, a) => a === b + 1,
+    says: 'team members named «Luis QA»',
+    detail: async (c) => `roles: ${await rolesOf(c, 'Luis QA')}`,
+  },
   B31: { count: (c) => products(c, 'Café QA'), ok: (b, a) => a === b + 1, says: 'products named «Café QA»' },
   B33: { count: (c) => customers(c, 'Ana QA'), ok: (b, a) => a === b - 1, says: 'customers named «Ana QA»' },
   C36: { count: (c) => customers(c, 'Cancelado QA'), ok: (b, a) => a === b, says: 'customers named «Cancelado QA»' },
@@ -279,7 +315,8 @@ for (const item of ITEMS) {
     };
     if (record) {
       const after = await record.count(context);
-      outcome.record = { checked: `${record.says}: ${countBefore} → ${after}${precondition}`, ok: record.ok(countBefore, after) };
+      const detail = record.detail ? `; ${await record.detail(context)}` : '';
+      outcome.record = { checked: `${record.says}: ${countBefore} → ${after}${detail}${precondition}`, ok: record.ok(countBefore, after) };
     }
     if (item.check === 'activate') {
       const apps = await api<{ apps: { id: string; state: string }[] }>(context, A, 'GET', '/apps');
@@ -307,7 +344,7 @@ for (const item of ITEMS) {
       }
     }
     try {
-      await capture(page, `qa/${item.id}-${item.slug}`);
+      await capture(page, `qa/${RUN}/${item.id}-${item.slug}`);
     } catch (error) {
       outcome.screenshot = `(not captured: ${(error as Error).message.slice(0, 200)})`;
     }
@@ -315,6 +352,11 @@ for (const item of ITEMS) {
     kept.outcomes[item.id] = outcome;
     writeState(kept);
 
+    // Reservations ends as the business had it, whatever B28b and B28c did (B26 asks about it in the next run).
+    if (item.id === 'B28c' && (await appOn(context, 'reservation')) === 0) {
+      const back = await api(context, A, 'POST', '/apps/enable', { app: 'reservation' });
+      expect(back.status, `turn Reservations back on: ${JSON.stringify(back.data)}`).toBe(200);
+    }
     const verdict = verdictOf(outcome);
     expect(verdict.verdict, `${item.id}: ${verdict.reasons.join('; ')}`).toBe('PASS');
   });

@@ -56,6 +56,8 @@ export interface Item {
   decide: 'confirm' | 'cancel';
   /** What only a person can judge in the answer (the battery's own words). */
   human: string;
+  /** The write a do-it item must run, when it names one. */
+  expects?: string;
 }
 
 /** What the spec measured for one item. */
@@ -105,11 +107,14 @@ export const ITEMS: readonly Item[] = [
   { id: 'B26', slug: 'reservar-mesa', question: '¿Cómo reservo una mesa?', language: 'es', check: 'howto', decide: 'cancel', human: 'If Reservations is off, says so or how to turn it on.' },
   { id: 'B27', slug: 'exportar-sap', question: '¿Cómo exporto a SAP?', language: 'es', check: 'trap', decide: 'cancel', human: 'Says the documentation does not cover it; invents no steps.' },
   { id: 'B28', slug: 'activar-clientes', question: 'Activa la app de clientes', language: 'es', check: 'activate', decide: 'confirm', human: 'Turns Customers on, or says it already is / which apps are on.' },
-  { id: 'B29', slug: 'crear-cliente', question: 'Crea el cliente «Ana QA» con teléfono 600000000', language: 'es', check: 'write', decide: 'confirm', human: 'The card names Ana QA and the phone.' },
-  { id: 'B30', slug: 'alta-empleado', question: 'Da de alta al empleado «Luis QA» como cajero', language: 'es', check: 'write', decide: 'confirm', human: 'The card names Luis QA and the cashier role.' },
-  { id: 'B31', slug: 'crear-producto', question: 'Crea el producto «Café QA» a 1,50 € con IVA 10 %', language: 'es', check: 'write', decide: 'confirm', human: 'The card shows 1,50 € and the 10 % tax.' },
+  // Customers cannot be off while Sales is on (Sales requires it): a business's own on/off goes through Reservations.
+  { id: 'B28b', slug: 'desactivar-reservas', question: 'Desactiva la app de reservas', language: 'es', check: 'write', decide: 'confirm', human: 'A card to turn Reservations off; it ends off.', expects: 'base.app.disable' },
+  { id: 'B28c', slug: 'activar-reservas', question: 'Activa la app de reservas', language: 'es', check: 'write', decide: 'confirm', human: 'A card to turn Reservations on; it ends on.', expects: 'base.app.enable' },
+  { id: 'B29', slug: 'crear-cliente', question: 'Crea el cliente «Ana QA» con teléfono 600000000', language: 'es', check: 'write', decide: 'confirm', human: 'The card names Ana QA and the phone.', expects: 'customer.customer.create' },
+  { id: 'B30', slug: 'alta-empleado', question: 'Da de alta al empleado «Luis QA» como cajero', language: 'es', check: 'write', decide: 'confirm', human: 'The card names Luis QA and the cashier role.', expects: 'staff.member.create' },
+  { id: 'B31', slug: 'crear-producto', question: 'Crea el producto «Café QA» a 1,50 € con IVA 10 %', language: 'es', check: 'write', decide: 'confirm', human: 'The card shows 1,50 € and the 10 % tax.', expects: 'inventory.product.create' },
   { id: 'B32', slug: 'ventas-hoy', question: '¿Qué vendí hoy?', language: 'es', check: 'read', decide: 'cancel', human: 'With no sales, says there are none; invents nothing.' },
-  { id: 'B33', slug: 'borrar-cliente', question: 'Borra el cliente «Ana QA»', language: 'es', check: 'write', decide: 'confirm', human: 'A dangerous card naming Ana QA.' },
+  { id: 'B33', slug: 'borrar-cliente', question: 'Borra el cliente «Ana QA»', language: 'es', check: 'write', decide: 'confirm', human: 'A dangerous card naming Ana QA.', expects: 'customer.customer.delete' },
   { id: 'B34', slug: 'cuanto-pago-erplora', question: '¿Cuánto pago a ERPlora al mes?', language: 'es', check: 'scope', decide: 'cancel', human: 'Sends to erplora.com or quotes the plans doc; no made-up amount.' },
   { id: 'C35', slug: 'cupo-sube', question: '¿Cómo cambio el idioma del Hub?', language: 'es', check: 'quota', decide: 'cancel', human: 'The foot (shown from 80 % of the month) moves with each answer.' },
   { id: 'C36', slug: 'cancelar-sin-aviso', question: 'Crea el cliente «Cancelado QA» con teléfono 600000001', language: 'es', check: 'cancel', decide: 'cancel', human: '«No lo he hecho» and no notice of a claimed change.' },
@@ -235,6 +240,17 @@ export function verdictOf(outcome: Outcome): Verdict {
   if (item.check !== 'cancel' && !wrote.length && outcome.notices.includes('claimed_change')) {
     fail('the «claimed a change» notice was shown though nothing was written');
   }
+  if (/^\s*>/m.test(outcome.answer)) fail('a blockquote is shown as a raw «>» line');
+  // A write the person said yes to that then fails: its card showed data the operation refuses. A write refused before
+  // its card (its data did not fit) is an attempt without a card (a cancelled one had its card): only the failures
+  // beyond those count.
+  const attempted = seen.executed.filter((row) => row.kind === 'command' && ['ok', 'error', 'cancelled'].includes(row.outcome));
+  for (const name of new Set(attempted.map((row) => row.name))) {
+    const tries = attempted.filter((row) => row.name === name);
+    const failed = tries.filter((row) => row.outcome === 'error');
+    const withoutCard = Math.max(0, tries.length - seen.cards.filter((card) => card.operation === name).length);
+    if (failed.length > withoutCard) fail(`${name} failed (${failed.map((row) => row.code).join(', ')}) after its card`);
+  }
   switch (item.check) {
     case 'howto':
       howTo();
@@ -256,6 +272,7 @@ export function verdictOf(outcome: Outcome): Verdict {
       if (!seen.cards.length) fail('no card was shown');
       if (outcome.decided !== 'confirmed') fail('the card was not confirmed');
       if (!wrote.length) fail('no write ran');
+      else if (item.expects && !wrote.some((row) => row.name === item.expects)) fail(`${item.expects} did not run`);
       if (!outcome.record?.ok) fail(`the record check failed: ${outcome.record?.checked ?? 'not checked'}`);
       break;
     case 'read': {
