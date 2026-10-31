@@ -1194,7 +1194,10 @@ def merge(ctx: OperationContext, data: OrderMergeIn) -> dict:
     source.status = Order.Status.VOIDED
     source.voided_by = actor(ctx)
     source.closed_at = timezone.now()
-    source.save(update_fields=["status", "voided_by", "closed_at", "updated_at"])
+    source.merged_into_id = target.id
+    source.save(
+        update_fields=["status", "voided_by", "closed_at", "merged_into_id", "updated_at"]
+    )
     _touch(ctx, source, event=False)
     record_event(
         ctx,

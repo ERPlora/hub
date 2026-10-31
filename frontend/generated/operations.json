@@ -2479,6 +2479,10 @@
     "method": "get",
     "path": "/api/printing/jobs/summary"
   },
+  "printing.job.get": {
+    "method": "get",
+    "path": "/api/printing/jobs/detail"
+  },
   "printing.job.create": {
     "method": "post",
     "path": "/api/printing/jobs"
@@ -2506,6 +2510,10 @@
   "printing.device.list": {
     "method": "get",
     "path": "/api/printing/devices"
+  },
+  "printing.device.detail": {
+    "method": "get",
+    "path": "/api/printing/devices/detail"
   },
   "printing.device.register": {
     "method": "post",

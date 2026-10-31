@@ -518,7 +518,8 @@ test('base-assistant-card-attempt-keys — in Spanish a print leaves its key out
   await expect(card(page)).toBeVisible();
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
-    await expect(card(page)).toContainText(`Crear en Impresión: barcode_label · ${product}`);
+    // The document by the queue's word for it, never as the model sent it (FIX-HUB-PRINTING-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS).
+    await expect(card(page)).toContainText(`Crear en Impresión: Etiqueta de código de barras · ${product}`);
     await expect(card(page)).not.toContainText(jobKey);
     await untilStill(page);
     await capture(page, `${KEY}-${vp.label}`);
