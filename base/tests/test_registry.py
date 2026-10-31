@@ -30,12 +30,12 @@ def test_only_a_demo_row_is_a_demo():
     assert registry.is_demo("nobody") is False
 
 
-@pytest.mark.parametrize("status", ["cancelled", "expired", "purged"])
+@pytest.mark.parametrize("status", ["cancelled", "archiving", "expired", "dropping", "purged"])
 def test_a_hub_that_ended_is_gone(status):
     assert registry.is_gone(Hub(slug="acme", status=status), NOW) is True
 
 
-@pytest.mark.parametrize("status", ["requested", "ready", "failed"])
+@pytest.mark.parametrize("status", ["requested", "creating", "migrating", "seeding", "ready", "failed"])
 def test_a_hub_that_did_not_end_is_not_gone(status):
     assert registry.is_gone(Hub(slug="acme", status=status), NOW) is False
 
@@ -55,6 +55,37 @@ def test_now_is_the_clock_by_default():
     assert registry.is_gone(Hub(slug="demo-0000beef", status="ready", is_demo=True, expires_at=past)) is True
 
 
-@pytest.mark.parametrize(("status", "preparing"), [("requested", True), ("failed", True), ("ready", False)])
+@pytest.mark.parametrize(
+    ("status", "preparing"),
+    [
+        ("requested", True),
+        ("creating", True),
+        ("migrating", True),
+        ("seeding", True),
+        ("failed", True),
+        ("ready", False),
+        ("cancelled", False),
+    ],
+)
 def test_a_hub_is_preparing_until_it_is_ready(status, preparing):
     assert registry.is_preparing(Hub(slug="acme", status=status)) is preparing
+
+
+@pytest.mark.parametrize(
+    ("db_name", "status", "was_ready", "made"),
+    [
+        ("", "requested", False, True),  # shares control's: always there
+        ("hub_x", "ready", False, True),
+        ("hub_x", "cancelled", True, True),  # cancelled after it was ready: its database stays
+        ("hub_x", "archiving", True, True),
+        ("hub_x", "cancelled", False, False),  # cancelled while it was being made
+        ("hub_x", "failed", False, False),
+        ("hub_x", "seeding", False, False),
+        ("hub_x", "requested", False, False),
+        ("hub_x", "purged", True, False),  # a demo whose database was dropped
+        ("hub_x", "dropping", True, False),
+    ],
+)
+def test_a_hub_database_is_made_once_it_was_ready_and_until_it_is_dropped(db_name, status, was_ready, made):
+    hub = Hub(slug="acme", db_name=db_name, status=status, ready_at=timezone.now() if was_ready else None)
+    assert registry.database_is_made(hub) is made

@@ -6,14 +6,14 @@
 // spec creates is named «E2E …» and removed after it.
 import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, api, type Credentials, EMPLOYEE, login, psql, shot, shown } from './helpers';
+import { A, api, type Credentials, EMPLOYEE, hubUserIdOf, login, psql, shot, shown } from './helpers';
 
 const TAG = 'E2E';
 
 /** The employee's user id on this database (never a fixed number: it depends on the seed). */
 /** The employee's person in the business's database (`base.HubUser`): what a staff record hangs from. */
 const employeeUser = (): string =>
-  psql(`select h.id from base_hubuser h join auth_user u on u.username = h.username where u.email = '${EMPLOYEE.email}'`);
+  hubUserIdOf(EMPLOYEE.email);
 
 function cleanup(): void {
   const members = `select id from staff_member where first_name like '${TAG}%'`;

@@ -87,12 +87,14 @@ function ensurePlatformTemplate(name: string, sql: AdminSql): void {
   }
 }
 
-/** Drops the e2e database `name` (a missing one is no error), then its templates (`<name>_template[_<vertical>]`,
- * which `migrate_hubs` keeps); never while a connection is open. */
+/** Drops the e2e database `name` (a missing one is no error), then its hubs' own databases (`<name>_<hex>`, a demo's
+ * `<name>_demo_<hex>`: what the worker made for them) and its templates (`<name>_template[_<vertical>]`, which
+ * `migrate_hubs` keeps); never while a connection is open. */
 export function dropDatabase(name: string, { sql }: { sql: AdminSql }): void {
   refuseUnlessE2e(name);
   const drop = sql(`drop database if exists "${name}"`);
   if (drop.status === 0) {
+    dropOwn(name, `${name}_`, new RegExp(`^${name}_(?:demo_)?[0-9a-f]{32}$`), "hub's database", sql);
     dropTemplates(name, sql);
     return;
   }
@@ -103,13 +105,17 @@ export function dropDatabase(name: string, { sql }: { sql: AdminSql }): void {
 }
 
 function dropTemplates(name: string, sql: AdminSql): void {
-  const pattern = `${name}_template`.replaceAll('_', '\\_');
+  dropOwn(name, `${name}_template`, new RegExp(`^${name}_template(?:_[a-z0-9_]+)?$`), 'template', sql);
+}
+
+/** Drops every database whose name starts with `prefix` and is `own`'s (`what` of `name`, in an error). */
+function dropOwn(name: string, prefix: string, own: RegExp, what: string, sql: AdminSql): void {
+  const pattern = prefix.replaceAll('_', '\\_');
   const listed = sql(`select datname from pg_database where datname like '${pattern}%' order by datname`);
   if (listed.status !== 0) throw new Error(`Could not read Postgres's databases: psql ${said(listed)}`);
-  const own = new RegExp(`^${name}_template(?:_[a-z0-9_]+)?$`);
-  for (const template of listed.stdout.split('\n').map((line) => line.trim()).filter((line) => own.test(line))) {
-    const drop = sql(`drop database if exists "${template}"`);
-    if (drop.status !== 0) throw new Error(`Could not drop the template ${template} of ${name}: psql ${said(drop)}`);
+  for (const database of listed.stdout.split('\n').map((line) => line.trim()).filter((line) => own.test(line))) {
+    const drop = sql(`drop database if exists "${database}"`);
+    if (drop.status !== 0) throw new Error(`Could not drop the ${what} ${database} of ${name}: psql ${said(drop)}`);
   }
 }
 

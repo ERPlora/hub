@@ -6,9 +6,9 @@
 // own error reported by itself. The employee has four tabs, no Logs, and is told who may see the failed events. Each
 // flow leaves its capture `APP-BASE-7-<G key>-<width>` once nothing scrolls sideways.
 //
-// The e2e stack runs no worker: the failed events (deliveries the relay gave up on) are written as the relay leaves
-// them, tagged in their payload so the run removes them after; the relay giving up and its live notice are
-// base/tests/test_services_system.py's. One of hub `b` is planted too: `a` never sees it.
+// The failed events (deliveries the relay gave up on) are written as the relay leaves them, tagged in their payload so
+// the run removes them after; the relay giving up and its live notice are base/tests/test_services_system.py's. One
+// of hub `b` is planted too, in `b`'s own database (S2a): `a` never sees it.
 // flow: BASE-G87 BASE-G88 BASE-G89 BASE-G90 BASE-G91 BASE-G92 BASE-G93 BASE-G94 BASE-G95
 import { type Browser, expect, type Page, test } from '@playwright/test';
 
@@ -25,7 +25,9 @@ const TAG = 'e2e-base-system';
 
 function cleanUp(): void {
   const events = `select id from live_outboxevent where payload->>'e2e' = '${TAG}'`;
-  psql([`delete from base_eventdelivery where event_id in (${events})`, `delete from live_outboxevent where id in (${events})`].join('; '));
+  for (const hub of ['a', 'b']) {
+    psql([`delete from base_eventdelivery where event_id in (${events})`, `delete from live_outboxevent where id in (${events})`].join('; '), hub);
+  }
 }
 
 /** A failed event of `hub`, as the relay leaves it after its last attempt: `sale.sale.completed` that Invoicing could
@@ -38,6 +40,7 @@ function plantFailed(hub: string, error: string): void {
       'insert into base_eventdelivery (id, event_id, app_label, depth, status, attempts, next_attempt_at, last_error, delivered_at) ' +
         `select gen_random_uuid(), e.id, 'invoice', 0, 'dead', 8, now(), '${error}', null from e`,
     ].join(' '),
+    hub,
   );
 }
 
@@ -73,9 +76,10 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await expect(testid(page, 'tab-resources')).toHaveClass(/segment-button-checked/);
       await expect(shown(page).locator('ion-segment-button[data-testid^="tab-"]')).toHaveCount(5);
 
-      // BASE-G88 — the database the business is on, and why there are no usage figures.
+      // BASE-G88 — the database the business is on (`a`'s own since S2a, round 2026-10-30 of PLAN-DB; one that shares
+      // control's says «Shared database»: SystemResources.test.ts), and why there are no usage figures.
       await expect(testid(page, 'system-resources-database')).toContainText('PostgreSQL');
-      await expect(testid(page, 'system-resources-database')).toContainText('Shared database');
+      await expect(testid(page, 'system-resources-database')).toContainText('Database of its own');
       await expect(testid(page, 'system-resources-not-measured')).toContainText('not measured per business');
       await snap(page, 'BASE-G88', width);
 
@@ -187,6 +191,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
         psql(
           `select d.status from base_eventdelivery d join live_outboxevent e on e.id = d.event_id ` +
             `where e.payload->>'e2e' = '${TAG}' and e.scope_key = 'b'`,
+          'b',
         ),
       ).toBe('dead');
     } finally {

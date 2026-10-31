@@ -165,9 +165,31 @@ describe('dropDatabase', () => {
 
     expect(postgres.statements).toEqual([
       'drop database if exists "hub_e2e_8030"',
+      "select datname from pg_database where datname like 'hub\\_e2e\\_8030\\_%' order by datname",
       "select datname from pg_database where datname like 'hub\\_e2e\\_8030\\_template%' order by datname",
       'drop database if exists "hub_e2e_8030_template"',
       'drop database if exists "hub_e2e_8030_template_restaurant"',
+    ]);
+  });
+
+  it("drops its hubs' own databases too (`<name>_<hex>`, a demo's `<name>_demo_<hex>`), never another one's", () => {
+    const own = 'hub_e2e_8030_01a18f790c747780b50a02d91d05c43c';
+    const demo = 'hub_e2e_8030_demo_01a18f92ac5774c4996c38b63d79ed08';
+    const postgres = fakePostgres([
+      'hub_e2e_8030',
+      own,
+      demo,
+      'hub_e2e_80301_01a18f790c747780b50a02d91d05c43c',
+      'hub_e2e_8030_notes',
+      'hub_01a18f790c747780b50a02d91d05c43c',
+    ]);
+
+    dropDatabase('hub_e2e_8030', { sql: postgres.sql });
+
+    expect(postgres.statements.filter((statement) => statement.startsWith('drop'))).toEqual([
+      'drop database if exists "hub_e2e_8030"',
+      `drop database if exists "${own}"`,
+      `drop database if exists "${demo}"`,
     ]);
   });
 

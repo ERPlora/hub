@@ -4,7 +4,7 @@
 // named «E2E Task …» (projects `e2e-…`) and deleted from the hub's database (phase 1: `a` and `b` share it).
 import { type Browser, type BrowserContext, expect, type Locator, type Page } from '@playwright/test';
 
-import { A, api, capture, type Credentials, horizontalOverflow, login, psql, shown, untilStill } from './helpers';
+import { A, api, capture, type Credentials, horizontalOverflow, hubUserIdOf, login, psql, shown, untilStill } from './helpers';
 
 /** Every name a task spec gives starts like this. */
 export const TAG = 'E2E Task';
@@ -43,7 +43,7 @@ export async function choose(page: Page, select: Locator, label: string): Promis
 /** The account's person in the business's database (`base.HubUser`, what a record hangs from; never a fixed id: it
  * depends on the seed). */
 export const userIdOf = (email: string): string =>
-  psql(`select h.id from base_hubuser h join auth_user u on u.username = h.username where u.email = '${email}'`);
+  hubUserIdOf(email);
 
 /**
  * The staff record linked to the account `email`, created (named `E2E Task …`) if it has none: one live

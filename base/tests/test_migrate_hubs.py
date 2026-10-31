@@ -19,6 +19,7 @@ from io import StringIO
 
 import psycopg
 import pytest
+from django.utils import timezone
 from django.core.management import CommandError, call_command
 from django.db import DatabaseError, OperationalError, connection, connections
 from django.db.migrations.loader import MigrationLoader
@@ -40,6 +41,8 @@ from base.tenancy.tests.hubs import (  # noqa: F401 (fixtures)
 from control.models import Hub
 
 PLATFORM = ("base", "live")
+#: The deployment's own templates, kept before the ``small`` fixture replaces them.
+REAL_TEMPLATES = migrator.templates
 SMALL_VERTICAL = "small"
 
 
@@ -110,9 +113,12 @@ def missing_database() -> str:
     return names.hub_db_name(tenancy_connections.control_name(), uuid.uuid7())
 
 
-def at_the_leaf() -> dict[str, str]:
+def at_the_leaf(*, apps: bool = True) -> dict[str, str]:
+    """A hub with its own database at the code's leaf: the platform and, until S3, every portable app
+    (``migrator.apps_every_hub_gets``: ``migrate_hubs`` adds the ones it lacks; ``apps=False``: none added, as for an
+    expired demo, about to be dropped)."""
     leaf = leaves()
-    return {label: leaf[label] for label in PLATFORM}
+    return {label: leaf[label] for label in (*PLATFORM, *(migrator.apps_every_hub_gets() if apps else ()))}
 
 
 # ── A run ───────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -157,7 +163,7 @@ def test_a_run_goes_control_then_templates_then_the_hubs_behind(small, new_datab
     hub.refresh_from_db()
     assert hub.schema_apps == at_the_leaf()
     assert hub.schema_state == Hub.SchemaState.CURRENT
-    assert hubs.table_names(new_database) == hubs.hub_tables(PLATFORM) | {"django_migrations"}
+    assert hubs.table_names(new_database) == hubs.hub_tables(tuple(at_the_leaf())) | {"django_migrations"}
 
 
 def test_a_missing_template_is_created_by_a_run(small, template_name, monkeypatch):
@@ -193,22 +199,26 @@ def test_hubs_at_the_leaf_are_not_opened(small, make_hub):
 
 
 def test_only_the_hubs_with_a_complete_database_of_their_own_are_migrated(small, make_database, make_hub):
-    """Ready, cancelled (kept to come back) and expired (until its purge); never one on control's database, one
-    being made (the worker's), a failed one or a purged one."""
-    alive = [
-        make_hub(make_database(), status=status)
-        for status in (Hub.Status.READY, Hub.Status.CANCELLED, Hub.Status.EXPIRED)
+    """Ready, cancelled (kept to come back) and expired (until its purge), once their database was made; never one on
+    control's database, one being made (the worker's), a failed one or a purged one, nor one cancelled or expired
+    before its database was ever made (a sign-up deleted while requested, or after failing): there is nothing to
+    migrate, and a deploy must not stop for it (review of round 5)."""
+    made = timezone.now()
+    alive = [make_hub(make_database(), status=Hub.Status.READY, ready_at=made)] + [
+        make_hub(make_database(), status=status, ready_at=made) for status in (Hub.Status.CANCELLED, Hub.Status.EXPIRED)
     ]
     make_hub("")
     for status in (Hub.Status.REQUESTED, Hub.Status.FAILED, Hub.Status.PURGED):
         make_hub(missing_database(), status=status)
+    for status in (Hub.Status.CANCELLED, Hub.Status.EXPIRED):
+        make_hub(missing_database(), status=status)  # never ready: no database
 
     out = migrate_hubs()
 
     assert "migrate_hubs: hubs: 3 migrated, 0 left behind, 0 up to date." in out
     for hub in alive:
         hub.refresh_from_db()
-        assert hub.schema_apps == at_the_leaf()
+        assert hub.schema_apps == at_the_leaf(apps=hub.status != Hub.Status.EXPIRED)
 
 
 def test_erploras_own_hub_goes_first_then_at_most_four_at_once(small, make_hub, monkeypatch):
@@ -403,6 +413,21 @@ def test_check_sees_a_new_migration_of_a_templates_app(small, db):
 
     assert status == 1
     assert out.splitlines() == [f"migrate_hubs: unapplied migrations in {vertical}:", f"tax.{leaf}"]
+
+
+def test_check_counts_a_template_without_the_portable_apps_as_behind(small, db, monkeypatch):
+    """Until S3 every template carries every portable app (``migrator.templates``): one built before, with the
+    platform alone, is behind, and a run gives it them."""
+    platform = small[0]  # the platform alone
+    up_to_date = migrator.Template(db_name=platform.db_name, apps=REAL_TEMPLATES()[0].apps)
+    monkeypatch.setattr(migrator, "templates", lambda control=None: [up_to_date])
+
+    status, out = migrate_hubs_check()
+
+    lines = out.splitlines()
+    assert status == 1
+    assert lines[0] == f"migrate_hubs: unapplied migrations in {platform.db_name}:"
+    assert any(line.startswith("tax.") for line in lines) and any(line.startswith("sale.") for line in lines)
 
 
 def test_check_lists_a_missing_verticals_template_and_creates_nothing(small, template_name, monkeypatch):

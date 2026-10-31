@@ -22,27 +22,42 @@ system) runs off this loop, in ``base.outbound``'s threads, so it never holds th
 its way out the worker gives what still runs ``OUTBOUND_GRACE_SECONDS`` and drops what waits (their lease sends them
 again). On the first tick and then every ``REAPER_INTERVAL_SECONDS`` it also purges the
 demo hubs that ended (``base.services.reap_demos``, plan 2026-10-17 §1.7), whatever the scheduler did: a
-pass that fails is logged and the next one tries again, and the worker never stops for it. Every pass
-releases its connection. Phase 1 runs the tasks on one fixed scope (``WORKER_SCOPE_SLUG``) and relays the
-one database every hub shares; phase 2 adds, in this loop, the hubs whose ``hub_due`` has come (each under
-``use_hub``, for its tasks and its outbox) and the hubs' provisioning and purge.
+pass that fails is logged and the next one tries again, and the worker never stops for it.
 
-Each pass opens its database context (phase 2, S1; plan 2026-10-22): the tasks and the relay run on phase 1's shared
-database (``use_shared_database``: every hub with ``db_name=""``; a hub with its own database waits for S2's
-``hub_due`` loop), and the reaper on control (``use_control``), where the registry and the demos live.
+The order of a tick (review of hub#471): the tasks and the relay of phase 1's shared database first, so a pass that
+makes databases holds back the kitchen, the stock or VeriFactu of the hubs that share it a few seconds at most
+(``provision.DUE_PASS_SECONDS``: it takes no new hub after them, though a clone it started finishes); then the hubs with
+their own database (``_hubs``, round 2026-10-30 of PLAN-DB): each one it serves (ready, or a business that left but
+keeps its database, whose records still to send must reach the AEAT), in its own database (``use_hub``) and one at a
+time, gets its outbox relayed, its apps' schedule written there once per process and the tasks due of its active
+apps run on its own scope (``host``, its slug: their live notices go on its channel), for ``HUB_PASS_SECONDS`` at most,
+the next tick going on after the last hub served; a hub that fails is logged and the others are served. Then the
+reaper, and last the hubs whose ``hub_due`` has come: their databases made, the demos that ended dropped
+(``base.tenancy.provision.run_due``); a hub made ready in a tick has its outbox relayed from the next one. Every pass
+releases its connections.
+
+Each pass opens its database context (phase 2, S1; plan 2026-10-22): the tasks and the relay of the shared database
+run on it (``use_shared_database``: every hub with ``db_name=""``), each hub with its own database in its own
+(``use_hub``), and the reaper and the ``hub_due`` pass on control (``use_control``), where the registry and the demos
+live (the provisioning enters each hub's own database itself).
 """
 
 import datetime as dt
 import logging
 import threading
+import time
 from collections.abc import Callable
 
 from django.db import close_old_connections
 from django.utils import timezone
 
-from base import catalog, outbound, relay, scheduler
+from live.context import Scope
+
+from base import catalog, outbound, relay, scheduler, services
 from base.services import reap_demos
-from base.tenancy.context import use_control, use_shared_database
+from base.tenancy import provision
+from base.tenancy.connections import close_hub_aliases
+from base.tenancy.context import use_control, use_hub, use_shared_database
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +68,12 @@ RETRY_FIRST_SECONDS = 5
 RETRY_MAX_SECONDS = 60
 #: How often the demo reaper purges the demos that ended (their hosts answer 410 from their end anyway).
 REAPER_INTERVAL_SECONDS = 60
+#: How long the pass over the hubs with their own database may go on in a tick; the next tick goes on from the next hub.
+HUB_PASS_SECONDS = 3.0
+#: The hubs whose schedule this process already wrote in their database (once per process: a release restarts it).
+_synced: set = set()
+#: The id of the last hub the pass served: the next pass starts after it, so every hub gets its turn.
+_next_hub = None
 #: What the calls in flight (``base.outbound``) get when the worker stops: ECS kills the task 30 s after SIGTERM, and
 #: the loop's step ends first. What still runs then is left to its lease.
 OUTBOUND_GRACE_SECONDS = 15
@@ -64,12 +85,15 @@ def run(
     tick_seconds: float = TICK_SECONDS,
     wait: Callable[[float], object] | None = None,
     clock: Callable[[], dt.datetime] = timezone.now,
+    databases_only: bool = False,
 ) -> int:
     """Register the apps, schedule their tasks, then run the due ones every tick until ``stop`` is set;
     return the process's exit code.
 
     ``wait(seconds)`` sleeps until the time is up or a stop is requested: ``stop.wait`` unless a
     test replaces it. ``stop`` alone says whether to stop. ``clock()`` is now (a test's fake clock).
+    ``databases_only`` (``run_worker --databases-only``, the e2e's worker): only the hubs' databases are made and the
+    demos that ended dropped; no task runs and no outbox is relayed, which the e2e's specs play themselves.
     """
     wait = stop.wait if wait is None else wait
     delay = RETRY_FIRST_SECONDS
@@ -111,11 +135,14 @@ def run(
     next_reap: dt.datetime | None = None
     while not stop.is_set():
         now = clock()
-        _tick(now)
-        _relay(now)
+        if not databases_only:
+            _tick(now)
+            _relay(now)
+            _hubs(now)
         if next_reap is None or now >= next_reap:
             _reap(now)
             next_reap = now + dt.timedelta(seconds=REAPER_INTERVAL_SECONDS)
+        _due(now)
         wait(tick_seconds)
     outbound.stop(OUTBOUND_GRACE_SECONDS)
     logger.info("worker: stopped.")
@@ -134,6 +161,63 @@ def _reap(now: dt.datetime) -> None:
             logger.info("worker: purged %d demo(s).", purged)
     finally:
         # The reaper's connection is not kept open while the worker idles, nor a broken one taken further.
+        close_old_connections()
+
+
+def _due(now: dt.datetime) -> None:
+    """Make the databases of the hubs due by ``now`` and drop the demos that ended; a failure is logged and the next
+    tick tries again (each hub's own failure is noted on it by the provisioning)."""
+    try:
+        with use_control():
+            worked = provision.run_due(now)
+    except Exception:
+        logger.exception("worker: the hub_due pass failed; the next tick tries again.")
+    else:
+        if worked:
+            logger.info("worker: worked on %d hub(s) due.", worked)
+    finally:
+        # The pass's connections (control's, and each hub's direct one) are not kept open while the worker idles.
+        close_old_connections()
+
+
+def _hubs(now: dt.datetime) -> None:
+    """Relay the outbox and run the due tasks of the hubs with their own database, each in it, one at a time, for
+    :data:`HUB_PASS_SECONDS` at most; the next tick goes on after the last one served. A hub that fails is logged and
+    the others are served."""
+    global _next_hub
+    try:
+        with use_control():
+            hubs = services.hubs_to_serve(now)
+    except Exception:
+        logger.exception("worker: the hubs to serve could not be read; the next tick tries again.")
+        close_old_connections()
+        return
+    if not hubs:
+        return
+    start = next((index for index, hub in enumerate(hubs) if _next_hub is not None and hub.pk > _next_hub), 0)
+    started = time.monotonic()
+    for hub in hubs[start:] + hubs[:start]:
+        _serve_hub(hub, now)
+        _next_hub = hub.pk
+        if time.monotonic() - started > HUB_PASS_SECONDS:
+            break
+
+
+def _serve_hub(hub, now: dt.datetime) -> None:
+    """One hub's outbox relayed and its due tasks run, in its own database and on its own scope; its schedule written
+    there first, once per process. A failure is logged; its connections are released either way."""
+    scope = Scope("host", hub.slug)
+    try:
+        with use_hub(hub):
+            if hub.pk not in _synced:
+                scheduler.sync(now)
+                _synced.add(hub.pk)
+            relay.run(now)
+            scheduler.run_due(now, scope=scope, active=relay.active_apps(scope))
+    except Exception:
+        logger.exception("worker: the hub %s failed; the next tick tries it again.", hub.slug)
+    finally:
+        close_hub_aliases(hub)
         close_old_connections()
 
 

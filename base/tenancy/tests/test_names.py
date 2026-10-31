@@ -1,7 +1,8 @@
 """Names of the hubs' databases (PLAN-DB §3 and §14.12; plan 2026-10-22-fase-2-tenencia §4, step 1).
 
 A hub's database is the control database's name, ``_`` and the hub's whole UUID in hex (``hub_<hex>``; pre's
-``pre_hub_<hex>``); a demo's is ``demo_<hex>``. Nothing is ever truncated (the first half of a UUIDv7 is its date),
+``pre_hub_<hex>``); a demo's is the control database's, ``_demo_`` and its hex (``hub_demo_<hex>``; pre's
+``pre_hub_demo_<hex>``: round 2026-10-30 of PLAN-DB, proposal (e)). Nothing is ever truncated (the first half of a UUIDv7 is its date),
 every name is validated against the control database it belongs to and reaches SQL only as ``sql.Identifier``.
 """
 
@@ -28,8 +29,9 @@ def test_pre_prefixes_its_hubs_through_its_control_database():
     assert names.hub_db_name(control, HUB_ID) == f"pre_hub_{HEX}"
 
 
-def test_a_demos_database_is_demo_and_the_hex_of_its_id():
-    assert names.demo_db_name(HUB_ID) == f"demo_{HEX}"
+def test_a_demos_database_is_its_control_databases_demo_and_the_hex_of_its_id():
+    assert names.demo_db_name("hub", HUB_ID) == f"hub_demo_{HEX}"
+    assert names.demo_db_name(Names.with_prefix("pre_").control, HUB_ID) == f"pre_hub_demo_{HEX}"
 
 
 def test_templates_derive_from_the_control_database():
@@ -42,7 +44,7 @@ def test_templates_derive_from_the_control_database():
     "name",
     [
         f"hub_{HEX}",
-        f"demo_{HEX}",
+        f"hub_demo_{HEX}",
         "hub_template",
         "hub_template_restaurant",
         "hub_template_hair_salon",
@@ -60,6 +62,9 @@ def test_the_names_of_a_control_database_are_valid(name):
         f"hub_{HEX.upper()}",  # not lowercase hex
         f"hub_{HEX[:-1]}g",  # not hex
         f"pre_hub_{HEX}",  # another control database's
+        f"demo_{HEX}",  # a demo without its control database (before round 2026-10-30)
+        f"pre_hub_demo_{HEX}",  # another control database's demo
+        f"hub_demo_{HEX[:-1]}",  # a truncated demo
         f"hub_{HEX}; DROP DATABASE hub",
         "hub",  # the control database itself
         "hub_template_",
@@ -76,6 +81,9 @@ def test_anything_else_is_refused(name):
 
 def test_pre_refuses_the_names_of_prod_and_prod_those_of_pre():
     assert names.validate(f"pre_hub_{HEX}", control="pre_hub") == f"pre_hub_{HEX}"
+    assert names.validate(f"pre_hub_demo_{HEX}", control="pre_hub") == f"pre_hub_demo_{HEX}"
+    with pytest.raises(names.InvalidDatabaseName):
+        names.validate(f"hub_demo_{HEX}", control="pre_hub")
     with pytest.raises(names.InvalidDatabaseName):
         names.validate(f"hub_{HEX}", control="pre_hub")
     with pytest.raises(names.InvalidDatabaseName):
@@ -90,11 +98,12 @@ def test_a_name_past_postgres_63_characters_is_refused_instead_of_truncated():
         names.template_db_name("hub", "v" * 60)
 
 
-def test_max_control_is_the_longest_control_database_its_hubs_names_fit_after():
-    # A hub's ``_<hex>`` is the longest a name adds to control's (config/settings.py fits the tests' to it).
+def test_max_control_is_the_longest_control_database_its_hubs_and_demos_names_fit_after():
+    # A demo's ``_demo_<hex>`` is the longest a name adds to control's (config/settings.py fits the tests' to it).
+    assert names.demo_db_name("c" * names.MAX_CONTROL, HUB_ID)
     assert names.hub_db_name("c" * names.MAX_CONTROL, HUB_ID)
     with pytest.raises(names.InvalidDatabaseName, match="63"):
-        names.hub_db_name("c" * (names.MAX_CONTROL + 1), HUB_ID)
+        names.demo_db_name("c" * (names.MAX_CONTROL + 1), HUB_ID)
 
 
 def test_an_invalid_vertical_never_makes_a_template_name():
@@ -114,8 +123,19 @@ def test_a_name_reaches_sql_only_quoted_as_an_identifier():
 def test_only_the_hubs_of_a_control_database_and_their_ddl_aliases_count_as_hub_aliases():
     assert names.is_hub_alias(f"hub_{HEX}", control="hub")
     assert names.is_hub_alias(f"hub_{HEX}__ddl", control="hub")
-    assert names.is_hub_alias(f"demo_{HEX}", control="hub")
+    assert names.is_hub_alias(f"hub_demo_{HEX}", control="hub")
+    assert not names.is_hub_alias(f"demo_{HEX}", control="hub")
     assert names.is_hub_alias("hub_template", control="hub")
     assert not names.is_hub_alias("default", control="hub")
     assert not names.is_hub_alias("shared", control="hub")
     assert not names.is_hub_alias(f"pre_hub_{HEX}", control="hub")
+
+
+def test_only_a_hubs_or_a_demos_database_passes_as_one_a_template_never():
+    assert names.validate_hub(f"hub_{HEX}", control="hub") == f"hub_{HEX}"
+    assert names.validate_hub(f"hub_demo_{HEX}", control="hub") == f"hub_demo_{HEX}"
+    for template in ("hub_template", "hub_template_restaurant"):
+        with pytest.raises(names.InvalidDatabaseName, match="template"):
+            names.validate_hub(template, control="hub")
+    with pytest.raises(names.InvalidDatabaseName):
+        names.validate_hub(f"pre_hub_{HEX}", control="hub")

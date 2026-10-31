@@ -113,7 +113,8 @@ del mes, los que quedan («Te quedan 30 de 150 mensajes de WhatsApp de tu plan e
 gastados este mes («Has usado todos los mensajes de WhatsApp de tu plan este mes. Los mensajes siguen
 llegando aquí, pero no se pueden enviar hasta el mes que viene o hasta que mejores el plan.») o un plan que
 no incluye ninguno («Tu plan no incluye mensajes de WhatsApp. Los mensajes siguen llegando aquí, pero no se
-puede enviar nada hasta que mejores el plan.»), los tres con **Mejorar el plan** para quien puede configurar.
+puede enviar nada hasta que mejores el plan.»), los tres con **Mejorar el plan** para quien puede configurar, en
+el navegador (en la app instalada no está: lo que vende solo está en la web).
 Vacía: «Sin conversaciones.», a la vista bajo el buscador también en el móvil; con búsqueda o filtro:
 «Sin resultados»; cargando: indicador; error de lista: el motivo con **Reintentar**; error del panel: el
 motivo que da el Hub o «No se pudo cargar la conversación»; una foto o una nota de voz que no carga: «No se ha
@@ -128,7 +129,7 @@ reconectar, **Desconectar**, que pregunta antes); **Este mes** (los mensajes
 enviados frente a los del plan; desde el 80 %, «Te quedan 30 de 150 mensajes de tu plan este mes.», y en el tope
 «Has usado todos los mensajes de tu plan este mes.»; si el plan no incluye ninguno, «Tu plan no incluye mensajes de
 WhatsApp.»; antes de que erplora.com hable, «erplora.com todavía no ha informado de los mensajes de este mes.»; desde
-el 80 % y en el tope, **Mejorar el plan**, que abre los planes de erplora.com); y **Plantillas de Meta**: tabla con **Nombre**,
+el 80 % y en el tope, **Mejorar el plan**, que abre los planes de erplora.com, solo en el navegador); y **Plantillas de Meta**: tabla con **Nombre**,
 **Idioma**, **Categoría** (Utilidad, Marketing, Autenticación), **Estado en Meta** (Sin enviar a Meta,
 Aprobada, En revisión, Rechazada, Pausada por Meta, Desactivada por Meta, Borrada en WhatsApp Manager;
 debajo, cuando toca, «Enviándose a Meta…», «No aceptada: …», «Cambios sin enviar: …» o «Borrándose en
@@ -324,9 +325,10 @@ Pasos:
 1. Un mensaje con adjunto enseña su tipo (Foto, Nota de voz, Vídeo, Documento, Sticker), el nombre del
    archivo y su texto.
 2. Una foto o un sticker se ven dentro de su bocadillo, sin salirse de él; tocarlos los abre a tamaño
-   completo en una pestaña nueva.
+   completo en una pestaña nueva (en la app instalada, en el navegador del dispositivo).
 3. Una nota de voz se escucha con su reproductor, en el mismo bocadillo.
-4. Un vídeo o un documento: pulsar **Abrir el adjunto** lo abre en una pestaña nueva.
+4. Un vídeo o un documento: pulsar **Abrir el adjunto** lo abre en una pestaña nueva (en la app instalada, en el
+   navegador del dispositivo).
 5. Solo se enseñan y se abren adjuntos de erplora.com, por https.
 Entra: el adjunto que guarda erplora.com: su enlace, su tipo, su nombre y su pie.
 Sale: nada cambia en el Hub.
@@ -447,16 +449,16 @@ Pasos:
 1. **Ajustes → Este mes** enseña los mensajes enviados este mes frente a los del plan; los dos
    números los pone erplora.com. Si el plan no incluye mensajes de WhatsApp, lo dice («Tu plan no incluye
    mensajes de WhatsApp.»), nunca que no tiene límite; desde el 80 % de los del plan, por ejemplo, «Te quedan 30
-   de 150 mensajes de tu plan este mes.» con **Mejorar el plan**; en el tope, «Has usado todos los mensajes de tu
+   de 150 mensajes de tu plan este mes.» con **Mejorar el plan** (en el navegador; en la app instalada no está); en el tope, «Has usado todos los mensajes de tu
    plan este mes.»; antes de que erplora.com hable, «erplora.com todavía no ha informado de los mensajes de este
    mes.».
 2. Desde el 80 % de los mensajes del mes, la bandeja lo avisa encima de la lista, por ejemplo, «Te quedan 30 de 150
-   mensajes de WhatsApp de tu plan este mes.»; quien puede configurar ve **Mejorar el plan**, que abre los planes
-   de erplora.com. Por debajo del 80 %, nada. La cuenta se mueve sola, sin recargar.
+   mensajes de WhatsApp de tu plan este mes.»; quien puede configurar ve, en el navegador, **Mejorar el plan**, que
+   abre los planes de erplora.com. Por debajo del 80 %, nada. La cuenta se mueve sola, sin recargar.
 3. En el tope (con un plan que no incluye ninguno, desde el primer mensaje), la bandeja lo avisa encima de
    la lista y **Enviar** lo explica en vez de enviar («Tu plan no incluye mensajes de WhatsApp: no se puede
-   enviar nada.» cuando el plan no incluye ninguno); quien puede configurar ve **Mejorar el plan**, que abre
-   los planes de erplora.com.
+   enviar nada.» cuando el plan no incluye ninguno); quien puede configurar ve, en el navegador, **Mejorar el
+   plan**, que abre los planes de erplora.com.
 4. Lo que escriben los clientes se sigue guardando.
 5. Al cambiar de mes (en el reloj del negocio) el aviso se va aunque erplora.com aún no haya hablado; si el
    plan no incluye mensajes, sigue.

@@ -10,7 +10,7 @@
 // way in into the PIN pad: base-access.spec.ts), and everything this file creates goes with it (`afterAll`).
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, EMPLOYEE, login, OWNER, psql, shot, shown, untilStill } from './helpers';
+import { A, api, EMPLOYEE, login, OWNER, psql, shot, shown, untilStill, usernamesOf } from './helpers';
 import { cleanInventory, createProduct } from './inventory-helpers';
 import { snapshotSeries } from './invoice-helpers';
 import { chargeByApi, cleanSales, drawerOff, restoreDrawer, type SaleOut, stamp } from './sale-helpers';
@@ -52,8 +52,8 @@ async function usernameOf(context: BrowserContext): Promise<string> {
   return psql(`SELECT username FROM base_hubuser WHERE id = '${id}'`);
 }
 
-/** Every account of `email` in this hub's database: the cleanup leaves none of them with what this file made. */
-const accountsOf = (email: string): string => `SELECT username FROM auth_user WHERE email = '${email}'`;
+/** Every account of `email` (their usernames, read from control's): the cleanup leaves none of them with what this file made. */
+const accountsOf = (email: string): string => usernamesOf(email);
 
 /** The owner's approvals of a void spent since this file started. */
 const spentVoids = (): number =>
