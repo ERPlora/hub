@@ -139,8 +139,10 @@ Plan `docs/plans/2026-10-22-fase-2-tenencia.md` de erplora-next; reglas en PLAN-
   plantillas de cada servidor (`clusters_to_migrate`: sin filas de `Cluster`, el del settings; con ellas, los abiertos
   y los cerrados que aún tienen hubs, y el del settings mientras viva en él un hub sin cluster), como canarios: si una
   falla, no se toca ningún hub; 3) los hubs atrasados según `schema_apps` (un despliegue sin migraciones no abre
-  ninguna BD de hub) con BD propia y estado `ready`, `cancelled` o `expired` (hasta S3 también los que no tienen
-  alguna app portable: se la añade, `migrator.apps_every_hub_gets`): primero el de ERPlora y después 4 a la
+  ninguna BD de hub) con BD propia ya hecha (`registry.own_database_made`: lista o con `ready_at`; uno cancelado o
+  caducado antes de estar listo no tiene BD y no para el despliegue) y estado `ready`, `cancelled` o `expired` (hasta
+  S3 también los que no tienen alguna app portable con migraciones: se la añade, `migrator.apps_to_add`, salvo a una
+  demo caducada): primero el de ERPlora y después 4 a la
   vez, cada uno en su servidor; un fallo de `lock_timeout` se reintenta hasta 3 veces, y el hub que falla queda
   `behind`, no para a los demás y hace salir al comando con código ≠ 0. Una BD por delante del código (tras un
   rollback) no cuenta como atrasada. `--check` no aplica nada: lista lo pendiente de control, de las plantillas (abre
