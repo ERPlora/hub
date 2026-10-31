@@ -160,3 +160,46 @@ def test_a_hub_that_fails_midway_leaves_no_connection_open_either(hub_a, monkeyp
 
     alias = f"hub_{hub_a.id.hex}"
     assert not [connection for connection in connections.all(initialized_only=True) if connection.alias == alias and connection.connection]
+
+
+@pytest.mark.parametrize("status", [Hub.Status.CANCELLED, Hub.Status.ARCHIVING])
+def test_a_business_that_left_still_sends_what_it_owes_the_aeat(hub_a, monkeypatch, status):
+    """Re-review of hub#471: a business cancelled (or being archived) with records still to send keeps its outbox
+    relayed and its tasks run, VeriFactu's queue first: every ticket with a QR reaches the AEAT (working rules §15). The
+    pass over the shared database never looked at a hub's status either."""
+    ran = []
+    monkeypatch.setattr(scheduler, "_execute", lambda name, scope=None: ran.append((name, scope.key)))
+    Hub.objects.filter(pk=hub_a.pk).update(status=status)
+    pending = record(hub_a, hub_a.slug)
+    now = timezone.now()
+
+    with use_control():
+        worker._hubs(now)
+        worker._hubs(now + dt.timedelta(minutes=2))
+
+    with use_hub(Hub.objects.get(pk=hub_a.pk)):
+        assert OutboxEvent.objects.get(pk=pending.pk).delivered_at is not None
+    assert ("verifactu.contingency.process", hub_a.slug) in ran
+
+
+@pytest.mark.parametrize("status", [Hub.Status.PURGED, Hub.Status.DROPPING, Hub.Status.EXPIRED, Hub.Status.FAILED])
+def test_a_hub_whose_database_is_gone_going_or_not_made_is_never_entered(hub_a, monkeypatch, status):
+    served = []
+    monkeypatch.setattr(worker, "_serve_hub", lambda hub, now: served.append(hub.slug))
+    Hub.objects.filter(pk=hub_a.pk).update(status=status)
+
+    with use_control():
+        worker._hubs(timezone.now())
+
+    assert served == []
+
+
+def test_a_demo_whose_time_is_up_is_never_entered(hub_a, monkeypatch):
+    served = []
+    monkeypatch.setattr(worker, "_serve_hub", lambda hub, now: served.append(hub.slug))
+    Hub.objects.filter(pk=hub_a.pk).update(is_demo=True, expires_at=timezone.now() - dt.timedelta(minutes=1))
+
+    with use_control():
+        worker._hubs(timezone.now())
+
+    assert served == []

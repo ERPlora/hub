@@ -24,10 +24,12 @@ again). On the first tick and then every ``REAPER_INTERVAL_SECONDS`` it also pur
 demo hubs that ended (``base.services.reap_demos``, plan 2026-10-17 §1.7), whatever the scheduler did: a
 pass that fails is logged and the next one tries again, and the worker never stops for it.
 
-The order of a tick (review of hub#471): the tasks and the relay of phase 1's shared database first, so a slow pass
-that makes databases never holds back the kitchen, the stock or VeriFactu of the hubs that share it; then the hubs with
-their own database (``_hubs``, round 2026-10-30 of PLAN-DB): each ready one, in its own database (``use_hub``) and one
-at a time, gets its outbox relayed, its apps' schedule written there once per process and the tasks due of its active
+The order of a tick (review of hub#471): the tasks and the relay of phase 1's shared database first, so a pass that
+makes databases holds back the kitchen, the stock or VeriFactu of the hubs that share it a few seconds at most
+(``provision.DUE_PASS_SECONDS``: it takes no new hub after them, though a clone it started finishes); then the hubs with
+their own database (``_hubs``, round 2026-10-30 of PLAN-DB): each one it serves (ready, or a business that left but
+keeps its database, whose records still to send must reach the AEAT), in its own database (``use_hub``) and one at a
+time, gets its outbox relayed, its apps' schedule written there once per process and the tasks due of its active
 apps run on its own scope (``host``, its slug: their live notices go on its channel), for ``HUB_PASS_SECONDS`` at most,
 the next tick going on after the last hub served; a hub that fails is logged and the others are served. Then the
 reaper, and last the hubs whose ``hub_due`` has come: their databases made, the demos that ended dropped

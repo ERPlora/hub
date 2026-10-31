@@ -50,9 +50,10 @@ logger = logging.getLogger(__name__)
 
 #: How long a hub's lease (``hub_due.lease_until``) lasts; every step renews it.
 LEASE = dt.timedelta(seconds=60)
-#: How many due hubs one pass of the worker takes, and for how long it goes on taking them (a tick of the worker).
+#: How many due hubs one pass of the worker takes, and for how long it goes on taking new ones: a few seconds a tick
+#: (the rest waits for the next), so the next tick's relay of the shared database is not held back long.
 DUE_BATCH = 20
-DUE_PASS_SECONDS = 30.0
+DUE_PASS_SECONDS = 5.0
 #: What a seeding writes in the hub's database, inside ``use_hub``.
 Seed = Callable[[Hub], None]
 

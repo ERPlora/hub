@@ -615,3 +615,10 @@ def test_a_stop_before_the_first_tick_makes_no_hub(calls, due):
     worker.run(stopped())
 
     assert due.passes == []
+
+
+
+def test_the_pass_that_makes_databases_gives_the_next_tick_its_turn():
+    """Re-review of hub#471 (c): the hubs due take at most a few seconds a tick (the rest waits for the next), so the
+    next tick's tasks and relay of the shared database are never held back long."""
+    assert provision.DUE_PASS_SECONDS <= worker.TICK_SECONDS

@@ -1031,11 +1031,17 @@ def registry_row(hub_id: UUID) -> Hub | None:
     return Hub.objects.select_related("cluster").filter(pk=hub_id).first()
 
 
+#: The statuses of a hub whose own database the worker serves (its outbox, its tasks): a ready one, and a business
+#: that left but keeps its database, whose records still to send must reach the AEAT (working rules §15).
+SERVED_STATUSES = (Hub.Status.READY, Hub.Status.CANCELLED, Hub.Status.ARCHIVING)
+
+
 def hubs_to_serve(now: dt.datetime) -> list[Hub]:
-    """The hubs with their own database that are ready (a demo whose time is up aside), by id: the worker relays their
-    outbox and runs their tasks, each in its database."""
+    """The hubs with their own database the worker relays the outbox and runs the tasks of, each in its database, by
+    id: ready ones and businesses that left but keep it (cancelled, being archived); never one being made, dropped or
+    purged, nor a demo whose time is up."""
     return list(
-        Hub.objects.filter(status=Hub.Status.READY)
+        Hub.objects.filter(status__in=SERVED_STATUSES)
         .exclude(db_name="")
         .exclude(is_demo=True, expires_at__lte=now)
         .select_related("cluster")

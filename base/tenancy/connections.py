@@ -159,11 +159,12 @@ def migrator_conninfo(dbname: str, *, cluster=None) -> dict:
 
 def register_ddl_alias(db_name: str, *, cluster=None) -> str:
     """The migrator's alias of the database ``db_name`` (``<db_name>__ddl``) on ``cluster`` (or the settings' own
-    server): direct, as the migrator's role, no pool, closed after use."""
+    server): direct, as the migrator's role, no pool, closed after use. Registered again when that role's user or
+    password changed (a rotation of the cluster's ``…/migrator`` secret)."""
     names.validate(db_name, control=control_name())
+    found = credentials_for(cluster, MIGRATOR)
 
     def build() -> dict:
-        found = credentials_for(cluster, MIGRATOR)
         host, port = _writer(cluster)
         settings = _copied(
             DEFAULT_DB_ALIAS,
@@ -178,7 +179,10 @@ def register_ddl_alias(db_name: str, *, cluster=None) -> str:
         settings["OPTIONS"].pop("pool", None)
         return settings
 
-    alias = _register(f"{db_name}{names.DDL_SUFFIX}", build)
+    name = f"{db_name}{names.DDL_SUFFIX}"
+    registered = connections.settings.get(name)
+    rotated = registered is not None and (registered["USER"], registered["PASSWORD"]) != (found.user, found.password)
+    alias = _register(name, build, replace=rotated)
     # A connection object this thread kept from an earlier registration (forgotten since) reaches as that one's role.
     _take_this_threads_role(alias)
     return alias

@@ -280,3 +280,17 @@ def test_a_migrators_alias_registered_again_never_keeps_another_roles_connection
         cursor.execute("SELECT current_user")
         assert cursor.fetchone()[0] == default["USER"]
     django_connections[alias].close()
+
+
+def test_forgetting_an_alias_drops_this_threads_connection_object_too(hub_databases):
+    """Re-review of hub#471 (a): ``hubs.forget_aliases`` leaves no connection object behind for an alias it forgets, as
+    ``migrator._forget_alias`` does (the leftover one was what broke the CI of 2b46f6e7)."""
+    from base.tenancy.tests import hubs as test_hubs
+
+    before = django_connections.settings
+    alias = tenancy_connections.register_ddl_alias(hub_databases.a)
+    django_connections[alias]  # this thread's object, made now
+    test_hubs.forget_aliases(before)
+
+    # Django keeps each thread's connection objects by alias apart from the settings (``connections._connections``).
+    assert getattr(django_connections._connections, alias, None) is None

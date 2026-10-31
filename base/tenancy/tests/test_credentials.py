@@ -375,3 +375,20 @@ def test_the_migrators_role_on_a_cluster_with_its_secret_is_that_secrets(secrets
     secrets.secrets[MIGRATOR_SECRET] = RuntimeError("AccessDeniedException")
     with pytest.raises(migrator.MigratorCredentialsMissing, match=MIGRATOR_SECRET):
         migrator.migrator_credentials(cluster())
+
+
+
+def test_a_rotated_migrators_password_reaches_a_ddl_alias_already_registered(secrets, clock):
+    """Re-review of hub#471 (b): a cluster's ``<db>__ddl`` takes the migrator's new password too, never the first one
+    for the life of the process."""
+    on = cluster()
+    db_name = a_hub(on=on).db_name
+    alias = tenancy_connections.register_ddl_alias(db_name, cluster=on)
+    assert django_connections[alias].settings_dict["PASSWORD"] == "migrator-secret"
+
+    secrets.secrets[MIGRATOR_SECRET] = MIGRATOR_VALUES | {"migrator_password": "rotated"}
+    clock.value += credentials.SECRET_TTL_SECONDS + 1
+    tenancy_connections.register_ddl_alias(db_name, cluster=on)
+
+    assert django_connections.settings[alias]["PASSWORD"] == "rotated"
+    assert django_connections[alias].settings_dict["PASSWORD"] == "rotated"
