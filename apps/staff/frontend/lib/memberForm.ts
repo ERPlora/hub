@@ -96,7 +96,7 @@ export function createPayload(form: MemberForm, options: SendOptions): MemberIn 
     bio: form.bio.trim(),
   };
   if (form.role_id) payload.role_id = form.role_id;
-  if (form.user_id) payload.user_id = Number(form.user_id);
+  if (form.user_id) payload.user_id = form.user_id;
   if (form.hire_date) payload.hire_date = form.hire_date;
   if (options.pay) {
     payload.hourly_rate = rate(form.hourly_rate, options.money);
@@ -115,7 +115,7 @@ export function formFromRecord(record: MemberDetailOut, pay: CompensationOut | n
     phone: record.phone,
     employee_number: record.employee_number,
     role_id: record.role_id ?? '',
-    user_id: record.user_id === null ? '' : String(record.user_id),
+    user_id: record.user_id ?? '',
     status: record.status,
     is_bookable: record.is_bookable,
     booking_buffer: String(record.booking_buffer),
@@ -139,7 +139,7 @@ export function patchPayload(id: string, original: MemberForm, form: MemberForm,
   if (form.is_bookable !== original.is_bookable) patch.is_bookable = form.is_bookable;
   if (form.booking_buffer.trim() !== original.booking_buffer.trim()) patch.booking_buffer = whole(form.booking_buffer);
   if (form.role_id !== original.role_id) patch.role_id = form.role_id || null;
-  if (form.user_id !== original.user_id) patch.user_id = form.user_id ? Number(form.user_id) : null;
+  if (form.user_id !== original.user_id) patch.user_id = form.user_id || null;
   if (form.hire_date !== original.hire_date) patch.hire_date = form.hire_date || null;
   if (options.pay) {
     const typed = centsFromText(form.hourly_rate, options.money);

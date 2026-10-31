@@ -4,10 +4,12 @@ settings (WORKBOOK «Para quien lo mantiene»).
 Phase 1 has no tenancy: every scope (``a``, ``b``) shares these tables; only the live notifications are
 per scope. A working day belongs to a staff record (``staff.Member``, the app this one requires) and is
 never deleted: the law asks for four years of records (art. 34.9 ET), so the foreign keys PROTECT and
-there is no delete operation. Times are stored in UTC; ``work_date`` is the business day of the clock-in.
+there is no delete operation. Times are stored in UTC; ``work_date`` is the business day of the clock-in. Who
+clocked, corrected or changed a day hangs from the person in the business's own database (``base.HubUser``), never
+from control's user (tenancy W10): the columns ``*_hub_user_id`` are new, the old ones wait empty for a later deploy to
+drop them (``migrations/0003_hub_users``).
 """
 
-from django.conf import settings
 from django.db import models
 from django.db.models import F, Q
 from django.utils.translation import gettext_lazy as _
@@ -75,19 +77,21 @@ class Record(UUIDModel):
     )
     note = models.TextField(_("internal note"), blank=True)
     created_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
+        "base.HubUser",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name="+",
+        db_column="created_by_hub_user_id",
         verbose_name=_("clocked by"),
     )
     updated_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
+        "base.HubUser",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name="+",
+        db_column="updated_by_hub_user_id",
         verbose_name=_("last changed by"),
     )
     created_at = models.DateTimeField(_("created at"), auto_now_add=True)
@@ -202,11 +206,12 @@ class Correction(UUIDModel):
     # later empties `created_by`, and that correction is still theirs, not the system's.
     is_system = models.BooleanField(_("made by the system"), default=False)
     created_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
+        "base.HubUser",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name="+",
+        db_column="created_by_hub_user_id",
         verbose_name=_("corrected by"),
     )
     # Who corrected, copied when the row is written: the trail keeps it even if the user goes.
@@ -248,11 +253,12 @@ class AttendanceSettings(UUIDModel):
         _("flag open days for review after (hours)"), default=12
     )
     updated_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
+        "base.HubUser",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name="+",
+        db_column="updated_by_hub_user_id",
         verbose_name=_("last changed by"),
     )
     updated_at = models.DateTimeField(_("updated at"), auto_now=True)

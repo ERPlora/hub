@@ -50,7 +50,7 @@ def test_a_deactivated_person_takes_no_new_task():
 
 def test_my_tasks_follow_the_record_linked_to_my_account(make_user):
     bea = make_user("bea", role="hub_employee", first_name="Bea")
-    record = run("staff.member.create", {"first_name": "Bea", "last_name": "Ruiz", "user_id": bea.pk})
+    record = run("staff.member.create", {"first_name": "Bea", "last_name": "Ruiz", "user_id": str(bea.person.pk)})
     run("task.task.create", {"title": "Restock shampoo", "assigned_to_id": str(record.id)})
     run("task.task.create", {"title": "Someone else's"})
     mine = run("task.task.mine", {}, ctx=ctx_for("hub_employee", actor=bea))

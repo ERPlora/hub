@@ -132,7 +132,7 @@ def test_migrates_the_control_database_and_a_second_run_applies_nothing(small, d
     assert second.splitlines()[-4:] == [
         f"migrate_hubs: template {small[0].db_name} up to date.",
         f"migrate_hubs: template {small[1].db_name} up to date.",
-        f"migrate_hubs: template {small[1].db_name} leaves out staff: its tables still reference control's users.",
+        f"migrate_hubs: template {small[1].db_name} leaves out staff: its tables reference a model of control's database.",
         "migrate_hubs: hubs: 0 migrated, 0 left behind, 0 up to date.",
     ]
 

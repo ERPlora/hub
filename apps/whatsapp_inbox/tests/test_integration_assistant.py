@@ -66,12 +66,20 @@ def test_no_datum_of_a_write_of_whatsapp_inbox_reaches_a_spanish_card_by_its_tec
     assert technical == {}
 
 
-def test_the_card_names_the_assignee_as_the_conversation_screen():
-    """By their name or by their id, the same person: «Assigned to», as the conversation's header says it."""
+@pytest.mark.django_db
+def test_the_card_names_the_assignee_as_the_conversation_screen(make_user):
+    """By their name or by their id, the same person: «Assigned to», as the conversation's header says it; the id
+    named as the business's database knows them (``base.hub_user.get``), never as an id."""
     assign = get("whatsapp_inbox.conversation.assign")
-    for arguments in ({"assignee": "Ana"}, {"assignee_id": 7}):
-        assert labels(assistant.card(assign, arguments, "es")) == [SCREENS["conversation"]["assignedTo"]]
-        assert labels(assistant.card(assign, arguments, "en")) == [SCREENS_EN["conversation"]["assignedTo"]]
+    ana = make_user("ana", first_name="Ana", last_name="López")
+    ctx = ctx_for("hub_employee", actor=ana)
+    for arguments in ({"assignee": "Ana"}, {"assignee_id": str(ana.person.id)}):
+        es, en = assistant.card(assign, arguments, "es", ctx), assistant.card(assign, arguments, "en", ctx)
+        assert labels(es) == [SCREENS["conversation"]["assignedTo"]]
+        assert labels(en) == [SCREENS_EN["conversation"]["assignedTo"]]
+    assert [field["value"] for field in assistant.card(assign, {"assignee_id": str(ana.person.id)}, "es", ctx)["fields"]] == [
+        "Ana López"
+    ]
     unassign = assistant.card(assign, {"unassign": True}, "es")
     assert labels(unassign) == [SCREENS["conversation"]["unassign"]]
 

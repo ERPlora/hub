@@ -22,8 +22,12 @@ passwords. Idempotent: every step checks or converges, so N runs leave the same 
    template, which the clones copy) and to ``saas_app``; ``SELECT`` to ``hub_admin`` (``pg_dump``).
    Django's ``django_migrations`` in control and the template is made first, by ``hub_migrator``, and
    ``hub_app`` keeps only ``SELECT`` on it (PLAN-DB §14.6): the record of the schema is the migrator's.
-6. Extension ``vector`` in the template, as the master. Missing on the server: an error in
-   production, a warning and ``skipped`` locally (the ``postgres:17`` image has no pgvector).
+6. Extension ``vector`` in the template and in ``saas``, as the master: on Aurora it is no trusted
+   extension (``Must be rds_superuser``, which the master holds and the migrators do not). The SaaS
+   migration that uses it (pgvector's ``VectorExtension``, ``CREATE EXTENSION IF NOT EXISTS
+   vector``, saas#171) then passes as ``saas_migrator``: PostgreSQL looks for the extension before it
+   checks the role. Missing on the server: an error in production, a warning and ``skipped`` locally
+   (a ``postgres`` image without pgvector, as CI's).
 7. Schema ``shared`` in ``saas``, owned by ``saas_migrator``, with the privileges of spec §3.3:
    ``SELECT``, ``INSERT`` and ``UPDATE`` to ``hub_shared``, ``SELECT`` to ``saas_app``.
 
@@ -54,6 +58,8 @@ MAX_IDENTIFIER = 63
 PREFIX_RE = re.compile(r"[a-z][a-z0-9_]*")
 #: Extensions of ``hub_template``; the vertical templates and every hub inherit them by cloning.
 TEMPLATE_EXTENSIONS = ("vector",)
+#: Extensions of ``saas`` its migrator cannot create on Aurora: ``vector``, the assistant's documentation search.
+SAAS_EXTENSIONS = ("vector",)
 #: PLAN-DB §12.2: per role, never global, so migrations and ``LISTEN`` are never cut.
 APP_TIMEOUTS = {"statement_timeout": "15s", "lock_timeout": "5s"}
 NO_LIMIT = {"statement_timeout": "0", "lock_timeout": "0"}
@@ -154,15 +160,21 @@ def bootstrap(
     names: Names | None = None,
     conninfo: Mapping | None = None,
     require_extensions: bool = True,
-    template_extensions: Sequence[str] = TEMPLATE_EXTENSIONS,
+    template_extensions: Sequence[str] | None = None,
+    saas_extensions: Sequence[str] | None = None,
     report: Callable[[Step], None] | None = None,
 ) -> list[Step]:
     """Converge the cluster to the databases and roles above; return the steps in order.
 
-    ``report`` sees each step as soon as it is done, so a failure still shows what came before.
+    ``report`` sees each step as soon as it is done, so a failure still shows what came before. The extensions
+    default to ``TEMPLATE_EXTENSIONS`` and ``SAAS_EXTENSIONS``, read at each call.
     """
     conninfo = dict(admin_conninfo() if conninfo is None else conninfo)
     n = Names() if names is None else names
+    if template_extensions is None:
+        template_extensions = TEMPLATE_EXTENSIONS
+    if saas_extensions is None:
+        saas_extensions = SAAS_EXTENSIONS
     steps: list[Step] = []
 
     def step(subject: str, action: Callable[..., tuple[str, str] | str], *args) -> None:
@@ -205,6 +217,9 @@ def bootstrap(
         step(f"default privileges on {n.saas}", _saas_default_privileges, conn, n)
         step(f"schema shared on {n.saas}", _ensure_shared_schema, conn, n)
         step(f"privileges on {n.saas}.shared", _shared_privileges, conn, n)
+        for extension in saas_extensions:
+            subject = f"extension {extension} on {n.saas}"
+            step(subject, _ensure_extension, conn, extension, require_extensions)
     return steps
 
 

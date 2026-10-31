@@ -3,7 +3,7 @@
 // `/api/openapi.json`. Keep it in step with schemas.py and `frontend/generated/operations.json`.
 // One input per operation (ninja's parity): no path parameters, an id travels in the input.
 // On the wire: dates `YYYY-MM-DD`, times `HH:MM:SS`, decimals (commission) as strings («12.50»),
-// money in whole minor units of the business's currency (cents in euros), a business user's id as a number.
+// money in whole minor units of the business's currency (cents in euros), a business user's id as a UUID.
 import type { Page } from '../../../frontend/sdk-types';
 
 export type MemberStatus = 'active' | 'inactive' | 'on_leave';
@@ -57,7 +57,7 @@ export interface MemberListIn extends PageIn {
   hire_date_from?: string;
   hire_date_to?: string;
   color?: string;
-  user_id?: number;
+  user_id?: string;
   /** A column, `-` first for descending. */
   sort?: string;
 }
@@ -70,7 +70,7 @@ export interface MemberIn {
   employee_number?: string;
   role_id?: string | null;
   role?: string | null;
-  user_id?: number | null;
+  user_id?: string | null;
   hire_date?: string | null;
   status?: MemberStatus;
   is_bookable?: boolean;
@@ -92,7 +92,7 @@ export interface MemberPatchIn extends MemberRefIn {
   employee_number?: string;
   role_id?: string | null;
   role?: string | null;
-  user_id?: number | null;
+  user_id?: string | null;
   hire_date?: string | null;
   status?: MemberStatus;
   is_bookable?: boolean;
@@ -152,7 +152,7 @@ export interface MemberOut {
   employee_number: string;
   role_id: string | null;
   role_name: string | null;
-  user_id: number | null;
+  user_id: string | null;
   status: MemberStatus;
   is_bookable: boolean;
   hire_date: string | null;
@@ -183,7 +183,7 @@ export interface CurrentMemberOut {
 
 export interface CompensationOut {
   id: string;
-  user_id: number | null;
+  user_id: string | null;
   full_name: string;
   role_id: string | null;
   role_name: string | null;
@@ -195,7 +195,7 @@ export interface CompensationOut {
 
 export interface CommissionOut {
   id: string;
-  user_id: number | null;
+  user_id: string | null;
   full_name: string;
   role_id: string | null;
   role_name: string | null;
@@ -250,11 +250,11 @@ export interface TerminatedOut {
 export interface AccountListIn extends PageIn {
   search?: string;
   /** Only this business user (to name the one a record hangs from). */
-  user_id?: number;
+  user_id?: string;
 }
 
 export interface AccountOut {
-  user_id: number;
+  user_id: string;
   name: string;
 }
 
@@ -412,7 +412,7 @@ export interface TimeOffListIn extends PageIn {
   status?: TimeOffStatus;
   leave_type?: LeaveType;
   is_full_day?: boolean;
-  approved_by_id?: number;
+  approved_by_id?: string;
   date_from?: string;
   date_to?: string;
   start_date_from?: string;
@@ -438,7 +438,7 @@ export interface TimeOffOut {
   start_time: string | null;
   end_time: string | null;
   status: TimeOffStatus;
-  approved_by_id: number | null;
+  approved_by_id: string | null;
   approved_at: string | null;
 }
 

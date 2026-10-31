@@ -3,13 +3,15 @@ copy of the templates Meta approved (WORKBOOK «Para quien lo mantiene → Model
 
 Phase 1 has no tenancy: every scope (``a``, ``b``) shares these tables; only the live notifications
 are per scope. Phase 2 moves them to each hub's database. A conversation is live while ``erased_at``
-is empty; erased (WHATSAPP_INBOX-F10, F11) it keeps no personal data and frees its number.
+is empty; erased (WHATSAPP_INBOX-F10, F11) it keeps no personal data and frees its number. Who a conversation is with,
+who sent a message from the Hub and who wrote a note hang from the person in the business's own database
+(``base.HubUser``), never from control's user (tenancy W10): the columns ``*_hub_user_id`` are new, the old ones wait
+empty for a later deploy to drop them (``migrations/0010_hub_users``).
 """
 
 import datetime as dt
 import re
 
-from django.conf import settings
 from django.db import models
 from django.db.models import Q
 from django.utils import timezone
@@ -118,11 +120,12 @@ class Conversation(UUIDModel):
         verbose_name=_("customer"),
     )
     assigned_to = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
+        "base.HubUser",
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
         related_name="whatsapp_conversations",
+        db_column="assigned_to_hub_user_id",
         verbose_name=_("assigned to"),
     )
     status = models.CharField(
@@ -295,11 +298,12 @@ class Message(UUIDModel):
     # The option the customer tapped (a template's quick reply, an interactive button or list row): its id.
     reply_id = models.CharField(_("option tapped"), max_length=256, blank=True)
     sent_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
+        "base.HubUser",
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
         related_name="+",
+        db_column="sent_by_hub_user_id",
         verbose_name=_("sent by"),
     )
     # Meta's own object, verbatim (what the Hub does not lift into columns).
@@ -344,11 +348,12 @@ class Note(UUIDModel):
     )
     text = models.TextField(_("text"))
     author = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
+        "base.HubUser",
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
         related_name="+",
+        db_column="author_hub_user_id",
         verbose_name=_("author"),
     )
     # The author's name when it was written: the note keeps it if the person leaves.

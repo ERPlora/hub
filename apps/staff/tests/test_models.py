@@ -4,11 +4,11 @@ import datetime as dt
 from decimal import Decimal
 
 import pytest
-from django.contrib.auth import get_user_model
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from apps.staff.models import Member, Role, Schedule, ScheduleDay, StaffSettings, TimeOff
+from base.models import HubUser
 
 pytestmark = pytest.mark.django_db
 
@@ -20,7 +20,7 @@ def member(first="Ana", last="López", **fields):
 
 
 def user(username="ana"):
-    return get_user_model().objects.create_user(username=username, password="pw")
+    return HubUser.objects.create(username=username)
 
 
 def violates(constraint, create):
@@ -185,7 +185,7 @@ def test_deleting_a_role_unlinks_its_members():
     assert ana.role is None
 
 
-def test_deleting_a_user_unlinks_the_record_and_the_approval():
+def test_deleting_a_hub_user_unlinks_the_record_and_the_approval():
     account = user()
     ana = member(user=account)
     leave = TimeOff.objects.create(
@@ -223,7 +223,7 @@ def test_deleting_a_member_deletes_its_schedules_days_and_time_off():
 def test_one_user_one_live_member():
     account = user()
     member("Ana", user=account)
-    violates("staff_member_user_unique", lambda: member("Bea", user=account))
+    violates("staff_member_hub_user_unique", lambda: member("Bea", user=account))
 
 
 def test_a_terminated_member_frees_the_user_and_many_members_have_no_user():

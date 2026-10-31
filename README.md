@@ -119,9 +119,9 @@ Plan `docs/plans/2026-10-22-fase-2-tenencia.md` de erplora-next; reglas en PLAN-
   `schema_locked`), lleva a la hoja del código la plataforma (`base`, `live`), las apps que esa BD ya tiene y las de
   `add` con sus `requires`, y escribe en control lo que tiene (`Hub.schema_apps`: manda el `django_migrations` de la BD
   del hub) y `schema_state = current`. Un hub sin BD propia (`db_name=""`) da `HubWithoutDatabase`; nunca toca
-  control. Nunca da un paso atrás ni borra una tabla. Las apps cuyas tablas aún enlazan al usuario de control
-  (`staff`, `attendance`, `task`, `whatsapp_inbox` y las que dependen de ellas) no caben todavía en la BD de un hub:
-  `add=` las rechaza (`AppNotPortable`) y las plantillas las dejan fuera.
+  control. Nunca da un paso atrás ni borra una tabla. Toda app del hub cabe en la BD de un hub (tenencia W10: las
+  personas del negocio son suyas, `base.HubUser`); si una volviera a enlazar un modelo de control, `add=` la rechazaría
+  (`AppNotPortable`) y las plantillas la dejarían fuera, y el lint «(h)» de `tests/test_guardrails.py` lo impide antes.
 - **Las plantillas**, en cada servidor donde viven hubs (`CREATE DATABASE … TEMPLATE` solo clona dentro de uno):
   `<control>_template`, solo la plataforma, y una `<control>_template_<vertical>` por vertical de `base/catalog.py`,
   clonada de la anterior, con las tablas de las apps de su vertical (`template_apps`) y todo apagado (ninguna
@@ -151,8 +151,7 @@ Plan `docs/plans/2026-10-22-fase-2-tenencia.md` de erplora-next; reglas en PLAN-
   (`SessionHostMiddleware`): la de B en el host de A es anónima (401).
 - **Tests**: la suite construye por sesión `<BD de test>_template_test` con el migrador y clona dos hubs con BD
   propia (`base/tenancy/tests/hubs.py`; fixtures `hub_a`, `hub_b`; marca `django_db(databases=hubs.HUB_DATABASES)`).
-  La plantilla de test lleva las apps cuyas tablas solo apuntan a las del hub: las enlazadas al usuario de control
-  (`staff`, `attendance`, `task`, `whatsapp_inbox` y las que dependen de ellas) esperan al personal propio del hub.
+  La plantilla de test lleva todas las apps del hub (`migrator.portable_apps()`, `base/tests/test_hub_user_links.py`).
   Los tests escritos antes de la tenencia caen en la BD compartida (fixture de sesión `shared_database_fallback`); los
   de la tenencia y los de cada puerta de entrada la apagan (`no_test_fallback`), como en producción.
 
@@ -315,6 +314,24 @@ Variables del repo: `AWS_REGION`, `ALB_DNS_NAME`, `AWS_DEPLOY_ROLE_ARN` (prod, c
 `ERPLORA_ENVIRONMENT` (`prod` o `pre`: prefijo `hub`/`pre-hub` de la caché en Valkey) y
 `HUB_BASE_DOMAIN` (`erplora.com` o `pre.erplora.com`; en local, `localhost`): un Hub solo sirve
 `<slug>.<HUB_BASE_DOMAIN>` y `hubs.<HUB_BASE_DOMAIN>`.
+
+### Las personas del negocio en su BD (`base.HubUser`)
+
+Control guarda el usuario de la sesión (`auth.User`, la copia `saas:<id>` de la cuenta de erplora.com) y el rol
+(`Membership`); la BD del hub guarda a la persona del negocio, `base.HubUser`: `username` (`saas:<id>`, `demo:<slug>`),
+`account_id` (la cuenta de erplora.com; ninguna para el dueño de una demo), nombre, correo, `is_active` y su alta. Nunca
+se borra: quien se va conserva su nombre en lo que firmó y deja de estar activo. Se crea o se pone al día en cada
+entrada (código de erplora.com, demo, PIN o tarjeta: `base.services.ensure_hub_user`), en la primera escritura de quien
+aún no la tiene (`acting_hub_user`) y desde la foto del SaaS (`base.hub_user.sync`, dentro de `hub.state_apply`). Las
+apps enlazan a ella, nunca a `settings.AUTH_USER_MODEL` (lint «(h)»): `staff` (registro y aprobación de ausencias),
+`attendance`, `task` y `whatsapp_inbox`; leen la de quien llama con `base.queries.hub_user_of`, y la tarjeta del
+asistente nombra a la persona por su id con `base.hub_user.get`. `base.session.me` da como `user.id` el de esa persona,
+el mismo que guardan los registros, para que una pantalla sepa qué es «suyo».
+
+El paso (expand) dejó las columnas viejas, a `auth_user`, fuera del estado, vacías y sin su clave (`*/migrations/*_hub_users`),
+y escribió el contract en `base/tests/test_migration_safety.py` (`ACCEPTED`) para un despliegue posterior. Para que la
+historia se pueda reproducir en una BD de hub, que no tiene `auth_user`, se editaron por excepción las `0001_initial` de esas
+cuatro apps (`db_constraint=False`) y el `RunPython` de `attendance/0002`: donde ya corrieron, nada cambia.
 
 ### Migraciones que conviven con el código anterior
 

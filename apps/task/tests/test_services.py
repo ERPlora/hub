@@ -17,6 +17,7 @@ from live.outbox import channel_for
 
 from apps.task import events as task_events
 from apps.task.models import Comment, Project, Task
+from base.models import HubUser, Membership
 
 from .conftest import A, B, ctx_for, make_comment, make_member, make_project, make_task
 
@@ -49,8 +50,8 @@ def team(make_user):
     return {
         "boss": boss,
         "worker": worker,
-        "boss_member": make_member("Marta", "Jefa", user=boss),
-        "worker_member": make_member("Bea", "Ruiz", user=worker),
+        "boss_member": make_member("Marta", "Jefa", user=boss.person),
+        "worker_member": make_member("Bea", "Ruiz", user=worker.person),
         "ana": make_member("Ana", "López"),
     }
 
@@ -70,7 +71,7 @@ def test_a_task_is_born_to_do_with_the_days_number_and_its_creator(team, today):
     task = run("task.task.create", {"title": "Clean the store room"}, ctx=as_manager(team))
     assert (task.status, task.priority, task.completed_at) == ("todo", "medium", None)
     assert task.number == f"TSK-{today:%Y%m%d}-0001"
-    assert (task.created_by_id, task.created_by_name) == (team["boss"].pk, "Marta Jefa")
+    assert (task.created_by_id, task.created_by_name) == (team["boss"].person.pk, "Marta Jefa")
     second = run("task.task.create", {"title": "Order dye"}, ctx=as_manager(team))
     assert second.number == f"TSK-{today:%Y%m%d}-0002"
     assert events() == [
@@ -154,7 +155,7 @@ def test_an_ambiguous_person_names_the_candidates(team):
 
 def test_an_employee_creates_tasks_and_sees_them_but_not_under_a_parent_they_do_not_see(team):
     task = run("task.task.create", {"title": "Mine", "assignee": "Ana"}, ctx=as_employee(team))
-    assert task.created_by_id == team["worker"].pk and task.can_change is True
+    assert task.created_by_id == team["worker"].person.pk and task.can_change is True
     hidden = make_task("Ana's", assigned_to=team["ana"])
     with pytest.raises(InvalidPayload) as caught:
         run("task.task.create", {"title": "Sub", "parent_id": str(hidden.id)}, ctx=as_employee(team))
@@ -367,10 +368,27 @@ def test_an_employee_does_not_delete(team):
 def test_a_comment_is_signed_by_the_caller(team):
     task = make_task(assigned_to=team["worker_member"])
     comment = run("task.comment.add", {"task_id": str(task.id), "text": " On it "}, ctx=as_employee(team))
-    assert (comment.text, comment.author_id, comment.author_name) == ("On it", team["worker"].pk, "Bea Ruiz")
+    assert (comment.text, comment.author_id, comment.author_name) == ("On it", team["worker"].person.pk, "Bea Ruiz")
     # What is kept, not only what the command answers: the thread is a record signed in the database.
-    assert Comment.objects.get(pk=comment.id).author_id == team["worker"].pk
+    assert Comment.objects.get(pk=comment.id).author_id == team["worker"].person.pk
     assert events() == [("task.comment.added", {"id": str(comment.id), "task_id": str(task.id)})]
+
+
+def test_a_comment_or_a_task_of_someone_the_business_s_database_does_not_know_yet_makes_their_person(
+    team, django_user_model
+):
+    # A session opened before the business's database knew them (W10): their first write signs with a person of its
+    # own, and they own what they created.
+    late = django_user_model.objects.create_user(username="saas:late", first_name="Eva")
+    Membership.objects.create(user=late, host="a", role="hub_employee")
+    ctx = ctx_for("hub_employee", actor=late)
+
+    task = run("task.task.create", {"title": "Restock"}, ctx=ctx)
+    comment = run("task.comment.add", {"task_id": str(task.id), "text": "Done"}, ctx=ctx)
+
+    person = HubUser.objects.get(username="saas:late")
+    assert (task.created_by_id, task.created_by_name, task.can_change) == (person.pk, "Eva", True)
+    assert (comment.author_id, comment.author_name) == (person.pk, "Eva")
 
 
 def test_an_employee_does_not_comment_someone_elses_task(team):

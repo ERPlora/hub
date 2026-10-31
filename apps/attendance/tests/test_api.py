@@ -53,7 +53,7 @@ def post(client, path, data, host="a.localhost", **headers):
 def ana(client, make_user):
     """An employee with her staff record, signed in."""
     user = make_user("ana", role="hub_employee", first_name="Ana", last_name="López")
-    Member.objects.create(first_name="Ana", last_name="López", user=user)
+    Member.objects.create(first_name="Ana", last_name="López", user=user.person)
     client.force_login(user)
     return user
 
@@ -61,7 +61,7 @@ def ana(client, make_user):
 @pytest.fixture
 def boss(client, make_user):
     user = make_user("boss", role="hub_manager", first_name="Marta", last_name="Jefa")
-    Member.objects.create(first_name="Marta", last_name="Jefa", user=user)
+    Member.objects.create(first_name="Marta", last_name="Jefa", user=user.person)
     client.force_login(user)
     return user
 
@@ -134,7 +134,7 @@ def test_a_refusal_is_the_409_envelope_with_its_code(ana, client):
 def test_an_employee_neither_corrects_nor_sees_the_team_nor_saves_settings(ana, client):
     Member.objects.create(first_name="Marta", last_name="Jefa")
     day = Record.objects.create(
-        member=Member.objects.get(user=ana),
+        member=Member.objects.get(user=ana.person),
         clock_in_at="2026-10-06T07:00Z",
         clock_out_at="2026-10-06T15:00Z",
         status="closed",
@@ -169,7 +169,7 @@ def test_an_employee_neither_corrects_nor_sees_the_team_nor_saves_settings(ana, 
 @pytest.mark.django_db
 def test_a_person_by_id_is_the_employees_own_and_anyone_for_the_manager(ana, client, make_user):
     marta = Member.objects.create(first_name="Marta", last_name="Jefa")
-    own = Member.objects.get(user=ana)
+    own = Member.objects.get(user=ana.person)
     mine = get(client, "/attendance/people/detail", id=str(own.id))
     assert mine.status_code == 200
     assert mine.json() == {"id": str(own.id), "name": "Ana López", "status": "active"}
@@ -187,7 +187,7 @@ def test_a_role_on_a_is_no_role_on_b(ana, client):
 @pytest.mark.django_db
 def test_a_correction_over_http_and_its_history(boss, client, make_user):
     worker = make_user("bea", role="hub_employee")
-    bea = Member.objects.create(first_name="Bea", last_name="Ruiz", user=worker)
+    bea = Member.objects.create(first_name="Bea", last_name="Ruiz", user=worker.person)
     day = Record.objects.create(
         member=bea,
         clock_in_at="2026-10-06T07:00Z",

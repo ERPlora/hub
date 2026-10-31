@@ -41,7 +41,7 @@ async function signedIn(browser: Browser, next: string, credentials?: Credential
 
 /** A staff record linked to the account found by `search` (its email), made through Staff's API. */
 async function linkedMember(owner: BrowserContext, search: string, firstName: string): Promise<string> {
-  const accounts = await api<Page<{ user_id: number; name: string }>>(owner, A, 'GET', `/staff/accounts?search=${encodeURIComponent(search)}&limit=5`);
+  const accounts = await api<Page<{ user_id: string; name: string }>>(owner, A, 'GET', `/staff/accounts?search=${encodeURIComponent(search)}&limit=5`);
   expect(accounts.status).toBe(200);
   expect(accounts.data.rows.length, `account ${search}`).toBeGreaterThan(0);
   const member = await api<{ id: string }>(owner, A, 'POST', '/staff/members', {

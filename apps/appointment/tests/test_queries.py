@@ -39,7 +39,7 @@ def employee_linked_to(member, make_user):
     from .conftest import ctx_for
 
     user = make_user("bea", role="hub_employee")
-    member.user = user
+    member.user = user.person
     member.save(update_fields=["user"])
     return ctx_for("hub_employee", actor=user)
 

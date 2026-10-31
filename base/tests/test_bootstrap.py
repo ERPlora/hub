@@ -1,9 +1,9 @@
 """``base.tenancy.bootstrap``: what ``manage.py bootstrap_databases`` runs (aws-next, «Contrato»).
 
 Databases ``saas``, ``hub`` and ``hub_template``; the roles of PLAN-DB §10 with their passwords
-(``*_PASSWORD``), timeouts (§12.2) and default privileges; ``vector`` in the template; the
-``shared`` schema of ``saas`` for ``hub_shared`` (round 16, PLAN §21; spec §3.3). Here, what each
-role can and cannot do once bootstrapped; the command's output and exit codes are
+(``*_PASSWORD``), timeouts (§12.2) and default privileges; ``vector`` in the template and in
+``saas``; the ``shared`` schema of ``saas`` for ``hub_shared`` (round 16, PLAN §21; spec §3.3).
+Here, what each role can and cannot do once bootstrapped; the command's output and exit codes are
 ``test_bootstrap_databases.py``, which reuses these helpers.
 
 Run against the local Postgres (``compose.yaml``) as an emulated RDS master: a role with
@@ -11,6 +11,11 @@ Run against the local Postgres (``compose.yaml``) as an emulated RDS master: a r
 so the permission rules of PostgreSQL 16+ apply as on Aurora. Every database and role carries a
 per-process prefix (``Names.with_prefix``): the real ``hub``/``saas`` and their roles are never
 touched, and the fixtures drop everything prefixed at the end.
+
+That master creates only trusted extensions (``pgcrypto``), so its tests name the ones they create.
+Aurora's master also holds ``rds_superuser``, which creates ``vector``; pgvector is no trusted
+extension, and locally only a superuser creates it: ``rds_cluster`` bootstraps with the local
+superuser as the master, where pgvector is installed.
 """
 
 import os
@@ -147,12 +152,17 @@ class Cluster:
         return connect_as(self.role(key), self.passwords[key], dbname)
 
     def rerun(self, **kwargs) -> list:
+        """The bootstrap again, with no extension but those the test names (the emulated master's are trusted)."""
+        options = {
+            "require_extensions": False,
+            "template_extensions": (),
+            "saas_extensions": (),
+        }
         return bootstrap.bootstrap(
             passwords=self.passwords,
             names=self.names,
             conninfo=self.master,
-            require_extensions=kwargs.pop("require_extensions", False),
-            **kwargs,
+            **options | kwargs,
         )
 
 
@@ -162,13 +172,38 @@ def cluster():
     prefix = f"test_bsm_{os.getpid()}_"
     drop_prefixed(prefix)
     try:  # a failed bootstrap still drops what it left
-        master = create_master(prefix)
-        names = bootstrap.Names.with_prefix(prefix)
-        passwords = {role: f"pw-{role}" for role in VARIABLES}
-        bootstrap.bootstrap(
-            passwords=passwords, names=names, conninfo=master, require_extensions=False
+        bootstrapped = Cluster(
+            prefix=prefix,
+            names=bootstrap.Names.with_prefix(prefix),
+            passwords={role: f"pw-{role}" for role in VARIABLES},
+            master=create_master(prefix),
         )
-        yield Cluster(prefix=prefix, names=names, passwords=passwords, master=master)
+        bootstrapped.rerun()
+        yield bootstrapped
+    finally:
+        drop_prefixed(prefix)
+
+
+@pytest.fixture
+def rds_cluster():
+    """Prefixed names whose master is the local superuser, standing in for Aurora's ``rds_superuser``."""
+    if not vector_available():
+        pytest.skip("pgvector is not installed on this server")
+    prefix = f"test_bsr_{os.getpid()}_"
+    database = django_settings.DATABASES["default"]
+    drop_prefixed(prefix)
+    try:
+        yield Cluster(
+            prefix=prefix,
+            names=bootstrap.Names.with_prefix(prefix),
+            passwords={role: f"pw-{role}" for role in VARIABLES},
+            master={
+                **server(),
+                "user": database["USER"],
+                "password": database["PASSWORD"],
+                "dbname": "postgres",
+            },
+        )
     finally:
         drop_prefixed(prefix)
 
@@ -444,31 +479,88 @@ def test_a_rerun_restores_the_shared_grants_on_existing_tables(cluster):
 # ── Extensions ─────────────────────────────────────────────────────────────────────────────────
 
 
-def test_a_template_extension_is_created_once(cluster):
-    subject = f"extension pgcrypto on {cluster.names.template}"
+#: Where each extension list goes: the database (field of ``Names``) and a role that reads it.
+EXTENSION_DATABASES = {"template": "hub_admin", "saas": "saas_migrator"}
 
-    first = [str(step) for step in cluster.rerun(template_extensions=("pgcrypto",))]
-    second = [str(step) for step in cluster.rerun(template_extensions=("pgcrypto",))]
+
+@pytest.mark.parametrize("database", EXTENSION_DATABASES)
+def test_an_extension_is_created_once(cluster, database):
+    dbname = getattr(cluster.names, database)
+    subject = f"extension pgcrypto on {dbname}"
+    extensions = {f"{database}_extensions": ("pgcrypto",)}
+
+    first = [str(step) for step in cluster.rerun(**extensions)]
+    second = [str(step) for step in cluster.rerun(**extensions)]
 
     assert f"{subject}: created" in first
     assert f"{subject}: exists" in second
-    with cluster.connect("hub_admin", cluster.names.template) as conn:
+    with cluster.connect(EXTENSION_DATABASES[database], dbname) as conn:
         assert conn.execute(
             "SELECT 1 FROM pg_extension WHERE extname = 'pgcrypto'"
         ).fetchone()
 
 
-def test_a_missing_extension_fails_in_production_and_is_skipped_locally(cluster):
-    missing = ("erplora_no_such_extension",)
+@pytest.mark.parametrize("database", EXTENSION_DATABASES)
+def test_a_missing_extension_fails_in_production_and_is_skipped_locally(
+    cluster, database
+):
+    missing = {f"{database}_extensions": ("erplora_no_such_extension",)}
 
     with pytest.raises(bootstrap.BootstrapError, match="erplora_no_such_extension"):
-        cluster.rerun(template_extensions=missing, require_extensions=True)
-    steps = [str(step) for step in cluster.rerun(template_extensions=missing)]
+        cluster.rerun(**missing, require_extensions=True)
+    steps = [str(step) for step in cluster.rerun(**missing)]
 
     assert (
-        f"extension erplora_no_such_extension on {cluster.names.template}: skipped "
+        f"extension erplora_no_such_extension on {getattr(cluster.names, database)}: skipped "
         "(not available on this server)"
     ) in steps
+
+
+def test_a_master_that_cannot_create_an_extension_fails_with_the_servers_reason(
+    cluster,
+):
+    # What saas-migrate met in pre (saas#171) with vector; dblink is untrusted too, and in every image's contrib.
+    reason = 'permission denied to create extension "dblink"'
+
+    with pytest.raises(bootstrap.BootstrapError) as raised:
+        cluster.rerun(saas_extensions=("dblink",), require_extensions=True)
+
+    assert str(raised.value) == f"extension dblink on {cluster.names.saas}: {reason}"
+
+
+def test_the_master_makes_vector_in_saas_so_the_saas_migration_only_finds_it(
+    rds_cluster,
+):
+    # saas#171: saas_migrator runs pgvector's VectorExtension (CREATE EXTENSION IF NOT EXISTS vector), which
+    # Aurora refuses it ("Must be rds_superuser"); PostgreSQL looks for the extension before it checks the role.
+    n = rds_cluster.names
+    migration = "CREATE EXTENSION IF NOT EXISTS vector"
+
+    def run() -> list[str]:
+        return [
+            str(step)
+            for step in bootstrap.bootstrap(
+                passwords=rds_cluster.passwords, names=n, conninfo=rds_cluster.master
+            )
+        ]
+
+    first, second = run(), run()
+
+    for dbname in (n.template, n.saas):
+        assert f"extension vector on {dbname}: created" in first
+        assert f"extension vector on {dbname}: exists" in second
+    with rds_cluster.connect("saas_migrator", n.saas) as conn:
+        conn.execute(migration)
+        assert conn.execute(
+            "SELECT extowner::regrole::text FROM pg_extension WHERE extname = 'vector'"
+        ).fetchone() == (rds_cluster.master["user"],)
+    with superuser(n.saas) as conn:
+        conn.execute("DROP EXTENSION vector")
+    with (
+        rds_cluster.connect("saas_migrator", n.saas) as conn,
+        pytest.raises(errors.InsufficientPrivilege, match="vector"),
+    ):
+        conn.execute(migration)
 
 
 # ── Inputs ─────────────────────────────────────────────────────────────────────────────────────

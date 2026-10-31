@@ -22,7 +22,7 @@ const away = (id: string, over: Partial<TimeOffOut> = {}): TimeOffOut => ({
   start_time: null,
   end_time: null,
   status: 'approved',
-  approved_by_id: 1,
+  approved_by_id: '01a16000-0000-7000-8000-0000000000b1',
   approved_at: '2026-10-10T09:00:00Z',
   ...over,
 });
