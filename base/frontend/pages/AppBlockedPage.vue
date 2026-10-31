@@ -5,10 +5,11 @@
 // needed» — its data is safe and comes back once it is bought on erplora.com (the Store's link only for whoever runs
 // the business and only on the web: the Hub never sells) —; an app the business does not have says so. Bought
 // meanwhile (the SaaS's photo re-runs the list), it offers to open the app with a full load, which brings the
-// session (a snapshot of the page load) up to date. A failed check says so; it never makes up a reason.
+// session (a snapshot of the page load) up to date. A failed check says so; it never makes up a reason. The Store's
+// link goes the Hub's one way out, `openExternalLink` (gh:hub#439: the installed app opens nothing on `_blank`).
 import { EmptyState, InlineFeedback } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
-import { AppPage, useSession, useSurface } from '@erplora/ui/shell';
+import { AppPage, openExternalLink, useSession, useSurface } from '@erplora/ui/shell';
 import { IonButton } from '@ionic/vue';
 import { computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
@@ -104,6 +105,7 @@ function toApps(): void {
               :href="storeUrl"
               target="_blank"
               rel="noopener"
+              @click="openExternalLink(storeUrl, $event)"
             >{{ t('base.appsPage.buy') }}</a>
             <ion-button
               fill="outline"

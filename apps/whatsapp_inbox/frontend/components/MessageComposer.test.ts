@@ -4,6 +4,7 @@
 // month spent or no erplora.com, nothing is offered and the reason is said. A refusal keeps the text,
 // and sending it again uses the same key (never twice).
 import { formatDateTime } from '@erplora/ui/components';
+import { applySurface } from '@erplora/ui/shell';
 import { describe, expect, it, vi } from 'vitest';
 
 import { click, EMPLOYEE, flush, ionValue, mountInbox, settle } from '../__tests__/mount-inbox';
@@ -220,6 +221,19 @@ describe('MessageComposer: the plan’s messages (WHATSAPP_INBOX-F13)', () => {
     const employee = await setup(BLOCKED, 'en', { channel: CHANNEL, session: EMPLOYEE });
     expect(employee.find('whatsapp-inbox-composer-blocked').text()).toContain('Your plan does not include WhatsApp messages');
     expect(employee.find('whatsapp-inbox-composer-upgrade').exists()).toBe(false);
+  });
+
+  // «Upgrade plan» sells, and everything that sells is web only (surface.ts): in the installed app the link opened
+  // nothing (gh:hub#439), so there the box says why it cannot send, without the link.
+  it('«Upgrade plan» sells: never on the app surfaces, where the box still says why it cannot send', async () => {
+    applySurface('mobile');
+    try {
+      const s = await setup(BLOCKED, 'en', { channel: CHANNEL });
+      expect(s.find('whatsapp-inbox-composer-blocked').text()).toContain('Your plan does not include WhatsApp messages: nothing can be sent.');
+      expect(s.find('whatsapp-inbox-composer-upgrade').exists()).toBe(false);
+    } finally {
+      applySurface('web');
+    }
   });
 
   it('the month spent keeps its own words, with «Upgrade plan»; without the channel, only the words', async () => {
