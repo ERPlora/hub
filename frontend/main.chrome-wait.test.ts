@@ -2,7 +2,7 @@
 // network leaves hanging, never loaded and never failed, would keep the hub from mounting and the page blank. Past
 // `CHROME_WAIT_MS` it mounts with what is here; the piece comes when its chunk does. Its own file: the piece's module
 // hangs from the first import of main.ts, which boots on import (main.chrome.test.ts holds one that arrives).
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@erplora/ui/shell', () => ({
   createShell: vi.fn(),
@@ -36,18 +36,15 @@ const router = {
 };
 const warned = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
 
-let main: typeof import('./main');
-
-// The wait's clock is the test's: the boot starts it, so the timers are fake before main.ts is imported.
-beforeAll(async () => {
-  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
-  document.body.innerHTML = `
-    <script id="spa-config" type="application/json">{"csrfCookieName": "csrftoken", "lang": "es", "loginUrl": "/auth/login"}</script>
-    <script id="session-me" type="application/json">${JSON.stringify(ME)}</script>
-    <div id="app"></div>`;
-  vi.mocked(createShell).mockResolvedValue({ app, router } as never);
-  main = await import('./main');
-});
+// The wait's clock is the test's: the boot starts it, so the timers are fake before main.ts is imported. Imported with
+// the file, out of any test's or hook's clock (main.chrome.test.ts says why).
+vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+document.body.innerHTML = `
+  <script id="spa-config" type="application/json">{"csrfCookieName": "csrftoken", "lang": "es", "loginUrl": "/auth/login"}</script>
+  <script id="session-me" type="application/json">${JSON.stringify(ME)}</script>
+  <div id="app"></div>`;
+vi.mocked(createShell).mockResolvedValue({ app, router } as never);
+const main = await import('./main');
 
 afterAll(() => {
   vi.useRealTimers();

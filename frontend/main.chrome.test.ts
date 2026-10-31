@@ -3,7 +3,7 @@
 // queries: mounted after the screen, they came more than 150 ms after its queries on a slow device, and the one live
 // stream was cut and opened again with them (tests/e2e/base-home.spec.ts, «when base's chrome arrives late»). Its own
 // file: the pieces' modules are held from the first import of main.ts, which boots on import.
-import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createApp, h } from 'vue';
 
 const chrome = vi.hoisted(() => {
@@ -49,17 +49,14 @@ const router = {
   currentRoute: { value: { path: '/', fullPath: '/', query: {}, hash: '', meta: {} } },
 };
 
-let main: typeof import('./main');
-
-// Importing main.ts boots it: out of the test's clock, which the module graph would eat on a loaded machine.
-beforeAll(async () => {
-  document.body.innerHTML = `
-    <script id="spa-config" type="application/json">{"csrfCookieName": "csrftoken", "lang": "es", "loginUrl": "/auth/login"}</script>
-    <script id="session-me" type="application/json">${JSON.stringify(ME)}</script>
-    <div id="app"></div>`;
-  vi.mocked(createShell).mockResolvedValue({ app, router } as never);
-  main = await import('./main');
-});
+// Importing main.ts boots it, with the file: out of any test's or hook's clock, which its module graph (Ionic, every
+// component, every app's routes and catalogues) outlasted on a loaded machine (a 10 s hook at load ~22).
+document.body.innerHTML = `
+  <script id="spa-config" type="application/json">{"csrfCookieName": "csrftoken", "lang": "es", "loginUrl": "/auth/login"}</script>
+  <script id="session-me" type="application/json">${JSON.stringify(ME)}</script>
+  <div id="app"></div>`;
+vi.mocked(createShell).mockResolvedValue({ app, router } as never);
+const main = await import('./main');
 
 describe("main.ts — base's chrome mounts with the screen", () => {
   it('mounts #app only once the pieces of the chrome have loaded, and a piece that fails to load does not keep it from mounting', async () => {
