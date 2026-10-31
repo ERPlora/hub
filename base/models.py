@@ -613,7 +613,9 @@ class AppActivation(UUIDModel):
 
     In a hub with its own database an app's tables are made the first time it is turned on (S3; PLAN-DB §7): the row is
     ``creating`` until the worker made them (``on``), or ``failed`` with ``attempts``, ``last_error`` and
-    ``next_attempt_at`` (tried again then, or by hand). The tables of an app off are never dropped.
+    ``next_attempt_at`` (tried again then, or by hand); ``target`` is the app's last migration in the code that asked,
+    so a worker of an older code (a deploy rolling) leaves it to one of that code. The tables of an app off are never
+    dropped.
     """
 
     class State(models.TextChoices):
@@ -651,6 +653,16 @@ class AppActivation(UUIDModel):
         null=True,
         blank=True,
         help_text=pgettext_lazy("app activation", "When the worker makes its tables again."),
+    )
+    target = models.CharField(
+        pgettext_lazy("app activation", "target migration"),
+        max_length=255,
+        blank=True,
+        default="",
+        db_default="",
+        help_text=pgettext_lazy(
+            "app activation", "The last migration of the code that asked for its tables: an older worker leaves it."
+        ),
     )
 
     class Meta:

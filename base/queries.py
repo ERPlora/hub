@@ -5,6 +5,7 @@ templates, what a blueprint brings, the export, the loads and the apps' data (th
 
 import base64
 import csv
+import datetime as dt
 import io
 from typing import Any
 from uuid import UUID
@@ -428,6 +429,21 @@ def app_activations(host: str) -> dict[str, activation.Activation]:
         app: activation.Activation(state, chosen)
         for app, state, chosen in AppActivation.objects.filter(host=host).values_list("app", "state", "chosen")
     }
+
+
+def activations_due(host: str, now: dt.datetime) -> dict[str, str]:
+    """The apps of ``host``'s business whose tables the worker makes now (S3), with the last migration the code that
+    asked named (``target``): ``creating`` unless put off (a schema held, a newer code's request), or ``failed`` once
+    its next try came."""
+    due = Q(state=activation.CREATING) & (Q(next_attempt_at__isnull=True) | Q(next_attempt_at__lte=now)) | Q(
+        state=activation.FAILED, next_attempt_at__lte=now
+    )
+    return dict(
+        AppActivation.objects.filter(host=host, app__in=list(activation.module_graph()))
+        .filter(due)
+        .order_by("app")
+        .values_list("app", "target")
+    )
 
 
 def _shell_icon(config: Any) -> str:

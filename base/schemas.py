@@ -433,6 +433,22 @@ class AppChangeOut(Schema):
     along: list[AppNameOut]
 
 
+class AppActivationSettleIn(Schema):
+    """The worker's step after making a hub's tables (``base.worker``): the apps it took and how it went."""
+
+    apps: list[str] = Field(description="The apps whose tables it made, or tried to.")
+    #: ``created``: ``ensure_schema`` ended; ``failed``: it raised (``error``, why); ``locked``: another run held the
+    #: hub's schema; ``newer_code``: the request is of a newer code than the worker's.
+    outcome: Literal["created", "failed", "locked", "newer_code"]
+    error: str = ""
+
+
+class AppActivationSettleOut(Schema):
+    on: list[str]
+    failed: list[str]
+    waiting: list[str]
+
+
 class PlanUsageIn(Schema):
     """No input: the plan of the business of the request."""
 

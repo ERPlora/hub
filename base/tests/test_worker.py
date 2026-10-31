@@ -107,6 +107,15 @@ def hubs_pass(monkeypatch) -> list[dt.datetime]:
 
 
 @pytest.fixture(autouse=True)
+def activations_pass(monkeypatch) -> list[dt.datetime]:
+    """Stands in for the pass making the tables of the apps turned on (``worker._activations``;
+    ``test_worker_activations.py``)."""
+    passes: list[dt.datetime] = []
+    monkeypatch.setattr(worker, "_activations", passes.append)
+    return passes
+
+
+@pytest.fixture(autouse=True)
 def data_pass(monkeypatch) -> list[dt.datetime]:
     """Stands in for the data pass (``worker._data``: a reset, a business that left; ``test_worker_data.py``)."""
     passes: list[dt.datetime] = []
@@ -601,6 +610,7 @@ def test_relays_the_shared_outbox_then_the_hubs_own_then_makes_the_hubs_due_on_e
     monkeypatch.setattr(provision, "run_due", lambda now: order.append("due") or due(now))
     monkeypatch.setattr(relay, "run", lambda now: order.append("relay") or outbox(now))
     monkeypatch.setattr(worker, "_hubs", lambda now: order.append("hubs"))
+    monkeypatch.setattr(worker, "_activations", lambda now: order.append("activations"))
     monkeypatch.setattr(worker, "_data", lambda now: order.append("data"))
     monkeypatch.setattr(worker, "_usage", lambda now: order.append("usage"))
     stop = threading.Event()
@@ -610,12 +620,13 @@ def test_relays_the_shared_outbox_then_the_hubs_own_then_makes_the_hubs_due_on_e
 
     assert due.passes == [ten(0), ten(1), ten(2)]
     assert due.contexts == [context.CONTROL] * 3
-    # The data work (a reset, a business that left: test_worker_data.py) before the hubs due, so the provisioning's
-    # pass never takes a reset's row first; the nightly measurement's check after it.
-    assert order == ["tasks", "relay", "hubs", "data", "usage", "due"] * 3
+    # The apps turned on whose tables a hub lacks (S3) right after its own pass, before the hubs due, whose pass ends
+    # the ring of a ready hub; the data work (a reset, a business that left: test_worker_data.py) before the hubs due,
+    # so the provisioning's pass never takes a reset's row first; the nightly measurement's check after it.
+    assert order == ["tasks", "relay", "hubs", "activations", "data", "usage", "due"] * 3
 
 
-def test_with_databases_only_it_makes_and_drops_the_hubs_databases_and_nothing_else(
+def test_with_databases_only_it_makes_the_hubs_databases_and_apps_tables_and_drops_the_demos_and_nothing_else(
     monkeypatch, calls, tasks, due, outbox
 ):
     """The e2e's worker (tests/e2e/global-setup.ts): its specs play the relay and the tasks themselves, so it only makes
@@ -626,6 +637,7 @@ def test_with_databases_only_it_makes_and_drops_the_hubs_databases_and_nothing_e
     monkeypatch.setattr(relay, "run", lambda now: order.append("relay") or outbox(now))
     monkeypatch.setattr(worker, "_hubs", lambda now: order.append("hubs"))
     monkeypatch.setattr(worker, "_reap", lambda now: order.append("reap"))
+    monkeypatch.setattr(worker, "_activations", lambda now: order.append("activations"))
     monkeypatch.setattr(worker, "_data", lambda now: order.append("data"))
     monkeypatch.setattr(worker, "_usage", lambda now: order.append("usage"))
     stop = threading.Event()
@@ -633,9 +645,10 @@ def test_with_databases_only_it_makes_and_drops_the_hubs_databases_and_nothing_e
 
     worker.run(stop, tick_seconds=TICK, wait=wait, clock=clock(0, 0, 1), databases_only=True)
 
-    # Every tick makes the databases due; the reaper keeps its own pace; nothing else runs.
-    assert [step for step in order if step != "reap"] == ["due", "due"]
-    assert order[0] == "reap" and not {"tasks", "relay", "hubs", "data", "usage"} & set(order)
+    # Every tick makes the tables of the apps turned on (S3: an app turned on in a spec is set up) and the databases
+    # due; the reaper keeps its own pace; nothing else runs.
+    assert [step for step in order if step != "reap"] == ["activations", "due", "activations", "due"]
+    assert not {"tasks", "relay", "hubs", "data", "usage"} & set(order)
 
 
 def test_a_due_pass_that_fails_is_logged_and_the_next_tick_tries_again(caplog, calls, tasks, due, outbox):

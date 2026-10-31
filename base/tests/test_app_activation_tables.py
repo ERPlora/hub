@@ -313,3 +313,15 @@ def test_the_retry_route_is_bound_to_its_command(db):
     [route] = router.path_operations["/apps/retry"].operations
     assert (route.methods, route.operation_id) == (["POST"], "base.app.retry")
     assert resolve("/api/apps/retry").url_name
+
+
+@own
+def test_an_app_being_created_or_failed_is_out_of_the_relay_and_the_tasks_until_it_is_on(hub_a):
+    from base import relay
+
+    given(hub_a, printing="creating*", website="failed*", flow="on*", created=["flow"])
+    with use_hub(Hub.objects.get(pk=hub_a.pk)):
+        active = relay.active_apps(Scope("host", hub_a.slug))
+
+    assert "flow" in active
+    assert not {"printing", "website"} & active

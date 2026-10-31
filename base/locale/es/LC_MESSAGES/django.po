@@ -2093,3 +2093,11 @@ msgstr "Se está preparando para este negocio. Vuelve a cargar la plantilla en u
 
 msgid "This app is not waiting to be set up again."
 msgstr "Esta app no está esperando a que se vuelva a preparar."
+
+msgctxt "app activation"
+msgid "target migration"
+msgstr "migración de destino"
+
+msgctxt "app activation"
+msgid "The last migration of the code that asked for its tables: an older worker leaves it."
+msgstr "La última migración del código que pidió sus tablas: un worker más antiguo la deja."

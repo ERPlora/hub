@@ -24,7 +24,17 @@ again). On the first tick and then every ``REAPER_INTERVAL_SECONDS`` it also pur
 demo hubs that ended (``base.services.reap_demos``, plan 2026-10-17 §1.7), whatever the scheduler did: a
 pass that fails is logged and the next one tries again, and the worker never stops for it.
 
-After the hubs with their own database, two passes of the data (round 2026-10-30 of PLAN-DB, S2b): ``_data`` takes one
+After the hubs with their own database, the apps they turned on whose tables they lack (S3; PLAN-DB §7 and §8,
+``_activations``, also with ``databases_only``): the hubs rung (``base.app.enable`` rings a hub's ``hub_due`` after its
+COMMIT) and, every ``ACTIVATION_SWEEP_SECONDS``, every ready hub with its own database (a ring lost, a failed app's next
+try), for ``ACTIVATION_PASS_SECONDS`` at most: in each one, what is due (``creating``, or ``failed`` past its next try)
+gets its tables from ``base.tenancy.migrator.ensure_schema(hub, add=…)`` under the hub's schema lock, and
+``base.app.activation_settle`` turns it on (its event, its live notice) or ``failed`` with why; a schema held elsewhere
+puts it off 30 s, and a request of a newer code than this worker's (``AppActivation.target``, or the hub's database
+ahead of this code: a deploy rolling) is left to a worker of that code, 60 s. The ``hub_due`` rung is left to the
+``hub_due`` pass, which ends it (the hub is ready).
+
+Then two passes of the data (round 2026-10-30 of PLAN-DB, S2b): ``_data`` takes one
 hub with data work due (``base.services.claim_next_data_hub``, under its lease): a reset asked (its database copied by
 ``base.tenancy.dumps``, then, only if the copy was kept, its sections emptied by ``base.hub.reset_apply`` in its
 database) or the copy of a business that left (tried again later when it fails); ``_usage`` measures the last UTC day
@@ -54,6 +64,7 @@ import logging
 import threading
 import time
 from collections.abc import Callable
+from functools import cache
 
 from django.db import close_old_connections
 from django.utils import timezone
@@ -61,11 +72,11 @@ from django.utils import timezone
 from live.context import OperationContext, Scope
 from live.operations import get as get_operation
 
-from base import catalog, outbound, relay, scheduler, services, usage
+from base import catalog, outbound, queries, relay, scheduler, services, usage
 from base.services import reap_demos
-from base.tenancy import dumps, provision
+from base.tenancy import dumps, migrator, provision
 from base.tenancy.connections import close_hub_aliases
-from base.schemas import HubResetApplyIn
+from base.schemas import AppActivationSettleIn, HubResetApplyIn
 from base.tenancy.context import use_control, use_hub, use_shared_database
 from control.models import Hub, HubDump
 
@@ -92,6 +103,17 @@ EMPTYING_LEASE = dt.timedelta(minutes=15)
 #: What the calls in flight (``base.outbound``) get when the worker stops: ECS kills the task 30 s after SIGTERM, and
 #: the loop's step ends first. What still runs then is left to its lease.
 OUTBOUND_GRACE_SECONDS = 15
+#: How long the pass making the tables of the apps turned on may go on in a tick; a hub it started is always finished,
+#: and the next tick goes on after it.
+ACTIVATION_PASS_SECONDS = 10.0
+#: How often every ready hub with its own database is looked at for apps due, beside the hubs rung.
+ACTIVATION_SWEEP_SECONDS = 60
+#: How long it waits for a hub's schema another run holds before putting the app off (``SchemaLocked``).
+ACTIVATION_LOCK_WAIT = 1.0
+#: When the next sweep comes, and the id of the last hub the running one looked at (a sweep cut by the pass's time
+#: goes on after it at the next tick).
+_next_sweep: dt.datetime | None = None
+_swept_after = None
 
 
 def run(
@@ -107,8 +129,9 @@ def run(
 
     ``wait(seconds)`` sleeps until the time is up or a stop is requested: ``stop.wait`` unless a
     test replaces it. ``stop`` alone says whether to stop. ``clock()`` is now (a test's fake clock).
-    ``databases_only`` (``run_worker --databases-only``, the e2e's worker): only the hubs' databases are made and the
-    demos that ended dropped; no task runs and no outbox is relayed, which the e2e's specs play themselves.
+    ``databases_only`` (``run_worker --databases-only``, the e2e's worker): only the hubs' databases are made, the
+    tables of the apps they turn on made (S3) and the demos that ended dropped; no task runs and no outbox is relayed,
+    which the e2e's specs play themselves.
     """
     wait = stop.wait if wait is None else wait
     delay = RETRY_FIRST_SECONDS
@@ -154,6 +177,8 @@ def run(
             _tick(now)
             _relay(now)
             _hubs(now)
+        _activations(now)
+        if not databases_only:
             _data(now)
             _usage(now)
         if next_reap is None or now >= next_reap:
@@ -218,6 +243,93 @@ def _hubs(now: dt.datetime) -> None:
         _next_hub = hub.pk
         if time.monotonic() - started > HUB_PASS_SECONDS:
             break
+
+
+def _activations(now: dt.datetime) -> None:
+    """Make the tables of the apps due in the hubs rung and, every :data:`ACTIVATION_SWEEP_SECONDS`, in every ready hub
+    with its own database, for :data:`ACTIVATION_PASS_SECONDS` at most; a hub that fails is logged and the others are
+    served."""
+    global _next_sweep, _swept_after
+    sweep = _next_sweep is None or now >= _next_sweep
+    try:
+        with use_control():
+            rung, every = services.activation_hubs(now, every=sweep)
+    except Exception:
+        logger.exception("worker: the hubs with apps to set up could not be read; the next tick tries again.")
+        close_old_connections()
+        return
+    started = time.monotonic()
+    served = set()
+    for hub in rung:
+        _activate(hub, now)
+        served.add(hub.pk)
+        if time.monotonic() - started > ACTIVATION_PASS_SECONDS:
+            return
+    if not sweep:
+        return
+    for hub in every:
+        if _swept_after is not None and hub.pk <= _swept_after:
+            continue
+        if hub.pk not in served:
+            _activate(hub, now)
+        _swept_after = hub.pk
+        if time.monotonic() - started > ACTIVATION_PASS_SECONDS:
+            return
+    _swept_after = None
+    _next_sweep = now + dt.timedelta(seconds=ACTIVATION_SWEEP_SECONDS)
+
+
+def _activate(hub, now: dt.datetime) -> None:
+    """The apps due in ``hub`` set up (:func:`_activate_in`); a failure is logged, its connections released either way."""
+    try:
+        _activate_in(hub, now)
+    except Exception:
+        logger.exception("worker: the apps of %s could not be set up; the next pass tries again.", hub.slug)
+    finally:
+        close_hub_aliases(hub)
+        close_old_connections()
+
+
+def _activate_in(hub, now: dt.datetime) -> None:
+    """Read what is due in ``hub``'s database; make its tables, unless the request or the database is of a newer code
+    than this worker's; settle the rows with how it went."""
+    with use_hub(hub):
+        due = queries.activations_due(hub.slug, now)
+    if not due:
+        return
+    apps, error = sorted(due), ""
+    code = _code()
+    newer = sorted(label for label, target in due.items() if target and (label, target) not in code.nodes)
+    ahead = sorted(
+        label for label, name in (hub.schema_apps or {}).items() if label in code.leaves and (label, name) not in code.nodes
+    )
+    if newer or ahead:
+        outcome = "newer_code"
+        logger.warning(
+            "base.app.activation_newer_code hub=%s apps=%s: asked by (%s) or a database at (%s) a newer code than this "
+            "worker's; left to a worker of that code.",
+            hub.slug, ",".join(apps), ",".join(newer) or "-", ",".join(ahead) or "-",
+        )
+    else:
+        try:
+            migrator.ensure_schema(hub, add=apps, lock_wait=ACTIVATION_LOCK_WAIT)
+            outcome = "created"
+        except migrator.SchemaLocked:
+            outcome = "locked"
+        except Exception as failure:
+            outcome, error = "failed", f"{type(failure).__name__}: {failure}"
+            logger.exception("worker: the tables of %s could not be made in %s.", ",".join(apps), hub.slug)
+    ctx = OperationContext(scope=Scope("host", hub.slug), actor="system", permissions=frozenset({"*"}), language="en")
+    with use_control():
+        hub = services.registry_row(hub.pk)
+    with use_hub(hub):
+        get_operation("base.app.activation_settle")(ctx, AppActivationSettleIn(apps=apps, outcome=outcome, error=error))
+
+
+@cache
+def _code() -> migrator.CodeMigrations:
+    """This code's migration graph (its leaves and nodes): it never changes while the process runs."""
+    return migrator.code_migrations()
 
 
 def _data(now: dt.datetime) -> None:
