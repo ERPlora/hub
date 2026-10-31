@@ -365,8 +365,8 @@ Pasos:
 3. Mientras trabaja sale «Importando…». Al acabar, un resumen «Importación: {total} filas —
    {creadas} creadas, {omitidas} omitidas.» con cada fila omitida y su motivo, que empieza por la
    columna de la que habla («Nombre: Este campo es obligatorio.»; igual con un email o un teléfono
-   que no son válidos), y las que tienen algo que revisar («país no reconocido: importado sin país,
-   revísalo en la ficha»).
+   que no son válidos), y las que tienen algo que revisar («País no reconocido: importado sin país,
+   revísalo en la ficha.»).
 Entra: el fichero, que la pantalla envía en bloques de 50 filas.
 Sale: las fichas creadas, con origen «Importación», el teléfono en formato internacional y sin
 consentimiento (aunque el fichero traiga una columna de consentimiento), y un aviso de ficha creada
@@ -579,8 +579,8 @@ Entra: la búsqueda y, al elegir, la ficha completa (CUSTOMER-F30).
 Sale: a Venta, el cliente y la copia fiscal. Cambiar la ficha después no cambia una factura emitida.
 Si falla: el motivo con «Reintentar»; sin resultados, «Sin resultados.»; si la ficha completa no se
 puede leer, el cliente no se asigna. Si al recuperar la cuenta su cliente ya no está disponible, la
-cuenta sigue sin cliente y sale «No se pudo recuperar el cliente de esta cuenta. Vuelve a asignarlo
-antes de cobrar.».
+cuenta sigue sin cliente; si no se puede leer, Venta avisa «No se ha podido leer el cliente de la
+cuenta. Vuelve a elegirlo si la venta lo necesita.» (o con el motivo que dé Clientes).
 Implicados: SALE-F04, SALE-F05, SALE-F17, INVOICE-F02
 
 ### CUSTOMER-F18 Crear un cliente desde el buscador del TPV
@@ -619,8 +619,8 @@ Pasos:
 Entra: el pedido y el cliente (o ninguno), con el permiso de quien está en la caja.
 Sale: el enlace cliente ↔ pedido y su aviso (`customer.order.linked` o `customer.order.unlinked`).
 Venta lo lee para devolver el cliente a la cuenta (CUSTOMER-F17).
-Si falla: la venta sigue; Venta enseña «La venta sigue, pero el cliente no se pudo asociar al
-pedido.». Un cliente que ya no está disponible no se enlaza.
+Si falla: la venta sigue; Venta avisa «No se ha podido unir el cliente a la cuenta. Vuelve a
+elegirlo.» (o con el motivo que dé Clientes). Un cliente que ya no está disponible no se enlaza.
 Implicados: SALE-F17
 
 ### CUSTOMER-F20 Sumar la compra a la ficha al cobrar
