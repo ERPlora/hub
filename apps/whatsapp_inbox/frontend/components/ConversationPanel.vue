@@ -106,7 +106,7 @@ async function searchTeam(query: string): Promise<ComboOption[]> {
 
 function pickAssignee(option: ComboOption | null): void {
   void act(() =>
-    option ? assign.run({ id: props.conversationId, assignee_id: Number(option.id) }) : assign.run({ id: props.conversationId, unassign: true }),
+    option ? assign.run({ id: props.conversationId, assignee_id: option.id }) : assign.run({ id: props.conversationId, unassign: true }),
   );
 }
 

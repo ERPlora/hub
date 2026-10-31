@@ -3,9 +3,9 @@
 Runs ``base.tenancy.bootstrap`` as the RDS master (``DB_NAME=postgres``) with the six
 ``*_PASSWORD`` of the roles: once before the first deploy, and again to rotate a password. One line
 per step, never a password. A missing variable or a failed step exits non-zero (a
-``CommandError``), which the infra's ``task_failed`` rule reports. In local mode (``DEBUG``) a
-template extension the server lacks (``vector`` on ``postgres:17``) is a warning; in production it
-fails. ``--prefix`` names every database and role apart: ``--prefix pre_`` is the pre environment
+``CommandError``), which the infra's ``task_failed`` rule reports. In local mode (``DEBUG``) an
+extension the server lacks (``vector`` of the template or of ``saas`` without pgvector) is a warning;
+in production it fails. ``--prefix`` names every database and role apart: ``--prefix pre_`` is the pre environment
 (``pre_hub``, ``pre_saas``, ``pre_hub_app``…, in prod's cluster; plan 2026-10-14-entorno-pre), and
 any other prefix is for tests and rehearsals. Production runs without it.
 """

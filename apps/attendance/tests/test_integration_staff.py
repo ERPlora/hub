@@ -21,7 +21,7 @@ def ana(make_user, clock):
     user = make_user("ana", role="hub_employee", first_name="Ana", last_name="López")
     member = run(
         "staff.member.create",
-        {"first_name": "Ana", "last_name": "López", "user_id": user.pk},
+        {"first_name": "Ana", "last_name": "López", "user_id": str(user.person.pk)},
         ctx_for("hub_manager"),
     )
     return user, member.id, ctx_for("hub_employee", actor=user)
@@ -132,14 +132,14 @@ def test_a_rehired_person_keeps_seeing_their_old_days(ana, clock):
     # Staff frees the account on termination: a new record can hang from it.
     again = run(
         "staff.member.create",
-        {"first_name": "Ana", "last_name": "López", "user_id": user.pk},
+        {"first_name": "Ana", "last_name": "López", "user_id": str(user.person.pk)},
         ctx_for("hub_manager"),
     )
     clock("2026-11-02T07:00")
     run("attendance.record.clock_in", {}, ctx)
     mine = run("attendance.record.list", {"mine": True}, ctx)
     assert {row.member_id for row in mine.rows} == {member_id, again.id}
-    assert Member.objects.filter(user=user).count() == 2
+    assert Member.objects.filter(user=user.person).count() == 2
     assert Record.objects.count() == 2
 
 

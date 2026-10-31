@@ -30,6 +30,7 @@ from base.models import (
     Credential,
     EventDelivery,
     Hub,
+    HubUser,
     ImportBatch,
     Membership,
     Profile,
@@ -84,6 +85,8 @@ from base.schemas import (
     FileOut,
     FileReadIn,
     HubGetIn,
+    HubUserGetIn,
+    HubUserOut,
     HubOut,
     HubsBySlugIn,
     HubsBySlugOut,
@@ -126,7 +129,7 @@ def session_me(ctx: OperationContext, data: SessionMeIn) -> dict[str, Any]:
     with translation.override(ctx.language):
         visible = [config for config in home.shown_modules(demo_hub=demo is not None) if _can_see(ctx, config)]
         return {
-            "user": _user(ctx.actor),
+            "user": _user(ctx.actor, hub_user_of(ctx)),
             "scope": {"kind": ctx.scope.kind, "key": ctx.scope.key},
             "permissions": sorted(ctx.permissions),
             "menu": [
@@ -158,13 +161,15 @@ def _can_see(ctx: OperationContext, config: Any) -> bool:
     return ctx.has(f"{config.label}.view") or any(ctx.has(permission) for permission in config.permissions)
 
 
-def _user(actor: Any) -> dict[str, str] | None:
+def _user(actor: Any, person: HubUser | None = None) -> dict[str, str] | None:
     if actor is None:
         return None
     if not hasattr(actor, "get_username"):  # the platform itself (live.context.system_context)
         return {"id": str(actor), "label": str(actor)}
-    # Named as in this hub: its «My profile» name, else its account's (APP-BASE-3).
-    return {"id": str(actor.pk), "label": person_label(actor)}
+    # The person of the business's database (base.HubUser), whose id every app's record names, so a screen tells
+    # «mine» by it; without one there yet (the platform's host), the session's user. Named as in this hub: its «My
+    # profile» name, else its account's (APP-BASE-3).
+    return {"id": str(actor.pk if person is None else person.pk), "label": person_label(actor)}
 
 
 # Not an assistant tool: the platform's door (/internal, the SaaS), no person.
@@ -1296,6 +1301,31 @@ def person_out(ctx: OperationContext, person: dict[str, Any]) -> dict[str, Any]:
         "entered": person["entered"],
         "me": me,
     }
+
+
+def is_a_person(actor: Any) -> bool:
+    """Whether ``actor`` is a signed-in person (a control user), not the platform, an API key or nobody."""
+    return hasattr(actor, "get_username") and bool(getattr(actor, "is_authenticated", False))
+
+
+def hub_user_of(ctx: OperationContext) -> HubUser | None:
+    """The caller's ``HubUser`` in the active hub's database, read only (``base.services.acting_hub_user`` makes it);
+    ``None`` for the platform, an API key, nobody, or a person who has none there yet."""
+    if not is_a_person(ctx.actor):
+        return None
+    return HubUser.objects.filter(username=ctx.actor.get_username()).first()
+
+
+# Not an assistant tool: what the cards of the writes that link a person read to name them (``REFERS``).
+@operation("base.hub_user.get", kind="query", permission=VIEW_HOME, input=HubUserGetIn, output=HubUserOut, ai=INTERNAL)
+def hub_user_get(ctx: OperationContext, data: HubUserGetIn) -> dict[str, Any]:
+    """A person of this business by their id in its database (``base.HubUser``), with access to it (a ``Membership``
+    on the scope's host, control's): how a staff record's user or a conversation's assignee is named on the
+    assistant's card. Anyone else, here or in another business, is ``NotFound``."""
+    person = HubUser.objects.filter(pk=data.id).first()
+    if person is None or not Membership.objects.filter(host=ctx.scope.key, user__username=person.username).exists():
+        raise NotFound(gettext("That person is not in this business."), code="base.person_not_found")
+    return {"id": person.pk, "name": person.display_name}
 
 
 def signed_in_username(ctx: OperationContext) -> str:

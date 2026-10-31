@@ -79,7 +79,7 @@ class Command(BaseCommand):
             if template.left_out:
                 self.stdout.write(
                     f"migrate_hubs: template {template.db_name}{_on(target)} leaves out "
-                    f"{', '.join(template.left_out)}: its tables still reference control's users."
+                    f"{', '.join(template.left_out)}: its tables reference a model of control's database."
                 )
 
     def migrate_hubs(self) -> None:

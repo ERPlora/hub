@@ -60,7 +60,8 @@ from apps.whatsapp_inbox.schemas import (
     TemplateSampleRefIn,
 )
 from base.auth import SAAS_PANEL_PATH
-from base.models import Membership
+from base.models import HubUser, Membership
+from base.queries import hub_user_of
 
 CONVERSATION_NOT_FOUND = _("That conversation does not exist in this business.")
 NO_CONVERSATION_MATCHES = _("No conversation matches “%(reference)s”.")
@@ -155,17 +156,18 @@ def e164(raw: str, ctx: OperationContext | None = None, *, from_whatsapp: bool =
     return number
 
 
-def person_name(user) -> str:
+def person_name(person: HubUser | None) -> str:
     """A person's name as the inbox shows it: their full name, else their username."""
-    if user is None:
+    if person is None:
         return ""
-    return (user.get_full_name() or user.get_username()).strip()
+    return (person.name or person.username).strip()
 
 
-def actor_id(ctx: OperationContext) -> int | None:
-    """The calling person's id; ``None`` for the system or a test's string actor."""
-    pk = getattr(ctx.actor, "pk", None)
-    return pk if isinstance(pk, int) else None
+def actor_id(ctx: OperationContext) -> UUID | None:
+    """The calling person's id in the business's database (``base.HubUser``), read only; ``None`` for the system, an
+    API key, a test's string actor or a person it does not know yet (whom nothing is assigned to)."""
+    person = hub_user_of(ctx)
+    return None if person is None else person.pk
 
 
 def preview(body: str, filename: str = "", caption: str = "") -> str:
@@ -357,13 +359,14 @@ def message_out(row: Message) -> dict:
     }
 
 
-def may_delete_note(ctx: OperationContext, note: Note) -> bool:
-    """The author deletes their own note; whoever may assign deletes anybody's."""
-    mine = note.author_id is not None and note.author_id == actor_id(ctx)
+def may_delete_note(ctx: OperationContext, note: Note, me: UUID | None) -> bool:
+    """The author deletes their own note; whoever may assign deletes anybody's. ``me`` is the caller's person
+    (:func:`actor_id`), read once by whoever asks about several notes."""
+    mine = note.author_id is not None and note.author_id == me
     return mine or ctx.has("whatsapp_inbox.assign")
 
 
-def note_out(ctx: OperationContext, row: Note) -> dict:
+def note_out(ctx: OperationContext, row: Note, me: UUID | None) -> dict:
     return {
         "id": row.id,
         "conversation_id": row.conversation_id,
@@ -371,7 +374,7 @@ def note_out(ctx: OperationContext, row: Note) -> dict:
         "author_id": row.author_id,
         "author_name": row.author_name,
         "created_at": row.created_at,
-        "can_delete": may_delete_note(ctx, row),
+        "can_delete": may_delete_note(ctx, row, me),
     }
 
 
@@ -441,7 +444,7 @@ def list_conversations(ctx: OperationContext, params: ConversationListIn) -> dic
     elif params.assigned == "none":
         rows = rows.filter(assigned_to__isnull=True)
     elif params.assigned:
-        rows = rows.filter(assigned_to_id=int(params.assigned))
+        rows = rows.filter(assigned_to_id=UUID(params.assigned))
     if params.unread is True:
         rows = rows.filter(unread_count__gt=0)
     elif params.unread is False:
@@ -655,7 +658,8 @@ def get_message(ctx: OperationContext, data: MessageRefIn) -> dict:
 def list_notes(ctx: OperationContext, params: NoteListIn) -> dict:
     conversation = find_conversation(params.id, params.conversation)
     rows = Note.objects.filter(conversation=conversation).order_by("-created_at", "-id")
-    return page(rows, params, lambda note: note_out(ctx, note))
+    me = actor_id(ctx)
+    return page(rows, params, lambda note: note_out(ctx, note, me))
 
 
 # ── Templates, channel and team ─────────────────────────────────────────────────────────────────
@@ -885,11 +889,17 @@ def plans_url() -> str:
     return f"{saas}{PLANS_PATH}" if saas else ""
 
 
-def team(ctx: OperationContext) -> QuerySet:
-    """The memberships of the people of this business (phase 1: the host's)."""
-    return Membership.objects.filter(
-        host=ctx.scope.key, user__is_active=True
-    ).select_related("user")
+def team_roles(ctx: OperationContext) -> dict[str, str]:
+    """``{username: role}`` of whoever has access to this business: control's memberships of the scope's host, read
+    first (a query never joins two databases)."""
+    return dict(
+        Membership.objects.filter(host=ctx.scope.key, user__is_active=True).values_list("user__username", "role")
+    )
+
+
+def team(ctx: OperationContext, roles: dict[str, str] | None = None) -> QuerySet[HubUser]:
+    """The people of this business in its own database (``base.HubUser``) who are still in it and have access to it."""
+    return HubUser.objects.filter(username__in=list(team_roles(ctx) if roles is None else roles), is_active=True)
 
 
 @operation(
@@ -903,18 +913,14 @@ def team(ctx: OperationContext) -> QuerySet:
     },
 )
 def list_agents(ctx: OperationContext, params: AgentListIn) -> dict:
-    rows = team(ctx)
+    roles = team_roles(ctx)
+    rows = team(ctx, roles)
     if params.search:
         text = params.search.strip()
-        rows = rows.filter(
-            Q(user__first_name__icontains=text)
-            | Q(user__last_name__icontains=text)
-            | Q(user__username__icontains=text)
-            | Q(user__email__icontains=text)
-        )
-    rows = rows.order_by("user__first_name", "user__last_name", "user__username", "id")
+        rows = rows.filter(Q(name__icontains=text) | Q(username__icontains=text) | Q(email__icontains=text))
+    rows = rows.order_by("name", "username", "id")
     return page(
         rows,
         params,
-        lambda m: {"id": m.user_id, "name": person_name(m.user), "role": m.role},
+        lambda person: {"id": person.pk, "name": person_name(person), "role": roles[person.username]},
     )

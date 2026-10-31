@@ -55,7 +55,8 @@ export const MANAGER: SessionMe = {
 /** An employee: reads, answers and takes conversations for themselves. */
 export const EMPLOYEE: SessionMe = {
   ...ADMIN,
-  user: { id: '2', label: 'Luis' },
+  // The person of the business's database (base.HubUser), as base.session.me says it.
+  user: { id: '01a16000-0000-7000-8000-0000000000b2', label: 'Luis' },
   permissions: ['whatsapp_inbox.view', 'whatsapp_inbox.reply', 'customer.view', 'customer.manage'],
 };
 

@@ -49,17 +49,17 @@ const ROW: MemberOut = {
   employee_number: 'E-7',
   role_id: 'r3',
   role_name: 'Barber',
-  user_id: 4,
+  user_id: '4',
   status: 'active',
   is_bookable: true,
   hire_date: '2024-02-01',
   color: '#AA3300',
 };
 const DETAIL = { ...ROW, booking_buffer: 10, specialties: 'Colour', bio: 'Ten years.', created_at: '2026-01-01T10:00:00Z', updated_at: '2026-01-01T10:00:00Z' };
-const PAY = { id: 'm1', user_id: 4, full_name: 'Ana López', role_id: 'r3', role_name: 'Barber', status: 'active', hourly_rate: 1250, commission_rate: '12.50', notes: 'Mornings.' };
+const PAY = { id: 'm1', user_id: '4', full_name: 'Ana López', role_id: 'r3', role_name: 'Barber', status: 'active', hourly_rate: 1250, commission_rate: '12.50', notes: 'Mornings.' };
 const ACCOUNTS = page([
-  { user_id: 4, name: 'Ana López' },
-  { user_id: 9, name: 'Bea Ruiz' },
+  { user_id: '4', name: 'Ana López' },
+  { user_id: '9', name: 'Bea Ruiz' },
 ]);
 
 const ROUTES = {
@@ -234,7 +234,7 @@ describe('MemberFormModal: New (STAFF-F01)', () => {
           specialties: '',
           bio: '',
           role_id: 'r1',
-          user_id: 9,
+          user_id: '9',
           hourly_rate: 1250,
           commission_rate: '10',
           notes: '',

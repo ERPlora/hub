@@ -55,7 +55,7 @@ def admin_client(client, make_user):
 @pytest.fixture
 def employee(make_user):
     user = make_user("bea", host="a", role="hub_employee", first_name="Bea", last_name="Ruiz")
-    return user, make_member("Bea", "Ruiz", user=user)
+    return user, make_member("Bea", "Ruiz", user=user.person)
 
 
 @pytest.fixture

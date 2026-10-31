@@ -26,6 +26,8 @@ from pydantic import (
     model_validator,
 )
 
+from base.schemas import names
+
 T = TypeVar("T")
 
 # Validation messages (English source, Spanish in locale/).
@@ -156,6 +158,8 @@ D_ROLE_ID = (
     "Id of the role (a catalogue label such as «stylist»; it grants no permission)."
 )
 D_ROLE = "Name of the role, when its id is not known (an active role of this business)."
+#: A person of the business by their id in its database: the card names them (``base.hub_user.get``).
+A_PERSON = names("base.hub_user.get")
 D_USER_ID = "Id of the business user (account) the record hangs from; one user, one live record."
 D_HIRE_DATE = "Hire date (YYYY-MM-DD)."
 D_BOOKABLE = "Whether the person takes appointments."
@@ -282,8 +286,8 @@ class MemberListIn(PageIn):
     color: Color | None = Field(
         None, description="Keep the records with this colour (#RRGGBB)."
     )
-    user_id: int | None = Field(
-        None, ge=1, description="Keep the record linked to this business user."
+    user_id: UUID | None = Field(
+        None, description="Keep the record linked to this business user."
     )
     sort: MemberSort = Field(
         "name", description="Column to sort by; a leading '-' sorts descending."
@@ -298,7 +302,7 @@ class MemberIn(Schema):
     employee_number: EmployeeNumber = Field("", description=D_EMPLOYEE_NUMBER)
     role_id: UUID | None = Field(None, description=D_ROLE_ID)
     role: Text100 | None = Field(None, description=D_ROLE)
-    user_id: int | None = Field(None, ge=1, description=D_USER_ID)
+    user_id: UUID | None = Field(None, description=D_USER_ID, json_schema_extra=A_PERSON)
     hire_date: dt.date | None = Field(None, description=D_HIRE_DATE)
     status: MemberStatus = Field(
         "active", description="Status the record is born with; active by default."
@@ -326,8 +330,8 @@ class MemberPatchIn(MemberRefIn):
         None, description=D_ROLE_ID + " Send null to remove the role."
     )
     role: Text100 | None = Field(None, description=D_ROLE)
-    user_id: int | None = Field(
-        None, ge=1, description=D_USER_ID + " Send null to unlink it."
+    user_id: UUID | None = Field(
+        None, description=D_USER_ID + " Send null to unlink it.", json_schema_extra=A_PERSON
     )
     hire_date: dt.date | None = Field(
         None, description=D_HIRE_DATE + " Send null to clear it."
@@ -446,7 +450,7 @@ class MemberOut(Schema):
     employee_number: str
     role_id: UUID | None
     role_name: str | None
-    user_id: int | None = Field(
+    user_id: UUID | None = Field(
         description="The business user the record hangs from, if any."
     )
     status: MemberStatus
@@ -487,7 +491,7 @@ class CurrentMemberOut(Schema):
 
 class CompensationOut(Schema):
     id: UUID
-    user_id: int | None
+    user_id: UUID | None
     full_name: str
     role_id: UUID | None
     role_name: str | None
@@ -502,7 +506,7 @@ class CommissionOut(Schema):
     each one earned in a period is ``staff.commission.report``."""
 
     id: UUID = Field(description="The staff record's id.")
-    user_id: int | None = Field(
+    user_id: UUID | None = Field(
         description="The business user's id; null when the record has none."
     )
     full_name: str
@@ -567,13 +571,13 @@ class TerminatedOut(Schema):
 
 class AccountListIn(PageIn):
     search: Search | None = Field(None, description="Text to look for in the account's name or email.")
-    user_id: int | None = Field(
-        None, ge=1, description="Only this business user (to name the one a record hangs from)."
+    user_id: UUID | None = Field(
+        None, description="Only this business user (to name the one a record hangs from)."
     )
 
 
 class AccountOut(Schema):
-    user_id: int = Field(description="The business user's id, for user_id of a record.")
+    user_id: UUID = Field(description="The business user's id, for user_id of a record.")
     name: str = Field(description="Its name, or its email when it has none.")
 
 
@@ -955,8 +959,8 @@ class TimeOffListIn(PageIn):
     is_full_day: bool | None = Field(
         None, description="Only whole days (true) or only part days (false)."
     )
-    approved_by_id: int | None = Field(
-        None, ge=1, description="Only the time off approved by this business user."
+    approved_by_id: UUID | None = Field(
+        None, description="Only the time off approved by this business user."
     )
     date_from: dt.date | None = Field(
         None, description="Only the time off that reaches this day or later."
@@ -1001,7 +1005,7 @@ class TimeOffOut(Schema):
     start_time: dt.time | None
     end_time: dt.time | None
     status: TimeOffStatus
-    approved_by_id: int | None = Field(description="The business user who approved it.")
+    approved_by_id: UUID | None = Field(description="The business user who approved it.")
     approved_at: dt.datetime | None
 
 

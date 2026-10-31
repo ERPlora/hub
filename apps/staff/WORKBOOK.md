@@ -715,11 +715,13 @@ El cajero del producto actual ya no existe como papel: lo que veía (el director
   (FIX-STAFF-SETTINGS-ORPHANS): ni el esquema ni el admin las exponen, `SettingsIn` rechaza su nombre
   (`extra="forbid"`, 422 «This field is not allowed.») y se quedan en la tabla hasta el paso de
   contract que las borre (expand/contract, PLAN-DB).
-- La ficha cuelga del usuario de la plataforma con una FK a `settings.AUTH_USER_MODEL`
-  (`SET_NULL`), como `base.Membership`; «con acceso a este negocio» es tener `Membership` en el
-  ámbito (fase 1). La fase 2 (usuarios del hub en su BD) cambia esa FK y esa comprobación junto con
-  `Membership`. Igual `TimeOff.approved_by`.
-- **Una cuenta, una ficha viva**: restricción parcial `staff_member_user_unique` (sin las dadas de
+- La ficha cuelga de la persona del negocio en su propia BD, `base.HubUser` (tenencia W10), con una FK
+  `SET_NULL` (columna `hub_user_id`); igual `TimeOff.approved_by` (`approved_by_hub_user_id`). Nunca de
+  `settings.AUTH_USER_MODEL`, que vive en control: una FK entre dos BD no existe (lint «(h)» de
+  `tests/test_guardrails.py`). «Con acceso a este negocio» es que la persona siga activa y tenga
+  `Membership` en el ámbito (control). Las columnas viejas `user_id` y `approved_by_id` quedan vacías
+  hasta el paso de contract que las borre (`migrations/0004_hub_users`).
+- **Una cuenta, una ficha viva**: restricción parcial `staff_member_hub_user_unique` (sin las dadas de
   baja); el servicio lo comprueba antes para nombrar a quien la tiene y traduce la violación de la
   restricción (dos guardados a la vez) al mismo 409.
 - **Un solo «Por defecto» por persona**: restricción parcial `staff_schedule_one_default`; el

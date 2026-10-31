@@ -40,7 +40,7 @@ const note = (over: Partial<NoteOut> = {}): NoteOut => ({
   id: 'n1',
   conversation_id: 'c1',
   text: 'Alérgica al tinte',
-  author_id: 1,
+  author_id: '01a16000-0000-7000-8000-0000000000b1',
   author_name: 'Ana',
   created_at: '2026-10-15T09:30:00Z',
   can_delete: true,

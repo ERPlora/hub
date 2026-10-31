@@ -31,6 +31,7 @@ from live.errors import Conflict, NotFound
 from live.operations import operation
 
 from apps.staff.queries import actor_user_id, own_member
+from base.models import HubUser
 from apps.task.models import Comment, Project, Task
 from apps.task.schemas import (
     CommentListIn,
@@ -168,10 +169,9 @@ def _full_name(member: str) -> Case:
     )
 
 
-def user_name(user: Any) -> str | None:
-    if user is None:
-        return None
-    return user.get_full_name() or user.email or user.get_username()
+def user_name(person: HubUser | None) -> str | None:
+    """How a row names a person of the business's database: their name, else their email, else their username."""
+    return None if person is None else person.display_name
 
 
 def task_row(task: Task, caller: Caller) -> dict:

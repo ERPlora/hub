@@ -135,6 +135,14 @@ class ConversationPageIn(ConversationRefIn, PageIn):
 # ── Conversations ───────────────────────────────────────────────────────────────────────────────
 
 
+def _is_uuid(value: str) -> bool:
+    try:
+        UUID(value)
+    except ValueError:
+        return False
+    return True
+
+
 class ConversationListIn(PageIn):
     search: _text(120) | None = Field(
         None,
@@ -165,7 +173,7 @@ class ConversationListIn(PageIn):
     @field_validator("assigned")
     @classmethod
     def _assigned(cls, value: str | None) -> str | None:
-        if value is None or value in ("me", "none") or re.fullmatch(r"\d{1,18}", value):
+        if value is None or value in ("me", "none") or _is_uuid(value):
             return value
         raise ValueError(UNKNOWN_ASSIGNED)
 
@@ -183,7 +191,7 @@ class ConversationOut(Schema):
     )
     customer_id: UUID | None = Field(description="The customer card it is joined to.")
     customer_name: str = Field(description="That card's name.")
-    assigned_to_id: int | None = Field(description="The person it is assigned to.")
+    assigned_to_id: UUID | None = Field(description="The person it is assigned to.")
     assigned_to_name: str = Field(description="That person's name.")
     status: ConversationStatus = Field(
         description="open, pending (waiting for the customer) or closed."
@@ -293,8 +301,11 @@ class NoticesOut(Schema):
 
 
 class AssignIn(ConversationRefIn):
-    assignee_id: int | None = Field(
-        None, title=gettext_noop("Assigned to"), description="The id of the person to assign it to."
+    assignee_id: UUID | None = Field(
+        None,
+        title=gettext_noop("Assigned to"),
+        description="The id of the person to assign it to.",
+        json_schema_extra=names("base.hub_user.get"),
     )
     unassign: bool = Field(
         False, title=gettext_noop("Remove assignment"), description="True: assign it to nobody."
@@ -696,7 +707,7 @@ class NoteOut(Schema):
     id: UUID = Field(description="The note's id.")
     conversation_id: UUID = Field(description="Its conversation.")
     text: str = Field(description="The note.")
-    author_id: int | None = Field(description="Who wrote it.")
+    author_id: UUID | None = Field(description="Who wrote it.")
     author_name: str = Field(description="Their name when they wrote it.")
     created_at: datetime = Field(description="When.")
     can_delete: bool = Field(description="Whether the caller may delete it.")
@@ -1137,7 +1148,7 @@ class AgentListIn(PageIn):
 
 
 class AgentOut(Schema):
-    id: int = Field(description="The person's id.")
+    id: UUID = Field(description="The person's id.")
     name: str = Field(description="Their name.")
     role: str = Field(description="Their role in the business.")
 
