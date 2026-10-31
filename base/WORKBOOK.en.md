@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:9927404536214e493145c002047fc3b1fb4af439f5347b93e0f1f5f17f96762d -->
+<!-- generated from WORKBOOK.md sha256:dfb84272613e9fde468001d8f7a6f488fb2ac9c67582a461899a273ed4144572 -->
 
 ## What it is for and who it is for
 
@@ -2175,14 +2175,19 @@ Steps:
   4. While it answers, "Send" becomes "Stop", "Attach a file" and "Dictate by voice" turn off and the answer keeps
      appearing; the conversation scrolls down by itself. They can already write the next question, but it is not
      sent until this one ends.
-  5. If the assistant ends without saying anything, the bubble reads "(no answer)".
-  6. "Stop" cuts what was left: what was already written stays, with "Stopped." below.
-  7. Under each finished answer, "Read aloud" reads it with the device's own voice, if it has one, and "Stop
+  5. If they ask how something is done in ERPlora, what an option means or what a plan includes ("How do I open the
+     cash register?"), the assistant searches ERPlora's documentation (the help, each app's and the plans) and answers
+     only with what it says, citing which section it comes from; if the documentation does not cover it, it says so
+     instead of making it up.
+  6. If the assistant ends without saying anything, the bubble reads "(no answer)".
+  7. "Stop" cuts what was left: what was already written stays, with "Stopped." below.
+  8. Under each finished answer, "Read aloud" reads it with the device's own voice, if it has one, and "Stop
      reading" stops it.
 In: what the person writes; the whole conversation travels with each question (BASE-F102).
 Out: the question to erplora.com, which answers it and counts it in the month's messages (BASE-F104).
 If it fails: without a connection, with the service down, without a plan or without messages: BASE-F106 and BASE-F104.
-"Stop" does not undo an action that had already been done.
+If the documentation cannot be searched at that moment, the assistant says so and does not answer from memory. "Stop"
+does not undo an action that had already been done.
 Involved: BASE-F102, BASE-F104, BASE-F106
 
 ### BASE-F94 Attach a file or dictate by voice

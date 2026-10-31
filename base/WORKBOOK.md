@@ -2285,14 +2285,18 @@ Pasos:
   4. Mientras responde, «Enviar» se convierte en «Detener», «Adjuntar archivo» y «Dictar por voz» se apagan y la
      respuesta va apareciendo; la conversación baja sola hasta el final. Se puede ir escribiendo la siguiente
      pregunta, pero no se envía hasta que acaba esta.
-  5. Si el asistente acaba sin decir nada, la burbuja dice «(sin respuesta)».
-  6. «Detener» corta lo que faltaba: lo ya escrito se queda, con «Detenido.» debajo.
-  7. Bajo cada respuesta terminada, «Leer en voz alta» la lee con la voz del propio dispositivo, si la tiene, y
+  5. Si pregunta cómo se hace algo en ERPlora, qué significa una opción o qué incluye un plan («¿Cómo abro la caja?»),
+     el asistente busca en la documentación de ERPlora (la ayuda, la de cada app y los planes) y contesta solo con lo
+     que dice, citando de qué sección sale; si la documentación no lo cubre, lo dice en lugar de inventarlo.
+  6. Si el asistente acaba sin decir nada, la burbuja dice «(sin respuesta)».
+  7. «Detener» corta lo que faltaba: lo ya escrito se queda, con «Detenido.» debajo.
+  8. Bajo cada respuesta terminada, «Leer en voz alta» la lee con la voz del propio dispositivo, si la tiene, y
      «Dejar de leer» la para.
 Entra: lo que escribe la persona; la conversación entera viaja con cada pregunta (BASE-F102).
 Sale: la pregunta a erplora.com, que la responde y la cuenta en los mensajes del mes (BASE-F104).
-Si falla: sin conexión, con el servicio caído, sin plan o sin mensajes: BASE-F106 y BASE-F104. «Detener» no deshace
-una acción que ya se había hecho.
+Si falla: sin conexión, con el servicio caído, sin plan o sin mensajes: BASE-F106 y BASE-F104. Si la documentación no
+se puede consultar en ese momento, el asistente lo dice y no contesta de memoria. «Detener» no deshace una acción que
+ya se había hecho.
 Implicados: BASE-F102, BASE-F104, BASE-F106
 
 ### BASE-F94 Adjuntar un archivo o dictar por voz
@@ -3155,8 +3159,8 @@ Implicados: ACCOUNTS-F38
   `base.person.detail`), la
   comparación del servidor (`confirmed`, como `ConfirmDialog`: sin mayúsculas ni espacios de los extremos),
   `run_tool` (la operación como la persona; `PermissionDenied`, `AppInactive` y `Unauthorized` → `refused`) y las
-  puertas firmadas del SaaS (`/internal/assistant/chat/stream`, `usage`, `report` y `/internal/speech/transcribe`, con
-  el HMAC de `base.signing`).
+  puertas firmadas del SaaS (`/internal/assistant/chat/stream`, `usage`, `report`, `docs/search` y
+  `/internal/speech/transcribe`, con el HMAC de `base.signing`).
 - Operaciones del asistente, todas con `base.view_home` y `ai=` «Not an assistant tool»: `base.assistant.turn`
   (command: corre las lecturas pendientes, para en la tarjeta de una escritura hasta su `decision`, corta a las
   `MAX_ROUNDS` = 6 rondas con `assistant.too_many_steps`; el «sí» a una escritura que la persona no puede hacer y un
@@ -3168,6 +3172,23 @@ Implicados: ACCOUNTS-F38
   `transcribe`): el turno responde en streaming (`text/event-stream`, `turn_response`) a **una** petición `fetch` +
   `ReadableStream` que se cierra al acabar (tramas `text`, `executed`, `confirm`, `usage`, `error` y `done`), no una
   segunda SSE permanente (PLAN §14). El navegador nunca habla con la pasarela ni con un proveedor.
+- **La documentación de ERPlora** (saas ASSISTANT-F28; ronda 2026-10-30e, plan `docs/plans/2026-10-30-asistente-saas.md`
+  de la raíz, tarea T5): `base.docs.search` (query, `base.view_home`, `database=False`, `ai=AI(…)`; herramienta
+  `base__docs__search`, en `ALWAYS` porque una pregunta de «cómo se hace» no comparte palabras con ella) pregunta al
+  único índice de erplora.com (`assistant.DocChunk`: la ayuda pública, la documentación de cada app, los WORKBOOK del
+  panel y los planes) por `POST /internal/assistant/docs/search` (`assistant.docs_search`: `hub`, `query`, `language`
+  —`es` para cualquier español, si no `en`— y `limit`, ≤ 12, 8 por defecto). El Hub no guarda índice ni llama a
+  `/internal/assistant/embeddings`. Dentro de un turno la espera no puede quedar en su transacción (PLAN §14.2): la
+  ruta pregunta antes (`assistant.prepare` → `prepare_docs`, solo con sesión y `base.view_home` y solo lo que el
+  esquema acepta) y el turno lee esa respuesta (`prepared_docs`, `searched_docs`); fuera de un turno pregunta en el
+  momento. Lo que la pasarela no contesta (409 sin proveedor, 503, 429, una respuesta que no es el contrato, sin red)
+  es 503 `base.assistant_unavailable`, «Ahora no se puede buscar en la documentación de ERPlora.», que el modelo
+  cuenta: nunca fragmentos inventados. Las instrucciones mandan contestar el «cómo se hace» solo con lo que devuelve,
+  citando la sección, y decir que la documentación no lo cubre si no devuelve nada; la regla de no inventar un
+  registro sigue. Su pantalla de recibo es `help` («Ayuda»; el chat solo pinta recibos de escrituras). Necesita la
+  puerta de ERPlora/saas#178 desplegada: sin ella contesta 503. Tests: `base/tests/test_queries_docs_search.py`,
+  `test_assistant.py` (catálogo, `ALWAYS`, instrucciones, «Ayuda») y `test_api_assistant.py` (el turno, y que la
+  pasarela se espera fuera de su transacción).
 - Panel: el chat compartido de `@erplora/ui/components` (`packages/ui/src/components/Assistant/`, desde el
   2026-10-30: el SaaS monta el mismo con sus herramientas): `AssistantPanel`, `AssistantMessage`, `AssistantMarkdown`,
   `AssistantComposer`, `AssistantConfirm` sobre `ConfirmDialog`, `AssistantReport` sobre `FormModal`, `AssistantEmpty`
