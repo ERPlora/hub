@@ -15,6 +15,7 @@ import pytest
 from django.core.files.base import ContentFile
 from django.core.files.storage import storages
 from django.urls import resolve
+from live.assistant import description
 from live.context import OperationContext, Scope
 from live.errors import InvalidPayload, NotFound, OperationError, PermissionDenied
 from live.live_registry import live_registry
@@ -92,7 +93,7 @@ def recorded(*names):
 def test_each_operation_has_its_permission_and_the_assistant_knows_it(name, declared):
     op = get(name)
     assert (op.kind, op.permission) == declared
-    assert op.ai and op.ai["description"]
+    assert description(op)
     # Integrations reach the files with an API key too (read for the queries, write for the commands).
     assert op.expose_api
 

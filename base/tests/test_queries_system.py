@@ -9,6 +9,7 @@ import datetime as dt
 import pytest
 from django.urls import resolve
 from django.utils import timezone
+from live.assistant import description
 from live.context import OperationContext, Scope
 from live.errors import NotFound, PermissionDenied
 from live.models import OutboxEvent
@@ -56,7 +57,7 @@ def delivery(outbox_event, app="invoice", status=EventDelivery.Status.DEAD, atte
 def test_each_query_is_for_who_runs_the_business_and_told_to_the_assistant(name):
     op = get(name)
     assert (op.kind, op.permission) == ("query", ADMIN)
-    assert op.ai and op.ai["description"]
+    assert description(op)
     with pytest.raises(PermissionDenied):
         run(name, "base.view_home")
 

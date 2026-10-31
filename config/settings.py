@@ -520,6 +520,13 @@ LIVE = {
     },
 }
 
+# The apps whose assistant tools all say what a person types to ask for them (AI.asks, live.E020; docs plan
+# 2026-10-31, the assistant's knowledge and QA): an app joins in the pull request that completes its asks, and layer 1
+# of the assistant's QA (base/tests/test_assistant_asks.py) checks each ask reaches its tool, role by role.
+LIVE_ASSISTANT_ASKS_REQUIRED = (
+    "base",
+)
+
 # Email: the console locally; in production the SES API signed by the task role (no static keys,
 # PLAN-AWS §3), or SMTP from EMAIL_* when SES_REGION is unset. EMAIL_BACKEND overrides the choice.
 
