@@ -4,8 +4,9 @@
 // says what it does and why it asks each permission; «Turn it on» builds it on with exactly that permission
 // (F33) and «See it» opens it; «Pause it» pauses it and keeps it (F34); built from an older version and
 // renamed, it says «New version» and «Restore the factory one», asked first, brings today's back (F35); set
-// up with a fault its app already fixed, its notice sits above «Your automations» and «Update it» changes only
-// when it starts (F36). One screenshot per flow and size (`APP-FLOW-3-<flow>-<width>`). A business has one
+// up with a fault its app already fixed, nothing waits for the owner: no notice above «Your automations», and its
+// «Only when…» already has what its app added, though nothing was written (F36). One screenshot per flow and size
+// (`APP-FLOW-3-<flow>-<width>`). A business has one
 // automation per recipe: it is removed before each size and after the run.
 import { expect, type Page, test } from '@playwright/test';
 
@@ -80,20 +81,21 @@ for (const viewport of VIEWPORTS) {
       await noHorizontalScroll(page, viewport.label);
       await snap('FLOW-F35');
 
-      // FLOW-F36: set up with a fault its app already fixed: its notice above the list; «Update it» only adds
-      // what its app added to «Only when…».
+      // FLOW-F36: set up with a fault its app already fixed, nothing waits for the owner: no notice above the list,
+      // and its «Only when…» already has what its app added (it never starts on a team's cancellation), though
+      // nothing was written behind the owner's back.
       psql(`update flow_flow set name = 'My gap', trigger_filter = '{}', recipe_digest = '${OLDER}' where recipe = '${REF}'`);
       await page.goto(`${A}/flow/automations`);
-      const notice = shown(page).locator(`[data-testid="flow-repair-${REF}"]`);
-      await expect(notice).toContainText('«My gap» was set up with an older version of Appointments');
-      await expect(notice).toContainText('Updating it only changes when it starts');
-      // The list under the notice has loaded before the screenshot: the automation is still there, paused.
+      // The list has loaded before looking for a notice: the automation is there, paused.
       await expect(shown(page).locator(`[data-testid="flow-list-toggle-${built('id')}"]`)).toBeVisible();
+      await expect(shown(page).locator('[data-testid=flow-repairs]')).toHaveCount(0);
+      await expect(shown(page).getByText('starts in more cases than it should')).toHaveCount(0);
       await noHorizontalScroll(page, viewport.label);
       await snap('FLOW-F36');
-      await shown(page).locator(`[data-testid="flow-repair-run-${REF}"]`).click();
-      await expect(notice).toHaveCount(0);
-      expect(built(`trigger_filter::text || ' ' || name || ' ' || enabled::text`)).toBe('{"input.by_customer": {"eq": true}} My gap false');
+      await page.goto(`${A}/flow/automations/${built('id')}`);
+      await shown(page).locator('[data-testid=flow-trigger-open]').click();
+      await expect(shown(page).locator('[data-testid^=flow-trigger-filter-row-]')).toHaveCount(1);
+      expect(built(`trigger_filter::text || ' ' || name || ' ' || enabled::text`)).toBe('{} My gap false');
     } finally {
       await context.close();
     }
