@@ -1,7 +1,8 @@
 # Workbook — Inventario (app)
 Prefijo: INVENTORY
 Alcance MVP: transversal
-Estado de la app: en uso; parcial F12 (espera al núcleo)
+Estado de la app: completa (2026-10-31)
+Lo que no entra todavía: ver «Lo que queda fuera».
 
 > Manual de usuario y especificación de la app `inventory`. Se escribe **antes** que el código: no
 > se programa nada que no esté aquí, y cada flujo pasa a `Estado: hecho` cuando sus tests están en
@@ -241,7 +242,7 @@ fueran los del negocio.
 | INVENTORY-F09 | Importar productos desde un CSV | hecho |
 | INVENTORY-F10 | Importar categorías desde un CSV | hecho |
 | INVENTORY-F11 | Exportar el catálogo a CSV | hecho |
-| INVENTORY-F12 | Cargar la carta de una plantilla del sector | parcial — la parte de Inventario está (el alta en lote con su stock y sus categorías, que salta los SKU que ya existen); falta cargar la plantilla del sector, que es del núcleo y el Hub todavía no tiene |
+| INVENTORY-F12 | Cargar la carta de una plantilla del sector | hecho |
 | | **Stock** | |
 | INVENTORY-F13 | Recibir mercancía | hecho |
 | INVENTORY-F14 | Contar el stock de un producto | hecho |
@@ -323,8 +324,7 @@ Sale: el producto cambiado, con sus categorías, en un solo paso. Inventario avi
 cada categoría añadida o quitada. El precio nuevo vale para lo que se añada a una cuenta desde
 ahora: una cuenta abierta conserva el precio de cuando se pidió (lo decide Ventas).
 Si falla: los mismos rechazos que el alta (INVENTORY-F01), dentro del panel, y no se guarda nada.
-Vaciar la categoría fiscal no se puede: «Elige la categoría fiscal: sin ella el producto no se
-puede vender.». La unidad de un producto con stock no se cambia: «No se puede cambiar la unidad de
+La categoría fiscal no se puede vaciar: el campo no tiene opción vacía. La unidad de un producto con stock no se cambia: «No se puede cambiar la unidad de
 un producto con stock. Cuenta su stock a cero y cámbiala después.».
 Implicados: SALE-F01, TAX-F01, TAX-F19
 
@@ -399,8 +399,8 @@ Sale: la categoría guardada. Editarla desde la pantalla no toca lo que la panta
 descripción, el icono, el color y el orden que se pusieron por el asistente o la API se conservan.
 Ventas la lee para la tira de categorías del TPV, y Cocina para elegir qué envía a cada estación.
 Una categoría no se desactiva: se crea, se edita o se elimina.
-Si falla: «Guardar» está apagado sin Nombre. Un rechazo sale dentro del panel («No se pudo
-guardar la categoría» o el motivo).
+Si falla: «Guardar» está apagado sin Nombre. Un rechazo sale dentro del panel, con su
+motivo.
 Implicados: KITCHEN-F04, SALE-F01, TAX-F01
 
 ### INVENTORY-F07 Eliminar una categoría
@@ -527,21 +527,35 @@ Implicados: ninguno
 
 ### INVENTORY-F12 Cargar la carta de una plantilla del sector
 <!-- origen: old-hub:HUB_SHELL-F26 old-hub:HUB-F235 old:inventory/workflow/importar-y-exportar.md#inventory-f12 wf:alta#rec_alta-f08 -->
-Estado: parcial — la parte de Inventario está (el alta en lote con su stock y sus categorías, que salta los SKU que ya existen); falta cargar la plantilla del sector, que es del núcleo y el Hub todavía no tiene
-Actor: administrador
-Pantalla: Ajustes del negocio: plantillas
+Estado: hecho
+Actor: propietario, administrador
+Pantalla: Ajustes · Datos y copias › Importar
 Pasos:
-1. En los ajustes del negocio, el administrador elige la plantilla de su sector.
-2. El negocio activa las apps que falten y aplica los datos de la plantilla; Inventario recibe sus
-   productos, sus categorías y sus enlaces.
-3. Comprueba en **Productos** que están y que ninguno sale «Sin configurar» (INVENTORY-F05).
-Entra: la plantilla.
-Sale: los productos, con su categoría fiscal, su stock (que queda en **Movimientos** como
-«Inicial») y su umbral, y las categorías de la plantilla. Si se vuelve a aplicar sobre un catálogo
-con los mismos SKU, esos productos se saltan: no cambian ni su precio ni su stock.
-Si falla: cada app aplica su parte por separado; si la de Inventario falla, sale en el informe de
-la plantilla y el resto se aplica.
-Implicados: ninguno
+1. Abre «Ajustes» › «Datos y copias»: en «Importar» salen las plantillas del Hub, una por sector e
+   idioma (hoy restaurante y peluquería, en español y en inglés), con lo que «Trae» cada una. Pulsa
+   «Usar plantilla» en la de tu sector (BASE-F29). En un negocio todavía vacío, Inicio ofrece lo mismo
+   arriba, en «Empieza con un negocio como el tuyo», con «Usar esta» (BASE-F38).
+2. En «Revisa lo que trae», deja marcada Inventario, que dice cuántas categorías y productos trae (si
+   está desactivada, «Está desactivada en tu negocio: se activará al cargarla.»); desmarca lo que no
+   quieras y pulsa «Importar» (BASE-F31).
+3. El informe dice «Todo ha entrado.» y, en Inventario, «Aplicado», con las categorías y los
+   productos creados (BASE-F32).
+4. En **Productos** está la carta: cada producto con su precio, su categoría fiscal (ninguno sale
+   «Sin configurar», INVENTORY-F05), su foto de la librería (INVENTORY-F33) y su categoría; en
+   **Categorías**, las de la plantilla, y el stock que trae, en **Movimientos** como «Inicial».
+Entra: la plantilla y las apps marcadas.
+Sale: los productos de la plantilla, dados de alta como en la importación de un CSV (INVENTORY-F09),
+con su categoría fiscal, su categoría, su foto, su stock y su umbral, y las categorías de la plantilla (la carta del
+restaurante trae 16 productos en 6 categorías, con stock solo en las bebidas embotelladas; la de la
+peluquería, 5 productos de venta con su stock). Inventario avisa de cada producto nuevo. Si se vuelve a
+cargar sobre un catálogo con los mismos SKU, esos productos se saltan: no cambian ni su precio ni su
+stock, y el informe dice «Ya lo tenías»; una categoría con el mismo nombre tampoco se duplica.
+Si falla: cada producto entra o falla por separado: el que Inventario rechaza sale en el informe con su
+nombre y su motivo («No todo entró.») y el resto se carga. Una foto que la librería ya no tiene deja su
+producto sin foto, con «Esa imagen ya no está en la librería. Elige otra.» en el informe. Si Inventario
+no se puede activar (el tope de apps del plan), no se carga nada suyo y el informe dice por qué. Lo
+cargado se puede deshacer entero (BASE-F34).
+Implicados: BASE-F29, BASE-F31, BASE-F32, BASE-F34, BASE-F38, INVENTORY-F05, INVENTORY-F09, INVENTORY-F33
 
 ### INVENTORY-F13 Recibir mercancía
 <!-- origen: fi:modules/inventory#command-inventory-_insert_product-_receive_line-_restock_on_void fi:modules/inventory#command-inventory-stock-receive-handler-wasm-receive_stock old:inventory/workflow/stock.md#inventory-f13 qa:modules/inventory/waste-and-adjustment -->
@@ -561,8 +575,8 @@ albarán. Si se escribió coste, pasa a ser el coste del producto. Se aplica aun
 lleve control de stock. Si un artículo con control sube por encima de su umbral, avisa del cruce
 (INVENTORY-F18). Inventario avisa de que el stock cambió.
 Si falla: «Registrar recepción» está apagado sin cantidad. «La cantidad no respeta el incremento
-permitido para esta unidad», un coste ilegible («Esto no es un importe…») o «No se pudo registrar
-la recepción» salen dentro de la ventana. Un servicio no se recibe: no tiene el botón, y por el
+permitido para esta unidad», un coste ilegible («Esto no es un importe…») o el motivo de
+cualquier otro rechazo salen dentro de la ventana. Un servicio no se recibe: no tiene el botón, y por el
 asistente o la API se rechaza con «Un servicio no lleva stock.». Una recepción con una línea sin
 producto, con un producto que no existe o con cantidad cero se rechaza entera, diciendo qué línea
 falla: no entra ninguna.
@@ -588,9 +602,9 @@ sentido, avisa del cruce (INVENTORY-F18).
 Si falla: «Aplicar recuento» está apagado y dice qué falta: «Escribe el stock contado para
 continuar.» o «Hace falta un motivo para aplicar el recuento.». Una cantidad negativa o que no
 encaja en la unidad: «La cantidad no respeta el incremento permitido para esta unidad». Un motivo de
-menos de 3 letras: «El motivo necesita al menos 3 letras.». Un servicio no se cuenta: no tiene el
+menos de 3 caracteres: «Debe tener al menos 3 caracteres.». Un servicio no se cuenta: no tiene el
 botón, y por el asistente o la API se rechaza con «Un servicio no lleva stock.». Todo sale dentro
-de la ventana; si no, «No se pudo aplicar el recuento».
+de la ventana, también el motivo de cualquier otro rechazo.
 Implicados: ninguno
 
 ### INVENTORY-F15 Dar de baja stock sin venta (merma, rotura, consumo propio)
@@ -611,8 +625,8 @@ Sale: el stock baja y queda el movimiento «Descuento»; Inventario avisa de que
 si cruza el umbral, del cruce (INVENTORY-F18). Lo pueden pedir el responsable y el administrador.
 Si falla: si no hay bastante y «Permitir vender sin stock» está apagado, «No hay stock suficiente
 para completar la operación.». Un producto que no existe: «Este producto no existe en este hub.».
-Una cantidad fuera del escalón: «Esa cantidad no encaja en la unidad del producto…» (no se
-redondea). Un servicio se rechaza con «Un servicio no lleva stock.», y un artículo sin control de
+Una cantidad fuera del escalón: «La cantidad no respeta el incremento permitido para esta
+unidad: usa múltiplos de …» (no se redondea). Un servicio se rechaza con «Un servicio no lleva stock.», y un artículo sin control de
 stock con «Este artículo no controla su stock: no hay nada que dar de baja.» (409
 `inventory.stock_not_tracked`): ni éxito en silencio ni movimiento. Todo sale dentro de la ventana.
 Implicados: ninguno
@@ -864,8 +878,9 @@ Entra: las unidades del negocio, que llegan al activar Inventario.
 Sale: el producto con su unidad. Ventas la lee para la línea; el precio es por 1 de la unidad.
 Por el asistente o la API, el precio se puede referir a otra cantidad (por 100 g, o por kilo con
 el stock en gramos).
-Si falla: «La cantidad no respeta el incremento permitido para esta unidad» en pantalla; «Esa
-cantidad no encaja en la unidad del producto…» por el asistente o la API. La unidad de un producto
+Si falla: «La cantidad no respeta el incremento permitido para esta unidad» en pantalla; «La
+cantidad no respeta el incremento permitido para esta unidad: usa múltiplos de …» por el asistente o la
+API. La unidad de un producto
 con stock no se cambia (INVENTORY-F02).
 Implicados: SALE-F10
 
@@ -882,9 +897,8 @@ Pasos:
 2. Cocina pide los productos y las categorías para elegir qué envía a cada estación.
 3. Menús pide los productos que se pueden poner como componente: los activos, también los agotados
    hoy (un menú se monta con ellos); al vender, no ofrece una elección cuyo producto está agotado.
-4. Sin Inventario activo, el TPV lo dice en la rejilla («… no está instalada, así que no hay rejilla
-   de productos. Puedes cobrar servicios y ventas a precio libre; …») y vende servicios y precio
-   libre.
+4. Sin Inventario activo, el TPV lo dice en la rejilla («Inventario no está activa, así que no hay
+   rejilla de productos. Puedes cobrar ventas a precio libre; …») y vende servicios y precio libre.
 Entra: nada: lo piden las demás apps (ver [Servicios](#servicios-lo-que-entra-y-lo-que-sale)).
 Sale: las lecturas. En el catálogo de venta solo salen los productos a la venta: activos, no agotados
 (INVENTORY-F29) y no eliminados; el mapa de categorías lleva los activos. La rejilla y el buscador del
@@ -1491,6 +1505,14 @@ Las hace cumplir la app por cualquier puerta (pantalla, asistente, API).
   sus movimientos se conservan.
 - **Fotos** (F30 a F33): la foto propia de un negocio solo la ven las personas de ese negocio y nunca la
   usa otro; la librería es la misma para todos y ningún negocio la cambia.
+
+## Lo que queda fuera
+
+- **Los importes de cuatro cifras sin separador de millares** («1234,56 €»), hub#525.
+- **La tarjeta de confirmación del asistente no dice qué registro toca una escritura**, hub#526.
+- Las peticiones a `@erplora/ui` de `UI-REQUESTS.md` (iconos, `KpiCard`, `Combo` múltiple, importar y
+  exportar CSV y panel lateral del `DataTable`, formateadores, `useI18n` y ayudas de test): ninguna rompe
+  un flujo, cada una tiene su sustituto en uso y su clave `inventory:ui-…` en el registro de la migración.
 
 ## Lo que NO hace, a propósito
 

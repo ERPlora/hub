@@ -3,10 +3,11 @@
 // `erp-attendance-clock`: «Hello, <name>» and «It is <time>», the state of the day, the time since the
 // clock-in (running), the one button of the moment — «Clock in», or «Start break»/«End break» and «Clock
 // out» —, «Today» (Worked and Breaks, running) and «Recent days» (the last ten). Everything comes live
-// (`attendance.record.current`, `attendance.settings.get`) and runs on from the server's figures with
-// the page's clock. A command answers with the server's time or the server's refusal; the stream brings
-// the new state. From a personal device, when the business asks for it, the position goes with the
-// clock-in (the Hub measures the distance and decides); clocking out never waits for it.
+// (`attendance.record.current`, `attendance.settings.get`, and `base.device.current` for this device) and
+// runs on from the server's figures with the page's clock. A command answers with the server's time or the
+// server's refusal; the stream brings the new state. From a personal device, when the business asks for it,
+// the position goes with the clock-in (the Hub measures the distance and decides); clocking out never waits
+// for it.
 import { EmptyState, StatusPill, type StatusPillTone } from '@erplora/ui/components';
 import { type ApiError, useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, HubIcon } from '@erplora/ui/shell';
@@ -16,7 +17,6 @@ import { computed, ref, watch } from 'vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import { useServerNow } from '../composables/useServerNow';
 import { useLocale, useT } from '../composables/useT';
-import { deviceMode } from '../lib/device';
 import { GeoError, type GeoErrorCode, getPosition } from '../lib/geo';
 import { formatDay, formatHm, formatHms, formatTime, liveSeconds } from '../lib/time';
 import type { PositionIn, RecordOut, RecordStatus } from '../operations';
@@ -40,6 +40,9 @@ const { data, status, error, refresh } = useLive('attendance.record.current', {}
 // The server's clock (its `as_of`), ticking every second: never the device's own.
 const now = useServerNow(() => data.value?.as_of, 1000);
 const { data: settings } = useLive('attendance.settings.get', {});
+// This device: the counter POS (`shared`) or someone's own phone (`personal`), as an administrator marked it
+// (BASE-F62). Unknown, or until it arrives, the shared one: the server decides the same on its own.
+const { data: device } = useLive('base.device.current', {});
 const clockInCommand = useCommand('attendance.record.clock_in');
 const clockOutCommand = useCommand('attendance.record.clock_out');
 const breakStartCommand = useCommand('attendance.break.start');
@@ -58,7 +61,7 @@ watch(data, () => {
 });
 const openDay = computed(() => (answered.value ? answered.value.open : (data.value?.open ?? null)));
 const onBreak = computed(() => !!openDay.value?.break_started_at);
-const locationChecked = computed(() => !!settings.value?.require_location && deviceMode() === 'personal');
+const locationChecked = computed(() => !!settings.value?.require_location && device.value?.mode === 'personal');
 const elapsed = computed(() => (openDay.value ? Math.max(0, Math.floor((now.value - Date.parse(openDay.value.clock_in_at)) / 1000)) : 0));
 const worked = computed(() => {
   const day = data.value;
@@ -485,6 +488,10 @@ function endOf(day: RecordOut): string {
   margin: 0;
   font-size: 0.9rem;
   color: var(--ion-color-medium, #6b6b6b);
+}
+/* The note's icon keeps its 1em when the text wraps on a phone: a flex item may shrink, and it shrank to a dot. */
+.attendance-clock__note ion-icon {
+  flex: none;
 }
 .attendance-clock__message {
   margin: 0;
