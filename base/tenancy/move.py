@@ -25,11 +25,20 @@ gets here (``control.services.MOVE_MAX_BYTES``); a larger one needs logical repl
    From then on every process reaches it there: a request, a live re-run and the worker read the row again and
    register the hub's alias anew when its server changed (``base.tenancy.connections``).
 
-Any failure before the switch puts everything back, nothing lost: the destination's database dropped (never the live
-one: by then the data is in the copy on the origin), the copy renamed back and opened to the app again, the hub ready
-where it was with the reason in ``last_error`` (``move_<step>: <why>``). An undo that fails leaves the hub moving and
-says why; the next pass goes on from wherever it stopped (a copy already renamed is copied from). A lease that went to
-another worker, or a worker that is stopping, leaves everything as it is for the next one to go on.
+Every step that drops, renames or switches first checks that the move is still this worker's: it holds the hub's lease
+(renewed by then) and the hub still moves to its destination, unasked to be undone (``control.services.still_ours``;
+the switch checks it again on its locked row). A worker whose lease ran out (each deploy starts the new one before the
+old one stops) thus never drops a destination another worker made live, nor switches a move another one finished; it
+stops, as one that is stopping or whose lease went elsewhere does, and leaves everything to whoever holds it now.
+
+Any failure before the switch puts the hub back on its origin, nothing lost, starting with the origin: the copy is
+renamed back (after the destination's database is dropped, when it answers: by then it is never the live one) and
+opened to the app again, the origin's schema record given back to control, the hub ready there with the reason in
+``last_error`` (``move_<step>: <why>``). A destination that does not answer is noted (``LeftoverDatabase``) and its
+database dropped on a later pass, under the hub's lease, never while control says it is a hub's (one on that cluster,
+moving to it, or living on the same server). An undo that cannot finish leaves the hub moving and says why; the next
+pass undoes it again, never taking it forward. Asked to cancel (``control.hub.move_cancel``), the next pass undoes it
+the same way.
 
 The copies are dropped after :data:`MOVED_COPY_DAYS` (:func:`drop_old_copies`, in the same pass), with their rows;
 one that cannot be dropped now is tried again on the next pass.
@@ -50,6 +59,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import psycopg
+from django.db import DEFAULT_DB_ALIAS, connections
 from django.utils import timezone
 from psycopg import errors, sql
 from psycopg.conninfo import make_conninfo
@@ -109,7 +119,12 @@ def run_due(
             services.release_hub(hub_id, timezone.now())
         break
     drop_old_copies(now)
+    drop_leftovers(now)
     return worked
+
+
+#: What ``last_error`` says after the reason of a move that could not be undone yet.
+UNDO_FAILED_MARK = " (move_undo_failed: "
 
 
 def move_hub(
@@ -119,8 +134,8 @@ def move_hub(
     roles: bootstrap.Names | None = None,
     cancelled: Callable[[], bool] | None = None,
 ) -> None:
-    """Move ``hub_id`` to the cluster it is moving to, its lease held (see the module); a failure is undone and noted on
-    it, never raised."""
+    """Move ``hub_id`` to the cluster it is moving to, or undo its move when it is to be undone, its lease held (see the
+    module); a failure is undone and noted on it, never raised."""
     now = now or timezone.now()
     hub = control_services.moving_row(hub_id)
     if hub is None or hub.moving_to is None:
@@ -133,44 +148,60 @@ def move_hub(
     def heartbeat() -> None:
         services.renew_lease(hub.id, LEASE)
 
-    try:
-        _close_and_rename(hub, copy_name, origin, roles)
+    def ours(*, forward: bool = True) -> None:
         heartbeat()
-        with tempfile.TemporaryDirectory(prefix="hub-move-") as folder:
-            path = Path(folder) / "move.dump"
-            _dump(copy_name, origin, path, heartbeat, cancelled)
-            heartbeat()
-            _make_destination(hub, target, roles)
-            _restore(path, hub.db_name, target, heartbeat, cancelled)
-        heartbeat()
-        _verify_identity(hub.db_name, target, hub.id)
-        _ensure_schema(hub, target)
-        _switch(hub.id, origin, copy_name, now)
-    except services.ProvisioningStopped as stopped:
-        logger.warning("base.tenancy.move.lease_lost hub=%s: %s; left to its holder.", hub.slug, stopped)
-        return
-    except (MoveStopped, dumps.DumpStopped) as stopped:
-        logger.info("base.tenancy.move.stopped hub=%s: %s; the next worker goes on.", hub.slug, stopped)
-        return
-    except Exception as error:
-        code = error.code if isinstance(error, MoveFailed) else "move_unexpected"
-        reason = error if isinstance(error, MoveFailed) else f"{code}: {type(error).__name__}: {error}"
-        logger.warning("base.tenancy.move.failed hub=%s: %s", hub.slug, reason)
         try:
-            _undo(hub, copy_name, origin, target, roles)
-        except Exception as undo_error:
-            logger.exception("base.tenancy.move.undo_failed hub=%s: it stays moving and is tried again.", hub.slug)
-            control_services.move_stuck(
-                hub.id, f"{reason} (move_undo_failed: {type(undo_error).__name__}: {undo_error})"
-            )
+            control_services.still_ours(hub.id, target.pk, services.LEASE_OWNER, forward=forward)
+        except control_services.MoveTaken as taken:
+            raise MoveStopped(str(taken)) from taken
+
+    back = {"hub": hub, "copy_name": copy_name, "origin": origin, "target": target, "roles": roles, "now": now}
+    try:
+        note = control_services.pending_copy(hub.id)
+        if note is not None and note.undoing:
+            reason = hub.last_error.split(UNDO_FAILED_MARK)[0] or "move_cancelled: the move was asked to be undone"
+            _back(**back, ours=ours, reason=reason)
             return
-        control_services.move_failed(hub.id, str(reason))
-        return
+        try:
+            _close_and_rename(hub, copy_name, origin, roles, ours)
+            with tempfile.TemporaryDirectory(prefix="hub-move-") as folder:
+                path = Path(folder) / "move.dump"
+                _dump(copy_name, origin, path, heartbeat, cancelled)
+                _make_destination(hub, target, roles, ours)
+                _restore(path, hub.db_name, target, heartbeat, cancelled)
+            heartbeat()
+            _verify_identity(hub.db_name, target, hub.id)
+            _ensure_schema(hub, target, heartbeat)
+            _switch(hub.id, target, origin, copy_name, now)
+        except (services.ProvisioningStopped, MoveStopped, dumps.DumpStopped) as stopped:
+            logger.info("base.tenancy.move.stopped hub=%s: %s; left to whoever holds it now.", hub.slug, stopped)
+            return
+        except Exception as error:
+            code = error.code if isinstance(error, MoveFailed) else "move_unexpected"
+            reason = str(error) if isinstance(error, MoveFailed) else f"{code}: {type(error).__name__}: {error}"
+            logger.warning("base.tenancy.move.failed hub=%s: %s", hub.slug, reason)
+            _back(**back, ours=ours, reason=reason)
+            return
+        logger.info(
+            "base.tenancy.move.moved hub=%s database=%s to=%s copy=%s", hub.slug, hub.db_name, target.name, copy_name
+        )
     finally:
         _close_this_processs(hub)
-    logger.info(
-        "base.tenancy.move.moved hub=%s database=%s to=%s copy=%s", hub.slug, hub.db_name, target.name, copy_name
-    )
+
+
+def _back(hub, copy_name: str, origin, target, roles, now, ours, *, reason: str) -> None:
+    """Undo the move of ``hub`` and note why; one that cannot be undone now stays moving, to be undone next time."""
+    try:
+        _undo(hub, copy_name, origin, target, roles, ours, now)
+    except (services.ProvisioningStopped, MoveStopped) as stopped:
+        logger.info("base.tenancy.move.stopped hub=%s: %s; left to whoever holds it now.", hub.slug, stopped)
+        return
+    except Exception as undo_error:
+        logger.exception("base.tenancy.move.undo_failed hub=%s: it stays moving and is undone next time.", hub.slug)
+        control_services.move_stuck(hub.id, f"{reason}{UNDO_FAILED_MARK}{type(undo_error).__name__}: {undo_error})")
+        return
+    control_services.move_undone(hub.id, getattr(origin, "pk", None), copy_name, reason)
+    logger.info("base.tenancy.move.undone hub=%s: %s", hub.slug, reason)
 
 
 def drop_old_copies(now: dt.datetime) -> int:
@@ -187,6 +218,45 @@ def drop_old_copies(now: dt.datetime) -> int:
         dropped += 1
         logger.info("base.tenancy.move.copy_dropped copy=%s", kept.db_name)
     return dropped
+
+
+def drop_leftovers(now: dt.datetime) -> int:
+    """Drop what undone moves may have left on their destinations, with their notes; how many. Never one control says is
+    a hub's database: on that cluster (the hub itself after a later move there), on the hub's own server (a row of
+    another cluster pointing at it), whose note is forgotten; nor one of a hub moving there now (its move drops it before
+    it clones). Each under the hub's lease; one that cannot be dropped now stays, and the next pass tries again."""
+    dropped = 0
+    for left in control_services.leftovers():
+        hub = left.hub
+        if hub.moving_to_id == left.cluster_id:
+            continue
+        if control_services.attributed(left.cluster_id, left.db_name) or _same_server(hub.cluster, left.cluster):
+            control_services.forget_leftover(left.cluster_id, left.db_name)
+            continue
+        if services.claim_hub(hub.id, now, LEASE) is None:
+            continue
+        try:
+            ops.drop_database(left.db_name, cluster=left.cluster)
+            control_services.forget_leftover(left.cluster_id, left.db_name)
+            dropped += 1
+            logger.info("base.tenancy.move.leftover_dropped database=%s cluster=%s", left.db_name, left.cluster.name)
+        except Exception:
+            logger.exception("base.tenancy.move.leftover_kept database=%s: it could not be dropped; tried again.", left.db_name)
+        finally:
+            services.release_hub(hub.id, timezone.now())
+    return dropped
+
+
+def _server(cluster) -> tuple[str, int]:
+    """The writer a cluster's row points at (``None``: the settings' own server)."""
+    if cluster is None:
+        default = connections.settings[DEFAULT_DB_ALIAS]
+        return str(default["HOST"]), int(default["PORT"])
+    return str(cluster.host), int(cluster.port)
+
+
+def _same_server(one, other) -> bool:
+    return _server(one) == _server(other)
 
 
 # ── The steps ────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -250,25 +320,31 @@ def _rename(conn, old: str, new: str) -> None:
             time.sleep(wait)
 
 
-def _close_and_rename(hub, copy_name: str, origin, roles: bootstrap.Names) -> None:
-    """Steps 1 and 2 on the origin: closed to the app, noted and renamed to its copy. A move cut after its rename (its
-    copy noted and there) goes on from the copy; without the hub's database or such a copy, there is nothing to move."""
+def _close_and_rename(hub, copy_name: str, origin, roles: bootstrap.Names, ours) -> None:
+    """Steps 1 and 2 on the origin: closed to the app, noted (with the origin's schema record) and renamed to its copy.
+    A move cut after its rename (its copy noted and there) goes on from the copy; without the hub's database or such a
+    copy, there is nothing to move."""
     name = hub.db_name
     origin_id = getattr(origin, "pk", None)
     try:
         with ops.connect_ops(cluster=origin) as conn:
             present = _present(conn, name, copy_name)
             if control_services.pending_copy(hub.id) is not None and copy_name in present:
+                ours()
                 _close(conn, copy_name, roles)
                 return
             if name not in present:
                 raise MoveFailed("move_database_missing", f"{name} is not on the origin")
+            ours()
             _close(conn, name, roles)
             if copy_name in present:
                 # An older copy of this hub, from an earlier move off this server: the newer one replaces it.
                 conn.execute(sql.SQL("DROP DATABASE {} WITH (FORCE)").format(_identifier(copy_name)))
                 control_services.forget_copy(origin_id, copy_name)
-            control_services.copy_pending(hub.id, origin_id, copy_name)
+            control_services.copy_pending(
+                hub.id, origin_id, copy_name, schema_state=hub.schema_state, schema_apps=hub.schema_apps
+            )
+            ours()
             _rename(conn, name, copy_name)
     except psycopg.Error as error:
         raise MoveFailed("move_close_failed", ops._reason(error)) from error
@@ -287,14 +363,18 @@ def _dump(source: str, cluster, path: Path, heartbeat: Callable[[], None], cance
         raise MoveFailed("move_dump_failed", failed) from failed
 
 
-def _make_destination(hub, target, roles: bootstrap.Names) -> None:
+def _make_destination(hub, target, roles: bootstrap.Names, ours=None) -> None:
     """Step 3, on the destination: its database cloned from the template of its vertical there, the template's tables
     taken out. A database of that name there is never the hub's live one by now (the data is in the copy): a leftover
-    of a move cut short, dropped first."""
+    of a move cut short, dropped first, unless control says it is a hub's database on that cluster (``MoveStopped``)."""
     try:
         template = provision.template_for(hub)
     except services.ProvisioningFailed as missing:
         raise MoveFailed("move_template_missing", missing) from missing
+    if control_services.attributed(target.pk, hub.db_name, besides=hub.id):
+        raise MoveStopped(f"control says {hub.db_name} on {target.name} is a hub's database: it is never dropped.")
+    if ours is not None:
+        ours()
     try:
         ops.drop_database(hub.db_name, cluster=target)
         ops.clone_database(hub.db_name, template=template, cluster=target, roles=roles)
@@ -419,36 +499,61 @@ def _verify_identity(name: str, cluster, hub_id) -> None:
         raise MoveFailed("move_identity_mismatch", f"it says it is {[str(value) for value in found]}, not {hub_id}")
 
 
-def _ensure_schema(hub, target) -> None:
-    """Step 4: the moved database brought to the code's leaf on its new cluster."""
+def _ensure_schema(hub, target, heartbeat=None) -> None:
+    """Step 4: the moved database brought to the code's leaf on its new cluster, the lease renewed meanwhile."""
     moved = copying.copy(hub)
     moved.cluster = target
     try:
-        migrator.ensure_schema(moved)
+        migrator.ensure_schema(moved, heartbeat=heartbeat)
     except Exception as error:
         raise MoveFailed("move_schema_failed", f"{type(error).__name__}: {error}") from error
 
 
-def _switch(hub_id, origin, copy_name: str, now: dt.datetime) -> None:
-    """Step 5: control moves the hub and keeps its copy's row, in one transaction."""
-    control_services.move_finished(hub_id, getattr(origin, "pk", None), copy_name, now)
+def _switch(hub_id, target, origin, copy_name: str, now: dt.datetime) -> None:
+    """Step 5: control moves the hub and dates its copy, in one transaction on its locked row, only if the move is
+    still this worker's (``MoveStopped`` otherwise: nothing written)."""
+    try:
+        control_services.move_finished(
+            hub_id, target.pk, getattr(origin, "pk", None), copy_name, now, owner=services.LEASE_OWNER
+        )
+    except control_services.MoveTaken as taken:
+        raise MoveStopped(str(taken)) from taken
 
 
-def _undo(hub, copy_name: str, origin, target, roles: bootstrap.Names) -> None:
-    """Back where it was: when control noted the data in the copy and the copy is there, the destination's database
-    dropped (by then never the live one) and the copy renamed back; the note forgotten and the origin opened to the app
-    again."""
-    origin_id = getattr(origin, "pk", None)
+def _undo(hub, copy_name: str, origin, target, roles: bootstrap.Names, ours, now: dt.datetime) -> None:
+    """Back where it was, the origin first: when the data is in the copy (control's note, and the copy there), the
+    destination's database dropped if it answers (noted as left over if not) and the copy renamed back; the origin
+    opened to the app again when its database is there."""
+    ours(forward=False)
     if control_services.pending_copy(hub.id) is not None:
         with ops.connect_ops(cluster=origin) as conn:
             renamed = copy_name in _present(conn, copy_name)
         if renamed:
-            ops.drop_database(hub.db_name, cluster=target)
-            with ops.connect_ops(cluster=origin) as conn:
-                _rename(conn, copy_name, hub.db_name)
-        control_services.forget_copy(origin_id, copy_name)
+            if not _drop_destination(hub, target):
+                control_services.leftover_noted(hub.id, target.pk, hub.db_name, now)
+            ours(forward=False)
+            _rename_back(origin, copy_name, hub.db_name)
     with ops.connect_ops(cluster=origin) as conn:
-        _open(conn, hub.db_name, roles)
+        if hub.db_name in _present(conn, hub.db_name):
+            _open(conn, hub.db_name, roles)
+
+
+def _drop_destination(hub, target) -> bool:
+    """Drop what the move made of ``hub``'s database on ``target`` (never one control says is a hub's there); whether
+    it is gone (``False``: the destination did not answer)."""
+    if control_services.attributed(target.pk, hub.db_name, besides=hub.id):
+        raise MoveStopped(f"control says {hub.db_name} on {target.name} is a hub's database: it is never dropped.")
+    try:
+        ops.drop_database(hub.db_name, cluster=target)
+    except ops.DatabaseOpsError as unreachable:
+        logger.warning("base.tenancy.move.destination_unreachable hub=%s: %s; noted to drop later.", hub.slug, unreachable)
+        return False
+    return True
+
+
+def _rename_back(origin, copy_name: str, name: str) -> None:
+    with ops.connect_ops(cluster=origin) as conn:
+        _rename(conn, copy_name, name)
 
 
 def _drop_copy(name: str, cluster) -> None:

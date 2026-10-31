@@ -323,3 +323,31 @@ def test_the_move_is_in_spanish():
     with translation.override("es"):
         assert str(Hub._meta.get_field("moving_to").verbose_name) == "moviéndose a"
         assert str(MovedCopy._meta.verbose_name_plural) == "copias tras mover"
+
+
+def test_a_leftover_of_an_undone_move_is_one_per_database_and_server_and_goes_with_its_hub():
+    from control.models import LeftoverDatabase
+
+    hub = Hub.objects.create(slug="acme", status=Hub.Status.READY, db_name=f"hub_{uuid.uuid7().hex}")
+    there = Cluster.objects.create(name="there", host="writer-there.example")
+    LeftoverDatabase.objects.create(hub=hub, cluster=there, db_name=hub.db_name, noted_at="2026-10-31T10:00Z")
+    with pytest.raises(IntegrityError), transaction.atomic():
+        LeftoverDatabase.objects.create(hub=hub, cluster=there, db_name=hub.db_name, noted_at="2026-10-31T11:00Z")
+    hub.delete()
+    assert not LeftoverDatabase.objects.exists()
+
+
+def test_a_moves_note_keeps_the_origins_schema_record_and_whether_it_is_being_undone():
+    from control.models import MovedCopy
+
+    hub = Hub.objects.create(slug="acme", status=Hub.Status.READY)
+    note = MovedCopy.objects.create(
+        hub=hub, db_name=f"hub_move_{hub.id.hex}", schema_state="behind", schema_apps={"base": "0001_initial"}
+    )
+    note.refresh_from_db()
+    assert (note.moved_at, note.undoing, note.schema_state, note.schema_apps) == (
+        None,
+        False,
+        "behind",
+        {"base": "0001_initial"},
+    )

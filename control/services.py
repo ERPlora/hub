@@ -39,7 +39,7 @@ from live.outbox import record_event
 from base.registry import internal_only
 from base.tenancy.credentials import APP, CredentialsUnavailable, credentials_for
 from control import events, queries
-from control.models import Cluster, Hub, MovedCopy
+from control.models import Cluster, Hub, HubDue, LeftoverDatabase, MovedCopy
 from control.schemas import ClusterDeletedOut, ClusterIdIn, ClusterIn, ClusterOut, ClusterUpdateIn, HubMoveIn, HubMoveOut
 
 #: What a cluster is registered with (``ClusterIn``), in the model's own names.
@@ -257,6 +257,11 @@ def hub_move(ctx: OperationContext, data: HubMoveIn) -> dict:
 # ── The worker's side of a move (``base.tenancy.move``): no operations, the platform's own steps on control ─────────
 
 
+class MoveTaken(RuntimeError):
+    """The move is no longer this worker's: its lease went to another, the hub no longer moves to that cluster (another
+    worker switched or undid it) or it was asked to be undone. Nothing more is written for it here."""
+
+
 @contextmanager
 def _control_transaction():
     """A transaction of control's own, whatever context the worker runs in."""
@@ -267,7 +272,7 @@ def _control_transaction():
 
 
 def hubs_moving() -> list[UUID]:
-    """The hubs asked to move, the longest asked first."""
+    """The hubs asked to move (or whose move is being undone), the longest asked first."""
     return list(Hub.objects.filter(moving_to__isnull=False).order_by("updated_at", "pk").values_list("pk", flat=True))
 
 
@@ -276,43 +281,96 @@ def moving_row(hub_id: UUID) -> Hub | None:
     return Hub.objects.select_related("cluster", "moving_to").filter(pk=hub_id).first()
 
 
-def move_finished(hub_id: UUID, origin: UUID | None, copy_name: str, at: dt.datetime) -> None:
-    """Switch ``hub_id`` to the cluster it moved to and keep the copy it left on ``origin`` (none: the settings' own
-    server), in one transaction: before it the hub is still where it was, after it where it moved."""
+def _ours(hub: Hub, target_id: UUID, owner: str, *, forward: bool) -> None:
+    """Refuse (``MoveTaken``) unless ``owner`` holds ``hub``'s lease, it still moves to ``target_id`` and, going
+    forward, nobody asked to undo it."""
+    if hub.moving_to_id != target_id:
+        raise MoveTaken(f"{hub.slug} no longer moves to {target_id}: another worker finished or undid it.")
+    # Whoever holds it: one that ran out and nobody took is still ``owner``'s (``base.services.renew_lease`` too).
+    if not HubDue.objects.filter(pk=hub.pk, lease_owner=owner).exists():
+        raise MoveTaken(f"the lease of {hub.slug} is no longer {owner}'s.")
+    if forward and MovedCopy.objects.filter(hub=hub, moved_at__isnull=True, undoing=True).exists():
+        raise MoveTaken(f"the move of {hub.slug} is to be undone.")
+
+
+def still_ours(hub_id: UUID, target_id: UUID, owner: str, *, forward: bool = True) -> None:
+    """Before a drop, a rename or the switch: ``MoveTaken`` unless the move is still ``owner``'s (see :func:`_ours`)."""
+    hub = Hub.objects.filter(pk=hub_id).first()
+    if hub is None:
+        raise MoveTaken(f"the hub {hub_id} is gone.")
+    _ours(hub, target_id, owner, forward=forward)
+
+
+def attributed(cluster_id: UUID | None, db_name: str, *, besides: UUID | None = None) -> bool:
+    """Whether control says ``db_name`` on ``cluster_id`` is a hub's database: one on that cluster (whichever), or one
+    moving to it other than ``besides`` (the hub whose move asks)."""
+    moving_there = Q(moving_to_id=cluster_id) & ~Q(pk=besides) if besides is not None else Q(moving_to_id=cluster_id)
+    return Hub.objects.filter(Q(cluster_id=cluster_id) | moving_there, db_name=db_name).exists()
+
+
+def move_finished(
+    hub_id: UUID, target_id: UUID, origin: UUID | None, copy_name: str, at: dt.datetime, *, owner: str
+) -> None:
+    """Switch ``hub_id`` to ``target_id`` and date its copy on ``origin`` (none: the settings' own server), in one
+    transaction on its locked row; ``MoveTaken`` when the move is no longer ``owner``'s (nothing written then). The
+    schema record is the destination's, which its migration wrote."""
     with _control_transaction():
         hub = Hub.objects.select_for_update().get(pk=hub_id)
-        hub.cluster_id = hub.moving_to_id
+        _ours(hub, target_id, owner, forward=True)
+        hub.cluster_id = target_id
         hub.moving_to = None
         hub.last_error = ""
         hub.save(update_fields=["cluster", "moving_to", "last_error", "updated_at"])
         MovedCopy.objects.update_or_create(
-            cluster_id=origin, db_name=copy_name, defaults={"hub_id": hub_id, "moved_at": at}
+            cluster_id=origin,
+            db_name=copy_name,
+            defaults={"hub_id": hub_id, "moved_at": at, "undoing": False, "schema_state": "", "schema_apps": None},
         )
 
 
-def move_failed(hub_id: UUID, error: str) -> None:
-    """The move of ``hub_id`` failed and was undone: ready where it was, with why."""
+def move_undone(hub_id: UUID, origin: UUID | None, copy_name: str, error: str) -> None:
+    """The move of ``hub_id`` was undone: ready where it was, with why, its note forgotten and the schema record of its
+    origin given back (the destination's migration wrote its own meanwhile)."""
     with _control_transaction():
-        Hub.objects.filter(pk=hub_id).update(moving_to=None, last_error=error[:2000], updated_at=timezone.now())
+        hub = Hub.objects.select_for_update().get(pk=hub_id)
+        note = MovedCopy.objects.filter(hub=hub, cluster_id=origin, db_name=copy_name, moved_at__isnull=True).first()
+        fields = ["moving_to", "last_error", "updated_at"]
+        if note is not None and note.schema_state:
+            hub.schema_state, hub.schema_apps = note.schema_state, note.schema_apps or {}
+            fields += ["schema_state", "schema_apps"]
+        hub.moving_to = None
+        hub.last_error = error[:2000]
+        hub.save(update_fields=fields)
+        if note is not None:
+            note.delete()
 
 
 def move_stuck(hub_id: UUID, error: str) -> None:
-    """The move of ``hub_id`` failed and could not be undone yet: still moving (its host closed), tried again."""
+    """The move of ``hub_id`` failed and could not be undone yet: still moving (its host closed), its note marked to be
+    undone on the next pass, never taken forward."""
     with _control_transaction():
         Hub.objects.filter(pk=hub_id).update(last_error=error[:2000], updated_at=timezone.now())
+        MovedCopy.objects.filter(hub_id=hub_id, moved_at__isnull=True).update(undoing=True)
 
 
 def pending_copy(hub_id: UUID) -> MovedCopy | None:
-    """The copy that holds ``hub_id``'s data while its move goes on (no ``moved_at`` yet), if any."""
+    """The note of ``hub_id``'s move in course (no ``moved_at`` yet), if any."""
     return MovedCopy.objects.select_related("cluster").filter(hub_id=hub_id, moved_at__isnull=True).first()
 
 
-def copy_pending(hub_id: UUID, cluster_id: UUID | None, db_name: str) -> None:
-    """Note, before the rename, that ``hub_id``'s data is about to be in the copy ``db_name`` on ``cluster_id``."""
+def copy_pending(hub_id: UUID, cluster_id: UUID | None, db_name: str, *, schema_state: str, schema_apps) -> None:
+    """Note, before the rename, that ``hub_id``'s data is about to be in the copy ``db_name`` on ``cluster_id``, and the
+    origin's schema record; a note already there (a move cut short) keeps its record."""
     with _control_transaction():
-        MovedCopy.objects.update_or_create(
-            cluster_id=cluster_id, db_name=db_name, defaults={"hub_id": hub_id, "moved_at": None}
+        note, made = MovedCopy.objects.get_or_create(
+            cluster_id=cluster_id,
+            db_name=db_name,
+            defaults={"hub_id": hub_id, "moved_at": None, "schema_state": schema_state, "schema_apps": schema_apps},
         )
+        if not made and note.moved_at is not None:
+            note.hub_id, note.moved_at, note.undoing = hub_id, None, False
+            note.schema_state, note.schema_apps = schema_state, schema_apps
+            note.save()
 
 
 def copies_due(before: dt.datetime) -> list[MovedCopy]:
@@ -325,3 +383,21 @@ def forget_copy(cluster_id: UUID | None, db_name: str) -> None:
     """The moved copy ``db_name`` on ``cluster_id`` (none: the settings' own server) is gone: its row goes too."""
     with _control_transaction():
         MovedCopy.objects.filter(cluster_id=cluster_id, db_name=db_name).delete()
+
+
+def leftover_noted(hub_id: UUID, cluster_id: UUID, db_name: str, at: dt.datetime) -> None:
+    """Note that an undone move of ``hub_id`` may have left ``db_name`` on ``cluster_id``: dropped on a later pass."""
+    with _control_transaction():
+        LeftoverDatabase.objects.update_or_create(
+            cluster_id=cluster_id, db_name=db_name, defaults={"hub_id": hub_id, "noted_at": at}
+        )
+
+
+def leftovers() -> list[LeftoverDatabase]:
+    """What undone moves may have left on their destinations, the oldest first, with their cluster and hub."""
+    return list(LeftoverDatabase.objects.select_related("cluster", "hub", "hub__cluster").order_by("noted_at", "pk"))
+
+
+def forget_leftover(cluster_id: UUID, db_name: str) -> None:
+    with _control_transaction():
+        LeftoverDatabase.objects.filter(cluster_id=cluster_id, db_name=db_name).delete()

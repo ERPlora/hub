@@ -378,6 +378,12 @@ class MovedCopy(UUIDModel):
     )
     db_name = models.CharField(_("database"), max_length=63)
     moved_at = models.DateTimeField(_("moved at"), null=True, blank=True)
+    # While the move goes on: the origin's schema record as control had it (the destination's is written when it is
+    # migrated, ``migrator.ensure_schema``), given back if the move is undone; and whether it is to be undone (a
+    # cancel, or an undo that could not finish: tried again as an undo, never taken forward).
+    schema_state = models.CharField(_("schema"), max_length=16, blank=True, default="", db_default="")
+    schema_apps = models.JSONField(_("created apps"), null=True, blank=True)
+    undoing = models.BooleanField(_("being undone"), default=False, db_default=False)
 
     class Meta:
         verbose_name = _("copy after a move")
@@ -387,6 +393,31 @@ class MovedCopy(UUIDModel):
             models.UniqueConstraint(
                 fields=["cluster", "db_name"], name="control_movedcopy_one_per_server", nulls_distinct=False
             )
+        ]
+
+    def __str__(self) -> str:
+        return self.db_name
+
+
+class LeftoverDatabase(UUIDModel):
+    """A database a move may have left on its destination when it was undone without reaching it (round 2026-10-31 of
+    the review of W8): the hub's name on that cluster, dropped by the worker on a later pass (``base.tenancy.move``)
+    under the hub's lease, never while control says a hub's database is there (the hub on that cluster, moving to it,
+    or living on the same server), and forgotten then."""
+
+    hub = models.ForeignKey(Hub, on_delete=models.CASCADE, related_name="leftovers", verbose_name=_("hub"))
+    cluster = models.ForeignKey(
+        Cluster, on_delete=models.PROTECT, related_name="leftovers", verbose_name=_("cluster")
+    )
+    db_name = models.CharField(_("database"), max_length=63)
+    noted_at = models.DateTimeField(_("noted at"))
+
+    class Meta:
+        verbose_name = _("database left by an undone move")
+        verbose_name_plural = _("databases left by undone moves")
+        ordering = ["noted_at"]
+        constraints = [
+            models.UniqueConstraint(fields=["cluster", "db_name"], name="control_leftover_one_per_server")
         ]
 
     def __str__(self) -> str:

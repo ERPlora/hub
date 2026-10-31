@@ -32,7 +32,7 @@ from base.tenancy import bootstrap, identity, migrator, move, names
 from base.tenancy import connections as tenancy_connections
 from base.tenancy.context import use_control
 from base.tenancy.tests import hubs
-from control.models import Cluster, Hub, HubDue, MovedCopy
+from control.models import Cluster, Hub, HubDue, LeftoverDatabase, MovedCopy
 
 pytestmark = pytest.mark.usefixtures("no_test_fallback")
 
@@ -393,11 +393,12 @@ class TestResuming:
         assert (hub.cluster_id, hub.moving_to_id) == (target.pk, None)
         assert marker(hub.db_name) == [MARKER] and marker(copy) == [MARKER]
 
-    def test_an_undo_that_failed_is_gone_on_from_the_copy_never_from_a_database_that_only_has_the_name(
+    def test_an_undo_that_failed_is_tried_again_as_an_undo_never_from_a_database_that_only_has_the_name(
         self, moves, monkeypatch
     ):
-        # The destination is on the origin's server: after the rename, the hub's database name there is the
-        # destination's. A pass that failed and could not undo leaves both; the next one copies from the copy.
+        # Review of round 2: a move that could not be undone is not taken forward on the next pass; it goes back to its
+        # origin. The destination is on the origin's server here: after the rename, the hub's name there is the
+        # destination's, never the data, which stays in the copy until it is renamed back.
         target = moves.cluster()
         hub = moves.hub(to=target)
         control = tenancy_connections.control_name()
@@ -408,21 +409,23 @@ class TestResuming:
 
         with monkeypatch.context() as patched:
             patched.setattr(move, "_ensure_schema", broken)
-            patched.setattr(move, "_undo", broken)
+            patched.setattr(move, "_rename_back", broken)
             run()
 
         stuck = fresh(hub)
         assert stuck.moving_to_id == target.pk and "move_undo_failed" in stuck.last_error
         assert marker(copy) == [MARKER]
         [pending] = MovedCopy.objects.filter(hub=hub)
-        assert pending.moved_at is None
+        assert (pending.moved_at, pending.undoing) == (None, True)
 
         run()
 
         hub = fresh(hub)
-        assert (hub.cluster_id, hub.moving_to_id, hub.last_error) == (target.pk, None, "")
-        assert marker(hub.db_name) == [MARKER] and marker(copy) == [MARKER]
-        assert MovedCopy.objects.get(hub=hub).moved_at == AT
+        assert (hub.cluster_id, hub.moving_to_id) == (None, None)
+        # The reason of the move's failure, not of the undo that failed meanwhile.
+        assert hub.last_error == "move_unexpected: RuntimeError: broke on purpose"
+        assert marker(hub.db_name) == [MARKER] and copy not in databases()
+        assert not MovedCopy.objects.filter(hub=hub).exists()
 
     def test_an_older_copy_of_the_same_hub_on_the_origin_gives_way_to_the_newer(self, moves):
         target = moves.cluster()
@@ -507,3 +510,168 @@ def test_the_restore_leaves_out_the_extensions_and_the_public_schema_of_the_copy
         "230; 1259 16500 TABLE public base_hub_identity hub_migrator",
         "4012; 0 16500 TABLE DATA public base_hub_identity hub_migrator",
     ]
+
+
+
+# ── Review of round 2: two workers, an unreachable destination, a missing origin, the schema record ──────────────────
+
+
+class TestTwoWorkers:
+    """A worker whose lease ran out (each deploy starts the new one before the old stops) never acts on a move another
+    one took over: before each drop, rename or switch it checks it still holds the lease and that the hub still moves
+    to its destination; the switch checks both on the locked row."""
+
+    def test_a_late_switch_never_puts_the_hub_on_no_cluster(self, moves, monkeypatch, caplog):
+        target = moves.cluster()
+        hub = moves.hub(to=target)
+        real = move._ensure_schema
+        state = {"inner": False}
+
+        def slow(moving, cluster, heartbeat=None):
+            real(moving, cluster, heartbeat)
+            if not state["inner"]:
+                state["inner"] = True
+                move.move_hub(moving.id)  # the worker that took the lease over, all the way to its switch
+
+        monkeypatch.setattr(move, "_ensure_schema", slow)
+
+        run()
+
+        hub = fresh(hub)
+        assert (hub.cluster_id, hub.moving_to_id, hub.last_error) == (target.pk, None, "")
+        assert marker(hub.db_name) == [MARKER]
+        assert "base.tenancy.move.stopped" in caplog.text
+
+    def test_a_stale_worker_never_drops_the_live_destination_nor_touches_control(self, moves, monkeypatch, caplog):
+        target = moves.cluster()
+        hub = moves.hub(to=target)
+        real_dump = move._dump
+        state = {"nested": False}
+
+        def dump(source, cluster, path, heartbeat, cancelled=None):
+            real_dump(source, cluster, path, heartbeat, cancelled)
+            if not state["nested"]:
+                state["nested"] = True
+                move.move_hub(hub.id)  # the other worker, all the way to its switch
+                with hubs._maintenance(fresh(hub).db_name) as conn:
+                    conn.execute("INSERT INTO w8a_marker VALUES ('written after the switch')")
+
+        monkeypatch.setattr(move, "_dump", dump)
+
+        run()
+
+        hub = fresh(hub)
+        assert (hub.cluster_id, hub.moving_to_id, hub.last_error) == (target.pk, None, "")
+        assert marker(hub.db_name) == [MARKER, "written after the switch"]
+        assert MovedCopy.objects.get(hub=hub).moved_at is not None
+        assert "base.tenancy.move.stopped" in caplog.text
+
+    def test_the_destination_control_says_is_a_hubs_there_is_never_dropped(self, moves):
+        target = moves.cluster()
+        hub = moves.hub(to=target)
+        other = moves.hub(to=None, cluster=target)
+        # A row of control that says the name is a hub's database on that cluster (another hub, here: a broken state).
+        Hub.objects.filter(pk=other.pk).update(db_name=hub.db_name)
+
+        with pytest.raises(move.MoveStopped):
+            move._make_destination(fresh(hub), target, move.ops.environment_roles(tenancy_connections.control_name()))
+
+        assert marker(hub.db_name) == [MARKER]
+
+
+class TestTheOriginFirst:
+    """Undoing starts with the origin: the copy renamed back and opened to the app, the hub ready there. The destination
+    is cleaned when it answers; when it does not, what may be left there is noted (``LeftoverDatabase``) and dropped on a
+    later pass, never a database control says is a hub's, nor one on the hub's own server."""
+
+    def test_an_unreachable_destination_puts_the_hub_back_on_its_origin_at_once(self, moves):
+        target = moves.cluster("dead", port=1)
+        hub = moves.hub(to=target)
+        control = tenancy_connections.control_name()
+
+        run()
+
+        hub = fresh(hub)
+        assert (hub.cluster_id, hub.moving_to_id) == (None, None)
+        assert hub.last_error.startswith("move_clone_failed")
+        assert marker(hub.db_name) == [MARKER] and names.moved_db_name(control, hub.id) not in databases()
+        assert not MovedCopy.objects.filter(hub=hub).exists()
+        [left] = LeftoverDatabase.objects.filter(hub=hub)
+        assert (left.cluster_id, left.db_name) == (target.pk, hub.db_name)
+
+    def test_a_leftover_is_dropped_on_a_later_pass_and_forgotten(self, moves):
+        # The hub lives on another server (a row that points elsewhere); its name on this one is only a leftover.
+        elsewhere = moves.cluster("elsewhere", port=1)
+        target = moves.cluster()
+        hub = moves.hub(to=None, cluster=elsewhere)
+        with use_control():
+            LeftoverDatabase.objects.create(hub=hub, cluster=target, db_name=hub.db_name, noted_at=AT)
+
+        run()
+
+        assert hub.db_name not in databases()
+        assert not LeftoverDatabase.objects.filter(hub=hub).exists()
+
+    @pytest.mark.parametrize("where", ["the hubs own server", "the hubs cluster now", "its move there"])
+    def test_a_leftover_that_is_a_hubs_live_database_is_never_dropped(self, moves, where):
+        target = moves.cluster()
+        if where == "the hubs own server":
+            hub = moves.hub(to=None)  # on the settings' own server: the same one the target's row points at
+        elif where == "the hubs cluster now":
+            hub = moves.hub(to=None, cluster=target)
+        else:
+            hub = moves.hub(to=target)
+        with use_control():
+            LeftoverDatabase.objects.create(hub=hub, cluster=target, db_name=hub.db_name, noted_at=AT)
+
+        with use_control():
+            move.drop_leftovers(AT)
+
+        assert marker(hub.db_name) == [MARKER]
+        if where != "its move there":
+            assert not LeftoverDatabase.objects.filter(hub=hub).exists()
+
+    def test_a_database_missing_on_the_origin_ends_the_move_with_why(self, moves):
+        hub = moves.hub(to=moves.cluster())
+        control = tenancy_connections.control_name()
+        with hubs._maintenance() as conn:
+            hubs._drop(conn, hub.db_name, control)
+
+        run()
+
+        hub = fresh(hub)
+        assert hub.moving_to_id is None and hub.last_error.startswith("move_database_missing")
+
+    def test_a_failed_switch_gives_control_back_the_origins_schema_record(self, moves, monkeypatch):
+        hub = moves.hub(to=moves.cluster(), schema_state=Hub.SchemaState.BEHIND, schema_apps={"base": "0001_initial"})
+
+        def broken(*args, **kwargs):
+            raise RuntimeError("control blinked")
+
+        monkeypatch.setattr(move, "_switch", broken)
+
+        run()
+
+        hub = fresh(hub)
+        assert (hub.moving_to_id, hub.schema_state, hub.schema_apps) == (None, "behind", {"base": "0001_initial"})
+
+    def test_a_move_asked_to_be_cancelled_goes_back_on_the_next_pass(self, moves, monkeypatch):
+        target = moves.cluster()
+        hub = moves.hub(to=target)
+
+        def stopped(*args, **kwargs):
+            raise move.MoveStopped("the worker is stopping")
+
+        with monkeypatch.context() as patched:
+            patched.setattr(move, "_restore", stopped)
+            run()
+        assert fresh(hub).moving_to_id == target.pk
+        with use_control():
+            MovedCopy.objects.filter(hub=hub).update(undoing=True)
+
+        run()
+
+        hub = fresh(hub)
+        assert (hub.cluster_id, hub.moving_to_id) == (None, None)
+        assert hub.last_error.startswith("move_cancelled")
+        assert marker(hub.db_name) == [MARKER] and not MovedCopy.objects.filter(hub=hub).exists()
