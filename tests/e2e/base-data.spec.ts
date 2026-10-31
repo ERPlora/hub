@@ -24,6 +24,18 @@ import { A, api, ARTIFACTS, emptyOfTemplateData, horizontalOverflow, hostPage, s
 // A control that never comes fails in half a minute and says which, instead of eating the whole test.
 test.use({ actionTimeout: 30_000 });
 
+// Once the tests are over (a failed one included), `a` is emptied again of what the templates loaded here brought, as
+// the run found it: every later spec uses the same business (hub#529: SALE-F12's «All» started with a service, and
+// the website's catalogue showed six categories instead of two). template-data.test.ts keeps every such spec at it.
+test.afterAll(async ({ browser }) => {
+  const { context } = await hostPage(browser, A, { next: '/' });
+  try {
+    await emptyOfTemplateData(context, A);
+  } finally {
+    await context.close();
+  }
+});
+
 const VIEWPORTS = {
   390: { width: 390, height: 844 },
   834: { width: 834, height: 1112 },
