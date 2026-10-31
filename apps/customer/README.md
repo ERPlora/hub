@@ -71,6 +71,6 @@ pnpm e2e tests/e2e/customer-flows.spec.ts tests/e2e/customer-pages.spec.ts tests
 ## Qué queda fuera
 
 - `CUSTOMER-F26` (hub#514), los importes sin separador de millares (hub#512), la tarjeta del asistente que
-  no dice qué ficha toca (hub#513) y el país del negocio para un teléfono sin prefijo (cruza las apps que
-  buscan fichas por teléfono): «Lo que queda fuera» del WORKBOOK.
+  no dice qué ficha toca (hub#513) y el país del negocio para un teléfono sin prefijo (hub#527, cruza las apps
+  que buscan fichas por teléfono): «Lo que queda fuera» del WORKBOOK.
 - Las peticiones de [`UI-REQUESTS.md`](UI-REQUESTS.md).

@@ -44,7 +44,8 @@ Quién la usa:
 ERPlora no inventa flujos: adopta los que el mercado ya probó.
 
 - **Teléfonos en formato internacional E.164** (UIT-T), con las reglas de **libphonenumber** de
-  Google: el número sin prefijo se lee en el país del negocio, como hacen los TPV de referencia.
+  Google: el número sin prefijo se lee en el país del negocio, como hacen los TPV de referencia;
+  ERPlora hoy lo lee siempre en España (CUSTOMER-F11, hub#527).
 - **Alta de ficha** como Odoo, Shopify, Square, Toast, Lightspeed, Fresha y Holded: solo el nombre es
   obligatorio; teléfono, email y NIF a la vista y el resto a un toque.
 - **Unir fichas duplicadas** como Square, Shopify, Odoo, Fresha, Lightspeed y Mindbody: una ficha se
@@ -1218,7 +1219,7 @@ asistente. Lo que en el producto actual tenía el perfil «Cajero» lo tiene aqu
   F11), aunque la plataforma ya guarda el país de cada negocio. Cambiarlo solo en Clientes partiría
   las fichas: Clientes las guardaría con el prefijo del negocio y Citas, Ventas, Facturas, Servicios,
   Tarifas, Mesas, Reservas, Reservas online y la Bandeja de WhatsApp, que las buscan sin decir de qué
-  negocio, seguirían buscando el de España. Propuesto como FIX que cruza esas apps (CLOSE-CUSTOMER).
+  negocio, seguirían buscando el de España. hub#527.
 
 ## Lo que NO hace, a propósito
 

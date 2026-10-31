@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:9744a1794e6a7f9b6cff7d1b8b2d406743dc4d5f9d4cf17c247c75c2b5e66a11 -->
+<!-- generated from WORKBOOK.md sha256:ed840a901ff341f3a14d4b4245851d2f0bd4544c5c94005c7afa55c504af1199 -->
 
 ## What it is for and who it is for
 
@@ -31,7 +31,8 @@ Who uses it:
 ERPlora does not invent flows: it adopts the ones the market has already proven.
 
 - **Phones in the international E.164 format** (ITU-T), with Google's **libphonenumber** rules: a number
-  without prefix is read in the business's country, as the reference POS systems do.
+  without prefix is read in the business's country, as the reference POS systems do; ERPlora today always
+  reads it in Spain (CUSTOMER-F11, hub#527).
 - **Adding a card** like Odoo, Shopify, Square, Toast, Lightspeed, Fresha and Holded: only the name is
   required; phone, email and tax ID in sight and the rest one tap away.
 - **Merging duplicate cards** like Square, Shopify, Odoo, Fresha, Lightspeed and Mindbody: one card
