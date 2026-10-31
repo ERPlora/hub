@@ -564,6 +564,30 @@ def test_the_people_of_a_photo_of_a_business_being_prepared_wait_for_its_seeding
     assert entered == []
 
 
+def test_a_photo_of_a_business_cancelled_before_its_database_was_made_is_kept_without_entering_it(client, db):
+    # Signed up (requested, its database not made yet) and deleted at once: cancelled, never ready.
+    signed(client, "put", HUB_PATH, REGISTRY)
+    deleted = signed(client, "delete", HUB_PATH, {"id": NEW_ID})
+    assert deleted.status_code < 300 and Hub.objects.get(pk=NEW_ID).status == "cancelled"
+    assert Hub.objects.get(pk=NEW_ID).ready_at is None
+    owner = "01a18f92-0000-7000-8000-000000000002"
+    photo = {
+        "id": NEW_ID,
+        "version": 4,
+        "status": "active",
+        "verifactu": {},
+        "whatsapp": {"status": "connected"},
+        "members": [{"user_id": owner, "role": "hub_owner", "email": "ana@example.com", "name": "Ana"}],
+    }
+
+    answer = signed(client, "put", f"{HUB_PATH}/state", photo, with_v2=True)
+
+    # Kept on its row for the day it is restored and made; its database, which does not exist, is never entered.
+    hub = Hub.objects.get(pk=NEW_ID)
+    assert answer.status_code == 200 and answer.json() == {"applied": True, "version": 4}
+    assert (hub.state_version, hub.state["members"][0]["user_id"]) == (4, owner)
+
+
 def test_a_saas_that_is_away_never_breaks_the_ready_notice(client, db, saas_at, caplog):
     saas_at(raises=OSError("connection refused"))
 

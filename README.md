@@ -84,15 +84,18 @@ Plan `docs/plans/2026-10-22-fase-2-tenencia.md` de erplora-next; reglas en PLAN-
   y retira el modo.
 - **Alta** (`base/tenancy/provision.py`, S2a). `PUT /internal/hubs/{id}` y `POST /internal/demos` dejan el hub
   `requested` y debido en `control.HubDue`; el worker (o `provision(hub)`) toma su arriendo (`SELECT … FOR UPDATE SKIP
-  LOCKED`, 60 s, renovado en cada paso: dos altas a la vez hacen una sola BD) y lo lleva por `creating` (lo coloca en
+  LOCKED`, 60 s, renovado en cada paso y entre app y app al migrar: dos altas a la vez hacen una sola BD) y lo lleva por `creating` (lo coloca en
   el `Cluster` abierto con menos hubs bajo su `max_hubs`, o en el servidor de los settings si no hay ninguna fila; sin
   sitio, `no_cluster_available`; y clona `<control>_template[_<vertical>]` de ese cluster con `CREATE DATABASE …
   TEMPLATE`, privada: nada a `PUBLIC`, `CONNECT, TEMPORARY` a `hub_app` y `hub_admin`), `migrating` (lleva a la hoja
-  las apps que la plantilla ya tiene, más `base`, y anota `schema_apps = {app: su última migración}`), `seeding` (la foto
-  del SaaS guardada en la fila: sus personas y los bloques de las apps encendidas) y `ready` (el SaaS lo oye tras el COMMIT). Cada paso escribe
+  las apps que la plantilla ya tiene, más `base` y, hasta S3, todas las portables, y anota `schema_apps = {app: su
+  última migración}`), `seeding` (la foto del SaaS guardada en la fila: sus personas y los bloques de las apps
+  encendidas; si llega otra mientras, se aplica también antes de `ready`) y `ready` (el SaaS lo oye tras el COMMIT).
+  Una foto que llega a un negocio sin BD hecha (preparándose, o cancelado o fallido antes de estar listo) se guarda en
+  la fila sin entrar en ella (`registry.database_is_made`). Cada paso escribe
   control en una transacción corta (`base/services.py`, «The provisioning's writes in control») y se puede repetir. Un
   fallo deja `failed` con `attempts`, `last_error` (`<código>: <motivo>`: `no_cluster_available`, `template_missing`,
-  `clone_failed`, `schema_failed`, `unexpected`) y `next_attempt_at` (1 min, 5 min, 15 min y luego cada hora). La
+  `clone_failed`, `schema_failed`, `photo_moving`, `unexpected`) y `next_attempt_at` (1 min, 5 min, 15 min y luego cada hora). La
   puerta del host responde 503 en todos esos estados. `CREATE`/`DROP DATABASE` van por `base/tenancy/ops.py`: conexión
   directa del migrador a `postgres`, en autocommit, cerrada al salir.
 - **Roles y clusters** (`base/tenancy/credentials.py`). El rol del migrador (`DB_MIGRATOR_USER/PASSWORD`; vacío, el de
@@ -136,7 +139,10 @@ Plan `docs/plans/2026-10-22-fase-2-tenencia.md` de erplora-next; reglas en PLAN-
   plantillas de cada servidor (`clusters_to_migrate`: sin filas de `Cluster`, el del settings; con ellas, los abiertos
   y los cerrados que aún tienen hubs, y el del settings mientras viva en él un hub sin cluster), como canarios: si una
   falla, no se toca ningún hub; 3) los hubs atrasados según `schema_apps` (un despliegue sin migraciones no abre
-  ninguna BD de hub) con BD propia y estado `ready`, `cancelled` o `expired`: primero el de ERPlora y después 4 a la
+  ninguna BD de hub) con BD propia ya hecha (`registry.own_database_made`: lista o con `ready_at`; uno cancelado o
+  caducado antes de estar listo no tiene BD y no para el despliegue) y estado `ready`, `cancelled` o `expired` (hasta
+  S3 también los que no tienen alguna app portable con migraciones: se la añade, `migrator.apps_to_add`, salvo a una
+  demo caducada): primero el de ERPlora y después 4 a la
   vez, cada uno en su servidor; un fallo de `lock_timeout` se reintenta hasta 3 veces, y el hub que falla queda
   `behind`, no para a los demás y hace salir al comando con código ≠ 0. Una BD por delante del código (tras un
   rollback) no cuenta como atrasada. `--check` no aplica nada: lista lo pendiente de control, de las plantillas (abre
