@@ -540,6 +540,8 @@ def blueprint_list(ctx: OperationContext, data: BlueprintListIn) -> dict:
             "never takes personal data (customers); a backup takes them. People, PINs and fiscal data never."
         ),
         risk="high",
+        # Only for live.E020 (it checks the whole app): base.assistant.NOT_FROM_CHAT keeps this out of the chat
+        # (pinned by base/tests/test_assistant.py).
         asks={
             "en": ("make a backup of the whole business", "export my menu as a template for the other bar"),
             "es": ("haz una copia de seguridad del negocio", "exporta mi carta como plantilla para el otro local"),
@@ -1519,7 +1521,7 @@ def person_detail_out(ctx: OperationContext, person: dict[str, Any]) -> dict[str
         ),
         asks={
             "en": ("who has access to the business?", "list everyone and their role", "who still hasn't signed in?"),
-            "es": ("¿quién tiene acceso al negocio?", "dime la gente que hay y su rol"),
+            "es": ("¿quién tiene acceso al negocio?", "¿quién puede entrar en el negocio y con qué rol?"),
         },
     ),
 )
@@ -1818,8 +1820,8 @@ def _approval_cell(text: str) -> str:
             "asked, how and whether it was used. It names people of the business."
         ),
         asks={
-            "en": ("export the approvals to a CSV", "download last month's manager approvals"),
-            "es": ("exporta las aprobaciones a un CSV", "descárgame las autorizaciones del mes pasado"),
+            "en": ("show me last month's manager approvals", "list the approvals made with a badge this week"),
+            "es": ("enséñame las autorizaciones del mes pasado", "¿qué se aprobó con placa esta semana?"),
         },
     ),
 )

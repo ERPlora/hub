@@ -18,7 +18,7 @@ from django.conf import settings
 from live import assistant as shared
 from live.assistant_qa import Miss, misses, uncovered
 from live.context import OperationContext, Scope
-from live.operations import Operation, registry
+from live.operations import MIN_ASKS, Operation, registry
 
 from base import approvals, assistant
 from base.models import Membership
@@ -81,6 +81,12 @@ def backlog(tools: Iterable[Operation], language: str) -> Counter[str]:
 def test_each_ask_of_a_listed_app_brings_its_tool_among_the_first_ten(context_of, label, language, role):
     assert label in assistant.active_apps(A)  # on in business a: its tools are in the catalogue, the sweep is real
     tools = assistant.catalog(context_of(role, language))
+    ranked = {name: op for name, op in tools.items() if op.app_label == label}
+    if role == Membership.Role.OWNER:  # who runs the business holds every tool of an app on: never an empty sweep
+        assert ranked, f"the owner's catalogue has no tool of {label!r}: none of its asks would be checked"
+    # Each tool of the app this role holds is ranked by MIN_ASKS phrases or more of its own in this language.
+    checked = {name: len(shared.asks_of(op).get(language, ())) for name, op in ranked.items()}
+    assert {name: count for name, count in checked.items() if count < MIN_ASKS} == {}
     assert [name for name in uncovered(tools, language) if of_app(name, label)] == []
     assert [miss for miss in missed(tools, language) if of_app(miss.tool_name, label)] == []
 

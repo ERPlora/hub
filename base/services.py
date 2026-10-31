@@ -1499,6 +1499,8 @@ def has_own_database(hub: Hub | None) -> bool:
             "confirm. Without it, empties the apps chosen for good, given the business's name typed exactly."
         ),
         risk="high",
+        # Only for live.E020 (it checks the whole app): base.assistant.NOT_FROM_CHAT keeps this out of the chat
+        # (pinned by base/tests/test_assistant.py).
         asks={
             "en": ("wipe all the data and start over", "empty the business, I want to start from scratch"),
             "es": ("borra todos los datos y empezamos de cero", "vacía el negocio, quiero empezar de nuevo"),
