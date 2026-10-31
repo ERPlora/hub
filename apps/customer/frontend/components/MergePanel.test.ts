@@ -5,7 +5,7 @@ import { toastSuccess } from '@erplora/ui/shell';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { customerRow, pageOf } from '../__tests__/fixtures';
-import { approvalDialog, approvalSettled, asksApproval } from '../__tests__/approval-dialog';
+import { approvalDialog, approvalSettled, asksApproval, CANCELLED } from '../__tests__/approval-dialog';
 import { flush, json, type MountOptions, mountCustomer, refusal, sent } from '../__tests__/mount-customer';
 import CustomerPicker from './CustomerPicker.vue';
 import MergePanel from './MergePanel.vue';
@@ -104,5 +104,19 @@ describe('MergePanel with a manager’s approval (BASE-F84)', () => {
     expect(s.net.api.map((call) => sent(call).path)).toEqual(['/api/customer/customers/merge', '/api/customer/customers/merge']);
     expect(toastSuccess).toHaveBeenCalledWith('Ana G. was merged into this customer.');
     expect(s.wrapper.emitted('done')).toHaveLength(1);
+  });
+
+  it('«Cancel» on the approval merges nothing and the panel says why', async () => {
+    const s = await setup();
+    await s.pick();
+    approvalDialog.answer = CANCELLED;
+    s.net.onApi(() => Response.json(asksApproval('customer.customer.merge', 'Merge two customer cards'), { status: 403 }));
+    await s.click('customer-merge-submit');
+    await approvalSettled();
+    await flush();
+    expect(s.net.api).toHaveLength(1);
+    expect(s.wrapper.get('[data-testid="customer-merge-error"]').text()).toContain('This needs a manager’s approval.');
+    expect(toastSuccess).not.toHaveBeenCalled();
+    expect(s.wrapper.emitted('done')).toBeUndefined();
   });
 });

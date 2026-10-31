@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:9ad321a283e2f3750d8aed3985ab459eaadb7d45fda0974694fdee004f924e5e -->
+<!-- generated from WORKBOOK.md sha256:f7b9eb9e73bfae2f78458cfb6221de7249f5abfb3628e238cf6b2a32a3bdeae8 -->
 
 ## What it is for and who it is for
 
@@ -21,7 +21,8 @@ Who uses it:
 - The **manager**: edits cards, merges duplicates, creates and changes groups, tags and fields (and
   deletes fields), exports and notes in the activity what other apps bring.
 - The **employee** (also at the till): looks up, adds, edits the card, imports, adds notes, assigns
-  groups and tags, records consent and puts the customer on the sale.
+  groups and tags, records consent and puts the customer on the sale. With a manager's PIN, on their
+  own device, merges duplicates and creates or changes groups, tags and fields (BASE-F84).
 - The **customer** does not use these screens: their data comes in at the counter, at the till or
   through their WhatsApp.
 
@@ -54,9 +55,9 @@ ERPlora does not invent flows: it adopts the ones the market has already proven.
 1. Turn on **Customers** on the business's apps page. It needs no other app. With **Sales & POS** the
    search appears at the till and purchases are recorded by themselves; with **Appointments**, the
    visit history on the card; with the **WhatsApp inbox**, recognition by phone.
-2. The country assumed for a phone written without prefix is today **Spain**, even if the business has
-   another country in Settings → Business: a phone from another country is written with its prefix
-   (`+48…`) (CUSTOMER-F11).
+2. A phone written without prefix is read in the **business's country**, the one in Settings →
+   Business (the same one that gives the currency); while the business has no country, in Spain. A
+   phone from another country is written with its prefix (`+48…`) (CUSTOMER-F11).
 3. If segmenting is needed, create the groups, the tags (CUSTOMER-F27, F28) and the business's own
    fields (CUSTOMER-F29). Mark as required only the essential ones: they are demanded every time the
    full card is saved (not when it is added).
@@ -84,7 +85,7 @@ may manage cards, and **Export CSV** for whoever may export. Tapping a row opens
 
 ### Customer card
 The name and the buttons the profile allows: **Edit**, **Delete**, **Merge with…** and **Erase personal
-data**. Blocks: the details (Email, Phone, Tax ID, Company, Address, Stage, Source, Preferred channel,
+data** (the employee sees **Merge with…**, which they do with a manager's PIN). Blocks: the details (Email, Phone, Tax ID, Company, Address, Stage, Source, Preferred channel,
 Purchases, Spent, Last purchase, Active, internal notes, birthday, anniversary and custom fields);
 "Groups" and "Tags" with checkboxes; "Marketing consent" with one line per channel and "Everything that
 was decided"; "Add note"; "Activity"; "Purchases" (each sale with its amount and its status); and at the
@@ -92,15 +93,16 @@ end the blocks of other apps (today, the "Visit history" of Appointments).
 
 ### Groups
 Table "Name", "Description", "Customers" (how many live cards it has), "Order" and "Active"; search
-"Search group…" and an active filter; **Add** and **Edit** for whoever may configure, **Delete** for the
-owner and the administrator.
+"Search group…" and an active filter; **Add** and **Edit** for whoever may configure and for the
+employee (with a manager's PIN), **Delete** for the owner and the administrator.
 
 ### Tags
 Table "Name", "Color", "Customers" and "Active"; search "Search tag…"; same actions as Groups.
 
 ### Fields
 Table "Name", "Type", "Required" (Yes/No), "Order" and "Active"; search "Search field…"; filters by
-type, required and active; **Add**, **Edit** and **Delete** for whoever may configure.
+type, required and active; **Add**, **Edit** and **Delete** for whoever may configure and for the
+employee (with a manager's PIN).
 
 ### Till customer search
 It lives inside the sale screen of **Sales & POS**: an "Assign customer" button (or the name of the
@@ -409,7 +411,8 @@ Steps:
    one has it (with spaces or dashes, with `0034` or `+34` in front, or with another country's prefix and
    the national zero in brackets).
 2. On saving, libphonenumber's rules are read: with the prefix it carries or, if it carries none, in the
-   business's country (today always Spain, see "Before you start"); out go spaces, dashes, dots, slashes,
+   business's country (the one in Settings → Business; Spain if it has none yet: in a business in Poland, a
+   mobile without prefix is stored with `+48` in front); out go spaces, dashes, dots, slashes,
    brackets and the national zero (also in brackets after the prefix). Italy and the other countries that
    keep the `0` after the prefix keep it. The number has to be a valid number of its country (its
    numbering, not only its length). It is stored with its prefix and the digits together (`+34` and the
@@ -443,7 +446,7 @@ Involved: WHATSAPP_INBOX-F37
 
 ### CUSTOMER-F13 Merge two cards of the same person
 Status: done
-Actor: owner, administrator, manager
+Actor: owner, administrator, manager; the employee, with a manager's PIN
 Screen: Customer card
 Steps:
 1. Open the card that is going to STAY and tap **Merge with…**.
@@ -452,6 +455,9 @@ Steps:
    conversations, prepaid packages, notes and consents move to {surviving}, empty fields are filled from
    it, and {absorbed} disappears from the list. This cannot be undone.".
 4. Tap **Merge**. "{name} was merged into this customer." shows.
+5. If an employee taps it, "An approval is needed" opens on top first with "Approving: Merge two customer
+   cards", and a manager approves it with their PIN (or their badge) on that same device (BASE-F84); then
+   they are merged.
 In: the two cards, live and different.
 Out: the one that stays keeps its details and only fills its EMPTY fields with the other's (also the
 preferred channel if it was "None"); the internal notes are put together one after the other; purchases
@@ -466,8 +472,9 @@ cards-merged notice (`customer.customer.merged`) makes Appointments, Sales & POS
 and Services re-point what is theirs; Online booking follows it through Appointments. Kitchen keeps no
 customer: it has nothing to re-point.
 If it fails: "This customer is no longer available." if one of the two is no longer there; choosing the
-same card: "Pick another card: a card cannot be merged into itself.". Nothing changes.
-Involved: APPOINTMENT-F23, RESERVATION-F21, SALE-F33, SERVICE-F28, WHATSAPP_INBOX-F12, ONLINE_BOOKING-F09
+same card: "Pick another card: a card cannot be merged into itself."; if "Cancel" is tapped in "An
+approval is needed", "This needs a manager's approval.". Nothing changes.
+Involved: APPOINTMENT-F23, RESERVATION-F21, SALE-F33, SERVICE-F28, WHATSAPP_INBOX-F12, ONLINE_BOOKING-F09, BASE-F84
 
 ### CUSTOMER-F14 Record the consent of a channel
 Status: done
@@ -722,7 +729,8 @@ Involved: WHATSAPP_INBOX-F21, WHATSAPP_INBOX-F24, WHATSAPP_INBOX-F37, APPOINTMEN
 
 ### CUSTOMER-F27 Create, change and delete customer groups
 Status: done
-Actor: owner, administrator, manager (deleting: owner and administrator)
+Actor: owner, administrator, manager; the employee creates and changes with a manager's PIN (deleting:
+owner and administrator)
 Screen: Groups
 Steps:
 1. In **Groups** tap **Add** ("New group"): "Name" (required), "Description", "Color" and "Order".
@@ -732,32 +740,41 @@ Steps:
    in the list with the inactive filter, from where it is activated again.
 3. To remove it, **Delete**: "Delete {name}? The customers who have it lose it." → "Group {name}
    deleted".
+4. If an employee taps **Save**, "An approval is needed" opens on top first with "Approving: Create a
+   customer group" (or "Change a customer group"), and a manager approves it with their PIN (or their
+   badge) on that same device (BASE-F84). Deleting is never asked for: the employee does not see it.
 In: the group's details.
 Out: the group, which is assigned from each card (CUSTOMER-F06), and its notice
 (`customer.group.created`, `.updated`, `.deleted`). Deleting a group really removes it from all its
 cards. A group carries no discount or price.
 If it fails: a name already used by another active group (ignoring case and the spaces at the ends):
 "There is already a group with that name. Choose another name." under "Name"; an inactive group frees its
-name, and reactivating it with a name another one already has is rejected all the same.
-Involved: none
+name, and reactivating it with a name another one already has is rejected all the same. If "Cancel" is
+tapped in "An approval is needed", the form stays open with what was typed and says "This needs a
+manager's approval.".
+Involved: BASE-F84
 
 ### CUSTOMER-F28 Create, change and delete customer tags
 Status: done
-Actor: owner, administrator, manager (deleting: owner and administrator)
+Actor: owner, administrator, manager; the employee creates and changes with a manager's PIN (deleting:
+owner and administrator)
 Screen: Tags
 Steps:
 1. In **Tags** tap **Add** ("New tag"): "Name" and "Color". **Save** → "Tag created".
 2. When editing ("Edit · {name}") "Active" appears, as in the groups. **Save** → "Tag updated".
 3. **Delete**: "Delete {name}? The customers who have it lose it." → "Tag {name} deleted".
+4. As with the groups, the employee saves with a manager's PIN: "Approving: Create a customer tag" (or
+   "Change a customer tag") (BASE-F84). Deleting is not offered to them.
 In: name and color.
 Out: the tag, which is assigned from each card (CUSTOMER-F06), and its notice (`customer.tag.created`,
 `.updated`, `.deleted`). Deleting it removes it from all its cards.
-If it fails: "There is already a tag with that name. Choose another name." under "Name".
-Involved: none
+If it fails: "There is already a tag with that name. Choose another name." under "Name"; "Cancel" in
+"An approval is needed": "This needs a manager's approval." and nothing is saved.
+Involved: BASE-F84
 
 ### CUSTOMER-F29 Define the card's custom fields
 Status: done
-Actor: owner, administrator, manager
+Actor: owner, administrator, manager; the employee, with a manager's PIN
 Screen: Fields
 Steps:
 1. In **Fields** tap **Add** ("New custom field"): "Name", "Type" ("Text", "Number", "Date", "Yes/No",
@@ -768,14 +785,17 @@ Steps:
    not demanded, and its values stay. Everything can be changed except the type, if there are already
    cards with a value. **Delete** → "Delete {name}? The values saved on the cards are deleted too." →
    "Field {name} deleted".
+4. If an employee saves or deletes, a manager approves it first with their PIN (or their badge) on that
+   same device (BASE-F84): "Approving: Create a custom field" ("Change…", "Delete a custom field").
 In: the field's definition.
 Out: the field and its notice (`customer.field.created`, `.updated`, `.deleted`). "Required" is only
 demanded when saving the full card (CUSTOMER-F04), never when adding it (Customers, till, import or
 WhatsApp).
 If it fails: "There is already a field with that name. Choose another name." under "Name"; a select
 field without options: "Add at least one option."; changing the type of a field with values: "This field
-already has values on some cards: its type cannot change.".
-Involved: none
+already has values on some cards: its type cannot change."; "Cancel" in "An approval is needed": "This
+needs a manager's approval." and nothing changes.
+Involved: BASE-F84
 
 ### CUSTOMER-F30 Give a customer's card to other apps
 Status: done
@@ -970,12 +990,17 @@ who use the services of Customers.
 |---|---|---|---|---|---|
 | View cards, groups, tags, fields, activity, purchases and consents | yes | yes | yes | yes | `customer.view` |
 | Add, edit, import, add notes, assign groups and tags, record consent and link orders | yes | yes | yes | yes | `customer.manage` |
-| Create and change groups, tags and custom fields; delete fields | yes | yes | yes | no | `customer.configure` |
-| Merge duplicate cards | yes | yes | yes | no | `customer.merge` |
+| Create and change groups, tags and custom fields; delete fields | yes | yes | yes | with PIN | `customer.configure` |
+| Merge duplicate cards | yes | yes | yes | with PIN | `customer.merge` |
 | Export to CSV | yes | yes | yes | no | `customer.export` |
 | Note in the activity what other apps bring | yes | yes | yes | no | `customer.record_activity` |
 | Delete cards, groups and tags | yes | yes | no | no | `customer.delete` |
 | Erase personal data | yes | yes | no | no | `customer.erase` |
+
+"With PIN": the employee does it if a manager approves it on the spot with their PIN (or their badge) on
+the same device (BASE-F84), as in the current product: what the manager holds, another profile does with
+their approval. Exporting is a read and is not approved; deleting cards, groups and tags and erasing
+personal data belong only to the owner and the administrator, and are never asked for.
 
 Recording and voiding purchases belongs to no role: the system does it when a sale is charged or voided
 (`customer.record_purchase`, which no app declares and therefore only the system has).

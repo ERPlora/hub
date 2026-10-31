@@ -34,7 +34,9 @@ Quién la usa:
 - El **responsable**: edita fichas, une duplicados, crea y cambia grupos, etiquetas y campos (y
   elimina campos), exporta y anota en la actividad lo que traen otras apps.
 - El **empleado** (también en la caja): consulta, da de alta, edita la ficha, importa, añade notas,
-  asigna grupos y etiquetas, registra el consentimiento y pone el cliente a la venta.
+  asigna grupos y etiquetas, registra el consentimiento y pone el cliente a la venta. Con el PIN de un
+  responsable, en su mismo dispositivo, une duplicados y crea o cambia grupos, etiquetas y campos
+  (BASE-F84).
 - El **cliente** no usa estas pantallas: sus datos entran por el mostrador, el TPV o su WhatsApp.
 
 ## Referencia adoptada
@@ -67,9 +69,9 @@ ERPlora no inventa flujos: adopta los que el mercado ya probó.
 1. Encender **Clientes** en la página de apps del negocio. No necesita ninguna otra app. Con
    **Venta** aparece el buscador en el TPV y las compras se apuntan solas; con **Citas**, el
    historial de visitas en la ficha; con la **Bandeja de WhatsApp**, el reconocimiento por teléfono.
-2. El país que se supone para un teléfono escrito sin prefijo es hoy **España**, aunque el negocio
-   tenga otro país en Ajustes → Negocio: el teléfono de otro país se escribe con su prefijo (`+48…`)
-   (CUSTOMER-F11).
+2. Un teléfono escrito sin prefijo se lee en el **país del negocio**, el de Ajustes → Negocio (el
+   mismo que da la moneda); mientras el negocio no tiene país, en España. El teléfono de otro país se
+   escribe con su prefijo (`+48…`) (CUSTOMER-F11).
 3. Si hace falta segmentar, crear los grupos, las etiquetas (CUSTOMER-F27, F28) y los campos propios
    del negocio (CUSTOMER-F29). Marcar como obligatorios solo los imprescindibles: se exigen cada vez
    que se guarda la ficha completa (no al darla de alta).
@@ -98,7 +100,8 @@ una fila abre la ficha.
 
 ### Ficha de cliente
 El nombre y los botones que permite el perfil: **Editar**, **Eliminar**, **Fusionar con…** y
-**Borrar datos personales**. Bloques: los datos (Email, Teléfono, NIF/CIF, Empresa, Dirección,
+**Borrar datos personales** (el empleado ve **Fusionar con…**, que hace con el PIN de un responsable).
+Bloques: los datos (Email, Teléfono, NIF/CIF, Empresa, Dirección,
 Etapa, Origen, Canal preferido, Compras, Gastado, Última compra, Activo, notas internas, cumpleaños,
 aniversario y campos personalizados); «Grupos» y «Etiquetas» con casillas; «Consentimiento de
 marketing» con una línea por canal y «Todo lo que se decidió»; «Añadir nota»; «Actividad»;
@@ -107,8 +110,8 @@ marketing» con una línea por canal y «Todo lo que se decidió»; «Añadir no
 
 ### Grupos
 Tabla «Nombre», «Descripción», «Clientes» (cuántas fichas vivas tiene), «Orden» y «Activo»; buscador
-«Buscar grupo…» y filtro de activos; **Añadir** y **Editar** a quien puede configurar, **Eliminar** al
-propietario y al administrador.
+«Buscar grupo…» y filtro de activos; **Añadir** y **Editar** a quien puede configurar y al empleado (con
+el PIN de un responsable), **Eliminar** al propietario y al administrador.
 
 ### Etiquetas
 Tabla «Nombre», «Color», «Clientes» y «Activa»; buscador «Buscar etiqueta…»; mismas acciones que
@@ -116,7 +119,8 @@ Grupos.
 
 ### Campos
 Tabla «Nombre», «Tipo», «Obligatorio» (Sí/No), «Orden» y «Activo»; buscador «Buscar campo…»; filtros
-por tipo, obligatorio y activo; **Añadir**, **Editar** y **Eliminar** a quien puede configurar.
+por tipo, obligatorio y activo; **Añadir**, **Editar** y **Eliminar** a quien puede configurar y al
+empleado (con el PIN de un responsable).
 
 ### Buscador de cliente del TPV
 Vive dentro de la pantalla de venta de **Venta**: un botón «Asignar cliente» (o el nombre del cliente
@@ -433,7 +437,8 @@ Pasos:
    tenga (con espacios o guiones, con `0034` o `+34` delante, o con el prefijo de otro país y el cero
    nacional entre paréntesis).
 2. Al guardar se leen las reglas de libphonenumber: con el prefijo que lleve o, si no lleva, en el
-   país del negocio (hoy siempre España, ver «Antes de empezar»); fuera espacios, guiones, puntos, barras,
+   país del negocio (el de Ajustes → Negocio; España si aún no tiene: en un negocio de Polonia, un
+   móvil sin prefijo se guarda con `+48` delante); fuera espacios, guiones, puntos, barras,
    paréntesis y el cero nacional (también entre paréntesis tras el prefijo). Italia y los demás
    países que conservan el `0` tras el prefijo lo conservan. El número tiene que ser un número
    válido de su país (su numeración, no solo su longitud). Se guarda con su prefijo y las cifras
@@ -467,7 +472,7 @@ Implicados: WHATSAPP_INBOX-F37
 ### CUSTOMER-F13 Unir dos fichas de la misma persona
 <!-- origen: old:customers/workflow/identidad-y-privacidad.md#customers-f13 -->
 Estado: hecho
-Actor: propietario, administrador, responsable
+Actor: propietario, administrador, responsable; el empleado, con el PIN de un responsable
 Pantalla: Ficha de cliente
 Pasos:
 1. Abre la ficha que se va a QUEDAR y pulsa **Fusionar con…**.
@@ -476,6 +481,9 @@ Pasos:
    conversaciones, bonos, notas y consentimientos pasan a {superviviente}, los datos que falten se
    completan con los suyos y {absorbida} desaparece de la lista. No se puede deshacer.».
 4. Pulsa **Fusionar**. Sale «{nombre} se ha fusionado en esta ficha.».
+5. Si quien pulsa es un empleado, antes se abre encima «Hace falta una aprobación» con «Se aprueba:
+   Fusionar dos fichas de cliente», y un responsable lo aprueba con su PIN (o su placa) en ese mismo
+   dispositivo (BASE-F84); entonces se fusionan.
 Entra: las dos fichas, vivas y distintas.
 Sale: la que se queda conserva sus datos y solo rellena sus campos VACÍOS con los de la otra (también
 el canal preferido si era «Ninguno»); las notas internas se juntan una detrás de otra; compras y
@@ -490,8 +498,9 @@ queda, así nunca hay cadenas. El aviso de fichas unidas (`customer.customer.mer
 hace que Citas, Ventas, Reservas, WhatsApp y Servicios re-apunten lo suyo; Reservas online lo sigue a
 través de Citas. Cocina no guarda cliente: no tiene nada que re-apuntar.
 Si falla: «Este cliente ya no está disponible.» si una de las dos ya no está; elegir la misma ficha:
-«Elige otra ficha: no se puede fusionar una ficha consigo misma.». No cambia nada.
-Implicados: APPOINTMENT-F23, RESERVATION-F21, SALE-F33, SERVICE-F28, WHATSAPP_INBOX-F12, ONLINE_BOOKING-F09
+«Elige otra ficha: no se puede fusionar una ficha consigo misma.»; si en «Hace falta una aprobación»
+se pulsa «Cancelar», «Esto necesita la aprobación de un encargado.». No cambia nada.
+Implicados: APPOINTMENT-F23, RESERVATION-F21, SALE-F33, SERVICE-F28, WHATSAPP_INBOX-F12, ONLINE_BOOKING-F09, BASE-F84
 
 ### CUSTOMER-F14 Registrar el consentimiento de un canal
 <!-- origen: old:customers/workflow/identidad-y-privacidad.md#customers-f14 -->
@@ -756,7 +765,8 @@ Implicados: WHATSAPP_INBOX-F21, WHATSAPP_INBOX-F24, WHATSAPP_INBOX-F37, APPOINTM
 ### CUSTOMER-F27 Crear, cambiar y eliminar grupos de clientes
 <!-- origen: fi:modules/customers#command-customers-groups-create-update-delete fi:modules/customers#query-customers-groups-list old:customers/workflow/segmentacion.md#customers-f27 -->
 Estado: hecho
-Actor: propietario, administrador, responsable (eliminar: propietario y administrador)
+Actor: propietario, administrador, responsable; el empleado crea y cambia con el PIN de un responsable
+(eliminar: propietario y administrador)
 Pantalla: Grupos
 Pasos:
 1. En **Grupos** pulsa **Añadir** («Nuevo grupo»): «Nombre» (obligatorio), «Descripción», «Color» y
@@ -766,19 +776,25 @@ Pasos:
    conservan) y sigue en la lista con el filtro de inactivos, desde donde se vuelve a activar.
 3. Para quitarlo, **Eliminar**: «¿Eliminar {nombre}? Las fichas que lo tienen lo pierden.» → «Grupo
    {nombre} eliminado».
+4. Si un empleado pulsa **Guardar**, antes se abre encima «Hace falta una aprobación» con «Se aprueba:
+   Crear un grupo de clientes» (o «Cambiar un grupo de clientes»), y un responsable lo aprueba con su
+   PIN (o su placa) en ese mismo dispositivo (BASE-F84). Eliminar nunca se pide: el empleado no lo ve.
 Entra: los datos del grupo.
 Sale: el grupo, que se asigna desde cada ficha (CUSTOMER-F06), y su aviso
 (`customer.group.created`, `.updated`, `.deleted`). Eliminar un grupo lo quita de todas sus fichas
 de verdad. Un grupo no lleva descuento ni precio.
 Si falla: un nombre ya usado por otro grupo activo (sin distinguir mayúsculas ni espacios de los
 extremos): «Ya hay un grupo con ese nombre. Elige otro nombre.» debajo de «Nombre»; un grupo
-inactivo libera su nombre, y reactivarlo con un nombre que ya tiene otro se rechaza igual.
-Implicados: ninguno
+inactivo libera su nombre, y reactivarlo con un nombre que ya tiene otro se rechaza igual. Si en «Hace
+falta una aprobación» se pulsa «Cancelar», el formulario sigue abierto con lo escrito y dice «Esto
+necesita la aprobación de un encargado.».
+Implicados: BASE-F84
 
 ### CUSTOMER-F28 Crear, cambiar y eliminar etiquetas de clientes
 <!-- origen: fi:modules/customers#command-customers-tags-create-update-delete fi:modules/customers#query-customers-tags-list old:customers/workflow/segmentacion.md#customers-f28 -->
 Estado: hecho
-Actor: propietario, administrador, responsable (eliminar: propietario y administrador)
+Actor: propietario, administrador, responsable; el empleado crea y cambia con el PIN de un responsable
+(eliminar: propietario y administrador)
 Pantalla: Etiquetas
 Pasos:
 1. En **Etiquetas** pulsa **Añadir** («Nueva etiqueta»): «Nombre» y «Color». **Guardar** →
@@ -787,16 +803,19 @@ Pasos:
    actualizada».
 3. **Eliminar**: «¿Eliminar {nombre}? Las fichas que la tienen la pierden.» → «Etiqueta {nombre}
    eliminada».
+4. Como en los grupos, el empleado guarda con el PIN de un responsable: «Se aprueba: Crear una etiqueta
+   de clientes» (o «Cambiar una etiqueta de clientes») (BASE-F84). Eliminar no se le ofrece.
 Entra: nombre y color.
 Sale: la etiqueta, que se asigna desde cada ficha (CUSTOMER-F06), y su aviso
 (`customer.tag.created`, `.updated`, `.deleted`). Eliminarla la quita de todas sus fichas.
-Si falla: «Ya hay una etiqueta con ese nombre. Elige otro nombre.» debajo de «Nombre».
-Implicados: ninguno
+Si falla: «Ya hay una etiqueta con ese nombre. Elige otro nombre.» debajo de «Nombre»; «Cancelar» en
+«Hace falta una aprobación»: «Esto necesita la aprobación de un encargado.» y no se guarda nada.
+Implicados: BASE-F84
 
 ### CUSTOMER-F29 Definir los campos personalizados de la ficha
 <!-- origen: fi:modules/customers#command-customers-fields-create-update-delete fi:modules/customers#query-customers-fields-list old:customers/workflow/segmentacion.md#customers-f29 -->
 Estado: hecho
-Actor: propietario, administrador, responsable
+Actor: propietario, administrador, responsable; el empleado, con el PIN de un responsable
 Pantalla: Campos
 Pasos:
 1. En **Campos** pulsa **Añadir** («Nuevo campo personalizado»): «Nombre», «Tipo» («Texto»,
@@ -808,14 +827,18 @@ Pasos:
    exige, y sus valores se quedan. Se cambia todo menos el tipo, si ya hay fichas con un valor.
    **Eliminar** → «¿Eliminar {nombre}? Se borran también los valores guardados en las fichas.» →
    «Campo {nombre} eliminado».
+4. Si quien guarda o elimina es un empleado, un responsable lo aprueba antes con su PIN (o su placa) en
+   ese mismo dispositivo (BASE-F84): «Se aprueba: Crear un campo personalizado» («Cambiar…»,
+   «Eliminar un campo personalizado»).
 Entra: la definición del campo.
 Sale: el campo y su aviso (`customer.field.created`, `.updated`, `.deleted`). «Obligatorio» solo se
 exige al guardar la ficha completa (CUSTOMER-F04), nunca al darla de alta (Clientes, TPV,
 importación ni WhatsApp).
 Si falla: «Ya hay un campo con ese nombre. Elige otro nombre.» debajo de «Nombre»; un campo de
 selección sin opciones: «Añade al menos una opción.»; cambiar el tipo de un campo con valores: «Este
-campo ya tiene valores en algunas fichas: su tipo no se puede cambiar.».
-Implicados: ninguno
+campo ya tiene valores en algunas fichas: su tipo no se puede cambiar.»; «Cancelar» en «Hace falta una
+aprobación»: «Esto necesita la aprobación de un encargado.» y no cambia nada.
+Implicados: BASE-F84
 
 ### CUSTOMER-F30 Dar la ficha de un cliente a otras apps
 <!-- origen: old:customers/workflow/con-otros-modulos.md#customers-f30 -->
@@ -1013,12 +1036,17 @@ ellas las que usan los servicios de Clientes.
 |---|---|---|---|---|---|
 | Ver fichas, grupos, etiquetas, campos, actividad, compras y consentimientos | sí | sí | sí | sí | `customer.view` |
 | Dar de alta, editar, importar, añadir notas, asignar grupos y etiquetas, registrar el consentimiento y enlazar pedidos | sí | sí | sí | sí | `customer.manage` |
-| Crear y cambiar grupos, etiquetas y campos personalizados; eliminar campos | sí | sí | sí | no | `customer.configure` |
-| Unir fichas duplicadas | sí | sí | sí | no | `customer.merge` |
+| Crear y cambiar grupos, etiquetas y campos personalizados; eliminar campos | sí | sí | sí | con PIN | `customer.configure` |
+| Unir fichas duplicadas | sí | sí | sí | con PIN | `customer.merge` |
 | Exportar a CSV | sí | sí | sí | no | `customer.export` |
 | Anotar en la actividad lo que traen otras apps | sí | sí | sí | no | `customer.record_activity` |
 | Eliminar fichas, grupos y etiquetas | sí | sí | no | no | `customer.delete` |
 | Borrar datos personales | sí | sí | no | no | `customer.erase` |
+
+«Con PIN»: el empleado lo hace si un responsable lo aprueba en el momento con su PIN (o su placa) en
+el mismo dispositivo (BASE-F84), como en el producto actual: lo que tiene el responsable, otro perfil
+lo hace con su aprobación. Exportar es una lectura y no se aprueba; eliminar fichas, grupos y
+etiquetas y borrar datos personales son solo del propietario y del administrador, y nunca se piden.
 
 Apuntar y anular compras no es de ningún papel: lo hace el sistema al cobrarse o anularse una venta
 (`customer.record_purchase`, que ninguna app declara y por eso solo tiene el sistema).
@@ -1036,9 +1064,15 @@ asistente. Lo que en el producto actual tenía el perfil «Cajero» lo tiene aqu
   número válido de su país; sus tests son el contrato del SDK del producto actual
   (`crates/guest-sdk/tests/phone_test.rs`), corregido donde ese SDK, que solo copiaba longitudes, se
   apartaba de libphonenumber. Los países se validan con `pycountry` (ISO 3166). El país del negocio
-  para un teléfono sin prefijo es `ES` fijo (`queries.business_country`), aunque la plataforma ya
-  guarda el país de cada negocio (`base.business.get`, el que Clientes usa para la moneda): ver «Lo
-  que queda fuera».
+  para un teléfono sin prefijo lo da `queries.business_country(ctx)`: el de `base.business.get` (el
+  mismo que da la moneda), leído con `system_context`, y `ES` si el negocio no tiene país o no hay
+  contexto. Lo usan el guardado, la importación (una vez por fichero), la búsqueda por teléfono y
+  `queries.find_customer(..., ctx=…)`; una llamada a `find_customer` sin `ctx` lee en España.
+- `apps.py` `approvals` nombra lo que un responsable aprueba con su PIN (BASE-F84): unir, crear y
+  cambiar grupos y etiquetas, y crear, cambiar y eliminar campos. `customer.activity.add` no, porque
+  ninguna pantalla la pide; exportar, eliminar y borrar datos nunca. La pantalla envuelve esas órdenes
+  en `withApproval` (`base/frontend/lib/approval.ts`) y enseña sus botones también a quien solo tiene
+  `customer.manage`; `tests/test_approvals.py` es el contrato.
 - Las reacciones a Venta (`events.REACTIONS`, `events.react`) las entrega el relay del outbox del
   worker en cada pasada (`base.relay`); `base/tests/test_relay.py` recorre el cobro, la anulación y la
   devolución hasta la ficha.
@@ -1156,6 +1190,8 @@ asistente. Lo que en el producto actual tenía el perfil «Cajero» lo tiene aqu
   sin cliente no toca ninguna ficha.
 - **Un pedido tiene como mucho un cliente.**
 - **Unir fichas es todo o nada**: dos fichas vivas y distintas, o no cambia nada; no se deshace.
+- **Lo que es solo del administrador no se aprueba con un PIN**: eliminar fichas, grupos y etiquetas y
+  borrar datos personales; lo del responsable, sí (BASE-F84).
 - **Borrar datos personales no se deshace**, alcanza a las fichas unidas en la borrada; repetirlo no
   cambia nada (pero vuelve a avisar), y conserva las compras y los pedidos.
 - **Eliminar o borrar datos de una ficha que no existe falla y no avisa a nadie**; sobre una ficha ya
@@ -1179,14 +1215,9 @@ asistente. Lo que en el producto actual tenía el perfil «Cajero» lo tiene aqu
   mesas (WHATSAPP_INBOX-F24) y «Crear ficha» de la Bandeja (WHATSAPP_INBOX-F37).
 - **Los importes de cuatro cifras sin separador de millares** («1234,56 €»), hub#512.
 - **La tarjeta de confirmación del asistente no dice qué ficha toca una escritura**, hub#513.
-- **El país del negocio para un teléfono sin prefijo**: se lee siempre como de España (CUSTOMER-F11),
-  aunque la plataforma ya guarda el país de cada negocio. Propuesto como FIX al cerrar la app
-  (CLOSE-CUSTOMER).
-- **La aprobación con el PIN de un responsable**: la plataforma ya la ofrece (una app nombra las
-  órdenes suyas que un responsable puede aprobar en el momento, como hace Ventas), pero Clientes no
-  nombra ninguna, así que un empleado no puede fusionar fichas, exportarlas ni cambiar grupos,
-  etiquetas o campos con el PIN de un responsable, como dejaba el producto actual. Propuesto como FIX
-  al cerrar la app (CLOSE-CUSTOMER).
+- **Un cliente nombrado por su teléfono desde otra app** (Ventas, Citas, Facturas, Reservas… y su
+  asistente) se busca aún como número de España en un negocio de otro país: esas apps no pasan su
+  contexto a `find_customer`. Propuesto como FIX al cerrar la app (CLOSE-CUSTOMER).
 
 ## Lo que NO hace, a propósito
 

@@ -37,6 +37,7 @@ las demás: Ventas, Citas, Reservas, la Bandeja de WhatsApp y otras cinco la req
 | La requieren | Ventas, Facturación, Citas, Servicios, Tarifas, Reservas, Mesas, Reservas online y la Bandeja de WhatsApp |
 | Pantallas | `/customer/customers` (lista y ficha, `/customer/customers/:id`), `/customer/groups`, `/customer/tags`, `/customer/fields`; `/customer/preview/customer-search` solo en el servidor de desarrollo |
 | Operaciones | 16 consultas (`queries.py`) y 28 acciones (`services.py`), todas con `ai=`; las cuatro `customer.health.*`, con `ai=INTERNAL` y sin `expose_api` (los datos de salud no llegan al asistente ni a las API keys); 41 rutas en `/api/customer/…` (sin ruta: las tres `customer.purchase.*`, que solo corre el sistema) |
+| Aprobaciones | 8 órdenes que un responsable aprueba con su PIN al empleado (`approvals`, BASE-F84): unir fichas, crear y cambiar grupos y etiquetas, y crear, cambiar y eliminar campos |
 | Eventos | 28, `customer.<entidad>.<hecho>` (`events.py`), solo con identificadores; `REACTIONS` a `sale.sale.completed`, `.voided` y `.refunded` (`customer.purchase.record`, `.void`, `.refund`), por el relay del outbox |
 | Bloques de la ficha | `apps/<id>/frontend/customer-card/<Bloque>.vue` de cada app encendida (hoy, `appointment`) |
 | Migraciones | `0001_initial`, `0002_purchase_refunds`, `0003_health_record` |
@@ -61,12 +62,14 @@ pnpm e2e tests/e2e/customer-flows.spec.ts tests/e2e/customer-pages.spec.ts tests
 
 - `test_phones.py` es el contrato de la lectura E.164; `test_concurrency.py` cruza en hilos, con sesiones
   reales, las escrituras de la app con el «Eliminar» del admin del Hub; `test_business_currency.py` lleva la moneda del negocio con dos hubs.
+- `test_business_country.py`: un teléfono sin prefijo se lee en el país del negocio (un hub `PL` y uno `ES`);
+  `test_approvals.py`: lo que el empleado hace con el PIN de un responsable y lo que nunca se le pide.
 - `apps/sale/tests/test_integration_customer.py` da a Clientes los avisos reales de Ventas, y
   `base/tests/test_relay.py` los lleva por el tick real del relay hasta la ficha.
 
 ## Qué queda fuera
 
 - `CUSTOMER-F26` (hub#514), los importes sin separador de millares (hub#512), la tarjeta del asistente que
-  no dice qué ficha toca (hub#513), el país del negocio para un teléfono sin prefijo y la aprobación con el
-  PIN de un responsable: «Lo que queda fuera» del WORKBOOK.
+  no dice qué ficha toca (hub#513) y el teléfono sin prefijo con que otras apps nombran a un cliente, que
+  aún se lee en España: «Lo que queda fuera» del WORKBOOK.
 - Las peticiones de [`UI-REQUESTS.md`](UI-REQUESTS.md).

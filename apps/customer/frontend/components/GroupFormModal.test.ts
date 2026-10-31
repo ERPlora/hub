@@ -120,15 +120,18 @@ describe('GroupFormModal with a manager’s approval (BASE-F84)', () => {
     expect(s.open.value).toBe(false);
   });
 
-  it('«Cancel» on the approval sends nothing more and the dialog stays open', async () => {
+  it('«Cancel» on the approval sends nothing more, says why and the dialog stays open with what was typed', async () => {
     const s = await setup();
     approvalDialog.answer = CANCELLED;
     s.net.onApi(() => Response.json(asksApproval('customer.group.create', 'Create a customer group'), { status: 403 }));
     await s.type('customer-group-form-name', 'VIP');
     await s.save();
     await approvalSettled();
+    await flush();
     expect(s.net.api).toHaveLength(1);
     expect(toastSuccess).not.toHaveBeenCalled();
     expect(s.open.value).toBe(true);
+    expect(s.el('customer-group-form-error')?.textContent).toContain('This needs a manager’s approval.');
+    expect(s.el('customer-group-form-name').value).toBe('VIP');
   });
 });
