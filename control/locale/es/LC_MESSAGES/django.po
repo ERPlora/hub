@@ -143,3 +143,93 @@ msgstr "Vacío: a sus hubs se llega por su escritor, directamente."
 
 msgid "leased by"
 msgstr "reservado por"
+
+#: services.py
+msgid "No cluster has this id."
+msgstr "Ningún clúster tiene este id."
+
+msgid "Another cluster is already called %(name)s."
+msgstr "Ya hay otro clúster llamado %(name)s."
+
+msgid "This secret does not resolve: %(reason)s"
+msgstr "Este secreto no se puede resolver: %(reason)s"
+
+msgid ""
+"The databases of its hubs are on this writer: move them to another cluster "
+"before changing it."
+msgstr ""
+"Las bases de datos de sus hubs están en este escritor: muévelas a otro "
+"clúster antes de cambiarlo."
+
+msgid ""
+"%(count)d hub is on this cluster: a cluster is only deleted once no hub is on "
+"it."
+msgid_plural ""
+"%(count)d hubs are on this cluster: a cluster is only deleted once no hub is "
+"on it."
+msgstr[0] ""
+"%(count)d hub está en este clúster: un clúster solo se borra cuando ya no "
+"queda ningún hub en él."
+msgstr[1] ""
+"%(count)d hubs están en este clúster: un clúster solo se borra cuando ya no "
+"queda ningún hub en él."
+msgstr[2] ""
+"%(count)d hubs están en este clúster: un clúster solo se borra cuando ya no "
+"queda ningún hub en él."
+
+#: queries.py
+msgid "the control database's server"
+msgstr "el servidor de la base de datos de control"
+
+msgid "The sizes of the databases on %(cluster)s could not be read: %(reason)s"
+msgstr ""
+"No se han podido leer los tamaños de las bases de datos de %(cluster)s: "
+"%(reason)s"
+
+#: admin.py
+msgctxt "cluster limit"
+msgid "no limit"
+msgstr "sin límite"
+
+msgctxt "cluster limit"
+msgid "limit"
+msgstr "límite"
+
+msgctxt "cluster"
+msgid "writer"
+msgstr "escritor"
+
+msgctxt "cluster"
+msgid "PgBouncer"
+msgstr "PgBouncer"
+
+msgctxt "cluster pgbouncer"
+msgid "none: its writer"
+msgstr "ninguno: su escritor"
+
+msgctxt "cluster"
+msgid "hubs / limit"
+msgstr "hubs / límite"
+
+msgctxt "cluster"
+msgid "total size"
+msgstr "tamaño total"
+
+msgid "Close to new hubs"
+msgstr "Cerrar a hubs nuevos"
+
+msgid "%(count)d cluster closed to new hubs: the hubs on it stay there."
+msgid_plural "%(count)d clusters closed to new hubs: the hubs on them stay there."
+msgstr[0] "%(count)d clúster cerrado a hubs nuevos: sus hubs se quedan en él."
+msgstr[1] ""
+"%(count)d clústeres cerrados a hubs nuevos: sus hubs se quedan en ellos."
+msgstr[2] ""
+"%(count)d clústeres cerrados a hubs nuevos: sus hubs se quedan en ellos."
+
+msgctxt "hub database"
+msgid "shared with control"
+msgstr "compartida con control"
+
+msgctxt "hub database"
+msgid "size"
+msgstr "tamaño"
