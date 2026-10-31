@@ -245,6 +245,33 @@ def test_a_request_that_finds_its_hub_busy_while_checking_its_database_answers_5
 
 
 @HUB_DB_COMMITTED
+async def test_an_asgi_request_that_finds_its_hub_busy_while_checking_its_database_answers_503(
+    async_client, hub_a, short_wait, monkeypatch
+):
+    """Daphne runs the middleware asynchronously (``HubDatabaseMiddleware.__acall__``): the same 503."""
+    from asgiref.sync import sync_to_async
+    from django.test.client import FakePayload
+
+    user = await sync_to_async(get_user_model().objects.create_user)(username="ana", password="pw")
+    await sync_to_async(Membership.objects.create)(user=user, host=hub_a.slug, role=Membership.Role.ADMIN)
+    await async_client.aforce_login(user)
+
+    with held_open(hub_a):
+        monkeypatch.setattr(identity, "_verified", set())
+        busy = await async_client.request(
+            method="GET",
+            path="/api/demo/items",
+            query_string="",
+            headers=[(b"host", f"{hub_a.slug}.localhost".encode())],
+            _body_file=FakePayload(b""),
+        )
+    await sync_to_async(connections.close_all)()
+
+    assert busy.status_code == 503
+    assert json.loads(busy.content)["error"]["code"] == "base.hub_busy"
+
+
+@HUB_DB_COMMITTED
 def test_the_hub_admin_on_a_busy_hub_answers_a_legible_503(client, hub_a, short_wait):
     client.force_login(get_user_model().objects.create_superuser("root", "root@example.com", "pw"))
     client.get(f"/admin/hub/{hub_a.slug}/", HTTP_HOST="hubs.localhost")

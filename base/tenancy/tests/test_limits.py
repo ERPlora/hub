@@ -11,6 +11,7 @@ The end-to-end guardrail (two hubs, an operation, a request, the live executor, 
 ``tests/test_guardrails_limits.py``.
 """
 
+import gc
 import logging
 import threading
 import time
@@ -153,8 +154,11 @@ def test_a_place_freed_while_waiting_lets_the_waiting_one_in():
     held = limiter.take(wait=0)
     threading.Timer(0.1, held.release).start()
 
+    started = time.monotonic()
     second = limiter.take(wait=2)
 
+    # At once, not at the end of the wait.
+    assert time.monotonic() - started < 1
     assert limiter.in_use == 1
     second.release()
     assert limiter.in_use == 0
@@ -185,9 +189,13 @@ def test_growing_lets_the_waiting_in_and_shrinking_waits_for_the_places_in_use()
     limiter = limits.Limiter(limits.FREE, version=1, alias="hub_x")
     first = limiter.take(wait=0)
     threading.Timer(0.1, lambda: limiter.resize(limits.PlanLimits(3, 15), version=2)).start()
+    started = time.monotonic()
     second = limiter.take(wait=2)
+    assert time.monotonic() - started < 1
     third = limiter.take(wait=0)
 
+    assert not limiter.resize(limits.FREE, version=1)
+    assert limiter.limits == limits.PlanLimits(3, 15)
     assert limiter.resize(limits.FREE, version=3)
     first.release()
     second.release()
@@ -272,6 +280,26 @@ def test_a_connection_closed_in_the_middle_of_a_transaction_frees_its_place(hub_
         assert limiter.in_use == 1
 
         connections[hubs.HUB_A_ALIAS].close()
+
+        assert limiter.in_use == 0
+
+
+@HUB_DB_COMMITTED
+def test_a_connection_dropped_in_the_middle_of_a_transaction_gives_its_place_back_when_collected(hub_a):
+    from base.tenancy.backend.base import DatabaseWrapper
+
+    with context.use_hub(hub_a):
+        limiter = limiter_of_a(hub_a)
+        dropped = DatabaseWrapper(dict(connections.settings[hubs.HUB_A_ALIAS]), hubs.HUB_A_ALIAS)
+        dropped.set_autocommit(False)
+        with dropped.cursor() as cursor:
+            cursor.execute("SELECT 1")
+        assert limiter.in_use == 1
+
+        # Its thread is gone: nobody commits, rolls back or closes it through Django.
+        dropped.connection.close()
+        del dropped, cursor
+        gc.collect()
 
         assert limiter.in_use == 0
 
