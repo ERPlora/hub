@@ -59,7 +59,8 @@ export const SIDEBAR: ShellSidebar = {
 /**
  * base's pieces of the chrome (APP-BASE-1, the old hub's): the assistant's sparkles and the bell at the end of the
  * topbar, «Upgrade plan» in the menu's footer, the blocking strip over every screen and, beside the pane, the device's
- * notices (APPOINTMENT-F28) and the assistant's panel (APP-BASE-9). Loaded on demand: none is needed to paint.
+ * notices (APPOINTMENT-F28) and the assistant's panel (APP-BASE-9). Each in its own chunk, which `boot` loads beside the
+ * first screen's: the hub mounts once they are here (`chromeLoaded`).
  */
 export const CHROME: NonNullable<CreateShellOptions['chrome']> = {
   topbar: defineAsyncComponent(() => import('../base/frontend/components/TopbarChrome.vue')),
@@ -67,6 +68,43 @@ export const CHROME: NonNullable<CreateShellOptions['chrome']> = {
   notice: defineAsyncComponent(() => import('../base/frontend/components/BlockingStrip.vue')),
   background: defineAsyncComponent(() => import('../base/frontend/components/BackgroundChrome.vue')),
 };
+
+/**
+ * Vue's own loader of a `defineAsyncComponent` (`__asyncLoader`): once it resolved, the wrapper paints its piece in the
+ * same render as the screen. Internal to Vue (no public type), but it is how Vue itself tells an async wrapper
+ * (`isAsyncWrapper`: KeepAlive, hydration) and what vue-router reads too; calling it again returns the same request.
+ * Should a Vue upgrade drop it (or make it throw), the piece is simply not waited for (as before this wait), and
+ * main.chrome.test.ts fails.
+ */
+type AsyncPiece = { __asyncLoader?: () => Promise<unknown> };
+
+/** How long the hub waits for its chrome before mounting without it: a chunk left hanging never keeps it blank. */
+export const CHROME_WAIT_MS = 3000;
+
+/**
+ * Loads the chrome's pieces, settled whether they load or not, for at most `CHROME_WAIT_MS`. The bell, the apps followed
+ * beside the pane and the blocking strip read live queries: mounted with the screen, they go in its one stream; mounted
+ * once their chunk arrived, more than 150 ms after the screen's queries on a slow device (the tab's CPU ×6), they cut it
+ * and opened it again (FIX-HUB-BASE-HOME-ONE-STREAM-FLAKY). Through each piece's own loader, not another `import()`: a
+ * module already here still resolves in a later task, after the stream opened. A piece that does not load never keeps
+ * the hub from mounting: it loads again at render, and Vue hands that failure to base's report (`installErrorReport`);
+ * one still loading past the wait paints when its chunk comes.
+ */
+export function chromeLoaded(pieces: object = CHROME): Promise<unknown> {
+  // Called inside a promise's executor: a loader that throws (none of Vue's does) is a piece that failed, like one that
+  // rejects, never a `boot` that dies before `app.mount`.
+  const loaded = Promise.allSettled(
+    Object.values(pieces).map((piece) => new Promise((resolve) => resolve((piece as AsyncPiece).__asyncLoader?.()))),
+  );
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const waited = new Promise<void>((resolve) => {
+    timer = setTimeout(() => {
+      console.warn(`hub: base's chrome did not load within ${CHROME_WAIT_MS} ms; the hub mounts without it`);
+      resolve();
+    }, CHROME_WAIT_MS);
+  });
+  return Promise.race([loaded.finally(() => clearTimeout(timer)), waited]);
+}
 
 /** The Hub's sign out: the assistant's conversation of the tab is forgotten first (BASE-G120), then the shell's. */
 export function signOut(doc: Document = document): void {
@@ -172,6 +210,7 @@ export async function boot(
   // A manager's approval (APP-BASE-5): the pass of the command being repeated travels in `X-Elevation-Token`.
   const client = createLiveClient(config, { routes: OPERATION_ROUTES, getElevationToken: approvalPass });
   const { reload, ...session } = loadSession(client, doc);
+  const chrome = chromeLoaded();
   const { app, router } = await createShell({
     ...session,
     routes: appRoutes(routeFiles),
@@ -204,6 +243,7 @@ export async function boot(
   }
   const blocked = appGate(router.currentRoute.value);
   if (blocked !== true) await router.replace(blocked);
+  await chrome;
   app.mount('#app');
   // base's way in (APP-BASE-3): the idle lock of a till, the person's appearance, «Now serving» after a switch.
   startWayIn(doc, {

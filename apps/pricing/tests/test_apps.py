@@ -14,7 +14,9 @@ QUERIES = {
     "pricing.price_item.list",
     "pricing.price_item.get",
     "pricing.rule.list",
+    "pricing.rule.get",
     "pricing.price.resolve",
+    "pricing.catalog.get",
 }
 COMMANDS = {
     "pricing.price_list.create",

@@ -19,6 +19,14 @@ const E2E_DIR = dirname(fileURLToPath(import.meta.url));
 /** The file of the one measure. */
 const HELPERS = 'helpers.ts';
 
+/** The word every measure below reads. A file or a statement without it measures nothing, so the count does not test it.
+ *  This check's work grows with the e2e: 287 files (3.2 MB, 58 000 lines), of which 35 say the word. Reading them inside
+ *  the test (~100 ms the first time in a worker; a freshly written worktree is inspected by the machine's on-access
+ *  scanner on that first read) and testing every rule on every line (~45 ms) took 124 ms alone and 6.5 s, past Vitest's
+ *  5 s, with the machine loaded ~23. Now the files are read once while Vitest collects this file (`E2E_SOURCES`), which
+ *  no test's timer covers, and only the lines that say the word are tested (~10 ms). */
+const WIDTH = 'scrollWidth';
+
 /** The document's root found by its selector: `querySelector('html')`, `'body'` or `':root'`. */
 const ROOT_QUERY = String.raw`querySelector(?:<[^>]*>)?\(\s*['"\x60](?:html|body|:root)['"\x60]\s*\)`;
 
@@ -91,6 +99,7 @@ function boxNames(source: string): string[] {
  * locator of the root. A vertical read (`scrollTop`, `scrollHeight`) is no such measure.
  */
 function documentMeasures(name: string, source: string): string[] {
+  if (!source.includes(WIDTH)) return [];
   const names = boxNames(source);
   const named = names.length ? new RegExp(String.raw`\b(?:${names.join('|')})\s*!?\s*\??\.\s*scrollWidth\b`) : null;
   const namedBox = names.length ? new RegExp(String.raw`^(?:${names.join('|')})\b`) : null;
@@ -100,21 +109,38 @@ function documentMeasures(name: string, source: string): string[] {
   };
   const measures = [DOCUMENT_WIDTH, SCROLL_BOX_WIDTH, ROOT_LOCATOR_WIDTH, ...(named ? [named] : [])];
   return statements(source).flatMap(({ line, text }) =>
-    measures.some((measure) => measure.test(text)) || destructured(text) ? [`${name}:${line}`] : [],
+    text.includes(WIDTH) && (measures.some((measure) => measure.test(text)) || destructured(text)) ? [`${name}:${line}`] : [],
   );
 }
 
-/** The files of the e2e (the specs and their helpers, not Vitest's own tests) that measure the document by hand. */
+/** The files of the e2e (the specs and their helpers, not Vitest's own tests) and their text, read once. */
+const E2E_SOURCES: ReadonlyArray<[string, string]> = readdirSync(E2E_DIR)
+  .filter((name) => name.endsWith('.ts') && !name.endsWith('.test.ts') && name !== HELPERS)
+  .sort()
+  .map((name) => [name, readFileSync(join(E2E_DIR, name), 'utf8')]);
+
+/** The files of the e2e that measure the document by hand. */
 function handMeasures(): string[] {
-  return readdirSync(E2E_DIR)
-    .filter((name) => name.endsWith('.ts') && !name.endsWith('.test.ts') && name !== HELPERS)
-    .sort()
-    .flatMap((name) => documentMeasures(name, readFileSync(join(E2E_DIR, name), 'utf8')));
+  return E2E_SOURCES.flatMap(([name, source]) => documentMeasures(name, source));
 }
 
 describe('the e2e checks for a horizontal scroll go through horizontalOverflow() of helpers.ts', () => {
   it('no file of tests/e2e but helpers.ts measures the document by hand: the check is horizontalOverflow(page)', () => {
     expect(handMeasures()).toEqual([]);
+  });
+
+  it('the files of the e2e are all read: the count is on every spec and helper but helpers.ts and Vitest’s own tests', () => {
+    const names = E2E_SOURCES.map(([name]) => name);
+    expect(names.length).toBeGreaterThan(200);
+    expect(names).toContain('pricing-assistant.spec.ts');
+    expect(names.filter((name) => name === HELPERS || name.endsWith('.test.ts'))).toEqual([]);
+  });
+
+  it('every measure reads the word scrollWidth: a file or a statement without it is left unread, and none is missed', () => {
+    for (const rule of [DOCUMENT_WIDTH, SCROLL_BOX_WIDTH, ROOT_LOCATOR_WIDTH, WIDTH_DESTRUCTURED]) expect(rule.source).toContain(WIDTH);
+    const root = ['const root = document.documentElement;', 'const total = 1;', 'return root.scrollWidth;'];
+    expect(documentMeasures('w.ts', root.join('\n'))).toEqual(['w.ts:3']);
+    expect(documentMeasures('w.ts', ['const root = document.documentElement;', 'return root.clientWidth;'].join('\n'))).toEqual([]);
   });
 
   it('helpers.ts has the one measure, and it reads the document and the scroll box of every ion-content', () => {
