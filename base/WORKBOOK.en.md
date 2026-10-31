@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:9503ac864f878b4ca855e7c8d8768d77a3c89159705f7061ceb037b65f7ed995 -->
+<!-- generated from WORKBOOK.md sha256:6a7107c43019ab66ec98a863b0d9188f7ecd81589f0dfd7b2664b9cf3254d2c0 -->
 
 ## What it is for and who it is for
 
@@ -2265,7 +2265,8 @@ Steps:
      understands it the same even if the app changes how it explains it: "at €15" shows "€15.00", never "1500". If
      the action names its own currency, the amount shows in it and with its decimals, as in Stripe or Square: a
      payment in dollars says "$15.00", and in yen, without decimals; a currency that does not exist is not made up:
-     the amount shows as written and the action refuses it when it runs. If the action is done on something that has
+     if the action no longer takes it in its data, no card shows (see "If it fails"); otherwise the amount shows as
+     written and the action refuses it when it runs. If the action is done on something that has
      its own currency, the amount shows in that one: adding a line to a cart in dollars says "$12.50", and setting a
      price on a price list in yen, "¥1,500"; if that cannot be read (it does not exist or whoever asks cannot see it),
      the amount shows as written and the action decides. Every amount of a card is written the same way, on top or
@@ -2298,11 +2299,15 @@ Steps:
      Create in Services", or "Not done, cancelled: …", "Not done, it failed: …" and "Not done, not allowed: …". If the
      person changes language, the earlier receipts show entirely in the new one, the app's name too.
 In: the action, its data and its risk, as its app declares them; the business's currency, the one of the record it is
-done on (read as the person) and, in "What will happen", the one its app gives; the business's time zone.
+done on (read as the person) and, in "What will happen", the one its app gives; the business's time zone; and, if its
+app declares it, the check it makes before the card, as the person: if it refuses the data (adding someone with a role
+the business does not have, STAFF-F01), no card shows and the assistant tells it as its error.
 Out: if accepted, the action done in its app, with the same event as if its button had been tapped.
 If it fails: an action its app refuses goes back to the assistant as an error and it tells it; the receipt reads
-"Not done, it failed: …". If the page is reloaded with the card open nothing is done, and the answer ends in "The
-answer was cut off." with "Try again".
+"Not done, it failed: …". Data the action does not take (a country or a currency that does not exist, a value
+outside its list) never reach the card: they go back to the assistant, which corrects them, and the person confirms
+only once. If the page is reloaded with the card open nothing is done, and the answer ends in "The answer was cut
+off." with "Try again".
 Involved: BASE-F98, BASE-F99, BASE-F101
 
 ### BASE-F98 Dangerous actions: type to confirm, or not from the chat

@@ -106,6 +106,15 @@ describe('FlowEditor: a new automation', () => {
     expect(s.find('flow-editor-notice').text()).toBe('Saved.');
   });
 
+  it('hands what the app of its recipe fixes to «When this happens…» and to each step (FLOW-F36)', async () => {
+    const fixedByApp = { app: 'sale', app_name: 'Sales', event: 'sale.sale.completed', filter: ['input.total'], pinned: {} };
+    const s = await setup({ flow: { ...FLOW, fixed_by_app: fixedByApp }, initial: fromFlow(FLOW) });
+    expect(s.wrapper.findComponent(TriggerCard).props('fixedByApp')).toEqual(fixedByApp);
+    expect(s.wrapper.findComponent(StepNode).props('fixedByApp')).toEqual(fixedByApp);
+    const mine = await setup({ flow: FLOW, initial: fromFlow(FLOW) });
+    expect(mine.wrapper.findComponent(TriggerCard).props('fixedByApp')).toBeNull();
+  });
+
   it('«Save» says its word, never an empty button (flows#144)', async () => {
     const s = await setup({ flow: null, initial: emptyDocument() });
     expect(s.find('flow-editor-save').text()).toBe('Save');

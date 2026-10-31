@@ -18,7 +18,7 @@ from live.context import OperationContext, Scope
 from live.errors import OperationError
 from live.operations import Operation, get, registry
 from ninja import Field, Schema
-from pydantic import SecretStr
+from pydantic import ConfigDict, SecretStr
 
 from base import assistant, entitlement
 from base.models import Membership
@@ -942,6 +942,135 @@ def test_the_previews_of_today_are_declared_right(settle):
     assert preview_errors() == []
 
 
+# ── What a write's app checks before its card (hub#538) ─────────────────────────────────────────────────────────
+# A new member with a role the business does not have showed its card, the person said yes, and only then the write
+# refused the role. A write may name, in its ``ai=``, a read of its own app that checks its data (``check``): run as
+# the person, with the data of the write its input takes, before the card; its refusal is the write's outcome and
+# no card is drawn. Nothing of its answer is shown: a normal write's card stays a single line.
+
+
+class NoteIn(Schema):
+    id: str = Field(min_length=1)
+    note: str = ""
+
+
+def checking(check, *, risk="normal", preview=None, input=NoteIn) -> Operation:
+    """A write of demo whose ``ai=`` names ``check`` (and, when dangerous, ``preview``)."""
+    declared = {"description": "Notes something on a demo item.", "risk": risk, "check": check}
+    if preview is not None:
+        declared["preview"] = preview
+    return Operation(
+        name="demo.item.note",
+        kind="command",
+        permission="demo.manage",
+        input=input,
+        output=SettlePreviewOut,
+        expose_api=False,
+        ai=declared,
+        fn=lambda ctx, data: data,
+    )
+
+
+@pytest.fixture
+def note(monkeypatch):
+    """A normal write that checks its item first, registered as an app's would be, with the read it names."""
+    monkeypatch.setitem(registry, SETTLE_PREVIEW.name, SETTLE_PREVIEW)
+    write = checking(SETTLE_PREVIEW.name)
+    monkeypatch.setitem(registry, write.name, write)
+    return write
+
+
+@pytest.mark.django_db
+def test_a_write_whose_check_refuses_its_data_gets_no_card_and_says_why(note):
+    failure, fields = assistant.preview(ctx(), note, {"id": "gone", "note": "x"})
+    assert (failure.outcome, failure.code, fields) == ("error", "demo.item_not_found", None)
+    assert json.loads(failure.content)["error"]["message"] == "This item is not there any more."
+
+
+@pytest.mark.django_db
+def test_a_check_that_passes_leaves_a_normal_writes_card_as_it_was(note):
+    """Nothing of the check's answer reaches the card: a normal write has no preview."""
+    assert assistant.preview(ctx(), note, {"id": "7", "note": "x"}) == (None, None)
+
+
+class StrictCheckIn(Schema):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(min_length=1)
+
+
+@pytest.mark.django_db
+def test_a_check_reads_only_the_data_its_own_input_takes(monkeypatch):
+    """The write's other data (its note) never reach its check: a read that refuses data it does not take still lets
+    a write whose data it takes reach its card."""
+    strict = Operation(**{**vars(SETTLE_PREVIEW), "name": "demo.item.note_check", "input": StrictCheckIn})
+    monkeypatch.setitem(registry, strict.name, strict)
+    write = checking(strict.name)
+    monkeypatch.setitem(registry, write.name, write)
+    assert assistant.preview(ctx(), write, {"id": "7", "note": "x"}) == (None, None)
+    failure, _ = assistant.preview(ctx(), write, {"id": "gone", "note": "x"})
+    assert failure.code == "demo.item_not_found"
+
+
+@pytest.mark.django_db
+def test_a_check_the_person_may_not_read_is_refused_never_read_for_them(note):
+    failure, fields = assistant.preview(ctx({"base.view_home", "demo.manage"}), note, {"id": "7"})
+    assert (failure.outcome, failure.code, fields) == ("refused", "permission_denied", None)
+
+
+@pytest.mark.django_db
+def test_a_dangerous_write_is_checked_before_its_preview_is_read(monkeypatch):
+    """The check refuses first: the preview is never read for data the write refuses."""
+    read: list[str] = []
+
+    def counted(ctx, data):
+        read.append(data.id)
+        return settle_preview(ctx, data)
+
+    previewed = Operation(**{**vars(SETTLE_PREVIEW), "name": "demo.item.note_preview", "fn": counted})
+    monkeypatch.setitem(registry, SETTLE_PREVIEW.name, SETTLE_PREVIEW)
+    monkeypatch.setitem(registry, previewed.name, previewed)
+    write = checking(SETTLE_PREVIEW.name, risk="high", preview={"operation": previewed.name, "fields": ["name"]})
+    monkeypatch.setitem(registry, write.name, write)
+    failure, _ = assistant.preview(ctx(), write, {"id": "gone"})
+    assert (failure.code, read) == ("demo.item_not_found", [])
+    failure, fields = assistant.preview(ctx(), write, {"id": "7"})
+    assert (failure, shown(fields), read) == (None, [("name", "text", "Item 7")], ["7"])
+
+
+def check_errors() -> list:
+    from django.core import checks
+
+    return [error for error in checks.run_checks(tags=["base"]) if error.id == "base.E012"]
+
+
+class NoItemIn(Schema):
+    note: str = ""
+
+
+@pytest.mark.parametrize(
+    "write, why",
+    [
+        (checking("demo.item.nothing"), "names no operation demo.item.nothing"),
+        (checking("base.business.get"), "of another app"),
+        (checking("demo.item.create"), "not a read"),
+        (checking({"operation": "demo.item.settle_preview"}), "is not the name of a read"),
+        (checking("demo.item.settle_preview", input=NoItemIn), "the write never takes id"),
+    ],
+)
+def test_a_check_is_checked_at_start(monkeypatch, write, why):
+    """Like a preview (base.E005): a check that names no read of its own app, or reads data its write does not
+    have, is said at start."""
+    monkeypatch.setitem(registry, SETTLE_PREVIEW.name, SETTLE_PREVIEW)
+    monkeypatch.setitem(registry, write.name, write)
+    [error] = check_errors()
+    assert "demo.item.note" in error.msg and why in error.msg
+
+
+def test_the_checks_of_today_are_declared_right(note):
+    assert check_errors() == []
+
+
 # ── A tool runs as the person, by its own operation (BASE-G115, G118) ────────────────────────────────────────────
 
 
@@ -983,6 +1112,17 @@ def test_the_instructions_answer_how_to_questions_only_from_the_documentation():
         "returns nothing, say the documentation does not cover it."
     ) in text
     assert "Never invent a record" in text
+
+
+
+def test_the_instructions_keep_ids_out_of_the_answer():
+    """hub#538: after creating a member, the answer listed it in a table with «ID 01a192cb-…». The model reads ids to
+    call its tools, but names a record to the person by its name, as the card and the screens do, never by its id."""
+    text = " ".join(assistant.instructions(language="es", currency="EUR", decimals=2, business="Bar Pepe", screens={}).split())
+    assert (
+        "Name a record to the person by its name, as the screens do: never write an id (a code such as "
+        "0190a3b4-…) in the answer, not in a table either."
+    ) in text
 
 
 def test_the_instructions_set_the_language_the_money_and_the_screens():

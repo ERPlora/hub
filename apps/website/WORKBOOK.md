@@ -480,7 +480,7 @@ las tres lecturas públicas de los visitantes (`website.public.*`).
   otro, y el equipo de un hub no lee ni cambia la web de otro. La primera escritura de un hub crea su fila
   (`get_or_create` y después `select_for_update`): dos primeras escrituras a la vez no fallan, la segunda espera a la
   primera. En la fase 2 cada BD de hub guarda su única fila y la columna se queda, siempre con el mismo valor. Las
-  claves del almacén (`hub-<id>/website/img/…`) y de la caché (`website:home:<slug>:…`) también llevan el hub. La e2e
+  claves del almacén (`hub-<id>/website/img/…`) y de la caché (`website:home:{<slug>}:…`) también llevan el hub. La e2e
   desconecta la página al terminar para no dejar `/` de `a` con ella (las demás e2e esperan el salto al login).
 - **El catálogo, solo de una app activa** (APP-WEBSITE, 2026-10-22): `queries._source_on` pregunta a
   `base.relay.active_apps` (la misma pregunta que la guarda de lo público), no a `apps.is_installed`: en la fase 1 toda
@@ -509,12 +509,12 @@ las tres lecturas públicas de los visitantes (`website.public.*`).
   imágenes). Los enlaces solo `https://`.
 - **Render y caché**: `public_home.respond` pinta la plantilla con lo publicado, en el idioma de `Accept-Language`
   (nunca una cookie), y guarda el HTML una hora en
-  `website:home:<slug>:<versión>:<idioma>:<día>:<moneda>:<APP_VERSION>` (la moneda es la del negocio: la de su país,
+  `website:home:{<slug>}:<versión>:<idioma>:<día>:<moneda>:<APP_VERSION>` (la moneda es la del negocio: la de su país,
   `base.business.currency_of` de la fila del registro que el host ya cargó (`request.hub`), lo mismo que contesta
   `base.business.get`, sin abrir una transacción de `@operation` por visita (una página servida de la caché cuesta lo
   que costaba: las transacciones de un hub se cuentan por plan); la vista previa y el catálogo público, que son
   operaciones, la preguntan con `base.operations.business_currency`, y el catálogo se guarda un minuto en
-  `website:catalog:<slug>:<versión>:<idioma>:<moneda>`; la copia publicada guarda el precio sin formato, en la
+  `website:catalog:{<slug>}:<versión>:<idioma>:<moneda>`; la copia publicada guarda el precio sin formato, en la
   unidad menor de la moneda, y `render.price_label` lo divide entre `10 ** decimales` de esa moneda: si el país del
   negocio cambia, la clave cambia y la página se repinta en la nueva sin volver a publicar; el día es el del negocio,
   `render.local_day` con la zona horaria del hub o `Europe/Madrid` si no tiene: el horario resalta hoy, así que cada
@@ -554,7 +554,7 @@ las tres lecturas públicas de los visitantes (`website.public.*`).
   id,displayName,rating,userRatingCount,reviews,googleMapsUri`). Se guarda el texto original de cada reseña
   (`originalText`, si no `text`), sin tocarlo; la fecha relativa la escribe el Hub en el idioma del visitante (desde
   `publishTime`), así una sola respuesta sirve para todos los idiomas. Solo se guardan enlaces `https://`.
-  Caché: `website:reviews:<slug>:<place id>` un día (o `failed` 10 minutos), `website:place:<slug>:<hash>` el sitio
+  Caché: `website:reviews:{<slug>}:<place id>` un día (o `failed` 10 minutos), `website:place:{<slug>}:<hash>` el sitio
   encontrado por nombre o enlace corto, y `website:reviews-lock:…` (30 s) para que pregunte un solo proceso. Nunca dentro
   de una transacción: `services.refresh_reviews` corre tras el COMMIT de guardar un sitio nuevo y de publicar (este
   borra antes lo guardado) y en `public_home.respond` cuando la página no está en caché y no hay nada guardado; una

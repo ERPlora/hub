@@ -24,11 +24,11 @@ describe('customerTabs', () => {
     ]);
   });
 
-  it('uses the product\'s icons where the shell registers them (Fields: layers-outline; Tags waits for pricetags)', () => {
+  it('uses the product\'s icons, all registered by the shell (Fields: layers-outline; Tags: pricetags)', () => {
     expect(customerTabs(t).map((tab) => tab.icon)).toEqual([
       'ion:people-outline',
       'ion:people-outline',
-      'ion:list-outline',
+      'ion:pricetags',
       'ion:layers-outline',
     ]);
   });

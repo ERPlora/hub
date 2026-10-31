@@ -490,6 +490,20 @@ msgstr "huella de la receta"
 msgid "This business has not turned that automation on: there is nothing to change."
 msgstr "Este negocio no ha encendido esa automatización: no hay nada que cambiar."
 
+msgid ""
+"«%(app)s» puts a condition on «%(field)s»: give it another value, start it "
+"with something else or make a copy."
+msgstr ""
+"«%(app)s» pone una condición en «%(field)s»: dale otro valor, haz que "
+"empiece con otra cosa o haz una copia."
+
+msgid ""
+"«%(app)s» fixes «%(field)s» of «%(name)s»: give it another value, take "
+"«%(name)s» off what it may use or make a copy."
+msgstr ""
+"«%(app)s» fija «%(field)s» de «%(name)s»: dale otro valor, quita «%(name)s» "
+"de lo que puede usar o haz una copia."
+
 msgid "No app of this business brings that automation."
 msgstr "Ninguna app de este negocio trae esa automatización."
 
