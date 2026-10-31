@@ -595,6 +595,27 @@ def test_relays_the_shared_outbox_then_the_hubs_own_then_makes_the_hubs_due_on_e
     assert order == ["tasks", "relay", "hubs", "due"] * 3
 
 
+def test_with_databases_only_it_makes_and_drops_the_hubs_databases_and_nothing_else(
+    monkeypatch, calls, tasks, due, outbox
+):
+    """The e2e's worker (tests/e2e/global-setup.ts): its specs play the relay and the tasks themselves, so it only makes
+    the databases of the hubs signed up during the run and drops the demos that ended."""
+    order: list[str] = []
+    monkeypatch.setattr(scheduler, "run_due", lambda now: order.append("tasks") or [])
+    monkeypatch.setattr(provision, "run_due", lambda now: order.append("due") or due(now))
+    monkeypatch.setattr(relay, "run", lambda now: order.append("relay") or outbox(now))
+    monkeypatch.setattr(worker, "_hubs", lambda now: order.append("hubs"))
+    monkeypatch.setattr(worker, "_reap", lambda now: order.append("reap"))
+    stop = threading.Event()
+    wait, _ = stop_after(stop, 2)
+
+    worker.run(stop, tick_seconds=TICK, wait=wait, clock=clock(0, 0, 1), databases_only=True)
+
+    # Every tick makes the databases due; the reaper keeps its own pace; nothing else runs.
+    assert [step for step in order if step != "reap"] == ["due", "due"]
+    assert order[0] == "reap" and not {"tasks", "relay", "hubs"} & set(order)
+
+
 def test_a_due_pass_that_fails_is_logged_and_the_next_tick_tries_again(caplog, calls, tasks, due, outbox):
     failure = DatabaseError("server closed the connection unexpectedly")
     due.failures.append(failure)

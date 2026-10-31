@@ -4,8 +4,8 @@
 // optional course, are left out), the supplements with their sign and the reason the button cannot add yet; two
 // coffees, two supplements; charged by card at the closed price plus every supplement, with its dishes on the
 // receipt (F07, F08). A pack to take away is split per dish on the receipt, 6,00 → 4,15 at 10 % and 1,85 at 21 %
-// (F09). The worker's outbox relay — the stack's worker runs it too (global-setup.ts), and a pass here as each tick
-// runs it makes sure it ran — lowers each
+// (F09). The worker's outbox relay — run here as each tick runs it, in `a`'s database: the e2e stack's worker
+// relays nothing — lowers each
 // dish's stock and never the menu's (F10). A menu sent from «Current order» reaches the kitchen dish by dish,
 // under the menu's kitchen name, and the kitchen display shows them under the menu's header (F11; the fire through
 // the relay is apps/combo/tests/test_relay.py). Each screen in 390×844, 834×1112 and 1440×900 (`APP-COMBO-COMBO-Fnn-<w>`).
@@ -279,7 +279,7 @@ test('COMBO-F09: a pack to take away is split per dish on the receipt, each at i
 });
 
 test('COMBO-F10: the relay lowers each dish sold, times the picks, and never the menu', async () => {
-  // The stack's worker may have relayed the sales already (global-setup.ts): what counts is the stock once it has.
+  expect([stock('LEN'), stock('STK'), stock('COF'), stock('SAN'), stock('BEE')]).toEqual(['10', '10', '10', '10', '10']);
   relayPass();
   // One menu (lentils, steak, two coffees) and one pack (sandwich, beer); the salad and the hake did not sell.
   expect([stock('LEN'), stock('STK'), stock('COF'), stock('SAN'), stock('BEE')]).toEqual(['9', '9', '8', '9', '9']);

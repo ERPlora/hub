@@ -29,6 +29,14 @@ describe('tablesOf', () => {
     ]);
   });
 
+  it("never takes a statement's own WITH names for tables", () => {
+    expect(
+      tablesOf(
+        "WITH ended AS (UPDATE django_session SET expire_date = now() WHERE session_key IN (SELECT session_id FROM base_sessionowner)) RETURNING 1), more AS (select 1) SELECT count(*) FROM ended, more",
+      ),
+    ).toEqual(['django_session', 'base_sessionowner']);
+  });
+
   it('reads a quoted name whole, and never takes a keyword or a function for a table', () => {
     expect(tablesOf('drop table if exists \\"e2e-fix-printing-hooks-parked\\"')).toEqual(['e2e-fix-printing-hooks-parked']);
     expect(tablesOf('drop table if exists "e2e-fix-printing-hooks-parked"')).toEqual(['e2e-fix-printing-hooks-parked']);
@@ -118,6 +126,19 @@ describe('plan', () => {
         database: 'hub_e2e_8030_a_db',
         sql: 'set client_min_messages = warning; create table if not exists e2e_c as select * from whatsapp_inbox_channel',
       },
+    ]);
+  });
+
+  it("finds a scratch table this process never noted (Playwright restarts its worker after a failure) where it is", () => {
+    const made = new Map<string, string>();
+    const find = (table: string) => (table === 'e2e_backup_photo' ? CONTROL : undefined);
+    expect(plan("select to_regclass('e2e_backup_photo') is not null", 'a', CONTROL, hubs, made, find)).toEqual([
+      { database: CONTROL, sql: "select to_regclass('e2e_backup_photo') is not null" },
+    ]);
+    expect(made.get('e2e_backup_photo')).toBe(CONTROL);
+    // One that is nowhere yet goes with its neighbours, as before.
+    expect(plan('drop table if exists e2e_new; create table e2e_new as select * from base_hub', 'a', CONTROL, hubs, new Map(), find)).toEqual([
+      { database: CONTROL, sql: 'drop table if exists e2e_new; create table e2e_new as select * from base_hub' },
     ]);
   });
 

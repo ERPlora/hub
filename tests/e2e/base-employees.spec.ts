@@ -167,7 +167,8 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     await testid(page, 'api-docs-open').click();
     await expect(page).toHaveURL(/\/api-docs$/);
     await expect(shown(page).locator('[data-testid="api-docs-section"]').first()).toBeVisible();
-    await expect(testid(page, 'api-docs-keys-soon')).toBeVisible();
+    // `a` has its own database (S2a): its keys can be made, so no «coming soon» (a shared one says it: ApiDocsPage.test.ts).
+    await expect(testid(page, 'api-docs-keys-soon')).toHaveCount(0);
     const route = shown(page).locator('[data-testid="api-docs-route"]').first();
     await route.locator('summary').click();
     await expect(route).toHaveAttribute('open', '');

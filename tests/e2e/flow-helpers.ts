@@ -49,7 +49,7 @@ export async function manualFlow(context: BrowserContext, name: string, steps: u
   return id;
 }
 
-/** Python for a one-shot `manage.py shell` playing the worker's relay to flow (in `a`'s database; the stack's worker relays too): the
+/** Python for a one-shot `manage.py shell` playing the worker's relay to flow (in `a`'s database: the e2e stack's worker relays nothing): the
  *  outbox event `FLOW_EVENT`, handed to flow's reaction as the relay does on every tick. What that reaction leaves
  *  for after its COMMIT (the call of FLOW-F27, the question to the assistant of FLOW-F38) goes to `base.outbound`'s
  *  threads, which would die with this process before making it: `OUTBOUND_AT_ONCE` makes it at once

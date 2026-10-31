@@ -12,8 +12,9 @@
 // WhatsApp seed with this Hub's ids of `a` and `b`, never `demo_seed` alone, whose own ids that seed refuses.
 // Before all that it refuses more than one worker: `--workers=N` overrides `workers: 1` of playwright.config.ts, and
 // specs running at once on the one stack delete each other's data (2026-10-23: the agenda spec timed out).
-// Once every check passes it starts this checkout's `manage.py run_worker` on the run's databases (round 2026-10-30 of
-// PLAN-DB, S2a: a business or a demo registered during the run is `requested` until the worker makes its database) and
+// Once every check passes it starts this checkout's `manage.py run_worker --databases-only` on the run's databases
+// (round 2026-10-30 of PLAN-DB, S2a: a business or a demo registered during the run is `requested` until the worker
+// makes its database; the specs play the relay and the tasks themselves) and
 // hands Playwright its stop as the run's teardown; a worker that never waits for work stops the run with what it said.
 import { type ChildProcess, spawn as spawnProcess, spawnSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
@@ -229,14 +230,16 @@ export type SpawnWorker = (
   stderr: Pick<NonNullable<ChildProcess['stderr']>, 'on'>;
 };
 
-/** `manage.py run_worker` of this checkout on the stack's databases, up once it says it waits for work. */
+/** `manage.py run_worker --databases-only` of this checkout on the stack's databases, up once it says it waits for
+ *  work: it makes the databases of the hubs and demos signed up during the run and drops the demos that ended; the
+ *  specs play the relay and the tasks themselves (a worker relaying too would race them). */
 export function startWorker(
   database: string,
   saasDatabase: string,
   spawn: SpawnWorker = spawnProcess as unknown as SpawnWorker,
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<StopWorker> {
-  const worker = spawn('uv', ['run', 'python', 'manage.py', 'run_worker'], {
+  const worker = spawn('uv', ['run', 'python', 'manage.py', 'run_worker', '--databases-only'], {
     cwd: HUB_DIR,
     env: { ...env, DB_NAME: database, SHARED_DB_NAME: saasDatabase },
     stdio: ['ignore', 'pipe', 'pipe'],

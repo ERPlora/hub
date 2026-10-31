@@ -852,11 +852,19 @@ const hubDatabase = hubDatabases(STACK.database, (sql) => psqlOn(STACK.database,
 /** Where each scratch table of this run's specs was made (`hub-databases.ts`), kept between calls. */
 const scratchTables = new Map<string, string>();
 
+/** The database the scratch table `table` is in, control's or `hub`'s, when this process never noted it: Playwright
+ * starts a new worker process after a failed test, and a spec's `afterAll` there must still find its copy. */
+function scratchTableOf(table: string, hub: string): string | undefined {
+  return [STACK.database, hubDatabase(hub)].find(
+    (database) => psqlOn(database, `select to_regclass('\\"${table}\\"') is not null`) === 't',
+  );
+}
+
 /** `sql` where its tables live (`hub-databases.ts`): each statement on control's tables in the stack's control
  * database, on any other in `hub`'s own (`a` unless the spec names another; round 2026-10-30 of PLAN-DB, S2a), the
  * ones in a row on one database in one call; what they print, in order. A statement that names both is refused. */
 export function psql(sql: string, hub = 'a'): string {
-  return plan(sql, hub, STACK.database, hubDatabase, scratchTables)
+  return plan(sql, hub, STACK.database, hubDatabase, scratchTables, (table) => scratchTableOf(table, hub))
     .map((run) => psqlOn(run.database, run.sql))
     .filter(Boolean)
     .join('\n');

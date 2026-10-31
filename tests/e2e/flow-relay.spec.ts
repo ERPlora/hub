@@ -2,7 +2,7 @@
 // «When something happens in the business, the automation starts» (apps/flow/WORKBOOK.md FLOW-F21), end to end
 // in each of the three sizes, as the owner and against the real apps: an automation on «A customer card is
 // created» that leaves a task, on and allowed; a real customer created through the Customers API; the worker's
-// outbox relay pass (`base.relay.run`, as every tick runs it, in `a`'s database); its History says the
+// outbox relay pass (`base.relay.run`, as every tick runs it, in `a`'s database: the e2e stack's worker relays nothing); its History says the
 // run finished well, step by step, and the task is in Tasks. A second pass starts nothing more. One screenshot
 // per size (`APP-FLOW-3-FLOW-F21-<width>`). What it creates is tagged `E2E FlowR` and goes.
 import { spawnSync } from 'node:child_process';

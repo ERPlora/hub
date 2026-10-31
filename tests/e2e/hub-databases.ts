@@ -22,11 +22,16 @@ const TABLE = new RegExp(
 );
 /** A table a statement asks about by name: `to_regclass('e2e_x')`, whether a scratch table is still there. */
 const ASKED = /\bto_regclass\(\s*'([a-z_][a-z0-9_-]*)'/gi;
+/** A name a statement gives its own subquery (`WITH ended AS (…)`, `, more AS (…)`): never a table. */
+const WITH_NAME = /(?:\bwith(?:\s+recursive)?|,)\s+([a-z_][a-z0-9_]*)\s+as\s*(?:not\s+)?(?:materialized\s+)?\(/gi;
 /** Words that follow `update` or `from` without being a table (`… do update set`). */
 const KEYWORD = new Set(['set', 'only', 'lateral']);
 /** The scratch table a statement makes or drops. */
 const MADE = new RegExp(String.raw`^\s*create\s+(?:unlogged\s+)?table\s+(?:if\s+not\s+exists\s+)?${NAME}`, 'i');
 const DROPPED = new RegExp(String.raw`^\s*drop\s+table\s+(?:if\s+exists\s+)?${NAME}`, 'i');
+
+/** The database a scratch table nobody noted is in (a new worker process of Playwright), or `undefined`: nowhere. */
+export type FindScratch = (table: string) => string | undefined;
 
 /** One run of `psql`: statements in a row that live on one database. */
 export interface Run {
@@ -34,13 +39,15 @@ export interface Run {
   sql: string;
 }
 
-/** The tables `sql` names, in order (a subquery's too), then those it asks about by name (`to_regclass`). */
+/** The tables `sql` names, in order (a subquery's too, never its own `WITH` names), then those it asks about by name
+ * (`to_regclass`). */
 export function tablesOf(sql: string): string[] {
+  const own = new Set([...sql.matchAll(WITH_NAME)].map(([, name]) => name.toLowerCase()));
   return [
     ...[...sql.matchAll(TABLE)]
       .filter(([, word, , , call]) => !(call && /^(?:from|join)$/i.test(word)))
       .map(([, , quoted, bare]) => (quoted ?? bare).toLowerCase())
-      .filter((table) => !KEYWORD.has(table)),
+      .filter((table) => !KEYWORD.has(table) && !own.has(table)),
     ...[...sql.matchAll(ASKED)].map(([, name]) => name.toLowerCase()),
   ];
 }
@@ -74,9 +81,15 @@ function databaseOf(
   control: string,
   hubDatabase: (slug: string) => string,
   made: Map<string, string>,
+  find: FindScratch,
 ): string | undefined {
   const tables = tablesOf(statement);
   const scratch = tables.filter((table) => SCRATCH_TABLE.test(table));
+  for (const table of scratch) {
+    if (made.has(table)) continue;
+    const found = find(table);
+    if (found) made.set(table, found);
+  }
   const ofControl = tables.filter((table) => !SCRATCH_TABLE.test(table) && CONTROL_TABLE.test(table));
   const ofHub = tables.filter((table) => !SCRATCH_TABLE.test(table) && !CONTROL_TABLE.test(table));
   if (ofControl.length && ofHub.length) {
@@ -106,7 +119,8 @@ function remember(statement: string, database: string, made: Map<string, string>
 }
 
 /** Where each statement of `sql` runs (`hub`'s tables in its database, control's in `control`), the ones in a row on
- * one database in one run, in order. `made` remembers, across calls, the database each scratch table was made in: a
+ * one database in one run, in order. `made` remembers, across calls, the database each scratch table was made in
+ * (one it never noted is looked for with `find`, which a new worker process needs): a
  * statement that names no table, or only scratch tables nobody made yet, goes with the next statement that says where
  * (else the last one; alone, the hub's for a scratch table and control's for none). A statement whose tables live in
  * two databases is refused. */
@@ -116,10 +130,11 @@ export function plan(
   control: string,
   hubDatabase: (slug: string) => string,
   made: Map<string, string>,
+  find: FindScratch = () => undefined,
 ): Run[] {
   const statements = statementsOf(sql);
   const places = statements.map((statement) => {
-    const database = databaseOf(statement, hub, control, hubDatabase, made);
+    const database = databaseOf(statement, hub, control, hubDatabase, made, find);
     if (database) remember(statement, database, made);
     return database;
   });

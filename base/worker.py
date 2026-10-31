@@ -85,12 +85,15 @@ def run(
     tick_seconds: float = TICK_SECONDS,
     wait: Callable[[float], object] | None = None,
     clock: Callable[[], dt.datetime] = timezone.now,
+    databases_only: bool = False,
 ) -> int:
     """Register the apps, schedule their tasks, then run the due ones every tick until ``stop`` is set;
     return the process's exit code.
 
     ``wait(seconds)`` sleeps until the time is up or a stop is requested: ``stop.wait`` unless a
     test replaces it. ``stop`` alone says whether to stop. ``clock()`` is now (a test's fake clock).
+    ``databases_only`` (``run_worker --databases-only``, the e2e's worker): only the hubs' databases are made and the
+    demos that ended dropped; no task runs and no outbox is relayed, which the e2e's specs play themselves.
     """
     wait = stop.wait if wait is None else wait
     delay = RETRY_FIRST_SECONDS
@@ -132,9 +135,10 @@ def run(
     next_reap: dt.datetime | None = None
     while not stop.is_set():
         now = clock()
-        _tick(now)
-        _relay(now)
-        _hubs(now)
+        if not databases_only:
+            _tick(now)
+            _relay(now)
+            _hubs(now)
         if next_reap is None or now >= next_reap:
             _reap(now)
             next_reap = now + dt.timedelta(seconds=REAPER_INTERVAL_SECONDS)

@@ -5,7 +5,7 @@
 // catalogue's supplements, a soda of another VAT on a line of its own with its base and VAT (F07); the round sent
 // from «Current order» reaches the kitchen display with the options by their kitchen names, in the order chosen
 // (F08); a product deleted in Inventory lets go of its groups once the worker's outbox relay runs — here as each tick
-// runs it, in `a`'s database — and the group's sheet no longer applies there (F09). Each screen in
+// runs it, in `a`'s database: the e2e stack's worker relays nothing — and the group's sheet no longer applies there (F09). Each screen in
 // 390×844, 834×1112 and 1440×900 (`APP-MODIFIER-MODIFIER-Fnn-<w>`). What a run makes — products `E2E-MTL-<run>-…`,
 // the category «E2E MTL <run>», the groups «E2E Mod Till … <run>», its checks, sales and kitchen tickets — goes.
 import { spawnSync } from 'node:child_process';

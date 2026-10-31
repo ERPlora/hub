@@ -98,7 +98,7 @@ async function menuId(context: BrowserContext): Promise<string> {
   return (await call<Detail>(context, 'GET', `/combo/combos/detail?combo=${encodeURIComponent(MENU)}`)).id;
 }
 
-/** The outbox relay as the worker runs it on every tick (in `a`'s database; the stack's worker runs it too), pass after pass until one
+/** The outbox relay as the worker runs it on every tick (in `a`'s database: the e2e stack's worker relays nothing), pass after pass until one
  *  finds nothing to do. */
 function relayPass(): void {
   const code = [

@@ -98,7 +98,7 @@ export function system<T = unknown>(op: string, payload: unknown): T {
   return JSON.parse(line) as T;
 }
 
-/** Python that goes first in a one-shot `manage.py shell` playing the worker's relay (in `a`'s database; the stack's worker relays too).
+/** Python that goes first in a one-shot `manage.py shell` playing the worker's relay (in `a`'s database: the e2e stack's worker relays nothing).
  *  What a reaction hands erplora.com after its COMMIT goes to `base.outbound`'s threads, which in the worker outlive
  *  the tick but here would die with this process (daemon threads) before erplora.com is called: this process makes
  *  those calls at once, as the suite's `conftest.py` does (FIX-HUB-WHATSAPP-INBOX-SLOW-SEND-BLOCKS-RELAY). */

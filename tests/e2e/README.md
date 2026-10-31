@@ -107,11 +107,12 @@ Reglas que el e2e hace cumplir:
   entorno, dice en una línea qué hizo con cada una (nunca su valor) y, si alguna no es una clave, falla sin escribir
   nada (`fernet-keys.ts`).
 - Si la BD e2e aún no existe, `global-setup.ts` lo dice con la orden que la crea.
-- Pasadas las comprobaciones, `global-setup.ts` arranca el `manage.py run_worker` de este checkout sobre `DB_NAME` (y
-  `SHARED_DB_NAME` = la BD del SaaS de la pila, donde registra las apps) y lo para con `SIGTERM` al acabar la
-  ejecución: desde S2a (ronda 2026-10-30 de PLAN-DB) un negocio o una demo que se dan de alta durante la ejecución
-  quedan `requested` hasta que el worker hace su BD. Si el worker no dice «waiting for work» en 60 s, o sale antes, la
-  ejecución para con lo que dijo.
+- Pasadas las comprobaciones, `global-setup.ts` arranca el `manage.py run_worker --databases-only` de este checkout
+  sobre `DB_NAME` (y `SHARED_DB_NAME` = la BD del SaaS de la pila, donde registra las apps) y lo para con `SIGTERM` al
+  acabar la ejecución: desde S2a (ronda 2026-10-30 de PLAN-DB) un negocio o una demo que se dan de alta durante la
+  ejecución quedan `requested` hasta que el worker hace su BD. Solo hace eso (y borra las demos que acaban): ni releva
+  el outbox ni corre tareas, que las specs juegan ellas mismas (`manage.py shell --hub a`); un worker que releva a la vez
+  se les adelanta. Si el worker no dice «waiting for work» en 60 s, o sale antes, la ejecución para con lo que dijo.
 - Las specs entran con las cuentas de demo del SaaS (`owner@example.com` y `employee@example.com`, con acceso a `a` y
   `b`), que crea `manage.py demo_seed` del SaaS (en la receta, por medio de `whatsapp_hub_seed.py`, abajo). `global-setup.ts`
   las busca en la BD del SaaS de la pila (`E2E_SAAS_DB`, por defecto `saas_e2e_<Hub+1>`; con un solo `select`, sin escribir

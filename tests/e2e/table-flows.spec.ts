@@ -106,7 +106,7 @@ function painted(page: Page, time: string): Promise<string> {
 }
 
 /** The outbox relay as the worker runs it on every tick (`base.relay.run`), in `a`'s database, tick after
- *  tick until a pass finds nothing to do (the stack's worker relays too; this makes sure it ran). */
+ *  tick until a pass finds nothing to do: the e2e stack's worker relays nothing, so what other specs recorded waits too. */
 function relayPass(): void {
   const code = [
     'from django.utils import timezone',

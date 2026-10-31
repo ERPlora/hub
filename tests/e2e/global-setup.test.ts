@@ -561,7 +561,8 @@ describe('startWorker', () => {
     const stop = await up;
 
     const [command, args, options] = calls[0];
-    expect([command, args]).toEqual(['uv', ['run', 'python', 'manage.py', 'run_worker']]);
+    // Databases only: the specs play the relay and the tasks themselves, so a worker relaying too would race them.
+    expect([command, args]).toEqual(['uv', ['run', 'python', 'manage.py', 'run_worker', '--databases-only']]);
     expect(options.cwd).toBe(HUB_DIR);
     expect(options.env).toMatchObject({ PATH: '/bin', DB_NAME: 'hub_e2e_8030', SHARED_DB_NAME: 'saas_e2e_8031' });
     expect(typeof stop).toBe('function');
