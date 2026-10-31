@@ -168,11 +168,12 @@ def test_the_bar_s_way_to_erplora_com_names_the_business_of_this_hub(client, set
     assert home_b["manage_url"] == ""
 
 
-def test_the_platform_s_superuser_gets_the_way_to_erplora_com_too(client, superuser):
-    # ``*`` grants every permission, the new one included (live.context.OperationContext.has).
+def test_the_platform_s_superuser_gets_no_way_to_a_business_that_is_not_its_own(client, superuser):
+    # ERPlora's staff is no customer: on a business's host it holds only what a Membership there gives
+    # (base.permissions; tests/test_guardrails_permissions.py), and the staff copy never has one.
     client.force_login(superuser)
     _, home = json_block(client.get("/demo/items", HTTP_HOST="a.localhost:8000"), "hub-home")
-    assert "/dashboard/businesses/" in home["manage_url"]
+    assert home["manage_url"] == ""
 
 
 def test_the_shell_embeds_the_persons_panels_so_the_home_opens_one_live_stream(client, make_user):
