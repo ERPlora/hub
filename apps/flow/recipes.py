@@ -247,13 +247,18 @@ def missing_clauses(recipe: Recipe, flow: Flow) -> dict[str, dict[str, Any]]:
     return _missing(recipe.declaration, flow)
 
 
-def _declared(ref: str) -> dict | None:
-    """What the active app that brings ``ref`` declares for it today, as it is (set aside or not: a fix it makes
-    must reach the automations built from it all the same); ``None`` when no active app does."""
+def _declaring(ref: str) -> tuple[LiveAppConfig, dict] | None:
+    """The active app that brings ``ref`` and what it declares for it today, as it is (set aside or not: a fix it
+    makes must reach the automations built from it all the same); ``None`` when no active app does."""
     for config, declared in declarations():
         if isinstance(declared, dict) and f"{config.label}/{declared.get('id', '')}" == ref:
-            return declared
+            return config, declared
     return None
+
+
+def _declared(ref: str) -> dict | None:
+    found = _declaring(ref)
+    return found[1] if found else None
 
 
 def fixed_filter(flow: Flow) -> dict[str, Any]:
@@ -263,6 +268,33 @@ def fixed_filter(flow: Flow) -> dict[str, Any]:
     declared = _declared(flow.recipe) if flow.recipe else None
     missing = _missing(declared, flow) if declared else {}
     return {**flow.trigger_filter, **missing} if missing else flow.trigger_filter
+
+
+def fixed_by_app(flow: Flow) -> dict[str, Any] | None:
+    """What its app fixes today on ``flow`` and is not taken off from it (FLOW-F36): the data its recipe's «Only
+    when…» has a condition on (while it starts on that ``event``) and, by step id and tool, the data its «Ask the
+    assistant» steps fix; ``None`` when no active app's recipe built it or it fixes nothing. A copy has no recipe: what
+    its app fixed is the owner's there."""
+    found = _declaring(flow.recipe) if flow.recipe else None
+    if found is None:
+        return None
+    config, declared = found
+    trigger = declared.get("trigger") or {}
+    clauses = list(_words(trigger.get("filter") or {})) if trigger.get("kind") == "event" else []
+    pinned = {
+        step["id"]: {tool: list(data) for tool, data in _words(step["pinned"]).items()}
+        for step in declared.get("steps") or []
+        if isinstance(step, dict) and step.get("kind") == "assistant" and step.get("pinned")
+    }
+    if not clauses and not pinned:
+        return None
+    return {
+        "app": config.label,
+        "app_name": str(config.verbose_name),
+        "event": trigger.get("event", "") if clauses else "",
+        "filter": clauses,
+        "pinned": pinned,
+    }
 
 
 def fixed_data(flow: Flow, steps: list[dict]) -> list[dict]:

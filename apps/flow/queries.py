@@ -542,6 +542,7 @@ def flow_row(flow: Flow) -> dict[str, Any]:
             if flow.last_run_id
             else None
         ),
+        "fixed_by_app": recipes.fixed_by_app(flow),
     }
 
 

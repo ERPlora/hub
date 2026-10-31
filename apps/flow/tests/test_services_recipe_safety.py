@@ -22,8 +22,10 @@ import uuid
 
 import pytest
 from live.context import system_context
+from live.errors import InvalidPayload
 from live.models import OutboxEvent
 
+from apps.flow import queries
 from apps.flow.models import Flow, FlowRun, Question
 from apps.flow.queries import TURN
 
@@ -205,7 +207,8 @@ def test_what_the_owner_fixed_on_that_step_stays_and_the_rest_gets_its_app_s(dec
     flow_id = turned_on_before_the_fix(declared)
     mine = {"id": "s9", "kind": "assistant", "prompt": "My words {{input.name}}", "tools": [CANCEL, UPDATE],
             "pinned": {CANCEL: {"on_behalf_of": "input.card"}}}
-    run("flow.flow.update", {"id": flow_id, "steps": [mine]}, ctx_for("hub_owner"))
+    # Saved so before its app fixed the rest (today an update that leaves it out is refused, as below).
+    Flow.objects.filter(pk=flow_id).update(steps=[mine])
 
     [step] = read(flow_id).steps
     assert step["prompt"] == "My words {{input.name}}"
@@ -220,7 +223,7 @@ def test_what_the_owner_fixed_on_that_step_stays_and_the_rest_gets_its_app_s(dec
 def test_a_tool_the_owner_took_off_the_step_gets_nothing_and_their_words_stay(declared):  # noqa: F811
     flow_id = turned_on_before_the_fix(declared)
     mine = {"id": "s9", "kind": "assistant", "prompt": "Only cancel {{input.name}}", "tools": [CANCEL]}
-    run("flow.flow.update", {"id": flow_id, "steps": [mine]}, ctx_for("hub_owner"))
+    Flow.objects.filter(pk=flow_id).update(steps=[mine])  # saved so before its app fixed its data
 
     [step] = read(flow_id).steps
     assert step == {**stored(flow_id).steps[0], "pinned": {CANCEL: THEIRS[CANCEL]}}
@@ -402,3 +405,101 @@ def test_the_table_answer_turned_on_before_its_app_left_out_old_messages_never_a
     message = {"id": str(uuid.uuid4()), "direction": "inbound", "source": "history", "phone": "+34600111222"}
     assert starts("whatsapp_inbox.message.received", message) == 0
     assert read(flow_id).trigger["filter"]["input.source"] == {"eq": "live"}
+
+
+# ── What its app fixes is not taken off from the automation (FLOW-F36, FLOW-F37) ───────────────────────────────────
+# Like Chrome and Android with a narrowed permission, what the app narrowed is not widened again from the automation:
+# the editor shows it as set by its app and an update that leaves it out is refused, never saved to come back unseen.
+# The owner's ways out: another value (theirs goes), taking that tool off the step, starting it with something else,
+# or a copy (which is theirs).
+
+
+def app_name(label: str) -> str:
+    return str(queries.active_apps()[label].verbose_name)
+
+
+def refused(flow_id: str, change: dict) -> InvalidPayload:
+    with pytest.raises(InvalidPayload) as caught:
+        run("flow.flow.update", {"id": flow_id, **change}, ctx_for("hub_owner"))
+    return caught.value
+
+
+def test_it_says_what_its_app_fixes_on_it(declared):  # noqa: F811
+    flow_id = turned_on_before_the_fix(declared)
+    assert read(flow_id).model_dump(mode="json")["fixed_by_app"] == {
+        "app": "reservation",
+        "app_name": app_name("reservation"),
+        "event": CANCELLED,
+        "filter": ["input.by_customer"],
+        "pinned": {"s9": {CANCEL: ["on_behalf_of"], UPDATE: ["on_behalf_of"]}},
+    }
+
+
+def test_one_no_recipe_built_and_a_copy_have_nothing_fixed_by_an_app_and_the_copy_s_owner_takes_it_off(declared):  # noqa: F811
+    flow_id = turned_on_before_the_fix(declared)
+    copied = str(run("flow.flow.duplicate", {"id": flow_id}, ctx_for("hub_owner")).id)
+    assert read(copied).fixed_by_app is None
+    step = {key: value for key, value in read(copied).steps[0].items() if key != "pinned"}
+    run("flow.flow.update", {"id": copied, "trigger": {"kind": "event", "event": CANCELLED, "filter": {}}, "steps": [step]})
+    assert (stored(copied).trigger_filter, "pinned" in stored(copied).steps[0]) == ({}, False)
+
+
+def test_taking_its_app_s_condition_off_is_refused_and_says_whose_it_is(declared):  # noqa: F811
+    # The reviewer's probe: built from today's version, the owner took the condition off, it was saved, and reading
+    # it brought it back without a word.
+    declared(("appointment", declaration()))
+    flow_id = str(run("flow.recipe.enable", {"recipe": GAP}, ctx_for("hub_owner")).flow.id)
+    before = stored(flow_id)
+
+    error = refused(flow_id, {"trigger": {"kind": "event", "event": CANCELLED, "filter": {}}})
+
+    assert (error.code, set(error.fields)) == ("flow.recipe_fixed", {"trigger.filter"})
+    assert app_name("appointment") in error.fields["trigger.filter"]
+    assert "input.by_customer" in error.fields["trigger.filter"]
+    assert (stored(flow_id).trigger_filter, stored(flow_id).version) == (ONLY_THE_CUSTOMER, before.version)
+
+
+def test_taking_a_datum_its_app_fixes_off_or_leaving_it_empty_is_refused_and_says_whose_it_is(declared):  # noqa: F811
+    flow_id = turned_on_before_the_fix(declared)
+    [step] = read(flow_id).steps
+    before = stored(flow_id).steps
+
+    error = refused(flow_id, {"steps": [{**step, "pinned": {UPDATE: THEIRS[UPDATE]}}]})
+
+    assert (error.code, set(error.fields)) == ("flow.recipe_fixed", {"steps.0.pinned"})
+    assert all(name in error.fields["steps.0.pinned"] for name in (app_name("reservation"), "on_behalf_of", CANCEL))
+    emptied = {**step, "pinned": {CANCEL: {"on_behalf_of": ""}, UPDATE: THEIRS[UPDATE]}}
+    assert refused(flow_id, {"steps": [emptied]}).code == "flow.recipe_fixed"
+    assert stored(flow_id).steps == before
+
+
+def test_its_ways_out_are_another_value_taking_the_tool_off_starting_it_otherwise_or_a_copy(declared):  # noqa: F811
+    flow_id = turned_on_before_the_fix(declared)
+    [step] = read(flow_id).steps
+    owner = ctx_for("hub_owner")
+
+    mine = {**step, "pinned": {**step["pinned"], CANCEL: {"on_behalf_of": "input.card"}}}
+    run("flow.flow.update", {"id": flow_id, "steps": [mine]}, owner)
+    assert stored(flow_id).steps[0]["pinned"][CANCEL] == {"on_behalf_of": "input.card"}
+
+    only = {**mine, "tools": [UPDATE], "pinned": {UPDATE: THEIRS[UPDATE]}}
+    run("flow.flow.update", {"id": flow_id, "steps": [only]}, owner)
+    assert stored(flow_id).steps[0]["tools"] == [UPDATE]
+
+    theirs = {"input.by_customer": {"eq": False}}
+    run("flow.flow.update", {"id": flow_id, "trigger": {"kind": "event", "event": CANCELLED, "filter": theirs}}, owner)
+    assert stored(flow_id).trigger_filter == theirs
+    created = "appointment.appointment.created"
+    run("flow.flow.update", {"id": flow_id, "trigger": {"kind": "event", "event": created, "filter": {}}}, owner)
+    assert (stored(flow_id).trigger_event, stored(flow_id).trigger_filter) == (created, {})
+
+
+def test_saved_as_it_is_read_it_is_taken_and_what_its_app_fixes_is_written(declared):  # noqa: F811
+    # The editor sends what it read: one turned on before its app fixed its data and its condition is saved untouched.
+    flow_id = turned_on_before_the_fix(declared)
+    Flow.objects.filter(pk=flow_id).update(trigger_filter={})
+    shown = read(flow_id)
+
+    run("flow.flow.update", {"id": flow_id, "trigger": shown.trigger, "steps": shown.steps}, ctx_for("hub_owner"))
+
+    assert (stored(flow_id).trigger_filter, stored(flow_id).steps[0]["pinned"]) == (ONLY_THE_CUSTOMER, THEIRS)

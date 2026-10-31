@@ -122,6 +122,16 @@ DISABLED = _("This automation is paused: turn it on to run it.")
 DRAFT_DECIDED = _("That draft was already decided.")
 GRANT_BEYOND_CALLER = _("You cannot allow what you may not do yourself: «%(name)s».")
 RECIPE_NOT_ON = _("This business has not turned that automation on: there is nothing to change.")
+#: What its app fixes on an automation built from one of its recipes is not taken off from it (FLOW-F36): the ways
+#: out are another value, taking that tool off the step, starting it with something else, or a copy (the owner's).
+FIXED_CLAUSE = _(
+    "«%(app)s» puts a condition on «%(field)s»: give it another value, start it with something else or make a copy."
+)
+FIXED_PIN = _(
+    "«%(app)s» fixes «%(field)s» of «%(name)s»: give it another value, take «%(name)s» off what it may use or make a copy."
+)
+#: The code of that refusal.
+RECIPE_FIXED_CODE = "flow.recipe_fixed"
 SECRETS_KEY_MISSING = _(
     "This server cannot keep secrets yet: its encryption key is missing. Nothing was saved."
 )
@@ -192,6 +202,36 @@ def _apply_trigger(flow: Flow, trigger: Any) -> None:
         else {}
     )
     flow.run_at = trigger.at if trigger.kind == "at" else None
+
+
+def _taken_off(flow: Flow, trigger: Any, steps: list[Any] | None) -> None:
+    """Refuses, by field, a change that leaves out what its app fixes on ``flow`` (FLOW-F36): a condition of its «Only
+    when…» while it starts on the recipe's event, or a datum of an «Ask the assistant» step (or leaves it empty) while
+    that step may use its tool. Saved, it would come back on reading it without a word."""
+    fixed = recipes.fixed_by_app(flow)
+    if fixed is None:
+        return
+    problems: dict[str, str] = {}
+    if trigger is not None and trigger.kind == "event" and trigger.event == fixed["event"]:
+        gone = next((path for path in fixed["filter"] if path not in (trigger.filter or {})), None)
+        if gone is not None:
+            problems["trigger.filter"] = str(FIXED_CLAUSE) % {"app": fixed["app_name"], "field": gone}
+    for index, step in enumerate(steps or []):
+        wanted = fixed["pinned"].get(step.id) if step.kind == "assistant" else None
+        for tool, fields in (wanted or {}).items():
+            have = (step.pinned or {}).get(tool) or {}
+            gone = next((field for field in fields if _blank(have.get(field))), None)
+            if tool in step.tools and gone is not None:
+                problems[f"steps.{index}.pinned"] = str(FIXED_PIN) % {
+                    "app": fixed["app_name"], "field": gone, "name": tool
+                }
+                break
+    if problems:
+        raise InvalidPayload(next(iter(problems.values())), code=RECIPE_FIXED_CODE, fields=problems)
+
+
+def _blank(value: Any) -> bool:
+    return value is None or (isinstance(value, str) and not value.strip())
 
 
 def _check(trigger: Any, steps: list[Any] | None, now: dt.datetime, saved_at: dt.datetime | None = None) -> None:
@@ -289,13 +329,15 @@ def create_flow(ctx: OperationContext, data: CreateIn) -> dict:
     ai={
         "description": "Change an automation, by its id or its name: its name, what starts it or its steps (to turn "
         "it on or pause it, `flow.flow.set_enabled`). Only what is sent changes; its permissions stay. Changing the trigger or the steps "
-        "raises its version, and what is already running goes on with the version it started with.",
+        "raises its version, and what is already running goes on with the version it started with. What its app fixes "
+        "on one built from a recipe (`fixed_by_app` of `flow.flow.detail`) cannot be left out: give it another value.",
         "risk": "normal",
     },
 )
 def update_flow(ctx: OperationContext, data: UpdateIn) -> dict:
     now = timezone.now()
     flow = resolve_flow(data.id, data.flow, lock=True)
+    _taken_off(flow, data.trigger, data.steps)
     _check(data.trigger, data.steps, now, saved_at=flow.run_at)
     changed_document = False
     if data.name is not None:
