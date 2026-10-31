@@ -108,6 +108,11 @@ ORM_EXCEPTIONS: dict[str, str] = {
     "base/catalog.py": SHARED_CATALOG_REASON,
     "base/tenancy/bootstrap.py": "bootstrap runs once as the RDS master before any app database exists.",
     "base/tenancy/connections.py": TENANCY_ALIASES_REASON,
+    "base/worker.py": (
+        "The worker's slow passes (a hub's copy, the nightly measurement) run in threads of their own, one piece at a "
+        "time (PLAN-DB round 2026-10-31b, C8): each closes its thread's connections when it ends "
+        "(connections.close_all, as migrate_hubs' threads do); no query, no write."
+    ),
     "base/tenancy/router.py": (
         "The TenantRouter compares the databases behind two aliases (connections.settings) to allow a relation: it "
         "routes, it never queries (PLAN-DB §4)."
@@ -1157,11 +1162,12 @@ OWN_DATABASE_OPERATIONS: dict[str, tuple[dict, int, str]] = {
     "base.api_key.revoke": ({"id": ANY_KEY}, 409, "base.api_keys_unavailable"),
     "base.api_key.detail": ({"id": ANY_KEY}, 404, "not_found"),
     "base.hub.reset": ({"dry_run": False, "apps": ["sale"], "confirm": "a"}, 409, "base.reset_shared_database"),
-    # The worker's emptying of a reset (S2b): never on the shared database, whoever runs it.
-    "base.hub.reset_apply": ({"apps": ["sale"]}, 409, "base.reset_shared_database"),
     # A copy of the business's data (S2b): none is ever made in a business that shares its database.
     "base.hub.dump_link": ({"id": ANY_KEY}, 404, "not_found"),
 }
+#: ``base.hub.reset_apply`` (S2b, the worker's emptying of a reset) is not above: it is the platform's alone, refused to
+#: anyone else before anything is read (review of hub#490), and to the platform itself on the shared database
+#: (base/tests/test_worker_data.py::test_the_emptying_is_never_run_on_a_shared_database).
 #: What the screens of those features read in any hub: in one without its own database the answer says «not available
 #: yet» (the screen's notice; an error would paint its load failure) and holds nothing of the feature's.
 OWN_DATABASE_READS: dict[str, tuple[dict, dict]] = {

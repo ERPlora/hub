@@ -221,6 +221,18 @@ def test_the_worker_empties_only_through_its_own_operation(hub_a):
     assert refused.value.code == "base.internal_only"
 
 
+def test_a_business_s_owner_with_every_permission_never_empties_through_it(hub_databases):
+    """The platform's alone, refused before anything else (review of hub#490, OPEN_OPERATIONS «platform»)."""
+    owner = get_user_model().objects.create_user(username="saas:owner-of-a")
+    Membership.objects.create(user=owner, host="a", role=Membership.Role.OWNER)
+    ctx = OperationContext(scope=Scope("host", "a"), actor=owner, permissions=frozenset({"*"}))
+
+    with use_hub(Hub.objects.get(slug="a")), pytest.raises(PermissionDenied) as refused:
+        call(ctx, "base.hub.reset_apply", apps=["table"])
+
+    assert refused.value.code == "base.internal_only"
+
+
 def test_the_emptying_is_never_run_on_a_shared_database(dumps_bucket):
     shared = Hub.objects.get(slug="a")
 

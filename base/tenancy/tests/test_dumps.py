@@ -219,3 +219,13 @@ def test_the_link_downloads_the_copy_as_a_file_named_after_the_business(hub_a, d
     assert query["response-content-disposition"] == [wanted]
     with urllib.request.urlopen(url) as answer:  # the tests' own S3 server
         assert answer.headers["Content-Disposition"] == wanted
+
+
+def test_a_copy_is_stopped_when_the_worker_stops_and_nothing_is_kept(hub_a, dumps_bucket, moto_s3):
+    """The worker on its way out (PLAN-DB round 2026-10-31b, C8): pg_dump is killed and the work stays due."""
+    with pytest.raises(dumps.DumpStopped):
+        dumps.dump_hub(hub_a, kind=HubDump.Kind.RESET, now=AT, cancelled=lambda: True)
+
+    assert not issubclass(dumps.DumpStopped, dumps.DumpError)  # never a failed copy: the reset is not marked failed
+    assert objects(moto_s3, dumps_bucket) == {}
+    assert not HubDump.objects.exists()
