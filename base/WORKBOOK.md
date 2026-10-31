@@ -511,7 +511,12 @@ Si falla: mientras carga, baldosas grises y «Cargando tus apps…» para el lec
 «Aquí aparecerán tus apps. Añade las que necesite tu negocio.». Si no se pudo leer la lista: «No se han
 podido cargar tus apps. Recarga la página; si sigue fallando, vuelve a iniciar sesión.», nunca que no
 hay apps. En una aplicación de Android antigua, que aún no sabe quedarse en segundo plano, el botón atrás
-vuelve a ser el del sistema.
+vuelve a ser el del sistema. Tras una actualización de ERPlora, una pantalla que esa pestaña aún no había abierto
+se abre igual (desde una baldosa, «Mis apps», el menú o cualquier botón), en una carga nueva de la página, que ya
+trae la versión nueva; nunca se queda el toque sin hacer nada. Si el servidor no responde (sin conexión o con la red
+inestable), la persona se queda donde estaba y un aviso dice «No se ha podido abrir <app>. Comprueba la conexión e
+inténtalo de nuevo.» («esa página» si la pantalla no es de una app), con «Reintentar», que vuelve a probar y la abre
+en cuanto el servidor responde.
 Implicados: ninguno
 
 ### BASE-F06 Ver los paneles de las apps en Inicio
