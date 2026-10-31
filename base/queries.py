@@ -369,7 +369,13 @@ def app_list(ctx: OperationContext, data: AppListIn) -> dict:
     else ``on`` or ``off`` as the business turned it, ``base.activation``), whether the business chose it, the first
     screen this person may open, what it needs (it comes along with it) and the apps on that need it (they go off
     first); and the plan's limit of chosen apps against the chosen ones on (PLAN-HUB §9), erplora.com's Store and its
-    plans of this business."""
+    plans of this business.
+
+    Read again when an app's state changes (its live notice, in every process with the list open: AppsFollower on every
+    screen), it first forgets what this process kept of the business's apps (``base.activation.forget``): a change the
+    worker made in another process (S3) never reaches a cache of the process's own (local development, without
+    Valkey), and the session read right after it (the menu) is then current."""
+    activation.forget(ctx.scope.key)
     hub = Hub.objects.filter(slug=ctx.scope.key).first()
     demo = bool(hub and hub.is_demo)
     configs = home.shown_modules(demo_hub=demo)

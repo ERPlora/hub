@@ -11,10 +11,17 @@ import datetime as dt
 import pytest
 from django.db import IntegrityError, transaction
 from django.utils import timezone
+from live.context import OperationContext, Scope
+from live.errors import Conflict
+from live.models import OutboxEvent
+from live.operations import get
 
+from base import activation, events
 from base.activation import CREATING, FAILED, OFF, ON
 from base.models import AppActivation
-
+from base.tenancy.context import use_hub
+from base.tenancy.tests import hubs
+from control.models import Hub, HubDue
 
 # ── The row: its states and what a failure leaves on it ─────────────────────────────────────────────────────────
 
@@ -46,15 +53,6 @@ def test_any_other_state_is_refused_by_the_database():
 
 # ── Turning one on in a hub with its own database ───────────────────────────────────────────────────────────────
 
-from live.context import OperationContext, Scope  # noqa: E402
-from live.errors import Conflict  # noqa: E402
-from live.models import OutboxEvent  # noqa: E402
-from live.operations import get  # noqa: E402
-
-from base import activation, events  # noqa: E402
-from base.tenancy.context import use_hub  # noqa: E402
-from base.tenancy.tests import hubs  # noqa: E402
-from control.models import Hub, HubDue  # noqa: E402
 
 own = pytest.mark.django_db(databases=hubs.HUB_DATABASES)
 
@@ -346,3 +344,25 @@ def test_a_blueprint_turns_on_an_app_still_to_set_up_and_says_to_load_it_again_o
     assert rows_of(hub_a)["website"] == (ON, True)
     assert by_app["website"]["status"] != "inactive"
     assert report["retry"] is True
+
+
+@own
+def test_reading_the_apps_list_again_forgets_what_this_process_kept_so_the_menu_read_after_it_is_current(hub_a):
+    """The worker turns an app on in another process: where the cache is the process's own (local development, no
+    Valkey) its forgetting never reaches the web. The Apps list every screen follows (AppsFollower) is read again when
+    the live notice of the change arrives, before the session is: that read forgets this process's apps of the
+    business, so the menu read right after it has the app (PLAN-DB §7, «cache_inval <hex>:apps»)."""
+    from django.core.cache import cache
+
+    given(hub_a, printing="on*", created=["printing"])
+    scope = Scope("host", hub_a.slug)
+    cache.set_many(
+        {activation.OFF_APPS_CACHE + hub_a.slug: ["printing"], activation.CREATING_APPS_CACHE + hub_a.slug: []}, 60
+    )
+    with use_hub(Hub.objects.get(pk=hub_a.pk)):
+        assert "printing" in activation.off_apps(scope)  # what this process kept before the worker's change
+
+        get("base.app.list")(as_admin(hub_a), get("base.app.list").input())
+        me = get("base.session.me")(as_admin(hub_a), get("base.session.me").input()).model_dump(mode="json")
+
+    assert {app["label"]: app["state"] for app in me["apps"]}["printing"] == "on"

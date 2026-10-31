@@ -23,10 +23,9 @@ from django.utils import timezone
 from live.context import OperationContext, Scope
 from live.models import OutboxEvent
 from live.operations import get
-from live.outbox import channel_for
 from psycopg import sql
 
-from base import activation, events, services, worker
+from base import activation, events, worker
 from base.activation import CREATING, FAILED, OFF, ON
 from base.models import AppActivation
 from base.tenancy import connections as tenancy_connections
@@ -163,7 +162,6 @@ def run_pass(now: dt.datetime | None = None) -> None:
 
 @pytest.mark.django_db
 def test_what_is_due_is_creating_unless_put_off_and_failed_once_its_next_try_came():
-    from base.queries import activations_due
     from base.tenancy.context import use_shared_database
 
     with use_shared_database():

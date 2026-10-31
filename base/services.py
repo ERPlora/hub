@@ -3806,7 +3806,7 @@ from live.meta import module_configs  # noqa: E402
 from live.operations import on_commit as after_commit  # noqa: E402,F811
 
 from base import activation, entitlement, home  # noqa: E402
-from base.activation import CREATING, FAILED, OFF, ON  # noqa: E402
+from base.activation import CREATING, FAILED, ON  # noqa: E402
 from base.models import AppActivation  # noqa: E402
 from base.schemas import AppActivationSettleIn, AppActivationSettleOut, AppChangeIn, AppChangeOut  # noqa: E402
 from base.tenancy import migrator  # noqa: E402

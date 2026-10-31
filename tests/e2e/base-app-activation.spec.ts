@@ -548,7 +548,8 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await expect(state).toHaveText('Installed', { timeout: SET_UP_MS });
       expect(stored(PRINTING)).toBe('on:true');
       expect(psql(`select schema_apps ? '${PRINTING}' from base_hub where slug = 'a'`)).toBe('t');
-      expect(await menuApps(page)).toContain('Printing');
+      // The menu is the session's: AppsFollower reads it again when the live list changes, a moment after.
+      await expect.poll(() => menuApps(page), { timeout: SET_UP_MS }).toContain('Printing');
       await snap(page, 'S3-on', width);
 
       // «Turning on…», as a row the worker set off leaves it: no button, no «Open».
