@@ -59,7 +59,8 @@ export const SIDEBAR: ShellSidebar = {
 /**
  * base's pieces of the chrome (APP-BASE-1, the old hub's): the assistant's sparkles and the bell at the end of the
  * topbar, «Upgrade plan» in the menu's footer, the blocking strip over every screen and, beside the pane, the device's
- * notices (APPOINTMENT-F28) and the assistant's panel (APP-BASE-9). Loaded on demand: none is needed to paint.
+ * notices (APPOINTMENT-F28) and the assistant's panel (APP-BASE-9). Each in its own chunk, which `boot` loads beside the
+ * first screen's: the hub mounts once they are here (`chromeLoaded`).
  */
 export const CHROME: NonNullable<CreateShellOptions['chrome']> = {
   topbar: defineAsyncComponent(() => import('../base/frontend/components/TopbarChrome.vue')),
@@ -67,6 +68,21 @@ export const CHROME: NonNullable<CreateShellOptions['chrome']> = {
   notice: defineAsyncComponent(() => import('../base/frontend/components/BlockingStrip.vue')),
   background: defineAsyncComponent(() => import('../base/frontend/components/BackgroundChrome.vue')),
 };
+
+/** Vue's own loader of a `defineAsyncComponent`: once it resolved, the piece mounts in the same render as the screen. */
+type AsyncPiece = { __asyncLoader: () => Promise<unknown> };
+
+/**
+ * Loads the chrome's pieces, settled whether they load or not. The bell, the apps followed beside the pane and the
+ * blocking strip read live queries: mounted with the screen, they go in its one stream; mounted once their chunk
+ * arrived, more than 150 ms after the screen's queries on a slow device (the tab's CPU ×6), they cut it and opened it
+ * again (FIX-HUB-BASE-HOME-ONE-STREAM-FLAKY). Through each piece's own loader, not another `import()`: a module already
+ * here still resolves in a later task, after the stream opened. A piece that does not load never keeps the hub from
+ * mounting: it loads again at render, and Vue hands that failure to base's report (`installErrorReport`).
+ */
+function chromeLoaded(): Promise<unknown> {
+  return Promise.allSettled(Object.values(CHROME).map((piece) => (piece as unknown as AsyncPiece).__asyncLoader()));
+}
 
 /** The Hub's sign out: the assistant's conversation of the tab is forgotten first (BASE-G120), then the shell's. */
 export function signOut(doc: Document = document): void {
@@ -172,6 +188,7 @@ export async function boot(
   // A manager's approval (APP-BASE-5): the pass of the command being repeated travels in `X-Elevation-Token`.
   const client = createLiveClient(config, { routes: OPERATION_ROUTES, getElevationToken: approvalPass });
   const { reload, ...session } = loadSession(client, doc);
+  const chrome = chromeLoaded();
   const { app, router } = await createShell({
     ...session,
     routes: appRoutes(routeFiles),
@@ -204,6 +221,7 @@ export async function boot(
   }
   const blocked = appGate(router.currentRoute.value);
   if (blocked !== true) await router.replace(blocked);
+  await chrome;
   app.mount('#app');
   // base's way in (APP-BASE-3): the idle lock of a till, the person's appearance, «Now serving» after a switch.
   startWayIn(doc, {

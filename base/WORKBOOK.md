@@ -2750,6 +2750,16 @@ Implicados: ACCOUNTS-F38
   (antes lo reabría al llegar la lista, `net::ERR_ABORTED`, con cada consulta dos veces); manda la respuesta viva.
   Lo comprueban `test_the_shell_embeds_the_persons_panels_so_the_home_opens_one_live_stream` y
   `tests/e2e/base-home.spec.ts` («one live stream»).
+- Las piezas de base en el marco (`CHROME` de `frontend/main.ts`: la campana, las apps seguidas junto al panel, la
+  franja de bloqueo y «Mejorar plan») van cada una en su trozo, que la SPA carga a la vez que la primera pantalla, y
+  monta cuando han llegado (o han fallado: una que no carga lo vuelve a intentar al pintarse y Vue lo pasa al informe
+  de errores de base). Así sus consultas vivas (`base.bell.counters`, `base.app.list`, `base.setup.status`) van en el
+  mismo `/api/live` de la pantalla. Antes se montaban al llegar su trozo, y con un equipo lento (la CPU de la pestaña
+  ×6) llegaban más de 150 ms después que las de la pantalla y reabrían el flujo (`net::ERR_ABORTED`; 7 de 9 cargas del
+  Inicio). Se precargan con el cargador del propio componente de Vue: otro `import()` de un módulo ya cargado se
+  resuelve en otra tarea, cuando el flujo ya ha abierto. Lo comprueban `frontend/main.chrome.test.ts` y
+  `tests/e2e/base-home.spec.ts` («when base's chrome arrives late»: cada pieza llega un segundo tarde)
+  (FIX-HUB-BASE-HOME-ONE-STREAM-FLAKY).
 - La SPA responde toda ruta sin URL propia en Django, salvo la que nombra un fichero (`base.spa.NOT_A_FILE`: el
   último segmento lleva extensión, con barra final o sin ella, como `/robots.txt`, `/favicon.ico` o
   `/wp-login.php`): esa no es ruta de la SPA (`spa_route` en `config/urls.py`) y recibe el 404 llano de Django, sin
