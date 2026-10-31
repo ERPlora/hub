@@ -136,6 +136,9 @@ ACCEPTED = {
     # the new column hub_user_id, which only the new code writes; the code of before writes the old user_id and leaves
     # hub_user_id NULL, outside the constraint's condition, so no row of it can break it.
     ("staff", "0004_hub_users", "AddConstraint", "member.staff_member_hub_user_unique"),
+    # Tenancy S3 (an app's tables made when it is turned on): the state's check is widened, dropped and added again in
+    # one migration with ``creating`` and ``failed``; ``on`` and ``off``, all the code of before writes, still pass it.
+    ("base", "0021_app_activation_creating", "AddConstraint", "appactivation.base_appactivation_state"),
     # Its contract, a later deploy's, once no code of before W10 runs (written here, not applied): the old columns to
     # control's users, which W10 took out of the state and nobody writes any more, leave the database through
     # SeparateDatabaseAndState(database_operations=[RunSQL("ALTER TABLE … DROP COLUMN …")]), with no state, and

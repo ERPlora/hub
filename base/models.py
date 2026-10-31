@@ -609,13 +609,18 @@ class AppActivation(UUIDModel):
     ``requires`` brought along. A business without any row has every module off (the baseline, round 2026-10-27): its
     first change writes them all down. The hubs of before have every module on, its roots chosen (migration 0017). ``host`` is the business's slug (the scope's key, as ``Membership`` and the
     outbox keep it): phase 1's businesses share one database (plan 2026-10-22, decision 1), and the cut of S5 leaves
-    one hub per database, where it is always the same. Phase 2 adds the state ``activating``, while the migrator makes
-    an app's tables. The tables of an app off are never dropped.
+    one hub per database, where it is always the same.
+
+    In a hub with its own database an app's tables are made the first time it is turned on (S3; PLAN-DB §7): the row is
+    ``creating`` until the worker made them (``on``), or ``failed`` with ``attempts``, ``last_error`` and
+    ``next_attempt_at`` (tried again then, or by hand). The tables of an app off are never dropped.
     """
 
     class State(models.TextChoices):
         ON = "on", pgettext_lazy("app state", "On")
         OFF = "off", pgettext_lazy("app state", "Off")
+        CREATING = "creating", pgettext_lazy("app state", "Turning on")
+        FAILED = "failed", pgettext_lazy("app state", "Could not turn on")
 
     host = models.CharField(_("host"), max_length=63, help_text=_("The hub's slug."))
     app = models.CharField(pgettext_lazy("app activation", "app"), max_length=100)
@@ -628,6 +633,25 @@ class AppActivation(UUIDModel):
         ),
     )
     changed_at = models.DateTimeField(pgettext_lazy("app activation", "changed at"), auto_now=True)
+    attempts = models.PositiveIntegerField(
+        pgettext_lazy("app activation", "attempts"),
+        default=0,
+        db_default=0,
+        help_text=pgettext_lazy("app activation", "How many times making its tables failed in a row."),
+    )
+    last_error = models.TextField(
+        pgettext_lazy("app activation", "last error"),
+        blank=True,
+        default="",
+        db_default="",
+        help_text=pgettext_lazy("app activation", "Why making its tables failed the last time."),
+    )
+    next_attempt_at = models.DateTimeField(
+        pgettext_lazy("app activation", "next attempt at"),
+        null=True,
+        blank=True,
+        help_text=pgettext_lazy("app activation", "When the worker makes its tables again."),
+    )
 
     class Meta:
         verbose_name = pgettext_lazy("app activation", "app activation")
@@ -635,7 +659,9 @@ class AppActivation(UUIDModel):
         ordering = ["host", "app"]
         constraints = [
             models.UniqueConstraint(fields=["host", "app"], name="base_appactivation_host_app"),
-            models.CheckConstraint(condition=Q(state__in=["on", "off"]), name="base_appactivation_state"),
+            models.CheckConstraint(
+                condition=Q(state__in=["on", "off", "creating", "failed"]), name="base_appactivation_state"
+            ),
         ]
 
     def __str__(self) -> str:

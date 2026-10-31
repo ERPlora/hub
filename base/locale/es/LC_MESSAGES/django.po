@@ -2055,3 +2055,41 @@ msgstr "Esta copia ya no se guarda."
 
 msgid "That day has not been measured yet."
 msgstr "Ese día todavía no se ha medido."
+
+msgctxt "app state"
+msgid "Turning on"
+msgstr "Activándose"
+
+msgctxt "app state"
+msgid "Could not turn on"
+msgstr "No se ha podido activar"
+
+msgctxt "app activation"
+msgid "attempts"
+msgstr "intentos"
+
+msgctxt "app activation"
+msgid "How many times making its tables failed in a row."
+msgstr "Cuántas veces seguidas ha fallado crear sus tablas."
+
+msgctxt "app activation"
+msgid "last error"
+msgstr "último error"
+
+msgctxt "app activation"
+msgid "Why making its tables failed the last time."
+msgstr "Por qué falló la última vez que se crearon sus tablas."
+
+msgctxt "app activation"
+msgid "next attempt at"
+msgstr "próximo intento"
+
+msgctxt "app activation"
+msgid "When the worker makes its tables again."
+msgstr "Cuándo vuelve a intentar crear sus tablas."
+
+msgid "It is being set up for this business. Load the template again in a minute to bring its data."
+msgstr "Se está preparando para este negocio. Vuelve a cargar la plantilla en un minuto para traer sus datos."
+
+msgid "This app is not waiting to be set up again."
+msgstr "Esta app no está esperando a que se vuelva a preparar."

@@ -3779,14 +3779,31 @@ def support_report(ctx: OperationContext, data: SupportReportIn) -> dict:
 # ── Apps turned on and off by the business, with the plan's limit (PLAN-HUB §9; BASE-F18, F19, F23–F25) ────────────
 # The rules are base.activation's; here, their rows (base.AppActivation) under a lock of the business's rows, so two
 # people at once never both pass the limit, and the events. Turning an app off never drops its tables.
+#
+# In a hub with its own database (S3; PLAN-DB §7, spec 2026-10-11 «tablas al activar») an app whose tables its database
+# does not have yet (``Hub.schema_apps``, what the migrator confirmed) is ``creating``: the answer says so (the route's
+# 202), the event ``base.app.activation_requested`` is recorded and the hub's ``hub_due`` rung after the COMMIT; the
+# worker makes its tables (``ensure_schema``) and turns it on (``base.app.activation_settle``: ``base.app.enabled``, its
+# live notice), or ``failed`` with why, tried again at 1, 5 and 15 minutes and then every hour, or by hand
+# (``base.app.retry``). What it needs goes in the same plan. One whose tables it has is on at once, as in phase 1. A hub
+# that still shares phase 1's database turns every app on at once (proposal (i) of round 2026-10-30, until S5).
+from functools import cache as _cache  # noqa: E402
 from typing import Any  # noqa: E402
 
 from live.meta import module_configs  # noqa: E402
 from live.operations import on_commit as after_commit  # noqa: E402,F811
 
 from base import activation, entitlement, home  # noqa: E402
+from base.activation import CREATING, FAILED, OFF, ON  # noqa: E402
 from base.models import AppActivation  # noqa: E402
 from base.schemas import AppChangeIn, AppChangeOut  # noqa: E402
+from base.tenancy import migrator  # noqa: E402
+
+#: The waits before the worker makes the tables of an app that failed again: 1 min, 5 min, 15 min, then every hour (as a
+#: hub's preparation, PLAN-DB §6 and §7).
+ACTIVATION_RETRY_SECONDS = (60, 300, 900, 3600)
+#: How long an app waits when another run holds its hub's schema (PLAN-DB §7: the activation is queued again +30 s).
+ACTIVATION_LOCKED_SECONDS = 30
 
 
 class AppLimitReached(OperationError):
@@ -3863,18 +3880,60 @@ def _locked_states(ctx: OperationContext, graph: dict) -> dict[str, activation.A
 
 
 def _write_states(host: str, changes: dict[str, activation.Activation]) -> None:
-    """Write ``changes`` and, after the COMMIT of the running change, forget what the cache kept of the business."""
+    """Write ``changes`` and, after the COMMIT of the running change, forget what the cache kept of the business. A row
+    that goes ``creating`` waits for no time (the worker takes it now) and keeps its failed attempts; one that goes on or
+    off has none left."""
     after_commit(partial(activation.forget, host))
     now = timezone.now()
     existing = set(AppActivation.objects.filter(host=host, app__in=list(changes)).values_list("app", flat=True))
     for label, row in changes.items():
         if label in existing:
-            AppActivation.objects.filter(host=host, app=label).update(state=row.state, chosen=row.chosen, changed_at=now)
+            settled = {} if row.state == CREATING else {"attempts": 0, "last_error": ""}
+            AppActivation.objects.filter(host=host, app=label).update(
+                state=row.state, chosen=row.chosen, changed_at=now, next_attempt_at=None, **settled
+            )
     AppActivation.objects.bulk_create(
         AppActivation(host=host, app=label, state=row.state, chosen=row.chosen)
         for label, row in changes.items()
         if label not in existing
     )
+
+
+@_cache
+def _apps_without_migrations() -> frozenset[str]:
+    """The modules with no migration: created in every hub by definition (they have no tables)."""
+    return frozenset(activation.module_graph()) - set(migrator.code_migrations().leaves)
+
+
+def _apps_created(hub: Hub | None) -> frozenset[str] | None:
+    """The modules whose tables ``hub``'s own database has: what the migrator confirmed (``Hub.schema_apps``; the
+    worker's ``ensure_schema`` makes what it lacks and is a no-op for what it has) and those without migrations;
+    ``None`` for a hub that shares phase 1's database, where every app has them."""
+    if not has_own_database(hub):
+        return None
+    return frozenset(hub.schema_apps or ()) | _apps_without_migrations()
+
+
+def _tables_first(
+    changes: dict[str, activation.Activation],
+    current: dict[str, activation.Activation],
+    created: frozenset[str] | None,
+) -> dict[str, activation.Activation]:
+    """``changes`` as they are written: when an app they turn on lacks its tables, every app they turn on is
+    ``creating`` (one plan, PLAN-DB §7); an app already on stays on."""
+    turning_on = [label for label, row in changes.items() if row.on and not current[label].on]
+    if created is None or all(label in created for label in turning_on):
+        return changes
+    return {
+        label: activation.Activation(CREATING, row.chosen) if label in turning_on else row
+        for label, row in changes.items()
+    }
+
+
+def _ring(hub: Hub) -> None:
+    """The hub has tables to make: due in ``hub_due`` now, so the worker takes it at its next tick (after the COMMIT of
+    the change that asked for them; on control)."""
+    HubDue.mark_due(hub, timezone.now())
 
 
 def _every_app_on(host: str, *, then: Callable[[Callable[[], None]], object] | None = None) -> None:
@@ -3896,7 +3955,9 @@ def _turn_on_listed(ctx: OperationContext, listed: Iterable[str], selected: set[
     some) that are off here, each through ``base.app.enable``: its plan's limit, its rights, what it needs along and
     its event, as if the person turned it on in Apps. Their roots first, chosen, so what they need comes along and
     does not count against the limit (as a vertical's template, ``base.activation.template``); then any listed app
-    still off. An app refused stays off and its reason is returned, by app: the rest are turned on and load."""
+    still off. An app refused stays off and its reason is returned, by app: the rest are turned on and load. One whose
+    tables its hub's own database is still making (``creating``) loads nothing yet, and its reason says to load again
+    once it is on (the load's «Retry» brings what it left out)."""
     graph = activation.module_graph()
     wanted = [app for app in dict.fromkeys(listed) if app in graph and (not selected or app in selected)]
     roots = activation.roots(set(wanted) | activation.needs(wanted, graph), graph)
@@ -3907,9 +3968,15 @@ def _turn_on_listed(ctx: OperationContext, listed: Iterable[str], selected: set[
         if app not in blocked and activation.states_of(ctx.scope)[app].on:
             continue
         try:
-            enable(ctx, AppChangeIn(app=app))
+            answer = enable(ctx, AppChangeIn(app=app))
         except OperationError as refusal:
             refused[app] = refusal.message
+            continue
+        if answer.state == CREATING:
+            with translation.override(ctx.language):
+                refused[app] = gettext(
+                    "It is being set up for this business. Load the template again in a minute to bring its data."
+                )
     return refused
 
 
@@ -3929,7 +3996,7 @@ def _names_said(ctx: OperationContext, labels: list[str]) -> str:
 
 
 def _app_answer(label: str, row: activation.Activation, along: list[dict[str, str]]) -> dict:
-    return {"app": label, "state": row.state, "chosen": row.on and row.chosen, "along": along}
+    return {"app": label, "state": row.state, "chosen": row.wanted and row.chosen, "along": along}
 
 
 @operation(
@@ -3948,7 +4015,9 @@ def _app_answer(label: str, row: activation.Activation, along: list[dict[str, st
 def app_enable(ctx: OperationContext, data: AppChangeIn) -> dict:
     """BASE-F18/F24: the app on and chosen, and what it needs on along with it (not chosen: it does not count). A
     paid one without its right (or needing one) is 402 ``app_entitlement_blocked``; one more chosen app at the plan's
-    limit, 402 ``base.app_limit_reached`` (a lower limit than the chosen ones turns nothing off: it only refuses this)."""
+    limit, 402 ``base.app_limit_reached`` (a lower limit than the chosen ones turns nothing off: it only refuses this).
+    In a hub with its own database whose tables for it (or for what it needs) are not made yet, ``creating`` (202):
+    the worker makes them and turns it on; one that failed is tried again."""
     with activation.changing(ctx.scope.key):
         return _enable(ctx, data)
 
@@ -3961,11 +4030,14 @@ def _enable(ctx: OperationContext, data: AppChangeIn) -> dict:
     for label in [data.app, *sorted(activation.needs([data.app], graph))]:
         if label in blocked:
             raise entitlement.refused(label, ctx.language)
-    if not activation.enabling(data.app, activation.states_of(ctx.scope), graph):
-        return _app_answer(data.app, activation.Activation(activation.ON, True), [])
+    current = activation.states_of(ctx.scope)
+    if not activation.enabling(data.app, current, graph):
+        return _unchanged(hub, data.app, current[data.app])
     current = _locked_states(ctx, graph)
     changes = activation.enabling(data.app, current, graph)
-    if changes.get(data.app, current[data.app]).chosen and not (current[data.app].on and current[data.app].chosen):
+    if not changes:
+        return _unchanged(hub, data.app, current[data.app])
+    if changes.get(data.app, current[data.app]).chosen and not (current[data.app].wanted and current[data.app].chosen):
         limit = queries.app_limit(hub)
         shown = {config.label for config in home.shown_modules(demo_hub=bool(hub and hub.is_demo))}
         enabled = activation.chosen_on(current, among=shown)
@@ -3977,12 +4049,25 @@ def _enable(ctx: OperationContext, data: AppChangeIn) -> dict:
                     limit,
                 ) % {"count": limit}
             raise AppLimitReached(message, max_apps=limit, enabled=enabled)
+    changes = _tables_first(changes, current, _apps_created(hub))
     _write_states(ctx.scope.key, changes)
-    if hub is not None and not hub.is_demo:
-        _sync_photo_blocks(hub, changes)
+    on_now = [label for label, row in changes.items() if row.on]
+    if hub is not None and not hub.is_demo and on_now:
+        _sync_photo_blocks(hub, on_now)
     along = [label for label in changes if label != data.app]
-    record_event(ctx, events.APP_ENABLED, {"app": data.app, "along": along})
-    return _app_answer(data.app, activation.Activation(activation.ON, True), _named(ctx, along))
+    answer = changes.get(data.app, current[data.app])
+    if any(row.state == CREATING for row in changes.values()):
+        after_commit(partial(_ring, hub))
+    name = events.APP_ACTIVATION_REQUESTED if answer.state == CREATING else events.APP_ENABLED
+    record_event(ctx, name, {"app": data.app, "along": along})
+    return _app_answer(data.app, answer, _named(ctx, along))
+
+
+def _unchanged(hub: Hub | None, label: str, row: activation.Activation) -> dict:
+    """Turning on an app on and chosen already, or being created (its hub rung again: a ring lost is found again)."""
+    if row.state == CREATING:
+        after_commit(partial(_ring, hub))
+    return _app_answer(label, row, [])
 
 
 @operation(
@@ -4009,10 +4094,10 @@ def app_disable(ctx: OperationContext, data: AppChangeIn) -> dict:
 def _disable(ctx: OperationContext, data: AppChangeIn) -> dict:
     _business_module(ctx, data.app, _business_hub(ctx))
     graph = activation.module_graph()
-    if not activation.states_of(ctx.scope)[data.app].on:
+    if not activation.states_of(ctx.scope)[data.app].wanted:
         return _app_answer(data.app, activation.OFF_ROW, [])
     current = _locked_states(ctx, graph)
-    if not current[data.app].on:
+    if not current[data.app].wanted:
         return _app_answer(data.app, activation.OFF_ROW, [])
     needed = activation.required_by(data.app, current, graph)
     if needed:
@@ -4029,3 +4114,41 @@ def _disable(ctx: OperationContext, data: AppChangeIn) -> dict:
     along = [label for label in changes if label != data.app]
     record_event(ctx, events.APP_DISABLED, {"app": data.app, "along": along})
     return _app_answer(data.app, activation.OFF_ROW, _named(ctx, along))
+
+
+@operation(
+    "base.app.retry",
+    kind="command",
+    permission=ADMINISTER_HUB,
+    input=AppChangeIn,
+    output=AppChangeOut,
+    ai={
+        "description": "Tries again to set up one of this business's apps that could not be turned on (its state "
+        "«failed» in base.app.list), with what it needs that failed too: it is set up in a moment and then shows in "
+        "the menu. Refused for an app that is not waiting for it.",
+        "risk": "normal",
+    },
+)
+def app_retry(ctx: OperationContext, data: AppChangeIn) -> dict:
+    """BASE-F21/F22: an app whose tables could not be made (``failed``) is ``creating`` again now, with what it needs
+    that failed too, and its hub rung (the worker also tries again by itself). 409 ``base.app_not_failed`` for any
+    other app, and in a hub that shares phase 1's database, where nothing is ever made later."""
+    with activation.changing(ctx.scope.key):
+        hub = _business_hub(ctx)
+        _business_module(ctx, data.app, hub)
+        current = _locked_states(ctx, activation.module_graph()) if has_own_database(hub) else None
+        if current is None or current[data.app].state != FAILED:
+            raise Conflict(gettext("This app is not waiting to be set up again."), code="base.app_not_failed")
+        graph = activation.module_graph()
+        closure = {data.app, *activation.needs([data.app], graph)}
+        changes = {
+            label: activation.Activation(CREATING, row.chosen)
+            for label, row in current.items()
+            if label in closure and row.state == FAILED
+        }
+        _write_states(ctx.scope.key, changes)
+        after_commit(partial(_ring, hub))
+        along = [label for label in changes if label != data.app]
+        record_event(ctx, events.APP_ACTIVATION_REQUESTED, {"app": data.app, "along": along})
+        return _app_answer(data.app, changes[data.app], _named(ctx, along))
+

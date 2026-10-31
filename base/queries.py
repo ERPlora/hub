@@ -132,8 +132,10 @@ def session_me(ctx: OperationContext, data: SessionMeIn) -> dict[str, Any]:
     # Labels are lazy translations; a live re-run happens outside the request that activated the
     # language, so it is set here.
     demo = _demo_hub(ctx)
-    # Not on: a paid module without its right, or one the business turned off (base.activation).
+    # Not on: a paid module without its right, or one the business turned off (base.activation); one whose tables the
+    # hub's own database is still getting is «activating».
     blocked = entitlement.blocked_apps(ctx.scope) | activation.off_apps(ctx.scope)
+    creating = activation.creating_apps(ctx.scope) if blocked else frozenset()
     with translation.override(ctx.language):
         visible = [config for config in home.shown_modules(demo_hub=demo is not None) if _can_see(ctx, config)]
         return {
@@ -151,10 +153,16 @@ def session_me(ctx: OperationContext, data: SessionMeIn) -> dict[str, Any]:
                 for config in visible
                 if config.navigation and config.label not in blocked
             ],
-            "apps": [{"label": config.label, "state": "off" if config.label in blocked else "on"} for config in visible],
+            "apps": [{"label": config.label, "state": _session_state(config.label, blocked, creating)} for config in visible],
             "language": ctx.language,
             "demo": None if demo is None else {"expires_at": demo.expires_at},
         }
+
+
+def _session_state(label: str, blocked: frozenset[str], creating: frozenset[str]) -> str:
+    if label not in blocked:
+        return "on"
+    return "activating" if label in creating else "off"
 
 
 def _demo_hub(ctx: OperationContext) -> Hub | None:
@@ -374,7 +382,7 @@ def app_list(ctx: OperationContext, data: AppListIn) -> dict:
     def state(label: str) -> str:
         if label in blocked:
             return "blocked"
-        return "on" if current[label].on else "off"
+        return current[label].state if current[label].wanted else "off"
 
     with translation.override(ctx.language):
         return {
@@ -389,7 +397,7 @@ def app_list(ctx: OperationContext, data: AppListIn) -> dict:
                     "premium": bool(config.premium),
                     "right": entitlement.FREE if demo else rights[config.label],
                     "state": state(config.label),
-                    "chosen": current[config.label].on and current[config.label].chosen,
+                    "chosen": current[config.label].wanted and current[config.label].chosen,
                     "path": _first_screen(ctx, config) if state(config.label) == "on" else None,
                     "requires": sorted(needs[config.label]),
                     "required_by": [

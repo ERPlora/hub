@@ -3,9 +3,12 @@
 The rules, without the database: ``base.services`` (``base.app.enable``, ``base.app.disable``) and ``base.queries``
 (``base.app.list``, ``base.session.me``) read and write the rows, ``base.models.AppActivation``.
 
-- A module (``kind = "app"``) is ``on`` or ``off`` in a hub (phase 2 adds ``activating``, while its tables are made).
-  It is **chosen** when the business turned it on itself; what the closure by ``requires`` brought along with it is
-  not, and goes off again with the last chosen module on that needs it (Odoo's «an app with its dependencies»).
+- A module (``kind = "app"``) is ``on`` or ``off`` in a hub. In a hub with its own database its tables are made the
+  first time it is turned on (S3; PLAN-DB §7): meanwhile it is ``creating`` and, if making them failed, ``failed`` (tried
+  again). Both are **wanted** on: the closure by ``requires``, the plan's limit and what goes off count them as on; only
+  ``on`` is active (its operations, the relay, the menu). It is **chosen** when the business turned it on itself; what
+  the closure by ``requires`` brought along with it is not, and goes off again with the last chosen module on that
+  needs it (Odoo's «an app with its dependencies»).
 - **The baseline** (round 2026-10-27): a hub is born with every module off, a demo too. The business turns on what it
   uses, one by one in Apps or all of a blueprint's at once (``base.blueprint.import`` turns them on, then loads); a
   module without its row is off (PLAN-DB: «``off`` o sin fila»). The first change writes every module down
@@ -49,13 +52,21 @@ logger = logging.getLogger(__name__)
 
 ON = "on"
 OFF = "off"
-STATES = (ON, OFF)
+#: Its tables being made in the hub's own database (the worker's ``ensure_schema``), and making them failed.
+CREATING = "creating"
+FAILED = "failed"
+STATES = (ON, OFF, CREATING, FAILED)
+#: What the business wants on: on, or on its way (its tables being made, or tried again after failing).
+WANTED = frozenset({ON, CREATING, FAILED})
 
 #: The modules off in a business, kept in Django's cache (Valkey in production, only as a cache) per host: the gate
 #: of every operation of a module, the relay and the menu ask it, and the rows are read once per business. A change
 #: forgets it at its COMMIT (:func:`forget`), so every process sees it at once; the timeout is only a safety net.
 OFF_APPS_CACHE = "base.apps_off:"
 OFF_APPS_TTL = 60
+#: Beside them, the modules whose tables the hub's own database is getting (``creating``): what the session tells
+#: «activating». Kept and forgotten with the apps off; read only when both are kept.
+CREATING_APPS_CACHE = "base.apps_creating:"
 
 #: The hosts whose rows the running change wrote and has not committed yet: what it reads of them is never kept.
 _changing: ContextVar[frozenset[str]] = ContextVar("base_activation_changing", default=frozenset())
@@ -73,7 +84,13 @@ class Activation:
 
     @property
     def on(self) -> bool:
+        """Active: its tables are made and the business has it on."""
         return self.state == ON
+
+    @property
+    def wanted(self) -> bool:
+        """The business wants it on: on, or its tables still being made (``creating``, ``failed``)."""
+        return self.state in WANTED
 
 
 OFF_ROW = Activation(OFF, False)
@@ -131,27 +148,33 @@ def effective(rows: Mapping[str, Activation], graph: Graph) -> dict[str, Activat
 
 
 def required_by(label: str, current: Mapping[str, Activation], graph: Graph) -> list[str]:
-    """The modules on that need ``label``, directly or through another one, sorted."""
-    return sorted(other for other, row in current.items() if other != label and row.on and label in needs([other], graph))
+    """The modules wanted on that need ``label``, directly or through another one, sorted."""
+    return sorted(
+        other for other, row in current.items() if other != label and row.wanted and label in needs([other], graph)
+    )
 
 
 def enabling(label: str, current: Mapping[str, Activation], graph: Graph) -> dict[str, Activation]:
-    """What turning ``label`` on changes: it, chosen, and what it needs that is off, on and not chosen; ``{}`` when
-    it is on and chosen already. ``KeyError`` for a label that is no module."""
+    """What turning ``label`` on changes: it, chosen, and what it needs that is off, on and not chosen; one that failed
+    is turned on again, keeping whether it was chosen. ``{}`` when it is on, or being created, and chosen already.
+    ``KeyError`` for a label that is no module. ``on`` here is what the business asks: a hub with its own database
+    makes the tables of one not created yet first (``creating``, ``base.services``)."""
     graph[label]  # noqa: B018 - an unknown module is a programming error
     changes: dict[str, Activation] = {}
-    if current[label] != Activation(ON, True):
+    if not (current[label].state in (ON, CREATING) and current[label].chosen):
         changes[label] = Activation(ON, True)
     for required in sorted(needs([label], graph) - {label}):
-        if not current[required].on:
-            changes[required] = Activation(ON, False)
+        row = current[required]
+        if row.state in (OFF, FAILED):
+            changes[required] = Activation(ON, row.chosen and row.state == FAILED)
     return changes
 
 
 def disabling(label: str, current: Mapping[str, Activation], graph: Graph) -> dict[str, Activation]:
     """What turning ``label`` off changes: it, and what came along with it (on, not chosen) that no module left on
-    needs any more; ``{}`` when it is off. ``ValueError`` when a module on needs it: check :func:`required_by` first."""
-    if not current[label].on:
+    needs any more; ``{}`` when it is off. ``ValueError`` when a module on needs it: check :func:`required_by` first.
+    A module being created (or that failed) is wanted on: it goes off as one on does, its tables kept."""
+    if not current[label].wanted:
         return {}
     needed_by = required_by(label, current, graph)
     if needed_by:
@@ -161,20 +184,23 @@ def disabling(label: str, current: Mapping[str, Activation], graph: Graph) -> di
     changed = True
     while changed:
         changed = False
-        staying = [other for other, row in current.items() if row.on and other not in off]
+        staying = [other for other, row in current.items() if row.wanted and other not in off]
         needed = needs(staying, graph)
         for candidate in sorted(brought - off):
             row = current[candidate]
-            if row.on and not row.chosen and candidate not in needed:
+            if row.wanted and not row.chosen and candidate not in needed:
                 off.add(candidate)
                 changed = True
     return {other: OFF_ROW for other in [label, *sorted(off - {label})]}
 
 
 def chosen_on(current: Mapping[str, Activation], *, among: Iterable[str] | None = None) -> int:
-    """How many modules on the business chose (``among`` those, if given): what the plan's limit counts."""
+    """How many modules wanted on the business chose (``among`` those, if given): what the plan's limit counts, those
+    whose tables are being made included."""
     allowed = None if among is None else set(among)
-    return sum(1 for label, row in current.items() if row.on and row.chosen and (allowed is None or label in allowed))
+    return sum(
+        1 for label, row in current.items() if row.wanted and row.chosen and (allowed is None or label in allowed)
+    )
 
 
 def plan_limit(photo: Any) -> int | None:
@@ -220,25 +246,42 @@ def states_of(scope: Scope) -> dict[str, Activation]:
 
 
 def off_apps(scope: Scope) -> frozenset[str]:
-    """The modules off in ``scope``'s business: what ``base.relay.active_apps`` and the operations leave out.
+    """The modules off in ``scope``'s business: what ``base.relay.active_apps`` and the operations leave out (those whose
+    tables are still being made too: only ``on`` is active).
 
     From the cache when it has them; else read from the rows and kept, unless the running change wrote them (not
     committed yet). A cache that does not answer is logged and the rows are read: never a guess."""
     if is_platform(scope):
         return frozenset()
-    key = OFF_APPS_CACHE + scope.key
+    return _kept(scope)[0]
+
+
+def creating_apps(scope: Scope) -> frozenset[str]:
+    """The modules whose tables ``scope``'s business is getting (``creating``), kept with :func:`off_apps`: the session
+    tells them «activating». None in the platform, nor in a hub that shares phase 1's database."""
+    if is_platform(scope):
+        return frozenset()
+    return _kept(scope)[1]
+
+
+def _kept(scope: Scope) -> tuple[frozenset[str], frozenset[str]]:
+    """``(off, creating)`` of ``scope``'s business, from the cache when it has both, else from its rows (kept, unless
+    the running change wrote them)."""
+    keys = (OFF_APPS_CACHE + scope.key, CREATING_APPS_CACHE + scope.key)
     changing = scope.key in _changing.get()
     if not changing:
-        kept = _cached(key)
+        kept = _cached_many(keys)
         if kept is not None:
-            return frozenset(kept)
-    off = frozenset(label for label, row in states_of(scope).items() if not row.on)
+            return frozenset(kept[0]), frozenset(kept[1])
+    states = states_of(scope)
+    off = frozenset(label for label, row in states.items() if not row.on)
+    creating = frozenset(label for label, row in states.items() if row.state == CREATING)
     if not changing:
         try:
-            cache.set(key, sorted(off), OFF_APPS_TTL)
+            cache.set_many({keys[0]: sorted(off), keys[1]: sorted(creating)}, OFF_APPS_TTL)
         except Exception:
             logger.exception("base.activation.cache_unavailable: the apps off of %s were read and not kept.", scope.key)
-    return off
+    return off, creating
 
 
 @contextmanager
@@ -255,15 +298,19 @@ def forget(host: str) -> None:
     """Drop ``host``'s apps off from the cache: after the COMMIT of a change, the next read sees it, in every process.
     A cache that does not answer is logged; what it kept ends with its timeout."""
     try:
-        cache.delete(OFF_APPS_CACHE + host)
+        cache.delete_many([OFF_APPS_CACHE + host, CREATING_APPS_CACHE + host])
     except Exception:
         logger.exception("base.activation.cache_unavailable: the apps off of %s could not be forgotten.", host)
 
 
-def _cached(key: str) -> list[str] | None:
+def _cached_many(keys: tuple[str, str]) -> tuple[list[str], list[str]] | None:
+    """Both lists kept under ``keys``, or ``None`` when either is missing or the cache does not answer (logged)."""
     try:
-        kept = cache.get(key)
+        kept = cache.get_many(list(keys))
     except Exception:
         logger.exception("base.activation.cache_unavailable: the apps off are read from the rows.")
         return None
-    return kept if isinstance(kept, list) else None
+    found = [kept.get(key) for key in keys]
+    if not all(isinstance(value, list) for value in found):
+        return None
+    return found[0], found[1]

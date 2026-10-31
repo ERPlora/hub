@@ -246,7 +246,7 @@ def test_the_states_are_named_in_spanish_as_the_screen_names_them():
     from django.utils import translation
 
     with translation.override("es"):
-        assert [str(label) for _, label in AppActivation.State.choices] == ["Activada", "Desactivada"]
+        assert [str(label) for _, label in AppActivation.State.choices] == ["Activada", "Desactivada", "Activándose", "No se ha podido activar"]
 
 
 # ── Turning one on ──────────────────────────────────────────────────────────────────────────────────────────
