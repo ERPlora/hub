@@ -2037,3 +2037,12 @@ msgstr "Ahora mismo no se puede hacer la copia de los datos, así que no se ha v
 
 msgid "The business is already being reset. Wait for it to finish."
 msgstr "Ya se está restableciendo el negocio. Espera a que termine."
+
+msgid "The copy cannot be downloaded right now. Try again in a moment."
+msgstr "Ahora mismo no se puede descargar la copia. Inténtalo en un momento."
+
+msgid "This copy is no longer kept."
+msgstr "Esta copia ya no se guarda."
+
+msgid "That day has not been measured yet."
+msgstr "Ese día todavía no se ha medido."

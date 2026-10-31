@@ -202,8 +202,10 @@ def test_another_businesss_copy_is_never_linked(dumps_bucket):
     business()
     theirs = copy(business(OTHER_ID, "other"), "reset", 0)
 
-    with pytest.raises(NotFound):
+    with pytest.raises(NotFound) as refused:
         call(person("acme"), "base.hub.dump_link", id=theirs.pk)
+
+    assert refused.value.message == "Esta copia ya no se guarda."
 
 
 def test_without_a_bucket_there_is_no_link_to_give(no_dumps_bucket):
@@ -213,6 +215,7 @@ def test_without_a_bucket_there_is_no_link_to_give(no_dumps_bucket):
         call(person("acme"), "base.hub.dump_link", id=made.pk)
 
     assert (refused.value.status, refused.value.code) == (503, "base.dumps_unavailable")
+    assert refused.value.message == "Ahora mismo no se puede descargar la copia. Inténtalo en un momento."
 
 
 @pytest.mark.parametrize("name", ["base.hub.dumps", "base.hub.dump_link"])
