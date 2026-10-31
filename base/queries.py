@@ -403,7 +403,7 @@ def app_list(ctx: OperationContext, data: AppListIn) -> dict:
 
 #: What a name that is no app of the business answers (BASE-F24); one that fits several, ``APP_AMBIGUOUS``.
 APP_NOT_FOUND = gettext_lazy("No app has that name or id.")
-APP_AMBIGUOUS = gettext_lazy("“%(said)s” fits several apps: %(names)s. Say which one.")
+APP_AMBIGUOUS = gettext_lazy("“%(said)s” matches several apps: %(names)s. Say which one.")
 
 
 def _plain(text: str) -> str:

@@ -31,6 +31,10 @@
     "method": "post",
     "path": "/api/apps/disable"
   },
+  "base.app.get": {
+    "method": "get",
+    "path": "/api/apps/detail"
+  },
   "base.plan.usage": {
     "method": "get",
     "path": "/api/system/plan"

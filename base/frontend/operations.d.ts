@@ -133,7 +133,7 @@ export interface AppList {
   enabled: number;
 }
 
-/** `base.AppChangeIn`: one app of the business, by its id. */
+/** `base.AppChangeIn`: one app of the business, by its name as the person says it or by its id. */
 export interface AppChangeIn {
   app: string;
 }
@@ -144,6 +144,20 @@ export interface AppChange {
   state: 'on' | 'off';
   chosen: boolean;
   along: { id: string; name: string }[];
+  /** It was on already (turning it on) or off already (turning it off): nothing went on or off. */
+  already: boolean;
+}
+
+/** `base.AppRefIn`: one app of the business, by its name or its id. */
+export interface AppRefIn {
+  app: string;
+}
+
+/** `base.AppRefOut`: which app a name names, with its state as the Apps screen says it. */
+export interface AppRef {
+  id: string;
+  name: string;
+  state: 'on' | 'off' | 'blocked';
 }
 
 /** `base.LimitOut`: what is in use (null: the Hub does not count it) against the plan's limit (null: none). */
@@ -726,6 +740,7 @@ declare module '@erplora/ui/sdk' {
     'base.app.list': { input: NoInput; output: AppList };
     'base.app.enable': { input: AppChangeIn; output: AppChange };
     'base.app.disable': { input: AppChangeIn; output: AppChange };
+    'base.app.get': { input: AppRefIn; output: AppRef };
     'base.plan.usage': { input: NoInput; output: PlanUsage };
     // ── Data (APP-BASE-2) ──
     'base.blueprint.list': { input: NoInput; output: { templates: Template[]; empty: boolean } };
