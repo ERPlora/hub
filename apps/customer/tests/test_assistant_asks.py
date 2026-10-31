@@ -78,16 +78,34 @@ def test_every_ask_of_customer_brings_its_tool_among_the_first_offered(catalog_o
     assert [miss for miss in missed if miss.tool_name.startswith("customer__")] == []
 
 
+#: A phrase of five customer tools, each with the tool it asks for: reads and writes, both languages.
+SAMPLE = [
+    ("es", "customer.customer.create", "apúntame a Ana con su teléfono 600 111 222"),
+    ("es", "customer.customer.detail", "¿qué sabemos de Marta?"),
+    ("es", "customer.customer.delete", "borra a este cliente"),
+    ("en", "customer.note.add", "add a note to Luis"),
+    ("en", "customer.consent.withdraw", "unsubscribe Marta from WhatsApp messages"),
+]
+
+
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
-@pytest.mark.parametrize("language", LANGUAGES)
-def test_the_layer_ranks_as_a_turn_of_the_hub_does(catalog_of, language):
-    """``misses`` above is given the Hub's turn's own ``always`` and app words: it ranks exactly as the turn."""
+@pytest.mark.parametrize(("language", "name", "phrase"), SAMPLE)
+def test_the_layer_ranks_each_phrase_where_a_turn_of_the_hub_offers_its_tool(catalog_of, language, name, phrase):
+    """``misses`` above is given the Hub's turn's ``always`` and app words: the place it gives a tool is the one the
+    turn (``base.assistant.relevant``) offers it at, so a turn that ranks otherwise fails here."""
     tools = catalog_of(Membership.Role.OWNER, language)
-    asks = [ask for op in customers(tools).values() for ask in shared.asks_of(op).get(language, ())]
-    assert asks  # positive control: there are asks to rank
-    for ask in asks:
-        turn = assistant.relevant(tools, [ask], language)
-        assert turn == shared.relevant(tools, [ask], language, always=assistant.ALWAYS, app_words=app_words)
+    assert phrase in shared.asks_of(tools[name])[language]  # positive control: the phrase is one of its asks
+    turn = [op.name for op in assistant.relevant(tools, [phrase], language)]
+    assert name in turn  # offered by the turn, so its place is known
+    tool = shared.tool_name(name)
+    # Every ask whose tool is not first in the turn is a miss with ``top=1``: its place, as the layer computes it.
+    places = {
+        miss.ask: miss.position
+        for miss in misses(tools, language=language, top=1, app_words=app_words, always=assistant.ALWAYS)
+        if miss.tool_name == tool
+    }
+    # With what is always at hand in front, none of these is first: the layer reports each one's place.
+    assert places[phrase] == turn.index(name) + 1
 
 
 @pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)

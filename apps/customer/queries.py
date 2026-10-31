@@ -471,8 +471,8 @@ def _cell(value) -> str:
         "figures, groups and tags. It hands out personal data.",
         risk="high",
         asks={
-            "en": ("download all my customers as a spreadsheet", "give me a CSV of every customer"),
-            "es": ("sácame un Excel con todos los clientes", "exporta las clientas a CSV"),
+            "en": ("download a CSV of every customer", "give me a file with all my customers"),
+            "es": ("descárgame los clientes en un CSV", "exporta las clientas a un fichero"),
         },
     ),
 )

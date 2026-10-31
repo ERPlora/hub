@@ -507,8 +507,8 @@ def _already_imported(values: dict) -> bool:
         "are skipped with their reason and the rest are created without consent.",
         risk="high",
         asks={
-            "en": ("import these customers from my spreadsheet", "bring in my clients from this CSV"),
-            "es": ("súbeme los clientes de este Excel", "carga los clientes de este CSV"),
+            "en": ("import my customers from this file", "bring in my clients from this CSV"),
+            "es": ("súbeme los clientes de este fichero", "carga los clientes de este CSV"),
         },
     ),
 )
@@ -872,7 +872,7 @@ def _erase_card(ctx: OperationContext, customer: Customer, reason: str) -> None:
             ),
             "es": (
                 "añade una nota a Marta: prefiere venir por la tarde",
-                "recuérdame que Carmen prefiere las mañanas",
+                "apunta que Carmen prefiere las mañanas",
                 "apunta que Luis viene siempre con su perro",
             ),
         },
