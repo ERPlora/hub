@@ -315,6 +315,92 @@ def test_the_next_number_previewed_is_the_one_the_emission_writes(issuer, today)
     assert InvoiceSeries.objects.get(pk=series.id).current_number == 1
 
 
+# What the assistant's card names a series and a refund by (FIX-HUB-INVOICE-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS)
+
+
+def test_a_series_is_read_by_its_id_or_its_code_with_the_label_its_card_says(issuer, today):
+    """«Cambia el prefijo de la serie de facturas»: one series as the Series screen shows it, and how it is named
+    outside its screen in the reader's language — its code, its year and its name, as the screen's card titles it."""
+    manual()  # this year's FACT is born with its first document
+    series = InvoiceSeries.objects.get(code="FACT", year=today.year)
+    read = run("invoice.series.get", {"series_id": str(series.id)}, ctx_for(language="es"))
+    assert (read.id, read.code, read.year, read.next_number) == (
+        series.id,
+        "FACT",
+        today.year,
+        f"FACT-{today.year}-000002",
+    )
+    assert read.label == f"FACT · {today.year} · Facturas"
+    assert run("invoice.series.get", {"code": "fact"}).label == f"FACT · {today.year} · Invoices"
+    with pytest.raises(NotFound) as gone:
+        run("invoice.series.get", {"code": "NOPE"})
+    assert gone.value.code == "invoice.series_not_found"
+
+
+def test_nobody_without_seeing_invoices_reads_a_series(issuer, today):
+    from live.context import OperationContext
+
+    from apps.invoice.tests.conftest import A
+
+    manual()
+    series = InvoiceSeries.objects.get(code="FACT", year=today.year)
+    issuing = OperationContext(scope=A, actor="x", permissions=frozenset({"invoice.add_invoice"}))
+    with pytest.raises(PermissionDenied):
+        run("invoice.series.get", {"series_id": str(series.id)}, issuing)
+    assert run("invoice.series.get", {"series_id": str(series.id)}, ctx_for("hub_employee")).code == "FACT"
+
+
+def a_refund(product, charge, amount=500):
+    """A sale of the shampoo charged by card and ``amount`` cents of it given back, with the till's own operations."""
+    from apps.sale.models import Sale
+
+    product()
+    sale = charge()
+    payment = Sale.objects.get(pk=sale.id).payments.get()
+    refund = run(
+        "sale.sale.refund",
+        {"sale_id": str(sale.id), "reason": "Broken", "allocations": [{"payment_id": str(payment.id), "amount": amount}]},
+    )
+    return sale, refund
+
+
+@pytest.mark.parametrize(("language", "label"), [("es", "{number} · 5,00\u00a0€"), ("en", "{number} · €5.00")])
+def test_a_refund_of_sales_is_read_by_its_id_with_the_label_its_card_says(issuer, product, charge, language, label):
+    """«Emite la rectificativa de esa devolución»: a refund of the Sales app by its id, named by the sale it gives back
+    and what it gave back, in the reader's language and the sale's currency."""
+    sale, refund = a_refund(product, charge)
+    read = run("invoice.refund.get", {"refund_id": str(refund.refund_id)}, ctx_for(language=language))
+    assert (read.id, read.sale_id, read.sale_number, read.total, read.currency, read.currency_decimals) == (
+        refund.refund_id,
+        sale.id,
+        sale.number,
+        500,
+        "EUR",
+        2,
+    )
+    assert read.label == label.format(number=sale.number)
+
+
+def test_a_refund_that_is_not_there_is_not_found(db):
+    import uuid
+
+    with pytest.raises(NotFound) as gone:
+        run("invoice.refund.get", {"refund_id": str(uuid.uuid7())})
+    assert gone.value.code == "invoice.refund_not_found"
+
+
+def test_nobody_without_seeing_invoices_reads_a_refund(issuer, product, charge):
+    from live.context import OperationContext
+
+    from apps.invoice.tests.conftest import A
+
+    _, refund = a_refund(product, charge)
+    rectifying = OperationContext(scope=A, actor="x", permissions=frozenset({"invoice.rectify_invoice"}))
+    with pytest.raises(PermissionDenied):
+        run("invoice.refund.get", {"refund_id": str(refund.refund_id)}, rectifying)
+    assert run("invoice.refund.get", {"refund_id": str(refund.refund_id)}, ctx_for("hub_employee")).total == 500
+
+
 # The preview of a rectification (INVOICE-F08: what the assistant says before the card of a rectification)
 
 
