@@ -8,6 +8,7 @@ import { useCommand } from '@erplora/ui/sdk';
 import { toastSuccess } from '@erplora/ui/shell';
 import { computed, ref, watch } from 'vue';
 
+import { withApproval } from '../../../../base/frontend/lib/approval';
 import { useCustomerI18n } from '../lib/useCustomerI18n';
 
 interface Target {
@@ -42,7 +43,8 @@ async function confirm(): Promise<void> {
   const what = target.value;
   if (!what) return;
   try {
-    await remove({ id: what.id });
+    // A custom field's: a manager's PIN lets an employee delete it (BASE-F84); a group's or a tag's is never asked.
+    await withApproval(() => remove({ id: what.id }));
   } catch {
     return; // the dialog shows the refusal.
   }

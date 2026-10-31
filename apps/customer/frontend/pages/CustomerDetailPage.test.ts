@@ -191,13 +191,13 @@ describe('CustomerDetailPage: the buttons the profile allows', () => {
     ]);
   });
 
-  it('manager: Edit and Merge with…; employee: Edit only; who only views: none, and read-only sections', async () => {
+  it('manager: Edit and Merge with…; employee: the same, merging with a manager’s approval; who only views: none, and read-only sections', async () => {
     const manager = await setup({ session: MANAGER });
     await manager.show(DETAIL);
     expect(buttons(manager)).toEqual(['customer-detail-edit', 'customer-detail-merge']);
     const employee = await setup({ session: EMPLOYEE });
     await employee.show(DETAIL);
-    expect(buttons(employee)).toEqual(['customer-detail-edit']);
+    expect(buttons(employee)).toEqual(['customer-detail-edit', 'customer-detail-merge']);
     const viewer = await setup({ session: VIEWER });
     await viewer.show(DETAIL);
     expect(buttons(viewer)).toEqual([]);

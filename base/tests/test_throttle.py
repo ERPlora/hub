@@ -18,9 +18,8 @@ from base.throttle import KEY_PREFIX, AttemptLimit, RateLimited, allow, client_a
 
 @pytest.fixture(autouse=True)
 def locmem_cache(settings):
-    settings.CACHES = {
-        "default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache", "LOCATION": "base-throttle-tests"}
-    }
+    # In memory, with the rules of the Valkey cluster of AWS (base/cache.py): a call on keys of different slots fails.
+    settings.CACHES = {"default": {"BACKEND": "base.cache.ClusterLocMemCache", "LOCATION": "base-throttle-tests"}}
     cache.clear()
     yield
     cache.clear()
@@ -199,11 +198,37 @@ def test_each_key_and_each_limit_count_on_their_own():
 
 
 def test_the_parts_make_a_namespaced_key_in_the_throttle_s_corner_of_the_cache():
+    # The key is the hash tag of its cache entries (``{…}``): the count and the end of its window share a slot.
     limit = AttemptLimit("pin", attempts=1, window=60)
     assert limit.key("acme", "42") == "limit:pin:acme:42"
     limit.failed("acme", "42")
-    assert cache.get(f"{KEY_PREFIX}limit:pin:acme:42") == 1
+    assert cache.get(f"{KEY_PREFIX}{{limit:pin:acme:42}}") == 1
+    assert cache.get(f"{KEY_PREFIX}{{limit:pin:acme:42}}:until") is not None
     assert cache.get("limit:pin:acme:42") is None
+
+
+def test_on_the_valkey_cluster_of_aws_the_limit_refuses_and_a_right_attempt_starts_it_again(caplog):
+    # hub#440: in production the PIN pad took nine wrong PINs in a row. The cache is a Valkey cluster, and reading the
+    # count with the end of its window (one ``get_many``) or forgetting both (one ``delete_many``) was refused
+    # (CROSSSLOT: the two keys hashed to different slots), so ``wait`` stepped aside on every call. Both keys share
+    # the limit's hash tag now: each of those calls is one a cluster accepts, and nothing is logged.
+    with caplog.at_level(logging.ERROR, logger="base.throttle"):
+        for _ in range(3):
+            CALLBACK.failed("203.0.113.7")
+        assert CALLBACK.wait("203.0.113.7") == 300
+        CALLBACK.clear("203.0.113.7")
+        assert CALLBACK.wait("203.0.113.7") == 0
+    assert caplog.records == []
+
+
+@pytest.mark.parametrize("parts", [("acme", "a}b"), ("acme", "{x}"), ("{", "}")])
+def test_parts_with_braces_still_keep_the_count_and_its_end_in_one_slot(parts):
+    # The person comes from the request's body: whatever braces it carries, the limit still counts and refuses.
+    for _ in range(3):
+        CALLBACK.failed(*parts)
+    assert CALLBACK.wait(*parts) == 300
+    CALLBACK.clear(*parts)
+    assert CALLBACK.wait(*parts) == 0
 
 
 def test_a_count_whose_window_end_was_lost_waits_the_whole_window():
@@ -211,7 +236,7 @@ def test_a_count_whose_window_end_was_lost_waits_the_whole_window():
     # a whole window, never zero.
     for _ in range(3):
         CALLBACK.failed("203.0.113.7")
-    cache.delete(f"{KEY_PREFIX}{CALLBACK.key('203.0.113.7')}:until")
+    cache.delete(f"{KEY_PREFIX}{{{CALLBACK.key('203.0.113.7')}}}:until")
     assert CALLBACK.wait("203.0.113.7") == 300
 
 
@@ -220,7 +245,7 @@ def test_a_window_end_this_clock_sees_as_past_still_waits_a_second():
     # sees the end already past while the count is alive. It still refuses (1 s), never 0 or a negative Retry-After.
     for _ in range(3):
         CALLBACK.failed("203.0.113.7")
-    cache.set(f"{KEY_PREFIX}{CALLBACK.key('203.0.113.7')}:until", time.time() - 10, timeout=300)
+    cache.set(f"{KEY_PREFIX}{{{CALLBACK.key('203.0.113.7')}}}:until", time.time() - 10, timeout=300)
     assert CALLBACK.wait("203.0.113.7") == 1
 
 
