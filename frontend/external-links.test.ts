@@ -37,7 +37,12 @@ function sources(): string[] {
 }
 
 /** The files whose `_blank` links still wait for the common way, and why (each one, an issue). */
-const WAITING: Readonly<Record<string, string>> = {};
+const WAITING: Readonly<Record<string, string>> = {
+  'apps/invoice/frontend/components/VerifactuReceipt.vue': 'gh:hub#518 (and the app must take the AEAT’s QR address)',
+  'apps/verifactu/frontend/pages/RecordDetailPage.vue': 'gh:hub#518 (and the app must take the AEAT’s QR address)',
+  'apps/verifactu/frontend/pages/RecordsPage.vue': 'gh:hub#518 (and the app must take the AEAT’s QR address)',
+  'apps/verifactu/frontend/pages/SettingsPage.vue': 'gh:hub#518',
+};
 
 /** An opening tag, with attribute values that may hold a `>` (`@click="a > b"`). */
 const OPENING_TAG = /<([a-zA-Z][\w-]*)((?:\s+[^\s=>"'/]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>"']+))?)*)\s*\/?>/g;

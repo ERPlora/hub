@@ -141,7 +141,7 @@ límite» o «Cerca del límite», las tarjetas «Personas» y «Dispositivos» 
 La segunda pestaña de las de abajo de «Ajustes» («General», «Negocio», «Impresión» y «Datos y copias»). La
 tarjeta «Tu negocio» enseña, sin campos que rellenar, «Nombre del negocio», «País», «Zona
 horaria» (con la hora que es allí), «Moneda» e «Idioma del negocio», cada uno con una línea que dice para qué
-sirve. Debajo, dónde se cambian y, para el propietario y el administrador, «Cambiar en erplora.com». Más abajo,
+sirve. Debajo, dónde se cambian y, para el propietario y el administrador, «Cambiar en erplora.com» (en la app instalada, en el navegador del dispositivo; en la de Google Play no está). Más abajo,
 «Datos fiscales», que abre el emisor de Facturación.
 
 ### Ajustes · Impresión
@@ -213,7 +213,7 @@ imágenes y PDF).
 
 ### Empleados · Personal
 Lo que se abre con «Empleados» en el menú lateral: la primera pestaña de abajo, «Personal», con las plazas del plan,
-«Invitar en erplora.com» para quien administra, «Las personas se invitan, se les cambia el rol y se quitan en
+«Invitar en erplora.com» para quien administra (en la app instalada, en el navegador del dispositivo; en la de Google Play no está), «Las personas se invitan, se les cambia el rol y se quitan en
 erplora.com, en «Miembros» del negocio.» y la tabla de personas (en el móvil, una tarjeta por persona). Las otras
 pestañas: «Roles» y, solo para quien administra, «API keys» y «Aprobaciones»; cada una en la dirección, así que
 «Atrás» sale de Empleados.
@@ -1439,8 +1439,9 @@ Pantalla: Ajustes · Negocio
 Pasos:
   1. En «Negocio», «Idioma del negocio» («El de quien no haya elegido el suyo») dice el idioma del negocio por su
      nombre.
-  2. Pulsa «Cambiar en erplora.com»: se abren en otra pestaña los ajustes del negocio en erplora.com, donde lo
-     cambia y pulsa «Guardar cambios» (HUBS-F15).
+  2. Pulsa «Cambiar en erplora.com»: se abren en otra pestaña (en la app instalada, en el navegador del dispositivo)
+     los ajustes del negocio en erplora.com, donde lo cambia y pulsa «Guardar cambios» (HUBS-F15). En la app de
+     Google Play el botón no está: se cambia en erplora.com desde un navegador.
   3. Sin recargar, «Negocio» enseña el idioma nuevo en cuanto el negocio lo recibe; igual con el nombre y la zona
      horaria.
 Entra: el idioma que guardó erplora.com.
@@ -1564,7 +1565,8 @@ Pasos:
      de ponerse al día.
   3. Su siguiente pantalla es **Acceso**, que arriba dice «Sesión abierta en otro dispositivo» — «Tu plan cubre un
      dispositivo a la vez, así que al entrar en otro se cerró la sesión de este. Vuelve a entrar para usarlo aquí,
-     o amplía los dispositivos de tu plan.» con «Mejorar plan».
+     o amplía los dispositivos de tu plan.» con «Mejorar plan» en el navegador (en la app instalada no está: lo que
+     vende solo está en la web).
   4. Puede volver a entrar (y cierra la del otro) o ir a ampliar el plan a erplora.com.
 Entra: los dispositivos que cubre el plan, que erplora.com le pasa al negocio.
 Sale: las sesiones de los dispositivos que sobran, cerradas, y el motivo guardado en cada uno para decírselo.
@@ -1965,7 +1967,8 @@ Pasos:
      plazas ocupadas», «{used} personas · sin límite» o, si erplora.com no ha dicho el plan, «{used} personas».
   2. Con todas ocupadas sale «Tu plan tiene todas las plazas ocupadas» y «Quita en erplora.com a alguien que ya no
      trabaje aquí, o pasa a un plan con más plazas.»; en la web, con «Mejorar plan».
-  3. Para invitar a alguien más, «Invitar en erplora.com» lleva a «Miembros» del negocio, donde se aplica el tope.
+  3. Para invitar a alguien más, «Invitar en erplora.com» lleva a «Miembros» del negocio, donde se aplica el tope
+     (en la app instalada, en el navegador del dispositivo; en la de Google Play no está).
 Entra: las personas del negocio y las plazas de su plan, como las manda erplora.com.
 Sale: nada guardado.
 Si falla: «No se pudo cargar el personal de este negocio.» con «Reintentar», nunca «Todavía no hay nadie en este
@@ -2017,7 +2020,8 @@ Actor: propietario, administrador
 Pantalla: Empleados · Personal
 Pasos:
   1. Quien salió del negocio ya no está en **Empleados › Personal**: se quitó en erplora.com.
-  2. Para que vuelva, «Invitar en erplora.com» y se la invita otra vez en «Miembros» del negocio, con su rol.
+  2. Para que vuelva, «Invitar en erplora.com» y se la invita otra vez en «Miembros» del negocio, con su rol (en la
+     app instalada, en el navegador del dispositivo; en la de Google Play no está).
   3. Cuando acepta, vuelve a la lista con lo que el negocio guardaba de ella: su PIN y su placa siguen valiendo.
 Entra: la invitación en erplora.com.
 Sale: la persona otra vez en el negocio, con su PIN y su placa de antes.
@@ -2052,7 +2056,7 @@ Pasos:
      erplora.com, y allí se cambia.».
   2. Una fila por rol: «Propietario», «Administrador», «Encargado» y «Empleado», con «Básico», «Siempre
      disponible», cuántas personas lo tienen y cuántos permisos da.
-  3. Quien administra tiene «Cambiar roles en erplora.com».
+  3. Quien administra tiene «Cambiar roles en erplora.com» (en la app instalada, en el navegador del dispositivo; en la de Google Play no está).
 Entra: los roles y las personas del negocio.
 Sale: nada guardado.
 Si falla: «No se pudo cargar el catálogo de roles.» con «Reintentar».
@@ -2065,7 +2069,8 @@ Actor: propietario, administrador
 Pantalla: Empleados · Roles
 Pasos:
   1. En **Empleados › Roles** o en la ficha de una persona, «Cambiar roles en erplora.com» o «Abrir en
-     erplora.com» lleva a «Miembros» del negocio.
+     erplora.com» lleva a «Miembros» del negocio (en la app instalada, en el navegador del dispositivo; en la de
+     Google Play no están).
   2. Allí le cambia el rol.
   3. Al volver, la persona sale con su rol nuevo y lo que puede hacer cambia al momento.
 Entra: el rol que se elige en erplora.com.
@@ -2990,7 +2995,12 @@ Implicados: ACCOUNTS-F38
   `base.administer_hub`). Lo pinta `TopbarChrome.vue` (`topbar-manage`; en el móvil, `topbar-chrome-more-manage`),
   un enlace con `target=_blank rel=noopener` que en la app instalada pasa por `openExternalLink` de
   `@erplora/ui/shell` (`open_external_url`); `base/frontend/lib/management.ts` lo oculta en la copia de Google Play
-  (`device_context` → `distribution: "play"`, gh:hub#1897) y no lo enseña hasta que la app contesta. Tests:
+  (`device_context` → `distribution: "play"`, gh:hub#1897) y no lo enseña hasta que la app contesta. Es el único
+  camino de salida del Hub (gh:hub#439): todo enlace `_blank` de `base/frontend` y de las apps llama a
+  `openExternalLink` en su `@click` (o en la función que nombra), los que llevan al panel de erplora.com («Invitar»,
+  «Cambiar roles», «Abrir en erplora.com», «Cambiar en erplora.com») llevan además `managementOffered()`, y lo que
+  vende («Mejorar plan» del acceso, de WhatsApp…) va con `isWeb`; lo vigila `frontend/external-links.test.ts`, con
+  su lista de espera por issue (VeriFactu y la factura: gh:hub#518). Tests:
   `base/tests/test_spa.py`, `test_access_spa.py`, `ShellChrome.test.ts`, `lib/management.test.ts`; e2e
   `tests/e2e/base-chrome.spec.ts` y `base-access.spec.ts` (BASE-G56). En `frontend/main.ts`, el menú de usuario lleva «Perfil» y «Cambiar de usuario», y `startWayIn`
   (`base/frontend/lib/access.ts`) arma el bloqueo por inactividad con esos minutos (gh:hub#2537, #2677: no hay
