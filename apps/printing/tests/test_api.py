@@ -24,6 +24,7 @@ ROUTES = {
     ("POST", "/printing/printers/test", "printing.printer.test"),
     ("GET", "/printing/jobs", "printing.job.list"),
     ("GET", "/printing/jobs/summary", "printing.job.summary"),
+    ("GET", "/printing/jobs/detail", "printing.job.get"),
     ("POST", "/printing/jobs", "printing.job.create"),
     ("POST", "/printing/jobs/claim", "printing.job.claim"),
     ("POST", "/printing/jobs/complete", "printing.job.complete"),
@@ -31,6 +32,7 @@ ROUTES = {
     ("POST", "/printing/jobs/retry", "printing.job.retry"),
     ("POST", "/printing/jobs/cancel", "printing.job.cancel"),
     ("GET", "/printing/devices", "printing.device.list"),
+    ("GET", "/printing/devices/detail", "printing.device.detail"),
     ("POST", "/printing/devices", "printing.device.register"),
     ("POST", "/printing/devices/update", "printing.device.update"),
     ("POST", "/printing/devices/retire", "printing.device.retire"),
@@ -129,6 +131,21 @@ def test_the_employee_prints_and_reads_but_does_not_set_up_or_cancel(employee_cl
     assert refused.status_code == 403
     refused = post(employee_client, "/printing/jobs/cancel", {"reference": "T-000123"})
     assert refused.status_code == 403
+
+
+@pytest.mark.django_db
+def test_the_employee_reads_one_job_and_one_device_by_their_id(employee_client):
+    """The two reads the assistant's card names a job and a device by, over HTTP (an id in the query, never the device's
+    own one)."""
+    from apps.printing.models import PrintDevice
+
+    job = post(employee_client, "/printing/jobs", {"document_type": "receipt", "document": RECEIPT}).json()["job"]
+    read = get(employee_client, "/printing/jobs/detail", job_id=job["id"])
+    assert (read.status_code, read.json()["label"]) == (200, "Receipt T-000123")
+    counter = PrintDevice.objects.create(name="Counter", key=PrintDevice.key_of(DEVICE))
+    read = get(employee_client, "/printing/devices/detail", device_id=str(counter.id))
+    assert (read.status_code, read.json()["name"]) == (200, "Counter")
+    assert get(employee_client, "/printing/devices/detail", device_id=job["id"]).status_code == 404
 
 
 @pytest.mark.django_db

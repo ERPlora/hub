@@ -133,6 +133,7 @@
       "incident": "Enviado declarado como tardío (incidencia)",
       "waitingTitle": "Aún no está en la AEAT",
       "waitingWhen": "Sale solo en la próxima pasada, en orden y declarado como envío tardío si ya falló antes. No tienes que hacer nada.",
+      "waitingWhenResolved": "Sale solo, en orden y declarado como envío tardío, en cuanto se resuelva.",
       "rejectedTitle": "La AEAT lo ha rechazado",
       "rejectedHelp": "Si el error está en la factura (un NIF de cliente que la AEAT no reconoce, un importe), rectifícala en Facturación. Si no (la cadena tras restaurar una copia, un fallo nuestro), subsana el registro.",
       "verify": "Cotejar en la AEAT",

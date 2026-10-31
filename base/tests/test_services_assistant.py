@@ -5,12 +5,14 @@ asked for, shows a write's card and runs it only with the person's yes, as the p
 
 import dataclasses
 import json
+from datetime import datetime
 
 import pytest
 from django.db import connections
 from live.context import OperationContext, Scope
 from live.errors import OperationError, Unauthorized
-from live.operations import get, registry
+from live.operations import Operation, get, registry
+from ninja import Schema
 
 from base import assistant
 from base.models import Hub, Membership
@@ -249,6 +251,36 @@ def test_an_amount_of_a_preview_reaches_the_card_in_the_currency_its_read_answer
         ("difference", "money", True, pln),
     ]
     assert [field["money"] for field in card["fields"]] == [None, None]
+
+
+class ListedIn(Schema):
+    starts: list[datetime]
+    codes: list[str]
+
+
+LISTED = Operation(
+    name="demo.item.settle",
+    kind="command",
+    permission="demo.manage",
+    input=ListedIn,
+    output=ListedIn,
+    expose_api=False,
+    ai={"description": "Books a demo item on several days."},
+    fn=lambda ctx, data: data,
+)
+
+
+def test_a_list_said_item_by_item_reaches_the_card_marked_named_and_one_of_codes_does_not(monkeypatch):
+    """FIX-HUB-PRINTING-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS: the turn's card dropped the mark on its way out (its
+    schema had no place for it), so the printers of a device, named on the server, reached the screen as «2 items»; a
+    list of codes nobody names keeps saying how many."""
+    monkeypatch.setitem(registry, LISTED.name, LISTED)
+    arguments = {"starts": ["2026-11-02T09:00:00Z", "2026-11-09T09:00:00Z"], "codes": ["sale.sale.create"]}
+    card = turn(call(LISTED.name, arguments))["confirm"]
+    assert [(field["name"], field["kind"], field["named"]) for field in card["fields"]] == [
+        ("starts", "list", True),
+        ("codes", "list", False),
+    ]
 
 
 def test_a_card_whose_app_declares_no_preview_is_as_before():

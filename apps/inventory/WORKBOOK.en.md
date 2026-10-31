@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:000ed2b683ff342d73b6761adadb7270147c3da7f5e81d31287c580c9a34e32a -->
+<!-- generated from WORKBOOK.md sha256:cbf68d22cae76c9e239707ceefa34142420b3dc72474c7a96487e75a14a656dc -->
 
 ## What it is for and who it is for
 
@@ -998,7 +998,9 @@ Steps:
 2. Import it into another business (BASE-F31): each own photo is copied to the folder of the business
    that imports, with a new name, and its item points at the copy; the items with a library image show
    it all the same.
-3. The Hub's templates (restaurant and hair salon, INVENTORY-F12) bring each item with its library image.
+3. The Hub's templates (restaurant and hair salon, INVENTORY-F12) bring each item with its library image;
+   one the library does not have yet (the restaurant's patatas bravas) loads without a photo, never
+   with another product's.
 In: the exported file (.blueprint.zip) with its photos.
 Out: the items with their photo in the business that imports. Importing the same file twice duplicates
 neither the items nor their photos: the item that is already there (the same SKU) is skipped, and its
