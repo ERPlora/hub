@@ -19,7 +19,7 @@ import { A, api, capture, HUB_DIR, psql, REPO_DIR, shown } from './helpers';
 import { confirmDialog, parkedEvent, RELAY, signedIn } from './flow-helpers';
 import { noHorizontalScroll, settled, VIEWPORTS } from './schedule-helpers';
 import { STACK } from './stack';
-import { cleanUp as inboxCleanUp, e2ePhone, pushChannel, receive } from './whatsapp-helpers';
+import { cleanUp as inboxCleanUp, e2ePhone, keepPhoto, pushChannel, receive, restorePhoto } from './whatsapp-helpers';
 
 const TASK = 'CLOSE-RESERVATION';
 const ANSWER = 'whatsapp_inbox/reservation_from_whatsapp';
@@ -140,6 +140,7 @@ async function bookRow(page: Page) {
 }
 
 test.beforeAll(async () => {
+  keepPhoto();
   provider = await startProvider(PROVIDER_PORT);
   const seeded = saasSql("select base_url from assistant_aiprovider where slug = 'e2e-local'");
   expect(seeded, `the SaaS ${SAAS_DB} is not seeded with this provider: README «El asistente»`).toBe(provider.url);
@@ -153,6 +154,7 @@ test.beforeEach(() => {
 test.afterAll(async () => {
   cleanUp();
   await provider?.close();
+  restorePhoto();
 });
 
 for (const viewport of VIEWPORTS) {
