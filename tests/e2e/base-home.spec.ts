@@ -187,6 +187,56 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
   });
 }
 
+/** The operations an `/api/live` address subscribes to (`?s=`, base64url JSON: `encodeSubscriptions` of @erplora/ui). */
+function liveOps(url: string): string[] {
+  const list = new URL(url).searchParams.get('s') ?? '';
+  return (JSON.parse(Buffer.from(list, 'base64url').toString()) as { op: string }[]).map((subscription) => subscription.op);
+}
+
+/** base's four pieces of the chrome (frontend/main.ts `CHROME`), by their module: the source in dev, the chunk in a build. */
+const CHROME_PIECE = /\/(TopbarChrome|UpgradePlanLink|BlockingStrip|BackgroundChrome)[.-]/;
+
+// FIX-HUB-BASE-HOME-ONE-STREAM-FLAKY (hub#473's review): base's chrome loaded on demand, after the screen had mounted. On
+// a slow device (the tab's CPU ×6: 7 of 9 runs) its modules came more than 150 ms after the screen's queries, so the
+// stream opened without the bell's `base.bell.counters` and the apps followed beside the pane (`base.app.list`), and was
+// cut and opened again with them. Here each piece arrives a second late, whatever the machine's load: the screen mounts
+// with its chrome, and one stream carries them all. The page that signed in is left first: its own stream is not counted.
+for (const [label, viewport] of Object.entries(VIEWPORTS)) {
+  test(`BASE-F06 BASE-F08 — the Home opens one live stream when base's chrome arrives late, at ${label}`, async ({ browser }) => {
+    const { context, page } = await hostPage(browser, A, { viewport, next: '/' });
+    await page.goto('about:blank');
+    await page.route(
+      (url) => CHROME_PIECE.test(url.pathname),
+      async (route) => {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        await route.continue();
+      },
+    );
+    const isLive = (url: string) => new URL(url).pathname === '/api/live';
+    const opened: string[] = [];
+    const cut: string[] = [];
+    page.on('request', (request) => {
+      if (isLive(request.url())) opened.push(request.url());
+    });
+    page.on('requestfailed', (request) => {
+      if (isLive(request.url())) cut.push(request.failure()?.errorText ?? 'failed');
+    });
+    // The chrome's queries only come in a stream opened once its pieces mounted: by then any reopening has happened.
+    const withChrome = page.waitForRequest((request) => {
+      if (!isLive(request.url())) return false;
+      const ops = liveOps(request.url());
+      return ops.includes('base.bell.counters') && ops.includes('base.app.list');
+    });
+    await page.goto(`${A}/`);
+    await withChrome;
+    const panel = testid(page, 'widget-board').locator('[data-testid="widget"][data-key="demo.open_items"]');
+    await expect(panel.locator('[data-testid="widget-value"]')).toHaveText(/\d/);
+    expect(cut).toEqual([]);
+    expect(opened).toHaveLength(1);
+    await context.close();
+  });
+}
+
 // BASE-F06 — a panel's row without its value (FIX-HUB-BASE-HOME-PANEL-NULL-SHOWS-ZERO): with «Exigir recuento al cierre»
 // off in Cash register, a session closed without a count has no difference, and «Descuadres recientes» painted it as
 // «0,00 €», a discrepancy that never was. The owner of `a`, in Spanish, adds the panel from «Personalizar panel»: the

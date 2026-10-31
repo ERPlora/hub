@@ -21,6 +21,7 @@ from django.db import models
 from django.db.models import F, Q
 from django.db.models.functions import Lower
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import pgettext_lazy
 from live.models import UUIDModel
 
 QUANTITY = {"max_digits": 15, "decimal_places": 3}
@@ -32,11 +33,13 @@ DEFAULT_PRIORITY = 100
 _VALID_RANGE = Q(valid_from__isnull=True) | Q(valid_until__isnull=True) | Q(valid_until__gte=F("valid_from"))
 
 
+# The texts another app translates otherwise in Spanish go with pricing's own context («activa», «divisa»,
+# «desde», «cambiado el»): the first catalog that says a message wins (base/tests/test_locale_modules.py).
 class _Audited(UUIDModel):
     created_at = models.DateTimeField(_("created at"), auto_now_add=True)
-    updated_at = models.DateTimeField(_("updated at"), auto_now=True)
+    updated_at = models.DateTimeField(pgettext_lazy("pricing", "updated at"), auto_now=True)
     created_by = models.CharField(_("created by"), max_length=ACTOR_MAX_LENGTH, blank=True)
-    updated_by = models.CharField(_("updated by"), max_length=ACTOR_MAX_LENGTH, blank=True)
+    updated_by = models.CharField(pgettext_lazy("pricing", "updated by"), max_length=ACTOR_MAX_LENGTH, blank=True)
 
     class Meta:
         abstract = True
@@ -46,15 +49,15 @@ class PriceList(_Audited):
     code = models.CharField(_("code"), max_length=CODE_MAX_LENGTH)
     name = models.CharField(_("name"), max_length=NAME_MAX_LENGTH)
     # ISO 4217, two decimals (the amounts are typed and read in cents).
-    currency = models.CharField(_("currency"), max_length=3, default="EUR")
+    currency = models.CharField(pgettext_lazy("pricing", "currency"), max_length=3, default="EUR")
     # Whether its prices carry the tax: empty = as the business sells (Sales' setting).
     tax_included = models.BooleanField(_("tax included"), null=True, blank=True)
     # A customer.CustomerGroup; empty: nobody's group (the general list, or a list asked for by name).
     customer_group_id = models.UUIDField(_("customer group"), null=True, blank=True)
-    valid_from = models.DateField(_("valid from"), null=True, blank=True)
-    valid_until = models.DateField(_("valid until"), null=True, blank=True)
+    valid_from = models.DateField(pgettext_lazy("pricing", "valid from"), null=True, blank=True)
+    valid_until = models.DateField(pgettext_lazy("pricing", "valid until"), null=True, blank=True)
     is_default = models.BooleanField(_("general list"), default=False)
-    is_active = models.BooleanField(_("active"), default=True)
+    is_active = models.BooleanField(pgettext_lazy("pricing", "active"), default=True)
 
     class Meta:
         verbose_name = _("price list")
@@ -172,11 +175,11 @@ class DiscountRule(_Audited):
     # switches its rules off and keeps the id: never would a VIP discount spread to everybody.
     customer_group_id = models.UUIDField(_("customer group"), null=True, blank=True)
     min_quantity = models.DecimalField(_("minimum quantity"), null=True, blank=True, **QUANTITY)
-    valid_from = models.DateField(_("valid from"), null=True, blank=True)
-    valid_until = models.DateField(_("valid until"), null=True, blank=True)
+    valid_from = models.DateField(pgettext_lazy("pricing", "valid from"), null=True, blank=True)
+    valid_until = models.DateField(pgettext_lazy("pricing", "valid until"), null=True, blank=True)
     # With equal discounts, the lower number wins.
     priority = models.PositiveIntegerField(_("priority"), default=DEFAULT_PRIORITY)
-    is_active = models.BooleanField(_("active"), default=True)
+    is_active = models.BooleanField(pgettext_lazy("pricing", "active"), default=True)
 
     class Meta:
         verbose_name = _("discount rule")
