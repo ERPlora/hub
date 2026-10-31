@@ -15,6 +15,7 @@ a day missing or badly written. On the Hub, ``base.plan.usage`` says the size of
 
 import datetime as dt
 import logging
+import threading
 import uuid
 
 import pytest
@@ -35,8 +36,9 @@ from base.tests.test_internal import signed
 from base.tests.test_session_revoke import ANA, OLGA, login
 from control.models import Hub, HubUsageDaily, HubVisit, UsageRun
 
-DAY = dt.date(2026, 10, 30)
-NIGHT = dt.datetime(2026, 10, 31, 0, 15, tzinfo=dt.UTC)
+#: A night long past, never the real yesterday of a run: no row a real clock writes can be this day's.
+DAY = dt.date(2026, 3, 10)
+NIGHT = dt.datetime(2026, 3, 11, 0, 15, tzinfo=dt.UTC)
 
 
 def size_in_the_catalog(name: str) -> int:
@@ -189,6 +191,37 @@ def test_a_measurement_that_fails_is_logged_and_the_next_tick_tries_again(hub_a,
     assert HubUsageDaily.objects.filter(day=DAY).count() == 1
 
 
+# ── The worker's real loop in the other tests (W8, 2026-10-31) ───────────────────────────────────────────────────
+
+
+def run_the_loop_once(monkeypatch) -> None:
+    from base import catalog
+    from base.catalog import RegisterResult
+
+    monkeypatch.setattr(catalog, "register_apps", lambda: RegisterResult(written=0, retired=0, docs_changed=0, skipped=True))
+    monkeypatch.setattr(worker, "_measured", None)
+    stop = threading.Event()
+    assert worker.run(stop, tick_seconds=0, wait=lambda seconds: stop.set()) == 0
+
+
+@pytest.mark.django_db(transaction=True)
+def test_a_test_that_runs_the_worker_s_loop_measures_nothing_unless_it_asks(monkeypatch):
+    """The slow passes (a copy, the nightly measurement) run in threads of their own, on their own connections: in a
+    test they committed outside its transaction, and the ``UsageRun`` of the real yesterday that the relay's tests left
+    broke the next tests (W8, 2026-10-31). The suite keeps them off (``conftest.py``, ``worker_slow_passes``)."""
+    run_the_loop_once(monkeypatch)
+
+    assert not UsageRun.objects.exists()
+
+
+@pytest.mark.worker_slow_passes
+@pytest.mark.django_db(transaction=True)
+def test_a_test_marked_for_them_gets_the_slow_passes(monkeypatch):
+    run_the_loop_once(monkeypatch)
+
+    assert list(UsageRun.objects.values_list("day", flat=True)) == [usage.day_due(timezone.now())]
+
+
 # ── Who came in ──────────────────────────────────────────────────────────────────────────────────────────────────
 
 
@@ -238,11 +271,11 @@ def measured_night(db):
 
 
 def test_the_day_measured_is_served_as_the_saas_reads_it(measured_night, settings):
-    answer = usage_of(Client(), "?day=2026-10-30")
+    answer = usage_of(Client(), "?day=2026-03-10")
 
     assert answer.status_code == 200
     assert answer.json() == {
-        "day": "2026-10-30",
+        "day": "2026-03-10",
         "hubs": [
             {
                 "id": str(hub.id),
@@ -261,8 +294,8 @@ def test_the_rows_come_by_pages_each_once(measured_night, monkeypatch):
     monkeypatch.setattr(usage, "PAGE_SIZE", 2)
     client = Client()
 
-    first = usage_of(client, "?day=2026-10-30").json()
-    second = usage_of(client, f"?day=2026-10-30&cursor={first['next_cursor']}").json()
+    first = usage_of(client, "?day=2026-03-10").json()
+    second = usage_of(client, f"?day=2026-03-10&cursor={first['next_cursor']}").json()
 
     assert [row["id"] for row in first["hubs"] + second["hubs"]] == [str(hub.id) for hub in measured_night]
     assert 1 <= len(first["next_cursor"]) <= 512
@@ -272,7 +305,7 @@ def test_the_rows_come_by_pages_each_once(measured_night, monkeypatch):
 def test_a_night_with_no_business_of_its_own_is_an_empty_page(db):
     UsageRun.objects.create(day=DAY, started_at=NIGHT, finished_at=NIGHT, hubs=0)
 
-    assert usage_of(Client(), "?day=2026-10-30").json() == {"day": "2026-10-30", "hubs": [], "next_cursor": None}
+    assert usage_of(Client(), "?day=2026-03-10").json() == {"day": "2026-03-10", "hubs": [], "next_cursor": None}
 
 
 @pytest.mark.parametrize("run", [None, {"finished_at": None}])
@@ -280,13 +313,13 @@ def test_a_day_not_measured_yet_is_not_ready(db, run):
     if run is not None:
         UsageRun.objects.create(day=DAY, started_at=NIGHT, **run)
 
-    answer = usage_of(Client(), "?day=2026-10-30")
+    answer = usage_of(Client(), "?day=2026-03-10")
 
     assert answer.status_code == 409
     assert answer.json()["error"]["code"] == "usage_not_ready"
 
 
-@pytest.mark.parametrize("query", ["", "?day=", "?day=30-10-2026", "?day=2026-13-01", "?day=2026-10-30&cursor=nope"])
+@pytest.mark.parametrize("query", ["", "?day=", "?day=10-03-2026", "?day=2026-13-01", "?day=2026-03-10&cursor=nope"])
 def test_a_day_missing_or_badly_written_or_a_cursor_not_ours_is_refused(measured_night, query):
     answer = usage_of(Client(), query)
 
@@ -295,7 +328,7 @@ def test_a_day_missing_or_badly_written_or_a_cursor_not_ours_is_refused(measured
 
 
 def test_an_unsigned_call_is_refused(db):
-    assert Client().get("/internal/usage?day=2026-10-30", HTTP_HOST="hubs.localhost").status_code == 401
+    assert Client().get("/internal/usage?day=2026-03-10", HTTP_HOST="hubs.localhost").status_code == 401
 
 
 # ── On the Hub: the size of its own database (BASE-F40) ──────────────────────────────────────────────────────────
