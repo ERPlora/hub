@@ -405,6 +405,8 @@ export interface OrderOut {
   updated_at: string;
   /** The lines left to charge. */
   lines: OrderLineOut[];
+  /** A check joined with another (`sale.order.merge`) ends voided and names the one that stays; null otherwise. */
+  merged_into_id: string | null;
   /** Opening the check of an appointment that already had one answers that one (nothing added). */
   already: boolean;
 }
@@ -539,6 +541,7 @@ export interface PreviewOut {
   /** Every discount given. */
   discount_amount: number;
   discount_percent: string;
+  /** What the ticket discount (its percent and its fixed amount) takes off this charge. */
   ticket_discount_amount: number;
   gift_total: number;
   total: number;

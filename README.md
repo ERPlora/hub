@@ -90,7 +90,8 @@ Plan `docs/plans/2026-10-22-fase-2-tenencia.md` de erplora-next; reglas en PLAN-
   el `Cluster` abierto con menos hubs bajo su `max_hubs`, o en el servidor de los settings si no hay ninguna fila; sin
   sitio, `no_cluster_available`; y clona `<control>_template[_<vertical>]` de ese cluster con `CREATE DATABASE …
   TEMPLATE`, privada: nada a `PUBLIC`, `CONNECT, TEMPORARY` a `hub_app` y `hub_admin`), `migrating` (lleva a la hoja
-  las apps que la plantilla ya tiene, más `base` y, hasta S3, todas las portables, y anota `schema_apps = {app: su
+  las apps que la plantilla ya tiene, más `base` y todas las portables, que las plantillas traen (también en S3): el
+  alta es el clon y no migra nada; cada paso deja en el log `base.tenancy.provision.step` con sus segundos), y anota `schema_apps = {app: su
   última migración}`), `seeding` (la foto del SaaS guardada en la fila: sus personas y los bloques de las apps
   encendidas; si llega otra mientras, se aplica también antes de `ready`) y `ready` (el SaaS lo oye tras el COMMIT).
   Una foto que llega a un negocio sin BD hecha (preparándose, o cancelado o fallido antes de estar listo) se guarda en
@@ -138,7 +139,10 @@ Plan `docs/plans/2026-10-22-fase-2-tenencia.md` de erplora-next; reglas en PLAN-
   `node tests/e2e/database.ts` crea la `<BD>_template` de cada BD de e2e (y `--drop` borra sus plantillas); para la
   `hub` de desarrollo, `createdb hub_template` en el Postgres de compose (o `bootstrap_databases`).
 - **`manage.py migrate_hubs`** (la tarea `hub-migrate` de cada despliegue): 1) control, bajo su lock; 2) las
-  plantillas de cada servidor (`clusters_to_migrate`: sin filas de `Cluster`, el del settings; con ellas, los abiertos
+  plantillas de cada servidor (con todas las apps portables, también en S3, `migrator.templates`; nunca se reconstruyen:
+  el primer despliegue que les añade las portables migra cada una en caliente, cerca de un minuto, y un alta en ese rato
+  cae en `clone_failed` y se reintenta a los 60 s; `clusters_to_migrate`: sin
+  filas de `Cluster`, el del settings; con ellas, los abiertos
   y los cerrados que aún tienen hubs, y el del settings mientras viva en él un hub sin cluster), como canarios: si una
   falla, no se toca ningún hub; 3) los hubs atrasados según `schema_apps` (un despliegue sin migraciones no abre
   ninguna BD de hub) con BD propia ya hecha (`registry.own_database_made`: lista o con `ready_at`; uno cancelado o
@@ -254,7 +258,8 @@ aviso vivo sale por su canal); y al final hace las BD de los hubs debidos en `Hu
 acabaron (`base/tenancy/provision.py`, «Tenencia», «Alta»). Con `--databases-only` solo hace esto último (las BD y
 las demos que acaban): es el worker del e2e, cuyas specs juegan ellas mismas el reparto y las tareas. El reparto lleva cada evento nuevo a las reacciones de las apps que lo escuchan (el
 `REACTIONS` de su `events.py`; `"*"` = todo evento de las demás): la venta cobrada baja el stock y cuenta en la ficha
-del cliente, la ronda enviada abre su comanda en cocina, etc. Cada app lo recibe **una vez** (`base.EventDelivery`, en
+del cliente, la ronda enviada abre su comanda en cocina, etc. Un evento que no es de un hub (los del registro y las
+demos, en el outbox de control) no lo oye ninguna app: no hay hub en el que correr su reacción. Cada app lo recibe **una vez** (`base.EventDelivery`, en
 la misma transacción que su reacción), como el sistema y en el ámbito del hub que lo anotó (su aviso vivo sale por el
 canal de ese hub). Una reacción que falla se deshace y reintenta a los 2, 4, 8… s (una hora como mucho); al octavo
 intento queda `dead` con su error, en el log y en la fila. Los eventos que una reacción anota se reparten un nivel

@@ -141,12 +141,17 @@ def test_the_employee_works_the_counter_but_neither_exports_nor_deletes(
     for response in (
         get(employee_client, "/customer/customers/export"),
         post(employee_client, "/customer/customers/delete", {"id": customer_id}),
-        post(employee_client, "/customer/groups", {"name": "VIP"}),
     ):
         assert (response.status_code, response.json()["error"]["code"]) == (
             403,
             "permission_denied",
         )
+    # A group is a manager's, so the employee is asked for a manager's PIN, not refused (test_approvals.py).
+    response = post(employee_client, "/customer/groups", {"name": "VIP"})
+    assert (response.status_code, response.json()["error"]["code"]) == (
+        403,
+        "requires_elevation",
+    )
 
 
 @pytest.mark.django_db

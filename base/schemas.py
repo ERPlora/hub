@@ -1581,6 +1581,11 @@ class AssistantFieldOut(Schema):
         default=False,
         description="An amount its app declares signed (a difference): written with its sign, «+» over.",
     )
+    named: bool = Field(
+        default=False,
+        description="A list whose every item the server said in words (a record by its name, a moment, a value by its "
+        "label, an amount): the card says its items; without it, how many it carries (`live.assistant.NAMED`).",
+    )
     money: AssistantMoneyOut | None = Field(
         default=None,
         description="The currency of an amount of a preview, as its read answers it (an invoice's); none = the "

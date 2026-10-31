@@ -106,13 +106,45 @@ describe('RecordDetailPage', () => {
     expect(s.find('verifactu-record-status').text()).toContain('Pending');
   });
 
-  it('says why it is not in the AEAT yet and that it goes out by itself', async () => {
+  it('says why it is not in the AEAT yet and that it goes out by itself once that is resolved', async () => {
     const s = await setup();
     const notice = s.find('verifactu-record-waiting');
     expect(notice.text()).toContain('Not at the AEAT yet');
     expect(notice.text()).toContain("ERPlora's sending gateway is not configured on this server");
-    expect(notice.text()).toContain('It goes out by itself with the next pass');
+    expect(notice.text()).toContain('as soon as that is resolved');
   });
+
+  it('when every wait clears by itself it goes out with the next pass and there is nothing to do', async () => {
+    const s = await setup({
+      waiting: [
+        { code: 'aeat_wait', message: 'the AEAT asked to wait until 10:01:00' },
+        { code: 'unreachable', message: 'the gateway or the AEAT could not be reached (timeout)' },
+      ],
+    });
+    const notice = s.find('verifactu-record-waiting');
+    expect(notice.text()).toContain('It goes out by itself with the next pass');
+    expect(notice.text()).toContain('You do not have to do anything');
+    expect(notice.text()).not.toContain('as soon as that is resolved');
+  });
+
+  // hub#454, VERIFACTU-F17: one «when». A wait that something has to resolve (a refusal of the gateway that is not
+  // sent again by itself, the authorisation, a business ERPlora has not linked) never says «nothing to do».
+  it.each(['refused', 'representation_not_approved', 'hub_unregistered', 'gateway_unavailable'])(
+    'with a %s wait it goes out once resolved, never «nothing to do»',
+    async (code) => {
+      const s = await setup({
+        waiting: [
+          { code: 'aeat_wait', message: 'the AEAT asked to wait until 10:01:00' },
+          { code, message: `why: ${code}` },
+        ],
+      });
+      const notice = s.find('verifactu-record-waiting');
+      expect(notice.text()).toContain(`why: ${code}`);
+      expect(notice.text()).toContain('It goes out by itself, in order and declared as late, as soon as that is resolved.');
+      expect(notice.text()).not.toContain('You do not have to do anything');
+      expect(notice.text()).not.toContain('with the next pass');
+    },
+  );
 
   it('outside Spain it says why and never that it goes out by itself', async () => {
     // FIX-HUB-VERIFACTU-ON-FOR-A-BUSINESS-OUTSIDE-SPAIN: VeriFactu is only for Spain, the record is never sent.

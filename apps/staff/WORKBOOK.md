@@ -209,8 +209,10 @@ un color que no es #RRGGBB, una tarifa negativa, una comisión fuera de 0–100,
 disponible: no existe en este negocio, o se ha eliminado o retirado.», «Ese usuario del Hub no tiene
 acceso a este negocio.» o la cuenta ya vinculada a otra ficha (STAFF-F03). Quien no puede ver la
 compensación no puede enviarla: «Se necesita el permiso «{permiso}».». Dos fichas con el mismo
-nombre, email o nº de empleado se aceptan.
-Implicados: ninguno
+nombre, email o nº de empleado se aceptan. Desde el asistente, un rol que el negocio no tiene (o que se
+ha retirado) se comprueba antes de la tarjeta de confirmación: no sale tarjeta, el asistente dice que
+ese rol no está disponible y no se crea nada.
+Implicados: BASE-F97
 
 ### STAFF-F02 Editar la ficha de un profesional
 <!-- origen: fi:modules/staff#command-staff-members-update fi:modules/staff#query-staff-members-get old:staff/workflow/ficha.md#staff-f02 -->

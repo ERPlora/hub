@@ -41,6 +41,8 @@ from base.tenancy.tests.hubs import (  # noqa: F401 (fixtures)
 from control.models import Hub
 
 PLATFORM = ("base", "live")
+#: The deployment's own templates, kept before the ``small`` fixture replaces them.
+REAL_TEMPLATES = migrator.templates
 SMALL_VERTICAL = "small"
 
 
@@ -411,6 +413,21 @@ def test_check_sees_a_new_migration_of_a_templates_app(small, db):
 
     assert status == 1
     assert out.splitlines() == [f"migrate_hubs: unapplied migrations in {vertical}:", f"tax.{leaf}"]
+
+
+def test_check_counts_a_template_without_the_portable_apps_as_behind(small, db, monkeypatch):
+    """Until S3 every template carries every portable app (``migrator.templates``): one built before, with the
+    platform alone, is behind, and a run gives it them."""
+    platform = small[0]  # the platform alone
+    up_to_date = migrator.Template(db_name=platform.db_name, apps=REAL_TEMPLATES()[0].apps)
+    monkeypatch.setattr(migrator, "templates", lambda control=None: [up_to_date])
+
+    status, out = migrate_hubs_check()
+
+    lines = out.splitlines()
+    assert status == 1
+    assert lines[0] == f"migrate_hubs: unapplied migrations in {platform.db_name}:"
+    assert any(line.startswith("tax.") for line in lines) and any(line.startswith("sale.") for line in lines)
 
 
 def test_check_lists_a_missing_verticals_template_and_creates_nothing(small, template_name, monkeypatch):

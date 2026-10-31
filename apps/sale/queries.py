@@ -1231,6 +1231,7 @@ def order_detail(order: Order) -> dict:
         "created_at": order.created_at,
         "updated_at": order.updated_at,
         "lines": [order_line_row(line) for line in lines],
+        "merged_into_id": order.merged_into_id,
     }
 
 
@@ -1457,7 +1458,7 @@ def preview(ctx: OperationContext, params: PreviewIn) -> dict:
         "tax_total": valuation.tax_total,
         "discount_amount": valuation.discount_amount,
         "discount_percent": percent,
-        "ticket_discount_amount": amount,
+        "ticket_discount_amount": valuation.ticket_discount_amount,
         "gift_total": valuation.gift_total,
         "total": valuation.total,
         "breakdown": breakdown_rows(valuation.breakdown),
