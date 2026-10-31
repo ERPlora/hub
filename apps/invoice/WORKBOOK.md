@@ -1042,7 +1042,11 @@ Recibir el emisor del SaaS (`invoice.sync_issuer`) no es de ningún papel: solo 
   descartado sin la foto ni la entrega, hub#501): el bloque `issuer` (`legal_name`, `tax_id`, `address`, `postal_code`, `city`,
   `province`, `country`) de `PUT /internal/hubs/{id}/state` → la plataforma llama a
   `invoice.issuer.sync` como sistema con `{legal_name, tax_id, address, postal_code, city, province,
-  country, version}`; una `version` menor o igual que la guardada se ignora.
+  country, version}`; una `version` menor o igual que la guardada se ignora. ⚠️ **Contradicción señalada, sin
+  elegir** (CLOSE-INVOICE, hub#501): PLAN-SAAS §3.1 punto 2, «Dos identidades» (decisión del 2026-10-11), dice
+  que los datos fiscales del negocio viven y se editan en el Hub y que el SaaS solo guarda al pagador
+  (`BillingProfile`); este contrato pide la dirección contraria. Hasta que se decida, el emisor se escribe en el
+  Hub (INVOICE-F21).
 - **Contrato con VeriFactu** (`apps/verifactu`, `requires=["invoice"]`; su WORKBOOK, «Contrato con
   Facturación»): `_issue`, tras escribir el documento y su aviso y **dentro de la misma transacción**, llama
   por nombre a `verifactu.record.create` con `{"invoice_id": …}` y la misma sesión, en su savepoint. La
@@ -1217,7 +1221,8 @@ Al cerrar la app (2026-10-31, `CLOSE-INVOICE`), lo que no entra tiene su issue a
   (`invoice.invoice.substitute`).
 - **hub#501** — El emisor de Facturación no se rellena con los datos fiscales de la cuenta de ERPlora
   (INVOICE-F22): la foto del SaaS no lleva el bloque `issuer` y `base.hub.state_apply` no llama a
-  `invoice.issuer.sync`, que ya existe.
+  `invoice.issuer.sync`, que ya existe; y el flujo choca con «Dos identidades» de PLAN-SAAS (los datos fiscales
+  del negocio viven en el Hub): primero hay que decidir la dirección.
 - **hub#502** — ERPlora todavía no puede emitir sus propias facturas desde su hub de plataforma
   (INVOICE-F23): el alta del hub de plataforma con su BD propia es de la tenencia (S2, PLAN §35); las
   operaciones de Facturación y sus puertas `/internal/platform/invoices` ya están.

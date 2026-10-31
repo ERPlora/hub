@@ -73,7 +73,9 @@ CI=1 pnpm e2e tests/e2e/invoice-sale.spec.ts tests/e2e/invoice-manual.spec.ts te
 ## Qué queda fuera
 
 - **hub#500** — El cliente no puede pedir él mismo la factura completa de su tique (INVOICE-F04).
-- **hub#501** — El emisor de Facturación no se rellena con los datos fiscales de la cuenta de ERPlora (INVOICE-F22).
+- **hub#501** — El emisor de Facturación no se rellena con los datos fiscales de la cuenta de ERPlora (INVOICE-F22);
+  choca con «Dos identidades» de PLAN-SAAS (los datos fiscales del negocio viven en el Hub): contradicción señalada,
+  sin elegir.
 - **hub#502** — ERPlora todavía no puede emitir sus propias facturas desde su hub de plataforma (INVOICE-F23).
 - Lo que no hace a propósito (enviar a la AEAT, cobrar, presupuestos, vencimientos, el libro registro para la
   gestoría…): «Lo que NO hace, a propósito» del WORKBOOK.
