@@ -54,7 +54,7 @@ def test_clocking_in_someone_else_by_id_or_by_name():
 
 
 def test_the_device_is_not_the_payloads_to_declare():
-    # Review of 2026-10-15, finding 6: shared or personal comes from the session's device (phase 2).
+    # Review of 2026-10-15, finding 6: shared or personal comes from the session's device (BASE-F62).
     assert "source" not in ClockInIn.model_fields
     assert not hasattr(ClockInIn.model_validate({"source": "personal"}), "source")
 

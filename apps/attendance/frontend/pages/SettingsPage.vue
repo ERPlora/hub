@@ -15,7 +15,6 @@ import { computed, ref, watch } from 'vue';
 
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import { useT } from '../composables/useT';
-import { deviceModesKnown } from '../lib/device';
 import { GeoError, type GeoErrorCode, getPosition } from '../lib/geo';
 import type { Radius, SettingsIn, SettingsOut } from '../operations';
 import { attendanceTabs } from '../tabs';
@@ -246,18 +245,17 @@ async function useMyLocation(): Promise<void> {
           data-testid="attendance-settings-require_location"
           label-placement="start"
           justify="space-between"
-          :disabled="!canEdit || !deviceModesKnown()"
+          :disabled="!canEdit"
           :checked="form.require_location"
           @ion-change="set('require_location', !!$event.detail.checked)"
         >
           {{ $t('attendance.settings.requireLocation') }}
         </ion-toggle>
         <InlineFeedback
-          v-if="!deviceModesKnown()"
           tone="info"
-          data-testid="attendance-settings-location-pending"
+          data-testid="attendance-settings-location-devices"
         >
-          {{ $t('attendance.settings.locationPending') }}
+          {{ $t('attendance.settings.locationDevices') }}
         </InlineFeedback>
         <ion-select
           data-testid="attendance-settings-geofence_radius_m"

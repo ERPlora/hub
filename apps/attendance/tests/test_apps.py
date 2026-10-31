@@ -66,8 +66,9 @@ def test_attendance_is_a_free_module_of_the_people_group():
     assert config in module_configs()
     assert config.category is Category.PEOPLE
     assert config.premium is False
-    # Its own icon: `ion:time-outline` is the Schedules app's on the apps page.
-    assert config.icon == "ion:log-in-outline"
+    # Its own icon, the fingerprint of the old module and of time clocks on the market (UI-REQUESTS.md),
+    # registered in the shell; `ion:time-outline` is the Schedules app's on the apps page.
+    assert config.icon == "ion:finger-print-outline"
     assert all(
         other.icon != config.icon for other in module_configs() if other is not config
     )

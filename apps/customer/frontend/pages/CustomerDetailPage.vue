@@ -37,7 +37,8 @@ const router = useRouter();
 const session = useSession();
 const canManage = computed(() => session.can('customer.manage'));
 const canDelete = computed(() => session.can('customer.delete'));
-const canMerge = computed(() => session.can('customer.merge'));
+// Whoever manages cards sees it too: without the permission, a manager approves it with their PIN (BASE-F84).
+const canMerge = computed(() => session.can('customer.merge') || session.can('customer.manage'));
 const canErase = computed(() => session.can('customer.erase'));
 const { t } = useCustomerI18n();
 

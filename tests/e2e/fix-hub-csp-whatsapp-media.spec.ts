@@ -10,9 +10,13 @@ import { expect, type Page, test } from '@playwright/test';
 
 import { A, login, onSaas, SAAS, shot, shown } from './helpers';
 import { FLOW_VIEWPORTS, noHorizontalScroll, settled } from './service-helpers';
-import { cleanUp, e2ePhone, PREFIX, pushChannel, receive } from './whatsapp-helpers';
+import { cleanUp, e2ePhone, keepPhoto, PREFIX, pushChannel, receive, restorePhoto } from './whatsapp-helpers';
 
-test.afterAll(() => cleanUp());
+test.beforeAll(keepPhoto);
+test.afterAll(() => {
+  cleanUp();
+  restorePhoto();
+});
 
 /** Where Meta keeps a customer's media: never reached from the Hub's page. */
 const META_CDN = 'https://mmg.whatsapp.net';
