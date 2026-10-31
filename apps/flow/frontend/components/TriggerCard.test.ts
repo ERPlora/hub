@@ -5,7 +5,7 @@
 import { Combo } from '@erplora/ui/components';
 import { describe, expect, it } from 'vitest';
 
-import type { CatalogOut, Trigger } from '../operations';
+import type { CatalogOut, FixedByAppOut, Trigger } from '../operations';
 import { click, ionValue, mountFlow } from '../__tests__/mount-flow';
 import ConditionRows from './ConditionRows.vue';
 import TriggerCard from './TriggerCard.vue';
@@ -99,6 +99,26 @@ describe('TriggerCard', () => {
     const sent = s.emitted().at(-1) as { kind: string; at: string };
     expect(sent.kind).toBe('at');
     expect(new Date(sent.at).getTime()).toBe(new Date('2026-11-01T09:00').getTime());
+  });
+
+  it('a condition its app puts on its «Only when…» is set by its app: its value changes, it never comes off (FLOW-F36)', async () => {
+    const fixedByApp: FixedByAppOut = { app: 'whatsapp_inbox', app_name: 'WhatsApp inbox', event: 'sale.sale.completed', filter: ['input.source'], pinned: {} };
+    const filter = { 'input.source': { eq: 'live' }, 'input.total': { gt: 10 } };
+    const m = await mountFlow(TriggerCard, {
+      props: { modelValue: { kind: 'event', event: 'sale.sale.completed', filter }, open: true, catalog: CATALOG, choices: [], steps: [], errors: {}, fixedByApp },
+    });
+    expect(m.find('flow-trigger-filter-remove-0').exists()).toBe(false);
+    expect((m.find('flow-trigger-filter-path-0').element as unknown as { disabled: boolean }).disabled).toBe(true);
+    expect((m.find('flow-trigger-filter-path-1').element as unknown as { disabled: boolean }).disabled).toBe(false);
+    expect(m.find('flow-trigger-filter-locked-0').text()).toBe('Set by WhatsApp inbox: you can change it, not take it off.');
+    // The owner's own condition still comes off.
+    expect(m.find('flow-trigger-filter-remove-1').exists()).toBe(true);
+    expect(m.find('flow-trigger-filter-locked-1').exists()).toBe(false);
+    // Started with something else, nothing of its app is on it.
+    const other = await mountFlow(TriggerCard, {
+      props: { modelValue: { kind: 'event', event: 'customer.group.deleted', filter }, open: true, catalog: CATALOG, choices: [], steps: [], errors: {}, fixedByApp },
+    });
+    expect(other.find('flow-trigger-filter-remove-0').exists()).toBe(true);
   });
 
   it('shows the server’s refusals next to their field', async () => {

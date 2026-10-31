@@ -2,7 +2,9 @@
 
 Pure: it reads nothing. The money of a line is ``unit_price × ratio`` (the quantity in the unit the
 price refers to, divided by its price quantity) with the line and ticket percents compounded, rounded
-once, half up. ``discount_amount`` is every discount given (line and ticket). A comp is charged at 0 and keeps its cost;
+once, half up. ``discount_amount`` is every discount given (line and ticket); ``ticket_discount_amount`` is
+the ticket's alone (its percent and its fixed amount): what the lines, each with its own discount, lose to it.
+A comp is charged at 0 and keeps its cost;
 a line a voucher pays (``covered``, SALE-F27) is worth 0, neither a discount nor a comp: the voucher was
 taxed when it was sold. A fixed ticket amount comes off after the
 percents, shared by weight (largest remainder, ties to the earlier line).
@@ -137,6 +139,8 @@ class Valuation:
     subtotal: int
     tax_total: int
     discount_amount: int
+    #: What the ticket discount (percent and fixed amount) takes off the lines, already discounted each.
+    ticket_discount_amount: int
     gift_total: int
     #: ``[{rate_pct, label, tax_type, regime, qualification, exempt_reason, base, tax}]`` in order of
     #: appearance: one entry per fiscal key and component.
@@ -178,6 +182,13 @@ def value(
         )
         for line in lines
     ]
+    # What each row paints: the line with its own discount only. The ticket's takes the rest off.
+    listed = [
+        0
+        if line.covered
+        else line_amount(line.unit_price, line.ratio, line_percent=line.line_percent, is_gift=line.is_gift)
+        for line in lines
+    ]
     # What the lines were worth before any discount (a comp is no discount: it is kept at cost; a line
     # a voucher pays is worth nothing to begin with).
     undiscounted = [
@@ -203,6 +214,7 @@ def value(
             max(0, amount - share)
             for amount, share in zip(amounts, shares, strict=True)
         ]
+    ticket_discount_amount = sum(listed) - sum(amounts)
 
     outs = [
         LineOut(key=line.key, tax_category_key=line.tax_category_key) for line in lines
@@ -289,6 +301,7 @@ def value(
         subtotal=subtotal,
         tax_total=tax_total,
         discount_amount=discount_amount,
+        ticket_discount_amount=ticket_discount_amount,
         gift_total=gift_total,
         breakdown=breakdown,
     )
