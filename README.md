@@ -89,7 +89,7 @@ Plan `docs/plans/2026-10-22-fase-2-tenencia.md` de erplora-next; reglas en PLAN-
   sitio, `no_cluster_available`; y clona `<control>_template[_<vertical>]` de ese cluster con `CREATE DATABASE …
   TEMPLATE`, privada: nada a `PUBLIC`, `CONNECT, TEMPORARY` a `hub_app` y `hub_admin`), `migrating` (lleva a la hoja
   las apps que la plantilla ya tiene, más `base`, y anota `schema_apps = {app: su última migración}`), `seeding` (la foto
-  del SaaS guardada en la fila, para las apps encendidas) y `ready` (el SaaS lo oye tras el COMMIT). Cada paso escribe
+  del SaaS guardada en la fila: sus personas y los bloques de las apps encendidas) y `ready` (el SaaS lo oye tras el COMMIT). Cada paso escribe
   control en una transacción corta (`base/services.py`, «The provisioning's writes in control») y se puede repetir. Un
   fallo deja `failed` con `attempts`, `last_error` (`<código>: <motivo>`: `no_cluster_available`, `template_missing`,
   `clone_failed`, `schema_failed`, `unexpected`) y `next_attempt_at` (1 min, 5 min, 15 min y luego cada hora). La
@@ -322,7 +322,8 @@ Control guarda el usuario de la sesión (`auth.User`, la copia `saas:<id>` de la
 `account_id` (la cuenta de erplora.com; ninguna para el dueño de una demo), nombre, correo, `is_active` y su alta. Nunca
 se borra: quien se va conserva su nombre en lo que firmó y deja de estar activo. Se crea o se pone al día en cada
 entrada (código de erplora.com, demo, PIN o tarjeta: `base.services.ensure_hub_user`), en la primera escritura de quien
-aún no la tiene (`acting_hub_user`) y desde la foto del SaaS (`base.hub_user.sync`, dentro de `hub.state_apply`). Las
+aún no la tiene (`acting_hub_user`) y desde la foto del SaaS (`base.hub_user.sync`, dentro de `hub.state_apply`; la de un negocio cuya BD aún se prepara, en
+su siembra). Las
 apps enlazan a ella, nunca a `settings.AUTH_USER_MODEL` (lint «(h)»): `staff` (registro y aprobación de ausencias),
 `attendance`, `task` y `whatsapp_inbox`; leen la de quien llama con `base.queries.hub_user_of`, y la tarjeta del
 asistente nombra a la persona por su id con `base.hub_user.get`. `base.session.me` da como `user.id` el de esa persona,

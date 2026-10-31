@@ -11,7 +11,9 @@ of its own (``base.services``, «The provisioning's writes in control»):
    ``base.tenancy.ops``), private to the environment's roles, with its identity (``base_hub_identity``);
 2. ``migrating``: the apps the clone has (its ``django_migrations``) and ``base`` are brought to the code's leaf through
    its migrator's alias (``base.tenancy.migrator.migrate_apps``: nothing to do when ``migrate_hubs`` kept the template
-   current) and noted in ``Hub.schema_apps`` (``{app: its leaf migration}``) with ``schema_state`` current;
+   current) and noted in ``Hub.schema_apps`` (``{app: its leaf migration}``) with ``schema_state`` current; until S3
+   (an app's tables made when it is turned on), every portable app's tables are made too, so that turning one on only
+   changes its row, as in phase 1;
 3. ``seeding``: inside ``use_hub``, the blocks of the SaaS's photo kept on the row for the apps it has on (none at
    birth: a business is born with every app off, PLAN §33);
 4. ``ready``, and the SaaS of a business hears it after the COMMIT (``base.services.report_ready``).
@@ -81,14 +83,17 @@ def provision(
     hub,
     *,
     now: dt.datetime | None = None,
-    apps: Iterable[str] = (),
+    apps: Iterable[str] | None = None,
     seed: Seed | None = None,
     tell_saas: bool = True,
 ) -> bool:
     """Make ``hub``'s database now, under its lease; whether it is ready after.
 
-    ``apps``: more apps than its template's whose tables it gets (``seed_local_hubs``: every app ``a`` and ``b`` turn
-    on); ``seed``: what its seeding writes, inside its database (``use_hub``), after the photo kept. A hub already
+    ``apps``: more apps than its template's whose tables it gets; ``None`` (the worker's pass too, :func:`run_due`):
+    every portable app's (``base.tenancy.migrator.portable_apps``). That is transitional, until S3 makes an app's
+    tables when it is turned on (``base.app.enable``, W6): meanwhile turning an app on only changes its row, as in phase
+    1, and a business born with every app off can turn any on. ``seed``: what its seeding writes, inside its database
+    (``use_hub``), after the photo kept. A hub already
     ready is left as it is (``True``); one that is not being prepared (cancelled, gone) or whose lease someone else
     holds is not touched (``False``). A failure is noted on the hub (``failed``), never raised. ``tell_saas=False``:
     the SaaS does not hear it is ready (the local hubs, which are no business of the SaaS's).
@@ -124,7 +129,8 @@ def drop(hub, *, now: dt.datetime | None = None) -> bool:
 def run_due(now: dt.datetime | None = None, *, limit: int = DUE_BATCH, budget: float = DUE_PASS_SECONDS) -> int:
     """The worker's pass over ``hub_due``: one hub at a time, each leased right before it is worked on (so no lease runs
     out while it waits its turn), up to ``limit`` hubs or ``budget`` seconds: make the databases still to make (a
-    failed one once its ``next_attempt_at`` came) and drop the demos that ended (a failed drop once its wait is over);
+    failed one once its ``next_attempt_at`` came; with every portable app's tables until S3: :func:`provision`) and drop
+    the demos that ended (a failed drop once its wait is over);
     how many it worked on. A hub that fails is logged and given back: the others go on."""
     now = now or timezone.now()
     started = time.monotonic()
@@ -154,8 +160,11 @@ def run_due(now: dt.datetime | None = None, *, limit: int = DUE_BATCH, budget: f
     return worked
 
 
-def _prepare(hub_id, *, apps: Iterable[str] = (), seed: Seed | None = None, tell_saas: bool = True) -> None:
-    """The steps of a hub's preparation, its lease held; a failure is noted on it, a hub that left them is left."""
+def _prepare(hub_id, *, apps: Iterable[str] | None = None, seed: Seed | None = None, tell_saas: bool = True) -> None:
+    """The steps of a hub's preparation, its lease held; a failure is noted on it, a hub that left them is left.
+    ``apps=None``: every portable app's tables (until S3, :func:`provision`)."""
+    if apps is None:
+        apps = migrator.portable_apps()
     try:
         hub = services.place_hub(hub_id)
         hub = services.provision_step(hub_id, Hub.Status.CREATING, timezone.now(), LEASE)
