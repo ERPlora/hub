@@ -172,15 +172,25 @@ def cluster_delete(ctx: OperationContext, data: ClusterIdIn) -> dict:
     platform_admin_only(ctx)
     cluster = _locked(data.id)
     held = Hub.objects.filter(Q(cluster=cluster) | Q(moving_to=cluster)).count()
-    held += MovedCopy.objects.filter(cluster=cluster).count()
     if held:
         raise Conflict(
             ngettext(
-                "%(count)d hub is on this cluster: a cluster is only deleted once no hub is on it.",
-                "%(count)d hubs are on this cluster: a cluster is only deleted once no hub is on it.",
+                "%(count)d hub is on this cluster or moving to it: a cluster is only deleted once no hub is.",
+                "%(count)d hubs are on this cluster or moving to it: a cluster is only deleted once no hub is.",
                 held,
             )
             % {"count": held},
+            code="control.cluster_holds_hubs",
+        )
+    kept = MovedCopy.objects.filter(cluster=cluster).count()
+    if kept:
+        raise Conflict(
+            ngettext(
+                "%(count)d copy of a hub that moved is kept on this cluster for a few days: it is deleted after it.",
+                "%(count)d copies of hubs that moved are kept on this cluster for a few days: it is deleted after them.",
+                kept,
+            )
+            % {"count": kept},
             code="control.cluster_holds_hubs",
         )
     cluster.delete()

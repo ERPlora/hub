@@ -12,6 +12,7 @@ Only the platform's admins (staff and superuser) change anything; support reads.
 
 import json
 import re
+import uuid
 
 import pytest
 from django.conf import settings
@@ -393,3 +394,113 @@ def test_its_words_are_translated():
     with translation.override("es"):
         assert str(control_admin.ClusterAdmin.close_to_new_hubs.short_description) == "Cerrar a hubs nuevos"
         assert control_admin.no_limit() == "sin límite"
+
+
+class TestMoveToCluster:
+    """«Move to cluster…» (round 2026-10-30b of PLAN-DB, decision 3): the platform's admins choose hubs, then an open
+    cluster on a confirmation page; each is asked to move through ``control.hub.move`` (the worker moves it, its host
+    503 meanwhile). Support never sees it."""
+
+    @pytest.fixture(autouse=True)
+    def small(self, monkeypatch):
+        from control import queries
+
+        monkeypatch.setattr(queries, "_measure", lambda cluster, names: {name: 1024 for name in names})
+
+    @staticmethod
+    def a_hub(slug: str, **fields) -> Hub:
+        row = {"slug": slug, "status": Hub.Status.READY, "db_name": f"hub_{uuid.uuid7().hex}"}
+        return Hub.objects.create(**(row | fields))
+
+    @staticmethod
+    def choose(client, *hubs, **more):
+        data = {"action": "move_to_cluster", "_selected_action": [str(hub.pk) for hub in hubs]} | more
+        return client.post(HUBS, data, HTTP_HOST=PLATFORM, follow=True)
+
+    def test_asks_for_an_open_cluster_first_and_changes_nothing(self, client, root):
+        hub = self.a_hub("acme")
+        open_one = a_cluster(name="cluster-2", host="writer-2.example")
+        a_cluster(name="cluster-closed", host="writer-9.example", is_open=False)
+
+        html = self.choose(client, hub).content.decode()
+
+        assert "Move to cluster" in html and "acme" in html
+        assert f'value="{open_one.pk}"' in html and "cluster-closed" not in html
+        assert 'name="apply"' in html
+        hub.refresh_from_db()
+        assert hub.moving_to_id is None
+
+    def test_confirmed_each_hub_is_asked_to_move_and_it_says_so(self, client, root):
+        first, second = self.a_hub("acme"), self.a_hub("bistro")
+        target = a_cluster(name="cluster-2", host="writer-2.example")
+
+        html = self.choose(client, first, second, apply="yes", cluster=str(target.pk)).content.decode()
+
+        assert "2 hubs will move to cluster-2" in html
+        for hub in (first, second):
+            hub.refresh_from_db()
+            assert hub.moving_to_id == target.pk
+        assert len(events("control.hub.move_requested")) == 2
+        on_cluster = row_of(page(client, HUBS), ">acme<")
+        assert "cluster-2" in on_cluster
+
+    def test_a_hub_the_operation_refuses_is_named_and_the_others_move(self, client, root):
+        ready, preparing = self.a_hub("acme"), self.a_hub("bistro", status=Hub.Status.REQUESTED)
+        target = a_cluster(name="cluster-2", host="writer-2.example")
+
+        html = self.choose(client, ready, preparing, apply="yes", cluster=str(target.pk)).content.decode().lower()
+
+        assert "bistro: only a ready hub with a database of its own moves." in html
+        assert "1 hub will move to cluster-2" in html
+        preparing.refresh_from_db()
+        assert preparing.moving_to_id is None
+
+    def test_without_a_cluster_chosen_it_asks_again(self, client, root):
+        hub = self.a_hub("acme")
+        a_cluster(name="cluster-2", host="writer-2.example")
+
+        html = self.choose(client, hub, apply="yes").content.decode()
+
+        assert 'name="apply"' in html and "errorlist" in html
+        hub.refresh_from_db()
+        assert hub.moving_to_id is None
+
+    def test_support_neither_sees_it_nor_runs_it(self, client, support):
+        hub = self.a_hub("acme")
+        target = a_cluster(name="cluster-2", host="writer-2.example")
+
+        assert "move_to_cluster" not in page(client, HUBS)
+        self.choose(client, hub, apply="yes", cluster=str(target.pk))
+
+        hub.refresh_from_db()
+        assert hub.moving_to_id is None
+
+
+def test_the_move_speaks_spanish():
+    from django.utils import translation
+    from django.utils.translation import gettext, ngettext
+
+    with translation.override("es"):
+        assert str(control_admin.HubAdmin.move_to_cluster.short_description) == "Mover a otro clúster…"
+        assert gettext("Only a ready hub with a database of its own moves.") == (
+            "Solo se mueve un hub listo con base de datos propia."
+        )
+        assert ngettext(
+            "%(count)d hub will move to %(cluster)s: closed for a few seconds while it moves.",
+            "%(count)d hubs will move to %(cluster)s: each closed for a few seconds while it moves.",
+            2,
+        ) % {"count": 2, "cluster": "c2"} == "2 hubs se moverán a c2: cada uno cerrado unos segundos mientras se mueve."
+
+
+def test_its_confirmation_page_speaks_spanish(client, root):
+    hub = Hub.objects.create(slug="acme", status=Hub.Status.READY, db_name=f"hub_{uuid.uuid7().hex}")
+    a_cluster(name="cluster-2", host="writer-2.example")
+
+    html = client.post(
+        HUBS,
+        {"action": "move_to_cluster", "_selected_action": [str(hub.pk)]},
+        HTTP_HOST=PLATFORM,
+        HTTP_ACCEPT_LANGUAGE="es",
+    ).content.decode()
+
+    assert "Cada hub elegido se cierra unos segundos" in html and 'value="Moverlos"' in html

@@ -22,9 +22,11 @@ from django.contrib import admin, messages
 from django.contrib.admin.views.main import ChangeList
 from django.db.models import Count, Q
 from django.http import HttpRequest, HttpResponseRedirect
+from django.contrib.admin import helpers
 from django.template.defaultfilters import filesizeformat
+from django.template.response import TemplateResponse
 from django.urls import reverse
-from django.utils.translation import gettext_lazy, ngettext, pgettext, pgettext_lazy
+from django.utils.translation import gettext, gettext_lazy, ngettext, pgettext, pgettext_lazy
 from live.context import OperationContext
 from live.errors import OperationError
 
@@ -32,8 +34,8 @@ from base import admin as base_admin
 from base.registry import REGISTRY_SCOPE
 from control.models import Cluster, Hub
 from control.queries import cluster_sizes
-from control.schemas import ClusterIdIn, ClusterIn, ClusterSizesIn, ClusterUpdateIn
-from control.services import CLUSTER_FIELDS, cluster_close, cluster_create, cluster_delete, cluster_update
+from control.schemas import ClusterIdIn, ClusterIn, ClusterSizesIn, ClusterUpdateIn, HubMoveIn
+from control.services import CLUSTER_FIELDS, cluster_close, cluster_create, cluster_delete, cluster_update, hub_move
 
 
 def staff_context(request: HttpRequest) -> OperationContext:
@@ -243,6 +245,20 @@ class ClusterAdmin(admin.ModelAdmin):
             return HttpResponseRedirect(reverse("admin:control_cluster_change", args=[object_id]))
 
 
+class MoveToClusterForm(forms.Form):
+    """The cluster the chosen hubs move to: an open one (``control.hub.move`` checks its room, hub by hub)."""
+
+    cluster = forms.ModelChoiceField(
+        queryset=Cluster.objects.filter(is_open=True).order_by("name"),
+        label=gettext_lazy("cluster"),
+        empty_label=None,
+    )
+
+
+#: The confirmation page of «Move to cluster…».
+MOVE_TEMPLATE = "admin/control/hub/move_to_cluster.html"
+
+
 # The registry's admin is base's (read only, «Expire now»); control's adds where each hub's data lives.
 admin.site.unregister(Hub)
 
@@ -265,7 +281,49 @@ class HubAdmin(base_admin.HubAdmin):
         "created_at",
     )
     list_filter = ("status", "cluster", "schema_state", "is_demo")
-    list_select_related = ("cluster",)
+    list_select_related = ("cluster", "moving_to")
+    actions = [*base_admin.HubAdmin.actions, "move_to_cluster"]
+
+    @admin.action(description=gettext_lazy("Move to cluster…"), permissions=["move"])
+    def move_to_cluster(self, request: HttpRequest, queryset):
+        """Choose an open cluster on a confirmation page, then ask each chosen hub to move there
+        (``control.hub.move``): the worker moves it, its host answering 503 «maintenance» meanwhile."""
+        form = MoveToClusterForm(request.POST if "apply" in request.POST else None)
+        if not form.is_bound or not form.is_valid():
+            context = {
+                **self.admin_site.each_context(request),
+                "title": gettext("Move to cluster"),
+                "opts": self.model._meta,
+                "hubs": queryset,
+                "form": form,
+                "action_checkbox_name": helpers.ACTION_CHECKBOX_NAME,
+            }
+            return TemplateResponse(request, MOVE_TEMPLATE, context)
+        target = form.cleaned_data["cluster"]
+        ctx = staff_context(request)
+        asked = 0
+        for hub in queryset:
+            try:
+                hub_move(ctx, HubMoveIn(hub=hub.pk, cluster=target.pk))
+            except OperationError as refused:
+                self.message_user(request, f"{hub.slug}: {refused.message}", messages.ERROR)
+                continue
+            asked += 1
+        if asked:
+            self.message_user(
+                request,
+                ngettext(
+                    "%(count)d hub will move to %(cluster)s: closed for a few seconds while it moves.",
+                    "%(count)d hubs will move to %(cluster)s: each closed for a few seconds while it moves.",
+                    asked,
+                )
+                % {"count": asked, "cluster": target.name},
+                messages.SUCCESS,
+            )
+        return None
+
+    def has_move_permission(self, request: HttpRequest) -> bool:
+        return is_platform_admin(request)
 
     def get_changelist(self, request: HttpRequest, **kwargs):
         return SizedChangeList
@@ -284,7 +342,8 @@ class HubAdmin(base_admin.HubAdmin):
 
     @admin.display(description=gettext_lazy("cluster"), ordering="cluster__name")
     def on_cluster(self, hub: Hub) -> str:
-        return hub.cluster.name if hub.cluster_id else self.get_empty_value_display()
+        here = hub.cluster.name if hub.cluster_id else self.get_empty_value_display()
+        return f"{here} → {hub.moving_to.name}" if hub.moving_to_id else here
 
     @admin.display(description=pgettext_lazy("hub database", "size"))
     def database_size(self, hub: Hub) -> str:
