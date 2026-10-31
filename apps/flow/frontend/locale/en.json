@@ -88,10 +88,7 @@
       "hidden": "Some automations your apps bring are hidden: they need {apps}.",
       "invalid": "«{name}» cannot be offered: {reason}",
       "loadError": "The automations your apps bring could not be read.",
-      "repairNotice": "«{name}» was set up with an older version of {app} that starts in more cases than it should.",
-      "repairHint": "Updating it only changes when it starts: its steps, permissions and switch stay as they are.",
-      "repair": "Update it",
-      "repaired": "«{name}» now only starts when it should."
+      "setByApp": "Set by {app}: you can change it, not take it off."
     },
     "gallery": {
       "heading": "Ready-made automations",

@@ -12,6 +12,7 @@ import { computed, ref, watch } from 'vue';
 
 import { refusalFields, refusalOutsideFields } from '../lib/apiErrors';
 import { colorOptions } from '../lib/colors';
+import { withApproval } from '../../../../base/frontend/lib/approval';
 import { useCustomerI18n } from '../lib/useCustomerI18n';
 import type { GroupRow } from '../operations';
 
@@ -62,8 +63,10 @@ async function save(): Promise<void> {
     sort_order: Number(order.value) || 0,
   };
   try {
-    if (props.group) await update.run({ id: props.group.id, ...fields, is_active: active.value });
-    else await create.run(fields);
+    // A manager's PIN lets an employee create or change it (BASE-F84, `apps.py` `approvals`).
+    const editing = props.group;
+    if (editing) await withApproval(() => update.run({ id: editing.id, ...fields, is_active: active.value }));
+    else await withApproval(() => create.run(fields));
   } catch {
     return; // the form paints the refusal.
   }

@@ -1458,7 +1458,7 @@ def preview(ctx: OperationContext, params: PreviewIn) -> dict:
         "tax_total": valuation.tax_total,
         "discount_amount": valuation.discount_amount,
         "discount_percent": percent,
-        "ticket_discount_amount": amount,
+        "ticket_discount_amount": valuation.ticket_discount_amount,
         "gift_total": valuation.gift_total,
         "total": valuation.total,
         "breakdown": breakdown_rows(valuation.breakdown),

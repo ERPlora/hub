@@ -2378,8 +2378,9 @@ Pasos:
      dinero, sale en la moneda del negocio (nunca en céntimos), también dentro de un dato que agrupa otros, y el
      asistente lo entiende igual aunque la app cambie cómo lo explica: «a 15 €» sale «15,00 €», nunca «1500». Si la
      acción nombra su propia moneda, sale en ella y con sus decimales, como en Stripe o Square: un pago en dólares dice
-     «15,00 $», y en yenes, sin decimales; una moneda que no existe no se inventa: el importe sale tal como se
-     escribió y la acción la rechaza al ejecutarse. Si la acción se hace sobre algo que tiene su propia moneda, sale en
+     «15,00 $», y en yenes, sin decimales; una moneda que no existe no se inventa: si la acción ya no la acepta en sus
+     datos, no sale tarjeta (ver «Si falla»); si no, el importe sale tal como se escribió y la acción la rechaza al
+     ejecutarse. Si la acción se hace sobre algo que tiene su propia moneda, sale en
      la de eso: añadir una línea a un carrito en dólares dice «12,50 $», y poner un precio en una tarifa en yenes,
      «1500 ¥»; si eso no se puede leer (no existe o quien pregunta no puede verlo), el importe sale tal como se
      escribió y lo decide la acción. Todos los importes de una tarjeta se escriben igual, arriba o dentro de un dato
@@ -2413,8 +2414,9 @@ Entra: la acción, sus datos y su riesgo, tal como los declara su app; la moneda
 que se hace (leída como la persona) y, en «Lo que va a pasar», la que dé su app; la zona horaria del negocio.
 Sale: si se acepta, la acción hecha en su app, con el mismo evento que si se hubiera pulsado su botón.
 Si falla: una acción que su app rechaza vuelve al asistente como error y él lo cuenta; el recibo dice «No se hizo,
-falló: …». Si se recarga la página con la tarjeta abierta no se hace nada, y la respuesta acaba en «La respuesta se
-cortó.» con «Reintentar».
+falló: …». Unos datos que la acción no acepta (un país o una moneda que no existe, un valor fuera de su lista) no
+llegan a la tarjeta: vuelven al asistente, que los corrige, y la persona confirma una sola vez. Si se recarga la
+página con la tarjeta abierta no se hace nada, y la respuesta acaba en «La respuesta se cortó.» con «Reintentar».
 Implicados: BASE-F98, BASE-F99, BASE-F101
 
 ### BASE-F98 Acciones peligrosas: escribir para confirmar, o no desde el chat

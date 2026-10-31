@@ -21,8 +21,10 @@ const props = defineProps<{
   steps: readonly Step[];
   catalog: CatalogOut | null;
   /** Prefix of the hooks: `<testid>-row-<n>`, `-path-<n>`, `-op-<n>`, `-value-<n>`, `-pill-<n>`, `-unpill-<n>`,
-   *  `-insert-<n>`, `-remove-<n>`, `-add`. */
+   *  `-insert-<n>`, `-remove-<n>`, `-locked-<n>`, `-add`. */
   testid: string;
+  /** The data an app puts a condition on (FLOW-F36): their rows keep their datum and never come off; the value changes. */
+  lockedBy?: { app: string; paths: readonly string[] } | null;
   /** Opens the editor's picker; the chosen path, or `null`. Without it a datum cannot be picked as the value. */
   pick?: () => Promise<string | null>;
 }>();
@@ -114,6 +116,9 @@ function add(): void {
 function remove(index: number): void {
   send(rows.value.filter((_, i) => i !== index));
 }
+
+/** Whether row `row`'s datum is one an app puts a condition on. */
+const locked = (row: ConditionRow): boolean => !!row.path && !!props.lockedBy?.paths.includes(row.path);
 </script>
 
 <template>
@@ -133,6 +138,7 @@ function remove(index: number): void {
         mode="md"
         interface="popover"
         :interface-options="DATA_LIST"
+        :disabled="locked(row)"
         @ion-change="setPath(index, String($event.detail.value))"
       >
         <IonSelectOption
@@ -219,8 +225,14 @@ function remove(index: number): void {
           class="flow-conditions__hint"
           :data-testid="`${testid}-hint-${index}`"
         >{{ $t('flow.steps.inHint') }}</span>
+        <span
+          v-if="locked(row)"
+          class="flow-conditions__hint"
+          :data-testid="`${testid}-locked-${index}`"
+        >{{ $t('flow.recipes.setByApp', { app: lockedBy?.app }) }}</span>
       </div>
       <IonButton
+        v-if="!locked(row)"
         fill="clear"
         color="medium"
         :data-testid="`${testid}-remove-${index}`"

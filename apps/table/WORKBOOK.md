@@ -327,8 +327,8 @@ Pasos:
 1. En **Mesas → Zonas**, «Editar»: cambia Nombre, Descripción, Color, Orden o «Activa» y pulsa
    «Guardar cambios». En el plano, el lápiz («Editar zona») cambia Nombre y Descripción.
 2. Para borrarla (solo el administrador): «Borrar» abre «¿Borrar la zona?» con «N mesas en esta zona.
-   Una zona con mesas no se puede borrar: mueve o borra antes sus mesas.»; con mesas, «Borrar zona»
-   sale apagado.
+   Una zona con mesas no se puede borrar: mueve o borra antes sus mesas.» (con una sola, «1 mesa en esta
+   zona. … muévela o bórrala antes.»); con mesas, «Borrar zona» sale apagado.
 3. Sin mesas, «Borrar zona» la quita de la lista y del plano.
 Entra: la zona elegida.
 Sale: la zona cambiada (avisa: `table.zone.updated`) o borrada (avisa: `table.zone.deleted`).
@@ -419,8 +419,8 @@ Estado: hecho
 Actor: empleado, responsable
 Pantalla: Plano de sala (Servicio)
 Pasos:
-1. En **Plano de sala → Servicio**, toca una mesa Ocupada: se abre su ventana con comensales, desde
-   cuándo, camarero y cliente.
+1. En **Plano de sala → Servicio**, toca una mesa Ocupada: se abre su ventana con comensales («1
+   comensal», «3 comensales»), desde cuándo, camarero y cliente.
 2. **Cobrar** lleva a **Ventas → Vender** con esa cuenta en pantalla (`/sale/pos?order=<id>`); allí se
    añaden rondas y se cobra.
 3. Con dos cuentas en la mesa (dividida), se elige primero la cuenta («Cuenta 1», «Cuenta 2»).
@@ -604,7 +604,7 @@ Pasos:
 1. En **Mesas → Sesiones → Abiertas**, «Cerrar sesión» (o «Cerrar mesa» en la ventana de la mesa).
 2. Confirma en «¿Cerrar la sesión?»: «Mesa N · N comensales. La mesa queda libre y la sesión pasa al
    histórico. Si su cuenta sigue abierta en Ventas, primero cóbrala, pásala a otra mesa o elimínala
-   desde el TPV.».
+   desde el TPV.» (con uno solo, «1 comensal»).
 3. Si su cuenta de Ventas está vacía (nadie pidió nada), Mesas la anula y cierra la mesa: un grupo que
    se levanta sin pedir no necesita a un responsable.
 4. Si su cuenta tiene algo pedido, no se cierra nada: se cobra (TABLE-F18), se pasa a otra mesa

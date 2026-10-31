@@ -1063,7 +1063,7 @@ class PreviewOut(Schema):
     discount_amount: int = Field(description="Every discount given, in cents.")
     discount_percent: Decimal = Field(description="Ticket discount in %.")
     ticket_discount_amount: int = Field(
-        description="Fixed ticket discount in cents applied to this charge."
+        description="What the ticket discount (its percent and its fixed amount) takes off this charge, in cents."
     )
     gift_total: int = Field(description="Comps at cost, in cents.")
     total: int = Field(description="What would be charged, in cents.")
