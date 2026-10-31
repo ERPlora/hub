@@ -1642,6 +1642,7 @@
       "descending": "Descending",
       "destination": "Destination",
       "device": "Device",
+      "device_id": "Device",
       "difference": "Difference",
       "difference_max": "Difference max",
       "difference_min": "Difference min",
