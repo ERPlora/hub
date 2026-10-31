@@ -6,7 +6,8 @@
 // The owner turned «Book a table» on before its app fixed whose card its assistant acts for (hub#447) and before it left
 // out the inbox's old messages: its «Ask the assistant» step (`s10`) has no fixed data, its «Only when…» has no
 // `source` and it is «New version». Nothing waits for the owner: Automatizaciones shows no notice for it, its editor
-// shows the condition and the fixed data its app puts on it, an old message of the inbox starts nothing, and when a
+// shows the condition and the fixed data its app puts on it as set by its app (never to take off from there, and saved
+// untouched they are written), an old message of the inbox starts nothing, and when a
 // guest asks to cancel another guest's table the assistant is not offered on whose behalf, the card of «Waiting for
 // your answer» says the writer's, and after the «Approve» the other guest's reservation is as it was.
 // flow: FLOW-F36 FLOW-F38 FLOW-F29
@@ -28,6 +29,8 @@ const CANCEL = 'reservation.reservation.cancel';
 /** How the book's slot and the open day this spec makes are known again (slots have no name). */
 const SENTINEL = 78;
 const OPEN_REASON = 'E2E factory safety fix open';
+/** What the editor says of a condition or a fixed datum its app puts on it, which never comes off from there. */
+const SET_BY = 'Set by WhatsApp inbox: you can change it, not take it off.';
 const PROVIDER_PORT = Number(process.env.E2E_AI_PROVIDER_PORT ?? STACK.hubPort + 2);
 const SAAS_DB = process.env.E2E_SAAS_DB ?? (STACK.hubPort === 8000 ? 'saas' : `saas_e2e_${STACK.hubPort + 1}`);
 
@@ -178,14 +181,26 @@ for (const viewport of VIEWPORTS) {
       // Its editor shows, under «Fixed data» of the assistant's step, the card its app fixes on a cancellation.
       await page.goto(`/flow/automations/${flowId}`);
       const editor = shown(page);
-      // Its «Only when…»: the inbound messages, and only the live ones, as its app has it today.
+      // Its «Only when…»: the inbound messages, and only the live ones, as its app has it today. Both are its app's:
+      // set by it, never to remove from here (FLOW-F36).
       await editor.locator('[data-testid=flow-trigger-open]').click();
       await expect(editor.locator('[data-testid^=flow-trigger-filter-row-]')).toHaveCount(2);
+      const locked = editor.locator('[data-testid^=flow-trigger-filter-locked-]');
+      await expect(locked).toHaveText([SET_BY, SET_BY]);
+      await expect(editor.locator('[data-testid^=flow-trigger-filter-remove-]')).toHaveCount(0);
+      await locked.last().scrollIntoViewIfNeeded();
+      await noHorizontalScroll(page, viewport.label);
+      await settled(page);
+      await capture(page, `${KEY}-editor-filter-${viewport.label}`);
       await editor.locator('[data-testid=flow-step-open-s10]').click();
       const pin = editor.locator(`[data-testid="flow-assistant-pin-s10-${CANCEL}-on_behalf_of"]`);
       await expect(pin).toContainText('Cancel a reservation › On behalf of the customer');
       await expect(editor.locator('[data-testid=flow-assistant-nopins-s10]')).toHaveCount(0);
-      await pin.scrollIntoViewIfNeeded();
+      // Its datum is its app's too: no ×, only its value would change.
+      const setBy = editor.locator(`[data-testid="flow-assistant-setbyapp-s10-${CANCEL}-on_behalf_of"]`);
+      await expect(setBy).toHaveText(SET_BY);
+      await expect(editor.locator(`[data-testid="flow-assistant-unpin-s10-${CANCEL}-on_behalf_of"]`)).toHaveCount(0);
+      await setBy.scrollIntoViewIfNeeded();
       await noHorizontalScroll(page, viewport.label);
       await settled(page);
       await capture(page, `${KEY}-editor-${viewport.label}`);
@@ -263,6 +278,13 @@ for (const viewport of VIEWPORTS) {
       expect(psql(`select count(*) from flow_flow, jsonb_array_elements(steps) as step where id = '${flowId}' and step ? 'pinned'`)).toBe('0');
       expect(psql(`select trigger_filter ? 'input.source' from flow_flow where id = '${flowId}'`)).toBe('f');
       expect(psql(`select enabled from flow_flow where id = '${flowId}'`)).toBe('t');
+
+      // Saved from its editor without touching anything, it is taken, and what its app fixes is written down.
+      await page.goto(`/flow/automations/${flowId}`);
+      await shown(page).locator('[data-testid=flow-editor-save]').click();
+      await expect(shown(page).locator('[data-testid=flow-editor-notice]')).toHaveText('Saved.');
+      expect(psql(`select trigger_filter->'input.source'->>'eq' from flow_flow where id = '${flowId}'`)).toBe('live');
+      expect(psql(`select count(*) from flow_flow, jsonb_array_elements(steps) as step where id = '${flowId}' and step->'pinned' ? '${CANCEL}'`)).toBe('1');
     } finally {
       await context.close();
     }
