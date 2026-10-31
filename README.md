@@ -208,7 +208,8 @@ La e2e de punta a punta es `tests/e2e/demo.spec.ts` (cómo correrla: `tests/e2e/
 `use_hub`, 3 s por tick como mucho y el siguiente tick sigue por el próximo hub), reparte su outbox, escribe una vez por
 proceso el calendario de sus apps en su BD y corre las tareas que tocan de sus apps encendidas en su propio ámbito (su
 aviso vivo sale por su canal); y al final hace las BD de los hubs debidos en `HubDue` y borra las de las demos que
-acabaron (`base/tenancy/provision.py`, «Tenencia», «Alta»). El reparto lleva cada evento nuevo a las reacciones de las apps que lo escuchan (el
+acabaron (`base/tenancy/provision.py`, «Tenencia», «Alta»). Con `--databases-only` solo hace esto último (las BD y
+las demos que acaban): es el worker del e2e, cuyas specs juegan ellas mismas el reparto y las tareas. El reparto lleva cada evento nuevo a las reacciones de las apps que lo escuchan (el
 `REACTIONS` de su `events.py`; `"*"` = todo evento de las demás): la venta cobrada baja el stock y cuenta en la ficha
 del cliente, la ronda enviada abre su comanda en cocina, etc. Cada app lo recibe **una vez** (`base.EventDelivery`, en
 la misma transacción que su reacción), como el sistema y en el ámbito del hub que lo anotó (su aviso vivo sale por el
