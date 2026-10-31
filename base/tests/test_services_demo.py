@@ -1,8 +1,9 @@
-"""The demo hubs (plan 2026-10-17, §1.5–§1.7): an empty hub for one browser of the SaaS, entered with a one-time code,
-purged by the worker once its hour is up.
+"""The demo hubs (plan 2026-10-17, §1.5–§1.7; round 2026-10-30 of PLAN-DB, S2a): an empty hub with a database of its
+own for one browser of the SaaS, entered with a one-time code, dropped and purged by the worker once its hour is up.
 
 ``base.demo.create`` (``POST /internal/demos``) gives a browser, named by the sha256 of its SaaS token, its live demo
-or a new ``demo-<8 hex>`` up to ``MAX_CONCURRENT_DEMOS``; ``base.demo.code_create`` (``POST …/{slug}/codes``) a code
+or a new ``demo-<8 hex>`` up to ``MAX_CONCURRENT_DEMOS``, ``requested`` until the worker makes its database
+(``base/tenancy/tests/test_provision.py``; here :func:`ready` stands in for it); ``base.demo.code_create`` (``POST …/{slug}/codes``) a code
 of a minute for the browser that owns it, which the demo's ``/auth/callback`` redeems here (``redeem_demo_code``) and
 turns into a session as ``demo:<slug>``, the owner (``open_demo_session``). ``base.demo.expire`` ends one now; the
 reaper (``reap_demos``) purges those that ended and, after ``DEMO_TOMBSTONE_DAYS``, forgets them.
@@ -14,6 +15,7 @@ import hashlib
 import logging
 import re
 import threading
+import uuid
 
 import pydantic
 import pytest
@@ -27,6 +29,9 @@ from live.models import OutboxEvent
 
 from base import registry, services
 from base.models import DemoCode, Hub, Membership
+from base.tenancy import names, ops, provision
+from base.tenancy.connections import control_name
+from control.models import HubDue
 from base.queries import demo_get
 from base.schemas import DemoCodeIn, DemoCreateIn, DemoSlugIn
 from base.services import (
@@ -55,6 +60,12 @@ def create(session_key: str = ANA, **changes):
     return demo_create(SYSTEM, DemoCreateIn(session_key=session_key, **changes))
 
 
+def ready(answer):
+    """The worker made the demo's database (``base.tenancy.provision``): it is ready."""
+    Hub.objects.filter(slug=answer.slug).update(status="ready", ready_at=timezone.now())
+    return answer
+
+
 def code_for(slug: str, session_key: str = ANA, language: str = "en"):
     return demo_code_create(SYSTEM, DemoCodeIn(slug=slug, session_key=session_key, language=language))
 
@@ -81,30 +92,34 @@ def a_request(rf):
 
 def entered(rf, slug: str, session_key: str = ANA):
     """The demo ``slug`` as its browser leaves it once inside: a code spent and the owner's session open."""
+    Hub.objects.filter(slug=slug).update(status="ready")
     redeemed = redeem_demo_code(slug, code_for(slug, session_key).code)
     open_demo_session(a_request(rf), redeemed.hub)
     return redeemed
 
 
 class TestCreate:
-    def test_a_new_demo_is_an_empty_hub_of_its_own_ready_for_an_hour(self, settings):
+    def test_a_new_demo_is_requested_with_a_database_of_its_own_to_make_for_an_hour(self, settings):
         settings.DEMO_TTL_MINUTES = 60
         before = timezone.now()
         answer = create(vertical="restaurant", language="es")
         after = timezone.now()
-        assert answer.created is True
+        assert (answer.created, answer.status) == (True, "requested")
         assert re.fullmatch(r"demo-[0-9a-f]{8}", answer.slug)
         hub = Hub.objects.get(slug=answer.slug)
         assert (hub.id, hub.is_demo, hub.status, hub.vertical, hub.language, hub.demo_session_key) == (
             answer.id,
             True,
-            "ready",
+            "requested",
             "restaurant",
             "es",
             ANA,
         )
         assert before + 60 * MINUTE <= hub.expires_at <= after + 60 * MINUTE
-        assert answer.expires_at == hub.expires_at and hub.ready_at is not None
+        assert answer.expires_at == hub.expires_at and hub.ready_at is None
+        # Its own database, never control's (round 2026-10-30, decision 1), made by the worker it is due in.
+        assert hub.db_name == names.demo_db_name(control_name(), hub.id)
+        assert HubDue.objects.get(pk=hub.pk).lease_until is None
         assert events("base.demo.created") == [{"id": str(hub.id), "slug": hub.slug, "vertical": "restaurant"}]
 
     def test_its_hour_is_the_setting_s(self, settings):
@@ -118,6 +133,35 @@ class TestCreate:
         assert (again.created, again.id, again.slug, again.expires_at) == (False, first.id, first.slug, first.expires_at)
         assert Hub.objects.filter(is_demo=True).count() == 1
         assert len(events("base.demo.created")) == 1
+
+    @pytest.mark.parametrize("status", ["requested", "creating", "migrating", "seeding", "ready"])
+    def test_a_demo_still_being_made_is_the_browsers_live_one_too(self, status):
+        first = create()
+        Hub.objects.filter(slug=first.slug).update(status=status)
+        again = create()
+        assert (again.created, again.slug, again.status) == (False, first.slug, status)
+
+    def test_a_demo_whose_preparation_failed_is_no_live_one_the_browser_gets_another(self):
+        failed = create()
+        Hub.objects.filter(slug=failed.slug).update(status="failed", attempts=1)
+        HubDue.objects.filter(pk=failed.id).delete()
+        again = create()
+        assert again.created and again.slug != failed.slug and again.status == "requested"
+        # The failed one ends: its database (if any) is dropped by the reaper, as a demo that ran out.
+        assert Hub.objects.get(slug=failed.slug).status == "expired"
+        assert HubDue.objects.filter(pk=failed.id).exists()
+
+    def test_a_failed_demo_of_another_browser_never_takes_a_place_under_the_cap(self, settings):
+        settings.MAX_CONCURRENT_DEMOS = 1
+        Hub.objects.filter(slug=create(ANA).slug).update(status="failed")
+        assert create(BEA).created
+
+    def test_demos_still_being_made_count_against_the_cap(self, settings):
+        settings.MAX_CONCURRENT_DEMOS = 1
+        create(ANA)
+        with pytest.raises(OperationError) as full:
+            create(BEA)
+        assert full.value.code == "base.demo_full"
 
     def test_another_browser_gets_another_demo(self):
         assert create(ANA).slug != create(BEA).slug
@@ -233,8 +277,20 @@ def at_once(*calls):
 
 
 class TestCodeCreate:
-    def test_the_owner_gets_a_one_time_code_of_a_minute_kept_by_its_hash(self):
+    def test_a_demo_being_made_gives_no_code_yet(self):
         demo = create()
+        with pytest.raises(OperationError) as preparing:
+            code_for(demo.slug)
+        assert (preparing.value.status, preparing.value.code) == (503, "base.hub_preparing")
+        assert not DemoCode.objects.exists()
+
+    def test_another_browser_never_learns_a_demo_is_being_made(self):
+        demo = create(ANA)
+        with pytest.raises(PermissionDenied):
+            code_for(demo.slug, BEA)
+
+    def test_the_owner_gets_a_one_time_code_of_a_minute_kept_by_its_hash(self):
+        demo = ready(create())
         before = timezone.now()
         answer = code_for(demo.slug, language="es")
         after = timezone.now()
@@ -247,7 +303,7 @@ class TestCodeCreate:
         assert events("base.demo.code_created") == [{"slug": demo.slug}]
 
     def test_every_code_is_another(self):
-        demo = create()
+        demo = ready(create())
         assert code_for(demo.slug).code != code_for(demo.slug).code
         assert DemoCode.objects.count() == 2
 
@@ -285,7 +341,7 @@ class TestCodeCreate:
 
 class TestRedeem:
     def test_a_code_opens_once(self):
-        demo = create()
+        demo = ready(create())
         code = code_for(demo.slug).code
         redeemed = redeem_demo_code(demo.slug, code)
         assert redeemed.hub.slug == demo.slug and redeemed.used_at is not None
@@ -293,26 +349,26 @@ class TestRedeem:
         assert redeem_demo_code(demo.slug, code) is None
 
     def test_a_code_past_its_minute_is_refused(self):
-        demo = create()
+        demo = ready(create())
         code = code_for(demo.slug).code
         assert redeem_demo_code(demo.slug, code, now=timezone.now() + dt.timedelta(seconds=61)) is None
         assert DemoCode.objects.get().used_at is None
 
     def test_a_code_of_another_demo_is_refused_and_stays_unspent(self):
-        mine, other = create(ANA), create(BEA)
+        mine, other = ready(create(ANA)), ready(create(BEA))
         code = code_for(mine.slug).code
         assert redeem_demo_code(other.slug, code) is None
         assert redeem_demo_code(mine.slug, code) is not None
 
     def test_a_code_of_a_demo_that_ran_out_is_refused(self):
-        demo = create()
+        demo = ready(create())
         code = code_for(demo.slug).code
         lapse(demo.slug)
         assert redeem_demo_code(demo.slug, code) is None
 
     @pytest.mark.parametrize("code", [None, "", "   ", "not-a-code"])
     def test_no_code_or_an_unknown_one_is_refused(self, code):
-        demo = create()
+        demo = ready(create())
         code_for(demo.slug)
         assert redeem_demo_code(demo.slug, code) is None
 
@@ -396,12 +452,20 @@ class TestExpire:
         with pytest.raises(PermissionDenied) as refused:
             demo_expire(a_user_context(**fields), DemoSlugIn(slug=demo.slug))
         assert refused.value.code == "base.internal_only"
-        assert Hub.objects.get(slug=demo.slug).status == "ready"
+        assert Hub.objects.get(slug=demo.slug).status == "requested"
+
+    @pytest.mark.parametrize("status", ["requested", "creating", "failed", "ready"])
+    def test_a_demo_still_being_made_is_ended_too_and_due_to_be_dropped(self, status):
+        demo = create()
+        Hub.objects.filter(slug=demo.slug).update(status=status)
+        HubDue.objects.filter(pk=demo.id).delete()
+        assert demo_expire(SYSTEM, DemoSlugIn(slug=demo.slug)).status == "expired"
+        assert HubDue.objects.filter(pk=demo.id).exists()
 
 
 class TestGet:
     def test_answers_a_demo_s_status(self):
-        demo = create()
+        demo = ready(create())
         answer = demo_get(SYSTEM, DemoSlugIn(slug=demo.slug))
         assert (answer.slug, answer.status, answer.expires_at) == (demo.slug, "ready", demo.expires_at)
 
@@ -468,16 +532,61 @@ class TestReaper:
         monkeypatch.setattr(services, "purge_demo_data", purge)
         with caplog.at_level(logging.ERROR, logger="base.services"):
             assert reap_demos() == 1
-        assert Hub.objects.get(slug=first.slug).status == "ready"
+        # Its purge was undone; it stays on its way out (410) and due again, its lease given back.
+        first_hub = Hub.objects.get(slug=first.slug)
+        assert first_hub.status == "dropping" and registry.is_gone(first_hub)
+        assert HubDue.objects.get(pk=first_hub.pk).lease_until is None
         assert Hub.objects.get(slug=second.slug).status == "purged"
         assert first.slug in caplog.text
+
+    def test_a_demo_whose_drop_fails_waits_longer_each_time_and_is_not_tried_before(self, monkeypatch):
+        """Review of hub#471 (I3): a drop the server refuses is noted on the demo (``attempts``, ``last_error``,
+        ``next_attempt_at``: 1 min, 5 min…) and its ``hub_due`` waits for it, never every tick of the worker."""
+        tried = []
+
+        def refused(hub):
+            tried.append(hub.slug)
+            raise RuntimeError("permission denied to terminate process")
+
+        monkeypatch.setattr(services, "purge_demo_data", refused)
+        demo = create()
+        lapse(demo.slug)
+        before = timezone.now()
+
+        assert reap_demos() == 0
+
+        hub = Hub.objects.get(slug=demo.slug)
+        assert (hub.status, hub.attempts) == ("dropping", 1)
+        assert hub.last_error.startswith("drop_failed: RuntimeError: permission denied")
+        assert before + MINUTE <= hub.next_attempt_at <= timezone.now() + MINUTE
+        assert HubDue.objects.get(pk=hub.pk).due_at == hub.next_attempt_at
+        assert reap_demos() == 0 and provision.run_due() == 0
+        assert tried == [demo.slug]
+
+        later = hub.next_attempt_at + dt.timedelta(seconds=1)
+        assert reap_demos(later) == 0
+        hub.refresh_from_db()
+        assert (tried, hub.attempts) == ([demo.slug, demo.slug], 2)
+        assert hub.next_attempt_at >= later + 5 * MINUTE - dt.timedelta(seconds=1)
+
+    def test_a_demo_whose_preparation_had_failed_is_dropped_at_once_when_it_ends(self, monkeypatch):
+        dropped = []
+        monkeypatch.setattr(services, "purge_demo_data", lambda hub: dropped.append(hub.slug))
+        demo = create()
+        Hub.objects.filter(slug=demo.slug).update(
+            status="failed", attempts=3, next_attempt_at=timezone.now() + 15 * MINUTE
+        )
+        lapse(demo.slug)
+
+        assert reap_demos() == 1
+        assert dropped == [demo.slug] and Hub.objects.get(slug=demo.slug).status == "purged"
 
     def test_purging_a_demo_that_has_not_ended_is_refused(self):
         demo = create()
         with pytest.raises(Conflict) as refused:
             demo_purge(SYSTEM, DemoSlugIn(slug=demo.slug))
         assert refused.value.code == "base.demo_live"
-        assert Hub.objects.get(slug=demo.slug).status == "ready"
+        assert Hub.objects.get(slug=demo.slug).status == "requested"
 
     def test_purging_twice_changes_nothing_more(self):
         demo = create()
@@ -488,12 +597,45 @@ class TestReaper:
         assert Hub.objects.get(slug=demo.slug).purged_at == purged_at
         assert len(events("base.demo.purged")) == 1
 
-    def test_phase_1_purges_no_data_of_the_apps(self):
-        # The apps' tables are shared by every hub and carry no hub_id (plan §1.7): nothing tells a demo's rows apart.
+    def test_a_demo_s_data_is_its_whole_database_dropped_on_its_cluster(self, monkeypatch):
+        dropped = []
+        monkeypatch.setattr(ops, "drop_database", lambda name, *, cluster=None: dropped.append((name, cluster)))
         hub = Hub.objects.get(slug=create().slug)
+        purge_demo_data(hub)
+        assert dropped == [(hub.db_name, None)]
+
+    def test_a_demo_whose_row_names_another_database_drops_nothing(self, monkeypatch):
+        """Review of hub#471 (M2): a DROP only ever takes the demo's own ``<control>_demo_<hex>``, never a business's
+        or another demo's database its row might name by mistake."""
+        dropped = []
+        monkeypatch.setattr(ops, "drop_database", lambda name, *, cluster=None: dropped.append(name))
+        hub = Hub.objects.get(slug=create().slug)
+        for wrong in (names.hub_db_name(control_name(), hub.id), names.demo_db_name(control_name(), uuid.uuid7())):
+            hub.db_name = wrong
+            with pytest.raises(names.InvalidDatabaseName, match="not the demo"):
+                purge_demo_data(hub)
+        assert dropped == []
+
+    def test_purging_a_demos_rows_never_drops_a_database_inside_their_transaction(self, monkeypatch):
+        """Review of hub#471 (M3): ``base.demo.purge`` purges rows only; its database went before, outside any
+        transaction of control (``base.tenancy.provision.drop``)."""
+        dropped = []
+        monkeypatch.setattr(ops, "drop_database", lambda name, *, cluster=None: dropped.append(name))
+        demo = create()
+        lapse(demo.slug)
+        assert demo_purge(SYSTEM, DemoSlugIn(slug=demo.slug)).status == "purged"
+        assert dropped == []
+
+    def test_a_demo_of_before_its_own_databases_purges_no_data_of_the_apps(self, monkeypatch):
+        # Made before round 2026-10-30, it shares the tables of every hub of phase 1, whose rows carry no hub_id (plan
+        # §1.7): nothing tells its rows apart, and there is no database of its own to drop.
+        dropped = []
+        monkeypatch.setattr(ops, "drop_database", lambda name, *, cluster=None: dropped.append(name))
+        hub = Hub.objects.create(slug="demo-0000beef", is_demo=True, status="expired")
         before = {model: model.objects.count() for model in (OutboxEvent, Hub, Membership)}
         assert purge_demo_data(hub) is None
         assert {model: model.objects.count() for model in before} == before
+        assert dropped == []
 
 
 class TestTombstones:

@@ -554,8 +554,14 @@ SAAS_DEMO_FAILED = "http://localhost:8001/demo/?state=failed"
 
 
 def new_demo(session_key: str = DEMO_OWNER) -> str:
-    """A demo of the browser ``session_key``, as ``POST /internal/demos`` leaves it; its slug."""
-    return demo_create(system_context(REGISTRY_SCOPE), DemoCreateIn(session_key=session_key, language="es")).slug
+    """A demo of the browser ``session_key``, as ``POST /internal/demos`` leaves it, ready; its slug.
+
+    Its own database is made by the worker (``base/tenancy/tests/test_provision.py``, on real databases): here, where
+    the door is tested, it stays on the tests' shared database (``db_name`` empty, as a demo of before S2a), which a
+    test case may reach."""
+    slug = demo_create(system_context(REGISTRY_SCOPE), DemoCreateIn(session_key=session_key, language="es")).slug
+    Hub.objects.filter(slug=slug).update(status=Hub.Status.READY, db_name="")
+    return slug
 
 
 def a_code(slug: str, session_key: str = DEMO_OWNER, language: str = "es") -> str:

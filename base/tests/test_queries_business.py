@@ -10,6 +10,7 @@ again (``base.hub.registered``), so a change made on erplora.com shows without r
 import pytest
 from django.urls import resolve
 from django.utils import translation
+from live.assistant import description
 from live.context import OperationContext, Scope
 from live.errors import NotFound, PermissionDenied
 from live.live_registry import live_registry
@@ -60,7 +61,7 @@ def hubs():
 def test_declaration():
     op = get("base.business.get")
     assert (op.kind, op.permission, op.input, op.output) == ("query", HOME, BusinessIn, BusinessOut)
-    assert op.ai and op.ai["description"]
+    assert description(op)
     assert "base.business.get" in live_registry.affected([HUB_REGISTERED])
 
 

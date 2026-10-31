@@ -168,6 +168,12 @@ def forget_aliases(before: dict) -> None:
     """
     for alias in set(connections.settings) - set(before):
         connections[alias].close()
+        # And this thread's connection object, as ``migrator._forget_alias`` does: a later registration of the same
+        # alias (another role, another server) would get the old object back, its old settings with it.
+        try:
+            del connections[alias]
+        except AttributeError:
+            pass
     connections.settings = before
 
 

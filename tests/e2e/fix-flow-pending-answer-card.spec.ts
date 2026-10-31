@@ -64,7 +64,7 @@ test.afterAll(async () => {
 /** The worker's part of the step (FLOW-F38), as in fix-flow-assistant-step.spec.ts: it never blocks this process,
  *  where the provider the SaaS asks lives. */
 async function workerAsks(flowId: string): Promise<void> {
-  await promisify(execFile)('uv', ['run', 'python', 'manage.py', 'shell', '-c', RELAY], {
+  await promisify(execFile)('uv', ['run', 'python', 'manage.py', 'shell', '--hub', 'a', '-c', RELAY], {
     cwd: HUB_DIR,
     env: { ...process.env, FLOW_EVENT: parkedEvent(flowId) },
   });

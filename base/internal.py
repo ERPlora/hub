@@ -20,9 +20,12 @@ heard (the SaaS never signs wrong: this is for whatever else reaches the door).
 The registry of hubs (plan 2026-10-17, §1.5), each route one operation of ``base`` run as the platform on the
 registry's scope (``base.registry.REGISTRY_SCOPE``):
 
-- ``PUT /internal/hubs/{id}`` (the SaaS's ``hub_registry()``) → ``base.hub.register``: 202 when it creates the row,
-  ready at once in phase 1 (the SaaS hears ``ready`` after the COMMIT), 200 when it updates it;
-- ``GET /internal/hubs/{id}`` → ``base.hub.get``: the row, whose ``status`` ``ready`` the SaaS waits for;
+- ``PUT /internal/hubs/{id}`` (the SaaS's ``hub_registry()``) → ``base.hub.register``: 202 ``requested`` when it
+  creates the row, with a database of its own that the worker makes (``base.tenancy.provision``; round 2026-10-30 of
+  PLAN-DB) before it tells the SaaS ``ready``; 202 too for an update while it is being made, 200 for one of a ready
+  hub;
+- ``GET /internal/hubs/{id}`` → ``base.hub.get``: the row, whose ``status`` ``ready`` the SaaS waits for (``requested``,
+  ``creating``, ``migrating``, ``seeding`` or ``failed`` before); never where its database is;
 - ``DELETE /internal/hubs/{id}`` → ``base.hub.cancel`` (202); ``POST /internal/hubs/{id}/restore`` →
   ``base.hub.restore`` (200; 409 ``hub_purged`` when it can never come back);
 - ``PUT /internal/hubs/{id}/state`` (the photo) → ``base.hub.state_apply``: kept on the row if its ``version`` is
@@ -37,12 +40,14 @@ scope: 200 ``{ended}`` with the sessions of that SaaS account it ended, on that 
 
 The demos (plan 2026-10-17, §1.5 and §1.6), on the same scope:
 
-- ``POST /internal/demos`` (``{session_key, vertical, language}``) → ``base.demo.create``: 201 ``{id, slug,
-  expires_at, created}`` for a new demo, 200 with the live one of that browser, 503 ``base.demo_full`` with
+- ``POST /internal/demos`` (``{session_key, vertical, language}``) → ``base.demo.create``: 202 ``{id, slug, status,
+  expires_at, created}`` for a new demo (``requested``: the worker clones its database, and the SaaS waits for
+  ``ready`` on ``GET /internal/hubs/{id}``), 200 with the live one of that browser, 503 ``base.demo_full`` with
   ``Retry-After`` when every demo is taken;
 - ``POST /internal/demos/{slug}/codes`` (``{session_key, language}``) → ``base.demo.code_create``: 201 ``{code,
   expires_at}``; 404 without such a demo, 410 ``base.hub_gone`` once it ended, 403 ``base.demo_not_owner`` for
-  another browser. The path names the demo: v2 binds the signature to it.
+  another browser, 503 ``base.hub_preparing`` while it is being made. The path names the demo: v2 binds the signature
+  to it.
 
 While the SaaS may still sign v1 only, a body that names the hub of its path (``hub_id`` or ``id``) must name the
 same one (422 ``internal.hub_mismatch``).
@@ -186,7 +191,8 @@ def hub(request: HttpRequest, hub_id: UUID) -> HttpResponse:
     answer, refused = _operation_call("base.hub.register", {**body, "id": str(hub_id)}, _registry_context())
     if refused is not None:
         return refused
-    return JsonResponse(_hub_answer(answer), status=202 if answer.created else 200)
+    # 202 while its database is being made (the worker's; the SaaS hears ``ready``), 200 for an update of a ready one.
+    return JsonResponse(_hub_answer(answer), status=200 if answer.status == "ready" else 202)
 
 
 @internal_view
@@ -241,7 +247,8 @@ def hub_state(request: HttpRequest, hub_id: UUID) -> HttpResponse:
 @internal_view
 @require_http_methods(["POST"])
 def demos(request: HttpRequest) -> HttpResponse:
-    """``POST /internal/demos``: a demo for the SaaS's browser; 201 when it is new, 200 when it is its live one."""
+    """``POST /internal/demos``: a demo for the SaaS's browser; 202 when it is new (``requested``: the worker makes its
+    database and the SaaS waits for ``ready``), 200 when it is its live one."""
     body = _body_object(request)
     if body is None:
         return _payload_invalid("The body is not a JSON object.")
@@ -250,7 +257,7 @@ def demos(request: HttpRequest) -> HttpResponse:
         if refused.status_code == 503:
             refused["Retry-After"] = str(DEMO_FULL_RETRY_AFTER_SECONDS)
         return refused
-    return JsonResponse(answer.model_dump(mode="json"), status=201 if answer.created else 200)
+    return JsonResponse(answer.model_dump(mode="json"), status=202 if answer.created else 200)
 
 
 @internal_view

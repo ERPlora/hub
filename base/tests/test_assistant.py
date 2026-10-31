@@ -61,6 +61,7 @@ def test_the_tools_are_the_operations_this_person_may_use_and_nothing_else():
     [
         ("base.pin.set", "«Not an assistant tool»: a PIN is typed on the pad"),
         ("base.hub.reset", "never from the chat: it empties the business"),
+        ("base.blueprint.export", "never from the chat: a file to download"),
         ("base.app.list", "no description for the assistant"),
         ("base.demo.create", "the system's (no permission declared)"),
     ],

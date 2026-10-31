@@ -457,8 +457,9 @@ class TestTheRegistryGate:
         response = client.post("/auth/callback", {"code": "c1"}, HTTP_HOST="acme.localhost:8000")
         assert (response.status_code, response.json()["error"]["code"]) == (410, "base.hub_gone")
 
-    def test_a_hub_being_prepared_is_503_and_asks_to_come_back(self, client, hub):
-        hub("acme", status="requested")
+    @pytest.mark.parametrize("status", ["requested", "creating", "migrating", "seeding", "failed"])
+    def test_a_hub_being_prepared_is_503_and_asks_to_come_back(self, client, hub, status):
+        hub("acme", status=status)
         response = browse(client, "/", "acme.localhost:8000")
         assert (response.status_code, response["Retry-After"]) == (503, "30")
         html = response.content.decode()

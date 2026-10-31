@@ -91,7 +91,7 @@ print(out.model_dump_json())
 
 /** Runs a system operation of the inbox in the hub `a`, as erplora.com's doors will; its output. */
 export function system<T = unknown>(op: string, payload: unknown): T {
-  const out = execFileSync('uv', ['run', 'python', 'manage.py', 'shell', '-c', RUN], {
+  const out = execFileSync('uv', ['run', 'python', 'manage.py', 'shell', '--hub', 'a', '-c', RUN], {
     cwd: HUB_DIR,
     encoding: 'utf8',
     env: { ...process.env, WA_OP: op, WA_PAYLOAD: JSON.stringify(payload) },
@@ -100,7 +100,7 @@ export function system<T = unknown>(op: string, payload: unknown): T {
   return JSON.parse(line) as T;
 }
 
-/** Python that goes first in a one-shot `manage.py shell` playing the worker's relay (this stack runs no worker).
+/** Python that goes first in a one-shot `manage.py shell` playing the worker's relay (in `a`'s database: the e2e stack's worker relays nothing).
  *  What a reaction hands erplora.com after its COMMIT goes to `base.outbound`'s threads, which in the worker outlive
  *  the tick but here would die with this process (daemon threads) before erplora.com is called: this process makes
  *  those calls at once, as the suite's `conftest.py` does (FIX-HUB-WHATSAPP-INBOX-SLOW-SEND-BLOCKS-RELAY). */
@@ -171,10 +171,13 @@ const hubIds = (): Record<string, string> =>
       .map((row) => row.split('=')),
   );
 
-/** Where `a`'s photo (`state` and its version) and the row of its WhatsApp channel (`channel`, as JSON; none, `[]`)
- *  wait from a spec's first `keepPhoto` (or `seedErplora`, which calls it) until `restorePhoto` puts them back: a
- *  table of the run's database, so a shell's quoting never touches them. */
+/** Where `a`'s photo (`state` and its version) waits from a spec's first `keepPhoto` (or `seedErplora`, which calls
+ *  it) until `restorePhoto` puts it back: a table next to the registry (control's database), so a shell's quoting
+ *  never touches it. */
 const PHOTO_BACKUP = 'e2e_backup_whatsapp_photo';
+/** Where the row of `a`'s WhatsApp channel (`channel`, as JSON; none, `[]`) waits meanwhile: a table of `a`'s own
+ *  database, next to the channel's. */
+const CHANNEL_BACKUP = 'e2e_backup_whatsapp_channel';
 
 /** Keeps `a`'s photo and the row of its WhatsApp channel as they are now, for `restorePhoto` to put back. Every spec
  *  that drives the inbox calls it first, in its `beforeAll` (or seeds, which calls it), because whatever it makes the
@@ -183,9 +186,14 @@ const PHOTO_BACKUP = 'e2e_backup_whatsapp_photo';
  *  ends its `afterAll` with `restorePhoto` (whatsapp-photo.test.ts says so). Called again before that, it keeps what
  *  it kept first. */
 export function keepPhoto(): void {
+  // Two tables since every hub has its own database (S2a): the photo next to the registry, the channel's row in `a`'s.
   psql(
-    `set client_min_messages = warning; create table if not exists ${PHOTO_BACKUP} as select h.id, h.state, h.state_version, ` +
-      "(select coalesce(json_agg(c), '[]') from whatsapp_inbox_channel c where c.host = 'a') as channel from base_hub h where h.slug = 'a'",
+    `set client_min_messages = warning; create table if not exists ${PHOTO_BACKUP} as ` +
+      "select h.id, h.state, h.state_version from base_hub h where h.slug = 'a'",
+  );
+  psql(
+    `set client_min_messages = warning; create table if not exists ${CHANNEL_BACKUP} as ` +
+      "select coalesce(json_agg(c), '[]') as channel from whatsapp_inbox_channel c where c.host = 'a'",
   );
 }
 
@@ -224,9 +232,10 @@ export function restorePhoto(): void {
   psql(
     [
       `update base_hub h set state = b.state, state_version = b.state_version from ${PHOTO_BACKUP} b where b.id = h.id`,
-      "delete from whatsapp_inbox_channel where host = 'a'",
-      `insert into whatsapp_inbox_channel select * from json_populate_recordset(null::whatsapp_inbox_channel, (select channel from ${PHOTO_BACKUP}))`,
       `drop table ${PHOTO_BACKUP}`,
+      "delete from whatsapp_inbox_channel where host = 'a'",
+      `insert into whatsapp_inbox_channel select * from json_populate_recordset(null::whatsapp_inbox_channel, (select channel from ${CHANNEL_BACKUP}))`,
+      `drop table ${CHANNEL_BACKUP}`,
     ].join('; '),
   );
 }
