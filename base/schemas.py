@@ -136,6 +136,29 @@ class HubStateOut(Schema):
     version: int
 
 
+class HubUserGetIn(Schema):
+    id: UUID = Field(description="The person's id in the business's database.")
+
+
+class HubUserOut(Schema):
+    id: UUID
+    name: str = Field(description="Their name, else their email, else how the Hub knows them.")
+
+
+class HubUserSyncIn(Schema):
+    """The people of the SaaS's photo (``members``), for the business's own database (``base.hub_user.sync``), and
+    the SaaS accounts the photo just took out of the business (``left``)."""
+
+    members: list[MemberIn]
+    left: list[str] = Field(default_factory=list)
+
+
+class HubUserSyncOut(Schema):
+    made: int = Field(description="People of the photo the business's database did not have yet.")
+    updated: int = Field(description="People whose name, email or state changed.")
+    left: int = Field(description="People no longer in the business, kept with their name, no longer active.")
+
+
 class SessionRevokeIn(Schema):
     """``POST /internal/sessions/revoke``: the SaaS account whose sessions end, on one business (``hub_id``) or on
     every host, the Hub admin's included (without it)."""

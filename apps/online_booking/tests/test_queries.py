@@ -14,6 +14,7 @@ from live.errors import Conflict, NotFound, OperationError, PermissionDenied
 
 from apps.online_booking.models import Booking
 from apps.online_booking.queries import hash_token, visitor_key
+from base.services import ensure_hub_user
 
 from .conftest import (
     MONDAY,
@@ -170,7 +171,7 @@ def test_the_inbox_sorts_by_any_column_and_pages(inbox):
 
 def test_the_employee_sees_the_online_bookings_of_her_own_agenda(inbox, salon):
     user = get_user_model().objects.create_user(username="bea", password="pw")
-    salon.bea.user = user
+    salon.bea.user = ensure_hub_user(user)
     salon.bea.save()
     assert numbers(listed(role="hub_employee", actor=user)) == ["APT-3", "APT-2"]
     stranger = get_user_model().objects.create_user(username="nobody", password="pw")

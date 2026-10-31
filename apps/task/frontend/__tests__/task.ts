@@ -17,7 +17,7 @@ export function task(over: Partial<TaskOut> = {}): TaskOut {
     parent_title: null,
     assigned_to_id: null,
     assignee_name: null,
-    created_by_id: 1,
+    created_by_id: '01a16000-0000-7000-8000-0000000000b1',
     created_by_name: 'Marta Jefa',
     due_date: null,
     completed_at: null,

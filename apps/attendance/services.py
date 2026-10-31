@@ -27,7 +27,6 @@ from apps.attendance.queries import (
     MEMBER_NOT_FOUND,
     RECORD_NOT_FOUND,
     TERMINATED_REASON_SOURCE,
-    actor_user,
     business_date,
     find_member,
     is_stale,
@@ -55,6 +54,7 @@ from apps.attendance.schemas import (
     TerminatedIn,
 )
 from apps.staff.models import Member
+from base.services import acting_hub_user
 
 NO_MEMBER_RECORD = _(
     "Your user is not linked to any staff record: ask a manager to link it in Staff."
@@ -277,7 +277,7 @@ def clock_in(ctx: OperationContext, data: ClockInIn) -> dict:
     source = device_source(ctx)
     where = _measure(values, data, source)
     _check_radius(values, source, where)
-    user = actor_user(ctx)
+    user = acting_hub_user(ctx)
     try:
         with atomic():
             record = Record.objects.create(
@@ -331,7 +331,7 @@ def clock_out(ctx: OperationContext, data: ClockOutIn) -> dict:
     record.out_accuracy_m = where["accuracy_m"]
     record.out_distance_m = where["distance_m"]
     record.out_within_radius = where["within_radius"]
-    record.updated_by = actor_user(ctx)
+    record.updated_by = acting_hub_user(ctx)
     record.save()
     record_event(
         ctx, events.CLOCKED_OUT, {"id": str(record.id), "member_id": str(member.id)}
@@ -408,6 +408,7 @@ def _correct(
     reason: str,
 ) -> Correction:
     """Rewrites a locked day and leaves its trail; running breaks end at the new clock-out."""
+    by = acting_hub_user(ctx)
     trail = Correction.objects.create(
         record=record,
         old_clock_in_at=record.clock_in_at,
@@ -417,15 +418,15 @@ def _correct(
         new_clock_out_at=clock_out_at,
         new_status=Record.Status.CLOSED if clock_out_at else Record.Status.OPEN,
         reason=reason,
-        is_system=actor_user(ctx) is None,
-        created_by=actor_user(ctx),
-        created_by_name=user_name(actor_user(ctx)),
+        is_system=by is None,
+        created_by=by,
+        created_by_name=user_name(by),
     )
     record.clock_in_at = clock_in_at
     record.clock_out_at = clock_out_at
     record.status = trail.new_status
     record.work_date = business_date(clock_in_at)
-    record.updated_by = actor_user(ctx)
+    record.updated_by = by
     try:
         with atomic():
             record.save()
@@ -541,7 +542,7 @@ def update_settings(ctx: OperationContext, data: SettingsIn) -> dict:
             str(BOTH_COORDINATES), fields={missing: str(BOTH_COORDINATES)}
         )
     if changed:
-        row.updated_by = actor_user(ctx)
+        row.updated_by = acting_hub_user(ctx)
         row.save()
         record_event(ctx, events.SETTINGS_UPDATED, {})
     return settings_values(row)

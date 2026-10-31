@@ -11,7 +11,9 @@ import { A, api, type Credentials, EMPLOYEE, login, psql, shot, shown } from './
 const TAG = 'E2E';
 
 /** The employee's user id on this database (never a fixed number: it depends on the seed). */
-const employeeUser = (): number => Number(psql(`select id from auth_user where email = '${EMPLOYEE.email}'`));
+/** The employee's person in the business's database (`base.HubUser`): what a staff record hangs from. */
+const employeeUser = (): string =>
+  psql(`select h.id from base_hubuser h join auth_user u on u.username = h.username where u.email = '${EMPLOYEE.email}'`);
 
 function cleanup(): void {
   const members = `select id from staff_member where first_name like '${TAG}%'`;

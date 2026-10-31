@@ -40,7 +40,9 @@ test.afterAll(cleanup);
 
 const stamp = (): string => Date.now().toString(36);
 const day = (offset: number): string => new Date(Date.now() + offset * 86_400_000).toISOString().slice(0, 10);
-const employeeUser = (): number => Number(psql(`select id from auth_user where email = '${EMPLOYEE.email}'`));
+/** The employee's person in the business's database (`base.HubUser`): what a staff record hangs from. */
+const employeeUser = (): string =>
+  psql(`select h.id from base_hubuser h join auth_user u on u.username = h.username where u.email = '${EMPLOYEE.email}'`);
 
 async function signedIn(browser: Browser, next: string, credentials?: Credentials): Promise<{ context: BrowserContext; page: Page }> {
   const context = await browser.newContext({ baseURL: A, viewport: { width: 1440, height: 900 }, locale: 'en-US' });
@@ -191,7 +193,7 @@ test('STAFF-F03: «Hub user» links the record to an account of the business, se
     await threeShots(page, 'STAFF-F03', () => picked, 'CLOSE-STAFF-member-form');
     await page.locator('[data-testid=staff-member-form-submit]').click();
     await expect(page.locator('ion-modal[data-testid=staff-member-form]')).toBeHidden();
-    await expect.poll(() => psql(`select user_id from staff_member where id = '${bea.id}'`)).toBe(String(employeeUser()));
+    await expect.poll(() => psql(`select hub_user_id from staff_member where id = '${bea.id}'`)).toBe(employeeUser());
     await release(context, bea.id);
   } finally {
     await context.close();

@@ -37,7 +37,7 @@ def cashier(make_user):
     user = make_user("bea", role="hub_employee")
     record = run(
         "staff.member.create",
-        {"first_name": "Bea", "last_name": "Ruiz", "user_id": user.pk},
+        {"first_name": "Bea", "last_name": "Ruiz", "user_id": str(user.person.pk)},
         system_context(A),
     )
     return user, record

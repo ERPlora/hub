@@ -10,6 +10,7 @@ from live.errors import Conflict, NotFound, PermissionDenied
 from live.operations import get
 
 from apps.staff.models import Member, StaffSettings, TimeOff
+from base.services import ensure_hub_user
 from apps.staff.schemas import (
     AccountListIn,
     AccountPage,
@@ -132,7 +133,7 @@ def test_the_directory_by_name_without_terminated_records(make_user):
         "Bea",
         "Ruiz",
         role=stylist,
-        user=account,
+        user=account.person,
         email="bea@example.com",
         hire_date=dt.date(2026, 1, 15),
     )
@@ -155,7 +156,7 @@ def test_the_directory_by_name_without_terminated_records(make_user):
         "Bea Ruiz",
         stylist.id,
         "Stylist",
-        account.id,
+        account.person.id,
         "bea@example.com",
         dt.date(2026, 1, 15),
     )
@@ -235,9 +236,9 @@ def test_the_old_tables_filters():
 
 def test_the_directory_by_its_linked_user(make_user):
     account = make_user("ana")
-    ana = make_member("Ana", user=account)
+    ana = make_member("Ana", user=account.person)
     make_member("Bea")
-    assert [row.id for row in members(user_id=account.id).rows] == [ana.id]
+    assert [row.id for row in members(user_id=account.person.id).rows] == [ana.id]
 
 
 def test_every_column_sorts_both_ways_with_id_as_the_tie_break():
@@ -326,9 +327,9 @@ def test_an_unknown_name_is_not_found():
 def test_mine_is_the_callers_own_record_with_their_own_pay(make_user):
     ana_user, bea_user = make_user("ana"), make_user("bea")
     ana = make_member(
-        "Ana", user=ana_user, hourly_rate=1500, commission_rate=Decimal("12.5")
+        "Ana", user=ana_user.person, hourly_rate=1500, commission_rate=Decimal("12.5")
     )
-    make_member("Bea", user=bea_user, hourly_rate=9900)
+    make_member("Bea", user=bea_user.person, hourly_rate=9900)
     make_member("Carla")
 
     mine = run("staff.member.mine", MineIn(), "hub_employee", actor=ana_user).member
@@ -342,7 +343,7 @@ def test_mine_is_the_callers_own_record_with_their_own_pay(make_user):
 
 def test_mine_is_empty_without_a_live_linked_record(make_user):
     linked, unlinked = make_user("ana"), make_user("bea")
-    make_member("Ana", user=linked, status=TERMINATED)
+    make_member("Ana", user=linked.person, status=TERMINATED)
     for actor in (linked, unlinked, "system"):
         assert (
             run("staff.member.mine", MineIn(), "hub_employee", actor=actor).member
@@ -355,8 +356,8 @@ def test_mine_is_empty_without_a_live_linked_record(make_user):
 
 def test_current_is_the_id_and_name_of_the_callers_own_record_without_any_staff_permission(make_user):
     ana_user, bea_user = make_user("ana"), make_user("bea")
-    ana = make_member("Ana", user=ana_user, hourly_rate=1500, commission_rate=Decimal("12.5"))
-    make_member("Bea", user=bea_user)
+    ana = make_member("Ana", user=ana_user.person, hourly_rate=1500, commission_rate=Decimal("12.5"))
+    make_member("Bea", user=bea_user.person)
     make_member("Carla")
 
     # A cashier may sell without seeing the team: her own record is no secret to her.
@@ -367,15 +368,15 @@ def test_current_is_the_id_and_name_of_the_callers_own_record_without_any_staff_
 
 def test_current_is_empty_without_a_live_linked_record_or_a_user_behind_the_session(make_user):
     linked, unlinked = make_user("ana"), make_user("bea")
-    make_member("Ana", user=linked, status=TERMINATED)
+    make_member("Ana", user=linked.person, status=TERMINATED)
     for actor in (linked, unlinked, "system", "tester"):
         assert run("staff.member.current", CurrentMemberIn(), actor=actor, permissions=set()).member is None
 
 
 def test_current_names_a_record_that_is_inactive_or_on_leave_and_still_sells(make_user):
     away, idle = make_user("ana"), make_user("bea")
-    ana = make_member("Ana", user=away, status=Member.Status.ON_LEAVE)
-    bea = make_member("Bea", user=idle, status=Member.Status.INACTIVE)
+    ana = make_member("Ana", user=away.person, status=Member.Status.ON_LEAVE)
+    bea = make_member("Bea", user=idle.person, status=Member.Status.INACTIVE)
     assert run("staff.member.current", CurrentMemberIn(), actor=away).member.id == ana.id
     assert run("staff.member.current", CurrentMemberIn(), actor=idle).member.id == bea.id
 
@@ -387,7 +388,7 @@ def test_the_pay_sheet_names_both_ids_of_each_person(make_user):
     account = make_user("ana")
     ana = make_member(
         "Ana",
-        user=account,
+        user=account.person,
         hourly_rate=1500,
         commission_rate=Decimal("15"),
         role=make_role("Stylist"),
@@ -401,7 +402,7 @@ def test_the_pay_sheet_names_both_ids_of_each_person(make_user):
     assert [row.model_dump() for row in page.rows] == [
         {
             "id": ana.id,
-            "user_id": account.id,
+            "user_id": account.person.id,
             "full_name": "Ana López",
             "role_id": ana.role_id,
             "role_name": "Stylist",
@@ -529,7 +530,7 @@ def test_absent_today_is_the_business_day(frozen_now):
 
 def test_the_commission_sheet_lists_who_can_earn_one_with_both_ids(make_user):
     account = make_user("ana")
-    ana = make_member("Ana", user=account, commission_rate=Decimal("15"), role=make_role("Stylist"))
+    ana = make_member("Ana", user=account.person, commission_rate=Decimal("15"), role=make_role("Stylist"))
     bea = make_member("Bea", status=Member.Status.ON_LEAVE)  # a zero rate is listed too
     make_member("Carla", status=Member.Status.INACTIVE, commission_rate=Decimal("10"))
     make_member("Dora", status=TERMINATED, commission_rate=Decimal("10"))
@@ -539,7 +540,7 @@ def test_the_commission_sheet_lists_who_can_earn_one_with_both_ids(make_user):
     assert [row.model_dump() for row in page.rows] == [
         {
             "id": ana.id,
-            "user_id": account.id,
+            "user_id": account.person.id,
             "full_name": "Ana López",
             "role_id": ana.role_id,
             "role_name": "Stylist",
@@ -995,15 +996,15 @@ def test_time_off_filters():
 def test_time_off_filters_of_the_old_table(make_user):
     boss = make_user("boss")
     ana = make_member("Ana")
-    approved = make_time_off(ana, "2026-10-01", "2026-10-03", status=TimeOff.Status.APPROVED, approved_by=boss)
+    approved = make_time_off(ana, "2026-10-01", "2026-10-03", status=TimeOff.Status.APPROVED, approved_by=boss.person)
     hours = make_time_off(ana, "2026-10-20", hours=("09:00", "10:00"))
     make_time_off(ana, "2026-11-10", "2026-11-12")
 
     def ids(**params):
         return [row.id for row in time_off(**params).rows]
 
-    assert ids(approved_by_id=boss.id) == [approved.id]
-    assert time_off(approved_by_id=boss.id).rows[0].approved_by_id == boss.id
+    assert ids(approved_by_id=boss.person.id) == [approved.id]
+    assert time_off(approved_by_id=boss.person.id).rows[0].approved_by_id == boss.person.id
     assert ids(is_full_day=False) == [hours.id]
     assert ids(start_date_from=dt.date(2026, 10, 2), start_date_to=dt.date(2026, 10, 31)) == [hours.id]
     assert ids(end_date_from=dt.date(2026, 10, 3), end_date_to=dt.date(2026, 10, 20)) == [hours.id, approved.id]
@@ -1034,7 +1035,7 @@ def test_time_off_detail_with_its_reason_and_approver(make_user):
         reason="Surgery",
         notes="Back on Monday",
         status=TimeOff.Status.APPROVED,
-        approved_by=boss,
+        approved_by=boss.person,
         approved_at=timezone.now(),
     )
     detail = run("staff.time_off.detail", ByIdIn(id=leave.id), "hub_manager")
@@ -1047,7 +1048,7 @@ def test_time_off_detail_with_its_reason_and_approver(make_user):
 
 
 def test_time_off_detail_names_an_approver_without_a_name_by_username(make_user):
-    leave = make_time_off(make_member(), "2026-10-12", approved_by=make_user("saas:42"))
+    leave = make_time_off(make_member(), "2026-10-12", approved_by=make_user("saas:42").person)
     assert (
         run("staff.time_off.detail", ByIdIn(id=leave.id)).approved_by_name == "saas:42"
     )
@@ -1126,7 +1127,7 @@ def test_today_is_the_business_day(frozen_now):
 
 def test_my_time_off_with_its_reason(make_user):
     me = make_user("ana")
-    ana = make_member("Ana", user=me)
+    ana = make_member("Ana", user=me.person)
     mine = [
         make_time_off(ana, "2026-10-12", reason="Wedding"),
         make_time_off(ana, "2026-11-02", status=TimeOff.Status.REJECTED),
@@ -1179,6 +1180,7 @@ def test_the_accounts_with_access_to_this_business(make_user):
     eva = make_user("saas:2", host="a", role="hub_employee")
     eva.email = "eva@shop.es"
     eva.save()
+    ensure_hub_user(eva)  # her next entry brings her person up to date
     make_user("saas:3", host="b", first_name="Other business")
     gone = make_user("saas:4", host="a", first_name="Deactivated")
     gone.is_active = False
@@ -1187,11 +1189,12 @@ def test_the_accounts_with_access_to_this_business(make_user):
     page = accounts()
 
     assert [row.model_dump() for row in page.rows] == [
-        {"user_id": eva.id, "name": "eva@shop.es"},
-        {"user_id": marta.id, "name": "Marta"},
+        {"user_id": eva.person.id, "name": "eva@shop.es"},
+        {"user_id": marta.person.id, "name": "Marta"},
     ]
     assert page.total == 2
-    assert [row.user_id for row in accounts(search="MAR").rows] == [marta.id]
+    assert [row.user_id for row in accounts(search="MAR").rows] == [marta.person.id]
+    assert [row.user_id for row in accounts(search="shop.es").rows] == [eva.person.id]
 
 
 def test_one_account_by_its_user_to_name_the_one_a_record_hangs_from(make_user):
@@ -1202,10 +1205,10 @@ def test_one_account_by_its_user_to_name_the_one_a_record_hangs_from(make_user):
     gone.is_active = False
     gone.save()
 
-    assert [row.name for row in accounts(user_id=marta.id).rows] == ["Marta"]
+    assert [row.name for row in accounts(user_id=marta.person.id).rows] == ["Marta"]
     # Without access to this business (another one's, or deactivated): nothing to name.
-    assert accounts(user_id=elsewhere.id).rows == []
-    assert accounts(user_id=gone.id).rows == []
+    assert accounts(user_id=elsewhere.person.id).rows == []
+    assert accounts(user_id=gone.person.id).rows == []
 
 
 def test_accounts_for_whoever_adds_or_edits_records():

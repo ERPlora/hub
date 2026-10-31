@@ -103,12 +103,13 @@ def test_the_platform_is_what_every_hubs_database_has():
     assert set(migrator.platform_apps()) == set(PLATFORM)
 
 
-def test_the_apps_linked_to_controls_users_cannot_live_in_a_hubs_database_yet():
-    """PLAN-DB round 2026-10-22 «Tests»: their tables reference control's user until the hub's own staff comes."""
+def test_every_hub_app_lives_in_a_hubs_database_now_that_its_people_are_its_own():
+    """Tenancy W10: the apps that linked control's user (PLAN-DB round 2026-10-22 «Tests») hang from ``base.HubUser``
+    now, so every hub app, and what waited for them (service, appointment, online_booking), fits a hub's database."""
     portable = set(migrator.portable_apps())
 
-    assert {*PLATFORM, "tax", "inventory", "sale"} <= portable
-    assert not {"staff", "attendance", "task", "whatsapp_inbox"} & portable
+    assert {"staff", "attendance", "task", "whatsapp_inbox", "service", "appointment", "online_booking"} <= portable
+    assert portable == set(migrator.hub_apps())
 
 
 def test_the_templates_are_the_platforms_and_one_per_vertical_cloned_from_it():
@@ -125,6 +126,8 @@ def test_the_templates_are_the_platforms_and_one_per_vertical_cloned_from_it():
         assert template.source == platform.db_name
         assert set(template.apps) == set(PLATFORM) | (wanted & portable)
         assert set(template.left_out) == wanted - portable
+        # Since tenancy W10 a vertical's template holds its whole list: a hair salon is born with its staff.
+        assert template.left_out == ()
 
 
 # ── Clusters: CREATE DATABASE … TEMPLATE clones only within a server, so each has its templates ─────────────────
@@ -315,8 +318,21 @@ def test_an_app_the_code_no_longer_knows_stays_in_schema_apps(new_database, make
     assert hub.schema_apps["gone"] == "0009_later"
 
 
-def test_add_refuses_an_app_that_cannot_live_in_a_hubs_database_yet(new_database, make_hub):
+def test_add_creates_the_people_apps_and_what_waited_for_them(new_database, make_hub):
+    # Tenancy W10: an appointment hangs from a staff record, and a staff record from the business's own person.
     hub = make_hub(new_database)
+
+    migrator.ensure_schema(hub, add=["appointment"])
+
+    assert {"base_hubuser", "staff_member", "service_service", "appointment_appointment"} <= hubs.table_names(new_database)
+    hub.refresh_from_db()
+    assert {"staff", "service", "appointment"} <= set(hub.schema_apps)
+
+
+def test_add_refuses_an_app_that_cannot_live_in_a_hubs_database(new_database, make_hub, monkeypatch):
+    # None today (tests/test_guardrails.py, «(h)»); one whose tables linked control's again would be refused.
+    hub = make_hub(new_database)
+    monkeypatch.setattr(migrator, "portable_apps", lambda: tuple(sorted(migrator.hub_apps() - {"staff"})))
 
     with pytest.raises(migrator.AppNotPortable, match="staff"):
         migrator.ensure_schema(hub, add=["staff"])

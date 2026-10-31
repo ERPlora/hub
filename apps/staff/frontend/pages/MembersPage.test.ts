@@ -63,7 +63,7 @@ const ROWS = [
 const PAY = page([
   { id: 'm1', user_id: null, full_name: 'Ana López', role_id: 'r1', role_name: 'Stylist', status: 'active', hourly_rate: 1250, commission_rate: '10.00', notes: '' },
 ]);
-const ACCOUNTS = page([{ user_id: 4, name: 'Ana López' }]);
+const ACCOUNTS = page([{ user_id: '4', name: 'Ana López' }]);
 const ROLES = page([{ id: 'r1', name: 'Stylist', description: '', color: '', order: 0, is_active: true, member_count: 1 }]);
 
 async function setup(options: MountOptions = {}) {
@@ -223,14 +223,14 @@ describe('MembersPage: the live directory', () => {
     ]);
   });
 
-  it('sends the filters as the query takes them: bookable a yes/no, the Hub user a number, from the first page', async () => {
+  it('sends the filters as the query takes them: bookable a yes/no, the Hub user its id, from the first page', async () => {
     const s = await setup();
     await s.show(page(ROWS, 120));
     s.table().vm.$emit('pageChange', 1);
     await flush();
     await s.filter({ status: 'on_leave', is_bookable: 'false', hire_date_from: '2024-01-01', user_id: '4', role_name: 'Stylist' });
     expect(s.list()).toEqual([
-      { status: 'on_leave', is_bookable: false, hire_date_from: '2024-01-01', user_id: 4, role_name: 'Stylist', sort: 'name', limit: 50, offset: 0 },
+      { status: 'on_leave', is_bookable: false, hire_date_from: '2024-01-01', user_id: '4', role_name: 'Stylist', sort: 'name', limit: 50, offset: 0 },
     ]);
     expect(s.prop('filters')).toEqual({ status: 'on_leave', is_bookable: 'false', hire_date_from: '2024-01-01', user_id: '4', role_name: 'Stylist' });
   });

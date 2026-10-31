@@ -81,7 +81,7 @@ const userChoice = computed<ComboOption>(() =>
 async function nameAccount(userId: string, ticket: number): Promise<void> {
   const gone = t('staff.members.form.hubUserGone');
   try {
-    const answer = await client.api.call('staff.account.list', { user_id: Number(userId), limit: 1 });
+    const answer = await client.api.call('staff.account.list', { user_id: userId, limit: 1 });
     if (ticket === opening) userLabel.value = answer.rows[0]?.name ?? gone;
   } catch {
     if (ticket === opening) userLabel.value = gone;

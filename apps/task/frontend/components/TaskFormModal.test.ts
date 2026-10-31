@@ -32,7 +32,7 @@ export const TASK: TaskOut = {
   parent_title: null,
   assigned_to_id: 'm1',
   assignee_name: 'Ana López',
-  created_by_id: 1,
+  created_by_id: '01a16000-0000-7000-8000-0000000000b1',
   created_by_name: 'Marta',
   due_date: '2026-10-20',
   completed_at: null,

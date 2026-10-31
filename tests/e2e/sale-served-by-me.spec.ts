@@ -23,7 +23,8 @@ const VIEWPORTS = [
 const UNLINKED = 'Your account has no record in Staff: left on «Me», this sale counts for nobody.';
 
 let product: Product;
-let userId: number;
+/** The owner's person in the business's database (`base.HubUser`), as `/api/me` says it. */
+let userId: string;
 /** The live record the owner's account already had, unlinked while the spec runs. */
 let kept: string | null = null;
 
@@ -35,11 +36,11 @@ test.beforeAll(async ({ browser }) => {
   const page = await context.newPage();
   await login(page, A, '/sale/pos');
   const me = await api<{ user: { id: string } }>(context, A, 'GET', '/me');
-  userId = Number(me.data.user.id);
+  userId = me.data.user.id;
   const current = await api<{ member: { id: string } | null }>(context, A, 'GET', '/staff/members/current');
   expect(current.status, 'whose record the session is').toBe(200);
   kept = current.data.member?.id ?? null;
-  if (kept) psql(`update staff_member set user_id = null where id = '${kept}'`);
+  if (kept) psql(`update staff_member set hub_user_id = null where id = '${kept}'`);
   product = await createProduct(context, { name: `E2E Shampoo ${RUN}`, sku: `E2E-ME-${RUN}`, price: 1210, tax_category_key: 'product.generic' });
   // The owner's session for the fleet's visual sweep of the till (`ui-clip-sweep.sh --storage-state`), when asked.
   if (process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
@@ -52,7 +53,7 @@ test.afterAll(() => {
     cleanInventory();
     psql(`delete from staff_member where first_name = '${TAG}'`);
   } finally {
-    if (kept) psql(`update staff_member set user_id = ${userId} where id = '${kept}'`);
+    if (kept) psql(`update staff_member set hub_user_id = '${userId}' where id = '${kept}'`);
   }
 });
 
