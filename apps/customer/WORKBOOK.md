@@ -1043,10 +1043,10 @@ asistente. Lo que en el producto actual tenía el perfil «Cajero» lo tiene aqu
   worker en cada pasada (`base.relay`); `base/tests/test_relay.py` recorre el cobro, la anulación y la
   devolución hasta la ficha.
 - Datos de salud (F32): `HealthRecord`, una fila por ficha, y su permiso en el libro `Consent` con
-  `purpose = "health"` y sin canal. Sus cuatro operaciones (`customer.health.*`) no declaran `ai` ni
-  `expose_api`: los datos de salud no llegan al asistente ni a las API keys (RGPD art. 9,
-  minimización). No salen en la lista, la búsqueda, la exportación ni `customer.customer.detail`.
-- Toda operación (salvo las de salud) declara `ai` (descripción para el asistente y, en las escrituras, `risk`) y todo
+  `purpose = "health"` y sin canal. Sus cuatro operaciones (`customer.health.*`) declaran
+  `ai=INTERNAL` y no `expose_api`: los datos de salud no llegan al asistente ni a las API keys (RGPD
+  art. 9, minimización). No salen en la lista, la búsqueda, la exportación ni `customer.customer.detail`.
+- Toda operación declara `ai` (descripción para el asistente y, en las escrituras, `risk`; las de salud, `INTERNAL`) y todo
   campo de `schemas.py` su descripción: son la herramienta del asistente. Las referencias humanas
   (nombre, teléfono, email) las resuelve `queries.find_customer`, solo entre fichas vivas.
 - Búsqueda: cada ficha guarda `search_text` (nombre, email, teléfono, NIF y empresa en minúsculas y
