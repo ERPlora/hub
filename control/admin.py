@@ -34,8 +34,8 @@ from base import admin as base_admin
 from base.registry import REGISTRY_SCOPE
 from control.models import Cluster, Hub
 from control.queries import cluster_sizes
-from control.schemas import ClusterIdIn, ClusterIn, ClusterSizesIn, ClusterUpdateIn, HubMoveIn
-from control.services import CLUSTER_FIELDS, cluster_close, cluster_create, cluster_delete, cluster_update, hub_move
+from control.schemas import ClusterIdIn, ClusterIn, ClusterSizesIn, ClusterUpdateIn, HubIdIn, HubMoveIn
+from control.services import CLUSTER_FIELDS, cluster_close, cluster_create, cluster_delete, cluster_update, hub_move, hub_move_cancel
 
 
 def staff_context(request: HttpRequest) -> OperationContext:
@@ -282,7 +282,7 @@ class HubAdmin(base_admin.HubAdmin):
     )
     list_filter = ("status", "cluster", "schema_state", "is_demo")
     list_select_related = ("cluster", "moving_to")
-    actions = [*base_admin.HubAdmin.actions, "move_to_cluster"]
+    actions = [*base_admin.HubAdmin.actions, "move_to_cluster", "cancel_the_move"]
 
     @admin.action(description=gettext_lazy("Move to cluster…"), permissions=["move"])
     def move_to_cluster(self, request: HttpRequest, queryset):
@@ -321,6 +321,30 @@ class HubAdmin(base_admin.HubAdmin):
                 messages.SUCCESS,
             )
         return None
+
+    @admin.action(description=gettext_lazy("Cancel the move"), permissions=["move"])
+    def cancel_the_move(self, request: HttpRequest, queryset) -> None:
+        """Ask the worker to undo each chosen hub's move (``control.hub.move_cancel``): back on its own cluster."""
+        ctx = staff_context(request)
+        asked = 0
+        for hub in queryset:
+            try:
+                hub_move_cancel(ctx, HubIdIn(id=hub.pk))
+            except OperationError as refused:
+                self.message_user(request, f"{hub.slug}: {refused.message}", messages.ERROR)
+                continue
+            asked += 1
+        if asked:
+            self.message_user(
+                request,
+                ngettext(
+                    "%(count)d move will be undone: the hub goes back to its cluster within a minute.",
+                    "%(count)d moves will be undone: each hub goes back to its cluster within a minute.",
+                    asked,
+                )
+                % {"count": asked},
+                messages.SUCCESS,
+            )
 
     def has_move_permission(self, request: HttpRequest) -> bool:
         return is_platform_admin(request)

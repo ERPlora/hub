@@ -13,4 +13,7 @@ CLUSTER_DELETED = "control.cluster.deleted"
 #: moves it (``base.tenancy.move``).
 HUB_MOVE_REQUESTED = "control.hub.move_requested"
 
-ALL = [CLUSTER_CREATED, CLUSTER_UPDATED, CLUSTER_CLOSED, CLUSTER_DELETED, HUB_MOVE_REQUESTED]
+#: A move was asked to be undone (``id``, ``slug``); the worker puts the hub back on its origin.
+HUB_MOVE_CANCEL_REQUESTED = "control.hub.move_cancel_requested"
+
+ALL = [CLUSTER_CREATED, CLUSTER_UPDATED, CLUSTER_CLOSED, CLUSTER_DELETED, HUB_MOVE_REQUESTED, HUB_MOVE_CANCEL_REQUESTED]

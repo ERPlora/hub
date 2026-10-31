@@ -237,6 +237,24 @@ class TestUpdate:
         cluster.refresh_from_db()
         assert (cluster.host, cluster.port) == ("writer-1.example", 5432)
 
+    @pytest.mark.parametrize("held_by", ["a hub on its way", "a moved copy", "a leftover of an undone move"])
+    def test_its_writer_never_changes_under_what_is_coming_or_kept_there(self, admin_ctx, held_by):
+        from control.models import LeftoverDatabase, MovedCopy
+
+        cluster = a_cluster()
+        hub = Hub.objects.create(slug="acme", status=Hub.Status.READY, db_name=f"hub_{uuid.uuid7().hex}")
+        if held_by == "a hub on its way":
+            Hub.objects.filter(pk=hub.pk).update(moving_to=cluster)
+        elif held_by == "a moved copy":
+            MovedCopy.objects.create(hub=hub, cluster=cluster, db_name=f"hub_move_{hub.id.hex}", moved_at="2026-10-31T10:00Z")
+        else:
+            LeftoverDatabase.objects.create(hub=hub, cluster=cluster, db_name=hub.db_name, noted_at="2026-10-31T10:00Z")
+
+        with pytest.raises(Conflict) as refused:
+            services.cluster_update(admin_ctx, update_in(cluster, host="writer-9.example"))
+
+        assert refused.value.code == "control.cluster_holds_hubs"
+
     def test_its_writer_changes_while_it_holds_none_but_purged_demos(self, admin_ctx):
         cluster = a_cluster()
         Hub.objects.create(slug="demo-0000beef", is_demo=True, status=Hub.Status.PURGED, cluster=cluster)
@@ -444,6 +462,17 @@ class TestMove:
         full.save(update_fields=["max_hubs"])
         assert services.hub_move(admin_ctx, HubMoveIn(hub=hub.pk, cluster=full.pk)).moving_to == full.pk
 
+    def test_a_demo_never_moves(self, admin_ctx, small):
+        from control.schemas import HubMoveIn
+
+        new = a_cluster()
+        demo = self.a_hub(slug="demo-0000beef", is_demo=True)
+
+        with pytest.raises(Conflict) as refused:
+            services.hub_move(admin_ctx, HubMoveIn(hub=demo.pk, cluster=new.pk))
+
+        assert refused.value.code == "control.hub_is_demo"
+
     def test_a_database_too_large_for_a_copy_waits_for_logical_replication(self, admin_ctx, monkeypatch):
         from control import queries
         from control.schemas import HubMoveIn
@@ -504,18 +533,20 @@ class TestMove:
         assert hub.moving_to_id is None
 
 
-def test_a_cluster_a_hub_is_moving_to_or_that_keeps_a_moved_copy_is_never_deleted(admin_ctx):
-    from control.models import MovedCopy
+def test_a_cluster_a_hub_is_moving_to_or_that_keeps_a_moved_copy_or_a_leftover_is_never_deleted(admin_ctx):
+    from control.models import LeftoverDatabase, MovedCopy
 
     target, old = a_cluster(), a_cluster(name="old", host="writer-old.example")
+    dead = a_cluster(name="dead", host="writer-dead.example")
     hub = Hub.objects.create(slug="acme", status=Hub.Status.READY, db_name=f"hub_{uuid.uuid7().hex}", moving_to=target)
     MovedCopy.objects.create(hub=hub, cluster=old, db_name=f"hub_move_{hub.id.hex}", moved_at="2026-10-31T10:00Z")
+    LeftoverDatabase.objects.create(hub=hub, cluster=dead, db_name=hub.db_name, noted_at="2026-10-31T10:00Z")
 
-    for cluster in (target, old):
+    for cluster in (target, old, dead):
         with pytest.raises(Conflict) as refused:
             services.cluster_delete(admin_ctx, ClusterIdIn(id=cluster.pk))
         assert refused.value.code == "control.cluster_holds_hubs"
-    assert Cluster.objects.count() == 2
+    assert Cluster.objects.count() == 3
 
 
 def test_the_move_is_an_internal_command_of_control():
@@ -524,3 +555,61 @@ def test_the_move_is_an_internal_command_of_control():
 
     op = get_operation("control.hub.move")
     assert (op.kind, op.app_label, op.ai_spec(), op.fn.__module__) == ("command", "control", INTERNAL, "control.services")
+
+
+class TestCancelAMove:
+    """``control.hub.move_cancel`` asks the worker to undo a move, started or not (review of W8, round 2): its note is
+    marked to be undone, made if the move had not started, with the origin's schema record; the worker puts the hub back
+    on its origin on its next pass (``base.tenancy.move``), the only one that may reopen it."""
+
+    def test_a_move_not_started_yet_is_marked_to_be_undone_with_the_origins_record(self, admin_ctx):
+        from control.models import MovedCopy
+        from control.schemas import HubIdIn
+
+        old, new = a_cluster(), a_cluster(name="cluster-2", host="writer-2.example")
+        hub = Hub.objects.create(
+            slug="acme",
+            status=Hub.Status.READY,
+            db_name=f"hub_{uuid.uuid7().hex}",
+            cluster=old,
+            moving_to=new,
+            schema_state="behind",
+            schema_apps={"base": "0001_initial"},
+        )
+
+        out = services.hub_move_cancel(admin_ctx, HubIdIn(id=hub.pk))
+
+        [note] = MovedCopy.objects.filter(hub=hub)
+        assert (note.cluster_id, note.moved_at, note.undoing) == (old.pk, None, True)
+        assert (note.schema_state, note.schema_apps) == ("behind", {"base": "0001_initial"})
+        assert note.db_name.endswith(f"_move_{hub.id.hex}")
+        hub.refresh_from_db()
+        assert hub.moving_to_id == new.pk and hub.last_error.startswith("move_cancelled")
+        assert (out.id, out.moving_to) == (hub.pk, new.pk)
+        assert events("control.hub.move_cancel_requested") == [{"id": str(hub.pk), "slug": "acme"}]
+
+    def test_a_move_in_course_keeps_its_note_marked_to_be_undone(self, admin_ctx):
+        from control.models import MovedCopy
+        from control.schemas import HubIdIn
+
+        new = a_cluster()
+        hub = Hub.objects.create(slug="acme", status=Hub.Status.READY, db_name=f"hub_{uuid.uuid7().hex}", moving_to=new)
+        MovedCopy.objects.create(hub=hub, db_name=f"hub_move_{hub.id.hex}", schema_state="current", schema_apps={})
+
+        services.hub_move_cancel(admin_ctx, HubIdIn(id=hub.pk))
+
+        [note] = MovedCopy.objects.filter(hub=hub)
+        assert (note.undoing, note.schema_state, note.db_name) == (True, "current", f"hub_move_{hub.id.hex}")
+
+    def test_a_hub_that_is_not_moving_is_refused_and_support_may_not(self, admin_ctx):
+        from control.schemas import HubIdIn
+
+        hub = Hub.objects.create(slug="acme", status=Hub.Status.READY, db_name=f"hub_{uuid.uuid7().hex}")
+
+        with pytest.raises(Conflict) as refused:
+            services.hub_move_cancel(admin_ctx, HubIdIn(id=hub.pk))
+        assert refused.value.code == "control.hub_not_moving"
+        with pytest.raises(PermissionDenied):
+            services.hub_move_cancel(as_actor(person("support", is_staff=True)), HubIdIn(id=hub.pk))
+        with pytest.raises(NotFound):
+            services.hub_move_cancel(admin_ctx, HubIdIn(id=uuid.uuid7()))

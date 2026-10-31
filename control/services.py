@@ -40,7 +40,16 @@ from base.registry import internal_only
 from base.tenancy.credentials import APP, CredentialsUnavailable, credentials_for
 from control import events, queries
 from control.models import Cluster, Hub, HubDue, LeftoverDatabase, MovedCopy
-from control.schemas import ClusterDeletedOut, ClusterIdIn, ClusterIn, ClusterOut, ClusterUpdateIn, HubMoveIn, HubMoveOut
+from control.schemas import (
+    ClusterDeletedOut,
+    ClusterIdIn,
+    ClusterIn,
+    ClusterOut,
+    ClusterUpdateIn,
+    HubIdIn,
+    HubMoveIn,
+    HubMoveOut,
+)
 
 #: What a cluster is registered with (``ClusterIn``), in the model's own names.
 CLUSTER_FIELDS = tuple(ClusterIn.model_fields)
@@ -62,6 +71,17 @@ def platform_admin_only(ctx: OperationContext) -> None:
 def living_hubs(cluster: Cluster):
     """The hubs on ``cluster`` that still have, or will have, a database there: all but the purged demos."""
     return Hub.objects.filter(cluster=cluster).exclude(status=Hub.Status.PURGED)
+
+
+def _holds_anything(cluster: Cluster) -> bool:
+    """Whether a database of a hub is, or is about to be, on ``cluster``: a living hub, one on its way there, or a
+    copy or a leftover of a move kept there."""
+    return (
+        living_hubs(cluster).exists()
+        or Hub.objects.filter(moving_to=cluster).exists()
+        or MovedCopy.objects.filter(cluster=cluster).exists()
+        or LeftoverDatabase.objects.filter(cluster=cluster).exists()
+    )
 
 
 def cluster_answer(cluster: Cluster) -> dict:
@@ -136,7 +156,7 @@ def cluster_update(ctx: OperationContext, data: ClusterUpdateIn) -> dict:
     if not changed:
         return cluster_answer(cluster)
     moved = [field for field in WRITER_FIELDS if field in changed]
-    if moved and living_hubs(cluster).exists():
+    if moved and _holds_anything(cluster):
         message = gettext(
             "The databases of its hubs are on this writer: move them to another cluster before changing it."
         )
@@ -182,12 +202,14 @@ def cluster_delete(ctx: OperationContext, data: ClusterIdIn) -> dict:
             % {"count": held},
             code="control.cluster_holds_hubs",
         )
-    kept = MovedCopy.objects.filter(cluster=cluster).count()
+    kept = MovedCopy.objects.filter(cluster=cluster).count() + LeftoverDatabase.objects.filter(cluster=cluster).count()
     if kept:
         raise Conflict(
             ngettext(
-                "%(count)d copy of a hub that moved is kept on this cluster for a few days: it is deleted after it.",
-                "%(count)d copies of hubs that moved are kept on this cluster for a few days: it is deleted after them.",
+                "%(count)d database left behind by a move is still kept on this cluster: it is deleted once it is "
+                "dropped.",
+                "%(count)d databases left behind by moves are still kept on this cluster: it is deleted once they are "
+                "dropped.",
                 kept,
             )
             % {"count": kept},
@@ -223,6 +245,8 @@ def hub_move(ctx: OperationContext, data: HubMoveIn) -> dict:
         raise _move_refused(
             gettext("Only a ready hub with a database of its own moves."), "control.hub_not_movable"
         )
+    if hub.is_demo:
+        raise _move_refused(gettext("A demo does not move: it ends on its own."), "control.hub_is_demo")
     if hub.moving_to_id is not None:
         raise _move_refused(gettext("This hub is already moving."), "control.hub_moving")
     if hub.cluster_id == target.pk:
@@ -252,6 +276,44 @@ def hub_move(ctx: OperationContext, data: HubMoveIn) -> dict:
         {"id": str(hub.pk), "slug": hub.slug, "from": str(origin) if origin else "", "to": str(target.pk)},
     )
     return {"id": hub.pk, "slug": hub.slug, "cluster": origin, "moving_to": target.pk}
+
+
+# Not an assistant tool: the platform's admins, in the Hub admin («Cancel the move»).
+@operation(
+    "control.hub.move_cancel", kind="command", permission=None, input=HubIdIn, output=HubMoveOut, ai=INTERNAL
+)
+def hub_move_cancel(ctx: OperationContext, data: HubIdIn) -> dict:
+    """Ask the worker to undo the move of ``data.id``, started or not: its note is marked to be undone (made, with the
+    origin's schema record, if the worker had not started); the worker puts the hub back on its origin."""
+    from base.tenancy import names
+    from base.tenancy.connections import control_name
+
+    platform_admin_only(ctx)
+    hub = Hub.objects.select_for_update().filter(pk=data.id).first()
+    if hub is None:
+        raise NotFound(gettext("No hub has this id."))
+    if hub.moving_to_id is None:
+        raise _move_refused(gettext("This hub is not moving."), "control.hub_not_moving")
+    note = MovedCopy.objects.filter(hub=hub, moved_at__isnull=True).first()
+    if note is None:
+        MovedCopy.objects.update_or_create(
+            cluster_id=hub.cluster_id,
+            db_name=names.moved_db_name(control_name(), hub.id),
+            defaults={
+                "hub": hub,
+                "moved_at": None,
+                "undoing": True,
+                "schema_state": hub.schema_state,
+                "schema_apps": hub.schema_apps,
+            },
+        )
+    else:
+        note.undoing = True
+        note.save(update_fields=["undoing"])
+    hub.last_error = "move_cancelled: the move was cancelled in the Hub admin."
+    hub.save(update_fields=["last_error", "updated_at"])
+    record_event(ctx, events.HUB_MOVE_CANCEL_REQUESTED, {"id": str(hub.pk), "slug": hub.slug})
+    return {"id": hub.pk, "slug": hub.slug, "cluster": hub.cluster_id, "moving_to": hub.moving_to_id}
 
 
 # ── The worker's side of a move (``base.tenancy.move``): no operations, the platform's own steps on control ─────────

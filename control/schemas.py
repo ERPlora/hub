@@ -86,3 +86,9 @@ class HubMoveOut(Schema):
     slug: str
     cluster: UUID | None
     moving_to: UUID | None
+
+
+class HubIdIn(Schema):
+    """Which hub (``control.hub.move_cancel``)."""
+
+    id: UUID

@@ -73,9 +73,14 @@ def validate_moved(name: str, *, control: str) -> str:
     ``InvalidDatabaseName``. What the move renames a hub's database to and drops after its days
     (``base.tenancy.move``)."""
     validate(name, control=control)
-    if not re.fullmatch(rf"{re.escape(control)}_{MOVED_INFIX}_{_HEX}", name):
+    if not is_moved(name, control=control):
         raise InvalidDatabaseName(f"{name!r} is no copy a hub of {control!r} left behind when it moved.")
     return name
+
+
+def is_moved(name: str, *, control: str) -> bool:
+    """Whether ``name`` is the copy a hub of ``control`` left behind when it moved (never a hub's own database)."""
+    return bool(re.fullmatch(rf"{re.escape(control)}_{MOVED_INFIX}_{_HEX}", name))
 
 
 def hub_db_name(control: str, hub_id: uuid.UUID) -> str:

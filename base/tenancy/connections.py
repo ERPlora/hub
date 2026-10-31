@@ -95,10 +95,13 @@ def _take_this_threads_role(alias: str) -> None:
 
 
 def _not_a_template(name: str, control: str) -> str:
-    """``name``, unless it is one of ``control``'s templates (``InvalidDatabaseName``): only the migrator reaches those."""
+    """``name``, unless it is one of ``control``'s templates (``InvalidDatabaseName``): only the migrator reaches those;
+    nor the copy a hub left behind when it moved (``base.tenancy.move``): closed to the app, only ever dropped."""
     template = names.template_db_name(control)
     if name == template or name.startswith(f"{template}_"):
         raise names.InvalidDatabaseName(f"{name!r} is a template: it is only cloned, never a hub's database.")
+    if names.is_moved(name, control=control):
+        raise names.InvalidDatabaseName(f"{name!r} is the copy a hub left behind when it moved, never a hub's database.")
     return name
 
 

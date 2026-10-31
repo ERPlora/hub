@@ -467,3 +467,11 @@ def test_the_migrators_alias_of_a_moved_database_reaches_its_new_writer(secrets)
         "writer-3.example",
         5434,
     )
+
+
+def test_the_copy_a_hub_left_behind_never_gets_a_hubs_alias(secrets):
+    hub = a_hub(on=cluster())
+    hub.db_name = names.moved_db_name(tenancy_connections.control_name(), hub.id)
+
+    with pytest.raises(names.InvalidDatabaseName, match="left behind"):
+        tenancy_connections.register_hub_alias(hub)

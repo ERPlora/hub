@@ -476,12 +476,46 @@ class TestMoveToCluster:
         assert hub.moving_to_id is None
 
 
+class TestCancelTheMove:
+    """«Cancel the move»: the worker puts each chosen hub back on its origin (``control.hub.move_cancel``)."""
+
+    def test_asks_the_worker_to_undo_the_chosen_moves_and_says_which_were_not_moving(self, client, root):
+        from control.models import MovedCopy
+
+        target = a_cluster(name="cluster-2", host="writer-2.example")
+        moving = Hub.objects.create(slug="acme", status=Hub.Status.READY, db_name=f"hub_{uuid.uuid7().hex}", moving_to=target)
+        still = Hub.objects.create(slug="bistro", status=Hub.Status.READY, db_name=f"hub_{uuid.uuid7().hex}")
+
+        html = client.post(
+            HUBS,
+            {"action": "cancel_the_move", "_selected_action": [str(moving.pk), str(still.pk)]},
+            HTTP_HOST=PLATFORM,
+            follow=True,
+        ).content.decode().lower()
+
+        assert "1 move will be undone: the hub goes back to its cluster" in html
+        assert "bistro: this hub is not moving." in html
+        assert MovedCopy.objects.get(hub=moving).undoing is True
+
+    def test_support_neither_sees_it_nor_runs_it(self, client, support):
+        target = a_cluster(name="cluster-2", host="writer-2.example")
+        moving = Hub.objects.create(slug="acme", status=Hub.Status.READY, db_name=f"hub_{uuid.uuid7().hex}", moving_to=target)
+
+        assert "cancel_the_move" not in page(client, HUBS)
+        client.post(HUBS, {"action": "cancel_the_move", "_selected_action": [str(moving.pk)]}, HTTP_HOST=PLATFORM)
+
+        from control.models import MovedCopy
+
+        assert not MovedCopy.objects.exists()
+
+
 def test_the_move_speaks_spanish():
     from django.utils import translation
     from django.utils.translation import gettext, ngettext
 
     with translation.override("es"):
         assert str(control_admin.HubAdmin.move_to_cluster.short_description) == "Mover a otro clúster…"
+        assert str(control_admin.HubAdmin.cancel_the_move.short_description) == "Cancelar el traslado"
         assert gettext("Only a ready hub with a database of its own moves.") == (
             "Solo se mueve un hub listo con base de datos propia."
         )

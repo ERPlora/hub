@@ -1178,9 +1178,9 @@ SERVED_STATUSES = (Hub.Status.READY, Hub.Status.CANCELLED, Hub.Status.ARCHIVING)
 def hubs_to_serve(now: dt.datetime) -> list[Hub]:
     """The hubs with their own database the worker relays the outbox and runs the tasks of, each in its database, by
     id: ready ones and businesses that left but keep it (cancelled, being archived); never one being made, dropped or
-    purged, nor a demo whose time is up."""
+    purged, a demo whose time is up, nor one moving to another cluster (its database is being copied)."""
     return list(
-        Hub.objects.filter(status__in=SERVED_STATUSES)
+        Hub.objects.filter(status__in=SERVED_STATUSES, moving_to__isnull=True)
         .exclude(db_name="")
         .exclude(is_demo=True, expires_at__lte=now)
         .select_related("cluster")
@@ -1289,6 +1289,11 @@ def place_hub(hub_id: UUID) -> Hub:
             .values_list("cluster")
             .annotate(count=Count("pk"))
         )
+        # The hubs on their way to a cluster (``control.hub.move``) take their place there already.
+        for cluster_id, count in Hub.objects.filter(moving_to__in=clusters).values_list("moving_to").annotate(
+            count=Count("pk")
+        ):
+            placed[cluster_id] = placed.get(cluster_id, 0) + count
         room = [
             cluster
             for cluster in clusters
