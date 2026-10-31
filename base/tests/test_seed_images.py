@@ -79,9 +79,8 @@ def real_library() -> image_catalog.Library:
     root = Path(settings.CATALOG_DIR or settings.BASE_DIR.parent / "blueprints" / "img")
     if not (root / image_catalog.MANIFEST).is_file():
         pytest.fail(
-            f"The shared image library is not at {root}: ERPlora/blueprints is a private repo, so clone it beside "
-            "this repo with a GitHub account that has access to it (gh repo clone ERPlora/blueprints ../blueprints) "
-            "or point CATALOG_DIR at its img/."
+            f"The shared image library is not at {root}: clone ERPlora/blueprints beside this repo "
+            "(git clone https://github.com/ERPlora/blueprints.git ../blueprints) or point CATALOG_DIR at its img/."
         )
     return image_catalog._parse((root / image_catalog.MANIFEST).read_bytes())
 
