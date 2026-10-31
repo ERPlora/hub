@@ -1,7 +1,8 @@
 # Peticiones de UI de la app `base`
 
 Lo que las pantallas de la plataforma necesitan de `@erplora/ui` y todavía no está. Mientras tanto usan lo más
-parecido que ya existe (dicho en cada punto); se cambia en cuanto llegue.
+parecido que ya existe (dicho en cada punto); se cambia en cuanto llegue. Revisado al cerrar la app (2026-11-01)
+contra `@erplora/ui` `667b7fb`: no ha llegado ninguna de las tres.
 
 ## Iconos de documento en el registro del shell (`packages/ui/src/shell/icons.ts`)
 
