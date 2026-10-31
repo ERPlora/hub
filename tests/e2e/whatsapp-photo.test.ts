@@ -7,6 +7,14 @@
 // same database lost its sessions to the device cap (BASE-G57; website-flows.spec.ts, WEBSITE-F11: 401). Last, because
 // what the hook pushes after it (a seed again, erplora.com's plan put back) would leave the photo changed once more.
 // whatsapp-photo.spec.ts proves the pair itself against the run's real erplora.com.
+//
+// Seeding is not the only way in: every spec that drives the WhatsApp inbox (it imports whatsapp-helpers.ts) can make
+// the Hub call erplora.com — a template sent to Meta's review, a message sent — and erplora.com, which knows `a` since
+// the stack's seed, answers some of those calls by pushing `a`'s photo (Meta's refusal of the seed's made-up permission
+// marks the number to reconnect, and the photo goes with it). fix-whatsapp-inbox-template-header-thumbnail.spec.ts
+// never seeded, so this guard did not look at it, and in a whole run it left `a` on the Free plan for every spec after
+// it (hub#528: nine of them failed with 401 or 402 `base.app_limit_reached`). So such a spec keeps `a`'s photo too
+// (`keepPhoto()`, or the seed that calls it) and, keeping it, puts it back last like a seeding scope.
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -40,6 +48,18 @@ function testCall(node: ts.Node): string | undefined {
 const callsTo = (node: ts.Node | undefined, name: string): boolean =>
   node !== undefined && ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === name;
 
+/** The hook `test.beforeAll(keepPhoto)`: `keepPhoto` handed over as the hook itself. */
+const hookIsKeepPhoto = (node: ts.Node): boolean => {
+  if (testCall(node) !== 'beforeAll' || !ts.isCallExpression(node)) return false;
+  const fn = node.arguments.at(-1);
+  return fn !== undefined && ts.isIdentifier(fn) && fn.text === 'keepPhoto';
+};
+
+/** `node` keeps `a`'s photo for a later `restorePhoto()`: `keepPhoto()` (or `test.beforeAll(keepPhoto)`), or
+ *  `seedErplora(…)`, which calls it. */
+const keeps = (node: ts.Node): boolean =>
+  callsTo(node, 'seedErplora') || callsTo(node, 'keepPhoto') || hookIsKeepPhoto(node);
+
 /** The hook `test.afterAll(…)` ends by putting `a`'s photo back: `restorePhoto()` is its last statement. */
 function endsRestoring(hook: ts.CallExpression): boolean {
   const fn = hook.arguments.at(-1);
@@ -51,8 +71,9 @@ function endsRestoring(hook: ts.CallExpression): boolean {
   return last !== undefined && ts.isExpressionStatement(last) && callsTo(last.expression, 'restorePhoto');
 }
 
-/** The scopes of the spec `file` (`source`) that call `seedErplora` and do not end an `afterAll` of their own with
- *  `restorePhoto()`: the file itself, or `<file> › <describe's title>` (nested ones joined the same way). */
+/** The scopes of the spec `file` (`source`) that keep `a`'s photo (`keepPhoto` or `seedErplora`) and do not end an
+ *  `afterAll` of their own with `restorePhoto()`: the file itself, or `<file> › <describe's title>` (nested ones joined
+ *  the same way). */
 function unrestored(file: string, source: string): string[] {
   const missing: string[] = [];
   const scope = (name: string, body: ts.Node): void => {
@@ -69,7 +90,7 @@ function unrestored(file: string, source: string): string[] {
         }
       }
       if (call === 'afterAll' && ts.isCallExpression(node) && endsRestoring(node)) restores = true;
-      if (callsTo(node, 'seedErplora')) seeds = true;
+      if (keeps(node)) seeds = true;
       ts.forEachChild(node, walk);
     };
     ts.forEachChild(body, walk);
@@ -79,12 +100,78 @@ function unrestored(file: string, source: string): string[] {
   return missing;
 }
 
+/** The spec `file` (`source`), named, when it drives the WhatsApp inbox — it imports whatsapp-helpers.ts — and never
+ *  keeps `a`'s photo: no `keepPhoto()` in a `test.beforeAll` of its own and no `seedErplora(…)` anywhere. Whatever it
+ *  makes the Hub ask erplora.com may bring erplora.com's photo of `a` back (hub#528). */
+function unkept(file: string, source: string): string[] {
+  const sourceFile = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+  const drivesInbox = sourceFile.statements.some(
+    (statement) =>
+      ts.isImportDeclaration(statement) &&
+      ts.isStringLiteral(statement.moduleSpecifier) &&
+      statement.moduleSpecifier.text === './whatsapp-helpers',
+  );
+  if (!drivesInbox) return [];
+  let kept = false;
+  const walk = (node: ts.Node, inBeforeAll: boolean): void => {
+    if (callsTo(node, 'seedErplora') || hookIsKeepPhoto(node) || (inBeforeAll && callsTo(node, 'keepPhoto'))) kept = true;
+    const within = inBeforeAll || testCall(node) === 'beforeAll';
+    ts.forEachChild(node, (child) => walk(child, within));
+  };
+  walk(sourceFile, false);
+  return kept ? [] : [file];
+}
+
 describe('every spec that seeds erplora.com', () => {
   it('puts a’s photo back last in its afterAll', () => {
     const specs = e2eSpecs().map((file) => ({ file, source: readFileSync(join(HERE, file), 'utf8') }));
     // Not a guard that finds nothing to guard: the WhatsApp specs seed erplora.com.
     expect(specs.filter(({ source }) => source.includes('seedErplora(')).length).toBeGreaterThan(0);
     expect(specs.flatMap(({ file, source }) => unrestored(file, source))).toEqual([]);
+  });
+});
+
+describe('every spec that drives the WhatsApp inbox', () => {
+  it('keeps a’s photo first (keepPhoto or the seed) and so puts it back last', () => {
+    const specs = e2eSpecs().map((file) => ({ file, source: readFileSync(join(HERE, file), 'utf8') }));
+    // Not a guard that finds nothing to guard: specs that never seed drive the inbox too.
+    const drivers = specs.filter(({ source }) => source.includes("from './whatsapp-helpers'"));
+    expect(drivers.filter(({ source }) => !source.includes('seedErplora(')).length).toBeGreaterThan(0);
+    expect(drivers.flatMap(({ file, source }) => unkept(file, source))).toEqual([]);
+  });
+});
+
+describe('unkept', () => {
+  const driving = (hooks: string) => `
+    import { cleanUp, keepPhoto, pushChannel, restorePhoto } from './whatsapp-helpers';
+    ${hooks}
+    test('x', () => { pushChannel({ status: 'connected' }); });`;
+
+  it('names a spec that drives the inbox and never keeps the photo (fix-whatsapp-inbox-template-header-thumbnail, hub#528)', () => {
+    expect(unkept('x.spec.ts', driving('test.beforeAll(() => cleanUp()); test.afterAll(() => cleanUp());'))).toEqual(['x.spec.ts']);
+    expect(unkept('x.spec.ts', driving('test.afterAll(() => { cleanUp(); restorePhoto(); });'))).toEqual(['x.spec.ts']);
+  });
+
+  it('passes one that keeps it in a beforeAll, or seeds', () => {
+    expect(unkept('x.spec.ts', driving('test.beforeAll(() => { keepPhoto(); cleanUp(); });'))).toEqual([]);
+    expect(unkept('x.spec.ts', driving('test.beforeAll(() => keepPhoto());'))).toEqual([]);
+    expect(unkept('x.spec.ts', driving('test.beforeAll(keepPhoto);'))).toEqual([]);
+    expect(unkept('x.spec.ts', driving("test.describe('one', () => { test.beforeAll(async () => { keepPhoto(); }); });"))).toEqual([]);
+    expect(unkept('x.spec.ts', driving("test('seeds', () => { expect(seedErplora()).toEqual({}); });"))).toEqual([]);
+  });
+
+  it('names one that keeps it only once a test has already run (too late: erplora.com may have pushed)', () => {
+    expect(unkept('x.spec.ts', driving("test('late', () => { keepPhoto(); });"))).toEqual(['x.spec.ts']);
+  });
+
+  it('leaves alone a spec that does not drive the inbox', () => {
+    expect(unkept('x.spec.ts', "import { A } from './helpers'; test.afterAll(() => cleanUp());")).toEqual([]);
+  });
+
+  it('and unrestored wants the restore of a scope that keeps it', () => {
+    expect(unrestored('x.spec.ts', driving('test.beforeAll(() => keepPhoto()); test.afterAll(() => cleanUp());'))).toEqual(['x.spec.ts']);
+    expect(unrestored('x.spec.ts', driving('test.beforeAll(keepPhoto); test.afterAll(() => cleanUp());'))).toEqual(['x.spec.ts']);
+    expect(unrestored('x.spec.ts', driving('test.beforeAll(() => keepPhoto()); test.afterAll(() => { cleanUp(); restorePhoto(); });'))).toEqual([]);
   });
 });
 

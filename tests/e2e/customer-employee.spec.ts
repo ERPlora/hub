@@ -1,7 +1,8 @@
 // What an employee can do with customers (apps.py `role_permissions`: `customer.view` and
 // `customer.manage`), in Ioan's Chrome: sees the list and adds a customer, imports, edits and notes
-// on the card; does not get «Export CSV», «Delete», «Merge with…» nor «Erase personal data», and the
-// server refuses the export to them too (403), whatever the screen shows.
+// on the card; gets «Merge with…», which a manager approves with their PIN (BASE-F84: customer-approval.spec.ts);
+// does not get «Export CSV», «Delete» nor «Erase personal data», and the server refuses the export to them too
+// (403), whatever the screen shows.
 import { expect, test } from '@playwright/test';
 
 import { cleanUp, customersReady, e2eName, idFromUrl, inputOf, rowNamed, searchList } from './customer-helpers';
@@ -30,13 +31,14 @@ test('the employee sees and creates customers but neither exports nor deletes', 
     await expect(row.locator('[data-testid$=-delete]')).toHaveCount(0);
     await page.screenshot({ path: shot('customer-employee-list') });
 
-    // On the card: Edit only; the note form is there.
+    // On the card: Edit and Merge with… (with a manager's approval); the note form is there.
     await row.click();
     await page.waitForURL(/\/customer\/customers\/[0-9a-f-]+$/);
     idFromUrl(page);
     const actions = shown(page).locator('[data-testid=customer-detail-actions] ion-button');
-    await expect(actions).toHaveCount(1);
-    await expect(actions.first()).toHaveAttribute('data-testid', 'customer-detail-edit');
+    await expect(actions).toHaveCount(2);
+    await expect(actions.nth(0)).toHaveAttribute('data-testid', 'customer-detail-edit');
+    await expect(actions.nth(1)).toHaveAttribute('data-testid', 'customer-detail-merge');
     await expect(shown(page).locator('[data-testid=customer-note-form]')).toBeVisible();
     await page.screenshot({ path: shot('customer-employee-card') });
 

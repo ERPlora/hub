@@ -322,13 +322,15 @@ def test_an_automation_built_from_an_older_version_lacks_the_clauses_its_app_add
     assert recipes.missing_clauses(recipe, older) == {"input.by_customer": {"eq": True}}
 
 
-def test_nothing_to_repair_when_it_has_the_clauses_or_was_built_from_this_version_or_starts_otherwise(declared):
+def test_nothing_to_repair_when_it_has_the_clauses_or_starts_otherwise(declared):
     declared(("appointment", declaration()))
     recipe = recipes.find("appointment/gap")
     current = recipes.digest(recipe)
     event = "appointment.appointment.cancelled"
-    # Built from today's version: whatever the owner left out was their choice, not a fault.
-    assert recipes.missing_clauses(recipe, make_flow(trigger_event=event, trigger_filter={}, recipe_digest=current)) == {}
+    # Built from today's version and its clause taken off: it still lacks it. A clause of its app counts whenever it
+    # was built (FIX-HUB-FLOW-FACTORY-SAFETY-FIX-WAITS-FOR-THE-OWNERS-UPDATE): before, this was «the owner's choice».
+    taken_off = make_flow(trigger_event=event, trigger_filter={}, recipe_digest=current)
+    assert recipes.missing_clauses(recipe, taken_off) == {"input.by_customer": {"eq": True}}
     # It already has the clause (the owner's own value of it is kept: only a missing clause is a fault).
     narrowed = {"input.by_customer": {"eq": False}}
     older = make_flow(trigger_event=event, trigger_filter=narrowed, recipe_digest="0" * 64)

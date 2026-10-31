@@ -215,6 +215,39 @@ La cuenta del e2e está en inglés: la spec comprueba las cadenas `en`.
 Si la misma pila corre también specs de WhatsApp, su SaaS arranca como dice «WhatsApp» (abajo), con estas mismas
 variables más las del Graph: nunca con un `SSL_CERT_FILE` escrito a mano.
 
+## La QA del asistente con el modelo real (`qa/assistant-battery.spec.ts`)
+
+La batería de QA del asistente del Hub (`docs/plans/2026-10-31-qa-asistente.md` de erplora-next: bloque B, 21 a 34, y
+C35 a C37) con el **modelo de verdad** y el **índice de documentación de verdad**: una prueba por punto. Se salta sin
+`QA_REAL_PROVIDER=1`, así que la suite y la CI nunca la corren (gasta tokens de verdad, unos 20 turnos). Pide una pila
+propia (arriba, «Varias ejecuciones a la vez») con el SaaS arrancado con `ASSISTANT_SERVICE_PROVIDER=openai` (las
+huellas de la búsqueda; sin `e2e-local`), y en el entorno de la ejecución:
+
+- `QA_QWEN_API_KEY` y `QA_OPENAI_API_KEY`: las claves, solo en el entorno. Nunca en el repo, en el informe ni en una
+  captura: el informe y su JSON pasan por `redact` antes de escribirse.
+- `E2E_SAAS_DIR`: el checkout del SaaS de la pila.
+
+Una vez por ejecución, antes del primer punto: `register_apps` del Hub en el esquema `shared` de la BD del SaaS de la
+pila (la documentación de las apps), los proveedores reales por las operaciones del propio SaaS (`SEED_PY` de
+`assistant-battery.ts`: `qwen`, compatible con OpenAI, contesta con `qwen3.7-plus`; `openai`, de reserva con
+`gpt-5.4-mini` y de las huellas), `index_docs` (idempotente: solo calcula lo nuevo) y los mensajes del mes de `a` a
+cero. Cada punto pregunta en una conversación nueva, en `es` (C37 en `en`), guarda lo que pasó por
+`/api/assistant/turn` (herramientas, tarjeta, extractos de `base.docs.search`, errores), confirma la tarjeta de los
+«hazlo» escribiendo la palabra que pide (los demás la cancelan), comprueba el registro por la API del Hub y escribe
+`.artifacts/qa/<ejecución>/assistant-battery-B.md` (el informe, punto a punto) y `.artifacts/qa/<ejecución>/<punto>-<slug>.png`:
+cada ejecución en su carpeta, así que repetir puntos nunca pisa la evidencia de otra. Una prueba falla
+si falla su veredicto automático (`verdictOf`, probado con Vitest en `assistant-battery.test.ts`); la redacción de la
+respuesta nunca se comprueba: la lee una persona en el informe. C35 pone el mes de `a` al 80 % para ver moverse el pie
+(solo se pinta desde ahí, BASE-G122) y lo devuelve a lo gastado.
+
+```bash
+# Con la pila en marcha (Hub 8894, SaaS 8895 en el ejemplo) y sus variables exportadas:
+export QA_REAL_PROVIDER=1 E2E_SAAS_DIR=<saas-wt> QA_QWEN_API_KEY=… QA_OPENAI_API_KEY=…
+CI=1 pnpm e2e tests/e2e/qa/assistant-battery.spec.ts
+# Volver a preguntar algunos puntos en el informe de una ejecución anterior (su id, el de la cabecera del informe):
+QA_BATTERY_RUN=<id> CI=1 pnpm e2e tests/e2e/qa/assistant-battery.spec.ts --grep C35
+```
+
 ## WhatsApp (`whatsapp-*.spec.ts`)
 
 Las specs de WhatsApp usan el SaaS de la pila de verdad, y Meta lo hace el Graph de la ejecución
@@ -237,6 +270,14 @@ llamada saliente, también en las de `http://`: hasta que una spec de WhatsApp a
 asistente respondía 502 al Hub (`FileNotFoundError` de httpx) y `fix-flow-assistant-step.spec.ts` caía sin decir por
 qué. Si la orden falla (argumentos que no entiende o la autoridad que no se puede crear), lo dice en una línea y el
 SaaS arranca sin esas variables: las specs de WhatsApp paran entonces en segundos nombrando lo que falta.
+
+Con el Graph en marcha, erplora.com también empuja la foto de `a` (con su plan Gratis) cuando **contesta** al Hub, no
+solo al sembrar: una plantilla mandada a revisión que Meta rechaza por el permiso inventado de la siembra (`meta_code=190`)
+marca el número para reconectar y la foto va detrás. Por eso **toda spec que maneja la bandeja** (importa
+`whatsapp-helpers.ts`), siembre o no, guarda la foto de `a` con `keepPhoto()` en su `beforeAll` (o con `seedErplora`, que
+la llama) y la repone con `restorePhoto()` como último paso de su `afterAll`; `whatsapp-photo.test.ts` lo exige. Sin eso,
+`fix-whatsapp-inbox-template-header-thumbnail.spec.ts` dejaba `a` en el plan Gratis para el resto de la pasada y nueve
+specs posteriores caían con 401 o con 402 `base.app_limit_reached` (hub#528).
 
 ```bash
 # El SaaS de la pila (8031, Hub en 8030), desde su worktree; <hub-wt> es el worktree del Hub de la pila:
