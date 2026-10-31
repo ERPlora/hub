@@ -1335,7 +1335,8 @@
         "profile": "Mi perfil",
         "employees": "Empleados",
         "files": "Archivos",
-        "report": "Reportar un problema"
+        "report": "Reportar un problema",
+        "help": "Ayuda"
       },
       "setup": {
         "ask": "Pedírselo al asistente"
