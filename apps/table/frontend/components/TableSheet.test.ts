@@ -20,11 +20,15 @@ vi.mock('@ionic/vue', async (importOriginal) => {
 
 const SESSION = { id: 's1', status: 'open' };
 
-async function sheet(table: TableOut, options: { settings?: Record<string, unknown>; answers?: Record<string, [number, unknown]>; session?: typeof EMPLOYEE } = {}) {
+async function sheet(
+  table: TableOut,
+  options: { settings?: Record<string, unknown>; answers?: Record<string, [number, unknown]>; session?: typeof EMPLOYEE; locale?: 'en' | 'es' } = {},
+) {
   const m = await mountTable(TableSheet, {
     props: { open: true, table, settings: { ...SETTINGS, ...options.settings }, now: NOW },
     answers: options.answers ?? {},
     session: options.session,
+    locale: options.locale,
   });
   await m.wrapper.setProps({ 'onUpdate:open': (open: boolean) => m.wrapper.setProps({ open }) });
   await settle();
@@ -94,6 +98,17 @@ describe('TableSheet · an occupied table', () => {
     await click(s.el('action-charge'));
     expect(s.router.currentRoute.value.fullPath).toBe('/sale/pos?order=o1');
     expect(s.closed()).toBe(true);
+  });
+
+  it.each([
+    ['en', '1 guest · Since', 'Table 4 · 1 guest. The table is freed'],
+    ['es', '1 comensal · Desde', 'Mesa 4 · 1 comensal. La mesa queda libre'],
+  ] as const)('one guest is said in the singular (%s, hub#462)', async (locale, summary, impact) => {
+    const [check] = occupied().checks;
+    const s = await sheet(occupied({ guests: 1, checks: [{ ...check, guests_count: 1 }] }), { locale });
+    expect(s.el('summary')?.textContent).toContain(summary);
+    await click(s.el('action-close'));
+    expect(s.el('close-impact')?.textContent).toContain(impact);
   });
 
   it('Transfer and Merge pick the destination on the plan', async () => {
