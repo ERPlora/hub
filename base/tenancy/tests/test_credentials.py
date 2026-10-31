@@ -392,3 +392,78 @@ def test_a_rotated_migrators_password_reaches_a_ddl_alias_already_registered(sec
 
     assert django_connections.settings[alias]["PASSWORD"] == "rotated"
     assert django_connections[alias].settings_dict["PASSWORD"] == "rotated"
+
+
+# ── A hub moved to another cluster (round 2026-10-30b of PLAN-DB, decision 3; base.tenancy.move) ────────────────────
+
+
+def another_cluster() -> SimpleNamespace:
+    return SimpleNamespace(
+        host="writer-3.example", port=5434, pooler_host="pooler-3.example", pooler_port=6434, secret_name=SECRET
+    )
+
+
+def test_a_hub_moved_to_another_cluster_reaches_it_as_soon_as_its_row_says_so(secrets):
+    hub = a_hub(on=cluster())
+    alias = tenancy_connections.register_hub_alias(hub)
+    assert (django_connections[alias].settings_dict["HOST"], django_connections[alias].settings_dict["PORT"]) == (
+        "pooler-2.example",
+        6433,
+    )
+
+    hub.cluster = another_cluster()
+    tenancy_connections.register_hub_alias(hub)
+
+    assert (django_connections.settings[alias]["HOST"], django_connections.settings[alias]["PORT"]) == (
+        "pooler-3.example",
+        6434,
+    )
+    # This thread's connection, opened on the old cluster, is given the new one.
+    assert django_connections[alias].settings_dict["HOST"] == "pooler-3.example"
+
+
+def test_another_threads_connection_reaches_the_new_cluster_when_it_opens_the_hub_again(secrets):
+    import threading
+
+    before = a_hub(on=cluster())
+    alias = tenancy_connections.register_hub_alias(before)
+    seen = {}
+
+    def other_thread(step, hub):
+        # Every request, live re-run and worker pass reads the hub's row again before it opens it.
+        tenancy_connections.register_hub_alias(hub)
+        seen[step] = django_connections[alias].settings_dict["HOST"]
+
+    first = threading.Thread(target=other_thread, args=("before", before))
+    first.start()
+    first.join()
+    after = SimpleNamespace(**(vars(before) | {"cluster": another_cluster()}))
+    tenancy_connections.register_hub_alias(after)
+    second = threading.Thread(target=other_thread, args=("after", after))
+    second.start()
+    second.join()
+
+    assert seen == {"before": "pooler-2.example", "after": "pooler-3.example"}
+
+
+def test_a_hub_moved_off_the_settings_own_server_reaches_its_cluster(secrets):
+    hub = a_hub(on=None)
+    alias = tenancy_connections.register_hub_alias(hub)
+    own = django_connections.settings[alias]["HOST"]
+
+    hub.cluster = another_cluster()
+    tenancy_connections.register_hub_alias(hub)
+
+    assert own != "pooler-3.example" and django_connections.settings[alias]["HOST"] == "pooler-3.example"
+
+
+def test_the_migrators_alias_of_a_moved_database_reaches_its_new_writer(secrets):
+    hub = a_hub(on=cluster())
+    alias = tenancy_connections.register_ddl_alias(hub.db_name, cluster=cluster())
+
+    tenancy_connections.register_ddl_alias(hub.db_name, cluster=another_cluster())
+
+    assert (django_connections.settings[alias]["HOST"], django_connections.settings[alias]["PORT"]) == (
+        "writer-3.example",
+        5434,
+    )
