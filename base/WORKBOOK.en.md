@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:fda3f9546ee9d0bc94a4d471983be13185cb507cdff30500fbe15add5ea01855 -->
+<!-- generated from WORKBOOK.md sha256:18e240894ef7c30d2e319a8eaf056e1599416f886caba0e75085e58647fd79c6 -->
 
 ## What it is for and who it is for
 
@@ -503,6 +503,11 @@ If it fails: while loading, grey tiles and "Loading your apps…" for the screen
 "Your apps will show up here. Add the ones your business needs.". If the list could not be read: "Could
 not load your apps. Reload the page; if it keeps failing, sign in again.", never that there are no apps.
 In an older Android app, which cannot yet stay in the background, the back button is the system's again.
+After an ERPlora update, a screen that tab had not opened yet still opens (from a tile, "My apps", the menu or
+any button), in a fresh load of the page, which already brings the new version; a tap never does nothing. If
+the server does not answer (offline or on a flaky network), the person stays where they were and a notice says
+"Could not open <app>. Check the connection and try again." ("that page" when the screen is not an app's), with
+"Retry", which tries again and opens it as soon as the server answers.
 Involved: none
 
 ### BASE-F06 See the apps' panels on the Home
