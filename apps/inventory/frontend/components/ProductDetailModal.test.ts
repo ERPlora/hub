@@ -39,6 +39,17 @@ function unmount(s: Awaited<ReturnType<typeof setup>>): void {
 }
 
 describe('ProductDetailModal', () => {
+  // INVENTORY-F32: the sheet shows the photo on top, larger; the initials when it has none.
+  it('shows the product’s photo on top, or its initials', async () => {
+    const url = '/p/catalog/hospitality/americano.webp';
+    const s = await setup({ product: product({ image: 'catalog:hospitality/americano', image_url: url }) });
+    const img = s.el('inventory-product-detail-photo')?.querySelector('img');
+    expect([img?.getAttribute('src'), img?.getAttribute('alt')]).toEqual([url, 'Coffee']);
+    unmount(s);
+    const plain = await setup();
+    expect(plain.el('inventory-product-detail-photo')?.textContent?.trim()).toBe('C');
+  });
+
   it('shows SKU, Price, Stock and Status under the product name', async () => {
     const s = await setup();
     expect(s.el('inventory-product-detail')?.getAttribute('aria-label')).toBe('Coffee');

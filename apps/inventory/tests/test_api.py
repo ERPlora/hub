@@ -13,6 +13,7 @@ from django.conf import settings
 from live.ninja import ensure_api_parity
 
 from apps.inventory.api import router
+from apps.inventory.tests.test_product_image import IMAGE_ROUTES
 from apps.tax.models import TaxCategory
 from config.api import api
 
@@ -45,7 +46,7 @@ ROUTES = {
     ("GET", "/inventory/units", "inventory.unit.list"),
     ("GET", "/inventory/config", "inventory.config.get"),
     ("POST", "/inventory/config", "inventory.config.update"),
-}
+} | IMAGE_ROUTES
 TAX = "test.general"
 
 

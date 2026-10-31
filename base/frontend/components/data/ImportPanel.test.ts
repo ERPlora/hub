@@ -141,17 +141,19 @@ describe('ImportPanel', () => {
     expect(m.wrapper.find('[data-testid="templates-row"]').exists()).toBe(true);
   });
 
-  it('a file: reads it in base64 and reviews it; one over 5 MB is refused before it is sent', async () => {
+  it('a file: reads it in base64 and reviews it; one over 20 MB is refused before it is sent', async () => {
     const m = await panel({ '/api/settings/data/blueprints/inspect': () => Response.json(summary({ source: 'file' })) });
     const input = m.wrapper.get('[data-testid="import-file"]').element as HTMLInputElement;
     // What the page writes in the input's value: a file input only takes '' (emptied for the same file again).
     const written: string[] = [];
     Object.defineProperty(input, 'value', { get: () => 'C:\\fakepath\\chosen.zip', set: (value: string) => void written.push(value), configurable: true });
-    const big = new File([new Uint8Array(5 * 1024 * 1024 + 1)], 'big.blueprint.zip');
+    // INVENTORY-F33: 20 MB, so 300 photos of its own fit (base.blueprint.MAX_FILE_BYTES).
+    const big = new File([new Uint8Array(4)], 'big.blueprint.zip');
+    Object.defineProperty(big, 'size', { value: 20 * 1024 * 1024 + 1 });
     Object.defineProperty(input, 'files', { value: [big], configurable: true });
     input.dispatchEvent(new Event('change'));
     await settle();
-    expect(m.wrapper.get('[data-testid="import-read-error"]').text()).toContain('the file is larger than 5 MB.');
+    expect(m.wrapper.get('[data-testid="import-read-error"]').text()).toContain('the file is larger than 20 MB.');
     expect(m.calls).toEqual([]);
     const small = new File([new Uint8Array([80, 75, 3, 4])], 'mine.blueprint.zip');
     Object.defineProperty(input, 'files', { value: [small], configurable: true });

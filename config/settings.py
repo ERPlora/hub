@@ -455,6 +455,13 @@ STORAGES["hub_files"] = hub_files_storage(
     },
     MEDIA_ROOT,
 )
+# The shared image library (base.image_catalog, round 2026-10-30): ERPlora/blueprints' img/. With a bucket, its copy
+# under shared/catalog/ in it (publish.yml writes it); without one, the ERPlora/blueprints checkout beside this repo.
+# CATALOG_DIR names a folder that wins over the bucket.
+CATALOG_DIR = config(
+    "CATALOG_DIR",
+    default="" if config("AWS_STORAGE_BUCKET_NAME", default="") else str(BASE_DIR.parent / "blueprints" / "img"),
+)
 
 # The apps' registry in the SaaS (round 16, PLAN §21; spec §4). The image's build fixes the release:
 # APP_VERSION (the commit's sha) and APP_RELEASED_AT (its time, ISO 8601), which register_apps

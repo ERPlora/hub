@@ -81,7 +81,8 @@ Configuración inicial, paso a paso:
 
 ### Menús
 Menú **Menús**. Tabla de menús con el buscador «Buscar un menú…» (busca por nombre y por nombre de
-cocina), vista de tabla o de tarjetas y columnas: Nombre (se ordena y se filtra), «Precio cerrado» (en la
+cocina), vista de tabla o de tarjetas y columnas: «Foto» (la miniatura, o las iniciales sobre su color),
+Nombre (se ordena y se filtra), «Precio cerrado» (en la
 moneda del negocio; se ordena), «Cómo se vende» («En el local» o «Para llevar»; se ordena y se filtra), «A la venta» (Sí o No;
 se ordena y se filtra) y Orden (se ordena). Páginas de 50, por orden y nombre. Con permiso de gestión
 hay botón **+** y, por fila, «Editar datos» y «Retirar»; sin él, solo se ve la lista. Tocar una fila
@@ -148,6 +149,7 @@ máximas», la casilla «Se puede elegir la misma opción más de una vez» y «
 | COMBO-F11 | Mandar el menú a cocina | hecho |
 | COMBO-F12 | Marcar una elección como agotada | hecho |
 | COMBO-F13 | Cuando un producto deja el catálogo | hecho |
+| COMBO-F14 | La foto del menú | hecho |
 
 ### COMBO-F01 Consultar y buscar los menús
 <!-- origen: old:combos/WORKFLOW.md#combos-f01 -->
@@ -464,6 +466,32 @@ en el TPV y el aviso del constructor dice por qué. Si quitar las elecciones fal
 solo; mientras, siguen marcadas y nadie las vende.
 Implicados: INVENTORY-F04, COMBO-F06
 
+### COMBO-F14 La foto del menú
+<!-- origen: nuevo (decisión de Ioan del 2026-10-30, encargo docs/plans/2026-10-30-blueprints-imagenes-prompt.md de erplora-next: «si el menú del día lleva foto en el TPV, se decide con market-decision»). Mercado, 2026-10-30: el menú se vende en el TPV como un artículo más, con su foto: Odoo POS (un combo es un producto, con su imagen; https://www.odoo.com/documentation/19.0/applications/sales/point_of_sale/products.html, https://www.odoo.com/documentation/17.0/applications/sales/point_of_sale/combos.html), Lightspeed Restaurant (el combo tiene su campo «Image»; https://resto-support.lightspeedhq.com/hc/en-us/articles/6455698479899-Creating-and-managing-combos), Toast (el combo es un artículo del menú, que lleva imagen; https://support.toasttab.com/en/article/Adding-Images-to-Menu-Items-in-the-Menu, https://intercom.help/toast-central/en/articles/14726324-build-a-customizable-meal-combo), Shopify POS (el lote es un producto; https://changelog.shopify.com/posts/shopify-bundles-support-on-pos), Loyverse (artículo compuesto con su foto o color y forma; https://help.loyverse.com/help/how-add-items-loyverse-back-office), Square (artículos con foto en la rejilla; https://community.squareup.com/t5/Troubleshooting/Item-images-on-Square-Register-POS/m-p/683217), SumUp (catálogo con fotos y lotes de productos; https://www.sumup.com/en-ie/pos/faq/, https://www.sumup.com/en-gb/business-guide/bundle-products-create-custom-offers-with-sumup-pos/) y Clover (imagen del artículo; https://bypassmobile.zendesk.com/hc/en-us/articles/360043275151). La librería del producto viejo ya tenía menu_dia, menu_infantil, menu_hamburguesa y menu_kebab. Gana: el menú lleva foto, de la librería o propia, como el artículo (INVENTORY-F30, F31). -->
+Estado: hecho
+Actor: propietario, administrador, responsable, asistente
+Pantalla: Menús
+Pasos:
+1. En «Editar datos» del menú, en «Foto», pulsa «Elegir de la librería» (se abre la librería de
+   imágenes con el nombre del menú ya buscado, como en INVENTORY-F30) o «Subir foto» (un JPG, PNG o WebP
+   de hasta 2 MB, como en INVENTORY-F31).
+2. Pulsa «Guardar»: el menú queda con su foto. «Quitar foto» lo deja con sus iniciales.
+3. Por el asistente: «ponle foto al menú del día». El asistente propone hasta cinco imágenes de la
+   librería por su título y pregunta cuál; nunca pone una por su cuenta.
+Entra: el menú y la imagen elegida o la foto subida.
+Sale: el menú con su foto (avisa: menú cambiado); el TPV la enseña en su baldosa sin recargar
+(INVENTORY-F32), y la lista de menús, en su fila. La foto propia se guarda en la carpeta del negocio,
+la ven solo las personas del negocio y cuenta en el espacio de su plan; subir otra, elegir una de la
+librería, «Quitar foto» o retirar el menú (COMBO-F04) la borra.
+Si falla: los mismos avisos que la foto del artículo. Junto a «Foto», al elegirla, y no se sube nada: «La
+foto pesa más de 2 MB. Elige una más ligera.» y «Ese archivo no es una foto. Sube una imagen JPG, PNG o
+WebP.». Si el menú se guardó y la foto no, la ventana lo dice («El menú se ha guardado, pero la foto no:
+<motivo>») con «Reintentar», que solo vuelve a mandar la foto, y el menú se queda con la foto que tenía;
+el motivo es «Esa imagen ya no está en la librería. Elige otra.», «No queda espacio para ese archivo: tu
+plan incluye <espacio>.» o «No se pudo guardar la foto. Inténtalo de nuevo.». Un menú sin foto, o cuya
+foto no carga, enseña sus iniciales.
+Implicados: COMBO-F03, COMBO-F04, COMBO-F07, INVENTORY-F30, INVENTORY-F31, INVENTORY-F32
+
 ## Servicios: lo que entra y lo que sale
 
 Todo se puede pedir por las pantallas, el asistente (por voz o por texto, con la sesión de quien
@@ -480,6 +508,7 @@ para varios, se dice cuáles y se pide que elija (`combo.combo_ambiguous`, `comb
 | Un menú con sus platos y sus elecciones, si sale en el TPV y por qué no (en vivo) | ver | F05, F06, F12 | `combo.combo.get` |
 | El catálogo de menús del TPV: los que se pueden vender, con sus platos y sus elecciones disponibles (en vivo) | ver | F07 | `combo.combo.for_sale` |
 | La línea de un menú con lo elegido: importe, componentes y reparto fiscal | ver | F08, F09, F10, F11 | `combo.combo.resolve` |
+| Hasta cinco imágenes de la librería para la foto de un menú, por su nombre; no pone ninguna | ver | F14 | `combo.combo.suggest_image` |
 
 ### Lo que ofrece: acciones (cambian datos)
 
@@ -498,6 +527,8 @@ para varios, se dice cuáles y se pide que elija (`combo.combo_ambiguous`, `comb
 | Quita una elección | gestionar | F06 | `combo.option.delete` |
 | Ordena las elecciones de un plato, todas a la vez | gestionar | F06 | `combo.option.reorder` |
 | Quita las elecciones de un producto eliminado | solo la plataforma | F13 | `combo.option.drop_product` |
+| Pone o quita la foto de un menú, de la librería | gestionar | F14 | `combo.combo.set_image` |
+| Sube la foto propia de un menú | gestionar | F14 | `combo.combo.upload_image` |
 
 ### Lo que avisa
 
@@ -527,6 +558,7 @@ agotado son de Inventario.
 |---|---|---|---|
 | Inventario (`requires`) | Los productos que pueden ser elección, con su nombre, SKU, precio, categoría fiscal, si están activos y si están agotados (lectura directa: es una app requerida) | F06, F07, F08, F09, F12 | modelo `inventory.Product`; el buscador de la pantalla usa `inventory.product.list` con `is_active` e `include_sold_out` (los activos, agotados o no) |
 | Impuestos (`requires`) | Las categorías fiscales del selector y la del menú «en el local» | F02, F03, F09 | modelo `tax.TaxCategory`; el selector usa `tax.category.list` |
+| Plataforma | La librería de imágenes: buscarla y nombrar por su título la imagen que se pone a un menú | F14 | `base.catalog_image.search`, `base.catalog_image.get` |
 
 ### Contrato con Ventas
 
@@ -534,7 +566,8 @@ Ventas no requiere Menús: lo llama por el nombre de la operación (`call_app`),
 vende, y si Menús no está activo el TPV no ofrece menús.
 
 - **Catálogo del TPV**: `useLive('combo.combo.for_sale', {limit: 50})`. Cada fila: `id`, `name`,
-  `kitchen_name`, `price` (céntimos), `supply_kind`, `sort_order` y `groups[]` (`id`, `name`,
+  `kitchen_name`, `price` (céntimos), `supply_kind`, `sort_order`, `image` e `image_url` (su foto, COMBO-F14) y
+  `groups[]` (`id`, `name`,
   `min_choices`, `max_choices` —0 sin límite—, `allow_repeat`, `options[]` con `id`, `product_id`,
   `product_name`, `sku`, `price_delta`). Solo menús a la venta que se pueden completar y elecciones
   disponibles.
@@ -577,7 +610,7 @@ vende, y si Menús no está activo el TPV no ofrece menús.
 | Permiso | Propietario | Administrador | Responsable | Empleado | Servicio |
 |---|---|---|---|---|---|
 | Ver los menús, el catálogo del TPV y calcular una línea de menú | sí | sí | sí | sí | `combo.view` |
-| Crear, cambiar, ordenar y retirar menús, platos y elecciones | sí | sí | sí | no | `combo.manage` |
+| Crear, cambiar, ordenar y retirar menús, platos y elecciones, y la foto de un menú | sí | sí | sí | no | `combo.manage` |
 
 ## Para quien lo mantiene
 
@@ -649,6 +682,14 @@ vende, y si Menús no está activo el TPV no ofrece menús.
   cambia) con el formulario del menú o la edición de una elección abiertos, el importe que nadie ha tocado
   se reescribe desde lo guardado con los decimales de su moneda; lo tecleado se queda y se lee en ella al
   guardar (si no se puede, lo dice el campo).
+- La foto del menú (COMBO-F14, hecha el 2026-10-30): el campo común `base/frontend/components/ImageField.vue` al
+  final de `MenuFormModal.vue` (tras guardar el menú, `combo.combo.set_image` o `combo.combo.upload_image`; un
+  fallo se queda en la ventana con «Reintentar», que solo manda la foto, y «Guardar» apagado), la columna `photo`
+  (`ItemImage` de 40 px) en `MenusPage.vue` y la baldosa del TPV en `apps/sale/frontend/components/pos/ComboTiles.vue`.
+  Tests: `frontend/components/MenuFormModal.test.ts` («MenuFormModal: photo»), `frontend/pages/MenusPage.test.ts`,
+  `apps/sale/frontend/components/pos/ComboTiles.test.ts` y en Chrome `tests/e2e/combo-photo.spec.ts`. Las cuatro
+  imágenes `menu_*` de la librería son hoy el mismo archivo (una bandeja de desayuno) y su manifiesto las titula
+  así: buscar «menú del día» no las encuentra.
 - Iconos registrados en la shell; los del producto actual (`restaurant-outline`, `arrow-up-outline`)
   esperan en `UI-REQUESTS.md` con su sustituto (`layers-outline`, `chevron-up-outline`); el asa la pinta
   `ion-reorder` con su icono propio.

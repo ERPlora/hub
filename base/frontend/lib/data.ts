@@ -154,8 +154,8 @@ export function saveFile(filename: string, blob: Blob): void {
 
 // ── The import (BASE-G103–G108) ──────────────────────────────────────────────────────────────────────────────────
 
-/** The server takes 5 MB of zip at most (`base.blueprint`). */
-export const MAX_FILE_BYTES = 5 * 1024 * 1024;
+/** The server takes 20 MB of zip at most (`base.blueprint`): 300 photos of its own fit (INVENTORY-F33). */
+export const MAX_FILE_BYTES = 20 * 1024 * 1024;
 
 function folded(text: string): string {
   return text

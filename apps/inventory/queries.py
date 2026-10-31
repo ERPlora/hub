@@ -8,6 +8,7 @@ movements. ``find_product`` and ``find_category`` resolve how a person names the
 import csv
 import io
 from decimal import ROUND_HALF_UP, Decimal
+from functools import partial
 from uuid import UUID
 
 from babel import Locale
@@ -34,7 +35,7 @@ from django.db.models import (
 from django.db.models.functions import Cast, Coalesce, NullIf
 from django.utils import translation
 from django.utils.translation import gettext_lazy as _
-from live.context import OperationContext
+from live.context import OperationContext, Scope
 from live.errors import Conflict, NotFound
 from live.operations import operation
 
@@ -63,6 +64,8 @@ from apps.inventory.schemas import (
     ProductCategoryListIn,
     ProductCategoryPage,
     ProductFiltersIn,
+    ProductImageSuggestIn,
+    ProductImageSuggestOut,
     ProductListIn,
     ProductOut,
     ProductPage,
@@ -73,8 +76,10 @@ from apps.inventory.schemas import (
     UnitListIn,
     UnitPage,
 )
+from base import images
 from base import operations as platform
 from base.business import money_text
+from base.queries import business_language, image_library
 
 PRODUCT_NOT_FOUND = _("This product does not exist in this hub.")
 CATEGORY_NOT_FOUND = _("This category no longer exists.")
@@ -144,10 +149,11 @@ def needs_tax_setup(product: Product) -> bool:
     return product.tax_category is None or not product.tax_category.is_active
 
 
-def load_product(product_id: UUID) -> dict | None:
-    """The live product as a ``ProductOut``, or ``None``. Not an operation: services return it after a write."""
+def load_product(product_id: UUID, scope: Scope) -> dict | None:
+    """The live product of ``scope`` as a ``ProductOut``, or ``None``. Not an operation: services return it after a
+    write."""
     product = _products(current_settings()).filter(pk=product_id).first()
-    return None if product is None else _product_row(product)
+    return None if product is None else _product_row(product, images.Urls(scope))
 
 
 def load_category(category_id: UUID) -> dict | None:
@@ -263,7 +269,7 @@ def _first_match(queryset, lookups) -> list:
 )
 def list_products(ctx: OperationContext, params: ProductListIn) -> dict:
     products = filter_products(_products(current_settings()), params)
-    return _page(products, params, _product_row)
+    return _page(products, params, partial(_product_row, urls=images.Urls(ctx.scope)))
 
 
 @operation(
@@ -279,8 +285,34 @@ def list_products(ctx: OperationContext, params: ProductListIn) -> dict:
 )
 def get_product(ctx: OperationContext, data: ProductRefIn) -> dict:
     return _product_row(
-        find_product(data.id, data.product, rows=_products(current_settings()))
+        find_product(data.id, data.product, rows=_products(current_settings())), images.Urls(ctx.scope)
     )
+
+
+@operation(
+    "inventory.product.suggest_image",
+    kind="query",
+    permission="inventory.view_product",
+    input=ProductImageSuggestIn,
+    output=ProductImageSuggestOut,
+    expose_api=True,
+    ai={
+        "description": "Propose images of ERPlora's shared image library for a product's photo («ponle foto al café "
+        "con leche»), the product named by its id, SKU or name: the best matches for its name first, each with its title and its reference (catalog:<folder>/<name>). It "
+        "never sets one: show them, and set the one the person picks with inventory.product.set_image."
+    },
+)
+def suggest_image(ctx: OperationContext, data: ProductImageSuggestIn) -> dict:
+    """INVENTORY-F30: the library searched by the product's name in either of its languages, titled in the business's
+    (the one its products are named in)."""
+    product = find_product(data.id, data.product)
+    language = business_language(ctx)
+    found = image_library(ctx).search(product.name, language)
+    return {
+        "product_id": product.id,
+        "query": product.name,
+        "rows": [image.row(language) for image in found[: data.limit]],
+    }
 
 
 @operation(
@@ -305,7 +337,7 @@ def list_for_sale(ctx: OperationContext, params: ForSaleListIn) -> dict:
         products = products.filter(
             Q(name__icontains=params.search) | Q(sku__icontains=params.search)
         )
-    return _page(products.order_by("name", "id"), params, _sale_row)
+    return _page(products.order_by("name", "id"), params, partial(_sale_row, urls=images.Urls(ctx.scope)))
 
 
 @operation(
@@ -717,7 +749,7 @@ def _products(settings: Settings):
     )
 
 
-def _product_row(product: Product) -> dict:
+def _product_row(product: Product, urls: images.Urls) -> dict:
     fields = (
         "id",
         "name",
@@ -745,10 +777,12 @@ def _product_row(product: Product) -> dict:
         "needs_tax_setup": needs_tax_setup(product),
         "tracks_stock": product.tracks,
         "category_ids": [link.category_id for link in product.live_links],
+        "image": product.image,
+        "image_url": urls(product.image),
     }
 
 
-def _sale_row(product: Product) -> dict:
+def _sale_row(product: Product, urls: images.Urls) -> dict:
     fields = (
         "id",
         "name",
@@ -766,6 +800,8 @@ def _sale_row(product: Product) -> dict:
         "tax_category_key": product.tax_category.key if product.tax_category else None,
         "needs_tax_setup": needs_tax_setup(product),
         "tracks_stock": product.tracks,
+        "image": product.image,
+        "image_url": urls(product.image),
     }
 
 

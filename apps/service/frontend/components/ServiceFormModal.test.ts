@@ -258,3 +258,104 @@ describe('ServiceFormModal: two rows opened one after the other', () => {
     expect([s.field('name').value, s.field('duration').value]).toEqual(['Beard', '15']);
   });
 });
+
+// SERVICE-F34/F35: «Photo» in the form, for who may edit services; the library opens with the service's name and the
+// Hair and Beauty sectors first. The image goes once the service is saved (`set_image`, `upload_image`); if the service
+// saved and the photo did not, the form says so with «Retry», which sends only the photo.
+describe('ServiceFormModal: photo', () => {
+  const MECHAS = {
+    reference: 'catalog:beauty_hair/mechas',
+    folder: 'beauty_hair',
+    name: 'mechas',
+    title: 'Mechas',
+    url: '/p/catalog/beauty_hair/mechas.webp',
+  };
+  const LIBRARY: [number, unknown] = [200, { rows: [MECHAS], total: 1, limit: 60, offset: 0 }];
+  const WITH_PHOTO: ServiceOut = { ...CUT, image: 'catalog:beauty_hair/corte_mujer', image_url: '/p/catalog/beauty_hair/corte_mujer.webp' };
+  const writes = (s: Awaited<ReturnType<typeof setup>>) => s.sent().filter((call) => call.method === 'POST');
+
+  async function chooseFile(s: Awaited<ReturnType<typeof setup>>, file: File) {
+    const input = s.inDoc('service-form-image-file') as HTMLInputElement;
+    Object.defineProperty(input, 'files', { configurable: true, value: [file] });
+    input.dispatchEvent(new Event('change'));
+    await vi.waitFor(() => expect(s.inDoc('service-form-image-preview')?.querySelector('img')?.getAttribute('src')).toMatch(/^data:/));
+  }
+
+  it('shows «Photo» with the service’s photo to who may edit services, and not to anyone else', async () => {
+    const s = await setup(WITH_PHOTO);
+    expect(s.inDoc('service-form-image-label')?.textContent?.trim()).toBe('Photo');
+    expect(s.inDoc('service-form-image-preview')?.querySelector('img')?.getAttribute('src')).toBe(WITH_PHOTO.image_url);
+    s.wrapper.unmount();
+    document.body.innerHTML = '';
+    const viewer = await setup(WITH_PHOTO, 'en', false);
+    expect(viewer.inDoc('service-form-image')).toBeNull();
+  });
+
+  it('a new service with a library image: Hair and Beauty first, the image goes once it is created', async () => {
+    const s = await setup();
+    await s.result('service.settings.get', SETTINGS);
+    s.answerBy({ '/api/catalog/images': LIBRARY, '/api/service/services': [201, CUT], '/api/service/services/image': [200, CUT] });
+    await ionValue(s.field('name'), 'Mechas', 'ionInput');
+    await click(s.inDoc('service-form-image-library'));
+    await settle();
+    const root = s.wrapper.element.parentElement ?? (s.wrapper.element as Element);
+    const tabs = [...root.querySelectorAll('[data-testid^="service-form-image-library-modal-folder-"]')].map((b) => b.getAttribute('data-testid')?.split('-folder-')[1]);
+    expect(tabs.slice(0, 3)).toEqual(['all', 'beauty_hair', 'beauty_body']);
+    expect(s.sent().find((call) => call.path === '/api/catalog/images')?.query.query).toBe('Mechas');
+    await click(s.inDoc('service-form-image-library-modal-image-beauty_hair-mechas'));
+    await click(s.save());
+    await settle();
+    expect(writes(s).map((call) => [call.path, call.body])).toEqual([
+      ['/api/service/services', expect.objectContaining({ name: 'Mechas' })],
+      ['/api/service/services/image', { id: 's1', image: 'catalog:beauty_hair/mechas' }],
+    ]);
+    expect(s.wrapper.emitted('update:open')?.at(-1)).toEqual([false]);
+  });
+
+  it('a photo of its own goes up after the changes; failing, the form says so and «Retry» sends only the photo', async () => {
+    const s = await setup(WITH_PHOTO, 'es');
+    s.answerBy({
+      '/api/service/services/update': [200, CUT],
+      '/api/service/services/image/upload': [503, { error: { code: 'base.photo_not_saved', message: 'No se pudo guardar la foto. Inténtalo de nuevo.' } }],
+    });
+    await chooseFile(s, new File(['ABC'], 'mine.png', { type: 'image/png' }));
+    await click(s.save());
+    await vi.waitFor(() => expect(s.inDoc('service-form-photo-failed')).not.toBeNull());
+    expect(s.inDoc('service-form-photo-failed')?.textContent).toContain(
+      'El servicio se ha guardado, pero la foto no: No se pudo guardar la foto. Inténtalo de nuevo.',
+    );
+    expect(s.save().disabled).toBe(true);
+    expect(s.wrapper.emitted('update:open')?.at(-1)).not.toEqual([false]);
+    s.answerBy({ '/api/service/services/image/upload': [200, CUT] });
+    await click(s.inDoc('service-form-photo-retry'));
+    await vi.waitFor(() => expect(s.wrapper.emitted('update:open')?.at(-1)).toEqual([false]));
+    expect(writes(s).map((call) => [call.path, call.body])).toEqual([
+      ['/api/service/services/update', { id: 's1' }],
+      ['/api/service/services/image/upload', { id: 's1', data_base64: 'QUJD' }],
+      ['/api/service/services/image/upload', { id: 's1', data_base64: 'QUJD' }],
+    ]);
+  });
+
+  it('«Remove photo» clears it when saved', async () => {
+    const s = await setup(WITH_PHOTO);
+    s.answerBy({ '/api/service/services/update': [200, CUT], '/api/service/services/image': [200, CUT] });
+    await click(s.inDoc('service-form-image-remove'));
+    await click(s.save());
+    await settle();
+    expect(writes(s).map((call) => call.body)).toEqual([{ id: 's1' }, { id: 's1', image: '' }]);
+  });
+
+  it('closing without saving discards the photo chosen; opening another service shows its own', async () => {
+    const s = await setup(WITH_PHOTO);
+    await click(s.inDoc('service-form-image-remove'));
+    await s.wrapper.setProps({ open: false });
+    await s.wrapper.setProps({ open: true });
+    await settle();
+    expect(s.inDoc('service-form-image-preview')?.querySelector('img')?.getAttribute('src')).toBe(WITH_PHOTO.image_url);
+    await s.wrapper.setProps({ open: false });
+    await s.wrapper.setProps({ service: { ...CUT, id: 's2', name: 'Beard trim' }, open: true });
+    await settle();
+    expect(s.inDoc('service-form-image-preview')?.querySelector('img')).toBeNull();
+    expect(s.inDoc('service-form-image-preview')?.textContent?.trim()).toBe('BT');
+  });
+});

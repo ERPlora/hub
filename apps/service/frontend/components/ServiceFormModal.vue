@@ -5,12 +5,17 @@
 // «No category») and Tax category (searched in Taxes; the settings' default comes chosen; no empty
 // option). «Create service» needs a name and a tax category; with no tax category in Taxes at all it
 // says where to make them. A row opens «Editing service — {name}»: «Save changes» sends only what
-// changed (no category = `category_id: null`), and below the form who performs the service.
+// changed (no category = `category_id: null`), and below the form who performs the service. «Photo» (SERVICE-F34/F35,
+// for who may edit services): a library image (Hair and Beauty first) or a photo of its own, sent once the service is
+// saved (`set_image`, `upload_image`, «Uploading photo…»); if the service saved and the photo did not, the form says so
+// with «Retry» (only the photo goes again) and the service keeps the photo it had.
 import { Combo, type ComboOption, FormModal, InlineFeedback } from '@erplora/ui/components';
 import { useCommand, useLive, useLiveClient } from '@erplora/ui/sdk';
-import { IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
+import { IonButton, IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import ImageField from '../../../../base/frontend/components/ImageField.vue';
+import { draftOf, type ImageDraft, useImageSave } from '../../../../base/frontend/lib/item-image';
 import { useLocale, useT } from '../composables/useT';
 import { useBusinessMoney } from '../lib/format';
 import { moneyFieldText, parseMoney } from '../lib/money';
@@ -20,6 +25,8 @@ import MoneyInput from './MoneyInput.vue';
 import ServiceProfessionals from './ServiceProfessionals.vue';
 
 const PRICING: readonly PricingType[] = ['fixed', 'hourly', 'from', 'variable', 'free'];
+/** The library's sectors a service's photo is looked for in first. */
+const PHOTO_FOLDERS = ['beauty_hair', 'beauty_body'] as const;
 
 const props = withDefaults(
   defineProps<{
@@ -56,13 +63,20 @@ const noTaxes = computed(() => taxes.value !== undefined && taxes.value.total ==
 
 const creation = useCommand('service.service.create');
 const update = useCommand('service.service.update');
-const pending = computed(() => creation.pending.value || update.pending.value);
+const setImage = useCommand('service.service.set_image');
+const uploadImage = useCommand('service.service.upload_image');
+const photo = useImageSave({
+  set: (id, image) => setImage.run({ id, image }),
+  upload: (id, data) => uploadImage.run({ id, data_base64: data }),
+});
+const pending = computed(() => creation.pending.value || update.pending.value || photo.pending.value);
 const error = computed(() => (props.service ? update.error.value : creation.error.value));
 const title = computed(() =>
   props.service ? t('service.services.form.titleEdit', { name: props.service.name }) : t('service.services.form.titleNew'),
 );
 
 const form = ref<Form>(blank());
+const image = ref<ImageDraft>(draftOf(props.service));
 const taxTouched = ref(false);
 const tried = ref(false);
 
@@ -91,6 +105,8 @@ watch(
   ([isOpen]) => {
     if (!isOpen) return;
     form.value = props.service ? fromService(props.service) : { ...blank(), tax: defaultTax() };
+    image.value = draftOf(props.service);
+    photo.reset();
     taxTouched.value = false;
     tried.value = false;
     creation.error.value = null;
@@ -141,10 +157,11 @@ async function save(): Promise<void> {
   const read = parseMoney(f.price, money.value);
   if (!read.ok || !f.tax) return;
   const price = read.cents ?? 0;
+  let saved: { id: string };
   try {
-    if (props.service) await update.run(patch(props.service, price));
+    if (props.service) saved = await update.run(patch(props.service, price));
     else
-      await creation.run({
+      saved = await creation.run({
         name: f.name.trim(),
         pricing_type: f.pricing,
         price,
@@ -155,7 +172,17 @@ async function save(): Promise<void> {
   } catch {
     return; // The dialog paints the error; what was typed stays.
   }
-  open.value = false;
+  await savePhoto(saved.id);
+}
+
+/** The photo's step for the saved service; the dialog closes once the photo is as the form says. */
+async function savePhoto(id: string): Promise<void> {
+  if (await photo.save(id, props.service?.image ?? '', image.value)) open.value = false;
+}
+
+function retryPhoto(): void {
+  const failed = photo.failure.value;
+  if (failed) void savePhoto(failed.id);
 }
 </script>
 
@@ -164,14 +191,32 @@ async function save(): Promise<void> {
     v-model:open="open"
     testid="service-form"
     :title="title"
-    :submit-label="service ? $t('service.services.form.save') : $t('service.services.form.create')"
+    :submit-label="photo.uploading.value ? $t('base.imageField.uploading') : service ? $t('service.services.form.save') : $t('service.services.form.create')"
     :pending="pending"
     :error="error"
-    :submit-disabled="!form.name.trim() || !form.tax || (!service && noTaxes)"
+    :submit-disabled="!form.name.trim() || !form.tax || (!service && noTaxes) || !!photo.failure.value"
     @submit="save"
   >
     <template #default="{ fieldErrors }">
       <div class="service-form">
+        <InlineFeedback
+          v-if="photo.failure.value"
+          tone="warning"
+          data-testid="service-form-photo-failed"
+        >
+          {{ t('service.services.form.photoNotSaved', { reason: photo.failure.value.reason || $t('base.imageField.notSaved') }) }}
+          <template #actions>
+            <ion-button
+              data-testid="service-form-photo-retry"
+              fill="outline"
+              size="small"
+              :disabled="photo.pending.value"
+              @click="retryPhoto"
+            >
+              {{ $t('base.imageField.retry') }}
+            </ion-button>
+          </template>
+        </InlineFeedback>
         <ion-input
           data-testid="service-form-name"
           :value="form.name"
@@ -250,6 +295,14 @@ async function save(): Promise<void> {
         >
           {{ t('service.services.form.taxMissing') }}
         </InlineFeedback>
+        <ImageField
+          v-if="canChange"
+          v-model="image"
+          testid="service-form-image"
+          :name="form.name.trim()"
+          :folders="PHOTO_FOLDERS"
+          :disabled="pending"
+        />
         <ServiceProfessionals
           v-if="service"
           :service-id="service.id"

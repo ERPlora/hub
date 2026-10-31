@@ -19,7 +19,7 @@ from uuid import UUID
 
 from django.db.models import Count, Prefetch, Q, QuerySet
 from django.utils.translation import gettext_lazy as _
-from live.context import OperationContext
+from live.context import OperationContext, Scope
 from live.errors import Conflict, NotFound
 from live.operations import operation
 
@@ -27,6 +27,8 @@ from apps.combo.models import ChoiceGroup, ChoiceOption, Combo
 from apps.combo.schemas import (
     ComboDetailOut,
     ComboListIn,
+    ComboImageSuggestIn,
+    ComboImageSuggestOut,
     ComboPage,
     ComboRefIn,
     ForSaleIn,
@@ -36,6 +38,8 @@ from apps.combo.schemas import (
 )
 from apps.inventory.models import ProductCategory, Unit
 from apps.tax.models import TaxCategory
+from base import images
+from base.queries import business_language, image_library
 
 COMBO_NOT_FOUND = _("That menu does not exist in this business.")
 GROUP_NOT_FOUND = _("That course does not exist in this menu.")
@@ -314,7 +318,7 @@ def group_row(group: ChoiceGroup, targets: frozenset[str]) -> dict:
     }
 
 
-def combo_row(combo: Combo, group_count: int) -> dict:
+def combo_row(combo: Combo, group_count: int, urls: images.Urls) -> dict:
     tax = combo.tax_category
     return {
         "id": combo.id,
@@ -327,6 +331,8 @@ def combo_row(combo: Combo, group_count: int) -> dict:
         "sort_order": combo.sort_order,
         "is_active": combo.is_active,
         "group_count": group_count,
+        "image": combo.image,
+        "image_url": urls(combo.image),
         "created_at": combo.created_at,
         "updated_at": combo.updated_at,
     }
@@ -388,18 +394,18 @@ def blockers(combo: Combo, targets: frozenset[str]) -> list[dict]:
     return found
 
 
-def load_detail(combo_id: UUID) -> dict:
-    """The detail of a menu by its id. Services return it after a write, with the menu locked."""
-    return detail_row(with_tree(Combo.objects.filter(pk=combo_id)).get())
+def load_detail(combo_id: UUID, scope: Scope) -> dict:
+    """The detail of a menu of ``scope`` by its id. Services return it after a write, with the menu locked."""
+    return detail_row(with_tree(Combo.objects.filter(pk=combo_id)).get(), images.Urls(scope))
 
 
-def detail_row(combo: Combo) -> dict:
+def detail_row(combo: Combo, urls: images.Urls) -> dict:
     """The menu (with its prefetched tree), whether the till offers it and why not."""
     groups = list(combo.groups.all())
     targets = takeaway_targets()
     found = blockers(combo, targets)
     return {
-        **combo_row(combo, len(groups)),
+        **combo_row(combo, len(groups), urls),
         "groups": [group_row(group, targets) for group in groups],
         "sellable": not found,
         "blockers": found,
@@ -449,8 +455,9 @@ def list_combos(ctx: OperationContext, params: ComboListIn) -> dict:
     ties = [key for key in ("name", "id") if key != column]
     ordered = combos.order_by(f"{sign}{column}", *ties)
     page = ordered[params.offset : params.offset + params.limit]
+    urls = images.Urls(ctx.scope)
     return _page(
-        [combo_row(combo, combo.courses) for combo in page], combos.count(), params
+        [combo_row(combo, combo.courses, urls) for combo in page], combos.count(), params
     )
 
 
@@ -467,7 +474,32 @@ def list_combos(ctx: OperationContext, params: ComboListIn) -> dict:
     },
 )
 def get_combo(ctx: OperationContext, data: ComboRefIn) -> dict:
-    return detail_row(find_combo(data.id, data.combo, rows=with_tree(Combo.objects.all())))
+    return detail_row(find_combo(data.id, data.combo, rows=with_tree(Combo.objects.all())), images.Urls(ctx.scope))
+
+
+@operation(
+    "combo.combo.suggest_image",
+    kind="query",
+    permission="combo.view",
+    input=ComboImageSuggestIn,
+    output=ComboImageSuggestOut,
+    expose_api=True,
+    ai={
+        "description": "Propose images of ERPlora's shared image library for a menu's photo («ponle foto al menú del "
+        "día»), the menu named by its id or its name: the best matches for its name first, each with its title and its reference (catalog:<folder>/<name>). It "
+        "never sets one: show them, and set the one the person picks with combo.combo.set_image."
+    },
+)
+def suggest_image(ctx: OperationContext, data: ComboImageSuggestIn) -> dict:
+    """COMBO-F14: the library searched by the menu's name in either of its languages, titled in the business's."""
+    combo = find_combo(data.id, data.combo)
+    language = business_language(ctx)
+    found = image_library(ctx).search(combo.name, language)
+    return {
+        "combo_id": combo.id,
+        "query": combo.name,
+        "rows": [image.row(language) for image in found[: data.limit]],
+    }
 
 
 # --- The till (COMBO-F07, F08, F09) --------------------------------------------------------------
@@ -493,14 +525,15 @@ def list_for_sale(ctx: OperationContext, params: ForSaleIn) -> dict:
         combos = combos.filter(name__icontains=params.search)
     targets = takeaway_targets()
     sellable = [combo for combo in combos if not blockers(combo, targets)]
+    urls = images.Urls(ctx.scope)
     rows = [
-        _sale_row(combo, targets)
+        _sale_row(combo, targets, urls)
         for combo in sellable[params.offset : params.offset + params.limit]
     ]
     return _page(rows, len(sellable), params)
 
 
-def _sale_row(combo: Combo, targets: frozenset[str]) -> dict:
+def _sale_row(combo: Combo, targets: frozenset[str], urls: images.Urls) -> dict:
     groups = []
     for group in combo.groups.all():
         options = [
@@ -532,6 +565,8 @@ def _sale_row(combo: Combo, targets: frozenset[str]) -> dict:
         "price": combo.price,
         "supply_kind": combo.supply_kind,
         "sort_order": combo.sort_order,
+        "image": combo.image,
+        "image_url": urls(combo.image),
         "groups": groups,
     }
 

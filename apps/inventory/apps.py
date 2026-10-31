@@ -31,6 +31,8 @@ class InventoryConfig(LiveAppConfig):
     verticals = ["restaurant"]
     # Each product and category points at a tax category (tax.TaxCategory).
     requires = ["tax"]
+    # The products' own photos (round 2026-10-30, base.images): served by /p/media/ to the hub's sessions only.
+    members_media = ["inventory/products/"]
     default_auto_field = "django.db.models.BigAutoField"
     permissions = [
         "inventory.view_product",

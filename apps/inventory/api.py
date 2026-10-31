@@ -8,6 +8,7 @@ route: only the platform runs them.
 
 from live.ninja import bind, run_operation
 from ninja import Query, Router
+from ninja.decorators import decorate_view
 
 from apps.inventory import queries, services
 from apps.inventory.schemas import (
@@ -25,6 +26,9 @@ from apps.inventory.schemas import (
     ProductCategoryIn,
     ProductCategoryListIn,
     ProductFiltersIn,
+    ProductImageIn,
+    ProductImageSuggestIn,
+    ProductImageUploadIn,
     ProductImportIn,
     ProductIn,
     ProductListIn,
@@ -35,8 +39,12 @@ from apps.inventory.schemas import (
     UnitListIn,
     WriteOffIn,
 )
+from base.request_body import accept_body_up_to
 
 router = Router(tags=["inventory"])
+
+#: A photo's body: 2 MB of photo in base64 (2 796 204 characters) and the JSON around it.
+MAX_PHOTO_BODY = 2_900_000
 
 
 # Products
@@ -192,3 +200,22 @@ async def config_get(request):
 @bind(router, "inventory.config.update", "/inventory/config")
 async def config_update(request, data: ConfigPatchIn):
     return await run_operation(request, services.update_config, data)
+
+
+# The product's image (round 2026-10-30, base.images)
+
+
+@bind(router, "inventory.product.set_image", "/inventory/products/image")
+async def product_image_set(request, data: ProductImageIn):
+    return await run_operation(request, services.set_image, data)
+
+
+@bind(router, "inventory.product.upload_image", "/inventory/products/image/upload")
+@decorate_view(accept_body_up_to(MAX_PHOTO_BODY))
+async def product_image_upload(request, data: ProductImageUploadIn):
+    return await run_operation(request, services.upload_image, data)
+
+
+@bind(router, "inventory.product.suggest_image", "/inventory/products/image/suggest")
+async def product_image_suggest(request, params: Query[ProductImageSuggestIn]):
+    return await run_operation(request, queries.suggest_image, params)

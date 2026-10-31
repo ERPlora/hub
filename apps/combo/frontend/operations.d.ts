@@ -3,6 +3,7 @@
 // `/api/openapi.json`. Keep it in step with schemas.py and with `frontend/generated/operations.json`.
 // One input per operation (ninja's parity): no path parameters, ids travel in the input. Money is in
 // cents; moments are ISO date-times.
+import type { CatalogImage } from '../../../base/frontend/operations';
 import type { Page } from '../../../frontend/sdk-types';
 
 export type SupplyKind = 'service' | 'goods';
@@ -21,6 +22,28 @@ interface PageIn {
 export interface ComboRefIn {
   id?: string | null;
   combo?: string | null;
+}
+
+/** COMBO-F14: `catalog:<folder>/<name>` of the shared library, or `''` for none (a `file:` is refused). */
+export interface ComboImageIn extends ComboRefIn {
+  image: string;
+}
+
+/** COMBO-F14: a JPG, PNG or WebP of 2 MB at most, in base64; kept as a 512 × 512 WebP. */
+export interface ComboImageUploadIn extends ComboRefIn {
+  data_base64: string;
+}
+
+export interface ComboImageSuggestIn extends ComboRefIn {
+  /** 1 to 20; 5 by default. */
+  limit?: number;
+}
+
+/** COMBO-F14: the library's best images for the menu's name, titled in the business's language. */
+export interface ComboImageSuggestOut {
+  combo_id: string;
+  query: string;
+  rows: CatalogImage[];
 }
 
 export interface ComboListIn extends PageIn {
@@ -168,6 +191,11 @@ export interface ComboOut {
   sort_order: number;
   is_active: boolean;
   group_count: number;
+  /** `catalog:<folder>/<name>`, `file:combo/combos/<uuid7 hex>.webp` or `''` (COMBO-F14). The server always sends
+   *  both; optional only so that the menus other apps' tests typed before them still compile. */
+  image?: string;
+  /** `/p/catalog/…` or `/p/media/<hub>/…`; `''`: none, show the initials. */
+  image_url?: string;
   created_at: string;
   updated_at: string;
 }
@@ -212,6 +240,11 @@ export interface SaleComboOut {
   price: number;
   supply_kind: SupplyKind;
   sort_order: number;
+  /** `catalog:<folder>/<name>`, `file:combo/combos/<uuid7 hex>.webp` or `''` (COMBO-F14). The server always sends
+   *  both; optional only so that the menus other apps' tests typed before them still compile. */
+  image?: string;
+  /** `/p/catalog/…` or `/p/media/<hub>/…`; `''`: none, show the initials. */
+  image_url?: string;
   groups: SaleGroupOut[];
 }
 
@@ -253,6 +286,9 @@ declare module '@erplora/ui/sdk' {
     'combo.combo.create': { input: ComboIn; output: ComboDetailOut };
     'combo.combo.update': { input: ComboPatchIn; output: ComboDetailOut };
     'combo.combo.delete': { input: ComboRefIn; output: DeletedOut };
+    'combo.combo.set_image': { input: ComboImageIn; output: ComboDetailOut };
+    'combo.combo.upload_image': { input: ComboImageUploadIn; output: ComboDetailOut };
+    'combo.combo.suggest_image': { input: ComboImageSuggestIn; output: ComboImageSuggestOut };
     'combo.group.create': { input: GroupIn; output: GroupOut };
     'combo.group.update': { input: GroupPatchIn; output: GroupOut };
     'combo.group.delete': { input: GroupRefIn; output: DeletedOut };

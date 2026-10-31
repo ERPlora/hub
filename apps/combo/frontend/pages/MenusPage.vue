@@ -17,6 +17,7 @@ import { AppPage, useSession } from '@erplora/ui/shell';
 import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
 
+import ItemImage from '../../../../base/frontend/components/ItemImage.vue';
 import MenuFormModal from '../components/MenuFormModal.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import { useLiveList } from '../composables/useLiveList';
@@ -58,6 +59,8 @@ const yesNo = computed(() => [
 ]);
 
 const columns = computed<DataTableColumn<ComboOut>[]>(() => [
+  // COMBO-F14: the menu's photo thumbnail before its name (its initials without one), in the list and on the cards.
+  { key: 'photo', label: t('combo.menus.photo'), sortable: false, cell: 'photo', width: '4rem' },
   { key: 'name', label: t('combo.menus.columns.name'), sortable: true, priority: 'high', filter: { type: 'text' } },
   { key: 'price', label: t('combo.menus.columns.price'), sortable: true, align: 'right', format: (_, row) => formatMoney(row.price, locale.value, money.value) },
   {
@@ -175,6 +178,14 @@ function onRowClick(row: ComboOut): void {
       @action="onAction"
       @retry="refresh()"
     >
+      <template #photo="{ row }">
+        <ItemImage
+          class="combo-menu-photo"
+          :data-testid="`combo-menu-photo-${row.id}`"
+          :src="row.image_url"
+          :name="row.name"
+        />
+      </template>
       <template #empty>
         <EmptyState
           data-testid="combo-menus-empty"
@@ -204,3 +215,12 @@ function onRowClick(row: ComboOut): void {
     />
   </AppPage>
 </template>
+
+<style scoped>
+.combo-menu-photo {
+  width: 40px;
+  height: 40px;
+  font-size: 0.85rem;
+  border-radius: 8px;
+}
+</style>

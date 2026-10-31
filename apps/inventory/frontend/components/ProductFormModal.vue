@@ -6,12 +6,18 @@
 // «Tax category» (required, none chosen in advance) and «Categories» (when there are any; both search
 // the server, TaxCategorySelect and ProductCategoriesField), saved in one go. Editing: the SKU is locked, there is no initial stock nor type, and only what changed is sent
 // (the stock is never edited here: it is received or counted). Amounts and quantities are read as
-// the person typed them; a refusal stays in the dialog, each message under its field.
-import { FormModal } from '@erplora/ui/components';
+// the person typed them; a refusal stays in the dialog, each message under its field. «Photo» (INVENTORY-F30/F31, for
+// who may change products): a library image or a photo of its own, sent once the product is saved (`set_image`,
+// `upload_image`, «Uploading photo…»); if the product saved and the photo did not, the dialog says so with «Retry»
+// (only the photo goes again) and the product keeps the photo it had.
+import { FormModal, InlineFeedback } from '@erplora/ui/components';
 import { type InputOf, type OutputOf, useCommand } from '@erplora/ui/sdk';
-import { IonCheckbox, IonInput, IonNote, IonSelect, IonSelectOption, IonTextarea } from '@ionic/vue';
+import { useSession } from '@erplora/ui/shell';
+import { IonButton, IonCheckbox, IonInput, IonNote, IonSelect, IonSelectOption, IonTextarea } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import ImageField from '../../../../base/frontend/components/ImageField.vue';
+import { draftOf, type ImageDraft, useImageSave } from '../../../../base/frontend/lib/item-image';
 import { useT } from '../composables/useT';
 import type { Unit } from '../composables/useUnits';
 import { errorFields } from '../lib/errors';
@@ -61,6 +67,14 @@ const { t, locale } = useT();
 const business = useBusinessMoney();
 const create = useCommand('inventory.product.create');
 const update = useCommand('inventory.product.update');
+const setImage = useCommand('inventory.product.set_image');
+const uploadImage = useCommand('inventory.product.upload_image');
+const photo = useImageSave({
+  set: (id, image) => setImage.run({ id, image }),
+  upload: (id, data) => uploadImage.run({ id, data_base64: data }),
+});
+const session = useSession();
+const canChangePhoto = computed(() => session.can('inventory.change_product'));
 
 const editing = computed(() => props.product !== null);
 
@@ -87,6 +101,7 @@ function fieldsOf(product: Product | null): Fields {
 
 const original = ref<Fields>(fieldsOf(props.product));
 const form = ref<Fields>(fieldsOf(props.product));
+const image = ref<ImageDraft>(draftOf(props.product));
 const tried = ref(false);
 
 watch(
@@ -95,6 +110,8 @@ watch(
     if (!isOpen) return;
     original.value = fieldsOf(props.product);
     form.value = fieldsOf(props.product);
+    image.value = draftOf(props.product);
+    photo.reset();
     tried.value = false;
     create.error.value = null;
     update.error.value = null;
@@ -117,7 +134,7 @@ watch(business, () => {
 
 const command = computed(() => (editing.value ? update : create));
 const error = computed(() => command.value.error.value);
-const pending = computed(() => command.value.pending.value);
+const pending = computed(() => command.value.pending.value || photo.pending.value);
 const fields = computed(() => errorFields(error.value));
 const invalid = (field: string) => ({ 'ion-invalid': !!fields.value[field], 'ion-touched': !!fields.value[field] });
 
@@ -150,11 +167,17 @@ function read() {
   return { price: price.cents ?? 0, cost: cost.cents ?? 0, initial: initial.value ?? '0', threshold: threshold.value ?? DEFAULT_THRESHOLD };
 }
 
+/** The photo's step for the saved product; the dialog closes once the photo is as the form says. */
+async function savePhoto(id: string): Promise<void> {
+  if (await photo.save(id, props.product?.image ?? '', image.value)) open.value = false;
+}
+
 async function save(): Promise<void> {
   tried.value = true;
   const values = read();
   if (!values || !complete.value) return;
   const now = form.value;
+  let saved: { id: string };
   try {
     if (props.product) {
       const was = original.value;
@@ -172,9 +195,9 @@ async function save(): Promise<void> {
         ...(now.track !== was.track && now.track !== null ? { track_stock: now.track } : {}),
         ...(now.categories.join() !== was.categories.join() ? { category_ids: now.categories } : {}),
       };
-      await update.run(patch);
+      saved = await update.run(patch);
     } else {
-      await create.run({
+      saved = await create.run({
         name: now.name.trim(),
         sku: now.sku.trim(),
         price: values.price,
@@ -193,7 +216,12 @@ async function save(): Promise<void> {
   } catch {
     return; // the dialog paints the error and stays open.
   }
-  open.value = false;
+  await savePhoto(saved.id);
+}
+
+function retryPhoto(): void {
+  const failed = photo.failure.value;
+  if (failed) void savePhoto(failed.id);
 }
 </script>
 
@@ -202,14 +230,32 @@ async function save(): Promise<void> {
     v-model:open="open"
     :title="title"
     testid="inventory-product-form"
-    :submit-label="pending ? $t('inventory.common.saving') : editing ? $t('inventory.common.saveChanges') : $t('inventory.common.save')"
+    :submit-label="photo.uploading.value ? $t('base.imageField.uploading') : pending ? $t('inventory.common.saving') : editing ? $t('inventory.common.saveChanges') : $t('inventory.common.save')"
     :cancel-label="editing ? $t('inventory.form.cancelEdit') : $t('inventory.common.cancel')"
     :pending="pending"
     :error="error"
-    :submit-disabled="!complete"
+    :submit-disabled="!complete || !!photo.failure.value"
     @submit="save"
   >
     <div class="product-form">
+      <InlineFeedback
+        v-if="photo.failure.value"
+        tone="warning"
+        data-testid="inventory-product-photo-failed"
+      >
+        {{ $t('inventory.form.photoNotSaved', { reason: photo.failure.value.reason || $t('base.imageField.notSaved') }) }}
+        <template #actions>
+          <ion-button
+            data-testid="inventory-product-photo-retry"
+            fill="outline"
+            size="small"
+            :disabled="photo.pending.value"
+            @click="retryPhoto"
+          >
+            {{ $t('base.imageField.retry') }}
+          </ion-button>
+        </template>
+      </InlineFeedback>
       <ion-input
         data-testid="inventory-product-name"
         :model-value="form.name"
@@ -365,6 +411,13 @@ async function save(): Promise<void> {
         :model-value="form.categories"
         :error-text="fields.category_ids"
         @update:model-value="set('categories', $event)"
+      />
+      <ImageField
+        v-if="canChangePhoto"
+        v-model="image"
+        testid="inventory-product-image"
+        :name="form.name.trim()"
+        :disabled="pending"
       />
     </div>
   </FormModal>

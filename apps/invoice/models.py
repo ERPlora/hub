@@ -103,15 +103,17 @@ class InvoiceSeries(UUIDModel):
     )
     # The last number given; the next document takes current_number + 1.
     current_number = models.IntegerField(_("current number"), default=0)
-    is_active = models.BooleanField(_("active"), default=True)
+    # «activa», «creada el»… (a series): the texts an earlier app translates otherwise in Spanish go with invoice's
+    # own context, since the first catalog that says a message wins (base/tests/test_locale_modules.py).
+    is_active = models.BooleanField(pgettext_lazy("invoice", "active"), default=True)
     is_default = models.BooleanField(_("default series"), default=False)
-    created_at = models.DateTimeField(_("created at"), auto_now_add=True)
-    updated_at = models.DateTimeField(_("updated at"), auto_now=True)
+    created_at = models.DateTimeField(pgettext_lazy("invoice", "created at"), auto_now_add=True)
+    updated_at = models.DateTimeField(pgettext_lazy("invoice", "updated at"), auto_now=True)
     created_by = models.CharField(
-        _("created by"), max_length=ACTOR_MAX_LENGTH, blank=True
+        pgettext_lazy("invoice", "created by"), max_length=ACTOR_MAX_LENGTH, blank=True
     )
     updated_by = models.CharField(
-        _("updated by"), max_length=ACTOR_MAX_LENGTH, blank=True
+        pgettext_lazy("invoice", "updated by"), max_length=ACTOR_MAX_LENGTH, blank=True
     )
 
     class Meta:
@@ -158,8 +160,9 @@ class Issuer(UUIDModel):
 
     singleton = models.BooleanField(_("single row"), default=True, editable=False)
     legal_name = models.CharField(_("legal name"), max_length=NAME_MAX_LENGTH)
-    tax_id = models.CharField(_("tax ID"), max_length=TAX_ID_MAX_LENGTH)
-    address = models.CharField(_("address"), max_length=255)
+    # «NIF» and «domicilio», as the Issuer screen says them, not customer's «NIF/CIF» and «dirección».
+    tax_id = models.CharField(pgettext_lazy("invoice", "tax ID"), max_length=TAX_ID_MAX_LENGTH)
+    address = models.CharField(pgettext_lazy("invoice", "address"), max_length=255)
     postal_code = models.CharField(_("postal code"), max_length=20, blank=True)
     city = models.CharField(_("city"), max_length=100, blank=True)
     province = models.CharField(_("province"), max_length=100, blank=True)
@@ -340,7 +343,7 @@ class Invoice(UUIDModel):
     created_by = models.CharField(
         _("issued by"), max_length=ACTOR_MAX_LENGTH, blank=True
     )
-    updated_at = models.DateTimeField(_("updated at"), auto_now=True)
+    updated_at = models.DateTimeField(pgettext_lazy("invoice", "updated at"), auto_now=True)
 
     class Meta:
         verbose_name = _("invoice")

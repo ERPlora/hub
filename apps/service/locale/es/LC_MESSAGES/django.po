@@ -561,3 +561,11 @@ msgstr "Tu catálogo de servicios"
 
 msgid "Add the services you sell, with their price and duration."
 msgstr "Añade los servicios que vendes, con su precio y su duración."
+
+#: models.py
+msgid "image"
+msgstr "imagen"
+
+#: schemas.py
+msgid "Image"
+msgstr "Imagen"

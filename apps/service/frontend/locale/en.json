@@ -87,8 +87,10 @@
         "tax": "Tax category",
         "taxMissing": "There are no tax categories yet. Set them up in Taxes before adding services.",
         "create": "Create service",
-        "save": "Save changes"
-      }
+        "save": "Save changes",
+        "photoNotSaved": "The service has been saved, but the photo has not: {reason}"
+      },
+      "photo": "Photo"
     },
     "professionals": {
       "title": "Professionals who perform it",
