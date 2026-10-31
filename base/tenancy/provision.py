@@ -11,17 +11,18 @@ of its own (``base.services``, «The provisioning's writes in control»):
    ``base.tenancy.ops``), private to the environment's roles, with its identity (``base_hub_identity``);
 2. ``migrating``: the apps the clone has (its ``django_migrations``) and ``base`` are brought to the code's leaf through
    its migrator's alias (``base.tenancy.migrator.migrate_apps``: nothing to do when ``migrate_hubs`` kept the template
-   current) and noted in ``Hub.schema_apps`` (``{app: its leaf migration}``) with ``schema_state`` current; until S3
+   current; the lease renewed between apps) and noted in ``Hub.schema_apps`` (``{app: its leaf migration}``) with ``schema_state`` current; until S3
    (an app's tables made when it is turned on), every portable app's tables are made too, so that turning one on only
    changes its row, as in phase 1;
-3. ``seeding``: inside ``use_hub``, the blocks of the SaaS's photo kept on the row for the apps it has on (none at
-   birth: a business is born with every app off, PLAN §33);
+3. ``seeding``: inside ``use_hub``, the SaaS's photo kept on the row (its people, and the blocks of the apps it has
+   on: none at birth, a business is born with every app off, PLAN §33); a newer photo that arrives meanwhile is
+   applied too before ``ready`` (:data:`SEED_ROUNDS`);
 4. ``ready``, and the SaaS of a business hears it after the COMMIT (``base.services.report_ready``).
 
 Every step is safe to run again: a database already there is gone on with (``42P04``), its identity is written once,
 the migrator applies only what is missing. A step that fails leaves the hub ``failed`` with ``attempts``, a readable
 ``last_error`` (``<code>: <why>``: ``no_cluster_available``, ``template_missing``, ``clone_failed``,
-``schema_failed``, ``unexpected``) and its ``next_attempt_at`` (1 min, 5 min, 15 min, then every hour), due again then:
+``schema_failed``, ``photo_moving``, ``unexpected``) and its ``next_attempt_at`` (1 min, 5 min, 15 min, then every hour), due again then:
 never an exception out of the worker's pass. A hub cancelled, or a demo that ended, meanwhile stops there.
 
 :func:`drop` ends a demo that ended: ``dropping``, its database dropped (``DROP DATABASE … WITH (FORCE)``, that one
@@ -56,6 +57,9 @@ LEASE = dt.timedelta(seconds=60)
 #: (the rest waits for the next), so the next tick's relay of the shared database is not held back long.
 DUE_BATCH = 20
 DUE_PASS_SECONDS = 5.0
+#: How many times a seeding applies a newer photo of the SaaS's that came while it ran, before it gives up for now
+#: (``photo_moving``: it is tried again later): one each time a photo arrives between its read and ``ready``.
+SEED_ROUNDS = 5
 #: What a seeding writes in the hub's database, inside ``use_hub``.
 Seed = Callable[[Hub], None]
 
@@ -90,9 +94,10 @@ def provision(
     """Make ``hub``'s database now, under its lease; whether it is ready after.
 
     ``apps``: more apps than its template's whose tables it gets; ``None`` (the worker's pass too, :func:`run_due`):
-    every portable app's (``base.tenancy.migrator.portable_apps``). That is transitional, until S3 makes an app's
-    tables when it is turned on (``base.app.enable``, W6): meanwhile turning an app on only changes its row, as in phase
-    1, and a business born with every app off can turn any on. ``seed``: what its seeding writes, inside its database
+    every portable app's (``base.tenancy.migrator.apps_every_hub_gets``, which ``migrate_hubs`` also gives the hubs
+    already made). That is transitional, until S3 makes an app's tables when it is turned on (``base.app.enable``,
+    W6): meanwhile turning an app on only changes its row, as in phase 1, and a business born with every app off can
+    turn any on. ``seed``: what its seeding writes, inside its database
     (``use_hub``), after the photo kept. A hub already
     ready is left as it is (``True``); one that is not being prepared (cancelled, gone) or whose lease someone else
     holds is not touched (``False``). A failure is noted on the hub (``failed``), never raised. ``tell_saas=False``:
@@ -164,7 +169,7 @@ def _prepare(hub_id, *, apps: Iterable[str] | None = None, seed: Seed | None = N
     """The steps of a hub's preparation, its lease held; a failure is noted on it, a hub that left them is left.
     ``apps=None``: every portable app's tables (until S3, :func:`provision`)."""
     if apps is None:
-        apps = migrator.portable_apps()
+        apps = migrator.apps_every_hub_gets()
     try:
         hub = services.place_hub(hub_id)
         hub = services.provision_step(hub_id, Hub.Status.CREATING, timezone.now(), LEASE)
@@ -179,8 +184,15 @@ def _prepare(hub_id, *, apps: Iterable[str] | None = None, seed: Seed | None = N
         identity.write(ddl, hub.id)
         hub = services.provision_step(hub_id, Hub.Status.MIGRATING, timezone.now(), LEASE)
         try:
-            # Its vertical's apps too: the template it was cloned from may still be being built (migrate_hubs).
-            migrator.ensure_schema(hub, add=["base", *vertical_apps(hub.vertical), *apps])
+            # Its vertical's apps too: the template it was cloned from may still be being built (migrate_hubs). The
+            # lease is renewed between apps: a long migration never lets another worker take the hub meanwhile.
+            migrator.ensure_schema(
+                hub,
+                add=["base", *vertical_apps(hub.vertical), *apps],
+                heartbeat=lambda: services.provision_step(hub_id, Hub.Status.MIGRATING, timezone.now(), LEASE),
+            )
+        except services.ProvisioningStopped:
+            raise
         except Exception as error:
             raise services.ProvisioningFailed("schema_failed", f"{type(error).__name__}: {error}") from error
         hub = services.provision_step(hub_id, Hub.Status.SEEDING, timezone.now(), LEASE)
@@ -188,7 +200,20 @@ def _prepare(hub_id, *, apps: Iterable[str] | None = None, seed: Seed | None = N
             services.apply_kept_photo(hub)
             if seed is not None:
                 seed(hub)
-        services.provision_ready(hub_id, timezone.now(), hub.schema_apps, tell_saas=tell_saas)
+        for _ in range(SEED_ROUNDS):
+            # Ready only with the photo it applied still the row's: one that came meanwhile was kept on the row only
+            # (its database was not made yet) and the SaaS never sends it again, so it is applied now and checked again.
+            if services.provision_ready(
+                hub_id, timezone.now(), hub.schema_apps, tell_saas=tell_saas, seeded_version=hub.state_version
+            ):
+                break
+            hub = services.registry_row(hub_id)
+            with use_hub(hub):
+                services.apply_kept_photo(hub)
+        else:
+            raise services.ProvisioningFailed(
+                "photo_moving", f"the SaaS's photo kept changing while it was seeded ({SEED_ROUNDS} times)"
+            )
         logger.info("base.tenancy.provision.ready hub=%s database=%s", hub.slug, hub.db_name)
     except services.ProvisioningStopped as stopped:
         logger.info("base.tenancy.provision.stopped hub=%s: %s", hub_id, stopped)

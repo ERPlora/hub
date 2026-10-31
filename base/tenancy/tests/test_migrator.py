@@ -316,6 +316,17 @@ def test_add_creates_only_that_app_and_what_it_requires(new_database, make_hub):
     assert hub.schema_apps == {label: leaf[label] for label in (*PLATFORM, "inventory", "tax")}
 
 
+def test_ensure_schema_beats_once_per_app_it_migrates(new_database, make_hub):
+    """Review of round 4 (4): a long migration renews its caller's lease between apps (the worker's ``hub_due``), so
+    two workers of a deploy never take the same hub while it is being made."""
+    hub = make_hub(new_database)
+    beats = []
+
+    applied = migrator.ensure_schema(hub, add=["inventory"], heartbeat=lambda: beats.append(len(beats)))
+
+    assert len(beats) == len({name.split(".")[0] for name in applied}) > 2
+
+
 def test_an_app_the_hubs_database_has_is_brought_to_the_leaf_even_if_control_never_learnt_it(new_database, make_hub):
     """«Si discrepan, manda el django_migrations de la BD del hub» (PLAN-DB §7)."""
     hub = make_hub(new_database)
@@ -377,12 +388,12 @@ def test_the_migrator_runs_with_plan_db_session_limits(new_database, monkeypatch
     seen = {}
     real = migrator.migrate_apps
 
-    def watching(alias, labels):
+    def watching(alias, labels, **kwargs):
         with connections[alias].cursor() as cursor:
             for setting in ("lock_timeout", "statement_timeout", "idle_in_transaction_session_timeout"):
                 cursor.execute(f"SHOW {setting}")
                 seen[setting] = cursor.fetchone()[0]
-        return real(alias, labels)
+        return real(alias, labels, **kwargs)
 
     monkeypatch.setattr(migrator, "migrate_apps", watching)
 
@@ -415,7 +426,7 @@ def test_a_schema_lock_held_elsewhere_fails_after_the_wait_as_schema_locked(new_
 def test_a_failed_run_leaves_neither_the_lock_nor_the_connection(new_database, monkeypatch, make_hub):
     hub = make_hub(new_database)
 
-    def broken(alias, labels):
+    def broken(alias, labels, **kwargs):
         raise RuntimeError("the migration broke")
 
     monkeypatch.setattr(migrator, "migrate_apps", broken)
@@ -433,7 +444,7 @@ def test_a_failed_run_leaves_neither_the_lock_nor_the_connection(new_database, m
 def test_a_failed_run_reports_its_own_error_even_when_its_connection_died(new_database, make_hub, monkeypatch):
     hub = make_hub(new_database)
 
-    def dying(alias, labels):
+    def dying(alias, labels, **kwargs):
         connections[alias].connection.close()  # the server went away in the middle of the run
         raise RuntimeError("the migration broke")
 
@@ -451,13 +462,13 @@ def test_two_runs_on_one_hub_at_once_one_waits_and_neither_fails(new_database, m
     inside = [0]
     peak = [0]
 
-    def tracked(alias, labels):
+    def tracked(alias, labels, **kwargs):
         with guard:
             inside[0] += 1
             peak[0] = max(peak[0], inside[0])
         try:
             time.sleep(0.3)  # widens the window two unlocked runs would overlap in
-            return real(alias, labels)
+            return real(alias, labels, **kwargs)
         finally:
             with guard:
                 inside[0] -= 1
@@ -503,7 +514,8 @@ def test_ensure_schema_of_a_never_opens_bs_database(hub_databases, make_hub, ope
 
 def test_a_hub_is_behind_when_an_app_it_has_is_not_at_the_codes_leaf():
     leaf = leaves()
-    current = {label: leaf[label] for label in PLATFORM}
+    # Until S3 a hub with its own database has every portable app (round 2026-10-31 of the S2a review): current is all.
+    current = {label: leaf[label] for label in (*PLATFORM, *migrator.portable_apps())}
 
     assert not migrator.is_behind(Hub(schema_apps=current))
     assert migrator.is_behind(Hub(schema_apps={}))  # never confirmed
@@ -513,6 +525,34 @@ def test_a_hub_is_behind_when_an_app_it_has_is_not_at_the_codes_leaf():
     assert not migrator.is_behind(Hub(schema_apps={**current, "gone": "0009_later"}))  # a rollback's unknown label
     # A later code's migration (after a rollback): the database is ahead, not behind.
     assert not migrator.is_behind(Hub(schema_apps={**current, "base": "0099_from_a_later_code"}))
+
+
+def test_until_s3_a_hub_without_a_portable_app_is_behind():
+    """A later code ports an app: until S3 makes an app's tables when it is turned on, a hub with its own database
+    that lacks it is behind, so ``migrate_hubs`` gives it (``base.app.enable`` would find no table)."""
+    leaf = leaves()
+    every = {label: leaf[label] for label in (*PLATFORM, *migrator.portable_apps())}
+    without_tax = {label: name for label, name in every.items() if label != "tax"}
+
+    assert not migrator.is_behind(Hub(db_name="hub_x", schema_apps=every))
+    assert migrator.is_behind(Hub(db_name="hub_x", schema_apps=without_tax))
+    assert migrator.is_behind(Hub(db_name="hub_x", schema_apps=without_tax), wanted=["tax"])
+    assert not migrator.is_behind(Hub(db_name="hub_x", schema_apps=without_tax), wanted=[])
+
+
+def test_until_s3_migrate_hubs_gives_a_hub_every_portable_app_it_lacks(new_database, make_hub):
+    hub = make_hub(new_database)
+    migrator.ensure_schema(hub, add=["tax"])  # what an older code gave it
+    hub.refresh_from_db()
+    assert "inventory" not in hub.schema_apps
+
+    result = migrator.migrate_hubs_behind(workers=1)
+
+    assert hub.slug in result.migrated and result.failed == {}
+    hub.refresh_from_db()
+    assert set(migrator.portable_apps()) <= set(hub.schema_apps)
+    assert "inventory_product" in hubs.table_names(new_database)
+    assert not migrator.is_behind(hub)
 
 
 # ── Templates ───────────────────────────────────────────────────────────────────────────────────────────────────

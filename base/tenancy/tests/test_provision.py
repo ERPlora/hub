@@ -14,6 +14,7 @@ themselves: the rows they wrote in control and the databases they made.
 
 import ast
 import datetime as dt
+import logging
 import threading
 import uuid
 from pathlib import Path
@@ -449,6 +450,84 @@ def test_the_people_of_the_photo_kept_while_it_was_prepared_are_in_its_database_
         HubUser.objects.create(username=f"saas:{gone}", name="Gone", is_active=True)
         services.apply_kept_photo(fresh(hub))
         assert not HubUser.objects.get(username=f"saas:{gone}").is_active
+
+
+def test_a_photo_that_arrives_while_it_is_seeded_is_in_its_database_when_it_is_ready(registry, told):
+    """Review of round 4 (2): the photo the SaaS sends between the seeding's read and ``ready`` is applied too; the
+    SaaS never sends it again (its version is not newer than the one the row keeps)."""
+    from live.context import system_context
+
+    from base.models import HubUser
+    from base.registry import REGISTRY_SCOPE
+    from base.schemas import HubStateIn
+
+    hub = registry.hub()
+    late = uuid.uuid7()
+    members = [{"user_id": str(late), "role": "hub_employee", "email": "luis@example.com", "name": "Luis"}]
+
+    def photo_meanwhile(row):
+        # The SaaS's photo, through its own door, while the seeding still runs: the hub is not ready, so it is kept.
+        with use_control():
+            services.hub_state_apply(
+                system_context(REGISTRY_SCOPE),
+                HubStateIn(id=row.id, version=7, members=members, photo={"members": members}),
+            )
+
+    assert provision.provision(hub, seed=photo_meanwhile) is True
+
+    hub = fresh(hub)
+    assert (hub.status, hub.state_version) == ("ready", 7)
+    with use_hub(hub):
+        assert HubUser.objects.filter(username=f"saas:{late}", is_active=True).exists()
+
+
+def test_a_photo_that_keeps_changing_while_it_is_seeded_leaves_it_failed_and_tried_again(registry, monkeypatch, told):
+    hub = registry.hub()
+    asked = []
+    monkeypatch.setattr(services, "provision_ready", lambda *args, **kwargs: asked.append(kwargs) or None)
+
+    assert provision.provision(hub) is False
+
+    hub = fresh(hub)
+    assert len(asked) == provision.SEED_ROUNDS
+    assert hub.status == "failed" and hub.last_error.startswith("photo_moving: ")
+
+
+def test_its_lease_is_renewed_while_its_schema_is_migrated(registry, monkeypatch, told):
+    hub = registry.hub()
+    real = migrator.ensure_schema
+    renewed = []
+
+    def beating(row, **kwargs):
+        before = HubDue.objects.get(pk=row.pk).lease_until
+        kwargs["heartbeat"]()
+        renewed.append(HubDue.objects.get(pk=row.pk).lease_until > before)
+        return real(row, **kwargs)
+
+    monkeypatch.setattr(migrator, "ensure_schema", beating)
+
+    assert provision.provision(hub) is True
+    assert renewed == [True]
+
+
+def test_a_lease_lost_while_its_schema_is_migrated_stops_it_there_without_failing_it(
+    registry, monkeypatch, told, caplog
+):
+    hub = registry.hub()
+
+    def taken_meanwhile(row, **kwargs):
+        HubDue.objects.filter(pk=row.pk).update(lease_owner="another-worker")
+        kwargs["heartbeat"]()
+
+    monkeypatch.setattr(migrator, "ensure_schema", taken_meanwhile)
+
+    with caplog.at_level(logging.INFO, logger="base.tenancy.provision"):
+        assert provision.provision(hub) is False
+
+    hub = fresh(hub)
+    assert (hub.status, hub.attempts, hub.last_error) == ("migrating", 0, "")
+    # Said as what it is: another worker holds it now, nothing failed.
+    assert "provision.stopped" in caplog.text and "provision.failed" not in caplog.text
 
 
 def test_a_hub_held_by_another_worker_is_not_taken(registry, told):

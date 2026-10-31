@@ -111,8 +111,10 @@ def missing_database() -> str:
 
 
 def at_the_leaf() -> dict[str, str]:
+    """A hub with its own database at the code's leaf: the platform and, until S3, every portable app
+    (``migrator.apps_every_hub_gets``: ``migrate_hubs`` adds the ones it lacks)."""
     leaf = leaves()
-    return {label: leaf[label] for label in PLATFORM}
+    return {label: leaf[label] for label in (*PLATFORM, *migrator.apps_every_hub_gets())}
 
 
 # ── A run ───────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -157,7 +159,7 @@ def test_a_run_goes_control_then_templates_then_the_hubs_behind(small, new_datab
     hub.refresh_from_db()
     assert hub.schema_apps == at_the_leaf()
     assert hub.schema_state == Hub.SchemaState.CURRENT
-    assert hubs.table_names(new_database) == hubs.hub_tables(PLATFORM) | {"django_migrations"}
+    assert hubs.table_names(new_database) == hubs.hub_tables(tuple(at_the_leaf())) | {"django_migrations"}
 
 
 def test_a_missing_template_is_created_by_a_run(small, template_name, monkeypatch):
