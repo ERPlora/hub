@@ -176,15 +176,18 @@ primera vez que el negocio la enciende** (PLAN-DB §7, spec 2026-10-11 «tablas 
   enciende queda `creating` en un solo plan, la ruta responde **202** con `state: "creating"`, se anota
   `base.app.activation_requested` y, tras el COMMIT, se llama al worker (`HubDue.mark_due`). Cada fila guarda la última
   migración de la app en el código que la pidió (`AppActivation.target`).
-- **El worker** (`_activations`, también con `--databases-only`) toma cada tick los hubs llamados y, cada 60 s, todos los
-  listos con BD propia (una llamada perdida se encuentra); en cada uno, lo debido (`creating`, o `failed` cuyo próximo
-  intento llegó) se crea con `migrator.ensure_schema(hub, add=…)` bajo el lock de esquema del hub y
-  `base.app.activation_settle` lo enciende (`base.app.enabled`, aviso vivo: Apps y el menú de todos los dispositivos
-  cambian sin recargar) o lo deja `failed` con `attempts`, `last_error` y `next_attempt_at` (1, 5, 15 min y después cada
-  hora; `base.app.activation_failed`). Esquema ocupado por otra ejecución: +30 s. Una petición de un código más nuevo que
-  el del worker (o una BD por delante de su código, un despliegue a medias): se deja a un worker de ese código, +60 s.
+- **El worker** (`_activations`, también con `--databases-only`) toma cada tick los hubs llamados (`hub_due` vencido y
+  libre); en cada uno, lo debido (`creating`, o `failed` cuyo próximo intento llegó) se crea con
+  `migrator.ensure_schema(hub, add=…)` bajo el lock de esquema del hub y `base.app.activation_settle` lo enciende
+  (`base.app.enabled`, aviso vivo: Apps y el menú de todos los dispositivos cambian sin recargar) o lo deja `failed` con
+  `attempts`, `last_error` y `next_attempt_at` (1, 5, 15 min y después cada hora; `base.app.activation_failed`), y mueve
+  la llamada del hub a lo siguiente que espera (o la quita). Esquema ocupado por otra ejecución: +30 s. Una petición de un
+  código más nuevo que el del worker (o la app o lo que necesita ya en una migración que su código no conoce): se deja a
+  un worker de ese código, +60 s, y a los 10 minutos queda `failed` con `code_behind` (tras un rollback no llega
+  ninguno). El pase de `hub_due` no toca la llamada de un hub listo. Una llamada perdida la encuentra el pase por los
+  hubs servidos: cada 10 minutos los que tuvieron una visita en 7 días y una vez al día el resto.
 - **Apps** pinta «Activándose…» (y la pantalla de la app dice que se abre en un momento) y, si falló, «No se ha podido
-  activar» con **«Reintentar»** (`base.app.retry`, 202) o «Desactivar». La sesión (`base.session.me`) da `activating`.
+  activar» con **«Reintentar»** (`base.app.retry`, 202); «Desactivar» en las tres. La sesión (`base.session.me`) da `activating`.
   Mientras no está `on` sus operaciones responden 404 `app_inactive`, el relevo no le entrega nada y sus tareas no
   corren. **Apagar** nunca borra tablas; apagada mientras se crean, queda `off` con ellas hechas. Un blueprint que
   enciende una app que aún se prepara no carga sus datos y su informe dice que se vuelva a cargar en un minuto

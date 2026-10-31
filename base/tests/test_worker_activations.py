@@ -53,8 +53,9 @@ def no_test_fallback(monkeypatch):
 @pytest.fixture(autouse=True)
 def nothing_checked_yet(monkeypatch):
     monkeypatch.setattr(identity, "_verified", set())
-    monkeypatch.setattr(worker, "_next_sweep", None)
-    monkeypatch.setattr(worker, "_swept_after", None)
+    monkeypatch.setattr(worker, "_swept", {})
+    monkeypatch.setattr(worker, "_synced", set())
+    monkeypatch.setattr(worker, "_next_hub", None)
 
 
 @pytest.fixture(scope="module")
@@ -194,7 +195,6 @@ def _what_is_due():
 
 def test_turned_on_in_a_its_tables_are_made_there_only_and_bs_database_is_never_opened(business):
     a, b = business("a"), business("b")
-    worker._next_sweep = timezone.now() + dt.timedelta(hours=1)  # only the hubs rung
     assert turn_on(a)["state"] == "creating"
     assert HubDue.objects.filter(hub_id=a.pk).exists()
     assert not hubs.hub_tables([APP]) & tables(a)
@@ -389,18 +389,164 @@ def test_the_request_names_the_codes_leaf_of_what_it_asks_for(business):
 # ── Which hubs it looks at ──────────────────────────────────────────────────────────────────────────────────────
 
 
-def test_a_ring_lost_is_found_again_by_the_sweep(business):
+def test_the_pass_takes_only_the_hubs_rung(business):
+    a = business("a")
+    turn_on(a)
+    HubDue.objects.filter(hub_id=a.pk).delete()  # a ring lost
+
+    with hubs.watched() as sent:
+        run_pass()
+
+    assert row(a).state == CREATING
+    assert not [alias for alias in sent if a.id.hex in alias]
+
+
+# ── Its retries go by hub_due, which the pass over the hubs due leaves to it (PLAN-DB §8) ─────────────────────────
+
+
+def due_at(hub: Hub):
+    return HubDue.objects.filter(hub_id=hub.pk).values_list("due_at", flat=True).first()
+
+
+def test_a_schema_held_puts_it_off_30_seconds_in_hub_due_and_the_pass_over_the_hubs_due_leaves_that_ring(business):
+    from base.tenancy import provision
+
+    a = business("a")
+    turn_on(a)
+    now = timezone.now()
+    with hubs._maintenance(a.db_name) as holder:
+        holder.execute("SELECT pg_advisory_lock(hashtext('erplora.schema'))")
+        run_pass(now)
+    assert dt.timedelta(seconds=25) <= due_at(a) - now <= dt.timedelta(seconds=35)
+
+    provision.run_due(now + dt.timedelta(seconds=40))  # the worker's own pass over hub_due, after the ring came
+
+    assert due_at(a) is not None
+    run_pass(now + dt.timedelta(seconds=40))
+    assert row(a).state == ON
+
+
+def test_a_failure_rings_its_hub_at_its_next_try_and_nothing_pending_ends_the_ring(business, monkeypatch):
+    a = business("a")
+    turn_on(a)
+    real = migrator.ensure_schema
+    monkeypatch.setattr(migrator, "ensure_schema", lambda hub, **kwargs: (_ for _ in ()).throw(RuntimeError("boom")))
+    now = timezone.now()
+
+    run_pass(now)
+
+    assert due_at(a) == row(a).next_attempt_at
+    monkeypatch.setattr(migrator, "ensure_schema", real)
+    run_pass(row(a).next_attempt_at)
+    assert row(a).state == ON
+    assert due_at(a) is None
+
+
+def test_a_ring_with_other_work_of_the_hub_is_left_to_it(business):
+    a = business("a")
+    turn_on(a)
+    Hub.objects.filter(pk=a.pk).update(reset_requested_at=timezone.now(), reset_sections={"apps": ["sale"]})
+
+    run_pass()
+
+    assert row(a).state == ON
+    assert due_at(a) is not None  # the reset still to do keeps it due
+
+
+# ── A ring lost is found by the sweep of the hubs served: every 10 min the active ones, daily all (PLAN-DB §8) ─────
+
+
+def activation_reads(sent: dict[str, list[str]], hub: Hub) -> int:
+    return sum(
+        1
+        for alias, statements in sent.items()
+        if hub.id.hex in alias
+        for statement in statements
+        if '"base_appactivation"' in statement
+    )
+
+
+def visited(hub: Hub, day) -> None:
+    from control.models import HubVisit
+
+    HubVisit.objects.create(host=hub.slug, day=day, saas_user_id="saas:1")
+
+
+def test_the_sweep_of_the_hubs_served_rings_a_hub_whose_ring_was_lost(business):
+    from base.tenancy.context import use_control
+
     a = business("a")
     turn_on(a)
     HubDue.objects.filter(hub_id=a.pk).delete()
     now = timezone.now()
-    worker._next_sweep = now + dt.timedelta(minutes=1)
+
+    with use_control():
+        worker._hubs(now)
+    assert due_at(a) is not None and due_at(a) <= timezone.now()
+
+    run_pass(timezone.now())
+    assert row(a).state == ON
+
+
+@pytest.mark.parametrize(("active", "again"), [(True, dt.timedelta(minutes=10)), (False, dt.timedelta(days=1))])
+def test_the_sweep_looks_into_a_hub_only_at_its_pace(business, active, again):
+    from base.tenancy.context import use_control
+
+    a = business("a")
+    now = timezone.now()
+    if active:
+        visited(a, now.date() - dt.timedelta(days=6))
+    with use_control():
+        worker._hubs(now)  # looked into once: the first pass of the process
+
+        with hubs.watched() as sent:
+            worker._hubs(now + dt.timedelta(minutes=1))
+            worker._hubs(now + again - dt.timedelta(seconds=1))
+        assert activation_reads(sent, a) == 0
+
+        with hubs.watched() as sent:
+            worker._hubs(now + again)
+        assert activation_reads(sent, a) > 0
+
+
+# ── PLAN-DB §7, rollback: a database ahead of this code holds back only what it is about ────────────────────────
+
+
+def test_the_platform_ahead_of_this_code_does_not_hold_back_another_apps_tables(business):
+    a = business("a")
+    Hub.objects.filter(pk=a.pk).update(schema_apps={"base": "0099_of_a_later_code", "live": "0001_initial"})
+    turn_on(a)
+
+    run_pass()
+
+    assert row(a).state == ON
+
+
+@pytest.mark.parametrize("ahead", ["target", "schema_apps"])
+def test_an_app_asked_by_a_code_that_is_gone_fails_as_code_behind_after_ten_minutes_and_is_tried_again(
+    business, ahead
+):
+    a = business("a")
+    turn_on(a)
+    if ahead == "target":
+        with use_hub(fresh(a)):
+            AppActivation.objects.filter(host=a.slug, app=APP).update(target="9999_of_a_code_rolled_back")
+    else:
+        Hub.objects.filter(pk=a.pk).update(schema_apps={**fresh(a).schema_apps, APP: "9999_of_a_code_rolled_back"})
+    now = timezone.now()
 
     run_pass(now)
-    assert row(a).state == CREATING  # nothing rang, and the sweep is not due
+    assert row(a).state == CREATING  # a newer worker may still be coming: put off
 
-    run_pass(now + dt.timedelta(minutes=1))
-    assert row(a).state == ON
+    with use_hub(fresh(a)):
+        AppActivation.objects.filter(host=a.slug, app=APP).update(changed_at=now - dt.timedelta(minutes=10))
+    run_pass(now + dt.timedelta(minutes=2))  # past its wait of a minute
+
+    failed = row(a)
+    assert (failed.state, failed.attempts) == (FAILED, 1)
+    assert failed.last_error.startswith("code_behind: ")
+    assert failed.next_attempt_at is not None and due_at(a) == failed.next_attempt_at
+    assert outbox(a)[-1] == (events.APP_ACTIVATION_FAILED, {"apps": [APP], "error": "code_behind"})
 
 
 @pytest.mark.parametrize("status", [Hub.Status.REQUESTED, Hub.Status.MIGRATING, Hub.Status.CANCELLED, Hub.Status.PURGED])

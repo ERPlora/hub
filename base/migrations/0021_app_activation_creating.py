@@ -4,6 +4,8 @@
 # attempts, its last error and its next try) when making them failed; ``target`` names the app's last migration in the
 # code that asked. Expand only: the new columns have their default in the database, and the state's check is widened
 # (``on``/``off``, all the code of before writes, still pass).
+# Its reverse puts the narrow check back: it fails while a row is ``creating`` or ``failed`` (turn those apps off, or
+# let the worker finish them, first); nothing is lost by refusing.
 
 from django.db import migrations, models
 

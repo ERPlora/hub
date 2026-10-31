@@ -558,7 +558,8 @@ describe('AppsPage', () => {
       expect(vi.mocked(toastSuccess).mock.calls[0][0]).toBe('Turning on Flows… It will be ready in a moment.');
       await m.result(m.call, 'base.app.list', listOf(TASK, FLOW_CREATING), 2);
       expect([pill(m, 'flow').text(), pill(m, 'flow').attributes('data-tone')]).toEqual(['Turning on…', 'info']);
-      expect(m.wrapper.find('[data-testid="apps-row-flow-toggle"]').exists()).toBe(false);
+      // A business that changed its mind turns it off while it is set up (a code rolled back would keep it waiting).
+      expect(m.wrapper.find('[data-testid="apps-row-flow-toggle"]').text()).toContain('Turn off');
       expect(m.wrapper.find('[data-testid="apps-row-flow-open"]').exists()).toBe(false);
       await m.result(m.call, 'base.app.list', listOf(TASK, { ...FLOW, state: 'on', chosen: true, path: '/flow/home' }), 3);
       expect(pill(m, 'flow').text()).toBe('Installed');
@@ -618,6 +619,20 @@ describe('AppsPage', () => {
       await m.result(m.call, 'base.app.list', listOf(TASK, FLOW_FAILED));
       expect(pill(m, 'flow').text()).toBe('Could not turn on');
       expect(m.wrapper.find('[data-testid="apps-row-flow-retry"]').exists()).toBe(false);
+    });
+
+    it('one being set up can be turned off too, in Spanish «Desactivar»', async () => {
+      mocks.confirm.mockResolvedValue(true);
+      const m = await open('/apps', {
+        locale: 'es',
+        onApi: () => Response.json({ app: 'flow', state: 'off', chosen: false, along: [] }),
+      });
+      await m.result(m.call, 'base.app.list', listOf(TASK, FLOW_CREATING));
+      const toggle = m.wrapper.find('[data-testid="apps-row-flow-toggle"]');
+      expect(toggle.text()).toContain('Desactivar');
+      await toggle.trigger('click');
+      await flush();
+      expect(posted(m)).toEqual([['/api/apps/disable', { app: 'flow' }]]);
     });
 
     it('in Spanish', async () => {

@@ -366,3 +366,17 @@ def test_reading_the_apps_list_again_forgets_what_this_process_kept_so_the_menu_
         me = get("base.session.me")(as_admin(hub_a), get("base.session.me").input()).model_dump(mode="json")
 
     assert {app["label"]: app["state"] for app in me["apps"]}["printing"] == "on"
+
+
+@own
+def test_only_the_platform_settles_what_the_worker_made(hub_a):
+    from live.errors import PermissionDenied
+
+    given(hub_a, printing="creating*")
+    op = get("base.app.activation_settle")
+
+    with pytest.raises(PermissionDenied) as refused, use_hub(Hub.objects.get(pk=hub_a.pk)):
+        op(as_admin(hub_a), op.input.model_validate({"apps": ["printing"], "outcome": "created"}))
+
+    assert refused.value.code == "base.internal_only"
+    assert rows_of(hub_a)["printing"] == (CREATING, True)

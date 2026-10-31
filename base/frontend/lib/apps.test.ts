@@ -165,12 +165,12 @@ describe('an app whose tables the business’s database is still getting (S3)', 
     expect(appsOfTab(APPS, 'mine').map((row) => row.id)).toEqual(['flow', 'website', 'sale', 'customer', 'task']);
   });
 
-  it('nothing to turn on or open while one is being set up; one that failed is tried again or turned off', () => {
+  it('nothing to turn on or open while one is being set up, but it can be turned off; one that failed is tried again or turned off', () => {
     expect(APPS.map((row) => [row.id, canTurnOn(row), canTurnOff(row), canRetry(row), canOpen(row)])).toEqual([
-      ['flow', false, false, false, false],
+      ['flow', false, true, false, false],
       ['website', false, true, true, false],
-      ['sale', false, false, false, false],
-      ['customer', false, false, false, false],
+      ['sale', false, true, false, false],
+      ['customer', false, true, false, false],
       ['task', false, true, false, true],
     ]);
   });

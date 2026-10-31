@@ -71,10 +71,10 @@ export function canTurnOn(app: AppRow): boolean {
   return app.state === 'off';
 }
 
-/** «Turn off»: an app that is on, or one that could not be turned on (the business gives up on it). One being set up
- *  waits until it is on. */
+/** «Turn off»: an app the business turned on: on, being set up or that could not be (it gives up on it; its tables, if
+ *  any were made, stay). */
 export function canTurnOff(app: AppRow): boolean {
-  return app.state === 'on' || app.state === 'failed';
+  return isWanted(app);
 }
 
 /** «Retry»: an app whose tables could not be made in the business's own database (`base.app.retry`). */

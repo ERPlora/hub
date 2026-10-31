@@ -552,7 +552,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await expect.poll(() => menuApps(page), { timeout: SET_UP_MS }).toContain('Printing');
       await snap(page, 'S3-on', width);
 
-      // «Turning on…», as a row the worker set off leaves it: no button, no «Open».
+      // «Turning on…», as a row the worker set off leaves it: no «Open», and «Turn off» if the business changes its mind.
       psql(
         `update base_appactivation set state = 'creating', next_attempt_at = now() + interval '10 minutes' ` +
           `where host = 'a' and app = '${PRINTING}'`,
@@ -560,7 +560,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await page.reload();
       await search(page, 'Printing');
       await expect(state).toHaveText('Turning on…');
-      await expect(testid(page, `apps-row-${PRINTING}-toggle`)).toHaveCount(0);
+      await expect(testid(page, `apps-row-${PRINTING}-toggle`)).toContainText('Turn off');
       await expect(testid(page, `apps-row-${PRINTING}-open`)).toHaveCount(0);
       await snap(page, 'S3-creating', width);
 

@@ -1231,11 +1231,14 @@ def claim_hub(hub_id: UUID, now: dt.datetime, lease: dt.timedelta, *, owner: str
 
 def claim_next_due_hub(now: dt.datetime, lease: dt.timedelta, *, owner: str = LEASE_OWNER) -> UUID | None:
     """Take for ``owner`` the lease of the hub due longest by ``now`` that nobody holds: one at a time, right before
-    it is worked on, so no lease runs out while it waits its turn in a pass."""
+    it is worked on, so no lease runs out while it waits its turn in a pass. Never a ready hub's (a demo whose time is
+    up aside): its ring is its apps' to set up (``base.worker._activations``, S3), which keep their own time, or its
+    data work's, whose pass takes it."""
     with _control_transaction():
         due = (
-            HubDue.objects.select_for_update(skip_locked=True)
+            HubDue.objects.select_for_update(skip_locked=True, of=("self",))
             .filter(_free(now), due_at__lte=now)
+            .exclude(Q(hub__status=Hub.Status.READY) & ~Q(hub__is_demo=True, hub__expires_at__lte=now))
             .order_by("due_at")
             .values_list("hub_id", flat=True)
             .first()
@@ -3827,6 +3830,9 @@ ACTIVATION_RETRY_SECONDS = (60, 300, 900, 3600)
 ACTIVATION_LOCKED_SECONDS = 30
 #: How long an app asked by a newer code waits for a worker of that code (PLAN-DB §7: any other worker queues it +60 s).
 ACTIVATION_NEWER_CODE_SECONDS = 60
+#: How long an app waits for a worker of its code before it fails as ``code_behind`` (PLAN-DB §7: 10 minutes, the
+#: alarm's threshold): after a rollback none is coming, and the business tries again, asked by the code that runs now.
+ACTIVATION_CODE_BEHIND_AFTER = dt.timedelta(minutes=10)
 
 
 class AppLimitReached(OperationError):
@@ -4192,20 +4198,49 @@ def app_retry(ctx: OperationContext, data: AppChangeIn) -> dict:
         return _app_answer(data.app, changes[data.app], _named(ctx, along))
 
 
-def activation_hubs(now: dt.datetime, *, every: bool) -> tuple[list[Hub], list[Hub]]:
-    """The hubs the worker looks at for apps whose tables to make (S3): ``(rung, every one)``. Rung: ready, with their own
-    database, whose ``hub_due`` came and nobody holds; every one (``every``: the sweep that finds a ring lost and a failed
-    app's next try): every ready hub with its own database. Never one being made, dropped or gone, nor a demo whose time
-    is up. By id."""
-    ready = (
+def activation_hubs(now: dt.datetime) -> list[Hub]:
+    """The hubs whose apps the worker sets up now (S3): ready, with their own database, whose ``hub_due`` came and
+    nobody holds. Never one being made, dropped or gone, nor a demo whose time is up. By id."""
+    return list(
         Hub.objects.filter(status=Hub.Status.READY)
         .exclude(db_name="")
         .exclude(is_demo=True, expires_at__lte=now)
+        .filter(due__due_at__lte=now)
+        .filter(Q(due__lease_until__isnull=True) | Q(due__lease_until__lte=now))
         .select_related("cluster")
         .order_by("id")
     )
-    rung = ready.filter(due__due_at__lte=now).filter(Q(due__lease_until__isnull=True) | Q(due__lease_until__lte=now))
-    return list(rung), list(ready) if every else []
+
+
+def ring_activations(hub: Hub, at: dt.datetime) -> None:
+    """``hub`` has apps to set up by ``at``: due in ``hub_due`` then, or earlier if it already is (the sweep's ring)."""
+    with _control_transaction():
+        HubDue.mark_due(hub, at)
+
+
+def activations_rung_at(hub_id: UUID, at: dt.datetime | None) -> None:
+    """After the worker looked into a ready hub's apps: its ring moves to ``at`` (the next of them to set up: a retry,
+    one put off), or ends with ``None``, unless the hub has other work due (a reset, the copy of a business that left)
+    or another worker holds its row. The pass over the hubs due leaves a ready hub's ring alone (``claim_next_due_hub``),
+    so its time is kept."""
+    now = timezone.now()
+    with _control_transaction():
+        hub = Hub.objects.filter(pk=hub_id).first()
+        due = HubDue.objects.select_for_update().filter(pk=hub_id).first()
+        if hub is None or (due is not None and due.lease_until is not None and due.lease_until > now):
+            return
+        if at is not None:
+            if due is None:
+                HubDue.mark_due(hub, at)
+            else:
+                HubDue.objects.filter(pk=hub_id).update(due_at=at)
+        elif due is not None and hub.reset_requested_at is None and not offboarding_due(hub):
+            due.delete()
+
+
+def hubs_visited_since(day: dt.date) -> frozenset[str]:
+    """The hubs (by slug) someone came into since ``day``: the active ones, which the sweep looks into more often."""
+    return frozenset(HubVisit.objects.filter(day__gte=day).values_list("host", flat=True).distinct())
 
 
 def _activation_retry_delay(attempts: int) -> dt.timedelta:
@@ -4245,22 +4280,31 @@ def app_activation_settle(ctx: OperationContext, data: AppActivationSettleIn) ->
         now = timezone.now()
         asked = [label for label in dict.fromkeys(data.apps) if label in current and current[label].state in (CREATING, FAILED)]
         after_commit(partial(activation.forget, host))
-        if data.outcome in ("locked", "newer_code"):
+        after_commit(partial(_ring_next, hub, host))
+        behind: list[str] = []
+        if data.outcome == "newer_code":
+            # Waited for a worker of its code since it was asked for (``changed_at``): after a rollback none is coming.
+            since = dict(AppActivation.objects.filter(host=host, app__in=asked).values_list("app", "changed_at"))
+            behind = [label for label in asked if since[label] <= now - ACTIVATION_CODE_BEHIND_AFTER]
+        if data.outcome == "locked" or (data.outcome == "newer_code" and not behind):
             wait = ACTIVATION_LOCKED_SECONDS if data.outcome == "locked" else ACTIVATION_NEWER_CODE_SECONDS
-            AppActivation.objects.filter(host=host, app__in=asked).update(
-                next_attempt_at=now + dt.timedelta(seconds=wait), changed_at=now
-            )
+            AppActivation.objects.filter(host=host, app__in=asked).update(next_attempt_at=now + dt.timedelta(seconds=wait))
             return {"on": [], "failed": [], "waiting": asked}
         created = _apps_created(hub)
         made = [label for label in asked if data.outcome == "created" and (created is None or label in created)]
-        failed = [label for label in asked if label not in made]
+        failed = behind or [label for label in asked if label not in made]
         if made:
             _write_states(host, {label: activation.Activation(ON, current[label].chosen) for label in made})
             if hub is not None and not hub.is_demo:
                 _sync_photo_blocks(hub, made)
             _record_enabled(ctx, made, current, graph)
         if failed:
-            error = data.error if data.outcome == "failed" else "not_created: the migrator ended without its tables."
+            kind = {"failed": "schema_failed", "newer_code": "code_behind"}.get(data.outcome, "not_created")
+            error = {
+                "schema_failed": data.error,
+                "code_behind": "code_behind: asked by a code no worker runs any more (a rollback): turn it on again.",
+                "not_created": "not_created: the migrator ended without its tables.",
+            }[kind]
             for label in failed:
                 attempts = AppActivation.objects.get(host=host, app=label).attempts + 1
                 AppActivation.objects.filter(host=host, app=label).update(
@@ -4270,10 +4314,14 @@ def app_activation_settle(ctx: OperationContext, data: AppActivationSettleIn) ->
                     next_attempt_at=now + _activation_retry_delay(attempts),
                     changed_at=now,
                 )
-            kind = "schema_failed" if data.outcome == "failed" else "not_created"
             record_event(ctx, events.APP_ACTIVATION_FAILED, {"apps": failed, "error": kind})
             logger.warning("base.app.activation_failed hub=%s apps=%s: %s", host, ",".join(failed), error[:300])
         return {"on": made, "failed": failed, "waiting": []}
+
+
+def _ring_next(hub: Hub, host: str) -> None:
+    """After the COMMIT of a settle (inside the hub's database): its ring moves to the next app to set up, or ends."""
+    activations_rung_at(hub.pk, queries.activation_next_at(host))
 
 
 def _record_enabled(

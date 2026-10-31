@@ -13,7 +13,7 @@ from uuid import UUID
 from django.conf import settings
 from django.contrib.auth.hashers import check_password
 from django.core.files.storage import Storage, storages
-from django.db.models import Max, Q
+from django.db.models import Max, Min, Q
 from django.http import HttpRequest
 from django.utils import timezone, translation
 from django.utils.translation import gettext, gettext_lazy, ngettext, pgettext
@@ -374,7 +374,8 @@ def app_list(ctx: OperationContext, data: AppListIn) -> dict:
     Read again when an app's state changes (its live notice, in every process with the list open: AppsFollower on every
     screen), it first forgets what this process kept of the business's apps (``base.activation.forget``): a change the
     worker made in another process (S3) never reaches a cache of the process's own (local development, without
-    Valkey), and the session read right after it (the menu) is then current."""
+    Valkey), and the session read right after it (the menu) is then current. Transitional: it goes once every process
+    hears ``cache_inval '<hex>:apps'`` itself (PLAN-DB §7; FIX-HUB-CACHE-INVAL-APPS-LISTEN)."""
     activation.forget(ctx.scope.key)
     hub = Hub.objects.filter(slug=ctx.scope.key).first()
     demo = bool(hub and hub.is_demo)
@@ -450,6 +451,17 @@ def activations_due(host: str, now: dt.datetime) -> dict[str, str]:
         .order_by("app")
         .values_list("app", "target")
     )
+
+
+def activation_next_at(host: str) -> dt.datetime | None:
+    """When the worker has to look into ``host``'s business next for apps to set up: now for one ``creating`` and not put
+    off, else the earliest next try of one ``creating`` or ``failed``; ``None`` when none waits."""
+    waiting = AppActivation.objects.filter(
+        host=host, app__in=list(activation.module_graph()), state__in=[activation.CREATING, activation.FAILED]
+    )
+    if waiting.filter(state=activation.CREATING, next_attempt_at__isnull=True).exists():
+        return timezone.now()
+    return waiting.aggregate(next=Min("next_attempt_at"))["next"]
 
 
 def _shell_icon(config: Any) -> str:

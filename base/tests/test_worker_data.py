@@ -257,7 +257,9 @@ def test_a_reset_still_to_do_stays_due_when_the_provisioning_pass_gives_its_leas
     loaded_and_asked(ready(hub_a), ["table"])
     now = timezone.now()
     with use_control():
-        assert services.claim_next_due_hub(now, provision.LEASE) == hub_a.pk
+        # S3: the provisioning's pass never takes a ready hub's ring (its data work's or its apps' to set up).
+        assert services.claim_next_due_hub(now, provision.LEASE) is None
+        assert services.claim_next_data_hub(now, provision.LEASE) == hub_a.pk
         services.release_hub(hub_a.pk, now)
 
     assert HubDue.objects.filter(hub_id=hub_a.pk, due_at=now, lease_until=None).exists()
