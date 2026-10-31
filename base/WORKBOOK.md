@@ -3219,8 +3219,8 @@ Implicados: ACCOUNTS-F38
   esas cifras (`Approval.figures`, JSON, migración `0018`), y la lista y el CSV las dicen en el idioma de quien lee
   (`operation_label` es el nombre sin cifras, para el filtro «Acción»). `base.E008` comprueba la declaración al
   arrancar: orden de la propia app que su `approvals` nombra, campos que existen en su entrada, `percent` de un
-  número y `money` de un entero, y los mismos huecos en `en` y `es`. Hoy la declaran `demo` (`demo.item.add_line`);
-  Ventas, en su FIX (SALE-F14).
+  número y `money` de un entero, y los mismos huecos en `en` y `es`. Hoy la declaran `demo` (`demo.item.add_line`) y
+  Ventas (los descuentos y el cobro por encima del máximo de SALE-F14, y el precio libre de SALE-F09).
   `base.approval.approve` comprueba el PIN o la placa como la puerta del PIN (`queries.pin_owner`,
   `services.badge_owner`, `PIN_PERSON_LIMIT`/`PIN_ADDRESS_LIMIT`) y que quien aprueba tenga el permiso, y devuelve un
   pase de un uso (120 s, `X-Elevation-Token`); la puerta marca la petición con él (`Approved`), `base.operations`
