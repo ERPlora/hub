@@ -8,22 +8,21 @@
 // generated for that checkout when missing or empty, never a fixed one, and the one already there (or in the
 // environment) kept as it is.
 // flow: ninguno — FIX tests/e2e
-import { spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
+import { createInterface } from 'node:readline';
 import { fileURLToPath } from 'node:url';
 
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, describe, expect, it } from 'vitest';
 
 import { ENV_FILE, ensureFernetKeys, isFernetKey, newFernetKey } from './fernet-keys';
 
 const HUB_DIR = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const NAMES = ['FISCAL_CERTIFICATE_KEY', 'FLOW_SECRETS_KEY'] as const;
 type Name = (typeof NAMES)[number];
-/** One Django start per probe (`server`): seconds, not milliseconds. */
-const PROBE_TIMEOUT_MS = 60_000;
 
 const folders: string[] = [];
 afterEach(() => {
@@ -50,41 +49,87 @@ function keyLines(path: string, name: Name): string[] {
 type Seen = { key: string | null; usable: boolean };
 
 /**
- * What the Hub's server makes of each .env: each key python-decouple reads from it, as config/settings.py does, and
- * whether the app that seals with it can (apps.verifactu.certificates keeps a certificate, the check behind the 409;
- * apps.flow.vault keeps a secret, the check behind the box's «cannot keep secrets»).
+ * The Hub's server, asked over its stdin: for each .env, each key python-decouple reads from it, as config/settings.py
+ * does, and whether the app that seals with it can (apps.verifactu.certificates keeps a certificate, the check behind
+ * the 409; apps.flow.vault keeps a secret, the check behind the box's «cannot keep secrets»). One line of paths in, one
+ * line of answers out; it stops when its stdin closes, also if this process dies.
  */
-function server(paths: string[]): Record<Name, Seen>[] {
-  const script = [
-    'import json, sys',
-    'import django',
-    'django.setup()',
-    'from decouple import RepositoryEnv',
-    'from django.conf import settings',
-    'from apps.flow import vault',
-    'from apps.verifactu import certificates',
-    'usable = {"FISCAL_CERTIFICATE_KEY": certificates.storage_available, "FLOW_SECRETS_KEY": vault.available}',
-    'seen = []',
-    'for path in json.loads(sys.argv[1]):',
-    '    data = RepositoryEnv(path).data',
-    '    entry = {}',
-    '    for name, works in usable.items():',
-    '        setattr(settings, name, data.get(name) or "")',
-    '        entry[name] = {"key": data.get(name), "usable": works()}',
-    '    seen.append(entry)',
-    'print(json.dumps(seen))',
-  ].join('\n');
+const PROBE = [
+  'import json, sys',
+  'import django',
+  'django.setup()',
+  'from decouple import RepositoryEnv',
+  'from django.conf import settings',
+  'from apps.flow import vault',
+  'from apps.verifactu import certificates',
+  'usable = {"FISCAL_CERTIFICATE_KEY": certificates.storage_available, "FLOW_SECRETS_KEY": vault.available}',
+  'print("ready", flush=True)',
+  'for line in sys.stdin:',
+  '    seen = []',
+  '    for path in json.loads(line):',
+  '        data = RepositoryEnv(path).data',
+  '        entry = {}',
+  '        for name, works in usable.items():',
+  '            setattr(settings, name, data.get(name) or "")',
+  '            entry[name] = {"key": data.get(name), "usable": works()}',
+  '        seen.append(entry)',
+  '    print(json.dumps(seen), flush=True)',
+].join('\n');
+
+/**
+ * Starts the probe and waits for Django to be up. Once per file, with the file: out of any test's clock. Each test
+ * started its own Django (django.setup() of the whole Hub: ~2 s and a thousand modules read), and on a busy run (the
+ * machine at load ~24) one took 70 s, past the 60 s it was given; asking a probe that is up takes milliseconds.
+ */
+async function startServer(): Promise<{ ask: (paths: string[]) => Promise<Record<Name, Seen>[]>; stop: () => Promise<void> }> {
   const env: NodeJS.ProcessEnv = { ...process.env, DEBUG: 'True', DJANGO_SETTINGS_MODULE: 'config.settings' };
   for (const name of NAMES) delete env[name];
-  const run = spawnSync('uv', ['run', 'python', '-c', script, JSON.stringify(paths)], { cwd: HUB_DIR, encoding: 'utf8', env });
-  expect(run.status, `${run.stdout}\n${run.stderr}`).toBe(0);
-  return JSON.parse(run.stdout.trim().split('\n').at(-1) ?? '');
+  const child = spawn('uv', ['run', 'python', '-c', PROBE], { cwd: HUB_DIR, env, stdio: ['pipe', 'pipe', 'pipe'] });
+  let errors = '';
+  child.stderr.setEncoding('utf8').on('data', (chunk: string) => (errors += chunk));
+  let closed = false;
+  const stopped = new Promise<never>((_, reject) => {
+    const fail = (why: string) => {
+      closed = true;
+      reject(new Error(`the Hub's probe ${why}:\n${errors}`));
+    };
+    child.once('error', (error) => fail(`did not start (${error.message})`));
+    child.once('close', (code) => fail(`stopped (exit ${code})`));
+  });
+  stopped.catch(() => undefined); // read by each answer
+  const lines = createInterface({ input: child.stdout })[Symbol.asyncIterator]();
+  const answer = async (): Promise<string> => {
+    const line = await Promise.race([lines.next(), stopped]);
+    if (line.done) return stopped;
+    return line.value;
+  };
+  const first = await answer();
+  if (first !== 'ready') throw new Error(`the Hub's probe said ${JSON.stringify(first)} instead of ready:\n${errors}`);
+  return {
+    async ask(paths) {
+      child.stdin.write(`${JSON.stringify(paths)}\n`);
+      return JSON.parse(await answer()) as Record<Name, Seen>[];
+    },
+    async stop() {
+      if (closed) return;
+      child.stdin.end();
+      await stopped.catch(() => undefined);
+    },
+  };
+}
+
+const hub = await startServer();
+afterAll(() => hub.stop());
+
+/** What the Hub's server makes of each .env (`PROBE`). */
+function server(paths: string[]): Promise<Record<Name, Seen>[]> {
+  return hub.ask(paths);
 }
 
 describe('ensureFernetKeys', () => {
   it(
     'gives a .env without each key, or with it empty as .env.example has it, one the Hub works with',
-    () => {
+    async () => {
       const made: { name: Name; path: string }[] = [];
       for (const name of NAMES) {
         const missing = envFile('# local\nDEBUG=True\n');
@@ -108,13 +153,12 @@ describe('ensureFernetKeys', () => {
         }
       }
 
-      const seen = server(made.map(({ path }) => path));
+      const seen = await server(made.map(({ path }) => path));
       made.forEach(({ name }, at) => {
         expect(seen[at][name].usable, name).toBe(true);
         expect(seen[at][name].key).toMatch(/^[A-Za-z0-9_-]{43}=$/);
       });
     },
-    PROBE_TIMEOUT_MS,
   );
 
   it('gives a .env without either both at once, each its own, saying where each came from in the order asked', () => {
@@ -231,7 +275,7 @@ describe('ensureFernetKeys', () => {
 describe('isFernetKey', () => {
   it(
     'says of each value what the Hub says, for the certificates and for the secrets',
-    () => {
+    async () => {
       const ones = Buffer.alloc(32, 0xff);
       const values = [
         newFernetKey(),
@@ -243,7 +287,7 @@ describe('isFernetKey', () => {
         'not-a-key',
         '',
       ];
-      const seen = server(values.map((value) => envFile(NAMES.map((name) => `${name}=${value}\n`).join(''))));
+      const seen = await server(values.map((value) => envFile(NAMES.map((name) => `${name}=${value}\n`).join(''))));
 
       for (const name of NAMES) {
         const said = seen.map((entry) => entry[name].usable);
@@ -251,7 +295,6 @@ describe('isFernetKey', () => {
         expect(said.slice(0, 3), name).toEqual([true, true, true]);
       }
     },
-    PROBE_TIMEOUT_MS,
   );
 });
 
