@@ -2970,9 +2970,10 @@ Implicados: ACCOUNTS-F38
   `grouped=False` para la exportación que su importación relee (flujo money-text). Lo usan el aviso y el tique de
   Ventas, el documento de Facturación, la exportación de Inventario, la web pública y los huecos de las aprobaciones;
   `tests/test_guardrails_money.py` no deja llamar a `format_currency` ni a `get_currency_symbol` de Babel fuera de él.
-  Ventas, Facturación, Inventario, Tarifas e Impresión aún
-  llevan su propia copia, `business_currency(ctx)`, que contesta lo mismo; Pagos, Carrito y pago, Clientes y Menús y combos
-  ya leen la moneda del negocio en pantalla (`useBusinessMoney`); Citas aún fija `EUR` en
+  Ventas, Facturación, Inventario, Tarifas, Impresión, Pagos y
+  Carrito y pago la leen con `base.operations.business_currency(ctx.scope)`, sin copia propia (las `business_currency(ctx)`
+  de `apps/sale/queries.py` y `apps/cart_checkout/queries.py` solo la llaman); en pantalla, Pagos, Carrito y pago,
+  Clientes y Menús y combos la leen con `useBusinessMoney`; Citas aún fija `EUR` en
   `apps/appointment/frontend/lib/format.ts` (BASE-F50 `descartado`, hub#577). Pantallas: `SettingsPage.vue` (pestañas por hash `#business`, `#tickets`,
   `#data`; `#tax` abre Negocio; `lib/data.ts`) y `components/settings/{BusinessPanel,TicketsPanel,SettingsRow}.vue`.
   Tests: `base/tests/test_business.py`, `test_queries_business.py`, `test_business_live.py`; e2e
