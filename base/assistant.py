@@ -26,6 +26,7 @@ The mechanics that do not depend on the gateway are ``live.assistant``'s, shared
 import dataclasses
 import datetime as dt
 import json
+import logging
 import time
 from collections.abc import AsyncIterator, Iterable
 from dataclasses import dataclass
@@ -625,6 +626,21 @@ def setup_block(status: dict | None) -> str:
 
 # ── The gateway (erplora.com) ────────────────────────────────────────────────────────────────────────────────────
 
+#: Each failed call to the gateway leaves one line here (saas#167): its door, the business, the HTTP status and the
+#: gateway's code, or that it never got there and how. The panel says every failure in a few words of its own, so the
+#: reason lives only in this log. Never what the person said, dictated or was answered.
+logger = logging.getLogger(__name__)
+
+
+def _log_refused(path: str, hub: Any, status: int, error: dict) -> None:
+    logger.warning(
+        "base.assistant.gateway_refused path=%s hub=%s status=%s code=%s", path, hub, status, error.get("code") or "-"
+    )
+
+
+def _log_unreachable(path: str, hub: Any, problem: Exception) -> None:
+    logger.warning("base.assistant.gateway_unreachable path=%s hub=%s kind=%s", path, hub, type(problem).__name__)
+
 
 class GatewayError(Exception):
     """A door of the gateway that did not answer what was asked: its code (ours or the gateway's) and details."""
@@ -652,7 +668,8 @@ def _post(path: str, payload: dict) -> dict:
     url, body, headers = _signed(path, payload)
     try:
         response = httpx.post(url, content=body, headers=headers, timeout=TIMEOUT_SECONDS)
-    except httpx.HTTPError:
+    except httpx.HTTPError as problem:
+        _log_unreachable(path, payload.get("hub"), problem)
         raise GatewayError("assistant.unreachable") from None
     try:
         answer = response.json()
@@ -660,6 +677,7 @@ def _post(path: str, payload: dict) -> dict:
         answer = None
     if response.status_code >= 300:
         error = _error_of(response.status_code, answer)
+        _log_refused(path, payload.get("hub"), response.status_code, error)
         raise GatewayError(str(error.get("code") or "assistant.unavailable"), response.status_code, error)
     return answer if isinstance(answer, dict) else {}
 
@@ -735,6 +753,7 @@ async def stream_turn(
                         error = _error_of(response.status_code, response.json())
                     except ValueError:
                         error = {}
+                    _log_refused(TURN_PATH, scope.key, response.status_code, error)
                     yield _refusal(response.status_code, error, response.headers.get("Retry-After"))
                     return
                 async for line in response.aiter_lines():
@@ -762,15 +781,22 @@ async def stream_turn(
                         yield {"type": "usage", **{key: frame.get(key) for key in ("used", "limit", "resets_at", "demo")}}
                     elif kind == "error":
                         failed = True
+                        logger.warning(
+                            "base.assistant.gateway_failed path=%s hub=%s code=%s retriable=%s",
+                            TURN_PATH, scope.key, frame.get("code") or "-", bool(frame.get("retriable")),
+                        )
                         yield {"type": "error", "code": "assistant.provider_failed", "retriable": bool(frame.get("retriable"))}
-    except httpx.HTTPError:
+    except httpx.HTTPError as problem:
         if not text and not calls:
+            _log_unreachable(TURN_PATH, scope.key, problem)
             yield {"type": "error", "code": "assistant.unreachable", "retriable": True}
             return
         failed = True
+        logger.warning("base.assistant.gateway_cut path=%s hub=%s kind=%s", TURN_PATH, scope.key, type(problem).__name__)
         yield {"type": "error", "code": "assistant.cut", "retriable": True}
     if not finished and not failed:
         failed = True
+        logger.warning("base.assistant.gateway_cut path=%s hub=%s kind=no_done", TURN_PATH, scope.key)
         yield {"type": "error", "code": "assistant.cut", "retriable": True}
     said = "".join(text)
     if failed:

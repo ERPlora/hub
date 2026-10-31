@@ -3185,8 +3185,17 @@ Implicados: ACCOUNTS-F38
   para el cuadro y para la app que abre el asistente dictando), fallos y cupo en `guide.ts`, todos en
   `packages/ui/src/components/Assistant/`. Desde 768 px el panel se ancla (clase `assistant-docked` en `<html>`, que
   empuja el pane); por debajo, velo.
-- Tests: `base/tests/test_assistant.py`, `test_services_assistant.py` y `test_api_assistant.py` (con la pasarela
-  falsa de `base/tests/fake_gateway.py`); Vitest de `base/frontend/lib/assistant-hub.test.ts`,
+- **El registro cuando la pasarela falla** (ERPlora/saas#167): el panel dice cada fallo con sus palabras (BASE-F94,
+  BASE-F106), así que el motivo solo queda en el registro. Cada llamada a erplora.com que no sale deja una línea
+  `WARNING` del logger `base.assistant` con la puerta (`path`) y el negocio (`hub`): `base.assistant.gateway_refused`
+  (`status` y el `code` del sobre de error; `-` si no lo trae, la página de un proxy),
+  `base.assistant.gateway_unreachable` (`kind`, la clase del fallo de `httpx`), `base.assistant.gateway_failed` (el
+  proveedor falló a mitad del turno: su `code` y `retriable`) o `base.assistant.gateway_cut` (el turno se cortó:
+  `kind`, la excepción o `no_done`). Nunca lo que la persona dijo, dictó o se le contestó. El 30/10 una producción
+  sin proveedores contestaba 503 `assistant.no_model` y `assistant.provider_not_configured` a todo, y el Hub no lo
+  decía.
+- Tests: `base/tests/test_assistant.py`, `test_services_assistant.py`, `test_api_assistant.py` y
+  `test_assistant_gateway_log.py` (con la pasarela falsa de `base/tests/fake_gateway.py`); Vitest de `base/frontend/lib/assistant-hub.test.ts`,
   `components/AssistantSetupEmpty.test.ts`, `SetupChecklist.test.ts`, `ShellChrome.test.ts` y `frontend/main.test.ts`,
   y los del chat en `packages/ui/src/components/Assistant/*.test.ts` (`pnpm --filter @erplora/ui test`); e2e
   `tests/e2e/base-assistant.spec.ts` contra un SaaS de verdad con su pasarela y el proveedor falso
