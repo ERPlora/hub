@@ -112,6 +112,13 @@ describe('TagListPage', () => {
     expect(s.wrapper.findComponent(EmptyState).props('heading')).toBe('Sin etiquetas.');
     expect(s.wrapper.findComponent(AppPage).props('title')).toBe('Etiquetas de clientes');
   });
+
+  it('wears the product’s icon, pricetags, on each card and on the empty list', async () => {
+    const s = await setup();
+    await s.show(pageOf([]));
+    expect(s.wrapper.findComponent(EmptyState).props('icon')).toBe('pricetags');
+    expect(s.prop<(row: unknown) => string>('cardIcon')(PAGE.rows[0])).toBe('ion:pricetags');
+  });
 });
 
 describe('TagListPage: the list fills the page (FIX-DATATABLE-HUB)', () => {

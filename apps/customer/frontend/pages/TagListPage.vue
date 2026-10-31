@@ -128,7 +128,7 @@ function onSort(next: { sort: string; dir: SortDir }): void {
       :views="['table', 'cards']"
       :card-title="(row: TagRow) => row.name"
       card-title-column="name"
-      :card-icon="() => 'ion:list-outline'"
+      :card-icon="() => 'ion:pricetags'"
       :entity-label="{ one: $t('customer.tags.entity.one'), many: $t('customer.tags.entity.many') }"
       :loading="status === 'loading'"
       :error="status === 'error' ? error?.message : undefined"
@@ -165,7 +165,7 @@ function onSort(next: { sort: string; dir: SortDir }): void {
       <template #empty>
         <EmptyState
           data-testid="customer-tags-empty"
-          icon="list-outline"
+          icon="pricetags"
           :heading="list.filtered.value ? $t('customer.list.noResults') : $t('customer.tags.empty')"
           :message="list.filtered.value ? $t('customer.tags.noResults') : undefined"
         />

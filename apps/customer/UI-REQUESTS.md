@@ -10,9 +10,6 @@ todos tienen su sustituto en uso.
 
 - **`formatMoney`** (`@erplora/ui/components/format`): la app sigue con su `lib/money.ts`, que no agrupa
   los millares; lo lleva hub#512.
-- **`ion:pricetags`** y **`ion:cloud-upload-outline`** ya están registrados: la pestaña **Etiquetas**
-  (`apps.py`, `Nav(id="tags")`, y `frontend/lib/tabs.ts`) sigue con `ion:list-outline` y **Importar CSV**
-  (`components/CustomerImportButton.vue`) con `ion:file-tray-outline`. Propuesto como FIX al cerrar la app.
 
 ## Iconos
 

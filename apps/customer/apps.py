@@ -69,8 +69,7 @@ class CustomerConfig(LiveAppConfig):
         "customer.field.update": _("Change a custom field"),
         "customer.field.delete": _("Delete a custom field"),
     }
-    # The product's four tabs. Tags waits for its own icon (pricetags: UI-REQUESTS.md); until the
-    # shell registers it, a registered one.
+    # The product's four tabs, with the product's icons (all in @erplora/ui's ION_ICONS).
     navigation = [
         Nav(
             id="customers",
@@ -84,7 +83,7 @@ class CustomerConfig(LiveAppConfig):
             icon="ion:people-outline",
             path="/customer/groups",
         ),
-        Nav(id="tags", label=_("Tags"), icon="ion:list-outline", path="/customer/tags"),
+        Nav(id="tags", label=_("Tags"), icon="ion:pricetags", path="/customer/tags"),
         Nav(
             id="fields",
             label=_("Fields"),
