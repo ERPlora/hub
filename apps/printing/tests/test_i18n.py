@@ -12,6 +12,7 @@ from django.utils.functional import Promise
 from live.operations import registry
 
 from apps.printing import documents, models, queries, schemas, services
+from apps.printing.tests.conftest import RECEIPT
 
 LOCALE = Path(apps.get_app_config("printing").path) / "locale" / "es" / "LC_MESSAGES"
 TEMPLATE = Path(apps.get_app_config("printing").path) / "templates" / "printing" / "test_page.html"
@@ -25,24 +26,27 @@ def _unescape(text: str) -> str:
 
 
 def po_entries(path: Path) -> dict[str, tuple[str, bool]]:
-    """``msgid → (msgstr, fuzzy)`` of a .po file without plurals or contexts (the header is skipped)."""
+    """``msgid → (msgstr, fuzzy)`` of a .po file without plurals (the header is skipped); an entry with a context
+    (``pgettext``) is keyed as gettext compiles it, ``<context>\x04<msgid>``."""
     entries: dict[str, tuple[str, bool]] = {}
-    parts: dict[str, list[str]] = {"msgid": [], "msgstr": []}
+    parts: dict[str, list[str]] = {"msgctxt": [], "msgid": [], "msgstr": []}
     fuzzy, current = False, None
 
     def flush():
         msgid = _unescape("".join(parts["msgid"]))
         if msgid:
-            entries[msgid] = (_unescape("".join(parts["msgstr"])), fuzzy)
+            context = _unescape("".join(parts["msgctxt"]))
+            entries[f"{context}\x04{msgid}" if context else msgid] = (_unescape("".join(parts["msgstr"])), fuzzy)
 
     for line in path.read_text(encoding="utf-8").splitlines():
         line = line.strip()
-        if line.startswith("msgid ") or (line.startswith("#") and current == "msgstr"):
+        starts = line.startswith("msgctxt ") or (line.startswith("msgid ") and current != "msgctxt")
+        if starts or (line.startswith("#") and current == "msgstr"):
             flush()
-            parts, fuzzy, current = {"msgid": [], "msgstr": []}, False, None
+            parts, fuzzy, current = {"msgctxt": [], "msgid": [], "msgstr": []}, fuzzy and current is None, None
         if line.startswith("#,") and "fuzzy" in line:
             fuzzy = True
-        elif line.startswith(("msgid ", "msgstr ")):
+        elif line.startswith(("msgctxt ", "msgid ", "msgstr ")):
             current, _, rest = line.partition(" ")
             parts[current].append(_STRING.match(rest).group(1))
         elif current and _STRING.match(line):
@@ -77,9 +81,17 @@ def visible_texts() -> set[str]:
         *models.PrintJob.Status.labels,
     ]
     with translation.override("en"):
-        texts = {str(text) for text in lazies}
+        texts = {source(text) for text in lazies}
     texts |= set(re.findall(r'{% translate "([^"]+)" %}', TEMPLATE.read_text()))
     return texts | schema_titles()
+
+
+def source(text) -> str:
+    """How the catalog keys a lazy text: its English, or ``context\x04English`` for a ``pgettext_lazy`` (a text that
+    goes back to ``_()`` while its entry keeps the context is missing from the catalog: it would say another app's
+    Spanish)."""
+    args = getattr(text, "_args", ())
+    return f"{args[0]}\x04{args[1]}" if len(args) == 2 else str(text)
 
 
 def schema_titles() -> set[str]:
@@ -133,3 +145,46 @@ def test_an_error_message_follows_the_language_of_the_request(client, make_user)
     assert response.json()["error"]["fields"] == {
         "address": "Escribe una IP o un nombre de red válidos (por ejemplo 192.168.1.100)."
     }
+
+
+def test_a_printer_and_a_job_say_their_own_words_in_spanish():
+    """A printer is «activa» and a job «Cancelado», «cancelado el»: printing's words, never the ones of an earlier
+    app that says the same English (auth's «activo», appointment's «Cancelada» and «cancelada el»), as the admin
+    shows them (FIX-HUB-PRINTING-ES-TEXTS-SHADOWED-BY-AN-EARLIER-APP)."""
+    with translation.override("es"):
+        said = {
+            "is_active": str(models.Printer._meta.get_field("is_active").verbose_name),
+            "cancelled_at": str(models.PrintJob._meta.get_field("cancelled_at").verbose_name),
+            "cancelled": str(dict(models.PrintJob._meta.get_field("status").choices)["cancelled"]),
+        }
+    assert said == {"is_active": "activa", "cancelled_at": "cancelado el", "cancelled": "Cancelado"}
+
+
+@pytest.mark.django_db
+def test_a_job_cancelled_meanwhile_is_refused_in_printing_s_words(client, make_user):
+    """Cancelling or sending back a job someone already cancelled says it is «cancelado» (a job), not appointment's
+    «cancelada»: the queue's cancel window and its notice show the server's refusal as it came
+    (FIX-HUB-PRINTING-ES-TEXTS-SHADOWED-BY-AN-EARLIER-APP)."""
+    client.force_login(make_user("boss", host="a", role="hub_admin"))
+
+    def post(path: str, data: dict):
+        return client.post(
+            f"/api/printing/{path}",
+            json.dumps(data),
+            content_type="application/json",
+            HTTP_HOST="a.localhost",
+            HTTP_ACCEPT_LANGUAGE="es",
+        )
+
+    created = post("jobs", {"document_type": "receipt", "document": RECEIPT})
+    assert created.status_code == 201
+    job = {"job_id": created.json()["job"]["id"]}
+    assert post("jobs/cancel", job).status_code == 200
+    cancelled, retried = post("jobs/cancel", job), post("jobs/retry", job)
+    assert (cancelled.status_code, retried.status_code) == (409, 409)
+    assert cancelled.json()["error"]["message"] == (
+        "Un trabajo que se está imprimiendo o ya se imprimió no se cancela; este está cancelado."
+    )
+    assert retried.json()["error"]["message"] == (
+        "Solo vuelve a la cola un trabajo pendiente o fallido, o uno enviado que no contestó; este está cancelado."
+    )
