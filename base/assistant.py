@@ -419,11 +419,34 @@ def _answer_money(answer: dict) -> dict | None:
 
 
 def preview(ctx: OperationContext, op: Operation, arguments: dict) -> tuple[ToolOutcome | None, list[dict] | None]:
-    """What the dangerous write ``op`` will do with ``arguments`` (``live.assistant.preview``: the read its ``ai=``
-    names, run as ``ctx``'s person), in the Hub's words: its amounts in the currency the read answers
-    (``_answer_money``), else the business's; ``signed`` when its schema declares it so. ``base.E005`` checks the
-    declaration at start."""
+    """What comes before the card of the write ``op`` with ``arguments``, run as ``ctx``'s person: first its check
+    (``checked``), whose refusal is the write's outcome; then what the dangerous write will do
+    (``live.assistant.preview``: the read its ``ai=`` names), in the Hub's words: its amounts in the currency the read
+    answers (``_answer_money``), else the business's; ``signed`` when its schema declares it so. ``base.E005`` and
+    ``base.E012`` check the declarations at start."""
+    refused = checked(ctx, op, arguments)
+    if refused is not None:
+        return refused, None
     return shared.preview(ctx, op, arguments, words_of_answer=_Words.of_answer)
+
+
+def check_of(op: Operation) -> Any:
+    """The read ``op``'s ``ai=`` names to check its data before its card (``check``), or ``None``."""
+    declared = op.ai
+    return declared.get("check") if isinstance(declared, dict) else getattr(declared, "check", None)
+
+
+def checked(ctx: OperationContext, op: Operation, arguments: dict) -> ToolOutcome | None:
+    """Why the read the write ``op`` names as its check (``check_of``) refuses ``arguments`` — run as ``ctx``'s person,
+    with the data of the write its input takes —, or ``None`` when it takes them or the write names none (hub#538: a
+    role the business does not have reached the card, and the write refused it only after the person's yes). Nothing
+    of its answer is shown: a normal write's card stays a single line."""
+    name = check_of(op)
+    if name is None:
+        return None
+    read = registry[name]
+    failure, _ = _run(ctx, read, {key: value for key, value in arguments.items() if key in read.input.model_fields})
+    return failure
 
 
 @checks.register("base")
@@ -457,10 +480,7 @@ def _preview_problems(op: Operation, declared: Any) -> list[str]:
     read = registry.get(declared["operation"])
     if read is None:
         return [*problems, f"names no operation {declared['operation']}"]
-    if read.app_label != op.app_label:
-        problems.append(f"names {read.name}, of another app")
-    if read.kind != "query":
-        problems.append(f"names {read.name}, not a read")
+    problems += _read_problems(op, read)
     fields = declared.get("fields")
     if not isinstance(fields, list) or not fields or not all(isinstance(name, str) for name in fields):
         return [*problems, "names no field of its answer"]
@@ -473,10 +493,50 @@ def _preview_problems(op: Operation, declared: Any) -> list[str]:
         for name, prop in shown.items()
         if _is_signed(prop) and not (prop.get("type") == "integer" and _is_money(name, prop))
     ]
+    return problems
+
+
+def _read_problems(op: Operation, read: Operation) -> list[str]:
+    """What is wrong with the read the write ``op`` names (its preview or its check): of another app, not a read, or
+    reading data the write never takes."""
+    problems = []
+    if read.app_label != op.app_label:
+        problems.append(f"names {read.name}, of another app")
+    if read.kind != "query":
+        problems.append(f"names {read.name}, not a read")
     problems += [
         f"reads {name}, but the write never takes {name}" for name in read.input.model_fields if name not in op.input.model_fields
     ]
     return problems
+
+
+@checks.register("base")
+def check_checks(app_configs=None, **kwargs) -> list[checks.CheckMessage]:
+    """``base.E012``: a write's check (``check_of``) names a read of its own app whose input the write also takes."""
+    errors: list[checks.CheckMessage] = []
+    for op in registry.values():
+        declared = check_of(op)
+        problems = [] if declared is None else _check_problems(op, declared)
+        if problems:
+            errors.append(
+                checks.Error(
+                    f"{op.name} declares a check that {'; '.join(problems)}.",
+                    hint='Declare ai={"check": "<app>.<entity>.<a query>"} with a read of its own app whose input the '
+                    "write also takes.",
+                    obj=op.name,
+                    id="base.E012",
+                )
+            )
+    return errors
+
+
+def _check_problems(op: Operation, declared: Any) -> list[str]:
+    if not isinstance(declared, str):
+        return ["is not the name of a read"]
+    read = registry.get(declared)
+    if read is None:
+        return [f"names no operation {declared}"]
+    return _read_problems(op, read)
 
 
 @checks.register("base")
@@ -599,6 +659,8 @@ Answer in {language_name}, short and plain, as a colleague who knows the app. Us
   say kindly that you only help with the business, in one sentence, and do not answer it.
 - Read before you answer: use the tools to look up records, numbers and ids. Never invent a record, an id, an amount
   or a date: if no tool returned it, say you do not know or that you could not find it.
+- Name a record to the person by its name, as the screens do: never write an id (a code such as 0190a3b4-…) in the
+  answer, not in a table either.
 - For questions about how ERPlora works (how to do something, what an option means, plans), search the documentation
   with `base__docs__search` and answer only from what it returns, citing the section; if it returns nothing, say the
   documentation does not cover it.

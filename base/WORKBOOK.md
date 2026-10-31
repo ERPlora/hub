@@ -2411,7 +2411,9 @@ Pasos:
      Crear en Servicios», o «No se hizo, cancelado: …», «No se hizo, falló: …» y «No se hizo, sin permiso: …». Si la
      persona cambia de idioma, los recibos de antes salen enteros en el nuevo, también el nombre de la app.
 Entra: la acción, sus datos y su riesgo, tal como los declara su app; la moneda del negocio, la del registro sobre el
-que se hace (leída como la persona) y, en «Lo que va a pasar», la que dé su app; la zona horaria del negocio.
+que se hace (leída como la persona) y, en «Lo que va a pasar», la que dé su app; la zona horaria del negocio; y,
+si su app la declara, la comprobación que hace antes de la tarjeta, como la persona: si rechaza los datos (dar de alta a
+alguien con un rol que el negocio no tiene, STAFF-F01), no sale tarjeta y el asistente lo cuenta como su error.
 Sale: si se acepta, la acción hecha en su app, con el mismo evento que si se hubiera pulsado su botón.
 Si falla: una acción que su app rechaza vuelve al asistente como error y él lo cuenta; el recibo dice «No se hizo,
 falló: …». Unos datos que la acción no acepta (un país o una moneda que no existe, un valor fuera de su lista) no
