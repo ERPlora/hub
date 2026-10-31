@@ -88,3 +88,13 @@ def test_the_card_names_the_money_the_print_at_checkout_and_the_document_of_a_ne
         "Referencia",
     ]
     assert labels(assistant.card(create, arguments, "en")) == ["Currency", "Automatic print at checkout", "Reference"]
+
+
+def test_the_card_says_a_printer_is_active_as_the_printers_screen_does():
+    """«Activa», the Printers screen's word for a printer that takes jobs, never auth's «Activo» for the same English
+    (FIX-HUB-PRINTING-ES-TEXTS-SHADOWED-BY-AN-EARLIER-APP)."""
+    for name in ("printing.printer.create", "printing.printer.update"):
+        op = get(name)
+        arguments = dict.fromkeys(op.input.model_json_schema()["properties"], "x")
+        said = {field["name"]: field["label"] for field in assistant.card(op, arguments, "es")["fields"]}
+        assert said["is_active"] == SCREENS["printers"]["columns"]["active"] == "Activa", name

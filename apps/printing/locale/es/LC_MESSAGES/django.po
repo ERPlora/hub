@@ -88,6 +88,7 @@ msgstr "Barra"
 msgid "Bluetooth"
 msgstr "Bluetooth"
 
+msgctxt "printing"
 msgid "Cancelled"
 msgstr "Cancelado"
 
@@ -215,6 +216,7 @@ msgstr "Escribe el nombre de la cola de impresión tal como lo da el sistema (si
 msgid "USB"
 msgstr "USB"
 
+msgctxt "printing"
 msgid "active"
 msgstr "activa"
 
@@ -236,6 +238,7 @@ msgstr "impresora de barra"
 msgid "cancel reason"
 msgstr "motivo de la cancelación"
 
+msgctxt "printing"
 msgid "cancelled at"
 msgstr "cancelado el"
 
