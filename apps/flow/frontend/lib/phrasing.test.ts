@@ -62,7 +62,19 @@ describe('events and actions in words', () => {
     // An event born after these words were written (none of the Hub's today) is composed.
     expect(eventLabel('customer.badge.deleted', CATALOG, phrasing())).toBe('Customers: badge deleted');
     expect(eventLabel('customer.badge.deleted', CATALOG, phrasing('es'))).toBe('Customers: badge borrado');
-    expect(eventLabel('spa.sauna.overheated', CATALOG, phrasing())).toBe('spa: sauna overheated');
+    // An app the catalog does not name is left out: never its internal name.
+    expect(eventLabel('spa.sauna.overheated', CATALOG, phrasing())).toBe('Sauna overheated');
+  });
+
+  it('an app it cannot name yet is left out, never its internal name; with its catalog, its visible name', () => {
+    // The editor at 390 painted «Look up: Read · whatsapp_inbox (message)» while its catalog was still on its way
+    // (the catalog it sees then is none): the same with one that could not be read or an app that is not on.
+    const read: Step = { id: 's1', kind: 'query', operation: 'whatsapp_inbox.message.get', params: {}, result: 'first' };
+    expect(describeStep(read, [read], null, phrasing())).toBe('Look up: Read (message)');
+    expect(actionLabel('whatsapp_inbox.message.get', CATALOG, phrasing('es'))).toBe('Leer (message)');
+    expect(eventLabel('whatsapp_inbox.message.flagged', null, phrasing())).toBe('Message flagged');
+    const inbox = { ...CATALOG, events: [...CATALOG.events, { name: 'whatsapp_inbox.message.received', app: 'whatsapp_inbox', app_name: 'WhatsApp inbox' }] } as CatalogOut;
+    expect(describeStep(read, [read], inbox, phrasing())).toBe('Look up: Read · WhatsApp inbox (message)');
   });
 
   it('a known action has its phrase; another says its verb, app and subject', () => {

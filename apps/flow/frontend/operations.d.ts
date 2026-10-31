@@ -129,6 +129,17 @@ export interface LastRunOut {
   started_at: string;
 }
 
+/** What its app fixes today on an automation built from one of its recipes, never taken off from it (FLOW-F36): the
+ *  data its «Only when…» has a condition on while it starts on `event`, and, by step id and tool, the fixed data of its
+ *  «Ask the assistant» steps. Another value of the owner's goes; an update that leaves one out is `flow.recipe_fixed`. */
+export interface FixedByAppOut {
+  app: string;
+  app_name: string;
+  event: string;
+  filter: string[];
+  pinned: Record<string, Record<string, string[]>>;
+}
+
 export interface FlowOut {
   id: string;
   name: string;
@@ -146,6 +157,7 @@ export interface FlowOut {
   created_by: string;
   updated_by: string;
   last_run: LastRunOut | null;
+  fixed_by_app?: FixedByAppOut | null;
 }
 
 export interface CreateIn {
