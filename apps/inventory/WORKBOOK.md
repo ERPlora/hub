@@ -1044,7 +1044,8 @@ Pasos:
    con un nombre nuevo, y su artículo apunta a la copia; los artículos con imagen de la librería la
    enseñan igual.
 3. Las plantillas del Hub (restaurante y peluquería, INVENTORY-F12) traen cada artículo con su imagen de
-   la librería.
+   la librería; el que la librería aún no tiene (las patatas bravas del restaurante) se carga sin foto,
+   nunca con la de otro producto.
 Entra: el archivo exportado (.blueprint.zip) con sus fotos.
 Sale: los artículos con su foto en el negocio que importa. Importar dos veces el mismo archivo no
 duplica ni los artículos ni sus fotos: el artículo que ya está (el mismo SKU) se salta, y con él su
