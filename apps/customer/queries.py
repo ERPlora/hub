@@ -379,7 +379,7 @@ def list_customers(ctx: OperationContext, params: CustomerListIn) -> dict:
         "Retrieves a customer's whole card by its id or by its exact name, phone or email: contact and tax details, "
         "groups, tags, custom fields and consent per channel.",
         asks={
-            "en": ("what do we know about Marta?", "pull up Luis's details", "show me Carmen's card"),
+            "en": ("what do we know about Marta?", "pull up Luis's details", "bring up Carmen's card"),
             "es": ("¿qué sabemos de Marta?", "dame los datos de la clienta Carmen", "¿quién es Luis Gómez?"),
         },
     ),
