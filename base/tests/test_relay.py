@@ -314,6 +314,35 @@ def test_listeners_of_an_event():
 
 
 @pytest.mark.django_db
+def test_an_event_of_the_platform_is_heard_by_no_app_of_a_hub():
+    """Verification of hub#471 in pre: ``base.demo.created`` (control's outbox, the registry's scope) reached Flows
+    («*»), whose reaction ran on control and failed 8 times with ``HubContextMissing``. An event of no hub has no hub
+    to enter: the apps of a hub never hear it."""
+    for name in ("base.demo.created", "base.demo.code_created", "base.hub.registered"):
+        assert relay.listeners(OutboxEvent(scope_kind="platform", scope_key="registry", name=name)) == []
+
+
+def test_the_worker_takes_a_platform_event_without_handing_it_to_any_app(worker_loop, db):
+    from base.registry import REGISTRY_SCOPE
+    from base.tenancy.context import use_control
+
+    with use_control():
+        event = OutboxEvent.objects.create(
+            scope_kind=REGISTRY_SCOPE.kind,
+            scope_key=REGISTRY_SCOPE.key,
+            name="base.demo.created",
+            payload={"slug": "demo-x1234567"},
+            actor="platform",
+        )
+
+    worker_loop()
+
+    event.refresh_from_db()
+    assert event.delivered_at is not None
+    assert not EventDelivery.objects.filter(event=event).exists()
+
+
+@pytest.mark.django_db
 def test_a_business_that_never_turned_an_app_off_has_every_installed_app_on():
     # base.session.me lists every module as «on»: no right is missing and nothing was turned off (base.activation).
     assert relay.active_apps(A) == frozenset(config.label for config in all_live_app_configs())
