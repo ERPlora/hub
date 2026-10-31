@@ -76,6 +76,17 @@ def is_preparing(hub: Hub) -> bool:
     return hub.status in PREPARING_STATUSES
 
 
+def database_is_made(hub: Hub) -> bool:
+    """Whether ``hub``'s data can be entered: it shares control's (phase 1), or its own database was made (it is ready,
+    or was once: ``ready_at``) and has not been dropped. A business cancelled or failed before it was ever ready has no
+    database: what reaches it waits on its row for the day it is made."""
+    if not hub.db_name:
+        return True
+    if hub.status in (Hub.Status.PURGED, Hub.Status.DROPPING):
+        return False
+    return hub.status == Hub.Status.READY or hub.ready_at is not None
+
+
 #: The codes of a host that does not serve the app (``refusal``).
 HUB_GONE = "base.hub_gone"
 HUB_PREPARING = "base.hub_preparing"
