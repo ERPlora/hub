@@ -284,10 +284,23 @@ test('PRINTING-F18, F14: a printer that does not print sends the job back with i
   await appPage(page, '/printing/printers');
   await setMode(page, 'fail');
   await shown(page).locator('[data-testid=printing-printers-row]').filter({ hasText: PRINTER }).waitFor({ state: 'visible' });
+  // «Test» answered a moment late, as by a busy hub: the queue is read before the test page is in it, while the
+  // newest job is still the receipt of the test before (printed at its first hand-out).
+  await page.route('**/api/printing/printers/test', async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 1_500));
+    await route.continue();
+  });
+  const before = (await jobsOf(context)).length;
   await printersRowAction(page, 'test');
-  await expect.poll(async () => (await newestJob(context)).attempts).toBe(1);
+  // The test page in the queue, then back in it with the device's error after its first hand-out.
+  await expect.poll(async () => (await jobsOf(context)).length).toBe(before + 1);
+  await expect
+    .poll(async () => {
+      const job = await newestJob(context);
+      return [job.kind, job.status, job.attempts, job.last_error];
+    })
+    .toEqual(['test_page', 'pending', 1, `printer_unreachable: ${ADDRESS} did not answer`]);
   const failing = await newestJob(context);
-  expect([failing.kind, failing.status, failing.last_error]).toEqual(['test_page', 'pending', `printer_unreachable: ${ADDRESS} did not answer`]);
   // Back in the queue, the device does not take it again by itself (a printer out of paper would burn its five
   // hand-outs in a moment): the app opened again takes it at its next connection.
   for (let attempt = 2; attempt <= 5; attempt += 1) {
