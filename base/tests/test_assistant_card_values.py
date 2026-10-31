@@ -305,12 +305,11 @@ UNNAMED_REFERENCES = {
     "customer": 22,
     "demo": 3,
     "inventory": 15,
-    "invoice": 12,
+    "invoice": 1,
     "kitchen": 23,
     "modifier": 14,
     "online_booking": 7,
     "payment": 8,
-    "pricing": 25,
     "printing": 11,
     "sale": 101,
     "schedule": 4,
@@ -326,7 +325,7 @@ UNNAMED_REFERENCES = {
 #: The closed lists (``enum`` of text) of the assistant's writes with a value the models of their app give no label,
 #: by app: their card says that value as sent. Only ever lower, as above.
 UNLABELLED_LISTS = {
-    "invoice": 4,
+    "invoice": 1,
     "kitchen": 1,
     "printing": 1,
     "sale": 3,
@@ -431,6 +430,9 @@ TITLED_IN_SPANISH = {
     "base.failed_event.retry:id": "Evento caído",
     "base.import.undo:id": "Importación",
     "base.support.report:description": "¿Qué pasó?",
+    **{f"pricing.price_item.{action}:id": "Precio" for action in ("remove", "update")},
+    **{f"pricing.price_list.{action}:id": "Tarifa" for action in ("activate", "deactivate", "set_default", "update")},
+    **{f"pricing.rule.{action}:id": "Regla de descuento" for action in ("activate", "deactivate", "update")},
     **{f"table.session.{action}:id": "Cuenta" for action in (
         "close", "delete", "link_order", "merge", "park", "restore", "set_guests", "split", "transfer",
     )},

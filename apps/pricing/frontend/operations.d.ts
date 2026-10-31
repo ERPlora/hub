@@ -147,6 +147,8 @@ export interface PriceItemOut {
 /** One price with the currency of its list, the one its price is in (ISO 4217). */
 export interface PriceItemDetailOut extends PriceItemOut {
   currency: string;
+  /** How it is named outside its list, in the reader's language: «Shampoo · VIP prices · from 10». */
+  label: string;
 }
 
 export interface DeletedOut {
@@ -275,6 +277,18 @@ export interface ResolveOut {
   total: number;
 }
 
+/** One service, category or customer group a price list, a price or a rule points at, by its id: exactly one. */
+export interface CatalogRefIn {
+  service_id?: string;
+  category_id?: string;
+  customer_group_id?: string;
+}
+
+export interface CatalogRecordOut {
+  id: string;
+  name: string;
+}
+
 declare module '@erplora/ui/sdk' {
   interface Operations {
     'pricing.price_list.list': { input: PriceListListIn; output: Page<PriceListOut> };
@@ -290,10 +304,12 @@ declare module '@erplora/ui/sdk' {
     'pricing.price_item.update': { input: PriceItemPatchIn; output: PriceItemOut };
     'pricing.price_item.remove': { input: PriceItemRefIn; output: DeletedOut };
     'pricing.rule.list': { input: RuleListIn; output: Page<RuleOut> };
+    'pricing.rule.get': { input: RuleRefIn; output: RuleOut };
     'pricing.rule.create': { input: RuleIn; output: RuleOut };
     'pricing.rule.update': { input: RulePatchIn; output: RuleOut };
     'pricing.rule.deactivate': { input: RuleRefIn; output: RuleOut };
     'pricing.rule.activate': { input: RuleRefIn; output: RuleOut };
     'pricing.price.resolve': { input: ResolveIn; output: ResolveOut };
+    'pricing.catalog.get': { input: CatalogRefIn; output: CatalogRecordOut };
   }
 }

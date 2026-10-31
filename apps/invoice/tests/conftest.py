@@ -71,6 +71,15 @@ def english():
 
 
 @pytest.fixture
+def no_fallback(monkeypatch):
+    """As production: without ``use_hub`` a hub's model fails, nothing falls back on the shared database (the tests
+    with the hubs ``hub_a`` and ``hub_b`` of the root conftest, each with its own database)."""
+    from base.tenancy import context
+
+    monkeypatch.setattr(context, "_test_fallback", None)
+
+
+@pytest.fixture
 def today():
     """The business day the test runs on, taken when it runs as the operations take it: a date taken at import
     is the day of the collection, and a run that crosses midnight would compare it with the next one

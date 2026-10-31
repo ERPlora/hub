@@ -478,6 +478,33 @@ describe('a bar-list with the colour of its row (BASE-F06): `map.color`, only a 
 
 // BASE-F06 — a chart of business days (Sales' «Sales, last 7 days»): the old hub's gh:hub#2392 painted each day
 // as `2026-10-17` and no amount at all.
+/** The zones a business day is read in, west to east: the day is the same in all of them. */
+const ZONES = ['America/Los_Angeles', 'Europe/Madrid', 'Pacific/Kiritimati'];
+
+/**
+ * A fresh copy of this module per zone, as a page opened there: its day formats are made on first use, in the zone set
+ * then, so no formatter of another zone is reused. Only this module is the page's: the UI library already loaded is
+ * handed to each copy, not evaluated again. Loaded with the file, out of any test's clock: each import waits for
+ * Vitest's main process, and on a busy run (the machine at load ~24) the three took 5.3 s inside the test while the
+ * file's other tests ran in 4 ms.
+ */
+async function copiesOfHome(count: number): Promise<(typeof import('./home'))[]> {
+  vi.doMock('@erplora/ui/components', () => components);
+  try {
+    const copies: (typeof import('./home'))[] = [];
+    for (let made = 0; made < count; made += 1) {
+      vi.resetModules();
+      copies.push(await import('./home'));
+    }
+    return copies;
+  } finally {
+    vi.doUnmock('@erplora/ui/components');
+    vi.resetModules();
+  }
+}
+
+const zoned = await copiesOfHome(ZONES.length);
+
 describe('a chart of business days (BASE-F06, gh:hub#2392)', () => {
   const WEEK = ['2026-10-17', '2026-10-18', '2026-10-19', '2026-10-20', '2026-10-21', '2026-10-22', '2026-10-23'];
   const chart = widget('sale.last_7_days', { kind: 'chart', map: { label: 'day', value: 'total' }, options: { format: 'currency' } });
@@ -508,27 +535,20 @@ describe('a chart of business days (BASE-F06, gh:hub#2392)', () => {
     expect(barsOf(days(eight), 'es').map((bar) => bar.label)).toEqual(['16 oct', '17 oct', '18 oct', '19 oct', '20 oct', '21 oct', '22 oct', '23 oct']);
   });
 
-  it('a business day is the same day in every time zone: a civil day, never an instant', async () => {
+  it('a business day is the same day in every time zone: a civil day, never an instant', () => {
     const zone = process.env.TZ;
-    // Only this module is the page's: the UI library already loaded is handed to each fresh copy, not evaluated again
-    // (every component and Ionic, three times over, outlasted the test on a busy run).
-    vi.doMock('@erplora/ui/components', () => components);
     try {
-      for (const tz of ['America/Los_Angeles', 'Europe/Madrid', 'Pacific/Kiritimati']) {
-        // A page opened in that zone: a fresh module, so no formatter of another zone is reused.
+      ZONES.forEach((tz, index) => {
+        // A page opened in that zone: its own copy of the module (`copiesOfHome`), first used here.
         process.env.TZ = tz;
-        vi.resetModules();
-        const fresh = await import('./home');
-        expect(fresh.widgetView(chart, days(['2026-10-17']), 'es'), tz).toMatchObject({
+        expect(zoned[index].widgetView(chart, days(['2026-10-17']), 'es'), tz).toMatchObject({
           kind: 'chart',
           bars: [{ label: 'sáb', detail: 'sáb, 17 oct' }],
         });
-      }
+      });
     } finally {
       if (zone === undefined) delete process.env.TZ;
       else process.env.TZ = zone;
-      vi.doUnmock('@erplora/ui/components');
-      vi.resetModules();
     }
   });
 

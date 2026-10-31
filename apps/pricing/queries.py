@@ -18,20 +18,24 @@ from typing import Any
 from uuid import UUID
 
 import pydantic
+from babel.numbers import format_decimal
 from django.db.models import CharField, Count, F, OuterRef, Q, QuerySet, Subquery
 from django.db.models.functions import Coalesce, Lower
-from django.utils import timezone
+from django.utils import timezone, translation
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import pgettext_lazy
 from live.context import OperationContext
 from live.errors import AppInactive, Conflict, InvalidPayload, NotFound
 from live.operations import UnknownOperation, get, operation
 
 from apps.customer.models import CustomerGroup
-from apps.customer.queries import find_customer
+from apps.customer.queries import find_customer, find_group
 from apps.inventory.models import UNIT_SPECS, Product, ProductCategory
-from apps.inventory.queries import find_product
+from apps.inventory.queries import find_category, find_product
 from apps.pricing.models import DiscountRule, PriceItem, PriceList
 from apps.pricing.schemas import (
+    CatalogRecordOut,
+    CatalogRefIn,
     Page,
     PriceItemDetailOut,
     PriceItemIdIn,
@@ -44,8 +48,10 @@ from apps.pricing.schemas import (
     ResolveOut,
     RuleListIn,
     RuleOut,
+    RuleRefIn,
 )
 from base import operations as platform
+from base.business import babel_locale
 
 #: Candidates named when a text matches several.
 MAX_CANDIDATES = 5
@@ -57,6 +63,8 @@ RULE_NOT_FOUND = _("This discount rule does not exist.")
 RULE_AMBIGUOUS = _("“%(said)s” matches several discount rules: %(names)s. Say which one.")
 ITEM_NOT_FOUND = _("That price no longer exists.")
 SERVICES_UNAVAILABLE = _("Services is not active in this business.")
+#: A price outside its list, from a quantity on: «Shampoo · VIP prices · from 10» (the list's «Desde»).
+FROM_QUANTITY = pgettext_lazy("pricing", "from %(quantity)s")
 
 SERVICE_GET = "service.service.get"
 
@@ -244,6 +252,17 @@ def load_item(item_id: UUID) -> dict:
     return item_row(PriceItem.objects.select_related("price_list", "product").get(pk=item_id))
 
 
+def item_label(row: dict, language: str) -> str:
+    """How a price is named outside its list, in ``language``: its article and its list and, from a quantity on, that
+    quantity, as the list's dialogs say it («Shampoo · VIP prices · from 10»)."""
+    parts = [row["name"], row["price_list_name"]]
+    if row["min_quantity"] != 1:
+        quantity = format_decimal(row["min_quantity"], locale=babel_locale(language))
+        with translation.override(language):
+            parts.append(str(FROM_QUANTITY) % {"quantity": quantity})
+    return " · ".join(parts)
+
+
 def _rules() -> QuerySet:
     return DiscountRule.objects.select_related("category", "product").annotate(customer_group_name=_group_name())
 
@@ -389,7 +408,8 @@ def get_price_item(ctx: OperationContext, data: PriceItemIdIn) -> dict:
     item = live_items().select_related("price_list", "product").filter(pk=data.id).first()
     if item is None:
         raise NotFound(str(ITEM_NOT_FOUND), code="pricing.price_item_not_found")
-    return {**item_row(item), "currency": item.price_list.currency}
+    row = item_row(item)
+    return {**row, "currency": item.price_list.currency, "label": item_label(row, ctx.language)}
 
 
 # ── Rules ────────────────────────────────────────────────────────────────────────────────────────
@@ -422,6 +442,44 @@ def list_rules(ctx: OperationContext, params: RuleListIn) -> dict:
             rows = rows.filter(**{column: value})
     rows = rows.order_by(*_ordering(params.sort, params.dir, Lower("code"), "id"))
     return _page(rows, params, rule_row)
+
+
+@operation(
+    "pricing.rule.get",
+    kind="query",
+    permission="pricing.view",
+    input=RuleRefIn,
+    output=RuleOut,
+    expose_api=True,
+    ai={"description": "Get one discount rule, active or not, by its id, its code or its name (e.g. «summer rule»)."},
+)
+def get_rule(ctx: OperationContext, data: RuleRefIn) -> dict:
+    return rule_row(find_rule(data.id, data.rule))
+
+
+# ── What a price or a rule points at in another app ──────────────────────────────────────────────
+
+
+@operation(
+    "pricing.catalog.get",
+    kind="query",
+    permission="pricing.view",
+    input=CatalogRefIn,
+    output=CatalogRecordOut,
+    expose_api=True,
+    ai={
+        "description": "Name by its id the service, the category or the customer group a price list, a price or a "
+        "rule points at, as Services, Inventory or Customers name it (a service needs its permission in Services)."
+    },
+)
+def get_catalog_record(ctx: OperationContext, data: CatalogRefIn) -> dict:
+    if data.service_id is not None:
+        record = call_service(ctx, data.service_id, None)
+    elif data.category_id is not None:
+        record = find_category(data.category_id, None)
+    else:
+        record = find_group(data.customer_group_id, None)
+    return {"id": record.id, "name": record.name}
 
 
 # ── The price of a line ──────────────────────────────────────────────────────────────────────────

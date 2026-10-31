@@ -24,6 +24,7 @@ from apps.invoice.schemas import (
     MarkPaidIn,
     RectificationPreviewIn,
     RectifyIn,
+    RefundGetIn,
     SeriesCreateIn,
     SeriesListIn,
     SeriesPeekIn,
@@ -119,6 +120,14 @@ async def invoice_rectify_from_void(request, data: FromVoidIn):
     return await run_operation(request, services.rectify_from_void, data)
 
 
+# Refunds of the Sales app, as an invoice names them
+
+
+@bind(router, "invoice.refund.get", "/invoice/refunds/detail")
+async def refund_get(request, params: Query[RefundGetIn]):
+    return await run_operation(request, queries.get_refund, params)
+
+
 # Series
 
 
@@ -130,6 +139,11 @@ async def series_list(request, params: Query[SeriesListIn]):
 @bind(router, "invoice.series.peek_next", "/invoice/series/peek_next")
 async def series_peek_next(request, params: Query[SeriesPeekIn]):
     return await run_operation(request, queries.peek_next, params)
+
+
+@bind(router, "invoice.series.get", "/invoice/series/detail")
+async def series_get(request, params: Query[SeriesPeekIn]):
+    return await run_operation(request, queries.get_series, params)
 
 
 @bind(router, "invoice.series.create", "/invoice/series", status=201)

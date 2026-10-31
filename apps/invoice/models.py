@@ -51,6 +51,18 @@ class InvoiceType(models.TextChoices):
     R5 = "R5", _("Rectifying invoice of a simplified invoice (R5)")
 
 
+class ForeignIdType(models.TextChoices):
+    """The AEAT's kinds of document of a foreign recipient (``IDType``; a Spanish NIF has none), by the words the
+    recipient form gives them: the assistant's card says them so too."""
+
+    EU_VAT = "02", _("EU VAT number")
+    PASSPORT = "03", _("Passport")
+    FOREIGN_TAX_ID = "04", _("Tax ID of their country")
+    RESIDENCE_CERTIFICATE = "05", _("Residence certificate")
+    OTHER = "06", _("Other document")
+    NOT_REGISTERED = "07", _("Not registered")
+
+
 ORDINARY_TYPES = ("F1", "F2", "F3")
 RECTIFYING_TYPES = ("R1", "R2", "R3", "R4", "R5")
 SIMPLIFIED_TYPES = ("F2", "R5")
@@ -262,7 +274,7 @@ class Invoice(UUIDModel):
     customer_country = models.CharField(_("customer country"), max_length=2, blank=True)
     # The AEAT's IDType of a foreign document (02 EU VAT number … 07 not registered); empty = a NIF.
     customer_id_type = models.CharField(
-        _("customer document type"), max_length=2, blank=True
+        _("customer document type"), max_length=2, choices=ForeignIdType.choices, blank=True
     )
     # The reason of a rectifying document (DescripcionOperacion); empty otherwise.
     description = models.CharField(_("description"), max_length=500, blank=True)
