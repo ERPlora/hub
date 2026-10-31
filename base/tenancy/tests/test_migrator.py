@@ -538,6 +538,12 @@ def test_until_s3_a_hub_without_a_portable_app_is_behind():
     assert migrator.is_behind(Hub(db_name="hub_x", schema_apps=without_tax))
     assert migrator.is_behind(Hub(db_name="hub_x", schema_apps=without_tax), wanted=["tax"])
     assert not migrator.is_behind(Hub(db_name="hub_x", schema_apps=without_tax), wanted=[])
+    # An app with no migrations is never recorded: it leaves no hub behind for ever (review of round 5).
+    assert not migrator.is_behind(Hub(db_name="hub_x", schema_apps=every), wanted=[*every, "an_app_without_migrations"])
+    # An expired demo, about to be dropped, gets no app added.
+    platform = {label: leaf[label] for label in PLATFORM}
+    assert not migrator.is_behind(Hub(db_name="hub_x", status=Hub.Status.EXPIRED, schema_apps=platform))
+    assert migrator.is_behind(Hub(db_name="hub_x", status=Hub.Status.READY, schema_apps=platform))
 
 
 def test_until_s3_migrate_hubs_gives_a_hub_every_portable_app_it_lacks(new_database, make_hub):

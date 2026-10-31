@@ -38,7 +38,6 @@ from collections.abc import Callable, Iterable, Iterator
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from functools import partial
 
 import decouple
 import psycopg
@@ -54,7 +53,7 @@ from django.utils import timezone
 from psycopg import errors as pg_errors
 from psycopg import sql
 
-from base import catalog
+from base import catalog, registry
 from base.tenancy import bootstrap, inventory, names
 from base.tenancy import connections as tenancy_connections
 from control.models import Cluster, Hub
@@ -373,11 +372,19 @@ def apps_every_hub_gets() -> tuple[str, ...]:
     return portable_apps()
 
 
+def apps_to_add(hub, every: Iterable[str] | None = None) -> tuple[str, ...]:
+    """The apps of :func:`apps_every_hub_gets` (or ``every``) that ``migrate_hubs`` gives ``hub`` until S3: none to an
+    expired demo, about to be dropped (work it would lose)."""
+    if hub.status == Hub.Status.EXPIRED:
+        return ()
+    return tuple(apps_every_hub_gets() if every is None else every)
+
+
 def is_behind(hub, code: CodeMigrations | None = None, *, wanted: Iterable[str] | None = None) -> bool:
     """Whether ``hub``'s database may lack a migration of this code, as control knows it (``Hub.schema_apps``).
 
     Behind: marked so, or the platform or any app it has not at the code's leaf (never confirmed counts), or, with its
-    own database, one of ``wanted`` (by default :func:`apps_every_hub_gets`, until S3) it does not have. A label or a
+    own database, one of ``wanted`` with migrations (by default :func:`apps_to_add`, until S3) it does not have. A label or a
     migration the code does not have (a later code's, after a rollback: the database is ahead) is not behind. Opens no
     database.
     """
@@ -385,7 +392,8 @@ def is_behind(hub, code: CodeMigrations | None = None, *, wanted: Iterable[str] 
         return True
     code = code_migrations() if code is None else code
     recorded = hub.schema_apps or {}
-    if hub.db_name and any(label not in recorded for label in (apps_every_hub_gets() if wanted is None else wanted)):
+    wanted = apps_to_add(hub) if wanted is None else wanted
+    if hub.db_name and any(label in code.leaves and label not in recorded for label in wanted):
         return True
     for label in set(platform_apps()) | {label for label in recorded if label in code.leaves}:
         name = recorded.get(label)
@@ -752,10 +760,11 @@ def _grantee(role: str) -> sql.Composable:
 
 
 def hubs_with_a_database() -> list:
-    """The hubs whose own database ``migrate_hubs`` keeps at the leaf: ERPlora's own first, then by slug."""
+    """The hubs whose own database ``migrate_hubs`` keeps at the leaf: ERPlora's own first, then by slug. Only those
+    whose database was made (``base.registry.own_database_made``): one cancelled or expired before it was ever ready
+    has none, and must not stop a deploy."""
     return list(
-        Hub.objects.exclude(db_name="")
-        .filter(status__in=MIGRATED_STATUSES)
+        Hub.objects.filter(registry.own_database_made(), status__in=MIGRATED_STATUSES)
         .select_related("cluster")
         .order_by("-is_platform", "slug")
     )
@@ -767,13 +776,14 @@ def migrate_hubs_behind(*, workers: int = HUB_WORKERS) -> HubsPass:
     every = hubs_with_a_database()
     code = code_migrations()
     wanted = apps_every_hub_gets()
-    behind = [hub for hub in every if is_behind(hub, code, wanted=wanted)]
+    behind = [hub for hub in every if is_behind(hub, code, wanted=apps_to_add(hub, wanted))]
     result = HubsPass(up_to_date=len(every) - len(behind))
     first = [hub for hub in behind if hub.is_platform]
     rest = [hub for hub in behind if not hub.is_platform]
-    outcomes = [(hub, _migrate_hub(hub, wanted)) for hub in first]
+    outcomes = [(hub, _migrate_hub(hub, apps_to_add(hub, wanted))) for hub in first]
     with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="migrate_hubs") as pool:
-        outcomes += zip(rest, pool.map(partial(_migrate_hub_in_thread, add=wanted), rest), strict=True)
+        adds = [apps_to_add(hub, wanted) for hub in rest]
+        outcomes += zip(rest, pool.map(_migrate_hub_in_thread, rest, adds), strict=True)
     for hub, failure in outcomes:
         if failure is None:
             result.migrated.append(hub.slug)
