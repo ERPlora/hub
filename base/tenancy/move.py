@@ -59,7 +59,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import psycopg
-from django.db import DEFAULT_DB_ALIAS, connections
+from django.conf import settings
 from django.utils import timezone
 from psycopg import errors, sql
 from psycopg.conninfo import make_conninfo
@@ -250,7 +250,7 @@ def drop_leftovers(now: dt.datetime) -> int:
 def _server(cluster) -> tuple[str, int]:
     """The writer a cluster's row points at (``None``: the settings' own server)."""
     if cluster is None:
-        default = connections.settings[DEFAULT_DB_ALIAS]
+        default = settings.DATABASES["default"]
         return str(default["HOST"]), int(default["PORT"])
     return str(cluster.host), int(cluster.port)
 
