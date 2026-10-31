@@ -18,7 +18,7 @@ from live.context import OperationContext, Scope
 from live.errors import OperationError
 from live.operations import Operation, get, registry
 from ninja import Field, Schema
-from pydantic import SecretStr
+from pydantic import ConfigDict, SecretStr
 
 from base import assistant, entitlement
 from base.models import Membership
@@ -986,6 +986,25 @@ def test_a_write_whose_check_refuses_its_data_gets_no_card_and_says_why(note):
 def test_a_check_that_passes_leaves_a_normal_writes_card_as_it_was(note):
     """Nothing of the check's answer reaches the card: a normal write has no preview."""
     assert assistant.preview(ctx(), note, {"id": "7", "note": "x"}) == (None, None)
+
+
+class StrictCheckIn(Schema):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(min_length=1)
+
+
+@pytest.mark.django_db
+def test_a_check_reads_only_the_data_its_own_input_takes(monkeypatch):
+    """The write's other data (its note) never reach its check: a read that refuses data it does not take still lets
+    a write whose data it takes reach its card."""
+    strict = Operation(**{**vars(SETTLE_PREVIEW), "name": "demo.item.note_check", "input": StrictCheckIn})
+    monkeypatch.setitem(registry, strict.name, strict)
+    write = checking(strict.name)
+    monkeypatch.setitem(registry, write.name, write)
+    assert assistant.preview(ctx(), write, {"id": "7", "note": "x"}) == (None, None)
+    failure, _ = assistant.preview(ctx(), write, {"id": "gone", "note": "x"})
+    assert failure.code == "demo.item_not_found"
 
 
 @pytest.mark.django_db

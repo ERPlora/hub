@@ -479,10 +479,7 @@ def _preview_problems(op: Operation, declared: Any) -> list[str]:
     read = registry.get(declared["operation"])
     if read is None:
         return [*problems, f"names no operation {declared['operation']}"]
-    if read.app_label != op.app_label:
-        problems.append(f"names {read.name}, of another app")
-    if read.kind != "query":
-        problems.append(f"names {read.name}, not a read")
+    problems += _read_problems(op, read)
     fields = declared.get("fields")
     if not isinstance(fields, list) or not fields or not all(isinstance(name, str) for name in fields):
         return [*problems, "names no field of its answer"]
@@ -495,6 +492,17 @@ def _preview_problems(op: Operation, declared: Any) -> list[str]:
         for name, prop in shown.items()
         if _is_signed(prop) and not (prop.get("type") == "integer" and _is_money(name, prop))
     ]
+    return problems
+
+
+def _read_problems(op: Operation, read: Operation) -> list[str]:
+    """What is wrong with the read the write ``op`` names (its preview or its check): of another app, not a read, or
+    reading data the write never takes."""
+    problems = []
+    if read.app_label != op.app_label:
+        problems.append(f"names {read.name}, of another app")
+    if read.kind != "query":
+        problems.append(f"names {read.name}, not a read")
     problems += [
         f"reads {name}, but the write never takes {name}" for name in read.input.model_fields if name not in op.input.model_fields
     ]
@@ -527,15 +535,7 @@ def _check_problems(op: Operation, declared: Any) -> list[str]:
     read = registry.get(declared)
     if read is None:
         return [f"names no operation {declared}"]
-    problems = []
-    if read.app_label != op.app_label:
-        problems.append(f"names {read.name}, of another app")
-    if read.kind != "query":
-        problems.append(f"names {read.name}, not a read")
-    problems += [
-        f"reads {name}, but the write never takes {name}" for name in read.input.model_fields if name not in op.input.model_fields
-    ]
-    return problems
+    return _read_problems(op, read)
 
 
 @checks.register("base")
