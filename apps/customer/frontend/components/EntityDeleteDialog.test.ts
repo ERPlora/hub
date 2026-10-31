@@ -5,18 +5,24 @@ import { toastSuccess } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { defineComponent, h, ref } from 'vue';
 
+import { approvalDialog, approvalSettled, asksApproval } from '../__tests__/approval-dialog';
 import { flush, json, mountCustomer, refusal, sent } from '../__tests__/mount-customer';
 import EntityDeleteDialog from './EntityDeleteDialog.vue';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
   const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
+  const { modalControllerStub } = await import('../__tests__/approval-dialog');
+  const ionic = await importOriginal<typeof import('@ionic/vue')>();
+  return { ...ionic, IonModal: IonModalStub, modalController: modalControllerStub(ionic.modalController) };
 });
 vi.mock('@erplora/ui/shell', async (importOriginal) => ({
   ...((await importOriginal()) as object),
   toastSuccess: vi.fn(() => Promise.resolve()),
 }));
-beforeEach(() => vi.mocked(toastSuccess).mockClear());
+beforeEach(() => {
+  vi.mocked(toastSuccess).mockClear();
+  approvalDialog.reset();
+});
 afterEach(() => {
   document.body.innerHTML = '';
 });
@@ -66,5 +72,20 @@ describe('EntityDeleteDialog', () => {
     await flush();
     expect(s.el('customer-groups-delete-error')?.textContent).toContain('You do not have permission to do that.');
     expect(s.target.value).not.toBeNull();
+  });
+});
+
+describe('EntityDeleteDialog with a manager’s approval (BASE-F84)', () => {
+  it('an employee deletes a field once more with the manager’s pass', async () => {
+    const s = await setup('fields');
+    let calls = 0;
+    s.net.onApi(() => (calls++ === 0 ? Response.json(asksApproval('customer.field.delete', 'Delete a custom field'), { status: 403 }) : json({ id: 'x1' })));
+    s.el('customer-fields-delete-submit')!.click();
+    await flush();
+    await approvalSettled();
+    expect(approvalDialog.questions.map((question) => question.label)).toEqual(['Delete a custom field']);
+    expect(s.net.api.map((call) => sent(call).path)).toEqual(['/api/customer/fields/delete', '/api/customer/fields/delete']);
+    expect(toastSuccess).toHaveBeenCalledWith('Field VIP deleted');
+    expect(s.target.value).toBeNull();
   });
 });
