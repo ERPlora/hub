@@ -476,7 +476,7 @@ WAIT_REASONS = {
         "your own certificate cannot be opened on this server: upload it again"
     ),
     "representation_not_approved": _(
-        "ERPlora still has to approve your signed authorisation to file in production"
+        "ERPlora still has to approve your signed authorisation to file for you"
     ),
     "go_live_forbidden": _(
         "this is a demo business: it always files in the AEAT's test environment"
@@ -486,6 +486,9 @@ WAIT_REASONS = {
     ),
     "hub_not_active": _(
         "your ERPlora account has a pending payment or is suspended"
+    ),
+    "hub_unregistered": _(
+        "ERPlora has not linked this business to its account on this server yet"
     ),
     "aeat_wait": _("the AEAT asked to wait until %(at)s"),
     "unreachable": _("the gateway or the AEAT could not be reached (%(detail)s)"),

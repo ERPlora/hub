@@ -544,7 +544,10 @@ Pasos:
 1. Pide al asistente «Imprime una prueba en la de cocina», «reintenta los trabajos fallidos de
    etiquetas» o «¿cómo está la impresora de la caja?».
 2. El asistente hace lo mismo que las pantallas, nombrando la impresora por su nombre y el trabajo por
-   su número, y contesta con lo que ha hecho.
+   su número, y contesta con lo que ha hecho. Antes de cambiar algo, su tarjeta de confirmación dice la
+   impresora y el dispositivo por su nombre, el trabajo como lo titula la cola (su documento y su número) y
+   el documento de un trabajo nuevo con la palabra de la cola, nunca por un identificador; lo que quien
+   pregunta no puede ver, o lo que ya no está (un dispositivo retirado), no sale en la tarjeta.
 Entra: la petición.
 Sale: lo mismo que la pantalla.
 Si falla: lo mismo que la pantalla, con las palabras del servidor.
@@ -676,9 +679,11 @@ Las demás apps y el asistente usan Impresión por estas operaciones, por su nom
 | Las impresoras, con búsqueda por nombre, filtros (función, conexión, activa) y páginas, cada una con su estado | ver | F03, F04, F19 | `printing.printer.list` |
 | Una impresora por id o por nombre | ver | F04 | `printing.printer.get` |
 | Los dispositivos que imprimen, por nombre, con sus impresoras, quién los dio de alta, cuándo se vieron por última vez y cuál es el que pregunta | ver | F18 | `printing.device.list` |
+| Un dispositivo que imprime, por su id de alta, con sus impresoras (uno retirado ya no está) | ver | F16, F18 | `printing.device.detail` |
 | El dispositivo dado de alta con un identificador, con sus impresoras (para el canal del dispositivo, al conectarse; sin ruta ni asistente) | imprimir | F18 | `printing.device.get` |
 | El estado de una impresora (por id o nombre) | ver | F19 | `printing.printer.status` |
 | La cola, del más reciente al más antiguo, con búsqueda por documento, filtros (estado, función, impresora) y páginas | ver | F01, F14 | `printing.job.list` |
+| Un trabajo de la cola por id o por el número de su documento (el más reciente), con su título como lo pone la cola | ver | F14, F16 | `printing.job.get` |
 | El resumen de la cola por función, con la impresora por la que sale cada una, cuántos trabajos no puede sacar ningún dispositivo dado de alta y cuántos llevan un minuto sin dispositivo encendido | ver | F01 | `printing.job.summary` |
 | Si una función tiene un dispositivo dado de alta que la imprime, encendido o no (el paso del Inicio), y cuántos de sus trabajos llevan un minuto o más en cola sin un dispositivo encendido que los saque (la campana) | ver | F01 | `printing.device.coverage` |
 
