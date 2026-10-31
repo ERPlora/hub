@@ -844,11 +844,12 @@ class TestACancelBeforeTheWorkerStarted:
 
 
 class TestTheUndoRenamesBackOnlyWhatLeft:
-    def test_a_hub_whose_database_never_left_its_origin_is_only_reopened_and_the_copy_kept_for_its_days(
+    def test_with_its_note_and_copy_a_database_of_the_hubs_name_on_the_origin_is_never_reopened_as_its_own(
         self, moves
     ):
-        # A note of a move in course and a copy on the origin, but the hub's database is there too (its data never
-        # left): nothing is renamed over it; the copy is kept, dated, for the reaper.
+        # Review of round 4: the worker's note and the copy on the origin say the data is in the copy (an older copy is
+        # dropped before the note is written). A database with the hub's name there is the destination's (one server)
+        # or a leftover, never the hub's: it is not reopened, the copy is not dated; the undo fails and is tried again.
         target = moves.cluster("away", port=1)
         hub = moves.hub(to=target)
         control = tenancy_connections.control_name()
@@ -866,8 +867,45 @@ class TestTheUndoRenamesBackOnlyWhatLeft:
         run()
 
         hub = fresh(hub)
-        assert hub.moving_to_id is None and marker(hub.db_name) == [MARKER]
-        assert copy in databases() and MovedCopy.objects.get(hub=hub).moved_at is not None
+        assert hub.moving_to_id == target.pk and "move_undo_failed" in hub.last_error
+        assert copy in databases() and MovedCopy.objects.get(hub=hub).moved_at is None
+
+    def test_on_one_server_a_destination_that_cannot_be_dropped_never_takes_the_place_of_the_real_data(
+        self, moves, monkeypatch
+    ):
+        # The reviewer's probe (round 4): the restore fails, then the undo's drop of the destination does too. The hub
+        # stays moving (503) with its data in the copy, never ready on the destination's half-made database.
+        target = moves.cluster()  # the origin's own server
+        hub = moves.hub(to=target)
+        real_drop = move.ops.drop_database
+        calls = {"n": 0}
+
+        def drop(name, **kwargs):
+            calls["n"] += 1
+            if calls["n"] >= 2:  # the undo's drop of the destination (the first is _make_destination's)
+                raise move.ops.DatabaseOpsError("statement timeout while dropping")
+            return real_drop(name, **kwargs)
+
+        def broken_restore(*args, **kwargs):
+            raise move.MoveFailed("move_restore_failed", "broke on purpose")
+
+        monkeypatch.setattr(move.ops, "drop_database", drop)
+        monkeypatch.setattr(move, "_restore", broken_restore)
+
+        run()
+
+        hub = fresh(hub)
+        copy = names.moved_db_name(tenancy_connections.control_name(), hub.id)
+        assert hub.moving_to_id == target.pk and hub.move_undo_asked_at is not None
+        assert hub.last_error.startswith("move_restore_failed") and "move_undo_failed" in hub.last_error
+        assert marker(copy) == [MARKER] and MovedCopy.objects.get(hub=hub).moved_at is None
+        monkeypatch.undo()
+
+        run()
+
+        hub = fresh(hub)
+        assert (hub.cluster_id, hub.moving_to_id) == (None, None)
+        assert marker(hub.db_name) == [MARKER] and copy not in databases()
 
     def test_the_destination_control_says_is_a_hubs_is_never_dropped_on_an_undo(self, moves):
         # On another server than the origin's (its row points elsewhere): only control's word stops the drop.

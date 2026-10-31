@@ -374,11 +374,9 @@ def move_finished(
         )
 
 
-def move_undone(hub_id: UUID, origin: UUID | None, copy_name: str, error: str, *, copy_kept: bool = False) -> None:
-    """The move of ``hub_id`` was undone: ready where it was, with why, no longer asked to be undone, and the schema record
-    of its origin given back (the destination's migration wrote its own meanwhile). Its note is forgotten, or, when a
-    copy of that name stayed on the origin (``copy_kept``: its data never left, the copy is an older one), dated so the
-    reaper drops it after its days."""
+def move_undone(hub_id: UUID, origin: UUID | None, copy_name: str, error: str) -> None:
+    """The move of ``hub_id`` was undone: ready where it was, with why, no longer asked to be undone, its note forgotten
+    and the schema record of its origin given back (the destination's migration wrote its own meanwhile)."""
     with _control_transaction():
         hub = Hub.objects.select_for_update().get(pk=hub_id)
         note = MovedCopy.objects.filter(hub=hub, cluster_id=origin, db_name=copy_name, moved_at__isnull=True).first()
@@ -390,10 +388,7 @@ def move_undone(hub_id: UUID, origin: UUID | None, copy_name: str, error: str, *
         hub.move_undo_asked_at = None
         hub.last_error = error[:2000]
         hub.save(update_fields=fields)
-        if note is not None and copy_kept:
-            note.moved_at, note.schema_state, note.schema_apps = timezone.now(), "", None
-            note.save(update_fields=["moved_at", "schema_state", "schema_apps"])
-        elif note is not None:
+        if note is not None:
             note.delete()
 
 

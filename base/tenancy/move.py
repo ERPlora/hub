@@ -193,7 +193,7 @@ def move_hub(
 def _back(hub, copy_name: str, origin, target, roles, now, ours, *, reason: str) -> None:
     """Undo the move of ``hub`` and note why; one that cannot be undone now stays moving, to be undone next time."""
     try:
-        copy_kept = _undo(hub, copy_name, origin, target, roles, ours, now)
+        _undo(hub, copy_name, origin, target, roles, ours, now)
     except (services.ProvisioningStopped, MoveStopped) as stopped:
         logger.info("base.tenancy.move.stopped hub=%s: %s; left to whoever holds it now.", hub.slug, stopped)
         return
@@ -201,7 +201,7 @@ def _back(hub, copy_name: str, origin, target, roles, now, ours, *, reason: str)
         logger.exception("base.tenancy.move.undo_failed hub=%s: it stays moving and is undone next time.", hub.slug)
         control_services.move_stuck(hub.id, f"{reason}{UNDO_FAILED_MARK}{type(undo_error).__name__}: {undo_error})")
         return
-    control_services.move_undone(hub.id, getattr(origin, "pk", None), copy_name, reason, copy_kept=copy_kept)
+    control_services.move_undone(hub.id, getattr(origin, "pk", None), copy_name, reason)
     logger.info("base.tenancy.move.undone hub=%s: %s", hub.slug, reason)
 
 
@@ -537,12 +537,13 @@ def _switch(hub_id, target, origin, copy_name: str, now: dt.datetime) -> None:
         raise MoveStopped(str(taken)) from taken
 
 
-def _undo(hub, copy_name: str, origin, target, roles: bootstrap.Names, ours, now: dt.datetime) -> bool:
-    """Back where it was, the origin first; whether a copy of that name stayed on the origin (an older one: the hub's
-    data never left). Only the worker's note says the data is in the copy: then what has the hub's name on the
-    destination is dropped if it answers (noted as left over if not), and the copy is renamed back, but only where the
-    hub's database is not (one that is there never left). The origin is opened to the app again when its database is
-    there."""
+def _undo(hub, copy_name: str, origin, target, roles: bootstrap.Names, ours, now: dt.datetime) -> None:
+    """Back where it was, the origin first. Only the worker's note says the data is in the copy (an older copy is dropped
+    before the note is written, so a copy there with the note is this move's): then what has the hub's name on the
+    destination is dropped if it answers (noted as left over if not) and the copy renamed back. A database with the
+    hub's name still on the origin's server then is the destination's or a leftover, never the hub's data: the undo
+    fails (``MoveFailed``) and is tried again, and no such database is ever opened to the app as the hub's. Without the
+    note, the data never left: the origin is opened to the app again when its database is there."""
     ours(forward=False)
     noted = control_services.pending_copy(hub.id) is not None
     with ops.connect_ops(cluster=origin) as conn:
@@ -551,18 +552,17 @@ def _undo(hub, copy_name: str, origin, target, roles: bootstrap.Names, ours, now
         if not _drop_destination(hub, target, origin=origin, copy_name=copy_name):
             control_services.leftover_noted(hub.id, target.pk, hub.db_name, now)
         with ops.connect_ops(cluster=origin) as conn:
-            present = _present(conn, hub.db_name, copy_name)
-    copy_kept = False
-    if noted and copy_name in present:
-        if hub.db_name in present:
-            copy_kept = True
-        else:
-            ours(forward=False)
-            _rename_back(origin, copy_name, hub.db_name)
+            if hub.db_name in _present(conn, hub.db_name):
+                raise MoveFailed(
+                    "move_undo_blocked",
+                    f"{hub.db_name} on the origin's server is not the hub's data (that is in {copy_name}): it could not "
+                    "be dropped yet",
+                )
+        ours(forward=False)
+        _rename_back(origin, copy_name, hub.db_name)
     with ops.connect_ops(cluster=origin) as conn:
         if hub.db_name in _present(conn, hub.db_name):
             _open(conn, hub.db_name, roles)
-    return copy_kept
 
 
 def _drop_destination(hub, target, *, origin=None, copy_name: str = "") -> bool:
