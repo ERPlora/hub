@@ -558,48 +558,30 @@ def test_the_move_is_an_internal_command_of_control():
 
 
 class TestCancelAMove:
-    """``control.hub.move_cancel`` asks the worker to undo a move, started or not (review of W8, round 2): its note is
-    marked to be undone, made if the move had not started, with the origin's schema record; the worker puts the hub back
-    on its origin on its next pass (``base.tenancy.move``), the only one that may reopen it."""
+    """``control.hub.move_cancel`` asks the worker to undo a move, started or not (reviews of W8, rounds 2 and 3): the hub
+    is marked (``move_undo_asked_at``); no note of a copy is made nor taken, so an older copy of the same hub is never
+    taken for its data. The worker puts the hub back on its origin on its next pass (``base.tenancy.move``)."""
 
-    def test_a_move_not_started_yet_is_marked_to_be_undone_with_the_origins_record(self, admin_ctx):
+    def test_a_move_is_marked_to_be_undone_and_no_copy_is_touched(self, admin_ctx):
         from control.models import MovedCopy
         from control.schemas import HubIdIn
 
         old, new = a_cluster(), a_cluster(name="cluster-2", host="writer-2.example")
         hub = Hub.objects.create(
-            slug="acme",
-            status=Hub.Status.READY,
-            db_name=f"hub_{uuid.uuid7().hex}",
-            cluster=old,
-            moving_to=new,
-            schema_state="behind",
-            schema_apps={"base": "0001_initial"},
+            slug="acme", status=Hub.Status.READY, db_name=f"hub_{uuid.uuid7().hex}", cluster=old, moving_to=new
         )
+        # An older copy of this hub on its cluster, from a move off it two days ago.
+        MovedCopy.objects.create(hub=hub, cluster=old, db_name=f"hub_move_{hub.id.hex}", moved_at="2026-10-29T10:00Z")
 
         out = services.hub_move_cancel(admin_ctx, HubIdIn(id=hub.pk))
 
-        [note] = MovedCopy.objects.filter(hub=hub)
-        assert (note.cluster_id, note.moved_at, note.undoing) == (old.pk, None, True)
-        assert (note.schema_state, note.schema_apps) == ("behind", {"base": "0001_initial"})
-        assert note.db_name.endswith(f"_move_{hub.id.hex}")
         hub.refresh_from_db()
-        assert hub.moving_to_id == new.pk and hub.last_error.startswith("move_cancelled")
+        assert hub.move_undo_asked_at is not None and hub.moving_to_id == new.pk
+        assert hub.last_error.startswith("move_cancelled")
+        [kept] = MovedCopy.objects.filter(hub=hub)
+        assert kept.moved_at is not None
         assert (out.id, out.moving_to) == (hub.pk, new.pk)
         assert events("control.hub.move_cancel_requested") == [{"id": str(hub.pk), "slug": "acme"}]
-
-    def test_a_move_in_course_keeps_its_note_marked_to_be_undone(self, admin_ctx):
-        from control.models import MovedCopy
-        from control.schemas import HubIdIn
-
-        new = a_cluster()
-        hub = Hub.objects.create(slug="acme", status=Hub.Status.READY, db_name=f"hub_{uuid.uuid7().hex}", moving_to=new)
-        MovedCopy.objects.create(hub=hub, db_name=f"hub_move_{hub.id.hex}", schema_state="current", schema_apps={})
-
-        services.hub_move_cancel(admin_ctx, HubIdIn(id=hub.pk))
-
-        [note] = MovedCopy.objects.filter(hub=hub)
-        assert (note.undoing, note.schema_state, note.db_name) == (True, "current", f"hub_move_{hub.id.hex}")
 
     def test_a_hub_that_is_not_moving_is_refused_and_support_may_not(self, admin_ctx):
         from control.schemas import HubIdIn

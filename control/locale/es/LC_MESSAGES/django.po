@@ -440,8 +440,8 @@ msgstr[2] ""
 "Se desharán %(count)d traslados: cada hub vuelve a su clúster en menos de un "
 "minuto."
 
-msgid "being undone"
-msgstr "deshaciéndose"
+msgid "move undo asked"
+msgstr "deshacer el traslado pedido"
 
 msgid "noted at"
 msgstr "anotada el"

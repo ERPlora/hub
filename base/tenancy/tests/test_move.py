@@ -416,7 +416,7 @@ class TestResuming:
         assert stuck.moving_to_id == target.pk and "move_undo_failed" in stuck.last_error
         assert marker(copy) == [MARKER]
         [pending] = MovedCopy.objects.filter(hub=hub)
-        assert (pending.moved_at, pending.undoing) == (None, True)
+        assert pending.moved_at is None and stuck.move_undo_asked_at is not None
 
         run()
 
@@ -608,7 +608,7 @@ class TestTwoWorkers:
         def cancelled_meanwhile(source, cluster, path, heartbeat, cancelled=None):
             real(source, cluster, path, heartbeat, cancelled)
             with use_control():
-                MovedCopy.objects.filter(hub=hub).update(undoing=True)
+                Hub.objects.filter(pk=hub.pk).update(move_undo_asked_at=AT)
 
         with monkeypatch.context() as patched:
             patched.setattr(move, "_dump", cancelled_meanwhile)
@@ -763,7 +763,7 @@ class TestTheOriginFirst:
             run()
         assert fresh(hub).moving_to_id == target.pk
         with use_control():
-            MovedCopy.objects.filter(hub=hub).update(undoing=True)
+            Hub.objects.filter(pk=hub.pk).update(move_undo_asked_at=AT)
 
         run()
 
@@ -771,3 +771,203 @@ class TestTheOriginFirst:
         assert (hub.cluster_id, hub.moving_to_id) == (None, None)
         assert hub.last_error.startswith("move_cancelled")
         assert marker(hub.db_name) == [MARKER] and not MovedCopy.objects.filter(hub=hub).exists()
+
+
+
+# ── Review of round 3: a cancel never takes an older copy for the hub's data; the minor points ───────────────────────
+
+
+def an_older_copy(moves, hub, *, note: str = "old copy, two days old") -> str:
+    """The copy this hub left on the settings' own server when it moved off it two days ago (kept 7 days)."""
+    control = tenancy_connections.control_name()
+    copy = names.moved_db_name(control, hub.id)
+    with hubs._maintenance() as conn:
+        conn.execute(
+            sql.SQL("CREATE DATABASE {} TEMPLATE {}").format(
+                names.identifier(copy, control=control), names.identifier(moves.template, control=control)
+            )
+        )
+    with hubs._maintenance(copy) as conn:
+        conn.execute("CREATE TABLE w8a_marker (note text)")
+        conn.execute("INSERT INTO w8a_marker VALUES (%s)", [note])
+    with use_control():
+        MovedCopy.objects.create(hub=hub, cluster=None, db_name=copy, moved_at=AT - dt.timedelta(days=2))
+    return copy
+
+
+def cancel(hub) -> None:
+    from live.context import system_context
+
+    from base.registry import REGISTRY_SCOPE
+    from control.schemas import HubIdIn
+
+    with use_control():
+        move.control_services.hub_move_cancel(system_context(REGISTRY_SCOPE), HubIdIn(id=hub.pk))
+
+
+class TestACancelBeforeTheWorkerStarted:
+    def test_an_older_copy_on_the_origin_is_never_taken_for_the_hubs_data(self, moves):
+        hub = moves.hub(to=moves.cluster())
+        copy = an_older_copy(moves, hub)
+
+        cancel(hub)
+        run()
+
+        hub = fresh(hub)
+        assert (hub.cluster_id, hub.moving_to_id, hub.move_undo_asked_at) == (None, None, None)
+        assert hub.last_error.startswith("move_cancelled")
+        assert marker(hub.db_name) == [MARKER]
+        # The older copy stays as it was, for its own days.
+        assert marker(copy) == ["old copy, two days old"]
+        assert MovedCopy.objects.get(hub=hub).moved_at == AT - dt.timedelta(days=2)
+
+    def test_with_its_destination_on_another_server_it_never_stays_moving(self, moves):
+        hub = moves.hub(to=moves.cluster("away", port=1))
+        an_older_copy(moves, hub)
+
+        cancel(hub)
+        run()
+
+        hub = fresh(hub)
+        assert (hub.moving_to_id, hub.move_undo_asked_at) == (None, None)
+        assert marker(hub.db_name) == [MARKER]
+
+    def test_without_an_older_copy_the_hub_is_back_at_once(self, moves):
+        hub = moves.hub(to=moves.cluster())
+
+        cancel(hub)
+        run()
+
+        hub = fresh(hub)
+        assert (hub.moving_to_id, hub.move_undo_asked_at) == (None, None)
+        assert marker(hub.db_name) == [MARKER] and not MovedCopy.objects.filter(hub=hub).exists()
+
+
+class TestTheUndoRenamesBackOnlyWhatLeft:
+    def test_a_hub_whose_database_never_left_its_origin_is_only_reopened_and_the_copy_kept_for_its_days(
+        self, moves
+    ):
+        # A note of a move in course and a copy on the origin, but the hub's database is there too (its data never
+        # left): nothing is renamed over it; the copy is kept, dated, for the reaper.
+        target = moves.cluster("away", port=1)
+        hub = moves.hub(to=target)
+        control = tenancy_connections.control_name()
+        copy = names.moved_db_name(control, hub.id)
+        with hubs._maintenance() as conn:
+            conn.execute(
+                sql.SQL("CREATE DATABASE {} TEMPLATE {}").format(
+                    names.identifier(copy, control=control), names.identifier(moves.template, control=control)
+                )
+            )
+        with use_control():
+            MovedCopy.objects.create(hub=hub, cluster=None, db_name=copy, moved_at=None)
+            Hub.objects.filter(pk=hub.pk).update(move_undo_asked_at=AT, last_error="move_cancelled: by hand")
+
+        run()
+
+        hub = fresh(hub)
+        assert hub.moving_to_id is None and marker(hub.db_name) == [MARKER]
+        assert copy in databases() and MovedCopy.objects.get(hub=hub).moved_at is not None
+
+    def test_the_destination_control_says_is_a_hubs_is_never_dropped_on_an_undo(self, moves):
+        target = moves.cluster()
+        hub = moves.hub(to=target)
+        other = moves.hub(to=None, cluster=target)
+        Hub.objects.filter(pk=other.pk).update(db_name=hub.db_name)
+
+        with pytest.raises(move.MoveStopped):
+            move._drop_destination(fresh(hub), target)
+
+        assert marker(hub.db_name) == [MARKER]
+
+
+    def test_on_the_origins_own_server_the_destination_is_never_dropped_without_the_copy_there(self, moves):
+        # The destination's row points at the origin's server: what has the hub's name there is the live database
+        # unless the data is in the copy, which is not there.
+        target = moves.cluster()
+        hub = moves.hub(to=target)
+        copy = names.moved_db_name(tenancy_connections.control_name(), hub.id)
+
+        with pytest.raises(move.MoveStopped):
+            move._drop_destination(fresh(hub), target, origin=None, copy_name=copy)
+
+        assert marker(hub.db_name) == [MARKER]
+
+
+class TestTheMinorPoints:
+    def test_the_switch_locks_the_lease_it_checks(self, moves):
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+
+        target = moves.cluster()
+        hub = moves.hub(to=target)
+        with use_control():
+            move.services.claim_hub(hub.id, AT, move.LEASE)
+            with CaptureQueriesContext(connection) as queries:
+                move.control_services.move_finished(
+                    hub.id, target.pk, None, f"x_move_{hub.id.hex}", AT, owner=move.services.LEASE_OWNER
+                )
+
+        leases = [q["sql"] for q in queries.captured_queries if '"control_hubdue"' in q["sql"]]
+        assert leases and all("FOR UPDATE" in sql for sql in leases)
+
+    def test_a_leftover_is_claimed_on_the_clock_and_checked_again_under_the_lease(self, moves, monkeypatch):
+        elsewhere = moves.cluster("elsewhere", port=1)
+        target = moves.cluster()
+        hub = moves.hub(to=None, cluster=elsewhere)
+        with use_control():
+            LeftoverDatabase.objects.create(hub=hub, cluster=target, db_name=hub.db_name, noted_at=AT)
+        claimed: list[dt.datetime] = []
+        real = move.services.claim_hub
+
+        def claim(hub_id, now, lease, **kwargs):
+            claimed.append(now)
+            # Meanwhile the hub moved to that cluster: its database there is live now.
+            Hub.objects.filter(pk=hub_id).update(cluster=target)
+            return real(hub_id, now, lease, **kwargs)
+
+        monkeypatch.setattr(move.services, "claim_hub", claim)
+
+        run()
+
+        assert marker(hub.db_name) == [MARKER]
+        assert not LeftoverDatabase.objects.filter(hub=hub).exists()
+        [at] = claimed
+        assert at > AT
+
+    def test_the_same_server_is_known_by_its_address_not_by_how_it_is_written(self, moves):
+        target = moves.cluster("spelled", host="localhost")
+        hub = moves.hub(to=None)  # on the settings' own server, 127.0.0.1
+        with use_control():
+            LeftoverDatabase.objects.create(hub=hub, cluster=target, db_name=hub.db_name, noted_at=AT)
+
+        with use_control():
+            move.drop_leftovers(AT)
+
+        assert marker(hub.db_name) == [MARKER]
+        assert move._same_server(None, target)
+
+    def test_a_cancel_is_heard_while_the_copy_is_restored(self, moves, monkeypatch, caplog):
+        target = moves.cluster()
+        hub = moves.hub(to=target)
+        monkeypatch.setattr(move.dumps, "POLL_SECONDS", 0.0)
+        real = move._kept_entries
+
+        def asked_meanwhile(listing):
+            Hub.objects.filter(pk=hub.pk).update(move_undo_asked_at=AT)
+            return real(listing)
+
+        monkeypatch.setattr(move, "_kept_entries", asked_meanwhile)
+
+        run()
+
+        # The restore was stopped (its one transaction undone): the destination never got the hub's tables.
+        assert fresh(hub).moving_to_id == target.pk
+        assert "w8a_marker" not in hubs.table_names(hub.db_name)
+        assert "base.tenancy.move.stopped" in caplog.text
+        monkeypatch.undo()
+
+        run()
+
+        hub = fresh(hub)
+        assert hub.moving_to_id is None and marker(hub.db_name) == [MARKER]

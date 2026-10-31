@@ -495,7 +495,8 @@ class TestCancelTheMove:
 
         assert "1 move will be undone: the hub goes back to its cluster" in html
         assert "bistro: this hub is not moving." in html
-        assert MovedCopy.objects.get(hub=moving).undoing is True
+        assert Hub.objects.get(pk=moving.pk).move_undo_asked_at is not None
+        assert not MovedCopy.objects.exists()
 
     def test_support_neither_sees_it_nor_runs_it(self, client, support):
         target = a_cluster(name="cluster-2", host="writer-2.example")
@@ -504,9 +505,7 @@ class TestCancelTheMove:
         assert "cancel_the_move" not in page(client, HUBS)
         client.post(HUBS, {"action": "cancel_the_move", "_selected_action": [str(moving.pk)]}, HTTP_HOST=PLATFORM)
 
-        from control.models import MovedCopy
-
-        assert not MovedCopy.objects.exists()
+        assert Hub.objects.get(pk=moving.pk).move_undo_asked_at is None
 
 
 def test_the_move_speaks_spanish():

@@ -337,7 +337,9 @@ def test_a_leftover_of_an_undone_move_is_one_per_database_and_server_and_goes_wi
     assert not LeftoverDatabase.objects.exists()
 
 
-def test_a_moves_note_keeps_the_origins_schema_record_and_whether_it_is_being_undone():
+def test_a_moves_note_keeps_the_origins_schema_record_and_a_hub_says_when_its_move_was_asked_to_be_undone():
+    from django.utils import translation
+
     from control.models import MovedCopy
 
     hub = Hub.objects.create(slug="acme", status=Hub.Status.READY)
@@ -345,9 +347,8 @@ def test_a_moves_note_keeps_the_origins_schema_record_and_whether_it_is_being_un
         hub=hub, db_name=f"hub_move_{hub.id.hex}", schema_state="behind", schema_apps={"base": "0001_initial"}
     )
     note.refresh_from_db()
-    assert (note.moved_at, note.undoing, note.schema_state, note.schema_apps) == (
-        None,
-        False,
-        "behind",
-        {"base": "0001_initial"},
-    )
+    hub.refresh_from_db()
+    assert (note.moved_at, note.schema_state, note.schema_apps) == (None, "behind", {"base": "0001_initial"})
+    assert hub.move_undo_asked_at is None
+    with translation.override("es"):
+        assert str(Hub._meta.get_field("move_undo_asked_at").verbose_name) == "deshacer el traslado pedido"

@@ -51,6 +51,7 @@ import copy as copying
 import datetime as dt
 import logging
 import os
+import socket
 import subprocess
 import tempfile
 import time
@@ -157,8 +158,7 @@ def move_hub(
 
     back = {"hub": hub, "copy_name": copy_name, "origin": origin, "target": target, "roles": roles, "now": now}
     try:
-        note = control_services.pending_copy(hub.id)
-        if note is not None and note.undoing:
+        if hub.move_undo_asked_at is not None:
             reason = hub.last_error.split(UNDO_FAILED_MARK)[0] or "move_cancelled: the move was asked to be undone"
             _back(**back, ours=ours, reason=reason)
             return
@@ -166,9 +166,10 @@ def move_hub(
             _close_and_rename(hub, copy_name, origin, roles, ours)
             with tempfile.TemporaryDirectory(prefix="hub-move-") as folder:
                 path = Path(folder) / "move.dump"
-                _dump(copy_name, origin, path, heartbeat, cancelled)
+                # Their heartbeat checks the move is still this worker's: a cancel or a lease lost stops them.
+                _dump(copy_name, origin, path, ours, cancelled)
                 _make_destination(hub, target, roles, ours)
-                _restore(path, hub.db_name, target, heartbeat, cancelled)
+                _restore(path, hub.db_name, target, ours, cancelled)
             heartbeat()
             _verify_identity(hub.db_name, target, hub.id)
             _ensure_schema(hub, target, heartbeat)
@@ -192,7 +193,7 @@ def move_hub(
 def _back(hub, copy_name: str, origin, target, roles, now, ours, *, reason: str) -> None:
     """Undo the move of ``hub`` and note why; one that cannot be undone now stays moving, to be undone next time."""
     try:
-        _undo(hub, copy_name, origin, target, roles, ours, now)
+        copy_kept = _undo(hub, copy_name, origin, target, roles, ours, now)
     except (services.ProvisioningStopped, MoveStopped) as stopped:
         logger.info("base.tenancy.move.stopped hub=%s: %s; left to whoever holds it now.", hub.slug, stopped)
         return
@@ -200,7 +201,7 @@ def _back(hub, copy_name: str, origin, target, roles, now, ours, *, reason: str)
         logger.exception("base.tenancy.move.undo_failed hub=%s: it stays moving and is undone next time.", hub.slug)
         control_services.move_stuck(hub.id, f"{reason}{UNDO_FAILED_MARK}{type(undo_error).__name__}: {undo_error})")
         return
-    control_services.move_undone(hub.id, getattr(origin, "pk", None), copy_name, reason)
+    control_services.move_undone(hub.id, getattr(origin, "pk", None), copy_name, reason, copy_kept=copy_kept)
     logger.info("base.tenancy.move.undone hub=%s: %s", hub.slug, reason)
 
 
@@ -224,16 +225,20 @@ def drop_leftovers(now: dt.datetime) -> int:
     """Drop what undone moves may have left on their destinations, with their notes; how many. Never one control says is
     a hub's database there (on that cluster, or of a hub moving to it, whose move drops it before it clones) nor one on
     the hub's own server (a row of another cluster pointing at it): its note is forgotten then. Each under the hub's
-    lease; one that cannot be dropped now stays, and the next pass tries again."""
+    lease, taken on the clock and checked again under it; one that cannot be dropped now stays, and the next pass tries
+    again."""
     dropped = 0
     for left in control_services.leftovers():
-        hub = left.hub
-        if control_services.attributed(left.cluster_id, left.db_name) or _same_server(hub.cluster, left.cluster):
+        if not _leftover_droppable(left.hub, left):
             control_services.forget_leftover(left.cluster_id, left.db_name)
             continue
-        if services.claim_hub(hub.id, now, LEASE) is None:
+        if services.claim_hub(left.hub_id, timezone.now(), LEASE) is None:
             continue
         try:
+            hub = control_services.moving_row(left.hub_id)
+            if hub is None or not _leftover_droppable(hub, left):
+                control_services.forget_leftover(left.cluster_id, left.db_name)
+                continue
             ops.drop_database(left.db_name, cluster=left.cluster)
             control_services.forget_leftover(left.cluster_id, left.db_name)
             dropped += 1
@@ -241,20 +246,34 @@ def drop_leftovers(now: dt.datetime) -> int:
         except Exception:
             logger.exception("base.tenancy.move.leftover_kept database=%s: it could not be dropped; tried again.", left.db_name)
         finally:
-            services.release_hub(hub.id, timezone.now())
+            services.release_hub(left.hub_id, timezone.now())
     return dropped
 
 
-def _server(cluster) -> tuple[str, int]:
-    """The writer a cluster's row points at (``None``: the settings' own server)."""
+def _leftover_droppable(hub, left) -> bool:
+    return not (
+        control_services.attributed(left.cluster_id, left.db_name) or _same_server(hub.cluster, left.cluster)
+    )
+
+
+def _server(cluster) -> tuple[frozenset[str], int]:
+    """Who a cluster's row points at (``None``: the settings' own server): the addresses its writer's name resolves to,
+    and its port. Two rows that spell one server differently (a name and its address, ``localhost``) are one server."""
     if cluster is None:
         default = settings.DATABASES["default"]
-        return str(default["HOST"]), int(default["PORT"])
-    return str(cluster.host), int(cluster.port)
+        host, port = str(default["HOST"]), int(default["PORT"])
+    else:
+        host, port = str(cluster.host), int(cluster.port)
+    try:
+        addresses = frozenset(found[4][0] for found in socket.getaddrinfo(host, port, type=socket.SOCK_STREAM))
+    except OSError:
+        addresses = frozenset({host.lower()})
+    return addresses, port
 
 
 def _same_server(one, other) -> bool:
-    return _server(one) == _server(other)
+    (one_addresses, one_port), (other_addresses, other_port) = _server(one), _server(other)
+    return one_port == other_port and bool(one_addresses & other_addresses)
 
 
 # ── The steps ────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -518,30 +537,45 @@ def _switch(hub_id, target, origin, copy_name: str, now: dt.datetime) -> None:
         raise MoveStopped(str(taken)) from taken
 
 
-def _undo(hub, copy_name: str, origin, target, roles: bootstrap.Names, ours, now: dt.datetime) -> None:
-    """Back where it was, the origin first: when the data is in the copy (control's note, and the copy there), the
-    destination's database dropped if it answers (noted as left over if not) and the copy renamed back; the origin
-    opened to the app again when its database is there."""
+def _undo(hub, copy_name: str, origin, target, roles: bootstrap.Names, ours, now: dt.datetime) -> bool:
+    """Back where it was, the origin first; whether a copy of that name stayed on the origin (an older one: the hub's
+    data never left). Only the worker's note says the data is in the copy: then what has the hub's name on the
+    destination is dropped if it answers (noted as left over if not), and the copy is renamed back, but only where the
+    hub's database is not (one that is there never left). The origin is opened to the app again when its database is
+    there."""
     ours(forward=False)
-    if control_services.pending_copy(hub.id) is not None:
+    noted = control_services.pending_copy(hub.id) is not None
+    with ops.connect_ops(cluster=origin) as conn:
+        present = _present(conn, hub.db_name, copy_name)
+    if noted and copy_name in present:
+        if not _drop_destination(hub, target, origin=origin, copy_name=copy_name):
+            control_services.leftover_noted(hub.id, target.pk, hub.db_name, now)
         with ops.connect_ops(cluster=origin) as conn:
-            renamed = copy_name in _present(conn, copy_name)
-        if renamed:
-            if not _drop_destination(hub, target):
-                control_services.leftover_noted(hub.id, target.pk, hub.db_name, now)
+            present = _present(conn, hub.db_name, copy_name)
+    copy_kept = False
+    if noted and copy_name in present:
+        if hub.db_name in present:
+            copy_kept = True
+        else:
             ours(forward=False)
             _rename_back(origin, copy_name, hub.db_name)
     with ops.connect_ops(cluster=origin) as conn:
         if hub.db_name in _present(conn, hub.db_name):
             _open(conn, hub.db_name, roles)
+    return copy_kept
 
 
-def _drop_destination(hub, target) -> bool:
-    """Drop what the move made of ``hub``'s database on ``target`` (never one control says is a hub's there); whether
-    it is gone (``False``: the destination did not answer)."""
+def _drop_destination(hub, target, *, origin=None, copy_name: str = "") -> bool:
+    """Drop what the move made of ``hub``'s database on ``target`` (never one control says is a hub's there, nor, on the
+    origin's own server, while the copy that holds the data is not there); whether it is gone (``False``: the
+    destination did not answer)."""
     if control_services.attributed(target.pk, hub.db_name, besides=hub.id):
         raise MoveStopped(f"control says {hub.db_name} on {target.name} is a hub's database: it is never dropped.")
     try:
+        if _same_server(origin, target):
+            with ops.connect_ops(cluster=target) as conn:
+                if copy_name not in _present(conn, copy_name):
+                    raise MoveStopped(f"{hub.db_name} on {target.name} is the origin's server and its copy is not there.")
         ops.drop_database(hub.db_name, cluster=target)
     except ops.DatabaseOpsError as unreachable:
         logger.warning("base.tenancy.move.destination_unreachable hub=%s: %s; noted to drop later.", hub.slug, unreachable)

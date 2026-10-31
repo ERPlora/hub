@@ -176,6 +176,9 @@ class Hub(models.Model):
         related_name="incoming",
         verbose_name=_("moving to"),
     )
+    # Its move is to be undone (``control.hub.move_cancel``, or an undo that could not finish): the worker puts it back
+    # on its origin on its next pass, never taking it forward.
+    move_undo_asked_at = models.DateTimeField(_("move undo asked"), null=True, blank=True)
 
     class Meta:
         db_table = "base_hub"
@@ -379,11 +382,10 @@ class MovedCopy(UUIDModel):
     db_name = models.CharField(_("database"), max_length=63)
     moved_at = models.DateTimeField(_("moved at"), null=True, blank=True)
     # While the move goes on: the origin's schema record as control had it (the destination's is written when it is
-    # migrated, ``migrator.ensure_schema``), given back if the move is undone; and whether it is to be undone (a
-    # cancel, or an undo that could not finish: tried again as an undo, never taken forward).
+    # migrated, ``migrator.ensure_schema``), given back if the move is undone. Only the worker writes a note, right
+    # before it renames: a note is always the truth of where the data is (a cancel never makes nor takes one).
     schema_state = models.CharField(_("schema"), max_length=16, blank=True, default="", db_default="")
     schema_apps = models.JSONField(_("created apps"), null=True, blank=True)
-    undoing = models.BooleanField(_("being undone"), default=False, db_default=False)
 
     class Meta:
         verbose_name = _("copy after a move")
