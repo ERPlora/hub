@@ -247,7 +247,7 @@ def show_statement_timeout(alias: str) -> str:
         return cursor.fetchone()[0]
 
 
-def test_a_hubs_alias_runs_on_the_limited_backend_and_its_migrators_and_controls_do_not():
+def test_a_hubs_alias_runs_on_the_limited_backend_and_its_migrators_and_controls_do_not(hub_databases):
     from base.tenancy.backend.base import DatabaseWrapper
 
     assert connections.settings[hubs.HUB_A_ALIAS]["ENGINE"] == limits.ENGINE

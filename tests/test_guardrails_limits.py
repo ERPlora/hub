@@ -219,6 +219,30 @@ def test_the_live_executor_waits_for_its_hubs_place_too(hub_a, short_wait, monke
 
 
 @HUB_DB_COMMITTED
+def test_a_live_stream_of_many_lists_on_a_busy_hub_waits_once_per_try_not_once_per_list(hub_a, short_wait, monkeypatch):
+    """Five lists of a busy Free hub: the pass waits as long as one list would (the client's watchdog is 45 s; with the
+    real waits, 4 × 2 s + 3 × 1 s ≈ 11 s, not 11 s per list), then every list gets the busy error."""
+    monkeypatch.setattr(limits.HubBusy, "retry_after", 0.05)
+    stream = a_stream_of_items(hub_a)
+    op = get_operation("demo.item.list")
+    for index in range(2, 6):
+        stream.subs[f"s{index}"] = Subscription(id=f"s{index}", op=op, params=op.input.model_validate({}))
+
+    with held_open(hub_a):
+        started = time.monotonic()
+        first = run_stream_once(stream)
+        elapsed = time.monotonic() - started
+    rest = []
+    while not stream.queue.empty():
+        rest.append(json.loads(stream.queue.get_nowait().decode().split("data: ", 1)[1]))
+
+    assert elapsed < 4 * short_wait + 3 * 0.05 + 1
+    assert [(frame["id"], frame["error"]["code"]) for frame in [first, *rest]] == [
+        (f"s{index}", "base.hub_busy") for index in range(1, 6)
+    ]
+
+
+@HUB_DB_COMMITTED
 def test_a_live_list_of_a_hub_busy_for_a_moment_gets_its_result_not_an_error(hub_a, short_wait):
     assert limits.HubBusy("Busy.").retry_after == limits.RETRY_AFTER_SECONDS
     stream = a_stream_of_items(hub_a)
