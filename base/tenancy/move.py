@@ -1,0 +1,461 @@
+"""A hub's database moved to another cluster (round 2026-10-30b of PLAN-DB, decision 3; tranche S7, part 1).
+
+The Hub admin asks (``control.hub.move``: ``Hub.moving_to``; its host answers 503 «maintenance» from then on,
+``base.registry``); the worker moves it here (:func:`run_due`, in its own thread), one hub at a time, under the hub's
+lease (``hub_due``, provisioning's: :data:`LEASE`, renewed while it copies). Only a database small enough for a copy
+gets here (``control.services.MOVE_MAX_BYTES``); a larger one needs logical replication, which the Hub does not do yet.
+
+1. **Closed.** On the origin (its cluster, or the settings' own server), ``CONNECT`` and ``TEMPORARY`` are taken from
+   the environment's ``hub_app`` and ``hub_admin`` (``base.tenancy.ops.environment_roles``) and every other session on
+   it is ended: nothing writes in it from here on (in AWS, PgBouncer's server connections are ended too and cannot come
+   back).
+2. **Renamed** ``<control>_move_<hex>`` (``base.tenancy.names``): the copy it leaves behind, noted in control first
+   (``MovedCopy`` without ``moved_at``: the hub's data is in it while the move goes on). An older copy of the same hub
+   on that server (an earlier move off it) gives way first. Renaming before the destination is made frees the name on
+   the origin's server, so a move between two clusters of one server works as any other (the tests' too): where the
+   data is comes from control's note, never from which names a server holds.
+3. **Copied**: ``pg_dump`` of the copy (``base.tenancy.dumps``' own run: the migrator's direct connection), and on the
+   destination a new database cloned from that cluster's template of the hub's vertical
+   (``ops.clone_database``: private, open to the app's roles), emptied of the template's tables and filled with
+   ``pg_restore`` in one transaction. The template's extensions stay: the restore leaves them out (on Aurora only the
+   master makes ``vector``).
+4. **Checked**: its identity (``base_hub_identity``) says it is this hub, and its schema is brought to the code's leaf
+   (``migrator.ensure_schema``).
+5. **Switched**: control moves the hub to the destination and keeps the copy's row (``MovedCopy``) in one transaction.
+   From then on every process reaches it there: a request, a live re-run and the worker read the row again and
+   register the hub's alias anew when its server changed (``base.tenancy.connections``).
+
+Any failure before the switch puts everything back, nothing lost: the destination's database dropped (never the live
+one: by then the data is in the copy on the origin), the copy renamed back and opened to the app again, the hub ready
+where it was with the reason in ``last_error`` (``move_<step>: <why>``). An undo that fails leaves the hub moving and
+says why; the next pass goes on from wherever it stopped (a copy already renamed is copied from). A lease that went to
+another worker, or a worker that is stopping, leaves everything as it is for the next one to go on.
+
+The copies are dropped after :data:`MOVED_COPY_DAYS` (:func:`drop_old_copies`, in the same pass), with their rows;
+one that cannot be dropped now is tried again on the next pass.
+
+Every name is validated by ``base.tenancy.names`` and reaches SQL as ``sql.Identifier``; control is written through
+``control.services`` only (its doors to the ORM).
+"""
+
+import copy as copying
+import datetime as dt
+import logging
+import os
+import subprocess
+import tempfile
+import time
+from collections.abc import Callable
+from pathlib import Path
+from types import SimpleNamespace
+
+import psycopg
+from django.utils import timezone
+from psycopg import errors, sql
+from psycopg.conninfo import make_conninfo
+
+from base import services
+from base.tenancy import bootstrap, dumps, migrator, names, ops, provision
+from base.tenancy import connections as tenancy_connections
+from control import services as control_services
+
+logger = logging.getLogger(__name__)
+
+#: The worker's lease of a moving hub: provisioning's, renewed while it copies.
+LEASE = provision.LEASE
+#: How long the copy a hub leaves behind is kept before it is dropped.
+MOVED_COPY_DAYS = 7
+#: How long the restore may run before it is stopped (the dump has its own, ``dumps.DUMP_TIMEOUT_SECONDS``).
+RESTORE_TIMEOUT_SECONDS = dumps.DUMP_TIMEOUT_SECONDS
+#: How many times the rename waits for a session that came back to the origin before it gives up.
+RENAME_WAITS = (0.5, 1.0)
+#: The entries of a dump the restore leaves out: the destination's template has its extensions already, and the public
+#: schema is the database's own (dropping it would take the extensions' objects with it).
+SKIPPED_ENTRIES = (" EXTENSION ", " COMMENT - EXTENSION ", " SCHEMA - public ", " COMMENT - SCHEMA public ")
+#: The lines of ``pg_restore``'s own complaint kept in a failure.
+ERROR_LINES = 3
+
+
+class MoveFailed(RuntimeError):
+    """A step of a move that failed: its code (``move_<step>``) and why, in a line."""
+
+    def __init__(self, code: str, reason: object) -> None:
+        super().__init__(f"{code}: {reason}")
+        self.code = code
+
+
+class MoveStopped(RuntimeError):
+    """The worker is stopping: the move is left as it is for the next one to go on."""
+
+
+def run_due(
+    now: dt.datetime | None = None,
+    *,
+    roles: bootstrap.Names | None = None,
+    cancelled: Callable[[], bool] | None = None,
+) -> int:
+    """The worker's pass: move the hub asked longest ago whose lease nobody else holds (one a pass: a copy takes a
+    while), then drop the copies past their days; how many hubs it worked on. ``roles``: the app's roles the origin is
+    closed to (default the environment's); ``cancelled``: whether the worker is stopping."""
+    now = now or timezone.now()
+    worked = 0
+    for hub_id in control_services.hubs_moving():
+        if services.claim_hub(hub_id, now, LEASE) is None:
+            continue
+        try:
+            move_hub(hub_id, now=now, roles=roles, cancelled=cancelled)
+            worked = 1
+        finally:
+            services.release_hub(hub_id, timezone.now())
+        break
+    drop_old_copies(now)
+    return worked
+
+
+def move_hub(
+    hub_id,
+    *,
+    now: dt.datetime | None = None,
+    roles: bootstrap.Names | None = None,
+    cancelled: Callable[[], bool] | None = None,
+) -> None:
+    """Move ``hub_id`` to the cluster it is moving to, its lease held (see the module); a failure is undone and noted on
+    it, never raised."""
+    now = now or timezone.now()
+    hub = control_services.moving_row(hub_id)
+    if hub is None or hub.moving_to is None:
+        return
+    control = tenancy_connections.control_name()
+    copy_name = names.moved_db_name(control, hub.id)
+    roles = ops.environment_roles(control) if roles is None else roles
+    origin, target = hub.cluster, hub.moving_to
+
+    def heartbeat() -> None:
+        services.renew_lease(hub.id, LEASE)
+
+    try:
+        _close_and_rename(hub, copy_name, origin, roles)
+        heartbeat()
+        with tempfile.TemporaryDirectory(prefix="hub-move-") as folder:
+            path = Path(folder) / "move.dump"
+            _dump(copy_name, origin, path, heartbeat, cancelled)
+            heartbeat()
+            _make_destination(hub, target, roles)
+            _restore(path, hub.db_name, target, heartbeat, cancelled)
+        heartbeat()
+        _verify_identity(hub.db_name, target, hub.id)
+        _ensure_schema(hub, target)
+        _switch(hub.id, origin, copy_name, now)
+    except services.ProvisioningStopped as stopped:
+        logger.warning("base.tenancy.move.lease_lost hub=%s: %s; left to its holder.", hub.slug, stopped)
+        return
+    except (MoveStopped, dumps.DumpStopped) as stopped:
+        logger.info("base.tenancy.move.stopped hub=%s: %s; the next worker goes on.", hub.slug, stopped)
+        return
+    except Exception as error:
+        code = error.code if isinstance(error, MoveFailed) else "move_unexpected"
+        reason = error if isinstance(error, MoveFailed) else f"{code}: {type(error).__name__}: {error}"
+        logger.warning("base.tenancy.move.failed hub=%s: %s", hub.slug, reason)
+        try:
+            _undo(hub, copy_name, origin, target, roles)
+        except Exception as undo_error:
+            logger.exception("base.tenancy.move.undo_failed hub=%s: it stays moving and is tried again.", hub.slug)
+            control_services.move_stuck(
+                hub.id, f"{reason} (move_undo_failed: {type(undo_error).__name__}: {undo_error})"
+            )
+            return
+        control_services.move_failed(hub.id, str(reason))
+        return
+    finally:
+        _close_this_processs(hub)
+    logger.info(
+        "base.tenancy.move.moved hub=%s database=%s to=%s copy=%s", hub.slug, hub.db_name, target.name, copy_name
+    )
+
+
+def drop_old_copies(now: dt.datetime) -> int:
+    """Drop the copies left behind more than :data:`MOVED_COPY_DAYS` before ``now``, with their rows; how many. One that
+    cannot be dropped now stays, and the next pass tries again."""
+    dropped = 0
+    for kept in control_services.copies_due(now - dt.timedelta(days=MOVED_COPY_DAYS)):
+        try:
+            _drop_copy(kept.db_name, kept.cluster)
+            control_services.forget_copy(kept.cluster_id, kept.db_name)
+        except Exception:
+            logger.exception("base.tenancy.move.copy_kept copy=%s: it could not be dropped; tried again.", kept.db_name)
+            continue
+        dropped += 1
+        logger.info("base.tenancy.move.copy_dropped copy=%s", kept.db_name)
+    return dropped
+
+
+# ── The steps ────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+def _identifier(name: str) -> sql.Identifier:
+    return names.identifier(name, control=tenancy_connections.control_name())
+
+
+def _present(conn, *wanted: str) -> set[str]:
+    return {row[0] for row in conn.execute("SELECT datname FROM pg_database WHERE datname = ANY(%s)", [list(wanted)])}
+
+
+def _app_roles(conn, roles: bootstrap.Names) -> list[str]:
+    """The environment's app roles the server has (local development and the tests may have none)."""
+    wanted = [roles.hub_app, roles.hub_admin]
+    present = {row[0] for row in conn.execute("SELECT rolname FROM pg_roles WHERE rolname = ANY(%s)", [wanted])}
+    return [role for role in wanted if role in present]
+
+
+def _close(conn, name: str, roles: bootstrap.Names) -> None:
+    """Take ``name`` from everyone but its owner (the migrator) and end every other session on it."""
+    conn.execute(sql.SQL("REVOKE ALL ON DATABASE {} FROM PUBLIC").format(_identifier(name)))
+    granted = _app_roles(conn, roles)
+    if granted:
+        conn.execute(
+            sql.SQL("REVOKE CONNECT, TEMPORARY ON DATABASE {} FROM {}").format(
+                _identifier(name), sql.SQL(", ").join(map(sql.Identifier, granted))
+            )
+        )
+    conn.execute(
+        "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = %s AND pid <> pg_backend_pid()", [name]
+    )
+
+
+def _open(conn, name: str, roles: bootstrap.Names) -> None:
+    """Give ``name`` back to the app's roles (what ``ops.clone_database`` gave it)."""
+    granted = _app_roles(conn, roles)
+    if granted:
+        conn.execute(
+            sql.SQL("GRANT CONNECT, TEMPORARY ON DATABASE {} TO {}").format(
+                _identifier(name), sql.SQL(", ").join(map(sql.Identifier, granted))
+            )
+        )
+
+
+def _rename(conn, old: str, new: str) -> None:
+    """``ALTER DATABASE old RENAME TO new``, ending the sessions that came back meanwhile, a few times."""
+    statement = sql.SQL("ALTER DATABASE {} RENAME TO {}").format(_identifier(old), _identifier(new))
+    for wait in (*RENAME_WAITS, None):
+        try:
+            conn.execute(statement)
+            return
+        except errors.ObjectInUse as busy:
+            if wait is None:
+                raise MoveFailed("move_rename_failed", f"{old} is still in use: {ops._reason(busy)}") from busy
+            conn.execute(
+                "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = %s AND pid <> pg_backend_pid()",
+                [old],
+            )
+            time.sleep(wait)
+
+
+def _close_and_rename(hub, copy_name: str, origin, roles: bootstrap.Names) -> None:
+    """Steps 1 and 2 on the origin: closed to the app, noted and renamed to its copy. A move cut after its rename (its
+    copy noted and there) goes on from the copy; without the hub's database or such a copy, there is nothing to move."""
+    name = hub.db_name
+    origin_id = getattr(origin, "pk", None)
+    try:
+        with ops.connect_ops(cluster=origin) as conn:
+            present = _present(conn, name, copy_name)
+            if control_services.pending_copy(hub.id) is not None and copy_name in present:
+                _close(conn, copy_name, roles)
+                return
+            if name not in present:
+                raise MoveFailed("move_database_missing", f"{name} is not on the origin")
+            _close(conn, name, roles)
+            if copy_name in present:
+                # An older copy of this hub, from an earlier move off this server: the newer one replaces it.
+                conn.execute(sql.SQL("DROP DATABASE {} WITH (FORCE)").format(_identifier(copy_name)))
+                control_services.forget_copy(origin_id, copy_name)
+            control_services.copy_pending(hub.id, origin_id, copy_name)
+            _rename(conn, name, copy_name)
+    except psycopg.Error as error:
+        raise MoveFailed("move_close_failed", ops._reason(error)) from error
+    except ops.DatabaseOpsError as error:
+        raise MoveFailed("move_close_failed", error) from error
+
+
+def _dump(source: str, cluster, path: Path, heartbeat: Callable[[], None], cancelled=None) -> None:
+    """Step 3, on the origin: ``pg_dump`` of ``source`` as the migrator (``base.tenancy.dumps``' own run)."""
+    copied = SimpleNamespace(db_name=source, cluster=cluster, slug=source)
+    try:
+        dumps._run_pg_dump(
+            copied, path, timeout=dumps.DUMP_TIMEOUT_SECONDS, heartbeat=heartbeat, cancelled=cancelled
+        )
+    except dumps.DumpError as failed:
+        raise MoveFailed("move_dump_failed", failed) from failed
+
+
+def _make_destination(hub, target, roles: bootstrap.Names) -> None:
+    """Step 3, on the destination: its database cloned from the template of its vertical there, the template's tables
+    taken out. A database of that name there is never the hub's live one by now (the data is in the copy): a leftover
+    of a move cut short, dropped first."""
+    try:
+        template = provision.template_for(hub)
+    except services.ProvisioningFailed as missing:
+        raise MoveFailed("move_template_missing", missing) from missing
+    try:
+        ops.drop_database(hub.db_name, cluster=target)
+        ops.clone_database(hub.db_name, template=template, cluster=target, roles=roles)
+    except ops.TemplateMissing as missing:
+        raise MoveFailed("move_template_missing", missing) from missing
+    except ops.DatabaseOpsError as refused:
+        raise MoveFailed("move_clone_failed", refused) from refused
+    try:
+        with ops.connect_ops(hub.db_name, cluster=target) as conn, conn.transaction():
+            _empty(conn)
+    except (psycopg.Error, ops.DatabaseOpsError) as error:
+        raise MoveFailed("move_clone_failed", f"its template's tables could not be taken out: {error}") from error
+
+
+#: What the template's clone has that the restore makes again: tables, views and foreign tables of ``public`` that no
+#: extension owns (the sequences of a table go with it).
+_RELATIONS = {"r": "TABLE", "p": "TABLE", "v": "VIEW", "m": "MATERIALIZED VIEW", "f": "FOREIGN TABLE"}
+
+
+def _empty(conn) -> None:
+    rows = conn.execute(
+        "SELECT c.relname, c.relkind FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace "
+        "WHERE n.nspname = 'public' AND c.relkind = ANY(%s) AND NOT c.relispartition AND NOT EXISTS ("
+        "SELECT 1 FROM pg_depend d WHERE d.classid = 'pg_class'::regclass AND d.objid = c.oid AND d.deptype = 'e')",
+        [list(_RELATIONS)],
+    ).fetchall()
+    for relation, kind in rows:
+        conn.execute(
+            sql.SQL("DROP {} IF EXISTS {} CASCADE").format(
+                sql.SQL(_RELATIONS[kind]), sql.Identifier("public", relation)
+            )
+        )
+
+
+def pg_restore() -> str:
+    """The ``pg_restore`` of the image (``postgresql-client-18``)."""
+    import shutil
+
+    found = shutil.which("pg_restore")
+    if found is None:
+        raise MoveFailed("move_restore_failed", "pg_restore is not installed on this machine.")
+    return found
+
+
+def _restore(path: Path, name: str, cluster, heartbeat: Callable[[], None], cancelled=None) -> None:
+    """Step 3, on the destination: ``pg_restore`` of the dump into ``name``, in one transaction, as the migrator, its
+    extensions and its public schema left out (:data:`SKIPPED_ENTRIES`)."""
+    tool = pg_restore()
+    try:
+        listing = subprocess.run([tool, "--list", str(path)], check=True, capture_output=True, text=True).stdout
+    except subprocess.CalledProcessError as failed:
+        raise MoveFailed("move_restore_failed", f"its copy could not be read: {failed.stderr.strip()}") from failed
+    kept = [line for line in listing.splitlines() if not any(entry in line for entry in SKIPPED_ENTRIES)]
+    entries = path.with_suffix(".list")
+    entries.write_text("\n".join(kept) + "\n", encoding="utf-8")
+    conninfo = tenancy_connections.migrator_conninfo(name, cluster=cluster)
+    password = str(conninfo.pop("password", "") or "")
+    dsn = make_conninfo(**{key: str(value) for key, value in conninfo.items() if value not in (None, "")})
+    command = [
+        tool,
+        "--no-owner",
+        "--no-acl",
+        "--clean",
+        "--if-exists",
+        "--exit-on-error",
+        "--single-transaction",
+        f"--use-list={entries}",
+        f"--dbname={dsn}",
+        str(path),
+    ]
+    _run(command, password, path.with_suffix(".restore.err"), heartbeat, cancelled, what=f"the restore of {name}")
+
+
+def _run(command: list[str], password: str, errors_path: Path, heartbeat, cancelled, *, what: str) -> None:
+    """Run ``command`` with ``password`` in its environment only, within :data:`RESTORE_TIMEOUT_SECONDS`, its
+    heartbeat every ``dumps.POLL_SECONDS``; a stop kills it."""
+    env = {key: value for key, value in os.environ.items() if not key.startswith("PG")}
+    env["PGPASSWORD"] = password
+    env["PGGSSENCMODE"] = "disable"
+    with open(errors_path, "w+", encoding="utf-8", errors="replace") as complaints:
+        process = subprocess.Popen(command, env=env, stdout=subprocess.DEVNULL, stderr=complaints)
+        started = last_beat = time.monotonic()
+        try:
+            while True:
+                if cancelled is not None and cancelled():
+                    raise MoveStopped(f"{what} was stopped: the worker is stopping.")
+                left = RESTORE_TIMEOUT_SECONDS - (time.monotonic() - started)
+                if left <= 0:
+                    raise MoveFailed("move_restore_failed", f"{what} took longer than {RESTORE_TIMEOUT_SECONDS:g} s")
+                try:
+                    process.wait(timeout=min(dumps.POLL_SECONDS, dumps.STOP_CHECK_SECONDS, left))
+                    break
+                except subprocess.TimeoutExpired:
+                    if time.monotonic() - last_beat >= dumps.POLL_SECONDS:
+                        heartbeat()
+                        last_beat = time.monotonic()
+        except BaseException:
+            process.kill()
+            process.wait()
+            raise
+        if process.returncode != 0:
+            complaints.seek(0)
+            said = " ".join(line.strip() for line in complaints.read().splitlines()[-ERROR_LINES:] if line.strip())
+            if password:
+                said = said.replace(password, "***")
+            raise MoveFailed("move_restore_failed", f"{what} failed (exit {process.returncode}): {said}")
+
+
+def _verify_identity(name: str, cluster, hub_id) -> None:
+    """Step 4: the moved database says it is this hub (``base_hub_identity``), and nobody else."""
+    try:
+        with ops.connect_ops(name, cluster=cluster) as conn:
+            found = [row[0] for row in conn.execute("SELECT hub_id FROM base_hub_identity")]
+    except (psycopg.Error, ops.DatabaseOpsError) as error:
+        raise MoveFailed("move_identity_mismatch", f"its identity could not be read: {error}") from error
+    if found != [hub_id]:
+        raise MoveFailed("move_identity_mismatch", f"it says it is {[str(value) for value in found]}, not {hub_id}")
+
+
+def _ensure_schema(hub, target) -> None:
+    """Step 4: the moved database brought to the code's leaf on its new cluster."""
+    moved = copying.copy(hub)
+    moved.cluster = target
+    try:
+        migrator.ensure_schema(moved)
+    except Exception as error:
+        raise MoveFailed("move_schema_failed", f"{type(error).__name__}: {error}") from error
+
+
+def _switch(hub_id, origin, copy_name: str, now: dt.datetime) -> None:
+    """Step 5: control moves the hub and keeps its copy's row, in one transaction."""
+    control_services.move_finished(hub_id, getattr(origin, "pk", None), copy_name, now)
+
+
+def _undo(hub, copy_name: str, origin, target, roles: bootstrap.Names) -> None:
+    """Back where it was: when control noted the data in the copy and the copy is there, the destination's database
+    dropped (by then never the live one) and the copy renamed back; the note forgotten and the origin opened to the app
+    again."""
+    origin_id = getattr(origin, "pk", None)
+    if control_services.pending_copy(hub.id) is not None:
+        with ops.connect_ops(cluster=origin) as conn:
+            renamed = copy_name in _present(conn, copy_name)
+        if renamed:
+            ops.drop_database(hub.db_name, cluster=target)
+            with ops.connect_ops(cluster=origin) as conn:
+                _rename(conn, copy_name, hub.db_name)
+        control_services.forget_copy(origin_id, copy_name)
+    with ops.connect_ops(cluster=origin) as conn:
+        _open(conn, hub.db_name, roles)
+
+
+def _drop_copy(name: str, cluster) -> None:
+    """Drop the copy ``name`` on ``cluster`` (none: the settings' own server); only a moved copy's name passes."""
+    target = sql.Identifier(names.validate_moved(name, control=tenancy_connections.control_name()))
+    with ops.connect_ops(cluster=cluster) as conn:
+        try:
+            conn.execute(sql.SQL("DROP DATABASE IF EXISTS {} WITH (FORCE)").format(target))
+        except psycopg.Error as error:
+            raise ops.DatabaseOpsError(f"{name!r} could not be dropped: {ops._reason(error)}") from error
+
+
+def _close_this_processs(hub) -> None:
+    """This thread's connections to the hub's database (its alias and its migrator's), closed: wherever they reached."""
+    tenancy_connections.close_hub_aliases(hub)

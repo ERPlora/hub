@@ -264,9 +264,9 @@ class TestTheOriginIsClosedToTheApp:
         seen: list[bool] = []
         real = move._dump
 
-        def dump(source, cluster, path, heartbeat):
+        def dump(source, cluster, path, heartbeat, cancelled=None):
             seen.append(self.reaches(app_role, source))
-            return real(source, cluster, path, heartbeat)
+            return real(source, cluster, path, heartbeat, cancelled)
 
         monkeypatch.setattr(move, "_dump", dump)
 
@@ -331,8 +331,8 @@ class TestAFailurePutsEverythingBack:
         hub = moves.hub(to=moves.cluster())
         real = move._restore
 
-        def restore_and_lie(path, name, cluster, heartbeat):
-            real(path, name, cluster, heartbeat)
+        def restore_and_lie(path, name, cluster, heartbeat, cancelled=None):
+            real(path, name, cluster, heartbeat, cancelled)
             with hubs._maintenance(name) as conn:
                 conn.execute("UPDATE base_hub_identity SET hub_id = %s", [uuid.uuid7()])
 
@@ -376,6 +376,9 @@ class TestResuming:
         hub = moves.hub(to=target)
         control = tenancy_connections.control_name()
         copy = names.moved_db_name(control, hub.id)
+        # Where a worker stopped: the copy noted as holding the data, then the rename.
+        with use_control():
+            MovedCopy.objects.create(hub=hub, cluster=None, db_name=copy, moved_at=None)
         with hubs._maintenance() as conn:
             conn.execute(
                 sql.SQL("ALTER DATABASE {} RENAME TO {}").format(
@@ -388,6 +391,37 @@ class TestResuming:
         hub = fresh(hub)
         assert (hub.cluster_id, hub.moving_to_id) == (target.pk, None)
         assert marker(hub.db_name) == [MARKER] and marker(copy) == [MARKER]
+
+    def test_an_undo_that_failed_is_gone_on_from_the_copy_never_from_a_database_that_only_has_the_name(
+        self, moves, monkeypatch
+    ):
+        # The destination is on the origin's server: after the rename, the hub's database name there is the
+        # destination's. A pass that failed and could not undo leaves both; the next one copies from the copy.
+        target = moves.cluster()
+        hub = moves.hub(to=target)
+        control = tenancy_connections.control_name()
+        copy = names.moved_db_name(control, hub.id)
+
+        def broken(*args, **kwargs):
+            raise RuntimeError("broke on purpose")
+
+        with monkeypatch.context() as patched:
+            patched.setattr(move, "_ensure_schema", broken)
+            patched.setattr(move, "_undo", broken)
+            run()
+
+        stuck = fresh(hub)
+        assert stuck.moving_to_id == target.pk and "move_undo_failed" in stuck.last_error
+        assert marker(copy) == [MARKER]
+        [pending] = MovedCopy.objects.filter(hub=hub)
+        assert pending.moved_at is None
+
+        run()
+
+        hub = fresh(hub)
+        assert (hub.cluster_id, hub.moving_to_id, hub.last_error) == (target.pk, None, "")
+        assert marker(hub.db_name) == [MARKER] and marker(copy) == [MARKER]
+        assert MovedCopy.objects.get(hub=hub).moved_at == AT
 
     def test_an_older_copy_of_the_same_hub_on_the_origin_gives_way_to_the_newer(self, moves):
         target = moves.cluster()

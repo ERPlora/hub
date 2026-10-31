@@ -292,8 +292,22 @@ def move_stuck(hub_id: UUID, error: str) -> None:
         Hub.objects.filter(pk=hub_id).update(last_error=error[:2000], updated_at=timezone.now())
 
 
+def pending_copy(hub_id: UUID) -> MovedCopy | None:
+    """The copy that holds ``hub_id``'s data while its move goes on (no ``moved_at`` yet), if any."""
+    return MovedCopy.objects.select_related("cluster").filter(hub_id=hub_id, moved_at__isnull=True).first()
+
+
+def copy_pending(hub_id: UUID, cluster_id: UUID | None, db_name: str) -> None:
+    """Note, before the rename, that ``hub_id``'s data is about to be in the copy ``db_name`` on ``cluster_id``."""
+    with _control_transaction():
+        MovedCopy.objects.update_or_create(
+            cluster_id=cluster_id, db_name=db_name, defaults={"hub_id": hub_id, "moved_at": None}
+        )
+
+
 def copies_due(before: dt.datetime) -> list[MovedCopy]:
-    """The moved copies left behind by ``before``, the oldest first, with their cluster."""
+    """The moved copies left behind by ``before`` (never one whose move still goes on), the oldest first, with their
+    cluster."""
     return list(MovedCopy.objects.select_related("cluster").filter(moved_at__lte=before).order_by("moved_at", "pk"))
 
 

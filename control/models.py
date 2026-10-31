@@ -361,7 +361,11 @@ class MovedCopy(UUIDModel):
     """The database a hub left behind on the server it moved from (round 2026-10-30b of PLAN-DB, decision 3; tranche
     S7): its ``<control>_move_<hex>`` (``base.tenancy.names``), closed to the app, kept a few days in case the move must
     be undone by hand, then dropped by the worker with its row (``base.tenancy.move``). ``cluster`` empty: the settings'
-    own server. One per database name and server: a newer move off the same server replaces the older copy."""
+    own server. One per database name and server: a newer move off the same server replaces the older copy.
+
+    Written before the worker renames the hub's database, without ``moved_at`` while the move goes on: the hub's data
+    is in that copy then, whatever else of that name the servers hold, so a move cut short is undone or gone on from it
+    and never from a database that only has the name. ``moved_at`` is set when control switches the hub."""
 
     hub = models.ForeignKey(Hub, on_delete=models.CASCADE, related_name="moved_copies", verbose_name=_("hub"))
     cluster = models.ForeignKey(
@@ -373,7 +377,7 @@ class MovedCopy(UUIDModel):
         verbose_name=_("cluster"),
     )
     db_name = models.CharField(_("database"), max_length=63)
-    moved_at = models.DateTimeField(_("moved at"))
+    moved_at = models.DateTimeField(_("moved at"), null=True, blank=True)
 
     class Meta:
         verbose_name = _("copy after a move")
