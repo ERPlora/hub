@@ -104,6 +104,8 @@ def test_the_spas_route_map_names_every_base_route(settings):
         # Turning an app on or off (PLAN-HUB §9).
         ("POST", "/api/apps/enable", "base.app.enable"),
         ("POST", "/api/apps/disable", "base.app.disable"),
+        # An app whose tables could not be made, tried again (S3).
+        ("POST", "/api/apps/retry", "base.app.retry"),
         ("GET", "/api/system/plan", "base.plan.usage"),
         *DATA_ROUTES,
         # Business settings (APP-BASE-6).

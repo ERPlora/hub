@@ -1164,6 +1164,10 @@ OWN_DATABASE_OPERATIONS: dict[str, tuple[dict, int, str]] = {
     "base.hub.reset": ({"dry_run": False, "apps": ["sale"], "confirm": "a"}, 409, "base.reset_shared_database"),
     # A copy of the business's data (S2b): none is ever made in a business that shares its database.
     "base.hub.dump_link": ({"id": ANY_KEY}, 404, "not_found"),
+    # An app's tables made when it is turned on (S3): only a hub with its own database ever waits for them, so there is
+    # nothing to try again, and the worker's step never runs on the shared database, whoever runs it.
+    "base.app.retry": ({"app": "printing"}, 409, "base.app_not_failed"),
+    "base.app.activation_settle": ({"apps": ["printing"], "outcome": "created"}, 409, "base.app_shared_database"),
 }
 #: ``base.hub.reset_apply`` (S2b, the worker's emptying of a reset) is not above: it is the platform's alone, refused to
 #: anyone else before anything is read (review of hub#490), and to the platform itself on the shared database

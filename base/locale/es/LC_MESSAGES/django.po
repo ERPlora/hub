@@ -2101,3 +2101,6 @@ msgstr "migración de destino"
 msgctxt "app activation"
 msgid "The last migration of the code that asked for its tables: an older worker leaves it."
 msgstr "La última migración del código que pidió sus tablas: un worker más antiguo la deja."
+
+msgid "This business shares its database: its apps are turned on at once."
+msgstr "Este negocio comparte su base de datos: sus apps se encienden al momento."

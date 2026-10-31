@@ -33,6 +33,7 @@ from base.tenancy import connections as tenancy_connections
 from base.tenancy import identity, migrator, names
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
+from base.tenancy.tests.hubs import opened_at  # noqa: F401 (a fixture)
 from control.models import Hub, HubDue
 
 pytestmark = pytest.mark.usefixtures("no_test_fallback")
@@ -444,3 +445,128 @@ def test_a_hub_that_fails_is_logged_and_the_others_are_served(business, monkeypa
 
     assert row(b).state == ON and row(a).state == CREATING
     assert "went away" in caplog.text
+
+
+# ── Spec §14, 2: migrate_hubs with a new migration of X touches A, never B (B's database is not even opened) ────
+
+
+def test_migrate_hubs_brings_xs_new_migration_to_a_and_never_opens_b(business, opened_at):
+    a, b = business("a"), business("b")
+    turn_on(a)
+    run_pass()
+    old = "0002_print_device"  # as A was left by the code before printing's last migration
+    alias = tenancy_connections.register_ddl_alias(a.db_name)
+    try:
+        from django.db.migrations.executor import MigrationExecutor
+
+        MigrationExecutor(connections[alias]).migrate([(APP, old)])
+    finally:
+        connections[alias].close()
+    Hub.objects.filter(pk=a.pk).update(schema_apps={**fresh(a).schema_apps, APP: old})
+    # B never turned X on: it lacks it and is at the leaf of what it has, never behind.
+    Hub.objects.filter(pk=b.pk).update(
+        schema_apps={label: name for label, name in fresh(a).schema_apps.items() if label != APP}
+    )
+    opened_at.clear()
+
+    result = migrator.migrate_hubs_behind(workers=1)
+
+    assert a.slug in result.migrated and b.slug not in result.migrated
+    assert fresh(a).schema_apps[APP] == migrator.code_migrations().leaves[APP]
+    assert not [name for _host, name in opened_at if name == b.db_name]
+    assert APP not in recorded(b)
+
+
+# ── Spec §14, 5 and 6: an app not on is never reached in a hub, whatever a process kept ─────────────────────────
+
+
+def read_printing(hub: Hub):
+    op = get("printing.settings.get")
+    with use_hub(fresh(hub)):
+        return op(as_admin(hub), op.input())
+
+
+def test_while_its_tables_are_made_its_operations_say_app_inactive_never_a_database_error(business):
+    from live.errors import AppInactive
+
+    a = business("a")
+    turn_on(a)
+
+    with pytest.raises(AppInactive):
+        read_printing(a)
+
+
+def test_a_process_whose_cache_lags_says_app_inactive_until_it_forgets_never_reaches_tables_before_on(business):
+    from django.core.cache import cache
+    from live.errors import AppInactive
+
+    a = business("a")
+    turn_on(a)
+    keys = (activation.OFF_APPS_CACHE + a.slug, activation.CREATING_APPS_CACHE + a.slug)
+    with use_hub(fresh(a)):
+        kept = {keys[0]: sorted(activation.off_apps(Scope("host", a.slug))), keys[1]: [APP]}
+    assert APP in kept[keys[0]]
+
+    run_pass()
+    cache.set_many(kept, 60)  # another process read the rows before the worker's COMMIT, and kept them
+
+    with pytest.raises(AppInactive):
+        read_printing(a)
+    activation.forget(a.slug)
+    assert read_printing(a) is not None
+
+
+def test_an_app_b_never_turned_on_says_app_inactive_in_b_never_a_database_error(business):
+    from live.errors import AppInactive
+
+    a, b = business("a"), business("b")
+    turn_on(a)
+    run_pass()
+    assert hubs.hub_tables([APP]) <= tables(a) and not hubs.hub_tables([APP]) & tables(b)
+
+    with pytest.raises(AppInactive):
+        read_printing(b)
+
+
+# ── Spec §14, 8: turning X on changes nothing of the process ────────────────────────────────────────────────────
+
+
+def test_turning_an_app_on_changes_neither_the_installed_apps_nor_the_urls_nor_the_api_routes(business):
+    from django.apps import apps as django_apps
+    from django.conf import settings
+    from django.urls import get_resolver
+
+    from config.api import api
+
+    def snapshot():
+        return (
+            list(settings.INSTALLED_APPS),
+            [config.label for config in django_apps.get_app_configs()],
+            sorted(str(pattern.pattern) for pattern in get_resolver().url_patterns),
+            sorted(api.get_openapi_schema()["paths"]),
+        )
+
+    before = snapshot()
+    a = business("a")
+    turn_on(a)
+    run_pass()
+
+    assert row(a).state == ON
+    assert snapshot() == before
+
+
+# ── Spec §14, 11: each app is made alone from nothing on the platform's template ────────────────────────────────
+
+
+@pytest.mark.parametrize("label", sorted(activation.module_graph()))
+def test_each_app_is_made_alone_with_what_it_requires_on_the_platforms_template(business, label):
+    a = business("a")
+    turn_on(a, label)
+
+    run_pass()
+
+    expected = {label} | activation.needs([label], activation.module_graph())
+    assert {name for name in expected if row(a, name).state != ON} == set()
+    assert hubs.hub_tables(expected) <= tables(a)
+    others = set(activation.module_graph()) - expected
+    assert not hubs.hub_tables(others) & tables(a)

@@ -3,7 +3,9 @@
 // in the address of a screen whose app `base.session.me` gives `off`. Which app it is comes from the address (the
 // app's own route, `meta.app`); why, from the live `base.app.list`: a paid app without its right gets «Subscription
 // needed» — its data is safe and comes back once it is bought on erplora.com (the Store's link only for whoever runs
-// the business and only on the web: the Hub never sells) —; an app the business does not have says so. Bought
+// the business and only on the web: the Hub never sells) —; an app the business does not have says so; one whose tables
+// its own database is getting (S3) says it opens in a moment, and one that could not be set up leads to Apps, where it
+// is tried again. Bought
 // meanwhile (the SaaS's photo re-runs the list), it offers to open the app with a full load, which brings the
 // session (a snapshot of the page load) up to date. A failed check says so; it never makes up a reason.
 import { EmptyState, InlineFeedback } from '@erplora/ui/components';
@@ -35,6 +37,11 @@ const title = computed(() => row.value?.name ?? t('base.appsPage.title'));
 
 function toApps(): void {
   void router.push({ path: '/apps', hash: '#all' });
+}
+
+/** «My apps», where an app that could not be set up is tried again. */
+function toMyApps(): void {
+  void router.push({ path: '/apps' });
 }
 </script>
 
@@ -80,6 +87,30 @@ function toApps(): void {
             data-testid="app-blocked-open"
             :href="route.fullPath"
           >{{ t('base.appBlocked.ready.open', { app: row.name }) }}</a>
+        </template>
+      </EmptyState>
+      <EmptyState
+        v-else-if="row?.state === 'creating'"
+        data-testid="app-blocked-creating"
+        icon="ion:time-outline"
+        :heading="t('base.appBlocked.creating.heading', { app: row.name })"
+        :message="t('base.appBlocked.creating.body')"
+      />
+      <EmptyState
+        v-else-if="row?.state === 'failed'"
+        data-testid="app-blocked-failed"
+        icon="ion:alert-circle-outline"
+        :heading="t('base.appBlocked.failed.heading', { app: row.name })"
+        :message="t('base.appBlocked.failed.body')"
+      >
+        <template #action>
+          <ion-button
+            fill="outline"
+            data-testid="app-blocked-to-apps"
+            @click="toMyApps"
+          >
+            {{ t('base.appBlocked.toApps') }}
+          </ion-button>
         </template>
       </EmptyState>
       <EmptyState
