@@ -2964,7 +2964,11 @@ Implicados: ACCOUNTS-F38
   (403 `base.device_not_trusted`, `base.pin_not_offered`), freno por persona (`PIN_PERSON_LIMIT`, 5 en 5 min; la
   placa, por su número) y la credencial de una persona activa del negocio (401 `base.pin_incorrect`,
   `base.badge_unknown`; 429 `base.too_many_attempts` con `Retry-After`). Lo aceptado no cuenta y reinicia el freno
-  de esa persona. La entrada deja la cookie del idioma de la persona (gh:hub#2639).
+  de esa persona. La entrada deja la cookie del idioma de la persona (gh:hub#2639). Cada freno guarda en la caché la
+  cuenta y el final de su ventana, y los lee y los olvida en una sola llamada: su clave va entre llaves
+  (`base.throttle:{limit:pin:<hub>:<persona>}` y `…}:until`) para que el clúster de Valkey de AWS las guarde en la
+  misma ranura. Sin eso el clúster rechazaba la lectura (`CROSSSLOT`), el freno se apartaba y el pinpad aceptó
+  nueve PIN erróneos seguidos en producción (hub#440).
 - `way_in` (sin sesión, pidiendo HTML): al Acceso (`/login`) si el dispositivo ofrece el pinpad
   (`queries.pin_door_open`), con `notice=ended` si llegó la cookie de una sesión que ya no existe, o si otra entrada
   cerró la suya (`notice=device_limit`); si no, el salto de siempre a la entrada de erplora.com, que devuelve dentro
@@ -3021,8 +3025,9 @@ Implicados: ACCOUNTS-F38
   caracteres y ruta de 980 bytes; los programas (`BLOCKED_EXTENSIONS`, la lista de Gmail) se rechazan. Subir nunca pisa:
   la escritura es condicional (`If-None-Match: *` en S3, `O_EXCL` en disco) y, si otra subida del mismo nombre llegó
   antes, toma el siguiente nombre libre. Un listado lee solo la carpeta abierta (`Delimiter` en S3); el árbol de carpetas
-  y lo que ocupan los archivos salen del índice del hub, guardado en la caché (`base.files:<hex>:*`, 10 minutos como
-  mucho): una subida le suma sus bytes y crear, renombrar, mover o borrar lo olvidan, así que un lote de subidas y los
+  y lo que ocupan los archivos salen del índice del hub, guardado en la caché (`base.files:{<hex>}:*`: el hub entre
+  llaves, para que sus tres claves caigan en una ranura del clúster; 10 minutos como mucho): una subida le suma sus
+  bytes y crear, renombrar, mover o borrar lo olvidan, así que un lote de subidas y los
   listados de después recorren los archivos una sola vez; lo que guardan las apps se cuenta en cada llamada. El espacio
   es el de todo el prefijo del hub, contra `plan.max_storage_bytes` de la foto del SaaS (sin él, «Sin límite»). Una app que
   guarde archivos lo hace en su carpeta propia del prefijo (como `website/`), fuera de `files/`, y Archivos no la
@@ -3304,6 +3309,13 @@ Implicados: ACCOUNTS-F38
   registra el texto. Tests: `base/tests/test_support_report.py`; Vitest de `base/frontend/lib/report-problem.test.ts`,
   `components/ReportProblemDialog.test.ts` y `frontend/main.test.ts`; e2e `tests/e2e/base-report-problem.spec.ts`
   contra el SaaS de la pila.
+
+- **La caché es un clúster** (hub#440): en AWS es ElastiCache Serverless, un Valkey en modo clúster, que rechaza
+  con `CROSSSLOT` una llamada con varias claves de ranuras distintas (`get_many`, `set_many`, `delete_many`). Las
+  claves que van juntas comparten una etiqueta de hash: lo que va entre la primera `{` y la siguiente `}`
+  (`base.files:{<hex>}:…`, `website:home:{<slug>}:…`). En local y en los tests la caché es
+  `base.cache.ClusterLocMemCache`, la memoria del proceso con esa misma regla y el mismo error: lo que fallaría en
+  AWS falla antes en el test.
 
 ## Lo que NO hace, a propósito
 
