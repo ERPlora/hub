@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 from django.apps import apps
+from live.assistant import NAMED as SAID_ITEM_BY_ITEM
 from live.context import OperationContext, Scope
 from live.operations import get, registry
 
@@ -218,6 +219,9 @@ def test_a_write_of_printing_names_each_record_as_the_printing_screens_do(langua
     said = cards(a_business(), ctx_for(language=language), language)
     assert {write: values(card) for write, card in said.items()} == named_as_the_screens(language)
     assert [write for write, card in said.items() if not no_id(card)] == []
+    # A device's printers, said by their names: the screen says them one after another, not how many.
+    printers = [field for card in said.values() for field in card["fields"] if field["name"] == "printers"]
+    assert len(printers) == 3 and all(field.get(SAID_ITEM_BY_ITEM) is True for field in printers)
 
 
 @pytest.mark.django_db
