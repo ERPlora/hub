@@ -119,6 +119,7 @@ export const order = (over: Partial<OrderOut> = {}): OrderOut => {
     lines_count: lines.length,
     created_at: '2026-10-14T09:05:00Z',
     updated_at: '2026-10-14T09:05:00Z',
+    merged_into_id: null,
     already: false,
     ...over,
     lines,

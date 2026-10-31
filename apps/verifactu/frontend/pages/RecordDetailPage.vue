@@ -44,6 +44,15 @@ const loadError = computed(() =>
 const pending = computed(() => transmit.pending.value || reconcile.pending.value || correct.pending.value);
 // A business outside Spain never sends it (VeriFactu is only for Spain): no «it goes out by itself».
 const neverSent = computed(() => !!record.value?.waiting.some((reason) => reason.code === 'outside_spain'));
+// The waits that clear by themselves: the next pass sends it with nothing to do. Any other waits for something to be
+// resolved first (a refusal of the gateway, the authorisation, the route, the server), so one «when» says so
+// (VERIFACTU-F17, hub#454).
+const SELF_CLEARING = new Set(['aeat_wait', 'unreachable', 'unknown', 'aeat_fault']);
+const waitingWhen = computed(() =>
+  record.value?.waiting.every((reason) => SELF_CLEARING.has(reason.code))
+    ? t('verifactu.detail.waitingWhen')
+    : t('verifactu.detail.waitingWhenResolved'),
+);
 
 const when = (value: string | null | undefined) => (value ? formatDateTime(value, locale.value) : '—');
 
@@ -208,7 +217,7 @@ async function correctIt(): Promise<void> {
           </li>
         </ul>
         <p v-if="!neverSent">
-          {{ $t('verifactu.detail.waitingWhen') }}
+          {{ waitingWhen }}
         </p>
         <p v-if="record.next_attempt_at">
           {{ $t('verifactu.detail.nextAttempt') }}: {{ when(record.next_attempt_at) }}
