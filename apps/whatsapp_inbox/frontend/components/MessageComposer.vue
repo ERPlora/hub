@@ -6,10 +6,11 @@
 // connected (or to reconnect: WHATSAPP_INBOX-F02), the month spent (or a plan that includes none:
 // WHATSAPP_INBOX-F13, with «Upgrade plan» for whoever configures) or no erplora.com, nothing is offered and
 // the reason is said. A refusal keeps the text with its reason, and sending it again carries the same key:
-// never sent twice.
+// never sent twice. «Upgrade plan» sells, so only on the web (surface.ts), and leaves the Hub by `openExternalLink`
+// (gh:hub#439: the installed app opens nothing on a `_blank` link).
 import { formatDateTime, InlineFeedback } from '@erplora/ui/components';
 import { useCommand } from '@erplora/ui/sdk';
-import { useSession } from '@erplora/ui/shell';
+import { openExternalLink, useSession, useSurface } from '@erplora/ui/shell';
 import { IonButton, IonSegment, IonSegmentButton, IonTextarea } from '@ionic/vue';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 
@@ -75,9 +76,10 @@ const blockedText = computed(() => {
   if (blocked.value === 'not_connected' && props.channel?.status === 'reconnect_needed') return t('whatsapp_inbox.composer.reconnectNeeded');
   return t(`whatsapp_inbox.composer.blocked.${blocked.value}`);
 });
-/** «Upgrade plan» at the cap, for whoever configures, with erplora.com to send them to. */
+/** «Upgrade plan» at the cap, for whoever configures, with erplora.com to send them to, and only on the web. */
+const { isWeb } = useSurface();
 const upgradeUrl = computed(() =>
-  blocked.value === 'cap_reached' && session.can('whatsapp_inbox.configure') ? (props.channel?.plans_url ?? '') : '',
+  isWeb.value && blocked.value === 'cap_reached' && session.can('whatsapp_inbox.configure') ? (props.channel?.plans_url ?? '') : '',
 );
 const windowOpen = computed(() => {
   const end = props.conversation.window_expires_at;
@@ -171,6 +173,7 @@ watch(
             :href="upgradeUrl"
             target="_blank"
             rel="noopener"
+            @click="openExternalLink(upgradeUrl, $event)"
           >{{ $t('whatsapp_inbox.upgradePlan') }}</a>
         </template>
       </InlineFeedback>

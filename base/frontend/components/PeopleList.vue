@@ -6,14 +6,18 @@
 // only: it sells). People are invited, given a role and removed on erplora.com («Members» of the business: HUBS-F24…
 // F27), which `hub-home` names only for a session opened with the account; who runs the business opens a person's
 // page from the row (their PIN and badge). On a phone each person is a card. A list that cannot be read says so.
+// Both links leave the Hub by `openExternalLink` (gh:hub#439: the installed app opens nothing on a `_blank` link, its
+// system browser does), and «Invite on erplora.com», a way to erplora.com's panel, never in the Google Play copy
+// (`managementOffered`, as «erplora.com» of the bar, gh:hub#1897).
 import { DataTable, type DataTableColumn, InlineFeedback, StatusPill } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
-import { HubIcon, useSession, useSurface } from '@erplora/ui/shell';
+import { HubIcon, openExternalLink, useSession, useSurface } from '@erplora/ui/shell';
 import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 
 import { type HubHome, readJsonBlock } from '../lib/home';
 import { useBaseI18n } from '../lib/i18n';
+import { managementOffered } from '../lib/management';
 import { accessKeys, roleKey } from '../lib/people';
 import type { Person } from '../operations';
 
@@ -26,6 +30,7 @@ const admin = computed(() => session.can('base.administer_hub'));
 const home = readJsonBlock<HubHome>('hub-home');
 const membersUrl = home?.members_url ?? '';
 const planUrl = home?.plan_url ?? '';
+const offered = managementOffered();
 
 const { data, status, refresh } = useLive('base.person.list', {});
 
@@ -73,12 +78,13 @@ function open(row: Person): void {
         {{ seatsText }}
       </p>
       <a
-        v-if="admin && membersUrl"
+        v-if="admin && membersUrl && offered"
         class="people-invite"
         data-testid="people-invite"
         :href="membersUrl"
         target="_blank"
         rel="noopener"
+        @click="openExternalLink(membersUrl, $event)"
       >
         <HubIcon
           name="ion:person-add-outline"
@@ -104,6 +110,7 @@ function open(row: Person): void {
           :href="planUrl"
           target="_blank"
           rel="noopener"
+          @click="openExternalLink(planUrl, $event)"
         >{{ t('base.plan.upgrade') }}</a>
       </template>
     </InlineFeedback>
