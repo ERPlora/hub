@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:b159af20d23f5f353f0e487c0c23faa40c06e0224e099190d81b0b113f512f47 -->
+<!-- generated from WORKBOOK.md sha256:b45f54abe3e55782b0c1655eb251c16205ed6d028ad32f7d7e1fb947988f7171 -->
 
 ## What it is for and who it is for
 
@@ -459,9 +459,11 @@ by their id, their name, their phone or their email. If a name fits several, it 
 | The price lists, with search, filters and sorting, in pages of up to 100 | view | F01 | `pricing.price_list.list` | yes |
 | A price list | view | F03, F06 | `pricing.price_list.get` | yes |
 | The prices of a price list, or those of a product or a service in all of them | view | F06 | `pricing.price_item.list` | yes |
-| A price, with what its price list shows of it and that list's currency, the one its price is in | view | F06, F08 | `pricing.price_item.get` | no |
+| A price, with what its price list shows of it, how it is named outside it (its article, its price list and, from a quantity on, that quantity) and that list's currency, the one its price is in | view | F06, F08 | `pricing.price_item.get` | no |
 | The discount rules | view | F09 | `pricing.rule.list` | yes |
+| A rule, active or not, by its id, its code or its name | view | F11, F12 | `pricing.rule.get` | no |
 | The price of a line (price list, rule, discount and total) | view | F13 | `pricing.price.resolve` | no |
+| The name of the service, the category or the customer group a price list, a price or a rule points at, by its id (a service's, with the Services permission of whoever asks) | view | F02, F03, F07, F08, F10, F11 | `pricing.catalog.get` | no |
 
 ### What it offers: actions (they change data)
 

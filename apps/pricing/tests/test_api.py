@@ -29,11 +29,13 @@ ROUTES = {
     ("POST", "/pricing/price_items/update", "pricing.price_item.update"),
     ("POST", "/pricing/price_items/remove", "pricing.price_item.remove"),
     ("GET", "/pricing/rules", "pricing.rule.list"),
+    ("GET", "/pricing/rules/detail", "pricing.rule.get"),
     ("POST", "/pricing/rules", "pricing.rule.create"),
     ("POST", "/pricing/rules/update", "pricing.rule.update"),
     ("POST", "/pricing/rules/deactivate", "pricing.rule.deactivate"),
     ("POST", "/pricing/rules/activate", "pricing.rule.activate"),
     ("GET", "/pricing/prices/resolve", "pricing.price.resolve"),
+    ("GET", "/pricing/catalog/detail", "pricing.catalog.get"),
 }
 
 
