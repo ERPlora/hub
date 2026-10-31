@@ -1763,6 +1763,11 @@ msgctxt "base"
 msgid "Report a problem"
 msgstr "Reportar un problema"
 
+#: base/assistant.py
+msgctxt "base"
+msgid "Help"
+msgstr "Ayuda"
+
 #: base/schemas.py
 msgid "Report subject"
 msgstr "Asunto del informe"
@@ -1786,6 +1791,10 @@ msgstr "No se ha podido transcribir el audio: inténtalo de nuevo."
 #: base/queries.py
 msgid "The assistant's plan could not be read now."
 msgstr "Ahora no se puede leer el plan del asistente."
+
+#: base/queries.py
+msgid "ERPlora's documentation could not be searched now."
+msgstr "Ahora no se puede buscar en la documentación de ERPlora."
 
 #: base/models.py
 msgctxt "location"
