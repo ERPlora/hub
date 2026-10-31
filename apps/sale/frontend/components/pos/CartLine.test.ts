@@ -4,6 +4,8 @@
 // buttons) marks it for a partial charge (SALE-F22). The amount is the server's `line_total`.
 import { describe, expect, it } from 'vitest';
 
+import { HubIcon } from '@erplora/ui/shell';
+
 import { click, mountSale } from '../../__tests__/mount-sale';
 import { plain } from '../../lib/format';
 import { line } from './__tests__/fixtures';
@@ -82,6 +84,7 @@ describe('CartLine: what it shows', () => {
     expect(row.find('.pos-line__gift').text()).toBe('Invitación');
     expect(row.find('.pos-line__meta').text()).toContain('Birthday');
     expect(plain(row.find('.pos-line__discount').text())).toBe('−10 %');
+    expect(m.find('pos-line-l1-discount').findComponent(HubIcon).props('name')).toBe('ion:pricetag');
     expect(row.find('.pos-line__amount').classes()).toContain('pos-line__amount--gift');
     expect(row.find('.pos-line__note').text()).toBe('No ice');
     const staff = m.find('pos-line-l1-staff');
@@ -114,6 +117,11 @@ describe('CartLine: actions', () => {
     expect(m.find('pos-line-l1-discount').attributes('title')).toBe('Line discount');
     expect(m.find('pos-line-l1-note').attributes('title')).toBe('Note');
     expect(m.find('pos-line-l1-gift').attributes('title')).toBe('Comp / un-comp line');
+  });
+
+  it('the discount button is an outlined tag until the line has a discount, then a filled one', async () => {
+    const m = await setup();
+    expect(m.find('pos-line-l1-discount').findComponent(HubIcon).props('name')).toBe('ion:pricetag-outline');
   });
 
   it('no discount button when the business does not allow discounts', async () => {

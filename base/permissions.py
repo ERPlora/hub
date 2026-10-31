@@ -40,6 +40,12 @@ def permissions_for(user: Any, scope: Scope) -> frozenset[str]:
     role = Membership.objects.filter(user=user, host=scope.key).values_list("role", flat=True).first()
     if role is None:
         return frozenset()
+    return permissions_of_role(role)
+
+
+def permissions_of_role(role: str) -> frozenset[str]:
+    """What ``role`` (a ``Membership.Role``) gives on a host: owner and admin, every permission declared by every app;
+    manager and employee, what each app's ``role_permissions`` gives them."""
     configs = all_live_app_configs()
     if role in FULL_ACCESS_ROLES:
         return frozenset(permission for config in configs for permission in config.permissions)

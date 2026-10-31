@@ -16,6 +16,7 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from django.utils.translation import gettext_lazy
+from live.assistant import description
 from live.context import OperationContext, Scope
 from live.errors import NotFound
 from live.meta import BellCounter, DeviceNotice, SetupCheck, SetupStep, Widget
@@ -143,8 +144,7 @@ def test_declarations(name, input, output):
 
 def test_the_assistant_reads_the_setup_status():
     """BASE-G128: the assistant gets the same document as a tool; it never takes on a step «not available»."""
-    ai = get("base.setup.status").ai
-    assert "not available" in ai["description"]
+    assert "not available" in description(get("base.setup.status"))
 
 
 # --- base.setup.status: the platform's steps (base.apps, base.team) ----------------------------------------
