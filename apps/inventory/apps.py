@@ -27,7 +27,8 @@ class InventoryConfig(LiveAppConfig):
         "edited, so every balance is explained. It warns when an article runs low, imports and exports "
         "the catalog as CSV and sells by weight or measure without rounding."
     )
-    # The restaurant's menu is this catalog; the hair salon's template does not carry it (PLAN-HUB §7).
+    # The restaurant's menu is this catalog. The hair salon's template brings a few retail products and turns the
+    # app on when it is loaded (base/seeds, INVENTORY-F12).
     verticals = ["restaurant"]
     # Each product and category points at a tax category (tax.TaxCategory).
     requires = ["tax"]
