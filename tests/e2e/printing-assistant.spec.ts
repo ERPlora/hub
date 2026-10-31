@@ -236,5 +236,6 @@ test('printing-assistant-card — in Spanish changing a device’s printers, ret
   expect([still.data.status, still.data.attempts]).toEqual(['pending', 0]);
   const queue = await api<{ total: number }>(context, A, 'GET', '/printing/jobs?search=M-1');
   expect(queue.data.total).toBe(0);
+  if (process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
   await context.close();
 });
