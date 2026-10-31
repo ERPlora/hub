@@ -313,3 +313,86 @@ def test_a_pass_approved_for_another_command_on_this_very_request_does_not_let_i
     assert Item.objects.get(pk=item.pk).name == "Mesa 4"
     assert Approval.objects.get().used_at is None
     cache.clear()
+
+
+# ── How-to questions answered from ERPlora's documentation (saas ASSISTANT-F28) ─────────────────────────────────────
+
+DOCS = "/internal/assistant/docs/search"
+HOW = {"role": "user", "content": "¿Cómo abro la caja?"}
+EXCERPT = {
+    "source": "app_doc",
+    "path": "app_doc:cash_register",
+    "heading": "Caja > Abrir la caja",
+    "text": "Abre la caja desde Caja > Abrir con el efectivo inicial.",
+    "score": 0.91,
+    "lang": "es",
+}
+SEARCH = {"call_id": "d1", "name": "base__docs__search", "arguments": '{"query": "¿Cómo abro la caja?"}'}
+SEARCH_ASKED = {"role": "assistant", "content": "", "tool_calls": [
+    {"id": "d1", "type": "function", "function": {"name": "base__docs__search", "arguments": SEARCH["arguments"]}}
+]}
+
+
+def test_a_how_to_question_gets_the_excerpts_of_the_documentation_as_its_tool_result(client, make_user, gateway):
+    client.force_login(make_user("ana", host="a", role="hub_employee"))
+    gateway.reply(DOCS, json={"results": [EXCERPT]})
+    gateway.turn({"type": "text_delta", "text": "Desde Caja > Abrir."}, {"type": "response", "output": [], "usage": {}, "continuation": None})
+
+    body = {"messages": [HOW, SEARCH_ASKED], "pending": [SEARCH], "continuation": "tok"}
+    got = frames(post(client, "/assistant/turn", body, HTTP_ACCEPT_LANGUAGE="es"))
+
+    assert [frame["type"] for frame in got] == ["executed", "text", "done"]
+    assert (got[0]["name"], got[0]["outcome"], got[0]["app_name"]) == ("base.docs.search", "ok", "Ayuda")
+    result = got[-1]["append"][0]
+    assert (result["tool_call_id"], json.loads(result["content"])) == ("d1", {"results": [EXCERPT]})
+    [asked] = gateway.sent(DOCS)
+    assert asked.body == {"hub": "a", "query": "¿Cómo abro la caja?", "language": "es", "limit": 8}
+    assert signed(asked)
+    assert gateway.sent("/internal/assistant/chat/stream")[0].body["messages"][-1]["tool_call_id"] == "d1"
+
+
+def test_documentation_that_cannot_be_searched_is_told_to_the_model_never_made_up(client, make_user, gateway):
+    client.force_login(make_user("ana", host="a", role="hub_employee"))
+    gateway.reply(DOCS, status=503, json={"error": {"code": "assistant.provider_unavailable", "message": "down"}})
+    gateway.turn({"type": "text_delta", "text": "No he podido buscar."}, {"type": "response", "output": [], "usage": {}, "continuation": None})
+
+    body = {"messages": [HOW, SEARCH_ASKED], "pending": [SEARCH], "continuation": "tok"}
+    got = frames(post(client, "/assistant/turn", body, HTTP_ACCEPT_LANGUAGE="es"))
+
+    assert (got[0]["name"], got[0]["outcome"], got[0]["code"]) == ("base.docs.search", "error", "base.assistant_unavailable")
+    assert "documentación de ERPlora" in json.loads(got[-1]["append"][0]["content"])["error"]["message"]
+    assert len(gateway.sent(DOCS)) == 1
+
+
+def test_nobody_without_a_session_makes_erplora_com_search(client, gateway):
+    body = {"messages": [HOW, SEARCH_ASKED], "pending": [SEARCH], "continuation": "tok"}
+
+    assert post(client, "/assistant/turn", body).status_code == 401
+    assert gateway.requests == []
+
+
+@pytest.mark.django_db(transaction=True)
+def test_the_turn_asks_the_documentation_before_its_transaction_opens(client, make_user, gateway, monkeypatch):
+    """The search waits on erplora.com (up to 15 s): inside the turn's transaction it would hold the hub's connection
+    (PLAN §14.2), so the route asks it first (``assistant.prepare``) and the turn reads the answer."""
+    from django.db import connections
+
+    from base import assistant
+
+    client.force_login(make_user("ana", host="a", role="hub_employee"))
+    gateway.reply(DOCS, json={"results": [EXCERPT]})
+    gateway.turn({"type": "text_delta", "text": "Desde Caja > Abrir."}, {"type": "response", "output": [], "usage": {}, "continuation": None})
+    seen = []
+    post_to_gateway = assistant._post
+
+    def probe(path, payload):
+        if path == DOCS:
+            seen.append(any(connection.in_atomic_block for connection in connections.all()))
+        return post_to_gateway(path, payload)
+
+    monkeypatch.setattr(assistant, "_post", probe)
+    body = {"messages": [HOW, SEARCH_ASKED], "pending": [SEARCH], "continuation": "tok"}
+    got = frames(post(client, "/assistant/turn", body, HTTP_ACCEPT_LANGUAGE="es"))
+
+    assert got[0]["outcome"] == "ok"
+    assert seen == [False]
