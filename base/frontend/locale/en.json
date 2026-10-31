@@ -1335,7 +1335,8 @@
         "profile": "My profile",
         "employees": "Employees",
         "files": "Files",
-        "report": "Report a problem"
+        "report": "Report a problem",
+        "help": "Help"
       },
       "setup": {
         "ask": "Ask the assistant"
