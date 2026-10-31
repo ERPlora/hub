@@ -266,6 +266,12 @@ test('PRINTING-F18, F13: a cash charge at the till prints its receipt, then open
     hasText: new RegExp(`(The cash drawer did not open: check that “${PRINTER}” is on and connected\\.|El cajón no se ha abierto: comprueba que «${PRINTER}» está encendida y conectada\\.)`),
   });
   await expect(told.last()).toBeVisible();
+  // The capture with the sale's document painted behind the notice: the charge opens it and it loads on its own
+  // subscriptions, never left at «Loading document…».
+  const document = page.locator('[data-testid=sale-document-modal]');
+  await expect(document.locator('[data-testid=sale-document-loading]')).toHaveCount(0);
+  await expect(document.locator('[data-testid=sale-document-print]')).toBeEnabled();
+  await expect(told.last()).toBeVisible();
   await page.screenshot({ path: shot(`${KEY}-drawer-1440`) });
   await expect.poll(async () => (await jobsOf(context)).length).toBe(before + 2);
   await expect.poll(async () => (await newestJob(context)).status).toBe('done');

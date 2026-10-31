@@ -127,8 +127,14 @@ async function spanishOwner(browser: Browser, viewport: { width: number; height:
   return { context, page, streams };
 }
 
-/** Waits until the page has opened no `/api/live` for a second: every subscription of the screen is declared. */
-async function settled(streams: Stream[]): Promise<void> {
+/**
+ * Waits until the page has let go of the screen it left (`left`, its operations) and then opened no `/api/live` for a
+ * second: every subscription of the screen is declared. A screen left keeps its subscriptions `RELEASE_GRACE_MS` (2 s,
+ * `use-live.ts` of `@erplora/ui`) in case it comes back, and only then does the stream reopen without them: a second
+ * of quiet can fall inside that grace, and the reopen then brings every result again in the middle of the reading.
+ */
+async function settled(streams: Stream[], left: string[] = []): Promise<void> {
+  await expect.poll(() => left.filter((op) => streams.at(-1)?.ops.includes(op)), { timeout: 15_000 }).toEqual([]);
   await expect.poll(() => Date.now() - (streams.at(-1)?.at ?? 0), { timeout: 15_000 }).toBeGreaterThan(1_000);
 }
 
@@ -177,7 +183,9 @@ FLOW_VIEWPORTS.forEach(({ label, width, height }) => {
       await unfolded(page);
 
       // The Home as it is read: its stream settled before anything changes the bell.
-      await settled(streams);
+      await settled(streams, DEVICES_OPS);
+      // Settled on the Home's own stream: Devices' subscriptions, released, ride on none of what the page has open.
+      expect(DEVICES_OPS.filter((op) => streams.at(-1)?.ops.includes(op)), 'the Home settled with Devices released').toEqual([]);
       const before = await counters(context);
       await badgeSays(page, before.total);
       const onTheHome = streams.length;
