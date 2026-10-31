@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:9503ac864f878b4ca855e7c8d8768d77a3c89159705f7061ceb037b65f7ed995 -->
+<!-- generated from WORKBOOK.md sha256:843542f4e1770579d5a824139f85349c9ddcd64a5f87992aa69314642193fa53 -->
 
 ## What it is for and who it is for
 
@@ -2298,7 +2298,9 @@ Steps:
      Create in Services", or "Not done, cancelled: …", "Not done, it failed: …" and "Not done, not allowed: …". If the
      person changes language, the earlier receipts show entirely in the new one, the app's name too.
 In: the action, its data and its risk, as its app declares them; the business's currency, the one of the record it is
-done on (read as the person) and, in "What will happen", the one its app gives; the business's time zone.
+done on (read as the person) and, in "What will happen", the one its app gives; the business's time zone; and, if its
+app declares it, the check it makes before the card, as the person: if it refuses the data (adding someone with a role
+the business does not have, STAFF-F01), no card shows and the assistant tells it as its error.
 Out: if accepted, the action done in its app, with the same event as if its button had been tapped.
 If it fails: an action its app refuses goes back to the assistant as an error and it tells it; the receipt reads
 "Not done, it failed: …". If the page is reloaded with the card open nothing is done, and the answer ends in "The
