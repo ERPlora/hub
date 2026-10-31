@@ -1,7 +1,9 @@
 # Peticiones de UI de la app `invoice`
 
 Lo que las páginas de Facturación necesitan de `@erplora/ui` y todavía no está. Mientras tanto usan lo
-más parecido que ya existe (dicho en cada punto); se cambia en cuanto llegue.
+más parecido que ya existe (dicho en cada punto); se cambia en cuanto llegue. Al cerrar la app
+(2026-10-31, `CLOSE-INVOICE`) siguen abiertas las cinco: ninguna rompe un flujo y cada una está en `## 6` del
+registro de la migración (`invoice:ui-…`).
 
 ## Iconos
 
@@ -21,6 +23,9 @@ Al registrarlos, cambiar a la vez `apps.py` (`icon`, `navigation` y `setup`), `f
 
 - **Qué**: `formatMoney(cents, locale)`, `formatPercent(rate, locale)`, `formatQuantity(value, locale)` y
   `formatDate('YYYY-MM-DD', locale)` (un día de calendario, sin moverlo de zona).
+- **Ya hay**: `formatMoney` en `@erplora/ui/components/format` (ui `673e625`), pero no cubre lo que pinta
+  Facturación: un importe vacío sale como «—» y el precio unitario lleva hasta dos decimales más que la moneda
+  (`formatUnitPrice`). Faltan esos dos casos y los otros tres formateadores.
 - **Hoy**: `frontend/lib/format.ts` (copia del de Ventas, más `formatDate`). Se borra cuando lleguen.
 
 ## Motor de listas vivas por ventanas y tabla de servidor
