@@ -212,3 +212,9 @@ def open_hub_alias(hub) -> str:
 
         identity.verify(alias, hub.id)
     return alias
+
+
+def close_this_threads_connections() -> None:
+    """Close every connection this thread opened, control's included (a pooled one goes back to its pool): what a
+    thread of the worker does when its piece ends (``base.worker.Background``, as ``migrate_hubs``' threads)."""
+    connections.close_all()

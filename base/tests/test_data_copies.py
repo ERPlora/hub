@@ -10,12 +10,14 @@
 """
 
 import datetime as dt
+import sys
 import urllib.parse
 import uuid
 
 import pytest
 from django.contrib.auth import get_user_model
 from django.test import Client
+from django.utils import timezone
 from live.context import OperationContext, Scope
 from live.errors import NotFound, OperationError, PermissionDenied
 from live.operations import get
@@ -31,7 +33,20 @@ pytestmark = pytest.mark.django_db
 
 HUB_ID = uuid.UUID("0199c4b0-0000-7000-8000-0000000000d1")
 OTHER_ID = uuid.UUID("0199c4b0-0000-7000-8000-0000000000d2")
-AT = dt.datetime(2026, 10, 31, 10, 15, tzinfo=dt.UTC)
+#: An hour before the test, to the minute (``at``, read when each test runs, never at import): the copies are made
+#: around it, within their 90 days whenever the suite runs.
+AT: dt.datetime
+
+
+@pytest.fixture(autouse=True)
+def at(monkeypatch) -> dt.datetime:
+    value = (timezone.now() - dt.timedelta(hours=1)).replace(second=0, microsecond=0)
+    monkeypatch.setattr(sys.modules[__name__], "AT", value, raising=False)
+    return value
+
+
+def iso(at: dt.datetime) -> str:
+    return f"{at:%Y-%m-%dT%H:%M:%S}Z"
 
 
 def business(hub_id=HUB_ID, slug="acme", *, own=True, **fields) -> Hub:
@@ -66,8 +81,8 @@ def test_the_saas_gets_the_copies_newest_first_each_with_a_link_of_15_minutes(du
     body = answer.json()
     assert body["available"] is True
     assert [(row["id"], row["kind"], row["created_at"], row["bytes"]) for row in body["dumps"]] == [
-        (newer.key, "offboarding", "2026-10-31T10:20:00Z", 20),
-        (older.key, "reset", "2026-10-31T10:15:00Z", 10),
+        (newer.key, "offboarding", iso(AT + dt.timedelta(minutes=5)), 20),
+        (older.key, "reset", iso(AT), 10),
     ]
     for row in body["dumps"]:
         link = urllib.parse.urlsplit(row["url"])
@@ -108,6 +123,18 @@ def test_a_business_that_never_gets_a_copy_says_it(dumps_bucket, fields):
     assert dumps_of(HUB_ID).json() == {"available": False, "dumps": []}
 
 
+def test_a_copy_past_its_90_days_is_never_listed_nor_linked_to_the_saas(dumps_bucket):
+    """The bucket's lifecycle rule deletes a copy after 90 days (aws s3_dumps.tf): the Hub never offers one it may no
+    longer have (its link would open S3's error page)."""
+    hub = business()
+    kept = copy(hub, "reset", 0)
+    copy(hub, "offboarding", -120 * 24 * 60)
+
+    answer = dumps_of(HUB_ID)
+
+    assert [row["id"] for row in answer.json()["dumps"]] == [kept.key]
+
+
 def test_an_unknown_or_purged_business_is_404(dumps_bucket):
     assert dumps_of(HUB_ID).status_code == 404
     business(status="purged")
@@ -121,6 +148,23 @@ def test_without_a_bucket_the_copies_cannot_be_linked(no_dumps_bucket):
 
     assert answer.status_code == 503
     assert answer.json()["error"]["code"] == "base.dumps_unavailable"
+
+
+def test_without_a_bucket_a_business_that_gets_copies_cannot_be_checked_even_without_any(no_dumps_bucket):
+    """PLAN-SAAS §24: anything but 200 or 404 is a failure for the SaaS («could not check»), never «no copy yet», which
+    would promise a copy this Hub can never make (review of round 3)."""
+    business()
+
+    answer = dumps_of(HUB_ID)
+
+    assert answer.status_code == 503
+    assert answer.json()["error"]["code"] == "base.dumps_unavailable"
+
+
+def test_without_a_bucket_a_business_that_never_gets_a_copy_still_says_so(no_dumps_bucket):
+    business(own=False)
+
+    assert dumps_of(HUB_ID).json() == {"available": False, "dumps": []}
 
 
 def test_an_unsigned_call_is_refused():
@@ -156,7 +200,7 @@ def test_who_runs_the_business_sees_its_copies_and_how_its_reset_went():
             "error": "",
             "removed": [{"id": "table", "label": "Mesas", "removed": 12, "failed": 0, "problems": []}],
             "dump": str(first.pk),
-            "finished_at": "2026-10-31T10:16:00+00:00",
+            "finished_at": (AT + dt.timedelta(minutes=1)).isoformat(),
         }
     )
     copy(business(OTHER_ID, "other"), "reset", 3)
@@ -171,6 +215,19 @@ def test_who_runs_the_business_sees_its_copies_and_how_its_reset_went():
     assert [(section.id, section.label) for section in seen.reset.sections] == [("table", "Mesas")]
     assert [(app.id, app.removed) for app in seen.reset.removed] == [("table", 12)]
     assert seen.reset.finished_at == AT + dt.timedelta(minutes=1)
+
+
+def test_a_copy_past_its_90_days_is_neither_listed_nor_linked(dumps_bucket):
+    hub = business()
+    kept = copy(hub, "reset", 0)
+    gone = copy(hub, "reset", -(90 * 24 * 60 + 1))
+
+    owner = person("acme")
+
+    assert [row.id for row in call(owner, "base.hub.dumps").dumps] == [kept.pk]
+    with pytest.raises(NotFound) as refused:
+        call(owner, "base.hub.dump_link", id=gone.pk)
+    assert refused.value.message == "Esta copia ya no se guarda."
 
 
 def test_a_business_never_reset_has_no_reset_to_show():

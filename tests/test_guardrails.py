@@ -108,11 +108,6 @@ ORM_EXCEPTIONS: dict[str, str] = {
     "base/catalog.py": SHARED_CATALOG_REASON,
     "base/tenancy/bootstrap.py": "bootstrap runs once as the RDS master before any app database exists.",
     "base/tenancy/connections.py": TENANCY_ALIASES_REASON,
-    "base/worker.py": (
-        "The worker's slow passes (a hub's copy, the nightly measurement) run in threads of their own, one piece at a "
-        "time (PLAN-DB round 2026-10-31b, C8): each closes its thread's connections when it ends "
-        "(connections.close_all, as migrate_hubs' threads do); no query, no write."
-    ),
     "base/tenancy/router.py": (
         "The TenantRouter compares the databases behind two aliases (connections.settings) to allow a relation: it "
         "routes, it never queries (PLAN-DB §4)."
