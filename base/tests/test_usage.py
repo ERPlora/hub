@@ -53,7 +53,11 @@ def visit(host: str, person: str, day: dt.date) -> None:
 
 @pytest.mark.django_db(databases=hubs.HUB_DATABASES)
 def test_each_hub_with_its_own_database_is_measured_and_the_shared_one_is_skipped(hub_a, hub_b, caplog, settings, tmp_path):
-    settings.MEDIA_ROOT = tmp_path
+    # The hub file store on this test's own folder: nothing lands in the checkout's media/.
+    settings.STORAGES = {
+        **settings.STORAGES,
+        "hub_files": {"BACKEND": "django.core.files.storage.FileSystemStorage", "OPTIONS": {"location": str(tmp_path)}},
+    }
     storages["hub_files"].save(f"{hub_prefix(hub_a.id)}/files/menu.pdf", ContentFile(b"x" * 1234))
     visit(hub_a.slug, ANA, DAY)
     visit(hub_a.slug, OLGA, DAY - dt.timedelta(days=29))
