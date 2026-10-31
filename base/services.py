@@ -113,7 +113,7 @@ from base.models import ApiKey
 from base.throttle import client_key
 from base.tenancy import names as database_names
 from base.tenancy.connections import control_name
-from control.models import Cluster, HubDue
+from control.models import Cluster, HubDue, HubDump
 from base.schemas import (
     BlueprintImportIn,
     BlueprintSourceIn,
@@ -1850,6 +1850,27 @@ def import_undo(ctx: OperationContext, data: ImportUndoIn) -> dict:
         load.save(update_fields=["undone_at"])
         record_event(ctx, events.IMPORT_UNDONE, {"id": str(load.pk)})
         return {"id": load.pk, "apps": removed["apps"]}
+
+
+# ── The copies of a hub's data (round 2026-10-30 of PLAN-DB, decision 2; base.tenancy.dumps) ─────────────────────────
+
+
+def dump_key_taken(key: str) -> bool:
+    """Whether a copy is already kept at ``key`` (two copies of a hub in the same second get the next second)."""
+    from base.tenancy.context import use_control
+
+    with use_control():
+        return HubDump.objects.filter(key=key).exists()
+
+
+def dump_recorded(
+    hub_id: UUID, *, kind: str, key: str, size: int, created_at: dt.datetime, requested_by: str = ""
+) -> HubDump:
+    """Keep in control the copy of ``hub_id`` just uploaded to ``key``."""
+    with _control_transaction():
+        return HubDump.objects.create(
+            hub_id=hub_id, kind=kind, key=key, bytes=size, created_at=created_at, requested_by=requested_by[:150]
+        )
 
 
 def same_name(typed: str, name: str) -> bool:

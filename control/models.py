@@ -160,6 +160,11 @@ class Hub(models.Model):
     ready_at = models.DateTimeField(pgettext_lazy("hub registry", "ready at"), null=True, blank=True)
     cancelled_at = models.DateTimeField(pgettext_lazy("hub registry", "cancelled at"), null=True, blank=True)
     purged_at = models.DateTimeField(_("purged at"), null=True, blank=True)
+    # «Reset the business» (round 2026-10-30 of PLAN-DB, decision 2): asked by who runs it, done by the worker after it
+    # copied the database (``base.tenancy.dumps``). ``reset_requested_at`` is set while it is to do; ``reset_sections``
+    # keeps what was asked and how it went (``base.services``, «The reset of a business»), shown on Settings › Data.
+    reset_requested_at = models.DateTimeField(_("reset asked"), null=True, blank=True)
+    reset_sections = models.JSONField(_("reset"), null=True, blank=True)
 
     class Meta:
         db_table = "base_hub"
@@ -246,3 +251,96 @@ class HubDue(models.Model):
                 f"ON CONFLICT (hub_id) DO UPDATE SET due_at = LEAST({table}.due_at, EXCLUDED.due_at)",
                 [hub.pk, at],
             )
+
+
+class HubDump(UUIDModel):
+    """A copy of a hub's database (``pg_dump -Fc``) in the dumps bucket (round 2026-10-30 of PLAN-DB, decision 2 and
+    proposals (a), (k), (m)): made before its data is reset (``reset``) and when the business leaves (``offboarding``),
+    at ``<hex>/<AAAAMMDDTHHMMSSZ>-<kind>.dump`` (``key``, unique: no versions in the bucket), kept 90 days by the
+    bucket's lifecycle rule. ``created_at`` is when it was made, the key's time; ``requested_by`` who asked for it
+    (the reset's person; empty for a business that left)."""
+
+    class Kind(models.TextChoices):
+        RESET = "reset", pgettext_lazy("data copy", "Before a reset")
+        OFFBOARDING = "offboarding", pgettext_lazy("data copy", "On leaving")
+
+    hub = models.ForeignKey(Hub, on_delete=models.CASCADE, related_name="dumps", verbose_name=_("hub"))
+    kind = models.CharField(_("kind"), max_length=16, choices=Kind.choices)
+    key = models.CharField(_("key"), max_length=512, unique=True)
+    bytes = models.PositiveBigIntegerField(_("size (bytes)"))
+    created_at = models.DateTimeField(pgettext_lazy("data copy", "made at"))
+    requested_by = models.CharField(pgettext_lazy("data copy", "asked by"), max_length=150, blank=True, default="")
+
+    class Meta:
+        verbose_name = _("data copy")
+        verbose_name_plural = _("data copies")
+        ordering = ["-created_at", "-id"]
+        indexes = [models.Index(fields=["hub", "-created_at"], name="control_hubdump_hub_created")]
+
+    def __str__(self) -> str:
+        return self.key
+
+
+class HubUsageDaily(UUIDModel):
+    """What a hub with its own database used on a day (UTC), as the worker measured it that night (``base.usage``):
+    its database (``pg_database_size``), its files in S3 and the people who came in that day and in the 30 days that
+    end it. One row per hub and day; ``GET /internal/usage?day=`` serves them to the SaaS (its ``hubs/README.md``,
+    «Contrato para el Hub»)."""
+
+    hub = models.ForeignKey(Hub, on_delete=models.CASCADE, related_name="usage", verbose_name=_("hub"))
+    day = models.DateField(_("day"))
+    db_bytes = models.PositiveBigIntegerField(_("database (bytes)"), default=0)
+    s3_bytes = models.PositiveBigIntegerField(_("files (bytes)"), default=0)
+    active_users_1d = models.PositiveIntegerField(_("people that day"), default=0)
+    active_users_30d = models.PositiveIntegerField(_("people in 30 days"), default=0)
+    measured_at = models.DateTimeField(_("measured at"))
+
+    class Meta:
+        verbose_name = _("daily use of a hub")
+        verbose_name_plural = _("daily use of the hubs")
+        ordering = ["-day", "hub_id"]
+        constraints = [models.UniqueConstraint(fields=["hub", "day"], name="control_hubusagedaily_one_per_day")]
+        indexes = [models.Index(fields=["day", "hub"], name="control_hubusagedaily_day_hub")]
+
+    def __str__(self) -> str:
+        return f"{self.hub_id} @ {self.day}"
+
+
+class HubVisit(models.Model):
+    """A person came into a hub on a day (UTC): a login of their account, their PIN or their badge
+    (``base.services``, every login). One row per hub, day and person, whatever the logins: what the nightly
+    measurement counts as the hub's active people (``base.usage``), which keeps the last 31 days only."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid7, editable=False)
+    host = models.CharField(_("host"), max_length=63)
+    day = models.DateField(_("day"))
+    saas_user_id = models.CharField(_("SaaS account"), max_length=64)
+
+    class Meta:
+        verbose_name = _("daily entry")
+        verbose_name_plural = _("daily entries")
+        constraints = [
+            models.UniqueConstraint(fields=["host", "day", "saas_user_id"], name="control_hubvisit_one_per_day")
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.saas_user_id} @ {self.host} ({self.day})"
+
+
+class UsageRun(models.Model):
+    """One night of measuring (``base.usage``): the day (UTC) measured, when a worker started it and when it finished.
+    A day without a finished run is one the Hub has not measured yet (``GET /internal/usage`` answers 409
+    ``usage_not_ready``); a run left unfinished (its worker stopped) is taken over after a while."""
+
+    day = models.DateField(_("day"), primary_key=True)
+    started_at = models.DateTimeField(_("started at"))
+    finished_at = models.DateTimeField(_("finished at"), null=True, blank=True)
+    hubs = models.PositiveIntegerField(_("hubs measured"), default=0)
+
+    class Meta:
+        verbose_name = _("nightly measurement")
+        verbose_name_plural = _("nightly measurements")
+        ordering = ["-day"]
+
+    def __str__(self) -> str:
+        return f"{self.day}"

@@ -143,3 +143,85 @@ msgstr "Vacío: a sus hubs se llega por su escritor, directamente."
 
 msgid "leased by"
 msgstr "reservado por"
+
+msgid "reset asked"
+msgstr "restablecimiento pedido"
+
+msgid "reset"
+msgstr "restablecimiento"
+
+msgctxt "data copy"
+msgid "Before a reset"
+msgstr "Antes de restablecer"
+
+msgctxt "data copy"
+msgid "On leaving"
+msgstr "Al darse de baja"
+
+msgid "kind"
+msgstr "tipo"
+
+msgid "key"
+msgstr "clave"
+
+msgid "size (bytes)"
+msgstr "tamaño (bytes)"
+
+msgctxt "data copy"
+msgid "made at"
+msgstr "hecha el"
+
+msgid "data copy"
+msgstr "copia de los datos"
+
+msgid "data copies"
+msgstr "copias de los datos"
+
+msgid "day"
+msgstr "día"
+
+msgid "database (bytes)"
+msgstr "base de datos (bytes)"
+
+msgid "files (bytes)"
+msgstr "ficheros (bytes)"
+
+msgid "people that day"
+msgstr "personas ese día"
+
+msgid "people in 30 days"
+msgstr "personas en 30 días"
+
+msgid "measured at"
+msgstr "medido el"
+
+msgid "daily use of a hub"
+msgstr "uso diario de un hub"
+
+msgid "daily use of the hubs"
+msgstr "uso diario de los hubs"
+
+msgid "daily entry"
+msgstr "entrada diaria"
+
+msgid "daily entries"
+msgstr "entradas diarias"
+
+msgid "started at"
+msgstr "empezada el"
+
+msgid "finished at"
+msgstr "terminada el"
+
+msgid "hubs measured"
+msgstr "hubs medidos"
+
+msgid "nightly measurement"
+msgstr "medición nocturna"
+
+msgid "nightly measurements"
+msgstr "mediciones nocturnas"
+
+msgctxt "data copy"
+msgid "asked by"
+msgstr "pedida por"
