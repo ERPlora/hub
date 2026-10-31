@@ -108,15 +108,19 @@ function callOf(lines: string[]): string {
   return lines.join('\n');
 }
 
+/** A line left open for the next one: it ends in `=` (`const { scrollWidth } =`) or opens a destructuring (`const {`). */
+const OPEN_LINE = /=\s*$|\b(?:const|let|var)\s*\{[^}]*$/;
+
 /**
  * The statements of `source`, each with the line it starts on: a line that goes on with a chain (`.x`, `?.x`) is joined to
- * the one before it, so that a measure split over lines (`document.documentElement` and `.scrollWidth` below) reads as one.
+ * the one before it, so that a measure split over lines (`document.documentElement` and `.scrollWidth` below) reads as one;
+ * so is a line after one left open (`const { scrollWidth } =` and the root below, or `const {` and its names below).
  */
 function statements(source: string): Array<{ line: number; text: string }> {
   const found: Array<{ line: number; text: string }> = [];
   source.split('\n').forEach((text, index) => {
     const last = found.at(-1);
-    if (last && /^\s*\??\.(?!\.)/.test(text)) last.text += text.trim();
+    if (last && (/^\s*\??\.(?!\.)/.test(text) || OPEN_LINE.test(last.text))) last.text += text.trim();
     else found.push({ line: index + 1, text });
   });
   return found;
@@ -420,5 +424,23 @@ describe('the e2e checks for a horizontal scroll go through horizontalOverflow()
       ["const { scrollWidth } = await page.locator('html').evaluate((html) => {", "  const table = html.querySelector('table');", '  return table;', '});'],
     ];
     expect(none.map((lines) => documentMeasures('g.ts', lines.join('\n')))).toEqual(none.map(() => []));
+  });
+
+  it('the count reads a width destructured over lines: the root below a line that ends in `=`, or the braces of `const {` open over several', () => {
+    const copies = [
+      ['const { scrollWidth, clientWidth } =', '  document.documentElement;'],
+      ['const {', '  scrollWidth,', '  clientWidth,', '} = document.documentElement;'],
+      ['const overflow = await page.evaluate(() => {', '  const { scrollWidth, clientWidth } =', '    document.scrollingElement!;', '  return scrollWidth - clientWidth;', '});'],
+      ['const {', '  scrollWidth: wide,', '} = await page.evaluate(() => document.documentElement);'],
+      ['const root =', '  document.documentElement;', 'return root.scrollWidth;'],
+    ];
+    expect(copies.map((copy) => documentMeasures('h.ts', copy.join('\n')))).toEqual([['h.ts:1'], ['h.ts:1'], ['h.ts:2'], ['h.ts:1'], ['h.ts:3']]);
+    const none = [
+      ['const { scrollHeight, clientHeight } =', '  document.documentElement;', "const cut = await page.locator('.chip').evaluate((el) => el.scrollWidth);"],
+      ['const { scrollWidth } =', "  document.querySelector('.chip')!;"],
+      ['const {', '  scrollWidth,', '} = chip;'],
+      ['const cut =', "  await page.locator('.chip').evaluate((el) => el.scrollWidth > el.clientWidth);"],
+    ];
+    expect(none.map((lines) => documentMeasures('h.ts', lines.join('\n')))).toEqual(none.map(() => []));
   });
 });
