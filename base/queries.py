@@ -1803,8 +1803,11 @@ def file_read(ctx: OperationContext, data: FileReadIn) -> dict:
 
 from live.errors import OperationError  # noqa: E402 - the assistant's block keeps its imports with it
 
+from live.operations import AI  # noqa: E402
+from pydantic import ValidationError  # noqa: E402
+
 from base import assistant  # noqa: E402
-from base.schemas import AssistantUsageIn, AssistantUsageOut  # noqa: E402
+from base.schemas import AssistantUsageIn, AssistantUsageOut, DocsSearchIn, DocsSearchOut  # noqa: E402
 
 
 @operation(
@@ -1832,6 +1835,34 @@ def assistant_usage(ctx: OperationContext, data: AssistantUsageIn) -> dict:
         "resets_at": usage.get("resets_at"),
         "demo": bool(usage.get("demo")),
     }
+
+
+@operation(
+    "base.docs.search",
+    kind="query",
+    permission=VIEW_HOME,
+    input=DocsSearchIn,
+    output=DocsSearchOut,
+    ai=AI(
+        description=(
+            "Searches ERPlora's help and the documentation of its apps for how-to questions (how to do something, "
+            "what a screen or option means, plans and prices): returns up to 8 cited excerpts. Not for the "
+            "business's own records."
+        )
+    ),
+    # It waits on erplora.com: no transaction holds the hub's connection meanwhile (in a turn, its route asked first).
+    database=False,
+)
+def docs_search(ctx: OperationContext, data: DocsSearchIn) -> DocsSearchOut:
+    """The excerpts of ERPlora's documentation nearest to the person's question, in their language (saas
+    ASSISTANT-F28): erplora.com's one index, never one of the Hub's. What it cannot answer is an error the assistant
+    relays, never excerpts made up."""
+    try:
+        return DocsSearchOut.model_validate(assistant.searched_docs(ctx, query=data.query, limit=data.limit))
+    except (assistant.GatewayError, ValidationError):
+        with translation.override(ctx.language):
+            message = gettext("ERPlora's documentation could not be searched now.")
+        raise OperationError(message, code="base.assistant_unavailable", status=503) from None
 
 
 # ── Locations (round 2026-10-24b, multi-location) ──────────────────────────────────────────────────────────────────
