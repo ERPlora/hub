@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:69dd561846a263dfdda497bf7c1c0a2aaac98fe84af7ab4f96b89105dae2a32e -->
+<!-- generated from WORKBOOK.md sha256:e464c1f7d85086eba0a68e893f0b6919a5518619d0a89e73ef0a892aa9863df8 -->
 
 ## What it is for and who it is for
 
@@ -313,8 +313,8 @@ Steps:
 1. In **Tables → Zones**, "Edit": change Name, Description, Colour, Order or "Active" and tap "Save
    changes". On the plan, the pencil ("Edit zone") changes Name and Description.
 2. To delete it (the administrator only): "Delete" opens "Delete zone?" with "N tables in this zone. A
-   zone with tables cannot be deleted: move or delete its tables first."; with tables, "Delete zone"
-   comes out off.
+   zone with tables cannot be deleted: move or delete its tables first." (with just one, "1 table in
+   this zone. … move or delete it first."); with tables, "Delete zone" comes out off.
 3. Without tables, "Delete zone" removes it from the list and from the plan.
 In: the chosen zone.
 Out: the changed zone (announces: `table.zone.updated`) or the deleted one (announces:
@@ -404,8 +404,8 @@ Status: done
 Actor: employee, manager
 Screen: Floor plan (Service)
 Steps:
-1. In **Floor plan → Service**, tap an Occupied table: its window opens with guests, since when, server
-   and customer.
+1. In **Floor plan → Service**, tap an Occupied table: its window opens with guests ("1 guest", "3
+   guests"), since when, server and customer.
 2. **Charge** takes you to **Sales → Sell** with that check on screen (`/sale/pos?order=<id>`); there
    rounds are added and it is charged.
 3. With two checks at the table (split), the check is chosen first ("Check 1", "Check 2").
@@ -578,7 +578,7 @@ Steps:
 1. In **Tables → Sessions → Open**, "Close session" (or "Close table" in the table's window).
 2. Confirm in "Close the session?": "Table N · N guests. The table is freed and the session moves to
    the history. If its bill is still open in Sales, first charge it, move it to another table or delete
-   it from the till.".
+   it from the till." (with just one, "1 guest").
 3. If its Sales check is empty (nobody ordered anything), Tables voids it and closes the table: a party
    that gets up without ordering does not need a manager.
 4. If its check has something ordered, nothing is closed: it is charged (TABLE-F18), moved to another

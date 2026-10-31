@@ -40,6 +40,15 @@ describe('ZoneDeleteDialog', () => {
     expect(d.submit().disabled).toBe(true);
   });
 
+  it.each([
+    ['en', '1 table in this zone. A zone with tables cannot be deleted: move or delete it first.'],
+    ['es', '1 mesa en esta zona. Una zona con mesas no se puede borrar: muévela o bórrala antes.'],
+  ] as const)('a zone with one table says it in the singular (%s, hub#462)', async (locale, impact) => {
+    const d = await dialog(zoneRow({ table_count: 1 }), {}, locale);
+    expect(d.inDoc('zones-delete')?.textContent).toContain(impact);
+    expect(d.submit().disabled).toBe(true);
+  });
+
   it('a refusal stays in the dialog', async () => {
     const refusal = { error: { code: 'table.zone_has_tables', message: 'That zone still has tables.' } };
     const d = await dialog(zoneRow(), { '/api/table/zones/delete': [409, refusal] });

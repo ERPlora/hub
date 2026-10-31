@@ -24,7 +24,8 @@ import { isThemeColor } from '../lib/colors';
 import type { TagListIn, TagRow } from '../operations';
 
 const session = useSession();
-const canConfigure = computed(() => session.can('customer.configure'));
+// Whoever manages cards sees it too: without the permission, a manager approves it with their PIN (BASE-F84).
+const canConfigure = computed(() => session.can('customer.configure') || session.can('customer.manage'));
 const canDelete = computed(() => session.can('customer.delete'));
 const { t } = useCustomerI18n();
 
@@ -127,7 +128,7 @@ function onSort(next: { sort: string; dir: SortDir }): void {
       :views="['table', 'cards']"
       :card-title="(row: TagRow) => row.name"
       card-title-column="name"
-      :card-icon="() => 'ion:list-outline'"
+      :card-icon="() => 'ion:pricetags'"
       :entity-label="{ one: $t('customer.tags.entity.one'), many: $t('customer.tags.entity.many') }"
       :loading="status === 'loading'"
       :error="status === 'error' ? error?.message : undefined"
@@ -164,7 +165,7 @@ function onSort(next: { sort: string; dir: SortDir }): void {
       <template #empty>
         <EmptyState
           data-testid="customer-tags-empty"
-          icon="list-outline"
+          icon="pricetags"
           :heading="list.filtered.value ? $t('customer.list.noResults') : $t('customer.tags.empty')"
           :message="list.filtered.value ? $t('customer.tags.noResults') : undefined"
         />

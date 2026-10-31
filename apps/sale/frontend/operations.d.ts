@@ -539,6 +539,7 @@ export interface PreviewOut {
   /** Every discount given. */
   discount_amount: number;
   discount_percent: string;
+  /** What the ticket discount (its percent and its fixed amount) takes off this charge. */
   ticket_discount_amount: number;
   gift_total: number;
   total: number;
