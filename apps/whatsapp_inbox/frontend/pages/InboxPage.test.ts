@@ -45,7 +45,7 @@ const row = (over: Partial<ConversationOut> = {}): ConversationOut => ({
   ...over,
 });
 const PAGE = {
-  rows: [row(), row({ id: 'c2', phone: '+34600999888', contact_name: '', display_name: '+34600999888', customer_id: null, customer_name: '', status: 'pending', unread_count: 0, assigned_to_id: 7, assigned_to_name: 'Marta' })],
+  rows: [row(), row({ id: 'c2', phone: '+34600999888', contact_name: '', display_name: '+34600999888', customer_id: null, customer_name: '', status: 'pending', unread_count: 0, assigned_to_id: '01a16000-0000-7000-8000-0000000000b7', assigned_to_name: 'Marta' })],
   total: 2,
   limit: 50,
   offset: 0,

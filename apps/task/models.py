@@ -3,11 +3,11 @@
 Phase 1 has no tenancy: every scope (``a``, ``b``) shares these tables; only the live notifications
 are per scope. Phase 2 moves them to each hub's database. The assignee and a project's owner are
 staff records (``staff.Member``, the app's only requirement); the creator of a task and the author of
-a comment hang from the platform's user (``settings.AUTH_USER_MODEL``), like ``staff.TimeOff``'s
-approver, and move with it in phase 2.
+a comment hang from the person in the business's own database (``base.HubUser``), like ``staff.TimeOff``'s
+approver, never from control's user (tenancy W10): their columns ``*_hub_user_id`` are new, the old ones wait empty
+for a later deploy to drop them (``migrations/0002_hub_users``).
 """
 
-from django.conf import settings
 from django.db import models
 from django.db.models import F, Q
 from django.db.models.functions import Lower
@@ -108,11 +108,12 @@ class Task(UUIDModel):
         verbose_name=_("assigned to"),
     )
     created_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
+        "base.HubUser",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name="+",
+        db_column="created_by_hub_user_id",
         verbose_name=_("created by"),
     )
     due_date = models.DateField(_("due date"), null=True, blank=True)
@@ -159,11 +160,12 @@ class Comment(UUIDModel):
         Task, on_delete=models.CASCADE, related_name="comments", verbose_name=_("task")
     )
     author = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
+        "base.HubUser",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name="+",
+        db_column="author_hub_user_id",
         verbose_name=_("author"),
     )
     text = models.TextField(_("comment"))

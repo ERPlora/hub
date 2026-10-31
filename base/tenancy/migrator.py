@@ -113,7 +113,9 @@ class UnknownApp(LookupError):
 
 
 class AppNotPortable(ValueError):
-    """An app whose tables still reference control's users: no hub's database can hold them yet."""
+    """An app whose tables reference a model of control's database: no hub's database can hold them. None since
+    tenancy W10 (the people of a business are its own, ``base.HubUser``); ``tests/test_guardrails.py`` «(h)» keeps it
+    so."""
 
     code = "app_not_portable"
 
@@ -160,7 +162,7 @@ class ClusterTarget:
 @dataclass(frozen=True)
 class Template:
     """A template every new hub is cloned from: its database, its apps and, for a vertical's, the template it is
-    cloned from when missing and its vertical's apps it cannot hold yet (``portable_apps``)."""
+    cloned from when missing and its vertical's apps it cannot hold (``portable_apps``: none since tenancy W10)."""
 
     db_name: str
     apps: tuple[str, ...]
@@ -280,9 +282,9 @@ def _hub_classes(model) -> bool:
 def portable_apps() -> tuple[str, ...]:
     """The hub apps whose tables reference only a hub's own, and whose migrations need no other app's.
 
-    Phase 1 links some modules to control's users (``settings.AUTH_USER_MODEL``: staff, attendance, task,
-    whatsapp_inbox and what depends on them): their tables cannot live in a hub's database until the hub's own staff
-    comes (PLAN-DB round 2026-10-22, «Tests»), so no template and no ``add=`` holds them yet.
+    Every hub app since tenancy W10: staff, attendance, task and whatsapp_inbox hang a person from the business's own
+    ``base.HubUser``, not from control's user. An app that linked a model of control's again (and what depends on it)
+    would be left out of every template and refused by ``add=``; ``tests/test_guardrails.py`` «(h)» stops it first.
     """
     labels = hub_apps()
     graph = MigrationLoader(None, ignore_no_migrations=True).graph
@@ -321,8 +323,8 @@ def _with_requires(labels: Iterable[str]) -> set[str]:
             pending.extend(getattr(django_apps.get_app_config(label), "requires", ()) or ())
     if blocked := sorted(closed - set(portable_apps())):
         raise AppNotPortable(
-            f"{', '.join(blocked)} cannot be created in a hub's database yet: their tables still reference "
-            "control's users (PLAN-DB round 2026-10-22, «Tests»)."
+            f"{', '.join(blocked)} cannot be created in a hub's database: their tables reference a model of "
+            "control's database (tests/test_guardrails.py, «(h)»)."
         )
     return closed
 

@@ -91,7 +91,7 @@ def values(card: dict) -> dict:
 def manager(make_user, permissions: frozenset | None):
     """Marta, who manages the team: with ``permissions`` alone, or with the manager's role when ``None``."""
     user = make_user("marta", role="hub_manager", first_name="Marta", last_name="Jefa")
-    make_member("Marta", "Jefa", user=user)
+    make_member("Marta", "Jefa", user=user.person)
     return ctx_for("hub_manager", actor=user, permissions=permissions)
 
 

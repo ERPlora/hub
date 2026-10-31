@@ -67,9 +67,9 @@ def correction(record, reason="Forgot to clock out", by=None, at=None) -> Correc
         new_clock_out_at=record.clock_out_at,
         new_status=record.status,
         reason=reason,
-        created_by=by,
+        created_by=None if by is None else by.person,
         is_system=by is None,
-        created_by_name=queries.user_name(by),
+        created_by_name=queries.user_name(None if by is None else by.person),
     )
     if at:
         Correction.objects.filter(pk=trail.pk).update(created_at=utc(at))
@@ -317,7 +317,7 @@ def test_the_detail_carries_the_breaks_and_where_it_was_clocked(
         in_accuracy_m=9.5,
         in_distance_m=12.0,
         in_within_radius=True,
-        created_by=boss,
+        created_by=boss.person,
     )
     detail = run("attendance.record.detail", {"id": str(record.id)}, ctx)
     assert isinstance(detail, RecordDetailOut)
@@ -792,6 +792,6 @@ def test_a_correction_keeps_who_made_it_when_their_user_is_deleted(person, make_
     record = day(ana, "2026-10-05T07:00", "2026-10-05T15:00")
     boss = make_user("boss", role="hub_manager", first_name="Marta", last_name="Jefa")
     correction(record, "First", by=boss)
-    boss.delete()
+    boss.person.delete()
     row = run("attendance.correction.list", {"record_id": str(record.id)}, ctx).rows[0]
     assert (row.is_system, row.created_by_name) == (False, "Marta Jefa")

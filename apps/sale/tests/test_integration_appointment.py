@@ -212,7 +212,7 @@ def test_charging_an_appointment_on_me_leaves_its_services_with_its_professional
     opened = run("appointment.appointment.charge", {"id": str(appointment.id)})
     # The receptionist charges it with the chip on «Me»; a comb sold at the till goes with the check.
     user = make_user("bea", role="hub_manager")
-    bea = as_platform("staff.member.create", {"first_name": "Bea", "last_name": "Ruiz", "user_id": user.pk})
+    bea = as_platform("staff.member.create", {"first_name": "Bea", "last_name": "Ruiz", "user_id": str(user.person.pk)})
     as_platform("inventory.product.create", {"name": "Comb", "sku": "CMB", "price": 605, "tax_category_key": "product.generic"})
     receptionist = ctx_for("hub_manager", actor=user)
     run("sale.order.add_line", {"order_id": str(opened.order_id), "product": "CMB"}, receptionist)

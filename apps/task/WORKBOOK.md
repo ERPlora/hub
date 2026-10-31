@@ -482,8 +482,9 @@ cliente o a un compañero).
   en Personal entregada por el relay real del worker (TASK-F15, con dos negocios).
 - Modelos: `Project`, `Task` (con `parent` a sí misma, `CASCADE`; `project` y `assigned_to`,
   `SET_NULL`), `Comment` (`CASCADE` con su tarea) y `TaskCounter` (un contador por día del negocio).
-  UUIDv7, sin `hub_id`. `created_by` y `Comment.author` cuelgan de `settings.AUTH_USER_MODEL`
-  (`SET_NULL`), como `staff.TimeOff.approved_by`; la fase 2 los mueve con los usuarios del hub.
+  UUIDv7, sin `hub_id`. `created_by` y `Comment.author` cuelgan de la persona del negocio en su BD,
+  `base.HubUser` (`SET_NULL`; columnas `*_hub_user_id`, tenencia W10), como `staff.TimeOff.approved_by`;
+  nunca de `settings.AUTH_USER_MODEL`, que vive en control.
 - **Hecha ⇔ fecha de completada**: restricción `task_task_completed_iff_done`.
 - **Número sin huecos**: `TSK-AAAAMMDD-NNNN` con el día del negocio; el contador del día se crea si
   falta (`INSERT … ON CONFLICT DO NOTHING`) y se sube con un `UPDATE` que bloquea su fila hasta el

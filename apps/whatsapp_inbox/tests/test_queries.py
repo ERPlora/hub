@@ -4,6 +4,8 @@ exact-number lookup for other apps, the summary, the templates, the channel and 
 import datetime as dt
 
 import pytest
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from live.errors import Conflict, NotFound, PermissionDenied
 
 from apps.whatsapp_inbox.models import Conversation
@@ -97,7 +99,7 @@ def test_filters_by_status_unread_and_assignment(three, make_user):
     run("whatsapp_inbox.conversation.mark_read", {"id": str(three["Carla"].id)})
     run(
         "whatsapp_inbox.conversation.assign",
-        {"id": str(three["Ana"].id), "assignee_id": luis.id},
+        {"id": str(three["Ana"].id), "assignee_id": str(luis.person.id)},
     )
     assert listed({"status": "pending"}) == ["+34600222222"]
     assert listed({"unread": True}) == ["+34600111111", "+34600222222"]
@@ -105,7 +107,7 @@ def test_filters_by_status_unread_and_assignment(three, make_user):
     assert listed({"assigned": "me"}, ctx_for("hub_employee", actor=luis)) == [
         "+34600111111"
     ]
-    assert listed({"assigned": str(luis.id)}) == ["+34600111111"]
+    assert listed({"assigned": str(luis.person.id)}) == ["+34600111111"]
     assert listed({"assigned": "none"}) == ["+34600222222", "+34600333333"]
 
 
@@ -128,7 +130,7 @@ def test_sorting_by_any_column_keeps_a_stable_order(three):
 def test_an_empty_value_goes_last_whichever_way_it_is_sorted(three, make_user):
     """gh:hub#2099: sorting by a column some rows leave empty never puts the empty ones first."""
     luis = make_user("luis")
-    run("whatsapp_inbox.conversation.assign", {"id": str(three["Bea"].id), "assignee_id": luis.id})
+    run("whatsapp_inbox.conversation.assign", {"id": str(three["Bea"].id), "assignee_id": str(luis.person.id)})
     assert listed({"sort": "assigned_to", "dir": "desc"})[0] == "+34600222222"
     assert listed({"sort": "assigned_to", "dir": "asc"})[0] == "+34600222222"
 
@@ -288,6 +290,25 @@ def test_notes_say_who_may_delete_them(three, make_user):
         "whatsapp_inbox.note.list", {"conversation": "Ana"}, ctx_for("hub_manager")
     ).rows
     assert all(note.can_delete for note in rows)
+
+
+def test_the_notes_ask_who_the_caller_is_once_however_many_there_are(three, make_user, django_assert_num_queries):
+    # W10: the caller is a person of the business's database (base.HubUser); reading them per note was one more query
+    # per row of the page.
+    luis = make_user("luis", first_name="Luis")
+    as_luis = ctx_for("hub_employee", actor=luis)
+
+    def listed():
+        return run("whatsapp_inbox.note.list", {"conversation": "Ana"}, as_luis).rows
+
+    run("whatsapp_inbox.note.add", {"conversation": "Ana", "text": "One"}, as_luis)
+    with CaptureQueriesContext(connection) as one:
+        assert len(listed()) == 1
+    for text in ("Two", "Three", "Four"):
+        run("whatsapp_inbox.note.add", {"conversation": "Ana", "text": text}, as_luis)
+
+    with django_assert_num_queries(len(one.captured_queries)):
+        assert [note.can_delete for note in listed()] == [True] * 4
 
 
 # ── Templates, channel and team ─────────────────────────────────────────────────────────────────

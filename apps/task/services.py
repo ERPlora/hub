@@ -55,6 +55,7 @@ from apps.task.schemas import (
     TaskPatchIn,
     TaskRefIn,
 )
+from base.services import acting_hub_user
 
 TASK_ALREADY_CLOSED = _("That task is already closed, so it was left as it was.")
 MEMBER_INACTIVE = _("That person is not active in the team.")
@@ -182,6 +183,8 @@ def _set_status(ctx: OperationContext, task: Task, status: str) -> None:
     },
 )
 def create_task(ctx: OperationContext, data: TaskIn) -> dict:
+    # Who creates it signs it (made if their session came before their person): first, so the caller owns it.
+    creator = acting_hub_user(ctx)
     caller = Caller(ctx)
     # What it names is held until the end, in the order the deletions take it: person, project, parent.
     assignee = _member(data.assigned_to_id, data.assignee, id_field="assigned_to_id", name_field="assignee")
@@ -195,7 +198,7 @@ def create_task(ctx: OperationContext, data: TaskIn) -> dict:
         project=project,
         parent=parent,
         assigned_to=assignee,
-        created_by_id=caller.user_id,
+        created_by=creator,
         tags=data.tags,
     )
     record_event(
@@ -392,11 +395,11 @@ def release_member(ctx: OperationContext, data: MemberReleaseIn) -> dict:
     },
 )
 def add_comment(ctx: OperationContext, data: CommentIn) -> dict:
+    author = acting_hub_user(ctx)
     caller = Caller(ctx)
     task = _changeable(caller, data.task_id, data.task)
-    comment = Comment.objects.create(task=task, author_id=caller.user_id, text=data.text)
+    comment = Comment.objects.create(task=task, author=author, text=data.text)
     record_event(ctx, events.COMMENT_ADDED, {"id": str(comment.pk), "task_id": str(task.pk)})
-    comment.author = ctx.actor if caller.user_id is not None else None
     return comment_row(comment)
 
 

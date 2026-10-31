@@ -57,8 +57,11 @@ def test_lists_page_by_at_most_100():
 def test_the_list_s_assignment_filter_is_me_none_or_a_person():
     assert S.ConversationListIn.model_validate({"assigned": "me"}).assigned == "me"
     assert S.ConversationListIn.model_validate({"assigned": "none"}).assigned == "none"
-    assert S.ConversationListIn.model_validate({"assigned": "7"}).assigned == "7"
+    person = "01a16000-0000-7000-8000-0000000000a7"
+    assert S.ConversationListIn.model_validate({"assigned": person}).assigned == person
     assert "assigned" in errors(S.ConversationListIn, {"assigned": "somebody"})
+    # A person is someone of the business's database (base.HubUser, W10): control's number no longer names one.
+    assert "assigned" in errors(S.ConversationListIn, {"assigned": "7"})
     assert "status" in errors(S.ConversationListIn, {"status": "archived"})
     assert "sort" in errors(S.ConversationListIn, {"sort": "payload"})
 
@@ -90,7 +93,8 @@ def test_send_goes_to_a_conversation_or_to_a_number():
 
 def test_assign_takes_one_person_or_nobody():
     assert S.AssignIn.model_validate({"id": str(ID), "assignee": "me"}).assignee == "me"
-    assert S.AssignIn.model_validate({"id": str(ID), "assignee_id": 7}).assignee_id == 7
+    person = UUID("01a16000-0000-7000-8000-0000000000a7")
+    assert S.AssignIn.model_validate({"id": str(ID), "assignee_id": str(person)}).assignee_id == person
     assert S.AssignIn.model_validate({"id": str(ID), "unassign": True}).unassign is True
     assert "assignee" in errors(S.AssignIn, {"id": str(ID)})
     assert "assignee" in errors(

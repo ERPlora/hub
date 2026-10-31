@@ -284,7 +284,7 @@ def test_an_ambiguous_name_is_a_409(boss, client):
 @pytest.mark.django_db
 def test_the_time_off_round_trip(boss, client, make_user):
     me = make_user("eva", host="a", role="hub_employee")
-    member = make_member("Eva", "Sanz", user=me)
+    member = make_member("Eva", "Sanz", user=me.person)
 
     created = post(
         client,
@@ -454,7 +454,7 @@ def test_a_field_the_batch_does_not_know_never_brings_it_down(boss, client):
 
 @pytest.mark.django_db
 def test_my_record_over_http(employee, client):
-    member = make_member("Ana", user=employee, hourly_rate=1200)
+    member = make_member("Ana", user=employee.person, hourly_rate=1200)
     assert get(client, "/staff/members/mine").json()["member"]["hourly_rate"] == 1200
     make_time_off(member, "2026-10-12")
     assert get(client, "/staff/time_off/mine").json()["total"] == 1
@@ -464,7 +464,7 @@ def test_my_record_over_http(employee, client):
 def test_the_current_record_over_http_says_only_who_and_never_the_pay(employee, client):
     # flow: SALE-F16 (atribuir a quien tiene la sesión con «Atiende yo»)
     assert get(client, "/staff/members/current").json() == {"member": None}
-    member = make_member("Ana", user=employee, hourly_rate=1200)
+    member = make_member("Ana", user=employee.person, hourly_rate=1200)
     assert get(client, "/staff/members/current").json() == {
         "member": {"id": str(member.id), "full_name": "Ana López"}
     }
@@ -476,6 +476,6 @@ def test_the_current_record_over_http_says_only_who_and_never_the_pay(employee, 
 def test_the_hub_user_selector_over_http(boss, client, employee):
     client.force_login(boss)
     rows = get(client, "/staff/accounts").json()["rows"]
-    assert {row["user_id"] for row in rows} == {boss.id, employee.id}
+    assert {row["user_id"] for row in rows} == {str(boss.person.id), str(employee.person.id)}
     client.force_login(employee)
     assert get(client, "/staff/accounts").status_code == 403

@@ -21,8 +21,12 @@ from base.tests.test_bootstrap import (
     create_master,
     drop_prefixed,
     superuser,
-    vector_available,
 )
+
+#: The extensions the command creates here: the emulated master's are trusted (``test_bootstrap.py``,
+#: ``rds_cluster`` for ``vector``).
+EXTENSIONS = ("pgcrypto",)
+MISSING = "erplora_no_such_extension"
 
 
 @pytest.fixture
@@ -47,6 +51,8 @@ def master(prefix, monkeypatch, settings) -> dict:
     """The command connects as the emulated master; ``DEBUG`` skips a missing extension."""
     conninfo = create_master(prefix)
     monkeypatch.setattr(bootstrap, "admin_conninfo", lambda: conninfo)
+    monkeypatch.setattr(bootstrap, "TEMPLATE_EXTENSIONS", EXTENSIONS)
+    monkeypatch.setattr(bootstrap, "SAAS_EXTENSIONS", EXTENSIONS)
     settings.DEBUG = True
     return conninfo
 
@@ -71,11 +77,11 @@ def test_first_run_creates_everything_and_a_second_run_only_reports_exists_or_up
         assert f"database {prefix}{database}: exists" in second
     assert f"schema shared on {prefix}saas: created" in first
     assert f"schema shared on {prefix}saas: exists" in second
-    vector_status = "exists" if vector_available() else "skipped"
-    assert f"extension vector on {prefix}hub_template: {vector_status}" in second
-    if vector_status == "skipped":
-        assert "vector" in second_err
+    for database in ("hub_template", "saas"):
+        assert f"extension pgcrypto on {prefix}{database}: created" in first
+        assert f"extension pgcrypto on {prefix}{database}: exists" in second
     assert ": created" not in second
+    assert "WARNING" not in second_err
     for value in passwords.values():
         assert value not in first + second + second_err
 
@@ -140,15 +146,26 @@ def test_an_invalid_prefix_is_refused_before_connecting(passwords, monkeypatch):
         run_command("Bad-Prefix")
 
 
-def test_production_fails_when_the_template_extension_is_missing(
-    prefix, passwords, master, settings
+@pytest.mark.parametrize(
+    ("constant", "database"),
+    [("TEMPLATE_EXTENSIONS", "hub_template"), ("SAAS_EXTENSIONS", "saas")],
+)
+def test_a_missing_extension_fails_in_production_and_warns_locally(
+    prefix, passwords, master, settings, monkeypatch, constant, database
 ):
-    if vector_available():
-        pytest.skip("vector is installed on this server: nothing missing to fail on")
+    monkeypatch.setattr(bootstrap, constant, (MISSING,))
+    subject = f"extension {MISSING} on {prefix}{database}"
     settings.DEBUG = False
 
-    with pytest.raises(CommandError, match="vector"):
+    with pytest.raises(CommandError) as raised:
         run_command(prefix)
+    settings.DEBUG = True
+    out, err = run_command(prefix)
+
+    assert raised.value.returncode != 0
+    assert f"{subject}: not available on this server" in str(raised.value)
+    assert f"bootstrap_databases: {subject}: skipped (not available on this server)" in out
+    assert f"WARNING {subject}: skipped" in err
 
 
 def test_the_pre_prefix_names_every_database_and_role_the_infra_expects(passwords, monkeypatch):

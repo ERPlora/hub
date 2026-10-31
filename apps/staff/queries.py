@@ -20,7 +20,8 @@ from live.errors import AppInactive, Conflict, NotFound, PermissionDenied
 from live.operations import UnknownOperation, get, operation
 
 from apps.staff.models import Member, Role, Schedule, StaffSettings, TimeOff
-from base.models import Membership
+from base.models import HubUser, Membership
+from base.queries import hub_user_of
 from apps.staff.schemas import (
     AccountListIn,
     AccountPage,
@@ -411,11 +412,11 @@ def resolve_member(
     return member
 
 
-def actor_user_id(ctx: OperationContext) -> int | None:
-    """The id of the user behind the context; ``None`` for the platform itself or an anonymous caller."""
-    if not hasattr(ctx.actor, "get_username"):
-        return None
-    return getattr(ctx.actor, "pk", None)
+def actor_user_id(ctx: OperationContext) -> UUID | None:
+    """The id of the caller's person in the business's database (``base.HubUser``); ``None`` for the platform itself,
+    an API key, an anonymous caller or a person it does not know yet (who has no record hanging from them)."""
+    person = hub_user_of(ctx)
+    return None if person is None else person.pk
 
 
 def own_member(ctx: OperationContext) -> Member | None:
@@ -444,33 +445,25 @@ ACCOUNT_PERMISSIONS = ("staff.add_member", "staff.change_member")
     ai={"description": "Lists the active user accounts with access to this business, to link one to a staff record."},
 )
 def list_accounts(ctx: OperationContext, params: AccountListIn) -> dict:
-    """STAFF-F03: the accounts a record can hang from, by name.
-
-    Phase 1: «access» is a ``base.Membership`` on the scope's host (the platform, not another app);
-    phase 2 reads the hub's own users.
+    """STAFF-F03: the accounts a record can hang from, by name: the people of the business's database
+    (``base.HubUser``) who are still in it and have access to it (a ``base.Membership`` on the scope's host, which
+    control keeps: read first, by username, since a query never joins two databases).
     """
     if not any(ctx.has(permission) for permission in ACCOUNT_PERMISSIONS):
         raise PermissionDenied(
             gettext("Permission “%(permission)s” is required.") % {"permission": ACCOUNT_PERMISSIONS[0]}
         )
-    memberships = Membership.objects.filter(host=ctx.scope.key, user__is_active=True).select_related("user")
+    with_access = list(
+        Membership.objects.filter(host=ctx.scope.key, user__is_active=True).values_list("user__username", flat=True)
+    )
+    people = HubUser.objects.filter(username__in=with_access, is_active=True)
     if params.user_id:
-        memberships = memberships.filter(user_id=params.user_id)
+        people = people.filter(pk=params.user_id)
     if params.search:
-        memberships = memberships.filter(
-            Q(user__first_name__icontains=params.search)
-            | Q(user__last_name__icontains=params.search)
-            | Q(user__email__icontains=params.search)
-        )
-    page = _page(memberships.order_by("user__first_name", "user__last_name", "user__email", "user_id"), params)
-    page["rows"] = [
-        {"user_id": membership.user_id, "name": _account_name(membership.user)} for membership in page["rows"]
-    ]
+        people = people.filter(Q(name__icontains=params.search) | Q(email__icontains=params.search))
+    page = _page(people.order_by("name", "email", "id"), params)
+    page["rows"] = [{"user_id": person.pk, "name": person.display_name} for person in page["rows"]]
     return page
-
-
-def _account_name(user: Any) -> str:
-    return user.get_full_name() or user.email or user.get_username()
 
 
 # --- Roles -----------------------------------------------------------------------------------------
@@ -853,10 +846,8 @@ def _with_approver(time_off: QuerySet[TimeOff]) -> QuerySet[TimeOff]:
 
 def _name_approvers(rows: list[TimeOff]) -> None:
     for row in rows:
-        user = row.approved_by
-        row.approved_by_name = (
-            (user.get_full_name() or user.get_username()) if user is not None else None
-        )
+        person = row.approved_by
+        row.approved_by_name = (person.name or person.username) if person is not None else None
 
 
 # --- Settings --------------------------------------------------------------------------------------

@@ -22,7 +22,7 @@ const MINE: MemberMineOut = {
   employee_number: 'E-9',
   role_id: 'r1',
   role_name: 'Stylist',
-  user_id: 2,
+  user_id: '01a16000-0000-7000-8000-0000000000b2',
   status: 'active',
   is_bookable: true,
   hire_date: '2025-03-04',
