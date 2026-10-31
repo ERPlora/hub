@@ -11,6 +11,10 @@ failure, the next refused attempt of that caller (:func:`client_key`) is answere
 ``Retry-After``) until the window ends. The door checks the credential first: what it accepts is never counted nor
 refused, so a valid caller behind the same address (a restaurant's other devices) is never locked out.
 
+An :class:`AttemptLimit` keeps two entries per key, the count and the end of its window, and reads or forgets both
+in one call: their key is a hash tag (``base.throttle:{limit:pin:<hub>:<person>}`` and ``…}:until``), so the Valkey
+cluster of AWS keeps them in one slot and accepts that call (``base/cache.py``; hub#440).
+
 A cache that does not answer (Valkey down) makes :func:`allow` raise, as every other use of the cache does: the public
 route fails loudly rather than turning its limit off. An :class:`AttemptLimit` steps aside instead, with an error in
 the log: the doors it guards (the login, printing, the SaaS's calls) must not stop with Valkey, as ``/readyz`` does
@@ -75,9 +79,12 @@ def _count(cache_key: str, window: int) -> int:
 class AttemptLimit:
     """At most ``attempts`` refused attempts of a key within ``window`` seconds of its first one.
 
-    The key is ``limit:<name>:<parts…>`` (``limit:callback:<IP>``, ``limit:pin:<hub>:<employee>``…), under
-    :data:`KEY_PREFIX`. The door checks the credential first; when it refuses it, :meth:`wait` says whether the caller
-    already waits (its 429) and otherwise :meth:`failed` counts it. An accepted attempt is neither counted nor refused."""
+    The key is ``limit:<name>:<parts…>`` (``limit:callback:<IP>``, ``limit:pin:<hub>:<employee>``…), kept under
+    :data:`KEY_PREFIX` as the hash tag of its two entries (``base.throttle:{<key>}`` and ``…}:until``): one slot of
+    the cluster for both, whatever braces the parts carry, because the tag starts at the first ``{``.
+
+    The door checks the credential first; when it refuses it, :meth:`wait` says whether the caller already waits (its
+    429) and otherwise :meth:`failed` counts it. An accepted attempt is neither counted nor refused."""
 
     name: str
     attempts: int
@@ -92,11 +99,14 @@ class AttemptLimit:
     def key(self, *parts: str) -> str:
         return ":".join(("limit", self.name, *parts))
 
+    def _cache_key(self, *parts: str) -> str:
+        return f"{KEY_PREFIX}{{{self.key(*parts)}}}"
+
     def wait(self, *parts: str) -> int:
         """0 while ``parts`` may try; once its failures reached the limit, the seconds until its window ends.
 
         0 too when the cache does not answer (logged): the door goes on to check the credential."""
-        cache_key = f"{KEY_PREFIX}{self.key(*parts)}"
+        cache_key = self._cache_key(*parts)
         try:
             found = cache.get_many([cache_key, cache_key + UNTIL_SUFFIX])
         except Exception:
@@ -115,7 +125,7 @@ class AttemptLimit:
 
         Not counted when the cache does not answer (logged)."""
         key = self.key(*parts)
-        cache_key = f"{KEY_PREFIX}{key}"
+        cache_key = self._cache_key(*parts)
         try:
             count = _count(cache_key, self.window)
             if count == 1:
@@ -136,7 +146,7 @@ class AttemptLimit:
     def clear(self, *parts: str) -> None:
         """Forget the refused attempts of ``parts`` (a right PIN starts its person's count again). A cache that does
         not answer leaves them (logged): they end with their window."""
-        cache_key = f"{KEY_PREFIX}{self.key(*parts)}"
+        cache_key = self._cache_key(*parts)
         try:
             cache.delete_many([cache_key, cache_key + UNTIL_SUFFIX])
         except Exception:

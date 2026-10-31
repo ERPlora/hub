@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:351f682a4310ea6629ab9c371fab8508002ebdff6fbe305b44467d66f15a4c36 -->
+<!-- generated from WORKBOOK.md sha256:a0554b0f2d2ddde971bc16bf98ca94d6ab4e17147895f843c617bf15ea84d427 -->
 
 ## What it is for and who it is for
 
@@ -194,8 +194,10 @@ is not one, a color that is not #RRGGBB, a negative rate, a commission outside 0
 available: it does not exist in this business, or it has been deleted or retired.", "That Hub user has no
 access to this business." or the account already linked to another record (STAFF-F03). Whoever cannot see
 the pay cannot send it: "Permission “{permission}” is required.". Two records with the same name, email or
-employee ID are accepted.
-Involved: none
+employee ID are accepted. From the assistant, a role the business does not have (or that has been retired)
+is checked before the confirmation card: no card shows, the assistant says that role is not available and
+nothing is created.
+Involved: BASE-F97
 
 ### STAFF-F02 Edit a professional's record
 Status: done (server and screen)

@@ -146,7 +146,7 @@ def test_a_place_id_is_asked_to_place_details_with_the_key_and_the_field_mask_an
         "uri": "https://www.google.com/maps/reviews/data=r0",
     }
     assert payload["fetched_at"]
-    assert cache_writes == [(f"website:reviews:{SLUG}:{PLACE}", payload, 24 * 3600)]
+    assert cache_writes == [(f"website:reviews:{{{SLUG}}}:{PLACE}", payload, 24 * 3600)]
     # Within the day, Google is not asked again.
     assert reviews.load(SLUG, PLACE, ADDRESS) == payload
     assert route.call_count == 1
@@ -213,7 +213,7 @@ def test_a_failure_is_kept_ten_minutes_so_google_is_not_asked_again_meanwhile(an
     else:
         route.mock(return_value=answer)
     assert reviews.load(SLUG, PLACE, ADDRESS) is None
-    assert cache_writes == [(f"website:reviews:{SLUG}:{PLACE}", reviews.FAILED, 600)]
+    assert cache_writes == [(f"website:reviews:{{{SLUG}}}:{PLACE}", reviews.FAILED, 600)]
     assert reviews.cached(SLUG, PLACE, ADDRESS) == reviews.FAILED
     assert reviews.load(SLUG, PLACE, ADDRESS) is None
     assert route.call_count == 1
