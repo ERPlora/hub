@@ -392,7 +392,36 @@
         "confirmMessage": "Se borrará definitivamente {n} fila: | Se borrarán definitivamente {n} filas:",
         "confirmLabel": "Borrar definitivamente",
         "typeName": "Escribe «{name}» para confirmar",
-        "done": "Negocio restablecido:"
+        "done": "Negocio restablecido:",
+        "busy": "Se está restableciendo el negocio: espera a que termine.",
+        "keptCopy": "Se guarda una copia completa de los datos de antes en «Copias».",
+        "progress": {
+          "copying": "Copiando los datos del negocio antes de vaciar…",
+          "copyingHint": "Después se vaciará: {sections}. Puedes salir de esta pantalla: sigue sola.",
+          "emptying": "Vaciando: {sections}…"
+        },
+        "failed": {
+          "heading": "No se ha vaciado nada",
+          "dumps_unavailable": "Ahora mismo no se puede hacer la copia de los datos, así que no se ha vaciado nada.",
+          "dump_failed": "No se ha podido hacer la copia de los datos, así que no se ha vaciado nada.",
+          "emptying_failed": "No se han podido vaciar las secciones, así que no se ha quitado nada. La copia de los datos de antes se guarda.",
+          "hub_not_ready": "El negocio está cerrado, así que no se ha vaciado nada.",
+          "retry": "Volver a intentarlo"
+        },
+        "copyFirst": "Antes de vaciar se hace una copia completa de los datos del negocio y se guarda 90 días, en «Copias», aquí debajo."
+      },
+      "copies": {
+        "title": "Copias de los datos",
+        "intro": "Antes de cada restablecimiento, ERPlora hace una copia completa de los datos del negocio y la guarda 90 días. Sirve para recuperar el negocio entero tal como estaba (formato de PostgreSQL, se restaura con pg_restore). Para llevar tus productos, servicios o ajustes a otro negocio, usa «Exportar».",
+        "loading": "Leyendo las copias…",
+        "loadError": "No se han podido leer las copias.",
+        "empty": "Todavía no hay copias: se hace una antes de cada restablecimiento.",
+        "kind": {
+          "reset": "Antes de restablecer",
+          "offboarding": "Al eliminar el negocio"
+        },
+        "download": "Descargar",
+        "downloadError": "No se ha podido descargar la copia."
       }
     },
     "blueprintCard": {
@@ -438,7 +467,10 @@
         "own": "Base de datos propia",
         "notMeasured": "El uso de CPU, memoria y conexiones no se mide por negocio: los servidores de ERPlora atienden a todos los negocios a la vez y crecen solos cuando hace falta.",
         "denied": "Solo el dueño o un administrador puede ver cuánto está usando el hub.",
-        "loading": "Consultando el sistema…"
+        "loading": "Consultando el sistema…",
+        "size": "Ocupa {size}",
+        "measuredOn": "Medido el {day}",
+        "notMeasuredYet": "Su tamaño se mide cada noche: la primera cifra llega mañana."
       },
       "updates": {
         "heading": "Qué te hemos actualizado",

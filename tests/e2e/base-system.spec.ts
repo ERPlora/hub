@@ -9,7 +9,7 @@
 // The failed events (deliveries the relay gave up on) are written as the relay leaves them, tagged in their payload so
 // the run removes them after; the relay giving up and its live notice are base/tests/test_services_system.py's. One
 // of hub `b` is planted too, in `b`'s own database (S2a): `a` never sees it.
-// flow: BASE-G87 BASE-G88 BASE-G89 BASE-G90 BASE-G91 BASE-G92 BASE-G93 BASE-G94 BASE-G95
+// flow: BASE-F40 BASE-G87 BASE-G88 BASE-G89 BASE-G90 BASE-G91 BASE-G92 BASE-G93 BASE-G94 BASE-G95
 import { type Browser, expect, type Page, test } from '@playwright/test';
 
 import { A, EMPLOYEE, horizontalOverflow, hostPage, openBell, psql, shot, shown, untilStill } from './helpers';
@@ -80,6 +80,8 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       // control's says «Shared database»: SystemResources.test.ts), and why there are no usage figures.
       await expect(testid(page, 'system-resources-database')).toContainText('PostgreSQL');
       await expect(testid(page, 'system-resources-database')).toContainText('Database of its own');
+      // BASE-F40 — its size comes with the nightly measurement (S2b; no night has measured the run's `a`).
+      await expect(testid(page, 'system-resources-size')).toContainText('Its size is measured every night');
       await expect(testid(page, 'system-resources-not-measured')).toContainText('not measured per business');
       await snap(page, 'BASE-G88', width);
 

@@ -4,22 +4,27 @@
 report and the rows it created as an ``ImportBatch``; a load that did not go in whole is retried from the same
 template version (never from an uploaded file). ``base.import.undo`` (BASE-G108) removes exactly the rows of one
 load. ``base.hub.reset`` (BASE-G109) gives the plan of what each app would lose (``dry_run``) and, typed the
-business's name, removes it; in phase 1 the business's data shares one database with every other hub, so the reset
-is refused until the hub has its own (plan 2026-10-22-fase-2-tenencia, S5). Each one only for who runs the hub.
+business's name, asks for it: the worker copies the business's database first and only then empties the sections
+(round 2026-10-30 of PLAN-DB, decision 2; ``base/tests/test_worker_data.py``), so the answer is ``copying`` and nothing
+is removed yet. In phase 1 the business's data shares one database with every other hub, so the reset is refused
+until the hub has its own (plan 2026-10-22-fase-2-tenencia, S5); without a bucket for the copy it is unavailable, and
+a second one waits for the first. Each one only for who runs the hub.
 """
 
 import base64
 
 import pytest
 from django.contrib.auth import get_user_model
-from live.context import OperationContext, Scope
-from live.errors import Conflict, InvalidPayload, NotFound, PermissionDenied
+from django.utils import timezone
+from live.context import OperationContext, Scope, system_context
+from live.errors import Conflict, InvalidPayload, NotFound, OperationError, PermissionDenied
 from live.models import OutboxEvent
 from live.operations import get
 
 from base import activation, blueprint, events as base_events, relay, services
 from base.catalog import template_apps
 from base.models import AppActivation, Hub, ImportBatch, Membership
+from control.models import HubDue
 from base.permissions import permissions_for
 
 pytestmark = pytest.mark.django_db
@@ -241,8 +246,15 @@ def test_who_does_not_run_the_hub_cannot_undo(owner, manager):
 
 @pytest.fixture
 def own_database(monkeypatch):
-    """The hub has its own database (phase 2): its reset touches no one else's data."""
+    """The hub has its own database (phase 2): its reset touches no one else's data. And a bucket for its copy."""
     monkeypatch.setattr(services, "has_own_database", lambda hub: True)
+    monkeypatch.setenv("HUB_DUMPS_BUCKET", "erplora-test-hub-dumps")
+
+
+def asked(slug="a"):
+    """The reset asked on the registry's row of ``slug``: when, and what."""
+    hub = Hub.objects.get(slug=slug)
+    return hub.reset_requested_at, hub.reset_sections
 
 
 def test_the_plan_says_what_each_app_would_lose_and_what_to_type(owner):
@@ -281,10 +293,35 @@ def test_in_phase_1_the_reset_says_why_it_is_not_available_and_removes_nothing(o
     assert total(owner, "table.table.list") == 10
 
 
-def test_resetting_removes_the_sections_chosen(owner, own_database):
+def test_resetting_asks_the_worker_for_a_copy_first_and_removes_nothing_yet(owner, own_database):
     call(owner, "base.blueprint.import", template="restaurant.es")
 
-    done = call(owner, "base.hub.reset", apps=["table"], confirm="a")
+    answer = call(owner, "base.hub.reset", apps=["table", "inventory", "table"], confirm="a")
+
+    assert (answer.status, answer.dry_run, answer.apps) == ("copying", False, [])
+    assert {section.id for section in answer.sections} == {"inventory", "table"}  # nothing removed yet
+    assert total(owner, "table.table.list") == 10
+    assert events("base.hub.data_reset") == []
+    requested_at, sections = asked()
+    assert requested_at is not None
+    assert sections == {
+        "apps": ["table", "inventory"],
+        "language": "es",
+        "requested_by": "olga",
+        "state": "copying",
+        "error": "",
+        "removed": [],
+        "dump": None,
+        "finished_at": None,
+    }
+    assert HubDue.objects.get(hub__slug="a").due_at <= timezone.now()
+
+
+def test_the_worker_empties_the_sections_asked_and_nothing_else(owner, own_database):
+    """``base.hub.reset_apply``, the worker's step once the copy was kept (``test_worker_data.py``)."""
+    call(owner, "base.blueprint.import", template="restaurant.es")
+
+    done = call(system_context(A), "base.hub.reset_apply", apps=["table"])
 
     assert total(owner, "table.table.list") == 0
     assert total(owner, "inventory.product.list") == 16
@@ -292,14 +329,52 @@ def test_resetting_removes_the_sections_chosen(owner, own_database):
     assert events("base.hub.data_reset") == [{"apps": ["table"]}]
 
 
+def test_the_dry_run_says_planned(owner):
+    assert call(owner, "base.hub.reset", dry_run=True).status == "planned"
+
+
 def test_the_name_is_compared_as_the_confirmation_dialog_does(owner, own_database):
     """Spaces around and inside collapsed and case ignored, accents kept (ConfirmDialog of @erplora/ui)."""
     Hub.objects.filter(slug="a").update(name="Bar  Pepé")
     call(owner, "base.blueprint.import", template="restaurant.es")
 
-    call(owner, "base.hub.reset", apps=["table"], confirm="  bar pepé ")
+    assert call(owner, "base.hub.reset", apps=["table"], confirm="  bar pepé ").status == "copying"
 
-    assert total(owner, "table.table.list") == 0
+
+def test_without_a_bucket_for_the_copy_the_reset_is_unavailable_and_asks_nothing(owner, own_database, monkeypatch):
+    monkeypatch.setenv("HUB_DUMPS_BUCKET", "")
+    call(owner, "base.blueprint.import", template="restaurant.es")
+
+    with pytest.raises(OperationError) as refused:
+        call(owner, "base.hub.reset", apps=["table"], confirm="a")
+
+    assert (refused.value.status, refused.value.code) == (503, "base.dumps_unavailable")
+    assert refused.value.message == (
+        "Ahora mismo no se puede hacer la copia de los datos, así que no se ha vaciado nada. Inténtalo más tarde."
+    )
+    assert asked() == (None, None)
+    assert total(owner, "table.table.list") == 10
+
+
+def test_a_second_reset_while_one_is_running_is_refused(owner, own_database):
+    call(owner, "base.blueprint.import", template="restaurant.es")
+    call(owner, "base.hub.reset", apps=["table"], confirm="a")
+    first = asked()
+
+    with pytest.raises(Conflict) as refused:
+        call(owner, "base.hub.reset", apps=["inventory"], confirm="a")
+
+    assert refused.value.code == "base.reset_in_progress"
+    assert refused.value.message == "Ya se está restableciendo el negocio. Espera a que termine."
+    assert asked() == first
+
+
+def test_a_reset_that_failed_can_be_asked_again(owner, own_database):
+    Hub.objects.filter(slug="a").update(reset_sections={"apps": ["table"], "state": "failed", "error": "dump_failed"})
+    call(owner, "base.blueprint.import", template="restaurant.es")
+
+    assert call(owner, "base.hub.reset", apps=["table"], confirm="a").status == "copying"
+    assert asked()[1]["state"] == "copying"
 
 
 @pytest.mark.parametrize(
@@ -319,6 +394,7 @@ def test_a_reset_without_the_exact_name_or_a_section_removes_nothing(owner, own_
 
     assert list(refused.value.fields) == [field]
     assert total(owner, "table.table.list") == 10
+    assert asked() == (None, None)
 
 
 def test_who_does_not_run_the_hub_cannot_reset(manager, own_database):
