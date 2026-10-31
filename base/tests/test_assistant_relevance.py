@@ -53,6 +53,44 @@ def test_the_tool_that_does_what_the_owner_asks_is_offered(owner, language, aske
     assert expected in offered(ctx, asked)
 
 
+#: What the review of live#18 asked besides the battery: each question with the tool that obviously does it. The Hub
+#: has no tool that invites someone (that is done on erplora.com): «invita a…» gets the people of the business, which
+#: says how each one gets in, and the documentation search.
+EVERYDAY = [
+    ("es", "cobra la mesa 4", {"sale.sale.complete"}),
+    ("es", "¿cuántos clientes tengo?", {"customer.customer.list", "customer.customer.stats"}),
+    ("es", "cambia el precio del café a 1,80", {"inventory.product.update", "pricing.price_item.update"}),
+    ("es", "imprime el ticket de la última venta", {"sale.sale.print"}),
+    ("es", "dame las reservas de mañana", {"reservation.reservation.list"}),
+    ("es", "abre la caja con 100 €", {"cash_register.session.open"}),
+    ("es", "añade a Ana como camarera", {"staff.member.create"}),
+    ("es", "¿qué productos están sin stock?", {"inventory.product.list_low_stock", "inventory.stock.get_summary"}),
+    ("es", "invita a juan@x.com", {"base.person.list", "base.docs.search"}),
+    ("es", "desactiva la app de reservas", {"base.app.disable"}),
+    ("en", "create a 10% discount", {"pricing.rule.create"}),
+    ("en", "show today's takings", {"sale.sale.today"}),
+    ("es", "reserva una mesa para 4 personas", {"reservation.reservation.create"}),
+]
+
+
+@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@pytest.mark.parametrize(("language", "asked", "expected"), EVERYDAY)
+def test_an_everyday_request_is_offered_the_tool_that_does_it(owner, language, asked, expected):
+    ctx = owner(language)
+    assert expected <= set(assistant.catalog(ctx))  # the owner holds them: only the selection can leave one out
+    got = offered(ctx, asked)
+    assert not expected - set(got), expected - set(got)
+
+
+@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+def test_the_people_of_a_reservation_never_bring_the_staffs_tools(owner):
+    """«personas» is not «Personal» (the staff app in Spanish): before live#18's review, «reserva una mesa para 4
+    personas» filled the turn with 11 tools of staff and left the reservation's own at 16."""
+    got = offered(owner("es"), "reserva una mesa para 4 personas")
+    assert got.index("reservation.reservation.create") == len(assistant.ALWAYS)  # first after what is always at hand
+    assert sum(name.startswith("staff.") for name in got) <= 1, [name for name in got if name.startswith("staff.")]
+
+
 #: Block B of the battery, in order: each question with the operations its turn must offer (B1 asks how something is
 #: done: the documentation search; B2 asks to do it: the operation that does it, and the read that finds the record).
 BLOCK_B = [
