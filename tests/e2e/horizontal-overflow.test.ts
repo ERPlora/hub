@@ -7,7 +7,9 @@
 // by hand (its `getScrollElement()`, `.inner-scroll` or `part="scroll"` and their `scrollWidth`): that copy left out the
 // menu and the sheets (seen by the reviewer of hub#393). Nor its width destructured (`const { scrollWidth } = document.
 // documentElement`), the root found by its selector or a locator (`page.locator('html')`), or a measure split over lines
-// (seen by the reviewer of saas#153). Its vertical scroll (`scrollTop`, `scrollHeight`) stays free.
+// (seen by the reviewer of saas#153). Nor its width destructured from what a `page.evaluate()` gives back, its call on one
+// line or over several (`const { scrollWidth } = await page.evaluate(() => document.documentElement)`, seen by the
+// reviewer of hub#473). Its vertical scroll (`scrollTop`, `scrollHeight`) stays free.
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -65,6 +67,29 @@ const WIDTH_DESTRUCTURED = /\{[^{}]*\bscrollWidth\b[^{}]*\}[\s}]*=\s*(?:await\s+
 /** What that destructuring measures by hand: the root (or `document`, destructured down to it) or a scroll box. */
 const MEASURED_BOX = new RegExp(String.raw`^(?:${ROOT}|document\s*$)|getScrollElement\(|inner-scroll|part~?=["']?scroll`);
 
+/** A call that runs a function in the browser and gives back what it returns: `page.evaluate(`, `evaluateHandle(`. */
+const EVALUATE = /\bevaluate(?:Handle)?\s*\(/;
+
+/** What such a function returns when it is the box itself, `box` (the root or a name of it), with no member read on it:
+ *  `() => document.documentElement`, `return root;`, `?? document.body`, `as HTMLElement`. */
+function returnedBox(box: string): RegExp {
+  return new RegExp(
+    String.raw`(?:=>|\breturn\b)\s*\(?\s*${box}(?:\s*(?:\?\?|\|\|)\s*${box})*\s*(?:as\s+[^;,)}]+)?\s*[;,)}]`,
+  );
+}
+
+/** The call that opens `lines[0]` (`evaluate(…`), through as many of the lines after it as it takes to close. */
+function callOf(lines: string[]): string {
+  let depth = 0;
+  for (const [index, line] of lines.entries()) {
+    for (let at = 0; at < line.length; at += 1) {
+      if (line[at] === '(') depth += 1;
+      else if (line[at] === ')' && (depth -= 1) === 0) return [...lines.slice(0, index), line.slice(0, at + 1)].join('\n');
+    }
+  }
+  return lines.join('\n');
+}
+
 /**
  * The statements of `source`, each with the line it starts on: a line that goes on with a chain (`.x`, `?.x`) is joined to
  * the one before it, so that a measure split over lines (`document.documentElement` and `.scrollWidth` below) reads as one.
@@ -95,21 +120,31 @@ function boxNames(source: string): string[] {
 
 /**
  * `file:line` of each statement of `source` (the file `name`) that measures by hand how wide the document or one
- * `ion-content` is: its `scrollWidth`, read directly, through a name given to it, taken by a destructuring or through a
- * locator of the root. A vertical read (`scrollTop`, `scrollHeight`) is no such measure.
+ * `ion-content` is: its `scrollWidth`, read directly, through a name given to it, taken by a destructuring (also of what
+ * an `evaluate()` gives back, its call over as many lines as it takes) or through a locator of the root. A vertical read
+ * (`scrollTop`, `scrollHeight`) is no such measure.
  */
 function documentMeasures(name: string, source: string): string[] {
   if (!source.includes(WIDTH)) return [];
   const names = boxNames(source);
   const named = names.length ? new RegExp(String.raw`\b(?:${names.join('|')})\s*!?\s*\??\.\s*scrollWidth\b`) : null;
   const namedBox = names.length ? new RegExp(String.raw`^(?:${names.join('|')})\b`) : null;
-  const destructured = (text: string) => {
-    const from = text.match(WIDTH_DESTRUCTURED)?.[1];
-    return from !== undefined && (MEASURED_BOX.test(from) || !!namedBox?.test(from));
+  const returned = returnedBox(names.length ? String.raw`(?:${ROOT}|\b(?:${names.join('|')})\b\s*!?)` : ROOT);
+  const found = statements(source);
+  const destructured = (text: string, index: number) => {
+    const match = text.match(WIDTH_DESTRUCTURED);
+    if (!match) return false;
+    const from = match[1];
+    if (MEASURED_BOX.test(from) || namedBox?.test(from)) return true;
+    const rest = text.slice(match.index! + match[0].length - from.length);
+    const call = rest.search(EVALUATE);
+    if (call < 0) return false;
+    const evaluated = callOf([rest.slice(call), ...found.slice(index + 1).map((next) => next.text)]);
+    return returned.test(evaluated) || MEASURED_BOX.test(evaluated);
   };
   const measures = [DOCUMENT_WIDTH, SCROLL_BOX_WIDTH, ROOT_LOCATOR_WIDTH, ...(named ? [named] : [])];
-  return statements(source).flatMap(({ line, text }) =>
-    text.includes(WIDTH) && (measures.some((measure) => measure.test(text)) || destructured(text)) ? [`${name}:${line}`] : [],
+  return found.flatMap(({ line, text }, index) =>
+    text.includes(WIDTH) && (measures.some((measure) => measure.test(text)) || destructured(text, index)) ? [`${name}:${line}`] : [],
   );
 }
 
@@ -292,5 +327,51 @@ describe('the e2e checks for a horizontal scroll go through horizontalOverflow()
     ]);
     const after = "await page.locator('body').press('End'); const cut = await title.evaluate((el) => el.scrollWidth > el.clientWidth);";
     expect(documentMeasures('e.ts', after)).toEqual([]);
+  });
+
+  it('the count reads the width destructured from what an evaluate() gives back, the root or a scroll box, on one line or over several', () => {
+    const copies = [
+      ['const { scrollWidth } = await page.evaluate(() => document.documentElement);'],
+      ['const { scrollWidth } = await page.evaluate(() =>', '  document.documentElement,', ');'],
+      ['const { scrollWidth, clientWidth } = await page.evaluate(() => {', '  return document.documentElement;', '});'],
+      ['const { scrollWidth } = await page.evaluate(', '  () => document.scrollingElement!,', ');'],
+      ['const { scrollWidth } = await page.evaluate(() => { const root = document.documentElement; return root; });'],
+      ['const { scrollWidth } = await page.evaluate(() => {', '  const root = document.scrollingElement;', '  return root!;', '});'],
+      ['const { scrollWidth } = await page.evaluateHandle(() => document.body as HTMLElement);'],
+      ['const { scrollWidth } = await page.evaluate(() => (document.scrollingElement ?? document.documentElement));'],
+      ['const { scrollWidth } = await page.evaluate(() => { return document.scrollingElement || document.body; });'],
+      ['const { scrollWidth } = await page.evaluate(async () =>', "  document.querySelector('ion-content')!.getScrollElement(),", ');'],
+      [
+        "test('the list fits at 390 px', async ({ page }) => {",
+        "  await page.goto('/apps/pricing/');",
+        '  const { scrollWidth } = await page.evaluate(() => document.documentElement)',
+        '  expect(scrollWidth).toBeGreaterThan(0);',
+        '});',
+      ],
+    ];
+    expect(copies.map((copy) => documentMeasures('f.ts', copy.join('\n')))).toEqual([
+      ['f.ts:1'],
+      ['f.ts:1'],
+      ['f.ts:1'],
+      ['f.ts:1'],
+      ['f.ts:1'],
+      ['f.ts:1'],
+      ['f.ts:1'],
+      ['f.ts:1'],
+      ['f.ts:1'],
+      ['f.ts:1'],
+      ['f.ts:3'],
+    ]);
+    const none = [
+      ['const { scrollHeight, scrollTop } = await page.evaluate(() => document.documentElement);'],
+      ['const { scrollHeight } = await page.evaluate(() =>', '  document.documentElement,', ');'],
+      ["const chip = await page.locator('.chip').evaluate((el) => el.scrollWidth);"],
+      ["const { scrollWidth } = await page.locator('.chip').evaluate((el) => el);"],
+      ["const { scrollWidth } = await page.evaluate(() => document.documentElement.querySelector('.chip')!);"],
+      ['const { scrollWidth } = await page.evaluate(() =>', "  document.querySelector('.chip')!,", ');'],
+      ['const { scrollWidth } = await page.evaluate(() => {', "  const chip = document.body.querySelector('.chip')!;", '  return chip;', '});'],
+      ['const { scrollWidth } = await page.evaluate(() => sizeOf(table));', 'return document.documentElement;'],
+    ];
+    expect(none.map((lines) => documentMeasures('f.ts', lines.join('\n')))).toEqual(none.map(() => []));
   });
 });
