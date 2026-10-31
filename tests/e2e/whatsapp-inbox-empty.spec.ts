@@ -36,13 +36,12 @@ test.beforeAll(async () => {
   cleanUp();
 });
 
+// The issuer goes first: it pushes nothing to erplora.com, and `a`'s photo has to be the last thing put back
+// (whatsapp-photo.test.ts).
 test.afterAll(() => {
-  try {
-    cleanUp();
-    restorePhoto();
-  } finally {
-    if (ownIssuer) psql("delete from invoice_issuer where legal_name like 'e2e %'");
-  }
+  if (ownIssuer) psql("delete from invoice_issuer where legal_name like 'e2e %'");
+  cleanUp();
+  restorePhoto();
 });
 
 const empty = (page: Page): Locator => shown(page).locator('[data-testid=whatsapp-inbox-empty]');
