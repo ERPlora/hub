@@ -32,9 +32,16 @@ describe('payment methods of the sheet', () => {
   it('paints each with its icon, by type and, for the others, by name', () => {
     expect(methodIcon(CASH)).toBe('ion:cash-outline');
     expect(methodIcon(CARD)).toBe('ion:card-outline');
-    expect(methodIcon(TRANSFER)).toBe('ion:swap-vertical-outline');
+    expect(methodIcon(TRANSFER)).toBe('ion:swap-horizontal-outline');
     expect(methodIcon(BIZUM)).toBe('ion:phone-portrait-outline');
     expect(methodIcon(method('vale', 'other', { name: 'Vale restaurante' }))).toBe('ion:ticket-outline');
+  });
+
+  it('a gift method is painted apart from a voucher, as the current product does (a «vale regalo» is a voucher)', () => {
+    expect(methodIcon(method('regalo', 'other', { name: 'Regalo' }))).toBe('ion:gift-outline');
+    expect(methodIcon(method('gift', 'other', { name: 'Gift' }))).toBe('ion:gift-outline');
+    expect(methodIcon(method('cheque', 'other', { name: 'Cheque comida' }))).toBe('ion:ticket-outline');
+    expect(methodIcon(method('vale-regalo', 'other', { name: 'Vale regalo' }))).toBe('ion:ticket-outline');
     expect(methodIcon(method('x', 'other', { name: 'Crypto' }))).toBe('ion:wallet-outline');
   });
 

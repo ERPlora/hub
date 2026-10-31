@@ -1,8 +1,8 @@
 // The payment methods the charge sheet offers (SALE-F02, F03, F37). Which ones may charge today is the
 // server's (`allowed`: the till settings «Allow cash / card / transfer»); the legal cash limit too
 // (`cash_limit` of `sale.checkout.preview`): here they are only ordered, painted and picked.
-// Icons: registered ones only. The old `swap-horizontal-outline`, `ellipsis-horizontal-circle-outline`
-// and Bizum's brand mark wait in apps/sale/UI-REQUESTS.md («Cobro»).
+// Icons: registered ones only, the current product's. Its `ellipsis-horizontal-circle-outline` and Bizum's
+// brand mark wait in apps/sale/UI-REQUESTS.md («Cobro»).
 import type { PaymentMethodOut } from '../../operations';
 
 type MethodLike = Pick<PaymentMethodOut, 'type' | 'name'>;
@@ -18,12 +18,14 @@ export function chargeableMethods(rows: readonly PaymentMethodOut[]): PaymentMet
 const BY_TYPE: Record<string, string> = {
   cash: 'ion:cash-outline',
   card: 'ion:card-outline',
-  transfer: 'ion:swap-vertical-outline',
+  transfer: 'ion:swap-horizontal-outline',
 };
 
 const BY_NAME: [RegExp, string][] = [
   [/bizum|m[óo]vil|mobile|apple pay|google pay/i, 'ion:phone-portrait-outline'],
-  [/vale|cheque|ticket|voucher|regalo|gift/i, 'ion:ticket-outline'],
+  // A voucher before a gift, as the current product: a «vale regalo» is a voucher.
+  [/vale|cheque|ticket|voucher/i, 'ion:ticket-outline'],
+  [/regalo|gift/i, 'ion:gift-outline'],
 ];
 
 const FALLBACK = 'ion:wallet-outline';
