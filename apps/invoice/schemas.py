@@ -33,9 +33,11 @@ from apps.invoice import fiscal
 from apps.invoice.models import (
     SERIES_CODE_MAX_LENGTH,
     SERIES_CODE_RE,
+    ForeignIdType,
     Invoice,
     InvoiceType,
 )
+from base.schemas import names
 
 T = TypeVar("T")
 
@@ -72,6 +74,17 @@ FIELD_REQUIRED = _("This field is required.")
 SALE = gettext_noop("Sale")
 NEXT_NUMBER = gettext_noop("Next number")
 
+# The assistant's card names the record a write acts on by these reads (base/assistant.py ``REFERS``), run as whoever
+# asks, never by its id: an invoice and a sale by their numbers, as their screens do; a refund by its sale and what it
+# gave back; a series by its code, its year and its name, as the Series screen's card titles it; the customer by the name
+# on their card. The product of a manual line is Inventory's, which Invoicing does not require: the card leaves it out,
+# and the line's description says what is invoiced.
+AN_INVOICE = names("invoice.invoice.get", by="invoice_id", name=("number",))
+A_SERIES = names("invoice.series.get", by="series_id", name=("label",))
+A_SALE = names("sale.sale.get", by="sale_id", name=("number",))
+A_REFUND = names("invoice.refund.get", by="refund_id", name=("label",))
+A_CUSTOMER = names("customer.customer.detail")
+
 Direction = Literal["asc", "desc"]
 VerifactuStatus = Literal["sealed", "unavailable", "pending"]
 VERIFACTU_STATUS = (
@@ -81,7 +94,7 @@ VERIFACTU_STATUS = (
 )
 InvoiceTypeCode = Literal[*InvoiceType.values]
 RectificationType = Literal["R1", "R2", "R3", "R4"]
-IdType = Literal["", "02", "03", "04", "05", "06", "07"]
+IdType = Literal["", *ForeignIdType.values]
 Status = Literal[*Invoice.Status.values]
 SourceType = Literal[*Invoice.Source.values]
 
@@ -178,7 +191,7 @@ class Page(Schema, Generic[T]):
 class InvoiceRefIn(Schema):
     """An invoice, by its id or its number."""
 
-    invoice_id: UUID | None = Field(None, description=INVOICE_ID)
+    invoice_id: UUID | None = Field(None, description=INVOICE_ID, json_schema_extra=AN_INVOICE)
     number: Annotated[_text(60) | None, BeforeValidator(_blank_to_none)] = Field(
         None, description=INVOICE_NUMBER
     )
@@ -193,7 +206,7 @@ class InvoiceRefIn(Schema):
 class SaleRefIn(Schema):
     """A sale of the Sales app, by its id or its number of the day."""
 
-    sale_id: UUID | None = Field(None, title=SALE, description="Id of the sale.")
+    sale_id: UUID | None = Field(None, title=SALE, description="Id of the sale.", json_schema_extra=A_SALE)
     sale: Annotated[_text(24) | None, BeforeValidator(_blank_to_none)] = Field(
         None,
         description="Number of the sale as printed on its ticket, such as 20261014-0003. Either this or sale_id.",
@@ -252,7 +265,7 @@ class RecipientFieldsIn(Schema):
 class RecipientIn(RecipientFieldsIn):
     """The recipient of a document: a customer card (by id or reference) and what is typed over it."""
 
-    customer_id: UUID | None = Field(None, description=CUSTOMER_ID)
+    customer_id: UUID | None = Field(None, description=CUSTOMER_ID, json_schema_extra=A_CUSTOMER)
     customer: Annotated[_text(200) | None, BeforeValidator(_blank_to_none)] = Field(
         None, description=CUSTOMER_REF
     )
@@ -383,7 +396,7 @@ class InvoiceCreateIn(RecipientIn):
     """A manual invoice: VAT on top of each price, closed once per rate."""
 
     series_id: UUID | None = Field(
-        None, description="Id of the series to number it in (F1 or F2, active)."
+        None, description="Id of the series to number it in (F1 or F2, active).", json_schema_extra=A_SERIES
     )
     series_code: Annotated[
         _text(SERIES_CODE_MAX_LENGTH) | None, BeforeValidator(_blank_to_none)
@@ -463,6 +476,7 @@ class FromRefundIn(Schema):
     refund_id: UUID = Field(
         title=gettext_noop("Sale refund"),
         description="Id of the refund document of the Sales app.",
+        json_schema_extra=A_REFUND,
     )
 
 
@@ -471,7 +485,7 @@ class FromVoidIn(Schema):
 
     model_config = ConfigDict(extra="ignore")
 
-    sale_id: UUID = Field(title=SALE, description="Id of the voided sale.")
+    sale_id: UUID = Field(title=SALE, description="Id of the voided sale.", json_schema_extra=A_SALE)
 
 
 class MarkPaidIn(InvoiceRefIn):
@@ -574,7 +588,7 @@ class SeriesCreateIn(Schema):
 
 
 class SeriesUpdateIn(Schema):
-    series_id: UUID = Field(description="Id of the series.")
+    series_id: UUID = Field(description="Id of the series.", json_schema_extra=A_SERIES)
     name: _text(120) | None = Field(None, description="New name.")
     prefix: _text(20) | None = Field(
         None, description="New prefix (only while the series has numbered nothing)."
@@ -621,6 +635,12 @@ class SeriesPeekIn(Schema):
         if self.series_id is None and not self.code:
             raise ValueError(str(WHICH_SERIES))
         return self
+
+
+class RefundGetIn(Schema):
+    """A refund of the Sales app, by its id."""
+
+    refund_id: UUID = Field(description="Id of the refund document of the Sales app.")
 
 
 class NumberingStatusIn(Schema):
@@ -899,6 +919,31 @@ class SeriesOut(Schema):
     format_locked: bool
     is_active: bool
     is_default: bool
+
+
+class SeriesDetailOut(SeriesOut):
+    """One series as the Series screen shows it, and how it is named outside its screen."""
+
+    label: str = Field(
+        description="How it is named outside its screen, in the reader's language: its code, its year and its name "
+        "(e.g. «FACT · 2026 · Invoices»)."
+    )
+
+
+class RefundOut(Schema):
+    """A refund of the Sales app as Invoicing names it: the sale it gives back and what it gave back."""
+
+    id: UUID
+    sale_id: UUID
+    sale_number: str = Field(description="Number of the sale it gives back, as printed on its ticket.")
+    total: int = Field(description="What it gave back, in the minor unit of its currency.")
+    currency: str = Field(description="The sale's currency (ISO 4217).")
+    currency_decimals: int = Field(description="The decimals of its currency (2 in EUR, 0 in JPY): its amounts' minor unit.")
+    invoice_number: str = Field(description="Number of its rectifying invoice; empty while none is issued.")
+    label: str = Field(
+        description="How it is named outside its sale, in the reader's language: the sale's number and what it gave "
+        "back (e.g. «20261014-0003 · €5.00»)."
+    )
 
 
 class SeriesPeekOut(Schema):

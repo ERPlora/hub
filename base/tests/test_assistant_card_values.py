@@ -305,7 +305,7 @@ UNNAMED_REFERENCES = {
     "customer": 22,
     "demo": 3,
     "inventory": 15,
-    "invoice": 12,
+    "invoice": 1,
     "kitchen": 23,
     "modifier": 14,
     "online_booking": 7,
@@ -325,7 +325,7 @@ UNNAMED_REFERENCES = {
 #: The closed lists (``enum`` of text) of the assistant's writes with a value the models of their app give no label,
 #: by app: their card says that value as sent. Only ever lower, as above.
 UNLABELLED_LISTS = {
-    "invoice": 4,
+    "invoice": 1,
     "kitchen": 1,
     "printing": 1,
     "sale": 3,

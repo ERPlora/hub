@@ -91,6 +91,30 @@ msgstr "Rectificativa: resto de causas (R4)"
 msgid "Rectifying invoice of a simplified invoice (R5)"
 msgstr "Rectificativa de una factura simplificada (R5)"
 
+#: models.py:58
+msgid "EU VAT number"
+msgstr "NIF-IVA de la UE"
+
+#: models.py:59
+msgid "Passport"
+msgstr "Pasaporte"
+
+#: models.py:60
+msgid "Tax ID of their country"
+msgstr "Identificación fiscal de su país"
+
+#: models.py:61
+msgid "Residence certificate"
+msgstr "Certificado de residencia"
+
+#: models.py:62
+msgid "Other document"
+msgstr "Otro documento"
+
+#: models.py:63
+msgid "Not registered"
+msgstr "No censado"
+
 #: models.py:61
 msgid "POS tickets"
 msgstr "Tiques del TPV"
