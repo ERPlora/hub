@@ -6,6 +6,7 @@ The rules themselves, without the database, are ``base/tests/test_activation.py`
 """
 
 import json
+import re
 import threading
 
 import psycopg
@@ -278,6 +279,7 @@ def test_turning_one_on_turns_on_what_it_needs_and_records_its_event():
         "state": "on",
         "chosen": True,
         "along": [{"id": "customer", "name": "Customers"}, {"id": "sale", "name": "Sales & POS"}, {"id": "tax", "name": "Taxes"}],
+        "already": False,
     }
     now = rows()
     assert now["invoice"] == Activation(ON, True)
@@ -299,7 +301,7 @@ def test_what_it_needs_and_was_chosen_stays_chosen():
 @pytest.mark.django_db
 def test_one_already_on_and_chosen_changes_nothing_and_records_nothing():
     set_rows(task="on*", staff="on")
-    assert enable("task") == {"app": "task", "state": "on", "chosen": True, "along": []}
+    assert enable("task") == {"app": "task", "state": "on", "chosen": True, "along": [], "already": True}
     assert recorded(events.APP_ENABLED) == []
 
 
@@ -324,12 +326,109 @@ def test_the_first_change_writes_down_every_app_of_the_business():
 @pytest.mark.django_db
 def test_an_unknown_app_or_the_platform_is_not_found():
     before = rows()
-    for label in ("nope", "base", "live"):
+    for label in ("nope", "base", "live", "peluquería"):
         with pytest.raises(NotFound):
             enable(label)
         with pytest.raises(NotFound):
             disable(label)
     assert rows() == before
+
+
+# ── By its name, as the person says it (BASE-F23, F24; hub#539) ────────────────────────────────────────────
+
+
+def app_get(app, *, language="en", permissions=(HOME,)):
+    op = get("base.app.get")
+    context = OperationContext(scope=A, actor="ana", permissions=frozenset(permissions), language=language)
+    return op(context, op.input.model_validate({"app": app})).model_dump(mode="json")
+
+
+@pytest.mark.django_db
+def test_the_app_the_person_names_goes_on_never_another_whose_name_starts_the_same():
+    """«Activa la app de reservas» with Reservas off and Reservas online on turned on Reservas online (hub#539)."""
+    set_rows(online_booking="on*", appointment="on", customer="on", service="on", staff="on")
+
+    answer = enable("reservas", context=ctx(language="es"))
+
+    assert (answer["app"], answer["state"], answer["already"]) == ("reservation", "on", False)
+    assert rows()["reservation"] == Activation(ON, True)
+    assert rows()["online_booking"] == Activation(ON, True)
+    assert [payload["app"] for _, payload in recorded(events.APP_ENABLED)] == ["reservation"]
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("said", "language", "app"),
+    [
+        ("reservation", "es", "reservation"),  # its id, whatever the language
+        ("Reservas online", "es", "online_booking"),  # its whole name
+        ("RESERVAS", "es", "reservation"),  # case aside
+        ("facturacion", "es", "invoice"),  # accents aside
+        ("Reservations", "es", "reservation"),  # its English name, whatever the person's language
+        ("Online booking", "en", "online_booking"),
+        ("booking", "en", "online_booking"),  # the only one with a word of its name that starts so
+        ("tpv", "es", "sale"),  # «Ventas / TPV»
+    ],
+)
+def test_an_app_is_named_by_its_id_or_by_its_name_as_the_person_says_it(said, language, app):
+    set_rows()
+    assert app_get(said, language=language)["id"] == app
+    assert enable(said, context=ctx(language=language))["app"] == app
+    assert disable(said, context=ctx(language=language))["app"] == app
+
+
+@pytest.mark.django_db
+def test_a_name_that_fits_several_apps_is_refused_naming_them_and_changes_nothing():
+    """«reserva» is Reservas and Reservas online: the assistant asks which one, never picks one (hub#539)."""
+    set_rows(online_booking="on*", appointment="on", customer="on", service="on", staff="on")
+    before = rows()
+    for turn in (enable, disable, app_get):
+        with pytest.raises(Conflict) as refused:
+            turn("reserva", **({"language": "es"} if turn is app_get else {"context": ctx(language="es")}))
+        assert (refused.value.status, refused.value.code) == (409, "base.app_ambiguous")
+        assert {"Reservas", "Reservas online"} <= set(re.findall(r"Reservas(?: online)?", str(refused.value)))
+    assert rows() == before
+    assert recorded(events.APP_ENABLED) == recorded(events.APP_DISABLED) == []
+
+
+@pytest.mark.django_db
+def test_one_already_on_says_so_also_when_it_had_come_along_with_another():
+    """«Activa la app de clientes» with Clientes on (it came with Sales): it was on already, and the answer says so."""
+    set_rows(sale="on*", tax="on", customer="on")
+    answer = enable("clientes", context=ctx(language="es"))
+    assert (answer["app"], answer["state"], answer["already"]) == ("customer", "on", True)
+
+
+@pytest.mark.django_db
+def test_the_read_says_which_app_a_name_names_and_whether_it_is_on(monkeypatch):
+    set_rows(online_booking="on*", appointment="on", customer="on", service="on", staff="on")
+    assert app_get("reservas", language="es") == {"id": "reservation", "name": "Reservas", "state": "off"}
+    assert app_get("Reservas online", language="es") == {"id": "online_booking", "name": "Reservas online", "state": "on"}
+    assert app_get("online_booking")["name"] == "Online booking"
+    with pytest.raises(NotFound):
+        app_get("nope")
+    monkeypatch.setattr(apps.get_app_config("task"), "premium", True)
+    keep("a", {"modules": []})
+    assert app_get("task")["state"] == "blocked"
+
+
+def test_the_read_is_for_who_sees_the_home_and_told_to_the_assistant():
+    op = get("base.app.get")
+    assert (op.kind, op.permission) == ("query", HOME)
+    assert op.ai["description"].strip()
+
+
+@pytest.mark.django_db
+def test_the_assistants_card_names_the_app_by_its_name_never_by_its_id():
+    """B28c (hub#539): the card said «online_booking», and the person confirmed Reservas online asking for Reservas."""
+    from base import assistant
+
+    set_rows()
+    for name in ("base.app.enable", "base.app.disable"):
+        card = assistant.card(get(name), {"app": "online_booking"}, "es", ctx(language="es"))
+        assert [(field["name"], field["value"]) for field in card["fields"]] == [("app", "Reservas online")]
+        card = assistant.card(get(name), {"app": "reservas"}, "en", ctx(language="en"))
+        assert [(field["name"], field["value"]) for field in card["fields"]] == [("app", "Reservations")]
 
 
 @pytest.mark.django_db
@@ -469,6 +568,7 @@ def test_turning_one_off_turns_off_what_came_with_it_and_records_its_event():
         "state": "off",
         "chosen": False,
         "along": [{"id": "customer", "name": "Customers"}, {"id": "sale", "name": "Sales & POS"}],
+        "already": False,
     }
     now = rows()
     assert [label for label, row in now.items() if row.on] == ["staff", "task", "tax"]
@@ -502,7 +602,7 @@ def test_the_409_is_said_in_the_language_of_who_asks():
 @pytest.mark.django_db
 def test_one_already_off_changes_nothing_and_records_nothing():
     set_rows(task="on*", staff="on")
-    assert disable("flow") == {"app": "flow", "state": "off", "chosen": False, "along": []}
+    assert disable("flow") == {"app": "flow", "state": "off", "chosen": False, "along": [], "already": True}
     assert recorded(events.APP_DISABLED) == []
 
 
@@ -916,6 +1016,15 @@ def test_the_routes_are_bound_to_their_commands(path, operation, db):
     [route] = router.path_operations[path].operations
     assert (route.methods, route.operation_id) == (["POST"], operation)
     assert resolve(f"/api{path}").url_name
+
+
+@pytest.mark.django_db
+def test_which_app_a_name_names_is_read_over_http(client, make_user):
+    client.force_login(make_user("ana", host="a", role="hub_owner"))
+    answered = client.get("/api/apps/detail", {"app": "Reservas online"}, HTTP_HOST="a.localhost:8000")
+    assert (answered.status_code, answered.json()["id"]) == (200, "online_booking")
+    refused = client.get("/api/apps/detail", {"app": "reserva"}, HTTP_HOST="a.localhost:8000", HTTP_ACCEPT_LANGUAGE="es")
+    assert (refused.status_code, refused.json()["error"]["code"]) == (409, "base.app_ambiguous")
 
 
 @pytest.mark.django_db

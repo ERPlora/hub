@@ -6,6 +6,8 @@ templates, what a blueprint brings, the export, the loads and the apps' data (th
 import base64
 import csv
 import io
+import re
+import unicodedata
 from typing import Any
 from uuid import UUID
 
@@ -17,7 +19,7 @@ from django.http import HttpRequest
 from django.utils import timezone, translation
 from django.utils.translation import gettext, gettext_lazy, ngettext, pgettext
 from live.context import OperationContext
-from live.errors import InvalidPayload, NotFound, Unauthorized
+from live.errors import Conflict, InvalidPayload, NotFound, Unauthorized
 from live.meta import Category, all_live_app_configs, permissions_for_role
 from live.models import OutboxEvent
 from live.operations import INTERNAL, operation
@@ -50,6 +52,8 @@ from base.schemas import (
     AccessSettingsOut,
     AppListIn,
     AppListOut,
+    AppRefIn,
+    AppRefOut,
     DeviceCurrentIn,
     DeviceCurrentOut,
     DeviceByIdIn,
@@ -395,6 +399,71 @@ def app_list(ctx: OperationContext, data: AppListIn) -> dict:
             "max_apps": app_limit(hub),
             "enabled": activation.chosen_on(current, among=shown),
         }
+
+
+#: What a name that is no app of the business answers (BASE-F24); one that fits several, ``APP_AMBIGUOUS``.
+APP_NOT_FOUND = gettext_lazy("No app has that name or id.")
+APP_AMBIGUOUS = gettext_lazy("“%(said)s” fits several apps: %(names)s. Say which one.")
+
+
+def _plain(text: str) -> str:
+    """``text`` as a name is compared: case and accents aside, its spaces collapsed."""
+    decomposed = unicodedata.normalize("NFKD", text.casefold())
+    return " ".join("".join(char for char in decomposed if not unicodedata.combining(char)).split())
+
+
+def find_app(said: str, *, demo: bool, language: str) -> Any:
+    """The app of the business ``said`` names, as a person says it (BASE-F23, F24; hub#539): its id; else the one whose
+    name in a language of the Hub is ``said``, case and accents aside («reservas» is Reservas, never Reservas online
+    beside it); else the only one with a word of its name that starts so («booking»). 404 when none (the platform is no
+    app); 409 ``base.app_ambiguous`` naming them, in ``language``, when several (``reserva``): the person says which,
+    as the apps' ``find_*`` of a table or a zone do."""
+    configs = home.shown_modules(demo_hub=demo)
+    plain = _plain(said)
+    found = [config for config in configs if config.label == said.strip()]
+    if not found and plain:
+        named = {}
+        for code, _ in settings.LANGUAGES:
+            with translation.override(code):
+                for config in configs:
+                    named.setdefault(config.label, set()).add(_plain(str(config.verbose_name)))
+        starts = re.compile(rf"(?:^|\W){re.escape(plain)}")
+        found = [config for config in configs if plain in named[config.label]] or [
+            config for config in configs if any(starts.search(name) for name in named[config.label])
+        ]
+    if not found:
+        with translation.override(language):
+            raise NotFound(str(APP_NOT_FOUND))
+    if len(found) > 1:
+        with translation.override(language):
+            names = ", ".join(sorted(str(config.verbose_name) for config in found))
+            raise Conflict(str(APP_AMBIGUOUS) % {"said": said.strip(), "names": names}, code="base.app_ambiguous")
+    return found[0]
+
+
+@operation(
+    "base.app.get",
+    kind="query",
+    permission=VIEW_HOME,
+    input=AppRefIn,
+    output=AppRefOut,
+    ai={
+        "description": "Says which of this business's apps a name names, as the person says it (e.g. «Reservas»), or "
+        "an id: its id, its name and whether it is on, off or blocked (a paid app without its right). A name that fits "
+        "several apps is refused naming them: ask the person which one."
+    },
+)
+def app_get(ctx: OperationContext, data: AppRefIn) -> dict:
+    """Which app ``data.app`` names (``find_app``), with its state as the Apps screen says it: what the assistant's card
+    of ``base.app.enable`` and ``base.app.disable`` names it by (``refers``), never by its id (hub#539)."""
+    hub = Hub.objects.filter(slug=ctx.scope.key).first()
+    config = find_app(data.app, demo=bool(hub and hub.is_demo), language=ctx.language)
+    if config.label in entitlement.blocked_apps(ctx.scope):
+        state = "blocked"
+    else:
+        state = "on" if activation.states_of(ctx.scope)[config.label].on else "off"
+    with translation.override(ctx.language):
+        return {"id": config.label, "name": str(config.verbose_name), "state": state}
 
 
 def app_limit(hub: Hub | None) -> int | None:
@@ -1690,7 +1759,6 @@ def approval_approvers(ctx: OperationContext, data: ApproversIn) -> dict:
 from base import api_docs  # noqa: E402
 from base.models import ApiSettings  # noqa: E402
 from base.schemas import ApiDocIn, ApiDocOut, ApiDocSettingsIn, ApiDocSettingsOut  # noqa: E402
-from live.errors import Conflict  # noqa: E402
 
 
 def api_docs_enabled() -> bool:

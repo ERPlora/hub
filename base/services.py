@@ -3110,12 +3110,10 @@ def _business_hub(ctx: OperationContext) -> Hub | None:
     return Hub.objects.filter(slug=ctx.scope.key).first()
 
 
-def _business_module(ctx: OperationContext, label: str, hub: Hub | None) -> Any:
-    """The module ``label`` as this business shows it; 404 for any other id (the platform, or one it never shows)."""
-    for config in home.shown_modules(demo_hub=bool(hub and hub.is_demo)):
-        if config.label == label:
-            return config
-    raise NotFound(gettext("No app has this id."))
+def _business_module(ctx: OperationContext, said: str, hub: Hub | None) -> Any:
+    """The module ``said`` names (its id, or its name as the person says it: ``queries.find_app``) as this business
+    shows it; 404 for any other (the platform, or one it never shows), 409 ``base.app_ambiguous`` for a name of several."""
+    return queries.find_app(said, demo=bool(hub and hub.is_demo), language=ctx.language)
 
 
 def _locked_states(ctx: OperationContext, graph: dict) -> dict[str, activation.Activation]:
@@ -3200,8 +3198,9 @@ def _names_said(ctx: OperationContext, labels: list[str]) -> str:
         return gettext("%(first)s and %(last)s") % {"first": ", ".join(names[:-1]), "last": names[-1]}
 
 
-def _app_answer(label: str, row: activation.Activation, along: list[dict[str, str]]) -> dict:
-    return {"app": label, "state": row.state, "chosen": row.on and row.chosen, "along": along}
+def _app_answer(label: str, row: activation.Activation, along: list[dict[str, str]], *, already: bool) -> dict:
+    """``already``: it was in that state before (on, or off), and nothing went on or off: the assistant says so."""
+    return {"app": label, "state": row.state, "chosen": row.on and row.chosen, "along": along, "already": already}
 
 
 @operation(
@@ -3211,9 +3210,10 @@ def _app_answer(label: str, row: activation.Activation, along: list[dict[str, st
     input=AppChangeIn,
     output=AppChangeOut,
     ai={
-        "description": "Turns on one of this business's apps (by its id in base.app.list), with the apps it needs, "
-        "which come along: it shows in the menu and can be used, with the data it had. Refused when the plan's "
-        "limit of apps is reached (turn one off, or upgrade the plan on erplora.com) or a paid app is not subscribed.",
+        "description": "Turns on one of this business's apps (by its name as the person says it, or its id), with the "
+        "apps it needs, which come along: it shows in the menu and can be used, with the data it had. Refused when the "
+        "plan's limit of apps is reached (turn one off, or upgrade the plan on erplora.com), a paid app is not "
+        "subscribed or the name fits several apps (ask which one). already=true: it was on already, nothing changed.",
         "risk": "normal",
     },
 )
@@ -3227,17 +3227,17 @@ def app_enable(ctx: OperationContext, data: AppChangeIn) -> dict:
 
 def _enable(ctx: OperationContext, data: AppChangeIn) -> dict:
     hub = _business_hub(ctx)
-    _business_module(ctx, data.app, hub)
+    app = _business_module(ctx, data.app, hub).label
     graph = activation.module_graph()
     blocked = entitlement.blocked_apps(ctx.scope)
-    for label in [data.app, *sorted(activation.needs([data.app], graph))]:
+    for label in [app, *sorted(activation.needs([app], graph))]:
         if label in blocked:
             raise entitlement.refused(label, ctx.language)
-    if not activation.enabling(data.app, activation.states_of(ctx.scope), graph):
-        return _app_answer(data.app, activation.Activation(activation.ON, True), [])
+    if not activation.enabling(app, activation.states_of(ctx.scope), graph):
+        return _app_answer(app, activation.Activation(activation.ON, True), [], already=True)
     current = _locked_states(ctx, graph)
-    changes = activation.enabling(data.app, current, graph)
-    if changes.get(data.app, current[data.app]).chosen and not (current[data.app].on and current[data.app].chosen):
+    changes = activation.enabling(app, current, graph)
+    if changes.get(app, current[app]).chosen and not (current[app].on and current[app].chosen):
         limit = queries.app_limit(hub)
         shown = {config.label for config in home.shown_modules(demo_hub=bool(hub and hub.is_demo))}
         enabled = activation.chosen_on(current, among=shown)
@@ -3252,9 +3252,9 @@ def _enable(ctx: OperationContext, data: AppChangeIn) -> dict:
     _write_states(ctx.scope.key, changes)
     if hub is not None and not hub.is_demo:
         _sync_photo_blocks(hub, changes)
-    along = [label for label in changes if label != data.app]
-    record_event(ctx, events.APP_ENABLED, {"app": data.app, "along": along})
-    return _app_answer(data.app, activation.Activation(activation.ON, True), _named(ctx, along))
+    along = [label for label in changes if label != app]
+    record_event(ctx, events.APP_ENABLED, {"app": app, "along": along})
+    return _app_answer(app, activation.Activation(activation.ON, True), _named(ctx, along), already=current[app].on)
 
 
 @operation(
@@ -3264,9 +3264,10 @@ def _enable(ctx: OperationContext, data: AppChangeIn) -> dict:
     input=AppChangeIn,
     output=AppChangeOut,
     ai={
-        "description": "Turns off one of this business's apps (by its id in base.app.list): it leaves everyone's menu "
-        "and its screens stop opening; the apps that came along only with it go off too. Nothing is deleted: turned "
-        "on again, it has its data. Refused while another app on needs it, or when the app itself says why not yet.",
+        "description": "Turns off one of this business's apps (by its name as the person says it, or its id): it "
+        "leaves everyone's menu and its screens stop opening; the apps that came along only with it go off too. Nothing "
+        "is deleted: turned on again, it has its data. Refused while another app on needs it, when the app itself says "
+        "why not yet or when the name fits several apps (ask which one). already=true: it was off already.",
         "risk": "high",
     },
 )
@@ -3279,25 +3280,25 @@ def app_disable(ctx: OperationContext, data: AppChangeIn) -> dict:
 
 
 def _disable(ctx: OperationContext, data: AppChangeIn) -> dict:
-    _business_module(ctx, data.app, _business_hub(ctx))
+    app = _business_module(ctx, data.app, _business_hub(ctx)).label
     graph = activation.module_graph()
-    if not activation.states_of(ctx.scope)[data.app].on:
-        return _app_answer(data.app, activation.OFF_ROW, [])
+    if not activation.states_of(ctx.scope)[app].on:
+        return _app_answer(app, activation.OFF_ROW, [], already=True)
     current = _locked_states(ctx, graph)
-    if not current[data.app].on:
-        return _app_answer(data.app, activation.OFF_ROW, [])
-    needed = activation.required_by(data.app, current, graph)
+    if not current[app].on:
+        return _app_answer(app, activation.OFF_ROW, [], already=True)
+    needed = activation.required_by(app, current, graph)
     if needed:
         # The ones to turn off: those chosen (what came along goes off with them).
         first = [label for label in needed if current[label].chosen] or needed
         with translation.override(ctx.language):
             message = gettext("Turn off %(apps)s first.") % {"apps": _names_said(ctx, first)}
         raise AppRequired(message, required_by=needed)
-    changes = activation.disabling(data.app, current, graph)
+    changes = activation.disabling(app, current, graph)
     vetoed = activation.veto(list(changes), ctx=ctx)
     if vetoed is not None:
         raise AppVetoed(vetoed[1], app=vetoed[0])
     _write_states(ctx.scope.key, changes)
-    along = [label for label in changes if label != data.app]
-    record_event(ctx, events.APP_DISABLED, {"app": data.app, "along": along})
-    return _app_answer(data.app, activation.OFF_ROW, _named(ctx, along))
+    along = [label for label in changes if label != app]
+    record_event(ctx, events.APP_DISABLED, {"app": app, "along": along})
+    return _app_answer(app, activation.OFF_ROW, _named(ctx, along), already=False)
