@@ -372,9 +372,8 @@ def test_sending_it_by_hand_without_the_link_is_refused_with_the_reason(platform
     assert refused == "verifactu.hub_unregistered"
 
 
-@pytest.mark.parametrize("tax_id", ["B27593136", " b27593136 "], ids=["as-is", "spaced-lowercase"])
-def test_erploras_own_records_are_still_presented_as_erploras_hub(platform_pass, tax_id):
-    run("invoice.issuer.update", {**ISSUER, "tax_id": tax_id}, platform_pass)
+def test_erploras_own_records_are_still_presented_as_erploras_hub(platform_pass, settings):
+    run("invoice.issuer.update", {**ISSUER, "tax_id": settings.PLATFORM_ISSUER_TAX_ID}, platform_pass)
     linked()
     sealed(platform_pass)
     with respx.mock:

@@ -258,17 +258,13 @@ def _server_problem(environment: str) -> str:
     return ""
 
 
-def _same_tax_id(one: str, other: str) -> bool:
-    return one.strip().upper() == other.strip().upper()
-
-
 def presenter(scope: Scope, config: Config, issuer_nif: str) -> str | None:
     """Who ERPlora's gateway is told presents ``issuer_nif``'s records (its ``hub``): ``scope``'s business by its slug
     (saas#29). ERPlora's own hub presents ERPlora's own records only (``PLATFORM_HUB_SLUG``); a business's record its
     pass sees (the worker's fixed scope while the tables are shared, phase 1) goes as that business, by the id
     erplora.com gave it (``Config.hub_id``, which the SaaS takes as well as a slug), never as ERPlora: the gateway
     would refuse it (409 ``nif_mismatch``, hub#454). ``None`` without that id: nothing can be presented yet."""
-    if not platform.is_platform_hub(scope) or _same_tax_id(issuer_nif, settings.PLATFORM_ISSUER_TAX_ID):
+    if not platform.is_platform_hub(scope) or issuer_nif == settings.PLATFORM_ISSUER_TAX_ID:
         return scope.key
     return str(config.hub_id) if config.hub_id is not None else None
 
