@@ -195,20 +195,40 @@ def run_stream_once(stream: Stream) -> dict:
     return json.loads(frame.split("data: ", 1)[1])
 
 
-@HUB_DB_COMMITTED
-def test_the_live_executor_waits_for_its_hubs_place_too(hub_a, short_wait):
+def a_stream_of_items(hub) -> Stream:
     user = get_user_model().objects.create_user(username="ana", password="pw")
-    Membership.objects.create(user=user, host=hub_a.slug, role=Membership.Role.ADMIN)
+    Membership.objects.create(user=user, host=hub.slug, role=Membership.Role.ADMIN)
     op = get_operation("demo.item.list")
-    stream = Stream(OperationContext(scope=Scope("host", hub_a.slug), actor=user))
+    stream = Stream(OperationContext(scope=Scope("host", hub.slug), actor=user))
     stream.subs["s1"] = Subscription(id="s1", op=op, params=op.input.model_validate({}))
+    return stream
+
+
+@HUB_DB_COMMITTED
+def test_the_live_executor_waits_for_its_hubs_place_too(hub_a, short_wait, monkeypatch):
+    monkeypatch.setattr(limits.HubBusy, "retry_after", 0.05)
+    stream = a_stream_of_items(hub_a)
 
     with held_open(hub_a):
         busy = run_stream_once(stream)
     free = run_stream_once(stream)
 
+    # Busy all along: its error once the executor's retries are spent.
     assert busy["error"]["code"] == "base.hub_busy"
     assert free["data"]["rows"] == []
+
+
+@HUB_DB_COMMITTED
+def test_a_live_list_of_a_hub_busy_for_a_moment_gets_its_result_not_an_error(hub_a, short_wait):
+    assert limits.HubBusy("Busy.").retry_after == limits.RETRY_AFTER_SECONDS
+    stream = a_stream_of_items(hub_a)
+
+    with held_open(hub_a) as held:
+        threading.Timer(0.5, held.end).start()
+        listed = run_stream_once(stream)
+
+    assert listed["data"]["rows"] == []
+    assert stream.queue.empty()
 
 
 @HUB_DB_COMMITTED

@@ -53,10 +53,12 @@ FREE = PlanLimits(max_transactions=1, statement_timeout_seconds=5)
 
 
 class HubBusy(OperationError):
-    """Every place of the hub in this process is taken, and none was freed within the bounded wait (503)."""
+    """Every place of the hub in this process is taken, and none was freed within the bounded wait (503). It passes:
+    the live executor runs the query again after :data:`RETRY_AFTER_SECONDS` (``OperationError.retry_after``)."""
 
     status = 503
     code = "base.hub_busy"
+    retry_after = RETRY_AFTER_SECONDS
 
 
 def _positive(value: Any) -> int | None:
