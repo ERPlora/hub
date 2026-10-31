@@ -10,7 +10,7 @@
 // flow: BASE-F86 BASE-F87 BASE-F88 BASE-F89
 import { type APIRequestContext, type Browser, expect, type Page, test } from '@playwright/test';
 
-import { A, api, collectProblems, horizontalOverflow, hostPage, psql, shot, shown, untilStill } from './helpers';
+import { A, api, capture, collectProblems, horizontalOverflow, hostPage, psql, shown, untilStill } from './helpers';
 
 const VIEWPORTS = {
   390: { width: 390, height: 844 },
@@ -42,7 +42,7 @@ async function snap(page: Page, key: string, width: number): Promise<void> {
   await untilStill(page);
   const overflow = await horizontalOverflow(page);
   expect(overflow, `${key} at ${width}: no sideways scroll`).toBeLessThanOrEqual(0);
-  await page.screenshot({ path: shot(`CLOSE-BASE-${key}-${width}`) });
+  await capture(page, `CLOSE-BASE-${key}-${width}`);
 }
 
 async function signedIn(browser: Browser, viewport: { width: number; height: number }) {
