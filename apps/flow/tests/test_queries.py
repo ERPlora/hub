@@ -63,7 +63,8 @@ def test_every_app_a_factory_recipe_names_has_its_name_in_the_catalog():
     from apps.flow import recipes
 
     catalog = run("flow.catalog.read")
-    named = {row.app: row.app_name for row in [*catalog.events, *catalog.actions]}
+    rows = [*catalog.events, *catalog.actions]
+    named = {row.app for row in rows}
     wanted = set()
     for _config, recipe in recipes.declarations():
         steps = recipe.get("steps") or []
@@ -71,8 +72,9 @@ def test_every_app_a_factory_recipe_names_has_its_name_in_the_catalog():
         names += [tool for step in steps for tool in step.get("tools") or []]
         wanted |= {name.split(".")[0] for name in names if name}
     assert {"whatsapp_inbox", "reservation", "customer"} <= wanted
-    assert sorted(wanted - set(named)) == []
-    assert [label for label in wanted if named[label] in ("", label)] == []
+    assert sorted(wanted - named) == []
+    # Every row, events and actions alike: the editor takes the name from the first one it finds of that app.
+    assert [(row.name, row.app_name) for row in rows if row.app in wanted and row.app_name in ("", row.app)] == []
 
 
 def test_the_catalog_names_the_apps_in_the_callers_language():
