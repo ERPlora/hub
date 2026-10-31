@@ -396,7 +396,7 @@ def duplicate_flow(ctx: OperationContext, data: FlowRefIn) -> dict:
         enabled=False,
         trigger_kind=original.trigger_kind,
         trigger_event=original.trigger_event,
-        trigger_filter=original.trigger_filter,
+        trigger_filter=recipes.fixed_filter(original),
         schedule=original.schedule,
         run_at=original.run_at,
         steps=recipes.fixed_data(original, original.steps),
@@ -1842,7 +1842,9 @@ def react(ctx: OperationContext, data: ReactIn) -> dict:
         if flow is None or FlowRun.objects.filter(flow=flow, trigger_key=key).exists():
             skipped += 1
             continue
-        if not document.readable(flow.trigger_filter):
+        # What its recipe excludes today counts too, whenever it was built (FLOW-F36).
+        wanted = recipes.fixed_filter(flow)
+        if not document.readable(wanted):
             # Never «does not hold» in silence (hub#1766): the owner reads why in its history.
             run = _start(
                 ctx,
@@ -1858,9 +1860,7 @@ def react(ctx: OperationContext, data: ReactIn) -> dict:
             with translation.override(flow.language):
                 _finish(ctx, run, FlowRun.Status.FAILED, now, _own("flow.filter_unreadable"))
             continue
-        if not document.holds(
-            flow.trigger_filter, {"input": data.payload, "steps": {}}
-        ):
+        if not document.holds(wanted, {"input": data.payload, "steps": {}}):
             skipped += 1
             continue
         run = _start(

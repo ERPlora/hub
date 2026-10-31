@@ -18,14 +18,16 @@ applying a narrower permission without asking (a wider one waits for consent). T
 
 import copy
 import json
+import uuid
 
 import pytest
+from live.context import system_context
 from live.models import OutboxEvent
 
 from apps.flow.models import Flow, FlowRun, Question
 from apps.flow.queries import TURN
 
-from .conftest import ctx_for, run
+from .conftest import A, ctx_for, run
 from .test_recipes import declaration, declared  # noqa: F401 - the fixture
 from .test_services_assistant_pinned import (  # noqa: F401 - the fixtures
     CANCEL,
@@ -308,3 +310,95 @@ def test_the_table_answer_turned_on_before_hub_447_is_read_with_its_card_and_num
     s10 = next(step for step in read(flow_id).steps if step["id"] == "s10")
     assert s10["pinned"] == fixed
     assert fixed[CANCEL] == {"on_behalf_of": "{{steps.s6.id}}{{steps.s7.id}}"}
+
+
+# ── «Only when…»: a clause its app added since never waits for the owner either ─────────────────────────────────────
+
+GAP = "appointment/gap"
+CANCELLED = "appointment.appointment.cancelled"
+ONLY_THE_CUSTOMER = {"input.by_customer": {"eq": True}}
+
+
+def gap_turned_on_before_the_clause(declared) -> str:  # noqa: F811 - the fixture
+    """The recipe «a cancelled appointment leaves a task» turned on when it started on every cancellation, and its app
+    starting it only on the customer's today: its id."""
+    declared(("appointment", declaration(trigger={"kind": "event", "event": CANCELLED})))
+    flow_id = str(run("flow.recipe.enable", {"recipe": GAP}, ctx_for("hub_owner")).flow.id)
+    declared(("appointment", declaration()))
+    return flow_id
+
+
+def starts(event: str, payload: dict) -> int:
+    """How many automations ``event`` with ``payload`` starts, as the relay hands it over."""
+    done = run("flow.run.react", {"event_id": str(uuid.uuid4()), "event": event, "payload": payload}, system_context(A))
+    return done.started
+
+
+def test_one_turned_on_before_its_app_left_out_the_team_s_cancellations_never_starts_on_one(declared):  # noqa: F811
+    # The premise: on main it started on every cancellation until the owner pressed «Update it».
+    flow_id = gap_turned_on_before_the_clause(declared)
+    assert stored(flow_id).trigger_filter == {}
+    assert starts(CANCELLED, {"by_customer": False, "number": "C-1"}) == 0
+    assert starts(CANCELLED, {"by_customer": True, "number": "C-2"}) == 1
+    assert stored(flow_id).trigger_filter == {}  # counted, not written behind the owner's back
+
+
+def test_a_condition_the_owner_put_on_the_same_datum_is_theirs(declared):  # noqa: F811
+    flow_id = gap_turned_on_before_the_clause(declared)
+    theirs = {"input.by_customer": {"eq": False}}
+    Flow.objects.filter(pk=flow_id).update(trigger_filter=theirs)
+    assert starts(CANCELLED, {"by_customer": False, "number": "C-1"}) == 1
+    assert starts(CANCELLED, {"by_customer": True, "number": "C-2"}) == 0
+    assert read(flow_id).trigger["filter"] == theirs
+
+
+def test_one_the_owner_made_start_on_something_else_gets_no_condition_of_its_recipe(declared):  # noqa: F811
+    flow_id = gap_turned_on_before_the_clause(declared)
+    Flow.objects.filter(pk=flow_id).update(trigger_event="appointment.appointment.created")
+    assert read(flow_id).trigger["filter"] == {}
+    assert starts("appointment.appointment.created", {"by_customer": False, "number": "C-1"}) == 1
+
+
+def test_one_built_from_today_s_version_is_read_and_starts_as_it_is(declared):  # noqa: F811
+    declared(("appointment", declaration()))
+    flow_id = str(run("flow.recipe.enable", {"recipe": GAP}, ctx_for("hub_owner")).flow.id)
+    before = stored(flow_id)
+    assert read(flow_id).trigger["filter"] == before.trigger_filter == ONLY_THE_CUSTOMER
+    assert starts(CANCELLED, {"by_customer": False, "number": "C-1"}) == 0
+    assert starts(CANCELLED, {"by_customer": True, "number": "C-2"}) == 1
+    assert (stored(flow_id).version, stored(flow_id).trigger_filter) == (before.version, before.trigger_filter)
+
+
+def test_it_is_read_with_its_app_s_condition_and_a_copy_and_updating_it_write_it(declared):  # noqa: F811
+    flow_id = gap_turned_on_before_the_clause(declared)
+    assert read(flow_id).trigger["filter"] == ONLY_THE_CUSTOMER
+    copied = run("flow.flow.duplicate", {"id": flow_id}, ctx_for("hub_owner"))
+    assert Flow.objects.get(pk=copied.id).trigger_filter == ONLY_THE_CUSTOMER
+    run("flow.recipe.repair", {"recipe": GAP}, ctx_for("hub_owner"))
+    assert stored(flow_id).trigger_filter == ONLY_THE_CUSTOMER
+
+
+def test_one_built_from_today_s_version_whose_condition_was_taken_off_still_never_starts_on_a_team_s_cancellation(
+    declared,  # noqa: F811
+):
+    # Whenever it was built: its app's condition counts, as the data it fixes do (FLOW-F36).
+    declared(("appointment", declaration()))
+    flow_id = str(run("flow.recipe.enable", {"recipe": GAP}, ctx_for("hub_owner")).flow.id)
+    Flow.objects.filter(pk=flow_id).update(trigger_filter={})
+    assert starts(CANCELLED, {"by_customer": False, "number": "C-1"}) == 0
+
+
+def test_the_table_answer_turned_on_before_its_app_left_out_old_messages_never_answers_one(monkeypatch):
+    from apps.whatsapp_inbox import recipes as inbox_recipes
+
+    older = copy.deepcopy(inbox_recipes.RECIPES)
+    [table_answer] = [recipe for recipe in older if recipe["id"] == "reservation_from_whatsapp"]
+    del table_answer["trigger"]["filter"]["input.source"]
+    with monkeypatch.context() as patch:
+        patch.setattr(inbox_recipes, "RECIPES", older)
+        flow_id = str(run("flow.recipe.enable", {"recipe": "whatsapp_inbox/reservation_from_whatsapp"}, ctx_for("hub_owner")).flow.id)
+    assert "input.source" not in stored(flow_id).trigger_filter
+
+    message = {"id": str(uuid.uuid4()), "direction": "inbound", "source": "history", "phone": "+34600111222"}
+    assert starts("whatsapp_inbox.message.received", message) == 0
+    assert read(flow_id).trigger["filter"]["input.source"] == {"eq": "live"}

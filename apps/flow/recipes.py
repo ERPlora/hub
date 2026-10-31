@@ -17,9 +17,10 @@ Its **fingerprint** (``digest``) is what it does: its document built in every la
 permissions; never the sentences that explain it. An automation keeps the one it was built from: a
 different one today is «New version». Its **repair** (``missing_clauses``): an automation built from an
 older version whose «Only when…» lacks a clause today's recipe has started in more cases than its app
-meant; the repair adds just those clauses. Its **fixed data** (``fixed_data``): the data today's recipe
-fixes on its «Ask the assistant» steps are fixed on those steps of every automation built from it,
-whenever it was built, without waiting for anybody; what the owner fixed there stays.
+meant. Its app's **safety fixes** never wait for anybody, whenever the automation was built: the clauses
+today's recipe has and its «Only when…» lacks count when an event comes (``fixed_filter``) and the data
+today's recipe fixes on its «Ask the assistant» steps are fixed on those steps (``fixed_data``); what the
+owner put on the same datum stays. They are read so, and written when it is saved, copied or repaired.
 """
 
 import hashlib
@@ -224,13 +225,12 @@ def find(ref: str) -> Recipe:
     raise NotFound(str(RECIPE_NOT_FOUND), code=NOT_FOUND)
 
 
-def missing_clauses(recipe: Recipe, flow: Flow) -> dict[str, dict[str, Any]]:
-    """The «Only when…» clauses today's recipe has and ``flow`` lacks, when ``flow`` was built from an older
-    version of it and still starts on the recipe's event; ``{}`` when there is nothing to repair."""
-    trigger = recipe.declaration["trigger"]
+def _missing(declared: dict, flow: Flow) -> dict[str, dict[str, Any]]:
+    """The «Only when…» clauses ``declared`` has and ``flow`` lacks (a datum ``flow`` already has a clause on is
+    the owner's), while ``flow`` still starts on its event."""
+    trigger = declared.get("trigger") or {}
     if (
         trigger.get("kind") != "event"
-        or flow.recipe_digest == digest(recipe)
         or flow.trigger_kind != Flow.Trigger.EVENT
         or flow.trigger_event != trigger.get("event")
     ):
@@ -240,6 +240,13 @@ def missing_clauses(recipe: Recipe, flow: Flow) -> dict[str, dict[str, Any]]:
     return {path: clause for path, clause in wanted.items() if path not in have}
 
 
+def missing_clauses(recipe: Recipe, flow: Flow) -> dict[str, dict[str, Any]]:
+    """The «Only when…» clauses today's recipe has and ``flow`` does not have written, whenever it was built and
+    while it starts on the recipe's event; ``{}`` when there is nothing to write (``fixed_filter`` counts them
+    meanwhile)."""
+    return _missing(recipe.declaration, flow)
+
+
 def _declared(ref: str) -> dict | None:
     """What the active app that brings ``ref`` declares for it today, as it is (set aside or not: a fix it makes
     must reach the automations built from it all the same); ``None`` when no active app does."""
@@ -247,6 +254,15 @@ def _declared(ref: str) -> dict | None:
         if isinstance(declared, dict) and f"{config.label}/{declared.get('id', '')}" == ref:
             return declared
     return None
+
+
+def fixed_filter(flow: Flow) -> dict[str, Any]:
+    """``flow``'s «Only when…» with the clauses its recipe has today and it lacks, whenever it was built: it never
+    starts in a case its app excludes, and without waiting for anybody (FLOW-F36). A clause the owner put on the same
+    datum is theirs; one that starts on another event gets none."""
+    declared = _declared(flow.recipe) if flow.recipe else None
+    missing = _missing(declared, flow) if declared else {}
+    return {**flow.trigger_filter, **missing} if missing else flow.trigger_filter
 
 
 def fixed_data(flow: Flow, steps: list[dict]) -> list[dict]:

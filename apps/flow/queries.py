@@ -486,7 +486,7 @@ def trigger_of(flow: Flow) -> dict[str, Any]:
         return {
             "kind": "event",
             "event": flow.trigger_event,
-            "filter": flow.trigger_filter,
+            "filter": recipes.fixed_filter(flow),
         }
     if flow.trigger_kind == Flow.Trigger.SCHEDULE:
         schedule = flow.schedule
