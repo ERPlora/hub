@@ -7,14 +7,13 @@ sin registrar no pinta nada). Mientras tanto, la app usa los registrados que se 
 
 | Deseado | Dónde | Mientras tanto |
 |---|---|---|
-| `ion:finger-print-outline` (o `material-symbols:badge-outline`) | Icono del módulo (página de apps, tienda): el del fichaje en el mercado | `ion:log-in-outline` (`ion:time-outline` es el de Horarios). **Ya registrado** en `@erplora/ui`: falta cambiarlo en `apps.py` (y `pnpm gen:app-icons`), pendiente de su FIX |
 | `ion:cafe-outline` | Botón «Empezar pausa» de Fichar | `ion:time-outline` |
 | `ion:play-outline` | Botón «Terminar pausa» de Fichar | `ion:arrow-undo-outline` |
 | `ion:location-outline` | Aviso «Al fichar la entrada desde este dispositivo se comprueba tu ubicación» | `ion:information-circle-outline` |
 | `ion:locate-outline` | Botón «Usar mi ubicación actual» de Ajustes | `ion:globe-outline` |
 | `ion:save-outline` | Botón «Guardar» de Ajustes | `lucide:save` |
 
-Al registrarlos: cambiar el `icon` de `apps.py` (y `pnpm gen:app-icons`) y los `name` de las páginas;
+El del módulo ya es `ion:finger-print-outline` (registrado). Al registrar los demás: cambiar los `name` de las páginas;
 `frontend/tabs.test.ts` y `icons.test.ts` del shell vigilan que estén registrados.
 
 ## Componentes

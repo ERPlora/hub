@@ -31,7 +31,7 @@ que queda en su historial y saca el mes en CSV. Ninguna jornada se borra y se co
 
 | Qué | Valor |
 |---|---|
-| `LiveAppConfig` | `kind = "app"`, icono `ion:log-in-outline`, categoría `people`, gratuita (`premium = False`) |
+| `LiveAppConfig` | `kind = "app"`, icono `ion:finger-print-outline`, categoría `people`, gratuita (`premium = False`) |
 | Verticales | `hair_salon` y `restaurant` |
 | `requires` | `["staff"]`: la jornada es de una ficha de Personal (`staff.Member`) |
 | Usa de otras apps | Personal (fichas y nombres, también las dadas de baja); de la plataforma, la persona de la sesión (`base.HubUser`) y el modo del dispositivo (`base.queries.device_of`, BASE-F62); la pantalla Fichar sigue `base.device.current` |

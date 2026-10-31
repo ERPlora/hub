@@ -546,7 +546,7 @@ Los avisos nunca llevan la posición ni el motivo de una corrección (datos pers
   (hub#493).
 - **Suprimir las jornadas pasados los cuatro años** (y con ellas su posición): se conservan; la
   supresión automática no está (como attendance#7 del producto actual).
-- **Iconos propios** (café, play, ubicación, huella): pedidos en `UI-REQUESTS.md`; mientras, iconos
+- **Iconos propios** (café, play, ubicación, localizar, guardar): pedidos en `UI-REQUESTS.md`; mientras, iconos
   registrados equivalentes.
 - **Varios locales con su propia ubicación** (attendance#4 del producto actual, ATTENDANCE-F04): un Hub es
   un negocio con una ubicación; varios locales por negocio no existen en la plataforma.
