@@ -720,12 +720,20 @@ class TestTheOriginFirst:
         assert not LeftoverDatabase.objects.filter(hub=hub).exists()
 
     def test_a_database_missing_on_the_origin_ends_the_move_with_why(self, moves):
-        hub = moves.hub(to=moves.cluster())
-        control = tenancy_connections.control_name()
+        # With the environment's app role on the server (as in AWS): nothing is granted on a database that is not there.
+        role = f"w8a_app_{uuid.uuid4().hex[:8]}"
         with hubs._maintenance() as conn:
-            hubs._drop(conn, hub.db_name, control)
+            conn.execute(sql.SQL("CREATE ROLE {} LOGIN PASSWORD 'app'").format(sql.Identifier(role)))
+        try:
+            hub = moves.hub(to=moves.cluster())
+            control = tenancy_connections.control_name()
+            with hubs._maintenance() as conn:
+                hubs._drop(conn, hub.db_name, control)
 
-        run()
+            run(roles=bootstrap.Names(hub_app=role, hub_admin="pg_monitor"))
+        finally:
+            with hubs._maintenance() as conn:
+                conn.execute(sql.SQL("DROP ROLE IF EXISTS {}").format(sql.Identifier(role)))
 
         hub = fresh(hub)
         assert hub.moving_to_id is None and hub.last_error.startswith("move_database_missing")
