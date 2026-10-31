@@ -69,7 +69,7 @@ describe('events and actions in words', () => {
   it('an app it cannot name yet is left out, never its internal name; with its catalog, its visible name', () => {
     // The editor at 390 painted «Look up: Read · whatsapp_inbox (message)» while its catalog was still on its way
     // (the catalog it sees then is none): the same with one that could not be read or an app that is not on.
-    const read: Step = { id: 's1', kind: 'query', operation: 'whatsapp_inbox.message.get', params: {} };
+    const read: Step = { id: 's1', kind: 'query', operation: 'whatsapp_inbox.message.get', params: {}, result: 'first' };
     expect(describeStep(read, [read], null, phrasing())).toBe('Look up: Read (message)');
     expect(actionLabel('whatsapp_inbox.message.get', CATALOG, phrasing('es'))).toBe('Leer (message)');
     expect(eventLabel('whatsapp_inbox.message.flagged', null, phrasing())).toBe('Message flagged');
