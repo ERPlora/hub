@@ -1027,6 +1027,10 @@ Pasos:
    sus **Datos fijos**, y el asistente no lo ve ni puede cambiarlo (FLOW-F38). Así, la respuesta por WhatsApp
    montada antes de que su app fijara la ficha de quien escribe tampoco anula ni cambia la reserva de otra persona,
    ni siquiera tras el **Aprobar**.
+4. Lo que su app pone no se quita desde tu automatización: en el editor, esa condición del «Solo cuando…» y ese dato
+   fijo dicen «Lo fija …: puedes cambiarlo, pero no quitarlo.», sin × y sin poder elegir otro dato. Tus salidas: darle
+   otro valor (vale el tuyo), quitar esa consulta o acción de **Qué puede usar**, hacer que arranque con otro aviso, o
+   hacer una copia (FLOW-F06), que es tuya entera.
 Entra: las automatizaciones montadas desde una tarjeta de **Viene con …**, cuando se montaran, cuyo «Solo cuando…»
 no tiene lo que su app le pone hoy mientras arrancan con el mismo aviso, o que dejan al asistente un dato que su
 app fija hoy en ese paso.
@@ -1037,8 +1041,11 @@ sobre el mismo dato y un dato que fijaste tú se quedan con lo tuyo, y nada más
 hiciste arrancar con otro aviso no recibe ninguna condición de su app. Si un dato fijo queda vacío en una
 ejecución, esa consulta o acción no se hace (FLOW-F38). Se lee así al abrirla y en **Probar**, y queda escrito
 cuando la guardas o haces una copia (FLOW-F06). Una versión nueva que solo cambia palabras no cambia nada.
-Si falla: no hay nada que pueda fallar delante de ti: si su app ya no está activa, su automatización tampoco puede
-arrancar con sus avisos.
+Si falla: si su app ya no está activa, su automatización tampoco puede arrancar con sus avisos. Un cambio que deja
+fuera lo que su app pone, o deja vacío un dato que fija (pidiéndoselo al asistente o desde otro programa), no se
+guarda, y nada cambia: junto a «Solo cuando…», ««…» pone una condición en «…»: dale otro valor, haz que empiece
+con otra cosa o haz una copia.»; junto a **Datos fijos**, ««…» fija «…» de «…»: dale otro valor, quita «…» de lo
+que puede usar o haz una copia.».
 Implicados: FLOW-F06, FLOW-F13, FLOW-F21, FLOW-F29, FLOW-F33, FLOW-F35, FLOW-F37, FLOW-F38
 
 ### FLOW-F37 Paso «Pedírselo al asistente»
@@ -1058,7 +1065,9 @@ Pasos:
 4. Si quieres que una consulta o una acción reciba siempre un dato que no decide el asistente, en **Datos fijos**
    elige con **Fijar un dato** cuál («En nombre del cliente», de «Anular una reserva») y rellénalo, con
    **Insertar un dato** si quieres (la «Ficha» que leyó un paso anterior). Sale como «Anular una reserva › En
-   nombre del cliente»; × lo quita, y quitar algo de **Qué puede usar** quita también sus datos fijos. Sin
+   nombre del cliente»; × lo quita, y quitar algo de **Qué puede usar** quita también sus datos fijos. Uno que fija la
+   app de la receta desde la que la montaste no tiene ×: dice «Lo fija …: puedes cambiarlo, pero no quitarlo.»
+   (FLOW-F36). Sin
    ninguno: «Ninguno: el asistente rellena todos los datos.». La tarjeta lo explica: «El asistente no los ve ni
    puede cambiarlos: se rellenan al pedírselo, y una herramienta con un dato fijo vacío no se usa.».
 5. En **Cambios**, elige «Que me lo pregunte» (de fábrica) o «Que lo haga por su cuenta». La tarjeta lo explica:
@@ -1078,7 +1087,7 @@ usar «…».»), junto a **Qué puede usar**. Con «Anular una reserva» puesta
 dato fijo de algo que no puede usar (««…» tiene datos fijos, pero el asistente no puede usarla: añádela a lo que
 puede usar o quita sus datos fijos.»), uno que esa consulta o acción no tiene (««…» no es un dato de «…».»), uno
 sin valor («Dale un valor a «…» de «…», o quítalo.»), ni uno que lee un secreto o un paso de después, como el
-encargo.
+encargo. Uno que fija su app, sin valor o quitado, tampoco (FLOW-F36).
 Implicados: FLOW-F11, FLOW-F12, FLOW-F13, FLOW-F17, FLOW-F25, FLOW-F29, FLOW-F38, FLOW-F39
 
 ### FLOW-F38 El asistente hace el paso que le toca dentro de una automatización
@@ -1195,7 +1204,7 @@ preguntas; una pregunta hecha a otro rol) no sale en la tarjeta.
 | Qué hace | Quién puede | Flujos | Servicio |
 |---|---|---|---|
 | Crea una automatización (de cero, de una tarjeta o de un borrador), en pausa y sin permisos | gestionar | F04, F09, F18 | `flow.flow.create` |
-| Cambia el nombre, el disparador o los pasos (el interruptor es `set_enabled`) | gestionar | F10, F11, F14 | `flow.flow.update` |
+| Cambia el nombre, el disparador o los pasos (el interruptor es `set_enabled`); no deja quitar lo que fija la app de su receta (`flow.recipe_fixed`) | gestionar | F10, F11, F14, F36 | `flow.flow.update` |
 | Enciende o pausa | gestionar | F03, F14 | `flow.flow.set_enabled` |
 | Hace una copia en pausa y sin permisos | gestionar | F06 | `flow.flow.duplicate` |
 | Borra (su historial se queda) | gestionar | F07 | `flow.flow.delete` |
@@ -1539,6 +1548,15 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   copiar y con `flow.recipe.repair`. No hay aviso ni pausa: no hay caso en que aplicarlo pise al dueño, y un dato
   fijo que su paso ya no rellena queda vacío y su herramienta no se usa. El aviso de FLOW-F36 encima de «Tus
   automatizaciones» (`RecipeRepairs.vue`, «Actualizarla») se quitó: ya no había nada que esperar del dueño.
+- **Lo que fija su app no se quita desde la automatización** (revisión 2026-10-31 de hub#476): como el filtro y los
+  datos fijos de la receta cuentan siempre, quitarlos desde la copia se guardaba y volvía en silencio al leerla.
+  `recipes.fixed_by_app(flow)` dice qué fija la app activa de su receta (las rutas del filtro de la receta mientras
+  arranque con su `event`, y por id de paso y herramienta los campos de su `pinned`) y sale en `FlowOut.fixed_by_app`
+  (`None` sin receta, y en una copia). `services._taken_off`, antes de `_check` en `flow.flow.update`, rechaza con
+  `flow.recipe_fixed` (422, por campo: `trigger.filter`, `steps.<n>.pinned`) un cambio que deja fuera una de esas
+  rutas mientras arranca con ese aviso, o un campo (o lo deja vacío) mientras el paso de ese id ofrece su
+  herramienta. En el editor, `TriggerCard` pasa a `ConditionRows` las rutas (`lockedBy`: sin quitar ni cambiar de
+  dato) y `StepNode` a `AssistantStepPanel` el `fixedByApp` (sin ×); los dos con «Lo fija …» (`flow.recipes.setByApp`).
 - **Asistente**: toda operación declara `ai={"description"…}` (`risk` solo en las acciones; `high` al
   encender o pausar, conceder, ejecutar y borrar) y todo campo de entrada lleva `description`. Las escrituras de
   `flow.system` (solo la plataforma) empiezan por «System only» y `flow.secret.set` por «Not an assistant tool»:
