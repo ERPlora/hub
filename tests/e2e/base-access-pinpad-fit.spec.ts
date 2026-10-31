@@ -131,13 +131,13 @@ test('BASE-F55: at the tablet in landscape the owner erases a wrong digit and en
   await expect(page).toHaveURL(`${A}/`);
 });
 
-test('BASE-F58: a session that ended says so over the pad, and the pad stays whole at the tablet in landscape', async () => {
+test('BASE-F58: a session that ended says so over the pad, and the pad stays whole at the tablet in landscape and a low phone', async () => {
   const { page } = till;
   await userMenu(page, 'logout');
   await expect(page).toHaveURL(/\/login(\?|$)/);
   await page.goto(`${A}/login?notice=ended`);
   await expect(shown(page).getByTestId('access-notice')).toBeVisible();
-  for (const size of [TABLET, SIZES[1], SIZES[2], SIZES[4]]) {
+  for (const size of [TABLET, SIZES[1], SIZES[2], SIZES[4], SIZES[6]]) {
     await expectWholePad(page, size);
     await capture(page, `${KEY}-ended-${size.label}`);
   }

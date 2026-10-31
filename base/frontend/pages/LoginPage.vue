@@ -401,4 +401,12 @@ onBeforeUnmount(() => {
     gap: 6px;
   }
 }
+
+/* A low screen (a phone 667 px tall; a tablet's or a laptop's browser): the notice of a session that ended keeps its
+   two lines with less room around them, so the pad under it keeps its last row, the 0 and erase, on screen (hub#441). */
+@media (max-height: 740px) {
+  .access__notice {
+    --padding: 8px 12px;
+  }
+}
 </style>
