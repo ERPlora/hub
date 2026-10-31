@@ -14,8 +14,9 @@ import os
 from pathlib import Path
 
 import pytest
+from botocore.exceptions import ClientError
 from django.core.files.base import ContentFile
-from django.core.files.storage import InMemoryStorage
+from django.core.files.storage import InMemoryStorage, storages
 from django.urls import resolve
 from live.context import OperationContext, Scope
 from live.errors import NotFound, OperationError, PermissionDenied
@@ -83,6 +84,32 @@ def write_library(root: Path, images: list[dict] = IMAGES) -> Path:
         path.write_bytes(webp())
     (root / "catalog.json").write_text(json.dumps({"version": 1, "images": images}), encoding="utf-8")
     return root
+
+
+@pytest.fixture(autouse=True)
+def nothing_kept():
+    """Every test reads the library afresh: what one test kept never answers another."""
+    image_catalog._kept.clear()
+    yield
+    image_catalog._kept.clear()
+
+
+S3 = "storages.backends.s3.S3Storage"
+
+
+def hub_files_as(settings, monkeypatch, backend: str = S3, *, answers: bool = True, **options) -> None:
+    """``hub_files`` made again as ``backend`` with ``options`` (Django drops the store it had): its manifest names one
+    image when it ``answers``, and it refuses the read when it does not."""
+    settings.CATALOG_DIR = ""
+    settings.STORAGES = {**settings.STORAGES, "hub_files": {"BACKEND": backend, "OPTIONS": options}}
+    manifest = json.dumps({"version": 1, "images": IMAGES[:1]}).encode()
+
+    def read(name, mode="rb"):
+        if not answers:
+            raise ClientError({"Error": {"Code": "NoSuchKey", "Message": "missing"}}, "GetObject")
+        return io.BytesIO(manifest)
+
+    monkeypatch.setattr(storages["hub_files"], "open", read)
 
 
 @pytest.fixture
@@ -199,6 +226,37 @@ def test_a_bucket_that_does_not_answer_makes_the_library_unavailable(settings, m
         raise ClientError({"Error": {"Code": "NoSuchKey", "Message": "missing"}}, "GetObject")
 
     monkeypatch.setattr(storages["hub_files"], "open", refused)
+
+    with pytest.raises(image_catalog.LibraryUnavailable):
+        image_catalog.library()
+
+
+def test_the_same_bucket_made_again_keeps_what_it_read(settings, monkeypatch):
+    hub_files_as(settings, monkeypatch, bucket_name="erplora-hubs")
+    assert len(image_catalog.library().images) == 1
+
+    hub_files_as(settings, monkeypatch, bucket_name="erplora-hubs", answers=False)
+
+    assert len(image_catalog.library().images) == 1
+
+
+@pytest.mark.parametrize(
+    ("backend", "options"),
+    [
+        (S3, {"bucket_name": "erplora-hubs-pre"}),
+        (S3, {"bucket_name": "erplora-hubs", "location": "elsewhere"}),
+        (S3, {"bucket_name": "erplora-hubs", "endpoint_url": "http://localhost:9000"}),
+        ("storages.backends.s3.S3StaticStorage", {"bucket_name": "erplora-hubs"}),
+    ],
+    ids=["another-bucket", "another-prefix", "another-endpoint", "another-backend"],
+)
+def test_what_one_store_read_never_answers_for_another_at_the_same_address(settings, monkeypatch, backend, options):
+    # A store dropped and another made can share an address (``id()``): what was read follows the place, not the object.
+    monkeypatch.setattr(image_catalog, "id", lambda obj: 1, raising=False)
+    hub_files_as(settings, monkeypatch, bucket_name="erplora-hubs")
+    assert len(image_catalog.library().images) == 1
+
+    hub_files_as(settings, monkeypatch, backend, answers=False, **options)
 
     with pytest.raises(image_catalog.LibraryUnavailable):
         image_catalog.library()

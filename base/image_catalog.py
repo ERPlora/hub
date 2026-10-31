@@ -221,11 +221,23 @@ class _Folder:
 
 
 class _Store:
-    """The library in the hub file store, under :data:`PREFIX`."""
+    """The library in the hub file store, under :data:`PREFIX`.
+
+    What was read is kept for the place the store points at (its backend, bucket, endpoint and prefix), never for the
+    object: Django makes the store again when ``STORAGES`` changes, and a new store of the same bucket reads the same
+    manifest, while another bucket, prefix or backend reads its own. ``id()`` would not do: a store dropped hands its
+    address to the next one made, which would then answer with the old one's library."""
 
     def __init__(self, store: Storage) -> None:
         self.store = store
-        self.key = ("store", id(store))
+        kind = type(store)
+        self.key = (
+            "store",
+            f"{kind.__module__}.{kind.__qualname__}",
+            getattr(store, "bucket_name", None),
+            getattr(store, "endpoint_url", None),
+            getattr(store, "location", None),
+        )
 
     def stamp(self) -> Any:
         return None
