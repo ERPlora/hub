@@ -1,0 +1,25 @@
+{% load i18n static %}<!doctype html>
+{% get_current_language as LANGUAGE_CODE %}<html lang="{{ LANGUAGE_CODE }}">
+{% comment %}
+503 of a hub whose database is moving to another cluster (base.middleware; control.hub.move), with Retry-After: it
+refreshes itself until the hub answers again. Rendered without the request: no context processors, no database, no
+scripts nor inline styles (strict CSP, no nonce): its look is base/gate.css, a static file.
+{% endcomment %}
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <meta http-equiv="refresh" content="10">
+  <title>{% translate "This business is under maintenance" %}</title>
+  <link rel="stylesheet" href="{% static 'base/gate.css' %}">
+</head>
+<body>
+  <main>
+    <div class="ep-gate__brand">
+      <img class="ep-gate__logo" src="{% static 'base/img/logo.png' %}" alt="" width="28" height="28"><span>ERPlora</span>
+    </div>
+    <h1>{% translate "This business is under maintenance" %}</h1>
+    <p>{% translate "It takes a few seconds. This page refreshes by itself." %}</p>
+  </main>
+</body>
+</html>

@@ -479,6 +479,31 @@ class TestTheRegistryGate:
         assert (page.status_code, api.status_code) == (status, status)
         assert not page.has_header("Retry-After") and not api.has_header("Retry-After")
 
+    # A hub moving to another cluster (round 2026-10-30b of PLAN-DB, decision 3; control.hub.move): closed for the few
+    # seconds its database is copied, then back on its new cluster.
+    def test_a_hub_moving_to_another_cluster_is_503_under_maintenance_and_asks_to_come_back(self, client, hub):
+        from control.models import Cluster
+
+        hub("acme", moving_to=Cluster.objects.create(name="next", host="writer-next.example"))
+        page = browse(client, "/", "acme.localhost:8000")
+        api = client.get("/api/me", HTTP_HOST="acme.localhost:8000")
+        assert (page.status_code, page["Retry-After"]) == (503, "30")
+        html = page.content.decode()
+        assert '<meta http-equiv="refresh" content="10">' in html
+        assert "This business is under maintenance" in html
+        assert (api.status_code, api["Retry-After"], api.json()["error"]["code"]) == (503, "30", "base.hub_maintenance")
+
+    def test_a_hub_under_maintenance_says_so_in_spanish(self, client, hub):
+        from control.models import Cluster
+
+        hub("acme", moving_to=Cluster.objects.create(name="next", host="writer-next.example"))
+        page = client.get("/", HTTP_HOST="acme.localhost:8000", HTTP_ACCEPT=HTML, HTTP_ACCEPT_LANGUAGE="es")
+        api = client.get("/api/me", HTTP_HOST="acme.localhost:8000", HTTP_ACCEPT_LANGUAGE="es")
+        assert "Este negocio está en mantenimiento" in page.content.decode()
+        assert api.json()["error"]["message"] == (
+            "Este hub está en mantenimiento unos segundos; vuelve a intentarlo enseguida."
+        )
+
     def test_the_api_of_a_hub_being_prepared_is_the_503_envelope(self, client, hub):
         hub("acme", status="failed")
         response = client.get("/api/me", HTTP_HOST="acme.localhost:8000")

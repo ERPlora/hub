@@ -89,6 +89,7 @@ logger = logging.getLogger(__name__)
 #: The page of a hub that is gone (410) and of one being prepared (503); no request, no scripts (strict CSP).
 HUB_GONE_TEMPLATE = "base/hub_gone.html"
 HUB_PREPARING_TEMPLATE = "base/hub_preparing.html"
+HUB_MAINTENANCE_TEMPLATE = "base/hub_maintenance.html"
 #: The page of a business suspended for an unpaid invoice (402): the way back is ERPlora, where it is paid.
 HUB_SUSPENDED_TEMPLATE = "base/hub_suspended.html"
 #: How long a client waits before asking a hub being prepared again (``Retry-After``).
@@ -140,7 +141,8 @@ class HubHostRequiredMiddleware(MiddlewareMixin):
         raise Http404("This host is no hub's.")
 
     def _refuse(self, request: HttpRequest, hub: Hub, refusal: registry.Refusal) -> HttpResponse:
-        """The registry's refusal: its envelope, or its page for a browser (gone, being prepared, suspended)."""
+        """The registry's refusal: its envelope, or its page for a browser (gone, being prepared, under maintenance,
+        suspended)."""
         if _wants_envelope(request):
             response = _envelope(refusal.status, refusal.code, refusal.message)
         elif refusal.code == registry.HUB_GONE:
@@ -149,10 +151,12 @@ class HubHostRequiredMiddleware(MiddlewareMixin):
             response = HttpResponse(html, status=refusal.status)
         elif refusal.code == registry.HUB_PREPARING:
             response = HttpResponse(render_to_string(HUB_PREPARING_TEMPLATE), status=refusal.status)
+        elif refusal.code == registry.HUB_MAINTENANCE:
+            response = HttpResponse(render_to_string(HUB_MAINTENANCE_TEMPLATE), status=refusal.status)
         else:
             html = render_to_string(HUB_SUSPENDED_TEMPLATE, {"back_url": saas_url(LAUNCH_PATH)})
             response = HttpResponse(html, status=refusal.status)
-        if refusal.code == registry.HUB_PREPARING:
+        if refusal.code in (registry.HUB_PREPARING, registry.HUB_MAINTENANCE):
             response["Retry-After"] = str(PREPARING_RETRY_AFTER_SECONDS)
         return response
 
