@@ -80,6 +80,18 @@ describe('TagFormModal', () => {
 });
 
 describe('TagFormModal with a manager’s approval (BASE-F84)', () => {
+  it('an employee’s tag goes once more with the manager’s pass, and is created', async () => {
+    const s = await setup();
+    let calls = 0;
+    s.net.onApi(() => (calls++ === 0 ? Response.json(asksApproval('customer.tag.create', 'Create a customer tag'), { status: 403 }) : json(LOYAL, 201)));
+    await s.type('customer-tag-form-name', 'Loyal');
+    await s.save();
+    await approvalSettled();
+    expect(approvalDialog.questions.map((question) => question.label)).toEqual(['Create a customer tag']);
+    expect(s.net.api.map((call) => sent(call).path)).toEqual(['/api/customer/tags', '/api/customer/tags']);
+    expect(toastSuccess).toHaveBeenCalledWith('Tag created');
+  });
+
   it('an employee’s change goes once more with the manager’s pass', async () => {
     const s = await setup(LOYAL);
     let calls = 0;

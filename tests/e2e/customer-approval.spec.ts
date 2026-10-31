@@ -18,7 +18,7 @@ import {
   searchList,
   spanishMobile,
 } from './customer-helpers';
-import { A, api, EMPLOYEE, login, OWNER, psql, shot, shown } from './helpers';
+import { A, api, capture, EMPLOYEE, login, OWNER, psql, shown } from './helpers';
 
 const OWNER_PIN = '2468';
 
@@ -85,10 +85,9 @@ for (const viewport of FLOW_VIEWPORTS) {
     const dialog = approval(page);
     await expect(dialog).toBeVisible();
     await expect(dialog.getByTestId('approval-action')).toHaveText(/^(Approving: Merge two customer cards|Se aprueba: Fusionar dos fichas de cliente)$/);
-    // The PIN pad (or the faces to choose from) painted, the sheet's animation over: then the picture.
+    // The PIN pad (or the faces to choose from) painted; `capture` waits for the sheet to stop moving.
     await expect(dialog.locator('[data-testid=pin-face], [data-testid=pinpad-key-1]').first()).toBeVisible();
-    await page.waitForTimeout(400);
-    await page.screenshot({ path: shot(`CLOSE-CUSTOMER-${viewport.label}`) });
+    await capture(page, `CLOSE-CUSTOMER-${viewport.label}`);
     await ownerApproves(page);
     await expect(dialog).toBeHidden();
     await expect(page.locator('ion-toast').last()).toContainText(duplicate.name);

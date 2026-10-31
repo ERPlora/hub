@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
 import { pageOf } from '../__tests__/fixtures';
-import { EMPLOYEE, flush, type MountOptions, mountCustomer } from '../__tests__/mount-customer';
+import { EMPLOYEE, flush, type MountOptions, mountCustomer, VIEWER } from '../__tests__/mount-customer';
 import EntityDeleteDialog from '../components/EntityDeleteDialog.vue';
 import FieldFormModal from '../components/FieldFormModal.vue';
 import type { FieldRow } from '../operations';
@@ -127,6 +127,13 @@ describe('FieldListPage', () => {
     await s.show(PAGE);
     expect(s.prop<{ id: string }[]>('actions').map((a) => a.id)).toEqual(['edit', 'delete']);
     expect(s.wrapper.find('[data-testid="customer-fields-add"]').exists()).toBe(true);
+  });
+
+  it('who only views neither adds, edits nor deletes', async () => {
+    const s = await setup({ session: VIEWER });
+    await s.show(PAGE);
+    expect(s.prop<{ id: string }[]>('actions')).toEqual([]);
+    expect(s.wrapper.find('[data-testid="customer-fields-add"]').exists()).toBe(false);
   });
 
   it('empty: «No custom fields.»; Spanish', async () => {

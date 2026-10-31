@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
 import { pageOf } from '../__tests__/fixtures';
-import { EMPLOYEE, flush, MANAGER, type MountOptions, mountCustomer } from '../__tests__/mount-customer';
+import { EMPLOYEE, flush, MANAGER, type MountOptions, mountCustomer, VIEWER } from '../__tests__/mount-customer';
 import EntityDeleteDialog from '../components/EntityDeleteDialog.vue';
 import TagFormModal from '../components/TagFormModal.vue';
 import type { TagRow } from '../operations';
@@ -104,6 +104,13 @@ describe('TagListPage', () => {
     await employee.show(PAGE);
     expect(employee.prop<{ id: string }[]>('actions').map((a) => a.id)).toEqual(['edit']);
     expect(employee.wrapper.find('[data-testid="customer-tags-add"]').exists()).toBe(true);
+  });
+
+  it('who only views neither adds, edits nor deletes', async () => {
+    const viewer = await setup({ session: VIEWER });
+    await viewer.show(PAGE);
+    expect(viewer.prop<{ id: string }[]>('actions')).toEqual([]);
+    expect(viewer.wrapper.find('[data-testid="customer-tags-add"]').exists()).toBe(false);
   });
 
   it('empty: «No tags.»; Spanish', async () => {

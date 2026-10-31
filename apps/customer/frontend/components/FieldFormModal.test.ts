@@ -124,4 +124,15 @@ describe('FieldFormModal with a manager’s approval (BASE-F84)', () => {
     expect(s.net.api.map((call) => sent(call).path)).toEqual(['/api/customer/fields', '/api/customer/fields']);
     expect(toastSuccess).toHaveBeenCalledWith('Field created');
   });
+
+  it('an employee’s change goes once more with the manager’s pass', async () => {
+    const s = await setup(DYE);
+    let calls = 0;
+    s.net.onApi(() => (calls++ === 0 ? Response.json(asksApproval('customer.field.update', 'Change a custom field'), { status: 403 }) : json(DYE)));
+    await s.save();
+    await approvalSettled();
+    expect(approvalDialog.questions.map((question) => question.label)).toEqual(['Change a custom field']);
+    expect(s.net.api.map((call) => sent(call).path)).toEqual(['/api/customer/fields/update', '/api/customer/fields/update']);
+    expect(toastSuccess).toHaveBeenCalledWith('Field updated');
+  });
 });

@@ -120,6 +120,17 @@ describe('GroupFormModal with a manager’s approval (BASE-F84)', () => {
     expect(s.open.value).toBe(false);
   });
 
+  it('an employee’s change goes once more with the manager’s pass', async () => {
+    const s = await setup(VIP);
+    let calls = 0;
+    s.net.onApi(() => (calls++ === 0 ? Response.json(asksApproval('customer.group.update', 'Change a customer group'), { status: 403 }) : json(VIP)));
+    await s.save();
+    await approvalSettled();
+    expect(approvalDialog.questions.map((question) => question.label)).toEqual(['Change a customer group']);
+    expect(s.net.api.map((call) => sent(call).path)).toEqual(['/api/customer/groups/update', '/api/customer/groups/update']);
+    expect(toastSuccess).toHaveBeenCalledWith('Group updated');
+  });
+
   it('«Cancel» on the approval sends nothing more, says why and the dialog stays open with what was typed', async () => {
     const s = await setup();
     approvalDialog.answer = CANCELLED;
