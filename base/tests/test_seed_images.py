@@ -26,6 +26,27 @@ NO_SHARED_WORD = {
     ("restaurant.en", "STA-02"): "The library has no patatas bravas: fried potatoes, the closest (es: «Patatas fritas»).",
     ("hair_salon.es", "Peinado"): "This seed's «Peinado» is a blow-dry (en «Blow-dry»), «Secado con cepillo» in the library.",
 }
+#: Pictures of a third party's product (its brand, label, pack or trade dress, such as the Coca-Cola contour bottle),
+#: which ERPlora/blueprints drops: no seed may point at one, whether the manifest at hand still lists it or not.
+THIRD_PARTY_BRANDS = frozenset(
+    {
+        "hospitality/coca_cola",
+        "hospitality/sprite",
+        "hospitality/coca_cola_zero",
+        "hospitality/aquarius",
+        "hospitality/fanta_limon",
+        "hospitality/fanta_naranja",
+        "hospitality/cerveza_sin",
+        "retail/coca_cola_2l",
+        "retail/detergente",
+        "retail/gel_ducha",
+        "retail/pasta_dientes",
+        "retail/yogur_natural",
+        "retail/carne_picada",
+        "retail/desodorante",
+        "retail/tomates_kg",
+    }
+)
 
 
 def seeds() -> dict[str, dict]:
@@ -37,6 +58,16 @@ def rows_with_image():
         for dataset in WITH_IMAGE:
             for row in seed["data"].get(dataset, []):
                 yield key, dataset, row
+
+
+def references(value) -> list[str]:
+    """Every ``catalog:<folder>/<name>`` a seed names, as ``<folder>/<name>``, wherever in the seed it is."""
+    if isinstance(value, dict):
+        return [found for item in value.values() for found in references(item)]
+    if isinstance(value, list):
+        return [found for item in value for found in references(item)]
+    parsed = image_catalog.parse_reference(value) if isinstance(value, str) else None
+    return ["/".join(parsed)] if parsed else []
 
 
 def row_key(dataset: str, row: dict) -> str:
@@ -77,6 +108,25 @@ def test_every_seed_image_reference_exists_in_the_manifest():
     ]
 
     assert unknown == []
+
+
+def test_no_seed_points_at_a_third_party_brand():
+    branded = [
+        (key, reference) for key, seed in seeds().items() for reference in references(seed) if reference in THIRD_PARTY_BRANDS
+    ]
+
+    assert branded == [], (
+        f"These seed images show a third party's brand (its product, label or trade dress), which the library drops: "
+        f"{branded}. Pick a generic picture of the same thing."
+    )
+
+
+def test_the_brand_check_finds_a_reference_anywhere_in_a_seed():
+    seed = {
+        "data": {"inventory.product": [{"image": "catalog:hospitality/coca_cola"}], "other": {"x": ["catalog:retail/detergente"]}}
+    }
+
+    assert references(seed) == ["hospitality/coca_cola", "retail/detergente"]
 
 
 def test_the_restaurant_shows_hospitality_and_the_hair_salon_its_hair_folder():
