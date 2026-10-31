@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:4e6891d55e8a9812997094b64d84d4b6aa28e94aaa9fe070bce453e1b6e907b6 -->
+<!-- generated from WORKBOOK.md sha256:032776aa4fb602bcf3f9c1f8f610624c6ae24e1be55cfffce9e2a44c42934583 -->
 
 ## What it is for and who it is for
 
@@ -126,7 +126,7 @@ From "System" in the side menu, the "Plan and limits" tab: "Your plan's limits" 
 The second of the tabs at the bottom of "Settings" ("General", "Business", "Printing" and "Data and backups").
 The "Your business" card shows, with no fields to fill in, "Business name", "Country", "Time
 zone" (with the time it is there), "Currency" and "Business language", each with a line that says what it is
-for. Below, where they are changed and, for the owner and the administrator, "Change on erplora.com". Further
+for. Below, where they are changed and, for the owner and the administrator, "Change on erplora.com" (in the installed app, in the device's browser; the Google Play copy does not have it). Further
 down, "Fiscal data", which opens Invoicing's issuer.
 
 ### Settings · Printing
@@ -198,7 +198,7 @@ its name, "Download" and "Close" ("Zoom in" and "Zoom out" on images and PDFs).
 
 ### Employees · Staff
 What "Employees" in the side menu opens: the first tab at the bottom, "Staff", with the plan's places, "Invite on
-erplora.com" for whoever runs the business, "People are invited, given a role and removed on erplora.com, in
+erplora.com" for whoever runs the business (in the installed app, in the device's browser; the Google Play copy does not have it), "People are invited, given a role and removed on erplora.com, in
 “Members” of the business." and the table of people (on a phone, a card per person). The other tabs: "Roles" and,
 only for whoever runs the business, "API keys" and "Approvals"; each one in the address, so "Back" leaves
 Employees.
@@ -1396,8 +1396,9 @@ Screen: Settings · Business
 Steps:
   1. In "Business", "Business language" ("The one of whoever has not chosen their own") says the business's
      language by its name.
-  2. Tap "Change on erplora.com": the business's settings on erplora.com open in another tab, where it is
-     changed and "Save changes" is tapped (HUBS-F15).
+  2. Tap "Change on erplora.com": the business's settings on erplora.com open in another tab (in the installed app,
+     in the device's browser), where it is changed and "Save changes" is tapped (HUBS-F15). In the Google Play copy
+     the button is not there: it is changed on erplora.com from a browser.
   3. Without reloading, "Business" shows the new language as soon as the business receives it; the same with the
      name and the time zone.
 In: the language erplora.com saved.
@@ -1518,7 +1519,8 @@ Steps:
      updating.
   3. Its next screen is **Access**, which says at the top "Session opened on another device" — "Your plan covers
      one device at a time, so entering on another one closed the session on this one. Enter again to use it here,
-     or add devices to your plan." with "Upgrade plan".
+     or add devices to your plan." with "Upgrade plan" in the browser (in the installed app it is not there: what
+     sells is only on the web).
   4. They can enter again (and it closes the other one's) or go to erplora.com to extend the plan.
 In: the devices the plan covers, which erplora.com passes to the business.
 Out: the sessions of the devices left over, ended, and the reason kept on each one to tell it.
@@ -1895,7 +1897,8 @@ Steps:
      taken", "{used} people · no limit" or, if erplora.com has not said the plan, "{used} people".
   2. With every place taken, "Every place of your plan is taken" shows with "Remove on erplora.com someone who no
      longer works here, or move to a plan with more places."; on the web, with "Upgrade plan".
-  3. To invite somebody else, "Invite on erplora.com" leads to "Members" of the business, where the limit applies.
+  3. To invite somebody else, "Invite on erplora.com" leads to "Members" of the business, where the limit applies
+     (in the installed app, in the device's browser; the Google Play copy does not have it).
 In: the people of the business and its plan's places, as erplora.com sends them.
 Out: nothing saved.
 If it fails: "The people of this business could not be loaded." with "Retry", never "Nobody is in this business
@@ -1945,7 +1948,7 @@ Screen: Employees · Staff
 Steps:
   1. Whoever left the business is no longer in **Employees › Staff**: they were removed on erplora.com.
   2. To bring them back, "Invite on erplora.com" and they are invited again in "Members" of the business, with
-     their role.
+     their role (in the installed app, in the device's browser; the Google Play copy does not have it).
   3. When they accept, they are back on the list with what the business kept of them: their PIN and their badge
      still work.
 In: the invitation on erplora.com.
@@ -1979,7 +1982,7 @@ Steps:
      erplora.com, and it is changed there.".
   2. A row per role: "Owner", "Administrator", "Manager" and "Employee", with "Basic", "Always available", how
      many people have it and how many permissions it gives.
-  3. Whoever runs the business has "Change roles on erplora.com".
+  3. Whoever runs the business has "Change roles on erplora.com" (in the installed app, in the device's browser; the Google Play copy does not have it).
 In: the roles and the people of the business.
 Out: nothing saved.
 If it fails: "The roles could not be loaded." with "Retry".
@@ -1991,7 +1994,8 @@ Actor: owner, administrator
 Screen: Employees · Roles
 Steps:
   1. In **Employees › Roles** or on a person's page, "Change roles on erplora.com" or "Open on erplora.com" leads to
-     "Members" of the business.
+     "Members" of the business (in the installed app, in the device's browser; the Google Play copy does not have
+     them).
   2. There they change the role.
   3. Back here, the person shows with their new role and what they may do changes at once.
 In: the role chosen on erplora.com.
