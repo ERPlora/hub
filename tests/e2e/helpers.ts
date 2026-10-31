@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 
 import { type Browser, type BrowserContext, type Cookie, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { databaseFor, hubDatabases } from './hub-databases';
+import { hubDatabases, plan } from './hub-databases';
 import { mailDirFrom, readMailCode } from './mail';
 import { isConnectionRefused, withRetry } from './retry';
 import { STACK } from './stack';
@@ -849,17 +849,29 @@ function psqlOn(database: string, sql: string): string {
 /** Each hub's own database, from the stack's registry (read once per hub; one that shares control's is control's). */
 const hubDatabase = hubDatabases(STACK.database, (sql) => psqlOn(STACK.database, sql));
 
-/** `sql` where its tables live (`hub-databases.ts`): control's in the stack's control database, any other in `hub`'s own
- * (`a` unless the spec names another; round 2026-10-30 of PLAN-DB, S2a). A statement that names both is refused. */
+/** Where each scratch table of this run's specs was made (`hub-databases.ts`), kept between calls. */
+const scratchTables = new Map<string, string>();
+
+/** `sql` where its tables live (`hub-databases.ts`): each statement on control's tables in the stack's control
+ * database, on any other in `hub`'s own (`a` unless the spec names another; round 2026-10-30 of PLAN-DB, S2a), the
+ * ones in a row on one database in one call; what they print, in order. A statement that names both is refused. */
 export function psql(sql: string, hub = 'a'): string {
-  return psqlOn(databaseFor(sql, hub, STACK.database, hubDatabase), sql);
+  return plan(sql, hub, STACK.database, hubDatabase, scratchTables)
+    .map((run) => psqlOn(run.database, run.sql))
+    .filter(Boolean)
+    .join('\n');
+}
+
+/** The usernames of every account of `email` (control's ``auth_user``), quoted for the `in (…)` of a statement on a
+ * hub's tables, which cannot read control's; `null` when it has none, which matches nothing. */
+export function usernamesOf(email: string): string {
+  return psql(`select string_agg(quote_literal(username), ',') from auth_user where email = '${email}'`) || 'null';
 }
 
 /** The person (``base.HubUser``) of the account `email` in `hub`'s database: its username is control's (``auth_user``),
  * the person the hub's; '' when it has none yet. */
 export function hubUserIdOf(email: string, hub = 'a'): string {
-  const usernames = psql(`select string_agg(quote_literal(username), ',') from auth_user where email = '${email}'`);
-  return usernames ? psql(`select id from base_hubuser where username in (${usernames})`, hub) : '';
+  return psql(`select id from base_hubuser where username in (${usernamesOf(email)})`, hub);
 }
 
 /** Decodes the `s=` of a `/api/live` URL (base64url JSON) into its subscriptions. */

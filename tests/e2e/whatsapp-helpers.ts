@@ -169,10 +169,12 @@ const hubIds = (): Record<string, string> =>
       .map((row) => row.split('=')),
   );
 
-/** Where `a`'s photo (`state` and its version) and the row of its WhatsApp channel (`channel`, as JSON; none, `[]`)
- *  wait from a spec's first `seedErplora` until `restorePhoto` puts them back: a table of the run's database, so a
- *  shell's quoting never touches them. */
+/** Where `a`'s photo (`state` and its version) waits from a spec's first `seedErplora` until `restorePhoto` puts it
+ *  back: a table next to the registry (control's database), so a shell's quoting never touches it. */
 const PHOTO_BACKUP = 'e2e_backup_whatsapp_photo';
+/** Where the row of `a`'s WhatsApp channel (`channel`, as JSON; none, `[]`) waits meanwhile: a table of `a`'s own
+ *  database, next to the channel's. */
+const CHANNEL_BACKUP = 'e2e_backup_whatsapp_channel';
 
 /** Gives `a` its WhatsApp number in the run's erplora.com, with erplora.com's own test seed, and has it push the
  *  photo to this Hub: what the seed printed (`delivered` true when this Hub took it). The seed also keeps `a`'s
@@ -190,8 +192,12 @@ export function seedErplora(seed: ErploraSeed = {}): { delivered: boolean; hub_e
   }
   const ids = hubIds();
   psql(
-    `set client_min_messages = warning; create table if not exists ${PHOTO_BACKUP} as select h.id, h.state, h.state_version, ` +
-      "(select coalesce(json_agg(c), '[]') from whatsapp_inbox_channel c where c.host = 'a') as channel from base_hub h where h.slug = 'a'",
+    `set client_min_messages = warning; create table if not exists ${PHOTO_BACKUP} as ` +
+      "select h.id, h.state, h.state_version from base_hub h where h.slug = 'a'",
+  );
+  psql(
+    `set client_min_messages = warning; create table if not exists ${CHANNEL_BACKUP} as ` +
+      "select coalesce(json_agg(c), '[]') as channel from whatsapp_inbox_channel c where c.host = 'a'",
   );
   const out = execFileSync('uv', ['run', 'python', script, ids.a, ids.b, ...seedArguments(seed)], {
     cwd: SAAS_DIR,
@@ -212,9 +218,10 @@ export function restorePhoto(): void {
   psql(
     [
       `update base_hub h set state = b.state, state_version = b.state_version from ${PHOTO_BACKUP} b where b.id = h.id`,
-      "delete from whatsapp_inbox_channel where host = 'a'",
-      `insert into whatsapp_inbox_channel select * from json_populate_recordset(null::whatsapp_inbox_channel, (select channel from ${PHOTO_BACKUP}))`,
       `drop table ${PHOTO_BACKUP}`,
+      "delete from whatsapp_inbox_channel where host = 'a'",
+      `insert into whatsapp_inbox_channel select * from json_populate_recordset(null::whatsapp_inbox_channel, (select channel from ${CHANNEL_BACKUP}))`,
+      `drop table ${CHANNEL_BACKUP}`,
     ].join('; '),
   );
 }

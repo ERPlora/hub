@@ -690,7 +690,8 @@ def hub_state_apply(ctx: OperationContext, data: HubStateIn) -> dict:
     applies and the block waits for the next one); both in this same transaction, so their notices go out after its
     COMMIT (a block out of contract keeps nothing). Its ``members`` apply on the business's memberships
     (:func:`_apply_members`) and on its people in its own database (``base.hub_user.sync``), in this transaction
-    too. Its modules and plan are read where they are kept: the right
+    too; a business whose database is still being made has its people there when its seeding applies the photo
+    (:func:`apply_kept_photo`: the SaaS sends it right after the registration). Its modules and plan are read where they are kept: the right
     to a paid app (``base.entitlement``) and «Plan and limits» (``base.plan.usage``) follow this photo.
     """
     internal_only(ctx)
@@ -709,7 +710,8 @@ def hub_state_apply(ctx: OperationContext, data: HubStateIn) -> dict:
         _sync_whatsapp(hub, data)
     if data.members is not None:
         left = _apply_members(hub, data.members)
-        _sync_hub_users(hub, data.members, left)
+        if reachable:
+            _sync_hub_users(hub, data.members, left)
     record_event(ctx, events.HUB_STATE_APPLIED, {"id": str(hub.id), "version": data.version})
     # Applied as the platform (/internal): its own notice goes to the platform's channel. The live queries that
     # follow the photo (base/live.py) listen on the business's, which hears it after the COMMIT too.
@@ -1050,7 +1052,8 @@ def hub_seed_local(ctx: OperationContext, data: HubSeedLocalIn) -> dict:
     (``base.tenancy.provision``, every app's tables and every app on: :func:`turn_every_app_on`). Local development
     only (the command checks ``DEBUG``): they are no business of the SaaS's, so the SaaS hears nothing. Idempotent: a
     hub already ready stays as it is, on the database it has; one left cancelled is ready again (or made again, if its
-    own database was never finished); the apps of one that already turned some on or off stay as they are.
+    own database was never finished); the apps of one that already turned some on or off stay as they are, and one
+    left with no app at all has every app on again, in whichever database it has.
     """
     from base.tenancy.context import use_hub
 
@@ -1087,6 +1090,11 @@ def hub_seed_local(ctx: OperationContext, data: HubSeedLocalIn) -> dict:
                 outcome = "requested"
             if hub.status != Hub.Status.READY:
                 HubDue.mark_due(hub, now)
+        if hub.db_name and hub.status == Hub.Status.READY:
+            # Made already, in its own database: every app on again there if it has none, as one that shares
+            # control's (its seeding turned them on the first time: turn_every_app_on).
+            with use_hub(hub):
+                _every_app_on(slug)
         if outcome != "already_ready":
             record_event(ctx, events.HUB_REGISTERED, {"id": str(hub.id), "slug": slug, "created": created})
         hubs.append({"slug": slug, "outcome": outcome})
@@ -1383,10 +1391,16 @@ def demo_drop_failed(hub_id: UUID, now: dt.datetime, error: str, *, owner: str =
 
 
 def apply_kept_photo(hub: Hub) -> None:
-    """Inside ``use_hub(hub)``: apply the blocks of the SaaS's photo kept on its row that belong to the apps it has on
-    (its seeding: the photo came while its database was being made)."""
+    """Inside ``use_hub(hub)``: apply the SaaS's photo kept on its row (its seeding: the photo came while its database
+    was being made): its people (``base.hub_user.sync``, which leaves out whoever it no longer lists) and the blocks
+    that belong to the apps it has on."""
     from base import relay
 
+    photo = hub.state if isinstance(hub.state, dict) else {}
+    if hub.state_version and photo.get("members") is not None:
+        hub_user_sync(
+            system_context(Scope("host", hub.slug)), HubUserSyncIn(members=photo["members"], left=[])
+        )
     _sync_photo_blocks(hub, relay.active_apps(Scope("host", hub.slug)))
 
 

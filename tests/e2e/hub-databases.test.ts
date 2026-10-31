@@ -4,7 +4,7 @@
 // cannot run anywhere now (no query crosses two databases): it is refused, saying how to split it.
 import { describe, expect, it, vi } from 'vitest';
 
-import { databaseFor, hubDatabases, tablesOf } from './hub-databases';
+import { hubDatabases, plan, statementsOf, tablesOf } from './hub-databases';
 
 describe('tablesOf', () => {
   it('reads the tables a statement names, after from, join, into, update, table and its subqueries', () => {
@@ -28,10 +28,112 @@ describe('tablesOf', () => {
       'staff_member',
     ]);
   });
+
+  it('reads a quoted name whole, and never takes a keyword or a function for a table', () => {
+    expect(tablesOf('drop table if exists \\"e2e-fix-printing-hooks-parked\\"')).toEqual(['e2e-fix-printing-hooks-parked']);
+    expect(tablesOf('drop table if exists "e2e-fix-printing-hooks-parked"')).toEqual(['e2e-fix-printing-hooks-parked']);
+    expect(
+      tablesOf("insert into base_hub (id) values ('x') on conflict (id) do update set state = excluded.state"),
+    ).toEqual(['base_hub']);
+    expect(tablesOf("select x from jsonb_array_elements('[]'::jsonb) x")).toEqual([]);
+  });
 });
 
-describe('databaseFor', () => {
+describe('statementsOf', () => {
+  it("splits at each ; outside a quoted string or name, and drops the empty ones", () => {
+    expect(
+      statementsOf(
+        `update base_hub set state = '{\\"plan\\": \\"a;b\\"}' where slug = 'it''s; fine'; drop table "e2e;x";; select 1;`,
+      ),
+    ).toEqual([
+      `update base_hub set state = '{\\"plan\\": \\"a;b\\"}' where slug = 'it''s; fine'`,
+      'drop table "e2e;x"',
+      'select 1',
+    ]);
+  });
+});
+
+describe('plan', () => {
   const hubs = (slug: string) => `hub_e2e_8030_${slug}_db`;
+  const CONTROL = 'hub_e2e_8030';
+
+  it('runs each statement where its tables live, the ones in a row on one database together, in order', () => {
+    const made = new Map<string, string>();
+    expect(
+      plan(
+        "delete from staff_member where first_name like 'E2E%'; select count(*) from auth_user; select count(*) from django_session; delete from printing_printjob",
+        'a',
+        CONTROL,
+        hubs,
+        made,
+      ),
+    ).toEqual([
+      { database: 'hub_e2e_8030_a_db', sql: "delete from staff_member where first_name like 'E2E%'" },
+      { database: CONTROL, sql: 'select count(*) from auth_user; select count(*) from django_session' },
+      { database: 'hub_e2e_8030_a_db', sql: 'delete from printing_printjob' },
+    ]);
+  });
+
+  it('remembers where a scratch table was made, across calls, until it is dropped', () => {
+    const made = new Map<string, string>();
+    const backup = 'e2e_backup_photo';
+    expect(
+      plan(`drop table if exists ${backup}; create table ${backup} as select id, state from base_hub`, 'a', CONTROL, hubs, made),
+    ).toEqual([{ database: CONTROL, sql: `drop table if exists ${backup}; create table ${backup} as select id, state from base_hub` }]);
+    expect(plan('create table e2e_rows as select * from base_appactivation', 'a', CONTROL, hubs, made)).toEqual([
+      { database: 'hub_e2e_8030_a_db', sql: 'create table e2e_rows as select * from base_appactivation' },
+    ]);
+
+    // The putting back names both, one statement each: each goes where its table was made.
+    expect(
+      plan(
+        `update base_hub h set state = b.state from ${backup} b where b.id = h.id; drop table ${backup}; drop table e2e_rows`,
+        'a',
+        CONTROL,
+        hubs,
+        made,
+      ),
+    ).toEqual([
+      { database: CONTROL, sql: `update base_hub h set state = b.state from ${backup} b where b.id = h.id; drop table ${backup}` },
+      { database: 'hub_e2e_8030_a_db', sql: 'drop table e2e_rows' },
+    ]);
+    expect([...made.keys()]).toEqual([]);
+  });
+
+  it('asks whether a scratch table is still there (to_regclass) where it was made', () => {
+    const made = new Map([['e2e_backup_photo', CONTROL]]);
+    expect(plan("select to_regclass('e2e_backup_photo') is not null", 'a', CONTROL, hubs, made)).toEqual([
+      { database: CONTROL, sql: "select to_regclass('e2e_backup_photo') is not null" },
+    ]);
+  });
+
+  it("puts a scratch table nobody made yet with the statement next to it, else the hub's", () => {
+    const made = new Map<string, string>();
+    expect(plan('drop table if exists e2e_x; create table e2e_x as select * from base_membership', 'a', CONTROL, hubs, made)).toEqual([
+      { database: CONTROL, sql: 'drop table if exists e2e_x; create table e2e_x as select * from base_membership' },
+    ]);
+    expect(plan('drop table if exists "e2e-fix-printing-hooks-parked"', 'a', CONTROL, hubs, made)).toEqual([
+      { database: 'hub_e2e_8030_a_db', sql: 'drop table if exists "e2e-fix-printing-hooks-parked"' },
+    ]);
+  });
+
+  it("refuses a statement whose scratch table lives in another database than its other tables", () => {
+    const made = new Map([['e2e_rows', 'hub_e2e_8030_a_db']]);
+    expect(() => plan('insert into base_hub select * from e2e_rows', 'a', CONTROL, hubs, made)).toThrow(
+      /e2e_rows.*hub_e2e_8030_a_db/,
+    );
+  });
+
+  it('refuses a statement that names tables of both, saying how to split it', () => {
+    expect(() =>
+      plan("update base_credential set pin_hash = '' where username in (select username from auth_user)", 'a', CONTROL, hubs, new Map()),
+    ).toThrow(/auth_user.*base_credential|base_credential.*auth_user/);
+  });
+});
+
+describe('where one statement runs', () => {
+  const hubs = (slug: string) => `hub_e2e_8030_${slug}_db`;
+  const on = (sql: string, hub = 'a') => plan(sql, hub, 'hub_e2e_8030', hubs, new Map()).map((run) => run.database);
 
   it("sends control's tables to the control database", () => {
     for (const sql of [
@@ -42,43 +144,26 @@ describe('databaseFor', () => {
       'select count(*) from base_sessionowner',
       'select count(*) from base_democode',
     ]) {
-      expect(databaseFor(sql, 'a', 'hub_e2e_8030', hubs)).toBe('hub_e2e_8030');
+      expect(on(sql)).toEqual(['hub_e2e_8030']);
     }
   });
 
   it("sends every other table to the hub's own database, a's unless another is named", () => {
-    expect(databaseFor('delete from printing_printjob', 'a', 'hub_e2e_8030', hubs)).toBe('hub_e2e_8030_a_db');
-    expect(databaseFor('select count(*) from base_hubuser', 'b', 'hub_e2e_8030', hubs)).toBe('hub_e2e_8030_b_db');
+    expect(on('delete from printing_printjob')).toEqual(['hub_e2e_8030_a_db']);
+    expect(on('select count(*) from base_hubuser', 'b')).toEqual(['hub_e2e_8030_b_db']);
     // Look-alikes of control's are a hub's: base_hubuser, base_hub_identity.
-    expect(databaseFor('select hub_id from base_hub_identity', 'a', 'hub_e2e_8030', hubs)).toBe('hub_e2e_8030_a_db');
+    expect(on('select hub_id from base_hub_identity')).toEqual(['hub_e2e_8030_a_db']);
   });
 
   it("puts a spec's own scratch tables (e2e_…) where the tables it copies or restores live", () => {
     const backup = 'e2e_backup_session_photo';
-    expect(
-      databaseFor(`drop table if exists ${backup}; create table ${backup} as select id, state from base_hub`, 'a', 'hub_e2e_8030', hubs),
-    ).toBe('hub_e2e_8030');
-    expect(databaseFor(`update base_hub h set state = b.state from ${backup} b where b.id = h.id`, 'a', 'hub_e2e_8030', hubs)).toBe(
+    expect(on(`drop table if exists ${backup}; create table ${backup} as select id, state from base_hub`)).toEqual([
       'hub_e2e_8030',
-    );
-    expect(databaseFor('create table e2e_rows as select * from base_appactivation', 'a', 'hub_e2e_8030', hubs)).toBe(
-      'hub_e2e_8030_a_db',
-    );
-    expect(databaseFor('select count(*) from e2e_rows', 'a', 'hub_e2e_8030', hubs)).toBe('hub_e2e_8030_a_db');
-    expect(databaseFor('drop table if exists "e2e-fix-printing-hooks-parked"', 'a', 'hub_e2e_8030', hubs)).toBe(
-      'hub_e2e_8030_a_db',
-    );
-  });
-
-  it('refuses a statement that names tables of both, saying how to split it', () => {
-    expect(() =>
-      databaseFor(
-        "select h.id from base_hubuser h join auth_user u on u.username = h.username where u.email = 'x'",
-        'a',
-        'hub_e2e_8030',
-        hubs,
-      ),
-    ).toThrow(/auth_user.*base_hubuser|base_hubuser.*auth_user/);
+    ]);
+    expect(on(`update base_hub h set state = b.state from ${backup} b where b.id = h.id`)).toEqual(['hub_e2e_8030']);
+    expect(on('create table e2e_rows as select * from base_appactivation')).toEqual(['hub_e2e_8030_a_db']);
+    expect(on('select count(*) from e2e_rows')).toEqual(['hub_e2e_8030_a_db']);
+    expect(on('drop table if exists "e2e-fix-printing-hooks-parked"')).toEqual(['hub_e2e_8030_a_db']);
   });
 });
 

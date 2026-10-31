@@ -61,17 +61,26 @@ Sin variables, el e2e va contra la pila compartida: Hub en `:8000` (Vite `:5173`
 
 ## Varias ejecuciones a la vez
 
-Cada ejecución en paralelo es **una pila propia**, con sus puertos, su SaaS y **su BD**. En la fase 1 todo el
-negocio de los hubs `a` y `b` vive en la BD de control (`DB_NAME`), así que una BD propia aísla todos los datos
-de la ejecución: dos pilas sobre `hub` se pisan (el 16-10-2026, el cobro en efectivo de una cayó en el turno de
-caja abierto de la otra y `cash-register-shift.spec.ts` falló).
+Cada ejecución en paralelo es **una pila propia**, con sus puertos, su SaaS y **su BD**. Desde S2a (ronda
+2026-10-30 de PLAN-DB) cada hub tiene su propia BD: la de control (`DB_NAME`) guarda el registro, las cuentas y las
+sesiones, y el negocio de `a`, de `b` y de cada negocio que una spec da de alta vive en la suya (`<DB_NAME>_<hex>`,
+la columna `db_name` de `base_hub`), que hace `seed_local_hubs` para `a` y `b` y el worker para el resto. Una BD de
+control propia aísla todos los datos de la ejecución: dos pilas sobre `hub` se pisan (el 16-10-2026, el cobro en
+efectivo de una cayó en el turno de caja abierto de la otra y `cash-register-shift.spec.ts` falló).
+
+`psql()` (`helpers.ts`) corre cada sentencia donde viven sus tablas (`hub-databases.ts`): las de control (`base_hub`,
+`base_democode`, `control_*`, `auth_*`, `django_*`, `base_membership`, `base_sessionowner`) en `DB_NAME` y el resto en
+la BD del hub (`a` si la spec no pasa otro), las seguidas de una misma BD en una sola llamada. Las tablas de copia de
+una spec (`e2e…`) van a la BD donde se crearon. Una sentencia que nombra tablas de las dos BD no puede correr en
+ninguna y falla diciendo cómo partirla: primero se lee lo de control (`usernamesOf`, el id de `a`) y se pasa el valor
+a la sentencia del hub.
 
 | Variable | Qué aísla | Quién la lee |
 |---|---|---|
 | `E2E_HUB_PORT` | puerto del `runserver` del Hub | las specs (`stack.ts`) |
 | `VITE_DEV_PORT` | puerto del Vite del Hub | `config/settings.py` (entorno o `.env`; `runserver` se la pasa a su Vite), `vite.config.ts` y specs (solo el entorno) |
 | `SAAS_URL` | el SaaS propio, donde va el login | `config/settings.py`, specs |
-| `DB_NAME` | la BD de la ejecución (control + negocio de `a`/`b`) | `config/settings.py`, specs (`psql()`) |
+| `DB_NAME` | la BD de control de la ejecución (y, por su nombre, las de sus hubs: `<DB_NAME>_<hex>`) | `config/settings.py`, specs (`psql()`) |
 | `E2E_MAIL_DIR` | la carpeta de correo del SaaS propio (código de acceso) | specs (`mail.ts`) |
 | `E2E_SAAS_DB` | la BD del SaaS propio, si no es `saas_e2e_<Hub+1>` (con el Hub en `:8000`, `saas`) | `global-setup.ts` y las specs que la leen (`stack.ts`) |
 
@@ -86,8 +95,9 @@ Reglas que el e2e hace cumplir:
   de la primera spec y dice qué exportar.
 - `node tests/e2e/database.ts` crea la BD de `DB_NAME` si falta y la migra (control y hubs); es idempotente y
   conserva sus filas, así que se repite tras añadir una migración. Va **antes** de arrancar `runserver`, que no
-  arranca sin su BD. `--drop` la borra al terminar, nunca a la fuerza: con el `runserver` vivo, falla y lo dice.
-  Solo toca BD e2e.
+  arranca sin su BD. `--drop` la borra al terminar, con las BD de sus hubs (`<DB_NAME>_<hex>`, las de demo
+  `<DB_NAME>_demo_<hex>`) y sus plantillas, nunca a la fuerza: con el `runserver` vivo, falla y lo dice. Solo toca BD
+  e2e.
 - Ese mismo paso deja en el `.env` del checkout las dos claves Fernet con las que cifra el Hub: la
   `FISCAL_CERTIFICATE_KEY` de los certificados de prueba (sin ella, «Mi certificado» de `verifactu-config.spec.ts`
   recibe un 409) y la `FLOW_SECRETS_KEY` de los secretos de las automatizaciones (sin ella, la caja «Secretos» de

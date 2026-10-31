@@ -433,6 +433,24 @@ def test_its_seeding_runs_inside_its_own_database(registry, monkeypatch, told):
     assert seeded == [(hub.pk, tenancy_connections.hub_alias(hub))]
 
 
+def test_the_people_of_the_photo_kept_while_it_was_prepared_are_in_its_database_when_it_is_born(registry, told):
+    from base.models import HubUser
+
+    owner, gone = uuid.uuid7(), uuid.uuid7()
+    members = [{"user_id": str(owner), "role": "hub_owner", "email": "ana@example.com", "name": "Ana"}]
+    hub = registry.hub(state={"members": members}, state_version=3)
+
+    assert provision.provision(hub) is True
+
+    with use_hub(fresh(hub)):
+        ana = HubUser.objects.get(username=f"saas:{owner}")
+        assert (ana.name, ana.email, ana.is_active) == ("Ana", "ana@example.com", True)
+        # A preparation that goes on again (a retry) leaves out who the photo no longer lists.
+        HubUser.objects.create(username=f"saas:{gone}", name="Gone", is_active=True)
+        services.apply_kept_photo(fresh(hub))
+        assert not HubUser.objects.get(username=f"saas:{gone}").is_active
+
+
 def test_a_hub_held_by_another_worker_is_not_taken(registry, told):
     hub = registry.hub()
     now = timezone.now()
@@ -593,9 +611,20 @@ def test_seed_local_hubs_gives_a_and_b_their_own_databases_once_every_app_can_li
                 assert {label for label in migrator.portable_apps() if label not in ("base", "live")} <= turned_on
             assert "a: created (its own database)" in out.getvalue()
             # A second run leaves them as they are; one left cancelled is ready again, on the database it has.
+            with use_hub(local["b"]):
+                AppActivation.objects.filter(host="b", app="task").update(state="off")
+            with use_hub(local["a"]):
+                a_on = set(AppActivation.objects.filter(host="a", state="on").values_list("app", flat=True))
+                AppActivation.objects.filter(host="a").delete()
             again = StringIO()
             call_command("seed_local_hubs", stdout=again)
             assert "a: already ready" in again.getvalue()
+            # As one that shares control's: a local hub left with no app at all has every app on again; one that
+            # turned some off keeps them off.
+            with use_hub(local["a"]):
+                assert set(AppActivation.objects.filter(host="a", state="on").values_list("app", flat=True)) == a_on
+            with use_hub(local["b"]):
+                assert AppActivation.objects.get(host="b", app="task").state == "off"
             Hub.objects.filter(slug="a").update(status=Hub.Status.CANCELLED)
             back = StringIO()
             call_command("seed_local_hubs", stdout=back)

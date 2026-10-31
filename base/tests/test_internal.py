@@ -546,6 +546,24 @@ def test_a_photo_of_a_business_being_prepared_waits_on_its_row_for_its_seeding(c
     assert entered == []
 
 
+def test_the_people_of_a_photo_of_a_business_being_prepared_wait_for_its_seeding(client, db, monkeypatch):
+    signed(client, "put", HUB_PATH, REGISTRY)
+    entered = []
+    monkeypatch.setattr(services, "_sync_hub_users", lambda hub, members, left: entered.append("people"))
+    owner = "01a18f92-0000-7000-8000-000000000001"
+    members = [{"user_id": owner, "role": "hub_owner", "email": "ana@example.com", "name": "Ana"}]
+    photo = {"id": NEW_ID, "version": 3, "members": members}
+
+    answer = signed(client, "put", f"{HUB_PATH}/state", photo, with_v2=True)
+
+    hub = Hub.objects.get(pk=NEW_ID)
+    assert answer.status_code == 200 and answer.json() == {"applied": True, "version": 3}
+    assert hub.state["members"] == members
+    # Its database is not made yet (the SaaS sends the photo right after the registration): its people enter it when
+    # its seeding applies the photo (services.apply_kept_photo), never now.
+    assert entered == []
+
+
 def test_a_saas_that_is_away_never_breaks_the_ready_notice(client, db, saas_at, caplog):
     saas_at(raises=OSError("connection refused"))
 
