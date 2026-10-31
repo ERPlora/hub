@@ -5,6 +5,7 @@ only (``DEBUG``), idempotent, through its operation (``base.hub.seed_local``), n
 them in production).
 """
 
+import logging
 from io import StringIO
 
 import pytest
@@ -17,15 +18,21 @@ from base import registry
 from base.models import Hub
 from base.schemas import HubSeedLocalIn
 from base.services import hub_seed_local
+from base.tenancy import migrator
 
 pytestmark = pytest.mark.django_db
 
 
 @pytest.fixture
-def fresh(settings):
-    """A developer's database before its first seed: the suite's own `a` and `b` (conftest) are not there."""
+def fresh(settings, monkeypatch):
+    """A developer's database before its first seed: the suite's own `a` and `b` (conftest) are not there. Some app
+    cannot live in a hub's own database here (``staff``, made unportable for these tests), so ``a`` and ``b`` share
+    control's, which a test case can reach: their own databases are ``base/tenancy/tests/test_provision.py``'s, on
+    real ones."""
     settings.DEBUG = True
     Hub.objects.filter(slug__in=["a", "b"]).delete()
+    portable = tuple(label for label in migrator.portable_apps() if label != "staff")
+    monkeypatch.setattr(migrator, "portable_apps", lambda: portable)
 
 
 def seed() -> str:
@@ -43,12 +50,21 @@ def test_creates_a_and_b_ready():
 
 
 @pytest.mark.usefixtures("fresh")
-def test_leaves_a_and_b_on_the_shared_database_of_phase_one():
-    """Phase 2, S1: a and b keep their data in control's database (``db_name=""``) until the cut of S5, so
-    ``a.localhost`` and ``b.localhost`` serve what they always did."""
-    seed()
+def test_leaves_a_and_b_on_the_shared_database_while_some_app_cannot_live_in_a_hubs_own(caplog):
+    """a and b turn every app on: while some app cannot live in a hub's own database (``migrator.portable_apps``; here
+    ``staff``), a and b keep their data in control's (``db_name=""``) and the log says which apps hold them there.
+    Every app can since W10 (hub#474), and then the same command gives them their own
+    (``base/tenancy/tests/test_provision.py``)."""
+    blocked = sorted(migrator.hub_apps() - set(migrator.portable_apps()))
+    assert blocked == ["staff"]
+
+    with caplog.at_level(logging.WARNING, logger="base.management.commands.seed_local_hubs"):
+        output = seed()
 
     assert sorted(Hub.objects.values_list("slug", "db_name")) == [("a", ""), ("b", "")]
+    assert "base.seed_local_hubs.shared_database" in caplog.text
+    assert all(label in caplog.text for label in blocked)
+    assert "share the control database" in output
 
 
 @pytest.mark.usefixtures("fresh")

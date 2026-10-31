@@ -110,7 +110,8 @@ def drop_prefixed(prefix: str) -> None:
 
 
 def create_master(prefix: str, *, createrole: bool = True) -> dict:
-    """An RDS-like master (``CREATEROLE``, ``CREATEDB``, no ``SUPERUSER``); its libpq parameters."""
+    """An RDS-like master (``CREATEROLE``, ``CREATEDB``, no ``SUPERUSER``, ``pg_signal_backend`` with its ADMIN option
+    as ``rds_superuser`` holds it); its libpq parameters."""
     name = prefix + "master"
     with superuser() as conn:
         conn.execute(
@@ -120,6 +121,7 @@ def create_master(prefix: str, *, createrole: bool = True) -> dict:
                 sql.Literal(MASTER_PASSWORD),
             )
         )
+        conn.execute(sql.SQL("GRANT pg_signal_backend TO {} WITH ADMIN OPTION").format(sql.Identifier(name)))
     return {**server(), "user": name, "password": MASTER_PASSWORD, "dbname": "postgres"}
 
 

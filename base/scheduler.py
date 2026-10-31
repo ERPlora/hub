@@ -18,9 +18,10 @@ transaction as the task's writes (``base.services.run_next_due_task``). A task t
 and rescheduled; the others still run. ``check_scheduled_tasks`` (``base.E001``–``E003``) refuses a
 declaration the engine could not run, at ``manage.py check`` and before every command.
 
-Phase 1 runs every task on one fixed scope, ``settings.WORKER_SCOPE_SLUG`` (the platform hub's slug
-by default): phase 1 has no registry of hubs. Phase 2 replaces it with the loop over the hubs whose
-``hub_due`` has come, each under ``use_hub(hub)``, running only the tasks of its active apps.
+Phase 1's shared database runs every task on one fixed scope, ``settings.WORKER_SCOPE_SLUG`` (the platform hub's
+slug by default). A hub with its own database has its own schedule in it: the worker's pass over those hubs
+(``base.worker``) writes it once per process and runs, under ``use_hub(hub)``, the tasks of its active apps on its own
+scope (review of hub#471, C1).
 """
 
 import datetime as dt
@@ -102,15 +103,25 @@ def sync(now: dt.datetime, *, declared: list[ScheduledTask] | None = None) -> No
     )
 
 
-def run_due(now: dt.datetime) -> list[str]:
+def run_due(now: dt.datetime, *, scope: Scope | None = None, active: frozenset[str] | None = None) -> list[str]:
     """Run every task due at ``now``, one transaction each; return those that ran (``<app>.<name>``).
 
-    The connections are released after each task, so the worker never idles holding one.
+    ``scope``: whose they are, the system's scope they run on (a hub's own, ``host`` and its slug, in the worker's pass
+    over the hubs with their own database: their live notices go on its channel); phase 1's shared database runs them
+    on ``WORKER_SCOPE_SLUG``'s. ``active``: the apps that are on there; a task of another app is not run (it moves to
+    its next time). The connections are released after each task, so the worker never idles holding one.
     """
+    scope = Scope("host", settings.WORKER_SCOPE_SLUG) if scope is None else scope
+
+    def execute(name: str) -> None:
+        if active is not None and name.split(".", 1)[0] not in active:
+            return
+        _execute(name, scope=scope)
+
     ran: list[str] = []
     for _ in range(MAX_PER_TICK):
         outcome = services.run_next_due_task(
-            now, execute=_execute, reschedule=next_after
+            now, execute=execute, reschedule=next_after
         )
         close_old_connections()
         if outcome is None:
@@ -121,11 +132,9 @@ def run_due(now: dt.datetime) -> list[str]:
     return ran
 
 
-def _execute(name: str) -> None:
+def _execute(name: str, scope: Scope) -> None:
     operation = get_operation(name)
-    operation(
-        system_context(Scope("host", settings.WORKER_SCOPE_SLUG)), operation.input()
-    )
+    operation(system_context(scope), operation.input())
 
 
 # ── The check of the declarations ──────────────────────────────────────────────────────────────

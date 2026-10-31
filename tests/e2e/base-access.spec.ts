@@ -164,6 +164,9 @@ let till: Page;
 let problems: Awaited<ReturnType<typeof collectProblems>>;
 /** Every answer of 400 or more the till got: its method and path. */
 const refused: string[] = [];
+/** `sql` on the business this file signs up: its tables live in its own database (round 2026-10-30 of PLAN-DB, S2a),
+ *  control's where they are (`psql`). */
+const own = (sql: string): string => psql(sql, business.slug);
 
 test.beforeAll(async ({ browser }) => {
   owner = await signUp(browser, 'owner');
@@ -176,8 +179,8 @@ test.beforeAll(async ({ browser }) => {
 test.afterAll(async () => {
   // The check of «Switch user» (its title is `e2e …`), with the Sales app's own cleanup.
   cleanSales();
-  // Phase 1 keeps the business's dial in a table every hub of this database shares: back to the factory's.
-  psql("UPDATE base_accesssettings SET pin_policy = 'per_shift', pin_inactivity_minutes = 5, pin_length = 4");
+  // The business's dial back to the factory's, in its own database (phase 1 shared it with every hub).
+  if (business) own("UPDATE base_accesssettings SET pin_policy = 'per_shift', pin_inactivity_minutes = 5, pin_length = 4");
   await owner?.context.close();
   await employee?.context.close();
 });
@@ -203,7 +206,7 @@ test('BASE-G52 BASE-G125 BASE-G126: the owner enters with the account, names the
   await profile.getByTestId('profile-pin-save').click();
   await expect(profile.getByTestId('profile-pin-saved')).toHaveText('PIN updated');
   await expect(profile.getByTestId('profile-pin')).toContainText('The PIN you enter the till with.');
-  expect(psql(`SELECT count(*) FROM base_credential WHERE username = '${usernameOf(owner.credentials.email)}' AND pin_hash <> ''`)).toBe('1');
+  expect(own(`SELECT count(*) FROM base_credential WHERE username = '${usernameOf(owner.credentials.email)}' AND pin_hash <> ''`)).toBe('1');
   await atEverySize(page, 'BASE-G125', async () => {
     await expect(shown(page).getByTestId('profile-summary')).toContainText('Ana López');
     // «System (auto)», «Light» and «Dark» whole at every size, never «System (au…».
@@ -368,9 +371,9 @@ test('BASE-G56: a badge that opens nothing says so; the owner’s badge enters a
     'That badge opens nothing here. Enter with your PIN or ask an administrator.',
   );
   // The badge is given in Employees (another part of base): here, the owner's card is written as the Hub keeps it.
-  const key = psql('SELECT badge_key FROM base_accesssettings');
+  const key = own('SELECT badge_key FROM base_accesssettings');
   const digest = createHmac('sha256', Buffer.from(key, 'hex')).update(BADGE).digest('hex');
-  psql(`UPDATE base_credential SET badge_digest = '${digest}', badge_set_at = now() WHERE username = '${usernameOf(owner.credentials.email)}'`);
+  own(`UPDATE base_credential SET badge_digest = '${digest}', badge_set_at = now() WHERE username = '${usernameOf(owner.credentials.email)}'`);
   await till.keyboard.type(BADGE, { delay: 5 });
   await till.keyboard.press('Enter');
   await expect(till).toHaveURL(/\/$/);
@@ -404,7 +407,7 @@ test('BASE-G60: «Switch user» over the sale in progress: whoever takes over en
   expect(await whoIsIn(till, origin)).toBe('Bea');
   // The same check, with its line, on the till of whoever took over; still open.
   await expect(shown(till).locator('.pos-line', { hasText: 'Coffee' })).toHaveCount(1);
-  expect(psql(`SELECT status FROM sale_order WHERE id = '${opened.data.id}'`)).toBe('open');
+  expect(own(`SELECT status FROM sale_order WHERE id = '${opened.data.id}'`)).toBe('open');
   // Back is not the screens whoever left had open: the reload replaced the page.
   await till.goto(`${origin}/settings`);
   await expect(shown(till).getByTestId('devices-admin-only')).toBeVisible();
@@ -418,7 +421,7 @@ test('BASE-G59: a till of a business that always asks goes back to the PIN pad a
   const again = shown(till).getByTestId('pin-policy-again');
   await again.locator('ion-segment-button', { hasText: /^1 min$/ }).click();
   await expect(shown(till).getByTestId('pin-policy-card')).toContainText('A till nobody touches for 1 minutes');
-  expect(psql('SELECT pin_policy || pin_inactivity_minutes FROM base_accesssettings')).toBe('always1');
+  expect(own('SELECT pin_policy || pin_inactivity_minutes FROM base_accesssettings')).toBe('always1');
   await till.clock.install();
   await till.reload();
   await expect(shown(till).getByTestId('pin-policy-card')).toBeVisible();
@@ -429,13 +432,13 @@ test('BASE-G59: a till of a business that always asks goes back to the PIN pad a
   await expect(till).toHaveURL(`${origin}/`);
   await till.goto(`${origin}/settings`);
   await shown(till).getByTestId('pin-policy-again').locator('ion-segment-button', { hasText: 'Until signing out' }).click();
-  await expect.poll(() => psql('SELECT pin_policy FROM base_accesssettings')).toBe('per_shift');
+  await expect.poll(() => own('SELECT pin_policy FROM base_accesssettings')).toBe('per_shift');
 });
 
 test('BASE-G58: the till’s session ends while working: its next page is its PIN pad, which says so', async () => {
   // Its shift is over (or an administrator ended it): the session is past its time. The business's only live session
   // is the till's (A's ended with the employee's entry).
-  const ended = psql(
+  const ended = own(
     `WITH ended AS (UPDATE django_session SET expire_date = now() - interval '1 minute' WHERE expire_date > now() AND ` +
       `session_key IN (SELECT session_id FROM base_sessionowner WHERE host = '${business.slug}') RETURNING 1) ` +
       'SELECT count(*) FROM ended',
@@ -462,7 +465,7 @@ test('BASE-G58: the till’s session ends while working: its next page is its PI
 });
 
 test('BASE-G66 BASE-G65: the device nobody uses goes; removing the one in hand ends its session', async () => {
-  psql(`UPDATE base_trusteddevice SET last_entry_at = now() - interval '40 days' WHERE name = 'Office'`);
+  own(`UPDATE base_trusteddevice SET last_entry_at = now() - interval '40 days' WHERE name = 'Office'`);
   // A page load of Settings › General (BASE-G58 left the till on its Data tab).
   await till.goto(`${origin}/settings`);
   const devices = shown(till).getByTestId('devices-card');
@@ -471,7 +474,7 @@ test('BASE-G66 BASE-G65: the device nobody uses goes; removing the one in hand e
   await devices.getByTestId('devices-prune-confirm').click();
   await expect(devices.getByTestId('device-row').filter({ hasText: 'Office' })).toHaveCount(0);
 
-  const inHand = psql(
+  const inHand = own(
     'SELECT o.device_id FROM base_sessionowner o JOIN django_session s ON s.session_key = o.session_id ' +
       `WHERE o.host = '${business.slug}' AND s.expire_date > now()`,
   );
@@ -490,7 +493,7 @@ test('BASE-G66 BASE-G65: the device nobody uses goes; removing the one in hand e
   // the person of this browser's account back in, on a device the hub trusts anew.
   await expect(till).toHaveURL(`${origin}/`, { timeout: SAAS_STEP });
   expect(await whoIsIn(till, origin)).toBe('Bea');
-  expect(psql(`SELECT count(*) FROM base_trusteddevice WHERE id = '${inHand}'`)).toBe('0');
+  expect(own(`SELECT count(*) FROM base_trusteddevice WHERE id = '${inHand}'`)).toBe('0');
   const seen = await problems();
   // Then, at most, the live stream hears that the session ended before the page leaves (the SDK's way to know,
   // `host-closed.ts`: a race with the navigation), and nothing else.

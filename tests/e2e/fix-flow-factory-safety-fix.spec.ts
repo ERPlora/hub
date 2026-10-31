@@ -78,10 +78,10 @@ function cleanUp(): void {
   saasSql("delete from assistant_assistantusage where hub_id = (select id from hubs_hub where slug = 'a')");
 }
 
-/** One tick of the worker's relay (this stack runs no worker): the outbox event `id` handed to Automations' reaction.
+/** One tick of the worker's relay (in `a`'s database: the e2e stack's worker relays nothing): the outbox event `id` handed to Automations' reaction.
  *  It does not block this process: the provider the SaaS asks lives here, and must answer. */
 async function relay(id: string): Promise<void> {
-  await promisify(execFile)('uv', ['run', 'python', 'manage.py', 'shell', '-c', RELAY], {
+  await promisify(execFile)('uv', ['run', 'python', 'manage.py', 'shell', '--hub', 'a', '-c', RELAY], {
     cwd: HUB_DIR,
     env: { ...process.env, FLOW_EVENT: id },
   });
@@ -135,6 +135,7 @@ function asTurnedOnBeforeTheFix(): string {
 }
 
 test.beforeAll(async () => {
+  // It drives the inbox: a's photo is kept first and put back last (whatsapp-photo.test.ts, hub#528).
   keepPhoto();
   provider = await startProvider(PROVIDER_PORT);
   const seeded = saasSql("select base_url from assistant_aiprovider where slug = 'e2e-local'");

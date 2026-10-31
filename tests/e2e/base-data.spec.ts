@@ -8,9 +8,10 @@
 //   - BASE-G104, G106, G107: a file uploaded by hand with a row an app refuses: «Applied in part» with the reason, and on
 //     coming back to Import, that last report first, with «Retry what is missing» off and why;
 //   - BASE-G108: Reset › «Undo an import», confirmed, with what was removed;
-//   - BASE-G109: Reset › «Reset the business»: the plan per section and, in phase 1 (one database for every hub), why
-//     it cannot be emptied, with no red button.
-// The business is emptied first through the apps' own operations (phase 1: `a` and `b` share their rows, as
+//   - BASE-G109: Reset › «Reset the business»: the plan per section, one box each, and its red button off until one is
+//     ticked (`a` has its own database since S2a, round 2026-10-30 of PLAN-DB; one that shares control's says why it
+//     cannot be emptied: ResetPanel.test.ts). Nothing is reset: the business stays for the other specs.
+// The business is emptied first through the apps' own operations (phase 1: `a` and `b` shared their rows, as
 // `clearItems` does with the demo's). Each flow leaves its capture `APP-BASE-2-<flow>-<width>`.
 // flow: BASE-G101 BASE-G102 BASE-G103 BASE-G104 BASE-G105 BASE-G106 BASE-G107 BASE-G108 BASE-G109 BASE-G131
 import { execFileSync } from 'node:child_process';
@@ -183,11 +184,18 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     expect((await good()).data.rows).toEqual([]);
     await snap(page, 'BASE-G108', width);
 
-    // BASE-G109 — the plan per section and, in phase 1, why the business cannot be emptied.
-    await expect(testid(page, 'reset-section').first()).toBeVisible();
-    await expect(testid(page, 'reset-shared')).toContainText('Resetting the business is not available yet');
-    await expect(testid(page, 'reset-submit')).toHaveCount(0);
-    await testid(page, 'reset-shared').scrollIntoViewIfNeeded();
+    // BASE-G109 — the plan per section, a box each, and «Reset the business» off until one is ticked (never pressed).
+    const first = testid(page, 'reset-section').first();
+    await expect(first).toBeVisible();
+    await expect(testid(page, 'reset-shared')).toHaveCount(0);
+    const submit = testid(page, 'reset-submit');
+    await expect(submit).toHaveAttribute('disabled');
+    const box = first.locator('ion-checkbox');
+    await box.click();
+    await expect(submit).not.toHaveAttribute('disabled');
+    await box.click();
+    await expect(submit).toHaveAttribute('disabled');
+    await submit.scrollIntoViewIfNeeded();
     await snap(page, 'BASE-G109', width);
 
     await context.close();
