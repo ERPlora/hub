@@ -13,7 +13,7 @@ import psycopg
 import pytest
 from django.apps import apps
 from django.db import IntegrityError, connections, transaction
-from live.assistant import description
+from live.assistant import description, risk
 from live.context import OperationContext, Scope
 from live.errors import AppInactive, Conflict, NotFound, OperationError, PermissionDenied
 from live.live_registry import live_registry
@@ -267,8 +267,8 @@ def test_the_commands_are_for_who_runs_the_business_and_told_to_the_assistant():
         op = get(name)
         assert (op.kind, op.permission, op.input, op.output) == ("command", ADMIN, AppChangeIn, AppChangeOut)
         assert description(op)
-    assert get("base.app.enable").ai.risk == "normal"
-    assert get("base.app.disable").ai.risk == "high"
+    assert risk(get("base.app.enable")) == "normal"
+    assert risk(get("base.app.disable")) == "high"
 
 
 @pytest.mark.django_db
@@ -418,7 +418,7 @@ def test_the_read_says_which_app_a_name_names_and_whether_it_is_on(monkeypatch):
 def test_the_read_is_for_who_sees_the_home_and_told_to_the_assistant():
     op = get("base.app.get")
     assert (op.kind, op.permission) == ("query", HOME)
-    assert op.ai["description"].strip()
+    assert description(op)
 
 
 @pytest.mark.django_db
