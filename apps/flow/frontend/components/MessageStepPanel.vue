@@ -2,14 +2,20 @@
 // The form of «Send a message» (WORKBOOK FLOW-F31; the old module's flows-f15): a «Do something» step of the
 // WhatsApp inbox's narrow send (`whatsapp_inbox.message.notify`). To whom is a datum — the customer's exact
 // international number, never one typed by hand —; the message goes as it is within the customer's 24 hours;
-// after them WhatsApp only lets an approved template through, chosen from the business's (read live from the
-// inbox) with a value for each of its blanks. A template it no longer finds stays chosen and says so.
+// after them WhatsApp only lets an approved template through, chosen from the ones the inbox can fill (read live
+// from it) with a value for each of its blanks. A template it no longer finds stays chosen and says so.
+// A template with a photo, a video or a document at the top (FLOW-F32; the old hub's HUB-F112) goes with a file: its
+// own, or the one chosen here, kept at once in the business's files (`whatsapp_inbox.template_sample.upload`, checked
+// here first by type and size) and kept by the step as `template.header_sample`; a saved step's file is read by its id.
 import { InlineFeedback } from '@erplora/ui/components';
-import { useLive } from '@erplora/ui/sdk';
-import { IonButton, IonSelect, IonSelectOption } from '@ionic/vue';
-import { computed } from 'vue';
+import { useCommand, useLive, useLiveClient } from '@erplora/ui/sdk';
+import { IonButton, IonSelect, IonSelectOption, IonSpinner } from '@ionic/vue';
+import { computed, ref, shallowRef, watch } from 'vue';
 
+import { bytesToBase64 } from '../../../../base/frontend/lib/data';
+import { useLocale, useT } from '../composables/useT';
 import { asCallText } from '../lib/document';
+import { formatFileSize, HEADER_FILE_RULES, headerFileKind, judgeHeaderFile } from '../lib/headerFile';
 import type { CatalogOut, Step } from '../operations';
 import ValueBox from './ValueBox.vue';
 
@@ -17,6 +23,16 @@ interface TemplateParam {
   name: string;
   language?: string;
   variables: string[];
+  /** The id of the file a photo, video or document header goes with, chosen in the step (FLOW-F32). */
+  header_sample?: string;
+}
+
+/** A file of a template's header, as the inbox answers it. */
+interface HeaderFile {
+  id: string;
+  header_format: string;
+  size: number;
+  name: string;
 }
 
 const props = defineProps<{
@@ -31,7 +47,12 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ 'update:step': [step: Step] }>();
 
-const templates = useLive('whatsapp_inbox.template.list', { sendable: true, limit: 100 });
+const t = useT();
+const locale = useLocale();
+const client = useLiveClient();
+// What the inbox can send: approved and filled by the Hub; a photo, video or document header asks for its file.
+const templates = useLive('whatsapp_inbox.template.list', { fillable: true, limit: 100 });
+const sampleUpload = useCommand('whatsapp_inbox.template_sample.upload');
 
 const id = computed(() => props.step.id);
 const params = computed<Record<string, unknown>>(() => (props.step.kind === 'command' ? props.step.params : {}));
@@ -46,6 +67,65 @@ const optionOf = (name: string, language = ''): string => `${name}|${language}`;
 const known = computed(() => rows.value.find((row) => row.name === chosen.value?.name && (!chosen.value?.language || row.language === chosen.value.language)) ?? null);
 /** Chosen, but not among the approved ones read (renamed, deleted…): kept, and said. */
 const missing = computed(() => !!chosen.value && !!templates.data.value && !known.value);
+
+// ── The file at the top (FLOW-F32) ──
+const fileKind = computed(() => headerFileKind(known.value?.header_format));
+/** The file the step chose, by its id: the upload's answer, or read once when the step is opened. */
+const stepFile = shallowRef<HeaderFile | null>(null);
+const stepFileState = ref<'idle' | 'reading' | 'gone' | 'failed'>('idle');
+const fileError = ref('');
+const picker = shallowRef<HTMLInputElement | null>(null);
+const uploading = computed(() => sampleUpload.pending.value);
+/** What goes at the top: the step's own choice, else the template's file. */
+const file = computed<HeaderFile | null>(() =>
+  chosen.value?.header_sample ? stepFile.value : (known.value?.header_sample ?? null),
+);
+
+async function readStepFile(): Promise<void> {
+  const sample = chosen.value?.header_sample;
+  if (!sample || stepFile.value?.id === sample) return;
+  stepFile.value = null;
+  stepFileState.value = 'reading';
+  try {
+    stepFile.value = await client.api.call('whatsapp_inbox.template_sample.detail', { id: sample });
+    stepFileState.value = 'idle';
+  } catch (err) {
+    const code = (err as { code?: string } | null)?.code;
+    stepFileState.value = code === 'whatsapp_inbox.sample_not_found' ? 'gone' : 'failed';
+  }
+}
+
+watch(() => chosen.value?.header_sample, readStepFile, { immediate: true });
+
+async function onPick(event: Event): Promise<void> {
+  const input = event.target as HTMLInputElement;
+  const picked = input.files?.[0];
+  input.value = ''; // choosing the same file again is a change too
+  const kind = fileKind.value;
+  if (!picked || !kind || !chosen.value) return;
+  fileError.value = '';
+  const verdict = judgeHeaderFile(picked, kind);
+  if (verdict !== 'ok') {
+    fileError.value =
+      verdict === 'type'
+        ? t(`flow.message.fileWrongType.${kind}`)
+        : t('flow.message.fileTooHeavy', { mb: HEADER_FILE_RULES[kind].maxBytes / (1024 * 1024) });
+    return;
+  }
+  try {
+    const kept = await sampleUpload.run({
+      header_format: kind,
+      name: picked.name,
+      content_base64: bytesToBase64(new Uint8Array(await picked.arrayBuffer())),
+    });
+    stepFile.value = kept;
+    stepFileState.value = 'idle';
+    setParams({ ...params.value, template: { ...chosen.value, header_sample: kept.id } });
+  } catch {
+    const refused = sampleUpload.error.value;
+    fileError.value = refused?.fields?.content_base64 ?? refused?.message ?? t('flow.message.fileUploadFailed');
+  }
+}
 
 function setParams(next: Record<string, unknown>): void {
   if (props.step.kind === 'command') emit('update:step', { ...props.step, params: next });
@@ -69,7 +149,9 @@ function chooseTemplate(value: string | null | undefined): void {
   const [name, language = ''] = value.split('|');
   const row = rows.value.find((candidate) => candidate.name === name && candidate.language === language);
   const count = row?.variables ?? chosen.value?.variables.length ?? 0;
+  // Another template lets the step's file go: it goes with its own, or asks for one of its kind.
   next.template = { name, language, variables: Array.from({ length: count }, (_, i) => chosen.value?.variables[i] ?? '') };
+  fileError.value = '';
   setParams(next);
 }
 
@@ -189,6 +271,92 @@ function setVariable(position: number, value: unknown): void {
       >
         {{ known.body }}
       </p>
+      <div
+        v-if="fileKind"
+        class="flow-message__file"
+        :data-testid="`flow-message-file-${id}`"
+      >
+        <div class="flow-message__file-row">
+          <span
+            v-if="file"
+            class="flow-message__file-name"
+            :data-testid="`flow-message-file-name-${id}`"
+          >{{ $t('flow.message.fileName', { kind: $t(`flow.message.fileKinds.${fileKind}`), name: file.name, size: formatFileSize(file.size, locale) }) }}</span>
+          <span
+            v-else-if="stepFileState === 'reading'"
+            class="flow-card__hint"
+            :data-testid="`flow-message-file-reading-${id}`"
+          >{{ $t('flow.message.fileReading') }}</span>
+          <span
+            v-else
+            class="flow-card__hint"
+            :data-testid="`flow-message-file-empty-${id}`"
+          >{{ $t('flow.message.fileNone') }}</span>
+          <IonButton
+            fill="outline"
+            size="small"
+            :disabled="uploading"
+            :data-testid="`flow-message-file-choose-${id}`"
+            @click="picker?.click()"
+          >
+            <IonSpinner
+              v-if="uploading"
+              slot="start"
+              name="crescent"
+            />
+            {{ uploading ? $t('flow.message.fileUploading') : file ? $t('flow.message.fileChange') : $t('flow.message.fileChoose') }}
+          </IonButton>
+        </div>
+        <span
+          class="flow-card__hint"
+          :data-testid="`flow-message-file-rules-${id}`"
+        >{{ $t(`flow.message.fileRules.${fileKind}`) }} {{ $t('flow.message.fileGoes') }}</span>
+        <InlineFeedback
+          v-if="stepFileState === 'gone'"
+          tone="warning"
+          :data-testid="`flow-message-file-gone-${id}`"
+        >
+          {{ $t('flow.message.fileGone') }}
+        </InlineFeedback>
+        <InlineFeedback
+          v-else-if="stepFileState === 'failed'"
+          tone="danger"
+          :data-testid="`flow-message-file-readerror-${id}`"
+        >
+          {{ $t('flow.message.fileReadFailed') }}
+          <IonButton
+            size="small"
+            fill="clear"
+            :data-testid="`flow-message-file-retry-${id}`"
+            @click="readStepFile()"
+          >
+            {{ $t('flow.live.retry') }}
+          </IonButton>
+        </InlineFeedback>
+        <InlineFeedback
+          v-else-if="!file && stepFileState !== 'reading'"
+          tone="warning"
+          :data-testid="`flow-message-file-missing-${id}`"
+        >
+          {{ $t(`flow.message.fileMissing.${fileKind}`) }}
+        </InlineFeedback>
+        <p
+          v-if="fileError"
+          class="flow-message__file-error"
+          role="alert"
+          :data-testid="`flow-message-file-error-${id}`"
+        >
+          {{ fileError }}
+        </p>
+        <input
+          ref="picker"
+          type="file"
+          hidden
+          :accept="HEADER_FILE_RULES[fileKind].accept"
+          :data-testid="`flow-message-file-input-${id}`"
+          @change="onPick"
+        >
+      </div>
       <ValueBox
         v-for="(value, position) in chosen.variables"
         :key="position"
@@ -221,5 +389,28 @@ function setVariable(position: number, value: unknown): void {
   background: var(--ep-surface, var(--ion-card-background, #fff));
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+.flow-message__file {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  min-width: 0;
+}
+.flow-message__file-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  min-width: 0;
+}
+.flow-message__file-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.flow-message__file-error {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--ion-color-danger);
 }
 </style>
