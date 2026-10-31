@@ -133,14 +133,14 @@ Error al abrir: «Factura no encontrada» o el mensaje del fallo, con «← Volv
 Ventana que abre «Rectificar», desde la fila o desde la ficha. Título «Rectificar {número}», la nota
 «Se emitirá una rectificativa (serie RECT) con los importes negados y la factura original quedará
 cancelada. Esta operación no se puede deshacer.», el «Tipo de rectificativa» (R1 a R4; en un tique,
-siempre R5, sin elegir), el campo «Motivo» (obligatorio), «Emitir rectificativa» («Rectificando…»
-mientras va) y «Cancelar». Tres finales dentro de la misma ventana: el rechazo traducido, el documento
+siempre R5, sin elegir), el campo «Motivo» (obligatorio), «Emitir rectificativa» (con una rueda que
+gira mientras va) y «Cancelar». Tres finales dentro de la misma ventana: el rechazo traducido, el documento
 que no se puede rectificar («Una rectificativa no se puede rectificar.», «La factura ya está
 cancelada.») y el resultado «Rectificativa {número} emitida. {original} queda cancelada.», cada uno con
 «Cerrar».
 
 ### Factura completa (sustituir un tique)
-Ventana que abre «Factura completa» en la ficha de un tique. Título «Factura completa del tique
+Ventana que abre «Factura completa» en la ficha de un tique. Título «Factura completa del ticket
 {número}», el buscador de clientes de Clientes (rellena los datos) y «Nombre o razón social», «País»,
 «Tipo de documento» (solo fuera de España), «NIF» y «Domicilio», todos obligatorios salvo el tipo.
 «Emitir factura completa» y «Cancelar». Al emitir, la ventana se cierra y la ficha abre la F3 nueva.
@@ -153,12 +153,12 @@ cifra no cuentan, como en 12,50 zł) y el
 tipo, con el nombre del impuesto del territorio fiscal del negocio: «IVA %» (21 de entrada), «IGIC %» en
 Canarias o «IPSI %» en Ceuta y Melilla, que empiezan en el tipo general de su regla de Impuestos y vacíos
 si el territorio aún no tiene regla de su impuesto. «+ Línea» añade otra y la cruz la quita. «Emitir
-factura» («Emitiendo…» mientras va) está en gris hasta que cada línea tiene descripción, cantidad, precio
+factura» (con una rueda que gira mientras va) está en gris hasta que cada línea tiene descripción, cantidad, precio
 y tipo. Un rechazo sale encima de los botones, por campo cuando es de un campo.
 
 ### Series
 Menú **Facturación → Series** (solo con permiso de llevar las series). La entrada «Cada serie define
-el prefijo, el formato y el contador de la numeración por año y tipo de factura…» y una tabla con
+el prefijo, el formato y el contador de la numeración de un tipo de factura y un año…» y una tabla con
 «Código», «Nombre», «Tipo», «Año», «Prefijo», «Formato» (vacío se lee `PREFIX-YYYY-NNNNNN`), «Nº
 actual», «Activa» y «Predet.»; buscador «Buscar código, nombre…». Por debajo de 1280 px abre en
 tarjetas. **+** abre «Nueva serie de numeración»; «Editar» (o pulsar la fila) abre «Editar serie
@@ -503,7 +503,7 @@ sustitutivas, RECT para las rectificativas; en el alta manual, la serie elegida)
 Sale: el número del documento. El número entra en la huella encadenada de VeriFactu.
 Si falla: si la emisión se rechaza o falla, no se guarda nada y el contador no sube: no queda hueco.
 Dos cobros a la vez en la misma serie esperan uno al otro y reciben números seguidos; dos documentos de
-la misma serie no pueden llevar el mismo número («Ese número ya existe en la serie…»: pasa si una serie
+la misma serie no pueden llevar el mismo número («El número {número} ya existe en la serie {código}…»: pasa si una serie
 de otro año usa un formato sin el año).
 Implicados: ninguno
 
