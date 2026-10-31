@@ -38,7 +38,6 @@ from collections.abc import Callable, Iterable, Iterator
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from functools import partial
 
 import decouple
 import psycopg
@@ -365,28 +364,18 @@ def templates(control: str | None = None) -> list[Template]:
     return [platform, *verticals]
 
 
-def apps_every_hub_gets() -> tuple[str, ...]:
-    """The apps whose tables every hub with its own database has: every portable one. Transitional, until S3 makes an
-    app's tables when it is turned on (``base.app.enable``, W6): meanwhile ``provision(apps=None)`` gives them at
-    birth and :func:`migrate_hubs_behind` adds to the hubs already made the ones a later code ports, so turning an app
-    on only changes its row, as in phase 1. The one list both read (:func:`portable_apps`)."""
-    return portable_apps()
-
-
-def is_behind(hub, code: CodeMigrations | None = None, *, wanted: Iterable[str] | None = None) -> bool:
+def is_behind(hub, code: CodeMigrations | None = None) -> bool:
     """Whether ``hub``'s database may lack a migration of this code, as control knows it (``Hub.schema_apps``).
 
-    Behind: marked so, or the platform or any app it has not at the code's leaf (never confirmed counts), or, with its
-    own database, one of ``wanted`` (by default :func:`apps_every_hub_gets`, until S3) it does not have. A label or a
-    migration the code does not have (a later code's, after a rollback: the database is ahead) is not behind. Opens no
-    database.
+    Behind: marked so, or the platform or any app it has not at the code's leaf (never confirmed counts). An app it
+    never turned on is not behind: its tables are made the first time it is (S3, ``base.app.enable`` → the worker's
+    :func:`ensure_schema`), never here. A label or a migration the code does not have (a later code's, after a rollback:
+    the database is ahead) is not behind. Opens no database.
     """
     if hub.schema_state == Hub.SchemaState.BEHIND:
         return True
     code = code_migrations() if code is None else code
     recorded = hub.schema_apps or {}
-    if hub.db_name and any(label not in recorded for label in (apps_every_hub_gets() if wanted is None else wanted)):
-        return True
     for label in set(platform_apps()) | {label for label in recorded if label in code.leaves}:
         name = recorded.get(label)
         if name is None:
@@ -766,14 +755,13 @@ def migrate_hubs_behind(*, workers: int = HUB_WORKERS) -> HubsPass:
     fails is marked ``behind`` (its traceback logged) and the others go on."""
     every = hubs_with_a_database()
     code = code_migrations()
-    wanted = apps_every_hub_gets()
-    behind = [hub for hub in every if is_behind(hub, code, wanted=wanted)]
+    behind = [hub for hub in every if is_behind(hub, code)]
     result = HubsPass(up_to_date=len(every) - len(behind))
     first = [hub for hub in behind if hub.is_platform]
     rest = [hub for hub in behind if not hub.is_platform]
-    outcomes = [(hub, _migrate_hub(hub, wanted)) for hub in first]
+    outcomes = [(hub, _migrate_hub(hub)) for hub in first]
     with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="migrate_hubs") as pool:
-        outcomes += zip(rest, pool.map(partial(_migrate_hub_in_thread, add=wanted), rest), strict=True)
+        outcomes += zip(rest, pool.map(_migrate_hub_in_thread, rest), strict=True)
     for hub, failure in outcomes:
         if failure is None:
             result.migrated.append(hub.slug)
@@ -782,20 +770,20 @@ def migrate_hubs_behind(*, workers: int = HUB_WORKERS) -> HubsPass:
     return result
 
 
-def _migrate_hub_in_thread(hub, add: Iterable[str] = ()) -> str | None:
+def _migrate_hub_in_thread(hub) -> str | None:
     try:
-        return _migrate_hub(hub, add)
+        return _migrate_hub(hub)
     finally:
         connections.close_all()  # this thread's own connections: control's goes back to its pool
 
 
-def _migrate_hub(hub, add: Iterable[str] = ()) -> str | None:
-    """``ensure_schema(hub, add=add)`` (until S3, every portable app: :func:`apps_every_hub_gets`), tried again on a
-    lock timeout; ``None`` if done, else why it was left behind."""
+def _migrate_hub(hub) -> str | None:
+    """``ensure_schema(hub)``: the platform and the apps its database has, at the leaf (never an app it never turned
+    on, S3); tried again on a lock timeout; ``None`` if done, else why it was left behind."""
     attempt = 1
     while True:
         try:
-            ensure_schema(hub, add=add)
+            ensure_schema(hub)
             return None
         except Exception as error:
             if _is_lock_timeout(error) and attempt < LOCK_TIMEOUT_ATTEMPTS:

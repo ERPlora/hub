@@ -111,10 +111,10 @@ def missing_database() -> str:
 
 
 def at_the_leaf() -> dict[str, str]:
-    """A hub with its own database at the code's leaf: the platform and, until S3, every portable app
-    (``migrator.apps_every_hub_gets``: ``migrate_hubs`` adds the ones it lacks)."""
+    """A hub with its own database at the code's leaf: the platform (S3: an app's tables are made when it is turned on,
+    never by ``migrate_hubs``)."""
     leaf = leaves()
-    return {label: leaf[label] for label in (*PLATFORM, *migrator.apps_every_hub_gets())}
+    return {label: leaf[label] for label in PLATFORM}
 
 
 # ── A run ───────────────────────────────────────────────────────────────────────────────────────────────────────

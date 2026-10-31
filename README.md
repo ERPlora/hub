@@ -90,8 +90,8 @@ Plan `docs/plans/2026-10-22-fase-2-tenencia.md` de erplora-next; reglas en PLAN-
   el `Cluster` abierto con menos hubs bajo su `max_hubs`, o en el servidor de los settings si no hay ninguna fila; sin
   sitio, `no_cluster_available`; y clona `<control>_template[_<vertical>]` de ese cluster con `CREATE DATABASE …
   TEMPLATE`, privada: nada a `PUBLIC`, `CONNECT, TEMPORARY` a `hub_app` y `hub_admin`), `migrating` (lleva a la hoja
-  las apps que la plantilla ya tiene, más `base` y, hasta S3, todas las portables, y anota `schema_apps = {app: su
-  última migración}`), `seeding` (la foto del SaaS guardada en la fila: sus personas y los bloques de las apps
+  las apps que la plantilla ya tiene, las de su vertical y `base`: el alta es el clon; las tablas de cualquier otra app
+  se crean la primera vez que el negocio la enciende, S3; y anota `schema_apps = {app: su última migración}`), `seeding` (la foto del SaaS guardada en la fila: sus personas y los bloques de las apps
   encendidas; si llega otra mientras, se aplica también antes de `ready`) y `ready` (el SaaS lo oye tras el COMMIT).
   Una foto que llega a un negocio sin BD hecha (preparándose, o cancelado o fallido antes de estar listo) se guarda en
   la fila sin entrar en ella (`registry.database_is_made`). Cada paso escribe
@@ -141,8 +141,8 @@ Plan `docs/plans/2026-10-22-fase-2-tenencia.md` de erplora-next; reglas en PLAN-
   plantillas de cada servidor (`clusters_to_migrate`: sin filas de `Cluster`, el del settings; con ellas, los abiertos
   y los cerrados que aún tienen hubs, y el del settings mientras viva en él un hub sin cluster), como canarios: si una
   falla, no se toca ningún hub; 3) los hubs atrasados según `schema_apps` (un despliegue sin migraciones no abre
-  ninguna BD de hub) con BD propia y estado `ready`, `cancelled` o `expired` (hasta S3 también los que no tienen
-  alguna app portable: se la añade, `migrator.apps_every_hub_gets`): primero el de ERPlora y después 4 a la
+  ninguna BD de hub) con BD propia y estado `ready`, `cancelled` o `expired`, solo con las apps que ya tienen (nunca
+  crea una app que el hub no encendió: eso es de la activación, S3): primero el de ERPlora y después 4 a la
   vez, cada uno en su servidor; un fallo de `lock_timeout` se reintenta hasta 3 veces, y el hub que falla queda
   `behind`, no para a los demás y hace salir al comando con código ≠ 0. Una BD por delante del código (tras un
   rollback) no cuenta como atrasada. `--check` no aplica nada: lista lo pendiente de control, de las plantillas (abre
