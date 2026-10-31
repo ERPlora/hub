@@ -3325,7 +3325,8 @@ Implicados: ACCOUNTS-F38
 - Tests: `base/tests/test_people.py`, `test_api_keys.py`, `test_approvals.py`, `test_approval_spend.py`, `test_approved_calls.py` y `test_api_docs.py`; Vitest de
   `base/frontend/lib/{people,approval,api-docs,sidebar}.test.ts`, `components/{PeopleList,RolesList,ApiKeysPanel,
   ApprovalDialog,ApprovalsList,ApiDocsCard}.test.ts` y `pages/{Employees,Person,ApiDocs}Page.test.ts`; e2e
-  `tests/e2e/base-employees.spec.ts`.
+  `tests/e2e/base-employees.spec.ts` y `tests/e2e/base-api-keys.spec.ts` (crear, copiar, usar, rotar y revocar una
+  llave en el hub `a`, con su BD propia, en los tres tamaños; borra lo que crea).
 - La QA maestra del Hub (BASE-F107 = BASE-G152, `qa:shared/qa-hub`, APP-BASE-10): el contrato de los agentes
   `qa-hub*` del hub viejo pasa a ser una e2e de `base`, `tests/e2e/base-qa-master.spec.ts`, contra el SaaS de la pila
   (alta en sus pantallas, negocio por su API con `business_type` del vertical) y su pasarela del asistente con el
