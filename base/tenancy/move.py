@@ -222,14 +222,12 @@ def drop_old_copies(now: dt.datetime) -> int:
 
 def drop_leftovers(now: dt.datetime) -> int:
     """Drop what undone moves may have left on their destinations, with their notes; how many. Never one control says is
-    a hub's database: on that cluster (the hub itself after a later move there), on the hub's own server (a row of
-    another cluster pointing at it), whose note is forgotten; nor one of a hub moving there now (its move drops it before
-    it clones). Each under the hub's lease; one that cannot be dropped now stays, and the next pass tries again."""
+    a hub's database there (on that cluster, or of a hub moving to it, whose move drops it before it clones) nor one on
+    the hub's own server (a row of another cluster pointing at it): its note is forgotten then. Each under the hub's
+    lease; one that cannot be dropped now stays, and the next pass tries again."""
     dropped = 0
     for left in control_services.leftovers():
         hub = left.hub
-        if hub.moving_to_id == left.cluster_id:
-            continue
         if control_services.attributed(left.cluster_id, left.db_name) or _same_server(hub.cluster, left.cluster):
             control_services.forget_leftover(left.cluster_id, left.db_name)
             continue

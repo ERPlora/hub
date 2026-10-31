@@ -579,6 +579,88 @@ class TestTwoWorkers:
         assert marker(hub.db_name) == [MARKER]
 
 
+    def test_a_lease_another_worker_took_just_before_the_switch_is_never_switched(self, moves, monkeypatch, caplog):
+        target = moves.cluster()
+        hub = moves.hub(to=target)
+        real = move._ensure_schema
+
+        def then_taken(moving, cluster, heartbeat=None):
+            real(moving, cluster, heartbeat)
+            with use_control():
+                HubDue.objects.filter(pk=moving.id).update(lease_owner="other:1")
+
+        monkeypatch.setattr(move, "_ensure_schema", then_taken)
+
+        run()
+
+        hub = fresh(hub)
+        assert (hub.cluster_id, hub.moving_to_id) == (None, target.pk)
+        assert MovedCopy.objects.get(hub=hub).moved_at is None
+        assert "base.tenancy.move.stopped" in caplog.text
+
+    def test_a_cancel_that_arrives_meanwhile_stops_it_before_its_switch_and_the_next_pass_undoes_it(
+        self, moves, monkeypatch
+    ):
+        target = moves.cluster()
+        hub = moves.hub(to=target)
+        real = move._dump
+
+        def cancelled_meanwhile(source, cluster, path, heartbeat, cancelled=None):
+            real(source, cluster, path, heartbeat, cancelled)
+            with use_control():
+                MovedCopy.objects.filter(hub=hub).update(undoing=True)
+
+        with monkeypatch.context() as patched:
+            patched.setattr(move, "_dump", cancelled_meanwhile)
+            run()
+        assert fresh(hub).moving_to_id == target.pk
+
+        run()
+
+        hub = fresh(hub)
+        assert (hub.cluster_id, hub.moving_to_id) == (None, None)
+        assert marker(hub.db_name) == [MARKER]
+
+    def test_a_worker_that_read_the_row_before_another_switched_never_touches_the_live_database(
+        self, moves, monkeypatch
+    ):
+        target = moves.cluster()
+        hub = moves.hub(to=target)
+        stale = move.control_services.moving_row(hub.id)  # read before the other worker's switch
+        run()
+        assert fresh(hub).cluster_id == target.pk
+        monkeypatch.setattr(move.control_services, "moving_row", lambda hub_id: stale)
+        with use_control():
+            move.services.claim_hub(hub.id, AT, move.LEASE)
+
+        with use_control():
+            move.move_hub(hub.id)
+
+        hub = fresh(hub)
+        copy = names.moved_db_name(tenancy_connections.control_name(), hub.id)
+        assert (hub.cluster_id, hub.moving_to_id) == (target.pk, None)
+        assert marker(hub.db_name) == [MARKER] and marker(copy) == [MARKER]
+
+    def test_its_lease_is_renewed_while_its_schema_is_migrated(self, moves, monkeypatch):
+        hub = moves.hub(to=moves.cluster())
+        leases: list[tuple[dt.datetime, dt.datetime]] = []
+        real = move.migrator.ensure_schema
+
+        def ensure(moving, *, heartbeat=None, **kwargs):
+            # A migration that takes a while beats the heart: the hub's lease (claimed at AT) moves on to now's.
+            before = HubDue.objects.get(pk=hub.pk).lease_until
+            heartbeat()
+            leases.append((before, HubDue.objects.get(pk=hub.pk).lease_until))
+            return real(moving, heartbeat=heartbeat, **kwargs)
+
+        monkeypatch.setattr(move.migrator, "ensure_schema", ensure)
+
+        run()
+
+        [(before, after)] = leases
+        assert after > before and fresh(hub).moving_to_id is None
+
+
 class TestTheOriginFirst:
     """Undoing starts with the origin: the copy renamed back and opened to the app, the hub ready there. The destination
     is cleaned when it answers; when it does not, what may be left there is noted (``LeftoverDatabase``) and dropped on a
@@ -612,15 +694,22 @@ class TestTheOriginFirst:
         assert hub.db_name not in databases()
         assert not LeftoverDatabase.objects.filter(hub=hub).exists()
 
-    @pytest.mark.parametrize("where", ["the hubs own server", "the hubs cluster now", "its move there"])
-    def test_a_leftover_that_is_a_hubs_live_database_is_never_dropped(self, moves, where):
+    @pytest.mark.parametrize(
+        "where", ["the hubs own server", "the hubs cluster now", "its move there", "another hubs row there"]
+    )
+    def test_a_leftover_that_is_a_hubs_live_database_is_never_dropped_and_its_note_goes(self, moves, where):
         target = moves.cluster()
         if where == "the hubs own server":
             hub = moves.hub(to=None)  # on the settings' own server: the same one the target's row points at
         elif where == "the hubs cluster now":
             hub = moves.hub(to=None, cluster=target)
+        elif where == "its move there":
+            hub = moves.hub(to=target)  # its move drops what is left there before it clones
         else:
-            hub = moves.hub(to=target)
+            # The hub lives on another server; a row of control says that name on the target is a hub's.
+            hub = moves.hub(to=None, cluster=moves.cluster("elsewhere", port=1))
+            other = moves.hub(to=None, cluster=target)
+            Hub.objects.filter(pk=other.pk).update(db_name=hub.db_name)
         with use_control():
             LeftoverDatabase.objects.create(hub=hub, cluster=target, db_name=hub.db_name, noted_at=AT)
 
@@ -628,8 +717,7 @@ class TestTheOriginFirst:
             move.drop_leftovers(AT)
 
         assert marker(hub.db_name) == [MARKER]
-        if where != "its move there":
-            assert not LeftoverDatabase.objects.filter(hub=hub).exists()
+        assert not LeftoverDatabase.objects.filter(hub=hub).exists()
 
     def test_a_database_missing_on_the_origin_ends_the_move_with_why(self, moves):
         hub = moves.hub(to=moves.cluster())
