@@ -11,7 +11,7 @@ locks it first (``lock_orders``), as every write on it does, and so does that of
 """
 
 from django.contrib import admin
-from django.db import transaction
+from live.operations import atomic
 
 from apps.sale.models import (
     Department,
@@ -57,7 +57,7 @@ class LockedDeletion:
 
     # The actions run outside a transaction; the lock above lasts until the deletion ends.
     def response_action(self, request, queryset, *args, **kwargs):
-        with transaction.atomic():
+        with atomic():
             return super().response_action(request, queryset, *args, **kwargs)
 
 

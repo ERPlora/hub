@@ -59,6 +59,8 @@ from apps.attendance.schemas import (
     SettingsOut,
 )
 from apps.staff.models import Member
+from base.models import HubUser
+from base.queries import hub_user_of
 from base.business import babel_locale
 
 MEMBER_NOT_FOUND = _("That person does not exist in Staff.")
@@ -109,15 +111,16 @@ def member_name_expression() -> Concat:
     return Concat("first_name", Value(" "), "last_name", output_field=CharField())
 
 
-def actor_user(ctx: OperationContext) -> Any | None:
-    """The user behind the context; ``None`` for the platform itself or an anonymous caller."""
-    return ctx.actor if hasattr(ctx.actor, "get_username") else None
+def actor_user(ctx: OperationContext) -> HubUser | None:
+    """The caller's person in the business's database (``base.HubUser``), read only; ``None`` for the platform itself,
+    an API key, an anonymous caller or a person it does not know yet (whom no record names)."""
+    return hub_user_of(ctx)
 
 
-def user_name(user: Any | None) -> str:
-    if user is None:
+def user_name(person: HubUser | None) -> str:
+    if person is None:
         return ""
-    return (user.get_full_name() or user.get_username()).strip()
+    return (person.name or person.username).strip()
 
 
 def own_member(ctx: OperationContext) -> Member | None:

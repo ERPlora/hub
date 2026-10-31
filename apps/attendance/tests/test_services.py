@@ -95,7 +95,7 @@ def test_clocking_in_opens_my_day_at_the_servers_time(person, clock):
     assert (day.clock_in_at, day.work_date, day.created_by) == (
         now,
         dt.date(2026, 10, 6),
-        ctx.actor,
+        ctx.actor.person,
     )
     assert (day.in_lat, day.in_distance_m, day.in_within_radius) == (None, None, None)
     assert outbox() == [
@@ -397,12 +397,12 @@ def test_a_manager_clocks_ana_in_and_out_by_name(person, clock, make_user):
     manager = ctx_for("hub_manager", actor=boss)
     run("attendance.record.clock_in", {"member": "ana"}, manager)
     day = Record.objects.get()
-    assert (day.member, day.created_by) == (ana, boss)
+    assert (day.member, day.created_by) == (ana, boss.person)
     clock("2026-10-06T15:00")
     run("attendance.break.start", {"member_id": str(ana.id)}, manager)
     run("attendance.record.clock_out", {"member": "Ana López"}, manager)
     day.refresh_from_db()
-    assert (day.status, day.updated_by) == ("closed", boss)
+    assert (day.status, day.updated_by) == ("closed", boss.person)
 
 
 def test_an_employee_cannot_clock_someone_else(person, clock):
@@ -471,7 +471,7 @@ def test_a_correction_rewrites_the_day_and_leaves_its_trail(person, clock, make_
         utc("2026-10-05T06:00"),
         utc("2026-10-05T14:30"),
         "closed",
-        boss,
+        boss.person,
     )
     # The business day follows the new clock-in.
     assert day.work_date == dt.date(2026, 10, 5) and result.work_date == day.work_date
@@ -486,7 +486,7 @@ def test_a_correction_rewrites_the_day_and_leaves_its_trail(person, clock, make_
         utc("2026-10-05T14:30"),
         "closed",
     )
-    assert (trail.reason, trail.created_by) == ("Forgot to clock out", boss)
+    assert (trail.reason, trail.created_by) == ("Forgot to clock out", boss.person)
     # Who corrected is copied: a deleted user never turns into «System».
     assert (trail.is_system, trail.created_by_name) == (False, "boss")
     assert outbox() == [

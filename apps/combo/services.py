@@ -11,12 +11,12 @@ one already under way is read once it ends, gone, as one deleted before (a 422 o
 
 from uuid import UUID
 
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError
 from django.db.models import Max
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import Conflict, InvalidPayload, NotFound
-from live.operations import operation
+from live.operations import atomic, operation
 from live.outbox import record_event
 
 from apps.combo import events
@@ -190,7 +190,7 @@ def _saved(write, conflict) -> None:
     """Runs ``write`` in a savepoint; a uniqueness lost to another writer anyway (the database's last net)
     becomes the 409 ``conflict`` raises, never a raw error."""
     try:
-        with transaction.atomic():
+        with atomic():
             write()
     except IntegrityError:
         conflict()

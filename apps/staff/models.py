@@ -1,13 +1,14 @@
 """Models of the staff app: roles, the record of each professional, their schedules and time off.
 
 Phase 1 has no tenancy: every scope (``a``, ``b``) shares these tables; only the live notifications
-are per scope. Phase 2 moves them to each hub's database. The record hangs from the platform's user
-(``settings.AUTH_USER_MODEL``) like ``base.Membership``; phase 2 moves both links to the hub's users.
+are per scope. Phase 2 moves them to each hub's database. The record and the approval hang from the person in the
+business's own database (``base.HubUser``), never from control's user (tenancy W10): their columns are new
+(``hub_user_id``, ``approved_by_hub_user_id``); the old ones, to control's users, wait empty for a later deploy to
+drop them (``migrations/0004_hub_users``).
 """
 
 import datetime as dt
 
-from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import F, Q
@@ -67,11 +68,12 @@ class Member(UUIDModel):
         verbose_name=_("role"),
     )
     user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
+        "base.HubUser",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name="staff_members",
+        db_column="hub_user_id",
         verbose_name=_("user"),
     )
     status = models.CharField(
@@ -115,7 +117,7 @@ class Member(UUIDModel):
             models.UniqueConstraint(
                 fields=["user"],
                 condition=Q(user__isnull=False) & ~Q(status="terminated"),
-                name="staff_member_user_unique",
+                name="staff_member_hub_user_unique",
             ),
             models.CheckConstraint(
                 condition=Q(commission_rate__gte=0) & Q(commission_rate__lte=100),
@@ -254,11 +256,12 @@ class TimeOff(UUIDModel):
     reason = models.CharField(_("reason"), max_length=500, blank=True)
     notes = models.TextField(_("notes"), blank=True)
     approved_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
+        "base.HubUser",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name="+",
+        db_column="approved_by_hub_user_id",
         verbose_name=_("approved by"),
     )
     approved_at = models.DateTimeField(_("approved at"), null=True, blank=True)

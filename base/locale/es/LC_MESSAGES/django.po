@@ -2012,3 +2012,21 @@ msgstr "El fichero trae una foto que no es una imagen WebP de hasta 2 MB, así q
 #: blueprint.py
 msgid "«%(row)s»: its photo is not in the file, so it loads without it."
 msgstr "«%(row)s»: su foto no viene en el archivo, así que entra sin ella."
+
+#: models.py
+msgctxt "person"
+msgid "email"
+msgstr "correo electrónico"
+
+#: models.py
+msgctxt "person"
+msgid "active"
+msgstr "activo"
+
+#: models.py
+msgid "business user"
+msgstr "usuario del negocio"
+
+#: models.py
+msgid "business users"
+msgstr "usuarios del negocio"

@@ -62,7 +62,7 @@ test('an employee sees and books her own agenda only, and the API agrees', async
   const owner = await signedIn(browser);
   try {
     // Her account (the hub user the SaaS login made) linked to a record of Staff; a colleague beside her.
-    const accounts = await api<{ rows: Array<{ user_id: number; name: string }> }>(owner.context, A, 'GET', '/staff/accounts?search=employee');
+    const accounts = await api<{ rows: Array<{ user_id: string; name: string }> }>(owner.context, A, 'GET', '/staff/accounts?search=employee');
     const account = accounts.data.rows.find((row) => row.name.toLowerCase().includes('employee'));
     expect(account, JSON.stringify(accounts.data)).toBeDefined();
     const linked = await api<{ rows: Array<{ id: string; full_name: string }> }>(owner.context, A, 'GET', `/staff/members?user_id=${account!.user_id}`);

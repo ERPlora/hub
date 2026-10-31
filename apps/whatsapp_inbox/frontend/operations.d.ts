@@ -2,7 +2,7 @@
 // apps/whatsapp_inbox/schemas.py. Written by hand, as the other apps', until V3 generates them from
 // `/api/openapi.json`. Keep it in step with schemas.py and with `frontend/generated/operations.json`.
 // One input per operation (ninja's parity): no path parameters, a conversation's `id` travels in the input.
-// Instants are ISO 8601 strings; person ids are numbers (the platform's user ids).
+// Instants are ISO 8601 strings; person ids are UUIDs (the people of the business's database, base.HubUser).
 import type { Page } from '../../../frontend/sdk-types';
 
 export type SortDir = 'asc' | 'desc';
@@ -50,7 +50,7 @@ export interface ConversationOut {
   display_name: string;
   customer_id: string | null;
   customer_name: string;
-  assigned_to_id: number | null;
+  assigned_to_id: string | null;
   assigned_to_name: string;
   status: ConversationStatus;
   unread_count: number;
@@ -119,7 +119,7 @@ export interface NoticesOut {
 }
 
 export interface AssignIn extends ConversationRefIn {
-  assignee_id?: number;
+  assignee_id?: string;
   /** A name, username or email, or `me`. */
   assignee?: string;
   unassign?: boolean;
@@ -209,7 +209,7 @@ export interface NoteOut {
   id: string;
   conversation_id: string;
   text: string;
-  author_id: number | null;
+  author_id: string | null;
   author_name: string;
   created_at: string;
   can_delete: boolean;
@@ -357,7 +357,7 @@ export interface AgentListIn extends PageIn {
 }
 
 export interface AgentOut {
-  id: number;
+  id: string;
   name: string;
   role: string;
 }

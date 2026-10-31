@@ -19,14 +19,14 @@ import datetime as dt
 import logging
 from uuid import UUID
 
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError
 from django.db.models import Max
 from django.utils import timezone, translation
 from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import AppInactive, Conflict, InvalidPayload, NotFound, OperationError
-from live.operations import UnknownOperation, get, operation
+from live.operations import UnknownOperation, atomic, get, operation
 from live.outbox import record_event
 
 from apps.customer.queries import find_customer
@@ -317,7 +317,7 @@ def _zone_name_taken(name: str, *, except_id=None) -> bool:
 def _save_zone(zone: Zone) -> None:
     """Saves a zone; the database's unique name is the net under two writes at once (a 409, never a 500)."""
     try:
-        with transaction.atomic():
+        with atomic():
             zone.save()
     except IntegrityError:
         raise Conflict(str(ZONE_NAME_TAKEN), code="table.zone_name_taken") from None
@@ -462,7 +462,7 @@ def _free_spot(
 def _save_unique(row) -> None:
     """Saves a table; the database's unique number is the net under two creations at once."""
     try:
-        with transaction.atomic():
+        with atomic():
             row.save()
     except IntegrityError:
         raise Conflict(str(NUMBER_TAKEN), code="table.number_taken") from None
@@ -672,7 +672,7 @@ def _put_customer(ctx: OperationContext, order_id: UUID, customer_id: UUID | Non
     match, not allowed), the table is seated all the same and the check stays without one (TABLE-F32): the
     reply says so with its empty customer."""
     try:
-        with transaction.atomic():
+        with atomic():
             customer = find_customer(customer_id, said)
             call_app(ctx, "customer.order.link", {"order_id": str(order_id), "customer_id": str(customer.pk)})
     except OperationError as refusal:
@@ -1385,7 +1385,7 @@ def _settings_row_locked() -> TableSettings:
     if settings is not None:
         return settings
     try:
-        with transaction.atomic():
+        with atomic():
             return TableSettings.objects.create()
     except IntegrityError:
         return TableSettings.objects.select_for_update().get()

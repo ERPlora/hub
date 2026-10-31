@@ -408,7 +408,7 @@ class TaskOut(Schema):
     parent_title: str | None
     assigned_to_id: UUID | None
     assignee_name: str | None
-    created_by_id: int | None
+    created_by_id: UUID | None
     created_by_name: str | None
     due_date: dt.date | None
     completed_at: dt.datetime | None
@@ -427,7 +427,7 @@ class CommentOut(Schema):
     id: UUID
     task_id: UUID
     text: str
-    author_id: int | None
+    author_id: UUID | None
     author_name: str | None
     created_at: dt.datetime
 

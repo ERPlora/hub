@@ -14,7 +14,7 @@ from types import SimpleNamespace
 import pytest
 from django.db import connections as django_connections
 
-from base.tenancy import connections, context, identity
+from base.tenancy import connections, context, identity, names
 from base.tenancy.tests import hubs
 
 pytestmark = pytest.mark.usefixtures("no_test_fallback")
@@ -65,10 +65,14 @@ def test_a_database_that_says_it_is_another_hub_is_refused(hub_databases, django
 
 
 def test_a_database_without_its_identity_is_refused(hub_databases, django_db_blocker):
-    assert identity.IDENTITY_TABLE in hubs.table_names(hub_databases.template)
+    # A clone of the template before its identity is written: the table is there, with no row. (The template itself
+    # never gets a hub's alias: test_connections.)
+    nobody = stranger(names.hub_db_name(hub_databases.control, uuid.uuid7()))
 
-    with django_db_blocker.unblock(), pytest.raises(identity.HubIdentityMismatch):
-        connections.open_hub_alias(stranger(hub_databases.template))
+    with django_db_blocker.unblock(), hubs.clone_of_the_template(hub_databases, nobody.db_name):
+        assert identity.IDENTITY_TABLE in hubs.table_names(nobody.db_name)
+        with pytest.raises(identity.HubIdentityMismatch):
+            connections.open_hub_alias(nobody)
 
 
 def test_a_refusal_is_not_remembered_the_database_is_read_again(hub_databases, django_db_blocker):

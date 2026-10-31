@@ -25,6 +25,7 @@ from apps.staff.models import Member
 from apps.task import events
 from apps.task.models import Comment, Project, Task
 from apps.task.queries import PROJECT_NOT_FOUND, TASK_NOT_FOUND
+from base.services import ensure_hub_user
 
 from .conftest import ctx_for, make_member, make_project, make_task
 
@@ -155,7 +156,7 @@ def reads_a_person(sql: str) -> bool:
 def taking_it_herself(ana: Member, task: Task):
     """«Assign to me» by Ana herself: a user of the hub with her staff record."""
     user = get_user_model().objects.create_user(username="ana", password="pw")
-    Member.objects.filter(pk=ana.pk).update(user=user)
+    Member.objects.filter(pk=ana.pk).update(user=ensure_hub_user(user))
     op = get("task.task.assign")
     return lambda: op(ctx_for("hub_admin", actor=user), op.input.model_validate({"id": str(task.id), "to_me": True}))
 

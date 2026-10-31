@@ -24,24 +24,27 @@ def _unescape(text: str) -> str:
 
 
 def po_entries(path: Path) -> dict[str, tuple[str, bool]]:
-    """``msgid → (msgstr, fuzzy)`` of a .po file without plurals nor contexts (the header is skipped)."""
+    """``msgid → (msgstr, fuzzy)`` of a .po file without plurals (the header is skipped); an entry with a context
+    (``pgettext``) is keyed as gettext compiles it, ``<context>\x04<msgid>``."""
     entries: dict[str, tuple[str, bool]] = {}
-    parts: dict[str, list[str]] = {"msgid": [], "msgstr": []}
+    parts: dict[str, list[str]] = {"msgctxt": [], "msgid": [], "msgstr": []}
     fuzzy, current = False, None
 
     def flush():
         msgid = _unescape("".join(parts["msgid"]))
         if msgid:
-            entries[msgid] = (_unescape("".join(parts["msgstr"])), fuzzy)
+            context = _unescape("".join(parts["msgctxt"]))
+            entries[f"{context}\x04{msgid}" if context else msgid] = (_unescape("".join(parts["msgstr"])), fuzzy)
 
     for line in path.read_text(encoding="utf-8").splitlines():
         line = line.strip()
-        if line.startswith("msgid ") or (line.startswith("#") and current == "msgstr"):
+        starts = line.startswith("msgctxt ") or (line.startswith("msgid ") and current != "msgctxt")
+        if starts or (line.startswith("#") and current == "msgstr"):
             flush()
-            parts, fuzzy, current = {"msgid": [], "msgstr": []}, False, None
+            parts, fuzzy, current = {"msgctxt": [], "msgid": [], "msgstr": []}, fuzzy and current is None, None
         if line.startswith("#,") and "fuzzy" in line:
             fuzzy = True
-        elif line.startswith(("msgid ", "msgstr ")):
+        elif line.startswith(("msgctxt ", "msgid ", "msgstr ")):
             current, _, rest = line.partition(" ")
             parts[current].append(_STRING.match(rest).group(1))
         elif current and _STRING.match(line):
@@ -78,7 +81,15 @@ def visible_texts() -> set[str]:
     for choices in (DiscountRule.Type, DiscountRule.Scope):
         lazies += list(choices.labels)
     with translation.override("en"):
-        return {str(text) for text in lazies} | schema_titles()
+        return {source(text) for text in lazies} | schema_titles()
+
+
+def source(text) -> str:
+    """How the catalog keys a lazy text: its English, or ``context\x04English`` for a ``pgettext_lazy`` (a text that
+    goes back to ``_()`` while its entry keeps the context is missing from the catalog: it would say another app's
+    Spanish)."""
+    args = getattr(text, "_args", ())
+    return f"{args[0]}\x04{args[1]}" if len(args) == 2 else str(text)
 
 
 def schema_titles() -> set[str]:
@@ -132,3 +143,26 @@ def test_spanish_texts_are_the_old_modules():
 def test_placeholders_survive_the_translation():
     for msgid, (msgstr, _) in po_entries(LOCALE / "django.po").items():
         assert sorted(re.findall(r"%\(\w+\)s", msgid)) == sorted(re.findall(r"%\(\w+\)s", msgstr)), msgid
+
+
+def test_the_data_of_a_list_a_price_and_a_rule_are_said_as_pricing_says_them():
+    """A list and a rule are «activa» (both feminine), in a «divisa» as the screens say it, «desde» and «hasta» a day as
+    their forms, and «cambiado el» or «por» whom: pricing's own words, never the earlier app's that also says them
+    («activo», «moneda», «vigente desde», «actualizado el»), in the admin and on the assistant's card
+    (FIX-HUB-PRICING-ES-TEXTS-SHADOWED-BY-AN-EARLIER-APP)."""
+    fields = {
+        PriceList: ("currency", "valid_from", "valid_until", "is_active", "updated_at", "updated_by"),
+        PriceItem: ("updated_at", "updated_by"),
+        DiscountRule: ("valid_from", "valid_until", "is_active", "updated_at", "updated_by"),
+    }
+    words = {
+        "currency": "divisa",
+        "valid_from": "desde",
+        "valid_until": "hasta",
+        "is_active": "activa",
+        "updated_at": "cambiado el",
+        "updated_by": "cambiado por",
+    }
+    with translation.override("es"):
+        said = {(model.__name__, name): str(model._meta.get_field(name).verbose_name) for model, names in fields.items() for name in names}
+    assert said == {(model.__name__, name): words[name] for model, names in fields.items() for name in names}

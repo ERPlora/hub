@@ -23,7 +23,7 @@ import logging
 import re
 import uuid
 
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError
 from django.db.models import Q
 from django.db.models.functions import Coalesce, Lower
 from django.template.loader import render_to_string
@@ -32,7 +32,7 @@ from babel.numbers import get_currency_precision
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import Conflict, InvalidPayload, NotFound, OperationError, PermissionDenied
-from live.operations import INTERNAL, UnknownOperation, operation
+from live.operations import INTERNAL, UnknownOperation, atomic, operation
 from live.operations import get as operation_named
 from live.outbox import record_event
 
@@ -218,7 +218,7 @@ def create_printer(ctx: OperationContext, data: PrinterIn) -> dict:
     if _name_taken(data.name):
         raise _refuse_taken_name()
     try:
-        with transaction.atomic():
+        with atomic():
             printer = Printer.objects.create(
                 name=data.name,
                 kind=data.kind,
@@ -270,7 +270,7 @@ def update_printer(ctx: OperationContext, data: PrinterUpdateIn) -> dict:
     for field, value in changes.items():
         setattr(printer, field, value)
     try:
-        with transaction.atomic():
+        with atomic():
             printer.save(update_fields=[*changes, "updated_at"])
     except IntegrityError:
         raise _refuse_taken_name() from None
@@ -306,7 +306,7 @@ def _locked_settings(ctx: OperationContext) -> Settings:
     if settings is not None:
         return settings
     try:
-        with transaction.atomic():
+        with atomic():
             return Settings.objects.create(updated_by=actor(ctx))
     except IntegrityError:
         return Settings.objects.select_for_update().get()
@@ -429,7 +429,7 @@ def _business_name(ctx: OperationContext) -> str:
 def _new_job(ctx: OperationContext, **values) -> PrintJob:
     """Writes the job unless its key is already in the queue (two at once write one)."""
     try:
-        with transaction.atomic():
+        with atomic():
             return PrintJob.objects.create(created_by=actor(ctx), **values)
     except IntegrityError:
         existing = PrintJob.objects.filter(job_key=values["job_key"]).first()
@@ -611,7 +611,7 @@ def _paired_device(ctx: OperationContext, key: str) -> tuple[PrintDevice, bool]:
     with translation.override(ctx.language):
         name = str(DEVICE_NUMBER) % {"number": PrintDevice.objects.count() + 1}
     try:
-        with transaction.atomic():
+        with atomic():
             device = PrintDevice.objects.create(key=key, name=name, registered_by=actor(ctx))
     except IntegrityError:
         return PrintDevice.objects.select_for_update().get(key=key), False
@@ -799,7 +799,7 @@ def register_device(ctx: OperationContext, data: DeviceRegisterIn) -> dict:
     device = PrintDevice.objects.select_for_update().filter(key=key).first()
     if device is None:
         try:
-            with transaction.atomic():
+            with atomic():
                 device = PrintDevice.objects.create(key=key, name=data.name, registered_by=actor(ctx))
         except IntegrityError:
             device = PrintDevice.objects.select_for_update().get(key=key)

@@ -11,14 +11,14 @@ Times are the server's (``timezone.now()``); the distance to the workplace is me
 import datetime as dt
 from typing import Any
 
-from django.db import IntegrityError, transaction
+from django.db import IntegrityError
 from django.db.models import Case, DateTimeField, F, Value, When
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from geopy.distance import geodesic
 from live.context import OperationContext
 from live.errors import Conflict, InvalidPayload, NotFound, PermissionDenied
-from live.operations import operation
+from live.operations import atomic, operation
 from live.outbox import record_event
 
 from apps.attendance import events
@@ -27,7 +27,6 @@ from apps.attendance.queries import (
     MEMBER_NOT_FOUND,
     RECORD_NOT_FOUND,
     TERMINATED_REASON_SOURCE,
-    actor_user,
     business_date,
     find_member,
     is_stale,
@@ -55,6 +54,7 @@ from apps.attendance.schemas import (
     TerminatedIn,
 )
 from apps.staff.models import Member
+from base.services import acting_hub_user
 
 NO_MEMBER_RECORD = _(
     "Your user is not linked to any staff record: ask a manager to link it in Staff."
@@ -277,9 +277,9 @@ def clock_in(ctx: OperationContext, data: ClockInIn) -> dict:
     source = device_source(ctx)
     where = _measure(values, data, source)
     _check_radius(values, source, where)
-    user = actor_user(ctx)
+    user = acting_hub_user(ctx)
     try:
-        with transaction.atomic():
+        with atomic():
             record = Record.objects.create(
                 member=member,
                 clock_in_at=now,
@@ -331,7 +331,7 @@ def clock_out(ctx: OperationContext, data: ClockOutIn) -> dict:
     record.out_accuracy_m = where["accuracy_m"]
     record.out_distance_m = where["distance_m"]
     record.out_within_radius = where["within_radius"]
-    record.updated_by = actor_user(ctx)
+    record.updated_by = acting_hub_user(ctx)
     record.save()
     record_event(
         ctx, events.CLOCKED_OUT, {"id": str(record.id), "member_id": str(member.id)}
@@ -362,7 +362,7 @@ def start_break(ctx: OperationContext, data: BreakIn) -> dict:
     if Break.objects.filter(record=record, ended_at__isnull=True).exists():
         raise running
     try:
-        with transaction.atomic():
+        with atomic():
             pause = Break.objects.create(
                 record=record, started_at=max(now, record.clock_in_at)
             )
@@ -408,6 +408,7 @@ def _correct(
     reason: str,
 ) -> Correction:
     """Rewrites a locked day and leaves its trail; running breaks end at the new clock-out."""
+    by = acting_hub_user(ctx)
     trail = Correction.objects.create(
         record=record,
         old_clock_in_at=record.clock_in_at,
@@ -417,17 +418,17 @@ def _correct(
         new_clock_out_at=clock_out_at,
         new_status=Record.Status.CLOSED if clock_out_at else Record.Status.OPEN,
         reason=reason,
-        is_system=actor_user(ctx) is None,
-        created_by=actor_user(ctx),
-        created_by_name=user_name(actor_user(ctx)),
+        is_system=by is None,
+        created_by=by,
+        created_by_name=user_name(by),
     )
     record.clock_in_at = clock_in_at
     record.clock_out_at = clock_out_at
     record.status = trail.new_status
     record.work_date = business_date(clock_in_at)
-    record.updated_by = actor_user(ctx)
+    record.updated_by = by
     try:
-        with transaction.atomic():
+        with atomic():
             record.save()
     except IntegrityError:
         raise Conflict(
@@ -541,7 +542,7 @@ def update_settings(ctx: OperationContext, data: SettingsIn) -> dict:
             str(BOTH_COORDINATES), fields={missing: str(BOTH_COORDINATES)}
         )
     if changed:
-        row.updated_by = actor_user(ctx)
+        row.updated_by = acting_hub_user(ctx)
         row.save()
         record_event(ctx, events.SETTINGS_UPDATED, {})
     return settings_values(row)

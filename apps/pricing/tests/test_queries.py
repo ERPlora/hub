@@ -214,7 +214,7 @@ def test_a_price_is_read_by_its_id_with_what_the_list_shows_and_its_list_s_curre
     make_item(make_list("VIP"), shampoo, price=1100)
     found = run("pricing.price_item.get", {"id": str(item.id)})
     listed = run("pricing.price_item.list", {"price_list": "DOLARES"}).rows[0]
-    assert found.model_dump() == {**listed.model_dump(), "currency": "USD"}
+    assert found.model_dump() == {**listed.model_dump(), "currency": "USD", "label": "Shampoo · Dollar prices · from 10"}
     assert (found.id, found.price_list_code, found.name, found.min_quantity, found.price) == (
         item.id,
         "DOLARES",
@@ -656,3 +656,152 @@ def test_the_employee_asks_for_prices_and_a_caller_without_the_permission_does_n
 
     with pytest.raises(PermissionDenied):
         op(ctx_for(permissions=set()), data)
+
+
+# What the assistant's card names a record by (FIX-HUB-PRICING-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS): a price by its
+# article and its list, a rule by its id, and what a price or a rule points at in another app by its id
+
+
+def by_id(name: str, data: dict, ctx):
+    op = get(name)
+    return op(ctx, op.input.model_validate(data))
+
+
+@pytest.mark.parametrize(
+    ("language", "expected"),
+    [
+        ("es", ["Shampoo · VIP prices", "Shampoo · VIP prices · desde 10", "Coffee · VIP prices · desde 2,5", "Haircut · VIP prices"]),
+        ("en", ["Shampoo · VIP prices", "Shampoo · VIP prices · from 10", "Coffee · VIP prices · from 2.5", "Haircut · VIP prices"]),
+    ],
+)
+def test_a_price_is_named_by_its_article_its_list_and_from_a_quantity_on_by_it(language, expected):
+    """As the list's dialogs name a price («Quitar el precio de Champú desde 10»), and outside it by its list too: in
+    the reader's language."""
+    vip = make_list("VIP")
+    shampoo = make_product("Shampoo", "SH-1")
+    one, ten = make_item(vip, shampoo, price=1200), make_item(vip, shampoo, price=1000, min_quantity="10")
+    by_weight = make_item(vip, make_product("Coffee", "CF", unit="kg"), price=900, min_quantity="2.5")
+    haircut = make_item(vip, None, price=1600, service_id=uuid.uuid7(), service_name="Haircut")
+    ctx = ctx_for(language=language)
+    labels = [by_id("pricing.price_item.get", {"id": str(item.id)}, ctx).label for item in (one, ten, by_weight, haircut)]
+    assert labels == expected
+
+
+def test_a_rule_is_read_by_its_id_its_code_or_its_name_as_the_rules_list_shows_it():
+    vip = make_group("VIP")
+    summer = make_rule("VERANO", name="Summer", customer_group_id=vip.id, applies_to="products")
+    make_rule("OTHER")
+    [listed] = [row for row in run("pricing.rule.list").rows if row.code == "VERANO"]
+    for data in ({"id": str(summer.id)}, {"rule": "verano"}, {"rule": "Summer"}):
+        assert run("pricing.rule.get", data).model_dump() == listed.model_dump()
+
+
+def test_an_inactive_rule_is_read_too():
+    """«Reactiva la regla de verano»: the card names the rule it reactivates."""
+    asleep = make_rule("VERANO", name="Summer", is_active=False)
+    assert run("pricing.rule.get", {"id": str(asleep.id)}).name == "Summer"
+
+
+def test_a_rule_that_is_not_there_is_not_found():
+    for data in ({"id": str(uuid.uuid7())}, {"rule": "nothing"}):
+        with pytest.raises(NotFound) as caught:
+            run("pricing.rule.get", data)
+        assert caught.value.code == "pricing.rule_not_found"
+
+
+def test_the_employee_reads_a_rule_and_a_caller_without_the_permission_does_not():
+    from live.errors import PermissionDenied
+
+    rule = make_rule("VERANO")
+    assert run("pricing.rule.get", {"id": str(rule.id)}, role="hub_employee").code == "VERANO"
+    with pytest.raises(PermissionDenied):
+        by_id("pricing.rule.get", {"id": str(rule.id)}, ctx_for(permissions=set()))
+
+
+def test_a_category_a_customer_group_and_a_service_are_named_by_their_id():
+    """What a rule or a list points at in another app, named as Inventory, Customers and Services name it."""
+    hair = make_category("Hair care")
+    vip = make_group("VIP")
+    haircut = make_service("Haircut")
+    named = [
+        run("pricing.catalog.get", data).model_dump()
+        for data in ({"category_id": str(hair.id)}, {"customer_group_id": str(vip.id)}, {"service_id": str(haircut.id)})
+    ]
+    assert named == [
+        {"id": hair.id, "name": "Hair care"},
+        {"id": vip.id, "name": "VIP"},
+        {"id": haircut.id, "name": "Haircut"},
+    ]
+
+
+def test_the_catalog_names_one_record_never_none_nor_two():
+    import pydantic
+
+    op = get("pricing.catalog.get")
+    for data in ({}, {"category_id": str(uuid.uuid7()), "customer_group_id": str(uuid.uuid7())}):
+        with pytest.raises(pydantic.ValidationError):
+            op.input.model_validate(data)
+
+
+def test_a_deleted_category_or_a_record_that_is_not_there_is_not_found():
+    gone = make_category("Old", is_deleted=True)
+    for data in (
+        {"category_id": str(gone.id)},
+        {"category_id": str(uuid.uuid7())},
+        {"customer_group_id": str(uuid.uuid7())},
+        {"service_id": str(uuid.uuid7())},
+    ):
+        with pytest.raises(NotFound):
+            run("pricing.catalog.get", data)
+
+
+def test_without_services_no_service_is_named(monkeypatch):
+    import apps.pricing.queries as queries
+    from live.operations import UnknownOperation
+
+    def missing(name):
+        raise UnknownOperation(name)
+
+    haircut = make_service("Haircut")
+    monkeypatch.setattr(queries, "get", missing)
+    with pytest.raises(Conflict) as caught:
+        run("pricing.catalog.get", {"service_id": str(haircut.id)})
+    assert caught.value.code == "pricing.services_unavailable"
+
+
+def test_a_service_is_named_with_the_caller_s_permission_in_services():
+    from live.errors import PermissionDenied
+
+    haircut = make_service("Haircut")
+    with pytest.raises(PermissionDenied):
+        by_id("pricing.catalog.get", {"service_id": str(haircut.id)}, ctx_for(permissions={"pricing.view"}))
+
+
+def test_the_employee_reads_the_catalog_and_a_caller_without_the_permission_does_not():
+    from live.errors import PermissionDenied
+
+    vip = make_group("VIP")
+    assert run("pricing.catalog.get", {"customer_group_id": str(vip.id)}, role="hub_employee").name == "VIP"
+    with pytest.raises(PermissionDenied):
+        by_id("pricing.catalog.get", {"customer_group_id": str(vip.id)}, ctx_for(permissions=set()))
+
+
+@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+def test_a_rule_a_category_or_a_group_of_another_business_is_not_found_there(hub_a, hub_b, no_fallback):
+    """A business reads its own only: the id of another's is none of its own, never its name. (A service is Services'
+    own read, as the person, in the hub they ask in; its tables stay out of a hub's database in these tests:
+    ``base/tenancy/tests/hubs.py``, ``portable_apps``.)"""
+    in_a, in_b = ctx_for(scope=Scope("host", hub_a.slug)), ctx_for(scope=Scope("host", hub_b.slug))
+    with use_hub(hub_b):
+        rule, hair, vip = make_rule("VERANO"), make_category("Hair care"), make_group("VIP")
+    reads = [
+        ("pricing.rule.get", {"id": str(rule.id)}),
+        ("pricing.catalog.get", {"category_id": str(hair.id)}),
+        ("pricing.catalog.get", {"customer_group_id": str(vip.id)}),
+    ]
+    with use_hub(hub_a):
+        for name, data in reads:
+            with pytest.raises(NotFound):
+                by_id(name, data, in_a)
+    with use_hub(hub_b):  # positive control: they are there, in their own business
+        assert [by_id(name, data, in_b).id for name, data in reads] == [rule.id, hair.id, vip.id]
