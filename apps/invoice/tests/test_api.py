@@ -43,6 +43,8 @@ ROUTES = {
     ),
     ("GET", "/invoice/series", "invoice.series.list"),
     ("GET", "/invoice/series/peek_next", "invoice.series.peek_next"),
+    ("GET", "/invoice/series/detail", "invoice.series.get"),
+    ("GET", "/invoice/refunds/detail", "invoice.refund.get"),
     ("POST", "/invoice/series", "invoice.series.create"),
     ("POST", "/invoice/series/update", "invoice.series.update"),
     ("GET", "/invoice/numbering/status", "invoice.numbering.status"),

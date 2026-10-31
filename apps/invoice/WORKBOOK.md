@@ -771,6 +771,8 @@ cliente por su nombre, su teléfono o su correo (como en Clientes) y una serie p
 | El tipo con que empieza una línea tecleada: el general del territorio, de su propia regla en Impuestos (vacío sin ella) | emitir | F03 | `invoice.invoice.line_defaults` |
 | Las series, con búsqueda, filtros y páginas | ver | F12, F13 | `invoice.series.list` |
 | El siguiente número de una serie, sin gastarlo | ver | F13 | `invoice.series.peek_next` |
+| Una serie, por su id o su código, y cómo se nombra fuera de su pantalla: su código, su año y su nombre | ver | F13 | `invoice.series.get` |
+| Una devolución de Ventas, por su id: la venta que devuelve, lo devuelto y el número de su rectificativa | ver | F09, F10 | `invoice.refund.get` |
 | Si la numeración del año está preparada | ver | F14 | `invoice.numbering.status` |
 | Los huecos de la numeración | ver | F15 | `invoice.numbering.gaps` |
 | El libro de números entregados | ver | F15 | `invoice.numbering.allocations` |
@@ -1113,7 +1115,15 @@ Recibir el emisor del SaaS (`invoice.sync_issuer`) no es de ningún papel: solo 
   dato por el `title` de su esquema (`gettext_noop`, con su `es` en el catálogo: «Copia», «Líneas»,
   «Tipo de rectificativa», «Siguiente número», «Venta», «Devolución de la venta») o, si no lo tiene,
   por el `verbose_name` de su campo en el modelo, el que da la ficha; un dato sin ninguno sale con el
-  nombre técnico y lo para `tests/test_integration_assistant.py`.
+  nombre técnico y lo para `tests/test_integration_assistant.py`. Un dato que nombra un registro por su id
+  lleva la marca `refers` (`base.schemas.names`) y la tarjeta lo dice por esa lectura, hecha como quien
+  pregunta y nunca por el id: la factura y la venta por su número, la devolución por su venta y lo devuelto
+  (`invoice.refund.get`), la serie por su código, su año y su nombre (`invoice.series.get`) y el cliente por
+  el nombre de su ficha; sin persona detrás, sin permiso para leerlo o si no existe, el dato no sale. El
+  producto de una línea a mano es de Inventario, que Facturación no requiere: no sale. El tipo de documento de
+  un destinatario extranjero sale con las palabras del formulario (`ForeignIdType`, los `choices` del campo);
+  el tipo de rectificativa aún sale con su código (R1–R4): `live` solo etiqueta por los `choices` de un campo
+  del modelo con el mismo nombre, y ninguno se llama `rectification_type`.
 
 ### Decisiones (dudas abiertas del producto actual, resueltas con el mercado)
 

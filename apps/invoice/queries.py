@@ -58,17 +58,22 @@ from apps.invoice.schemas import (
     PlatformRefIn,
     RectificationPreviewIn,
     RectificationPreviewOut,
+    RefundGetIn,
+    RefundOut,
+    SeriesDetailOut,
     SeriesListIn,
     SeriesPage,
     SeriesPeekIn,
     SeriesPeekOut,
 )
+from apps.sale.models import Refund
 from apps.sale.queries import find_sale
 from apps.tax.queries import business_tax_kind, resolve_tax
 from base.business import money_text
 
 INVOICE_NOT_FOUND = _("Invoice not found.")
 SERIES_NOT_FOUND = _("This numbering series does not exist.")
+REFUND_NOT_FOUND = _("That refund does not exist.")
 
 # Texts of the printed document (and its titles), in the reader's language.
 DOC_INVOICE = _("Invoice")
@@ -610,6 +615,40 @@ def line_defaults(ctx: OperationContext, params: LineDefaultsIn) -> dict:
     return {"tax_rate": None}
 
 
+# ── Refunds of the Sales app, as an invoice names them ──────────────────────────────────────────
+
+
+@operation(
+    "invoice.refund.get",
+    kind="query",
+    permission="invoice.view_invoice",
+    input=RefundGetIn,
+    output=RefundOut,
+    expose_api=True,
+    ai={
+        "description": "Name a refund of the Sales app by its id: the sale it gives back, what it gave back and the "
+        "number of its rectifying invoice, if issued."
+    },
+)
+def get_refund(ctx: OperationContext, params: RefundGetIn) -> dict:
+    refund = Refund.objects.select_related("sale").filter(pk=params.refund_id).first()
+    if refund is None:
+        raise NotFound(str(REFUND_NOT_FOUND), code="invoice.refund_not_found")
+    sale = refund.sale
+    with translation.override(ctx.language):
+        given_back = money_text(refund.total, sale.currency)
+    return {
+        "id": refund.id,
+        "sale_id": sale.id,
+        "sale_number": sale.number,
+        "total": refund.total,
+        "currency": sale.currency,
+        "currency_decimals": get_currency_precision(sale.currency),
+        "invoice_number": refund.invoice_number,
+        "label": f"{sale.number} · {given_back}",
+    }
+
+
 # ── Series ──────────────────────────────────────────────────────────────────────────────────────
 
 
@@ -681,6 +720,26 @@ def peek_next(ctx: OperationContext, params: SeriesPeekIn) -> dict:
         "next_number": row["next_number"],
         "format_locked": row["format_locked"],
     }
+
+
+@operation(
+    "invoice.series.get",
+    kind="query",
+    permission="invoice.view_invoice",
+    input=SeriesPeekIn,
+    output=SeriesDetailOut,
+    expose_api=True,
+    ai={
+        "description": "Get one numbering series, active or not, by its id or by its code (this year, or the year "
+        "said): what the Series screen shows of it and how it is named (code, year and name)."
+    },
+)
+def get_series(ctx: OperationContext, params: SeriesPeekIn) -> dict:
+    """Named as the Series screen's card titles it, with its name in the reader's language: «FACT · 2026 · Invoices»."""
+    series = find_series(params.series_id, params.code, params.year)
+    with translation.override(ctx.language):
+        row = series_row(series)
+    return {**row, "label": " · ".join(part for part in (row["code"], str(row["year"]), row["display_name"]) if part)}
 
 
 def born_series_values(code: str, year: int) -> dict:

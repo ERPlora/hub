@@ -132,6 +132,8 @@ def test_every_operation_is_described_for_the_assistant():
         "invoice.invoice.rectify_from_void",
         "invoice.series.list",
         "invoice.series.peek_next",
+        "invoice.series.get",
+        "invoice.refund.get",
         "invoice.series.create",
         "invoice.series.update",
         "invoice.numbering.status",

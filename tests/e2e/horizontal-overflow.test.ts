@@ -7,7 +7,11 @@
 // by hand (its `getScrollElement()`, `.inner-scroll` or `part="scroll"` and their `scrollWidth`): that copy left out the
 // menu and the sheets (seen by the reviewer of hub#393). Nor its width destructured (`const { scrollWidth } = document.
 // documentElement`), the root found by its selector or a locator (`page.locator('html')`), or a measure split over lines
-// (seen by the reviewer of saas#153). Its vertical scroll (`scrollTop`, `scrollHeight`) stays free.
+// (seen by the reviewer of saas#153). Nor its width destructured from what a `page.evaluate()` gives back, its call on one
+// line or over several (`const { scrollWidth } = await page.evaluate(() => document.documentElement)`, seen by the
+// reviewer of hub#473), also of the root found by a locator whose function gives back its own parameter
+// (`page.locator('html').evaluate((html) => html)`, `page.$eval('body', (el) => el)`). Its vertical scroll (`scrollTop`,
+// `scrollHeight`) stays free.
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -41,9 +45,15 @@ const DOCUMENT_WIDTH = new RegExp(
 const SCROLL_BOX_WIDTH =
   /(?:getScrollElement\(\)|inner-scroll|part~?=["']?scroll)[^;\n]*?(?:\)|=>\s*\w+)\s*!?\s*\??\.\s*scrollWidth\b/;
 
+/** The root found by a locator of Playwright: `page.locator('html')`, `page.$eval('body', …`, `page.$(':root')`. */
+const ROOT_LOCATOR = String.raw`(?:\blocator|\$eval|\$)\(\s*['"\x60](?:html|body|:root)['"\x60]`;
+
 /** The root found by a locator of Playwright and its width read in the same statement: `page.locator('html').evaluate(
  *  (html) => html.scrollWidth …)`, `page.$eval('body', …)`. */
-const ROOT_LOCATOR_WIDTH = /(?:\blocator|\$eval|\$)\(\s*['"`](?:html|body|:root)['"`][^;]*\bscrollWidth\b/;
+const ROOT_LOCATOR_WIDTH = new RegExp(String.raw`${ROOT_LOCATOR}[^;]*\bscrollWidth\b`);
+
+/** The same root found by a locator, the element an `evaluate()` of it is run on. */
+const ROOT_LOCATED = new RegExp(ROOT_LOCATOR);
 
 /** The document's root by any of its names (`document.documentElement`, `.scrollingElement`, `.body`, `querySelector('html')`). */
 const ROOT = String.raw`(?:(?:window|globalThis)\s*\.\s*)?document\s*\.\s*(?:documentElement|scrollingElement|body|${ROOT_QUERY})\s*!?`;
@@ -65,15 +75,52 @@ const WIDTH_DESTRUCTURED = /\{[^{}]*\bscrollWidth\b[^{}]*\}[\s}]*=\s*(?:await\s+
 /** What that destructuring measures by hand: the root (or `document`, destructured down to it) or a scroll box. */
 const MEASURED_BOX = new RegExp(String.raw`^(?:${ROOT}|document\s*$)|getScrollElement\(|inner-scroll|part~?=["']?scroll`);
 
+/** A call that runs a function in the browser and gives back what it returns: `page.evaluate(`, `evaluateHandle(`,
+ *  `$eval(`. */
+const EVALUATE = /(?:\bevaluate(?:Handle)?|\$eval)\s*\(/;
+
+/** The parameter of the function such a call runs, its first argument (after the selector of a `$eval`): `html` of
+ *  `evaluate((html) => …`, `el` of `$eval('body', async (el) => …`. */
+const PARAMETER = /^[^(]*\((?:[^,()]*,)?\s*(?:async\s*)?\(?\s*(\w+)\s*\)?\s*=>/;
+
+/** The names that function gives to its parameter `name` (`const root = html;`). */
+function aliasesOf(name: string, call: string): string[] {
+  return [...call.matchAll(new RegExp(String.raw`\b(?:const|let|var)\s+(\w+)\s*=\s*${name}\s*[;,)]`, 'g'))].map(([, alias]) => alias);
+}
+
+/** What such a function returns when it is the box itself, `box` (the root or a name of it), with no member read on it:
+ *  `() => document.documentElement`, `return root;`, `?? document.body`, `as HTMLElement`. */
+function returnedBox(box: string): RegExp {
+  return new RegExp(
+    String.raw`(?:=>|\breturn\b)\s*\(?\s*${box}(?:\s*(?:\?\?|\|\|)\s*${box})*\s*(?:as\s+[^;,)}]+)?\s*[;,)}]`,
+  );
+}
+
+/** The call that opens `lines[0]` (`evaluate(…`), through as many of the lines after it as it takes to close. */
+function callOf(lines: string[]): string {
+  let depth = 0;
+  for (const [index, line] of lines.entries()) {
+    for (let at = 0; at < line.length; at += 1) {
+      if (line[at] === '(') depth += 1;
+      else if (line[at] === ')' && (depth -= 1) === 0) return [...lines.slice(0, index), line.slice(0, at + 1)].join('\n');
+    }
+  }
+  return lines.join('\n');
+}
+
+/** A line left open for the next one: it ends in `=` (`const { scrollWidth } =`) or opens a destructuring (`const {`). */
+const OPEN_LINE = /=\s*$|\b(?:const|let|var)\s*\{[^}]*$/;
+
 /**
  * The statements of `source`, each with the line it starts on: a line that goes on with a chain (`.x`, `?.x`) is joined to
- * the one before it, so that a measure split over lines (`document.documentElement` and `.scrollWidth` below) reads as one.
+ * the one before it, so that a measure split over lines (`document.documentElement` and `.scrollWidth` below) reads as one;
+ * so is a line after one left open (`const { scrollWidth } =` and the root below, or `const {` and its names below).
  */
 function statements(source: string): Array<{ line: number; text: string }> {
   const found: Array<{ line: number; text: string }> = [];
   source.split('\n').forEach((text, index) => {
     const last = found.at(-1);
-    if (last && /^\s*\??\.(?!\.)/.test(text)) last.text += text.trim();
+    if (last && (/^\s*\??\.(?!\.)/.test(text) || OPEN_LINE.test(last.text))) last.text += text.trim();
     else found.push({ line: index + 1, text });
   });
   return found;
@@ -95,21 +142,35 @@ function boxNames(source: string): string[] {
 
 /**
  * `file:line` of each statement of `source` (the file `name`) that measures by hand how wide the document or one
- * `ion-content` is: its `scrollWidth`, read directly, through a name given to it, taken by a destructuring or through a
- * locator of the root. A vertical read (`scrollTop`, `scrollHeight`) is no such measure.
+ * `ion-content` is: its `scrollWidth`, read directly, through a name given to it, taken by a destructuring (also of what
+ * an `evaluate()` gives back, its call over as many lines as it takes: the root, a scroll box or, run on the root found by
+ * a locator, its own parameter) or through a locator of the root. A vertical read (`scrollTop`, `scrollHeight`) is no
+ * such measure.
  */
 function documentMeasures(name: string, source: string): string[] {
   if (!source.includes(WIDTH)) return [];
   const names = boxNames(source);
   const named = names.length ? new RegExp(String.raw`\b(?:${names.join('|')})\s*!?\s*\??\.\s*scrollWidth\b`) : null;
   const namedBox = names.length ? new RegExp(String.raw`^(?:${names.join('|')})\b`) : null;
-  const destructured = (text: string) => {
-    const from = text.match(WIDTH_DESTRUCTURED)?.[1];
-    return from !== undefined && (MEASURED_BOX.test(from) || !!namedBox?.test(from));
+  const returned = returnedBox(names.length ? String.raw`(?:${ROOT}|\b(?:${names.join('|')})\b\s*!?)` : ROOT);
+  const found = statements(source);
+  const destructured = (text: string, index: number) => {
+    const match = text.match(WIDTH_DESTRUCTURED);
+    if (!match) return false;
+    const from = match[1];
+    if (MEASURED_BOX.test(from) || namedBox?.test(from)) return true;
+    const rest = text.slice(match.index! + match[0].length - from.length);
+    const call = rest.search(EVALUATE);
+    if (call < 0) return false;
+    const evaluated = callOf([rest.slice(call), ...found.slice(index + 1).map((next) => next.text)]);
+    if (returned.test(evaluated) || MEASURED_BOX.test(evaluated)) return true;
+    const parameter = ROOT_LOCATED.test(rest.slice(0, call)) || ROOT_LOCATED.test(evaluated) ? evaluated.match(PARAMETER)?.[1] : undefined;
+    if (parameter === undefined) return false;
+    return returnedBox(String.raw`\b(?:${[parameter, ...aliasesOf(parameter, evaluated)].join('|')})\b`).test(evaluated);
   };
   const measures = [DOCUMENT_WIDTH, SCROLL_BOX_WIDTH, ROOT_LOCATOR_WIDTH, ...(named ? [named] : [])];
-  return statements(source).flatMap(({ line, text }) =>
-    text.includes(WIDTH) && (measures.some((measure) => measure.test(text)) || destructured(text)) ? [`${name}:${line}`] : [],
+  return found.flatMap(({ line, text }, index) =>
+    text.includes(WIDTH) && (measures.some((measure) => measure.test(text)) || destructured(text, index)) ? [`${name}:${line}`] : [],
   );
 }
 
@@ -292,5 +353,94 @@ describe('the e2e checks for a horizontal scroll go through horizontalOverflow()
     ]);
     const after = "await page.locator('body').press('End'); const cut = await title.evaluate((el) => el.scrollWidth > el.clientWidth);";
     expect(documentMeasures('e.ts', after)).toEqual([]);
+  });
+
+  it('the count reads the width destructured from what an evaluate() gives back, the root or a scroll box, on one line or over several', () => {
+    const copies = [
+      ['const { scrollWidth } = await page.evaluate(() => document.documentElement);'],
+      ['const { scrollWidth } = await page.evaluate(() =>', '  document.documentElement,', ');'],
+      ['const { scrollWidth, clientWidth } = await page.evaluate(() => {', '  return document.documentElement;', '});'],
+      ['const { scrollWidth } = await page.evaluate(', '  () => document.scrollingElement!,', ');'],
+      ['const { scrollWidth } = await page.evaluate(() => { const root = document.documentElement; return root; });'],
+      ['const { scrollWidth } = await page.evaluate(() => {', '  const root = document.scrollingElement;', '  return root!;', '});'],
+      ['const { scrollWidth } = await page.evaluateHandle(() => document.body as HTMLElement);'],
+      ['const { scrollWidth } = await page.evaluate(() => (document.scrollingElement ?? document.documentElement));'],
+      ['const { scrollWidth } = await page.evaluate(() => { return document.scrollingElement || document.body; });'],
+      ['const { scrollWidth } = await page.evaluate(async () =>', "  document.querySelector('ion-content')!.getScrollElement(),", ');'],
+      [
+        "test('the list fits at 390 px', async ({ page }) => {",
+        "  await page.goto('/apps/pricing/');",
+        '  const { scrollWidth } = await page.evaluate(() => document.documentElement)',
+        '  expect(scrollWidth).toBeGreaterThan(0);',
+        '});',
+      ],
+    ];
+    expect(copies.map((copy) => documentMeasures('f.ts', copy.join('\n')))).toEqual([
+      ['f.ts:1'],
+      ['f.ts:1'],
+      ['f.ts:1'],
+      ['f.ts:1'],
+      ['f.ts:1'],
+      ['f.ts:1'],
+      ['f.ts:1'],
+      ['f.ts:1'],
+      ['f.ts:1'],
+      ['f.ts:1'],
+      ['f.ts:3'],
+    ]);
+    const none = [
+      ['const { scrollHeight, scrollTop } = await page.evaluate(() => document.documentElement);'],
+      ['const { scrollHeight } = await page.evaluate(() =>', '  document.documentElement,', ');'],
+      ["const chip = await page.locator('.chip').evaluate((el) => el.scrollWidth);"],
+      ["const { scrollWidth } = await page.locator('.chip').evaluate((el) => el);"],
+      ["const { scrollWidth } = await page.evaluate(() => document.documentElement.querySelector('.chip')!);"],
+      ['const { scrollWidth } = await page.evaluate(() =>', "  document.querySelector('.chip')!,", ');'],
+      ['const { scrollWidth } = await page.evaluate(() => {', "  const chip = document.body.querySelector('.chip')!;", '  return chip;', '});'],
+      ['const { scrollWidth } = await page.evaluate(() => sizeOf(table));', 'return document.documentElement;'],
+    ];
+    expect(none.map((lines) => documentMeasures('f.ts', lines.join('\n')))).toEqual(none.map(() => []));
+  });
+
+  it('the count reads the width destructured from the root found by a locator, its evaluate() giving back its own parameter or a name of it', () => {
+    const copies = [
+      ["const { scrollWidth } = await page.locator('html').evaluate((html) => html);"],
+      ["const { scrollWidth } = await page.locator('body').evaluate((body) => body);"],
+      ["const { scrollWidth } = await page.locator(':root').evaluate((root) => root);"],
+      ["const { scrollWidth } = await page.$eval('html', (el) => el);"],
+      ["const { scrollWidth } = await page.locator('html').evaluateHandle((html) => html);"],
+      ["const { scrollWidth } = await page.locator('html').evaluate(async (html) => html);"],
+      ["const { scrollWidth } = await page.locator('html').evaluate(", '  (html) => html,', ');'],
+      ['const { scrollWidth, clientWidth } = await page.$eval(', "  'body',", '  (el) => el,', ');'],
+      ['const { scrollWidth } = await page', "  .locator('html')", '  .evaluate((html) => html);'],
+      ["const { scrollWidth } = await page.locator('html').evaluate((html) => {", '  const root = html;', '  return root;', '});'],
+    ];
+    expect(copies.map((copy) => documentMeasures('g.ts', copy.join('\n')))).toEqual(copies.map(() => ['g.ts:1']));
+    const none = [
+      ["const { scrollWidth } = await page.locator('.chip').evaluate((el) => el);"],
+      ["const { scrollWidth } = await page.$eval('.chip', (el) => el);"],
+      ["const { scrollWidth } = await page.locator('html').evaluate((html) => html.querySelector('.chip')!);"],
+      ["const { scrollHeight } = await page.locator('html').evaluate((html) => html);"],
+      ["const { scrollWidth } = await page.locator('html').evaluate(() => [...document.querySelectorAll('tr')].find((row) => row)!);"],
+      ["const { scrollWidth } = await page.locator('html').evaluate((html) => {", "  const table = html.querySelector('table');", '  return table;', '});'],
+    ];
+    expect(none.map((lines) => documentMeasures('g.ts', lines.join('\n')))).toEqual(none.map(() => []));
+  });
+
+  it('the count reads a width destructured over lines: the root below a line that ends in `=`, or the braces of `const {` open over several', () => {
+    const copies = [
+      ['const { scrollWidth, clientWidth } =', '  document.documentElement;'],
+      ['const {', '  scrollWidth,', '  clientWidth,', '} = document.documentElement;'],
+      ['const overflow = await page.evaluate(() => {', '  const { scrollWidth, clientWidth } =', '    document.scrollingElement!;', '  return scrollWidth - clientWidth;', '});'],
+      ['const {', '  scrollWidth: wide,', '} = await page.evaluate(() => document.documentElement);'],
+      ['const root =', '  document.documentElement;', 'return root.scrollWidth;'],
+    ];
+    expect(copies.map((copy) => documentMeasures('h.ts', copy.join('\n')))).toEqual([['h.ts:1'], ['h.ts:1'], ['h.ts:2'], ['h.ts:1'], ['h.ts:3']]);
+    const none = [
+      ['const { scrollHeight, clientHeight } =', '  document.documentElement;', "const cut = await page.locator('.chip').evaluate((el) => el.scrollWidth);"],
+      ['const { scrollWidth } =', "  document.querySelector('.chip')!;"],
+      ['const {', '  scrollWidth,', '} = chip;'],
+      ['const cut =', "  await page.locator('.chip').evaluate((el) => el.scrollWidth > el.clientWidth);"],
+    ];
+    expect(none.map((lines) => documentMeasures('h.ts', lines.join('\n')))).toEqual(none.map(() => []));
   });
 });

@@ -40,6 +40,7 @@ from apps.invoice.models import (
 from apps.invoice.queries import (
     FULL,
     RECTIFYING,
+    REFUND_NOT_FOUND,
     TICKET,
     VERIFACTU_BY_INVOICE,
     born_series_values,
@@ -150,7 +151,6 @@ SALE_NOT_INVOICED = _(
     "The sale %(number)s has no invoice yet: its rectification waits for it."
 )
 SALE_NOT_VOIDED = _("The sale %(number)s is not voided.")
-REFUND_NOT_FOUND = _("That refund does not exist.")
 UNKNOWN_CATEGORY = _("There is no tax category «%(category)s».")
 NO_TAX_RULE = _("No tax rule applies today to the tax category «%(category)s».")
 LINE_UNDERFLOW = _(

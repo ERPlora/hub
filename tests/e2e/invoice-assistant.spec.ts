@@ -14,12 +14,14 @@
 // flow: INVOICE-F08
 // flow: BASE-F97 (the card and its receipt name the action: «Rectify in Invoicing», «Rectificar en Facturación»;
 // FIX-HUB-BASE-ASSISTANT-CARD-RECTIFY-SAYS-DO-THIS-IN-INVOICING, it said «Do this»)
+// flow: invoice-assistant-card (FIX-HUB-INVOICE-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS: the card names the invoice, the
+// series and the customer a write names by its id, and the kind of a foreign recipient's document, never raw)
 import { execSync } from 'node:child_process';
 
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { type Provider, startProvider } from './assistant-provider';
-import { A, api, compactBar, login, registerBusinessIn, registrationOf, REPO_DIR, shot, shown, untilStill } from './helpers';
+import { A, api, capture, compactBar, login, psql, registerBusinessIn, registrationOf, REPO_DIR, shot, shown, untilStill } from './helpers';
 import { cleanInvoices, ensureIssuer, type InvoiceOut, invoiceOf, issuedIds, snapshotSeries } from './invoice-helpers';
 import { stamp } from './sale-helpers';
 import { STACK } from './stack';
@@ -435,4 +437,108 @@ test('INVOICE-F08 — asked to rectify a rectifying invoice, the assistant says 
   expect((await invoiceOf(context, invoice.id)).rectifications).toHaveLength(1);
   await untilStill(page);
   await page.screenshot({ path: shot(`${KEY}-refused-1440`) });
+});
+
+// FIX-HUB-INVOICE-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS: since hub#416 the card left out every id its schema does not
+// mark, and said a closed list's value as sent: «hazle una factura a Talleres en la serie de facturas, con su NIF-IVA»
+// said no customer and no series, and «Tipo de documento del cliente: 02»; «marca como pagada esa factura» said no
+// invoice. Now each record is named as the Facturas screens show it — the customer by the name on their card, the
+// series by its code, its year and its name, the invoice by its number —, read as the person, never by its id; the
+// kind of document by the recipient form's words. Cancelled: nothing is issued nor paid. (E2E-ASK: assistant-provider.ts.)
+const CARD_KEY = 'FIX-HUB-INVOICE-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS';
+/** An id as a schema's `format: uuid` takes it: never on a card. */
+const AN_ID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+
+type SentCard = { fields: { name: string; label: string; value: unknown }[] };
+
+/** The card of the confirm frame of a turn's answer (`text/event-stream`: one `data: <JSON>` per frame), if any. */
+function confirmedCard(stream: string): SentCard | undefined {
+  const frames = stream
+    .split('\n')
+    .filter((line) => line.startsWith('data:'))
+    .map((line) => JSON.parse(line.slice(5)) as { type: string; card?: SentCard });
+  return frames.find((frame) => frame.type === 'confirm')?.card;
+}
+
+/** The card the server sends for the person to confirm, as it arrives: the answer of the turn that carries it. */
+async function sentCard(page: Page): Promise<SentCard> {
+  const answer = await page.waitForResponse(
+    async (response) => response.url().endsWith('/api/assistant/turn') && confirmedCard(await response.text()) !== undefined,
+  );
+  return confirmedCard(await answer.text())!;
+}
+
+const saidBy = (sent: SentCard) => Object.fromEntries(sent.fields.map((field) => [field.name, [field.label, field.value]]));
+
+test('invoice-assistant-card — in Spanish issuing an invoice names the customer, the series and the kind of document, and marking one paid names the invoice, never by their id', async ({ browser }) => {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await login(page, A, '/invoice/invoices');
+  await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
+  const name = `e2e Talleres card ${RUN}`;
+  const customer = await api<{ id: string }>(context, A, 'POST', '/customer/customers', {
+    name,
+    tax_id: 'B12345674',
+    address: 'Calle Luna 3, Madrid',
+  });
+  expect(customer.status, JSON.stringify(customer.data)).toBe(201);
+  try {
+    const invoice = (await anInvoice(context)) as InvoiceOut & { series_id: string };
+    const series = await api<{ id: string; year: number; label: string }>(context, A, 'GET', `/invoice/series/detail?series_id=${invoice.series_id}`);
+    expect(series.status, JSON.stringify(series.data)).toBe(200);
+    const seriesLabel = `FACT · ${series.data.year} · Facturas`;
+    expect(series.data.label).toBe(seriesLabel);
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(`${A}/invoice/invoices`);
+    await openPanel(page);
+
+    // «Hazle una factura a Talleres en la serie de facturas, con su NIF-IVA»: the customer, the series and the kind of
+    // document in words.
+    let sent = sentCard(page);
+    const line = { description: `e2e Corte ${RUN}`, quantity: '1', unit_price: 10000, tax_rate: '21' };
+    await ask(
+      page,
+      `E2E-ASK invoice__invoice__create ${JSON.stringify({ customer_id: customer.data.id, series_id: invoice.series_id, customer_id_type: '02', lines: [line] })}`,
+    );
+    await expect(card(page)).toBeVisible({ timeout: 30_000 });
+    let fields = await sent;
+    expect(saidBy(fields)).toMatchObject({
+      customer_id: ['Cliente', name],
+      series_id: ['Serie', seriesLabel],
+      customer_id_type: ['Tipo de documento del cliente', 'NIF-IVA de la UE'],
+    });
+    expect(JSON.stringify(fields)).not.toMatch(AN_ID);
+    for (const vp of VIEWPORTS) {
+      await page.setViewportSize({ width: vp.width, height: vp.height });
+      await expect(card(page)).toContainText(name);
+      await expect(card(page)).toContainText(seriesLabel);
+      await expect(card(page)).toContainText('NIF-IVA de la UE');
+      await expect(card(page)).not.toContainText(AN_ID);
+      await untilStill(page);
+      await capture(page, `${CARD_KEY}-${vp.label}`);
+    }
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await decide(page, 'cancel');
+    await expect(lastAnswer(page)).toContainText('No lo he hecho.');
+
+    // «Marca como pagada esa factura»: the invoice by its number.
+    sent = sentCard(page);
+    await ask(page, `E2E-ASK invoice__invoice__mark_paid ${JSON.stringify({ invoice_id: invoice.id })}`);
+    await expect(card(page)).toBeVisible({ timeout: 30_000 });
+    fields = await sent;
+    expect(saidBy(fields)).toMatchObject({ invoice_id: ['Factura', invoice.number] });
+    expect(JSON.stringify(fields)).not.toMatch(AN_ID);
+    await expect(card(page)).toContainText(invoice.number);
+    await expect(card(page)).not.toContainText(AN_ID);
+    await untilStill(page);
+    await capture(page, `${CARD_KEY}-mark-paid-1440`);
+    await decide(page, 'cancel');
+    await expect(lastAnswer(page)).toContainText('No lo he hecho.');
+    // Cancelled: nothing paid, and no invoice for the customer.
+    expect((await invoiceOf(context, invoice.id)).status).toBe('issued');
+    expect(psql(`select count(*) from invoice_invoice where customer_id = '${customer.data.id}'`)).toBe('0');
+  } finally {
+    psql(`delete from customer_customer where id = '${customer.data.id}'`);
+    await context.close();
+  }
 });

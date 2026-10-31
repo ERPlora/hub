@@ -1219,9 +1219,17 @@
     "method": "get",
     "path": "/api/invoice/series"
   },
+  "invoice.refund.get": {
+    "method": "get",
+    "path": "/api/invoice/refunds/detail"
+  },
   "invoice.series.peek_next": {
     "method": "get",
     "path": "/api/invoice/series/peek_next"
+  },
+  "invoice.series.get": {
+    "method": "get",
+    "path": "/api/invoice/series/detail"
   },
   "invoice.series.create": {
     "method": "post",
