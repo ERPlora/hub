@@ -10,7 +10,7 @@
 import { expect, type Page, test } from '@playwright/test';
 
 import { choose, confirmDialog, signedIn } from './flow-helpers';
-import { psql, shot, shown } from './helpers';
+import { capture, psql, shown } from './helpers';
 import { FLOW_VIEWPORTS, noHorizontalScroll, settled } from './service-helpers';
 import { photo } from './website-helpers';
 import { cleanUp as cleanUpInbox, e2ePhone, metaGraph, pushChannel, receive, restorePhoto, seedErplora, template } from './whatsapp-helpers';
@@ -94,7 +94,7 @@ for (const viewport of FLOW_VIEWPORTS) {
       await editor.locator('[data-testid=flow-message-var-s1-0-text-0]').fill('Ana');
       await settled(page);
       await noHorizontalScroll(page, `FLOW-F32 ${viewport.label}`);
-      await page.screenshot({ path: shot(`${TASK}-${viewport.label}`) });
+      await capture(page, `${TASK}-${viewport.label}`);
 
       await editor.locator('[data-testid=flow-editor-save]').click();
       await page.waitForURL(/\/flow\/automations\/[0-9a-f-]+$/);

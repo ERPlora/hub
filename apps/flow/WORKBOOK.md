@@ -103,7 +103,7 @@ Menú **Automatizaciones**, una sola entrada. De arriba abajo:
   (opcional)**, **Aprobar** y **No** (FLOW-F29). Un responsable o un empleado,
   que solo contestan, ven solo esto: «No hay nada esperando tu respuesta.» cuando no hay nada.
 - **Propuestas por el asistente** — solo si hay borradores: «El asistente las escribió cuando le
-  pediste una automatización. No hace nada hasta que la revises y la actives.», y por cada uno su
+  pediste una automatización. No hacen nada hasta que las revises y las actives.», y por cada uno su
   nombre, la etiqueta «Borrador», **Revisar** y una × («Descartar») (FLOW-F18, FLOW-F19).
 - **Tus automatizaciones** — solo si hay alguna. El buscador «Busca por nombre, por lo que la arranca o
   por lo que hace», los filtros **Ver** (encendidas, en pausa) y **Arranca con** (algo que pasa, un
@@ -118,7 +118,7 @@ Menú **Automatizaciones**, una sola entrada. De arriba abajo:
   automatizaciones hechas (hoy, «Citas», «Reservas online» y «Bandeja de WhatsApp»), con sus tarjetas, su estado («Activa»,
   «En pausa», «Versión nueva») y **Encenderla**, **Ponerla en pausa**, **Verla** y **Restaurar la de
   fábrica** (FLOW-F33 a F35); al final, la línea de lo que falta («Hay automatizaciones ocultas: necesitan
-  la app …») (FLOW-F04).
+  Tareas.») (FLOW-F04).
 
 ### Editor de automatización
 Se abre al tocar una fila, al pulsar **Nueva automatización**, al usar una tarjeta o al revisar un
