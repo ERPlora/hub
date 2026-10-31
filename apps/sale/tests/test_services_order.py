@@ -629,6 +629,23 @@ def test_merging_moves_the_unpaid_lines_and_voids_the_absorbed_check(coffee, ste
     assert len(again.lines) == 2 and events() == []
 
 
+def test_the_absorbed_check_says_which_check_it_was_joined_with(coffee, steak):
+    """hub#459: the till that had the absorbed check on screen follows the one that stays, so the absorbed
+    check names it (``merged_into_id``); the one that stays and an ordinary void name none."""
+    first = open_order({"product": "COF"})
+    second = open_order({"product": "STK"})
+    assert first.merged_into_id is None
+    run(
+        "sale.order.merge",
+        {"from_order_id": str(first.id), "to_order_id": str(second.id)},
+    )
+    absorbed = run("sale.order.get", {"order_id": str(first.id)})
+    assert absorbed.status == "voided" and absorbed.merged_into_id == second.id
+    assert run("sale.order.get", {"order_id": str(second.id)}).merged_into_id is None
+    third = open_order()
+    assert run("sale.order.void", {"order_id": str(third.id)}).merged_into_id is None
+
+
 def test_a_check_cannot_merge_into_a_closed_one_nor_into_itself(coffee):
     first = open_order({"product": "COF"})
     second = open_order()

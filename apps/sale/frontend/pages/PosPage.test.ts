@@ -376,6 +376,23 @@ describe('PosPage: charging', () => {
   });
 });
 
+describe('PosPage: a check joined with another one (TABLE-F16, SALE-F24)', () => {
+  it('the check on screen joined from Tables (on this device or another) is not «closed on another device»: the till shows the one that stays, with its customer (hub#459)', async () => {
+    const s = await setup();
+    await s.addProduct();
+    await s.result('sale.order.get', order({ id: 'o1', version: 9, status: 'voided', merged_into_id: 'o2', lines: [] }), { order_id: 'o1' }, 9);
+    await settle();
+    // The absorbed check's subscription goes after the SDK's 2 s grace on unmounting.
+    await s.clock.advance(2000);
+    await s.reopen();
+    expect(toastError).not.toHaveBeenCalled();
+    expect(toast).toHaveBeenCalledWith('That check was joined with another one: the screen shows the joined check.');
+    expect(localStorage.getItem(CURRENT_CHECK_KEY)).toBe('o2');
+    expect(s.params('sale.order.get')).toEqual([{ order_id: 'o2' }]);
+    expect(s.sent().some((c) => c.path === '/api/customer/orders/customer' && c.query.order_id === 'o2')).toBe(true);
+  });
+});
+
 describe('PosPage: parking and switching', () => {
   it('parks under a title: the screen empties and says so', async () => {
     const s = await setup();

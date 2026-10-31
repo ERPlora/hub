@@ -521,7 +521,9 @@ Pasos:
 4. La mesa de origen queda libre si no le queda otra cuenta y su cuenta de mesa, «Fusionada». En
    Ventas, las líneas sin cobrar de la cuenta de origen pasan a la de la mesa que se queda y la vacía
    queda anulada, **en la misma operación**: o se junta todo, o no se junta nada. Lo que la cuenta de
-   origen ya había cobrado sigue en su «Cobrado».
+   origen ya había cobrado sigue en su «Cobrado». El TPV que tenía la cuenta de origen en pantalla (en
+   este dispositivo o en otro) pasa a la de la mesa que se queda y avisa «Esa cuenta se ha juntado con
+   otra: la pantalla muestra la cuenta juntada.» (SALE-F24).
 Entra: las dos cuentas.
 Sale: una sola cuenta abierta en la mesa que se queda (avisa: `table.session.merged` y
 `sale.order.merged`).

@@ -812,6 +812,11 @@ class OrderOut(Schema):
     created_at: datetime = Field(description="When it was opened.")
     updated_at: datetime = Field(description="When it last changed.")
     lines: list[OrderLineOut] = Field(description="The lines left to charge, in order.")
+    merged_into_id: UUID | None = Field(
+        None,
+        description="A check joined with another (sale.order.merge) ends voided and names here the check that stays; "
+        "null otherwise.",
+    )
     already: bool = Field(
         False,
         description="Opening a check of an appointment that already has one open answers that one: true, "

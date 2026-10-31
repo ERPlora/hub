@@ -79,7 +79,15 @@ const marks = shallowRef<string[]>([]);
 const preview = shallowRef<PreviewOut | undefined>();
 const charging = shallowRef(false);
 
-const till = useTill({ settings: () => settings.value, onOpened: (id) => customer.value && void linkCustomer(id, customer.value) });
+const till = useTill({
+  settings: () => settings.value,
+  onOpened: (id) => customer.value && void linkCustomer(id, customer.value),
+  // The check on screen was joined with another (TABLE-F16, SALE-F24): the till shows that one, as switching to it does.
+  onJoined: (id) => {
+    clearScreen();
+    void loadCustomer(id);
+  },
+});
 const order = computed(() => till.order.value);
 const lines = computed(() => order.value?.lines ?? []);
 

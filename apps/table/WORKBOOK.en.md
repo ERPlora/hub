@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:69dd561846a263dfdda497bf7c1c0a2aaac98fe84af7ab4f96b89105dae2a32e -->
+<!-- generated from WORKBOOK.md sha256:54660a53640f2723741895d1d4261ab336f63e4b0e4484554dd7adab7de01e13 -->
 
 ## What it is for and who it is for
 
@@ -501,7 +501,9 @@ Steps:
 4. The origin table stays free if it has no other check left and its table check, "Merged". In Sales,
    the uncharged lines of the origin check go to the one of the table that stays and the empty one is
    voided, **in the same operation**: either everything is joined, or nothing is. What the origin check
-   had already charged stays in its "Charged".
+   had already charged stays in its "Charged". The till that had the origin check on screen (on this
+   device or another) moves to the check of the table that stays and says "That check was joined with
+   another one: the screen shows the joined check." (SALE-F24).
 In: the two checks.
 Out: a single open check at the table that stays (announces: `table.session.merged` and
 `sale.order.merged`).

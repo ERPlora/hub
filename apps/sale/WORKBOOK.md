@@ -895,8 +895,11 @@ Pasos:
 2. Las líneas sin cobrar de una pasan a la otra y la vacía queda anulada.
 Entra: las dos cuentas.
 Sale: una sola cuenta; las líneas se mueven sin volver a crearlas, así que lo ya enviado a cocina no
-se envía otra vez. Repetirlo no cambia nada (avisa: cuentas juntadas, con la absorbida y la que
-queda).
+se envía otra vez. La absorbida queda anulada y dice con cuál se juntó: el TPV que la tenía en
+pantalla, en este dispositivo o en otro, pasa a la que queda con el aviso «Esa cuenta se ha juntado
+con otra: la pantalla muestra la cuenta juntada.», nunca «se ha cerrado en otro dispositivo»; si en
+ese momento guardaba un cambio en ella, primero termina ese cambio. Repetirlo no cambia nada (avisa:
+cuentas juntadas, con la absorbida y la que queda).
 Si falla: si una de las dos ya no está abierta, se rechaza sin mover nada.
 Implicados: TABLE-F16, KITCHEN-F28
 

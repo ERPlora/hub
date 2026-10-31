@@ -1231,6 +1231,7 @@ def order_detail(order: Order) -> dict:
         "created_at": order.created_at,
         "updated_at": order.updated_at,
         "lines": [order_line_row(line) for line in lines],
+        "merged_into_id": order.merged_into_id,
     }
 
 

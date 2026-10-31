@@ -405,6 +405,8 @@ export interface OrderOut {
   updated_at: string;
   /** The lines left to charge. */
   lines: OrderLineOut[];
+  /** A check joined with another (`sale.order.merge`) ends voided and names the one that stays; null otherwise. */
+  merged_into_id: string | null;
   /** Opening the check of an appointment that already had one answers that one (nothing added). */
   already: boolean;
 }
