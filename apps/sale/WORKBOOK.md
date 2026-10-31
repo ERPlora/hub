@@ -312,10 +312,10 @@ cobrar se pinta en la hoja con su frase (p. ej. «Un producto del tique ya no es
 Quita la línea y vuelve a añadirla.») y la cuenta sigue intacta. Si mientras se cobra otro
 dispositivo cambia la cuenta (añade, cambia, quita, anula o cobra una línea, pone o quita un
 descuento, la divide, la junta o la cierra), gana el primero: el cobro no cobra nada, la hoja dice
-«La cuenta ha cambiado mientras se cobraba. No se ha cobrado nada; la cuenta se ha vuelto a cargar,
-revísala y vuelve a cobrar.» y el siguiente «Cobrar» cobra lo que hay; si gana el cobro, el cambio
-que llegaba se rechaza con «La cuenta ha cambiado mientras se cobraba. No se ha cambiado nada: revisa
-las líneas y vuelve a intentarlo.». Nunca entra en la venta una línea anulada o quitada ni se cobra
+«La cuenta ha cambiado mientras se cobraba: se añadió, cambió, quitó, anuló o cobró una línea, se puso o
+se quitó un descuento, o la cuenta se dividió, se juntó o se cerró. No se ha cobrado ni cambiado nada:
+revisa las líneas y vuelve a intentarlo.» y el siguiente «Cobrar» cobra lo que hay; si gana el cobro, el
+cambio que llegaba se rechaza con la misma frase. Nunca entra en la venta una línea anulada o quitada ni se cobra
 otra cantidad u otro descuento del que guarda la cuenta.
 Implicados: INVENTORY-F21, CUSTOMER-F20, TAX-F18
 
@@ -534,7 +534,7 @@ Pasos:
 Entra: la unidad del artículo, su escalón y la cantidad a la que se refiere su precio, de Inventario.
 Sale: la línea con su cantidad y su unidad congeladas.
 Si falla: una cantidad que no encaja con el escalón de la unidad se rechaza con «La cantidad no encaja
-con el escalón del producto» y la línea queda como estaba. No hay lector de báscula.
+con el escalón del producto (…).» y la línea queda como estaba. No hay lector de báscula.
 Implicados: INVENTORY-F26
 
 ### SALE-F11 Elegir los suplementos de un artículo
@@ -941,7 +941,7 @@ Si falla: enlazar una cita a una cuenta que ya no está abierta se rechaza; enla
 cuando ya tiene una abierta, «Esa cita ya tiene una cuenta abierta: cobra esa (Cuentas abiertas).». Si
 la dirección nombra una cuenta que ya no está abierta (se cobró, se anuló) o que no existe, el TPV lo
 dice («Esa cuenta ya no está abierta…») y sigue como estaba.
-Implicados: APPOINTMENTS-F17
+Implicados: APPOINTMENT-F17
 
 ### SALE-F27 Pagar una línea con un bono
 <!-- origen: wf:peluqueria-dia#rec_peluqueria-f10 old:sales/workflow/peluqueria.md#sales-f27 qa:modules/sales/voucher-or-session-package -->
