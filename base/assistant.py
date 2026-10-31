@@ -30,7 +30,7 @@ import json
 import logging
 import time
 from contextvars import ContextVar
-from collections.abc import AsyncIterator, Iterable
+from collections.abc import AsyncIterator, Collection, Iterable
 from dataclasses import dataclass
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -99,6 +99,9 @@ DOCS_SEARCH = "base.docs.search"
 ALWAYS = ("base.setup.status", "base.business.get", DOCS_SEARCH)
 #: Never from the chat (the old hub's «destructive actions of the hub itself»): emptying the business; a file.
 NOT_FROM_CHAT = frozenset({"base.hub.reset", "base.blueprint.export"})
+#: How a person names each app in a turn: its id, its name and its menu (``live.assistant.app_words``). The QA of the
+#: assistant ranks with it too (``base/tests/test_assistant_asks.py``).
+APP_WORDS = shared.app_words
 
 TURN_PATH = "/internal/assistant/chat/stream"
 USAGE_PATH = "/internal/assistant/usage"
@@ -126,12 +129,13 @@ def active_apps(scope: Scope) -> dict[str, LiveAppConfig]:
     return {config.label: config for config in all_live_app_configs() if config.label not in left_out}
 
 
-def catalog(ctx: OperationContext) -> dict[str, Operation]:
-    """The tools of ``ctx``'s person: by name, in name order. A write a manager may approve is theirs too, as its
-    button on the screen is (APP-BASE-5): running it asks for the approval (BASE-G118)."""
+def catalog(ctx: OperationContext, *, active_labels: Collection[str] | None = None) -> dict[str, Operation]:
+    """The tools of ``ctx``'s person: by name, in name order, of the apps on in its business (``active_labels``, else
+    ``active_apps``). A write a manager may approve is theirs too, as its button on the screen is (APP-BASE-5): running
+    it asks for the approval (BASE-G118)."""
     tools = shared.catalog(
         ctx,
-        active_labels=active_apps(ctx.scope),
+        active_labels=active_apps(ctx.scope) if active_labels is None else active_labels,
         not_from_chat=NOT_FROM_CHAT,
         approvable=lambda op: approvals.label_of(op) is not None,
     )
@@ -140,8 +144,8 @@ def catalog(ctx: OperationContext) -> dict[str, Operation]:
 
 def relevant(tools: dict[str, Operation], texts: Iterable[str], language: str) -> list[Operation]:
     """The tools of what ``texts`` ask, best first, at most ``MAX_TOOLS`` (``live.assistant.relevant``): ``ALWAYS``
-    first."""
-    return shared.relevant(tools, texts, language, always=ALWAYS)
+    first, each app named by ``APP_WORDS``."""
+    return shared.relevant(tools, texts, language, always=ALWAYS, app_words=APP_WORDS)
 
 
 # ── The card of a write in the Hub's words (BASE-G115, G116) ─────────────────────────────────────────────────────
