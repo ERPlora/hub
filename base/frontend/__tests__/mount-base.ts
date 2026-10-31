@@ -82,11 +82,22 @@ export function leaveInstalledApp(): void {
   forgetAppDistribution();
 }
 
-/** A click on `element` as a person's tap, to read afterwards whether the page stopped the link (`defaultPrevented`). */
-export function tap(element: Element): MouseEvent {
+/** A click on `element` as a person's tap, and whether the page stopped the link (`defaultPrevented`). The test
+ *  environment never follows the link afterwards (happy-dom would fetch its address). */
+export function tap(element: Element): { defaultPrevented: boolean } {
   const click = new MouseEvent('click', { bubbles: true, cancelable: true });
-  element.dispatchEvent(click);
-  return click;
+  const seen = { defaultPrevented: false };
+  const last = (event: Event) => {
+    seen.defaultPrevented = event.defaultPrevented;
+    event.preventDefault();
+  };
+  window.addEventListener('click', last);
+  try {
+    element.dispatchEvent(click);
+  } finally {
+    window.removeEventListener('click', last);
+  }
+  return seen;
 }
 
 const BLANK = { template: '<div />' };
