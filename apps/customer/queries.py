@@ -14,7 +14,7 @@ from django.db.models.functions import Coalesce
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import Conflict, NotFound
-from live.operations import INTERNAL, operation
+from live.operations import AI, INTERNAL, operation
 
 from apps.customer.models import (
     Activity,
@@ -352,10 +352,18 @@ def _customer_count(relation: str) -> Count:
     permission="customer.view",
     input=CustomerListIn,
     output=CustomerPage,
-    ai={
-        "description": "Lists the business's customers, 50 per page, with a search over name, email, phone, "
-        "tax id and company and filters by stage, source, activity, purchases and spend."
-    },
+    ai=AI(
+        "Lists the business's customers, 50 per page, with a search over name, email, phone, tax id and company and "
+        "filters by stage, source, activity, purchases and spend.",
+        asks={
+            "en": ("show me my customers", "who are my best clients?", "find the customers from Acme"),
+            "es": (
+                "¿qué clientes tengo?",
+                "búscame los clientes de la empresa Acme",
+                "pásame las clientas que más gastan",
+            ),
+        },
+    ),
 )
 def list_customers(ctx: OperationContext, params: CustomerListIn) -> dict:
     return page(_customers(params), params)
@@ -367,10 +375,14 @@ def list_customers(ctx: OperationContext, params: CustomerListIn) -> dict:
     permission="customer.view",
     input=CustomerRefIn,
     output=CustomerDetailOut,
-    ai={
-        "description": "Retrieves a customer's whole card by its id or by its exact name, phone or email: "
-        "contact and tax details, groups, tags, custom fields and consent per channel."
-    },
+    ai=AI(
+        "Retrieves a customer's whole card by its id or by its exact name, phone or email: contact and tax details, "
+        "groups, tags, custom fields and consent per channel.",
+        asks={
+            "en": ("what do we know about Marta?", "pull up Luis's details", "bring up Carmen's card"),
+            "es": ("¿qué sabemos de Marta?", "dame los datos de la clienta Carmen", "¿quién es Luis Gómez?"),
+        },
+    ),
 )
 def customer_detail(ctx: OperationContext, data: CustomerRefIn) -> dict:
     return load_detail(find_customer(data.id, data.customer))
@@ -382,9 +394,17 @@ def customer_detail(ctx: OperationContext, data: CustomerRefIn) -> dict:
     permission="customer.view",
     input=CustomerStatsIn,
     output=CustomerStatsOut,
-    ai={
-        "description": "Returns the customer figures: how many customers, how many active, how many VIP, and the revenue."
-    },
+    ai=AI(
+        "Returns the customer figures: how many customers, how many active, how many VIP, and the revenue.",
+        asks={
+            "en": ("what are our customer stats?", "give me our customer figures"),
+            "es": (
+                "¿cuántos clientes VIP hay?",
+                "¿cuánto nos han dejado los clientes en total?",
+                "dame las cifras de clientes",
+            ),
+        },
+    ),
 )
 def customer_stats(ctx: OperationContext, data: CustomerStatsIn) -> dict:
     return Customer.objects.live().aggregate(
@@ -401,11 +421,23 @@ def customer_stats(ctx: OperationContext, data: CustomerStatsIn) -> dict:
     permission="customer.view",
     input=ByPhoneIn,
     output=PhoneMatchOut,
-    ai={
-        "description": "Finds the customers whose phone is the same number as `phone`, however it was typed "
-        "(spaces, dashes, + or 00, the business's country for a number without prefix, the bare digits WhatsApp "
-        "sends); another country's code is another person, and an unreadable number matches nobody."
-    },
+    ai=AI(
+        "Finds the customers whose phone is the same number as `phone`, however it was typed (spaces, dashes, + or "
+        "00, the business's country for a number without prefix, the bare digits WhatsApp sends); another country's "
+        "code is another person, and an unreadable number matches nobody.",
+        asks={
+            "en": (
+                "whose number is 600 111 222?",
+                "who's calling from +34 612 345 678?",
+                "look up this phone number",
+            ),
+            "es": (
+                "¿de quién es el 600 111 222?",
+                "me llama el 612345678, ¿es clienta?",
+                "busca quién tiene este móvil",
+            ),
+        },
+    ),
 )
 def customers_by_phone(ctx: OperationContext, data: ByPhoneIn) -> dict:
     numbers = candidates(data.phone, business_country(ctx))
@@ -434,11 +466,15 @@ def _cell(value) -> str:
     permission="customer.export",
     input=CustomerExportIn,
     output=ExportOut,
-    ai={
-        "description": "Exports every customer that matches the search and filters as a CSV file, with "
-        "contact details, stage, figures, groups and tags. It hands out personal data.",
-        "risk": "high",
-    },
+    ai=AI(
+        "Exports every customer that matches the search and filters as a CSV file, with contact details, stage, "
+        "figures, groups and tags. It hands out personal data.",
+        risk="high",
+        asks={
+            "en": ("download a CSV of every customer", "give me a file with all my customers"),
+            "es": ("descárgame los clientes en un CSV", "exporta las clientas a un fichero"),
+        },
+    ),
 )
 def export_customers(ctx: OperationContext, params: CustomerExportIn) -> dict:
     cards = _customers(params).prefetch_related("groups", "tags")
@@ -474,9 +510,13 @@ def export_customers(ctx: OperationContext, params: CustomerExportIn) -> dict:
     permission="customer.view",
     input=GroupListIn,
     output=GroupPage,
-    ai={
-        "description": "Lists the customer groups with how many customers are in each, active and inactive."
-    },
+    ai=AI(
+        "Lists the customer groups with how many customers are in each, active and inactive.",
+        asks={
+            "en": ("what customer groups are there?", "how many people are in the VIP group?"),
+            "es": ("¿qué grupos tenemos?", "¿cuánta gente hay en el grupo VIP?"),
+        },
+    ),
 )
 def list_groups(ctx: OperationContext, params: GroupListIn) -> dict:
     groups = CustomerGroup.objects.annotate(customer_count=_customer_count("customers"))
@@ -502,9 +542,13 @@ def list_groups(ctx: OperationContext, params: GroupListIn) -> dict:
     permission="customer.view",
     input=TagListIn,
     output=TagPage,
-    ai={
-        "description": "Lists the customer tags with how many customers have each, active and inactive."
-    },
+    ai=AI(
+        "Lists the customer tags with how many customers have each, active and inactive.",
+        asks={
+            "en": ("which tags do we have?", "how many clients are tagged vegan?"),
+            "es": ("¿qué etiquetas usamos?", "¿cuántos clientes llevan la etiqueta habitual?"),
+        },
+    ),
 )
 def list_tags(ctx: OperationContext, params: TagListIn) -> dict:
     tags = CustomerTag.objects.annotate(customer_count=_customer_count("customers"))
@@ -523,9 +567,14 @@ def list_tags(ctx: OperationContext, params: TagListIn) -> dict:
     permission="customer.view",
     input=FieldListIn,
     output=FieldPage,
-    ai={
-        "description": "Lists the custom fields defined for the customers' cards, with their type, options and whether they are required."
-    },
+    ai=AI(
+        "Lists the custom fields defined for the customers' cards, with their type, options and whether they are "
+        "required.",
+        asks={
+            "en": ("what custom fields do we have?", "which extra fields are on the customer card?"),
+            "es": ("¿qué campos extra tiene la ficha?", "¿qué datos pedimos a los clientes además del nombre?"),
+        },
+    ),
 )
 def list_fields(ctx: OperationContext, params: FieldListIn) -> dict:
     fields = CustomField.objects.all()
@@ -551,9 +600,18 @@ def list_fields(ctx: OperationContext, params: FieldListIn) -> dict:
     permission="customer.view",
     input=ActivityListIn,
     output=ActivityPage,
-    ai={
-        "description": "Lists a customer's activity history, newest first: notes, purchases, voids, consent decisions, merges and other apps' entries."
-    },
+    ai=AI(
+        "Lists a customer's activity history, newest first: notes, purchases, voids, consent decisions, merges and "
+        "other apps' entries.",
+        asks={
+            "en": (
+                "what's been going on with Pedro?",
+                "show Lucía's history",
+                "has anything happened with Javier lately?",
+            ),
+            "es": ("¿qué ha pasado con Pedro últimamente?", "enséñame el historial de Lucía"),
+        },
+    ),
 )
 def list_activity(ctx: OperationContext, params: ActivityListIn) -> dict:
     customer = find_customer(params.customer_id, params.customer)
@@ -571,9 +629,14 @@ def list_activity(ctx: OperationContext, params: ActivityListIn) -> dict:
     permission="customer.view",
     input=PurchaseListIn,
     output=PurchasePage,
-    ai={
-        "description": "Paginated purchase history of a customer: each sale with its amount in cents, currency and status (paid or voided); voided ones are kept."
-    },
+    ai=AI(
+        "Paginated purchase history of a customer: each sale with its amount in cents, currency and status (paid or "
+        "voided); voided ones are kept.",
+        asks={
+            "en": ("what has Sara bought?", "how much has Pedro spent with us?", "show Ana's purchases"),
+            "es": ("¿qué ha comprado Sara?", "¿cuánto se ha gastado Pedro con nosotros?", "las compras de Ana"),
+        },
+    ),
 )
 def list_purchases(ctx: OperationContext, params: PurchaseListIn) -> dict:
     customer = find_customer(params.customer_id, params.customer)
@@ -597,9 +660,14 @@ def list_purchases(ctx: OperationContext, params: PurchaseListIn) -> dict:
     permission="customer.view",
     input=DivergencesIn,
     output=DivergencePage,
-    ai={
-        "description": "Reconciliation audit: the customers whose purchase count or spend disagree with their purchase history. Empty means healthy."
-    },
+    ai=AI(
+        "Reconciliation audit: the customers whose purchase count or spend disagree with their purchase history. "
+        "Empty means healthy.",
+        asks={
+            "en": ("check the customer spend figures for mismatches", "are the customers' spend totals right?"),
+            "es": ("revisa si cuadra el gasto de cada cliente", "¿está bien calculado el gasto de los clientes?"),
+        },
+    ),
 )
 def purchase_divergences(ctx: OperationContext, params: DivergencesIn) -> dict:
     confirmed = Q(purchases__status=Purchase.Status.CONFIRMED)
@@ -629,10 +697,19 @@ def purchase_divergences(ctx: OperationContext, params: DivergencesIn) -> dict:
     input=ConsentStateIn,
     output=ConsentStateOut,
     expose_api=True,
-    ai={
-        "description": "The consent in force of a customer, one row per purpose and channel: granted or withdrawn. "
-        "The last fact wins, so a withdrawal is in force on the next read. Ask it before writing to anybody."
-    },
+    ai=AI(
+        "Whether a customer agreed to be sent marketing (offers, news) by email, SMS, WhatsApp, phone or post: the "
+        "consent in force, one row per purpose and channel, granted or withdrawn. The last fact wins, so a "
+        "withdrawal is in force on the next read. Ask it before writing to anybody.",
+        asks={
+            "en": ("can I send Luis marketing emails?", "has Marta agreed to WhatsApp messages?"),
+            "es": (
+                "¿puedo mandarle un email a Marta?",
+                "¿qué permisos nos ha dado Carmen?",
+                "¿Luis acepta publicidad por WhatsApp?",
+            ),
+        },
+    ),
 )
 def consent_state(ctx: OperationContext, data: ConsentStateIn) -> dict:
     customer = find_customer(data.customer_id, data.customer)
@@ -645,9 +722,14 @@ def consent_state(ctx: OperationContext, data: ConsentStateIn) -> dict:
     permission="customer.view",
     input=ConsentHistoryIn,
     output=ConsentPage,
-    ai={
-        "description": "Every consent fact of a customer, newest first: what was decided, for which purpose and channel, at which address, from where, after which words, and who wrote it down."
-    },
+    ai=AI(
+        "Every consent fact of a customer, newest first: what was decided, for which purpose and channel, at which "
+        "address, from where, after which words, and who wrote it down.",
+        asks={
+            "en": ("when did Carmen opt in?", "show Luis's consent history"),
+            "es": ("¿cuándo dijo Carmen que sí a los emails?", "historial de permisos de Luis"),
+        },
+    ),
 )
 def consent_history(ctx: OperationContext, params: ConsentHistoryIn) -> dict:
     customer = find_customer(params.customer_id, params.customer)
@@ -670,9 +752,13 @@ def consent_history(ctx: OperationContext, params: ConsentHistoryIn) -> dict:
     permission="customer.view",
     input=OrderIn,
     output=OrderCustomerOut,
-    ai={
-        "description": "Returns the customer linked to an open order, if any, so the till can put her back on a restored check."
-    },
+    ai=AI(
+        "Returns the customer linked to an open order, if any, so the till can put her back on a restored check.",
+        asks={
+            "en": ("who's on this order?", "whose tab is this?"),
+            "es": ("¿de quién es este pedido?", "¿qué cliente tiene la cuenta abierta?"),
+        },
+    ),
 )
 def order_customer(ctx: OperationContext, data: OrderIn) -> dict:
     link = OrderLink.objects.filter(
@@ -691,9 +777,13 @@ def order_customer(ctx: OperationContext, data: OrderIn) -> dict:
     input=OrderListIn,
     output=OrderPage,
     expose_api=True,
-    ai={
-        "description": "Lists the order ids linked to a customer, newest first. The amounts live in the sale app."
-    },
+    ai=AI(
+        "Lists the order ids linked to a customer, newest first. The amounts live in the sale app.",
+        asks={
+            "en": ("what orders does Pedro have?", "list Ana's orders"),
+            "es": ("¿qué pedidos tiene el cliente Pedro?", "los pedidos de la clienta Ana"),
+        },
+    ),
 )
 def list_orders(ctx: OperationContext, params: OrderListIn) -> dict:
     customer = find_customer(params.customer_id, params.customer)

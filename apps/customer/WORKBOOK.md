@@ -1080,8 +1080,11 @@ asistente. Lo que en el producto actual tenía el perfil «Cajero» lo tiene aqu
   `purpose = "health"` y sin canal. Sus cuatro operaciones (`customer.health.*`) declaran
   `ai=INTERNAL` y no `expose_api`: los datos de salud no llegan al asistente ni a las API keys (RGPD
   art. 9, minimización). No salen en la lista, la búsqueda, la exportación ni `customer.customer.detail`.
-- Toda operación declara `ai` (descripción para el asistente y, en las escrituras, `risk`; las de salud, `INTERNAL`) y todo
-  campo de `schemas.py` su descripción: son la herramienta del asistente. Las referencias humanas
+- Toda operación declara `ai`: `AI(…)` con su descripción para el asistente, su `risk` en las escrituras y sus `asks`
+  (2–4 frases en `en` y `es`, como las diría quien la usa); las de salud y las tres de compras que solo lanza la venta
+  (`customer.purchase.*`), `INTERNAL`. `tests/test_assistant_asks.py` comprueba que cada frase lleva a su herramienta
+  entre las 10 primeras del catálogo real del dueño, el encargado y el empleado. Todo campo de `schemas.py` lleva su
+  descripción: son la herramienta del asistente. Las referencias humanas
   (nombre, teléfono, email) las resuelve `queries.find_customer`, solo entre fichas vivas.
 - Búsqueda: cada ficha guarda `search_text` (nombre, email, teléfono, NIF y empresa en minúsculas y
   sin acentos), recalculado en `Customer.save()`; así no hace falta la extensión `unaccent`.
