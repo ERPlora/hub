@@ -53,6 +53,8 @@ logger = logging.getLogger(__name__)
 DUMP_TIMEOUT_SECONDS = 15 * 60
 #: How often a running dump's heartbeat runs (the worker's lease is 60 s).
 POLL_SECONDS = 15.0
+#: How soon a running dump hears that the worker is stopping.
+STOP_CHECK_SECONDS = 1.0
 #: How long a link to a copy works.
 LINK_MINUTES = 15
 #: The time in a copy's key: UTC, to the second.
@@ -73,6 +75,11 @@ class HubWithoutDatabase(DumpError):
     """The hub keeps its business in phase 1's shared database: there is no database of its own to copy."""
 
     code = "hub_without_database"
+
+
+class DumpStopped(RuntimeError):
+    """The worker is stopping: the copy was stopped (``pg_dump`` killed) and nothing was kept. No failure of the copy:
+    the work stays due for the next worker."""
 
 
 class DumpsUnavailable(DumpError):
@@ -128,8 +135,10 @@ def dump_hub(
     now: dt.datetime | None = None,
     timeout: float = DUMP_TIMEOUT_SECONDS,
     heartbeat: Callable[[], object] | None = None,
+    cancelled: Callable[[], bool] | None = None,
 ):
-    """Copy ``hub``'s own database to the bucket and keep its ``HubDump``; return it."""
+    """Copy ``hub``'s own database to the bucket and keep its ``HubDump``; return it. ``cancelled()`` true (the worker
+    stopping) stops it within :data:`STOP_CHECK_SECONDS`: :class:`DumpStopped`, nothing kept."""
     from base import services
 
     if not hub.db_name:
@@ -145,7 +154,7 @@ def dump_hub(
     key = key_for(hub, kind, stamp)
     with tempfile.TemporaryDirectory(prefix="hub-dump-") as folder:
         path = Path(folder) / "copy.dump"
-        _run_pg_dump(hub, path, timeout=timeout, heartbeat=heartbeat)
+        _run_pg_dump(hub, path, timeout=timeout, heartbeat=heartbeat, cancelled=cancelled)
         size = path.stat().st_size
         try:
             client().upload_file(str(path), target, key, ExtraArgs={"ContentType": "application/octet-stream"})
@@ -156,7 +165,14 @@ def dump_hub(
     return made
 
 
-def _run_pg_dump(hub, path: Path, *, timeout: float, heartbeat: Callable[[], object] | None) -> None:
+def _run_pg_dump(
+    hub,
+    path: Path,
+    *,
+    timeout: float,
+    heartbeat: Callable[[], object] | None,
+    cancelled: Callable[[], bool] | None = None,
+) -> None:
     conninfo = tenancy_connections.migrator_conninfo(hub.db_name, cluster=hub.cluster)
     password = str(conninfo.pop("password", "") or "")
     dsn = make_conninfo(**{name: str(value) for name, value in conninfo.items() if value not in (None, "")})
@@ -168,18 +184,21 @@ def _run_pg_dump(hub, path: Path, *, timeout: float, heartbeat: Callable[[], obj
     env["PGGSSENCMODE"] = "disable"
     with open(path.with_suffix(".err"), "w+", encoding="utf-8", errors="replace") as complaints:
         process = subprocess.Popen(command, env=env, stdout=subprocess.DEVNULL, stderr=complaints)
-        started = time.monotonic()
+        started = last_beat = time.monotonic()
         try:
             while True:
+                if cancelled is not None and cancelled():
+                    raise DumpStopped(f"The copy of {hub.slug} was stopped: the worker is stopping.")
                 left = timeout - (time.monotonic() - started)
                 if left <= 0:
                     raise DumpFailed(f"The copy of {hub.slug} took longer than {timeout:g} s and was stopped.")
                 try:
-                    process.wait(timeout=min(POLL_SECONDS, left))
+                    process.wait(timeout=min(POLL_SECONDS, STOP_CHECK_SECONDS, left))
                     break
                 except subprocess.TimeoutExpired:
-                    if heartbeat is not None:
+                    if heartbeat is not None and time.monotonic() - last_beat >= POLL_SECONDS:
                         heartbeat()
+                        last_beat = time.monotonic()
         except BaseException:
             process.kill()
             process.wait()
