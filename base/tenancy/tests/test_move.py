@@ -141,7 +141,8 @@ def run(now: dt.datetime = AT, **kwargs) -> int:
 class TestAMove:
     def test_the_hub_moves_with_its_data_and_leaves_its_copy_behind(self, moves):
         target = moves.cluster()
-        hub = moves.hub(to=target)
+        # Its schema noted behind (a deploy in course): brought to the code's leaf on its new cluster.
+        hub = moves.hub(to=target, schema_state=Hub.SchemaState.BEHIND)
         control = tenancy_connections.control_name()
         copy = names.moved_db_name(control, hub.id)
 
@@ -485,3 +486,24 @@ def test_the_moves_lease_is_provisionings_and_its_copies_last_a_week():
     from base.tenancy import provision
 
     assert (move.LEASE, move.MOVED_COPY_DAYS) == (provision.LEASE, 7)
+
+
+def test_the_restore_leaves_out_the_extensions_and_the_public_schema_of_the_copy():
+    # On Aurora only the master makes ``vector``: the destination's template has it, and the restore must neither drop
+    # nor make it (nor the public schema, which holds its objects). The tests' superuser would not notice.
+    listing = """;
+; Archive created at 2026-10-31 18:00:00 UTC
+3; 2615 2200 SCHEMA - public pg_database_owner
+4; 0 0 COMMENT - SCHEMA public pg_database_owner
+2; 3079 16385 EXTENSION - vector
+5; 0 0 COMMENT - EXTENSION vector
+230; 1259 16500 TABLE public base_hub_identity hub_migrator
+4012; 0 16500 TABLE DATA public base_hub_identity hub_migrator
+"""
+
+    kept = move._kept_entries(listing)
+
+    assert [line for line in kept if not line.startswith(";")] == [
+        "230; 1259 16500 TABLE public base_hub_identity hub_migrator",
+        "4012; 0 16500 TABLE DATA public base_hub_identity hub_migrator",
+    ]

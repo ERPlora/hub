@@ -347,7 +347,7 @@ def _restore(path: Path, name: str, cluster, heartbeat: Callable[[], None], canc
         listing = subprocess.run([tool, "--list", str(path)], check=True, capture_output=True, text=True).stdout
     except subprocess.CalledProcessError as failed:
         raise MoveFailed("move_restore_failed", f"its copy could not be read: {failed.stderr.strip()}") from failed
-    kept = [line for line in listing.splitlines() if not any(entry in line for entry in SKIPPED_ENTRIES)]
+    kept = _kept_entries(listing)
     entries = path.with_suffix(".list")
     entries.write_text("\n".join(kept) + "\n", encoding="utf-8")
     conninfo = tenancy_connections.migrator_conninfo(name, cluster=cluster)
@@ -366,6 +366,11 @@ def _restore(path: Path, name: str, cluster, heartbeat: Callable[[], None], canc
         str(path),
     ]
     _run(command, password, path.with_suffix(".restore.err"), heartbeat, cancelled, what=f"the restore of {name}")
+
+
+def _kept_entries(listing: str) -> list[str]:
+    """The lines of ``pg_restore --list`` the restore keeps: all but :data:`SKIPPED_ENTRIES`."""
+    return [line for line in listing.splitlines() if not any(entry in f"{line} " for entry in SKIPPED_ENTRIES)]
 
 
 def _run(command: list[str], password: str, errors_path: Path, heartbeat, cancelled, *, what: str) -> None:
