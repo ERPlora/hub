@@ -389,11 +389,11 @@ def _department_out(ctx: OperationContext, department: Department) -> dict:
         risk="normal",
         asks={
             "en": (
-                "add a Bakery section for open prices at 10% VAT",
+                "add a Bakery section for open prices at the reduced rate",
                 "create a section for loose sweets",
             ),
             "es": (
-                "crea una sección «Bollería» al 10 %",
+                "crea una sección «Bollería» con el IVA de la comida",
                 "añade un departamento para las chuches a granel",
             ),
         },
@@ -423,11 +423,11 @@ def create_department(ctx: OperationContext, data: DepartmentIn) -> dict:
         risk="normal",
         asks={
             "en": (
-                "change the drinks section to 21% VAT",
+                "move the drinks section to the standard VAT rate",
                 "rename the Misc section to Others",
             ),
             "es": (
-                "pon la sección de bebidas al 21 %",
+                "pon la sección de bebidas al IVA general",
                 "renombra el departamento «Varios» a «Otros»",
             ),
         },
@@ -2694,7 +2694,7 @@ def void_sale(ctx: OperationContext, data: VoidIn) -> dict:
         asks={
             "en": (
                 "issue the invoice that got stuck for sale 12",
-                "the ticket never got its fiscal document, send it now",
+                "issue the fiscal document that is still pending for that ticket",
             ),
             "es": (
                 "emite ya la factura pendiente de la venta 12",
@@ -2869,7 +2869,7 @@ def _refund_replay(data: RefundIn) -> dict | None:
             "es": (
                 "devuélvele el dinero de la última venta",
                 "devuelve 5 € del ticket 7, que el café estaba frío",
-                "ha traído una camiseta de vuelta, hazle el reembolso",
+                "ha devuelto un producto, hazle el reembolso",
             ),
         },
     ),

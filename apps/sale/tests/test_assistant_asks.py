@@ -5,15 +5,18 @@ Spanish). Each of those phrases, put to the same selection a turn makes (``live.
 own tool among the first ten offered — with no model and no network — as each role that holds it.
 
 The catalogue is the Hub's own (``base.assistant.catalog``: the role's permissions, the writes a manager may approve,
-what is never done from the chat) in a business with Sales & POS, the apps it requires and the platform on; the turn
-ranks as the Hub's does (``base.assistant.ALWAYS`` first, ``live.assistant.app_words``).
+what is never done from the chat) in a business with Sales & POS, the apps it requires and the platform on, and nothing
+else; the turn ranks as the Hub's does (``base.assistant.ALWAYS`` first, ``live.assistant.app_words``). A business with
+more apps on (Tables, Inventory, Cash register…) offers more tools that compete for the same words: that wider standard
+is not checked here.
 """
 
 import pytest
-from live.assistant import app_words, tool_name
+from live.assistant import app_words, asks_of, tool_name
 from live.assistant_qa import misses, uncovered
 from live.checks import check_assistant_asks
 from live.meta import all_live_app_configs
+from live.operations import registry
 
 from apps.sale.tests.conftest import ctx_for
 from base import assistant
@@ -21,6 +24,8 @@ from base import assistant
 #: The roles of a business, as the SaaS sends them: the owner holds everything, the employee the till.
 ROLES = ("hub_owner", "hub_manager", "hub_employee")
 LANGUAGES = ("en", "es")
+#: The phrases of sale's tools put to the turn at least, both languages together: a silent drop of asks fails.
+MIN_PHRASES = 200
 #: Where an ask's tool has to come at worst among the tools a turn offers (``ALWAYS`` included).
 TOP = 10
 SALE = tool_name("sale.")
@@ -41,7 +46,8 @@ def with_what_it_requires(label: str) -> set[str]:
 
 @pytest.fixture
 def sale_on(monkeypatch):
-    """A business with Sales & POS on and nothing else but what it needs: the catalogue its people get."""
+    """The business this file covers: Sales & POS, the apps it requires (however deep) and the platform on, every other
+    app off. Its people's catalogue is the narrowest one in which sale is on, not the one of a business with more apps."""
     configs = {config.label: config for config in all_live_app_configs()}
     on = with_what_it_requires("sale")
     monkeypatch.setattr(assistant, "active_apps", lambda scope: {name: configs[name] for name in on})
@@ -70,8 +76,22 @@ def test_every_tool_of_sale_says_how_people_ask_for_it(sale_on, role, language):
 @pytest.mark.parametrize("role", ROLES)
 def test_each_ask_of_sale_is_offered_its_tool_among_the_first_ten(sale_on, role, language):
     tools = tools_of(role, language)
+    sale = [op for op in tools.values() if op.app_label == "sale"]
+    checked = sum(len(asks_of(op).get(language, ())) for op in sale)
+    assert sale and checked >= 2 * len(sale)  # every tool's own phrases are put to the turn, never a silent few
     found = misses(tools, language=language, top=TOP, app_words=app_words, always=assistant.ALWAYS)
     assert [miss for miss in found if miss.tool_name.startswith(SALE)] == []
+
+
+def test_every_phrase_of_every_tool_of_sale_is_checked(sale_on):
+    """The owner holds every tool of sale (none is left out of their catalogue), each says at least two phrases in each
+    language, and they are at least ``MIN_PHRASES`` in all: what the ranking above checks is the whole set."""
+    sale_tools = {name for name, op in registry.items() if op.app_label == "sale" and assistant.is_tool(op)}
+    owner = {name: op for name, op in tools_of("hub_owner", "en").items() if op.app_label == "sale"}
+    assert set(owner) == sale_tools
+    counts = {(name, language): len(asks_of(op).get(language, ())) for name, op in owner.items() for language in LANGUAGES}
+    assert {key: count for key, count in counts.items() if count < 2} == {}
+    assert sum(counts.values()) >= MIN_PHRASES
 
 
 def test_what_the_employee_may_not_do_is_not_in_their_catalogue(sale_on):
