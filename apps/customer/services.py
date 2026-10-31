@@ -380,7 +380,7 @@ def create_customer(ctx: OperationContext, data: CustomerIn) -> dict:
     },
 )
 def update_customer(ctx: OperationContext, data: CustomerPatchIn) -> dict:
-    customer = find_customer(data.id, data.customer, lock=True)
+    customer = find_customer(data.id, data.customer, lock=True, ctx=ctx)
     sent = {
         field: value
         for field, value in data.model_dump(
@@ -420,9 +420,10 @@ def _field_message(error: dict) -> str:
 
 
 def _import_row(
-    row: ImportRowIn, ctx: OperationContext
+    row: ImportRowIn, phone_country: str
 ) -> tuple[dict, dict[str, str], dict[str, str]]:
-    """A CSV row as the values of a new card, or the reason it is skipped, and what to review."""
+    """A CSV row as the values of a new card, or the reason it is skipped, and what to review; a phone without prefix
+    is read in ``phone_country`` (the business's, read once per import)."""
     raw = {
         field: value[1:] if value.startswith(EXPORT_GUARD) else value
         for field, value in row.model_dump().items()
@@ -455,7 +456,7 @@ def _import_row(
             )
         return {}, errors, warnings
     try:
-        values["phone"] = to_e164(values["phone"], business_country(ctx))
+        values["phone"] = to_e164(values["phone"], phone_country)
     except InvalidPhone:
         return {}, {"phone": str(PHONE_INVALID)}, warnings
     return values, {}, warnings
@@ -491,8 +492,9 @@ def _already_imported(values: dict) -> bool:
 )
 def import_customers(ctx: OperationContext, data: ImportIn) -> dict:
     rows = []
+    phone_country = business_country(ctx)
     for index, row in enumerate(data.rows):
-        values, errors, warnings = _import_row(row, ctx)
+        values, errors, warnings = _import_row(row, phone_country)
         customer_id = None
         if not errors and _already_imported(values):
             errors = {"name": str(ALREADY_IMPORTED)}
@@ -570,7 +572,7 @@ def _set_members(
     },
 )
 def set_groups(ctx: OperationContext, data: SetGroupsIn) -> dict:
-    customer = find_customer(data.id, data.customer, lock=True)
+    customer = find_customer(data.id, data.customer, lock=True, ctx=ctx)
     ids = _named_ids(
         CustomerGroup,
         data.group_ids,
@@ -595,7 +597,7 @@ def set_groups(ctx: OperationContext, data: SetGroupsIn) -> dict:
     },
 )
 def set_tags(ctx: OperationContext, data: SetTagsIn) -> dict:
-    customer = find_customer(data.id, data.customer, lock=True)
+    customer = find_customer(data.id, data.customer, lock=True, ctx=ctx)
     ids = _named_ids(
         CustomerTag,
         data.tag_ids,
@@ -621,7 +623,7 @@ def set_tags(ctx: OperationContext, data: SetTagsIn) -> dict:
     },
 )
 def delete_customer(ctx: OperationContext, data: CustomerRefIn) -> dict:
-    customer = find_customer(data.id, data.customer, lock=True, live=False)
+    customer = find_customer(data.id, data.customer, lock=True, live=False, ctx=ctx)
     if customer.deleted_at is None:
         customer.deleted_at = timezone.now()
         customer.is_active = False
@@ -644,8 +646,8 @@ def delete_customer(ctx: OperationContext, data: CustomerRefIn) -> dict:
     },
 )
 def merge_customers(ctx: OperationContext, data: MergeIn) -> dict:
-    survivor_id = find_customer(data.id, data.customer).id
-    absorbed_id = find_customer(data.absorbed_id, data.absorbed).id
+    survivor_id = find_customer(data.id, data.customer, ctx=ctx).id
+    absorbed_id = find_customer(data.absorbed_id, data.absorbed, ctx=ctx).id
     if survivor_id == absorbed_id:
         raise InvalidPayload(
             SAME_CUSTOMER,
@@ -762,7 +764,7 @@ def _merge_health(survivor: Customer, absorbed: Customer) -> None:
     },
 )
 def erase_customer(ctx: OperationContext, data: EraseIn) -> dict:
-    customer = find_customer(data.id, data.customer, lock=True, live=False)
+    customer = find_customer(data.id, data.customer, lock=True, live=False, ctx=ctx)
     # The same person's duplicates merged into this card keep their own data (CUSTOMER-F13):
     # erasing the person erases them too, however deep the chain, all locked in this transaction.
     cards, pending = [customer], [customer.id]
@@ -827,7 +829,7 @@ def _erase_card(ctx: OperationContext, customer: Customer, reason: str) -> None:
     },
 )
 def add_note(ctx: OperationContext, data: NoteIn) -> Activity:
-    customer = find_customer(data.customer_id, data.customer, lock=True)
+    customer = find_customer(data.customer_id, data.customer, lock=True, ctx=ctx)
     entry = Activity.objects.create(
         customer=customer,
         kind=Activity.Kind.NOTE_ADDED,
@@ -856,7 +858,7 @@ def add_note(ctx: OperationContext, data: NoteIn) -> Activity:
     },
 )
 def add_activity(ctx: OperationContext, data: ActivityIn) -> Activity:
-    customer = find_customer(data.customer_id, data.customer, lock=True)
+    customer = find_customer(data.customer_id, data.customer, lock=True, ctx=ctx)
     entry = Activity.objects.create(
         customer=customer,
         kind=data.kind,
@@ -891,7 +893,7 @@ def _contact_point(customer: Customer, channel: str) -> str:
 
 
 def _record_consent(ctx: OperationContext, data, state: str) -> Consent:
-    customer = find_customer(data.customer_id, data.customer, lock=True)
+    customer = find_customer(data.customer_id, data.customer, lock=True, ctx=ctx)
     now = timezone.now()
     occurred_at = data.occurred_at or now
     if occurred_at > now + CLOCK_SKEW:
@@ -1044,7 +1046,7 @@ def _health_fact(
     ai=INTERNAL,
 )
 def grant_health(ctx: OperationContext, data: HealthGrantIn) -> dict:
-    customer = find_customer(data.customer_id, data.customer, lock=True)
+    customer = find_customer(data.customer_id, data.customer, lock=True, ctx=ctx)
     _health_fact(ctx, data, customer, Consent.State.GRANTED)
     return load_health(customer)
 
@@ -1059,7 +1061,7 @@ def grant_health(ctx: OperationContext, data: HealthGrantIn) -> dict:
     ai=INTERNAL,
 )
 def withdraw_health(ctx: OperationContext, data: HealthWithdrawIn) -> dict:
-    customer = find_customer(data.customer_id, data.customer, lock=True)
+    customer = find_customer(data.customer_id, data.customer, lock=True, ctx=ctx)
     _health_fact(ctx, data, customer, Consent.State.WITHDRAWN)
     # Withdrawing the only ground to keep them erases them in the same step (GDPR arts. 7.3, 17.1.b).
     HealthRecord.objects.filter(customer=customer).delete()
@@ -1076,7 +1078,7 @@ def withdraw_health(ctx: OperationContext, data: HealthWithdrawIn) -> dict:
     ai=INTERNAL,
 )
 def update_health(ctx: OperationContext, data: HealthIn) -> dict:
-    customer = find_customer(data.customer_id, data.customer, lock=True)
+    customer = find_customer(data.customer_id, data.customer, lock=True, ctx=ctx)
     fact = health_consent(customer)
     if fact is None or fact.state != Consent.State.GRANTED:
         raise Conflict(HEALTH_CONSENT_REQUIRED, code="customer.health_consent_required")
@@ -1139,7 +1141,7 @@ def link_order(ctx: OperationContext, data: OrderLinkIn) -> dict:
     unlinking = data.customer_id is None and not (data.customer or "").strip()
     # The card before the link, the order a merge takes them in (cards, then what hangs from them).
     customer = (
-        None if unlinking else find_customer(data.customer_id, data.customer, lock=True)
+        None if unlinking else find_customer(data.customer_id, data.customer, lock=True, ctx=ctx)
     )
     link = OrderLink.objects.select_for_update().filter(order_id=data.order_id).first()
     if customer is None:
