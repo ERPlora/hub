@@ -109,7 +109,7 @@ onBeforeUnmount(() => {
       </button>
       <main class="access__column">
         <span
-          class="erp-logo md access__logo"
+          class="erp-logo md"
           aria-hidden="true"
         >
           <i class="erp-nw" /><i class="erp-n" /><i class="erp-ne" />
@@ -379,37 +379,5 @@ onBeforeUnmount(() => {
   margin: 0;
   font-size: 0.75rem;
   color: var(--ion-color-medium);
-}
-
-/* A screen that is not tall (a tablet in landscape, 776 px under the native app's status bar, less in its browser; a
-   laptop; a phone): less room around the logo, a smaller logo and a tighter card, so the PIN pad's four rows (the 0
-   and erase) fit without scrolling, even under the notice of a session that ended (hub#441). */
-@media (max-height: 960px) {
-  .access__column {
-    padding: 12px 16px;
-    gap: 8px;
-  }
-
-  .erp-logo.access__logo {
-    --u: 0.444px;
-  }
-
-  .access__card {
-    padding: 12px 16px;
-    gap: 8px;
-  }
-
-  .access__pin,
-  .access__account {
-    gap: 6px;
-  }
-}
-
-/* A low screen (a phone 667 px tall; a tablet's or a laptop's browser): the notice of a session that ended keeps its
-   two lines with less room around them, so the pad under it keeps its last row, the 0 and erase, on screen (hub#441). */
-@media (max-height: 740px) {
-  .access__notice {
-    --padding: 8px 12px;
-  }
 }
 </style>

@@ -511,12 +511,7 @@ Si falla: mientras carga, baldosas grises y «Cargando tus apps…» para el lec
 «Aquí aparecerán tus apps. Añade las que necesite tu negocio.». Si no se pudo leer la lista: «No se han
 podido cargar tus apps. Recarga la página; si sigue fallando, vuelve a iniciar sesión.», nunca que no
 hay apps. En una aplicación de Android antigua, que aún no sabe quedarse en segundo plano, el botón atrás
-vuelve a ser el del sistema. Tras una actualización de ERPlora, una pantalla que esa pestaña aún no había abierto
-se abre igual (desde una baldosa, «Mis apps», el menú o cualquier botón), en una carga nueva de la página, que ya
-trae la versión nueva; nunca se queda el toque sin hacer nada. Si el servidor no responde (sin conexión o con la red
-inestable), la persona se queda donde estaba y un aviso dice «No se ha podido abrir <app>. Comprueba la conexión e
-inténtalo de nuevo.» («esa página» si la pantalla no es de una app), con «Reintentar», que vuelve a probar y la abre
-en cuanto el servidor responde.
+vuelve a ser el del sistema.
 Implicados: ninguno
 
 ### BASE-F06 Ver los paneles de las apps en Inicio
@@ -1526,9 +1521,7 @@ Pasos:
      PIN», «…o pasa tu placa: no hace falta elegir tu nombre antes.» y «Elige tu usuario» con una cara por
      persona (iniciales y nombre; nunca su correo). Con una sola persona, ya sale elegida.
   2. Toca tu nombre: sale «PIN de {name}» y el teclado con tantos círculos como dígitos tenga el PIN del negocio.
-     La flecha («Cambiar usuario») vuelve a las caras. El teclado se ve entero, hasta el 0 y el de borrar, sin
-     desplazar la pantalla: en una tablet en horizontal (también dentro de su navegador), un portátil o un móvil
-     bajo, el nombre sale sin la cara grande y las teclas se juntan algo, siempre del tamaño de un dedo.
+     La flecha («Cambiar usuario») vuelve a las caras.
   3. Teclea el PIN: entra solo al último dígito, sin botón.
   4. Entras en la pantalla que habías pedido o en **Inicio**. El pie dice «ERPlora · dispositivo de confianza».
 Entra: las personas del negocio con PIN, releídas cada minuto y al volver a la pantalla: quien recibe un PIN
@@ -1591,8 +1584,7 @@ Pasos:
   2. Lo siguiente que abre la lleva a la entrada; si la sesión se cerró porque quitaron el dispositivo o la
      persona dejó el negocio, lo que tiene abierto se entera al momento.
   3. En una caja con pinpad, **Acceso** dice arriba «Tu sesión ha terminado» — «Caducó o se cerró. Vuelve a
-     entrar.» y, debajo, el teclado entero (también en una tablet en horizontal o un móvil bajo): la siguiente
-     persona entra con su PIN. En un dispositivo sin pinpad va a la entrada de erplora.com,
+     entrar.» y la siguiente persona entra con su PIN. En un dispositivo sin pinpad va a la entrada de erplora.com,
      que la devuelve dentro si su sesión allí sigue abierta.
 Entra: la sesión que ya no existe.
 Sale: nada guardado; la venta a medias la conserva su app.
