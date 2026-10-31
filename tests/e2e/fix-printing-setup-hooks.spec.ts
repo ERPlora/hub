@@ -87,16 +87,36 @@ async function setUpDevice(context: BrowserContext, device: string): Promise<str
   return ((await res.json()) as { id: string }).id;
 }
 
+/** A `/api/live` the page opened: when, and the operations it carries (its `s`, base64 of the subscriptions). */
+interface Stream {
+  at: number;
+  ops: string[];
+}
+
+function streamOf(url: string): Stream {
+  let ops: string[] = [];
+  try {
+    const subscriptions: unknown = JSON.parse(Buffer.from(new URL(url).searchParams.get('s') ?? '', 'base64').toString());
+    if (Array.isArray(subscriptions)) ops = subscriptions.map((subscription: { op?: unknown }) => String(subscription.op));
+  } catch {
+    // Not the SDK's stream: no operations to tell.
+  }
+  return { at: Date.now(), ops };
+}
+
+/** The operations Printing → Devices subscribes, which the Home does not. */
+const DEVICES_OPS = ['printing.device.list', 'printing.printer.list'];
+
 /**
- * The owner on `a` in Spanish, on the Home, with the instant of every `/api/live` the page opens: a new stream brings
- * every result again, so a count that changes without one came over the stream already open, re-run by its events.
+ * The owner on `a` in Spanish, on the Home, with every `/api/live` the page opens: a new stream brings every result
+ * again, so a count that changes without one came over the stream already open, re-run by its events.
  */
 async function spanishOwner(browser: Browser, viewport: { width: number; height: number }) {
   const context = await browser.newContext({ baseURL: A, viewport, locale: 'es-ES' });
   const page = await context.newPage();
-  const streams: number[] = [];
+  const streams: Stream[] = [];
   page.on('request', (request) => {
-    if (request.url().includes('/api/live')) streams.push(Date.now());
+    if (request.url().includes('/api/live')) streams.push(streamOf(request.url()));
   });
   await login(page, A, '/');
   await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
@@ -108,8 +128,8 @@ async function spanishOwner(browser: Browser, viewport: { width: number; height:
 }
 
 /** Waits until the page has opened no `/api/live` for a second: every subscription of the screen is declared. */
-async function settled(streams: number[]): Promise<void> {
-  await expect.poll(() => Date.now() - (streams.at(-1) ?? 0), { timeout: 15_000 }).toBeGreaterThan(1_000);
+async function settled(streams: Stream[]): Promise<void> {
+  await expect.poll(() => Date.now() - (streams.at(-1)?.at ?? 0), { timeout: 15_000 }).toBeGreaterThan(1_000);
 }
 
 const card = (page: Page): Locator => shown(page).locator('[data-testid="setup-card"]');
@@ -150,6 +170,8 @@ FLOW_VIEWPORTS.forEach(({ label, width, height }) => {
       await step(page).locator(`[data-testid="setup-configure-${STEP}"]`).click();
       await expect(page).toHaveURL(`${A}/printing/devices`);
       await expect(shown(page).locator('[data-testid=printing-devices-this]')).toBeVisible();
+      // Devices is live, as a person reads it: its subscriptions are on the stream before going back.
+      await expect.poll(() => DEVICES_OPS.every((op) => streams.at(-1)?.ops.includes(op)), { timeout: 15_000 }).toBe(true);
       await page.goBack();
       await expect(page).toHaveURL(`${A}/`);
       await unfolded(page);
