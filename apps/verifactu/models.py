@@ -476,7 +476,7 @@ WAIT_REASONS = {
         "your own certificate cannot be opened on this server: upload it again"
     ),
     "representation_not_approved": _(
-        "ERPlora still has to approve your signed authorisation to file in production"
+        "ERPlora still has to approve your signed authorisation to file for you"
     ),
     "go_live_forbidden": _(
         "this is a demo business: it always files in the AEAT's test environment"
