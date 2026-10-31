@@ -702,7 +702,7 @@ def gets_copies(hub: Hub) -> bool:
             "reset of the business went (copying, emptying, done or failed, and what was removed)."
         ),
         asks={
-            "en": ("do I have a backup of my data?", "how did the reset of the business go?"),
+            "en": ("do I have a backup of my data?", "show me the copies of my data made before the reset"),
             "es": ("¿tengo una copia de seguridad de mis datos?", "¿cómo fue el restablecimiento del negocio?"),
         },
     ),
