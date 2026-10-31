@@ -112,7 +112,7 @@ function relayPass(): void {
     '    done = relay.run(timezone.now())',
     '    if not (done.taken or done.delivered): break',
   ].join('\n');
-  const out = spawnSync('uv', ['run', 'python', 'manage.py', 'shell', '-c', code], { cwd: HUB_DIR, env: process.env, encoding: 'utf8' });
+  const out = spawnSync('uv', ['run', 'python', 'manage.py', 'shell', '--hub', 'a', '-c', code], { cwd: HUB_DIR, env: process.env, encoding: 'utf8' });
   expect(out.status, `relay pass: ${out.stderr}`).toBe(0);
 }
 
@@ -326,7 +326,7 @@ test('flow-send-message: the day a notice is expected to name reads as the Hub w
     'from apps.schedule.queries import day_label',
     `print(json.dumps([day_label(dt.date.fromisoformat(d), "es") for d in ${JSON.stringify(dates)}]))`,
   ].join('\n');
-  const out = spawnSync('uv', ['run', 'python', 'manage.py', 'shell', '-c', code], { cwd: HUB_DIR, env: process.env, encoding: 'utf8' });
+  const out = spawnSync('uv', ['run', 'python', 'manage.py', 'shell', '--hub', 'a', '-c', code], { cwd: HUB_DIR, env: process.env, encoding: 'utf8' });
   expect(out.status, `day_label: ${out.stderr}`).toBe(0);
   const hub = JSON.parse(out.stdout.trim().split('\n').at(-1) ?? '[]') as string[];
   expect(dates.map(spanishDay)).toEqual(hub);

@@ -182,7 +182,9 @@ def test_a_business_the_saas_registers_is_born_with_every_app_off():
                       timezone="Europe/Madrid", language="es", vertical="restaurant"),
     )
 
-    assert Hub.objects.get(slug="nuevo").status == "ready"
+    # Requested, with its own database to make (round 2026-10-30, S2a): its template carries no app turned on
+    # (base/tenancy/tests/test_provision.py), and nothing turns one on before it is ready.
+    assert Hub.objects.get(slug="nuevo").status == "requested"
     assert modules_on(Scope("host", "nuevo")) == set()
     assert rows("nuevo") == {}
 

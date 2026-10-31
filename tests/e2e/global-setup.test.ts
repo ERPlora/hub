@@ -6,7 +6,9 @@
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { describe, expect, it } from 'vitest';
+import { EventEmitter } from 'node:events';
+
+import { describe, expect, it, vi } from 'vitest';
 
 import globalSetup, {
   assertDemoAccountsSeeded,
@@ -15,8 +17,13 @@ import globalSetup, {
   DEMO_ACCOUNTS,
   managePy,
   psqlOn,
+  startWorker,
+  WORKER_READY,
+  WORKER_START_TIMEOUT_MS,
   type CommandResult,
   type Spawn,
+  type SpawnWorker,
+  type StartWorker,
 } from './global-setup';
 import { STACK } from './stack';
 
@@ -468,9 +475,38 @@ describe('globalSetup', () => {
     const manage = readyManagePy();
     const saas = seededSaasSql();
 
-    expect(() => globalSetup({ workers: 1 }, manage.run, saas.run)).not.toThrow();
+    const started: string[][] = [];
+    const stop = async (): Promise<void> => undefined;
+    const start: StartWorker = async (database, saasDatabase) => (started.push([database, saasDatabase]), stop);
+
+    expect(() => globalSetup({ workers: 1 }, manage.run, saas.run, start)).not.toThrow();
     expect(manage.calls.map((args) => args[0])).toEqual(['migrate', 'migrate_hubs', 'seed_local_hubs']);
     expect(saas.statements).toHaveLength(1);
+    // Then the worker, which makes the databases of the hubs registered during the run (round 2026-10-30, S2a).
+    expect(started).toEqual([[STACK.database, STACK.saasDatabase]]);
+  });
+
+  it('gives Playwright the stop of its worker as the teardown of the run', async () => {
+    const manage = readyManagePy();
+    const saas = seededSaasSql();
+    let stopped = 0;
+    const start: StartWorker = async () => async () => {
+      stopped += 1;
+    };
+
+    const teardown = await globalSetup({ workers: 1 }, manage.run, saas.run, start);
+    await teardown();
+
+    expect(stopped).toBe(1);
+  });
+
+  it('starts no worker when a check stops the run', () => {
+    const manage = readyManagePy();
+    let started = 0;
+    const start: StartWorker = async () => ((started += 1), async () => undefined);
+
+    expect(() => globalSetup({ workers: 1 }, manage.run, () => ({ status: 0, stdout: '', stderr: '' }), start)).toThrow();
+    expect(started).toBe(0);
   });
 
   it("stops the run before the first spec when the stack's SaaS has no demo accounts", () => {
@@ -487,5 +523,90 @@ describe('globalSetup', () => {
 
     expect(() => globalSetup({ workers: 1 }, manage.run, none)).toThrow(`HUB_INTERNAL_URL=http://127.0.0.1:${STACK.hubPort} `);
     expect(() => globalSetup({ workers: 1 }, manage.run, none)).toThrow(`psql -U hub -d ${STACK.database} -At -c `);
+  });
+});
+
+
+describe('startWorker', () => {
+  /** A `run_worker` child as `spawn` returns it: its two outputs, its exit and the signals it was sent. */
+  class FakeWorker extends EventEmitter {
+    stdout = new EventEmitter();
+    stderr = new EventEmitter();
+    exitCode: number | null = null;
+    signals: string[] = [];
+
+    kill(signal: string): boolean {
+      this.signals.push(signal);
+      return true;
+    }
+
+    exit(code: number): void {
+      this.exitCode = code;
+      this.emit('exit', code, null);
+    }
+  }
+
+  function spawned(): { worker: FakeWorker; calls: Parameters<SpawnWorker>[]; spawn: SpawnWorker } {
+    const worker = new FakeWorker();
+    const calls: Parameters<SpawnWorker>[] = [];
+    return { worker, calls, spawn: (...args) => (calls.push(args), worker as never) };
+  }
+
+  it("runs this checkout's run_worker on the stack's databases and is up once it waits for work", async () => {
+    const { worker, calls, spawn } = spawned();
+
+    const up = startWorker('hub_e2e_8030', 'saas_e2e_8031', spawn, { PATH: '/bin' });
+    worker.stderr.emit('data', Buffer.from('INFO base.worker worker: registering\n'));
+    worker.stderr.emit('data', Buffer.from(`INFO base.worker ${WORKER_READY} (3 app(s) registered).\n`));
+    const stop = await up;
+
+    const [command, args, options] = calls[0];
+    // Databases only: the specs play the relay and the tasks themselves, so a worker relaying too would race them.
+    expect([command, args]).toEqual(['uv', ['run', 'python', 'manage.py', 'run_worker', '--databases-only']]);
+    expect(options.cwd).toBe(HUB_DIR);
+    expect(options.env).toMatchObject({ PATH: '/bin', DB_NAME: 'hub_e2e_8030', SHARED_DB_NAME: 'saas_e2e_8031' });
+    expect(typeof stop).toBe('function');
+  });
+
+  it('is stopped as ECS stops it, with SIGTERM, and is done once it exits', async () => {
+    const { worker, spawn } = spawned();
+    const up = startWorker('hub_e2e_8030', 'saas_e2e_8031', spawn, {});
+    worker.stdout.emit('data', Buffer.from(`${WORKER_READY}\n`));
+    const stop = await up;
+
+    const stopping = stop();
+    expect(worker.signals).toEqual(['SIGTERM']);
+    worker.exit(0);
+    await stopping;
+    await stop();
+
+    expect(worker.signals).toEqual(['SIGTERM']);
+  });
+
+  it('fails the run with what the worker said when it exits before it waits for work', async () => {
+    const { worker, spawn } = spawned();
+    const up = startWorker('hub_e2e_8030', 'saas_e2e_8031', spawn, {});
+
+    worker.stderr.emit('data', Buffer.from('ERROR base.worker worker: register_apps failed; the worker stops.\n'));
+    worker.exit(1);
+
+    await expect(up).rejects.toThrow(/run_worker of the e2e \(DB_NAME=hub_e2e_8030\) exited with 1[\s\S]*register_apps failed/);
+  });
+
+  it('fails the run and stops the worker when it never waits for work in time', async () => {
+    vi.useFakeTimers();
+    try {
+      const { worker, spawn } = spawned();
+      const up = startWorker('hub_e2e_8030', 'saas_e2e_8031', spawn, {});
+      const failed = expect(up).rejects.toThrow(`did not wait for work within ${WORKER_START_TIMEOUT_MS / 1000} s`);
+
+      worker.stderr.emit('data', Buffer.from('WARNING base.worker worker: shared schema not migrated yet\n'));
+      await vi.advanceTimersByTimeAsync(WORKER_START_TIMEOUT_MS);
+
+      await failed;
+      expect(worker.signals).toEqual(['SIGTERM']);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

@@ -96,3 +96,50 @@ msgstr "listo el"
 msgctxt "hub registry"
 msgid "cancelled at"
 msgstr "cancelado el"
+
+msgctxt "hub status"
+msgid "Creating"
+msgstr "Creando"
+
+msgctxt "hub status"
+msgid "Migrating"
+msgstr "Migrando"
+
+msgctxt "hub status"
+msgid "Seeding"
+msgstr "Sembrando datos"
+
+msgctxt "hub status"
+msgid "Archiving"
+msgstr "Archivando"
+
+msgctxt "hub status"
+msgid "Dropping"
+msgstr "Borrando"
+
+msgid "attempts"
+msgstr "intentos"
+
+msgid "last error"
+msgstr "último error"
+
+msgid "next attempt"
+msgstr "próximo intento"
+
+msgid "hub limit"
+msgstr "máximo de hubs"
+
+msgid "0 = no limit."
+msgstr "0 = sin límite."
+
+msgid "credentials secret"
+msgstr "secreto de credenciales"
+
+msgid "The prefix of this cluster's two Secrets Manager secrets (…/app and …/migrator); empty, the environment's roles."
+msgstr "El prefijo de los dos secretos de Secrets Manager de este clúster (…/app y …/migrator); vacío, los roles del entorno."
+
+msgid "Empty: its hubs are reached on its writer, directly."
+msgstr "Vacío: a sus hubs se llega por su escritor, directamente."
+
+msgid "leased by"
+msgstr "reservado por"

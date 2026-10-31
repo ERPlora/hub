@@ -168,6 +168,13 @@ export function cleanSales(): void {
     [
       `create temp table e2e_orders as ${E2E_ORDERS}`,
       'create temp table e2e_sales as select id from sale_sale where order_id in (select id from e2e_orders)',
+      // Their events, delivered or not: an event about a sale this deletes would reach Invoicing at the next relay
+      // pass (a spec's, as the worker's), find no sale and, after its attempts, stay in System › Failed events (and
+      // the bell) of the business for the specs that come next.
+      `create temp table e2e_events as select id from live_outboxevent
+        where payload->>'sale_id' in (select id::text from e2e_sales) or payload->>'order_id' in (select id::text from e2e_orders)`,
+      'delete from base_eventdelivery where event_id in (select id from e2e_events)',
+      'delete from live_outboxevent where id in (select id from e2e_events)',
       // The paper their charges, reprints and bills asked of Printing, and the kitchen's sheets of their checks
       // (job keys `sale-<sale>-…`, `sale-order-<check>-…`, `kitchen-<ticket>-…`): a sheet left waiting without
       // a printer is the next one a device takes in another spec.

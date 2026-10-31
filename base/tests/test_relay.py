@@ -16,6 +16,7 @@ import logging
 import threading
 from decimal import Decimal
 from importlib import import_module
+from types import SimpleNamespace
 
 import psycopg
 import pytest
@@ -311,6 +312,77 @@ def test_listeners_of_an_event():
     assert relay.listeners(event("sale.order.fired")) == ["flow", "kitchen"]
     assert relay.listeners(event("flow.run.finished")) == []
     assert relay.listeners(event("demo.item.created")) == ["flow"]
+
+
+@pytest.mark.django_db
+def test_an_event_of_the_platform_is_heard_by_no_app_of_a_hub():
+    """Verification of hub#471 in pre: ``base.demo.created`` (control's outbox, the registry's scope) reached Flows
+    («*»), whose reaction ran on control and failed 8 times with ``HubContextMissing``. An event of no hub has no hub
+    to enter: the apps of a hub never hear it."""
+    for name in ("base.demo.created", "base.demo.code_created", "base.hub.registered"):
+        assert relay.listeners(OutboxEvent(scope_kind="platform", scope_key="registry", name=name)) == []
+
+
+def test_the_worker_takes_a_platform_event_without_handing_it_to_any_app(worker_loop, db):
+    from base.registry import REGISTRY_SCOPE
+    from base.tenancy.context import use_control
+
+    with use_control():
+        event = OutboxEvent.objects.create(
+            scope_kind=REGISTRY_SCOPE.kind,
+            scope_key=REGISTRY_SCOPE.key,
+            name="base.demo.created",
+            payload={"slug": "demo-x1234567"},
+            actor="platform",
+        )
+
+    worker_loop()
+
+    event.refresh_from_db()
+    assert event.delivered_at is not None
+    assert not EventDelivery.objects.filter(event=event).exists()
+
+
+class TestTheMigrationThatClosesControlDeliveries:
+    """``base/migrations/0021_close_control_deliveries``: the deliveries of an event of no hub written before the relay
+    stopped handing them to any app (hub#471) would fail on every attempt until given up, each with its traceback;
+    they are closed ``dead`` at once, with why. A hub's own deliveries, and the ones already closed, stay as
+    they are."""
+
+    migration = import_module("base.migrations.0021_close_control_deliveries")
+
+    @staticmethod
+    def delivery(scope_kind, scope_key, *, status=EventDelivery.Status.PENDING, last_error=""):
+        event = OutboxEvent.objects.create(
+            scope_kind=scope_kind, scope_key=scope_key, name="base.demo.created", payload={}, actor="platform"
+        )
+        return EventDelivery.objects.create(
+            event=event, app_label="flow", status=status, next_attempt_at=timezone.now(), last_error=last_error
+        )
+
+    @pytest.mark.django_db
+    def test_a_pending_delivery_of_an_event_of_no_hub_is_closed_dead_with_why(self):
+        from base.tenancy.context import use_control
+
+        with use_control():
+            control = self.delivery("platform", "registry")
+            business = self.delivery("host", "a")
+            done = self.delivery("platform", "registry", status=EventDelivery.Status.DEAD, last_error="Boom")
+
+            self.migration.close_control_deliveries(
+                global_apps, SimpleNamespace(connection=SimpleNamespace(alias=connection.alias))
+            )
+
+            for row in (control, business, done):
+                row.refresh_from_db()
+        assert (control.status, control.last_error.split(":")[0]) == (EventDelivery.Status.DEAD, "control_scope")
+        assert (business.status, business.last_error) == (EventDelivery.Status.PENDING, "")
+        assert (done.status, done.last_error) == (EventDelivery.Status.DEAD, "Boom")
+
+    def test_reverting_it_leaves_them_closed(self):
+        (close,) = self.migration.Migration.operations
+        assert close.reversible
+        assert close.reverse_code is close.noop
 
 
 @pytest.mark.django_db
