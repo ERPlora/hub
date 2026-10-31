@@ -192,7 +192,7 @@ test('printing-assistant-card — in Spanish changing a device’s printers, ret
   await openPanel(page);
 
   // «Que la tablet del mostrador imprima también por la de cocina»: the device and its printers by their names, as the
-  // server sends them (the card's screen says a list by how many it carries: «Impresoras: 2 elementos»).
+  // server sends them and as the card says them, one after another (never «Impresoras: 2 elementos»).
   let sent = sentCard(page);
   await ask(page, `E2E-ASK printing__device__update ${JSON.stringify({ device_id: device.id, printers: [till.id, kitchen.id] })}`);
   await expect(card(page)).toBeVisible();
@@ -202,6 +202,8 @@ test('printing-assistant-card — in Spanish changing a device’s printers, ret
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
     await expect(card(page)).toContainText(`Dispositivo: ${device.name}`);
+    await expect(card(page)).toContainText(`Impresoras: ${till.name}, ${kitchen.name}`);
+    await expect(card(page)).not.toContainText('elementos');
     await expect(card(page)).not.toContainText(AN_ID);
     await untilStill(page);
     await capture(page, `${KEY}-${vp.label}`);
