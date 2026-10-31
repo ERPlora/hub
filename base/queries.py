@@ -457,11 +457,21 @@ def find_app(said: str, *, demo: bool, language: str) -> Any:
     permission=VIEW_HOME,
     input=AppRefIn,
     output=AppRefOut,
-    ai={
-        "description": "Says which of this business's apps a name names, as the person says it (e.g. «Reservas»), or "
-        "an id: its id, its name and whether it is on, off or blocked (a paid app without its right). A name that fits "
-        "several apps is refused naming them: ask the person which one."
-    },
+    ai=AI(
+        description=(
+            "Says which of this business's apps a name names, as the person says it (e.g. «Reservas»), or an id: its "
+            "id, its name and whether it is on, off or blocked (a paid app without its right). A name that fits "
+            "several apps is refused naming them: ask the person which one."
+        ),
+        asks={
+            "en": ("is the reservations app on?", "what state is the website app in?", "do I have the kitchen app?"),
+            "es": (
+                "¿está activada la app de reservas?",
+                "¿en qué estado está la app de la web?",
+                "¿tengo la app de cocina?",
+            ),
+        },
+    ),
 )
 def app_get(ctx: OperationContext, data: AppRefIn) -> dict:
     """Which app ``data.app`` names (``find_app``), with its state as the Apps screen says it: what the assistant's card
