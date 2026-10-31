@@ -167,6 +167,24 @@ def test_the_checklist_read_is_always_at_hand():
     assert "base.setup.status" in [op.name for op in assistant.relevant(tools, ["zzz"], "es")]
 
 
+@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@pytest.mark.parametrize("permissions", [EMPLOYEE, MANAGER, {"*"}])
+def test_the_documentation_search_is_always_at_hand_for_everybody(permissions):
+    """saas ASSISTANT-F28 (Ioan, 2026-10-31: «everything it is asked, it answers with our information, inventing
+    nothing»): a how-to question («¿cómo abro la caja?») shares no word with the tool, so it is in every turn."""
+    assert "base.docs.search" in assistant.ALWAYS
+    tools = assistant.catalog(ctx(permissions))
+    assert "base.docs.search" in tools
+    assert "base.docs.search" in [op.name for op in assistant.relevant(tools, ["¿cómo abro la caja?"], "es")]
+
+
+@pytest.mark.parametrize(("language", "name"), [("en", "Help"), ("es", "Ayuda")])
+def test_a_documentation_search_is_named_help_on_its_receipt(language, name):
+    """As the panel of erplora.com names it: the help, not a screen of the business."""
+    with translation.override(language):
+        assert assistant.app_name(get("base.docs.search")) == name
+
+
 def test_a_tool_is_offered_in_the_gateways_format():
     spec = assistant.tool_spec(get("demo.item.create"))
     assert spec["type"] == "function"
@@ -953,6 +971,18 @@ def test_arguments_that_do_not_fit_come_back_to_the_model_with_the_field():
 
 
 # ── The instructions of a turn (gh:hub#1039, #1045, #1046) ───────────────────────────────────────────────────────
+
+
+def test_the_instructions_answer_how_to_questions_only_from_the_documentation():
+    """saas ASSISTANT-F28: how ERPlora works comes from its documentation, cited; what it does not cover is said, never
+    made up. Its records still come only from its tools."""
+    text = " ".join(assistant.instructions(language="es", currency="EUR", decimals=2, business="Bar Pepe", screens={}).split())
+    assert (
+        "For questions about how ERPlora works (how to do something, what an option means, plans), search the "
+        "documentation with `base__docs__search` and answer only from what it returns, citing the section; if it "
+        "returns nothing, say the documentation does not cover it."
+    ) in text
+    assert "Never invent a record" in text
 
 
 def test_the_instructions_set_the_language_the_money_and_the_screens():
