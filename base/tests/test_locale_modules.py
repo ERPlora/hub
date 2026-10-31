@@ -38,7 +38,6 @@ SHADOWED = {
     "cash_register": 5,
     "combo": 1,
     "flow": 7,
-    "invoice": 9,
     "kitchen": 7,
     "modifier": 2,
     "online_booking": 1,

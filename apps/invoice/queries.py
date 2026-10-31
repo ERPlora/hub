@@ -19,6 +19,7 @@ from django.utils import timezone, translation
 from django.utils.formats import date_format
 from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import pgettext_lazy
 from live.context import OperationContext
 from live.errors import AppInactive, Conflict, NotFound
 from live.operations import UnknownOperation, operation
@@ -82,9 +83,10 @@ DOC_RECTIFYING = _("Rectifying invoice")
 DOC_COPY = _("Copy")
 TAX_VAT = _("VAT")
 TAX_SURCHARGE = _("Equivalence surcharge")
-TAX_EXEMPT = _("Exempt")
+# «Exento» and «No sujeto», as the invoice's screen says them, not taxes' «Exenta» and «No sujeta».
+TAX_EXEMPT = pgettext_lazy("invoice", "Exempt")
 TAX_EXEMPT_CAUSE = _("Exempt (%(cause)s)")
-TAX_NOT_SUBJECT = _("Not subject")
+TAX_NOT_SUBJECT = pgettext_lazy("invoice", "Not subject")
 TAX_REVERSE_CHARGE = _("Reverse charge")
 RECTIFIES_NOTE = _("Rectifies invoice %(number)s. Reason: %(reason)s")
 RECTIFIES_NOTE_NO_REASON = _("Rectifies invoice %(number)s.")
@@ -484,10 +486,10 @@ def _tax_label(item: dict, language: str) -> list[tuple[str, int, int]]:
         label = (
             gettext(TAX_EXEMPT_CAUSE) % {"cause": cause}
             if cause
-            else gettext(TAX_EXEMPT)
+            else str(TAX_EXEMPT)
         )
     elif qualification in ("not_subject", "not_subject_location"):
-        label = gettext(TAX_NOT_SUBJECT)
+        label = str(TAX_NOT_SUBJECT)
     elif qualification == "subject_reverse":
         label = gettext(TAX_REVERSE_CHARGE)
     else:

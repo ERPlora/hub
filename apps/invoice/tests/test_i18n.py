@@ -9,7 +9,7 @@ import pytest
 from django.apps import apps
 from django.core.validators import RegexValidator
 from django.utils import translation
-from live.operations import registry
+from live.operations import get, registry
 
 from apps.invoice import platform, queries, schemas, services
 from apps.invoice.models import (
@@ -20,10 +20,13 @@ from apps.invoice.models import (
     InvoiceType,
     Issuer,
 )
+from apps.invoice.tests.conftest import ctx_for, run
+from base import assistant
 
 APP = Path(apps.get_app_config("invoice").path)
 LOCALE = APP / "locale" / "es" / "LC_MESSAGES"
 TEMPLATE = APP / "templates" / "invoice" / "invoice.html"
+SCREENS = json.loads((APP / "frontend" / "locale" / "es.json").read_text(encoding="utf-8"))["invoice"]
 _STRING = re.compile(r'^"(.*)"$')
 _ESCAPE = re.compile(r"\\(.)")
 _ESCAPES = {"n": "\n", "t": "\t"}
@@ -54,7 +57,8 @@ def po_entries(path: Path) -> dict[str, tuple[str, bool]]:
         ) or (line.startswith("#") and current == "msgstr")
         if starts_entry:
             flush()
-            parts, fuzzy, current = {"msgctxt": [], "msgid": [], "msgstr": []}, False, None
+            # A ``#, fuzzy`` above a ``msgctxt`` belongs to the entry the context opens: only a new comment forgets it.
+            parts, fuzzy, current = {"msgctxt": [], "msgid": [], "msgstr": []}, fuzzy and current is None, None
         if line.startswith("#,") and "fuzzy" in line:
             fuzzy = True
         elif line.startswith(("msgctxt ", "msgid ", "msgstr ")):
@@ -196,3 +200,90 @@ def test_an_error_message_follows_the_language_of_the_request(client, make_user)
     )
     assert response.status_code == 409
     assert response.json()["error"]["message"].startswith("Configura el emisor")
+
+
+# Django joins every app's Spanish catalogue and the first that translates a message wins, so a text invoice says
+# with its own words reads another app's when that app comes earlier (base/tests/test_locale_modules.py).
+# FIX-HUB-INVOICE-ES-TEXTS-SHADOWED-BY-AN-EARLIER-APP.
+
+
+def test_a_series_an_issuer_and_an_invoice_say_their_own_words_in_spanish():
+    """As the admin shows them: a series is «activa», «creada el», «actualizada por»… (a series, never demo's or
+    auth's «creado el», «activo»), the issuer's tax ID is «NIF» and its address «domicilio» (never customer's
+    «NIF/CIF» and «dirección»), and the issuer, a masculine word, «actualizado el» and «actualizado por»."""
+
+    def said(model, *names: str) -> dict[str, str]:
+        return {name: str(model._meta.get_field(name).verbose_name) for name in names}
+
+    with translation.override("es"):
+        assert said(InvoiceSeries, "is_active", "created_at", "created_by", "updated_at", "updated_by") == {
+            "is_active": "activa",
+            "created_at": "creada el",
+            "created_by": "creada por",
+            "updated_at": "actualizada el",
+            "updated_by": "actualizada por",
+        }
+        assert said(Issuer, "tax_id", "address", "updated_at", "updated_by") == {
+            "tax_id": "NIF",
+            "address": "domicilio",
+            "updated_at": "actualizado el",
+            "updated_by": "actualizado por",
+        }
+        assert said(Invoice, "updated_at") == {"updated_at": "actualizada el"}
+
+
+def test_the_card_says_a_series_active_and_the_issuer_s_tax_id_and_address_as_their_screens_do():
+    """The assistant's card names these data by their models' names: «Activa» as the series form says it, «NIF» and
+    «Domicilio» as the Issuer screen does, never auth's «Activo» nor customer's «NIF/CIF» and «Dirección»."""
+
+    def card(name: str) -> dict[str, str]:
+        op = get(name)
+        arguments = dict.fromkeys(op.input.model_json_schema()["properties"], "x")
+        return {field["name"]: field["label"] for field in assistant.card(op, arguments, "es")["fields"]}
+
+    for name in ("invoice.series.create", "invoice.series.update"):
+        assert card(name)["is_active"] == SCREENS["series"]["form"]["active"] == "Activa", name
+    for name in ("invoice.issuer.update", "invoice.issuer.sync"):
+        said = card(name)
+        assert (said["tax_id"], said["address"]) == (
+            SCREENS["issuer"]["fields"]["taxId"],
+            SCREENS["issuer"]["fields"]["address"],
+        ) == ("NIF", "Domicilio"), name
+
+
+@pytest.mark.django_db
+def test_the_printed_breakdown_says_exempt_and_not_subject_as_the_invoice_screen_does(issuer):
+    """The A4 paper's breakdown (INVOICE-F18) in Spanish: an exempt line «Exento» and one not subject «No sujeto», as
+    the invoice's screen says them, never taxes' «Exenta» and «No sujeta»."""
+    for category, operation_class in (("product.generic", "exempt"), ("service.generic", "not_subject")):
+        run(
+            "tax.rule.create",
+            {
+                "country_code": "ES",
+                "region_code": "ES-CN",
+                "tax_category_key": category,
+                "rate_pct": "0",
+                "tax_type": "igic",
+                "operation_class": operation_class,
+            },
+        )
+    run("tax.settings.update", {"region_code": "ES-CN"})
+    invoice = run(
+        "invoice.invoice.create",
+        {
+            "customer_name": "Talleres Pérez SL",
+            "customer_tax_id": "B12345674",
+            "customer_address": "Calle Luna 3",
+            "lines": [
+                {"description": "Book", "quantity": "1", "unit_price": 1000, "tax_category_key": "product.generic"},
+                {"description": "Advice", "quantity": "1", "unit_price": 2000, "tax_category_key": "service.generic"},
+            ],
+        },
+    )
+    assert sorted(entry.qualification for entry in invoice.tax_breakdown) == ["exempt", "not_subject"]
+    html = run("invoice.invoice.document", {"number": invoice.number}, ctx_for(language="es")).html
+    # Each breakdown row of the totals: its label, then its base in brackets.
+    rows = re.findall(r'<td class="muted">\s*([^<]+?)\s*<span class="muted">\(', html)
+    assert (SCREENS["taxes"]["exempt"], SCREENS["taxes"]["notSubject"]) == ("Exento", "No sujeto")
+    assert {"Exento", "No sujeto"} <= set(rows)
+    assert not {"Exenta", "No sujeta"} & set(rows)
