@@ -1157,11 +1157,20 @@ OWN_DATABASE_OPERATIONS: dict[str, tuple[dict, int, str]] = {
     "base.api_key.revoke": ({"id": ANY_KEY}, 409, "base.api_keys_unavailable"),
     "base.api_key.detail": ({"id": ANY_KEY}, 404, "not_found"),
     "base.hub.reset": ({"dry_run": False, "apps": ["sale"], "confirm": "a"}, 409, "base.reset_shared_database"),
+    # The worker's emptying of a reset (S2b): never on the shared database, whoever runs it.
+    "base.hub.reset_apply": ({"apps": ["sale"]}, 409, "base.reset_shared_database"),
+    # A copy of the business's data (S2b): none is ever made in a business that shares its database.
+    "base.hub.dump_link": ({"id": ANY_KEY}, 404, "not_found"),
 }
 #: What the screens of those features read in any hub: in one without its own database the answer says «not available
 #: yet» (the screen's notice; an error would paint its load failure) and holds nothing of the feature's.
 OWN_DATABASE_READS: dict[str, tuple[dict, dict]] = {
     "base.api_key.list": ({}, {"available": False, "keys": []}),
+    # Settings › Data's «Copies» and the last reset (S2b).
+    "base.hub.dumps": ({}, {"available": False, "reset": None, "dumps": []}),
+    # System's size of the business's database (BASE-F40, S2b): «Plan and limits» reads the same answer, whose people
+    # and devices are control's (Membership, SessionOwner) and stay for every business.
+    "base.plan.usage": ({}, {"database": {"available": False, "bytes": None, "day": None}}),
 }
 #: Tables of a hub that those operations may still read in control's database for a hub without its own, each with its
 #: reason; anything else of a hub's there is the business's data and is never touched.

@@ -17,7 +17,7 @@ from django.http import HttpRequest
 from django.utils import timezone, translation
 from django.utils.translation import gettext, gettext_lazy, ngettext, pgettext
 from live.context import OperationContext
-from live.errors import InvalidPayload, NotFound, Unauthorized
+from live.errors import InvalidPayload, NotFound, OperationError, Unauthorized
 from live.meta import Category, all_live_app_configs, permissions_for_role
 from live.models import OutboxEvent
 from live.operations import INTERNAL, operation
@@ -42,6 +42,7 @@ from base.permissions import ADMINISTER_HUB, FULL_ACCESS_ROLES, VIEW_HOME
 from base.registry import hub_answer, internal_only
 from base.relay import active_apps
 from base.storage import media_url
+from control.models import HubDump, HubUsageDaily, UsageRun
 from base.throttle import client_key
 from base.schemas import (
     AccessDoorIn,
@@ -92,8 +93,15 @@ from base.schemas import (
     HubsBySlugOut,
     NoticeListIn,
     NoticeListOut,
+    HubDumpLinkIn,
+    HubDumpLinkOut,
+    HubDumpsIn,
+    HubDumpsOut,
+    InternalDumpsOut,
     PlanUsageIn,
     PlanUsageOut,
+    UsageListIn,
+    UsageListOut,
     SessionMeIn,
     SessionMeOut,
     SetupStatusIn,
@@ -441,8 +449,9 @@ def plan_usage(ctx: OperationContext, data: PlanUsageIn) -> dict:
     """«Plan and limits» of System (BASE-G81): the limits of the plan the SaaS's last photo carries (``plan``:
     ``max_users``, ``max_devices``; 0 = no limit) against the people of the business (its active members, the ones
     the SaaS counts) and the devices in use (those with a session open on this hub: the ones the cap of BASE-G57
-    keeps, APP-BASE-3). Memory, CPU and database size are gone with the old process per hub (PLAN-HUB §1a):
-    erplora.com measures the use. For who runs the business."""
+    keeps, APP-BASE-3), and the size of its own database the last night measured (``database``, BASE-F40; none while it
+    shares control's). Memory and CPU are gone with the old process per hub (PLAN-HUB §1a). For who runs the
+    business."""
     hub = Hub.objects.filter(slug=ctx.scope.key).first()
     state = hub.state if hub is not None and isinstance(hub.state, dict) else {}
     plan = state.get("plan") if isinstance(state.get("plan"), dict) else None
@@ -459,6 +468,49 @@ def plan_usage(ctx: OperationContext, data: PlanUsageIn) -> dict:
         "known": known,
         "people": {"used": people, "limit": _limit(plan, "max_users") if known else None},
         "devices": {"used": devices, "limit": _limit(plan, "max_devices") if known else None},
+        "database": _database_usage(hub),
+    }
+
+
+def _database_usage(hub: Hub | None) -> dict:
+    """The size of the business's own database the last night measured (``base.usage``, BASE-F40); none while it shares
+    control's (PLAN-DB §14.14: never control's size)."""
+    if hub is None or not hub.db_name:
+        return {"available": False, "bytes": None, "day": None}
+    last = HubUsageDaily.objects.filter(hub=hub).order_by("-day").first()
+    return {"available": True, "bytes": last.db_bytes if last else None, "day": last.day if last else None}
+
+
+# Not an assistant tool: the platform's door (/internal, the SaaS), no person.
+@operation("base.usage.list", kind="query", permission=None, input=UsageListIn, output=UsageListOut, ai=INTERNAL)
+def usage_list(ctx: OperationContext, data: UsageListIn) -> dict[str, Any]:
+    """One page of what the hubs with their own database used on ``data.day`` (``GET /internal/usage``, the SaaS's
+    ``collect_hub_usage``), by hub id, after ``data.cursor``; 409 ``usage_not_ready`` until that night was measured to
+    its end (``base.usage``). For the platform only."""
+    from base import usage
+
+    internal_only(ctx)
+    if not UsageRun.objects.filter(day=data.day, finished_at__isnull=False).exists():
+        raise OperationError(gettext("That day has not been measured yet."), code="usage_not_ready", status=409)
+    rows = HubUsageDaily.objects.filter(day=data.day).order_by("hub_id")
+    if data.cursor is not None:
+        rows = rows.filter(hub_id__gt=data.cursor)
+    page = list(rows[: usage.PAGE_SIZE + 1])
+    more = len(page) > usage.PAGE_SIZE
+    page = page[: usage.PAGE_SIZE]
+    return {
+        "day": data.day,
+        "hubs": [
+            {
+                "id": row.hub_id,
+                "s3_bytes": row.s3_bytes,
+                "db_bytes": row.db_bytes,
+                "active_users_1d": row.active_users_1d,
+                "active_users_30d": row.active_users_30d,
+            }
+            for row in page
+        ],
+        "next_cursor": str(page[-1].hub_id) if more else None,
     }
 
 
@@ -561,6 +613,129 @@ def blueprint_export(ctx: OperationContext, data: BlueprintExportIn) -> dict:
             "content_type": "application/zip",
             "content_base64": base64.b64encode(blueprint.write_zip(bundle)).decode("ascii"),
         }
+
+
+# ── The copies of the business's data (round 2026-10-30 of PLAN-DB, decision 2, proposals (k), (l)) ───────────────
+
+
+def _dumps_unavailable() -> OperationError:
+    return OperationError(
+        gettext("The copy cannot be downloaded right now. Try again in a moment."),
+        code="base.dumps_unavailable",
+        status=503,
+    )
+
+
+def _reset_state(hub: Hub) -> dict | None:
+    """The last reset of ``hub`` as Settings › Data shows it (``Hub.reset_sections``), or ``None`` before the first."""
+    asked = hub.reset_sections if isinstance(hub.reset_sections, dict) else None
+    if not asked or asked.get("state") not in ("copying", "emptying", "done", "failed"):
+        return None
+    return {
+        "state": asked["state"],
+        "sections": [{"id": app, "label": blueprint.app_label(app)} for app in asked.get("apps") or []],
+        "requested_by": asked.get("requested_by") or "",
+        "error": asked.get("error") or "",
+        "removed": asked.get("removed") or [],
+        "finished_at": asked.get("finished_at"),
+    }
+
+
+def gets_copies(hub: Hub) -> bool:
+    """Whether ``hub`` has, or will have, copies of its data: its own database, made (or being made); never a business
+    that shares control's, nor one that left before its database was finished."""
+    from base import registry
+
+    return bool(hub.db_name) and (hub.ready_at is not None or hub.status in registry.PREPARING_STATUSES)
+
+
+@operation(
+    "base.hub.dumps",
+    kind="query",
+    permission=ADMINISTER_HUB,
+    input=HubDumpsIn,
+    output=HubDumpsOut,
+    ai={
+        "description": "Lists the full copies of this business's data that ERPlora keeps for 90 days (one before each "
+        "reset, one when the business is deleted): when each was made and how big it is, newest first; and how "
+        "the last reset of the business went (copying, emptying, done or failed, and what was removed)."
+    },
+)
+def hub_dumps(ctx: OperationContext, data: HubDumpsIn) -> dict:
+    """Settings › Data's «Copies» (BASE-F37): the copies of the business's own database, without their links
+    (``base.hub.dump_link`` gives one on each click), and how its last reset went (``base.services``, «The reset of a
+    business»). While the business shares its database with others, nothing (PLAN-DB §14.14)."""
+    with translation.override(ctx.language):
+        hub = Hub.objects.filter(slug=ctx.scope.key).first()
+        if hub is None or not hub.db_name:
+            return {"available": False, "reset": None, "dumps": []}
+        return {
+            "available": True,
+            "reset": _reset_state(hub),
+            "dumps": [
+                {"id": dump.pk, "kind": dump.kind, "created_at": dump.created_at, "bytes": dump.bytes}
+                for dump in HubDump.objects.filter(hub=hub).order_by("-created_at", "-id")
+            ],
+        }
+
+
+# Not an assistant tool: a link that downloads every person's data of the business is for the person on the screen.
+@operation(
+    "base.hub.dump_link",
+    kind="query",
+    permission=ADMINISTER_HUB,
+    input=HubDumpLinkIn,
+    output=HubDumpLinkOut,
+    ai=INTERNAL,
+)
+def hub_dump_link(ctx: OperationContext, data: HubDumpLinkIn) -> dict:
+    """The link of one copy of the business's data, signed for 15 minutes when it is asked (each «Download»); a copy of
+    another business is not found."""
+    from base.tenancy import dumps
+
+    with translation.override(ctx.language):
+        hub = Hub.objects.filter(slug=ctx.scope.key).first()
+        dump = HubDump.objects.filter(pk=data.id, hub=hub).first() if hub is not None and hub.db_name else None
+        if dump is None:
+            raise NotFound(gettext("This copy is no longer kept."))
+        try:
+            url = dumps.presigned_url(dump.key, filename=dumps.file_name(hub.slug, dump.key))
+        except dumps.DumpsUnavailable:
+            raise _dumps_unavailable() from None
+        return {"url": url, "expires_at": dumps.link_expires_at(url)}
+
+
+# Not an assistant tool: the platform's door (/internal, the SaaS), no person.
+@operation(
+    "base.hub.dump_list", kind="query", permission=None, input=HubGetIn, output=InternalDumpsOut, ai=INTERNAL
+)
+def hub_dump_list(ctx: OperationContext, data: HubGetIn) -> dict:
+    """The copies of ``data.id``'s data (``GET /internal/hubs/{id}/dumps``, the SaaS's panel and its mails of a
+    deletion), newest first, each with a link of 15 minutes; ``available`` false for a business that never gets one.
+    A business that left answers too (the 410 is its host's door); one unknown or purged is not found."""
+    from base.tenancy import dumps
+
+    internal_only(ctx)
+    hub = Hub.objects.filter(pk=data.id).exclude(status=Hub.Status.PURGED).first()
+    if hub is None:
+        raise NotFound(gettext("No hub has this id."))
+    if not gets_copies(hub):
+        return {"available": False, "dumps": []}
+    rows = list(HubDump.objects.filter(hub=hub).order_by("-created_at", "-id"))
+    try:
+        listed = [
+            {
+                "id": dump.key,
+                "kind": dump.kind,
+                "created_at": dump.created_at,
+                "bytes": dump.bytes,
+                "url": dumps.presigned_url(dump.key, filename=dumps.file_name(hub.slug, dump.key)),
+            }
+            for dump in rows
+        ]
+    except dumps.DumpsUnavailable:
+        raise _dumps_unavailable() from None
+    return {"available": True, "dumps": listed}
 
 
 @operation(

@@ -2,18 +2,32 @@
 // System › Resources (BASE-G88, G45; the old hub's SystemPage `#resources`, HUB_SHELL-F136), for who runs the business
 // (the page tells anyone else who may see it): the live `base.system.status` — «Cloud resources» and the database the
 // business is on (phase 1: the one every business shares) — and, instead of CPU, memory and connections, why there are
-// none: one service runs every business, so no figure is this hub's own (PLAN-HUB §1a). Never a made-up zero.
+// none: one service runs every business, so no figure is this hub's own (PLAN-HUB §1a). Never a made-up zero. A
+// business on its own database says its size as the last night measured it (the live `base.plan.usage`'s `database`,
+// BASE-F40), or that the first figure comes after the first night.
 import { InlineFeedback, StatusPill } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
 import { HubIcon } from '@erplora/ui/shell';
 import { IonButton } from '@ionic/vue';
 import { computed } from 'vue';
 
+import { formatSize } from '../lib/files';
 import { useBaseI18n } from '../lib/i18n';
 
-const { t } = useBaseI18n();
+const { t, locale } = useBaseI18n();
 
 const { data, status, refresh } = useLive('base.system.status', {});
+const usage = useLive('base.plan.usage', {});
+const database = computed(() => {
+  const measured = usage.data.value?.database;
+  return measured?.available ? measured : null;
+});
+
+function onDay(day: string): string {
+  // A UTC day (`YYYY-MM-DD`), said as that day wherever the screen is.
+  const date = new Date(`${day}T12:00:00Z`);
+  return Number.isNaN(date.getTime()) ? day : new Intl.DateTimeFormat(locale.value, { dateStyle: 'medium', timeZone: 'UTC' }).format(date);
+}
 
 const failed = computed(() => status.value === 'error' && data.value === undefined);
 </script>
@@ -69,6 +83,17 @@ const failed = computed(() => status.value === 'error' && data.value === undefin
         <strong class="system-resources-engine">{{ t('base.system.resources.engine') }}</strong>
         <span class="system-resources-muted">
           {{ t(data.shared_database ? 'base.system.resources.shared' : 'base.system.resources.own') }}
+        </span>
+        <span
+          v-if="database"
+          class="system-resources-muted"
+          data-testid="system-resources-size"
+        >
+          <template v-if="database.bytes !== null && database.day">
+            {{ t('base.system.resources.size', { size: formatSize(database.bytes, locale) }) }} ·
+            {{ t('base.system.resources.measuredOn', { day: onDay(database.day) }) }}
+          </template>
+          <template v-else>{{ t('base.system.resources.notMeasuredYet') }}</template>
         </span>
       </article>
       <InlineFeedback

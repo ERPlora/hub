@@ -34,6 +34,7 @@ from base.schemas import (
     FileReadIn,
     FileRenameIn,
     FileUploadIn,
+    HubDumpLinkIn,
     HubResetIn,
     ImportIdIn,
     ImportUndoIn,
@@ -150,6 +151,16 @@ async def dataset_list(request):
 @bind(router, "base.hub.reset", "/settings/data/reset")
 async def hub_reset(request, data: HubResetIn):
     return await run_operation(request, services.hub_reset, data)
+
+
+@bind(router, "base.hub.dumps", "/settings/data/dumps")
+async def hub_dumps(request):
+    return await run_operation(request, queries.hub_dumps)
+
+
+@bind(router, "base.hub.dump_link", "/settings/data/dumps/link")
+async def hub_dump_link(request, data: Query[HubDumpLinkIn]):
+    return await run_operation(request, queries.hub_dump_link, data)
 
 
 # ── Business settings and the hub's context (APP-BASE-6) ──

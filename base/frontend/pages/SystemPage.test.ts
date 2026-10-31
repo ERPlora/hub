@@ -13,7 +13,12 @@ import SystemResources from '../components/SystemResources.vue';
 import type { PlanUsage } from '../operations';
 import SystemPage from './SystemPage.vue';
 
-const USAGE: PlanUsage = { known: true, people: { used: 2, limit: 3 }, devices: { used: 1, limit: 2 } };
+const USAGE: PlanUsage = {
+  known: true,
+  people: { used: 2, limit: 3 },
+  devices: { used: 1, limit: 2 },
+  database: { available: false, bytes: null, day: null },
+};
 
 async function open(options: Parameters<typeof mountBase>[1] = {}) {
   // «Plan and limits» is its tab now: `/system` opens Resources, as the old hub did (BASE-G87).
