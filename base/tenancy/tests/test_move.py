@@ -870,7 +870,8 @@ class TestTheUndoRenamesBackOnlyWhatLeft:
         assert copy in databases() and MovedCopy.objects.get(hub=hub).moved_at is not None
 
     def test_the_destination_control_says_is_a_hubs_is_never_dropped_on_an_undo(self, moves):
-        target = moves.cluster()
+        # On another server than the origin's (its row points elsewhere): only control's word stops the drop.
+        target = moves.cluster("away", port=1)
         hub = moves.hub(to=target)
         other = moves.hub(to=None, cluster=target)
         Hub.objects.filter(pk=other.pk).update(db_name=hub.db_name)
