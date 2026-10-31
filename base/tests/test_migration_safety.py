@@ -136,10 +136,13 @@ ACCEPTED = {
     # the new column hub_user_id, which only the new code writes; the code of before writes the old user_id and leaves
     # hub_user_id NULL, outside the constraint's condition, so no row of it can break it.
     ("staff", "0004_hub_users", "AddConstraint", "member.staff_member_hub_user_unique"),
-    # Its contract, a later deploy's, once no code of before W10 runs (written here, not applied): each app's
-    # link_hub_users runs once more (a row the code of before linked during W10's deploy), then the old columns to
+    # Its contract, a later deploy's, once no code of before W10 runs (written here, not applied): the old columns to
     # control's users, which W10 took out of the state and nobody writes any more, leave the database through
-    # SeparateDatabaseAndState(database_operations=[RunSQL("ALTER TABLE … DROP COLUMN …")]), with no state:
+    # SeparateDatabaseAndState(database_operations=[RunSQL("ALTER TABLE … DROP COLUMN …")]), with no state, and
+    # nothing is linked again first: an old column keeps forever what it said before W10, so filling the new links from
+    # it again (link_hub_users overwrites them) would undo every reassignment made since and could break
+    # staff_member_hub_user_unique. A row the code of before linked during W10's own deploy keeps no person: it is
+    # linked again on its screen. The columns:
     #   staff_member.user_id, staff_timeoff.approved_by_id,
     #   attendance_record.created_by_id, attendance_record.updated_by_id, attendance_correction.created_by_id,
     #   attendance_attendancesettings.updated_by_id, task_task.created_by_id, task_comment.author_id,

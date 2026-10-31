@@ -1739,7 +1739,7 @@ def add_note(ctx: OperationContext, data: NoteAddIn) -> dict:
         events.NOTE_ADDED,
         {"id": str(note.id), "conversation_id": str(conversation.id)},
     )
-    return note_out(ctx, note)
+    return note_out(ctx, note, None if author is None else author.pk)
 
 
 @operation(
@@ -1762,7 +1762,7 @@ def delete_note(ctx: OperationContext, data: NoteRefIn) -> dict:
     )
     if note is None:
         raise NotFound(str(NOTE_NOT_FOUND), code="whatsapp_inbox.note_not_found")
-    if not may_delete_note(ctx, note):
+    if not may_delete_note(ctx, note, actor_id(ctx)):
         raise PermissionDenied(str(NOTE_NOT_YOURS))
     conversation_id = note.conversation_id
     note.delete()

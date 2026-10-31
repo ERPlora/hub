@@ -359,13 +359,14 @@ def message_out(row: Message) -> dict:
     }
 
 
-def may_delete_note(ctx: OperationContext, note: Note) -> bool:
-    """The author deletes their own note; whoever may assign deletes anybody's."""
-    mine = note.author_id is not None and note.author_id == actor_id(ctx)
+def may_delete_note(ctx: OperationContext, note: Note, me: UUID | None) -> bool:
+    """The author deletes their own note; whoever may assign deletes anybody's. ``me`` is the caller's person
+    (:func:`actor_id`), read once by whoever asks about several notes."""
+    mine = note.author_id is not None and note.author_id == me
     return mine or ctx.has("whatsapp_inbox.assign")
 
 
-def note_out(ctx: OperationContext, row: Note) -> dict:
+def note_out(ctx: OperationContext, row: Note, me: UUID | None) -> dict:
     return {
         "id": row.id,
         "conversation_id": row.conversation_id,
@@ -373,7 +374,7 @@ def note_out(ctx: OperationContext, row: Note) -> dict:
         "author_id": row.author_id,
         "author_name": row.author_name,
         "created_at": row.created_at,
-        "can_delete": may_delete_note(ctx, row),
+        "can_delete": may_delete_note(ctx, row, me),
     }
 
 
@@ -657,7 +658,8 @@ def get_message(ctx: OperationContext, data: MessageRefIn) -> dict:
 def list_notes(ctx: OperationContext, params: NoteListIn) -> dict:
     conversation = find_conversation(params.id, params.conversation)
     rows = Note.objects.filter(conversation=conversation).order_by("-created_at", "-id")
-    return page(rows, params, lambda note: note_out(ctx, note))
+    me = actor_id(ctx)
+    return page(rows, params, lambda note: note_out(ctx, note, me))
 
 
 # ── Templates, channel and team ─────────────────────────────────────────────────────────────────

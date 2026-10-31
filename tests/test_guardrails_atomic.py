@@ -63,7 +63,8 @@ REPORTED_NAMES = ATOMIC_NAMES | DEFAULT_ALIAS_NAMES
 CONTROL_LOGIN = (
     "The way in writes control's models (the account's local copy in auth, its Membership, Django's session and its "
     "SessionOwner) in control's transaction, Django's atomic on default, whatever hub's host it runs on; the hub's own "
-    "rows (its TrustedDevice) go in the hub's, live.operations.atomic() inside it: two databases, a block on each."
+    "rows (its TrustedDevice, the person's base.HubUser) go in the hub's, live.operations.atomic() inside it: two "
+    "databases, a block on each."
 )
 
 #: ``<path>::<function>`` → why Django's atomic (or the rest of its transactions) on its alias is the one meant there.
@@ -87,8 +88,9 @@ DJANGO_ATOMIC_ALLOWED: dict[str, str] = {
         "transaction."
     ),
     "base/services.py::open_demo_session": (
-        "Only control's models (the demo's local user, its Membership, Django's session): control's transaction, "
-        "whatever demo's host it runs on."
+        "Control's models (the demo's local user, its Membership, Django's session) in control's transaction, Django's "
+        "atomic on default, whatever demo's host it runs on; the owner's person (base.HubUser, tenancy W10) in the "
+        "hub's, live.operations.atomic() inside it: two databases, a block on each."
     ),
 }
 

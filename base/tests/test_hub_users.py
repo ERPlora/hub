@@ -2,7 +2,7 @@
 
 Control keeps the session's user (``auth.User``, the copy ``saas:<id>`` of an erplora.com account) and the role
 (``Membership``); the hub's database keeps who signed what in it: a staff record, a task, a clock-in, a message. A key
-between two databases does not exist, so the apps hang those from ``HubUser`` (``tests/test_guardrails.py``, «(g)»).
+between two databases does not exist, so the apps hang those from ``HubUser`` (``tests/test_guardrails.py``, «(h)»).
 
 It is made, or brought up to date, at every entry to the hub (the code of erplora.com, a demo, a PIN or a badge), by
 the first write of whoever has none yet (``acting_hub_user``) and from the SaaS's photo, which lists the people of
@@ -354,3 +354,18 @@ class TestTheSession:
 
         assert self.me(ana)["id"] == str(ana.pk)
         assert not HubUser.objects.exists(), "a read never makes a person"
+
+
+@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+def test_a_demo_entry_that_fails_leaves_no_person_in_the_hub_s_database(hub_a, rf, monkeypatch):
+    # The owner's person is the hub's row: written in the hub's transaction (live.operations.atomic), next to
+    # control's, so an entry that fails after it takes it back (tests/test_guardrails_atomic.py, W9).
+    def refused(*args, **kwargs):
+        raise RuntimeError("the session could not be opened")
+
+    monkeypatch.setattr(services, "login", refused)
+    with use_hub(hub_a), pytest.raises(RuntimeError):
+        services.open_demo_session(_with_session(rf.get("/")), hub_a)
+
+    with use_hub(hub_a):
+        assert not HubUser.objects.exists()

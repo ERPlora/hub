@@ -3,7 +3,7 @@
 Phase 1 hung a staff record, its time off, a clock-in, a task, its comments and the WhatsApp inbox's assignments and
 messages from control's ``auth.User``. A key between two databases does not exist, so those apps could not live in a
 hub's own database and the templates of the verticals left them out: a hair salon would have been born with no staff,
-no services and no appointments. They hang from ``base.HubUser`` now (``tests/test_guardrails.py``, «(g)»), so every
+no services and no appointments. They hang from ``base.HubUser`` now (``tests/test_guardrails.py``, «(h)»), so every
 app fits, every vertical's template holds its whole list, and the expand migrations that moved them fill the new links
 in phase 1's shared database and nothing in a hub's own.
 """

@@ -265,7 +265,7 @@ def _note_the_owner(
 
 
 @transaction.atomic  # control's: the account's copy, its Membership and the session
-@atomic  # the hub's: the trusted device and the ones it ends
+@atomic  # the hub's: the person (base.HubUser), the trusted device and the ones it ends
 def open_session_from_saas(request: HttpRequest, redeemed: RedeemedUser, slug: str):
     """Get or create the customer copy, set its role on ``slug`` and log it in (a new session key).
 
@@ -1212,7 +1212,8 @@ def redeem_demo_code(slug: str, code: str | None, *, now: dt.datetime | None = N
     return found
 
 
-@transaction.atomic
+@transaction.atomic  # control's: the demo's local user, its Membership and the session
+@atomic  # the hub's: the owner's person (base.HubUser)
 def open_demo_session(request: HttpRequest, hub: Hub):
     """Log the visitor in as the owner of the demo ``hub`` (``demo:<slug>``, ``hub_owner``; a new session key).
 
@@ -1697,7 +1698,7 @@ def _end_other_devices(slug: str, device: TrustedDevice) -> None:
 
 
 @transaction.atomic  # control's: the new session and the other devices' ones it ends
-@atomic  # the hub's: the device, locked, and the ones it ends
+@atomic  # the hub's: the device, locked, the person (base.HubUser) and the ones it ends
 def open_session_on_device(request: HttpRequest, user, device: TrustedDevice, credential: str) -> None:
     """Log ``user`` in on the hub's ``device`` with its PIN or its badge (BASE-G55, G56, G60), for a shift (or what the
     device and the business allow). Over someone else's session («Switch user») ``login`` ends that one only now, once
