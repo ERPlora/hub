@@ -555,3 +555,27 @@ msgstr "Autor"
 
 msgid "Open order"
 msgstr "Pedido abierto"
+
+msgid "Merge two customer cards"
+msgstr "Fusionar dos fichas de cliente"
+
+msgid "Create a customer group"
+msgstr "Crear un grupo de clientes"
+
+msgid "Change a customer group"
+msgstr "Cambiar un grupo de clientes"
+
+msgid "Create a customer tag"
+msgstr "Crear una etiqueta de clientes"
+
+msgid "Change a customer tag"
+msgstr "Cambiar una etiqueta de clientes"
+
+msgid "Create a custom field"
+msgstr "Crear un campo personalizado"
+
+msgid "Change a custom field"
+msgstr "Cambiar un campo personalizado"
+
+msgid "Delete a custom field"
+msgstr "Eliminar un campo personalizado"

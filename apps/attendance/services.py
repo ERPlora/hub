@@ -54,6 +54,8 @@ from apps.attendance.schemas import (
     TerminatedIn,
 )
 from apps.staff.models import Member
+from base import access
+from base.queries import device_of
 from base.services import acting_hub_user
 
 NO_MEMBER_RECORD = _(
@@ -154,19 +156,24 @@ def _not_clocked_in() -> Conflict:
 def device_source(ctx: OperationContext) -> str:
     """The device that clocks: the counter POS (``shared``) or someone's own phone (``personal``).
 
-    It is the platform's to say, never the payload's: phase 2 reads it from the session's trusted
-    device (`base`, with the PIN). Phase 1 has no device modes, so every device clocks as the shared one,
-    the strict fallback of the old module: the location is never asked for (ATTENDANCE-F03).
+    It is the platform's to say, never the payload's: the mode an administrator chose on the session's
+    device (BASE-F62, «Settings › This device»). A browser the hub does not know, and a caller without one
+    (an integration's API key, the system), clock as the shared one, the strict fallback of the old module:
+    the location is never asked for (ATTENDANCE-F03).
     """
+    device = device_of(ctx.request)
+    if device is not None and device.mode == access.PERSONAL:
+        return Record.Source.PERSONAL
     return Record.Source.SHARED
 
 
-def _measure(values: dict, data: PositionIn, source: str) -> dict[str, Any]:
+def _measure(values: dict, data: PositionIn, source: str, mine: bool) -> dict[str, Any]:
     """What is kept of where the device is (ATTENDANCE-F03; review of 2026-10-15, finding 7).
 
     With the workplace set, the distance the Hub measures, inside/outside and the accuracy. The exact
-    coordinates only when the business requires the location and the device is personal: nobody asked
-    for them otherwise, and the day keeps them as long as the record (four years, art. 34.9 ET).
+    coordinates only when the business requires the location and the person clocks their own day from a
+    personal device: nobody asked for them otherwise (nor for a manager's, clocking someone else, F12), and
+    the day keeps them as long as the record (four years, art. 34.9 ET).
     """
     has_position = data.lat is not None and data.lng is not None
     distance = within = None
@@ -174,7 +181,7 @@ def _measure(values: dict, data: PositionIn, source: str) -> dict[str, Any]:
         distance = geodesic((values["workplace_lat"], values["workplace_lng"]), (data.lat, data.lng)).meters
         within = distance <= values["geofence_radius_m"]
         distance = round(distance, 1)
-    keep = has_position and values["require_location"] and source == Record.Source.PERSONAL
+    keep = has_position and mine and values["require_location"] and source == Record.Source.PERSONAL
     return {
         "lat": data.lat if keep else None,
         "lng": data.lng if keep else None,
@@ -184,9 +191,12 @@ def _measure(values: dict, data: PositionIn, source: str) -> dict[str, Any]:
     }
 
 
-def _check_radius(values: dict, source: str, where: dict[str, Any]) -> None:
-    """ATTENDANCE-F03: a personal device must be within the radius when the business asks for it."""
-    if not values["require_location"] or source != Record.Source.PERSONAL:
+def _check_radius(values: dict, source: str, where: dict[str, Any], mine: bool) -> None:
+    """ATTENDANCE-F03: a personal device must be within the radius when the business asks for it.
+
+    Only for the person's own clock-in: a manager clocking someone else vouches for them (ATTENDANCE-F12, as
+    Homebase and Deputy), wherever the manager is."""
+    if not mine or not values["require_location"] or source != Record.Source.PERSONAL:
         return
     if not values["workplace_set"]:
         raise Conflict(str(WORKPLACE_NOT_SET), code="attendance.workplace_not_set")
@@ -275,8 +285,8 @@ def clock_in(ctx: OperationContext, data: ClockInIn) -> dict:
     if _open_day(member) is not None:
         raise already
     source = device_source(ctx)
-    where = _measure(values, data, source)
-    _check_radius(values, source, where)
+    where = _measure(values, data, source, mine)
+    _check_radius(values, source, where, mine)
     user = acting_hub_user(ctx)
     try:
         with atomic():
@@ -316,14 +326,14 @@ def clock_in(ctx: OperationContext, data: ClockInIn) -> dict:
     },
 )
 def clock_out(ctx: OperationContext, data: ClockOutIn) -> dict:
-    member, _mine = _target(ctx, data)
+    member, mine = _target(ctx, data)
     now = timezone.now()
     record = _day_now(member, now)
     if record is None:
         raise _not_clocked_in()
     out = now if now > record.clock_in_at else record.clock_in_at + TICK
     _end_break(ctx, record, out)
-    where = _measure(settings_values(saved_settings()), data, record.source)
+    where = _measure(settings_values(saved_settings()), data, device_source(ctx), mine)
     record.clock_out_at = out
     record.status = Record.Status.CLOSED
     record.out_lat = where["lat"]

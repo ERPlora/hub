@@ -171,9 +171,8 @@ def test_the_employee_works_the_counter_with_the_old_cashier_rights():
 
 
 def test_navigation_is_the_products_four_tabs_with_registered_icons():
-    # The product's tabs: Customers, Groups, Tags and Fields, with the product's icons where the
-    # shell registers them. Tags waits for its own (pricetags: UI-REQUESTS.md); until then, a
-    # registered one.
+    # The product's tabs: Customers, Groups, Tags and Fields, with the product's icons, all registered by the shell
+    # (`ION_ICONS` of @erplora/ui; pricetags since 673e625).
     entries = customer().navigation
     assert all(isinstance(entry, Nav) for entry in entries)
     with translation.override("en"):
@@ -182,7 +181,7 @@ def test_navigation_is_the_products_four_tabs_with_registered_icons():
         ] == [
             ("customers", "Customers", "/customer/customers", "ion:people-outline"),
             ("groups", "Groups", "/customer/groups", "ion:people-outline"),
-            ("tags", "Tags", "/customer/tags", "ion:list-outline"),
+            ("tags", "Tags", "/customer/tags", "ion:pricetags"),
             ("fields", "Fields", "/customer/fields", "ion:layers-outline"),
         ]
 
