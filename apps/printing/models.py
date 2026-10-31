@@ -20,6 +20,7 @@ from django.db import models
 from django.db.models import Q
 from django.db.models.functions import Lower
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import pgettext_lazy
 from live.models import UUIDModel
 
 from apps.printing.documents import DOCUMENT_TYPES
@@ -56,7 +57,9 @@ class Printer(UUIDModel):
     port = models.PositiveIntegerField(_("port"), null=True, blank=True)
     paper_width = models.PositiveSmallIntegerField(_("paper width"), choices=Paper.choices, default=Paper.MM_80)
     usage = models.CharField(_("function"), max_length=16, choices=Usage.choices)
-    is_active = models.BooleanField(_("active"), default=True)
+    # «activa» (a printer), not auth's «activo»: the texts an earlier app translates otherwise in Spanish go with
+    # printing's own context, since the first catalog that says a message wins (base/tests/test_locale_modules.py).
+    is_active = models.BooleanField(pgettext_lazy("printing", "active"), default=True)
     last_printed_at = models.DateTimeField(_("last printed at"), null=True, blank=True)
     last_failed_at = models.DateTimeField(_("last failed at"), null=True, blank=True)
     last_error = models.CharField(_("last error"), max_length=ERROR_MAX_LENGTH, blank=True)
@@ -187,7 +190,8 @@ class PrintJob(UUIDModel):
         SENT = "sent", _("Sent")
         DONE = "done", _("Printed")
         FAILED = "failed", _("Failed")
-        CANCELLED = "cancelled", _("Cancelled")
+        # «Cancelado» and «cancelado el» (a job), not appointment's «Cancelada» and «cancelada el».
+        CANCELLED = "cancelled", pgettext_lazy("printing", "Cancelled")
 
     job_key = models.CharField(_("job key"), max_length=128, unique=True)
     kind = models.CharField(_("kind"), max_length=16, choices=Kind.choices, default=Kind.DOCUMENT)
@@ -220,7 +224,7 @@ class PrintJob(UUIDModel):
     failed_at = models.DateTimeField(_("failed at"), null=True, blank=True)
     retried_at = models.DateTimeField(_("retried at"), null=True, blank=True)
     retried_by = models.CharField(_("retried by"), max_length=ACTOR_MAX_LENGTH, blank=True)
-    cancelled_at = models.DateTimeField(_("cancelled at"), null=True, blank=True)
+    cancelled_at = models.DateTimeField(pgettext_lazy("printing", "cancelled at"), null=True, blank=True)
     cancelled_by = models.CharField(_("cancelled by"), max_length=ACTOR_MAX_LENGTH, blank=True)
     cancel_reason = models.CharField(_("cancel reason"), max_length=ERROR_MAX_LENGTH, blank=True)
 
