@@ -3279,8 +3279,8 @@ Implicados: ACCOUNTS-F38
   F07/F09/F10/F13/F14/F17/F18 (la cola de `/ws/print`). Sus specs: `cash-register-*`, `table-flows`, `reservation-book`,
   `sale-*` (con `sale-invoice-chain`), `modifier-till`, `kitchen-*`, `invoice-sale`, `verifactu-flows`,
   `printing-*`, `appointment-*`, `staff-commissions`, `service-flows` y `customer-flows`. Lo que aún no está entero
-  es `parcial` en su app: PRINTING-F02 (buscar la impresora en la red), PRINTING-F13 (el cajón al cobrar),
-  PRINTING-F18 (el dispositivo que recoge la cola), SALE-F14 (el descuento) y SERVICE-F14 (vender un bono en el TPV).
+  lo dice su app: PRINTING-F02 (buscar la impresora en la red) es `parcial`, y de SERVICE-F14 la venta del bono en el
+  TPV está en «Lo que queda fuera» de Servicios.
 - Del contrato viejo no sigue lo que era proceso de aquella flota: §2 (método: el QA no arregla y abre issues por
   repo), §2b (el banco de pruebas en PRE con `spawn-hub.sh`), §3 (contar 25–27 módulos y sus `module.json`), §9 (la
   lista de vigilancia), §10 (el informe PASS/FAIL por escenario) y §11 (el `POST /api/command|query` del runtime en
