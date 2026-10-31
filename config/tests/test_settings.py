@@ -28,6 +28,8 @@ ENV_KEYS = (
     "DB_NAME",
     "DB_USER",
     "DB_PASSWORD",
+    "DB_MIGRATOR_USER",
+    "DB_MIGRATOR_PASSWORD",
     "DB_HOST",
     "DB_PORT",
     "SAAS_URL",
@@ -892,8 +894,9 @@ XDIST_SUFFIXES = ("", "_gw0", "_gw9", "_gw10", "_gw999")
 
 def names_the_suite_derives(databases: dict) -> list[str]:
     """Every database the suite may create from these settings, with and without xdist's suffix: the test databases
-    and, from control's, both test hubs' and every template's (``base.tenancy.names``, which refuses a name past
-    PostgreSQL's 63 characters instead of truncating it)."""
+    and, from control's, both test hubs', a demo's (``<control>_demo_<hex>``, the longest; round 2026-10-30 of PLAN-DB)
+    and every template's (``base.tenancy.names``, which refuses a name past PostgreSQL's 63 characters instead of
+    truncating it)."""
     from base import catalog
     from base.tenancy import names
     from base.tenancy.tests import hubs
@@ -904,14 +907,15 @@ def names_the_suite_derives(databases: dict) -> list[str]:
         control = databases["default"]["TEST"]["NAME"] + suffix
         derived += [control, *(databases[alias]["TEST"]["NAME"] + suffix for alias in ("shared", "hub_template"))]
         derived += [names.hub_db_name(control, hub_id) for hub_id in (hubs.HUB_A_ID, hubs.HUB_B_ID)]
+        derived += [names.demo_db_name(control, hubs.HUB_A_ID)]
         derived += [names.template_db_name(control, vertical) for vertical in verticals]
     return derived
 
 
 @pytest.mark.parametrize(
     "requested",
-    # "ñ" * 13: 13 characters but 26 bytes, past the 24 that fit (PostgreSQL's limit counts bytes).
-    ["test_hub_next", "test_hub_sup", "t" * 24, "t" * 25, LONG_TEST_DB_NAME, "t" * 63, "ñ" * 13, "ñ" * 40, "t" * 100],
+    # "ñ" * 10: 10 characters but 20 bytes, past the 19 that fit (PostgreSQL's limit counts bytes).
+    ["test_hub_next", "test_hub_sup", "t" * 19, "t" * 20, LONG_TEST_DB_NAME, "t" * 63, "ñ" * 10, "ñ" * 40, "t" * 100],
 )
 def test_every_database_the_suite_derives_from_any_test_db_name_fits_in_postgres(load_settings, requested):
     """A worker never counts characters: whatever TEST_DB_NAME it sets, every name fits (TODO.md, hub#188, hub#204)."""
@@ -925,7 +929,7 @@ def test_every_database_the_suite_derives_from_any_test_db_name_fits_in_postgres
 
 def test_a_test_db_name_that_fits_is_kept_as_it_is(load_settings):
     # --reuse-db and the fleet's sweep.sh find a short name's databases by that name.
-    for requested in ("test_hub_next", "t" * 24):
+    for requested in ("test_hub_next", "t" * 19):
         databases = load_settings(**DEVELOPMENT_ENV, TEST_DB_NAME=requested)["DATABASES"]
         assert databases["default"]["TEST"]["NAME"] == requested
 
@@ -939,13 +943,26 @@ def test_a_long_test_db_name_is_shortened_the_same_every_run_and_apart_from_anot
         assert (databases["default"]["NAME"], databases["hub_template"]["NAME"]) == ("pre_hub", "pre_hub_template")
         return {alias: databases[alias]["TEST"]["NAME"] for alias in ("default", "shared", "hub_template")}
 
-    shortened = f"test_hub_next_f_{hashlib.sha256(LONG_TEST_DB_NAME.encode()).hexdigest()[:8]}"
+    # 19 characters fit (a demo's ``_demo_<hex>`` and xdist's ``_gw999`` after them): its first 10, ``_`` and 8.
+    shortened = f"test_hub_n_{hashlib.sha256(LONG_TEST_DB_NAME.encode()).hexdigest()[:8]}"
     assert test_names(LONG_TEST_DB_NAME) == {
         "default": shortened,
         "shared": f"{shortened}_shared",
         "hub_template": f"{shortened}_template",
     }
     assert test_names(OTHER_LONG_TEST_DB_NAME)["default"] not in (shortened, OTHER_LONG_TEST_DB_NAME)
+
+
+def test_the_migrators_role_is_the_default_connections_only_in_development(load_settings):
+    """Locally (and in the suite) the compose Postgres's user is every role; in AWS only the worker and hub-migrate
+    carry DB_MIGRATOR_* (aws stacks/prod/apps.tf), and without them there is no migrator (base.tenancy.credentials)."""
+    development = load_settings(**DEVELOPMENT_ENV, DB_USER="hub", DB_PASSWORD="hub-pw")
+    production = load_settings(**PRODUCTION_ENV, DB_USER="hub_app", DB_PASSWORD="app-pw")
+    worker = load_settings(**PRODUCTION_ENV, DB_MIGRATOR_USER="hub_migrator", DB_MIGRATOR_PASSWORD="migrator-pw")
+
+    assert (development["DB_MIGRATOR_USER"], development["DB_MIGRATOR_PASSWORD"]) == ("hub", "hub-pw")
+    assert (production["DB_MIGRATOR_USER"], production["DB_MIGRATOR_PASSWORD"]) == ("", "")
+    assert (worker["DB_MIGRATOR_USER"], worker["DB_MIGRATOR_PASSWORD"]) == ("hub_migrator", "migrator-pw")
 
 
 def test_the_hubs_template_alias_is_named_after_control_and_reaches_it_directly_in_development(load_settings):

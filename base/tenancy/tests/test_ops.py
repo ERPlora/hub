@@ -1,0 +1,296 @@
+"""The migrator's maintenance connection: making and dropping a hub's database (PLAN-DB §6; round 2026-10-30, S2a).
+
+``base.tenancy.ops`` reaches the server directly as the migrator (``DB_MIGRATOR_USER``; the default connection's role
+where it is not set: local development and these tests), never through PgBouncer and never on a Django alias:
+``CREATE DATABASE`` and ``DROP DATABASE`` cannot run in a transaction. A hub's database is a clone of its template,
+private (no ``PUBLIC``) and open to the environment's ``hub_app`` and ``hub_admin``; making it twice makes it once,
+a template in use is waited for a bounded while, and a drop takes only the database it names.
+"""
+
+import uuid
+
+import psycopg
+import pytest
+from django.db import connections as django_connections
+from psycopg import sql
+
+from base.tenancy import bootstrap, names, ops
+from base.tenancy import connections as tenancy_connections
+from base.tenancy.tests import hubs
+
+pytestmark = pytest.mark.usefixtures("hub_databases")
+
+
+@pytest.fixture(autouse=True, scope="session")
+def on_the_tests_control_database(django_db_setup):
+    """These tests make and drop real databases next to control's: only ever the tests' own. pytest-django sets the
+    test databases up only when the session has a ``django_db`` test (this module has one); without it control would
+    still be the developer's database, and ``hub_databases`` would make and drop its templates there. Session-scoped
+    and autouse, it runs before ``hub_databases`` builds anything."""
+    from django.conf import settings
+
+    control = tenancy_connections.control_name()
+    if not control.startswith(settings.DATABASES["default"]["TEST"]["NAME"]):
+        pytest.fail(f"The control database is {control!r}, not the tests': run this module whole, not one test of it.")
+
+
+def databases() -> set[str]:
+    """The databases of this session's control database (other sessions make and drop theirs meanwhile)."""
+    control = tenancy_connections.control_name()
+    with hubs._maintenance() as conn:
+        return {row[0] for row in conn.execute("SELECT datname FROM pg_database") if row[0].startswith(control)}
+
+
+@pytest.fixture
+def made(hub_databases):
+    """Names of hub databases a test makes; dropped after it, whatever happened."""
+    control = hub_databases.control
+    made_names: list[str] = []
+
+    def new(*, demo: bool = False) -> str:
+        build = names.demo_db_name if demo else names.hub_db_name
+        made_names.append(name := build(control, uuid.uuid7()))
+        return name
+
+    yield new
+    with hubs._maintenance() as conn:
+        for name in made_names:
+            hubs._drop(conn, name, control)
+
+
+def test_the_maintenance_connection_is_the_migrators_to_postgres_in_autocommit_and_closed_after(settings):
+    default = django_connections.settings["default"]
+    settings.DB_MIGRATOR_USER, settings.DB_MIGRATOR_PASSWORD = default["USER"], default["PASSWORD"]
+
+    with ops.connect_ops() as conn:
+        assert conn.info.dbname == "postgres"
+        assert conn.autocommit is True
+        assert conn.execute("SELECT current_user").fetchone()[0] == default["USER"]
+
+    assert conn.closed
+
+
+def test_the_migrators_role_reaches_the_maintenance_connection_and_a_hubs_ddl_alias(settings, hub_databases):
+    settings.DB_MIGRATOR_USER, settings.DB_MIGRATOR_PASSWORD = "hub_migrator", "its-password"
+
+    conninfo = tenancy_connections.migrator_conninfo("postgres")
+    alias = tenancy_connections.register_ddl_alias(hub_databases.a)
+    ddl = django_connections.settings[alias]
+
+    assert (conninfo["user"], conninfo["password"], conninfo["dbname"]) == ("hub_migrator", "its-password", "postgres")
+    assert "pool" not in conninfo
+    assert (ddl["USER"], ddl["PASSWORD"]) == ("hub_migrator", "its-password")
+
+
+def test_without_a_migrators_role_nothing_is_made_nor_dropped_as_the_app(settings, hub_databases):
+    """A process without ``DB_MIGRATOR_*`` (the web) opens no maintenance connection and no ``__ddl`` alias: a
+    readable failure, never ``hub_app``."""
+    from base.tenancy.credentials import CredentialsUnavailable
+
+    settings.DB_MIGRATOR_USER, settings.DB_MIGRATOR_PASSWORD = "", ""
+
+    with pytest.raises(CredentialsUnavailable):
+        tenancy_connections.migrator_conninfo("postgres")
+    with pytest.raises(CredentialsUnavailable):
+        tenancy_connections.register_ddl_alias(hub_databases.a)
+    with pytest.raises(CredentialsUnavailable):
+        ops.drop_database(names.hub_db_name(hub_databases.control, uuid.uuid7()))
+
+
+def test_a_clone_is_a_copy_of_its_template_and_a_second_one_makes_nothing(hub_databases, made):
+    name = made()
+
+    assert ops.clone_database(name, template=hub_databases.template) is True
+    assert hubs.table_names(name) == hubs.table_names(hub_databases.template)
+    assert ops.clone_database(name, template=hub_databases.template) is False
+    assert name in databases()
+
+
+def test_a_clone_is_private_and_open_to_the_environments_app_and_admin_roles(hub_databases, made):
+    prefix = f"zz{uuid.uuid4().hex[:8]}_"
+    roles = bootstrap.Names.with_prefix(prefix)
+    name = made()
+    with hubs._maintenance() as conn:
+        for role in (roles.hub_app, roles.hub_admin):
+            conn.execute(sql.SQL("CREATE ROLE {} NOLOGIN").format(sql.Identifier(role)))
+    try:
+        ops.clone_database(name, template=hub_databases.template, roles=roles)
+        with hubs._maintenance() as conn:
+            granted = {
+                (role, privilege): conn.execute(
+                    "SELECT has_database_privilege(%s, %s, %s)", [role, name, privilege]
+                ).fetchone()[0]
+                for role in (roles.hub_app, roles.hub_admin)
+                for privilege in ("CONNECT", "TEMPORARY")
+            }
+            acl = conn.execute("SELECT datacl::text[] FROM pg_database WHERE datname = %s", [name]).fetchone()[0]
+    finally:
+        with hubs._maintenance() as conn:
+            hubs._drop(conn, name, hub_databases.control)
+            for role in (roles.hub_app, roles.hub_admin):
+                conn.execute(sql.SQL("DROP ROLE IF EXISTS {}").format(sql.Identifier(role)))
+
+    assert all(granted.values()), granted
+    # No entry for PUBLIC (``=…/owner``): only the owner and the two roles.
+    assert not [entry for entry in acl if entry.startswith("=")], acl
+
+
+def test_roles_the_cluster_does_not_have_are_skipped_with_a_warning(hub_databases, made, caplog):
+    name = made()
+    roles = bootstrap.Names.with_prefix(f"zz{uuid.uuid4().hex[:8]}_")
+
+    assert ops.clone_database(name, template=hub_databases.template, roles=roles) is True
+
+    assert name in databases()
+    assert roles.hub_app in caplog.text and "base.tenancy.ops.role_missing" in caplog.text
+
+
+def test_the_environments_roles_carry_its_control_databases_prefix():
+    assert ops.environment_roles("hub") == bootstrap.Names()
+    assert ops.environment_roles("pre_hub") == bootstrap.Names.with_prefix("pre_")
+    assert ops.environment_roles("test_hub_next") == bootstrap.Names()
+
+
+def test_a_template_in_use_is_waited_for_and_then_cloned(hub_databases, made):
+    name = made()
+    blocker = psycopg.connect(**tenancy_connections.migrator_conninfo(hub_databases.template), autocommit=True)
+    waited = []
+
+    def wait(seconds):
+        waited.append(seconds)
+        blocker.close()
+
+    assert ops.clone_database(name, template=hub_databases.template, waits=(0.5, 1.0), sleep=wait) is True
+    assert waited == [0.5]
+    assert name in databases()
+
+
+def test_a_template_in_use_for_longer_than_the_waits_is_a_readable_failure(hub_databases, made):
+    name = made()
+    waited = []
+    with psycopg.connect(**tenancy_connections.migrator_conninfo(hub_databases.template), autocommit=True):
+        with pytest.raises(ops.DatabaseOpsError, match=r"template .* in use"):
+            ops.clone_database(name, template=hub_databases.template, waits=(0.1, 0.2), sleep=waited.append)
+
+    assert waited == [0.1, 0.2]
+    assert name not in databases()
+
+
+def test_a_missing_template_is_a_readable_failure_and_makes_nothing(hub_databases, made):
+    name = made()
+    missing = names.template_db_name(hub_databases.control, "nowhere")
+
+    with pytest.raises(ops.TemplateMissing, match="nowhere"):
+        ops.clone_database(name, template=missing)
+
+    assert name not in databases()
+
+
+#: A hub of the developer's database (``hub``), of pre's and of prod's: never this session's.
+OTHER_CONTROLS = (
+    f"hub_{uuid.UUID(int=1).hex}",
+    f"hub_demo_{uuid.UUID(int=1).hex}",
+    f"pre_hub_{uuid.UUID(int=1).hex}",
+    "hub_template",
+    "hub_template_test",
+)
+
+
+@pytest.mark.parametrize(
+    "bad", ["postgres", "hub", "template0", "template1", 'x"; DROP DATABASE hub; --', *OTHER_CONTROLS]
+)
+def test_a_name_that_is_no_hubs_never_reaches_the_server(bad, hub_databases):
+    with pytest.raises(names.InvalidDatabaseName):
+        ops.clone_database(bad, template=hub_databases.template)
+    with pytest.raises(names.InvalidDatabaseName):
+        ops.drop_database(bad)
+
+
+def test_only_a_name_of_this_sessions_control_database_is_ever_dropped(hub_databases):
+    """What ``drop_database`` takes must pass ``names.validate`` with this session's control database: another
+    session's, the developer's (``hub``), pre's or a template are refused before the server hears anything."""
+    control = tenancy_connections.control_name()
+    assert control.startswith(django_connections.settings["default"]["TEST"]["NAME"])
+    for name in OTHER_CONTROLS:
+        with pytest.raises(names.InvalidDatabaseName):
+            names.validate_hub(name, control=control)
+    another_session = names.hub_db_name(f"{control}x", uuid.uuid7())
+    with pytest.raises(names.InvalidDatabaseName):
+        ops.drop_database(another_session)
+
+
+def test_a_template_is_never_dropped(hub_databases):
+    with pytest.raises(names.InvalidDatabaseName):
+        ops.drop_database(hub_databases.template)
+
+    assert hub_databases.template in databases()
+
+
+def test_a_drop_takes_its_database_only_even_with_someone_connected(hub_databases, made):
+    name = made(demo=True)
+    ops.clone_database(name, template=hub_databases.template)
+    before = databases()
+    connected = psycopg.connect(**tenancy_connections.migrator_conninfo(name), autocommit=True)
+
+    assert ops.drop_database(name) is True
+
+    assert databases() == before - {name}
+    with pytest.raises(psycopg.OperationalError):
+        connected.execute("SELECT 1")
+    connected.close()
+
+
+def test_dropping_a_database_that_is_not_there_drops_nothing(hub_databases, made):
+    name = made(demo=True)
+    before = databases()
+
+    assert ops.drop_database(name) is False
+    assert databases() == before
+
+
+@pytest.mark.django_db
+def test_the_control_database_is_never_dropped_nor_cloned_into():
+    control = tenancy_connections.control_name()
+
+    with pytest.raises(names.InvalidDatabaseName):
+        ops.drop_database(control)
+    with pytest.raises(names.InvalidDatabaseName):
+        ops.clone_database(control, template=names.template_db_name(control))
+
+
+def test_a_migrators_alias_registered_again_never_keeps_another_roles_connection(
+    settings, hub_databases, django_db_blocker
+):
+    """CI of hub#471: a migrator's alias registered with one role and forgotten left this thread's connection object
+    behind; registered again with another role, it must not reach the server with the first one."""
+    from base.tenancy.tests import hubs as test_hubs
+
+    default = django_connections.settings["default"]
+    before = django_connections.settings
+    settings.DB_MIGRATOR_USER, settings.DB_MIGRATOR_PASSWORD = "hub_migrator", "its-password"
+    alias = tenancy_connections.register_ddl_alias(hub_databases.a)
+    assert django_connections[alias].settings_dict["USER"] == "hub_migrator"
+    test_hubs.forget_aliases(before)
+
+    settings.DB_MIGRATOR_USER, settings.DB_MIGRATOR_PASSWORD = default["USER"], default["PASSWORD"]
+    tenancy_connections.register_ddl_alias(hub_databases.a)
+
+    assert django_connections[alias].settings_dict["USER"] == default["USER"]
+    with django_db_blocker.unblock(), django_connections[alias].cursor() as cursor:
+        cursor.execute("SELECT current_user")
+        assert cursor.fetchone()[0] == default["USER"]
+    django_connections[alias].close()
+
+
+def test_forgetting_an_alias_drops_this_threads_connection_object_too(hub_databases):
+    """Re-review of hub#471 (a): ``hubs.forget_aliases`` leaves no connection object behind for an alias it forgets, as
+    ``migrator._forget_alias`` does (the leftover one was what broke the CI of 2b46f6e7)."""
+    from base.tenancy.tests import hubs as test_hubs
+
+    before = django_connections.settings
+    alias = tenancy_connections.register_ddl_alias(hub_databases.a)
+    django_connections[alias]  # this thread's object, made now
+    test_hubs.forget_aliases(before)
+
+    # Django keeps each thread's connection objects by alias apart from the settings (``connections._connections``).
+    assert getattr(django_connections._connections, alias, None) is None

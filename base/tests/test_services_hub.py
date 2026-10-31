@@ -1,16 +1,19 @@
 """The registry's operations (plan 2026-10-17, §1.5): what ``/internal/hubs/{id}`` runs, as the platform only.
 
 ``base.hub.register`` (``PUT``), ``base.hub.state_apply`` (``PUT …/state``), ``base.hub.cancel`` (``DELETE``),
-``base.hub.restore`` (``POST …/restore``) and the query ``base.hub.get`` (``GET``). A sign-up is ready at once
-in phase 1 (no database to clone), and the SaaS hears it after the COMMIT (``report_ready``).
+``base.hub.restore`` (``POST …/restore``) and the query ``base.hub.get`` (``GET``). A sign-up is ``requested`` with a
+database of its own that the worker makes (round 2026-10-30 of PLAN-DB, S2a; ``base/tenancy/tests/test_provision.py``),
+and the SaaS hears ``ready`` from it (``report_ready``).
 """
 
+import datetime as dt
 import json
 import logging
 import uuid
 
 import pytest
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 from live.context import OperationContext, system_context
 from live.errors import Conflict, InvalidPayload, NotFound, PermissionDenied
 from live.models import OutboxEvent
@@ -21,7 +24,10 @@ from base.models import Hub
 from base.queries import hub_get, hubs_by_slugs
 from base.schemas import HubCancelIn, HubGetIn, HubRegistryIn, HubRestoreIn, HubsBySlugIn, HubStateIn
 from base.services import hub_cancel, hub_register, hub_restore, hub_state_apply, report_ready
+from base.tenancy import names
+from base.tenancy.connections import control_name
 from base.tests.conftest import SECRET
+from control.models import HubDue
 
 pytestmark = pytest.mark.django_db
 
@@ -53,12 +59,14 @@ def events(name):
 
 
 class TestRegister:
-    def test_a_new_business_is_registered_ready_at_once(self, django_capture_on_commit_callbacks, fake_saas):
-        fake_saas()
-        with django_capture_on_commit_callbacks():
+    def test_a_new_business_is_requested_with_its_own_database_to_make(
+        self, django_capture_on_commit_callbacks, fake_saas
+    ):
+        fake = fake_saas()
+        with django_capture_on_commit_callbacks(execute=True):
             answer = register()
-        assert (answer.created, answer.status, answer.is_demo, answer.state_version) == (True, "ready", False, 0)
-        assert answer.ready_at is not None and answer.expires_at is None
+        assert (answer.created, answer.status, answer.is_demo, answer.state_version) == (True, "requested", False, 0)
+        assert answer.ready_at is None and answer.expires_at is None
         hub = Hub.objects.get(pk=HUB_ID)
         assert (hub.slug, hub.name, hub.country, hub.timezone, hub.language, hub.vertical) == (
             "acme",
@@ -68,15 +76,15 @@ class TestRegister:
             "es",
             "restaurant",
         )
+        assert hub.db_name == names.hub_db_name(control_name(), HUB_ID)
+        assert HubDue.objects.filter(pk=HUB_ID).exists()
         assert events("base.hub.registered") == [{"id": str(HUB_ID), "slug": "acme", "created": True}]
+        # The worker tells it once its database is made (report_ready, below), not the registration.
+        assert fake.calls == []
 
-    def test_the_saas_hears_ready_after_the_commit_signed_v1_and_v2(self, django_capture_on_commit_callbacks, fake_saas):
+    def test_the_saas_hears_ready_signed_v1_and_v2(self, fake_saas):
         fake = fake_saas(body={"id": str(HUB_ID), "status": "active"})
-        with django_capture_on_commit_callbacks() as callbacks:
-            register()
-            assert fake.calls == []  # never inside the transaction
-        for callback in callbacks:
-            callback()
+        report_ready(HUB_ID)
         [call] = fake.calls
         path = f"/internal/hubs/{HUB_ID}/ready"
         assert call["url"] == f"http://localhost:8001{path}"
@@ -88,27 +96,42 @@ class TestRegister:
         assert signing.verify_signed("POST", path, call["body"], headers, secrets=[SECRET], now=now)
         assert "X-Erplora-Signature-V2" in headers and "X-Erplora-Signature" in headers
 
-    def test_registering_again_updates_it_without_another_ready(self, django_capture_on_commit_callbacks, fake_saas):
+    def test_registering_a_ready_one_again_updates_it_and_says_nothing(
+        self, django_capture_on_commit_callbacks, fake_saas
+    ):
         fake = fake_saas()
         with django_capture_on_commit_callbacks(execute=True):
             register()
+        Hub.objects.filter(pk=HUB_ID).update(status="ready")
         with django_capture_on_commit_callbacks(execute=True):
             answer = register(name="Acme Café", slug="acme-cafe", vertical=None)
         assert (answer.created, answer.status) == (False, "ready")
         hub = Hub.objects.get(pk=HUB_ID)
         assert (hub.name, hub.slug, hub.vertical) == ("Acme Café", "acme-cafe", "")
-        assert len(fake.calls) == 1
+        assert fake.calls == []
 
-    def test_a_hub_that_was_not_ready_becomes_ready_and_the_saas_hears_it(
-        self, django_capture_on_commit_callbacks, fake_saas
-    ):
-        Hub.objects.create(id=HUB_ID, slug="acme", status="failed")
+    def test_a_hub_whose_preparation_failed_is_tried_again_now(self, django_capture_on_commit_callbacks, fake_saas):
+        Hub.objects.create(
+            id=HUB_ID,
+            slug="acme",
+            status="failed",
+            db_name=names.hub_db_name(control_name(), HUB_ID),
+            attempts=3,
+            next_attempt_at=timezone.now() + dt.timedelta(minutes=15),
+        )
         fake = fake_saas()
+        before = timezone.now()
         with django_capture_on_commit_callbacks(execute=True):
             answer = register()
-        assert (answer.created, answer.status) == (False, "ready")
-        assert Hub.objects.get(pk=HUB_ID).ready_at is not None
-        assert len(fake.calls) == 1
+        hub = Hub.objects.get(pk=HUB_ID)
+        assert (answer.created, answer.status, hub.attempts) == (False, "failed", 3)
+        assert hub.next_attempt_at <= timezone.now() and HubDue.objects.get(pk=HUB_ID).due_at >= before
+        assert fake.calls == []
+
+    def test_a_hub_never_prepared_before_its_own_databases_gets_one(self):
+        Hub.objects.create(id=HUB_ID, slug="acme", status="requested")
+        register()
+        assert Hub.objects.get(pk=HUB_ID).db_name == names.hub_db_name(control_name(), HUB_ID)
 
     @pytest.mark.parametrize("slug", ["demo-abcd1234", "hub", "demo", "Acme", "a b", "xn--bcher-kva"])
     def test_a_slug_no_business_may_take_is_refused(self, slug):

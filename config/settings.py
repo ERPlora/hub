@@ -195,8 +195,8 @@ db_optional_options = {
 db_connect_timeout = config("DB_CONNECT_TIMEOUT", default=5, cast=int)
 # Not test_hub: that one belongs to the packages/live suite, which may run at the same time. Two runs
 # of this suite at once (two sessions, two checkouts) each set their own TEST_DB_NAME, as saas-next.
-# Every database the suite makes derives from it: pytest-xdist appends `_gwN` and the tenancy a hub's
-# `_<hex>` (base.tenancy.names, which refuses a name past PostgreSQL's 63 characters). A name with no
+# Every database the suite makes derives from it: pytest-xdist appends `_gwN` and the tenancy a demo's
+# `_demo_<hex>`, its longest (base.tenancy.names, which refuses a name past PostgreSQL's 63 characters). A name with no
 # room for both (`_gw999`: up to 1000 workers) keeps its first characters and the first 8 of its
 # SHA-256: the same database every run (--reuse-db, the fleet's sweep) and another for another name.
 TEST_DB_NAME = config("TEST_DB_NAME", default="test_hub_next")
@@ -231,6 +231,14 @@ DATABASES = {
         "TEST": {"NAME": TEST_DB_NAME},
     }
 }
+
+# The migrator's role (hub_migrator: DDL and CREATEDB; PLAN-DB §10) for the direct connections that make and change a
+# hub's database: its `<db_name>__ddl` alias and the maintenance connection to `postgres` (base.tenancy.connections,
+# base.tenancy.ops). Only the worker and the hub-migrate task have it (aws stacks/prod/apps.tf,
+# hub_migrator_credentials; never the web). Unset, there is no migrator (base.tenancy.credentials fails closed, never
+# hub_app), except in development (DEBUG, the suite), where the compose Postgres's user is every role.
+DB_MIGRATOR_USER = config("DB_MIGRATOR_USER", default=DATABASES["default"]["USER"] if DEBUG else "")
+DB_MIGRATOR_PASSWORD = config("DB_MIGRATOR_PASSWORD", default=DATABASES["default"]["PASSWORD"] if DEBUG else "")
 
 # The SaaS's `saas` database, schema `shared`, only for register_apps (round 16, PLAN §21; spec §3.3).
 # Declared only where its credentials exist: in production the worker task (SHARED_DB_USER, role
@@ -519,6 +527,13 @@ LIVE = {
         "cwd": str(BASE_DIR),
     },
 }
+
+# The apps whose assistant tools all say what a person types to ask for them (AI.asks, live.E020; docs plan
+# 2026-10-31, the assistant's knowledge and QA): an app joins in the pull request that completes its asks, and layer 1
+# of the assistant's QA (base/tests/test_assistant_asks.py) checks each ask reaches its tool, role by role.
+LIVE_ASSISTANT_ASKS_REQUIRED = (
+    "base",
+)
 
 # Email: the console locally; in production the SES API signed by the task role (no static keys,
 # PLAN-AWS §3), or SMTP from EMAIL_* when SES_REGION is unset. EMAIL_BACKEND overrides the choice.

@@ -4,8 +4,8 @@ Every name derives from the control database's (``settings.DATABASES["default"][
 ``pre_hub`` in pre, the test database in the tests), so no pattern of one environment ever reaches another's:
 
 - a hub: ``<control>_<hex>``, the whole ``Hub.id.hex`` (never truncated: the first half of a UUIDv7 is its date);
-- a demo: ``demo_<hex>`` (round 2026-10-15d; PLAN-DB §14.12 flags that this one does not carry the control's
-  prefix);
+- a demo: ``<control>_demo_<hex>`` (prod ``hub_demo_<hex>``, pre ``pre_hub_demo_<hex>``: round 2026-10-30 of
+  PLAN-DB, proposal (e); before it a demo was ``demo_<hex>`` in every environment, and no such database was ever made);
 - a template: ``<control>_template`` or ``<control>_template_<vertical>``.
 
 PostgreSQL silently truncates an identifier past 63 bytes, so a longer name is refused, never cut. A name reaches SQL
@@ -19,9 +19,9 @@ from psycopg import sql
 
 #: Longest identifier PostgreSQL keeps (``NAMEDATALEN - 1``).
 MAX_IDENTIFIER = 63
-#: Longest control database name its hubs' fit after: a hub's ``_<hex>`` is the most a name adds to control's.
-MAX_CONTROL = MAX_IDENTIFIER - len("_") - 32
-DEMO_PREFIX = "demo"
+DEMO_INFIX = "demo"
+#: Longest control database name its hubs' and demos' fit after: a demo's ``_demo_<hex>`` is the most a name adds.
+MAX_CONTROL = MAX_IDENTIFIER - len(f"_{DEMO_INFIX}_") - 32
 TEMPLATE_SUFFIX = "template"
 #: The suffix of a hub's migrator alias (``<alias>__ddl``, PLAN-DB §4): the same database, reached directly.
 DDL_SUFFIX = "__ddl"
@@ -38,7 +38,7 @@ class InvalidDatabaseName(ValueError):
 def _patterns(control: str) -> re.Pattern:
     escaped = re.escape(control)
     return re.compile(
-        rf"(?:{escaped}|{DEMO_PREFIX})_{_HEX}|{escaped}_{TEMPLATE_SUFFIX}(?:_{_VERTICAL})?"
+        rf"{escaped}(?:_{DEMO_INFIX})?_{_HEX}|{escaped}_{TEMPLATE_SUFFIX}(?:_{_VERTICAL})?"
     )
 
 
@@ -53,15 +53,25 @@ def validate(name: str, *, control: str) -> str:
     return name
 
 
+def validate_hub(name: str, *, control: str) -> str:
+    """``name`` if it is a hub's or a demo's database of ``control`` (never a template's); else ``InvalidDatabaseName``.
+
+    What may be dropped (``base.tenancy.ops.drop_database``): a template is every hub's source, never one hub's.
+    """
+    validate(name, control=control)
+    if not re.fullmatch(rf"{re.escape(control)}(?:_{DEMO_INFIX})?_{_HEX}", name):
+        raise InvalidDatabaseName(f"{name!r} is a template of {control!r}, not a hub's or a demo's database.")
+    return name
+
+
 def hub_db_name(control: str, hub_id: uuid.UUID) -> str:
     """The database of the hub ``hub_id`` next to the control database ``control``."""
     return validate(f"{control}_{hub_id.hex}", control=control)
 
 
-def demo_db_name(hub_id: uuid.UUID) -> str:
-    """The database of the demo ``hub_id`` (``demo_<hex>``, any control database)."""
-    name = f"{DEMO_PREFIX}_{hub_id.hex}"
-    return validate(name, control=DEMO_PREFIX)
+def demo_db_name(control: str, hub_id: uuid.UUID) -> str:
+    """The database of the demo ``hub_id`` next to the control database ``control`` (``<control>_demo_<hex>``)."""
+    return validate(f"{control}_{DEMO_INFIX}_{hub_id.hex}", control=control)
 
 
 def template_db_name(control: str, vertical: str | None = None) -> str:

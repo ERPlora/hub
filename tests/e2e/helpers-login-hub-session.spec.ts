@@ -43,20 +43,21 @@ function jumpsOf(context: BrowserContext): string[] {
   return jumps;
 }
 
-/** A fresh context signed in on `origin` as `credentials`: who the hub says it is and the jumps it took. */
+/** A fresh context signed in on `origin` as `credentials`: who the hub says it is (its person's id, which is that
+ *  business's own since S2a, and the account it names) and the jumps it took. */
 async function entry(
   browser: Browser,
   origin: string,
   credentials: Credentials = OWNER,
   options: { fresh?: boolean } = {},
-): Promise<{ context: BrowserContext; user: string; jumps: string[] }> {
+): Promise<{ context: BrowserContext; user: string; label: string; jumps: string[] }> {
   const context = await browser.newContext({ baseURL: origin });
   const jumps = jumpsOf(context);
   const page = await context.newPage();
   await login(page, origin, '/demo/items', credentials, options);
-  const me = await api<{ user: { id: string } | null }>(context, origin, 'GET', '/me');
+  const me = await api<{ user: { id: string; label: string } | null }>(context, origin, 'GET', '/me');
   expect(me.status, `GET /api/me on ${origin}`).toBe(200);
-  return { context, user: me.data.user?.id ?? '', jumps };
+  return { context, user: me.data.user?.id ?? '', label: me.data.user?.label ?? '', jumps };
 }
 
 /** «Sign out» of the hub in that context (`POST /auth/logout`): the hub's session ends, the SaaS's stays. */
@@ -141,15 +142,16 @@ test('a context signed in at the SaaS as another account: the session its jump o
     // opens theirs.
     const page = await employee.context.newPage();
     await login(page, B, '/demo/items', OWNER, { fresh: true });
-    const there = await api<{ user: { id: string } | null }>(employee.context, B, 'GET', '/me');
-    expect(there.data.user?.id, 'what the SaaS signed in').toBe(employee.user);
+    // Each business has its own person for the account (S2a): `b`'s names the employee, under `b`'s own id.
+    const there = await api<{ user: { id: string; label: string } | null }>(employee.context, B, 'GET', '/me');
+    expect(there.data.user?.label, 'what the SaaS signed in').toBe(employee.label);
   } finally {
     await employee.context.close();
   }
 
   const owner = await entry(browser, B);
   await owner.context.close();
-  expect(owner.user, 'the owner enters hub b as the owner').not.toBe(employee.user);
+  expect(owner.label, 'the owner enters hub b as the owner').not.toBe(employee.label);
 });
 
 // FIX-HUB-E2E-INVENTORY-TABS-WALK-TIMEOUT-AFTER-OTHERS: `/inventory` is no page, the SPA's router sends it to

@@ -7,7 +7,7 @@
 // removed after it (and before, if a run died half-way).
 import { type Browser, expect, type Page, test } from '@playwright/test';
 
-import { A, api, EMPLOYEE, hostPage, login, psql, shot, shown } from './helpers';
+import { A, api, EMPLOYEE, hostPage, hubUserIdOf, login, psql, shot, shown } from './helpers';
 
 const TAG = 'E2E';
 const PHONE = { width: 390, height: 844 };
@@ -123,7 +123,7 @@ test('the owner adds, links, edits, deactivates and terminates staff, live, with
     await expect(rowOf(page, linkedName)).toContainText(/12[.,]50/);
     const linkedId = await memberId(context, linkedName);
     expect(psql(`select hub_user_id from staff_member where id = '${linkedId}'`)).toBe(
-      psql(`select h.id from base_hubuser h join auth_user u on u.username = h.username where u.email = '${EMPLOYEE.email}'`),
+      hubUserIdOf(EMPLOYEE.email),
     );
 
     // STAFF-F02: a row opens «Edit · {name}»; only what changed is saved.

@@ -20,7 +20,14 @@ STOP_SIGNALS = (signal.SIGTERM, signal.SIGINT)
 class Command(BaseCommand):
     help = "Run the Hub's worker until SIGTERM or SIGINT (phase 1: register the apps, then wait)."
 
-    def handle(self, *args, **options):
+    def add_arguments(self, parser):
+        parser.add_argument(
+            "--databases-only",
+            action="store_true",
+            help="Only make the hubs' databases and drop the demos that ended: no tasks, no outbox relay (the e2e).",
+        )
+
+    def handle(self, *args, databases_only: bool = False, **options):
         stop = threading.Event()
 
         def request_stop(signum, frame):
@@ -30,7 +37,7 @@ class Command(BaseCommand):
         try:
             self.stdout.write("worker: started")
             self.stdout.flush()
-            code = worker.run(stop)
+            code = worker.run(stop, databases_only=databases_only)
         finally:
             for sig, handler in previous.items():
                 signal.signal(sig, handler)
