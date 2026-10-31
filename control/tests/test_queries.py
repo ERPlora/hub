@@ -145,6 +145,7 @@ class TestACluster:
     def test_one_without_hubs_of_its_own_database_is_not_even_reached(self, staff_ctx, connects):
         cluster = local_cluster(host="writer.invalid")
         hub_on("", cluster=cluster)
+        hub_on(f"hub_demo_{'0' * 32}", cluster=cluster, slug="demo-0000beef", is_demo=True, status=Hub.Status.PURGED)
 
         assert queries.cluster_sizes(staff_ctx, ClusterSizesIn(cluster=cluster.pk)).databases == {}
         assert connects == []
@@ -203,6 +204,25 @@ class TestKeptTenMinutes:
         assert set(later.databases) == {hub_databases.a, hub_databases.b}
         assert measured == [[hub_databases.a], [hub_databases.b]]
         assert kept == [queries.SIZE_TTL_SECONDS, queries.SIZE_TTL_SECONDS] and queries.SIZE_TTL_SECONDS == 600
+
+    def test_the_same_name_on_two_servers_is_kept_apart(self, staff_ctx, hub_databases, monkeypatch):
+        measured: list[object] = []
+        real = queries._measure
+
+        def measure(cluster, names):
+            measured.append(cluster.pk if cluster is not None else None)
+            return real(cluster, names)
+
+        monkeypatch.setattr(queries, "_measure", measure)
+        cluster = local_cluster()
+        # While a hub moves (base.hub.move) its database's name is on both servers.
+        hub_on(hub_databases.a)
+        hub_on(hub_databases.a, cluster=cluster)
+
+        queries.cluster_sizes(staff_ctx, ClusterSizesIn(cluster=None))
+        queries.cluster_sizes(staff_ctx, ClusterSizesIn(cluster=cluster.pk))
+
+        assert measured == [None, cluster.pk]
 
     def test_a_cache_that_does_not_answer_only_costs_a_measure(self, staff_ctx, hub_databases, monkeypatch):
         def away(*args, **kwargs):

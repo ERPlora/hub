@@ -16,7 +16,7 @@ import re
 import pytest
 from django.conf import settings
 from django.contrib import admin
-from django.contrib.admin.models import ADDITION, CHANGE, LogEntry
+from django.contrib.admin.models import ADDITION, CHANGE, DELETION, LogEntry
 from django.contrib.auth import get_user_model
 from live.models import OutboxEvent
 
@@ -145,8 +145,10 @@ class TestClusters:
         assert f"{default['HOST']}:{default['PORT']}" in local and "pooler-1.example:6432" in local
         assert "1 / 100" in local and "icon-yes" in local
         assert SIZE.search(local)
+        assert 'class="field-limit">100<' in local
         other = row_of(html, ">cluster-1<")
         assert "0 / no limit" in other and "writer-1.example:5432" in other and "icon-no" in other
+        assert 'class="field-limit">no limit<' in other and "none: its writer" in other
         assert "erplora/x/clusters/one" in other and not SIZE.search(other)
 
     def test_one_that_cannot_be_measured_says_why_and_the_page_still_answers(self, client, root):
@@ -177,6 +179,15 @@ class TestClusters:
         html = response.content.decode()
         assert response.status_code == 200
         assert "erplora/prod/clusters/nope/app" in html and "errorlist" in html
+        assert not Cluster.objects.exists()
+
+    def test_what_only_the_operation_bounds_is_shown_on_its_field(self, client, root):
+        # The model takes a port 0; the operation's schema does not.
+        response = client.post(f"{CLUSTERS}add/", form(port="0"), HTTP_HOST=PLATFORM)
+
+        html = response.content.decode()
+        assert response.status_code == 200 and "greater than or equal to 1" in html
+        assert re.search(r'errorlist[^>]*id="id_port_error"', html)
         assert not Cluster.objects.exists()
 
     def test_a_secret_that_resolves_is_kept(self, client, root, secrets):
@@ -246,6 +257,7 @@ class TestClusters:
         assert response.status_code == 302
         assert not Cluster.objects.exists()
         assert events("control.cluster.deleted") == [{"id": str(cluster.pk), "name": "cluster-1"}]
+        assert LogEntry.objects.filter(object_id=str(cluster.pk), action_flag=DELETION).count() == 1
 
     def test_the_bulk_delete_goes_through_its_operation_too(self, client, root):
         first, second = a_cluster(), a_cluster(name="cluster-2", host="writer-2.example")
@@ -258,6 +270,32 @@ class TestClusters:
 
         assert not Cluster.objects.exists()
         assert len(events("control.cluster.deleted")) == 2
+
+    def test_a_bulk_delete_logs_only_what_its_operation_deleted(self, client, root, monkeypatch):
+        from live.errors import Conflict
+
+        first, second = a_cluster(), a_cluster(name="cluster-2", host="writer-2.example")
+        real = control_admin.cluster_delete
+
+        def refuses_the_second(ctx, data):
+            if data.id == second.pk:
+                raise Conflict("A hub was just placed on cluster-2.", code="control.cluster_holds_hubs")
+            return real(ctx, data)
+
+        monkeypatch.setattr(control_admin, "cluster_delete", refuses_the_second)
+
+        response = client.post(
+            CLUSTERS,
+            {"action": "delete_selected", "_selected_action": [str(first.pk), str(second.pk)], "post": "yes"},
+            HTTP_HOST=PLATFORM,
+            follow=True,
+        )
+
+        # The admin capitalises its messages («Cluster-2: …»).
+        assert "cluster-2: a hub was just placed on cluster-2." in response.content.decode().lower()
+        assert list(Cluster.objects.values_list("name", flat=True)) == ["cluster-2"]
+        logged = LogEntry.objects.filter(action_flag=DELETION).values_list("object_id", flat=True)
+        assert list(logged) == [str(first.pk)]
 
     def test_a_refusal_between_the_check_and_the_delete_is_said_and_logs_nothing(self, client, root, monkeypatch):
         from live.errors import Conflict

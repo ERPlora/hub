@@ -246,6 +246,16 @@ class TestUpdate:
         cluster.refresh_from_db()
         assert (cluster.host, cluster.port) == ("writer-9.example", 5433)
 
+    def test_nothing_changed_writes_nothing_and_reads_no_secret(self, admin_ctx, monkeypatch):
+        cluster = a_cluster(secret_name=SECRET)
+        fake = FakeSecrets({})
+        monkeypatch.setattr(credentials, "secrets_client", lambda: fake)
+
+        out = services.cluster_update(admin_ctx, update_in(cluster))
+
+        assert (out.id, out.secret_name, fake.reads) == (cluster.pk, SECRET, [])
+        assert events("control.cluster.updated") == []
+
     def test_an_unknown_cluster_is_not_found(self, admin_ctx):
         ghost = Cluster(id=uuid.uuid7(), name="ghost", host="nowhere.example")
 
@@ -263,6 +273,8 @@ class TestClose:
     def test_closes_it_to_new_hubs_and_leaves_its_hubs_where_they_are(self, admin_ctx):
         cluster = a_cluster()
         hub = Hub.objects.create(slug="acme", status=Hub.Status.READY, cluster=cluster)
+        # A purged demo has no database left there: not counted among its hubs.
+        Hub.objects.create(slug="demo-0000beef", is_demo=True, status=Hub.Status.PURGED, cluster=cluster)
 
         out = services.cluster_close(admin_ctx, ClusterIdIn(id=cluster.pk))
 

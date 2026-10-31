@@ -271,9 +271,8 @@ class HubAdmin(base_admin.HubAdmin):
         return SizedChangeList
 
     def attach_sizes(self, request: HttpRequest, hubs) -> None:
-        measured = {
-            hub.cluster_id for hub in hubs if hub.db_name and hub.status != Hub.Status.PURGED
-        }
+        # Only a hub with a database of its own has a size; the query leaves out the purged ones itself.
+        measured = {hub.cluster_id for hub in hubs if hub.db_name}
         sizes = {cluster_id: sizes_of(request, cluster_id) for cluster_id in sorted(measured, key=str)}
         for hub in hubs:
             on_its_server = sizes.get(hub.cluster_id) or {}

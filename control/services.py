@@ -72,11 +72,6 @@ def _name_taken(name: str) -> Conflict:
     return Conflict(message, code="control.cluster_name_taken", fields={"name": message})
 
 
-def _name_free(name: str, *, besides: UUID | None = None) -> None:
-    if Cluster.objects.filter(name=name).exclude(pk=besides).exists():
-        raise _name_taken(name)
-
-
 def _secret_resolves(secret_name: str) -> None:
     """Refuse ``secret_name`` unless its app's secret can be read and has its user and password."""
     if not secret_name:
@@ -89,7 +84,9 @@ def _secret_resolves(secret_name: str) -> None:
 
 
 def _saved(cluster: Cluster, *, update_fields: list[str] | None = None) -> None:
-    """Save ``cluster`` in a savepoint: a name another cluster took meanwhile is the same refusal as one taken before."""
+    """Save ``cluster`` in a savepoint; its name is its only unique column a valid ``ClusterIn`` can break (the id is
+    a fresh UUIDv7, the bounds are the schema's), so a refusal of the database is another cluster with that name,
+    taken before or at the same time."""
     try:
         with atomic():
             cluster.save(update_fields=update_fields)
@@ -106,7 +103,6 @@ def _record(ctx: OperationContext, name: str, cluster: Cluster, cluster_id: UUID
 def cluster_create(ctx: OperationContext, data: ClusterIn) -> dict:
     """Register a cluster, open or closed, with its limit of hubs; its secret, if it names one, must resolve first."""
     platform_admin_only(ctx)
-    _name_free(data.name)
     _secret_resolves(data.secret_name)
     cluster = Cluster(**data.model_dump())
     _saved(cluster)
@@ -127,8 +123,6 @@ def cluster_update(ctx: OperationContext, data: ClusterUpdateIn) -> dict:
     changed = [field for field in CLUSTER_FIELDS if getattr(cluster, field) != wanted[field]]
     if not changed:
         return cluster_answer(cluster)
-    if "name" in changed:
-        _name_free(wanted["name"], besides=cluster.pk)
     moved = [field for field in WRITER_FIELDS if field in changed]
     if moved and living_hubs(cluster).exists():
         message = gettext(
