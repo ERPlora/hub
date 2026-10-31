@@ -52,7 +52,8 @@ async function save(): Promise<void> {
   const fields = { name: name.value.trim(), color: color.value };
   try {
     // A manager's PIN lets an employee create or change it (BASE-F84, `apps.py` `approvals`).
-    if (props.tag) await withApproval(() => update.run({ id: props.tag.id, ...fields, is_active: active.value }));
+    const editing = props.tag;
+    if (editing) await withApproval(() => update.run({ id: editing.id, ...fields, is_active: active.value }));
     else await withApproval(() => create.run(fields));
   } catch {
     return; // the form paints the refusal.
