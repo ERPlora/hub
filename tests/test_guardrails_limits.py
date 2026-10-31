@@ -54,7 +54,7 @@ class Held:
         self.hub = hub
         self.opened = threading.Event()
         self.done = threading.Event()
-        self.failure: list[BaseException] = []
+        self.failure: list[Exception] = []
         self.thread = threading.Thread(target=self._hold)
 
     def _hold(self) -> None:
@@ -65,7 +65,7 @@ class Held:
                     cursor.execute("SELECT 1")
                     self.opened.set()
                     self.done.wait(10)
-        except BaseException as exc:  # reported to the test, which fails on it
+        except Exception as exc:  # noqa: BLE001 - reported to the test, which fails on it
             self.failure.append(exc)
         finally:
             self.opened.set()

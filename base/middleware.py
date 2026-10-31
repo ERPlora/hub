@@ -293,7 +293,7 @@ class HubDatabaseMiddleware:
         return tenancy_context.use_hub(resolved)
 
     @staticmethod
-    def _busy(request: HttpRequest, busy: "tenancy_limits.HubBusy") -> HttpResponse:
+    def _busy(request: HttpRequest, busy: tenancy_limits.HubBusy) -> HttpResponse:
         """503 ``base.hub_busy``: the envelope, or the message for a page; come back in a moment (``Retry-After``)."""
         if _wants_envelope(request):
             response = _envelope(busy.status, busy.code, busy.message)

@@ -360,9 +360,8 @@ def test_a_newer_photo_resizes_the_limit_of_the_running_process(hub_a):
     with context.use_hub(hub_a):
         assert limiter_of_a(hub_a).limits == limits.FREE
 
-    with context.use_hub(with_plan(hub_a, STANDARD, version=9)):
-        with transaction.atomic(using=hubs.HUB_A_ALIAS):
-            inside = show_statement_timeout(hubs.HUB_A_ALIAS)
+    with context.use_hub(with_plan(hub_a, STANDARD, version=9)), transaction.atomic(using=hubs.HUB_A_ALIAS):
+        inside = show_statement_timeout(hubs.HUB_A_ALIAS)
 
     assert limiter_of_a(hub_a).limits == limits.PlanLimits(6, 15)
     assert inside == "15s"

@@ -78,7 +78,7 @@ def plan_limits(state: Any) -> PlanLimits | None:
 class Slot:
     """One place of a :class:`Limiter`, held by one transaction; it keeps the limits it was taken with."""
 
-    def __init__(self, limiter: "Limiter", limits: PlanLimits) -> None:
+    def __init__(self, limiter: Limiter, limits: PlanLimits) -> None:
         self._limiter = limiter
         self.limits = limits
         self._released = False
