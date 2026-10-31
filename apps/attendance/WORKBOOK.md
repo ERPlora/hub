@@ -1,8 +1,7 @@
 # Workbook — Control horario (app)
 Prefijo: ATTENDANCE
 Alcance MVP: transversal (lo necesitan la peluquería y el restaurante: todo negocio con empleados)
-Estado de la app: hecha (servidor, páginas y panel del Inicio); el modo del dispositivo espera a la
-plataforma (ver «Lo que queda fuera»)
+Estado de la app: completa (2026-10-31)
 
 > Manual de usuario y especificación de la app `attendance`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `hecho` cuando sus tests están en verde (servidor
@@ -53,7 +52,9 @@ Quién la usa:
    del Hub», STAFF-F03). Una cuenta sin ficha vinculada ve «Tu usuario no está vinculado a ninguna
    ficha de Personal» y no puede fichar.
 3. Si se quiere exigir que el móvil esté en el local, un responsable lo activa en **Ajustes** y fija
-   la ubicación del local (ATTENDANCE-F04). Por defecto no se pide ninguna ubicación.
+   la ubicación del local (ATTENDANCE-F04), y un administrador elige «Personal — un dispositivo que solo
+   usas tú» en el móvil de cada persona, desde ese mismo móvil, en **Ajustes › Este dispositivo**
+   (BASE-F62). Por defecto no se pide ninguna ubicación.
 
 ## Pantallas
 
@@ -81,9 +82,9 @@ El **Inicio** del Hub enseña el panel «Fichados ahora» de serie, agrupado com
 ahora» encima de Registros. Solo lo tiene quien ve las jornadas de todo el equipo; un empleado no.
 
 ### Ajustes
-La pestaña «Ajustes» de la app. «Pedir la ubicación al fichar desde un dispositivo personal», «Radio
-permitido», «Ubicación del lugar de trabajo» (Latitud, Longitud y «Usar mi ubicación actual») y
-«Marcar a revisar tras (horas)». Solo un responsable o un administrador puede guardar; los demás la ven
+La pestaña «Ajustes» de la app. «Pedir la ubicación al fichar desde un dispositivo personal» (debajo,
+dónde se marca un dispositivo como personal), «Radio permitido», «Ubicación del lugar de trabajo»
+(Latitud, Longitud y «Usar mi ubicación actual») y «Marcar a revisar tras (horas)». Solo un responsable o un administrador puede guardar; los demás la ven
 en solo lectura con «Solo un responsable o un administrador puede cambiar estos ajustes.».
 
 ## Estados de cada pantalla
@@ -91,7 +92,7 @@ en solo lectura con «Solo un responsable o un administrador puede cambiar estos
 | Pantalla | Cargando | Vacía | Error |
 |---|---|---|---|
 | Fichar | «Cargando…» | «Todavía no hay jornadas» en Últimas jornadas; sin ficha vinculada, «Tu usuario no está vinculado a ninguna ficha de Personal» | «No se ha podido cargar el control horario…» y «Reintentar» |
-| Registros | «Cargando jornadas…» | «No hay jornadas en este mes» (o «Nada coincide con los filtros») | «No se han podido cargar las jornadas.» y «Reintentar» |
+| Registros | «Cargando jornadas…» | «No hay jornadas en este mes.» (o «Nada coincide con la búsqueda o los filtros.») | «No se han podido cargar las jornadas.» y «Reintentar» |
 | Historial | «Cargando historial…» | «Esta jornada no se ha corregido nunca.» | «No se ha podido cargar el historial.» |
 | Ajustes | indicador de carga | — | el aviso y «Reintentar» |
 | Panel «Fichados ahora» del Inicio | una barra gris en el sitio del número | «0» si no hay nadie dentro | «No disponible» en el panel; los demás siguen |
@@ -105,7 +106,7 @@ no está activa en este negocio» si se apaga y «No tienes permiso» si el pape
 |---|---|---|---|
 | ATTENDANCE-F01 | Fichar la entrada al llegar y la salida al irse | común | hecho |
 | ATTENDANCE-F02 | Hacer una pausa sin salir de la jornada | común | hecho |
-| ATTENDANCE-F03 | Fichar desde el móvil cuando el negocio pide la ubicación | común | parcial: el modo del dispositivo es de la plataforma (fase 2) |
+| ATTENDANCE-F03 | Fichar desde el móvil cuando el negocio pide la ubicación | común | hecho |
 | ATTENDANCE-F04 | Ajustar la ubicación del local y cuándo se revisa una jornada olvidada | común | hecho |
 | ATTENDANCE-F05 | Marcar para revisar una jornada que nadie cerró | común | hecho |
 | ATTENDANCE-F06 | Ver mis jornadas del mes y quién las corrigió | común | hecho |
@@ -165,34 +166,38 @@ Implicados: ATTENDANCE-F01, ATTENDANCE-F05
 
 ### ATTENDANCE-F03 Fichar desde el móvil cuando el negocio pide la ubicación
 <!-- origen: old:attendance/WORKFLOW.md#attendance-f03 qa:modules/attendance/clock-in-from-mobile-with-location gh:attendance#2 gh:hub#2552 gh:hub#2554 -->
-Estado: parcial — saber si un dispositivo es el TPV compartido o el móvil de alguien es de la
-plataforma, que lo traerá con el PIN y el dispositivo de confianza (fase 2), y nunca lo dice la petición
-(ni la pantalla, ni el asistente, ni la API). Hasta entonces todo dispositivo ficha como el compartido,
-no se pide ninguna ubicación y Ajustes deja «Pedir la ubicación…» desactivado diciendo por qué. Lo que
-sigue está hecho y probado en el servidor y en la pantalla, a la espera de ese dato.
+Estado: hecho (servidor y pantalla)
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Fichar
 Pasos:
 1. El negocio tiene activado «Pedir la ubicación al fichar desde un dispositivo personal»
-   (ATTENDANCE-F04) y la persona usa su propio móvil o portátil.
-2. Pulsa «Fichar entrada». Ve «Obteniendo tu ubicación…»; la primera vez el móvil pide permiso.
+   (ATTENDANCE-F04) y la persona usa su propio móvil o portátil, en el que un administrador eligió
+   «Personal — un dispositivo que solo usas tú» desde ese mismo dispositivo, en Ajustes › Este
+   dispositivo (BASE-F62). Si lo cambia con Fichar abierto, la pantalla lo sigue sin recargar.
+2. Bajo el botón ve «Al fichar la entrada desde este dispositivo se comprueba tu ubicación.». Pulsa
+   «Fichar entrada». Ve «Obteniendo tu ubicación…»; la primera vez el móvil pide permiso.
 3. Dentro del radio, ficha como siempre y la jornada guarda la posición, la precisión y la distancia
    al local, que **calcula el Hub** (no se fía de la que diga el dispositivo).
 4. Fuera del radio no ficha y lo dice: «Estás a 850 m del lugar de trabajo, fuera de los 100 m
    permitidos. Acércate para fichar o ficha en el mostrador.».
 5. La salida nunca se bloquea: se guarda la posición si se puede y, si no, se ficha igual.
-6. En el TPV del mostrador nunca se pide la ubicación, aunque el ajuste esté activado.
-Entra: los ajustes de ubicación (ATTENDANCE-F04) y el modo del dispositivo.
+6. En el TPV del mostrador (un dispositivo compartido) nunca se pide la ubicación, aunque el ajuste esté
+   activado; tampoco en un navegador en el que nadie ha entrado con su cuenta, que ficha como el mostrador.
+7. Que el dispositivo es personal lo sabe el Hub, nunca lo dice quien ficha: ni la pantalla, ni el
+   asistente, ni la API.
+Entra: los ajustes de ubicación (ATTENDANCE-F04) y el modo del dispositivo desde el que se ficha
+(BASE-F62).
 Sale: la jornada con la distancia, la precisión y si estaba dentro del radio, solo en el momento de
 fichar; las coordenadas exactas, solo cuando el negocio pide la ubicación y el dispositivo es personal
 (nunca se guardan si nadie las pidió). Se conservan lo que la jornada: cuatro años. En Registros, la
 columna «Ubicación» enseña dentro o fuera.
 Si falla: con el permiso denegado, «El acceso a la ubicación está denegado…»; sin la ubicación del
 local fijada, «Aún no se ha fijado la ubicación del lugar de trabajo…»; sin posición, «Hace falta tu
-ubicación para fichar desde este dispositivo…»; si el GPS tarda más de 15 segundos, «Obtener tu
-posición ha tardado demasiado. Vuelve a intentarlo.». En todos los casos no se ficha y se puede fichar
-en el mostrador.
-Implicados: ATTENDANCE-F04
+ubicación para fichar desde este dispositivo…» (también si se pide al asistente desde un dispositivo
+personal, que no manda la posición); si el GPS tarda más de 15 segundos, «Obtener tu posición ha
+tardado demasiado. Vuelve a intentarlo.». En todos los casos no se ficha y se puede fichar en el
+mostrador.
+Implicados: ATTENDANCE-F04, ATTENDANCE-F12, BASE-F62
 
 ### ATTENDANCE-F04 Ajustar la ubicación del local y cuándo se revisa una jornada olvidada
 <!-- origen: old:attendance/WORKFLOW.md#attendance-f04 gh:attendance#4 gh:hub#2588 -->
@@ -201,9 +206,10 @@ Actor: propietario, administrador, responsable
 Pantalla: Ajustes
 Pasos:
 1. Abre Control horario → «Ajustes».
-2. Activa «Pedir la ubicación al fichar desde un dispositivo personal» (desactivado, con su motivo,
-   mientras el Hub no distinga los dispositivos: ATTENDANCE-F03) y elige el «Radio permitido»: 50, 100,
-   250, 500 o 1000 m.
+2. Activa «Pedir la ubicación al fichar desde un dispositivo personal» y elige el «Radio permitido»: 50,
+   100, 250, 500 o 1000 m. Debajo lee «Solo se pide la ubicación a un dispositivo marcado como personal;
+   al TPV del mostrador, nunca. Cada dispositivo se marca como compartido o personal desde él mismo, en
+   Ajustes › Este dispositivo.» (ATTENDANCE-F03).
 3. Desde el propio local, pulsa «Usar mi ubicación actual»: se rellenan la latitud y la longitud y ve
    la precisión leída. También puede escribirlas a mano.
 4. En «Marcar a revisar tras (horas)» pone de 1 a 24 horas (12 si no lo toca).
@@ -365,7 +371,9 @@ Pasos:
    la API con la persona por su id o su nombre).
 2. Antes de fichar, el asistente pide confirmación y dice a quién, en «Persona», por su nombre (Ana López),
    nunca por un código; el responsable confirma.
-3. El Hub ficha a Ana con la hora del servidor, como si lo hiciera ella, y guarda quién lo hizo.
+3. El Hub ficha a Ana con la hora del servidor, como si lo hiciera ella, y guarda quién lo hizo. Nunca
+   pide la ubicación, aunque el negocio la pida y el responsable esté en su móvil personal: el
+   responsable responde por ella, y su posición no se guarda en la jornada de Ana.
 Entra: la ficha de Personal de esa persona.
 Sale: lo mismo que ATTENDANCE-F01 y ATTENDANCE-F02.
 Si falla: un empleado no puede fichar a otra persona («Solo puedes fichar tu propia entrada y
@@ -483,10 +491,15 @@ Los avisos nunca llevan la posición ni el motivo de una corrección (datos pers
   después de la entrada; la pausa termina después de empezar.
 - La distancia al local la calcula el servidor con `geopy` (`geodesic`, WGS-84) a partir de la
   posición que manda el dispositivo; el dispositivo nunca dice si está dentro ni si es personal: eso
-  sale de `services.device_source(ctx)`, que en la fase 1 dice «compartido» y en la fase 2 leerá el
-  dispositivo de confianza de la sesión. Las coordenadas se guardan solo si el negocio pide la ubicación
-  y el dispositivo es personal; si no, solo distancia, dentro/fuera y precisión (la migración 0002 borró
-  las de las jornadas del dispositivo compartido).
+  sale de `services.device_source(ctx)`, que lee el modo del dispositivo de la sesión
+  (`base.queries.device_of(ctx.request)`, el de la cookie `hub_device`; BASE-F62): `personal` solo si
+  `base` lo conoce y así está marcado; un navegador desconocido o una llamada sin navegador (API key,
+  sistema), compartido. La pantalla lo sigue en vivo con `base.device.current`. El radio y las
+  coordenadas exactas solo valen para quien ficha lo suyo (`mine` de `_target`): fichar a otra persona
+  (F12) nunca los pide ni guarda los del responsable. La salida mide con el dispositivo que ficha la
+  salida, no con el de la entrada. Las coordenadas se guardan solo si el negocio pide la ubicación y el
+  dispositivo es personal; si no, solo distancia, dentro/fuera y precisión (la migración 0002 borró las
+  de las jornadas del dispositivo compartido).
 - **Jornada olvidada** (`queries.is_stale`): abierta y con más horas que las de Ajustes. Se lee como
   «Por revisar» al momento (estado efectivo, sin tiempo trabajado y con su pausa parada), aunque la
   tarea aún no la haya marcado; `clock_out` y las pausas la rechazan con 409
@@ -500,7 +513,7 @@ Los avisos nunca llevan la posición ni el motivo de una corrección (datos pers
   correr sola a partir de ahí, sin preguntar cada segundo. Una jornada «Por revisar» sin salida no tiene
   tiempo trabajado (vacío): contar «hasta ahora» sumaría días que nadie trabajó.
 - La revisión de jornadas olvidadas es la tarea programada `review_stale` (`*/15 * * * *`, `collapse`,
-  en UTC): la corre el worker como sistema (fase 1, en su ámbito fijo; fase 2, en cada hub;
+  en UTC): la corre el worker como sistema (en su ámbito fijo; con la BD por negocio, en cada hub;
   `tests/test_scheduled_review.py` la pasa por `base.scheduler`) y la aplica también `clock_in` a la
   persona que ficha, para no depender del worker.
 - La reacción a `staff.member.terminated` (ATTENDANCE-F13) se la entrega el relay del outbox del worker
@@ -522,16 +535,18 @@ Los avisos nunca llevan la posición ni el motivo de una corrección (datos pers
   con `attendance.record.correct`, que deja rastro. Contradice el «CRUD completo sobre todas sus
   tablas» del admin; lo impone el art. 34.9 ET, como en `invoice` lo impone el RD 1619/2012.
 - Fase 1: el ámbito es la primera parte del Host y los datos se comparten entre `a` y `b`; lo que sí se
-  separa son los avisos en vivo. El PIN y el dispositivo de confianza (quién ficha en un TPV compartido
-  y si un dispositivo es personal) son de `base`, en la fase 2.
+  separa son los avisos en vivo. El PIN y el modo de cada dispositivo (compartido o personal) son de
+  `base` (BASE-F55, BASE-F62): Control horario solo lee el modo.
 
 ## Lo que queda fuera
 
-- **Modo del dispositivo** (ATTENDANCE-F03): es de la plataforma (fase 2). Hasta entonces todo
-  dispositivo ficha como el compartido y «Pedir la ubicación…» queda desactivado en Ajustes.
+- **Una traducción al español marcada «fuzzy» sale en inglés** y su test de traducciones no lo ve
+  (hub#491).
+- **Un texto que pierde su contexto sale con la traducción de otra app** y su test de catálogo no lo ve
+  (hub#493).
 - **Suprimir las jornadas pasados los cuatro años** (y con ellas su posición): se conservan; la
   supresión automática no está (como attendance#7 del producto actual).
-- **Iconos propios** (café, play, ubicación, huella): pedidos en `UI-REQUESTS.md`; mientras, iconos
+- **Iconos propios** (café, play, ubicación, localizar, guardar): pedidos en `UI-REQUESTS.md`; mientras, iconos
   registrados equivalentes.
 - **Varios locales con su propia ubicación** (attendance#4 del producto actual, ATTENDANCE-F04): un Hub es
   un negocio con una ubicación; varios locales por negocio no existen en la plataforma.
@@ -548,7 +563,8 @@ Los avisos nunca llevan la posición ni el motivo de una corrección (datos pers
 - `frontend/routes.ts`: `/attendance/clock`, `/attendance/records` y `/attendance/settings`; la barra
   de pestañas (`frontend/tabs.ts`) son las tres, «Ajustes» para todos (en solo lectura para quien no
   puede guardar), como en el producto actual.
-- Fichar se suscribe a `attendance.record.current` y `attendance.settings.get`; el reloj, el tiempo
+- Fichar se suscribe a `attendance.record.current`, `attendance.settings.get` y `base.device.current`
+  (el modo de este dispositivo, que decide si se lee la posición); el reloj, el tiempo
   desde la entrada y los totales de hoy corren con un temporizador de un segundo sobre el `as_of` del
   servidor.
 - Registros: `useLiveList` + `useServerTable` (ventanas de hasta 100 filas, orden `columna`/`-columna`),
