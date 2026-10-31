@@ -11,14 +11,20 @@ import { type Browser, type BrowserContext, expect, type Locator, type Page, tes
 
 import { A, api, bellBadge, horizontalOverflow, login, openBell, psql, shot, shown, untilStill } from './helpers';
 import { FLOW_VIEWPORTS } from './service-helpers';
-import { cleanUp, e2ePhone, PREFIX, pushChannel, receive } from './whatsapp-helpers';
+import { cleanUp, e2ePhone, keepPhoto, PREFIX, pushChannel, receive, restorePhoto } from './whatsapp-helpers';
 
 const KEY = 'FIX-WHATSAPP_INBOX-SETUP-HOOKS';
 const RUN = Date.now().toString(36);
 const LABEL = 'Clientes de WhatsApp esperando respuesta';
 
-test.beforeAll(() => cleanUp());
-test.afterAll(() => cleanUp());
+test.beforeAll(() => {
+  keepPhoto();
+  cleanUp();
+});
+test.afterAll(() => {
+  cleanUp();
+  restorePhoto();
+});
 
 interface Counter {
   key: string;
