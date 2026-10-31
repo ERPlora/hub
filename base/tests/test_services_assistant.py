@@ -301,6 +301,16 @@ def test_a_name_that_fits_several_apps_shows_no_card_and_the_model_asks_which(na
     assert "Reservas online" in said and "Reservas," in said
 
 
+@pytest.mark.parametrize("name", ["base.app.enable", "base.app.disable"])
+def test_a_name_that_is_no_apps_shows_no_card(name):
+    """A name of no app put an empty card up, and the yes ended in a 404: it goes back to the model before any card."""
+    admin = {"base.view_home", "base.administer_hub"}
+    plan = turn(call(name, {"app": "nope"}), permissions=admin)
+    assert (plan["confirm"], plan["pending"]) == (None, [])
+    [row] = plan["executed"]
+    assert (row["name"], row["outcome"], row["code"]) == (name, "error", "not_found")
+
+
 def test_each_write_of_a_chain_asks_its_own_yes():
     first = call("demo.item.create", {"name": "Uno"}, "c1")
     second = call("demo.item.create", {"name": "Dos"}, "c2")

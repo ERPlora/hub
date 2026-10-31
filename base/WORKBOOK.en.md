@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:137dcefed077618427b64a18e8c2c997059266b81ad8a76fa3af2aae5a705f1d -->
+<!-- generated from WORKBOOK.md sha256:617590c2791474c46dd13bf8f3d0fc23aa039d35f39df8707a45df8926c6d258 -->
 
 ## What it is for and who it is for
 
@@ -2290,9 +2290,7 @@ Steps:
      time show as they are written in the person's language and at the business's hour ("Nov 2, 2026, 10:00 AM"; a day
      alone, "Nov 2, 2026"; a time alone, "9:30 PM"); a value of a closed list, with the name its app gives it ("Front
      desk", not the internal value); and a record, by its name when its app lets whoever asks read it ("Person: Eva
-     Gil"): otherwise the card leaves it out, never by its code. If the person names the record by its name and that name
-     fits several ("reserva": Reservations and Online booking), no card shows: the assistant asks which one, naming
-     them, and nothing is confirmed blind (BASE-F24). Nor does it put the key its app uses to avoid doing
+     Gil"): otherwise the card leaves it out, never by its code. Nor does it put the key its app uses to avoid doing
      the same thing twice on a retry (charging, sending a WhatsApp, printing): nobody can judge it, and the action
      receives it all the same when it runs. Everything shows in the person's language, also the
      name of each datum when the card puts it on its own line (BASE-F98): the

@@ -35,7 +35,6 @@ from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import httpx
-import pydantic
 import pycountry
 from asgiref.sync import sync_to_async
 from babel.dates import format_date, format_time, get_datetime_format
@@ -68,7 +67,6 @@ from live.assistant import (
     tool_spec,
 )
 from live.context import OperationContext, Scope, get_builder
-from live.errors import Conflict, OperationError
 from live.meta import LiveAppConfig, all_live_app_configs
 from live.operations import Operation, get, registry
 
@@ -424,32 +422,8 @@ def preview(ctx: OperationContext, op: Operation, arguments: dict) -> tuple[Tool
     """What the dangerous write ``op`` will do with ``arguments`` (``live.assistant.preview``: the read its ``ai=``
     names, run as ``ctx``'s person), in the Hub's words: its amounts in the currency the read answers
     (``_answer_money``), else the business's; ``signed`` when its schema declares it so. ``base.E005`` checks the
-    declaration at start. A record named as the person says it that fits several (``_ambiguous``) is the write's
-    outcome instead, with no card: nothing is confirmed blind, and the model asks which one."""
-    ambiguous = _ambiguous(ctx, op, arguments)
-    if ambiguous is not None:
-        return ambiguous, None
+    declaration at start."""
     return shared.preview(ctx, op, arguments, words_of_answer=_Words.of_answer)
-
-
-def _ambiguous(ctx: OperationContext, op: Operation, arguments: dict) -> ToolOutcome | None:
-    """Why ``op`` cannot be put on a card yet when a datum of ``arguments`` names its record as the person says it (no
-    id) and the read its schema marks (``REFERS``) finds several (``Conflict``: «reserva» is Reservas and Reservas
-    online, hub#539); its message names them, in the person's language. ``None`` otherwise: what the read cannot find or
-    may not show is the write's own answer, as before."""
-    props = shared.input_schema(op).get("properties", {})
-    for name, value in arguments.items():
-        declared = refers_of(props.get(name, {}))
-        read = registry.get(declared.get("read")) if declared else None
-        if read is None or not isinstance(value, str) or shared.is_uuid(value):
-            continue
-        try:
-            read(ctx, read.input.model_validate({declared.get("by"): value}))
-        except Conflict as exc:
-            return ToolOutcome("error", exc.code, error_content(exc.code, str(exc)))
-        except (pydantic.ValidationError, OperationError):
-            continue
-    return None
 
 
 @checks.register("base")

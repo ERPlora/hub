@@ -2403,9 +2403,7 @@ Pasos:
      de la persona y a la hora del negocio («2 nov 2026, 10:00»; un día solo, «2 nov 2026»; una hora sola,
      «21:30»); un valor de una lista cerrada, con el nombre que le da su app («Mostrador», no el valor interno); y
      un registro, por su nombre cuando su app deja leerlo a quien pregunta («Persona: Eva Gil»): si no, la tarjeta
-     no lo pone, nunca por su código. Si la persona nombra el registro por su nombre y ese nombre vale para varios
-     («reserva»: Reservas y Reservas online), no sale tarjeta: el asistente pregunta cuál, nombrándolos, y nada se
-     confirma a ciegas (BASE-F24). Tampoco pone la clave con que su app evita hacer dos veces lo mismo si se
+     no lo pone, nunca por su código. Tampoco pone la clave con que su app evita hacer dos veces lo mismo si se
      reintenta (cobrar, enviar un WhatsApp, imprimir): nadie puede juzgarla, y la acción la recibe igual al
      ejecutarse. Todo sale en el idioma de la persona, también el nombre de cada dato
      cuando la tarjeta lo pone en su línea (BASE-F98): el mismo con que lo llama su app, nunca un nombre

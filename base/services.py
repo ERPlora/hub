@@ -3219,6 +3219,7 @@ def _app_answer(label: str, row: activation.Activation, along: list[dict[str, st
         "plan's limit of apps is reached (turn one off, or upgrade the plan on erplora.com), a paid app is not "
         "subscribed or the name fits several apps (ask which one). already=true: it was on already, nothing changed.",
         "risk": "normal",
+        "check": "base.app.get",
     },
 )
 def app_enable(ctx: OperationContext, data: AppChangeIn) -> dict:
@@ -3273,6 +3274,7 @@ def _enable(ctx: OperationContext, data: AppChangeIn) -> dict:
         "is deleted: turned on again, it has its data. Refused while another app on needs it, when the app itself says "
         "why not yet or when the name fits several apps (ask which one). already=true: it was off already.",
         "risk": "high",
+        "check": "base.app.get",
     },
 )
 def app_disable(ctx: OperationContext, data: AppChangeIn) -> dict:
