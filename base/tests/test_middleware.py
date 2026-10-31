@@ -490,8 +490,9 @@ class TestTheRegistryGate:
         assert (page.status_code, page["Retry-After"]) == (503, "30")
         html = page.content.decode()
         assert '<meta http-equiv="refresh" content="10">' in html
-        assert "This business is under maintenance" in html
+        assert "This business is under maintenance" in html and "It takes a few minutes." in html
         assert (api.status_code, api["Retry-After"], api.json()["error"]["code"]) == (503, "30", "base.hub_maintenance")
+        assert "for a few minutes" in api.json()["error"]["message"]
 
     def test_a_hub_under_maintenance_says_so_in_spanish(self, client, hub):
         from control.models import Cluster
@@ -500,8 +501,9 @@ class TestTheRegistryGate:
         page = client.get("/", HTTP_HOST="acme.localhost:8000", HTTP_ACCEPT=HTML, HTTP_ACCEPT_LANGUAGE="es")
         api = client.get("/api/me", HTTP_HOST="acme.localhost:8000", HTTP_ACCEPT_LANGUAGE="es")
         assert "Este negocio está en mantenimiento" in page.content.decode()
+        assert "Tarda unos minutos." in page.content.decode()
         assert api.json()["error"]["message"] == (
-            "Este hub está en mantenimiento unos segundos; vuelve a intentarlo enseguida."
+            "Este hub está en mantenimiento unos minutos; vuelve a intentarlo enseguida."
         )
 
     def test_the_api_of_a_hub_being_prepared_is_the_503_envelope(self, client, hub):

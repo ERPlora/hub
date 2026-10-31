@@ -313,8 +313,8 @@ class HubAdmin(base_admin.HubAdmin):
             self.message_user(
                 request,
                 ngettext(
-                    "%(count)d hub will move to %(cluster)s: closed for a few seconds while it moves.",
-                    "%(count)d hubs will move to %(cluster)s: each closed for a few seconds while it moves.",
+                    "%(count)d hub will move to %(cluster)s: closed for a few minutes while it moves.",
+                    "%(count)d hubs will move to %(cluster)s: each closed for a few minutes while it moves.",
                     asked,
                 )
                 % {"count": asked, "cluster": target.name},

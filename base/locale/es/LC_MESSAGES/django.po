@@ -321,8 +321,8 @@ msgid "This hub is still being prepared; try again in a few seconds."
 msgstr "Este hub aún se está preparando; vuelve a intentarlo en unos segundos."
 
 #: registry.py (a hub moving to another cluster, control.hub.move)
-msgid "This hub is under maintenance for a few seconds; try again shortly."
-msgstr "Este hub está en mantenimiento unos segundos; vuelve a intentarlo enseguida."
+msgid "This hub is under maintenance for a few minutes; try again shortly."
+msgstr "Este hub está en mantenimiento unos minutos; vuelve a intentarlo enseguida."
 
 #: registry.py:91
 msgid "This business is suspended until its unpaid invoice is paid."
@@ -417,6 +417,9 @@ msgstr "Estamos preparando tu negocio"
 #: templates/base/hub_maintenance.html
 msgid "This business is under maintenance"
 msgstr "Este negocio está en mantenimiento"
+
+msgid "It takes a few minutes. This page refreshes by itself."
+msgstr "Tarda unos minutos. Esta página se actualiza sola."
 
 #: templates/base/hub_preparing.html:22
 msgid "It takes a few seconds. This page refreshes by itself."

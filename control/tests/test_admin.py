@@ -436,7 +436,7 @@ class TestMoveToCluster:
 
         html = self.choose(client, first, second, apply="yes", cluster=str(target.pk)).content.decode()
 
-        assert "2 hubs will move to cluster-2" in html
+        assert "2 hubs will move to cluster-2: each closed for a few minutes" in html
         for hub in (first, second):
             hub.refresh_from_db()
             assert hub.moving_to_id == target.pk
@@ -520,10 +520,10 @@ def test_the_move_speaks_spanish():
             "Solo se mueve un hub listo con base de datos propia."
         )
         assert ngettext(
-            "%(count)d hub will move to %(cluster)s: closed for a few seconds while it moves.",
-            "%(count)d hubs will move to %(cluster)s: each closed for a few seconds while it moves.",
+            "%(count)d hub will move to %(cluster)s: closed for a few minutes while it moves.",
+            "%(count)d hubs will move to %(cluster)s: each closed for a few minutes while it moves.",
             2,
-        ) % {"count": 2, "cluster": "c2"} == "2 hubs se moverán a c2: cada uno cerrado unos segundos mientras se mueve."
+        ) % {"count": 2, "cluster": "c2"} == "2 hubs se moverán a c2: cada uno cerrado unos minutos mientras se mueve."
 
 
 def test_its_confirmation_page_speaks_spanish(client, root):
@@ -537,4 +537,4 @@ def test_its_confirmation_page_speaks_spanish(client, root):
         HTTP_ACCEPT_LANGUAGE="es",
     ).content.decode()
 
-    assert "Cada hub elegido se cierra unos segundos" in html and 'value="Moverlos"' in html
+    assert "Cada hub elegido se cierra unos minutos" in html and 'value="Moverlos"' in html

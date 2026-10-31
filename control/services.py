@@ -55,7 +55,7 @@ from control.schemas import (
 CLUSTER_FIELDS = tuple(ClusterIn.model_fields)
 #: Which server it is: never changed under the hubs on it.
 WRITER_FIELDS = ("host", "port")
-#: The largest database a move copies (``pg_dump``/``pg_restore``, its hub closed meanwhile): a few seconds' work. A
+#: The largest database a move copies (``pg_dump``/``pg_restore``, its hub closed meanwhile): a few minutes' work. A
 #: larger one needs logical replication, which the Hub does not do yet.
 MOVE_MAX_BYTES = 512 * 1024 * 1024
 
