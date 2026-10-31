@@ -112,8 +112,6 @@ Menú **Automatizaciones**, una sola entrada. De arriba abajo:
   las 09:00», «Solo cuando pulses Ejecutar»), la última ejecución, la etiqueta «Activa» o «En pausa»,
   el interruptor, **Hacer una copia** y **Borrar**. Con varias elegidas, **Encenderlas** y **Ponerlas en
   pausa** (FLOW-F02, FLOW-F03).
-- Encima de **Tus automatizaciones**, un aviso por cada automatización que trae otra app y se montó con un
-  fallo que esa app ya corrigió, con **Actualizarla** (FLOW-F36).
 - **La galería**, siempre debajo: «Elige una y pasa a ser tuya, apagada, para que la mires antes de que
   haga nada.», el botón **¿Cómo funciona esto?** y las tarjetas en «Cualquier negocio», «Peluquería y
   estética» y «Bares y restaurantes»; debajo, una sección **Viene con …** por cada app que trae
@@ -1016,34 +1014,32 @@ Implicados: FLOW-F33, FLOW-F36
 ### FLOW-F36 Reparar una automatización montada con un fallo que su app ya corrigió
 <!-- origen: old:flows/workflow/lista-y-galeria.md#flows-f11 gh:flows#80 -->
 Estado: hecho (servidor y pantalla)
-Actor: propietario, administrador, asistente, la plataforma
+Actor: la plataforma, propietario, administrador, asistente
 Pantalla: Automatizaciones
 Pasos:
-1. Para los datos fijos que su app añadió después a su paso **Pedírselo al asistente** (FLOW-F37), no tienes que
-   hacer nada: una automatización montada antes, aunque la hayas retocado, ya los lleva en ese paso, sin ningún
-   aviso. Al abrirla salen en sus **Datos fijos**, y el asistente no los ve ni puede cambiarlos (FLOW-F38). Así, la
-   respuesta por WhatsApp montada antes de que su app fijara la ficha de quien escribe tampoco anula ni cambia la
-   reserva de otra persona, ni siquiera tras el **Aprobar**.
-2. Encima de **Tus automatizaciones** sale, por cada una que se montó con una versión anterior que arrancaba
-   en más casos de los debidos: ««…» se montó con una versión anterior de Citas que arranca en más casos de los
-   debidos. Actualizarla solo cambia cuándo arranca: sus pasos, permisos e interruptor se quedan como están.».
-3. Pulsa **Actualizarla**.
-4. Sale ««…» ya solo arranca cuando debe.» y el aviso desaparece.
-Entra: las automatizaciones montadas desde una tarjeta de **Viene con …** con una versión anterior: las que
-siguen arrancando con el mismo aviso y cuyo «Solo cuando…» no tiene lo que su app le añadió después, y las que
-dejan al asistente un dato que su app fija hoy en ese paso.
-Sale: los datos fijos de su app, en ese paso desde el primer momento, también en lo que ya estaba en marcha: lo
-que el asistente pida desde entonces y un cambio que ya esperaba tu sí, cuya tarjeta en **Esperan tu respuesta**
-dice en nombre de quién lo hará el sí. Solo los de las consultas y acciones que ese paso sigue pudiendo usar, y
-solo los que no fijaste tú: un dato que fijaste tú se queda con tu valor, y nada más de ese paso ni de los
-demás cambia. Si un dato fijo queda vacío en una ejecución, esa consulta o acción no se hace (FLOW-F38). Hacer
-una copia de la automatización (FLOW-F06) se los lleva escritos. Con **Actualizarla**, la misma automatización
-con solo lo que faltaba añadido a su «Solo cuando…» y esos datos fijos escritos en su paso
-(`flow.flow.updated`); su nombre, sus permisos y su interruptor no cambian, y lo que ya tenía su «Solo cuando…»
-se respeta. Una versión nueva que solo cambia palabras no cambia nada ni avisa. Una que no tiene nada que
-reparar no cambia.
-Si falla: el mensaje en el aviso, que se queda.
-Implicados: FLOW-F06, FLOW-F29, FLOW-F33, FLOW-F35, FLOW-F37, FLOW-F38
+1. No tienes que hacer nada: lo que su app corrigió después de que la montaras llega solo a tu automatización,
+   aunque la hayas retocado, y sin ningún aviso encima de **Tus automatizaciones**. La tarjeta de **Viene con …**
+   sigue diciendo «Versión nueva», como con cualquier otro cambio de su app (FLOW-F35).
+2. Si su app estrechó cuándo arranca, ya no arranca en los casos que su app dejó fuera: la respuesta por WhatsApp
+   montada antes de que su app dejara fuera los mensajes antiguos que trae la bandeja ya no contesta a ninguno. Al
+   abrirla, su «Solo cuando…» ya lo dice.
+3. Si su app fijó un dato de su paso **Pedírselo al asistente** (FLOW-F37), ese paso ya lo lleva: al abrirla sale en
+   sus **Datos fijos**, y el asistente no lo ve ni puede cambiarlo (FLOW-F38). Así, la respuesta por WhatsApp
+   montada antes de que su app fijara la ficha de quien escribe tampoco anula ni cambia la reserva de otra persona,
+   ni siquiera tras el **Aprobar**.
+Entra: las automatizaciones montadas desde una tarjeta de **Viene con …**, cuando se montaran, cuyo «Solo cuando…»
+no tiene lo que su app le pone hoy mientras arrancan con el mismo aviso, o que dejan al asistente un dato que su
+app fija hoy en ese paso.
+Sale: lo que su app pone hoy, desde el primer momento y también en lo que ya estaba en marcha: cuenta al decidir si
+arranca, va en lo que el asistente pida desde entonces y en un cambio que ya esperaba tu sí, cuya tarjeta en
+**Esperan tu respuesta** dice en nombre de quién lo hará el sí. Solo lo que no pusiste tú: una condición que pusiste
+sobre el mismo dato y un dato que fijaste tú se quedan con lo tuyo, y nada más de la automatización cambia; una que
+hiciste arrancar con otro aviso no recibe ninguna condición de su app. Si un dato fijo queda vacío en una
+ejecución, esa consulta o acción no se hace (FLOW-F38). Se lee así al abrirla y en **Probar**, y queda escrito
+cuando la guardas o haces una copia (FLOW-F06). Una versión nueva que solo cambia palabras no cambia nada.
+Si falla: no hay nada que pueda fallar delante de ti: si su app ya no está activa, su automatización tampoco puede
+arrancar con sus avisos.
+Implicados: FLOW-F06, FLOW-F13, FLOW-F21, FLOW-F29, FLOW-F33, FLOW-F35, FLOW-F37, FLOW-F38
 
 ### FLOW-F37 Paso «Pedírselo al asistente»
 <!-- origen: old-hub:HUB-F95 old:flows/workflow/editor.md#flows-f17 -->
@@ -1221,7 +1217,7 @@ preguntas; una pregunta hecha a otro rol) no sale en la tarjeta.
 | Enciende una automatización que trae otra app: la primera vez la crea encendida con exactamente sus permisos; después solo la enciende | gestionar | F33 | `flow.recipe.enable` |
 | La pone en pausa, sin borrarla | gestionar | F34 | `flow.recipe.disable` |
 | Le devuelve la versión que trae hoy su app, con sus permisos, encendida o en pausa como esté | gestionar | F35 | `flow.recipe.restore` |
-| Añade a su «Solo cuando…» solo lo que su app le añadió desde la versión con que se montó, y escribe en su paso del asistente los datos fijos que su app le pone | gestionar | F36 | `flow.recipe.repair` |
+| Deja escrito lo que su app le corrigió y ya cuenta: lo que le falta a su «Solo cuando…» y los datos fijos de su paso del asistente (sin pantalla: no hay nada que esperar del dueño) | gestionar | F36 | `flow.recipe.repair` |
 
 ### Lo que avisa
 
@@ -1522,9 +1518,10 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   debe poder hacer lo que pide (la regla de `grant`); dos a la vez dan una (la restricción única y un
   *savepoint*: la segunda lee la de la primera). Reencender conserva lo del dueño; sin ningún permiso, recibe
   los de la receta. Restaurar (`risk: high`) sobrescribe nombre, disparador, pasos, permisos y huella y no toca
-  el interruptor. Reparar (`missing_clauses`): una montada con otra huella que sigue en el aviso de la receta y
-  a cuyo «Solo cuando…» le faltan **claves** del de hoy recibe solo esas (una clave que el dueño cambió se
-  respeta). Las apps de este carril que traen recetas hoy: `appointment` y `online_booking`.
+  el interruptor. Reparar (`missing_clauses`, `flow.recipe.repair`, sin pantalla): una montada que sigue en el
+  aviso de la receta y a cuyo «Solo cuando…» le faltan **claves** del de hoy, se montara cuando se montara, recibe
+  escritas solo esas (una clave que el dueño cambió se respeta) y los datos fijos de abajo. Las apps de este carril
+  que traen recetas hoy: `appointment` y `online_booking`.
 - **El arreglo de seguridad de una receta llega solo** (revisión 2026-10-30,
   FIX-HUB-FLOW-FACTORY-SAFETY-FIX-WAITS-FOR-THE-OWNERS-UPDATE): `recipes.fixed_data(flow, steps)` suma a cada paso
   `assistant` de una automatización con `recipe` el `pinned` que el paso del **mismo id** de la receta de hoy declara
@@ -1535,8 +1532,13 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   `answer_question`, que además vuelve a poner los datos fijos sobre la propuesta guardada en `_make_proposal`, o no
   la hace si quedan vacíos), `queries.proposal_of` (la tarjeta de «Esperan tu respuesta»: un dato vacío no se pinta)
   y `queries.flow_row` (el editor y la API los enseñan, y guardar los escribe) — y se escribe al hacer una copia
-  (`duplicate_flow`, que ya no lleva `recipe`) y con `flow.recipe.repair`. No hay aviso ni pausa: no hay caso en que
-  aplicarlo pise al dueño, y un dato fijo que su paso ya no rellena queda vacío y su herramienta no se usa.
+  (`duplicate_flow`, que ya no lleva `recipe`) y con `flow.recipe.repair`. Lo mismo con el «Solo cuando…»:
+  `recipes.fixed_filter(flow)` le suma las claves que el de la receta de hoy tiene y él no, mientras arranque con el
+  mismo aviso (`_missing`, sin huella: también una montada desde la versión de hoy a la que el dueño quitó la
+  cláusula); cuenta en `flow.run.react`, se lee en `queries.trigger_of` (editor, «Probar» y API) y se escribe al
+  copiar y con `flow.recipe.repair`. No hay aviso ni pausa: no hay caso en que aplicarlo pise al dueño, y un dato
+  fijo que su paso ya no rellena queda vacío y su herramienta no se usa. El aviso de FLOW-F36 encima de «Tus
+  automatizaciones» (`RecipeRepairs.vue`, «Actualizarla») se quitó: ya no había nada que esperar del dueño.
 - **Asistente**: toda operación declara `ai={"description"…}` (`risk` solo en las acciones; `high` al
   encender o pausar, conceder, ejecutar y borrar) y todo campo de entrada lleva `description`. Las escrituras de
   `flow.system` (solo la plataforma) empiezan por «System only» y `flow.secret.set` por «Not an assistant tool»:
@@ -1623,7 +1625,7 @@ Los avisos llevan ids, nunca nombres ni contenidos.
 | `POST /api/hub/flows/templates/{module}/{family}/activate` | `flow.recipe.enable` | se enciende desde la galería; crear, conceder y encender son una transacción y dos a la vez dan una |
 | `…/templates/{module}/{family}/deactivate` | `flow.recipe.disable` | — |
 | `…/templates/{module}/{family}/restore` | `flow.recipe.restore` | — |
-| reparación del filtro de WhatsApp en la pantalla | `flow.recipe.repair` | general: vale para la receta de cualquier app, no solo la de WhatsApp |
+| reparación del filtro de WhatsApp en la pantalla | `recipes.fixed_filter` al arrancar (y `flow.recipe.repair`, sin pantalla, para dejarlo escrito) | general y sin esperar al dueño: vale para la receta de cualquier app, también para los datos fijos de su paso del asistente |
 
 ### Paridad: consultas
 

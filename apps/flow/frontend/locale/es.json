@@ -87,11 +87,7 @@
       "off": "«{name}» está en pausa. No se ha borrado nada.",
       "hidden": "Hay automatizaciones de tus apps ocultas: necesitan {apps}.",
       "invalid": "«{name}» no se puede ofrecer: {reason}",
-      "loadError": "No se han podido leer las automatizaciones que traen tus apps.",
-      "repairNotice": "«{name}» se montó con una versión anterior de {app} que arranca en más casos de los debidos.",
-      "repairHint": "Actualizarla solo cambia cuándo arranca: sus pasos, permisos e interruptor se quedan como están.",
-      "repair": "Actualizarla",
-      "repaired": "«{name}» ya solo arranca cuando debe."
+      "loadError": "No se han podido leer las automatizaciones que traen tus apps."
     },
     "gallery": {
       "heading": "Automatizaciones hechas",

@@ -3,11 +3,12 @@
 // this stack, its SaaS's gateway (`/internal/assistant/chat`, `/internal/whatsapp/send`) and, behind it, the e2e's
 // provider (assistant-provider.ts, started by this spec; the SaaS seeded with it, README «El asistente») and Meta's
 // Graph (README «WhatsApp»).
-// The owner turned «Book a table» on before its app fixed whose card its assistant acts for (hub#447): its «Ask the
-// assistant» step (`s10`) has no fixed data and it is «New version». Nothing waits for the owner: Automatizaciones
-// shows no notice for it, its editor shows the fixed data its app puts on that step, and when a guest asks to cancel
-// another guest's table the assistant is not offered on whose behalf, the card of «Waiting for your answer» says the
-// writer's, and after the «Approve» the other guest's reservation is as it was.
+// The owner turned «Book a table» on before its app fixed whose card its assistant acts for (hub#447) and before it left
+// out the inbox's old messages: its «Ask the assistant» step (`s10`) has no fixed data, its «Only when…» has no
+// `source` and it is «New version». Nothing waits for the owner: Automatizaciones shows no notice for it, its editor
+// shows the condition and the fixed data its app puts on it, an old message of the inbox starts nothing, and when a
+// guest asks to cancel another guest's table the assistant is not offered on whose behalf, the card of «Waiting for
+// your answer» says the writer's, and after the «Approve» the other guest's reservation is as it was.
 // flow: FLOW-F36 FLOW-F38 FLOW-F29
 import { execFile, execSync } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -114,16 +115,19 @@ async function openTheBook(context: BrowserContext): Promise<void> {
   expect(open.status, JSON.stringify(open.data)).toBe(201);
 }
 
-/** «Book a table» as an owner who turned it on before hub#447 has it: its assistant's step fixes no data, and it was
- *  built from another version («New version»). */
+/** «Book a table» as an owner who turned it on before hub#447 and before its app left out the inbox's old messages has
+ *  it: its assistant's step fixes no data, its «Only when…» says nothing of `source`, and it was built from another
+ *  version («New version»). */
 function asTurnedOnBeforeTheFix(): string {
   const flowId = psql(`select id from flow_flow where recipe = '${ANSWER}'`);
   expect(flowId, '«Book a table» turned on').not.toBe('');
   psql(
     `update flow_flow set steps = (select jsonb_agg(case when step->>'id' = 's10' then step - 'pinned' else step end order by at) ` +
-      `from jsonb_array_elements(steps) with ordinality as listed(step, at)), recipe_digest = repeat('0', 64) where id = '${flowId}'`,
+      `from jsonb_array_elements(steps) with ordinality as listed(step, at)), trigger_filter = trigger_filter - 'input.source', ` +
+      `recipe_digest = repeat('0', 64) where id = '${flowId}'`,
   );
   expect(psql(`select count(*) from flow_flow, jsonb_array_elements(steps) as step where id = '${flowId}' and step ? 'pinned'`)).toBe('0');
+  expect(psql(`select trigger_filter ? 'input.source' from flow_flow where id = '${flowId}'`)).toBe('f');
   return flowId;
 }
 
@@ -144,7 +148,7 @@ test.afterAll(async () => {
 });
 
 for (const viewport of VIEWPORTS) {
-  test(`FLOW-F36 a table answer turned on before its app fixed whose card it acts for never cancels another guest's table, with nothing for the owner to press, at ${viewport.label}`, async ({ browser }) => {
+  test(`FLOW-F36 a table answer turned on before its app's safety fixes never answers an old message nor cancels another guest's table, with nothing for the owner to press, at ${viewport.label}`, async ({ browser }) => {
     // The editor's visit on top of the whole WhatsApp round of fix-whatsapp-inbox-table-cancel.spec.ts: 180 s ran out
     // on a loaded machine (load average 32) in the last relay, at 1440.
     test.setTimeout(300_000);
@@ -161,11 +165,22 @@ for (const viewport of VIEWPORTS) {
       // its app, and no notice over «Your automations» asks for anything.
       await page.goto('/flow/automations');
       await expect(shown(page).locator(`[data-testid="flow-recipe-${ANSWER}"]`)).toContainText('New version');
+      const list = shown(page).locator('[data-testid=flow-list-section]');
+      await expect(list.locator(`[data-testid="flow-list-toggle-${flowId}"]`)).toBeVisible();
+      await expect(shown(page).locator('[data-testid=flow-repairs]')).toHaveCount(0);
       await expect(shown(page).locator(`[data-testid="flow-repair-${ANSWER}"]`)).toHaveCount(0);
+      await expect(shown(page).getByText('starts in more cases than it should')).toHaveCount(0);
+      await list.scrollIntoViewIfNeeded();
+      await noHorizontalScroll(page, viewport.label);
+      await settled(page);
+      await capture(page, `${KEY}-list-${viewport.label}`);
 
       // Its editor shows, under «Fixed data» of the assistant's step, the card its app fixes on a cancellation.
       await page.goto(`/flow/automations/${flowId}`);
       const editor = shown(page);
+      // Its «Only when…»: the inbound messages, and only the live ones, as its app has it today.
+      await editor.locator('[data-testid=flow-trigger-open]').click();
+      await expect(editor.locator('[data-testid^=flow-trigger-filter-row-]')).toHaveCount(2);
       await editor.locator('[data-testid=flow-step-open-s10]').click();
       const pin = editor.locator(`[data-testid="flow-assistant-pin-s10-${CANCEL}-on_behalf_of"]`);
       await expect(pin).toContainText('Cancel a reservation › On behalf of the customer');
@@ -179,6 +194,15 @@ for (const viewport of VIEWPORTS) {
       const lucia = e2ePhone();
       let marta = e2ePhone();
       while (marta === lucia) marta = e2ePhone();
+
+      // An old message of Lucía's chat that the inbox brings in (`source` «history») starts nothing.
+      const old = receive(lucia, 'Do you have a table on Friday?', 'E2E Lucía', { source: 'history' });
+      const oldReceived = psql(
+        `select id from live_outboxevent where name = 'whatsapp_inbox.message.received' and payload->>'id' = '${old.id}'`,
+      );
+      expect(oldReceived, 'whatsapp_inbox.message.received of the old message in the outbox').not.toBe('');
+      await relay(oldReceived);
+      expect(psql(`select count(*) from flow_flowrun where flow_id = '${flowId}'`)).toBe('0');
       const theirs = await api<{ id: string }>(context, A, 'POST', '/customer/customers', { name: 'E2E Marta', phone: marta, source: 'whatsapp' });
       expect(theirs.status, JSON.stringify(theirs.data)).toBe(201);
       const made = await api<{ id: string }>(context, A, 'POST', '/reservation/reservations', {
@@ -237,6 +261,7 @@ for (const viewport of VIEWPORTS) {
       expect(await statusOf(context, reservation)).toBe(before);
       // Nothing was written behind the owner's back: the automation is still as they had it, and still on.
       expect(psql(`select count(*) from flow_flow, jsonb_array_elements(steps) as step where id = '${flowId}' and step ? 'pinned'`)).toBe('0');
+      expect(psql(`select trigger_filter ? 'input.source' from flow_flow where id = '${flowId}'`)).toBe('f');
       expect(psql(`select enabled from flow_flow where id = '${flowId}'`)).toBe('t');
     } finally {
       await context.close();
