@@ -92,8 +92,8 @@ PLATFORM_WRITES = {
 
 
 def platform_operations(owner: OperationContext) -> list[str]:
-    """The operations only who holds «*» reaches (a superuser, the system): not even the owner of the business, who
-    holds every permission its apps declare, may run them."""
+    """The operations only who holds «*» reaches (the system; a superuser, on the platform's scope only): not even the
+    owner of the business, who holds every permission its apps declare, may run them."""
     return sorted(name for name, op in registry.items() if op.permission is not None and not owner.has(op.permission))
 
 
@@ -113,9 +113,14 @@ def test_no_operation_of_the_platform_is_a_tool_whatever_its_ai_says(owner):
 
 
 def test_a_superusers_assistant_is_offered_no_operation_of_the_platform(owner, superuser):
-    """The tools a superuser's turn gets (``base.assistant.turn``: ``catalog`` of the person's own permissions, «*»):
-    every write of the business's apps, none that only the platform runs."""
-    tools = assistant.catalog(ctx(permissions_for(superuser, A), actor=superuser))
+    """The tools a superuser's turn gets (``base.assistant.turn``: ``catalog`` of the person's own permissions): on a
+    business's host those of a person without a role, since ERPlora's staff holds nothing there without a Membership
+    (``base.permissions``); and «*» itself offers every write of the business's apps, none that only the platform
+    runs."""
+    staff_tools = assistant.catalog(ctx(permissions_for(superuser, A), actor=superuser))
+    assert staff_tools == assistant.catalog(ctx(frozenset(), actor=superuser))  # what a person without a role gets
+    assert "demo.item.create" not in staff_tools
+    tools = assistant.catalog(ctx({"*"}, actor=superuser))
     assert "demo.item.create" in tools
     assert sorted(set(tools) & set(platform_operations(owner))) == []
 
