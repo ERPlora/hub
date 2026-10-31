@@ -87,7 +87,8 @@
       "off": "«{name}» is paused. Nothing was deleted.",
       "hidden": "Some automations your apps bring are hidden: they need {apps}.",
       "invalid": "«{name}» cannot be offered: {reason}",
-      "loadError": "The automations your apps bring could not be read."
+      "loadError": "The automations your apps bring could not be read.",
+      "setByApp": "Set by {app}: you can change it, not take it off."
     },
     "gallery": {
       "heading": "Ready-made automations",

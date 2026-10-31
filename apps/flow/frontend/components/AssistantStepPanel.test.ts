@@ -3,7 +3,7 @@
 // a change waits for a yes («Ask me first») or it makes it on its own, and its most turns. Refusals show by field.
 import { describe, expect, it } from 'vitest';
 
-import type { CatalogOut, Step } from '../operations';
+import type { CatalogOut, FixedByAppOut, Step } from '../operations';
 import { ionValue, mountFlow } from '../__tests__/mount-flow';
 import AssistantStepPanel from './AssistantStepPanel.vue';
 import ValueBox from './ValueBox.vue';
@@ -165,6 +165,34 @@ describe('AssistantStepPanel fixed data', () => {
     expect(s.find('flow-assistant-pinnedhint-s1').text()).toBe(
       'The assistant never sees them nor can change them: they are filled in when it is asked, and a tool whose fixed datum is empty is not used.',
     );
+  });
+
+  it('shows a datum its app fixes as set by its app, never to take off; the owner changes it or takes its tool off (FLOW-F36)', async () => {
+    const step: Step = {
+      ...TABLE,
+      pinned: { 'reservation.reservation.cancel': { on_behalf_of: 'input.customer' }, 'reservation.reservation.update': { on_behalf_of: 'input.card' } },
+    };
+    const fixedByApp: FixedByAppOut = { app: 'reservation', app_name: 'Reservations', event: '', filter: [], pinned: { s1: { 'reservation.reservation.cancel': ['on_behalf_of'] } } };
+    const m = await mountFlow(AssistantStepPanel, { props: { step, index: 0, steps: [step], catalog: BOOKING, errors: {}, pick: async () => null, fixedByApp } });
+    const emitted = () => (m.wrapper.emitted('update:step') ?? []).map(([value]) => value as Step);
+    expect(m.find('flow-assistant-unpin-s1-reservation.reservation.cancel-on_behalf_of').exists()).toBe(false);
+    expect(m.find('flow-assistant-setbyapp-s1-reservation.reservation.cancel-on_behalf_of').text()).toBe('Set by Reservations: you can change it, not take it off.');
+    // The owner's own datum still comes off.
+    expect(m.find('flow-assistant-unpin-s1-reservation.reservation.update-on_behalf_of').exists()).toBe(true);
+    expect(m.find('flow-assistant-setbyapp-s1-reservation.reservation.update-on_behalf_of').exists()).toBe(false);
+    // Its value is the owner's to change.
+    const box = m.wrapper.findAllComponents(ValueBox).find((candidate) => candidate.props('testid') === 'flow-assistant-pin-s1-reservation.reservation.cancel-on_behalf_of')!;
+    box.vm.$emit('update:modelValue', 'input.card');
+    expect(emitted().at(-1)).toMatchObject({ pinned: { 'reservation.reservation.cancel': { on_behalf_of: 'input.card' } } });
+    // Taking its tool off the step is a way out: its fixed data go with it.
+    await m.find('flow-assistant-tool-remove-s1-reservation.reservation.cancel').trigger('click');
+    expect(emitted().at(-1)).toMatchObject({ tools: ['reservation.reservation.update'], pinned: { 'reservation.reservation.update': { on_behalf_of: 'input.card' } } });
+  });
+
+  it('locks nothing on a step its app does not fix', async () => {
+    const fixedByApp: FixedByAppOut = { app: 'reservation', app_name: 'Reservations', event: '', filter: [], pinned: { s9: { 'reservation.reservation.cancel': ['on_behalf_of'] } } };
+    const m = await mountFlow(AssistantStepPanel, { props: { step: PINNED, index: 0, steps: [PINNED], catalog: BOOKING, errors: {}, pick: async () => null, fixedByApp } });
+    expect(m.find('flow-assistant-unpin-s1-reservation.reservation.cancel-on_behalf_of').exists()).toBe(true);
   });
 
   it('keeps the catalog still loading from breaking the fixed data', async () => {

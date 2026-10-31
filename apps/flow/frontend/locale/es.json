@@ -87,7 +87,8 @@
       "off": "«{name}» está en pausa. No se ha borrado nada.",
       "hidden": "Hay automatizaciones de tus apps ocultas: necesitan {apps}.",
       "invalid": "«{name}» no se puede ofrecer: {reason}",
-      "loadError": "No se han podido leer las automatizaciones que traen tus apps."
+      "loadError": "No se han podido leer las automatizaciones que traen tus apps.",
+      "setByApp": "Lo fija {app}: puedes cambiarlo, pero no quitarlo."
     },
     "gallery": {
       "heading": "Automatizaciones hechas",
