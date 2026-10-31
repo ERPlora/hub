@@ -7,7 +7,7 @@
 // and the device and the settings go away.
 import { expect, type Page, test } from '@playwright/test';
 
-import { A, api, login, psql, shot, shown } from './helpers';
+import { A, api, capture, login, psql, shown } from './helpers';
 import { noHorizontalScroll, settled, VIEWPORTS } from './schedule-helpers';
 
 type Rows<T> = { rows: T[]; total: number };
@@ -55,7 +55,7 @@ function dayOf(memberId: string): string {
 async function snap(page: Page, label: string): Promise<void> {
   await noHorizontalScroll(page, `F03 ${label}`);
   await settled(page);
-  await page.screenshot({ path: shot(`${KEY}-${label}`) });
+  await capture(page, `${KEY}-${label}`);
 }
 
 for (const vp of VIEWPORTS) {
@@ -134,6 +134,12 @@ for (const vp of VIEWPORTS) {
       expect(
         psql(`select status || ',' || out_within_radius from attendance_record where member_id = '${memberId}' order by clock_in_at desc limit 1`),
       ).toBe('closed,false');
+      // The owner's session on this personal device for the fleet's visual sweep (`ui-clip-sweep.sh --storage-state`),
+      // when asked: the device then stays, or its session would end with it.
+      if (process.env.E2E_SAVE_STORAGE_STATE) {
+        await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
+        deviceId = '';
+      }
     } finally {
       if (deviceId) await api(context, A, 'POST', '/devices/remove', { id: deviceId });
       await context.close();
