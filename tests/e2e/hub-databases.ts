@@ -4,8 +4,9 @@
 // and session owners of phase 1 (`base_membership`, `base_sessionowner`) — live in the stack's control database
 // (`DB_NAME`); every other table in the hub's own, read from the registry once per hub (`db_name`; empty: it still
 // shares control's). Each statement of a spec's SQL runs where its tables live, the ones in a row on one database
-// together; a spec's own scratch tables (`e2e…`) go where they were made. No statement crosses two databases, so one
-// that names tables of both is refused, saying how to split it.
+// together; a spec's own scratch tables (`e2e…`) go where they were made, and SQL that names no table (`pg_notify`)
+// runs on control's, where live's notices are heard. No statement crosses two databases, so one that names tables of
+// both is refused, saying how to split it.
 
 /** Control's tables: the registry, Django's own and phase 1's memberships and session owners (base/tenancy/inventory.py). */
 const CONTROL_TABLE = /^(?:auth_\w+|django_\w+|control_\w+|base_hub|base_democode|base_membership|base_sessionowner)$/;
@@ -65,7 +66,8 @@ export function statementsOf(sql: string): string[] {
 }
 
 /** The database `statement` runs on from what it names: control's tables, the hub's or the scratch tables it knows
- * were made (`made`); `undefined` when it names only scratch tables nobody made yet (it goes with its neighbours). */
+ * were made (`made`); `undefined` when it names no table, or only scratch tables nobody made yet (it goes with its
+ * neighbours). */
 function databaseOf(
   statement: string,
   hub: string,
@@ -91,7 +93,7 @@ function databaseOf(
     const where = known.map((table) => `${table} in ${made.get(table)}`).join(', ');
     throw new Error(`This statement names tables of two databases (${where}; the rest in ${named}).\n${statement}`);
   }
-  return [...places][0] ?? (scratch.length ? undefined : hubDatabase(hub));
+  return [...places][0];
 }
 
 /** Note in `made` the scratch table `statement` makes (where it runs) or, unless `madeOnly`, forget the one it drops. */
@@ -105,8 +107,9 @@ function remember(statement: string, database: string, made: Map<string, string>
 
 /** Where each statement of `sql` runs (`hub`'s tables in its database, control's in `control`), the ones in a row on
  * one database in one run, in order. `made` remembers, across calls, the database each scratch table was made in: a
- * statement that names only scratch tables nobody made yet goes with the next statement that says where (else the
- * last one, else the hub's). A statement whose tables live in two databases is refused. */
+ * statement that names no table, or only scratch tables nobody made yet, goes with the next statement that says where
+ * (else the last one; alone, the hub's for a scratch table and control's for none). A statement whose tables live in
+ * two databases is refused. */
 export function plan(
   sql: string,
   hub: string,
@@ -124,7 +127,9 @@ export function plan(
     if (database) return;
     const next = places.slice(at + 1).find(Boolean);
     const last = places.slice(0, at).reverse().find(Boolean);
-    places[at] = next ?? last ?? hubDatabase(hub);
+    // Alone: a scratch table nobody made yet is the hub's; SQL with no table at all (`pg_notify`) is control's, where
+    // the live notices are heard (live's broker listens there).
+    places[at] = next ?? last ?? (tablesOf(statements[at]).length ? hubDatabase(hub) : control);
     // It named no table anybody had made when it came: what it drops was not noted, what came after it may have been.
     remember(statements[at], places[at] as string, made, true);
   });

@@ -105,8 +105,8 @@ function painted(page: Page, time: string): Promise<string> {
   );
 }
 
-/** The outbox relay as the worker runs it on every tick (`base.relay.run`), on this run's database, tick after
- *  tick until a pass finds nothing to do: the e2e stack runs no worker, so what other specs recorded waits too. */
+/** The outbox relay as the worker runs it on every tick (`base.relay.run`), in `a`'s database, tick after
+ *  tick until a pass finds nothing to do (the stack's worker relays too; this makes sure it ran). */
 function relayPass(): void {
   const code = [
     'from django.utils import timezone',
@@ -116,7 +116,7 @@ function relayPass(): void {
     '    if not (done.taken or done.delivered): break',
     'print(done)',
   ].join('\n');
-  const out = spawnSync('uv', ['run', 'python', 'manage.py', 'shell', '-c', code], { cwd: HUB_DIR, env: process.env, encoding: 'utf8' });
+  const out = spawnSync('uv', ['run', 'python', 'manage.py', 'shell', '--hub', 'a', '-c', code], { cwd: HUB_DIR, env: process.env, encoding: 'utf8' });
   expect(out.status, `relay pass: ${out.stderr}`).toBe(0);
 }
 

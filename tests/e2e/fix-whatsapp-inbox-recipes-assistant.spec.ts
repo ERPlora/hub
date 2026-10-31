@@ -81,11 +81,11 @@ function cleanUp(): void {
 const built = (ref: string): string =>
   psql(`select enabled::text || ' ' || (deleted_at is null)::text from flow_flow where recipe = '${ref}'`);
 
-/** One tick of the worker's relay (this stack runs no worker): the outbox event `id` handed to Automations' reaction,
+/** One tick of the worker's relay (in `a`'s database; the stack's worker relays too): the outbox event `id` handed to Automations' reaction,
  *  and what it leaves for after its COMMIT made at once. It does not block this process: the provider the SaaS asks
  *  lives here, and must answer. */
 async function relay(id: string): Promise<void> {
-  await promisify(execFile)('uv', ['run', 'python', 'manage.py', 'shell', '-c', RELAY], {
+  await promisify(execFile)('uv', ['run', 'python', 'manage.py', 'shell', '--hub', 'a', '-c', RELAY], {
     cwd: HUB_DIR,
     env: { ...process.env, FLOW_EVENT: id },
   });

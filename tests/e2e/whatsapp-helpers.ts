@@ -89,7 +89,7 @@ print(out.model_dump_json())
 
 /** Runs a system operation of the inbox in the hub `a`, as erplora.com's doors will; its output. */
 export function system<T = unknown>(op: string, payload: unknown): T {
-  const out = execFileSync('uv', ['run', 'python', 'manage.py', 'shell', '-c', RUN], {
+  const out = execFileSync('uv', ['run', 'python', 'manage.py', 'shell', '--hub', 'a', '-c', RUN], {
     cwd: HUB_DIR,
     encoding: 'utf8',
     env: { ...process.env, WA_OP: op, WA_PAYLOAD: JSON.stringify(payload) },
@@ -98,7 +98,7 @@ export function system<T = unknown>(op: string, payload: unknown): T {
   return JSON.parse(line) as T;
 }
 
-/** Python that goes first in a one-shot `manage.py shell` playing the worker's relay (this stack runs no worker).
+/** Python that goes first in a one-shot `manage.py shell` playing the worker's relay (in `a`'s database; the stack's worker relays too).
  *  What a reaction hands erplora.com after its COMMIT goes to `base.outbound`'s threads, which in the worker outlive
  *  the tick but here would die with this process (daemon threads) before erplora.com is called: this process makes
  *  those calls at once, as the suite's `conftest.py` does (FIX-HUB-WHATSAPP-INBOX-SLOW-SEND-BLOCKS-RELAY). */

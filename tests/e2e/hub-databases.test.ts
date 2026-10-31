@@ -100,6 +100,27 @@ describe('plan', () => {
     expect([...made.keys()]).toEqual([]);
   });
 
+  it("runs SQL that names no table at all on control's, where the live notices are heard; a statement without one goes with its neighbours", () => {
+    const made = new Map<string, string>();
+    expect(plan("SELECT pg_notify('live_host_b', '*')", 'b', CONTROL, hubs, made)).toEqual([
+      { database: CONTROL, sql: "SELECT pg_notify('live_host_b', '*')" },
+    ]);
+    expect(
+      plan(
+        "set client_min_messages = warning; create table if not exists e2e_c as select * from whatsapp_inbox_channel",
+        'a',
+        CONTROL,
+        hubs,
+        made,
+      ),
+    ).toEqual([
+      {
+        database: 'hub_e2e_8030_a_db',
+        sql: 'set client_min_messages = warning; create table if not exists e2e_c as select * from whatsapp_inbox_channel',
+      },
+    ]);
+  });
+
   it('asks whether a scratch table is still there (to_regclass) where it was made', () => {
     const made = new Map([['e2e_backup_photo', CONTROL]]);
     expect(plan("select to_regclass('e2e_backup_photo') is not null", 'a', CONTROL, hubs, made)).toEqual([

@@ -71,7 +71,8 @@ efectivo de una cayó en el turno de caja abierto de la otra y `cash-register-sh
 `psql()` (`helpers.ts`) corre cada sentencia donde viven sus tablas (`hub-databases.ts`): las de control (`base_hub`,
 `base_democode`, `control_*`, `auth_*`, `django_*`, `base_membership`, `base_sessionowner`) en `DB_NAME` y el resto en
 la BD del hub (`a` si la spec no pasa otro), las seguidas de una misma BD en una sola llamada. Las tablas de copia de
-una spec (`e2e…`) van a la BD donde se crearon. Una sentencia que nombra tablas de las dos BD no puede correr en
+una spec (`e2e…`) van a la BD donde se crearon, y lo que no nombra ninguna tabla (`pg_notify`) va a la de control, donde
+escucha lo vivo. Para un `manage.py shell -c` sobre los datos de un hub, `--hub <slug>`. Una sentencia que nombra tablas de las dos BD no puede correr en
 ninguna y falla diciendo cómo partirla: primero se lee lo de control (`usernamesOf`, el id de `a`) y se pasa el valor
 a la sentencia del hub.
 
