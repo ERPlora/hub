@@ -2759,7 +2759,8 @@ def _assistant_refusal(outcome: str, code: str, message: str) -> "assistant.Tool
 def _assistant_answer(ctx, tools, call, decision, *, stopped: bool):
     """Run one pending ``call`` (a read alone; a write with the person's yes) → ``(outcome, card)``: the card when the
     write still waits for its answer, with what it will do when its app declares a preview (BASE-F98); one that
-    cannot be read is the write's outcome, and no card is shown."""
+    cannot be read is the write's outcome, and no card is shown. Neither is one for data the write would refuse
+    (live#17): the model hears which (``invalid_payload``) and asks again with them corrected."""
     op = assistant.operation_of(call.name, tools)
     if op is None:
         return _assistant_refusal("refused", "not_available", NOT_AVAILABLE), None
@@ -2773,6 +2774,9 @@ def _assistant_answer(ctx, tools, call, decision, *, stopped: bool):
         arguments = None
     if not isinstance(arguments, dict):
         return assistant.run_tool(ctx, op, call.arguments), None
+    refused = assistant.invalid_arguments(op, arguments)
+    if refused is not None:
+        return refused, None
     card = assistant.card(op, arguments, ctx.language, ctx)
     if decision is None or decision.call_id != call.call_id:
         if card["blocked"]:
