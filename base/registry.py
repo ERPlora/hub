@@ -10,6 +10,7 @@ import datetime as dt
 import uuid
 from dataclasses import dataclass
 
+from django.db.models import Q
 from django.utils import timezone
 from django.utils.translation import gettext
 from live.context import OperationContext, Scope
@@ -71,15 +72,29 @@ def is_preparing(hub: Hub) -> bool:
     return hub.status in PREPARING_STATUSES
 
 
+#: The statuses of a hub whose own database was dropped (a demo that ended).
+DROPPED_STATUSES = (Hub.Status.PURGED, Hub.Status.DROPPING)
+
+
 def database_is_made(hub: Hub) -> bool:
     """Whether ``hub``'s data can be entered: it shares control's (phase 1), or its own database was made (it is ready,
     or was once: ``ready_at``) and has not been dropped. A business cancelled or failed before it was ever ready has no
-    database: what reaches it waits on its row for the day it is made."""
+    database: what reaches it waits on its row for the day it is made. :func:`own_database_made` is the same, as a
+    query."""
     if not hub.db_name:
         return True
-    if hub.status in (Hub.Status.PURGED, Hub.Status.DROPPING):
+    if hub.status in DROPPED_STATUSES:
         return False
     return hub.status == Hub.Status.READY or hub.ready_at is not None
+
+
+def own_database_made() -> Q:
+    """The rows with a database of their own that :func:`database_is_made` says was made (``migrate_hubs``'s hubs)."""
+    return (
+        ~Q(db_name="")
+        & ~Q(status__in=DROPPED_STATUSES)
+        & (Q(status=Hub.Status.READY) | Q(ready_at__isnull=False))
+    )
 
 
 #: The codes of a host that does not serve the app (``refusal``).

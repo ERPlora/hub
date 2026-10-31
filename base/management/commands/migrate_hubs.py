@@ -111,7 +111,7 @@ class Command(BaseCommand):
             every = migrator.hubs_with_a_database()
             code = migrator.code_migrations()
             wanted = migrator.apps_every_hub_gets()
-            behind = [hub for hub in every if migrator.is_behind(hub, code, wanted=wanted)]
+            behind = [hub for hub in every if migrator.is_behind(hub, code, wanted=migrator.apps_to_add(hub, wanted))]
         except Exception as error:
             logger.exception("migrate_hubs --check: the databases could not be read.")
             raise CommandError(f"migrate_hubs --check: the databases could not be read: {error}") from error
