@@ -5,7 +5,7 @@
 // (also from `?conversation=`); the notices: number not connected or to reconnect (with «Go to Settings», where it
 // is connected, for whoever configures), month spent, number erased; every state of the screen.
 import { DataTable, EmptyState } from '@erplora/ui/components';
-import { AppPage } from '@erplora/ui/shell';
+import { AppPage, applySurface } from '@erplora/ui/shell';
 import { describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
@@ -228,6 +228,19 @@ describe('InboxPage: the channel notices (WHATSAPP_INBOX-F01, F02, F13)', () => 
     });
     expect(spent.find('whatsapp-inbox-upgrade').text()).toBe('Upgrade plan');
     expect((await setup()).find('whatsapp-inbox-cap-reached').exists()).toBe(false);
+  });
+
+  // «Upgrade plan» sells, and everything that sells is web only (surface.ts): in the installed app the link opened
+  // nothing (gh:hub#439), so there the inbox says it without the link.
+  it('«Upgrade plan» sells: never on the app surfaces, where the inbox still says the month is spent', async () => {
+    applySurface('mobile');
+    try {
+      const spent = await setup({}, { ...CONNECTED, cap_reached: true, monthly_usage: 150 });
+      expect(spent.find('whatsapp-inbox-cap-reached').text()).toContain('You have used all the WhatsApp messages of your plan this month.');
+      expect(spent.find('whatsapp-inbox-upgrade').exists()).toBe(false);
+    } finally {
+      applySurface('web');
+    }
   });
 
   it('from 80 % of the month\'s messages the inbox says how many are left, «Upgrade plan» for whoever configures (as the assistant, BASE-F104)', async () => {

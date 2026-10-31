@@ -2,8 +2,9 @@
 // «Upgrade plan» at the foot of the side menu (BASE-G169; the old hub's, HUB_SHELL-F129): this hub's plan page
 // on erplora.com, which `base/spa.py` embeds in `hub-home`, for every profile (the owner often comes in through
 // the till's session); what the hub may do there, erplora.com decides by profile. A plain link in a new tab:
-// the old one-time pass (HUB-F142) is not ported. It sells, so only on the web (`useSurface`).
-import { HubIcon, useSurface } from '@erplora/ui/shell';
+// the old one-time pass (HUB-F142) is not ported. It sells, so only on the web (`useSurface`); its click goes the
+// Hub's one way out, `openExternalLink` (gh:hub#439: the installed app opens nothing on a `_blank` link).
+import { HubIcon, openExternalLink, useSurface } from '@erplora/ui/shell';
 import { computed } from 'vue';
 
 import { type HubHome, readJsonBlock } from '../lib/home';
@@ -23,6 +24,7 @@ const shown = computed(() => isWeb.value && planUrl !== '');
     rel="noopener"
     :title="$t('base.plan.upgrade')"
     :aria-label="$t('base.plan.upgrade')"
+    @click="openExternalLink(planUrl, $event)"
   >
     <HubIcon name="ion:sparkles-outline" />
     <!-- The menu folded to its rail (≥992 px) hides every `.nav-label` (polish.css): the icon stays, named above. -->

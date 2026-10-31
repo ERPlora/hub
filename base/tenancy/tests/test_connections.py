@@ -205,15 +205,25 @@ def _sessions_on(database: str) -> int:
         return cursor.fetchone()[0]
 
 
+def _nobody_on(database: str, *, wait: float = 5.0) -> bool:
+    """Whether every session on ``database`` ends within ``wait`` seconds: a connection just closed (a previous test's
+    clone of the template) still counts for a moment, as its server process leaves ``pg_stat_activity`` after
+    ``close()`` returns (hub#487, the CI of hub#471)."""
+    deadline = time.monotonic() + wait
+    while _sessions_on(database) and time.monotonic() < deadline:
+        time.sleep(0.05)
+    return _sessions_on(database) == 0
+
+
 @pytest.mark.django_db(databases=hubs.HUB_DATABASES)
 def test_working_in_a_hub_leaves_no_connection_open_to_its_template(hub_a, hub_databases):
-    assert _sessions_on(hub_databases.template) == 0
+    assert _nobody_on(hub_databases.template)
     with use_hub(hub_a):
         with django_connections[hubs.HUB_A_ALIAS].cursor() as cursor:
             cursor.execute("SELECT 1")
 
     assert _sessions_on(hub_databases.a) >= 1
-    assert _sessions_on(hub_databases.template) == 0
+    assert _nobody_on(hub_databases.template)
     assert django_connections[connections.TEMPLATE_ALIAS].connection is None
     # No alias of this process reaches the template: the migrator's, which built it, was forgotten after.
     assert not [

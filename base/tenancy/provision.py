@@ -164,10 +164,28 @@ def run_due(now: dt.datetime | None = None, *, limit: int = DUE_BATCH, budget: f
     return worked
 
 
+class _Steps:
+    """How long each step of a preparation took, logged as it ends (``base.tenancy.provision.step``): what a slow
+    sign-up spends its time on, read from the logs."""
+
+    def __init__(self) -> None:
+        self.started = self.last = time.monotonic()
+
+    def done(self, name: str, hub: Hub) -> None:
+        """Log step ``name`` of ``hub`` (by its slug, as ``provision.ready``) with the time since the previous one."""
+        now = time.monotonic()
+        logger.info("base.tenancy.provision.step hub=%s step=%s seconds=%.2f", hub.slug, name, now - self.last)
+        self.last = now
+
+    def total(self) -> float:
+        return time.monotonic() - self.started
+
+
 def _prepare(hub_id, *, apps: Iterable[str] | None = None, seed: Seed | None = None, tell_saas: bool = True) -> None:
     """The steps of a hub's preparation, its lease held; a failure is noted on it, a hub that left them is left.
     ``apps``: more apps than its template's whose tables it gets (:func:`provision`)."""
     apps = list(apps or ())
+    step = _Steps()
     try:
         hub = services.place_hub(hub_id)
         hub = services.provision_step(hub_id, Hub.Status.CREATING, timezone.now(), LEASE)
@@ -180,6 +198,7 @@ def _prepare(hub_id, *, apps: Iterable[str] | None = None, seed: Seed | None = N
             raise services.ProvisioningFailed("clone_failed", str(refused)) from refused
         ddl = tenancy_connections.register_ddl_alias(hub.db_name, cluster=hub.cluster)
         identity.write(ddl, hub.id)
+        step.done("creating", hub)
         hub = services.provision_step(hub_id, Hub.Status.MIGRATING, timezone.now(), LEASE)
         try:
             # Its vertical's apps too: the template it was cloned from may still be being built (migrate_hubs). The
@@ -193,6 +212,7 @@ def _prepare(hub_id, *, apps: Iterable[str] | None = None, seed: Seed | None = N
             raise
         except Exception as error:
             raise services.ProvisioningFailed("schema_failed", f"{type(error).__name__}: {error}") from error
+        step.done("migrating", hub)
         hub = services.provision_step(hub_id, Hub.Status.SEEDING, timezone.now(), LEASE)
         with use_hub(hub):
             services.apply_kept_photo(hub)
@@ -212,7 +232,8 @@ def _prepare(hub_id, *, apps: Iterable[str] | None = None, seed: Seed | None = N
             raise services.ProvisioningFailed(
                 "photo_moving", f"the SaaS's photo kept changing while it was seeded ({SEED_ROUNDS} times)"
             )
-        logger.info("base.tenancy.provision.ready hub=%s database=%s", hub.slug, hub.db_name)
+        step.done("seeding", hub)
+        logger.info("base.tenancy.provision.ready hub=%s database=%s seconds=%.2f", hub.slug, hub.db_name, step.total())
     except services.ProvisioningStopped as stopped:
         logger.info("base.tenancy.provision.stopped hub=%s: %s", hub_id, stopped)
     except services.ProvisioningFailed as failed:

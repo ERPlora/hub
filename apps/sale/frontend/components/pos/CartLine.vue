@@ -201,7 +201,7 @@ function onRow(): void {
             :aria-label="$t('sale.pos.discountLine')"
             @click.stop="emit('discount')"
           >
-            <HubIcon name="ion:pricetag-outline" />
+            <HubIcon :name="discounted ? 'ion:pricetag' : 'ion:pricetag-outline'" />
           </button>
           <button
             type="button"

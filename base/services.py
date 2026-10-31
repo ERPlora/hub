@@ -68,7 +68,7 @@ from live.errors import Conflict, InvalidPayload, NotFound, OperationError, Perm
 from live.live_registry import ALL_EVENTS
 from live.models import OutboxEvent
 from live.operations import get as get_operation
-from live.operations import INTERNAL, atomic, operation
+from live.operations import AI, INTERNAL, atomic, operation
 from live.operations import on_commit
 from live.outbox import notify, record_event
 from live.slugs import DEMO_SLUG_PREFIX, validate_hub_slug
@@ -1790,7 +1790,16 @@ def _who(ctx: OperationContext) -> str:
     permission=ADMINISTER_HUB,
     input=BlueprintSourceIn,
     output=BlueprintSummaryOut,
-    ai={"description": "Says what a template of the catalogue brings, app by app, before loading it; it writes nothing."},
+    ai=AI(
+        description="Says what a template of the catalogue brings, app by app, before loading it; it writes nothing.",
+        asks={
+            "en": ("what does the hair salon template bring?", "before loading it, what's inside the bar template?"),
+            "es": (
+                "antes de cargarla, ¿qué incluye la plantilla de bar?",
+                "¿qué viene en la plantilla de restaurante?",
+            ),
+        },
+    ),
 )
 def blueprint_inspect(ctx: OperationContext, data: BlueprintSourceIn) -> dict:
     """What a template or an uploaded file brings and what of it would load here (BASE-G104, BASE-G105).
@@ -1809,14 +1818,24 @@ def blueprint_inspect(ctx: OperationContext, data: BlueprintSourceIn) -> dict:
     permission=ADMINISTER_HUB,
     input=BlueprintImportIn,
     output=ImportOut,
-    ai={
-        "description": "Loads a template of the catalogue (a restaurant, a hair salon…) into this business: turns on "
-        "its apps that are off (with the apps they need, within the plan's limit of apps), then loads its menu or "
-        "services, its tables and the rest of its apps' data, app by app; what is already there is left as it was. "
-        "Returns the report of what went in, with why an app could not be turned on. Never brings people, PINs or "
-        "fiscal data.",
-        "risk": "high",
-    },
+    ai=AI(
+        description=(
+            "Loads a template of the catalogue (a restaurant, a hair salon…) into this business: turns on its apps "
+            "that are off (with the apps they need, within the plan's limit of apps), then loads its menu or services, "
+            "its tables and the rest of its apps' data, app by app; what is already there is left as it was. Returns "
+            "the report of what went in, with why an app could not be turned on. Never brings people, PINs or fiscal "
+            "data."
+        ),
+        risk="high",
+        asks={
+            "en": (
+                "load the restaurant template",
+                "set me up like a hair salon",
+                "fill the business with the café starter menu",
+            ),
+            "es": ("carga la plantilla de restaurante", "quiero empezar con la plantilla de bar"),
+        },
+    ),
 )
 def blueprint_import(ctx: OperationContext, data: BlueprintImportIn) -> dict:
     """Load a template, a file or what a load left out (BASE-G103–G107) and keep its report and the rows it created.
@@ -1867,11 +1886,17 @@ def blueprint_import(ctx: OperationContext, data: BlueprintImportIn) -> dict:
     permission=ADMINISTER_HUB,
     input=ImportUndoIn,
     output=ImportUndoOut,
-    ai={
-        "description": "Undoes one load of a template or a file: removes exactly the rows it brought; what was made "
-        "afterwards stays.",
-        "risk": "high",
-    },
+    ai=AI(
+        description=(
+            "Undoes one load of a template or a file: removes exactly the rows it brought; what was made afterwards "
+            "stays."
+        ),
+        risk="high",
+        asks={
+            "en": ("undo the template I just loaded", "take back that import, it was the wrong file"),
+            "es": ("deshaz la plantilla que acabo de cargar", "echa atrás esa importación, era el archivo equivocado"),
+        },
+    ),
 )
 def import_undo(ctx: OperationContext, data: ImportUndoIn) -> dict:
     """Remove exactly the rows one load created (BASE-G108), once."""
@@ -2032,13 +2057,21 @@ def has_own_database(hub: Hub | None) -> bool:
     permission=ADMINISTER_HUB,
     input=HubResetIn,
     output=HubResetOut,
-    ai={
-        "description": "With dry_run, says what each app of this business would lose if emptied and what name must be "
-        "typed to confirm. Without it, given the business's name typed exactly, copies all of the business's data and "
-        "then empties the apps chosen for good, in the background: Settings › Data shows when it is done and keeps "
-        "the copy.",
-        "risk": "high",
-    },
+    ai=AI(
+        description=(
+            "With dry_run, says what each app of this business would lose if emptied and what name must be typed to "
+            "confirm. Without it, given the business's name typed exactly, copies all of the business's data and then "
+            "empties the apps chosen for good, in the background: Settings › Data shows when it is done and keeps the "
+            "copy."
+        ),
+        risk="high",
+        # Only for live.E020 (it checks the whole app): base.assistant.NOT_FROM_CHAT keeps this out of the chat
+        # (pinned by base/tests/test_assistant.py).
+        asks={
+            "en": ("wipe all the data and start over", "empty the business, I want to start from scratch"),
+            "es": ("borra todos los datos y empezamos de cero", "vacía el negocio, quiero empezar de nuevo"),
+        },
+    ),
 )
 def hub_reset(ctx: OperationContext, data: HubResetIn) -> dict:
     """The plan of what each app would lose, or the reset of the apps chosen asked, with the business's name typed
@@ -2279,12 +2312,17 @@ def offboarding_copied(hub_id: UUID) -> None:
     permission=ADMINISTER_HUB,
     input=FailedEventIn,
     output=FailedEventOutId,
-    ai={
-        "description": "Resends one failed event of this hub (by its id, from the list of failed events) once its "
-        "cause is fixed: it goes back to the queue with its attempts at zero, for the app that could not take it "
-        "only. Refused when that app is no longer on in this business.",
-        "risk": "normal",
-    },
+    ai=AI(
+        description=(
+            "Resends one failed event of this hub (by its id, from the list of failed events) once its cause is fixed: "
+            "it goes back to the queue with its attempts at zero, for the app that could not take it only. Refused "
+            "when that app is no longer on in this business."
+        ),
+        asks={
+            "en": ("retry that failed event", "send the stuck invoicing event again"),
+            "es": ("reintenta ese evento caído", "vuelve a mandar el evento de facturación que se quedó atascado"),
+        },
+    ),
 )
 def failed_event_retry(ctx: OperationContext, data: FailedEventIn) -> dict:
     """HUB-F55: ``pending`` again, due now, attempts at zero; the relay takes it on its next tick."""
@@ -2308,12 +2346,17 @@ def failed_event_retry(ctx: OperationContext, data: FailedEventIn) -> dict:
     permission=ADMINISTER_HUB,
     input=FailedEventRetryAllIn,
     output=FailedEventCountOut,
-    ai={
-        "description": "Resends every failed event of this hub that can be resent (also those beyond the first page "
-        "of the list), once the cause of a passing failure is fixed. Those for an app that is no longer on stay. "
-        "Says how many went back to the queue.",
-        "risk": "normal",
-    },
+    ai=AI(
+        description=(
+            "Resends every failed event of this hub that can be resent (also those beyond the first page of the list), "
+            "once the cause of a passing failure is fixed. Those for an app that is no longer on stay. Says how many "
+            "went back to the queue."
+        ),
+        asks={
+            "en": ("retry all the failed events", "the printer is back, resend everything that failed"),
+            "es": ("reintenta todos los eventos caídos", "vuelve a mandar todos los eventos que fallaron"),
+        },
+    ),
 )
 def failed_event_retry_all(ctx: OperationContext, data: FailedEventRetryAllIn) -> dict:
     """HUB-F56: every ``dead`` delivery of the hub whose app is on; another worker's rows wait (``SKIP LOCKED``)."""
@@ -2341,13 +2384,19 @@ def failed_event_retry_all(ctx: OperationContext, data: FailedEventRetryAllIn) -
     permission=ADMINISTER_HUB,
     input=FailedEventDiscardIn,
     output=FailedEventOutId,
-    ai={
-        "description": "Discards one failed event of this hub for good (by its id), with an optional reason: it is "
-        "never delivered again and is kept with who discarded it, when and why. Only when it must not be delivered "
-        "(a duplicate, already done by hand): discarding a sale's event for Invoicing leaves that sale without its "
-        "invoice.",
-        "risk": "high",
-    },
+    ai=AI(
+        description=(
+            "Discards one failed event of this hub for good (by its id), with an optional reason: it is never "
+            "delivered again and is kept with who discarded it, when and why. Only when it must not be delivered (a "
+            "duplicate, already done by hand): discarding a sale's event for Invoicing leaves that sale without its "
+            "invoice."
+        ),
+        risk="high",
+        asks={
+            "en": ("discard that failed event, I already did it by hand", "drop the duplicate event that failed"),
+            "es": ("descarta ese evento caído, ya lo hice a mano", "olvídate del evento duplicado que falló"),
+        },
+    ),
 )
 def failed_event_discard(ctx: OperationContext, data: FailedEventDiscardIn) -> dict:
     """HUB-F57: closed as ``discarded`` with who, when and why; the row and its last error stay for the audit."""
@@ -2576,11 +2625,16 @@ def _actor_label(ctx: OperationContext) -> str:
     permission=ADMINISTER_HUB,
     input=DeviceModeIn,
     output=DeviceCurrentOut,
-    ai={
-        "description": "Makes the device the person is using shared (a till several people use: PIN, a shift) or "
-        "personal (one person's: no PIN, 30 days). Only on the device itself.",
-        "risk": "normal",
-    },
+    ai=AI(
+        description=(
+            "Makes the device the person is using shared (a till several people use: PIN, a shift) or personal (one "
+            "person's: no PIN, 30 days). Only on the device itself."
+        ),
+        asks={
+            "en": ("make this tablet a shared till", "this laptop is only mine, set it to personal"),
+            "es": ("pon esta tablet como caja compartida", "este portátil es solo mío, que no pida PIN"),
+        },
+    ),
 )
 def device_mode_set(ctx: OperationContext, data: DeviceModeIn) -> dict:
     """«This device» (BASE-G72): the mode of the browser that asks, never another's. The sessions opened from now on
@@ -2610,10 +2664,13 @@ def _device(device_id) -> TrustedDevice:
     permission=ADMINISTER_HUB,
     input=DeviceRenameIn,
     output=DeviceByIdIn,
-    ai={
-        "description": "Names a device of the hub after its place («Bar», «Kitchen», «Office laptop»).",
-        "risk": "normal",
-    },
+    ai=AI(
+        description="Names a device of the hub after its place («Bar», «Kitchen», «Office laptop»).",
+        asks={
+            "en": ("call this tablet Bar", "rename the old iPad to Kitchen"),
+            "es": ("llama a esta tablet «Barra»", "renombra el iPad viejo como «Terraza»"),
+        },
+    ),
 )
 def device_rename(ctx: OperationContext, data: DeviceRenameIn) -> dict:
     """«Name it» (BASE-G64): the one thing of a device the business decides."""
@@ -2637,11 +2694,17 @@ def device_rename(ctx: OperationContext, data: DeviceRenameIn) -> dict:
     permission=ADMINISTER_HUB,
     input=DeviceByIdIn,
     output=DeviceRemoveOut,
-    ai={
-        "description": "Removes a lost device from the hub: its session ends at once and the PIN stops working on "
-        "it until someone signs in with an account on it again. Removing the one in hand signs the person out.",
-        "risk": "high",
-    },
+    ai=AI(
+        description=(
+            "Removes a lost device from the hub: its session ends at once and the PIN stops working on it until "
+            "someone signs in with an account on it again. Removing the one in hand signs the person out."
+        ),
+        risk="high",
+        asks={
+            "en": ("we lost the terrace tablet, remove it", "kick the stolen phone out of the business"),
+            "es": ("hemos perdido la tablet de la terraza, quítala", "echa del negocio el móvil que nos robaron"),
+        },
+    ),
 )
 def device_remove(ctx: OperationContext, data: DeviceByIdIn) -> dict:
     """«Remove this device» (BASE-G65): the device is cut off, not its people; whoever has an account can enter on it
@@ -2660,10 +2723,17 @@ def device_remove(ctx: OperationContext, data: DeviceByIdIn) -> dict:
     permission=ADMINISTER_HUB,
     input=DevicePruneIn,
     output=DevicePruneOut,
-    ai={
-        "description": "Removes at once the devices of the hub nobody used in 30 days, never the one in hand.",
-        "risk": "high",
-    },
+    ai=AI(
+        description="Removes at once the devices of the hub nobody used in 30 days, never the one in hand.",
+        risk="high",
+        asks={
+            "en": ("clean out the devices nobody has used in 30 days", "remove the old devices we don't use"),
+            "es": (
+                "limpia los dispositivos que nadie usa desde hace 30 días",
+                "quita los aparatos viejos que ya no se usan",
+            ),
+        },
+    ),
 )
 def device_prune(ctx: OperationContext, data: DevicePruneIn) -> dict:
     """«Remove the unused» (BASE-G66): those nobody entered on in 30 days, as BASE-G65 removes one."""
@@ -2687,11 +2757,27 @@ def _remove_devices(ids: list) -> None:
     permission=ADMINISTER_HUB,
     input=AccessSettingsUpdateIn,
     output=AccessSettingsOut,
-    ai={
-        "description": "Changes how the business asks who is at the till: show the PIN pad or not, ask again after "
-        "1, 5, 10, 15 or 30 minutes without use or once per shift, and PINs of 4 or 6 digits.",
-        "risk": "high",
-    },
+    ai=AI(
+        description=(
+            "Changes how the business asks who is at the till: show the PIN pad or not, ask again after 1, 5, 10, 15 "
+            "or 30 minutes without use or once per shift, and PINs of 4 or 6 digits."
+        ),
+        risk="high",
+        asks={
+            "en": (
+                "ask for the PIN again after 5 minutes",
+                "make the PINs 6 digits",
+                "stop showing the PIN pad on the till",
+                "only ask for the PIN once per shift",
+            ),
+            "es": (
+                "que pida el PIN cada 10 minutos",
+                "pon los PIN de 6 cifras",
+                "quita el teclado del PIN de la caja",
+                "que solo pida el PIN una vez por turno",
+            ),
+        },
+    ),
 )
 def access_settings_update(ctx: OperationContext, data: AccessSettingsUpdateIn) -> dict:
     """The «PIN pad» card (BASE-G62, G151): only the fields sent change. The PINs of the other length keep working
@@ -2727,11 +2813,13 @@ def _profile(user) -> Profile:
     permission=VIEW_HOME,
     input=ProfileUpdateIn,
     output=ProfileOut,
-    ai={
-        "description": "Saves the person's own name, last name and contact email in this hub (not their sign-in "
-        "email).",
-        "risk": "normal",
-    },
+    ai=AI(
+        description="Saves the person's own name, last name and contact email in this hub (not their sign-in email).",
+        asks={
+            "en": ("change my last name to García", "my contact email is now ana@bar.com"),
+            "es": ("cambia mi apellido a García", "mi correo de contacto ahora es ana@bar.com"),
+        },
+    ),
 )
 def profile_update(ctx: OperationContext, data: ProfileUpdateIn) -> dict:
     """«Save my data» (BASE-G125): how the person appears in this hub. The contact email gives and takes no access."""
@@ -2758,10 +2846,13 @@ def profile_update(ctx: OperationContext, data: ProfileUpdateIn) -> dict:
     permission=VIEW_HOME,
     input=PreferencesIn,
     output=PreferencesOut,
-    ai={
-        "description": "Sets the person's own language (Spanish, English or the business's) and appearance.",
-        "risk": "normal",
-    },
+    ai=AI(
+        description="Sets the person's own language (Spanish, English or the business's) and appearance.",
+        asks={
+            "en": ("switch me to English", "put the app in dark mode", "change my language to Spanish"),
+            "es": ("ponme el idioma en inglés", "quiero el modo oscuro", "cámbiame la apariencia a clara"),
+        },
+    ),
 )
 def preferences_set(ctx: OperationContext, data: PreferencesIn) -> dict:
     """«Preferences» (BASE-G125): saved as chosen and applied at once; empty = the business's. They follow the person
@@ -2833,7 +2924,13 @@ def _is_image(raw: bytes, pillow_format: str) -> bool:
     permission=VIEW_HOME,
     input=AvatarRemoveIn,
     output=AvatarOut,
-    ai={"description": "Removes the photo of the person's own profile.", "risk": "normal"},
+    ai=AI(
+        description="Removes the photo of the person's own profile.",
+        asks={
+            "en": ("remove my profile picture", "take the picture off my profile"),
+            "es": ("quita mi foto de perfil", "no quiero foto en mi perfil"),
+        },
+    ),
 )
 def avatar_remove(ctx: OperationContext, data: AvatarRemoveIn) -> dict:
     """«Remove» (BASE-G125): the profile forgets its photo (the file, named by its content, may be someone else's)."""
@@ -2875,13 +2972,18 @@ def _person_answer(ctx: OperationContext, person_id: str) -> dict:
     permission=ADMINISTER_HUB,
     input=PersonIn,
     output=PersonDetailOut,
-    ai={
-        "description": "Takes a person's PIN away (a forgotten or shared one): they stop entering with it at the "
-        "shared tills and keep entering with their erplora.com account. The owner's, only the owner.",
-        "risk": "high",
-        # The card names whose PIN goes, not the id the model sends (BASE-F98).
-        "preview": {"operation": "base.person.detail", "fields": ["name", "email"]},
-    },
+    ai=AI(
+        description=(
+            "Takes a person's PIN away (a forgotten or shared one): they stop entering with it at the shared tills and "
+            "keep entering with their erplora.com account. The owner's, only the owner."
+        ),
+        risk="high",
+        preview={"operation": "base.person.detail", "fields": ["name", "email"]},
+        asks={
+            "en": ("Ana forgot her PIN, remove it", "take away Luis's PIN, he shared it"),
+            "es": ("quítale el PIN a Luis, lo ha compartido", "Ana ha olvidado su PIN, bórraselo"),
+        },
+    ),
 )
 def person_pin_remove(ctx: OperationContext, data: PersonIn) -> dict:
     """«Remove the PIN» (BASE-G139): the PIN goes at once, the badge and the account stay."""
@@ -2952,10 +3054,13 @@ def person_badge_set(ctx: OperationContext, data: BadgeSetIn) -> dict:
     permission=ADMINISTER_HUB,
     input=PersonIn,
     output=PersonDetailOut,
-    ai={
-        "description": "Takes a person's badge away (a lost card): it stops opening the till; their PIN and account stay.",
-        "risk": "normal",
-    },
+    ai=AI(
+        description="Takes a person's badge away (a lost card): it stops opening the till; their PIN and account stay.",
+        asks={
+            "en": ("Luis lost his card, take his badge away", "remove Marta's badge"),
+            "es": ("Luis ha perdido la tarjeta, quítale la placa", "quita la placa de Marta"),
+        },
+    ),
 )
 def person_badge_remove(ctx: OperationContext, data: PersonIn) -> dict:
     """«Remove the badge» (BASE-G140): the card stops opening anything; a lost one never leaves anybody out."""
@@ -3079,11 +3184,24 @@ def api_key_rotate(ctx: OperationContext, data: ApiKeyIdIn) -> dict:
     permission=ADMINISTER_HUB,
     input=ApiKeyIdIn,
     output=ApiKeyRevokeOut,
-    ai={
-        "description": "Revokes an API key: any system using it loses access at once, for good. The key stays listed "
-        "as revoked.",
-        "risk": "high",
-    },
+    ai=AI(
+        description=(
+            "Revokes an API key: any system using it loses access at once, for good. The key stays listed as revoked."
+        ),
+        risk="high",
+        asks={
+            "en": (
+                "revoke the old Shopify key",
+                "cut off the key the accountant was using",
+                "kill that API key, it leaked",
+            ),
+            "es": (
+                "revoca la clave de la tienda online",
+                "córtale el acceso a la clave de la gestoría",
+                "anula esa clave de API, se ha filtrado",
+            ),
+        },
+    ),
 )
 def api_key_revoke(ctx: OperationContext, data: ApiKeyIdIn) -> dict:
     """«Revoke» (BASE-G148): at once and for good; the key is kept, for the record."""
@@ -3290,11 +3408,16 @@ from base.schemas import ApiDocSettingsIn, ApiDocSettingsOut, ApiDocSettingsUpda
     permission=ADMINISTER_HUB,
     input=ApiDocSettingsUpdateIn,
     output=ApiDocSettingsOut,
-    ai={
-        "description": "Shows or hides the documentation of this business's API (for whoever connects another "
-        "system); it comes hidden.",
-        "risk": "normal",
-    },
+    ai=AI(
+        description=(
+            "Shows or hides the documentation of this business's API (for whoever connects another system); it comes "
+            "hidden."
+        ),
+        asks={
+            "en": ("show the API docs to our developer", "hide the API documentation again"),
+            "es": ("publica la documentación de la API para el programador", "oculta otra vez la doc de la API"),
+        },
+    ),
 )
 def api_doc_settings_update(ctx: OperationContext, data: ApiDocSettingsUpdateIn) -> dict:
     """«Show the API documentation» (BASE-G100): saved at once."""
@@ -3338,12 +3461,21 @@ def _file_bytes(content_base64: str) -> bytes:
     input=FileUploadIn,
     output=FileSavedOut,
     expose_api=True,
-    ai={
-        "description": "Keeps a file the person attached in the business's files, in a folder by its path (the "
-        "folder «Facturas»; empty: the top). Never overwrites: a taken name becomes «name (1).ext». 25 MB at most; "
-        "programs are refused.",
-        "risk": "normal",
-    },
+    ai=AI(
+        description=(
+            "Keeps a file the person attached in the business's files, in a folder by its path (the folder «Facturas»; "
+            "empty: the top). Never overwrites: a taken name becomes «name (1).ext». 25 MB at most; programs are "
+            "refused."
+        ),
+        asks={
+            "en": ("upload the contract I attached", "keep this photo in our files", "save this PDF in our files"),
+            "es": (
+                "archiva esta foto en los documentos",
+                "guarda este PDF en los archivos",
+                "sube el archivo que te he adjuntado",
+            ),
+        },
+    ),
 )
 def file_upload(ctx: OperationContext, data: FileUploadIn) -> dict:
     """BASE-G83: keep the file, numbered when its name is taken, within the plan's space."""
@@ -3368,11 +3500,16 @@ def file_upload(ctx: OperationContext, data: FileUploadIn) -> dict:
     input=FileFolderCreateIn,
     output=FilePathOut,
     expose_api=True,
-    ai={
-        "description": "Makes a new, empty folder in the business's files, inside another by its path (the folder "
-        "«Facturas»; empty: the top). Refused when that name is taken there.",
-        "risk": "normal",
-    },
+    ai=AI(
+        description=(
+            "Makes a new, empty folder in the business's files, inside another by its path (the folder «Facturas»; "
+            "empty: the top). Refused when that name is taken there."
+        ),
+        asks={
+            "en": ("make a folder called Invoices", "create a 2026 folder inside Contracts"),
+            "es": ("hazme una carpeta 2026 dentro de Contratos", "crea una carpeta para los contratos"),
+        },
+    ),
 )
 def file_create_folder(ctx: OperationContext, data: FileFolderCreateIn) -> dict:
     """BASE-G83: a new folder, never over a file or folder of that name."""
@@ -3389,11 +3526,16 @@ def file_create_folder(ctx: OperationContext, data: FileFolderCreateIn) -> dict:
     input=FileRenameIn,
     output=FilePathOut,
     expose_api=True,
-    ai={
-        "description": "Gives a file or a folder of the business's files another name, where it is (the file "
-        "«Facturas/marzo.pdf» becomes «abril.pdf»). Refused when the new name is taken there.",
-        "risk": "normal",
-    },
+    ai=AI(
+        description=(
+            "Gives a file or a folder of the business's files another name, where it is (the file «Facturas/marzo.pdf» "
+            "becomes «abril.pdf»). Refused when the new name is taken there."
+        ),
+        asks={
+            "en": ("rename march.pdf to april.pdf", "call that folder Suppliers instead"),
+            "es": ("renombra marzo.pdf como abril.pdf", "renombra la carpeta Viejos como «Archivo 2024»"),
+        },
+    ),
 )
 def file_rename(ctx: OperationContext, data: FileRenameIn) -> dict:
     """BASE-G85: a new name in the same folder; a folder takes everything in it along."""
@@ -3411,12 +3553,17 @@ def file_rename(ctx: OperationContext, data: FileRenameIn) -> dict:
     input=FileMoveIn,
     output=FilePathOut,
     expose_api=True,
-    ai={
-        "description": "Moves a file or a folder of the business's files into another folder, both by their path "
-        "(the file «marzo.pdf» into the folder «Facturas»; empty: the top). Never overwrites, and a folder never "
-        "goes inside itself.",
-        "risk": "normal",
-    },
+    ai=AI(
+        description=(
+            "Moves a file or a folder of the business's files into another folder, both by their path (the file "
+            "«marzo.pdf» into the folder «Facturas»; empty: the top). Never overwrites, and a folder never goes inside "
+            "itself."
+        ),
+        asks={
+            "en": ("move march.pdf into Invoices", "put the contracts folder inside Legal"),
+            "es": ("mueve marzo.pdf a la carpeta Facturas", "mete la carpeta de contratos dentro de Legal"),
+        },
+    ),
 )
 def file_move(ctx: OperationContext, data: FileMoveIn) -> dict:
     """BASE-G85: to another folder; deleting where it was and uploading where it goes."""
@@ -3435,11 +3582,17 @@ def file_move(ctx: OperationContext, data: FileMoveIn) -> dict:
     input=FileDeleteIn,
     output=FileDeletedOut,
     expose_api=True,
-    ai={
-        "description": "Deletes a file of the business's files, or a folder and everything in it, by its path (the "
-        "folder «Facturas/2025»). There is no bin: it cannot be undone.",
-        "risk": "high",
-    },
+    ai=AI(
+        description=(
+            "Deletes a file of the business's files, or a folder and everything in it, by its path (the folder "
+            "«Facturas/2025»). There is no bin: it cannot be undone."
+        ),
+        risk="high",
+        asks={
+            "en": ("delete the old 2025 folder", "throw away march.pdf from our files"),
+            "es": ("borra la carpeta de 2025", "elimina marzo.pdf de los archivos"),
+        },
+    ),
 )
 def file_delete(ctx: OperationContext, data: FileDeleteIn) -> dict:
     """BASE-G86: the file, or the folder and everything in it; no bin."""
@@ -3509,7 +3662,8 @@ def _assistant_refusal(outcome: str, code: str, message: str) -> "assistant.Tool
 def _assistant_answer(ctx, tools, call, decision, *, stopped: bool):
     """Run one pending ``call`` (a read alone; a write with the person's yes) → ``(outcome, card)``: the card when the
     write still waits for its answer, with what it will do when its app declares a preview (BASE-F98); one that
-    cannot be read is the write's outcome, and no card is shown."""
+    cannot be read is the write's outcome, and no card is shown. Neither is one for data the write would refuse
+    (live#17): the model hears which (``invalid_payload``) and asks again with them corrected."""
     op = assistant.operation_of(call.name, tools)
     if op is None:
         return _assistant_refusal("refused", "not_available", NOT_AVAILABLE), None
@@ -3523,6 +3677,9 @@ def _assistant_answer(ctx, tools, call, decision, *, stopped: bool):
         arguments = None
     if not isinstance(arguments, dict):
         return assistant.run_tool(ctx, op, call.arguments), None
+    refused = assistant.invalid_arguments(op, arguments)
+    if refused is not None:
+        return refused, None
     card = assistant.card(op, arguments, ctx.language, ctx)
     if decision is None or decision.call_id != call.call_id:
         if card["blocked"]:
@@ -3744,12 +3901,25 @@ def _reply_to(answer: bytes) -> str | None:
     permission=VIEW_HOME,
     input=SupportReportIn,
     output=SupportReportOut,
-    ai={
-        "description": "Sends erplora.com's support team a problem the person describes: a short subject and what "
-        "happened. Their account, this business, the screen and the browser go with it, and support answers by email "
-        "to their account. Only for a person who entered with their erplora.com account, never with a PIN.",
-        "risk": "normal",
-    },
+    ai=AI(
+        description=(
+            "Sends erplora.com's support team a problem the person describes: a short subject and what happened. Their "
+            "account, this business, the screen and the browser go with it, and support answers by email to their "
+            "account. Only for a person who entered with their erplora.com account, never with a PIN."
+        ),
+        asks={
+            "en": (
+                "tell support the payment screen freezes",
+                "report a bug: the totals don't add up",
+                "send ERPlora a problem",
+            ),
+            "es": (
+                "reporta un fallo: no me cuadran los totales",
+                "mándale una incidencia a ERPlora",
+                "avisa a soporte de que la app se queda colgada",
+            ),
+        },
+    ),
     # It waits on erplora.com: no transaction holds the hub's connection meanwhile.
     database=False,
 )
@@ -4050,12 +4220,17 @@ def _app_answer(label: str, row: activation.Activation, along: list[dict[str, st
     permission=ADMINISTER_HUB,
     input=AppChangeIn,
     output=AppChangeOut,
-    ai={
-        "description": "Turns on one of this business's apps (by its id in base.app.list), with the apps it needs, "
-        "which come along: it shows in the menu and can be used, with the data it had. Refused when the plan's "
-        "limit of apps is reached (turn one off, or upgrade the plan on erplora.com) or a paid app is not subscribed.",
-        "risk": "normal",
-    },
+    ai=AI(
+        description=(
+            "Turns on one of this business's apps (by its id in base.app.list), with the apps it needs, which come "
+            "along: it shows in the menu and can be used, with the data it had. Refused when the plan's limit of apps "
+            "is reached (turn one off, or upgrade the plan on erplora.com) or a paid app is not subscribed."
+        ),
+        asks={
+            "en": ("turn on the customers app", "activate the bookings app", "can you turn on the kitchen module?"),
+            "es": ("activa la app de clientes", "ponme la app de cocina", "activa el módulo de citas"),
+        },
+    ),
 )
 def app_enable(ctx: OperationContext, data: AppChangeIn) -> dict:
     """BASE-F18/F24: the app on and chosen, and what it needs on along with it (not chosen: it does not count). A
@@ -4121,12 +4296,26 @@ def _unchanged(hub: Hub | None, label: str, row: activation.Activation) -> dict:
     permission=ADMINISTER_HUB,
     input=AppChangeIn,
     output=AppChangeOut,
-    ai={
-        "description": "Turns off one of this business's apps (by its id in base.app.list): it leaves everyone's menu "
-        "and its screens stop opening; the apps that came along only with it go off too. Nothing is deleted: turned "
-        "on again, it has its data. Refused while another app on needs it, or when the app itself says why not yet.",
-        "risk": "high",
-    },
+    ai=AI(
+        description=(
+            "Turns off one of this business's apps (by its id in base.app.list): it leaves everyone's menu and its "
+            "screens stop opening; the apps that came along only with it go off too. Nothing is deleted: turned on "
+            "again, it has its data. Refused while another app on needs it, or when the app itself says why not yet."
+        ),
+        risk="high",
+        asks={
+            "en": (
+                "turn off the reservations app",
+                "we don't use tables anymore, switch that app off",
+                "deactivate the loyalty module",
+            ),
+            "es": (
+                "desactiva la app de reservas",
+                "apaga la app de mesas, ya no la usamos",
+                "quita el módulo de fidelización, no lo necesitamos",
+            ),
+        },
+    ),
 )
 def app_disable(ctx: OperationContext, data: AppChangeIn) -> dict:
     """BASE-F23/F25: the app off, and what came along only with it. 409 ``base.app_required`` while an app on needs

@@ -17,6 +17,7 @@ from django.db import IntegrityError, connection, transaction
 from django.db.migrations.operations import RunPython
 from django.urls import resolve
 from django.utils import translation
+from live.assistant import description
 from live.context import OperationContext, Scope
 from live.errors import PermissionDenied
 from live.live_registry import live_registry
@@ -243,7 +244,7 @@ def test_it_is_a_read_that_tells_the_assistant_what_it_does():
     op = get("base.location.list")
 
     assert (op.kind, op.permission) == ("query", HOME)
-    assert isinstance(op.ai, dict) and op.ai["description"].strip()
+    assert description(op)
 
 
 def test_it_is_bound_to_its_route():

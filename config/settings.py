@@ -301,7 +301,8 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # Cache: the shared Valkey (TLS, rediss://) when VALKEY_URL is set, with a prefix per project and
 # environment (hub, pre-hub: pre shares prod's Valkey), a TTL on every key (never TIMEOUT=None) and
 # 2 s socket timeouts (a Valkey that hangs fails the call, not the request; Django hands OPTIONS to
-# redis-py); otherwise this process's memory.
+# redis-py); otherwise this process's memory, refusing what that Valkey (a cluster) refuses: a call on
+# keys of different hash slots (base/cache.py).
 
 VALKEY_URL = config("VALKEY_URL", default="")
 CACHE_KEY_PREFIX = "hub" if ERPLORA_ENVIRONMENT == "prod" else f"{ERPLORA_ENVIRONMENT}-hub"
@@ -315,7 +316,7 @@ CACHES = {
             "OPTIONS": {"socket_connect_timeout": 2, "socket_timeout": 2},
         }
         if VALKEY_URL
-        else {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}
+        else {"BACKEND": "base.cache.ClusterLocMemCache"}
     )
 }
 
@@ -526,6 +527,13 @@ LIVE = {
         "cwd": str(BASE_DIR),
     },
 }
+
+# The apps whose assistant tools all say what a person types to ask for them (AI.asks, live.E020; docs plan
+# 2026-10-31, the assistant's knowledge and QA): an app joins in the pull request that completes its asks, and layer 1
+# of the assistant's QA (base/tests/test_assistant_asks.py) checks each ask reaches its tool, role by role.
+LIVE_ASSISTANT_ASKS_REQUIRED = (
+    "base",
+)
 
 # Email: the console locally; in production the SES API signed by the task role (no static keys,
 # PLAN-AWS §3), or SMTP from EMAIL_* when SES_REGION is unset. EMAIL_BACKEND overrides the choice.

@@ -4,7 +4,7 @@
 import { applySurface } from '@erplora/ui/shell';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { EMPLOYEE, errorFrame, flush, mountBase, subId } from '../__tests__/mount-base';
+import { EMPLOYEE, errorFrame, flush, installedApp, leaveInstalledApp, mountBase, subId, tap } from '../__tests__/mount-base';
 import type { Person, Seats } from '../operations';
 import PeopleList from './PeopleList.vue';
 
@@ -44,6 +44,7 @@ async function open(options: Parameters<typeof mountBase>[1] = {}) {
 
 afterEach(() => {
   applySurface('web');
+  leaveInstalledApp();
   document.head.innerHTML = '';
   document.body.innerHTML = '';
 });
@@ -126,6 +127,34 @@ describe('PeopleList', () => {
     expect(invite.text()).toContain('Invitar en erplora.com');
     expect([invite.attributes('href'), invite.attributes('target'), invite.attributes('rel')]).toEqual([MEMBERS_URL, '_blank', 'noopener']);
     expect(m.wrapper.text()).toContain('Las personas se invitan, se les cambia el rol y se quitan en erplora.com');
+  });
+
+  // gh:hub#439: on the tablet's app «Invite on erplora.com» did nothing (its webview opens no `_blank`).
+  it('in the installed app, inviting opens «Members» in the system browser, and in a browser the link opens its tab', async () => {
+    embed({ name: 'Bar', plan_url: PLAN_URL, members_url: MEMBERS_URL });
+    const browser = await open();
+    await browser.result(browser.call, 'base.person.list', { people: PEOPLE, seats: SEATS });
+    expect(tap(browser.wrapper.get('[data-testid="people-invite"]').element).defaultPrevented).toBe(false);
+    browser.wrapper.unmount();
+
+    const invoke = installedApp('direct');
+    const m = await open();
+    await m.result(m.call, 'base.person.list', { people: PEOPLE, seats: SEATS });
+    await flush();
+    const click = tap(m.wrapper.get('[data-testid="people-invite"]').element);
+    await flush();
+    expect(click.defaultPrevented).toBe(true);
+    expect(invoke).toHaveBeenCalledWith('open_external_url', { url: MEMBERS_URL });
+  });
+
+  it('the Google Play copy has no way to erplora.com’s panel (gh:hub#1897): only where it is done', async () => {
+    embed({ name: 'Bar', plan_url: PLAN_URL, members_url: MEMBERS_URL });
+    installedApp('play');
+    const m = await open();
+    await m.result(m.call, 'base.person.list', { people: PEOPLE, seats: SEATS });
+    await flush();
+    expect(m.wrapper.find('[data-testid="people-invite"]').exists()).toBe(false);
+    expect(m.wrapper.text()).toContain('People are invited, given a role and removed on erplora.com');
   });
 
   it('without erplora.com’s address (a session opened with a PIN) there is no link, only where it is done', async () => {
