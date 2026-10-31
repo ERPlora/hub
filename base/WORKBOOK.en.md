@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:9503ac864f878b4ca855e7c8d8768d77a3c89159705f7061ceb037b65f7ed995 -->
+<!-- generated from WORKBOOK.md sha256:c89b4c8c317baf7ecd2871deb85ef6e58fb40ef104c67b006876eb8ad7145647 -->
 
 ## What it is for and who it is for
 
@@ -832,10 +832,13 @@ Steps:
      (BASE-F26) and the counter at the top takes one away.
   4. In "Add apps" they stay, with their icon, their name and "Off": from there they are turned on again
      (BASE-F24).
+  5. From the assistant ("Turn off the reservations app") the app is named as in BASE-F24, the high-risk card shows
+     its whole name and, if it was off already, the assistant says so and nothing changes.
 In: the business's apps, what each one needs and which ones the business chose.
 Out: the app turned off in this business, and the ones that came only with it, with their data intact.
 If it fails: if another running app needs it, or the app itself refuses, nothing changes (BASE-F25). With
-"Cancel", nothing either.
+"Cancel", nothing either. From the assistant, a name that fits several apps shows no card: it asks which one
+(BASE-F24).
 Involved: VERIFACTU-F32
 
 ### BASE-F24 Turn an app on
@@ -848,12 +851,19 @@ Steps:
      asking.
   3. The app comes back to "My apps" and to the menu, without reloading, with the data it had: "Reservations is
      on." and, if it came with others, "Also turned on: Tables.".
+  4. From the assistant ("Turn on the reservations app") the app is named as the person says it: by its name in any
+     language of the Hub, case and accents aside, or, if none is called so, by the only one with a word of its name
+     that starts so ("booking" is Online booking). "Reservas" is Reservations, never Online booking (Reservas online)
+     even though it starts the same. The card shows its whole name (BASE-F97), never its id, and if it was on
+     already the assistant says so ("Customers was on already") instead of "turned on".
 In: what the app needs and what the business has subscribed to.
 Out: the app running in this business, chosen by it.
 If it fails: with the plan's limit of apps reached, the notice of BASE-F18 with "Upgrade plan"; a paid app not
 subscribed to cannot be turned on (BASE-F20). Moving to a lower plan turns nothing off: with more chosen apps than
-the new plan has, all of them keep running and only no other can be turned on until it is below.
-Involved: none
+the new plan has, all of them keep running and only no other can be turned on until it is below. From the
+assistant, a name that fits several apps ("reserva": Reservations and Online booking) shows no card and turns none
+on: the assistant asks which one, naming them; one that is no app's: "No app has that name or id.".
+Involved: BASE-F97
 
 ### BASE-F25 See an app refuse to be turned off
 Status: done
@@ -2279,7 +2289,9 @@ Steps:
      time show as they are written in the person's language and at the business's hour ("Nov 2, 2026, 10:00 AM"; a day
      alone, "Nov 2, 2026"; a time alone, "9:30 PM"); a value of a closed list, with the name its app gives it ("Front
      desk", not the internal value); and a record, by its name when its app lets whoever asks read it ("Person: Eva
-     Gil"): otherwise the card leaves it out, never by its code. Nor does it put the key its app uses to avoid doing
+     Gil"): otherwise the card leaves it out, never by its code. If the person names the record by its name and that name
+     fits several ("reserva": Reservations and Online booking), no card shows: the assistant asks which one, naming
+     them, and nothing is confirmed blind (BASE-F24). Nor does it put the key its app uses to avoid doing
      the same thing twice on a retry (charging, sending a WhatsApp, printing): nobody can judge it, and the action
      receives it all the same when it runs. Everything shows in the person's language, also the
      name of each datum when the card puts it on its own line (BASE-F98): the

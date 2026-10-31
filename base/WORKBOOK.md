@@ -856,10 +856,12 @@ Pasos:
      «Mis apps» y, sin recargar, del menú de todos los dispositivos del negocio; sus pantallas dicen que la app no
      está disponible (BASE-F26) y el contador de arriba resta una.
   4. En «Añadir apps» siguen, con su icono, su nombre y «Desactivada»: desde ahí se vuelven a activar (BASE-F24).
+  5. Desde el asistente («Desactiva la app de reservas») la app se nombra como en BASE-F24, la tarjeta de riesgo alto
+     la pone con su nombre entero y, si ya estaba desactivada, el asistente lo dice y no cambia nada.
 Entra: las apps del negocio, lo que necesita cada una y cuáles eligió el negocio.
 Sale: la app apagada en este negocio, y las que llegaron solo con ella, con sus datos intactos.
 Si falla: si otra app en marcha la necesita, o la propia app se niega, no cambia nada (BASE-F25). Con «Cancelar»,
-tampoco.
+tampoco. Desde el asistente, un nombre que vale para varias apps no saca tarjeta: pregunta cuál (BASE-F24).
 Implicados: VERIFACTU-F32
 
 ### BASE-F24 Activar una app
@@ -873,12 +875,19 @@ Pasos:
      sin preguntar.
   3. La app vuelve a «Mis apps» y al menú, sin recargar, con los datos que tenía: «Reservas está activada.» y, si
      llegó con otras, «También se ha activado: Mesas.».
+  4. Desde el asistente («Activa la app de reservas») la app se nombra como la dice la persona: por su nombre en
+     cualquier idioma del Hub, sin mirar mayúsculas ni acentos, o, si ninguna se llama así, por la única con una
+     palabra de su nombre que empieza así («booking» es Reservas online). «Reservas» es Reservas, nunca Reservas online
+     aunque empiece igual. La tarjeta la pone con su nombre entero (BASE-F97), nunca con su identificador, y si ya
+     estaba activada el asistente lo dice («Clientes ya estaba activada») en vez de «activada».
 Entra: lo que necesita la app y lo que el negocio tiene contratado.
 Sale: la app en marcha en este negocio, elegida por él.
 Si falla: con el límite de apps del plan alcanzado, el aviso de BASE-F18 con «Mejorar plan»; una app de pago sin
 contratar no se puede activar (BASE-F20). Bajar de plan no apaga nada: con más apps elegidas que las del plan nuevo,
-todas siguen en marcha y solo no se puede activar otra hasta quedar por debajo.
-Implicados: ninguno
+todas siguen en marcha y solo no se puede activar otra hasta quedar por debajo. Desde el asistente, un nombre que vale
+para varias apps («reserva»: Reservas y Reservas online) no saca tarjeta ni activa ninguna: el asistente pregunta
+cuál, nombrándolas; uno que no es de ninguna: «Ninguna app tiene ese nombre o identificador.».
+Implicados: BASE-F97
 
 ### BASE-F25 Ver que una app se niega a desactivarse
 <!-- origen: old-hub:HUB_SHELL-F125 -->
@@ -2393,7 +2402,9 @@ Pasos:
      de la persona y a la hora del negocio («2 nov 2026, 10:00»; un día solo, «2 nov 2026»; una hora sola,
      «21:30»); un valor de una lista cerrada, con el nombre que le da su app («Mostrador», no el valor interno); y
      un registro, por su nombre cuando su app deja leerlo a quien pregunta («Persona: Eva Gil»): si no, la tarjeta
-     no lo pone, nunca por su código. Tampoco pone la clave con que su app evita hacer dos veces lo mismo si se
+     no lo pone, nunca por su código. Si la persona nombra el registro por su nombre y ese nombre vale para varios
+     («reserva»: Reservas y Reservas online), no sale tarjeta: el asistente pregunta cuál, nombrándolos, y nada se
+     confirma a ciegas (BASE-F24). Tampoco pone la clave con que su app evita hacer dos veces lo mismo si se
      reintenta (cobrar, enviar un WhatsApp, imprimir): nadie puede juzgarla, y la acción la recibe igual al
      ejecutarse. Todo sale en el idioma de la persona, también el nombre de cada dato
      cuando la tarjeta lo pone en su línea (BASE-F98): el mismo con que lo llama su app, nunca un nombre
