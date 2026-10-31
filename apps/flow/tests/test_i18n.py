@@ -105,11 +105,15 @@ def schema_titles() -> set[str]:
     }
 
 
+def untranslated(entries: dict[str, tuple[str, bool]]) -> list[str]:
+    """The keys gettext shows in English: no ``msgstr``, or a ``#, fuzzy`` one it skips."""
+    return [key for key, (msgstr, fuzzy) in entries.items() if not msgstr or fuzzy]
+
+
 def test_every_entry_has_a_spanish_translation():
     entries = po_entries(LOCALE / "django.po")
     assert entries
-    untranslated = [msgid for msgid, (msgstr, fuzzy) in entries.items() if not msgstr or fuzzy]
-    assert untranslated == []
+    assert untranslated(entries) == []
 
 
 def test_the_reader_sees_a_fuzzy_mark_with_and_without_a_context(tmp_path):
@@ -175,6 +179,7 @@ def test_a_fuzzy_mark_in_flows_own_catalog_is_seen(tmp_path):
     assert [lines[first_msgid + 1], lines[first_msgctxt + 2]] == ['msgid "Automations"', 'msgctxt "automation"']
     fuzzy = [key for key, (_, is_fuzzy) in po_entries(marked).items() if is_fuzzy]
     assert fuzzy == ["Automations", "automation\x04on"]
+    assert untranslated(po_entries(marked)) == ["Automations", "automation\x04on"]
 
 
 def test_every_visible_text_is_in_the_catalog():
