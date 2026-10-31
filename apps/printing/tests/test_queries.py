@@ -125,6 +125,41 @@ def test_the_queue_newest_first_with_its_printer_and_what_can_be_done():
     assert second.id == newest.id
 
 
+@pytest.mark.parametrize(("language", "title"), [("es", "Comanda de cocina M-12"), ("en", "Kitchen order M-12")])
+def test_a_job_by_its_id_or_its_number_titled_as_the_queue_titles_it(language, title):
+    """«printing.job.get»: one job as the queue shows it, titled by its document and its number in the reader's
+    language — what the assistant's card names a job by (FIX-HUB-PRINTING-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS)."""
+    printer("Kitchen", usage="kitchen")
+    queued = enqueue("kitchen_order", {"order_number": "M-12", "items": [ITEM]}).job
+    by_id = run("printing.job.get", {"job_id": str(queued.id)}, ctx_for("hub_employee", language=language))
+    assert (by_id.id, by_id.reference, by_id.document_type, by_id.status, by_id.label) == (
+        queued.id,
+        "M-12",
+        "kitchen_order",
+        "pending",
+        title,
+    )
+    assert run("printing.job.get", {"reference": "m-12"}, ctx_for(language=language)).id == queued.id
+
+
+def test_a_job_with_no_number_is_titled_by_what_it_is():
+    till = printer("Till")
+    page = run("printing.printer.test", {"printer_id": str(till.id)})
+    opening = PrintJob.objects.create(job_key="drawer-1", kind=PrintJob.Kind.DRAWER, usage="receipt", printer_id=till.id)
+    untitled = enqueue("generic", {"lines": ["Hello"]}).job
+    titles = [run("printing.job.get", {"job_id": str(job)}).label for job in (page.id, opening.id, untitled.id)]
+    assert titles == ["Test page Till", "Open the drawer", "Document"]
+
+
+def test_a_job_that_is_not_there_or_for_nobody_with_printing_is_never_read():
+    with pytest.raises(NotFound) as missing:
+        run("printing.job.get", {"job_id": "0192f0b2-0000-7000-8000-000000000000"})
+    assert missing.value.code == "printing.job_not_found"
+    queued = enqueue().job
+    with pytest.raises(PermissionDenied):
+        run("printing.job.get", {"job_id": str(queued.id)}, ctx_for("nobody"))
+
+
 def test_a_sent_job_with_no_answer_is_stale():
     printer("Till")
     queued = enqueue().job
@@ -210,6 +245,32 @@ def test_the_devices_by_name_with_the_printers_each_one_reaches():
     assert run("printing.device.list", {"limit": 1, "offset": 1}).rows[0].name == "Counter"
     with pytest.raises(PermissionDenied):
         run("printing.device.list", ctx=ctx_for("nobody"))
+
+
+def test_a_device_by_its_registration_id_with_the_printers_it_reaches():
+    """«printing.device.detail»: one device set up to print, as the devices screen shows it — what the assistant's card
+    names a device by (FIX-HUB-PRINTING-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS). Never its own id; a retired one is no
+    device there."""
+    from apps.printing.models import PrintDevice
+
+    till = printer("Till")
+    counter = PrintDevice.objects.create(name="Counter", key=PrintDevice.key_of("counter"), registered_by="Ana")
+    counter.printers.add(till.id)
+    out = run("printing.device.detail", {"device_id": str(counter.id)}, ctx_for("hub_employee"))
+    assert (out.id, out.name, [p.name for p in out.printers], out.registered_by, out.this_device) == (
+        counter.id,
+        "Counter",
+        ["Till"],
+        "Ana",
+        False,
+    )
+    assert "key" not in out.model_dump()
+    with pytest.raises(PermissionDenied):
+        run("printing.device.detail", {"device_id": str(counter.id)}, ctx_for("nobody"))
+    PrintDevice.objects.filter(pk=counter.id).update(retired_at=timezone.now())
+    with pytest.raises(NotFound) as retired:
+        run("printing.device.detail", {"device_id": str(counter.id)})
+    assert retired.value.code == "printing.device_not_found"
 
 
 # ── Who prints each function: the Home's «Set up your printer» and the bell's «Nothing is printing» ───────────────

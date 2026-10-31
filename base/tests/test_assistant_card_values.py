@@ -310,7 +310,6 @@ UNNAMED_REFERENCES = {
     "modifier": 14,
     "online_booking": 7,
     "payment": 8,
-    "printing": 11,
     "sale": 101,
     "schedule": 4,
     "service": 35,
@@ -327,7 +326,6 @@ UNNAMED_REFERENCES = {
 UNLABELLED_LISTS = {
     "invoice": 4,
     "kitchen": 1,
-    "printing": 1,
     "sale": 3,
     "tax": 5,
     "website": 4,
