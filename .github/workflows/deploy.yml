@@ -44,6 +44,9 @@ jobs:
   test:
     if: inputs.release == ''
     uses: ./.github/workflows/test.yml
+    # Only the secret test.yml needs: read access to the private ERPlora/blueprints.
+    secrets:
+      BLUEPRINTS_TOKEN: ${{ secrets.BLUEPRINTS_TOKEN }}
 
   # The image of the commit, side by side with test, pushed to the environment's ECR repository only
   # once docker/image.test.sh passes on it.

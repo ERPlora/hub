@@ -8,6 +8,12 @@ name: test
 
 on:
   workflow_call:
+    secrets:
+      # Read access to the private ERPlora/blueprints (the python job's shared image library). Not
+      # required here so that the step fails with its own clear message when the secret is missing.
+      BLUEPRINTS_TOKEN:
+        description: Fine-grained token with Contents read-only on ERPlora/blueprints.
+        required: false
 
 permissions:
   contents: read
@@ -59,12 +65,22 @@ jobs:
           git clone --quiet --depth 1 --filter=blob:none --sparse https://github.com/ERPlora/saas.git ../saas
           git -C ../saas sparse-checkout set public/declaracion
       # The seeds' images must be in the shared image library's manifest (base/tests/test_seed_images.py), and the
-      # templates load them from it: ERPlora/blueprints is public, so its img/ is fetched beside the Hub
-      # (../blueprints), where config/settings.py looks for it without a bucket (CATALOG_DIR). No token.
+      # templates load them from it: its img/ is fetched beside the Hub (../blueprints), where config/settings.py
+      # looks for it without a bucket (CATALOG_DIR). ERPlora/blueprints is private, so the clone authenticates with
+      # the repository secret BLUEPRINTS_TOKEN, a fine-grained token with Contents read-only on that repo alone,
+      # passed through env (never interpolated into the script). The sparse checkout fetches img/'s blobs with
+      # it too; then the remote drops the token so that it does not stay in ../blueprints/.git/config.
       - name: The shared image library
+        env:
+          BLUEPRINTS_TOKEN: ${{ secrets.BLUEPRINTS_TOKEN }}
         run: |
-          git clone --quiet --depth 1 --filter=blob:none --sparse https://github.com/ERPlora/blueprints.git ../blueprints
+          if [ -z "$BLUEPRINTS_TOKEN" ]; then
+            echo "::error::BLUEPRINTS_TOKEN secret missing: ERPlora/blueprints is private; add a fine-grained token with Contents:read on that repo"
+            exit 1
+          fi
+          git clone --quiet --depth 1 --filter=blob:none --sparse "https://x-access-token:${BLUEPRINTS_TOKEN}@github.com/ERPlora/blueprints.git" ../blueprints
           git -C ../blueprints sparse-checkout set img
+          git -C ../blueprints remote set-url origin https://github.com/ERPlora/blueprints.git
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           enable-cache: true

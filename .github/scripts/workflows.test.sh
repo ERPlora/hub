@@ -9,6 +9,7 @@ here="$(cd "$(dirname "$0")" && pwd)"
 
 python3 - "$here/../workflows" <<'PYEOF'
 import pathlib
+import re
 import sys
 
 import yaml
@@ -103,10 +104,34 @@ check("python runs pytest over a Postgres service",
       "pytest" in python_runs and "postgres" in (tjobs.get("python", {}).get("services") or {}))
 check("pytest runs in parallel (pytest-xdist)", "pytest" in python_runs and " -n " in python_runs)
 # The seeds' images are checked against the shared library's manifest (base/tests/test_seed_images.py): ERPlora/blueprints
-# is public and fetched beside the Hub, where config/settings.py looks for it (CATALOG_DIR), before pytest runs.
+# is fetched beside the Hub, where config/settings.py looks for it (CATALOG_DIR), before pytest runs.
 check("python fetches ERPlora/blueprints into ../blueprints before pytest",
-      "ERPlora/blueprints.git ../blueprints" in python_runs
+      re.search(r'ERPlora/blueprints\.git"? \.\./blueprints', python_runs) is not None
       and python_runs.index("ERPlora/blueprints.git") < python_runs.index("pytest"))
+# ERPlora/blueprints is private: the clone authenticates with the repository secret BLUEPRINTS_TOKEN (a fine-grained
+# token, Contents read-only on that repo), which reaches test.yml only if its callers pass it.
+TOKEN_REF = "${{ secrets.BLUEPRINTS_TOKEN }}"
+library = next((step for step in steps(tjobs.get("python", {})) if "ERPlora/blueprints.git" in str(step.get("run", ""))), {})
+library_run = str(library.get("run", ""))
+check("the library clone authenticates with BLUEPRINTS_TOKEN",
+      "https://x-access-token:${BLUEPRINTS_TOKEN}@github.com/ERPlora/blueprints.git" in library_run)
+check("the token reaches the clone through env, never interpolated into the script",
+      (library.get("env") or {}).get("BLUEPRINTS_TOKEN") == TOKEN_REF and "secrets." not in library_run)
+check("the clone fails with a clear error when BLUEPRINTS_TOKEN is missing",
+      '[ -z "$BLUEPRINTS_TOKEN" ]' in library_run and "::error::BLUEPRINTS_TOKEN" in library_run
+      and "exit 1" in library_run and library_run.index("::error::") < library_run.index("git clone"))
+check("the clone is quiet and keeps the sparse checkout of img",
+      "git clone --quiet" in library_run
+      and re.search(r"^git -C \.\./blueprints sparse-checkout set img$", library_run, re.M) is not None)
+check("the token does not stay in ../blueprints/.git/config once img/ is checked out",
+      "remote set-url origin https://github.com/ERPlora/blueprints.git" in library_run
+      and library_run.index("sparse-checkout set img") < library_run.index("remote set-url"))
+test_on = test.get("on", test.get(True)) or {}
+check("test.yml declares the BLUEPRINTS_TOKEN secret it is called with",
+      "BLUEPRINTS_TOKEN" in ((test_on.get("workflow_call") or {}).get("secrets") or {}))
+check("ci.yml and deploy.yml pass only BLUEPRINTS_TOKEN to test.yml",
+      all((caller.get("jobs", {}).get("test") or {}).get("secrets") == {"BLUEPRINTS_TOKEN": TOKEN_REF}
+          for caller in (ci, deploy)))
 check("frontend runs lint, typecheck, Vitest and the build",
       all(f"pnpm {task}" in frontend_runs for task in ("lint", "typecheck", "test", "build")))
 check("scripts runs actionlint, shellcheck and the script tests",
