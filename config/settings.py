@@ -293,7 +293,8 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # Cache: the shared Valkey (TLS, rediss://) when VALKEY_URL is set, with a prefix per project and
 # environment (hub, pre-hub: pre shares prod's Valkey), a TTL on every key (never TIMEOUT=None) and
 # 2 s socket timeouts (a Valkey that hangs fails the call, not the request; Django hands OPTIONS to
-# redis-py); otherwise this process's memory.
+# redis-py); otherwise this process's memory, refusing what that Valkey (a cluster) refuses: a call on
+# keys of different hash slots (base/cache.py).
 
 VALKEY_URL = config("VALKEY_URL", default="")
 CACHE_KEY_PREFIX = "hub" if ERPLORA_ENVIRONMENT == "prod" else f"{ERPLORA_ENVIRONMENT}-hub"
@@ -307,7 +308,7 @@ CACHES = {
             "OPTIONS": {"socket_connect_timeout": 2, "socket_timeout": 2},
         }
         if VALKEY_URL
-        else {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}
+        else {"BACKEND": "base.cache.ClusterLocMemCache"}
     )
 }
 

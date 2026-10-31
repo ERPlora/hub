@@ -16,8 +16,8 @@ from django.utils import timezone
 from django.utils.translation import gettext
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
-from live.errors import AppInactive, Conflict, NotFound, PermissionDenied
-from live.operations import UnknownOperation, get, operation
+from live.errors import AppInactive, Conflict, InvalidPayload, NotFound, PermissionDenied
+from live.operations import INTERNAL, UnknownOperation, get, operation
 
 from apps.staff.models import Member, Role, Schedule, StaffSettings, TimeOff
 from base.models import HubUser, Membership
@@ -48,6 +48,8 @@ from apps.staff.schemas import (
     PageIn,
     RoleListIn,
     RolePage,
+    RoleResolveIn,
+    RoleResolveOut,
     ScheduleListIn,
     ScheduleOut,
     SchedulePage,
@@ -467,6 +469,45 @@ def list_accounts(ctx: OperationContext, params: AccountListIn) -> dict:
 
 
 # --- Roles -----------------------------------------------------------------------------------------
+
+
+ROLE_UNAVAILABLE = _(
+    "That role is not available: it does not exist in this business, or it has been deleted or retired."
+)
+
+
+def active_role(role_id: UUID | None, name: str | None) -> Role | None:
+    """The active role ``role_id`` names, else the one called ``name`` (in any case); ``None`` when there is none."""
+    roles = Role.objects.filter(is_active=True)
+    if role_id is not None:
+        return roles.filter(pk=role_id).first()
+    return roles.filter(name__iexact=name).first()
+
+
+def role_for(role_id: UUID | None, name: str | None) -> Role | None:
+    """The active role given by id or by name, ``None`` when none is given; 422 on that field when there is none."""
+    if role_id is None and not name:
+        return None
+    role = active_role(role_id, name)
+    if role is None:
+        field = "role_id" if role_id is not None else "role"
+        raise InvalidPayload(str(ROLE_UNAVAILABLE), fields={field: str(ROLE_UNAVAILABLE)})
+    return role
+
+
+# Not an assistant tool: what the assistant reads to check a new member's role before its card (``check``).
+@operation(
+    "staff.role.resolve",
+    kind="query",
+    permission="staff.add_member",
+    input=RoleResolveIn,
+    output=RoleResolveOut,
+    ai=INTERNAL,
+)
+def resolve_role(ctx: OperationContext, params: RoleResolveIn) -> dict:
+    """STAFF-F01 (hub#538): the role a new member would take, refused as staff.member.create refuses it."""
+    role = role_for(params.role_id, params.role)
+    return {"id": role.id if role else None, "name": role.name if role else None}
 
 
 @operation(

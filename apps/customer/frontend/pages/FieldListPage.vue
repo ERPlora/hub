@@ -23,8 +23,9 @@ import { useLiveList } from '../lib/useLiveList';
 import type { CustomFieldType, FieldListIn, FieldRow } from '../operations';
 
 const session = useSession();
-const canConfigure = computed(() => session.can('customer.configure'));
-const canDelete = computed(() => session.can('customer.configure'));
+// Whoever manages cards sees it too: without the permission, a manager approves it with their PIN (BASE-F84).
+const canConfigure = computed(() => session.can('customer.configure') || session.can('customer.manage'));
+const canDelete = canConfigure;
 const { t } = useCustomerI18n();
 
 const list = useListState({ sort: 'sort_order' });

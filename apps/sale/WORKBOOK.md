@@ -640,7 +640,9 @@ Pasos:
 2. Marca el porcentaje; en la cuenta puedes cambiar a importe fijo con el botón de la moneda del negocio
    («€», «zł»…).
 3. Pulsa «Aplicar −N %» (o «Aplicar −<importe>»). «Quitar» lo borra. La línea enseña «−N %» y el pie
-   la fila «Descuento del ticket».
+   la fila «Descuento del ticket −N %» con lo que el descuento de la cuenta quita, sea porcentaje o
+   importe fijo: un 10 % sobre 8,50 € dice «−0,85 €», nunca «−0,00 €». Lo calcula el servidor (la
+   valoración del cobro, `ticket_discount_amount`) sobre las líneas ya con su propio descuento.
 4. Si el descuento pasa del máximo que el negocio deja dar sin autorización, lo da un responsable: quien
    no puede darlo ve encima «Hace falta una aprobación» con lo que se aprueba y su cifra, la de ese mismo
    descuento: «Se aprueba: Descontar una línea un {discount_percent, percent}» (el porcentaje marcado) o,
@@ -836,7 +838,9 @@ Pantalla: Cuenta (precuenta)
 Pasos:
 1. Con la cuenta en pantalla, pulsa la impresora del pie («Imprimir cuenta»).
 2. Se abre «Cuenta» con las líneas, notas, descuentos, el desglose de IVA, el total y el título, y el
-   aviso «Cuenta — no es una factura. El tiquet fiscal se entrega al cobrar.».
+   aviso «Cuenta — no es una factura. El tiquet fiscal se entrega al cobrar.». Con descuento en la
+   cuenta, la fila «Descuento» dice lo que quita (el mismo importe que el pie del TPV, SALE-F14): con
+   precios con IVA, las líneas menos el descuento dan el total.
 3. Pulsa la impresora de arriba: con **Impresión** y una impresora de tiques activa, la cuenta va a su
    cola y se lee «Enviado a <impresora>.» (PRINTING-F09); si no, sale por el diálogo de impresión del
    dispositivo.
