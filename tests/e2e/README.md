@@ -238,6 +238,14 @@ asistente respondía 502 al Hub (`FileNotFoundError` de httpx) y `fix-flow-assis
 qué. Si la orden falla (argumentos que no entiende o la autoridad que no se puede crear), lo dice en una línea y el
 SaaS arranca sin esas variables: las specs de WhatsApp paran entonces en segundos nombrando lo que falta.
 
+Con el Graph en marcha, erplora.com también empuja la foto de `a` (con su plan Gratis) cuando **contesta** al Hub, no
+solo al sembrar: una plantilla mandada a revisión que Meta rechaza por el permiso inventado de la siembra (`meta_code=190`)
+marca el número para reconectar y la foto va detrás. Por eso **toda spec que maneja la bandeja** (importa
+`whatsapp-helpers.ts`), siembre o no, guarda la foto de `a` con `keepPhoto()` en su `beforeAll` (o con `seedErplora`, que
+la llama) y la repone con `restorePhoto()` como último paso de su `afterAll`; `whatsapp-photo.test.ts` lo exige. Sin eso,
+`fix-whatsapp-inbox-template-header-thumbnail.spec.ts` dejaba `a` en el plan Gratis para el resto de la pasada y nueve
+specs posteriores caían con 401 o con 402 `base.app_limit_reached` (hub#528).
+
 ```bash
 # El SaaS de la pila (8031, Hub en 8030), desde su worktree; <hub-wt> es el worktree del Hub de la pila:
 env $(node <hub-wt>/tests/e2e/whatsapp-graph.ts 8030 http://localhost:8031) \
