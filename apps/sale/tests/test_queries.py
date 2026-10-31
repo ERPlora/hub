@@ -596,6 +596,36 @@ def test_the_preview_of_some_lines_or_of_loose_ones(catalog):
     assert (loose.total, loose.discount_amount, loose.order_id) == (1620, 180, None)
 
 
+def test_the_preview_says_what_a_ticket_percent_takes_off_not_zero(product):
+    # hub#457 (SALE-F14, SALE-F21): 2 espressos and a cheesecake, 8.50, with 10 % off the check. The till's
+    # «Ticket discount» row and the bill read it here: 0.85, never the fixed amount's 0.
+    product("Espresso", "ESP", 150, "restaurant.drink")
+    product("Cheesecake", "CHK", 550, "restaurant.food")
+    order = run(
+        "sale.order.open",
+        {"lines": [{"product": "ESP", "quantity": "2"}, {"product": "CHK"}]},
+    )
+    ref = {"order_id": str(order.id)}
+    run("sale.order.set_discount", {**ref, "discount_percent": "10"})
+    whole = run("sale.checkout.preview", ref)
+    assert (whole.total, whole.ticket_discount_amount, whole.discount_amount) == (765, 85, 85)
+    # Charging only the cheesecake, the 10 % comes off it too (SALE-F22): 0.55 of 5.50.
+    part = run(
+        "sale.checkout.preview", {**ref, "line_ids": [str(order.lines[1].id)]}
+    )
+    assert (part.total, part.ticket_discount_amount) == (495, 55)
+    # A fixed amount on top comes off only the charge that closes the check.
+    run("sale.order.set_discount", {**ref, "discount_percent": "10", "discount_amount": 65})
+    assert run("sale.checkout.preview", ref).ticket_discount_amount == 150
+    assert run("sale.checkout.preview", {**ref, "line_ids": [str(order.lines[1].id)]}).ticket_discount_amount == 55
+    # Loose lines (a counter sale) say it the same way.
+    loose = run(
+        "sale.checkout.preview",
+        {"lines": [{"product": "CHK"}], "discount_percent": "10"},
+    )
+    assert loose.ticket_discount_amount == 55
+
+
 # ── Open checks ─────────────────────────────────────────────────────────────────────────────────
 
 
