@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:dd888bc399d7310cc16d0b52e3e7c8318c24c0bda7de70967b7e7697a65c4529 -->
+<!-- generated from WORKBOOK.md sha256:6e44f96f8a697fce7b4cea475b7e329fe9685da3ee94aa4610219f85790a9679 -->
 
 ## What it is for and who it is for
 
@@ -2268,8 +2268,9 @@ Steps:
      in another currency shows in its own: rectifying an invoice issued in euros says "Total: -€121.00" even though the business now charges in złoty, and
      the assistant says it in that same currency in its answer. A difference shows with its sign as on its app's
      screen, to see at a glance whether there is too much or too little (closing the till says "Difference: +€137.90" when there is too much, "-€4.90" when there is too little and
-     no sign when it balances); a yes or a no, as "Yes" or "No"; a list, by how many items it carries, and a datum
-     that groups others, such as a WhatsApp template, by its values, without the name of each one ("Template:
+     no sign when it balances); a yes or a no, as "Yes" or "No"; a list, by its items one after another when its app
+     names them ("Printers: Till, Kitchen"; past four, the first three and how many more: "Till, Kitchen, Bar and 2
+     more") and, otherwise, like the lines of a sale, by how many items it carries; and a datum that groups others, such as a WhatsApp template, by its values, without the name of each one ("Template:
      cita_recordatorio · es · Ana, 10:00"; of a till count, the notes and coins counted remain: "50: 2"). A date and a
      time show as they are written in the person's language and at the business's hour ("Nov 2, 2026, 10:00 AM"; a day
      alone, "Nov 2, 2026"; a time alone, "9:30 PM"); a value of a closed list, with the name its app gives it ("Front
