@@ -23,11 +23,13 @@ The mechanics that do not depend on the gateway are ``live.assistant``'s, shared
   ``assistant.unavailable``…), and what never reached it is ``assistant.unreachable``.
 """
 
+import contextlib
 import dataclasses
 import datetime as dt
 import json
 import logging
 import time
+from contextvars import ContextVar
 from collections.abc import AsyncIterator, Iterable
 from dataclasses import dataclass
 from typing import Any
@@ -35,6 +37,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import httpx
 import pycountry
+from asgiref.sync import sync_to_async
 from babel.dates import format_date, format_time, get_datetime_format
 from django.conf import settings
 from django.core import checks
@@ -63,9 +66,9 @@ from live.assistant import (
     tool_name,
     tool_spec,
 )
-from live.context import OperationContext, Scope
+from live.context import OperationContext, Scope, get_builder
 from live.meta import LiveAppConfig, all_live_app_configs
-from live.operations import Operation, registry
+from live.operations import Operation, get, registry
 
 from base import activation, approvals, entitlement, signing
 from base.auth import saas_internal_url
@@ -88,14 +91,18 @@ _schema = shared.input_schema
 _sends_amount = shared.sends_amount
 _verbose_name = shared.verbose_name
 
-#: Always offered when the person may read them: the checklist and the business's own data.
-ALWAYS = ("base.setup.status", "base.business.get")
+#: The search in ERPlora's documentation (saas ASSISTANT-F28): how ERPlora works is answered from it, never from memory.
+DOCS_SEARCH = "base.docs.search"
+#: Always offered when the person may read them: the checklist, the business's own data and the documentation (a
+#: how-to question, «¿cómo abro la caja?», shares no word with its tool).
+ALWAYS = ("base.setup.status", "base.business.get", DOCS_SEARCH)
 #: Never from the chat (the old hub's «destructive actions of the hub itself»): emptying the business; a file.
 NOT_FROM_CHAT = frozenset({"base.hub.reset", "base.blueprint.export"})
 
 TURN_PATH = "/internal/assistant/chat/stream"
 USAGE_PATH = "/internal/assistant/usage"
 REPORT_PATH = "/internal/assistant/report"
+DOCS_PATH = "/internal/assistant/docs/search"
 TRANSCRIBE_PATH = "/internal/speech/transcribe"
 #: A door that answers at once; the turn waits longer for its model, piece by piece.
 TIMEOUT_SECONDS = 15
@@ -333,6 +340,8 @@ FILES = pgettext_lazy("base", "Files")
 APPS = pgettext_lazy("base", "Apps")
 #: The user menu's «Report a problem» (BASE-F108), a dialog of its own.
 REPORT_A_PROBLEM = pgettext_lazy("base", "Report a problem")
+#: ERPlora's documentation (``base.docs.search``), as the panel of erplora.com names its receipt: no screen of the Hub.
+HELP = pgettext_lazy("base", "Help")
 
 #: The platform's screens by their key, the one a receipt names its screen by (``screen``) and base's catalogue names it
 #: by in each language (``base.assistant.screens.<key>``, the same name: ``test_each_screen_a_receipt_names_…``).
@@ -345,6 +354,7 @@ SCREEN_NAMES = {
     "files": FILES,
     "apps": APPS,
     "report": REPORT_A_PROBLEM,
+    "help": HELP,
 }
 
 #: Where a person does each thing of the platform on their own, by the entity of its operation: a card or a receipt
@@ -363,6 +373,7 @@ BASE_SCREENS = {
     "catalog_image": "home",
     "dataset": "settings",
     "device": "settings",
+    "docs": "help",
     "event": "system",
     "failed_event": "system",
     "file": "files",
@@ -588,6 +599,9 @@ Answer in {language_name}, short and plain, as a colleague who knows the app. Us
   say kindly that you only help with the business, in one sentence, and do not answer it.
 - Read before you answer: use the tools to look up records, numbers and ids. Never invent a record, an id, an amount
   or a date: if no tool returned it, say you do not know or that you could not find it.
+- For questions about how ERPlora works (how to do something, what an option means, plans), search the documentation
+  with `base__docs__search` and answer only from what it returns, citing the section; if it returns nothing, say the
+  documentation does not cover it.
 - To change something, call its tool: the person sees a card and confirms it before it runs. If the tool comes back
   «not confirmed» or with an error, nothing changed: say so, and never say it was done.
 - Amounts: a datum a tool marks `"money": true` takes the amount in the minor unit of its currency, whatever its
@@ -701,6 +715,83 @@ def transcribe(scope: Scope, *, audio: str, mime_type: str, language: str) -> di
     """The text of a dictation (``audio`` in base64): ``{text, language}``."""
     answer = _post(TRANSCRIBE_PATH, {"hub": scope.key, "audio": audio, "mime_type": mime_type, "language": language})
     return {"text": str(answer.get("text") or ""), "language": str(answer.get("language") or language)}
+
+
+def docs_language(language: str) -> str:
+    """The language of ERPlora's documentation a person reads: Spanish for any Spanish, else English (the two it is
+    written in)."""
+    return "es" if (language or "").split("-")[0].lower() == "es" else "en"
+
+
+def docs_search(scope: Scope, *, query: str, language: str, limit: int) -> dict:
+    """The excerpts of ERPlora's documentation nearest to ``query``, from erplora.com's one index (saas ASSISTANT-F28),
+    in the documentation of ``language``: ``{results: [{source, path, heading, text, score, lang}]}``."""
+    return _post(DOCS_PATH, {"hub": scope.key, "query": query, "language": docs_language(language), "limit": limit})
+
+
+# ── What the turn's tools wait on erplora.com for, before the turn's transaction ─────────────────────────────────
+
+#: The documentation searches of this request's turn, asked before its transaction (``prepare``): by their question
+#: and limit, erplora.com's answer or its refusal.
+_prepared_docs: ContextVar[dict | None] = ContextVar("base_assistant_prepared_docs", default=None)
+
+
+def prepare_docs(ctx: OperationContext, pending: Iterable[Any]) -> dict[tuple[str, int], dict | GatewayError]:
+    """The documentation searches among ``pending`` (the tools the model asked for), asked now for ``ctx``'s person:
+    by their question and limit, erplora.com's answer or its refusal. None for whom may not run the search, and none
+    whose arguments the search would refuse anyway."""
+    op = get(DOCS_SEARCH)
+    if ctx.actor is None or not ctx.has(op.permission):
+        return {}
+    name = tool_name(DOCS_SEARCH)
+    prepared: dict[tuple[str, int], dict | GatewayError] = {}
+    for call in pending:
+        if call.name != name:
+            continue
+        try:
+            data = op.input.model_validate_json(call.arguments or "{}")
+        except ValueError:  # pydantic's ValidationError, the JSON's too: the turn refuses it as invalid_payload
+            continue
+        key = (data.query, data.limit)
+        if key in prepared:
+            continue
+        try:
+            prepared[key] = docs_search(ctx.scope, query=data.query, language=ctx.language, limit=data.limit)
+        except GatewayError as refused:
+            prepared[key] = refused
+    return prepared
+
+
+@contextlib.contextmanager
+def prepared_docs(prepared: dict[tuple[str, int], dict | GatewayError]):
+    """While inside, ``searched_docs`` reads ``prepared`` instead of asking erplora.com."""
+    token = _prepared_docs.set(prepared)
+    try:
+        yield
+    finally:
+        _prepared_docs.reset(token)
+
+
+async def prepare(request: Any, data: Any) -> dict[tuple[str, int], dict | GatewayError]:
+    """What the turn's tools wait on erplora.com for, asked before ``base.assistant.turn`` opens its transaction (up to
+    ``TIMEOUT_SECONDS`` inside it would hold the hub's connection, PLAN §14.2): the documentation searches the model
+    asked for (``prepare_docs``), for the route to hand them to the turn (``prepared_docs``)."""
+    name = tool_name(DOCS_SEARCH)
+    if not any(call.name == name for call in data.pending):
+        return {}
+    ctx = await sync_to_async(get_builder().from_request)(request)
+    return await sync_to_async(prepare_docs)(ctx, data.pending)
+
+
+def searched_docs(ctx: OperationContext, *, query: str, limit: int) -> dict:
+    """The documentation search of ``base.docs.search``: what this request's turn asked before its transaction
+    (``prepare``) or, outside a turn, erplora.com's answer now. ``GatewayError`` when it could not answer."""
+    prepared = (_prepared_docs.get() or {}).get((query, limit))
+    if prepared is None:
+        return docs_search(ctx.scope, query=query, language=ctx.language, limit=limit)
+    if isinstance(prepared, GatewayError):
+        raise prepared
+    return prepared
 
 
 def sse(frame: dict) -> bytes:
