@@ -12,7 +12,7 @@ from uuid import UUID
 
 from django.utils.translation import gettext_noop
 from ninja import Schema
-from pydantic import Field
+from pydantic import Field, field_validator
 
 
 def names(read: str, by: str = "id", name: tuple[str, ...] = ("name",)) -> dict:
@@ -1632,6 +1632,50 @@ class AssistantUsageOut(Schema):
     limit: int = Field(description="Messages of the month in the plan; 0: the plan has no assistant.")
     resets_at: str | None = Field(None, description="When the allowance comes back (UTC); none for a demo.")
     demo: bool
+
+
+#: The most excerpts of ERPlora's documentation a search returns (erplora.com's own cap, saas ASSISTANT-F28).
+DOCS_SEARCH_MAX = 12
+
+
+class DocsSearchIn(Schema):
+    """A question about how ERPlora works, in the person's words; ``limit`` excerpts at most (up to 12)."""
+
+    query: str = Field(min_length=1, max_length=500, description="The how-to question, in the person's words.")
+    limit: int = Field(
+        default=8,
+        ge=1,
+        description=f"How many excerpts to return, at most {DOCS_SEARCH_MAX}.",
+        json_schema_extra={"maximum": DOCS_SEARCH_MAX},
+    )
+
+    @field_validator("query")
+    @classmethod
+    def _something_asked(cls, query: str) -> str:
+        query = query.strip()
+        if not query:
+            raise ValueError("ask something")
+        return query
+
+    @field_validator("limit")
+    @classmethod
+    def _capped(cls, limit: int) -> int:
+        return min(limit, DOCS_SEARCH_MAX)
+
+
+class DocsExcerptOut(Schema):
+    """An excerpt of ERPlora's documentation that answers, with where it comes from to cite it."""
+
+    source: str = Field(description="Where it comes from: help, app_doc (an app's documentation), workbook or plans.")
+    path: str
+    heading: str = Field(description="The headings it sits under, to cite it.")
+    text: str
+    score: float = Field(description="How close it is to the question: 1 the same meaning, 0 nothing in common.")
+    lang: str
+
+
+class DocsSearchOut(Schema):
+    results: list[DocsExcerptOut]
 
 
 class AssistantReportIn(Schema):
