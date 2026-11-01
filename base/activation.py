@@ -68,6 +68,17 @@ OFF_APPS_TTL = 60
 #: «activating». Kept and forgotten with the apps off; read only when both are kept.
 CREATING_APPS_CACHE = "base.apps_creating:"
 
+
+def off_apps_key(host: str) -> str:
+    """The key of ``host``'s apps off: tagged with the business (``{host}``), as :func:`creating_apps_key`, so the one
+    call that reads, keeps or forgets both lands on one hash slot of the Valkey cluster (``base/cache.py``)."""
+    return f"{OFF_APPS_CACHE}{{{host}}}"
+
+
+def creating_apps_key(host: str) -> str:
+    """The key of ``host``'s apps being set up, in the hash slot of :func:`off_apps_key`."""
+    return f"{CREATING_APPS_CACHE}{{{host}}}"
+
 #: The hosts whose rows the running change wrote and has not committed yet: what it reads of them is never kept.
 _changing: ContextVar[frozenset[str]] = ContextVar("base_activation_changing", default=frozenset())
 
@@ -267,7 +278,7 @@ def creating_apps(scope: Scope) -> frozenset[str]:
 def _kept(scope: Scope) -> tuple[frozenset[str], frozenset[str]]:
     """``(off, creating)`` of ``scope``'s business, from the cache when it has both, else from its rows (kept, unless
     the running change wrote them)."""
-    keys = (OFF_APPS_CACHE + scope.key, CREATING_APPS_CACHE + scope.key)
+    keys = (off_apps_key(scope.key), creating_apps_key(scope.key))
     changing = scope.key in _changing.get()
     if not changing:
         kept = _cached_many(keys)
@@ -298,7 +309,7 @@ def forget(host: str) -> None:
     """Drop ``host``'s apps off from the cache: after the COMMIT of a change, the next read sees it, in every process.
     A cache that does not answer is logged; what it kept ends with its timeout."""
     try:
-        cache.delete_many([OFF_APPS_CACHE + host, CREATING_APPS_CACHE + host])
+        cache.delete_many([off_apps_key(host), creating_apps_key(host)])
     except Exception:
         logger.exception("base.activation.cache_unavailable: the apps off of %s could not be forgotten.", host)
 

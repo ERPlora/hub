@@ -2,7 +2,7 @@
 
 A write of a datum the cache keeps forgets its key after its COMMIT, and only then is anybody told; a rollback leaves
 the key as it was and tells nobody. The real case: turning an app off (``base.app.disable``) forgets the business's
-apps off (``base.activation``, the cache's ``base.apps_off:<host>``) with ``live.operations.on_commit``, on the
+apps off (``base.activation``, the cache's ``base.apps_off:{<host>}``) with ``live.operations.on_commit``, on the
 operation's alias: in a hub with its own database that is the hub's, never control's (``default``), where a callback
 would run at once, also after the hub's rollback.
 """
@@ -38,7 +38,7 @@ def notices(sent: dict[str, list[str]]) -> list[str]:
 
 
 def test_a_rolled_back_change_keeps_the_cached_key_and_tells_nobody(hub_a, django_capture_on_commit_callbacks):
-    key = activation.OFF_APPS_CACHE + hub_a.slug
+    key = activation.off_apps_key(hub_a.slug)
     cache.set(key, KEPT, 60)
 
     with (
@@ -58,7 +58,7 @@ def test_a_rolled_back_change_keeps_the_cached_key_and_tells_nobody(hub_a, djang
 def test_the_same_change_committed_forgets_the_key_and_tells_after_its_commit(
     hub_a, django_capture_on_commit_callbacks
 ):
-    key = activation.OFF_APPS_CACHE + hub_a.slug
+    key = activation.off_apps_key(hub_a.slug)
     cache.set(key, KEPT, 60)
 
     with hubs.watched() as sent:

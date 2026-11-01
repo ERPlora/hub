@@ -646,7 +646,7 @@ def test_a_process_whose_cache_lags_says_app_inactive_until_it_forgets_never_rea
 
     a = business("a")
     turn_on(a)
-    keys = (activation.OFF_APPS_CACHE + a.slug, activation.CREATING_APPS_CACHE + a.slug)
+    keys = (activation.off_apps_key(a.slug), activation.creating_apps_key(a.slug))
     with use_hub(fresh(a)):
         kept = {keys[0]: sorted(activation.off_apps(Scope("host", a.slug))), keys[1]: [APP]}
     assert APP in kept[keys[0]]

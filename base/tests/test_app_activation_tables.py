@@ -357,7 +357,7 @@ def test_reading_the_apps_list_again_forgets_what_this_process_kept_so_the_menu_
     given(hub_a, printing="on*", created=["printing"])
     scope = Scope("host", hub_a.slug)
     cache.set_many(
-        {activation.OFF_APPS_CACHE + hub_a.slug: ["printing"], activation.CREATING_APPS_CACHE + hub_a.slug: []}, 60
+        {activation.off_apps_key(hub_a.slug): ["printing"], activation.creating_apps_key(hub_a.slug): []}, 60
     )
     with use_hub(Hub.objects.get(pk=hub_a.pk)):
         assert "printing" in activation.off_apps(scope)  # what this process kept before the worker's change
@@ -366,6 +366,29 @@ def test_reading_the_apps_list_again_forgets_what_this_process_kept_so_the_menu_
         me = get("base.session.me")(as_admin(hub_a), get("base.session.me").input()).model_dump(mode="json")
 
     assert {app["label"]: app["state"] for app in me["apps"]}["printing"] == "on"
+
+
+@own
+def test_the_apps_off_and_creating_of_a_business_are_kept_in_one_hash_slot_so_a_valkey_cluster_takes_them(
+    hub_a, django_assert_num_queries
+):
+    """In AWS the cache is a Valkey cluster, which refuses one call on keys of different hash slots (``base/cache.py``,
+    hub#440; the tests' ``ClusterLocMemCache`` refuses it too). The apps off and those being set up are read, kept and
+    forgotten in one call each: their keys share the business's hash tag, so the second read takes no row."""
+    from django.core.cache import cache
+    from redis.crc import key_slot
+
+    given(hub_a, printing="creating*")
+    scope = Scope("host", hub_a.slug)
+    keys = (activation.off_apps_key(hub_a.slug), activation.creating_apps_key(hub_a.slug))
+    assert len({key_slot(cache.make_and_validate_key(key).encode()) for key in keys}) == 1
+    with use_hub(Hub.objects.get(pk=hub_a.pk)):
+        assert "printing" in activation.off_apps(scope)
+        assert set(cache.get_many(list(keys))) == set(keys)
+        with django_assert_num_queries(0, using=hubs.HUB_A_ALIAS):
+            assert activation.creating_apps(scope) == frozenset({"printing"})
+    activation.forget(hub_a.slug)
+    assert cache.get_many(list(keys)) == {}
 
 
 @own

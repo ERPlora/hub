@@ -4356,12 +4356,18 @@ def _disable(ctx: OperationContext, data: AppChangeIn) -> dict:
     permission=ADMINISTER_HUB,
     input=AppChangeIn,
     output=AppChangeOut,
-    ai={
-        "description": "Tries again to set up one of this business's apps that could not be turned on (its state "
-        "«failed» in base.app.list), with what it needs that failed too: it is set up in a moment and then shows in "
-        "the menu. Refused for an app that is not waiting for it.",
-        "risk": "normal",
-    },
+    ai=AI(
+        description=(
+            "Tries again to set up one of this business's apps that could not be turned on (its state «failed» in "
+            "base.app.list), with what it needs that failed too: it is set up in a moment and then shows in the menu. "
+            "Refused for an app that is not waiting for it."
+        ),
+        risk="normal",
+        asks={
+            "en": ("the bookings app could not be turned on, try again", "retry setting up the kitchen app"),
+            "es": ("la app de reservas no se pudo activar, inténtalo otra vez", "reintenta activar la app de cocina"),
+        },
+    ),
 )
 def app_retry(ctx: OperationContext, data: AppChangeIn) -> dict:
     """BASE-F21/F22: an app whose tables could not be made (``failed``) is ``creating`` again now, with what it needs
@@ -4454,7 +4460,9 @@ def app_activation_settle(ctx: OperationContext, data: AppActivationSettleIn) ->
     chose, with what came along; then their photo's blocks, as an app turned on at once) and leaves the rest ``failed``;
     ``failed`` leaves them ``failed`` with ``attempts`` + 1, the error and the next try (1, 5, 15 min, then every hour;
     ``base.app.activation_failed``); ``locked`` and ``newer_code`` put them off (30 s, 60 s), still ``creating``. Never
-    on phase 1's shared database (409 ``base.app_shared_database``), whoever runs it; only the platform runs it."""
+    on phase 1's shared database (409 ``base.app_shared_database``); only the platform runs it, refused before anything
+    is read."""
+    internal_only(ctx)
     host = ctx.scope.key
     hub = _business_hub(ctx)
     if not has_own_database(hub):
@@ -4462,7 +4470,6 @@ def app_activation_settle(ctx: OperationContext, data: AppActivationSettleIn) ->
             gettext("This business shares its database: its apps are turned on at once."),
             code="base.app_shared_database",
         )
-    internal_only(ctx)
     with activation.changing(host):
         graph = activation.module_graph()
         current = _locked_states(ctx, graph)

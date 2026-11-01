@@ -87,6 +87,11 @@ OPEN_OPERATIONS: dict[str, tuple[str, str]] = {
         "The SPA's own session, read at start: an anonymous visitor gets no user and no permission (the login).",
     ),
     "base.session.revoke": (PLATFORM, "The SaaS ends an account's sessions (/internal, back-channel logout)."),
+    "base.app.activation_settle": (
+        PLATFORM,
+        "The worker turns on, or marks failed, the apps whose tables it has just made in the business's own database "
+        "(base.worker); internal_only refuses anyone else.",
+    ),
     "base.usage.list": (
         PLATFORM,
         "The SaaS's collect_hub_usage reads what each business used on a day, measured that night (/internal/usage).",
