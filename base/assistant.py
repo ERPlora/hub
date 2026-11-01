@@ -42,7 +42,7 @@ from babel.dates import format_date, format_time, get_datetime_format
 from django.conf import settings
 from django.core import checks
 from django.http import StreamingHttpResponse
-from django.utils import timezone
+from django.utils import timezone, translation
 from django.utils.translation import get_language_info, pgettext_lazy
 from live import assistant as shared
 
@@ -74,6 +74,7 @@ from live.operations import Operation, get, registry
 from base import activation, approvals, entitlement, signing
 from base.auth import saas_internal_url
 from base.business import babel_locale, currency_decimals
+from base.models import Membership
 from base.operations import HostScopeResolver
 
 # The card's helpers by the names this module and the apps' tests have always read them by (``live.assistant``'s).
@@ -647,10 +648,26 @@ def _reference_problems(op: Operation, declared: Any) -> list[str]:
 # ── The instructions of a turn ───────────────────────────────────────────────────────────────────────────────────
 
 
-def instructions(*, language: str, currency: str, decimals: int, business: str, screens: dict[str, str]) -> str:
+#: Who can do what a role of the business cannot (hub#585): the roles above it. The owner and an administrator hold
+#: every permission of every app (``base.permissions.FULL_ACCESS_ROLES``): what no tool of theirs does is done on its
+#: screen, never someone else's.
+ABOVE = {Membership.Role.MANAGER: "the owner or an administrator", Membership.Role.EMPLOYEE: "a manager or the owner"}
+
+
+def instructions(
+    *,
+    language: str,
+    currency: str,
+    decimals: int,
+    business: str,
+    screens: dict[str, str],
+    role: str | None = None,
+    approvable: Collection[str] = (),
+) -> str:
     """The system message of every turn (the gateway's only one): who it serves, in which language, the rules of its
     tools and money (an amount in the minor unit of its currency, ``decimals`` the business's; said in the currency
-    its result gives, else the business's), and the screens it may link."""
+    its result gives, else the business's), the screens it may link, and the person's ``role`` in the business with
+    the writes offered to it that a manager must approve (``approvable``, by operation name; BASE-F100)."""
     try:
         language_name = get_language_info(language)["name"]
     except KeyError:
@@ -677,8 +694,35 @@ Answer in {language_name}, short and plain, as a colleague who knows the app. Us
   the person, write an amount in the currency its result gives (its `currency`, with `currency_decimals` decimals)
   when it gives one, else in {currency} with {decimals} decimals; never in the minor unit.
 - When the person should go to a screen, link it with its path, only one of these:
-{links}
+{links}{_who_asks(role, language, approvable)}
 - If something cannot be done from here (you have no tool for it), say on which screen it is done."""
+
+
+def _who_asks(role: str | None, language: str, approvable: Collection[str]) -> str:
+    """The lines of the instructions on whom the assistant serves (hub#585, BASE-F100): their role as the screens name
+    it, in the chat's language, whose tools these are; for a role below the owner's, that what no tool does is said as
+    theirs to ask of someone else, never looked for another way nor answered with the state of something else; and the
+    writes they may only run with a manager's approval. Nothing for no role of the business (an automation's step)."""
+    lines = []
+    if role in Membership.Role.values:
+        with translation.override(language):
+            name = str(Membership.Role(role).label)
+        lines.append(
+            f"- You talk to the «{name}» of this business: your tools are the ones this role may use, no more."
+        )
+        if role in ABOVE:
+            lines.append(
+                "  When they ask for something none of your tools does, do not try other tools for it and never tell\n"
+                "  the state of something else instead: say plainly that their role cannot do it here and that "
+                f"{ABOVE[role]} can,\n  or on which screen it is done."
+            )
+    if approvable:
+        tools = ", ".join(f"`{tool_name(name)}`" for name in approvable)
+        lines.append(
+            f"- This person needs a manager's approval to run {tools}: before you call one, say that its card will\n"
+            "  ask a manager to approve it (their PIN or badge) and that it runs only once approved."
+        )
+    return "".join(f"\n{line}" for line in lines)
 
 
 def setup_block(status: dict | None) -> str:

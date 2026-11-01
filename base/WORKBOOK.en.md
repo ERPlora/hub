@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:5f6df02e29555d091b5b359b71f2202f6081edd439a65a4b70c3b66233d61592 -->
+<!-- generated from WORKBOOK.md sha256:d188dc85e13bbd63fa00fb5e6eb367ac31a30987668fe6adfe4a4c3136c95c9f -->
 
 ## What it is for and who it is for
 
@@ -2385,10 +2385,15 @@ Steps:
   1. The assistant works with the session of whoever is in front of it: it sees and does what that person would see
      and do with their buttons, in the business's apps that are on, and nothing else. An action they have no
      permission for is not offered to the assistant, which tells them so; one its app lets a manager approve is, as
-     its button on the screen is.
-  2. That action comes with its card, like any other. Tapping "Run it" opens "An approval is needed", the same as on
-     the screen: a manager taps their face and types their PIN, or swipes their badge, and the action is done once,
-     with whoever asked for it as its author. It is recorded in **Employees › Approvals**.
+     its button on the screen is. The assistant knows the role it talks to (owner, administrator, manager or
+     employee, said in the language of the conversation) and that its tools are that role's: asked for something none
+     of them does, it neither looks for another way nor tells the state of something else, but says in one sentence
+     that their role cannot do it from here and who can (to an employee, a manager or the owner; to a manager, the
+     owner or an administrator) or on which screen it is done.
+  2. That action comes with its card, like any other, and the assistant says beforehand that the card will ask a
+     manager to approve it. Tapping "Run it" opens "An approval is needed", the same as on the screen: a manager taps
+     their face and types their PIN, or swipes their badge, and the action is done once, with whoever asked for it as
+     its author. It is recorded in **Employees › Approvals**.
   3. If nobody approves it ("Cancel"), it is not done: the receipt reads "Not done, cancelled: …" and the assistant
      knows it.
   4. If it tries anyway an action without permission that nobody can approve, it is not done: the receipt reads "Not

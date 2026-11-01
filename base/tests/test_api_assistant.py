@@ -168,6 +168,44 @@ def test_a_long_answer_can_be_reported_whole(client, make_user, gateway):
 APPROVED_CREATE = {"demo.item.create": "Create an item"}
 
 
+# ── Who asks, told to the model (hub#585, BASE-F100) ────────────────────────────────────────────────────────────
+
+
+def _instructions_sent(gateway) -> str:
+    return " ".join(gateway.sent("/internal/assistant/chat/stream")[0].body["instructions"].split())
+
+
+def test_the_model_is_told_the_role_of_an_employee_and_what_a_manager_must_approve(client, make_user, gateway):
+    """hub#585: an employee asked to switch an app off and the model, never told whom it served, looked for another
+    way until «too many steps», or told the state of something else as if it were the app's. What the gateway gets
+    names their role as the screens do, in their language, who can do what it cannot, and the write their app lets a
+    manager approve (``demo.item.add_line``), offered to them as its button on the screen is."""
+    client.force_login(make_user("eva", host="a", role="hub_employee"))
+    gateway.turn({"type": "response", "output": [], "usage": {}, "continuation": None})
+    ask = {"role": "user", "content": "añade una línea de 2 cafés al elemento Mesa 4"}
+    frames(post(client, "/assistant/turn", {"messages": [ask]}, HTTP_ACCEPT_LANGUAGE="es"))
+
+    sent = _instructions_sent(gateway)
+    assert "You talk to the «Empleado» of this business: your tools are the ones this role may use" in sent
+    assert "say plainly that their role cannot do it here and that a manager or the owner can" in sent
+    offered = gateway.sent("/internal/assistant/chat/stream")[0].body["tools"]
+    assert "demo__item__add_line" in [tool["name"] for tool in offered]
+    approval = sent.split("This person needs a manager's approval to run ")[1].split(": before you call one")[0]
+    assert "`demo__item__add_line`" in approval.split(", ")
+
+
+def test_a_manager_who_may_do_it_is_asked_for_no_approval(client, make_user, gateway):
+    client.force_login(make_user("mario", host="a", role="hub_manager"))
+    gateway.turn({"type": "response", "output": [], "usage": {}, "continuation": None})
+    ask = {"role": "user", "content": "add a line of 2 coffees to the item Mesa 4"}
+    frames(post(client, "/assistant/turn", {"messages": [ask]}, HTTP_ACCEPT_LANGUAGE="en"))
+
+    sent = _instructions_sent(gateway)
+    assert "You talk to the «Manager» of this business" in sent
+    assert "the owner or an administrator can" in sent
+    assert "approv" not in sent
+
+
 @pytest.fixture
 def approvable_create(monkeypatch):
     """``demo`` names its «create» as approvable, as an app would in its ``LiveAppConfig``."""

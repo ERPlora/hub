@@ -1153,6 +1153,75 @@ def test_the_instructions_say_an_amount_in_the_currency_its_result_gives(currenc
     assert "two decimals" not in text
 
 
+# ── Who asks: their role and what it may do (hub#585, BASE-F100) ─────────────────────────────────────────────────
+
+
+def _said(language="en", **who):
+    text = assistant.instructions(language=language, currency="EUR", decimals=2, business="Bar Pepe", screens={}, **who)
+    return " ".join(text.split())
+
+
+@pytest.mark.parametrize(
+    ("role", "language", "name"),
+    [
+        (Membership.Role.OWNER, "en", "Owner"),
+        (Membership.Role.OWNER, "es", "Propietario"),
+        (Membership.Role.ADMIN, "en", "Admin"),
+        (Membership.Role.ADMIN, "es", "Administrador"),
+        (Membership.Role.MANAGER, "en", "Manager"),
+        (Membership.Role.MANAGER, "es", "Encargado"),
+        (Membership.Role.EMPLOYEE, "en", "Employee"),
+        (Membership.Role.EMPLOYEE, "es", "Empleado"),
+    ],
+)
+def test_the_instructions_name_the_persons_role_in_the_chat_language(role, language, name):
+    """hub#585: the model never knew whom it served, so an employee who asked to switch an app off got «too many
+    steps» or a made-up «it is already off». It is told their role as the screens name it, and that its tools are
+    that role's."""
+    assert f"You talk to the «{name}» of this business: your tools are the ones this role may use, no more." in _said(
+        language, role=role
+    )
+
+
+@pytest.mark.parametrize(
+    ("role", "who"),
+    [(Membership.Role.EMPLOYEE, "a manager or the owner"), (Membership.Role.MANAGER, "the owner or an administrator")],
+)
+def test_a_role_that_cannot_do_something_is_told_who_can_and_no_other_tool_is_tried(role, who):
+    text = _said(role=role)
+    assert (
+        "When they ask for something none of your tools does, do not try other tools for it and never tell the state "
+        "of something else instead: say plainly that their role cannot do it here and that "
+        f"{who} can, or on which screen it is done."
+    ) in text
+
+
+@pytest.mark.parametrize("role", [Membership.Role.OWNER, Membership.Role.ADMIN])
+def test_the_owner_and_an_administrator_are_never_told_their_role_cannot(role):
+    """They hold every permission of every app: what no tool does is done on its screen, not someone else's."""
+    text = _said(role=role)
+    assert "their role cannot" not in text
+    assert "If something cannot be done from here (you have no tool for it), say on which screen it is done." in text
+
+
+@pytest.mark.parametrize("role", ["", "staff", None])
+def test_without_a_role_of_the_business_no_role_is_named(role):
+    """An automation's step (``apps.flow``) or a session with no role here: nobody to name."""
+    assert "You talk to the" not in _said(role=role)
+
+
+def test_a_write_a_manager_approves_is_said_to_ask_for_that_approval():
+    """BASE-F100 step 1: an employee is offered the write their app lets a manager approve; the model says it will ask
+    a manager to approve it, instead of running it as if it were theirs or saying they cannot."""
+    text = _said(role=Membership.Role.EMPLOYEE, approvable=["demo.item.add_line", "demo.item.create"])
+    assert (
+        "This person needs a manager's approval to run `demo__item__add_line`, `demo__item__create`: before you call "
+        "one, say that its card will ask a manager to approve it (their PIN or badge) and that it runs only once "
+        "approved."
+    ) in text
+    assert "approv" not in _said(role=Membership.Role.EMPLOYEE)
+
+
 def test_the_setup_block_carries_what_is_pending_and_who_does_it():
     status = {
         "total": 3,
