@@ -113,12 +113,11 @@ def missing_database() -> str:
     return names.hub_db_name(tenancy_connections.control_name(), uuid.uuid7())
 
 
-def at_the_leaf(*, apps: bool = True) -> dict[str, str]:
-    """A hub with its own database at the code's leaf: the platform and, until S3, every portable app
-    (``migrator.apps_every_hub_gets``: ``migrate_hubs`` adds the ones it lacks; ``apps=False``: none added, as for an
-    expired demo, about to be dropped)."""
+def at_the_leaf() -> dict[str, str]:
+    """A hub with its own database at the code's leaf: the platform (S3: an app's tables are made when it is turned on,
+    never by ``migrate_hubs``)."""
     leaf = leaves()
-    return {label: leaf[label] for label in (*PLATFORM, *(migrator.apps_every_hub_gets() if apps else ()))}
+    return {label: leaf[label] for label in PLATFORM}
 
 
 # ── A run ───────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -218,7 +217,7 @@ def test_only_the_hubs_with_a_complete_database_of_their_own_are_migrated(small,
     assert "migrate_hubs: hubs: 3 migrated, 0 left behind, 0 up to date." in out
     for hub in alive:
         hub.refresh_from_db()
-        assert hub.schema_apps == at_the_leaf(apps=hub.status != Hub.Status.EXPIRED)
+        assert hub.schema_apps == at_the_leaf()
 
 
 def test_erploras_own_hub_goes_first_then_at_most_four_at_once(small, make_hub, monkeypatch):

@@ -109,8 +109,9 @@ export interface AppRow {
   /** Bought on erplora.com; the Store has its price. */
   premium: boolean;
   right: AppRight;
-  /** «off»: the business turned it off (or never on); «blocked»: no right to it (phase 2 adds activating and failed). */
-  state: 'on' | 'off' | 'blocked';
+  /** «off»: the business turned it off (or never on); «blocked»: no right to it; «creating»: its tables are being made
+   *  in the business's own database; «failed»: making them failed (tried again later, or `base.app.retry`). */
+  state: 'on' | 'off' | 'blocked' | 'creating' | 'failed';
   /** Turned on by the business itself (what the plan's limit counts); what came along with another app is not. */
   chosen: boolean;
   /** The first screen of its menu this person may open; null: no «Open». */
@@ -138,10 +139,11 @@ export interface AppChangeIn {
   app: string;
 }
 
-/** `base.AppChangeOut`: the app as it is now, and the apps that went on (or off) with it. */
+/** `base.AppChangeOut`: the app as it is now, and the apps that went on (or off) with it; «creating» (202): its tables
+ *  are being made, and `base.app.list` says when it is on. */
 export interface AppChange {
   app: string;
-  state: 'on' | 'off';
+  state: 'on' | 'off' | 'creating';
   chosen: boolean;
   along: { id: string; name: string }[];
 }
@@ -769,6 +771,7 @@ declare module '@erplora/ui/sdk' {
     'base.app.list': { input: NoInput; output: AppList };
     'base.app.enable': { input: AppChangeIn; output: AppChange };
     'base.app.disable': { input: AppChangeIn; output: AppChange };
+    'base.app.retry': { input: AppChangeIn; output: AppChange };
     'base.plan.usage': { input: NoInput; output: PlanUsage };
     // ── Data (APP-BASE-2) ──
     'base.blueprint.list': { input: NoInput; output: { templates: Template[]; empty: boolean } };

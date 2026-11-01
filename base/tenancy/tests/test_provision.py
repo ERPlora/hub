@@ -678,33 +678,67 @@ def test_a_hub_may_get_more_apps_than_its_template_and_a_seed_inside_its_databas
     assert seeded == [tenancy_connections.hub_alias(hub)]
 
 
-def _every_portable_app_is_there(hub: Hub) -> None:
+def _only_its_templates_apps_are_there(hub: Hub) -> None:
+    """S3: a new hub has its template's tables and nothing more, every app off; an app's tables are made the first time
+    it is turned on (``base.app.enable`` → the worker's ``ensure_schema``)."""
     hub = fresh(hub)
     assert hub.status == "ready"
-    assert set(migrator.portable_apps()) <= set(hub.schema_apps)
-    assert {"sale_sale", "customer_customer", "tax_taxrule"} <= hubs.table_names(hub.db_name)
+    assert set(hub.schema_apps) == {"base", "live"}
+    tables = hubs.table_names(hub.db_name)
+    assert not {table for table in tables if table.startswith(("sale_", "customer_", "tax_"))}
     with use_hub(hub):
-        from apps.sale.models import Sale
-
-        assert Sale.objects.count() == 0  # there before Sales is ever turned on: turning it on only changes its row
+        assert not AppActivation.objects.filter(state="on").exists()
 
 
-def test_until_s3_a_new_hub_gets_every_portable_apps_tables_whatever_its_template_has(registry, small_template, told):
+def test_a_new_hub_gets_only_its_templates_tables_every_app_off(registry, small_template, told):
     hub = registry.hub(vertical="small")
     assert not {table for table in hubs.table_names(small_template) if table.startswith("sale_")}
 
     assert provision.provision(hub) is True
 
-    _every_portable_app_is_there(hub)
+    _only_its_templates_apps_are_there(hub)
 
 
-def test_until_s3_the_due_pass_gives_a_new_business_every_portable_apps_tables(registry, small_template, told):
+def test_the_due_pass_gives_a_new_business_only_its_templates_tables(registry, small_template, told):
     hub = registry.hub(vertical="small")
     HubDue.mark_due(hub)
 
     assert provision.run_due() == 1
 
-    _every_portable_app_is_there(hub)
+    _only_its_templates_apps_are_there(hub)
+
+
+@pytest.fixture
+def full_template(django_db_blocker, hub_databases):
+    """``<control>_template_full``: built as ``migrate_hubs`` builds the platform's (``migrator.templates()[0].apps``)."""
+    control = hub_databases.control
+    name = names.template_db_name(control, "full")
+    with django_db_blocker.unblock():
+        with hubs._maintenance() as conn:
+            hubs._drop(conn, name, control)
+            conn.execute(sql.SQL("CREATE DATABASE {}").format(names.identifier(name, control=control)))
+        ddl = tenancy_connections.register_ddl_alias(name)
+        try:
+            migrator.migrate_apps(ddl, migrator.templates()[0].apps)
+        finally:
+            migrator._forget_alias(ddl)  # closed and out of the settings: Django's test case unwraps only its own
+    yield name
+    with hubs._maintenance() as conn:
+        hubs._drop(conn, name, control)
+
+
+def test_a_sign_up_from_a_template_up_to_date_is_the_clone_alone(registry, full_template, monkeypatch, told):
+    """Review of hub#471 in pre: ~63 s of migrations per sign-up on Fargate. The templates carry every portable app
+    (``migrator.templates``), so a hub made from one migrates nothing: its sign-up is the clone."""
+    hub = registry.hub(vertical="full")
+    applied = []
+    real = migrator.ensure_schema
+    monkeypatch.setattr(migrator, "ensure_schema", lambda row, **kwargs: applied.append(real(row, **kwargs)) or applied[-1])
+
+    assert provision.provision(hub) is True
+
+    assert applied == [[]]
+    assert set(migrator.portable_apps()) <= set(fresh(hub).schema_apps)
 
 
 @pytest.fixture

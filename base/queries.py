@@ -5,6 +5,7 @@ templates, what a blueprint brings, the export, the loads and the apps' data (th
 
 import base64
 import csv
+import datetime as dt
 import io
 from typing import Any
 from uuid import UUID
@@ -12,7 +13,7 @@ from uuid import UUID
 from django.conf import settings
 from django.contrib.auth.hashers import check_password
 from django.core.files.storage import Storage, storages
-from django.db.models import Max, Q
+from django.db.models import Max, Min, Q
 from django.http import HttpRequest
 from django.utils import timezone, translation
 from django.utils.translation import gettext, gettext_lazy, ngettext, pgettext
@@ -132,8 +133,10 @@ def session_me(ctx: OperationContext, data: SessionMeIn) -> dict[str, Any]:
     # Labels are lazy translations; a live re-run happens outside the request that activated the
     # language, so it is set here.
     demo = _demo_hub(ctx)
-    # Not on: a paid module without its right, or one the business turned off (base.activation).
+    # Not on: a paid module without its right, or one the business turned off (base.activation); one whose tables the
+    # hub's own database is still getting is «activating».
     blocked = entitlement.blocked_apps(ctx.scope) | activation.off_apps(ctx.scope)
+    creating = activation.creating_apps(ctx.scope) if blocked else frozenset()
     with translation.override(ctx.language):
         visible = [config for config in home.shown_modules(demo_hub=demo is not None) if _can_see(ctx, config)]
         return {
@@ -151,10 +154,16 @@ def session_me(ctx: OperationContext, data: SessionMeIn) -> dict[str, Any]:
                 for config in visible
                 if config.navigation and config.label not in blocked
             ],
-            "apps": [{"label": config.label, "state": "off" if config.label in blocked else "on"} for config in visible],
+            "apps": [{"label": config.label, "state": _session_state(config.label, blocked, creating)} for config in visible],
             "language": ctx.language,
             "demo": None if demo is None else {"expires_at": demo.expires_at},
         }
+
+
+def _session_state(label: str, blocked: frozenset[str], creating: frozenset[str]) -> str:
+    if label not in blocked:
+        return "on"
+    return "activating" if label in creating else "off"
 
 
 def _demo_hub(ctx: OperationContext) -> Hub | None:
@@ -370,7 +379,14 @@ def app_list(ctx: OperationContext, data: AppListIn) -> dict:
     else ``on`` or ``off`` as the business turned it, ``base.activation``), whether the business chose it, the first
     screen this person may open, what it needs (it comes along with it) and the apps on that need it (they go off
     first); and the plan's limit of chosen apps against the chosen ones on (PLAN-HUB §9), erplora.com's Store and its
-    plans of this business."""
+    plans of this business.
+
+    Read again when an app's state changes (its live notice, in every process with the list open: AppsFollower on every
+    screen), it first forgets what this process kept of the business's apps (``base.activation.forget``): a change the
+    worker made in another process (S3) never reaches a cache of the process's own (local development, without
+    Valkey), and the session read right after it (the menu) is then current. Transitional: it goes once every process
+    hears ``cache_inval '<hex>:apps'`` itself (PLAN-DB §7; FIX-HUB-CACHE-INVAL-APPS-LISTEN)."""
+    activation.forget(ctx.scope.key)
     hub = Hub.objects.filter(slug=ctx.scope.key).first()
     demo = bool(hub and hub.is_demo)
     configs = home.shown_modules(demo_hub=demo)
@@ -384,7 +400,7 @@ def app_list(ctx: OperationContext, data: AppListIn) -> dict:
     def state(label: str) -> str:
         if label in blocked:
             return "blocked"
-        return "on" if current[label].on else "off"
+        return current[label].state if current[label].wanted else "off"
 
     with translation.override(ctx.language):
         return {
@@ -399,7 +415,7 @@ def app_list(ctx: OperationContext, data: AppListIn) -> dict:
                     "premium": bool(config.premium),
                     "right": entitlement.FREE if demo else rights[config.label],
                     "state": state(config.label),
-                    "chosen": current[config.label].on and current[config.label].chosen,
+                    "chosen": current[config.label].wanted and current[config.label].chosen,
                     "path": _first_screen(ctx, config) if state(config.label) == "on" else None,
                     "requires": sorted(needs[config.label]),
                     "required_by": [
@@ -430,6 +446,32 @@ def app_activations(host: str) -> dict[str, activation.Activation]:
         app: activation.Activation(state, chosen)
         for app, state, chosen in AppActivation.objects.filter(host=host).values_list("app", "state", "chosen")
     }
+
+
+def activations_due(host: str, now: dt.datetime) -> dict[str, str]:
+    """The apps of ``host``'s business whose tables the worker makes now (S3), with the last migration the code that
+    asked named (``target``): ``creating`` unless put off (a schema held, a newer code's request), or ``failed`` once
+    its next try came."""
+    due = Q(state=activation.CREATING) & (Q(next_attempt_at__isnull=True) | Q(next_attempt_at__lte=now)) | Q(
+        state=activation.FAILED, next_attempt_at__lte=now
+    )
+    return dict(
+        AppActivation.objects.filter(host=host, app__in=list(activation.module_graph()))
+        .filter(due)
+        .order_by("app")
+        .values_list("app", "target")
+    )
+
+
+def activation_next_at(host: str) -> dt.datetime | None:
+    """When the worker has to look into ``host``'s business next for apps to set up: now for one ``creating`` and not put
+    off, else the earliest next try of one ``creating`` or ``failed``; ``None`` when none waits."""
+    waiting = AppActivation.objects.filter(
+        host=host, app__in=list(activation.module_graph()), state__in=[activation.CREATING, activation.FAILED]
+    )
+    if waiting.filter(state=activation.CREATING, next_attempt_at__isnull=True).exists():
+        return timezone.now()
+    return waiting.aggregate(next=Min("next_attempt_at"))["next"]
 
 
 def _shell_icon(config: Any) -> str:

@@ -88,8 +88,13 @@ FILE_EVENTS = (FILE_UPLOADED, FILE_FOLDER_CREATED, FILE_RENAMED, FILE_MOVED, FIL
 APP_ENABLED = "base.app.enabled"
 #: Whoever runs the business turned an app off (``app``) and, with it, what only it needed (``along``).
 APP_DISABLED = "base.app.disabled"
+#: An app (``app``, with what it needs: ``along``) was turned on in a hub whose own database lacks its tables, or tried
+#: again after failing: ``creating`` until the worker makes them (S3; PLAN-DB §7), then ``base.app.enabled``.
+APP_ACTIVATION_REQUESTED = "base.app.activation_requested"
+#: Making the tables of the apps ``apps`` failed (``error``, its kind): ``failed``, tried again later or by hand.
+APP_ACTIVATION_FAILED = "base.app.activation_failed"
 #: What changes which apps are on: the Apps screen, the menu and the Home follow them.
-APP_EVENTS = (APP_ENABLED, APP_DISABLED)
+APP_EVENTS = (APP_ENABLED, APP_DISABLED, APP_ACTIVATION_REQUESTED, APP_ACTIVATION_FAILED)
 
 ALL = [
     HUB_REGISTERED,
