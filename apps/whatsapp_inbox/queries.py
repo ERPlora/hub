@@ -653,13 +653,12 @@ def last_offered(message: Message) -> str:
     """What the business last wrote her from the Hub, in the 24 hours before ``message``: the list of options she may be
     answering by its number (WHATSAPP_INBOX-F19), or ``""``. Ordered by when the Hub recorded each one, not by Meta's
     clock; never what the owner wrote from the phone, nor what did not get to her. Anything the Hub writes her later
-    (a booking done, another question) takes its place, so a list is forgotten once it was answered."""
+    (a booking done, another question, a template) takes its place, so a list is forgotten once it was answered."""
     last = (
         Message.objects.filter(
             conversation_id=message.conversation_id,
             direction=Message.Direction.OUTBOUND,
             origin=Message.Origin.HUB,
-            kind="text",
             created_at__lt=message.created_at,
             created_at__gte=message.created_at - OFFER_MEMORY,
         )

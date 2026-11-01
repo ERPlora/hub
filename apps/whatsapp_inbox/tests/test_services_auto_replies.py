@@ -14,7 +14,7 @@ from live.errors import NotFound, PermissionDenied
 from live.models import OutboxEvent
 
 from apps.whatsapp_inbox.models import Conversation, Message
-from apps.whatsapp_inbox.tests.conftest import NOW, card, connect, ctx_for, receive, run
+from apps.whatsapp_inbox.tests.conftest import NOW, card, connect, ctx_for, receive, run, template
 
 pytestmark = pytest.mark.django_db
 
@@ -146,6 +146,24 @@ def test_options_older_than_24_hours_are_forgotten():
     assert options("wamid.2") == ""
     offer.update(created_at=answer_at - dt.timedelta(hours=23, minutes=59))
     assert options("wamid.2") == OFFERED
+
+
+def test_a_template_the_business_sends_her_after_the_list_takes_its_place():
+    """A template is something the business wrote her from the Hub too (F33): sent after the list, it is what she
+    may be answering, not the list."""
+    connect(templates=[template("recordatorio")])
+    receive("wamid.1", "34600111222", text="A table for 4 on Saturday")
+    notify(OFFERED)
+    run(
+        "whatsapp_inbox.message.send",
+        {
+            "id": str(Conversation.objects.get().id),
+            "template": {"name": "recordatorio", "variables": ["Ana", "viernes"]},
+            "client_message_id": "0199e000-0000-7000-8000-0000000000f2",
+        },
+    )
+    receive("wamid.2", "34600111222", text="the 2nd")
+    assert options("wamid.2") == "Hola Ana, te esperamos el viernes."
 
 
 def test_only_what_the_hub_got_to_send_her_counts():
