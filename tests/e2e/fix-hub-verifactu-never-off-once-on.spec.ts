@@ -7,7 +7,7 @@
 // flow: VERIFACTU-F32
 import { type Browser, expect, type Page, test } from '@playwright/test';
 
-import { A, horizontalOverflow, hostPage, login, psql, shot, shown, untilStill } from './helpers';
+import { A, capture, horizontalOverflow, hostPage, login, psql, shown } from './helpers';
 
 const VIEWPORTS = {
   390: { width: 390, height: 844 },
@@ -65,9 +65,8 @@ async function turnOffVerifactu(page: Page, labels: { search: string; title: str
 /** The capture once the screen settled and nothing scrolls sideways. */
 async function snap(page: Page, name: string): Promise<void> {
   await expect(shown(page).locator('ion-skeleton-text:visible')).toHaveCount(0);
-  await untilStill(page);
   expect(await horizontalOverflow(page), `${name}: no sideways scroll`).toBeLessThanOrEqual(0);
-  await page.screenshot({ path: shot(name) });
+  await capture(page, name);
 }
 
 test.describe.configure({ mode: 'serial' });
