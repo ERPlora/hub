@@ -194,6 +194,8 @@ def test_a_session_open_for_days_counts_on_each_of_them(counting, at, acme):
 
     assert set(HubVisit.objects.values_list("day", flat=True)) == {DAY, NEXT_DAY}
     assert services.active_people("acme", NEXT_DAY, 30) == (1, 1)
+    # So the sweep keeps looking into a hub whose session never logged in again (base.worker).
+    assert services.hubs_visited_since(NEXT_DAY) == {"acme"}
 
 
 def test_a_pass_with_nothing_to_write_touches_nothing(counting, at, db, django_assert_num_queries):

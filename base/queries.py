@@ -667,13 +667,14 @@ def _connections_usage(state: dict, known: bool, counted: _Counted) -> dict:
 def _activity_usage(hub: Hub | None, demo: bool, last: HubUsageDaily | None, counted: _Counted) -> dict:
     """Who is active now, in the last visits of every task (yesterday's too: a day may have just changed) and in this
     process's memory, and the people of the last night measured."""
+    now = timezone.now().astimezone(dt.UTC)
+    today = now.date()
     active_now = None
-    today = timezone.now().astimezone(dt.UTC).date()
     if hub is not None and not demo:
         recent = HubVisit.objects.filter(
             host=hub.slug,
             day__in=(today, today - dt.timedelta(days=1)),
-            last_seen_at__gte=timezone.now() - ACTIVE_NOW,
+            last_seen_at__gte=now - ACTIVE_NOW,
         ).values_list("saas_user_id", flat=True)
         active_now = len(set(recent) | counted.people_now)
     return {

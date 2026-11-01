@@ -261,7 +261,7 @@ def _note_the_owner(
 ) -> None:
     """Note whose and where the new session is (``SessionOwner``), so ``base.session.revoke`` finds it by index, and
     on which device and with which credential it was opened; and, on a hub, that its person came in today
-    (``control.HubVisit``, its nightly use).
+    (``control.HubVisit``, its nightly use and who is active now).
 
     ``login`` gives the session a new key and saves it, unless it flushed another user's session first: then it has
     no key until it is saved, which happens here, in the login's transaction.
@@ -2081,7 +2081,7 @@ def hubs_to_measure() -> tuple[list[Hub], int]:
 
 
 def active_people(host: str, day: dt.date, window_days: int) -> tuple[int, int]:
-    """The people who came into ``host`` on ``day``, and in the ``window_days`` that end it."""
+    """The people with activity in ``host`` on ``day``, and in the ``window_days`` that end it."""
     visits = HubVisit.objects.filter(host=host)
     on_day = visits.filter(day=day).values("saas_user_id").distinct().count()
     in_window = (
@@ -4611,7 +4611,8 @@ def activations_rung_at(hub_id: UUID, at: dt.datetime | None) -> None:
 
 
 def hubs_visited_since(day: dt.date) -> frozenset[str]:
-    """The hubs (by slug) someone came into since ``day``: the active ones, which the sweep looks into more often."""
+    """The hubs (by slug) someone had activity in since ``day`` (a login, or anything done in a session that stayed open:
+    ``base.meter``): the active ones, which the sweep looks into more often."""
     return frozenset(HubVisit.objects.filter(day__gte=day).values_list("host", flat=True).distinct())
 
 

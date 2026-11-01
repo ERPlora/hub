@@ -249,16 +249,30 @@ def test_counting_adds_no_statement_to_a_request(client, hub_a, monkeypatch):
 # ── The serving process starts it ─────────────────────────────────────────────────────────────────────────────────────
 
 
-def test_the_process_daphne_runs_starts_the_meter_and_the_worker_does_not(monkeypatch):
+def test_the_process_daphne_runs_starts_the_meter(monkeypatch):
     import runpy
-    from pathlib import Path
 
     import config.asgi
 
     started = []
     monkeypatch.setattr(meter, "start", lambda: started.append(True))
 
-    runpy.run_path(str(Path(config.asgi.__file__)))
+    runpy.run_path(config.asgi.__file__)
 
     assert started == [True]
-    assert "meter" not in Path("base/worker.py").read_text(encoding="utf-8")
+
+
+def test_no_other_process_starts_it():
+    """A pass of the worker that finds its hub busy is nobody's error on a screen: it must not tell an owner to upgrade."""
+    import re
+    from pathlib import Path
+
+    root = Path(meter.__file__).resolve().parents[1]
+    sources = [path for folder in ("apps", "base", "config", "control") for path in (root / folder).rglob("*.py")]
+    starters = {
+        path.relative_to(root).as_posix()
+        for path in sources
+        if "tests" not in path.parts and re.search(r"\bmeter\.start\(", path.read_text(encoding="utf-8"))
+    }
+
+    assert starters == {"config/asgi.py"}
