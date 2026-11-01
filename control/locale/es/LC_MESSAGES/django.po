@@ -144,6 +144,111 @@ msgstr "Vacío: a sus hubs se llega por su escritor, directamente."
 msgid "leased by"
 msgstr "reservado por"
 
+#: services.py
+msgid "No cluster has this id."
+msgstr "Ningún clúster tiene este id."
+
+msgid "Another cluster is already called %(name)s."
+msgstr "Ya hay otro clúster llamado %(name)s."
+
+msgid "This secret does not resolve: %(reason)s"
+msgstr "Este secreto no se puede resolver: %(reason)s"
+
+msgid ""
+"The databases of its hubs are on this writer: move them to another cluster "
+"before changing it."
+msgstr ""
+"Las bases de datos de sus hubs están en este escritor: muévelas a otro "
+"clúster antes de cambiarlo."
+
+msgid ""
+"%(count)d hub is on this cluster or moving to it: a cluster is only deleted "
+"once no hub is."
+msgid_plural ""
+"%(count)d hubs are on this cluster or moving to it: a cluster is only "
+"deleted once no hub is."
+msgstr[0] ""
+"%(count)d hub está en este clúster o moviéndose a él: un clúster solo se "
+"borra cuando ya no hay ninguno."
+msgstr[1] ""
+"%(count)d hubs están en este clúster o moviéndose a él: un clúster solo se "
+"borra cuando ya no hay ninguno."
+msgstr[2] ""
+"%(count)d hubs están en este clúster o moviéndose a él: un clúster solo se "
+"borra cuando ya no hay ninguno."
+
+msgid ""
+"%(count)d database left behind by a move is still kept on this cluster: it "
+"is deleted once it is dropped."
+msgid_plural ""
+"%(count)d databases left behind by moves are still kept on this cluster: it "
+"is deleted once they are dropped."
+msgstr[0] ""
+"Este clúster aún guarda %(count)d base de datos que dejó un traslado: se "
+"borra cuando ya no la guarde."
+msgstr[1] ""
+"Este clúster aún guarda %(count)d bases de datos que dejaron traslados: se "
+"borra cuando ya no las guarde."
+msgstr[2] ""
+"Este clúster aún guarda %(count)d bases de datos que dejaron traslados: se "
+"borra cuando ya no las guarde."
+
+#: queries.py
+msgid "the control database's server"
+msgstr "el servidor de la base de datos de control"
+
+msgid "The sizes of the databases on %(cluster)s could not be read: %(reason)s"
+msgstr ""
+"No se han podido leer los tamaños de las bases de datos de %(cluster)s: "
+"%(reason)s"
+
+#: admin.py
+msgctxt "cluster limit"
+msgid "no limit"
+msgstr "sin límite"
+
+msgctxt "cluster limit"
+msgid "limit"
+msgstr "límite"
+
+msgctxt "cluster"
+msgid "writer"
+msgstr "escritor"
+
+msgctxt "cluster"
+msgid "PgBouncer"
+msgstr "PgBouncer"
+
+msgctxt "cluster pgbouncer"
+msgid "none: its writer"
+msgstr "ninguno: su escritor"
+
+msgctxt "cluster"
+msgid "hubs / limit"
+msgstr "hubs / límite"
+
+msgctxt "cluster"
+msgid "total size"
+msgstr "tamaño total"
+
+msgid "Close to new hubs"
+msgstr "Cerrar a hubs nuevos"
+
+msgid "%(count)d cluster closed to new hubs: the hubs on it stay there."
+msgid_plural "%(count)d clusters closed to new hubs: the hubs on them stay there."
+msgstr[0] "%(count)d clúster cerrado a hubs nuevos: sus hubs se quedan en él."
+msgstr[1] ""
+"%(count)d clústeres cerrados a hubs nuevos: sus hubs se quedan en ellos."
+msgstr[2] ""
+"%(count)d clústeres cerrados a hubs nuevos: sus hubs se quedan en ellos."
+
+msgctxt "hub database"
+msgid "shared with control"
+msgstr "compartida con control"
+
+msgctxt "hub database"
+msgid "size"
+msgstr "tamaño"
 msgid "reset asked"
 msgstr "restablecimiento pedido"
 
@@ -239,3 +344,110 @@ msgstr "host"
 msgctxt "hub usage"
 msgid "SaaS account"
 msgstr "cuenta de ERPlora"
+
+#: models.py (a hub's move, S7)
+msgid "moving to"
+msgstr "moviéndose a"
+
+msgid "moved at"
+msgstr "movida el"
+
+msgid "copy after a move"
+msgstr "copia tras mover"
+
+msgid "copies after a move"
+msgstr "copias tras mover"
+
+#: services.py (control.hub.move)
+msgid "No hub has this id."
+msgstr "Ningún hub tiene este id."
+
+msgid "Only a ready hub with a database of its own moves."
+msgstr "Solo se mueve un hub listo con base de datos propia."
+
+msgid "This hub is already moving."
+msgstr "Este hub ya se está moviendo."
+
+msgid "This hub is on that cluster already."
+msgstr "Este hub ya está en ese clúster."
+
+msgid "That cluster is closed to new hubs."
+msgstr "Ese clúster está cerrado a hubs nuevos."
+
+msgid "That cluster has no room for another hub."
+msgstr "Ese clúster no tiene sitio para otro hub."
+
+msgid "The database of this hub is not on its server: there is nothing to move."
+msgstr "La base de datos de este hub no está en su servidor: no hay nada que mover."
+
+msgid ""
+"This hub's database is too large to move with a copy: it needs logical "
+"replication."
+msgstr ""
+"La base de datos de este hub es demasiado grande para moverla con una copia: "
+"necesita replicación lógica."
+
+#: admin.py and templates/admin/control/hub/move_to_cluster.html
+msgid "Move to cluster…"
+msgstr "Mover a otro clúster…"
+
+msgid "Move to cluster"
+msgstr "Mover a otro clúster"
+
+msgid "%(count)d hub will move to %(cluster)s: closed for a few minutes while it moves."
+msgid_plural ""
+"%(count)d hubs will move to %(cluster)s: each closed for a few minutes while "
+"it moves."
+msgstr[0] "%(count)d hub se moverá a %(cluster)s: cerrado unos minutos mientras se mueve."
+msgstr[1] ""
+"%(count)d hubs se moverán a %(cluster)s: cada uno cerrado unos minutos "
+"mientras se mueve."
+msgstr[2] ""
+"%(count)d hubs se moverán a %(cluster)s: cada uno cerrado unos minutos "
+"mientras se mueve."
+
+msgid ""
+"Each hub chosen closes for a few minutes while its database is copied to the "
+"cluster you choose, and opens again there. A database too large for a copy is "
+"refused."
+msgstr ""
+"Cada hub elegido se cierra unos minutos mientras su base de datos se copia al "
+"clúster que elijas, y vuelve a abrirse allí. Una base de datos demasiado grande "
+"para una copia se rechaza."
+
+msgid "Move them"
+msgstr "Moverlos"
+
+#: round 3 of the move (review): its cancel, the demos and what an undone move leaves
+msgid "A demo does not move: it ends on its own."
+msgstr "Una demo no se mueve: termina sola."
+
+msgid "This hub is not moving."
+msgstr "Este hub no se está moviendo."
+
+msgid "Cancel the move"
+msgstr "Cancelar el traslado"
+
+msgid "%(count)d move will be undone: the hub goes back to its cluster within a minute."
+msgid_plural ""
+"%(count)d moves will be undone: each hub goes back to its cluster within a "
+"minute."
+msgstr[0] "Se deshará %(count)d traslado: el hub vuelve a su clúster en menos de un minuto."
+msgstr[1] ""
+"Se desharán %(count)d traslados: cada hub vuelve a su clúster en menos de un "
+"minuto."
+msgstr[2] ""
+"Se desharán %(count)d traslados: cada hub vuelve a su clúster en menos de un "
+"minuto."
+
+msgid "move undo asked"
+msgstr "deshacer el traslado pedido"
+
+msgid "noted at"
+msgstr "anotada el"
+
+msgid "database left by an undone move"
+msgstr "base de datos que dejó un traslado deshecho"
+
+msgid "databases left by undone moves"
+msgstr "bases de datos que dejaron traslados deshechos"
