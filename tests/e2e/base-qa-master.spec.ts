@@ -359,9 +359,9 @@ for (const language of LANGUAGES) {
         await check(`employees-${id}`);
       }
 
-      // System, its five tabs.
+      // System, its four tabs.
       await menu(page, 'system', /\/system/);
-      for (const id of ['resources', 'plan', 'updates', 'events', 'logs']) {
+      for (const id of ['usage', 'updates', 'events', 'logs']) {
         await tab(page, id);
         await check(`system-${id}`);
       }

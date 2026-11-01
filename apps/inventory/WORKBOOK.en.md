@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:cbf68d22cae76c9e239707ceefa34142420b3dc72474c7a96487e75a14a656dc -->
+<!-- generated from WORKBOOK.md sha256:e05defc19192fa95bb8012233fece21cbff07ef1edaee4b4ae3ab32491095132 -->
 
 ## What it is for and who it is for
 
@@ -964,7 +964,7 @@ photo. Upload a JPG, PNG or WebP image.". If the item was saved and the photo wa
 photo again, and the item keeps the photo it had; the reason is, with no space in the plan, "There is no
 space left for that file: your plan includes <space>." and, if the storage does not answer, "The photo
 could not be saved. Try again.".
-Involved: INVENTORY-F01, INVENTORY-F02, INVENTORY-F04, INVENTORY-F32, BASE-F28
+Involved: INVENTORY-F01, INVENTORY-F02, INVENTORY-F04, INVENTORY-F32, BASE-F40
 
 ### INVENTORY-F32 The photo on the till's tile
 Status: done
