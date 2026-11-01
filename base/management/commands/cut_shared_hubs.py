@@ -8,8 +8,8 @@ plan is printed first, a business with each mode, the tables and rows a copy tak
 writes nothing. Before the first cut, control is copied to the dumps bucket (``<control>/<time>-cut.dump``): without
 a bucket it is refused unless ``--no-dump`` (local development and ``pre`` only). The businesses are cut one at a
 time, the copy first; the first that fails stops the run with why, left as it was, and the next run does it again.
-A business already with its own database is left as it is. Runs where the migrator's credentials are (the
-``hub-migrate`` task in AWS).
+A business already with its own database is left as it is. Runs where the migrator's credentials and the dumps
+bucket's write are: a one-off task of the ``worker`` family in AWS (``hub-migrate`` cannot write to the bucket).
 """
 
 from django.core.management.base import BaseCommand, CommandError
@@ -147,6 +147,13 @@ class Command(BaseCommand):
             if hub.db_name:
                 self.stdout.write(head + f"already has its own database ({hub.db_name})")
             elif mode == cut.COPY_ALL:
+                fiscal = cut.fiscal_rows()
+                if fiscal:
+                    issuers = ", ".join(f"issuer {name} ({tax_id})" for name, tax_id in fiscal.issuers) or "no issuer"
+                    self.stdout.write(
+                        f"Warning: control holds fiscal rows that a copy-all takes into {slug}: {issuers}; "
+                        f"VeriFactu records: {fiscal.records}. Check they are this business's before the cut."
+                    )
                 counted = cut.count_rows(slug)
                 rows = {table: count for table, count in counted.items() if count}
                 self.stdout.write(

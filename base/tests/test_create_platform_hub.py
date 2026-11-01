@@ -224,3 +224,40 @@ def test_without_execute_a_missing_platform_hub_is_only_said():
 
     assert "would make its registry row and its own database" in out
     assert not Hub.objects.filter(slug=PLATFORM.key).exists()
+
+
+@pytest.mark.django_db
+def test_its_row_is_never_left_due_for_the_worker_to_take_meanwhile():
+    """The command makes the platform hub's database itself, under its lease: the worker's pass over ``hub_due``
+    never finds the row to take first (it would leave the command with «could not be made»)."""
+    from base import services
+    from base.tenancy.context import use_control
+    from control.models import Hub, HubDue
+
+    with use_control():
+        hub = services.platform_hub_register(PLATFORM.key)
+
+    assert hub.status == Hub.Status.REQUESTED and hub.db_name
+    assert not HubDue.objects.filter(pk=hub.pk).exists()
+
+
+@pytest.mark.django_db
+def test_when_the_worker_holds_it_the_command_waits_for_it_to_be_ready(deployment, monkeypatch):
+    """A row left due by an older run may be the worker's when the command comes: it waits for it, never fails."""
+    from base.management.commands import create_platform_hub
+    from base.tenancy import provision
+    from control.models import Hub
+
+    Hub.objects.filter(slug=PLATFORM.key).update(status=Hub.Status.MIGRATING)
+    polls = []
+
+    def the_worker_finishes(seconds):
+        polls.append(seconds)
+        Hub.objects.filter(slug=PLATFORM.key).update(status=Hub.Status.READY)
+
+    monkeypatch.setattr(provision, "provision", lambda hub, **kwargs: False)
+    monkeypatch.setattr(create_platform_hub, "wait", the_worker_finishes)
+
+    out = command("--execute")
+
+    assert polls and "issuer set" in out

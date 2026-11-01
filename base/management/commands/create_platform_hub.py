@@ -14,9 +14,12 @@ Then, inside that database, it gives the hub its issuer, ERPlora's tax identity 
 prod: production, pre: testing), always through their operations, as the system on that slug. Invoicing and
 VeriFactu are always active on it.
 
-In AWS it runs once per environment as a one-off ECS task of the ``hub-migrate`` task definition, which has the
-migrator's credentials to make the database (WORKBOOK of invoice; runbook ``docs/runbooks/cut-shared-hubs.md``).
+In AWS it runs once per environment as a one-off ECS task of the ``worker`` family, which has the migrator's
+credentials to make the database (WORKBOOK of invoice; runbook ``docs/runbooks/cut-shared-hubs.md``). The command
+makes the database itself; a row an older run left due may be the worker's to finish then, and it waits for it.
 """
+
+import time
 
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
@@ -38,6 +41,13 @@ ISSUER_SETTINGS = {
     "country": "PLATFORM_ISSUER_COUNTRY",
 }
 REQUIRED = ("legal_name", "tax_id", "address")
+
+
+#: How long the command waits for the worker to finish the platform hub's database it took first, and how often it
+#: looks.
+WAIT_FOR_THE_WORKER_SECONDS = 180
+WAIT_STEP_SECONDS = 2
+wait = time.sleep
 
 
 class Command(BaseCommand):
@@ -75,14 +85,23 @@ class Command(BaseCommand):
         with use_control():
             hub = services.platform_hub_register(slug)
         if hub.status != hub.Status.READY and not provision.provision(hub, tell_saas=False):
-            with use_control():
-                found = services.registry_row(hub.id)
+            # Its lease is someone else's (the worker took a row an older run left due): its database is being made.
+            waited = 0
+            while waited < WAIT_FOR_THE_WORKER_SECONDS:
+                with use_control():
+                    found = services.registry_row(hub.id)
+                if found.status == found.Status.READY or found.status == found.Status.FAILED:
+                    break
+                wait(WAIT_STEP_SECONDS)
+                waited += WAIT_STEP_SECONDS
+        with use_control():
+            found = services.registry_row(hub.id)
+        if found.status != found.Status.READY:
             raise CommandError(
                 f"The platform hub's database could not be made ({found.status}: {found.last_error or '-'}); run it "
                 "again. Nothing else was written."
             )
-        with use_control():
-            return services.registry_row(hub.id)
+        return found
 
     def _handle(self, *args, execute: bool = False, **options):
         ctx = system_context(Scope("host", settings.PLATFORM_HUB_SLUG))

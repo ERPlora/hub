@@ -1460,6 +1460,11 @@ def copy_all_went_to() -> str:
     return found or ""
 
 
+def holds_hub_lease(hub_id: UUID, *, owner: str = LEASE_OWNER) -> bool:
+    """Whether ``hub_id``'s lease is still ``owner``'s (this process's): run out or not, nobody else took it."""
+    return HubDue.objects.filter(pk=hub_id, lease_owner=owner).exists()
+
+
 def renew_hub_lease(hub_id: UUID, now: dt.datetime, lease: dt.timedelta, *, owner: str = LEASE_OWNER) -> None:
     """Renew ``owner``'s lease of the ready hub ``hub_id`` (a cut of it runs); ``ProvisioningStopped`` when it is no
     longer ``owner``'s."""
@@ -1469,8 +1474,9 @@ def renew_hub_lease(hub_id: UUID, now: dt.datetime, lease: dt.timedelta, *, owne
 
 def platform_hub_register(slug: str) -> Hub:
     """ERPlora's platform hub in the registry (``manage.py create_platform_hub``): its row, ``is_platform``, born
-    ``requested`` with its own database's name and due, as a sign-up (the command makes it then); the one already there
-    otherwise. Never a business's row: the slug is reserved (``live.slugs``)."""
+    ``requested`` with its own database's name, as a sign-up, but not due: the command makes it itself, under its
+    lease, and the worker's pass over ``hub_due`` never takes it first. The one already there otherwise. Never a
+    business's row: the slug is reserved (``live.slugs``)."""
     with _control_transaction():
         hub = Hub.objects.select_for_update().filter(slug=slug).first()
         if hub is not None:
@@ -1483,7 +1489,6 @@ def platform_hub_register(slug: str) -> Hub:
             db_name=database_names.hub_db_name(control_name(), new_id),
             is_platform=True,
         )
-        HubDue.mark_due(hub)
     return registry_row(hub.id)
 
 
@@ -1502,16 +1507,27 @@ def hub_cut_finish(ctx: OperationContext, data: HubCutFinishIn) -> dict:
     into it and control's copy taken before (``dump``), in one transaction.
 
     Only the platform runs it, refused before anything is read. Refused (409 ``base.hub_already_cut``) when the business
-    got a database meanwhile (another cut of it finished first) or is no longer ready, and (409
+    got a database meanwhile (another cut of it finished first) or is no longer ready, (409 ``base.hub_cut_lease_lost``)
+    when its lease is no longer this process's (it ran out and another cut took it: the database may be that one's),
+    and (409
     ``base.hub_copy_all_taken``) a copy of control's rows when another business got them already (two runs that
     raced: they go to one business, once); ``done: false`` when a newer
     photo of the SaaS's came after ``seeded_version`` was applied: the cut applies it and asks again."""
     internal_only(ctx)
+    if data.mode == "copy_all":
+        # Every business still on control's, in one order: two copies at once wait for each other, and the second one
+        # reads the first one's event.
+        list(Hub.objects.select_for_update().filter(Q(db_name="") | Q(pk=data.id)).order_by("pk").values_list("pk"))
     hub = _locked_hub(data.id)
     if hub.db_name or hub.status != Hub.Status.READY:
         raise Conflict(
             gettext("This business already works on its own database, or is not ready."),
             code="base.hub_already_cut",
+        )
+    if not holds_hub_lease(hub.id):
+        raise Conflict(
+            gettext("Another process is cutting this business now: this cut stops."),
+            code="base.hub_cut_lease_lost",
         )
     went_to = copy_all_went_to()
     if data.mode == "copy_all" and went_to and went_to != hub.slug:

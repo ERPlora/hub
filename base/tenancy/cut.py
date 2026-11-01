@@ -244,6 +244,47 @@ def _count(source: psycopg.Connection, table: str, slug: str) -> int:
     return source.execute(query, params).fetchone()[0]
 
 
+@dataclass(frozen=True)
+class FiscalRows:
+    """What control's tables hold of a fiscal identity, which a copy of all of them takes into one business: the
+    issuers (legal name, tax ID) and how many VeriFactu records."""
+
+    issuers: list[tuple[str, str]]
+    records: int
+
+    def __bool__(self) -> bool:
+        return bool(self.issuers or self.records)
+
+
+def fiscal_rows() -> FiscalRows:
+    """The issuers and the VeriFactu records phase 1 left in control's tables (the platform's own among them, if
+    ``create_platform_hub`` ran then): the dry run warns that a copy of all of them takes them along."""
+    issuer = _model_table("invoice", "Issuer")
+    record = _model_table("verifactu", "Record")
+    with _control() as source:
+        present = _tables(source)
+        issuers = []
+        if issuer in present:
+            issuers = [
+                (row[0], row[1])
+                for row in source.execute(
+                    sql.SQL("SELECT legal_name, tax_id FROM {} ORDER BY legal_name").format(sql.Identifier(issuer))
+                )
+            ]
+        records = 0
+        if record in present:
+            records = source.execute(sql.SQL("SELECT count(*) FROM {}").format(sql.Identifier(record))).fetchone()[0]
+        source.rollback()
+    return FiscalRows(issuers=issuers, records=records)
+
+
+def _model_table(app_label: str, model_name: str) -> str:
+    try:
+        return django_apps.get_model(app_label, model_name)._meta.db_table
+    except LookupError:
+        return ""
+
+
 def copy_rows(hub, *, heartbeat: Callable[[], object] | None = None) -> dict[str, int]:
     """Copy into ``hub``'s new database every row control's tables of the hubs' apps hold (of the outbox, its own
     events and their deliveries); return the rows copied by table.
@@ -268,17 +309,24 @@ def copy_rows(hub, *, heartbeat: Callable[[], object] | None = None) -> dict[str
             target.execute(
                 sql.SQL("TRUNCATE {} CASCADE").format(sql.SQL(", ").join(map(sql.Identifier, sorted(present))))
             )
+        if heartbeat is not None:
+            heartbeat()
         copied: dict[str, int] = {}
         for group in groups:
-            with target.transaction():
-                target.execute("SET CONSTRAINTS ALL DEFERRED")
-                for table in group:
-                    copied[table] = _copy_table(source, target, table, slug)
+            copied.update(_copy_group(source, target, group, slug))
             if heartbeat is not None:
                 heartbeat()
         _keys_go_on(target, present)
         source.rollback()
     return copied
+
+
+def _copy_group(source: psycopg.Connection, target: psycopg.Connection, group: list[str], slug: str) -> dict[str, int]:
+    """The tables of ``group`` copied in one short transaction of the new database, its constraints checked at its
+    COMMIT; the rows copied by table."""
+    with target.transaction():
+        target.execute("SET CONSTRAINTS ALL DEFERRED")
+        return {table: _copy_table(source, target, table, slug) for table in group}
 
 
 def _copy_table(source: psycopg.Connection, target: psycopg.Connection, table: str, slug: str) -> int:
@@ -336,7 +384,10 @@ def cut_hub(hub_id, mode: str, *, dump: str = "") -> Outcome:
 
 def _cut(hub_id, mode: str, dump: str, started: float) -> Outcome:
     def renew() -> None:
-        services.renew_hub_lease(hub_id, timezone.now(), LEASE)
+        try:
+            services.renew_hub_lease(hub_id, timezone.now(), LEASE)
+        except services.ProvisioningStopped as stopped:
+            raise CutError(f"its lease went to another process, which cuts it now: {stopped}") from stopped
 
     try:
         hub = services.place_hub(hub_id)
@@ -349,14 +400,16 @@ def _cut(hub_id, mode: str, dump: str, started: float) -> Outcome:
     # Named as every hub's; written in control only by the last step, so its host answers 503 until then.
     hub.db_name = names.hub_db_name(tenancy_connections.control_name(), hub.id)
     try:
-        ops.drop_database(hub.db_name, cluster=hub.cluster)  # what a cut that broke left
+        renew()  # the lease is this process's: what a cut that broke left under its name is dropped
+        ops.drop_database(hub.db_name, cluster=hub.cluster)
         ops.clone_database(hub.db_name, template=provision.template_for(hub), cluster=hub.cluster)
+        renew()
         ddl = tenancy_connections.register_ddl_alias(hub.db_name, cluster=hub.cluster)
         identity.write(ddl, hub.id)
         migrator.ensure_schema(hub, add=["base", *provision.vertical_apps(hub.vertical)], heartbeat=renew)
         renew()
         copied = copy_rows(hub, heartbeat=renew) if mode == COPY_ALL else {}
-        _seed_and_finish(hub, mode, copied, dump)
+        _seed_and_finish(hub, mode, copied, dump, renew)
     except Exception as error:
         _undo(hub)
         if isinstance(error, CutError):
@@ -376,13 +429,14 @@ def _cut(hub_id, mode: str, dump: str, started: float) -> Outcome:
     return Outcome(slug=hub.slug, mode=mode, database=hub.db_name, copied=copied, seconds=seconds)
 
 
-def _seed_and_finish(hub, mode: str, copied: dict[str, int], dump: str) -> None:
-    """The SaaS's photo kept on its row applied in its database, then the last step; again with a newer photo that came
-    meanwhile, as a sign-up's seeding does (``provision.SEED_ROUNDS``)."""
+def _seed_and_finish(hub, mode: str, copied: dict[str, int], dump: str, renew: Callable[[], None]) -> None:
+    """The SaaS's photo kept on its row applied in its database, then the last step (the lease renewed in between);
+    again with a newer photo that came meanwhile, as a sign-up's seeding does (``provision.SEED_ROUNDS``)."""
     finish = get_operation("base.hub.cut_finish")
     for _ in range(provision.SEED_ROUNDS):
         with use_hub(hub):
             services.apply_kept_photo(hub)
+        renew()
         done = finish(
             system_context(registry.REGISTRY_SCOPE),
             HubCutFinishIn(
@@ -403,9 +457,17 @@ def _seed_and_finish(hub, mode: str, copied: dict[str, int], dump: str) -> None:
 
 
 def _undo(hub) -> None:
-    """Drop what a cut that broke made, unless control already names it (its last step went through)."""
+    """Drop what a cut that broke made, unless control already names it (its last step went through) or its lease is
+    another process's now (what is under that name is the other cut's)."""
     found = services.registry_row(hub.id)
     if found is not None and found.db_name:
+        return
+    if not services.holds_hub_lease(hub.id):
+        logger.warning(
+            "base.tenancy.cut.undo_skipped hub=%s: another process holds its lease; %s is that one's.",
+            hub.slug,
+            hub.db_name,
+        )
         return
     tenancy_connections.close_hub_aliases(hub)
     try:

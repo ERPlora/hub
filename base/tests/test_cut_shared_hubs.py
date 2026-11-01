@@ -124,6 +124,14 @@ def phase_one(django_db_blocker, hub_databases):
             OutboxEvent.objects.filter(created_at__gte=started).delete()
 
 
+def held(hub: Hub, owner: str | None = None) -> None:
+    """``hub``'s lease taken now, as a cut takes it (``services.claim_hub``): this process's, or ``owner``'s."""
+    from base import services
+
+    kwargs = {} if owner is None else {"owner": owner}
+    assert services.claim_hub(hub.id, timezone.now(), cut.LEASE, **kwargs) is not None
+
+
 def run(*args: str) -> str:
     out = io.StringIO()
     call_command("cut_shared_hubs", *args, stdout=out)
@@ -386,6 +394,7 @@ def test_a_cut_s_last_step_refuses_a_business_that_got_its_database_meanwhile(ph
     hub = phase_one.business("raced")
     made = names.hub_db_name(tenancy_connections.control_name(), hub.id)
     with use_control():
+        held(hub)
         Hub.objects.filter(pk=hub.pk).update(db_name=made)
         finish = get("base.hub.cut_finish")
         with pytest.raises(Conflict) as refused:
@@ -431,6 +440,8 @@ def test_the_last_step_of_a_second_copy_all_is_refused_even_when_two_runs_raced(
     first, second = phase_one.business("first"), phase_one.business("second")
     run("--copy-all", first.slug, "--no-dump")
     made = names.hub_db_name(tenancy_connections.control_name(), second.id)
+    with use_control():
+        held(second)
 
     with use_control(), pytest.raises(Conflict) as refused:
         get("base.hub.cut_finish")(
@@ -473,3 +484,231 @@ def test_only_the_platform_finishes_a_cut(phase_one):
             owner, HubCutFinishIn(id=hub.id, mode=cut.RECREATE, database="x", schema_apps={}, copied={}, dump="")
         )
     assert fresh(hub).db_name == ""
+
+
+# ── Round 2 of hub#602's review: the lease, two runs at once, and what each guard keeps ─────────────────────────────
+
+
+def finish_input(hub: Hub, mode: str = cut.RECREATE):
+    from base.schemas import HubCutFinishIn
+
+    made = names.hub_db_name(tenancy_connections.control_name(), hub.id)
+    return HubCutFinishIn(id=hub.id, mode=mode, database=made, schema_apps={}, copied={}, dump="")
+
+
+def test_the_last_step_is_refused_once_the_lease_is_another_process_s(phase_one):
+    """A cut whose lease ran out and was taken by another never names its database in control: that one may be the
+    other cut's, being made again from the start."""
+    from live.context import system_context
+    from live.errors import Conflict
+    from live.operations import get
+
+    from base import registry
+
+    hub = phase_one.business("stale")
+    with use_control():
+        held(hub, owner="another-worker")
+        with pytest.raises(Conflict) as refused:
+            get("base.hub.cut_finish")(system_context(registry.REGISTRY_SCOPE), finish_input(hub))
+    assert refused.value.code == "base.hub_cut_lease_lost"
+    assert fresh(hub).db_name == ""
+
+
+def test_a_cut_whose_lease_is_taken_meanwhile_stops_and_never_drops_what_the_other_one_makes(phase_one, monkeypatch):
+    aurora = phase_one.business("aurora")
+    phase_one.rows_of(aurora.slug)
+    target = names.hub_db_name(tenancy_connections.control_name(), aurora.id)
+    copy = cut.copy_rows
+
+    def taken_meanwhile(hub, **kwargs):
+        from control.models import HubDue
+
+        # Another cut took the lease once this one's ran out: what it makes now is its own.
+        HubDue.objects.filter(pk=hub.id).update(lease_owner="another-cut", lease_until=timezone.now() + cut.LEASE)
+        return copy(hub, **kwargs)
+
+    monkeypatch.setattr(cut, "copy_rows", taken_meanwhile)
+    with pytest.raises(CommandError, match="lease"):
+        run("--copy-all", aurora.slug, "--no-dump")
+
+    assert fresh(aurora).db_name == ""
+    assert target in databases()  # the other cut's: never dropped by this one
+
+
+def test_a_cut_renews_its_lease_around_every_long_step(phase_one, monkeypatch):
+    from base import services
+    from base.tenancy import ops
+
+    aurora = phase_one.business("aurora")
+    phase_one.rows_of(aurora.slug)
+    steps: list[str] = []
+
+    def spy(name, real):
+        def step(*args, **kwargs):
+            steps.append(name)
+            return real(*args, **kwargs)
+
+        return step
+
+    monkeypatch.setattr(services, "renew_hub_lease", spy("renew", services.renew_hub_lease))
+    monkeypatch.setattr(ops, "clone_database", spy("clone", ops.clone_database))
+    monkeypatch.setattr(services, "apply_kept_photo", spy("seed", services.apply_kept_photo))
+    monkeypatch.setattr(cut, "_copy_group", spy("group", cut._copy_group))
+    monkeypatch.setattr(cut.migrator, "ensure_schema", spy("schema", cut.migrator.ensure_schema))
+
+    run("--copy-all", aurora.slug, "--no-dump")
+
+    assert steps[steps.index("clone") + 1 : steps.index("schema")] == ["renew"]
+    assert steps[steps.index("seed") + 1] == "renew"
+    groups = [index for index, step in enumerate(steps) if step == "group"]
+    assert groups and all(steps[index + 1] == "renew" for index in groups)
+
+
+def test_two_copy_alls_at_once_into_two_businesses_leave_one(phase_one, monkeypatch):
+    """Two runs at once, each for another business: the last steps take the businesses of phase 1 in one order, so the
+    second waits for the first and finds control's rows gone to it."""
+    import threading
+
+    from live.context import system_context
+    from live.errors import Conflict
+    from live.operations import get
+
+    from base import registry, services
+
+    first, second = phase_one.business("first"), phase_one.business("second")
+    with use_control():
+        held(first)
+        held(second)
+    both = threading.Barrier(2, timeout=2)
+    went_to = services.copy_all_went_to
+
+    def read_then_wait():
+        found = went_to()
+        try:
+            both.wait()  # both read «nobody» before either writes, unless the second one waits for the first
+        except threading.BrokenBarrierError:
+            pass
+        return found
+
+    monkeypatch.setattr(services, "copy_all_went_to", read_then_wait)
+    outcomes: dict[str, object] = {}
+
+    def last_step(hub):
+        from django.db import connections as django_connections
+
+        try:
+            with use_control():
+                get("base.hub.cut_finish")(system_context(registry.REGISTRY_SCOPE), finish_input(hub, cut.COPY_ALL))
+            outcomes[hub.slug] = "done"
+        except Conflict as refused:
+            outcomes[hub.slug] = refused.code
+        finally:
+            django_connections.close_all()
+
+    threads = [threading.Thread(target=last_step, args=(hub,)) for hub in (first, second)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(30)
+
+    assert sorted(outcomes.values()) == ["base.hub_copy_all_taken", "done"]
+    with use_control():
+        assert OutboxEvent.objects.filter(name="base.hub.cut", payload__mode=cut.COPY_ALL).count() == 1
+
+
+def test_a_failure_after_the_last_step_never_drops_the_database_control_names(phase_one, monkeypatch):
+    elpa = phase_one.business("elpa")
+    real = cut.get_operation
+
+    def finishing_then_failing(name):
+        operation = real(name)
+
+        def call(ctx, data):
+            operation(ctx, data)
+            raise RuntimeError("the network went away after the COMMIT")
+
+        return call
+
+    monkeypatch.setattr(cut, "get_operation", finishing_then_failing)
+    with pytest.raises(CommandError, match="after the COMMIT"):
+        run("--recreate", elpa.slug, "--no-dump")
+
+    assert fresh(elpa).db_name in databases()
+
+
+def test_what_a_cut_that_broke_left_is_dropped_before_the_next_one_starts(phase_one, hub_databases):
+    """A recreate never inherits the rows of the database a broken cut left under the business's name."""
+    from psycopg import sql
+
+    elpa = phase_one.business("elpa")
+    control = tenancy_connections.control_name()
+    left = names.hub_db_name(control, elpa.id)
+    with hubs._maintenance() as conn:
+        conn.execute(
+            sql.SQL("CREATE DATABASE {} TEMPLATE {}").format(
+                names.identifier(left, control=control), names.identifier(hub_databases.template, control=control)
+            )
+        )
+    alias = tenancy_connections.register_ddl_alias(left)
+    try:
+        Printer.objects.using(alias).create(name="Left by a broken cut", **PRINTER)
+    finally:
+        from django.db import connections as django_connections
+
+        django_connections[alias].close()
+
+    run("--recreate", elpa.slug, "--no-dump")
+
+    with use_hub(fresh(elpa)):
+        assert not Printer.objects.exists()
+
+
+@pytest.mark.parametrize("where", ["control", "its database"])
+def test_only_the_columns_both_have_are_copied(phase_one, where):
+    """A column control still has and the code dropped, or one the code added that control never got: the rows go,
+    with what both have."""
+    from django.db import connection
+
+    aurora = phase_one.business("aurora")
+    rows = phase_one.rows_of(aurora.slug)
+    with connection.cursor() as cursor:
+        if where == "control":
+            cursor.execute("ALTER TABLE printing_printer ADD COLUMN phase_one_note text DEFAULT 'x'")
+        else:
+            cursor.execute("ALTER TABLE printing_printer DROP COLUMN last_printed_at")
+    try:
+        run("--copy-all", aurora.slug, "--no-dump")
+    finally:
+        with connection.cursor() as cursor:
+            if where == "control":
+                cursor.execute("ALTER TABLE printing_printer DROP COLUMN phase_one_note")
+            else:
+                cursor.execute("ALTER TABLE printing_printer ADD COLUMN last_printed_at timestamp with time zone NULL")
+
+    with use_hub(fresh(aurora)):
+        assert Printer.objects.get(pk=rows.printer.pk).name == rows.printer.name
+
+
+def test_control_is_read_in_one_snapshot_that_writes_nothing(phase_one):
+    import psycopg
+
+    with cut._control() as source:
+        assert source.execute("SHOW transaction_isolation").fetchone()[0] == "repeatable read"
+        with pytest.raises(psycopg.errors.ReadOnlySqlTransaction):
+            source.execute("UPDATE base_hub SET name = name WHERE false")
+
+
+def test_the_dry_run_warns_of_the_platform_s_fiscal_rows_a_copy_all_would_take(phase_one):
+    from apps.invoice.models import Issuer
+
+    aurora = phase_one.business("aurora")
+    with use_legacy():
+        Issuer.objects.create(legal_name="ERPLORA CLOUD SL", tax_id="B12345674", address="Avda. de Lisboa, 17")
+    try:
+        said = run("--dry-run", "--copy-all", aurora.slug)
+    finally:
+        with use_legacy():
+            Issuer.objects.all().delete()
+
+    assert "Warning: control holds fiscal rows" in said
+    assert "issuer ERPLORA CLOUD SL (B12345674)" in said and "VeriFactu records: 0" in said
