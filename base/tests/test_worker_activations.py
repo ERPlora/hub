@@ -60,6 +60,9 @@ def nothing_checked_yet(monkeypatch):
 
 @pytest.fixture(scope="module")
 def platform_template(django_db_setup, django_db_blocker):
+    """A template with the platform's tables alone: what a hub's template is for an app ported after it was made. The
+    real ones carry every portable app (``migrator.templates``, PLAN-DB round 2026-11-01), so turning on an app they have
+    is on at once; this one makes every app one whose tables its hubs lack."""
     with django_db_blocker.unblock():
         name = names.template_db_name(tenancy_connections.control_name(), VERTICAL)
         hubs.drop_database(name)

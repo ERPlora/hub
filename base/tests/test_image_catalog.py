@@ -18,6 +18,7 @@ from botocore.exceptions import ClientError
 from django.core.files.base import ContentFile
 from django.core.files.storage import InMemoryStorage, storages
 from django.urls import resolve
+from live.assistant import description
 from live.context import OperationContext, Scope
 from live.errors import NotFound, OperationError, PermissionDenied
 from live.operations import get
@@ -342,7 +343,7 @@ def test_search_is_a_read_for_everyone_of_the_hub_and_a_tool_of_the_assistant():
     op = get("base.catalog_image.search")
 
     assert (op.kind, op.permission) == ("query", HOME)
-    assert "image" in op.ai["description"] and "library" in op.ai["description"]
+    assert "image" in description(op) and "library" in description(op)
 
 
 def speaks(language: str, slug: str = "a") -> None:

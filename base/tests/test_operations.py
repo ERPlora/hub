@@ -213,8 +213,9 @@ def test_authenticated_request_gets_its_role_on_that_host(make_user):
 
 
 @pytest.mark.django_db
-def test_superuser_request(superuser):
-    assert HubContextBuilder().from_request(request_for("a.localhost", superuser)).permissions == {"*"}
+def test_a_superusers_request_holds_nothing_on_a_business_s_host_without_a_membership(superuser):
+    # ERPlora's staff is no customer (base.permissions): its «*» is the platform scope's alone.
+    assert HubContextBuilder().from_request(request_for("a.localhost", superuser)).permissions == frozenset()
 
 
 @pytest.mark.django_db

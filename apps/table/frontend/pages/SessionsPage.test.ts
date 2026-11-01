@@ -145,6 +145,17 @@ describe('SessionsPage', () => {
     expect(s.sent().map((call) => [call.path, call.body])).toEqual([['/api/table/sessions/delete', { id: 's3' }]]);
   });
 
+  it.each([
+    ['en', 'Table 4 · 1 guest. The table is freed'],
+    ['es', 'Mesa 4 · 1 comensal. La mesa queda libre'],
+  ] as const)('closing a check of one guest says it in the singular (%s, hub#462)', async (locale, impact) => {
+    const one = sessionRow({ id: 's1', opened_at: '2026-10-14T18:30:00Z', guests_count: 1 });
+    const s = await setup({ locale });
+    await s.show([one]);
+    await s.action('close', one);
+    expect(s.dialog('table-sessions-close')?.props('message')).toContain(impact);
+  });
+
   it('a waiter closes and seats again, but does not delete', async () => {
     const s = await setup({ session: EMPLOYEE });
     await s.show([OPEN]);

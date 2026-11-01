@@ -82,6 +82,7 @@
       "cartLabel": "Check",
       "cartEmptyTouch": "Tap a product to add it.",
       "checkGone": "That check was closed on another device: the screen starts a new one.",
+      "checkJoined": "That check was joined with another one: the screen shows the joined check.",
       "courseInProgress": "Unsent",
       "sentHeader": "Sent",
       "commandRound": "Order {n}",

@@ -58,6 +58,7 @@ function onComplete(pin: string): void {
       data-testid="pin-door-chosen"
     >
       <UserAvatar
+        class="pin-door__avatar"
         :name="chosen.name"
         size="xl"
         decorative
@@ -184,5 +185,14 @@ function onComplete(pin: string): void {
   margin: 0;
   color: var(--ion-color-danger);
   font-size: 0.875rem;
+}
+
+/* A short screen (a tablet in landscape, 776 px under the native app's status bar; a low phone; a laptop): the name
+   says who is entering, without the big face (Square's, Toast's and Clover's passcode screens show none), so the pad's
+   last row, the 0 and erase, fits without scrolling, with room to spare for a device's own fonts (hub#441). */
+@media (max-height: 800px) {
+  .pin-door__avatar {
+    display: none;
+  }
 }
 </style>

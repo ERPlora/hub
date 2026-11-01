@@ -165,12 +165,16 @@ test('SALE-F14, F15, F16, F21: a line discounted, one on the house, one sold by 
 
   // F14: −10 % on the steak, from its price tag.
   const steakId = await lineId(page, steak.name);
+  // The price tag is outlined until the line has a discount, then filled (the current product's icons).
+  const steakTag = lineOf(page, steak.name).locator(`[data-testid=pos-line-${steakId}-discount] ion-icon`);
+  await expect(steakTag).toHaveAttribute('name', 'pricetag-outline');
   await lineOf(page, steak.name).locator(`[data-testid=pos-line-${steakId}-discount]`).click();
   for (const key of ['1', '0']) await page.locator(`[data-testid=pos-key-${key}]:visible`).click();
   await expect(page.locator('[data-testid=pos-discount-value]:visible')).toContainText('10');
   await page.locator('[data-testid=pos-discount-apply]:visible').click();
   await expect(lineOf(page, steak.name)).toContainText('−10');
   await expect(lineOf(page, steak.name)).toContainText('18.00');
+  await expect(steakTag).toHaveAttribute('name', 'pricetag');
 
   // F15: the cake on the house.
   const cakeId = await lineId(page, cake.name);
@@ -204,6 +208,40 @@ test('SALE-F14, F15, F16, F21: a line discounted, one on the house, one sold by 
   await expect(prebill).toBeHidden();
 });
 
+test('SALE-F14, F21 (hub#457): 10 % off the whole check says what it takes off, in the foot and on the bill', async ({ page }) => {
+  await freshTill(page);
+  await add(page, coffee);
+  await add(page, coffee);
+  await add(page, cake);
+  await expect(total(page)).toContainText('7.00');
+
+  // F14: −10 % on the check, from the foot's price tag: 1.50 × 2 + 4.00 lose 0.70, never «−0.00». The tag is
+  // outlined until the check has a discount, then filled.
+  const footTag = shown(page).locator('[data-testid=pos-ticket-discount] ion-icon');
+  await expect(footTag).toHaveAttribute('name', 'pricetag-outline');
+  await shown(page).locator('[data-testid=pos-ticket-discount]').click();
+  for (const key of ['1', '0']) await page.locator(`[data-testid=pos-key-${key}]:visible`).click();
+  await expect(page.locator('[data-testid=pos-discount-value]:visible')).toContainText('10');
+  await page.locator('[data-testid=pos-discount-apply]:visible').click();
+  const row = shown(page).locator('[data-testid=pos-ticket-discount-row]');
+  await expect(row).toContainText('−10');
+  await expect(row).toContainText('−€0.70');
+  await expect(total(page)).toContainText('6.30');
+  await expect(footTag).toHaveAttribute('name', 'pricetag');
+  await shots(page, 'APP-SALE-SALE-F14-TICKET', cartReady);
+
+  // F21: the bill names the same discount, so its lines (7.00) less it make its total (6.30).
+  await shown(page).locator('[data-testid=pos-prebill]').click();
+  const prebill = page.locator('[data-testid=pos-prebill-paper]:visible');
+  await expect(prebill.locator('.pos-bill__discount')).toContainText('−€0.70');
+  await expect(prebill.locator('.pos-bill__total')).toContainText('6.30');
+  await shots(page, 'APP-SALE-SALE-F21-TICKET', async (p) => {
+    await p.locator('[data-testid=pos-prebill-paper]:visible').waitFor({ state: 'visible' });
+  });
+  await page.locator('[data-testid=pos-prebill-close]:visible').click();
+  await expect(prebill).toBeHidden();
+});
+
 test('SALE-F03: a check charged part by card and the rest in cash, with its change', async ({ page, context }) => {
   await freshTill(page);
   await add(page, steak);
@@ -212,6 +250,16 @@ test('SALE-F03: a check charged part by card and the rest in cash, with its chan
   const sheet = page.locator('[data-testid=sale-checkout-modal]');
   await expect(sheet).toBeVisible();
   const byType = await methodIds(context);
+  // «Split the payment» carries the current product's arrows.
+  await expect(sheet.locator('[data-testid=sale-checkout-split] ion-icon')).toHaveAttribute('name', 'swap-horizontal-outline');
+  await shots(
+    page,
+    'CLOSE-SALE-SALE-F03-SPLIT',
+    async (p) => {
+      await p.locator('[data-testid=sale-checkout-modal] [data-testid=sale-checkout-split]').waitFor({ state: 'visible' });
+    },
+    { width: 1440, height: 900 },
+  );
   await sheet.locator('[data-testid=sale-checkout-split]').click();
   await expect(sheet.locator('[data-testid=sale-checkout-remaining]')).toContainText('20.00');
   await sheet.locator(`[data-testid=sale-checkout-method-${byType.card}]`).click();

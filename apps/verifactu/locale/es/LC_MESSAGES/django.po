@@ -528,8 +528,8 @@ msgid "your own certificate is not loaded or has expired"
 msgstr "tu certificado propio no está cargado o ha caducado"
 
 #: models.py:437
-msgid "ERPlora still has to approve your signed authorisation to file in production"
-msgstr "falta que ERPlora apruebe tu autorización firmada para remitir en producción"
+msgid "ERPlora still has to approve your signed authorisation to file for you"
+msgstr "falta que ERPlora apruebe tu autorización firmada para remitir en tu nombre"
 
 #: models.py
 msgid "ERPlora does not recognise this business: contact ERPlora's support"
@@ -986,6 +986,10 @@ msgstr "estado del negocio"
 #: models.py
 msgid "your ERPlora account has a pending payment or is suspended"
 msgstr "tu cuenta de ERPlora tiene un pago pendiente o está suspendida"
+
+#: models.py
+msgid "ERPlora has not linked this business to its account on this server yet"
+msgstr "ERPlora todavía no ha vinculado este negocio con su cuenta en este servidor"
 
 #: services.py
 msgid "Your ERPlora account has a pending payment or is suspended: settle it in your ERPlora account to go live."

@@ -253,6 +253,11 @@ class Order(UUIDModel):
     voided_by = models.CharField(
         _("voided by"), max_length=ACTOR_MAX_LENGTH, blank=True
     )
+    # A check joined with another (SALE-F24) ends voided and names the one that stays: a till that had it on
+    # screen follows that one instead of saying it was closed on another device.
+    merged_into_id = models.UUIDField(
+        _("joined with"), null=True, blank=True, editable=False
+    )
 
     class Meta:
         verbose_name = _("open check")

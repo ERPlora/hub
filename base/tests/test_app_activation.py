@@ -12,6 +12,7 @@ import psycopg
 import pytest
 from django.apps import apps
 from django.db import IntegrityError, connections, transaction
+from live.assistant import description
 from live.context import OperationContext, Scope
 from live.errors import AppInactive, Conflict, NotFound, OperationError, PermissionDenied
 from live.live_registry import live_registry
@@ -264,9 +265,9 @@ def test_the_commands_are_for_who_runs_the_business_and_told_to_the_assistant():
     for name in ("base.app.enable", "base.app.disable"):
         op = get(name)
         assert (op.kind, op.permission, op.input, op.output) == ("command", ADMIN, AppChangeIn, AppChangeOut)
-        assert op.ai["description"].strip()
-    assert get("base.app.enable").ai["risk"] == "normal"
-    assert get("base.app.disable").ai["risk"] == "high"
+        assert description(op)
+    assert get("base.app.enable").ai.risk == "normal"
+    assert get("base.app.disable").ai.risk == "high"
 
 
 @pytest.mark.django_db

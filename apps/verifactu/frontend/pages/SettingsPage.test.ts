@@ -45,7 +45,7 @@ const CONFIG: ConfigOut = {
   issue_blocker: null,
   live_blockers: [],
 };
-const NOT_APPROVED = { code: 'representation_not_approved', message: 'ERPlora still has to approve your signed authorisation to file in production' };
+const NOT_APPROVED = { code: 'representation_not_approved', message: 'ERPlora still has to approve your signed authorisation to file for you' };
 const NOT_ACTIVE = { code: 'hub_not_active', message: 'your ERPlora account has a pending payment or is suspended' };
 const GATEWAY = { code: 'gateway_unavailable', message: "ERPlora's sending gateway is not configured on this server" };
 const DIAGNOSTIC: DiagnosticOut = {

@@ -13,7 +13,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('base', '0020_hub_user'),
+        ('base', '0021_close_control_deliveries'),
     ]
 
     operations = [

@@ -1,9 +1,9 @@
 # Workbook — Reservas (app)
 Prefijo: RESERVATION
 Alcance MVP: restaurante
-Estado de la app: hecha (servidor y páginas). De la reserva por WhatsApp, el aviso al confirmar (F19) ya sale; de
-F17 y F18 está la parte de Reservas y la conversación es de la segunda parte de la Bandeja de WhatsApp. La liberación de pendientes
-(F13) avisa al momento solo en un negocio hasta la fase 2: ver «Lo que queda fuera».
+Estado de la app: completa (2026-10-31)
+Lo que no entra todavía: ver «Lo que queda fuera». La liberación sola de las pendientes (F13) queda descartada
+mientras no avise al momento en cada negocio.
 
 > Manual de usuario y especificación de la app `reservation`. Se escribe **antes** que el código: no
 > se programa nada que no esté aquí, y cada flujo pasa a `hecho` cuando sus tests están en verde
@@ -132,7 +132,7 @@ Menú **Reservas → Lista de espera**. Tabla, en el orden en que se apuntaron (
 Fecha, Hora pref., Cliente, Teléfono (como en Clientes), Pax, Contactado, Estado (En espera, Convertida);
 buscador y filtros (fecha, contactado, convertida). Acción principal **«Añadir cliente»** (Cliente,
 Nombre, Teléfono, Fecha, Hora, Pax, Notas → «Añadir a la lista de espera»); por fila «Contactado»,
-«Convertir» y «Quitar». Vacía: «La lista de espera está vacía.». Cargando: «Cargando…». Error: el mensaje
+«Convertir» y «Quitar». Vacía: «Lista de espera vacía.». Cargando: «Cargando…». Error: el mensaje
 de la tabla con «Reintentar».
 
 ### Disponibilidad
@@ -142,8 +142,8 @@ Menú **Reservas → Disponibilidad**. Tres secciones apiladas:
   fuera del horario del negocio, marcada «Fuera de horario». Encima, el horario del negocio de ese día
   y, si el día está bloqueado, su motivo. Se refresca sola cuando entra, cambia o se cancela una
   reserva. Vacía: «Sin servicio ese día (sin franjas).».
-- **Franjas horarias**: Día, Desde, Hasta, Máx. reservas, Máx. comensales; «Añadir franja» (Día,
-  Desde, Hasta, Máx. reservas, Máx. comensales → «Crear franja») y «Quitar» por fila. Vacía: «Sin
+- **Franjas horarias**: Día, Desde, Hasta, Máx (de reservas), Máx comensales; «Añadir franja» (Día,
+  Desde, Hasta, Máx, Máx comensales (opcional) → «Crear franja») y «Quitar» por fila. Vacía: «Sin
   franjas horarias.».
 - **Fechas bloqueadas**: Fecha, Motivo, Horas (Todo el día, o desde–hasta); «Añadir fecha bloqueada»
   (Fecha, Motivo, Todo el día, Desde, Hasta → «Bloquear fecha») y «Quitar». Vacía: «Sin fechas
@@ -161,7 +161,7 @@ pendiente. «Guardar».
 | Pantalla | Cargando | Vacía | Error | Sin permiso | App apagada |
 |---|---|---|---|---|---|
 | Reservas | «Cargando…», cifras en gris | «No hay reservas este día» + «Nueva reserva» | mensaje + «Reintentar» | aviso en lugar de la tabla | aviso en lugar de la tabla |
-| Lista de espera | «Cargando…» | «La lista de espera está vacía.» | mensaje + «Reintentar» | aviso | aviso |
+| Lista de espera | «Cargando…» | «Lista de espera vacía.» | mensaje + «Reintentar» | aviso | aviso |
 | Disponibilidad | «Cargando…» por sección | un texto por sección | mensaje + «Reintentar» por sección | aviso | aviso |
 | Ajustes | «Cargando…» | — | mensaje + «Reintentar» | aviso | aviso |
 
@@ -183,12 +183,12 @@ Mientras se recupera la conexión en vivo, «Reconectando…» encima, sin borra
 | RESERVATION-F10 | Marcar que no se presentaron | hecho |
 | RESERVATION-F11 | Sentar a la reserva | hecho |
 | RESERVATION-F12 | Completar la reserva | hecho |
-| RESERVATION-F13 | Liberar las reservas pendientes que nadie confirmó | parcial |
+| RESERVATION-F13 | Liberar las reservas pendientes que nadie confirmó | descartado |
 | RESERVATION-F14 | Apuntar en la lista de espera | hecho |
 | RESERVATION-F15 | Marcar contactado o quitar de la lista de espera | hecho |
 | RESERVATION-F16 | Convertir una entrada de la lista de espera en reserva | hecho |
-| RESERVATION-F17 | Reserva que llega por WhatsApp | parcial |
-| RESERVATION-F18 | Cambiar o anular la reserva por WhatsApp | parcial |
+| RESERVATION-F17 | Reserva que llega por WhatsApp | hecho |
+| RESERVATION-F18 | Cambiar o anular la reserva por WhatsApp | hecho |
 | RESERVATION-F19 | Avisar por WhatsApp cuando el restaurante confirma | hecho |
 | RESERVATION-F20 | Borrar una reserva | hecho |
 | RESERVATION-F21 | Unir las reservas de dos fichas de cliente | hecho |
@@ -413,14 +413,15 @@ Implicados: RESERVATION-F11
 
 ### RESERVATION-F13 Liberar las reservas pendientes que nadie confirmó
 <!-- origen: wf:whatsapp-mesa#rec_wa_mesa-f06 old:reservations/workflow/reservas.md#reservations-f13 -->
-Estado: parcial — la liberación corre sola cada cuarto de hora y libera las pendientes de todos los
-negocios, pero en esta fase avisa en un único negocio fijo: la pantalla de Reservas de los demás la ve
-en su repaso de cinco minutos, no al momento (llega con el recorrido por negocio de la fase 2)
+Estado: descartado — la liberación corre sola cada cuarto de hora y libera las pendientes de todos los
+negocios, pero avisa al momento solo en el negocio de la plataforma: la pantalla de Reservas de los demás
+la ve en su repaso de cinco minutos; avisar en cada negocio es del recorrido del trabajador por negocio
+(hub#551)
 Actor: sistema
 Pantalla: ninguna
 Pasos:
 1. Cada cuarto de hora, las reservas que siguen Pendientes pasados los minutos de los ajustes (15) desde
-   su hora se cancelan con el motivo «Sin confirmar» y dejan su hueco libre.
+   su hora se cancelan con el motivo «Liberada: nunca se confirmó» y dejan su hueco libre.
 2. Las confirmadas, sentadas y las de otros días no se tocan.
 Entra: la hora.
 Sale: las reservas liberadas (avisa: `reservation.reservation.unconfirmed_released`, solo si liberó
@@ -470,7 +471,8 @@ Pasos:
    entrada queda Convertida.
 2. La conversión comprueba que la hora no haya pasado, el día bloqueado, el horario del negocio y la
    franja con sitio: es el personal quien la hace, a menudo para ahora mismo (sin antelación, días
-   máximos ni límites de comensales). Con la franja llena, se pregunta «¿Convertir igualmente?».
+   máximos ni límites de comensales). Con la franja llena, avisa «¿Reservar igualmente?» y ofrece
+   «Convertir igualmente».
 Entra: la entrada.
 Sale: la reserva (origen «Lista de espera») y la entrada convertida (avisa:
 `reservation.reservation.created`, `reservation.waitlist.converted`).
@@ -480,45 +482,56 @@ Implicados: RESERVATION-F06, RESERVATION-F14
 
 ### RESERVATION-F17 Reserva que llega por WhatsApp
 <!-- origen: wf:whatsapp-mesa#rec_wa_mesa-f03 qa:verticals/restaurant/05-reservations wf:whatsapp-mesa#rec_wa_mesa-f05 old:reservations/workflow/whatsapp-y-clientes.md#reservations-f17 qa:modules/reservations/whatsapp-reservation -->
-Estado: parcial — Reservas ya acepta la reserva que el cliente hace por WhatsApp con sus reglas; falta
-la conversación que la pide (preguntar comensales, ofrecer horas libres, contestar), que es la segunda
-parte de la Bandeja de WhatsApp
-Actor: cliente, asistente
-Pantalla: ninguna
+Estado: hecho
+Actor: cliente, propietario, asistente
+Pantalla: Reservas; se activa en Bandeja de WhatsApp → Ajustes y se aprueba en Automatizaciones
 Pasos:
-1. El cliente escribe al WhatsApp del restaurante («mesa para 4 el sábado a las 21»).
-2. La reserva entra con las reglas del cliente que reserva solo (comensales, antelación, días máximos;
-   una franja llena, nunca), ligada a la ficha que ya tiene ese teléfono o a una nueva de origen
-   WhatsApp; con el nombre que dé en el mensaje y, si no da ninguno, a nombre de su teléfono. Sus
-   peticiones van a las notas.
-3. La reserva aparece en Reservas, Pendiente para que la confirme el personal (o Confirmada, si se
-   confirman solas).
+1. En **Bandeja de WhatsApp → Ajustes → ¿Para qué lo usas?**, el dueño activa **Reservar mesa**
+   (WHATSAPP_INBOX-F15) y elige si las reservas se confirman solas o las revisa él antes
+   (RESERVATION-F04, WHATSAPP_INBOX-F16).
+2. El cliente escribe al WhatsApp del restaurante («mesa para 4 el sábado a las 21»). El asistente mira
+   cuánto queda libre ese día y propone la reserva; el día, la hora y los comensales los dice el
+   cliente, nunca el asistente (WHATSAPP_INBOX-F24).
+3. La reserva espera en **Automatizaciones**, en «Esperan tu respuesta», con el teléfono de quien la
+   pide. Con «Aprobar» entra en Reservas con las reglas del cliente que reserva solo (comensales,
+   antelación, días máximos; una franja llena, nunca), ligada a la ficha que ya tiene ese teléfono o a
+   una nueva de origen WhatsApp, y con el teléfono desde el que escribe, nunca otro; con el nombre que
+   dé en el mensaje o el de su WhatsApp y, si no llega ninguno, a nombre de su teléfono.
+4. La reserva sale en **Reservas**, en su día y a su hora, con su nombre, su teléfono y sus comensales,
+   «Pendiente» para que la confirme el personal (o «Confirmada», si se confirman solas), y el cliente
+   recibe por WhatsApp lo que se ha reservado.
 Entra: el mensaje, el teléfono y la ficha del cliente.
 Sale: la reserva, de origen WhatsApp (avisa: `reservation.reservation.created`).
-Si falla: los motivos de RESERVATION-F06 que atan al cliente, para contárselo y ofrecerle otra hora.
-Implicados: CUSTOMER-F10, WHATSAPP_INBOX-F15, WHATSAPP_INBOX-F24
+Si falla: los motivos de RESERVATION-F06 que atan al cliente: se le cuentan y se le ofrecen otras horas
+o la lista de espera. Con «No» en «Esperan tu respuesta», o si nadie contesta en 72 horas, no se
+reserva nada.
+Implicados: CUSTOMER-F10, RESERVATION-F04, RESERVATION-F19, WHATSAPP_INBOX-F15, WHATSAPP_INBOX-F16,
+WHATSAPP_INBOX-F24
 
 ### RESERVATION-F18 Cambiar o anular la reserva por WhatsApp
 <!-- origen: old:reservations/workflow/whatsapp-y-clientes.md#reservations-f18 wf:whatsapp-mesa#rec_wa_mesa-f08 -->
-Estado: parcial — Reservas ya cambia o anula la reserva en nombre del cliente, comprobando que es suya;
-falta que WhatsApp lo pida desde la conversación (segunda parte de la Bandeja de WhatsApp; en el
-producto actual tampoco lo hacía)
-Actor: cliente, asistente
-Pantalla: ninguna
+Estado: hecho
+Actor: cliente, propietario, asistente
+Pantalla: Reservas; se aprueba en Automatizaciones
 Pasos:
-1. El cliente escribe «no vamos a poder ir» o «¿podemos ir a las nueve?».
-2. Se comprueba que la reserva es de quien escribe (su ficha); si no, se rechaza sin contar nada de
-   ella, ni siquiera si existe.
-3. Se anula o se cambia con las reglas del cliente que reserva solo; la mesa, las notas internas y
-   reservar igualmente siguen siendo cosa del restaurante.
-4. La mesa retenida se suelta o se mueve, como al cambiar o cancelar a mano.
+1. Con **Reservar mesa** activa (RESERVATION-F17), el cliente escribe «no vamos a poder ir» o
+   «¿podemos ir a las nueve?».
+2. Se busca su última reserva por el número desde el que escribe. El cambio o la anulación de esa misma
+   reserva espera en **Automatizaciones**, en «Esperan tu respuesta», nombrada por su cliente, su día y
+   su hora; una anulación solo la aprueba quien puede cancelar reservas (WHATSAPP_INBOX-F25).
+3. Con «Aprobar», se comprueba que la reserva es de quien escribe (su ficha); si no, se rechaza sin
+   contar nada de ella, ni siquiera si existe. Se cambia con las reglas del cliente que reserva solo; la
+   mesa, las notas internas y reservar igualmente siguen siendo cosa del restaurante.
+4. En **Reservas** la reserva sale a su nueva hora, o «Cancelada»; la mesa retenida se mueve o se suelta,
+   como al cambiar o cancelar a mano, y el cliente recibe por WhatsApp lo que ha pasado.
 Entra: el mensaje y la ficha del cliente.
 Sale: la reserva anulada o cambiada (avisa: `reservation.reservation.status_changed`,
 `reservation.reservation.updated`).
 Si falla: «Esa reserva es de otro comensal, así que no se puede gestionar en su nombre.»; «La mesa y
 las notas internas las pone el restaurante: no se pueden cambiar desde la reserva del propio
-cliente.»; o el motivo de la puerta (RESERVATION-F06).
-Implicados: RESERVATION-F08, RESERVATION-F09, WHATSAPP_INBOX-F25
+cliente.»; o el motivo de la puerta (RESERVATION-F06): se le explica por WhatsApp y la reserva sigue
+como estaba. Con «No» en «Esperan tu respuesta», o si nadie contesta en 72 horas, no cambia nada.
+Implicados: RESERVATION-F08, RESERVATION-F09, RESERVATION-F17, WHATSAPP_INBOX-F25
 
 ### RESERVATION-F19 Avisar por WhatsApp cuando el restaurante confirma
 <!-- origen: old:reservations/workflow/whatsapp-y-clientes.md#reservations-f19 wf:whatsapp-mesa#rec_wa_mesa-f07 -->
@@ -833,7 +846,17 @@ la que solo se le autorizó reservar.
 - **Tarea programada**: `release_unconfirmed_reservations` (`reservation.reservation.release_unconfirmed`,
   cada 15 minutos, en UTC, `collapse`); la corre el worker (`base/scheduler.py`) como sistema en el ámbito
   fijo `WORKER_SCOPE_SLUG` de la fase 1: libera las pendientes de toda la BD compartida, pero su aviso vivo
-  sale solo por ese ámbito (F13 `parcial` hasta el recorrido por `hub_due`).
+  sale solo por ese ámbito (F13 `descartado` hasta el recorrido por hub del worker, hub#551; lo trae la
+  «C1» de hub#471).
+- **WhatsApp** (F17, F18): la conversación es la receta `reservation_from_whatsapp` de `whatsapp_inbox`
+  (`apps/whatsapp_inbox/recipes.py`, WHATSAPP_INBOX-F24, F25), un paso de asistente con «Que me lo pregunte»
+  cuyas herramientas son `reservation.availability.day`, `.availability.tables`, `.reservation.create`,
+  `.reservation.update`, `.reservation.cancel` y `.waitlist.create`. La receta fija (`pinned`) la ficha y el
+  teléfono de quien escribe en el alta y la espera (`customer_id`, `guest_phone`) y la ficha en el cambio y la
+  anulación (`on_behalf_of`), y el asistente no los ve; la última reserva la lee `reservation.reservation.list`
+  por `guest_phone`. Reservas toma la ficha antes que cualquier nombre y aplica la puerta del cliente
+  (`engine.GUEST_SOURCES`) a `source="whatsapp"` y a todo `on_behalf_of`. La e2e
+  `tests/e2e/reservation-whatsapp.spec.ts` la sigue hasta la pantalla de Reservas.
 - **Relay del outbox** (`base/relay.py`, en el worker desde el 2026-10-21): entrega `customer.customer.merged`
   y `customer.customer.erased` a `events.REACTIONS` (F21, F22), como sistema en el ámbito del hub que anotó
   el aviso; idempotentes.
@@ -894,18 +917,17 @@ la que solo se le autorizó reservar.
 
 ### Lo que queda fuera
 
-- **La conversación de WhatsApp** (F17, F18): pedir los comensales y ofrecer horas libres, y cambiar o
-  anular desde el mensaje son de la segunda parte de la Bandeja de WhatsApp (`whatsapp_inbox` F24, F25, que
-  esperan al asistente del Hub). Reservas ya tiene su parte: la reserva del cliente con sus reglas y la puerta
-  «en nombre del cliente». El aviso al confirmar (F19) ya sale: lo manda la receta `reservation_confirmed` de
-  `whatsapp_inbox` (WHATSAPP_INBOX-F26) con el `status_changed` confirmado y el día y la hora listos para el
-  mensaje (`date_label`, `time_label`; `tests/test_queries.py`, `tests/test_services.py`;
-  `apps/whatsapp_inbox/tests/test_relay_notify.py`).
+- **hub#551 — El aviso al momento de la liberación de pendientes en cada negocio** (F13, `descartado`): la
+  tarea corre en el ámbito fijo de la fase 1 y la pantalla de Reservas de los demás negocios la ve en su
+  repaso de cinco minutos; llega con el recorrido del worker por negocio (hub#471).
+- **hub#547** — Una traducción al español marcada «fuzzy» sale en inglés y su test de traducciones no la ve.
+- **hub#548** — Dos textos en español salen con las palabras de otra app («origen» en vez de «reservada por»).
+- **hub#549** — La tarjeta de confirmación del asistente llama «Registro» a la reserva, la franja o la
+  entrada que va a borrar.
+- **hub#550** — La tarjeta de confirmación del asistente dice la mesa solo por su número, sin su zona.
 - **Asignación automática de mesa y juntar mesas para un grupo grande**: una reserva tiene una mesa
   (la retención de Mesas es una por reserva); juntar mesas espera a que Mesas tenga mesas unidas
   (su duda 3).
-- **El aviso al momento de la liberación de pendientes en cada negocio** (F13): en la fase 1 la tarea
-  corre en un único ámbito fijo; llega con el recorrido por negocio de la fase 2.
 - **Que sentar desde el plano marque la reserva** Sentada: Mesas gasta la retención, pero no sabe de la
   reserva; se marca en Reservas con «Sentar» (que entonces no abre otra cuenta).
 - **La cola de la puerta con espera estimada y aviso por SMS** (duda 6): necesita mensajería; la lista de
@@ -914,8 +936,8 @@ la que solo se le autorizó reservar.
 
 ### Dudas abiertas
 
-Resueltas en esta versión (por mercado, «Referencia adoptada»): 1, 2, 3, 4, 5, 6, 7 y 8. Siguen fuera
-del MVP: asignación automática y mesas unidas (5) y el aviso por WhatsApp (F19).
+Resueltas en esta versión (por mercado, «Referencia adoptada»): 1, 2, 3, 4, 5, 6, 7 y 8. Sigue fuera
+del MVP: asignación automática y mesas unidas (5). El aviso por WhatsApp (F19) ya sale.
 
 ### Paridad con el producto actual
 

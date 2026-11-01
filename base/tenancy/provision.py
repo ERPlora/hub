@@ -12,9 +12,10 @@ of its own (``base.services``, «The provisioning's writes in control»):
 2. ``migrating``: the apps the clone has (its ``django_migrations``: its template's), its vertical's and ``base`` are
    brought to the code's leaf (``base.tenancy.migrator.ensure_schema``: nothing to do when ``migrate_hubs`` kept the
    template current, so the sign-up is the clone; the lease renewed between apps) and noted in ``Hub.schema_apps``
-   (``{app: its leaf migration}``) with ``schema_state`` current. No other app's tables are made: an app's are made the
-   first time the business turns it on (S3: ``base.app.enable`` → ``creating`` → the worker's ``ensure_schema``,
-   PLAN-DB §7);
+   (``{app: its leaf migration}``) with ``schema_state`` current. Every template carries every portable app's tables
+   (``migrator.templates``, PLAN-DB round 2026-11-01), so the clone has them; an app it lacks (one ported after its
+   template was made) gets its tables the first time the business turns it on (S3: ``base.app.enable`` → ``creating``
+   → the worker's ``ensure_schema``, PLAN-DB §7);
 3. ``seeding``: inside ``use_hub``, the SaaS's photo kept on the row (its people, and the blocks of the apps it has
    on: none at birth, a business is born with every app off, PLAN §33); a newer photo that arrives meanwhile is
    applied too before ``ready`` (:data:`SEED_ROUNDS`);
@@ -96,7 +97,8 @@ def provision(
 
     ``apps``: more apps than its template's whose tables it gets now (the local hubs a and b, born with every app on:
     ``seed_local_hubs``); none by default, as the worker's pass (:func:`run_due`): a business and a demo are born with
-    their template's tables and every app off (PLAN §33), and an app's tables are made when it is turned on (S3).
+    their template's tables (every portable app's) and every app off (PLAN §33); an app their template lacked gets its
+    tables when it is turned on (S3).
     ``seed``: what its seeding writes, inside its database (``use_hub``), after the photo kept. A hub already ready is
     left as it is (``True``); one that is not being prepared (cancelled, gone) or whose lease someone else holds is not
     touched (``False``). A failure is noted on the hub (``failed``), never raised. ``tell_saas=False``: the SaaS does
@@ -164,10 +166,28 @@ def run_due(now: dt.datetime | None = None, *, limit: int = DUE_BATCH, budget: f
     return worked
 
 
+class _Steps:
+    """How long each step of a preparation took, logged as it ends (``base.tenancy.provision.step``): what a slow
+    sign-up spends its time on, read from the logs."""
+
+    def __init__(self) -> None:
+        self.started = self.last = time.monotonic()
+
+    def done(self, name: str, hub: Hub) -> None:
+        """Log step ``name`` of ``hub`` (by its slug, as ``provision.ready``) with the time since the previous one."""
+        now = time.monotonic()
+        logger.info("base.tenancy.provision.step hub=%s step=%s seconds=%.2f", hub.slug, name, now - self.last)
+        self.last = now
+
+    def total(self) -> float:
+        return time.monotonic() - self.started
+
+
 def _prepare(hub_id, *, apps: Iterable[str] | None = None, seed: Seed | None = None, tell_saas: bool = True) -> None:
     """The steps of a hub's preparation, its lease held; a failure is noted on it, a hub that left them is left.
     ``apps``: more apps than its template's whose tables it gets (:func:`provision`)."""
     apps = list(apps or ())
+    step = _Steps()
     try:
         hub = services.place_hub(hub_id)
         hub = services.provision_step(hub_id, Hub.Status.CREATING, timezone.now(), LEASE)
@@ -180,6 +200,7 @@ def _prepare(hub_id, *, apps: Iterable[str] | None = None, seed: Seed | None = N
             raise services.ProvisioningFailed("clone_failed", str(refused)) from refused
         ddl = tenancy_connections.register_ddl_alias(hub.db_name, cluster=hub.cluster)
         identity.write(ddl, hub.id)
+        step.done("creating", hub)
         hub = services.provision_step(hub_id, Hub.Status.MIGRATING, timezone.now(), LEASE)
         try:
             # Its vertical's apps too: the template it was cloned from may still be being built (migrate_hubs). The
@@ -193,6 +214,7 @@ def _prepare(hub_id, *, apps: Iterable[str] | None = None, seed: Seed | None = N
             raise
         except Exception as error:
             raise services.ProvisioningFailed("schema_failed", f"{type(error).__name__}: {error}") from error
+        step.done("migrating", hub)
         hub = services.provision_step(hub_id, Hub.Status.SEEDING, timezone.now(), LEASE)
         with use_hub(hub):
             services.apply_kept_photo(hub)
@@ -212,7 +234,8 @@ def _prepare(hub_id, *, apps: Iterable[str] | None = None, seed: Seed | None = N
             raise services.ProvisioningFailed(
                 "photo_moving", f"the SaaS's photo kept changing while it was seeded ({SEED_ROUNDS} times)"
             )
-        logger.info("base.tenancy.provision.ready hub=%s database=%s", hub.slug, hub.db_name)
+        step.done("seeding", hub)
+        logger.info("base.tenancy.provision.ready hub=%s database=%s seconds=%.2f", hub.slug, hub.db_name, step.total())
     except services.ProvisioningStopped as stopped:
         logger.info("base.tenancy.provision.stopped hub=%s: %s", hub_id, stopped)
     except services.ProvisioningFailed as failed:
