@@ -139,3 +139,27 @@ def test_only_a_hubs_or_a_demos_database_passes_as_one_a_template_never():
             names.validate_hub(template, control="hub")
     with pytest.raises(names.InvalidDatabaseName):
         names.validate_hub(f"pre_hub_{HEX}", control="hub")
+
+
+# ── The copy a hub leaves behind when it moves (round 2026-10-30b of PLAN-DB, decision 3; tranche S7) ────────────────
+
+
+def test_a_moved_copy_is_its_control_databases_move_and_the_hex_of_its_hub():
+    assert names.moved_db_name("hub", HUB_ID) == f"hub_move_{HEX}"
+    assert names.moved_db_name("pre_hub", HUB_ID) == f"pre_hub_move_{HEX}"
+    # As long as a demo's: it fits after the longest control database.
+    assert names.moved_db_name("c" * names.MAX_CONTROL, HUB_ID)
+    assert names.identifier(f"hub_move_{HEX}", control="hub") == sql.Identifier(f"hub_move_{HEX}")
+
+
+def test_only_a_moved_copy_passes_as_one_never_a_hub_a_demo_or_a_template():
+    assert names.validate_moved(f"hub_move_{HEX}", control="hub") == f"hub_move_{HEX}"
+    for other in (f"hub_{HEX}", f"hub_demo_{HEX}", "hub_template", f"pre_hub_move_{HEX}", f"hub_move_{HEX[:-1]}"):
+        with pytest.raises(names.InvalidDatabaseName):
+            names.validate_moved(other, control="hub")
+
+
+def test_a_moved_copy_is_no_hubs_own_database_to_drop_with_it():
+    # ``validate_hub`` (``ops.drop_database``) takes a hub's or a demo's database only: a copy is dropped by the move.
+    with pytest.raises(names.InvalidDatabaseName):
+        names.validate_hub(f"hub_move_{HEX}", control="hub")

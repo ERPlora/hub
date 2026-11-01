@@ -338,6 +338,19 @@ def test_a_full_or_closed_cluster_never_takes_a_new_hub_nor_does_the_settings_se
     assert hub.db_name not in databases()
 
 
+def test_a_hub_on_its_way_to_a_cluster_takes_its_place_there(registry, told):
+    # A hub moving to a cluster (control.hub.move) counts against its limit, as it will be on it in a moment.
+    full = registry.cluster("full", max_hubs=1)
+    registry.hub(status=Hub.Status.READY, db_name="", moving_to=full)
+    hub = registry.hub()
+
+    assert provision.provision(hub) is False
+
+    hub = fresh(hub)
+    assert (hub.status, hub.cluster) == ("failed", None)
+    assert hub.last_error.startswith("no_cluster_available: ")
+
+
 def test_a_purged_hub_frees_its_place_on_a_cluster(registry, told):
     small = registry.cluster("small", max_hubs=1)
     registry.hub(status=Hub.Status.PURGED, db_name="", cluster=small)
@@ -876,4 +889,3 @@ def test_every_hub_the_services_make_names_its_own_database_but_the_listed_ones(
         "A new hub is born with its own database (round 2026-10-30 of PLAN-DB, decision 1): name its db_name "
         f"(base.tenancy.names) or list the call in SHARED_HUB_CREATES with its reason: {offenders}"
     )
-

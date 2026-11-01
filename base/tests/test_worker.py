@@ -149,6 +149,14 @@ def usage_pass(monkeypatch) -> list[dt.datetime]:
 
 
 @pytest.fixture(autouse=True)
+def moves_pass(monkeypatch) -> list[dt.datetime]:
+    """Stands in for the moves' pass (``worker._moves``: a hub moved to another cluster; ``base/tenancy/tests/test_move.py``)."""
+    passes: list[dt.datetime] = []
+    monkeypatch.setattr(worker, "_moves", lambda now, stop=None: passes.append(now))
+    return passes
+
+
+@pytest.fixture(autouse=True)
 def due(monkeypatch) -> FakeDue:
     fake = FakeDue()
     monkeypatch.setattr(provision, "run_due", fake)
@@ -782,3 +790,79 @@ def test_a_slow_pass_that_fails_is_logged_and_the_next_tick_starts_it_again(monk
 
     assert runs == [ten(0), ten(1)]
     assert "the data pass failed" in caplog.text
+
+
+# ── A hub moved to another cluster (round 2026-10-30b of PLAN-DB, decision 3; base.tenancy.move) ────────────────────
+
+
+def test_the_moves_run_in_a_thread_of_their_own_every_tick_after_the_data_and_before_the_hubs_due(
+    monkeypatch, calls, tasks, due, outbox
+):
+    order: list[str] = []
+    started: list[str] = []
+
+    class Recorded(Inline):
+        def start(self, piece) -> bool:
+            started.append(self.name)
+            return super().start(piece)
+
+    monkeypatch.setattr(worker, "Background", Recorded)
+    monkeypatch.setattr(provision, "run_due", lambda now: order.append("due") or due(now))
+    monkeypatch.setattr(worker, "_hubs", lambda now: order.append("hubs"))
+    monkeypatch.setattr(worker, "_data", lambda now, stop=None: order.append("data"))
+    monkeypatch.setattr(worker, "_usage", lambda now: order.append("usage"))
+    monkeypatch.setattr(worker, "_moves", lambda now, stop=None: order.append("moves"))
+    stop = threading.Event()
+    wait, _ = stop_after(stop, 2)
+
+    worker.run(stop, tick_seconds=TICK, wait=wait, clock=clock(0, 0, 1))
+
+    assert order == ["hubs", "data", "usage", "moves", "due"] * 2
+    assert started == ["data", "usage", "move"] * 2
+
+
+def test_with_databases_only_no_hub_moves(monkeypatch, calls, tasks, due, outbox, moves_pass):
+    stop = threading.Event()
+    wait, _ = stop_after(stop, 2)
+
+    worker.run(stop, tick_seconds=TICK, wait=wait, clock=clock(0, 0, 1), databases_only=True)
+
+    assert moves_pass == []
+
+
+def test_the_moves_pass_runs_on_control_and_hears_the_stop(monkeypatch):
+    from base.tenancy import move
+
+    monkeypatch.undo()
+    seen: list[tuple[str, bool]] = []
+    stop = threading.Event()
+
+    def run_due(now, *, cancelled):
+        seen.append((context.current().kind, cancelled()))
+        stop.set()
+        seen.append((context.current().kind, cancelled()))
+        return 1
+
+    monkeypatch.setattr(move, "run_due", run_due)
+
+    worker._moves(ten(0), stop)
+
+    assert seen == [(context.CONTROL, False), (context.CONTROL, True)]
+
+
+def test_a_moves_pass_that_fails_is_logged_and_the_next_tick_tries_again(monkeypatch, caplog):
+    from base.tenancy import move
+
+    monkeypatch.undo()
+    failure = DatabaseError("server closed the connection unexpectedly")
+
+    def run_due(now, *, cancelled):
+        raise failure
+
+    monkeypatch.setattr(move, "run_due", run_due)
+
+    with caplog.at_level(logging.ERROR, logger="base.worker"):
+        worker._moves(ten(0), threading.Event())
+
+    [record] = [r for r in caplog.records if r.name == "base.worker"]
+    assert "move" in record.getMessage() and record.exc_info[1] is failure
