@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:b49f38cf86538cbc03694e1c19df81c6b334e275ca13fccb1a7c1ca64a7fa042 -->
+<!-- generated from WORKBOOK.md sha256:fe10711e5d566c42c20ee7da3b6395f03cd90d69557fb279a80b02a3661395b8 -->
 
 ## What it is for and who it is for
 
@@ -35,7 +35,9 @@ It is the Home of ERPlora's old hub, the one businesses already use, with its st
 date, app launcher, setup list with a progress bar, board of panels and the "Summary" and "Activity"
 tabs. It follows what the market does: the "Setup guide" list of Shopify and Square (steps with their
 button, the progress on top and what is done folded away), Odoo's app launcher, the board of panels that
-each person picks and orders of Lightspeed and Toast, and the bell with counters of any back office.
+each person picks and orders of Lightspeed and Toast, and the bell with counters of any back office. System's
+"Resources" follows Business Central's "Capacity" and the usage pages of Supabase, Vercel and Neon: each figure
+against what the plan includes and, like Google Workspace, the yellow notice at 80 % and the red one when full.
 
 ## Before you start
 
@@ -148,7 +150,8 @@ the one chosen stays in the link, so it can be shared and Back leaves Settings.
 ### System · Resources
 From "System" in the side menu. Five tabs at the bottom: "Resources", "Plan and limits", "Updates", "Failed
 events" and "Logs" (this one, only for whoever runs the business); "Resources" opens: "Cloud resources" with the
-"Cloud" pill, the "Database" card and why there are no CPU, memory or connections figures.
+"Cloud" pill, the notice when it is time to upgrade, the "Connections" and "Files" cards, with their bar against the
+plan, and "Requests this month", "People" and "Database", with their figure.
 
 ### System · Updates
 "What we have updated": the version running, when it was published and that the hub updates itself.
@@ -336,7 +339,7 @@ On the Employees screens and the API documentation:
 | BASE-F37 | Reset the business by sections | discarded |
 | BASE-F38 | See the Home up to date after importing a template | done |
 | BASE-F39 | Open System and move between its tabs | done |
-| BASE-F40 | See how much the hub is using | discarded |
+| BASE-F40 | See how much the hub is using | not done |
 | BASE-F41 | Know which version is running and what has been updated | discarded |
 | BASE-F42 | See the log of what happened in the system | done |
 | BASE-F43 | See the failed events | done |
@@ -610,7 +613,7 @@ Out: nothing.
 If it fails: an employee or a manager does not see the row. If it cannot ask, the bell keeps what it
 last knew; if it never knew: "Could not check the notifications. They will show up when the connection is
 back.".
-Involved: none
+Involved: BASE-F40
 
 ### BASE-F11 Go to erplora.com to manage or upgrade the plan
 Status: discarded — without the one-time pass: if the browser does not have the erplora.com session open, you sign in with the account on arrival; the pass belongs mostly to erplora.com (saas#190)
@@ -631,7 +634,7 @@ Out: nothing saved in the hub.
 If it fails: if the hub does not know which business it belongs to, neither of the two shows (never a button that
 does nothing). If the installed app cannot open the browser, it says so: "Could not open that page. Try again.". An
 employee, a session opened with a PIN or with the badge and the Google Play app do not have "erplora.com".
-Involved: none
+Involved: BASE-F40
 
 ### BASE-F12 Ask the assistant to go over the setup
 Status: done
@@ -937,7 +940,7 @@ If it fails: "We could not read your plan" — "Check the connection and try aga
 not run the business sees "Only whoever runs the business can see the plan and its limits.", without "Retry". While
 the hub does not know the plan: "We do not know this business's plan yet: it shows up as soon as erplora.com
 sends it.".
-Involved: BASE-F57
+Involved: BASE-F40, BASE-F57
 
 ### BASE-F29 Choose a template of the catalogue to import
 Status: done
@@ -1172,24 +1175,61 @@ Steps:
 In: the person's role in the business; whoever does not run it is never asked for anything the hub would refuse.
 Out: nothing saved.
 If it fails: each tab says its own (BASE-F40 to BASE-F43).
-Involved: none
+Involved: BASE-F40
 
 ### BASE-F40 See how much the hub is using
-Status: discarded — no CPU, memory or connections of the business: a single service serves every business and no figure is its own; the size and use of its database come with each business's measurement, built separately (hub#575)
+Status: not done — reopened by hub#603: today it only shows the size of the database and says the rest is not measured; the connections, the month's requests, the people active now, the files and the rest that is already measured every night are missing, and so is the notice to upgrade
 Actor: owner, administrator
 Screen: System · Resources
 Steps:
-  1. They open "System": "Resources" opens. While it loads: "Reading the system…".
-  2. The title is "Cloud resources", with the "Cloud" pill.
-  3. The "Database" card says "PostgreSQL" and, below, "Shared database" (or "Database of its own" when the
-     business has its own).
-  4. Below: "CPU, memory and connections are not measured per business: ERPlora's servers serve every business at
-     once and grow by themselves when needed.". Never a made-up figure or a zero.
-In: which database the business is on.
-Out: nothing saved.
+  1. They open "System": "Resources" opens. While it loads: "Reading the system…". The title is "Cloud resources",
+     with the "Cloud" pill. Today's figures are read on opening the screen; the night's carry their date.
+  2. The first card is "Connections", with "What your business can do at once in its database.": "{used} of {limit}
+     at once", the highest measured today against what it really has (what its plan includes or, if that is less,
+     what the service gives), with its bar. Below, "Requests with no room in the last 7 days: {count}", the times
+     someone got "Too many requests. Try again in a moment.". The pill says "Within the limit" and, with one or more
+     with no room, "Close to the limit": reaching the top for a moment bothers nobody; running out of room does.
+  3. The second is "Files", what the business's files and those of its apps take up: "{used} of {limit}", with its
+     bar and "Measured on {day}" (the "Files" screen says what there is right now: what is deleted today goes down
+     here tomorrow). The pill says "Within the limit", "Close to the limit" from 80 % and "Limit reached" when full.
+     With a plan with no limit, "{used} · No limit", with no bar or pill.
+  4. Then, what no plan limits, with its figure and with no bar or pill. "Requests this month": the ones the business
+     has served since day 1. "People": "Active now" ("With activity in the last 5 minutes."), "Active yesterday" (or
+     "Active on {day}", if the last night measured is earlier) and "Last 30 days", with "Your plan's places are in
+     "Plan and limits".". "Database": "PostgreSQL", "Database of its own" and "Its size: {size}" · "Measured on
+     {day}". Neither CPU nor memory: they cannot be attributed to a business, so they do not appear, nor does any
+     sentence in their place.
+  5. With "Files" close to the limit, above the cards comes "You are running out of space" — "Your files take up
+     {percent} % of your plan's space. When it is full, no more can be uploaded."; when full, in red, "There is no
+     space left for files" — "Your files take up all your plan's space: no more can be uploaded until you upgrade the
+     plan or delete some.".
+  6. With "Connections" close to the limit, also above: "Your plan falls short at your busiest moments" — "Sometimes
+     whoever is working gets an error because there is no more room at once ({count} in the last 7 days). A bigger
+     plan gives more connections.".
+  7. Each notice carries "Upgrade plan", which opens this business's plan page on erplora.com (BASE-F11); in the
+     installed app, or where that link does not appear, with no button, "Plans are managed from your ERPlora
+     account, on erplora.com.".
+  8. If their plan already includes all the connections the service gives, a bigger plan would give them no more, and
+     the notice of step 6 is another one, with no "Upgrade plan": "Your business already uses all the service gives
+     at once" — "Sometimes whoever is working gets an error because there is no more room at once ({count} in the
+     last 7 days). A bigger plan would not give more connections: tell us in "Report a problem".".
+  9. With any notice, the bell of whoever runs the business adds one per notice and shows the "Plan limits" row, which
+     opens "System" on "Resources". With no notices, the row goes away.
+  10. Whoever runs the business can ask the assistant the same ("how much space do I have left?", "how many requests
+      have we had this month?") and it answers with these figures.
+In: what is measured of this business: every night, what its files and its database take up and the people who came
+in; during the day, its requests, its connections and who has activity. And the plan's limits erplora.com passes to
+the hub.
+Out: nothing saved by looking at the screen. What is measured stays per business and day, and erplora.com collects it
+every night so ERPlora's team sees the same (HUBS-F22).
 If it fails: "We could not read the system" — "The figures and the logs are not available right now. You can
-try again." with "Retry".
-Involved: none
+try again." with "Retry". What has not been measured yet says so, never with a zero: before the first night,
+"Measured every night: the first figure comes tomorrow."; with no measure of the connections today, "Not measured
+today yet."; if the requests or the times with no room have been counted for less than their period, they say "Since
+{day}". In a demo, instead of the cards: "Use is not measured in a demo: its data is deleted when it ends.". While the
+hub does not know the plan: "We do not know this business's plan yet: it shows up as soon as erplora.com sends it."
+and the figures, with no limit, bar, pill or notice. Whoever does not run the business reads what BASE-F39 says.
+Involved: BASE-F10, BASE-F11, BASE-F28, BASE-F39, BASE-F72, BASE-F73, BASE-F108, HUBS-F21, HUBS-F22
 
 ### BASE-F41 Know which version is running and what has been updated
 Status: discarded — the version and its date, yes; apps no longer have their own version (they are all released together with the hub) and there are no notes for each version to show yet (hub#576)
@@ -1791,7 +1831,7 @@ website's images) do not show here.
 Out: nothing saved.
 If it fails: "The files could not be loaded" with the reason ("The file store did not answer. Try again in a
 moment." or "Check the connection and try again.") and "Retry"; a failure never shows as "No files".
-Involved: none
+Involved: BASE-F40
 
 ### BASE-F73 Upload files and make folders
 Status: done
@@ -1815,7 +1855,7 @@ at a time and the new one closes the one before, never one on top of another. Wh
 valid. Use a name without slashes or lone dots." or "There is already a file or folder with that name here.".
 Whoever does not administer the business does not see the buttons and, if they try anyway, reads "Only an
 administrator can change the files.".
-Involved: none
+Involved: BASE-F40
 
 ### BASE-F74 Preview and download a file
 Status: discarded — Excel sheets (xlsx) and Word documents (docx) say "No preview" and are downloaded, and a data file (.json) is shown sorted but cannot be folded; the old hub's viewer showed them (hub#578)
@@ -2581,4 +2621,4 @@ keeps nothing.
 If it fails: after five reports in an hour (the hub's and erplora.com's together), "Too many attempts. Please try
 again in a few minutes."; if erplora.com does not answer or cannot send it, a notice with the support address to
 write to directly. In both cases what was written stays and can be sent again.
-Involved: ACCOUNTS-F38
+Involved: ACCOUNTS-F38, BASE-F40
