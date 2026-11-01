@@ -152,6 +152,15 @@ export function saveFile(filename: string, blob: Blob): void {
   URL.revokeObjectURL(url);
 }
 
+/** Hands the browser the file at `url`, a link of the server's signed for a while (a copy of the business's data): it
+ *  is served as an attachment, so the browser saves it and the page stays. */
+export function downloadFrom(url: string): void {
+  const link = document.createElement('a');
+  link.href = url;
+  link.rel = 'noopener';
+  link.click();
+}
+
 // ── The import (BASE-G103–G108) ──────────────────────────────────────────────────────────────────────────────────
 
 /** The server takes 20 MB of zip at most (`base.blueprint`): 300 photos of its own fit (INVENTORY-F33). */

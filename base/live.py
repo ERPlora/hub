@@ -4,7 +4,8 @@ and the way in's (APP-BASE-3): the grid of «Switch user», the devices, the PIN
 Each step, panel and counter names in ``refresh_on`` the events that change it (PLAN-HUB round 2026-10-21); base
 follows the union of them per query, fixed from the start like every declaration. The SaaS's photo
 (``base.hub.state_applied``) re-runs the three: it may turn apps on or off and change the country or the vertical. What
-Settings › Data does to the business (a load, an undo, a reset) re-runs them too, and its own two queries.
+Settings › Data does to the business (a load, an undo, a reset) re-runs them too, and its own queries: the copies of
+its data follow each step of a reset, which the worker tells after its COMMIT in control.
 """
 
 from live.live_registry import live
@@ -18,8 +19,11 @@ from base.events import (
     FAILED_EVENT_DISCARDED,
     FAILED_EVENT_RETRIED,
     FILE_EVENTS,
+    HUB_DATA_RESET,
     HUB_REGISTERED,
+    HUB_RESET_PROGRESSED,
     HUB_STATE_APPLIED,
+    HUB_USAGE_MEASURED,
 )
 
 #: What changes the failed events: the relay gives one up, who runs the business resends or discards one (APP-BASE-7).
@@ -43,14 +47,18 @@ live("base.notice.list", on=events_of("notices"))
 # The SaaS's photo gives or takes the right to a paid module (base.entitlement) and carries the plan's limit of apps;
 # the business turns apps on and off (base.activation, PLAN-HUB §9): the Apps screen follows both.
 live("base.app.list", on=sorted([HUB_STATE_APPLIED, *APP_EVENTS]))
-# The plan and the members come in the photo too: «Plan and limits» follows it.
-live("base.plan.usage", on=[HUB_STATE_APPLIED])
+# The plan and the members come in the photo too: «Plan and limits» follows it, and the size of the business's own
+# database the nightly measurement keeps (BASE-F40, base.usage).
+live("base.plan.usage", on=[HUB_STATE_APPLIED, HUB_USAGE_MEASURED])
 
 # ── Data: blueprints, imports and reset (APP-BASE-2) ──
 # A load, an undo or a reset re-runs the Home (above: BASE-G131, the Home up to date without reloading), the catalogue
 # (the Home's card asks whether the business is still empty) and the list of loads of Settings › Data.
 live("base.blueprint.list", on=sorted({HUB_STATE_APPLIED, *DATA_EVENTS}))
 live("base.import.list", on=sorted(DATA_EVENTS))
+# The copies of the business's data and its last reset (round 2026-10-30 of PLAN-DB, decision 2): each step of a reset
+# the worker takes (copying, emptying, failed; a copy made), and the reset done.
+live("base.hub.dumps", on=sorted([HUB_RESET_PROGRESSED, HUB_DATA_RESET]))
 
 # ── Business settings and the hub's context (APP-BASE-6) ──
 # The SaaS registers the business again when its owner changes its name, time zone or language on erplora.com

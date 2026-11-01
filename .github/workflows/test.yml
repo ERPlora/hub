@@ -51,6 +51,15 @@ jobs:
       # WeasyPrint's libraries (apps/invoice/pdf.py), as the Dockerfile installs them.
       - name: WeasyPrint's libraries
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz-subset0
+      # PostgreSQL 18's client, as the Dockerfile's postgresql-client-18: base/tenancy/dumps.py copies a hub's database
+      # with pg_dump (and its tests read the copy with pg_restore). The runner's own client is older, and pg_dump refuses
+      # a newer server, so 18's bin goes first in the PATH.
+      - name: PostgreSQL 18's client
+        run: |
+          sudo apt-get install -y --no-install-recommends postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y --no-install-recommends postgresql-client-18
+          echo "/usr/lib/postgresql/18/bin" >> "$GITHUB_PATH"
       # apps/verifactu/tests/test_producer.py checks the producer's constants against the signed declaration
       # the SaaS publishes, and fails in CI without it: ERPlora/saas is public, so its public/declaracion is
       # fetched next to the Hub (../saas), as in the erplora-next tree. No token.
