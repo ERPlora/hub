@@ -583,7 +583,7 @@ def plan_usage(ctx: OperationContext, data: PlanUsageIn) -> dict:
         "connections": _connections_usage(state, known, counted),
         "requests": {"this_month": counted.requests_this_month, "since": counted.requests_since},
         "activity": _activity_usage(hub, demo, last, counted),
-        "meters": [] if demo else home.plan_meters(ctx, home.home_modules(active_apps(ctx.scope), demo_hub=False)),
+        "meters": _apps_meters(ctx, hub, home.home_modules(active_apps(ctx.scope), demo_hub=demo)),
     }
 
 
@@ -702,6 +702,12 @@ def _activity_usage(hub: Hub | None, demo: bool, last: HubUsageDaily | None, cou
     }
 
 
+def _apps_meters(ctx: OperationContext, hub: Hub | None, modules: Iterable[Any]) -> list[dict]:
+    """What the apps on say their plan includes (``base.home.plan_meters``), read in the business's own database: none in
+    a demo, which is not measured, or without one."""
+    return [] if hub is None or hub.is_demo or not hub.db_name else home.plan_meters(ctx, modules)
+
+
 def _plan_motives(ctx: OperationContext, hub: Hub | None, modules: Iterable[Any]) -> int:
     """How many reasons to upgrade the bell can tell (BASE-F40) without asking erplora.com, so never the assistant's: the
     files close to the plan's space or full, a capacity that fell short when a bigger plan would give more, and the
@@ -711,11 +717,11 @@ def _plan_motives(ctx: OperationContext, hub: Hub | None, modules: Iterable[Any]
     if not known or hub is None or hub.is_demo:
         return 0
     files_status = _files_usage(state, known, _last_night(hub))["status"]
-    connections = _connections_usage(state, known, _counted_during_the_day(hub))
-    fell_short = bool(connections["busy_last_7_days"]) and connections["bigger_plan_gives_more"]
+    capacity = _connections_usage(state, known, _counted_during_the_day(hub))
+    fell_short = bool(capacity["busy_last_7_days"]) and capacity["bigger_plan_gives_more"]
     meters = sum(
         1
-        for meter in home.plan_meters(ctx, modules)
+        for meter in _apps_meters(ctx, hub, modules)
         if meter["limit"] and meter["used"] is not None and _is_near(meter["used"], meter["limit"])
     )
     return int(files_status in ("near", "full")) + int(fell_short) + meters

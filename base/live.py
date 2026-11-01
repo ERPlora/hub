@@ -47,7 +47,7 @@ live("base.notice.list", on=events_of("notices"))
 # The SaaS's photo gives or takes the right to a paid module (base.entitlement) and carries the plan's limit of apps;
 # the business turns apps on and off (base.activation, PLAN-HUB §9): the Apps screen follows both.
 live("base.app.list", on=sorted([HUB_STATE_APPLIED, *APP_EVENTS]))
-# The plan and the members come in the photo too: «Plan and limits» follows it, and the size of the business's own
+# The plan and the members come in the photo too: «Usage and plan» follows it, and the size of the business's own
 # database the nightly measurement keeps (BASE-F40, base.usage).
 live("base.plan.usage", on=[HUB_STATE_APPLIED, HUB_USAGE_MEASURED])
 

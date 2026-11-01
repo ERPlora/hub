@@ -714,7 +714,7 @@ def hub_state_apply(ctx: OperationContext, data: HubStateIn) -> dict:
     (:func:`_apply_members`) and on its people in its own database (``base.hub_user.sync``), in this transaction
     too; a business whose database is still being made has its people there when its seeding applies the photo
     (:func:`apply_kept_photo`: the SaaS sends it right after the registration). Its modules and plan are read where they are kept: the right
-    to a paid app (``base.entitlement``) and «Plan and limits» (``base.plan.usage``) follow this photo.
+    to a paid app (``base.entitlement``) and «Usage and plan» (``base.plan.usage``) follow this photo.
     """
     internal_only(ctx)
     hub = _locked_hub(data.id)
