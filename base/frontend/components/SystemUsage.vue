@@ -24,12 +24,10 @@ const failed = computed(() => status.value === 'error' && usage.value === undefi
 const { planUrl, offered } = usePlanLink();
 
 const assistant = ref<AssistantRead>(null);
-let asked = false;
 watch(
   () => usage.value?.known === true,
   (known) => {
-    if (!known || asked) return;
-    asked = true;
+    if (!known) return;
     client.api.call('base.assistant.usage', {}).then(
       (read) => {
         assistant.value = read;
@@ -183,7 +181,9 @@ function pillTone(row: UsageRow) {
         v-if="usage.known"
         class="system-usage-plan"
       >
-        <h2>{{ t('base.system.usage.plan', { name: planName }) }}</h2>
+        <h2 v-if="planName">
+          {{ t('base.system.usage.plan', { name: planName }) }}
+        </h2>
         <a
           v-if="offered"
           class="system-usage-upgrade"
@@ -331,12 +331,12 @@ function pillTone(row: UsageRow) {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 8px 16px;
 }
 
 .system-usage-plan h2 {
-  margin: 0;
+  margin: 0 auto 0 0;
   font-size: 1.25rem;
   font-weight: 700;
 }

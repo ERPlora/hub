@@ -10,6 +10,7 @@ import datetime as dt
 import logging
 import threading
 import uuid
+from types import SimpleNamespace
 
 import pytest
 from django.db import connection, connections
@@ -311,6 +312,22 @@ def test_several_tasks_writing_at_once_lose_nothing(at):
 
     assert failures == []
     assert (row(hub).requests, row(hub).peak_connections, row(hub).busy_requests) == (15, 7, 10)
+
+
+def test_a_row_another_task_made_meanwhile_is_added_to(acme, monkeypatch):
+    """Both found no row: the second one finds it when it goes to make it, and adds to it instead."""
+
+    def another_task_made_it():
+        HubActivityDaily.objects.create(hub=acme, day=DAY, requests=5, peak_connections=3, busy_requests=1)
+        return True
+
+    monkeypatch.setattr(
+        services, "Hub", SimpleNamespace(objects=SimpleNamespace(filter=lambda **_: SimpleNamespace(exists=another_task_made_it)))
+    )
+
+    assert services.activity_recorded(ACME, DAY, requests=2, peak=7, busy=4) is True
+
+    assert (row(acme).requests, row(acme).peak_connections, row(acme).busy_requests) == (7, 7, 5)
 
 
 # ── The process's thread ──────────────────────────────────────────────────────────────────────────────────────────────

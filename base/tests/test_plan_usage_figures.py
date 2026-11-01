@@ -383,6 +383,12 @@ def test_the_answer_names_the_plan_by_its_slug(hub_a):
     assert usage_of(hub_a)["plan_slug"] == "starter"
 
 
+def test_a_photo_with_no_readable_name_of_plan_says_none(hub_a):
+    on_plan(hub_a, {**STARTER, "slug": 7})
+
+    assert usage_of(hub_a)["plan_slug"] is None
+
+
 def chose_only(hub, *chosen) -> None:
     """The business's own choice of apps: those on, chosen by it; every other one off."""
     with use_hub(hub):

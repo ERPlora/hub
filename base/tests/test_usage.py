@@ -312,10 +312,10 @@ def test_the_day_measured_is_served_as_the_saas_reads_it(measured_night, setting
 
 def test_each_row_says_what_the_day_counted_only_that_day_and_only_its_hub(measured_night):
     """``collect_hub_usage`` (saas) reads them by these names; nothing counted is null, never a zero."""
-    first, second, _ = measured_night
+    first, second, third = measured_night
     HubActivityDaily.objects.create(hub=first, day=DAY, requests=120, peak_connections=3, busy_requests=2)
     HubActivityDaily.objects.create(hub=second, day=DAY, requests=7, peak_connections=0, busy_requests=0)
-    HubActivityDaily.objects.create(hub=second, day=DAY + dt.timedelta(days=1), requests=99, peak_connections=9, busy_requests=9)
+    HubActivityDaily.objects.create(hub=third, day=DAY + dt.timedelta(days=1), requests=99, peak_connections=9, busy_requests=9)
 
     rows = {row["id"]: row for row in usage_of(Client(), "?day=2026-03-10").json()["hubs"]}
 

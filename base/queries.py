@@ -571,7 +571,7 @@ def plan_usage(ctx: OperationContext, data: PlanUsageIn) -> dict:
     return {
         "known": known,
         "demo": demo,
-        "plan_slug": plan.get("slug") if known else None,
+        "plan_slug": _plan_slug(plan) if known else None,
         "people": {"used": people, "limit": _limit(plan, "max_users") if known else None},
         "devices": {"used": devices, "limit": _limit(plan, "max_devices") if known else None},
         "apps": {
@@ -592,6 +592,11 @@ def _plan_of(hub: Hub | None) -> tuple[dict, dict | None, bool]:
     state = hub.state if hub is not None and isinstance(hub.state, dict) else {}
     plan = state.get("plan") if isinstance(state.get("plan"), dict) else None
     return state, plan, plan is not None and all(_is_count(plan.get(field)) for field in ("max_users", "max_devices"))
+
+
+def _plan_slug(plan: dict) -> str | None:
+    slug = plan.get("slug")
+    return slug if isinstance(slug, str) and slug else None
 
 
 def _last_night(hub: Hub | None) -> HubUsageDaily | None:

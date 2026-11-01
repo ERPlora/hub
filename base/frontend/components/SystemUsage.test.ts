@@ -167,6 +167,13 @@ describe('SystemUsage', () => {
       const m = await open(figures({ plan_slug: 'custom-deal' }));
       expect(m.wrapper.find('h2').text()).toBe('Custom-deal plan');
     });
+
+    it('a plan with no name it can read shows no heading, and the way to upgrade stays', async () => {
+      embed({ name: 'Bar', plan_url: PLAN_URL });
+      const m = await open(figures({ plan_slug: null }));
+      expect(m.wrapper.find('h2').exists()).toBe(false);
+      expect(m.part('upgrade').exists()).toBe(true);
+    });
   });
 
   describe('what the plan includes', () => {
