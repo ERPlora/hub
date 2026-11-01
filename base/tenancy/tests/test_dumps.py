@@ -264,7 +264,7 @@ def test_a_stopped_copy_kills_pg_dump_at_once_even_while_it_waits_on_a_lock(hub_
 # ── Control's own copy, before the cut of S5 ──────────────────────────────────────────────────────────────────────
 
 
-def test_control_is_copied_to_a_key_of_its_own_and_no_hub_s_copy_is_noted(dumps_bucket, moto_s3, tmp_path):
+def test_control_is_copied_to_a_key_of_its_own_and_no_hub_s_copy_is_noted(hub_databases, dumps_bucket, moto_s3, tmp_path):
     from base.tenancy import connections as tenancy_connections
 
     noted = HubDump.objects.count()
@@ -278,6 +278,6 @@ def test_control_is_copied_to_a_key_of_its_own_and_no_hub_s_copy_is_noted(dumps_
     assert HubDump.objects.count() == noted
 
 
-def test_without_a_bucket_control_is_not_copied(no_dumps_bucket):
+def test_without_a_bucket_control_is_not_copied(hub_databases, no_dumps_bucket):
     with pytest.raises(dumps.DumpsUnavailable):
         dumps.dump_control(kind=dumps.CUT, now=AT)

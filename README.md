@@ -74,16 +74,18 @@ Plan `docs/plans/2026-10-22-fase-2-tenencia.md` de erplora-next; reglas en PLAN-
   sesiones) y, en esta fase, `base.Membership`. La de cada hub, todo lo demás (`base`, `live` y cada app de `apps/`).
   La lista explícita está en `base/tenancy/inventory.py`; un modelo sin clase falla. El outbox (`live.OutboxEvent`
   y sus entregas) sigue al contexto: las operaciones del registro (`base.hub.*`, `base.demo.*`) lo escriben en control.
-- **Modo compartido transitorio (hasta S5).** `Hub.db_name` vacío = el hub sigue con sus datos en la BD de control,
-  como en la fase 1: los hubs de prod de antes de S2a, las demos de antes y `a`/`b` (`seed_local_hubs`). Desde S2a
-  (ronda 2026-10-30 de PLAN-DB, decisión 1) todo negocio y toda demo nuevos nacen con `db_name` (`<control>_<hex>`,
-  `<control>_demo_<hex>`; `base/tenancy/names.py`) y trabajan en su BD; un test
-  (`base/tenancy/tests/test_provision.py`) impide crear un hub en `base/services.py` sin ella, salvo `a`/`b`:
-  `seed_local_hubs` les da BD propia (clonada de `<control>_template`, con las tablas de todas las apps y todas
-  encendidas) solo cuando todas las apps pueden vivir en una (`provision.portable_apps`); mientras alguna no pueda
-  (`staff`, `attendance`, `task`, `whatsapp_inbox` y las que dependen de ellas apuntan a los usuarios de control),
-  comparten la de control y el log dice qué apps lo impiden. Un `a`/`b` que ya existe conserva su BD. S5 hace el corte
-  y retira el modo.
+- **Sin modo compartido (S5).** Todo negocio y toda demo nacen con `db_name` (`<control>_<hex>`,
+  `<control>_demo_<hex>`; `base/tenancy/names.py`) y trabajan en su BD; un test (`base/tenancy/tests/test_provision.py`)
+  impide crear un hub en `base/services.py` sin ella, también `a`/`b`: `seed_local_hubs` les da su BD (clonada de
+  `<control>_template`, con las tablas de todas las apps y todas encendidas) y se niega si alguna app no puede vivir en
+  una (`migrator.portable_apps`). Un negocio de la fase 1 que aún tiene `db_name` vacío no se sirve: su host da 503
+  `base.hub_maintenance` y el worker lo nombra al arrancar (`ERROR base.worker.hub_without_database`) sin tocarlo, hasta
+  que **`manage.py cut_shared_hubs`** le da su BD (`base/tenancy/cut.py`): `--copy-all <slug>` (una vez, un negocio:
+  todas las filas de las tablas de hub que quedan en control), `--recreate <slug>` (de su plantilla y la foto del SaaS,
+  nada copiado) o `--skip <slug>` (un cancelado, sin BD: si vuelve, `base.hub.restore` le hace una de cero);
+  `--dry-run` dice el plan, y antes del primer corte copia control al bucket de volcados (`<control>/<hora>-cut.dump`;
+  sin bucket, solo con `--no-dump`). Runbook: `docs/runbooks/cut-shared-hubs.md` (ERPlora/docs). `migrate` ya no crea
+  tablas de hub en control (`TenantRouter.allow_migrate`); las que quedan allí de la fase 1 no se tocan.
 - **Alta** (`base/tenancy/provision.py`, S2a). `PUT /internal/hubs/{id}` y `POST /internal/demos` dejan el hub
   `requested` y debido en `control.HubDue`; el worker (o `provision(hub)`) toma su arriendo (`SELECT … FOR UPDATE SKIP
   LOCKED`, 60 s, renovado en cada paso y entre app y app al migrar: dos altas a la vez hacen una sola BD) y lo lleva por `creating` (lo coloca en
@@ -108,9 +110,9 @@ Plan `docs/plans/2026-10-22-fase-2-tenencia.md` de erplora-next; reglas en PLAN-
   la fila manda en host y puertos. Con `secret_name`, las credenciales salen de dos secretos de Secrets Manager bajo
   ese prefijo, `…/app` (el único que puede leer el web) y `…/migrator`, leídos una vez cada 10 min; uno ilegible es un
   error con su nombre, nunca las credenciales del entorno. Sin `secret_name`, las del entorno.
-- **Contexto** (`base/tenancy/context.py`): `use_hub(hub)`, `use_control()` y, transitorio, `use_shared_database()`
-  (la BD única de la fase 1 para lo que aún no tiene un hub: el relevo y las tareas del worker, el admin sin hub
-  elegido, `manage.py shell`, el hub de plataforma sin fila). Sin contexto, un modelo o una operación de hub lanza
+- **Contexto** (`base/tenancy/context.py`): `use_hub(hub)` (un negocio sin BD propia da `HubWithoutDatabase`) y
+  `use_control()` (el registro, las demos, el outbox de control, el admin sin negocio elegido y `manage.py shell` sin
+  `--hub`). El hub de plataforma es una fila más con su BD (`create_platform_hub --execute` la hace). Sin contexto, un modelo o una operación de hub lanza
   `HubContextMissing`: nunca cae a `default`. Una operación de un hub dentro del contexto de otro,
   `HubContextMismatch`.
 - **Enrutado** (`base/tenancy/router.py`, detrás de `SharedRouter`): control → `default`; hub → el alias del contexto.
@@ -159,14 +161,16 @@ Plan `docs/plans/2026-10-22-fase-2-tenencia.md` de erplora-next; reglas en PLAN-
   `DEBUG` (un solo rol); los tests las fijan en `config/settings_pytest.py`. Las de cada cluster se enchufan en
   `migrator.migrator_credentials`.
 - **Quién abre el contexto**: `HubDatabaseMiddleware` (cada petición: el hub del host; en `hubs.localhost`, el hub
-  elegido en el admin o la BD compartida), `HubContextBuilder.enter` (cada re-ejecución viva, en el hilo del ejecutor),
+  elegido en el admin o control, donde el admin solo enseña los modelos de control, `base/admin_site.py`), `HubContextBuilder.enter` (cada re-ejecución viva, en el hilo del ejecutor),
   `/ws/print`, las puertas de `/internal`, el worker y los comandos. Una sesión vale solo en el host donde se abrió
   (`SessionHostMiddleware`): la de B en el host de A es anónima (401).
 - **Tests**: la suite construye por sesión `<BD de test>_template_test` con el migrador y clona dos hubs con BD
   propia (`base/tenancy/tests/hubs.py`; fixtures `hub_a`, `hub_b`; marca `django_db(databases=hubs.HUB_DATABASES)`).
   La plantilla de test lleva todas las apps del hub (`migrator.portable_apps()`, `base/tests/test_hub_user_links.py`).
-  Los tests escritos antes de la tenencia caen en la BD compartida (fixture de sesión `shared_database_fallback`); los
-  de la tenencia y los de cada puerta de entrada la apagan (`no_test_fallback`), como en producción.
+  Los tests escritos antes de la tenencia caen en un respaldo solo de la suite (`base/tenancy/tests/legacy.py`, fixture
+  de sesión `legacy_fallback`): la BD de control de test lleva también las tablas de hub (`LegacyTablesRouter`, solo en
+  `config/settings_pytest.py`) y el worker les corre el paso de la fase 1 (`legacy_worker`); los de la tenencia y los
+  de cada puerta de entrada lo apagan (`no_test_fallback`), como en producción.
 
 
 ### Activar una app crea sus tablas (tajada S3)
@@ -197,8 +201,8 @@ primera vez que el negocio la enciende** (PLAN-DB §7, spec 2026-10-11 «tablas 
   corren. **Apagar** nunca borra tablas; apagada mientras se crean, queda `off` con ellas hechas. Un blueprint que
   enciende una app que aún se prepara no carga sus datos y su informe dice que se vuelva a cargar en un minuto
   («Reintentar» del informe trae lo que faltó).
-- Un hub que aún comparte la BD de la fase 1 (`db_name=""`) enciende al momento, como hasta ahora (propuesta (i) de
-  la ronda 2026-10-30, hasta el corte de S5). `seed_local_hubs` da a `a` y `b` las tablas de todas las apps y todas
+- Desde S5 ningún negocio sin BD propia se sirve; solo el respaldo de la suite tiene alguno, y allí enciende al
+  momento (propuesta (i) de la ronda 2026-10-30). `seed_local_hubs` da a `a` y `b` las tablas de todas las apps y todas
   encendidas (`provision(apps=…)`).
 
 
@@ -284,8 +288,8 @@ La e2e de punta a punta es `tests/e2e/demo.spec.ts` (cómo correrla: `tests/e2e/
 ## Worker: tareas programadas y avisos entre apps
 
 `uv run python manage.py run_worker` es la tarea `worker` (`base/worker.py`): registra los módulos en el SaaS y, cada
-5 s, corre las tareas programadas que tocan (`base/scheduler.py`) y reparte el outbox (`base/relay.py`, ronda
-2026-10-20 de `PLAN-HUB.md`) de la BD compartida; después, en cada hub listo con BD propia (uno a uno, dentro de
+5 s, toma el outbox de control (los eventos del registro y de las demos, que no oye ninguna app; `base/relay.py`,
+ronda 2026-10-20 de `PLAN-HUB.md`); después, en cada hub listo con BD propia (uno a uno, dentro de
 `use_hub`, 3 s por tick como mucho y el siguiente tick sigue por el próximo hub), reparte su outbox, escribe una vez por
 proceso el calendario de sus apps en su BD y corre las tareas que tocan de sus apps encendidas en su propio ámbito (su
 aviso vivo sale por su canal); y al final hace las BD de los hubs debidos en `HubDue` y borra las de las demos que

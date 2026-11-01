@@ -200,7 +200,7 @@ def dump_control(*, kind: str = CUT, now: dt.datetime | None = None, timeout: fl
     key = f"{control}/{made_at:{KEY_TIME}}-{kind}.dump"
     with tempfile.TemporaryDirectory(prefix="control-dump-") as folder:
         path = Path(folder) / "copy.dump"
-        _run_pg_dump(SimpleNamespace(db_name=control, cluster=None, slug=control), path, timeout=timeout, heartbeat=None)
+        run_pg_dump(SimpleNamespace(db_name=control, cluster=None, slug=control), path, timeout=timeout, heartbeat=None)
         size = path.stat().st_size
         try:
             client().upload_file(
