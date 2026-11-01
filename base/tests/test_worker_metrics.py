@@ -3,8 +3,8 @@
 Once its apps are registered and their tasks scheduled, the worker builds its emitter (``metrics.emitter``, on its own
 stop request) and, every tick, starts a metrics pass when one is due (at once, then once a minute of its clock) in a
 thread of its own, ``Background("metrics")``, as its other slow passes (PLAN-DB round 2026-10-31b, C8): a pass that
-takes long (a slow database, CloudWatch unreachable) never delays the relay, the tasks, VeriFactu or the hubs due, and on
-its way out it shares their grace. A worker that never registered its apps measures nothing. No database here: the
+takes long (a slow database, CloudWatch unreachable) never delays the relay, the tasks, VeriFactu or the hubs due, and
+on its way out it shares their grace. A worker that never registered its apps measures nothing. No database here: the
 passes of the tick are the fakes of ``test_worker.py``; the metrics' own tests are ``test_metrics.py``.
 """
 
@@ -111,7 +111,9 @@ def test_a_slow_metrics_pass_never_holds_the_tick(registered, cloudwatch, monkey
     assert measured_in == ["worker-metrics"]
 
 
-def test_on_its_way_out_a_metrics_pass_in_course_shares_the_slow_passes_grace(registered, cloudwatch, monkeypatch, caplog):
+def test_on_its_way_out_a_metrics_pass_in_course_shares_the_slow_passes_grace(
+    registered, cloudwatch, monkeypatch, caplog
+):
     monkeypatch.setattr(worker, "Background", THREADED)
     monkeypatch.setattr(worker, "BACKGROUND_GRACE_SECONDS", 0.2)
     entered, release = threading.Event(), threading.Event()
@@ -137,7 +139,8 @@ def test_on_its_way_out_a_metrics_pass_in_course_shares_the_slow_passes_grace(re
 
     # Within the slow passes' own grace (ECS kills the task 30 s after SIGTERM), never a wait of its own on top.
     assert time.monotonic() - started < 2
-    assert any(message.startswith("worker: the metrics pass is still running on the way out") for message in caplog.messages)
+    said = "worker: the metrics pass is still running on the way out"
+    assert any(message.startswith(said) for message in caplog.messages)
 
 
 def test_off_no_metrics_pass_ever_starts(registered, monkeypatch, settings):

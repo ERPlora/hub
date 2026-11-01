@@ -2638,7 +2638,38 @@
       "templatesError": "No se han podido leer tus plantillas de WhatsApp.",
       "noTemplates": "Todavía no tienes plantillas aprobadas: crea una en WhatsApp › Ajustes.",
       "missing": "«{name}» no está entre tus plantillas de WhatsApp aprobadas: WhatsApp no la enviará.",
-      "variable": "Dato {n}"
+      "variable": "Dato {n}",
+      "fileKinds": {
+        "IMAGE": "Foto",
+        "VIDEO": "Vídeo",
+        "DOCUMENT": "Documento"
+      },
+      "fileName": "{kind}: {name} · {size}",
+      "fileNone": "Ningún archivo elegido",
+      "fileReading": "Leyendo el archivo…",
+      "fileChoose": "Elegir archivo",
+      "fileChange": "Cambiar archivo",
+      "fileUploading": "Subiendo…",
+      "fileRules": {
+        "IMAGE": "JPEG o PNG, hasta 5 MB.",
+        "VIDEO": "MP4, hasta 16 MB.",
+        "DOCUMENT": "PDF, hasta 25 MB."
+      },
+      "fileGoes": "El cliente recibe la plantilla con este archivo arriba.",
+      "fileMissing": {
+        "IMAGE": "Esta plantilla lleva una foto arriba: elígela o WhatsApp no la enviará.",
+        "VIDEO": "Esta plantilla lleva un vídeo arriba: elígelo o WhatsApp no la enviará.",
+        "DOCUMENT": "Esta plantilla lleva un documento arriba: elígelo o WhatsApp no la enviará."
+      },
+      "fileWrongType": {
+        "IMAGE": "Elige una foto JPEG o PNG.",
+        "VIDEO": "Elige un vídeo MP4.",
+        "DOCUMENT": "Elige un documento PDF."
+      },
+      "fileTooHeavy": "Este archivo pesa más de {mb} MB: elige uno más ligero.",
+      "fileUploadFailed": "No se pudo subir el archivo. Inténtalo de nuevo.",
+      "fileGone": "El archivo que había elegido este paso ya no está guardado: elígelo de nuevo.",
+      "fileReadFailed": "No se ha podido leer el archivo de este paso."
     },
     "inbox": {
       "heading": "Esperan tu respuesta",

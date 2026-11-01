@@ -18,15 +18,19 @@ pytestmark = pytest.mark.django_db
 
 
 def make(slug: str, status: str, *, created: dt.datetime, **more) -> Hub:
-    """A registry row in ``status`` created at ``created`` (``created_at`` is ``auto_now_add``: set after the insert)."""
+    """A registry row in ``status`` created at ``created`` (``created_at`` and ``updated_at`` are automatic: set after
+    the insert)."""
     hub = Hub.objects.create(slug=slug, status=status, **more)
-    Hub.objects.filter(pk=hub.pk).update(created_at=created, **({"updated_at": more["updated_at"]} if "updated_at" in more else {}))
+    changed = {"updated_at": more["updated_at"]} if "updated_at" in more else {}
+    Hub.objects.filter(pk=hub.pk).update(created_at=created, **changed)
     return hub
 
 
 def test_with_every_hub_ready_nothing_waits_and_none_failed():
     """The suite's local hubs ``a`` and ``b`` are ready (``conftest.local_hubs``)."""
-    assert registry_health(timezone.now()) == RegistryHealth(oldest_preparing_since=None, failed=0, oldest_ended_demo_since=None)
+    assert registry_health(timezone.now()) == RegistryHealth(
+        oldest_preparing_since=None, failed=0, oldest_ended_demo_since=None
+    )
 
 
 @pytest.mark.parametrize("status", ["requested", "creating", "migrating", "seeding", "failed"])
@@ -56,8 +60,10 @@ def test_a_hub_no_longer_being_prepared_never_waits(status):
 
 def test_a_demo_whose_time_is_up_is_an_ended_demo_not_a_sign_up_still_being_prepared():
     now = timezone.now()
-    make("demo-x", "creating", created=now - dt.timedelta(hours=3), is_demo=True, expires_at=now - dt.timedelta(minutes=5))
-    make("demo-y", "creating", created=now - dt.timedelta(minutes=7), is_demo=True, expires_at=now + dt.timedelta(hours=1))
+    ended = now - dt.timedelta(minutes=5)
+    make("demo-x", "creating", created=now - dt.timedelta(hours=3), is_demo=True, expires_at=ended)
+    later = now + dt.timedelta(hours=1)
+    make("demo-y", "creating", created=now - dt.timedelta(minutes=7), is_demo=True, expires_at=later)
 
     health = registry_health(now)
 
@@ -93,7 +99,8 @@ def test_an_expired_or_dropping_demo_waits_to_be_dropped_since_it_ended(status):
 
 def test_an_expired_demo_without_its_end_waits_since_it_last_changed():
     now = timezone.now()
-    make("demo-x", "expired", created=now - dt.timedelta(days=1), is_demo=True, updated_at=now - dt.timedelta(minutes=50))
+    changed = now - dt.timedelta(minutes=50)
+    make("demo-x", "expired", created=now - dt.timedelta(days=1), is_demo=True, updated_at=changed)
 
     assert registry_health(now).oldest_ended_demo_since == now - dt.timedelta(minutes=50)
 

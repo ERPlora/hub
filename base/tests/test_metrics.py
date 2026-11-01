@@ -78,7 +78,9 @@ def test_the_registry_measures_the_stuck_sign_up_the_failed_hubs_and_the_demo_le
         stuck = Hub.objects.create(slug="acme", status=Hub.Status.CREATING)
         Hub.objects.filter(pk=stuck.pk).update(created_at=now - dt.timedelta(minutes=11))
         Hub.objects.create(slug="broken", status=Hub.Status.FAILED)
-        Hub.objects.create(slug="demo-x", status=Hub.Status.EXPIRED, is_demo=True, expires_at=now - dt.timedelta(minutes=40))
+        Hub.objects.create(
+            slug="demo-x", status=Hub.Status.EXPIRED, is_demo=True, expires_at=now - dt.timedelta(minutes=40)
+        )
 
     found = by_name(metrics.registry_metrics(now, never()))
 
@@ -227,7 +229,8 @@ def test_a_hub_that_cannot_be_read_keeps_its_last_reading_and_is_logged(hub_a, h
     with caplog.at_level(logging.ERROR, logger="base.metrics"):
         assert oldest_age(backlog(now, never())) == pytest.approx(1200.0, abs=1)
 
-    assert f"worker: the fiscal backlog of the hub {hub_a.slug} could not be read; its last reading stays." in caplog.messages
+    said = f"worker: the fiscal backlog of the hub {hub_a.slug} could not be read; its last reading stays."
+    assert said in caplog.messages
 
 
 @hub_db
@@ -278,7 +281,12 @@ def test_every_app_that_keeps_a_fiscal_queue_is_asked_and_the_oldest_answer_wins
     class NoQueue:
         label = "sale"
 
-    configs = [Queue("verifactu", NOW - dt.timedelta(minutes=3)), NoQueue(), Queue("ticketbai", NOW - dt.timedelta(minutes=9)), Queue("other", None)]
+    configs = [
+        Queue("verifactu", NOW - dt.timedelta(minutes=3)),
+        NoQueue(),
+        Queue("ticketbai", NOW - dt.timedelta(minutes=9)),
+        Queue("other", None),
+    ]
     monkeypatch.setattr(metrics, "all_live_app_configs", lambda: configs)
 
     assert metrics.fiscal_pending_since() == NOW - dt.timedelta(minutes=9)
@@ -308,7 +316,10 @@ def denied(operation: str = "PutMetricData") -> ClientError:
 
 
 def hubs_measure(now, stop):
-    return [Metric(HUBS_NAMESPACE, "HubsFailed", 2.0, "Count"), Metric(HUBS_NAMESPACE, "HubsRequestedAgeSeconds", 61.5, "Seconds")]
+    return [
+        Metric(HUBS_NAMESPACE, "HubsFailed", 2.0, "Count"),
+        Metric(HUBS_NAMESPACE, "HubsRequestedAgeSeconds", 61.5, "Seconds"),
+    ]
 
 
 def fiscal_measure(now, stop):
@@ -329,6 +340,11 @@ def released(monkeypatch) -> list[str]:
     return done
 
 
+def datum(name: str, value: float, unit: str) -> dict:
+    """One value as ``PutMetricData`` takes it, at NOW, with prod's dimension."""
+    return {"MetricName": name, "Dimensions": DIMENSIONS, "Timestamp": NOW, "Value": value, "Unit": unit}
+
+
 def test_each_namespace_goes_in_one_call_with_the_environment_dimension(released):
     client = boto3.client("cloudwatch", region_name="eu-west-1", aws_access_key_id="k", aws_secret_access_key="s")
     with Stubber(client) as stub:
@@ -338,8 +354,8 @@ def test_each_namespace_goes_in_one_call_with_the_environment_dimension(released
             {
                 "Namespace": "ERPlora/Hubs",
                 "MetricData": [
-                    {"MetricName": "HubsFailed", "Dimensions": DIMENSIONS, "Timestamp": NOW, "Value": 2.0, "Unit": "Count"},
-                    {"MetricName": "HubsRequestedAgeSeconds", "Dimensions": DIMENSIONS, "Timestamp": NOW, "Value": 61.5, "Unit": "Seconds"},
+                    datum("HubsFailed", 2.0, "Count"),
+                    datum("HubsRequestedAgeSeconds", 61.5, "Seconds"),
                 ],
             },
         )
@@ -349,7 +365,7 @@ def test_each_namespace_goes_in_one_call_with_the_environment_dimension(released
             {
                 "Namespace": "ERPlora/Fiscal",
                 "MetricData": [
-                    {"MetricName": "OldestPendingAgeSeconds", "Dimensions": DIMENSIONS, "Timestamp": NOW, "Value": 30.0, "Unit": "Seconds"}
+                    datum("OldestPendingAgeSeconds", 30.0, "Seconds")
                 ],
             },
         )
@@ -382,7 +398,9 @@ def test_a_measure_that_fails_is_logged_and_the_others_are_published(caplog, rel
     assert "worker: the measure broken failed; its metrics are missing from this pass." in caplog.messages
 
 
-@pytest.mark.parametrize("failure", [denied(), EndpointConnectionError(endpoint_url="https://monitoring")], ids=["denied", "unreachable"])
+@pytest.mark.parametrize(
+    "failure", [denied(), EndpointConnectionError(endpoint_url="https://monitoring")], ids=["denied", "unreachable"]
+)
 def test_cloudwatch_refusing_a_namespace_is_logged_and_the_next_one_is_still_sent(caplog, released, failure):
     client = FakeCloudWatch()
     client.failures = [failure]
@@ -392,7 +410,8 @@ def test_cloudwatch_refusing_a_namespace_is_logged_and_the_next_one_is_still_sen
 
     assert [call["Namespace"] for call in client.calls] == ["ERPlora/Hubs", "ERPlora/Fiscal"]
     assert published == 1
-    assert "worker: CloudWatch did not take the ERPlora/Hubs metrics; the next pass sends them again." in caplog.messages
+    said = "worker: CloudWatch did not take the ERPlora/Hubs metrics; the next pass sends them again."
+    assert said in caplog.messages
 
 
 def test_the_threads_connections_are_released_after_each_measure(released):

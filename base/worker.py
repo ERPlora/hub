@@ -190,9 +190,10 @@ def run(
 
 class Background:
     """One slow pass at a time in a thread of its own (PLAN-DB round 2026-10-31b, C8): the data pass, whose copy of a
-    hub's database may take minutes, the nightly measurement and the CloudWatch metrics. The loop starts it when it is not running and goes on
-    with its tick; a piece that fails is logged and the next tick starts it again. Each piece opens its own connections
-    (the thread starts with no database context: the passes enter theirs) and closes all of them when it ends."""
+    hub's database may take minutes, the nightly measurement and the CloudWatch metrics (``base.metrics``). The loop
+    starts it when it is not running and goes on with its tick; a piece that fails is logged and the next tick starts it
+    again. Each piece opens its own connections (the thread starts with no database context: the passes enter theirs)
+    and closes all of them when it ends."""
 
     def __init__(self, name: str) -> None:
         self.name = name

@@ -1,5 +1,5 @@
-"""Control's reads for the worker's metrics (hub#488; PLAN-AWS §8, PLAN-DB §6 and §8): plain reads of the registry, no
-operation (no hub, no user: the worker's own measure, like ``base.services.hubs_to_serve``), on control's database
+"""Control's reads for the worker's metrics (hub#488; PLAN-AWS §8, PLAN-DB §6 and §8): plain reads of the registry,
+no operation (no hub, no user: the worker's own measure, like ``base.services.hubs_to_serve``), on control's database
 (the caller opens ``use_control``)."""
 
 import datetime as dt

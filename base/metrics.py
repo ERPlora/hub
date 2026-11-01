@@ -147,7 +147,9 @@ class FiscalBacklog:
             with use_hub(hub):
                 self._since[hub.pk] = fiscal_pending_since(relay.active_apps(Scope(HUB_SCOPE_KIND, hub.slug)))
         except Exception:
-            logger.exception("worker: the fiscal backlog of the hub %s could not be read; its last reading stays.", hub.slug)
+            logger.exception(
+                "worker: the fiscal backlog of the hub %s could not be read; its last reading stays.", hub.slug
+            )
         finally:
             close_hub_aliases(hub)
 
@@ -212,7 +214,9 @@ class Emitter:
             try:
                 measured = collect(now, self.stop)
             except Exception:
-                logger.exception("worker: the measure %s failed; its metrics are missing from this pass.", _name(collect))
+                logger.exception(
+                    "worker: the measure %s failed; its metrics are missing from this pass.", _name(collect)
+                )
                 continue
             finally:
                 # A measure's connections (control's, the shared database's) are not handed to the next one broken.
@@ -232,7 +236,9 @@ class Emitter:
             try:
                 self._cloudwatch().put_metric_data(Namespace=namespace, MetricData=data)
             except (BotoCoreError, ClientError):
-                logger.exception("worker: CloudWatch did not take the %s metrics; the next pass sends them again.", namespace)
+                logger.exception(
+                    "worker: CloudWatch did not take the %s metrics; the next pass sends them again.", namespace
+                )
             else:
                 published += len(data)
         logger.debug("worker: published %d metric(s).", published)
