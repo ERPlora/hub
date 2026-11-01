@@ -15,7 +15,7 @@ from types import SimpleNamespace
 import pytest
 from django.db import connections as django_connections
 
-from base.tenancy import connections, names
+from base.tenancy import connections, limits, names
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
 
@@ -72,8 +72,10 @@ def test_a_hub_with_its_database_gets_an_alias_copied_from_the_template():
     registered = django_connections.settings[alias]
     template = django_connections.settings[connections.TEMPLATE_ALIAS]
     assert registered["NAME"] == hub.db_name
-    assert {key: value for key, value in registered.items() if key != "NAME"} == {
-        key: value for key, value in template.items() if key != "NAME"
+    # On the hubs' engine: the plan's limits on every transaction (base.tenancy.limits).
+    assert registered["ENGINE"] == limits.ENGINE
+    assert {key: value for key, value in registered.items() if key not in ("NAME", "ENGINE")} == {
+        key: value for key, value in template.items() if key not in ("NAME", "ENGINE")
     }
     assert registered["OPTIONS"] is not template["OPTIONS"]
     # A new dict was swapped in; the one other threads may be reading is as it was.
@@ -229,3 +231,21 @@ def test_working_in_a_hub_leaves_no_connection_open_to_its_template(hub_a, hub_d
     assert not [
         alias for alias, settings in django_connections.settings.items() if settings["NAME"] == hub_databases.template
     ]
+
+
+@pytest.mark.django_db(transaction=True)
+def test_a_thread_of_the_worker_closes_every_connection_it_opened_when_its_piece_ends():
+    """The worker's slow passes run in threads of their own (base.worker.Background): each piece leaves no connection
+    of its thread open, control's included (review of round 3: one helper of the tenancy, not django.db in the worker)."""
+    left_open: list[bool] = []
+
+    def piece() -> None:
+        django_connections["default"].ensure_connection()
+        connections.close_this_threads_connections()
+        left_open.append(django_connections["default"].connection is not None)
+
+    thread = threading.Thread(target=piece)
+    thread.start()
+    thread.join(10)
+
+    assert left_open == [False]

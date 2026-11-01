@@ -143,6 +143,9 @@ DATA_ROUTES = {
     ("POST", "/api/settings/data/imports/undo", "base.import.undo"),
     ("GET", "/api/settings/data/datasets", "base.dataset.list"),
     ("POST", "/api/settings/data/reset", "base.hub.reset"),
+    # The copies of the business's data (round 2026-10-30 of PLAN-DB, S2b): base/tests/test_data_copies.py.
+    ("GET", "/api/settings/data/dumps", "base.hub.dumps"),
+    ("GET", "/api/settings/data/dumps/link", "base.hub.dump_link"),
 }
 
 

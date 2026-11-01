@@ -9,6 +9,11 @@ registered with another database is refused (``HubAliasConflict``): every thread
 one, so a hub moved to another database needs the process restarted. A template's database (``<control>_template…``)
 never gets one: it is only cloned, and a connection to it would make its next clone fail (PLAN-DB §6).
 
+Every hub's alias runs on the hubs' engine (``base.tenancy.backend``, ``base.tenancy.limits``): each transaction holds a
+place of its hub's limiter in this process and carries its plan's ``statement_timeout``; registering the alias (on every
+``use_hub``) makes or resizes that limiter from the hub's photo. The migrator's alias does not: its passes have their
+own budget.
+
 ``connections.settings`` is never changed in place: ``close_old_connections`` walks it from other threads, so a new
 dict with the alias is swapped in, under a lock, after looking again. A hub of the shared database (``db_name=""``,
 phase 1 until S5) stays on ``default``.
@@ -31,7 +36,7 @@ import threading
 
 from django.db import DEFAULT_DB_ALIAS, connections
 
-from base.tenancy import names
+from base.tenancy import limits, names
 from base.tenancy.credentials import APP, MIGRATOR, credentials_for
 
 #: The static alias every hub's alias is copied from; nobody connects to it.
@@ -99,7 +104,8 @@ def _not_a_template(name: str, control: str) -> str:
 
 def register_hub_alias(hub) -> str:
     """The alias of ``hub``'s own database, registered if this process has not yet; its name is validated first, and
-    a template's is refused."""
+    a template's is refused. It runs on the hubs' engine, and its limiter follows ``hub``'s photo
+    (``base.tenancy.limits``)."""
     control = control_name()
     name = _not_a_template(names.validate(hub.db_name, control=control), control)
     alias = hub_alias(hub)
@@ -108,7 +114,7 @@ def register_hub_alias(hub) -> str:
         raise HubAliasConflict(
             f"{alias} already reaches {registered['NAME']!r} in this process, and its hub now names {name!r}."
         )
-    overrides = {"NAME": name}
+    overrides = {"NAME": name, "ENGINE": limits.ENGINE}
     cluster = getattr(hub, "cluster", None)
     if cluster is not None:
         found = credentials_for(cluster, APP)
@@ -129,6 +135,7 @@ def register_hub_alias(hub) -> str:
     rotated = registered is not None and any(registered[key] != overrides.get(key, registered[key]) for key in ROLE_KEYS)
     _register(alias, lambda: _copied(TEMPLATE_ALIAS, **overrides), replace=rotated)
     _take_this_threads_role(alias)
+    limits.configure(alias, hub)
     return alias
 
 
@@ -212,3 +219,9 @@ def open_hub_alias(hub) -> str:
 
         identity.verify(alias, hub.id)
     return alias
+
+
+def close_this_threads_connections() -> None:
+    """Close every connection this thread opened, control's included (a pooled one goes back to its pool): what a
+    thread of the worker does when its piece ends (``base.worker.Background``, as ``migrate_hubs``' threads)."""
+    connections.close_all()

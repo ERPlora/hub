@@ -142,6 +142,33 @@ def outbound_pool(request, monkeypatch):
     assert pool.stop(grace=10), "a job of base.outbound was still running when the test ended"
 
 
+class _NoSlowPasses:
+    """``base.worker.Background`` in the tests: the worker's loop starts no slow pass. They run in threads of their own,
+    on their own connections, so in a test they would commit outside its transaction (a nightly ``UsageRun`` the relay's
+    tests left broke the next tests, W8 2026-10-31). Their own tests call ``worker._data``/``_usage`` directly."""
+
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+    def busy(self) -> bool:
+        return False
+
+    def start(self, piece) -> bool:
+        return False
+
+    def join(self, timeout: float) -> bool:
+        return True
+
+
+@pytest.fixture(autouse=True)
+def worker_slow_passes(request, monkeypatch):
+    """The worker's loop runs no slow pass (``_NoSlowPasses``) unless the test is marked ``worker_slow_passes``."""
+    if request.node.get_closest_marker("worker_slow_passes") is None:
+        from base import worker
+
+        monkeypatch.setattr(worker, "Background", _NoSlowPasses)
+
+
 # ── Phase 2's tenancy (plan docs/plans/2026-10-22-fase-2-tenencia.md, S1) ─────────────────────────────────────────
 
 
