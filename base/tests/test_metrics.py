@@ -19,7 +19,6 @@ the session's two hub databases; CloudWatch is botocore's ``Stubber`` on a real 
 import datetime as dt
 import logging
 import threading
-import time
 
 import boto3
 import pytest
@@ -420,109 +419,72 @@ def test_the_measures_are_the_registrys_and_the_fiscal_backlog():
     assert len(collectors) == 2
 
 
-# ── The thread ──────────────────────────────────────────────────────────────────────────────────────────────────────
+# ── When a pass starts ──────────────────────────────────────────────────────────────────────────────────────────
 
 
-def test_off_nothing_runs_and_it_is_said_once(settings, caplog, monkeypatch):
-    settings.METRICS_ENABLED = False
-    monkeypatch.setattr(metrics, "default_collectors", lambda: pytest.fail("no measure runs while off"))
+class FakeRunner:
+    """Stands in for the worker's ``Background("metrics")``: records each piece it is given, runs none of them, and
+    says it is busy when told."""
 
-    with caplog.at_level(logging.INFO, logger="base.metrics"):
-        emitter = metrics.start(never())
+    def __init__(self) -> None:
+        self.pieces: list = []
+        self.busy = False
 
-    assert emitter.join(0) is True
-    assert not any(thread.name == "worker-metrics" for thread in threading.enumerate())
-    assert caplog.messages == ["worker: CloudWatch metrics are off (METRICS_ENABLED): nothing is published."]
+    def start(self, piece) -> bool:
+        if self.busy:
+            return False
+        self.pieces.append(piece)
+        return True
 
 
-def test_on_it_publishes_at_once_then_every_interval_until_stopped(released):
-    stop = threading.Event()
+def test_on_a_pass_starts_at_once_then_once_a_minute_of_the_workers_clock(released):
     client = FakeCloudWatch()
-    times = iter(range(1000))
-    emitter = Emitter(
-        stop, collectors=[fiscal_measure], client=client, interval=0.05, clock=lambda: NOW + dt.timedelta(minutes=next(times))
-    ).start()
+    emitter = Emitter(never(), collectors=[fiscal_measure], client=client)
+    runner = FakeRunner()
 
-    deadline = time.monotonic() + 5
-    while len(client.calls) < 3 and time.monotonic() < deadline:
-        time.sleep(0.01)
-    stop.set()
+    started = [emitter.start_due(NOW + dt.timedelta(seconds=second), runner) for second in (0, 5, 55, 60, 65, 125)]
 
-    assert emitter.join(2) is True
-    assert [call["MetricData"][0]["Timestamp"] for call in client.calls[:3]] == [
+    assert started == [True, False, False, True, False, True]
+    for piece in runner.pieces:
+        piece()
+    assert [call["MetricData"][0]["Timestamp"] for call in client.calls] == [
         NOW,
-        NOW + dt.timedelta(minutes=1),
-        NOW + dt.timedelta(minutes=2),
+        NOW + dt.timedelta(seconds=60),
+        NOW + dt.timedelta(seconds=125),
     ]
 
 
-def test_started_by_the_settings_it_runs_the_default_measures_in_its_thread(monkeypatch, released):
+def test_a_pass_still_running_is_not_started_again_and_the_next_tick_tries(released):
+    emitter = Emitter(never(), collectors=[fiscal_measure], client=FakeCloudWatch())
+    runner = FakeRunner()
+    assert emitter.start_due(NOW, runner) is True
+
+    runner.busy = True
+    assert emitter.start_due(NOW + dt.timedelta(seconds=60), runner) is False
+    runner.busy = False
+
+    assert emitter.start_due(NOW + dt.timedelta(seconds=65), runner) is True
+    assert len(runner.pieces) == 2
+
+
+def test_off_no_pass_ever_starts_and_it_is_said_once(settings, caplog, monkeypatch):
+    settings.METRICS_ENABLED = False
+    monkeypatch.setattr(metrics, "default_collectors", lambda: pytest.fail("no measure is even built while off"))
+    runner = FakeRunner()
+
+    with caplog.at_level(logging.INFO, logger="base.metrics"):
+        emitter = metrics.emitter(never())
+        started = [emitter.start_due(NOW + dt.timedelta(minutes=minute), runner) for minute in range(3)]
+
+    assert started == [False, False, False]
+    assert runner.pieces == []
+    assert caplog.messages == ["worker: CloudWatch metrics are off (METRICS_ENABLED): nothing is published."]
+
+
+def test_on_the_worker_gets_the_default_measures_on_its_stop_request(monkeypatch):
     stop = threading.Event()
-    measured = threading.Event()
-    seen: list[str] = []
+    monkeypatch.setattr(metrics, "default_collectors", lambda: ["registry", "fiscal"])
 
-    def measure(now, stop_):
-        seen.append(threading.current_thread().name)
-        measured.set()
-        return []
+    emitter = metrics.emitter(stop)
 
-    monkeypatch.setattr(metrics, "default_collectors", lambda: [measure])
-    emitter = metrics.start(stop)
-
-    assert measured.wait(5)
-    stop.set()
-    assert emitter.join(2) is True
-    assert seen[0] == "worker-metrics"
-
-
-def test_a_stop_while_it_waits_ends_the_thread_at_once(released):
-    stop = threading.Event()
-    emitter = Emitter(stop, collectors=[fiscal_measure], client=FakeCloudWatch(), interval=3600).start()
-    time.sleep(0.05)
-
-    started = time.monotonic()
-    stop.set()
-
-    assert emitter.join(2) is True
-    assert time.monotonic() - started < 1
-
-
-def test_a_pass_that_fails_unexpectedly_is_logged_and_the_next_one_runs(caplog, released):
-    stop = threading.Event()
-    client = FakeCloudWatch()
-    ticks = iter([RuntimeError("clock broke"), NOW, NOW, NOW, NOW])
-
-    def clock():
-        value = next(ticks)
-        if isinstance(value, Exception):
-            raise value
-        return value
-
-    with caplog.at_level(logging.ERROR, logger="base.metrics"):
-        emitter = Emitter(stop, collectors=[fiscal_measure], client=client, interval=0.01, clock=clock).start()
-        deadline = time.monotonic() + 5
-        while not client.calls and time.monotonic() < deadline:
-            time.sleep(0.01)
-        stop.set()
-        emitter.join(2)
-
-    assert client.calls
-    assert "worker: a metrics pass failed; the next one runs in its time." in caplog.messages
-
-
-def test_a_pass_still_running_on_the_way_out_is_said_and_left(caplog, released):
-    stop = threading.Event()
-    release = threading.Event()
-
-    def slow(now, stop_):
-        release.wait(5)
-        return []
-
-    emitter = Emitter(stop, collectors=[slow], client=FakeCloudWatch()).start()
-    stop.set()
-    with caplog.at_level(logging.WARNING, logger="base.metrics"):
-        assert emitter.join(0.05) is False
-    release.set()
-    assert emitter.join(2) is True
-
-    assert "worker: the metrics pass is still running on the way out; it ends with the process." in caplog.messages
+    assert (emitter.enabled, emitter.collectors, emitter.stop) == (True, ["registry", "fiscal"], stop)

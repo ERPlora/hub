@@ -1,7 +1,8 @@
 """The worker's CloudWatch metrics (hub#488; PLAN-AWS §8 «Observabilidad mínima»; PLAN-DB §6 and §8).
 
-Once a minute, in a thread of its own (``worker-metrics``: the worker's tick never waits for it), the worker measures
-and publishes with ``PutMetricData``, every value with the ``Environment`` dimension (``ERPLORA_ENVIRONMENT``):
+Once a minute of its clock, in a thread of its own (the worker's ``Background("metrics")``, ``worker-metrics``: the tick
+never waits for it), the worker measures and publishes with ``PutMetricData``, every value with the ``Environment``
+dimension (``ERPLORA_ENVIRONMENT``):
 
 - ``ERPlora/Hubs`` (:func:`registry_metrics`, control's registry in one query): ``HubsRequestedAgeSeconds``, since when
   the oldest hub still being prepared waits (requested, creating, migrating, seeding, or failed and retried);
@@ -27,11 +28,11 @@ import threading
 import time
 from collections.abc import Callable, Collection
 from dataclasses import dataclass
+from functools import partial
 
 from botocore.exceptions import BotoCoreError, ClientError
 from django.conf import settings
 from django.db import close_old_connections
-from django.utils import timezone
 from live.context import Scope
 from live.meta import all_live_app_configs
 
@@ -173,23 +174,35 @@ def _name(collector: Collector) -> str:
 
 
 class Emitter:
-    """Measures and publishes every ``interval`` seconds, in its own thread, until ``stop`` is set (the worker's)."""
+    """Measures and publishes, one pass at a time in the worker's ``Background("metrics")`` thread (``base.worker``),
+    once every ``interval`` seconds of the worker's clock; off (``METRICS_ENABLED``), it never starts a pass."""
 
     def __init__(
         self,
         stop: threading.Event,
         *,
+        enabled: bool = True,
         collectors: list[Collector] | None = None,
         client=None,
         interval: float = INTERVAL_SECONDS,
-        clock: Callable[[], dt.datetime] = timezone.now,
     ) -> None:
         self.stop = stop
-        self.collectors = default_collectors() if collectors is None else collectors
+        self.enabled = enabled
+        self.collectors = (default_collectors() if enabled else []) if collectors is None else collectors
         self.interval = interval
-        self.clock = clock
         self._client = client
-        self._thread: threading.Thread | None = None
+        self._next: dt.datetime | None = None
+
+    def start_due(self, now: dt.datetime, runner) -> bool:
+        """Start a pass at ``now`` in ``runner`` (``base.worker.Background``) when on, at once and then once
+        ``interval`` passed since the last one started; whether it started. A pass still running is not started again:
+        the next tick tries."""
+        if not self.enabled or (self._next is not None and now < self._next):
+            return False
+        if not runner.start(partial(self.publish, now)):
+            return False
+        self._next = now + dt.timedelta(seconds=self.interval)
+        return True
 
     def publish(self, now: dt.datetime) -> int:
         """Measure everything at ``now`` and send each namespace in one ``PutMetricData``; how many values went out."""
@@ -202,7 +215,7 @@ class Emitter:
                 logger.exception("worker: the measure %s failed; its metrics are missing from this pass.", _name(collect))
                 continue
             finally:
-                # The measure's connections (control's, the shared database's) are not kept open while the thread waits.
+                # A measure's connections (control's, the shared database's) are not handed to the next one broken.
                 close_old_connections()
             for metric in measured:
                 by_namespace.setdefault(metric.namespace, []).append(
@@ -222,6 +235,7 @@ class Emitter:
                 logger.exception("worker: CloudWatch did not take the %s metrics; the next pass sends them again.", namespace)
             else:
                 published += len(data)
+        logger.debug("worker: published %d metric(s).", published)
         return published
 
     def _cloudwatch(self):
@@ -229,38 +243,10 @@ class Emitter:
             self._client = cloudwatch_client()
         return self._client
 
-    def start(self) -> "Emitter":
-        """Run the passes in the ``worker-metrics`` thread: the first one at once."""
-        self._thread = threading.Thread(target=self._run, name="worker-metrics", daemon=True)
-        self._thread.start()
-        return self
 
-    def _run(self) -> None:
-        while not self.stop.is_set():
-            started = time.monotonic()
-            try:
-                published = self.publish(self.clock())
-            except Exception:
-                logger.exception("worker: a metrics pass failed; the next one runs in its time.")
-            else:
-                logger.debug("worker: published %d metric(s).", published)
-            self.stop.wait(max(0.0, self.interval - (time.monotonic() - started)))
-
-    def join(self, timeout: float) -> bool:
-        """Wait up to ``timeout`` seconds for the pass in course once ``stop`` is set; whether none runs after."""
-        if self._thread is None:
-            return True
-        self._thread.join(timeout)
-        if self._thread.is_alive():
-            logger.warning("worker: the metrics pass is still running on the way out; it ends with the process.")
-            return False
-        return True
-
-
-def start(stop: threading.Event) -> Emitter:
-    """The worker's emitter, started when ``METRICS_ENABLED`` is on; off, one line says so and nothing runs (its
-    ``join`` returns at once)."""
+def emitter(stop: threading.Event) -> Emitter:
+    """The worker's emitter: on with ``METRICS_ENABLED``; off, one line says so and it never starts a pass."""
     if not settings.METRICS_ENABLED:
         logger.info("worker: CloudWatch metrics are off (METRICS_ENABLED): nothing is published.")
-        return Emitter(stop, collectors=[])
-    return Emitter(stop).start()
+        return Emitter(stop, enabled=False)
+    return Emitter(stop)

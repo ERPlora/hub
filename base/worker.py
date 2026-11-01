@@ -51,10 +51,10 @@ run on it (``use_shared_database``: every hub with ``db_name=""``), each hub wit
 (``use_hub``), and the reaper and the ``hub_due`` pass on control (``use_control``), where the registry and the demos
 live (the provisioning enters each hub's own database itself).
 
-Once its apps are registered, its CloudWatch metrics run in a thread of their own (``base.metrics``, hub#488): once a
-minute the registry's (a sign-up still being prepared, the hubs that failed, a demo left to drop) and the fiscal
-backlog, only where ``METRICS_ENABLED`` is on; the tick never waits for them, and on its way out the worker gives a
-pass in course ``METRICS_GRACE_SECONDS``.
+Its CloudWatch metrics (``base.metrics``, hub#488), only where ``METRICS_ENABLED`` is on, are a third slow pass in a
+thread of its own (``Background("metrics")``), started on the first tick and then once a minute of its clock, also with
+``databases_only``: the registry's (a sign-up still being prepared, the hubs that failed, a demo left to drop) and the
+fiscal backlog. On the way out it shares the others' grace, ending before its next hub.
 """
 
 import datetime as dt
@@ -105,9 +105,6 @@ EMPTYING_LEASE = dt.timedelta(minutes=15)
 #: What the calls in flight (``base.outbound``) get when the worker stops: ECS kills the task 30 s after SIGTERM, and
 #: the loop's step ends first. What still runs then is left to its lease.
 OUTBOUND_GRACE_SECONDS = 15
-#: What a metrics pass in course gets when the worker stops (``base.metrics``: it ends before its next hub), before the
-#: calls in flight get theirs; what still runs then ends with the process.
-METRICS_GRACE_SECONDS = 5.0
 
 
 def run(
@@ -163,10 +160,10 @@ def run(
     else:
         registered = f"{result.written} app(s) registered: {', '.join(result.apps)}"
     logger.info("worker: waiting for work (%s).", registered)
-    emitter = metrics.start(stop)
+    emitter = metrics.emitter(stop)
     next_reap: dt.datetime | None = None
     # The slow passes, each in a thread of its own and one at a time: the loop keeps ticking while they run.
-    data_pass, usage_pass = Background("data"), Background("usage")
+    data_pass, usage_pass, metrics_pass = Background("data"), Background("usage"), Background("metrics")
     while not stop.is_set():
         now = clock()
         if not databases_only:
@@ -175,16 +172,17 @@ def run(
             _hubs(now)
             data_pass.start(partial(_data, now, stop))
             usage_pass.start(partial(_usage, now))
+        emitter.start_due(now, metrics_pass)
         if next_reap is None or now >= next_reap:
             _reap(now)
             next_reap = now + dt.timedelta(seconds=REAPER_INTERVAL_SECONDS)
         _due(now)
         wait(tick_seconds)
-    # On the way out: a copy hears the stop (pg_dump killed, its lease given back); both get a while, together.
+    # On the way out: a copy hears the stop (pg_dump killed, its lease given back), a metrics pass ends before its next
+    # hub; they all get a while, together.
     deadline = time.monotonic() + BACKGROUND_GRACE_SECONDS
-    for runner in (data_pass, usage_pass):
+    for runner in (data_pass, usage_pass, metrics_pass):
         runner.join(max(0.0, deadline - time.monotonic()))
-    emitter.join(METRICS_GRACE_SECONDS)
     outbound.stop(OUTBOUND_GRACE_SECONDS)
     logger.info("worker: stopped.")
     return 0
@@ -192,7 +190,7 @@ def run(
 
 class Background:
     """One slow pass at a time in a thread of its own (PLAN-DB round 2026-10-31b, C8): the data pass, whose copy of a
-    hub's database may take minutes, and the nightly measurement. The loop starts it when it is not running and goes on
+    hub's database may take minutes, the nightly measurement and the CloudWatch metrics. The loop starts it when it is not running and goes on
     with its tick; a piece that fails is logged and the next tick starts it again. Each piece opens its own connections
     (the thread starts with no database context: the passes enter theirs) and closes all of them when it ends."""
 
