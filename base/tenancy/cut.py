@@ -338,7 +338,10 @@ def _cut(hub_id, mode: str, dump: str, started: float) -> Outcome:
     def renew() -> None:
         services.renew_hub_lease(hub_id, timezone.now(), LEASE)
 
-    hub = services.place_hub(hub_id)
+    try:
+        hub = services.place_hub(hub_id)
+    except services.ProvisioningFailed as failed:
+        raise CutError(str(failed)) from failed
     if hub.db_name or hub.status != Hub.Status.READY:
         raise CutError(
             f"it is {hub.status} with database {hub.db_name or '-'}: only a ready business on control's is cut."

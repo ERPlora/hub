@@ -58,6 +58,8 @@ class Command(BaseCommand):
             on_control = services.hubs_on_control()
             refusals = self._refusals(modes)
             self._print_plan(on_control, modes, no_dump)
+        for line in refusals:
+            self.stdout.write(f"Refused: {line}")
         if dry_run:
             self.stdout.write("Dry run: nothing was written.")
             return

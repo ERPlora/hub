@@ -22,6 +22,7 @@ from django.db import DEFAULT_DB_ALIAS, connections
 
 from base.tenancy import context, inventory, names
 
+
 def _route(model, hints: dict) -> str | None:
     database_class = inventory.classify(model)
     if database_class == inventory.CONTROL:

@@ -239,6 +239,10 @@ def test_an_unknown_business_a_demo_and_one_named_twice_are_refused(phase_one):
 
     with pytest.raises(CommandError, match="no business"):
         run("--recreate", "nobody-here", "--no-dump")
+    # The dry run says what would be refused too, and still writes nothing.
+    said = run("--dry-run", "--recreate", "nobody-here", "--recreate", demo.slug)
+    assert "Refused: nobody-here: no business has this name." in said
+    assert f"Refused: {demo.slug}: a demo is not cut" in said
     with pytest.raises(CommandError, match="a demo is not cut"):
         run("--recreate", demo.slug, "--no-dump")
     with pytest.raises(CommandError, match="named more than once"):
@@ -434,6 +438,24 @@ def test_the_last_step_of_a_second_copy_all_is_refused_even_when_two_runs_raced(
         )
     assert refused.value.code == "base.hub_copy_all_taken"
     assert fresh(second).db_name == ""
+
+
+def test_without_a_cluster_with_room_the_cut_says_so_and_makes_nothing(phase_one):
+    from django.db import connections as django_connections
+
+    from control.models import Cluster
+
+    aurora = phase_one.business("aurora")
+    default = django_connections.settings["default"]
+    closed = Cluster.objects.create(name="closed", host=default["HOST"], port=default["PORT"], is_open=False)
+    before = databases()
+    try:
+        with pytest.raises(CommandError, match="no_cluster_available"):
+            run("--recreate", aurora.slug, "--no-dump")
+    finally:
+        Hub.objects.filter(pk=aurora.pk).update(cluster=None)
+        closed.delete()
+    assert fresh(aurora).db_name == "" and databases() == before
 
 
 def test_only_the_platform_finishes_a_cut(phase_one):
