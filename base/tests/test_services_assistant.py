@@ -89,14 +89,6 @@ def test_a_new_question_offers_the_tools_of_what_it_asks_and_the_instructions():
     assert "17.00 EUR → 1700" in plan["instructions"] and "`currency_decimals`" in plan["instructions"]
 
 
-def test_a_turn_reads_the_hubs_own_words():
-    """In the Hub a «cuenta» is a table's open check (``base.assistant.SYNONYMS``): the turn offers the read of a check
-    among its first tools, as the assistant's QA ranks it (base/tests/test_assistant_asks.py), never at 14."""
-    asked = {"role": "user", "content": "¿qué hay en la cuenta de la mesa 6?"}
-    plan = run("base.assistant.turn", {"*"}, messages=[asked])
-    assert assistant.tool_name("sale.order.get") in [tool["name"] for tool in plan["tools"]][:10]
-
-
 def test_the_instructions_take_the_decimals_of_the_business_currency_not_two():
     """FIX-HUB-BASE-ASSISTANT-CARD-MONEY-IN-BUSINESS-NOT-PREVIEW-CURRENCY: a yen business has no cents, so its turn
     tells the model «17 JPY → 17» (``base.business.get``'s ``currency_decimals``), never a fixed «.00 → 1700»;
@@ -541,3 +533,11 @@ def test_waiting_for_erplora_com_holds_no_transaction(gateway, monkeypatch, oper
     monkeypatch.setattr(assistant, "_post", probe)
     run(operation_name, EMPLOYEE, **data)
     assert seen == [False]
+
+
+def test_a_turn_reads_the_hubs_own_words():
+    """In the Hub a «cuenta» is a table's open check (``base.assistant.SYNONYMS``): the turn offers the read of a check
+    among its first tools, as the assistant's QA ranks it (base/tests/test_assistant_asks.py), never at 14."""
+    asked = {"role": "user", "content": "¿qué hay en la cuenta de la mesa 6?"}
+    plan = run("base.assistant.turn", {"*"}, messages=[asked])
+    assert assistant.tool_name("sale.order.get") in [tool["name"] for tool in plan["tools"]][:10]
