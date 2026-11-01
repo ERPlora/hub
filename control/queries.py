@@ -50,7 +50,9 @@ def platform_staff_only(ctx: OperationContext) -> None:
 
 
 def _key(cluster: Cluster | None, name: str) -> str:
-    return f"{SIZE_KEY_PREFIX}:{cluster.pk if cluster is not None else 'settings'}:{name}"
+    """The cache key of ``name``'s size on ``cluster``'s server: the server is its hash tag (``{<id>}``), one slot of the
+    Valkey cluster for every database of one server, read and kept in one call each (``base/cache.py``)."""
+    return f"{SIZE_KEY_PREFIX}:{{{cluster.pk if cluster is not None else 'settings'}}}:{name}"
 
 
 def _cached(what: str, call, default):
