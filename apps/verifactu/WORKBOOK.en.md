@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:5c79f935129f7b5110049f5f33aa036def9d18316d58a688939830e0bfe449ae -->
+<!-- generated from WORKBOOK.md sha256:89229c8cbefd17a1746d321eef6669523c8e93acc45b8b1e4ca815a3e5523e28 -->
 
 ## What it is for and who it is for
 
@@ -238,7 +238,7 @@ Screen notices: the result of each action in a strip on top (green if it went we
 | VERIFACTU-F29 | Continue the chain of another application (migration) | done |
 | VERIFACTU-F30 | Cancel a record sent by error | done |
 | VERIFACTU-F31 | Watch the submissions from the screens | done — also from the four Home panels |
-| VERIFACTU-F32 | Prevent turning the app off with unsent records | done — VeriFactu's `can_disable` and 409 `base.app_vetoed` from `base.app.disable` (hub#267) |
+| VERIFACTU-F32 | Prevent turning the app off once on | done — VeriFactu's `can_disable` and 409 `base.app_vetoed` from `base.app.disable` (hub#267); in Spain it never goes off (FIX-HUB-VERIFACTU-NEVER-OFF-ONCE-ON) |
 | VERIFACTU-F33 | Cease the activity | discarded — the census deregistration belongs to the business, outside ERPlora; a deregistered business does not open (410) |
 | VERIFACTU-F34 | Renew the own certificate | done — in the Hub (uploading the renewed one replaces the previous one) |
 | VERIFACTU-F35 | Ask the AEAT whether it already has a queue record | done — in the record's detail, in the Hub's admin and through the API |
@@ -862,24 +862,26 @@ Out: nothing; it is a lookup.
 If it fails: the message with "Retry".
 Involved: none
 
-### VERIFACTU-F32 Prevent turning the app off with unsent records
+### VERIFACTU-F32 Prevent turning the app off once on
 Status: done — the platform asks when turning off (`base.app.disable`, hub#256) and VeriFactu answers with its
-`can_disable` (hub#267, FIX-BASE-APP-TURN-OFF-VETO)
+`can_disable` (hub#267, FIX-BASE-APP-TURN-OFF-VETO); in Spain, once on, it never goes off
+(FIX-HUB-VERIFACTU-NEVER-OFF-ONCE-ON)
 Actor: system
 Screen: Hub: Apps
 Steps:
-1. When turning VeriFactu off, the platform asks it how many records are not at the AEAT yet: the pending ones
-   (also those waiting for their retry) and those sent with no answer. Invoicing cannot be turned off while
-   VeriFactu is on, because VeriFactu needs it.
-2. If any is left, it refuses and VeriFactu stays on. What the AEAT already answered (accepted, accepted with errors
-   or rejected) does not count: a rejection is corrected with a new record, which counts while it does not go out.
-3. In a business outside Spain it never refuses: its records are not going to be sent, so turning it off stops
+1. When turning VeriFactu off in a business in Spain, the platform asks it and VeriFactu always refuses: once on,
+   the business's invoices have to keep reaching the AEAT (the law requires staying with VERI*FACTU at least until
+   the natural year ends, and ERPlora has no other way of recording them).
+2. Whatever the queue holds makes no difference: with records to send or with everything already answered by the
+   AEAT, the answer is the same. VeriFactu stays on and its records stay as they were. Invoicing cannot be turned off
+   either, because VeriFactu needs it.
+3. A business without a country (a demo) is in Spain: it does not go off either.
+4. In a business outside Spain it never refuses: its records are not going to be sent, so turning it off stops
    nothing; they are kept as they are.
 In: the request to turn it off.
-Out: nothing if it refuses; the app off if nothing is left to send.
-If it fails: "VeriFactu still has {n} records to send to the AEAT. Wait until they are sent or fix them before turning
-it off." (with one: "VeriFactu still has 1 record to send to the AEAT. Wait until it is sent or fix it before turning
-it off.").
+Out: nothing in Spain; outside Spain, the app off.
+If it fails: "VeriFactu can't be turned off once it's on: the law requires your invoices to keep reaching the
+AEAT.".
 Involved: BASE-F23, BASE-F25
 
 ### VERIFACTU-F33 Cease the activity
@@ -953,7 +955,7 @@ invoice** (`TICKET-2026-000012`) or by its sequence; an issuer, by its tax ID.
 | The current record of an invoice (QR, CSV, status) | view | F19 | `verifactu.record.by_invoice` |
 | The queue: the records not yet at the AEAT | view | F20–F22 | `verifactu.contingency.list` |
 | The audit events, with search by words and filters | view | F31 | `verifactu.event.list` |
-| How many records are not at the AEAT (and whether it can be turned off) | view | F31, F32 | `verifactu.stats.compliance_summary`; when turning off, `can_disable` |
+| How many records are not at the AEAT | view | F31 | `verifactu.stats.compliance_summary` |
 | The records by status | view | F31 | `verifactu.stats.records_by_status` |
 | The summary of the queue | view | F31 | `verifactu.stats.contingency_summary` |
 | The latest events | view | F31 | `verifactu.stats.events_recent` |
@@ -1037,7 +1039,7 @@ delivered).
 |---|---|---|
 | Invoicing | Seal the record of each document inside its issuing | `verifactu.record.create` |
 | Sales, Invoicing, Printing | Put the QR and the fiscal status on the ticket and the invoice | `verifactu.record.by_invoice` |
-| Platform (`base.app.disable`) | Not turn VeriFactu off with unsent records (in Spain) | `can_disable` of `VerifactuConfig` |
+| Platform (`base.app.disable`) | Not turn VeriFactu off once on (in Spain) | `can_disable` of `VerifactuConfig` |
 
 ### Who can do what
 

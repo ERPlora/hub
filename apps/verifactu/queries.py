@@ -814,29 +814,21 @@ def compliance_summary(ctx: OperationContext, data: NoInput) -> ComplianceSummar
     )
 
 
-#: Why VeriFactu refuses to go off while its queue holds records (VERIFACTU-F32): one, or how many.
-STILL_TO_SEND_ONE = _(
-    "VeriFactu still has 1 record to send to the AEAT. Wait until it is sent or fix it before turning it off."
-)
-STILL_TO_SEND = _(
-    "VeriFactu still has %(count)s records to send to the AEAT. Wait until they are sent or fix them before turning "
-    "it off."
-)
+#: Why VeriFactu never goes off once on, in Spain (VERIFACTU-F32, FIX-HUB-VERIFACTU-NEVER-OFF-ONCE-ON).
+NEVER_OFF = _("VeriFactu can't be turned off once it's on: the law requires your invoices to keep reaching the AEAT.")
 
 
 def disable_refusal(ctx: OperationContext) -> str | None:
-    """VERIFACTU-F32: why the app may not go off yet, in ``ctx``'s language, or ``None``. While a record is not in the
-    AEAT (``Record.UNSENT``: pending, its retry waiting included, or sent without an answer) turning it off would stop
-    its send; what the AEAT answered is out of the queue (a rejected one is corrected with a new record, which counts
-    again). Read in the hub of the active context, inside ``base.app.disable``'s transaction. Outside Spain no record
-    is ever sent, so turning it off stops nothing: never refused (the records are kept)."""
+    """VERIFACTU-F32: why the app may not go off, in ``ctx``'s language, or ``None``. In Spain, never once on: from
+    then on the business's invoices reach the AEAT, VERI*FACTU binds it at least to the end of the natural year
+    (RD 1007/2023, Orden HAC/1177/2024) and ERPlora keeps no other way of recording them, so whatever its queue holds
+    the answer is the same (FIX-HUB-VERIFACTU-NEVER-OFF-ONCE-ON). A business without a country (a demo) is in Spain.
+    Outside Spain no record is ever sent, so turning it off stops nothing: never refused (the records are kept). The
+    country is read in the hub of the active context, inside ``base.app.disable``'s transaction."""
     if outside_spain(ctx.scope):
         return None
-    count = Record.objects.filter(status__in=Record.UNSENT).count()
-    if not count:
-        return None
     with translation.override(ctx.language):
-        return str(STILL_TO_SEND_ONE) if count == 1 else str(STILL_TO_SEND) % {"count": count}
+        return str(NEVER_OFF)
 
 
 @operation(

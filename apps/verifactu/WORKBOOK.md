@@ -253,7 +253,7 @@ Avisos de la pantalla: el resultado de cada acción en una franja arriba (verde 
 | VERIFACTU-F29 | Continuar la cadena de otra aplicación (migración) | hecho |
 | VERIFACTU-F30 | Anular un registro enviado por error | hecho |
 | VERIFACTU-F31 | Vigilar los envíos desde las pantallas | hecho — también desde los cuatro paneles del Inicio |
-| VERIFACTU-F32 | Impedir apagar la app con registros sin enviar | hecho — `can_disable` de VeriFactu y 409 `base.app_vetoed` de `base.app.disable` (hub#267) |
+| VERIFACTU-F32 | Impedir apagar la app una vez encendida | hecho — `can_disable` de VeriFactu y 409 `base.app_vetoed` de `base.app.disable` (hub#267); en España no se apaga nunca (FIX-HUB-VERIFACTU-NEVER-OFF-ONCE-ON) |
 | VERIFACTU-F33 | Cesar la actividad | descartado — la baja censal es del negocio, fuera de ERPlora; un negocio dado de baja no abre (410) |
 | VERIFACTU-F34 | Renovar el certificado propio | hecho — en el Hub (subir el renovado sustituye al anterior) |
 | VERIFACTU-F35 | Preguntar a la AEAT si ya tiene un registro de la cola | hecho — en la ficha del registro, en el admin del Hub y por la API |
@@ -898,25 +898,27 @@ Sale: nada; es consulta.
 Si falla: el mensaje con «Reintentar».
 Implicados: ninguno
 
-### VERIFACTU-F32 Impedir apagar la app con registros sin enviar
+### VERIFACTU-F32 Impedir apagar la app una vez encendida
 <!-- origen: fi:modules/verifactu#query-verifactu-stats-compliance_summary old-hub:HUB-F314 old-hub:HUB-F316 old:verifactu/workflow/control.md#verifactu-f32 -->
 Estado: hecho — la plataforma pregunta al apagar (`base.app.disable`, hub#256) y VeriFactu responde con su
-`can_disable` (hub#267, FIX-BASE-APP-TURN-OFF-VETO)
+`can_disable` (hub#267, FIX-BASE-APP-TURN-OFF-VETO); en España, una vez encendida, no se apaga nunca
+(FIX-HUB-VERIFACTU-NEVER-OFF-ONCE-ON)
 Actor: sistema
 Pantalla: Hub: Apps
 Pasos:
-1. Al apagar VeriFactu, la plataforma le pregunta cuántos registros no están todavía en la AEAT: los pendientes
-   (también los que esperan su reintento) y los enviados sin respuesta. Facturación no se puede apagar mientras
-   VeriFactu esté encendida, porque VeriFactu la necesita.
-2. Si queda alguno, lo niega y VeriFactu sigue encendida. Lo que la AEAT ya contestó (aceptado, aceptado con errores
-   o rechazado) no cuenta: un rechazo se subsana con un registro nuevo, que cuenta mientras no salga.
-3. En un negocio de fuera de España no lo niega nunca: sus registros no se van a enviar, así que apagarla no para
+1. Al apagar VeriFactu en un negocio de España, la plataforma le pregunta y VeriFactu lo niega siempre: una vez
+   encendida, las facturas del negocio tienen que seguir llegando a la AEAT (la ley obliga a seguir con VERI*FACTU
+   al menos hasta que acabe el año natural, y ERPlora no tiene otra forma de registrarlas).
+2. Da igual lo que haya en la cola: con registros por enviar o con todo ya contestado por la AEAT, la respuesta es
+   la misma. VeriFactu sigue encendida y sus registros se quedan como estaban. Facturación tampoco se puede apagar,
+   porque VeriFactu la necesita.
+3. Un negocio sin país (una demo) es de España: tampoco se apaga.
+4. En un negocio de fuera de España no lo niega nunca: sus registros no se van a enviar, así que apagarla no para
    nada; se guardan tal cual.
 Entra: la petición de apagar.
-Sale: nada si se niega; la app apagada si no queda nada por enviar.
-Si falla: «VeriFactu aún tiene {n} registros por enviar a la AEAT. Espera a que se envíen o arréglalos antes de
-desactivarla.» (con uno: «VeriFactu aún tiene 1 registro por enviar a la AEAT. Espera a que se envíe o arréglalo
-antes de desactivarla.»).
+Sale: nada en España; fuera de España, la app apagada.
+Si falla: «VeriFactu no se puede desactivar una vez activada: la ley obliga a que tus facturas sigan llegando a la
+AEAT.».
 Implicados: BASE-F23, BASE-F25
 
 ### VERIFACTU-F33 Cesar la actividad
@@ -992,7 +994,7 @@ factura** (`TICKET-2026-000012`) o por su secuencia; un emisor, por su NIF.
 | El registro vigente de una factura (QR, CSV, estado) | ver | F19 | `verifactu.record.by_invoice` |
 | La cola: los registros que aún no están en la AEAT | ver | F20–F22 | `verifactu.contingency.list` |
 | Los eventos de auditoría, con búsqueda por palabras y filtros | ver | F31 | `verifactu.event.list` |
-| Cuántos registros no están en la AEAT (y si se puede apagar) | ver | F31, F32 | `verifactu.stats.compliance_summary`; al apagar, `can_disable` |
+| Cuántos registros no están en la AEAT | ver | F31 | `verifactu.stats.compliance_summary` |
 | Los registros por estado | ver | F31 | `verifactu.stats.records_by_status` |
 | El resumen de la cola | ver | F31 | `verifactu.stats.contingency_summary` |
 | Los últimos eventos | ver | F31 | `verifactu.stats.events_recent` |
@@ -1075,7 +1077,7 @@ sellado no añade nada (`already`). En un negocio de fuera de España no reaccio
 |---|---|---|
 | Facturación | Sellar el registro de cada documento dentro de su emisión | `verifactu.record.create` |
 | Ventas, Facturación, Impresión | Poner el QR y el estado fiscal en el tique y la factura | `verifactu.record.by_invoice` |
-| Plataforma (`base.app.disable`) | No apagar VeriFactu con registros sin enviar (en España) | `can_disable` de `VerifactuConfig` |
+| Plataforma (`base.app.disable`) | No apagar VeriFactu una vez encendida (en España) | `can_disable` de `VerifactuConfig` |
 
 ### Quién puede qué
 
@@ -1499,6 +1501,17 @@ Las cerradas quedan tachadas con su motivo; las abiertas dicen dónde siguen.
     **Apps** no la ofrezca encendible fuera de España necesita un gancho de encendido de la plataforma
     (`can_enable(self, ctx) -> str | None` en `LiveAppConfig`, como `can_disable`, que respeten `base.app.enable` y
     `base.app.list`); hasta entonces se enciende y no hace nada.
+16. **Una vez encendida, VeriFactu no se apaga en España** (FIX-HUB-VERIFACTU-NEVER-OFF-ONCE-ON, 2026-11-01; ajuste
+    de Ioan del 22/10 en el plan de la fase 2, «Tablas por módulo (S3)»): `disable_refusal` contesta siempre
+    `NEVER_OFF`, salvo fuera de España (decisión 15); sin país (una demo), es España. La AEAT obliga a seguir con
+    VERI*FACTU al menos hasta el fin del año natural (FAQ de su sede) y el mercado no deja apagarlo a mitad de año
+    (Square: la baja se aplica a final de año; Sage 50: baja con fecha 31-12, «irreversible» tras la primera factura
+    certificada; B2Brouter, el conector de Business Central: desde 2027 no se desactiva en un ejercicio con envíos;
+    Zoho Books: desaconsejado salvo migración). ERPlora no tiene modo «NO VERI*FACTU», así que una baja diferida a
+    fin de año dejaría al negocio sin registro de sus facturas: la regla es «nunca», sin baja programada. Sustituye a
+    la negativa por registros pendientes (hub#267; el aviso con cuántos de hub#2595 queda sin objeto). Solo
+    `base.app.disable` apaga una app: bajar de plan no apaga nada (BASE-F24), la foto del SaaS no apaga apps, una
+    demo caducada se borra entera y la baja de un negocio conserva su base de datos.
 
 ### Cambios frente al producto actual
 
