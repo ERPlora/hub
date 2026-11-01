@@ -19,6 +19,7 @@ HTML = "text/html,application/xhtml+xml"
 #: Each page with the context its view renders it with (base.middleware, base.auth_views).
 PAGES = {
     "preparing": ("base/hub_preparing.html", {}),
+    "maintenance": ("base/hub_maintenance.html", {}),
     "gone": ("base/hub_gone.html", {"is_demo": False, "back_url": f"{SAAS}/launch"}),
     "gone-demo": ("base/hub_gone.html", {"is_demo": True, "back_url": f"{SAAS}/demo/ended"}),
     "suspended": ("base/hub_suspended.html", {"back_url": f"{SAAS}/launch"}),

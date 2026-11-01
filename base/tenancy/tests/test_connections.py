@@ -15,7 +15,7 @@ from types import SimpleNamespace
 import pytest
 from django.db import connections as django_connections
 
-from base.tenancy import connections, names
+from base.tenancy import connections, limits, names
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
 
@@ -72,8 +72,10 @@ def test_a_hub_with_its_database_gets_an_alias_copied_from_the_template():
     registered = django_connections.settings[alias]
     template = django_connections.settings[connections.TEMPLATE_ALIAS]
     assert registered["NAME"] == hub.db_name
-    assert {key: value for key, value in registered.items() if key != "NAME"} == {
-        key: value for key, value in template.items() if key != "NAME"
+    # On the hubs' engine: the plan's limits on every transaction (base.tenancy.limits).
+    assert registered["ENGINE"] == limits.ENGINE
+    assert {key: value for key, value in registered.items() if key not in ("NAME", "ENGINE")} == {
+        key: value for key, value in template.items() if key not in ("NAME", "ENGINE")
     }
     assert registered["OPTIONS"] is not template["OPTIONS"]
     # A new dict was swapped in; the one other threads may be reading is as it was.

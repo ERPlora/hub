@@ -9,6 +9,7 @@ included, so a tool found here is found in any business with fewer apps on.
 """
 
 import pytest
+from live import assistant as shared
 from live.context import OperationContext, Scope
 
 from base import assistant
@@ -121,3 +122,37 @@ def test_each_question_of_the_qa_battery_is_offered_its_tools(owner, index, aske
     for texts in ([asked], [before, asked] if before else [asked]):
         missing = expected - set(offered(ctx, *texts))
         assert not missing, (texts, missing)
+
+
+#: The Hub's own words (``base.assistant.SYNONYMS``), in phrases no tool says as its asks: a «cuenta», a check or a
+#: tab is a table's open check (``sale.order``), never the person's account; a ticket or a receipt is a sale's.
+HUB_WORDS = [
+    ("es", "¿qué hay en la cuenta de la mesa 6?", "sale.order.get"),
+    ("es", "divide la cuenta de la mesa 2 entre tres", "sale.order.split"),
+    ("en", "what's on the tab for table 6?", "sale.order.get"),
+    ("es", "reimprime el ticket 25", "sale.sale.print"),
+    ("es", "¿de cuánto fue el ticket 25?", "sale.sale.get"),
+    ("en", "show me ticket 25", "sale.sale.get"),
+]
+
+
+@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@pytest.mark.parametrize(("language", "asked", "expected"), HUB_WORDS)
+def test_the_hubs_own_words_bring_the_tool_they_mean_among_the_first_ten(owner, language, asked, expected):
+    """Before the Hub said what its words mean, these came at 11 to 31, or not at all: «cuenta» shared no word with an
+    order and «ticket» brought the kitchen's tickets (live#22 leaves those meanings to each project)."""
+    ctx = owner(language)
+    assert expected in assistant.catalog(ctx)  # the owner holds it: only the selection can leave it out
+    assert expected in offered(ctx, asked)[:10]
+
+
+@pytest.mark.django_db  # the catalogue is of the apps on in the business (base.activation)
+@pytest.mark.parametrize(
+    ("language", "asked"), [("es", "¿cómo invito a alguien a mi negocio?"), ("en", "how do I split a check?")]
+)
+def test_a_how_to_question_ranks_the_documentation_first_by_being_one(owner, language, asked):
+    """The documentation search is always offered (``ALWAYS``), and a how-to question also ranks it first by itself
+    (``HOWTO``): ranked without what is always at hand, it still leads."""
+    tools = assistant.catalog(owner(language))
+    ranking = {**assistant.RANKING, "always": ()}
+    assert [op.name for op in shared.relevant(tools, [asked], language, **ranking)][0] == assistant.DOCS_SEARCH

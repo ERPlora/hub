@@ -10,6 +10,7 @@
     "typecheck": "vue-tsc --noEmit -p tsconfig.app.json && vue-tsc --noEmit -p tsconfig.vitest.json && vue-tsc --noEmit -p tsconfig.node.json && vue-tsc --noEmit -p tests/e2e/tsconfig.json",
     "lint": "eslint .",
     "e2e": "playwright test -c tests/e2e/playwright.config.ts",
+    "qa:probes": "node tests/e2e/assistant-probes.ts",
     "gen:app-icons": "node scripts/app-icons.mjs"
   },
   "dependencies": {

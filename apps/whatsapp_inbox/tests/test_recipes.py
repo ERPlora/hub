@@ -324,6 +324,34 @@ def test_an_answer_tells_the_assistant_what_she_wrote_and_her_number(ref):
 
 
 @pytest.mark.parametrize("ref", ANSWERS)
+def test_an_answer_tells_the_assistant_the_options_it_last_offered_her_in_the_business_s_language(ref):
+    """F19: what the business last wrote her (the numbered list «the 2nd» points to) goes on its own lines too, never
+    read as an instruction, and the Spanish answer has its own words, not the English ones."""
+    for language in ("en", "es"):
+        assert "\n———\n{{steps.s1.options}}\n———\n" in assistant_step(ref, language)["prompt"], language
+    assert assistant_step(ref, "es")["prompt"] != assistant_step(ref, "en")["prompt"]
+    assert "«el 2»" in assistant_step(ref, "es")["prompt"]
+
+
+def test_who_has_the_table_answer_on_without_the_options_is_offered_the_version_that_reads_them(monkeypatch):
+    """WHATSAPP_INBOX-F18, F19: an answer turned on before it heard the options last offered is «New version», and
+    updating it gives its assistant that list."""
+    older = copy.deepcopy(RECIPES)
+    [table] = [recipe for recipe in older if recipe["id"] == "reservation_from_whatsapp"]
+    [step] = [step for step in table["steps"] if step["kind"] == "assistant"]
+    step["prompt"] = "A guest wrote:\n———\n{{steps.s1.body}}\n———\n"
+    with monkeypatch.context() as patch:
+        patch.setattr(inbox_recipes, "RECIPES", older)
+        run("flow.recipe.enable", {"recipe": TABLE_REF}, ctx_for("hub_owner"))
+
+    [row] = [row for row in run("flow.recipe.list", {}, ctx_for("hub_owner")).recipes if row.ref == TABLE_REF]
+    assert row.installed.outdated is True
+    flow = run("flow.recipe.restore", {"recipe": TABLE_REF}, ctx_for("hub_owner"))
+    [assistant] = [step for step in flow.steps if step["kind"] == "assistant"]
+    assert "{{steps.s1.options}}" in assistant["prompt"]
+
+
+@pytest.mark.parametrize("ref", ANSWERS)
 def test_an_answer_books_only_on_her_card(ref):
     """Her card, found by her number or just made, and her number are fixed on a booking and on a place on the waiting
     list; the prompt asks her for neither."""

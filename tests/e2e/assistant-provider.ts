@@ -17,6 +17,9 @@
 //   preview (`invoice.invoice.rectification_preview`) with that reason, then says it (`rectifyPreview`) and, in the same
 //   answer, asks for the dangerous write `invoice.invoice.rectify` of the invoice it named; a preview refused, it says
 //   why and asks for nothing;
+// - `E2E-OFFER <line> | <line> | …`: answers with those lines, one under the other (a numbered list of options); a write
+//   named in it as `E2E-ASK` is only asked by the next question that hears the list (WHATSAPP_INBOX-F19: the guest's
+//   «the 2nd» comes with what the business last wrote them);
 // - `E2E-CLAIM`: says it created something without running anything;
 // - `E2E-DOWN`: the provider fails (500);
 // - `E2E-SLOW`: a long answer, piece by piece, to stop it half-way;
@@ -213,6 +216,8 @@ export function answerTo(messages: Message[]): { status: number; frames: unknown
   if (last?.role === 'tool') {
     return text(refused(textOf(last.content)) ? 'No lo he hecho.' : 'Hecho.');
   }
+  const offer = /E2E-OFFER (.+)$/m.exec(question);
+  if (offer) return text(offer[1].split(' | ').join('\n'));
   const create = /E2E-CREATE (.+)$/m.exec(question);
   if (create) return call('demo__item__create', { name: create[1].trim() });
   const remove = /E2E-DELETE (\S+)/.exec(question);

@@ -385,6 +385,25 @@ export function redact(text: string, secrets: string[]): string {
   return secrets.filter(Boolean).reduce((out, secret) => out.split(secret).join('[redacted]'), text);
 }
 
+/** The member of ERPlora's staff the seed acts as on the stack's SaaS; the cleanup removes it again. */
+export const QA_STAFF_EMAIL = 'qa-assistant-staff@example.com';
+
+/**
+ * Only a stack's own SaaS database (`saas_e2e_<port>`) gets the real keys and the QA accounts: never the shared one
+ * (`saas`, the stack on :8000) nor any other.
+ */
+export function guardSaasDatabase(name: string): void {
+  if (name === 'saas') {
+    throw new Error(
+      'the real-model QA never writes to the shared SaaS database «saas»: run it on its own stack ' +
+        '(E2E_SAAS_DB=saas_e2e_<port>, tests/e2e/README.md)',
+    );
+  }
+  if (!/(^|_)e2e(_|$)/.test(name)) {
+    throw new Error(`«${name}» is not an e2e database: the real-model QA only seeds a stack's own SaaS database (saas_e2e_<port>)`);
+  }
+}
+
 /**
  * The SaaS side of the seed (`manage.py shell -c` in the stack's SaaS, DEBUG only): the real providers set through the
  * gateway's own operations, as ERPlora's staff does in the admin. `openai` (the services' provider: embeddings, and the
@@ -411,9 +430,9 @@ services.credential_import(
     services.platform_context(), CredentialImportIn(kind="openai", api_key=openai_secret, label="qa", force=True)
 )
 User = get_user_model()
-staff = User.objects.filter(email="qa-assistant-staff@example.com").first()
+staff = User.objects.filter(email="${QA_STAFF_EMAIL}").first()
 if staff is None:
-    staff = User.objects.create_user(email="qa-assistant-staff@example.com", password=None, is_staff=True, language="en")
+    staff = User.objects.create_user(email="${QA_STAFF_EMAIL}", password=None, is_staff=True, language="en")
 staff.user_permissions.add(*Permission.objects.filter(content_type__app_label="assistant"))
 staff = User.objects.get(pk=staff.pk)
 ctx = OperationContext(scope=Scope("user", str(staff.pk)), actor=staff, permissions=frozenset({"assistant.manage"}), language="en")
@@ -435,6 +454,7 @@ type Env = Record<string, string | undefined>;
 
 /** How the seed runs from the stack's SaaS checkout: on `saasDatabase`, the keys only in the environment. */
 export function seedCommand(env: Env, saasDatabase: string): { file: string; args: string[]; env: Record<string, string> } {
+  guardSaasDatabase(saasDatabase);
   for (const name of ['QA_QWEN_API_KEY', 'QA_OPENAI_API_KEY']) {
     if (!env[name]?.trim()) throw new Error(`${name} is not set: export it before a run with the real provider (tests/e2e/README.md).`);
   }
@@ -450,5 +470,37 @@ export function seedCommand(env: Env, saasDatabase: string): { file: string; arg
       QA_ANSWER_MODEL: ANSWER_MODEL,
       QA_FALLBACK_MODEL: FALLBACK_MODEL,
     },
+  };
+}
+
+/**
+ * What a run leaves behind on the stack's SaaS, taken out again once it ends, failed or not (`manage.py shell -c`,
+ * DEBUG only): every provider key labelled `qa` (the real keys the seed wrote) and the accounts it made, named in
+ * `QA_CLEANUP_EMAILS` (their memberships go with them). It prints how many of each, never a key.
+ */
+export const CLEANUP_PY = `
+import json, os
+from django.conf import settings
+from django.contrib.auth import get_user_model
+from assistant.models import AIProviderCredential
+
+if not settings.DEBUG:
+    raise SystemExit("the real-provider cleanup only runs with DEBUG=True")
+emails = [email.strip() for email in os.environ["QA_CLEANUP_EMAILS"].split(",") if email.strip()]
+keys = AIProviderCredential.objects.filter(label="qa").delete()[0]
+accounts = get_user_model().objects.filter(email__in=emails)
+named = accounts.count()
+accounts.delete()
+print(json.dumps({"keys": keys, "accounts": named}))
+`;
+
+/** How the cleanup runs from the stack's SaaS checkout, on `saasDatabase`, for the accounts `emails`. */
+export function cleanupCommand(env: Env, saasDatabase: string, emails: string[]): { file: string; args: string[]; env: Record<string, string> } {
+  guardSaasDatabase(saasDatabase);
+  const base = Object.fromEntries(Object.entries(env).filter((entry): entry is [string, string] => entry[1] !== undefined));
+  return {
+    file: 'uv',
+    args: ['run', 'python', 'manage.py', 'shell', '-c', CLEANUP_PY],
+    env: { ...base, DB_NAME: saasDatabase, QA_CLEANUP_EMAILS: emails.join(',') },
   };
 }

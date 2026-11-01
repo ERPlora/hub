@@ -1,7 +1,7 @@
 # Workbook — Automatizaciones (app)
 Prefijo: FLOW
 Alcance MVP: transversal (peluquería y restaurante: reglas «cuando pase esto, haz aquello»)
-Estado de la app: hecha (servidor, motor y páginas)
+Estado de la app: completa (2026-11-01)
 
 > Manual de usuario y especificación de la app `flow`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `hecho` cuando sus tests están en verde (servidor
@@ -103,7 +103,7 @@ Menú **Automatizaciones**, una sola entrada. De arriba abajo:
   (opcional)**, **Aprobar** y **No** (FLOW-F29). Un responsable o un empleado,
   que solo contestan, ven solo esto: «No hay nada esperando tu respuesta.» cuando no hay nada.
 - **Propuestas por el asistente** — solo si hay borradores: «El asistente las escribió cuando le
-  pediste una automatización. No hace nada hasta que la revises y la actives.», y por cada uno su
+  pediste una automatización. No hacen nada hasta que las revises y las actives.», y por cada uno su
   nombre, la etiqueta «Borrador», **Revisar** y una × («Descartar») (FLOW-F18, FLOW-F19).
 - **Tus automatizaciones** — solo si hay alguna. El buscador «Busca por nombre, por lo que la arranca o
   por lo que hace», los filtros **Ver** (encendidas, en pausa) y **Arranca con** (algo que pasa, un
@@ -118,7 +118,7 @@ Menú **Automatizaciones**, una sola entrada. De arriba abajo:
   automatizaciones hechas (hoy, «Citas», «Reservas online» y «Bandeja de WhatsApp»), con sus tarjetas, su estado («Activa»,
   «En pausa», «Versión nueva») y **Encenderla**, **Ponerla en pausa**, **Verla** y **Restaurar la de
   fábrica** (FLOW-F33 a F35); al final, la línea de lo que falta («Hay automatizaciones ocultas: necesitan
-  la app …») (FLOW-F04).
+  Tareas.») (FLOW-F04).
 
 ### Editor de automatización
 Se abre al tocar una fila, al pulsar **Nueva automatización**, al usar una tarjeta o al revisar un
@@ -130,7 +130,7 @@ borrador. Cabecera: ← (vuelve a la lista; si hay cambios sin guardar, pregunta
   para arrastrar y × (las esperas y los «Solo sigue si…» son tiras estrechas; el resto, tarjetas que se
   despliegan al tocarlas; dentro, **Más opciones**: «Solo si…» y «Si falla, sigue», FLOW-F25), y los
   botones para añadir: **Hacer algo**, **Consultar algo**, **Solo sigue
-  si…**, **Esperar**, **Enviar un mensaje** (FLOW-F31, con la Bandeja de WhatsApp), **Llamar a otro sistema**
+  si…**, **Esperar**, **Enviar un mensaje** (FLOW-F31 y F32, con la Bandeja de WhatsApp), **Llamar a otro sistema**
   (FLOW-F27), **Preguntar antes a alguien** (FLOW-F28) y **Pedírselo al asistente** (FLOW-F37). Sin pasos: «Todavía no hay pasos. Añade lo primero que debe hacer esta
   automatización.»
 - **Probar**: lo que haría con lo último que pasó, sin hacer nada (FLOW-F13).
@@ -193,7 +193,7 @@ automatizaciones** regresa (FLOW-F08).
 | FLOW-F29 | Contestar lo que pregunta una automatización | hecho |
 | FLOW-F30 | Cerrar lo que nadie contestó a tiempo | hecho |
 | FLOW-F31 | Mandar un mensaje a un cliente | hecho |
-| FLOW-F32 | Poner una foto, un vídeo o un PDF en la cabecera de un WhatsApp | parcial |
+| FLOW-F32 | Poner una foto, un vídeo o un PDF en la cabecera de un WhatsApp | hecho |
 | FLOW-F33 | Encender una automatización que trae otra app | hecho |
 | FLOW-F34 | Poner en pausa una automatización que trae otra app, sin borrarla | hecho |
 | FLOW-F35 | Restaurar la versión de fábrica de una automatización que trae otra app | hecho |
@@ -913,7 +913,8 @@ Pasos:
    también en los huecos de la plantilla.
 4. Elige la «Plantilla» entre tus plantillas aprobadas por Meta (debajo se ve su texto) y rellena un dato por
    cada hueco: pasadas las 24 horas, WhatsApp solo deja pasar una plantilla aprobada. Sin plantillas
-   aprobadas lo dice: «Todavía no tienes plantillas aprobadas: crea una en WhatsApp › Ajustes.».
+   aprobadas lo dice: «Todavía no tienes plantillas aprobadas: crea una en WhatsApp › Ajustes.». Si la que
+   eliges lleva arriba una foto, un vídeo o un documento, se manda con su archivo (FLOW-F32).
 5. **Guardar** y, en **Permisos**, autoriza «Enviar un WhatsApp a un cliente» (FLOW-F12).
 Entra: el teléfono del cliente (de un aviso o de un paso anterior), las plantillas aprobadas de la Bandeja de
 WhatsApp y la conversación de ese número.
@@ -928,21 +929,34 @@ el número de WhatsApp sin conectar o los mensajes del plan de este mes gastados
 solo le llega a un cliente que lo haya aceptado en Clientes. Lo que Meta rechace después se ve en la
 conversación de la bandeja («No entregado»). Sin la Bandeja de WhatsApp el botón no aparece; por correo
 todavía no se puede (ver «Qué queda fuera»).
-Implicados: FLOW-F11, FLOW-F12, FLOW-F16, WHATSAPP_INBOX-F23, WHATSAPP_INBOX-F33
+Implicados: FLOW-F11, FLOW-F12, FLOW-F16, FLOW-F32, WHATSAPP_INBOX-F23, WHATSAPP_INBOX-F33
 
 ### FLOW-F32 Poner una foto, un vídeo o un PDF en la cabecera de un WhatsApp
 <!-- origen: old-hub:HUB-F112 -->
-Estado: parcial — el paso «Enviar un mensaje» (FLOW-F31) manda texto y plantillas con cabecera de texto; una foto, un vídeo o un PDF necesitan un sitio donde guardar los archivos y plantillas con esa cabecera, que el Hub todavía no tiene
+Estado: hecho
 Actor: propietario, administrador
 Pantalla: Editor de automatización
 Pasos:
-1. Abre una automatización y mira los botones para añadir de **Pasos**.
-2. En **Enviar un mensaje** (FLOW-F31), la «Plantilla» solo ofrece las que el Hub sabe rellenar: las que
-   llevan una foto, un vídeo o un documento arriba no salen.
-Entra: —
-Sale: nada todavía.
-Si falla: no aplica mientras la cabecera con archivo no se ofrezca.
-Implicados: FLOW-F31
+1. En un paso **Enviar un mensaje** (FLOW-F31), elige en «Plantilla» una que lleve arriba una foto, un vídeo o un
+   documento: debajo sale el archivo que se manda con ella y lo que acepta WhatsApp («JPEG o PNG, hasta 5 MB.»,
+   «MP4, hasta 16 MB.» o «PDF, hasta 25 MB.»).
+2. Si la plantilla ya tiene su archivo (la hiciste en WhatsApp › Ajustes), sale su nombre y su tamaño («Foto:
+   carta.jpg · 6,2 KB») y se manda ese; para mandar otro, pulsa **Cambiar archivo**.
+3. Si no lo tiene (la hiciste en WhatsApp Manager), sale «Ningún archivo elegido» y el aviso «Esta plantilla lleva
+   una foto arriba: elígela o WhatsApp no la enviará.»: pulsa **Elegir archivo** y elige uno del tipo que pide.
+4. El archivo se guarda en el acto en los archivos del negocio y el paso lo nombra. **Guardar**: al volver a abrir
+   la automatización, el paso sigue nombrando su archivo.
+Entra: la plantilla aprobada que eliges y el archivo, de este negocio.
+Sale: al ejecutarse, el WhatsApp le llega al cliente con ese archivo arriba y queda en su conversación de la
+bandeja, nombrando el archivo con el que salió (WHATSAPP_INBOX-F33). Si cambias de plantilla, el paso suelta el
+archivo elegido.
+Si falla: un archivo de otro tipo o más pesado de lo que acepta WhatsApp se dice debajo y no se sube («Elige una
+foto JPEG o PNG.», «Este archivo pesa más de 5 MB: elige uno más ligero.»); si no se puede guardar, «No se pudo
+subir el archivo. Inténtalo de nuevo.». Si el archivo que eligió el paso ya no está guardado, lo dice («El archivo
+que había elegido este paso ya no está guardado: elígelo de nuevo.»); si no se puede leer ahora, «No se ha podido
+leer el archivo de este paso.» con **Reintentar**. Sin archivo, al ejecutarse no sale nada y el motivo queda en el
+historial de la automatización (FLOW-F16); un archivo de otro negocio nunca se manda.
+Implicados: FLOW-F11, FLOW-F16, FLOW-F31, WHATSAPP_INBOX-F29, WHATSAPP_INBOX-F33
 
 ### FLOW-F33 Encender una automatización que trae otra app
 <!-- origen: old-hub:HUB-F105 old-hub:HUB-F104 old:flows/workflow/lista-y-galeria.md#flows-f05 -->
@@ -1262,7 +1276,11 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   la única de enviar que una automatización puede tener: solo a la conversación viva del número internacional
   exacto, texto dentro de las 24 horas y plantilla aprobada fuera, con el tope del mes; sale por el mismo camino
   que lo enviado desde la bandeja. El envío de la bandeja (`whatsapp_inbox.message.send`, a cualquier número)
-  sigue necesitando a una persona delante.
+  sigue necesitando a una persona delante. La «Plantilla» ofrece las que la bandeja sabe rellenar
+  (`whatsapp_inbox.template.list` con `fillable`); el archivo de una cabecera con foto, vídeo o documento
+  (FLOW-F32) lo guarda la bandeja en los archivos del negocio (`whatsapp_inbox.template_sample.upload`, con el
+  permiso de responder de quien edita) y el paso guarda solo su id (`template.header_sample`), que lee al abrirse
+  (`whatsapp_inbox.template_sample.detail`); al ejecutarse, la bandeja manda solo un archivo de este negocio.
 - **A su propio `flow.run.parked`**: cuando una ejecución espera a «Llamar a otro sistema», el worker hace la
   llamada (`flow.run.call`, FLOW-F27); nunca la petición que la dejó esperando.
 - De la plataforma: la zona horaria del negocio (los horarios) y los avisos del outbox (el último de un
@@ -1671,27 +1689,38 @@ Los avisos llevan ids, nunca nombres ni contenidos.
 
 ## Contradicciones señaladas (no resueltas aquí)
 
-- **PLAN-HUB** deja los flows para «tarde» (tabla de rutas del hub y §8); la decisión de Ioan del
-  2026-10-15 los porta ya: hace falta una ronda nueva en PLAN-HUB que lo diga.
+- **PLAN-HUB** dejaba los flows para «tarde» (tabla de rutas del hub y §8), y la decisión de Ioan del
+  2026-10-15 los portaba ya. Resuelta: la ronda de cierre de esta app en PLAN-HUB (2026-11-01) dice que el motor y
+  la pantalla de automatizaciones están portados y completos en `apps/flow`.
 - **El asistente como actor** de FLOW-F03, F12 y F15: es coherente con «no enciende ni concede sin
   confirmarlo» porque `create`/`update` ya no llevan el interruptor y `set_enabled`, `grant`, `run` y
   `delete` son `risk: "high"` (el asistente confirma antes).
-- **`@operation` hoy no aplica la app activa** (fase 1): el catálogo de esta app filtra por las apps
-  instaladas y el motor comprueba que la operación sigue en él al ejecutar; la comprobación de la
-  plataforma llega con la fase 2.
+- **`@operation` no aplicaba la app activa** en la fase 1: el catálogo de esta app filtra por las apps
+  instaladas y el motor comprueba que la operación sigue en él al ejecutar. Resuelta: la plataforma ya
+  rechaza la operación de una app apagada en el negocio («app_inactive», `base.entitlement.operation_database`), y
+  el filtro de esta app se queda como primera barrera del catálogo.
 
 ## Qué queda fuera
 
 - **Mandar un correo a un cliente desde una automatización** (FLOW-F31 lo manda por WhatsApp): el Hub todavía
-  no manda correos a clientes. Y la cabecera con foto, vídeo o PDF de un WhatsApp (FLOW-F32, parcial): falta un
-  sitio donde guardar los archivos.
+  no manda correos a clientes.
+- **Arreglos pendientes, abiertos como issues** (`migration-leftover`): siete textos en español con las
+  palabras de otra app (hub#497); la pregunta o la tarjeta de un paso que cobra no reconoce su importe como
+  dinero (hub#498); la tarjeta de confirmación del asistente llama «Registro» a la automatización o a la ejecución
+  (hub#499) y dice «N elementos» en los permisos de un flujo sin decir cuáles (hub#504, con `base`).
+- **Trabajo encolado del carril** (cola de la migración, sin issue todavía): una ejecución aparcada que se reanuda
+  sale como el hub de la plataforma y la respuesta de mesa por WhatsApp no le llega al cliente
+  (FIX-HUB-FLOW-RESUME-DUE-SENDS-A-PARKED-RUN-AS-THE-PLATFORM-HUB); un paso no puede pedir cita para un
+  profesional (FIX-HUB-FLOW-STEP-CANNOT-BOOK-FOR-A-PROFESSIONAL) ni confirmar, mover o anular una cita
+  (FIX-HUB-FLOW-STEP-CANNOT-CHANGE-AN-APPOINTMENT).
 - **«Necesita tu atención»** (eventos que no se entregaron): el reparto del worker ya entrega los avisos a esta
   app y, tras 8 intentos fallidos, da uno por perdido y lo deja anotado; la pantalla que los enseña y los vuelve a
   intentar es la administración de los avisos (PLAN-HUB bloque 7), de la plataforma, y todavía no existe.
 - **El resto de recetas de la Bandeja de WhatsApp** (la cita y la mesa por WhatsApp, que ya pueden usar el paso
   «Pedírselo al asistente», FLOW-F37, y el aviso de mesa confirmada, que espera a que Reservas diga el día en palabras) y su reparación concreta: las
   declara esa app en su `recipes.py` sobre este registro; la del aviso de cita confirmada ya está
-  (WHATSAPP_INBOX-F23). La tarjeta «Contestar los WhatsApp» vuelve cuando la Bandeja declare su aviso.
+  (WHATSAPP_INBOX-F23). La respuesta automática que pide cita a una clienta nueva espera a que un paso pueda pedir cita para un
+  profesional (hub#514). La tarjeta «Contestar los WhatsApp» vuelve cuando la Bandeja declare su aviso.
 - **Encender una receta desde la pantalla de su propia app** (el Hub viejo lo hacía desde la de WhatsApp): hoy
   se enciende desde la galería de Automatizaciones; la pantalla de cada app puede llamar a `flow.recipe.enable`
   cuando la tenga.

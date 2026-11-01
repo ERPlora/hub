@@ -246,19 +246,18 @@ def test_people_need_view_to_read_and_manage_to_change(flow_operations):
             assert op.permission == "flow.manage", name
 
 
-def test_the_store_card_promises_only_what_phase_1_does():
-    # FLOW-F21 and FLOW-F17 are partial: nothing starts an automation on an event of another app, and
-    # the Hub has no assistant. The store's card says what it does today and what comes later, like the
-    # guide and the WORKBOOK.
+def test_the_store_card_says_what_it_does_today():
+    # FLOW-F21 (an automation starts on its own when something happens in the business) and FLOW-F17 (the
+    # assistant drafts one) are done: the store's card says so and promises nothing for «a later version».
     config = flow_app()
     expected = {
-        "en": ("when something happens", "assistant", "when a sale is charged", "comes in a later version"),
-        "es": ("cuando pasa algo", "asistente", "cuando se cobra una venta", "llega en una versión posterior"),
+        "en": ("when something happens", "later version", "assistant"),
+        "es": ("cuando pasa algo", "versión posterior", "asistente"),
     }
-    for language, (happens, assistant, sale, later) in expected.items():
+    for language, (happens, later, assistant) in expected.items():
         with translation.override(language):
             summary, description = str(config.summary).lower(), str(config.description).lower()
-        assert happens not in summary, summary
-        assert assistant not in summary and assistant not in description
-        assert sale not in description, description
-        assert later in description, description
+        assert later not in description and later not in summary, description
+        assert happens in description, description
+        assert happens in summary, summary
+        assert assistant in description, description
