@@ -230,3 +230,25 @@ describe('MessageStepPanel: a file at the top of the template (FLOW-F32)', () =>
     expect(s.find('flow-message-file-choose-s2').text()).toBe('Elegir archivo');
   });
 });
+
+describe('MessageStepPanel: the file at the top after changing the template (FLOW-F32)', () => {
+  it('a template chosen after one whose file was gone shows its own file, with no «gone» left over', async () => {
+    const gone = chosenStep({ name: 'promo_video', language: 'es', variables: ['x'], header_sample: 'gone' });
+    const s = await mountFlow(MessageStepPanel, {
+      props: { step: gone, index: 1, steps: [gone], catalog: null, errors: {}, pick: async () => null },
+      answers: { [DETAIL]: [404, { error: { code: 'whatsapp_inbox.sample_not_found', message: 'That file is not among this business’s files.' } }] },
+    });
+    const stream = await s.live();
+    stream.push(resultFrame(s.subId(TEMPLATE_LIST), WITH_FILES, 1));
+    await settle();
+    expect(s.find('flow-message-file-gone-s2').exists()).toBe(true);
+
+    await ionValue(s.find('flow-message-template-s2').element, 'carta_foto|es');
+    const next = (s.wrapper.emitted('update:step') ?? []).at(-1)![0] as Step;
+    await s.wrapper.setProps({ step: next, steps: [next] });
+    await settle();
+    expect(s.find('flow-message-file-name-s2').text()).toBe('Photo: carta.jpg · 6.2 KB');
+    expect(s.find('flow-message-file-gone-s2').exists()).toBe(false);
+    expect(s.find('flow-message-file-readerror-s2').exists()).toBe(false);
+  });
+});

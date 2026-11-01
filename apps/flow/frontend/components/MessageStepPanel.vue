@@ -83,7 +83,13 @@ const file = computed<HeaderFile | null>(() =>
 
 async function readStepFile(): Promise<void> {
   const sample = chosen.value?.header_sample;
-  if (!sample || stepFile.value?.id === sample) return;
+  if (!sample) {
+    // Another template (or none): what the step read for the one before, and what it said of it, goes with it.
+    stepFile.value = null;
+    stepFileState.value = 'idle';
+    return;
+  }
+  if (stepFile.value?.id === sample) return;
   stepFile.value = null;
   stepFileState.value = 'reading';
   try {
@@ -294,6 +300,7 @@ function setVariable(position: number, value: unknown): void {
           >{{ $t('flow.message.fileNone') }}</span>
           <IonButton
             fill="outline"
+            mode="md"
             size="small"
             :disabled="uploading"
             :data-testid="`flow-message-file-choose-${id}`"
