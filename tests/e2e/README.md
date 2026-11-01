@@ -265,6 +265,66 @@ CI=1 pnpm e2e tests/e2e/qa/assistant-battery.spec.ts
 QA_BATTERY_RUN=<id> CI=1 pnpm e2e tests/e2e/qa/assistant-battery.spec.ts --grep C35
 ```
 
+## Las sondas del asistente: capa 2 con el modelo real (`qa/assistant-probes.spec.ts`)
+
+La capa 2 de la QA del asistente (`docs/plans/2026-10-31-asistente-conocimiento-y-qa.md` de erplora-next, §1.5): una
+**sonda** es una frase natural **nueva** para una herramienta, escrita como la teclearía una persona de un rol en un
+idioma, y lo que el turno tiene que hacer. Nunca es una de las `asks` de la herramienta (eso ya lo mide la capa 1 en cada
+PR): mide que el asistente generaliza. Las sondas viven en `qa/probes/*.json` (esquema `qa/probes.schema.json`; el corpus
+que se va ampliando), y cada una dice:
+
+- `id` (único entre todos los ficheros), `app`, `tool` (el nombre de la operación, `sale.sale.today`), `role`
+  (`owner`, `admin`, `manager` o `employee`), `language` (`en` o `es`) y `phrase`;
+- `expect`: `read` (corre esa lectura y no sale tarjeta), `card` (sale la tarjeta de esa escritura), `refused` (el rol no
+  tiene la herramienta: no corre ninguna del negocio, no sale tarjeta y la respuesta dice que no puede) o `docs`
+  (corre `base.docs.search` y la respuesta cita la documentación);
+- `decide`, solo en `card`: `cancel` (por defecto: se cancela y no cambia nada) o `confirm` (se confirma y la escritura
+  tiene que salir bien; solo con datos del negocio sembrado);
+- `notes`, libre.
+
+Antes de preguntar, cada sonda se comprueba contra el catálogo exportado (`manage.py export_assistant_catalog`) de su rol
+e idioma y del dueño: la frase no está vacía ni copia una `ask` (sin mayúsculas ni espacios de más, en los dos idiomas),
+la herramienta existe y es de esa app, `read` es una lectura y `card` una escritura que el rol tiene, y `refused` es una
+herramienta del dueño que el rol no tiene. Si no encaja, la sonda sale **N/A** y no se gasta ningún turno: hay que
+arreglar la sonda, no el producto.
+
+La spec se salta sin `QA_REAL_PROVIDER=1` (gasta tokens de verdad; nunca en la CI) y pide lo mismo que la batería de
+arriba: pila propia, el SaaS con `ASSISTANT_SERVICE_PROVIDER=openai`, `E2E_SAAS_DIR` y las dos claves en el entorno.
+Una vez por ejecución hace la siembra de la batería (proveedores reales, índice de documentación), da de alta en el
+SaaS de la pila un encargado y un administrador de `a` (`qa-manager@example.com` / `manager` y `qa-admin@example.com` /
+`admin`; el dueño y el empleado son los de `demo_seed`) y enciende todas las apps de `a`, como supone el catálogo. Cada
+sonda entra con su rol, en una conversación nueva y con su idioma, vacía antes los mensajes del mes de `a` y escribe
+`.artifacts/qa/<ejecución>/assistant-probes.md` (el informe: PASS, FAIL y N/A, la herramienta que eligió el modelo y
+los 300 primeros caracteres de la respuesta), su JSON y `.artifacts/qa/<ejecución>/<sonda>.png`; nada de eso se sube.
+El veredicto (`probeVerdict`) y la carga de los ficheros están en `assistant-probes.ts`, probados con Vitest en
+`assistant-probes.test.ts`.
+
+```bash
+# Con la pila en marcha y sus variables exportadas (como la batería):
+export QA_REAL_PROVIDER=1 E2E_SAAS_DIR=<saas-wt> QA_QWEN_API_KEY=… QA_OPENAI_API_KEY=…
+CI=1 pnpm e2e tests/e2e/qa/assistant-probes.spec.ts                       # todo qa/probes/
+QA_PROBES=tests/e2e/qa/probes/sale-customer-base.json CI=1 pnpm e2e tests/e2e/qa/assistant-probes.spec.ts
+# Repetir algunas sondas en el informe de una ejecución anterior:
+QA_PROBES_RUN=<id> CI=1 pnpm e2e tests/e2e/qa/assistant-probes.spec.ts --grep employee.es
+```
+
+**El esqueleto** (`pnpm qa:probes`) saca el catálogo de un rol e idioma y escribe un fichero de sondas con la frase
+**vacía** para que la escriba quien hace la QA: por cada app, `--sample N` herramientas del rol (2 por defecto,
+lecturas y escrituras alternadas) y otras tantas del dueño que el rol no tiene (`refused`), más `--docs N` sondas de
+documentación (1 por defecto); `--all` las toma todas. `expect` sale de la herramienta (lectura → `read`, escritura →
+`card`) y `notes`, de su descripción. Con la misma `--seed` sale la misma muestra; por defecto va a
+`.artifacts/qa/probes-<rol>-<idioma>-<semilla>.json`, y solo cuando tiene las frases escritas se copia a `qa/probes/`.
+
+```bash
+pnpm -s qa:probes --role employee --language es --apps sale,customer --sample 2
+pnpm -s qa:probes --role owner --language en --all --out probes-owner-en.json
+```
+
+**El agente** `qa-assistant-hub` (definición fuera del repo, en la configuración de los agentes de erplora-next) hace
+la vuelta entera: pila propia sobre `origin/main`, catálogo y esqueleto por rol e idioma, escribe las frases (nuevas,
+ambiguas, como las diría esa persona; nunca las `asks`), corre la spec, abre una issue por fallo del producto (no de la
+sonda) y sube las sondas nuevas en una PR. Por defecto, 2 herramientas por app y rol; «completa» = `--all`.
+
 ## WhatsApp (`whatsapp-*.spec.ts`)
 
 Las specs de WhatsApp usan el SaaS de la pila de verdad, y Meta lo hace el Graph de la ejecución
