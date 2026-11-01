@@ -78,8 +78,8 @@ system on that business, whose refusals (422 out of contract…) are answered wi
 Their databases (phase 2, S1; plan 2026-10-22): the registry's and the demos' operations run on control
 (``base.tenancy.context.operation_database``); the WhatsApp doors enter the business's hub (``use_hub``) before they ask
 whether the app is on in it (its rows are in its database: the host erplora.com calls, ``hub.erplora.internal``, opens
-no context), and a database that fails them there is 503 ``base.hub_unavailable``, logged; ERPlora's invoices run on
-phase 1's shared database, where the platform hub keeps its data until S2.
+no context), and a database that fails them there is 503 ``base.hub_unavailable``, logged; ERPlora's invoices run in
+the platform hub's own database (its registry row, made by ``create_platform_hub``; S5).
 """
 
 import json
@@ -101,7 +101,7 @@ from pydantic import ValidationError
 
 from base import registry, relay
 from base.registry import REGISTRY_SCOPE
-from base.tenancy.context import use_hub, use_shared_database
+from base.tenancy.context import HubWithoutDatabase, use_hub
 from base.tenancy.identity import HubIdentityMismatch
 from base.services import DEMO_FULL_RETRY_AFTER_SECONDS, WHATSAPP_APP
 from base.throttle import AttemptLimit, RateLimited, client_key
@@ -403,12 +403,28 @@ def _issue_answer(answer) -> dict:
 
 
 def _platform_call(name: str, payload: dict):
-    """Runs ``name`` as the system on the platform hub: its output, or the response of its refusal.
+    """Runs ``name`` as the system on the platform hub, in its own database: its output, or the response of its
+    refusal.
 
-    Phase 1's platform hub has no registry row and keeps its data in the one database every hub shares: it runs
-    there (``use_shared_database``, S1–S4) until S2 provisions it as a hub with its own (``is_platform``)."""
-    with use_shared_database():
-        return _operation_call(name, payload, _platform_context())
+    The platform hub is the registry's row of ``PLATFORM_HUB_SLUG`` with a database of its own, as any business since
+    S5 (``manage.py create_platform_hub --execute`` makes both): without it, 503 ``base.platform_hub_missing``, saying
+    so; a database that is not its own or cannot be reached now, 503 as for any business."""
+    hub = registry.hub_by_slug(settings.PLATFORM_HUB_SLUG)
+    if hub is None or registry.refusal(hub) is not None:
+        return None, refuse(
+            503,
+            "base.platform_hub_missing",
+            "ERPlora's platform hub has no database of its own yet: run manage.py create_platform_hub --execute.",
+        )
+    try:
+        with use_hub(hub):
+            return _operation_call(name, payload, _platform_context())
+    except HubIdentityMismatch:
+        logger.critical("base.hub_unavailable hub=%s: its database is not its own; %s refused.", hub.slug, name)
+        return None, _unavailable()
+    except (DatabaseError, HubWithoutDatabase):
+        logger.warning("base.hub_unreachable hub=%s: %s could not reach its database now.", hub.slug, name)
+        return None, _unavailable()
 
 
 def _operation_call(name: str, payload: dict, ctx: OperationContext):

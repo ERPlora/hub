@@ -69,6 +69,7 @@ ENV_KEYS = (
     "AWS_STORAGE_BUCKET_NAME",
     "AWS_REGION",
     "MEDIA_ROOT",
+    "METRICS_ENABLED",
 )
 # Local development opts in with DEBUG=True (the .env of a checkout); nothing else turns it on.
 DEVELOPMENT_ENV = {"DEBUG": "True"}
@@ -104,9 +105,11 @@ def test_live_precedes_daphne_so_its_runserver_wins():
 
 
 def test_base_precedes_the_admin_so_its_admin_templates_win():
-    # base/templates/admin/base_site.html adds the chosen hub's banner (round 13, PLAN §18.1).
+    # base/templates/admin/base_site.html adds the chosen hub's banner (round 13, PLAN §18.1). Django's admin is
+    # installed through its config with the Hub's own site (base/admin_site.py: a hub's model only with a business).
     installed = settings.INSTALLED_APPS
-    assert installed.index("base") < installed.index("django.contrib.admin")
+    assert "django.contrib.admin" not in installed
+    assert installed.index("base") < installed.index("base.admin_site.AdminConfig")
 
 
 def test_the_platform_host_is_hubs_and_no_customer_can_take_it():
@@ -310,6 +313,15 @@ def test_the_fiscal_certificate_key_comes_from_the_environment(load_settings):
         load_settings(**PRODUCTION_ENV, FISCAL_CERTIFICATE_KEY=key)["FISCAL_CERTIFICATE_KEY"]
         == key
     )
+
+
+def test_the_worker_publishes_its_metrics_only_where_the_environment_turns_them_on(load_settings):
+    """hub#488: CloudWatch's PutMetricData only where the task role may call it (prod's worker, aws stacks/prod); pre,
+    local development and the tests have no such permission, so a missing variable publishes nothing."""
+    assert load_settings(**PRODUCTION_ENV)["METRICS_ENABLED"] is False
+    assert load_settings(**DEVELOPMENT_ENV)["METRICS_ENABLED"] is False
+    assert load_settings(**PRODUCTION_ENV, METRICS_ENABLED="true")["METRICS_ENABLED"] is True
+    assert load_settings(**PRODUCTION_ENV, METRICS_ENABLED="false")["METRICS_ENABLED"] is False
 
 
 def test_the_internal_saas_url_defaults_to_the_public_one(load_settings):
@@ -1040,12 +1052,17 @@ def test_production_shared_alias_without_its_password_refuses_to_start(load_sett
 
 
 def test_the_shared_router_goes_first(load_settings):
-    # Phase 2's TenantRouter goes after it and never touches `shared`.
-    assert settings.DATABASE_ROUTERS[0] == "base.routers.SharedRouter"
-    assert (
-        load_settings(**PRODUCTION_ENV)["DATABASE_ROUTERS"][0]
-        == "base.routers.SharedRouter"
-    )
+    # Phase 2's TenantRouter goes after it and never touches `shared`. The tests put one of theirs in front, for their
+    # businesses written before the tenancy only (base/tenancy/tests/legacy.py): never production's settings.
+    assert settings.DATABASE_ROUTERS == [
+        "base.tenancy.tests.legacy.LegacyTablesRouter",
+        "base.routers.SharedRouter",
+        "base.tenancy.router.TenantRouter",
+    ]
+    assert load_settings(**PRODUCTION_ENV)["DATABASE_ROUTERS"] == [
+        "base.routers.SharedRouter",
+        "base.tenancy.router.TenantRouter",
+    ]
 
 
 def test_the_static_files_finders_add_the_documentation_images_of_the_modules():

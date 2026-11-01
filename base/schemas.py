@@ -183,12 +183,31 @@ class HubRestoreIn(Schema):
     id: UUID
 
 
+class HubCutFinishIn(Schema):
+    """The last step of the cut of a business of phase 1 (``base.tenancy.cut``): its database made, its rows copied
+    (``copied``: rows per table, none when it was made again) and seeded with the SaaS's photo of ``seeded_version``."""
+
+    id: UUID
+    mode: Literal["recreate", "copy_all"]
+    database: str
+    schema_apps: dict[str, str]
+    copied: dict[str, int]
+    dump: str = ""
+    seeded_version: int | None = None
+
+
+class HubCutFinishOut(Schema):
+    """``done``: the business now works on its own database; false when a newer photo came while it was seeded (the
+    cut applies it and asks again)."""
+
+    done: bool
+
+
 class HubSeedLocalIn(Schema):
-    """``manage.py seed_local_hubs``: the local hubs to leave ready (``a`` and ``b``); ``own_database``: a new one is
-    born with a database of its own (``requested``, the command makes it), else it shares control's."""
+    """``manage.py seed_local_hubs``: the local hubs to leave ready (``a`` and ``b``), each with a database of its own
+    (``requested``, the command makes it)."""
 
     slugs: list[str]
-    own_database: bool = False
 
 
 class SeededHub(Schema):

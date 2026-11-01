@@ -92,7 +92,8 @@ INSTALLED_APPS = [
     "base",
     # The mirror of the SaaS's `shared` schema (round 16): only base/catalog.py writes it.
     "shared",
-    "django.contrib.admin",
+    # Django's admin, its site the Hub's own: a hub's model only once a business is chosen (base/admin_site.py).
+    "base.admin_site.AdminConfig",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
@@ -565,6 +566,11 @@ elif email_backend == smtp_email_backend:
         "timeout": 10,
     }
 DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="noreply@erplora.com")
+
+# The worker's CloudWatch metrics (base.metrics; hub#488): published only where the environment turns them on, prod's
+# worker, whose task role may call PutMetricData on ERPlora/Hubs and ERPlora/Fiscal (aws stacks/prod/apps.tf). pre,
+# local development and the tests have no such permission: off by default, so nothing is published there.
+METRICS_ENABLED = config("METRICS_ENABLED", default=False, cast=bool)
 
 # Logging: everything to the console (CloudWatch Logs in production), at LOG_LEVEL.
 

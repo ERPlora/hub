@@ -135,11 +135,16 @@ def test_two_threads_registering_the_same_hub_register_it_once():
     assert len(swaps) == 1
 
 
-def test_a_hub_of_the_shared_database_stays_on_default():
+def test_a_business_without_its_own_database_has_no_alias_and_never_gets_default():
+    from base.tenancy.context import HubWithoutDatabase
+
     hub = SimpleNamespace(id=uuid.uuid7(), slug="a", db_name="", cluster=None)
     before = django_connections.settings
 
-    assert connections.alias_for(hub) == "default"
+    with pytest.raises(HubWithoutDatabase):
+        connections.alias_for(hub)
+    with pytest.raises(HubWithoutDatabase):
+        connections.open_hub_alias(hub)
     assert django_connections.settings is before
 
 

@@ -13,7 +13,7 @@ from operator import and_
 from uuid import UUID
 
 from django.conf import settings
-from django.db.models import Case, Count, Q, QuerySet, When
+from django.db.models import Case, Count, Min, Q, QuerySet, When
 from django.utils import timezone, translation
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext, Scope, system_context
@@ -837,6 +837,16 @@ def disable_refusal(ctx: OperationContext) -> str | None:
         return None
     with translation.override(ctx.language):
         return str(STILL_TO_SEND_ONE) if count == 1 else str(STILL_TO_SEND) % {"count": count}
+
+
+def oldest_unsent_at() -> dt.datetime | None:
+    """hub#488: since when the oldest production record not in the AEAT yet (``Record.UNSENT``: pending, its retry
+    waiting included, or sent without an answer) waits, or ``None``: the platform's ``OldestPendingAgeSeconds``, read
+    in the database of the active context. A record of the AEAT's test environment files nothing, so it never counts;
+    what the AEAT answered is out of the queue."""
+    return Record.objects.filter(status__in=Record.UNSENT, environment=Environment.PRODUCTION).aggregate(
+        oldest=Min("created_at")
+    )["oldest"]
 
 
 @operation(

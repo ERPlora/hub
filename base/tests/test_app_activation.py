@@ -209,24 +209,6 @@ def test_a_demo_is_born_with_every_app_off():
     assert rows(demo.slug) == {}
 
 
-@pytest.mark.django_db
-def test_the_local_hubs_are_seeded_with_every_app_on_and_keep_what_they_chose():
-    """``seed_local_hubs`` leaves the developer's hubs as every hub of before round 2026-10-27: every app on, the
-    roots chosen; a local hub that already changed its apps keeps them."""
-    from live.context import system_context
-
-    from base import registry
-    from base.schemas import HubSeedLocalIn
-
-    set_rows("b", task="on*", staff="on")
-    seed = get("base.hub.seed_local")
-
-    seed(system_context(registry.REGISTRY_SCOPE), HubSeedLocalIn(slugs=["c", "b"]))
-
-    graph = activation.module_graph()
-    assert rows("c") == activation.every_on(graph)
-    assert modules_on(Scope("host", "b")) == {"task", "staff"}
-
 
 def test_the_hubs_admin_shows_the_rows_and_changes_none(rf):
     """The Hub's admin (hubs.erplora.com/admin) shows each business's apps as they are; turning one on or off is

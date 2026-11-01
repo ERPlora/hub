@@ -4,8 +4,8 @@ Second in ``DATABASE_ROUTERS``, after ``base.routers.SharedRouter`` (the SaaS's 
 database class of each model from ``base.tenancy.inventory`` and the active context from ``base.tenancy.context``:
 
 - ``control`` → ``default``, always;
-- ``hub`` → the alias of the active ``use_hub`` (or ``default`` in phase 1's shared database); without a context, or
-  in control's, ``HubContextMissing``: never a guess;
+- ``hub`` → the alias of the active ``use_hub``; without a context, or in control's, ``HubContextMissing``: never a
+  guess;
 - ``contextual`` (the outbox) → the alias of the active context, control's included.
 
 A hub's object related to another hub object already loaded (``instance`` hint) goes where that one is, as Django's
@@ -13,17 +13,14 @@ own default does; a control object's hint (a reverse relation from a user) never
 does.
 
 ``allow_relation`` compares databases, not aliases (``hub_x`` and ``hub_x__ddl`` are one database). ``allow_migrate``:
-control's models only on ``default``; a hub's only on a migrator's ``…__ddl`` alias and, while phase 1's hubs keep
-their data in control's database (S1–S4, plan decision 1), on ``default`` too; S5 takes ``default`` out of that rule
-with the shared database.
+control's models (and the outbox's, contextual) on ``default``; a hub's only on a migrator's ``…__ddl`` alias, never on
+``default``: since S5 control holds control's tables alone (phase 1's businesses got their own databases,
+``base.tenancy.cut``; the tables they left in control are never migrated again, a contract migration renames them).
 """
 
 from django.db import DEFAULT_DB_ALIAS, connections
 
 from base.tenancy import context, inventory, names
-
-#: Phase 1's shared database (S1–S4): control's, where every hub with ``db_name=""`` still has its tables.
-SHARED_DATABASE_ALIAS = DEFAULT_DB_ALIAS
 
 
 def _route(model, hints: dict) -> str | None:
@@ -73,4 +70,6 @@ class TenantRouter:
             return None
         if database_class == inventory.CONTROL:
             return db == DEFAULT_DB_ALIAS
-        return db == SHARED_DATABASE_ALIAS or db.endswith(names.DDL_SUFFIX)
+        if database_class == inventory.CONTEXTUAL:
+            return db == DEFAULT_DB_ALIAS or db.endswith(names.DDL_SUFFIX)
+        return db.endswith(names.DDL_SUFFIX)

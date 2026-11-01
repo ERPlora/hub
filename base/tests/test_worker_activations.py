@@ -166,9 +166,9 @@ def run_pass(now: dt.datetime | None = None) -> None:
 
 @pytest.mark.django_db
 def test_what_is_due_is_creating_unless_put_off_and_failed_once_its_next_try_came():
-    from base.tenancy.context import use_shared_database
+    from base.tenancy.tests.legacy import use_legacy
 
-    with use_shared_database():
+    with use_legacy():
         _what_is_due()
 
 
