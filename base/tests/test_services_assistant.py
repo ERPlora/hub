@@ -312,6 +312,37 @@ def test_taking_a_pin_away_names_whose_it_is(make_user):
     assert {field["name"]: field["value"] for field in card["preview"]} == {"name": "Eva Gil", "email": "eva@example.com"}
 
 
+@pytest.mark.parametrize("name", ["base.app.enable", "base.app.disable", "base.app.retry"])
+def test_turning_an_app_on_or_off_names_it_on_its_card(name):
+    """B28c (hub#539): «Activa la app de reservas» showed «online_booking», and Reservas online was the one confirmed."""
+    admin = {"base.view_home", "base.administer_hub"}
+    plan = turn(call(name, {"app": "online_booking"}), permissions=admin)
+    assert [(field["name"], field["value"]) for field in plan["confirm"]["fields"]] == [("app", "Reservas online")]
+    assert plan["executed"] == []
+
+
+@pytest.mark.parametrize("name", ["base.app.enable", "base.app.disable", "base.app.retry"])
+def test_a_name_that_fits_several_apps_shows_no_card_and_the_model_asks_which(name):
+    """«reserva» is Reservas and Reservas online: nothing to confirm blind; the model hears both names to ask."""
+    admin = {"base.view_home", "base.administer_hub"}
+    plan = turn(call(name, {"app": "reserva"}), permissions=admin)
+    assert (plan["confirm"], plan["pending"]) == (None, [])
+    [row] = plan["executed"]
+    assert (row["name"], row["outcome"], row["code"]) == (name, "error", "base.app_ambiguous")
+    said = json.loads(plan["append"][0]["content"])["error"]["message"]
+    assert "Reservas online" in said and "Reservas," in said
+
+
+@pytest.mark.parametrize("name", ["base.app.enable", "base.app.disable", "base.app.retry"])
+def test_a_name_that_is_no_apps_shows_no_card(name):
+    """A name of no app put an empty card up, and the yes ended in a 404: it goes back to the model before any card."""
+    admin = {"base.view_home", "base.administer_hub"}
+    plan = turn(call(name, {"app": "nope"}), permissions=admin)
+    assert (plan["confirm"], plan["pending"]) == (None, [])
+    [row] = plan["executed"]
+    assert (row["name"], row["outcome"], row["code"]) == (name, "error", "not_found")
+
+
 def test_each_write_of_a_chain_asks_its_own_yes():
     first = call("demo.item.create", {"name": "Uno"}, "c1")
     second = call("demo.item.create", {"name": "Dos"}, "c2")

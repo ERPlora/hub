@@ -82,11 +82,17 @@ async def app_list(request):
     return await run_operation(request, queries.app_list)
 
 
-# Turning an app on or off, with the plan's limit (PLAN-HUB §9): the app's id in the body. While a hub's own database
-# gets the app's tables (S3) the same answer comes with 202: accepted, the worker finishes it.
+# Turning an app on or off, with the plan's limit (PLAN-HUB §9): the app by its name or its id in the body; which app
+# a name names, by ``base.app.get`` (hub#539). While a hub's own database gets the app's tables (S3) the same answer
+# comes with 202: accepted, the worker finishes it.
 from django.http import JsonResponse  # noqa: E402
 
-from base.schemas import AppChangeIn  # noqa: E402
+from base.schemas import AppChangeIn, AppRefIn  # noqa: E402
+
+
+@bind(router, "base.app.get", "/apps/detail")
+async def app_get(request, params: Query[AppRefIn]):
+    return await run_operation(request, queries.app_get, params)
 
 
 def _accepted_while_creating(answer):

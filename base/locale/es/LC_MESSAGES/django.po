@@ -1896,9 +1896,14 @@ msgstr "activaciones de apps"
 msgid "%(app)s is turned off in this business."
 msgstr "%(app)s está desactivada en este negocio."
 
-#: base/services.py
-msgid "No app has this id."
-msgstr "Ninguna app tiene este identificador."
+#: base/queries.py
+msgid "No app has that name or id."
+msgstr "Ninguna app tiene ese nombre o identificador."
+
+#: base/queries.py
+#, python-format
+msgid "“%(said)s” matches several apps: %(names)s. Say which one."
+msgstr "«%(said)s» coincide con varias apps: %(names)s. Di cuál."
 
 #: base/services.py
 #, python-format

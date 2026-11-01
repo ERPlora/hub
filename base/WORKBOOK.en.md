@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:07687203e82f7b81bef42e45b52250741a4ef17047978e0cf027ff197615fc87 -->
+<!-- generated from WORKBOOK.md sha256:ea53d4b5bca8ac62ae51e0b0493bbc4f726e3530d430bd23fb4897fe7f60aa53 -->
 
 ## What it is for and who it is for
 
@@ -812,11 +812,13 @@ Steps:
      could not be set up" — "Go to Apps to try again. Nothing of the business was lost.".
   3. "Retry" asks for it again: "Turning on {app}… It will be ready in a moment." and the row goes back to "Turning
      on…".
+  4. From the assistant ("Try turning on the website app again") the app is named as in BASE-F24 and the card shows
+     its full name.
 In: the app that could not be set up.
 Out: the activation asked for again (`base.app.activation_requested`).
 If it fails: if it fails again, it says so again with its "Retry". If it was no longer waiting, because another device
 tried it again, a notice shows with the app's name and "This app is not waiting to be set up again.", which stays
-until it is closed.
+until it is closed. From the assistant, a name that fits several apps, or none, shows no card (BASE-F24).
 Involved: none
 
 ### BASE-F22 Follow an app being turned on while moving around
@@ -852,10 +854,13 @@ Steps:
      (BASE-F26) and the counter at the top takes one away.
   4. In "Add apps" they stay, with their icon, their name and "Off": from there they are turned on again
      (BASE-F24).
+  5. From the assistant ("Turn off the reservations app") the app is named as in BASE-F24, the high-risk card shows
+     its whole name and, if it was off already, the assistant says so and nothing changes.
 In: the business's apps, what each one needs and which ones the business chose.
 Out: the app turned off in this business, and the ones that came only with it, with their data intact.
 If it fails: if another running app needs it, or the app itself refuses, nothing changes (BASE-F25). With
-"Cancel", nothing either.
+"Cancel", nothing either. From the assistant, a name that fits several apps shows no card: it asks which one
+(BASE-F24).
 Involved: VERIFACTU-F32
 
 ### BASE-F24 Turn an app on
@@ -868,12 +873,19 @@ Steps:
      asking.
   3. The app comes back to "My apps" and to the menu, without reloading, with the data it had: "Reservations is
      on." and, if it came with others, "Also turned on: Tables.".
+  4. From the assistant ("Turn on the reservations app") the app is named as the person says it: by its name in any
+     language of the Hub, case and accents aside, or, if none is called so, by the only one with a word of its name
+     that starts so ("booking" is Online booking). "Reservas" is Reservations, never Online booking (Reservas online)
+     even though it starts the same. The card shows its whole name (BASE-F97), never its id, and if it was on
+     already the assistant says so ("Customers was on already") instead of "turned on".
 In: what the app needs and what the business has subscribed to.
 Out: the app running in this business, chosen by it.
 If it fails: with the plan's limit of apps reached, the notice of BASE-F18 with "Upgrade plan"; a paid app not
 subscribed to cannot be turned on (BASE-F20). Moving to a lower plan turns nothing off: with more chosen apps than
-the new plan has, all of them keep running and only no other can be turned on until it is below.
-Involved: none
+the new plan has, all of them keep running and only no other can be turned on until it is below. From the
+assistant, a name that fits several apps ("reserva": Reservations and Online booking) shows no card and turns none
+on: the assistant asks which one, naming them; one that is no app's: "No app has that name or id.".
+Involved: BASE-F97
 
 ### BASE-F25 See an app refuse to be turned off
 Status: done
