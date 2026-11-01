@@ -92,6 +92,11 @@ OPEN_OPERATIONS: dict[str, tuple[str, str]] = {
         "The worker turns on, or marks failed, the apps whose tables it has just made in the business's own database "
         "(base.worker); internal_only refuses anyone else.",
     ),
+    "base.hub.cut_finish": (
+        PLATFORM,
+        "The last step of the cut of S5 (manage.py cut_shared_hubs): a business of phase 1 gets its own database "
+        "in control's registry; internal_only refuses anyone else.",
+    ),
     "base.usage.list": (
         PLATFORM,
         "The SaaS's collect_hub_usage reads what each business used on a day, measured that night (/internal/usage).",

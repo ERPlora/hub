@@ -2104,3 +2104,15 @@ msgstr "La última migración del código que pidió sus tablas: un worker más 
 
 msgid "This business shares its database: its apps are turned on at once."
 msgstr "Este negocio comparte su base de datos: sus apps se encienden al momento."
+
+#: middleware.py
+msgid ""
+"Choose a business first: its pages are in its own database. Open it from the "
+"SaaS admin («Open in the Hub admin») or at /admin/hub/<slug>/."
+msgstr ""
+"Elige antes un negocio: sus páginas están en su propia base de datos. Ábrelo "
+"desde el admin del SaaS («Abrir en el admin del Hub») o en /admin/hub/<slug>/."
+
+#: services.py
+msgid "This business already works on its own database, or is not ready."
+msgstr "Este negocio ya trabaja en su propia base de datos, o no está listo."

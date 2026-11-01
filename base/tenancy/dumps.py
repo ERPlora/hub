@@ -16,9 +16,10 @@ business leaves). It keeps a ``control.HubDump`` row for it (``base.services``: 
   copy goes up (boto3's ``Callback``, in this same thread) and once more right after it;
 - to a temporary file first, uploaded only when ``pg_dump`` ended well, so a failed dump leaves nothing in the bucket.
 
-A hub without its own database is never dumped (:class:`HubWithoutDatabase`: phase 1's shared database holds every
-business); without a bucket there is nothing to dump to (:class:`DumpsUnavailable`). Every failure is a
-:class:`DumpFailed` with what went wrong in a line.
+A hub without its own database is never dumped (:class:`HubWithoutDatabase`: a business of phase 1 not cut yet);
+without a bucket there is nothing to dump to (:class:`DumpsUnavailable`). Every failure is a :class:`DumpFailed` with
+what went wrong in a line. :func:`dump_control` copies control's own database the same way, before the cut of S5
+(``manage.py cut_shared_hubs``), to ``<control>/<AAAAMMDDTHHMMSSZ>-cut.dump``, with no ``HubDump``.
 
 :func:`presigned_url` signs a link to one copy for 15 minutes (``X-Amz-Expires=900``, SigV4); the Hub's Settings › Data
 asks for it on every click, and the SaaS through ``GET /internal/hubs/{id}/dumps`` (``base.internal``).
@@ -37,6 +38,7 @@ import tempfile
 import time
 from collections.abc import Callable
 from pathlib import Path
+from types import SimpleNamespace
 
 import boto3
 import decouple
@@ -68,6 +70,8 @@ KEY_TIME = "%Y%m%dT%H%M%SZ"
 DEFAULT_REGION = "eu-west-1"
 #: The lines of ``pg_dump``'s own complaint kept in a failure.
 ERROR_LINES = 3
+#: The kind of control's own copy: made before the cut of S5 (``base.tenancy.cut``), under ``<control>/``.
+CUT = "cut"
 
 
 class DumpError(RuntimeError):
@@ -77,7 +81,7 @@ class DumpError(RuntimeError):
 
 
 class HubWithoutDatabase(DumpError):
-    """The hub keeps its business in phase 1's shared database: there is no database of its own to copy."""
+    """The business has no database of its own yet (phase 1's, not cut): there is nothing of its own to copy."""
 
     code = "hub_without_database"
 
@@ -178,6 +182,38 @@ def dump_hub(
     made = services.dump_recorded(hub.id, kind=kind, key=key, size=size, created_at=made_at, requested_by=requested_by)
     logger.info("base.tenancy.dumps.made hub=%s kind=%s key=%s bytes=%d", hub.slug, kind, key, size)
     return made
+
+
+def dump_control(*, kind: str = CUT, now: dt.datetime | None = None, timeout: float = DUMP_TIMEOUT_SECONDS) -> str:
+    """Copy control's database to the bucket, at ``<control>/<AAAAMMDDTHHMMSSZ>-<kind>.dump``; return its key.
+
+    The copy taken before the cut of S5 moves the businesses of phase 1 out of it (``cut_shared_hubs``): every table,
+    the registry and what phase 1 kept of each business, restorable with ``pg_restore``. As a hub's, by the migrator on
+    a direct connection to control's writer, its password only in the subprocess's environment; uploaded only when it
+    ended well. No ``HubDump`` is noted: it is no business's copy, nor listed to anyone; the bucket keeps it its 90
+    days. Without a bucket, :class:`DumpsUnavailable`."""
+    target = bucket()
+    if not target:
+        raise DumpsUnavailable("No bucket is named for the copies (HUB_DUMPS_BUCKET).")
+    control = tenancy_connections.control_name()
+    made_at = (now or timezone.now()).astimezone(dt.UTC)
+    key = f"{control}/{made_at:{KEY_TIME}}-{kind}.dump"
+    with tempfile.TemporaryDirectory(prefix="control-dump-") as folder:
+        path = Path(folder) / "copy.dump"
+        _run_pg_dump(SimpleNamespace(db_name=control, cluster=None, slug=control), path, timeout=timeout, heartbeat=None)
+        size = path.stat().st_size
+        try:
+            client().upload_file(
+                str(path),
+                target,
+                key,
+                ExtraArgs={"ContentType": "application/octet-stream"},
+                Config=TransferConfig(use_threads=False),
+            )
+        except (S3UploadFailedError, BotoCoreError, ClientError) as error:
+            raise DumpFailed(f"The copy of {control} could not be uploaded: {error}") from error
+    logger.info("base.tenancy.dumps.made control=%s kind=%s key=%s bytes=%d", control, kind, key, size)
+    return key
 
 
 class _Progress:

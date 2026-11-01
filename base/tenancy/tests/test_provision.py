@@ -810,13 +810,8 @@ def test_seed_local_hubs_gives_a_and_b_their_own_databases_once_every_app_can_li
 # ── Guardrail (round 2026-10-30, proposal (c)): no new hub is ever born sharing control's database ──────────────────
 
 #: The ``Hub.objects.create`` calls of ``base/services.py`` that may leave ``db_name`` empty, each with its reason.
-SHARED_HUB_CREATES = {
-    "hub_seed_local": (
-        "the local hubs a and b turn every app on: they share the developer's control database only while some app "
-        "cannot live in a hub's own (provision.portable_apps: staff, attendance, task, whatsapp_inbox and what needs "
-        "them refer to control's users); seed_local_hubs then asks own_database=True and they get theirs."
-    ),
-}
+#: None since S5: phase 1's shared database is gone, every hub is born with its own (the local ones included).
+SHARED_HUB_CREATES: dict[str, str] = {}
 
 
 #: The manager's methods that make a row.

@@ -259,3 +259,25 @@ def test_a_stopped_copy_kills_pg_dump_at_once_even_while_it_waits_on_a_lock(hub_
 
     assert took < 5, f"pg_dump was waited for {took:.1f} s instead of being killed"
     assert objects(moto_s3, dumps_bucket) == {}
+
+
+# ── Control's own copy, before the cut of S5 ──────────────────────────────────────────────────────────────────────
+
+
+def test_control_is_copied_to_a_key_of_its_own_and_no_hub_s_copy_is_noted(dumps_bucket, moto_s3, tmp_path):
+    from base.tenancy import connections as tenancy_connections
+
+    noted = HubDump.objects.count()
+
+    key = dumps.dump_control(kind=dumps.CUT, now=AT)
+
+    assert key == f"{tenancy_connections.control_name()}/20261031T101500Z-cut.dump"
+    assert objects(moto_s3, dumps_bucket)[key] > 0
+    schema = restored(body(moto_s3, dumps_bucket, key), tmp_path, "--schema-only", "--table=base_hub")
+    assert "CREATE TABLE public.base_hub " in schema
+    assert HubDump.objects.count() == noted
+
+
+def test_without_a_bucket_control_is_not_copied(no_dumps_bucket):
+    with pytest.raises(dumps.DumpsUnavailable):
+        dumps.dump_control(kind=dumps.CUT, now=AT)

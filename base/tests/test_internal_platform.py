@@ -19,7 +19,9 @@ from apps.invoice.models import Invoice
 from apps.invoice.tests.test_platform import BODY
 from apps.invoice.tests.test_platform_invoices import PLATFORM, PLATFORM_ISSUER, system
 from apps.invoice.tests.conftest import run
+from base.tenancy.tests.hubs import HUB_DATABASES
 from base.tests.test_internal import code, signed
+from live.context import Scope, system_context
 
 ROOT = "/internal/platform/invoices"
 HOST = "hub.erplora.internal"
@@ -37,8 +39,17 @@ def get(client, path, **more):
 
 
 @pytest.fixture
-def platform_hub(db, settings):
+def platform_row(db, settings):
+    """The platform hub's row in the registry (``create_platform_hub`` makes it); the suite's fallback keeps its rows
+    on control's test database, as every business of the tests written before the tenancy."""
+    from control.models import Hub
+
     settings.PLATFORM_HUB_SLUG = PLATFORM.key
+    return Hub.objects.create(slug=PLATFORM.key, status=Hub.Status.READY, is_platform=True)
+
+
+@pytest.fixture
+def platform_hub(platform_row, settings):
     settings.ERPLORA_ENVIRONMENT = "pre"
     run("invoice.issuer.update", PLATFORM_ISSUER, system())
 
@@ -52,14 +63,42 @@ def test_health_is_ok_with_its_issuer(client, platform_hub):
     assert (answer.status_code, answer.json()) == (200, {"status": "ok"})
 
 
-def test_health_without_an_issuer_is_503_and_says_why(client, db, settings):
-    settings.PLATFORM_HUB_SLUG = PLATFORM.key
-
+def test_health_without_an_issuer_is_503_and_says_why(client, platform_row):
     answer = get(client, f"{ROOT}/health")
 
     assert answer.status_code == 503
     assert answer.json()["status"] == "unconfigured"
     assert "issuer" in answer.json()["detail"]
+
+
+def test_without_the_platform_hub_in_the_registry_it_is_503_and_says_how_to_make_it(client, db, settings):
+    settings.PLATFORM_HUB_SLUG = PLATFORM.key
+
+    health = get(client, f"{ROOT}/health")
+    issued = post(client, BODY)
+
+    assert health.status_code == 503 and "create_platform_hub" in health.json()["detail"]
+    assert (issued.status_code, code(issued)) == (503, "base.platform_hub_missing")
+
+
+@pytest.mark.django_db(databases=HUB_DATABASES)
+@pytest.mark.usefixtures("no_test_fallback")
+def test_the_platform_hub_issues_in_its_own_database_and_nowhere_else(client, hub_a, settings):
+    """Since S5 the platform hub is a business with its own database (``is_platform``): its invoices go there."""
+    from base.tenancy.context import use_hub
+    from control.models import Hub
+
+    Hub.objects.filter(pk=hub_a.pk).update(is_platform=True)
+    settings.PLATFORM_HUB_SLUG = hub_a.slug
+    settings.ERPLORA_ENVIRONMENT = "pre"
+    with use_hub(hub_a):
+        run("invoice.issuer.update", PLATFORM_ISSUER, system_context(Scope("host", hub_a.slug)))
+
+    answer = post(client, BODY)
+
+    assert answer.status_code == 201
+    with use_hub(hub_a):
+        assert Invoice.objects.count() == 1
 
 
 def test_health_unsigned_is_401(client, platform_hub):

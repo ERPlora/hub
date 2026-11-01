@@ -16,8 +16,9 @@ from django.utils.translation import gettext
 from live.context import OperationContext, Scope
 from live.errors import PermissionDenied
 
-from control.models import Hub
 from base.schemas import HubOut
+from base.tenancy.context import serves_hubs_without_database
+from control.models import Hub
 
 #: The scope of the registry's operations (``base.hub.*``): the platform's, never a hub's.
 REGISTRY_SCOPE = Scope("platform", "registry")
@@ -77,12 +78,12 @@ DROPPED_STATUSES = (Hub.Status.PURGED, Hub.Status.DROPPING)
 
 
 def database_is_made(hub: Hub) -> bool:
-    """Whether ``hub``'s data can be entered: it shares control's (phase 1), or its own database was made (it is ready,
-    or was once: ``ready_at``) and has not been dropped. A business cancelled or failed before it was ever ready has no
-    database: what reaches it waits on its row for the day it is made. :func:`own_database_made` is the same, as a
-    query."""
+    """Whether ``hub``'s data can be entered: its own database was made (it is ready, or was once: ``ready_at``) and
+    has not been dropped. A business cancelled or failed before it was ever ready has no database, nor one of phase 1
+    not yet cut (``db_name=""``, S5): what reaches it waits on its row for the day it is made (its seeding, its cut).
+    :func:`own_database_made` is the same, as a query."""
     if not hub.db_name:
-        return True
+        return serves_hubs_without_database()
     if hub.status in DROPPED_STATUSES:
         return False
     return hub.status == Hub.Status.READY or hub.ready_at is not None
@@ -117,7 +118,8 @@ class Refusal:
 def refusal(hub: Hub | None, *, ended: bool = True) -> Refusal | None:
     """Why the host of ``hub`` does not serve the app, or ``None`` while it does; in the active language.
 
-    The host gate's rule (``base.middleware``), in its order: no row 404, gone 410, still being prepared 503,
+    The host gate's rule (``base.middleware``), in its order: no row 404, gone 410, still being prepared 503 (a
+    business of phase 1 without its own database too, until its cut gives it one: S5, ``base.tenancy.cut``),
     suspended for an unpaid invoice 402. An open live stream and the print socket hear it again before each run
     (``base.operations.HubContextBuilder.refresh``). ``ended=False`` leaves out that it ended (a demo's login still
     answers then)."""
@@ -125,7 +127,7 @@ def refusal(hub: Hub | None, *, ended: bool = True) -> Refusal | None:
         return Refusal(404, "not_found", gettext("Not found"))
     if ended and is_gone(hub):
         return Refusal(410, HUB_GONE, gettext("This hub is no longer available."))
-    if is_preparing(hub):
+    if is_preparing(hub) or not (hub.db_name or serves_hubs_without_database()):
         return Refusal(503, HUB_PREPARING, gettext("This hub is still being prepared; try again in a few seconds."))
     if is_suspended(hub):
         return Refusal(402, HUB_SUSPENDED, gettext("This business is suspended until its unpaid invoice is paid."))

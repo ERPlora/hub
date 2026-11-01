@@ -5,15 +5,17 @@ ERPlora's platform hub issues ERPlora's invoices to its customers, posted by the
 dry run unless ``--execute``; it names what it finds, and it refuses rather than guesses, because one hub is one
 issuer is one VeriFactu chain: it never writes over another identity.
 
-Phase 1 has neither the control registry nor hub databases (``control/``, phase 2): the platform hub is its reserved
-slug, ``PLATFORM_HUB_SLUG`` (``erplora``, in ``live.slugs``' reserved list, so no business can ever take it and the
-SaaS's normal sign-up never creates it), on the one database, and Invoicing and VeriFactu are always active. So here
-it gives that hub its issuer, ERPlora's tax identity from ``PLATFORM_ISSUER_*`` (``invoice.issuer.update``), and pins
-VeriFactu to the deployment's environment (``verifactu.config.follow_deployment``; prod: production, pre: testing),
-always through their operations, as the system on that slug. Phase 2 adds the registry row (``is_platform``) and its
-database, provisioned as any other hub.
+The platform hub is its reserved slug, ``PLATFORM_HUB_SLUG`` (``erplora``, in ``live.slugs``' reserved list, so no
+business can ever take it and the SaaS's normal sign-up never creates it), and since S5 a row of the registry
+(``is_platform``) with a database of its own, as every business: with ``--execute``, a missing one is made as a sign-up
+is (``base.services.platform_hub_register``, then ``base.tenancy.provision``), never as a business of the SaaS's.
+Then, inside that database, it gives the hub its issuer, ERPlora's tax identity from ``PLATFORM_ISSUER_*``
+(``invoice.issuer.update``), and pins VeriFactu to the deployment's environment (``verifactu.config.follow_deployment``;
+prod: production, pre: testing), always through their operations, as the system on that slug. Invoicing and
+VeriFactu are always active on it.
 
-In AWS it runs once per environment as a one-off ECS task of the ``hub`` service (WORKBOOK of invoice).
+In AWS it runs once per environment as a one-off ECS task of the ``hub-migrate`` task definition, which has the
+migrator's credentials to make the database (WORKBOOK of invoice; runbook ``docs/runbooks/cut-shared-hubs.md``).
 """
 
 from django.conf import settings
@@ -22,7 +24,9 @@ from live.context import Scope, system_context
 from live.errors import OperationError
 from live.operations import get as get_operation
 
-from base.tenancy.context import use_shared_database
+from base import services
+from base.tenancy import provision
+from base.tenancy.context import use_control, use_hub
 
 ISSUER_SETTINGS = {
     "legal_name": "PLATFORM_ISSUER_LEGAL_NAME",
@@ -49,10 +53,36 @@ class Command(BaseCommand):
             help="Write. Without it the command only says what it would do.",
         )
 
-    def handle(self, *args, **options):
-        # Phase 1's platform hub has no registry row: its data lives in the database every hub shares (S1–S4).
-        with use_shared_database():
-            return self._handle(*args, **options)
+    def handle(self, *args, execute: bool = False, **options):
+        slug = settings.PLATFORM_HUB_SLUG
+        with use_control():
+            hub = services.registry_row_by_slug(slug)
+        if hub is not None and not hub.is_platform:
+            raise CommandError(f"The row {slug} of the registry is no platform hub's: nothing was written.")
+        if hub is None or hub.status != hub.Status.READY:
+            if not execute:
+                self.stdout.write(f"ERPlora's own hub: {slug} ({settings.ERPLORA_ENVIRONMENT})")
+                self.stdout.write("Dry run: nothing is written without --execute.")
+                self.stdout.write("- would make its registry row and its own database, then set its issuer")
+                return None
+            hub = self._made(slug)
+        self.stdout.write(f"- the platform hub works on its own database {hub.db_name}")
+        with use_hub(hub):
+            return self._handle(*args, execute=execute, **options)
+
+    def _made(self, slug: str):
+        """Its row (``is_platform``) and its own database, made now as a sign-up's (the SaaS is not told)."""
+        with use_control():
+            hub = services.platform_hub_register(slug)
+        if hub.status != hub.Status.READY and not provision.provision(hub, tell_saas=False):
+            with use_control():
+                found = services.registry_row(hub.id)
+            raise CommandError(
+                f"The platform hub's database could not be made ({found.status}: {found.last_error or '-'}); run it "
+                "again. Nothing else was written."
+            )
+        with use_control():
+            return services.registry_row(hub.id)
 
     def _handle(self, *args, execute: bool = False, **options):
         ctx = system_context(Scope("host", settings.PLATFORM_HUB_SLUG))
@@ -111,7 +141,7 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.WARNING(f"- not ready: {health.detail}"))
         else:
             self.stdout.write(f"- would pin VeriFactu to {environment}")
-        self.stdout.write("- Invoicing and VeriFactu: always active in phase 1")
+        self.stdout.write("- Invoicing and VeriFactu: always active on it")
         if settings.ERPLORA_ENVIRONMENT == "prod":
             self.stdout.write(self.style.MIGRATE_HEADING("Before a single real record"))
             self.stdout.write(

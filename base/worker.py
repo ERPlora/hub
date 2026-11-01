@@ -10,19 +10,20 @@ no release, so it does no work before that. Two cases (first production deploy, 
 - any other failure, a missing column included (a contract gap, spec §3.5): fatal, 1, and ECS's
   ``task_failed`` rule reports it.
 
-Then it schedules the apps' tasks once (``scheduler.sync``: a failure is fatal, 1) and, every tick
-(5 s), runs the ones that are due (``scheduler.run_due``): the VeriFactu queue every minute
-(VERIFACTU-F20) and every other ``scheduled_tasks`` an app declares, each claimed with ``SKIP LOCKED``.
-A tick that fails (the database went away) is logged and the next one tries again; a stop request
-ends the loop at once. Every tick, after the tasks and whatever they did, it relays the outbox
-(``base.relay``, round 2026-10-20 of PLAN-HUB): each new event to the reactions of the apps that listen
-to it, exactly once, in the scope of the hub that recorded it; a pass that fails is logged and the next
-tick tries again. What a reaction or a task leaves for after its COMMIT that waits on the network (a call to another
-system) runs off this loop, in ``base.outbound``'s threads, so it never holds the next delivery nor the next task; on
-its way out the worker gives what still runs ``OUTBOUND_GRACE_SECONDS`` and drops what waits (their lease sends them
-again). On the first tick and then every ``REAPER_INTERVAL_SECONDS`` it also purges the
-demo hubs that ended (``base.services.reap_demos``, plan 2026-10-17 §1.7), whatever the scheduler did: a
-pass that fails is logged and the next one tries again, and the worker never stops for it.
+Then it names, as an error, each ready business still without a database of its own (phase 1's, not cut yet: S5,
+``manage.py cut_shared_hubs``): it never serves one, nor runs it on control. Every tick (5 s), each hub with its own
+database gets its outbox relayed (``base.relay``, round 2026-10-20 of PLAN-HUB: each new event to the reactions of the
+apps that listen to it, exactly once, in the scope of the hub that recorded it) and the tasks of its apps that are due
+run (``scheduler.run_due``: the VeriFactu queue every minute, VERIFACTU-F20, and every other ``scheduled_tasks`` an
+app declares, each claimed with ``SKIP LOCKED``; its schedule written in its database once per process); control's own
+outbox (the registry's and the demos' events, which no app hears) is taken on control. A pass that fails (the database
+went away) is logged and the next tick tries again; a stop request ends the loop at once. What a reaction or a task
+leaves for after its COMMIT that waits on the network (a call to another system) runs off this loop, in
+``base.outbound``'s threads, so it never holds the next delivery nor the next task; on its way out the worker gives
+what still runs ``OUTBOUND_GRACE_SECONDS`` and drops what waits (their lease sends them again). On the first tick and
+then every ``REAPER_INTERVAL_SECONDS`` it also purges the demo hubs that ended (``base.services.reap_demos``, plan
+2026-10-17 §1.7), whatever the scheduler did: a pass that fails is logged and the next one tries again, and the worker
+never stops for it.
 
 After the hubs with their own database, the apps they turned on whose tables they lack (S3; PLAN-DB §7 and §8,
 ``_activations``, also with ``databases_only``): the hubs rung (``hub_due`` come and free: ``base.app.enable`` rings
@@ -46,22 +47,20 @@ once it ended (``base.usage``, 00:15 UTC, before the SaaS collects it at 01:15; 
 Neither runs with ``databases_only``. On the way out the worker waits for them :data:`BACKGROUND_GRACE_SECONDS` at most:
 a copy hears the stop, kills ``pg_dump`` and gives its lease back, and its work stays due.
 
-The order of a tick (review of hub#471): the tasks and the relay of phase 1's shared database first, so a pass that
-makes databases holds back the kitchen, the stock or VeriFactu of the hubs that share it a few seconds at most
-(``provision.DUE_PASS_SECONDS``: it takes no new hub after them, though a clone it started finishes); then the hubs with
-their own database (``_hubs``, round 2026-10-30 of PLAN-DB): each one it serves (ready, or a business that left but
-keeps its database, whose records still to send must reach the AEAT), in its own database (``use_hub``) and one at a
-time, gets its outbox relayed, its apps' schedule written there once per process and the tasks due of its active
-apps run on its own scope (``host``, its slug: their live notices go on its channel), for ``HUB_PASS_SECONDS`` at most,
-the next tick going on after the last hub served; a hub that fails is logged and the others are served. Then the
-reaper, and last the hubs whose ``hub_due`` has come: their databases made, the demos that ended dropped
-(``base.tenancy.provision.run_due``); a hub made ready in a tick has its outbox relayed from the next one. Every pass
-releases its connections.
+The order of a tick (review of hub#471): control's own outbox first; then the hubs with their own database
+(``_hubs``, round 2026-10-30 of PLAN-DB): each one it serves (ready, or a business that left but keeps its database,
+whose records still to send must reach the AEAT), in its own database (``use_hub``) and one at a time, gets its outbox
+relayed, its apps' schedule written there once per process and the tasks due of its active apps run on its own scope
+(``host``, its slug: their live notices go on its channel), for ``HUB_PASS_SECONDS`` at most, the next tick going on
+after the last hub served; a hub that fails is logged and the others are served. Then the reaper, and last the hubs
+whose ``hub_due`` has come: their databases made, the demos that ended dropped (``base.tenancy.provision.run_due``; it
+takes no new hub after ``provision.DUE_PASS_SECONDS``, though a clone it started finishes); a hub made ready in a tick
+has its outbox relayed from the next one. Every pass releases its connections.
 
-Each pass opens its database context (phase 2, S1; plan 2026-10-22): the tasks and the relay of the shared database
-run on it (``use_shared_database``: every hub with ``db_name=""``), each hub with its own database in its own
-(``use_hub``), and the reaper and the ``hub_due`` pass on control (``use_control``), where the registry and the demos
-live (the provisioning enters each hub's own database itself).
+Each pass opens its database context (phase 2, S1; plan 2026-10-22): each hub with its own database in its own
+(``use_hub``), and control's outbox, the reaper and the ``hub_due`` pass on control (``use_control``), where the
+registry and the demos live (the provisioning enters each hub's own database itself). Since S5 there is no shared
+database: a business without its own is never entered.
 """
 
 import datetime as dt
@@ -84,7 +83,7 @@ from base.services import reap_demos
 from base.tenancy import dumps, migrator, provision
 from base.tenancy.connections import close_hub_aliases, close_this_threads_connections
 from base.schemas import AppActivationSettleIn, HubResetApplyIn
-from base.tenancy.context import use_control, use_hub, use_shared_database
+from base.tenancy.context import use_control, use_hub
 from control.models import Hub, HubDump
 
 logger = logging.getLogger(__name__)
@@ -169,13 +168,8 @@ def run(
             logger.info("worker: stopped before registering its apps.")
             return 0
         delay = min(delay * 2, RETRY_MAX_SECONDS)
-    try:
-        with use_shared_database():
-            scheduler.sync(clock())
-    except Exception:
-        logger.exception("worker: the apps' scheduled tasks could not be scheduled; the worker stops.")
-        return 1
-    # register_apps' connection (the SaaS's database) and sync's are not kept open while it idles.
+    _name_the_businesses_without_a_database()
+    # register_apps' connection (the SaaS's database) and the registry's are not kept open while it idles.
     close_old_connections()
     if result.skipped:
         registered = "a newer release had already registered its apps"
@@ -188,7 +182,6 @@ def run(
     while not stop.is_set():
         now = clock()
         if not databases_only:
-            _tick(now)
             _relay(now)
             _hubs(now)
         _activations(now)
@@ -527,12 +520,13 @@ def _sweep_due(hub_id, now: dt.datetime, active: bool) -> bool:
 
 
 def _relay(now: dt.datetime) -> None:
-    """Relay the outbox at ``now``; a failure is logged and the next tick tries again."""
+    """Take control's own outbox at ``now`` (the registry's and the demos' events: no app hears them); a failure is
+    logged and the next tick tries again. A hub's events are relayed in its own database (:func:`_serve_hub`)."""
     try:
-        with use_shared_database():
-            done = relay.run(now)
+        with use_control():
+            done = relay.run(now, of_hubs=False)
     except Exception:
-        logger.exception("worker: the outbox relay failed; the next tick tries again.")
+        logger.exception("worker: control's outbox could not be taken; the next tick tries again.")
         # A broken connection is not taken into the next tick.
         close_old_connections()
         return
@@ -542,15 +536,19 @@ def _relay(now: dt.datetime) -> None:
         )
 
 
-def _tick(now: dt.datetime) -> None:
-    """Run the scheduled tasks due at ``now``; a failure is logged and the next tick tries again."""
+def _name_the_businesses_without_a_database() -> None:
+    """Log, as an error, each ready business still without a database of its own (phase 1's, not cut yet): since S5
+    the worker never serves one, nor runs it on control, and its host answers 503 until ``manage.py cut_shared_hubs``
+    gives it one. A business that left (``cancelled``) without one is no error: it is made one if it comes back."""
     try:
-        with use_shared_database():
-            ran = scheduler.run_due(now)
+        with use_control():
+            waiting = [hub.slug for hub in services.hubs_on_control() if hub.status == Hub.Status.READY]
     except Exception:
-        logger.exception("worker: the scheduled tasks could not run; the next tick tries again.")
-        # A broken connection is not taken into the next tick.
-        close_old_connections()
+        logger.exception("worker: the businesses without a database of their own could not be read.")
         return
-    if ran:
-        logger.debug("worker: ran %s.", ", ".join(ran))
+    for slug in waiting:
+        logger.error(
+            "base.worker.hub_without_database hub=%s: it has no database of its own and is not served; run "
+            "manage.py cut_shared_hubs (docs/runbooks/cut-shared-hubs.md).",
+            slug,
+        )

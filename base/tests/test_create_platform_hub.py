@@ -2,10 +2,11 @@
 
 Ported from the old SaaS's ``ensure_platform_hub`` (hubs/main/tests/test_ensure_platform_hub.py): idempotent, a dry
 run unless ``--execute``, it names what it found and refuses rather than guesses — one hub is one issuer is one chain,
-so it never writes over another identity. Phase 1 has neither the control registry nor hub databases: the platform
-hub is its reserved slug (``PLATFORM_HUB_SLUG``, which no business can take) on the one database, so "creating" it is
-giving it its issuer (``PLATFORM_ISSUER_*``) and pinning VeriFactu to the deployment's environment; Invoicing and
-VeriFactu are always active in phase 1.
+so it never writes over another identity. The platform hub is its reserved slug (``PLATFORM_HUB_SLUG``, which no
+business can take): since S5 a row of the registry (``is_platform``) with a database of its own, which ``--execute``
+makes when it is missing, as a sign-up does; then it gives it its issuer (``PLATFORM_ISSUER_*``) and pins VeriFactu to
+the deployment's environment, inside that database. The tests below keep its rows on control's test database (the
+suite's fallback, ``base/tenancy/tests/legacy.py``); the last ones make its database for real.
 """
 
 from io import StringIO
@@ -23,8 +24,7 @@ from apps.verifactu.models import Config, Environment
 PLATFORM = Scope("host", "erplora")
 
 
-@pytest.fixture
-def deployment(db, settings):
+def environment(settings):
     settings.PLATFORM_HUB_SLUG = PLATFORM.key
     settings.ERPLORA_ENVIRONMENT = "pre"
     settings.PLATFORM_ISSUER_LEGAL_NAME = "ERPLORA CLOUD SL"
@@ -35,6 +35,14 @@ def deployment(db, settings):
     settings.PLATFORM_ISSUER_PROVINCE = "Madrid"
     settings.PLATFORM_ISSUER_COUNTRY = "ES"
     return settings
+
+
+@pytest.fixture
+def deployment(db, settings):
+    from control.models import Hub
+
+    Hub.objects.create(slug=PLATFORM.key, status=Hub.Status.READY, is_platform=True)
+    return environment(settings)
 
 
 def command(*args) -> str:
@@ -161,3 +169,58 @@ def test_with_production_open_its_dry_run_pins_production(deployment):
     out = command()
 
     assert "would pin VeriFactu to production" in out
+
+
+# ── Its own database (S5), for real: no test case around, the database made and dropped ───────────────────────────
+
+
+@pytest.fixture
+def made_for_real(django_db_blocker, hub_databases, settings, monkeypatch):
+    """No row yet; the database it makes is cloned from the session's template and dropped after the test."""
+    from base.tenancy import connections as tenancy_connections
+    from base.tenancy import identity, names, provision
+    from base.tenancy.tests import hubs
+    from control.models import Hub, HubDue
+
+    monkeypatch.setattr(identity, "_verified", set())
+    monkeypatch.setattr(provision, "template_for", lambda hub: hub_databases.template)
+    environment(settings)
+    with django_db_blocker.unblock():
+        yield
+        made = Hub.objects.filter(slug=PLATFORM.key).first()
+        if made is not None:
+            hubs.drop_database(names.hub_db_name(tenancy_connections.control_name(), made.id))
+            HubDue.objects.filter(pk=made.pk).delete()
+            made.delete()
+
+
+@pytest.mark.django_db
+def test_the_module_sets_the_tests_databases_up():
+    """pytest-django sets the test databases up only for a session with a ``django_db`` test."""
+
+
+@pytest.mark.usefixtures("no_test_fallback", "made_for_real")
+def test_execute_makes_the_platform_hub_its_own_database_and_sets_its_issuer_there():
+    from base.tenancy.context import use_hub
+    from control.models import Hub
+
+    out = command("--execute")
+
+    hub = Hub.objects.get(slug=PLATFORM.key)
+    assert hub.is_platform and hub.status == Hub.Status.READY and hub.db_name
+    with use_hub(hub):
+        assert Issuer.objects.get().tax_id == "B12345674"
+    assert f"its own database {hub.db_name}" in out
+    # Again: the same row, the same database, nothing written twice.
+    assert "issuer found" in command("--execute")
+    assert Hub.objects.filter(slug=PLATFORM.key).count() == 1
+
+
+@pytest.mark.usefixtures("no_test_fallback", "made_for_real")
+def test_without_execute_a_missing_platform_hub_is_only_said():
+    from control.models import Hub
+
+    out = command()
+
+    assert "would make its registry row and its own database" in out
+    assert not Hub.objects.filter(slug=PLATFORM.key).exists()

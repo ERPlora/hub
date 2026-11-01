@@ -343,6 +343,33 @@ def test_the_worker_takes_a_platform_event_without_handing_it_to_any_app(worker_
     assert not EventDelivery.objects.filter(event=event).exists()
 
 
+@pytest.mark.django_db
+@pytest.mark.usefixtures("no_test_fallback")
+def test_on_control_the_relay_takes_the_platform_s_events_and_leaves_what_phase_1_left_of_a_business_alone():
+    """S5: control's outbox keeps the events a business of phase 1 recorded there before its cut; reading the apps on
+    of that business would need its database, so on control the relay never takes one, nor runs its deliveries
+    (the cut copies a business's own into its database: ``base.tenancy.cut``)."""
+    from base.registry import REGISTRY_SCOPE
+    from base.tenancy.context import use_control
+
+    with use_control():
+        platform = OutboxEvent.objects.create(
+            scope_kind=REGISTRY_SCOPE.kind, scope_key=REGISTRY_SCOPE.key, name="base.hub.registered", actor="platform"
+        )
+        left = OutboxEvent.objects.create(scope_kind="host", scope_key="elpa", name="sale.sale.paid", actor="ana")
+        pending = EventDelivery.objects.create(event=left, app_label="inventory", next_attempt_at=timezone.now())
+
+        done = relay.run(timezone.now(), of_hubs=False)
+
+        platform.refresh_from_db()
+        left.refresh_from_db()
+        pending.refresh_from_db()
+    assert done.taken == 1 and done.failed == 0
+    assert platform.delivered_at is not None
+    assert left.delivered_at is None
+    assert (pending.status, pending.attempts) == (EventDelivery.Status.PENDING, 0)
+
+
 class TestTheMigrationThatClosesControlDeliveries:
     """``base/migrations/0021_close_control_deliveries``: the deliveries of an event of no hub written before the relay
     stopped handing them to any app (hub#471) would fail on every attempt until given up, each with its traceback;

@@ -114,6 +114,7 @@ from base.models import ApiKey
 from base.throttle import client_key
 from base.tenancy import names as database_names
 from base.tenancy.connections import control_name
+from base.tenancy.context import HUB_SCOPE_KIND
 from control.models import Cluster, HubDue, HubDump, HubUsageDaily, HubVisit, UsageRun
 from django.db.models import Exists, OuterRef
 from base.schemas import (
@@ -144,6 +145,8 @@ from base.schemas import (
     HubRegisterOut,
     HubRegistryIn,
     HubRestoreIn,
+    HubCutFinishIn,
+    HubCutFinishOut,
     HubSeedLocalIn,
     HubSeedLocalOut,
     HubStateIn,
@@ -416,20 +419,25 @@ def _note_an_event_recorded_by_the_delivery(sender, instance: OutboxEvent, creat
 
 
 def relay_take_events(
-    now: dt.datetime, *, listeners: Callable[[OutboxEvent], list[str]], limit: int, max_depth: int
+    now: dt.datetime,
+    *,
+    listeners: Callable[[OutboxEvent], list[str]],
+    limit: int,
+    max_depth: int,
+    of_hubs: bool = True,
 ) -> int:
     """Take up to ``limit`` events nobody took yet, oldest first: one delivery per app of ``listeners(event)``,
-    and the event's ``delivered_at`` (taken) in the same transaction. Returns how many it took.
+    and the event's ``delivered_at`` (taken) in the same transaction. Returns how many it took. ``of_hubs=False``
+    (control's outbox): a business's event is never taken there.
 
     ``SELECT … FOR UPDATE SKIP LOCKED``: a second worker (a deploy overlaps the old one and the new one) skips the
     events this one holds, and once it commits they are taken.
     """
     with atomic():
-        taken = list(
-            OutboxEvent.objects.select_for_update(skip_locked=True)
-            .filter(delivered_at__isnull=True)
-            .order_by("created_at", "id")[:limit]
-        )
+        events = OutboxEvent.objects.select_for_update(skip_locked=True).filter(delivered_at__isnull=True)
+        if not of_hubs:
+            events = events.exclude(scope_kind=HUB_SCOPE_KIND)
+        taken = list(events.order_by("created_at", "id")[:limit])
         _hand_over(taken, now=now, depth=0, listeners=listeners, max_depth=max_depth)
     return len(taken)
 
@@ -442,6 +450,7 @@ def relay_deliver_next(
     max_depth: int,
     max_attempts: int,
     backoff: Callable[[int], dt.timedelta],
+    of_hubs: bool = True,
 ) -> tuple[EventDelivery, bool] | None:
     """Claim one delivery due at ``now`` (the oldest event first), run its app's reaction and mark it, all in
     one transaction; returns ``(delivery, delivered)``, or ``None`` when nothing is due.
@@ -453,13 +462,12 @@ def relay_deliver_next(
     warning with its code; anything else, and the delivery given up, as an error with its traceback.
     """
     with atomic():
-        delivery = (
-            EventDelivery.objects.select_for_update(skip_locked=True, of=("self",))
-            .select_related("event")
-            .filter(status=EventDelivery.Status.PENDING, next_attempt_at__lte=now)
-            .order_by("event__created_at", "event_id", "app_label")
-            .first()
+        due = EventDelivery.objects.select_for_update(skip_locked=True, of=("self",)).filter(
+            status=EventDelivery.Status.PENDING, next_attempt_at__lte=now
         )
+        if not of_hubs:
+            due = due.exclude(event__scope_kind=HUB_SCOPE_KIND)
+        delivery = due.select_related("event").order_by("event__created_at", "event_id", "app_label").first()
         if delivery is None:
             return None
         delivery.attempts += 1
@@ -792,11 +800,6 @@ def acting_hub_user(ctx: OperationContext) -> HubUser | None:
     return ensure_hub_user(ctx.actor)
 
 
-def _shared_database_hosts() -> list[str]:
-    """Phase 1's shared database (S1–S4): every business whose rows it still holds (``db_name=""``)."""
-    return list(Hub.objects.filter(db_name="").values_list("slug", flat=True))
-
-
 # Not an assistant tool: the SaaS's photo (/internal), no person.
 @operation(
     "base.hub_user.sync", kind="command", permission=None, input=HubUserSyncIn, output=HubUserSyncOut, ai=INTERNAL
@@ -804,11 +807,9 @@ def _shared_database_hosts() -> list[str]:
 def hub_user_sync(ctx: OperationContext, data: HubUserSyncIn) -> dict:
     """Make the people of the business's database say what the SaaS's photo lists (its ``members``), before they ever
     enter: who is new is made, with the name and the email the photo says (what it leaves out stays as it was); who is
-    no longer in the business keeps their name on what they signed and is no longer active. In a hub with its own
-    database, that is everyone the photo leaves out (its people are only this business's); in phase 1's shared one,
-    which holds every business's, only those the photo just took out (``left``), unless another business there still
-    has them. The photo's own transaction calls it in the business's database (:func:`hub_state_apply`), after the
-    memberships changed."""
+    no longer in the business keeps their name on what they signed and is no longer active: everyone the photo leaves
+    out, since a business's database holds only its own people (S5). The photo's own transaction calls it in the
+    business's database (:func:`hub_state_apply`), after the memberships changed; ``left`` is the SaaS's, unused here."""
     internal_only(ctx)
     made = updated = 0
     listed = set()
@@ -825,23 +826,14 @@ def hub_user_sync(ctx: OperationContext, data: HubUserSyncIn) -> dict:
             made += 1
         elif _bring_up_to_date(person, wanted):
             updated += 1
-    from base.tenancy.context import current_hub
-
-    hub = current_hub()
-    if hub is not None and hub.db_name:
-        gone = HubUser.objects.filter(username__startswith=SAAS_USERNAME_PREFIX, is_active=True).exclude(
-            username__in=listed
-        )
-    else:
-        leaving = {username_for(str(saas_user_id)) for saas_user_id in data.left} - listed
-        staying = Membership.objects.filter(user__username__in=leaving, host__in=_shared_database_hosts())
-        gone = HubUser.objects.filter(username__in=leaving - set(staying.values_list("user__username", flat=True)))
+    gone = HubUser.objects.filter(username__startswith=SAAS_USERNAME_PREFIX, is_active=True).exclude(
+        username__in=listed
+    )
     return {"made": made, "updated": updated, "left": gone.update(is_active=False)}
 
 
 def _sync_hub_users(hub: Hub, members: list, left: list[str]) -> None:
-    """The photo's people in the business's own database (``base.hub_user.sync``), and who just left it: the same
-    transaction while it shares control's (phase 1, S1–S4)."""
+    """The photo's people in the business's own database (``base.hub_user.sync``), and who just left it."""
     from base.tenancy.context import use_hub
 
     with use_hub(hub):
@@ -944,7 +936,7 @@ def _sync_verifactu(hub: Hub, data: HubStateIn) -> None:
         raise InvalidPayload(
             f"The verifactu block is out of contract: {invalid}", code="internal.payload_invalid"
         ) from None
-    # The hub's own operation, in its database: the same transaction while it shares control's (phase 1, S1–S4).
+    # The hub's own operation, in its database.
     # Off in the business (base.activation), its block waits: turning VeriFactu on applies the photo kept then.
     scope = Scope("host", hub.slug)
     with use_hub(hub):
@@ -1032,14 +1024,18 @@ def hub_cancel(ctx: OperationContext, data: HubCancelIn) -> dict:
 # Not an assistant tool: the platform's door (/internal, the SaaS), no person.
 @operation("base.hub.restore", kind="command", permission=None, input=HubRestoreIn, output=HubOut, ai=INTERNAL)
 def hub_restore(ctx: OperationContext, data: HubRestoreIn) -> dict:
-    """Bring a cancelled hub back (``ready``, or ``requested`` again if its database was never finished); a hub that
+    """Bring a cancelled hub back (``ready``, or ``requested`` again if its database was never finished, or never
+    made: a business of phase 1 that left before the cut of S5 is made one from nothing, as a sign-up); a hub that
     never ended stays as it is; a purged one is ``hub_purged``."""
     internal_only(ctx)
     hub = _locked_hub(data.id)
     _refuse_purged(hub)
     if hub.status == Hub.Status.CANCELLED:
+        if not hub.db_name:
+            hub.db_name, hub.ready_at = database_names.hub_db_name(control_name(), hub.id), None
+            hub.save(update_fields=["db_name", "ready_at", "updated_at"])
         # Its own database never finished (cancelled while it was being made): it is made again, not opened.
-        unfinished = hub.db_name and hub.ready_at is None
+        unfinished = hub.ready_at is None
         hub.status = Hub.Status.REQUESTED if unfinished else Hub.Status.READY
         hub.cancelled_at = None
         # A copy of its leaving that failed is no longer owed: a second leaving starts from the first wait.
@@ -1061,16 +1057,17 @@ def hub_restore(ctx: OperationContext, data: HubRestoreIn) -> dict:
     ai=INTERNAL,
 )
 def hub_seed_local(ctx: OperationContext, data: HubSeedLocalIn) -> dict:
-    """Leave the local hubs ``data.slugs`` in the registry, with an id of their own (``seed_local_hubs``), and every app
-    on, its roots chosen, as every hub of before round 2026-10-27 (a business is born with every app off).
+    """Leave the local hubs ``data.slugs`` in the registry, with an id of their own (``seed_local_hubs``), each with a
+    database of its own, and every app on, its roots chosen, as every hub of before round 2026-10-27 (a business is
+    born with every app off).
 
-    A new one shares control's database and is ready at once, every app on; with ``data.own_database`` it is born
-    ``requested`` with a database of its own instead (``<control>_<hex>``), due, and the command makes it
-    (``base.tenancy.provision``, every app's tables and every app on: :func:`turn_every_app_on`). Local development
-    only (the command checks ``DEBUG``): they are no business of the SaaS's, so the SaaS hears nothing. Idempotent: a
-    hub already ready stays as it is, on the database it has; one left cancelled is ready again (or made again, if its
-    own database was never finished); the apps of one that already turned some on or off stay as they are, and one
-    left with no app at all has every app on again, in whichever database it has.
+    A new one is born ``requested`` with its database's name (``<control>_<hex>``) and due, and the command makes it
+    (``base.tenancy.provision``, every app's tables and every app on: :func:`turn_every_app_on`); a local hub of phase 1
+    left on control's database (``db_name=""``) gets its own the same way: since S5 nothing is served from control's.
+    Local development only (the command checks ``DEBUG``): they are no business of the SaaS's, so the SaaS hears
+    nothing. Idempotent: a hub already ready stays as it is, on its database; one left cancelled is ready again (or
+    made again, if its own database was never finished); the apps of one that already turned some on or off stay as
+    they are, and one left with no app at all has every app on again.
     """
     from base.tenancy.context import use_hub
 
@@ -1078,24 +1075,21 @@ def hub_seed_local(ctx: OperationContext, data: HubSeedLocalIn) -> dict:
     now = timezone.now()
     hubs = []
     for slug in data.slugs:
-        if data.own_database:
-            new_id = uuid7()
-            defaults = {
+        new_id = uuid7()
+        hub, created = Hub.objects.select_for_update().get_or_create(
+            slug=slug,
+            defaults={
                 "id": new_id,
                 "status": Hub.Status.REQUESTED,
                 "db_name": database_names.hub_db_name(control_name(), new_id),
-            }
-        else:
-            defaults = {"status": Hub.Status.READY, "ready_at": now}
-        hub, created = Hub.objects.select_for_update().get_or_create(slug=slug, defaults=defaults)
+            },
+        )
         outcome = "created" if created else "already_ready"
         if not hub.db_name:
-            with use_hub(hub):
-                _every_app_on(slug)
-            if not created and hub.status != Hub.Status.READY:
-                hub.status, hub.ready_at, hub.cancelled_at = Hub.Status.READY, now, None
-                hub.save(update_fields=["status", "ready_at", "cancelled_at", "updated_at"])
-                outcome = "ready_again"
+            hub.db_name = database_names.hub_db_name(control_name(), hub.id)
+            hub.status, hub.ready_at, hub.cancelled_at = Hub.Status.REQUESTED, None, None
+            hub.save(update_fields=["db_name", "status", "ready_at", "cancelled_at", "updated_at"])
+            outcome = "requested"
         elif hub.status != Hub.Status.READY:
             if hub.status == Hub.Status.CANCELLED:
                 made = hub.ready_at is not None
@@ -1105,11 +1099,11 @@ def hub_seed_local(ctx: OperationContext, data: HubSeedLocalIn) -> dict:
                 outcome = "ready_again" if made else "requested"
             elif not created:
                 outcome = "requested"
-            if hub.status != Hub.Status.READY:
-                HubDue.mark_due(hub, now)
-        if hub.db_name and hub.status == Hub.Status.READY:
-            # Made already, in its own database: every app on again there if it has none, as one that shares
-            # control's (its seeding turned them on the first time: turn_every_app_on).
+        if hub.status != Hub.Status.READY:
+            HubDue.mark_due(hub, now)
+        else:
+            # Made already, in its own database: every app on again there if it has none (its seeding turned them on
+            # the first time: turn_every_app_on).
             with use_hub(hub):
                 _every_app_on(slug)
         if outcome != "already_ready":
@@ -1119,9 +1113,9 @@ def hub_seed_local(ctx: OperationContext, data: HubSeedLocalIn) -> dict:
 
 
 def turn_every_app_on(hub: Hub) -> None:
-    """Inside ``use_hub(hub)``: every app on in the local hub ``hub``, as :func:`hub_seed_local` does for one that shares
-    control's database (the seeding of ``seed_local_hubs``'s own databases). Outside any operation, before the hub
-    serves anything: its activations' cache is forgotten at once, after the write."""
+    """Inside ``use_hub(hub)``: every app on in the local hub ``hub`` (the seeding of ``seed_local_hubs``'s
+    databases). Outside any operation, before the hub serves anything: its activations' cache is forgotten at once,
+    after the write."""
     _every_app_on(hub.slug, then=lambda forget: forget())
 
 
@@ -1433,6 +1427,105 @@ def apply_kept_photo(hub: Hub) -> None:
             system_context(Scope("host", hub.slug)), HubUserSyncIn(members=photo["members"], left=[])
         )
     _sync_photo_blocks(hub, relay.active_apps(Scope("host", hub.slug)))
+
+
+# ── The cut of S5: the businesses of phase 1 get their own database (``base.tenancy.cut``) ───────────────────────
+
+
+def hubs_on_control() -> list[Hub]:
+    """The businesses whose data phase 1 kept in control's database (``db_name`` empty), by slug: what the cut gives a
+    database of its own, a demo aside (it ends on its own). None that was purged."""
+    return list(
+        Hub.objects.filter(db_name="", is_demo=False)
+        .exclude(status__in=PURGED_STATUSES)
+        .select_related("cluster")
+        .order_by("slug")
+    )
+
+
+def copy_all_went_to() -> str:
+    """The business control's rows were copied into by a cut (``copy_all``), or ``""``: they go to one business,
+    once."""
+    found = (
+        OutboxEvent.objects.filter(name=events.HUB_CUT, payload__mode="copy_all")
+        .order_by("created_at")
+        .values_list("payload__slug", flat=True)
+        .first()
+    )
+    return found or ""
+
+
+def renew_hub_lease(hub_id: UUID, now: dt.datetime, lease: dt.timedelta, *, owner: str = LEASE_OWNER) -> None:
+    """Renew ``owner``'s lease of the ready hub ``hub_id`` (a cut of it runs); ``ProvisioningStopped`` when it is no
+    longer ``owner``'s."""
+    with _control_transaction():
+        _leased(hub_id, now, lease, owner)
+
+
+def platform_hub_register(slug: str) -> Hub:
+    """ERPlora's platform hub in the registry (``manage.py create_platform_hub``): its row, ``is_platform``, born
+    ``requested`` with its own database's name and due, as a sign-up (the command makes it then); the one already there
+    otherwise. Never a business's row: the slug is reserved (``live.slugs``)."""
+    with _control_transaction():
+        hub = Hub.objects.select_for_update().filter(slug=slug).first()
+        if hub is not None:
+            return hub
+        new_id = uuid7()
+        hub = Hub.objects.create(
+            id=new_id,
+            slug=slug,
+            status=Hub.Status.REQUESTED,
+            db_name=database_names.hub_db_name(control_name(), new_id),
+            is_platform=True,
+        )
+        HubDue.mark_due(hub)
+    return registry_row(hub.id)
+
+
+# Not an assistant tool: the cut's last step (manage.py cut_shared_hubs), no person.
+@operation(
+    "base.hub.cut_finish",
+    kind="command",
+    permission=None,
+    input=HubCutFinishIn,
+    output=HubCutFinishOut,
+    ai=INTERNAL,
+)
+def hub_cut_finish(ctx: OperationContext, data: HubCutFinishIn) -> dict:
+    """The business of phase 1 ``data.id`` works on its own database from now on (the cut of S5): ``db_name``, the
+    schema its database has, and ``base.hub.cut`` in control's outbox with how it was made (``mode``), the rows copied
+    into it and control's copy taken before (``dump``), in one transaction.
+
+    Only the platform runs it, refused before anything is read. Refused (409 ``base.hub_already_cut``) when the business
+    got a database meanwhile (another cut of it finished first) or is no longer ready; ``done: false`` when a newer
+    photo of the SaaS's came after ``seeded_version`` was applied: the cut applies it and asks again."""
+    internal_only(ctx)
+    hub = _locked_hub(data.id)
+    if hub.db_name or hub.status != Hub.Status.READY:
+        raise Conflict(
+            gettext("This business already works on its own database, or is not ready."),
+            code="base.hub_already_cut",
+        )
+    if data.seeded_version is not None and hub.state_version != data.seeded_version:
+        return {"done": False}
+    hub.db_name = data.database
+    hub.schema_apps, hub.schema_state = data.schema_apps, Hub.SchemaState.CURRENT
+    hub.save(update_fields=["db_name", "schema_apps", "schema_state", "updated_at"])
+    record_event(
+        ctx,
+        events.HUB_CUT,
+        {
+            "id": str(hub.id),
+            "slug": hub.slug,
+            "mode": data.mode,
+            "database": data.database,
+            "copied": {table: rows for table, rows in data.copied.items() if rows},
+            "dump": data.dump,
+        },
+    )
+    # What any process kept of its apps came from control's rows: from now on they are its database's.
+    on_commit(partial(activation.forget, hub.slug))
+    return {"done": True}
 
 
 # ── The demos (plan 2026-10-17, §1.6 and §1.7) ───────────────────────────────────────────────────────────────────
@@ -2043,10 +2136,11 @@ def same_name(typed: str, name: str) -> bool:
 
 
 def has_own_database(hub: Hub | None) -> bool:
-    """The hub keeps its business in its own database (phase 2's S5): emptying it touches no other hub.
+    """The hub keeps its business in its own database: emptying it touches no other hub.
 
-    In phase 1 every hub with ``db_name=""`` shares one database (plan 2026-10-22-fase-2-tenencia, decision 1), and
-    an app's rows are everyone's: a reset would empty them for all.
+    Since S5 every business served has one (``base.tenancy.cut``); one without it (phase 1's, before its cut) is never
+    served, and only the suite's tests written before the tenancy still run one (``base/tenancy/tests/legacy.py``),
+    where an app's rows are everyone's: a reset would empty them for all, so these refusals stay.
     """
     return bool(hub is not None and hub.db_name)
 
@@ -3979,8 +4073,9 @@ def support_report(ctx: OperationContext, data: SupportReportIn) -> dict:
 # 202), the event ``base.app.activation_requested`` is recorded and the hub's ``hub_due`` rung after the COMMIT; the
 # worker makes its tables (``ensure_schema``) and turns it on (``base.app.activation_settle``: ``base.app.enabled``, its
 # live notice), or ``failed`` with why, tried again at 1, 5 and 15 minutes and then every hour, or by hand
-# (``base.app.retry``). What it needs goes in the same plan. One whose tables it has is on at once, as in phase 1. A hub
-# that still shares phase 1's database turns every app on at once (proposal (i) of round 2026-10-30, until S5).
+# (``base.app.retry``). What it needs goes in the same plan. One whose tables it has is on at once, as in phase 1. A
+# business without its own database turns every app on at once (proposal (i) of round 2026-10-30): since S5 none is
+# served, only the suite's tests written before the tenancy still have one (``base/tenancy/tests/legacy.py``).
 from functools import cache as _cache  # noqa: E402
 from typing import Any  # noqa: E402
 

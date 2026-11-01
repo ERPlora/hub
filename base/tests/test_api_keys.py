@@ -24,6 +24,7 @@ from base.models import ApiKey, Membership
 from base.tenancy import context
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
+from base.tenancy.tests.legacy import use_legacy
 
 HUB_DB = pytest.mark.django_db(databases=hubs.HUB_DATABASES)
 
@@ -112,7 +113,7 @@ class TestNotYetAvailable:
     def test_not_even_one_that_is_in_the_shared_tables(self, client):
         """A key row in phase 1's shared tables (left by hand, or by a business before it moved) would be anybody's."""
         token = api_keys.new_token()
-        with context.use_shared_database():
+        with use_legacy():
             ApiKey.objects.create(name="Planted", prefix=token[: api_keys.PREFIX_LENGTH], token_digest=api_keys.digest(token), mode="full")
         for slug in ("a", "b"):
             assert get(client, f"{slug}.localhost:8000", CARTS, **bearer(token)).status_code == 401
@@ -121,7 +122,7 @@ class TestNotYetAvailable:
     def test_nor_is_one_of_the_shared_tables_read_by_its_id(self, client):
         """What names a key on the assistant's card (``base.api_key.detail``) reads none either."""
         token = api_keys.new_token()
-        with context.use_shared_database():
+        with use_legacy():
             planted = ApiKey.objects.create(
                 name="Planted", prefix=token[: api_keys.PREFIX_LENGTH], token_digest=api_keys.digest(token), mode="full"
             )

@@ -10,8 +10,8 @@ one, so a hub moved to another database needs the process restarted. A template'
 never gets one: it is only cloned, and a connection to it would make its next clone fail (PLAN-DB §6).
 
 ``connections.settings`` is never changed in place: ``close_old_connections`` walks it from other threads, so a new
-dict with the alias is swapped in, under a lock, after looking again. A hub of the shared database (``db_name=""``,
-phase 1 until S5) stays on ``default``.
+dict with the alias is swapped in, under a lock, after looking again. A business without a database of its own
+(``db_name=""``: phase 1's, not yet cut) has no alias (``HubWithoutDatabase``): since S5 it never runs on ``default``.
 
 The migrator's alias, ``<db_name>__ddl`` (PLAN-DB §4 and §7), is the same database reached directly, without
 PgBouncer and without the control database's pool, as the migrator's role: only the migrator, the provisioning
@@ -198,19 +198,20 @@ def close_hub_aliases(hub) -> None:
 
 
 def alias_for(hub) -> str:
-    """The alias ``hub``'s models go to: its database's, or ``default`` while it shares control's (``db_name=""``)."""
+    """The alias ``hub``'s models go to, its database's; ``HubWithoutDatabase`` for a business without one."""
     if not hub.db_name:
-        return DEFAULT_DB_ALIAS
+        from base.tenancy.context import HubWithoutDatabase
+
+        raise HubWithoutDatabase(f"The business {hub.slug or hub.id} has no database of its own: it has no alias.")
     return register_hub_alias(hub)
 
 
 def open_hub_alias(hub) -> str:
     """:func:`alias_for` with the database's identity checked (once per process and alias): what ``use_hub`` uses."""
-    alias = alias_for(hub)
-    if alias != DEFAULT_DB_ALIAS:
-        from base.tenancy import identity
+    from base.tenancy import identity
 
-        identity.verify(alias, hub.id)
+    alias = alias_for(hub)
+    identity.verify(alias, hub.id)
     return alias
 
 

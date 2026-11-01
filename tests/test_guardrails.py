@@ -20,8 +20,8 @@ control), then run over ``base/`` and ``apps/`` (outside ``tests/``).
 (e) Phase 2's tenancy (plan 2026-10-22, S1; PLAN-DB §14.5, §14.9): no ``CREATE``/``DROP DATABASE`` built by string
     formatting (``base.tenancy.names``: ``sql.Identifier``); ``connections.settings`` never changed in place (a copy is
     swapped in); ``apps/`` never imports ``base.tenancy`` (the context is the platform's); no ``LISTEN`` outside
-    ``live.broker``; phase 1's shared database (``use_shared_database``) only where the list says, until S5; the
-    tests' fallback never set outside the tests; no ``hub_id`` column in a hub's model but the listed ones; no bare
+    ``live.broker``; phase 1's shared database (``use_shared_database``) is gone since S5 and nobody brings it back;
+    the tests' fallback never set outside the tests; no ``hub_id`` column in a hub's model but the listed ones; no bare
     ``transaction.on_commit`` in ``apps/`` (``live.operations.on_commit``): S2's first step moved the last ones.
 (f) The tests read the clock when they run, never when pytest imports them (``clock_at_import``): a date taken at
     import is the day of the collection, and a run that crosses midnight or New Year's Eve falls. Unlike the others,
@@ -29,9 +29,9 @@ control), then run over ``base/`` and ``apps/`` (outside ``tests/``).
     ``tests`` folders, but the submodules of ``packages/``.
 (g) Operations that need the hub's own database (PLAN-DB §14.14, round 2026-10-30, decision 3): in a hub that still
     shares control's (``db_name=""``) each refuses with its domain error before it reads or writes anything of the
-    business in ``default``, an API key is refused for that reason (never let through by a session), and none of them
-    is code allowed on phase 1's shared database (``SHARED_DATABASE_USERS``). Unlike (a)–(f), these run operations
-    on the test database.
+    business in ``default``, and an API key is refused for that reason (never let through by a session). Since S5 such
+    a business is not served at all; the checks stay, the suite's fallback still has one (``base/tenancy/tests/
+    legacy.py``). Unlike (a)–(f), these run operations on the test database.
 
 Every ninja route bound to an operation is ``config/tests/test_api.py`` (``ensure_api_parity``);
 ``/admin/`` on a tenant's host → 404 is ``base/tests/test_middleware.py``.
@@ -376,16 +376,6 @@ DATABASE_DDL_RE = re.compile(r"\b(?:CREATE|DROP|ALTER)\s+DATABASE\b", re.IGNOREC
 DICT_MUTATORS = frozenset({"update", "pop", "popitem", "setdefault", "clear", "__setitem__", "__delitem__"})
 #: A ``LISTEN``/``UNLISTEN`` statement, alone in its string (a docstring that mentions it is no statement).
 LISTEN_RE = re.compile(r"(?:UN)?LISTEN(?:\s+\S+)?\s*;?")
-#: Who may still run on phase 1's shared database (``base.tenancy.context.use_shared_database``), each with its
-#: reason; S5 removes it with ``db_name=""``.
-SHARED_DATABASE_USERS: dict[str, str] = {
-    "base/tenancy/context.py": "where it is defined.",
-    "base/worker.py": "the scheduled tasks and the outbox relay of every hub of phase 1 at once; S2's hub_due per hub.",
-    "base/middleware.py": "the Hub admin with no hub chosen shows phase 1's one database, as before.",
-    "base/internal.py": "ERPlora's invoices: the platform hub has no registry row before S2.",
-    "base/management/commands/create_platform_hub.py": "the platform hub has no registry row before S2.",
-    "base/management/commands/shell.py": "manage.py shell (the e2e's relay helpers) on phase 1's database.",
-}
 #: ``transaction.on_commit`` in the modules, by file and count: with the hub's own database the operation's transaction
 #: is on the hub's alias and a bare one registers on ``default`` (it would run at once, also after a rollback). S2's
 #: first step moved the last ones (website's) to ``live.operations.on_commit``: it stays empty.
@@ -957,14 +947,12 @@ def test_nothing_but_live_listens():
     assert offenders == [], f"One LISTEN per process, on control, in live.broker (PLAN-DB §9): {offenders}"
 
 
-def test_only_the_listed_code_runs_on_the_shared_database():
-    files = [path for path in source_files(HUB_DIR) if str(path) not in SHARED_DATABASE_USERS]
-
-    offenders = _offenders(lambda path: shared_database_touches((HUB_DIR / path).read_text()), files)
+def test_nothing_runs_on_a_shared_database_any_more():
+    offenders = _offenders(lambda path: shared_database_touches((HUB_DIR / path).read_text()), source_files(HUB_DIR))
 
     assert offenders == [], (
-        "Phase 1's shared database is transitional (S1–S4): run in use_hub(hub), or add a reasoned entry to "
-        f"SHARED_DATABASE_USERS: {offenders}"
+        "Phase 1's shared database is gone since S5 (base.tenancy.cut): every business has its own; run in "
+        f"use_hub(hub) or use_control(): {offenders}"
     )
 
 
@@ -1181,13 +1169,10 @@ OWN_DATABASE_READS: dict[str, tuple[dict, dict]] = {
 #: reason; anything else of a hub's there is the business's data and is never touched.
 SHARED_MODE_READS: dict[str, str] = {
     "base_appactivation": (
-        "round 2026-10-30, decision (i): a hub without its own database turns its apps on and off in control's until "
-        "S5, and what is on is read before any operation runs."
+        "what is on is read before any operation runs; a business without its own database exists only under the "
+        "suite's fallback since S5 (base/tenancy/tests/legacy.py), where decision (i) still turns its apps on at once."
     ),
 }
-#: The helpers those operations run through outside the file that defines them (their ``services.py`` helpers live in
-#: that same file): the key's door.
-OWN_DATABASE_HELPERS = ("base/api_keys.py",)
 
 
 def _business_tables() -> set[str]:
@@ -1212,13 +1197,6 @@ def business_touches(sent: dict[str, list[str]], tables: set[str]) -> dict[str, 
     return {alias: names for alias, names in found.items() if names}
 
 
-def own_database_problems(defined_in: dict[str, str], shared_users) -> list[str]:
-    """``operation (file)`` for every operation of ``defined_in`` (``{operation: file}``) whose file, or a helper of
-    ``OWN_DATABASE_HELPERS``, may run on phase 1's shared database (``shared_users``)."""
-    problems = [f"{name} ({path})" for name, path in sorted(defined_in.items()) if path in shared_users]
-    return problems + [f"helper ({path})" for path in OWN_DATABASE_HELPERS if path in shared_users]
-
-
 def _defined_in(name: str) -> str:
     import inspect
 
@@ -1238,22 +1216,13 @@ def test_the_own_database_checks_see_what_they_must():
     assert "base_hub" not in _business_tables() and "base_appactivation" not in _business_tables()
     assert {"base_apikey", "sale_order", "live_outboxevent"} <= _business_tables()
 
-    defined = {"base.api_key.create": "base/services.py", "base.api_key.list": "base/queries.py"}
-    assert own_database_problems(defined, {"base/services.py": "why"}) == ["base.api_key.create (base/services.py)"]
-    assert own_database_problems(defined, {"base/api_keys.py": "why"}) == ["helper (base/api_keys.py)"]
-    assert own_database_problems(defined, SHARED_DATABASE_USERS) == []
 
-
-def test_no_operation_that_needs_the_own_database_may_run_on_the_shared_one():
+def test_the_operations_that_need_the_own_database_are_the_base_s_doors():
+    """Their files are where the ORM is (``services.py``/``queries.py``), which ``test_nothing_runs_on_a_shared_database
+    _any_more`` keeps off any shared database: since S5 there is none."""
     defined = {name: _defined_in(name) for name in [*OWN_DATABASE_OPERATIONS, *OWN_DATABASE_READS]}
+
     assert set(defined.values()) <= {"base/services.py", "base/queries.py"}, defined
-
-    problems = own_database_problems(defined, SHARED_DATABASE_USERS)
-
-    assert problems == [], (
-        "What needs the hub's own database never runs on phase 1's shared one (PLAN-DB §14.14): take it out of "
-        f"SHARED_DATABASE_USERS: {problems}"
-    )
 
 
 def _as_admin_of(slug: str):
@@ -1263,7 +1232,10 @@ def _as_admin_of(slug: str):
 
 
 def _run_in_a_hub_without_its_database(name: str, payload: dict):
-    """``name`` as an administrator of ``a`` (``db_name=""``, phase 1), in its context; ``(answer or error, sent)``."""
+    """``name`` as an administrator of ``a`` (``db_name=""``, phase 1), in its context; ``(answer or error, sent)``.
+
+    Since S5 production never enters such a business (``HubWithoutDatabase``, 503 at its door): only the suite's
+    fallback does (``base/tenancy/tests/legacy.py``), and there these refusals still keep its data untouched."""
     from live.errors import OperationError
     from live.operations import get
 
@@ -1272,15 +1244,13 @@ def _run_in_a_hub_without_its_database(name: str, payload: dict):
     from base.tenancy.tests import hubs
 
     hub = Hub.objects.get(slug="a")
-    assert not hub.db_name
+    assert not hub.db_name and context.serves_hubs_without_database()
     op = get(name)
-    with pytest.MonkeyPatch.context() as patch:
-        patch.setattr(context, "_test_fallback", None)  # as production: the request's hub, nothing else
-        with hubs.watched() as sent, context.use_hub(hub):
-            try:
-                outcome = op(_as_admin_of(hub.slug), op.input.model_validate(payload))
-            except OperationError as error:
-                outcome = error
+    with hubs.watched() as sent, context.use_hub(hub):
+        try:
+            outcome = op(_as_admin_of(hub.slug), op.input.model_validate(payload))
+        except OperationError as error:
+            outcome = error
     return outcome, sent
 
 

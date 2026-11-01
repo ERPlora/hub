@@ -142,26 +142,27 @@ def test_after_commit_outside_an_operation_is_a_misuse():
 
 @pytest.mark.django_db(databases=hubs.HUB_DATABASES, transaction=True)
 def test_each_job_runs_in_the_database_of_the_hub_that_asked_and_leaves_nothing_behind(hub_a, hub_b, pool, monkeypatch):
-    # As in production: a thread of its own has no context, and nothing falls back on the shared database.
+    # As in production: a thread of its own has no context, and nothing falls back on control's.
     monkeypatch.setattr(context, "_test_fallback", None)
     one_thread, seen = pool(threads=1), []
 
     def where(name):
         hub = context.current_hub()
-        seen.append((name, hub.slug if hub else None, [str(found) for found in HubIdentity.objects.values_list("hub_id", flat=True)]))
+        identities = [str(found) for found in HubIdentity.objects.values_list("hub_id", flat=True)] if hub else None
+        seen.append((name, hub.slug if hub else None, identities))
 
     with context.use_hub(hub_a):
         one_thread.submit(job_here(where, "a"))
     with context.use_hub(hub_b):
         one_thread.submit(job_here(where, "b"))
-    with context.use_shared_database():
-        one_thread.submit(job_here(where, "shared"))
+    with context.use_control():
+        one_thread.submit(job_here(where, "control"))
 
     assert eventually(lambda: len(seen) == 3)
     assert seen == [
         ("a", "tenant-a", [str(hubs.HUB_A_ID)]),
         ("b", "tenant-b", [str(hubs.HUB_B_ID)]),
-        ("shared", None, []),  # phase 1's shared database has the table and no row
+        ("control", None, None),  # control has no hub's identity: the job of the platform reads none
     ]
 
 
@@ -177,15 +178,7 @@ def test_a_job_of_a_hub_with_its_own_database_reaches_it_from_a_fresh_thread(hub
     assert seen == [job.database.alias] and seen != ["default"]
 
 
-# ── For the business of its row: phase 1's shared tables, never another hub's database ─────────────────────────────
-
-
-def phase_1_hub(slug: str):
-    """A hub of phase 1 (``db_name=""``): its data in the shared database, with every other one's."""
-    from control.models import Hub
-
-    hub, _ = Hub.objects.update_or_create(slug=slug, defaults={"status": Hub.Status.READY, "db_name": ""})
-    return hub
+# ── For the business of its row: never another hub's database ─────────────────────────────────────────────────────────
 
 
 def for_its_business(seen: list):
@@ -206,49 +199,11 @@ def for_its_business(seen: list):
 
 
 @pytest.mark.outbound_threads
-@pytest.mark.django_db(transaction=True)
-@pytest.mark.parametrize(
-    ("asked_for", "said", "expected"),
-    [
-        (B, B, ("b", context.SHARED, "default", [], "ran")),
-        (A, A, ("a", context.HUB, "default", [], "ran")),
-        (B, None, ("b", context.HUB, "default", [], "HubContextMismatch")),
-        (PLATFORM, PLATFORM, ("registry", context.HUB, "default", [], "ran")),
-    ],
-    ids=["another-business", "its-own", "not-said", "the-platform"],
-)
-def test_a_job_for_another_business_of_phase_1_runs_at_once_where_that_business_s_operations_run(
-    asked_for, said, expected, pool, monkeypatch
-):
-    """«Retry» from a's inbox on a row of b (phase 1 shares the tables): the job said to be for b runs in phase 1's
-    shared database, where b's operations run (as the worker's sweep hands it over), at once; one for a itself stays in
-    a's context, as one for the platform does (no business: its operations run on control from anywhere); one that does
-    not say whom it is for runs in the context that asked, where b's operation is refused."""
-    monkeypatch.setattr(context, "_test_fallback", None)  # as in production: a thread of its own starts without one
-    monkeypatch.setattr(outbound, "_pool", pool(threads=1))
-    seen: list = []
-    job = for_its_business(seen)
-
-    def retry(ctx, data):
-        if said is None:
-            outbound.after_commit(job, asked_for)
-        else:
-            outbound.after_commit(job, asked_for, scope=said)
-        return {"count": 1}
-
-    with context.use_hub(phase_1_hub("a")):
-        command(retry)(as_system(A), Schema())
-
-    assert eventually(lambda: seen != [])
-    assert seen == [expected]
-
-
-@pytest.mark.outbound_threads
 @pytest.mark.django_db(databases=hubs.HUB_DATABASES, transaction=True)
 def test_a_job_for_another_hub_never_reaches_its_database(hub_a, hub_b, pool, monkeypatch):
-    """Phase 2: a hub with its own database holds only its own rows. A job it says is for another hub stays in its
-    database, sees only its rows and the other's operation is refused; one a hub of phase 1 says is for a hub with its
-    own database runs in the shared one. No job ever reaches another hub's database."""
+    """A hub's database holds only its own rows. A job it says is for another hub stays in its database, sees only its
+    rows and the other's operation is refused; one for the platform runs on control. No job ever reaches another hub's
+    database (since S5 there is no shared database to hand it to)."""
     monkeypatch.setattr(context, "_test_fallback", None)
     monkeypatch.setattr(outbound, "_pool", pool(threads=1))
     seen: list = []
@@ -259,25 +214,29 @@ def test_a_job_for_another_hub_never_reaches_its_database(hub_a, hub_b, pool, mo
         outbound.after_commit(job, tenant_b, scope=tenant_b)
         return {"count": 1}
 
+    def ask_the_platform(ctx, data):
+        outbound.after_commit(job, PLATFORM, scope=PLATFORM)
+        return {"count": 1}
+
     with context.use_hub(hub_a):
         command(ask)(as_system(tenant_a), Schema())
-    with context.use_hub(phase_1_hub("a")):
-        command(ask)(as_system(A), Schema())
+        command(ask_the_platform)(as_system(tenant_a), Schema())
 
     assert eventually(lambda: len(seen) == 2)
     assert seen == [
         ("tenant-b", context.HUB, hubs.HUB_A_ALIAS, [str(hubs.HUB_A_ID)], "HubContextMismatch"),
-        ("tenant-b", context.SHARED, "default", [], "ran"),
+        ("registry", context.HUB, hubs.HUB_A_ALIAS, [str(hubs.HUB_A_ID)], "ran"),
     ]
 
 
 def test_whom_a_job_is_for_is_kept_from_when_it_is_asked():
     """The context a job runs in is chosen when it is asked and never changes after: nobody hands it another hub's."""
-    with context.use_hub(SimpleNamespace(slug="a", db_name="")):
+    a = SimpleNamespace(slug="a", db_name="")
+    with context.use_hub(a):
         job = outbound.Job(print, (), context.current_for(B))
     with pytest.raises(FrozenInstanceError):
         job.database = context.CONTROL_DATABASE  # type: ignore[misc]
-    assert job.database is context.SHARED_DATABASE
+    assert job.database.hub is a
 
 
 # ── Bounded: a few at once, a queue with a limit, the same job never twice ───────────────────────────────────────
@@ -296,7 +255,7 @@ def test_at_most_its_threads_run_at_once(pool):
             running.remove(n)
 
     for n in range(5):
-        assert two.submit(outbound.Job(job, (n,), context.SHARED_DATABASE))
+        assert two.submit(outbound.Job(job, (n,), context.CONTROL_DATABASE))
     assert eventually(lambda: len(running) == 2)
     time.sleep(0.1)  # a third thread, had there been one, would have started by now
     assert len(running) == 2
@@ -312,12 +271,12 @@ def test_the_same_job_already_waiting_is_not_queued_twice(pool):
         ran.append(run_id)
         let_go.wait(WAIT)
 
-    assert one.submit(outbound.Job(job, ("r1",), context.SHARED_DATABASE))
+    assert one.submit(outbound.Job(job, ("r1",), context.CONTROL_DATABASE))
     assert eventually(lambda: ran == ["r1"])  # running
-    assert one.submit(outbound.Job(job, ("r2",), context.SHARED_DATABASE))  # waits
-    assert not one.submit(outbound.Job(job, ("r2",), context.SHARED_DATABASE))  # a sweep sends it again: not twice
+    assert one.submit(outbound.Job(job, ("r2",), context.CONTROL_DATABASE))  # waits
+    assert not one.submit(outbound.Job(job, ("r2",), context.CONTROL_DATABASE))  # a sweep sends it again: not twice
     # r1 runs, it no longer waits: the next step of its run may need it again (its claim says whether it goes).
-    assert one.submit(outbound.Job(job, ("r1",), context.SHARED_DATABASE))
+    assert one.submit(outbound.Job(job, ("r1",), context.CONTROL_DATABASE))
     let_go.set()
     assert eventually(lambda: ran == ["r1", "r2", "r1"])
 
@@ -329,11 +288,11 @@ def test_past_its_queue_a_job_is_dropped_with_a_warning_and_its_app_sends_it_aga
         ran.append(n)
         let_go.wait(WAIT)
 
-    assert one.submit(outbound.Job(job, (1,), context.SHARED_DATABASE))
+    assert one.submit(outbound.Job(job, (1,), context.CONTROL_DATABASE))
     assert eventually(lambda: ran == [1])
-    assert one.submit(outbound.Job(job, (2,), context.SHARED_DATABASE))  # waits: the queue holds one
+    assert one.submit(outbound.Job(job, (2,), context.CONTROL_DATABASE))  # waits: the queue holds one
     with caplog.at_level(logging.WARNING, logger="base.outbound"):
-        assert not one.submit(outbound.Job(job, (3,), context.SHARED_DATABASE))
+        assert not one.submit(outbound.Job(job, (3,), context.CONTROL_DATABASE))
     let_go.set()
     assert eventually(lambda: ran == [1, 2])
     assert [record.levelno for record in caplog.records] == [logging.WARNING]
@@ -353,8 +312,8 @@ def test_a_job_that_fails_is_logged_with_its_traceback_and_the_others_go_on(pool
         ran.append(run_id)
 
     with caplog.at_level(logging.ERROR, logger="base.outbound"):
-        one.submit(outbound.Job(broken, ("r1",), context.SHARED_DATABASE))
-        one.submit(outbound.Job(fine, ("r2",), context.SHARED_DATABASE))
+        one.submit(outbound.Job(broken, ("r1",), context.CONTROL_DATABASE))
+        one.submit(outbound.Job(fine, ("r2",), context.CONTROL_DATABASE))
         assert eventually(lambda: ran == ["r2"])
     failed = [record for record in caplog.records if record.levelno == logging.ERROR]
     assert len(failed) == 1 and failed[0].exc_info is not None
@@ -374,7 +333,7 @@ def test_a_job_gives_its_connection_back_before_it_waits_and_when_it_ends(pool):
         seen["wrapper"] = connections["default"]  # this thread's own, not the proxy the test would read as its own
         finished.set()
 
-    one.submit(outbound.Job(job, (), context.SHARED_DATABASE))
+    one.submit(outbound.Job(job, (), context.CONTROL_DATABASE))
 
     assert finished.wait(WAIT)
     assert eventually(lambda: seen["wrapper"].connection is None)  # given back when the job ended
@@ -397,7 +356,7 @@ def test_release_inside_an_operation_is_refused_and_its_transaction_kept(pool):
         command(fn)(as_system(), Schema())
         finished.set()
 
-    one.submit(outbound.Job(job, (), context.SHARED_DATABASE))
+    one.submit(outbound.Job(job, (), context.CONTROL_DATABASE))
 
     assert finished.wait(WAIT)
     assert seen == ["refused", False]
@@ -417,15 +376,15 @@ def test_stop_drops_what_waits_and_gives_what_runs_its_grace(pool, caplog):
         ran.append(n)
         let_go.wait(WAIT)
 
-    one.submit(outbound.Job(job, (1,), context.SHARED_DATABASE))
+    one.submit(outbound.Job(job, (1,), context.CONTROL_DATABASE))
     assert eventually(lambda: ran == [1])
-    one.submit(outbound.Job(job, (2,), context.SHARED_DATABASE))
+    one.submit(outbound.Job(job, (2,), context.CONTROL_DATABASE))
 
     with caplog.at_level(logging.WARNING, logger="base.outbound"):
         started = time.monotonic()
         assert one.stop(grace=0.2) is False  # 1 still runs: left to its lease
         assert time.monotonic() - started < 2
-        assert not one.submit(outbound.Job(job, (3,), context.SHARED_DATABASE))  # a stopped pool takes nothing
+        assert not one.submit(outbound.Job(job, (3,), context.CONTROL_DATABASE))  # a stopped pool takes nothing
     messages = [record.getMessage() for record in caplog.records]
     assert any("waited" in message and "dropped" in message for message in messages)
     assert any("still running" in message for message in messages)
@@ -441,7 +400,7 @@ def test_stop_returns_once_what_runs_ends_within_its_grace(pool):
         let_go.wait(WAIT)
         ran.append(n)
 
-    one.submit(outbound.Job(job, (1,), context.SHARED_DATABASE))
+    one.submit(outbound.Job(job, (1,), context.CONTROL_DATABASE))
     threading.Timer(0.1, let_go.set).start()
 
     assert one.stop(grace=WAIT) is True

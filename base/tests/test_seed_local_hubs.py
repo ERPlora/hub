@@ -5,13 +5,12 @@ only (``DEBUG``), idempotent, through its operation (``base.hub.seed_local``), n
 them in production).
 """
 
-import logging
 from io import StringIO
 
 import pytest
 from django.core.management import call_command
 from django.core.management.base import CommandError
-from live.context import OperationContext
+from live.context import OperationContext, system_context
 from live.errors import PermissionDenied
 
 from base import registry
@@ -26,9 +25,8 @@ pytestmark = pytest.mark.django_db
 @pytest.fixture
 def fresh(settings, monkeypatch):
     """A developer's database before its first seed: the suite's own `a` and `b` (conftest) are not there. Some app
-    cannot live in a hub's own database here (``staff``, made unportable for these tests), so ``a`` and ``b`` share
-    control's, which a test case can reach: their own databases are ``base/tenancy/tests/test_provision.py``'s, on
-    real ones."""
+    cannot live in a hub's own database here (``staff``, made unportable for these tests), so the command refuses
+    before making any: their own databases are ``base/tenancy/tests/test_provision.py``'s, on real ones."""
     settings.DEBUG = True
     Hub.objects.filter(slug__in=["a", "b"]).delete()
     portable = tuple(label for label in migrator.portable_apps() if label != "staff")
@@ -42,46 +40,31 @@ def seed() -> str:
 
 
 @pytest.mark.usefixtures("fresh")
-def test_creates_a_and_b_ready():
-    output = seed()
-    assert sorted(Hub.objects.values_list("slug", "status", "is_demo")) == [("a", "ready", False), ("b", "ready", False)]
-    assert all(hub.ready_at is not None for hub in Hub.objects.all())
-    assert "a: created" in output and "b: created" in output
+def test_refuses_while_some_app_cannot_live_in_a_hub_s_own_database():
+    """Since S5 there is no shared database to leave a and b on: while some app cannot live in a hub's own database
+    (``migrator.portable_apps``; here ``staff``), it refuses and writes nothing. Every app can since W10 (hub#474):
+    the command then makes their databases (``base/tenancy/tests/test_provision.py``, on real ones)."""
+    with pytest.raises(CommandError, match="staff"):
+        seed()
+    assert not Hub.objects.filter(slug__in=["a", "b"]).exists()
 
 
 @pytest.mark.usefixtures("fresh")
-def test_leaves_a_and_b_on_the_shared_database_while_some_app_cannot_live_in_a_hubs_own(caplog):
-    """a and b turn every app on: while some app cannot live in a hub's own database (``migrator.portable_apps``; here
-    ``staff``), a and b keep their data in control's (``db_name=""``) and the log says which apps hold them there.
-    Every app can since W10 (hub#474), and then the same command gives them their own
-    (``base/tenancy/tests/test_provision.py``)."""
-    blocked = sorted(migrator.hub_apps() - set(migrator.portable_apps()))
-    assert blocked == ["staff"]
+def test_the_operation_names_each_local_hub_s_own_database_and_leaves_it_due():
+    from control.models import HubDue
 
-    with caplog.at_level(logging.WARNING, logger="base.management.commands.seed_local_hubs"):
-        output = seed()
+    from base.tenancy import connections as tenancy_connections
+    from base.tenancy import names
 
-    assert sorted(Hub.objects.values_list("slug", "db_name")) == [("a", ""), ("b", "")]
-    assert "base.seed_local_hubs.shared_database" in caplog.text
-    assert all(label in caplog.text for label in blocked)
-    assert "share the control database" in output
+    Hub.objects.create(slug="a", status="ready")  # a developer's a of phase 1, on control's database
 
+    answer = hub_seed_local(system_context(registry.REGISTRY_SCOPE), HubSeedLocalIn(slugs=["a", "b"]))
 
-@pytest.mark.usefixtures("fresh")
-def test_is_idempotent():
-    seed()
-    ids = dict(Hub.objects.values_list("slug", "id"))
-    output = seed()
-    assert dict(Hub.objects.values_list("slug", "id")) == ids
-    assert "a: already ready" in output and "b: already ready" in output
-
-
-@pytest.mark.usefixtures("fresh")
-def test_brings_a_local_hub_back_when_it_was_left_cancelled():
-    seed()
-    Hub.objects.filter(slug="a").update(status="cancelled")
-    assert "a: ready again" in seed()
-    assert Hub.objects.get(slug="a").status == "ready"
+    control = tenancy_connections.control_name()
+    for hub in Hub.objects.filter(slug__in=["a", "b"]):
+        assert (hub.status, hub.db_name) == ("requested", names.hub_db_name(control, hub.id))
+        assert HubDue.objects.filter(pk=hub.pk).exists()
+    assert {seeded.slug: seeded.outcome for seeded in answer.hubs} == {"a": "requested", "b": "created"}
 
 
 def test_is_only_for_local_development(settings):
