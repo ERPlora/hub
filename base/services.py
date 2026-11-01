@@ -3731,8 +3731,8 @@ def assistant_turn(ctx: OperationContext, data: AssistantTurnIn) -> dict:
     """A turn of the Hub's assistant made ready (BASE-G111, G115…G119, G121): the reads the model asked for run as the
     person; a write shows its card and runs only with the person's yes (``decision``; «Cancel all» = ``stop``); a tool
     this person was not offered never runs. Then what goes to the gateway: the tools of what was asked, by relevance,
-    and the instructions (with the checklist, read again, in ``setup``). Past ``assistant.MAX_ROUNDS`` rounds of tools
-    it goes no further (``stop``)."""
+    and the instructions (with the person's role and the writes a manager must approve, hub#585; with the checklist,
+    read again, in ``setup``). Past ``assistant.MAX_ROUNDS`` rounds of tools it goes no further (``stop``)."""
     if ctx.actor is None:
         raise Unauthorized(gettext("Sign in to talk to the assistant."))
     tools = assistant.catalog(ctx)
@@ -3776,12 +3776,16 @@ def assistant_turn(ctx: OperationContext, data: AssistantTurnIn) -> dict:
         # gh:hub#1045: the card paints an amount (its schema's ``money`` mark) in the business's currency, with its decimals.
         currency = business.get("currency") or "EUR"
         card["money"] = {"currency": currency, "decimals": business.get("currency_decimals", 2)}
+    offered = assistant.relevant(tools, asked[-2:], ctx.language)
     text = assistant.instructions(
         language=ctx.language,
         currency=business.get("currency") or "EUR",
         decimals=business.get("currency_decimals", 2),
         business=business.get("name") or "",
         screens=_assistant_screens(ctx),
+        role=_assistant_role(ctx),
+        # What is offered without its permission is a write a manager may approve (``assistant.catalog``).
+        approvable=[op.name for op in offered if not ctx.has(op.permission)],
     )
     if data.setup:
         text += "\n\n" + assistant.setup_block(_assistant_read(ctx, "base.setup.status"))
@@ -3794,11 +3798,19 @@ def assistant_turn(ctx: OperationContext, data: AssistantTurnIn) -> dict:
         "executed": executed,
         "confirm": card,
         "pending": [p.model_dump() for p in pending],
-        "tools": [assistant.tool_spec(op) for op in assistant.relevant(tools, asked[-2:], ctx.language)],
+        "tools": [assistant.tool_spec(op) for op in offered],
         "instructions": text,
         "continuation": data.continuation,
         "stop": stop,
     }
+
+
+def _assistant_role(ctx: OperationContext) -> str:
+    """The role in this business of whom the assistant serves (hub#585): their ``Membership``'s; "" for an actor with
+    none here (an API key, ERPlora's staff)."""
+    if not hasattr(ctx.actor, "get_username"):
+        return ""
+    return Membership.objects.filter(user=ctx.actor, host=ctx.scope.key).values_list("role", flat=True).first() or ""
 
 
 def _gateway_failure(code: str, message: str) -> OperationError:

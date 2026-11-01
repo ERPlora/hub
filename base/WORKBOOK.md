@@ -2505,10 +2505,15 @@ Pasos:
   1. El asistente trabaja con la sesión de quien está delante: ve y hace lo que esa persona vería y haría con sus
      botones, en las apps encendidas del negocio, y nada más. Una acción para la que no tiene permiso no se le ofrece
      al asistente, que así se lo dice; la que su app deja aprobar a un responsable sí, igual que su botón en la
-     pantalla.
-  2. Esa acción sale con su tarjeta, como cualquier otra. Al pulsar «Ejecutar» se abre «Hace falta una aprobación», la
-     misma de la pantalla: un responsable toca su cara y teclea su PIN, o pasa su placa, y la acción se hace una vez,
-     con quien la pidió como autor. Queda anotada en **Empleados › Aprobaciones**.
+     pantalla. El asistente sabe con qué rol habla (propietario, administrador, encargado o empleado, dicho en el
+     idioma de la conversación) y que sus herramientas son las de ese rol: si le piden algo que ninguna hace, no busca
+     otro camino ni cuenta el estado de otra cosa, sino que dice en una frase que no lo tiene disponible aquí, porque
+     su rol no puede o porque esa app no está encendida, y quién puede (al empleado, un encargado o el propietario; al
+     encargado, el propietario o un administrador) o en qué pantalla se hace.
+  2. Esa acción sale con su tarjeta, como cualquier otra, y el asistente avisa antes de que la tarjeta pedirá la
+     aprobación de un responsable. Al pulsar «Ejecutar» se abre «Hace falta una aprobación», la misma de la pantalla:
+     un responsable toca su cara y teclea su PIN, o pasa su placa, y la acción se hace una vez, con quien la pidió
+     como autor. Queda anotada en **Empleados › Aprobaciones**.
   3. Si nadie la aprueba («Cancelar»), no se hace: el recibo dice «No se hizo, cancelado: …» y el asistente lo sabe.
   4. Si aun así intenta una acción sin permiso que nadie puede aprobar, no se hace: el recibo dice «No se hizo, sin
      permiso: …» y el asistente explica que no puede.
