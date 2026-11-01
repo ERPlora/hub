@@ -381,6 +381,7 @@ LISTEN_RE = re.compile(r"(?:UN)?LISTEN(?:\s+\S+)?\s*;?")
 SHARED_DATABASE_USERS: dict[str, str] = {
     "base/tenancy/context.py": "where it is defined.",
     "base/worker.py": "the scheduled tasks and the outbox relay of every hub of phase 1 at once; S2's hub_due per hub.",
+    "base/metrics.py": "the fiscal backlog of every hub of phase 1 at once (hub#488), read-only, until S5.",
     "base/middleware.py": "the Hub admin with no hub chosen shows phase 1's one database, as before.",
     "base/internal.py": "ERPlora's invoices: the platform hub has no registry row before S2.",
     "base/management/commands/create_platform_hub.py": "the platform hub has no registry row before S2.",

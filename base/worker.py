@@ -50,6 +50,11 @@ Each pass opens its database context (phase 2, S1; plan 2026-10-22): the tasks a
 run on it (``use_shared_database``: every hub with ``db_name=""``), each hub with its own database in its own
 (``use_hub``), and the reaper and the ``hub_due`` pass on control (``use_control``), where the registry and the demos
 live (the provisioning enters each hub's own database itself).
+
+Once its apps are registered, its CloudWatch metrics run in a thread of their own (``base.metrics``, hub#488): once a
+minute the registry's (a sign-up still being prepared, the hubs that failed, a demo left to drop) and the fiscal
+backlog, only where ``METRICS_ENABLED`` is on; the tick never waits for them, and on its way out the worker gives a
+pass in course ``METRICS_GRACE_SECONDS``.
 """
 
 import datetime as dt
@@ -66,7 +71,7 @@ from django.utils import timezone
 from live.context import OperationContext, Scope
 from live.operations import get as get_operation
 
-from base import catalog, outbound, relay, scheduler, services, usage
+from base import catalog, metrics, outbound, relay, scheduler, services, usage
 from base.services import reap_demos
 from base.tenancy import dumps, provision
 from base.tenancy.connections import close_hub_aliases, close_this_threads_connections
@@ -100,6 +105,9 @@ EMPTYING_LEASE = dt.timedelta(minutes=15)
 #: What the calls in flight (``base.outbound``) get when the worker stops: ECS kills the task 30 s after SIGTERM, and
 #: the loop's step ends first. What still runs then is left to its lease.
 OUTBOUND_GRACE_SECONDS = 15
+#: What a metrics pass in course gets when the worker stops (``base.metrics``: it ends before its next hub), before the
+#: calls in flight get theirs; what still runs then ends with the process.
+METRICS_GRACE_SECONDS = 5.0
 
 
 def run(
@@ -155,6 +163,7 @@ def run(
     else:
         registered = f"{result.written} app(s) registered: {', '.join(result.apps)}"
     logger.info("worker: waiting for work (%s).", registered)
+    emitter = metrics.start(stop)
     next_reap: dt.datetime | None = None
     # The slow passes, each in a thread of its own and one at a time: the loop keeps ticking while they run.
     data_pass, usage_pass = Background("data"), Background("usage")
@@ -175,6 +184,7 @@ def run(
     deadline = time.monotonic() + BACKGROUND_GRACE_SECONDS
     for runner in (data_pass, usage_pass):
         runner.join(max(0.0, deadline - time.monotonic()))
+    emitter.join(METRICS_GRACE_SECONDS)
     outbound.stop(OUTBOUND_GRACE_SECONDS)
     logger.info("worker: stopped.")
     return 0
