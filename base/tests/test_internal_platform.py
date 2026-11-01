@@ -20,6 +20,7 @@ from apps.invoice.tests.test_platform import BODY
 from apps.invoice.tests.test_platform_invoices import PLATFORM, PLATFORM_ISSUER, system
 from apps.invoice.tests.conftest import run
 from base.tenancy.tests.hubs import HUB_DATABASES
+from base.tenancy.tests.legacy import use_legacy
 from base.tests.test_internal import code, signed
 from live.context import Scope, system_context
 
@@ -79,6 +80,18 @@ def test_without_the_platform_hub_in_the_registry_it_is_503_and_says_how_to_make
 
     assert health.status_code == 503 and "create_platform_hub" in health.json()["detail"]
     assert (issued.status_code, code(issued)) == (503, "base.platform_hub_missing")
+
+
+@pytest.mark.usefixtures("no_test_fallback")
+def test_a_platform_hub_of_phase_1_without_its_own_database_is_503_and_says_how_to_make_it(client, platform_row):
+    """Its row is there but its data is still in control's (phase 1): never run there, nor on control (S5)."""
+    issued = post(client, BODY)
+    health = get(client, f"{ROOT}/health")
+
+    assert (issued.status_code, code(issued)) == (503, "base.platform_hub_missing")
+    assert health.status_code == 503 and "create_platform_hub" in health.json()["detail"]
+    with use_legacy():
+        assert not Invoice.objects.exists()
 
 
 @pytest.mark.django_db(databases=HUB_DATABASES)
