@@ -166,6 +166,20 @@ class Hub(models.Model):
     # keeps what was asked and how it went (``base.services``, «The reset of a business»), shown on Settings › Data.
     reset_requested_at = models.DateTimeField(_("reset asked"), null=True, blank=True)
     reset_sections = models.JSONField(_("reset"), null=True, blank=True)
+    # Its move to another cluster (round 2026-10-30b of PLAN-DB, decision 3; tranche S7): asked in the Hub admin
+    # (``control.hub.move``) and done by the worker (``base.tenancy.move``). Set while it is to do: its host answers 503
+    # «maintenance» meanwhile, and the cluster cannot be deleted.
+    moving_to = models.ForeignKey(
+        Cluster,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="incoming",
+        verbose_name=_("moving to"),
+    )
+    # Its move is to be undone (``control.hub.move_cancel``, or an undo that could not finish): the worker puts it back
+    # on its origin on its next pass, never taking it forward.
+    move_undo_asked_at = models.DateTimeField(_("move undo asked"), null=True, blank=True)
 
     class Meta:
         db_table = "base_hub"
@@ -345,3 +359,69 @@ class UsageRun(UUIDModel):
 
     def __str__(self) -> str:
         return f"{self.day}"
+
+
+class MovedCopy(UUIDModel):
+    """The database a hub left behind on the server it moved from (round 2026-10-30b of PLAN-DB, decision 3; tranche
+    S7): its ``<control>_move_<hex>`` (``base.tenancy.names``), closed to the app, kept a few days in case the move must
+    be undone by hand, then dropped by the worker with its row (``base.tenancy.move``). ``cluster`` empty: the settings'
+    own server. One per database name and server: a newer move off the same server replaces the older copy.
+
+    Written before the worker renames the hub's database, without ``moved_at`` while the move goes on: the hub's data
+    is in that copy then, whatever else of that name the servers hold, so a move cut short is undone or gone on from it
+    and never from a database that only has the name. ``moved_at`` is set when control switches the hub."""
+
+    hub = models.ForeignKey(Hub, on_delete=models.CASCADE, related_name="moved_copies", verbose_name=_("hub"))
+    cluster = models.ForeignKey(
+        Cluster,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="moved_copies",
+        verbose_name=_("cluster"),
+    )
+    db_name = models.CharField(_("database"), max_length=63)
+    moved_at = models.DateTimeField(_("moved at"), null=True, blank=True)
+    # While the move goes on: the origin's schema record as control had it (the destination's is written when it is
+    # migrated, ``migrator.ensure_schema``), given back if the move is undone. Only the worker writes a note, right
+    # before it renames: a note is always the truth of where the data is (a cancel never makes nor takes one).
+    schema_state = models.CharField(_("schema"), max_length=16, blank=True, default="", db_default="")
+    schema_apps = models.JSONField(_("created apps"), null=True, blank=True)
+
+    class Meta:
+        verbose_name = _("copy after a move")
+        verbose_name_plural = _("copies after a move")
+        ordering = ["moved_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["cluster", "db_name"], name="control_movedcopy_one_per_server", nulls_distinct=False
+            )
+        ]
+
+    def __str__(self) -> str:
+        return self.db_name
+
+
+class LeftoverDatabase(UUIDModel):
+    """A database a move may have left on its destination when it was undone without reaching it (round 2026-10-31 of
+    the review of W8): the hub's name on that cluster, dropped by the worker on a later pass (``base.tenancy.move``)
+    under the hub's lease, never while control says a hub's database is there (the hub on that cluster, moving to it,
+    or living on the same server), and forgotten then."""
+
+    hub = models.ForeignKey(Hub, on_delete=models.CASCADE, related_name="leftovers", verbose_name=_("hub"))
+    cluster = models.ForeignKey(
+        Cluster, on_delete=models.PROTECT, related_name="leftovers", verbose_name=_("cluster")
+    )
+    db_name = models.CharField(_("database"), max_length=63)
+    noted_at = models.DateTimeField(_("noted at"))
+
+    class Meta:
+        verbose_name = _("database left by an undone move")
+        verbose_name_plural = _("databases left by undone moves")
+        ordering = ["noted_at"]
+        constraints = [
+            models.UniqueConstraint(fields=["cluster", "db_name"], name="control_leftover_one_per_server")
+        ]
+
+    def __str__(self) -> str:
+        return self.db_name

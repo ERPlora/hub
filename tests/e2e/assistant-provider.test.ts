@@ -55,6 +55,17 @@ describe('answerTo', () => {
     expect(textOf(answerTo(cancelled).frames)).toBe('No lo he hecho.');
   });
 
+  it('a list it offers (E2E-OFFER), one line per « | », as text; the write named in it, only when the next question hears that list', () => {
+    const offer = 'E2E-OFFER 1. Saturday at 20:00 | 2. Saturday at 21:30 | E2E-ASK reservation__reservation__create {"time":"21:30"}';
+    const offered = answerTo([user(`A table for 4 on Saturday?\n${offer}`)]);
+    const list = '1. Saturday at 20:00\n2. Saturday at 21:30\nE2E-ASK reservation__reservation__create {"time":"21:30"}';
+    expect(textOf(offered.frames)).toBe(list);
+    expect(finish(offered.frames)).toEqual(['stop']);
+    // WHATSAPP_INBOX-F19: the guest's «the 2nd» comes with what the business last wrote them, the list: its write is asked.
+    const picked = answerTo([user(`———\nthe 2nd\n———\n\n———\n${list}\n———\n`)]);
+    expect(toolOf(picked.frames)).toEqual({ name: 'reservation__reservation__create', arguments: '{"time":"21:30"}' });
+  });
+
   it('the outcome by the shape of the result: the Hub’s error envelope is a refusal, a word inside a result that ran is not', () => {
     const outcome = (content: string) => textOf(answerTo([user('x'), { role: 'tool', content }]).frames);
     // What the Hub sends when a tool did not run (`error_content`): cancelled, refused, failed with its fields.

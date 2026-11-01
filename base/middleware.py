@@ -50,7 +50,11 @@ its database context: ``use_hub(request.hub)`` on a hub's host; on the platform 
 choose a business); nothing for ``/internal`` and the open paths, whose code opens its own. A hub's database that says
 it is another hub (``base.tenancy.identity``) answers 503 (``base.hub_unavailable``), serves nothing and raises an
 alarm; one that cannot be reached now answers the same 503 with ``Retry-After`` and a warning; a business without its
-own database yet (phase 1's, before its cut: S5) answers 503 ``base.hub_preparing``.
+own database yet (phase 1's, before its cut: S5) answers 503 ``base.hub_maintenance``, as one being moved. A hub
+whose every place in this process is taken (its plan's transactions at once, ``base.tenancy.limits``) answers 503
+``base.hub_busy`` with ``Retry-After``, whether that happens while checking its database, in
+``SaasLoginRequiredMiddleware`` (the website, a till's device) or in the view (the API's routes answer it themselves,
+with the same envelope): the envelope, or for a page (the admin, the website) its message as text.
 
 ``SessionHostMiddleware`` (phase 2, S1): a session is a session of the host it was opened on (the login notes it);
 on another hub's host, or on the platform host, it is anonymous (401).
@@ -83,6 +87,7 @@ from base.public_home import website_enabled
 from base.spa import spa
 from base.tenancy import connections as tenancy_connections
 from base.tenancy import context as tenancy_context
+from base.tenancy import limits as tenancy_limits
 from base.tenancy.identity import HubIdentityMismatch
 
 logger = logging.getLogger(__name__)
@@ -90,6 +95,7 @@ logger = logging.getLogger(__name__)
 #: The page of a hub that is gone (410) and of one being prepared (503); no request, no scripts (strict CSP).
 HUB_GONE_TEMPLATE = "base/hub_gone.html"
 HUB_PREPARING_TEMPLATE = "base/hub_preparing.html"
+HUB_MAINTENANCE_TEMPLATE = "base/hub_maintenance.html"
 #: The page of a business suspended for an unpaid invoice (402): the way back is ERPlora, where it is paid.
 HUB_SUSPENDED_TEMPLATE = "base/hub_suspended.html"
 #: How long a client waits before asking a hub being prepared again (``Retry-After``).
@@ -141,7 +147,8 @@ class HubHostRequiredMiddleware(MiddlewareMixin):
         raise Http404("This host is no hub's.")
 
     def _refuse(self, request: HttpRequest, hub: Hub, refusal: registry.Refusal) -> HttpResponse:
-        """The registry's refusal: its envelope, or its page for a browser (gone, being prepared, suspended)."""
+        """The registry's refusal: its envelope, or its page for a browser (gone, being prepared, under maintenance,
+        suspended)."""
         if _wants_envelope(request):
             response = _envelope(refusal.status, refusal.code, refusal.message)
         elif refusal.code == registry.HUB_GONE:
@@ -150,10 +157,12 @@ class HubHostRequiredMiddleware(MiddlewareMixin):
             response = HttpResponse(html, status=refusal.status)
         elif refusal.code == registry.HUB_PREPARING:
             response = HttpResponse(render_to_string(HUB_PREPARING_TEMPLATE), status=refusal.status)
+        elif refusal.code == registry.HUB_MAINTENANCE:
+            response = HttpResponse(render_to_string(HUB_MAINTENANCE_TEMPLATE), status=refusal.status)
         else:
             html = render_to_string(HUB_SUSPENDED_TEMPLATE, {"back_url": saas_url(LAUNCH_PATH)})
             response = HttpResponse(html, status=refusal.status)
-        if refusal.code == registry.HUB_PREPARING:
+        if refusal.code in (registry.HUB_PREPARING, registry.HUB_MAINTENANCE):
             response["Retry-After"] = str(PREPARING_RETRY_AFTER_SECONDS)
         return response
 
@@ -203,6 +212,14 @@ class SaasLoginRequiredMiddleware(MiddlewareMixin):
     """Placed after ``AuthenticationMiddleware``: it reads ``request.user``."""
 
     def process_view(self, request: HttpRequest, view_func, view_args, view_kwargs) -> HttpResponse | None:
+        try:
+            return self._gate(request, view_func)
+        except tenancy_limits.HubBusy as busy:
+            # It reads the hub's database (its website, the browser's device) before any view, and what a process_view
+            # raises never reaches HubDatabaseMiddleware.process_exception: the same 503.
+            return HubDatabaseMiddleware._busy(request, busy)
+
+    def _gate(self, request: HttpRequest, view_func) -> HttpResponse | None:
         if view_func is not spa or request.user.is_authenticated:
             return None
         if request.method not in ("GET", "HEAD") or "text/html" not in request.headers.get("Accept", ""):
@@ -243,6 +260,8 @@ class HubDatabaseMiddleware:
             return self.__acall__(request)
         try:
             resolved = self._resolve(request)
+        except tenancy_limits.HubBusy as busy:
+            return self._busy(request, busy)
         except (HubIdentityMismatch, DatabaseError, tenancy_context.HubWithoutDatabase) as error:
             return self._unavailable(request, error)
         with self._entered(resolved):
@@ -255,6 +274,8 @@ class HubDatabaseMiddleware:
                 resolved = await sync_to_async(self._resolve)(request)
             else:
                 resolved = self._resolve(request)
+        except tenancy_limits.HubBusy as busy:
+            return self._busy(request, busy)
         except (HubIdentityMismatch, DatabaseError, tenancy_context.HubWithoutDatabase) as error:
             return self._unavailable(request, error)
         with self._entered(resolved):
@@ -285,8 +306,11 @@ class HubDatabaseMiddleware:
         return tenancy_context.use_hub(resolved)
 
     def process_exception(self, request: HttpRequest, exception: Exception) -> HttpResponse | None:
-        """On the platform host with no business chosen, a page of a hub's model (which only a business's database
-        holds) goes back to the admin's index, saying what to do; anything else is left to Django."""
+        """A view that found its hub busy (the admin's, a page's) answers 503 instead of 500. On the platform host with
+        no business chosen, a page of a hub's model (which only a business's database holds) goes back to the admin's
+        index, saying what to do; anything else is left to Django."""
+        if isinstance(exception, tenancy_limits.HubBusy):
+            return self._busy(request, exception)
         if not (isinstance(exception, tenancy_context.HubContextMissing) and getattr(request, "platform_host", False)):
             return None
         from django.contrib import messages
@@ -301,6 +325,16 @@ class HubDatabaseMiddleware:
         return HttpResponseRedirect(reverse("admin:index"))
 
     @staticmethod
+    def _busy(request: HttpRequest, busy: tenancy_limits.HubBusy) -> HttpResponse:
+        """503 ``base.hub_busy``: the envelope, or the message for a page; come back in a moment (``Retry-After``)."""
+        if _wants_envelope(request):
+            response = _envelope(busy.status, busy.code, busy.message)
+        else:
+            response = HttpResponse(busy.message, status=busy.status, content_type="text/plain; charset=utf-8")
+        response["Retry-After"] = str(tenancy_limits.RETRY_AFTER_SECONDS)
+        return response
+
+    @staticmethod
     def _unavailable(request: HttpRequest, error: Exception) -> HttpResponse:
         """503: a database that is not its hub's (an alarm), one that cannot be reached now (it passes), or a business
         without its own yet (its cut is to come)."""
@@ -308,7 +342,9 @@ class HubDatabaseMiddleware:
         if isinstance(error, tenancy_context.HubWithoutDatabase):
             logger.warning("base.hub_without_database: %s; nothing is served until its cut.", error)
             refusal = registry.Refusal(
-                503, registry.HUB_PREPARING, gettext("This hub is still being prepared; try again in a few seconds.")
+                503,
+                registry.HUB_MAINTENANCE,
+                gettext("This hub is under maintenance for a few minutes; try again shortly."),
             )
             response = _envelope(refusal.status, refusal.code, refusal.message)
             response["Retry-After"] = str(PREPARING_RETRY_AFTER_SECONDS)

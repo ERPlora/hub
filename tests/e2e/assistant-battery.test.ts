@@ -16,6 +16,9 @@ import {
   redact,
   renderReport,
   SEED_PY,
+  CLEANUP_PY,
+  cleanupCommand,
+  QA_STAFF_EMAIL,
   seedCommand,
   verdictOf,
 } from './assistant-battery';
@@ -332,11 +335,42 @@ describe('seedCommand', () => {
     expect(() => seedCommand({ QA_QWEN_API_KEY: 'sk-qwen-secret' }, 'saas_e2e_8895')).toThrow(/QA_OPENAI_API_KEY/);
   });
 
+  it('refuses the shared SaaS database and any database that is not an e2e one', () => {
+    expect(() => seedCommand(env, 'saas')).toThrow(/shared SaaS database «saas»/);
+    expect(() => seedCommand(env, 'saas_dev')).toThrow(/not an e2e database/);
+  });
+
   it('sets the providers only through the SaaS operations and prints no key', () => {
     for (const op of ['credential_import', 'credential_save', 'model_select', 'policy_update']) expect(SEED_PY).toContain(`services.${op}(`);
     expect(SEED_PY).not.toMatch(/print\([^)]*(key|KEY)/);
     expect(SEED_PY).not.toMatch(/cursor|raw\(/);
     const parsed = spawnSync('python3', ['-c', 'import ast, sys; ast.parse(sys.stdin.read())'], { input: SEED_PY, encoding: 'utf8' });
+    expect(parsed.status, parsed.stderr).toBe(0);
+  });
+});
+
+describe('cleanupCommand', () => {
+  it('takes the QA keys and accounts out of the stack’s SaaS, on its database, with the accounts in the environment', () => {
+    const command = cleanupCommand({ PATH: '/bin' }, 'saas_e2e_8895', [QA_STAFF_EMAIL, 'qa-manager@example.com']);
+    expect(command.file).toBe('uv');
+    expect(command.args).toEqual(['run', 'python', 'manage.py', 'shell', '-c', CLEANUP_PY]);
+    expect(command.env).toMatchObject({ PATH: '/bin', DB_NAME: 'saas_e2e_8895', QA_CLEANUP_EMAILS: `${QA_STAFF_EMAIL},qa-manager@example.com` });
+  });
+
+  it('refuses the shared SaaS database and any database that is not an e2e one', () => {
+    expect(() => cleanupCommand({}, 'saas', [QA_STAFF_EMAIL])).toThrow(/shared SaaS database «saas»/);
+    expect(() => cleanupCommand({}, 'saas_dev', [QA_STAFF_EMAIL])).toThrow(/not an e2e database/);
+  });
+
+  it('deletes only the keys labelled qa and the named accounts, in development only, and is Python', () => {
+    expect(SEED_PY).toContain(`"${QA_STAFF_EMAIL}"`);
+    expect(SEED_PY.match(/label="qa"/g)?.length).toBeGreaterThanOrEqual(2);
+    expect(CLEANUP_PY).toContain('if not settings.DEBUG');
+    expect(CLEANUP_PY).toContain('AIProviderCredential.objects.filter(label="qa").delete()');
+    expect(CLEANUP_PY).toContain('email__in=');
+    expect(CLEANUP_PY).toContain('os.environ["QA_CLEANUP_EMAILS"]');
+    expect(CLEANUP_PY).not.toMatch(/cursor|raw\(/);
+    const parsed = spawnSync('python3', ['-c', 'import ast, sys; ast.parse(sys.stdin.read())'], { input: CLEANUP_PY, encoding: 'utf8' });
     expect(parsed.status, parsed.stderr).toBe(0);
   });
 });

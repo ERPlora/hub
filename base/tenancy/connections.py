@@ -9,6 +9,11 @@ registered with another database is refused (``HubAliasConflict``): every thread
 one, so a hub moved to another database needs the process restarted. A template's database (``<control>_template…``)
 never gets one: it is only cloned, and a connection to it would make its next clone fail (PLAN-DB §6).
 
+Every hub's alias runs on the hubs' engine (``base.tenancy.backend``, ``base.tenancy.limits``): each transaction holds a
+place of its hub's limiter in this process and carries its plan's ``statement_timeout``; registering the alias (on every
+``use_hub``) makes or resizes that limiter from the hub's photo. The migrator's alias does not: its passes have their
+own budget.
+
 ``connections.settings`` is never changed in place: ``close_old_connections`` walks it from other threads, so a new
 dict with the alias is swapped in, under a lock, after looking again. A business without a database of its own
 (``db_name=""``: phase 1's, not yet cut) has no alias (``HubWithoutDatabase``): since S5 it never runs on ``default``.
@@ -31,7 +36,7 @@ import threading
 
 from django.db import DEFAULT_DB_ALIAS, connections
 
-from base.tenancy import names
+from base.tenancy import limits, names
 from base.tenancy.credentials import APP, MIGRATOR, credentials_for
 
 #: The static alias every hub's alias is copied from; nobody connects to it.
@@ -77,6 +82,11 @@ def _register(alias: str, build, *, replace: bool = False) -> str:
 
 #: What a rotation of a cluster's secret changes in a hub's alias.
 ROLE_KEYS = ("USER", "PASSWORD")
+#: Where and as whom an alias reaches its database: a rotation changes its role, a move (``base.tenancy.move``) its
+#: server. When the hub's row (read again by every request, live re-run and worker pass) says otherwise than the alias,
+#: the alias is registered again with it and this thread's connection given it; another thread's takes it when that
+#: thread opens the hub again.
+REACH_KEYS = ("HOST", "PORT", *ROLE_KEYS)
 
 
 def _take_this_threads_role(alias: str) -> None:
@@ -84,22 +94,26 @@ def _take_this_threads_role(alias: str) -> None:
     (another thread's takes them when that thread opens the hub again: every request does, through ``use_hub``)."""
     current = connections.settings[alias]
     for connection in connections.all(initialized_only=True):
-        if connection.alias == alias and any(connection.settings_dict.get(key) != current[key] for key in ROLE_KEYS):
+        if connection.alias == alias and any(connection.settings_dict.get(key) != current[key] for key in REACH_KEYS):
             connection.close()
             connection.settings_dict = copy.deepcopy(current)
 
 
 def _not_a_template(name: str, control: str) -> str:
-    """``name``, unless it is one of ``control``'s templates (``InvalidDatabaseName``): only the migrator reaches those."""
+    """``name``, unless it is one of ``control``'s templates (``InvalidDatabaseName``): only the migrator reaches those;
+    nor the copy a hub left behind when it moved (``base.tenancy.move``): closed to the app, only ever dropped."""
     template = names.template_db_name(control)
     if name == template or name.startswith(f"{template}_"):
         raise names.InvalidDatabaseName(f"{name!r} is a template: it is only cloned, never a hub's database.")
+    if names.is_moved(name, control=control):
+        raise names.InvalidDatabaseName(f"{name!r} is the copy a hub left behind when it moved, never a hub's database.")
     return name
 
 
 def register_hub_alias(hub) -> str:
     """The alias of ``hub``'s own database, registered if this process has not yet; its name is validated first, and
-    a template's is refused."""
+    a template's is refused. It runs on the hubs' engine, and its limiter follows ``hub``'s photo
+    (``base.tenancy.limits``)."""
     control = control_name()
     name = _not_a_template(names.validate(hub.db_name, control=control), control)
     alias = hub_alias(hub)
@@ -108,7 +122,7 @@ def register_hub_alias(hub) -> str:
         raise HubAliasConflict(
             f"{alias} already reaches {registered['NAME']!r} in this process, and its hub now names {name!r}."
         )
-    overrides = {"NAME": name}
+    overrides = {"NAME": name, "ENGINE": limits.ENGINE}
     cluster = getattr(hub, "cluster", None)
     if cluster is not None:
         found = credentials_for(cluster, APP)
@@ -126,9 +140,11 @@ def register_hub_alias(hub) -> str:
                 "PORT": port,
                 "OPTIONS": copy.deepcopy(connections.settings[TEMPLATE_ALIAS]["OPTIONS"]) | tls,
             }
-    rotated = registered is not None and any(registered[key] != overrides.get(key, registered[key]) for key in ROLE_KEYS)
+    template = connections.settings[TEMPLATE_ALIAS]
+    rotated = registered is not None and any(registered[key] != overrides.get(key, template[key]) for key in REACH_KEYS)
     _register(alias, lambda: _copied(TEMPLATE_ALIAS, **overrides), replace=rotated)
     _take_this_threads_role(alias)
+    limits.configure(alias, hub)
     return alias
 
 
@@ -160,7 +176,7 @@ def migrator_conninfo(dbname: str, *, cluster=None) -> dict:
 def register_ddl_alias(db_name: str, *, cluster=None) -> str:
     """The migrator's alias of the database ``db_name`` (``<db_name>__ddl``) on ``cluster`` (or the settings' own
     server): direct, as the migrator's role, no pool, closed after use. Registered again when that role's user or
-    password changed (a rotation of the cluster's ``…/migrator`` secret)."""
+    password changed (a rotation of the cluster's ``…/migrator`` secret), or its writer (a move)."""
     names.validate(db_name, control=control_name())
     found = credentials_for(cluster, MIGRATOR)
 
@@ -181,7 +197,8 @@ def register_ddl_alias(db_name: str, *, cluster=None) -> str:
 
     name = f"{db_name}{names.DDL_SUFFIX}"
     registered = connections.settings.get(name)
-    rotated = registered is not None and (registered["USER"], registered["PASSWORD"]) != (found.user, found.password)
+    reach = (*_writer(cluster), found.user, found.password)
+    rotated = registered is not None and tuple(registered[key] for key in REACH_KEYS) != reach
     alias = _register(name, build, replace=rotated)
     # A connection object this thread kept from an earlier registration (forgotten since) reaches as that one's role.
     _take_this_threads_role(alias)

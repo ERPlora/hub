@@ -68,6 +68,11 @@ def is_suspended(hub: Hub) -> bool:
     return isinstance(hub.state, dict) and hub.state.get("status") == SUSPENDED
 
 
+def is_moving(hub: Hub) -> bool:
+    """Whether ``hub`` is moving to another cluster (``control.hub.move``, ``base.tenancy.move``): closed meanwhile."""
+    return hub.moving_to_id is not None
+
+
 def is_preparing(hub: Hub) -> bool:
     """Whether ``hub`` is not ready yet (requested, being prepared, or its preparation failed and is retried)."""
     return hub.status in PREPARING_STATUSES
@@ -102,6 +107,8 @@ def own_database_made() -> Q:
 HUB_GONE = "base.hub_gone"
 HUB_PREPARING = "base.hub_preparing"
 HUB_SUSPENDED = "base.hub_suspended"
+#: A hub whose database is moving to another cluster (round 2026-10-30b of PLAN-DB, decision 3): a few minutes.
+HUB_MAINTENANCE = "base.hub_maintenance"
 #: A hub whose database is not its own (``base.tenancy.identity``): nothing is served from it (phase 2, S1).
 HUB_UNAVAILABLE = "base.hub_unavailable"
 
@@ -118,17 +125,20 @@ class Refusal:
 def refusal(hub: Hub | None, *, ended: bool = True) -> Refusal | None:
     """Why the host of ``hub`` does not serve the app, or ``None`` while it does; in the active language.
 
-    The host gate's rule (``base.middleware``), in its order: no row 404, gone 410, still being prepared 503 (a
-    business of phase 1 without its own database too, until its cut gives it one: S5, ``base.tenancy.cut``),
-    suspended for an unpaid invoice 402. An open live stream and the print socket hear it again before each run
+    The host gate's rule (``base.middleware``), in its order: no row 404, gone 410, still being prepared 503, moving
+    to another cluster 503 (maintenance), a business of phase 1 without its own database 503 too (maintenance, until
+    its cut gives it one: S5, ``base.tenancy.cut``), suspended for an unpaid invoice 402. An open live stream and the
+    print socket hear it again before each run
     (``base.operations.HubContextBuilder.refresh``). ``ended=False`` leaves out that it ended (a demo's login still
     answers then)."""
     if hub is None:
         return Refusal(404, "not_found", gettext("Not found"))
     if ended and is_gone(hub):
         return Refusal(410, HUB_GONE, gettext("This hub is no longer available."))
-    if is_preparing(hub) or not (hub.db_name or serves_hubs_without_database()):
+    if is_preparing(hub):
         return Refusal(503, HUB_PREPARING, gettext("This hub is still being prepared; try again in a few seconds."))
+    if is_moving(hub) or not (hub.db_name or serves_hubs_without_database()):
+        return Refusal(503, HUB_MAINTENANCE, gettext("This hub is under maintenance for a few minutes; try again shortly."))
     if is_suspended(hub):
         return Refusal(402, HUB_SUSPENDED, gettext("This business is suspended until its unpaid invoice is paid."))
     return None

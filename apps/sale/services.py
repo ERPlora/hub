@@ -688,12 +688,12 @@ def _open_check_of(appointment_id) -> Order | None:
             "en": (
                 "start a check for table 4",
                 "open a tab for Ana with two beers",
-                "new ticket with a coffee",
+                "open a ticket with a coffee",
             ),
             "es": (
                 "ábreme una cuenta para la mesa 4",
                 "abre la cuenta de la terraza con dos cañas",
-                "empieza un ticket nuevo con un café",
+                "abre un ticket con un café",
             ),
         },
     ),
@@ -783,7 +783,7 @@ def add_line(ctx: OperationContext, data: OrderAddLineIn) -> dict:
                 "key in 12 euros by hand in the drinks section",
             ),
             "es": (
-                "pon 3,50 € a precio libre en bollería",
+                "marca 3,50 € a precio libre en bollería",
                 "mete 12 € a mano en la sección de varios",
             ),
         },
@@ -848,7 +848,7 @@ def add_service_line(ctx: OperationContext, data: OrderAddServiceLineIn) -> dict
         asks={
             "en": (
                 "add a menu of the day with lentils, hake and flan",
-                "put two set menus on table 3",
+                "add two lunch menus to table 3",
             ),
             "es": (
                 "pon un menú del día con lentejas, merluza y flan",
@@ -1475,7 +1475,7 @@ VOID_PERMISSION = "sale.void_sale"
             ),
             "es": (
                 "anula la cuenta vacía de la barra",
-                "elimina la cuenta de la mesa 5, que se fueron sin pedir",
+                "cancela la cuenta de la mesa 5, que se fueron sin pedir",
             ),
         },
     ),
@@ -1503,7 +1503,7 @@ def void_order(ctx: OperationContext, data: OrderRefIn) -> dict:
             ),
             "es": (
                 "anula la cuenta de la 5 aunque tenga cosas",
-                "elimina la cuenta con lo pedido, lo autorizo yo",
+                "cancela la cuenta de la mesa 2 con lo que ya han tomado, lo autorizo yo",
             ),
         },
     ),
@@ -1601,7 +1601,7 @@ def _set_discount(
         risk="high",
         asks={
             "en": (
-                "give table 4 10% off",
+                "give table 4 a 10% discount",
                 "take 5 euros off the bill",
             ),
             "es": (
@@ -1681,7 +1681,7 @@ def _set_line_discount(
         risk="high",
         asks={
             "en": (
-                "20% off the haircut",
+                "a 20% discount on the haircut",
                 "discount the wine by 10%",
             ),
             "es": (
@@ -2612,7 +2612,7 @@ def complete_over_limit(ctx: OperationContext, data: CompleteIn) -> dict:
         asks={
             "en": (
                 "void the last sale, I charged it twice",
-                "cancel ticket 12, wrong table",
+                "void ticket 12, wrong table",
             ),
             "es": (
                 "anula la última venta, la cobré dos veces",

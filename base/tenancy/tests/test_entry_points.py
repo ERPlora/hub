@@ -62,7 +62,7 @@ def test_a_request_on_a_business_without_its_own_database_answers_503_and_runs_n
     created = api_post(client, f"{slug}.localhost", "/demo/items", {"name": "Shared"})
 
     assert created.status_code == 503
-    assert created.json()["error"]["code"] == "base.hub_preparing"
+    assert created.json()["error"]["code"] == "base.hub_maintenance"
     assert items_in() == []
 
 
@@ -182,7 +182,7 @@ def test_a_live_rerun_of_a_business_without_its_own_database_closes_the_stream()
 
     with pytest.raises(HostClosed) as closed:
         HubContextBuilder().enter(ctx)
-    assert (closed.value.status, closed.value.code) == (503, "base.hub_preparing")
+    assert (closed.value.status, closed.value.code) == (503, "base.hub_maintenance")
 
 
 @pytest.mark.django_db
@@ -269,7 +269,7 @@ def test_internal_calls_for_a_business_without_its_own_database_answer_503_and_e
 
     answer = internal._whatsapp_call(request, "whatsapp_inbox.message.receive")
 
-    assert (answer.status_code, json.loads(answer.content)["error"]["code"]) == (503, "base.hub_preparing")
+    assert (answer.status_code, json.loads(answer.content)["error"]["code"]) == (503, "base.hub_maintenance")
 
 
 @HUB_DB

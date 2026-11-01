@@ -330,13 +330,14 @@ def test_while_a_business_is_cut_its_host_answers_503_and_after_it_its_own_datab
     heard = []
 
     def watched(*args, **kwargs):
-        heard.append(Client().get("/api/session/me", HTTP_HOST=f"{aurora.slug}.localhost:8000").status_code)
+        answer = Client().get("/api/session/me", HTTP_HOST=f"{aurora.slug}.localhost:8000")
+        heard.append((answer.status_code, answer.json()["error"]["code"]))
         return copy(*args, **kwargs)
 
     monkeypatch.setattr(cut, "copy_rows", watched)
     run("--copy-all", aurora.slug, "--no-dump")
 
-    assert heard == [503]
+    assert heard == [(503, "base.hub_maintenance")]
     assert Client().get("/api/session/me", HTTP_HOST=f"{aurora.slug}.localhost:8000").status_code != 503
 
 

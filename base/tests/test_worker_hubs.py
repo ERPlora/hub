@@ -203,3 +203,17 @@ def test_a_demo_whose_time_is_up_is_never_entered(hub_a, monkeypatch):
         worker._hubs(timezone.now())
 
     assert served == []
+
+
+def test_a_hub_moving_to_another_cluster_is_never_entered(hub_a, monkeypatch):
+    # Its database is being copied (base.tenancy.move): nothing is relayed nor run in it meanwhile.
+    from control.models import Cluster
+
+    served = []
+    monkeypatch.setattr(worker, "_serve_hub", lambda hub, now: served.append(hub.slug))
+    Hub.objects.filter(pk=hub_a.pk).update(moving_to=Cluster.objects.create(name="next", host="writer-next.example"))
+
+    with use_control():
+        worker._hubs(timezone.now())
+
+    assert served == []

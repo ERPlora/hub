@@ -101,14 +101,14 @@ class TestNotYetAvailable:
         client.force_login(member("a"))
         listed = get(client, "a.localhost:8000", "/keys")
         refused = post(client, "a.localhost:8000", "/keys", {"name": "X", "rate_per_minute": 60, "mode": "full", "scopes": {}})
-        assert [(answer.status_code, code(answer)) for answer in (listed, refused)] == [(503, "base.hub_preparing")] * 2
+        assert [(answer.status_code, code(answer)) for answer in (listed, refused)] == [(503, "base.hub_maintenance")] * 2
         with use_legacy():
             assert not ApiKey.objects.exists()
 
     @pytest.mark.django_db
     def test_no_token_gets_in(self, client):
         response = get(client, "a.localhost:8000", CARTS, **bearer("erpk_live_" + "x" * 43))
-        assert (response.status_code, code(response)) == (503, "base.hub_preparing")
+        assert (response.status_code, code(response)) == (503, "base.hub_maintenance")
 
     @pytest.mark.django_db
     def test_not_even_one_that_is_in_control_s_tables(self, client):

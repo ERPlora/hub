@@ -423,7 +423,8 @@ class MessagePage(Page[MessageOut]):
 
 
 class MessageGetOut(MessageOut):
-    """A message with what an automation needs to answer it: its conversation's exact number and her name."""
+    """A message with what an automation needs to answer it: its conversation's exact number, her name and the options
+    last offered to her."""
 
     phone: str = Field(description="Its conversation's number, exactly in international format (+34600111222).")
     display_name: str = Field(
@@ -431,6 +432,10 @@ class MessageGetOut(MessageOut):
     )
     can_send: bool = Field(
         description="Whether anything can be sent now (the number connected and the month's messages not spent)."
+    )
+    options: str = Field(
+        description="What the business last wrote her from the Hub in the 24 hours before this message, where the "
+        "options she may be answering by their number («the 2nd») were offered; empty when it wrote her nothing."
     )
 
 
@@ -923,13 +928,14 @@ class TemplateListIn(PageIn):
     )
     sendable: bool | None = Field(
         None,
-        description="true: only the ones the Hub sends as they are (approved, not being deleted, a photo, video or "
-        "document header only with its own file): what an automation may send.",
+        description="true: only the ones the Hub sends as they are, with nothing to choose (approved, not being "
+        "deleted, a photo, video or document header only with its own file).",
     )
     fillable: bool | None = Field(
         None,
         description="true: the ones the inbox can send (approved, not being deleted), a photo, video or document "
-        "header asking for its file when it has none of its own.",
+        "header asking for its file when it has none of its own: also what an automation's «Send a message» step "
+        "offers, with the file chosen in the step.",
     )
 
 

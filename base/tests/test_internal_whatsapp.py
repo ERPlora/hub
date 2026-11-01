@@ -361,7 +361,7 @@ def test_a_business_without_its_own_database_is_503_and_runs_nothing(acme, produ
 
     answer = post(door, path, door_body(path), host=PRIVATE_NAME)
 
-    assert answer.status_code == 503 and code(answer) == "base.hub_preparing"
+    assert answer.status_code == 503 and code(answer) == "base.hub_maintenance"
     with use_legacy():
         assert not Message.objects.exists() and not Channel.objects.exists()
 
