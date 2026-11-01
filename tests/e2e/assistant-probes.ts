@@ -80,7 +80,7 @@ export interface ProbeOutcome {
 export interface ProbeVerdict {
   verdict: 'PASS' | 'FAIL' | 'N/A';
   reasons: string[];
-  /** The tool the model went for: the first of the business it called, else its card, else the docs, else none. */
+  /** The tool the model went for: its card's write, else the first of the business it called, else the docs, else none. */
   chosen: string;
 }
 
@@ -244,11 +244,12 @@ export function saysCannot(text: string, language: Language): boolean {
   return CANNOT[language].some((pattern) => pattern.test(said));
 }
 
-/** The tool the model went for in a turn (`ProbeVerdict.chosen`). */
+/** The tool the model went for in a turn (`ProbeVerdict.chosen`): the write of its card (a read before it only looked
+ *  the record up), else the first tool of the business it called, else the docs. */
 export function chosenTool(seen: Observed): string {
+  if (seen.cards.length) return seen.cards[0].operation;
   const business = seen.executed.find((row) => !ALWAYS.includes(row.name));
   if (business) return business.name;
-  if (seen.cards.length) return seen.cards[0].operation;
   if (seen.executed.some((row) => row.name === DOCS_SEARCH)) return DOCS_SEARCH;
   return 'none';
 }

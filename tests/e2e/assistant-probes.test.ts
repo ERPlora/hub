@@ -329,7 +329,9 @@ describe('probeVerdict', () => {
 });
 
 describe('chosenTool', () => {
-  it('is the first tool of the business that ran, else the card, else the docs, else none', () => {
+  it('is the card of a write, else the first tool of the business that ran, else the docs, else none', () => {
+    const lookedUp = observe([sse(executed('customer.customer.by_phone', 'query'), { type: 'confirm', card: { operation: 'customer.customer.create' }, call: {} })]);
+    expect(chosenTool(lookedUp)).toBe('customer.customer.create');
     expect(chosenTool(observe([sse(executed('base.setup.status', 'query'), executed('sale.sale.list', 'query', 'ok', 'c2'))]))).toBe('sale.sale.list');
     expect(chosenTool(observe([sse({ type: 'confirm', card: { operation: 'base.app.disable' }, call: {} })]))).toBe('base.app.disable');
     expect(chosenTool(observe([sse(executed('base.docs.search', 'query'))]))).toBe('base.docs.search');
