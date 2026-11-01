@@ -542,7 +542,6 @@ def test_a_hub_without_an_app_it_never_turned_on_is_not_behind():
     assert not migrator.is_behind(Hub(db_name="hub_x", schema_apps=every))
     assert not migrator.is_behind(Hub(db_name="hub_x", schema_apps=without_tax))
     assert not migrator.is_behind(Hub(db_name="hub_x", schema_apps=platform_only))
-    assert not hasattr(migrator, "apps_every_hub_gets")
 
 
 def test_migrate_hubs_brings_what_a_hub_has_to_the_leaf_and_never_makes_an_app_it_never_turned_on(

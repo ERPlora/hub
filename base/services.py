@@ -4470,10 +4470,17 @@ def _disable(ctx: OperationContext, data: AppChangeIn) -> dict:
             "base.app.list), with what it needs that failed too: it is set up in a moment and then shows in the menu. "
             "Refused for an app that is not waiting for it."
         ),
-        risk="normal",
         asks={
-            "en": ("the bookings app could not be turned on, try again", "retry setting up the kitchen app"),
-            "es": ("la app de reservas no se pudo activar, inténtalo otra vez", "reintenta activar la app de cocina"),
+            "en": (
+                "the bookings app could not be turned on, try again",
+                "retry setting up the kitchen app",
+                "try turning on the website app again",
+            ),
+            "es": (
+                "la app de reservas no se pudo activar, inténtalo otra vez",
+                "reintenta preparar la app de cocina",
+                "vuelve a intentar activar la web",
+            ),
         },
     ),
 )
@@ -4503,9 +4510,10 @@ def app_retry(ctx: OperationContext, data: AppChangeIn) -> dict:
 
 def activation_hubs(now: dt.datetime) -> list[Hub]:
     """The hubs whose apps the worker sets up now (S3): ready, with their own database, whose ``hub_due`` came and
-    nobody holds. Never one being made, dropped or gone, nor a demo whose time is up. By id."""
+    nobody holds. Never one being made, dropped or gone, a demo whose time is up, nor one moving to another cluster
+    (``moving_to``: tables made while its database is copied would stay behind; its ring waits for the move). By id."""
     return list(
-        Hub.objects.filter(status=Hub.Status.READY)
+        Hub.objects.filter(status=Hub.Status.READY, moving_to__isnull=True)
         .exclude(db_name="")
         .exclude(is_demo=True, expires_at__lte=now)
         .filter(due__due_at__lte=now)
@@ -4568,8 +4576,8 @@ def app_activation_settle(ctx: OperationContext, data: AppActivationSettleIn) ->
     chose, with what came along; then their photo's blocks, as an app turned on at once) and leaves the rest ``failed``;
     ``failed`` leaves them ``failed`` with ``attempts`` + 1, the error and the next try (1, 5, 15 min, then every hour;
     ``base.app.activation_failed``); ``locked`` and ``newer_code`` put them off (30 s, 60 s), still ``creating``. Never
-    on phase 1's shared database (409 ``base.app_shared_database``); only the platform runs it, refused before anything
-    is read."""
+    on phase 1's shared database (409 ``base.app_shared_database``); only the platform runs it, anyone else refused
+    before anything is read (as ``base.hub.reset_apply``, review of hub#490)."""
     internal_only(ctx)
     host = ctx.scope.key
     hub = _business_hub(ctx)

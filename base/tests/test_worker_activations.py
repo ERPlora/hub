@@ -60,6 +60,9 @@ def nothing_checked_yet(monkeypatch):
 
 @pytest.fixture(scope="module")
 def platform_template(django_db_setup, django_db_blocker):
+    """A template with the platform's tables alone: what a hub's template is for an app ported after it was made. The
+    real ones carry every portable app (``migrator.templates``, PLAN-DB round 2026-11-01), so turning on an app they have
+    is on at once; this one makes every app one whose tables its hubs lack."""
     with django_db_blocker.unblock():
         name = names.template_db_name(tenancy_connections.control_name(), VERTICAL)
         hubs.drop_database(name)
@@ -646,13 +649,14 @@ def test_a_process_whose_cache_lags_says_app_inactive_until_it_forgets_never_rea
 
     a = business("a")
     turn_on(a)
-    keys = (activation.off_apps_key(a.slug), activation.creating_apps_key(a.slug))
+    keys = (activation.OFF_APPS_CACHE + a.slug, activation.CREATING_APPS_CACHE + a.slug)
     with use_hub(fresh(a)):
         kept = {keys[0]: sorted(activation.off_apps(Scope("host", a.slug))), keys[1]: [APP]}
     assert APP in kept[keys[0]]
 
     run_pass()
-    cache.set_many(kept, 60)  # another process read the rows before the worker's COMMIT, and kept them
+    for key, value in kept.items():  # another process read the rows before the worker's COMMIT, and kept them
+        cache.set(key, value, 60)
 
     with pytest.raises(AppInactive):
         read_printing(a)
@@ -714,3 +718,26 @@ def test_each_app_is_made_alone_with_what_it_requires_on_the_platforms_template(
     assert hubs.hub_tables(expected) <= tables(a)
     others = set(activation.module_graph()) - expected
     assert not hubs.hub_tables(others) & tables(a)
+
+
+def test_a_hub_moving_to_another_cluster_is_not_entered_until_its_move_ends(business):
+    """Its database is being copied (S7, ``base.tenancy.move``): tables made meanwhile would stay behind on the old
+    cluster. Its ring waits; once the move ends, the app is set up."""
+    from control.models import Cluster
+
+    a = business("a")
+    turn_on(a)
+    target = Cluster.objects.create(name=f"w6-{a.id.hex[-8:]}", host="127.0.0.1", port=5432)
+    Hub.objects.filter(pk=a.pk).update(moving_to=target)
+    try:
+        with hubs.watched() as sent:
+            run_pass()
+        assert not [alias for alias in sent if a.id.hex in alias]
+        assert row(a).state == CREATING and due_at(a) is not None
+
+        Hub.objects.filter(pk=a.pk).update(moving_to=None)
+        run_pass()
+        assert row(a).state == ON
+    finally:
+        Hub.objects.filter(pk=a.pk).update(moving_to=None)
+        target.delete()

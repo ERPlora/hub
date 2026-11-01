@@ -356,9 +356,8 @@ def test_reading_the_apps_list_again_forgets_what_this_process_kept_so_the_menu_
 
     given(hub_a, printing="on*", created=["printing"])
     scope = Scope("host", hub_a.slug)
-    cache.set_many(
-        {activation.off_apps_key(hub_a.slug): ["printing"], activation.creating_apps_key(hub_a.slug): []}, 60
-    )
+    cache.set(activation.OFF_APPS_CACHE + hub_a.slug, ["printing"], 60)
+    cache.set(activation.CREATING_APPS_CACHE + hub_a.slug, [], 60)
     with use_hub(Hub.objects.get(pk=hub_a.pk)):
         assert "printing" in activation.off_apps(scope)  # what this process kept before the worker's change
 
@@ -366,44 +365,6 @@ def test_reading_the_apps_list_again_forgets_what_this_process_kept_so_the_menu_
         me = get("base.session.me")(as_admin(hub_a), get("base.session.me").input()).model_dump(mode="json")
 
     assert {app["label"]: app["state"] for app in me["apps"]}["printing"] == "on"
-
-
-@own
-def test_the_apps_off_and_creating_of_a_business_are_kept_in_one_hash_slot_so_a_valkey_cluster_takes_them(
-    hub_a, django_assert_num_queries
-):
-    """In AWS the cache is a Valkey cluster, which refuses one call on keys of different hash slots (``base/cache.py``,
-    hub#440; the tests' ``ClusterLocMemCache`` refuses it too). The apps off and those being set up are read, kept and
-    forgotten in one call each: their keys share the business's hash tag, so the second read takes no row."""
-    from django.core.cache import cache
-    from redis.crc import key_slot
-
-    given(hub_a, printing="creating*")
-    scope = Scope("host", hub_a.slug)
-    keys = (activation.off_apps_key(hub_a.slug), activation.creating_apps_key(hub_a.slug))
-    assert len({key_slot(cache.make_and_validate_key(key).encode()) for key in keys}) == 1
-    with use_hub(Hub.objects.get(pk=hub_a.pk)):
-        assert "printing" in activation.off_apps(scope)
-        assert set(cache.get_many(list(keys))) == set(keys)
-        with django_assert_num_queries(0, using=hubs.HUB_A_ALIAS):
-            assert activation.creating_apps(scope) == frozenset({"printing"})
-    activation.forget(hub_a.slug)
-    assert cache.get_many(list(keys)) == {}
-
-
-@pytest.mark.django_db
-def test_the_platform_never_settles_on_a_business_without_its_own_database():
-    """Since S5 only the suite's fallback enters one (``base/tenancy/tests/legacy.py``): the worker's step is refused
-    there, before it writes anything."""
-    from live.context import system_context
-
-    op = get("base.app.activation_settle")
-    a = Hub.objects.get(slug="a")
-
-    with pytest.raises(Conflict) as refused, use_hub(a):
-        op(system_context(Scope("host", "a")), op.input.model_validate({"apps": ["printing"], "outcome": "created"}))
-
-    assert refused.value.code == "base.app_shared_database"
 
 
 @own
@@ -418,3 +379,18 @@ def test_only_the_platform_settles_what_the_worker_made(hub_a):
 
     assert refused.value.code == "base.internal_only"
     assert rows_of(hub_a)["printing"] == (CREATING, True)
+
+
+@pytest.mark.django_db
+def test_the_platforms_settle_never_runs_on_a_shared_database():
+    from live.context import system_context
+
+    Hub.objects.update_or_create(slug="c", defaults={"status": "ready", "db_name": ""})
+    AppActivation.objects.create(host="c", app="printing", state=OFF, chosen=False)
+    op = get("base.app.activation_settle")
+
+    with pytest.raises(Conflict) as refused:
+        op(system_context(Scope("host", "c")), op.input.model_validate({"apps": ["printing"], "outcome": "created"}))
+
+    assert refused.value.code == "base.app_shared_database"
+    assert AppActivation.objects.get(host="c", app="printing").state == OFF

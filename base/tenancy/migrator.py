@@ -375,6 +375,14 @@ def templates(control: str | None = None) -> list[Template]:
     return [platform, *verticals]
 
 
+def apps_every_hub_gets() -> tuple[str, ...]:
+    """The apps whose tables every template carries (:func:`templates`): every portable one, so a hub made from one has
+    them with the clone and its sign-up migrates nothing. It stays so in S3 (PLAN-DB round 2026-11-01): turning an app
+    on makes tables only for an app its hub's template had not (one ported later), through the worker's
+    :func:`ensure_schema`; ``migrate_hubs`` never adds an app to a hub already made."""
+    return portable_apps()
+
+
 def is_behind(hub, code: CodeMigrations | None = None) -> bool:
     """Whether ``hub``'s database may lack a migration of this code, as control knows it (``Hub.schema_apps``).
 

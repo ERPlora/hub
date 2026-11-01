@@ -92,10 +92,10 @@ Plan `docs/plans/2026-10-22-fase-2-tenencia.md` de erplora-next; reglas en PLAN-
   el `Cluster` abierto con menos hubs bajo su `max_hubs`, o en el servidor de los settings si no hay ninguna fila; sin
   sitio, `no_cluster_available`; y clona `<control>_template[_<vertical>]` de ese cluster con `CREATE DATABASE …
   TEMPLATE`, privada: nada a `PUBLIC`, `CONNECT, TEMPORARY` a `hub_app` y `hub_admin`), `migrating` (lleva a la hoja
-  las apps que la plantilla ya tiene (todas las portables, que las plantillas traen) y `base`: el alta es el clon y no
-  migra nada; las tablas de cualquier otra app se crean la primera vez que el negocio la enciende (S3); cada paso deja en
-  el log `base.tenancy.provision.step` con sus segundos), y anota `schema_apps = {app: su última migración}`), `seeding`
-  (la foto del SaaS guardada en la fila: sus personas y los bloques de las apps
+  las apps que la plantilla ya tiene, más `base` y todas las portables, que las plantillas traen (también en S3): el
+  alta es el clon y no migra nada; cada paso deja en el log `base.tenancy.provision.step` con sus segundos; una app que
+  su plantilla no traía la crea su activación, S3), y anota `schema_apps = {app: su
+  última migración}`), `seeding` (la foto del SaaS guardada en la fila: sus personas y los bloques de las apps
   encendidas; si llega otra mientras, se aplica también antes de `ready`) y `ready` (el SaaS lo oye tras el COMMIT).
   Una foto que llega a un negocio sin BD hecha (preparándose, o cancelado o fallido antes de estar listo) se guarda en
   la fila sin entrar en ella (`registry.database_is_made`). Cada paso escribe
@@ -203,6 +203,39 @@ primera vez que el negocio la enciende** (PLAN-DB §7, spec 2026-10-11 «tablas 
   («Reintentar» del informe trae lo que faltó).
 - Desde S5 ningún negocio sin BD propia se sirve; solo el respaldo de la suite tiene alguno, y allí enciende al
   momento (propuesta (i) de la ronda 2026-10-30). `seed_local_hubs` da a `a` y `b` las tablas de todas las apps y todas
+  encendidas (`provision(apps=…)`).
+
+
+### Activar una app crea sus tablas (tajada S3)
+
+Un negocio y una demo nacen con las tablas de su plantilla (`<control>_template[_<vertical>]`, que lleva la plataforma y
+todas las apps portables, PLAN-DB ronda 2026-11-01) y todas las apps apagadas (PLAN §33); el alta es el clon. Las tablas
+de una app que su plantilla no traía (una portada después) se crean **la primera vez que el negocio la enciende**
+(PLAN-DB §7, spec 2026-10-11 «tablas al activar»), nunca en el alta ni en `migrate_hubs`, y nunca se borran:
+
+- **Encender** (`base.app.enable`, Apps o un blueprint) en un hub con BD propia: si su BD ya tiene las tablas de la app
+  y de lo que necesita (`Hub.schema_apps`, lo que confirmó el migrador), queda `on` al momento (200); si no, todo lo que
+  enciende queda `creating` en un solo plan, la ruta responde **202** con `state: "creating"`, se anota
+  `base.app.activation_requested` y, tras el COMMIT, se llama al worker (`HubDue.mark_due`). Cada fila guarda la última
+  migración de la app en el código que la pidió (`AppActivation.target`).
+- **El worker** (`_activations`, también con `--databases-only`) toma cada tick los hubs llamados (`hub_due` vencido y
+  libre); en cada uno, lo debido (`creating`, o `failed` cuyo próximo intento llegó) se crea con
+  `migrator.ensure_schema(hub, add=…)` bajo el lock de esquema del hub y `base.app.activation_settle` lo enciende
+  (`base.app.enabled`, aviso vivo: Apps y el menú de todos los dispositivos cambian sin recargar) o lo deja `failed` con
+  `attempts`, `last_error` y `next_attempt_at` (1, 5, 15 min y después cada hora; `base.app.activation_failed`), y mueve
+  la llamada del hub a lo siguiente que espera (o la quita). Esquema ocupado por otra ejecución: +30 s. Una petición de un
+  código más nuevo que el del worker (o la app o lo que necesita ya en una migración que su código no conoce): se deja a
+  un worker de ese código, +60 s, y a los 10 minutos queda `failed` con `code_behind` (tras un rollback no llega
+  ninguno). El pase de `hub_due` no toca la llamada de un hub listo. Una llamada perdida la encuentra el pase por los
+  hubs servidos: cada 10 minutos los que tuvieron una visita en 7 días y una vez al día el resto.
+- **Apps** pinta «Activándose…» (y la pantalla de la app dice que se abre en un momento) y, si falló, «No se ha podido
+  activar» con **«Reintentar»** (`base.app.retry`, 202); «Desactivar» en las tres. La sesión (`base.session.me`) da `activating`.
+  Mientras no está `on` sus operaciones responden 404 `app_inactive`, el relevo no le entrega nada y sus tareas no
+  corren. **Apagar** nunca borra tablas; apagada mientras se crean, queda `off` con ellas hechas. Un blueprint que
+  enciende una app que aún se prepara no carga sus datos y su informe dice que se vuelva a cargar en un minuto
+  («Reintentar» del informe trae lo que faltó).
+- Un hub que aún comparte la BD de la fase 1 (`db_name=""`) enciende al momento, como hasta ahora (propuesta (i) de
+  la ronda 2026-10-30, hasta el corte de S5). `seed_local_hubs` da a `a` y `b` las tablas de todas las apps y todas
   encendidas (`provision(apps=…)`).
 
 

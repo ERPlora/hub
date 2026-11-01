@@ -822,8 +822,8 @@ def test_each_business_has_its_own_entry():
         task_list_as(A)
     task_list_as(B)
 
-    assert "task" in cache.get(activation.off_apps_key("a"))
-    assert cache.get(activation.off_apps_key("b")) == []
+    assert "task" in cache.get(activation.OFF_APPS_CACHE + "a")
+    assert cache.get(activation.OFF_APPS_CACHE + "b") == []
 
 
 def test_turned_off_and_committed_the_next_operation_is_refused_at_once(transactional_db):
@@ -845,7 +845,7 @@ def test_the_commit_forgets_what_another_process_cached_meanwhile(django_capture
     with django_capture_on_commit_callbacks() as callbacks:
         disable("task")
     # Before the COMMIT another process read the rows as they were, and kept them.
-    cache.set(activation.off_apps_key("a"), [], 60)
+    cache.set(activation.OFF_APPS_CACHE + "a", [], 60)
 
     for callback in callbacks:
         callback()
@@ -862,11 +862,11 @@ def test_inside_a_change_nothing_is_kept_before_its_commit(client, registered_a)
 
     set_rows(staff="on*")
     put_photo(client, registered_a, 3, status="active", verifactu={"representation": {"status": "approved", "updated_at": "2026-10-15T10:00:00Z", "reason": ""}})
-    cache.delete(activation.off_apps_key("a"))
+    cache.delete(activation.OFF_APPS_CACHE + "a")
 
     enable("verifactu")
 
-    assert cache.get(activation.off_apps_key("a")) is None
+    assert cache.get(activation.OFF_APPS_CACHE + "a") is None
 
 
 @pytest.mark.django_db

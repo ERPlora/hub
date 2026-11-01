@@ -12,9 +12,10 @@ of its own (``base.services``, «The provisioning's writes in control»):
 2. ``migrating``: the apps the clone has (its ``django_migrations``: its template's), its vertical's and ``base`` are
    brought to the code's leaf (``base.tenancy.migrator.ensure_schema``: nothing to do when ``migrate_hubs`` kept the
    template current, so the sign-up is the clone; the lease renewed between apps) and noted in ``Hub.schema_apps``
-   (``{app: its leaf migration}``) with ``schema_state`` current. No other app's tables are made: an app's are made the
-   first time the business turns it on (S3: ``base.app.enable`` → ``creating`` → the worker's ``ensure_schema``,
-   PLAN-DB §7);
+   (``{app: its leaf migration}``) with ``schema_state`` current. Every template carries every portable app's tables
+   (``migrator.templates``, PLAN-DB round 2026-11-01), so the clone has them; an app it lacks (one ported after its
+   template was made) gets its tables the first time the business turns it on (S3: ``base.app.enable`` → ``creating``
+   → the worker's ``ensure_schema``, PLAN-DB §7);
 3. ``seeding``: inside ``use_hub``, the SaaS's photo kept on the row (its people, and the blocks of the apps it has
    on: none at birth, a business is born with every app off, PLAN §33); a newer photo that arrives meanwhile is
    applied too before ``ready`` (:data:`SEED_ROUNDS`);
@@ -96,7 +97,8 @@ def provision(
 
     ``apps``: more apps than its template's whose tables it gets now (the local hubs a and b, born with every app on:
     ``seed_local_hubs``); none by default, as the worker's pass (:func:`run_due`): a business and a demo are born with
-    their template's tables and every app off (PLAN §33), and an app's tables are made when it is turned on (S3).
+    their template's tables (every portable app's) and every app off (PLAN §33); an app their template lacked gets its
+    tables when it is turned on (S3).
     ``seed``: what its seeding writes, inside its database (``use_hub``), after the photo kept. A hub already ready is
     left as it is (``True``); one that is not being prepared (cancelled, gone) or whose lease someone else holds is not
     touched (``False``). A failure is noted on the hub (``failed``), never raised. ``tell_saas=False``: the SaaS does
