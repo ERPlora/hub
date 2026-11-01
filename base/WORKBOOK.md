@@ -3445,7 +3445,7 @@ Implicados: ACCOUNTS-F38, BASE-F40
 
 Al cerrar la app (2026-11-01) ninguno de sus flujos quedó a medias: los que no entran están `descartado`, cada uno
 con su issue, y llegan con ella. Después llegaron BASE-F21 y BASE-F22 (hub#601), BASE-F37 y BASE-G157 (hub#580) y BASE-F40
-(hub#603), ya en producción o en camino.
+(hub#603).
 
 - **Avisar por correo al dueño cuando debe ampliar (BASE-F40)**: el mercado lo da por supuesto, pero lo manda erplora.com
   (ronda 2026-11-01f de PLAN-HUB y PLAN-SAAS §28) y lleva su flujo y su issue allí.
