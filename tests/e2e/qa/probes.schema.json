@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://erplora.com/schemas/hub/assistant-probes.json",
+  "title": "Probes of the Hub assistant's QA with the real model (layer 2)",
+  "description": "One new natural phrase per tool, role and language, and what the turn must do. Read by tests/e2e/assistant-probes.ts (parseProbeFile), which must agree with this schema (assistant-probes.test.ts).",
+  "type": "object",
+  "required": ["probes"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "generated": {
+      "description": "How `pnpm qa:probes` drew the skeleton this file was written from.",
+      "type": "object",
+      "properties": {
+        "role": { "type": "string" },
+        "language": { "type": "string" },
+        "apps": { "type": "array", "items": { "type": "string" } },
+        "sample": { "type": "integer", "minimum": 1 },
+        "all": { "type": "boolean" },
+        "seed": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "probes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "app", "tool", "role", "language", "phrase", "expect"],
+        "properties": {
+          "id": { "description": "Unique across every probe file.", "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*$" },
+          "app": { "description": "The app label of the tool.", "type": "string", "minLength": 1 },
+          "tool": { "description": "The operation's name, as export_assistant_catalog names it (sale.sale.today).", "type": "string", "minLength": 1 },
+          "role": { "type": "string", "enum": ["owner", "admin", "manager", "employee"] },
+          "language": { "type": "string", "enum": ["en", "es"] },
+          "phrase": { "description": "What a person of the role types, written by the QA agent: never one of the tool's asks. Empty only in a skeleton.", "type": "string" },
+          "expect": {
+            "description": "read: the tool is the first of the business called (after its lookups) and no card; card: the first card is the write's and no other follows; refused: the role lacks the tool, nothing of the business runs and the answer names the permission or the role; docs: base.docs.search returns excerpts, the answer names one and nothing of the business runs.",
+            "type": "string",
+            "enum": ["read", "card", "refused", "docs"]
+          },
+          "lookups": {
+            "description": "Only for a read: the tools the model may call before it to look something up (sale.business_day.get). Without it, the first tool of the business called must be the probe's.",
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "decide": { "description": "Only for a card: cancel (default, nothing changes) or confirm (data of the seeded business only).", "type": "string", "enum": ["cancel", "confirm"] },
+          "notes": { "type": "string" }
+        }
+      }
+    }
+  }
+}

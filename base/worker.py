@@ -44,7 +44,9 @@ the hubs due. ``_data`` takes one hub with data work due (``base.services.claim_
 database) or the copy of a business that left (tried again later when it fails); ``_usage`` measures the last UTC day
 once it ended (``base.usage``, 00:15 UTC, before the SaaS collects it at 01:15; once a night whichever worker claims it).
 Neither runs with ``databases_only``. On the way out the worker waits for them :data:`BACKGROUND_GRACE_SECONDS` at most:
-a copy hears the stop, kills ``pg_dump`` and gives its lease back, and its work stays due.
+a copy hears the stop, kills ``pg_dump`` and gives its lease back, and its work stays due. A third thread moves the hubs
+asked to move to another cluster and drops the copies they left behind after their days (``_moves``,
+``base.tenancy.move``, round 2026-10-30b of PLAN-DB, decision 3), likewise.
 
 The order of a tick (review of hub#471): the tasks and the relay of phase 1's shared database first, so a pass that
 makes databases holds back the kitchen, the stock or VeriFactu of the hubs that share it a few seconds at most
@@ -81,7 +83,7 @@ from live.operations import get as get_operation
 
 from base import activation, catalog, outbound, queries, relay, scheduler, services, usage
 from base.services import reap_demos
-from base.tenancy import dumps, migrator, provision
+from base.tenancy import dumps, migrator, move, provision
 from base.tenancy.connections import close_hub_aliases, close_this_threads_connections
 from base.schemas import AppActivationSettleIn, HubResetApplyIn
 from base.tenancy.context import use_control, use_hub, use_shared_database
@@ -185,6 +187,8 @@ def run(
     next_reap: dt.datetime | None = None
     # The slow passes, each in a thread of its own and one at a time: the loop keeps ticking while they run.
     data_pass, usage_pass = Background("data"), Background("usage")
+    # A hub's move to another cluster (base.tenancy.move): its copy takes a while too, in a thread of its own.
+    move_pass = Background("move")
     while not stop.is_set():
         now = clock()
         if not databases_only:
@@ -195,6 +199,7 @@ def run(
         if not databases_only:
             data_pass.start(partial(_data, now, stop))
             usage_pass.start(partial(_usage, now))
+            move_pass.start(partial(_moves, now, stop))
         if next_reap is None or now >= next_reap:
             _reap(now)
             next_reap = now + dt.timedelta(seconds=REAPER_INTERVAL_SECONDS)
@@ -202,7 +207,7 @@ def run(
         wait(tick_seconds)
     # On the way out: a copy hears the stop (pg_dump killed, its lease given back); both get a while, together.
     deadline = time.monotonic() + BACKGROUND_GRACE_SECONDS
-    for runner in (data_pass, usage_pass):
+    for runner in (data_pass, usage_pass, move_pass):
         runner.join(max(0.0, deadline - time.monotonic()))
     outbound.stop(OUTBOUND_GRACE_SECONDS)
     logger.info("worker: stopped.")
@@ -445,6 +450,23 @@ def _usage(now: dt.datetime) -> None:
         _measured = day
     if measured is not None:
         logger.info("worker: measured the use of %d hub(s) on %s.", measured, day)
+
+
+def _moves(now: dt.datetime, stop: threading.Event | None = None) -> None:
+    """Move the hub asked longest ago to its new cluster and drop the copies past their days
+    (``base.tenancy.move.run_due``, round 2026-10-30b of PLAN-DB, decision 3), on control, in the worker's move thread
+    (:class:`Background`); a failure is logged and the next tick tries again. ``stop`` set stops the copy in course and
+    leaves the move for the next worker to go on."""
+    try:
+        with use_control():
+            moved = move.run_due(now, cancelled=stop.is_set if stop is not None else None)
+    except Exception:
+        logger.exception("worker: the moves' pass failed; the next tick tries again.")
+    else:
+        if moved:
+            logger.info("worker: worked on the move of %d hub(s).", moved)
+    finally:
+        close_old_connections()
 
 
 def _heartbeat(hub) -> Callable[[], None]:

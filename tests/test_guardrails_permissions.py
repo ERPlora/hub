@@ -95,6 +95,34 @@ OPEN_OPERATIONS: dict[str, tuple[str, str]] = {
         PLATFORM,
         "The SaaS's collect_hub_usage reads what each business used on a day, measured that night (/internal/usage).",
     ),
+    "control.cluster.close": (
+        PLATFORM,
+        "The Hub admin's «Close to new hubs» on a database cluster, for the platform's admins (staff and superuser).",
+    ),
+    "control.cluster.create": (
+        PLATFORM,
+        "The Hub admin registers a database cluster, for the platform's admins (staff and superuser).",
+    ),
+    "control.cluster.delete": (
+        PLATFORM,
+        "The Hub admin deletes a database cluster no hub is on, for the platform's admins (staff and superuser).",
+    ),
+    "control.cluster.sizes": (
+        PLATFORM,
+        "The Hub admin's sizes of the hubs' databases on a cluster, for the platform's staff (support only reads).",
+    ),
+    "control.cluster.update": (
+        PLATFORM,
+        "The Hub admin edits a database cluster, for the platform's admins (staff and superuser).",
+    ),
+    "control.hub.move": (
+        PLATFORM,
+        "The Hub admin's «Move to cluster…», for the platform's admins (staff and superuser); the worker moves it.",
+    ),
+    "control.hub.move_cancel": (
+        PLATFORM,
+        "The Hub admin's «Cancel the move», for the platform's admins (staff and superuser); the worker undoes it.",
+    ),
     "staff.account.list": (
         CHECKED_INSIDE,
         "staff.add_member or staff.change_member (the «Hub user» selector of the record's form, STAFF-F03).",
