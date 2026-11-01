@@ -4467,7 +4467,9 @@ def app_activation_settle(ctx: OperationContext, data: AppActivationSettleIn) ->
     chose, with what came along; then their photo's blocks, as an app turned on at once) and leaves the rest ``failed``;
     ``failed`` leaves them ``failed`` with ``attempts`` + 1, the error and the next try (1, 5, 15 min, then every hour;
     ``base.app.activation_failed``); ``locked`` and ``newer_code`` put them off (30 s, 60 s), still ``creating``. Never
-    on phase 1's shared database (409 ``base.app_shared_database``), whoever runs it; only the platform runs it."""
+    on phase 1's shared database (409 ``base.app_shared_database``); only the platform runs it, anyone else refused
+    before anything is read (as ``base.hub.reset_apply``, review of hub#490)."""
+    internal_only(ctx)
     host = ctx.scope.key
     hub = _business_hub(ctx)
     if not has_own_database(hub):
@@ -4475,7 +4477,6 @@ def app_activation_settle(ctx: OperationContext, data: AppActivationSettleIn) ->
             gettext("This business shares its database: its apps are turned on at once."),
             code="base.app_shared_database",
         )
-    internal_only(ctx)
     with activation.changing(host):
         graph = activation.module_graph()
         current = _locked_states(ctx, graph)

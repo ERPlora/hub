@@ -74,6 +74,10 @@ OPEN_OPERATIONS: dict[str, tuple[str, str]] = {
     ),
     "base.hub.get": (PLATFORM, "The SaaS reads a registry row it never heard ready from (/internal)."),
     "base.hub.register": (PLATFORM, "The SaaS registers or renames a business (/internal)."),
+    "base.app.activation_settle": (
+        PLATFORM,
+        "The worker turns on, or leaves failed, the apps whose tables it made in the business's own database (S3).",
+    ),
     "base.hub.reset_apply": (
         PLATFORM,
         "The worker empties the sections of a reset whose copy it kept (base.worker), in the business's own database.",

@@ -356,9 +356,8 @@ def test_reading_the_apps_list_again_forgets_what_this_process_kept_so_the_menu_
 
     given(hub_a, printing="on*", created=["printing"])
     scope = Scope("host", hub_a.slug)
-    cache.set_many(
-        {activation.OFF_APPS_CACHE + hub_a.slug: ["printing"], activation.CREATING_APPS_CACHE + hub_a.slug: []}, 60
-    )
+    cache.set(activation.OFF_APPS_CACHE + hub_a.slug, ["printing"], 60)
+    cache.set(activation.CREATING_APPS_CACHE + hub_a.slug, [], 60)
     with use_hub(Hub.objects.get(pk=hub_a.pk)):
         assert "printing" in activation.off_apps(scope)  # what this process kept before the worker's change
 
@@ -380,3 +379,18 @@ def test_only_the_platform_settles_what_the_worker_made(hub_a):
 
     assert refused.value.code == "base.internal_only"
     assert rows_of(hub_a)["printing"] == (CREATING, True)
+
+
+@pytest.mark.django_db
+def test_the_platforms_settle_never_runs_on_a_shared_database():
+    from live.context import system_context
+
+    Hub.objects.update_or_create(slug="c", defaults={"status": "ready", "db_name": ""})
+    AppActivation.objects.create(host="c", app="printing", state=OFF, chosen=False)
+    op = get("base.app.activation_settle")
+
+    with pytest.raises(Conflict) as refused:
+        op(system_context(Scope("host", "c")), op.input.model_validate({"apps": ["printing"], "outcome": "created"}))
+
+    assert refused.value.code == "base.app_shared_database"
+    assert AppActivation.objects.get(host="c", app="printing").state == OFF

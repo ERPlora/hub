@@ -655,7 +655,8 @@ def test_a_process_whose_cache_lags_says_app_inactive_until_it_forgets_never_rea
     assert APP in kept[keys[0]]
 
     run_pass()
-    cache.set_many(kept, 60)  # another process read the rows before the worker's COMMIT, and kept them
+    for key, value in kept.items():  # another process read the rows before the worker's COMMIT, and kept them
+        cache.set(key, value, 60)
 
     with pytest.raises(AppInactive):
         read_printing(a)

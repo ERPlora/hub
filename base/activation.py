@@ -65,7 +65,8 @@ WANTED = frozenset({ON, CREATING, FAILED})
 OFF_APPS_CACHE = "base.apps_off:"
 OFF_APPS_TTL = 60
 #: Beside them, the modules whose tables the hub's own database is getting (``creating``): what the session tells
-#: «activating». Kept and forgotten with the apps off; read only when both are kept.
+#: «activating». Kept and forgotten with the apps off; read only when both are kept. One call per key: the two keys hash
+#: to different slots of the Valkey cluster, which refuses a call on both (``base.cache``).
 CREATING_APPS_CACHE = "base.apps_creating:"
 
 #: The hosts whose rows the running change wrote and has not committed yet: what it reads of them is never kept.
@@ -278,7 +279,8 @@ def _kept(scope: Scope) -> tuple[frozenset[str], frozenset[str]]:
     creating = frozenset(label for label, row in states.items() if row.state == CREATING)
     if not changing:
         try:
-            cache.set_many({keys[0]: sorted(off), keys[1]: sorted(creating)}, OFF_APPS_TTL)
+            cache.set(keys[0], sorted(off), OFF_APPS_TTL)
+            cache.set(keys[1], sorted(creating), OFF_APPS_TTL)
         except Exception:
             logger.exception("base.activation.cache_unavailable: the apps off of %s were read and not kept.", scope.key)
     return off, creating
@@ -298,7 +300,8 @@ def forget(host: str) -> None:
     """Drop ``host``'s apps off from the cache: after the COMMIT of a change, the next read sees it, in every process.
     A cache that does not answer is logged; what it kept ends with its timeout."""
     try:
-        cache.delete_many([OFF_APPS_CACHE + host, CREATING_APPS_CACHE + host])
+        for key in (OFF_APPS_CACHE + host, CREATING_APPS_CACHE + host):
+            cache.delete(key)
     except Exception:
         logger.exception("base.activation.cache_unavailable: the apps off of %s could not be forgotten.", host)
 
@@ -306,11 +309,10 @@ def forget(host: str) -> None:
 def _cached_many(keys: tuple[str, str]) -> tuple[list[str], list[str]] | None:
     """Both lists kept under ``keys``, or ``None`` when either is missing or the cache does not answer (logged)."""
     try:
-        kept = cache.get_many(list(keys))
+        found = [cache.get(key) for key in keys]
     except Exception:
         logger.exception("base.activation.cache_unavailable: the apps off are read from the rows.")
         return None
-    found = [kept.get(key) for key in keys]
     if not all(isinstance(value, list) for value in found):
         return None
     return found[0], found[1]
