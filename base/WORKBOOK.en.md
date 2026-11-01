@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:032776aa4fb602bcf3f9c1f8f610624c6ae24e1be55cfffce9e2a44c42934583 -->
+<!-- generated from WORKBOOK.md sha256:dca8c045ba4e03e721b3eeb39e4b3771ea96c8c7661e76688268a8502ca369b2 -->
 
 ## What it is for and who it is for
 
@@ -298,7 +298,7 @@ On the Employees screens and the API documentation:
 | ID | Flow | Status |
 |---|---|---|
 | BASE-F01 | See what the business still has to set up | done |
-| BASE-F02 | See the business at a glance on coming in | partial |
+| BASE-F02 | See the business at a glance on coming in | discarded |
 | BASE-F03 | Go and set up from "Finish setting up your business" | done |
 | BASE-F04 | See which steps of the list an administrator has to set up | done |
 | BASE-F05 | Open an app from "My apps" | done |
@@ -307,7 +307,7 @@ On the Employees screens and the API documentation:
 | BASE-F08 | Keep the panels up to date without reloading | done |
 | BASE-F09 | Look at the recent activity | done |
 | BASE-F10 | See in the bell the notices between apps that were not delivered | done |
-| BASE-F11 | Go to erplora.com to manage or upgrade the plan | partial |
+| BASE-F11 | Go to erplora.com to manage or upgrade the plan | discarded |
 | BASE-F12 | Ask the assistant to go over the setup | done |
 | BASE-F13 | Lose access on a role change or on leaving the business | done |
 | BASE-F14 | See the business's apps | done |
@@ -317,8 +317,8 @@ On the Employees screens and the API documentation:
 | BASE-F18 | Install an app | done |
 | BASE-F19 | Know what else comes with an app | done |
 | BASE-F20 | Try to use an app that needs a subscription | done |
-| BASE-F21 | See why an app could not be turned on and try again | partial |
-| BASE-F22 | Follow an app being turned on while moving around | partial |
+| BASE-F21 | See why an app could not be turned on and try again | discarded |
+| BASE-F22 | Follow an app being turned on while moving around | discarded |
 | BASE-F23 | Turn an app off | done |
 | BASE-F24 | Turn an app on | done |
 | BASE-F25 | See an app refuse to be turned off | done |
@@ -333,11 +333,11 @@ On the Employees screens and the API documentation:
 | BASE-F34 | Undo an import | done |
 | BASE-F35 | Export a backup or a template | done |
 | BASE-F36 | Choose which apps, data and tables travel in the export | done |
-| BASE-F37 | Reset the business by sections | partial |
+| BASE-F37 | Reset the business by sections | discarded |
 | BASE-F38 | See the Home up to date after importing a template | done |
 | BASE-F39 | Open System and move between its tabs | done |
-| BASE-F40 | See how much the hub is using | partial |
-| BASE-F41 | Know which version is running and what has been updated | partial |
+| BASE-F40 | See how much the hub is using | discarded |
+| BASE-F41 | Know which version is running and what has been updated | discarded |
 | BASE-F42 | See the log of what happened in the system | done |
 | BASE-F43 | See the failed events | done |
 | BASE-F44 | Resend a failed event | done |
@@ -346,7 +346,7 @@ On the Employees screens and the API documentation:
 | BASE-F47 | Report an error of the screen without anyone asking | done |
 | BASE-F48 | Open Settings and move through its tabs | done |
 | BASE-F49 | See the business's country | done |
-| BASE-F50 | See the business's currency | partial |
+| BASE-F50 | See the business's currency | discarded |
 | BASE-F51 | Change the business's language on erplora.com | done |
 | BASE-F52 | Enter with the erplora.com account | done |
 | BASE-F53 | Enter from the erplora.com panel without typing the password again | done |
@@ -370,7 +370,7 @@ On the Employees screens and the API documentation:
 | BASE-F71 | Remove at once the devices nobody uses | done |
 | BASE-F72 | See the business's files | done |
 | BASE-F73 | Upload files and make folders | done |
-| BASE-F74 | Preview and download a file | partial |
+| BASE-F74 | Preview and download a file | discarded |
 | BASE-F75 | Move and rename a file or a folder | done |
 | BASE-F76 | Delete a file or a folder | done |
 | BASE-F77 | Reach the plan's limit of people | done |
@@ -378,14 +378,14 @@ On the Employees screens and the API documentation:
 | BASE-F79 | Give a person a badge or take it away | done |
 | BASE-F80 | Bring back a person who left the business | done |
 | BASE-F81 | Understand how each person gets in | done |
-| BASE-F82 | See the roles and turn on the ones an app brings | partial |
+| BASE-F82 | See the roles and turn on the ones an app brings | discarded |
 | BASE-F83 | Give a person a role | done |
 | BASE-F84 | Approve with a manager's PIN | done |
 | BASE-F85 | Look up who approved what | done |
-| BASE-F86 | Create an API key and copy its token | partial |
-| BASE-F87 | Rotate an API key | partial |
-| BASE-F88 | Revoke an API key | partial |
-| BASE-F89 | See the API keys and what each one may do | partial |
+| BASE-F86 | Create an API key and copy its token | done |
+| BASE-F87 | Rotate an API key | done |
+| BASE-F88 | Revoke an API key | done |
+| BASE-F89 | See the API keys and what each one may do | done |
 | BASE-F90 | Read the API documentation | done |
 | BASE-F91 | Show or hide the API documentation | done |
 | BASE-F92 | Open and close the assistant's panel | done |
@@ -432,7 +432,7 @@ side to do yet. We are on it.".
 Involved: INVENTORY-F28
 
 ### BASE-F02 See the business at a glance on coming in
-Status: partial — without the hub's health row (the printer and WhatsApp with "View system")
+Status: discarded — the hub's health row (the printer and WhatsApp, with a link to System) needs each app to say how its own part is doing, and that touches Printing and the WhatsApp Inbox; today the bell already warns when nobody is printing (hub#573)
 Actor: owner, administrator, manager, employee
 Screen: Home · Summary
 Steps:
@@ -613,7 +613,7 @@ back.".
 Involved: none
 
 ### BASE-F11 Go to erplora.com to manage or upgrade the plan
-Status: partial — without the one-time pass: if the browser has no erplora.com session open, they come in with the account on arriving
+Status: discarded — without the one-time pass: if the browser does not have the erplora.com session open, you sign in with the account on arrival; the pass belongs mostly to erplora.com (saas#190)
 Actor: owner, administrator, manager, employee
 Screen: Side menu, top bar
 Steps:
@@ -798,7 +798,7 @@ opened says why (BASE-F27).
 Involved: APPS-F07
 
 ### BASE-F21 See why an app could not be turned on and try again
-Status: partial — today turning an app on is immediate and is never left halfway, because its data is already prepared in every business; preparing it on turning the app on, the notice that it could not be done and its "Retry" come in phase 2, when every business has its data apart
+Status: discarded — today turning an app on is immediate and never left halfway, because its data is already prepared in the business's database; preparing it when turning it on, the warning that it could not be done and its "Retry" come with the per-business activation, built separately (hub#574)
 Actor: administrator
 Screen: Apps
 Steps:
@@ -811,7 +811,7 @@ If it fails: if it fails again, it says so again with its "Retry".
 Involved: none
 
 ### BASE-F22 Follow an app being turned on while moving around
-Status: partial — today turning an app on is immediate and it shows in the menu of every device of the business without reloading; the "Activating…" step while its data is prepared is missing, and comes in phase 2, when every business has its data apart
+Status: discarded — today turning an app on is immediate and it shows in the menu of every device of the business without reloading; the "Activating…" step while its data is prepared comes with the per-business activation, built separately (hub#574)
 Actor: administrator
 Screen: Apps
 Steps:
@@ -1115,7 +1115,7 @@ be exported.
 Involved: none
 
 ### BASE-F37 Reset the business by sections
-Status: partial — while the business shares its database with other businesses it cannot be emptied: the screen says so and offers no button; it will be possible once each business has its own
+Status: discarded — a business with its own database is already reset as the steps say, but without the backup that is always kept before emptying; that backup comes with each business's backups, built separately (hub#575)
 Actor: owner, administrator
 Screen: Settings · Data and backups › Reset
 Steps:
@@ -1185,7 +1185,7 @@ If it fails: each tab says its own (BASE-F40 to BASE-F43).
 Involved: none
 
 ### BASE-F40 See how much the hub is using
-Status: partial — no CPU, memory or connections of the business: one service serves every business and no figure is its own alone; the size and the use of its database come when each business has its own
+Status: discarded — no CPU, memory or connections of the business: a single service serves every business and no figure is its own; the size and use of its database come with each business's measurement, built separately (hub#575)
 Actor: owner, administrator
 Screen: System · Resources
 Steps:
@@ -1202,7 +1202,7 @@ try again." with "Retry".
 Involved: none
 
 ### BASE-F41 Know which version is running and what has been updated
-Status: partial — the version and its date, yes; without the list of what changed in each app: every app is published together, in a single deployment and without release notes
+Status: discarded — the version and its date, yes; apps no longer have their own version (they are all released together with the hub) and there are no notes for each version to show yet (hub#576)
 Actor: owner, administrator
 Screen: System · Updates
 Steps:
@@ -1373,7 +1373,7 @@ has no country: "—".
 Involved: HUBS-F15, BASE-F01, BASE-F29
 
 ### BASE-F50 See the business's currency
-Status: partial — the Home, Sales & POS, Cash register, Invoicing, Inventory, Price Lists, Printing, Kitchen and Modifiers are already in the business's currency, but Payments, Cart & Checkout, Appointments, Menus and combos and Customers still in euros even when the business's country pays in another currency: it fits Spain and Portugal, not a country of another currency
+Status: discarded — every app is in the business's currency except Appointments, which stays in euros even if the business's country pays in another currency: with Spain and Portugal it adds up, with a country of another currency it does not (hub#577)
 Actor: owner, administrator, manager, employee
 Screen: Settings · Business; Home · Summary and Home · Activity
 Steps:
@@ -1828,7 +1828,7 @@ administrator can change the files.".
 Involved: none
 
 ### BASE-F74 Preview and download a file
-Status: partial — Excel sheets (xlsx) and Word documents (docx) say "No preview" and are downloaded, and a data file (.json) is shown tidied but not foldable; the old hub's viewer showed them
+Status: discarded — Excel sheets (xlsx) and Word documents (docx) say "No preview" and are downloaded, and a data file (.json) is shown sorted but cannot be folded; the old hub's viewer showed them (hub#578)
 Actor: owner, administrator, manager, employee
 Screen: Files
 Steps:
@@ -1974,7 +1974,7 @@ If it fails: "The people of this business could not be loaded." with "Retry".
 Involved: BASE-F77, BASE-F78, BASE-F79
 
 ### BASE-F82 See the roles and turn on the ones an app brings
-Status: partial — the four roles of erplora.com are shown; no app brings roles of its own to turn on yet
+Status: discarded — the four roles of erplora.com are shown; whether an app brings its own roles to turn on is still to be decided in the new product, where the role is given when inviting on erplora.com (hub#579)
 Actor: owner, administrator, manager, employee
 Screen: Employees · Roles
 Steps:
@@ -2060,7 +2060,7 @@ so with its reason and nothing is downloaded.
 Involved: BASE-F84
 
 ### BASE-F86 Create an API key and copy its token
-Status: partial — a business that still shares its database with others cannot have keys: the tab says "Not available yet"
+Status: done
 Actor: owner, administrator
 Screen: Employees · API keys
 Steps:
@@ -2075,11 +2075,13 @@ Steps:
 In: the name, the pace and what it may do.
 Out: the key, of which the business keeps only what lets it be recognised. Event `base.api_key.created`.
 If it fails: "The API key could not be created.", "Choose at least one app and what the key may do on it.", "That
-app does not publish what the key would do on it." or "It could not be copied to the clipboard.".
+app does not publish what the key would do on it." or "It could not be copied to the clipboard.". A business that
+still shares its database with others (those signed up before every business was born with its own) has no "New API
+key" (BASE-F89).
 Involved: BASE-F89, BASE-F90
 
 ### BASE-F87 Rotate an API key
-Status: partial — a business that still shares its database with others cannot have keys
+Status: done
 Actor: owner, administrator
 Screen: Employees · API keys
 Steps:
@@ -2094,7 +2096,7 @@ longer exists. Refresh the list and try again.".
 Involved: BASE-F86, BASE-F89
 
 ### BASE-F88 Revoke an API key
-Status: partial — a business that still shares its database with others cannot have keys
+Status: done
 Actor: owner, administrator
 Screen: Employees · API keys
 Steps:
@@ -2108,7 +2110,7 @@ If it fails: "The API key could not be revoked.".
 Involved: BASE-F89
 
 ### BASE-F89 See the API keys and what each one may do
-Status: partial — a business that still shares its database with others cannot have keys: instead, "Not available yet" and "API keys are not available yet in this business." show
+Status: done
 Actor: owner, administrator
 Screen: Employees · API keys
 Steps:
@@ -2119,7 +2121,9 @@ Steps:
 In: the business's keys.
 Out: nothing saved. It updates by itself when one is created, rotated or revoked.
 If it fails: "Your API keys could not be loaded." with "Retry"; with none, "No API keys yet. Create one so that
-another system can read or write your business's data.".
+another system can read or write your business's data.". A business that still shares its database with others
+cannot have keys, because a key of its own could open another's data: instead, "Not available yet" and "API keys are
+not available yet in this business." show, until it moves to its own.
 Involved: BASE-F86, BASE-F87, BASE-F88
 
 ### BASE-F90 Read the API documentation
