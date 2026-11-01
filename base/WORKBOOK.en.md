@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:27f768f732e0e9f08f9800fd5bc98e2cd44f81effa22c07776a642aaf92d90fe -->
+<!-- generated from WORKBOOK.md sha256:ea53d4b5bca8ac62ae51e0b0493bbc4f726e3530d430bd23fb4897fe7f60aa53 -->
 
 ## What it is for and who it is for
 
@@ -144,8 +144,8 @@ the one chosen stays in the link, so it can be shared and Back leaves Settings.
   Then "Review what it brings" and the "Import report".
 - **Export**: the file's name and language, "What is this file for?", the apps with their "App" and "Data"
   boxes, and "Export".
-- **Reset**: "Undo an import", with one row per import that can be undone, and "Reset the business", with
-  what each section has.
+- **Reset**: "Undo an import", with one row per import that can be undone, "Reset the business", with what
+  each section has, and "Copies of the data", with the copies kept and their "Download".
 
 ### System · Resources
 From "System" in the side menu. Five tabs at the bottom: "Resources", "Plan and limits", "Updates", "Failed
@@ -320,8 +320,8 @@ On the Employees screens and the API documentation:
 | BASE-F18 | Install an app | done |
 | BASE-F19 | Know what else comes with an app | done |
 | BASE-F20 | Try to use an app that needs a subscription | done |
-| BASE-F21 | See why an app could not be turned on and try again | discarded |
-| BASE-F22 | Follow an app being turned on while moving around | discarded |
+| BASE-F21 | See why an app could not be turned on and try again | done |
+| BASE-F22 | Follow an app being turned on while moving around | done |
 | BASE-F23 | Turn an app off | done |
 | BASE-F24 | Turn an app on | done |
 | BASE-F25 | See an app refuse to be turned off | done |
@@ -336,7 +336,7 @@ On the Employees screens and the API documentation:
 | BASE-F34 | Undo an import | done |
 | BASE-F35 | Export a backup or a template | done |
 | BASE-F36 | Choose which apps, data and tables travel in the export | done |
-| BASE-F37 | Reset the business by sections | discarded |
+| BASE-F37 | Reset the business by sections | done |
 | BASE-F38 | See the Home up to date after importing a template | done |
 | BASE-F39 | Open System and move between its tabs | done |
 | BASE-F40 | See how much the hub is using | not done |
@@ -801,28 +801,42 @@ opened says why (BASE-F27).
 Involved: APPS-F07
 
 ### BASE-F21 See why an app could not be turned on and try again
-Status: discarded — today turning an app on is immediate and never left halfway, because its data is already prepared in the business's database; preparing it when turning it on, the warning that it could not be done and its "Retry" come with the per-business activation, built separately (hub#574)
+Status: done
 Actor: administrator
 Screen: Apps
 Steps:
-  1. Turning an app on does not finish: its data could not be prepared.
-  2. Its row says it could not be turned on and offers "Retry", which asks for it again; meanwhile the app does
-     not open.
-In: the reason the hub gives.
-Out: nothing; the app stays as it was.
-If it fails: if it fails again, it says so again with its "Retry".
+  1. An app being set up (BASE-F22) does not finish because its data could not be prepared. The hub tries again by
+     itself: after a minute, after 5 minutes, after 15 and then every hour.
+  2. Its row, in "My apps", says "Could not turn on" and, to whoever runs the business, offers "Retry" and "Turn off";
+     whoever does not run it sees the state, with no buttons. Meanwhile the app does not open and its screen says "{app}
+     could not be set up" — "Go to Apps to try again. Nothing of the business was lost.".
+  3. "Retry" asks for it again: "Turning on {app}… It will be ready in a moment." and the row goes back to "Turning
+     on…".
+  4. From the assistant ("Try turning on the website app again") the app is named as in BASE-F24 and the card shows
+     its full name.
+In: the app that could not be set up.
+Out: the activation asked for again (`base.app.activation_requested`).
+If it fails: if it fails again, it says so again with its "Retry". If it was no longer waiting, because another device
+tried it again, a notice shows with the app's name and "This app is not waiting to be set up again.", which stays
+until it is closed. From the assistant, a name that fits several apps, or none, shows no card (BASE-F24).
 Involved: none
 
 ### BASE-F22 Follow an app being turned on while moving around
-Status: discarded — today turning an app on is immediate and it shows in the menu of every device of the business without reloading; the "Activating…" step while its data is prepared comes with the per-business activation, built separately (hub#574)
+Status: done
 Actor: administrator
 Screen: Apps
 Steps:
-  1. Whoever runs the business turns an app on (BASE-F18) and goes to another screen.
-  2. The app shows "Activating…" in "My apps" and in the menu until it is ready; then it opens like any other,
-     on every device of the business, without reloading.
+  1. Whoever runs the business turns on an app (BASE-F18) whose data is not prepared yet in this business: one that
+     reached ERPlora after the business was born. The others have no wait: they are on at once (BASE-F18).
+  2. "Turning on {app}… It will be ready in a moment." shows; its row says "Turning on…", with "Turn off", and "My apps"
+     on the Home says "Activating…", without opening. The person can go to another screen: it goes on by itself. It is
+     not in the menu yet.
+  3. If its screen is opened by its address, it says "{app} is being set up" — "It opens in a moment: this page shows it
+     as soon as it is ready.".
+  4. When it is ready it opens like any other: it turns "Active" with "Open", shows in the menu of every device of the
+     business without reloading and its screen says "{app} is ready" — "It can be used now.", with "Open {app}".
 In: how the activation is going.
-Out: nothing saved.
+Out: the app running in this business (`base.app.enabled`).
 If it fails: BASE-F21.
 Involved: none
 
@@ -1118,27 +1132,34 @@ be exported.
 Involved: none
 
 ### BASE-F37 Reset the business by sections
-Status: discarded — a business with its own database is already reset as the steps say, but without the backup that is always kept before emptying; that backup comes with each business's backups, built separately (hub#575)
+Status: done
 Actor: owner, administrator
 Screen: Settings · Data and backups › Reset
 Steps:
   1. In "Reset", "Reset the business": "Removes for good the data you mark. It cannot be undone: if in
      doubt, export a copy first.", with "Export a copy first", which opens "Export".
   2. It says what is never removed: "Only what each section lists here is removed. Sales, invoices, fiscal
-     records, people and their access, files and the business's settings always stay.".
+     records, people and their access, files and the business's settings always stay.", and "Before emptying, a
+     full copy of the business's data is made and kept for 90 days, in «Copies» below.".
   3. One row per section (an app) that has something, with what it has (each part and its rows) and its total.
-  4. With its own database, tick the sections and tap "Reset the business": "This cannot be undone", with
-     "{n} rows will be removed for good:" and the breakdown. Type the business's name ("Type «{name}» to
-     confirm") and tap "Remove for good" (or "Cancel").
-  5. "Business reset:" shows with one line per section ("{app} — {n} rows removed") and the list is worked
-     out again.
-  6. Today, with the shared database, "Resetting the business is not available yet. Undo an import instead, or
-     remove what you want from each app." shows, with no boxes nor button.
+  4. Tick the sections and tap "Reset the business": "This cannot be undone", with "{n} rows will be removed for
+     good:" and the breakdown. Type the business's name ("Type «{name}» to confirm") and tap "Remove for good" (or
+     "Cancel").
+  5. "Copying the business's data before emptying…" shows, with "Then {sections} will be emptied. You can leave this
+     screen: it goes on by itself.", and then "Emptying {sections}…". Meanwhile no other is offered: "A reset is under
+     way: wait for it to finish.".
+  6. "Business reset:" shows with one line per section ("{app} — {n} rows removed") and "A full copy of the data from
+     before is kept in «Copies».", and the list is worked out again.
+  7. Below, "Copies of the data": one row per copy, with why it was made ("Before a reset" or "When the business was
+     deleted"), its date, its size and "Download". With none: "No copies yet: one is made before each reset.".
 In: what each section has and what is ticked.
-Out: what is ticked, removed for good (`base.hub.data_reset`).
+Out: a copy of all the business's data, kept for 90 days, and then what is ticked, removed for good
+(`base.hub.data_reset`).
 If it fails: the reason shows in the dialog, which does not close: a name that is not the business's, "The
-name does not match.". Who does not administer the business reads "Only an administrator can undo imports
-or reset the business.".
+name does not match.". If the copy cannot be made, nothing is emptied: "Nothing was emptied", with "The copy of the
+data could not be made, so nothing was emptied." and "Try again", with the same sections. If emptying is what fails,
+the copy is kept: "The sections could not be emptied, so nothing was removed. The copy of the data from before is
+kept.". Who does not administer the business reads "Only an administrator can undo imports or reset the business.".
 Involved: none
 
 ### BASE-F38 See the Home up to date after importing a template
