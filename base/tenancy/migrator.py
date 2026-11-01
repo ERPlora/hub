@@ -346,9 +346,20 @@ def _with_requires(labels: Iterable[str]) -> set[str]:
 
 def templates(control: str | None = None) -> list[Template]:
     """The templates of this deployment: the platform's, then one per vertical of ``base.catalog``, cloned from it;
-    named after ``control`` (default: this control database)."""
+    named after ``control`` (default: this control database).
+
+    Each carries every portable app's tables (:func:`apps_every_hub_gets`): a hub made from one gets them with the
+    clone, and its sign-up migrates nothing. That stays so in S3: turning an app on makes tables only for an app its
+    hub's template had not (ruling of hub#471's review, 2026-10-31).
+
+    :func:`ensure_template` never rebuilds a template, it migrates it where it is: the first deployment that adds the
+    portable apps to an existing template migrates each one live (about a minute on Fargate). A sign-up meanwhile finds
+    the template in use, its clone is refused (``55006``) as ``clone_failed``, and it is tried again 60 s later
+    (``services.PROVISION_RETRY_SECONDS``). It happens once."""
     control = tenancy_connections.control_name() if control is None else control
-    platform = Template(db_name=names.template_db_name(control), apps=platform_apps())
+    platform = Template(
+        db_name=names.template_db_name(control), apps=tuple(sorted(set(platform_apps()) | set(apps_every_hub_gets())))
+    )
     portable = set(portable_apps())
     verticals = []
     for vertical in catalog.known_verticals():
@@ -366,9 +377,10 @@ def templates(control: str | None = None) -> list[Template]:
 
 def apps_every_hub_gets() -> tuple[str, ...]:
     """The apps whose tables every hub with its own database has: every portable one. Transitional, until S3 makes an
-    app's tables when it is turned on (``base.app.enable``, W6): meanwhile ``provision(apps=None)`` gives them at
-    birth and :func:`migrate_hubs_behind` adds to the hubs already made the ones a later code ports, so turning an app
-    on only changes its row, as in phase 1. The one list both read (:func:`portable_apps`)."""
+    app's tables when it is turned on (``base.app.enable``, W6): meanwhile every template carries them
+    (:func:`templates`, so a sign-up is the clone alone), ``provision(apps=None)`` brings a clone of an older template
+    up to them and :func:`migrate_hubs_behind` adds to the hubs already made the ones a later code ports, so turning an
+    app on only changes its row, as in phase 1. The one list they all read (:func:`portable_apps`)."""
     return portable_apps()
 
 

@@ -120,6 +120,55 @@ def test_a_reset_is_copied_first_then_emptied_and_the_screen_hears_each_step(hub
     assert not HubDue.objects.filter(hub=hub).exists()
 
 
+class SlowUpload:
+    """The bucket's client with a slow upload: the copy goes up in three parts of 0.7 s, then 1.5 s more before the
+    upload returns, longer in all than the lease (1 s here); each part tells boto3's ``Callback``, if it is given.
+    After the second part another worker tries to take the hub (``rival``): it must find the lease alive."""
+
+    def __init__(self, real, rival):
+        self.real = real
+        self.rival = rival
+
+    def upload_file(self, path, bucket, key, ExtraArgs=None, Callback=None, Config=None):  # noqa: N803 (boto3's)
+        import os
+        import time
+
+        size = os.path.getsize(path)
+        for part in range(3):
+            time.sleep(0.7)
+            if Callback is not None:
+                Callback(size // 3)
+            if part == 1:
+                self.rival()
+        time.sleep(1.5)
+        return self.real.upload_file(path, bucket, key, ExtraArgs=ExtraArgs)
+
+
+def test_a_slow_upload_keeps_its_lease_and_the_reset_is_done_with_one_copy(hub_a, dumps_bucket, moto_s3, monkeypatch):
+    """Review of round 3: the upload renews the lease as it goes (boto3's Callback) and right after it, so the reset
+    is never left «copying» with another copy in the bucket at every pass."""
+    owner = loaded_and_asked(ready(hub_a), ["table"])
+    real = dumps.client
+    taken: list[object] = []
+
+    def rival() -> None:
+        with use_control():
+            taken.append(services.claim_hub(hub_a.pk, timezone.now(), provision.LEASE, owner="another:1:x"))
+
+    monkeypatch.setattr(dumps, "client", lambda: SlowUpload(real(), rival))
+    monkeypatch.setattr(provision, "LEASE", dt.timedelta(seconds=1))
+    monkeypatch.setattr(dumps, "POLL_SECONDS", 0.3)
+
+    run_pass()
+
+    hub = Hub.objects.get(pk=hub_a.pk)
+    assert taken == [None]  # the lease was alive mid-upload: no other worker could take the hub
+    assert hub.reset_sections["state"] == "done"
+    assert len(objects(moto_s3, dumps_bucket)) == 1
+    assert HubDump.objects.filter(hub=hub).count() == 1
+    assert rows(hub, owner, "table.table.list") == 0
+
+
 def test_a_copy_that_fails_empties_nothing_and_says_so(hub_a, dumps_bucket, moto_s3, settings, told):
     owner = loaded_and_asked(ready(hub_a), ["table"])
     settings.DB_MIGRATOR_PASSWORD = "wrong-secret-6f1c"
@@ -303,6 +352,25 @@ def test_a_copy_of_a_business_that_left_that_fails_is_tried_again_later(hub_a, d
     assert HubDump.objects.filter(hub=hub, kind="offboarding").count() == 1
     assert (done.attempts, done.last_error, done.next_attempt_at) == (0, "", None)
     assert not HubDue.objects.filter(hub=hub).exists()
+
+
+def test_a_business_brought_back_forgets_its_failed_copy_and_leaving_again_is_copied_at_once(hub_a, dumps_bucket, settings):
+    """Review of round 3: a restore clears the copy that failed (attempts, last error, next attempt), so a second
+    leaving starts from the first wait, not from the long one."""
+    hub = ready(hub_a)
+    cancel(hub)
+    settings.DB_MIGRATOR_PASSWORD = "wrong-secret-6f1c"
+    run_pass()
+    settings.DB_MIGRATOR_PASSWORD = settings.DATABASES["default"]["PASSWORD"]
+    Hub.objects.filter(pk=hub.pk).update(attempts=4, next_attempt_at=timezone.now() + dt.timedelta(hours=1))
+
+    call(system_context(REGISTRY_SCOPE), "base.hub.restore", id=hub.pk)
+
+    back = Hub.objects.get(pk=hub.pk)
+    assert (back.status, back.attempts, back.last_error, back.next_attempt_at) == (Hub.Status.READY, 0, "", None)
+    cancel(back)
+    run_pass()
+    assert HubDump.objects.filter(hub=hub, kind="offboarding").count() == 1
 
 
 def test_a_business_cancelled_before_its_database_was_finished_is_never_copied(hub_a, dumps_bucket):

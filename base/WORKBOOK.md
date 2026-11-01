@@ -141,7 +141,7 @@ límite» o «Cerca del límite», las tarjetas «Personas» y «Dispositivos» 
 La segunda pestaña de las de abajo de «Ajustes» («General», «Negocio», «Impresión» y «Datos y copias»). La
 tarjeta «Tu negocio» enseña, sin campos que rellenar, «Nombre del negocio», «País», «Zona
 horaria» (con la hora que es allí), «Moneda» e «Idioma del negocio», cada uno con una línea que dice para qué
-sirve. Debajo, dónde se cambian y, para el propietario y el administrador, «Cambiar en erplora.com». Más abajo,
+sirve. Debajo, dónde se cambian y, para el propietario y el administrador, «Cambiar en erplora.com» (en la app instalada, en el navegador del dispositivo; en la de Google Play no está). Más abajo,
 «Datos fiscales», que abre el emisor de Facturación.
 
 ### Ajustes · Impresión
@@ -213,7 +213,7 @@ imágenes y PDF).
 
 ### Empleados · Personal
 Lo que se abre con «Empleados» en el menú lateral: la primera pestaña de abajo, «Personal», con las plazas del plan,
-«Invitar en erplora.com» para quien administra, «Las personas se invitan, se les cambia el rol y se quitan en
+«Invitar en erplora.com» para quien administra (en la app instalada, en el navegador del dispositivo; en la de Google Play no está), «Las personas se invitan, se les cambia el rol y se quitan en
 erplora.com, en «Miembros» del negocio.» y la tabla de personas (en el móvil, una tarjeta por persona). Las otras
 pestañas: «Roles» y, solo para quien administra, «API keys» y «Aprobaciones»; cada una en la dirección, así que
 «Atrás» sale de Empleados.
@@ -511,7 +511,12 @@ Si falla: mientras carga, baldosas grises y «Cargando tus apps…» para el lec
 «Aquí aparecerán tus apps. Añade las que necesite tu negocio.». Si no se pudo leer la lista: «No se han
 podido cargar tus apps. Recarga la página; si sigue fallando, vuelve a iniciar sesión.», nunca que no
 hay apps. En una aplicación de Android antigua, que aún no sabe quedarse en segundo plano, el botón atrás
-vuelve a ser el del sistema.
+vuelve a ser el del sistema. Tras una actualización de ERPlora, una pantalla que esa pestaña aún no había abierto
+se abre igual (desde una baldosa, «Mis apps», el menú o cualquier botón), en una carga nueva de la página, que ya
+trae la versión nueva; nunca se queda el toque sin hacer nada. Si el servidor no responde (sin conexión o con la red
+inestable), la persona se queda donde estaba y un aviso dice «No se ha podido abrir <app>. Comprueba la conexión e
+inténtalo de nuevo.» («esa página» si la pantalla no es de una app), con «Reintentar», que vuelve a probar y la abre
+en cuanto el servidor responde.
 Implicados: ninguno
 
 ### BASE-F06 Ver los paneles de las apps en Inicio
@@ -1439,8 +1444,9 @@ Pantalla: Ajustes · Negocio
 Pasos:
   1. En «Negocio», «Idioma del negocio» («El de quien no haya elegido el suyo») dice el idioma del negocio por su
      nombre.
-  2. Pulsa «Cambiar en erplora.com»: se abren en otra pestaña los ajustes del negocio en erplora.com, donde lo
-     cambia y pulsa «Guardar cambios» (HUBS-F15).
+  2. Pulsa «Cambiar en erplora.com»: se abren en otra pestaña (en la app instalada, en el navegador del dispositivo)
+     los ajustes del negocio en erplora.com, donde lo cambia y pulsa «Guardar cambios» (HUBS-F15). En la app de
+     Google Play el botón no está: se cambia en erplora.com desde un navegador.
   3. Sin recargar, «Negocio» enseña el idioma nuevo en cuanto el negocio lo recibe; igual con el nombre y la zona
      horaria.
 Entra: el idioma que guardó erplora.com.
@@ -1520,7 +1526,9 @@ Pasos:
      PIN», «…o pasa tu placa: no hace falta elegir tu nombre antes.» y «Elige tu usuario» con una cara por
      persona (iniciales y nombre; nunca su correo). Con una sola persona, ya sale elegida.
   2. Toca tu nombre: sale «PIN de {name}» y el teclado con tantos círculos como dígitos tenga el PIN del negocio.
-     La flecha («Cambiar usuario») vuelve a las caras.
+     La flecha («Cambiar usuario») vuelve a las caras. El teclado se ve entero, hasta el 0 y el de borrar, sin
+     desplazar la pantalla: en una tablet en horizontal (también dentro de su navegador), un portátil o un móvil
+     bajo, el nombre sale sin la cara grande y las teclas se juntan algo, siempre del tamaño de un dedo.
   3. Teclea el PIN: entra solo al último dígito, sin botón.
   4. Entras en la pantalla que habías pedido o en **Inicio**. El pie dice «ERPlora · dispositivo de confianza».
 Entra: las personas del negocio con PIN, releídas cada minuto y al volver a la pantalla: quien recibe un PIN
@@ -1564,7 +1572,8 @@ Pasos:
      de ponerse al día.
   3. Su siguiente pantalla es **Acceso**, que arriba dice «Sesión abierta en otro dispositivo» — «Tu plan cubre un
      dispositivo a la vez, así que al entrar en otro se cerró la sesión de este. Vuelve a entrar para usarlo aquí,
-     o amplía los dispositivos de tu plan.» con «Mejorar plan».
+     o amplía los dispositivos de tu plan.» con «Mejorar plan» en el navegador (en la app instalada no está: lo que
+     vende solo está en la web).
   4. Puede volver a entrar (y cierra la del otro) o ir a ampliar el plan a erplora.com.
 Entra: los dispositivos que cubre el plan, que erplora.com le pasa al negocio.
 Sale: las sesiones de los dispositivos que sobran, cerradas, y el motivo guardado en cada uno para decírselo.
@@ -1582,7 +1591,8 @@ Pasos:
   2. Lo siguiente que abre la lleva a la entrada; si la sesión se cerró porque quitaron el dispositivo o la
      persona dejó el negocio, lo que tiene abierto se entera al momento.
   3. En una caja con pinpad, **Acceso** dice arriba «Tu sesión ha terminado» — «Caducó o se cerró. Vuelve a
-     entrar.» y la siguiente persona entra con su PIN. En un dispositivo sin pinpad va a la entrada de erplora.com,
+     entrar.» y, debajo, el teclado entero (también en una tablet en horizontal o un móvil bajo): la siguiente
+     persona entra con su PIN. En un dispositivo sin pinpad va a la entrada de erplora.com,
      que la devuelve dentro si su sesión allí sigue abierta.
 Entra: la sesión que ya no existe.
 Sale: nada guardado; la venta a medias la conserva su app.
@@ -1965,7 +1975,8 @@ Pasos:
      plazas ocupadas», «{used} personas · sin límite» o, si erplora.com no ha dicho el plan, «{used} personas».
   2. Con todas ocupadas sale «Tu plan tiene todas las plazas ocupadas» y «Quita en erplora.com a alguien que ya no
      trabaje aquí, o pasa a un plan con más plazas.»; en la web, con «Mejorar plan».
-  3. Para invitar a alguien más, «Invitar en erplora.com» lleva a «Miembros» del negocio, donde se aplica el tope.
+  3. Para invitar a alguien más, «Invitar en erplora.com» lleva a «Miembros» del negocio, donde se aplica el tope
+     (en la app instalada, en el navegador del dispositivo; en la de Google Play no está).
 Entra: las personas del negocio y las plazas de su plan, como las manda erplora.com.
 Sale: nada guardado.
 Si falla: «No se pudo cargar el personal de este negocio.» con «Reintentar», nunca «Todavía no hay nadie en este
@@ -2017,7 +2028,8 @@ Actor: propietario, administrador
 Pantalla: Empleados · Personal
 Pasos:
   1. Quien salió del negocio ya no está en **Empleados › Personal**: se quitó en erplora.com.
-  2. Para que vuelva, «Invitar en erplora.com» y se la invita otra vez en «Miembros» del negocio, con su rol.
+  2. Para que vuelva, «Invitar en erplora.com» y se la invita otra vez en «Miembros» del negocio, con su rol (en la
+     app instalada, en el navegador del dispositivo; en la de Google Play no está).
   3. Cuando acepta, vuelve a la lista con lo que el negocio guardaba de ella: su PIN y su placa siguen valiendo.
 Entra: la invitación en erplora.com.
 Sale: la persona otra vez en el negocio, con su PIN y su placa de antes.
@@ -2052,7 +2064,7 @@ Pasos:
      erplora.com, y allí se cambia.».
   2. Una fila por rol: «Propietario», «Administrador», «Encargado» y «Empleado», con «Básico», «Siempre
      disponible», cuántas personas lo tienen y cuántos permisos da.
-  3. Quien administra tiene «Cambiar roles en erplora.com».
+  3. Quien administra tiene «Cambiar roles en erplora.com» (en la app instalada, en el navegador del dispositivo; en la de Google Play no está).
 Entra: los roles y las personas del negocio.
 Sale: nada guardado.
 Si falla: «No se pudo cargar el catálogo de roles.» con «Reintentar».
@@ -2065,7 +2077,8 @@ Actor: propietario, administrador
 Pantalla: Empleados · Roles
 Pasos:
   1. En **Empleados › Roles** o en la ficha de una persona, «Cambiar roles en erplora.com» o «Abrir en
-     erplora.com» lleva a «Miembros» del negocio.
+     erplora.com» lleva a «Miembros» del negocio (en la app instalada, en el navegador del dispositivo; en la de
+     Google Play no están).
   2. Allí le cambia el rol.
   3. Al volver, la persona sale con su rol nuevo y lo que puede hacer cambia al momento.
 Entra: el rol que se elige en erplora.com.
@@ -2378,8 +2391,9 @@ Pasos:
      dinero, sale en la moneda del negocio (nunca en céntimos), también dentro de un dato que agrupa otros, y el
      asistente lo entiende igual aunque la app cambie cómo lo explica: «a 15 €» sale «15,00 €», nunca «1500». Si la
      acción nombra su propia moneda, sale en ella y con sus decimales, como en Stripe o Square: un pago en dólares dice
-     «15,00 $», y en yenes, sin decimales; una moneda que no existe no se inventa: el importe sale tal como se
-     escribió y la acción la rechaza al ejecutarse. Si la acción se hace sobre algo que tiene su propia moneda, sale en
+     «15,00 $», y en yenes, sin decimales; una moneda que no existe no se inventa: si la acción ya no la acepta en sus
+     datos, no sale tarjeta (ver «Si falla»); si no, el importe sale tal como se escribió y la acción la rechaza al
+     ejecutarse. Si la acción se hace sobre algo que tiene su propia moneda, sale en
      la de eso: añadir una línea a un carrito en dólares dice «12,50 $», y poner un precio en una tarifa en yenes,
      «1500 ¥»; si eso no se puede leer (no existe o quien pregunta no puede verlo), el importe sale tal como se
      escribió y lo decide la acción. Todos los importes de una tarjeta se escriben igual, arriba o dentro de un dato
@@ -2387,7 +2401,10 @@ Pasos:
      suya: rectificar una factura emitida en euros dice «Total: -121,00 €» aunque el negocio cobre ya en złoty, y el asistente lo dice en
      la misma moneda en su respuesta. Una diferencia sale con su signo como en la pantalla de su app, para ver de un
      vistazo si sobra o falta (el cierre de caja dice «Diferencia: +137,90 €» si sobra, «-4,90 €» si falta y sin signo si cuadra); un sí o un no, como «Sí» o «No»;
-     una lista, por cuántos elementos lleva, y un dato que agrupa otros, como la plantilla de un WhatsApp, por sus
+     una lista que su app (el servidor) nombra, por sus elementos uno tras otro («Impresoras: Caja, Cocina»; con más
+     de cuatro, los tres primeros y cuántos más: «Caja, Cocina, Barra y 2 más»; si un elemento lleva coma, como una
+     fecha, separados por punto y coma: «2 nov 2026, 10:00; 9 nov 2026, 10:00») y cualquier otra, como las líneas de
+     una venta o una lista de códigos, por cuántos elementos lleva; y un dato que agrupa otros, como la plantilla de un WhatsApp, por sus
      valores, sin el nombre de cada uno («Plantilla: cita_recordatorio · es · Ana, 10:00»; del recuento de una caja
      quedan los billetes y monedas contados: «50: 2»). Una fecha y una hora salen como se escriben en el idioma
      de la persona y a la hora del negocio («2 nov 2026, 10:00»; un día solo, «2 nov 2026»; una hora sola,
@@ -2410,11 +2427,14 @@ Pasos:
      Crear en Servicios», o «No se hizo, cancelado: …», «No se hizo, falló: …» y «No se hizo, sin permiso: …». Si la
      persona cambia de idioma, los recibos de antes salen enteros en el nuevo, también el nombre de la app.
 Entra: la acción, sus datos y su riesgo, tal como los declara su app; la moneda del negocio, la del registro sobre el
-que se hace (leída como la persona) y, en «Lo que va a pasar», la que dé su app; la zona horaria del negocio.
+que se hace (leída como la persona) y, en «Lo que va a pasar», la que dé su app; la zona horaria del negocio; y,
+si su app la declara, la comprobación que hace antes de la tarjeta, como la persona: si rechaza los datos (dar de alta a
+alguien con un rol que el negocio no tiene, STAFF-F01), no sale tarjeta y el asistente lo cuenta como su error.
 Sale: si se acepta, la acción hecha en su app, con el mismo evento que si se hubiera pulsado su botón.
 Si falla: una acción que su app rechaza vuelve al asistente como error y él lo cuenta; el recibo dice «No se hizo,
-falló: …». Si se recarga la página con la tarjeta abierta no se hace nada, y la respuesta acaba en «La respuesta se
-cortó.» con «Reintentar».
+falló: …». Unos datos que la acción no acepta (un país o una moneda que no existe, un valor fuera de su lista) no
+llegan a la tarjeta: vuelven al asistente, que los corrige, y la persona confirma una sola vez. Si se recarga la
+página con la tarjeta abierta no se hace nada, y la respuesta acaba en «La respuesta se cortó.» con «Reintentar».
 Implicados: BASE-F98, BASE-F99, BASE-F101
 
 ### BASE-F98 Acciones peligrosas: escribir para confirmar, o no desde el chat
@@ -2968,7 +2988,11 @@ Implicados: ACCOUNTS-F38
   (403 `base.device_not_trusted`, `base.pin_not_offered`), freno por persona (`PIN_PERSON_LIMIT`, 5 en 5 min; la
   placa, por su número) y la credencial de una persona activa del negocio (401 `base.pin_incorrect`,
   `base.badge_unknown`; 429 `base.too_many_attempts` con `Retry-After`). Lo aceptado no cuenta y reinicia el freno
-  de esa persona. La entrada deja la cookie del idioma de la persona (gh:hub#2639).
+  de esa persona. La entrada deja la cookie del idioma de la persona (gh:hub#2639). Cada freno guarda en la caché la
+  cuenta y el final de su ventana, y los lee y los olvida en una sola llamada: su clave va entre llaves
+  (`base.throttle:{limit:pin:<hub>:<persona>}` y `…}:until`) para que el clúster de Valkey de AWS las guarde en la
+  misma ranura. Sin eso el clúster rechazaba la lectura (`CROSSSLOT`), el freno se apartaba y el pinpad aceptó
+  nueve PIN erróneos seguidos en producción (hub#440).
 - `way_in` (sin sesión, pidiendo HTML): al Acceso (`/login`) si el dispositivo ofrece el pinpad
   (`queries.pin_door_open`), con `notice=ended` si llegó la cookie de una sesión que ya no existe, o si otra entrada
   cerró la suya (`notice=device_limit`); si no, el salto de siempre a la entrada de erplora.com, que devuelve dentro
@@ -2990,7 +3014,12 @@ Implicados: ACCOUNTS-F38
   `base.administer_hub`). Lo pinta `TopbarChrome.vue` (`topbar-manage`; en el móvil, `topbar-chrome-more-manage`),
   un enlace con `target=_blank rel=noopener` que en la app instalada pasa por `openExternalLink` de
   `@erplora/ui/shell` (`open_external_url`); `base/frontend/lib/management.ts` lo oculta en la copia de Google Play
-  (`device_context` → `distribution: "play"`, gh:hub#1897) y no lo enseña hasta que la app contesta. Tests:
+  (`device_context` → `distribution: "play"`, gh:hub#1897) y no lo enseña hasta que la app contesta. Es el único
+  camino de salida del Hub (gh:hub#439): todo enlace `_blank` de `base/frontend` y de las apps llama a
+  `openExternalLink` en su `@click` (o en la función que nombra), los que llevan al panel de erplora.com («Invitar»,
+  «Cambiar roles», «Abrir en erplora.com», «Cambiar en erplora.com») llevan además `managementOffered()`, y lo que
+  vende («Mejorar plan» del acceso, de WhatsApp…) va con `isWeb`; lo vigila `frontend/external-links.test.ts`, con
+  su lista de espera por issue (VeriFactu y la factura: gh:hub#518). Tests:
   `base/tests/test_spa.py`, `test_access_spa.py`, `ShellChrome.test.ts`, `lib/management.test.ts`; e2e
   `tests/e2e/base-chrome.spec.ts` y `base-access.spec.ts` (BASE-G56). En `frontend/main.ts`, el menú de usuario lleva «Perfil» y «Cambiar de usuario», y `startWayIn`
   (`base/frontend/lib/access.ts`) arma el bloqueo por inactividad con esos minutos (gh:hub#2537, #2677: no hay
@@ -3025,8 +3054,9 @@ Implicados: ACCOUNTS-F38
   caracteres y ruta de 980 bytes; los programas (`BLOCKED_EXTENSIONS`, la lista de Gmail) se rechazan. Subir nunca pisa:
   la escritura es condicional (`If-None-Match: *` en S3, `O_EXCL` en disco) y, si otra subida del mismo nombre llegó
   antes, toma el siguiente nombre libre. Un listado lee solo la carpeta abierta (`Delimiter` en S3); el árbol de carpetas
-  y lo que ocupan los archivos salen del índice del hub, guardado en la caché (`base.files:<hex>:*`, 10 minutos como
-  mucho): una subida le suma sus bytes y crear, renombrar, mover o borrar lo olvidan, así que un lote de subidas y los
+  y lo que ocupan los archivos salen del índice del hub, guardado en la caché (`base.files:{<hex>}:*`: el hub entre
+  llaves, para que sus tres claves caigan en una ranura del clúster; 10 minutos como mucho): una subida le suma sus
+  bytes y crear, renombrar, mover o borrar lo olvidan, así que un lote de subidas y los
   listados de después recorren los archivos una sola vez; lo que guardan las apps se cuenta en cada llamada. El espacio
   es el de todo el prefijo del hub, contra `plan.max_storage_bytes` de la foto del SaaS (sin él, «Sin límite»). Una app que
   guarde archivos lo hace en su carpeta propia del prefijo (como `website/`), fuera de `files/`, y Archivos no la
@@ -3206,8 +3236,17 @@ Implicados: ACCOUNTS-F38
   para el cuadro y para la app que abre el asistente dictando), fallos y cupo en `guide.ts`, todos en
   `packages/ui/src/components/Assistant/`. Desde 768 px el panel se ancla (clase `assistant-docked` en `<html>`, que
   empuja el pane); por debajo, velo.
-- Tests: `base/tests/test_assistant.py`, `test_services_assistant.py` y `test_api_assistant.py` (con la pasarela
-  falsa de `base/tests/fake_gateway.py`); Vitest de `base/frontend/lib/assistant-hub.test.ts`,
+- **El registro cuando la pasarela falla** (ERPlora/saas#167): el panel dice cada fallo con sus palabras (BASE-F94,
+  BASE-F106), así que el motivo solo queda en el registro. Cada llamada a erplora.com que no sale deja una línea
+  `WARNING` del logger `base.assistant` con la puerta (`path`) y el negocio (`hub`): `base.assistant.gateway_refused`
+  (`status` y el `code` del sobre de error; `-` si no lo trae, la página de un proxy),
+  `base.assistant.gateway_unreachable` (`kind`, la clase del fallo de `httpx`), `base.assistant.gateway_failed` (el
+  proveedor falló a mitad del turno: su `code` y `retriable`) o `base.assistant.gateway_cut` (el turno se cortó:
+  `kind`, la excepción o `no_done`). Nunca lo que la persona dijo, dictó o se le contestó. El 30/10 una producción
+  sin proveedores contestaba 503 `assistant.no_model` y `assistant.provider_not_configured` a todo, y el Hub no lo
+  decía.
+- Tests: `base/tests/test_assistant.py`, `test_services_assistant.py`, `test_api_assistant.py` y
+  `test_assistant_gateway_log.py` (con la pasarela falsa de `base/tests/fake_gateway.py`); Vitest de `base/frontend/lib/assistant-hub.test.ts`,
   `components/AssistantSetupEmpty.test.ts`, `SetupChecklist.test.ts`, `ShellChrome.test.ts` y `frontend/main.test.ts`,
   y los del chat en `packages/ui/src/components/Assistant/*.test.ts` (`pnpm --filter @erplora/ui test`); e2e
   `tests/e2e/base-assistant.spec.ts` contra un SaaS de verdad con su pasarela y el proveedor falso
@@ -3325,6 +3364,13 @@ Implicados: ACCOUNTS-F38
   registra el texto. Tests: `base/tests/test_support_report.py`; Vitest de `base/frontend/lib/report-problem.test.ts`,
   `components/ReportProblemDialog.test.ts` y `frontend/main.test.ts`; e2e `tests/e2e/base-report-problem.spec.ts`
   contra el SaaS de la pila.
+
+- **La caché es un clúster** (hub#440): en AWS es ElastiCache Serverless, un Valkey en modo clúster, que rechaza
+  con `CROSSSLOT` una llamada con varias claves de ranuras distintas (`get_many`, `set_many`, `delete_many`). Las
+  claves que van juntas comparten una etiqueta de hash: lo que va entre la primera `{` y la siguiente `}`
+  (`base.files:{<hex>}:…`, `website:home:{<slug>}:…`). En local y en los tests la caché es
+  `base.cache.ClusterLocMemCache`, la memoria del proceso con esa misma regla y el mismo error: lo que fallaría en
+  AWS falla antes en el test.
 
 ## Lo que NO hace, a propósito
 

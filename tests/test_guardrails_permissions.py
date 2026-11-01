@@ -70,13 +70,13 @@ OPEN_OPERATIONS: dict[str, tuple[str, str]] = {
     "base.hub.cancel": (PLATFORM, "The SaaS cancels a business (/internal)."),
     "base.hub.dump_list": (
         PLATFORM,
-        "The SaaS reads the copies of a business's data and their links (GET /internal/hubs/{id}/dumps).",
+        "The SaaS reads the copies of a business's data and their links of 15 minutes (/internal/hubs/{id}/dumps).",
     ),
     "base.hub.get": (PLATFORM, "The SaaS reads a registry row it never heard ready from (/internal)."),
     "base.hub.register": (PLATFORM, "The SaaS registers or renames a business (/internal)."),
     "base.hub.reset_apply": (
         PLATFORM,
-        "The worker empties the sections of a reset whose copy it kept (base.worker).",
+        "The worker empties the sections of a reset whose copy it kept (base.worker), in the business's own database.",
     ),
     "base.hub.restore": (PLATFORM, "The SaaS restores a cancelled business (/internal)."),
     "base.hub.seed_local": (PLATFORM, "seed_local_hubs registers a and b, in local development only (DEBUG)."),
@@ -89,7 +89,7 @@ OPEN_OPERATIONS: dict[str, tuple[str, str]] = {
     "base.session.revoke": (PLATFORM, "The SaaS ends an account's sessions (/internal, back-channel logout)."),
     "base.usage.list": (
         PLATFORM,
-        "The SaaS's collect_hub_usage reads the night's use of each business (GET /internal/usage).",
+        "The SaaS's collect_hub_usage reads what each business used on a day, measured that night (/internal/usage).",
     ),
     "control.cluster.close": (
         PLATFORM,

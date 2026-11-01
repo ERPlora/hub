@@ -8,6 +8,7 @@ import type { CatalogOut, Step } from '../operations';
 import { click, ionValue, mountFlow } from '../__tests__/mount-flow';
 import ConditionRows from './ConditionRows.vue';
 import AskStepPanel from './AskStepPanel.vue';
+import AssistantStepPanel from './AssistantStepPanel.vue';
 import HttpStepPanel from './HttpStepPanel.vue';
 import MessageStepPanel from './MessageStepPanel.vue';
 import StepNode from './StepNode.vue';
@@ -174,5 +175,13 @@ describe('StepNode', () => {
     s.wrapper.findComponent(MessageStepPanel).vm.$emit('update:step', { ...message, params: { phone: 'input.phone', text: 'Hello' } });
     expect(s.emitted().at(-1)).toMatchObject({ params: { text: 'Hello' } });
     expect(s.wrapper.findComponent(StepOptions).exists()).toBe(true);
+  });
+  it('hands «Ask the assistant» what the app of its recipe fixes (FLOW-F36)', async () => {
+    const step: Step = { id: 's9', kind: 'assistant', prompt: 'Help', tools: [], mode: 'ask', max_rounds: 6 };
+    const fixedByApp = { app: 'reservation', app_name: 'Reservations', event: '', filter: [], pinned: { s9: { 'reservation.reservation.cancel': ['on_behalf_of'] } } };
+    const m = await mountFlow(StepNode, {
+      props: { step, index: 0, steps: [step], catalog: CATALOG, open: true, errors: {}, choices: [], pick: async () => null, fixedByApp },
+    });
+    expect(m.wrapper.findComponent(AssistantStepPanel).props('fixedByApp')).toEqual(fixedByApp);
   });
 });

@@ -27,9 +27,10 @@ import contextlib
 import dataclasses
 import datetime as dt
 import json
+import logging
 import time
 from contextvars import ContextVar
-from collections.abc import AsyncIterator, Iterable
+from collections.abc import AsyncIterator, Collection, Iterable
 from dataclasses import dataclass
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -55,6 +56,7 @@ from live.assistant import (
     confirmed,
     description,
     error_content,
+    invalid_arguments,
     named,
     operation_of,
     preview_of,
@@ -97,6 +99,9 @@ DOCS_SEARCH = "base.docs.search"
 ALWAYS = ("base.setup.status", "base.business.get", DOCS_SEARCH)
 #: Never from the chat (the old hub's «destructive actions of the hub itself»): emptying the business; a file.
 NOT_FROM_CHAT = frozenset({"base.hub.reset", "base.blueprint.export"})
+#: How a person names each app in a turn: its id, its name and its menu (``live.assistant.app_words``). The QA of the
+#: assistant ranks with it too (``base/tests/test_assistant_asks.py``).
+APP_WORDS = shared.app_words
 
 TURN_PATH = "/internal/assistant/chat/stream"
 USAGE_PATH = "/internal/assistant/usage"
@@ -124,12 +129,13 @@ def active_apps(scope: Scope) -> dict[str, LiveAppConfig]:
     return {config.label: config for config in all_live_app_configs() if config.label not in left_out}
 
 
-def catalog(ctx: OperationContext) -> dict[str, Operation]:
-    """The tools of ``ctx``'s person: by name, in name order. A write a manager may approve is theirs too, as its
-    button on the screen is (APP-BASE-5): running it asks for the approval (BASE-G118)."""
+def catalog(ctx: OperationContext, *, active_labels: Collection[str] | None = None) -> dict[str, Operation]:
+    """The tools of ``ctx``'s person: by name, in name order, of the apps on in its business (``active_labels``, else
+    ``active_apps``). A write a manager may approve is theirs too, as its button on the screen is (APP-BASE-5): running
+    it asks for the approval (BASE-G118)."""
     tools = shared.catalog(
         ctx,
-        active_labels=active_apps(ctx.scope),
+        active_labels=active_apps(ctx.scope) if active_labels is None else active_labels,
         not_from_chat=NOT_FROM_CHAT,
         approvable=lambda op: approvals.label_of(op) is not None,
     )
@@ -138,8 +144,8 @@ def catalog(ctx: OperationContext) -> dict[str, Operation]:
 
 def relevant(tools: dict[str, Operation], texts: Iterable[str], language: str) -> list[Operation]:
     """The tools of what ``texts`` ask, best first, at most ``MAX_TOOLS`` (``live.assistant.relevant``): ``ALWAYS``
-    first."""
-    return shared.relevant(tools, texts, language, always=ALWAYS)
+    first, each app named by ``APP_WORDS``."""
+    return shared.relevant(tools, texts, language, always=ALWAYS, app_words=APP_WORDS)
 
 
 # ── The card of a write in the Hub's words (BASE-G115, G116) ─────────────────────────────────────────────────────
@@ -418,11 +424,34 @@ def _answer_money(answer: dict) -> dict | None:
 
 
 def preview(ctx: OperationContext, op: Operation, arguments: dict) -> tuple[ToolOutcome | None, list[dict] | None]:
-    """What the dangerous write ``op`` will do with ``arguments`` (``live.assistant.preview``: the read its ``ai=``
-    names, run as ``ctx``'s person), in the Hub's words: its amounts in the currency the read answers
-    (``_answer_money``), else the business's; ``signed`` when its schema declares it so. ``base.E005`` checks the
-    declaration at start."""
+    """What comes before the card of the write ``op`` with ``arguments``, run as ``ctx``'s person: first its check
+    (``checked``), whose refusal is the write's outcome; then what the dangerous write will do
+    (``live.assistant.preview``: the read its ``ai=`` names), in the Hub's words: its amounts in the currency the read
+    answers (``_answer_money``), else the business's; ``signed`` when its schema declares it so. ``base.E005`` and
+    ``base.E012`` check the declarations at start."""
+    refused = checked(ctx, op, arguments)
+    if refused is not None:
+        return refused, None
     return shared.preview(ctx, op, arguments, words_of_answer=_Words.of_answer)
+
+
+def check_of(op: Operation) -> Any:
+    """The read ``op``'s ``ai=`` names to check its data before its card (``check``), or ``None``."""
+    declared = op.ai
+    return declared.get("check") if isinstance(declared, dict) else getattr(declared, "check", None)
+
+
+def checked(ctx: OperationContext, op: Operation, arguments: dict) -> ToolOutcome | None:
+    """Why the read the write ``op`` names as its check (``check_of``) refuses ``arguments`` — run as ``ctx``'s person,
+    with the data of the write its input takes —, or ``None`` when it takes them or the write names none (hub#538: a
+    role the business does not have reached the card, and the write refused it only after the person's yes). Nothing
+    of its answer is shown: a normal write's card stays a single line."""
+    name = check_of(op)
+    if name is None:
+        return None
+    read = registry[name]
+    failure, _ = _run(ctx, read, {key: value for key, value in arguments.items() if key in read.input.model_fields})
+    return failure
 
 
 @checks.register("base")
@@ -456,10 +485,7 @@ def _preview_problems(op: Operation, declared: Any) -> list[str]:
     read = registry.get(declared["operation"])
     if read is None:
         return [*problems, f"names no operation {declared['operation']}"]
-    if read.app_label != op.app_label:
-        problems.append(f"names {read.name}, of another app")
-    if read.kind != "query":
-        problems.append(f"names {read.name}, not a read")
+    problems += _read_problems(op, read)
     fields = declared.get("fields")
     if not isinstance(fields, list) or not fields or not all(isinstance(name, str) for name in fields):
         return [*problems, "names no field of its answer"]
@@ -472,10 +498,50 @@ def _preview_problems(op: Operation, declared: Any) -> list[str]:
         for name, prop in shown.items()
         if _is_signed(prop) and not (prop.get("type") == "integer" and _is_money(name, prop))
     ]
+    return problems
+
+
+def _read_problems(op: Operation, read: Operation) -> list[str]:
+    """What is wrong with the read the write ``op`` names (its preview or its check): of another app, not a read, or
+    reading data the write never takes."""
+    problems = []
+    if read.app_label != op.app_label:
+        problems.append(f"names {read.name}, of another app")
+    if read.kind != "query":
+        problems.append(f"names {read.name}, not a read")
     problems += [
         f"reads {name}, but the write never takes {name}" for name in read.input.model_fields if name not in op.input.model_fields
     ]
     return problems
+
+
+@checks.register("base")
+def check_checks(app_configs=None, **kwargs) -> list[checks.CheckMessage]:
+    """``base.E012``: a write's check (``check_of``) names a read of its own app whose input the write also takes."""
+    errors: list[checks.CheckMessage] = []
+    for op in registry.values():
+        declared = check_of(op)
+        problems = [] if declared is None else _check_problems(op, declared)
+        if problems:
+            errors.append(
+                checks.Error(
+                    f"{op.name} declares a check that {'; '.join(problems)}.",
+                    hint='Declare ai={"check": "<app>.<entity>.<a query>"} with a read of its own app whose input the '
+                    "write also takes.",
+                    obj=op.name,
+                    id="base.E012",
+                )
+            )
+    return errors
+
+
+def _check_problems(op: Operation, declared: Any) -> list[str]:
+    if not isinstance(declared, str):
+        return ["is not the name of a read"]
+    read = registry.get(declared)
+    if read is None:
+        return [f"names no operation {declared}"]
+    return _read_problems(op, read)
 
 
 @checks.register("base")
@@ -598,6 +664,8 @@ Answer in {language_name}, short and plain, as a colleague who knows the app. Us
   say kindly that you only help with the business, in one sentence, and do not answer it.
 - Read before you answer: use the tools to look up records, numbers and ids. Never invent a record, an id, an amount
   or a date: if no tool returned it, say you do not know or that you could not find it.
+- Name a record to the person by its name, as the screens do: never write an id (a code such as 0190a3b4-…) in the
+  answer, not in a table either.
 - For questions about how ERPlora works (how to do something, what an option means, plans), search the documentation
   with `base__docs__search` and answer only from what it returns, citing the section; if it returns nothing, say the
   documentation does not cover it.
@@ -639,6 +707,21 @@ def setup_block(status: dict | None) -> str:
 
 # ── The gateway (erplora.com) ────────────────────────────────────────────────────────────────────────────────────
 
+#: Each failed call to the gateway leaves one line here (saas#167): its door, the business, the HTTP status and the
+#: gateway's code, or that it never got there and how. The panel says every failure in a few words of its own, so the
+#: reason lives only in this log. Never what the person said, dictated or was answered.
+logger = logging.getLogger(__name__)
+
+
+def _log_refused(path: str, hub: Any, status: int, error: dict) -> None:
+    logger.warning(
+        "base.assistant.gateway_refused path=%s hub=%s status=%s code=%s", path, hub, status, error.get("code") or "-"
+    )
+
+
+def _log_unreachable(path: str, hub: Any, problem: Exception) -> None:
+    logger.warning("base.assistant.gateway_unreachable path=%s hub=%s kind=%s", path, hub, type(problem).__name__)
+
 
 class GatewayError(Exception):
     """A door of the gateway that did not answer what was asked: its code (ours or the gateway's) and details."""
@@ -666,7 +749,8 @@ def _post(path: str, payload: dict) -> dict:
     url, body, headers = _signed(path, payload)
     try:
         response = httpx.post(url, content=body, headers=headers, timeout=TIMEOUT_SECONDS)
-    except httpx.HTTPError:
+    except httpx.HTTPError as problem:
+        _log_unreachable(path, payload.get("hub"), problem)
         raise GatewayError("assistant.unreachable") from None
     try:
         answer = response.json()
@@ -674,6 +758,7 @@ def _post(path: str, payload: dict) -> dict:
         answer = None
     if response.status_code >= 300:
         error = _error_of(response.status_code, answer)
+        _log_refused(path, payload.get("hub"), response.status_code, error)
         raise GatewayError(str(error.get("code") or "assistant.unavailable"), response.status_code, error)
     return answer if isinstance(answer, dict) else {}
 
@@ -826,6 +911,7 @@ async def stream_turn(
                         error = _error_of(response.status_code, response.json())
                     except ValueError:
                         error = {}
+                    _log_refused(TURN_PATH, scope.key, response.status_code, error)
                     yield _refusal(response.status_code, error, response.headers.get("Retry-After"))
                     return
                 async for line in response.aiter_lines():
@@ -853,15 +939,22 @@ async def stream_turn(
                         yield {"type": "usage", **{key: frame.get(key) for key in ("used", "limit", "resets_at", "demo")}}
                     elif kind == "error":
                         failed = True
+                        logger.warning(
+                            "base.assistant.gateway_failed path=%s hub=%s code=%s retriable=%s",
+                            TURN_PATH, scope.key, frame.get("code") or "-", bool(frame.get("retriable")),
+                        )
                         yield {"type": "error", "code": "assistant.provider_failed", "retriable": bool(frame.get("retriable"))}
-    except httpx.HTTPError:
+    except httpx.HTTPError as problem:
         if not text and not calls:
+            _log_unreachable(TURN_PATH, scope.key, problem)
             yield {"type": "error", "code": "assistant.unreachable", "retriable": True}
             return
         failed = True
+        logger.warning("base.assistant.gateway_cut path=%s hub=%s kind=%s", TURN_PATH, scope.key, type(problem).__name__)
         yield {"type": "error", "code": "assistant.cut", "retriable": True}
     if not finished and not failed:
         failed = True
+        logger.warning("base.assistant.gateway_cut path=%s hub=%s kind=no_done", TURN_PATH, scope.key)
         yield {"type": "error", "code": "assistant.cut", "retriable": True}
     said = "".join(text)
     if failed:

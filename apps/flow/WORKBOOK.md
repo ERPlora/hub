@@ -1,7 +1,7 @@
 # Workbook — Automatizaciones (app)
 Prefijo: FLOW
 Alcance MVP: transversal (peluquería y restaurante: reglas «cuando pase esto, haz aquello»)
-Estado de la app: hecha (servidor, motor y páginas)
+Estado de la app: completa (2026-11-01)
 
 > Manual de usuario y especificación de la app `flow`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `hecho` cuando sus tests están en verde (servidor
@@ -103,7 +103,7 @@ Menú **Automatizaciones**, una sola entrada. De arriba abajo:
   (opcional)**, **Aprobar** y **No** (FLOW-F29). Un responsable o un empleado,
   que solo contestan, ven solo esto: «No hay nada esperando tu respuesta.» cuando no hay nada.
 - **Propuestas por el asistente** — solo si hay borradores: «El asistente las escribió cuando le
-  pediste una automatización. No hace nada hasta que la revises y la actives.», y por cada uno su
+  pediste una automatización. No hacen nada hasta que las revises y las actives.», y por cada uno su
   nombre, la etiqueta «Borrador», **Revisar** y una × («Descartar») (FLOW-F18, FLOW-F19).
 - **Tus automatizaciones** — solo si hay alguna. El buscador «Busca por nombre, por lo que la arranca o
   por lo que hace», los filtros **Ver** (encendidas, en pausa) y **Arranca con** (algo que pasa, un
@@ -112,15 +112,13 @@ Menú **Automatizaciones**, una sola entrada. De arriba abajo:
   las 09:00», «Solo cuando pulses Ejecutar»), la última ejecución, la etiqueta «Activa» o «En pausa»,
   el interruptor, **Hacer una copia** y **Borrar**. Con varias elegidas, **Encenderlas** y **Ponerlas en
   pausa** (FLOW-F02, FLOW-F03).
-- Encima de **Tus automatizaciones**, un aviso por cada automatización que trae otra app y se montó con un
-  fallo que esa app ya corrigió, con **Actualizarla** (FLOW-F36).
 - **La galería**, siempre debajo: «Elige una y pasa a ser tuya, apagada, para que la mires antes de que
   haga nada.», el botón **¿Cómo funciona esto?** y las tarjetas en «Cualquier negocio», «Peluquería y
   estética» y «Bares y restaurantes»; debajo, una sección **Viene con …** por cada app que trae
   automatizaciones hechas (hoy, «Citas», «Reservas online» y «Bandeja de WhatsApp»), con sus tarjetas, su estado («Activa»,
   «En pausa», «Versión nueva») y **Encenderla**, **Ponerla en pausa**, **Verla** y **Restaurar la de
   fábrica** (FLOW-F33 a F35); al final, la línea de lo que falta («Hay automatizaciones ocultas: necesitan
-  la app …») (FLOW-F04).
+  Tareas.») (FLOW-F04).
 
 ### Editor de automatización
 Se abre al tocar una fila, al pulsar **Nueva automatización**, al usar una tarjeta o al revisar un
@@ -132,7 +130,7 @@ borrador. Cabecera: ← (vuelve a la lista; si hay cambios sin guardar, pregunta
   para arrastrar y × (las esperas y los «Solo sigue si…» son tiras estrechas; el resto, tarjetas que se
   despliegan al tocarlas; dentro, **Más opciones**: «Solo si…» y «Si falla, sigue», FLOW-F25), y los
   botones para añadir: **Hacer algo**, **Consultar algo**, **Solo sigue
-  si…**, **Esperar**, **Enviar un mensaje** (FLOW-F31, con la Bandeja de WhatsApp), **Llamar a otro sistema**
+  si…**, **Esperar**, **Enviar un mensaje** (FLOW-F31 y F32, con la Bandeja de WhatsApp), **Llamar a otro sistema**
   (FLOW-F27), **Preguntar antes a alguien** (FLOW-F28) y **Pedírselo al asistente** (FLOW-F37). Sin pasos: «Todavía no hay pasos. Añade lo primero que debe hacer esta
   automatización.»
 - **Probar**: lo que haría con lo último que pasó, sin hacer nada (FLOW-F13).
@@ -195,7 +193,7 @@ automatizaciones** regresa (FLOW-F08).
 | FLOW-F29 | Contestar lo que pregunta una automatización | hecho |
 | FLOW-F30 | Cerrar lo que nadie contestó a tiempo | hecho |
 | FLOW-F31 | Mandar un mensaje a un cliente | hecho |
-| FLOW-F32 | Poner una foto, un vídeo o un PDF en la cabecera de un WhatsApp | parcial |
+| FLOW-F32 | Poner una foto, un vídeo o un PDF en la cabecera de un WhatsApp | hecho |
 | FLOW-F33 | Encender una automatización que trae otra app | hecho |
 | FLOW-F34 | Poner en pausa una automatización que trae otra app, sin borrarla | hecho |
 | FLOW-F35 | Restaurar la versión de fábrica de una automatización que trae otra app | hecho |
@@ -915,7 +913,8 @@ Pasos:
    también en los huecos de la plantilla.
 4. Elige la «Plantilla» entre tus plantillas aprobadas por Meta (debajo se ve su texto) y rellena un dato por
    cada hueco: pasadas las 24 horas, WhatsApp solo deja pasar una plantilla aprobada. Sin plantillas
-   aprobadas lo dice: «Todavía no tienes plantillas aprobadas: crea una en WhatsApp › Ajustes.».
+   aprobadas lo dice: «Todavía no tienes plantillas aprobadas: crea una en WhatsApp › Ajustes.». Si la que
+   eliges lleva arriba una foto, un vídeo o un documento, se manda con su archivo (FLOW-F32).
 5. **Guardar** y, en **Permisos**, autoriza «Enviar un WhatsApp a un cliente» (FLOW-F12).
 Entra: el teléfono del cliente (de un aviso o de un paso anterior), las plantillas aprobadas de la Bandeja de
 WhatsApp y la conversación de ese número.
@@ -930,21 +929,34 @@ el número de WhatsApp sin conectar o los mensajes del plan de este mes gastados
 solo le llega a un cliente que lo haya aceptado en Clientes. Lo que Meta rechace después se ve en la
 conversación de la bandeja («No entregado»). Sin la Bandeja de WhatsApp el botón no aparece; por correo
 todavía no se puede (ver «Qué queda fuera»).
-Implicados: FLOW-F11, FLOW-F12, FLOW-F16, WHATSAPP_INBOX-F23, WHATSAPP_INBOX-F33
+Implicados: FLOW-F11, FLOW-F12, FLOW-F16, FLOW-F32, WHATSAPP_INBOX-F23, WHATSAPP_INBOX-F33
 
 ### FLOW-F32 Poner una foto, un vídeo o un PDF en la cabecera de un WhatsApp
 <!-- origen: old-hub:HUB-F112 -->
-Estado: parcial — el paso «Enviar un mensaje» (FLOW-F31) manda texto y plantillas con cabecera de texto; una foto, un vídeo o un PDF necesitan un sitio donde guardar los archivos y plantillas con esa cabecera, que el Hub todavía no tiene
+Estado: hecho
 Actor: propietario, administrador
 Pantalla: Editor de automatización
 Pasos:
-1. Abre una automatización y mira los botones para añadir de **Pasos**.
-2. En **Enviar un mensaje** (FLOW-F31), la «Plantilla» solo ofrece las que el Hub sabe rellenar: las que
-   llevan una foto, un vídeo o un documento arriba no salen.
-Entra: —
-Sale: nada todavía.
-Si falla: no aplica mientras la cabecera con archivo no se ofrezca.
-Implicados: FLOW-F31
+1. En un paso **Enviar un mensaje** (FLOW-F31), elige en «Plantilla» una que lleve arriba una foto, un vídeo o un
+   documento: debajo sale el archivo que se manda con ella y lo que acepta WhatsApp («JPEG o PNG, hasta 5 MB.»,
+   «MP4, hasta 16 MB.» o «PDF, hasta 25 MB.»).
+2. Si la plantilla ya tiene su archivo (la hiciste en WhatsApp › Ajustes), sale su nombre y su tamaño («Foto:
+   carta.jpg · 6,2 KB») y se manda ese; para mandar otro, pulsa **Cambiar archivo**.
+3. Si no lo tiene (la hiciste en WhatsApp Manager), sale «Ningún archivo elegido» y el aviso «Esta plantilla lleva
+   una foto arriba: elígela o WhatsApp no la enviará.»: pulsa **Elegir archivo** y elige uno del tipo que pide.
+4. El archivo se guarda en el acto en los archivos del negocio y el paso lo nombra. **Guardar**: al volver a abrir
+   la automatización, el paso sigue nombrando su archivo.
+Entra: la plantilla aprobada que eliges y el archivo, de este negocio.
+Sale: al ejecutarse, el WhatsApp le llega al cliente con ese archivo arriba y queda en su conversación de la
+bandeja, nombrando el archivo con el que salió (WHATSAPP_INBOX-F33). Si cambias de plantilla, el paso suelta el
+archivo elegido.
+Si falla: un archivo de otro tipo o más pesado de lo que acepta WhatsApp se dice debajo y no se sube («Elige una
+foto JPEG o PNG.», «Este archivo pesa más de 5 MB: elige uno más ligero.»); si no se puede guardar, «No se pudo
+subir el archivo. Inténtalo de nuevo.». Si el archivo que eligió el paso ya no está guardado, lo dice («El archivo
+que había elegido este paso ya no está guardado: elígelo de nuevo.»); si no se puede leer ahora, «No se ha podido
+leer el archivo de este paso.» con **Reintentar**. Sin archivo, al ejecutarse no sale nada y el motivo queda en el
+historial de la automatización (FLOW-F16); un archivo de otro negocio nunca se manda.
+Implicados: FLOW-F11, FLOW-F16, FLOW-F31, WHATSAPP_INBOX-F29, WHATSAPP_INBOX-F33
 
 ### FLOW-F33 Encender una automatización que trae otra app
 <!-- origen: old-hub:HUB-F105 old-hub:HUB-F104 old:flows/workflow/lista-y-galeria.md#flows-f05 -->
@@ -1014,23 +1026,41 @@ nada que cambiar.»; si quien restaura no puede hacer él mismo algo de lo que p
 Implicados: FLOW-F33, FLOW-F36
 
 ### FLOW-F36 Reparar una automatización montada con un fallo que su app ya corrigió
-<!-- origen: old:flows/workflow/lista-y-galeria.md#flows-f11 -->
+<!-- origen: old:flows/workflow/lista-y-galeria.md#flows-f11 gh:flows#80 -->
 Estado: hecho (servidor y pantalla)
-Actor: propietario, administrador, asistente
+Actor: la plataforma, propietario, administrador, asistente
 Pantalla: Automatizaciones
 Pasos:
-1. Encima de **Tus automatizaciones** sale, por cada una que se montó con una versión anterior que arrancaba
-   en más casos de los debidos: ««…» se montó con una versión anterior de Citas que arranca en más casos de los
-   debidos. Actualizarla solo cambia cuándo arranca: sus pasos, permisos e interruptor se quedan como están.».
-2. Pulsa **Actualizarla**.
-3. Sale ««…» ya solo arranca cuando debe.» y el aviso desaparece.
-Entra: las automatizaciones montadas desde una tarjeta de **Viene con …** con una versión anterior cuyo «Solo
-cuando…» no tiene lo que su app le añadió después, y que siguen arrancando con el mismo aviso.
-Sale: la misma automatización con solo eso añadido a su «Solo cuando…» (`flow.flow.updated`); su nombre, sus
-pasos, sus permisos y su interruptor no cambian, y lo que ya tenía su «Solo cuando…» se respeta. Una que no
-tiene nada que reparar no cambia.
-Si falla: el mensaje en el aviso, que se queda.
-Implicados: FLOW-F33, FLOW-F35
+1. No tienes que hacer nada: lo que su app corrigió después de que la montaras llega solo a tu automatización,
+   aunque la hayas retocado, y sin ningún aviso encima de **Tus automatizaciones**. La tarjeta de **Viene con …**
+   sigue diciendo «Versión nueva», como con cualquier otro cambio de su app (FLOW-F35).
+2. Si su app estrechó cuándo arranca, ya no arranca en los casos que su app dejó fuera: la respuesta por WhatsApp
+   montada antes de que su app dejara fuera los mensajes antiguos que trae la bandeja ya no contesta a ninguno. Al
+   abrirla, su «Solo cuando…» ya lo dice.
+3. Si su app fijó un dato de su paso **Pedírselo al asistente** (FLOW-F37), ese paso ya lo lleva: al abrirla sale en
+   sus **Datos fijos**, y el asistente no lo ve ni puede cambiarlo (FLOW-F38). Así, la respuesta por WhatsApp
+   montada antes de que su app fijara la ficha de quien escribe tampoco anula ni cambia la reserva de otra persona,
+   ni siquiera tras el **Aprobar**.
+4. Lo que su app pone no se quita desde tu automatización: en el editor, esa condición del «Solo cuando…» y ese dato
+   fijo dicen «Lo fija …: puedes cambiarlo, pero no quitarlo.», sin × y sin poder elegir otro dato. Tus salidas: darle
+   otro valor (vale el tuyo), quitar esa consulta o acción de **Qué puede usar**, hacer que arranque con otro aviso, o
+   hacer una copia (FLOW-F06), que es tuya entera.
+Entra: las automatizaciones montadas desde una tarjeta de **Viene con …**, cuando se montaran, cuyo «Solo cuando…»
+no tiene lo que su app le pone hoy mientras arrancan con el mismo aviso, o que dejan al asistente un dato que su
+app fija hoy en ese paso.
+Sale: lo que su app pone hoy, desde el primer momento y también en lo que ya estaba en marcha: cuenta al decidir si
+arranca, va en lo que el asistente pida desde entonces y en un cambio que ya esperaba tu sí, cuya tarjeta en
+**Esperan tu respuesta** dice en nombre de quién lo hará el sí. Solo lo que no pusiste tú: una condición que pusiste
+sobre el mismo dato y un dato que fijaste tú se quedan con lo tuyo, y nada más de la automatización cambia; una que
+hiciste arrancar con otro aviso no recibe ninguna condición de su app. Si un dato fijo queda vacío en una
+ejecución, esa consulta o acción no se hace (FLOW-F38). Se lee así al abrirla y en **Probar**, y queda escrito
+cuando la guardas o haces una copia (FLOW-F06). Una versión nueva que solo cambia palabras no cambia nada.
+Si falla: si su app ya no está activa, su automatización tampoco puede arrancar con sus avisos. Un cambio que deja
+fuera lo que su app pone, o deja vacío un dato que fija (pidiéndoselo al asistente o desde otro programa), no se
+guarda, y nada cambia: junto a «Solo cuando…», ««…» pone una condición en «…»: dale otro valor, haz que empiece
+con otra cosa o haz una copia.»; junto a **Datos fijos**, ««…» fija «…» de «…»: dale otro valor, quita «…» de lo
+que puede usar o haz una copia.».
+Implicados: FLOW-F06, FLOW-F13, FLOW-F21, FLOW-F29, FLOW-F33, FLOW-F35, FLOW-F37, FLOW-F38
 
 ### FLOW-F37 Paso «Pedírselo al asistente»
 <!-- origen: old-hub:HUB-F95 old:flows/workflow/editor.md#flows-f17 -->
@@ -1049,7 +1079,9 @@ Pasos:
 4. Si quieres que una consulta o una acción reciba siempre un dato que no decide el asistente, en **Datos fijos**
    elige con **Fijar un dato** cuál («En nombre del cliente», de «Anular una reserva») y rellénalo, con
    **Insertar un dato** si quieres (la «Ficha» que leyó un paso anterior). Sale como «Anular una reserva › En
-   nombre del cliente»; × lo quita, y quitar algo de **Qué puede usar** quita también sus datos fijos. Sin
+   nombre del cliente»; × lo quita, y quitar algo de **Qué puede usar** quita también sus datos fijos. Uno que fija la
+   app de la receta desde la que la montaste no tiene ×: dice «Lo fija …: puedes cambiarlo, pero no quitarlo.»
+   (FLOW-F36). Sin
    ninguno: «Ninguno: el asistente rellena todos los datos.». La tarjeta lo explica: «El asistente no los ve ni
    puede cambiarlos: se rellenan al pedírselo, y una herramienta con un dato fijo vacío no se usa.».
 5. En **Cambios**, elige «Que me lo pregunte» (de fábrica) o «Que lo haga por su cuenta». La tarjeta lo explica:
@@ -1069,7 +1101,7 @@ usar «…».»), junto a **Qué puede usar**. Con «Anular una reserva» puesta
 dato fijo de algo que no puede usar (««…» tiene datos fijos, pero el asistente no puede usarla: añádela a lo que
 puede usar o quita sus datos fijos.»), uno que esa consulta o acción no tiene (««…» no es un dato de «…».»), uno
 sin valor («Dale un valor a «…» de «…», o quítalo.»), ni uno que lee un secreto o un paso de después, como el
-encargo.
+encargo. Uno que fija su app, sin valor o quitado, tampoco (FLOW-F36).
 Implicados: FLOW-F11, FLOW-F12, FLOW-F13, FLOW-F17, FLOW-F25, FLOW-F29, FLOW-F38, FLOW-F39
 
 ### FLOW-F38 El asistente hace el paso que le toca dentro de una automatización
@@ -1085,7 +1117,8 @@ Pasos:
    nombra **y** la automatización tiene concedido; nunca con los permisos de una persona. Los datos fijos del paso
    (FLOW-F37) no se le enseñan: se rellenan con los datos de la ejecución, como el encargo, y van en cada consulta o
    acción que los lleva, por encima de lo que el asistente mande para ellos o aunque no los mande. Así, la
-   respuesta por WhatsApp solo anula o cambia la reserva de quien escribe, aunque le pidan la de otra persona.
+   respuesta por WhatsApp solo anula o cambia la reserva de quien escribe, aunque le pidan la de otra persona. En
+   una automatización que trae otra app, también los que su app fijó después de montarla (FLOW-F36).
 3. Lo que el asistente consulta se hace en el acto y no se le pregunta a nadie; el historial dice «El asistente
    ha usado «…».».
 4. Lo que quiere cambiar:
@@ -1185,7 +1218,7 @@ preguntas; una pregunta hecha a otro rol) no sale en la tarjeta.
 | Qué hace | Quién puede | Flujos | Servicio |
 |---|---|---|---|
 | Crea una automatización (de cero, de una tarjeta o de un borrador), en pausa y sin permisos | gestionar | F04, F09, F18 | `flow.flow.create` |
-| Cambia el nombre, el disparador o los pasos (el interruptor es `set_enabled`) | gestionar | F10, F11, F14 | `flow.flow.update` |
+| Cambia el nombre, el disparador o los pasos (el interruptor es `set_enabled`); no deja quitar lo que fija la app de su receta (`flow.recipe_fixed`) | gestionar | F10, F11, F14, F36 | `flow.flow.update` |
 | Enciende o pausa | gestionar | F03, F14 | `flow.flow.set_enabled` |
 | Hace una copia en pausa y sin permisos | gestionar | F06 | `flow.flow.duplicate` |
 | Borra (su historial se queda) | gestionar | F07 | `flow.flow.delete` |
@@ -1207,7 +1240,7 @@ preguntas; una pregunta hecha a otro rol) no sale en la tarjeta.
 | Enciende una automatización que trae otra app: la primera vez la crea encendida con exactamente sus permisos; después solo la enciende | gestionar | F33 | `flow.recipe.enable` |
 | La pone en pausa, sin borrarla | gestionar | F34 | `flow.recipe.disable` |
 | Le devuelve la versión que trae hoy su app, con sus permisos, encendida o en pausa como esté | gestionar | F35 | `flow.recipe.restore` |
-| Añade a su «Solo cuando…» solo lo que su app le añadió desde la versión con que se montó | gestionar | F36 | `flow.recipe.repair` |
+| Deja escrito lo que su app le corrigió y ya cuenta: lo que le falta a su «Solo cuando…» y los datos fijos de su paso del asistente (sin pantalla: no hay nada que esperar del dueño) | gestionar | F36 | `flow.recipe.repair` |
 
 ### Lo que avisa
 
@@ -1243,7 +1276,11 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   la única de enviar que una automatización puede tener: solo a la conversación viva del número internacional
   exacto, texto dentro de las 24 horas y plantilla aprobada fuera, con el tope del mes; sale por el mismo camino
   que lo enviado desde la bandeja. El envío de la bandeja (`whatsapp_inbox.message.send`, a cualquier número)
-  sigue necesitando a una persona delante.
+  sigue necesitando a una persona delante. La «Plantilla» ofrece las que la bandeja sabe rellenar
+  (`whatsapp_inbox.template.list` con `fillable`); el archivo de una cabecera con foto, vídeo o documento
+  (FLOW-F32) lo guarda la bandeja en los archivos del negocio (`whatsapp_inbox.template_sample.upload`, con el
+  permiso de responder de quien edita) y el paso guarda solo su id (`template.header_sample`), que lee al abrirse
+  (`whatsapp_inbox.template_sample.detail`); al ejecutarse, la bandeja manda solo un archivo de este negocio.
 - **A su propio `flow.run.parked`**: cuando una ejecución espera a «Llamar a otro sistema», el worker hace la
   llamada (`flow.run.call`, FLOW-F27); nunca la petición que la dejó esperando.
 - De la plataforma: la zona horaria del negocio (los horarios) y los avisos del outbox (el último de un
@@ -1508,9 +1545,36 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   debe poder hacer lo que pide (la regla de `grant`); dos a la vez dan una (la restricción única y un
   *savepoint*: la segunda lee la de la primera). Reencender conserva lo del dueño; sin ningún permiso, recibe
   los de la receta. Restaurar (`risk: high`) sobrescribe nombre, disparador, pasos, permisos y huella y no toca
-  el interruptor. Reparar (`missing_clauses`): una montada con otra huella que sigue en el aviso de la receta y
-  a cuyo «Solo cuando…» le faltan **claves** del de hoy recibe solo esas (una clave que el dueño cambió se
-  respeta). Las apps de este carril que traen recetas hoy: `appointment` y `online_booking`.
+  el interruptor. Reparar (`missing_clauses`, `flow.recipe.repair`, sin pantalla): una montada que sigue en el
+  aviso de la receta y a cuyo «Solo cuando…» le faltan **claves** del de hoy, se montara cuando se montara, recibe
+  escritas solo esas (una clave que el dueño cambió se respeta) y los datos fijos de abajo. Las apps de este carril
+  que traen recetas hoy: `appointment` y `online_booking`.
+- **El arreglo de seguridad de una receta llega solo** (revisión 2026-10-30,
+  FIX-HUB-FLOW-FACTORY-SAFETY-FIX-WAITS-FOR-THE-OWNERS-UPDATE): `recipes.fixed_data(flow, steps)` suma a cada paso
+  `assistant` de una automatización con `recipe` el `pinned` que el paso del **mismo id** de la receta de hoy declara
+  (`recipes._declared`: lo que declara la app activa, apartada o no; sin validar ni huella, así que vale también
+  para una montada desde la versión de hoy), solo para las herramientas que ese paso sigue ofreciendo y solo las
+  entradas que el paso no fija (lo que fijó el dueño gana). No escribe nada: se aplica donde se lee el paso —
+  `services._step_of` (al ofrecer las herramientas en `claim_assistant`, en `assistant_round` y en el sí de
+  `answer_question`, que además vuelve a poner los datos fijos sobre la propuesta guardada en `_make_proposal`, o no
+  la hace si quedan vacíos), `queries.proposal_of` (la tarjeta de «Esperan tu respuesta»: un dato vacío no se pinta)
+  y `queries.flow_row` (el editor y la API los enseñan, y guardar los escribe) — y se escribe al hacer una copia
+  (`duplicate_flow`, que ya no lleva `recipe`) y con `flow.recipe.repair`. Lo mismo con el «Solo cuando…»:
+  `recipes.fixed_filter(flow)` le suma las claves que el de la receta de hoy tiene y él no, mientras arranque con el
+  mismo aviso (`_missing`, sin huella: también una montada desde la versión de hoy a la que el dueño quitó la
+  cláusula); cuenta en `flow.run.react`, se lee en `queries.trigger_of` (editor, «Probar» y API) y se escribe al
+  copiar y con `flow.recipe.repair`. No hay aviso ni pausa: no hay caso en que aplicarlo pise al dueño, y un dato
+  fijo que su paso ya no rellena queda vacío y su herramienta no se usa. El aviso de FLOW-F36 encima de «Tus
+  automatizaciones» (`RecipeRepairs.vue`, «Actualizarla») se quitó: ya no había nada que esperar del dueño.
+- **Lo que fija su app no se quita desde la automatización** (revisión 2026-10-31 de hub#476): como el filtro y los
+  datos fijos de la receta cuentan siempre, quitarlos desde la copia se guardaba y volvía en silencio al leerla.
+  `recipes.fixed_by_app(flow)` dice qué fija la app activa de su receta (las rutas del filtro de la receta mientras
+  arranque con su `event`, y por id de paso y herramienta los campos de su `pinned`) y sale en `FlowOut.fixed_by_app`
+  (`None` sin receta, y en una copia). `services._taken_off`, antes de `_check` en `flow.flow.update`, rechaza con
+  `flow.recipe_fixed` (422, por campo: `trigger.filter`, `steps.<n>.pinned`) un cambio que deja fuera una de esas
+  rutas mientras arranca con ese aviso, o un campo (o lo deja vacío) mientras el paso de ese id ofrece su
+  herramienta. En el editor, `TriggerCard` pasa a `ConditionRows` las rutas (`lockedBy`: sin quitar ni cambiar de
+  dato) y `StepNode` a `AssistantStepPanel` el `fixedByApp` (sin ×); los dos con «Lo fija …» (`flow.recipes.setByApp`).
 - **Asistente**: toda operación declara `ai={"description"…}` (`risk` solo en las acciones; `high` al
   encender o pausar, conceder, ejecutar y borrar) y todo campo de entrada lleva `description`. Las escrituras de
   `flow.system` (solo la plataforma) empiezan por «System only» y `flow.secret.set` por «Not an assistant tool»:
@@ -1597,7 +1661,7 @@ Los avisos llevan ids, nunca nombres ni contenidos.
 | `POST /api/hub/flows/templates/{module}/{family}/activate` | `flow.recipe.enable` | se enciende desde la galería; crear, conceder y encender son una transacción y dos a la vez dan una |
 | `…/templates/{module}/{family}/deactivate` | `flow.recipe.disable` | — |
 | `…/templates/{module}/{family}/restore` | `flow.recipe.restore` | — |
-| reparación del filtro de WhatsApp en la pantalla | `flow.recipe.repair` | general: vale para la receta de cualquier app, no solo la de WhatsApp |
+| reparación del filtro de WhatsApp en la pantalla | `recipes.fixed_filter` al arrancar (y `flow.recipe.repair`, sin pantalla, para dejarlo escrito) | general y sin esperar al dueño: vale para la receta de cualquier app, también para los datos fijos de su paso del asistente |
 
 ### Paridad: consultas
 
@@ -1625,27 +1689,38 @@ Los avisos llevan ids, nunca nombres ni contenidos.
 
 ## Contradicciones señaladas (no resueltas aquí)
 
-- **PLAN-HUB** deja los flows para «tarde» (tabla de rutas del hub y §8); la decisión de Ioan del
-  2026-10-15 los porta ya: hace falta una ronda nueva en PLAN-HUB que lo diga.
+- **PLAN-HUB** dejaba los flows para «tarde» (tabla de rutas del hub y §8), y la decisión de Ioan del
+  2026-10-15 los portaba ya. Resuelta: la ronda de cierre de esta app en PLAN-HUB (2026-11-01) dice que el motor y
+  la pantalla de automatizaciones están portados y completos en `apps/flow`.
 - **El asistente como actor** de FLOW-F03, F12 y F15: es coherente con «no enciende ni concede sin
   confirmarlo» porque `create`/`update` ya no llevan el interruptor y `set_enabled`, `grant`, `run` y
   `delete` son `risk: "high"` (el asistente confirma antes).
-- **`@operation` hoy no aplica la app activa** (fase 1): el catálogo de esta app filtra por las apps
-  instaladas y el motor comprueba que la operación sigue en él al ejecutar; la comprobación de la
-  plataforma llega con la fase 2.
+- **`@operation` no aplicaba la app activa** en la fase 1: el catálogo de esta app filtra por las apps
+  instaladas y el motor comprueba que la operación sigue en él al ejecutar. Resuelta: la plataforma ya
+  rechaza la operación de una app apagada en el negocio («app_inactive», `base.entitlement.operation_database`), y
+  el filtro de esta app se queda como primera barrera del catálogo.
 
 ## Qué queda fuera
 
 - **Mandar un correo a un cliente desde una automatización** (FLOW-F31 lo manda por WhatsApp): el Hub todavía
-  no manda correos a clientes. Y la cabecera con foto, vídeo o PDF de un WhatsApp (FLOW-F32, parcial): falta un
-  sitio donde guardar los archivos.
+  no manda correos a clientes.
+- **Arreglos pendientes, abiertos como issues** (`migration-leftover`): siete textos en español con las
+  palabras de otra app (hub#497); la pregunta o la tarjeta de un paso que cobra no reconoce su importe como
+  dinero (hub#498); la tarjeta de confirmación del asistente llama «Registro» a la automatización o a la ejecución
+  (hub#499) y dice «N elementos» en los permisos de un flujo sin decir cuáles (hub#504, con `base`).
+- **Trabajo encolado del carril** (cola de la migración, sin issue todavía): una ejecución aparcada que se reanuda
+  sale como el hub de la plataforma y la respuesta de mesa por WhatsApp no le llega al cliente
+  (FIX-HUB-FLOW-RESUME-DUE-SENDS-A-PARKED-RUN-AS-THE-PLATFORM-HUB); un paso no puede pedir cita para un
+  profesional (FIX-HUB-FLOW-STEP-CANNOT-BOOK-FOR-A-PROFESSIONAL) ni confirmar, mover o anular una cita
+  (FIX-HUB-FLOW-STEP-CANNOT-CHANGE-AN-APPOINTMENT).
 - **«Necesita tu atención»** (eventos que no se entregaron): el reparto del worker ya entrega los avisos a esta
   app y, tras 8 intentos fallidos, da uno por perdido y lo deja anotado; la pantalla que los enseña y los vuelve a
   intentar es la administración de los avisos (PLAN-HUB bloque 7), de la plataforma, y todavía no existe.
 - **El resto de recetas de la Bandeja de WhatsApp** (la cita y la mesa por WhatsApp, que ya pueden usar el paso
   «Pedírselo al asistente», FLOW-F37, y el aviso de mesa confirmada, que espera a que Reservas diga el día en palabras) y su reparación concreta: las
   declara esa app en su `recipes.py` sobre este registro; la del aviso de cita confirmada ya está
-  (WHATSAPP_INBOX-F23). La tarjeta «Contestar los WhatsApp» vuelve cuando la Bandeja declare su aviso.
+  (WHATSAPP_INBOX-F23). La respuesta automática que pide cita a una clienta nueva espera a que un paso pueda pedir cita para un
+  profesional (hub#514). La tarjeta «Contestar los WhatsApp» vuelve cuando la Bandeja declare su aviso.
 - **Encender una receta desde la pantalla de su propia app** (el Hub viejo lo hacía desde la de WhatsApp): hoy
   se enciende desde la galería de Automatizaciones; la pantalla de cada app puede llamar a `flow.recipe.enable`
   cuando la tenga.

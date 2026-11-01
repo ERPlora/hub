@@ -6,7 +6,7 @@
 import type { SessionMe } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { EMPLOYEE, errorFrame, flush, mountBase, OWNER, subId } from '../../__tests__/mount-base';
+import { EMPLOYEE, errorFrame, flush, installedApp, leaveInstalledApp, mountBase, OWNER, subId, tap } from '../../__tests__/mount-base';
 import type { Business } from '../../operations';
 import BusinessPanel from './BusinessPanel.vue';
 
@@ -57,6 +57,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
+  leaveInstalledApp();
   document.body.innerHTML = '';
 });
 
@@ -96,6 +97,27 @@ describe('BusinessPanel', () => {
       'El nombre, la zona horaria y el idioma se cambian en erplora.com. El país no cambia una vez listo el negocio.',
     );
     expect(m.wrapper.findAll('ion-input, ion-select, input, select')).toHaveLength(0);
+  });
+
+  // gh:hub#439: on the tablet's app «Change on erplora.com» did nothing (its webview opens no `_blank`).
+  it('in the installed app «Change on erplora.com» opens the system browser; the Google Play copy has none', async () => {
+    const invoke = installedApp('direct');
+    const m = await panel();
+    await flush();
+    const click = tap(changeLink(m.wrapper));
+    await flush();
+    expect(click.defaultPrevented).toBe(true);
+    expect(invoke).toHaveBeenCalledWith('open_external_url', { url: BUSINESS.settings_url });
+    m.wrapper.unmount();
+
+    leaveInstalledApp();
+    installedApp('play');
+    const play = await panel();
+    await flush();
+    expect(play.wrapper.find('[data-testid="business-change"]').exists()).toBe(false);
+    expect(play.wrapper.get('[data-testid="business-where"]').text()).toBe(
+      'El nombre, la zona horaria y el idioma se cambian en erplora.com. El país no cambia una vez listo el negocio.',
+    );
   });
 
   it('whoever does not run the hub reads them, and is told who changes them', async () => {

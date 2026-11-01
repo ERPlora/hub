@@ -18,6 +18,7 @@ import logging
 import threading
 import uuid
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from psycopg import sql
@@ -547,6 +548,24 @@ def test_a_lease_lost_while_its_schema_is_migrated_stops_it_there_without_failin
     assert "provision.stopped" in caplog.text and "provision.failed" not in caplog.text
 
 
+def test_each_step_of_a_preparation_is_logged_with_how_long_it_took(registry, told, caplog, monkeypatch):
+    """Verification of hub#471 in pre: only ready/failed were logged, and each step's time had to be guessed. Each
+    line says its own step's time, not the time since the start, and names the hub by its slug, as ``ready`` does."""
+    import re
+
+    hub = registry.hub()
+    # Started at 100; creating ends at 103, migrating at 110, seeding at 111, and ``ready`` reads 111.
+    clock = iter([100.0, 103.0, 110.0, 111.0, 111.0])
+    monkeypatch.setattr(provision, "time", SimpleNamespace(monotonic=lambda: next(clock)))
+
+    with caplog.at_level(logging.INFO, logger="base.tenancy.provision"):
+        assert provision.provision(hub) is True
+
+    steps = re.findall(r"base\.tenancy\.provision\.step hub=(\S+) step=(\w+) seconds=(\S+)", caplog.text)
+    assert steps == [(hub.slug, "creating", "3.00"), (hub.slug, "migrating", "7.00"), (hub.slug, "seeding", "1.00")]
+    assert f"base.tenancy.provision.ready hub={hub.slug} database={fresh(hub).db_name} seconds=11.00" in caplog.text
+
+
 def test_a_hub_held_by_another_worker_is_not_taken(registry, told):
     hub = registry.hub()
     now = timezone.now()
@@ -635,7 +654,7 @@ def small_template(django_db_blocker, hub_databases):
         try:
             migrator.migrate_apps(ddl, ["base"])
         finally:
-            django_connections[ddl].close()
+            migrator._forget_alias(ddl)  # closed and out of the settings: Django's test case unwraps only its own
     yield name
     with hubs._maintenance() as conn:
         hubs._drop(conn, name, control)
@@ -686,6 +705,39 @@ def test_until_s3_the_due_pass_gives_a_new_business_every_portable_apps_tables(r
     assert provision.run_due() == 1
 
     _every_portable_app_is_there(hub)
+
+
+@pytest.fixture
+def full_template(django_db_blocker, hub_databases):
+    """``<control>_template_full``: built as ``migrate_hubs`` builds the platform's (``migrator.templates()[0].apps``)."""
+    control = hub_databases.control
+    name = names.template_db_name(control, "full")
+    with django_db_blocker.unblock():
+        with hubs._maintenance() as conn:
+            hubs._drop(conn, name, control)
+            conn.execute(sql.SQL("CREATE DATABASE {}").format(names.identifier(name, control=control)))
+        ddl = tenancy_connections.register_ddl_alias(name)
+        try:
+            migrator.migrate_apps(ddl, migrator.templates()[0].apps)
+        finally:
+            migrator._forget_alias(ddl)  # closed and out of the settings: Django's test case unwraps only its own
+    yield name
+    with hubs._maintenance() as conn:
+        hubs._drop(conn, name, control)
+
+
+def test_a_sign_up_from_a_template_up_to_date_is_the_clone_alone(registry, full_template, monkeypatch, told):
+    """Review of hub#471 in pre: ~63 s of migrations per sign-up on Fargate. The templates carry every portable app
+    (``migrator.templates``), so a hub made from one migrates nothing: its sign-up is the clone."""
+    hub = registry.hub(vertical="full")
+    applied = []
+    real = migrator.ensure_schema
+    monkeypatch.setattr(migrator, "ensure_schema", lambda row, **kwargs: applied.append(real(row, **kwargs)) or applied[-1])
+
+    assert provision.provision(hub) is True
+
+    assert applied == [[]]
+    assert set(migrator.portable_apps()) <= set(fresh(hub).schema_apps)
 
 
 @pytest.fixture
