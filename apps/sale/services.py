@@ -1503,7 +1503,7 @@ def void_order(ctx: OperationContext, data: OrderRefIn) -> dict:
             ),
             "es": (
                 "anula la cuenta de la 5 aunque tenga cosas",
-                "elimina la cuenta con lo pedido, lo autorizo yo",
+                "elimina la cuenta con todo lo que lleva, lo autorizo yo",
             ),
         },
     ),
