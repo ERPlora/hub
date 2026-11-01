@@ -159,3 +159,11 @@ class VerifactuConfig(LiveAppConfig):
         from apps.verifactu import queries  # the models are not loaded yet when this module is
 
         return queries.disable_refusal(ctx)
+
+    def fiscal_pending_since(self):
+        """hub#488: the platform's metrics (``base.metrics``) ask, in each database they read, since when the oldest
+        production record not in the AEAT yet waits (``queries.oldest_unsent_at``), or ``None``: its age pages the
+        team after 5 minutes (``ERPlora/Fiscal`` ``OldestPendingAgeSeconds``)."""
+        from apps.verifactu import queries  # the models are not loaded yet when this module is
+
+        return queries.oldest_unsent_at()
