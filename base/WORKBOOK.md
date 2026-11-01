@@ -1,7 +1,7 @@
 # Workbook — Base (plataforma)
 Prefijo: BASE
 Alcance MVP: núcleo (la plataforma del hub: siempre está, no se activa ni se apaga)
-Estado de la app: completa (2026-11-01)
+Estado de la app: completa (2026-11-01); BASE-F40 reabierto por hub#603
 Lo que no entra todavía: ver «Lo que queda fuera».
 
 > Manual de usuario y especificación de `base`, la plataforma del Hub: siempre está, no se activa ni se
@@ -48,7 +48,9 @@ fecha, lanzador de apps, lista de configuración con barra de progreso, tablero 
 «Resumen» y «Actividad». Sigue lo que hace el mercado: la lista de «Setup guide» de Shopify y Square
 (pasos con su botón, el progreso arriba y lo hecho plegado), el lanzador de apps de Odoo, el tablero de
 paneles que cada uno elige y ordena de Lightspeed y Toast, y la campana con contadores de cualquier
-backoffice.
+backoffice. «Recursos» de Sistema sigue a «Capacity» de Business Central y a las páginas de uso de Supabase, Vercel y
+Neon: cada cifra frente a lo que incluye el plan y, como Google Workspace, el aviso amarillo al 80 % y el rojo al
+llenarse.
 
 ## Antes de empezar
 
@@ -164,7 +166,8 @@ con «Importar» (lo que se abre), «Exportar» y
 ### Sistema · Recursos
 Desde «Sistema» en el menú lateral. Cinco pestañas abajo: «Recursos», «Plan y límites», «Actualizaciones», «Eventos
 caídos» y «Registros» (esta, solo para quien administra el negocio); se abre «Recursos»: «Recursos en la nube» con la
-pastilla «Nube», la tarjeta «Base de datos» y por qué no hay cifras de CPU, memoria ni conexiones.
+pastilla «Nube», el aviso cuando toca ampliar, las tarjetas «Conexiones» y «Archivos», con su barra frente al plan, y
+«Peticiones este mes», «Personas» y «Base de datos», con su cifra.
 
 ### Sistema · Actualizaciones
 «Qué te hemos actualizado»: la versión que corre, cuándo se publicó y que el hub se actualiza solo.
@@ -342,7 +345,7 @@ En la pantalla Archivos:
 | BASE-F37 | Restablecer el negocio por secciones | descartado |
 | BASE-F38 | Ver Inicio al día después de importar una plantilla | hecho |
 | BASE-F39 | Abrir Sistema y moverse por sus pestañas | hecho |
-| BASE-F40 | Ver cuánto está usando el hub | descartado |
+| BASE-F40 | Ver cuánto está usando el hub | no hecho |
 | BASE-F41 | Saber qué versión corre y qué se le ha actualizado | descartado |
 | BASE-F42 | Ver el registro de sucesos del sistema | hecho |
 | BASE-F43 | Ver los eventos caídos | hecho |
@@ -626,7 +629,7 @@ Sale: nada.
 Si falla: un empleado o un responsable no ve la fila. Si no se puede preguntar, la campana se queda con
 lo último que supo; si nunca lo supo: «No se han podido comprobar las notificaciones. Aparecerán cuando
 vuelva la conexión.».
-Implicados: ninguno
+Implicados: BASE-F40
 
 ### BASE-F11 Ir a erplora.com a gestionar o mejorar el plan
 <!-- origen: old-hub:HUB_SHELL-F129 -->
@@ -648,7 +651,7 @@ Sale: nada guardado en el hub.
 Si falla: si el hub no sabe a qué negocio pertenece, ninguno de los dos sale (nunca un botón que no hace nada). Si la
 app instalada no consigue abrir el navegador, lo dice: «No se ha podido abrir esa página. Inténtalo de nuevo.». Un
 empleado, una sesión abierta con PIN o con la placa y la app de Google Play no tienen «erplora.com».
-Implicados: ninguno
+Implicados: BASE-F40
 
 ### BASE-F12 Pedirle al asistente que repase la configuración
 <!-- origen: old-hub:HUB_SHELL-F30 -->
@@ -969,7 +972,7 @@ Si falla: «No hemos podido leer tu plan» — «Comprueba la conexión y vuelve
 Quien no administra el negocio ve «Solo quien administra el negocio ve el plan y sus límites.», sin
 «Reintentar». Mientras el hub no conoce el plan: «Todavía no conocemos el plan de este negocio: aparecerá en
 cuanto erplora.com lo envíe.».
-Implicados: BASE-F57
+Implicados: BASE-F40, BASE-F57
 
 ### BASE-F29 Elegir una plantilla del catálogo para importar
 <!-- origen: old-hub:HUB_SHELL-F175 -->
@@ -1221,25 +1224,63 @@ Pasos:
 Entra: el papel de la persona en el negocio; a quien no lo administra no se le pide nada que el hub le negaría.
 Sale: nada guardado.
 Si falla: cada pestaña dice lo suyo (BASE-F40 a BASE-F43).
-Implicados: ninguno
+Implicados: BASE-F40
 
 ### BASE-F40 Ver cuánto está usando el hub
 <!-- origen: old-hub:HUB_SHELL-F136 -->
-Estado: descartado — sin CPU, memoria ni conexiones del negocio: un solo servicio atiende a todos los negocios y ninguna cifra es solo suya; el tamaño y el uso de su base de datos llegan con la medición de cada negocio, que se construye aparte (hub#575)
+Estado: no hecho — reabierto por hub#603: hoy solo enseña el tamaño de la base de datos y dice que lo demás no se mide; faltan las conexiones, las peticiones del mes, las personas activas ahora, los archivos y lo demás que ya se mide cada noche, y el aviso de ampliar
 Actor: propietario, administrador
 Pantalla: Sistema · Recursos
 Pasos:
-  1. Abre «Sistema»: se abre «Recursos». Mientras carga: «Consultando el sistema…».
-  2. El título es «Recursos en la nube», con la pastilla «Nube».
-  3. La tarjeta «Base de datos» dice «PostgreSQL» y, debajo, «Base de datos compartida» (o «Base de datos propia»
-     cuando el negocio tiene la suya).
-  4. Debajo: «El uso de CPU, memoria y conexiones no se mide por negocio: los servidores de ERPlora atienden a todos
-     los negocios a la vez y crecen solos cuando hace falta.». Nunca una cifra inventada ni un cero.
-Entra: en qué base de datos está el negocio.
-Sale: nada guardado.
+  1. Abre «Sistema»: se abre «Recursos». Mientras carga: «Consultando el sistema…». El título es «Recursos en la
+     nube», con la pastilla «Nube». Las cifras de hoy se leen al abrir la pantalla; las de la noche llevan su fecha.
+  2. La primera tarjeta es «Conexiones», con «Lo que tu negocio puede hacer a la vez en su base de datos.»: «{used}
+     de {limit} a la vez», el máximo medido hoy frente a lo que de verdad tiene (lo que incluye su plan o, si es menos,
+     lo que da el servicio), con su barra. Debajo, «Peticiones sin hueco en los últimos 7 días: {count}», las veces
+     que a alguien le salió «Demasiadas peticiones. Inténtalo de nuevo en un momento.». La pastilla dice «Dentro del
+     límite» y, con una o más sin hueco, «Cerca del límite»: llegar al tope un momento no molesta a nadie; quedarse
+     sin hueco, sí.
+  3. La segunda es «Archivos», lo que ocupan los archivos del negocio y los de sus apps: «{used} de {limit}», con su
+     barra y «Medido el {day}» (la pantalla «Archivos» dice lo de este momento: lo que se borra hoy baja aquí mañana).
+     La pastilla dice «Dentro del límite», «Cerca del límite» desde el 80 % y «Límite alcanzado» al llenarse. Con un
+     plan sin tope, «{used} · Sin límite», sin barra ni pastilla.
+  4. Después, lo que ningún plan limita, con su cifra y sin barra ni pastilla. «Peticiones este mes»: las que ha
+     atendido el negocio desde el día 1. «Personas»: «Activas ahora» («Con actividad en los últimos 5 minutos.»),
+     «Activas ayer» (o «Activas el {day}», si la última noche medida es anterior) y «Últimos 30 días», con «Las
+     plazas de tu plan están en «Plan y límites».». «Base de datos»: «PostgreSQL», «Base de datos propia» y «Ocupa
+     {size}» · «Medido el {day}». Ni CPU ni memoria: no se pueden atribuir a un negocio, así que no salen, ni una
+     frase en su lugar.
+  5. Con «Archivos» cerca del límite, arriba de las tarjetas sale «Te estás quedando sin espacio» — «Tus archivos
+     ocupan el {percent} % del espacio de tu plan. Cuando se llene, no se podrán subir más.»; al llenarse, en rojo,
+     «Ya no queda espacio para archivos» — «Tus archivos ocupan todo el espacio de tu plan: no se pueden subir más
+     hasta que amplíes el plan o borres algunos.».
+  6. Con «Conexiones» cerca del límite, también arriba: «Tu plan se queda corto en los momentos de más trabajo» — «A
+     veces, quien trabaja recibe un error porque no hay más hueco a la vez ({count} en los últimos 7 días). Un plan
+     mayor da más conexiones.».
+  7. Cada aviso lleva «Mejorar plan», que abre la página del plan de este negocio en erplora.com (BASE-F11); en la app
+     instalada, o donde ese enlace no sale, sin botón, «Los planes se gestionan desde tu cuenta de ERPlora, en
+     erplora.com.».
+  8. Si su plan ya incluye todas las conexiones que da el servicio, un plan mayor no le daría más, y el aviso del
+     paso 6 es otro, sin «Mejorar plan»: «Tu negocio ya usa todo lo que el servicio da a la vez» — «A veces, quien
+     trabaja recibe un error porque no hay más hueco a la vez ({count} en los últimos 7 días). Un plan mayor no daría
+     más conexiones: cuéntanoslo en «Reportar un problema».».
+  9. Con algún aviso, la campana de quien administra el negocio suma uno por aviso y enseña la fila «Límites del
+     plan», que abre «Sistema» en «Recursos». Sin avisos, la fila desaparece.
+  10. Quien administra el negocio puede preguntar lo mismo al asistente («¿cuánto espacio me queda?», «¿cuántas
+      peticiones llevamos este mes?») y contesta con estas cifras.
+Entra: lo que se mide de este negocio: cada noche, lo que ocupan sus archivos y su base de datos y las personas que
+entraron; durante el día, sus peticiones, sus conexiones y quién tiene actividad. Y los topes del plan que erplora.com
+le pasa al hub.
+Sale: nada guardado al mirar la pantalla. Lo medido queda por negocio y día, y erplora.com lo recoge cada noche para
+que el equipo de ERPlora vea lo mismo (HUBS-F22).
 Si falla: «No se pudo consultar el sistema» — «Las métricas y los registros no están disponibles ahora. Puedes
-volver a intentarlo.» con «Reintentar».
-Implicados: ninguno
+volver a intentarlo.» con «Reintentar». Lo que aún no se ha medido lo dice, nunca con un cero: antes de la primera
+noche, «Se mide cada noche: la primera cifra llega mañana.»; sin medida de las conexiones hoy, «Todavía sin medir
+hoy.»; si las peticiones o las veces sin hueco llevan contándose menos que su periodo, dicen «Desde el {day}». En una
+demo, en lugar de las tarjetas: «En una demo no se mide el uso: sus datos se borran al terminar.». Mientras el hub no
+conoce el plan: «Todavía no conocemos el plan de este negocio: aparecerá en cuanto erplora.com lo envíe.» y las
+cifras, sin tope, barra, pastilla ni aviso. Quien no administra el negocio lee lo que dice BASE-F39.
+Implicados: BASE-F10, BASE-F11, BASE-F28, BASE-F39, BASE-F72, BASE-F73, BASE-F108, HUBS-F21, HUBS-F22
 
 ### BASE-F41 Saber qué versión corre y qué se le ha actualizado
 <!-- origen: old-hub:HUB_SHELL-F142 -->
@@ -1876,7 +1917,7 @@ Sale: nada guardado.
 Si falla: «No se pudieron cargar los archivos» con el motivo («El almacén de archivos no ha respondido. Inténtalo de
 nuevo en un momento.» o «Comprueba la conexión y vuelve a intentarlo.») y «Reintentar»; un fallo nunca sale como «Sin
 archivos».
-Implicados: ninguno
+Implicados: BASE-F40
 
 ### BASE-F73 Subir archivos y crear carpetas
 <!-- origen: old-hub:HUB_SHELL-F131 -->
@@ -1900,7 +1941,7 @@ la vez y el nuevo cierra el anterior, nunca uno encima de otro. Al crear una car
 no es válido. Usa un nombre sin barras ni puntos sueltos.» o «Ya hay un archivo o una carpeta con ese nombre aquí.».
 Quien no administra el negocio no ve los botones y, si lo intenta igual, lee «Solo un administrador puede modificar
 los archivos.».
-Implicados: ninguno
+Implicados: BASE-F40
 
 ### BASE-F74 Previsualizar y descargar un archivo
 <!-- origen: old-hub:HUB_SHELL-F132 -->
@@ -2704,7 +2745,7 @@ no guarda nada.
 Si falla: tras cinco informes en una hora (los del hub y los de erplora.com juntos), «Demasiados intentos. Vuelve a
 intentarlo en unos minutos.»; si erplora.com no responde o no puede enviarlo, un aviso con la dirección de soporte
 para escribir directamente. En los dos casos lo escrito se queda y se puede volver a enviar.
-Implicados: ACCOUNTS-F38
+Implicados: ACCOUNTS-F38, BASE-F40
 
 ## Para quien lo mantiene
 
@@ -3383,14 +3424,17 @@ Implicados: ACCOUNTS-F38
 
 ## Lo que queda fuera
 
-Al cerrar la app (2026-11-01) ninguno de sus flujos queda a medias: los que no entran están `descartado`, cada uno
-con su issue, y llegan con ella.
+Al cerrar la app (2026-11-01) ninguno de sus flujos quedó a medias: los que no entran están `descartado`, cada uno
+con su issue, y llegan con ella. Después se reabrió BASE-F40: está `no hecho` hasta que se entregue (hub#603).
 
 - **Activar una app con «Activando…», su fallo y su «Reintentar» (BASE-F21, BASE-F22)**, hub#574: la activación por
   negocio de la tenencia (S3), construida en la rama `tenancy/activation-wip`. Hoy activar es inmediato porque las
   tablas de todas las apps ya están en la base de datos del negocio.
-- **La copia antes de restablecer, el tamaño de la base de datos en Sistema › Recursos y la descarga de los datos de
-  un negocio borrado (BASE-F37, BASE-F40, BASE-G157)**, hub#575: las copias y el uso por negocio de la tenencia (S2b),
+- **Las cifras de uso y el aviso de ampliar de Sistema › Recursos (BASE-F40)**, hub#603: el flujo está escrito, con
+  su decisión de mercado en la ronda 2026-11-01f de PLAN-HUB, y el código va aparte. Avisar también por correo al
+  dueño es de erplora.com y no entra en esa entrega.
+- **La copia antes de restablecer y la descarga de los datos de un negocio borrado (BASE-F37, BASE-G157)**,
+  hub#575: las copias y el uso por negocio de la tenencia (S2b),
   construidos en la rama `tenancy/dumps-wip`. Hoy un negocio con su base de datos se restablece sin la copia previa
   que pide la decisión 2 de la ronda 2026-10-30 de PLAN-DB.
 - **La fila de salud del Inicio (BASE-F02)**, hub#573: un punto de extensión más en `LiveAppConfig` y su uso en
