@@ -59,8 +59,8 @@ class MenuGroup(Schema):
 
 class AppState(Schema):
     label: str
-    # "off": no right to it (base.entitlement) or turned off by the business (base.activation); "activating" is
-    # phase 2's, while its tables are made.
+    # "off": no right to it (base.entitlement), turned off by the business, or its tables could not be made
+    # (base.activation); "activating" while the hub's own database gets its tables (S3).
     state: Literal["on", "activating", "off"]
 
 
@@ -385,10 +385,12 @@ class AppOut(Schema):
     #: Where its right comes from: ``free``, ``plan``, ``purchase``, ``required`` (with an app that needs it) or
     #: ``missing``.
     right: Literal["free", "plan", "purchase", "required", "missing"]
-    #: ``on``, ``off`` (the business turned it off, or never on), or ``blocked`` while the business has no right to
-    #: it (phase 2 adds activating and failed).
-    state: Literal["on", "off", "blocked"]
-    #: The business turned it on itself (what the plan's limit counts); what came along with another app is not.
+    #: ``on``, ``off`` (the business turned it off, or never on), ``blocked`` while the business has no right to it;
+    #: in a hub with its own database, ``creating`` while its tables are made and ``failed`` when making them failed
+    #: (tried again later, or by hand: ``base.app.retry``).
+    state: Literal["on", "off", "blocked", "creating", "failed"]
+    #: The business turned it on itself (what the plan's limit counts, also while it is being set up); what came along
+    #: with another app is not.
     chosen: bool
     #: The first screen of its menu this person may open; ``None``: «Open» is not offered.
     path: str | None
@@ -421,13 +423,30 @@ class AppNameOut(Schema):
 
 
 class AppChangeOut(Schema):
-    """The app as it is now, and the apps that went on (or off) with it."""
+    """The app as it is now, and the apps that went on (or off) with it. ``creating``: its tables are being made in the
+    hub's own database (202); the Apps screen follows it until it is on (``base.app.list``)."""
 
     app: str
-    state: Literal["on", "off"]
+    state: Literal["on", "off", "creating"]
     chosen: bool
     #: Turned on with it because it needs them, or off with it because nothing else needs them any more; by name.
     along: list[AppNameOut]
+
+
+class AppActivationSettleIn(Schema):
+    """The worker's step after making a hub's tables (``base.worker``): the apps it took and how it went."""
+
+    apps: list[str] = Field(description="The apps whose tables it made, or tried to.")
+    #: ``created``: ``ensure_schema`` ended; ``failed``: it raised (``error``, why); ``locked``: another run held the
+    #: hub's schema; ``newer_code``: the request is of a newer code than the worker's.
+    outcome: Literal["created", "failed", "locked", "newer_code"]
+    error: str = ""
+
+
+class AppActivationSettleOut(Schema):
+    on: list[str]
+    failed: list[str]
+    waiting: list[str]
 
 
 class PlanUsageIn(Schema):

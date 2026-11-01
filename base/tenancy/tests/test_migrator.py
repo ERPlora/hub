@@ -531,37 +531,35 @@ def test_a_hub_is_behind_when_an_app_it_has_is_not_at_the_codes_leaf():
     assert not migrator.is_behind(Hub(schema_apps={**current, "base": "0099_from_a_later_code"}))
 
 
-def test_until_s3_a_hub_without_a_portable_app_is_behind():
-    """A later code ports an app: until S3 makes an app's tables when it is turned on, a hub with its own database
-    that lacks it is behind, so ``migrate_hubs`` gives it (``base.app.enable`` would find no table)."""
+def test_a_hub_without_an_app_it_never_turned_on_is_not_behind():
+    """S3: an app's tables are made the first time its hub turns it on (``base.app.enable`` → the worker's
+    ``ensure_schema``), never by ``migrate_hubs``: a hub with its own database that lacks one is up to date."""
     leaf = leaves()
     every = {label: leaf[label] for label in (*PLATFORM, *migrator.portable_apps())}
     without_tax = {label: name for label, name in every.items() if label != "tax"}
+    platform_only = {label: leaf[label] for label in PLATFORM}
 
     assert not migrator.is_behind(Hub(db_name="hub_x", schema_apps=every))
-    assert migrator.is_behind(Hub(db_name="hub_x", schema_apps=without_tax))
-    assert migrator.is_behind(Hub(db_name="hub_x", schema_apps=without_tax), wanted=["tax"])
-    assert not migrator.is_behind(Hub(db_name="hub_x", schema_apps=without_tax), wanted=[])
-    # An app with no migrations is never recorded: it leaves no hub behind for ever (review of round 5).
-    assert not migrator.is_behind(Hub(db_name="hub_x", schema_apps=every), wanted=[*every, "an_app_without_migrations"])
-    # An expired demo, about to be dropped, gets no app added.
-    platform = {label: leaf[label] for label in PLATFORM}
-    assert not migrator.is_behind(Hub(db_name="hub_x", status=Hub.Status.EXPIRED, schema_apps=platform))
-    assert migrator.is_behind(Hub(db_name="hub_x", status=Hub.Status.READY, schema_apps=platform))
+    assert not migrator.is_behind(Hub(db_name="hub_x", schema_apps=without_tax))
+    assert not migrator.is_behind(Hub(db_name="hub_x", schema_apps=platform_only))
 
 
-def test_until_s3_migrate_hubs_gives_a_hub_every_portable_app_it_lacks(new_database, make_hub):
+def test_migrate_hubs_brings_what_a_hub_has_to_the_leaf_and_never_makes_an_app_it_never_turned_on(
+    new_database, make_hub
+):
     hub = make_hub(new_database)
-    migrator.ensure_schema(hub, add=["tax"])  # what an older code gave it
+    tax = leaves()["tax"]
+    migrator.ensure_schema(hub, add=["tax"])  # what it turned on
     hub.refresh_from_db()
-    assert "inventory" not in hub.schema_apps
+    Hub.objects.filter(pk=hub.pk).update(schema_state=Hub.SchemaState.BEHIND)
 
     result = migrator.migrate_hubs_behind(workers=1)
 
     assert hub.slug in result.migrated and result.failed == {}
     hub.refresh_from_db()
-    assert set(migrator.portable_apps()) <= set(hub.schema_apps)
-    assert "inventory_product" in hubs.table_names(new_database)
+    assert hub.schema_apps["tax"] == tax
+    assert "inventory" not in hub.schema_apps
+    assert "inventory_product" not in hubs.table_names(new_database)
     assert not migrator.is_behind(hub)
 
 

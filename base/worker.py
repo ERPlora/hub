@@ -24,7 +24,19 @@ again). On the first tick and then every ``REAPER_INTERVAL_SECONDS`` it also pur
 demo hubs that ended (``base.services.reap_demos``, plan 2026-10-17 §1.7), whatever the scheduler did: a
 pass that fails is logged and the next one tries again, and the worker never stops for it.
 
-After the hubs with their own database, two slow passes of the data (round 2026-10-30 of PLAN-DB, S2b), each in a
+After the hubs with their own database, the apps they turned on whose tables they lack (S3; PLAN-DB §7 and §8,
+``_activations``, also with ``databases_only``): the hubs rung (``hub_due`` come and free: ``base.app.enable`` rings
+after its COMMIT, a retry at its time, the sweep), for ``ACTIVATION_PASS_SECONDS`` at most: in each one, what is due
+(``creating``, or ``failed`` past its next try) gets its tables from ``base.tenancy.migrator.ensure_schema(hub, add=…)``
+under the hub's schema lock, and ``base.app.activation_settle`` turns it on (its event, its live notice) or ``failed``
+with why, and moves the hub's ring to the next of its apps to set up (or ends it); a schema held elsewhere puts it off
+30 s, and a request of a newer code than this worker's (``AppActivation.target``, or the app or what it needs already at
+a migration this code does not know: a deploy rolling) is left to a worker of that code, 60 s, and fails as
+``code_behind`` after 10 minutes (a rollback: none is coming). The pass over ``hub_due`` leaves a ready hub's ring to
+it. A ring lost is found by the pass over the hubs served (``_hubs``), which looks into each ready one for apps still to
+set up every 10 minutes when it had a visit in the last 7 days, and once a day otherwise.
+
+Then two slow passes of the data (round 2026-10-30 of PLAN-DB, S2b), each in a
 thread of its own (:class:`Background`, one piece at a time, its own connections closed when it ends; PLAN-DB round
 2026-10-31b, C8): the loop starts them and goes on, so a copy of minutes never holds the relay, the tasks, VeriFactu or
 the hubs due. ``_data`` takes one hub with data work due (``base.services.claim_next_data_hub``, under its lease): a reset asked (its database copied by
@@ -64,6 +76,7 @@ import logging
 import threading
 import time
 from collections.abc import Callable
+from functools import cache
 
 from functools import partial
 
@@ -73,11 +86,11 @@ from django.utils import timezone
 from live.context import OperationContext, Scope
 from live.operations import get as get_operation
 
-from base import catalog, metrics, outbound, relay, scheduler, services, usage
+from base import activation, catalog, metrics, outbound, queries, relay, scheduler, services, usage
 from base.services import reap_demos
-from base.tenancy import dumps, move, provision
+from base.tenancy import dumps, migrator, move, provision
 from base.tenancy.connections import close_hub_aliases, close_this_threads_connections
-from base.schemas import HubResetApplyIn
+from base.schemas import AppActivationSettleIn, HubResetApplyIn
 from base.tenancy.context import use_control, use_hub, use_shared_database
 from control.models import Hub, HubDump
 
@@ -107,6 +120,19 @@ EMPTYING_LEASE = dt.timedelta(minutes=15)
 #: What the calls in flight (``base.outbound``) get when the worker stops: ECS kills the task 30 s after SIGTERM, and
 #: the loop's step ends first. What still runs then is left to its lease.
 OUTBOUND_GRACE_SECONDS = 15
+#: How long the pass making the tables of the apps turned on may go on in a tick; a hub it started is always finished,
+#: and the next tick goes on after it.
+ACTIVATION_PASS_SECONDS = 10.0
+#: How often the pass over the hubs served (``_hubs``) looks into a hub for apps to set up whose ring was lost (between a
+#: COMMIT and its ring, or ended by another pass): an active one (a visit in the last 7 days) every 10 minutes, any
+#: other once a day (PLAN-DB §8, «barrido de reconciliación»).
+SWEEP_ACTIVE = dt.timedelta(minutes=10)
+SWEEP_ALL = dt.timedelta(days=1)
+ACTIVE_WINDOW = dt.timedelta(days=7)
+#: How long it waits for a hub's schema another run holds before putting the app off (``SchemaLocked``).
+ACTIVATION_LOCK_WAIT = 1.0
+#: When the sweep of the hubs served last looked into each one for apps to set up (``_serve_hub``), by hub id.
+_swept: dict = {}
 
 
 def run(
@@ -122,8 +148,9 @@ def run(
 
     ``wait(seconds)`` sleeps until the time is up or a stop is requested: ``stop.wait`` unless a
     test replaces it. ``stop`` alone says whether to stop. ``clock()`` is now (a test's fake clock).
-    ``databases_only`` (``run_worker --databases-only``, the e2e's worker): only the hubs' databases are made and the
-    demos that ended dropped; no task runs and no outbox is relayed, which the e2e's specs play themselves.
+    ``databases_only`` (``run_worker --databases-only``, the e2e's worker): only the hubs' databases are made, the
+    tables of the apps they turn on made (S3) and the demos that ended dropped; no task runs and no outbox is relayed,
+    which the e2e's specs play themselves.
     """
     wait = stop.wait if wait is None else wait
     delay = RETRY_FIRST_SECONDS
@@ -174,6 +201,8 @@ def run(
             _tick(now)
             _relay(now)
             _hubs(now)
+        _activations(now)
+        if not databases_only:
             data_pass.start(partial(_data, now, stop))
             usage_pass.start(partial(_usage, now))
             move_pass.start(partial(_moves, now, stop))
@@ -276,6 +305,7 @@ def _hubs(now: dt.datetime) -> None:
     try:
         with use_control():
             hubs = services.hubs_to_serve(now)
+            active = services.hubs_visited_since((now - ACTIVE_WINDOW).date()) if hubs else frozenset()
     except Exception:
         logger.exception("worker: the hubs to serve could not be read; the next tick tries again.")
         close_old_connections()
@@ -285,10 +315,88 @@ def _hubs(now: dt.datetime) -> None:
     start = next((index for index, hub in enumerate(hubs) if _next_hub is not None and hub.pk > _next_hub), 0)
     started = time.monotonic()
     for hub in hubs[start:] + hubs[:start]:
-        _serve_hub(hub, now)
+        _serve_hub(hub, now, active=hub.slug in active)
         _next_hub = hub.pk
         if time.monotonic() - started > HUB_PASS_SECONDS:
             break
+
+
+def _activations(now: dt.datetime) -> None:
+    """Make the tables of the apps due in the hubs rung (their ``hub_due`` came: an app turned on or tried again, a
+    retry's time, a ring of the sweep), for :data:`ACTIVATION_PASS_SECONDS` at most; a hub that fails is logged and the
+    others are served."""
+    try:
+        with use_control():
+            rung = services.activation_hubs(now)
+    except Exception:
+        logger.exception("worker: the hubs with apps to set up could not be read; the next tick tries again.")
+        close_old_connections()
+        return
+    started = time.monotonic()
+    for hub in rung:
+        _activate(hub, now)
+        if time.monotonic() - started > ACTIVATION_PASS_SECONDS:
+            return
+
+
+def _activate(hub, now: dt.datetime) -> None:
+    """The apps due in ``hub`` set up (:func:`_activate_in`); a failure is logged, its connections released either way."""
+    try:
+        _activate_in(hub, now)
+    except Exception:
+        logger.exception("worker: the apps of %s could not be set up; the next pass tries again.", hub.slug)
+    finally:
+        close_hub_aliases(hub)
+        close_old_connections()
+
+
+def _activate_in(hub, now: dt.datetime) -> None:
+    """Read what is due in ``hub``'s database; make its tables, unless the request or the database is of a newer code
+    than this worker's; settle the rows with how it went."""
+    with use_hub(hub):
+        due = queries.activations_due(hub.slug, now)
+        if not due:
+            # Rung for nothing due now (a retry still to come, or nothing left): its ring moves to what is next, or ends.
+            services.activations_rung_at(hub.pk, queries.activation_next_at(hub.slug))
+            return
+    apps, error = sorted(due), ""
+    code = _code()
+    newer = sorted(label for label, target in due.items() if target and (label, target) not in code.nodes)
+    # Only what it makes counts: the platform or another app of a later code (a rollback) never holds it back, as the
+    # migrator ignores what it does not know (PLAN-DB §7, «Rollback»).
+    making = set(apps) | activation.needs(apps, activation.module_graph())
+    ahead = sorted(
+        label
+        for label, name in (hub.schema_apps or {}).items()
+        if label in making and label in code.leaves and (label, name) not in code.nodes
+    )
+    if newer or ahead:
+        outcome = "newer_code"
+        logger.warning(
+            "base.app.activation_newer_code hub=%s apps=%s: asked by (%s) or a database at (%s) a newer code than this "
+            "worker's; left to a worker of that code.",
+            hub.slug, ",".join(apps), ",".join(newer) or "-", ",".join(ahead) or "-",
+        )
+    else:
+        try:
+            migrator.ensure_schema(hub, add=apps, lock_wait=ACTIVATION_LOCK_WAIT)
+            outcome = "created"
+        except migrator.SchemaLocked:
+            outcome = "locked"
+        except Exception as failure:
+            outcome, error = "failed", f"{type(failure).__name__}: {failure}"
+            logger.exception("worker: the tables of %s could not be made in %s.", ",".join(apps), hub.slug)
+    ctx = OperationContext(scope=Scope("host", hub.slug), actor="system", permissions=frozenset({"*"}), language="en")
+    with use_control():
+        hub = services.registry_row(hub.pk)
+    with use_hub(hub):
+        get_operation("base.app.activation_settle")(ctx, AppActivationSettleIn(apps=apps, outcome=outcome, error=error))
+
+
+@cache
+def _code() -> migrator.CodeMigrations:
+    """This code's migration graph (its leaves and nodes): it never changes while the process runs."""
+    return migrator.code_migrations()
 
 
 def _data(now: dt.datetime, stop: threading.Event | None = None) -> None:
@@ -420,9 +528,10 @@ def _offboarding_copy(hub, now: dt.datetime, cancelled: Callable[[], bool] | Non
     services.offboarding_copied(hub.pk)
 
 
-def _serve_hub(hub, now: dt.datetime) -> None:
+def _serve_hub(hub, now: dt.datetime, *, active: bool = False) -> None:
     """One hub's outbox relayed and its due tasks run, in its own database and on its own scope; its schedule written
-    there first, once per process. A failure is logged; its connections are released either way."""
+    there first, once per process; and, at the sweep's pace (``active``: a visit in the last 7 days), a ready hub with
+    apps still to set up rung again (a ring lost). A failure is logged; its connections are released either way."""
     scope = Scope("host", hub.slug)
     try:
         with use_hub(hub):
@@ -431,11 +540,21 @@ def _serve_hub(hub, now: dt.datetime) -> None:
                 _synced.add(hub.pk)
             relay.run(now)
             scheduler.run_due(now, scope=scope, active=relay.active_apps(scope))
+            if hub.status == Hub.Status.READY and _sweep_due(hub.pk, now, active):
+                _swept[hub.pk] = now
+                pending = queries.activation_next_at(hub.slug)
+                if pending is not None:
+                    services.ring_activations(hub, pending)
     except Exception:
         logger.exception("worker: the hub %s failed; the next tick tries it again.", hub.slug)
     finally:
         close_hub_aliases(hub)
         close_old_connections()
+
+
+def _sweep_due(hub_id, now: dt.datetime, active: bool) -> bool:
+    last = _swept.get(hub_id)
+    return last is None or now - last >= (SWEEP_ACTIVE if active else SWEEP_ALL)
 
 
 def _relay(now: dt.datetime) -> None:

@@ -25,9 +25,19 @@ export function sellsApart(apps: readonly AppRow[]): boolean {
   return apps.some((app) => app.premium);
 }
 
-/** The rows of a tab: the apps on, every app, or the paid ones (never a free one: hub#2655). */
+/** The states of an app the business turned on: on, or its tables still being made in the business's own database
+ *  (`creating`) or failed to be (`failed`, tried again): the server's «wanted» (`base.activation`, S3). */
+const WANTED: ReadonlySet<AppRow['state']> = new Set(['on', 'creating', 'failed']);
+
+/** The business turned it on: on, or on its way. */
+export function isWanted(app: AppRow): boolean {
+  return WANTED.has(app.state);
+}
+
+/** The rows of a tab: the apps the business turned on (on, or being set up), every app, or the paid ones (never a free
+ *  one: hub#2655). */
 export function appsOfTab(apps: readonly AppRow[], tab: AppsTab): AppRow[] {
-  if (tab === 'mine') return apps.filter((app) => app.state === 'on');
+  if (tab === 'mine') return apps.filter(isWanted);
   if (tab === 'paid') return apps.filter((app) => app.premium);
   return [...apps];
 }
@@ -44,7 +54,7 @@ export function comesWith(app: AppRow, apps: readonly AppRow[]): string[] {
 
 /** The apps on that need `app`: what gives a paid app its right when it is not bought itself. */
 export function includedWith(app: AppRow, apps: readonly AppRow[]): string[] {
-  const on = new Set(apps.filter((row) => row.state === 'on').map((row) => row.id));
+  const on = new Set(apps.filter(isWanted).map((row) => row.id));
   return namesOf(
     app.required_by.filter((id) => on.has(id)),
     apps,
@@ -61,9 +71,15 @@ export function canTurnOn(app: AppRow): boolean {
   return app.state === 'off';
 }
 
-/** «Turn off»: an app that is on. */
+/** «Turn off»: an app the business turned on: on, being set up or that could not be (it gives up on it; its tables, if
+ *  any were made, stay). */
 export function canTurnOff(app: AppRow): boolean {
-  return app.state === 'on';
+  return isWanted(app);
+}
+
+/** «Retry»: an app whose tables could not be made in the business's own database (`base.app.retry`). */
+export function canRetry(app: AppRow): boolean {
+  return app.state === 'failed';
 }
 
 /** The names of what turning `app` on also turns on: what it needs that is off. */
@@ -85,7 +101,7 @@ export function goesOffWith(app: AppRow, apps: readonly AppRow[]): string[] {
     changed = false;
     for (const id of app.requires) {
       const row = byId.get(id);
-      if (!row || off.has(id) || row.state !== 'on' || row.chosen) continue;
+      if (!row || off.has(id) || !isWanted(row) || row.chosen) continue;
       if (row.required_by.every((other) => off.has(other))) {
         off.add(id);
         changed = true;
@@ -96,11 +112,14 @@ export function goesOffWith(app: AppRow, apps: readonly AppRow[]): string[] {
   return namesOf([...off], apps);
 }
 
-/** The names of the apps to turn off before `app`: the chosen ones on that need it (what came along goes with them),
- *  else every app on that needs it; none when nothing on does. */
+/** The names of the apps to turn off before `app`: the chosen ones on (or on their way) that need it (what came along
+ *  goes with them), else every one that does; none when nothing on does. */
 export function offFirst(app: AppRow, apps: readonly AppRow[]): string[] {
   const byId = new Map(apps.map((row) => [row.id, row]));
-  const needing = app.required_by.filter((id) => byId.get(id)?.state === 'on');
+  const needing = app.required_by.filter((id) => {
+    const row = byId.get(id);
+    return row !== undefined && isWanted(row);
+  });
   const chosen = needing.filter((id) => byId.get(id)?.chosen);
   return namesOf(chosen.length ? chosen : needing, apps);
 }

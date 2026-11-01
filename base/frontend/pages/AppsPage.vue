@@ -14,7 +14,10 @@
 // (`max_apps`; what came along does not count); at the limit, the notice with «Upgrade plan» (erplora.com's plans,
 // only on the web). The menu of this screen is read again after each change; the other screens of the business
 // follow the live list (AppsFollower). Both links to erplora.com go the Hub's one way out, `openExternalLink`
-// (gh:hub#439: the installed app opens nothing on a `_blank` link).
+// (gh:hub#439: the installed app opens nothing on a `_blank` link). In a business with its own database an app turned on
+// for the first time gets its tables first when its template lacked them (S3): the answer says «creating», the toast
+// «Turning on…» and its row «Turning on…» until the live list says it is on; one that could not be set up says so with
+// «Retry» (`base.app.retry`); both can be turned off.
 import {
   DataTable,
   EmptyState,
@@ -35,6 +38,7 @@ import {
   type AppsTab,
   appsOfTab,
   canOpen,
+  canRetry,
   canTurnOff,
   canTurnOn,
   comesWith,
@@ -59,6 +63,7 @@ const { isWeb } = useSurface();
 const { data, status, refresh } = useLive('base.app.list', {});
 const enable = useCommand('base.app.enable');
 const disable = useCommand('base.app.disable');
+const retry = useCommand('base.app.retry');
 
 const apps = computed<AppRow[]>(() => data.value?.apps ?? []);
 const storeUrl = computed(() => data.value?.store_url ?? '');
@@ -108,11 +113,15 @@ const categories = computed(() =>
 function stateLabel(app: AppRow): string {
   if (app.state === 'blocked') return t('base.appsPage.state.blocked');
   if (app.state === 'off') return t('base.appsPage.state.off');
+  if (app.state === 'creating') return t('base.appsPage.state.creating');
+  if (app.state === 'failed') return t('base.appsPage.state.failed');
   return t(catalogue.value ? 'base.appsPage.state.installed' : 'base.appsPage.state.on');
 }
 
-function stateTone(app: AppRow): 'success' | 'warning' | 'neutral' {
+function stateTone(app: AppRow): 'success' | 'info' | 'warning' | 'danger' | 'neutral' {
   if (app.state === 'on') return 'success';
+  if (app.state === 'creating') return 'info';
+  if (app.state === 'failed') return 'danger';
   return app.state === 'off' ? 'neutral' : 'warning';
 }
 
@@ -166,6 +175,8 @@ const columns = computed<DataTableColumn<AppRow>[]>(() => [
             { value: 'on', label: t('base.appsPage.state.installed') },
             { value: 'off', label: t('base.appsPage.state.off') },
             { value: 'blocked', label: t('base.appsPage.state.blocked') },
+            { value: 'creating', label: t('base.appsPage.state.creating') },
+            { value: 'failed', label: t('base.appsPage.state.failed') },
           ],
         }
       : undefined,
@@ -180,6 +191,15 @@ const actions = computed<DataTableAction<AppRow>[]>(() => [
     color: 'primary',
     pinned: true,
     hidden: (row) => !canOpen(row),
+  },
+  {
+    id: 'retry',
+    // A text button, as «Turn on»: what it does is its label.
+    label: t('base.appsPage.toggle.retry'),
+    color: 'primary',
+    hidden: (row) => !mayManage.value || !canRetry(row),
+    loading: (row) => pending.value === row.id,
+    disabled: (row) => pending.value !== null && pending.value !== row.id,
   },
   {
     id: 'toggle',
@@ -198,6 +218,7 @@ function onAction({ actionId, row }: { actionId: string; row: AppRow }): void {
   if (!current) return;
   if (actionId === 'open' && canOpen(current)) void router.push(current.path as string);
   if (actionId === 'toggle' && pending.value === null) void toggle(current);
+  if (actionId === 'retry' && pending.value === null && canRetry(current)) void change('retry', current);
 }
 
 /** «A», «A and B», «A, B and C», in the screen's language. */
@@ -242,15 +263,20 @@ async function toggle(app: AppRow): Promise<void> {
   await change('enable', app);
 }
 
-async function change(kind: 'enable' | 'disable', app: AppRow): Promise<void> {
+const COMMANDS = { enable, disable, retry };
+
+async function change(kind: 'enable' | 'disable' | 'retry', app: AppRow): Promise<void> {
   pending.value = app.id;
   limitHit.value = null;
   refusal.value = null;
   try {
-    const answer = await (kind === 'enable' ? enable : disable).run({ app: app.id });
+    const answer = await COMMANDS[kind].run({ app: app.id });
     const along = answer.along.map((other) => other.name);
-    const said = [t(kind === 'enable' ? 'base.appsPage.turnedOn' : 'base.appsPage.turnedOff', { app: app.name })];
-    if (along.length) said.push(t(kind === 'enable' ? 'base.appsPage.alsoOn' : 'base.appsPage.alsoOff', { apps: listOf(along) }));
+    const on = kind !== 'disable';
+    // «creating» (S3): its tables are being made; its row says when it is on (the live list).
+    const done = answer.state === 'creating' ? 'base.appsPage.turningOn' : on ? 'base.appsPage.turnedOn' : 'base.appsPage.turnedOff';
+    const said = [t(done, { app: app.name })];
+    if (along.length) said.push(t(on ? 'base.appsPage.alsoOn' : 'base.appsPage.alsoOff', { apps: listOf(along) }));
     void toastSuccess(said.join(' '));
     // The menu is the session's: read it again (the other screens of the business follow the live list).
     sessionChanged();
