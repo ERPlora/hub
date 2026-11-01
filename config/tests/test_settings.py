@@ -69,6 +69,7 @@ ENV_KEYS = (
     "AWS_STORAGE_BUCKET_NAME",
     "AWS_REGION",
     "MEDIA_ROOT",
+    "METRICS_ENABLED",
 )
 # Local development opts in with DEBUG=True (the .env of a checkout); nothing else turns it on.
 DEVELOPMENT_ENV = {"DEBUG": "True"}
@@ -310,6 +311,15 @@ def test_the_fiscal_certificate_key_comes_from_the_environment(load_settings):
         load_settings(**PRODUCTION_ENV, FISCAL_CERTIFICATE_KEY=key)["FISCAL_CERTIFICATE_KEY"]
         == key
     )
+
+
+def test_the_worker_publishes_its_metrics_only_where_the_environment_turns_them_on(load_settings):
+    """hub#488: CloudWatch's PutMetricData only where the task role may call it (prod's worker, aws stacks/prod); pre,
+    local development and the tests have no such permission, so a missing variable publishes nothing."""
+    assert load_settings(**PRODUCTION_ENV)["METRICS_ENABLED"] is False
+    assert load_settings(**DEVELOPMENT_ENV)["METRICS_ENABLED"] is False
+    assert load_settings(**PRODUCTION_ENV, METRICS_ENABLED="true")["METRICS_ENABLED"] is True
+    assert load_settings(**PRODUCTION_ENV, METRICS_ENABLED="false")["METRICS_ENABLED"] is False
 
 
 def test_the_internal_saas_url_defaults_to_the_public_one(load_settings):

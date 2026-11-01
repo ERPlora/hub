@@ -64,6 +64,11 @@ Each pass opens its database context (phase 2, S1; plan 2026-10-22): the tasks a
 run on it (``use_shared_database``: every hub with ``db_name=""``), each hub with its own database in its own
 (``use_hub``), and the reaper and the ``hub_due`` pass on control (``use_control``), where the registry and the demos
 live (the provisioning enters each hub's own database itself).
+
+Its CloudWatch metrics (``base.metrics``, hub#488), only where ``METRICS_ENABLED`` is on, are one more slow pass in a
+thread of its own (``Background("metrics")``), started on the first tick and then once a minute of its clock, also with
+``databases_only``: the registry's (a sign-up still being prepared, the hubs that failed, a demo left to drop) and the
+fiscal backlog. On the way out it shares the others' grace, ending before its next hub.
 """
 
 import datetime as dt
@@ -81,7 +86,7 @@ from django.utils import timezone
 from live.context import OperationContext, Scope
 from live.operations import get as get_operation
 
-from base import activation, catalog, outbound, queries, relay, scheduler, services, usage
+from base import activation, catalog, metrics, outbound, queries, relay, scheduler, services, usage
 from base.services import reap_demos
 from base.tenancy import dumps, migrator, move, provision
 from base.tenancy.connections import close_hub_aliases, close_this_threads_connections
@@ -184,9 +189,10 @@ def run(
     else:
         registered = f"{result.written} app(s) registered: {', '.join(result.apps)}"
     logger.info("worker: waiting for work (%s).", registered)
+    emitter = metrics.emitter(stop)
     next_reap: dt.datetime | None = None
     # The slow passes, each in a thread of its own and one at a time: the loop keeps ticking while they run.
-    data_pass, usage_pass = Background("data"), Background("usage")
+    data_pass, usage_pass, metrics_pass = Background("data"), Background("usage"), Background("metrics")
     # A hub's move to another cluster (base.tenancy.move): its copy takes a while too, in a thread of its own.
     move_pass = Background("move")
     while not stop.is_set():
@@ -200,14 +206,16 @@ def run(
             data_pass.start(partial(_data, now, stop))
             usage_pass.start(partial(_usage, now))
             move_pass.start(partial(_moves, now, stop))
+        emitter.start_due(now, metrics_pass)
         if next_reap is None or now >= next_reap:
             _reap(now)
             next_reap = now + dt.timedelta(seconds=REAPER_INTERVAL_SECONDS)
         _due(now)
         wait(tick_seconds)
-    # On the way out: a copy hears the stop (pg_dump killed, its lease given back); both get a while, together.
+    # On the way out: a copy hears the stop (pg_dump killed, its lease given back), a metrics pass ends before its next
+    # hub; they all get a while, together.
     deadline = time.monotonic() + BACKGROUND_GRACE_SECONDS
-    for runner in (data_pass, usage_pass, move_pass):
+    for runner in (data_pass, usage_pass, move_pass, metrics_pass):
         runner.join(max(0.0, deadline - time.monotonic()))
     outbound.stop(OUTBOUND_GRACE_SECONDS)
     logger.info("worker: stopped.")
@@ -216,9 +224,10 @@ def run(
 
 class Background:
     """One slow pass at a time in a thread of its own (PLAN-DB round 2026-10-31b, C8): the data pass, whose copy of a
-    hub's database may take minutes, and the nightly measurement. The loop starts it when it is not running and goes on
-    with its tick; a piece that fails is logged and the next tick starts it again. Each piece opens its own connections
-    (the thread starts with no database context: the passes enter theirs) and closes all of them when it ends."""
+    hub's database may take minutes, the nightly measurement and the CloudWatch metrics (``base.metrics``). The loop
+    starts it when it is not running and goes on with its tick; a piece that fails is logged and the next tick starts it
+    again. Each piece opens its own connections (the thread starts with no database context: the passes enter theirs)
+    and closes all of them when it ends."""
 
     def __init__(self, name: str) -> None:
         self.name = name
