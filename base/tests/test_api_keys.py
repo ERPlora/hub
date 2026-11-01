@@ -24,6 +24,7 @@ from base.models import ApiKey, Membership
 from base.tenancy import context
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
+from base.tenancy.tests.legacy import use_legacy
 
 HUB_DB = pytest.mark.django_db(databases=hubs.HUB_DATABASES)
 
@@ -91,43 +92,32 @@ TAX_CATEGORIES = "/tax/categories"
 
 
 class TestNotYetAvailable:
-    """A business on phase 1's shared database: its keys would open its neighbours', so none is made nor accepted."""
+    """A business still on control's database (phase 1's, not cut: S5) is not served at all: its door answers 503 before
+    any key is read, made or accepted (the operations' own refusals, for the suite's fallback, are guardrail (g) of
+    ``tests/test_guardrails.py``)."""
 
     @pytest.mark.django_db
-    def test_the_screen_says_not_yet_and_nothing_is_created(self, client):
+    def test_the_screen_and_a_new_key_answer_503_and_nothing_is_created(self, client):
         client.force_login(member("a"))
         listed = get(client, "a.localhost:8000", "/keys")
-        assert listed.status_code == 200, listed.content
-        assert (listed.json()["available"], listed.json()["keys"]) == (False, [])
         refused = post(client, "a.localhost:8000", "/keys", {"name": "X", "rate_per_minute": 60, "mode": "full", "scopes": {}})
-        assert (refused.status_code, code(refused)) == (409, "base.api_keys_unavailable")
-        assert "not available yet" in refused.json()["error"]["message"]
+        assert [(answer.status_code, code(answer)) for answer in (listed, refused)] == [(503, "base.hub_maintenance")] * 2
+        with use_legacy():
+            assert not ApiKey.objects.exists()
 
     @pytest.mark.django_db
     def test_no_token_gets_in(self, client):
         response = get(client, "a.localhost:8000", CARTS, **bearer("erpk_live_" + "x" * 43))
-        assert response.status_code == 401
+        assert (response.status_code, code(response)) == (503, "base.hub_maintenance")
 
     @pytest.mark.django_db
-    def test_not_even_one_that_is_in_the_shared_tables(self, client):
-        """A key row in phase 1's shared tables (left by hand, or by a business before it moved) would be anybody's."""
+    def test_not_even_one_that_is_in_control_s_tables(self, client):
+        """A key row phase 1 left in control's tables (by hand, or by a business before its cut) is nobody's."""
         token = api_keys.new_token()
-        with context.use_shared_database():
+        with use_legacy():
             ApiKey.objects.create(name="Planted", prefix=token[: api_keys.PREFIX_LENGTH], token_digest=api_keys.digest(token), mode="full")
         for slug in ("a", "b"):
-            assert get(client, f"{slug}.localhost:8000", CARTS, **bearer(token)).status_code == 401
-
-    @pytest.mark.django_db
-    def test_nor_is_one_of_the_shared_tables_read_by_its_id(self, client):
-        """What names a key on the assistant's card (``base.api_key.detail``) reads none either."""
-        token = api_keys.new_token()
-        with context.use_shared_database():
-            planted = ApiKey.objects.create(
-                name="Planted", prefix=token[: api_keys.PREFIX_LENGTH], token_digest=api_keys.digest(token), mode="full"
-            )
-        client.force_login(member("a"))
-        answer = get(client, "a.localhost:8000", f"/keys/detail?id={planted.pk}")
-        assert (answer.status_code, code(answer)) == (404, "not_found")
+            assert get(client, f"{slug}.localhost:8000", CARTS, **bearer(token)).status_code == 503
 
 
 @HUB_DB

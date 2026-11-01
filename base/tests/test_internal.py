@@ -660,9 +660,28 @@ def test_delete_of_an_unknown_hub_is_404(client, db):
 
 
 def test_restore_brings_a_cancelled_hub_back(client, db, registered):
+    # With its own database, made and kept while it was away.
+    Hub.objects.filter(pk=HUB_ID).update(db_name="hub_x", ready_at=Hub.objects.get(pk=HUB_ID).created_at)
     signed(client, "delete", f"/internal/hubs/{HUB_ID}", {"id": HUB_ID})
     answer = signed(client, "post", f"/internal/hubs/{HUB_ID}/restore", {"id": HUB_ID}, with_v2=True)
     assert answer.status_code == 200 and answer.json()["status"] == "ready"
+
+
+def test_restore_of_a_business_of_phase_1_without_its_own_database_makes_one_from_nothing(client, db, registered):
+    """A business cancelled before the cut of S5 (``--skip``: no database was made for it) comes back as a sign-up
+    does: its own database's name, ``requested`` and due; the worker makes it. Nothing of control's is copied."""
+    from base.tenancy import connections as tenancy_connections
+    from base.tenancy import names
+
+    signed(client, "delete", f"/internal/hubs/{HUB_ID}", {"id": HUB_ID})
+    HubDue.objects.filter(pk=HUB_ID).delete()
+
+    answer = signed(client, "post", f"/internal/hubs/{HUB_ID}/restore", {"id": HUB_ID}, with_v2=True)
+
+    hub = Hub.objects.get(pk=HUB_ID)
+    assert answer.status_code == 200 and answer.json()["status"] == "requested"
+    assert hub.db_name == names.hub_db_name(tenancy_connections.control_name(), hub.id)
+    assert hub.ready_at is None and HubDue.objects.filter(pk=HUB_ID).exists()
 
 
 def test_restore_of_a_business_cancelled_before_its_database_was_finished_makes_it_again(client, db):

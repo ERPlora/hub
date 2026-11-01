@@ -1,6 +1,6 @@
 """The worker publishes its CloudWatch metrics without ever holding its tick (hub#488; ``base.metrics``).
 
-Once its apps are registered and their tasks scheduled, the worker builds its emitter (``metrics.emitter``, on its own
+Once its apps are registered, the worker builds its emitter (``metrics.emitter``, on its own
 stop request) and, every tick, starts a metrics pass when one is due (at once, then once a minute of its clock) in a
 thread of its own, ``Background("metrics")``, as its other slow passes (PLAN-DB round 2026-10-31b, C8): a pass that
 takes long (a slow database, CloudWatch unreachable) never delays the relay, the tasks, VeriFactu or the hubs due, and
@@ -69,14 +69,14 @@ def test_a_pass_runs_at_once_then_once_a_minute_of_the_workers_clock(registered,
         if len(ticks) == 6:
             stop.set()
 
-    # The schedule is written at 10:00:00, then six ticks 30 s apart from 10:00:30 (the passes run inline here,
-    # test_worker.inline_passes): a pass on the first tick, then one a minute.
+    # Six ticks 30 s apart from 10:00:00 (since S5 no schedule is written before them: each hub's is written in its
+    # own database; the passes run inline here, test_worker.inline_passes): a pass on the first tick, then one a minute.
     assert worker.run(stop, wait=wait, clock=every(30)) == 0
 
     assert [call["MetricData"][0]["Timestamp"] for call in cloudwatch.calls] == [
-        START + dt.timedelta(seconds=30),
-        START + dt.timedelta(seconds=90),
-        START + dt.timedelta(seconds=150),
+        START,
+        START + dt.timedelta(seconds=60),
+        START + dt.timedelta(seconds=120),
     ]
 
 

@@ -99,7 +99,8 @@ class Hub(models.Model):
     monotonic ``state_version``: an older or equal one changes nothing. ``demo_session_key`` is the sha256 of the
     SaaS's browser session that owns a demo, never the session key itself.
 
-    ``db_name`` is the hub's own database, or empty while it shares control's (``base.tenancy.context.use_hub``);
+    ``db_name`` is the hub's own database, or empty for a business of phase 1 not cut yet, which is not served (S5,
+    ``base.tenancy.cut``; ``base.tenancy.context.use_hub``);
     ``schema_state`` and ``schema_apps`` are what the migrator confirmed of its schema (S3); ``cluster`` the cluster
     its database is on (none: the settings' own); ``is_platform`` marks ERPlora's own hub (PLAN-SAAS §4).
     """

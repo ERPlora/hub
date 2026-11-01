@@ -10,7 +10,8 @@ dimension (``ERPLORA_ENVIRONMENT``):
 - ``ERPlora/Fiscal`` (:class:`FiscalBacklog`): ``OldestPendingAgeSeconds``, since when the oldest production record
   waits to reach the tax authority. The queue is the records themselves (PLAN-DB §8, «la cola son los propios
   registros»), so every app that keeps one answers ``fiscal_pending_since()`` on its ``LiveAppConfig`` (VeriFactu),
-  in phase 1's shared database and in each hub with its own database where the app is on.
+  in each hub with its own database where the app is on (since S5 there is no shared database: a business still
+  without its own, whose host answers 503 until ``manage.py cut_shared_hubs``, is never read).
 
 What is measured is the list :func:`default_collectors` gives: one more measure is one more function there, taking the
 time and the stop request and giving its :class:`Metric` s. A measure that fails is logged and missing from that pass,
@@ -38,7 +39,7 @@ from live.meta import all_live_app_configs
 
 from base import relay, services
 from base.tenancy.connections import close_hub_aliases
-from base.tenancy.context import use_control, use_hub, use_shared_database
+from base.tenancy.context import use_control, use_hub
 from base.tenancy.limits import HubBusy
 from control.queries import registry_health
 
@@ -108,10 +109,9 @@ def fiscal_pending_since(apps_on: Collection[str] | None = None) -> dt.datetime 
 class FiscalBacklog:
     """``ERPlora/Fiscal`` ``OldestPendingAgeSeconds``: the oldest fiscal record still to send, of every business.
 
-    Phase 1's shared database (every hub with ``db_name=""``, all of prod's today) is read on every pass, all its
-    hubs at once: a pass that cannot read it fails, never hiding them. The hubs with their own database the worker
-    serves (``base.services.hubs_to_serve``: ready, or a business that left whose records must still reach the tax
-    authority) are read in turn, each in its database where the app is on, for ``budget`` seconds a pass; each one's
+    The hubs with their own database the worker serves (``base.services.hubs_to_serve``: ready, or a business that
+    left whose records must still reach the tax authority; never one without its own database, since S5 there is no
+    shared one) are read in turn, each in its database where the app is on, for ``budget`` seconds a pass; each one's
     last reading is kept until it is read again, and forgotten when it is no longer served. A hub that cannot be read
     (busy: a warning; any other failure: an error with its trace) keeps its last reading or, without one that says
     something waits, waits since its first failure. A stop request ends the pass before the next hub.
@@ -123,10 +123,8 @@ class FiscalBacklog:
         self._last = None
 
     def __call__(self, now: dt.datetime, stop: threading.Event) -> list[Metric]:
-        with use_shared_database():
-            shared = fiscal_pending_since()
         self._read_hubs(now, stop)
-        found = [since for since in (shared, *self._since.values()) if since is not None]
+        found = [since for since in self._since.values() if since is not None]
         oldest = min(found, default=None)
         return [Metric(FISCAL_NAMESPACE, "OldestPendingAgeSeconds", seconds_since(oldest, now), "Seconds")]
 
@@ -233,7 +231,7 @@ class Emitter:
                 )
                 continue
             finally:
-                # A measure's connections (control's, the shared database's) are not handed to the next one broken.
+                # A measure's connections (control's) are not handed to the next one broken.
                 close_old_connections()
             for metric in measured:
                 by_namespace.setdefault(metric.namespace, []).append(

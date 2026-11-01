@@ -135,12 +135,12 @@ def test_every_hub_app_lives_in_a_hubs_database_now_that_its_people_are_its_own(
 
 
 def test_the_templates_are_the_platforms_and_one_per_vertical_cloned_from_it():
-    """Proposal (h): ``hub_template_<vertical>`` = ``hub_template`` + the tables of ``template_apps(vertical)``; until
-    S3 every template also carries every portable app's (``apps_every_hub_gets``, review of hub#471 in pre: a sign-up
-    is the clone alone, never ~60 s of migrations on Fargate)."""
+    """Proposal (h): ``hub_template_<vertical>`` = ``hub_template`` + the tables of ``template_apps(vertical)``; every
+    template also carries every portable app's (``portable_apps``, review of hub#471 in pre, kept in S3: a sign-up is
+    the clone alone, never ~60 s of migrations on Fargate)."""
     platform, *verticals = migrator.templates()
     portable = set(migrator.portable_apps())
-    every = set(migrator.apps_every_hub_gets())
+    every = portable
 
     assert platform.db_name == names.template_db_name(control()) and platform.source is None
     assert set(platform.apps) == set(PLATFORM) | every

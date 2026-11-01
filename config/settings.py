@@ -92,7 +92,8 @@ INSTALLED_APPS = [
     "base",
     # The mirror of the SaaS's `shared` schema (round 16): only base/catalog.py writes it.
     "shared",
-    "django.contrib.admin",
+    # Django's admin, its site the Hub's own: a hub's model only once a business is chosen (base/admin_site.py).
+    "base.admin_site.AdminConfig",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",

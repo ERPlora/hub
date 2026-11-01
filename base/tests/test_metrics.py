@@ -7,8 +7,8 @@ Once a minute, in a thread of its own (the worker's tick never waits for it), th
   dropped), read from control's registry in one query (``control.queries.registry_health``);
 - ``ERPlora/Fiscal``: ``OldestPendingAgeSeconds``, since when the oldest production record waits to reach the tax
   authority, asked to every app that keeps such a queue (``fiscal_pending_since`` on its ``LiveAppConfig``: VeriFactu)
-  in phase 1's shared database and in each hub with its own database where the app is on, a time budget per pass and
-  the hubs in turn, each one's last reading kept.
+  in each hub with its own database where the app is on, a time budget per pass and the hubs in turn, each one's last
+  reading kept. Since S5 there is no shared database: a business still without its own is never read.
 
 Every value carries the ``Environment`` dimension (prod, pre). A measure that fails is logged and missing from that
 pass (its alarm treats missing data as breaching); CloudWatch refusing a namespace is logged and never stops the
@@ -31,7 +31,7 @@ from apps.verifactu.models import Environment, Record
 from apps.verifactu.tests.test_fiscal_backlog import record
 from base import metrics, relay
 from base.metrics import FISCAL_NAMESPACE, HUBS_NAMESPACE, Emitter, FiscalBacklog, Metric
-from base.tenancy.context import use_hub, use_shared_database
+from base.tenancy.context import use_control, use_hub
 from base.tenancy.tests import hubs
 from control.models import Hub
 
@@ -71,8 +71,6 @@ def test_with_every_hub_ready_the_registry_measures_zero():
 @pytest.mark.django_db
 @pytest.mark.usefixtures("no_test_fallback")
 def test_the_registry_measures_the_stuck_sign_up_the_failed_hubs_and_the_demo_left_to_drop():
-    from base.tenancy.context import use_control
-
     now = timezone.now()
     with use_control():
         stuck = Hub.objects.create(slug="acme", status=Hub.Status.CREATING)
@@ -121,12 +119,19 @@ def test_with_no_record_to_send_anywhere_the_backlog_is_zero(hub_a, hub_b):
 
 @hub_db
 @pytest.mark.usefixtures("no_test_fallback")
-def test_a_record_waiting_in_phase_1s_shared_database_is_measured(hub_a, hub_b):
+def test_a_business_still_without_its_own_database_is_never_read(hub_a, hub_b, caplog):
+    """Since S5 there is no shared database to read: a business the cut has not reached yet answers 503 and keeps no
+    records anywhere the worker reads; were it read, its failure would wait since then and page (``_failed``)."""
     now = timezone.now()
-    with use_shared_database():
-        pending(now - dt.timedelta(minutes=8))
+    with use_control():
+        Hub.objects.create(slug="not-cut-yet", status=Hub.Status.READY)
+    backlog = FiscalBacklog()
 
-    assert oldest_age(FiscalBacklog()(now, never())) == pytest.approx(480.0, abs=1)
+    backlog(now, never())
+    later = backlog(now + dt.timedelta(minutes=20), never())
+
+    assert oldest_age(later) == 0.0
+    assert "not-cut-yet" not in caplog.text
 
 
 @hub_db
@@ -137,8 +142,6 @@ def test_the_oldest_record_of_every_hub_with_its_own_database_is_measured(hub_a,
         pending(now - dt.timedelta(minutes=6))
     with use_hub(hub_b):
         pending(now - dt.timedelta(minutes=25))
-    with use_shared_database():
-        pending(now - dt.timedelta(minutes=1))
 
     assert oldest_age(FiscalBacklog()(now, never())) == pytest.approx(1500.0, abs=1)
 
@@ -316,13 +319,14 @@ def test_a_stop_ends_the_pass_before_the_next_hub(hub_a, hub_b, monkeypatch):
 
 @hub_db
 @pytest.mark.usefixtures("no_test_fallback")
-def test_a_shared_database_that_cannot_be_read_leaves_the_measure_out(hub_a, hub_b, monkeypatch):
-    """Phase 1's shared database holds every business of prod today: a reading without it would hide them."""
+def test_a_registry_that_cannot_be_read_leaves_the_measure_out(hub_a, hub_b, monkeypatch):
+    """Without the list of the businesses to read, a reading of none would say nothing waits and hide them all."""
+    from base import services
 
-    def broken(apps_on=None):
+    def broken(now):
         raise RuntimeError("database gone")
 
-    monkeypatch.setattr(metrics, "fiscal_pending_since", broken)
+    monkeypatch.setattr(services, "hubs_to_serve", broken)
 
     with pytest.raises(RuntimeError):
         FiscalBacklog()(timezone.now(), never())

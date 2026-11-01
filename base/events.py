@@ -8,6 +8,9 @@ HUB_REGISTERED = "base.hub.registered"
 HUB_STATE_APPLIED = "base.hub.state_applied"
 HUB_CANCELLED = "base.hub.cancelled"
 HUB_RESTORED = "base.hub.restored"
+#: A business of phase 1 got its own database (S5, ``cut_shared_hubs``): how (its mode), where, the rows copied into
+#: it and the copy of control taken before; recorded in control's outbox, the record of the cut.
+HUB_CUT = "base.hub.cut"
 DEMO_CREATED = "base.demo.created"
 #: A one-time code into a demo was made; the event names the demo, never the code.
 DEMO_CODE_CREATED = "base.demo.code_created"
@@ -101,6 +104,7 @@ ALL = [
     HUB_STATE_APPLIED,
     HUB_CANCELLED,
     HUB_RESTORED,
+    HUB_CUT,
     DEMO_CREATED,
     DEMO_CODE_CREATED,
     DEMO_EXPIRED,
