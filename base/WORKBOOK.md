@@ -1,7 +1,8 @@
 # Workbook — Base (plataforma)
 Prefijo: BASE
-Alcance MVP: fase 1 (el Inicio del hub; el resto de la plataforma llega por partes)
-Estado de la app: en construcción (2026-10-22)
+Alcance MVP: núcleo (la plataforma del hub: siempre está, no se activa ni se apaga)
+Estado de la app: completa (2026-11-01)
+Lo que no entra todavía: ver «Lo que queda fuera».
 
 > Manual de usuario y especificación de `base`, la plataforma del Hub: siempre está, no se activa ni se
 > apaga. Esta primera parte describe el **Inicio**, la pantalla a la que se llega al entrar en el negocio
@@ -303,7 +304,7 @@ En la pantalla Archivos:
 | ID | Flujo | Estado |
 |---|---|---|
 | BASE-F01 | Ver lo que le falta por configurar al negocio | hecho |
-| BASE-F02 | Ver el negocio de un vistazo al entrar | parcial |
+| BASE-F02 | Ver el negocio de un vistazo al entrar | descartado |
 | BASE-F03 | Ir a configurar desde «Termina de configurar tu negocio» | hecho |
 | BASE-F04 | Ver qué pasos de la lista tiene que configurar un administrador | hecho |
 | BASE-F05 | Abrir una app desde «Mis apps» | hecho |
@@ -312,7 +313,7 @@ En la pantalla Archivos:
 | BASE-F08 | Mantener los paneles al día sin recargar | hecho |
 | BASE-F09 | Consultar la actividad reciente | hecho |
 | BASE-F10 | Ver en la campana los avisos entre apps que no se entregaron | hecho |
-| BASE-F11 | Ir a erplora.com a gestionar o mejorar el plan | parcial |
+| BASE-F11 | Ir a erplora.com a gestionar o mejorar el plan | descartado |
 | BASE-F12 | Pedirle al asistente que repase la configuración | hecho |
 | BASE-F13 | Perder el acceso al cambiar de rol o al salir del negocio | hecho |
 | BASE-F14 | Ver las apps del negocio | hecho |
@@ -322,8 +323,8 @@ En la pantalla Archivos:
 | BASE-F18 | Instalar una app | hecho |
 | BASE-F19 | Saber qué más viene con una app | hecho |
 | BASE-F20 | Intentar usar una app que necesita suscripción | hecho |
-| BASE-F21 | Ver por qué no se ha podido activar una app y reintentarlo | parcial |
-| BASE-F22 | Seguir la activación de una app mientras se navega | parcial |
+| BASE-F21 | Ver por qué no se ha podido activar una app y reintentarlo | descartado |
+| BASE-F22 | Seguir la activación de una app mientras se navega | descartado |
 | BASE-F23 | Desactivar una app | hecho |
 | BASE-F24 | Activar una app | hecho |
 | BASE-F25 | Ver que una app se niega a desactivarse | hecho |
@@ -338,11 +339,11 @@ En la pantalla Archivos:
 | BASE-F34 | Deshacer una importación | hecho |
 | BASE-F35 | Exportar una copia de seguridad o una plantilla | hecho |
 | BASE-F36 | Elegir qué apps, datos y tablas viajan en la exportación | hecho |
-| BASE-F37 | Restablecer el negocio por secciones | parcial |
+| BASE-F37 | Restablecer el negocio por secciones | descartado |
 | BASE-F38 | Ver Inicio al día después de importar una plantilla | hecho |
 | BASE-F39 | Abrir Sistema y moverse por sus pestañas | hecho |
-| BASE-F40 | Ver cuánto está usando el hub | parcial |
-| BASE-F41 | Saber qué versión corre y qué se le ha actualizado | parcial |
+| BASE-F40 | Ver cuánto está usando el hub | descartado |
+| BASE-F41 | Saber qué versión corre y qué se le ha actualizado | descartado |
 | BASE-F42 | Ver el registro de sucesos del sistema | hecho |
 | BASE-F43 | Ver los eventos caídos | hecho |
 | BASE-F44 | Reenviar un evento caído | hecho |
@@ -351,7 +352,7 @@ En la pantalla Archivos:
 | BASE-F47 | Informar de un error de la pantalla sin que nadie lo pida | hecho |
 | BASE-F48 | Abrir Ajustes y moverse por sus pestañas | hecho |
 | BASE-F49 | Ver el país del negocio | hecho |
-| BASE-F50 | Ver la moneda del negocio | parcial |
+| BASE-F50 | Ver la moneda del negocio | descartado |
 | BASE-F51 | Cambiar el idioma del negocio en erplora.com | hecho |
 | BASE-F52 | Entrar con la cuenta de erplora.com | hecho |
 | BASE-F53 | Entrar desde el panel de erplora.com sin volver a teclear la contraseña | hecho |
@@ -375,7 +376,7 @@ En la pantalla Archivos:
 | BASE-F71 | Quitar de golpe los dispositivos que nadie usa | hecho |
 | BASE-F72 | Ver los archivos del negocio | hecho |
 | BASE-F73 | Subir archivos y crear carpetas | hecho |
-| BASE-F74 | Previsualizar y descargar un archivo | parcial |
+| BASE-F74 | Previsualizar y descargar un archivo | descartado |
 | BASE-F75 | Mover y renombrar un archivo o una carpeta | hecho |
 | BASE-F76 | Borrar un archivo o una carpeta | hecho |
 | BASE-F77 | Llegar al tope de personas del plan | hecho |
@@ -383,14 +384,14 @@ En la pantalla Archivos:
 | BASE-F79 | Dar de alta o retirar la placa de una persona | hecho |
 | BASE-F80 | Reincorporar a una persona que salió del negocio | hecho |
 | BASE-F81 | Entender cómo entra cada persona | hecho |
-| BASE-F82 | Ver los roles y encender los que trae una app | parcial |
+| BASE-F82 | Ver los roles y encender los que trae una app | descartado |
 | BASE-F83 | Asignar un rol a una persona | hecho |
 | BASE-F84 | Aprobar con el PIN de un responsable | hecho |
 | BASE-F85 | Consultar quién aprobó qué | hecho |
-| BASE-F86 | Crear una llave de API y copiar su token | parcial |
-| BASE-F87 | Rotar una llave de API | parcial |
-| BASE-F88 | Revocar una llave de API | parcial |
-| BASE-F89 | Ver las llaves de API y qué puede cada una | parcial |
+| BASE-F86 | Crear una llave de API y copiar su token | hecho |
+| BASE-F87 | Rotar una llave de API | hecho |
+| BASE-F88 | Revocar una llave de API | hecho |
+| BASE-F89 | Ver las llaves de API y qué puede cada una | hecho |
 | BASE-F90 | Consultar la documentación de la API | hecho |
 | BASE-F91 | Mostrar u ocultar la documentación de la API | hecho |
 | BASE-F92 | Abrir y cerrar el panel del asistente | hecho |
@@ -436,7 +437,7 @@ Implicados: INVENTORY-F28
 
 ### BASE-F02 Ver el negocio de un vistazo al entrar
 <!-- origen: old-hub:HUB_SHELL-F25 -->
-Estado: parcial — sin la fila de salud del hub (la impresora y WhatsApp con «Ver sistema»)
+Estado: descartado — la fila de salud del hub (la impresora y WhatsApp, con un enlace a Sistema) necesita que cada app diga cómo está lo suyo, y eso toca Impresión y la Bandeja de WhatsApp; hoy la campana ya avisa cuando nadie está imprimiendo (hub#573)
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Inicio · Resumen
 Pasos:
@@ -629,7 +630,7 @@ Implicados: ninguno
 
 ### BASE-F11 Ir a erplora.com a gestionar o mejorar el plan
 <!-- origen: old-hub:HUB_SHELL-F129 -->
-Estado: parcial — sin el pase de un solo uso: si el navegador no tiene abierta la sesión de erplora.com, se entra con la cuenta al llegar
+Estado: descartado — sin el pase de un solo uso: si el navegador no tiene abierta la sesión de erplora.com, se entra con la cuenta al llegar; el pase es sobre todo de erplora.com (saas#190)
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Menú lateral, barra de arriba
 Pasos:
@@ -821,7 +822,7 @@ Implicados: APPS-F07
 
 ### BASE-F21 Ver por qué no se ha podido activar una app y reintentarlo
 <!-- origen: old-hub:HUB_SHELL-F112 -->
-Estado: parcial — hoy activar una app es inmediato y no se queda a medias, porque sus datos ya están preparados en cada negocio; prepararlos al activarla, el aviso de que no se ha podido y su «Reintentar» llegan en la fase 2, cuando cada negocio tenga sus datos aparte
+Estado: descartado — hoy activar una app es inmediato y no se queda a medias, porque sus datos ya están preparados en la base de datos del negocio; prepararlos al activarla, el aviso de que no se ha podido y su «Reintentar» llegan con la activación por negocio, que se construye aparte (hub#574)
 Actor: administrador
 Pantalla: Apps
 Pasos:
@@ -835,7 +836,7 @@ Implicados: ninguno
 
 ### BASE-F22 Seguir la activación de una app mientras se navega
 <!-- origen: old-hub:HUB_SHELL-F113 -->
-Estado: parcial — hoy activar una app es inmediato y sale en el menú de todos los dispositivos del negocio sin recargar; falta el paso «Activando…» mientras se preparan sus datos, que llega en la fase 2, cuando cada negocio tenga sus datos aparte
+Estado: descartado — hoy activar una app es inmediato y sale en el menú de todos los dispositivos del negocio sin recargar; el paso «Activando…» mientras se preparan sus datos llega con la activación por negocio, que se construye aparte (hub#574)
 Actor: administrador
 Pantalla: Apps
 Pasos:
@@ -1151,7 +1152,7 @@ Implicados: ninguno
 
 ### BASE-F37 Restablecer el negocio por secciones
 <!-- origen: old-hub:HUB_SHELL-F181 -->
-Estado: parcial — mientras el negocio comparte su base de datos con otros negocios no se puede vaciar: la pantalla lo explica y no ofrece el botón; se podrá cuando cada negocio tenga la suya
+Estado: descartado — un negocio con su propia base de datos ya se restablece como dicen los pasos, pero sin la copia de seguridad que se guarda siempre antes de vaciar; esa copia llega con las copias de cada negocio, que se construyen aparte (hub#575)
 Actor: propietario, administrador
 Pantalla: Ajustes · Datos y copias › Restablecer
 Pasos:
@@ -1224,7 +1225,7 @@ Implicados: ninguno
 
 ### BASE-F40 Ver cuánto está usando el hub
 <!-- origen: old-hub:HUB_SHELL-F136 -->
-Estado: parcial — sin CPU, memoria ni conexiones del negocio: un solo servicio atiende a todos los negocios y ninguna cifra es solo suya; el tamaño y el uso de su base de datos llegan cuando cada negocio tenga la suya
+Estado: descartado — sin CPU, memoria ni conexiones del negocio: un solo servicio atiende a todos los negocios y ninguna cifra es solo suya; el tamaño y el uso de su base de datos llegan con la medición de cada negocio, que se construye aparte (hub#575)
 Actor: propietario, administrador
 Pantalla: Sistema · Recursos
 Pasos:
@@ -1242,7 +1243,7 @@ Implicados: ninguno
 
 ### BASE-F41 Saber qué versión corre y qué se le ha actualizado
 <!-- origen: old-hub:HUB_SHELL-F142 -->
-Estado: parcial — la versión y su fecha sí; sin la lista de lo cambiado en cada app: todas las apps se publican juntas, en un solo despliegue y sin notas de versión
+Estado: descartado — la versión y su fecha sí; las apps ya no tienen versión propia (se publican todas juntas con el hub) y todavía no hay notas de cada versión que enseñar (hub#576)
 Actor: propietario, administrador
 Pantalla: Sistema · Actualizaciones
 Pasos:
@@ -1420,7 +1421,7 @@ Implicados: HUBS-F15, BASE-F01, BASE-F29
 
 ### BASE-F50 Ver la moneda del negocio
 <!-- origen: old-hub:HUB_SHELL-F158 -->
-Estado: parcial — el Inicio, Ventas, Caja, Facturación, Inventario, Tarifas, Impresión, Cocina y Suplementos ya van en la moneda del negocio, pero Pagos, Carrito y pago, Citas, Menús y combos y Clientes todavía en euros aunque el país del negocio pague en otra moneda: con España y Portugal cuadra, con un país de otra moneda no
+Estado: descartado — todas las apps van en la moneda del negocio salvo Citas, que sigue en euros aunque el país del negocio pague en otra moneda: con España y Portugal cuadra, con un país de otra moneda no (hub#577)
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Ajustes · Negocio; Inicio · Resumen e Inicio · Actividad
 Pasos:
@@ -1903,7 +1904,7 @@ Implicados: ninguno
 
 ### BASE-F74 Previsualizar y descargar un archivo
 <!-- origen: old-hub:HUB_SHELL-F132 -->
-Estado: parcial — las hojas de Excel (xlsx) y los documentos de Word (docx) dicen «Sin vista previa» y se descargan, y un archivo de datos (.json) se ve ordenado pero sin plegar; el visor del hub viejo los enseñaba
+Estado: descartado — las hojas de Excel (xlsx) y los documentos de Word (docx) dicen «Sin vista previa» y se descargan, y un archivo de datos (.json) se ve ordenado pero sin plegar; el visor del hub viejo los enseñaba (hub#578)
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Archivos
 Pasos:
@@ -2056,7 +2057,7 @@ Implicados: BASE-F77, BASE-F78, BASE-F79
 
 ### BASE-F82 Ver los roles y encender los que trae una app
 <!-- origen: old-hub:HUB_SHELL-F91 -->
-Estado: parcial — se ven los cuatro roles de erplora.com; ninguna app trae todavía roles propios que encender
+Estado: descartado — se ven los cuatro roles de erplora.com; que una app traiga roles propios que encender está por decidir en el producto nuevo, donde el rol se da al invitar en erplora.com (hub#579)
 Actor: propietario, administrador, encargado, empleado
 Pantalla: Empleados · Roles
 Pasos:
@@ -2145,7 +2146,7 @@ Implicados: BASE-F84
 
 ### BASE-F86 Crear una llave de API y copiar su token
 <!-- origen: old-hub:HUB_SHELL-F94 -->
-Estado: parcial — un negocio que aún comparte su base de datos con otros no puede tener llaves: la pestaña dice «Todavía no disponible»
+Estado: hecho
 Actor: propietario, administrador
 Pantalla: Empleados · API keys
 Pasos:
@@ -2160,12 +2161,14 @@ Pasos:
 Entra: el nombre, el ritmo y lo que puede hacer.
 Sale: la llave, de la que el negocio solo guarda lo que permite reconocerla. Evento `base.api_key.created`.
 Si falla: «No se pudo crear la API key.», «Elige al menos una app y qué puede hacer la key en ella.», «Esa app no
-publica lo que la key haría en ella.» o «No se pudo copiar al portapapeles.».
+publica lo que la key haría en ella.» o «No se pudo copiar al portapapeles.». Un negocio que todavía comparte su base
+de datos con otros (los dados de alta antes de que cada negocio naciera con la suya) no tiene «Nueva API key»
+(BASE-F89).
 Implicados: BASE-F89, BASE-F90
 
 ### BASE-F87 Rotar una llave de API
 <!-- origen: old-hub:HUB_SHELL-F95 -->
-Estado: parcial — un negocio que aún comparte su base de datos con otros no puede tener llaves
+Estado: hecho
 Actor: propietario, administrador
 Pantalla: Empleados · API keys
 Pasos:
@@ -2181,7 +2184,7 @@ Implicados: BASE-F86, BASE-F89
 
 ### BASE-F88 Revocar una llave de API
 <!-- origen: old-hub:HUB_SHELL-F96 -->
-Estado: parcial — un negocio que aún comparte su base de datos con otros no puede tener llaves
+Estado: hecho
 Actor: propietario, administrador
 Pantalla: Empleados · API keys
 Pasos:
@@ -2196,7 +2199,7 @@ Implicados: BASE-F89
 
 ### BASE-F89 Ver las llaves de API y qué puede cada una
 <!-- origen: old-hub:HUB_SHELL-F97 -->
-Estado: parcial — un negocio que aún comparte su base de datos con otros no puede tener llaves: en su lugar sale «Todavía no disponible» y «Las API keys todavía no están disponibles en este negocio.»
+Estado: hecho
 Actor: propietario, administrador
 Pantalla: Empleados · API keys
 Pasos:
@@ -2207,7 +2210,9 @@ Pasos:
 Entra: las llaves del negocio.
 Sale: nada guardado. Se pone al día sola al crear, rotar o revocar una.
 Si falla: «No se pudieron cargar tus API keys.» con «Reintentar»; sin ninguna, «Aún no hay API keys. Crea una para
-que un sistema externo pueda leer o escribir datos de tu negocio.».
+que un sistema externo pueda leer o escribir datos de tu negocio.». Un negocio que todavía comparte su base de datos
+con otros no puede tener llaves, porque una llave suya podría abrir los datos de otro: en su lugar sale «Todavía no
+disponible» y «Las API keys todavía no están disponibles en este negocio.», hasta que pase a la suya.
 Implicados: BASE-F86, BASE-F87, BASE-F88
 
 ### BASE-F90 Consultar la documentación de la API
@@ -2970,9 +2975,11 @@ Implicados: ACCOUNTS-F38
   `grouped=False` para la exportación que su importación relee (flujo money-text). Lo usan el aviso y el tique de
   Ventas, el documento de Facturación, la exportación de Inventario, la web pública y los huecos de las aprobaciones;
   `tests/test_guardrails_money.py` no deja llamar a `format_currency` ni a `get_currency_symbol` de Babel fuera de él.
-  Ventas, Facturación, Inventario, Tarifas e Impresión aún
-  llevan su propia copia, `business_currency(ctx)`, que contesta lo mismo; Pagos, Carrito y pago, Citas, Menús y combos y Clientes
-  aún cobran en `EUR` (BASE-F50 `parcial`). Pantallas: `SettingsPage.vue` (pestañas por hash `#business`, `#tickets`,
+  Ventas, Facturación, Inventario, Tarifas, Impresión, Pagos y
+  Carrito y pago la leen con `base.operations.business_currency(ctx.scope)`, sin copia propia (las `business_currency(ctx)`
+  de `apps/sale/queries.py` y `apps/cart_checkout/queries.py` solo la llaman); en pantalla, Pagos, Carrito y pago,
+  Clientes y Menús y combos la leen con `useBusinessMoney`; Citas aún fija `EUR` en
+  `apps/appointment/frontend/lib/format.ts` (BASE-F50 `descartado`, hub#577). Pantallas: `SettingsPage.vue` (pestañas por hash `#business`, `#tickets`,
   `#data`; `#tax` abre Negocio; `lib/data.ts`) y `components/settings/{BusinessPanel,TicketsPanel,SettingsRow}.vue`.
   Tests: `base/tests/test_business.py`, `test_queries_business.py`, `test_business_live.py`; e2e
   `tests/e2e/base-settings-business.spec.ts`, con el Hub y el SaaS reales.
@@ -3323,7 +3330,8 @@ Implicados: ACCOUNTS-F38
 - Tests: `base/tests/test_people.py`, `test_api_keys.py`, `test_approvals.py`, `test_approval_spend.py`, `test_approved_calls.py` y `test_api_docs.py`; Vitest de
   `base/frontend/lib/{people,approval,api-docs,sidebar}.test.ts`, `components/{PeopleList,RolesList,ApiKeysPanel,
   ApprovalDialog,ApprovalsList,ApiDocsCard}.test.ts` y `pages/{Employees,Person,ApiDocs}Page.test.ts`; e2e
-  `tests/e2e/base-employees.spec.ts`.
+  `tests/e2e/base-employees.spec.ts` y `tests/e2e/base-api-keys.spec.ts` (crear, copiar, usar, rotar y revocar una
+  llave en el hub `a`, con su BD propia, en los tres tamaños; borra lo que crea).
 - La QA maestra del Hub (BASE-F107 = BASE-G152, `qa:shared/qa-hub`, APP-BASE-10): el contrato de los agentes
   `qa-hub*` del hub viejo pasa a ser una e2e de `base`, `tests/e2e/base-qa-master.spec.ts`, contra el SaaS de la pila
   (alta en sus pantallas, negocio por su API con `business_type` del vertical) y su pasarela del asistente con el
@@ -3346,7 +3354,8 @@ Implicados: ACCOUNTS-F38
   F07/F09/F10/F13/F14/F17/F18 (la cola de `/ws/print`). Sus specs: `cash-register-*`, `table-flows`, `reservation-book`,
   `sale-*` (con `sale-invoice-chain`), `modifier-till`, `kitchen-*`, `invoice-sale`, `verifactu-flows`,
   `printing-*`, `appointment-*`, `staff-commissions`, `service-flows` y `customer-flows`. Lo que aún no está entero
-  lo dice su app: PRINTING-F02 (buscar la impresora en la red) es `parcial`, y de SERVICE-F14 la venta del bono en el
+  lo dice su app: PRINTING-F02 (buscar la impresora en la red) es `descartado` (app#17: en una red sin salida a internet la app del
+  dispositivo no barre la red), y de SERVICE-F14 la venta del bono en el
   TPV está en «Lo que queda fuera» de Servicios.
 - Del contrato viejo no sigue lo que era proceso de aquella flota: §2 (método: el QA no arregla y abre issues por
   repo), §2b (el banco de pruebas en PRE con `spawn-hub.sh`), §3 (contar 25–27 módulos y sus `module.json`), §9 (la
@@ -3376,6 +3385,33 @@ Implicados: ACCOUNTS-F38
   (`base.files:{<hex>}:…`, `website:home:{<slug>}:…`). En local y en los tests la caché es
   `base.cache.ClusterLocMemCache`, la memoria del proceso con esa misma regla y el mismo error: lo que fallaría en
   AWS falla antes en el test.
+
+## Lo que queda fuera
+
+Al cerrar la app (2026-11-01) ninguno de sus flujos queda a medias: los que no entran están `descartado`, cada uno
+con su issue, y llegan con ella.
+
+- **Activar una app con «Activando…», su fallo y su «Reintentar» (BASE-F21, BASE-F22)**, hub#574: la activación por
+  negocio de la tenencia (S3), construida en la rama `tenancy/activation-wip`. Hoy activar es inmediato porque las
+  tablas de todas las apps ya están en la base de datos del negocio.
+- **La copia antes de restablecer, el tamaño de la base de datos en Sistema › Recursos y la descarga de los datos de
+  un negocio borrado (BASE-F37, BASE-F40, BASE-G157)**, hub#575: las copias y el uso por negocio de la tenencia (S2b),
+  construidos en la rama `tenancy/dumps-wip`. Hoy un negocio con su base de datos se restablece sin la copia previa
+  que pide la decisión 2 de la ronda 2026-10-30 de PLAN-DB.
+- **La fila de salud del Inicio (BASE-F02)**, hub#573: un punto de extensión más en `LiveAppConfig` y su uso en
+  Impresión y la Bandeja de WhatsApp.
+- **El pase de un solo uso a erplora.com (BASE-F11)**, saas#190, sobre todo del SaaS.
+- **Las notas de cada versión (BASE-F41)**, hub#576.
+- **Citas en la moneda del negocio (BASE-F50)**, hub#577, de `apps/appointment`.
+- **La vista previa de .xlsx y .docx y el .json plegable (BASE-F74)**, hub#578.
+- **Los roles que trae una app (BASE-F82)**, hub#579, con la contradicción entre PLAN-HUB §3 (`RoleActivation`) y
+  los cuatro roles de PLAN §22 sin resolver.
+- **Los negocios que aún comparten la base de datos de control** (todos los dados de alta antes de hub#471) no tienen
+  llaves de API (BASE-F86–F89) ni restablecen hasta el corte de S5 (ronda 2026-10-30 de PLAN-DB, decisión 1).
+- **La cola de PgBouncer de cada negocio en CloudWatch**, hub#572, y **la tarjeta del asistente que enseña los ids de
+  las apps de una plantilla** (`base.blueprint.import`), hub#504 (también de Automatizaciones).
+- **Peticiones a `@erplora/ui`** que siguen abiertas: [`UI-REQUESTS.md`](UI-REQUESTS.md) (los iconos de documento de
+  Archivos, los del cuadro del asistente y `useI18n` en el shell).
 
 ## Lo que NO hace, a propósito
 
