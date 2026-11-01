@@ -106,6 +106,48 @@ def hubs_pass(monkeypatch) -> list[dt.datetime]:
     return passes
 
 
+#: The worker's own runner of its slow passes, a thread each (the tests of the loop's order run them inline).
+THREADED = worker.Background
+
+
+class Inline:
+    """Stands in for ``worker.Background``: the piece runs at once, in the loop's own thread, so the order is exact."""
+
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+    def busy(self) -> bool:
+        return False
+
+    def start(self, piece) -> bool:
+        piece()
+        return True
+
+    def join(self, timeout: float) -> bool:
+        return True
+
+
+@pytest.fixture(autouse=True)
+def inline_passes(monkeypatch) -> None:
+    monkeypatch.setattr(worker, "Background", Inline)
+
+
+@pytest.fixture(autouse=True)
+def data_pass(monkeypatch) -> list[dt.datetime]:
+    """Stands in for the data pass (``worker._data``: a reset, a business that left; ``test_worker_data.py``)."""
+    passes: list[dt.datetime] = []
+    monkeypatch.setattr(worker, "_data", lambda now, stop=None: passes.append(now))
+    return passes
+
+
+@pytest.fixture(autouse=True)
+def usage_pass(monkeypatch) -> list[dt.datetime]:
+    """Stands in for the nightly measurement's pass (``worker._usage``; ``test_usage.py``)."""
+    passes: list[dt.datetime] = []
+    monkeypatch.setattr(worker, "_usage", passes.append)
+    return passes
+
+
 @pytest.fixture(autouse=True)
 def due(monkeypatch) -> FakeDue:
     fake = FakeDue()
@@ -585,6 +627,8 @@ def test_relays_the_shared_outbox_then_the_hubs_own_then_makes_the_hubs_due_on_e
     monkeypatch.setattr(provision, "run_due", lambda now: order.append("due") or due(now))
     monkeypatch.setattr(relay, "run", lambda now: order.append("relay") or outbox(now))
     monkeypatch.setattr(worker, "_hubs", lambda now: order.append("hubs"))
+    monkeypatch.setattr(worker, "_data", lambda now, stop=None: order.append("data"))
+    monkeypatch.setattr(worker, "_usage", lambda now: order.append("usage"))
     stop = threading.Event()
     wait, _ = stop_after(stop, 3)
 
@@ -592,7 +636,10 @@ def test_relays_the_shared_outbox_then_the_hubs_own_then_makes_the_hubs_due_on_e
 
     assert due.passes == [ten(0), ten(1), ten(2)]
     assert due.contexts == [context.CONTROL] * 3
-    assert order == ["tasks", "relay", "hubs", "due"] * 3
+    # The slow passes (the data work, the nightly measurement) are started where the loop is in this order, run inline
+    # here (Inline); in the worker they run in threads of their own, so nothing orders them against the hubs due: a
+    # reset's row the provisioning's pass takes first is given back still due (release_hub, test_worker_data.py).
+    assert order == ["tasks", "relay", "hubs", "data", "usage", "due"] * 3
 
 
 def test_with_databases_only_it_makes_and_drops_the_hubs_databases_and_nothing_else(
@@ -606,6 +653,8 @@ def test_with_databases_only_it_makes_and_drops_the_hubs_databases_and_nothing_e
     monkeypatch.setattr(relay, "run", lambda now: order.append("relay") or outbox(now))
     monkeypatch.setattr(worker, "_hubs", lambda now: order.append("hubs"))
     monkeypatch.setattr(worker, "_reap", lambda now: order.append("reap"))
+    monkeypatch.setattr(worker, "_data", lambda now, stop=None: order.append("data"))
+    monkeypatch.setattr(worker, "_usage", lambda now: order.append("usage"))
     stop = threading.Event()
     wait, _ = stop_after(stop, 2)
 
@@ -613,7 +662,7 @@ def test_with_databases_only_it_makes_and_drops_the_hubs_databases_and_nothing_e
 
     # Every tick makes the databases due; the reaper keeps its own pace; nothing else runs.
     assert [step for step in order if step != "reap"] == ["due", "due"]
-    assert order[0] == "reap" and not {"tasks", "relay", "hubs"} & set(order)
+    assert order[0] == "reap" and not {"tasks", "relay", "hubs", "data", "usage"} & set(order)
 
 
 def test_a_due_pass_that_fails_is_logged_and_the_next_tick_tries_again(caplog, calls, tasks, due, outbox):
@@ -643,3 +692,93 @@ def test_the_pass_that_makes_databases_gives_the_next_tick_its_turn():
     """Re-review of hub#471 (c): the hubs due take at most a few seconds a tick (the rest waits for the next), so the
     next tick's tasks and relay of the shared database are never held back long."""
     assert provision.DUE_PASS_SECONDS <= worker.TICK_SECONDS
+
+
+# ── The slow passes run off the loop (PLAN-DB round 2026-10-31b, C8) ──────────────────────────────────────────────
+
+
+def test_a_slow_data_pass_never_holds_the_relay_the_tasks_nor_the_hubs_due(monkeypatch, calls, tasks, due, outbox):
+    """A copy takes minutes (base.tenancy.dumps): it runs in a thread of its own, one at a time, while the loop keeps
+    relaying the events, running the tasks and making the hubs' databases every tick."""
+    monkeypatch.setattr(worker, "Background", THREADED)
+    release = threading.Event()
+    started: list[dt.datetime] = []
+
+    def slow(now, stop=None):
+        started.append(now)
+        release.wait(10)
+
+    monkeypatch.setattr(worker, "_data", slow)
+    stop = threading.Event()
+    wait, _ = stop_after(stop, 3)
+
+    def waiting(seconds):
+        stopped = wait(seconds)
+        if stopped:
+            release.set()  # the copy ends: run waits for it on its way out
+        return stopped
+
+    assert worker.run(stop, tick_seconds=TICK, wait=waiting, clock=clock(0, 0, 1, 2)) == 0
+
+    assert due.passes == [ten(0), ten(1), ten(2)]
+    assert outbox.passes == [ten(0), ten(1), ten(2)]
+    assert tasks.ticks == [ten(0), ten(1), ten(2)]
+    # One copy at a time: the next tick does not start a second one while the first runs.
+    assert started == [ten(0)]
+
+
+def test_a_data_pass_hears_the_stop_and_the_worker_waits_for_it(monkeypatch, calls):
+    monkeypatch.setattr(worker, "Background", THREADED)
+    ended: list[str] = []
+
+    def stoppable(now, stop=None):
+        stop.wait(10)  # a copy polling its stop: it kills pg_dump and gives its lease back
+        ended.append("given back")
+
+    monkeypatch.setattr(worker, "_data", stoppable)
+    stop = threading.Event()
+    wait, _ = stop_after(stop, 1)
+
+    assert worker.run(stop, tick_seconds=TICK, wait=wait, clock=clock(0, 0)) == 0
+
+    assert ended == ["given back"]
+
+
+def test_a_pass_that_does_not_end_is_waited_for_a_while_only(monkeypatch, calls, caplog):
+    monkeypatch.setattr(worker, "Background", THREADED)
+    monkeypatch.setattr(worker, "BACKGROUND_GRACE_SECONDS", 0.2)
+    stuck = threading.Event()
+    monkeypatch.setattr(worker, "_usage", lambda now: stuck.wait(10))
+    stop = threading.Event()
+    wait, _ = stop_after(stop, 1)
+    started = time.monotonic()
+
+    with caplog.at_level(logging.WARNING, logger="base.worker"):
+        assert worker.run(stop, tick_seconds=TICK, wait=wait, clock=clock(0, 0)) == 0
+
+    assert time.monotonic() - started < 5
+    assert "still running on the way out" in caplog.text
+    stuck.set()
+
+
+def test_a_slow_pass_that_fails_is_logged_and_the_next_tick_starts_it_again(monkeypatch, calls, caplog):
+    monkeypatch.setattr(worker, "Background", THREADED)
+    runs: list[dt.datetime] = []
+
+    def failing(now, stop=None):
+        runs.append(now)
+        raise RuntimeError("the database went away")
+
+    monkeypatch.setattr(worker, "_data", failing)
+    stop = threading.Event()
+    wait, _ = stop_after(stop, 2)
+
+    def settled(seconds):
+        time.sleep(0.2)  # the failed pass ends before the next tick looks
+        return wait(seconds)
+
+    with caplog.at_level(logging.ERROR, logger="base.worker"):
+        worker.run(stop, tick_seconds=TICK, wait=settled, clock=clock(0, 0, 1))
+
+    assert runs == [ten(0), ten(1)]
+    assert "the data pass failed" in caplog.text

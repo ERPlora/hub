@@ -2039,3 +2039,19 @@ msgstr "usuario del negocio"
 #: models.py
 msgid "business users"
 msgstr "usuarios del negocio"
+
+#: base/services.py (the reset of a business and the copies of its data, round 2026-10-30 of PLAN-DB)
+msgid "The copy of the data cannot be made right now, so nothing was emptied. Try again later."
+msgstr "Ahora mismo no se puede hacer la copia de los datos, así que no se ha vaciado nada. Inténtalo más tarde."
+
+msgid "The business is already being reset. Wait for it to finish."
+msgstr "Ya se está restableciendo el negocio. Espera a que termine."
+
+msgid "The copy cannot be downloaded right now. Try again in a moment."
+msgstr "Ahora mismo no se puede descargar la copia. Inténtalo en un momento."
+
+msgid "This copy is no longer kept."
+msgstr "Esta copia ya no se guarda."
+
+msgid "That day has not been measured yet."
+msgstr "Ese día todavía no se ha medido."
