@@ -49,7 +49,10 @@ its database context: ``use_hub(request.hub)`` on a hub's host; on the platform 
 (``/admin/hub/<slug>/``) or, with none, phase 1's shared database; nothing for ``/internal`` and the open paths,
 whose code opens its own. A hub's database that says it is another hub (``base.tenancy.identity``) answers 503
 (``base.hub_unavailable``), serves nothing and raises an alarm; one that cannot be reached now answers the same 503
-with ``Retry-After`` and a warning.
+with ``Retry-After`` and a warning. A hub whose every place in this process is taken (its plan's transactions at once,
+``base.tenancy.limits``) answers 503 ``base.hub_busy`` with ``Retry-After``, whether that happens while checking its
+database, in ``SaasLoginRequiredMiddleware`` (the website, a till's device) or in the view (the API's routes answer it
+themselves, with the same envelope): the envelope, or for a page (the admin, the website) its message as text.
 
 ``SessionHostMiddleware`` (phase 2, S1): a session is a session of the host it was opened on (the login notes it);
 on another hub's host, or on the platform host, it is anonymous (401).
@@ -82,6 +85,7 @@ from base.public_home import website_enabled
 from base.spa import spa
 from base.tenancy import connections as tenancy_connections
 from base.tenancy import context as tenancy_context
+from base.tenancy import limits as tenancy_limits
 from base.tenancy.identity import HubIdentityMismatch
 
 logger = logging.getLogger(__name__)
@@ -202,6 +206,14 @@ class SaasLoginRequiredMiddleware(MiddlewareMixin):
     """Placed after ``AuthenticationMiddleware``: it reads ``request.user``."""
 
     def process_view(self, request: HttpRequest, view_func, view_args, view_kwargs) -> HttpResponse | None:
+        try:
+            return self._gate(request, view_func)
+        except tenancy_limits.HubBusy as busy:
+            # It reads the hub's database (its website, the browser's device) before any view, and what a process_view
+            # raises never reaches HubDatabaseMiddleware.process_exception: the same 503.
+            return HubDatabaseMiddleware._busy(request, busy)
+
+    def _gate(self, request: HttpRequest, view_func) -> HttpResponse | None:
         if view_func is not spa or request.user.is_authenticated:
             return None
         if request.method not in ("GET", "HEAD") or "text/html" not in request.headers.get("Accept", ""):
@@ -242,6 +254,8 @@ class HubDatabaseMiddleware:
             return self.__acall__(request)
         try:
             resolved = self._resolve(request)
+        except tenancy_limits.HubBusy as busy:
+            return self._busy(request, busy)
         except (HubIdentityMismatch, DatabaseError) as error:
             return self._unavailable(request, error)
         with self._entered(resolved):
@@ -254,10 +268,18 @@ class HubDatabaseMiddleware:
                 resolved = await sync_to_async(self._resolve)(request)
             else:
                 resolved = self._resolve(request)
+        except tenancy_limits.HubBusy as busy:
+            return self._busy(request, busy)
         except (HubIdentityMismatch, DatabaseError) as error:
             return self._unavailable(request, error)
         with self._entered(resolved):
             return await self.get_response(request)
+
+    def process_exception(self, request: HttpRequest, exception: Exception) -> HttpResponse | None:
+        """A view that found its hub busy (the admin's, a page's) answers 503 instead of 500."""
+        if isinstance(exception, tenancy_limits.HubBusy):
+            return self._busy(request, exception)
+        return None
 
     def _resolve(self, request: HttpRequest):
         """The hub the request works on, ``_SHARED`` or ``None``; a hub's own database is registered and checked."""
@@ -277,6 +299,16 @@ class HubDatabaseMiddleware:
         if resolved is None:
             return nullcontext()
         return tenancy_context.use_hub(resolved)
+
+    @staticmethod
+    def _busy(request: HttpRequest, busy: tenancy_limits.HubBusy) -> HttpResponse:
+        """503 ``base.hub_busy``: the envelope, or the message for a page; come back in a moment (``Retry-After``)."""
+        if _wants_envelope(request):
+            response = _envelope(busy.status, busy.code, busy.message)
+        else:
+            response = HttpResponse(busy.message, status=busy.status, content_type="text/plain; charset=utf-8")
+        response["Retry-After"] = str(tenancy_limits.RETRY_AFTER_SECONDS)
+        return response
 
     @staticmethod
     def _unavailable(request: HttpRequest, error: Exception) -> HttpResponse:
