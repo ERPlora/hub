@@ -270,7 +270,8 @@ class TestCancelAndRestore:
         assert len(events("base.hub.cancelled")) == 1
 
     def test_restoring_brings_a_cancelled_hub_back(self):
-        Hub.objects.create(id=HUB_ID, slug="acme", status="ready")
+        # With its own database, made and kept while it was away (one without is made one: test_internal.py).
+        Hub.objects.create(id=HUB_ID, slug="acme", status="ready", db_name="hub_x", ready_at=timezone.now())
         hub_cancel(SYSTEM, HubCancelIn(id=HUB_ID))
         answer = hub_restore(SYSTEM, HubRestoreIn(id=HUB_ID))
         assert answer.status == "ready"

@@ -32,6 +32,7 @@ from base.tenancy import context
 from base.tenancy.context import use_hub
 from base.tenancy.identity import HubIdentityMismatch
 from base.tenancy.tests import hubs
+from base.tenancy.tests.legacy import use_legacy
 from base.tests.test_internal import HUB_ID, PATH as STATE_PATH, SECRET, code, signed
 
 INBOUND = "/internal/whatsapp/inbound"
@@ -325,27 +326,43 @@ def cold(*slugs: str) -> None:
         activation.forget(slug)
 
 
+@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
 @pytest.mark.parametrize("host", SAAS_HOSTS)
 @pytest.mark.parametrize("path", DOORS)
-def test_each_door_answers_with_the_cache_of_the_apps_off_cold(acme, production, path, host):
+def test_each_door_answers_with_the_cache_of_the_apps_off_cold(hub_a, production, path, host):
     door = production()
-    cold("acme")
+    cold(hub_a.slug)
 
-    answer = post(door, path, door_body(path), host=host)
+    answer = post(door, path, door_body(path, hub=hub_a.slug), host=host)
 
     assert answer.status_code == 200
 
 
+@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
 @pytest.mark.parametrize("path", DOORS)
-def test_the_app_off_in_its_rows_is_404_app_inactive_with_the_cache_cold(acme, production, path):
-    AppActivation.objects.filter(host="acme", app="whatsapp_inbox").update(state="off", chosen=False)
+def test_the_app_off_in_its_rows_is_404_app_inactive_with_the_cache_cold(hub_a, production, path):
+    with use_hub(hub_a):
+        AppActivation.objects.filter(host=hub_a.slug, app="whatsapp_inbox").update(state="off", chosen=False)
     door = production()
-    cold("acme")
+    cold(hub_a.slug)
+
+    answer = post(door, path, door_body(path, hub=hub_a.slug), host=PRIVATE_NAME)
+
+    assert answer.status_code == 404 and code(answer) == "app_inactive"
+    with use_hub(hub_a):
+        assert not Message.objects.exists() and not Channel.objects.exists()
+
+
+@pytest.mark.parametrize("path", DOORS)
+def test_a_business_without_its_own_database_is_503_and_runs_nothing(acme, production, path):
+    """S5: a business still on control's database (phase 1's, not cut) is not served: erplora.com keeps the message and
+    tries again once its cut gives it its own."""
+    door = production()
 
     answer = post(door, path, door_body(path), host=PRIVATE_NAME)
 
-    assert answer.status_code == 404 and code(answer) == "app_inactive"
-    with use_hub(acme):
+    assert answer.status_code == 503 and code(answer) == "base.hub_preparing"
+    with use_legacy():
         assert not Message.objects.exists() and not Channel.objects.exists()
 
 
@@ -385,8 +402,9 @@ def test_each_business_answers_from_its_own_database(hub_a, hub_b, production, m
     ],
 )
 @pytest.mark.parametrize("path", DOORS)
+@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
 def test_a_database_that_fails_asking_for_the_apps_is_503_and_logged(
-    acme, production, monkeypatch, caplog, path, failure, level
+    hub_a, production, monkeypatch, caplog, path, failure, level
 ):
     # erplora.com keeps the message and tries again; the Hub's log says which business and why.
     def failing(scope):
@@ -395,11 +413,11 @@ def test_a_database_that_fails_asking_for_the_apps_is_503_and_logged(
     monkeypatch.setattr(relay, "active_apps", failing)
     door = production()
 
-    answer = post(door, path, door_body(path), host=PRIVATE_NAME)
+    answer = post(door, path, door_body(path, hub=hub_a.slug), host=PRIVATE_NAME)
 
     assert answer.status_code == 503 and code(answer) == "base.hub_unavailable"
     [logged] = [record for record in caplog.records if record.name == "base.internal"]
-    assert logged.levelname == level and "hub=acme" in logged.getMessage()
+    assert logged.levelname == level and f"hub={hub_a.slug}" in logged.getMessage()
     assert logged.exc_info[1] is failure
 
 
