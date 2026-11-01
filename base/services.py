@@ -1231,11 +1231,14 @@ def claim_hub(hub_id: UUID, now: dt.datetime, lease: dt.timedelta, *, owner: str
 
 def claim_next_due_hub(now: dt.datetime, lease: dt.timedelta, *, owner: str = LEASE_OWNER) -> UUID | None:
     """Take for ``owner`` the lease of the hub due longest by ``now`` that nobody holds: one at a time, right before
-    it is worked on, so no lease runs out while it waits its turn in a pass."""
+    it is worked on, so no lease runs out while it waits its turn in a pass. Never a ready hub's (a demo whose time is
+    up aside): its ring is its apps' to set up (``base.worker._activations``, S3), which keep their own time, or its
+    data work's, whose pass takes it."""
     with _control_transaction():
         due = (
-            HubDue.objects.select_for_update(skip_locked=True)
+            HubDue.objects.select_for_update(skip_locked=True, of=("self",))
             .filter(_free(now), due_at__lte=now)
+            .exclude(Q(hub__status=Hub.Status.READY) & ~Q(hub__is_demo=True, hub__expires_at__lte=now))
             .order_by("due_at")
             .values_list("hub_id", flat=True)
             .first()
@@ -3975,14 +3978,36 @@ def support_report(ctx: OperationContext, data: SupportReportIn) -> dict:
 # ── Apps turned on and off by the business, with the plan's limit (PLAN-HUB §9; BASE-F18, F19, F23–F25) ────────────
 # The rules are base.activation's; here, their rows (base.AppActivation) under a lock of the business's rows, so two
 # people at once never both pass the limit, and the events. Turning an app off never drops its tables.
+#
+# In a hub with its own database (S3; PLAN-DB §7, spec 2026-10-11 «tablas al activar») an app whose tables its database
+# does not have yet (``Hub.schema_apps``, what the migrator confirmed) is ``creating``: the answer says so (the route's
+# 202), the event ``base.app.activation_requested`` is recorded and the hub's ``hub_due`` rung after the COMMIT; the
+# worker makes its tables (``ensure_schema``) and turns it on (``base.app.activation_settle``: ``base.app.enabled``, its
+# live notice), or ``failed`` with why, tried again at 1, 5 and 15 minutes and then every hour, or by hand
+# (``base.app.retry``). What it needs goes in the same plan. One whose tables it has is on at once, as in phase 1. A hub
+# that still shares phase 1's database turns every app on at once (proposal (i) of round 2026-10-30, until S5).
+from functools import cache as _cache  # noqa: E402
 from typing import Any  # noqa: E402
 
 from live.meta import module_configs  # noqa: E402
 from live.operations import on_commit as after_commit  # noqa: E402,F811
 
 from base import activation, entitlement, home  # noqa: E402
+from base.activation import CREATING, FAILED, ON  # noqa: E402
 from base.models import AppActivation  # noqa: E402
-from base.schemas import AppChangeIn, AppChangeOut  # noqa: E402
+from base.schemas import AppActivationSettleIn, AppActivationSettleOut, AppChangeIn, AppChangeOut  # noqa: E402
+from base.tenancy import migrator  # noqa: E402
+
+#: The waits before the worker makes the tables of an app that failed again: 1 min, 5 min, 15 min, then every hour (as a
+#: hub's preparation, PLAN-DB §6 and §7).
+ACTIVATION_RETRY_SECONDS = (60, 300, 900, 3600)
+#: How long an app waits when another run holds its hub's schema (PLAN-DB §7: the activation is queued again +30 s).
+ACTIVATION_LOCKED_SECONDS = 30
+#: How long an app asked by a newer code waits for a worker of that code (PLAN-DB §7: any other worker queues it +60 s).
+ACTIVATION_NEWER_CODE_SECONDS = 60
+#: How long an app waits for a worker of its code before it fails as ``code_behind`` (PLAN-DB §7: 10 minutes, the
+#: alarm's threshold): after a rollback none is coming, and the business tries again, asked by the code that runs now.
+ACTIVATION_CODE_BEHIND_AFTER = dt.timedelta(minutes=10)
 
 
 class AppLimitReached(OperationError):
@@ -4057,18 +4082,76 @@ def _locked_states(ctx: OperationContext, graph: dict) -> dict[str, activation.A
 
 
 def _write_states(host: str, changes: dict[str, activation.Activation]) -> None:
-    """Write ``changes`` and, after the COMMIT of the running change, forget what the cache kept of the business."""
+    """Write ``changes`` and, after the COMMIT of the running change, forget what the cache kept of the business. A row
+    that goes ``creating`` waits for no time (the worker takes it now) and keeps its failed attempts; one that goes on or
+    off has none left."""
     after_commit(partial(activation.forget, host))
     now = timezone.now()
     existing = set(AppActivation.objects.filter(host=host, app__in=list(changes)).values_list("app", flat=True))
     for label, row in changes.items():
         if label in existing:
-            AppActivation.objects.filter(host=host, app=label).update(state=row.state, chosen=row.chosen, changed_at=now)
+            settled = {"target": _code_leaf(label)} if row.state == CREATING else {"attempts": 0, "last_error": ""}
+            AppActivation.objects.filter(host=host, app=label).update(
+                state=row.state, chosen=row.chosen, changed_at=now, next_attempt_at=None, **settled
+            )
     AppActivation.objects.bulk_create(
-        AppActivation(host=host, app=label, state=row.state, chosen=row.chosen)
+        AppActivation(
+            host=host,
+            app=label,
+            state=row.state,
+            chosen=row.chosen,
+            target=_code_leaf(label) if row.state == CREATING else "",
+        )
         for label, row in changes.items()
         if label not in existing
     )
+
+
+@_cache
+def _code_leaves() -> dict[str, str]:
+    """This code's last migration of each app (its migrations never change while the process runs)."""
+    return dict(migrator.code_migrations().leaves)
+
+
+def _code_leaf(label: str) -> str:
+    """The last migration of ``label`` in this code, which its tables are made to; ``""`` for an app without any."""
+    return _code_leaves().get(label, "")
+
+
+def _apps_without_migrations() -> frozenset[str]:
+    """The modules with no migration: created in every hub by definition (they have no tables)."""
+    return frozenset(activation.module_graph()) - set(_code_leaves())
+
+
+def _apps_created(hub: Hub | None) -> frozenset[str] | None:
+    """The modules whose tables ``hub``'s own database has: what the migrator confirmed (``Hub.schema_apps``; the
+    worker's ``ensure_schema`` makes what it lacks and is a no-op for what it has) and those without migrations;
+    ``None`` for a hub that shares phase 1's database, where every app has them."""
+    if not has_own_database(hub):
+        return None
+    return frozenset(hub.schema_apps or ()) | _apps_without_migrations()
+
+
+def _tables_first(
+    changes: dict[str, activation.Activation],
+    current: dict[str, activation.Activation],
+    created: frozenset[str] | None,
+) -> dict[str, activation.Activation]:
+    """``changes`` as they are written: when an app they turn on lacks its tables, every app they turn on is
+    ``creating`` (one plan, PLAN-DB §7); an app already on stays on."""
+    turning_on = [label for label, row in changes.items() if row.on and not current[label].on]
+    if created is None or all(label in created for label in turning_on):
+        return changes
+    return {
+        label: activation.Activation(CREATING, row.chosen) if label in turning_on else row
+        for label, row in changes.items()
+    }
+
+
+def _ring(hub: Hub) -> None:
+    """The hub has tables to make: due in ``hub_due`` now, so the worker takes it at its next tick (after the COMMIT of
+    the change that asked for them; on control)."""
+    HubDue.mark_due(hub, timezone.now())
 
 
 def _every_app_on(host: str, *, then: Callable[[Callable[[], None]], object] | None = None) -> None:
@@ -4090,7 +4173,9 @@ def _turn_on_listed(ctx: OperationContext, listed: Iterable[str], selected: set[
     some) that are off here, each through ``base.app.enable``: its plan's limit, its rights, what it needs along and
     its event, as if the person turned it on in Apps. Their roots first, chosen, so what they need comes along and
     does not count against the limit (as a vertical's template, ``base.activation.template``); then any listed app
-    still off. An app refused stays off and its reason is returned, by app: the rest are turned on and load."""
+    still off. An app refused stays off and its reason is returned, by app: the rest are turned on and load. One whose
+    tables its hub's own database is still making (``creating``) loads nothing yet, and its reason says to load again
+    once it is on (the load's «Retry» brings what it left out)."""
     graph = activation.module_graph()
     wanted = [app for app in dict.fromkeys(listed) if app in graph and (not selected or app in selected)]
     roots = activation.roots(set(wanted) | activation.needs(wanted, graph), graph)
@@ -4101,9 +4186,15 @@ def _turn_on_listed(ctx: OperationContext, listed: Iterable[str], selected: set[
         if app not in blocked and activation.states_of(ctx.scope)[app].on:
             continue
         try:
-            enable(ctx, AppChangeIn(app=app))
+            answer = enable(ctx, AppChangeIn(app=app))
         except OperationError as refusal:
             refused[app] = refusal.message
+            continue
+        if answer.state == CREATING:
+            with translation.override(ctx.language):
+                refused[app] = gettext(
+                    "It is being set up for this business. Load the template again in a minute to bring its data."
+                )
     return refused
 
 
@@ -4124,7 +4215,7 @@ def _names_said(ctx: OperationContext, labels: list[str]) -> str:
 
 def _app_answer(label: str, row: activation.Activation, along: list[dict[str, str]], *, already: bool) -> dict:
     """``already``: it was in that state before (on, or off), and nothing went on or off: the assistant says so."""
-    return {"app": label, "state": row.state, "chosen": row.on and row.chosen, "along": along, "already": already}
+    return {"app": label, "state": row.state, "chosen": row.wanted and row.chosen, "along": along, "already": already}
 
 
 @operation(
@@ -4138,7 +4229,8 @@ def _app_answer(label: str, row: activation.Activation, along: list[dict[str, st
         "description": "Turns on one of this business's apps (by its name as the person says it, or its id), with the "
         "apps it needs, which come along: it shows in the menu and can be used, with the data it had. Refused when the "
         "plan's limit of apps is reached (turn one off, or upgrade the plan on erplora.com), a paid app is not "
-        "subscribed or the name fits several apps (ask which one). already=true: it was on already, nothing changed.",
+        "subscribed or the name fits several apps (ask which one). state=creating: it is being set up and is on in a "
+        "moment. already=true: it was on (or being set up) already, nothing changed.",
         "risk": "normal",
         "check": "base.app.get",
         "asks": {
@@ -4150,7 +4242,9 @@ def _app_answer(label: str, row: activation.Activation, along: list[dict[str, st
 def app_enable(ctx: OperationContext, data: AppChangeIn) -> dict:
     """BASE-F18/F24: the app on and chosen, and what it needs on along with it (not chosen: it does not count). A
     paid one without its right (or needing one) is 402 ``app_entitlement_blocked``; one more chosen app at the plan's
-    limit, 402 ``base.app_limit_reached`` (a lower limit than the chosen ones turns nothing off: it only refuses this)."""
+    limit, 402 ``base.app_limit_reached`` (a lower limit than the chosen ones turns nothing off: it only refuses this).
+    In a hub with its own database whose tables for it (or for what it needs) are not made yet, ``creating`` (202):
+    the worker makes them and turns it on; one that failed is tried again."""
     with activation.changing(ctx.scope.key):
         return _enable(ctx, data)
 
@@ -4163,11 +4257,14 @@ def _enable(ctx: OperationContext, data: AppChangeIn) -> dict:
     for label in [app, *sorted(activation.needs([app], graph))]:
         if label in blocked:
             raise entitlement.refused(label, ctx.language)
-    if not activation.enabling(app, activation.states_of(ctx.scope), graph):
-        return _app_answer(app, activation.Activation(activation.ON, True), [], already=True)
+    current = activation.states_of(ctx.scope)
+    if not activation.enabling(app, current, graph):
+        return _unchanged(hub, app, current[app])
     current = _locked_states(ctx, graph)
     changes = activation.enabling(app, current, graph)
-    if changes.get(app, current[app]).chosen and not (current[app].on and current[app].chosen):
+    if not changes:
+        return _unchanged(hub, app, current[app])
+    if changes.get(app, current[app]).chosen and not (current[app].wanted and current[app].chosen):
         limit = queries.app_limit(hub)
         shown = {config.label for config in home.shown_modules(demo_hub=bool(hub and hub.is_demo))}
         enabled = activation.chosen_on(current, among=shown)
@@ -4179,12 +4276,26 @@ def _enable(ctx: OperationContext, data: AppChangeIn) -> dict:
                     limit,
                 ) % {"count": limit}
             raise AppLimitReached(message, max_apps=limit, enabled=enabled)
+    changes = _tables_first(changes, current, _apps_created(hub))
     _write_states(ctx.scope.key, changes)
-    if hub is not None and not hub.is_demo:
-        _sync_photo_blocks(hub, changes)
+    on_now = [label for label, row in changes.items() if row.on]
+    if hub is not None and not hub.is_demo and on_now:
+        _sync_photo_blocks(hub, on_now)
     along = [label for label in changes if label != app]
-    record_event(ctx, events.APP_ENABLED, {"app": app, "along": along})
-    return _app_answer(app, activation.Activation(activation.ON, True), _named(ctx, along), already=current[app].on)
+    answer = changes.get(app, current[app])
+    if any(row.state == CREATING for row in changes.values()):
+        after_commit(partial(_ring, hub))
+    name = events.APP_ACTIVATION_REQUESTED if answer.state == CREATING else events.APP_ENABLED
+    record_event(ctx, name, {"app": app, "along": along})
+    return _app_answer(app, answer, _named(ctx, along), already=current[app].on)
+
+
+def _unchanged(hub: Hub | None, label: str, row: activation.Activation) -> dict:
+    """Turning on an app on and chosen already, or being created (its hub rung again: a ring lost is found again):
+    ``already``, nothing went on."""
+    if row.state == CREATING:
+        after_commit(partial(_ring, hub))
+    return _app_answer(label, row, [], already=True)
 
 
 @operation(
@@ -4226,10 +4337,10 @@ def app_disable(ctx: OperationContext, data: AppChangeIn) -> dict:
 def _disable(ctx: OperationContext, data: AppChangeIn) -> dict:
     app = _business_module(ctx, data.app, _business_hub(ctx)).label
     graph = activation.module_graph()
-    if not activation.states_of(ctx.scope)[app].on:
+    if not activation.states_of(ctx.scope)[app].wanted:
         return _app_answer(app, activation.OFF_ROW, [], already=True)
     current = _locked_states(ctx, graph)
-    if not current[app].on:
+    if not current[app].wanted:
         return _app_answer(app, activation.OFF_ROW, [], already=True)
     needed = activation.required_by(app, current, graph)
     if needed:
@@ -4246,3 +4357,201 @@ def _disable(ctx: OperationContext, data: AppChangeIn) -> dict:
     along = [label for label in changes if label != app]
     record_event(ctx, events.APP_DISABLED, {"app": app, "along": along})
     return _app_answer(app, activation.OFF_ROW, _named(ctx, along), already=False)
+
+
+@operation(
+    "base.app.retry",
+    kind="command",
+    permission=ADMINISTER_HUB,
+    input=AppChangeIn,
+    output=AppChangeOut,
+    # A dict, not AI(...): AI has no ``check`` (base.assistant.check_of), the read run before the card (hub#542, hub#539).
+    ai={
+        "description": "Tries again to set up one of this business's apps that could not be turned on (its state "
+        "«failed» in base.app.list; by its name as the person says it, or its id), with what it needs that failed too: "
+        "it is set up in a moment and then shows in the menu. Refused for an app that is not waiting for it, or when the "
+        "name fits several apps (ask which one).",
+        "risk": "normal",
+        "check": "base.app.get",
+        "asks": {
+            "en": (
+                "the bookings app could not be turned on, try again",
+                "retry setting up the kitchen app",
+                "try turning on the website app again",
+            ),
+            "es": (
+                "la app de reservas no se pudo activar, inténtalo otra vez",
+                "reintenta preparar la app de cocina",
+                "vuelve a intentar activar la web",
+            ),
+        },
+    },
+)
+def app_retry(ctx: OperationContext, data: AppChangeIn) -> dict:
+    """BASE-F21/F22: an app whose tables could not be made (``failed``) is ``creating`` again now, with what it needs
+    that failed too, and its hub rung (the worker also tries again by itself). 409 ``base.app_not_failed`` for any
+    other app, and in a hub that shares phase 1's database, where nothing is ever made later. The app by its name or its
+    id, as ``base.app.enable`` takes it (hub#539)."""
+    with activation.changing(ctx.scope.key):
+        hub = _business_hub(ctx)
+        app = _business_module(ctx, data.app, hub).label
+        current = _locked_states(ctx, activation.module_graph()) if has_own_database(hub) else None
+        if current is None or current[app].state != FAILED:
+            raise Conflict(gettext("This app is not waiting to be set up again."), code="base.app_not_failed")
+        graph = activation.module_graph()
+        closure = {app, *activation.needs([app], graph)}
+        changes = {
+            label: activation.Activation(CREATING, row.chosen)
+            for label, row in current.items()
+            if label in closure and row.state == FAILED
+        }
+        _write_states(ctx.scope.key, changes)
+        after_commit(partial(_ring, hub))
+        along = [label for label in changes if label != app]
+        record_event(ctx, events.APP_ACTIVATION_REQUESTED, {"app": app, "along": along})
+        return _app_answer(app, changes[app], _named(ctx, along), already=False)
+
+
+def activation_hubs(now: dt.datetime) -> list[Hub]:
+    """The hubs whose apps the worker sets up now (S3): ready, with their own database, whose ``hub_due`` came and
+    nobody holds. Never one being made, dropped or gone, a demo whose time is up, nor one moving to another cluster
+    (``moving_to``: tables made while its database is copied would stay behind; its ring waits for the move). By id."""
+    return list(
+        Hub.objects.filter(status=Hub.Status.READY, moving_to__isnull=True)
+        .exclude(db_name="")
+        .exclude(is_demo=True, expires_at__lte=now)
+        .filter(due__due_at__lte=now)
+        .filter(Q(due__lease_until__isnull=True) | Q(due__lease_until__lte=now))
+        .select_related("cluster")
+        .order_by("id")
+    )
+
+
+def ring_activations(hub: Hub, at: dt.datetime) -> None:
+    """``hub`` has apps to set up by ``at``: due in ``hub_due`` then, or earlier if it already is (the sweep's ring)."""
+    with _control_transaction():
+        HubDue.mark_due(hub, at)
+
+
+def activations_rung_at(hub_id: UUID, at: dt.datetime | None) -> None:
+    """After the worker looked into a ready hub's apps: its ring moves to ``at`` (the next of them to set up: a retry,
+    one put off), or ends with ``None``, unless the hub has other work due (a reset, the copy of a business that left)
+    or another worker holds its row. The pass over the hubs due leaves a ready hub's ring alone (``claim_next_due_hub``),
+    so its time is kept."""
+    now = timezone.now()
+    with _control_transaction():
+        hub = Hub.objects.filter(pk=hub_id).first()
+        due = HubDue.objects.select_for_update().filter(pk=hub_id).first()
+        if hub is None or (due is not None and due.lease_until is not None and due.lease_until > now):
+            return
+        if at is not None:
+            if due is None:
+                HubDue.mark_due(hub, at)
+            else:
+                HubDue.objects.filter(pk=hub_id).update(due_at=at)
+        elif due is not None and hub.reset_requested_at is None and not offboarding_due(hub):
+            due.delete()
+
+
+def hubs_visited_since(day: dt.date) -> frozenset[str]:
+    """The hubs (by slug) someone came into since ``day``: the active ones, which the sweep looks into more often."""
+    return frozenset(HubVisit.objects.filter(day__gte=day).values_list("host", flat=True).distinct())
+
+
+def _activation_retry_delay(attempts: int) -> dt.timedelta:
+    """How long an app whose tables failed ``attempts`` times in a row waits before the next try."""
+    return dt.timedelta(seconds=ACTIVATION_RETRY_SECONDS[min(attempts, len(ACTIVATION_RETRY_SECONDS)) - 1])
+
+
+# Not an assistant tool: the worker's step after making a hub's tables, no person.
+@operation(
+    "base.app.activation_settle",
+    kind="command",
+    permission=None,
+    input=AppActivationSettleIn,
+    output=AppActivationSettleOut,
+    ai=INTERNAL,
+)
+def app_activation_settle(ctx: OperationContext, data: AppActivationSettleIn) -> dict:
+    """The worker's step after ``ensure_schema`` in a hub's own database (``base.worker``), as the platform.
+
+    Of the apps it took that are still waiting (``creating``, or ``failed``: one turned off meanwhile stays off, its
+    tables made): ``created`` turns on those whose tables the hub now has (``base.app.enabled``, one per app the business
+    chose, with what came along; then their photo's blocks, as an app turned on at once) and leaves the rest ``failed``;
+    ``failed`` leaves them ``failed`` with ``attempts`` + 1, the error and the next try (1, 5, 15 min, then every hour;
+    ``base.app.activation_failed``); ``locked`` and ``newer_code`` put them off (30 s, 60 s), still ``creating``. Never
+    on phase 1's shared database (409 ``base.app_shared_database``); only the platform runs it, anyone else refused
+    before anything is read (as ``base.hub.reset_apply``, review of hub#490)."""
+    internal_only(ctx)
+    host = ctx.scope.key
+    hub = _business_hub(ctx)
+    if not has_own_database(hub):
+        raise Conflict(
+            gettext("This business shares its database: its apps are turned on at once."),
+            code="base.app_shared_database",
+        )
+    with activation.changing(host):
+        graph = activation.module_graph()
+        current = _locked_states(ctx, graph)
+        now = timezone.now()
+        asked = [label for label in dict.fromkeys(data.apps) if label in current and current[label].state in (CREATING, FAILED)]
+        after_commit(partial(activation.forget, host))
+        after_commit(partial(_ring_next, hub, host))
+        behind: list[str] = []
+        if data.outcome == "newer_code":
+            # Waited for a worker of its code since it was asked for (``changed_at``): after a rollback none is coming.
+            since = dict(AppActivation.objects.filter(host=host, app__in=asked).values_list("app", "changed_at"))
+            behind = [label for label in asked if since[label] <= now - ACTIVATION_CODE_BEHIND_AFTER]
+        if data.outcome == "locked" or (data.outcome == "newer_code" and not behind):
+            wait = ACTIVATION_LOCKED_SECONDS if data.outcome == "locked" else ACTIVATION_NEWER_CODE_SECONDS
+            AppActivation.objects.filter(host=host, app__in=asked).update(next_attempt_at=now + dt.timedelta(seconds=wait))
+            return {"on": [], "failed": [], "waiting": asked}
+        created = _apps_created(hub)
+        made = [label for label in asked if data.outcome == "created" and (created is None or label in created)]
+        failed = behind or [label for label in asked if label not in made]
+        if made:
+            _write_states(host, {label: activation.Activation(ON, current[label].chosen) for label in made})
+            if hub is not None and not hub.is_demo:
+                _sync_photo_blocks(hub, made)
+            _record_enabled(ctx, made, current, graph)
+        if failed:
+            kind = {"failed": "schema_failed", "newer_code": "code_behind"}.get(data.outcome, "not_created")
+            error = {
+                "schema_failed": data.error,
+                "code_behind": "code_behind: asked by a code no worker runs any more (a rollback): turn it on again.",
+                "not_created": "not_created: the migrator ended without its tables.",
+            }[kind]
+            for label in failed:
+                attempts = AppActivation.objects.get(host=host, app=label).attempts + 1
+                AppActivation.objects.filter(host=host, app=label).update(
+                    state=FAILED,
+                    attempts=attempts,
+                    last_error=error[:LAST_ERROR_MAX],
+                    next_attempt_at=now + _activation_retry_delay(attempts),
+                    changed_at=now,
+                )
+            record_event(ctx, events.APP_ACTIVATION_FAILED, {"apps": failed, "error": kind})
+            logger.warning("base.app.activation_failed hub=%s apps=%s: %s", host, ",".join(failed), error[:300])
+        return {"on": made, "failed": failed, "waiting": []}
+
+
+def _ring_next(hub: Hub, host: str) -> None:
+    """After the COMMIT of a settle (inside the hub's database): its ring moves to the next app to set up, or ends."""
+    activations_rung_at(hub.pk, queries.activation_next_at(host))
+
+
+def _record_enabled(
+    ctx: OperationContext, made: list[str], current: dict[str, activation.Activation], graph: dict
+) -> None:
+    """``base.app.enabled`` for each app the business chose that went on, with what came along with it; one that came
+    along with none of them (its chooser on already) gets its own."""
+    chosen = [label for label in made if current[label].chosen]
+    along_any: set[str] = set()
+    for label in chosen:
+        along = sorted(other for other in made if other not in chosen and other in activation.needs([label], graph))
+        along_any.update(along)
+        record_event(ctx, events.APP_ENABLED, {"app": label, "along": along})
+    for label in made:
+        if label not in chosen and label not in along_any:
+            record_event(ctx, events.APP_ENABLED, {"app": label, "along": []})
+

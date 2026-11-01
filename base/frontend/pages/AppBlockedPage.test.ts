@@ -124,6 +124,28 @@ describe('AppBlockedPage', () => {
     expect(m.router.currentRoute.value.fullPath).toBe('/apps#all');
   });
 
+  it('an app being set up (S3) says so, and offers to open it once it is on, live', async () => {
+    const m = await open();
+    const creating = app('stock', { name: 'Stock', premium: false, right: 'free', state: 'creating', chosen: true });
+    await m.result(m.call, 'base.app.list', { ...LIST, apps: [creating] });
+    const setting = m.wrapper.find('[data-testid="app-blocked-creating"]');
+    expect(setting.text()).toContain('Stock is being set up');
+    expect(setting.text()).toContain('It opens in a moment');
+    expect(m.wrapper.find('[data-testid="app-blocked-missing"]').exists()).toBe(false);
+    await m.result(m.call, 'base.app.list', { ...LIST, apps: [{ ...creating, state: 'on', path: '/stock/items' }] }, 2);
+    expect(m.wrapper.find('[data-testid="app-blocked-open"]').attributes('href')).toBe('/stock/items');
+  });
+
+  it('an app that could not be set up says so and leads to Apps, where it is tried again; in Spanish too', async () => {
+    const m = await open('/stock/items', { locale: 'es' });
+    const failed = app('stock', { name: 'Stock', premium: false, right: 'free', state: 'failed', chosen: true });
+    await m.result(m.call, 'base.app.list', { ...LIST, apps: [failed] });
+    expect(m.wrapper.find('[data-testid="app-blocked-failed"]').text()).toContain('No se ha podido preparar Stock');
+    await m.wrapper.find('[data-testid="app-blocked-to-apps"]').trigger('click');
+    await flush();
+    expect(m.router.currentRoute.value.fullPath).toBe('/apps');
+  });
+
   it('a failed check says so with «Retry», never a reason made up', async () => {
     const m = await open();
     m.call.push(errorFrame(subId(m.client, 'base.app.list'), 'internal_error'));

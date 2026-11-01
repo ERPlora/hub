@@ -9,11 +9,13 @@ of its own (``base.services``, «The provisioning's writes in control»):
    its ``max_hubs``; the settings' own server when there are no clusters; ``no_cluster_available`` when none has
    room) and its database is cloned from that cluster's template of its vertical (``<control>_template[_<vertical>]``,
    ``base.tenancy.ops``), private to the environment's roles, with its identity (``base_hub_identity``);
-2. ``migrating``: the apps the clone has (its ``django_migrations``) and ``base`` are brought to the code's leaf through
-   its migrator's alias (``base.tenancy.migrator.migrate_apps``: nothing to do when ``migrate_hubs`` kept the template
-   current; the lease renewed between apps) and noted in ``Hub.schema_apps`` (``{app: its leaf migration}``) with ``schema_state`` current; until S3
-   (an app's tables made when it is turned on), every portable app's tables are made too, so that turning one on only
-   changes its row, as in phase 1;
+2. ``migrating``: the apps the clone has (its ``django_migrations``: its template's), its vertical's and ``base`` are
+   brought to the code's leaf (``base.tenancy.migrator.ensure_schema``: nothing to do when ``migrate_hubs`` kept the
+   template current, so the sign-up is the clone; the lease renewed between apps) and noted in ``Hub.schema_apps``
+   (``{app: its leaf migration}``) with ``schema_state`` current. Every template carries every portable app's tables
+   (``migrator.templates``, PLAN-DB round 2026-11-01), so the clone has them; an app it lacks (one ported after its
+   template was made) gets its tables the first time the business turns it on (S3: ``base.app.enable`` → ``creating``
+   → the worker's ``ensure_schema``, PLAN-DB §7);
 3. ``seeding``: inside ``use_hub``, the SaaS's photo kept on the row (its people, and the blocks of the apps it has
    on: none at birth, a business is born with every app off, PLAN §33); a newer photo that arrives meanwhile is
    applied too before ``ready`` (:data:`SEED_ROUNDS`);
@@ -93,15 +95,14 @@ def provision(
 ) -> bool:
     """Make ``hub``'s database now, under its lease; whether it is ready after.
 
-    ``apps``: more apps than its template's whose tables it gets; ``None`` (the worker's pass too, :func:`run_due`):
-    every portable app's (``base.tenancy.migrator.apps_every_hub_gets``, which ``migrate_hubs`` also gives the hubs
-    already made). That is transitional, until S3 makes an app's tables when it is turned on (``base.app.enable``,
-    W6): meanwhile turning an app on only changes its row, as in phase 1, and a business born with every app off can
-    turn any on. ``seed``: what its seeding writes, inside its database
-    (``use_hub``), after the photo kept. A hub already
-    ready is left as it is (``True``); one that is not being prepared (cancelled, gone) or whose lease someone else
-    holds is not touched (``False``). A failure is noted on the hub (``failed``), never raised. ``tell_saas=False``:
-    the SaaS does not hear it is ready (the local hubs, which are no business of the SaaS's).
+    ``apps``: more apps than its template's whose tables it gets now (the local hubs a and b, born with every app on:
+    ``seed_local_hubs``); none by default, as the worker's pass (:func:`run_due`): a business and a demo are born with
+    their template's tables (every portable app's) and every app off (PLAN §33); an app their template lacked gets its
+    tables when it is turned on (S3).
+    ``seed``: what its seeding writes, inside its database (``use_hub``), after the photo kept. A hub already ready is
+    left as it is (``True``); one that is not being prepared (cancelled, gone) or whose lease someone else holds is not
+    touched (``False``). A failure is noted on the hub (``failed``), never raised. ``tell_saas=False``: the SaaS does
+    not hear it is ready (the local hubs, which are no business of the SaaS's).
     """
     now = now or timezone.now()
     with use_control():
@@ -134,8 +135,8 @@ def drop(hub, *, now: dt.datetime | None = None) -> bool:
 def run_due(now: dt.datetime | None = None, *, limit: int = DUE_BATCH, budget: float = DUE_PASS_SECONDS) -> int:
     """The worker's pass over ``hub_due``: one hub at a time, each leased right before it is worked on (so no lease runs
     out while it waits its turn), up to ``limit`` hubs or ``budget`` seconds: make the databases still to make (a
-    failed one once its ``next_attempt_at`` came; with every portable app's tables until S3: :func:`provision`) and drop
-    the demos that ended (a failed drop once its wait is over);
+    failed one once its ``next_attempt_at`` came; its template's tables, every app off: :func:`provision`) and drop the
+    demos that ended (a failed drop once its wait is over);
     how many it worked on. A hub that fails is logged and given back: the others go on."""
     now = now or timezone.now()
     started = time.monotonic()
@@ -184,9 +185,8 @@ class _Steps:
 
 def _prepare(hub_id, *, apps: Iterable[str] | None = None, seed: Seed | None = None, tell_saas: bool = True) -> None:
     """The steps of a hub's preparation, its lease held; a failure is noted on it, a hub that left them is left.
-    ``apps=None``: every portable app's tables (until S3, :func:`provision`)."""
-    if apps is None:
-        apps = migrator.apps_every_hub_gets()
+    ``apps``: more apps than its template's whose tables it gets (:func:`provision`)."""
+    apps = list(apps or ())
     step = _Steps()
     try:
         hub = services.place_hub(hub_id)

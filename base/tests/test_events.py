@@ -53,5 +53,8 @@ def test_every_event_is_named_as_the_convention_says():
         # An app turned on or off by the business (PLAN-HUB §9).
         "base.app.enabled",
         "base.app.disabled",
+        # S3: an app whose tables a hub's own database is getting, and making them failing.
+        "base.app.activation_requested",
+        "base.app.activation_failed",
     ]
     assert all(NAME_RE.match(name) for name in events.ALL)

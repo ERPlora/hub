@@ -7,6 +7,7 @@ import type { AppRow } from '../operations';
 import {
   appsOfTab,
   canOpen,
+  canRetry,
   canTurnOff,
   canTurnOn,
   comesWith,
@@ -150,3 +151,33 @@ describe('turning an app on or off (PLAN-HUB §9)', () => {
     expect(appsOfTab(ON, 'all').map((row) => row.id)).toContain('flow');
   });
 });
+
+describe('an app whose tables the business’s database is still getting (S3)', () => {
+  // flow is being set up; website could not be; sale (being set up) needs customer, which came along with it.
+  const FLOW = app('flow', { name: 'Flows', state: 'creating', path: null });
+  const WEBSITE = app('website', { name: 'Website', state: 'failed', path: null });
+  const SALE = app('sale', { name: 'Sales', state: 'creating', path: null, requires: ['customer'] });
+  const CUSTOMER = app('customer', { name: 'Customers', state: 'creating', chosen: false, path: null, required_by: ['sale'] });
+  const TASK = app('task', { name: 'Tasks' });
+  const APPS = [FLOW, WEBSITE, SALE, CUSTOMER, TASK];
+
+  it('«My apps» lists them with the ones on: the business turned them on', () => {
+    expect(appsOfTab(APPS, 'mine').map((row) => row.id)).toEqual(['flow', 'website', 'sale', 'customer', 'task']);
+  });
+
+  it('nothing to turn on or open while one is being set up, but it can be turned off; one that failed is tried again or turned off', () => {
+    expect(APPS.map((row) => [row.id, canTurnOn(row), canTurnOff(row), canRetry(row), canOpen(row)])).toEqual([
+      ['flow', false, true, false, false],
+      ['website', false, true, true, false],
+      ['sale', false, true, false, false],
+      ['customer', false, true, false, false],
+      ['task', false, true, false, true],
+    ]);
+  });
+
+  it('one being set up that needs another keeps it from going off, as one on does', () => {
+    expect(offFirst(CUSTOMER, APPS)).toEqual(['Sales']);
+    expect(includedWith(CUSTOMER, APPS)).toEqual(['Sales']);
+  });
+});
+

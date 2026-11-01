@@ -35,6 +35,10 @@
     "method": "get",
     "path": "/api/apps/detail"
   },
+  "base.app.retry": {
+    "method": "post",
+    "path": "/api/apps/retry"
+  },
   "base.plan.usage": {
     "method": "get",
     "path": "/api/system/plan"
