@@ -1188,11 +1188,13 @@ def test_the_instructions_name_the_persons_role_in_the_chat_language(role, langu
     [(Membership.Role.EMPLOYEE, "a manager or the owner"), (Membership.Role.MANAGER, "the owner or an administrator")],
 )
 def test_a_role_that_cannot_do_something_is_told_who_can_and_no_other_tool_is_tried(role, who):
+    """A tool may be missing for their role or because its app is off or out of the plan (``active_apps``): the model
+    says it is not available to them here, with both reasons, never that the role alone is to blame."""
     text = _said(role=role)
     assert (
         "When they ask for something none of your tools does, do not try other tools for it and never tell the state "
-        "of something else instead: say plainly that their role cannot do it here and that "
-        f"{who} can, or on which screen it is done."
+        "of something else instead: say plainly that it is not available to them here, because their role cannot do "
+        f"it or because its app is not on, and that {who} can, or on which screen it is done."
     ) in text
 
 

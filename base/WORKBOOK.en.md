@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:d188dc85e13bbd63fa00fb5e6eb367ac31a30987668fe6adfe4a4c3136c95c9f -->
+<!-- generated from WORKBOOK.md sha256:bffc9adf0c48072996381c5a49ca56178a72908aed04138ce3493b05cb153008 -->
 
 ## What it is for and who it is for
 
@@ -2388,8 +2388,9 @@ Steps:
      its button on the screen is. The assistant knows the role it talks to (owner, administrator, manager or
      employee, said in the language of the conversation) and that its tools are that role's: asked for something none
      of them does, it neither looks for another way nor tells the state of something else, but says in one sentence
-     that their role cannot do it from here and who can (to an employee, a manager or the owner; to a manager, the
-     owner or an administrator) or on which screen it is done.
+     that it is not available to them here, because their role cannot do it or because that app is not on, and who
+     can (to an employee, a manager or the owner; to a manager, the owner or an administrator) or on which screen it
+     is done.
   2. That action comes with its card, like any other, and the assistant says beforehand that the card will ask a
      manager to approve it. Tapping "Run it" opens "An approval is needed", the same as on the screen: a manager taps
      their face and types their PIN, or swipes their badge, and the action is done once, with whoever asked for it as

@@ -187,7 +187,10 @@ def test_the_model_is_told_the_role_of_an_employee_and_what_a_manager_must_appro
 
     sent = _instructions_sent(gateway)
     assert "You talk to the «Empleado» of this business: your tools are the ones this role may use" in sent
-    assert "say plainly that their role cannot do it here and that a manager or the owner can" in sent
+    assert (
+        "say plainly that it is not available to them here, because their role cannot do it or because its app is not "
+        "on, and that a manager or the owner can"
+    ) in sent
     offered = gateway.sent("/internal/assistant/chat/stream")[0].body["tools"]
     assert "demo__item__add_line" in [tool["name"] for tool in offered]
     approval = sent.split("This person needs a manager's approval to run ")[1].split(": before you call one")[0]
