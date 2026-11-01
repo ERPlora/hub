@@ -11,7 +11,7 @@ import uuid
 
 from django.db.models import Case, Count, IntegerField, Min, Prefetch, Q, QuerySet, Value, When
 from django.db.models.functions import Lower
-from django.utils import timezone
+from django.utils import timezone, translation
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import NotFound
@@ -25,9 +25,12 @@ from apps.printing.schemas import (
     DeviceGetOut,
     DeviceListIn,
     DeviceOut,
+    DeviceRefIn,
     EmptyIn,
+    JobDetailOut,
     JobListIn,
     JobOut,
+    JobRefIn,
     JobSummaryOut,
     Page,
     PrinterListIn,
@@ -383,6 +386,31 @@ def list_jobs(ctx: OperationContext, params: JobListIn) -> dict:
     return {"rows": [job_row(job, now) for job in page], "total": total, "limit": params.limit, "offset": params.offset}
 
 
+def job_label(job: PrintJob, language: str) -> str:
+    """How the queue titles ``job`` in ``language``: its document and its number («Receipt T-000123»), or what it is
+    when it has none («Open the drawer»), as the Jobs screen's ``jobTitle``."""
+    with translation.override(language):
+        what = str(job.get_document_type_display() if job.kind == PrintJob.Kind.DOCUMENT else job.get_kind_display())
+    return f"{what} {job.reference}" if job.reference else what
+
+
+@operation(
+    "printing.job.get",
+    kind="query",
+    permission="printing.view_settings",
+    input=JobRefIn,
+    output=JobDetailOut,
+    expose_api=True,
+    ai={
+        "description": "Get one print job by its id or by its document's number («T-000123»: its newest job), titled as "
+        "the queue titles it, with its state, printer, attempts, last error and who retried or cancelled it."
+    },
+)
+def get_job(ctx: OperationContext, params: JobRefIn) -> dict:
+    job = find_job(params.job_id, params.reference)
+    return {**job_row(job), "label": job_label(job, ctx.language)}
+
+
 def _takeable(devices: QuerySet[PrintDevice], usages: list[str]) -> tuple[set[tuple[str, str]], Q]:
     """What ``devices`` print: the (function, paper) of the active printers they reach, and the waiting jobs they take.
 
@@ -556,6 +584,22 @@ def list_devices(ctx: OperationContext, params: DeviceListIn) -> dict:
     page = devices.prefetch_related(_BY_NAME).order_by(Lower("name"), "id")[params.offset : params.offset + params.limit]
     key = this_device_key(ctx)
     return {"rows": [device_row(device, key) for device in page], "total": total, "limit": params.limit, "offset": params.offset}
+
+
+@operation(
+    "printing.device.detail",
+    kind="query",
+    permission="printing.view_settings",
+    input=DeviceRefIn,
+    output=DeviceOut,
+    expose_api=True,
+    ai={
+        "description": "Get one device set up to print by its registration id (printing.device.list): its name, the "
+        "printers it reaches and prints for, who set it up and when it was last seen. A retired one is not there."
+    },
+)
+def get_device_detail(ctx: OperationContext, params: DeviceRefIn) -> dict:
+    return device_row(find_device(params.device_id), this_device_key(ctx))
 
 
 # Not an assistant tool: /ws/print's hello, the device's own.

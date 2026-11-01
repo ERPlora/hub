@@ -39,6 +39,7 @@ from live.meta import all_live_app_configs
 from live.models import OutboxEvent
 
 from base import activation, entitlement, services
+from base.tenancy.context import HUB_SCOPE_KIND
 
 #: How deep a chain of events may go (an event, the event its reaction records, …): the old Hub's.
 MAX_EVENT_DEPTH = 16
@@ -80,7 +81,11 @@ def _events_modules() -> dict[str, ModuleType]:
 
 
 def listeners(event: OutboxEvent) -> list[str]:
-    """The apps on in the event's scope that react to it; ``"*"`` hears every event but its own app's."""
+    """The apps on in the event's scope that react to it; ``"*"`` hears every event but its own app's. An event of no
+    hub (the registry's and the demos', in control's outbox) is heard by none: an app's reaction is a hub's work, and
+    such an event has no hub to run it in (verification of hub#471 in pre: Flows failed on ``base.demo.created``)."""
+    if event.scope_kind != HUB_SCOPE_KIND:
+        return []
     on = active_apps(Scope(event.scope_kind, event.scope_key))
     source = event.name.split(".", 1)[0]
     return [

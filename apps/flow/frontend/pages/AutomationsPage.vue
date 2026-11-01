@@ -23,7 +23,6 @@ import FlowList from '../components/FlowList.vue';
 import FlowGallery from '../components/FlowGallery.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import QuestionInbox from '../components/QuestionInbox.vue';
-import RecipeRepairs from '../components/RecipeRepairs.vue';
 import { useCatalog } from '../composables/useCatalog';
 import { wording } from '../lib/refusal';
 import type { FlowOut } from '../operations';
@@ -113,7 +112,6 @@ function openFlow(flow: FlowOut, tab?: string): void {
     >
       <QuestionInbox :alone="false" />
       <DraftTray @ready="draftsReady = true" />
-      <RecipeRepairs />
       <!-- Mounted with the page and only hidden while there is none: its subscription goes on the page's one stream,
            instead of arriving with the count and reopening it. -->
       <FlowList

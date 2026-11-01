@@ -392,7 +392,36 @@
         "confirmMessage": "{n} row will be removed for good: | {n} rows will be removed for good:",
         "confirmLabel": "Remove for good",
         "typeName": "Type «{name}» to confirm",
-        "done": "Business reset:"
+        "done": "Business reset:",
+        "busy": "A reset is under way: wait for it to finish.",
+        "keptCopy": "A full copy of the data from before is kept in «Copies».",
+        "progress": {
+          "copying": "Copying the business's data before emptying…",
+          "copyingHint": "Then {sections} will be emptied. You can leave this screen: it goes on by itself.",
+          "emptying": "Emptying {sections}…"
+        },
+        "failed": {
+          "heading": "Nothing was emptied",
+          "dumps_unavailable": "The copy of the data cannot be made right now, so nothing was emptied.",
+          "dump_failed": "The copy of the data could not be made, so nothing was emptied.",
+          "emptying_failed": "The sections could not be emptied, so nothing was removed. The copy of the data from before is kept.",
+          "hub_not_ready": "The business is closed, so nothing was emptied.",
+          "retry": "Try again"
+        },
+        "copyFirst": "Before emptying, a full copy of the business's data is made and kept for 90 days, in «Copies» below."
+      },
+      "copies": {
+        "title": "Copies of the data",
+        "intro": "Before each reset, ERPlora makes a full copy of the business's data and keeps it for 90 days. It brings the whole business back as it was (PostgreSQL's format, restored with pg_restore). To take your products, services or settings to another business, use «Export».",
+        "loading": "Reading the copies…",
+        "loadError": "The copies could not be read.",
+        "empty": "No copies yet: one is made before each reset.",
+        "kind": {
+          "reset": "Before a reset",
+          "offboarding": "When the business was deleted"
+        },
+        "download": "Download",
+        "downloadError": "The copy could not be downloaded."
       }
     },
     "blueprintCard": {
@@ -438,7 +467,10 @@
         "own": "Database of its own",
         "notMeasured": "CPU, memory and connections are not measured per business: ERPlora's servers serve every business at once and grow by themselves when needed.",
         "denied": "Only the owner or an administrator can see how much the hub is using.",
-        "loading": "Reading the system…"
+        "loading": "Reading the system…",
+        "size": "Its size: {size}",
+        "measuredOn": "Measured on {day}",
+        "notMeasuredYet": "Its size is measured every night: the first figure comes tomorrow."
       },
       "updates": {
         "heading": "What we have updated",

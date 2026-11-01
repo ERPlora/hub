@@ -23,7 +23,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.sessions.middleware import SessionMiddleware
 from django.db import connection
 from django.utils import timezone
-from live.context import OperationContext, system_context
+from live.context import OperationContext, Scope, system_context
 from live.errors import Conflict, NotFound, OperationError, PermissionDenied
 from live.models import OutboxEvent
 
@@ -445,6 +445,19 @@ class TestExpire:
         demo = create()
         staff = a_user_context(is_staff=True, is_superuser=True)
         assert demo_expire(staff, DemoSlugIn(slug=demo.slug)).status == "expired"
+
+    @pytest.mark.parametrize("host", ["a", "demo"])
+    def test_staff_acting_on_a_business_s_scope_never_ends_one(self, host):
+        """Review of hub#490: ERPlora's staff passes only on the platform's scope (the Hub admin, REGISTRY_SCOPE); on a
+        business's host, its own or the demo's, it is no more than anyone there."""
+        demo = create()
+        user = get_user_model().objects.create_user(username="ana", password="pw", is_staff=True, is_superuser=True)
+        Membership.objects.create(user=user, host="a", role=Membership.Role.ADMIN)
+        scope = Scope("host", demo.slug if host == "demo" else host)
+        with pytest.raises(PermissionDenied) as refused:
+            demo_expire(OperationContext(scope=scope, actor=user, permissions=frozenset({"*"})), DemoSlugIn(slug=demo.slug))
+        assert refused.value.code == "base.internal_only"
+        assert Hub.objects.get(slug=demo.slug).status == "requested"
 
     @pytest.mark.parametrize("fields", [{}, {"is_staff": True}, {"is_superuser": True}])
     def test_nobody_else_ends_one(self, fields):

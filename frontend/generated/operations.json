@@ -83,6 +83,14 @@
     "method": "post",
     "path": "/api/settings/data/reset"
   },
+  "base.hub.dumps": {
+    "method": "get",
+    "path": "/api/settings/data/dumps"
+  },
+  "base.hub.dump_link": {
+    "method": "get",
+    "path": "/api/settings/data/dumps/link"
+  },
   "base.system.status": {
     "method": "get",
     "path": "/api/system/status"
@@ -2479,6 +2487,10 @@
     "method": "get",
     "path": "/api/printing/jobs/summary"
   },
+  "printing.job.get": {
+    "method": "get",
+    "path": "/api/printing/jobs/detail"
+  },
   "printing.job.create": {
     "method": "post",
     "path": "/api/printing/jobs"
@@ -2506,6 +2518,10 @@
   "printing.device.list": {
     "method": "get",
     "path": "/api/printing/devices"
+  },
+  "printing.device.detail": {
+    "method": "get",
+    "path": "/api/printing/devices/detail"
   },
   "printing.device.register": {
     "method": "post",

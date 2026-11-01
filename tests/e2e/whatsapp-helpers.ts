@@ -11,7 +11,9 @@
 // WhatsApp channel with the photo's version: `seedErplora` keeps both as they were and `restorePhoto`, last in the
 // `afterAll` of every spec that seeds (whatsapp-photo.test.ts), puts them back, so no spec run after it on the same
 // database finds `a` on erplora.com's plan, nor a channel whose version a later erplora.com, made afresh, never
-// exceeds (whatsapp-photo.spec.ts).
+// exceeds (whatsapp-photo.spec.ts). erplora.com pushes that photo also when it answers the Hub (a template sent to
+// Meta's review, a message sent), so a spec that drives the inbox without seeding keeps it first with `keepPhoto` and
+// puts it back the same way (hub#528).
 //
 // The run's real erplora.com (`SAAS_URL`) also takes part: `seedErplora` gives the hub `a` its WhatsApp number there
 // with erplora.com's own test seed (`tests/e2e/panel/whatsapp_hub_seed.py` of its checkout: `a` and `b` with this
@@ -169,19 +171,38 @@ const hubIds = (): Record<string, string> =>
       .map((row) => row.split('=')),
   );
 
-/** Where `a`'s photo (`state` and its version) waits from a spec's first `seedErplora` until `restorePhoto` puts it
- *  back: a table next to the registry (control's database), so a shell's quoting never touches it. */
+/** Where `a`'s photo (`state` and its version) waits from a spec's first `keepPhoto` (or `seedErplora`, which calls
+ *  it) until `restorePhoto` puts it back: a table next to the registry (control's database), so a shell's quoting
+ *  never touches it. */
 const PHOTO_BACKUP = 'e2e_backup_whatsapp_photo';
 /** Where the row of `a`'s WhatsApp channel (`channel`, as JSON; none, `[]`) waits meanwhile: a table of `a`'s own
  *  database, next to the channel's. */
 const CHANNEL_BACKUP = 'e2e_backup_whatsapp_channel';
+
+/** Keeps `a`'s photo and the row of its WhatsApp channel as they are now, for `restorePhoto` to put back. Every spec
+ *  that drives the inbox calls it first, in its `beforeAll` (or seeds, which calls it), because whatever it makes the
+ *  Hub ask erplora.com may bring erplora.com's photo of `a` back, plan included (hub#528: a template sent to Meta's
+ *  review, refused for the seed's made-up permission, marks the number to reconnect and pushes the Free plan); and
+ *  ends its `afterAll` with `restorePhoto` (whatsapp-photo.test.ts says so). Called again before that, it keeps what
+ *  it kept first. */
+export function keepPhoto(): void {
+  // Two tables since every hub has its own database (S2a): the photo next to the registry, the channel's row in `a`'s.
+  psql(
+    `set client_min_messages = warning; create table if not exists ${PHOTO_BACKUP} as ` +
+      "select h.id, h.state, h.state_version from base_hub h where h.slug = 'a'",
+  );
+  psql(
+    `set client_min_messages = warning; create table if not exists ${CHANNEL_BACKUP} as ` +
+      "select coalesce(json_agg(c), '[]') as channel from whatsapp_inbox_channel c where c.host = 'a'",
+  );
+}
 
 /** Gives `a` its WhatsApp number in the run's erplora.com, with erplora.com's own test seed, and has it push the
  *  photo to this Hub: what the seed printed (`delivered` true when this Hub took it). The seed also keeps `a`'s
  *  templates as erplora.com does after reading Meta's list (`SEED_TEMPLATES`) and sets the month's usage to `used`
  *  (whatsapp-seed.ts).
  *  That photo replaces `a`'s with erplora.com's, plan included (Free: one device), and writes its channel's row, so
- *  the spec's first seed keeps both as they were until `restorePhoto`, the last step of the spec's `afterAll`
+ *  the seed keeps both first (`keepPhoto`) until `restorePhoto`, the last step of the spec's `afterAll`
  *  (whatsapp-photo.test.ts says so).
  *  Running it again keeps what exists, connects the number again (a reconnect asked by Meta is cleared), sets the
  *  usage again and pushes once more; what is kept stays the first seed's. */
@@ -191,14 +212,7 @@ export function seedErplora(seed: ErploraSeed = {}): { delivered: boolean; hub_e
     throw new Error(`erplora.com's checkout with ${script} is needed (E2E_SAAS_DIR): see whatsapp-helpers.ts.`);
   }
   const ids = hubIds();
-  psql(
-    `set client_min_messages = warning; create table if not exists ${PHOTO_BACKUP} as ` +
-      "select h.id, h.state, h.state_version from base_hub h where h.slug = 'a'",
-  );
-  psql(
-    `set client_min_messages = warning; create table if not exists ${CHANNEL_BACKUP} as ` +
-      "select coalesce(json_agg(c), '[]') as channel from whatsapp_inbox_channel c where c.host = 'a'",
-  );
+  keepPhoto();
   const out = execFileSync('uv', ['run', 'python', script, ids.a, ids.b, ...seedArguments(seed)], {
     cwd: SAAS_DIR,
     encoding: 'utf8',
@@ -207,12 +221,12 @@ export function seedErplora(seed: ErploraSeed = {}): { delivered: boolean; hub_e
   return JSON.parse(out.trim().split('\n').at(-1) ?? '{}');
 }
 
-/** Puts back `a`'s photo as it was before the spec's first `seedErplora`, its version too, and the row of its WhatsApp
- *  channel (none, if it had none): a spec run after it on the same database finds `a` as it was, never on
- *  erplora.com's Free plan, whose one device ends another device's session (BASE-G57), nor with a channel whose
+/** Puts back `a`'s photo as it was at the spec's first `keepPhoto` (or `seedErplora`), its version too, and the row
+ *  of its WhatsApp channel (none, if it had none): a spec run after it on the same database finds `a` as it was, never
+ *  on erplora.com's Free plan, whose one device ends another device's session (BASE-G57), nor with a channel whose
  *  version stops the photos of an erplora.com made afresh (`whatsapp_inbox.channel.sync` ignores an equal or older
- *  one). It goes last in the `afterAll` of every spec that seeds, after anything else there that pushes a photo (a
- *  seed again, erplora.com's plan put back). With nothing seeded since the last one, it changes nothing. */
+ *  one). It goes last in the `afterAll` of every spec that keeps the photo, after anything else there that pushes a
+ *  photo (a seed again, erplora.com's plan put back). With nothing kept since the last one, it changes nothing. */
 export function restorePhoto(): void {
   if (psql(`select to_regclass('${PHOTO_BACKUP}') is not null`) !== 't') return;
   psql(

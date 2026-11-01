@@ -5,7 +5,8 @@ operations tells the assistant what it does, or that it is not the assistant's t
 import json
 
 import pytest
-from live.operations import get
+from live.assistant import description
+from live.operations import AI, get
 
 ROUTES = {
     ("GET", "/access/door", "base.access.door"),
@@ -61,9 +62,9 @@ NOT_ASSISTANT_TOOLS = ["base.access.door", "base.access.faces", "base.pin.set", 
 @pytest.mark.parametrize("name", WAY_IN_OPERATIONS)
 def test_each_operation_of_the_way_in_declares_what_it_does_to_the_assistant(name):
     op = get(name)
-    assert isinstance(op.ai, dict) and op.ai["description"].strip()
+    assert description(op)
     if op.kind == "command":
-        assert op.ai["risk"] in {"normal", "high"}
+        assert (op.ai.risk if isinstance(op.ai, AI) else op.ai["risk"]) in {"normal", "high"}
 
 
 @pytest.mark.parametrize("name", NOT_ASSISTANT_TOOLS)

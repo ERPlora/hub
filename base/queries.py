@@ -17,10 +17,10 @@ from django.http import HttpRequest
 from django.utils import timezone, translation
 from django.utils.translation import gettext, gettext_lazy, ngettext, pgettext
 from live.context import OperationContext
-from live.errors import InvalidPayload, NotFound, Unauthorized
+from live.errors import InvalidPayload, NotFound, OperationError, Unauthorized
 from live.meta import Category, all_live_app_configs, permissions_for_role
 from live.models import OutboxEvent
-from live.operations import INTERNAL, operation
+from live.operations import AI, INTERNAL, operation
 
 from base import access, activation, blueprint, business, entitlement, files, home, system
 from base.auth import SAAS_PANEL_PATH, saas_url
@@ -42,6 +42,7 @@ from base.permissions import ADMINISTER_HUB, FULL_ACCESS_ROLES, VIEW_HOME
 from base.registry import hub_answer, internal_only
 from base.relay import active_apps
 from base.storage import media_url
+from control.models import HubDump, HubUsageDaily, UsageRun
 from base.throttle import client_key
 from base.schemas import (
     AccessDoorIn,
@@ -92,8 +93,15 @@ from base.schemas import (
     HubsBySlugOut,
     NoticeListIn,
     NoticeListOut,
+    HubDumpLinkIn,
+    HubDumpLinkOut,
+    HubDumpsIn,
+    HubDumpsOut,
+    InternalDumpsOut,
     PlanUsageIn,
     PlanUsageOut,
+    UsageListIn,
+    UsageListOut,
     SessionMeIn,
     SessionMeOut,
     SetupStatusIn,
@@ -214,12 +222,22 @@ def demo_get(ctx: OperationContext, data: DemoSlugIn) -> dict[str, Any]:
     permission=VIEW_HOME,
     input=SetupStatusIn,
     output=SetupStatusOut,
-    ai={
-        "description": "Reads the checklist «Finish setting up your business» of this hub, as this person may see "
-        "it: each step with its state (done, pending, or not available — ours, never something to ask the person "
-        "to do), its level (needed to invoice, important, recommended), whether the person can set it up "
-        "(otherwise an administrator must) and the screen that completes it; with how many are pending."
-    },
+    ai=AI(
+        description=(
+            "Reads the checklist «Finish setting up your business» of this hub, as this person may see it: each step "
+            "with its state (done, pending, or not available — ours, never something to ask the person to do), its "
+            "level (needed to invoice, important, recommended), whether the person can set it up (otherwise an "
+            "administrator must) and the screen that completes it; with how many are pending."
+        ),
+        asks={
+            "en": ("what's left to set up?", "am I ready to invoice yet?", "what's still pending on the checklist?"),
+            "es": (
+                "¿qué me falta por configurar?",
+                "¿ya puedo facturar?",
+                "¿qué queda pendiente para terminar de montar el negocio?",
+            ),
+        },
+    ),
 )
 def setup_status(ctx: OperationContext, data: SetupStatusIn) -> dict:
     """The old hub's ``hub.setup.status``: the platform's steps (``base.apps``, ``base.team``) and the modules'."""
@@ -441,8 +459,9 @@ def plan_usage(ctx: OperationContext, data: PlanUsageIn) -> dict:
     """«Plan and limits» of System (BASE-G81): the limits of the plan the SaaS's last photo carries (``plan``:
     ``max_users``, ``max_devices``; 0 = no limit) against the people of the business (its active members, the ones
     the SaaS counts) and the devices in use (those with a session open on this hub: the ones the cap of BASE-G57
-    keeps, APP-BASE-3). Memory, CPU and database size are gone with the old process per hub (PLAN-HUB §1a):
-    erplora.com measures the use. For who runs the business."""
+    keeps, APP-BASE-3), and the size of its own database the last night measured (``database``, BASE-F40; none while it
+    shares control's). Memory and CPU are gone with the old process per hub (PLAN-HUB §1a). For who runs the
+    business."""
     hub = Hub.objects.filter(slug=ctx.scope.key).first()
     state = hub.state if hub is not None and isinstance(hub.state, dict) else {}
     plan = state.get("plan") if isinstance(state.get("plan"), dict) else None
@@ -459,6 +478,49 @@ def plan_usage(ctx: OperationContext, data: PlanUsageIn) -> dict:
         "known": known,
         "people": {"used": people, "limit": _limit(plan, "max_users") if known else None},
         "devices": {"used": devices, "limit": _limit(plan, "max_devices") if known else None},
+        "database": _database_usage(hub),
+    }
+
+
+def _database_usage(hub: Hub | None) -> dict:
+    """The size of the business's own database the last night measured (``base.usage``, BASE-F40); none while it shares
+    control's (PLAN-DB §14.14: never control's size)."""
+    if hub is None or not hub.db_name:
+        return {"available": False, "bytes": None, "day": None}
+    last = HubUsageDaily.objects.filter(hub=hub).order_by("-day").first()
+    return {"available": True, "bytes": last.db_bytes if last else None, "day": last.day if last else None}
+
+
+# Not an assistant tool: the platform's door (/internal, the SaaS), no person.
+@operation("base.usage.list", kind="query", permission=None, input=UsageListIn, output=UsageListOut, ai=INTERNAL)
+def usage_list(ctx: OperationContext, data: UsageListIn) -> dict[str, Any]:
+    """One page of what the hubs with their own database used on ``data.day`` (``GET /internal/usage``, the SaaS's
+    ``collect_hub_usage``), by hub id, after ``data.cursor``; 409 ``usage_not_ready`` until that night was measured to
+    its end (``base.usage``). For the platform only."""
+    from base import usage
+
+    internal_only(ctx)
+    if not UsageRun.objects.filter(day=data.day, finished_at__isnull=False).exists():
+        raise OperationError(gettext("That day has not been measured yet."), code="usage_not_ready", status=409)
+    rows = HubUsageDaily.objects.filter(day=data.day).order_by("hub_id")
+    if data.cursor is not None:
+        rows = rows.filter(hub_id__gt=data.cursor)
+    page = list(rows[: usage.PAGE_SIZE + 1])
+    more = len(page) > usage.PAGE_SIZE
+    page = page[: usage.PAGE_SIZE]
+    return {
+        "day": data.day,
+        "hubs": [
+            {
+                "id": row.hub_id,
+                "s3_bytes": row.s3_bytes,
+                "db_bytes": row.db_bytes,
+                "active_users_1d": row.active_users_1d,
+                "active_users_30d": row.active_users_30d,
+            }
+            for row in page
+        ],
+        "next_cursor": str(page[-1].hub_id) if more else None,
     }
 
 
@@ -482,10 +544,24 @@ IMPORTS_SHOWN = 50
     permission=ADMINISTER_HUB,
     input=BlueprintListIn,
     output=BlueprintListOut,
-    ai={
-        "description": "Lists the templates of businesses this hub can load (a restaurant, a hair salon…): what each "
-        "one brings (its apps, its menu or services, its tables) and whether this business is still empty."
-    },
+    ai=AI(
+        description=(
+            "Lists the templates of businesses this hub can load (a restaurant, a hair salon…): what each one brings "
+            "(its apps, its menu or services, its tables) and whether this business is still empty."
+        ),
+        asks={
+            "en": (
+                "which templates can I start from?",
+                "show me the business templates",
+                "is there a template for a bakery?",
+            ),
+            "es": (
+                "¿qué plantillas hay?",
+                "¿tenéis alguna plantilla para una panadería?",
+                "enséñame los modelos de negocio para empezar",
+            ),
+        },
+    ),
 )
 def blueprint_list(ctx: OperationContext, data: BlueprintListIn) -> dict:
     """The seeds by vertical (BASE-G103): the hub's country first, then the person's language, then the hub's vertical."""
@@ -510,11 +586,19 @@ def blueprint_list(ctx: OperationContext, data: BlueprintListIn) -> dict:
     permission=ADMINISTER_HUB,
     input=BlueprintExportIn,
     output=BlueprintFileOut,
-    ai={
-        "description": "Writes a .blueprint.zip of this business: the apps chosen and, of those marked, their data. A "
-        "template never takes personal data (customers); a backup takes them. People, PINs and fiscal data never.",
-        "risk": "high",
-    },
+    ai=AI(
+        description=(
+            "Writes a .blueprint.zip of this business: the apps chosen and, of those marked, their data. A template "
+            "never takes personal data (customers); a backup takes them. People, PINs and fiscal data never."
+        ),
+        risk="high",
+        # Only for live.E020 (it checks the whole app): base.assistant.NOT_FROM_CHAT keeps this out of the chat
+        # (pinned by base/tests/test_assistant.py).
+        asks={
+            "en": ("make a backup of the whole business", "export my menu as a template for the other bar"),
+            "es": ("haz una copia de seguridad del negocio", "exporta mi carta como plantilla para el otro local"),
+        },
+    ),
 )
 def blueprint_export(ctx: OperationContext, data: BlueprintExportIn) -> dict:
     """The file of the apps and datasets chosen (BASE-G101, BASE-G102), in base64 for the screen to save."""
@@ -563,16 +647,162 @@ def blueprint_export(ctx: OperationContext, data: BlueprintExportIn) -> dict:
         }
 
 
+# ── The copies of the business's data (round 2026-10-30 of PLAN-DB, decision 2, proposals (k), (l)) ───────────────
+
+
+def _dumps_unavailable() -> OperationError:
+    return OperationError(
+        gettext("The copy cannot be downloaded right now. Try again in a moment."),
+        code="base.dumps_unavailable",
+        status=503,
+    )
+
+
+def _reset_state(hub: Hub) -> dict | None:
+    """The last reset of ``hub`` as Settings › Data shows it (``Hub.reset_sections``), or ``None`` before the first."""
+    asked = hub.reset_sections if isinstance(hub.reset_sections, dict) else None
+    if not asked or asked.get("state") not in ("copying", "emptying", "done", "failed"):
+        return None
+    return {
+        "state": asked["state"],
+        "sections": [{"id": app, "label": blueprint.app_label(app)} for app in asked.get("apps") or []],
+        "requested_by": asked.get("requested_by") or "",
+        "error": asked.get("error") or "",
+        "removed": asked.get("removed") or [],
+        "finished_at": asked.get("finished_at"),
+    }
+
+
+def _kept_dumps(hub: Hub):
+    """The copies of ``hub`` still in the bucket, newest first: none past its 90 days (``dumps.RETENTION``), which the
+    bucket's lifecycle rule deleted or is about to."""
+    from base.tenancy import dumps
+
+    return HubDump.objects.filter(hub=hub, created_at__gt=timezone.now() - dumps.RETENTION).order_by("-created_at", "-id")
+
+
+def gets_copies(hub: Hub) -> bool:
+    """Whether ``hub`` has, or will have, copies of its data: its own database, made (or being made); never a business
+    that shares control's, nor one that left before its database was finished."""
+    from base import registry
+
+    return bool(hub.db_name) and (hub.ready_at is not None or hub.status in registry.PREPARING_STATUSES)
+
+
+@operation(
+    "base.hub.dumps",
+    kind="query",
+    permission=ADMINISTER_HUB,
+    input=HubDumpsIn,
+    output=HubDumpsOut,
+    ai=AI(
+        description=(
+            "Lists the full copies of this business's data that ERPlora keeps for 90 days (one before each reset, one "
+            "when the business is deleted): when each was made and how big it is, newest first; and how the last "
+            "reset of the business went (copying, emptying, done or failed, and what was removed)."
+        ),
+        asks={
+            "en": ("do I have a backup of my data?", "show me the copies of my data made before the reset"),
+            "es": ("¿tengo una copia de seguridad de mis datos?", "¿cómo fue el restablecimiento del negocio?"),
+        },
+    ),
+)
+def hub_dumps(ctx: OperationContext, data: HubDumpsIn) -> dict:
+    """Settings › Data's «Copies» (BASE-F37): the copies of the business's own database, without their links
+    (``base.hub.dump_link`` gives one on each click), and how its last reset went (``base.services``, «The reset of a
+    business»). While the business shares its database with others, nothing (PLAN-DB §14.14)."""
+    with translation.override(ctx.language):
+        hub = Hub.objects.filter(slug=ctx.scope.key).first()
+        if hub is None or not hub.db_name:
+            return {"available": False, "reset": None, "dumps": []}
+        return {
+            "available": True,
+            "reset": _reset_state(hub),
+            "dumps": [
+                {"id": dump.pk, "kind": dump.kind, "created_at": dump.created_at, "bytes": dump.bytes}
+                for dump in _kept_dumps(hub)
+            ],
+        }
+
+
+# Not an assistant tool: a link that downloads every person's data of the business is for the person on the screen.
+@operation(
+    "base.hub.dump_link",
+    kind="query",
+    permission=ADMINISTER_HUB,
+    input=HubDumpLinkIn,
+    output=HubDumpLinkOut,
+    ai=INTERNAL,
+)
+def hub_dump_link(ctx: OperationContext, data: HubDumpLinkIn) -> dict:
+    """The link of one copy of the business's data, signed for 15 minutes when it is asked (each «Download»); a copy of
+    another business is not found."""
+    from base.tenancy import dumps
+
+    with translation.override(ctx.language):
+        hub = Hub.objects.filter(slug=ctx.scope.key).first()
+        dump = _kept_dumps(hub).filter(pk=data.id).first() if hub is not None and hub.db_name else None
+        if dump is None:
+            raise NotFound(gettext("This copy is no longer kept."))
+        try:
+            url = dumps.presigned_url(dump.key, filename=dumps.file_name(hub.slug, dump.key))
+        except dumps.DumpsUnavailable:
+            raise _dumps_unavailable() from None
+        return {"url": url, "expires_at": dumps.link_expires_at(url)}
+
+
+# Not an assistant tool: the platform's door (/internal, the SaaS), no person.
+@operation(
+    "base.hub.dump_list", kind="query", permission=None, input=HubGetIn, output=InternalDumpsOut, ai=INTERNAL
+)
+def hub_dump_list(ctx: OperationContext, data: HubGetIn) -> dict:
+    """The copies of ``data.id``'s data (``GET /internal/hubs/{id}/dumps``, the SaaS's panel and its mails of a
+    deletion), newest first, each with a link of 15 minutes; ``available`` false for a business that never gets one.
+    A business that left answers too (the 410 is its host's door); one unknown or purged is not found."""
+    from base.tenancy import dumps
+
+    internal_only(ctx)
+    hub = Hub.objects.filter(pk=data.id).exclude(status=Hub.Status.PURGED).first()
+    if hub is None:
+        raise NotFound(gettext("No hub has this id."))
+    if not gets_copies(hub):
+        return {"available": False, "dumps": []}
+    if not dumps.configured():
+        # No bucket: this Hub can make no copy, so «none yet» would promise one (PLAN-SAAS §24: a failure, not «none»).
+        raise _dumps_unavailable()
+    rows = list(_kept_dumps(hub))
+    try:
+        listed = [
+            {
+                "id": dump.key,
+                "kind": dump.kind,
+                "created_at": dump.created_at,
+                "bytes": dump.bytes,
+                "url": dumps.presigned_url(dump.key, filename=dumps.file_name(hub.slug, dump.key)),
+            }
+            for dump in rows
+        ]
+    except dumps.DumpsUnavailable:
+        raise _dumps_unavailable() from None
+    return {"available": True, "dumps": listed}
+
+
 @operation(
     "base.import.list",
     kind="query",
     permission=ADMINISTER_HUB,
     input=ImportListIn,
     output=ImportListOut,
-    ai={
-        "description": "Lists the templates and files loaded into this business, newest first, each with its report, "
-        "whether it can be undone and whether what did not go in can be loaded again."
-    },
+    ai=AI(
+        description=(
+            "Lists the templates and files loaded into this business, newest first, each with its report, whether it "
+            "can be undone and whether what did not go in can be loaded again."
+        ),
+        asks={
+            "en": ("what have we imported so far?", "list the templates we loaded"),
+            "es": ("¿qué importaciones hemos hecho?", "lista las plantillas que hemos cargado"),
+        },
+    ),
 )
 def import_list(ctx: OperationContext, data: ImportListIn) -> dict:
     """The loads, newest first; the last one, when it did not go in whole and stands, is shown first (BASE-G107)."""
@@ -591,7 +821,13 @@ def import_list(ctx: OperationContext, data: ImportListIn) -> dict:
     permission=ADMINISTER_HUB,
     input=ImportIdIn,
     output=ImportOut,
-    ai={"description": "Reads one template or file loaded into this business, by its id, as the list of loads shows it."},
+    ai=AI(
+        description="Reads one template or file loaded into this business, by its id, as the list of loads shows it.",
+        asks={
+            "en": ("what did that template load bring in?", "show me the report of yesterday's import"),
+            "es": ("¿qué metió esa carga de plantilla?", "enséñame el informe de la importación de ayer"),
+        },
+    ),
 )
 def import_detail(ctx: OperationContext, data: ImportIdIn) -> dict:
     """One load of Settings › Data (BASE-G107), as its row."""
@@ -607,7 +843,15 @@ def import_detail(ctx: OperationContext, data: ImportIdIn) -> dict:
     permission=ADMINISTER_HUB,
     input=DatasetListIn,
     output=DatasetListOut,
-    ai={"description": "Lists the apps on in this business and, of each, what can travel in an export and how many rows it has."},
+    ai=AI(
+        description=(
+            "Lists the apps on in this business and, of each, what can travel in an export and how many rows it has."
+        ),
+        asks={
+            "en": ("what data can I export?", "how many rows does each app have?"),
+            "es": ("¿cuántos registros tiene cada app?", "¿qué se puede sacar en una exportación?"),
+        },
+    ),
 )
 def dataset_list(ctx: OperationContext, data: DatasetListIn) -> dict:
     """Every app on (BASE-G102), with its datasets and their rows: what an export can take."""
@@ -640,11 +884,25 @@ def dataset_list(ctx: OperationContext, data: DatasetListIn) -> dict:
     permission=VIEW_HOME,
     input=BusinessIn,
     output=BusinessOut,
-    ai={
-        "description": "Reads this business's name, country, time zone, language and currency, as erplora.com "
-        "registered it. They are changed on erplora.com by the owner or an administrator, never here; the country no "
-        "longer changes once the business is ready, and the currency is always the country's."
-    },
+    ai=AI(
+        description=(
+            "Reads this business's name, country, time zone, language and currency, as erplora.com registered it. They "
+            "are changed on erplora.com by the owner or an administrator, never here; the country no longer changes "
+            "once the business is ready, and the currency is always the country's."
+        ),
+        asks={
+            "en": (
+                "what currency is the business in?",
+                "what's our time zone?",
+                "under what name is the business registered?",
+            ),
+            "es": (
+                "¿en qué moneda trabaja el negocio?",
+                "¿qué zona horaria tenemos?",
+                "¿con qué nombre está dado de alta el negocio?",
+            ),
+        },
+    ),
 )
 def business_get(ctx: OperationContext, data: BusinessIn) -> dict:
     """Settings › Business (BASE-G97…G99) and what the old ``/api/hub/context`` gave (BASE-G43): the business as the
@@ -714,11 +972,17 @@ FAILED_EVENT_ERROR_LENGTH = 300
     permission=ADMINISTER_HUB,
     input=SystemStatusIn,
     output=SystemStatusOut,
-    ai={
-        "description": "Reads the status of this hub's system: the version of ERPlora it runs and when that version "
-        "was published (the hub updates itself, nobody installs anything), and whether its data is on the database "
-        "every business shares or on its own. CPU, memory and connections are not measured per business."
-    },
+    ai=AI(
+        description=(
+            "Reads the status of this hub's system: the version of ERPlora it runs and when that version was published "
+            "(the hub updates itself, nobody installs anything), and whether its data is on the database every "
+            "business shares or on its own. CPU, memory and connections are not measured per business."
+        ),
+        asks={
+            "en": ("which ERPlora version are we on?", "is the system up to date?"),
+            "es": ("¿qué versión de ERPlora tenemos?", "¿está actualizado el sistema?"),
+        },
+    ),
 )
 def system_status(ctx: OperationContext, data: SystemStatusIn) -> dict:
     """The release (``base.system``: the commit, short) and its date, never made up, and where the business's data
@@ -737,12 +1001,18 @@ def system_status(ctx: OperationContext, data: SystemStatusIn) -> dict:
     permission=ADMINISTER_HUB,
     input=EventListIn,
     output=EventListOut,
-    ai={
-        "description": "Reads the log of the last 50 events between this hub's apps (a sale charged, a round "
-        "fired…), newest first: when each happened, which app recorded it, its level (info, warning, error) and "
-        "what happened to it (delivered to each app, retrying, given up and waiting in «Failed events», "
-        "discarded). Never the content of an event."
-    },
+    ai=AI(
+        description=(
+            "Reads the log of the last 50 events between this hub's apps (a sale charged, a round fired…), newest "
+            "first: when each happened, which app recorded it, its level (info, warning, error) and what happened to "
+            "it (delivered to each app, retrying, given up and waiting in «Failed events», discarded). Never the "
+            "content of an event."
+        ),
+        asks={
+            "en": ("what's been happening between the apps?", "show me the latest event log"),
+            "es": ("enséñame el registro de eventos", "¿qué ha pasado entre las apps últimamente?"),
+        },
+    ),
 )
 def event_list(ctx: OperationContext, data: EventListIn) -> dict:
     """The old hub's System › Logs: the hub's last outbox events with how their deliveries went (``base.relay``)."""
@@ -811,12 +1081,22 @@ def _delivery_detail(delivery: EventDelivery) -> str:
     permission=ADMINISTER_HUB,
     input=FailedEventListIn,
     output=FailedEventListOut,
-    ai={
-        "description": "Lists the failed events of this hub, newest first: messages between apps (a sale to "
-        "Invoicing, a round to Printing…) that could not be delivered after every retry. Each one says the event, "
-        "the app that sent it and the one that could not take it, the attempts, when it happened, the start of the "
-        "last error and whether it can be resent (not when the app it was for is no longer on). Pages of up to 100."
-    },
+    ai=AI(
+        description=(
+            "Lists the failed events of this hub, newest first: messages between apps (a sale to Invoicing, a round to "
+            "Printing…) that could not be delivered after every retry. Each one says the event, the app that sent it "
+            "and the one that could not take it, the attempts, when it happened, the start of the last error and "
+            "whether it can be resent (not when the app it was for is no longer on). Pages of up to 100."
+        ),
+        asks={
+            "en": (
+                "is anything stuck between the apps?",
+                "list the failed events",
+                "what never got delivered to printing?",
+            ),
+            "es": ("¿hay algo atascado entre las apps?", "lista los eventos caídos"),
+        },
+    ),
 )
 def failed_event_list(ctx: OperationContext, data: FailedEventListIn) -> dict:
     """The deliveries the relay gave up on (``dead``) of the hub; a resent one is ``pending`` again and a discarded one
@@ -838,10 +1118,16 @@ def failed_event_list(ctx: OperationContext, data: FailedEventListIn) -> dict:
     permission=ADMINISTER_HUB,
     input=FailedEventIn,
     output=FailedEventOut,
-    ai={
-        "description": "Reads one failed event of this hub by its id, as the list of failed events shows it: the event, "
-        "the app that sent it and the one that could not take it, the attempts and whether it can be resent."
-    },
+    ai=AI(
+        description=(
+            "Reads one failed event of this hub by its id, as the list of failed events shows it: the event, the app "
+            "that sent it and the one that could not take it, the attempts and whether it can be resent."
+        ),
+        asks={
+            "en": ("why did that failed event fail?", "show me the failed invoicing event"),
+            "es": ("¿por qué ha fallado ese evento?", "dame el detalle del evento caído de facturación"),
+        },
+    ),
 )
 def failed_event_detail(ctx: OperationContext, data: FailedEventIn) -> dict:
     """One failed event of System (a delivery the relay gave up on), of the hub of ``ctx`` only."""
@@ -1044,7 +1330,13 @@ def has_pin(user) -> bool:
     permission=VIEW_HOME,
     input=DeviceCurrentIn,
     output=DeviceCurrentOut,
-    ai={"description": "Says whether the device the person is using is shared (a till: PIN, a shift) or personal."},
+    ai=AI(
+        description="Says whether the device the person is using is shared (a till: PIN, a shift) or personal.",
+        asks={
+            "en": ("is this a shared device?", "what mode is this device in?", "does this device ask for a PIN?"),
+            "es": ("¿este aparato es de uso compartido?", "¿este dispositivo pide PIN?"),
+        },
+    ),
 )
 def device_current(ctx: OperationContext, data: DeviceCurrentIn) -> dict[str, Any]:
     """«This device» of Settings › General (BASE-G72): the mode of the browser that asks, and whether the hub knows it
@@ -1061,10 +1353,20 @@ def device_current(ctx: OperationContext, data: DeviceCurrentIn) -> dict[str, An
     permission=ADMINISTER_HUB,
     input=DeviceListIn,
     output=DeviceListOut,
-    ai={
-        "description": "Lists the devices someone entered this hub from: name, browser, shared or personal, whether "
-        "it has a session open now and until when, who entered last and when, and which ones nobody used in 30 days."
-    },
+    ai=AI(
+        description=(
+            "Lists the devices someone entered this hub from: name, browser, shared or personal, whether it has a "
+            "session open now and until when, who entered last and when, and which ones nobody used in 30 days."
+        ),
+        asks={
+            "en": (
+                "which devices are signed in to the business?",
+                "list the tablets and computers",
+                "which devices haven't been used in a month?",
+            ),
+            "es": ("lista las tablets y ordenadores del negocio", "¿qué aparatos llevan un mes sin usarse?"),
+        },
+    ),
 )
 def device_list(ctx: OperationContext, data: DeviceListIn) -> dict[str, Any]:
     """«Devices» of Settings › General (BASE-G63): never a device's token, which is its proof. Phase 1 lists the rows
@@ -1079,7 +1381,18 @@ def device_list(ctx: OperationContext, data: DeviceListIn) -> dict[str, Any]:
     permission=ADMINISTER_HUB,
     input=DeviceByIdIn,
     output=DeviceOut,
-    ai={"description": "Reads one device someone entered this hub from, by its id, as the devices list shows it: its name first."},
+    ai=AI(
+        description=(
+            "Reads one device someone entered this hub from, by its id, as the devices list shows it: its name first."
+        ),
+        asks={
+            "en": ("show me the kitchen tablet's details", "who used the bar device last?"),
+            "es": (
+                "¿quién entró el último en el dispositivo de la barra?",
+                "¿quién usó por última vez el ordenador de la oficina?",
+            ),
+        },
+    ),
 )
 def device_detail(ctx: OperationContext, data: DeviceByIdIn) -> dict[str, Any]:
     """One device of «Devices» (BASE-G63), as its row: what the assistant's card names a device by."""
@@ -1133,10 +1446,24 @@ def unused_devices(here: TrustedDevice | None):
     permission=VIEW_HOME,
     input=AccessSettingsIn,
     output=AccessSettingsOut,
-    ai={
-        "description": "Reads how the business asks who is at the till: whether the PIN pad shows, when it asks "
-        "again (after some minutes without use, or once per shift) and how many digits a PIN has."
-    },
+    ai=AI(
+        description=(
+            "Reads how the business asks who is at the till: whether the PIN pad shows, when it asks again (after some "
+            "minutes without use, or once per shift) and how many digits a PIN has."
+        ),
+        asks={
+            "en": (
+                "how many digits is the PIN?",
+                "does the till ask for the PIN again after a while?",
+                "when does the screen lock and ask who's there?",
+            ),
+            "es": (
+                "¿cada cuánto pide el PIN la caja?",
+                "¿se bloquea la caja si nadie la toca?",
+                "¿el PIN es de 4 o de 6 cifras?",
+            ),
+        },
+    ),
 )
 def access_settings_get(ctx: OperationContext, data: AccessSettingsIn) -> dict[str, Any]:
     """The «PIN pad» card of Settings › General (BASE-G62, G151): what the Hub confirmed, for everyone of the hub."""
@@ -1155,7 +1482,13 @@ def access_settings_get(ctx: OperationContext, data: AccessSettingsIn) -> dict[s
     permission=VIEW_HOME,
     input=ProfileIn,
     output=ProfileOut,
-    ai={"description": "Reads the person's own profile in this hub: name, contact email, language and appearance."},
+    ai=AI(
+        description="Reads the person's own profile in this hub: name, contact email, language and appearance.",
+        asks={
+            "en": ("what email is on my profile?", "show me my profile"),
+            "es": ("¿qué correo tengo en mi perfil?", "¿con qué nombre salgo yo?"),
+        },
+    ),
 )
 def profile_get(ctx: OperationContext, data: ProfileIn) -> dict[str, Any]:
     """«My profile» (BASE-G125): always the profile of whoever asks; without a row, the account's name."""
@@ -1372,11 +1705,17 @@ def person_detail_out(ctx: OperationContext, person: dict[str, Any]) -> dict[str
     permission=VIEW_HOME,
     input=PersonListIn,
     output=PersonListOut,
-    ai={
-        "description": "Lists the people of this business: name, role (owner, admin, manager, employee), how each one "
-        "gets in (their erplora.com account, and a PIN or a badge at the shared tills) and whether they entered yet; "
-        "and the places of the plan taken. Inviting, changing a role or removing someone is done on erplora.com."
-    },
+    ai=AI(
+        description=(
+            "Lists the people of this business: name, role (owner, admin, manager, employee), how each one gets in "
+            "(their erplora.com account, and a PIN or a badge at the shared tills) and whether they entered yet; and "
+            "the places of the plan taken. Inviting, changing a role or removing someone is done on erplora.com."
+        ),
+        asks={
+            "en": ("who has access to the business?", "list everyone and their role", "who still hasn't signed in?"),
+            "es": ("¿quién tiene acceso al negocio?", "¿quién puede entrar en el negocio y con qué rol?"),
+        },
+    ),
 )
 def person_list(ctx: OperationContext, data: PersonListIn) -> dict:
     """Employees › Personal (BASE-G11, G142, G138): every person once, owner first, with the plan's places."""
@@ -1390,10 +1729,16 @@ def person_list(ctx: OperationContext, data: PersonListIn) -> dict:
     permission=ADMINISTER_HUB,
     input=PersonIn,
     output=PersonDetailOut,
-    ai={
-        "description": "Reads one person of this business by their id: role, how they get in (PIN, badge), since when, "
-        "and whether who asks may take their PIN away or give them a badge."
-    },
+    ai=AI(
+        description=(
+            "Reads one person of this business by their id: role, how they get in (PIN, badge), since when, and "
+            "whether who asks may take their PIN away or give them a badge."
+        ),
+        asks={
+            "en": ("how does Luis get in, PIN or badge?", "can Ana still use her PIN?"),
+            "es": ("¿cómo entra Luis, con PIN o con placa?", "¿Ana tiene placa?"),
+        },
+    ),
 )
 def person_detail(ctx: OperationContext, data: PersonIn) -> dict:
     """A person's page (BASE-G10), for who runs the business."""
@@ -1406,10 +1751,16 @@ def person_detail(ctx: OperationContext, data: PersonIn) -> dict:
     permission=VIEW_HOME,
     input=RoleListIn,
     output=RoleListOut,
-    ai={
-        "description": "Lists the roles of this business (owner, admin, manager, employee): how many people have each "
-        "one and how many permissions of the apps it gives. Roles are given on erplora.com."
-    },
+    ai=AI(
+        description=(
+            "Lists the roles of this business (owner, admin, manager, employee): how many people have each one and how "
+            "many permissions of the apps it gives. Roles are given on erplora.com."
+        ),
+        asks={
+            "en": ("how many managers do we have?", "what can a manager do here?"),
+            "es": ("¿qué roles hay en el negocio?", "¿cuántos encargados tenemos?"),
+        },
+    ),
 )
 def role_list(ctx: OperationContext, data: RoleListIn) -> dict:
     """Employees › Roles (BASE-G143): erplora.com's four, from the top, with their people and permissions."""
@@ -1477,11 +1828,25 @@ def api_apps(ctx: OperationContext) -> list[dict[str, Any]]:
     permission=ADMINISTER_HUB,
     input=ApiKeyListIn,
     output=ApiKeyListOut,
-    ai={
-        "description": "Lists this business's API keys for other systems: name, the start of the token (never the "
-        "whole), what each may do (all, read, write or per app), its requests a minute, when it was last used and "
-        "whether it was revoked; and the apps whose API a key can reach."
-    },
+    ai=AI(
+        description=(
+            "Lists this business's API keys for other systems: name, the start of the token (never the whole), what "
+            "each may do (all, read, write or per app), its requests a minute, when it was last used and whether it "
+            "was revoked; and the apps whose API a key can reach."
+        ),
+        asks={
+            "en": (
+                "which API keys do we have?",
+                "what systems are connected with a key?",
+                "when was the Holded key last used?",
+            ),
+            "es": (
+                "¿qué claves de API tenemos?",
+                "¿qué programas están conectados con clave?",
+                "¿cuándo se usó por última vez la clave de Holded?",
+            ),
+        },
+    ),
 )
 def api_key_list(ctx: OperationContext, data: ApiKeyListIn) -> dict:
     """Employees › API keys (BASE-G149, G05): every key, the newest first, and the apps a key per app may reach. While
@@ -1498,10 +1863,16 @@ def api_key_list(ctx: OperationContext, data: ApiKeyListIn) -> dict:
     permission=ADMINISTER_HUB,
     input=ApiKeyIdIn,
     output=ApiKeyOut,
-    ai={
-        "description": "Reads one API key of this business by its id, as the list of keys shows it: its name, the start "
-        "of its token (never the whole), what it may do and whether it was revoked."
-    },
+    ai=AI(
+        description=(
+            "Reads one API key of this business by its id, as the list of keys shows it: its name, the start of its "
+            "token (never the whole), what it may do and whether it was revoked."
+        ),
+        asks={
+            "en": ("what can the accountant's API key do?", "show me the Shopify key"),
+            "es": ("¿qué permisos tiene la clave de la gestoría?", "dame los datos de la clave de Shopify"),
+        },
+    ),
 )
 def api_key_detail(ctx: OperationContext, data: ApiKeyIdIn) -> dict:
     """One key of Employees › API keys; none while the business shares phase 1's database (``api_key_list``)."""
@@ -1546,10 +1917,24 @@ def approval_action(operation: str, figures: dict | None = None, currency: str |
     permission=ADMINISTER_HUB,
     input=ApprovalListIn,
     output=ApprovalListOut,
-    ai={
-        "description": "Lists the actions a manager approved with their PIN or badge, the newest first: when, what "
-        "in words, who asked, who approved, how, and whether the approval was used."
-    },
+    ai=AI(
+        description=(
+            "Lists the actions a manager approved with their PIN or badge, the newest first: when, what in words, who "
+            "asked, who approved, how, and whether the approval was used."
+        ),
+        asks={
+            "en": (
+                "who approved that discount?",
+                "show me today's approvals",
+                "what did the manager authorise with their PIN?",
+            ),
+            "es": (
+                "¿quién aprobó la anulación de ayer?",
+                "enséñame las aprobaciones de hoy",
+                "¿qué ha autorizado el encargado con su PIN?",
+            ),
+        },
+    ),
 )
 def approval_list(ctx: OperationContext, data: ApprovalListIn) -> dict:
     """Employees › Approvals (BASE-G145): the record of approvals, read only."""
@@ -1620,11 +2005,17 @@ def _approval_cell(text: str) -> str:
     permission=ADMINISTER_HUB,
     input=ApprovalExportIn,
     output=ApprovalExportOut,
-    ai={
-        "description": "Exports the record of approvals as a CSV file, the newest first, with the search and the filters "
-        "of Employees › Approvals (days, action, PIN or badge, used or not): when, what in words, who approved, who "
-        "asked, how and whether it was used. It names people of the business."
-    },
+    ai=AI(
+        description=(
+            "Exports the record of approvals as a CSV file, the newest first, with the search and the filters of "
+            "Employees › Approvals (days, action, PIN or badge, used or not): when, what in words, who approved, who "
+            "asked, how and whether it was used. It names people of the business."
+        ),
+        asks={
+            "en": ("show me last month's manager approvals", "list the approvals made with a badge this week"),
+            "es": ("enséñame las autorizaciones del mes pasado", "¿qué se aprobó con placa esta semana?"),
+        },
+    ),
 )
 def approval_export(ctx: OperationContext, data: ApprovalExportIn) -> dict:
     """Employees › Approvals › «Export CSV» (BASE-F85): every approval the list's search and filters keep, not only the
@@ -1704,7 +2095,15 @@ def api_docs_enabled() -> bool:
     permission=VIEW_HOME,
     input=ApiDocSettingsIn,
     output=ApiDocSettingsOut,
-    ai={"description": "Says whether this business shows the documentation of its API, and whether who asks may change it."},
+    ai=AI(
+        description=(
+            "Says whether this business shows the documentation of its API, and whether who asks may change it."
+        ),
+        asks={
+            "en": ("is our API documentation visible?", "can the developer see the API docs?"),
+            "es": ("¿está publicada la documentación de la API?", "¿el programador puede ver la doc de la API?"),
+        },
+    ),
 )
 def api_doc_settings(ctx: OperationContext, data: ApiDocSettingsIn) -> dict:
     """«Show the API documentation» in Settings › General (BASE-G100); off without a row."""
@@ -1763,11 +2162,17 @@ def refuse_past_the_plans_space(ctx: OperationContext, store: Storage, size: int
     input=FileListIn,
     output=FileListOut,
     expose_api=True,
-    ai={
-        "description": "Lists the business's files: every folder, and the files of one folder by its path (the "
-        "folder «Facturas/2026»; empty: the top), each with its name, size and date, and the space they take "
-        "against what the plan includes."
-    },
+    ai=AI(
+        description=(
+            "Lists the business's files: every folder, and the files of one folder by its path (the folder "
+            "«Facturas/2026»; empty: the top), each with its name, size and date, and the space they take against what "
+            "the plan includes."
+        ),
+        asks={
+            "en": ("show me our files", "how much storage are we using?", "what's in the Contracts folder?"),
+            "es": ("enséñame los archivos del negocio", "¿cuánto espacio llevamos ocupado?"),
+        },
+    ),
 )
 def file_list(ctx: OperationContext, data: FileListIn) -> dict:
     """BASE-G82: the tree, the folder's files, the space used and what this person may do with them."""
@@ -1788,10 +2193,16 @@ def file_list(ctx: OperationContext, data: FileListIn) -> dict:
     input=FileReadIn,
     output=FileOut,
     expose_api=True,
-    ai={
-        "description": "Finds one file of the business by its path (the file «Facturas/marzo.pdf»): its name, size "
-        "and type. Its bytes are read at the same address by whoever may see the files."
-    },
+    ai=AI(
+        description=(
+            "Finds one file of the business by its path (the file «Facturas/marzo.pdf»): its name, size and type. Its "
+            "bytes are read at the same address by whoever may see the files."
+        ),
+        asks={
+            "en": ("find the file Invoices/march.pdf", "how big is the contract PDF?"),
+            "es": ("búscame el archivo Facturas/marzo.pdf", "¿cuánto pesa ese archivo?"),
+        },
+    ),
 )
 def file_read(ctx: OperationContext, data: FileReadIn) -> dict:
     """BASE-G84: the file, described; ``base.api`` streams its bytes to the person who asked."""
@@ -1803,7 +2214,6 @@ def file_read(ctx: OperationContext, data: FileReadIn) -> dict:
 
 from live.errors import OperationError  # noqa: E402 - the assistant's block keeps its imports with it
 
-from live.operations import AI  # noqa: E402
 from pydantic import ValidationError  # noqa: E402
 
 from base import assistant  # noqa: E402
@@ -1845,10 +2255,22 @@ def assistant_usage(ctx: OperationContext, data: AssistantUsageIn) -> dict:
     output=DocsSearchOut,
     ai=AI(
         description=(
-            "Searches ERPlora's help and the documentation of its apps for how-to questions (how to do something, "
-            "what a screen or option means, plans and prices): returns up to 8 cited excerpts. Not for the "
-            "business's own records."
-        )
+            "Searches ERPlora's help and the documentation of its apps for how-to questions (how to do something, what "
+            "a screen or option means, plans and prices): returns up to 8 cited excerpts. Not for the business's own "
+            "records."
+        ),
+        asks={
+            "en": (
+                "how do I close the till at night?",
+                "what does a shared device mean?",
+                "how much is the Standard plan?",
+            ),
+            "es": (
+                "¿cómo se hace una devolución?",
+                "¿qué significa dispositivo compartido?",
+                "¿cuánto cuesta el plan Standard?",
+            ),
+        },
     ),
     # It waits on erplora.com: no transaction holds the hub's connection meanwhile (in a turn, its route asked first).
     database=False,
@@ -1877,10 +2299,16 @@ from base.schemas import LocationListIn, LocationListOut  # noqa: E402
     permission=VIEW_HOME,
     input=LocationListIn,
     output=LocationListOut,
-    ai={
-        "description": "Lists the places this business works in (its shops, bars or salons), the default one first, "
-        "and whether each is still in use. A business with one place has only its default one."
-    },
+    ai=AI(
+        description=(
+            "Lists the places this business works in (its shops, bars or salons), the default one first, and whether "
+            "each is still in use. A business with one place has only its default one."
+        ),
+        asks={
+            "en": ("which shops do we have?", "list our locations", "which is our main salon?"),
+            "es": ("¿qué locales tenemos?", "¿cuáles son nuestras tiendas?", "¿cuál es el local principal?"),
+        },
+    ),
 )
 def location_list(ctx: OperationContext, data: LocationListIn) -> dict:
     """The business's locations, for everyone of the hub: the default first, then by name, those no longer in use
@@ -1928,12 +2356,26 @@ def business_language(ctx: OperationContext) -> str:
     permission=VIEW_HOME,
     input=CatalogImageSearchIn,
     output=CatalogImagePage,
-    ai={
-        "description": "Finds an image for a product, a service or a set menu in ERPlora's shared image library by "
-        "what it is called, in Spanish or English («café con leche», «women's haircut»), the best match first, each "
-        "with its title and the reference (catalog:<folder>/<name>) that sets it as the image of a product, a service "
-        "or a set menu. Empty: the whole library by title."
-    },
+    ai=AI(
+        description=(
+            "Finds an image for a product, a service or a set menu in ERPlora's shared image library by what it is "
+            "called, in Spanish or English («café con leche», «women's haircut»), the best match first, each with its "
+            "title and the reference (catalog:<folder>/<name>) that sets it as the image of a product, a service or a "
+            "set menu. Empty: the whole library by title."
+        ),
+        asks={
+            "en": (
+                "find a picture of a cappuccino",
+                "is there an image for a women's haircut?",
+                "look for a burger photo in the library",
+            ),
+            "es": (
+                "búscame una foto de café con leche",
+                "¿hay alguna imagen de corte de pelo de mujer?",
+                "encuéntrame un dibujo de hamburguesa",
+            ),
+        },
+    ),
 )
 def catalog_image_search(ctx: OperationContext, data: CatalogImageSearchIn) -> dict:
     """The library is everyone's: who may see the hub's Home may look an image up (the screens that set one need their
@@ -1956,10 +2398,16 @@ def catalog_image_search(ctx: OperationContext, data: CatalogImageSearchIn) -> d
     database=False,
     input=CatalogImageRefIn,
     output=CatalogImageOut,
-    ai={
-        "description": "Says which image of the shared library a reference (catalog:<folder>/<name>) names: its title "
-        "in the person's language and where it is served."
-    },
+    ai=AI(
+        description=(
+            "Says which image of the shared library a reference (catalog:<folder>/<name>) names: its title in the "
+            "person's language and where it is served."
+        ),
+        asks={
+            "en": ("which picture is catalog:drinks/espresso?", "what's that library image called?"),
+            "es": ("¿qué foto es catalog:bebidas/espresso?", "¿cómo se llama esa imagen de la biblioteca?"),
+        },
+    ),
 )
 def catalog_image_get(ctx: OperationContext, data: CatalogImageRefIn) -> dict:
     """What the assistant's card says of an image a write sets (``refers``): its title in the person's language (the

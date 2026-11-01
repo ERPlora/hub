@@ -3,7 +3,8 @@
 No path parameters (as ``apps.demo``): ids travel in the input, because a route takes one parameter, the
 operation's input. ``jobs/claim``, ``jobs/complete`` and ``jobs/fail`` are the device's (base's
 ``/ws/print`` calls the same operations). ``POST devices`` sets up the device that calls (its ``X-Device-Id``);
-a device's own id never travels in a URL, which access logs keep (``printing.device.get`` has no route).
+a device's own id never travels in a URL, which access logs keep (``printing.device.get`` has no route): ``devices/detail``
+takes its registration id, the one the devices screen lists.
 """
 
 from live.ninja import bind, run_operation
@@ -92,6 +93,11 @@ async def job_summary(request):
     return await run_operation(request, queries.job_summary)
 
 
+@bind(router, "printing.job.get", "/printing/jobs/detail")
+async def job_get(request, params: Query[JobRefIn]):
+    return await run_operation(request, queries.get_job, params)
+
+
 @bind(router, "printing.job.create", "/printing/jobs", status=201)
 async def job_create(request, data: JobCreateIn):
     return await run_operation(request, services.create_job, data)
@@ -128,6 +134,11 @@ async def job_cancel(request, data: JobCancelIn):
 @bind(router, "printing.device.list", "/printing/devices")
 async def device_list(request, params: Query[DeviceListIn]):
     return await run_operation(request, queries.list_devices, params)
+
+
+@bind(router, "printing.device.detail", "/printing/devices/detail")
+async def device_detail(request, params: Query[DeviceRefIn]):
+    return await run_operation(request, queries.get_device_detail, params)
 
 
 @bind(router, "printing.device.register", "/printing/devices", status=201)
