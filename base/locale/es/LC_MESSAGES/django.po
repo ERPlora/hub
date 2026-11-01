@@ -312,6 +312,9 @@ msgstr "Añade a las personas que usarán el TPV, cada una con su forma de entra
 msgid "Failed events"
 msgstr "Eventos caídos"
 
+msgid "Plan limits"
+msgstr "Límites del plan"
+
 #: registry.py:87
 msgid "This hub is no longer available."
 msgstr "Este hub ya no está disponible."

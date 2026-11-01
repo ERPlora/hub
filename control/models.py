@@ -321,15 +321,40 @@ class HubUsageDaily(UUIDModel):
         return f"{self.hub_id} @ {self.day}"
 
 
+class HubActivityDaily(UUIDModel):
+    """What a hub did on a day (UTC), as its serving tasks counted it (``base.meter``, every minute): the requests it
+    served, the most transactions it had at once in one process (how the plan's limit is applied) and the requests
+    that found no room (503 ``base.hub_busy``). One row per hub and day, added to by every task with atomic increments;
+    ``GET /internal/usage?day=`` serves it to the SaaS with that night's figures (``HubUsageDaily``)."""
+
+    hub = models.ForeignKey(Hub, on_delete=models.CASCADE, related_name="activity", verbose_name=_("hub"))
+    day = models.DateField(pgettext_lazy("hub usage", "day"))
+    requests = models.PositiveBigIntegerField(_("requests"), default=0)
+    peak_connections = models.PositiveIntegerField(_("most connections at once"), default=0)
+    busy_requests = models.PositiveBigIntegerField(_("requests with no room"), default=0)
+
+    class Meta:
+        verbose_name = _("daily activity of a hub")
+        verbose_name_plural = _("daily activity of the hubs")
+        ordering = ["-day", "hub_id"]
+        constraints = [models.UniqueConstraint(fields=["hub", "day"], name="control_hubactivitydaily_one_per_day")]
+
+    def __str__(self) -> str:
+        return f"{self.hub_id} @ {self.day}"
+
+
 class HubVisit(models.Model):
-    """A person came into a hub on a day (UTC): a login of their account, their PIN or their badge
-    (``base.services``, every login). One row per hub, day and person, whatever the logins: what the nightly
-    measurement counts as the hub's active people (``base.usage``), which keeps the last 31 days only."""
+    """A person had activity in a hub on a day (UTC): a login of their account, their PIN or their badge
+    (``base.services``, every login) or anything they did there since (``base.meter``), so a session open for days
+    counts on each of them. One row per hub, day and person: what the nightly measurement counts as the hub's active
+    people (``base.usage``), which keeps the last 31 days only. ``last_seen_at`` says who has activity now (empty: a
+    login not followed by anything yet, or a row from before it was noted)."""
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid7, editable=False)
     host = models.CharField(pgettext_lazy("hub usage", "host"), max_length=63)
     day = models.DateField(pgettext_lazy("hub usage", "day"))
     saas_user_id = models.CharField(pgettext_lazy("hub usage", "SaaS account"), max_length=64)
+    last_seen_at = models.DateTimeField(pgettext_lazy("hub usage", "last seen at"), null=True, blank=True)
 
     class Meta:
         verbose_name = _("daily entry")

@@ -34,6 +34,7 @@ from live.operations import UnknownOperation
 from live.operations import get as get_operation
 from live.slugs import validate_hub_slug
 
+from base import meter
 from base import registry
 from base.api_keys import KeyCaller
 from base.approvals import Approved, consequence_context
@@ -171,6 +172,17 @@ def _session_ended(request: HttpRequest | None) -> bool:
     return key is not None and not session.exists(key)
 
 
+def _note_the_person(request: HttpRequest, user: Any) -> None:
+    """The person of this request has activity in its business (``base.meter``, BASE-F40): here their session is already
+    read, so it adds no statement, and an API key or a visitor never get here. A demo is not measured; the platform's host
+    has no ``request.hub``."""
+    from base.services import saas_user_id_of
+
+    hub = getattr(request, "hub", None)
+    if hub is not None and not hub.is_demo:
+        meter.note_seen(hub.slug, saas_user_id_of(user))
+
+
 class HubContextBuilder:
     def __init__(self, resolver: HostScopeResolver | None = None) -> None:
         self.resolver = resolver or HostScopeResolver()
@@ -190,6 +202,8 @@ class HubContextBuilder:
             )
         user: Any = getattr(request, "user", None)
         actor = user if user is not None and user.is_authenticated else None
+        if actor is not None:
+            _note_the_person(request, actor)
         permissions = permissions_for(actor, scope)
         approved = getattr(request, "approved", None)
         if isinstance(approved, Approved):

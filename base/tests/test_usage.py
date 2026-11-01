@@ -23,6 +23,8 @@ from django.core.files.base import ContentFile
 from django.core.files.storage import storages
 from django.test import Client
 from django.utils import timezone
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from live.context import OperationContext, Scope
 from live.operations import get
 
@@ -34,7 +36,7 @@ from base.tenancy.tests import hubs
 from base.tenancy.tests.hubs import make_cluster, make_hub  # noqa: F401 (fixtures)
 from base.tests.test_internal import signed
 from base.tests.test_session_revoke import ANA, OLGA, login
-from control.models import Hub, HubUsageDaily, HubVisit, UsageRun
+from control.models import Hub, HubActivityDaily, HubUsageDaily, HubVisit, UsageRun
 
 #: A night long past, never the real yesterday of a run: no row a real clock writes can be this day's.
 DAY = dt.date(2026, 3, 10)
@@ -298,11 +300,38 @@ def test_the_day_measured_is_served_as_the_saas_reads_it(measured_night, setting
                 "db_bytes": 1000 + index,
                 "active_users_1d": index,
                 "active_users_30d": index + 1,
+                "requests": None,
+                "peak_connections": None,
+                "busy_requests": None,
             }
             for index, hub in enumerate(measured_night)
         ],
         "next_cursor": None,
     }
+
+
+def test_each_row_says_what_the_day_counted_only_that_day_and_only_its_hub(measured_night):
+    """``collect_hub_usage`` (saas) reads them by these names; nothing counted is null, never a zero."""
+    first, second, third = measured_night
+    HubActivityDaily.objects.create(hub=first, day=DAY, requests=120, peak_connections=3, busy_requests=2)
+    HubActivityDaily.objects.create(hub=second, day=DAY, requests=7, peak_connections=0, busy_requests=0)
+    HubActivityDaily.objects.create(hub=third, day=DAY + dt.timedelta(days=1), requests=99, peak_connections=9, busy_requests=9)
+
+    rows = {row["id"]: row for row in usage_of(Client(), "?day=2026-03-10").json()["hubs"]}
+
+    figures = [(row["requests"], row["peak_connections"], row["busy_requests"]) for row in rows.values()]
+    assert figures == [(120, 3, 2), (7, 0, 0), (None, None, None)]
+
+
+def test_a_page_reads_the_day_s_activity_in_one_query(measured_night):
+    """However many hubs it holds: no query per row."""
+    op = get("base.usage.list")
+    ctx = OperationContext(scope=Scope("platform", "platform"), actor="system", permissions=frozenset({"*"}))
+
+    with CaptureQueriesContext(connection) as queries:
+        op(ctx, op.input(day=DAY))
+
+    assert sum('"control_hubactivitydaily"' in query["sql"] for query in queries) == 1
 
 
 def test_the_rows_come_by_pages_each_once(measured_night, monkeypatch):

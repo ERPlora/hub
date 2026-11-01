@@ -228,33 +228,8 @@
     "systemPlan": {
       "title": "Sistema",
       "tabs": {
-        "label": "Secciones de Sistema",
-        "plan": "Plan y límites"
-      },
-      "heading": "Los límites de tu plan",
-      "status": {
-        "within": "Dentro del límite",
-        "close": "Cerca del límite"
-      },
-      "people": "Personas",
-      "devices": "Dispositivos",
-      "limitHint": "Límite del plan",
-      "noLimit": "Sin límite",
-      "upTo": "Hasta {n}",
-      "full": {
-        "heading": "Te estás quedando sin margen en tu plan",
-        "body": "Tu plan tiene todas las plazas ocupadas, así que no puedes añadir a nadie más."
-      },
-      "unknown": "Todavía no conocemos el plan de este negocio: aparecerá en cuanto erplora.com lo envíe.",
-      "managed": "Los planes se gestionan desde tu cuenta de ERPlora, en erplora.com.",
-      "loading": "Cargando tu plan…",
-      "denied": "Solo quien administra el negocio ve el plan y sus límites.",
-      "error": {
-        "heading": "No hemos podido leer tu plan",
-        "body": "Comprueba la conexión y vuelve a intentarlo."
-      },
-      "retry": "Reintentar",
-      "devicesInUse": "Con una sesión abierta ahora."
+        "label": "Secciones de Sistema"
+      }
     },
     "settings": {
       "title": "Ajustes",
@@ -460,7 +435,7 @@
     },
     "system": {
       "tabs": {
-        "resources": "Recursos",
+        "usage": "Uso y plan",
         "updates": "Actualizaciones",
         "events": "Eventos caídos",
         "logs": "Registros"
@@ -470,20 +445,6 @@
         "body": "Las métricas y los registros no están disponibles ahora. Puedes volver a intentarlo."
       },
       "retry": "Reintentar",
-      "resources": {
-        "heading": "Recursos en la nube",
-        "cloud": "Nube",
-        "database": "Base de datos",
-        "engine": "PostgreSQL",
-        "shared": "Base de datos compartida",
-        "own": "Base de datos propia",
-        "notMeasured": "El uso de CPU, memoria y conexiones no se mide por negocio: los servidores de ERPlora atienden a todos los negocios a la vez y crecen solos cuando hace falta.",
-        "denied": "Solo el dueño o un administrador puede ver cuánto está usando el hub.",
-        "loading": "Consultando el sistema…",
-        "size": "Ocupa {size}",
-        "measuredOn": "Medido el {day}",
-        "notMeasuredYet": "Su tamaño se mide cada noche: la primera cifra llega mañana."
-      },
       "updates": {
         "heading": "Qué te hemos actualizado",
         "loading": "Consultando la versión…",
@@ -549,6 +510,76 @@
         "search": "Buscar evento…",
         "empty": "Sin eventos: todavía no ha pasado nada entre las apps de este negocio.",
         "error": "No se pudo cargar el registro. Comprueba la conexión y reintenta."
+      },
+      "usage": {
+        "loading": "Consultando el sistema…",
+        "denied": "Solo el dueño o un administrador puede ver cuánto está usando el hub.",
+        "plan": "Plan {name}",
+        "planNames": {
+          "free": "Gratis",
+          "starter": "Starter",
+          "standard": "Standard",
+          "pro": "Pro",
+          "enterprise": "Enterprise",
+          "max": "Max"
+        },
+        "verdict": {
+          "enough": "Tu plan te alcanza",
+          "must": "Tienes que ampliar: {motive}",
+          "should": "Te conviene ampliar: {motive}",
+          "full": "{things} al completo: para añadir más, amplía el plan."
+        },
+        "motive": {
+          "filesFull": "ya no caben más archivos",
+          "filesNear": "casi no te quedan archivos",
+          "assistantFull": "se han acabado los mensajes del asistente de este mes",
+          "assistantNear": "casi no te quedan mensajes del asistente este mes",
+          "meterFull": "se han acabado los mensajes de {name} de este mes",
+          "meterNear": "casi no te quedan mensajes de {name} este mes",
+          "capacity": "tu negocio se queda sin capacidad en los momentos de más trabajo"
+        },
+        "included": "Lo que incluye tu plan",
+        "using": "Lo que usas",
+        "information": "Para tu información",
+        "rows": {
+          "files": "Archivos",
+          "apps": "Apps",
+          "people": "Personas",
+          "devices": "Dispositivos",
+          "assistant": "Asistente",
+          "capacity": "Capacidad"
+        },
+        "amount": {
+          "of": "{used} de {limit}",
+          "perMonth": "{used} de {limit} al mes",
+          "noLimit": "{used} · Sin límite",
+          "connections": "{used} de {limit} conexiones",
+          "connectionsOpen": "{used} conexión | {used} conexiones",
+          "notIncluded": "Tu plan no incluye {name}",
+          "notIncludedAssistant": "Tu plan no incluye asistente",
+          "unavailable": "No disponible ahora",
+          "loading": "Consultando…"
+        },
+        "pill": {
+          "near": "Cerca",
+          "full": "Completo"
+        },
+        "fellShort": "se quedó corta 1 vez esta semana | se quedó corta {count} veces esta semana",
+        "topCapacity": "Ya tienes la capacidad máxima: cuéntanoslo en «Reportar un problema».",
+        "notMeasured": "Todavía sin medir.",
+        "notMeasuredToday": "Todavía sin medir hoy.",
+        "notMeasuredYet": "Se mide cada noche: la primera cifra llega mañana.",
+        "since": "Desde el {day}",
+        "measuredOn": "Medido el {day}",
+        "info": {
+          "requests": "Peticiones este mes",
+          "active": "Activas ahora",
+          "month": "Últimos 30 días",
+          "database": "Tamaño de la base"
+        },
+        "demo": "En una demo no se mide el uso: sus datos se borran al terminar.",
+        "unknown": "Todavía no conocemos el plan de este negocio: aparecerá en cuanto erplora.com lo envíe.",
+        "managed": "Los planes se gestionan desde tu cuenta de ERPlora, en erplora.com."
       }
     },
     "settingsBusiness": {

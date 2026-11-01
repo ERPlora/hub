@@ -6,7 +6,7 @@
   (its sessions end at once and the PIN stops working on it) and remove at once those nobody used in 30 days.
 - G57: a plan that covers N devices (``plan.max_devices`` of the SaaS's photo) ends, at each entry, the sessions of
   the other devices past the N - 1 most recent; each of them says why at its next way in.
-- G81 (BASE-F28): «Plan and limits» counts the devices in use the way that cap does: those with a session open on
+- G81 (BASE-F40): «Usage and plan» counts the devices in use the way that cap does: those with a session open on
   this hub.
 """
 
@@ -240,7 +240,7 @@ class TestThePlanCoversOneDevice:
 
 
 class TestThePlanSaysTheDevicesInUse:
-    """BASE-G81: the devices «Plan and limits» counts are those the cap of BASE-G57 keeps: a session open on this hub."""
+    """BASE-G81: the devices «Usage and plan» counts are those the cap of BASE-G57 keeps: a session open on this hub."""
 
     @pytest.fixture(autouse=True)
     def plan(self, db):

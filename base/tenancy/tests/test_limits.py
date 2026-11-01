@@ -15,6 +15,7 @@ import gc
 import logging
 import threading
 import time
+import uuid
 from types import SimpleNamespace
 
 import pytest
@@ -45,12 +46,48 @@ def photo(plan=None, version: int = 1):
 
 
 @pytest.mark.parametrize(
+    ("ceiling", "plan_gives", "effective"),
+    [(6, 1, 1), (6, 3, 3), (6, 6, 6), (6, 12, 6), (6, 48, 6), (3, 6, 3), (3, 1, 1)],
+)
+def test_no_plan_gets_more_at_once_than_pgbouncer_gives(settings, ceiling, plan_gives, effective):
+    """Past it, a transaction would wait 10 s in PgBouncer and fail with no ``base.hub_busy`` that counts it."""
+    settings.PGBOUNCER_MAX_DB_CONNECTIONS = ceiling
+    plan = {"slug": "x", "max_db_connections": plan_gives, "statement_timeout_seconds": 15}
+
+    assert limits.plan_limits({"plan": plan}) == limits.PlanLimits(effective, 15)
+
+
+def test_a_ceiling_that_makes_no_sense_leaves_the_plan_s(settings):
+    settings.PGBOUNCER_MAX_DB_CONNECTIONS = 0
+    plan = {"slug": "x", "max_db_connections": 3, "statement_timeout_seconds": 15}
+
+    assert limits.plan_limits({"plan": plan}) == limits.PlanLimits(3, 15)
+
+
+@pytest.mark.parametrize(
+    ("ceiling", "plan_gives", "helps"),
+    [(6, 1, True), (6, 3, True), (6, 5, True), (6, 6, False), (6, 12, False), (3, 3, False), (3, 1, True)],
+)
+def test_a_bigger_plan_helps_only_below_what_pgbouncer_gives(settings, ceiling, plan_gives, helps):
+    settings.PGBOUNCER_MAX_DB_CONNECTIONS = ceiling
+    plan = {"slug": "x", "max_db_connections": plan_gives, "statement_timeout_seconds": 15}
+
+    assert limits.bigger_plan_gives_more({"plan": plan}) is helps
+
+
+@pytest.mark.parametrize("state", [{}, None, {"plan": None}, {"plan": {"slug": "x"}}])
+def test_a_photo_with_no_usable_plan_cannot_say_a_bigger_plan_helps(state):
+    assert limits.bigger_plan_gives_more(state) is False
+
+
+@pytest.mark.parametrize(
     ("plan", "expected"),
     [
         ({"slug": "free", "max_db_connections": 1, "statement_timeout_seconds": 5}, limits.PlanLimits(1, 5)),
         (STARTER, limits.PlanLimits(3, 15)),
         (STANDARD, limits.PlanLimits(6, 15)),
-        ({"slug": "pro", "max_db_connections": 12, "statement_timeout_seconds": 15}, limits.PlanLimits(12, 15)),
+        # What PgBouncer gives each database is the ceiling, 6 by default: a Pro's 12 are 6 here (PLAN-HUB §66).
+        ({"slug": "pro", "max_db_connections": 12, "statement_timeout_seconds": 15}, limits.PlanLimits(6, 15)),
     ],
     ids=["free", "starter", "standard", "pro"],
 )
@@ -219,6 +256,112 @@ def test_growing_lets_the_waiting_in_and_shrinking_waits_for_the_places_in_use()
 
     limiter.take(wait=0).release()
     assert limiter.in_use == 0
+
+
+# ── What the meter hears (BASE-F40) ───────────────────────────────────────────────────────────────────────────────
+
+
+ACME = uuid.UUID("0199c4b0-0000-7000-8000-00000000d001")
+
+
+def photo_of(*, pk=ACME, is_demo=False, plan=STANDARD):
+    return SimpleNamespace(pk=pk, is_demo=is_demo, state={"plan": plan}, state_version=1)
+
+
+@pytest.fixture
+def heard(monkeypatch):
+    """What the limiters tell the meter: ``peaks`` and ``busy``."""
+    told = SimpleNamespace(peaks=[], busy=[])
+    monkeypatch.setattr(limits.meter, "note_peak", lambda hub_id, in_use: told.peaks.append((hub_id, in_use)))
+    monkeypatch.setattr(limits.meter, "count_busy", told.busy.append)
+    return told
+
+
+def test_each_place_taken_says_how_many_are_in_use_now(heard):
+    limiter = limits.configure("hub_x", photo_of())
+
+    first = limiter.take(wait=0)
+    second = limiter.take(wait=0)
+    second.release()
+    third = limiter.take(wait=0)
+
+    assert heard.peaks == [(ACME, 1), (ACME, 2), (ACME, 2)]
+    assert heard.busy == []
+    first.release()
+    third.release()
+
+
+FREE_PLAN = {"slug": "free", "max_db_connections": 1, "statement_timeout_seconds": 5}
+
+
+def test_finding_no_room_counts_nothing_yet_and_the_failure_knows_whose_it_is(heard):
+    """Whoever catches it decides: the live executor tries again, and a try nobody saw must not tell an owner to upgrade."""
+    limiter = limits.configure("hub_x", photo_of(plan=FREE_PLAN))
+    held = limiter.take(wait=0)
+
+    with pytest.raises(limits.HubBusy) as busy:
+        limiter.take(wait=0)
+
+    assert heard.busy == []
+    assert busy.value.hub_id == ACME
+    held.release()
+
+
+def test_the_failure_counts_when_it_reaches_a_client(heard):
+    limiter = limits.configure("hub_x", photo_of(plan=FREE_PLAN))
+    held = limiter.take(wait=0)
+    with pytest.raises(limits.HubBusy) as busy:
+        limiter.take(wait=0)
+    held.release()
+
+    busy.value.reached_client()
+
+    assert heard.busy == [ACME]
+
+
+def test_the_same_failure_counts_once_however_many_doors_it_goes_through(heard):
+    busy = limits.HubBusy("Too many requests.", hub_id=ACME)
+
+    busy.reached_client()
+    busy.reached_client()
+
+    assert heard.busy == [ACME]
+
+
+def test_the_meter_is_told_outside_the_limiter_s_lock(monkeypatch):
+    """A slow pass of the meter never holds up who waits for a place of the hub."""
+    limiter = limits.configure("hub_x", photo_of(plan=FREE_PLAN))
+    held_while_told = []
+    monkeypatch.setattr(limits.meter, "note_peak", lambda *_: held_while_told.append(limiter._condition._is_owned()))
+
+    slot = limiter.take(wait=0)
+    slot.release()
+
+    assert held_while_told == [False]
+
+
+def test_a_demo_is_never_measured(heard):
+    limiter = limits.configure("hub_x", photo_of(is_demo=True, plan=FREE_PLAN))
+
+    held = limiter.take(wait=0)
+    with pytest.raises(limits.HubBusy) as busy:
+        limiter.take(wait=0)
+    held.release()
+    busy.value.reached_client()
+
+    assert (heard.peaks, heard.busy) == ([], [])
+
+
+def test_an_alias_no_hub_configured_is_nobody_s_to_measure(heard):
+    limiter = limits.limiter_for("hub_nobody")
+
+    held = limiter.take(wait=0)
+    with pytest.raises(limits.HubBusy) as busy:
+        limiter.take(wait=0)
+    held.release()
+    busy.value.reached_client()
+
+    assert (heard.peaks, heard.busy) == ([], [])
 
 
 def test_the_statement_timeout_is_said_in_seconds():

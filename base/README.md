@@ -23,7 +23,7 @@ por `/internal`.
   negocio como el suyo.
 - **Apps** (F14–F27): las apps del negocio y el catálogo, su precio, lo que traen consigo, activar y desactivar (al
   momento y en todos los dispositivos), por qué una no se abre y la de pago bloqueada.
-- **Sistema** (F28, F39–F47): Recursos, Plan y límites con lo que se usa, Actualizaciones (versión y fecha), los
+- **Sistema** (F39–F47): Uso y plan, con lo que usa el negocio y si tiene que ampliar, Actualizaciones (versión y fecha), los
   eventos caídos (reenviar o descartar) y el registro de sucesos; los errores de la pantalla se informan solos.
 - **Ajustes** (F29–F37, F48–F51): Negocio (nombre, país, moneda, idioma y zona, tal como los tiene erplora.com),
   General, y Datos y copias: importar una plantilla o un fichero, revisar, leer el informe, reintentar, deshacer,
