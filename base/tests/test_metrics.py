@@ -76,7 +76,9 @@ def test_the_registry_measures_the_stuck_sign_up_the_failed_hubs_and_the_demo_le
     now = timezone.now()
     with use_control():
         stuck = Hub.objects.create(slug="acme", status=Hub.Status.CREATING)
-        Hub.objects.filter(pk=stuck.pk).update(created_at=now - dt.timedelta(minutes=11))
+        # Its last step began 11 minutes ago (``updated_at``: control.queries.registry_health).
+        last_step = now - dt.timedelta(minutes=11)
+        Hub.objects.filter(pk=stuck.pk).update(created_at=now - dt.timedelta(hours=1), updated_at=last_step)
         Hub.objects.create(slug="broken", status=Hub.Status.FAILED)
         Hub.objects.create(
             slug="demo-x", status=Hub.Status.EXPIRED, is_demo=True, expires_at=now - dt.timedelta(minutes=40)
@@ -230,7 +232,63 @@ def test_a_hub_that_cannot_be_read_keeps_its_last_reading_and_is_logged(hub_a, h
         assert oldest_age(backlog(now, never())) == pytest.approx(1200.0, abs=1)
 
     said = f"worker: the fiscal backlog of the hub {hub_a.slug} could not be read; its last reading stays."
-    assert said in caplog.messages
+    (logged,) = [record for record in caplog.records if record.getMessage() == said]
+    assert (logged.levelname, logged.exc_info is not None) == ("ERROR", True)
+
+
+@hub_db
+@pytest.mark.usefixtures("no_test_fallback")
+def test_a_busy_free_hub_never_read_waits_since_its_first_failure_and_pages_once_that_ages(
+    hub_a, hub_b, monkeypatch, caplog
+):
+    """Review of hub#598: a Free hub (one place of its database in this process) whose place is taken, with a
+    production record waiting for 20 minutes, read by a backlog just made (a worker restarted): nothing read yet is no
+    «nothing to send». It waits since the first failure, so the alarm pages once that is older than 5 minutes; read at
+    last, the real reading replaces it. Busy is the plan's limit doing its work: said as a warning, without a trace."""
+    from base.tenancy import limits
+
+    now = timezone.now()
+    with use_hub(hub_a):
+        pending(now - dt.timedelta(minutes=20))
+        place = limits.take(hubs.HUB_A_ALIAS)
+    monkeypatch.setattr(limits, "SLOT_WAIT_SECONDS", 0.05)
+    backlog = FiscalBacklog()
+    try:
+        with caplog.at_level(logging.WARNING, logger="base.metrics"):
+            first = oldest_age(backlog(now, never()))
+            later = oldest_age(backlog(now + dt.timedelta(minutes=6), never()))
+    finally:
+        place.release()
+    read = oldest_age(backlog(now + dt.timedelta(minutes=7), never()))
+
+    assert first == 0.0
+    assert later == pytest.approx(360.0, abs=1)
+    assert read == pytest.approx(1620.0, abs=2)
+    said = f"worker: the hub {hub_a.slug} is busy; its fiscal backlog is read on the next pass."
+    busy = [record for record in caplog.records if record.getMessage() == said]
+    assert [(record.levelname, record.exc_info) for record in busy] == [("WARNING", None), ("WARNING", None)]
+
+
+@hub_db
+@pytest.mark.usefixtures("no_test_fallback")
+def test_a_hub_last_read_with_nothing_to_send_that_cannot_be_read_waits_since_its_first_failure(
+    hub_a, hub_b, monkeypatch
+):
+    now = timezone.now()
+    backlog = FiscalBacklog()
+    assert oldest_age(backlog(now, never())) == 0.0
+    real = relay.active_apps
+
+    def broken(scope):
+        if scope.key == hub_a.slug:
+            raise RuntimeError("database gone")
+        return real(scope)
+
+    monkeypatch.setattr(relay, "active_apps", broken)
+
+    assert oldest_age(backlog(now + dt.timedelta(minutes=1), never())) == 0.0
+    # Still failing 7 minutes later: it waits since the first failure, never since the last one.
+    assert oldest_age(backlog(now + dt.timedelta(minutes=8), never())) == pytest.approx(420.0, abs=1)
 
 
 @hub_db

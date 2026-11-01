@@ -172,14 +172,15 @@ class RegistryHealth:
 def registry_health(now: dt.datetime) -> RegistryHealth:
     """The registry's health at ``now``, in one query.
 
-    A hub still being prepared (requested, creating, migrating, seeding, or failed and retried) waits since it was
-    created; a demo whose time is up is not one of them but an ended demo, which waits to be dropped since its end
-    (``expires_at``; one expired without it, since it last changed) until the reaper purges it, as
-    ``base.services.reap_demos`` takes them.
+    A hub still being prepared (requested, creating, migrating, seeding, or failed and retried) waits since its row last
+    changed (``updated_at``: each step of its preparation, each failure, and ``base.hub.restore``, which brings a
+    business that left back to ``requested``, born long before); a demo whose time is up is not one of them but an
+    ended demo, which waits to be dropped since its end (``expires_at``; one expired without it, since it last changed)
+    until the reaper purges it, as ``base.services.reap_demos`` takes them.
     """
     demo_over = Q(is_demo=True, expires_at__lte=now)
     row = Hub.objects.aggregate(
-        oldest_preparing_since=Min("created_at", filter=Q(status__in=PREPARING_STATUSES) & ~demo_over),
+        oldest_preparing_since=Min("updated_at", filter=Q(status__in=PREPARING_STATUSES) & ~demo_over),
         failed=Count("pk", filter=Q(status=Hub.Status.FAILED) & ~demo_over),
         oldest_ended_demo_since=Min(
             Coalesce("expires_at", "updated_at"),

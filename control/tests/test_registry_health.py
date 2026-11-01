@@ -17,12 +17,11 @@ from control.queries import RegistryHealth, registry_health
 pytestmark = pytest.mark.django_db
 
 
-def make(slug: str, status: str, *, created: dt.datetime, **more) -> Hub:
-    """A registry row in ``status`` created at ``created`` (``created_at`` and ``updated_at`` are automatic: set after
-    the insert)."""
+def make(slug: str, status: str, *, created: dt.datetime, changed: dt.datetime | None = None, **more) -> Hub:
+    """A registry row in ``status`` created at ``created`` and last changed at ``changed`` (``created`` when not said);
+    ``created_at`` and ``updated_at`` are automatic, so both are set after the insert."""
     hub = Hub.objects.create(slug=slug, status=status, **more)
-    changed = {"updated_at": more["updated_at"]} if "updated_at" in more else {}
-    Hub.objects.filter(pk=hub.pk).update(created_at=created, **changed)
+    Hub.objects.filter(pk=hub.pk).update(created_at=created, updated_at=changed or created)
     return hub
 
 
@@ -34,11 +33,20 @@ def test_with_every_hub_ready_nothing_waits_and_none_failed():
 
 
 @pytest.mark.parametrize("status", ["requested", "creating", "migrating", "seeding", "failed"])
-def test_a_hub_still_being_prepared_waits_since_it_was_created(status):
+def test_a_hub_still_being_prepared_waits_since_its_last_change(status):
     now = timezone.now()
-    make("acme", status, created=now - dt.timedelta(minutes=12))
+    make("acme", status, created=now - dt.timedelta(minutes=30), changed=now - dt.timedelta(minutes=12))
 
     assert registry_health(now).oldest_preparing_since == now - dt.timedelta(minutes=12)
+
+
+def test_a_business_restored_into_its_preparation_waits_since_it_was_restored_not_since_it_was_born():
+    """Review of hub#598: ``base.hub.restore`` brings a business that left back to ``requested`` when its preparation
+    never ended; born months ago, it would page at once if its age counted from its birth."""
+    now = timezone.now()
+    make("acme", "requested", created=now - dt.timedelta(days=90), changed=now - dt.timedelta(minutes=2))
+
+    assert registry_health(now).oldest_preparing_since == now - dt.timedelta(minutes=2)
 
 
 def test_the_oldest_of_the_hubs_being_prepared_is_the_one_read():
@@ -100,7 +108,7 @@ def test_an_expired_or_dropping_demo_waits_to_be_dropped_since_it_ended(status):
 def test_an_expired_demo_without_its_end_waits_since_it_last_changed():
     now = timezone.now()
     changed = now - dt.timedelta(minutes=50)
-    make("demo-x", "expired", created=now - dt.timedelta(days=1), is_demo=True, updated_at=changed)
+    make("demo-x", "expired", created=now - dt.timedelta(days=1), changed=changed, is_demo=True)
 
     assert registry_health(now).oldest_ended_demo_since == now - dt.timedelta(minutes=50)
 

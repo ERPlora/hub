@@ -39,6 +39,7 @@ from live.meta import all_live_app_configs
 from base import relay, services
 from base.tenancy.connections import close_hub_aliases
 from base.tenancy.context import use_control, use_hub, use_shared_database
+from base.tenancy.limits import HubBusy
 from control.queries import registry_health
 
 logger = logging.getLogger(__name__)
@@ -112,7 +113,8 @@ class FiscalBacklog:
     serves (``base.services.hubs_to_serve``: ready, or a business that left whose records must still reach the tax
     authority) are read in turn, each in its database where the app is on, for ``budget`` seconds a pass; each one's
     last reading is kept until it is read again, and forgotten when it is no longer served. A hub that cannot be read
-    is logged and keeps its last reading. A stop request ends the pass before the next hub.
+    (busy: a warning; any other failure: an error with its trace) keeps its last reading or, without one that says
+    something waits, waits since its first failure. A stop request ends the pass before the next hub.
     """
 
     def __init__(self, budget: float = FISCAL_PASS_SECONDS) -> None:
@@ -139,19 +141,31 @@ class FiscalBacklog:
         for read, hub in enumerate(hubs[start:] + hubs[:start]):
             if stop.is_set() or (read and time.monotonic() - started > self.budget):
                 break
-            self._read(hub)
+            self._read(hub, now)
             self._last = hub.pk
 
-    def _read(self, hub) -> None:
+    def _read(self, hub, now: dt.datetime) -> None:
         try:
             with use_hub(hub):
                 self._since[hub.pk] = fiscal_pending_since(relay.active_apps(Scope(HUB_SCOPE_KIND, hub.slug)))
+        except HubBusy:
+            # The plan's limit doing its work (a Free hub has one place in this process): no trace, it is no fault.
+            logger.warning("worker: the hub %s is busy; its fiscal backlog is read on the next pass.", hub.slug)
+            self._failed(hub, now)
         except Exception:
             logger.exception(
                 "worker: the fiscal backlog of the hub %s could not be read; its last reading stays.", hub.slug
             )
+            self._failed(hub, now)
         finally:
             close_hub_aliases(hub)
+
+    def _failed(self, hub, now: dt.datetime) -> None:
+        """A hub that could not be read keeps its last reading; without one that says something waits (never read since
+        the worker started, or nothing waited last time), it waits since this first failure: what cannot be read is
+        never «nothing to send», and the alarm pages once that is older than its threshold."""
+        if self._since.get(hub.pk) is None:
+            self._since[hub.pk] = now
 
 
 def default_collectors() -> list[Collector]:
