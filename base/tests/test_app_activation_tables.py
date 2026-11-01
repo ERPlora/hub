@@ -391,6 +391,21 @@ def test_the_apps_off_and_creating_of_a_business_are_kept_in_one_hash_slot_so_a_
     assert cache.get_many(list(keys)) == {}
 
 
+@pytest.mark.django_db
+def test_the_platform_never_settles_on_a_business_without_its_own_database():
+    """Since S5 only the suite's fallback enters one (``base/tenancy/tests/legacy.py``): the worker's step is refused
+    there, before it writes anything."""
+    from live.context import system_context
+
+    op = get("base.app.activation_settle")
+    a = Hub.objects.get(slug="a")
+
+    with pytest.raises(Conflict) as refused, use_hub(a):
+        op(system_context(Scope("host", "a")), op.input.model_validate({"apps": ["printing"], "outcome": "created"}))
+
+    assert refused.value.code == "base.app_shared_database"
+
+
 @own
 def test_only_the_platform_settles_what_the_worker_made(hub_a):
     from live.errors import PermissionDenied

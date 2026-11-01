@@ -24,6 +24,7 @@ from base import outbound
 from base.models import HubIdentity
 from base.tenancy import context
 from base.tenancy.tests import hubs
+from base.tenancy.tests.legacy import LEGACY
 
 A = Scope("host", "a")
 B = Scope("host", "b")
@@ -255,7 +256,7 @@ def test_at_most_its_threads_run_at_once(pool):
             running.remove(n)
 
     for n in range(5):
-        assert two.submit(outbound.Job(job, (n,), context.CONTROL_DATABASE))
+        assert two.submit(outbound.Job(job, (n,), LEGACY))
     assert eventually(lambda: len(running) == 2)
     time.sleep(0.1)  # a third thread, had there been one, would have started by now
     assert len(running) == 2
@@ -271,12 +272,12 @@ def test_the_same_job_already_waiting_is_not_queued_twice(pool):
         ran.append(run_id)
         let_go.wait(WAIT)
 
-    assert one.submit(outbound.Job(job, ("r1",), context.CONTROL_DATABASE))
+    assert one.submit(outbound.Job(job, ("r1",), LEGACY))
     assert eventually(lambda: ran == ["r1"])  # running
-    assert one.submit(outbound.Job(job, ("r2",), context.CONTROL_DATABASE))  # waits
-    assert not one.submit(outbound.Job(job, ("r2",), context.CONTROL_DATABASE))  # a sweep sends it again: not twice
+    assert one.submit(outbound.Job(job, ("r2",), LEGACY))  # waits
+    assert not one.submit(outbound.Job(job, ("r2",), LEGACY))  # a sweep sends it again: not twice
     # r1 runs, it no longer waits: the next step of its run may need it again (its claim says whether it goes).
-    assert one.submit(outbound.Job(job, ("r1",), context.CONTROL_DATABASE))
+    assert one.submit(outbound.Job(job, ("r1",), LEGACY))
     let_go.set()
     assert eventually(lambda: ran == ["r1", "r2", "r1"])
 
@@ -288,11 +289,11 @@ def test_past_its_queue_a_job_is_dropped_with_a_warning_and_its_app_sends_it_aga
         ran.append(n)
         let_go.wait(WAIT)
 
-    assert one.submit(outbound.Job(job, (1,), context.CONTROL_DATABASE))
+    assert one.submit(outbound.Job(job, (1,), LEGACY))
     assert eventually(lambda: ran == [1])
-    assert one.submit(outbound.Job(job, (2,), context.CONTROL_DATABASE))  # waits: the queue holds one
+    assert one.submit(outbound.Job(job, (2,), LEGACY))  # waits: the queue holds one
     with caplog.at_level(logging.WARNING, logger="base.outbound"):
-        assert not one.submit(outbound.Job(job, (3,), context.CONTROL_DATABASE))
+        assert not one.submit(outbound.Job(job, (3,), LEGACY))
     let_go.set()
     assert eventually(lambda: ran == [1, 2])
     assert [record.levelno for record in caplog.records] == [logging.WARNING]
@@ -312,8 +313,8 @@ def test_a_job_that_fails_is_logged_with_its_traceback_and_the_others_go_on(pool
         ran.append(run_id)
 
     with caplog.at_level(logging.ERROR, logger="base.outbound"):
-        one.submit(outbound.Job(broken, ("r1",), context.CONTROL_DATABASE))
-        one.submit(outbound.Job(fine, ("r2",), context.CONTROL_DATABASE))
+        one.submit(outbound.Job(broken, ("r1",), LEGACY))
+        one.submit(outbound.Job(fine, ("r2",), LEGACY))
         assert eventually(lambda: ran == ["r2"])
     failed = [record for record in caplog.records if record.levelno == logging.ERROR]
     assert len(failed) == 1 and failed[0].exc_info is not None
@@ -333,7 +334,7 @@ def test_a_job_gives_its_connection_back_before_it_waits_and_when_it_ends(pool):
         seen["wrapper"] = connections["default"]  # this thread's own, not the proxy the test would read as its own
         finished.set()
 
-    one.submit(outbound.Job(job, (), context.CONTROL_DATABASE))
+    one.submit(outbound.Job(job, (), LEGACY))
 
     assert finished.wait(WAIT)
     assert eventually(lambda: seen["wrapper"].connection is None)  # given back when the job ended
@@ -356,7 +357,7 @@ def test_release_inside_an_operation_is_refused_and_its_transaction_kept(pool):
         command(fn)(as_system(), Schema())
         finished.set()
 
-    one.submit(outbound.Job(job, (), context.CONTROL_DATABASE))
+    one.submit(outbound.Job(job, (), LEGACY))
 
     assert finished.wait(WAIT)
     assert seen == ["refused", False]
@@ -376,15 +377,15 @@ def test_stop_drops_what_waits_and_gives_what_runs_its_grace(pool, caplog):
         ran.append(n)
         let_go.wait(WAIT)
 
-    one.submit(outbound.Job(job, (1,), context.CONTROL_DATABASE))
+    one.submit(outbound.Job(job, (1,), LEGACY))
     assert eventually(lambda: ran == [1])
-    one.submit(outbound.Job(job, (2,), context.CONTROL_DATABASE))
+    one.submit(outbound.Job(job, (2,), LEGACY))
 
     with caplog.at_level(logging.WARNING, logger="base.outbound"):
         started = time.monotonic()
         assert one.stop(grace=0.2) is False  # 1 still runs: left to its lease
         assert time.monotonic() - started < 2
-        assert not one.submit(outbound.Job(job, (3,), context.CONTROL_DATABASE))  # a stopped pool takes nothing
+        assert not one.submit(outbound.Job(job, (3,), LEGACY))  # a stopped pool takes nothing
     messages = [record.getMessage() for record in caplog.records]
     assert any("waited" in message and "dropped" in message for message in messages)
     assert any("still running" in message for message in messages)
@@ -400,7 +401,7 @@ def test_stop_returns_once_what_runs_ends_within_its_grace(pool):
         let_go.wait(WAIT)
         ran.append(n)
 
-    one.submit(outbound.Job(job, (1,), context.CONTROL_DATABASE))
+    one.submit(outbound.Job(job, (1,), LEGACY))
     threading.Timer(0.1, let_go.set).start()
 
     assert one.stop(grace=WAIT) is True

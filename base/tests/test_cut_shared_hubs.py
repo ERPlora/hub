@@ -105,7 +105,9 @@ def phase_one(django_db_blocker, hub_databases):
             AppActivation.objects.create(host=slug, app="printing", state="on", chosen=True)
             own = OutboxEvent.objects.create(scope_kind="host", scope_key=slug, name="printing.printer.created")
             delivery = EventDelivery.objects.create(event=own, app_label="flow", next_attempt_at=timezone.now())
-            other = OutboxEvent.objects.create(scope_kind="host", scope_key="elsewhere", name="printing.printer.created")
+            other = OutboxEvent.objects.create(
+                scope_kind="host", scope_key="elsewhere", name="printing.printer.created"
+            )
         return SimpleNamespace(printer=printer, device=device, person=person, own=own, delivery=delivery, other=other)
 
     with django_db_blocker.unblock():
@@ -161,8 +163,11 @@ def test_copy_all_gives_a_business_its_database_with_every_row_of_controls_table
         assert set(OutboxEvent.objects.values_list("pk", flat=True)) >= {rows.own.pk}
         assert not OutboxEvent.objects.filter(pk=rows.other.pk).exists()
         assert EventDelivery.objects.get(pk=rows.delivery.pk).event_id == rows.own.pk
-        # The serial key of a many-to-many table goes on after the rows copied: a new link is no clash.
+        # The serial key of a many-to-many table goes on after the rows copied: a new link takes a key past them.
+        links = PrintDevice.printers.through.objects
+        copied = max(links.values_list("pk", flat=True))
         PrintDevice.objects.create(name="Kitchen").printers.add(printer)
+        assert links.order_by("-pk").first().pk > copied
         # The SaaS's photo is applied over what was copied.
         assert HubUser.objects.get(account_id=ALICE).is_active
     assert f"{aurora.slug}: copy-all done" in said
@@ -386,6 +391,49 @@ def test_a_cut_s_last_step_refuses_a_business_that_got_its_database_meanwhile(ph
     assert refused.value.code == "base.hub_already_cut"
     with use_control():
         assert not OutboxEvent.objects.filter(name="base.hub.cut", payload__slug=hub.slug).exists()
+
+
+def test_a_table_of_control_with_rows_that_its_database_lacks_stops_the_copy_and_nothing_is_lost(
+    phase_one, monkeypatch
+):
+    """Every row goes, or the cut does not: a table control holds rows of and the new database lacks (an app its
+    template does not carry) is never left behind in silence."""
+    aurora = phase_one.business("aurora")
+    phase_one.rows_of(aurora.slug)
+    target = names.hub_db_name(tenancy_connections.control_name(), aurora.id)
+    tables = cut._tables
+
+    def without_its_apps_there(conn):
+        found = tables(conn)
+        return found - {"base_appactivation"} if conn.info.dbname == target else found
+
+    monkeypatch.setattr(cut, "_tables", without_its_apps_there)
+
+    with pytest.raises(CommandError, match="base_appactivation"):
+        run("--copy-all", aurora.slug, "--no-dump")
+    assert fresh(aurora).db_name == ""
+    assert target not in databases()
+
+
+def test_the_last_step_of_a_second_copy_all_is_refused_even_when_two_runs_raced(phase_one):
+    from live.context import system_context
+    from live.errors import Conflict
+    from live.operations import get
+
+    from base import registry
+    from base.schemas import HubCutFinishIn
+
+    first, second = phase_one.business("first"), phase_one.business("second")
+    run("--copy-all", first.slug, "--no-dump")
+    made = names.hub_db_name(tenancy_connections.control_name(), second.id)
+
+    with use_control(), pytest.raises(Conflict) as refused:
+        get("base.hub.cut_finish")(
+            system_context(registry.REGISTRY_SCOPE),
+            HubCutFinishIn(id=second.id, mode=cut.COPY_ALL, database=made, schema_apps={}, copied={}, dump=""),
+        )
+    assert refused.value.code == "base.hub_copy_all_taken"
+    assert fresh(second).db_name == ""
 
 
 def test_only_the_platform_finishes_a_cut(phase_one):

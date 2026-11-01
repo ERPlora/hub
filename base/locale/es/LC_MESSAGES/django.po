@@ -2116,3 +2116,7 @@ msgstr ""
 #: services.py
 msgid "This business already works on its own database, or is not ready."
 msgstr "Este negocio ya trabaja en su propia base de datos, o no está listo."
+
+#: services.py
+msgid "Control's rows already went to another business: they are copied once."
+msgstr "Las filas de control ya fueron a otro negocio: se copian una sola vez."

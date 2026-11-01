@@ -279,7 +279,7 @@ class HubDatabaseMiddleware:
     @staticmethod
     def _entered(resolved):
         if resolved is _CONTROL:
-            return tenancy_context.use_control()
+            return tenancy_context.use_admin_without_a_business()
         if resolved is None:
             return nullcontext()
         return tenancy_context.use_hub(resolved)

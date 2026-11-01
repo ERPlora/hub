@@ -17,9 +17,9 @@ hub again in theirs).
 
 Without any of them, a hub's model or operation fails with :class:`HubContextMissing`: it never falls back to
 ``default``. ``_test_fallback`` is the one exception, set only by the suite's ``conftest.py``: the tests written before
-the tenancy keep every business of theirs (``db_name=""``) in control's test database (``base/tenancy/tests/legacy.py``),
-so under it they run without a context and such a business is entered there (:func:`serves_hubs_without_database`).
-Never outside the tests.
+the tenancy keep every business of theirs (``db_name=""``) in control's test database
+(``base/tenancy/tests/legacy.py``), so under it they run without a context and such a business is entered there
+(:func:`serves_hubs_without_database`). Never outside the tests.
 """
 
 from collections.abc import Iterator
@@ -98,6 +98,13 @@ def use_hub(hub) -> Iterator[DatabaseContext]:
 def use_control() -> Iterator[DatabaseContext]:
     """Work as the platform until the block ends: control's models and outbox, no hub's."""
     return _entered(CONTROL_DATABASE)
+
+
+def use_admin_without_a_business() -> AbstractContextManager[DatabaseContext]:
+    """Where the admin works with no business chosen (``base.middleware``): control. Under the suite's fallback, the
+    fallback itself: control's test database, with the rows of every business of the tests written before the
+    tenancy, as the admin showed them in phase 1."""
+    return use_control() if _test_fallback is None else _entered(_test_fallback)
 
 
 def serves_hubs_without_database() -> bool:

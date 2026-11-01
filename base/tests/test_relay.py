@@ -345,12 +345,17 @@ def test_the_worker_takes_a_platform_event_without_handing_it_to_any_app(worker_
 
 @pytest.mark.django_db
 @pytest.mark.usefixtures("no_test_fallback")
-def test_on_control_the_relay_takes_the_platform_s_events_and_leaves_what_phase_1_left_of_a_business_alone():
+def test_on_control_the_relay_takes_the_platform_s_events_and_leaves_what_phase_1_left_of_a_business_alone(
+    monkeypatch,
+):
     """S5: control's outbox keeps the events a business of phase 1 recorded there before its cut; reading the apps on
     of that business would need its database, so on control the relay never takes one, nor runs its deliveries
     (the cut copies a business's own into its database: ``base.tenancy.cut``)."""
     from base.registry import REGISTRY_SCOPE
     from base.tenancy.context import use_control
+
+    # Inside the test's transaction the relay's release of its connections would close the test's own.
+    monkeypatch.setattr(BaseDatabaseWrapper, "close_if_unusable_or_obsolete", lambda self: None)
 
     with use_control():
         platform = OutboxEvent.objects.create(

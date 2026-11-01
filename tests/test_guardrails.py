@@ -1148,13 +1148,14 @@ OWN_DATABASE_OPERATIONS: dict[str, tuple[dict, int, str]] = {
     # A copy of the business's data (S2b): none is ever made in a business that shares its database.
     "base.hub.dump_link": ({"id": ANY_KEY}, 404, "not_found"),
     # An app's tables made when it is turned on (S3): only a hub with its own database ever waits for them, so there is
-    # nothing to try again, and the worker's step never runs on the shared database, whoever runs it.
+    # nothing to try again.
     "base.app.retry": ({"app": "printing"}, 409, "base.app_not_failed"),
-    "base.app.activation_settle": ({"apps": ["printing"], "outcome": "created"}, 409, "base.app_shared_database"),
 }
-#: ``base.hub.reset_apply`` (S2b, the worker's emptying of a reset) is not above: it is the platform's alone, refused to
-#: anyone else before anything is read (review of hub#490), and to the platform itself on the shared database
-#: (base/tests/test_worker_data.py::test_the_emptying_is_never_run_on_a_shared_database).
+#: ``base.hub.reset_apply`` (S2b, the worker's emptying of a reset) and ``base.app.activation_settle`` (S3, the worker's
+#: step after making an app's tables) are not above: they are the platform's alone, refused to anyone else before
+#: anything is read (review of hub#490), and to the platform itself on a business without its own database
+#: (base/tests/test_worker_data.py::test_the_emptying_is_never_run_on_a_shared_database,
+#: base/tests/test_app_activation_tables.py).
 #: What the screens of those features read in any hub: in one without its own database the answer says «not available
 #: yet» (the screen's notice; an error would paint its load failure) and holds nothing of the feature's.
 OWN_DATABASE_READS: dict[str, tuple[dict, dict]] = {

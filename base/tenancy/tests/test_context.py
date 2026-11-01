@@ -247,3 +247,15 @@ def test_the_test_fallback_stands_for_a_missing_context_only_when_the_tests_set_
     monkeypatch.setattr(context, "_test_fallback", None)
     with pytest.raises(context.HubWithoutDatabase):
         fresh(probe)
+
+
+def test_the_admin_without_a_business_works_on_control_and_under_the_suites_fallback_on_it(monkeypatch):
+    from base.tenancy.tests.legacy import LEGACY
+
+    def probe():
+        with context.use_admin_without_a_business() as active:
+            return active.kind
+
+    assert fresh(probe) == context.CONTROL
+    monkeypatch.setattr(context, "_test_fallback", LEGACY)
+    assert fresh(probe) == LEGACY.kind

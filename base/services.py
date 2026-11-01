@@ -1497,7 +1497,9 @@ def hub_cut_finish(ctx: OperationContext, data: HubCutFinishIn) -> dict:
     into it and control's copy taken before (``dump``), in one transaction.
 
     Only the platform runs it, refused before anything is read. Refused (409 ``base.hub_already_cut``) when the business
-    got a database meanwhile (another cut of it finished first) or is no longer ready; ``done: false`` when a newer
+    got a database meanwhile (another cut of it finished first) or is no longer ready, and (409
+    ``base.hub_copy_all_taken``) a copy of control's rows when another business got them already (two runs that
+    raced: they go to one business, once); ``done: false`` when a newer
     photo of the SaaS's came after ``seeded_version`` was applied: the cut applies it and asks again."""
     internal_only(ctx)
     hub = _locked_hub(data.id)
@@ -1505,6 +1507,12 @@ def hub_cut_finish(ctx: OperationContext, data: HubCutFinishIn) -> dict:
         raise Conflict(
             gettext("This business already works on its own database, or is not ready."),
             code="base.hub_already_cut",
+        )
+    went_to = copy_all_went_to()
+    if data.mode == "copy_all" and went_to and went_to != hub.slug:
+        raise Conflict(
+            gettext("Control's rows already went to another business: they are copied once."),
+            code="base.hub_copy_all_taken",
         )
     if data.seeded_version is not None and hub.state_version != data.seeded_version:
         return {"done": False}

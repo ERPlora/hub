@@ -122,7 +122,10 @@ def copy_order(tables: Iterable[str], points_to: Iterable[tuple[str, str]]) -> l
     order whatever order they come in."""
     tables = sorted(set(tables))
     known = set(tables)
-    parents = {table: sorted({parent for child, parent in points_to if child == table and parent in known}) for table in tables}
+    points_to = list(points_to)
+    parents = {
+        table: sorted({parent for child, parent in points_to if child == table and parent in known}) for table in tables
+    }
     groups = _strongly_connected(tables, parents)
     group_of = {table: index for index, group in enumerate(groups) for table in group}
     needs = {
@@ -229,15 +232,16 @@ def count_rows(slug: str) -> dict[str, int]:
     """The rows of control's tables a copy into ``slug`` would take, by table (the dry run)."""
     with _control() as source:
         present = _tables(source)
-        counted = {}
-        for table in tables_to_copy():
-            if table not in present:
-                continue
-            where, params = rows_of(table, slug)
-            query = sql.SQL("SELECT count(*) FROM {} ").format(sql.Identifier(table)) + sql.SQL(where)
-            counted[table] = source.execute(query, params).fetchone()[0]
+        counted = {table: _count(source, table, slug) for table in tables_to_copy() if table in present}
         source.rollback()
     return counted
+
+
+def _count(source: psycopg.Connection, table: str, slug: str) -> int:
+    """The rows of ``table`` in control that a copy into ``slug`` takes."""
+    where, params = rows_of(table, slug)
+    query = sql.SQL("SELECT count(*) FROM {} ").format(sql.Identifier(table)) + sql.SQL(where)
+    return source.execute(query, params).fetchone()[0]
 
 
 def copy_rows(hub, *, heartbeat: Callable[[], object] | None = None) -> dict[str, int]:
@@ -250,7 +254,15 @@ def copy_rows(hub, *, heartbeat: Callable[[], object] | None = None) -> dict[str
     rows copied."""
     slug = hub.slug
     with _control() as source, _connect(hub.db_name, hub.cluster, autocommit=True) as target:
-        present = _tables(source) & _tables(target) & set(tables_to_copy())
+        in_control = _tables(source) & set(tables_to_copy())
+        present = in_control & _tables(target)
+        left_behind = {table: _count(source, table, slug) for table in sorted(in_control - present)}
+        left_behind = {table: rows for table, rows in left_behind.items() if rows}
+        if left_behind:
+            raise CutError(
+                "its database lacks tables control holds rows of, nothing is left behind: "
+                + ", ".join(f"{table} ({rows})" for table, rows in left_behind.items())
+            )
         groups = copy_order(present, _foreign_keys(target))
         if present:
             target.execute(
@@ -328,7 +340,9 @@ def _cut(hub_id, mode: str, dump: str, started: float) -> Outcome:
 
     hub = services.place_hub(hub_id)
     if hub.db_name or hub.status != Hub.Status.READY:
-        raise CutError(f"it is {hub.status} with database {hub.db_name or '-'}: only a ready business on control's is cut.")
+        raise CutError(
+            f"it is {hub.status} with database {hub.db_name or '-'}: only a ready business on control's is cut."
+        )
     # Named as every hub's; written in control only by the last step, so its host answers 503 until then.
     hub.db_name = names.hub_db_name(tenancy_connections.control_name(), hub.id)
     try:
