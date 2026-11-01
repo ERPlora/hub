@@ -167,11 +167,22 @@ export interface PlanLimit {
 }
 
 /** `base.PlanUsageOut`: «Plan and limits» of System. */
+/** `base.DatabaseUsageOut`: the size of the business's own database, as the last night measured it (BASE-F40). */
+export interface DatabaseUsage {
+  /** False while the business shares its database with others: no size of its own yet. */
+  available: boolean;
+  /** Its size in bytes; null before the first night measured it. */
+  bytes: number | null;
+  /** The day (UTC, `YYYY-MM-DD`) it was measured; null before the first night. */
+  day: string | null;
+}
+
 export interface PlanUsage {
   /** Whether the Hub has the business's plan from erplora.com yet. */
   known: boolean;
   people: PlanLimit;
   devices: PlanLimit;
+  database: DatabaseUsage;
 }
 
 // ── Data: blueprints, imports and reset (APP-BASE-2) ──
@@ -330,7 +341,39 @@ export interface HubReset {
   /** False in phase 1: the business shares its database with other hubs. */
   available: boolean;
   sections: ResetSection[];
+  /** Always empty: the worker empties after copying (`base.hub.dumps` says how it went). */
   apps: Removal[];
+  /** `planned`: the plan only (dry run); `copying`: asked, the copy is being made, then the sections are emptied. */
+  status: 'planned' | 'copying';
+}
+
+/** How the last reset went (`base.ResetStateOut`). */
+export type ResetState = 'copying' | 'emptying' | 'done' | 'failed';
+
+export interface ResetProgress {
+  state: ResetState;
+  sections: BlueprintApp[];
+  requested_by: string;
+  /** Why it failed: `dumps_unavailable`, `dump_failed`, `emptying_failed` or `hub_not_ready`; empty otherwise. */
+  error: string;
+  removed: Removal[];
+  finished_at: string | null;
+}
+
+/** A copy of the business's data (`base.HubDumpOut`): before a reset, or when the business was deleted. */
+export interface HubDump {
+  id: string;
+  kind: 'reset' | 'offboarding';
+  created_at: string;
+  bytes: number;
+}
+
+/** `base.HubDumpsOut`: the copies (newest first) and the last reset. */
+export interface HubDumps {
+  /** False while the business shares its database with others: no copy is ever made then. */
+  available: boolean;
+  reset: ResetProgress | null;
+  dumps: HubDump[];
 }
 
 // ── Business settings (APP-BASE-6) ──
@@ -757,6 +800,9 @@ declare module '@erplora/ui/sdk' {
       input: { apps?: string[]; confirm?: string; dry_run?: boolean };
       output: HubReset;
     };
+    'base.hub.dumps': { input: NoInput; output: HubDumps };
+    // 503 `base.dumps_unavailable` when the copy cannot be linked now; 404 when it is no longer kept.
+    'base.hub.dump_link': { input: { id: string }; output: { url: string; expires_at: string } };
     // ── Business settings (APP-BASE-6) ──
     'base.business.get': { input: NoInput; output: Business };
     // The shared image library (round 2026-10-30): 503 `base.image_library_unavailable` when it cannot be read.

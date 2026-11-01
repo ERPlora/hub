@@ -34,6 +34,12 @@ IMPORT_UNDONE = "base.import.undone"
 HUB_DATA_RESET = "base.hub.data_reset"
 #: What Settings › Data does to the business: the Home's queries follow them (BASE-G131).
 DATA_EVENTS = (BLUEPRINT_IMPORTED, IMPORT_UNDONE, HUB_DATA_RESET)
+#: A reset moved on (asked, copying, emptying, failed) or a copy of the business's data was made (round 2026-10-30 of
+#: PLAN-DB, decision 2): told to the hub's live queries after the COMMIT in control, never recorded in the outbox (the
+#: worker writes it in control, outside any operation of the hub).
+HUB_RESET_PROGRESSED = "base.hub.reset_progressed"
+#: The nightly measurement kept the business's use of yesterday (``base.usage``): told after its COMMIT, as above.
+HUB_USAGE_MEASURED = "base.hub.usage_measured"
 
 # ── System (APP-BASE-7) ───────────────────────────────────────────────────────────────────────────────────────
 #: The relay gave up on a delivery (its last attempt, or past the deepest level): told to the hub's live queries after

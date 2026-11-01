@@ -466,6 +466,16 @@ class LimitOut(Schema):
     limit: int | None
 
 
+class DatabaseUsageOut(Schema):
+    """The size of the business's own database, as the last night measured it (``base.usage``)."""
+
+    available: bool = Field(
+        description="False while the business shares its database with others: it has no size of its own yet."
+    )
+    bytes: int | None = Field(description="Its size in bytes; None before the first night measured it.")
+    day: dt.date | None = Field(description="The day (UTC) it was measured; None before the first night.")
+
+
 class PlanUsageOut(Schema):
     """``base.plan.usage``: the plan's limits (the SaaS's photo, ``plan``) against what the business uses."""
 
@@ -473,6 +483,30 @@ class PlanUsageOut(Schema):
     known: bool
     people: LimitOut
     devices: LimitOut
+    database: DatabaseUsageOut
+
+
+class UsageListIn(Schema):
+    """``GET /internal/usage``: the day (UTC) the SaaS asks for, and where its last page ended."""
+
+    day: dt.date
+    cursor: UUID | None = None
+
+
+class UsageRowOut(Schema):
+    id: UUID
+    s3_bytes: int
+    db_bytes: int
+    active_users_1d: int
+    active_users_30d: int
+
+
+class UsageListOut(Schema):
+    """One page of the day's use (saas ``hubs/README.md``, «Contrato para el Hub»)."""
+
+    day: dt.date
+    hubs: list[UsageRowOut]
+    next_cursor: str | None
 
 
 # ── Data: blueprints, imports and reset (APP-BASE-2) ──
@@ -730,7 +764,89 @@ class HubResetOut(Schema):
         description="False in phase 1: the business shares its database with other hubs, so nothing can be emptied."
     )
     sections: list[ResetSectionOut] = Field(description="The apps with rows: what each one would lose.")
-    apps: list[RemovalOut] = Field(description="What was removed (empty in a plan).")
+    apps: list[RemovalOut] = Field(
+        description="Always empty: the worker empties the sections after copying the data (base.hub.dumps says how it "
+        "went)."
+    )
+    status: Literal["planned", "copying"] = Field(
+        description="planned: only the plan (dry_run). copying: asked; the business's data is being copied, then the "
+        "sections chosen are emptied."
+    )
+
+
+
+class HubResetApplyIn(Schema):
+    """The worker's emptying of a reset it already copied (``base.hub.reset_apply``)."""
+
+    apps: list[str] = Field(min_length=1, max_length=200, description="The sections (apps) to empty.")
+
+
+class HubResetApplyOut(Schema):
+    apps: list[RemovalOut] = Field(description="What was removed of each section, and what could not be.")
+
+
+
+class HubDumpsIn(Schema):
+    """No input: the copies of the business of the request."""
+
+
+class ResetSectionNameOut(Schema):
+    id: str
+    label: str
+
+
+class ResetStateOut(Schema):
+    """How the last reset of the business went (``Hub.reset_sections``): asked, copying, emptying, done or failed."""
+
+    state: Literal["copying", "emptying", "done", "failed"]
+    sections: list[ResetSectionNameOut] = Field(description="The sections asked, by name.")
+    requested_by: str
+    error: str = Field(
+        description="Why it failed: dumps_unavailable, dump_failed, emptying_failed or hub_not_ready; empty otherwise."
+    )
+    removed: list[RemovalOut] = Field(description="What was removed of each section (done).")
+    finished_at: dt.datetime | None
+
+
+class HubDumpOut(Schema):
+    id: UUID
+    kind: Literal["reset", "offboarding"]
+    created_at: dt.datetime
+    bytes: int
+
+
+class HubDumpsOut(Schema):
+    """``base.hub.dumps``: the copies of the business's data (newest first) and its last reset."""
+
+    available: bool = Field(
+        description="False while the business shares its database with others: no copy is ever made then."
+    )
+    reset: ResetStateOut | None
+    dumps: list[HubDumpOut]
+
+
+class HubDumpLinkIn(Schema):
+    id: UUID = Field(description="The copy's id (base.hub.dumps).")
+
+
+class HubDumpLinkOut(Schema):
+    url: str = Field(description="A link that downloads the copy, for 15 minutes.")
+    expires_at: dt.datetime
+
+
+class InternalDumpOut(Schema):
+    id: str = Field(description="Its key in the bucket.")
+    kind: Literal["reset", "offboarding"]
+    created_at: dt.datetime
+    bytes: int
+    url: str
+
+
+class InternalDumpsOut(Schema):
+    """``GET /internal/hubs/{id}/dumps`` (saas ``hubs/README.md``, «Contrato para el Hub»)."""
+
+    available: bool
+    dumps: list[InternalDumpOut]
 
 
 # ── Business settings and the hub's context (APP-BASE-6) ──

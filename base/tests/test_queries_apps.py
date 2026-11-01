@@ -195,6 +195,8 @@ def test_the_people_against_the_plans_limit_and_the_devices_limit(make_user):
         "people": {"used": 2, "limit": 3},
         # The devices in use are those with a session open here (base/tests/test_access_devices.py): none yet.
         "devices": {"used": 0, "limit": 2},
+        # `a` shares control's database: no size of its own (base/tests/test_usage.py, BASE-F40).
+        "database": {"available": False, "bytes": None, "day": None},
     }
 
 

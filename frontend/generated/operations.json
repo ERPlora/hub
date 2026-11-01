@@ -87,6 +87,14 @@
     "method": "post",
     "path": "/api/settings/data/reset"
   },
+  "base.hub.dumps": {
+    "method": "get",
+    "path": "/api/settings/data/dumps"
+  },
+  "base.hub.dump_link": {
+    "method": "get",
+    "path": "/api/settings/data/dumps/link"
+  },
   "base.system.status": {
     "method": "get",
     "path": "/api/system/status"

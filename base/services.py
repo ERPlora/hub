@@ -69,6 +69,7 @@ from live.live_registry import ALL_EVENTS
 from live.models import OutboxEvent
 from live.operations import get as get_operation
 from live.operations import AI, INTERNAL, atomic, operation
+from live.operations import on_commit
 from live.outbox import notify, record_event
 from live.slugs import DEMO_SLUG_PREFIX, validate_hub_slug
 from PIL import Image as PILImage
@@ -113,7 +114,8 @@ from base.models import ApiKey
 from base.throttle import client_key
 from base.tenancy import names as database_names
 from base.tenancy.connections import control_name
-from control.models import Cluster, HubDue
+from control.models import Cluster, HubDue, HubDump, HubUsageDaily, HubVisit, UsageRun
+from django.db.models import Exists, OuterRef
 from base.schemas import (
     BlueprintImportIn,
     BlueprintSourceIn,
@@ -147,6 +149,8 @@ from base.schemas import (
     HubStateIn,
     HubUserSyncIn,
     HubUserSyncOut,
+    HubResetApplyIn,
+    HubResetApplyOut,
     HubResetIn,
     HubResetOut,
     HubStateOut,
@@ -252,22 +256,29 @@ def _note_the_owner(
     credential: str = SessionOwner.Credential.ACCOUNT,
 ) -> None:
     """Note whose and where the new session is (``SessionOwner``), so ``base.session.revoke`` finds it by index, and
-    on which device and with which credential it was opened.
+    on which device and with which credential it was opened; and, on a hub, that its person came in today
+    (``control.HubVisit``, its nightly use).
 
     ``login`` gives the session a new key and saves it, unless it flushed another user's session first: then it has
     no key until it is saved, which happens here, in the login's transaction.
     """
     if request.session.session_key is None:
         request.session.save()
+    host = session_host(request) or ""
     SessionOwner.objects.update_or_create(
         session_id=request.session.session_key,
         defaults={
             "saas_user_id": saas_user_id,
-            "host": session_host(request) or "",
+            "host": host,
             "device_id": None if device is None else device.pk,
             "credential": credential,
         },
     )
+    if host and host != PLATFORM_SESSION_HOST:
+        # Who came into the business today (its nightly use, ``base.usage``): once a day, whatever the logins.
+        HubVisit.objects.bulk_create(
+            [HubVisit(host=host, day=timezone.now().date(), saas_user_id=saas_user_id)], ignore_conflicts=True
+        )
 
 
 @transaction.atomic  # control's: the account's copy, its Membership and the session
@@ -1002,13 +1013,17 @@ def _sync_photo_blocks(hub: Hub, labels: Iterable[str]) -> None:
 # Not an assistant tool: the platform's door (/internal, the SaaS), no person.
 @operation("base.hub.cancel", kind="command", permission=None, input=HubCancelIn, output=HubOut, ai=INTERNAL)
 def hub_cancel(ctx: OperationContext, data: HubCancelIn) -> dict:
-    """The SaaS deleted the business: its host answers 410 from now on; its members and data stay, for a restore."""
+    """The SaaS deleted the business: its host answers 410 from now on; its members and data stay, for a restore. A
+    business with a finished database of its own is due for its copy (``offboarding``, the worker's)."""
     internal_only(ctx)
     hub = _locked_hub(data.id)
     _refuse_purged(hub)
     if hub.status != Hub.Status.CANCELLED:
         hub.status, hub.cancelled_at = Hub.Status.CANCELLED, timezone.now()
         hub.save(update_fields=["status", "cancelled_at", "updated_at"])
+        if offboarding_due(hub):
+            # Its copy, by the worker (round 2026-10-30 of PLAN-DB, proposal (a)): the SaaS's mail and panel link to it.
+            HubDue.mark_due(hub, hub.cancelled_at)
         record_event(ctx, events.HUB_CANCELLED, {"id": str(hub.id)})
         transaction.on_commit(partial(_wake_open_apps, hub.slug), robust=True)
     return hub_answer(hub)
@@ -1027,7 +1042,9 @@ def hub_restore(ctx: OperationContext, data: HubRestoreIn) -> dict:
         unfinished = hub.db_name and hub.ready_at is None
         hub.status = Hub.Status.REQUESTED if unfinished else Hub.Status.READY
         hub.cancelled_at = None
-        hub.save(update_fields=["status", "cancelled_at", "updated_at"])
+        # A copy of its leaving that failed is no longer owed: a second leaving starts from the first wait.
+        hub.attempts, hub.last_error, hub.next_attempt_at = 0, "", None
+        hub.save(update_fields=["status", "cancelled_at", "attempts", "last_error", "next_attempt_at", "updated_at"])
         if hub.status == Hub.Status.REQUESTED:
             HubDue.mark_due(hub)
         record_event(ctx, events.HUB_RESTORED, {"id": str(hub.id)})
@@ -1230,8 +1247,9 @@ def claim_next_due_hub(now: dt.datetime, lease: dt.timedelta, *, owner: str = LE
 
 
 def release_hub(hub_id: UUID, now: dt.datetime, *, owner: str = LEASE_OWNER) -> None:
-    """Give ``owner``'s lease of ``hub_id`` back: due again when it still has work (a retry, a demo to drop: at its
-    ``next_attempt_at`` when the last try failed), else gone. A lease that is no longer ``owner``'s is left alone."""
+    """Give ``owner``'s lease of ``hub_id`` back: due again when it still has work (a retry, a demo to drop, a reset to
+    do, the copy of a business that left: at its ``next_attempt_at`` when the last try failed), else gone. A lease that
+    is no longer ``owner``'s is left alone."""
     with _control_transaction():
         hub = Hub.objects.filter(pk=hub_id).first()
         due = HubDue.objects.select_for_update().filter(pk=hub_id, lease_owner=owner)
@@ -1244,8 +1262,11 @@ def release_hub(hub_id: UUID, now: dt.datetime, *, owner: str = LEASE_OWNER) -> 
         elif hub is not None and (
             hub.status in registry.PREPARING_STATUSES
             or (hub.is_demo and hub.status in (Hub.Status.EXPIRED, Hub.Status.DROPPING))
+            or hub.reset_requested_at is not None
         ):
             due.update(due_at=now, lease_until=None, lease_owner="")
+        elif hub is not None and offboarding_due(hub):
+            due.update(due_at=hub.next_attempt_at or now, lease_until=None, lease_owner="")
         else:
             due.delete()
 
@@ -1466,9 +1487,14 @@ def _demo_full() -> OperationError:
 
 
 def _platform_or_its_admin(ctx: OperationContext) -> None:
-    """The platform, or one of its admins in the Hub admin (staff and superuser, ``platform_admin``); nobody else."""
+    """The platform, or one of its admins in the Hub admin (staff and superuser, ``platform_admin``) on the platform's
+    own scope (``REGISTRY_SCOPE``); nobody else: on a business's host, staff is no more than anyone there (review of
+    hub#490)."""
+    from base.tenancy.context import PLATFORM_SCOPE_KIND
+
     actor = ctx.actor
-    if getattr(actor, "is_staff", False) and getattr(actor, "is_superuser", False):
+    on_the_platform = ctx.scope.kind == PLATFORM_SCOPE_KIND
+    if on_the_platform and getattr(actor, "is_staff", False) and getattr(actor, "is_superuser", False):
         return
     internal_only(ctx)
 
@@ -1884,6 +1910,125 @@ def import_undo(ctx: OperationContext, data: ImportUndoIn) -> dict:
         return {"id": load.pk, "apps": removed["apps"]}
 
 
+# ── The nightly use of each business (base.usage; round 2026-10-30 of PLAN-DB, proposal (j)) ───────────────────────
+
+
+def usage_run_claim(day: dt.date, now: dt.datetime, takeover: dt.timedelta) -> bool:
+    """Claim the measurement of ``day``: whether this worker measures it (no run yet, or one left unfinished for
+    ``takeover``); a finished night is never measured again."""
+    with _control_transaction():
+        run = UsageRun.objects.select_for_update().filter(day=day).first()
+        if run is None:
+            UsageRun.objects.create(day=day, started_at=now)
+            return True
+        if run.finished_at is not None or run.started_at > now - takeover:
+            return False
+        run.started_at = now
+        run.save(update_fields=["started_at"])
+        return True
+
+
+def usage_run_finished(day: dt.date, hubs: int, now: dt.datetime) -> None:
+    with _control_transaction():
+        UsageRun.objects.filter(day=day).update(finished_at=now, hubs=hubs)
+
+
+def usage_ready(day: dt.date) -> bool:
+    """Whether the night of ``day`` was measured to its end."""
+    return UsageRun.objects.filter(day=day, finished_at__isnull=False).exists()
+
+
+def hubs_to_measure() -> tuple[list[Hub], int]:
+    """The hubs with their own database whose use is measured (a ready one, a business that left with its database
+    finished; never a demo, nor one being made, dropped or gone), and how many hubs still share control's."""
+    with_own = (
+        Hub.objects.exclude(db_name="")
+        .filter(Q(status=Hub.Status.READY) | Q(status__in=SERVED_STATUSES, ready_at__isnull=False))
+        .filter(is_demo=False)
+        .select_related("cluster")
+        .order_by("id")
+    )
+    shared = Hub.objects.filter(db_name="", is_demo=False, status__in=SERVED_STATUSES).count()
+    return list(with_own), shared
+
+
+def active_people(host: str, day: dt.date, window_days: int) -> tuple[int, int]:
+    """The people who came into ``host`` on ``day``, and in the ``window_days`` that end it."""
+    visits = HubVisit.objects.filter(host=host)
+    on_day = visits.filter(day=day).values("saas_user_id").distinct().count()
+    in_window = (
+        visits.filter(day__gt=day - dt.timedelta(days=window_days), day__lte=day)
+        .values("saas_user_id")
+        .distinct()
+        .count()
+    )
+    return on_day, in_window
+
+
+def usage_recorded(
+    hub_id: UUID,
+    day: dt.date,
+    *,
+    db_bytes: int,
+    s3_bytes: int,
+    active_users_1d: int,
+    active_users_30d: int,
+    now: dt.datetime,
+) -> None:
+    """Keep what ``hub_id`` used on ``day`` (measured again, its figures replace the day's); its live queries hear it
+    after the COMMIT."""
+    with _control_transaction():
+        HubUsageDaily.objects.update_or_create(
+            hub_id=hub_id,
+            day=day,
+            defaults={
+                "db_bytes": db_bytes,
+                "s3_bytes": s3_bytes,
+                "active_users_1d": active_users_1d,
+                "active_users_30d": max(active_users_30d, active_users_1d),
+                "measured_at": now,
+            },
+        )
+        slug = Hub.objects.filter(pk=hub_id).values_list("slug", flat=True).first()
+    if slug:
+        notify(Scope("host", slug), [events.HUB_USAGE_MEASURED])
+
+
+def expired_dumps_forgotten(*, before: dt.datetime) -> int:
+    """Forget the copies made before ``before``: the bucket's lifecycle rule deleted them (90 days)."""
+    with _control_transaction():
+        forgotten, _ = HubDump.objects.filter(created_at__lt=before).delete()
+    return forgotten
+
+
+def visits_forgotten(*, before: dt.date) -> int:
+    """Forget the visits older than ``before``: no window counts them any more."""
+    with _control_transaction():
+        forgotten, _ = HubVisit.objects.filter(day__lt=before).delete()
+    return forgotten
+
+
+# ── The copies of a hub's data (round 2026-10-30 of PLAN-DB, decision 2; base.tenancy.dumps) ─────────────────────────
+
+
+def dump_key_taken(key: str) -> bool:
+    """Whether a copy is already kept at ``key`` (two copies of a hub in the same second get the next second)."""
+    from base.tenancy.context import use_control
+
+    with use_control():
+        return HubDump.objects.filter(key=key).exists()
+
+
+def dump_recorded(
+    hub_id: UUID, *, kind: str, key: str, size: int, created_at: dt.datetime, requested_by: str = ""
+) -> HubDump:
+    """Keep in control the copy of ``hub_id`` just uploaded to ``key``."""
+    with _control_transaction():
+        return HubDump.objects.create(
+            hub_id=hub_id, kind=kind, key=key, bytes=size, created_at=created_at, requested_by=requested_by[:150]
+        )
+
+
 def same_name(typed: str, name: str) -> bool:
     """The name typed is the business's: spaces around and inside collapsed, case ignored, accents kept — what the
     confirmation dialog of the screen (``ConfirmDialog`` of ``@erplora/ui``) already asked."""
@@ -1912,7 +2057,9 @@ def has_own_database(hub: Hub | None) -> bool:
     ai=AI(
         description=(
             "With dry_run, says what each app of this business would lose if emptied and what name must be typed to "
-            "confirm. Without it, empties the apps chosen for good, given the business's name typed exactly."
+            "confirm. Without it, given the business's name typed exactly, copies all of the business's data and then "
+            "empties the apps chosen for good, in the background: Settings › Data shows when it is done and keeps the "
+            "copy."
         ),
         risk="high",
         # Only for live.E020 (it checks the whole app): base.assistant.NOT_FROM_CHAT keeps this out of the chat
@@ -1924,9 +2071,14 @@ def has_own_database(hub: Hub | None) -> bool:
     ),
 )
 def hub_reset(ctx: OperationContext, data: HubResetIn) -> dict:
-    """The plan of what each app would lose, or empty the apps chosen with the business's name typed (BASE-G109).
+    """The plan of what each app would lose, or the reset of the apps chosen asked, with the business's name typed
+    (BASE-G109): a copy of its database first, by the worker, and only then the sections emptied (round 2026-10-30 of
+    PLAN-DB, decision 2; «The reset of a business», below).
 
-    Without the business's own database the reset is refused before anything of it is read (PLAN-DB §14.14)."""
+    Without the business's own database the reset is refused before anything of it is read (PLAN-DB §14.14); without a
+    bucket for its copy it is unavailable (503); while one runs, a second one waits for it (409)."""
+    from base.tenancy import dumps
+
     with translation.override(ctx.language):
         hub = Hub.objects.filter(slug=ctx.scope.key).first()
         available = has_own_database(hub)
@@ -1946,6 +2098,7 @@ def hub_reset(ctx: OperationContext, data: HubResetIn) -> dict:
             "available": available,
             "sections": sections,
             "apps": [],
+            "status": "planned",
         }
         if data.dry_run:
             return answer
@@ -1961,9 +2114,187 @@ def hub_reset(ctx: OperationContext, data: HubResetIn) -> dict:
                 gettext("The name does not match."),
                 fields={"confirm": gettext("Type the business's name exactly as it is shown.")},
             )
+        if not dumps.configured():
+            raise _dumps_unavailable()
+        reset_requested(hub.id, chosen, language=ctx.language, requested_by=_who(ctx), now=timezone.now())
+        on_commit(partial(reset_progressed, hub.slug))
+        return {**answer, "status": "copying"}
+
+
+# ── The reset of a business (round 2026-10-30 of PLAN-DB, decision 2, proposal (f)) ─────────────────────────────────
+# Asked by who runs it (``base.hub.reset``), done by the worker (``base.worker``, the data pass): a copy of its database
+# first (``base.tenancy.dumps``, ``reset``) and, only if it was kept, the sections emptied in its database
+# (``base.hub.reset_apply``), the event ``base.hub.data_reset`` recorded there. ``Hub.reset_requested_at`` is set while
+# it is to do; ``Hub.reset_sections`` keeps what was asked and how it went, for Settings › Data (``base.hub.dumps``):
+# ``state`` copying → emptying → done, or failed with its ``error`` (``dumps_unavailable``, ``dump_failed``,
+# ``emptying_failed``, ``hub_not_ready``) and nothing emptied. Each step is told to the hub's live queries after its
+# COMMIT in control (``base.hub.reset_progressed``).
+
+#: The states of a reset; a failed one is asked again from the screen («Try again»).
+RESET_STATES = ("copying", "emptying", "done", "failed")
+
+
+def _dumps_unavailable() -> OperationError:
+    return OperationError(
+        gettext("The copy of the data cannot be made right now, so nothing was emptied. Try again later."),
+        code="base.dumps_unavailable",
+        status=503,
+    )
+
+
+def reset_progressed(slug: str) -> None:
+    """Tell the hub's live queries that its reset moved on (after the COMMIT that moved it)."""
+    notify(Scope("host", slug), [events.HUB_RESET_PROGRESSED])
+
+
+def reset_requested(hub_id: UUID, apps: list[str], *, language: str, requested_by: str, now: dt.datetime) -> None:
+    """Ask for the reset of ``apps`` on ``hub_id``: due for the worker now. ``base.reset_in_progress`` while another
+    one is to do."""
+    with _control_transaction():
+        hub = Hub.objects.select_for_update().get(pk=hub_id)
+        if hub.reset_requested_at is not None:
+            raise Conflict(
+                gettext("The business is already being reset. Wait for it to finish."), code="base.reset_in_progress"
+            )
+        hub.reset_requested_at = now
+        hub.reset_sections = {
+            "apps": list(apps),
+            "language": language,
+            "requested_by": requested_by,
+            "state": "copying",
+            "error": "",
+            "removed": [],
+            "dump": None,
+            "finished_at": None,
+        }
+        hub.save(update_fields=["reset_requested_at", "reset_sections", "updated_at"])
+        HubDue.mark_due(hub, now)
+
+
+def reset_moved(hub_id: UUID, *, state: str, owner: str = LEASE_OWNER, **changes) -> Hub:
+    """Note that the reset of ``hub_id`` moved to ``state`` (with ``changes``: its ``error``, ``dump``, ``removed``),
+    under ``owner``'s lease (``ProvisioningStopped`` when another worker holds it now); a done or failed one is no
+    longer to do. Its live queries hear it after the COMMIT."""
+    if state not in RESET_STATES:
+        raise ValueError(f"No such state of a reset: {state!r}.")
+    now = timezone.now()
+    with _control_transaction():
+        hub = Hub.objects.select_for_update().get(pk=hub_id)
+        _holds(hub_id, owner, now)
+        sections = {**(hub.reset_sections or {}), **changes, "state": state}
+        if state in ("done", "failed"):
+            sections["finished_at"] = now.isoformat()
+            hub.reset_requested_at = None
+        hub.reset_sections = sections
+        hub.save(update_fields=["reset_requested_at", "reset_sections", "updated_at"])
+    reset_progressed(hub.slug)
+    return hub
+
+
+def _holds(hub_id: UUID, owner: str, now: dt.datetime) -> None:
+    """``ProvisioningStopped`` unless ``owner`` holds the lease of ``hub_id`` now: what another worker took over is
+    left to it."""
+    if not HubDue.objects.filter(pk=hub_id, lease_owner=owner, lease_until__gt=now).exists():
+        raise ProvisioningStopped(f"the lease of {hub_id} is no longer {owner}'s: another worker holds it now.")
+
+
+def renew_lease(hub_id: UUID, lease: dt.timedelta, *, owner: str = LEASE_OWNER) -> None:
+    """Renew ``owner``'s lease of ``hub_id`` for ``lease`` from now (a long copy's heartbeat);
+    ``ProvisioningStopped`` when another worker holds it now."""
+    with _control_transaction():
+        _leased(hub_id, timezone.now(), lease, owner)
+
+
+# Not an assistant tool: the worker's step of a reset it already copied, no person.
+@operation(
+    "base.hub.reset_apply",
+    kind="command",
+    permission=None,
+    input=HubResetApplyIn,
+    output=HubResetApplyOut,
+    ai=INTERNAL,
+)
+def hub_reset_apply(ctx: OperationContext, data: HubResetApplyIn) -> dict:
+    """Empty the sections of a reset whose copy was kept (``base.worker``), in the hub's own database, in one
+    transaction: every row of them goes, or none (a failure rolls back the rows already removed). Never on phase 1's
+    shared database (PLAN-DB §14.14); only the platform runs it, refused to anyone else first (review of hub#490)."""
+    internal_only(ctx)
+    hub = Hub.objects.filter(slug=ctx.scope.key).first()
+    if not has_own_database(hub):
+        raise Conflict(
+            gettext("Resetting the business is not available yet. Undo a load instead, or remove what you want from each app."),
+            code="base.reset_shared_database",
+        )
+    chosen = list(dict.fromkeys(data.apps))
+    with translation.override(ctx.language):
         removed = blueprint.reset(ctx, chosen)
-        record_event(ctx, events.HUB_DATA_RESET, {"apps": chosen})
-        return {**answer, "sections": blueprint.reset_plan(ctx), "apps": removed["apps"]}
+    record_event(ctx, events.HUB_DATA_RESET, {"apps": chosen})
+    return {"apps": removed["apps"]}
+
+
+# ── A business that leaves: its copy (round 2026-10-30 of PLAN-DB, proposal (a)) ───────────────────────────────────
+# ``base.hub.cancel`` makes a business with a finished database of its own due; the worker copies it once
+# (``offboarding``) and the database stays (its 90 days; ``restore`` brings it back). A copy that fails is tried again
+# at ``next_attempt_at`` (1 min, 5 min, 15 min, then every hour), with ``attempts`` and ``last_error`` on the row.
+
+
+def _offboarding_copied(hub_ref, cancelled_at) -> Exists:
+    return Exists(
+        HubDump.objects.filter(hub_id=hub_ref, kind=HubDump.Kind.OFFBOARDING, created_at__gte=cancelled_at)
+    )
+
+
+def offboarding_due(hub: Hub) -> bool:
+    """Whether ``hub`` left with a finished database of its own and has no copy of this leaving yet."""
+    return bool(
+        hub.status == Hub.Status.CANCELLED
+        and hub.db_name
+        and hub.ready_at is not None
+        and hub.cancelled_at is not None
+        and not HubDump.objects.filter(
+            hub_id=hub.pk, kind=HubDump.Kind.OFFBOARDING, created_at__gte=hub.cancelled_at
+        ).exists()
+    )
+
+
+def claim_next_data_hub(now: dt.datetime, lease: dt.timedelta, *, owner: str = LEASE_OWNER) -> UUID | None:
+    """Take for ``owner`` the lease of the hub due longest by ``now``, that nobody holds, with data work to do: a reset
+    asked, or the copy of a business that left."""
+    leaving = (
+        Q(hub__status=Hub.Status.CANCELLED, hub__ready_at__isnull=False, hub__cancelled_at__isnull=False)
+        & ~Q(hub__db_name="")
+        & ~_offboarding_copied(OuterRef("hub_id"), OuterRef("hub__cancelled_at"))
+    )
+    with _control_transaction():
+        due = (
+            HubDue.objects.select_for_update(skip_locked=True, of=("self",))
+            .filter(_free(now), due_at__lte=now)
+            .filter(Q(hub__reset_requested_at__isnull=False) | leaving)
+            .order_by("due_at")
+            .values_list("hub_id", flat=True)
+            .first()
+        )
+        if due is None:
+            return None
+        _take(due, now, lease, owner)
+    return due
+
+
+def offboarding_copy_failed(hub_id: UUID, now: dt.datetime, error: str, *, owner: str = LEASE_OWNER) -> None:
+    """The copy of a business that left failed: tried again at its next attempt."""
+    with _control_transaction():
+        hub = Hub.objects.select_for_update().get(pk=hub_id)
+        _holds(hub_id, owner, timezone.now())
+        hub.attempts += 1
+        hub.last_error = error[:2000]
+        hub.next_attempt_at = now + retry_delay(hub.attempts)
+        hub.save(update_fields=["attempts", "last_error", "next_attempt_at", "updated_at"])
+
+
+def offboarding_copied(hub_id: UUID) -> None:
+    """The copy of a business that left was kept: nothing more to try."""
+    with _control_transaction():
+        Hub.objects.filter(pk=hub_id).update(attempts=0, last_error="", next_attempt_at=None, updated_at=timezone.now())
 
 
 # ── System: the failed events (APP-BASE-7) ─────────────────────────────────────────────────────────────────────────
@@ -3642,7 +3973,7 @@ def support_report(ctx: OperationContext, data: SupportReportIn) -> dict:
 from typing import Any  # noqa: E402
 
 from live.meta import module_configs  # noqa: E402
-from live.operations import on_commit as after_commit  # noqa: E402
+from live.operations import on_commit as after_commit  # noqa: E402,F811
 
 from base import activation, entitlement, home  # noqa: E402
 from base.models import AppActivation  # noqa: E402

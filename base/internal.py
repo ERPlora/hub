@@ -26,8 +26,17 @@ registry's scope (``base.registry.REGISTRY_SCOPE``):
   hub;
 - ``GET /internal/hubs/{id}`` → ``base.hub.get``: the row, whose ``status`` ``ready`` the SaaS waits for (``requested``,
   ``creating``, ``migrating``, ``seeding`` or ``failed`` before); never where its database is;
-- ``DELETE /internal/hubs/{id}`` → ``base.hub.cancel`` (202); ``POST /internal/hubs/{id}/restore`` →
-  ``base.hub.restore`` (200; 409 ``hub_purged`` when it can never come back);
+- ``DELETE /internal/hubs/{id}`` → ``base.hub.cancel`` (202; a business with its own database is copied by the
+  worker, ``offboarding``); ``POST /internal/hubs/{id}/restore`` → ``base.hub.restore`` (200; 409 ``hub_purged`` when
+  it can never come back);
+- ``GET /internal/hubs/{id}/dumps`` → ``base.hub.dump_list``: ``{available, dumps: [{id, kind, created_at, bytes,
+  url}]}``, the copies of its data (``id``: the key in the bucket), newest first, each link signed for 15 minutes;
+  ``available`` false for a business that never gets one (no database of its own); 200 for a business that left too
+  (its 410 is its host's door), 404 for one unknown or purged, 503 ``base.dumps_unavailable`` without a bucket;
+- ``GET /internal/usage?day=YYYY-MM-DD[&cursor=]`` → ``base.usage.list``: one page of what the businesses with their
+  own database used that day (UTC), as the worker measured it that night (``base.usage``): ``{day, hubs: [{id,
+  s3_bytes, db_bytes, active_users_1d, active_users_30d}], next_cursor}``; 409 ``usage_not_ready`` before that night
+  was measured, 422 ``internal.payload_invalid`` for a day missing or badly written, or a cursor not of its own;
 - ``PUT /internal/hubs/{id}/state`` (the photo) → ``base.hub.state_apply``: kept on the row if its ``version`` is
   newer, with its VeriFactu block, the business's status and its id in ERPlora applied through
   ``verifactu.config.sync`` on the hub's slug, and its ``whatsapp`` (the number's state, door 4 of WhatsApp's
@@ -193,6 +202,23 @@ def hub(request: HttpRequest, hub_id: UUID) -> HttpResponse:
         return refused
     # 202 while its database is being made (the worker's; the SaaS hears ``ready``), 200 for an update of a ready one.
     return JsonResponse(_hub_answer(answer), status=200 if answer.status == "ready" else 202)
+
+
+@internal_view
+@require_http_methods(["GET"])
+def hub_dumps(request: HttpRequest, hub_id: UUID) -> HttpResponse:
+    """``GET /internal/hubs/{id}/dumps``: the copies of the business's data, each with a link of 15 minutes."""
+    answer, refused = _operation_call("base.hub.dump_list", {"id": str(hub_id)}, _registry_context())
+    return refused or JsonResponse(answer.model_dump(mode="json"))
+
+
+@internal_view
+@require_http_methods(["GET"])
+def usage(request: HttpRequest) -> HttpResponse:
+    """``GET /internal/usage?day=YYYY-MM-DD[&cursor=]``: one page of what the businesses used that day (UTC)."""
+    payload = {"day": request.GET.get("day"), "cursor": request.GET.get("cursor") or None}
+    answer, refused = _operation_call("base.usage.list", payload, _registry_context())
+    return refused or JsonResponse(answer.model_dump(mode="json"))
 
 
 @internal_view
