@@ -190,14 +190,14 @@ def test_the_people_against_the_plans_limit_and_the_devices_limit(make_user):
     make_user("old", host="a", role="hub_employee", is_active=False)
     make_user("bea", host="b", role="hub_owner")
 
-    assert plan_usage("base.administer_hub") == {
-        "known": True,
-        "people": {"used": 2, "limit": 3},
-        # The devices in use are those with a session open here (base/tests/test_access_devices.py): none yet.
-        "devices": {"used": 0, "limit": 2},
-        # `a` shares control's database: no size of its own (base/tests/test_usage.py, BASE-F40).
-        "database": {"available": False, "bytes": None, "day": None},
-    }
+    usage = plan_usage("base.administer_hub")
+    assert (usage["known"], usage["demo"]) == (True, False)
+    assert usage["people"] == {"used": 2, "limit": 3}
+    # The devices in use are those with a session open here (base/tests/test_access_devices.py): none yet.
+    assert usage["devices"] == {"used": 0, "limit": 2}
+    # `a` shares control's database: no size of its own (base/tests/test_usage.py, BASE-F40); the rest of what this
+    # answer says of the business, in base/tests/test_plan_usage_figures.py.
+    assert usage["database"] == {"available": False, "bytes": None, "day": None}
 
 
 def test_zero_in_the_plan_is_no_limit():

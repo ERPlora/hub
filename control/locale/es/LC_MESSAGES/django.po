@@ -310,6 +310,25 @@ msgstr "uso diario de un hub"
 msgid "daily use of the hubs"
 msgstr "uso diario de los hubs"
 
+msgid "requests"
+msgstr "peticiones"
+
+msgid "most connections at once"
+msgstr "máximo de conexiones a la vez"
+
+msgid "requests with no room"
+msgstr "peticiones sin hueco"
+
+msgid "daily activity of a hub"
+msgstr "actividad diaria de un hub"
+
+msgid "daily activity of the hubs"
+msgstr "actividad diaria de los hubs"
+
+msgctxt "hub usage"
+msgid "last seen at"
+msgstr "visto por última vez"
+
 msgid "daily entry"
 msgstr "entrada diaria"
 

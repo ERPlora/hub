@@ -78,7 +78,7 @@ from django.utils.translation import gettext
 from live.api_errors import DEFAULT_API_PREFIX
 from live.errors import NotFound
 
-from base import registry
+from base import meter, registry
 from base.auth import admin_hubs_url, saas_url
 from base.health import READYZ_PATH
 from base.models import Hub
@@ -264,6 +264,7 @@ class HubDatabaseMiddleware:
             return self._busy(request, busy)
         except (HubIdentityMismatch, DatabaseError, tenancy_context.HubWithoutDatabase) as error:
             return self._unavailable(request, error)
+        _count_the_request(request)
         with self._entered(resolved):
             return self.get_response(request)
 
@@ -278,6 +279,7 @@ class HubDatabaseMiddleware:
             return self._busy(request, busy)
         except (HubIdentityMismatch, DatabaseError, tenancy_context.HubWithoutDatabase) as error:
             return self._unavailable(request, error)
+        _count_the_request(request)
         with self._entered(resolved):
             return await self.get_response(request)
 
@@ -357,6 +359,15 @@ class HubDatabaseMiddleware:
         response = _envelope(refusal.status, refusal.code, refusal.message)
         response["Retry-After"] = str(PREPARING_RETRY_AFTER_SECONDS)
         return response
+
+
+def _count_the_request(request: HttpRequest) -> None:
+    """One more request of the business whose host it came to (``base.meter``, BASE-F40): the platform's host, ``/internal``
+    and the open paths have no ``request.hub``, and ``HealthCheckMiddleware`` and WhiteNoise answered before; a demo is not
+    measured."""
+    hub = getattr(request, "hub", None)
+    if hub is not None and not hub.is_demo:
+        meter.count_request(hub.pk)
 
 
 def _reaches_the_database(request: HttpRequest) -> bool:

@@ -489,14 +489,69 @@ class DatabaseUsageOut(Schema):
     day: dt.date | None = Field(description="The day (UTC) it was measured; None before the first night.")
 
 
+class FilesUsageOut(Schema):
+    """What the business's files and those of its apps take up, as the last night measured it, against its plan."""
+
+    bytes: int | None = Field(description="What they take up, in bytes; None before the first night measured it.")
+    day: dt.date | None = Field(description="The day (UTC) it was measured; None before the first night.")
+    limit: int | None = Field(description="The space the plan includes, in bytes; None: no limit, or the plan is not known.")
+    percent: int | None = Field(description="How much of that space they take up; None without a limit or a figure.")
+    status: Literal["within", "near", "full"] | None = Field(
+        description="Within the limit, close to it (from 80 %) or reached; None without a limit or a figure."
+    )
+
+
+class ConnectionsUsageOut(Schema):
+    """What the business does at once in its database against what it really has."""
+
+    peak_today: int | None = Field(description="The most transactions at once today; None: not measured today yet.")
+    limit: int | None = Field(
+        description="What it really has at once: what its plan includes or, if less, what the service gives. None: the plan is not known."
+    )
+    busy_last_7_days: int | None = Field(
+        description="The requests that found no room in the last 7 days; None: never counted yet."
+    )
+    busy_since: dt.date | None = Field(
+        description="Since when they are counted, when that is less than the 7 days; otherwise None."
+    )
+    status: Literal["within", "near"] | None = Field(
+        description="Close to the limit when a request found no room in those 7 days; None: the plan is not known."
+    )
+    bigger_plan_gives_more: bool = Field(description="Whether a bigger plan would give it more at once.")
+
+
+class RequestsUsageOut(Schema):
+    """The requests the business has served this calendar month (UTC)."""
+
+    this_month: int | None = Field(description="How many; None: never counted yet.")
+    since: dt.date | None = Field(description="Since when they are counted, when that is after day 1; otherwise None.")
+
+
+class ActivityUsageOut(Schema):
+    """The people with activity in the business; the plan's places are ``people`` of the same answer."""
+
+    active_now: int | None = Field(description="With activity in the last 5 minutes; None in a demo.")
+    last_day: int | None = Field(description="Those of the last day measured; None before the first night.")
+    last_day_date: dt.date | None = Field(description="That day (UTC); None before the first night.")
+    last_day_is_yesterday: bool = Field(description="Whether that day is yesterday.")
+    last_30_days: int | None = Field(description="Those of the 30 days it ends; None before the first night.")
+
+
 class PlanUsageOut(Schema):
-    """``base.plan.usage``: the plan's limits (the SaaS's photo, ``plan``) against what the business uses."""
+    """``base.plan.usage``: the plan's limits (the SaaS's photo, ``plan``) against what the business uses. A figure not
+    measured yet comes as None, never as a zero."""
 
     #: Whether the Hub has the business's plan from erplora.com (a demo, or a business without a photo yet, has not).
     known: bool
+    #: A demo: nothing of it is measured, and its data is deleted when it ends.
+    demo: bool
     people: LimitOut
     devices: LimitOut
     database: DatabaseUsageOut
+    files: FilesUsageOut
+    connections: ConnectionsUsageOut
+    requests: RequestsUsageOut
+    activity: ActivityUsageOut
 
 
 class UsageListIn(Schema):
@@ -512,6 +567,10 @@ class UsageRowOut(Schema):
     db_bytes: int
     active_users_1d: int
     active_users_30d: int
+    #: What the day's serving tasks counted (``control.HubActivityDaily``); null: nothing counted that day.
+    requests: int | None
+    peak_connections: int | None
+    busy_requests: int | None
 
 
 class UsageListOut(Schema):

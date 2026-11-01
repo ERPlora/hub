@@ -40,7 +40,7 @@ import secrets
 import socket
 import time
 import unicodedata
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Mapping
 from contextlib import contextmanager
 from contextvars import ContextVar
 from functools import partial
@@ -57,7 +57,8 @@ from django.core.files.base import ContentFile
 from django.core.files.storage import storages
 from django.core.validators import validate_email
 from django.db import IntegrityError, connection, transaction
-from django.db.models import Count, Max, Q
+from django.db.models import Count, F, Max, PositiveIntegerField, Q, Value
+from django.db.models.functions import Greatest
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.http import HttpRequest
@@ -115,7 +116,7 @@ from base.throttle import client_key
 from base.tenancy import names as database_names
 from base.tenancy.connections import control_name
 from base.tenancy.context import HUB_SCOPE_KIND
-from control.models import Cluster, HubDue, HubDump, HubUsageDaily, HubVisit, UsageRun
+from control.models import Cluster, HubActivityDaily, HubDue, HubDump, HubUsageDaily, HubVisit, UsageRun
 from django.db.models import Exists, OuterRef
 from base.schemas import (
     BlueprintImportIn,
@@ -278,9 +279,11 @@ def _note_the_owner(
         },
     )
     if host and host != PLATFORM_SESSION_HOST:
-        # Who came into the business today (its nightly use, ``base.usage``): once a day, whatever the logins.
+        # Who came into the business today (its nightly use, ``base.usage``): once a day, whatever the logins; what they
+        # do next keeps ``last_seen_at`` going (``base.meter``).
+        now = timezone.now()
         HubVisit.objects.bulk_create(
-            [HubVisit(host=host, day=timezone.now().date(), saas_user_id=saas_user_id)], ignore_conflicts=True
+            [HubVisit(host=host, day=now.date(), saas_user_id=saas_user_id, last_seen_at=now)], ignore_conflicts=True
         )
 
 
@@ -2117,6 +2120,48 @@ def usage_recorded(
         slug = Hub.objects.filter(pk=hub_id).values_list("slug", flat=True).first()
     if slug:
         notify(Scope("host", slug), [events.HUB_USAGE_MEASURED])
+
+
+def activity_recorded(hub_id: UUID, day: dt.date, *, requests: int = 0, peak: int = 0, busy: int = 0) -> bool:
+    """Add what a process counted of ``hub_id`` on ``day`` (``base.meter``) to its row, made if it is the first; several
+    tasks write at once, so it is added in the database, never read first. ``False``: the hub is gone, nothing to keep."""
+
+    def add() -> int:
+        return HubActivityDaily.objects.filter(hub_id=hub_id, day=day).update(
+            requests=F("requests") + requests,
+            peak_connections=Greatest(F("peak_connections"), Value(peak), output_field=PositiveIntegerField()),
+            busy_requests=F("busy_requests") + busy,
+        )
+
+    with _control_transaction():
+        if add():
+            return True
+        if not Hub.objects.filter(pk=hub_id).exists():
+            return False
+        _, created = HubActivityDaily.objects.get_or_create(
+            hub_id=hub_id,
+            day=day,
+            defaults={"requests": requests, "peak_connections": peak, "busy_requests": busy},
+        )
+        if not created:  # another task made it meanwhile
+            add()
+    return True
+
+
+def people_seen(host: str, day: dt.date, last_seen: Mapping[str, dt.datetime]) -> None:
+    """Note who had activity in ``host`` on ``day`` and when last (``base.meter``): their visit of the day, made if it is
+    the first. Two tasks may write out of order by up to a pass: a moment against a window of minutes, which it does not
+    change, so one upsert is enough."""
+    with _control_transaction():
+        HubVisit.objects.bulk_create(
+            [
+                HubVisit(host=host, day=day, saas_user_id=person, last_seen_at=moment)
+                for person, moment in last_seen.items()
+            ],
+            update_conflicts=True,
+            unique_fields=["host", "day", "saas_user_id"],
+            update_fields=["last_seen_at"],
+        )
 
 
 def expired_dumps_forgotten(*, before: dt.datetime) -> int:
