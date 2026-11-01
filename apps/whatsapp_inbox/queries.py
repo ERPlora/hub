@@ -624,8 +624,8 @@ def list_messages(ctx: OperationContext, params: MessageListIn) -> dict:
     expose_api=True,
     ai={
         "description": "One WhatsApp message by its id (the one an automation started on): what it says, who said it "
-        "and when, its conversation's exact international number, what to call the customer and whether anything "
-        "can be sent now."
+        "and when, its conversation's exact international number, what to call the customer, whether anything "
+        "can be sent now and the options the business last offered her, which she may be answering."
     },
 )
 def get_message(ctx: OperationContext, data: MessageRefIn) -> dict:
@@ -641,7 +641,34 @@ def get_message(ctx: OperationContext, data: MessageRefIn) -> dict:
         "phone": row.conversation.phone,
         "display_name": display_name(row.conversation),
         "can_send": send_blocked(channel(ctx.scope)) is None,
+        "options": last_offered(row),
     }
+
+
+#: How long a list the business offered stays the one an answer like «the 2nd» points to (WHATSAPP_INBOX-F19).
+OFFER_MEMORY = dt.timedelta(hours=24)
+
+
+def last_offered(message: Message) -> str:
+    """What the business last wrote her from the Hub, in the 24 hours before ``message``: the list of options she may be
+    answering by its number (WHATSAPP_INBOX-F19), or ``""``. Ordered by when the Hub recorded each one, not by Meta's
+    clock; never what the owner wrote from the phone, nor what did not get to her. Anything the Hub writes her later
+    (a booking done, another question, a template) takes its place, so a list is forgotten once it was answered."""
+    last = (
+        Message.objects.filter(
+            conversation_id=message.conversation_id,
+            direction=Message.Direction.OUTBOUND,
+            origin=Message.Origin.HUB,
+            created_at__lt=message.created_at,
+            created_at__gte=message.created_at - OFFER_MEMORY,
+        )
+        .exclude(status=Message.Status.FAILED)
+        .exclude(body="")
+        .order_by("-created_at", "-id")
+        .values_list("body", flat=True)
+        .first()
+    )
+    return last or ""
 
 
 @operation(

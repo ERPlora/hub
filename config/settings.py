@@ -533,6 +533,8 @@ LIVE = {
 # of the assistant's QA (base/tests/test_assistant_asks.py) checks each ask reaches its tool, role by role.
 LIVE_ASSISTANT_ASKS_REQUIRED = (
     "base",
+    "customer",
+    "sale",
 )
 
 # Email: the console locally; in production the SES API signed by the task role (no static keys,

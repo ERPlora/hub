@@ -533,3 +533,11 @@ def test_waiting_for_erplora_com_holds_no_transaction(gateway, monkeypatch, oper
     monkeypatch.setattr(assistant, "_post", probe)
     run(operation_name, EMPLOYEE, **data)
     assert seen == [False]
+
+
+def test_a_turn_reads_the_hubs_own_words():
+    """In the Hub a «cuenta» is a table's open check (``base.assistant.SYNONYMS``): the turn offers the read of a check
+    among its first tools, as the assistant's QA ranks it (base/tests/test_assistant_asks.py), never at 14."""
+    asked = {"role": "user", "content": "¿qué hay en la cuenta de la mesa 6?"}
+    plan = run("base.assistant.turn", {"*"}, messages=[asked])
+    assert assistant.tool_name("sale.order.get") in [tool["name"] for tool in plan["tools"]][:10]
