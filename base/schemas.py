@@ -502,20 +502,17 @@ class FilesUsageOut(Schema):
 
 
 class ConnectionsUsageOut(Schema):
-    """What the business does at once in its database against what it really has."""
+    """The business's capacity: what it does at once in its database against what it really has."""
 
-    peak_today: int | None = Field(description="The most transactions at once today; None: not measured today yet.")
+    peak_today: int | None = Field(description="The most connections at once today; None: not measured today yet.")
     limit: int | None = Field(
         description="What it really has at once: what its plan includes or, if less, what the service gives. None: the plan is not known."
     )
     busy_last_7_days: int | None = Field(
-        description="The requests that found no room in the last 7 days; None: never counted yet."
+        description="The times in the last 7 days somebody got an error because there was no room; None: never counted yet."
     )
     busy_since: dt.date | None = Field(
         description="Since when they are counted, when that is less than the 7 days; otherwise None."
-    )
-    status: Literal["within", "near"] | None = Field(
-        description="Close to the limit when a request found no room in those 7 days; None: the plan is not known."
     )
     bigger_plan_gives_more: bool = Field(description="Whether a bigger plan would give it more at once.")
 
@@ -531,10 +528,18 @@ class ActivityUsageOut(Schema):
     """The people with activity in the business; the plan's places are ``people`` of the same answer."""
 
     active_now: int | None = Field(description="With activity in the last 5 minutes; None in a demo.")
-    last_day: int | None = Field(description="Those of the last day measured; None before the first night.")
-    last_day_date: dt.date | None = Field(description="That day (UTC); None before the first night.")
-    last_day_is_yesterday: bool = Field(description="Whether that day is yesterday.")
-    last_30_days: int | None = Field(description="Those of the 30 days it ends; None before the first night.")
+    last_30_days: int | None = Field(description="In the 30 days the last night measured ends; None before the first night.")
+    day: dt.date | None = Field(description="The day (UTC) that night measured; None before the first night.")
+
+
+class PlanMeterOut(Schema):
+    """What an app on says its plan includes this month (``base.home.plan_meters``), such as WhatsApp's messages."""
+
+    key: str = Field(description="The app it is of.")
+    label: str = Field(description="What it is called, in the person's language.")
+    used: int | None = Field(description="How much of it is spent; None: not measured yet, or it could not be read.")
+    limit: int | None = Field(description="How much the plan includes; 0: the plan includes none; None: as above.")
+    available: bool = Field(description="False when its app could not be read now.")
 
 
 class PlanUsageOut(Schema):
@@ -545,13 +550,16 @@ class PlanUsageOut(Schema):
     known: bool
     #: A demo: nothing of it is measured, and its data is deleted when it ends.
     demo: bool
+    plan_slug: str | None = Field(description="The plan the business is on (free, starter…); None: not known.")
     people: LimitOut
     devices: LimitOut
+    apps: LimitOut
     database: DatabaseUsageOut
     files: FilesUsageOut
     connections: ConnectionsUsageOut
     requests: RequestsUsageOut
     activity: ActivityUsageOut
+    meters: list[PlanMeterOut]
 
 
 class UsageListIn(Schema):

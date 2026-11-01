@@ -291,41 +291,63 @@ def test_each_place_taken_says_how_many_are_in_use_now(heard):
     third.release()
 
 
-def test_a_transaction_that_finds_no_room_is_counted_and_still_answers_busy(heard):
-    limiter = limits.configure("hub_x", photo_of(plan={"slug": "free", "max_db_connections": 1, "statement_timeout_seconds": 5}))
+FREE_PLAN = {"slug": "free", "max_db_connections": 1, "statement_timeout_seconds": 5}
+
+
+def test_finding_no_room_counts_nothing_yet_and_the_failure_knows_whose_it_is(heard):
+    """Whoever catches it decides: the live executor tries again, and a try nobody saw must not tell an owner to upgrade."""
+    limiter = limits.configure("hub_x", photo_of(plan=FREE_PLAN))
     held = limiter.take(wait=0)
 
-    with pytest.raises(limits.HubBusy):
+    with pytest.raises(limits.HubBusy) as busy:
         limiter.take(wait=0)
 
-    assert heard.busy == [ACME]
-    assert heard.peaks == [(ACME, 1)]
+    assert heard.busy == []
+    assert busy.value.hub_id == ACME
     held.release()
+
+
+def test_the_failure_counts_when_it_reaches_a_client(heard):
+    limiter = limits.configure("hub_x", photo_of(plan=FREE_PLAN))
+    held = limiter.take(wait=0)
+    with pytest.raises(limits.HubBusy) as busy:
+        limiter.take(wait=0)
+    held.release()
+
+    busy.value.reached_client()
+
+    assert heard.busy == [ACME]
+
+
+def test_the_same_failure_counts_once_however_many_doors_it_goes_through(heard):
+    busy = limits.HubBusy("Too many requests.", hub_id=ACME)
+
+    busy.reached_client()
+    busy.reached_client()
+
+    assert heard.busy == [ACME]
 
 
 def test_the_meter_is_told_outside_the_limiter_s_lock(monkeypatch):
     """A slow pass of the meter never holds up who waits for a place of the hub."""
-    limiter = limits.configure("hub_x", photo_of(plan={"slug": "free", "max_db_connections": 1, "statement_timeout_seconds": 5}))
+    limiter = limits.configure("hub_x", photo_of(plan=FREE_PLAN))
     held_while_told = []
-    tell = lambda *_: held_while_told.append(limiter._condition._is_owned())  # noqa: E731
-    monkeypatch.setattr(limits.meter, "note_peak", tell)
-    monkeypatch.setattr(limits.meter, "count_busy", tell)
+    monkeypatch.setattr(limits.meter, "note_peak", lambda *_: held_while_told.append(limiter._condition._is_owned()))
 
     slot = limiter.take(wait=0)
-    with pytest.raises(limits.HubBusy):
-        limiter.take(wait=0)
     slot.release()
 
-    assert held_while_told == [False, False]
+    assert held_while_told == [False]
 
 
 def test_a_demo_is_never_measured(heard):
-    limiter = limits.configure("hub_x", photo_of(is_demo=True, plan={"slug": "free", "max_db_connections": 1, "statement_timeout_seconds": 5}))
+    limiter = limits.configure("hub_x", photo_of(is_demo=True, plan=FREE_PLAN))
 
     held = limiter.take(wait=0)
-    with pytest.raises(limits.HubBusy):
+    with pytest.raises(limits.HubBusy) as busy:
         limiter.take(wait=0)
     held.release()
+    busy.value.reached_client()
 
     assert (heard.peaks, heard.busy) == ([], [])
 
@@ -334,9 +356,10 @@ def test_an_alias_no_hub_configured_is_nobody_s_to_measure(heard):
     limiter = limits.limiter_for("hub_nobody")
 
     held = limiter.take(wait=0)
-    with pytest.raises(limits.HubBusy):
+    with pytest.raises(limits.HubBusy) as busy:
         limiter.take(wait=0)
     held.release()
+    busy.value.reached_client()
 
     assert (heard.peaks, heard.busy) == ([], [])
 

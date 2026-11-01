@@ -92,6 +92,15 @@ class WhatsappInboxConfig(LiveAppConfig):
             refresh_on=AWAITING_REPLY_EVENTS,
         )
     ]
+    # What the plan includes and the month has spent, for System › «Usage and plan» and the bell (BASE-F40): base reads no
+    # other app's tables. No figure until erplora.com sent the channel's (its 0 would say the plan includes none).
+    plan_meter = {
+        "operation": "whatsapp_inbox.channel.get",
+        "used": "monthly_usage",
+        "limit": "monthly_limit",
+        "measured": "synced_at",
+        "label": _("WhatsApp"),
+    }
     # hub#2303 (round 2026-10-23): the installed app tells the device of each message of a customer left waiting for
     # an answer, with who and what she wrote; a tap opens that conversation in the inbox.
     notices = [

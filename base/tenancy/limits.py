@@ -18,11 +18,12 @@ each transaction (Django's ``atomic`` of an operation, of ``live.operations.atom
 statement alone, which is a transaction of its own) and gives it back at its ``COMMIT``, ``ROLLBACK`` or when the
 connection closes; its first statement runs after ``SET LOCAL statement_timeout``. No statement on a hub's alias runs
 without a place: one that finds none waits :data:`SLOT_WAIT_SECONDS` and answers 503 ``base.hub_busy``
-(:class:`HubBusy`), logged with the hub's alias and counted (``base.meter``, as every place taken says how many are in
-use: never a statement of its own, and never holding the limiter's lock), so the limits can be adjusted by measuring and
-the owner sees it (BASE-F40). A demo is not measured. Control's database and a hub of phase 1's shared database
-(``db_name=""``, ``default``) are not limited; the migrator's direct alias (``__ddl``) neither: its passes have their
-own budget (``base.tenancy.migrator``).
+(:class:`HubBusy`), logged with the hub's alias, so the limits can be adjusted by measuring. Every place taken tells the
+meter how many are in use (``base.meter``, never a statement of its own, and never holding the limiter's lock). The
+failure is counted only when it reaches a client (:meth:`HubBusy.reached_client`): the live executor tries a query again
+after it, and a try nobody saw must not tell an owner to upgrade (BASE-F40). A demo is not measured. Control's database
+and a hub of phase 1's shared database (``db_name=""``, ``default``) are not limited; the migrator's direct alias
+(``__ddl``) neither: its passes have their own budget (``base.tenancy.migrator``).
 """
 
 import logging
@@ -69,6 +70,18 @@ class HubBusy(OperationError):
     status = 503
     code = "base.hub_busy"
     retry_after = RETRY_AFTER_SECONDS
+
+    def __init__(self, message: str, *, hub_id: uuid.UUID | None = None) -> None:
+        super().__init__(message)
+        self.hub_id = hub_id
+        self._counted = False
+
+    def reached_client(self) -> None:
+        """Somebody got this failure (``live``: a route's envelope, a live stream's last frame; ``base.middleware``: a
+        page's 503): one more request with no room for its hub, once, however many doors it goes through."""
+        if self.hub_id is not None and not self._counted:
+            self._counted = True
+            meter.count_busy(self.hub_id)
 
 
 def _positive(value: Any) -> int | None:
@@ -156,7 +169,7 @@ class Limiter:
             return True
 
     def take(self, *, wait: float) -> Slot:
-        """A place, waiting at most ``wait`` seconds for one; :class:`HubBusy` (logged and counted) when none came."""
+        """A place, waiting at most ``wait`` seconds for one; :class:`HubBusy` (logged) when none came."""
         started = time.monotonic()
         with self._condition:
             room = self._condition.wait_for(lambda: self._in_use < self._limits.max_transactions, timeout=wait)
@@ -173,9 +186,7 @@ class Limiter:
                     time.monotonic() - started,
                 )
         if not room:
-            if self.hub_id is not None:
-                meter.count_busy(self.hub_id)
-            raise HubBusy(gettext("Too many requests. Try again in a moment."))
+            raise HubBusy(gettext("Too many requests. Try again in a moment."), hub_id=self.hub_id)
         if self.hub_id is not None:
             meter.note_peak(self.hub_id, in_use)
         return slot

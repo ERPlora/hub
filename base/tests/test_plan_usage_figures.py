@@ -1,6 +1,6 @@
-"""System › Resources reads ``base.plan.usage`` (BASE-F40; PLAN-HUB §66): every figure of the business against what its plan
-really gives, with two real hubs so one never sees the other's. What was not measured yet comes as nothing, never as a
-zero; the notices' thresholds live here, so the bell and the screen say the same.
+"""System › «Usage and plan» reads ``base.plan.usage`` (BASE-F40; PLAN-HUB, round 2026-11-01g): every figure of the business
+against what its plan really gives, with two real hubs so one never sees the other's. What was not measured yet comes as
+nothing, never as a zero. The bell's row is worked out here, with no call to erplora.com.
 """
 
 import datetime as dt
@@ -10,10 +10,11 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from django.utils.translation import override
 from live.context import OperationContext, Scope
+from live.meta import module_configs
 from live.operations import AI, get
 
 from base import meter
-from base.models import Membership
+from base.models import AppActivation, Membership
 from base.permissions import permissions_for
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
@@ -180,7 +181,6 @@ def test_the_requests_with_no_room_are_those_of_the_last_7_days(hub_a):
     connections = usage_of(hub_a)["connections"]
 
     assert (connections["busy_last_7_days"], connections["busy_since"]) == (5, None)
-    assert connections["status"] == "near"
 
 
 def test_counted_for_less_than_7_days_it_says_since_when(hub_a):
@@ -191,7 +191,6 @@ def test_counted_for_less_than_7_days_it_says_since_when(hub_a):
 
     assert connections["busy_last_7_days"] == 0
     assert connections["busy_since"] == (TODAY - dt.timedelta(days=5)).isoformat()
-    assert connections["status"] == "within"
 
 
 def test_counted_for_exactly_7_days_it_says_no_since(hub_a):
@@ -201,21 +200,12 @@ def test_counted_for_exactly_7_days_it_says_no_since(hub_a):
     assert usage_of(hub_a)["connections"]["busy_since"] is None
 
 
-def test_reaching_the_top_for_a_moment_is_within_the_limit(hub_a):
-    """A Free plan's first operation of the day is its 100 %: only running out of room says anything."""
-    on_plan(hub_a, FREE)
-    did(hub_a, TODAY, peak=1)
-
-    assert usage_of(hub_a)["connections"]["status"] == "within"
-
-
 def test_never_counted_it_has_no_figure_never_a_zero(hub_a):
     on_plan(hub_a, STARTER)
 
     connections = usage_of(hub_a)["connections"]
 
     assert (connections["peak_today"], connections["busy_last_7_days"], connections["busy_since"]) == (None, None, None)
-    assert connections["status"] == "within"
 
 
 # ── Requests ──────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -302,34 +292,16 @@ def test_active_now_looks_at_yesterday_s_visit_around_midnight(hub_a, monkeypatc
     assert usage_of(hub_a)["activity"]["active_now"] == 2
 
 
-def test_the_people_of_the_last_night_and_its_30_days(hub_a):
-    measured(hub_a, YESTERDAY, people=2, month=7)
+def test_the_people_of_the_last_30_days_come_from_the_last_night(hub_a):
+    measured(hub_a, TODAY - dt.timedelta(days=3), people=2, month=7)
 
     activity = usage_of(hub_a)["activity"]
 
-    assert (activity["last_day"], activity["last_30_days"]) == (2, 7)
-    assert (activity["last_day_date"], activity["last_day_is_yesterday"]) == (YESTERDAY.isoformat(), True)
-
-
-def test_a_last_night_older_than_yesterday_says_its_date(hub_a):
-    day = TODAY - dt.timedelta(days=3)
-    measured(hub_a, day, people=2, month=7)
-
-    activity = usage_of(hub_a)["activity"]
-
-    assert (activity["last_day_date"], activity["last_day_is_yesterday"]) == (day.isoformat(), False)
+    assert activity == {"active_now": 0, "last_30_days": 7, "day": (TODAY - dt.timedelta(days=3)).isoformat()}
 
 
 def test_before_the_first_night_the_people_measured_have_no_figure(hub_a):
-    activity = usage_of(hub_a)["activity"]
-
-    assert activity == {
-        "active_now": 0,
-        "last_day": None,
-        "last_day_date": None,
-        "last_day_is_yesterday": False,
-        "last_30_days": None,
-    }
+    assert usage_of(hub_a)["activity"] == {"active_now": 0, "last_30_days": None, "day": None}
 
 
 # ── A business never sees another's ───────────────────────────────────────────────────────────────────────────────────
@@ -352,8 +324,8 @@ def test_a_hub_never_sees_the_figures_of_another(hub_a, hub_b):
     assert (b["files"]["bytes"], b["files"]["limit"], b["database"]["bytes"]) == (900, 2000, 22)
     assert (a["requests"]["this_month"], a["connections"]["peak_today"], a["connections"]["busy_last_7_days"]) == (5, 1, 0)
     assert (b["requests"]["this_month"], b["connections"]["peak_today"], b["connections"]["busy_last_7_days"]) == (50, 4, 9)
-    assert (a["activity"]["active_now"], a["activity"]["last_day"], a["activity"]["last_30_days"]) == (1, 1, 2)
-    assert (b["activity"]["active_now"], b["activity"]["last_day"], b["activity"]["last_30_days"]) == (2, 3, 4)
+    assert (a["activity"]["active_now"], a["activity"]["last_30_days"]) == (1, 2)
+    assert (b["activity"]["active_now"], b["activity"]["last_30_days"]) == (2, 4)
 
 
 # ── What the hub does not know ────────────────────────────────────────────────────────────────────────────────────────
@@ -370,8 +342,10 @@ def test_without_the_plan_the_figures_have_no_limit_status_or_notice(hub_a):
     assert usage["files"]["percent"] is None
     assert usage["connections"]["peak_today"] == 1
     assert usage["connections"]["busy_last_7_days"] == 9
-    assert (usage["connections"]["limit"], usage["connections"]["status"]) == (None, None)
+    assert usage["connections"]["limit"] is None
     assert usage["connections"]["bigger_plan_gives_more"] is False
+    assert usage["plan_slug"] is None
+    assert usage["apps"]["limit"] is None
 
 
 def test_a_demo_says_so_and_carries_no_figure(hub_a):
@@ -390,18 +364,76 @@ def test_a_demo_says_so_and_carries_no_figure(hub_a):
         "limit": None,
         "busy_last_7_days": None,
         "busy_since": None,
-        "status": None,
         "bigger_plan_gives_more": False,
     }
-    assert usage["activity"]["active_now"] is None
-    assert usage["activity"]["last_day"] is None
+    assert usage["activity"] == {"active_now": None, "last_30_days": None, "day": None}
+    assert usage["meters"] == []
 
 
 def test_a_business_is_no_demo(hub_a):
     assert usage_of(hub_a)["demo"] is False
 
 
-# ── The bell ──────────────────────────────────────────────────────────────────────────────────────────────────────────
+# ── The plan: its name and its apps ───────────────────────────────────────────────────────────────────────────────────
+
+
+def test_the_answer_names_the_plan_by_its_slug(hub_a):
+    on_plan(hub_a, STARTER)
+
+    assert usage_of(hub_a)["plan_slug"] == "starter"
+
+
+def chose_only(hub, *chosen) -> None:
+    """The business's own choice of apps: those on, chosen by it; every other one off."""
+    with use_hub(hub):
+        for config in module_configs():
+            on = config.label in chosen
+            AppActivation.objects.update_or_create(
+                host=hub.slug,
+                app=config.label,
+                defaults={"state": AppActivation.State.ON if on else AppActivation.State.OFF, "chosen": on},
+            )
+
+
+def test_the_apps_chosen_against_what_the_plan_allows(hub_a):
+    on_plan(hub_a, STARTER, max_apps=10)
+    chose_only(hub_a, "customer", "sale")
+
+    assert usage_of(hub_a)["apps"] == {"used": 2, "limit": 10}
+
+
+def test_a_plan_with_no_limit_of_apps_says_none(hub_a):
+    on_plan(hub_a, STARTER, max_apps=0)
+
+    assert usage_of(hub_a)["apps"]["limit"] is None
+
+
+# ── What an app says its plan includes (the hook: base reads no other app's tables) ───────────────────────────────────
+
+
+def whatsapp_meter(used=None, limit=None, *, available=True):
+    return {"key": "whatsapp_inbox", "label": "WhatsApp", "used": used, "limit": limit, "available": available}
+
+
+@pytest.fixture
+def an_app_meter(monkeypatch):
+    """What the apps on declare: ``an_app_meter(used, limit)``."""
+
+    def declare(used=None, limit=None, *, available=True):
+        monkeypatch.setattr(
+            "base.queries.home.plan_meters", lambda ctx, configs: [whatsapp_meter(used, limit, available=available)]
+        )
+
+    return declare
+
+
+def test_the_meters_of_the_apps_on_go_in_the_answer(hub_a, an_app_meter):
+    an_app_meter(40, 150)
+
+    assert usage_of(hub_a)["meters"] == [whatsapp_meter(40, 150)]
+
+
+# ── The bell, with no call to erplora.com ─────────────────────────────────────────────────────────────────────────────
 
 
 def bell_of(hub, role="hub_owner", language="en"):
@@ -412,7 +444,7 @@ def bell_of(hub, role="hub_owner", language="en"):
     return [row for row in answer.model_dump(mode="json")["counters"] if row["key"] == "base.plan_limits"]
 
 
-def test_without_a_notice_the_bell_has_no_row(hub_a):
+def test_with_nothing_amber_or_red_the_bell_has_no_row(hub_a):
     on_plan(hub_a, STARTER, max_storage_bytes=100)
     measured(hub_a, s3=79)
     did(hub_a, TODAY, peak=3, busy=0)
@@ -420,7 +452,7 @@ def test_without_a_notice_the_bell_has_no_row(hub_a):
     assert bell_of(hub_a) == []
 
 
-def test_each_notice_adds_one_and_the_row_opens_resources(hub_a):
+def test_each_motive_adds_one_and_the_row_opens_the_tab(hub_a):
     on_plan(hub_a, STARTER, max_storage_bytes=100)
     measured(hub_a, s3=80)
 
@@ -429,7 +461,7 @@ def test_each_notice_adds_one_and_the_row_opens_resources(hub_a):
             "key": "base.plan_limits",
             "app": "base",
             "count": 1,
-            "route": "/system#resources",
+            "route": "/system#usage",
             "label": "Plan limits",
             "icon": "ion:speedometer-outline",
         }
@@ -439,16 +471,64 @@ def test_each_notice_adds_one_and_the_row_opens_resources(hub_a):
     assert bell_of(hub_a)[0]["count"] == 2
 
 
-def test_full_files_alone_are_one_notice(hub_a):
+def test_full_files_alone_are_one_motive(hub_a):
     on_plan(hub_a, STARTER, max_storage_bytes=100)
     measured(hub_a, s3=100)
 
     assert bell_of(hub_a)[0]["count"] == 1
 
 
-def test_the_connections_alone_are_one_notice_also_on_a_plan_that_cannot_grow(hub_a):
-    on_plan(hub_a, PRO)
+def test_capacity_that_fell_short_is_a_motive_when_a_bigger_plan_would_help(hub_a):
+    on_plan(hub_a, STARTER)
     did(hub_a, TODAY, busy=3)
+
+    assert bell_of(hub_a)[0]["count"] == 1
+
+
+@pytest.mark.parametrize("plan", [STANDARD, PRO], ids=["standard", "pro"])
+def test_capacity_is_no_motive_on_a_plan_with_all_the_service_gives(hub_a, plan):
+    on_plan(hub_a, plan)
+    did(hub_a, TODAY, busy=3)
+
+    assert bell_of(hub_a) == []
+
+
+def test_reaching_the_top_for_a_moment_is_no_motive(hub_a):
+    """A Free plan's first operation of the day is its 100 %: only running out of room says anything."""
+    on_plan(hub_a, FREE)
+    did(hub_a, TODAY, peak=1)
+
+    assert bell_of(hub_a) == []
+
+
+@pytest.mark.parametrize(
+    ("used", "limit", "rows"),
+    [(119, 150, 0), (120, 150, 1), (150, 150, 1), (0, 0, 0), (None, None, 0)],
+    ids=["below 80 %", "from 80 %", "spent", "the plan includes none", "not measured"],
+)
+def test_an_app_s_meter_is_a_motive_from_80_percent(hub_a, an_app_meter, used, limit, rows):
+    on_plan(hub_a, STARTER)
+    an_app_meter(used, limit)
+
+    assert len(bell_of(hub_a)) == rows
+
+
+def test_people_devices_and_apps_at_their_limit_are_no_motive(hub_a):
+    """A Free business with its one device in use is fine: an alarm for that would never go away."""
+    on_plan(hub_a, {**FREE, "max_apps": 2})
+    chose_only(hub_a, "customer", "sale")
+
+    assert usage_of(hub_a)["apps"] == {"used": 2, "limit": 2}
+    assert bell_of(hub_a) == []
+
+
+def test_the_bell_never_calls_erplora_com(hub_a, monkeypatch):
+    def refuses(*args, **kwargs):
+        raise AssertionError("the bell asked erplora.com")
+
+    monkeypatch.setattr("base.assistant.usage", refuses)
+    on_plan(hub_a, STARTER, max_storage_bytes=100)
+    measured(hub_a, s3=100)
 
     assert bell_of(hub_a)[0]["count"] == 1
 
@@ -478,7 +558,7 @@ def test_without_the_plan_or_in_a_demo_there_is_no_row(hub_a):
     assert bell_of(hub_a) == []
 
 
-def test_the_bell_of_a_hub_hears_only_its_own_notices(hub_a, hub_b):
+def test_the_bell_of_a_hub_hears_only_its_own_motives(hub_a, hub_b):
     on_plan(hub_a, STARTER, max_storage_bytes=100)
     on_plan(hub_b, STARTER, max_storage_bytes=100)
     measured(hub_b, s3=100)

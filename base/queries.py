@@ -8,6 +8,7 @@ import csv
 import dataclasses
 import datetime as dt
 import io
+from collections.abc import Iterable
 from typing import Any
 from uuid import UUID
 
@@ -328,7 +329,7 @@ def widget_list(ctx: OperationContext, data: WidgetListIn) -> dict:
 )
 def bell_counters(ctx: OperationContext, data: BellCountersIn) -> dict:
     """The bell: the counters above zero of the apps on, and for who runs the hub the events the relay gave up on and
-    the notices of «Resources» (BASE-F40)."""
+    the reasons to upgrade its plan (BASE-F40)."""
     with translation.override(ctx.language):
         hub = Hub.objects.filter(slug=ctx.scope.key).first()
         modules = home.home_modules(active_apps(ctx.scope), demo_hub=bool(hub and hub.is_demo))
@@ -339,15 +340,15 @@ def bell_counters(ctx: OperationContext, data: BellCountersIn) -> dict:
                 event__scope_kind=ctx.scope.kind,
                 event__scope_key=ctx.scope.key,
             ).count()
-            notices = _plan_notices(hub)
-            if notices:
+            motives = _plan_motives(ctx, hub, modules)
+            if motives:
                 counters.insert(
                     0,
                     {
                         "key": "base.plan_limits",
                         "app": "base",
-                        "count": notices,
-                        "route": "/system#resources",
+                        "count": motives,
+                        "route": "/system#usage",
                         "label": gettext("Plan limits"),
                         "icon": "ion:speedometer-outline",
                     },
@@ -504,9 +505,9 @@ def _first_screen(ctx: OperationContext, config: Any) -> str | None:
     return config.navigation[0].path
 
 
-#: From here on the space for files is «Close to the limit»: the same number as erplora.com's panel
+#: From here on what a plan includes is close to its limit: for the files, the same number as erplora.com's panel
 #: (``STORAGE_WARNING_PERCENT``), so both say the same of the same figure.
-FILES_NEAR_PERCENT = 80
+NEAR_PERCENT = 80
 #: Who counts as active now, among all the tasks; a window of activity, not presence (PLAN-HUB §66).
 ACTIVE_NOW = dt.timedelta(minutes=5)
 #: The days the requests with no room are told for: today and the 6 before it.
@@ -521,11 +522,12 @@ BUSY_WINDOW_DAYS = 7
     output=PlanUsageOut,
     ai=AI(
         description=(
-            "Reads how much this business is using: the space its files take up against what its plan includes, what "
-            "it does at once in its database against what it really has and the requests that found no room in the "
-            "last 7 days, the requests served this month, the people active now, on the last day measured and in 30 "
-            "days, the size of its database, and the people and devices of the plan. A figure that is null has not "
-            "been measured yet: say so, never read it as a zero. Files and the database are measured every night."
+            "Reads what this business uses of its plan and whether it should upgrade: the plan it is on, the space its "
+            "files take up, its apps, people and devices, and the messages of its apps this month, each against what the "
+            "plan includes; its capacity (what it does at once against what it really has, and the times it fell short "
+            "in the last 7 days); the requests served this month, the people active now and in 30 days, and the size of "
+            "its database. A figure that is null has not been measured yet: say so, never read it as a zero. The "
+            "assistant's own messages are not here. Files and the database are measured every night."
         ),
         asks={
             "en": (
@@ -544,13 +546,14 @@ BUSY_WINDOW_DAYS = 7
     ),
 )
 def plan_usage(ctx: OperationContext, data: PlanUsageIn) -> dict:
-    """What «Plan and limits» (BASE-G81) and «Resources» (BASE-F40) of System say: the limits of the plan the SaaS's last
-    photo carries (``plan``: ``max_users``, ``max_devices``; 0 = no limit) against the people of the business (its active
-    members, the ones the SaaS counts) and the devices in use (those with a session open on this hub: the ones the cap of
-    BASE-G57 keeps, APP-BASE-3); what the last night measured (``database``, ``files``, the people of ``activity``); and
+    """What «Usage and plan» of System says (BASE-F40): the limits of the plan the SaaS's last photo carries (``plan``:
+    ``max_users``, ``max_devices``, ``max_apps``; 0 = no limit) against the people of the business (its active members, the
+    ones the SaaS counts), the devices in use (those with a session open on this hub: the ones the cap of BASE-G57 keeps,
+    APP-BASE-3) and the apps it chose; what the last night measured (``database``, ``files``, the 30 days of ``activity``);
     what is counted during the day (``base.meter``: ``connections``, ``requests``, who is active now), as control has it
-    plus what this process has not written yet. Memory and CPU cannot be attributed to a business. For who runs the
-    business."""
+    plus what this process has not written yet; and what its apps say their plan includes (``meters``). The assistant's
+    messages wait on erplora.com, so the screen asks ``base.assistant.usage`` apart. Memory and CPU cannot be attributed
+    to a business. For who runs the business."""
     hub = Hub.objects.filter(slug=ctx.scope.key).first()
     state, plan, known = _plan_of(hub)
     people = Membership.objects.filter(host=ctx.scope.key, user__is_active=True).count()
@@ -564,16 +567,23 @@ def plan_usage(ctx: OperationContext, data: PlanUsageIn) -> dict:
     demo = hub is not None and hub.is_demo
     last = None if demo else _last_night(hub)
     counted = _counted_during_the_day(hub) if hub is not None and not demo else _NOTHING_COUNTED
+    shown = {config.label for config in home.shown_modules(demo_hub=demo)}
     return {
         "known": known,
         "demo": demo,
+        "plan_slug": plan.get("slug") if known else None,
         "people": {"used": people, "limit": _limit(plan, "max_users") if known else None},
         "devices": {"used": devices, "limit": _limit(plan, "max_devices") if known else None},
+        "apps": {
+            "used": activation.chosen_on(activation.states_of(ctx.scope), among=shown),
+            "limit": app_limit(hub) if known else None,
+        },
         "database": _database_usage(hub, last),
         "files": _files_usage(state, known, last),
         "connections": _connections_usage(state, known, counted),
         "requests": {"this_month": counted.requests_this_month, "since": counted.requests_since},
         "activity": _activity_usage(hub, demo, last, counted),
+        "meters": [] if demo else home.plan_meters(ctx, home.home_modules(active_apps(ctx.scope), demo_hub=False)),
     }
 
 
@@ -599,6 +609,10 @@ def _database_usage(hub: Hub | None, last: HubUsageDaily | None) -> dict:
     return {"available": True, "bytes": last.db_bytes if last else None, "day": last.day if last else None}
 
 
+def _is_near(used: int, limit: int) -> bool:
+    return used * 100 >= limit * NEAR_PERCENT
+
+
 def _files_usage(state: dict, known: bool, last: HubUsageDaily | None) -> dict:
     """What the files take up (``s3_bytes``) against the plan's space (BASE-F40, step 3); nothing to compare, no status."""
     limit = files.space_limit(state) if known else None
@@ -606,7 +620,7 @@ def _files_usage(state: dict, known: bool, last: HubUsageDaily | None) -> dict:
     percent = status = None
     if limit is not None and used is not None:
         percent = used * 100 // limit
-        status = "full" if used >= limit else "near" if used * 100 >= limit * FILES_NEAR_PERCENT else "within"
+        status = "full" if used >= limit else "near" if _is_near(used, limit) else "within"
     return {"bytes": used, "day": last.day if last else None, "limit": limit, "percent": percent, "status": status}
 
 
@@ -651,22 +665,21 @@ def _counted_during_the_day(hub: Hub) -> _Counted:
 
 
 def _connections_usage(state: dict, known: bool, counted: _Counted) -> dict:
-    """Today's highest against what it really has (BASE-F40, step 2). Close to the limit only with a request that found no
-    room: with limits of 1, 3 or 6 a percentage says nothing, a Free plan's first operation of the day is its 100 %."""
+    """Today's highest against what it really has (BASE-F40), and the times it fell short: with limits of 1, 3 or 6 a
+    percentage says nothing, a Free plan's first operation of the day is its 100 %."""
     limits = tenancy_limits.plan_limits(state) if known else None
     return {
         "peak_today": counted.peak_today,
         "limit": limits.max_transactions if limits else None,
         "busy_last_7_days": counted.busy_last_7_days,
         "busy_since": counted.busy_since,
-        "status": ("near" if counted.busy_last_7_days else "within") if limits else None,
         "bigger_plan_gives_more": tenancy_limits.bigger_plan_gives_more(state) if known else False,
     }
 
 
 def _activity_usage(hub: Hub | None, demo: bool, last: HubUsageDaily | None, counted: _Counted) -> dict:
     """Who is active now, in the last visits of every task (yesterday's too: a day may have just changed) and in this
-    process's memory, and the people of the last night measured."""
+    process's memory, and the people of the 30 days the last night measured."""
     now = timezone.now().astimezone(dt.UTC)
     today = now.date()
     active_now = None
@@ -679,22 +692,28 @@ def _activity_usage(hub: Hub | None, demo: bool, last: HubUsageDaily | None, cou
         active_now = len(set(recent) | counted.people_now)
     return {
         "active_now": active_now,
-        "last_day": last.active_users_1d if last else None,
-        "last_day_date": last.day if last else None,
-        "last_day_is_yesterday": last is not None and last.day == today - dt.timedelta(days=1),
         "last_30_days": last.active_users_30d if last else None,
+        "day": last.day if last else None,
     }
 
 
-def _plan_notices(hub: Hub | None) -> int:
-    """How many notices «Resources» shows (BASE-F40, steps 5, 6 and 8): the one of the files and the one of the
-    connections, read as the screen reads them; none without the plan or in a demo."""
+def _plan_motives(ctx: OperationContext, hub: Hub | None, modules: Iterable[Any]) -> int:
+    """How many reasons to upgrade the bell can tell (BASE-F40) without asking erplora.com, so never the assistant's: the
+    files close to the plan's space or full, a capacity that fell short when a bigger plan would give more, and the
+    meters of the apps close to what the plan includes. People, devices and apps at their limit are none: a Free business
+    with its one device in use is fine. None without the plan or in a demo."""
     state, _, known = _plan_of(hub)
     if not known or hub is None or hub.is_demo:
         return 0
     files_status = _files_usage(state, known, _last_night(hub))["status"]
-    connections_status = _connections_usage(state, known, _counted_during_the_day(hub))["status"]
-    return int(files_status in ("near", "full")) + int(connections_status == "near")
+    connections = _connections_usage(state, known, _counted_during_the_day(hub))
+    fell_short = bool(connections["busy_last_7_days"]) and connections["bigger_plan_gives_more"]
+    meters = sum(
+        1
+        for meter in home.plan_meters(ctx, modules)
+        if meter["limit"] and meter["used"] is not None and _is_near(meter["used"], meter["limit"])
+    )
+    return int(files_status in ("near", "full")) + int(fell_short) + meters
 
 
 # Not an assistant tool: the platform's door (/internal, the SaaS), no person.

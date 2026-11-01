@@ -4,17 +4,23 @@ demos are not measured; a visitor of the public web and an API key are no people
 the request, sync or async.
 """
 
+import uuid
+from contextlib import contextmanager
+from types import SimpleNamespace
+
 import pytest
 from django.contrib.auth import get_user_model
 from django.db import connections
 from django.test.client import FakePayload
 from django.test.utils import CaptureQueriesContext
+from live.context import OperationContext, Scope
+from live.executor import PASSING_ERROR_RETRIES, Executor, Stream, Subscription
 
 from base import meter
 from base.models import Membership
 from base.operations import HubContextBuilder
 from base.tenancy import connections as tenancy_connections
-from base.tenancy import limits
+from base.tenancy import identity, limits
 from base.tenancy.tests import hubs
 from base.tests.test_api_keys import CARTS, bearer, create, get, host
 from base.tests.test_internal import signed
@@ -132,29 +138,73 @@ async def test_a_request_daphne_serves_counts_too(async_client, hub_a):
     assert meter.unflushed(hub_a.pk, hub_a.slug).peak >= 1
 
 
-# ── Room ──────────────────────────────────────────────────────────────────────────────────────────────────────────────
+# ── Room: counted where a 503 reaches somebody, never on a try nobody saw ──────────────────────────────────────────────
+
+
+@pytest.fixture
+def held_full(monkeypatch):
+    """Every place of the hub taken in this process, and a short wait for one: ``with held_full(hub): …``."""
+    monkeypatch.setattr(limits, "SLOT_WAIT_SECONDS", 0.05)
+
+    @contextmanager
+    def hold(hub):
+        limiter = limits.limiter_for(tenancy_connections.hub_alias(hub))
+        taken = [limiter.take(wait=0) for _ in range(limiter.limits.max_transactions)]
+        try:
+            yield
+        finally:
+            for slot in taken:
+                slot.release()
+
+    return hold
 
 
 @HUB_DB_COMMITTED
-def test_a_request_with_no_room_is_counted_as_that(client, hub_a, hub_b, monkeypatch):
-    """Answered 503 ``base.hub_busy``, as anyone sees it, whichever transaction hit it, and only for its own hub."""
-    monkeypatch.setattr(limits, "SLOT_WAIT_SECONDS", 0.05)
+def test_a_request_with_no_room_counts_once_and_only_for_its_hub(client, hub_a, hub_b, held_full):
     client.force_login(member(hub_a.slug))
     assert client.get(ITEMS, HTTP_HOST=host(hub_a)).status_code == 200
     assert on(hub_a).busy == 0
 
-    limiter = limits.limiter_for(tenancy_connections.hub_alias(hub_a))
-    taken = [limiter.take(wait=0) for _ in range(limiter.limits.max_transactions)]
-    try:
+    with held_full(hub_a):
         busy = client.get(ITEMS, HTTP_HOST=host(hub_a))
-    finally:
-        for slot in taken:
-            slot.release()
 
     assert (busy.status_code, busy.json()["error"]["code"]) == (503, "base.hub_busy")
-    assert on(hub_a).busy >= 1
+    assert on(hub_a).busy == 1
     assert on(hub_b).busy == 0
     assert client.get(ITEMS, HTTP_HOST=host(hub_a)).status_code == 200
+    assert on(hub_a).busy == 1
+
+
+@HUB_DB_COMMITTED
+async def test_a_request_daphne_serves_with_no_room_counts_once(async_client, hub_a, held_full):
+    from asgiref.sync import sync_to_async
+
+    await async_client.aforce_login(await sync_to_async(member)(hub_a.slug))
+    await async_client.request(
+        method="GET", path=ITEMS, query_string="", headers=[(b"host", host(hub_a).encode())], _body_file=FakePayload(b"")
+    )
+
+    with held_full(hub_a):
+        busy = await async_client.request(
+            method="GET", path=ITEMS, query_string="", headers=[(b"host", host(hub_a).encode())], _body_file=FakePayload(b"")
+        )
+    await sync_to_async(connections.close_all)()
+
+    assert busy.status_code == 503
+    assert on(hub_a).busy == 1
+
+
+@HUB_DB_COMMITTED
+def test_a_page_with_no_room_counts_once(client, hub_a, held_full, monkeypatch):
+    """The answer ``HubDatabaseMiddleware`` gives itself: here, while checking its database is its own."""
+    client.force_login(member(hub_a.slug))
+    monkeypatch.setattr(identity, "_verified", set())
+
+    with held_full(hub_a):
+        busy = client.get("/", HTTP_HOST=host(hub_a), HTTP_ACCEPT="text/html")
+
+    assert busy.status_code == 503
+    assert on(hub_a).busy == 1
 
 
 @HUB_DB_COMMITTED
@@ -164,6 +214,71 @@ def test_the_peak_comes_from_the_real_transactions(client, hub_a):
     assert client.get(ITEMS, HTTP_HOST=host(hub_a)).status_code == 200
 
     assert on(hub_a).peak == 1
+
+
+BUSY_HUB = uuid.UUID("0199c4b0-0000-7000-8000-00000000d0aa")
+
+
+class LiveQuery:
+    """A live query that finds no room in its hub the first ``full_for`` times it runs."""
+
+    name = "demo.item.list"
+    kind = "query"
+    permission = None
+
+    def __init__(self, full_for: int) -> None:
+        self.full_for = full_for
+        self.calls = 0
+
+    def __call__(self, ctx, params):
+        self.calls += 1
+        if self.calls <= self.full_for:
+            raise limits.HubBusy("Too many requests. Try again in a moment.", hub_id=BUSY_HUB)
+        return SimpleNamespace(model_dump=lambda mode: {"rows": []})
+
+
+class PlainBuilder:
+    """A context builder that enters nothing: the executor's tries are what is under test."""
+
+    def refresh(self, ctx):
+        return ctx
+
+
+@pytest.fixture
+def executor(settings, monkeypatch):
+    """The real executor, with its passing errors waiting only a moment."""
+    settings.LIVE = {**settings.LIVE, "context_builder": "base.tests.test_meter_requests.PlainBuilder"}
+    monkeypatch.setattr(limits.HubBusy, "retry_after", 0.01)
+    runner = Executor(debounce=0.01)
+    yield runner
+    runner.reset()
+    runner.shutdown()
+
+
+def stream_of(query: LiveQuery) -> Stream:
+    ctx = OperationContext(scope=Scope("host", "tenant-a"), actor="ana", permissions=frozenset({"*"}), language="en")
+    stream = Stream(ctx)
+    stream.subs["s1"] = Subscription(id="s1", op=query, params=None)
+    return stream
+
+
+async def test_an_internal_retry_of_the_live_executor_counts_nothing(executor):
+    """It finds no room twice and answers on the third: nobody saw an error, nobody is told to upgrade."""
+    query = LiveQuery(full_for=2)
+
+    await executor.run_all(stream_of(query))
+
+    assert query.calls == 3
+    assert meter.unflushed(BUSY_HUB, "tenant-a").busy == 0
+
+
+async def test_a_live_query_that_runs_out_of_tries_counts_once_when_its_frame_goes(executor):
+    query = LiveQuery(full_for=100)
+
+    await executor.run_all(stream_of(query))
+
+    assert query.calls == 1 + PASSING_ERROR_RETRIES
+    assert meter.unflushed(BUSY_HUB, "tenant-a").busy == 1
 
 
 # ── People ────────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -263,7 +378,7 @@ def test_the_process_daphne_runs_starts_the_meter(monkeypatch):
 
 
 def test_no_other_process_starts_it():
-    """A pass of the worker that finds its hub busy is nobody's error on a screen: it must not tell an owner to upgrade."""
+    """What the worker does is nobody's request, nor anybody's activity."""
     import re
     from pathlib import Path
 

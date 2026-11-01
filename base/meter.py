@@ -8,7 +8,8 @@ Four figures, each in the UTC day of its moment:
 - :func:`note_peak`: the most transactions it had at once in one process, which is how the plan's limit is applied
   (``base.tenancy.limits``). Reading ``pg_stat_activity`` from time to time would see almost nothing, because a
   transaction lasts milliseconds: the false zero the screen must not paint;
-- :func:`count_busy`: the requests that found no room (503 ``base.hub_busy``, ``base.tenancy.limits``);
+- :func:`count_busy`: the requests that found no room, when that reached a client (``HubBusy.reached_client``): a 503
+  ``base.hub_busy`` or a live stream's last frame, never a try the live executor makes again;
 - :func:`note_seen`: who has activity there (``base.operations.HubContextBuilder``: people, never a visitor of the public
   web nor an API key).
 
@@ -18,8 +19,8 @@ control database never reaches one. A thread (:func:`start`, once per process) w
 stays for the next pass, and a hub that went away meanwhile is forgotten without stopping the others.
 
 Only a process that serves requests counts (``config/asgi.py`` starts it, unless ``METER_ENABLED`` is off, as in the
-tests). The worker never does, on purpose: a pass of its own that finds its hub busy is nobody's error on a screen, and
-it must not tell the owner to upgrade. Not Valkey: it may lose what it holds, and in this project it is only a cache.
+tests). The worker never does, on purpose: what it does is nobody's request, nor anybody's activity. Not Valkey: it may
+lose what it holds, and in this project it is only a cache.
 """
 
 import atexit
@@ -96,7 +97,7 @@ def note_peak(hub_id: uuid.UUID, in_use: int) -> None:
 
 
 def count_busy(hub_id: uuid.UUID) -> None:
-    """A transaction of the hub found no room."""
+    """Somebody got a 503 ``base.hub_busy`` of the hub."""
     if not _recording:
         return
     with _lock:
