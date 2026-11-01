@@ -4407,9 +4407,10 @@ def app_retry(ctx: OperationContext, data: AppChangeIn) -> dict:
 
 def activation_hubs(now: dt.datetime) -> list[Hub]:
     """The hubs whose apps the worker sets up now (S3): ready, with their own database, whose ``hub_due`` came and
-    nobody holds. Never one being made, dropped or gone, nor a demo whose time is up. By id."""
+    nobody holds. Never one being made, dropped or gone, a demo whose time is up, nor one moving to another cluster
+    (``moving_to``: tables made while its database is copied would stay behind; its ring waits for the move). By id."""
     return list(
-        Hub.objects.filter(status=Hub.Status.READY)
+        Hub.objects.filter(status=Hub.Status.READY, moving_to__isnull=True)
         .exclude(db_name="")
         .exclude(is_demo=True, expires_at__lte=now)
         .filter(due__due_at__lte=now)
