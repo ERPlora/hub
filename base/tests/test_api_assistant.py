@@ -13,7 +13,9 @@ from base.tests.fake_gateway import gateway, signed  # noqa: F401 - the fixture
 pytestmark = pytest.mark.django_db
 
 HOST = {"HTTP_HOST": "a.localhost:8000"}
-ASK = {"role": "user", "content": "¿cuántos elementos tengo?"}
+#: A question that names the app it asks about: «elementos» is no tool's word (the demo items say no asks), and since
+#: live#22 a «¿cuántos…?» of nothing a tool knows brings no list at all.
+ASK = {"role": "user", "content": "¿cuántos elementos tengo en Demo?"}
 
 
 async def _read(stream) -> bytes:

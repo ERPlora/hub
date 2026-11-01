@@ -32,6 +32,7 @@ import time
 from contextvars import ContextVar
 from collections.abc import AsyncIterator, Collection, Iterable
 from dataclasses import dataclass
+from types import MappingProxyType
 from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -103,6 +104,19 @@ NOT_FROM_CHAT = frozenset({"base.hub.reset", "base.blueprint.export"})
 #: How a person names each app in a turn: its id, its name and its menu (``live.assistant.app_words``). The QA of the
 #: assistant ranks with it too (``base/tests/test_assistant_asks.py``).
 APP_WORDS = shared.app_words
+#: What a word means in the Hub and nowhere else (``live.assistant`` keeps what it means in any business): a «cuenta», a
+#: check or a tab is a table's open check, ``sale.order``, never the person's account (what it is in erplora.com's
+#: panel); a ticket or a receipt is a sale's, as the till's screens say («Tickets hoy», «Ticket medio», the «Tique» it
+#: prints), never the kitchen's, which is named by its app («la cocina»).
+SYNONYMS = (
+    ("cuenta", "check", "tab", "order"),
+    ("ticket", "tique", "recibo", "receipt", "sale"),
+)
+#: The help a how-to question asks for (``live.assistant.HOWTO_POINTS``): it ranks by being one, not only by ``ALWAYS``.
+HOWTO = (DOCS_SEARCH,)
+#: How a turn ranks the tools it offers (``relevant``), and the assistant's QA with it, word for word
+#: (``base/tests/test_assistant_asks.py``): one place, so the QA never ranks otherwise than the turn.
+RANKING = MappingProxyType({"always": ALWAYS, "app_words": APP_WORDS, "synonyms": SYNONYMS, "howto": HOWTO})
 
 TURN_PATH = "/internal/assistant/chat/stream"
 USAGE_PATH = "/internal/assistant/usage"
@@ -144,9 +158,9 @@ def catalog(ctx: OperationContext, *, active_labels: Collection[str] | None = No
 
 
 def relevant(tools: dict[str, Operation], texts: Iterable[str], language: str) -> list[Operation]:
-    """The tools of what ``texts`` ask, best first, at most ``MAX_TOOLS`` (``live.assistant.relevant``): ``ALWAYS``
-    first, each app named by ``APP_WORDS``."""
-    return shared.relevant(tools, texts, language, always=ALWAYS, app_words=APP_WORDS)
+    """The tools of what ``texts`` ask, best first, at most ``MAX_TOOLS`` (``live.assistant.relevant``), as ``RANKING``
+    says."""
+    return shared.relevant(tools, texts, language, **RANKING)
 
 
 # ── The card of a write in the Hub's words (BASE-G115, G116) ─────────────────────────────────────────────────────
