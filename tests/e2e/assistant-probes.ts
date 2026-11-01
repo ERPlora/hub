@@ -11,7 +11,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import { ALWAYS, type Observed } from './assistant-battery.ts';
+import { ALWAYS, type Citation, guardSaasDatabase, type Observed, QA_STAFF_EMAIL } from './assistant-battery.ts';
 
 export const ROLES = ['owner', 'admin', 'manager', 'employee'] as const;
 export type Role = (typeof ROLES)[number];
@@ -34,6 +34,8 @@ export interface Probe {
   phrase: string;
   expect: Expect;
   decide?: Decision;
+  /** Only for a read: the tools the model may call before it to look something up (the business day, a record). */
+  lookups?: string[];
   notes?: string;
 }
 
@@ -94,7 +96,7 @@ export interface ProbeMeta {
 
 const DOCS_SEARCH = 'base.docs.search';
 const ID = /^[a-z0-9][a-z0-9._-]*$/;
-const FIELDS = new Set(['id', 'app', 'tool', 'role', 'language', 'phrase', 'expect', 'decide', 'notes']);
+const FIELDS = new Set(['id', 'app', 'tool', 'role', 'language', 'phrase', 'expect', 'decide', 'lookups', 'notes']);
 /** How much of an answer the report shows. */
 const ANSWER_CHARS = 300;
 
@@ -147,6 +149,14 @@ function probeOf(entry: unknown, where: string): Probe {
     if (probe.expect !== 'card') fail('decide is only for a «card» probe');
     probe.decide = oneOf('decide', DECISIONS);
   }
+  if (raw.lookups !== undefined) {
+    if (probe.expect !== 'read') fail('lookups is only for a «read» probe');
+    const lookups = raw.lookups;
+    if (!Array.isArray(lookups) || !lookups.every((name) => typeof name === 'string' && name.trim())) {
+      fail('lookups must be a list of tool names');
+    }
+    probe.lookups = lookups as string[];
+  }
   if (raw.notes !== undefined) probe.notes = text('notes', { empty: true });
   return probe;
 }
@@ -168,27 +178,35 @@ export function loadedProbes(files: { source: string; text: string }[]): Probe[]
 
 export const catalogKey = (role: Role, language: Language): string => `${role}/${language}`;
 
-/** The catalogues a run needs: each probe's role in its language, and the owner's (a refused tool is one of the
- *  owner's that the role lacks; the owner holds every tool of an app on). */
+/** The catalogues a run needs: each probe's role in its language, and the owner's in BOTH languages (a refused tool
+ *  is one of the owner's that the role lacks, the owner holds every tool of an app on, and a phrase is checked against
+ *  the asks of its tool in both languages). */
 export function catalogsNeeded(probes: Probe[]): { role: Role; language: Language }[] {
-  const keys = new Set<string>();
-  for (const probe of probes) {
-    keys.add(catalogKey(probe.role, probe.language));
-    keys.add(catalogKey('owner', probe.language));
-  }
+  const keys = new Set<string>(LANGUAGES.map((language) => catalogKey('owner', language)));
+  for (const probe of probes) keys.add(catalogKey(probe.role, probe.language));
   return [...keys].sort().map((key) => {
     const [role, language] = key.split('/') as [Role, Language];
     return { role, language };
   });
 }
 
-const normalized = (text: string): string => text.toLowerCase().replace(/\s+/g, ' ').trim();
+/** `text` as a comparison reads it: lower case, without accents, punctuation or extra spaces («¿Cuánto vendí hoy?» is
+ *  «cuanto vendi hoy»). */
+const normalized = (text: string): string =>
+  text
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim();
 
 /** Why `probe` cannot be asked as written (empty: it can), checked against the exported `catalogs`. */
 export function problemsOf(probe: Probe, catalogs: Record<string, Catalog>): string[] {
   if (!probe.phrase.trim()) return ['the phrase is empty: write how a person of the role would ask'];
+  for (const language of LANGUAGES) {
+    if (!catalogs[catalogKey('owner', language)]) return [`no catalogue of the owner in ${language}`];
+  }
   const owner = catalogs[catalogKey('owner', probe.language)];
-  if (!owner) return [`no catalogue of the owner in ${probe.language}`];
   const mine = catalogs[catalogKey(probe.role, probe.language)];
   if (!mine) return [`no catalogue of the ${probe.role} in ${probe.language}`];
   const tool = owner.find((row) => row.name === probe.tool);
@@ -196,7 +214,7 @@ export function problemsOf(probe: Probe, catalogs: Record<string, Catalog>): str
   const problems: string[] = [];
   if (tool.app_label !== probe.app) problems.push(`${probe.tool} is a tool of ${tool.app_label}, not of ${probe.app}`);
   const languages = [probe.language, ...LANGUAGES.filter((language) => language !== probe.language)];
-  const asks = languages.flatMap((language) => catalogs[catalogKey('owner', language)]?.find((row) => row.name === probe.tool)?.asks ?? []);
+  const asks = languages.flatMap((language) => catalogs[catalogKey('owner', language)].find((row) => row.name === probe.tool)?.asks ?? []);
   const copied = asks.find((ask) => normalized(ask) === normalized(probe.phrase));
   if (copied !== undefined) problems.push(`the phrase is one of the asks of ${probe.tool} («${copied}»): write a new one`);
   const holds = mine.some((row) => row.name === probe.tool);
@@ -218,30 +236,49 @@ export function problemsOf(probe: Probe, catalogs: Record<string, Catalog>): str
       if (holds) problems.push(`the ${probe.role} holds ${probe.tool}: it is not refused`);
       break;
   }
+  for (const name of probe.lookups ?? []) {
+    const lookup = owner.find((row) => row.name === name);
+    if (name === probe.tool) problems.push(`the lookup ${name} is the tool itself`);
+    else if (!lookup) problems.push(`the lookup ${name} is not a tool of the owner`);
+    else if (lookup.kind !== 'read') problems.push(`the lookup ${name} is a write, not a read`);
+    else if (!mine.some((row) => row.name === name)) problems.push(`the ${probe.role} does not hold the lookup ${name}`);
+  }
   return problems;
 }
 
-/** How an answer says it cannot do what was asked (no permission, someone else's job), per language. */
-const CANNOT: Record<Language, RegExp[]> = {
-  es: [
-    /\bno (puedo|puedes|podemos|se puede|me es posible|es posible|tengo (permiso|acceso)|tienes (el |los )?(permiso|acceso|derecho))/,
-    /\bsin (permiso|acceso)/,
-    /\bsolo (lo |la |los |las )?(puede|pueden|podr[aá])\b/,
-    /\bsolo (el|la|los|las|un|una|tu|su) (due[ñn]|propietari|administrador|encargad|responsable|gerente)/,
-    /\bno (est[aá]s|est[aá]) (autorizad|permitid)/,
-    /\b(tu|su) (rol|perfil|usuario|cuenta) no (te |le )?(permite|deja|tiene)/,
-  ],
-  en: [
-    /\b(can't|can’t|cannot|can not|unable to|not able to|not allowed|not permitted|no permission|no access)\b/,
-    /\b(don't|don’t|do not|doesn't|doesn’t|does not) (have|allow|let)\b/,
-    /\bonly (the |an |a |your )?(owner|admin|administrator|manager)s?\b/,
-  ],
+/**
+ * How an answer refuses what the person's role may not do: a negation («no», «solo», «not», «only», «can't»…) AND the
+ * permission or a role named («permiso», «rol», «propietario», «encargado», «administrador»; «permission», «role»,
+ * «owner», «manager», «admin»), in the normalized text (no accents nor punctuation). A bare «no puedo» or «I don't have
+ * any sales yet» is not a refusal of the role: such an answer fails, with its text for a person to judge.
+ */
+const REFUSAL: Record<Language, { negation: RegExp; role: RegExp }> = {
+  es: {
+    negation: /\b(no|solo|sin|nunca|tampoco)\b/,
+    role: /\b(permisos?|rol|roles|propietari[oa]s?|duen[oa]s?|encargad[oa]s?|administrador(a|es|as)?|gerentes?)\b/,
+  },
+  en: {
+    negation: /\b(not|no|only|cannot|can t|don t|doesn t|isn t|aren t|won t|unable|never)\b/,
+    role: /\b(permissions?|roles?|owners?|managers?|admins?|administrators?)\b/,
+  },
 };
 
-/** Whether `text` says, in `language`, that it cannot do what was asked. */
+/** Whether `text` says, in `language`, that the person's role may not do what was asked. */
 export function saysCannot(text: string, language: Language): boolean {
-  const said = text.toLowerCase();
-  return CANNOT[language].some((pattern) => pattern.test(said));
+  const said = normalized(text);
+  const { negation, role } = REFUSAL[language];
+  return negation.test(said) && role.test(said);
+}
+
+/** Whether `answer` names one of the excerpts the docs search returned: its path, its heading or a part of it. */
+function namesAnExcerpt(answer: string, citations: Citation[]): boolean {
+  const words = ` ${normalized(answer)} `;
+  const lowered = answer.toLowerCase();
+  return citations.some((citation) => {
+    if (citation.path && lowered.includes(citation.path.toLowerCase())) return true;
+    const parts = [citation.heading, ...citation.heading.split(/[›>|/·:]/)].map(normalized).filter((part) => part.length >= 3);
+    return parts.some((part) => words.includes(` ${part} `));
+  });
 }
 
 /** The tool the model went for in a turn (`ProbeVerdict.chosen`): the write of its card (a read before it only looked
@@ -269,16 +306,28 @@ export function probeVerdict(outcome: ProbeOutcome): ProbeVerdict {
     if (wrote.length) reasons.push(`a write ran: ${names(wrote)}`);
     if (seen.cards.length) reasons.push(`a card was shown: ${seen.cards.map((card) => card.operation).join(', ')}`);
   };
+  const cards = seen.cards.map((card) => card.operation);
   switch (probe.expect) {
-    case 'read':
+    case 'read': {
+      const lookups = new Set(probe.lookups ?? []);
+      const first = seen.executed.find((row) => !ALWAYS.includes(row.name) && !lookups.has(row.name));
       if (!ran.some((row) => row.name === probe.tool && row.kind === 'query')) {
         reasons.push(`${probe.tool} did not run (ran: ${names(business) || 'none'})`);
+      } else if (first && first.name !== probe.tool) {
+        reasons.push(`the first tool called was ${first.name}, not ${probe.tool}`);
       }
       noWrite();
       break;
+    }
     case 'card': {
-      if (!seen.cards.some((card) => card.operation === probe.tool)) {
-        reasons.push(`no card of ${probe.tool} (cards: ${seen.cards.map((card) => card.operation).join(', ') || 'none'})`);
+      // The write asked for is the first card; a wrong write offered first, or another one after it, is a failure.
+      if (!cards.includes(probe.tool)) {
+        reasons.push(`no card of ${probe.tool} (cards: ${cards.join(', ') || 'none'})`);
+      } else if (cards[0] !== probe.tool) {
+        reasons.push(`the first card was ${cards[0]}, not ${probe.tool}`);
+      } else {
+        const others = [...new Set(cards.filter((operation) => operation !== probe.tool))];
+        if (others.length) reasons.push(`another card was shown: ${others.join(', ')}`);
       }
       if ((probe.decide ?? 'cancel') === 'cancel') {
         if (outcome.decided !== 'cancelled') reasons.push('the card was not cancelled');
@@ -302,9 +351,14 @@ export function probeVerdict(outcome: ProbeOutcome): ProbeVerdict {
       if (!saysCannot(outcome.answer, probe.language)) reasons.push('the answer does not say it cannot');
       break;
     case 'docs':
+      if (business.length) reasons.push(`a tool of the business ran: ${names(business)}`);
+      if (cards.length) reasons.push(`a card was shown: ${cards.join(', ')}`);
       if (!ran.some((row) => row.name === DOCS_SEARCH)) reasons.push(`${DOCS_SEARCH} did not run`);
       else if (!seen.citations.length) reasons.push(`${DOCS_SEARCH} returned no excerpt`);
-      noWrite();
+      else if (!namesAnExcerpt(outcome.answer, seen.citations)) {
+        const headings = [...new Set(seen.citations.map((citation) => citation.heading || citation.path))];
+        reasons.push(`the answer names none of the excerpts it got (${headings.join('; ')})`);
+      }
       break;
   }
   return { verdict: reasons.length ? 'FAIL' : 'PASS', reasons, chosen: chosenTool(seen) };
@@ -421,6 +475,8 @@ export function skeleton(roleCatalog: Catalog, ownerCatalog: Catalog, options: S
     const mine = roleCatalog.filter((row) => row.app_label === app && offered(row));
     const lacked = ownerCatalog.filter((row) => row.app_label === app && offered(row) && !held.has(row.name));
     const taken = options.all ? mine : mixed(mine, options.sample, next);
+    // What to expect comes from the kind alone: every write a person holds shows its card before it runs (the turn's
+    // instructions, base/assistant.py: «To change something, call its tool: the person sees a card and confirms it»).
     for (const row of taken) add(row.name, app, row.kind === 'read' ? 'read' : 'card');
     const refused = options.all ? lacked : shuffled([...lacked].sort((a, b) => a.name.localeCompare(b.name)), next).slice(0, options.sample);
     for (const row of refused) add(row.name, app, 'refused');
@@ -540,9 +596,14 @@ export function membersCommand(
   env: Record<string, string | undefined>,
   saasDatabase: string,
 ): { file: string; args: string[]; env: Record<string, string> } {
+  guardSaasDatabase(saasDatabase);
   const base = Object.fromEntries(Object.entries(env).filter((entry): entry is [string, string] => entry[1] !== undefined));
   return { file: 'uv', args: ['run', 'python', 'manage.py', 'shell', '-c', MEMBERS_PY], env: { ...base, DB_NAME: saasDatabase } };
 }
+
+/** Every account a probe run makes on the stack's SaaS (the staff the providers' seed acts as, and the members): what
+ *  its cleanup removes. */
+export const QA_EMAILS = [QA_STAFF_EMAIL, MEMBERS.manager.email, MEMBERS.admin.email];
 
 /** The Hub's checkout: where `manage.py` runs. */
 export const HUB_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', '..');

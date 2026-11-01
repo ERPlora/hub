@@ -244,11 +244,13 @@ huellas de la búsqueda; sin `e2e-local`), y en el entorno de la ejecución:
   captura: el informe y su JSON pasan por `redact` antes de escribirse.
 - `E2E_SAAS_DIR`: el checkout del SaaS de la pila.
 
-Una vez por ejecución, antes del primer punto: `register_apps` del Hub en el esquema `shared` de la BD del SaaS de la
+En cada invocación, antes del primer punto: `register_apps` del Hub en el esquema `shared` de la BD del SaaS de la
 pila (la documentación de las apps), los proveedores reales por las operaciones del propio SaaS (`SEED_PY` de
 `assistant-battery.ts`: `qwen`, compatible con OpenAI, contesta con `qwen3.7-plus`; `openai`, de reserva con
-`gpt-5.4-mini` y de las huellas), `index_docs` (idempotente: solo calcula lo nuevo) y los mensajes del mes de `a` a
-cero. Cada punto pregunta en una conversación nueva, en `es` (C37 en `en`), guarda lo que pasó por
+`gpt-5.4-mini` y de las huellas) e `index_docs` (idempotente: solo calcula lo nuevo); una vez por ejecución, los mensajes
+del mes de `a` a cero. Al acabar, pase o falle, su `afterAll` saca del SaaS de la pila las claves (las de etiqueta `qa`) y
+la cuenta de personal con la que siembra (`CLEANUP_PY`): las claves nunca se quedan en la BD. Se niega a sembrar en la BD
+compartida `saas` o en una que no sea `…e2e…`. Cada punto pregunta en una conversación nueva, en `es` (C37 en `en`), guarda lo que pasó por
 `/api/assistant/turn` (herramientas, tarjeta, extractos de `base.docs.search`, errores), confirma la tarjeta de los
 «hazlo» escribiendo la palabra que pide (los demás la cancelan), comprueba el registro por la API del Hub y escribe
 `.artifacts/qa/<ejecución>/assistant-battery-B.md` (el informe, punto a punto) y `.artifacts/qa/<ejecución>/<punto>-<slug>.png`:
@@ -275,24 +277,36 @@ que se va ampliando), y cada una dice:
 
 - `id` (único entre todos los ficheros), `app`, `tool` (el nombre de la operación, `sale.sale.today`), `role`
   (`owner`, `admin`, `manager` o `employee`), `language` (`en` o `es`) y `phrase`;
-- `expect`: `read` (corre esa lectura y no sale tarjeta), `card` (sale la tarjeta de esa escritura), `refused` (el rol no
-  tiene la herramienta: no corre ninguna del negocio, no sale tarjeta y la respuesta dice que no puede) o `docs`
-  (corre `base.docs.search` y la respuesta cita la documentación);
+- `expect`:
+  - `read`: esa lectura es la primera herramienta del negocio que llama el modelo y no sale tarjeta;
+  - `card`: la primera tarjeta es la de esa escritura y no sale otra detrás (una escritura equivocada ofrecida
+    primero es un fallo del producto);
+  - `refused`: el rol no tiene la herramienta, no corre nada del negocio, no sale tarjeta y la respuesta nombra el
+    permiso o un rol («permiso», «rol», «propietario», «encargado», «administrador»; «permission», «role», «owner»,
+    «manager», «admin») junto a una negación. Un «no puedo» suelto no cuenta: sale FAIL con su texto para que lo
+    juzgue una persona;
+  - `docs`: `base.docs.search` devuelve extractos, la respuesta nombra uno (su título, una parte del título o su ruta)
+    y no corre nada del negocio;
 - `decide`, solo en `card`: `cancel` (por defecto: se cancela y no cambia nada) o `confirm` (se confirma y la escritura
   tiene que salir bien; solo con datos del negocio sembrado);
+- `lookups`, solo en `read`: las lecturas que el modelo puede hacer antes para buscar algo (`sale.business_day.get`);
 - `notes`, libre.
 
 Antes de preguntar, cada sonda se comprueba contra el catálogo exportado (`manage.py export_assistant_catalog`) de su rol
-e idioma y del dueño: la frase no está vacía ni copia una `ask` (sin mayúsculas ni espacios de más, en los dos idiomas),
-la herramienta existe y es de esa app, `read` es una lectura y `card` una escritura que el rol tiene, y `refused` es una
-herramienta del dueño que el rol no tiene. Si no encaja, la sonda sale **N/A** y no se gasta ningún turno: hay que
+e idioma y del dueño en los dos idiomas: la frase no está vacía ni copia una `ask` de la herramienta en ningún idioma
+(sin contar mayúsculas, acentos, signos ni espacios: «¿Cuánto vendí hoy?» es «cuanto vendi hoy»), la herramienta existe y
+es de esa app, `read` es una lectura y `card` una escritura que el rol tiene, `refused` es una herramienta del dueño que el
+rol no tiene y cada `lookups` es otra lectura que el rol tiene. Si no encaja, la sonda sale **N/A** y no se gasta ningún turno: hay que
 arreglar la sonda, no el producto.
 
 La spec se salta sin `QA_REAL_PROVIDER=1` (gasta tokens de verdad; nunca en la CI) y pide lo mismo que la batería de
 arriba: pila propia, el SaaS con `ASSISTANT_SERVICE_PROVIDER=openai`, `E2E_SAAS_DIR` y las dos claves en el entorno.
 Una vez por ejecución hace la siembra de la batería (proveedores reales, índice de documentación), da de alta en el
 SaaS de la pila un encargado y un administrador de `a` (`qa-manager@example.com` / `manager` y `qa-admin@example.com` /
-`admin`; el dueño y el empleado son los de `demo_seed`) y enciende todas las apps de `a`, como supone el catálogo. Cada
+`admin`; el dueño y el empleado son los de `demo_seed`) y enciende todas las apps de `a`, como supone el catálogo. Al
+acabar, pase o falle, su `afterAll` saca del SaaS de la pila las claves (`qa`) y esas cuentas (`CLEANUP_PY`), igual que
+la batería; por eso cada invocación vuelve a sembrarlas. Tampoco escribe nunca en la BD compartida `saas` ni en una que no
+sea `…e2e…`: se niega antes de sembrar. Cada
 sonda entra con su rol, en una conversación nueva y con su idioma, vacía antes los mensajes del mes de `a` y escribe
 `.artifacts/qa/<ejecución>/assistant-probes.md` (el informe: PASS, FAIL y N/A, la herramienta que eligió el modelo y
 los 300 primeros caracteres de la respuesta), su JSON y `.artifacts/qa/<ejecución>/<sonda>.png`; nada de eso se sube.

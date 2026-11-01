@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { observe, type Observed } from './assistant-battery';
+import { observe, type Observed, QA_STAFF_EMAIL } from './assistant-battery';
 import {
   type Catalog,
   catalogKey,
@@ -24,6 +24,7 @@ import {
   MEMBERS,
   MEMBERS_PY,
   membersCommand,
+  QA_EMAILS,
   parseProbeFile,
   type Probe,
   type ProbeOutcome,
@@ -65,7 +66,11 @@ const OWNER_ES: Catalog = [
 const EMPLOYEE_ES: Catalog = OWNER_ES.filter((row) =>
   ['base.docs.search', 'customer.customer.create', 'customer.customer.list', 'sale.sale.list'].includes(row.name),
 );
+const OWNER_EN: Catalog = OWNER_ES.map((row) =>
+  row.name === 'sale.sale.today' ? { ...row, asks: ['what did we take today?', 'today’s sales'] } : { ...row, asks: [] },
+);
 const CATALOGS: Record<string, Catalog> = {
+  [catalogKey('owner', 'en')]: OWNER_EN,
   [catalogKey('owner', 'es')]: OWNER_ES,
   [catalogKey('employee', 'es')]: EMPLOYEE_ES,
 };
@@ -92,7 +97,12 @@ const executed = (name: string, kind: 'query' | 'command', outcome = 'ok', call 
   outcome,
   code: '',
 });
-const DOCS = JSON.stringify({ results: [{ source: 'help', path: 'help/pin.md', heading: 'PIN', text: '…', lang: 'es' }] });
+const DOCS = JSON.stringify({
+  results: [
+    { source: 'app_doc', path: 'staff/README.md', heading: 'Equipo › Alta', text: '…', lang: 'es' },
+    { source: 'help', path: 'help/pin.md', heading: 'PIN', text: '…', lang: 'es' },
+  ],
+});
 
 function outcome(p: Probe, observed: Observed, overrides: Partial<ProbeOutcome> = {}): ProbeOutcome {
   return { probe: p, answer: 'Hoy llevas 120,00 €.', observed, decided: 'none', notices: [], screenshot: `/tmp/${p.id}.png`, problems: [], ...overrides };
@@ -121,6 +131,14 @@ describe('parseProbeFile', () => {
     expect(() => parseProbeFile(file({ ...probe(), extra: 1 }), 'a.json')).toThrow(/extra/);
   });
 
+  it('takes lookups (reads allowed before the tool) only on a read, as a list of tool names', () => {
+    const lookups = probe({ lookups: ['sale.business_day.get'] });
+    expect(parseProbeFile(file(lookups), 'a.json')).toEqual([lookups]);
+    expect(() => parseProbeFile(file({ ...probe({ expect: 'card' }), lookups: ['x'] }), 'a.json')).toThrow(/lookups.*read/);
+    expect(() => parseProbeFile(file({ ...probe(), lookups: 'sale.business_day.get' }), 'a.json')).toThrow(/lookups/);
+    expect(() => parseProbeFile(file({ ...probe(), lookups: [''] }), 'a.json')).toThrow(/lookups/);
+  });
+
   it('takes a decision only on a card, and only cancel or confirm', () => {
     expect(() => parseProbeFile(file(probe({ decide: 'confirm' })), 'a.json')).toThrow(/decide.*card/);
     expect(() => parseProbeFile(file({ ...probe({ expect: 'card' }), decide: 'yes' }), 'a.json')).toThrow(/decide/);
@@ -141,6 +159,13 @@ describe('loadedProbes', () => {
 });
 
 describe('catalogsNeeded', () => {
+  it('always asks for the owner in both languages: a phrase is checked against the asks of both', () => {
+    expect(catalogsNeeded([probe()])).toEqual([
+      { role: 'owner', language: 'en' },
+      { role: 'owner', language: 'es' },
+    ]);
+  });
+
   it('asks for each role and language once, and for the owner of every language (the refused ones are the owner’s)', () => {
     const probes = [probe(), probe({ id: 'x', role: 'employee' }), probe({ id: 'y', role: 'employee', language: 'en' })];
     expect(catalogsNeeded(probes)).toEqual([
@@ -171,10 +196,17 @@ describe('problemsOf', () => {
     ]);
   });
 
-  it('refuses a copy of an ask of the other language too, when its catalogue is there', () => {
-    const owner = (asks: string[]) => OWNER_ES.map((row) => (row.name === 'sale.sale.today' ? { ...row, asks } : row));
-    const both = { ...CATALOGS, [catalogKey('owner', 'en')]: owner(['what did we take today?', 'today’s sales']) };
-    expect(problemsOf(probe({ phrase: 'What did we take today?' }), both)).toEqual([
+  it('refuses a copy whatever its accents and punctuation', () => {
+    expect(problemsOf(probe({ phrase: 'cuanto llevo hoy' }), CATALOGS)).toEqual([
+      'the phrase is one of the asks of sale.sale.today («¿cuánto llevo hoy?»): write a new one',
+    ]);
+    expect(problemsOf(probe({ phrase: '¡¿Qué he vendido, hoy?!' }), CATALOGS)).toEqual([
+      'the phrase is one of the asks of sale.sale.today («¿qué he vendido hoy?»): write a new one',
+    ]);
+  });
+
+  it('refuses a copy of an ask of the other language too', () => {
+    expect(problemsOf(probe({ phrase: 'What did we take today?' }), CATALOGS)).toEqual([
       'the phrase is one of the asks of sale.sale.today («what did we take today?»): write a new one',
     ]);
   });
@@ -185,8 +217,17 @@ describe('problemsOf', () => {
     expect(problemsOf(docs, blind)).toEqual(['the employee does not hold base.docs.search']);
   });
 
-  it('says when a catalogue the probe needs was not exported', () => {
-    expect(problemsOf(probe({ language: 'en' }), CATALOGS)).toEqual(['no catalogue of the owner in en']);
+  it('says when a catalogue the probe needs was not exported, the owner’s of the other language too', () => {
+    expect(problemsOf(probe({ role: 'employee', language: 'en', tool: 'sale.sale.list' }), CATALOGS)).toEqual(['no catalogue of the employee in en']);
+    const spanish = Object.fromEntries(Object.entries(CATALOGS).filter(([key]) => key !== catalogKey('owner', 'en')));
+    expect(problemsOf(probe(), spanish)).toEqual(['no catalogue of the owner in en']);
+  });
+
+  it('wants each lookup to be a read the role holds, other than the tool', () => {
+    expect(problemsOf(probe({ lookups: ['sale.sale.list'] }), CATALOGS)).toEqual([]);
+    expect(problemsOf(probe({ lookups: ['sale.nothing.get'] }), CATALOGS)).toEqual(['the lookup sale.nothing.get is not a tool of the owner']);
+    expect(problemsOf(probe({ lookups: ['sale.department.create'] }), CATALOGS)).toEqual(['the lookup sale.department.create is a write, not a read']);
+    expect(problemsOf(probe({ lookups: ['sale.sale.today'] }), CATALOGS)).toEqual(['the lookup sale.sale.today is the tool itself']);
   });
 
   it('names a tool the Hub does not have, or of another app', () => {
@@ -219,7 +260,8 @@ describe('saysCannot', () => {
   it('hears a refusal in Spanish and in English', () => {
     expect(saysCannot('Lo siento, no puedo borrar clientes: no tienes permiso.', 'es')).toBe(true);
     expect(saysCannot('Eso solo lo puede hacer el dueño del negocio.', 'es')).toBe(true);
-    expect(saysCannot('No tienes acceso a las estadísticas de ventas.', 'es')).toBe(true);
+    expect(saysCannot('Apagar apps es cosa del propietario o de un administrador: con tu rol no se puede.', 'es')).toBe(true);
+    expect(saysCannot('No: eso lo hace el encargado.', 'es')).toBe(true);
     expect(saysCannot("Sorry, I can't do that: your role doesn't allow it.", 'en')).toBe(true);
     expect(saysCannot('Only the owner or an admin can turn apps off.', 'en')).toBe(true);
     expect(saysCannot('You do not have permission to delete customers.', 'en')).toBe(true);
@@ -229,6 +271,16 @@ describe('saysCannot', () => {
     expect(saysCannot('Hoy llevas 120,00 € en 5 tickets.', 'es')).toBe(false);
     expect(saysCannot('You sold 120.00 € today in 5 tickets.', 'en')).toBe(false);
     expect(saysCannot('', 'es')).toBe(false);
+  });
+
+  it('wants the permission or the role named: a bare «cannot» is not a refusal of the role', () => {
+    expect(saysCannot("I don't have any sales yet.", 'en')).toBe(false);
+    expect(saysCannot("I can't find that customer.", 'en')).toBe(false);
+    expect(saysCannot('No puedo encontrar a Marta en tus clientes.', 'es')).toBe(false);
+    expect(saysCannot('No puedo activarlo directamente desde aquí: ve a Reservas online › Ajustes.', 'es')).toBe(false);
+    expect(saysCannot('No tienes acceso a las estadísticas de ventas.', 'es')).toBe(false);
+    expect(saysCannot('You are the owner: here are your sales.', 'en')).toBe(false);
+    expect(saysCannot('Eres la propietaria: aquí tienes tus ventas.', 'es')).toBe(false);
   });
 });
 
@@ -245,6 +297,15 @@ describe('probeVerdict', () => {
     const card = { operation: 'sale.department.create', risk: 'normal', confirm_word: '' };
     const carded = observe([sse(executed('sale.sale.today', 'query'), { type: 'confirm', card, call: {} })]);
     expect(probeVerdict(outcome(probe(), carded, { decided: 'cancelled' })).reasons).toEqual(['a card was shown: sale.department.create']);
+  });
+
+  it('fails a read whose first tool of the business was another one, unless the probe lists it as a lookup', () => {
+    const stats = probe({ tool: 'sale.sale.stats' });
+    const looked = observe([sse(executed('base.setup.status', 'query'), executed('sale.business_day.get', 'query', 'ok', 'c2'), executed('sale.sale.stats', 'query', 'ok', 'c3'))]);
+    expect(probeVerdict(outcome(stats, looked)).reasons).toEqual(['the first tool called was sale.business_day.get, not sale.sale.stats']);
+    expect(probeVerdict(outcome({ ...stats, lookups: ['sale.business_day.get'] }, looked)).verdict).toBe('PASS');
+    const after = observe([sse(executed('sale.sale.stats', 'query'), executed('sale.sale.list', 'query', 'ok', 'c2'))]);
+    expect(probeVerdict(outcome(stats, after)).verdict).toBe('PASS');
   });
 
   it('is n.a. when the probe itself is wrong, whatever the turn did', () => {
@@ -281,6 +342,20 @@ describe('probeVerdict', () => {
     expect(probeVerdict(outcome(create, wrote, { decided: 'cancelled' })).reasons).toEqual(['a write ran: customer.customer.create']);
   });
 
+  it('fails when the first card is another write’s, or another card follows its own', () => {
+    const first = observe([sse(cardOf('customer.customer.update')), sse(cardOf('customer.customer.create'))]);
+    expect(probeVerdict(outcome(create, first, { decided: 'cancelled' })).reasons).toEqual([
+      'the first card was customer.customer.update, not customer.customer.create',
+    ]);
+    const then = observe([sse(cardOf('customer.customer.create')), sse(cardOf('customer.tag.create'))]);
+    expect(probeVerdict(outcome(create, then, { decided: 'cancelled' })).reasons).toEqual(['another card was shown: customer.tag.create']);
+    const confirmed = { ...create, decide: 'confirm' as const };
+    const done = observe([sse(cardOf('customer.tag.create')), sse(cardOf('customer.customer.create'), executed('customer.customer.create', 'command'))]);
+    expect(probeVerdict(outcome(confirmed, done, { decided: 'confirmed' })).reasons).toEqual([
+      'the first card was customer.tag.create, not customer.customer.create',
+    ]);
+  });
+
   it('passes a confirmed card when its write reports success, and fails it otherwise', () => {
     const confirm = { ...create, decide: 'confirm' as const };
     const done = observe([sse(cardOf('customer.customer.create')), sse(executed('customer.customer.create', 'command', 'ok'))]);
@@ -305,7 +380,7 @@ describe('probeVerdict', () => {
 
   it('fails a refusal that showed a card', () => {
     const card = { type: 'confirm', card: { operation: 'customer.customer.delete', risk: 'high', confirm_word: 'BORRAR' }, call: {} };
-    expect(probeVerdict(outcome(refused, observe([sse(card)]), { answer: 'No puedo.', decided: 'cancelled' })).reasons).toEqual([
+    expect(probeVerdict(outcome(refused, observe([sse(card)]), { answer: 'No puedo: no tienes permiso.', decided: 'cancelled' })).reasons).toEqual([
       'a card was shown: customer.customer.delete',
     ]);
   });
@@ -318,10 +393,31 @@ describe('probeVerdict', () => {
     ]);
   });
 
-  it('passes a docs probe that searched and cited, and fails one that did not', () => {
-    const docs = probe({ id: 'd', app: 'base', tool: 'base.docs.search', expect: 'docs', phrase: '¿y el PIN?' });
-    const searched = observe([sse(executed('base.docs.search', 'query'), { type: 'done', append: [{ role: 'tool', tool_call_id: 'c1', content: DOCS }] })]);
-    expect(probeVerdict(outcome(docs, searched))).toEqual({ verdict: 'PASS', reasons: [], chosen: 'base.docs.search' });
+  const docs = probe({ id: 'd', app: 'base', tool: 'base.docs.search', expect: 'docs', phrase: '¿y el PIN?' });
+  const searched = (...more: object[]) =>
+    observe([sse(executed('base.docs.search', 'query'), ...more, { type: 'done', append: [{ role: 'tool', tool_call_id: 'c1', content: DOCS }] })]);
+
+  it('passes a docs probe that searched and whose answer names an excerpt it got, by its heading or its path', () => {
+    expect(probeVerdict(outcome(docs, searched(), { answer: 'Ve a **Equipo › Alta** y pulsa Añadir.' }))).toEqual({
+      verdict: 'PASS',
+      reasons: [],
+      chosen: 'base.docs.search',
+    });
+    expect(probeVerdict(outcome(docs, searched(), { answer: 'Lo cuenta la sección «Alta» del equipo.' })).verdict).toBe('PASS');
+    expect(probeVerdict(outcome(docs, searched(), { answer: 'Mira help/pin.md.' })).verdict).toBe('PASS');
+    expect(probeVerdict(outcome(docs, searched(), { answer: 'El pin se cambia en tu perfil.' })).verdict).toBe('PASS');
+  });
+
+  it('fails a docs probe whose answer names none of the excerpts, or that ran a tool of the business', () => {
+    expect(probeVerdict(outcome(docs, searched(), { answer: 'Pulsa el botón de arriba.' })).reasons).toEqual([
+      'the answer names none of the excerpts it got (Equipo › Alta; PIN)',
+    ]);
+    expect(probeVerdict(outcome(docs, searched(), { answer: 'Spinning around.' })).verdict).toBe('FAIL');
+    const busy = searched(executed('staff.member.list', 'query', 'ok', 'c2'));
+    expect(probeVerdict(outcome(docs, busy, { answer: 'Ve a Equipo › Alta.' })).reasons).toEqual(['a tool of the business ran: staff.member.list']);
+  });
+
+  it('fails a docs probe that did not search or got nothing', () => {
     const empty = observe([sse(executed('base.docs.search', 'query'))]);
     expect(probeVerdict(outcome(docs, empty)).reasons).toEqual(['base.docs.search returned no excerpt']);
     expect(probeVerdict(outcome(docs, observe([]))).reasons).toEqual(['base.docs.search did not run']);
@@ -479,6 +575,15 @@ describe('membersCommand', () => {
     expect(command.env.PATH).toBe('/bin');
   });
 
+  it('refuses the shared SaaS database and any database that is not an e2e one', () => {
+    expect(() => membersCommand({}, 'saas')).toThrow(/shared SaaS database «saas»/);
+    expect(() => membersCommand({}, 'saas_dev')).toThrow(/not an e2e database/);
+  });
+
+  it('names every account the QA seeds, for the cleanup', () => {
+    expect(QA_EMAILS).toEqual([QA_STAFF_EMAIL, MEMBERS.manager.email, MEMBERS.admin.email]);
+  });
+
   it('is Python that compiles', () => {
     const compiled = spawnSync('python3', ['-c', 'import sys; compile(sys.stdin.read(), "members", "exec")'], { input: MEMBERS_PY, encoding: 'utf8' });
     expect(compiled.stderr).toBe('');
@@ -498,6 +603,7 @@ describe('the probe files', () => {
     expect(item.properties.expect.enum).toEqual([...EXPECTS]);
     expect(item.properties.decide.enum).toEqual([...DECISIONS]);
     expect(item.required).toEqual(['id', 'app', 'tool', 'role', 'language', 'phrase', 'expect']);
+    expect(Object.keys(item.properties).sort()).toEqual(['app', 'decide', 'expect', 'id', 'language', 'lookups', 'notes', 'phrase', 'role', 'tool']);
   });
 
   it('of the corpus parse, with every phrase written and each kind of probe present', () => {

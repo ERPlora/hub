@@ -33,9 +33,14 @@
           "language": { "type": "string", "enum": ["en", "es"] },
           "phrase": { "description": "What a person of the role types, written by the QA agent: never one of the tool's asks. Empty only in a skeleton.", "type": "string" },
           "expect": {
-            "description": "read: the tool runs and no card; card: the write's card; refused: the role lacks the tool, nothing runs and the answer says it cannot; docs: base.docs.search runs and the answer cites the documentation.",
+            "description": "read: the tool is the first of the business called (after its lookups) and no card; card: the first card is the write's and no other follows; refused: the role lacks the tool, nothing of the business runs and the answer names the permission or the role; docs: base.docs.search returns excerpts, the answer names one and nothing of the business runs.",
             "type": "string",
             "enum": ["read", "card", "refused", "docs"]
+          },
+          "lookups": {
+            "description": "Only for a read: the tools the model may call before it to look something up (sale.business_day.get). Without it, the first tool of the business called must be the probe's.",
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
           },
           "decide": { "description": "Only for a card: cancel (default, nothing changes) or confirm (data of the seeded business only).", "type": "string", "enum": ["cancel", "confirm"] },
           "notes": { "type": "string" }

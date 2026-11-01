@@ -7,7 +7,7 @@ import { execFileSync } from 'node:child_process';
 
 import { expect, type Locator, type Page, type Response } from '@playwright/test';
 
-import { type Meta, observe, redact, seedCommand } from './assistant-battery';
+import { cleanupCommand, type Meta, observe, redact, seedCommand } from './assistant-battery';
 import { A, compactBar, HUB_DIR, REPO_DIR, shown } from './helpers';
 import { STACK } from './stack';
 
@@ -67,6 +67,17 @@ export function seedRealProviders(): Omit<Meta, 'run'> {
       }),
   );
   return { ...models, chunks };
+}
+
+/**
+ * Takes out of the stack's SaaS what a run left there: the real keys (labelled `qa`) and the accounts `emails`. Each
+ * spec calls it in its `afterAll`, so it runs whether the run passed or failed; without `E2E_SAAS_DIR` nothing could
+ * have been seeded. It refuses the shared SaaS database, as the seed does.
+ */
+export function cleanUpRealProviders(emails: string[]): void {
+  if (!SAAS_DIR) return;
+  const command = cleanupCommand(process.env, STACK.saasDatabase, emails);
+  run(command.file, command.args, SAAS_DIR, command.env);
 }
 
 // ── The panel (as base-assistant.spec.ts reads it) ──

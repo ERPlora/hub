@@ -29,11 +29,13 @@ import {
   type ProbeOutcome,
   probeVerdict,
   problemsOf,
+  QA_EMAILS,
   renderProbeReport,
   type Role,
 } from '../assistant-probes';
 import {
   answerOf,
+  cleanUpRealProviders,
   converse,
   emptyMonth,
   noticesOf,
@@ -101,14 +103,17 @@ function save(outcome: ProbeOutcome): void {
   writeState(kept);
 }
 
-/** Once per run: the real providers and the index (as the battery), and the manager and the admin of `a`. */
+/**
+ * On every invocation (its `afterAll` takes them out again): the real providers and the index (as the battery), and
+ * the manager and the admin of `a`. The run's state and report are kept per run, so probes asked again join them.
+ */
 function prepare(): State {
   mkdirSync(QA_DIR, { recursive: true });
-  const kept = readState();
-  if (kept) return kept;
   const seeded = seedRealProviders();
   const members = membersCommand(process.env, STACK.saasDatabase);
   run(members.file, members.args, SAAS_DIR, members.env);
+  const kept = readState();
+  if (kept) return kept;
   const meta: ProbeMeta = {
     run: RUN,
     model: seeded.model,
@@ -141,6 +146,9 @@ async function everyAppOn(context: BrowserContext): Promise<void> {
 
 let state: State;
 const catalogs: Record<string, Catalog> = {};
+
+// The real keys and the QA accounts never stay in the stack's SaaS, whether the run passed or not.
+test.afterAll(() => cleanUpRealProviders(QA_EMAILS));
 
 test.beforeAll(async ({ browser }) => {
   test.setTimeout(900_000);

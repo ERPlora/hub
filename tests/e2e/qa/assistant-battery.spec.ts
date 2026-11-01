@@ -14,9 +14,10 @@ import { join } from 'node:path';
 
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { ITEMS, type Meta, observe, type Outcome, redact, renderReport, verdictOf } from '../assistant-battery';
+import { ITEMS, type Meta, observe, type Outcome, QA_STAFF_EMAIL, redact, renderReport, verdictOf } from '../assistant-battery';
 import {
   answerOf,
+  cleanUpRealProviders,
   converse,
   emptyMonth,
   foot,
@@ -60,12 +61,15 @@ function writeState(state: State): void {
   writeFileSync(REPORT, redact(renderReport(ordered, state.meta), SECRETS));
 }
 
-/** Once per run: the apps' docs in the SaaS, the real providers, the index, and `a`'s month of messages emptied. */
+/**
+ * The apps' docs in the SaaS, the real providers and the index on every invocation (its `afterAll` takes the keys out
+ * again, so asking some items again into an earlier run seeds them anew); once per run, `a`'s month of messages emptied.
+ */
 function prepare(): State {
   mkdirSync(QA_DIR, { recursive: true });
+  const seeded = seedRealProviders();
   const kept = readState();
   if (kept) return kept;
-  const seeded = seedRealProviders();
   emptyMonth();
   const state: State = { run: RUN, meta: { run: RUN, ...seeded }, prepared: false, outcomes: {} };
   writeState(state);
@@ -147,6 +151,9 @@ const RECORDS: Record<
 };
 
 let state: State;
+
+// The real keys and the staff account the seed wrote never stay in the stack's SaaS, whether the run passed or not.
+test.afterAll(() => cleanUpRealProviders([QA_STAFF_EMAIL]));
 
 test.beforeAll(async ({ browser }) => {
   test.setTimeout(900_000);
