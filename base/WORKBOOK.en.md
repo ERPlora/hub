@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:4879782912984019afe4d26b06a180a9331a06c0dafd311f3fbcce6a015deb57 -->
+<!-- generated from WORKBOOK.md sha256:896e02f85d58089c61e8a694a04f13f97cd50e3536df6c1e209ca4abbc765688 -->
 
 ## What it is for and who it is for
 
@@ -1195,7 +1195,10 @@ Steps:
      are almost spent this month" or "WhatsApp messages are almost spent this month". In red, "You have to upgrade:
      {motive}": "no more files fit", "the assistant's messages are spent this month", "WhatsApp messages are spent this
      month" or "your business runs out of capacity at its busiest moments". With several motives, the most serious wins
-     and, among equals, the fullest.
+     and, among equals, the fullest. Green only comes when everything that applies could be read: with no motives, while
+     something is answering, "Checking your plan…"; if something could not be read, "We could not check everything", with
+     "Retry". A motive is said all the same, because it is still true, and what their plan does not include is not left
+     to check.
   3. "What your plan includes", from the fullest down: "Files" ("{used} of {limit}", with "Measured on {day}"), "Apps",
      "People" and "Devices" ("{used} of {limit}"), and "Assistant" and, with its app on, "WhatsApp" ("{used} of {limit} a
      month"), each with its bar, in the colour of the line at the top. From 80 %, the files and the messages say "Close";

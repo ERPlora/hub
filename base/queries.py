@@ -670,9 +670,10 @@ def _counted_during_the_day(hub: Hub) -> _Counted:
 
 
 def _connections_usage(state: dict, known: bool, counted: _Counted) -> dict:
-    """Today's highest against what it really has (BASE-F40), and the times it fell short: with limits of 1, 3 or 6 a
+    """Today's highest against what it really has (BASE-F40), by the limiter's own rule: a known plan whose photo lacks its
+    limits gets Free's, so the screen says that, never «no limit». And the times it fell short: with limits of 1, 3 or 6 a
     percentage says nothing, a Free plan's first operation of the day is its 100 %."""
-    limits = tenancy_limits.plan_limits(state) if known else None
+    limits = (tenancy_limits.plan_limits(state) or tenancy_limits.FREE) if known else None
     return {
         "peak_today": counted.peak_today,
         "limit": limits.max_transactions if limits else None,

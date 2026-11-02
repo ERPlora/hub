@@ -44,7 +44,7 @@ function embed(block: object | null) {
 
 async function open(
   usage?: PlanUsage,
-  options: Parameters<typeof mountBase>[1] & { assistant?: AssistantUsage | 'failed' | 'waiting' } = {},
+  options: Parameters<typeof mountBase>[1] & { assistant?: AssistantUsage | 'failed' | 'waiting' | Promise<Response> } = {},
 ) {
   const { assistant = MESSAGES, ...rest } = options;
   const asked: string[] = [];
@@ -52,6 +52,7 @@ async function open(
     onApi: ({ url }) => {
       const path = url.replace(/^.*\/api/, '/api');
       asked.push(path);
+      if (assistant instanceof Promise) return assistant;
       if (assistant === 'waiting') return new Promise<Response>(() => {});
       if (assistant === 'failed') return Response.json({ error: { code: 'base.assistant_unavailable', message: 'No' } }, { status: 503 });
       return Response.json(assistant);
@@ -135,6 +136,106 @@ describe('SystemUsage', () => {
     it('at their limit under an amber line it says only the motive', async () => {
       const m = await open(figures({ people: { used: 5, limit: 5 }, files: NEAR_FILES }));
       expect(m.part('verdict').text()).not.toContain('at the limit');
+    });
+  });
+
+  describe('the line at the top, when not everything could be read', () => {
+    it('while the assistant answers it never says green, and it does not flicker from green to red', async () => {
+      const answer = Promise.withResolvers<Response>();
+      const m = await open(figures(), { assistant: answer.promise });
+      expect(m.part('verdict').attributes('data-tone')).toBe('neutral');
+      expect(m.part('verdict').text()).toContain('Checking your plan…');
+      expect(m.part('verdict').text()).not.toContain('Your plan is enough');
+      expect(m.part('verdict-retry').exists()).toBe(false);
+
+      answer.resolve(Response.json({ ...MESSAGES, used: 300 }));
+      await flush();
+      await flush();
+      expect(m.part('verdict').attributes('data-tone')).toBe('danger');
+      expect(m.part('verdict').text()).toContain("You have to upgrade: the assistant's messages are spent this month");
+    });
+
+    it('with the assistant answering room, it goes from checking to green', async () => {
+      const answer = Promise.withResolvers<Response>();
+      const m = await open(figures(), { assistant: answer.promise });
+      expect(m.part('verdict').attributes('data-tone')).toBe('neutral');
+
+      answer.resolve(Response.json(MESSAGES));
+      await flush();
+      await flush();
+      expect(m.part('verdict').attributes('data-tone')).toBe('success');
+    });
+
+    it('with the assistant down it never says green: not everything could be checked, with «Retry»', async () => {
+      const m = await open(figures(), { assistant: 'failed' });
+      expect(m.part('verdict').attributes('data-tone')).toBe('neutral');
+      expect(m.part('verdict').text()).toContain('We could not check everything');
+      expect(m.part('verdict').text()).not.toContain('Your plan is enough');
+      expect(m.part('verdict-retry').text()).toBe('Retry');
+    });
+
+    it('«Retry» asks again: checking meanwhile, and the answer decides', async () => {
+      let answer: AssistantUsage | null = null;
+      const asked: string[] = [];
+      const m = await mountBase(SystemUsage, {
+        onApi: ({ url }) => {
+          asked.push(url);
+          return answer
+            ? Response.json(answer)
+            : Response.json({ error: { code: 'base.assistant_unavailable', message: 'No' } }, { status: 503 });
+        },
+      });
+      const call = await m.live();
+      await m.result(call, OP, figures());
+      await flush();
+      await flush();
+      const verdict = () => m.wrapper.get('[data-testid="system-usage-verdict"]');
+      expect(verdict().text()).toContain('We could not check everything');
+      expect(asked).toHaveLength(1);
+
+      answer = { ...MESSAGES, used: 300 };
+      await m.wrapper.get('[data-testid="system-usage-verdict-retry"]').trigger('click');
+      expect(verdict().text()).toContain('Checking your plan…');
+      await flush();
+      await flush();
+      expect(asked).toHaveLength(2);
+      expect(verdict().attributes('data-tone')).toBe('danger');
+      expect(m.wrapper.find('[data-testid="system-usage-verdict-retry"]').exists()).toBe(false);
+    });
+
+    it('with an app that could not be read it never says green', async () => {
+      const m = await open(figures({ meters: [{ ...WHATSAPP, used: null, limit: null, available: false }] }));
+      expect(m.part('verdict').attributes('data-tone')).toBe('neutral');
+      expect(m.part('verdict').text()).toContain('We could not check everything');
+      expect(m.part('verdict-retry').exists()).toBe(true);
+    });
+
+    it('a motive is still true with the assistant down: it is said, with no «Retry»', async () => {
+      const m = await open(figures({ files: FULL_FILES }), { assistant: 'failed' });
+      expect(m.part('verdict').attributes('data-tone')).toBe('danger');
+      expect(m.part('verdict').text()).toContain('You have to upgrade: no more files fit');
+      expect(m.part('verdict-retry').exists()).toBe(false);
+    });
+
+    it('a plan with no assistant or no WhatsApp has nothing left to check: green', async () => {
+      const m = await open(figures({ meters: [{ ...WHATSAPP, used: 0, limit: 0 }] }), { assistant: { ...MESSAGES, used: 0, limit: 0 } });
+      expect(m.part('verdict').attributes('data-tone')).toBe('success');
+      expect(m.part('verdict').text()).toContain('Your plan is enough');
+    });
+
+    it('«at the limit» is said only under the green line', async () => {
+      const m = await open(figures({ people: { used: 5, limit: 5 } }), { assistant: 'failed' });
+      expect(m.part('verdict').text()).not.toContain('at the limit');
+      expect(m.row('people').text()).toContain('Full');
+    });
+
+    it('lo dice en español', async () => {
+      const checking = await open(figures(), { assistant: 'waiting', locale: 'es' });
+      expect(checking.part('verdict').text()).toContain('Comprobando tu plan…');
+      checking.wrapper.unmount();
+      const failed = await open(figures(), { assistant: 'failed', locale: 'es' });
+      expect(failed.part('verdict').text()).toContain('No hemos podido comprobarlo todo');
+      expect(failed.part('verdict-retry').text()).toBe('Reintentar');
     });
   });
 
@@ -237,7 +338,6 @@ describe('SystemUsage', () => {
       expect(m.row('assistant').text()).toContain('Not available right now');
       expect(m.row('assistant').text()).not.toMatch(/\d/);
       expect(m.row('files').exists()).toBe(true);
-      expect(m.part('verdict').attributes('data-tone')).toBe('success');
     });
 
     it('while the assistant answers its row says it is reading', async () => {

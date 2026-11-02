@@ -1247,7 +1247,10 @@ Pasos:
      mensajes del asistente este mes» o «casi no te quedan mensajes de WhatsApp este mes». En rojo, «Tienes que ampliar:
      {motivo}»: «ya no caben más archivos», «se han acabado los mensajes del asistente de este mes», «se han acabado los
      mensajes de WhatsApp de este mes» o «tu negocio se queda sin capacidad en los momentos de más trabajo». Con varios
-     motivos, gana el más grave y, a igualdad, el más lleno.
+     motivos, gana el más grave y, a igualdad, el más lleno. El verde sale solo cuando todo lo que aplica se ha podido
+     leer: sin motivos, mientras algo contesta, «Comprobando tu plan…»; si algo no se ha podido leer, «No hemos podido
+     comprobarlo todo», con «Reintentar». Un motivo se dice igual, porque sigue siendo cierto, y lo que su plan no incluye
+     no queda por comprobar.
   3. «Lo que incluye tu plan», de lo más lleno a lo menos: «Archivos» («{used} de {limit}», con «Medido el {day}»),
      «Apps», «Personas» y «Dispositivos» («{used} de {limit}»), y «Asistente» y, con su app encendida, «WhatsApp»
      («{used} de {limit} al mes»), cada uno con su barra, del color de la línea de arriba. Desde el 80 %, los archivos y

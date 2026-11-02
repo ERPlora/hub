@@ -16,6 +16,8 @@ from live.operations import AI, get
 from base import meter
 from base.models import AppActivation, Membership
 from base.permissions import permissions_for
+from base.tenancy import connections as tenancy_connections
+from base.tenancy import limits
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
 from control.models import Hub, HubActivityDaily, HubUsageDaily, HubVisit
@@ -151,6 +153,37 @@ def test_the_limit_is_the_effective_one_and_a_bigger_plan_helps_only_below_it(hu
     connections = usage_of(hub_a)["connections"]
 
     assert (connections["limit"], connections["bigger_plan_gives_more"]) == (limit, helps)
+
+
+@pytest.mark.parametrize(
+    "plan",
+    [
+        {"slug": "x", "max_users": 3, "max_devices": 2},
+        {"slug": "x", "max_users": 3, "max_devices": 2, "max_db_connections": 6},
+        {"slug": "x", "max_users": 3, "max_devices": 2, "statement_timeout_seconds": 15},
+    ],
+    ids=["neither", "no timeout", "no connections"],
+)
+def test_a_known_plan_without_its_limits_says_what_the_limiter_applies(hub_a, monkeypatch, plan):
+    """The limiter falls back on Free's: the screen says that limit, never «no limit», and a bigger plan would give more."""
+    on_plan(hub_a, plan)
+    monkeypatch.setattr(limits, "_limiters", {})
+    hub_a.refresh_from_db()
+
+    usage = usage_of(hub_a)
+
+    assert usage["known"] is True
+    applied = limits.configure(tenancy_connections.hub_alias(hub_a), hub_a).limits.max_transactions
+    assert applied == limits.FREE.max_transactions
+    assert usage["connections"]["limit"] == applied
+    assert usage["connections"]["bigger_plan_gives_more"] is True
+
+
+def test_that_limit_makes_a_shortfall_a_motive_like_any_other(hub_a):
+    on_plan(hub_a, {"slug": "x", "max_users": 3, "max_devices": 2})
+    did(hub_a, TODAY, busy=2)
+
+    assert bell_of(hub_a)[0]["count"] == 1
 
 
 def test_the_limit_follows_what_pgbouncer_gives_here(hub_a, settings):

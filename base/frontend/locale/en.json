@@ -525,6 +525,8 @@
         },
         "verdict": {
           "enough": "Your plan is enough",
+          "checking": "Checking your plan…",
+          "incomplete": "We could not check everything",
           "must": "You have to upgrade: {motive}",
           "should": "You should upgrade: {motive}",
           "full": "{things} at the limit: to add more, upgrade the plan."

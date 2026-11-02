@@ -30,13 +30,15 @@ const whatsapp = (used: number | null, limit: number | null, available = true): 
   available,
 });
 const assistant = (used: number, limit: number): AssistantUsage => ({ used, limit, resets_at: null, demo: false });
+/** The assistant's messages read, with room: nothing left to check about them. */
+const READ = assistant(10, 300);
 const figures = (parts: Partial<PlanUsage>): PlanUsage => ({ ...USAGE, ...parts });
 const filesAt = (percent: number, status: 'within' | 'near' | 'full') => ({ ...USAGE.files, percent, status });
 const shortBy = (count: number, bigger = true) => ({ ...USAGE.connections, busy_last_7_days: count, bigger_plan_gives_more: bigger });
 
 describe('verdictOf', () => {
   it('tells whoever has room that the plan is enough', () => {
-    expect(verdictOf(USAGE, assistant(10, 300))).toEqual({ tone: 'success', motive: null, full: [] });
+    expect(verdictOf(USAGE, READ)).toEqual({ tone: 'success', motive: null, full: [], unchecked: null });
   });
 
   it.each([
@@ -63,9 +65,9 @@ describe('verdictOf', () => {
   });
 
   it.each([
-    ['files just below', figures({ files: filesAt(79, 'within') }), null],
+    ['files just below', figures({ files: filesAt(79, 'within') }), READ],
     ['the assistant just below', USAGE, assistant(239, 300)],
-    ['WhatsApp just below', figures({ meters: [whatsapp(119, 150)] }), null],
+    ['WhatsApp just below', figures({ meters: [whatsapp(119, 150)] }), READ],
   ] as const)('stays green with %s 80 %%', (_, usage, messages) => {
     expect(verdictOf(usage, messages).tone).toBe('success');
   });
@@ -85,11 +87,16 @@ describe('verdictOf', () => {
 
   it('capacity never goes by its percentage: with a limit of 1 the first operation is its 100 %', () => {
     const usage = figures({ connections: { ...USAGE.connections, peak_today: 1, limit: 1 } });
-    expect(verdictOf(usage, null).tone).toBe('success');
+    expect(verdictOf(usage, READ).tone).toBe('success');
   });
 
   it('capacity on a plan with all the service gives is no motive, however short it fell', () => {
-    expect(verdictOf(figures({ connections: shortBy(9, false) }), null)).toEqual({ tone: 'success', motive: null, full: [] });
+    expect(verdictOf(figures({ connections: shortBy(9, false) }), READ)).toEqual({
+      tone: 'success',
+      motive: null,
+      full: [],
+      unchecked: null,
+    });
   });
 
   it('people, devices and apps at their limit never change the colour: they are told apart, under the green line', () => {
@@ -98,25 +105,72 @@ describe('verdictOf', () => {
       devices: { used: 1, limit: 1 },
       apps: { used: 11, limit: 10 },
     });
-    expect(verdictOf(usage, null)).toEqual({ tone: 'success', motive: null, full: ['people', 'devices', 'apps'] });
+    expect(verdictOf(usage, READ)).toEqual({ tone: 'success', motive: null, full: ['people', 'devices', 'apps'], unchecked: null });
   });
 
   it('with no limit nothing is ever full', () => {
     const usage = figures({ people: { used: 5, limit: null }, devices: { used: 1, limit: null }, apps: { used: 3, limit: null } });
-    expect(verdictOf(usage, null).full).toEqual([]);
+    expect(verdictOf(usage, READ).full).toEqual([]);
   });
 
   it('what the plan does not include is no motive', () => {
     expect(verdictOf(figures({ meters: [whatsapp(0, 0)] }), assistant(0, 0)).tone).toBe('success');
   });
 
-  it('what could not be read, or was not measured yet, is no motive', () => {
+  it('what was not measured yet is no motive and does not hold the green: a business on its first day is fine', () => {
     const usage = figures({
-      meters: [whatsapp(null, null), whatsapp(null, null, false)],
+      meters: [whatsapp(null, null)],
       files: { bytes: null, day: null, limit: 5 * GB, percent: null, status: null },
       connections: { ...USAGE.connections, peak_today: null, busy_last_7_days: null },
     });
-    expect(verdictOf(usage, null).tone).toBe('success');
+    expect(verdictOf(usage, READ)).toMatchObject({ tone: 'success', unchecked: null });
+  });
+});
+
+describe('verdictOf, when it could not read everything', () => {
+  // Green only when everything that applies was read: 30 of 30 messages with the assistant down must not read «enough».
+  it('with the assistant still answering and no motive: neutral, checking, never green', () => {
+    expect(verdictOf(USAGE, null)).toEqual({ tone: 'neutral', motive: null, full: [], unchecked: 'checking' });
+  });
+
+  it('with the assistant failed and no motive: neutral, not everything checked, never green', () => {
+    expect(verdictOf(USAGE, 'failed')).toEqual({ tone: 'neutral', motive: null, full: [], unchecked: 'incomplete' });
+  });
+
+  it('with an app that could not be read and no motive: neutral, not everything checked', () => {
+    const usage = figures({ meters: [whatsapp(null, null, false)] });
+    expect(verdictOf(usage, READ)).toEqual({ tone: 'neutral', motive: null, full: [], unchecked: 'incomplete' });
+  });
+
+  it('checking wins over failed while something can still change it', () => {
+    const usage = figures({ meters: [whatsapp(null, null, false)] });
+    expect(verdictOf(usage, null).unchecked).toBe('checking');
+  });
+
+  it.each([
+    ['still answering', null],
+    ['failed', 'failed'],
+  ] as const)('a motive is still true with the assistant %s: it is said', (_, read) => {
+    const red = verdictOf(figures({ files: filesAt(100, 'full') }), read);
+    expect(red).toMatchObject({ tone: 'danger', motive: { key: 'files' }, unchecked: null });
+    const amber = verdictOf(figures({ meters: [whatsapp(120, 150)] }), read);
+    expect(amber).toMatchObject({ tone: 'warning', motive: { key: 'whatsapp_inbox' }, unchecked: null });
+  });
+
+  it('a motive is still true with an app that could not be read', () => {
+    const usage = figures({ files: filesAt(85, 'near'), meters: [whatsapp(null, null, false)] });
+    expect(verdictOf(usage, READ)).toMatchObject({ tone: 'warning', unchecked: null });
+  });
+
+  it('what the plan does not include is nothing to check', () => {
+    expect(verdictOf(USAGE, assistant(0, 0))).toMatchObject({ tone: 'success', unchecked: null });
+    expect(verdictOf(figures({ meters: [whatsapp(0, 0)] }), READ)).toMatchObject({ tone: 'success', unchecked: null });
+    expect(verdictOf(figures({ meters: [] }), READ)).toMatchObject({ tone: 'success', unchecked: null });
+  });
+
+  it('people, devices and apps at their limit are still told apart, whatever the line says', () => {
+    const usage = figures({ people: { used: 5, limit: 5 } });
+    expect(verdictOf(usage, null).full).toEqual(['people']);
   });
 });
 

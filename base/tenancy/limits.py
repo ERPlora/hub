@@ -111,11 +111,11 @@ def plan_limits(state: Any) -> PlanLimits | None:
 
 
 def bigger_plan_gives_more(state: Any) -> bool:
-    """Whether a bigger plan would give the hub of the photo ``state`` more at once: only while its own includes less
-    than PgBouncer gives. Told by its own photo, without knowing the other plans."""
-    limits = plan_limits(state)
+    """Whether a bigger plan would give the hub of the photo ``state`` more at once: only while what it has, by the
+    limiter's own rule (its plan's limits, or Free's without a usable plan), is less than PgBouncer gives. Told by its own
+    photo, without knowing the other plans."""
     ceiling = _ceiling()
-    return limits is not None and ceiling is not None and limits.max_transactions < ceiling
+    return ceiling is not None and (plan_limits(state) or FREE).max_transactions < ceiling
 
 
 class Slot:

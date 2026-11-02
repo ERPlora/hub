@@ -525,6 +525,8 @@
         },
         "verdict": {
           "enough": "Tu plan te alcanza",
+          "checking": "Comprobando tu plan…",
+          "incomplete": "No hemos podido comprobarlo todo",
           "must": "Tienes que ampliar: {motive}",
           "should": "Te conviene ampliar: {motive}",
           "full": "{things} al completo: para añadir más, amplía el plan."

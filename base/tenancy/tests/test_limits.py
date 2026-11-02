@@ -76,7 +76,12 @@ def test_a_bigger_plan_helps_only_below_what_pgbouncer_gives(settings, ceiling, 
 
 
 @pytest.mark.parametrize("state", [{}, None, {"plan": None}, {"plan": {"slug": "x"}}])
-def test_a_photo_with_no_usable_plan_cannot_say_a_bigger_plan_helps(state):
+def test_a_photo_with_no_usable_plan_is_on_free_s_so_a_bigger_plan_would_help(settings, state):
+    """The limiter applies Free's: the same rule says what a bigger plan would give."""
+    settings.PGBOUNCER_MAX_DB_CONNECTIONS = 6
+    assert limits.bigger_plan_gives_more(state) is True
+
+    settings.PGBOUNCER_MAX_DB_CONNECTIONS = limits.FREE.max_transactions
     assert limits.bigger_plan_gives_more(state) is False
 
 

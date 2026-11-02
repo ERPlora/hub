@@ -291,6 +291,56 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     });
   });
 
+  test(`BASE-F40 — neutral: never green with something still to read, at ${width}`, async ({ browser }) => {
+    await withUsage(async (hubId) => {
+      onPlan({ max_storage_bytes: 1024 * 1024 });
+      measuredFiles(hubId, 512 * 1024);
+      const { context, page } = await signedIn(browser, viewport, '/');
+      try {
+        // erplora.com has not answered the assistant's messages yet: checking, with no green that could turn red.
+        let answer: () => void = () => {};
+        const answered = new Promise<void>((resolve) => (answer = resolve));
+        await page.route('**/api/assistant/usage', async (route) => {
+          await answered;
+          await route.fulfill({ status: 503, json: { error: { code: 'base.assistant_unavailable', message: 'Not now.' } } });
+        });
+        await page.goto(`${A}/system`);
+        await expect(testid(page, 'system-usage-verdict')).toHaveAttribute('data-tone', 'neutral');
+        await expect(testid(page, 'system-usage-verdict')).toContainText('Checking your plan…');
+        await expect(testid(page, 'system-usage-verdict-retry')).toHaveCount(0);
+        await expect(testid(page, 'system-usage-row-assistant')).toContainText('Reading…');
+        await snap(page, 'BASE-F40-neutral-checking', width);
+
+        // It does not answer: not everything could be checked, with «Retry», and the rest of the screen goes on.
+        answer();
+        await expect(testid(page, 'system-usage-verdict')).toHaveAttribute('data-tone', 'neutral');
+        await expect(testid(page, 'system-usage-verdict')).toContainText('We could not check everything');
+        await expect(testid(page, 'system-usage-row-assistant')).toContainText('Not available right now');
+        await expect(testid(page, 'system-usage-row-files')).toContainText('512 KB of 1 MB');
+        await expect(testid(page, 'system-usage-verdict-retry')).toBeVisible();
+        await snap(page, 'BASE-F40-neutral-incomplete', width);
+
+        // A motive is still true without it: it is said.
+        measuredFiles(hubId, 2 * 1024 * 1024);
+        await page.reload();
+        await expect(testid(page, 'system-usage-verdict')).toHaveAttribute('data-tone', 'danger');
+        await expect(testid(page, 'system-usage-verdict')).toContainText('You have to upgrade: no more files fit');
+        await expect(testid(page, 'system-usage-verdict-retry')).toHaveCount(0);
+
+        // «Retry», with erplora.com back: everything read, and only now green.
+        measuredFiles(hubId, 512 * 1024);
+        await page.reload();
+        await expect(testid(page, 'system-usage-verdict-retry')).toBeVisible();
+        await page.unrouteAll({ behavior: 'wait' });
+        await testid(page, 'system-usage-verdict-retry').click();
+        await expect(testid(page, 'system-usage-verdict')).toHaveAttribute('data-tone', 'success');
+        await expect(testid(page, 'system-usage-verdict')).toContainText('Your plan is enough');
+      } finally {
+        await context.close();
+      }
+    });
+  });
+
   test(`BASE-G91 BASE-G92 BASE-G94 BASE-G93 — Failed events at ${width}`, async ({ browser }) => {
     plantFailed('a', 'E2E one: Set up the issuer first.');
     plantFailed('a', 'E2E two: no such sale.');

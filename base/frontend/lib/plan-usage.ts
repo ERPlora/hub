@@ -9,6 +9,11 @@
 // - Capacity never goes by its percentage, only by the times it fell short: with a limit of 1 the first operation is its
 //   100 %. And on a plan with all the service gives there is nothing to upgrade to.
 // - What the plan does not include, could not be read or was not measured yet is no motive.
+// - Green only when everything that applies was read: with no motive, while the assistant answers the line says it is
+//   checking, and with the assistant or an app that could not be read it says not everything could be checked, never that
+//   the plan is enough (30 of 30 messages with the assistant down would read green). A motive is still true without them:
+//   it is said. What the plan does not include is nothing to check, and a figure not measured yet does not hold the green:
+//   a business on its first day has no files measured, and an app with no number never will.
 //
 // The bell's row tells the same from the server, without what waits on erplora.com (`base.queries._plan_motives`).
 import type { AssistantUsage, PlanMeter, PlanUsage } from '../operations';
@@ -19,8 +24,9 @@ export const NEAR_PERCENT = 80;
 /** The assistant's messages, which the screen asks apart because they wait on erplora.com: null until they answer. */
 export type AssistantRead = AssistantUsage | null | 'failed';
 
-export type VerdictTone = 'danger' | 'warning' | 'success';
-type MotiveTone = Exclude<VerdictTone, 'success'>;
+export type VerdictTone = 'danger' | 'warning' | 'success' | 'neutral';
+type MotiveTone = 'danger' | 'warning';
+type RowTone = MotiveTone | 'success';
 
 export interface Motive {
   /** `files`, `assistant`, `capacity` or the app of a meter. */
@@ -41,6 +47,8 @@ export interface UsageVerdict {
   motive: Motive | null;
   /** What is at its limit and never changes the colour. */
   full: FullThing[];
+  /** With no motive: something is still answering, or could not be read. The line is neutral then, never green. */
+  unchecked: 'checking' | 'incomplete' | null;
 }
 
 export type RowState = 'measured' | 'noLimit' | 'notIncluded' | 'notMeasured' | 'unavailable' | 'loading' | 'plain';
@@ -54,13 +62,13 @@ export interface UsageRow {
   limit: number | null;
   /** How full; null: no bar. */
   percent: number | null;
-  tone: VerdictTone;
+  tone: RowTone;
   pill: 'near' | 'full' | null;
   state: RowState;
 }
 
 /** How a monthly allowance stands; null: nothing to say of it. */
-function messagesTone(used: number | null, limit: number | null): MotiveTone | 'success' | null {
+function messagesTone(used: number | null, limit: number | null): RowTone | null {
   if (used === null || !limit) return null;
   const percent = (used / limit) * 100;
   if (percent >= 100) return 'danger';
@@ -99,7 +107,10 @@ export function verdictOf(usage: PlanUsage, assistant: AssistantRead): UsageVerd
     const { used, limit } = usage[thing];
     return limit !== null && used !== null && used >= limit;
   });
-  return { tone: motive?.tone ?? 'success', motive: motive ?? null, full };
+  if (motive) return { tone: motive.tone, motive, full, unchecked: null };
+  const unchecked =
+    assistant === null ? 'checking' : assistant === 'failed' || usage.meters.some((meter) => !meter.available) ? 'incomplete' : null;
+  return { tone: unchecked ? 'neutral' : 'success', motive: null, full, unchecked };
 }
 
 function row(id: string, kind: UsageRow['kind'], fields: Partial<UsageRow>): UsageRow {

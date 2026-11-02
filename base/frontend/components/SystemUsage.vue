@@ -2,7 +2,8 @@
 // System › «Usage and plan» (BASE-F40; it joins the old Resources and «Plan and limits»), for who runs the business (the
 // page tells anyone else who may see it): the live `base.plan.usage`, so whoever opens it knows in one line whether to
 // upgrade (`lib/plan-usage.ts`), then what the plan includes, the fullest first, and what no plan limits. The assistant's
-// messages wait on erplora.com, so they are asked apart, once the plan is known, and failing only touches their own row.
+// messages wait on erplora.com, so they are asked apart, once the plan is known; failing touches their own row and keeps the
+// line from saying green, with «Retry».
 // «Upgrade plan» goes by BASE-F11's rule (`lib/plan-link.ts`). What was not measured yet says so, never with a zero; a demo
 // says it is not measured; without the plan, what is in use goes with no limit, bar, pill or verdict.
 import { InlineFeedback, StatusPill, UsageMeter } from '@erplora/ui/components';
@@ -24,22 +25,33 @@ const failed = computed(() => status.value === 'error' && usage.value === undefi
 const { planUrl, offered } = usePlanLink();
 
 const assistant = ref<AssistantRead>(null);
+
+function askTheAssistant(): void {
+  client.api.call('base.assistant.usage', {}).then(
+    (read) => {
+      assistant.value = read;
+    },
+    (error: unknown) => {
+      console.warn('base: the assistant’s messages could not be read', error);
+      assistant.value = 'failed';
+    },
+  );
+}
+
 watch(
   () => usage.value?.known === true,
   (known) => {
-    if (!known) return;
-    client.api.call('base.assistant.usage', {}).then(
-      (read) => {
-        assistant.value = read;
-      },
-      (error: unknown) => {
-        console.warn('base: the assistant’s messages could not be read', error);
-        assistant.value = 'failed';
-      },
-    );
+    if (known) askTheAssistant();
   },
   { immediate: true },
 );
+
+/** «Retry» of the neutral line: everything that could not be read, again; it is checking meanwhile. */
+function checkAgain(): void {
+  assistant.value = null;
+  askTheAssistant();
+  void refresh();
+}
 
 function onDay(day: string): string {
   // A UTC day (`YYYY-MM-DD`), said as that day wherever the screen is.
@@ -69,7 +81,8 @@ function motiveText(motive: Motive): string {
 }
 
 const verdictLine = computed(() => {
-  const { motive } = verdict.value ?? {};
+  const { motive, unchecked } = verdict.value ?? {};
+  if (unchecked) return t(`base.system.usage.verdict.${unchecked}`);
   if (!motive) return t('base.system.usage.verdict.enough');
   return t(`base.system.usage.verdict.${motive.tone === 'danger' ? 'must' : 'should'}`, { motive: motiveText(motive) });
 });
@@ -209,6 +222,19 @@ function pillTone(row: UsageRow) {
       >
         <template v-if="fullLine">
           {{ fullLine }}
+        </template>
+        <template
+          v-if="verdict.unchecked === 'incomplete'"
+          #actions
+        >
+          <ion-button
+            size="small"
+            fill="outline"
+            data-testid="system-usage-verdict-retry"
+            @click="checkAgain()"
+          >
+            {{ t('base.system.retry') }}
+          </ion-button>
         </template>
       </InlineFeedback>
       <InlineFeedback
