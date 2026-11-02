@@ -42,6 +42,15 @@ function embed(block: object | null) {
     : '';
 }
 
+/** An answer of erplora.com the test gives when it wants. */
+function heldAnswer(): { promise: Promise<Response>; resolve: (answer: Response) => void } {
+  let resolve: (answer: Response) => void = () => {};
+  const promise = new Promise<Response>((given) => {
+    resolve = given;
+  });
+  return { promise, resolve };
+}
+
 async function open(
   usage?: PlanUsage,
   options: Parameters<typeof mountBase>[1] & { assistant?: AssistantUsage | 'failed' | 'waiting' | Promise<Response> } = {},
@@ -141,7 +150,7 @@ describe('SystemUsage', () => {
 
   describe('the line at the top, when not everything could be read', () => {
     it('while the assistant answers it never says green, and it does not flicker from green to red', async () => {
-      const answer = Promise.withResolvers<Response>();
+      const answer = heldAnswer();
       const m = await open(figures(), { assistant: answer.promise });
       expect(m.part('verdict').attributes('data-tone')).toBe('neutral');
       expect(m.part('verdict').text()).toContain('Checking your plan…');
@@ -156,7 +165,7 @@ describe('SystemUsage', () => {
     });
 
     it('with the assistant answering room, it goes from checking to green', async () => {
-      const answer = Promise.withResolvers<Response>();
+      const answer = heldAnswer();
       const m = await open(figures(), { assistant: answer.promise });
       expect(m.part('verdict').attributes('data-tone')).toBe('neutral');
 
