@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:896e02f85d58089c61e8a694a04f13f97cd50e3536df6c1e209ca4abbc765688 -->
+<!-- generated from WORKBOOK.md sha256:1123c182329c846f87764cd6fb0ab73b9be5d7d7c85984fe7f0f617f8fd8e94d -->
 
 ## What it is for and who it is for
 
@@ -1210,11 +1210,13 @@ Steps:
   6. At the end of the list, "Capacity": "{used} of {limit} connections", the highest measured today against what it
      really has (what its plan includes or, if that is less, what the service gives), with its bar. It never goes by
      percentage, because with a limit of 1 the first operation of the day is already 100 %, but by the times someone got
-     "Too many requests. Try again in a moment.": "fell short {count} times this week". Then, if a bigger plan would give
+     "Too many requests. Try again in a moment.": "Fell short {count} times this week". Then, if a bigger plan would give
      more, it moves to the top of the list and the line at the top turns red.
   7. If their plan already includes all the capacity the service gives, a bigger plan would give them no more: the row
      offers no upgrade, does not turn the top red and, when it falls short, says "You already have the maximum capacity:
-     tell us in "Report a problem".".
+     tell us in "Report a problem".". Green does not come at the top either: the line, neutral, says "You do not need to
+     upgrade: you already have the maximum capacity, but it sometimes falls short.". If there is another motive (the files
+     or the messages), that one wins.
   8. "For your information", what no plan limits, with no bar or pill: "Requests this month", the ones the business has
      served since day 1; "Active now", the people with activity in the last 5 minutes; "Last 30 days" and "Database size",
      with "Measured on {day}". Neither CPU nor memory: they cannot be attributed to a business, so they do not appear, nor

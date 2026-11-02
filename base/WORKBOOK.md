@@ -1262,11 +1262,12 @@ Pasos:
   6. Al final de la lista, «Capacidad»: «{used} de {limit} conexiones», el máximo medido hoy frente a lo que de verdad
      tiene (lo que incluye su plan o, si es menos, lo que da el servicio), con su barra. Nunca va por porcentaje, porque
      con tope 1 la primera operación del día ya es el 100 %, sino por las veces que a alguien le salió «Demasiadas
-     peticiones. Inténtalo de nuevo en un momento.»: «se quedó corta {count} veces esta semana». Entonces, si un plan
+     peticiones. Inténtalo de nuevo en un momento.»: «Se quedó corta {count} veces esta semana». Entonces, si un plan
      mayor daría más, sube al principio de la lista y la línea de arriba se pone en rojo.
   7. Si su plan ya incluye toda la capacidad que da el servicio, un plan mayor no le daría más: la fila no ofrece
      ampliar, no pone rojo arriba y, cuando se queda corta, dice «Ya tienes la capacidad máxima: cuéntanoslo en «Reportar
-     un problema».».
+     un problema».». Arriba tampoco sale el verde: la línea, neutra, dice «No hace falta que amplíes: ya tienes la capacidad
+     máxima, pero a veces se queda corta.». Si hay otro motivo (los archivos o los mensajes), gana ese.
   8. «Para tu información», lo que ningún plan limita, sin barra ni pastilla: «Peticiones este mes», las que ha atendido
      el negocio desde el día 1; «Activas ahora», las personas con actividad en los últimos 5 minutos; «Últimos 30 días» y
      «Tamaño de la base», con «Medido el {day}». Ni CPU ni memoria: no se pueden atribuir a un negocio, así que no salen,

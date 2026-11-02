@@ -196,7 +196,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
         await expect(testid(page, 'system-usage-row-files').locator('.usage-meter')).toHaveAttribute('data-tone', 'success');
         await expect(testid(page, 'system-usage-row-capacity')).toContainText('Capacity');
         await expect(testid(page, 'system-usage-row-capacity')).toContainText(/[1-3] of 3 connections/);
-        await expect(testid(page, 'system-usage-row-capacity')).not.toContainText('fell short');
+        await expect(testid(page, 'system-usage-row-capacity')).not.toContainText('Fell short');
         // A bar says nothing of its percentage on this screen: its amount is above it.
         await expect(testid(page, 'system-usage-row-capacity').locator('.usage-meter__percent')).toBeHidden();
         await expect(testid(page, 'system-usage-row-assistant')).toBeVisible();
@@ -261,7 +261,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       try {
         await expect(testid(page, 'system-usage-verdict')).toHaveAttribute('data-tone', 'danger');
         await expect(testid(page, 'system-usage-verdict')).toContainText('You have to upgrade: your business runs out of capacity at its busiest moments');
-        await expect(testid(page, 'system-usage-row-capacity')).toContainText(/fell short [4-9] times this week/);
+        await expect(testid(page, 'system-usage-row-capacity')).toContainText(/Fell short [4-9] times this week/);
         await expect(testid(page, 'system-usage-row-capacity').locator('.usage-meter')).toHaveAttribute('data-tone', 'danger');
         await expect(shown(page).locator('[data-testid^="system-usage-row-"]').first()).toHaveAttribute('data-testid', 'system-usage-row-capacity');
         await snap(page, 'BASE-F40-red', width);
@@ -276,15 +276,29 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
         await expect(testid(page, 'system-usage-row-files').locator('.usage-meter')).toHaveAttribute('data-tone', 'danger');
         await snap(page, 'BASE-F40-red-files', width);
 
-        // A plan with all the service gives: its capacity never offers to upgrade, and 12 are 6 here.
+        // A plan with all the service gives: 12 are 6 here. Its capacity fell short: no red or upgrade for it, because a
+        // bigger plan would give no more, and no green over it either.
         measuredFiles(hubId, 512 * 1024);
         onPlan({ slug: 'pro', max_db_connections: 12, max_storage_bytes: 1024 * 1024 });
         await page.goto(`${A}/system`);
-        await expect(testid(page, 'system-usage-verdict')).toHaveAttribute('data-tone', 'success');
+        await expect(testid(page, 'system-usage-verdict')).toHaveAttribute('data-tone', 'neutral');
+        await expect(testid(page, 'system-usage-verdict')).toContainText('You do not need to upgrade: you already have the maximum capacity, but it sometimes falls short.');
+        await expect(testid(page, 'system-usage-verdict-retry')).toHaveCount(0);
         await expect(testid(page, 'system-usage-row-capacity')).toContainText(/[1-6] of 6 connections/);
         await expect(testid(page, 'system-usage-row-capacity')).toContainText('You already have the maximum capacity: tell us in «Report a problem».');
         await expect(testid(page, 'system-usage-row-capacity').locator('.usage-meter')).toHaveAttribute('data-tone', 'success');
-        await snap(page, 'BASE-F40-top-plan', width);
+        await snap(page, 'BASE-F40-neutral-capacity', width);
+
+        // Its bell has no row for it: nothing to upgrade to.
+        await page.goto(`${A}/`);
+        await openBell(page);
+        await expect(page.locator('ion-popover [data-testid="hub-bell-row"]', { hasText: 'Plan limits' })).toHaveCount(0);
+
+        // A real motive wins that line: more space can be bought.
+        measuredFiles(hubId, 900 * 1024);
+        await page.goto(`${A}/system`);
+        await expect(testid(page, 'system-usage-verdict')).toHaveAttribute('data-tone', 'warning');
+        await expect(testid(page, 'system-usage-verdict')).toContainText('You should upgrade: you are almost out of space for files');
       } finally {
         await context.close();
       }

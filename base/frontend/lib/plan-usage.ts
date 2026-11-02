@@ -7,7 +7,8 @@
 // - People, devices and apps at their limit say «Full» on their row and never change the colour: a Free business with its
 //   one device in use is fine, and that alarm would never go away.
 // - Capacity never goes by its percentage, only by the times it fell short: with a limit of 1 the first operation is its
-//   100 %. And on a plan with all the service gives there is nothing to upgrade to.
+//   100 %. On a plan with all the service gives there is nothing to upgrade to, so falling short is no motive and no red,
+//   but neither is it green: a neutral line says so, unless a real motive wins it.
 // - What the plan does not include, could not be read or was not measured yet is no motive.
 // - Green only when everything that applies was read: with no motive, while the assistant answers the line says it is
 //   checking, and with the assistant or an app that could not be read it says not everything could be checked, never that
@@ -47,8 +48,11 @@ export interface UsageVerdict {
   motive: Motive | null;
   /** What is at its limit and never changes the colour. */
   full: FullThing[];
-  /** With no motive: something is still answering, or could not be read. The line is neutral then, never green. */
-  unchecked: 'checking' | 'incomplete' | null;
+  /**
+   * Why the line is neutral, with no motive: something is still answering, something could not be read, or capacity fell
+   * short with nothing bigger to upgrade to. Never green then.
+   */
+  neutral: 'checking' | 'incomplete' | 'capacity' | null;
 }
 
 export type RowState = 'measured' | 'noLimit' | 'notIncluded' | 'notMeasured' | 'unavailable' | 'loading' | 'plain';
@@ -75,8 +79,8 @@ function messagesTone(used: number | null, limit: number | null): RowTone | null
   return percent >= NEAR_PERCENT ? 'warning' : 'success';
 }
 
-const fellShort = (usage: PlanUsage): boolean =>
-  usage.connections.bigger_plan_gives_more && (usage.connections.busy_last_7_days ?? 0) > 0;
+const shortOfRoom = (usage: PlanUsage): boolean => (usage.connections.busy_last_7_days ?? 0) > 0;
+const fellShort = (usage: PlanUsage): boolean => usage.connections.bigger_plan_gives_more && shortOfRoom(usage);
 
 const GRAVITY: Record<MotiveTone, number> = { danger: 1, warning: 0 };
 
@@ -107,10 +111,16 @@ export function verdictOf(usage: PlanUsage, assistant: AssistantRead): UsageVerd
     const { used, limit } = usage[thing];
     return limit !== null && used !== null && used >= limit;
   });
-  if (motive) return { tone: motive.tone, motive, full, unchecked: null };
-  const unchecked =
-    assistant === null ? 'checking' : assistant === 'failed' || usage.meters.some((meter) => !meter.available) ? 'incomplete' : null;
-  return { tone: unchecked ? 'neutral' : 'success', motive: null, full, unchecked };
+  if (motive) return { tone: motive.tone, motive, full, neutral: null };
+  const neutral = neutralReason(usage, assistant);
+  return { tone: neutral ? 'neutral' : 'success', motive: null, full, neutral };
+}
+
+/** Why there is no green with no motive; first what may still turn out to be one: «no need to upgrade» needs it all read. */
+function neutralReason(usage: PlanUsage, assistant: AssistantRead): UsageVerdict['neutral'] {
+  if (assistant === null) return 'checking';
+  if (assistant === 'failed' || usage.meters.some((meter) => !meter.available)) return 'incomplete';
+  return shortOfRoom(usage) ? 'capacity' : null;
 }
 
 function row(id: string, kind: UsageRow['kind'], fields: Partial<UsageRow>): UsageRow {

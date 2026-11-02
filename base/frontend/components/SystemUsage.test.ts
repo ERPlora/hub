@@ -383,17 +383,17 @@ describe('SystemUsage', () => {
       const m = await open(figures());
       expect(m.row('capacity').text()).toContain('Capacity');
       expect(m.row('capacity').text()).toContain('2 of 3 connections');
-      expect(m.row('capacity').text()).not.toContain('fell short');
+      expect(m.row('capacity').text()).not.toContain('Fell short');
       expect(m.row('capacity').get('.usage-meter').attributes('data-tone')).toBe('success');
     });
 
     it('says how many times it fell short this week', async () => {
       const many = await open(figures({ connections: FELL_SHORT }));
-      expect(many.row('capacity').text()).toContain('fell short 4 times this week');
+      expect(many.row('capacity').text()).toContain('Fell short 4 times this week');
       expect(many.row('capacity').get('.usage-meter').attributes('data-tone')).toBe('danger');
       many.wrapper.unmount();
       const once = await open(figures({ connections: { ...FELL_SHORT, busy_last_7_days: 1 } }));
-      expect(once.row('capacity').text()).toContain('fell short once this week');
+      expect(once.row('capacity').text()).toContain('Fell short once this week');
     });
 
     it('counted for less than 7 days says since when', async () => {
@@ -410,11 +410,29 @@ describe('SystemUsage', () => {
     it('a plan with all the service gives never offers to upgrade it: it says where to tell us', async () => {
       embed({ name: 'Bar', plan_url: PLAN_URL });
       const m = await open(figures({ plan_slug: 'pro', connections: TOP_PLAN }));
-      expect(m.part('verdict').attributes('data-tone')).toBe('success');
+      // No green over «Fell short», and no red: a bigger plan would give no more.
+      expect(m.part('verdict').attributes('data-tone')).toBe('neutral');
+      expect(m.part('verdict').text()).toContain(
+        'You do not need to upgrade: you already have the maximum capacity, but it sometimes falls short.',
+      );
+      expect(m.part('verdict').text()).not.toContain('Your plan is enough');
+      expect(m.part('verdict-retry').exists()).toBe(false);
       expect(m.row('capacity').text()).toContain('You already have the maximum capacity: tell us in «Report a problem».');
       expect(m.row('capacity').text()).toContain('6 of 6 connections');
       expect(m.row('capacity').get('.usage-meter').attributes('data-tone')).toBe('success');
       expect(m.row('capacity').find('a').exists()).toBe(false);
+    });
+
+    it('at the top of the service, a real motive still wins the line', async () => {
+      const m = await open(figures({ plan_slug: 'pro', connections: TOP_PLAN, files: NEAR_FILES }));
+      expect(m.part('verdict').attributes('data-tone')).toBe('warning');
+      expect(m.part('verdict').text()).toContain('You should upgrade: you are almost out of space for files');
+    });
+
+    it('at the top of the service, never having fallen short, the line is green', async () => {
+      const m = await open(figures({ plan_slug: 'pro', connections: { ...TOP_PLAN, busy_last_7_days: 0 } }));
+      expect(m.part('verdict').attributes('data-tone')).toBe('success');
+      expect(m.part('verdict').text()).toContain('Your plan is enough');
     });
 
     it('with no measure today says so: no bar, never a zero', async () => {
@@ -549,7 +567,7 @@ describe('SystemUsage', () => {
     expect(m.row('whatsapp_inbox').text()).toContain('40 de 150 al mes');
     expect(m.row('capacity').text()).toContain('Capacidad');
     expect(m.row('capacity').text()).toContain('2 de 3 conexiones');
-    expect(m.row('capacity').text()).toContain('se quedó corta 4 veces esta semana');
+    expect(m.row('capacity').text()).toContain('Se quedó corta 4 veces esta semana');
     expect(m.part('information-heading').text()).toBe('Para tu información');
     expect(m.part('info-requests').text()).toContain('Peticiones este mes');
     expect(m.part('info-active').text()).toContain('Activas ahora');
@@ -578,6 +596,7 @@ describe('SystemUsage', () => {
     );
 
     const top = await open(figures({ connections: TOP_PLAN, files: { ...FIGURES.files, limit: null, percent: null, status: null } }), { locale: 'es', assistant: { ...MESSAGES, limit: 0, used: 0 } });
+    expect(top.part('verdict').text()).toContain('No hace falta que amplíes: ya tienes la capacidad máxima, pero a veces se queda corta.');
     expect(top.row('capacity').text()).toContain('Ya tienes la capacidad máxima: cuéntanoslo en «Reportar un problema».');
     expect(top.row('files').text()).toContain('2 GB · Sin límite');
     expect(top.row('assistant').text()).toContain('Tu plan no incluye asistente');
@@ -594,7 +613,7 @@ describe('SystemUsage', () => {
     expect(managed.part('managed').text()).toBe('Los planes se gestionan desde tu cuenta de ERPlora, en erplora.com.');
     expect(managed.row('files').text()).toContain('Se mide cada noche: la primera cifra llega mañana.');
     expect(managed.row('capacity').text()).toContain('Todavía sin medir hoy.');
-    expect(managed.row('capacity').text()).toContain('se quedó corta 1 vez esta semana');
+    expect(managed.row('capacity').text()).toContain('Se quedó corta 1 vez esta semana');
     managed.wrapper.unmount();
 
     const demo = await open(figures({ demo: true, known: false }), { locale: 'es' });

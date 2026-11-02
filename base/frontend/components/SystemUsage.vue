@@ -81,8 +81,8 @@ function motiveText(motive: Motive): string {
 }
 
 const verdictLine = computed(() => {
-  const { motive, unchecked } = verdict.value ?? {};
-  if (unchecked) return t(`base.system.usage.verdict.${unchecked}`);
+  const { motive, neutral } = verdict.value ?? {};
+  if (neutral) return t(`base.system.usage.verdict.${neutral}`);
   if (!motive) return t('base.system.usage.verdict.enough');
   return t(`base.system.usage.verdict.${motive.tone === 'danger' ? 'must' : 'should'}`, { motive: motiveText(motive) });
 });
@@ -224,7 +224,7 @@ function pillTone(row: UsageRow) {
           {{ fullLine }}
         </template>
         <template
-          v-if="verdict.unchecked === 'incomplete'"
+          v-if="verdict.neutral === 'incomplete'"
           #actions
         >
           <ion-button

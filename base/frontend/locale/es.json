@@ -527,6 +527,7 @@
           "enough": "Tu plan te alcanza",
           "checking": "Comprobando tu plan…",
           "incomplete": "No hemos podido comprobarlo todo",
+          "capacity": "No hace falta que amplíes: ya tienes la capacidad máxima, pero a veces se queda corta.",
           "must": "Tienes que ampliar: {motive}",
           "should": "Te conviene ampliar: {motive}",
           "full": "{things} al completo: para añadir más, amplía el plan."
@@ -566,7 +567,7 @@
           "near": "Cerca",
           "full": "Completo"
         },
-        "fellShort": "se quedó corta 1 vez esta semana | se quedó corta {count} veces esta semana",
+        "fellShort": "Se quedó corta 1 vez esta semana | Se quedó corta {count} veces esta semana",
         "topCapacity": "Ya tienes la capacidad máxima: cuéntanoslo en «Reportar un problema».",
         "notMeasured": "Todavía sin medir.",
         "notMeasuredToday": "Todavía sin medir hoy.",

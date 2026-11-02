@@ -527,6 +527,7 @@
           "enough": "Your plan is enough",
           "checking": "Checking your plan…",
           "incomplete": "We could not check everything",
+          "capacity": "You do not need to upgrade: you already have the maximum capacity, but it sometimes falls short.",
           "must": "You have to upgrade: {motive}",
           "should": "You should upgrade: {motive}",
           "full": "{things} at the limit: to add more, upgrade the plan."
@@ -566,7 +567,7 @@
           "near": "Close",
           "full": "Full"
         },
-        "fellShort": "fell short once this week | fell short {count} times this week",
+        "fellShort": "Fell short once this week | Fell short {count} times this week",
         "topCapacity": "You already have the maximum capacity: tell us in «Report a problem».",
         "notMeasured": "Not measured yet.",
         "notMeasuredToday": "Not measured today yet.",
