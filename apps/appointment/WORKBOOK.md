@@ -596,7 +596,8 @@ Estado: hecho
 Actor: empleado (las suyas), responsable, asistente
 Pantalla: Agenda (Editar) y asistente
 Pasos:
-1. En «Editar la cita» cambia las notas, o pide al asistente corregir el teléfono o el email.
+1. En «Editar la cita» cambia las notas, o pide al asistente corregir el teléfono o el email. **Editar** solo
+   está en una cita pendiente o confirmada sin cobrar; las notas de cualquier otra se cambian por el asistente.
 2. Solo cambia lo que se envía. El teléfono se guarda en formato internacional, con el prefijo del país;
    uno que no es un número válido se rechaza (`appointment.phone_invalid`) y no se guarda nada.
 Entra: una cita.

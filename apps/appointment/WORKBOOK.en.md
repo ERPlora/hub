@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:2082cea708ea0e7f2dac63bd04aca676150079dcdfab86cdb89d2b6df3396c6a -->
+<!-- generated from WORKBOOK.md sha256:d0666702b138778a39274c60f6476ead690be6cb213ad41a496cf40dc5770139 -->
 
 ## What it is for and who it is for
 
@@ -581,7 +581,9 @@ Status: done
 Actor: employee (their own), manager, assistant
 Screen: Agenda (Edit) and assistant
 Steps:
-1. In "Edit appointment" change the notes, or ask the assistant to correct the phone or the email.
+1. In "Edit appointment" change the notes, or ask the assistant to correct the phone or the email. **Edit** is
+   only on a pending or confirmed appointment that is not charged; the notes of any other one are changed
+   through the assistant.
 2. Only what is sent changes. The phone is saved in international format, with the country prefix;
    one that is not a valid number is refused (`appointment.phone_invalid`) and nothing is saved.
 In: an appointment.
