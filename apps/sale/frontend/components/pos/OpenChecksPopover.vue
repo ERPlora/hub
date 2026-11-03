@@ -3,8 +3,8 @@
 // F18). On top, a refusal (sticky); «Park this check» and its hint where parked tickets are allowed;
 // «Open checks — Tap a check to resume it.»; a row per open check of the business but the one on
 // screen, newest first, 20 at a time (title or amount, time and amount), that resumes it; and, for
-// whoever builds checks, its bin: a first tap arms it for 3 seconds («Tap again to delete — this voids
-// the check»), a second voids it. An empty check is whoever builds checks' (a party that left without
+// whoever builds checks, its bin: a first tap arms it for 3 seconds and says so on screen, in a line
+// under the check («Tap again to delete — this voids the check»; hub#463), a second voids it. An empty check is whoever builds checks' (a party that left without
 // ordering needs no manager); one with something on it is a manager's, so whoever may not void asks a
 // manager, who approves it with their PIN on this very device (BASE-F84). A voided check leaves the list
 // with the next live result.
@@ -150,6 +150,13 @@ const meta = (row: OrderRow) => {
           :name="armed === row.id ? 'ion:alert-circle-outline' : 'ion:trash-outline'"
         />
       </ion-button>
+      <p
+        v-if="armed === row.id"
+        class="pos-checks__confirm"
+        :data-testid="`pos-parked-${row.id}-confirm`"
+      >
+        {{ $t('sale.pos.deleteCheckConfirm') }}
+      </p>
     </div>
     <p
       v-if="checks.status.value !== 'loading' && !rows.length"
@@ -213,6 +220,7 @@ const meta = (row: OrderRow) => {
 }
 .pos-checks__item {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 0.3rem;
@@ -246,5 +254,13 @@ const meta = (row: OrderRow) => {
 .pos-checks__delete {
   margin: 0;
   --color: var(--ion-color-danger, #c5000f);
+}
+/* Its own line under the check, so the armed bin stays where the first tap was. */
+.pos-checks__confirm {
+  flex-basis: 100%;
+  margin: 0 0 0.3rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ion-color-danger, #c5000f);
 }
 </style>
