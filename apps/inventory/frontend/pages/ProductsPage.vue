@@ -150,7 +150,9 @@ const columns = computed<DataTableColumn<Product>[]>(() => [
 
 const isService = (row: Product): boolean => row.product_type === 'service';
 const actions = computed<DataTableAction<Product>[]>(() => [
-  { id: 'detail', label: t('inventory.products.actions.detail'), icon: 'ion:information-circle-outline' },
+  // In «⋮»: tapping the row opens the same sheet. Inline, its button took the room the «Not configured» chip needs
+  // to read whole at 1280 beside the «Photo» column (hub#530).
+  { id: 'detail', label: t('inventory.products.actions.detail'), icon: 'ion:information-circle-outline', menuOnly: true },
   ...(canMove.value
     ? [
         { id: 'receive', label: t('inventory.products.actions.receive'), icon: 'ion:download-outline', hidden: isService },
