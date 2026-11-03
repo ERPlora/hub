@@ -17,7 +17,7 @@ import { execSync } from 'node:child_process';
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { type Provider, startProvider } from './assistant-provider';
-import { A, api, capture, compactBar, login, psql, REPO_DIR, shown, turnOn, untilStill } from './helpers';
+import { A, api, capture, compactBar, login, psql, REPO_DIR, shown, turnOffTurnedOn, turnOnMissing, untilStill } from './helpers';
 import { createProduct, post, stamp } from './pricing-helpers';
 import { STACK } from './stack';
 
@@ -43,7 +43,10 @@ const FIFTEEN_DOLLARS = /15,00\s\$/;
 type PriceItem = { id: string; price: number; currency: string };
 
 let provider: Provider;
-let wasOn = new Set<string>();
+/** The apps this file turned on, in that order (`turnOnMissing`): its `afterAll` turns off these and nothing else, so
+ *  a `beforeAll` that falls before turning anything on (the SaaS without its assistant seed) leaves the business as it
+ *  found it (hub#480). */
+const turnedOn: string[] = [];
 
 function saasSql(sql: string): string {
   return execSync(`docker compose exec -T postgres psql -U hub -d ${SAAS_DB} -At -c "${sql}"`, {
@@ -75,9 +78,7 @@ test.beforeAll(async ({ browser }) => {
   const context = await browser.newContext();
   const page = await context.newPage();
   await login(page, A, '/');
-  const before = await api<{ apps: { id: string; state: string }[] }>(context, A, 'GET', '/apps');
-  wasOn = new Set(before.data.apps.filter((app) => app.state === 'on').map((app) => app.id));
-  await turnOn(context, A, ...NEEDED.filter((id) => !wasOn.has(id)));
+  await turnOnMissing(context, A, NEEDED, turnedOn);
   await context.close();
 });
 
@@ -92,10 +93,7 @@ test.afterAll(async ({ browser }) => {
   const context = await browser.newContext();
   const page = await context.newPage();
   await login(page, A, '/');
-  for (const app of [...NEEDED].reverse().filter((id) => !wasOn.has(id))) {
-    const off = await api(context, A, 'POST', '/apps/disable', { app });
-    expect(off.status, `turn off ${app}: ${JSON.stringify(off.data)}`).toBe(200);
-  }
+  await turnOffTurnedOn(context, A, turnedOn);
   await context.close();
   await provider?.close();
 });
