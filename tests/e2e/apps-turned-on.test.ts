@@ -9,7 +9,7 @@
 // `afterAll` turns off that record and nothing else, last first (`turnOffTurnedOn`, helpers.ts): a file that fell before
 // turning anything on leaves the business as it found it. The guardrail keeps it so: no hook, and no function a hook
 // can call, posts `/apps/disable` itself; only a test does (turning an app off is what some tests prove) and the one
-// helper.
+// helper, which every file hands the record its own `turnOnMissing` filled (never `NEEDED` or a copy).
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -91,6 +91,32 @@ function disablesOffTheRecord(file: string, source: string): string[] {
   return found;
 }
 
+/** Where `file` (`source`) hands `turnOffTurnedOn` something other than a record its own `turnOnMissing` filled (a
+ *  list of its own such as `NEEDED`, or a copy): hub#480 again, through the helper. `file:line` each. */
+function turnsOffOffTheRecord(file: string, source: string): string[] {
+  const sourceFile = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+  const calls: ts.CallExpression[] = [];
+  const walk = (node: ts.Node): void => {
+    if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)) calls.push(node);
+    ts.forEachChild(node, walk);
+  };
+  walk(sourceFile);
+  const named = (call: ts.CallExpression, name: string): boolean => (call.expression as ts.Identifier).text === name;
+  const records = new Set(
+    calls.filter((call) => named(call, 'turnOnMissing')).flatMap((call) => {
+      const record = call.arguments[3];
+      return record !== undefined && ts.isIdentifier(record) ? [record.text] : [];
+    }),
+  );
+  return calls
+    .filter((call) => named(call, 'turnOffTurnedOn'))
+    .filter((call) => {
+      const record = call.arguments[2];
+      return record === undefined || !ts.isIdentifier(record) || !records.has(record.text);
+    })
+    .map((call) => `${file}:${sourceFile.getLineAndCharacterOfPosition(call.getStart()).line + 1}`);
+}
+
 describe('turnOnRecording', () => {
   it('turns on, in order, only the needed apps that are off, and records each one once it is on', async () => {
     const calls: string[] = [];
@@ -159,6 +185,13 @@ describe('every source of the e2e', () => {
     expect(offenders, 'turn off in an afterAll with turnOffTurnedOn(context, origin, turnedOn) of helpers.ts').toEqual([]);
   });
 
+  it('hands turnOffTurnedOn only the record its own turnOnMissing filled', () => {
+    const sources = e2eSources().map((file) => ({ file, source: readFileSync(join(HERE, file), 'utf8') }));
+    expect(sources.filter(({ source }) => /turnOffTurnedOn\(context/.test(source)).length).toBeGreaterThan(1);
+    const offenders = sources.flatMap(({ file, source }) => turnsOffOffTheRecord(file, source));
+    expect(offenders, 'hand turnOffTurnedOn the same list the file handed turnOnMissing').toEqual([]);
+  });
+
   it('and helpers.ts posts it once, for each app of the record (turnOffTurnedOn → turnOffRecorded)', () => {
     const source = readFileSync(join(HERE, 'helpers.ts'), 'utf8');
     expect(disablesOutsideATest('helpers.ts', source)).toHaveLength(1);
@@ -186,6 +219,22 @@ describe('disablesOffTheRecord', () => {
   it('names one posted from another function of helpers.ts', () => {
     const other = `export async function turnOffAll(context, origin, turnedOn) {\n  await turnOffRecorded(turnedOn, async (app) => {\n    ${post}\n  });\n}`;
     expect(disablesOffTheRecord('helpers.ts', other)).toEqual(['helpers.ts:3']);
+  });
+});
+
+describe('turnsOffOffTheRecord', () => {
+  const on = 'test.beforeAll(async () => {\n  await turnOnMissing(context, A, NEEDED, turnedOn);\n});';
+
+  it('passes a file whose afterAll hands the record its turnOnMissing filled', () => {
+    const spec = `${on}\ntest.afterAll(async () => {\n  await turnOffTurnedOn(context, A, turnedOn);\n});`;
+    expect(turnsOffOffTheRecord('x.spec.ts', spec)).toEqual([]);
+  });
+
+  it('names one that hands it NEEDED, a copy of the record, or a record no turnOnMissing filled (hub#480)', () => {
+    for (const record of ['NEEDED', '[...NEEDED]', '[...turnedOn]', 'other']) {
+      const spec = `${on}\ntest.afterAll(async () => {\n  await turnOffTurnedOn(context, A, ${record});\n});`;
+      expect(turnsOffOffTheRecord('x.spec.ts', spec), record).toEqual(['x.spec.ts:5']);
+    }
   });
 });
 
