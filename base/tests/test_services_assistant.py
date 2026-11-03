@@ -89,6 +89,19 @@ def test_a_new_question_offers_the_tools_of_what_it_asks_and_the_instructions():
     assert "17.00 EUR → 1700" in plan["instructions"] and "`currency_decimals`" in plan["instructions"]
 
 
+def test_a_turn_whose_actor_has_no_role_here_names_none():
+    """hub#585: the role comes from the person's ``Membership`` in this business; an actor with none (a key, a
+    staff session elsewhere) is named nothing, and its turn still goes."""
+    plan = run("base.assistant.turn", messages=[ASK])
+    assert "You talk to the" not in plan["instructions"]
+
+
+def test_a_turn_names_the_role_of_the_persons_membership(make_user):
+    ana = make_user("ana", host="a", role=Membership.Role.ADMIN)
+    plan = run("base.assistant.turn", actor=ana, messages=[ASK])
+    assert "You talk to the «Administrador» of this business" in plan["instructions"]
+
+
 def test_the_instructions_take_the_decimals_of_the_business_currency_not_two():
     """FIX-HUB-BASE-ASSISTANT-CARD-MONEY-IN-BUSINESS-NOT-PREVIEW-CURRENCY: a yen business has no cents, so its turn
     tells the model «17 JPY → 17» (``base.business.get``'s ``currency_decimals``), never a fixed «.00 → 1700»;
