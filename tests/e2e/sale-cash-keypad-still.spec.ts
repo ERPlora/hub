@@ -7,7 +7,7 @@
 // to where each key was when the sheet opened, as a cashier's do; the sheet is scrolled to its end first, where a
 // sheet that shrinks would pull its content along. What a run creates, its product `E2E-KEYPAD-<run>` and its check,
 // is deleted after it.
-import { type Browser, expect, type Locator, type Page, test } from '@playwright/test';
+import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, capture, login, painted, shown } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
@@ -28,8 +28,9 @@ const SIZES = [
   { label: '375x667', width: 375, height: 667 },
   /** A tall phone, where the whole sheet fits. */
   { label: '390x844', width: 390, height: 844 },
-  /** The narrowest phone: the longest reason takes two lines of the row over the keypad. */
-  { label: '320x568', width: 320, height: 568 },
+  /** The narrowest phone: the longest reason takes two lines of the row over the keypad. Its till's «Charge» is under
+   *  the tab bar (hub#630): the sheet opens at 375x667 and the screen shrinks to this with it open. */
+  { label: '320x568', width: 320, height: 568, opensAt: { width: 375, height: 667 } },
 ] as const;
 type KeyId = '0' | '1' | '5' | 'clear' | 'dot';
 /** The issue's way of tendering: the two digits that cover the total, then what makes them another figure. */
@@ -70,12 +71,16 @@ async function openSheet(page: Page): Promise<Locator> {
   const sheet = page.locator('[data-testid=sale-checkout-modal]');
   await expect(sheet.locator('[data-testid=sale-checkout-keypad]')).toBeVisible();
   await expect(sheet.locator('[data-testid=sale-checkout-total]')).toContainText(/\d/);
-  // Both scrollers at their end: on a low screen, where the keys are reached; the column's from 821 px, the sheet's below.
+  await toTheEnd(sheet);
+  await capture(page, `${KEY}-sheet`);
+  return sheet;
+}
+
+/** Both scrollers at their end: on a low screen, where the keys are reached; the column's from 821 px, the sheet's below. */
+async function toTheEnd(sheet: Locator): Promise<void> {
   for (const scroller of ['.sale-checkout', '.pay-tender']) {
     await sheet.locator(scroller).evaluate((box) => box.scrollTo({ top: box.scrollHeight }));
   }
-  await capture(page, `${KEY}-sheet`);
-  return sheet;
 }
 
 /** Where every key is on screen, to the pixel's tenth, once the browser has painted the last tap. All in one read. */
@@ -109,8 +114,13 @@ async function totalOf(sheet: Locator): Promise<number> {
 }
 
 async function keypadStaysStill(page: Page, size: (typeof SIZES)[number], lang: 'en' | 'es'): Promise<void> {
-  await page.setViewportSize({ width: size.width, height: size.height });
+  const opensAt = 'opensAt' in size ? size.opensAt : size;
+  await page.setViewportSize({ width: opensAt.width, height: opensAt.height });
   const sheet = await openSheet(page);
+  if (opensAt !== size) {
+    await page.setViewportSize({ width: size.width, height: size.height });
+    await toTheEnd(sheet);
+  }
   const at = await places(page, sheet);
   const where = `${lang} ${size.label}`;
   expect.soft(at['0'].y + at['0'].height, `the last row on screen at ${where}`).toBeLessThanOrEqual(size.height);
@@ -140,28 +150,38 @@ async function keypadStaysStill(page: Page, size: (typeof SIZES)[number], lang: 
   await expect(sheet).toBeHidden();
 }
 
-async function everySize(browser: Browser, lang: 'en' | 'es', tendered: string): Promise<void> {
-  const context = await browser.newContext({ baseURL: A, locale: lang === 'es' ? 'es-ES' : 'en-US', viewport: { width: 1440, height: 900 } });
-  const page = await context.newPage();
-  await login(page, A, '/sale/pos');
-  // In the language under test (the Hub's language cookie, which the sign-in has just set from the account).
-  await context.addCookies([{ name: 'django_language', value: lang, domain: new URL(A).hostname, path: '/' }]);
-  await page.reload();
-  await aCheck(page);
-  const sheet = await openSheet(page);
-  await expect(sheet.locator('[data-testid=sale-checkout-tendered]'), 'the sheet in the language under test').toContainText(tendered);
-  await sheet.locator('[data-testid=sale-checkout-close]').click();
-  await expect(sheet).toBeHidden();
-  for (const size of SIZES) await keypadStaysStill(page, size, lang);
-  await context.close();
+const LANGUAGES = [
+  { name: 'English', lang: 'en', locale: 'en-US', tendered: 'Tendered' },
+  { name: 'Spanish', lang: 'es', locale: 'es-ES', tendered: 'Entregado' },
+] as const;
+
+for (const { name, lang, locale, tendered } of LANGUAGES) {
+  test.describe(`SALE-F01: in ${name}, the keypad stays under the finger until the change is on screen`, () => {
+    let context: BrowserContext;
+    let page: Page;
+
+    test.beforeAll(async ({ browser }) => {
+      context = await browser.newContext({ baseURL: A, locale, viewport: { width: 1440, height: 900 } });
+      page = await context.newPage();
+      await login(page, A, '/sale/pos');
+      // In the language under test (the Hub's language cookie, which the sign-in has just set from the account).
+      await context.addCookies([{ name: 'django_language', value: lang, domain: new URL(A).hostname, path: '/' }]);
+      await page.reload();
+      await aCheck(page);
+      const sheet = await openSheet(page);
+      await expect(sheet.locator('[data-testid=sale-checkout-tendered]'), 'the sheet in the language under test').toContainText(tendered);
+      await sheet.locator('[data-testid=sale-checkout-close]').click();
+      await expect(sheet).toBeHidden();
+    });
+
+    test.afterAll(async () => {
+      await context.close();
+    });
+
+    for (const size of SIZES) {
+      test(size.label, async () => {
+        await keypadStaysStill(page, size, lang);
+      });
+    }
+  });
 }
-
-test('SALE-F01: in English, the keypad stays under the finger until the change is on screen', async ({ browser }) => {
-  test.setTimeout(420_000);
-  await everySize(browser, 'en', 'Tendered');
-});
-
-test('SALE-F01: in Spanish, the keypad stays under the finger until the change is on screen', async ({ browser }) => {
-  test.setTimeout(420_000);
-  await everySize(browser, 'es', 'Entregado');
-});
