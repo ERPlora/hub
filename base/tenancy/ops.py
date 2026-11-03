@@ -49,7 +49,7 @@ class TemplateMissing(DatabaseOpsError):
     """The template a hub is cloned from is not on its cluster (``migrate_hubs`` makes them on every open one)."""
 
 
-def _reason(error: psycopg.Error) -> str:
+def reason(error: psycopg.Error) -> str:
     diag = getattr(error, "diag", None)
     return (diag and diag.message_primary) or str(error).strip()
 
@@ -61,7 +61,7 @@ def connect_ops(database: str = MAINTENANCE_DATABASE, *, cluster=None) -> Iterat
     try:
         conn = psycopg.connect(**tenancy_connections.migrator_conninfo(database, cluster=cluster), autocommit=True)
     except psycopg.Error as error:
-        raise DatabaseOpsError(f"The migrator cannot connect to {database!r}: {_reason(error)}") from error
+        raise DatabaseOpsError(f"The migrator cannot connect to {database!r}: {reason(error)}") from error
     try:
         yield conn
     finally:
@@ -113,16 +113,16 @@ def _create(conn, statement, name: str, template: str, waits: Sequence[float], s
         except errors.ObjectInUse as busy:
             if wait is None:
                 raise DatabaseOpsError(
-                    f"The template {template!r} is in use: {name!r} could not be cloned from it ({_reason(busy)})."
+                    f"The template {template!r} is in use: {name!r} could not be cloned from it ({reason(busy)})."
                 ) from busy
             sleep(wait)
             continue
         except errors.InvalidCatalogName as missing:
             raise TemplateMissing(
-                f"The template {template!r} is not on this cluster: {name!r} could not be cloned ({_reason(missing)})."
+                f"The template {template!r} is not on this cluster: {name!r} could not be cloned ({reason(missing)})."
             ) from missing
         except psycopg.Error as error:
-            raise DatabaseOpsError(f"{name!r} could not be cloned from {template!r}: {_reason(error)}") from error
+            raise DatabaseOpsError(f"{name!r} could not be cloned from {template!r}: {reason(error)}") from error
         return True
     raise AssertionError("unreachable: the last attempt returns or raises")
 
@@ -140,7 +140,7 @@ def _make_private(conn, target: sql.Identifier, name: str, roles: bootstrap.Name
                 )
             )
     except psycopg.Error as error:
-        raise DatabaseOpsError(f"The privileges of {name!r} could not be set: {_reason(error)}") from error
+        raise DatabaseOpsError(f"The privileges of {name!r} could not be set: {reason(error)}") from error
     for role in wanted:
         if role not in present:
             logger.warning(
@@ -159,5 +159,5 @@ def drop_database(name: str, *, cluster=None) -> bool:
             existed = conn.execute("SELECT 1 FROM pg_database WHERE datname = %s", [name]).fetchone() is not None
             conn.execute(sql.SQL("DROP DATABASE IF EXISTS {} WITH (FORCE)").format(target))
         except psycopg.Error as error:
-            raise DatabaseOpsError(f"{name!r} could not be dropped: {_reason(error)}") from error
+            raise DatabaseOpsError(f"{name!r} could not be dropped: {reason(error)}") from error
     return existed

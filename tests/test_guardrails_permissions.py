@@ -74,6 +74,10 @@ OPEN_OPERATIONS: dict[str, tuple[str, str]] = {
     ),
     "base.hub.get": (PLATFORM, "The SaaS reads a registry row it never heard ready from (/internal)."),
     "base.hub.register": (PLATFORM, "The SaaS registers or renames a business (/internal)."),
+    "base.app.activation_settle": (
+        PLATFORM,
+        "The worker turns on, or leaves failed, the apps whose tables it made in the business's own database (S3).",
+    ),
     "base.hub.reset_apply": (
         PLATFORM,
         "The worker empties the sections of a reset whose copy it kept (base.worker), in the business's own database.",
@@ -87,9 +91,47 @@ OPEN_OPERATIONS: dict[str, tuple[str, str]] = {
         "The SPA's own session, read at start: an anonymous visitor gets no user and no permission (the login).",
     ),
     "base.session.revoke": (PLATFORM, "The SaaS ends an account's sessions (/internal, back-channel logout)."),
+    "base.app.activation_settle": (
+        PLATFORM,
+        "The worker turns on, or marks failed, the apps whose tables it has just made in the business's own database "
+        "(base.worker); internal_only refuses anyone else.",
+    ),
+    "base.hub.cut_finish": (
+        PLATFORM,
+        "The last step of the cut of S5 (manage.py cut_shared_hubs): a business of phase 1 gets its own database "
+        "in control's registry; internal_only refuses anyone else.",
+    ),
     "base.usage.list": (
         PLATFORM,
         "The SaaS's collect_hub_usage reads what each business used on a day, measured that night (/internal/usage).",
+    ),
+    "control.cluster.close": (
+        PLATFORM,
+        "The Hub admin's «Close to new hubs» on a database cluster, for the platform's admins (staff and superuser).",
+    ),
+    "control.cluster.create": (
+        PLATFORM,
+        "The Hub admin registers a database cluster, for the platform's admins (staff and superuser).",
+    ),
+    "control.cluster.delete": (
+        PLATFORM,
+        "The Hub admin deletes a database cluster no hub is on, for the platform's admins (staff and superuser).",
+    ),
+    "control.cluster.sizes": (
+        PLATFORM,
+        "The Hub admin's sizes of the hubs' databases on a cluster, for the platform's staff (support only reads).",
+    ),
+    "control.cluster.update": (
+        PLATFORM,
+        "The Hub admin edits a database cluster, for the platform's admins (staff and superuser).",
+    ),
+    "control.hub.move": (
+        PLATFORM,
+        "The Hub admin's «Move to cluster…», for the platform's admins (staff and superuser); the worker moves it.",
+    ),
+    "control.hub.move_cancel": (
+        PLATFORM,
+        "The Hub admin's «Cancel the move», for the platform's admins (staff and superuser); the worker undoes it.",
     ),
     "staff.account.list": (
         CHECKED_INSIDE,

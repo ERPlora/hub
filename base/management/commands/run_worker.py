@@ -24,7 +24,8 @@ class Command(BaseCommand):
         parser.add_argument(
             "--databases-only",
             action="store_true",
-            help="Only make the hubs' databases and drop the demos that ended: no tasks, no outbox relay (the e2e).",
+            help="Only make the hubs' databases and the tables of the apps they turn on, and drop the demos that ended: no "
+            "tasks, no outbox relay (the e2e).",
         )
 
     def handle(self, *args, databases_only: bool = False, **options):

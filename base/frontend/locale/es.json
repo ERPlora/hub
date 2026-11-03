@@ -132,7 +132,9 @@
         "on": "Activa",
         "installed": "Instalada",
         "blocked": "Necesita suscripción",
-        "off": "Desactivada"
+        "off": "Desactivada",
+        "creating": "Activándose…",
+        "failed": "No se ha podido activar"
       },
       "right": {
         "free": "Gratis",
@@ -161,10 +163,12 @@
       "noResults": "No hay apps que coincidan con tu búsqueda.",
       "toggle": {
         "on": "Activar",
-        "off": "Desactivar"
+        "off": "Desactivar",
+        "retry": "Reintentar"
       },
       "turnedOn": "{app} está activada.",
       "turnedOff": "{app} está desactivada.",
+      "turningOn": "Activando {app}… Estará lista en un momento.",
       "alsoOn": "También se ha activado: {apps}.",
       "alsoOff": "También se ha desactivado: {apps}.",
       "confirmOn": {
@@ -194,6 +198,14 @@
     },
     "appBlocked": {
       "checking": "Comprobando por qué no se abre esta app…",
+      "creating": {
+        "heading": "Se está preparando {app}",
+        "body": "Se abre en un momento: esta página lo muestra en cuanto esté lista."
+      },
+      "failed": {
+        "heading": "No se ha podido preparar {app}",
+        "body": "Ve a Apps para volver a intentarlo. No se ha perdido nada del negocio."
+      },
       "subscription": {
         "heading": "Suscripción necesaria",
         "body": "{app} está deshabilitada porque este negocio no tiene su suscripción. Tus datos están a salvo y vuelven en cuanto se contrate."

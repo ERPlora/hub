@@ -15,8 +15,8 @@ place of its hub's limiter in this process and carries its plan's ``statement_ti
 own budget.
 
 ``connections.settings`` is never changed in place: ``close_old_connections`` walks it from other threads, so a new
-dict with the alias is swapped in, under a lock, after looking again. A hub of the shared database (``db_name=""``,
-phase 1 until S5) stays on ``default``.
+dict with the alias is swapped in, under a lock, after looking again. A business without a database of its own
+(``db_name=""``: phase 1's, not yet cut) has no alias (``HubWithoutDatabase``): since S5 it never runs on ``default``.
 
 The migrator's alias, ``<db_name>__ddl`` (PLAN-DB §4 and §7), is the same database reached directly, without
 PgBouncer and without the control database's pool, as the migrator's role: only the migrator, the provisioning
@@ -82,6 +82,11 @@ def _register(alias: str, build, *, replace: bool = False) -> str:
 
 #: What a rotation of a cluster's secret changes in a hub's alias.
 ROLE_KEYS = ("USER", "PASSWORD")
+#: Where and as whom an alias reaches its database: a rotation changes its role, a move (``base.tenancy.move``) its
+#: server. When the hub's row (read again by every request, live re-run and worker pass) says otherwise than the alias,
+#: the alias is registered again with it and this thread's connection given it; another thread's takes it when that
+#: thread opens the hub again.
+REACH_KEYS = ("HOST", "PORT", *ROLE_KEYS)
 
 
 def _take_this_threads_role(alias: str) -> None:
@@ -89,16 +94,19 @@ def _take_this_threads_role(alias: str) -> None:
     (another thread's takes them when that thread opens the hub again: every request does, through ``use_hub``)."""
     current = connections.settings[alias]
     for connection in connections.all(initialized_only=True):
-        if connection.alias == alias and any(connection.settings_dict.get(key) != current[key] for key in ROLE_KEYS):
+        if connection.alias == alias and any(connection.settings_dict.get(key) != current[key] for key in REACH_KEYS):
             connection.close()
             connection.settings_dict = copy.deepcopy(current)
 
 
 def _not_a_template(name: str, control: str) -> str:
-    """``name``, unless it is one of ``control``'s templates (``InvalidDatabaseName``): only the migrator reaches those."""
+    """``name``, unless it is one of ``control``'s templates (``InvalidDatabaseName``): only the migrator reaches those;
+    nor the copy a hub left behind when it moved (``base.tenancy.move``): closed to the app, only ever dropped."""
     template = names.template_db_name(control)
     if name == template or name.startswith(f"{template}_"):
         raise names.InvalidDatabaseName(f"{name!r} is a template: it is only cloned, never a hub's database.")
+    if names.is_moved(name, control=control):
+        raise names.InvalidDatabaseName(f"{name!r} is the copy a hub left behind when it moved, never a hub's database.")
     return name
 
 
@@ -132,7 +140,8 @@ def register_hub_alias(hub) -> str:
                 "PORT": port,
                 "OPTIONS": copy.deepcopy(connections.settings[TEMPLATE_ALIAS]["OPTIONS"]) | tls,
             }
-    rotated = registered is not None and any(registered[key] != overrides.get(key, registered[key]) for key in ROLE_KEYS)
+    template = connections.settings[TEMPLATE_ALIAS]
+    rotated = registered is not None and any(registered[key] != overrides.get(key, template[key]) for key in REACH_KEYS)
     _register(alias, lambda: _copied(TEMPLATE_ALIAS, **overrides), replace=rotated)
     _take_this_threads_role(alias)
     limits.configure(alias, hub)
@@ -167,7 +176,7 @@ def migrator_conninfo(dbname: str, *, cluster=None) -> dict:
 def register_ddl_alias(db_name: str, *, cluster=None) -> str:
     """The migrator's alias of the database ``db_name`` (``<db_name>__ddl``) on ``cluster`` (or the settings' own
     server): direct, as the migrator's role, no pool, closed after use. Registered again when that role's user or
-    password changed (a rotation of the cluster's ``…/migrator`` secret)."""
+    password changed (a rotation of the cluster's ``…/migrator`` secret), or its writer (a move)."""
     names.validate(db_name, control=control_name())
     found = credentials_for(cluster, MIGRATOR)
 
@@ -188,7 +197,8 @@ def register_ddl_alias(db_name: str, *, cluster=None) -> str:
 
     name = f"{db_name}{names.DDL_SUFFIX}"
     registered = connections.settings.get(name)
-    rotated = registered is not None and (registered["USER"], registered["PASSWORD"]) != (found.user, found.password)
+    reach = (*_writer(cluster), found.user, found.password)
+    rotated = registered is not None and tuple(registered[key] for key in REACH_KEYS) != reach
     alias = _register(name, build, replace=rotated)
     # A connection object this thread kept from an earlier registration (forgotten since) reaches as that one's role.
     _take_this_threads_role(alias)
@@ -205,19 +215,20 @@ def close_hub_aliases(hub) -> None:
 
 
 def alias_for(hub) -> str:
-    """The alias ``hub``'s models go to: its database's, or ``default`` while it shares control's (``db_name=""``)."""
+    """The alias ``hub``'s models go to, its database's; ``HubWithoutDatabase`` for a business without one."""
     if not hub.db_name:
-        return DEFAULT_DB_ALIAS
+        from base.tenancy.context import HubWithoutDatabase
+
+        raise HubWithoutDatabase(f"The business {hub.slug or hub.id} has no database of its own: it has no alias.")
     return register_hub_alias(hub)
 
 
 def open_hub_alias(hub) -> str:
     """:func:`alias_for` with the database's identity checked (once per process and alias): what ``use_hub`` uses."""
-    alias = alias_for(hub)
-    if alias != DEFAULT_DB_ALIAS:
-        from base.tenancy import identity
+    from base.tenancy import identity
 
-        identity.verify(alias, hub.id)
+    alias = alias_for(hub)
+    identity.verify(alias, hub.id)
     return alias
 
 

@@ -132,7 +132,9 @@
         "on": "Active",
         "installed": "Installed",
         "blocked": "Needs a subscription",
-        "off": "Off"
+        "off": "Off",
+        "creating": "Turning on…",
+        "failed": "Could not turn on"
       },
       "right": {
         "free": "Free",
@@ -161,10 +163,12 @@
       "noResults": "No apps match your search.",
       "toggle": {
         "on": "Turn on",
-        "off": "Turn off"
+        "off": "Turn off",
+        "retry": "Retry"
       },
       "turnedOn": "{app} is on.",
       "turnedOff": "{app} is off.",
+      "turningOn": "Turning on {app}… It will be ready in a moment.",
       "alsoOn": "Also turned on: {apps}.",
       "alsoOff": "Also turned off: {apps}.",
       "confirmOn": {
@@ -194,6 +198,14 @@
     },
     "appBlocked": {
       "checking": "Checking why this app does not open…",
+      "creating": {
+        "heading": "{app} is being set up",
+        "body": "It opens in a moment: this page shows it as soon as it is ready."
+      },
+      "failed": {
+        "heading": "{app} could not be set up",
+        "body": "Go to Apps to try again. Nothing of the business was lost."
+      },
       "subscription": {
         "heading": "Subscription needed",
         "body": "{app} is disabled because this business does not have its subscription. Your data is safe and comes back as soon as it is subscribed to."

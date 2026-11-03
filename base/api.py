@@ -82,18 +82,30 @@ async def app_list(request):
     return await run_operation(request, queries.app_list)
 
 
-# Turning an app on or off, with the plan's limit (PLAN-HUB §9): the app's id in the body.
+# Turning an app on or off, with the plan's limit (PLAN-HUB §9): the app's id in the body. While a hub's own database
+# gets the app's tables (S3) the same answer comes with 202: accepted, the worker finishes it.
+from django.http import JsonResponse  # noqa: E402
+
 from base.schemas import AppChangeIn  # noqa: E402
+
+
+def _accepted_while_creating(answer):
+    return JsonResponse(answer.model_dump(mode="json"), status=202) if answer.state == "creating" else answer
 
 
 @bind(router, "base.app.enable", "/apps/enable")
 async def app_enable(request, data: AppChangeIn):
-    return await run_operation(request, services.app_enable, data)
+    return _accepted_while_creating(await run_operation(request, services.app_enable, data))
 
 
 @bind(router, "base.app.disable", "/apps/disable")
 async def app_disable(request, data: AppChangeIn):
     return await run_operation(request, services.app_disable, data)
+
+
+@bind(router, "base.app.retry", "/apps/retry")
+async def app_retry(request, data: AppChangeIn):
+    return _accepted_while_creating(await run_operation(request, services.app_retry, data))
 
 
 @bind(router, "base.plan.usage", "/system/plan")

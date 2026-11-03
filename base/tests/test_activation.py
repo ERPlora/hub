@@ -232,3 +232,64 @@ def test_the_first_app_that_refuses_says_why():
 
 def test_a_blank_reason_is_no_refusal():
     assert activation.veto(["task"], ctx=None, configs=[Config("task", lambda ctx: "  ")]) is None
+
+
+# ── Its tables being made (S3; PLAN-DB §7): «creating» and «failed» ───────────────────────────────────────────────
+# In a hub with its own database an app's tables are made the first time it is turned on: meanwhile it is
+# ``creating``, and ``failed`` if making them failed (tried again). Both are wanted on: the closure by ``requires``, the
+# plan's limit and what goes off count them as on; only ``on`` is active (its operations, the relay, the menu).
+
+from base.activation import CREATING, FAILED  # noqa: E402
+
+
+def wanted(**given: str) -> dict[str, Activation]:
+    """Like :func:`states`, with ``creating``/``failed`` (``*`` chosen too)."""
+    out = {label: Activation(OFF, False) for label in GRAPH}
+    for label, mark in given.items():
+        out[label] = Activation(mark.rstrip("*"), mark.endswith("*"))
+    return out
+
+
+def test_the_states_are_on_off_creating_and_failed():
+    assert activation.STATES == (ON, OFF, CREATING, FAILED)
+    assert (CREATING, FAILED) == ("creating", "failed")
+
+
+@pytest.mark.parametrize(("state", "on", "is_wanted"), [(ON, True, True), (CREATING, False, True), (FAILED, False, True), (OFF, False, False)])
+def test_only_on_is_active_and_creating_or_failed_are_wanted_on(state, on, is_wanted):
+    assert Activation(state, True).on is on
+    assert Activation(state, True).wanted is is_wanted
+
+
+def test_one_being_created_and_chosen_changes_nothing_when_turned_on_again():
+    assert activation.enabling("sale", wanted(sale="creating*", tax="creating", customer="on"), GRAPH) == {}
+
+
+def test_one_that_failed_is_turned_on_again_and_what_it_needs_that_failed_too():
+    changes = activation.enabling("sale", wanted(sale="failed*", tax="failed", customer="on"), GRAPH)
+    assert changes == {"sale": Activation(ON, True), "tax": Activation(ON, False)}
+
+
+def test_what_it_needs_being_created_is_left_as_it_is():
+    changes = activation.enabling("invoice", wanted(sale="creating*", tax="creating", customer="creating"), GRAPH)
+    assert changes == {"invoice": Activation(ON, True)}
+
+
+def test_an_app_being_created_that_needs_one_keeps_it_from_going_off():
+    current = wanted(sale="creating*", tax="on", customer="on")
+    assert activation.required_by("tax", current, GRAPH) == ["sale"]
+    with pytest.raises(ValueError, match="sale"):
+        activation.disabling("tax", current, GRAPH)
+
+
+def test_turning_off_one_being_created_or_failed_turns_it_off_with_what_came_along():
+    assert activation.disabling("sale", wanted(sale="creating*", tax="creating", customer="on"), GRAPH) == {
+        "sale": Activation(OFF, False),
+        "tax": Activation(OFF, False),
+        "customer": Activation(OFF, False),
+    }
+    assert activation.disabling("task", wanted(task="failed*"), GRAPH) == {"task": Activation(OFF, False)}
+
+
+def test_the_chosen_ones_being_created_or_failed_count_against_the_limit():
+    assert activation.chosen_on(wanted(sale="creating*", task="failed*", invoice="on*", tax="creating")) == 3

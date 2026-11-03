@@ -11,9 +11,9 @@ for every hub with its own database it serves (ready, or a business that left an
 - ``active_users_1d`` and ``active_users_30d``: the people who came in that day, and in the 30 days that end it
   (``control.HubVisit``, noted at every login; the visits older than the window are forgotten after).
 
-A hub that still shares control's database is not measured (decision 3: it never gets control's size) and is logged
-once a night as ``base.usage_shared_database``. Each hub's figures replace that day's (one row per hub and day,
-``control.HubUsageDaily``) and its live queries hear it; the night also forgets the rows of the copies of the hubs' data
+A business without its own database (phase 1's, not cut yet) is not measured (decision 3: it never gets control's
+size) and is logged once a night as ``base.usage_shared_database``. Each hub's figures replace that day's (one row per
+hub and day, ``control.HubUsageDaily``) and its live queries hear it; the night also forgets the rows of the copies of the hubs' data
 past their 90 days (``base.tenancy.dumps.RETENTION``), which the bucket no longer keeps (``base.hub.usage_measured``). The night itself is a
 ``control.UsageRun``: the first worker that claims it measures it, a run left unfinished for :data:`RUN_TAKEOVER` is taken
 over, and a finished one is never measured again. ``GET /internal/usage`` (``base.internal``, ``base.usage.list``)
