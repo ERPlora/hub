@@ -7,7 +7,7 @@ any other view; both are commands (POST): reading what a file brings writes noth
 from asgiref.sync import sync_to_async
 from django.core.files.storage import storages
 from live.ninja import bind, run_operation
-from ninja import Query, Router
+from ninja import Query, Router, Status
 from ninja.decorators import decorate_view
 
 from django.http import HttpResponse
@@ -84,9 +84,7 @@ async def app_list(request):
 
 # Turning an app on or off, with the plan's limit (PLAN-HUB §9): the app by its name or its id in the body; which app
 # a name names, by ``base.app.get`` (hub#539). While a hub's own database gets the app's tables (S3) the same answer
-# comes with 202: accepted, the worker finishes it.
-from django.http import JsonResponse  # noqa: E402
-
+# comes with 202: accepted, the worker finishes it. Both codes are in the OpenAPI, with the same schema.
 from base.schemas import AppChangeIn, AppRefIn  # noqa: E402
 
 
@@ -96,10 +94,10 @@ async def app_get(request, params: Query[AppRefIn]):
 
 
 def _accepted_while_creating(answer):
-    return JsonResponse(answer.model_dump(mode="json"), status=202) if answer.state == "creating" else answer
+    return Status(202, answer) if answer.state == "creating" else answer
 
 
-@bind(router, "base.app.enable", "/apps/enable")
+@bind(router, "base.app.enable", "/apps/enable", status=(200, 202))
 async def app_enable(request, data: AppChangeIn):
     return _accepted_while_creating(await run_operation(request, services.app_enable, data))
 
@@ -109,7 +107,7 @@ async def app_disable(request, data: AppChangeIn):
     return await run_operation(request, services.app_disable, data)
 
 
-@bind(router, "base.app.retry", "/apps/retry")
+@bind(router, "base.app.retry", "/apps/retry", status=(200, 202))
 async def app_retry(request, data: AppChangeIn):
     return _accepted_while_creating(await run_operation(request, services.app_retry, data))
 

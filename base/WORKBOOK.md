@@ -2990,7 +2990,7 @@ Implicados: ACCOUNTS-F38, BASE-F40
   bajar de plan no apaga nada). Una app apagada da 404 `app_inactive` y sale del menú, del relay y del asistente
   (caché `base.apps_off:<host>`, olvidada al COMMIT). Una app cuyas tablas la BD del hub aún no tiene (`Hub.schema_apps`;
   las plantillas traen las de todas las portables, así que solo pasa con la que llega con un código posterior) da 202
-  `creating`: el worker las crea (`_activations`, `base.app.activation_settle`) o la deja `failed` con `attempts`,
+  `creating` (el OpenAPI documenta 200 y 202 con el mismo esquema, hub#705): el worker las crea (`_activations`, `base.app.activation_settle`) o la deja `failed` con `attempts`,
   `last_error` y `next_attempt_at` (1, 5 y 15 min, luego cada hora), y `base.app.retry` la vuelve a pedir (BASE-F21, F22;
   S3, hub#601). `last_error` no llega a la pantalla, que dice «No se ha podido activar»: se queda en la fila, y el
   evento `base.app.activation_failed` lleva su código. La sesión da `activating` a la que se prepara y `off` a la que falló, y ninguna
