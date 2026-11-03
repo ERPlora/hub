@@ -120,6 +120,15 @@ describe("«Read aloud» in the server's voice (round 2026-11-03n)", () => {
     expect(JSON.parse(String(init.body))).toEqual(XIMENA);
   });
 
+  it('a reading stopped before its audio arrives aborts the request: the signal goes to fetch, never into the body', async () => {
+    const fetcher = vi.fn(async () => new Response(MP3, { status: 200, headers: { 'Content-Type': 'audio/mpeg' } }));
+    const stop = new AbortController();
+    await speakAloud({ ...XIMENA, signal: stop.signal }, spaDocument(), fetcher);
+    const [, init] = fetcher.mock.calls[0] as unknown as [string, RequestInit];
+    expect(init.signal).toBe(stop.signal);
+    expect(JSON.parse(String(init.body))).toEqual(XIMENA);
+  });
+
   it("a refusal rejects with the envelope's code and sentence, so the panel reads with the device's voice", async () => {
     const envelope = { error: { code: 'base.assistant_speech_unavailable', message: 'Not available.' } };
     const fetcher = vi.fn(async () => Response.json(envelope, { status: 503 }));

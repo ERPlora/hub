@@ -95,9 +95,10 @@ export function hubApproval(ask?: AskApproval): AssistantApproval {
 export const SPEAK_URL = '/api/assistant/speak';
 
 /** The mp3 of `input` read aloud in its server voice, from `base.assistant.speak`'s route; a refusal rejects with the
- *  envelope's ApiError, and the panel reads with the device's voice instead. */
+ *  envelope's ApiError, and the panel reads with the device's voice instead. Its `signal` (the person stopped the
+ *  reading before the audio arrived) aborts the request. */
 export async function speakAloud(
-  input: AssistantSpeech,
+  { signal, ...input }: AssistantSpeech,
   doc: Document = document,
   // The SDK's client reads JSON only, never an mp3: same origin and the SDK's CSRF header, as its own calls.
   // eslint-disable-next-line no-restricted-globals -- see above
@@ -113,6 +114,7 @@ export async function speakAloud(
       [config.csrfHeader]: readCookie(doc.cookie, config.csrfCookieName) ?? '',
     },
     body: JSON.stringify(input),
+    signal,
   });
   if (!response.ok) throw parseErrorEnvelope(response.status, await response.text());
   return response.blob();
