@@ -1,6 +1,7 @@
 <script setup lang="ts">
-// The foot of the charge sheet (the old `.sheet-foot`): what went wrong, why it cannot charge yet, and
-// ONE button that says what it does and for how much. Blocked, it stays tappable (`aria-disabled`, never
+// The foot of the charge sheet (the old `.sheet-foot`): what went wrong, why it cannot charge yet (what the
+// keypad's keys change is written over the keypad, CheckoutTender: the foot keeps its height while the
+// amount is typed, hub#456), and ONE button that says what it does and for how much. Blocked, it stays tappable (`aria-disabled`, never
 // `disabled`: that would swallow the tap) and answers with the reason (`blocked`); only «Charging…» and
 // a total still loading use the native `disabled`. A refusal is the server's own words; a lost answer is
 // said as such, and when nobody knows whether it charged, «Check in Sales» goes and looks. Cash with the
@@ -11,7 +12,7 @@ import { computed } from 'vue';
 
 import type { CheckoutFailure } from '../../composables/checkout/useCheckout';
 import { useLocale, useT } from '../../composables/useT';
-import type { ChargeBlock } from '../../lib/checkout/blocks';
+import { type ChargeBlock, tenderReason } from '../../lib/checkout/blocks';
 import { needsTendered, type TenderMethod } from '../../lib/checkout/tender';
 import { formatMoney, useBusinessMoney } from '../../lib/format';
 
@@ -57,7 +58,7 @@ const short = computed(() => {
   return t(`sale.checkout.block.${block.kind}`);
 });
 
-/** The whole reason, written above the button; the recipient's is the details box itself. */
+/** The whole reason, what a tap on the blocked button answers; the recipient's is the details box itself. */
 const reason = computed(() => {
   const block = props.block;
   // The recipient's box itself says what is missing or wrong.
@@ -66,6 +67,9 @@ const reason = computed(() => {
   if (block.kind === 'remaining') return t('sale.checkout.reason.remaining', { amount: money(block.amount) });
   return t(`sale.checkout.reason.${block.kind}`);
 });
+
+/** The reason written above the button. */
+const written = computed(() => (tenderReason(props.block) ? '' : reason.value));
 
 const label = computed(() => {
   if (props.busy) return t('sale.checkout.charging');
@@ -136,11 +140,11 @@ function press(): void {
       </ion-button>
     </template>
     <p
-      v-if="reason"
+      v-if="written"
       class="pay-block-reason"
       data-testid="sale-checkout-block-reason"
     >
-      {{ reason }}
+      {{ written }}
     </p>
     <ion-button
       class="charge"
