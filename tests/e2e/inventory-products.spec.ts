@@ -14,7 +14,7 @@
 //     amount it cannot read is said under its field and does not filter.
 import { expect, test } from '@playwright/test';
 
-import { A, api, login, psql, record, shot, shown } from './helpers';
+import { A, api, capture, login, psql, record, shot, shown } from './helpers';
 import {
   cleanInventory,
   createProduct,
@@ -265,7 +265,7 @@ test('INVENTORY-F05 · FIX-INVENTORY-PRODUCTS-UNCONFIGURED-CHIP-CLIPPED: the «N
         const options = { within: '[role=cell], .data-table__field-value', whole: vp.roomy, titled: true };
         const fit = await settledChipFit(chip, options, `Spanish list at ${vp.label}`);
         record(`FIX-INVENTORY-PRODUCTS-UNCONFIGURED-CHIP-CLIPPED-es-${vp.label}`, { ...fit.metrics, problems: fit.problems });
-        await es.screenshot({ path: shot(`FIX-INVENTORY-PRODUCTS-UNCONFIGURED-CHIP-CLIPPED-es-${vp.label}`) });
+        await capture(es, `FIX-INVENTORY-PRODUCTS-UNCONFIGURED-CHIP-CLIPPED-es-${vp.label}`);
       }
     } finally {
       await spanish.close();
