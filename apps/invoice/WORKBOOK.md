@@ -341,8 +341,10 @@ Sale: la F3 en la serie «FACT» del año, con las líneas y los importes del ti
 nace pagada. Avisa `invoice.invoice.issued`. Desde entonces, rectificar o devolver esa venta rectifica
 la F3, no el tique.
 Si falla: sin nombre, NIF o domicilio, rechazo; un NIF español que no es válido, «Ese NIF no es
-válido.»; un documento que no es un tique, «Solo un tique (factura simplificada) se puede sustituir por
-una factura completa.». Si el tique ya tiene su F3, responde con ella sin emitir otra ni gastar número.
+válido.» bajo el campo y arriba «Revisa los datos marcados.», que se va en cuanto se cambia algo (y el
+mensaje del campo, en cuanto se corrige ese campo) y vuelve si el siguiente intento también se rechaza; un
+documento que no es un tique, «Solo un tique (factura simplificada) se puede sustituir por una factura
+completa.». Si el tique ya tiene su F3, responde con ella sin emitir otra ni gastar número.
 Implicados: INVOICE-F04
 
 ### INVOICE-F06 Una venta cobrada que no se ha podido facturar

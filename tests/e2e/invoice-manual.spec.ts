@@ -186,8 +186,22 @@ test('INVOICE-F05: the customer asks for the full invoice of their ticket, an F3
   const dialog = openDialog(page, 'invoice-substitute');
   await expect(dialog.locator('[data-testid=invoice-substitute-intro]')).toBeVisible();
   await dialog.locator('[data-testid=invoice-recipient-name] input').fill(`e2e Talleres F3 ${RUN}`);
-  await dialog.locator('[data-testid=invoice-recipient-tax-id] input').fill('B12345674');
   await dialog.locator('[data-testid=invoice-recipient-address] input').fill('Calle Luna 3, Madrid');
+
+  // hub#461: a wrong NIF says what to do on top and why under the field, and both go when it is corrected.
+  const taxId = dialog.locator('[data-testid=invoice-recipient-tax-id]');
+  const notice = dialog.locator('[data-testid=invoice-substitute-error]');
+  await taxId.locator('input').fill('B12345678');
+  await dialog.locator('[data-testid=invoice-substitute-submit]').click();
+  await expect(notice).toContainText('Check the highlighted details.');
+  await expect(taxId).toContainText('That tax ID is not valid.');
+  await flowShots(page, 'INVOICE-F05-refused', async (p) => {
+    await expect(openDialog(p, 'invoice-substitute').locator('[data-testid=invoice-substitute-error]')).toBeVisible();
+  });
+  await taxId.locator('input').fill('B12345674');
+  await expect(notice).toBeHidden();
+  await expect(taxId).not.toContainText('That tax ID is not valid.');
+
   await flowShots(page, 'INVOICE-F05', async (p) => {
     await expect(openDialog(p, 'invoice-substitute')).toBeVisible();
   });

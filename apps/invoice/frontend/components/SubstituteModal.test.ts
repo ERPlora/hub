@@ -7,7 +7,7 @@ import { toastSuccess } from '@erplora/ui/shell';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { defineComponent, h } from 'vue';
 
-import { click, mountInvoice } from '../__tests__/mount-invoice';
+import { click, ionValue, mountInvoice } from '../__tests__/mount-invoice';
 import RecipientFields from './RecipientFields.vue';
 import SubstituteModal from './SubstituteModal.vue';
 
@@ -75,11 +75,33 @@ describe('SubstituteModal', () => {
   it('a refusal is read inside the window; one of a field goes under it', async () => {
     const s = await setup();
     await s.fill();
-    s.answer(422, { error: { code: 'invalid_payload', message: 'Invalid payload', fields: { customer_tax_id: 'That tax ID is not valid.' } } });
+    s.answer(422, { error: { code: 'invalid_payload', message: 'Check the highlighted details.', fields: { customer_tax_id: 'That tax ID is not valid.' } } });
     await click(s.submitButton());
-    expect(s.inDoc('invoice-substitute-error')?.textContent).toContain('Invalid payload');
+    expect(s.inDoc('invoice-substitute-error')?.textContent).toContain('Check the highlighted details.');
     expect(s.wrapper.findComponent(RecipientFields).props('fieldErrors')).toEqual({ customer_tax_id: 'That tax ID is not valid.' });
     expect(s.wrapper.emitted('substituted')).toBeUndefined();
+  });
+
+  it('correcting the refused tax ID takes away the notice and the message under it; the next refusal says them again (hub#461)', async () => {
+    const s = await setup();
+    await s.fill({ ...COMPLETE, taxId: 'B12345678' });
+    const refused = { error: { code: 'invalid_payload', message: 'Check the highlighted details.', fields: { customer_tax_id: 'That tax ID is not valid.' } } };
+    s.answer(422, refused);
+    await click(s.submitButton());
+    const taxId = s.inDoc('invoice-recipient-tax-id') as HTMLElement & { errorText?: string };
+    expect(taxId.errorText).toBe('That tax ID is not valid.');
+
+    // A person types: the native `input` bubbles out of the field, then Ionic's own event carries the value.
+    taxId.dispatchEvent(new Event('input', { bubbles: true }));
+    await ionValue(taxId, 'B12345670', 'ionInput');
+
+    expect(s.inDoc('invoice-substitute-error')).toBeNull();
+    expect(taxId.errorText).toBeFalsy();
+
+    s.answer(422, refused);
+    await click(s.submitButton());
+    expect(s.inDoc('invoice-substitute-error')?.textContent).toContain('Check the highlighted details.');
+    expect(taxId.errorText).toBe('That tax ID is not valid.');
   });
 
   it('speaks Spanish', async () => {

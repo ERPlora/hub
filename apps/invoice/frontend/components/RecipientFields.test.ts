@@ -2,7 +2,7 @@
 // fields), «Name or company name», «Country» (Spain first), «Document type» (only abroad: a new country
 // resets it to the usual one there), «Tax ID» and «Address». What the server refused is said under its
 // field.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { defineComponent, h } from 'vue';
 
 import type { CustomerSnapshot } from '../../../customer/frontend/components/CustomerSearch.vue';
@@ -79,6 +79,56 @@ describe('RecipientFields', () => {
     expect(prop(s.field('tax-id'), 'errorText')).toBe('That tax ID is not valid.');
     expect(s.find('invoice-recipient-tax-id').classes()).toContain('ion-invalid');
     expect(prop(s.field('address'), 'errorText')).toBe('This field is required.');
+  });
+
+  describe('what the server refused stops being said once it is changed (hub#461)', () => {
+    const WRONG: Recipient = { ...BLANK, name: 'Talleres Pérez SL', taxId: 'B12345678', address: 'Calle Luna 3' };
+    const REFUSED = { customer_tax_id: 'That tax ID is not valid.', customer_address: 'Write the whole address.' };
+
+    it('the corrected field goes quiet and loses its red; the other keeps its message', async () => {
+      const s = await setup(WRONG, { fieldErrors: REFUSED });
+      await s.wrapper.setProps({ modelValue: { ...WRONG, taxId: 'B12345674' } });
+      expect(prop(s.field('tax-id'), 'errorText')).toBeFalsy();
+      expect(s.find('invoice-recipient-tax-id').classes()).not.toContain('ion-invalid');
+      expect(prop(s.field('address'), 'errorText')).toBe('Write the whole address.');
+      expect(s.find('invoice-recipient-address').classes()).toContain('ion-invalid');
+    });
+
+    it('the tax ID is judged with its country and its document type: changing those quiets it too', async () => {
+      const s = await setup(WRONG, { fieldErrors: REFUSED });
+      await s.wrapper.setProps({ modelValue: { ...WRONG, country: 'FR', idType: '02' } });
+      expect(prop(s.field('tax-id'), 'errorText')).toBeFalsy();
+      expect(prop(s.field('address'), 'errorText')).toBe('Write the whole address.');
+    });
+
+    it('a document type the server refused is marked too: the notice on top promises it', async () => {
+      const abroad: Recipient = { ...WRONG, country: 'FR', idType: '' };
+      const s = await setup(abroad, { fieldErrors: { customer_id_type: 'Choose the kind of document.' } });
+      expect(prop(s.field('id-type'), 'errorText')).toBe('Choose the kind of document.');
+      expect(s.find('invoice-recipient-id-type').classes()).toContain('ion-invalid');
+      await s.wrapper.setProps({ modelValue: { ...abroad, idType: '02' } });
+      expect(prop(s.field('id-type'), 'errorText')).toBeFalsy();
+    });
+
+    it('a new refusal is said over whatever is written by then', async () => {
+      const s = await setup(WRONG, { fieldErrors: REFUSED });
+      const again = { ...WRONG, taxId: 'B00000000' };
+      await s.wrapper.setProps({ modelValue: again });
+      await s.wrapper.setProps({ fieldErrors: {} });
+      await s.wrapper.setProps({ fieldErrors: { customer_tax_id: 'That tax ID is not valid.' } });
+      expect(prop(s.field('tax-id'), 'errorText')).toBe('That tax ID is not valid.');
+      expect(s.find('invoice-recipient-tax-id').classes()).toContain('ion-invalid');
+    });
+
+    it('picking a card tells the form around it, as typing does', async () => {
+      const s = await setup(WRONG, { fieldErrors: REFUSED });
+      const heard = vi.fn();
+      s.wrapper.element.parentElement?.addEventListener('input', heard);
+      s.wrapper.findComponent(CustomerSearchStub).vm.$emit('update:modelValue', CARD);
+      await s.wrapper.vm.$nextTick();
+      expect(heard).toHaveBeenCalledTimes(1);
+      s.wrapper.element.parentElement?.removeEventListener('input', heard);
+    });
   });
 
   it('speaks Spanish', async () => {
