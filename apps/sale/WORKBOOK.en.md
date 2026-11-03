@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:fb4903203aafd7dbe749448d9614f3a90d7fdc2b9393ae5578ca2d0e07ae7a31 -->
+<!-- generated from WORKBOOK.md sha256:ce832bda0c3b199b0fd1a72703174c3b993f2ae37b09b2b4e7a7e4b6eb3eb935 -->
 
 ## What it is for and who it is for
 
@@ -150,10 +150,12 @@ Sheet opened by "Charge". At the top, the big amount (the one the server works o
 <total>" if there are marked lines and "Remaining" when splitting. On one side, the summary ("Receipt" /
 "Invoice", customer), with "Invoice" the customer's details and, with Services, "Lines paid another
 way": each service line of the charge with its voucher slot (SALE-F27). On the other, "Payments taken",
-the payment methods (cash, in a business in Spain not available from €1,000, with its reason),
-"Tendered", "Change" and the keypad in cash, or "Exact amount" and "Charge <amount> on the card terminal,
-then confirm." with another method; "Split the payment" and "Add this payment". Footer: the reason if it
-cannot be charged and "Charge <amount>" ("Charging…" while it goes); with the cash register closed and
+the payment methods (cash, in a business in Spain not available from €1,000, with its reason) and, in
+cash, "Tendered", a row of fixed height with what the amount lacks ("Enter the amount tendered on the
+keypad", "The amount tendered does not cover the total") or, in its place, the large "Change", and the
+keypad, which does not move while typing (hub#456); with another method, "Exact amount" and "Charge
+<amount> on the card terminal, then confirm."; "Split the payment" and "Add this payment". Footer: the
+reason if it cannot be charged (those of the amount tendered go above the keypad) and "Charge <amount>" ("Charging…" while it goes); with the cash register closed and
 cash, the refusal and "Open a cash session".
 
 ### Open checks
@@ -276,7 +278,8 @@ Steps:
 3. Press "Charge · <total>" at the foot of the check (on a phone, first open the check with the floating
    button, which shows the total).
 4. In the **Charge** sheet, with cash chosen, enter the amount tendered on the keypad; the change shows
-   large underneath.
+   large above the keypad, in the row that until then asks for the amount, and the keys do not move under
+   the finger while typing (hub#456).
 5. Press "Charge <total>".
 6. The sheet closes, the check is left empty and the **Sale document** opens with the ticket. With
    **Printing**, the charge asks the queue for the ticket in its very transaction, according to its
@@ -292,7 +295,8 @@ check closed. With Invoicing, its ticket (F2) numbered in the year's series in t
 (INVENTORY-F21) and Customers adds the purchase to the record (CUSTOMER-F20). Each line keeps the
 category, rate, country, region and Taxes rule it was charged with.
 If it fails: with no amount tendered the button does not charge and "Enter the amount tendered on the
-keypad" is read; too little, "The amount tendered does not cover the total". An article without VAT shows
+keypad" is read above the keypad; too little, "The amount tendered does not cover the total" (on the button
+too, and a tap says it). An article without VAT shows
 marked "VAT missing" and, when tapped, says "Cannot be sold: no tax category. VAT needs to be set up.";
 a sold-out one shows greyed with "Sold out" and, when tapped, says "«…» is sold out." (SALE-F07). A
 refusal when charging is painted in the sheet with its sentence (e.g. "A product of the ticket is no
