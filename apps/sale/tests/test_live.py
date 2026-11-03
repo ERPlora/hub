@@ -35,6 +35,7 @@ def test_the_live_queries():
         "sale.payment_method.list",
         "sale.settings.get",
         "sale.pos_settings.get",
+        "sale.letterhead.get",
         "sale.department.list",
         "sale.quick_note.list",
         "sale.refund.options",

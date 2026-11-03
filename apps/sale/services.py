@@ -76,6 +76,7 @@ from apps.sale.queries import (
     call_services,
     charge_parts,
     check_grid,
+    business_letterhead,
     current_settings,
     department_rates,
     department_row,
@@ -3090,7 +3091,6 @@ def record_invoice(ctx: OperationContext, data: InvoiceIssuedIn) -> dict:
 
 PRINT_JOB = "printing.job.create"
 FISCAL_RECORD = "verifactu.record.by_invoice"
-ISSUER = "invoice.issuer.get"
 NOT_QUEUED = {"queued": False, "job_id": None, "printer": None}
 
 
@@ -3142,16 +3142,6 @@ def _fiscal_record(ctx: OperationContext, sale: SaleOut) -> dict | None:
     return found.record.model_dump() if found.record else None
 
 
-def _issuer_tax_id(ctx: OperationContext) -> str:
-    """The business's tax ID as Invoicing keeps it, for a full invoice's paper; empty when it cannot be read
-    (Printing then refuses the invoice and the screen prints it)."""
-    try:
-        op = get(ISSUER)
-        return op(ctx, op.input.model_validate({})).tax_id
-    except (UnknownOperation, OperationError):
-        return ""
-
-
 def _print_sale(ctx: OperationContext, sale: Sale, detail: SaleOut, *, duplicate: bool, key: str, at_checkout: bool = False) -> dict:
     """The receipt (or the full invoice) of ``sale`` to the receipt printer's queue. ``at_checkout``: the print by
     itself of the charge — it follows the printing settings, and the drawer opens only when cash came in. A
@@ -3167,14 +3157,11 @@ def _print_sale(ctx: OperationContext, sale: Sale, detail: SaleOut, *, duplicate
     with translation.override(ctx.language):
         kind, document = paper.receipt(
             detail,
-            header=settings.receipt_header,
+            letterhead=business_letterhead(ctx, detail.invoice_id),
             footer=settings.receipt_footer,
             decimals=get_currency_precision(currency),
             duplicate=duplicate,
             record=record,
-            issuer_tax_id=_issuer_tax_id(ctx) if detail.document_type == "invoice" else "",
-            customer_tax_id=sale.customer_tax_id,
-            customer_address=sale.customer_address,
         )
     request = {
         "job_key": key,
@@ -3250,10 +3237,11 @@ def print_sale(ctx: OperationContext, data: SalePrintIn) -> dict:
 def print_bill(ctx: OperationContext, data: OrderRefIn) -> dict:
     order = find_order(data.order_id)
     valued = preview(ctx, PreviewIn(order_id=data.order_id))
-    settings = current_settings()
     currency = business_currency(ctx)
     with translation.override(ctx.language):
-        document = paper.bill(valued, label=order.label, header=settings.receipt_header, decimals=get_currency_precision(currency))
+        document = paper.bill(
+            valued, label=order.label, letterhead=business_letterhead(ctx), decimals=get_currency_precision(currency)
+        )
     return _queue_paper(
         ctx,
         {

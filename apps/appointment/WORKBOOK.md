@@ -186,7 +186,9 @@ Quien pide algo en nombre de la clienta sin ser una persona del equipo (un paso 
 conversación de WhatsApp, la reserva online) se juzga y se contesta **como la clienta**: no tiene las
 excepciones del mostrador (una hora ya pasada, dentro de la antelación mínima, **Reservar igual** sobre un
 solape, cancelar fuera de la política) y no lee el contacto de la clienta, las notas ni el motivo de una
-cancelación (APPOINTMENT-F01, F06, F18 y F20).
+cancelación (APPOINTMENT-F01, F06, F18 y F20). Como no es nadie del equipo, no tiene citas «suyas»: lo que se le
+permite sobre ellas (reservar, mover, confirmar o editar) vale para las de cualquier profesional, igual que la
+clienta reserva con quien quiera; lo que no se le permite, no lo hace (APPOINTMENT-F01 y F04).
 
 ### APPOINTMENT-F01 Reservar una cita desde la agenda
 <!-- origen: fi:modules/appointments#command-appointments-appointments-create-handler-wasm fi:modules/online_booking#command-online_booking-bookings-create-sql-transaccional old:appointments/workflow/agenda.md#appointments-f01 old:online_booking/WORKFLOW.md#online_booking-f01 qa:modules/appointments/chained-services qa:modules/appointments/create-appointment-without-overlap qa:modules/appointments/walk-in qa:verticals/beauty/03-appointments-and-whatsapp wf:peluqueria-dia#rec_peluqueria-f03 wf:peluqueria-dia#rec_peluqueria-f06 -->
@@ -215,7 +217,8 @@ Si falla: el motivo sale dentro del panel, sin perder lo tecleado: fuera del hor
 profesional no trabaja a esa hora, franja bloqueada, el profesional ya tiene una cita
 (`appointment.slot_taken`), demasiado lejos, la clienta, el servicio o el profesional no existen o no
 se pueden reservar. Desde el mostrador ni la antelación mínima ni una hora ya pasada rechazan (la
-hora pasada solo avisa antes de guardar); una automatización no tiene esas excepciones. Dos personas
+hora pasada solo avisa antes de guardar); una automatización no tiene esas excepciones. Un empleado
+solo reserva para sí; una automatización a la que se permite reservar, con cualquier profesional. Dos personas
 que reservan a la vez el mismo hueco del mismo profesional: entra una y la otra recibe el rechazo.
 Implicados: CUSTOMER-F11, CUSTOMER-F25, CUSTOMER-F30, SERVICE-F10, SERVICE-F33, STAFF-F16, SCHEDULE-F11
 
@@ -279,7 +282,9 @@ Sale: la cita movida (servicios nuevos traen su nombre y precio del catálogo y 
 del profesional si la tiene; un profesional nuevo conserva el precio y la duración), su historial y el
 aviso `appointment.appointment.rescheduled`.
 Si falla: el motivo en el panel y en un aviso; un bloque arrastrado vuelve a su sitio. Una cita en
-curso, completada, cancelada o no presentada no se mueve (**Editar** sale en gris).
+curso, completada, cancelada o no presentada no se mueve (**Editar** sale en gris). Un empleado solo mueve
+las suyas; una automatización a la que se permite moverlas, las de cualquier profesional, con las reglas de
+la clienta.
 Implicados: SERVICE-F33, STAFF-F16, SCHEDULE-F11
 
 ### APPOINTMENT-F05 Cancelar una cita desde la agenda
@@ -844,6 +849,18 @@ agenda tuya que enseñar.».
   `too_far`, `outside_schedule`, `outside_staff_hours`, `blocked`, `overlap`. `in_past` y `too_soon` solo
   para la clienta y las series; el mostrador los salta. Un día con `source = none` en Horarios no
   restringe (como el producto actual); un día sin horario de Personal solo restringe por ausencias.
+- **«Las suyas» de quien no es una persona** (revisión 2026-11-03, FIX-HUB-FLOW-STEP-CANNOT-BOOK-FOR-A-PROFESSIONAL):
+  `may_book_for` y `may_change` piden `add_appointment`/`change_appointment`, o `add_own_appointment`/
+  `change_own_appointment` sobre una cita de la ficha propia (`is_own`). Quien no es una persona (`by_person`: el paso
+  de una automatización, una API key, la plataforma) no tiene ficha, así que con el permiso «propio» toma las de todo
+  el equipo, y `_judge` lo juzga siempre como la clienta: la que reserva sola elige cualquier profesional (la reserva
+  online ya llama con los permisos de todo el equipo). Antes, un paso al que se concedía reservar o mover nunca podía
+  («You may only book your own appointments.»), y una API key abierta sobre `appointment.appointment.create` tampoco.
+  No presta nada: sin el permiso, `@operation` lo rechaza; una persona sigue con «las suyas»; ver una cita sigue
+  pidiendo `view_appointment` (`find_appointment`). Lo usan los pasos de Automatizaciones (FLOW-F12) y desbloquea
+  la cita por WhatsApp (WHATSAPP_INBOX-F21 y F22). Tests: `test_services.py`
+  (`test_what_is_not_a_person_*`, `test_a_person_with_their_own_permission_*`) y
+  `apps/flow/tests/test_services_appointment_steps.py`.
 - **Solapes con bloqueo**: reservar, mover y editar bloquean antes la ficha del profesional
   (`resolve_member(lock=True)`, por id en orden fijo cuando son dos), así que dos reservas del mismo
   profesional a la vez se esperan y la segunda ve la primera (`tests/test_concurrency.py`). Con los
@@ -906,8 +923,8 @@ Lo que se vio fallar y queda abierto al cerrar la app (2026-11-03), cada cosa co
 - **hub#577** — Citas enseña los precios en euros aunque el negocio sea de un país con otra moneda (BASE-F50).
 - **hub#527** — En un negocio de otro país, un teléfono escrito sin prefijo se guarda y se busca como español
   (cruza APPOINTMENT-F22).
-- **hub#634** — Una automatización con permiso para confirmar, mover o anular citas no puede cambiar la cita de
-  otra profesional.
+- **hub#634** — Anular una cita con «Que me lo pregunte» (confirmar, mover y editar la cita de otra profesional ya lo
+  hace una automatización con su permiso, desde FIX-HUB-FLOW-STEP-CANNOT-BOOK-FOR-A-PROFESSIONAL).
 - **hub#636** — Una cita que cruza el cambio de hora dura una hora más (octubre) o menos (marzo) de lo reservado.
 - **hub#687** — La hora del negocio no es la misma en la tarjeta del asistente y en las apps cuando la zona del negocio
   no es la del despliegue (cruza Citas, Horarios, Reservas, Mesas, Cocina, Automatizaciones y la plataforma; hoy la
@@ -918,8 +935,6 @@ Lo que se vio fallar y queda abierto al cerrar la app (2026-11-03), cada cosa co
 - **hub#631**, **hub#633**, **hub#635** y **hub#637** — textos: una traducción «fuzzy» que sale en inglés, siete
   textos en español con las palabras de otra app, la tarjeta de confirmación del asistente que no dice qué
   registro toca y la que nombra en inglés algunos datos («Confirm Overlap»).
-- En la cola de la migración (P1), sin issue: un paso de una automatización no puede reservar ni mover la cita de
-  una profesional (`FIX-HUB-FLOW-STEP-CANNOT-BOOK-FOR-A-PROFESSIONAL`, Automatizaciones y Citas).
 - Las peticiones de componentes de [`UI-REQUESTS.md`](UI-REQUESTS.md) (`Scheduler`, `DateField`/`TimeField`, tres
   iconos y el bloqueo de la baja en Personal): ninguna rompe un flujo.
 

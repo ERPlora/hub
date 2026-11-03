@@ -5,8 +5,8 @@
 //   - INVENTORY-F05: a product whose tax category Taxes deactivated is «Not configured», the sale
 //     catalog says it cannot be sold, and saving it with that category is refused; picking another
 //     one in the form fixes it; its «Not configured» chip keeps its icon in sight and its text whole while the
-//     row has room, or ending in «…» with the whole text as its title, at 390, 834, 1280 and 1440
-//     (FIX-INVENTORY-PRODUCTS-UNCONFIGURED-CHIP-CLIPPED);
+//     row has room, or ending in «…» with the whole text as its title, at 390, 834, 1280 and 1440, in English and
+//     in Spanish (FIX-INVENTORY-PRODUCTS-UNCONFIGURED-CHIP-CLIPPED, hub#530);
 //   - INVENTORY-F11: the export downloads the filtered catalog with the headers the import reads;
 //   - `/inventory` lands on the dashboard and the tabs walk the five sections; screenshots of every page in three
 //     viewports;
@@ -14,7 +14,7 @@
 //     amount it cannot read is said under its field and does not filter.
 import { expect, test } from '@playwright/test';
 
-import { A, api, login, psql, record, shot, shown } from './helpers';
+import { A, api, capture, login, psql, record, shot, shown } from './helpers';
 import {
   cleanInventory,
   createProduct,
@@ -212,6 +212,7 @@ const CHIP_VIEWPORTS = [
 test('INVENTORY-F05 · FIX-INVENTORY-PRODUCTS-UNCONFIGURED-CHIP-CLIPPED: the «Not configured» chip keeps its icon in sight and its text whole or ending in «…», at every width', async ({
   page,
   context,
+  browser,
 }) => {
   await login(page, A, '/inventory/dashboard');
   const key = `e2e.chip_${stamp().toLowerCase()}`;
@@ -243,6 +244,31 @@ test('INVENTORY-F05 · FIX-INVENTORY-PRODUCTS-UNCONFIGURED-CHIP-CLIPPED: the «N
     for (const vp of CHIP_VIEWPORTS) {
       await page.setViewportSize({ width: vp.width, height: vp.height });
       await settledChipFit(formChip, { within: '.tax-category-select' }, `form at ${vp.label}`);
+    }
+
+    // hub#530: the business sees it in Spanish, «Sin configurar · Falta la categoría fiscal», wider than the English
+    // one: whole at 1280 too, beside the «Photo» column (INVENTORY-F32). The Hub's language cookie, as the sign-in
+    // sets it from the account.
+    const spanish = await browser.newContext({ baseURL: A, viewport: { width: 1280, height: 800 }, locale: 'es-ES' });
+    try {
+      const es = await spanish.newPage();
+      await login(es, A, '/inventory/dashboard');
+      await spanish.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
+      await es.goto(`${A}/inventory/products?status=unconfigured`);
+      await expect(es.locator('html')).toHaveAttribute('lang', /^es/);
+      await productsReady(es);
+      const chip = shown(es).locator(`[data-testid=inventory-products-unconfigured-${product.id}]`);
+      await expect(chip).toContainText('Sin configurar · Falta la categoría fiscal');
+      for (const vp of CHIP_VIEWPORTS) {
+        await es.setViewportSize({ width: vp.width, height: vp.height });
+        await expect(chip).toBeVisible();
+        const options = { within: '[role=cell], .data-table__field-value', whole: vp.roomy, titled: true };
+        const fit = await settledChipFit(chip, options, `Spanish list at ${vp.label}`);
+        record(`FIX-INVENTORY-PRODUCTS-UNCONFIGURED-CHIP-CLIPPED-es-${vp.label}`, { ...fit.metrics, problems: fit.problems });
+        await capture(es, `FIX-INVENTORY-PRODUCTS-UNCONFIGURED-CHIP-CLIPPED-es-${vp.label}`);
+      }
+    } finally {
+      await spanish.close();
     }
   } finally {
     psql(`update tax_taxcategory set is_active = true where key = '${key}'`);

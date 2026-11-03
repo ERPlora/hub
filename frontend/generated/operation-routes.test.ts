@@ -174,7 +174,7 @@ describe('OPERATION_ROUTES', () => {
     });
   });
 
-  it('binds the 56 routed sale operations to apps/sale/api.py: queries by GET, commands by POST; the reaction to a merge has no route (the territory’s tax is Taxes’ tax.settings.get)', () => {
+  it('binds the 57 routed sale operations to apps/sale/api.py: queries by GET, commands by POST; the reaction to a merge has no route (the territory’s tax is Taxes’ tax.settings.get)', () => {
     const sale = Object.fromEntries(Object.entries(OPERATION_ROUTES).filter(([op]) => op.startsWith('sale.')));
     expect(sale).toEqual({
       'sale.sale.list': { method: 'get', path: '/api/sale/sales' },
@@ -222,6 +222,7 @@ describe('OPERATION_ROUTES', () => {
       'sale.settings.get': { method: 'get', path: '/api/sale/settings' },
       'sale.settings.update': { method: 'post', path: '/api/sale/settings' },
       'sale.pos_settings.get': { method: 'get', path: '/api/sale/pos_settings' },
+      'sale.letterhead.get': { method: 'get', path: '/api/sale/letterhead' },
       'sale.department.list': { method: 'get', path: '/api/sale/departments' },
       'sale.department.create': { method: 'post', path: '/api/sale/departments' },
       'sale.department.update': { method: 'post', path: '/api/sale/departments/update' },

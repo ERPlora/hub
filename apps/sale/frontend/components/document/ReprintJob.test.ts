@@ -8,7 +8,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { errorFrame, flush, mountSale } from '../../__tests__/mount-sale';
 import { printPaper } from '../../lib/print';
-import { saleOut, SETTINGS } from './__tests__/fixtures';
+import { LETTERHEAD, saleOut, SETTINGS } from './__tests__/fixtures';
 import ReceiptPaper from './ReceiptPaper.vue';
 import ReprintJob from './ReprintJob.vue';
 
@@ -33,6 +33,7 @@ async function setup(locale: 'en' | 'es' = 'en') {
   async function load() {
     await m.result('sale.sale.get', saleOut());
     await m.result('sale.pos_settings.get', { ...SETTINGS, updated_at: null });
+    await m.result('sale.letterhead.get', LETTERHEAD);
   }
   return { ...m, call, load };
 }

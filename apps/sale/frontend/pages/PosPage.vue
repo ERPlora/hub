@@ -823,7 +823,6 @@ onBeforeUnmount(() => {
         v-model:open="prebillOpen"
         :order="order"
         :customer-name="customerName"
-        :header="settings.receipt_header"
       />
       <CheckoutSheet
         v-if="order"

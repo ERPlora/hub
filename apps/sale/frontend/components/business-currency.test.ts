@@ -8,7 +8,7 @@ import { h, ref } from 'vue';
 import { business, click, JAPANESE, mountSale, POLISH, settle } from '../__tests__/mount-sale';
 import { plain } from '../lib/format';
 import PayKeypad from './checkout/PayKeypad.vue';
-import { saleOut, SETTINGS } from './document/__tests__/fixtures';
+import { LETTERHEAD, saleOut, SETTINGS } from './document/__tests__/fixtures';
 import ReceiptPaper from './document/ReceiptPaper.vue';
 import CartFooter from './pos/CartFooter.vue';
 import DiscountSheet from './pos/DiscountSheet.vue';
@@ -95,7 +95,7 @@ describe('the till, in the business’s currency', () => {
 describe('what was charged, in the sale’s own currency', () => {
   it('a ticket charged in zlotys prints zlotys while the business is now in euros', async () => {
     const m = await mountSale(ReceiptPaper, {
-      props: { sale: saleOut({ currency: 'PLN', currency_decimals: 2 }), settings: SETTINGS },
+      props: { sale: saleOut({ currency: 'PLN', currency_decimals: 2 }), letterhead: LETTERHEAD, settings: SETTINGS },
       locale: 'es',
     });
     const totals = m.wrapper.findAll('[data-testid="sale-receipt-total-row"]').map((row) => plain(row.text()));

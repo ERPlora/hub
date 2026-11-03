@@ -1,7 +1,7 @@
 <script setup lang="ts">
-// The document of one sale (SALE-F29): `sale.sale.get` and the receipt settings (`sale.pos_settings.get`)
-// followed live, «Loading document…» until both answered, «Error loading the document» (with the
-// server's words and Retry) when either fails, then the paper — above it, out of what prints, «Fiscal
+// The document of one sale (SALE-F29): `sale.sale.get`, the business on its paper (`sale.letterhead.get`) and
+// the receipt settings (`sale.pos_settings.get`) followed live, «Loading document…» until all answered, «Error
+// loading the document» (with the server's words and Retry) when any fails, then the paper — above it, out of what prints, «Fiscal
 // document pending» with «Issue now» while a document of the sale waits. The host is told when the
 // paper is painted (`ready`, with its element, what `printPaper` copies) or that it could not be
 // (`failed`). With VeriFactu on and readable, a sale with a fiscal document waits for that document's record
@@ -32,6 +32,7 @@ const emit = defineEmits<{
 }>();
 
 const sale = useLive('sale.sale.get', () => ({ sale_id: props.saleId }));
+const letterhead = useLive('sale.letterhead.get', () => ({ sale_id: props.saleId }));
 const settings = useLive('sale.pos_settings.get', {});
 const session = useSession();
 
@@ -46,13 +47,16 @@ watch(recordOf, () => {
   fiscal.value = { record: undefined, error: null };
 });
 
-const error = computed(() => sale.error.value ?? settings.error.value ?? (recordOf.value ? fiscal.value.error : null));
-/** The asked sale's document is here (another sale's, still on screen while the new one comes, is not), with its
- *  fiscal record when it waits for one. */
+const error = computed(
+  () => sale.error.value ?? letterhead.error.value ?? settings.error.value ?? (recordOf.value ? fiscal.value.error : null),
+);
+/** The asked sale's document is here with its letterhead (another sale's, still on screen while the new one comes, is
+ *  not), with its fiscal record when it waits for one. */
 const loaded = computed(
   () =>
     !error.value &&
     sale.data.value?.id === props.saleId &&
+    letterhead.data.value?.sale_id === props.saleId &&
     !!settings.data.value &&
     (!recordOf.value || fiscal.value.record !== undefined),
 );
@@ -103,7 +107,7 @@ function retry(): void {
         </ion-button>
       </template>
     </InlineFeedback>
-    <template v-else-if="loaded && sale.data.value">
+    <template v-else-if="loaded && sale.data.value && letterhead.data.value">
       <PendingDocuments
         v-if="sale.data.value.documents_pending"
         :sale-id="sale.data.value.id"
@@ -111,6 +115,7 @@ function retry(): void {
       <ReceiptPaper
         ref="paper"
         :sale="sale.data.value"
+        :letterhead="letterhead.data.value"
         :settings="settings.data.value"
         :duplicate="duplicate"
         :record="record"

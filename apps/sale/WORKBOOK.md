@@ -188,7 +188,7 @@ permiso de anular o de devolver también las ve, y un responsable se lo aprueba 
 no hay ventas.»; cargando: «Cargando…»; error: el aviso con «Reintentar».
 
 ### Documento de venta
-Ventana del tique de una venta: el papel tal como se imprime (título «Tique» o «Factura», cabecera,
+Ventana del tique de una venta: el papel tal como se imprime (título «Tique» o «Factura», el negocio con su NIF,
 el número que le dio Facturación —«Factura FACT-2026-000012», «Tiquet TICKET-2026-000031»— o, sin
 él, el de la venta, fecha, líneas, una fila de IVA por clave fiscal, total, forma de pago, entregado y
 cambio, pie), la ✕ y la impresora. Toda impresión desde **Ventas** sale con «DUPLICADO». Error:
@@ -841,8 +841,9 @@ Actor: empleado, responsable
 Pantalla: Cuenta (precuenta)
 Pasos:
 1. Con la cuenta en pantalla, pulsa la impresora del pie («Imprimir cuenta»).
-2. Se abre «Cuenta» con las líneas, notas, descuentos, el desglose de IVA, el total y el título, y el
-   aviso «Cuenta — no es una factura. El tiquet fiscal se entrega al cobrar.». Con descuento en la
+2. Se abre «Cuenta» con el negocio (nombre, domicilio y NIF del emisor de hoy, con la «Cabecera del
+   recibo» debajo como añadido; sin emisor, como dice SALE-F29), las líneas, notas, descuentos, el
+   desglose de IVA, el total y el título, y el aviso «Cuenta — no es una factura. El tiquet fiscal se entrega al cobrar.». Con descuento en la
    cuenta, la fila «Descuento» dice lo que quita (el mismo importe que el pie del TPV, SALE-F14): con
    precios con IVA, las líneas menos el descuento dan el total.
 3. Pulsa la impresora de arriba: con **Impresión** y una impresora de tiques activa, la cuenta va a su
@@ -1033,7 +1034,12 @@ Pantalla: Documento de venta
 Pasos:
 1. En **Ventas**, toca la fila o la acción «Documento»; también se abre solo tras cobrar, la cuenta
    entera o una parte (SALE-F22).
-2. Se ve el tique («Tique», o «Factura» si se cobró como factura) con su cabecera, el número que le
+2. Se ve el tique («Tique», o «Factura» si se cobró como factura). Arriba, el negocio: nombre, domicilio
+   y NIF del emisor, los del documento fiscal de la venta (un duplicado dice lo que el original, aunque
+   el emisor cambie después) o, sin documento todavía, los que Facturación tenga hoy, con la «Cabecera del
+   recibo» debajo como añadido, sin repetir lo que el emisor ya dice. Sin emisor configurado, la primera
+   línea de la cabecera es el nombre y el resto el domicilio; sin cabecera, el nombre con el que se dio de
+   alta el negocio. En una factura, bajo «Cliente», su NIF y su domicilio. Luego, el número que le
    dio Facturación en el cobro («Factura FACT-2026-000012», «Tiquet TICKET-2026-000031»; sin
    Facturación, o mientras su documento está pendiente, el número de la venta), fecha, líneas, una fila
    de IVA por clave fiscal (un exento dice su causa: «Exento (E1)»), total, forma de pago, entregado y
@@ -1056,14 +1062,16 @@ Pasos:
    con la sesión de quien lo pulsa, todo lo que espera, en orden (su tique o factura y luego las
    rectificativas) y sale «Documentos fiscales emitidos.». Antes, el hub lo reintenta solo unos minutos
    (INVOICE-F06): si la causa se arregla a tiempo, la pastilla se va sola.
-Entra: la venta, con el número de su documento fiscal (que Facturación le dio en el mismo cobro).
+Entra: la venta, con el número de su documento fiscal (que Facturación le dio en el mismo cobro), y el
+emisor de Facturación, que se lee por nombre y como la plataforma: quien vende imprime esos datos aunque
+no pueda leer Facturación. El papel no toca el documento ni su registro fiscal.
 Sale: el papel; reimprimir no crea venta ni documento fiscal. «Emitir ahora» emite los documentos que
 esperaban (avisa: venta con su documento, uno por documento).
 Si falla: «Cargando documento…» y «Error cargando el documento» (también si no se puede leer el QR
 fiscal: el papel nunca sale sin él). «No se pudo imprimir». «Emitir ahora»
 rechazado dice el motivo de Facturación («Configura el emisor…») y no cambia nada; sin palabras del
 servidor, «No se han podido emitir los documentos. Inténtalo de nuevo.».
-Implicados: INVOICE-F01, INVOICE-F02, INVOICE-F06, INVOICE-F18, PRINTING-F08, VERIFACTU-F19
+Implicados: INVOICE-F01, INVOICE-F02, INVOICE-F06, INVOICE-F18, PRINTING-F08, VERIFACTU-F19, SALE-F21, SALE-F34
 
 ### SALE-F30 Anular una venta cobrada
 <!-- origen: wf:peluqueria-dia#rec_peluqueria-f14 wf:restaurante-dia#rec_restaurante-f15 wf:cadena-fiscal#rec_fiscal-f13 qa:modules/sales/void-sale fi:modules/sales#command-sales-void-sql-transaccional old:sales/workflow/historial-y-correcciones.md#sales-f30 -->
@@ -1186,8 +1194,10 @@ Pasos:
    «Mostrar productos en el TPV», «Mostrar servicios en el TPV», «Exigir cliente en cada venta»,
    «Permitir descuentos», «Descuento máximo que puede aplicar solo quien cobra, por descuento (%)»,
    «Permitir tiques aparcados», «Precios con IVA incluido», «Emitir factura si el cliente tiene NIF»,
-   «Documento por defecto» («Tique» o «Factura»), «Cabecera del recibo», «Pie del recibo», «Imagen de
-   pie (URL)», «URL del QR promocional» y «Texto del QR promocional».
+   «Documento por defecto» («Tique» o «Factura»), «Cabecera del recibo» (se añade bajo el nombre, el NIF
+   y el domicilio del emisor; sin emisor todavía, la primera línea es el nombre y el resto la dirección:
+   SALE-F29), «Pie del recibo», «Imagen de pie (URL)», «URL del QR promocional» y «Texto del QR
+   promocional».
 3. Pulsa **Guardar**: sale «Ajustes guardados.».
 Entra: nada de otras apps.
 Sale: los ajustes del negocio (una fila). El servidor aplica al cobrar «Permitir efectivo / tarjeta /
@@ -1315,7 +1325,8 @@ diciendo cuáles (409 `*_ambiguous`).
 | Qué da | Quién puede | Flujos | Servicio |
 |---|---|---|---|
 | Las ventas, con búsqueda por número o cliente, filtros (estado, pago, cliente, profesional, días, total), orden y páginas (hasta 100); cada una dice si tiene algún documento fiscal pendiente | ver ventas | F28, F29 | `sale.sale.list` |
-| Una venta entera: cabecera, líneas, cobros, desglose de IVA y lo devuelto | ver ventas | F29 | `sale.sale.get` |
+| Una venta entera: cabecera, cliente con su NIF y domicilio (en una factura), líneas, cobros, desglose de IVA y lo devuelto | ver ventas | F29 | `sale.sale.get` |
+| El negocio tal como lo nombra el papel: nombre, NIF y líneas (domicilio y cabecera del recibo); de una venta, los de su documento fiscal | ver ventas | F21, F29 | `sale.letterhead.get` |
 | La venta grabada con una clave de intento de cobro | ver ventas | F06 | `sale.sale.by_idempotency_key` |
 | Las cifras de un periodo de días del negocio, con el impuesto con que se declararon sus ventas (vacío si mezclan impuestos) | informes | F28 | `sale.sale.stats` |
 | Lo vendido hoy y los tiques de hoy | informes | F28 | `sale.sale.today` |
@@ -1719,7 +1730,9 @@ administrador y responsable, los mismos que anulan y devuelven).
   con la sesión de quien vende, su permiso y su app activa, por la única puerta `call_app`: la de la plataforma
   (`base.operations.call`, BASE-F84) con el 409 propio de Ventas cuando esa app no está en el negocio
   (`sale.services_unavailable`, `sale.invoice_unavailable`…); lo que la otra app no acepta es el 422 de Ventas y,
-  dentro de una escritura, corre en un savepoint. Ventas no lleva regla de permisos propia. Mesas (que
+  dentro de una escritura, corre en un savepoint. Lo que nombra el papel (`invoice.issuer.get`, `invoice.invoice.get`
+  y `base.business.get`) se lee como la plataforma, porque quien vende lo imprime aunque no pueda leer Facturación; sin
+  esa app, o apagada, el papel sale con la cabecera del recibo (SALE-F29). Ventas no lleva regla de permisos propia. Mesas (que
   requiere Ventas) solo desde la pantalla «Elegir mesa», también por el nombre de sus operaciones
   (`useLive`/`useCommand`), sin importar nada de `apps/table`. Todo señalado para una ronda nueva de
   PLAN-HUB (este WORKBOOK no edita los planes).
@@ -1901,9 +1914,3 @@ administrador y responsable, los mismos que anulan y devuelven).
 2. El PIN del encargado sobre el dispositivo del empleado (elevación) es de la plataforma (BASE-F84) y
    Ventas lo usa desde FIX-SALE-VOID-REFUND-ASKS-NO-APPROVAL (F09, F14, F18, F20, F30, F31); el diálogo
    ya dice la cifra del descuento que aprueba (F14).
-3. El nombre legal y el NIF del emisor en el documento: el producto actual los leía del hub
-   (`sales.business.get`); aquí la identidad fiscal del negocio vive en el SaaS y el Hub aún no la
-   tiene, así que el tique pinta la «Cabecera del recibo» de los ajustes. El documento fiscal (con NIF del
-   emisor, número de factura y QR) lo emite Facturación (F29) con el emisor que tenga; que ese emisor
-   llegue de la cuenta de erplora.com es hub#501, que choca con «Dos identidades» de PLAN-SAAS §3.1
-   (contradicción señalada en la ronda 2026-10-31b de PLAN-HUB, sin elegir).

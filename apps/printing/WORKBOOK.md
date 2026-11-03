@@ -774,7 +774,8 @@ Campos del documento que lee la impresora (los demás se ignoran):
   `payment_method`, `paid`, `change`, `qr_data`, `qr_heading`, `qr_legend`, `receipt_header`,
   `receipt_footer`, `claim_*`, `promo_*`, `decimals`, `locale`. Una `invoice` exige `vat_number`,
   `receipt_id`, `customer_name`, `customer_tax_id` y `tax_breakdown` no vacío (422 si falta).
-- `prebill`: lo mismo sin número, QR ni pago, con `notice`; exige `items` no vacío.
+- `prebill`: lo mismo sin número, QR ni pago, con `notice`; exige `items` no vacío. La app del dispositivo no
+  pinta `vat_number` en este papel: Ventas manda el NIF como última línea de `business_address` (SALE-F21).
 - `kitchen_order`: `order_number`, `round_number`, `table`, `waiter`, `label`, `priority`, `items`
   (`name`, `quantity`, `modifiers`, `notes`, `combo_name`, `combo_ref`); `modifiers` es una lista de textos,
   los suplementos en el orden elegido, que la impresora pinta un renglón cada uno, antes de `notes`.
