@@ -49,7 +49,9 @@ def po_entries(path: Path) -> dict[str, tuple[str, bool]]:
         starts_entry = line.startswith("msgctxt ") or (line.startswith("msgid ") and current != "msgctxt")
         if starts_entry or (line.startswith("#") and current == "msgstr"):
             flush()
-            parts, fuzzy, current = {"msgctxt": [], "msgid": [], "msgstr": []}, False, None
+            # A ``#, fuzzy`` above a ``msgctxt`` or ``msgid`` belongs to the entry they open: only what comes after a
+            # ``msgstr`` forgets it.
+            parts, fuzzy, current = {"msgctxt": [], "msgid": [], "msgstr": []}, fuzzy and current is None, None
         if line.startswith("#,") and "fuzzy" in line:
             fuzzy = True
         elif line.startswith(("msgctxt ", "msgid ", "msgstr ")):
@@ -117,6 +119,39 @@ def schema_titles() -> set[str]:
         if op.app_label == "table"
         for field in op.input.model_fields.values()
         if field.title
+    }
+
+
+def test_the_reader_sees_a_fuzzy_mark_with_and_without_a_context(tmp_path):
+    """gettext does not use a fuzzy translation, so the screen stays in English: the reader has to see the mark on its
+    own entry, also above a ``msgctxt``, and the entry behind it must not inherit it."""
+    po = tmp_path / "django.po"
+    po.write_text(
+        'msgid ""\n'
+        'msgstr ""\n'
+        '"Language: es\\n"\n'
+        "\n"
+        "#, fuzzy\n"
+        'msgid "Plain"\n'
+        'msgstr "Llano"\n'
+        "\n"
+        'msgid "Behind plain"\n'
+        'msgstr "Tras llano"\n'
+        "\n"
+        "#, fuzzy\n"
+        'msgctxt "table"\n'
+        'msgid "With context"\n'
+        'msgstr "Con contexto"\n'
+        "\n"
+        'msgid "Behind context"\n'
+        'msgstr "Tras contexto"\n',
+        encoding="utf-8",
+    )
+    assert po_entries(po) == {
+        "Plain": ("Llano", True),
+        "Behind plain": ("Tras llano", False),
+        "table\x04With context": ("Con contexto", True),
+        "Behind context": ("Tras contexto", False),
     }
 
 
