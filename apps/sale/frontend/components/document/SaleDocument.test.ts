@@ -91,6 +91,19 @@ describe('SaleDocument', () => {
     expect(s.wrapper.emitted('ready')).toHaveLength(2);
   });
 
+  it('the next sale’s letterhead arriving before its sale never paints the previous sale under it', async () => {
+    const s = await setup();
+    await s.showSale();
+    await s.showSettings();
+    await s.wrapper.setProps({ saleId: 's2' });
+    await s.reopen();
+    await s.showLetterhead({ ...LETTERHEAD, sale_id: 's2' }, { sale_id: 's2' });
+    expect(s.wrapper.findComponent(ReceiptPaper).exists()).toBe(false);
+    expect(s.find('sale-document-loading').exists()).toBe(true);
+    await s.result('sale.sale.get', saleOut({ id: 's2', number: '20261014-0008' }), { sale_id: 's2' });
+    expect(s.wrapper.findComponent(ReceiptPaper).props('sale')).toMatchObject({ id: 's2' });
+  });
+
   it('an original right after charging carries no «DUPLICATE»', async () => {
     const s = await setup({ duplicate: false });
     await s.showSale();
