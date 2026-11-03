@@ -3152,7 +3152,7 @@ Implicados: ACCOUNTS-F38, BASE-F40
   `openExternalLink` u `openSaasPass` en su `@click` (o en la función que nombra), los que llevan al panel de erplora.com («Invitar»,
   «Cambiar roles», «Abrir en erplora.com», «Cambiar en erplora.com») llevan además `managementOffered()`, y lo que
   vende («Mejorar plan» del acceso, de WhatsApp…) va con `isWeb`; lo vigila `frontend/external-links.test.ts`, con
-  su lista de espera por issue (VeriFactu y la factura: gh:hub#518). Tests:
+  su lista de espera por issue, hoy vacía. Tests:
   `base/tests/test_spa.py`, `test_access_spa.py`, `ManageLink.test.ts`, `SidebarFooter.test.ts`,
   `ShellChrome.test.ts`, `lib/management.test.ts`; e2e
   `tests/e2e/base-chrome.spec.ts` y `base-access.spec.ts` (BASE-G56). En `frontend/main.ts`, el menú de usuario lleva «Perfil» y «Cambiar de usuario», y `startWayIn`
