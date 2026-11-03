@@ -460,7 +460,9 @@ Pasos:
 3. Lo que Inventario tiene marcado como agotado sale en la rejilla y en el buscador en gris, con
    «Agotado»: tocarlo no lo añade y dice «… está agotado.» con su nombre. Pedirlo por el asistente
    tampoco lo añade. Lo que ya estaba en una cuenta antes de agotarse se divide, se junta, se
-   imprime y se cobra igual. En cuanto vuelve a la venta, se puede pedir otra vez.
+   imprime y se cobra igual. En cuanto vuelve a la venta, se puede pedir otra vez, y el aviso de
+   agotado se va solo, sin tocar nada más (igual el de «sin categoría fiscal» en cuanto el artículo
+   la tiene). Al salir de **Vender**, el aviso del último toque se va también.
 4. Si Inventario no está activo, la rejilla lo explica y se vende a precio libre.
 5. Con VeriFactu activa, si ahora mismo no deja emitir tiques ni facturas (el negocio ya factura en
    producción y sus registros no tendrían cómo llegar a Hacienda), sale arriba de la rejilla «Ahora no se

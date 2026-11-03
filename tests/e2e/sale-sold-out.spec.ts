@@ -2,13 +2,14 @@
 // stays in the till, greyed with «Sold out»: a tap adds nothing and says why, and its search row says it
 // too, while the article next to it still sells. Through the API (the assistant's way, which never sees the
 // grid) a new line of it is a 409 `sale.product_sold_out` and nothing is written. What was ordered before it
-// sold out is still charged (apps/sale/tests/test_integration_inventory.py). Screenshots of the till in
-// the three viewports. What this file creates is deleted after it.
+// sold out is still charged (apps/sale/tests/test_integration_inventory.py). The notice of a refused tap goes on
+// its own once the article is back on sale, and on leaving the till for another screen (hub#442). Screenshots of
+// the till in the three viewports. What this file creates is deleted after it.
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, login, shot, shown } from './helpers';
+import { A, api, capture, login, shot, shown } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
-import { cleanSales, drawerOff, openTillCart, restoreDrawer, saleByKey, stamp } from './sale-helpers';
+import { cleanSales, drawerOff, openTillCart, restoreDrawer, saleByKey, stamp, tillIsPhone } from './sale-helpers';
 
 const RUN = stamp();
 let croquettes: Product;
@@ -46,6 +47,16 @@ const linesOf = (page: Page, product: Product): Locator => shown(page).locator('
 async function tillReady(page: Page): Promise<void> {
   await shown(page).locator('[data-testid=pos-till]').waitFor({ state: 'visible' });
   await tile(page, bread).waitFor({ state: 'visible' });
+}
+
+/** Opens `path` from inside the Hub, as one of its links does: the SPA's router, no page load (Ionic keeps the
+ *  till mounted under the screen it opens, and brings that same till back). */
+async function openInside(page: Page, path: string): Promise<void> {
+  type Mounted = { __vue_app__: { config: { globalProperties: { $router: { push: (to: string) => Promise<unknown> } } } } };
+  await page.evaluate(
+    (to) => (document.querySelector('#app') as unknown as Mounted).__vue_app__.config.globalProperties.$router.push(to),
+    path,
+  );
 }
 
 test('SALE-F07: a sold-out article is greyed «Sold out» in the till; a tap adds nothing and says why', async ({ page }) => {
@@ -121,4 +132,52 @@ test('SALE-F07: through the API a new line of a sold-out article is a 409 and no
   expect(charged.status).toBe(409);
   expect(charged.data.error.code).toBe('sale.product_sold_out');
   expect(await saleByKey(context, `e2e-sold-out-${RUN}`)).toBeNull();
+});
+
+test('SALE-F07 (hub#442): the sold-out notice goes on its own once the article is back on sale, and on leaving the till', async ({
+  page,
+  context,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await login(page, A, '/sale/pos');
+  const bravas = await createProduct(context, { name: `E2E Bravas ${RUN}`, sku: `E2E-SO-P-${RUN}`, price: 550, tax_category_key: 'restaurant.food' });
+  const mark = async (soldOut: boolean) => {
+    const res = await api(context, A, 'POST', '/inventory/products/sold_out', { id: bravas.id, sold_out: soldOut });
+    expect(res.status, `sold_out=${soldOut}`).toBe(200);
+  };
+  const notice = shown(page).locator('[data-testid=pos-tap-notice]');
+  const said = new RegExp(`^«${bravas.name}» (is sold out|está agotado)\\.$`);
+  await mark(true);
+  await page.goto(`${A}/sale/pos`);
+  await tillReady(page);
+  await expect(tile(page, bravas)).toHaveClass(/pos-tile--sold-out/);
+  await tile(page, bravas).click({ force: true });
+  await expect(notice).toHaveText(said);
+
+  // Inventory puts it back on sale (another device, the assistant): the till hears it, and the notice goes
+  // without another tap; nothing went into the check.
+  await mark(false);
+  await expect(tile(page, bravas)).not.toHaveClass(/pos-tile--sold-out/);
+  await expect(notice).toBeHidden();
+  await expect(linesOf(page, bravas)).toHaveCount(0);
+  for (const size of SHOTS) {
+    await page.setViewportSize({ width: size.width, height: size.height });
+    await expect(tile(page, bravas)).toBeVisible();
+    // On a phone the check becomes a drawer that slides away (0.25 s): the shot waits until it is gone.
+    if (await tillIsPhone(page)) await expect(shown(page).locator('[data-testid=pos-cart-drawer]')).toBeHidden();
+    await capture(page, `HUB-442-back-on-sale-${size.label}`);
+  }
+
+  // Sold out again and refused again; off to Inventory and back to the till inside the Hub: the notice is gone.
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await mark(true);
+  await expect(tile(page, bravas)).toHaveClass(/pos-tile--sold-out/);
+  await tile(page, bravas).click({ force: true });
+  await expect(notice).toHaveText(said);
+  await openInside(page, '/inventory/products');
+  await expect(shown(page).locator('[data-testid=pos-till]')).toHaveCount(0);
+  await openInside(page, '/sale/pos');
+  await tillReady(page);
+  await expect(tile(page, bravas)).toHaveClass(/pos-tile--sold-out/);
+  await expect(shown(page).locator('[data-testid=pos-tap-notice]')).toHaveCount(0);
 });
