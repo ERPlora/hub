@@ -1,6 +1,7 @@
 // «Open checks» (WORKBOOK «Cuentas abiertas»; SALE-F17, F18): «Park this check» with its hint, «Tap a
 // check to resume it.» and a row per open check of the business (title or amount, time and amount),
-// newest first, 20 at a time, with its bin: a first tap arms it for 3 seconds, a second voids the check.
+// newest first, 20 at a time, with its bin: a first tap arms it for 3 seconds and says so under the
+// check, a second voids the check.
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { approvalDialog, approvalSettled, asksApproval } from '../../__tests__/approval-dialog';
@@ -101,6 +102,22 @@ describe('OpenChecksPopover: deleting', () => {
     expect(bin().attributes('aria-label')).toBe('Delete check');
   });
 
+  it('the armed bin says on screen, in its own row, that a second tap deletes it (hub#463)', async () => {
+    const m = await setup({}, { locale: 'es' });
+    await m.result(OP, page(ROWS));
+    const hint = (id: string) => m.find(`pos-parked-${id}-confirm`);
+    expect(hint('o2').exists()).toBe(false);
+    await click(m.find('pos-parked-o2-delete').element);
+    expect(hint('o2').text()).toBe('Toca otra vez para eliminar — anula la cuenta');
+    expect(m.find('pos-parked-o2-delete').element.closest('.pos-checks__item')!.contains(hint('o2').element)).toBe(true);
+    expect(hint('o3').exists()).toBe(false);
+    await click(m.find('pos-parked-o3-delete').element);
+    expect(hint('o2').exists()).toBe(false);
+    expect(hint('o3').exists()).toBe(true);
+    await m.clock.advance(3000);
+    expect(hint('o3').exists()).toBe(false);
+  });
+
   it('a second tap voids the check (it leaves the list with the next result)', async () => {
     const m = await setup();
     await m.result(OP, page(ROWS));
@@ -108,6 +125,7 @@ describe('OpenChecksPopover: deleting', () => {
     await click(m.find('pos-parked-o2-delete').element);
     await click(m.find('pos-parked-o2-delete').element);
     expect(m.sent()).toEqual([{ method: 'POST', path: '/api/sale/orders/void', query: {}, body: { order_id: 'o2' } }]);
+    expect(m.find('pos-parked-o2-confirm').exists()).toBe(false);
   });
 
   it('a refusal says the check is still there, on top of the list', async () => {
