@@ -167,6 +167,7 @@ for (const { name, lang, locale, tendered } of LANGUAGES) {
       // In the language under test (the Hub's language cookie, which the sign-in has just set from the account).
       await context.addCookies([{ name: 'django_language', value: lang, domain: new URL(A).hostname, path: '/' }]);
       await page.reload();
+      if (process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
       await aCheck(page);
       const sheet = await openSheet(page);
       await expect(sheet.locator('[data-testid=sale-checkout-tendered]'), 'the sheet in the language under test').toContainText(tendered);
