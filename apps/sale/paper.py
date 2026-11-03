@@ -1,9 +1,9 @@
 """The paper of Sales on the receipt printer (PRINTING-F07, F08, F09; SALE-F21, F29): the receipt of a sale and
 the bill of a check as the app of the device paints them (``crates/peripherals/src/escpos.rs``), composed from
-the same figures the screen's paper lays out (``ReceiptPaper.vue``, ``PrebillModal.vue``): the header of the
-receipt settings (its first line is the name, the rest the address), the number Invoicing gave the sale (its
-own while it has none), the lines, the totals, the payment and, with VeriFactu, the fiscal QR. Every figure is
-the server's; this only lays them out, in units (the renderer prints major-unit amounts). Pure: no ORM.
+the same figures the screen's paper lays out (``ReceiptPaper.vue``, ``PrebillModal.vue``): the business as
+``letterhead`` names it, the number Invoicing gave the sale (its own while it has none), the lines, the totals,
+the payment and, with VeriFactu, the fiscal QR. Every figure is the server's; this only lays them out, in units
+(the renderer prints major-unit amounts). Pure: no ORM.
 """
 
 from decimal import Decimal
@@ -28,11 +28,27 @@ def _header(text: str) -> list[str]:
     return [line.strip() for line in (text or "").split("\n") if line.strip()]
 
 
-def _business(header: str) -> dict:
-    lines = _header(header)
-    business = {"business_name": lines[0] if lines else gettext("My business")}
-    if lines[1:]:
-        business["business_address"] = "\n".join(lines[1:])
+def letterhead(issuer: dict | None, *, header: str, registered_name: str = "") -> dict:
+    """The business as every paper of the till names it (hub#458; RD 1619/2012, arts. 6 and 7): ``issuer``
+    (``name``, ``tax_id``, ``address``) heads it and the receipt header goes under it as an addition, without what
+    the issuer already said. Without an issuer the header is all there is: its first line is the name and the rest
+    the address; without either, the name the business registered."""
+    added = _header(header)
+    if issuer is None:
+        return {"name": added[0] if added else registered_name or gettext("My business"), "tax_id": "", "lines": added[1:]}
+    said = {issuer["name"].casefold(), issuer["address"].casefold()}
+    address = [issuer["address"]] if issuer["address"] else []
+    return {
+        "name": issuer["name"],
+        "tax_id": issuer["tax_id"],
+        "lines": [*address, *(line for line in added if line.casefold() not in said)],
+    }
+
+
+def _business(name: str, lines: list[str]) -> dict:
+    business = {"business_name": name}
+    if lines:
+        business["business_address"] = "\n".join(lines)
     return business
 
 
@@ -64,21 +80,18 @@ def _dish(dish) -> str:
 def receipt(
     sale: SaleOut,
     *,
-    header: str,
+    letterhead: dict,
     footer: str,
     decimals: int,
     duplicate: bool,
     record: dict | None = None,
-    issuer_tax_id: str = "",
-    customer_tax_id: str = "",
-    customer_address: str = "",
 ) -> tuple[str, dict]:
     """The document type and the document of ``sale``'s receipt: ``receipt`` for a ticket, ``invoice`` for a
     sale charged as a full invoice (both parties and its breakdown). ``record``: VeriFactu's record of its
     document (``qr_url``), whose QR opens the paper."""
     full = sale.document_type == "invoice"
     document = {
-        **_business(header),
+        **_business(letterhead["name"], letterhead["lines"]),
         "receipt_id": sale.invoice_number or sale.number,
         "duplicate": duplicate,
         "cashier": sale.created_by,
@@ -90,19 +103,20 @@ def receipt(
         "paid": units(sale.tendered_total, decimals),
         "change": units(sale.change_total, decimals),
     }
+    if letterhead["tax_id"]:
+        document["vat_number"] = letterhead["tax_id"]
     if sale.customer_name:
         document["customer_name"] = sale.customer_name
     if full:
         document.update(
-            vat_number=issuer_tax_id,
-            customer_tax_id=customer_tax_id,
+            customer_tax_id=sale.customer_tax_id,
             tax_breakdown=[
                 {"rate": float(row.rate_pct), "base": units(row.base, decimals), "tax": units(row.tax, decimals)}
                 for row in sale.breakdown
             ],
         )
-        if customer_address:
-            document["customer_address"] = customer_address
+        if sale.customer_address:
+            document["customer_address"] = sale.customer_address
     # The discount is already inside the amounts: said under them, as on screen, never subtracted again.
     said = []
     if sale.discount_amount > 0:
@@ -119,10 +133,12 @@ def receipt(
     return ("invoice" if full else "receipt"), document
 
 
-def bill(valued: PreviewOut, *, label: str, header: str, decimals: int) -> dict:
-    """The bill of a check (``prebill``): what is owed, without a number, a QR or a payment."""
+def bill(valued: PreviewOut, *, label: str, letterhead: dict, decimals: int) -> dict:
+    """The bill of a check (``prebill``): what is owed, without a number, a QR or a payment. The app's bill prints no
+    ``vat_number`` (``render_prebill``), so the tax ID travels as the last line of the address."""
+    tax_id = [gettext("Tax ID: %(tax_id)s") % {"tax_id": letterhead["tax_id"]}] if letterhead["tax_id"] else []
     document = {
-        **_business(header),
+        **_business(letterhead["name"], [*letterhead["lines"], *tax_id]),
         "items": [_item(line, decimals) for line in valued.lines],
         "subtotal": units(valued.subtotal, decimals),
         "tax_amount": units(valued.tax_total, decimals),

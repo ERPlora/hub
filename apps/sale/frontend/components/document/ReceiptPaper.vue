@@ -1,10 +1,11 @@
 <script setup lang="ts">
 // The ticket of a sale as it prints (SALE-F29; the old `ok-receipt`, thermal paper 80 mm; a sale
-// charged as a full invoice is titled «Invoice» and numbered «No.» instead of «Receipt»): the header
-// from the receipt settings (first line = the name, else «My business»; the rest = the address),
+// charged as a full invoice is titled «Invoice» and numbered «No.» instead of «Receipt»): the business as
+// the server names it (`sale.letterhead.get`, hub#458: name, lines and tax ID; RD 1619/2012 art. 7),
 // «DUPLICATE» on a reprint, the number with the date and time — the number Invoicing gave its ticket or
 // invoice in the very charge («Invoice FACT-2026-000012»), the sale's own only while it has none, and
-// then «Fiscal document pending» under it, so the paper never poses as issued —, the customer, the lines
+// then «Fiscal document pending» under it, so the paper never poses as issued —, the customer (on a full
+// invoice, with the tax ID and address it was issued to: art. 6), the lines
 // («qty × unit price», a gift «(On the house)», a line a voucher paid «Already paid · <voucher>»
 // (SALE-F27), the note), «Subtotal», a VAT row per fiscal key from the sale's breakdown (an
 // exempt key names its cause), «TOTAL», the payment rows and «Change», the discount already applied and
@@ -18,14 +19,16 @@ import { useLocale, useT } from '../../composables/useT';
 import { taxRow } from '../../lib/breakdown';
 import { dishLabel } from '../../lib/comboChoice';
 import { formatMoney, formatQuantity, moneyOf } from '../../lib/format';
-import type { SaleOut, SettingsOut } from '../../operations';
+import type { LetterheadOut, SaleOut, SettingsOut } from '../../operations';
 import type { FiscalRecord } from './FiscalRecordFollower.vue';
 
 const props = withDefaults(
   defineProps<{
     sale: SaleOut;
-    /** The receipt settings (`sale.pos_settings.get`); none = the default header and no footer. */
-    settings?: Pick<SettingsOut, 'receipt_header' | 'receipt_footer'> | null;
+    /** The business on this paper (`sale.letterhead.get`). */
+    letterhead: LetterheadOut;
+    /** The receipt settings (`sale.pos_settings.get`); none = no footer. */
+    settings?: Pick<SettingsOut, 'receipt_footer'> | null;
     /** A reprint: «DUPLICATE» on top. */
     duplicate?: boolean;
     /** VeriFactu's record of its fiscal document; none = no fiscal QR. */
@@ -42,9 +45,6 @@ const TAX_NAMES = new Set(['vat', 'surcharge', 'igic', 'ipsi']);
 
 const money = (cents: number): string => formatMoney(cents, locale.value, moneyOf(props.sale));
 
-const header = computed(() => (props.settings?.receipt_header ?? '').split('\n').map((line) => line.trim()).filter(Boolean));
-const businessName = computed(() => header.value[0] ?? t('sale.document.defaultBusiness'));
-const address = computed(() => header.value.slice(1));
 const when = computed(() => formatDateTime(props.sale.created_at, locale.value));
 /** A sale charged as a full invoice says so on top and is numbered «No.», never «Receipt». */
 const isInvoice = computed(() => props.sale.document_type === 'invoice');
@@ -135,15 +135,22 @@ const footer = computed(() =>
         class="sale-receipt__name"
         data-testid="sale-receipt-name"
       >
-        {{ businessName }}
+        {{ letterhead.name }}
       </div>
       <div
-        v-for="(text, index) in address"
+        v-for="(text, index) in letterhead.lines"
         :key="index"
         class="sale-receipt__small"
         data-testid="sale-receipt-address"
       >
         {{ text }}
+      </div>
+      <div
+        v-if="letterhead.tax_id"
+        class="sale-receipt__small"
+        data-testid="sale-receipt-tax-id"
+      >
+        {{ $t('sale.document.taxId', { id: letterhead.tax_id }) }}
       </div>
     </header>
     <hr class="sale-receipt__rule">
@@ -163,6 +170,20 @@ const footer = computed(() =>
     >
       <span data-testid="sale-receipt-customer">{{ $t('sale.document.customer') }}: {{ sale.customer_name }}</span>
     </div>
+    <template v-if="isInvoice">
+      <div
+        v-if="sale.customer_tax_id"
+        class="sale-receipt__meta"
+      >
+        <span data-testid="sale-receipt-customer-tax-id">{{ $t('sale.document.taxId', { id: sale.customer_tax_id }) }}</span>
+      </div>
+      <div
+        v-if="sale.customer_address"
+        class="sale-receipt__meta"
+      >
+        <span data-testid="sale-receipt-customer-address">{{ $t('sale.document.customerAddress', { address: sale.customer_address }) }}</span>
+      </div>
+    </template>
     <hr class="sale-receipt__rule">
     <table
       v-if="lines.length"

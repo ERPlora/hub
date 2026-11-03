@@ -168,7 +168,6 @@
       "prebillTitle": "Cuenta",
       "print": "Imprimir",
       "close": "Cerrar",
-      "docDefaultBusiness": "Mi negocio",
       "docCustomer": "Cliente",
       "docSubtotal": "Subtotal",
       "docDiscount": "Descuento",
@@ -395,12 +394,13 @@
       "close": "Cerrar",
       "print": "Imprimir",
       "printFailed": "No se pudo imprimir",
-      "defaultBusiness": "Mi negocio",
       "queued": "Enviado a {printer}.",
       "receipt": "Tiquet",
       "invoice": "Factura",
       "number": "Nº",
       "customer": "Cliente",
+      "customerAddress": "Domicilio: {address}",
+      "taxId": "NIF: {id}",
       "item": "Concepto",
       "amount": "Importe",
       "noLines": "— Sin líneas —",
@@ -674,7 +674,7 @@
         },
         "receipt_header": {
           "label": "Cabecera del recibo",
-          "description": "Primera línea = nombre; resto = dirección."
+          "description": "Se añade bajo el nombre, el NIF y el domicilio del emisor. Sin emisor todavía, la primera línea es el nombre y el resto la dirección."
         },
         "receipt_footer": {
           "label": "Pie del recibo"

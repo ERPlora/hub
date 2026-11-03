@@ -824,6 +824,9 @@ msgstr "platos"
 msgid "My business"
 msgstr "Mi negocio"
 
+msgid "Tax ID: %(tax_id)s"
+msgstr "NIF: %(tax_id)s"
+
 msgid "(On the house)"
 msgstr "(Invitación)"
 

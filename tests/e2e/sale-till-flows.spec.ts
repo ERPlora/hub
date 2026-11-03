@@ -9,12 +9,13 @@ import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, api, login, psql, shown, untilStill } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
-import { snapshotSeries } from './invoice-helpers';
+import { ensureIssuer, snapshotSeries } from './invoice-helpers';
 import { cleanSales, drawerOff, newestSaleOf, openTillCart, restoreDrawer, shots, stamp, VIEWPORTS } from './sale-helpers';
 
 const RUN = stamp();
 const SECTION = `e2e Fruit ${RUN}`;
 const MEMBER = `E2E Till ${RUN}`;
+let issuer: Awaited<ReturnType<typeof ensureIssuer>>;
 let coffee: Product;
 let steak: Product;
 let cake: Product;
@@ -43,6 +44,7 @@ test.beforeAll(async ({ browser }) => {
   const section = await api<{ id: string }>(context, A, 'POST', '/sale/departments', { name: SECTION, tax_category_key: 'product.super_reduced' });
   expect(section.status, 'the section').toBe(201);
   sectionId = section.data.id;
+  issuer = await ensureIssuer(context);
   const member = await api<{ id: string }>(context, A, 'POST', '/staff/members', { first_name: MEMBER, last_name: 'Team' });
   expect(member.status, 'the team member').toBe(201);
   memberId = member.data.id;
@@ -235,6 +237,9 @@ test('SALE-F14, F21 (hub#457): 10 % off the whole check says what it takes off, 
   const prebill = page.locator('[data-testid=pos-prebill-paper]:visible');
   await expect(prebill.locator('.pos-bill__discount')).toContainText('−€0.70');
   await expect(prebill.locator('.pos-bill__total')).toContainText('6.30');
+  // The bill says who the business is (hub#458): never «My business» once Invoicing has its issuer.
+  await expect(prebill.locator('[data-testid=pos-prebill-tax-id]')).toContainText(issuer.tax_id);
+  await expect(prebill.locator('.pos-bill__business')).toHaveText(issuer.legal_name);
   await shots(page, 'APP-SALE-SALE-F21-TICKET', async (p) => {
     await p.locator('[data-testid=pos-prebill-paper]:visible').waitFor({ state: 'visible' });
   });
@@ -325,10 +330,37 @@ test('SALE-F17, F18: a check parked and taken back from «Open checks», another
   );
   if (!(await list.isVisible())) await shown(page).locator('[data-testid=pos-open-checks]').click();
 
-  // F18: the bin arms on the first tap and deletes on the second.
+  // F18: the bin arms on the first tap and says so on screen, under its check (hub#463); the second deletes it.
+  const ARMED = 'Tap again to delete — this voids the check';
   const bin = list.locator(`[data-testid=pos-parked-${droppedCheck?.id}-delete]`);
+  const armed = list.locator(`[data-testid=pos-parked-${droppedCheck?.id}-confirm]`);
+  await shots(
+    page,
+    'APP-SALE-SALE-F18-armed',
+    async (p) => {
+      await cartReady(p);
+      const open = shown(p).locator('[data-testid=pos-checks]');
+      if (!(await open.isVisible())) await shown(p).locator('[data-testid=pos-open-checks]').click();
+      await open.waitFor({ state: 'visible' });
+      const hint = open.locator(`[data-testid=pos-parked-${droppedCheck?.id}-confirm]`);
+      // Disarmed first, so this tap arms the bin instead of deleting the check.
+      await hint.waitFor({ state: 'hidden' });
+      await open.locator(`[data-testid=pos-parked-${droppedCheck?.id}-delete]`).click();
+      await expect(hint).toHaveText(ARMED);
+    },
+    { width: 1440, height: 900 },
+  );
+  if (!(await list.isVisible())) await shown(page).locator('[data-testid=pos-open-checks]').click();
+  await armed.waitFor({ state: 'hidden' });
+  const disarmedAt = await bin.boundingBox();
   await bin.click();
-  await expect(bin).toHaveAttribute('aria-label', 'Tap again to delete — this voids the check');
+  await expect(bin).toHaveAttribute('aria-label', ARMED);
+  await expect(armed).toBeVisible();
+  await expect(armed).toHaveText(ARMED);
+  // The hint takes a line of its own: the armed bin stays where the first tap was, so the second lands on it.
+  const armedAt = await bin.boundingBox();
+  expect(Math.abs(armedAt!.x - disarmedAt!.x), 'the armed bin moved sideways').toBeLessThan(1);
+  expect(Math.abs(armedAt!.y - disarmedAt!.y), 'the armed bin moved up or down').toBeLessThan(1);
   await bin.click();
   await expect(list.locator(`[data-testid=pos-parked-${droppedCheck?.id}]`)).toHaveCount(0);
   expect(await checkOf(context, dropped)).toBeUndefined();

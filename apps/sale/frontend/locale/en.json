@@ -168,7 +168,6 @@
       "prebillTitle": "Bill",
       "print": "Print",
       "close": "Close",
-      "docDefaultBusiness": "My business",
       "docCustomer": "Customer",
       "docSubtotal": "Subtotal",
       "docDiscount": "Discount",
@@ -395,12 +394,13 @@
       "close": "Close",
       "print": "Print",
       "printFailed": "Could not print",
-      "defaultBusiness": "My business",
       "queued": "Sent to {printer}.",
       "receipt": "Receipt",
       "invoice": "Invoice",
       "number": "No.",
       "customer": "Customer",
+      "customerAddress": "Address: {address}",
+      "taxId": "Tax ID: {id}",
       "item": "Item",
       "amount": "Amount",
       "noLines": "— No lines —",
@@ -674,7 +674,7 @@
         },
         "receipt_header": {
           "label": "Receipt header",
-          "description": "First line = name; the rest = address."
+          "description": "Added under the issuer's name, tax ID and address. With no issuer yet, the first line is the name and the rest the address."
         },
         "receipt_footer": {
           "label": "Receipt footer"
