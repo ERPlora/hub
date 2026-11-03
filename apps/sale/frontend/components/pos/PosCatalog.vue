@@ -5,8 +5,9 @@
 // windows of 100 (one subscription each; «Load more» opens the next). The search asks the server too.
 // The grid and the search show what is sold out in Inventory too, greyed (SALE-F07), and the counts count
 // what the grid shows (INVENTORY-F27). A sellable tap goes up (`add`); a blocked or sold-out one says why, above the
-// grid and in a toast, and adds nothing. That notice follows the refused product live and goes, with its toast, the
-// moment the reason no longer holds (back on sale, or given its tax category), and on leaving the till (hub#442).
+// grid and in a toast, and adds nothing. That notice follows the refused product or service live and goes, with its
+// toast, the moment the reason no longer holds (back on sale, or given its tax category), and on leaving the till
+// (hub#442, hub#719).
 // Inventory off: the grid explains it and the open price stays. With products hidden by the
 // till settings, only the open price is offered. With the services of Services (SALE-F38,
 // `showServices`), «Services» follows «All» in the strip and shows their grid (first, when products are
@@ -22,7 +23,7 @@ import { useRoute } from 'vue-router';
 
 import type { SaleComboOut } from '../../../../combo/frontend/operations';
 import type { CategoryOut, ProductOut } from '../../../../inventory/frontend/operations';
-import type { ServiceSaleOut } from '../../../../service/frontend/operations';
+import type { ServiceOut, ServiceSaleOut } from '../../../../service/frontend/operations';
 import { useLiveWindows } from '../../composables/useLiveWindows';
 import { useTaxName } from '../../../../tax/frontend/composables/useTaxName';
 import { useT } from '../../composables/useT';
@@ -34,6 +35,7 @@ import ProductFollower from './ProductFollower.vue';
 import ProductGrid from './ProductGrid.vue';
 import ProductSearch from './ProductSearch.vue';
 import ScreenMenu from './ScreenMenu.vue';
+import ServiceFollower from './ServiceFollower.vue';
 import ServiceGrid from './ServiceGrid.vue';
 import SpeakKey from './SpeakKey.vue';
 import { SERVICES } from './till';
@@ -80,10 +82,12 @@ const searching = shallowRef(false);
 
 /** Why the till refused a product: the notice stays only while this still holds. */
 type Refused = 'soldOut' | 'noTax';
-/** The reason of the last refused tap; of a product, which one and why, to follow it live. */
+/** The reason of the last refused tap and what was refused, to follow it live: a product and why, or a service (only
+ *  ever refused for its missing tax category). */
 interface TapNotice {
   text: string;
   product?: { id: string; reason: Refused };
+  serviceId?: string;
 }
 const tapNotice = shallowRef<TapNotice | null>(null);
 /** The toast of a refused tap, named so it goes with the notice once what it says stops being true. */
@@ -116,8 +120,8 @@ const emptyText = computed(() => {
 });
 
 /** A tap on something the till cannot sell now: the reason above the grid and in a toast; nothing is added. */
-function refuse(text: string, product?: TapNotice['product']): void {
-  tapNotice.value = { text, product };
+function refuse(text: string, refused: Pick<TapNotice, 'product' | 'serviceId'>): void {
+  tapNotice.value = { text, ...refused };
   void toast(text, 'warning', undefined, TAP_TOAST);
 }
 
@@ -128,28 +132,37 @@ function noTax(): string {
 
 function pick(product: ProductOut): void {
   searching.value = false;
-  if (product.is_sold_out) return refuse(t('sale.pos.soldOut', { name: product.name }), { id: product.id, reason: 'soldOut' });
-  if (product.needs_tax_setup) return refuse(noTax(), { id: product.id, reason: 'noTax' });
+  if (product.is_sold_out) return refuse(t('sale.pos.soldOut', { name: product.name }), { product: { id: product.id, reason: 'soldOut' } });
+  if (product.needs_tax_setup) return refuse(noTax(), { product: { id: product.id, reason: 'noTax' } });
   tapNotice.value = null;
   emit('add', product);
 }
 
 function pickService(service: ServiceSaleOut): void {
   searching.value = false;
-  if (service.needs_tax_setup) return refuse(noTax());
+  if (service.needs_tax_setup) return refuse(noTax(), { serviceId: service.id });
   tapNotice.value = null;
   emit('service', service);
 }
 
+/** The reason of the refused tap is gone: so are the notice and its toast. */
+function dropTapNotice(): void {
+  tapNotice.value = null;
+  void dismissToast(TAP_TOAST);
+}
+
 /** The refused product as Inventory has it now (its follower is the notice's own: `:key`, and Vue drops what an
- *  unmounted one emits): once the reason it was refused for is gone, so are the notice and its toast. */
+ *  unmounted one emits). */
 function settle(product: ProductOut): void {
   const refused = tapNotice.value?.product;
   if (!refused) return;
   const holds = refused.reason === 'soldOut' ? product.is_sold_out : product.needs_tax_setup;
-  if (holds) return;
-  tapNotice.value = null;
-  void dismissToast(TAP_TOAST);
+  if (!holds) dropTapNotice();
+}
+
+/** The refused service as Services has it now (its follower is the notice's own, like the product's). */
+function settleService(service: ServiceOut): void {
+  if (!service.needs_tax_setup) dropTapNotice();
 }
 
 /** Ionic keeps the till mounted under another screen: leaving it drops the notice, which belongs to that moment. */
@@ -208,6 +221,12 @@ watch(
       :key="tapNotice.product.id"
       :product-id="tapNotice.product.id"
       @product="settle"
+    />
+    <ServiceFollower
+      v-if="tapNotice?.serviceId"
+      :key="tapNotice.serviceId"
+      :service-id="tapNotice.serviceId"
+      @service="settleService"
     />
     <InlineFeedback
       v-if="failure && !servicesMode"

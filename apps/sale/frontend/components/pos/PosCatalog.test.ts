@@ -335,6 +335,98 @@ describe('PosCatalog: the services of Services (SALE-F38)', () => {
     expect(s.find('pos-tap-notice').text()).toBe('No se puede vender: sin categoría fiscal. Falta configurar el IVA.');
   });
 
+  describe('the notice of a service without VAT (hub#719)', () => {
+    const SERVICE = 'service.service.get';
+
+    /** The till on «Services» with `rows`, the service `sv2` without VAT among them, and that service tapped. */
+    async function refused(rows = [service({ id: 'sv2', needs_tax_setup: true })]) {
+      const s = await setup({ showServices: true });
+      await s.result(SERVICES, page(rows));
+      s.wrapper.findComponent(CategoryStrip).vm.$emit('update:modelValue', 'services');
+      await s.reopen();
+      await click(s.find('pos-service-sv2').element);
+      await s.reopen();
+      return s;
+    }
+
+    it('follows that service and nothing of Inventory', async () => {
+      const s = await refused();
+      expect(s.params(SERVICE)).toEqual([{ id: 'sv2' }]);
+      expect(s.params(GET)).toEqual([]);
+    });
+
+    it('stays while it has no tax category; goes, with its toast, the moment it has one, and nothing is added', async () => {
+      const s = await refused();
+      const named = vi.mocked(toast).mock.calls[0]?.[3];
+      expect(named).toEqual(expect.any(String));
+      await s.result(SERVICE, service({ id: 'sv2', needs_tax_setup: true }));
+      expect(s.find('pos-tap-notice').exists()).toBe(true);
+      expect(dismissToast).not.toHaveBeenCalled();
+      await s.result(SERVICE, service({ id: 'sv2', needs_tax_setup: false }), {}, 2);
+      expect(s.find('pos-tap-notice').exists()).toBe(false);
+      expect(dismissToast).toHaveBeenCalledExactlyOnceWith(named);
+      expect(s.wrapper.emitted('service')).toBeUndefined();
+      await s.clock.advance(RELEASE_GRACE_MS);
+      expect(s.params(SERVICE)).toEqual([]);
+    });
+
+    it('a service picked in the search is followed too: the grid in use may not show it', async () => {
+      const s = await setup({ showServices: true });
+      await click(s.find('pos-search-trigger').element);
+      s.wrapper.findComponent(ProductSearch).vm.$emit('pickService', service({ id: 'sv7', needs_tax_setup: true }));
+      await s.reopen();
+      expect(s.find('pos-tap-notice').exists()).toBe(true);
+      await s.result(SERVICE, service({ id: 'sv7', needs_tax_setup: false }));
+      expect(s.find('pos-tap-notice').exists()).toBe(false);
+    });
+
+    it('a second refused service is followed instead of the first: the first getting its category changes nothing', async () => {
+      const s = await refused([service({ id: 'sv2', needs_tax_setup: true }), service({ id: 'sv3', needs_tax_setup: true })]);
+      await click(s.find('pos-service-sv3').element);
+      await s.reopen();
+      await s.result(SERVICE, service({ id: 'sv2', needs_tax_setup: false }), { id: 'sv2' });
+      expect(s.find('pos-tap-notice').exists()).toBe(true);
+      await s.clock.advance(RELEASE_GRACE_MS);
+      expect(s.params(SERVICE)).toEqual([{ id: 'sv3' }]);
+      await s.result(SERVICE, service({ id: 'sv3', needs_tax_setup: false }), { id: 'sv3' });
+      expect(s.find('pos-tap-notice').exists()).toBe(false);
+    });
+
+    it('a refused article after it takes over: the service is let go and the article is followed', async () => {
+      const s = await refused();
+      await s.result(PRODUCTS, page([product({ id: 'p1', name: 'Tea', is_sold_out: true })]), { sort: 'name' });
+      s.wrapper.findComponent(CategoryStrip).vm.$emit('update:modelValue', '');
+      await s.reopen();
+      await click(s.find('pos-product-p1').element);
+      await s.reopen();
+      await s.clock.advance(RELEASE_GRACE_MS);
+      expect(s.params(SERVICE)).toEqual([]);
+      expect(s.params(GET)).toEqual([{ id: 'p1' }]);
+      expect(s.find('pos-tap-notice').text()).toBe('«Tea» is sold out.');
+    });
+
+    it('the next sellable tap clears the notice and lets the service go', async () => {
+      const s = await refused([service({ id: 'sv1' }), service({ id: 'sv2', needs_tax_setup: true })]);
+      expect(s.params(SERVICE)).toEqual([{ id: 'sv2' }]);
+      await click(s.find('pos-service-sv1').element);
+      await s.reopen();
+      expect(s.find('pos-tap-notice').exists()).toBe(false);
+      await s.clock.advance(RELEASE_GRACE_MS);
+      expect(s.params(SERVICE)).toEqual([]);
+    });
+
+    it('leaving the till takes the notice away; coming back does not bring it back', async () => {
+      const s = await refused();
+      expect(s.find('pos-tap-notice').exists()).toBe(true);
+      await s.router.push('/service/services');
+      await flush();
+      expect(s.find('pos-tap-notice').exists()).toBe(false);
+      await s.router.push('/sale/pos');
+      await flush();
+      expect(s.find('pos-tap-notice').exists()).toBe(false);
+    });
+  });
+
   it('with products hidden, the services come first and «All» keeps the open price', async () => {
     const s = await setup({ showProducts: false, showServices: true });
     await s.result(SERVICES, page([service()]));
