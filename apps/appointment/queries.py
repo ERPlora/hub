@@ -227,16 +227,22 @@ def sees_member(ctx: OperationContext, staff_id: UUID) -> bool:
     return sees_everyone(ctx) or staff_id == own_staff_id(ctx)
 
 
+def is_own(ctx: OperationContext, staff_id: UUID | None) -> bool:
+    """Whether «their own» appointments take those of ``staff_id``. A person's are their staff record's. A caller that
+    is not a person (``by_person``: a flow's step, an API key…) has none, so what it was granted on «its own» takes the
+    whole team's — as the customer, who books with any professional — and is judged by her rules
+    (FIX-HUB-FLOW-STEP-CANNOT-BOOK-FOR-A-PROFESSIONAL)."""
+    if not by_person(ctx):
+        return True
+    return staff_id is not None and staff_id == own_staff_id(ctx)
+
+
 def may_change(ctx: OperationContext, staff_id: UUID | None) -> bool:
-    return ctx.has(CHANGE_ALL) or (
-        ctx.has(CHANGE_OWN) and staff_id is not None and staff_id == own_staff_id(ctx)
-    )
+    return ctx.has(CHANGE_ALL) or (ctx.has(CHANGE_OWN) and is_own(ctx, staff_id))
 
 
 def may_book_for(ctx: OperationContext, staff_id: UUID | None) -> bool:
-    return ctx.has(ADD_ALL) or (
-        ctx.has(ADD_OWN) and staff_id is not None and staff_id == own_staff_id(ctx)
-    )
+    return ctx.has(ADD_ALL) or (ctx.has(ADD_OWN) and is_own(ctx, staff_id))
 
 
 # ── Appointments ─────────────────────────────────────────────────────────────────────────────

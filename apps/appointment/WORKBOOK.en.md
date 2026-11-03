@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:d0666702b138778a39274c60f6476ead690be6cb213ad41a496cf40dc5770139 -->
+<!-- generated from WORKBOOK.md sha256:b76ec7f0687945ded1f0a5247c2c5cea2ba715f1da8ba7c75690455fe2371e6e -->
 
 ## What it is for and who it is for
 
@@ -181,7 +181,10 @@ Whoever asks for something on behalf of the customer without being a person of t
 automation, the WhatsApp conversation, online booking) is judged and answered **as the customer**: they do
 not have the front desk's exceptions (a time already past, inside the minimum notice, **Book anyway** over
 an overlap, cancelling outside the policy) and they do not read the customer's contact details, the notes
-or the reason for a cancellation (APPOINTMENT-F01, F06, F18 and F20).
+or the reason for a cancellation (APPOINTMENT-F01, F06, F18 and F20). As they are nobody of the team, they have
+no appointments of "their own": what they are allowed on them (booking, moving, confirming or editing) counts
+for those of any professional, just as the customer books with whoever she likes; what they are not allowed,
+they do not do (APPOINTMENT-F01 and F04).
 
 ### APPOINTMENT-F01 Book an appointment from the agenda
 Status: done
@@ -209,7 +212,8 @@ If it fails: the reason shows inside the panel, without losing what was typed: o
 opening hours, the professional does not work at that time, blocked slot, the professional already has an
 appointment (`appointment.slot_taken`), too far ahead, the customer, the service or the professional do
 not exist or cannot be booked. From the front desk neither the minimum notice nor a time already past
-refuses (the past time only warns before saving); an automation does not have those exceptions. Two people
+refuses (the past time only warns before saving); an automation does not have those exceptions. An employee
+only books for themselves; an automation allowed to book, with any professional. Two people
 who book the same slot of the same professional at once: one gets in and the other gets the refusal.
 Involved: CUSTOMER-F11, CUSTOMER-F25, CUSTOMER-F30, SERVICE-F10, SERVICE-F33, STAFF-F16, SCHEDULE-F11
 
@@ -275,7 +279,9 @@ Out: the moved appointment (new services bring their name and price from the cat
 duration, the professional's own if they have one; a new professional keeps the price and the duration),
 its history and the `appointment.appointment.rescheduled` event.
 If it fails: the reason in the panel and in a notice; a dragged block goes back to its place. An
-appointment in progress, completed, cancelled or no-show does not move (**Edit** is greyed out).
+appointment in progress, completed, cancelled or no-show does not move (**Edit** is greyed out). An employee
+only moves their own; an automation allowed to move them, those of any professional, by the customer's
+rules.
 Involved: SERVICE-F33, STAFF-F16, SCHEDULE-F11
 
 ### APPOINTMENT-F05 Cancel an appointment from the agenda
