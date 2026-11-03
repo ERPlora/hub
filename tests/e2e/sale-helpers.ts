@@ -5,7 +5,7 @@
 // `afterAll` (the fiscal documents Invoicing issued for its sales go first: a document keeps its sale).
 // What a run creates is named `E2E-…` (products), `e2e.…` (customers) or `e2e …` (departments, quick
 // notes, check titles); its sales are found by their lines.
-import { type BrowserContext, expect, type Page } from '@playwright/test';
+import { type BrowserContext, expect, type Locator, type Page } from '@playwright/test';
 
 import { A, api, psql, shot, shown } from './helpers';
 import { cleanInvoices, issuedIds } from './invoice-helpers';
@@ -208,4 +208,52 @@ export function cleanSales(): void {
       "delete from sale_quicknote where text like 'e2e %'",
     ].join('; '),
   );
+}
+
+/** Where the number and the date and time sit on `paper`: how many lines each takes, whether the date shares the
+ *  number's line (after it) or starts right under it, and how far any of them runs past the paper's printable width. */
+export interface NumberRow {
+  numberLines: number;
+  dateLines: number;
+  dateBeside: boolean;
+  dateUnder: boolean;
+  overflow: number;
+}
+
+export async function numberRow(paper: Locator): Promise<NumberRow> {
+  return paper.evaluate((el) => {
+    const style = getComputedStyle(el);
+    const right = el.getBoundingClientRect().right - parseFloat(style.paddingRight);
+    const lineHeight = parseFloat(style.lineHeight) || parseFloat(style.fontSize) * 1.2;
+    /** The text boxes of `node`, one per piece of a line it wraps onto. */
+    const boxes = (node: Element) => {
+      const range = document.createRange();
+      range.selectNodeContents(node);
+      return [...range.getClientRects()].filter((box) => box.width > 0 && box.height > 0);
+    };
+    /** How many lines `node`'s text takes: its boxes grouped by their top, half a line apart. */
+    const lines = (node: Element) => {
+      const tops = boxes(node).map((box) => box.top).sort((a, b) => a - b);
+      return tops.filter((top, index) => index === 0 || top - tops[index - 1] > lineHeight / 2).length;
+    };
+    const number = el.querySelector('[data-testid=sale-receipt-number]')!;
+    const date = el.querySelector('[data-testid=sale-receipt-datetime]')!;
+    const numberBoxes = boxes(number);
+    const dateBoxes = boxes(date);
+    const numberTop = Math.min(...numberBoxes.map((box) => box.top));
+    const numberBottom = Math.max(...numberBoxes.map((box) => box.bottom));
+    const numberRight = Math.max(...numberBoxes.map((box) => box.right));
+    const dateTop = Math.min(...dateBoxes.map((box) => box.top));
+    const dateLeft = Math.min(...dateBoxes.map((box) => box.left));
+    const dateRight = Math.max(...dateBoxes.map((box) => box.right));
+    return {
+      numberLines: lines(number),
+      dateLines: lines(date),
+      dateBeside: Math.abs(dateTop - numberTop) < lineHeight / 2 && dateLeft >= numberRight,
+      // Right under it, as the next line of the paper: no blank line between them.
+      dateUnder: dateTop >= numberBottom - 1 && dateTop - numberBottom <= 2,
+      // Whole pixels: text set flush right lands a hundredth of a pixel either side of the edge.
+      overflow: Math.max(0, Math.round(Math.max(numberRight, dateRight) - right)),
+    };
+  });
 }

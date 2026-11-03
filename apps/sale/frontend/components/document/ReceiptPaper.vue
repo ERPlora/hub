@@ -155,7 +155,7 @@ const footer = computed(() =>
     </header>
     <hr class="sale-receipt__rule">
     <div class="sale-receipt__meta">
-      <span data-testid="sale-receipt-number">{{ numberLabel }}: <strong>{{ shownNumber }}</strong></span>
+      <span data-testid="sale-receipt-number">{{ numberLabel }}: <strong class="sale-receipt__number">{{ shownNumber }}</strong></span>
       <span data-testid="sale-receipt-datetime">{{ when }}</span>
     </div>
     <div
@@ -404,11 +404,18 @@ const footer = computed(() =>
   border-top: 1px dashed #000;
   margin: 2mm 0;
 }
+/* The number and the date share a row while they fit; when they do not (80 mm hold «Receipt: TICKET-2026-000004»
+   or «Nov 3, 2026, 2:08 PM», not both), the date wraps to the paper's next line, with no blank row between. */
 .sale-receipt__meta {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
-  gap: 0.5rem;
+  gap: 0 0.5rem;
   font-size: 10px;
+}
+/* A fiscal number reads as one: it never breaks at its hyphens («TICKET-2026-» / «000004», hub#695). */
+.sale-receipt__number {
+  white-space: nowrap;
 }
 .sale-receipt__line-name--child {
   padding-left: 0.75rem;
