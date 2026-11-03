@@ -9,7 +9,9 @@ plan», BASE-G169), the SaaS's account page (the user menu's «My account», PLA
 hub's own dialog, BASE-F108, offered where «My account» is) and this business on
 the SaaS's panel (``manage_url``, the bar's «erplora.com», BASE-F11; only with ``base.open_management``), those only
 to a session opened with the account, and the session's way in (``access``: «Switch user», the idle lock; APP-BASE-3,
-``base.queries.shell_access``) and the person's own appearance (``preferences``, BASE-G125). ``widget-list`` carries
+``base.queries.shell_access``) and the person's own appearance (``preferences``, BASE-G125). The addresses on erplora.com
+are the usual ones, which ask to sign in: their click goes with the pass ``base.saas_pass.create`` signs (BASE-F11), never
+embedded here, where it would expire in a minute and any script could read it. ``widget-list`` carries
 ``base.widget.list`` as its live query answers it to this person: the Home's board mounts its panels with it, so their
 data goes in the same live stream as the list instead of reopening it on every load (the live answer then wins). Both
 go only to a person with a session: the auth gate sends anyone else to the login, so their HTML names neither the
