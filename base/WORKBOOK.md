@@ -833,11 +833,14 @@ Pasos:
      «Desactivar»; quien no lo administra ve el estado, sin botones. Mientras tanto la app no se abre y su pantalla dice
      «No se ha podido preparar {app}» — «Ve a Apps para volver a intentarlo. No se ha perdido nada del negocio.».
   3. «Reintentar» la vuelve a pedir: «Activando {app}… Estará lista en un momento.» y la fila vuelve a «Activándose…».
+  4. Desde el asistente («Vuelve a intentar activar la web») la app se nombra como en BASE-F24 y la tarjeta la pone con
+     su nombre entero.
 Entra: la app que no se ha podido preparar.
 Sale: la activación pedida de nuevo (`base.app.activation_requested`).
 Si falla: si vuelve a fallar, vuelve a decirlo con su «Reintentar». Si ya no estaba esperando, porque otro dispositivo
 la ha reintentado, sale en un aviso con el nombre de la app y «Esta app no está esperando a que se vuelva a preparar.»,
-que se queda hasta cerrarlo.
+que se queda hasta cerrarlo. Desde el asistente, un nombre que vale para varias apps, o para ninguna, no saca tarjeta
+(BASE-F24).
 Implicados: ninguno
 
 ### BASE-F22 Seguir la activación de una app mientras se navega
@@ -874,10 +877,12 @@ Pasos:
      «Mis apps» y, sin recargar, del menú de todos los dispositivos del negocio; sus pantallas dicen que la app no
      está disponible (BASE-F26) y el contador de arriba resta una.
   4. En «Añadir apps» siguen, con su icono, su nombre y «Desactivada»: desde ahí se vuelven a activar (BASE-F24).
+  5. Desde el asistente («Desactiva la app de reservas») la app se nombra como en BASE-F24, la tarjeta de riesgo alto
+     la pone con su nombre entero y, si ya estaba desactivada, el asistente lo dice y no cambia nada.
 Entra: las apps del negocio, lo que necesita cada una y cuáles eligió el negocio.
 Sale: la app apagada en este negocio, y las que llegaron solo con ella, con sus datos intactos.
 Si falla: si otra app en marcha la necesita, o la propia app se niega, no cambia nada (BASE-F25). Con «Cancelar»,
-tampoco.
+tampoco. Desde el asistente, un nombre que vale para varias apps no saca tarjeta: pregunta cuál (BASE-F24).
 Implicados: VERIFACTU-F32
 
 ### BASE-F24 Activar una app
@@ -891,12 +896,19 @@ Pasos:
      sin preguntar.
   3. La app vuelve a «Mis apps» y al menú, sin recargar, con los datos que tenía: «Reservas está activada.» y, si
      llegó con otras, «También se ha activado: Mesas.».
+  4. Desde el asistente («Activa la app de reservas») la app se nombra como la dice la persona: por su nombre en
+     cualquier idioma del Hub, sin mirar mayúsculas ni acentos, o, si ninguna se llama así, por la única con una
+     palabra de su nombre que empieza así («booking» es Reservas online). «Reservas» es Reservas, nunca Reservas online
+     aunque empiece igual. La tarjeta la pone con su nombre entero (BASE-F97), nunca con su identificador, y si ya
+     estaba activada el asistente lo dice («Clientes ya estaba activada») en vez de «activada».
 Entra: lo que necesita la app y lo que el negocio tiene contratado.
 Sale: la app en marcha en este negocio, elegida por él.
 Si falla: con el límite de apps del plan alcanzado, el aviso de BASE-F18 con «Mejorar plan»; una app de pago sin
 contratar no se puede activar (BASE-F20). Bajar de plan no apaga nada: con más apps elegidas que las del plan nuevo,
-todas siguen en marcha y solo no se puede activar otra hasta quedar por debajo.
-Implicados: ninguno
+todas siguen en marcha y solo no se puede activar otra hasta quedar por debajo. Desde el asistente, un nombre que vale
+para varias apps («reserva»: Reservas y Reservas online) no saca tarjeta ni activa ninguna: el asistente pregunta
+cuál, nombrándolas; uno que no es de ninguna: «Ninguna app tiene ese nombre o identificador.».
+Implicados: BASE-F97
 
 ### BASE-F25 Ver que una app se niega a desactivarse
 <!-- origen: old-hub:HUB_SHELL-F125 -->
@@ -2930,6 +2942,18 @@ Implicados: ACCOUNTS-F38, BASE-F40
   donde escuchan las consultas vivas que la siguen. `base.plan.usage` (`GET /api/system/plan`, `base.administer_hub`,
   viva con la foto): `plan.max_users`/`max_devices` de la foto (0 = sin tope) frente a las `Membership` activas del
   host; los dispositivos, sin cuenta. Tests: `base/tests/test_queries_apps.py`.
+- `base.app.get` (`GET /api/apps/detail?app=…`, `base.view_home`, no es viva; hub#539): qué app del negocio nombra
+  `app`, como la dice la persona (`queries.find_app`): su id; si no, la que se llama exactamente así en cualquier idioma
+  del Hub, sin mirar mayúsculas ni acentos («reservas» es Reservas, nunca Reservas online); si no, la única con una
+  palabra de su nombre que empieza así («booking»). Devuelve `id`, `name` (en el idioma de quien pide) y `state` como lo
+  dice la pantalla de Apps: `on`, `off`, `blocked` (de pago sin derecho de uso), `creating` o `failed` (mientras la BD
+  del hub recibe sus tablas). Si no es de ninguna, 404 «Ninguna app tiene ese nombre o identificador.» (la plataforma no
+  es una app); si vale para varias («reserva»), 409 `base.app_ambiguous` nombrándolas en el idioma de quien pide.
+  `base.app.enable`, `base.app.disable` y `base.app.retry` resuelven `AppChangeIn.app` con la misma `find_app` y declaran
+  `"check": "base.app.get"` en su `ai=` (hub#542): el asistente la lee antes de la tarjeta, y un nombre de varias apps o
+  de ninguna no saca tarjeta, vuelve al modelo, que pregunta cuál. `AppChangeIn.app` la marca `REFERS`, así que la
+  tarjeta nombra la app por su nombre entero, nunca por su id. Tests: `base/tests/test_app_activation.py`,
+  `test_app_activation_tables.py` y `test_api.py`.
 - «Uso y plan» (BASE-F40, hub#603; PLAN-HUB, rondas 2026-11-01f y 2026-11-01g). `SystemUsage.vue` lee `base.plan.usage` y, aparte,
   `base.assistant.usage`, que espera a erplora.com; `lib/plan-usage.ts` saca de ahí la línea de arriba y las filas, sin
   estado. La fila de la campana (`base.plan_limits` de `base.bell.counters`) la calcula `queries._plan_motives`, sin
