@@ -70,6 +70,7 @@ ROUTES = {
     ("GET", "/sale/settings", "sale.settings.get"),
     ("POST", "/sale/settings", "sale.settings.update"),
     ("GET", "/sale/pos_settings", "sale.pos_settings.get"),
+    ("GET", "/sale/letterhead", "sale.letterhead.get"),
     ("GET", "/sale/departments", "sale.department.list"),
     ("POST", "/sale/departments", "sale.department.create"),
     ("POST", "/sale/departments/update", "sale.department.update"),

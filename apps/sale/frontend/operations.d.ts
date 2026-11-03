@@ -617,6 +617,16 @@ export interface SalePaymentOut {
   reference: string;
 }
 
+/** The business as the papers of the till name it: the issuer in Invoicing, with what the receipt header adds. */
+export interface LetterheadOut {
+  sale_id: string | null;
+  name: string;
+  /** Empty without an issuer. */
+  tax_id: string;
+  /** Under the name: the address, then the receipt header's lines. */
+  lines: string[];
+}
+
 export interface SaleOut {
   id: string;
   number: string;
@@ -626,6 +636,9 @@ export interface SaleOut {
   order_id: string | null;
   customer_id: string | null;
   customer_name: string;
+  /** The recipient's tax ID and address, on a full invoice; empty on a ticket. */
+  customer_tax_id: string;
+  customer_address: string;
   staff_id: string | null;
   appointment_id: string | null;
   tax_included: boolean;
@@ -934,6 +947,7 @@ declare module '@erplora/ui/sdk' {
     'sale.settings.get': { input: Record<string, never>; output: SettingsOut };
     'sale.settings.update': { input: SettingsPatchIn; output: SettingsOut };
     'sale.pos_settings.get': { input: Record<string, never>; output: SettingsOut };
+    'sale.letterhead.get': { input: { sale_id?: string }; output: LetterheadOut };
     'sale.department.list': { input: DepartmentListIn; output: Page<DepartmentOut> };
     'sale.department.create': { input: DepartmentIn; output: DepartmentOut };
     'sale.department.update': { input: DepartmentUpdateIn; output: DepartmentOut };

@@ -14,7 +14,8 @@ from base.models import Hub
 
 pytestmark = pytest.mark.django_db
 
-HEADER = "Bar Ana\nCalle Mayor 1\n28001 Madrid"
+#: The business as ``sale.letterhead.get`` names it (``test_letterhead.py``).
+LETTERHEAD = {"name": "Bar Ana SL", "tax_id": "B12345674", "lines": ["Calle Mayor 1", "28001 Madrid"]}
 
 
 @pytest.fixture
@@ -38,10 +39,15 @@ def charged(key="paper-sale-1", lines=None, payments=None, **more):
 
 def test_a_ticket_says_what_the_screen_paper_says(bar):
     sale = charged()
-    kind, document = paper.receipt(sale, header=HEADER, footer="Thank you!", decimals=2, duplicate=False)
+    kind, document = paper.receipt(sale, letterhead=LETTERHEAD, footer="Thank you!", decimals=2, duplicate=False)
     assert kind == "receipt"
     assert documents.problems(kind, document) is None
-    assert (document["business_name"], document["business_address"]) == ("Bar Ana", "Calle Mayor 1\n28001 Madrid")
+    # A simplified invoice names its issuer and its tax ID (RD 1619/2012, art. 7; hub#458).
+    assert (document["business_name"], document["business_address"], document["vat_number"]) == (
+        "Bar Ana SL",
+        "Calle Mayor 1\n28001 Madrid",
+        "B12345674",
+    )
     # The number Invoicing gave it in the very charge; the sale's own only while it has none.
     assert document["receipt_id"] == (sale.invoice_number or sale.number)
     assert document["items"] == [
@@ -56,12 +62,12 @@ def test_a_ticket_says_what_the_screen_paper_says(bar):
     assert "qr_data" not in document
 
 
-def test_a_reprint_says_duplicate_and_a_business_without_header_is_my_business(bar):
+def test_a_reprint_says_duplicate_and_a_business_without_issuer_prints_no_tax_id(bar):
     sale = charged()
-    with translation.override("es"):
-        _, document = paper.receipt(sale, header="  \n", footer="", decimals=2, duplicate=True)
-    assert (document["duplicate"], document["business_name"]) == (True, "Mi negocio")
-    assert "business_address" not in document and "receipt_footer" not in document
+    bare = {"name": "Bar Ana", "tax_id": "", "lines": []}
+    _, document = paper.receipt(sale, letterhead=bare, footer="", decimals=2, duplicate=True)
+    assert (document["duplicate"], document["business_name"]) == (True, "Bar Ana")
+    assert not {"vat_number", "business_address", "receipt_footer"} & set(document)
 
 
 def test_a_gift_a_voucher_line_and_the_discount_say_so_as_on_screen(bar):
@@ -71,7 +77,7 @@ def test_a_gift_a_voucher_line_and_the_discount_say_so_as_on_screen(bar):
         discount_percent="10",
     )
     with translation.override("es"):
-        _, document = paper.receipt(sale, header=HEADER, footer="Gracias", decimals=2, duplicate=False)
+        _, document = paper.receipt(sale, letterhead=LETTERHEAD, footer="Gracias", decimals=2, duplicate=False)
     assert document["items"][0]["name"] == "Coffee (Invitación)"
     # The discount is already inside the amounts: it is said under them, never subtracted again.
     assert "discount" not in document
@@ -82,7 +88,7 @@ def test_a_gift_a_voucher_line_and_the_discount_say_so_as_on_screen(bar):
 def test_the_fiscal_qr_opens_the_paper_with_its_legal_texts(bar):
     sale = charged()
     record = {"qr_url": "https://prewww2.aeat.es/wlpl/TIKE-CONT/ValidarQR?nif=B12345674&numserie=T-1", "csv": ""}
-    _, document = paper.receipt(sale, header=HEADER, footer="", decimals=2, duplicate=False, record=record)
+    _, document = paper.receipt(sale, letterhead=LETTERHEAD, footer="", decimals=2, duplicate=False, record=record)
     assert (document["qr_data"], document["qr_heading"], document["qr_legend"]) == (
         record["qr_url"],
         "QR tributario:",
@@ -98,23 +104,15 @@ def test_a_full_invoice_carries_both_parties_and_its_breakdown(bar):
         customer_address="Calle Real 2",
         payments=[{"method": "card"}],
     )
-    kind, document = paper.receipt(
-        sale,
-        header=HEADER,
-        footer="",
-        decimals=2,
-        duplicate=False,
-        issuer_tax_id="B12345674",
-        customer_tax_id="B76543214",
-        customer_address="Calle Real 2",
-    )
+    kind, document = paper.receipt(sale, letterhead=LETTERHEAD, footer="", decimals=2, duplicate=False)
     assert kind == "invoice"
     assert documents.problems(kind, document) is None
-    assert (document["vat_number"], document["customer_name"], document["customer_tax_id"]) == (
-        "B12345674",
-        "Salón Ana SL",
-        "B76543214",
-    )
+    assert (
+        document["vat_number"],
+        document["customer_name"],
+        document["customer_tax_id"],
+        document["customer_address"],
+    ) == ("B12345674", "Salón Ana SL", "B76543214", "Calle Real 2")
     assert document["tax_breakdown"] == [
         {"rate": float(row.rate_pct), "base": row.base / 100, "tax": row.tax / 100} for row in sale.breakdown
     ]
@@ -126,9 +124,12 @@ def test_the_bill_of_a_check_lists_what_is_owed_without_number_or_payment(bar):
         {"lines": [{"product": "COF", "quantity": "2"}, {"product": "TAP", "quantity": "1"}], "label": "Table 4"},
     )
     valued = run("sale.checkout.preview", {"order_id": str(order.id)})
-    document = paper.bill(valued, label="Table 4", header=HEADER, decimals=2)
+    with translation.override("es"):
+        document = paper.bill(valued, label="Table 4", letterhead=LETTERHEAD, decimals=2)
     assert documents.problems("prebill", document) is None
-    assert (document["business_name"], document["customer_name"]) == ("Bar Ana", "Table 4")
+    assert (document["business_name"], document["customer_name"]) == ("Bar Ana SL", "Table 4")
+    # The app's bill prints no `vat_number` (`render_prebill`, escpos.rs): the tax ID travels as a line of the address.
+    assert document["business_address"] == "Calle Mayor 1\n28001 Madrid\nNIF: B12345674"
     assert [(item["name"], item["quantity"], item["total"]) for item in document["items"]] == [
         ("Coffee", 2.0, 3.0),
         ("Tapa", 1.0, 4.5),
@@ -143,5 +144,5 @@ def test_a_discount_in_a_currency_written_in_letters_keeps_the_code_off_the_figu
     sale = charged(payments=[{"method": "card"}], discount_percent="10")
     assert sale.currency == "PLN"
     with translation.override("en"):
-        _, document = paper.receipt(sale, header=HEADER, footer="", decimals=2, duplicate=False)
+        _, document = paper.receipt(sale, letterhead=LETTERHEAD, footer="", decimals=2, duplicate=False)
     assert document["receipt_footer"] == "Discount of PLN\xa00.75, already applied to the amounts above."

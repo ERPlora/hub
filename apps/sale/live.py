@@ -28,6 +28,8 @@ live("sale.checkout.preview", on=[*E.ORDER_EVENTS, E.SETTINGS_UPDATED, *RULE_EVE
 live("sale.payment_method.list", on=[E.PAYMENT_METHOD_CREATED, E.SETTINGS_UPDATED])
 live("sale.settings.get", on=[E.SETTINGS_UPDATED])
 live("sale.pos_settings.get", on=[E.SETTINGS_UPDATED])
+# The paper's head: the issuer, the receipt header and the document its sale gets (SALE-F29).
+live("sale.letterhead.get", on=[*SALES, E.SETTINGS_UPDATED, E.ISSUER_UPDATED])
 # Each department shows the rate its category charges today.
 live(
     "sale.department.list",

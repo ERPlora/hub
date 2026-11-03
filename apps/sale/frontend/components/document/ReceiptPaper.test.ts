@@ -1,6 +1,5 @@
-// The ticket of a sale as it prints (SALE-F29; the old `ok-receipt`): the header from the receipt
-// settings (first line = the name, else «My business»; the rest = the address), «DUPLICATE» on every
-// reprint, the number and the date and time, the customer, the lines («qty × unit price», a gift
+// The ticket of a sale as it prints (SALE-F29; the old `ok-receipt`): the business as the server names it
+// (`sale.letterhead.get`: name, lines, tax ID; hub#458), «DUPLICATE» on every reprint, the number and the date and time, the customer, the lines («qty × unit price», a gift
 // «(On the house)», the note), «Subtotal», the VAT rows by rate from the sale's breakdown, «TOTAL», the
 // payment rows and «Change», the discount already applied and the footer. With VeriFactu's record of its
 // fiscal document, the fiscal QR: «Tax QR:» over it, «VERI*FACTU» under it and how to check it, or the AEAT's CSV.
@@ -9,7 +8,7 @@ import { describe, expect, it } from 'vitest';
 
 import { mountSale } from '../../__tests__/mount-sale';
 import { plain } from '../../lib/format';
-import { saleOut, SETTINGS, SUBJECT_VAT } from './__tests__/fixtures';
+import { LETTERHEAD, saleOut, SETTINGS, SUBJECT_VAT } from './__tests__/fixtures';
 import ReceiptPaper from './ReceiptPaper.vue';
 import source from './ReceiptPaper.vue?raw';
 
@@ -25,17 +24,45 @@ function words(el: Element): string {
 }
 
 async function paper(props: Record<string, unknown>, locale: 'en' | 'es' = 'es') {
-  const m = await mountSale(ReceiptPaper, { props, locale });
+  const m = await mountSale(ReceiptPaper, { props: { letterhead: LETTERHEAD, ...props }, locale });
   const text = (testid: string) => plain(m.find(testid).text());
   const all = (testid: string) => m.wrapper.findAll(`[data-testid="${testid}"]`).map((el) => words(el.element));
   return { ...m, text, all };
 }
 
 describe('ReceiptPaper', () => {
-  it('heads with the receipt header: its first line is the name, the rest the address', async () => {
+  it('heads with the business as the server names it: its name, its lines and its tax ID, on a ticket too', async () => {
     const s = await paper({ sale: saleOut(), settings: SETTINGS });
-    expect(s.text('sale-receipt-name')).toBe('Bar Pepe');
-    expect(s.all('sale-receipt-address')).toEqual(['Calle Mayor 1', 'Madrid']);
+    expect(s.text('sale-receipt-name')).toBe('Bar Pepe S.L.');
+    expect(s.all('sale-receipt-address')).toEqual(['Calle Mayor 1, 28001 Madrid (Madrid)', 'Tel. 600 000 000']);
+    expect(s.text('sale-receipt-tax-id')).toBe('NIF: B12345674');
+    const en = await paper({ sale: saleOut(), settings: SETTINGS }, 'en');
+    expect(en.text('sale-receipt-tax-id')).toBe('Tax ID: B12345674');
+  });
+
+  it('a business without a tax ID yet prints no tax ID line, and invents no name', async () => {
+    const s = await paper({ sale: saleOut(), letterhead: { sale_id: 's1', name: 'Bar Ana', tax_id: '', lines: [] } });
+    expect(s.text('sale-receipt-name')).toBe('Bar Ana');
+    expect(s.find('sale-receipt-tax-id').exists()).toBe(false);
+    expect(s.find('sale-receipt-address').exists()).toBe(false);
+  });
+
+  it('a full invoice says the tax details of its customer; a ticket says none', async () => {
+    const recipient = { customer_name: 'Javier Gomez Ruiz', customer_tax_id: '76543210S', customer_address: 'Calle Real 2' };
+    const s = await paper({ sale: saleOut({ document_type: 'invoice', ...recipient }) });
+    expect(s.text('sale-receipt-customer')).toBe('Cliente: Javier Gomez Ruiz');
+    expect(s.text('sale-receipt-customer-tax-id')).toBe('NIF: 76543210S');
+    expect(s.text('sale-receipt-customer-address')).toBe('Domicilio: Calle Real 2');
+    const en = await paper({ sale: saleOut({ document_type: 'invoice', ...recipient }) }, 'en');
+    expect(en.text('sale-receipt-customer-tax-id')).toBe('Tax ID: 76543210S');
+    expect(en.text('sale-receipt-customer-address')).toBe('Address: Calle Real 2');
+    const ticket = await paper({ sale: saleOut({ customer_name: 'Lucía' }) });
+    expect(ticket.find('sale-receipt-customer-tax-id').exists()).toBe(false);
+    expect(ticket.find('sale-receipt-customer-address').exists()).toBe(false);
+    // As the printed paper (`paper.receipt`): the recipient's details belong to an invoice, never to a ticket.
+    const carried = await paper({ sale: saleOut({ document_type: 'ticket', ...recipient }) });
+    expect(carried.find('sale-receipt-customer-tax-id').exists()).toBe(false);
+    expect(carried.find('sale-receipt-customer-address').exists()).toBe(false);
   });
 
   it('a sale charged as an invoice is titled «Invoice» and numbered «No.», never «Receipt»', async () => {
@@ -78,14 +105,6 @@ describe('ReceiptPaper', () => {
       settings: SETTINGS,
     });
     expect(s.all('sale-receipt-total-row').slice(1, 4)).toEqual(['IVA 10 % 0,27 €', 'IVA 0 % 0,00 €', 'Exento (E1) 0,00 €']);
-  });
-
-  it('without a header the name is «My business»', async () => {
-    const s = await paper({ sale: saleOut(), settings: { receipt_header: '  \n', receipt_footer: '' } });
-    expect(s.text('sale-receipt-name')).toBe('Mi negocio');
-    expect(s.find('sale-receipt-address').exists()).toBe(false);
-    const en = await paper({ sale: saleOut(), settings: null }, 'en');
-    expect(en.text('sale-receipt-name')).toBe('My business');
   });
 
   it('says the sale’s number with its date and time, and the customer when there is one', async () => {
@@ -213,7 +232,7 @@ describe('ReceiptPaper', () => {
   it('ends with the discount already applied and the receipt footer', async () => {
     const s = await paper({ sale: saleOut({ discount_amount: 200 }), settings: SETTINGS });
     expect(s.all('sale-receipt-footer')).toEqual(['Descuento de 2,00 €, ya aplicado en los importes de arriba.', '¡Gracias por su visita!']);
-    const bare = await paper({ sale: saleOut(), settings: { receipt_header: '', receipt_footer: '' } });
+    const bare = await paper({ sale: saleOut(), settings: { receipt_footer: '' } });
     expect(bare.find('sale-receipt-footer').exists()).toBe(false);
   });
 

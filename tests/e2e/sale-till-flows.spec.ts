@@ -9,12 +9,13 @@ import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, api, login, psql, shown, untilStill } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
-import { snapshotSeries } from './invoice-helpers';
+import { ensureIssuer, snapshotSeries } from './invoice-helpers';
 import { cleanSales, drawerOff, newestSaleOf, openTillCart, restoreDrawer, shots, stamp, VIEWPORTS } from './sale-helpers';
 
 const RUN = stamp();
 const SECTION = `e2e Fruit ${RUN}`;
 const MEMBER = `E2E Till ${RUN}`;
+let issuer: Awaited<ReturnType<typeof ensureIssuer>>;
 let coffee: Product;
 let steak: Product;
 let cake: Product;
@@ -43,6 +44,7 @@ test.beforeAll(async ({ browser }) => {
   const section = await api<{ id: string }>(context, A, 'POST', '/sale/departments', { name: SECTION, tax_category_key: 'product.super_reduced' });
   expect(section.status, 'the section').toBe(201);
   sectionId = section.data.id;
+  issuer = await ensureIssuer(context);
   const member = await api<{ id: string }>(context, A, 'POST', '/staff/members', { first_name: MEMBER, last_name: 'Team' });
   expect(member.status, 'the team member').toBe(201);
   memberId = member.data.id;
@@ -235,6 +237,9 @@ test('SALE-F14, F21 (hub#457): 10 % off the whole check says what it takes off, 
   const prebill = page.locator('[data-testid=pos-prebill-paper]:visible');
   await expect(prebill.locator('.pos-bill__discount')).toContainText('−€0.70');
   await expect(prebill.locator('.pos-bill__total')).toContainText('6.30');
+  // The bill says who the business is (hub#458): never «My business» once Invoicing has its issuer.
+  await expect(prebill.locator('[data-testid=pos-prebill-tax-id]')).toContainText(issuer.tax_id);
+  await expect(prebill.locator('.pos-bill__business')).toHaveText(issuer.legal_name);
   await shots(page, 'APP-SALE-SALE-F21-TICKET', async (p) => {
     await p.locator('[data-testid=pos-prebill-paper]:visible').waitFor({ state: 'visible' });
   });

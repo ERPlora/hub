@@ -1,4 +1,5 @@
-// «Bill», the pre-bill (SALE-F21): the check as the paper taken to the table — business, title, date,
+// «Bill», the pre-bill (SALE-F21): the check as the paper taken to the table — the business as the server
+// names it (`sale.letterhead.get`: name, lines, tax ID; hub#458), title, date,
 // customer, lines with their notes and comps, the discount, the VAT breakdown and the total the server
 // works out —, «Bill — this is not an invoice…», and the print and close buttons. No number, no QR.
 // «Print» asks the printing queue first (PRINTING-F09): queued, a toast names the printer; else the
@@ -53,17 +54,20 @@ const VALUED = preview({
   breakdown: [{ tax_type: 'vat', regime: '01', qualification: 'subject', exempt_reason: '', rate_pct: '10.00', label: 'vat', base: 2455, tax: 245 }],
 });
 
-async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 'en') {
+const BUSINESS = { sale_id: null, name: 'Casa Pepe S.L.', tax_id: 'B12345674', lines: ['Calle Mayor 1', 'Tel. 600 000 000'] };
+
+async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 'en', letterhead: unknown = BUSINESS) {
   const open = ref(true);
   const m = await mountSale(
     {
       setup: () => () =>
-        h(PrebillModal, { open: open.value, 'onUpdate:open': (v: boolean) => (open.value = v), order: CHECK, customerName: null, header: '', ...props }),
+        h(PrebillModal, { open: open.value, 'onUpdate:open': (v: boolean) => (open.value = v), order: CHECK, customerName: null, ...props }),
     },
     { locale },
   );
   await settle();
   await m.live();
+  if (letterhead) await m.result('sale.letterhead.get', letterhead);
   return { ...m, open };
 }
 
@@ -75,11 +79,13 @@ describe('PrebillModal', () => {
   });
 
   it('paints the paper: business, «Bill», title, date, lines with notes and comps, discount, VAT and total', async () => {
-    const m = await setup({ header: 'Casa Pepe\nCalle Mayor 1', customerName: 'Lucía' }, 'es');
+    const m = await setup({ customerName: 'Lucía' }, 'es');
     await m.result('sale.checkout.preview', VALUED);
     const paper = m.find('pos-prebill-paper');
     expect(m.find('pos-prebill-title').text()).toBe('Cuenta');
-    expect(paper.find('.pos-bill__business').text()).toBe('Casa Pepe');
+    expect(paper.find('.pos-bill__business').text()).toBe('Casa Pepe S.L.');
+    expect(m.wrapper.findAll('[data-testid="pos-prebill-address"]').map((el) => el.text())).toEqual(['Calle Mayor 1', 'Tel. 600 000 000']);
+    expect(m.find('pos-prebill-tax-id').text()).toBe('NIF: B12345674');
     expect(paper.find('.pos-bill__label').text()).toBe('Table 4');
     expect(paper.find('.pos-bill__date').text()).toBe(formatDateTime(new Date(), 'es'));
     expect(paper.find('.pos-bill__customer').text()).toBe('Cliente: Lucía');
@@ -145,10 +151,24 @@ describe('PrebillModal', () => {
     ]);
   });
 
-  it('without a receipt header the business is «My business»', async () => {
-    const m = await setup();
+  it('asks today’s business, of no sale, and prints no tax ID line while it has none', async () => {
+    const m = await setup({}, 'en', { sale_id: null, name: 'Bar Ana', tax_id: '', lines: [] });
+    expect(m.params('sale.letterhead.get')).toEqual([{}]);
     await m.result('sale.checkout.preview', VALUED);
-    expect(m.find('pos-prebill-paper').find('.pos-bill__business').text()).toBe('My business');
+    expect(m.find('pos-prebill-paper').find('.pos-bill__business').text()).toBe('Bar Ana');
+    expect(m.find('pos-prebill-tax-id').exists()).toBe(false);
+  });
+
+  it('waits for the business: no paper to print without it, and a failed read says so with «Retry»', async () => {
+    const m = await setup({}, 'en', null);
+    await m.result('sale.checkout.preview', VALUED);
+    expect(m.find('pos-prebill-loading').exists()).toBe(true);
+    expect(m.find('pos-prebill-paper').exists()).toBe(false);
+    expect((m.find('pos-prebill-print').element as HTMLElement & { disabled?: boolean }).disabled).toBe(true);
+    m.net.lastStream().push(errorFrame(m.subId('sale.letterhead.get'), 'internal_error'));
+    await settle();
+    expect(m.find('pos-prebill-error').exists()).toBe(true);
+    expect(m.find('pos-prebill-paper').exists()).toBe(false);
   });
 
   it('asks the printing queue first: queued, a toast names the printer and the screen prints nothing', async () => {
