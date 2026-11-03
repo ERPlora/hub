@@ -11,7 +11,6 @@ import { click, errorFrame, flush, mountSale, taxSettings } from '../../__tests_
 import { category, page, product, service } from './__tests__/fixtures';
 import CategoryStrip from './CategoryStrip.vue';
 import PosCatalog from './PosCatalog.vue';
-import ProductFollower from './ProductFollower.vue';
 import ProductGrid from './ProductGrid.vue';
 import ProductSearch from './ProductSearch.vue';
 import ServiceGrid from './ServiceGrid.vue';
@@ -188,19 +187,6 @@ describe('PosCatalog: taps', () => {
     expect(s.params(GET)).toEqual([{ id: 'p2' }]);
     await s.result(GET, product({ id: 'p2', name: 'Tea', is_sold_out: false }), { id: 'p2' });
     expect(s.find('pos-tap-notice').exists()).toBe(false);
-  });
-
-  it('an answer about the article refused before, still on its way, leaves the notice of the last one alone', async () => {
-    const s = await setup();
-    await s.result(PRODUCTS, page([product({ id: 'p1', is_sold_out: true }), product({ id: 'p2', name: 'Tea', is_sold_out: true })]), {
-      sort: 'name',
-    });
-    await click(s.find('pos-product-p1').element);
-    const first = s.wrapper.findComponent(ProductFollower);
-    await click(s.find('pos-product-p2').element);
-    first.vm.$emit('product', product({ id: 'p1', is_sold_out: false }));
-    await flush();
-    expect(s.find('pos-tap-notice').text()).toBe('«Tea» is sold out.');
   });
 
   it('leaving the till takes the notice away; coming back does not bring it back', async () => {

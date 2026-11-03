@@ -139,11 +139,11 @@ function pickService(service: ServiceSaleOut): void {
   emit('service', service);
 }
 
-/** The refused product as Inventory has it now: once the reason it was refused for is gone, so is the notice. An
- *  answer about another product (one refused before, still on its way) leaves the notice of the last one alone. */
+/** The refused product as Inventory has it now (its follower is the notice's own: `:key`, and Vue drops what an
+ *  unmounted one emits): once the reason it was refused for is gone, so is the notice. */
 function settle(product: ProductOut): void {
   const refused = tapNotice.value?.product;
-  if (refused?.id !== product.id) return;
+  if (!refused) return;
   const holds = refused.reason === 'soldOut' ? product.is_sold_out : product.needs_tax_setup;
   if (!holds) tapNotice.value = null;
 }
