@@ -850,10 +850,14 @@ Pasos:
    precios con IVA, las líneas menos el descuento dan el total.
 3. Pulsa la impresora de arriba: con **Impresión** y una impresora de tiques activa, la cuenta va a su
    cola y se lee «Enviado a <impresora>.» (PRINTING-F09); si no, sale por el diálogo de impresión del
-   dispositivo.
+   dispositivo con la cuenta sola: el del navegador o, en la app instalada, su pantalla de impresión (el
+   diálogo del sistema, con la impresora o «Guardar como PDF»).
 Entra: la cuenta abierta y su total calculado por el servidor.
 Sale: un papel sin número fiscal; no consume numeración ni crea venta. Cada pulsación, una cuenta.
-Si falla: «No se pudo imprimir la cuenta».
+Si falla: «No se pudo imprimir la cuenta». Si la app instalada no abre su pantalla de impresión, el aviso
+dice por qué tras dos puntos: «…: esta versión de la app de ERPlora no puede imprimir; actualízala», «…: el
+servicio de impresión del dispositivo no se abrió», «…: el documento está vacío o es demasiado grande para
+imprimirlo» o «…: esta app está vinculada a otro negocio».
 Implicados: PRINTING-F09
 
 ### SALE-F22 Cobrar solo una parte de la cuenta
@@ -1055,7 +1059,9 @@ Pasos:
    Cuando esté resuelto, emítelo ahora.» con «Emitir ahora».
 3. Pulsa la impresora del pie para imprimirlo, o «Reimprimir» en la fila. Con **Impresión** y una
    impresora de tiques activa, el papel va a su cola y se lee «Enviado a <impresora>.» (PRINTING-F08); si
-   no (o con su documento fiscal pendiente), sale por el diálogo de impresión del dispositivo. Toda
+   no (o con su documento fiscal pendiente), sale por el diálogo de impresión del dispositivo con el papel
+   solo: el del navegador o, en la app instalada, su pantalla de impresión (el diálogo del sistema, con la
+   impresora o «Guardar como PDF»). Toda
    impresión desde **Ventas** sale con «DUPLICADO», también con su QR fiscal; solo el primer papel justo
    tras cobrar es el original (y es copia si el cobro ya lo mandó a la cola).
 4. **Documento pendiente**: en la lista, una venta con algún documento fiscal pendiente (el suyo, la
@@ -1070,7 +1076,8 @@ no pueda leer Facturación. El papel no toca el documento ni su registro fiscal.
 Sale: el papel; reimprimir no crea venta ni documento fiscal. «Emitir ahora» emite los documentos que
 esperaban (avisa: venta con su documento, uno por documento).
 Si falla: «Cargando documento…» y «Error cargando el documento» (también si no se puede leer el QR
-fiscal: el papel nunca sale sin él). «No se pudo imprimir». «Emitir ahora»
+fiscal: el papel nunca sale sin él). «No se pudo imprimir»; si la app instalada no abre su pantalla de
+impresión, con el motivo tras dos puntos, como en SALE-F21. «Emitir ahora»
 rechazado dice el motivo de Facturación («Configura el emisor…») y no cambia nada; sin palabras del
 servidor, «No se han podido emitir los documentos. Inténtalo de nuevo.».
 Implicados: INVOICE-F01, INVOICE-F02, INVOICE-F06, INVOICE-F18, PRINTING-F08, VERIFACTU-F19, SALE-F21, SALE-F34

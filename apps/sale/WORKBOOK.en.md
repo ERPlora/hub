@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:2e146f30575865a4368eae14d9b0b040d5b03ca067ac426c8c78bf73ded5c794 -->
+<!-- generated from WORKBOOK.md sha256:729e1b57931a379294b21ef70433ce63bb45e1eba7fe85e49bff49e2c5354333 -->
 
 ## What it is for and who it is for
 
@@ -825,10 +825,14 @@ Steps:
    with prices including VAT, the lines minus the discount give the total.
 3. Press the printer at the top: with **Printing** and an active ticket printer, the bill goes to its
    queue and "Sent to <printer>." is read (PRINTING-F09); if not, it goes through the device's print
-   dialog.
+   dialog with the bill alone: the browser's or, in the installed app, its print screen (the system's
+   dialog, with the printer or "Save as PDF").
 In: the open check and its total worked out by the server.
 Out: a paper with no fiscal number; it uses up no numbering and creates no sale. Each press, one bill.
-If it fails: "Bill could not be printed".
+If it fails: "Bill could not be printed". If the installed app does not open its print screen, the notice
+says why after a colon: "…: this version of the ERPlora app cannot print; update it", "…: the device's print
+service did not open", "…: the document is empty or too large to print" or "…: this app is linked to
+another business".
 Involved: PRINTING-F09
 
 ### SALE-F22 Charge only part of the check
@@ -1025,7 +1029,9 @@ Steps:
    permission). Once that is fixed, issue it now." with "Issue now".
 3. Press the footer's printer to print it, or "Reprint" on the row. With **Printing** and an active
    ticket printer, the paper goes to its queue and "Sent to <printer>." is read (PRINTING-F08); if not (or
-   with its fiscal document pending), it goes through the device's print dialog. Every print from
+   with its fiscal document pending), it goes through the device's print dialog with the paper alone: the
+   browser's or, in the installed app, its print screen (the system's dialog, with the printer or "Save
+   as PDF"). Every print from
    **Sales** comes out with "DUPLICATE", also with its fiscal QR; only the first paper right after
    charging is the original (and it is a copy if the charge already sent it to the queue).
 4. **Document pending**: in the list, a sale with some fiscal document pending (its own, the corrective
@@ -1040,7 +1046,8 @@ cannot read Invoicing. The paper does not touch the document or its fiscal recor
 Out: the paper; reprinting creates no sale or fiscal document. "Issue now" issues the documents that were
 waiting (announces: sale with its document, one per document).
 If it fails: "Loading document…" and "Error loading the document" (also if the fiscal QR cannot be read:
-the paper never comes out without it). "Could not print". A refused "Issue now" says Invoicing's reason
+the paper never comes out without it). "Could not print"; if the installed app does not open its print
+screen, with the reason after a colon, as in SALE-F21. A refused "Issue now" says Invoicing's reason
 ("Set up the issuer…") and changes nothing; without words from the server, "The documents could not be
 issued. Try again.".
 Involved: INVOICE-F01, INVOICE-F02, INVOICE-F06, INVOICE-F18, PRINTING-F08, VERIFACTU-F19, SALE-F21, SALE-F34
