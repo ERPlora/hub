@@ -153,6 +153,13 @@ class VerifactuConfig(LiveAppConfig):
         }
     ]
 
+    def can_enable(self, ctx) -> str | None:
+        """VERIFACTU-F01: the platform's ``base.app.enable`` asks before turning the app on: only in Spain, with the
+        reason (``queries.enable_refusal``)."""
+        from apps.verifactu import queries  # the models are not loaded yet when this module is
+
+        return queries.enable_refusal(ctx)
+
     def can_disable(self, ctx) -> str | None:
         """VERIFACTU-F32: the platform's ``base.app.disable`` asks before turning the app off: in Spain it never goes
         off once on, with the legal reason (``queries.disable_refusal``); outside Spain it goes off."""

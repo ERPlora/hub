@@ -821,6 +821,16 @@ VERIFACTU = "verifactu"
 NEVER_OFF = _("VeriFactu can't be turned off once it's on: the law requires your invoices to keep reaching the AEAT.")
 
 
+def enable_refusal(ctx: OperationContext) -> str | None:
+    """VERIFACTU-F01: why the app may not go on, in ``ctx``'s language, or ``None``: outside Spain it would seal and send
+    nothing (``outside_spain``), so it does not go on (hub#694). One already on stays as it is, and goes off when asked.
+    A business without a country (a demo) is in Spain."""
+    if not outside_spain(ctx.scope):
+        return None
+    with translation.override(ctx.language):
+        return str(ONLY_IN_SPAIN)
+
+
 def disable_refusal(ctx: OperationContext) -> str | None:
     """VERIFACTU-F32: why the app may not go off, in ``ctx``'s language, or ``None``. In Spain, never once on: from
     then on the business's invoices reach the AEAT, VERI*FACTU binds it at least to the end of the natural year

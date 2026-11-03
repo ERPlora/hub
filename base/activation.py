@@ -23,9 +23,10 @@ The rules, without the database: ``base.services`` (``base.app.enable``, ``base.
 - **The plan's limit**: the SaaS's photo carries ``plan.max_apps`` (0, or no key: no limit), how many modules the
   business may *choose*; the ones brought along do not count. A photo with a lower limit than the chosen ones (a plan
   lowered) turns nothing off: it only refuses turning on one more (PLAN §32, point 3).
-- **An app's veto**: a module may refuse to go off while it has something unfinished (VeriFactu with records the AEAT
-  has not accepted yet, VERIFACTU-F32) by defining ``can_disable(self, ctx) -> str | None`` on its ``LiveAppConfig``:
-  the reason, in the person's language, or ``None``. It runs in the transaction of ``base.app.disable``, in the
+- **An app's refusal**: a module may refuse to go off (VeriFactu once on in Spain, VERIFACTU-F32) by defining
+  ``can_disable(self, ctx) -> str | None`` on its ``LiveAppConfig``, and to go on (VeriFactu outside Spain,
+  VERIFACTU-F01) by defining ``can_enable`` alike: the reason, in the person's language, or ``None``. Each runs in the
+  transaction of ``base.app.disable`` or ``base.app.enable``, and when ``base.app.list`` says it beforehand, in the
   language of who asks (``ctx.language``), so a hook that only calls ``gettext`` already answers in it.
 
 What is off is also out of everything that asks which apps are on (``base.relay.active_apps``): its operations answer
@@ -71,6 +72,10 @@ CREATING_APPS_CACHE = "base.apps_creating:"
 
 #: The hosts whose rows the running change wrote and has not committed yet: what it reads of them is never kept.
 _changing: ContextVar[frozenset[str]] = ContextVar("base_activation_changing", default=frozenset())
+
+#: The hooks a module refuses by (:func:`refusals`): to go off, and to go on.
+CAN_DISABLE = "can_disable"
+CAN_ENABLE = "can_enable"
 
 #: ``{label: what it requires}``, a module's direct ``requires`` (acyclic: ``live.checks``).
 Graph = Mapping[str, Iterable[str]]
@@ -195,6 +200,13 @@ def disabling(label: str, current: Mapping[str, Activation], graph: Graph) -> di
     return {other: OFF_ROW for other in [label, *sorted(off - {label})]}
 
 
+def keeping_on(label: str, current: Mapping[str, Activation], graph: Graph) -> list[str]:
+    """Whose refusal to go off keeps ``label`` on: the modules wanted on that need it (they would have to go off first)
+    and itself; with none, itself and what would go off along with it."""
+    needed = required_by(label, current, graph)
+    return [*needed, label] if needed else list(disabling(label, current, graph))
+
+
 def chosen_on(current: Mapping[str, Activation], *, among: Iterable[str] | None = None) -> int:
     """How many modules wanted on the business chose (``among`` those, if given): what the plan's limit counts, those
     whose tables are being made included."""
@@ -213,20 +225,31 @@ def plan_limit(photo: Any) -> int | None:
     return limit
 
 
-def veto(labels: Iterable[str], *, ctx: Any, configs: Iterable[Any] | None = None) -> tuple[str, str] | None:
-    """The first of ``labels`` whose ``can_disable(ctx)`` gives a reason, with it; ``None`` when none refuses. Each
-    hook runs in the language of who asks: its reason is said in it, whatever the process runs in."""
+def refusals(
+    labels: Iterable[str], *, ctx: Any, hook: str = CAN_DISABLE, configs: Iterable[Any] | None = None
+) -> dict[str, str]:
+    """``{label: its reason}`` of those of ``labels`` whose ``hook`` (:data:`CAN_DISABLE`, :data:`CAN_ENABLE`) gives one,
+    in the order of ``labels``. Each hook runs once, in the language of who asks: its reason is said in it, whatever the
+    process runs in."""
     by_label = {config.label: config for config in (module_configs() if configs is None else configs)}
     language = getattr(ctx, "language", None)
+    said: dict[str, str] = {}
     for label in labels:
-        hook = getattr(by_label.get(label), "can_disable", None)
-        if not callable(hook):
+        ask = getattr(by_label.get(label), hook, None)
+        if not callable(ask):
             continue
         with translation.override(language) if language else nullcontext():
-            reason = hook(ctx)
+            reason = ask(ctx)
         if isinstance(reason, str) and reason.strip():
-            return label, reason.strip()
-    return None
+            said[label] = reason.strip()
+    return said
+
+
+def veto(
+    labels: Iterable[str], *, ctx: Any, hook: str = CAN_DISABLE, configs: Iterable[Any] | None = None
+) -> tuple[str, str] | None:
+    """The first of ``labels`` that refuses by ``hook``, with its reason (:func:`refusals`); ``None`` when none does."""
+    return next(iter(refusals(labels, ctx=ctx, hook=hook, configs=configs).items()), None)
 
 
 def is_platform(scope: Scope) -> bool:

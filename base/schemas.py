@@ -416,6 +416,9 @@ class AppOut(Schema):
     #: What it needs, transitively (it comes along with it), and the apps on that need it (they go off first).
     requires: list[str]
     required_by: list[str]
+    #: Why turning it on (off) or off (on) is refused, in the reader's language: an app's own ``can_enable`` or
+    #: ``can_disable``, and the apps it depends on (hub#618, hub#694); ``None``: nothing refuses it.
+    refusal: str | None
 
 
 class AppListOut(Schema):
