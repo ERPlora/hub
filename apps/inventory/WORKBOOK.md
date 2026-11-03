@@ -376,7 +376,9 @@ Pasos:
    «Revisar el catálogo» (solo para quien puede cambiar productos): abre **Productos** filtrado
    por «Sin configurar». También se llega filtrando Estado → «Sin configurar».
 2. Cada fila lleva la marca «Sin configurar · Falta la categoría fiscal»: tocarla abre el
-   formulario de edición.
+   formulario de edición. Se lee al menos hasta «Sin configurar» también en la tableta, junto a un
+   nombre largo: mientras alguna fila lleva la marca, su columna no baja de su suelo y las acciones
+   de la fila se pliegan antes al «⋮». Lo que no quepa detrás acaba en «…».
 3. Elige la «Categoría fiscal» y pulsa «Guardar cambios». El producto pasa a «Sí».
 Entra: los productos cuya categoría fiscal ya no está en Impuestos. No se les inventa ninguna.
 Sale: el producto con su categoría fiscal; Inventario avisa del cambio y el TPV deja de marcarlo

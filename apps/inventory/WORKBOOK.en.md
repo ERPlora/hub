@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:c4d64e8c13ebb7cef563355ebdc2bdbc6d2aaf1840629f09f232c879f3e3fb07 -->
+<!-- generated from WORKBOOK.md sha256:dc8952a11cd9b46d9d4808a7f9e6ae9da60eb21cff13e46a50c22e406a4f5393 -->
 
 ## What it is for and who it is for
 
@@ -357,7 +357,9 @@ Steps:
    catalogue" (only for whoever can change products): it opens **Products** filtered by "Not
    configured". It can also be reached by filtering Status → "Not configured".
 2. Each row carries the mark "Not configured · Missing tax category": tapping it opens the edit
-   form.
+   form. It reads at least as far as "Not configured" on a tablet too, beside a long name: while any
+   row carries the mark, its column does not go below its floor and the row's actions fold into the
+   "⋮" sooner. Whatever does not fit after that ends in "…".
 3. Choose the "Tax category" and tap "Save changes". The product goes to "Yes".
 In: the products whose tax category is no longer in Taxes. None is made up for them.
 Out: the product with its tax category; Inventory tells of the change and the till stops marking it
