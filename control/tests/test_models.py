@@ -254,6 +254,29 @@ def test_a_person_counts_once_a_day_on_a_hub():
     assert HubVisit.objects.count() == 2
 
 
+def test_the_activity_of_a_day_is_one_row_per_hub_and_day_from_zero():
+    from control.models import HubActivityDaily
+
+    hub = Hub.objects.create(slug="acme", db_name="hub_test_activity")
+    HubActivityDaily.objects.create(hub=hub, day="2026-10-30")
+
+    with pytest.raises(IntegrityError), transaction.atomic():
+        HubActivityDaily.objects.create(hub=hub, day="2026-10-30")
+    row = HubActivityDaily.objects.get()
+    assert (row.requests, row.peak_connections, row.busy_requests) == (0, 0, 0)
+
+
+def test_a_visit_says_when_its_person_was_last_seen_or_nothing_yet():
+    from control.models import HubVisit
+
+    visit = HubVisit.objects.create(host="acme", day="2026-10-30", saas_user_id="u1")
+    assert visit.last_seen_at is None
+
+    HubVisit.objects.filter(pk=visit.pk).update(last_seen_at="2026-10-30T10:00Z")
+    visit.refresh_from_db()
+    assert visit.last_seen_at.isoformat() == "2026-10-30T10:00:00+00:00"
+
+
 def test_a_night_of_measuring_is_one_row_per_day():
     from control.models import UsageRun
 

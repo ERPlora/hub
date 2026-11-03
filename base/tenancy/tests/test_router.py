@@ -3,8 +3,8 @@
 Control's models always go to ``default``; a hub's go to the alias of the active ``use_hub`` and, without one, fail
 (``HubContextMissing``): they never fall back to ``default``. The outbox follows the context (control's for the
 registry). Relations stay inside one database, compared by database, not by alias. Control's apps migrate only on
-``default``; a hub's only on a migrator's ``…__ddl`` alias, and on ``default`` only while it is phase 1's shared
-database (S1–S4, plan decision 1). ``migrate`` on a hub's alias is refused.
+``default``; a hub's only on a migrator's ``…__ddl`` alias, never on ``default`` (S5: phase 1's shared database is
+gone). ``migrate`` on a hub's alias is refused.
 """
 
 import uuid
@@ -81,17 +81,11 @@ def test_the_outbox_follows_the_hub(hub_alias):
         assert router.db_for_write(OutboxEvent) == alias
 
 
-def test_the_shared_database_holds_every_hubs_models_until_s5():
-    with context.use_shared_database():
-        assert router.db_for_write(Item) == "default"
-        assert router.db_for_write(OutboxEvent) == "default"
-
-
 def test_a_model_nobody_classified_is_refused():
     stranger = SimpleNamespace(
         _meta=SimpleNamespace(label_lower="audit.entry", app_label="audit", app_config=SimpleNamespace(name="audit"))
     )
-    with context.use_shared_database(), pytest.raises(UnclassifiedModel):
+    with context.use_control(), pytest.raises(UnclassifiedModel):
         router.db_for_read(stranger)
 
 
@@ -118,11 +112,12 @@ def test_relations_stay_inside_one_database_whatever_the_alias(hub_alias):
         ("contenttypes", None, True, False, False, False),
         ("base", "membership", True, False, False, False),
         ("base", "hub", True, False, False, False),  # the registry before it moved
-        ("base", "taskschedule", True, True, False, False),
-        ("base", None, True, True, False, False),
-        ("demo", "item", True, True, False, False),
-        ("demo", None, True, True, False, False),
+        ("base", "taskschedule", False, True, False, False),
+        ("base", None, False, True, False, False),
+        ("demo", "item", False, True, False, False),
+        ("demo", None, False, True, False, False),
         ("live", "outboxevent", True, True, False, False),
+        ("base", "eventdelivery", True, True, False, False),
     ],
 )
 def test_who_migrates_where(hub_alias, app_label, model_name, on_default, on_ddl, on_hub_alias, on_template):

@@ -4,19 +4,16 @@
 // the till's session); what the hub may do there, erplora.com decides by profile. A plain link in a new tab:
 // the old one-time pass (HUB-F142) is not ported. It sells, so only on the web (`useSurface`); its click goes the
 // Hub's one way out, `openExternalLink` (gh:hub#439: the installed app opens nothing on a `_blank` link).
-import { HubIcon, openExternalLink, useSurface } from '@erplora/ui/shell';
-import { computed } from 'vue';
+import { HubIcon, openExternalLink } from '@erplora/ui/shell';
 
-import { type HubHome, readJsonBlock } from '../lib/home';
+import { usePlanLink } from '../lib/plan-link';
 
-const { isWeb } = useSurface();
-const planUrl = readJsonBlock<HubHome>('hub-home')?.plan_url ?? '';
-const shown = computed(() => isWeb.value && planUrl !== '');
+const { planUrl, offered } = usePlanLink();
 </script>
 
 <template>
   <a
-    v-if="shown"
+    v-if="offered"
     class="upgrade-plan"
     data-testid="upgrade-plan"
     :href="planUrl"

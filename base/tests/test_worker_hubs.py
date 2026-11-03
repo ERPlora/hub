@@ -134,7 +134,7 @@ def test_the_pass_leaves_no_hubs_connection_open(hub_a, hub_b):
 
 def test_the_pass_stops_at_its_budget_and_the_next_tick_goes_on_with_the_next_hub(hub_a, hub_b, monkeypatch):
     served = []
-    monkeypatch.setattr(worker, "_serve_hub", lambda hub, now: served.append(hub.slug))
+    monkeypatch.setattr(worker, "_serve_hub", lambda hub, now, **sweep: served.append(hub.slug))
     monkeypatch.setattr(worker, "HUB_PASS_SECONDS", -1.0)  # out of time after the first one
 
     with use_control():
@@ -185,7 +185,7 @@ def test_a_business_that_left_still_sends_what_it_owes_the_aeat(hub_a, monkeypat
 @pytest.mark.parametrize("status", [Hub.Status.PURGED, Hub.Status.DROPPING, Hub.Status.EXPIRED, Hub.Status.FAILED])
 def test_a_hub_whose_database_is_gone_going_or_not_made_is_never_entered(hub_a, monkeypatch, status):
     served = []
-    monkeypatch.setattr(worker, "_serve_hub", lambda hub, now: served.append(hub.slug))
+    monkeypatch.setattr(worker, "_serve_hub", lambda hub, now, **sweep: served.append(hub.slug))
     Hub.objects.filter(pk=hub_a.pk).update(status=status)
 
     with use_control():
@@ -196,7 +196,7 @@ def test_a_hub_whose_database_is_gone_going_or_not_made_is_never_entered(hub_a, 
 
 def test_a_demo_whose_time_is_up_is_never_entered(hub_a, monkeypatch):
     served = []
-    monkeypatch.setattr(worker, "_serve_hub", lambda hub, now: served.append(hub.slug))
+    monkeypatch.setattr(worker, "_serve_hub", lambda hub, now, **sweep: served.append(hub.slug))
     Hub.objects.filter(pk=hub_a.pk).update(is_demo=True, expires_at=timezone.now() - dt.timedelta(minutes=1))
 
     with use_control():

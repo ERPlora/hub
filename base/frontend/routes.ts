@@ -20,7 +20,7 @@ const routes: RouteRecordRaw[] = [
     component: () => import('./pages/AppsPage.vue'),
     meta: { auth: true },
   },
-  // System (BASE-G81 brings its «Plan and limits»; its other sections come with the part of System).
+  // System: «Usage and plan» (BASE-F40), Updates, Failed events and Logs, in the address hash (`lib/system.ts`).
   {
     path: '/system',
     name: 'base-system',

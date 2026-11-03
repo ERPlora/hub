@@ -21,8 +21,10 @@ it, the ``REACTIONS`` of their ``events.py`` (``"*"``: every event of the other 
 Both steps claim their rows with ``SKIP LOCKED``: the old worker and the new one overlap on a deploy. Every
 transaction releases its connection, so the worker never idles holding one. The events recorded before the relay
 existed were taken without a delivery by its migration (``base/migrations/0006_event_delivery.py``): the backlog
-of phase 1 is never applied. The worker runs it on phase 1's database every hub with ``db_name=""`` shares, and then
-in each ready hub with its own database, under ``use_hub`` (``base.worker._hubs``; review of hub#471).
+of phase 1 is never applied. The worker runs it in each hub with its own database, under ``use_hub``
+(``base.worker._hubs``; review of hub#471), and on control for control's own events (``of_hubs=False``: the registry's
+and the demos', which no app hears); since S5 what a business of phase 1 recorded in control before its cut is never
+taken there (its cut copies its own events into its database, ``base.tenancy.cut``).
 """
 
 import datetime as dt
@@ -111,10 +113,11 @@ def backoff(attempts: int) -> dt.timedelta:
     return dt.timedelta(seconds=min(2**attempts, BACKOFF_MAX_SECONDS))
 
 
-def run(now: dt.datetime) -> RelayPass:
-    """Take the new events, then run the deliveries due at ``now``, one transaction each."""
+def run(now: dt.datetime, *, of_hubs: bool = True) -> RelayPass:
+    """Take the new events, then run the deliveries due at ``now``, one transaction each. ``of_hubs=False`` (control's
+    outbox): only the events of no hub, never a business's."""
     taken = services.relay_take_events(
-        now, listeners=listeners, limit=TAKE_PER_TICK, max_depth=MAX_EVENT_DEPTH
+        now, listeners=listeners, limit=TAKE_PER_TICK, max_depth=MAX_EVENT_DEPTH, of_hubs=of_hubs
     )
     close_old_connections()
     delivered = failed = 0
@@ -126,6 +129,7 @@ def run(now: dt.datetime) -> RelayPass:
             max_depth=MAX_EVENT_DEPTH,
             max_attempts=MAX_ATTEMPTS,
             backoff=backoff,
+            of_hubs=of_hubs,
         )
         close_old_connections()
         if outcome is None:

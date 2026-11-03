@@ -8,15 +8,12 @@ Local development only (``DEBUG``): production's hubs are the SaaS's, registered
 Idempotent, through its operation (``base.hub.seed_local``). ``--check`` writes nothing and fails unless both are
 ready (``base.hub.by_slugs``): the e2e's global setup asks it before the first spec.
 
-Where their data lives (round 2026-10-30 of PLAN-DB, S2a) follows what can live in a hub's own database
-(``base.tenancy.migrator.portable_apps``): ``a`` and ``b`` turn every app on, so while some app cannot (its tables
-refer to control's users), new ones share control's database and the log says which apps hold them there; the day every
-app can, new ones are born with their own (``<control>_<hex>``), made here at once from ``<control>_template`` with
-every app's tables and every app on, under their ``hub_due`` lease (``migrate_hubs`` makes the template first). A
-local hub that already exists keeps the database it has.
+Each has a database of its own (``<control>_<hex>``; S5: there is no shared database), made here at once from
+``<control>_template`` with every app's tables and every app on, under its ``hub_due`` lease (``migrate_hubs`` makes the
+template first); a local hub of phase 1 left on control's database gets its own the same way. ``a`` and ``b`` turn every
+app on, so while some app cannot live in a hub's own database (``base.tenancy.migrator.portable_apps``: its tables
+refer to control's users) it refuses and writes nothing. A local hub that already has its own keeps it.
 """
-
-import logging
 
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
@@ -29,7 +26,6 @@ from base.schemas import HubsBySlugIn, HubSeedLocalIn
 from base.services import hub_seed_local
 from base.tenancy import migrator, provision
 
-logger = logging.getLogger(__name__)
 
 LOCAL_HUBS = ("a", "b")
 OUTCOMES = {
@@ -67,13 +63,11 @@ class Command(BaseCommand):
         every_app = migrator.hub_apps()
         blocked = sorted(every_app - set(migrator.portable_apps()))
         if blocked:
-            logger.warning(
-                "base.seed_local_hubs.shared_database: a and b share the control database: %s cannot have their "
-                "tables in a hub's own database yet (they refer to control's users).",
-                ", ".join(blocked),
+            raise CommandError(
+                f"{', '.join(blocked)} cannot have their tables in a hub's own database (they refer to control's "
+                "users), and a and b turn every app on: nothing was written."
             )
-            self.stdout.write(f"a and b share the control database ({len(blocked)} app(s) cannot live in their own yet).")
-        answer = hub_seed_local(ctx, HubSeedLocalIn(slugs=list(LOCAL_HUBS), own_database=not blocked))
+        answer = hub_seed_local(ctx, HubSeedLocalIn(slugs=list(LOCAL_HUBS)))
         for seeded in answer.hubs:
             said = OUTCOMES[seeded.outcome]
             hub = services.registry_row_by_slug(seeded.slug)

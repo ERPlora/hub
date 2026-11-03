@@ -74,7 +74,7 @@ def test_a_hub_is_preparing_until_it_is_ready(status, preparing):
 @pytest.mark.parametrize(
     ("db_name", "status", "was_ready", "made"),
     [
-        ("", "requested", False, True),  # shares control's: always there
+        ("", "ready", True, False),  # a business of phase 1 not yet cut (S5): its database is still to be made
         ("hub_x", "ready", False, True),
         ("hub_x", "cancelled", True, True),  # cancelled after it was ready: its database stays
         ("hub_x", "archiving", True, True),
@@ -86,6 +86,28 @@ def test_a_hub_is_preparing_until_it_is_ready(status, preparing):
         ("hub_x", "dropping", True, False),
     ],
 )
+@pytest.mark.usefixtures("no_test_fallback")
 def test_a_hub_database_is_made_once_it_was_ready_and_until_it_is_dropped(db_name, status, was_ready, made):
     hub = Hub(slug="acme", db_name=db_name, status=status, ready_at=timezone.now() if was_ready else None)
     assert registry.database_is_made(hub) is made
+
+
+@pytest.mark.usefixtures("no_test_fallback")
+def test_a_ready_business_without_its_own_database_is_not_served_until_its_cut():
+    """S5: phase 1's shared database is gone; a business still on control's answers 503 until ``cut_shared_hubs``
+    gives it its own (``base.tenancy.cut``), the maintenance one, as one moving to another cluster (W8)."""
+    hub = Hub(slug="acme", db_name="", status="ready", ready_at=timezone.now())
+
+    refused = registry.refusal(hub)
+
+    assert (refused.status, refused.code) == (503, registry.HUB_MAINTENANCE)
+    assert registry.refusal(Hub(slug="acme", db_name="hub_x", status="ready")) is None
+    # One that ended is still gone, with or without a database.
+    assert registry.refusal(Hub(slug="acme", db_name="", status="cancelled")).status == 410
+
+
+def test_under_the_suite_s_fallback_a_business_without_its_own_database_is_served_on_control_s_test_database():
+    hub = Hub(slug="acme", db_name="", status="ready", ready_at=timezone.now())
+
+    assert registry.refusal(hub) is None
+    assert registry.database_is_made(hub)

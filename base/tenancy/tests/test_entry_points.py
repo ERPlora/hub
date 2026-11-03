@@ -1,8 +1,9 @@
 """Every way into the Hub opens its database context itself (plan 2026-10-22-fase-2-tenencia §3 S1 and §4, step 8).
 
 Without the suite's fallback (``no_test_fallback``), as in production: a request on a hub's host runs in
-``use_hub(request.hub)``; on the platform host, in the hub chosen for the admin or, with none, phase 1's shared
-database; a live re-execution enters its stream's hub in the executor's thread; the registry's operations run on
+``use_hub(request.hub)``; on the platform host, in the hub chosen for the admin or, with none, on control (a hub's page
+there asks to choose one); a business without its own database (phase 1's, before its cut: S5) answers 503 and runs
+nothing; a live re-execution enters its stream's hub in the executor's thread; the registry's operations run on
 control and their outbox lands there; ``/internal``'s calls for a business enter it; the worker and the commands open
 theirs (``manage.py shell``: ``base/tests/test_shell.py``). A hub with a database of its own (``hub_a``) gets its rows there and nowhere else.
 """
@@ -25,6 +26,7 @@ from base.models import Membership
 from base.operations import HostClosed, HubContextBuilder
 from base.tenancy import context, identity
 from base.tenancy.tests import hubs
+from base.tenancy.tests.legacy import use_legacy
 
 pytestmark = pytest.mark.usefixtures("no_test_fallback")
 
@@ -42,8 +44,8 @@ def api_post(client, host, path, data):
 
 
 def items_in(hub=None) -> list[str]:
-    """The demo items of ``hub``'s database (``None``: phase 1's shared one), read as the code would."""
-    entered = context.use_shared_database() if hub is None else context.use_hub(hub)
+    """The demo items of ``hub``'s database (``None``: what phase 1 left in control's tables), read as the code would."""
+    entered = use_legacy() if hub is None else context.use_hub(hub)
     with entered:
         return sorted(Item.objects.values_list("name", flat=True))
 
@@ -53,13 +55,15 @@ def items_in(hub=None) -> list[str]:
 
 @pytest.mark.django_db
 @pytest.mark.parametrize("slug", ["a", "b"])
-def test_a_request_on_a_hub_of_the_shared_database_works_as_in_phase_one(client, slug):
+def test_a_request_on_a_business_without_its_own_database_answers_503_and_runs_nothing(client, slug):
+    # S5: phase 1's shared database is gone; until its cut, a business still on control's is not served.
     client.force_login(member(slug))
 
     created = api_post(client, f"{slug}.localhost", "/demo/items", {"name": "Shared"})
 
-    assert created.status_code == 201
-    assert items_in() == ["Shared"]
+    assert created.status_code == 503
+    assert created.json()["error"]["code"] == "base.hub_maintenance"
+    assert items_in() == []
 
 
 @HUB_DB
@@ -119,22 +123,35 @@ def test_a_hub_whose_database_cannot_be_reached_now_is_503_without_the_mismatch_
 
 
 @pytest.mark.django_db
-def test_the_admin_without_a_chosen_hub_works_on_the_shared_database(client):
-    with context.use_shared_database():
-        Item.objects.create(name="Visible")
+def test_the_admin_without_a_chosen_hub_works_on_control_and_a_hubs_page_asks_to_choose_one(client):
+    with use_legacy():
+        Item.objects.create(name="Left on control")
     client.force_login(get_user_model().objects.create_superuser("root", "root@example.com", "pw"))
+
+    page = client.get("/admin/demo/item/", HTTP_HOST="hubs.localhost", follow=True)
+    registry = client.get("/admin/base/membership/", HTTP_HOST="hubs.localhost")
+
+    assert page.redirect_chain == [("/admin/", 302)]
+    assert "Choose a business first" in page.content.decode()
+    assert "Left on control" not in page.content.decode()
+    assert registry.status_code == 200
+
+
+@pytest.mark.django_db
+def test_the_admin_on_a_chosen_business_without_its_own_database_answers_503(client):
+    client.force_login(get_user_model().objects.create_superuser("root", "root@example.com", "pw"))
+    client.get("/admin/hub/a/", HTTP_HOST="hubs.localhost")
 
     page = client.get("/admin/demo/item/", HTTP_HOST="hubs.localhost")
 
-    assert page.status_code == 200
-    assert "Visible" in page.content.decode()
+    assert page.status_code == 503
 
 
 @HUB_DB
 def test_the_admin_with_a_chosen_hub_works_on_its_database(client, hub_a):
     with context.use_hub(hub_a):
         Item.objects.create(name="Of tenant a")
-    with context.use_shared_database():
+    with use_legacy():
         Item.objects.create(name="Of phase one")
     client.force_login(get_user_model().objects.create_superuser("root", "root@example.com", "pw"))
     client.get(f"/admin/hub/{hub_a.slug}/", HTTP_HOST="hubs.localhost")
@@ -148,15 +165,24 @@ def test_the_admin_with_a_chosen_hub_works_on_its_database(client, hub_a):
 # ── The live executor and the print socket: a thread of their own ─────────────────────────────────────────────────
 
 
-@pytest.mark.django_db
-def test_a_live_rerun_enters_its_streams_hub():
-    ctx = OperationContext(scope=Scope("host", "a"), actor="system", permissions=frozenset({"*"}))
+@HUB_DB
+def test_a_live_rerun_enters_its_streams_hub(hub_a):
+    ctx = OperationContext(scope=Scope("host", hub_a.slug), actor="system", permissions=frozenset({"*"}))
 
     def run():
         with HubContextBuilder().enter(ctx):
-            return context.current_hub().slug
+            return context.current_hub().slug, context.current_alias()
 
-    assert contextvars.Context().run(run) == "a"
+    assert contextvars.Context().run(run) == (hub_a.slug, hubs.HUB_A_ALIAS)
+
+
+@pytest.mark.django_db
+def test_a_live_rerun_of_a_business_without_its_own_database_closes_the_stream():
+    ctx = OperationContext(scope=Scope("host", "a"), actor="system", permissions=frozenset({"*"}))
+
+    with pytest.raises(HostClosed) as closed:
+        HubContextBuilder().enter(ctx)
+    assert (closed.value.status, closed.value.code) == (503, "base.hub_maintenance")
 
 
 @pytest.mark.django_db
@@ -170,20 +196,21 @@ def test_a_live_rerun_of_a_hub_that_ended_closes_the_stream():
         HubContextBuilder().enter(ctx)
 
 
-@pytest.mark.django_db
-def test_the_print_socket_runs_its_hubs_code_inside_its_hub():
+@pytest.mark.django_db(databases=hubs.HUB_DATABASES, transaction=True)
+def test_the_print_socket_runs_its_hubs_code_inside_its_hub(hub_b):
+    # Committed (no test case holding hub_b's one place of its plan, base.tenancy.limits): the socket's own thread
+    # opens its transaction there.
     from base.ws_print import PrintSocket
-    from control.models import Hub
 
     socket = PrintSocket({"path": "/ws/print"}, None, None)
-    socket.request = type("Admitted", (), {"hub": Hub.objects.get(slug="b")})()
+    socket.request = type("Admitted", (), {"hub": hub_b})()
 
-    def inside() -> str:
-        return context.current_hub().slug
+    def inside() -> tuple[str, str]:
+        return context.current_hub().slug, context.current_alias()
 
     import asyncio
 
-    assert asyncio.run(socket._sync(inside)) == "b"
+    assert asyncio.run(socket._sync(inside)) == (hub_b.slug, hubs.HUB_B_ALIAS)
 
 
 # ── /internal, the registry and the demos ────────────────────────────────────────────────────────────────────────
@@ -216,40 +243,53 @@ def test_a_hubs_operation_never_runs_inside_another_hub(hub_a, hub_b):
     assert items_in(hub_a) == items_in(hub_b) == []
 
 
-@pytest.mark.django_db
-def test_internal_calls_for_a_business_enter_it(monkeypatch):
+@HUB_DB
+def test_internal_calls_for_a_business_enter_it(monkeypatch, hub_b):
     from base import internal
 
     seen = []
 
     def call(name, body, ctx):
-        seen.append(context.current_hub().slug)
+        seen.append((context.current_hub().slug, context.current_alias()))
         return None, internal.refuse(418, "probe", "seen")
 
     monkeypatch.setattr(internal, "_operation_call", call)
     monkeypatch.setattr(internal.relay, "active_apps", lambda scope: frozenset({internal.WHATSAPP_APP}))
-    request = type("Request", (), {"body": json.dumps({"hub": "b"}).encode()})()
+    request = type("Request", (), {"body": json.dumps({"hub": hub_b.slug}).encode()})()
 
     internal._whatsapp_call(request, "whatsapp_inbox.message.receive")
 
-    assert seen == ["b"]
+    assert seen == [(hub_b.slug, hubs.HUB_B_ALIAS)]
 
 
 @pytest.mark.django_db
-def test_internal_calls_for_the_platform_hub_run_on_the_shared_database(monkeypatch):
+def test_internal_calls_for_a_business_without_its_own_database_answer_503_and_enter_nothing(monkeypatch):
     from base import internal
 
+    monkeypatch.setattr(internal, "_operation_call", lambda *args: pytest.fail("it ran"))
+    request = type("Request", (), {"body": json.dumps({"hub": "b"}).encode()})()
+
+    answer = internal._whatsapp_call(request, "whatsapp_inbox.message.receive")
+
+    assert (answer.status_code, json.loads(answer.content)["error"]["code"]) == (503, "base.hub_maintenance")
+
+
+@HUB_DB
+def test_internal_calls_for_the_platform_hub_run_in_its_own_database(monkeypatch, settings, hub_a):
+    from base import internal
+
+    settings.PLATFORM_HUB_SLUG = hub_a.slug
     seen = []
 
     def call(name, body, ctx):
-        seen.append(context.current().kind)
+        seen.append((context.current().kind, context.current_alias()))
         return None, internal.refuse(418, "probe", "seen")
 
     monkeypatch.setattr(internal, "_operation_call", call)
 
     internal._platform_call("invoice.invoice.platform_health", {})
 
-    assert seen == [context.SHARED]
+    assert seen == [(context.HUB, hubs.HUB_A_ALIAS)]
 
 
 # ── The worker, the commands and the shell ───────────────────────────────────────────────────────────────────────
@@ -260,8 +300,8 @@ def test_the_worker_opens_a_context_for_each_pass(caplog):
     now = timezone.now()
 
     def passes():
-        worker._tick(now)
         worker._relay(now)
+        worker._hubs(now)
         worker._reap(now)
 
     contextvars.Context().run(passes)
@@ -290,7 +330,8 @@ def test_seed_local_hubs_and_demo_expire_open_their_context(settings):
     settings.DEBUG = True
     Hub.objects.create(slug="demo-0000cafe", is_demo=True, status=Hub.Status.READY, expires_at=timezone.now())
 
-    contextvars.Context().run(call_command, "seed_local_hubs", verbosity=0)
+    # a and b are ready already (the suite's local hubs): it only checks them, in its context.
+    contextvars.Context().run(call_command, "seed_local_hubs", "--check", verbosity=0)
     contextvars.Context().run(call_command, "demo_expire", "demo-0000cafe", verbosity=0)
 
     assert Hub.objects.get(slug="demo-0000cafe").status == Hub.Status.PURGED
@@ -335,9 +376,10 @@ async def asgi_post(async_client, host: str, path: str, data: dict):
 
 
 @pytest.mark.django_db(databases=hubs.HUB_DATABASES, transaction=True)
-@pytest.mark.parametrize("own_database", [False, True], ids=["shared", "own"])
+@pytest.mark.parametrize("own_database", [False, True], ids=["without", "own"])
 async def test_an_asgi_request_runs_in_its_hub_too(async_client, hub_a, own_database):
-    """Daphne runs the middleware asynchronously (``HubDatabaseMiddleware.__acall__``): the same context."""
+    """Daphne runs the middleware asynchronously (``HubDatabaseMiddleware.__acall__``): the same context, and the same
+    503 for a business without its own database (S5)."""
     from asgiref.sync import sync_to_async
 
     slug = hub_a.slug if own_database else "a"
@@ -346,7 +388,7 @@ async def test_an_asgi_request_runs_in_its_hub_too(async_client, hub_a, own_data
 
     created = await asgi_post(async_client, f"{slug}.localhost", "/api/demo/items", {"name": "Async"})
 
-    assert created.status_code == 201
-    assert await sync_to_async(items_in)(hub_a if own_database else None) == ["Async"]
+    assert created.status_code == (201 if own_database else 503)
+    assert await sync_to_async(items_in)(hub_a if own_database else None) == (["Async"] if own_database else [])
     # The connections of the ASGI handler's thread, not the test's: closed before the databases are flushed.
     await sync_to_async(connections.close_all)()

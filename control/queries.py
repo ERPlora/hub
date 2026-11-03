@@ -14,19 +14,27 @@ purged demo have none. Each size is kept :data:`SIZE_TTL_SECONDS` in the cache (
 so a new hub is measured on the next look without measuring the others again; a cache that does not answer only costs
 a measure, said in the log. A database that is not on the server is left out, never cached. A server that cannot be
 reached, or a secret that does not resolve, is ``control.cluster_unreachable`` (503) with its reason.
+
+The worker's metrics (``base.metrics``, hub#488; PLAN-AWS §8, PLAN-DB §6 and §8) read the registry's health here too:
+:func:`registry_health` is a plain read, not an operation (no hub and no user: the worker's own measure, like
+``base.services.hubs_to_serve``), on control's database (the caller opens ``use_control``).
 """
 
+import datetime as dt
 import logging
+from dataclasses import dataclass
 
 import psycopg
 from django.core.cache import cache
 from django.db import DEFAULT_DB_ALIAS, DatabaseError, connection, connections
+from django.db.models import Count, Min, Q
+from django.db.models.functions import Coalesce
 from django.utils.translation import gettext
 from live.context import OperationContext
 from live.errors import NotFound, OperationError
 from live.operations import INTERNAL, operation
 
-from base.registry import internal_only
+from base.registry import PREPARING_STATUSES, internal_only
 from base.tenancy.connections import NON_LIBPQ_OPTIONS
 from base.tenancy.credentials import APP, CredentialsUnavailable, credentials_for
 from base.tenancy.ops import MAINTENANCE_DATABASE
@@ -141,3 +149,43 @@ def cluster_sizes(ctx: OperationContext, data: ClusterSizesIn) -> dict:
             )
         sizes |= measured
     return {"databases": dict(sorted(sizes.items()))}
+
+
+# ── The registry's health, for the worker's metrics ──
+
+#: A demo still open: being prepared or ready (``base.services.OPEN_DEMO_STATUSES``); once its time is up it ended.
+_OPEN_DEMO_STATUSES = (*PREPARING_STATUSES, Hub.Status.READY)
+#: A demo the reaper marked as ended and has not purged yet.
+_ENDING_DEMO_STATUSES = (Hub.Status.EXPIRED, Hub.Status.DROPPING)
+
+
+@dataclass(frozen=True)
+class RegistryHealth:
+    """What the registry says at one moment: since when the oldest hub still being prepared waits (``None``: none),
+    how many hubs failed, and since when the oldest demo that ended waits to be dropped (``None``: none)."""
+
+    oldest_preparing_since: dt.datetime | None
+    failed: int
+    oldest_ended_demo_since: dt.datetime | None
+
+
+def registry_health(now: dt.datetime) -> RegistryHealth:
+    """The registry's health at ``now``, in one query.
+
+    A hub still being prepared (requested, creating, migrating, seeding, or failed and retried) waits since its row last
+    changed (``updated_at``: each step of its preparation, each failure, and ``base.hub.restore``, which brings a
+    business that left back to ``requested``, born long before); a demo whose time is up is not one of them but an
+    ended demo, which waits to be dropped since its end (``expires_at``; one expired without it, since it last changed)
+    until the reaper purges it, as ``base.services.reap_demos`` takes them.
+    """
+    demo_over = Q(is_demo=True, expires_at__lte=now)
+    row = Hub.objects.aggregate(
+        oldest_preparing_since=Min("updated_at", filter=Q(status__in=PREPARING_STATUSES) & ~demo_over),
+        failed=Count("pk", filter=Q(status=Hub.Status.FAILED) & ~demo_over),
+        oldest_ended_demo_since=Min(
+            Coalesce("expires_at", "updated_at"),
+            filter=Q(is_demo=True)
+            & (Q(status__in=_ENDING_DEMO_STATUSES) | Q(status__in=_OPEN_DEMO_STATUSES, expires_at__lte=now)),
+        ),
+    )
+    return RegistryHealth(**row)

@@ -6,7 +6,9 @@ explicit list: ``control`` (the registry, Django's admin, auth, contenttypes and
 deliveries: in the database of the context, control's for the registry's events) or ``shared`` (the SaaS's schema).
 A model nobody classified fails here and in the router, never lands anywhere by default. Own models have a UUIDv7
 key. Once migrated, each database holds exactly its classes' tables and ``django_migrations``: control's, its own and
-the outbox (plus phase 1's hubs' until S5, ``SHARED_MODE_EXTRA``); a hub's, those of its apps.
+the outbox (since S5, nothing of a hub's: ``SHARED_MODE_EXTRA`` is empty); a hub's, those of its apps. The suite's
+control test database also holds the hubs' tables, for its tests written before the tenancy only
+(``base/tenancy/tests/legacy.py``): what production's ``migrate`` makes is checked on a database of its own.
 """
 
 import uuid
@@ -149,14 +151,9 @@ def test_own_models_have_a_uuid7_key(model):
 # ── After migrating: each database holds exactly its tables (PLAN-DB §14.1) ──────────────────────────────────────────
 
 #: Database classes whose tables control's database also holds while phase 1's hubs share it (``db_name=""``), each
-#: with its reason. S5 retires the shared database with the ``db_name=""`` branch and empties this: from then on a hub's
-#: table left in control's fails the equality below.
-SHARED_MODE_EXTRA: dict[str, str] = {
-    inventory.HUB: (
-        "phase 1's hubs (db_name='') keep base, live and every module in control's database until S5 (plan "
-        "2026-10-22-fase-2-tenencia, decision 1); retired with S5."
-    ),
-}
+#: with its reason. Empty since S5 (``base.tenancy.cut``: every business has its own database): a hub's table that
+#: production's ``migrate`` makes in control fails the equality below.
+SHARED_MODE_EXTRA: dict[str, str] = {}
 #: Django's own bookkeeping, in every database it migrates.
 MIGRATIONS_TABLE = "django_migrations"
 
@@ -170,22 +167,69 @@ def tables_of(*classes: str) -> set[str]:
     }
 
 
-def test_shared_mode_extra_names_known_classes_with_their_reason():
-    for database_class, reason in SHARED_MODE_EXTRA.items():
-        assert database_class in inventory.CLASSES - {inventory.CONTROL}, database_class
-        assert "S5" in reason, database_class
+def test_since_s5_control_shares_its_database_with_no_hub():
+    assert SHARED_MODE_EXTRA == {}
+
+
+@pytest.fixture
+def production_control(django_db_blocker):
+    """A control database migrated as production's is: ``manage.py migrate`` in a process of its own, with
+    ``config.settings`` (its routers alone, not the tests' ``LegacyTablesRouter``), on a database of its own; dropped
+    after the test."""
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    from django.db import connection
+    from psycopg import sql
+
+    from base.tenancy.tests import hubs
+
+    name = f"{connection.settings_dict['NAME']}_prodctl"
+    with django_db_blocker.unblock():
+        with hubs._maintenance() as conn:
+            conn.execute(sql.SQL("DROP DATABASE IF EXISTS {} WITH (FORCE)").format(sql.Identifier(name)))
+            conn.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(name)))
+        environment = {**os.environ, "DJANGO_SETTINGS_MODULE": "config.settings", "DB_NAME": name}
+        try:
+            migrated = subprocess.run(
+                [sys.executable, "manage.py", "migrate", "--noinput", "--verbosity", "0"],
+                cwd=Path(__file__).resolve().parents[3],
+                env=environment,
+                capture_output=True,
+                text=True,
+                timeout=600,
+            )
+            assert migrated.returncode == 0, migrated.stderr[-3000:]
+            yield hubs.table_names(name)
+        finally:
+            with hubs._maintenance() as conn:
+                conn.execute(sql.SQL("DROP DATABASE IF EXISTS {} WITH (FORCE)").format(sql.Identifier(name)))
 
 
 @pytest.mark.django_db
-def test_controls_database_holds_exactly_controls_tables_and_phase_1s_hubs():
+def test_controls_database_as_production_migrates_it_holds_exactly_controls_tables(production_control):
+    # The outbox is contextual: the registry's own events (base.hub.*, the demos) stay in control's after S5 too.
+    expected = tables_of(inventory.CONTROL, inventory.CONTEXTUAL, *SHARED_MODE_EXTRA) | {MIGRATIONS_TABLE}
+
+    assert production_control == expected, {
+        "not a model's": sorted(production_control - expected),
+        "missing": sorted(expected - production_control),
+    }
+
+
+@pytest.mark.django_db
+def test_the_suites_control_database_holds_the_hubs_tables_too_only_for_its_tests_written_before_the_tenancy():
+    from django.conf import settings
     from django.db import connection
 
     from base.tenancy.tests import hubs
 
     found = hubs.table_names(connection.settings_dict["NAME"])
 
-    # The outbox is contextual: the registry's own events (base.hub.*, the demos) stay in control's after S5 too.
-    expected = tables_of(inventory.CONTROL, inventory.CONTEXTUAL, *SHARED_MODE_EXTRA) | {MIGRATIONS_TABLE}
+    assert settings.DATABASE_ROUTERS[0] == "base.tenancy.tests.legacy.LegacyTablesRouter"
+    expected = tables_of(inventory.CONTROL, inventory.CONTEXTUAL, inventory.HUB) | {MIGRATIONS_TABLE}
     assert found == expected, {"not a model's": sorted(found - expected), "missing": sorted(expected - found)}
 
 

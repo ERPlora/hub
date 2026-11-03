@@ -11,6 +11,8 @@ def test_every_event_is_named_as_the_convention_says():
         "base.hub.state_applied",
         "base.hub.cancelled",
         "base.hub.restored",
+        # The cut of S5: a business of phase 1 got its own database (cut_shared_hubs).
+        "base.hub.cut",
         "base.demo.created",
         "base.demo.code_created",
         "base.demo.expired",
@@ -53,5 +55,8 @@ def test_every_event_is_named_as_the_convention_says():
         # An app turned on or off by the business (PLAN-HUB §9).
         "base.app.enabled",
         "base.app.disabled",
+        # S3: an app whose tables a hub's own database is getting, and making them failing.
+        "base.app.activation_requested",
+        "base.app.activation_failed",
     ]
     assert all(NAME_RE.match(name) for name in events.ALL)

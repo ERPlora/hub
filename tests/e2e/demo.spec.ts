@@ -27,12 +27,18 @@ async function doorSays(page: Page, state: string): Promise<void> {
   await expect(page.getByTestId(`demo-state-${state}`)).toBeVisible();
 }
 
+/** How long a demo may take to be ready, door to shell: since S3 its sign-up is the clone of its template (every app off,
+ *  an app's tables made when it is turned on), measured at 1.4–4.1 s from its request to `ready` with the worker's 5 s
+ *  tick (2026-10-31; 13–32 s while every app's tables were made at sign-up). PLAN-DB §6 aims at 5 s: 15 s is the tick
+ *  and that aim with room for a loaded machine, and a sign-up that makes tables again fails here. */
+const DEMO_READY_MS = 15_000;
+
 /** «Try the demo» on the door, then the jump through the demo's /auth/login and callback: its slug, once its shell
  *  is up. */
 async function startDemo(page: Page): Promise<string> {
   await page.getByTestId('demo-start').click();
-  await page.waitForURL(DEMO_HOST, { timeout: 30_000 });
-  await shown(page).locator('[data-testid=topbar-apps]').waitFor({ state: 'attached', timeout: 30_000 });
+  await page.waitForURL(DEMO_HOST, { timeout: DEMO_READY_MS });
+  await shown(page).locator('[data-testid=topbar-apps]').waitFor({ state: 'attached', timeout: DEMO_READY_MS });
   const slug = DEMO_HOST.exec(page.url())?.[1];
   if (!slug) throw new Error(`not on a demo host: ${page.url()}`);
   return slug;

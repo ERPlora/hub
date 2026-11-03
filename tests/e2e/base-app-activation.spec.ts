@@ -479,3 +479,116 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     }
   });
 }
+
+// ── S3: an app whose tables the business's own database lacks is set up first (PLAN-DB §7; BASE-F21, F22) ───────────
+// `a` has its own database with every app's tables (`seed_local_hubs`); control's copy of what it has
+// (`base_hub.schema_apps`) is told it lacks Printing, so turning Printing on goes through the whole path of a business
+// whose database does not have it: the Hub answers 202 «creating», the run's worker (`run_worker --databases-only`) makes
+// its tables (`ensure_schema`, a no-op on tables already there: the DDL itself is pytest's, on real databases) and turns
+// it on, and the screen and the topbar's «My apps» follow without reloading. «Turning on…» and «Could not turn on» are
+// written on the row (the worker set off, or a failure as it leaves it) so each is seen and captured whatever the
+// worker's tick; «Retry» goes through the API and the worker again. Captures `APP-BASE-ACTIVATION-S3-<step>-<width>`.
+
+/** The copy the run keeps of what control knows `a`'s database has. */
+const SCHEMA = 'e2e_base_app_activation_schema_apps';
+const PRINTING = 'printing';
+
+/** Control believes `a`'s database lacks Printing, and Printing is off. */
+function printingNotMadeYet(): void {
+  psql(
+    [
+      `drop table if exists ${SCHEMA}`,
+      `create table ${SCHEMA} as select id, schema_apps from base_hub where slug = 'a'`,
+      `update base_hub set schema_apps = schema_apps - '${PRINTING}' where slug = 'a'`,
+    ].join('; '),
+  );
+  psql(`update base_appactivation set state = 'off', chosen = false where host = 'a' and app = '${PRINTING}'`);
+}
+
+function schemaBack(): void {
+  psql(
+    [
+      `update base_hub h set schema_apps = s.schema_apps from ${SCHEMA} s where s.id = h.id`,
+      `drop table if exists ${SCHEMA}`,
+    ].join('; '),
+  );
+}
+
+/** The worker is told `a` has work due now, as `base.app.enable` tells it after its COMMIT. */
+function ring(): void {
+  psql(
+    `insert into control_hubdue (hub_id, due_at, lease_owner) values ('${hubId}', now(), '') ` +
+      'on conflict (hub_id) do update set due_at = least(control_hubdue.due_at, excluded.due_at)',
+  );
+}
+
+/** How long the run's worker may take to set an app up: one tick (5 s), the clone-free migration and its settle. */
+const SET_UP_MS = 30_000;
+
+for (const [label, viewport] of Object.entries(VIEWPORTS)) {
+  const width = Number(label);
+
+  test(`BASE-F21 BASE-F22 — an app the business's database lacks is set up, then on, live, at ${width}`, async ({ browser }) => {
+    test.setTimeout(180_000);
+    printingNotMadeYet();
+    const { context, page } = await signedIn(browser, viewport, '/apps#all');
+    try {
+      await search(page, 'Printing');
+      const state = appRow(page, PRINTING).locator('[data-testid="apps-state"]');
+      await expect(state).toHaveText('Off');
+
+      // «Turn on»: 202 «creating», and the toast says it is being set up.
+      const answered = page.waitForResponse((response) => response.url().endsWith('/api/apps/enable'));
+      await testid(page, `apps-row-${PRINTING}-toggle`).click();
+      const response = await answered;
+      expect([response.status(), (await response.json()).state]).toEqual([202, 'creating']);
+      await expect(toast(page, 'Turning on Printing… It will be ready in a moment.')).toBeVisible();
+
+      // The worker sets it up and turns it on: the row and the topbar's «My apps» follow without a reload.
+      await expect(state).toHaveText('Installed', { timeout: SET_UP_MS });
+      expect(stored(PRINTING)).toBe('on:true');
+      expect(psql(`select schema_apps ? '${PRINTING}' from base_hub where slug = 'a'`)).toBe('t');
+      // The menu is the session's: AppsFollower reads it again when the live list changes, a moment after.
+      await expect.poll(() => menuApps(page), { timeout: SET_UP_MS }).toContain('Printing');
+      await snap(page, 'S3-on', width);
+
+      // «Turning on…», as a row the worker set off leaves it: no «Open», and «Turn off» if the business changes its mind.
+      psql(
+        `update base_appactivation set state = 'creating', next_attempt_at = now() + interval '10 minutes' ` +
+          `where host = 'a' and app = '${PRINTING}'`,
+      );
+      await page.reload();
+      await search(page, 'Printing');
+      await expect(state).toHaveText('Turning on…');
+      await expect(testid(page, `apps-row-${PRINTING}-toggle`)).toContainText('Turn off');
+      await expect(testid(page, `apps-row-${PRINTING}-open`)).toHaveCount(0);
+      await snap(page, 'S3-creating', width);
+
+      // Its time comes: the worker turns it on and the screen says so, live.
+      psql(`update base_appactivation set next_attempt_at = null where host = 'a' and app = '${PRINTING}'`);
+      ring();
+      await expect(state).toHaveText('Installed', { timeout: SET_UP_MS });
+
+      // «Could not turn on», as a failure leaves the row: «Retry» sets it up again through the worker.
+      psql(
+        `update base_appactivation set state = 'failed', attempts = 1, last_error = 'schema_failed: e2e', ` +
+          `next_attempt_at = now() + interval '1 hour' where host = 'a' and app = '${PRINTING}'`,
+      );
+      await page.reload();
+      await search(page, 'Printing');
+      await expect(state).toHaveText('Could not turn on');
+      await snap(page, 'S3-failed', width);
+      const retried = page.waitForResponse((answer) => answer.url().endsWith('/api/apps/retry'));
+      await testid(page, `apps-row-${PRINTING}-retry`).click();
+      expect((await retried).status()).toBe(202);
+      await expect(toast(page, 'Turning on Printing… It will be ready in a moment.')).toBeVisible();
+      await expect(state).toHaveText('Installed', { timeout: SET_UP_MS });
+      expect(psql(`select attempts || ':' || last_error from base_appactivation where host = 'a' and app = '${PRINTING}'`)).toBe(
+        '0:',
+      );
+    } finally {
+      await context.close();
+      schemaBack();
+    }
+  });
+}

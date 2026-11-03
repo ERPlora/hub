@@ -573,15 +573,33 @@ export async function emptyOfTemplateData(context: BrowserContext, origin: strin
   throw new Error('the business could not be emptied of what a template brings');
 }
 
+/** How long the run's worker may take to make an app's tables in a business's own database (S3): its tick, the
+ *  migrations of the app and what it needs, and its settle. */
+export const APP_SET_UP_MS = 60_000;
+
 /**
  * Turns on `apps` in the business at `origin`, as the person of `context` who runs it, through Apps' own command
  * (`POST /api/apps/enable`, `base.app.enable`): a business is born with every app off (PLAN-HUB round 2026-10-27).
- * One already on changes nothing.
+ * One already on changes nothing. In a business whose own database lacks an app's tables (a demo, a new business:
+ * S3) the answer is 202 «creating» and the run's worker makes them: it waits until `base.app.list` says it is on.
  */
 export async function turnOn(context: BrowserContext, origin: string, ...apps: string[]): Promise<void> {
   for (const app of apps) {
-    const answer = await api(context, origin, 'POST', '/apps/enable', { app });
-    expect(answer.status, `turn on ${app}: ${JSON.stringify(answer.data)}`).toBe(200);
+    const answer = await api<{ state: string }>(context, origin, 'POST', '/apps/enable', { app });
+    const said = `turn on ${app}: ${answer.status} ${JSON.stringify(answer.data)}`;
+    expect([200, 202], said).toContain(answer.status);
+    if (answer.status === 202) {
+      expect(answer.data.state, said).toBe('creating');
+      await expect
+        .poll(
+          async () => {
+            const listed = await api<{ apps: { id: string; state: string }[] }>(context, origin, 'GET', '/apps');
+            return listed.data.apps.find((row) => row.id === app)?.state;
+          },
+          { message: `${app} set up by the worker`, timeout: APP_SET_UP_MS },
+        )
+        .toBe('on');
+    }
   }
 }
 
