@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:4686282ee9dad725583785135d8876acd1a95984b8c6fc219cd18829360084cc -->
+<!-- generated from WORKBOOK.md sha256:2cba51877cea329f7d7e8733574efd8efa23f356378309420538463bdd04438f -->
 
 ## What it is for and who it is for
 
@@ -323,7 +323,9 @@ operation) and the same operation date; the ticket is not touched. If the ticket
 paid. Announces `invoice.invoice.issued`. From then on, rectifying or refunding that sale rectifies the
 F3, not the ticket.
 If it fails: without name, tax ID or address, refusal; a Spanish tax ID that is not valid, "That tax ID
-is not valid."; a document that is not a ticket, "Only a ticket (simplified invoice) can be replaced by a
+is not valid." under the field and "Check the highlighted details." on top, which goes as soon as anything
+is changed (and the field's message, as soon as that field is corrected) and comes back if the next try is
+refused too; a document that is not a ticket, "Only a ticket (simplified invoice) can be replaced by a
 full invoice.". If the ticket already has its F3, it answers with it without issuing another or using a
 number.
 Involved: INVOICE-F04
