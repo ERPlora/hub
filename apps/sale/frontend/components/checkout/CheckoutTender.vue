@@ -1,14 +1,16 @@
 <script setup lang="ts">
 // The tender group of the charge sheet (the old `.pay-tender`): how it is paid. «Payments taken» once
 // splitting, the methods (only with more than one), then what to type: cash (or any leg of a split)
-// types on the keypad, with the change big below; any other method charges the exact amount on the card
-// terminal. «Split the payment» opens the split (secondary: most charges are one method); «Add this
+// types on the keypad; any other method charges the exact amount on the card terminal. Over the keypad, in
+// cash, one row of a fixed height says what the keys are missing and then, big, the change: the sheet is as
+// tall as its content, so a row that came and went would move the keys under the finger (hub#456). «Split the payment» opens the split (secondary: most charges are one method); «Add this
 // payment» takes each leg (with nothing typed, all that is left). It paints the sheet's tender state
 // (useTender) and sends what is tapped.
 import { HubIcon } from '@erplora/ui/shell';
 import { computed } from 'vue';
 
 import { useLocale } from '../../composables/useT';
+import { type ChargeBlock, tenderReason } from '../../lib/checkout/blocks';
 import { type Leg, needsTendered, type TenderMethod } from '../../lib/checkout/tender';
 import { formatMoney, moneyDecimals, useBusinessMoney } from '../../lib/format';
 import type { PaymentMethodOut } from '../../operations';
@@ -28,6 +30,8 @@ const props = defineProps<{
   /** The server's total of this charge. */
   total: number;
   remaining: number;
+  /** Why the sheet cannot charge yet. */
+  block: ChargeBlock | null;
 }>();
 
 const emit = defineEmits<{
@@ -46,6 +50,7 @@ const money = (cents: number): string => formatMoney(cents, locale.value, busine
 const cash = computed(() => needsTendered(props.method));
 const typing = computed(() => cash.value || props.splitting);
 const amountLabel = computed(() => (props.splitting && !cash.value ? 'sale.checkout.legAmount' : 'sale.checkout.tendered'));
+const reason = computed(() => tenderReason(props.block));
 </script>
 
 <template>
@@ -72,12 +77,25 @@ const amountLabel = computed(() => (props.splitting && !cash.value ? 'sale.check
         <span class="amt__value">{{ money(typed) }}</span>
       </div>
       <div
-        v-if="change > 0"
-        class="amt amt--change"
-        data-testid="sale-checkout-change"
+        v-if="cash || change > 0"
+        class="tender-status"
+        data-testid="sale-checkout-tender-status"
       >
-        <span>{{ $t('sale.checkout.change') }}</span>
-        <span class="amt__value">{{ money(change) }}</span>
+        <div
+          v-if="change > 0"
+          class="amt amt--change"
+          data-testid="sale-checkout-change"
+        >
+          <span>{{ $t('sale.checkout.change') }}</span>
+          <span class="amt__value">{{ money(change) }}</span>
+        </div>
+        <p
+          v-else-if="reason"
+          class="tender-status__reason"
+          data-testid="sale-checkout-block-reason"
+        >
+          {{ $t(`sale.checkout.reason.${reason}`) }}
+        </p>
       </div>
       <PayKeypad
         :decimals="moneyDecimals(business)"
@@ -146,6 +164,25 @@ const amountLabel = computed(() => (props.splitting && !cash.value ? 'sale.check
 .amt__value {
   font-weight: 700;
   white-space: nowrap;
+}
+
+/* As tall as the big change or two lines of reason, whichever it holds, or nothing: the keys below never move. */
+.tender-status {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 2.75rem;
+}
+
+.tender-status__reason {
+  margin: 0;
+  padding: 0.25rem 0.65rem;
+  border: 1px solid var(--ion-color-warning, #e8a33d);
+  border-radius: 0.6rem;
+  background: color-mix(in srgb, var(--ion-color-warning, #e8a33d) 12%, transparent);
+  color: var(--ion-text-color, #1c1b18);
+  font-size: 0.85rem;
+  line-height: 1.2;
 }
 
 /* The change is what the cashier looks for when handing it back. */

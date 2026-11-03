@@ -358,6 +358,7 @@ function openDrawer(): void {
           :change="tender.change.value"
           :total="total"
           :remaining="tender.remaining.value"
+          :block="block"
           @pick="pick"
           @key="tender.press"
           @split="tender.startSplit"
@@ -492,9 +493,10 @@ function openDrawer(): void {
   font-size: 0.9rem;
 }
 
+/* Never shrinks: shrunk to the sheet's height, its keypad would spill behind the foot, out of any scroll's reach (hub#456). */
 .pay {
   display: flex;
-  flex: 1;
+  flex: 1 0 auto;
   flex-direction: column;
   gap: 0.8rem;
   min-height: 8rem;
