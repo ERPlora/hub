@@ -4,7 +4,7 @@
 // A sellable tap is handed up; a blocked one says why and adds nothing; Inventory off is explained and
 // the open price stays.
 import { RELEASE_GRACE_MS } from '@erplora/ui/sdk';
-import { toast } from '@erplora/ui/shell';
+import { dismissToast, toast } from '@erplora/ui/shell';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { click, errorFrame, flush, mountSale, taxSettings } from '../../__tests__/mount-sale';
@@ -19,9 +19,13 @@ import SpeakKey from './SpeakKey.vue';
 vi.mock('@erplora/ui/shell', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@erplora/ui/shell')>()),
   toast: vi.fn(() => Promise.resolve()),
+  dismissToast: vi.fn(() => Promise.resolve(true)),
 }));
 
-afterEach(() => vi.mocked(toast).mockClear());
+afterEach(() => {
+  vi.mocked(toast).mockClear();
+  vi.mocked(dismissToast).mockClear();
+});
 
 const PRODUCTS = 'inventory.product.list';
 /** The refused article, followed while its notice is up (hub#442). */
@@ -96,7 +100,7 @@ describe('PosCatalog: taps', () => {
     expect(s.wrapper.emitted('add')).toBeUndefined();
     const reason = 'No se puede vender: sin categoría fiscal. Falta configurar el IVA.';
     expect(s.find('pos-tap-notice').text()).toBe(reason);
-    expect(toast).toHaveBeenCalledExactlyOnceWith(reason, 'warning');
+    expect(toast).toHaveBeenCalledExactlyOnceWith(reason, 'warning', undefined, expect.any(String));
   });
 
   it('in the Canary Islands the reason of a blocked tap names the IGIC', async () => {
@@ -106,7 +110,7 @@ describe('PosCatalog: taps', () => {
     await click(s.find('pos-product-p1').element);
     const reason = 'No se puede vender: sin categoría fiscal. Falta configurar el IGIC.';
     expect(s.find('pos-tap-notice').text()).toBe(reason);
-    expect(toast).toHaveBeenCalledExactlyOnceWith(reason, 'warning');
+    expect(toast).toHaveBeenCalledExactlyOnceWith(reason, 'warning', undefined, expect.any(String));
   });
 
   it('a sold-out article adds nothing: «… is sold out.» goes above the grid and in a warning toast', async () => {
@@ -116,7 +120,7 @@ describe('PosCatalog: taps', () => {
     expect(s.wrapper.emitted('add')).toBeUndefined();
     const reason = '«Croquetas» está agotado.';
     expect(s.find('pos-tap-notice').text()).toBe(reason);
-    expect(toast).toHaveBeenCalledExactlyOnceWith(reason, 'warning');
+    expect(toast).toHaveBeenCalledExactlyOnceWith(reason, 'warning', undefined, expect.any(String));
   });
 
   it('the next sellable tap clears that notice', async () => {
@@ -140,6 +144,19 @@ describe('PosCatalog: taps', () => {
     expect(s.wrapper.emitted('add')).toBeUndefined();
     await s.clock.advance(RELEASE_GRACE_MS);
     expect(s.params(GET)).toEqual([]);
+  });
+
+  it('the toast that said why goes with the notice, and only then (hub#442)', async () => {
+    const s = await setup();
+    await s.result(PRODUCTS, page([product({ id: 'p1', name: 'Croquettes', is_sold_out: true })]), { sort: 'name' });
+    await click(s.find('pos-product-p1').element);
+    await s.reopen();
+    const named = vi.mocked(toast).mock.calls[0]?.[3];
+    expect(named).toEqual(expect.any(String));
+    await s.result(GET, product({ id: 'p1', name: 'Croquettes', is_sold_out: true }));
+    expect(dismissToast).not.toHaveBeenCalled();
+    await s.result(GET, product({ id: 'p1', name: 'Croquettes', is_sold_out: false }), {}, 2);
+    expect(dismissToast).toHaveBeenCalledExactlyOnceWith(named);
   });
 
   it('a sold-out article picked in the search is followed too: it is not on the grid in use', async () => {
