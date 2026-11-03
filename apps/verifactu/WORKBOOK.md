@@ -1452,7 +1452,7 @@ Las cerradas quedan tachadas con su motivo; las abiertas dicen dónde siguen.
    `_identity`) ya solo pide el otorgamiento aprobado en producción, así que un negocio nuevo, por la vía por defecto,
    llega a la AEAT de pruebas desde su primer tique; el Anexo I sigue siendo lo que abre el paso a producción
    (VERIFACTU-F08). En pruebas la pasarela sigue rechazando a un negocio que declara el NIF de ERPlora (409
-   `nif_mismatch`). Decisión y referencias en la ronda 2026-11-03k de `PLAN-SAAS.md` (§33); este Hub no cambia.
+   `nif_mismatch`). Decisión y referencias en la ronda 2026-11-03l de `PLAN-SAAS.md` (§33); este Hub no cambia.
 12. **«Fijo tras el primer envío» frente a «tras el primer sellado»** — **sigue abierta** (señalada en PLAN-HUB §4,
    ronda 2026-10-22b): PLAN §30 deja el interruptor en vivo fijo cuando se **envía** la primera factura a la AEAT;
    `verifactu.config.back_to_testing` ya se niega (409 `verifactu.production_has_records`) en cuanto hay un registro
