@@ -552,6 +552,17 @@ function openDrawer(): void {
     white-space: nowrap;
   }
 
+  /* The words of a total still loading are wider than the figure: smaller, so they stay clear of the title. */
+  .pay-total:first-child .pay-total__loading {
+    gap: 0.35rem;
+    font-size: 0.8rem;
+  }
+
+  .pay-total:first-child .pay-total__loading ion-spinner {
+    width: 1.2rem;
+    height: 1.2rem;
+  }
+
   .pay-part,
   .pay-remaining {
     margin-top: 0;

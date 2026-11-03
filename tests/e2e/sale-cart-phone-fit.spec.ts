@@ -6,7 +6,8 @@
 // another, nor does their text spill out of them («Assign customer» sat on «Open checks»), and the customer's button
 // keeps its words wherever two lines of them fit, as it always read there; and the charge sheet opened from there
 // shows its whole cash keypad above its foot as soon as it opens (375x667: the last row peeked half under «Charge»;
-// 320x568: three rows lay under it). A tablet and a desktop keep what they had. The worst case of a real
+// 320x568: three rows lay under it), with the words of a total still loading clear of the title on the lowest phone,
+// where the figure shares the title's row. A tablet and a desktop keep what they had. The worst case of a real
 // business: the red strip of a hub that cannot issue invoices yet takes 138 px over the till (hub `a`'s issuer is
 // parked for the run and put back after it), with Tables and Kitchen on (their button and the «Check» / «Current
 // order» tabs). What a run creates, its product `E2E-CARTFIT-<run>` and its check, is deleted after it.
@@ -39,6 +40,8 @@ const EDGE = 0.5;
 type Box = { left: number; top: number; right: number; bottom: number };
 
 let product: Product;
+/** A second line, so that one can be marked: only with two lines or more. */
+let other: Product;
 
 test.describe.configure({ mode: 'serial' });
 
@@ -50,6 +53,7 @@ test.beforeAll(async ({ browser }) => {
   // Cash without a cash session: the drawer's lock is sale-cash-gate.spec.ts's.
   await drawerOff(context);
   product = await createProduct(context, { name: `E2E Cart fit ${RUN}`, sku: `E2E-CARTFIT-${RUN}`, price: 700, tax_category_key: 'restaurant.drink' });
+  other = await createProduct(context, { name: `E2E Cart fit other ${RUN}`, sku: `E2E-CARTFIT-B-${RUN}`, price: 300, tax_category_key: 'restaurant.drink' });
   await context.close();
 });
 
@@ -310,5 +314,44 @@ for (const { name, lang, locale, assign } of LANGUAGES) {
         await wideKeepsItsBar(page, size, lang, assign);
       });
     }
+  });
+}
+
+for (const { name, lang, locale } of LANGUAGES) {
+  // A marked line: the total of the whole check is already followed by the till, the total of a part has no earlier
+  // answer to show while the new one is held back (and it is what a real part charge shows on a slow network).
+  test(`SALE-F01: in ${name}, at 320x568 the sheet's total still being worked out stays between its title and «Close»`, async ({ browser }) => {
+    const context = await browser.newContext({ baseURL: A, locale, viewport: { width: 1440, height: 900 } });
+    const page = await context.newPage();
+    await login(page, A, '/sale/pos');
+    await context.addCookies([{ name: 'django_language', value: lang, domain: new URL(A).hostname, path: '/' }]);
+    await page.reload();
+    await shown(page).locator('[data-testid=pos-till]').waitFor({ state: 'visible' });
+    await shown(page).locator(`[data-testid=pos-product-${product.id}]`).click();
+    const line = shown(page).locator('[data-testid^=pos-line-]').filter({ hasText: product.name }).first();
+    await expect(line).toBeAttached();
+    await shown(page).locator(`[data-testid=pos-product-${other.id}]`).click();
+    await expect(shown(page).locator('[data-testid^=pos-line-]').filter({ hasText: other.name }).first()).toBeAttached();
+    await line.locator('[data-testid$=-mark]').click();
+    await page.setViewportSize({ width: 320, height: 568 });
+    await openDrawer(page);
+
+    // The stream the opening sheet asks for never answers.
+    await page.route('**/api/live**', () => {});
+    await shown(page).locator('[data-testid=pos-charge]').click({ timeout: 5_000 });
+    const sheet = page.locator('[data-testid=sale-checkout-modal]');
+    await expect(sheet.locator('.pay-total__loading')).toBeVisible();
+    const row = await sheet.evaluate((root) => {
+      const box = (selector: string) => {
+        const r = root.querySelector(selector)?.getBoundingClientRect();
+        return { left: r?.left ?? 0, top: r?.top ?? 0, right: r?.right ?? 0, bottom: r?.bottom ?? 0 };
+      };
+      return { words: box('.pay-total__loading'), title: box('[data-testid=sale-checkout-title]'), close: box('[data-testid=sale-checkout-close]') };
+    });
+    expect.soft(row.words.left, 'the loading words clear of the title').toBeGreaterThanOrEqual(row.title.right - EDGE);
+    expect.soft(row.words.right, 'the loading words clear of «Close»').toBeLessThanOrEqual(row.close.left + EDGE);
+    expect.soft(row.words.bottom, 'the loading words in the row of the title').toBeLessThanOrEqual(row.close.bottom + EDGE);
+    await capture(page, `${KEY}-${lang}-loading-320x568`);
+    await context.close();
   });
 }
