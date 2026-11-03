@@ -74,6 +74,8 @@ const client = useLiveClient();
 const session = useSession();
 const canCreate = computed(() => session.can('customer.manage'));
 const { t, locale } = useCustomerI18n();
+/** What the button says: the chosen customer (the person, F17), or «Assign customer». */
+const triggerLabel = computed(() => value.value?.display_name || value.value?.customer_name || t('customer.pos.assign'));
 
 const term = ref('');
 const failure = ref('');
@@ -170,13 +172,15 @@ async function useMatch(match: { id: string; name: string }): Promise<void> {
     class="customer-search__trigger"
     fill="outline"
     data-testid="customer-search-trigger"
+    :aria-label="triggerLabel"
     @click="open = true"
   >
     <HubIcon
       slot="start"
       :name="value ? 'ion:person-outline' : 'ion:person-add-outline'"
     />
-    {{ value?.display_name || value?.customer_name || $t('customer.pos.assign') }}
+    <!-- A label of its own: a narrow bar (the till's on a phone, hub#630) may show only the icon; the button keeps its name. -->
+    <span class="customer-search__label">{{ triggerLabel }}</span>
   </ion-button>
 
   <ion-modal

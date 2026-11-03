@@ -1,7 +1,8 @@
 // flow: SALE-F01
 // hub#630: on a low phone the check's drawer holds what a cashier needs to charge. With a check open in the drawer,
 // «Charge» is whole inside the drawer and above the section tab bar, and a finger on it reaches it (on a 320x568
-// phone it lay under the tab bar: the tap fell on «Quick notes»); the controls of the check's bar never sit on one
+// phone it lay under the tab bar: the tap fell on «Quick notes»); what sits between the bar and the foot scrolls, so
+// the check's line is reached too; the controls of the check's bar never sit on one
 // another, nor does their text spill out of them («Assign customer» sat on «Open checks»); and the charge sheet opened
 // from there shows its whole cash keypad above its foot as soon as it opens where it fits (375x667: the last row
 // peeked half under «Charge»), and once scrolled to its end where it does not (320x568). The worst case of a real
@@ -100,6 +101,20 @@ async function chargeWithinReach(page: Page, drawer: Locator, where: string): Pr
   return charge;
 }
 
+/** The check's line, scrolled into view inside the drawer: what sits between the bar and the foot scrolls, and a
+ *  finger on the line reaches it (squeezed to nothing, the lines would be out of any scroll's reach). */
+async function lineWithinReach(page: Page, where: string): Promise<void> {
+  const line = shown(page).locator('[data-testid^=pos-line-]').filter({ hasText: product.name }).first();
+  await line.scrollIntoViewIfNeeded();
+  const reach = await line.evaluate((el) => {
+    const r = el.getBoundingClientRect();
+    const hit = document.elementFromPoint((r.left + r.right) / 2, (r.top + r.bottom) / 2);
+    return { height: r.height, reached: !!hit && el.contains(hit), hit: hit ? `${hit.tagName.toLowerCase()} ${hit.getAttribute('data-testid') ?? ''}`.trim() : 'nothing' };
+  });
+  expect(reach.height, `the check's line has its height at ${where}`).toBeGreaterThan(0);
+  expect(reach.reached, `a finger on the check's line reaches it at ${where} (it touches «${reach.hit}»)`).toBe(true);
+}
+
 /** The check's bar: no control on another, every control inside the bar, and the text of each inside its control. */
 async function barInOrder(page: Page, where: string): Promise<void> {
   const bar = shown(page).locator('[data-testid=pos-cart] .pos-toolbar');
@@ -171,6 +186,7 @@ async function cartFits(page: Page, size: (typeof SIZES)[number], lang: 'en' | '
   await expect(shown(page).locator('[data-testid=blocking-strip]'), 'the strip of a hub that cannot issue invoices yet').toBeVisible();
   const drawer = await openDrawer(page);
   await barInOrder(page, where);
+  await lineWithinReach(page, where);
   const charge = await chargeWithinReach(page, drawer, where);
   await capture(page, `${KEY}-${lang}-cart-${size.label}`);
 

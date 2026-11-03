@@ -513,6 +513,20 @@ function openDrawer(): void {
   background: var(--ion-background-color, #fff);
 }
 
+/* A low phone (375x667): a tighter head and figure, so the whole cash keypad stands above the foot as the sheet
+   opens; the keys keep their size (hub#630). Lower still (320x568) the sheet scrolls to them. */
+@media (max-width: 820px) and (max-height: 700px) {
+  .sheet-h {
+    margin-bottom: 0;
+    padding-top: 0.4rem;
+  }
+
+  .pay-total {
+    margin: 0 0 0.5rem;
+    font-size: 2rem;
+  }
+}
+
 /* From 821 px, two columns as on Square or Shopify POS: the figure and what the sale is on the left, the
    method, the amount and the keypad on the right, from the figure down to the foot. Each column scrolls
    on its own; `.pay` steps aside so its two groups are the grid's items. */

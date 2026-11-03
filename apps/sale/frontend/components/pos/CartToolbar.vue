@@ -1,7 +1,9 @@
 <script setup lang="ts">
 // The bar on top of the check, left to right: «Park this check» (only where parked tickets are
-// allowed; nothing to park on an empty check), the slot where the Customers app's button sits, a
-// spacer, «Open checks» with how many others are open, and — in the phone's drawer — «Close».
+// allowed; nothing to park on an empty check), the slot where the Customers app's button sits (it takes the
+// room left; where its text does not fit, on a phone, the button shows only its icon, as Square's cart does —
+// the heading still names the customer), «Open checks» with how many others are open, and — in the phone's
+// drawer — «Close».
 // Icons the product had that are not registered yet (`pause-circle-outline`) use the closest one
 // (UI-REQUESTS.md, «POS»).
 import { HubIcon } from '@erplora/ui/shell';
@@ -39,7 +41,6 @@ const emit = defineEmits<{ park: []; toggleChecks: []; close: [] }>();
     <div class="pos-toolbar__slot">
       <slot />
     </div>
-    <span class="pos-toolbar__spacer" />
     <ion-button
       fill="clear"
       class="pos-toolbar__icon pos-toolbar__checks"
@@ -100,13 +101,31 @@ const emit = defineEmits<{ park: []; toggleChecks: []; close: [] }>();
   --padding-end: 0.3rem;
   --color: var(--ion-text-color, #1c1b18);
 }
+/* The room between the bar's icons, measured: «Assign customer» (or the customer's name) needs ~9.2rem
+   beside the table button's 2.6rem; in less, a phone of 320 px, it would sit on «Open checks» (hub#630). */
 .pos-toolbar__slot {
   display: flex;
+  flex: 1 1 0;
   align-items: center;
   min-width: 0;
+  container-type: inline-size;
 }
-.pos-toolbar__spacer {
-  flex: 1;
+.pos-toolbar__slot :deep(.customer-search__trigger) {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+}
+/* A name longer than the room ends in «…». */
+.pos-toolbar__slot :deep(.customer-search__label) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@container (max-width: 12rem) {
+  .pos-toolbar__slot :deep(.customer-search__label) {
+    display: none;
+  }
 }
 .pos-toolbar__badge {
   position: relative;
