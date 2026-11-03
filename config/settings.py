@@ -274,6 +274,9 @@ if SHARED_DB_USER:
 # «prepared statement _pg3_N does not exist»). The sidecar listens on the task's own loopback, so TLS goes from
 # PgBouncer to Aurora, not to it.
 PGBOUNCER_HOST = config("PGBOUNCER_HOST", default="")
+# PgBouncer's connections per database, each task's (aws stacks/*/apps.tf: 6 in prod, 3 in pre): no plan gets more
+# transactions at once than this (base.tenancy.limits), or what passes it would wait in PgBouncer and fail uncounted.
+PGBOUNCER_MAX_DB_CONNECTIONS = config("PGBOUNCER_MAX_DB_CONNECTIONS", default=6, cast=int)
 DATABASES["hub_template"] = {
     "ENGINE": "django.db.backends.postgresql",
     "NAME": f"{DATABASES['default']['NAME']}_template",
@@ -571,6 +574,9 @@ DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="noreply@erplora.com")
 # worker, whose task role may call PutMetricData on ERPlora/Hubs and ERPlora/Fiscal (aws stacks/prod/apps.tf). pre,
 # local development and the tests have no such permission: off by default, so nothing is published there.
 METRICS_ENABLED = config("METRICS_ENABLED", default=False, cast=bool)
+# What each business does during the day, counted by the process that serves it (base/meter.py): on wherever
+# config.asgi runs; off in the tests, which write by calling meter.flush().
+METER_ENABLED = config("METER_ENABLED", default=True, cast=bool)
 
 # Logging: everything to the console (CloudWatch Logs in production), at LOG_LEVEL.
 

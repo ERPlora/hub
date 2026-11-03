@@ -8,8 +8,9 @@ for every hub with its own database it serves (ready, or a business that left an
   connection of its cluster (``base.tenancy.ops.connect_ops``, the database ``postgres``): the hub's database is never
   opened. A database that is not there leaves its hub unmeasured (logged ``base.usage.not_measured``);
 - ``s3_bytes``: what its prefix holds in the file store (``base.files.used_bytes``: its files and its apps');
-- ``active_users_1d`` and ``active_users_30d``: the people who came in that day, and in the 30 days that end it
-  (``control.HubVisit``, noted at every login; the visits older than the window are forgotten after).
+- ``active_users_1d`` and ``active_users_30d``: the people with activity that day, and in the 30 days that end it
+  (``control.HubVisit``, noted at every login and by what they do after it, ``base.meter``: a session open for days counts
+  on each of them; the visits older than the window are forgotten after).
 
 A business without its own database (phase 1's, not cut yet) is not measured (decision 3: it never gets control's
 size) and is logged once a night as ``base.usage_shared_database``. Each hub's figures replace that day's (one row per
@@ -17,7 +18,8 @@ hub and day, ``control.HubUsageDaily``) and its live queries hear it; the night 
 past their 90 days (``base.tenancy.dumps.RETENTION``), which the bucket no longer keeps (``base.hub.usage_measured``). The night itself is a
 ``control.UsageRun``: the first worker that claims it measures it, a run left unfinished for :data:`RUN_TAKEOVER` is taken
 over, and a finished one is never measured again. ``GET /internal/usage`` (``base.internal``, ``base.usage.list``)
-serves a finished night by pages of :data:`PAGE_SIZE`; before that, the day is not ready.
+serves a finished night by pages of :data:`PAGE_SIZE`; before that, the day is not ready. Each row of it also says what
+the serving tasks counted that day (``control.HubActivityDaily``, ``base.meter``), or null when they counted nothing.
 """
 
 import datetime as dt

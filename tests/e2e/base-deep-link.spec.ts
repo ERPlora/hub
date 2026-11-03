@@ -1,5 +1,5 @@
 // flow: BASE-G52 (base/WORKBOOK.md, «Entrar con la cuenta de erplora.com»; APP-BASE-3)
-// A link to a tab of a screen (`/settings#data`, `/system#plan`) opened without a session goes through erplora.com's
+// A link to a tab of a screen (`/settings#data`, `/system#usage`) opened without a session goes through erplora.com's
 // sign-in and back to that tab: the part after `#` never reaches a server, so the jump must not drop it. At each size,
 // in a fresh browser (no session on the hub nor on erplora.com): the SaaS's form, then the hub, on the address asked.
 import { expect, test } from '@playwright/test';
@@ -14,7 +14,7 @@ const SIZES = [
 
 const LINKS = [
   { path: '/settings#data', tab: 'tab-data', shown: 'data-sections' },
-  { path: '/system#plan', tab: 'tab-plan', shown: 'system-plan-devices' },
+  { path: '/system#usage', tab: 'tab-usage', shown: 'system-usage-row-devices' },
 ] as const;
 
 for (const size of SIZES) {
@@ -30,7 +30,7 @@ for (const size of SIZES) {
         await expect(page).toHaveURL(`${A}${link.path}`);
         await expect(shown(page).getByTestId(link.tab)).toHaveClass(/segment-button-checked/);
         await expect(shown(page).getByTestId(link.shown).first()).toBeVisible();
-        if (link.path === '/system#plan') {
+        if (link.path === '/system#usage') {
           await untilStill(page);
           await page.screenshot({ path: shot(`APP-BASE-3-BASE-G52-deep-link-${size.name}`), fullPage: true });
         }

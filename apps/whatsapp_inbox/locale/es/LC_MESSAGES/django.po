@@ -14,6 +14,9 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=3; plural=n == 1 ? 0 : n != 0 && n % 1000000 == 0 ? 1 : 2;\n"
 
+msgid "WhatsApp"
+msgstr "WhatsApp"
+
 msgid "WhatsApp inbox"
 msgstr "Bandeja de WhatsApp"
 
