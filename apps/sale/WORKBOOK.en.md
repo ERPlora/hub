@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:fb4903203aafd7dbe749448d9614f3a90d7fdc2b9393ae5578ca2d0e07ae7a31 -->
+<!-- generated from WORKBOOK.md sha256:82cdb620c490a5f0ce243761b12c56eb45d86ff915a6bb2706186ef9d1cfb54a -->
 
 ## What it is for and who it is for
 
@@ -175,7 +175,7 @@ also sees them, and a manager approves it for them with their PIN. Empty: "No sa
 "Loading…"; error: the notice with "Retry".
 
 ### Sale document
-Window with a sale's ticket: the paper as it prints (title "Receipt" or "Invoice", header, the number
+Window with a sale's ticket: the paper as it prints (title "Receipt" or "Invoice", the business with its tax ID, the number
 Invoicing gave it —"Invoice FACT-2026-000012", "Receipt TICKET-2026-000031"— or, without it, the sale's,
 date, lines, one VAT row per tax key, total, payment method, tendered and change, footer), the ✕ and the
 printer. Every print from **Sales** comes out with "DUPLICATE". Error: "Error loading the document".
@@ -812,8 +812,9 @@ Actor: employee, manager
 Screen: Check (bill)
 Steps:
 1. With the check on screen, press the footer's printer ("Print bill").
-2. "Bill" opens with the lines, notes, discounts, the VAT breakdown, the total and the title, and the
-   notice "Bill — this is not an invoice. The fiscal receipt is issued on payment.". With a discount on
+2. "Bill" opens with the business (name, address and tax ID of today's issuer, with the "Receipt
+   header" under them as an addition; without an issuer, as SALE-F29 says), the lines, notes, discounts,
+   the VAT breakdown, the total and the title, and the notice "Bill — this is not an invoice. The fiscal receipt is issued on payment.". With a discount on
    the check, the "Discount" row says what it takes off (the same amount as the POS footer, SALE-F14):
    with prices including VAT, the lines minus the discount give the total.
 3. Press the printer at the top: with **Printing** and an active ticket printer, the bill goes to its
@@ -999,8 +1000,13 @@ Screen: Sale document
 Steps:
 1. In **Sales**, tap the row or the "Document" action; it also opens by itself after charging, the whole
    check or part of it (SALE-F22).
-2. The ticket shows ("Receipt", or "Invoice" if it was charged as an invoice) with its header, the number
-   Invoicing gave it when charging ("Invoice FACT-2026-000012", "Receipt TICKET-2026-000031"; without
+2. The ticket shows ("Receipt", or "Invoice" if it was charged as an invoice). On top, the business: name,
+   address and tax ID of the issuer, those of the sale's fiscal document (a duplicate says what the
+   original said, even if the issuer changes later) or, without a document yet, those Invoicing has today,
+   with the "Receipt header" under them as an addition, without repeating what the issuer already says.
+   Without an issuer set up, the header's first line is the name and the rest the address; without a
+   header, the name the business signed up with. On an invoice, under "Customer", its tax ID and its
+   address. Then, the number Invoicing gave it when charging ("Invoice FACT-2026-000012", "Receipt TICKET-2026-000031"; without
    Invoicing, or while its document is pending, the sale's number), date, lines, one VAT row per tax key
    (an exempt one says its cause: "Exempt (E1)"), total, payment method, tendered and change, and the
    footer. With **VeriFactu**, before the footer goes the fiscal QR: "Tax QR:" above, "VERI*FACTU" below
@@ -1022,14 +1028,16 @@ Steps:
    whoever presses it, for everything that is waiting, in order (its ticket or invoice and then the
    corrective invoices) and "Fiscal documents issued." shows. Before that, the hub retries it by itself
    for a few minutes (INVOICE-F06): if the cause is fixed in time, the pill goes away by itself.
-In: the sale, with the number of its fiscal document (which Invoicing gave it in the same charge).
+In: the sale, with the number of its fiscal document (which Invoicing gave it in the same charge), and
+Invoicing's issuer, read by name and as the platform: whoever sells prints those details even if they
+cannot read Invoicing. The paper does not touch the document or its fiscal record.
 Out: the paper; reprinting creates no sale or fiscal document. "Issue now" issues the documents that were
 waiting (announces: sale with its document, one per document).
 If it fails: "Loading document…" and "Error loading the document" (also if the fiscal QR cannot be read:
 the paper never comes out without it). "Could not print". A refused "Issue now" says Invoicing's reason
 ("Set up the issuer…") and changes nothing; without words from the server, "The documents could not be
 issued. Try again.".
-Involved: INVOICE-F01, INVOICE-F02, INVOICE-F06, INVOICE-F18, PRINTING-F08, VERIFACTU-F19
+Involved: INVOICE-F01, INVOICE-F02, INVOICE-F06, INVOICE-F18, PRINTING-F08, VERIFACTU-F19, SALE-F21, SALE-F34
 
 ### SALE-F30 Void a charged sale
 Status: done
@@ -1143,8 +1151,10 @@ Steps:
 2. Change what you need: "Allow cash", "Allow card", "Allow bank transfer", "Show products in the till",
    "Show services in the till", "Require a customer on every sale", "Allow discounts", "Largest discount
    a cashier may give alone, per discount (%)", "Allow parked tickets", "Prices include VAT", "Issue an
-   invoice when the customer has a tax ID", "Default document" ("Ticket" or "Invoice"), "Receipt header",
-   "Receipt footer", "Footer image (URL)", "Promotional QR URL" and "Promotional QR text".
+   invoice when the customer has a tax ID", "Default document" ("Ticket" or "Invoice"), "Receipt header"
+   (added under the issuer's name, tax ID and address; without an issuer yet, the first line is the name
+   and the rest the address: SALE-F29), "Receipt footer", "Footer image (URL)", "Promotional QR URL" and
+   "Promotional QR text".
 3. Press **Save**: "Settings saved." shows.
 In: nothing from other apps.
 Out: the business's settings (one row). The server applies when charging "Allow cash / card / bank
@@ -1266,7 +1276,8 @@ id, its name or its type ("cash", "card"). If a name matches several, it is refu
 | What it gives | Who can | Flows | Service |
 |---|---|---|---|
 | The sales, with search by number or customer, filters (status, payment, customer, professional, days, total), sorting and pages (up to 100); each one says whether it has some fiscal document pending | see sales | F28, F29 | `sale.sale.list` |
-| A whole sale: header, lines, payments, VAT breakdown and what was refunded | see sales | F29 | `sale.sale.get` |
+| A whole sale: header, customer with its tax ID and address (on an invoice), lines, payments, VAT breakdown and what was refunded | see sales | F29 | `sale.sale.get` |
+| The business as the paper names it: name, tax ID and lines (address and receipt header); for a sale, those of its fiscal document | see sales | F21, F29 | `sale.letterhead.get` |
 | The sale recorded with a charge attempt key | see sales | F06 | `sale.sale.by_idempotency_key` |
 | The figures of a period of business days, with the tax its sales were declared with (empty if they mix taxes) | reports | F28 | `sale.sale.stats` |
 | What was sold today and today's tickets | reports | F28 | `sale.sale.today` |
