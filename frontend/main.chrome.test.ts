@@ -25,15 +25,15 @@ vi.mock('@erplora/ui/sdk', async (importOriginal) => ({
   provideLiveClient: vi.fn(),
 }));
 // Each piece a stub of its own (`__esModule`: Vue takes `default` from a module it recognises; Vitest's mock is not
-// tagged `Module`). The one beside the pane is held until the test lets it arrive; «Upgrade plan» never loads (a
-// chunk the network lost): the piece's own load reports it at render.
+// tagged `Module`). The one beside the pane is held until the test lets it arrive; the menu's foot («Upgrade plan»,
+// «Manage on erplora.com») never loads (a chunk the network lost): the piece's own load reports it at render.
 vi.mock('../base/frontend/components/TopbarChrome.vue', () => ({ __esModule: true, default: { render: () => null } }));
 vi.mock('../base/frontend/components/BlockingStrip.vue', () => ({ __esModule: true, default: { render: () => null } }));
 vi.mock('../base/frontend/components/BackgroundChrome.vue', async () => {
   await chrome.late;
   return { __esModule: true, default: { render: () => h('span', { 'data-testid': 'background-chrome' }) } };
 });
-vi.mock('../base/frontend/components/UpgradePlanLink.vue', () => {
+vi.mock('../base/frontend/components/SidebarFooter.vue', () => {
   throw new Error('chunk lost');
 });
 

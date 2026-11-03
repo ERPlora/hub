@@ -17,8 +17,8 @@ class BaseConfig(LiveAppConfig):
     # The Home (PLAN-HUB round 2026-10-21): everyone of the hub sees it; whoever runs the hub (the old hub's
     # ``hub.administer``) is told its platform steps and the failed events.
     # Files (APP-BASE-8): everyone sees and opens them; who runs the hub uploads, renames and deletes (the old hub's).
-    # «erplora.com» of the bar (BASE-F11, gh:hub#364): the owner, an administrator and a manager open this business on
-    # erplora.com's panel; a manager does not administer the hub, so it is a permission of its own.
+    # «Manage on erplora.com» at the menu's foot (BASE-F11, gh:hub#364): the owner, an administrator and a manager open
+    # this business on erplora.com's panel; a manager does not administer the hub, so it is a permission of its own.
     permissions = [
         "base.view_home",
         "base.administer_hub",

@@ -2,7 +2,7 @@
 // Guardrail of the way out of the Hub (gh:hub#439): a link that opens another page in a new tab (`target="_blank"`)
 // works in a browser by itself, but the installed app opens nothing on `_blank` (its webview spawns no window): the
 // owner tapped «Invite on erplora.com» and «Change on erplora.com» on the tablet and nothing happened. The one way
-// out is `openExternalLink` of `@erplora/ui/shell` on the link's click (TopbarChrome's «erplora.com»): in the app it
+// out is `openExternalLink` of `@erplora/ui/shell` on the link's click (ManageLink's «erplora.com»): in the app it
 // hands the address to the system browser (`open_external_url`) and says so when it cannot. Every `_blank` link of
 // base and of the apps goes that way, called on its `@click` or from the function its `@click` names; a
 // `window.open(…, '_blank')` has no such way and is not written. The files still waiting, each with its issue, are
@@ -122,10 +122,10 @@ describe('guardrail: every link of the Hub to another page goes by `openExternal
     expect(fixed).toEqual([]);
   });
 
-  it('reads the links it guards: erplora.com of the bar, inviting, roles, the business, the plan and the apps', () => {
+  it("reads the links it guards: erplora.com of the menu's foot, inviting, roles, the business, the plan and the apps", () => {
     const through = Object.fromEntries(found.filter((entry) => entry.through > 0).map((entry) => [entry.file, entry.through]));
     expect(through).toMatchObject({
-      'base/frontend/components/TopbarChrome.vue': 2,
+      'base/frontend/components/ManageLink.vue': 1,
       'base/frontend/components/PeopleList.vue': 2,
       'base/frontend/components/RolesList.vue': 1,
       'base/frontend/components/settings/BusinessPanel.vue': 1,

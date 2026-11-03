@@ -98,8 +98,7 @@
     },
     "plan": {
       "upgrade": "Upgrade plan",
-      "manage": "Manage on erplora.com",
-      "manageShort": "erplora.com"
+      "manage": "Manage on erplora.com"
     },
     "userMenu": {
       "account": "My account",
