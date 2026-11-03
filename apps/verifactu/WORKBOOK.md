@@ -910,8 +910,8 @@ Pasos:
    encendida, las facturas del negocio tienen que seguir llegando a la AEAT (la ley obliga a seguir con VERI*FACTU
    al menos hasta que acabe el año natural, y ERPlora no tiene otra forma de registrarlas).
 2. Da igual lo que haya en la cola: con registros por enviar o con todo ya contestado por la AEAT, la respuesta es
-   la misma. VeriFactu sigue encendida y sus registros se quedan como estaban. Facturación tampoco se puede apagar,
-   porque VeriFactu la necesita.
+   la misma. VeriFactu sigue encendida y sus registros se quedan como estaban. Tampoco se pueden apagar las apps que
+   necesita: Facturación y, por ella, Impuestos, Ventas / TPV y Clientes.
 3. Un negocio sin país (una demo) es de España: tampoco se apaga.
 4. Mientras su estado dice «Activándose…» o «No se ha podido activar» todavía no ha estado encendida ni ha sellado
    nada: se puede desactivar.

@@ -129,12 +129,14 @@ def test_the_reason_is_in_the_language_of_whoever_turns_it_off():
 
 
 @pytest.mark.django_db
-def test_invoicing_stays_on_while_verifactu_needs_it():
-    refused = refusal(app="invoice")
+@pytest.mark.parametrize("app", ["invoice", "tax", "sale", "customer"])
+def test_what_verifactu_needs_stays_on_with_it(app):
+    refused = refusal(app=app)
 
     error = refused.envelope()["error"]
-    assert (refused.status, error["code"], error["required_by"]) == (409, "base.app_required", ["verifactu"])
-    assert is_on(app="invoice")
+    assert (refused.status, error["code"]) == (409, "base.app_required")
+    assert "verifactu" in error["required_by"]
+    assert is_on(app=app)
     assert is_on()
 
 

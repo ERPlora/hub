@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:8633ae1d5c1e0305eaadfa0065dbfecf10e3d27df42e4e7dbe30553f876cc5d5 -->
+<!-- generated from WORKBOOK.md sha256:5199a3d54130bb34b55e49e7654f074f06674e95ca7f5f3174255146af160a89 -->
 
 ## What it is for and who it is for
 
@@ -873,8 +873,8 @@ Steps:
    the business's invoices have to keep reaching the AEAT (the law requires staying with VERI*FACTU at least until
    the natural year ends, and ERPlora has no other way of recording them).
 2. Whatever the queue holds makes no difference: with records to send or with everything already answered by the
-   AEAT, the answer is the same. VeriFactu stays on and its records stay as they were. Invoicing cannot be turned off
-   either, because VeriFactu needs it.
+   AEAT, the answer is the same. VeriFactu stays on and its records stay as they were. The apps it needs cannot be
+   turned off either: Invoicing and, through it, Taxes, Sales & POS and Customers.
 3. A business without a country (a demo) is in Spain: it does not go off either.
 4. While its status says "Turning on…" or "Could not turn on" it has not been on yet nor sealed anything: it can be
    turned off.
