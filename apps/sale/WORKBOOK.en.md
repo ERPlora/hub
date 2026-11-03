@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:c0d22b7ce3e0e363d3f8574638b199e774ae2c81ce48833cffcab66e27c7844f -->
+<!-- generated from WORKBOOK.md sha256:729e1b57931a379294b21ef70433ce63bb45e1eba7fe85e49bff49e2c5354333 -->
 
 ## What it is for and who it is for
 
@@ -444,7 +444,9 @@ Steps:
 3. What Inventory has marked as sold out shows in the grid and in the search greyed, with "Sold out":
    tapping it does not add it and says "«…» is sold out." with its name. Asking for it through the
    assistant does not add it either. What was already on a check before it sold out is split, merged,
-   printed and charged just the same. As soon as it is back on sale, it can be ordered again.
+   printed and charged just the same. As soon as it is back on sale, it can be ordered again, and the
+   sold-out notice goes away on its own, without touching anything else (the same for "no tax
+   category" as soon as the article has one). On leaving **Sell**, the notice of the last tap goes too.
 4. If Inventory is not active, the grid explains it and you sell at an open price.
 5. With VeriFactu active, if right now it does not allow issuing tickets or invoices (the business
    already invoices in production and its records would have no way to reach the Tax Agency), "Sales
