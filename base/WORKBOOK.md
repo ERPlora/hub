@@ -3317,7 +3317,7 @@ Implicados: ACCOUNTS-F38, BASE-F40
   `es` o `en`, la de la pantalla si no viene y el inglés para cualquier otra; `voice`, un id del catálogo de
   `@erplora/ui` `voices.ts`, o ninguna: la primera del idioma). Espera hasta 65 s (`SPEECH_TIMEOUT`, más que los 60 s
   que erplora.com espera al proveedor). La ruta devuelve el mp3 (`audio/mpeg`, `no-store`), o la salida JSON (el mp3 en
-  base64) a quien solo acepta JSON. Sin voz configurada en erplora.com (`speech_unavailable`,
+  base64) a quien solo acepta JSON. Sin voz configurada en erplora.com (`assistant.speech_unavailable`,
   `assistant.provider_not_configured`) responde 503 `base.assistant_speech_unavailable`; cualquier otro fallo (4xx,
   5xx, tiempo agotado, una respuesta que no es audio), 503 `base.assistant_speech_failed`; los dos dejan su línea en el
   log. El panel lo reproduce desde un `blob:` (CSP `media-src 'self' blob:` y el origen del SaaS) y, si falla, lee con

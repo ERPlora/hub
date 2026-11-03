@@ -100,7 +100,7 @@ def test_the_longest_text_read_at_once_is_erplora_coms_own_ceiling(gateway):
     assert len(gateway.sent(SYNTHESIZE)[0].body["text"]) == 4096
 
 
-@pytest.mark.parametrize("code", ["speech_unavailable", "assistant.provider_not_configured"])
+@pytest.mark.parametrize("code", ["assistant.speech_unavailable", "assistant.provider_not_configured"])
 def test_without_a_server_voice_it_says_it_is_not_available(gateway, code):
     """No key of the voices' provider on erplora.com: nothing to try again, the panel reads with the device's voice."""
     gateway.reply(SYNTHESIZE, **refused(503, code))
@@ -133,7 +133,7 @@ def test_an_answer_that_is_no_audio_is_no_reading(gateway, answer):
 
 
 def test_its_refusals_are_said_in_the_persons_language(gateway):
-    gateway.reply(SYNTHESIZE, **refused(503, "speech_unavailable"))
+    gateway.reply(SYNTHESIZE, **refused(503, "assistant.speech_unavailable"))
     gateway.reply(SYNTHESIZE, **refused(502, "assistant.provider_unavailable"))
     said = []
     with translation.override("es"):
@@ -205,7 +205,9 @@ def test_the_panel_gets_the_mp3_itself(client, make_user, gateway):
     response = post(client, {"text": "Hola", "language": "es", "voice": XIMENA}, HTTP_ACCEPT="audio/mpeg")
     assert (response.status_code, response["Content-Type"], response.content) == (200, "audio/mpeg", MP3)
     assert response["Cache-Control"] == "no-store"
-    assert gateway.sent(SYNTHESIZE)[0].body["voice"] == XIMENA
+    # Through the operation and the signed door of erplora.com (here its fake, a real HTTP server).
+    [seen] = gateway.sent(SYNTHESIZE)
+    assert (seen.body["voice"], signed(seen)) == (XIMENA, True)
 
 
 def test_an_integration_that_only_reads_json_gets_the_operations_output(client, make_user, gateway):
@@ -217,7 +219,7 @@ def test_an_integration_that_only_reads_json_gets_the_operations_output(client, 
 
 def test_without_the_server_voice_the_route_answers_the_envelope(client, make_user, gateway):
     client.force_login(make_user("ana", host="a", role="hub_employee"))
-    gateway.reply(SYNTHESIZE, **refused(503, "speech_unavailable"))
+    gateway.reply(SYNTHESIZE, **refused(503, "assistant.speech_unavailable"))
     response = post(client, {"text": "Hola"}, HTTP_ACCEPT="audio/mpeg")
     assert response.status_code == 503
     assert response.json()["error"]["code"] == "base.assistant_speech_unavailable"

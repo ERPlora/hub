@@ -4031,7 +4031,7 @@ def assistant_transcribe(ctx: OperationContext, data: AssistantTranscribeIn) -> 
 
 
 #: erplora.com has no voice to read with (no key of the voices' provider): nothing to try again.
-SPEECH_NOT_CONFIGURED = frozenset({"speech_unavailable", "assistant.provider_not_configured"})
+SPEECH_NOT_CONFIGURED = frozenset({"assistant.speech_unavailable", "assistant.provider_not_configured"})
 
 
 @operation(
