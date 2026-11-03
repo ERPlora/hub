@@ -3,10 +3,10 @@
 // What was not measured yet says so, never with a zero; the assistant, which waits on erplora.com, fails on its own row.
 // «PostgreSQL», «Database of its own», «Cloud», CPU and memory are gone.
 import { applySurface } from '@erplora/ui/shell';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { AssistantUsage, PlanMeter, PlanUsage } from '../operations';
-import { errorFrame, flush, mountBase, subId } from '../__tests__/mount-base';
+import { errorFrame, flush, mountBase, subId, tap } from '../__tests__/mount-base';
 import SystemUsage from './SystemUsage.vue';
 
 const OP = 'base.plan.usage';
@@ -256,6 +256,23 @@ describe('SystemUsage', () => {
       const link = m.part('upgrade');
       expect(link.text()).toBe('Upgrade plan');
       expect([link.attributes('href'), link.attributes('target'), link.attributes('rel')]).toEqual([PLAN_URL, '_blank', 'noopener']);
+    });
+
+    it('its «Upgrade plan» goes with the pass, already signed in on erplora.com', async () => {
+      embed({ name: 'Bar', plan_url: PLAN_URL });
+      const tab = { opener: {}, location: { href: 'about:blank' } };
+      const windowOpen = vi.spyOn(window, 'open').mockReturnValue(tab as unknown as Window);
+      const url = 'http://localhost:8001/hub-pass/?pass=abc';
+      const m = await open(figures(), {
+        onApi: (call) => Response.json(call.url.includes('/saas-pass') ? { url } : MESSAGES),
+      });
+
+      tap(m.part('upgrade').element);
+      await flush();
+
+      expect(JSON.parse(m.net.api.at(-1)!.init.body as string)).toEqual({ next: 'plan' });
+      expect(tab.location.href).toBe(url);
+      windowOpen.mockRestore();
     });
 
     it('in the installed app, no button: where plans are managed', async () => {

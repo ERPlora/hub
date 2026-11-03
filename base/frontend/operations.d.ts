@@ -954,5 +954,7 @@ declare module '@erplora/ui/sdk' {
     };
     // «Report a problem» of the user menu (BASE-F108): erplora.com answers the address support writes back to.
     'base.support.report': { input: SupportReportInput; output: { reply_to: string } };
+    // The pass to erplora.com (BASE-F11): its address, signed at the click, opens for a minute, once.
+    'base.saas_pass.create': { input: { next: 'plan' | 'business' }; output: { url: string } };
   }
 }
