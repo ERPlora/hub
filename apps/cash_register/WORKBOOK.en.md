@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:bfbd03f10e159b04f29b2a9f5fb686def65542344b133028d36b3a2218d5f5b7 -->
+<!-- generated from WORKBOOK.md sha256:443dca1e91a6fb3a00a300e9001dab5d86885eb860e94e0bb9548fd0216d3997 -->
 
 ## What it is for and who it is for
 
@@ -515,13 +515,17 @@ Steps:
    itself" if it closed by itself), the float, the expected cash and, line by line, the sales by payment
    method, refunds, cash in, cash out, comps, the expected cash and, in the Z, the counted cash and the
    discrepancy.
-4. With Printing not on or with no active receipt printer, the browser's print dialog shows with the same
-   report (in the queue it would wait forever).
+4. With Printing not on or with no active receipt printer, the device's print dialog shows with the same
+   report (in the queue it would wait forever): the browser's or, in the installed app, its print screen
+   (the system's dialog, with the printer or "Save as PDF"), titled with the report and the session ("Cash
+   closing (Z) · S-…").
 In: the summary of the session, the same one the screen shows.
-Out: a job in the receipt queue of Printing (or the browser's paper). Each "Print" is a new paper.
-If it fails: "Could not print." with the reason from Printing (for example, no permission to print). With
-the blind count, whoever cannot see the expected cash does not see "Print" in an open session (the report
-carries the expected cash); in a closed one they do.
+Out: a job in the receipt queue of Printing (or the device's paper). Each "Print" is a new paper.
+If it fails: "Could not print." with the reason from Printing (for example, no permission to print); if the
+installed app does not open its print screen, with its own ("…: this version of the ERPlora app cannot
+print; update it", "…: the device's print service did not open"…). With the blind count, whoever cannot
+see the expected cash does not see "Print" in an open session (the report carries the expected cash); in a
+closed one they do.
 Involved: CASH_REGISTER-F11, PRINTING-F17
 
 ### CASH_REGISTER-F17 See the sale lines in no shift

@@ -5,8 +5,9 @@
 // breakdown and the total — all of it as `sale.checkout.preview` works it out —, and «Bill — this is
 // not an invoice…». No number, no QR, no payment: it consumes nothing. «Print» asks the printing queue
 // first (`sale.order.print_bill`, PRINTING-F09): queued, a toast names the printer; not queued (Printing
-// off, no receipt printer) or the queue out of reach, the device prints this very paper (`printPaper`); a
-// failure says so. It values the check while it is mounted: the page mounts it only while the bill is open.
+// off, no receipt printer) or the queue out of reach, the device prints this very paper (`printPaper`: inside the
+// installed app, its print screen, hub#455); a failure says so, with the app's reason when it gives one. It values
+// the check while it is mounted: the page mounts it only while the bill is open.
 import { formatDateTime } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { HubIcon, toastError, toastSuccess } from '@erplora/ui/shell';
@@ -17,6 +18,7 @@ import { useLocale, useT } from '../../composables/useT';
 import { taxRow } from '../../lib/breakdown';
 import { dishLabel } from '../../lib/comboChoice';
 import { formatMoney, formatQuantity, useBusinessMoney } from '../../lib/format';
+import { printRefusal, withReason } from '../../../../../base/frontend/lib/print-paper';
 import { printPaper } from '../../lib/print';
 import type { OrderLineOut, OrderOut } from '../../operations';
 
@@ -65,20 +67,26 @@ async function print(): Promise<void> {
   if (!element || sending.value) return;
   sending.value = true;
   try {
-    const sent = await queue.run({ order_id: props.order.id });
-    if (sent.queued) {
-      void toastSuccess(t('sale.document.queued', { printer: sent.printer ?? '' }));
-      return;
-    }
-  } catch {
-    // The queue could not be asked: the screen's paper still prints (below).
+    if (await queued()) return;
+    // Not queued: the device prints the screen's paper (inside the app, its print screen, hub#455).
+    await printPaper(element, { title: t('sale.pos.prebillTitle') });
+  } catch (failure) {
+    void toastError(withReason(t('sale.pos.prebillPrintFailed'), printRefusal(failure, t)));
   } finally {
     sending.value = false;
   }
+}
+
+/** Asks the printing queue; `true` when a printer took the bill (a toast names it). */
+async function queued(): Promise<boolean> {
   try {
-    printPaper(element);
+    const sent = await queue.run({ order_id: props.order.id });
+    if (!sent.queued) return false;
+    void toastSuccess(t('sale.document.queued', { printer: sent.printer ?? '' }));
+    return true;
   } catch {
-    void toastError(t('sale.pos.prebillPrintFailed'));
+    // The queue could not be asked: the screen's paper still prints.
+    return false;
   }
 }
 </script>

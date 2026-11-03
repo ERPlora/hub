@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:3ae6e80df3a512ce43f9c7da9a46efc47d969da44c614fae19c8aeccb6b9938e -->
+<!-- generated from WORKBOOK.md sha256:c4d64e8c13ebb7cef563355ebdc2bdbc6d2aaf1840629f09f232c879f3e3fb07 -->
 
 ## What it is for and who it is for
 
@@ -810,7 +810,10 @@ In: the product's SKU, name and price; the printer with the "Label" function, fr
 be asked for through the assistant ("print the shampoo's label") or through the API.
 Out: a label job in Printing's queue, with the price in the business's currency.
 If it fails: whoever does not reach the print queue (Printing is not active, or they cannot print) sees
-the browser's print dialog with the code, the SKU and the name, without a price. A SKU with letters a
+the device's print dialog with the code, the SKU and the name, without a price: the browser's or, in the
+installed app, its print screen (the system's dialog, with the printer or "Save as PDF"). If the app does not
+open it, the card says why: "Could not print the barcode label: this version of the ERPlora app cannot
+print; update it" (or the reason that applies). A SKU with letters a
 barcode does not carry (accents, ñ) is neither drawn nor printed: "This SKU cannot be turned into a
 barcode: use letters without accents, digits and signs.". Any other refusal shows inside the card:
 "Could not print the barcode label: <reason>".

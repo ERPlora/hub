@@ -4,11 +4,13 @@
 // while it is closed; from Sales every print is a «DUPLICATE» (the till passes `duplicate=false` for
 // the first paper after charging). «Print» asks the printing queue first (PRINTING-F08): queued, a toast
 // names the printer; not queued (Printing off, no receipt printer, a fiscal document pending) or not
-// reachable, the browser prints the screen's paper (`printPaper`); a failure says «Could not print».
+// reachable, the device prints the screen's paper (`printPaper`; inside the installed app, its print screen,
+// hub#455); a failure says «Could not print», with the app's reason when it gives one.
 import { toastError, toastSuccess } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { flush, type MountOptions, mountSale } from '../../__tests__/mount-sale';
+import { PrintRefused } from '../../../../../base/frontend/lib/print-paper';
 import { printPaper } from '../../lib/print';
 import { LETTERHEAD, saleOut, SETTINGS } from './__tests__/fixtures';
 import DocumentModal from './DocumentModal.vue';
@@ -76,6 +78,8 @@ describe('DocumentModal', () => {
     await flush();
     expect(printPaper).toHaveBeenCalledOnce();
     expect(vi.mocked(printPaper).mock.calls[0][0]).toBe(s.wrapper.findComponent(ReceiptPaper).element);
+    // Titled with the document's number: the print job's name and the file «Save as PDF» proposes (hub#455).
+    expect(vi.mocked(printPaper).mock.calls[0][1]).toEqual({ title: '20261014-0007' });
   });
 
   it('asks the printing queue first: queued, a toast names the printer and the screen prints nothing', async () => {
@@ -127,6 +131,31 @@ describe('DocumentModal', () => {
     await s.printButton().trigger('click');
     await flush();
     expect(toastError).toHaveBeenCalledWith('Could not print');
+  });
+
+  it('in the installed app, a print the app refuses says why (hub#455)', async () => {
+    const s = await setup();
+    await s.load();
+    vi.mocked(printPaper).mockRejectedValueOnce(new PrintRefused('failed', 'native_print_failed: no service'));
+    await s.printButton().trigger('click');
+    await flush();
+    expect(toastError).toHaveBeenCalledExactlyOnceWith("Could not print: the device's print service did not open");
+  });
+
+  it('a second press while the app prints waits for it (hub#455)', async () => {
+    const s = await setup();
+    await s.load();
+    let done = (): void => {};
+    vi.mocked(printPaper).mockReturnValueOnce(new Promise<void>((resolve) => (done = resolve)));
+    await s.printButton().trigger('click');
+    await flush();
+    expect(s.printable()).toBe(false);
+    await s.printButton().trigger('click');
+    await flush();
+    expect(printPaper).toHaveBeenCalledOnce();
+    done();
+    await flush();
+    expect(s.printable()).toBe(true);
   });
 
   it('the ✕ closes it, and closed it lets its subscriptions go', async () => {

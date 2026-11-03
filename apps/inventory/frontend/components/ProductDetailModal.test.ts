@@ -4,15 +4,16 @@
 // stock», «Count stock» and «Write off stock». For whoever can change products, «Mark sold out» or «Put
 // back on sale» (INVENTORY-F29), whose refusal is said inside the sheet. The SKU's barcode on its white
 // plate and «Print barcode» (INVENTORY-F25): the label goes to Printing's queue; without the queue, the
-// browser's print dialog.
+// device's print dialog (the browser's; inside the installed app, its print screen, hub#455).
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { EMPLOYEE, flush, mountInventory, ok, product, refusal } from '../__tests__/mount-inventory';
+import { PrintRefused } from '../../../../base/frontend/lib/print-paper';
 import { formatMoney } from '../lib/format';
 import ProductDetailModal from './ProductDetailModal.vue';
 
-const browser = vi.hoisted(() => ({ printInBrowser: vi.fn() }));
-vi.mock('../lib/print-label', () => browser);
+const device = vi.hoisted(() => ({ printLabel: vi.fn() }));
+vi.mock('../lib/print-label', () => device);
 
 vi.mock('@ionic/vue', async (importOriginal) => {
   const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
@@ -21,7 +22,7 @@ vi.mock('@ionic/vue', async (importOriginal) => {
 
 afterEach(() => {
   document.body.innerHTML = '';
-  browser.printInBrowser.mockReset();
+  device.printLabel.mockReset();
 });
 
 async function setup(props: Record<string, unknown> = {}, options: Parameters<typeof mountInventory>[1] = {}) {
@@ -133,7 +134,7 @@ describe('ProductDetailModal', () => {
     await flush();
     expect(s.calls('/api/inventory/products/print_label').map((call) => s.body(call))).toEqual([{ id: 'p1' }, { id: 'p1' }]);
     expect(s.el('inventory-product-detail-label')?.textContent?.trim()).toBe('The label went to the printer «Labels».');
-    expect(browser.printInBrowser).not.toHaveBeenCalled();
+    expect(device.printLabel).not.toHaveBeenCalled();
   });
 
   it('INVENTORY-F25: with no «Label» printer the label waits in the queue, and the sheet says what to do', async () => {
@@ -149,11 +150,29 @@ describe('ProductDetailModal', () => {
     const s = await setup({}, { api: () => refusal(409, 'inventory.label_queue_unavailable', 'The print queue is not available here.') });
     s.el('inventory-product-detail-print-label')!.click();
     await flush();
-    expect(browser.printInBrowser).toHaveBeenCalledOnce();
-    const [svg, label] = browser.printInBrowser.mock.calls[0];
+    expect(device.printLabel).toHaveBeenCalledOnce();
+    const [svg, label] = device.printLabel.mock.calls[0];
     expect((svg as SVGSVGElement).getAttribute('aria-label')).toBe('Barcode CAF-1');
     expect(label).toEqual({ sku: 'CAF-1', name: 'Coffee' });
     expect(s.el('inventory-product-detail-error')).toBeNull();
+  });
+
+  it('INVENTORY-F25: in the installed app, a label the app refuses to print says why (hub#455)', async () => {
+    device.printLabel.mockRejectedValueOnce(new PrintRefused('outdated', 'Command print_document not found'));
+    const s = await setup({}, { api: () => refusal(409, 'inventory.label_queue_unavailable', 'The print queue is not available here.') });
+    s.el('inventory-product-detail-print-label')!.click();
+    await flush();
+    expect(s.el('inventory-product-detail-error')?.textContent?.trim()).toBe(
+      'Could not print the barcode label: this version of the ERPlora app cannot print; update it',
+    );
+  });
+
+  it('INVENTORY-F25: a print the browser refuses is said inside the sheet with its reason (hub#455)', async () => {
+    device.printLabel.mockRejectedValueOnce(new Error('Printing is blocked.'));
+    const s = await setup({}, { api: () => refusal(409, 'inventory.label_queue_unavailable', 'The print queue is not available here.') });
+    s.el('inventory-product-detail-print-label')!.click();
+    await flush();
+    expect(s.el('inventory-product-detail-error')?.textContent?.trim()).toBe('Could not print the barcode label: Printing is blocked.');
   });
 
   it('INVENTORY-F25: any other refusal is said inside the sheet with its reason', async () => {
@@ -163,7 +182,7 @@ describe('ProductDetailModal', () => {
     expect(s.el('inventory-product-detail-error')?.textContent?.trim()).toBe(
       'Could not print the barcode label: This product does not exist in this hub.',
     );
-    expect(browser.printInBrowser).not.toHaveBeenCalled();
+    expect(device.printLabel).not.toHaveBeenCalled();
   });
 
   it('speaks Spanish', async () => {

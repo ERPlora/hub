@@ -3,9 +3,9 @@
 // the receipt settings (`sale.pos_settings.get`) followed live, «Loading document…» until all answered, «Error
 // loading the document» (with the server's words and Retry) when any fails, then the paper — above it, out of what prints, «Fiscal
 // document pending» with «Issue now» while a document of the sale waits. The host is told when the
-// paper is painted (`ready`, with its element, what `printPaper` copies) or that it could not be
-// (`failed`). With VeriFactu on and readable, a sale with a fiscal document waits for that document's record
-// too (VERIFACTU-F19): the paper carries its QR, a reprint included, and a record that cannot be read fails the
+// paper is painted (`ready`, with its element, what `printPaper` copies, and its number, the document's title) or
+// that it could not be (`failed`). With VeriFactu on and readable, a sale with a fiscal document waits for that
+// document's record too (VERIFACTU-F19): the paper carries its QR, a reprint included, and a record that cannot be read fails the
 // document like the sale would — never a paper without its QR.
 // Mount it only while it is wanted: its subscriptions live as long as it does.
 import { InlineFeedback } from '@erplora/ui/components';
@@ -25,8 +25,8 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  /** The paper is painted: its element. */
-  ready: [paper: HTMLElement];
+  /** The paper is painted: its element, and its title (the number on it: the print job's and the PDF's name). */
+  ready: [paper: HTMLElement, title: string];
   /** It could not be loaded: the reason. */
   failed: [message: string];
 }>();
@@ -68,7 +68,8 @@ watch(
   loaded,
   (now) => {
     const element = paper.value?.$el as HTMLElement | undefined;
-    if (now && element) emit('ready', element);
+    const shown = sale.data.value;
+    if (now && element && shown) emit('ready', element, shown.invoice_number || shown.number);
   },
   { flush: 'post' },
 );

@@ -302,9 +302,19 @@ describe('assertDemoAccountsSeeded', () => {
     expect(() => assertDemoAccountsSeeded(saas.run, 'saas_e2e_8031', HUB_8030)).not.toThrow();
     expect(saas.statements).toHaveLength(1);
     expect(saas.statements[0]).toMatch(/^select /);
-    for (const word of ["'owner@example.com'", "'employee@example.com'", "'a'", "'b'", 'accounts_user', 'accounts_hubmembership']) {
+    for (const word of ["'owner@example.com'", "'employee@example.com'", "'a'", "'b'", 'accounts_user', 'hubs_hubmember', 'hubs_hub']) {
       expect(saas.statements[0]).toContain(word);
     }
+    expect(saas.statements[0]).not.toContain('accounts_hubmembership');
+  });
+
+  // What the jump reads: an invitation still unanswered, or a business being deleted, lets nobody in.
+  it('counts only the answered members of a business that still opens', () => {
+    const saas = fakeSaasSql(SEEDED);
+
+    assertDemoAccountsSeeded(saas.run, 'saas_e2e_8031', HUB_8030);
+    expect(saas.statements[0]).toContain('m.accepted_at is not null');
+    expect(saas.statements[0]).toContain("h.status not in ('deleting', 'deleted')");
   });
 
   // An account with access to one demo hub only is not seeded: the select keeps an email only with every demo hub
@@ -313,7 +323,7 @@ describe('assertDemoAccountsSeeded', () => {
     const saas = fakeSaasSql(SEEDED);
 
     assertDemoAccountsSeeded(saas.run, 'saas_e2e_8031', HUB_8030);
-    expect(saas.statements[0]).toContain(`having count(distinct m.hub_slug) = ${DEMO_HUBS_COUNT}`);
+    expect(saas.statements[0]).toContain(`having count(distinct h.slug) = ${DEMO_HUBS_COUNT}`);
   });
 
   it("stops the run naming the missing accounts and the exact command that seeds them with this Hub's ids", () => {

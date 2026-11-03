@@ -20,6 +20,8 @@ import {
   type StreamCall,
 } from '../../../../packages/ui/src/sdk/__tests__/live-harness';
 import { HUB_ASSISTANT } from '../../../../base/frontend/lib/assistant-hub';
+import baseEn from '../../../../base/frontend/locale/en.json';
+import baseEs from '../../../../base/frontend/locale/es.json';
 import type { Business } from '../../../../base/frontend/operations';
 import { OPERATION_ROUTES } from '../../../../frontend/generated/operation-routes';
 import taxEn from '../../../tax/frontend/locale/en.json';
@@ -131,7 +133,7 @@ export async function mountSale(component: Component, options: MountOptions = {}
   // The session is provided app-wide, as createShell does.
   const app = createApp({});
   provideSession(ref(options.session ?? MANAGER), ref('live'), { app });
-  const i18n = createShellI18n({ locale: options.locale ?? 'en', messages: { en: { ...taxEn, ...en }, es: { ...taxEs, ...es } } });
+  const i18n = createShellI18n({ locale: options.locale ?? 'en', messages: { en: { ...baseEn, ...taxEn, ...en }, es: { ...baseEs, ...taxEs, ...es } } });
   const wrapper = mount(component, {
     props: options.props,
     global: {

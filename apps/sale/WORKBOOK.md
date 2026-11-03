@@ -162,9 +162,11 @@ Hoja que abre «Cobrar». Arriba, el importe grande (el que calcula el servidor)
 <total>» si hay líneas marcadas y «Restante» al repartir. A un lado, el resumen («Tique» / «Factura»,
 cliente), con «Factura» los datos del cliente y, con Servicios, «Líneas pagadas de otra forma»: cada
 línea de servicio del cobro con su hueco del bono (SALE-F27). Al otro, «Cobros tomados», los medios de pago
-(el efectivo, en un negocio de España no disponible desde 1.000 €, con su motivo), «Entregado», «Cambio» y el teclado en
-efectivo, o «Importe exacto» y «Cobra <importe> en el datáfono y confirma.» con otro medio;
-«Repartir el cobro» y «Añadir este cobro». Pie: el motivo si no se puede cobrar y «Cobrar <importe>»
+(el efectivo, en un negocio de España no disponible desde 1.000 €, con su motivo) y, en efectivo, «Entregado», una fila
+de alto fijo con lo que le falta al importe («Marca en el teclado el importe entregado», «Lo entregado no cubre el total»)
+o, en su sitio, el «Cambio» en grande, y el teclado, que no se mueve mientras se teclea (hub#456); con otro medio,
+«Importe exacto» y «Cobra <importe> en el datáfono y confirma.»; «Repartir el cobro» y «Añadir este cobro». Pie: el
+motivo si no se puede cobrar (los del importe entregado van encima del teclado) y «Cobrar <importe>»
 («Cobrando…» mientras va); con la caja cerrada y efectivo, el rechazo y «Abrir sesión de caja».
 
 ### Cuentas abiertas
@@ -289,7 +291,8 @@ Pasos:
 3. Pulsa «Cobrar · <total>» al pie de la cuenta (en el móvil, abre antes la cuenta con el botón
    flotante, que enseña el total).
 4. En la hoja **Cobro**, con efectivo elegido, marca en el teclado el importe entregado; el cambio
-   sale debajo en grande.
+   sale en grande encima del teclado, en la fila que hasta entonces pide el importe, y las teclas no se
+   mueven bajo el dedo mientras se teclea (hub#456).
 5. Pulsa «Cobrar <total>».
 6. La hoja se cierra, la cuenta queda vacía y se abre el **Documento de venta** con el tique. Con
    **Impresión**, el cobro pide el tique a la cola en su misma transacción, según sus ajustes (y, si
@@ -304,8 +307,8 @@ factura), y la cuenta cerrada. Con Facturación, su tique (F2) numerado en la se
 cobro (INVOICE-F01): o los dos o ninguno. Ventas avisa de la venta cobrada: Inventario baja el stock
 (INVENTORY-F21) y Clientes suma la compra a la ficha (CUSTOMER-F20). Cada línea guarda la categoría,
 el tipo, el país, la región y la regla de Impuestos con que se cobró.
-Si falla: sin importe entregado el botón no cobra y se lee «Marca en el teclado el importe
-entregado»; corto, «Lo entregado no cubre el total». Un artículo sin IVA sale marcado «Falta el IVA»
+Si falla: sin importe entregado el botón no cobra y se lee encima del teclado «Marca en el teclado el
+importe entregado»; corto, «Lo entregado no cubre el total» (también en el botón, y lo dice al tocarlo). Un artículo sin IVA sale marcado «Falta el IVA»
 y al tocarlo dice «No se puede vender: sin categoría fiscal. Falta configurar el IVA.»; uno agotado
 sale en gris con «Agotado» y al tocarlo dice «… está agotado.» (SALE-F07). Un rechazo al
 cobrar se pinta en la hoja con su frase (p. ej. «Un producto del tique ya no está en el catálogo.
@@ -845,10 +848,14 @@ Pasos:
    precios con IVA, las líneas menos el descuento dan el total.
 3. Pulsa la impresora de arriba: con **Impresión** y una impresora de tiques activa, la cuenta va a su
    cola y se lee «Enviado a <impresora>.» (PRINTING-F09); si no, sale por el diálogo de impresión del
-   dispositivo.
+   dispositivo con la cuenta sola: el del navegador o, en la app instalada, su pantalla de impresión (el
+   diálogo del sistema, con la impresora o «Guardar como PDF»).
 Entra: la cuenta abierta y su total calculado por el servidor.
 Sale: un papel sin número fiscal; no consume numeración ni crea venta. Cada pulsación, una cuenta.
-Si falla: «No se pudo imprimir la cuenta».
+Si falla: «No se pudo imprimir la cuenta». Si la app instalada no abre su pantalla de impresión, el aviso
+dice por qué tras dos puntos: «…: esta versión de la app de ERPlora no puede imprimir; actualízala», «…: el
+servicio de impresión del dispositivo no se abrió», «…: el documento está vacío o es demasiado grande para
+imprimirlo» o «…: esta app está vinculada a otro negocio».
 Implicados: PRINTING-F09
 
 ### SALE-F22 Cobrar solo una parte de la cuenta
@@ -1050,7 +1057,9 @@ Pasos:
    Cuando esté resuelto, emítelo ahora.» con «Emitir ahora».
 3. Pulsa la impresora del pie para imprimirlo, o «Reimprimir» en la fila. Con **Impresión** y una
    impresora de tiques activa, el papel va a su cola y se lee «Enviado a <impresora>.» (PRINTING-F08); si
-   no (o con su documento fiscal pendiente), sale por el diálogo de impresión del dispositivo. Toda
+   no (o con su documento fiscal pendiente), sale por el diálogo de impresión del dispositivo con el papel
+   solo: el del navegador o, en la app instalada, su pantalla de impresión (el diálogo del sistema, con la
+   impresora o «Guardar como PDF»). Toda
    impresión desde **Ventas** sale con «DUPLICADO», también con su QR fiscal; solo el primer papel justo
    tras cobrar es el original (y es copia si el cobro ya lo mandó a la cola).
 4. **Documento pendiente**: en la lista, una venta con algún documento fiscal pendiente (el suyo, la
@@ -1065,7 +1074,8 @@ no pueda leer Facturación. El papel no toca el documento ni su registro fiscal.
 Sale: el papel; reimprimir no crea venta ni documento fiscal. «Emitir ahora» emite los documentos que
 esperaban (avisa: venta con su documento, uno por documento).
 Si falla: «Cargando documento…» y «Error cargando el documento» (también si no se puede leer el QR
-fiscal: el papel nunca sale sin él). «No se pudo imprimir». «Emitir ahora»
+fiscal: el papel nunca sale sin él). «No se pudo imprimir»; si la app instalada no abre su pantalla de
+impresión, con el motivo tras dos puntos, como en SALE-F21. «Emitir ahora»
 rechazado dice el motivo de Facturación («Configura el emisor…») y no cambia nada; sin palabras del
 servidor, «No se han podido emitir los documentos. Inténtalo de nuevo.».
 Implicados: INVOICE-F01, INVOICE-F02, INVOICE-F06, INVOICE-F18, PRINTING-F08, VERIFACTU-F19, SALE-F21, SALE-F34
