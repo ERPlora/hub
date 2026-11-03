@@ -48,7 +48,9 @@ def po_entries(path: Path) -> dict[str, tuple[str, bool]]:
         starts_entry = line.startswith("msgctxt ") or (line.startswith("msgid ") and current != "msgctxt")
         if starts_entry or (line.startswith("#") and current == "msgstr"):
             flush()
-            parts, fuzzy, current = {"msgctxt": [], "msgid": [], "msgstr": []}, False, None
+            # A ``#, fuzzy`` above a ``msgctxt`` or ``msgid`` belongs to the entry they open: only what comes after a
+            # ``msgstr`` forgets it.
+            parts, fuzzy, current = {"msgctxt": [], "msgid": [], "msgstr": []}, fuzzy and current is None, None
         if line.startswith("#,") and "fuzzy" in line:
             fuzzy = True
         elif line.startswith(("msgctxt ", "msgid ", "msgstr ")):
