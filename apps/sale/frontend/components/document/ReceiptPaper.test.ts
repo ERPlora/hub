@@ -59,6 +59,10 @@ describe('ReceiptPaper', () => {
     const ticket = await paper({ sale: saleOut({ customer_name: 'Lucía' }) });
     expect(ticket.find('sale-receipt-customer-tax-id').exists()).toBe(false);
     expect(ticket.find('sale-receipt-customer-address').exists()).toBe(false);
+    // As the printed paper (`paper.receipt`): the recipient's details belong to an invoice, never to a ticket.
+    const carried = await paper({ sale: saleOut({ document_type: 'ticket', ...recipient }) });
+    expect(carried.find('sale-receipt-customer-tax-id').exists()).toBe(false);
+    expect(carried.find('sale-receipt-customer-address').exists()).toBe(false);
   });
 
   it('a sale charged as an invoice is titled «Invoice» and numbered «No.», never «Receipt»', async () => {
