@@ -1446,13 +1446,13 @@ Las cerradas quedan tachadas con su motivo; las abiertas dicen dónde siguen.
    y `base.operations.is_demo_hub` la lee; como en la fase 1 comparte tablas, su entorno no sale de la configuración
    sino de que es demo: siempre pruebas (`queries.effective_environment`). En la fase 2 lee `control.Hub.is_demo` y
    no cambia nada más.
-11. **La autorización en el entorno de pruebas** — **sigue abierta** (FIX-FISCAL-TESTING-AUTHORISATION-CONTRADICTION,
-   bloqueada; señalada en el cierre de `fiscal_gateway`, saas#82): la pasarela del SaaS (`fiscal_gateway/internal.py`,
-   `_identity`) exige el otorgamiento aprobado por la vía de ERPlora en los dos entornos, y este Hub
-   (`queries._route_sending_problem`) solo lo pide en producción: un negocio nuevo, por la vía por defecto, sella en
-   pruebas y sus registros no llegan a la AEAT de pruebas hasta que ERPlora aprueba su Anexo I. ADR-0360 del producto
-   actual dice «en pruebas no hay nada que autorizar». Es fiscal y queda bajo la supervisión de Ioan
-   (working-rules §15): no se elige lado aquí.
+11. ~~**La autorización en el entorno de pruebas**~~ — **cerrada (2026-11-03, saas#210;
+   FIX-FISCAL-TESTING-AUTHORISATION-CONTRADICTION)**: gana el lado de este Hub (`queries._route_sending_problem`) y de
+   ADR-0360 del producto actual. La autorización se exige por entorno: la pasarela del SaaS (`fiscal_gateway/internal.py`,
+   `_identity`) ya solo pide el otorgamiento aprobado en producción, así que un negocio nuevo, por la vía por defecto,
+   llega a la AEAT de pruebas desde su primer tique; el Anexo I sigue siendo lo que abre el paso a producción
+   (VERIFACTU-F08). En pruebas la pasarela sigue rechazando a un negocio que declara el NIF de ERPlora (409
+   `nif_mismatch`). Decisión y referencias en la ronda 2026-11-03l de `PLAN-SAAS.md` (§33); este Hub no cambia.
 12. **«Fijo tras el primer envío» frente a «tras el primer sellado»** — **sigue abierta** (señalada en PLAN-HUB §4,
    ronda 2026-10-22b): PLAN §30 deja el interruptor en vivo fijo cuando se **envía** la primera factura a la AEAT;
    `verifactu.config.back_to_testing` ya se niega (409 `verifactu.production_has_records`) en cuanto hay un registro
@@ -1610,10 +1610,10 @@ Al cerrar la app (CLOSE-VERIFACTU, 2026-10-27), lo que sigue en la cola fuera de
 - **Que Apps no deje encender VeriFactu fuera de España** (FIX-HUB-APPS-ENABLE-REFUSED-OUTSIDE-ITS-COUNTRY,
   `hub:base,verifactu`): falta el gancho de encendido de la plataforma (`can_enable`, como `can_disable`); hoy se
   enciende y no hace nada (Decisión 15).
-- **La autorización en pruebas** (FIX-FISCAL-TESTING-AUTHORISATION-CONTRADICTION, bloqueada): contradicción 11, sin
-  elegir lado. Desde hub#454 el registro de pruebas de un negocio sin otorgamiento aprobado llega a la pasarela como
-  ese negocio y espera con su rechazo, `representation_not_approved` («falta que ERPlora apruebe tu autorización
-  firmada para remitir en tu nombre»), en vez de `nif_mismatch`; el lado (si en pruebas hace falta) sigue sin elegir.
+- ~~**La autorización en pruebas**~~ (FIX-FISCAL-TESTING-AUTHORISATION-CONTRADICTION) — **cerrada el 2026-11-03**
+  (saas#210, contradicción 11): la pasarela ya no pide el otorgamiento en pruebas, y el registro de pruebas de un
+  negocio sin otorgamiento aprobado, que desde hub#454 llega a la pasarela como ese negocio, se presenta a la AEAT de
+  pruebas en vez de esperar con `representation_not_approved`.
 - **El NIF de ERPlora tecleado por un negocio en la BD compartida** (fase 1, hasta una BD por hub): la pasada del hub
   de ERPlora no distingue ese emisor del de ERPlora y lo presenta como `erplora` (saas#2524); cuando cada hub tenga su
   BD (tenencia), la pasada de cada uno corre en el ámbito de su negocio y presenta con su slug.
