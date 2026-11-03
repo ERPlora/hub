@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:f37b4d83d4e37610d20e3b9b1c8fdcdfeef92521f331a26e3cd0ac38b045eecc -->
+<!-- generated from WORKBOOK.md sha256:26a125565b5be807c9ced65c58096ea9a2eb0c82dd442bb73dcf868035ed694e -->
 
 ## What it is for and who it is for
 
@@ -439,8 +439,11 @@ when an **Ask the assistant** step with "Ask me first" uses it (FLOW-F37), and o
 they cannot do themselves: "You cannot allow what you may not do yourself: "…"." (nor an integration with
 its key). Each step acts only with the permission it was granted, never with all those of whoever set it
 up. Booking with only the name and phone of whoever books finds or creates their customer card without
-allowing anything of Customers.
-Involved: FLOW-F04, FLOW-F06, FLOW-F11, FLOW-F16, FLOW-F37
+allowing anything of Customers. What is allowed on appointments (booking, moving, confirming or editing them)
+counts for those of any professional, also after the **Approve** of "Ask me first": an automation is nobody
+of the team, so Appointments treats it as the customer, who books with whoever she likes, and judges it by
+her rules (the minimum notice, the opening hours and never a time already past).
+Involved: FLOW-F04, FLOW-F06, FLOW-F11, FLOW-F16, FLOW-F37, APPOINTMENT-F01, APPOINTMENT-F04
 
 ### FLOW-F13 Try it without it doing anything
 Status: done (server and screen)

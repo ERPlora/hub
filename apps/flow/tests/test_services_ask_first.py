@@ -8,8 +8,8 @@ and n8n's human review gate the irreversible step; Odoo's approval rules gate a 
 Fresha's AI Concierge cancels within the business's cancellation policy). Never on its own, never as a plain step,
 never what is done in person (seating), never money, fiscal records or erasing. The yes is a person's who may cancel
 themselves (the old engine's «no elevation»); the change still runs as the automation. Cancelling an appointment is not
-in yet: Appointments refuses every change an automation makes («You may only change your own appointments.»), so it
-would always fail after the yes.
+in yet (hub#634): Appointments takes an automation's booking and its other changes to anyone's appointment, judged as
+the customer (test_services_appointment_steps.py), but cancelling one is not offered to «Ask me first».
 """
 
 import datetime as dt
