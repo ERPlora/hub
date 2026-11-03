@@ -465,8 +465,11 @@ dice qué. La única excepción es «Anular una reserva»: se autoriza cuando un
 que no puede hacer él mismo: «No puedes permitir lo que tú no puedes hacer: «…».» (tampoco una
 integración con su clave). Cada paso actúa solo con el permiso que se le concedió, nunca con todos los
 de quien la montó. Reservar con solo el nombre y el teléfono de quien reserva busca o crea su ficha de
-cliente sin autorizar nada de Clientes.
-Implicados: FLOW-F04, FLOW-F06, FLOW-F11, FLOW-F16, FLOW-F37
+cliente sin autorizar nada de Clientes. Lo autorizado sobre las citas (reservar, mover, confirmar o editar)
+vale para las de cualquier profesional, también tras el **Aprobar** de «Que me lo pregunte»: una automatización
+no es nadie del equipo, así que Citas la trata como a la clienta, que reserva con quien quiera, y la juzga con
+sus reglas (la antelación mínima, el horario y nunca una hora pasada).
+Implicados: FLOW-F04, FLOW-F06, FLOW-F11, FLOW-F16, FLOW-F37, APPOINTMENT-F01, APPOINTMENT-F04
 
 ### FLOW-F13 Probar sin que haga nada
 <!-- origen: old:flows/workflow/editor.md#flows-f20 -->
@@ -1388,8 +1391,7 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   su marca `refers`, ejecutada como esa persona (si no puede leerlo, el dato no sale). La pantalla los pinta con
   `fieldLines` del chat compartido (`@erplora/ui/components`), como la tarjeta del chat, sin los vacíos y con la
   moneda de `base.business.get`. Una pregunta de «Preguntar antes a alguien» no trae `fields`.
-  `appointment.appointment.cancel` tampoco, todavía: Citas niega todo cambio de una automatización
-  (`may_change` pide `appointment.change_appointment` o la ficha propia, y el paso no tiene ninguna de las dos).
+  `appointment.appointment.cancel` tampoco, todavía: no está en `ASK_FIRST` (hub#634), así que ningún paso la propone.
 - **La acción del cambio que espera un sí** (revisión 2026-10-30, FIX-HUB-FLOW-PENDING-ANSWER-CARD-DOES-NOT-SAY-THE-ACTION):
   la tarjeta se titulaba siempre «El asistente quiere cambiar algo en «Reservas»», también al anular: quien aprobaba
   no leía la acción. `queries.question_row` calcula al leer, con `ctx.language` de quien lee, el título
@@ -1428,6 +1430,17 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   llamada, nunca el paso (`reservation.reservation.create` busca o crea la ficha por teléfono con
   `card_keeper`, como lee Horarios con `reader`): `_step_context` no gana permisos de otras apps
   (`test_services_safety.py`).
+- **Una automatización y las citas «suyas»** (revisión 2026-11-03, FIX-HUB-FLOW-STEP-CANNOT-BOOK-FOR-A-PROFESSIONAL):
+  reservar, mover, confirmar y editar una cita piden «las suyas» (`appointment.add_own_appointment`,
+  `appointment.change_own_appointment`), y el paso, que no es nadie del equipo, no tiene ficha: siempre salía
+  «You may only book your own appointments.» (`permission_denied`). La regla vive en Citas
+  (`apps.appointment.queries.is_own`), la única app con permisos «propios», no aquí: quien no es una persona
+  (`by_person`) toma lo concedido sobre «las suyas» para todo el equipo y se juzga como la clienta. `_step_context`
+  no cambia: el techo sigue siendo `grants` (sin ellos no hay cita) y nada se eleva a «todos los permisos». Vale igual
+  para el paso de operación, el asistente que actúa solo y el cambio que hace tras el **Aprobar**, que corren con el
+  mismo contexto (`test_services_appointment_steps.py`). Es lo que hacía el producto viejo (la automatización reservaba
+  con cualquier profesional y las reglas de la clienta) y como separa Square el permiso de comprador del de vendedor
+  en su API de citas.
 - **El motivo de una parada, en el idioma de quien lo lee** (FLOW-F16; mismo patrón que `message_reason` de
   whatsapp_inbox, hub#384): la ejecución (`error_reason`) y la entrada del paso que falló (`error.reason`)
   guardan el **nombre** del motivo propio del motor y sus datos (`queries.REASONS`: el código, salvo donde un
@@ -1717,23 +1730,21 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   palabras de otra app (hub#497); la pregunta o la tarjeta de un paso que cobra no reconoce su importe como
   dinero (hub#498); la tarjeta de confirmación del asistente llama «Registro» a la automatización o a la ejecución
   (hub#499) y dice «N elementos» en los permisos de un flujo sin decir cuáles (hub#504, con `base`).
-- **Trabajo encolado del carril** (cola de la migración, sin issue todavía): un paso no puede pedir cita para un
-  profesional (FIX-HUB-FLOW-STEP-CANNOT-BOOK-FOR-A-PROFESSIONAL) ni confirmar, mover o anular una cita
-  (FIX-HUB-FLOW-STEP-CANNOT-CHANGE-AN-APPOINTMENT).
 - **«Necesita tu atención»** (eventos que no se entregaron): el reparto del worker ya entrega los avisos a esta
   app y, tras 8 intentos fallidos, da uno por perdido y lo deja anotado; la pantalla que los enseña y los vuelve a
   intentar es la administración de los avisos (PLAN-HUB bloque 7), de la plataforma, y todavía no existe.
 - **El resto de recetas de la Bandeja de WhatsApp** (la cita y la mesa por WhatsApp, que ya pueden usar el paso
   «Pedírselo al asistente», FLOW-F37, y el aviso de mesa confirmada, que espera a que Reservas diga el día en palabras) y su reparación concreta: las
   declara esa app en su `recipes.py` sobre este registro; la del aviso de cita confirmada ya está
-  (WHATSAPP_INBOX-F23). La respuesta automática que pide cita a una clienta nueva espera a que un paso pueda pedir cita para un
-  profesional (hub#514). La tarjeta «Contestar los WhatsApp» vuelve cuando la Bandeja declare su aviso.
+  (WHATSAPP_INBOX-F23). Un paso ya puede pedir cita para cualquier profesional (FLOW-F12); la respuesta automática que
+  pide cita a una clienta nueva vuelve cuando la Bandeja la ofrezca otra vez (hub#514). La tarjeta «Contestar los
+  WhatsApp» vuelve cuando la Bandeja declare su aviso.
 - **Encender una receta desde la pantalla de su propia app** (el Hub viejo lo hacía desde la de WhatsApp): hoy
   se enciende desde la galería de Automatizaciones; la pantalla de cada app puede llamar a `flow.recipe.enable`
   cuando la tenga.
 - **Límites en un permiso** («solo con este cliente»): se concede la acción entera.
-- **Anular una cita con «Que me lo pregunte»**, como ya se anula una reserva: espera a que Citas acepte cambios de
-  una automatización; hoy ninguna confirma, mueve ni anula una cita («Solo puedes cambiar tus propias citas.»).
+- **Anular una cita con «Que me lo pregunte»**, como ya se anula una reserva (hub#634): una automatización ya reserva,
+  mueve, confirma y edita la cita de cualquier profesional (FLOW-F12), pero anularla todavía no se le puede autorizar.
 - **Borrar al momento lo que leyó una ejecución que espera** cuando se borran los datos de un cliente
   (pm#637): una ejecución terminada no guarda nada de lo que leyeron sus pasos, pero una que espera
   conserva la ficha que leyó hasta que despierta (como mucho 30 días). Borrarla en el acto pide que esta app
