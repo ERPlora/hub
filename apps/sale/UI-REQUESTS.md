@@ -88,9 +88,6 @@ Lo que pide la hoja **Cobro** (`frontend/components/checkout/`, `lib/checkout/me
 Lo que pide la pantalla **Vender** (`pages/PosPage.vue`, `frontend/components/pos/`).
 
 - `ion:pause-circle-outline` — botón **Aparcar esta cuenta** de la cabecera. Hoy: `ion:time-outline`.
-- `ion:gift-outline` / `ion:gift` — botón **Invitar / quitar invitación** de la línea. Hoy:
-  `ion:sparkles-outline` (en verde cuando está invitada). `ion:gift-outline` ya está registrado; falta el
-  relleno, `ion:gift`, para la línea invitada: se cambian los dos juntos.
 - `ion:chatbox-ellipses-outline` / `ion:chatbox-ellipses` — botón **Nota** de la línea y la nota bajo
   ella. Hoy: `ion:chatbubbles-outline` (en el color primario cuando hay nota).
 - `ion:print-outline` — botón **Imprimir cuenta** del pie y la impresora de la precuenta. Hoy:
