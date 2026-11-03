@@ -1,9 +1,8 @@
 <script setup lang="ts">
 // The bar on top of the check, left to right: «Park this check» (only where parked tickets are
 // allowed; nothing to park on an empty check), the slot where the Customers app's button sits (it takes the
-// room left; where its text does not fit, on a phone, the button shows only its icon, as Square's cart does —
-// the heading still names the customer), «Open checks» with how many others are open, and — in the phone's
-// drawer — «Close».
+// room left; where its text does not fit, on a phone, the button shows only its icon — the customer chip in the
+// heading still names them), «Open checks» with how many others are open, and — in the phone's drawer — «Close».
 // Icons the product had that are not registered yet (`pause-circle-outline`) use the closest one
 // (UI-REQUESTS.md, «POS»).
 import { HubIcon } from '@erplora/ui/shell';

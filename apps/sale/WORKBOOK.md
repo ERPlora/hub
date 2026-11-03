@@ -137,8 +137,8 @@ zonas:
   servidor), el botón de descuento, la impresora («Imprimir cuenta») y «Cobrar · <importe>». En el
   cajón del móvil la barra de arriba y el pie con «Cobrar» se quedan siempre a la vista, encima de la
   barra de pestañas, también en un teléfono de 320×568; lo de en medio (título, chips, pestañas y
-  líneas) se desplaza. Donde no cabe el texto del botón de cliente, se queda en su icono, como en el
-  carrito de Square en el móvil: el título de la cuenta ya nombra al cliente (hub#630).
+  líneas) se desplaza. Donde no cabe el texto del botón de cliente, se queda en su icono: el chip de
+  cliente de la cabecera ya lo nombra (hub#630).
 
 **Hablar** (la tecla del micrófono de la tira; solo a quien puede usar el asistente y en un dispositivo
 que puede grabar): púlsala y habla. Mientras graba se pone roja, se llama «Parar» y debajo sale

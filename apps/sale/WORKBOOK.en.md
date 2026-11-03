@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:96799fd7139ac704caa58b3cfd727da2eb5f19c6705938eeac2c914d773613ba -->
+<!-- generated from WORKBOOK.md sha256:e976f879d0e7c84e85fbb3d9cae9de09699db6d356774532981fe7c2973dab4a -->
 
 ## What it is for and who it is for
 
@@ -124,8 +124,8 @@ areas:
   if there is one, "Total" (the one the server works out), the discount button, the printer ("Print
   bill") and "Charge · <amount>". In the phone's drawer the top bar and the footer with "Charge" always
   stay in view, above the tab bar, also on a 320×568 phone; what is in between (title, chips, tabs and
-  lines) scrolls. Where the customer button's text does not fit, it keeps only its icon, as in Square's
-  cart on a phone: the check's title already names the customer (hub#630).
+  lines) scrolls. Where the customer button's text does not fit, it keeps only its icon: the customer
+  chip in the heading already names them (hub#630).
 
 **Speak** (the strip's microphone key; only for whoever may use the assistant and on a device that can
 record): press it and speak. While it records it turns red, is called "Stop" and "Listening…" shows
