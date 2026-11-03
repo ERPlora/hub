@@ -10,6 +10,7 @@ a bucket it is refused unless ``--no-dump`` (local development and ``pre`` only)
 time, the copy first; the first that fails stops the run with why, left as it was, and the next run does it again.
 A business already with its own database is left as it is. Runs where the migrator's credentials and the dumps
 bucket's write are: a one-off task of the ``worker`` family in AWS (``hub-migrate`` cannot write to the bucket).
+Once ``control/0007`` renamed control's tables of the hubs' apps, ``--copy-all`` is refused: there is nothing to copy.
 """
 
 from django.core.management.base import BaseCommand, CommandError
@@ -130,6 +131,8 @@ class Command(BaseCommand):
                 refusals.append(f"{slug} is {hub.status}: only a ready business is cut (skip a cancelled one).")
             elif mode == cut.COPY_ALL and went_to and went_to != slug:
                 refusals.append(f"{slug}: control's rows already went to {went_to}; they are copied once.")
+            elif mode == cut.COPY_ALL and not cut.holds_apps_tables():
+                refusals.append(f"{slug}: {cut.NOTHING_TO_COPY}")
         return refusals
 
     def _print_plan(self, on_control: list[Hub], modes: dict[str, str], no_dump: bool) -> None:

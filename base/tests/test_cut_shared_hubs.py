@@ -13,6 +13,7 @@ hubs' apps from another connection, so they write committed rows (no test case; 
 """
 
 import datetime as dt
+import importlib
 import io
 import subprocess
 import uuid
@@ -20,6 +21,7 @@ from types import SimpleNamespace
 
 import pytest
 from django.core.management import CommandError, call_command
+from django.db import connection
 from django.test import Client
 from django.utils import timezone
 from live.models import OutboxEvent
@@ -267,6 +269,47 @@ def test_control_s_rows_are_copied_only_once_into_one_business(phase_one):
     with pytest.raises(CommandError, match=f"already went to {first.slug}"):
         run("--copy-all", second.slug, "--no-dump")
     assert fresh(second).db_name == ""
+
+
+# ── After the contract of S5 (``control/0007``): control no longer holds the hubs' tables under their names ─────────
+
+
+@pytest.fixture
+def hubs_tables_renamed(phase_one, settings):
+    """Control's tables of the hubs' apps renamed, committed (the cut reads them from another connection), as
+    ``control/0007`` leaves them with production's routers; their names back after the test, before ``phase_one`` cleans
+    its rows up."""
+    settings.DATABASE_ROUTERS = [
+        router for router in settings.DATABASE_ROUTERS if router != "base.tenancy.tests.legacy.LegacyTablesRouter"
+    ]
+    migration = importlib.import_module("control.migrations.0007_hub_tables_renamed_shared")
+    pairs = [(table, f"{table}{migration.SUFFIX}") for table in migration.left_behind("default")]
+    assert pairs
+    migration.rename(connection, pairs)
+    yield
+    migration.rename(connection, [(new, old) for old, new in pairs])
+
+
+def test_once_the_tables_are_renamed_a_copy_all_is_refused_and_nothing_is_lost_in_silence(phase_one, hubs_tables_renamed):
+    hub = phase_one.business("late")
+    before = databases()
+
+    assert f"Refused: {hub.slug}" in run("--dry-run", "--copy-all", hub.slug)
+    with pytest.raises(CommandError, match="Nothing was cut"):
+        run("--copy-all", hub.slug, "--no-dump")
+    with pytest.raises(cut.CutError):
+        cut.cut_hub(hub.id, cut.COPY_ALL)
+
+    assert fresh(hub).db_name == ""
+    assert databases() == before
+
+
+def test_once_the_tables_are_renamed_recreate_still_gives_a_business_its_database(phase_one, hubs_tables_renamed):
+    hub = phase_one.business("late")
+
+    run("--recreate", hub.slug, "--no-dump")
+
+    assert fresh(hub).db_name
 
 
 # ── The dry run, and running it again ─────────────────────────────────────────────────────────────────────────────
