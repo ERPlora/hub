@@ -22,6 +22,7 @@ from live.slugs import is_reserved_hub_slug
 SETTINGS_FILE = Path(__file__).resolve().parents[1] / "settings.py"
 BASE_DIR = SETTINGS_FILE.parents[1]
 ENV_KEYS = (
+    "ASSISTANT_SERVER_VOICE",
     "DEBUG",
     "SECRET_KEY",
     "ALLOWED_HOSTS",
@@ -98,6 +99,12 @@ def load_settings(monkeypatch, tmp_path):
         return runpy.run_path(str(SETTINGS_FILE))
 
     return load
+
+
+@pytest.mark.parametrize(("env", "on"), [({}, False), ({"ASSISTANT_SERVER_VOICE": "True"}, True)])
+def test_the_server_voice_of_the_assistant_is_off_unless_the_environment_turns_it_on(load_settings, env, on):
+    """Round 2026-11-04a: no voice provider for now; the panel reads with the device's voice."""
+    assert load_settings(**PRODUCTION_ENV, **env)["ASSISTANT_SERVER_VOICE"] is on
 
 
 def test_live_precedes_daphne_so_its_runserver_wins():

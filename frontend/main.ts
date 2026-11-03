@@ -26,7 +26,7 @@ import { onSessionChanged, readAccess, startWayIn } from '../base/frontend/lib/a
 import { APP_BLOCKED_ROUTE, appOfRouteFile, createAppGate } from '../base/frontend/lib/app-gate';
 import { installErrorReport } from '../base/frontend/lib/error-report';
 import { approvalPass } from '../base/frontend/lib/approval';
-import { HUB_ASSISTANT } from '../base/frontend/lib/assistant-hub';
+import { hubAssistant } from '../base/frontend/lib/assistant-hub';
 import { type HubHome, readJsonBlock } from '../base/frontend/lib/home';
 import { openReportProblem } from '../base/frontend/lib/report-problem';
 import { allowedTo, useApiDocsShown } from '../base/frontend/lib/sidebar';
@@ -206,7 +206,7 @@ export async function boot(
 ): Promise<void> {
   const config = readSpaConfig(doc);
   // The shared assistant's panel (APP-BASE-9) as the Hub's: its routes, base's operations and words, who uses it.
-  configureAssistant(HUB_ASSISTANT);
+  configureAssistant(hubAssistant(doc));
   // A manager's approval (APP-BASE-5): the pass of the command being repeated travels in `X-Elevation-Token`.
   const client = createLiveClient(config, { routes: OPERATION_ROUTES, getElevationToken: approvalPass });
   const { reload, ...session } = loadSession(client, doc);

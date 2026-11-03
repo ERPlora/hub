@@ -139,6 +139,8 @@ def test_the_shell_embeds_this_hub_s_name_and_where_its_plan_is_changed_on_the_s
         # APP-BASE-3: the session's way in (base/tests/test_access_spa.py).
         "access": {"credential": "account", "switch_user": False, "idle_minutes": None},
         "preferences": {"theme_mode": "", "palette": ""},
+        # Round 2026-11-04a: no server voice for the assistant unless ASSISTANT_SERVER_VOICE (base/tests/test_assistant_speak.py).
+        "server_voice": False,
     }
 
 

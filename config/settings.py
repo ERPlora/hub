@@ -346,6 +346,9 @@ INTERNAL_SHARED_SECRET_PREVIOUS = config("INTERNAL_SHARED_SECRET_PREVIOUS", defa
 #: Where «Report a problem» tells the person to write when erplora.com could not take the report (BASE-F108): the
 #: SaaS's own support mailbox.
 SUPPORT_EMAIL = config("SUPPORT_EMAIL", default="support@erplora.com")
+#: Whether erplora.com reads the assistant's answers aloud in its own voices (base.assistant.speak). Off until a voice
+#: provider is configured there (round 2026-11-04a): the panel reads with the device's voice and offers no choice.
+ASSISTANT_SERVER_VOICE = config("ASSISTANT_SERVER_VOICE", default=False, cast=bool)
 # How far an internal call's X-Erplora-Timestamp may be from now (both ways), as in the SaaS.
 INTERNAL_SIGNATURE_MAX_AGE_SECONDS = 300
 # The demo hubs (plan 2026-10-17, §1.11), which the SaaS's /demo/ asks for: how many may be live at once (503

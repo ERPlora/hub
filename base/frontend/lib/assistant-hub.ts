@@ -1,9 +1,10 @@
 // The Hub's configuration of the shared assistant (`@erplora/ui/components`; the SaaS mounts the same chat with its
-// own): `configureAssistant(HUB_ASSISTANT)` when the SPA boots (main.ts), and in the test helpers that mount its pieces
-// (`mountBase`, `mount-sale`).
+// own): `configureAssistant(hubAssistant(doc))` when the SPA boots (main.ts), and `HUB_ASSISTANT` in the test helpers
+// that mount its pieces (`mountBase`, `mount-sale`).
 // - A turn goes to `base.assistant.turn`'s route; the allowance, a dictation and a report through base's operations.
 // - «Read aloud» in a server voice (round 2026-11-03n): the mp3 of `base.assistant.speak`'s route; when it fails, the
-//   panel reads with the device's voice.
+//   panel reads with the device's voice. Only where the page says erplora.com has a voice (`hub-home.server_voice`,
+//   off by default since round 2026-11-04a, `hubAssistant`): else no choice of voice and no request, the device reads.
 // - Whoever sees the Home uses it (BASE-G110); whoever administers the business upgrades the plan, on erplora.com's
 //   page the Home's block gives (gh:hub#1259).
 // - A write a manager must approve goes through APP-BASE-5's approvals (BASE-G118): the dialog «An approval is
@@ -128,7 +129,6 @@ export const HUB_ASSISTANT: AssistantConfig = {
   approval: hubApproval(),
   usage: (client) => client.api.call('base.assistant.usage', {}),
   transcribe: (client, clip) => client.api.call('base.assistant.transcribe', clip),
-  speak: (input) => speakAloud(input),
   report: (client, report) => client.api.call('base.assistant.report', report),
   canUse: (session) => session.can('base.view_home'),
   canUpgrade: (session) => session.can('base.administer_hub'),
@@ -137,3 +137,10 @@ export const HUB_ASSISTANT: AssistantConfig = {
   placeKey,
   screenKey: platformScreenKey,
 };
+
+/** The Hub's configuration for the page `doc`: `HUB_ASSISTANT`, with the server's voice (`speak`) only where the page
+ *  says erplora.com has one (`hub-home.server_voice`, `ASSISTANT_SERVER_VOICE`). */
+export function hubAssistant(doc: Document = document): AssistantConfig {
+  if (readJsonBlock<HubHome>('hub-home', doc)?.server_voice !== true) return HUB_ASSISTANT;
+  return { ...HUB_ASSISTANT, speak: (input) => speakAloud(input, doc) };
+}

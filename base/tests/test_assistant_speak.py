@@ -31,6 +31,13 @@ MP3 = b"ID3\x04\x00\x00\x00\x00\x00\x00\xff\xfb\x90d" + bytes(range(256))
 XIMENA = "es-ES-Ximena:DragonHDLatestNeural"
 
 
+@pytest.fixture(autouse=True)
+def server_voice(settings):
+    """The server's voice turned on (``ASSISTANT_SERVER_VOICE``), as a deployment with a voice provider has it; the
+    default (off, round 2026-11-04a) is tested by name below."""
+    settings.ASSISTANT_SERVER_VOICE = True
+
+
 def ctx(permissions=EMPLOYEE, *, actor="ana", screen="es"):
     return OperationContext(scope=A, actor=actor, permissions=frozenset(permissions), language=screen)
 
@@ -147,6 +154,15 @@ def test_its_refusals_are_said_in_the_persons_language(gateway):
     ]
 
 
+def test_with_the_server_voice_off_nothing_is_asked_of_erplora_com(settings, gateway):
+    """Round 2026-11-04a: no voice provider for now, so the Hub never asks (the panel reads with the device's voice)."""
+    settings.ASSISTANT_SERVER_VOICE = False
+    with pytest.raises(OperationError) as caught:
+        speak(text="Hola")
+    assert (caught.value.status, caught.value.code) == (503, "base.assistant_speech_unavailable")
+    assert gateway.requests == []
+
+
 def test_erplora_com_slower_than_the_hub_waits_is_a_failure(gateway, monkeypatch):
     monkeypatch.setattr(assistant, "SPEECH_TIMEOUT", httpx.Timeout(0.2))
     gateway.reply(SYNTHESIZE, content=MP3, content_type="audio/mpeg", delay=1.0)
@@ -223,6 +239,27 @@ def test_without_the_server_voice_the_route_answers_the_envelope(client, make_us
     response = post(client, {"text": "Hola"}, HTTP_ACCEPT="audio/mpeg")
     assert response.status_code == 503
     assert response.json()["error"]["code"] == "base.assistant_speech_unavailable"
+
+
+def test_with_the_server_voice_off_the_route_answers_the_envelope_without_asking(client, make_user, settings, gateway):
+    settings.ASSISTANT_SERVER_VOICE = False
+    client.force_login(make_user("ana", host="a", role="hub_employee"))
+    response = post(client, {"text": "Hola"}, HTTP_ACCEPT="audio/mpeg")
+    assert (response.status_code, response.json()["error"]["code"]) == (503, "base.assistant_speech_unavailable")
+    assert gateway.requests == []
+
+
+@pytest.mark.usefixtures("spa_manifest")
+@pytest.mark.parametrize("on", [False, True])
+def test_the_shell_tells_the_panel_whether_there_is_a_server_voice(client, make_user, settings, on):
+    """The panel offers the server's voices (and asks the route) only when there is one; else it reads with the
+    device's voice, without a choice of voice and without a request (``assistant-hub.ts`` ``hubAssistant``)."""
+    from base.tests.test_spa import json_block
+
+    settings.ASSISTANT_SERVER_VOICE = on
+    client.force_login(make_user("ana", host="a", role="hub_employee"))
+    _, home = json_block(client.get("/demo/items", **HOST), "hub-home")
+    assert home["server_voice"] is on
 
 
 def test_nobody_without_a_session_has_anything_read(client, gateway):

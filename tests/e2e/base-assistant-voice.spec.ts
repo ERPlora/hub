@@ -1,12 +1,16 @@
-// «Read aloud» in the server's voice (round 2026-11-03n, PLAN-HUB §73; BASE-F93 step 8), end to end with the stack's
-// Hub and SaaS and the e2e's provider (assistant-provider.ts, started here; README «El asistente»): the panel's head
-// offers the two voices of the screen's language and the device's own, and «Read aloud» asks the Hub
-// (`/api/assistant/speak`), which asks the SaaS (`/internal/speech/synthesize`). No stack has a key of the voices'
-// provider: the Hub answers 503 in its envelope and the panel reads with the device's voice, with no unhandled error.
-// Headless Chrome has no voice of its own to read with, so the device's `speechSynthesis.speak` is recorded at the edge.
-// And the server's audio plays from a `blob:` under the Hub's real CSP (`media-src`): there, and only there, the Hub's
-// answer is replaced in the browser by a short silence made here (a WAV), the one way to hear a server voice without a
-// key; a CSP without `blob:` makes the player fail and the device read instead, which the test catches.
+// «Read aloud» of the assistant's answers (BASE-F93 step 8), end to end with the stack's Hub and SaaS and the e2e's
+// provider (assistant-provider.ts, started here; README «El asistente»). Headless Chrome has no voice of its own to read
+// with, so the device's `speechSynthesis.speak` is recorded at the edge.
+// - By default there is no server voice (round 2026-11-04a, `ASSISTANT_SERVER_VOICE` off): the panel offers no choice
+//   of voice and reads with the device's, never asking the Hub.
+// - With the stack's Hub started with `ASSISTANT_SERVER_VOICE=True` (round 2026-11-03n, PLAN-HUB §73): the panel's head
+//   offers the two voices of the screen's language and the device's own, and «Read aloud» asks the Hub
+//   (`/api/assistant/speak`), which asks the SaaS (`/internal/speech/synthesize`). No stack has a key of the voices'
+//   provider: the Hub answers 503 in its envelope and the panel reads with the device's voice, with no unhandled error.
+//   And the server's audio plays from a `blob:` under the Hub's real CSP (`media-src`): there, and only there, the Hub's
+//   answer is replaced in the browser by a short silence made here (a WAV), the one way to hear a server voice without a
+//   key; a CSP without `blob:` makes the player fail and the device read instead, which the test catches.
+// Each test runs on the stack whose Hub has its setting and is skipped on the other: run the spec once with each.
 // flow: BASE-F93
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
@@ -74,6 +78,10 @@ function watchProblems(page: Page): string[] {
   return problems;
 }
 
+/** Whether the stack's Hub reads aloud in a server voice (`hub-home.server_voice`, `ASSISTANT_SERVER_VOICE`). */
+const serverVoice = (page: Page): Promise<boolean> =>
+  page.evaluate(() => JSON.parse(document.getElementById('hub-home')?.textContent || '{}').server_voice === true);
+
 /** The Home in Spanish (the Hub's language cookie, as the sign-in sets it: the e2e's account is in English) with the
  *  panel open and one answer of the e2e's provider. */
 async function answered(page: Page): Promise<void> {
@@ -87,10 +95,35 @@ async function answered(page: Page): Promise<void> {
   await expect(listen(page)).toBeVisible();
 }
 
+test('BASE-F93 — with no server voice (the default) there is no choice of voice and the device reads the answer, never asking the Hub', async ({ page }) => {
+  const problems = watchProblems(page);
+  const asked: string[] = [];
+  page.on('request', (request) => {
+    if (request.url().includes('/api/assistant/speak')) asked.push(request.url());
+  });
+  await recordDevice(page);
+  await answered(page);
+  test.skip(await serverVoice(page), 'the stack reads aloud in a server voice (ASSISTANT_SERVER_VOICE=True)');
+
+  await expect(voice(page)).toHaveCount(0);
+  await listen(page).click();
+  await expect.poll(() => deviceSaid(page)).toEqual([{ text: GREETING, lang: 'es-ES' }]);
+  await expect(listen(page)).toHaveText('Leer en voz alta');
+  await expect(panel(page).locator('[data-testid="assistant-listen-failed"]')).toHaveCount(0);
+  for (const vp of VIEWPORTS) {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    await expect(listen(page)).toBeVisible();
+    await capture(page, `${KEY}-device-only-${vp.label}`);
+  }
+  expect(asked).toEqual([]);
+  expect(problems).toEqual([]);
+});
+
 test('BASE-F93 — the head offers the two voices of the language and the device’s; without the server’s voice the device reads the answer', async ({ page }) => {
   const problems = watchProblems(page);
   await recordDevice(page);
   await answered(page);
+  test.skip(!(await serverVoice(page)), 'the stack has no server voice (ASSISTANT_SERVER_VOICE off, the default)');
 
   // The voices of Spanish, the first one chosen until the person picks another, and the device's own.
   await expect(voice(page)).toHaveJSProperty('value', 'es-ES-Ximena:DragonHDLatestNeural');
@@ -153,6 +186,7 @@ test('BASE-F93 — the server’s audio plays from a blob: under the Hub’s CSP
   const problems = watchProblems(page);
   await recordDevice(page);
   await answered(page);
+  test.skip(!(await serverVoice(page)), 'the stack has no server voice (ASSISTANT_SERVER_VOICE off, the default)');
   await page.route('**/api/assistant/speak', (route) => route.fulfill({ status: 200, contentType: 'audio/wav', body: silence() }));
 
   await listen(page).click();

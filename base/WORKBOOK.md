@@ -2374,9 +2374,10 @@ Pasos:
      que dice, citando de qué sección sale; si la documentación no lo cubre, lo dice en lugar de inventarlo.
   6. Si el asistente acaba sin decir nada, la burbuja dice «(sin respuesta)».
   7. «Detener» corta lo que faltaba: lo ya escrito se queda, con «Detenido.» debajo.
-  8. Bajo cada respuesta terminada, «Leer en voz alta» la lee con la voz elegida en la cabecera del panel: una de las
-     dos voces de ERPlora del idioma de la pantalla (la primera, hasta que se elige otra; el dispositivo recuerda la
-     elección) o la «Voz del dispositivo», si la tiene. «Dejar de leer» la para.
+  8. Bajo cada respuesta terminada, «Leer en voz alta» la lee con la voz del dispositivo, si la tiene, y «Dejar de
+     leer» la para. Si ERPlora tiene activadas sus propias voces (hoy no), la cabecera del panel deja elegir entre las
+     dos del idioma de la pantalla (la primera, hasta que se elige otra; el dispositivo recuerda la elección) y la «Voz
+     del dispositivo».
 Entra: lo que escribe la persona; la conversación entera viaja con cada pregunta (BASE-F102).
 Sale: la pregunta a erplora.com, que la responde y la cuenta en los mensajes del mes (BASE-F104).
 Si falla: sin conexión, con el servicio caído, sin plan o sin mensajes: BASE-F106 y BASE-F104. Si la documentación no
@@ -3312,7 +3313,10 @@ Implicados: ACCOUNTS-F38, BASE-F40
   **una** petición `fetch` + `ReadableStream` que se cierra al acabar (tramas `text`, `executed`, `confirm`, `usage`,
   `error` y `done`), no una segunda SSE permanente (PLAN §14). El navegador nunca habla con la pasarela ni con un
   proveedor.
-- **Leer en voz alta con la voz del servidor** (ronda 2026-11-03n, PLAN-HUB §73): `base.assistant.speak` (`database=False`)
+- **Leer en voz alta con la voz del servidor** (ronda 2026-11-03n, PLAN-HUB §73; dormida desde la ronda 2026-11-04a:
+  `ASSISTANT_SERVER_VOICE`, apagado por defecto, la enciende; apagado, `hub-home.server_voice` es `false`, el panel no
+  recibe `speak` —ni selector de voz ni petición— y lee con la voz del dispositivo, y la operación responde 503
+  `base.assistant_speech_unavailable` sin llamar a erplora.com): `base.assistant.speak` (`database=False`)
   pide a erplora.com el mp3 de una respuesta (`text` de 1 a 4096 caracteres, sin espacios de los extremos; `language`,
   `es` o `en`, la de la pantalla si no viene y el inglés para cualquier otra; `voice`, un id del catálogo de
   `@erplora/ui` `voices.ts`, o ninguna: la primera del idioma). Espera hasta 65 s (`SPEECH_TIMEOUT`, más que los 60 s
@@ -3321,7 +3325,7 @@ Implicados: ACCOUNTS-F38, BASE-F40
   `assistant.provider_not_configured`) responde 503 `base.assistant_speech_unavailable`; cualquier otro fallo (4xx,
   5xx, tiempo agotado, una respuesta que no es audio), 503 `base.assistant_speech_failed`; los dos dejan su línea en el
   log. El panel lo reproduce desde un `blob:` (CSP `media-src 'self' blob:` y el origen del SaaS) y, si falla, lee con
-  la voz del dispositivo (`HUB_ASSISTANT.speak` = `speakAloud`, `base/frontend/lib/assistant-hub.ts`).
+  la voz del dispositivo (`hubAssistant(doc).speak` = `speakAloud`, `base/frontend/lib/assistant-hub.ts`).
 - **La documentación de ERPlora** (saas ASSISTANT-F28; ronda 2026-10-30e, plan `docs/plans/2026-10-30-asistente-saas.md`
   de la raíz, tarea T5): `base.docs.search` (query, `base.view_home`, `database=False`, `ai=AI(…)`; herramienta
   `base__docs__search`, en `ALWAYS` porque una pregunta de «cómo se hace» no comparte palabras con ella) pregunta al

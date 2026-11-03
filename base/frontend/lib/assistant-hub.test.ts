@@ -27,6 +27,7 @@ import {
   hubApproval,
   placeKey,
   platformScreenKey,
+  hubAssistant,
   setupShortcuts,
   speakAloud,
 } from './assistant-hub';
@@ -148,12 +149,24 @@ describe("«Read aloud» in the server's voice (round 2026-11-03n)", () => {
     expect((refused as ApiError).status).toBe(502);
   });
 
-  it('is the configuration the panel reads aloud with, on the page itself', async () => {
-    document.body.append(spaDocument().getElementById('spa-config')!);
+  it('without the server’s voice (the default, round 2026-11-04a) the panel gets no speak: no choice of voice, no request', () => {
+    expect(HUB_ASSISTANT.speak).toBeUndefined();
+    const off = spaDocument();
+    off.body.insertAdjacentHTML('beforeend', `<script id="hub-home" type="application/json">${JSON.stringify({ server_voice: false })}</script>`);
+    expect(hubAssistant(off)).toBe(HUB_ASSISTANT);
+    expect(hubAssistant(spaDocument())).toBe(HUB_ASSISTANT);
+  });
+
+  it('with the server’s voice the panel reads through base.assistant.speak’s route, the rest as HUB_ASSISTANT', async () => {
+    const on = spaDocument();
+    on.body.insertAdjacentHTML('beforeend', `<script id="hub-home" type="application/json">${JSON.stringify({ server_voice: true })}</script>`);
     const fetcher = vi.fn(async () => new Response(MP3, { status: 200, headers: { 'Content-Type': 'audio/mpeg' } }));
     vi.stubGlobal('fetch', fetcher);
-    expect((await HUB_ASSISTANT.speak!(XIMENA)).type).toBe('audio/mpeg');
-    expect((fetcher.mock.calls[0] as unknown as [string])[0]).toBe('/api/assistant/speak');
+    const config = hubAssistant(on);
+    expect([config.turnUrl, config.transcribe]).toEqual([HUB_ASSISTANT.turnUrl, HUB_ASSISTANT.transcribe]);
+    expect((await config.speak!(XIMENA)).type).toBe('audio/mpeg');
+    const [url, init] = fetcher.mock.calls[0] as unknown as [string, RequestInit];
+    expect([url, (init.headers as Record<string, string>)['X-CSRFToken']]).toEqual(['/api/assistant/speak', 'tok123']);
   });
 });
 

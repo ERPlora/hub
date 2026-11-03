@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:d7cdc8e5115d5c6d30c96bd45dfddc2b7cf161ecb33c0c2c227273f35772eb75 -->
+<!-- generated from WORKBOOK.md sha256:0dceb6e2c41bfb662f4f6c85fc571108518581e959fccd4d26685cab5351d789 -->
 
 ## What it is for and who it is for
 
@@ -2262,9 +2262,10 @@ Steps:
      instead of making it up.
   6. If the assistant ends without saying anything, the bubble reads "(no answer)".
   7. "Stop" cuts what was left: what was already written stays, with "Stopped." below.
-  8. Under each finished answer, "Read aloud" reads it in the voice chosen in the panel's header: one of ERPlora's
-     two voices for the screen's language (the first one, until another is chosen; the device remembers the choice)
-     or the "Device voice", if it has one. "Stop reading" stops it.
+  8. Under each finished answer, "Read aloud" reads it with the device's voice, if it has one, and "Stop reading"
+     stops it. If ERPlora has its own voices turned on (not today), the panel's header lets the person choose between
+     the two for the screen's language (the first one, until another is chosen; the device remembers the choice) and
+     the "Device voice".
 In: what the person writes; the whole conversation travels with each question (BASE-F102).
 Out: the question to erplora.com, which answers it and counts it in the month's messages (BASE-F104).
 If it fails: without a connection, with the service down, without a plan or without messages: BASE-F106 and BASE-F104.
