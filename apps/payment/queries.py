@@ -323,3 +323,9 @@ def list_methods(ctx: OperationContext, params: MethodListIn) -> dict:
 )
 def get_method(ctx: OperationContext, data: MethodRefIn) -> dict:
     return method_row(find_method(data.id, data.method), whole=True)
+
+
+def keeps_fiscal_documents() -> bool:
+    """Whether this database holds its outgoing payments (``fiscal_documents_kept`` on this app's config), of any status: a draft counts
+    too, for what it asks is whether a database can go, and that cannot be undone."""
+    return Payment.objects.exists()

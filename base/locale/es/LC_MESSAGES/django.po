@@ -361,6 +361,10 @@ msgstr "Esta dirección no puede nombrar un negocio (%(reason)s)."
 msgid "This hub was cancelled: restore it first."
 msgstr "Este hub está cancelado: restáuralo primero."
 
+#: services.py
+msgid "This business is not being dropped."
+msgstr "Este negocio no se está borrando."
+
 #: services.py:670
 msgid "Every demo is taken right now; try again in a minute."
 msgstr ""
