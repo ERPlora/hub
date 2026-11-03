@@ -18,6 +18,8 @@ import {
 } from '../../../../packages/ui/src/sdk/__tests__/live-harness';
 import type { Business } from '../../../../base/frontend/operations';
 import { OPERATION_ROUTES } from '../../../../frontend/generated/operation-routes';
+import baseEn from '../../../../base/frontend/locale/en.json';
+import baseEs from '../../../../base/frontend/locale/es.json';
 import { ComposableHost } from './composable-host';
 import en from '../locale/en.json';
 import es from '../locale/es.json';

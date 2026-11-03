@@ -3,8 +3,8 @@
 // detail`): «Session detail · S-…» with Back to the sessions, the summary (who opened and closed it, the
 // drawer, the figures by payment method, expected, counted, difference and the notes), the session's
 // «Movements» and «Counts», and «Print»: the X report of an open session or the Z of a closed one, to the
-// receipt printer's queue (Printing's PRINTING-F17), or through the browser's dialog when Printing is not on
-// in the business. A blind count hides «Print» on an open session from whoever may not see the expected
+// receipt printer's queue (Printing's PRINTING-F17), or on the device when Printing is not on in the business
+// (the browser's dialog; inside the installed app, its print screen, hub#455; a refusal says why). A blind count hides «Print» on an open session from whoever may not see the expected
 // cash. Read-only; everything re-runs by itself (a sale, a movement, a count, the close).
 import { InlineFeedback } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
@@ -17,6 +17,7 @@ import SessionCounts from '../components/SessionCounts.vue';
 import SessionLines from '../components/SessionLines.vue';
 import SessionSummary from '../components/SessionSummary.vue';
 import { useT } from '../composables/useT';
+import { printRefusal, withReason } from '../../../../base/frontend/lib/print-paper';
 import * as paper from '../lib/print';
 import { cashRegisterTabs } from '../tabs';
 
@@ -36,16 +37,19 @@ const printing = useCommand('cash_register.session.print');
 /** A blind count keeps an open session's report from whoever may not see its expected cash. */
 const printable = computed(() => !!session.value && !(session.value.status === 'open' && session.value.expected_hidden));
 
-/** The browser's dialog, with the paper alone: the way out when Printing is not on in the business. */
+/** The device's dialog, with the paper alone (inside the installed app, its print screen, hub#455): the way out
+ *  when Printing is not on in the business. Titled with the report and the session, as the paper heads them. */
 async function printHere(): Promise<void> {
   printedAt.value = new Date();
   await nextTick();
   const element = report.value?.$el as HTMLElement | undefined;
-  if (!element) return;
+  const shown = session.value;
+  if (!element || !shown) return;
+  const kind = t(shown.status === 'closed' ? 'cash_register.report.z' : 'cash_register.report.x');
   try {
-    paper.printPaper(element);
-  } catch {
-    void toastError(t('cash_register.detail.printFailed'));
+    await paper.printPaper(element, { title: `${kind} · ${shown.number}` });
+  } catch (failure) {
+    void toastError(withReason(t('cash_register.detail.printFailed'), printRefusal(failure, t)));
   }
 }
 

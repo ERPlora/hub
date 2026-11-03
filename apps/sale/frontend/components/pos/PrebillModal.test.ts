@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { h, ref } from 'vue';
 
 import { click, errorFrame, mountSale, settle } from '../../__tests__/mount-sale';
+import { PrintRefused } from '../../../../../base/frontend/lib/print-paper';
 import { printPaper } from '../../lib/print';
 import { plain } from '../../lib/format';
 import { line, order, preview } from './__tests__/fixtures';
@@ -190,13 +191,41 @@ describe('PrebillModal', () => {
     expect(m.find('pos-prebill-print').attributes('aria-label')).toBe('Print');
     await click(m.find('pos-prebill-print').element);
     await settle();
-    expect(printPaper).toHaveBeenCalledExactlyOnceWith(m.find('pos-prebill-paper').element);
+    expect(printPaper).toHaveBeenCalledExactlyOnceWith(m.find('pos-prebill-paper').element, { title: 'Bill' });
     vi.mocked(printPaper).mockImplementationOnce(() => {
       throw new Error('blocked');
     });
     await click(m.find('pos-prebill-print').element);
     await settle();
     expect(toastError).toHaveBeenCalledExactlyOnceWith('Bill could not be printed');
+  });
+
+  it('in the installed app, a print the app refuses says why (hub#455)', async () => {
+    const m = await setup();
+    await m.result('sale.checkout.preview', VALUED);
+    vi.mocked(printPaper).mockRejectedValueOnce(new PrintRefused('outdated', 'Command print_document not found'));
+    await click(m.find('pos-prebill-print').element);
+    await settle();
+    expect(toastError).toHaveBeenCalledExactlyOnceWith(
+      'Bill could not be printed: this version of the ERPlora app cannot print; update it',
+    );
+  });
+
+  it('a second press while the app prints waits for it (hub#455)', async () => {
+    const m = await setup();
+    await m.result('sale.checkout.preview', VALUED);
+    let done = (): void => {};
+    vi.mocked(printPaper).mockReturnValueOnce(new Promise<void>((resolve) => (done = resolve)));
+    await click(m.find('pos-prebill-print').element);
+    await settle();
+    await click(m.find('pos-prebill-print').element);
+    await settle();
+    expect(printPaper).toHaveBeenCalledOnce();
+    done();
+    await settle();
+    await click(m.find('pos-prebill-print').element);
+    await settle();
+    expect(printPaper).toHaveBeenCalledTimes(2);
   });
 
   it('cannot be valued: says so with «Retry»; the close button closes it', async () => {

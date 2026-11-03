@@ -7,13 +7,16 @@
 // while the window is closed. Every print from Sales is a «DUPLICATE» (the default); the till passes
 // `false` for the first paper after charging. «Print» asks the printing queue first (`sale.sale.print`,
 // PRINTING-F08): queued, a toast names the printer; not queued (Printing off, no receipt printer, a fiscal
-// document pending) or the queue out of reach, the browser prints the screen's paper (`printPaper`).
+// document pending) or the queue out of reach, the device prints the screen's paper (`printPaper`: inside the
+// installed app, its print screen, hub#455), titled with the document's number; a failure says so, with the app's
+// reason when it gives one.
 import { useCommand } from '@erplora/ui/sdk';
 import { HubIcon, toastError, toastSuccess } from '@erplora/ui/shell';
 import { IonButton, IonContent, IonFooter, IonModal, IonToolbar } from '@ionic/vue';
 import { shallowRef, watch } from 'vue';
 
 import { useT } from '../../composables/useT';
+import { printRefusal, withReason } from '../../../../../base/frontend/lib/print-paper';
 import { printPaper } from '../../lib/print';
 import SaleDocument from './SaleDocument.vue';
 
@@ -30,8 +33,14 @@ const open = defineModel<boolean>('open', { required: true });
 
 const t = useT();
 
-/** The painted paper, once there is one: what the print button prints. */
+/** The painted paper, once there is one, and its number: what the print button prints, and the print's title. */
 const paper = shallowRef<HTMLElement | null>(null);
+const title = shallowRef('');
+
+function painted(element: HTMLElement, number: string): void {
+  paper.value = element;
+  title.value = number;
+}
 
 // Closed, or another sale asked: the old paper is not this one's (the new one says `ready` again).
 watch([open, () => props.saleId], ([now], [, before]) => {
@@ -44,23 +53,30 @@ const sending = shallowRef(false);
 
 async function print(): Promise<void> {
   const element = paper.value;
-  if (!element || !props.saleId || sending.value) return;
+  const saleId = props.saleId;
+  if (!element || !saleId || sending.value) return;
   sending.value = true;
   try {
-    const sent = await queue.run({ sale_id: props.saleId, duplicate: props.duplicate });
-    if (sent.queued) {
-      void toastSuccess(t('sale.document.queued', { printer: sent.printer ?? '' }));
-      return;
-    }
-  } catch {
-    // The queue could not be asked: the screen's paper still prints (below).
+    if (await queued(saleId)) return;
+    // Not queued: the device prints the screen's paper (inside the app, its print screen, hub#455).
+    await printPaper(element, { title: title.value });
+  } catch (failure) {
+    void toastError(withReason(t('sale.document.printFailed'), printRefusal(failure, t)));
   } finally {
     sending.value = false;
   }
+}
+
+/** Asks the printing queue; `true` when a printer took the document (a toast names it). */
+async function queued(saleId: string): Promise<boolean> {
   try {
-    printPaper(element);
+    const sent = await queue.run({ sale_id: saleId, duplicate: props.duplicate });
+    if (!sent.queued) return false;
+    void toastSuccess(t('sale.document.queued', { printer: sent.printer ?? '' }));
+    return true;
   } catch {
-    void toastError(t('sale.document.printFailed'));
+    // The queue could not be asked: the screen's paper still prints.
+    return false;
   }
 }
 </script>
@@ -93,7 +109,7 @@ async function print(): Promise<void> {
           v-if="open && saleId"
           :sale-id="saleId"
           :duplicate="duplicate"
-          @ready="paper = $event"
+          @ready="painted"
           @failed="paper = null"
         />
       </div>

@@ -7,8 +7,9 @@
 // the reader's language); the lines, the breakdown and the totals; «Mark as paid», «Rectify» and «Full
 // invoice» where they apply and for whoever may, a refusal said right above them. «Print / PDF» asks the
 // printing queue first (`invoice.invoice.print`, PRINTING-F08): queued for the system printer, a toast names
-// it; not queued (Printing off, no system printer) or the queue out of reach, the browser prints the A4
-// paper (a document of a sale is a copy: its original was the till's paper). With VeriFactu on and its records
+// it; not queued (Printing off, no system printer) or the queue out of reach, the device prints the A4 paper (the
+// browser's dialog; inside the installed app, its print screen, hub#455; a refusal says why), and a document of a
+// sale is a copy: its original was the till's paper. With VeriFactu on and its records
 // readable, it follows the invoice's record too (`verifactu.record.by_invoice`, VERIFACTU-F19, by name: Invoicing
 // does not require VeriFactu): the «VeriFactu receipt» card under the invoice and the record's QR on the screen's
 // paper, which waits for it and is never printed without it (a record it cannot read prints nothing). It follows
@@ -21,6 +22,7 @@ import { computed, shallowRef, watch } from 'vue';
 import { useRouter } from 'vue-router';
 
 import FiscalRecordFollower, { type FiscalRecordState } from '../../../sale/frontend/components/document/FiscalRecordFollower.vue';
+import { printRefusal, withReason } from '../../../../base/frontend/lib/print-paper';
 import { printPaper } from '../../../sale/frontend/lib/print';
 import InvoiceLinesTable from '../components/InvoiceLinesTable.vue';
 import InvoicePaper from '../components/InvoicePaper.vue';
@@ -123,28 +125,35 @@ const sending = shallowRef(false);
 
 async function print(): Promise<void> {
   const element = paper.value?.$el;
-  if (!element || sending.value) return;
+  const number = invoice.value?.number;
+  if (!element || !number || sending.value) return;
   sending.value = true;
   try {
-    const sent = await queue.run({ invoice_id: props.id, duplicate: duplicate.value });
-    if (sent.queued) {
-      void toastSuccess(t('invoice.detail.queued', { printer: sent.printer ?? '' }));
+    if (await queued()) return;
+    // The screen's paper never goes out without the QR of a record it could not read.
+    if (recordOf.value && fiscal.value.error) {
+      void toastError(t('invoice.detail.printFailed'));
       return;
     }
-  } catch {
-    // The queue could not be asked: the screen's paper still prints (below).
+    // Inside the installed app, its print screen (hub#455): a printer or «Save as PDF», under the invoice's name.
+    await printPaper(element, { title: t('invoice.detail.title', { number }) });
+  } catch (failure) {
+    void toastError(withReason(t('invoice.detail.printFailed'), printRefusal(failure, t)));
   } finally {
     sending.value = false;
   }
-  // The screen's paper never goes out without the QR of a record it could not read.
-  if (recordOf.value && fiscal.value.error) {
-    void toastError(t('invoice.detail.printFailed'));
-    return;
-  }
+}
+
+/** Asks the printing queue; `true` when a printer took the invoice (a toast names it). */
+async function queued(): Promise<boolean> {
   try {
-    printPaper(element);
+    const sent = await queue.run({ invoice_id: props.id, duplicate: duplicate.value });
+    if (!sent.queued) return false;
+    void toastSuccess(t('invoice.detail.queued', { printer: sent.printer ?? '' }));
+    return true;
   } catch {
-    void toastError(t('invoice.detail.printFailed'));
+    // The queue could not be asked: the screen's paper still prints.
+    return false;
   }
 }
 

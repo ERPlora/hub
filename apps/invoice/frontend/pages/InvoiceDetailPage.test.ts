@@ -13,6 +13,7 @@ import InvoiceLinesTable from '../components/InvoiceLinesTable.vue';
 import InvoicePaper from '../components/InvoicePaper.vue';
 import RectifyModal from '../components/RectifyModal.vue';
 import SubstituteModal from '../components/SubstituteModal.vue';
+import { PrintRefused } from '../../../../base/frontend/lib/print-paper';
 import { plain } from '../lib/format';
 import type { InvoiceOut } from '../operations';
 import InvoiceDetailPage from './InvoiceDetailPage.vue';
@@ -196,6 +197,34 @@ describe('InvoiceDetailPage: its actions', () => {
     await flush();
     expect(mocks.print).toHaveBeenCalledOnce();
     expect((mocks.print.mock.calls[0][0] as HTMLElement).dataset.testid).toBe('invoice-paper');
+    // Titled: the print job's name and the file «Save as PDF» proposes (hub#455).
+    expect(mocks.print.mock.calls[0][1]).toEqual({ title: 'Invoice FACT-2026-000001' });
+  });
+
+  it('in the installed app, a print the app refuses says why (hub#455)', async () => {
+    const s = await setup();
+    await s.show(INVOICE);
+    mocks.print.mockRejectedValueOnce(new PrintRefused('refused', 'print_document_refused'));
+    await click(s.find('invoice-detail-print').element);
+    await flush();
+    expect(mocks.failed).toHaveBeenCalledExactlyOnceWith('Could not print the invoice: the document is empty or too large to print');
+  });
+
+  it('a second press while the app prints waits for it (hub#455)', async () => {
+    const s = await setup();
+    await s.show(INVOICE);
+    let done = (): void => {};
+    mocks.print.mockReturnValueOnce(new Promise<void>((resolve) => (done = resolve)));
+    await click(s.find('invoice-detail-print').element);
+    await flush();
+    await click(s.find('invoice-detail-print').element);
+    await flush();
+    expect(mocks.print).toHaveBeenCalledOnce();
+    done();
+    await flush();
+    await click(s.find('invoice-detail-print').element);
+    await flush();
+    expect(mocks.print).toHaveBeenCalledTimes(2);
   });
 
   it('«Print / PDF» asks the printing queue first: queued, a toast names the printer and the screen prints nothing', async () => {
