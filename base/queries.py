@@ -580,7 +580,7 @@ def plan_usage(ctx: OperationContext, data: PlanUsageIn) -> dict:
         },
         "database": _database_usage(hub, last),
         "files": _files_usage(state, known, last),
-        "connections": _connections_usage(state, known, counted),
+        "connections": _connections_usage(hub, known, counted),
         "requests": {"this_month": counted.requests_this_month, "since": counted.requests_since},
         "activity": _activity_usage(hub, demo, last, counted),
         "meters": _apps_meters(ctx, hub, home.home_modules(active_apps(ctx.scope), demo_hub=demo)),
@@ -669,17 +669,19 @@ def _counted_during_the_day(hub: Hub) -> _Counted:
     )
 
 
-def _connections_usage(state: dict, known: bool, counted: _Counted) -> dict:
-    """Today's highest against what it really has (BASE-F40), by the limiter's own rule: a known plan whose photo lacks its
-    limits gets Free's, so the screen says that, never «no limit». And the times it fell short: with limits of 1, 3 or 6 a
-    percentage says nothing, a Free plan's first operation of the day is its 100 %."""
-    limits = (tenancy_limits.plan_limits(state) or tenancy_limits.FREE) if known else None
+def _connections_usage(hub: Hub | None, known: bool, counted: _Counted) -> dict:
+    """Today's highest against what it really has (BASE-F40), by the limiter's own rule (``limits.hub_limits``): a known
+    plan whose photo lacks its limits gets Free's, so the screen says that, never «no limit», and ERPlora's own hub, with no
+    plan to know, what its row gives it. And the times it fell short: with limits of 1, 3 or 6 a percentage says nothing, a
+    Free plan's first operation of the day is its 100 %."""
+    platform = hub is not None and hub.is_platform
+    limits = (tenancy_limits.hub_limits(hub) or tenancy_limits.FREE) if known or platform else None
     return {
         "peak_today": counted.peak_today,
         "limit": limits.max_transactions if limits else None,
         "busy_last_7_days": counted.busy_last_7_days,
         "busy_since": counted.busy_since,
-        "bigger_plan_gives_more": tenancy_limits.bigger_plan_gives_more(state) if known else False,
+        "bigger_plan_gives_more": tenancy_limits.bigger_plan_gives_hub_more(hub) if known else False,
     }
 
 
@@ -718,7 +720,7 @@ def _plan_motives(ctx: OperationContext, hub: Hub | None, modules: Iterable[Any]
     if not known or hub is None or hub.is_demo:
         return 0
     files_status = _files_usage(state, known, _last_night(hub))["status"]
-    capacity = _connections_usage(state, known, _counted_during_the_day(hub))
+    capacity = _connections_usage(hub, known, _counted_during_the_day(hub))
     fell_short = bool(capacity["busy_last_7_days"]) and capacity["bigger_plan_gives_more"]
     meters = sum(
         1

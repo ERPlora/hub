@@ -381,6 +381,51 @@ def test_without_the_plan_the_figures_have_no_limit_status_or_notice(hub_a):
     assert usage["apps"]["limit"] is None
 
 
+def as_platform(hub) -> None:
+    """ERPlora's own hub: ``is_platform`` on its row, whatever its photo says (it has none: the SaaS does not know it)."""
+    Hub.objects.filter(pk=hub.pk).update(is_platform=True)
+    hub.refresh_from_db()
+
+
+def test_the_platform_hub_says_what_it_really_has_and_a_business_without_a_plan_still_says_nothing(hub_a, hub_b, monkeypatch):
+    as_platform(hub_a)
+    monkeypatch.setattr(limits, "_limiters", {})
+    did(hub_a, TODAY, peak=2, busy=3)
+    did(hub_b, TODAY, peak=1, busy=3)
+
+    usage = usage_of(hub_a)
+
+    assert (usage["known"], usage["plan_slug"]) == (False, None)
+    assert usage["connections"]["peak_today"] == 2
+    assert usage["connections"]["limit"] == 6
+    assert usage["connections"]["bigger_plan_gives_more"] is False
+    assert usage["connections"]["limit"] == limits.configure(tenancy_connections.hub_alias(hub_a), hub_a).limits.max_transactions
+    other = usage_of(hub_b)["connections"]
+    assert (other["limit"], other["bigger_plan_gives_more"]) == (None, False)
+
+
+@pytest.mark.parametrize("plan", [FREE, STARTER, PRO], ids=["free", "starter", "pro"])
+def test_a_photo_on_the_platform_hub_changes_neither_its_limit_nor_offers_it_a_bigger_plan(hub_a, plan):
+    as_platform(hub_a)
+    on_plan(hub_a, plan)
+    did(hub_a, TODAY, peak=1, busy=4)
+
+    connections = usage_of(hub_a)["connections"]
+
+    assert (connections["limit"], connections["bigger_plan_gives_more"]) == (6, False)
+    assert bell_of(hub_a) == []
+
+
+@pytest.mark.parametrize(("ceiling", "limit"), [(3, 3), (12, 6)], ids=["below-its-own", "above-its-own"])
+def test_the_platform_hub_s_limit_follows_pgbouncer_and_no_plan_would_give_it_more(hub_a, settings, ceiling, limit):
+    settings.PGBOUNCER_MAX_DB_CONNECTIONS = ceiling
+    as_platform(hub_a)
+
+    connections = usage_of(hub_a)["connections"]
+
+    assert (connections["limit"], connections["bigger_plan_gives_more"]) == (limit, False)
+
+
 def test_a_demo_says_so_and_carries_no_figure(hub_a):
     Hub.objects.filter(pk=hub_a.pk).update(is_demo=True)
     measured(hub_a, s3=900, people=4, month=4)
