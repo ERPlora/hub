@@ -121,16 +121,19 @@ métricas del inventario.» y el aviso de la tabla con «Reintentar».
 ### Productos
 Tabla con Nombre, SKU, Precio, Stock («—» en un artículo sin control de stock) y Estado: un
 interruptor activo/inactivo, «Sí»/«No» para quien no puede cambiar productos, o la marca «Sin
-configurar · Falta la categoría fiscal»; a su lado, la insignia roja «Agotado» si el artículo está
-agotado. Buscador «Buscar producto…» por nombre o SKU; orden por columna; filtros por nombre, SKU,
-precio desde/hasta, stock desde/hasta y estado («Sí», «No», «Sin configurar», «Agotado»); 50 por
-página; vista de tabla o de tarjetas.
+configurar · Falta la categoría fiscal», entera mientras la fila tiene sitio (también a 1280 px con el
+menú lateral abierto y la columna «Foto») y, si no, acabada en «…» con el texto entero al pasar el
+ratón; a su lado, la insignia roja «Agotado» si el artículo está agotado. Buscador «Buscar
+producto…» por nombre o SKU; orden por columna; filtros por nombre, SKU, precio desde/hasta, stock
+desde/hasta y estado («Sí», «No», «Sin configurar», «Agotado»); 50 por página; vista de tabla o de
+tarjetas.
 
 Botones de la tabla: **+** (dar de alta), importar CSV y exportar CSV, cada uno solo para quien
-tiene ese permiso. Por fila: «Detalles», «Recibir stock» y «Contar stock» (con permiso de stock y
-solo en productos físicos), «Dar de baja stock» (además, solo en artículos con control de stock),
-«Editar», «Marcar agotado» o, si ya lo está, «Volver a poner a la venta» (en el menú «⋮», para quien
-puede cambiar productos) y «Eliminar». Tocar la fila abre la ficha.
+tiene ese permiso. Por fila, a la vista: «Recibir stock» y «Contar stock» (con permiso de stock y
+solo en productos físicos) y «Editar». En el menú «⋮»: «Detalles» (la misma ficha que abre tocar la
+fila), «Dar de baja stock» (además, solo en artículos con control de stock), «Marcar agotado» o, si
+ya lo está, «Volver a poner a la venta» (para quien puede cambiar productos) y «Eliminar». Tocar la
+fila abre la ficha. Si la fila no tiene sitio, también los de la vista pasan al «⋮».
 
 El **+** y «Editar» abren el panel lateral del formulario: Nombre, SKU (bloqueado al editar: «El
 SKU es la identidad del producto: no se edita»), Precio, «Coste (<moneda>)», «Stock inicial» (solo al
@@ -841,8 +844,8 @@ Estado: hecho
 Actor: administrador, responsable, empleado, cajero
 Pantalla: Ficha del producto
 Pasos:
-1. Abre la ficha del producto (toca la fila o «Detalles»): se ve el código de barras de su SKU en una
-   placa blanca, con el SKU debajo, que se lee también con el tema oscuro.
+1. Abre la ficha del producto (toca la fila o «⋮» → «Detalles»): se ve el código de barras de su SKU
+   en una placa blanca, con el SKU debajo, que se lee también con el tema oscuro.
 2. Pulsa «Imprimir código de barras».
 3. La etiqueta (nombre, código de barras y precio) va a la cola de Impresión, a la impresora con la
    función «Etiqueta», y la ficha dice «La etiqueta ha ido a la impresora «<nombre>».». La saca el

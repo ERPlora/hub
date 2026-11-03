@@ -299,8 +299,10 @@ describe('ProductsPage: actions', () => {
     const s = await setup();
     await s.show(LIST);
     const actions = s.prop<Array<{ id: string; label: string; hidden?: (row: unknown) => boolean; menuOnly?: boolean }>>('actions');
+    // hub#530: «Details» lives in «⋮», since tapping the row already opens the same sheet: its inline button took
+    // the room the «Not configured» chip needs at 1280 once the list grew its «Photo» column.
     expect(actions.map((a) => [a.id, a.label, !!a.menuOnly])).toEqual([
-      ['detail', 'Details', false],
+      ['detail', 'Details', true],
       ['receive', 'Receive stock', false],
       ['count', 'Count stock', false],
       ['write_off', 'Write off stock', true],

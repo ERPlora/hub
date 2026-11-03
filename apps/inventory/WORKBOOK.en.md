@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:e05defc19192fa95bb8012233fece21cbff07ef1edaee4b4ae3ab32491095132 -->
+<!-- generated from WORKBOOK.md sha256:3ae6e80df3a512ce43f9c7da9a46efc47d969da44c614fae19c8aeccb6b9938e -->
 
 ## What it is for and who it is for
 
@@ -109,15 +109,18 @@ with "Retry".
 ### Products
 Table with Name, SKU, Price, Stock ("—" for an item without stock control) and Status: an
 active/inactive switch, "Yes"/"No" for whoever cannot change products, or the mark "Not configured ·
-Missing tax category"; next to it, the red "Sold out" badge if the item is sold out. Search box
-"Search product…" by name or SKU; sorting by column; filters by name, SKU, price from/to, stock
-from/to and status ("Yes", "No", "Not configured", "Sold out"); 50 per page; table or card view.
+Missing tax category", whole while the row has room (also at 1280 px with the side menu open and the
+"Photo" column) and, if not, ending in "…" with the whole text on mouse hover; next to it, the red
+"Sold out" badge if the item is sold out. Search box "Search product…" by name or SKU; sorting by
+column; filters by name, SKU, price from/to, stock from/to and status ("Yes", "No", "Not configured",
+"Sold out"); 50 per page; table or card view.
 
 The table's buttons: **+** (create), import CSV and export CSV, each one only for whoever has that
-permission. Per row: "Details", "Receive stock" and "Count stock" (with stock permission and only on
-physical products), "Write off stock" (also, only on items with stock control), "Edit", "Mark sold
-out" or, if it already is, "Put back on sale" (in the "⋮" menu, for whoever can change products) and
-"Delete". Tapping the row opens the product's card.
+permission. Per row, in sight: "Receive stock" and "Count stock" (with stock permission and only on
+physical products) and "Edit". In the "⋮" menu: "Details" (the same card that tapping the row
+opens), "Write off stock" (also, only on items with stock control), "Mark sold out" or, if it already
+is, "Put back on sale" (for whoever can change products) and "Delete". Tapping the row opens the
+product's card. If the row has no room, the ones in sight go to the "⋮" too.
 
 The **+** and "Edit" open the form's side panel: Name, SKU (locked when editing: "The SKU is the
 product's identity: it is not edited"), Price, "Cost (<currency>)", "Initial stock" (only when
@@ -794,7 +797,7 @@ Status: done
 Actor: administrator, manager, employee, cashier
 Screen: Product card
 Steps:
-1. Open the product's card (tap the row or "Details"): the barcode of its SKU shows on a white plate,
+1. Open the product's card (tap the row or "⋮" → "Details"): the barcode of its SKU shows on a white plate,
    with the SKU below, which also reads with the dark theme.
 2. Tap "Print barcode".
 3. The label (name, barcode and price) goes to Printing's queue, to the printer with the "Label"
