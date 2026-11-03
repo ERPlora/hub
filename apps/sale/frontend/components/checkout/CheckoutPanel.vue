@@ -493,9 +493,10 @@ function openDrawer(): void {
   font-size: 0.9rem;
 }
 
+/* Never shrinks: shrunk to the sheet's height, its keypad would spill behind the foot, out of any scroll's reach (hub#456). */
 .pay {
   display: flex;
-  flex: 1;
+  flex: 1 0 auto;
   flex-direction: column;
   gap: 0.8rem;
   min-height: 8rem;

@@ -29,8 +29,8 @@ const SIZES = [
   /** A tall phone, where the whole sheet fits. */
   { label: '390x844', width: 390, height: 844 },
   /** The narrowest phone: the longest reason takes two lines of the row over the keypad. Its till's «Charge» is under
-   *  the tab bar (hub#630): the sheet opens at 375x667 and the screen shrinks to this with it open. */
-  { label: '320x568', width: 320, height: 568, opensAt: { width: 375, height: 667 } },
+   *  the tab bar (hub#630): the button's own click event opens the sheet there, as a tap that reached it would. */
+  { label: '320x568', width: 320, height: 568, chargeUnderTabBar: true },
 ] as const;
 type KeyId = '0' | '1' | '5' | 'clear' | 'dot';
 /** The issue's way of tendering: the two digits that cover the total, then what makes them another figure. */
@@ -65,9 +65,11 @@ async function aCheck(page: Page): Promise<void> {
   await expect(shown(page).locator('[data-testid^=pos-line-]').filter({ hasText: product.name }).first()).toBeAttached();
 }
 
-async function openSheet(page: Page): Promise<Locator> {
+async function openSheet(page: Page, chargeUnderTabBar = false): Promise<Locator> {
   await openTillCart(page);
-  await shown(page).locator('[data-testid=pos-charge]').click();
+  const charge = shown(page).locator('[data-testid=pos-charge]');
+  if (chargeUnderTabBar) await charge.dispatchEvent('click');
+  else await charge.click();
   const sheet = page.locator('[data-testid=sale-checkout-modal]');
   await expect(sheet.locator('[data-testid=sale-checkout-keypad]')).toBeVisible();
   await expect(sheet.locator('[data-testid=sale-checkout-total]')).toContainText(/\d/);
@@ -76,10 +78,16 @@ async function openSheet(page: Page): Promise<Locator> {
   return sheet;
 }
 
-/** Both scrollers at their end: on a low screen, where the keys are reached; the column's from 821 px, the sheet's below. */
+/** Both scrollers at their end: on a low screen, where the keys are reached; the column's from 821 px, the sheet's below.
+ *  Again until it holds: a scroll while the sheet is still growing into place is lost. */
 async function toTheEnd(sheet: Locator): Promise<void> {
   for (const scroller of ['.sale-checkout', '.pay-tender']) {
-    await sheet.locator(scroller).evaluate((box) => box.scrollTo({ top: box.scrollHeight }));
+    const box = sheet.locator(scroller);
+    await expect
+      .poll(() => box.evaluate((el) => (el.scrollTo({ top: el.scrollHeight }), el.scrollHeight - el.clientHeight - el.scrollTop)), {
+        message: `${scroller} scrolled to its end`,
+      })
+      .toBeLessThanOrEqual(1);
   }
 }
 
@@ -114,16 +122,13 @@ async function totalOf(sheet: Locator): Promise<number> {
 }
 
 async function keypadStaysStill(page: Page, size: (typeof SIZES)[number], lang: 'en' | 'es'): Promise<void> {
-  const opensAt = 'opensAt' in size ? size.opensAt : size;
-  await page.setViewportSize({ width: opensAt.width, height: opensAt.height });
-  const sheet = await openSheet(page);
-  if (opensAt !== size) {
-    await page.setViewportSize({ width: size.width, height: size.height });
-    await toTheEnd(sheet);
-  }
+  await page.setViewportSize({ width: size.width, height: size.height });
+  const sheet = await openSheet(page, 'chargeUnderTabBar' in size);
   const at = await places(page, sheet);
   const where = `${lang} ${size.label}`;
-  expect.soft(at['0'].y + at['0'].height, `the last row on screen at ${where}`).toBeLessThanOrEqual(size.height);
+  // Every key whole above the foot, where a finger reaches it: the foot sticks to the bottom of a low screen, over what scrolls.
+  const foot = await sheet.locator('.sheet-foot').evaluate((el) => el.getBoundingClientRect().top);
+  for (const [id, key] of Object.entries(at)) expect.soft(key.y + key.height, `the key «${id}» above the foot at ${where}`).toBeLessThanOrEqual(foot + 0.5);
   const total = await totalOf(sheet);
   const separator = lang === 'es' ? ',' : '.';
   const tendered = sheet.locator('[data-testid=sale-checkout-tendered]');
