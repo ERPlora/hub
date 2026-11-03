@@ -9,7 +9,7 @@ import { expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, login, shot, shown } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
-import { cleanSales, drawerOff, openTillCart, restoreDrawer, saleByKey, stamp } from './sale-helpers';
+import { cleanSales, drawerOff, openTillCart, restoreDrawer, saleByKey, stamp, tillIsPhone } from './sale-helpers';
 
 const RUN = stamp();
 let croquettes: Product;
@@ -163,6 +163,8 @@ test('SALE-F07 (hub#442): the sold-out notice goes on its own once the article i
   for (const size of SHOTS) {
     await page.setViewportSize({ width: size.width, height: size.height });
     await expect(tile(page, bravas)).toBeVisible();
+    // On a phone the check becomes a drawer that slides away (0.25 s): the shot waits until it is gone.
+    if (await tillIsPhone(page)) await expect(shown(page).locator('[data-testid=pos-cart-drawer]')).toBeHidden();
     await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
     await page.screenshot({ path: shot(`HUB-442-back-on-sale-${size.label}`) });
   }
