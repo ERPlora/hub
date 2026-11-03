@@ -545,7 +545,13 @@ test('CASH_REGISTER-F17: cash charged with the drawer closed is said, with its l
   const list = dialog(page, 'cash-register-unassigned');
   await expect(list).toBeVisible();
   await expect(list).toContainText(sale.number);
+  // It only shows data: one «Close» in its footer, no «Cancel» that does the same (hub#711).
+  await expect(list.locator('[data-testid=cash-register-unassigned-cancel]')).toHaveCount(0);
+  await expect(list.locator('[data-testid=cash-register-unassigned-submit]')).toHaveCount(0);
+  await expect(list.locator('[data-testid=cash-register-unassigned-done]')).toBeFocused();
   await flowShots(page, 'CASH_REGISTER-F17', async () => {
     await expect(list).toContainText(sale.number);
   });
+  await list.locator('[data-testid=cash-register-unassigned-done]').click();
+  await expect(list).toBeHidden();
 });
