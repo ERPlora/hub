@@ -5,12 +5,14 @@ asked for, shows a write's card and runs it only with the person's yes, as the p
 
 import dataclasses
 import json
+from datetime import datetime
 
 import pytest
 from django.db import connections
 from live.context import OperationContext, Scope
 from live.errors import OperationError, Unauthorized
-from live.operations import get, registry
+from live.operations import Operation, get, registry
+from ninja import Schema
 
 from base import assistant
 from base.models import Hub, Membership
@@ -87,6 +89,19 @@ def test_a_new_question_offers_the_tools_of_what_it_asks_and_the_instructions():
     assert "17.00 EUR → 1700" in plan["instructions"] and "`currency_decimals`" in plan["instructions"]
 
 
+def test_a_turn_whose_actor_has_no_role_here_names_none():
+    """hub#585: the role comes from the person's ``Membership`` in this business; an actor with none (a key, a
+    staff session elsewhere) is named nothing, and its turn still goes."""
+    plan = run("base.assistant.turn", messages=[ASK])
+    assert "You talk to the" not in plan["instructions"]
+
+
+def test_a_turn_names_the_role_of_the_persons_membership(make_user):
+    ana = make_user("ana", host="a", role=Membership.Role.ADMIN)
+    plan = run("base.assistant.turn", actor=ana, messages=[ASK])
+    assert "You talk to the «Administrador» of this business" in plan["instructions"]
+
+
 def test_the_instructions_take_the_decimals_of_the_business_currency_not_two():
     """FIX-HUB-BASE-ASSISTANT-CARD-MONEY-IN-BUSINESS-NOT-PREVIEW-CURRENCY: a yen business has no cents, so its turn
     tells the model «17 JPY → 17» (``base.business.get``'s ``currency_decimals``), never a fixed «.00 → 1700»;
@@ -132,6 +147,20 @@ def test_a_write_waits_for_its_card_and_changes_nothing_meanwhile():
     assert plan["pending"] == [write]
     assert (plan["append"], plan["executed"]) == ([], [])
     assert "Mesa 4" not in items()
+
+
+def test_a_write_its_operation_would_refuse_shows_no_card_and_the_model_hears_what_to_correct():
+    """live#17 (QA 2026-10-31, A2.12): a card said what its write would refuse, the person typed the word, the write
+    failed and the model asked again: two cards for one change. The data are checked before any card is drawn; the
+    model hears which do not fit, field by field, and asks again with them corrected."""
+    plan = turn(call("demo.item.create", {"name": "Mesa 4", "status": "abierto"}))
+    assert plan["confirm"] is None
+    assert plan["pending"] == []
+    assert (plan["executed"][0]["outcome"], plan["executed"][0]["code"]) == ("error", "invalid_payload")
+    assert set(json.loads(plan["append"][0]["content"])["error"]["fields"]) == {"status"}
+    assert "Mesa 4" not in items()
+    corrected = turn(call("demo.item.create", {"name": "Mesa 4", "status": "open"}))
+    assert corrected["confirm"]["operation"] == "demo.item.create"
 
 
 def test_the_card_carries_the_business_currency_for_its_amounts():
@@ -235,6 +264,36 @@ def test_an_amount_of_a_preview_reaches_the_card_in_the_currency_its_read_answer
         ("difference", "money", True, pln),
     ]
     assert [field["money"] for field in card["fields"]] == [None, None]
+
+
+class ListedIn(Schema):
+    starts: list[datetime]
+    codes: list[str]
+
+
+LISTED = Operation(
+    name="demo.item.settle",
+    kind="command",
+    permission="demo.manage",
+    input=ListedIn,
+    output=ListedIn,
+    expose_api=False,
+    ai={"description": "Books a demo item on several days."},
+    fn=lambda ctx, data: data,
+)
+
+
+def test_a_list_said_item_by_item_reaches_the_card_marked_named_and_one_of_codes_does_not(monkeypatch):
+    """FIX-HUB-PRINTING-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS: the turn's card dropped the mark on its way out (its
+    schema had no place for it), so the printers of a device, named on the server, reached the screen as «2 items»; a
+    list of codes nobody names keeps saying how many."""
+    monkeypatch.setitem(registry, LISTED.name, LISTED)
+    arguments = {"starts": ["2026-11-02T09:00:00Z", "2026-11-09T09:00:00Z"], "codes": ["sale.sale.create"]}
+    card = turn(call(LISTED.name, arguments))["confirm"]
+    assert [(field["name"], field["kind"], field["named"]) for field in card["fields"]] == [
+        ("starts", "list", True),
+        ("codes", "list", False),
+    ]
 
 
 def test_a_card_whose_app_declares_no_preview_is_as_before():
@@ -487,3 +546,11 @@ def test_waiting_for_erplora_com_holds_no_transaction(gateway, monkeypatch, oper
     monkeypatch.setattr(assistant, "_post", probe)
     run(operation_name, EMPLOYEE, **data)
     assert seen == [False]
+
+
+def test_a_turn_reads_the_hubs_own_words():
+    """In the Hub a «cuenta» is a table's open check (``base.assistant.SYNONYMS``): the turn offers the read of a check
+    among its first tools, as the assistant's QA ranks it (base/tests/test_assistant_asks.py), never at 14."""
+    asked = {"role": "user", "content": "¿qué hay en la cuenta de la mesa 6?"}
+    plan = run("base.assistant.turn", {"*"}, messages=[asked])
+    assert assistant.tool_name("sale.order.get") in [tool["name"] for tool in plan["tools"]][:10]

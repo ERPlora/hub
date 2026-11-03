@@ -3,6 +3,8 @@
 // Charge is blocked but still answers when something is missing (SALE-F05): the page says what.
 import { describe, expect, it } from 'vitest';
 
+import { HubIcon } from '@erplora/ui/shell';
+
 import { click, mountSale } from '../../__tests__/mount-sale';
 import { plain } from '../../lib/format';
 import CartFooter from './CartFooter.vue';
@@ -65,6 +67,13 @@ describe('CartFooter', () => {
   it('an empty check can do none of it', async () => {
     const m = await setup({ hasLines: false, total: 0 });
     for (const id of ['pos-ticket-discount', 'pos-prebill', 'pos-charge']) expect(disabled(m.find(id).element), id).toBe(true);
+  });
+
+  it('the discount button is an outlined tag until the check has a discount (% or amount), then a filled one', async () => {
+    const icon = (m: Awaited<ReturnType<typeof setup>>) => m.find('pos-ticket-discount').findComponent(HubIcon).props('name');
+    expect(icon(await setup())).toBe('ion:pricetag-outline');
+    expect(icon(await setup({ discountPercent: '10.00', ticketDiscount: 139 }))).toBe('ion:pricetag');
+    expect(icon(await setup({ discountAmount: 500, ticketDiscount: 500 }))).toBe('ion:pricetag');
   });
 
   it('no discount button when the business does not allow discounts', async () => {

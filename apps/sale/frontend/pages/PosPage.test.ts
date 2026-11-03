@@ -376,6 +376,31 @@ describe('PosPage: charging', () => {
   });
 });
 
+describe('PosPage: a check joined with another one (TABLE-F16, SALE-F24)', () => {
+  it('the check on screen joined from Tables (on this device or another) is not «closed on another device»: the till shows the one that stays, with its customer (hub#459)', async () => {
+    const s = await setup();
+    await s.addProduct();
+    s.reply({ order_id: 'o1', customer_id: 'c1' });
+    s.wrapper.findComponent({ name: 'CustomerSearch' }).vm.$emit('update:modelValue', LUCIA);
+    await settle();
+    expect(s.wrapper.findComponent(CartHeading).props('customerName')).toBe('Lucía');
+    // The check that stays has no customer of its own.
+    s.reply({ order_id: 'o2', customer_id: null });
+    await s.result('sale.order.get', order({ id: 'o1', version: 9, status: 'voided', merged_into_id: 'o2', lines: [] }), { order_id: 'o1' }, 9);
+    await settle();
+    // The absorbed check's subscription goes after the SDK's 2 s grace on unmounting.
+    await s.clock.advance(2000);
+    await s.reopen();
+    expect(toastError).not.toHaveBeenCalled();
+    expect(toast).toHaveBeenCalledWith('That check was joined with another one: the screen shows the joined check.');
+    expect(localStorage.getItem(CURRENT_CHECK_KEY)).toBe('o2');
+    expect(s.params('sale.order.get')).toEqual([{ order_id: 'o2' }]);
+    expect(s.sent().some((c) => c.path === '/api/customer/orders/customer' && c.query.order_id === 'o2')).toBe(true);
+    // The absorbed check's customer does not carry over to the one that stays.
+    expect(s.wrapper.findComponent(CartHeading).props('customerName')).toBeNull();
+  });
+});
+
 describe('PosPage: parking and switching', () => {
   it('parks under a title: the screen empties and says so', async () => {
     const s = await setup();

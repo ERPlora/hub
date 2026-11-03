@@ -533,4 +533,120 @@ describe('AppsPage', () => {
       expect(m.wrapper.find('[data-testid="apps-counter"]').text()).toBe('3 apps activadas · Sin límite');
     });
   });
+
+  describe('an app whose tables the business’s database is still getting (S3)', () => {
+    const FLOW = app('flow', { name: 'Flows', state: 'off', chosen: false, path: null });
+    const FLOW_CREATING = { ...FLOW, state: 'creating' as const, chosen: true };
+    const FLOW_FAILED = { ...FLOW, state: 'failed' as const, chosen: true };
+    const TASK = app('task', { name: 'Tasks' });
+    const listOf = (...apps: AppRow[]): AppList => ({ apps, store_url: STORE, plan_url: PLANS, max_apps: 20, enabled: 1 });
+    const posted = (m: Awaited<ReturnType<typeof open>>) =>
+      m.net.api.map((c) => [c.url, JSON.parse(String(c.init.body ?? '{}')) as Record<string, unknown>]);
+    const pill = (m: Awaited<ReturnType<typeof open>>, id: string) =>
+      m.wrapper.find(`[data-testid="apps-row"][data-id="${id}"] [data-testid="apps-state"]`);
+
+    it('«Turn on» answered «creating» says it is being set up, and the row says so until it is on', async () => {
+      const m = await open('/apps#all', {
+        onApi: () => Response.json({ app: 'flow', state: 'creating', chosen: true, along: [] }, { status: 202 }),
+      });
+      await m.result(m.call, 'base.app.list', listOf(TASK, FLOW));
+
+      await m.wrapper.find('[data-testid="apps-row-flow-toggle"]').trigger('click');
+      await flush();
+
+      expect(posted(m)).toEqual([['/api/apps/enable', { app: 'flow' }]]);
+      expect(vi.mocked(toastSuccess).mock.calls[0][0]).toBe('Turning on Flows… It will be ready in a moment.');
+      await m.result(m.call, 'base.app.list', listOf(TASK, FLOW_CREATING), 2);
+      expect([pill(m, 'flow').text(), pill(m, 'flow').attributes('data-tone')]).toEqual(['Turning on…', 'info']);
+      // A business that changed its mind turns it off while it is set up (a code rolled back would keep it waiting).
+      expect(m.wrapper.find('[data-testid="apps-row-flow-toggle"]').text()).toContain('Turn off');
+      expect(m.wrapper.find('[data-testid="apps-row-flow-open"]').exists()).toBe(false);
+      await m.result(m.call, 'base.app.list', listOf(TASK, { ...FLOW, state: 'on', chosen: true, path: '/flow/home' }), 3);
+      expect(pill(m, 'flow').text()).toBe('Installed');
+    });
+
+    it('«My apps» lists the ones being set up and the ones that failed, with their state and no «Open»', async () => {
+      const m = await open();
+      await m.result(m.call, 'base.app.list', listOf(TASK, FLOW_CREATING, { ...FLOW_FAILED, id: 'website', name: 'Website' }));
+      expect(ids(m.wrapper)).toEqual(['task', 'flow', 'website']);
+      expect([pill(m, 'flow').text(), pill(m, 'website').text(), pill(m, 'website').attributes('data-tone')]).toEqual([
+        'Turning on…',
+        'Could not turn on',
+        'danger',
+      ]);
+      expect(m.wrapper.find('[data-testid="apps-row-flow-open"]').exists()).toBe(false);
+    });
+
+    it('one that could not be turned on offers «Retry» to whoever runs the business, and is set up again', async () => {
+      const m = await open('/apps', {
+        onApi: () => Response.json({ app: 'flow', state: 'creating', chosen: true, along: [] }, { status: 202 }),
+      });
+      await m.result(m.call, 'base.app.list', listOf(TASK, FLOW_FAILED));
+      const retry = m.wrapper.find('[data-testid="apps-row-flow-retry"]');
+      expect(retry.text()).toContain('Retry');
+
+      await retry.trigger('click');
+      await flush();
+
+      expect(posted(m)).toEqual([['/api/apps/retry', { app: 'flow' }]]);
+      expect(vi.mocked(toastSuccess).mock.calls[0][0]).toBe('Turning on Flows… It will be ready in a moment.');
+    });
+
+    it('a retry refused says why, on screen', async () => {
+      const m = await open('/apps', {
+        onApi: () =>
+          Response.json({ error: { code: 'base.app_not_failed', message: 'This app is not waiting to be set up again.' } }, { status: 409 }),
+      });
+      await m.result(m.call, 'base.app.list', listOf(TASK, FLOW_FAILED));
+      await m.wrapper.find('[data-testid="apps-row-flow-retry"]').trigger('click');
+      await flush();
+      expect(m.wrapper.find('[data-testid="apps-refused"]').text()).toContain('This app is not waiting to be set up again.');
+    });
+
+    it('one that could not be turned on can be turned off instead', async () => {
+      mocks.confirm.mockResolvedValue(true);
+      const m = await open('/apps', { onApi: () => Response.json({ app: 'flow', state: 'off', chosen: false, along: [] }) });
+      await m.result(m.call, 'base.app.list', listOf(TASK, FLOW_FAILED));
+      const toggle = m.wrapper.find('[data-testid="apps-row-flow-toggle"]');
+      expect(toggle.text()).toContain('Turn off');
+      await toggle.trigger('click');
+      await flush();
+      expect(posted(m)).toEqual([['/api/apps/disable', { app: 'flow' }]]);
+    });
+
+    it('who does not run the business sees the state, without «Retry»', async () => {
+      const m = await open('/apps', { session: EMPLOYEE });
+      await m.result(m.call, 'base.app.list', listOf(TASK, FLOW_FAILED));
+      expect(pill(m, 'flow').text()).toBe('Could not turn on');
+      expect(m.wrapper.find('[data-testid="apps-row-flow-retry"]').exists()).toBe(false);
+    });
+
+    it('one being set up can be turned off too, in Spanish «Desactivar»', async () => {
+      mocks.confirm.mockResolvedValue(true);
+      const m = await open('/apps', {
+        locale: 'es',
+        onApi: () => Response.json({ app: 'flow', state: 'off', chosen: false, along: [] }),
+      });
+      await m.result(m.call, 'base.app.list', listOf(TASK, FLOW_CREATING));
+      const toggle = m.wrapper.find('[data-testid="apps-row-flow-toggle"]');
+      expect(toggle.text()).toContain('Desactivar');
+      await toggle.trigger('click');
+      await flush();
+      expect(posted(m)).toEqual([['/api/apps/disable', { app: 'flow' }]]);
+    });
+
+    it('in Spanish', async () => {
+      const m = await open('/apps', {
+        locale: 'es',
+        onApi: () => Response.json({ app: 'flow', state: 'creating', chosen: true, along: [] }, { status: 202 }),
+      });
+      await m.result(m.call, 'base.app.list', listOf(TASK, FLOW_CREATING, { ...FLOW_FAILED, id: 'website', name: 'Web' }));
+      expect([pill(m, 'flow').text(), pill(m, 'website').text()]).toEqual(['Activándose…', 'No se ha podido activar']);
+      const retry = m.wrapper.find('[data-testid="apps-row-website-retry"]');
+      expect(retry.text()).toContain('Reintentar');
+      await retry.trigger('click');
+      await flush();
+      expect(vi.mocked(toastSuccess).mock.calls[0][0]).toBe('Activando Web… Estará lista en un momento.');
+    });
+  });
 });

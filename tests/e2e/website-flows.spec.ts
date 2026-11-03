@@ -31,8 +31,8 @@ const HERO = 'Fresh bread every morning';
 const PHONE = '+34 600 123 456';
 /** Google's own example of a Place ID (Sydney's office): never asked here. */
 const PLACE_ID = 'ChIJN1t_tDeuEmsRUsoyG83frY4';
-/** The site's row of hub `a` (phase 1: one row per hub in shared tables). */
-const SITE_ROW = "hub_id = (select id from base_hub where slug = 'a')";
+/** The site's row of hub `a`, by its id read from control's registry first: a statement on `a`'s tables cannot read it. */
+const siteRow = (): string => `hub_id = '${psql("select id from base_hub where slug = 'a'")}'`;
 
 interface Rows<T> {
   rows: T[];
@@ -108,7 +108,7 @@ async function reset(page: Page, body: Record<string, unknown> = baseline()): Pr
   await page.goto('about:blank');
   await saveSite(body);
   await unpublishApi();
-  psql(`update website_site set reviews_snapshot = '{}'::jsonb where ${SITE_ROW}`);
+  psql(`update website_site set reviews_snapshot = '{}'::jsonb where ${siteRow()}`);
   await page.setViewportSize(WIDE);
   await page.goto(`${A}/website`);
   await expect(page.getByTestId('website-editor')).toBeVisible({ timeout: 30_000 });
@@ -222,7 +222,7 @@ test.afterAll(async () => {
   if (!owner) return;
   await saveSite(baseline());
   await unpublishApi();
-  psql(`update website_site set reviews_snapshot = '{}'::jsonb where ${SITE_ROW}`);
+  psql(`update website_site set reviews_snapshot = '{}'::jsonb where ${siteRow()}`);
   await owner.context.close();
 });
 
@@ -719,7 +719,7 @@ test('WEBSITE-F12: the business’s Google Maps link is checked, and its rating 
   };
   // In base64: `psql()` hands the SQL to a shell inside double quotes, where the JSON's own quotes would end it.
   const encoded = Buffer.from(JSON.stringify(answer), 'utf8').toString('base64');
-  psql(`update website_site set reviews_snapshot = convert_from(decode('${encoded}', 'base64'), 'UTF8')::jsonb where ${SITE_ROW}`);
+  psql(`update website_site set reviews_snapshot = convert_from(decode('${encoded}', 'base64'), 'UTF8')::jsonb where ${siteRow()}`);
   await page.reload();
   await openSection(page, 'reviews');
   await expect(status).toHaveAttribute('data-state', 'ready');

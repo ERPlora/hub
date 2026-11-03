@@ -56,6 +56,27 @@ def test_an_event_an_app_lists_in_another_apps_name_stays_out_of_the_catalog(mon
     assert "ghost.thing.happened" not in names
 
 
+def test_every_app_a_factory_recipe_names_has_its_name_in_the_catalog():
+    # Guard (hub#476): the editor, the list and «Try it» say an app by the name the catalog gives it, never by its id;
+    # an app a recipe names (its event, its steps, what its assistant may use) missing from the catalog would be said
+    # without it.
+    from apps.flow import recipes
+
+    catalog = run("flow.catalog.read")
+    rows = [*catalog.events, *catalog.actions]
+    named = {row.app for row in rows}
+    wanted = set()
+    for _config, recipe in recipes.declarations():
+        steps = recipe.get("steps") or []
+        names = [(recipe.get("trigger") or {}).get("event", ""), *(step.get("operation", "") for step in steps)]
+        names += [tool for step in steps for tool in step.get("tools") or []]
+        wanted |= {name.split(".")[0] for name in names if name}
+    assert {"whatsapp_inbox", "reservation", "customer"} <= wanted
+    assert sorted(wanted - named) == []
+    # Every row, events and actions alike: the editor takes the name from the first one it finds of that app.
+    assert [(row.name, row.app_name) for row in rows if row.app in wanted and row.app_name in ("", row.app)] == []
+
+
 def test_the_catalog_names_the_apps_in_the_callers_language():
     with translation.override("es"):
         catalog = run("flow.catalog.read", ctx=ctx_for(language="es"))

@@ -4,7 +4,7 @@
 // administrator may not change (the owner's, one's own badge) is said instead of offered; a refusal by its code.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { errorFrame, flush, mountBase, subId } from '../__tests__/mount-base';
+import { errorFrame, flush, installedApp, leaveInstalledApp, mountBase, subId, tap } from '../__tests__/mount-base';
 import type { PersonDetail } from '../operations';
 import PersonPage from './PersonPage.vue';
 
@@ -71,6 +71,7 @@ function valueOf(field: { element: Element }) {
 }
 
 afterEach(() => {
+  leaveInstalledApp();
   document.head.innerHTML = '';
   document.body.innerHTML = '';
 });
@@ -90,6 +91,26 @@ describe('PersonPage', () => {
     expect(m.wrapper.get('a[data-testid="person-open-saas"]').attributes('href')).toBe(MEMBERS_URL);
     expect(m.wrapper.get('[data-testid="person-pin"]').text()).toContain('Tiene PIN desde el');
     expect(m.wrapper.get('[data-testid="person-badge"]').text()).toContain('Sin placa.');
+  });
+
+  // gh:hub#439: the installed app opens nothing on a `_blank` link; the system browser does.
+  it('in the installed app «Open on erplora.com» opens the system browser; the Google Play copy has none', async () => {
+    const invoke = installedApp('direct');
+    const m = await open();
+    await m.result(m.call, 'base.person.detail', detail());
+    await flush();
+    const click = tap(m.wrapper.get('[data-testid="person-open-saas"]').element);
+    await flush();
+    expect(click.defaultPrevented).toBe(true);
+    expect(invoke).toHaveBeenCalledWith('open_external_url', { url: MEMBERS_URL });
+    m.wrapper.unmount();
+
+    leaveInstalledApp();
+    installedApp('play');
+    const play = await open();
+    await play.result(play.call, 'base.person.detail', detail());
+    await flush();
+    expect(play.wrapper.find('[data-testid="person-open-saas"]').exists()).toBe(false);
   });
 
   it('«Remove the PIN» asks first, then the PIN goes (BASE-G139)', async () => {

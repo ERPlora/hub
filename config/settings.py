@@ -92,7 +92,8 @@ INSTALLED_APPS = [
     "base",
     # The mirror of the SaaS's `shared` schema (round 16): only base/catalog.py writes it.
     "shared",
-    "django.contrib.admin",
+    # Django's admin, its site the Hub's own: a hub's model only once a business is chosen (base/admin_site.py).
+    "base.admin_site.AdminConfig",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
@@ -195,8 +196,8 @@ db_optional_options = {
 db_connect_timeout = config("DB_CONNECT_TIMEOUT", default=5, cast=int)
 # Not test_hub: that one belongs to the packages/live suite, which may run at the same time. Two runs
 # of this suite at once (two sessions, two checkouts) each set their own TEST_DB_NAME, as saas-next.
-# Every database the suite makes derives from it: pytest-xdist appends `_gwN` and the tenancy a hub's
-# `_<hex>` (base.tenancy.names, which refuses a name past PostgreSQL's 63 characters). A name with no
+# Every database the suite makes derives from it: pytest-xdist appends `_gwN` and the tenancy a demo's
+# `_demo_<hex>`, its longest (base.tenancy.names, which refuses a name past PostgreSQL's 63 characters). A name with no
 # room for both (`_gw999`: up to 1000 workers) keeps its first characters and the first 8 of its
 # SHA-256: the same database every run (--reuse-db, the fleet's sweep) and another for another name.
 TEST_DB_NAME = config("TEST_DB_NAME", default="test_hub_next")
@@ -232,6 +233,14 @@ DATABASES = {
     }
 }
 
+# The migrator's role (hub_migrator: DDL and CREATEDB; PLAN-DB §10) for the direct connections that make and change a
+# hub's database: its `<db_name>__ddl` alias and the maintenance connection to `postgres` (base.tenancy.connections,
+# base.tenancy.ops). Only the worker and the hub-migrate task have it (aws stacks/prod/apps.tf,
+# hub_migrator_credentials; never the web). Unset, there is no migrator (base.tenancy.credentials fails closed, never
+# hub_app), except in development (DEBUG, the suite), where the compose Postgres's user is every role.
+DB_MIGRATOR_USER = config("DB_MIGRATOR_USER", default=DATABASES["default"]["USER"] if DEBUG else "")
+DB_MIGRATOR_PASSWORD = config("DB_MIGRATOR_PASSWORD", default=DATABASES["default"]["PASSWORD"] if DEBUG else "")
+
 # The SaaS's `saas` database, schema `shared`, only for register_apps (round 16, PLAN §21; spec §3.3).
 # Declared only where its credentials exist: in production the worker task (SHARED_DB_USER, role
 # hub_shared), locally always (compose.yaml's user). Straight to Aurora's writer (the PgBouncer
@@ -265,6 +274,9 @@ if SHARED_DB_USER:
 # «prepared statement _pg3_N does not exist»). The sidecar listens on the task's own loopback, so TLS goes from
 # PgBouncer to Aurora, not to it.
 PGBOUNCER_HOST = config("PGBOUNCER_HOST", default="")
+# PgBouncer's connections per database, each task's (aws stacks/*/apps.tf: 6 in prod, 3 in pre): no plan gets more
+# transactions at once than this (base.tenancy.limits), or what passes it would wait in PgBouncer and fail uncounted.
+PGBOUNCER_MAX_DB_CONNECTIONS = config("PGBOUNCER_MAX_DB_CONNECTIONS", default=6, cast=int)
 DATABASES["hub_template"] = {
     "ENGINE": "django.db.backends.postgresql",
     "NAME": f"{DATABASES['default']['NAME']}_template",
@@ -293,7 +305,8 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # Cache: the shared Valkey (TLS, rediss://) when VALKEY_URL is set, with a prefix per project and
 # environment (hub, pre-hub: pre shares prod's Valkey), a TTL on every key (never TIMEOUT=None) and
 # 2 s socket timeouts (a Valkey that hangs fails the call, not the request; Django hands OPTIONS to
-# redis-py); otherwise this process's memory.
+# redis-py); otherwise this process's memory, refusing what that Valkey (a cluster) refuses: a call on
+# keys of different hash slots (base/cache.py).
 
 VALKEY_URL = config("VALKEY_URL", default="")
 CACHE_KEY_PREFIX = "hub" if ERPLORA_ENVIRONMENT == "prod" else f"{ERPLORA_ENVIRONMENT}-hub"
@@ -307,7 +320,7 @@ CACHES = {
             "OPTIONS": {"socket_connect_timeout": 2, "socket_timeout": 2},
         }
         if VALKEY_URL
-        else {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}
+        else {"BACKEND": "base.cache.ClusterLocMemCache"}
     )
 }
 
@@ -519,6 +532,15 @@ LIVE = {
     },
 }
 
+# The apps whose assistant tools all say what a person types to ask for them (AI.asks, live.E020; docs plan
+# 2026-10-31, the assistant's knowledge and QA): an app joins in the pull request that completes its asks, and layer 1
+# of the assistant's QA (base/tests/test_assistant_asks.py) checks each ask reaches its tool, role by role.
+LIVE_ASSISTANT_ASKS_REQUIRED = (
+    "base",
+    "customer",
+    "sale",
+)
+
 # Email: the console locally; in production the SES API signed by the task role (no static keys,
 # PLAN-AWS §3), or SMTP from EMAIL_* when SES_REGION is unset. EMAIL_BACKEND overrides the choice.
 
@@ -547,6 +569,14 @@ elif email_backend == smtp_email_backend:
         "timeout": 10,
     }
 DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="noreply@erplora.com")
+
+# The worker's CloudWatch metrics (base.metrics; hub#488): published only where the environment turns them on, prod's
+# worker, whose task role may call PutMetricData on ERPlora/Hubs and ERPlora/Fiscal (aws stacks/prod/apps.tf). pre,
+# local development and the tests have no such permission: off by default, so nothing is published there.
+METRICS_ENABLED = config("METRICS_ENABLED", default=False, cast=bool)
+# What each business does during the day, counted by the process that serves it (base/meter.py): on wherever
+# config.asgi runs; off in the tests, which write by calling meter.flush().
+METER_ENABLED = config("METER_ENABLED", default=True, cast=bool)
 
 # Logging: everything to the console (CloudWatch Logs in production), at LOG_LEVEL.
 

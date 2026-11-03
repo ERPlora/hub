@@ -82,6 +82,7 @@
       "cartLabel": "Cuenta",
       "cartEmptyTouch": "Toca un producto para añadirlo.",
       "checkGone": "Esa cuenta se ha cerrado en otro dispositivo: la pantalla empieza una nueva.",
+      "checkJoined": "Esa cuenta se ha juntado con otra: la pantalla muestra la cuenta juntada.",
       "courseInProgress": "Pendiente de enviar",
       "sentHeader": "Enviado",
       "commandRound": "Comanda {n}",

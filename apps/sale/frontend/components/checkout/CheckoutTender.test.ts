@@ -67,7 +67,7 @@ describe('CheckoutTender: one method', () => {
   it('offers «Split the payment», and sends the method, the keys and the split', async () => {
     const s = await setup();
     expect(s.text('sale-checkout-split')).toBe('Split the payment');
-    expect(s.find('sale-checkout-split').findComponent(HubIcon).props('name')).toBe('ion:swap-vertical-outline');
+    expect(s.find('sale-checkout-split').findComponent(HubIcon).props('name')).toBe('ion:swap-horizontal-outline');
     s.wrapper.findComponent(MethodPicker).vm.$emit('pick', CARD);
     s.wrapper.findComponent(PayKeypad).vm.$emit('key', '7');
     await click(s.find('sale-checkout-split').element);

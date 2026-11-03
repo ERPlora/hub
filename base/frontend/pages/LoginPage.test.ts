@@ -2,6 +2,7 @@
 // hub of a business that asks, the PIN pad (faces, PIN, badge) and «Account»; elsewhere only «Enter with your account»
 // (erplora.com's sign-in for this hub). What happened (the session ended, another device's entry ended it) on top.
 import { ApiError } from '@erplora/ui/sdk';
+import { applySurface } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { flush, mountBase } from '../__tests__/mount-base';
@@ -183,6 +184,20 @@ describe('LoginPage — what happened', () => {
     expect(notice.text()).toContain('Session opened on another device');
     expect(notice.text()).toContain('Your plan covers one device at a time');
     expect(notice.get('[data-testid="access-upgrade"]').attributes('href')).toBe('https://erplora.example/store/plans');
+  });
+
+  // «Upgrade plan» sells, and everything that sells is web only (surface.ts; BASE-F11): in the installed app, where
+  // the link opened nothing (gh:hub#439), the notice says why without it.
+  it('«Upgrade plan» sells: never on the app surfaces, where the notice still says why', async () => {
+    applySurface('mobile');
+    try {
+      const { wrapper } = await login([NO_PIN], '/login?next=%2F&notice=device_limit');
+      const notice = wrapper.get('[data-testid="access-notice"]');
+      expect(notice.text()).toContain('Your plan covers one device at a time');
+      expect(notice.find('[data-testid="access-upgrade"]').exists()).toBe(false);
+    } finally {
+      applySurface('web');
+    }
   });
 
   it('speaks Spanish', async () => {

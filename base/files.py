@@ -384,7 +384,10 @@ class Index:
 
 
 def _index_keys(hub: uuid.UUID) -> tuple[str, str, str]:
-    return f"base.files:{hub.hex}:folders", f"base.files:{hub.hex}:bytes", f"base.files:{hub.hex}:generation"
+    """The index's keys, read, kept and forgotten together: the hub is their hash tag (``{<hex>}``), one slot of the
+    Valkey cluster for the three, which refuses a call on keys of different slots (``base/cache.py``)."""
+    tag = f"base.files:{{{hub.hex}}}"
+    return f"{tag}:folders", f"{tag}:bytes", f"{tag}:generation"
 
 
 def _cached(what: str, call, default):

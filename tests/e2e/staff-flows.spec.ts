@@ -7,7 +7,7 @@
 // Everything created here is named «E2E…» and removed after the run (and before, if a run died half-way).
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, type Credentials, EMPLOYEE, horizontalOverflow, login, psql, shot, shown } from './helpers';
+import { A, api, type Credentials, EMPLOYEE, horizontalOverflow, hubUserIdOf, login, psql, shot, shown } from './helpers';
 
 const TAG = 'E2E';
 const VIEWPORTS = [
@@ -42,7 +42,7 @@ const stamp = (): string => Date.now().toString(36);
 const day = (offset: number): string => new Date(Date.now() + offset * 86_400_000).toISOString().slice(0, 10);
 /** The employee's person in the business's database (`base.HubUser`): what a staff record hangs from. */
 const employeeUser = (): string =>
-  psql(`select h.id from base_hubuser h join auth_user u on u.username = h.username where u.email = '${EMPLOYEE.email}'`);
+  hubUserIdOf(EMPLOYEE.email);
 
 async function signedIn(browser: Browser, next: string, credentials?: Credentials): Promise<{ context: BrowserContext; page: Page }> {
   const context = await browser.newContext({ baseURL: A, viewport: { width: 1440, height: 900 }, locale: 'en-US' });

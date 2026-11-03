@@ -60,6 +60,8 @@ def library(settings, tmp_path):
     for seed in blueprint.catalog():
         for key in ("inventory.product", "service.service"):
             for row in seed.bundle.data.get(key, []):
+                if not row.get("image"):
+                    continue
                 folder, name = row["image"].removeprefix("catalog:").split("/")
                 if (folder, name) not in seen:
                     seen.add((folder, name))
@@ -129,10 +131,10 @@ def test_a_template_brings_each_product_and_service_with_its_image(ctx, library,
 
     assert problems(result) == []
     shown = {row.sku: row.image for row in call(ctx, "inventory.product.list", limit=100).rows}
-    assert shown == {row["sku"]: row["image"] for row in seed.bundle.data["inventory.product"]}
+    assert shown == {row["sku"]: row.get("image", "") for row in seed.bundle.data["inventory.product"]}
     if "service.service" in seed.bundle.data:
         services = {row.name: row.image for row in call(ctx, "service.service.list", limit=100).rows}
-        assert services == {row["name"]: row["image"] for row in seed.bundle.data["service.service"]}
+        assert services == {row["name"]: row.get("image", "") for row in seed.bundle.data["service.service"]}
 
 
 def test_loading_a_template_again_changes_no_image(ctx, library):

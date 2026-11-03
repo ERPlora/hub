@@ -13,7 +13,7 @@ import { computed, nextTick, ref } from 'vue';
 import { usePhrasing } from '../composables/usePhrasing';
 import { asCallText } from '../lib/document';
 import { actionLabel, fieldLabel } from '../lib/phrasing';
-import type { AssistantStep, CatalogOut, Step } from '../operations';
+import type { AssistantStep, CatalogOut, FixedByAppOut, Step } from '../operations';
 import ValueBox from './ValueBox.vue';
 
 /** The server's limits (apps/flow/schemas.py `AssistantStep`). */
@@ -29,6 +29,8 @@ const props = defineProps<{
   errors: Readonly<Record<string, string>>;
   /** Opens the editor's picker for this step; the chosen path, or `null`. */
   pick: () => Promise<string | null>;
+  /** What the app of the recipe it was built from fixes (FLOW-F36): shown as set by it, never taken off here. */
+  fixedByApp?: FixedByAppOut | null;
 }>();
 const emit = defineEmits<{ 'update:step': [step: Step] }>();
 const phrasing = usePhrasing();
@@ -67,10 +69,20 @@ function tidy(pinned: Pinned): Pinned | undefined {
   return Object.keys(kept).length ? kept : undefined;
 }
 
+/** Whether the app of its recipe fixes `tool`'s datum `field` on this step: its value changes, it never comes off. */
+const byApp = (tool: string, field: string): boolean =>
+  props.step.tools.includes(tool) && !!props.fixedByApp?.pinned[props.step.id]?.[tool]?.includes(field);
+
 /** Each fixed datum, tool by tool in the order it may use them. */
 const pins = computed(() =>
   Object.entries(props.step.pinned ?? {}).flatMap(([tool, data]) =>
-    Object.entries(data).map(([field, value]) => ({ tool, field, value, label: `${label(tool)} › ${fieldLabel(field, phrasing.value)}` })),
+    Object.entries(data).map(([field, value]) => ({
+      tool,
+      field,
+      value,
+      label: `${label(tool)} › ${fieldLabel(field, phrasing.value)}`,
+      locked: byApp(tool, field),
+    })),
   ),
 );
 
@@ -216,6 +228,7 @@ function setRounds(text: string | null | undefined): void {
           @update:model-value="setPin(pin.tool, pin.field, $event)"
         />
         <button
+          v-if="!pin.locked"
           type="button"
           class="flow-icon-btn"
           :aria-label="$t('flow.assistant.removePin', { datum: pin.label })"
@@ -224,6 +237,11 @@ function setRounds(text: string | null | undefined): void {
         >
           <HubIcon name="ion:close-outline" />
         </button>
+        <span
+          v-else
+          class="flow-card__hint flow-assistant__byapp"
+          :data-testid="`flow-assistant-setbyapp-${id}-${pin.tool}-${pin.field}`"
+        >{{ $t('flow.recipes.setByApp', { app: fixedByApp?.app_name }) }}</span>
       </div>
       <span
         v-if="!pins.length"
@@ -336,6 +354,9 @@ function setRounds(text: string | null | undefined): void {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: start;
   gap: 0.25rem;
+}
+.flow-assistant__byapp {
+  grid-column: 1 / -1;
 }
 .flow-assistant__bad {
   color: var(--ion-color-danger);

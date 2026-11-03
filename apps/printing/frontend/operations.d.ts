@@ -172,6 +172,12 @@ export interface JobOut {
   cancel_reason: string;
 }
 
+/** One job as the queue shows it, with its title. */
+export interface JobDetailOut extends JobOut {
+  /** How the queue titles it, in the reader's language: «Receipt T-000123», or «Open the drawer» with no number. */
+  label: string;
+}
+
 export interface JobCreateOut {
   job: JobOut | null;
   duplicate: boolean;
@@ -308,6 +314,7 @@ declare module '@erplora/ui/sdk' {
     'printing.printer.test': { input: PrinterRefIn; output: JobOut };
     'printing.job.list': { input: JobListIn; output: Page<JobOut> };
     'printing.job.summary': { input: EmptyIn; output: JobSummaryOut };
+    'printing.job.get': { input: JobRefIn; output: JobDetailOut };
     'printing.job.create': { input: JobCreateIn; output: JobCreateOut };
     'printing.job.claim': { input: JobClaimIn; output: { job: HostJobOut | null } };
     'printing.job.complete': { input: { job_id: string; device: string; attempt: number }; output: JobAckOut };
@@ -315,6 +322,7 @@ declare module '@erplora/ui/sdk' {
     'printing.job.retry': { input: JobRefIn; output: JobOut };
     'printing.job.cancel': { input: JobCancelIn; output: JobOut };
     'printing.device.list': { input: PageIn; output: Page<DeviceOut> };
+    'printing.device.detail': { input: DeviceRefIn; output: DeviceOut };
     'printing.device.register': { input: DeviceRegisterIn; output: DeviceOut };
     'printing.device.update': { input: DeviceUpdateIn; output: DeviceOut };
     'printing.device.retire': { input: DeviceRefIn; output: DeviceOut };

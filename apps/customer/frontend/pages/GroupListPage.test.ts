@@ -8,7 +8,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
 import { pageOf } from '../__tests__/fixtures';
-import { EMPLOYEE, errorFrame, flush, MANAGER, type MountOptions, mountCustomer, subId } from '../__tests__/mount-customer';
+import { EMPLOYEE, errorFrame, flush, MANAGER, type MountOptions, mountCustomer, subId, VIEWER } from '../__tests__/mount-customer';
 import EntityDeleteDialog from '../components/EntityDeleteDialog.vue';
 import GroupFormModal from '../components/GroupFormModal.vue';
 import type { GroupRow } from '../operations';
@@ -122,16 +122,24 @@ describe('GroupListPage', () => {
     expect(s.wrapper.findComponent(EntityDeleteDialog).props()).toMatchObject({ kind: 'groups', target: { id: 'g1', name: 'VIP' } });
   });
 
-  it('the manager adds and edits but does not delete; the employee only sees', async () => {
+  it('the manager adds and edits but does not delete; the employee too, with a manager’s approval', async () => {
     const manager = await setup({ session: MANAGER });
     await manager.show(PAGE);
     expect(manager.prop<{ id: string }[]>('actions').map((a) => a.id)).toEqual(['edit']);
     expect(manager.wrapper.find('[data-testid="customer-groups-add"]').exists()).toBe(true);
     const employee = await setup({ session: EMPLOYEE });
     await employee.show(PAGE);
-    expect(employee.prop<{ id: string }[]>('actions')).toEqual([]);
-    expect(employee.wrapper.find('[data-testid="customer-groups-add"]').exists()).toBe(false);
-    expect(employee.prop('rowClickable')).toBe(false);
+    expect(employee.prop<{ id: string }[]>('actions').map((a) => a.id)).toEqual(['edit']);
+    expect(employee.wrapper.find('[data-testid="customer-groups-add"]').exists()).toBe(true);
+    expect(employee.prop('rowClickable')).toBe(true);
+  });
+
+  it('who only views neither adds, edits nor deletes', async () => {
+    const viewer = await setup({ session: VIEWER });
+    await viewer.show(PAGE);
+    expect(viewer.prop<{ id: string }[]>('actions')).toEqual([]);
+    expect(viewer.wrapper.find('[data-testid="customer-groups-add"]').exists()).toBe(false);
+    expect(viewer.prop('rowClickable')).toBe(false);
   });
 
   it('empty: «No groups.»; a search with nothing: «No results»; a failure with Retry', async () => {

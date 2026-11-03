@@ -30,12 +30,12 @@ def test_only_a_demo_row_is_a_demo():
     assert registry.is_demo("nobody") is False
 
 
-@pytest.mark.parametrize("status", ["cancelled", "expired", "purged"])
+@pytest.mark.parametrize("status", ["cancelled", "archiving", "expired", "dropping", "purged"])
 def test_a_hub_that_ended_is_gone(status):
     assert registry.is_gone(Hub(slug="acme", status=status), NOW) is True
 
 
-@pytest.mark.parametrize("status", ["requested", "ready", "failed"])
+@pytest.mark.parametrize("status", ["requested", "creating", "migrating", "seeding", "ready", "failed"])
 def test_a_hub_that_did_not_end_is_not_gone(status):
     assert registry.is_gone(Hub(slug="acme", status=status), NOW) is False
 
@@ -55,6 +55,59 @@ def test_now_is_the_clock_by_default():
     assert registry.is_gone(Hub(slug="demo-0000beef", status="ready", is_demo=True, expires_at=past)) is True
 
 
-@pytest.mark.parametrize(("status", "preparing"), [("requested", True), ("failed", True), ("ready", False)])
+@pytest.mark.parametrize(
+    ("status", "preparing"),
+    [
+        ("requested", True),
+        ("creating", True),
+        ("migrating", True),
+        ("seeding", True),
+        ("failed", True),
+        ("ready", False),
+        ("cancelled", False),
+    ],
+)
 def test_a_hub_is_preparing_until_it_is_ready(status, preparing):
     assert registry.is_preparing(Hub(slug="acme", status=status)) is preparing
+
+
+@pytest.mark.parametrize(
+    ("db_name", "status", "was_ready", "made"),
+    [
+        ("", "ready", True, False),  # a business of phase 1 not yet cut (S5): its database is still to be made
+        ("hub_x", "ready", False, True),
+        ("hub_x", "cancelled", True, True),  # cancelled after it was ready: its database stays
+        ("hub_x", "archiving", True, True),
+        ("hub_x", "cancelled", False, False),  # cancelled while it was being made
+        ("hub_x", "failed", False, False),
+        ("hub_x", "seeding", False, False),
+        ("hub_x", "requested", False, False),
+        ("hub_x", "purged", True, False),  # a demo whose database was dropped
+        ("hub_x", "dropping", True, False),
+    ],
+)
+@pytest.mark.usefixtures("no_test_fallback")
+def test_a_hub_database_is_made_once_it_was_ready_and_until_it_is_dropped(db_name, status, was_ready, made):
+    hub = Hub(slug="acme", db_name=db_name, status=status, ready_at=timezone.now() if was_ready else None)
+    assert registry.database_is_made(hub) is made
+
+
+@pytest.mark.usefixtures("no_test_fallback")
+def test_a_ready_business_without_its_own_database_is_not_served_until_its_cut():
+    """S5: phase 1's shared database is gone; a business still on control's answers 503 until ``cut_shared_hubs``
+    gives it its own (``base.tenancy.cut``), the maintenance one, as one moving to another cluster (W8)."""
+    hub = Hub(slug="acme", db_name="", status="ready", ready_at=timezone.now())
+
+    refused = registry.refusal(hub)
+
+    assert (refused.status, refused.code) == (503, registry.HUB_MAINTENANCE)
+    assert registry.refusal(Hub(slug="acme", db_name="hub_x", status="ready")) is None
+    # One that ended is still gone, with or without a database.
+    assert registry.refusal(Hub(slug="acme", db_name="", status="cancelled")).status == 410
+
+
+def test_under_the_suite_s_fallback_a_business_without_its_own_database_is_served_on_control_s_test_database():
+    hub = Hub(slug="acme", db_name="", status="ready", ready_at=timezone.now())
+
+    assert registry.refusal(hub) is None
+    assert registry.database_is_made(hub)

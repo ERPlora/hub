@@ -21,8 +21,10 @@ it, the ``REACTIONS`` of their ``events.py`` (``"*"``: every event of the other 
 Both steps claim their rows with ``SKIP LOCKED``: the old worker and the new one overlap on a deploy. Every
 transaction releases its connection, so the worker never idles holding one. The events recorded before the relay
 existed were taken without a delivery by its migration (``base/migrations/0006_event_delivery.py``): the backlog
-of phase 1 is never applied. Phase 1 relays the one database every hub shares; phase 2 runs it per hub, for the
-hubs whose ``hub_due`` has come, each under ``use_hub``.
+of phase 1 is never applied. The worker runs it in each hub with its own database, under ``use_hub``
+(``base.worker._hubs``; review of hub#471), and on control for control's own events (``of_hubs=False``: the registry's
+and the demos', which no app hears); since S5 what a business of phase 1 recorded in control before its cut is never
+taken there (its cut copies its own events into its database, ``base.tenancy.cut``).
 """
 
 import datetime as dt
@@ -39,6 +41,7 @@ from live.meta import all_live_app_configs
 from live.models import OutboxEvent
 
 from base import activation, entitlement, services
+from base.tenancy.context import HUB_SCOPE_KIND
 
 #: How deep a chain of events may go (an event, the event its reaction records, …): the old Hub's.
 MAX_EVENT_DEPTH = 16
@@ -80,7 +83,11 @@ def _events_modules() -> dict[str, ModuleType]:
 
 
 def listeners(event: OutboxEvent) -> list[str]:
-    """The apps on in the event's scope that react to it; ``"*"`` hears every event but its own app's."""
+    """The apps on in the event's scope that react to it; ``"*"`` hears every event but its own app's. An event of no
+    hub (the registry's and the demos', in control's outbox) is heard by none: an app's reaction is a hub's work, and
+    such an event has no hub to run it in (verification of hub#471 in pre: Flows failed on ``base.demo.created``)."""
+    if event.scope_kind != HUB_SCOPE_KIND:
+        return []
     on = active_apps(Scope(event.scope_kind, event.scope_key))
     source = event.name.split(".", 1)[0]
     return [
@@ -106,10 +113,11 @@ def backoff(attempts: int) -> dt.timedelta:
     return dt.timedelta(seconds=min(2**attempts, BACKOFF_MAX_SECONDS))
 
 
-def run(now: dt.datetime) -> RelayPass:
-    """Take the new events, then run the deliveries due at ``now``, one transaction each."""
+def run(now: dt.datetime, *, of_hubs: bool = True) -> RelayPass:
+    """Take the new events, then run the deliveries due at ``now``, one transaction each. ``of_hubs=False`` (control's
+    outbox): only the events of no hub, never a business's."""
     taken = services.relay_take_events(
-        now, listeners=listeners, limit=TAKE_PER_TICK, max_depth=MAX_EVENT_DEPTH
+        now, listeners=listeners, limit=TAKE_PER_TICK, max_depth=MAX_EVENT_DEPTH, of_hubs=of_hubs
     )
     close_old_connections()
     delivered = failed = 0
@@ -121,6 +129,7 @@ def run(now: dt.datetime) -> RelayPass:
             max_depth=MAX_EVENT_DEPTH,
             max_attempts=MAX_ATTEMPTS,
             backoff=backoff,
+            of_hubs=of_hubs,
         )
         close_old_connections()
         if outcome is None:

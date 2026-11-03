@@ -15,7 +15,7 @@ from types import SimpleNamespace
 import pytest
 from django.db import connections as django_connections
 
-from base.tenancy import connections, names
+from base.tenancy import connections, limits, names
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
 
@@ -72,8 +72,10 @@ def test_a_hub_with_its_database_gets_an_alias_copied_from_the_template():
     registered = django_connections.settings[alias]
     template = django_connections.settings[connections.TEMPLATE_ALIAS]
     assert registered["NAME"] == hub.db_name
-    assert {key: value for key, value in registered.items() if key != "NAME"} == {
-        key: value for key, value in template.items() if key != "NAME"
+    # On the hubs' engine: the plan's limits on every transaction (base.tenancy.limits).
+    assert registered["ENGINE"] == limits.ENGINE
+    assert {key: value for key, value in registered.items() if key not in ("NAME", "ENGINE")} == {
+        key: value for key, value in template.items() if key not in ("NAME", "ENGINE")
     }
     assert registered["OPTIONS"] is not template["OPTIONS"]
     # A new dict was swapped in; the one other threads may be reading is as it was.
@@ -94,7 +96,7 @@ def test_registering_again_changes_nothing():
 def test_an_alias_never_moves_to_another_database_while_the_process_runs():
     hub = hub_with_database()
     connections.register_hub_alias(hub)
-    hub.db_name = names.demo_db_name(hub.id)
+    hub.db_name = names.demo_db_name(connections.control_name(), hub.id)
 
     with pytest.raises(connections.HubAliasConflict):
         connections.register_hub_alias(hub)
@@ -133,11 +135,16 @@ def test_two_threads_registering_the_same_hub_register_it_once():
     assert len(swaps) == 1
 
 
-def test_a_hub_of_the_shared_database_stays_on_default():
+def test_a_business_without_its_own_database_has_no_alias_and_never_gets_default():
+    from base.tenancy.context import HubWithoutDatabase
+
     hub = SimpleNamespace(id=uuid.uuid7(), slug="a", db_name="", cluster=None)
     before = django_connections.settings
 
-    assert connections.alias_for(hub) == "default"
+    with pytest.raises(HubWithoutDatabase):
+        connections.alias_for(hub)
+    with pytest.raises(HubWithoutDatabase):
+        connections.open_hub_alias(hub)
     assert django_connections.settings is before
 
 
@@ -205,17 +212,45 @@ def _sessions_on(database: str) -> int:
         return cursor.fetchone()[0]
 
 
+def _nobody_on(database: str, *, wait: float = 5.0) -> bool:
+    """Whether every session on ``database`` ends within ``wait`` seconds: a connection just closed (a previous test's
+    clone of the template) still counts for a moment, as its server process leaves ``pg_stat_activity`` after
+    ``close()`` returns (hub#487, the CI of hub#471)."""
+    deadline = time.monotonic() + wait
+    while _sessions_on(database) and time.monotonic() < deadline:
+        time.sleep(0.05)
+    return _sessions_on(database) == 0
+
+
 @pytest.mark.django_db(databases=hubs.HUB_DATABASES)
 def test_working_in_a_hub_leaves_no_connection_open_to_its_template(hub_a, hub_databases):
-    assert _sessions_on(hub_databases.template) == 0
+    assert _nobody_on(hub_databases.template)
     with use_hub(hub_a):
         with django_connections[hubs.HUB_A_ALIAS].cursor() as cursor:
             cursor.execute("SELECT 1")
 
     assert _sessions_on(hub_databases.a) >= 1
-    assert _sessions_on(hub_databases.template) == 0
+    assert _nobody_on(hub_databases.template)
     assert django_connections[connections.TEMPLATE_ALIAS].connection is None
     # No alias of this process reaches the template: the migrator's, which built it, was forgotten after.
     assert not [
         alias for alias, settings in django_connections.settings.items() if settings["NAME"] == hub_databases.template
     ]
+
+
+@pytest.mark.django_db(transaction=True)
+def test_a_thread_of_the_worker_closes_every_connection_it_opened_when_its_piece_ends():
+    """The worker's slow passes run in threads of their own (base.worker.Background): each piece leaves no connection
+    of its thread open, control's included (review of round 3: one helper of the tenancy, not django.db in the worker)."""
+    left_open: list[bool] = []
+
+    def piece() -> None:
+        django_connections["default"].ensure_connection()
+        connections.close_this_threads_connections()
+        left_open.append(django_connections["default"].connection is not None)
+
+    thread = threading.Thread(target=piece)
+    thread.start()
+    thread.join(10)
+
+    assert left_open == [False]

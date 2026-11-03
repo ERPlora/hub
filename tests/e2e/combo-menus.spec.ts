@@ -98,7 +98,7 @@ async function menuId(context: BrowserContext): Promise<string> {
   return (await call<Detail>(context, 'GET', `/combo/combos/detail?combo=${encodeURIComponent(MENU)}`)).id;
 }
 
-/** The outbox relay as the worker runs it on every tick (the e2e stack runs no worker), pass after pass until one
+/** The outbox relay as the worker runs it on every tick (in `a`'s database: the e2e stack's worker relays nothing), pass after pass until one
  *  finds nothing to do. */
 function relayPass(): void {
   const code = [
@@ -108,7 +108,7 @@ function relayPass(): void {
     '    done = relay.run(timezone.now())',
     '    if not (done.taken or done.delivered): break',
   ].join('\n');
-  const out = spawnSync('uv', ['run', 'python', 'manage.py', 'shell', '-c', code], { cwd: HUB_DIR, env: process.env, encoding: 'utf8' });
+  const out = spawnSync('uv', ['run', 'python', 'manage.py', 'shell', '--hub', 'a', '-c', code], { cwd: HUB_DIR, env: process.env, encoding: 'utf8' });
   expect(out.status, `relay pass: ${out.stderr}`).toBe(0);
 }
 

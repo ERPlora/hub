@@ -12,7 +12,11 @@
 // WhatsApp seed with this Hub's ids of `a` and `b`, never `demo_seed` alone, whose own ids that seed refuses.
 // Before all that it refuses more than one worker: `--workers=N` overrides `workers: 1` of playwright.config.ts, and
 // specs running at once on the one stack delete each other's data (2026-10-23: the agenda spec timed out).
-import { spawnSync } from 'node:child_process';
+// Once every check passes it starts this checkout's `manage.py run_worker --databases-only` on the run's databases
+// (round 2026-10-30 of PLAN-DB, S2a: a business or a demo registered during the run is `requested` until the worker
+// makes its database; the specs play the relay and the tasks themselves) and
+// hands Playwright its stop as the run's teardown; a worker that never waits for work stops the run with what it said.
+import { type ChildProcess, spawn as spawnProcess, spawnSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -205,14 +209,87 @@ function assertSingleWorker(workers: number): void {
   );
 }
 
-/** Playwright calls it with the resolved config (`--workers=N` already applied); `manage` and `saas` are for the tests. */
+/** What `run_worker` logs once it registered the apps and scheduled their tasks (`base/worker.py`). */
+export const WORKER_READY = 'worker: waiting for work';
+/** How long the worker gets to register the apps in the SaaS and schedule their tasks. */
+export const WORKER_START_TIMEOUT_MS = 60_000;
+/** How much of the worker's output a failure quotes. */
+const WORKER_OUTPUT_TAIL = 4_000;
+
+/** The run's worker, running: its stop, which sends it SIGTERM (as ECS does) and resolves once it exited. */
+export type StopWorker = () => Promise<void>;
+/** Starts the run's worker on `database` (the Hub's) and `saasDatabase` (where it registers the apps). */
+export type StartWorker = (database: string, saasDatabase: string) => Promise<StopWorker>;
+/** `spawn` as `startWorker` calls it. */
+export type SpawnWorker = (
+  command: string,
+  args: string[],
+  options: { cwd: string; env: NodeJS.ProcessEnv; stdio: ['ignore', 'pipe', 'pipe'] },
+) => Pick<ChildProcess, 'kill' | 'exitCode' | 'once' | 'on'> & {
+  stdout: Pick<NonNullable<ChildProcess['stdout']>, 'on'>;
+  stderr: Pick<NonNullable<ChildProcess['stderr']>, 'on'>;
+};
+
+/** `manage.py run_worker --databases-only` of this checkout on the stack's databases, up once it says it waits for
+ *  work: it makes the databases of the hubs and demos signed up during the run and drops the demos that ended; the
+ *  specs play the relay and the tasks themselves (a worker relaying too would race them). */
+export function startWorker(
+  database: string,
+  saasDatabase: string,
+  spawn: SpawnWorker = spawnProcess as unknown as SpawnWorker,
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<StopWorker> {
+  const worker = spawn('uv', ['run', 'python', 'manage.py', 'run_worker', '--databases-only'], {
+    cwd: HUB_DIR,
+    env: { ...env, DB_NAME: database, SHARED_DB_NAME: saasDatabase },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  let output = '';
+  let exited = worker.exitCode !== null;
+  const done = new Promise<void>((resolve) => {
+    worker.once('exit', () => {
+      exited = true;
+      resolve();
+    });
+  });
+  const stop: StopWorker = async () => {
+    if (!exited) worker.kill('SIGTERM');
+    await done;
+  };
+  const said = (): string => output.slice(-WORKER_OUTPUT_TAIL).trim();
+  const where = `run_worker of the e2e (DB_NAME=${database})`;
+  return new Promise<StopWorker>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      void stop();
+      reject(new Error(`The ${where} did not wait for work within ${WORKER_START_TIMEOUT_MS / 1000} s:\n${said()}`));
+    }, WORKER_START_TIMEOUT_MS);
+    const heard = (chunk: Buffer | string): void => {
+      output += chunk.toString();
+      if (output.includes(WORKER_READY)) {
+        clearTimeout(timer);
+        resolve(stop);
+      }
+    };
+    worker.stdout.on('data', heard);
+    worker.stderr.on('data', heard);
+    worker.once('exit', (code) => {
+      clearTimeout(timer);
+      reject(new Error(`The ${where} exited with ${code ?? 'a signal'} before it waited for work:\n${said()}`));
+    });
+  });
+}
+
+/** Playwright calls it with the resolved config (`--workers=N` already applied); `manage`, `saas` and `start` are for
+ * the tests. Every check runs before the worker starts: a check that stops the run leaves no worker behind. */
 export default function globalSetup(
   config: Pick<FullConfig, 'workers'>,
   manage: ManagePy = managePy(STACK.database),
   saas: SaasSql = psqlOn(STACK.saasDatabase),
-): void {
+  start: StartWorker = startWorker,
+): Promise<StopWorker> {
   assertSingleWorker(config.workers);
   assertMigrationsApplied(manage, STACK.database);
   assertLocalHubsRegistered(manage, STACK.database);
   assertDemoAccountsSeeded(saas, STACK.saasDatabase, STACK);
+  return start(STACK.database, STACK.saasDatabase);
 }

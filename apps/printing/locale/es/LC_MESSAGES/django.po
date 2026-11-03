@@ -162,6 +162,24 @@ msgstr "Impresora del sistema (A4)"
 msgid "Test page"
 msgstr "Hoja de prueba"
 
+msgid "Kitchen order"
+msgstr "Comanda de cocina"
+
+msgid "Invoice"
+msgstr "Factura"
+
+msgid "Delivery note"
+msgstr "Albarán"
+
+msgid "Barcode label"
+msgstr "Etiqueta de código de barras"
+
+msgid "Cash session report"
+msgstr "Cierre de caja"
+
+msgid "Pre-bill"
+msgstr "Cuenta preliminar"
+
 msgid "That printer cannot print this paper: A4 pages go to the system printer and receipts to a receipt printer."
 msgstr "Esa impresora no imprime este papel: las páginas A4 van a la impresora del sistema y los tiques a una impresora de tiques."
 

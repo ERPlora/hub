@@ -49,7 +49,7 @@ export async function manualFlow(context: BrowserContext, name: string, steps: u
   return id;
 }
 
-/** Python for a one-shot `manage.py shell` playing the worker's relay to flow (this stack runs no worker): the
+/** Python for a one-shot `manage.py shell` playing the worker's relay to flow (in `a`'s database: the e2e stack's worker relays nothing): the
  *  outbox event `FLOW_EVENT`, handed to flow's reaction as the relay does on every tick. What that reaction leaves
  *  for after its COMMIT (the call of FLOW-F27, the question to the assistant of FLOW-F38) goes to `base.outbound`'s
  *  threads, which would die with this process before making it: `OUTBOUND_AT_ONCE` makes it at once
@@ -77,7 +77,7 @@ export function parkedEvent(flowId: string): string {
  *  flow's reaction as the outbox relay does on every tick (`RELAY`); the call goes out after that COMMIT, never
  *  from the request that parked it. */
 export function workerCalls(flowId: string): void {
-  execFileSync('uv', ['run', 'python', 'manage.py', 'shell', '-c', RELAY], {
+  execFileSync('uv', ['run', 'python', 'manage.py', 'shell', '--hub', 'a', '-c', RELAY], {
     cwd: HUB_DIR,
     encoding: 'utf8',
     env: { ...process.env, FLOW_EVENT: parkedEvent(flowId) },

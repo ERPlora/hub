@@ -53,6 +53,16 @@ def run_worker() -> str:
     return out.getvalue()
 
 
+def test_databases_only_asks_the_worker_to_make_and_drop_the_hubs_databases_alone(monkeypatch, guard):
+    asked = []
+    monkeypatch.setattr(worker, "run", lambda stop, **options: asked.append(options) or 0)
+
+    call_command("run_worker", "--databases-only", stdout=StringIO())
+    call_command("run_worker", stdout=StringIO())
+
+    assert asked == [{"databases_only": True}, {"databases_only": False}]
+
+
 @pytest.mark.parametrize(
     "sig", [signal.SIGTERM, signal.SIGINT], ids=["SIGTERM", "SIGINT"]
 )

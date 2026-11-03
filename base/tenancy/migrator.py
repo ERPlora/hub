@@ -53,7 +53,7 @@ from django.utils import timezone
 from psycopg import errors as pg_errors
 from psycopg import sql
 
-from base import catalog
+from base import catalog, registry
 from base.tenancy import bootstrap, inventory, names
 from base.tenancy import connections as tenancy_connections
 from control.models import Cluster, Hub
@@ -221,21 +221,36 @@ def migrate_control(*, stdout=None, verbosity: int = 1) -> int:
     return len(after - before)
 
 
-def migrate_apps(ddl_alias: str, app_labels) -> list[str]:
+def migrate_apps(ddl_alias: str, app_labels, *, heartbeat: Callable[[], object] | None = None) -> list[str]:
     """Bring ``app_labels`` of the database behind ``ddl_alias`` to the code's leaf; return what it applied, in order.
 
     Only a migrator's alias (``…__ddl``): every other alias is refused. Their dependencies come along (Django's own
     and control's are recorded, their tables left to control's database by the ``TenantRouter``); with nothing to
-    apply it does not migrate at all, and it never steps back.
+    apply it does not migrate at all, and it never steps back. ``heartbeat()`` is called before each app's first
+    migration (a caller's lease renewed between apps; what it raises stops the run there).
     """
     if not ddl_alias.endswith(names.DDL_SUFFIX):
         raise ValueError(f"migrate_apps runs only on a migrator's alias (…{names.DDL_SUFFIX}), not on {ddl_alias!r}.")
-    executor = MigrationExecutor(connections[ddl_alias])
+    executor = MigrationExecutor(connections[ddl_alias], progress_callback=_beat_per_app(heartbeat))
     targets, plan = _forwards_plan(executor, app_labels, ddl_alias)
     if not plan:
         return []
     executor.migrate(targets, plan=plan)
     return [f"{migration.app_label}.{migration.name}" for migration, _backwards in plan]
+
+
+def _beat_per_app(heartbeat: Callable[[], object] | None) -> Callable[..., None] | None:
+    """Django's ``progress_callback`` that calls ``heartbeat`` when the first migration of each app starts."""
+    if heartbeat is None:
+        return None
+    started: set[str] = set()
+
+    def progress(action: str, migration=None, fake: bool = False) -> None:
+        if action == "apply_start" and migration is not None and migration.app_label not in started:
+            started.add(migration.app_label)
+            heartbeat()
+
+    return progress
 
 
 def _forwards_plan(executor: MigrationExecutor, app_labels, where: str) -> tuple[list, list]:
@@ -331,9 +346,20 @@ def _with_requires(labels: Iterable[str]) -> set[str]:
 
 def templates(control: str | None = None) -> list[Template]:
     """The templates of this deployment: the platform's, then one per vertical of ``base.catalog``, cloned from it;
-    named after ``control`` (default: this control database)."""
+    named after ``control`` (default: this control database).
+
+    Each carries every portable app's tables (:func:`portable_apps`): a hub made from one gets them with the clone, and
+    its sign-up migrates nothing. That stays so in S3: turning an app on makes tables only for an app its hub's template
+    had not (ruling of hub#471's review, 2026-10-31).
+
+    :func:`ensure_template` never rebuilds a template, it migrates it where it is: the first deployment that adds the
+    portable apps to an existing template migrates each one live (about a minute on Fargate). A sign-up meanwhile finds
+    the template in use, its clone is refused (``55006``) as ``clone_failed``, and it is tried again 60 s later
+    (``services.PROVISION_RETRY_SECONDS``). It happens once."""
     control = tenancy_connections.control_name() if control is None else control
-    platform = Template(db_name=names.template_db_name(control), apps=platform_apps())
+    platform = Template(
+        db_name=names.template_db_name(control), apps=tuple(sorted(set(platform_apps()) | set(portable_apps())))
+    )
     portable = set(portable_apps())
     verticals = []
     for vertical in catalog.known_verticals():
@@ -349,12 +375,21 @@ def templates(control: str | None = None) -> list[Template]:
     return [platform, *verticals]
 
 
+def apps_every_hub_gets() -> tuple[str, ...]:
+    """The apps whose tables every template carries (:func:`templates`): every portable one, so a hub made from one has
+    them with the clone and its sign-up migrates nothing. It stays so in S3 (PLAN-DB round 2026-11-01): turning an app
+    on makes tables only for an app its hub's template had not (one ported later), through the worker's
+    :func:`ensure_schema`; ``migrate_hubs`` never adds an app to a hub already made."""
+    return portable_apps()
+
+
 def is_behind(hub, code: CodeMigrations | None = None) -> bool:
     """Whether ``hub``'s database may lack a migration of this code, as control knows it (``Hub.schema_apps``).
 
-    Behind: marked so, or the platform or any app it has not at the code's leaf (never confirmed counts). A label or a
-    migration the code does not have (a later code's, after a rollback: the database is ahead) is not behind. Opens no
-    database.
+    Behind: marked so, or the platform or any app it has not at the code's leaf (never confirmed counts). An app it
+    never turned on is not behind: its tables are made the first time it is (S3, ``base.app.enable`` → the worker's
+    :func:`ensure_schema`), never here. A label or a migration the code does not have (a later code's, after a rollback:
+    the database is ahead) is not behind. Opens no database.
     """
     if hub.schema_state == Hub.SchemaState.BEHIND:
         return True
@@ -379,8 +414,17 @@ def migrator_credentials(cluster) -> tuple[str, str]:
     aws ``apps.tf``; the tests', ``config/settings_pytest.py``). Without them it refuses
     (``MigratorCredentialsMissing``): ``default`` is ``hub_app`` in the web and the worker. Only local development
     (``DEBUG``, compose's Postgres, one role for everything, as db-bootstrap's local mode) takes ``default``'s. A
-    cluster's own secret (``Cluster.secret_name``) plugs in here.
+    cluster with its own secret (``Cluster.secret_name``) has its own migrator: its ``…/migrator`` secret
+    (``base.tenancy.credentials``; one that cannot be read refuses as well).
     """
+    if cluster is not None and getattr(cluster, "secret_name", ""):
+        from base.tenancy.credentials import MIGRATOR, CredentialsUnavailable, credentials_for
+
+        try:
+            found = credentials_for(cluster, MIGRATOR)
+        except CredentialsUnavailable as unavailable:
+            raise MigratorCredentialsMissing(str(unavailable)) from unavailable
+        return found.user, found.password
     user = decouple.config("DB_MIGRATOR_USER", default="")
     password = decouple.config("DB_MIGRATOR_PASSWORD", default="")
     if user and password:
@@ -481,13 +525,20 @@ def _forget_alias(alias: str) -> None:
 # ── Changing a database's schema ───────────────────────────────────────────────────────────────────────────────
 
 
-def ensure_schema(hub, *, add: Iterable[str] = (), lock_wait: float = SCHEMA_LOCK_WAIT) -> list[str]:
+def ensure_schema(
+    hub,
+    *,
+    add: Iterable[str] = (),
+    lock_wait: float = SCHEMA_LOCK_WAIT,
+    heartbeat: Callable[[], object] | None = None,
+) -> list[str]:
     """Bring ``hub``'s own database to the code's leaf; return what it applied, as ``<app>.<migration>`` in order.
 
     The platform, the apps its database already has and ``add`` (with what they require) are migrated; then control's
     row learns what the database has (``schema_apps``, the last migration of each app; the labels of a code that no
     longer has them are kept) and ``schema_state = current``. ``SchemaLocked`` after ``lock_wait`` seconds if another
     run holds the database; ``HubWithoutDatabase`` for a hub still on control's, which is never touched.
+    ``heartbeat``: called between apps (:func:`migrate_apps`), the worker's lease renewed while a hub is made.
     """
     if not hub.db_name:
         raise HubWithoutDatabase(
@@ -496,7 +547,7 @@ def ensure_schema(hub, *, add: Iterable[str] = (), lock_wait: float = SCHEMA_LOC
     added = _with_requires(add) if add else set()
     target = cluster_target(hub.cluster)
     applied, has = _migrate_database(
-        hub.db_name, target, lambda found: set(platform_apps()) | found | added, lock_wait
+        hub.db_name, target, lambda found: set(platform_apps()) | found | added, lock_wait, heartbeat=heartbeat
     )
     installed = {app.label for app in django_apps.get_app_configs()}
     schema_apps = {label: name for label, name in (hub.schema_apps or {}).items() if label not in installed} | has
@@ -558,7 +609,12 @@ def pending_template(template: Template, *, target: ClusterTarget | None = None)
 
 
 def _migrate_database(
-    db_name: str, target: ClusterTarget, targets: Callable[[set[str]], set[str]], lock_wait: float
+    db_name: str,
+    target: ClusterTarget,
+    targets: Callable[[set[str]], set[str]],
+    lock_wait: float,
+    *,
+    heartbeat: Callable[[], object] | None = None,
 ) -> tuple[list[str], dict[str, str]]:
     """Under ``db_name``'s schema lock on ``target``, migrate ``targets(the hub apps it has)``; return what was applied
     and, after, ``{hub app: its last migration}`` from its ``django_migrations``. The connection is closed in any
@@ -571,7 +627,7 @@ def _migrate_database(
                 cursor.execute("SELECT set_config(%s, %s, false)", [setting, value])
         _take_schema_lock(connection, db_name, lock_wait)
         try:
-            applied = migrate_apps(alias, targets(set(_last_migrations(connection))))
+            applied = migrate_apps(alias, targets(set(_last_migrations(connection))), heartbeat=heartbeat)
             return applied, _last_migrations(connection)
         finally:
             try:
@@ -704,10 +760,11 @@ def _grantee(role: str) -> sql.Composable:
 
 
 def hubs_with_a_database() -> list:
-    """The hubs whose own database ``migrate_hubs`` keeps at the leaf: ERPlora's own first, then by slug."""
+    """The hubs whose own database ``migrate_hubs`` keeps at the leaf: ERPlora's own first, then by slug. Only those
+    whose database was made (``base.registry.own_database_made``): one cancelled or expired before it was ever ready
+    has none, and must not stop a deploy."""
     return list(
-        Hub.objects.exclude(db_name="")
-        .filter(status__in=MIGRATED_STATUSES)
+        Hub.objects.filter(registry.own_database_made(), status__in=MIGRATED_STATUSES)
         .select_related("cluster")
         .order_by("-is_platform", "slug")
     )
@@ -741,7 +798,8 @@ def _migrate_hub_in_thread(hub) -> str | None:
 
 
 def _migrate_hub(hub) -> str | None:
-    """``ensure_schema(hub)``, tried again on a lock timeout; ``None`` if done, else why it was left behind."""
+    """``ensure_schema(hub)``: the platform and the apps its database has, at the leaf (never an app it never turned
+    on, S3); tried again on a lock timeout; ``None`` if done, else why it was left behind."""
     attempt = 1
     while True:
         try:

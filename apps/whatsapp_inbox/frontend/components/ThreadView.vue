@@ -9,10 +9,11 @@
 // the message they answer, and the team's internal notes in their own colour. An attachment is kept by
 // erplora.com, over https only (WORKBOOK F06): a photo or a sticker is painted in its bubble (opening full size
 // in a new tab) and a voice note gets a player — the Hub's CSP lets `img-src` and `media-src` reach erplora.com's
-// origin —; one that does not load says so and, like a video or a document, offers «Open the attachment» there.
+// origin —; one that does not load says so and, like a video or a document, offers «Open the attachment» there. Both
+// links leave the Hub by `openExternalLink` (gh:hub#439: the installed app opens nothing on a `_blank` link).
 // «View earlier» asks the page for the previous page; the page owns the data.
 import { InlineFeedback } from '@erplora/ui/components';
-import { useSession } from '@erplora/ui/shell';
+import { openExternalLink, useSession } from '@erplora/ui/shell';
 import { IonButton } from '@ionic/vue';
 import { computed, nextTick, reactive, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
@@ -67,6 +68,12 @@ function inline(message: MessageOut): 'image' | 'audio' | null {
   if (!safeMediaUrl(message.media_url) || unloaded.has(mediaKey(message))) return null;
   const kind = mediaKind(message);
   return kind === 'image' || kind === 'sticker' ? 'image' : kind === 'audio' ? 'audio' : null;
+}
+
+/** An attachment's link: in the installed app, to the system browser (`openExternalLink`). */
+function openMedia(message: MessageOut, event: Event): void {
+  const url = safeMediaUrl(message.media_url);
+  if (url) openExternalLink(url, event);
 }
 
 /** Why an attachment that should have been shown is only a link. */
@@ -187,6 +194,7 @@ watch(
             :href="safeMediaUrl(item.message.media_url) ?? undefined"
             target="_blank"
             rel="noopener noreferrer"
+            @click="openMedia(item.message, $event)"
           >
             <img
               data-testid="whatsapp-inbox-message-image"
@@ -218,6 +226,7 @@ watch(
               :href="safeMediaUrl(item.message.media_url) ?? undefined"
               target="_blank"
               rel="noopener noreferrer"
+              @click="openMedia(item.message, $event)"
             >{{ $t('whatsapp_inbox.thread.openAttachment') }}</a>
           </template>
           <p

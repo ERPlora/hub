@@ -66,7 +66,7 @@ const discountLabel = computed(() => {
       >
         <HubIcon
           slot="icon-only"
-          name="ion:pricetag-outline"
+          :name="hasDiscount ? 'ion:pricetag' : 'ion:pricetag-outline'"
         />
       </ion-button>
       <ion-button

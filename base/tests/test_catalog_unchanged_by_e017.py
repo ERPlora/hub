@@ -73,8 +73,10 @@ def test_a_person_of_the_business_is_offered_the_same_tools(make_user, role):
 
 @pytest.mark.django_db
 def test_a_superuser_is_offered_the_same_tools_and_none_only_the_platform_runs(superuser):
-    """«*» reaches every permission: only the old rule of the platform's permissions kept their reactions out."""
-    ctx = person(superuser)
+    """«*» reaches every permission: only the old rule of the platform's permissions kept their reactions out. Said
+    outright: a superuser holds «*» on the platform's scope alone, nothing on a business's host (``base.permissions``)."""
+    ctx = OperationContext(scope=A, actor=superuser, permissions=frozenset({"*"}), language="es")
     expected = legacy_catalog(ctx)
+    assert expected and "demo.item.create" in expected  # «*» reached a write no approval offers: not an empty sweep
     assert "table.hold.expire" not in expected and "staff.member.current" not in expected
     assert list(assistant.catalog(ctx)) == expected

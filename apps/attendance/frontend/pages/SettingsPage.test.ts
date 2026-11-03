@@ -6,7 +6,7 @@
 // at under its field.
 import { describe, expect, it, vi } from 'vitest';
 
-import { EMPLOYEE, click, ionValue, mountAttendance, settle } from '../__tests__/mount-attendance';
+import { EMPLOYEE, click, ionChecked, ionValue, mountAttendance, settle } from '../__tests__/mount-attendance';
 import type { SettingsOut } from '../operations';
 import SettingsPage from './SettingsPage.vue';
 
@@ -69,15 +69,29 @@ describe('SettingsPage (ATTENDANCE-F04)', () => {
     expect(s.find('attendance-settings-saved').text()).toContain('Settings saved.');
   });
 
-  it('keeps «Require location» off until devices have a mode, and says why (review of 2026-10-15, finding 6)', async () => {
+  // ATTENDANCE-F03: the location is asked only of a personal device, which an administrator marks as such on
+  // the device itself (BASE-F62, «Settings › This device»): the screen says where.
+  it('turns «Require location» on, and says it applies to the devices marked personal', async () => {
     const s = await setup();
-    expect(s.field('require_location').disabled).toBe(true);
-    expect(s.find('attendance-settings-location-pending').text()).toContain(
-      'which this Hub does not tell yet: until it does, every device clocks as the counter',
+    expect(s.field('require_location').disabled).toBe(false);
+    expect(s.find('attendance-settings-location-devices').text()).toBe(
+      'Only a device marked as personal is asked for its location; the counter POS never is. Each device is marked shared or personal on the device itself, in Settings › This device.',
+    );
+    s.answerBy({ '/api/attendance/settings': [200, { ...DEFAULTS, require_location: true, saved: true }] });
+    await ionChecked(s.field('require_location'), true);
+    await click(s.field('save'));
+    await settle();
+    expect(s.sent()).toEqual([{ method: 'POST', path: '/api/attendance/settings', query: {}, body: { require_location: true } }]);
+  });
+
+  it('says where a device is marked personal in Spanish too', async () => {
+    const s = await setup({ locale: 'es' });
+    expect(s.find('attendance-settings-location-devices').text()).toBe(
+      'Solo se pide la ubicación a un dispositivo marcado como personal; al TPV del mostrador, nunca. Cada dispositivo se marca como compartido o personal desde él mismo, en Ajustes › Este dispositivo.',
     );
   });
 
-  it('saves the radius and the workplace, ready for when it applies', async () => {
+  it('saves the radius and the workplace', async () => {
     const s = await setup();
     s.answerBy({ '/api/attendance/settings': [200, DEFAULTS] });
     await ionValue(s.field('geofence_radius_m'), '250');

@@ -61,7 +61,7 @@ function relayToInventory(saleId: string): void {
     `select id from live_outboxevent where name = 'sale.sale.completed' and payload->>'sale_id' = '${saleId}' order by created_at desc, id desc limit 1`,
   );
   expect(event, `sale.sale.completed of ${saleId} in the outbox`).not.toBe('');
-  execFileSync('uv', ['run', 'python', 'manage.py', 'shell', '-c', RELAY], {
+  execFileSync('uv', ['run', 'python', 'manage.py', 'shell', '--hub', 'a', '-c', RELAY], {
     cwd: HUB_DIR,
     encoding: 'utf8',
     env: { ...process.env, INVENTORY_EVENT: event },

@@ -50,7 +50,7 @@
       "parked": "Parked"
     },
     "pax": "{count} pax",
-    "guestsCount": "{count} guests",
+    "guestsCount": "{count} guest | {count} guests",
     "minutes": "{minutes} min",
     "servedBy": "Served by {name}",
     "reservedFor": "Reserved for {name}",
@@ -149,7 +149,7 @@
       },
       "delete": {
         "title": "Delete zone?",
-        "impact": "{count} tables in this zone. A zone with tables cannot be deleted: move or delete its tables first.",
+        "impact": "{count} table in this zone. A zone with tables cannot be deleted: move or delete it first. | {count} tables in this zone. A zone with tables cannot be deleted: move or delete its tables first.",
         "confirm": "Delete zone"
       },
       "loadError": "Could not load the zones"
@@ -208,7 +208,7 @@
       },
       "close": {
         "title": "Close the session?",
-        "impact": "Table {number} · {count} guests. The table is freed and the session moves to the history. If its bill is still open in Sales, first charge it, move it to another table or delete it from the till.",
+        "impact": "Table {number} · {count} guest. The table is freed and the session moves to the history. If its bill is still open in Sales, first charge it, move it to another table or delete it from the till. | Table {number} · {count} guests. The table is freed and the session moves to the history. If its bill is still open in Sales, first charge it, move it to another table or delete it from the till.",
         "confirm": "Close session"
       },
       "delete": {

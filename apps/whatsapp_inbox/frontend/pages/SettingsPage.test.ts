@@ -4,7 +4,7 @@
 // — Name, Language, Category, Status in Meta and Text, «Search template…», Meta's reason on a rejected
 // one, «No templates.» with where they are made. Whoever may not configure reads «You do not have permission».
 import { DataTable, EmptyState, UsageMeter } from '@erplora/ui/components';
-import { AppPage } from '@erplora/ui/shell';
+import { AppPage, applySurface } from '@erplora/ui/shell';
 import { describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
@@ -107,6 +107,19 @@ describe('SettingsPage: the number and the month', () => {
       rel: 'noopener',
     });
     expect(spent.find('whatsapp-inbox-settings-upgrade').text()).toBe('Upgrade plan');
+  });
+
+  // «Upgrade plan» sells, and everything that sells is web only (surface.ts): in the installed app the link opened
+  // nothing (gh:hub#439), so there the month says it without the link.
+  it('«Upgrade plan» sells: never on the app surfaces, where the month still says it is spent', async () => {
+    applySurface('mobile');
+    try {
+      const spent = await setup({}, { ...CONNECTED, monthly_usage: 150, cap_reached: true });
+      expect(spent.find('whatsapp-inbox-settings-month').text()).toContain('You have used all the messages of your plan this month.');
+      expect(spent.find('whatsapp-inbox-settings-upgrade').exists()).toBe(false);
+    } finally {
+      applySurface('web');
+    }
   });
 
   it('from 80 % of the month\'s messages, the month says how many are left, with «Upgrade plan»', async () => {

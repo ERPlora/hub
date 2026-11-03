@@ -9,6 +9,7 @@ import { toastSuccess } from '@erplora/ui/shell';
 import { IonButton } from '@ionic/vue';
 import { ref } from 'vue';
 
+import { withApproval } from '../../../../base/frontend/lib/approval';
 import { useCustomerI18n } from '../lib/useCustomerI18n';
 import type { CustomerRow } from '../operations';
 import CustomerPicker from './CustomerPicker.vue';
@@ -31,7 +32,8 @@ async function confirm(): Promise<void> {
   const absorbed = target.value;
   if (!absorbed) return;
   try {
-    await merge({ id: props.customer.id, absorbed_id: absorbed.id });
+    // A manager's PIN lets an employee merge (BASE-F84, `apps.py` `approvals`).
+    await withApproval(() => merge({ id: props.customer.id, absorbed_id: absorbed.id }));
   } catch {
     return; // `error` holds it: the panel shows it.
   }

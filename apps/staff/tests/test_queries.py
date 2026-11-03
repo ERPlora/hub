@@ -6,10 +6,11 @@ from decimal import Decimal
 
 import pytest
 from django.utils import timezone, translation
-from live.errors import Conflict, NotFound, PermissionDenied
+from live.errors import Conflict, InvalidPayload, NotFound, PermissionDenied
 from live.operations import get
 
 from apps.staff.models import Member, StaffSettings, TimeOff
+from apps.staff.queries import ROLE_UNAVAILABLE
 from base.services import ensure_hub_user
 from apps.staff.schemas import (
     AccountListIn,
@@ -615,6 +616,50 @@ def test_roles_carry_their_order_and_sort_and_filter_like_the_old_table():
     assert names(color="#FF0000") == ["Stylist"]
     assert names(member_count_min=2) == ["Stylist"]
     assert names(member_count_max=1) == ["Barber"]
+
+
+
+# staff.role.resolve (STAFF-F01, hub#538): the role a new member would take, checked before the assistant's card
+
+
+def resolve(as_role="hub_admin", **data):
+    op = get("staff.role.resolve")
+    return op(ctx_for(as_role), op.input.model_validate(data))
+
+
+def test_a_role_resolves_to_the_active_one_by_its_name_in_any_case_or_by_its_id():
+    cashier = make_role("Cajero")
+    assert resolve(role="cajero").model_dump() == {"id": cashier.id, "name": "Cajero"}
+    assert resolve(role_id=str(cashier.id)).model_dump() == {"id": cashier.id, "name": "Cajero"}
+    assert resolve().model_dump() == {"id": None, "name": None}
+
+
+@pytest.mark.parametrize(
+    ("data", "field"),
+    [
+        ({"role": "cajero"}, "role"),
+        ({"role": "Retired"}, "role"),
+        ({"role_id": "0190a3b4-0000-7000-8000-000000000000"}, "role_id"),
+        ({"role_id": "retired"}, "role_id"),
+    ],
+    ids=["a-name-it-does-not-have", "a-retired-name", "an-id-it-does-not-have", "a-retired-id"],
+)
+def test_a_role_the_business_does_not_have_is_refused_on_its_datum(data, field):
+    """The refusal the write itself gives (``InvalidPayload`` on ``role`` or ``role_id``), with the screen's words."""
+    retired = make_role("Retired", is_active=False)
+    if data.get("role_id") == "retired":
+        data = {"role_id": str(retired.id)}
+    with pytest.raises(InvalidPayload) as refused:
+        resolve(**data)
+    assert set(refused.value.fields) == {field}
+    assert refused.value.fields[field] == str(ROLE_UNAVAILABLE)
+
+
+def test_only_who_may_add_a_member_resolves_its_role():
+    make_role("Cajero")
+    with pytest.raises(PermissionDenied):
+        resolve(as_role="hub_employee", role="Cajero")
+    assert resolve(as_role="hub_manager", role="Cajero").name == "Cajero"
 
 
 # staff.schedule.list and staff.schedule.detail (STAFF-F13–F15)

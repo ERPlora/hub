@@ -29,6 +29,7 @@ from base.schemas import HubStateIn, HubUserGetIn, SessionMeIn
 from base.tenancy import inventory
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
+from base.tenancy.tests.legacy import use_legacy
 from base.tests.test_auth_views import callback
 
 pytestmark = pytest.mark.django_db
@@ -219,25 +220,6 @@ class TestThePhoto:
         assert dict(HubUser.objects.values_list("account_id", "is_active")) == {ANA_ID: False, OLGA_ID: True}
         assert HubUser.objects.get(account_id=ANA_ID).name == "Ana"
 
-    def test_in_the_shared_database_someone_still_in_another_business_stays_active(self, acme):
-        Hub.objects.create(id=BETA_ID, slug="beta", status="ready")
-        ana = account_copy(ANA_ID)
-        Membership.objects.create(user=ana, host="acme", role="hub_employee")
-        Membership.objects.create(user=ana, host="beta", role="hub_employee")
-        services.hub_state_apply(SYSTEM, photo(1, (ANA_ID, "Ana", "", "hub_employee")))
-
-        services.hub_state_apply(SYSTEM, photo(2))
-
-        assert HubUser.objects.get(account_id=ANA_ID).is_active
-
-    def test_in_the_shared_database_a_business_s_photo_never_touches_the_people_of_another(self, acme):
-        # Olga never was in acme: whatever her state, acme's photo is not hers to change (and the shared database
-        # holds every business's people, so it reads only whoever just left acme).
-        HubUser.objects.create(username=f"saas:{OLGA_ID}", account_id=OLGA_ID, name="Olga")
-        services.hub_state_apply(SYSTEM, photo(1, (ANA_ID, "Ana", "", "hub_employee")))
-
-        assert HubUser.objects.get(account_id=OLGA_ID).is_active
-
     def test_a_photo_without_members_changes_nobody(self, acme):
         services.hub_state_apply(SYSTEM, photo(1, (ANA_ID, "Ana", "", "hub_employee")))
 
@@ -258,14 +240,15 @@ def test_in_a_hub_with_its_own_database_the_people_land_there_and_nowhere_else(h
         assert set(HubUser.objects.values_list("account_id", flat=True)) == {ANA_ID, OLGA_ID}
     with use_hub(hub_b):
         assert not HubUser.objects.exists()
-    assert not HubUser.objects.exists(), "phase 1's shared database got a person of a hub with its own"
+    with use_legacy():
+        assert not HubUser.objects.exists(), "control's tables got a person of a hub with its own"
 
 
 @pytest.mark.django_db(databases=hubs.HUB_DATABASES)
 def test_a_person_who_leaves_a_hub_with_its_own_database_is_no_longer_active_there(hub_a):
     ana = account_copy(ANA_ID)
     Membership.objects.create(user=ana, host=hub_a.slug, role="hub_employee")
-    # Still in a business of the shared database: that one is not this hub's.
+    # Still in another business: that one is not this hub's.
     Membership.objects.create(user=ana, host="a", role="hub_employee")
     services.hub_state_apply(SYSTEM, photo(1, (ANA_ID, "Ana", "", "hub_employee"), hub_id=hub_a.id, slug=hub_a.slug))
 

@@ -24,7 +24,8 @@ import { useLiveList } from '../lib/useLiveList';
 import type { GroupListIn, GroupRow } from '../operations';
 
 const session = useSession();
-const canConfigure = computed(() => session.can('customer.configure'));
+// Whoever manages cards sees it too: without the permission, a manager approves it with their PIN (BASE-F84).
+const canConfigure = computed(() => session.can('customer.configure') || session.can('customer.manage'));
 const canDelete = computed(() => session.can('customer.delete'));
 const { t } = useCustomerI18n();
 

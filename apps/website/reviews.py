@@ -141,12 +141,15 @@ def _digest(ref: str, address: list[str]) -> str:
 
 
 def reviews_key(slug: str, place_id: str) -> str:
-    return f"website:reviews:{slug}:{place_id}"
+    """Google's answer for ``place_id`` on ``slug``. The slug is the hash tag (``{<slug>}``) of this key and
+    :func:`resolution_key`'s: :func:`forget` drops both in one call, which the Valkey cluster accepts only for keys of
+    one slot (``base/cache.py``)."""
+    return f"website:reviews:{{{slug}}}:{place_id}"
 
 
 def resolution_key(slug: str, ref: str, address: list[str]) -> str:
     """Where the place a name or a share link led to is kept (it depends on the address the search used too)."""
-    return f"website:place:{slug}:{_digest(ref, address)}"
+    return f"website:place:{{{slug}}}:{_digest(ref, address)}"
 
 
 def lock_key(slug: str, ref: str, address: list[str]) -> str:

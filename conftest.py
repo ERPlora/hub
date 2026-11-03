@@ -142,24 +142,77 @@ def outbound_pool(request, monkeypatch):
     assert pool.stop(grace=10), "a job of base.outbound was still running when the test ended"
 
 
+class _NoSlowPasses:
+    """``base.worker.Background`` in the tests: the worker's loop starts no slow pass. They run in threads of their own,
+    on their own connections, so in a test they would commit outside its transaction (a nightly ``UsageRun`` the relay's
+    tests left broke the next tests, W8 2026-10-31). Their own tests call ``worker._data``/``_usage`` directly."""
+
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+    def busy(self) -> bool:
+        return False
+
+    def start(self, piece) -> bool:
+        return False
+
+    def join(self, timeout: float) -> bool:
+        return True
+
+
+@pytest.fixture(autouse=True)
+def worker_slow_passes(request, monkeypatch):
+    """The worker's loop runs no slow pass (``_NoSlowPasses``) unless the test is marked ``worker_slow_passes``."""
+    if request.node.get_closest_marker("worker_slow_passes") is None:
+        from base import worker
+
+        monkeypatch.setattr(worker, "Background", _NoSlowPasses)
+
+
 # ── Phase 2's tenancy (plan docs/plans/2026-10-22-fase-2-tenencia.md, S1) ─────────────────────────────────────────
 
 
 @pytest.fixture(autouse=True, scope="session")
-def shared_database_fallback():
-    """The tests written before the tenancy run on phase 1's shared database without a context of their own.
+def legacy_fallback():
+    """The tests written before the tenancy run without a context of their own, every business of theirs on control's
+    test database (``base/tenancy/tests/legacy.py``).
 
-    In production a hub's model or operation without ``use_hub`` fails (``HubContextMissing``). The suite's tests call
-    operations and the ORM directly, in their own threads too, as phase 1 let them: here they fall back on the shared
-    database (``default``), as the hubs ``a`` and ``b`` do (``db_name=""``). The tenancy's own tests turn it off
-    (``no_test_fallback``, ``base/tenancy/tests/conftest.py``) and so do the ones of every way in (requests, the live
-    executor, the print socket, ``/internal``, the worker, the commands), which must open their context themselves.
+    In production a hub's model or operation without ``use_hub`` fails (``HubContextMissing``) and a business without
+    its own database is not served (S5). The suite's older tests call operations and the ORM directly, in their own
+    threads too, for the local hubs ``a`` and ``b`` (``db_name=""``): here they fall back on control's test database,
+    which also holds the tables of the hubs' apps (``LegacyTablesRouter``). The tenancy's own tests turn it off
+    (``no_test_fallback``) and so do the ones of every way in (requests, the live executor, the print socket,
+    ``/internal``, the worker, the commands), which must open their context themselves.
     """
     from base.tenancy import context
+    from base.tenancy.tests.legacy import LEGACY
 
-    context._test_fallback = context.SHARED_DATABASE
+    context._test_fallback = LEGACY
     yield
     context._test_fallback = None
+
+
+@pytest.fixture(autouse=True)
+def legacy_worker(request, monkeypatch):
+    """The worker's loop serves only the hubs with their own database (S5). A test written before the tenancy that runs
+    it on its businesses (on control's test database) gets phase 1's pass instead of the one over control's outbox:
+    their tasks and their events' relay (``base/tenancy/tests/legacy.py``, ``worker_pass``). Not for a test that runs as
+    production (``no_test_fallback``) nor for the worker's own (``production_worker``)."""
+    if "no_test_fallback" in request.fixturenames or request.node.get_closest_marker("production_worker"):
+        return
+    from base import worker
+    from base.tenancy.tests import legacy
+
+    monkeypatch.setattr(worker, "_relay", legacy.worker_pass)
+
+
+@pytest.fixture
+def no_test_fallback(monkeypatch):
+    """The test runs as production does: without a context, a hub's model or operation fails (``HubContextMissing``)
+    and a business without its own database is not entered (``HubWithoutDatabase``)."""
+    from base.tenancy import context
+
+    monkeypatch.setattr(context, "_test_fallback", None)
 
 
 @pytest.fixture(scope="session")

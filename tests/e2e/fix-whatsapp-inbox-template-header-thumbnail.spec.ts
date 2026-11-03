@@ -14,7 +14,7 @@ import { expect, type Locator, type Page, test } from '@playwright/test';
 import { A, capture, login, psql, shown } from './helpers';
 import { FLOW_VIEWPORTS, noHorizontalScroll, rowAction, settled } from './service-helpers';
 import { photo } from './website-helpers';
-import { cleanUp, e2ePhone, pushChannel, receive, template } from './whatsapp-helpers';
+import { cleanUp, e2ePhone, keepPhoto, pushChannel, receive, restorePhoto, template } from './whatsapp-helpers';
 
 test.describe.configure({ mode: 'serial' });
 
@@ -52,13 +52,17 @@ const VIDEO = Buffer.from(
 );
 const PDF = Buffer.from('%PDF-1.7\n%e2e\n');
 
+// «Send to Meta for review» goes to the run's erplora.com, which answers by pushing its photo of `a` (Free plan) once
+// the run's Graph is up: the photo is kept first and put back last (hub#528, whatsapp-photo.test.ts).
 test.beforeAll(() => {
+  keepPhoto();
   cleanUp();
   pushChannel({ status: 'connected', templates: [MANAGER] });
 });
 
 test.afterAll(() => {
   cleanUp();
+  restorePhoto();
 });
 
 const editor = (page: Page) => page.locator(`ion-modal[data-testid=${EDITOR}]`);

@@ -377,7 +377,7 @@ test('Ajustes: the authorisation in review keeps the business from going live un
   const view = shown(page);
   const blockers = view.locator('[data-testid=verifactu-settings-live-blockers]');
   await expect(blockers).toContainText('Todavía no puede pasar a producción:');
-  await expect(blockers).toContainText('falta que ERPlora apruebe tu autorización firmada para remitir en producción');
+  await expect(blockers).toContainText('falta que ERPlora apruebe tu autorización firmada para remitir en tu nombre');
   await expect(view.locator('[data-testid=verifactu-settings-go-live]')).toHaveAttribute('aria-disabled', 'true');
   await flowShots(page, 'F08', async (p) => {
     await expect(shown(p).locator('[data-testid=verifactu-settings-live-blockers]')).toBeVisible();

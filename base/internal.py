@@ -20,11 +20,23 @@ heard (the SaaS never signs wrong: this is for whatever else reaches the door).
 The registry of hubs (plan 2026-10-17, §1.5), each route one operation of ``base`` run as the platform on the
 registry's scope (``base.registry.REGISTRY_SCOPE``):
 
-- ``PUT /internal/hubs/{id}`` (the SaaS's ``hub_registry()``) → ``base.hub.register``: 202 when it creates the row,
-  ready at once in phase 1 (the SaaS hears ``ready`` after the COMMIT), 200 when it updates it;
-- ``GET /internal/hubs/{id}`` → ``base.hub.get``: the row, whose ``status`` ``ready`` the SaaS waits for;
-- ``DELETE /internal/hubs/{id}`` → ``base.hub.cancel`` (202); ``POST /internal/hubs/{id}/restore`` →
-  ``base.hub.restore`` (200; 409 ``hub_purged`` when it can never come back);
+- ``PUT /internal/hubs/{id}`` (the SaaS's ``hub_registry()``) → ``base.hub.register``: 202 ``requested`` when it
+  creates the row, with a database of its own that the worker makes (``base.tenancy.provision``; round 2026-10-30 of
+  PLAN-DB) before it tells the SaaS ``ready``; 202 too for an update while it is being made, 200 for one of a ready
+  hub;
+- ``GET /internal/hubs/{id}`` → ``base.hub.get``: the row, whose ``status`` ``ready`` the SaaS waits for (``requested``,
+  ``creating``, ``migrating``, ``seeding`` or ``failed`` before); never where its database is;
+- ``DELETE /internal/hubs/{id}`` → ``base.hub.cancel`` (202; a business with its own database is copied by the
+  worker, ``offboarding``); ``POST /internal/hubs/{id}/restore`` → ``base.hub.restore`` (200; 409 ``hub_purged`` when
+  it can never come back);
+- ``GET /internal/hubs/{id}/dumps`` → ``base.hub.dump_list``: ``{available, dumps: [{id, kind, created_at, bytes,
+  url}]}``, the copies of its data (``id``: the key in the bucket), newest first, each link signed for 15 minutes;
+  ``available`` false for a business that never gets one (no database of its own); 200 for a business that left too
+  (its 410 is its host's door), 404 for one unknown or purged, 503 ``base.dumps_unavailable`` without a bucket;
+- ``GET /internal/usage?day=YYYY-MM-DD[&cursor=]`` → ``base.usage.list``: one page of what the businesses with their
+  own database used that day (UTC), as the worker measured it that night (``base.usage``): ``{day, hubs: [{id,
+  s3_bytes, db_bytes, active_users_1d, active_users_30d}], next_cursor}``; 409 ``usage_not_ready`` before that night
+  was measured, 422 ``internal.payload_invalid`` for a day missing or badly written, or a cursor not of its own;
 - ``PUT /internal/hubs/{id}/state`` (the photo) → ``base.hub.state_apply``: kept on the row if its ``version`` is
   newer, with its VeriFactu block, the business's status and its id in ERPlora applied through
   ``verifactu.config.sync`` on the hub's slug, and its ``whatsapp`` (the number's state, door 4 of WhatsApp's
@@ -37,12 +49,14 @@ scope: 200 ``{ended}`` with the sessions of that SaaS account it ended, on that 
 
 The demos (plan 2026-10-17, §1.5 and §1.6), on the same scope:
 
-- ``POST /internal/demos`` (``{session_key, vertical, language}``) → ``base.demo.create``: 201 ``{id, slug,
-  expires_at, created}`` for a new demo, 200 with the live one of that browser, 503 ``base.demo_full`` with
+- ``POST /internal/demos`` (``{session_key, vertical, language}``) → ``base.demo.create``: 202 ``{id, slug, status,
+  expires_at, created}`` for a new demo (``requested``: the worker clones its database, and the SaaS waits for
+  ``ready`` on ``GET /internal/hubs/{id}``), 200 with the live one of that browser, 503 ``base.demo_full`` with
   ``Retry-After`` when every demo is taken;
 - ``POST /internal/demos/{slug}/codes`` (``{session_key, language}``) → ``base.demo.code_create``: 201 ``{code,
   expires_at}``; 404 without such a demo, 410 ``base.hub_gone`` once it ended, 403 ``base.demo_not_owner`` for
-  another browser. The path names the demo: v2 binds the signature to it.
+  another browser, 503 ``base.hub_preparing`` while it is being made. The path names the demo: v2 binds the signature
+  to it.
 
 While the SaaS may still sign v1 only, a body that names the hub of its path (``hub_id`` or ``id``) must name the
 same one (422 ``internal.hub_mismatch``).
@@ -64,8 +78,8 @@ system on that business, whose refusals (422 out of contract…) are answered wi
 Their databases (phase 2, S1; plan 2026-10-22): the registry's and the demos' operations run on control
 (``base.tenancy.context.operation_database``); the WhatsApp doors enter the business's hub (``use_hub``) before they ask
 whether the app is on in it (its rows are in its database: the host erplora.com calls, ``hub.erplora.internal``, opens
-no context), and a database that fails them there is 503 ``base.hub_unavailable``, logged; ERPlora's invoices run on
-phase 1's shared database, where the platform hub keeps its data until S2.
+no context), and a database that fails them there is 503 ``base.hub_unavailable``, logged; ERPlora's invoices run in
+the platform hub's own database (its registry row, made by ``create_platform_hub``; S5).
 """
 
 import json
@@ -87,7 +101,7 @@ from pydantic import ValidationError
 
 from base import registry, relay
 from base.registry import REGISTRY_SCOPE
-from base.tenancy.context import use_hub, use_shared_database
+from base.tenancy.context import HubWithoutDatabase, use_hub
 from base.tenancy.identity import HubIdentityMismatch
 from base.services import DEMO_FULL_RETRY_AFTER_SECONDS, WHATSAPP_APP
 from base.throttle import AttemptLimit, RateLimited, client_key
@@ -186,7 +200,25 @@ def hub(request: HttpRequest, hub_id: UUID) -> HttpResponse:
     answer, refused = _operation_call("base.hub.register", {**body, "id": str(hub_id)}, _registry_context())
     if refused is not None:
         return refused
-    return JsonResponse(_hub_answer(answer), status=202 if answer.created else 200)
+    # 202 while its database is being made (the worker's; the SaaS hears ``ready``), 200 for an update of a ready one.
+    return JsonResponse(_hub_answer(answer), status=200 if answer.status == "ready" else 202)
+
+
+@internal_view
+@require_http_methods(["GET"])
+def hub_dumps(request: HttpRequest, hub_id: UUID) -> HttpResponse:
+    """``GET /internal/hubs/{id}/dumps``: the copies of the business's data, each with a link of 15 minutes."""
+    answer, refused = _operation_call("base.hub.dump_list", {"id": str(hub_id)}, _registry_context())
+    return refused or JsonResponse(answer.model_dump(mode="json"))
+
+
+@internal_view
+@require_http_methods(["GET"])
+def usage(request: HttpRequest) -> HttpResponse:
+    """``GET /internal/usage?day=YYYY-MM-DD[&cursor=]``: one page of what the businesses used that day (UTC)."""
+    payload = {"day": request.GET.get("day"), "cursor": request.GET.get("cursor") or None}
+    answer, refused = _operation_call("base.usage.list", payload, _registry_context())
+    return refused or JsonResponse(answer.model_dump(mode="json"))
 
 
 @internal_view
@@ -241,7 +273,8 @@ def hub_state(request: HttpRequest, hub_id: UUID) -> HttpResponse:
 @internal_view
 @require_http_methods(["POST"])
 def demos(request: HttpRequest) -> HttpResponse:
-    """``POST /internal/demos``: a demo for the SaaS's browser; 201 when it is new, 200 when it is its live one."""
+    """``POST /internal/demos``: a demo for the SaaS's browser; 202 when it is new (``requested``: the worker makes its
+    database and the SaaS waits for ``ready``), 200 when it is its live one."""
     body = _body_object(request)
     if body is None:
         return _payload_invalid("The body is not a JSON object.")
@@ -250,7 +283,7 @@ def demos(request: HttpRequest) -> HttpResponse:
         if refused.status_code == 503:
             refused["Retry-After"] = str(DEMO_FULL_RETRY_AFTER_SECONDS)
         return refused
-    return JsonResponse(answer.model_dump(mode="json"), status=201 if answer.created else 200)
+    return JsonResponse(answer.model_dump(mode="json"), status=202 if answer.created else 200)
 
 
 @internal_view
@@ -370,12 +403,28 @@ def _issue_answer(answer) -> dict:
 
 
 def _platform_call(name: str, payload: dict):
-    """Runs ``name`` as the system on the platform hub: its output, or the response of its refusal.
+    """Runs ``name`` as the system on the platform hub, in its own database: its output, or the response of its
+    refusal.
 
-    Phase 1's platform hub has no registry row and keeps its data in the one database every hub shares: it runs
-    there (``use_shared_database``, S1–S4) until S2 provisions it as a hub with its own (``is_platform``)."""
-    with use_shared_database():
-        return _operation_call(name, payload, _platform_context())
+    The platform hub is the registry's row of ``PLATFORM_HUB_SLUG`` with a database of its own, as any business since
+    S5 (``manage.py create_platform_hub --execute`` makes both): without it, 503 ``base.platform_hub_missing``, saying
+    so; a database that is not its own or cannot be reached now, 503 as for any business."""
+    hub = registry.hub_by_slug(settings.PLATFORM_HUB_SLUG)
+    if hub is None or registry.refusal(hub) is not None:
+        return None, refuse(
+            503,
+            "base.platform_hub_missing",
+            "ERPlora's platform hub has no database of its own yet: run manage.py create_platform_hub --execute.",
+        )
+    try:
+        with use_hub(hub):
+            return _operation_call(name, payload, _platform_context())
+    except HubIdentityMismatch:
+        logger.critical("base.hub_unavailable hub=%s: its database is not its own; %s refused.", hub.slug, name)
+        return None, _unavailable()
+    except (DatabaseError, HubWithoutDatabase):
+        logger.warning("base.hub_unreachable hub=%s: %s could not reach its database now.", hub.slug, name)
+        return None, _unavailable()
 
 
 def _operation_call(name: str, payload: dict, ctx: OperationContext):

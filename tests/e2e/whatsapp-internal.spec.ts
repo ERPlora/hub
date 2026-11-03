@@ -17,7 +17,7 @@ import { expect, type Page, test } from '@playwright/test';
 import { A, login, shot, shown } from './helpers';
 import { FLOW_VIEWPORTS, noHorizontalScroll, settled } from './service-helpers';
 import { STACK } from './stack';
-import { cleanUp, e2ePhone, PREFIX, waId } from './whatsapp-helpers';
+import { cleanUp, e2ePhone, keepPhoto, PREFIX, restorePhoto, waId } from './whatsapp-helpers';
 
 /** The name of the final screen's shots. */
 const SHOTS = 'FIX-HUB-BASE-INTERNAL-WHATSAPP-DOORS-500-ON-COLD-ACTIVATION-CACHE';
@@ -86,8 +86,10 @@ const rowOf = (page: Page, phone: string) => shown(page).locator('[data-testid=w
 const panel = (page: Page) => shown(page).locator('[data-testid=whatsapp-inbox-detail]');
 const bubbles = (page: Page, side: 'inbound' | 'outbound') => panel(page).locator(`[data-testid=whatsapp-inbox-message][data-side=${side}]`);
 
+test.beforeAll(keepPhoto);
 test.afterAll(() => {
   cleanUp();
+  restorePhoto();
 });
 
 test('erplora.com pushes WhatsApp through the signed doors and the open inbox follows without a reload (internal-whatsapp-doors)', async ({ page }) => {

@@ -33,7 +33,10 @@ type Day = { id: string; status: string; clock_in_at: string; clock_out_at: stri
 type Detail = Day & { name: string };
 
 let provider: Provider;
-let wasOn = new Set<string>();
+/** The apps this file turned on, in that order: each one only once its `enable` answered 200. The `afterAll` turns off
+ *  these and nothing else, so a `beforeAll` that falls before reading `/apps` (the SaaS without its assistant seed)
+ *  leaves the business as it found it: never Time clock off for the specs that come after. */
+const turnedOn: string[] = [];
 
 function saasSql(sql: string): string {
   return execSync(`docker compose exec -T postgres psql -U hub -d ${SAAS_DB} -At -c "${sql}"`, {
@@ -61,8 +64,11 @@ test.beforeAll(async ({ browser }) => {
   const page = await context.newPage();
   await login(page, A, '/');
   const before = await api<{ apps: { id: string; state: string }[] }>(context, A, 'GET', '/apps');
-  wasOn = new Set(before.data.apps.filter((app) => app.state === 'on').map((app) => app.id));
-  await turnOn(context, A, ...NEEDED.filter((id) => !wasOn.has(id)));
+  const wasOn = new Set(before.data.apps.filter((app) => app.state === 'on').map((app) => app.id));
+  for (const app of NEEDED.filter((id) => !wasOn.has(id))) {
+    await turnOn(context, A, app);
+    turnedOn.push(app);
+  }
   await context.close();
 });
 
@@ -77,7 +83,7 @@ test.afterAll(async ({ browser }) => {
   const context = await browser.newContext();
   const page = await context.newPage();
   await login(page, A, '/');
-  for (const app of [...NEEDED].reverse().filter((id) => !wasOn.has(id))) {
+  for (const app of [...turnedOn].reverse()) {
     const off = await api(context, A, 'POST', '/apps/disable', { app });
     expect(off.status, `turn off ${app}: ${JSON.stringify(off.data)}`).toBe(200);
   }

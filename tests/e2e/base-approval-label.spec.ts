@@ -15,7 +15,7 @@ import { execSync } from 'node:child_process';
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { type Provider, startProvider } from './assistant-provider';
-import { A, api, compactBar, createItem, EMPLOYEE, login, OWNER, psql, REPO_DIR, shot, shown, untilStill } from './helpers';
+import { A, api, compactBar, createItem, EMPLOYEE, login, OWNER, psql, REPO_DIR, shot, shown, untilStill, usernamesOf } from './helpers';
 import { STACK } from './stack';
 
 const KEY = 'FIX-HUB-BASE-APPROVAL-LABEL-WITHOUT-DISCOUNT-FIGURE';
@@ -55,8 +55,8 @@ function unspent(): void {
   saasSql("delete from assistant_assistantusage where hub_id = (select id from hubs_hub where slug = 'a')");
 }
 
-/** Every account of `email` in this hub's database: the cleanup leaves none of them with what this file made. */
-const accountsOf = (email: string): string => `SELECT username FROM auth_user WHERE email = '${email}'`;
+/** Every account of `email` (their usernames, read from control's): the cleanup leaves none of them with what this file made. */
+const accountsOf = (email: string): string => usernamesOf(email);
 
 /** No PIN of the owner's left behind, in any of their accounts: the business's way in stays erplora.com's. */
 function forgetThePin(): void {

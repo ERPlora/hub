@@ -336,9 +336,9 @@ test('an employee notes and takes a conversation, but neither erases nor opens t
   }
 });
 
-/** `b`'s reply that erplora.com never answered («Not sent», with «Retry»), in phase 1's shared tables: `b`'s own
- *  operations, run as the platform in a one-shot `manage.py shell` (phase 1's shared database, as the helpers of
- *  whatsapp-helpers.ts do for `a`), with what their COMMIT hands to erplora.com dropped, as when the worker stops on a
+/** `b`'s reply that erplora.com never answered («Not sent», with «Retry»), in `b`'s own database: `b`'s own
+ *  operations, run as the platform in a one-shot `manage.py shell --hub b` (as the helpers of whatsapp-helpers.ts do
+ *  for `a`), with what their COMMIT hands to erplora.com dropped, as when the worker stops on a
  *  deploy. Its channel's version and its conversation's number carry the run's marks: `cleanUp` deletes them. */
 const B_NOT_SENT = `
 import json, os, uuid
@@ -391,7 +391,7 @@ function notSentOfB(phone: string, contactName: string, text: string): string {
     },
     text,
   };
-  const out = execFileSync('uv', ['run', 'python', 'manage.py', 'shell', '-c', B_NOT_SENT], {
+  const out = execFileSync('uv', ['run', 'python', 'manage.py', 'shell', '--hub', 'b', '-c', B_NOT_SENT], {
     cwd: HUB_DIR,
     encoding: 'utf8',
     env: { ...process.env, WA_SETUP: JSON.stringify(setup) },
@@ -400,6 +400,10 @@ function notSentOfB(phone: string, contactName: string, text: string): string {
 }
 
 test('«Retry» on another business’s reply in the shared inbox hands it to erplora.com at once, for that business', async ({ page }) => {
+  // Only a hub that shares control's database lists another business's conversations. Since S2a (round 2026-10-30 of
+  // PLAN-DB) `a` and `b` have their own, so their inboxes share nothing and this case cannot happen on this stack; the
+  // shared one stays covered by apps/whatsapp_inbox/tests/test_resume_per_business.py.
+  test.skip(psql("select db_name from base_hub where slug = 'a'") !== '', '`a` and `b` no longer share an inbox (own databases)');
   // WHATSAPP_INBOX-F34 (FIX-HUB-WHATSAPP-INBOX-RETRY-OF-ANOTHER-BUSINESS-WAITS-FOR-THE-SWEEP): phase 1's inbox of `a` also
   // lists `b`'s conversations. `a`'s owner retries `b`'s reply that did not leave: `a`'s request hands it to erplora.com
   // at once, for `b` (never as `a`'s, never refused for running in `a`'s context), and erplora.com answers `b`'s way:

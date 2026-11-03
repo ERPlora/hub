@@ -20,6 +20,7 @@ from django.conf import settings
 from django.core import checks
 from django.utils import timezone, translation
 from live.context import OperationContext, Scope
+from live.assistant import NAMED, REFERS
 from live.errors import NotFound
 from live.operations import Operation, get, registry
 from ninja import Field, Schema
@@ -294,6 +295,58 @@ def test_no_write_lets_an_id_or_an_iso_moment_reach_its_card():
     assert {"appointment.appointment.create", "reservation.reservation.create", "staff.schedule.create"} <= set(checked)
 
 
+# ── A list the screen says by its items: only one the server said in words (``NAMED``) ──────────────────────────────
+
+
+def list_field(card: dict, name: str) -> dict:
+    return next(field for field in card["fields"] if field["name"] == name)
+
+
+def test_a_list_of_codes_nobody_names_reaches_its_card_unnamed_so_it_says_how_many():
+    """FIX-HUB-PRINTING-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS (ui#48's revisers): with the screen saying every list by its
+    items, a dangerous grant said «Permisos: sale.sale.create, invoice.invoice.issue» and a blueprint «Apps que se cargan:
+    sale, invoice». The server sends both as they are, never ``named``: the screen says how many they carry."""
+    grant = assistant.card(get("flow.flow.grant"), {"operations": ["sale.sale.create", "invoice.invoice.issue"]}, "es")
+    blueprint = assistant.card(get("base.blueprint.import"), {"apps": ["sale", "invoice"]}, "es")
+    for card, name in ((grant, "operations"), (blueprint, "apps")):
+        assert list_field(card, name)["kind"] == "list"
+        assert NAMED not in list_field(card, name), name
+
+
+def text_lists() -> dict[str, list[str]]:
+    """Each list of texts of the assistant's writes no schema says anything of (no record, moment or closed list): the
+    write and its datum."""
+    found: dict[str, list[str]] = {}
+    for op in writes():
+        schema = op.input.model_json_schema()
+        defs = schema.get("$defs", {})
+        for name, prop in schema.get("properties", {}).items():
+            prop = assistant._resolved(prop, defs)
+            if prop.get("type") != "array":
+                continue
+            items = assistant._resolved(prop.get("items", {}), defs)
+            if items.get("type") == "string" and not {"enum", "format", REFERS} & items.keys():
+                found.setdefault(op.name, []).append(name)
+    return found
+
+
+def test_no_list_of_texts_sent_as_they_are_is_named():
+    """Every one of them, codes or a person's own words: as sent, so never said item by item as if the server had named
+    it. A list the server says in words is (positive control: a series of visits, said as moments)."""
+    found = text_lists()
+    assert {"flow.flow.grant", "base.blueprint.import"} <= found.keys()
+    named = [
+        f"{write}:{name}"
+        for write, names in found.items()
+        for name in names
+        if NAMED in list_field(assistant.card(get(write), {name: ["sale.sale.create", "vip"]}, "es"), name)
+    ]
+    assert named == []
+    starts = ["2026-11-02T10:00:00+01:00", "2026-11-09T10:00:00+01:00"]
+    visits = list_field(assistant.card(get("appointment.appointment.bulk_create"), {"starts": starts}, "es"), "starts")
+    assert (visits["value"], visits.get(NAMED)) == (["2 nov 2026, 10:00", "9 nov 2026, 10:00"], True)
+
+
 # ── The ratchet: references nobody marks and lists nobody labels, by app ──────────────────────────────────────────────
 
 #: The references (``format: uuid``) of the assistant's writes no ``refers`` mark names, by app: their card leaves
@@ -310,7 +363,6 @@ UNNAMED_REFERENCES = {
     "modifier": 14,
     "online_booking": 7,
     "payment": 8,
-    "printing": 11,
     "sale": 101,
     "schedule": 4,
     "service": 35,
@@ -327,7 +379,6 @@ UNNAMED_REFERENCES = {
 UNLABELLED_LISTS = {
     "invoice": 1,
     "kitchen": 1,
-    "printing": 1,
     "sale": 3,
     "tax": 5,
     "website": 4,

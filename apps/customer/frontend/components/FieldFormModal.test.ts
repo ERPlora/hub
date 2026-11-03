@@ -6,19 +6,25 @@ import { toastSuccess } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { defineComponent, h, ref } from 'vue';
 
+import { approvalDialog, approvalSettled, asksApproval } from '../__tests__/approval-dialog';
 import { flush, json, mountCustomer, refusal, sent } from '../__tests__/mount-customer';
 import type { FieldRow } from '../operations';
 import FieldFormModal from './FieldFormModal.vue';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
   const { IonModalStub } = await import('../../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
-  return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
+  const { modalControllerStub } = await import('../__tests__/approval-dialog');
+  const ionic = await importOriginal<typeof import('@ionic/vue')>();
+  return { ...ionic, IonModal: IonModalStub, modalController: modalControllerStub(ionic.modalController) };
 });
 vi.mock('@erplora/ui/shell', async (importOriginal) => ({
   ...((await importOriginal()) as object),
   toastSuccess: vi.fn(() => Promise.resolve()),
 }));
-beforeEach(() => vi.mocked(toastSuccess).mockClear());
+beforeEach(() => {
+  vi.mocked(toastSuccess).mockClear();
+  approvalDialog.reset();
+});
 afterEach(() => {
   document.body.innerHTML = '';
 });
@@ -103,5 +109,30 @@ describe('FieldFormModal', () => {
     await s.save();
     expect(s.el('customer-field-form-type').errorText).toBe(HAS_VALUES);
     expect(s.open.value).toBe(true);
+  });
+});
+
+describe('FieldFormModal with a manager’s approval (BASE-F84)', () => {
+  it('an employee’s field goes once more with the manager’s pass, and is created', async () => {
+    const s = await setup();
+    let calls = 0;
+    s.net.onApi(() => (calls++ === 0 ? Response.json(asksApproval('customer.field.create', 'Create a custom field'), { status: 403 }) : json(DYE, 201)));
+    await s.type('customer-field-form-name', 'Dye');
+    await s.save();
+    await approvalSettled();
+    expect(approvalDialog.questions.map((question) => question.label)).toEqual(['Create a custom field']);
+    expect(s.net.api.map((call) => sent(call).path)).toEqual(['/api/customer/fields', '/api/customer/fields']);
+    expect(toastSuccess).toHaveBeenCalledWith('Field created');
+  });
+
+  it('an employee’s change goes once more with the manager’s pass', async () => {
+    const s = await setup(DYE);
+    let calls = 0;
+    s.net.onApi(() => (calls++ === 0 ? Response.json(asksApproval('customer.field.update', 'Change a custom field'), { status: 403 }) : json(DYE)));
+    await s.save();
+    await approvalSettled();
+    expect(approvalDialog.questions.map((question) => question.label)).toEqual(['Change a custom field']);
+    expect(s.net.api.map((call) => sent(call).path)).toEqual(['/api/customer/fields/update', '/api/customer/fields/update']);
+    expect(toastSuccess).toHaveBeenCalledWith('Field updated');
   });
 });

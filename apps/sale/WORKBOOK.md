@@ -1,15 +1,16 @@
 # Workbook — Ventas / TPV (app)
 Prefijo: SALE
 Alcance MVP: núcleo
-Estado de la app: hecha (servidor y páginas); lo que depende de apps que aún no existen lo dice cada flujo
+Estado de la app: completa (2026-10-31)
+Lo que no entra todavía: ver «Lo que queda fuera» (la propina, SALE-G06, descartada con su issue).
 
 > Manual de usuario y especificación de la app `sale`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `Estado: hecho` cuando sus tests están en verde
 > (servidor y páginas). Parte del `WORKFLOW.md` del módulo Ventas / TPV del producto actual
 > (`modules-workspace/modules/sales`, `origin/main` `c6cf4af`, v2.16.169) y de sus ficheros
 > `workflow/*.md`. La app hace lo mismo y se ve igual; los números de flujo se conservan
-> (`SALES-Fnn` → `SALE-Fnn`) porque otras apps los citan. Lo que todavía depende de otra app (o de
-> la plataforma) y no está completo lo dice su flujo en la línea `Estado:`.
+> (`SALES-Fnn` → `SALE-Fnn`) porque otras apps los citan. Todos los flujos están hechos; lo que no
+> entra está en «Lo que queda fuera», con su issue.
 
 ## Para qué sirve y para quién
 
@@ -311,10 +312,10 @@ cobrar se pinta en la hoja con su frase (p. ej. «Un producto del tique ya no es
 Quita la línea y vuelve a añadirla.») y la cuenta sigue intacta. Si mientras se cobra otro
 dispositivo cambia la cuenta (añade, cambia, quita, anula o cobra una línea, pone o quita un
 descuento, la divide, la junta o la cierra), gana el primero: el cobro no cobra nada, la hoja dice
-«La cuenta ha cambiado mientras se cobraba. No se ha cobrado nada; la cuenta se ha vuelto a cargar,
-revísala y vuelve a cobrar.» y el siguiente «Cobrar» cobra lo que hay; si gana el cobro, el cambio
-que llegaba se rechaza con «La cuenta ha cambiado mientras se cobraba. No se ha cambiado nada: revisa
-las líneas y vuelve a intentarlo.». Nunca entra en la venta una línea anulada o quitada ni se cobra
+«La cuenta ha cambiado mientras se cobraba: se añadió, cambió, quitó, anuló o cobró una línea, se puso o
+se quitó un descuento, o la cuenta se dividió, se juntó o se cerró. No se ha cobrado ni cambiado nada:
+revisa las líneas y vuelve a intentarlo.» y el siguiente «Cobrar» cobra lo que hay; si gana el cobro, el
+cambio que llegaba se rechaza con la misma frase. Nunca entra en la venta una línea anulada o quitada ni se cobra
 otra cantidad u otro descuento del que guarda la cuenta.
 Implicados: INVENTORY-F21, CUSTOMER-F20, TAX-F18
 
@@ -533,7 +534,7 @@ Pasos:
 Entra: la unidad del artículo, su escalón y la cantidad a la que se refiere su precio, de Inventario.
 Sale: la línea con su cantidad y su unidad congeladas.
 Si falla: una cantidad que no encaja con el escalón de la unidad se rechaza con «La cantidad no encaja
-con el escalón del producto» y la línea queda como estaba. No hay lector de báscula.
+con el escalón del producto (…).» y la línea queda como estaba. No hay lector de báscula.
 Implicados: INVENTORY-F26
 
 ### SALE-F11 Elegir los suplementos de un artículo
@@ -640,7 +641,9 @@ Pasos:
 2. Marca el porcentaje; en la cuenta puedes cambiar a importe fijo con el botón de la moneda del negocio
    («€», «zł»…).
 3. Pulsa «Aplicar −N %» (o «Aplicar −<importe>»). «Quitar» lo borra. La línea enseña «−N %» y el pie
-   la fila «Descuento del ticket».
+   la fila «Descuento del ticket −N %» con lo que el descuento de la cuenta quita, sea porcentaje o
+   importe fijo: un 10 % sobre 8,50 € dice «−0,85 €», nunca «−0,00 €». Lo calcula el servidor (la
+   valoración del cobro, `ticket_discount_amount`) sobre las líneas ya con su propio descuento.
 4. Si el descuento pasa del máximo que el negocio deja dar sin autorización, lo da un responsable: quien
    no puede darlo ve encima «Hace falta una aprobación» con lo que se aprueba y su cifra, la de ese mismo
    descuento: «Se aprueba: Descontar una línea un {discount_percent, percent}» (el porcentaje marcado) o,
@@ -836,7 +839,9 @@ Pantalla: Cuenta (precuenta)
 Pasos:
 1. Con la cuenta en pantalla, pulsa la impresora del pie («Imprimir cuenta»).
 2. Se abre «Cuenta» con las líneas, notas, descuentos, el desglose de IVA, el total y el título, y el
-   aviso «Cuenta — no es una factura. El tiquet fiscal se entrega al cobrar.».
+   aviso «Cuenta — no es una factura. El tiquet fiscal se entrega al cobrar.». Con descuento en la
+   cuenta, la fila «Descuento» dice lo que quita (el mismo importe que el pie del TPV, SALE-F14): con
+   precios con IVA, las líneas menos el descuento dan el total.
 3. Pulsa la impresora de arriba: con **Impresión** y una impresora de tiques activa, la cuenta va a su
    cola y se lee «Enviado a <impresora>.» (PRINTING-F09); si no, sale por el diálogo de impresión del
    dispositivo.
@@ -895,8 +900,11 @@ Pasos:
 2. Las líneas sin cobrar de una pasan a la otra y la vacía queda anulada.
 Entra: las dos cuentas.
 Sale: una sola cuenta; las líneas se mueven sin volver a crearlas, así que lo ya enviado a cocina no
-se envía otra vez. Repetirlo no cambia nada (avisa: cuentas juntadas, con la absorbida y la que
-queda).
+se envía otra vez. La absorbida queda anulada y dice con cuál se juntó: el TPV que la tenía en
+pantalla, en este dispositivo o en otro, pasa a la que queda con el aviso «Esa cuenta se ha juntado
+con otra: la pantalla muestra la cuenta juntada.», nunca «se ha cerrado en otro dispositivo»; si en
+ese momento guardaba un cambio en ella, primero termina ese cambio. Repetirlo no cambia nada (avisa:
+cuentas juntadas, con la absorbida y la que queda).
 Si falla: si una de las dos ya no está abierta, se rechaza sin mover nada.
 Implicados: TABLE-F16, KITCHEN-F28
 
@@ -933,7 +941,7 @@ Si falla: enlazar una cita a una cuenta que ya no está abierta se rechaza; enla
 cuando ya tiene una abierta, «Esa cita ya tiene una cuenta abierta: cobra esa (Cuentas abiertas).». Si
 la dirección nombra una cuenta que ya no está abierta (se cobró, se anuló) o que no existe, el TPV lo
 dice («Esa cuenta ya no está abierta…») y sigue como estaba.
-Implicados: APPOINTMENTS-F17
+Implicados: APPOINTMENT-F17
 
 ### SALE-F27 Pagar una línea con un bono
 <!-- origen: wf:peluqueria-dia#rec_peluqueria-f10 old:sales/workflow/peluqueria.md#sales-f27 qa:modules/sales/voucher-or-session-package -->
@@ -968,9 +976,8 @@ antes.»); un descuento de importe fijo de la cuenta mayor que lo que quedaría 
 no está reservada (pasó un día, SERVICE-F25) o si la venta no es de la titular del bono: se lee el
 motivo en la hoja y se deshace el bono. El descuento máximo sin responsable se mide sobre lo que queda
 por pagar: una línea pagada con bono no cuenta. Sin permiso para gastar sesiones, el hueco no
-aparece. Queda fuera hasta la fase 2 (activación por hub): sin Servicios activa el hueco tampoco aparece y, si
-se apaga con líneas pagadas con bono, cobrarlas se rechaza («Servicios no está activa en este
-negocio…»); hoy la plataforma no apaga apps por hub y ese camino solo se prueba en los tests.
+aparece. Sin Servicios activa en el negocio el hueco tampoco aparece y, si se apaga con líneas pagadas
+con bono, cobrarlas se rechaza («Servicios no está activa en este negocio…»).
 Implicados: SERVICE-F22, SERVICE-F23, SERVICE-F24, SERVICE-F25
 
 ### SALE-F28 Consultar el historial y las cifras de ventas
@@ -1076,9 +1083,9 @@ Con Facturación, la rectificativa del tique entero (R5, serie «RECT») en la m
 sigue sin poder, la anulación sigue adelante y los dos documentos quedan pendientes, a la vista
 (SALE-F29, «Emitir ahora»). Inventario repone el stock (INVENTORY-F23) y Clientes resta la compra (CUSTOMER-F21).
 Si falla: sin motivo, «Hace falta un motivo para anular una venta»; si se cobró como factura
-completa, «Esta venta lleva factura completa: emite una factura rectificativa en vez de anularla»;
+completa, «Esta venta lleva factura completa: emite una factura rectificativa en vez de anularla.»;
 con devoluciones, «Esta venta ya tiene devoluciones: devuelve el importe que queda en vez de
-anularla»; anulada desde otro dispositivo a la vez, «Esta venta ya está anulada». Un rechazo se lee
+anularla.»; anulada desde otro dispositivo a la vez, «Esta venta ya está anulada.». Un rechazo se lee
 dentro de la ventana, que sigue abierta. Si en «Hace falta una aprobación» se pulsa «Cancelar», no se
 anula nada y la ventana dice «Esto necesita la aprobación de un encargado.». La anulación aprobada hace
 lo mismo que la del responsable, una sola vez: la rectificativa en la misma anulación, las sesiones de
@@ -1146,10 +1153,8 @@ Sale: la devolución (avisa: venta devuelta) y la sesión de vuelta en su bono e
 (SERVICE-F26, SERVICE-F27). La venta pasa a Devuelta cuando vuelven todo el dinero y todas sus
 sesiones.
 Si falla: «Una devolución tiene que devolver dinero o la sesión de un bono.»; una sesión ya devuelta,
-«Una de las líneas marcadas ya se devolvió…». Queda fuera hasta la fase 2 (activación por hub): si Servicios
-no está activa, la devolución o la anulación de una venta con sesiones se rechaza («Servicios no está
-activa en este negocio…»); hoy la plataforma no apaga apps por hub y ese camino solo se prueba en los
-tests.
+«Una de las líneas marcadas ya se devolvió…». Si Servicios no está activa en el negocio, la devolución o
+la anulación de una venta con sesiones se rechaza («Servicios no está activa en este negocio…»).
 Implicados: SERVICE-F26, SERVICE-F27
 
 ### SALE-F33 Unir las ventas de dos fichas de cliente
@@ -1429,7 +1434,7 @@ secciones, las notas rápidas y lo devolvible se pueden seguir en vivo.
 | Caja | No reacciona a avisos: lee las ventas, anulaciones y devoluciones de cada turno (la requiere); Ventas le pregunta si la caja está abierta | `Sale`, `Refund`, `sale.order.list` |
 | Citas | Marca cobrada la cita de una venta y lo deshace al anularla; abre la cuenta de una cita (`sale.order.open`) y la lleva al TPV por su dirección | `sale.sale.created_from_appointment`, `sale.sale.voided` |
 | Mesas | Abre, retitula, divide y junta las cuentas de sus mesas y anula la vacía de una mesa que se cierra, por las operaciones de Ventas con la sesión de quien está en la sala; lee el estado de cada cuenta | `sale.order.open`, `.set_label`, `.split`, `.merge`, `.void` |
-| VeriFactu, Cocina | Reaccionarán a los avisos cuando existan | los avisos de arriba |
+| Cocina | Abre la comanda de cada ronda enviada y la pone al día cuando la cuenta se cobra entera, se anula o se anula una de sus líneas (KITCHEN-F05, KITCHEN-F27 a KITCHEN-F29) | `sale.order.fired`, `sale.order.completed`, `sale.order.voided`, `sale.order.line_voided` |
 
 ### Quién puede qué
 
@@ -1848,10 +1853,10 @@ administrador y responsable, los mismos que anulan y devuelven).
   VeriFactu.
 - No mueve stock ni cuadra la caja: Inventario al oír la venta; Caja lee las ventas de cada turno.
 - No habla con el datáfono ni con la báscula.
-- No tiene propinas, ni comensal por línea, ni cursos con retención.
+- No tiene propinas (SALE-G06, hub#562), ni comensal por línea, ni cursos con retención.
 - No marca artículos como agotados («86»): es un dato del artículo, de Inventario; el TPV enseña en gris
   con «Agotado» lo que Inventario tiene agotado y no deja pedirlo (`sale.product_sold_out`), pero cobra lo
-  que ya estaba pedido (SALE-F07).
+  que ya estaba pedido (SALE-F07, INVENTORY-F29; el «86» del QA viejo, SALE-G05, queda cubierto así).
 - No reabre una venta cobrada ni cambia su tipo de documento.
 - No reprecia una cuenta abierta: si el catálogo cambia, la cuenta conserva el precio con que se
   pidió.
@@ -1877,14 +1882,25 @@ administrador y responsable, los mismos que anulan y devuelven).
   (se abre desde el plano, TABLE-F11, o desde **Cuentas abiertas**); y el icono relleno `grid` del botón
   con mesa (no está registrado en `packages/ui`: se pinta `grid-outline` en color).
 
+- **Cobrar con propina** (SALE-G06): un flujo nuevo que cruza Ventas y Caja y que nunca entra en la base ni
+  en el IVA del tique; el producto la aplazó tras el MVP (pm#100). Mientras, la propina en efectivo se anota
+  en Caja como «Entrada» (CASH_REGISTER-F05). Issue hub#562.
+- **Fallos vistos que quedan como issue** (`migration-leftover`): hub#558 (dos pruebas del precio libre
+  del TPV fallan por tiempo con la máquina cargada), hub#560 (seis textos en español salen con las
+  palabras de otra app) y hub#561 (la tarjeta de confirmación del asistente no dice qué registro toca una
+  escritura de Ventas). Y, en la cadena de arreglos de Ventas, hub#442: el aviso de agotado se queda en el
+  TPV tras volver a poner el artículo a la venta (F07).
+
 ### Dudas abiertas
 
 1. Anular un tique ya remitido a la AEAT: lo decidió Facturación (INVOICE-F07): la anulación emite la
    rectificativa R5 del tique entero, en la misma operación; el registro de VeriFactu es de su app.
 2. El PIN del encargado sobre el dispositivo del empleado (elevación) es de la plataforma (BASE-F84) y
-   Ventas lo usa desde FIX-SALE-VOID-REFUND-ASKS-NO-APPROVAL (F09, F14, F18, F20, F30, F31). Falta que el
-   diálogo diga la cifra de un descuento (F14, «Pendiente»).
+   Ventas lo usa desde FIX-SALE-VOID-REFUND-ASKS-NO-APPROVAL (F09, F14, F18, F20, F30, F31); el diálogo
+   ya dice la cifra del descuento que aprueba (F14).
 3. El nombre legal y el NIF del emisor en el documento: el producto actual los leía del hub
    (`sales.business.get`); aquí la identidad fiscal del negocio vive en el SaaS y el Hub aún no la
    tiene, así que el tique pinta la «Cabecera del recibo» de los ajustes. El documento fiscal (con NIF del
-   emisor, número de factura y QR) lo emitirá Facturación (F29).
+   emisor, número de factura y QR) lo emite Facturación (F29) con el emisor que tenga; que ese emisor
+   llegue de la cuenta de erplora.com es hub#501, que choca con «Dos identidades» de PLAN-SAAS §3.1
+   (contradicción señalada en la ronda 2026-10-31b de PLAN-HUB, sin elegir).

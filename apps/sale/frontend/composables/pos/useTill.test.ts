@@ -3,7 +3,7 @@
 // second tap on the same product raises its line. One write in flight at a time per check. What the
 // screen shows is what the operations answer (no money of its own); a refusal says the server's words. What the
 // cashier's role does not allow, a manager approves with their PIN on this very device (BASE-F84).
-import { toastError } from '@erplora/ui/shell';
+import { toast, toastError } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { defineComponent, h } from 'vue';
 
@@ -32,14 +32,20 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.mocked(toastError).mockClear();
+  vi.mocked(toast).mockClear();
 });
 
 async function setup(options: { settings?: Partial<SettingsOut>; session?: typeof MANAGER; locale?: 'en' | 'es' } = {}) {
   let till!: Till;
   const opened: string[] = [];
+  const joined: string[] = [];
   const Probe = defineComponent({
     setup() {
-      till = useTill({ settings: () => settings(options.settings), onOpened: (id) => opened.push(id) });
+      till = useTill({
+        settings: () => settings(options.settings),
+        onOpened: (id) => opened.push(id),
+        onJoined: (id) => joined.push(id),
+      });
       return () => h('div');
     },
   });
@@ -47,7 +53,7 @@ async function setup(options: { settings?: Partial<SettingsOut>; session?: typeo
   /** The server answers every write with `body` (an OrderOut by default). */
   const reply = (body: unknown) => m.net.onApi(() => Response.json(body));
   const calls = () => m.sent().map((c) => [c.path.replace('/api/sale/orders', ''), c.body]);
-  return { ...m, till: () => till, reply, calls, opened };
+  return { ...m, till: () => till, reply, calls, opened, joined };
 }
 
 const CHECK = order({ id: 'o1', version: 1, lines: [line({ id: 'l1', product_id: 'p1' })] });
@@ -554,6 +560,51 @@ describe('useTill: following the check live', () => {
     expect(await voiding).toEqual({ ok: true });
     expect(s.till().orderId.value).toBeNull();
     expect(toastError).not.toHaveBeenCalled();
+  });
+
+  it('a check joined with another one (Tables «Merge», here or on another device) is not «closed on another device»: the till follows the one that stays (hub#459)', async () => {
+    const s = await withCheck();
+    s.till().follow(order({ id: 'o1', version: 5, status: 'voided', merged_into_id: 'o2', lines: [] }));
+    expect(toastError).not.toHaveBeenCalled();
+    expect(toast).toHaveBeenCalledWith('That check was joined with another one: the screen shows the joined check.');
+    expect(s.till().orderId.value).toBe('o2');
+    expect(s.till().order.value).toBeNull();
+    expect(localStorage.getItem(CURRENT_CHECK_KEY)).toBe('o2');
+    expect(s.joined).toEqual(['o2']);
+    s.till().follow(order({ id: 'o2', version: 7 }));
+    expect(s.till().order.value?.id).toBe('o2');
+  });
+
+  it('a check joined while this screen writes to it: the write answers first, then the till follows the one that stays', async () => {
+    const s = await withCheck();
+    const answer = deferred();
+    s.net.onApi(() => answer.promise);
+    const renaming = s.till().rename('Terrace');
+    await flush();
+    s.till().follow(order({ id: 'o1', version: 5, status: 'voided', merged_into_id: 'o2', lines: [] }));
+    expect(s.till().orderId.value).toBe('o1');
+    answer.resolve(Response.json(order({ id: 'o1', version: 4, label: 'Terrace' })));
+    await renaming;
+    await flush();
+    expect(s.till().orderId.value).toBe('o2');
+    expect(s.till().order.value).toBeNull();
+    expect(s.joined).toEqual(['o2']);
+    expect(toastError).not.toHaveBeenCalled();
+  });
+
+  it('a check closed on another device while this screen writes to it: once the write answers, the screen lets it go and says so', async () => {
+    const s = await withCheck();
+    const answer = deferred();
+    s.net.onApi(() => answer.promise);
+    const renaming = s.till().rename('Terrace');
+    await flush();
+    s.till().follow(order({ id: 'o1', version: 5, status: 'completed', lines: [] }));
+    expect(s.till().orderId.value).toBe('o1');
+    answer.resolve(Response.json(order({ id: 'o1', version: 4, label: 'Terrace' })));
+    await renaming;
+    await flush();
+    expect(s.till().orderId.value).toBeNull();
+    expect(toastError).toHaveBeenCalledWith('That check was closed on another device: the screen starts a new one.');
   });
 
   it('a check that no longer exists lets the screen go too', async () => {

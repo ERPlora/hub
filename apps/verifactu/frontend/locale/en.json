@@ -133,6 +133,7 @@
       "incident": "Sent declared as late (incident)",
       "waitingTitle": "Not at the AEAT yet",
       "waitingWhen": "It goes out by itself with the next pass, in order, and declared as late if it failed before. You do not have to do anything.",
+      "waitingWhenResolved": "It goes out by itself, in order and declared as late, as soon as that is resolved.",
       "rejectedTitle": "The AEAT rejected it",
       "rejectedHelp": "If the invoice itself is wrong (a customer's tax ID the AEAT does not know, an amount), rectify it in Invoicing. If not (the chain after restoring a backup, a fault of ours), correct the record.",
       "verify": "Verify at the AEAT",

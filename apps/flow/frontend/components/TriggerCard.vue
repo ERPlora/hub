@@ -11,7 +11,7 @@ import { computed } from 'vue';
 import { usePhrasing } from '../composables/usePhrasing';
 import type { DataChoice } from '../lib/document';
 import { describeTrigger, eventLabel } from '../lib/phrasing';
-import type { CatalogOut, Condition, Step, Trigger, TriggerKind } from '../operations';
+import type { CatalogOut, Condition, FixedByAppOut, Step, Trigger, TriggerKind } from '../operations';
 import ConditionRows from './ConditionRows.vue';
 
 const props = defineProps<{
@@ -25,6 +25,8 @@ const props = defineProps<{
   errors: Readonly<Record<string, string>>;
   /** Opens the editor's picker on what the event brings, for a comparison with another datum. */
   pick?: () => Promise<string | null>;
+  /** What the app of the recipe it was built from fixes (FLOW-F36): its conditions never come off here. */
+  fixedByApp?: FixedByAppOut | null;
 }>();
 const emit = defineEmits<{ 'update:modelValue': [value: Trigger]; toggle: [] }>();
 const phrasing = usePhrasing();
@@ -90,6 +92,14 @@ function setAt(raw: string): void {
   emit('update:modelValue', { kind: 'at', at: date && !Number.isNaN(date.getTime()) ? date.toISOString() : '' });
 }
 
+/** The data its app puts a condition on, while it starts on the recipe's event (started otherwise, none). */
+const lockedBy = computed(() => {
+  const fixed = props.fixedByApp;
+  const value = trigger.value;
+  if (!fixed?.filter.length || value.kind !== 'event' || value.event !== fixed.event) return null;
+  return { app: fixed.app_name, paths: fixed.filter };
+});
+
 const generalError = computed(() => props.errors['trigger.at'] ?? props.errors['trigger.time'] ?? props.errors['trigger.filter'] ?? props.errors.trigger ?? '');
 </script>
 
@@ -154,6 +164,7 @@ const generalError = computed(() => props.errors['trigger.at'] ?? props.errors['
               :pick="pick"
               :steps="steps"
               :catalog="catalog"
+              :locked-by="lockedBy"
               @update:model-value="setFilter"
             />
           </div>

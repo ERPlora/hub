@@ -792,6 +792,19 @@ class LastRunOut(Schema):
     started_at: dt.datetime
 
 
+class FixedByAppOut(Schema):
+    """What its app fixes today on an automation built from one of its recipes, which is not taken off from the
+    automation (FLOW-F36): the data its «Only when…» has a condition on while it starts on ``event``, and, by step id
+    and tool, the fixed data of its «Ask the assistant» steps. Another value of the owner's goes; leaving one out is
+    refused (``flow.recipe_fixed``)."""
+
+    app: str
+    app_name: str
+    event: str
+    filter: list[str]
+    pinned: dict[str, dict[str, list[str]]]
+
+
 class FlowOut(Schema):
     id: UUID
     name: str
@@ -808,6 +821,7 @@ class FlowOut(Schema):
     created_by: str
     updated_by: str
     last_run: LastRunOut | None
+    fixed_by_app: FixedByAppOut | None = None
 
 
 class RunOut(Schema):

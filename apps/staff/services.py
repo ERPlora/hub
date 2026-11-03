@@ -34,6 +34,7 @@ from apps.staff.queries import (
     ROLE_NOT_FOUND,
     SCHEDULE_NOT_FOUND,
     TIME_OFF_NOT_FOUND,
+    active_role,
     actor_user_id,
     business_today,
     load_member,
@@ -42,6 +43,7 @@ from apps.staff.queries import (
     load_time_off,
     overlapping_time_off,
     resolve_member,
+    role_for,
     settings_out,
 )
 from apps.staff.schemas import (
@@ -73,9 +75,6 @@ from apps.staff.schemas import (
 from base.models import HubUser, Membership
 from base.services import acting_hub_user
 
-ROLE_UNAVAILABLE = _(
-    "That role is not available: it does not exist in this business, or it has been deleted or retired."
-)
 ROLE_NAME_TAKEN = _("A role with that name already exists.")
 USER_NOT_IN_BUSINESS = _("That Hub user has no access to this business.")
 USER_ALREADY_LINKED = _(
@@ -138,8 +137,12 @@ TRANSITIONS = {
     output=MemberDetailOut,
     expose_api=True,
     ai={
-        "description": "Adds a staff member (a person who works in the business).",
+        "description": "Adds a staff member (a person who works in the business). Their role is one of the "
+        "business's active roles: read them with staff.role.list first, and if the role asked for is not there, "
+        "ask the person before creating it.",
         "risk": "normal",
+        # hub#538: a role the business does not have is told to the model before the card, not after the yes.
+        "check": "staff.role.resolve",
     },
 )
 def create_member(ctx: OperationContext, data: MemberIn) -> Member | None:
@@ -314,26 +317,15 @@ def _require_pay_permission(ctx: OperationContext, fields: Any) -> None:
 
 
 def _active_role_id(role_id: UUID | None, name: str | None) -> UUID | None:
-    roles = Role.objects.filter(is_active=True)
-    role = (
-        roles.filter(pk=role_id).first()
-        if role_id is not None
-        else roles.filter(name__iexact=name).first()
-    )
+    role = active_role(role_id, name)
     return role.id if role else None
 
 
 def _role_for(role_id: UUID | None, name: str | None) -> UUID | None:
-    """The id of an active role given by id or by name; 422 on that field when there is none."""
-    if role_id is None and not name:
-        return None
-    found = _active_role_id(role_id, name)
-    if found is None:
-        field = "role_id" if role_id is not None else "role"
-        raise InvalidPayload(
-            str(ROLE_UNAVAILABLE), fields={field: str(ROLE_UNAVAILABLE)}
-        )
-    return found
+    """The id of an active role given by id or by name (``queries.role_for``: staff.role.resolve checks it so before
+    the assistant's card); 422 on that field when there is none."""
+    role = role_for(role_id, name)
+    return role.id if role else None
 
 
 def _check_user(

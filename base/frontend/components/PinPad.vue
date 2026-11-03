@@ -215,11 +215,13 @@ defineExpose({ clear: () => (digits.value = '') });
   font-size: 1.375rem;
 }
 
-/* A short screen (a low phone, 667 px tall; a laptop's browser): smaller keys, still well over a finger, so the whole
-   pad fits under what is above it (the approval dialog's texts, the till's faces), never its last row cut off. */
+/* A short screen (a low phone, 667 px tall; a laptop's browser): smaller keys, still well over a finger, closer
+   together, so the whole pad fits under what is above it (the approval dialog's texts, the till's faces, Access's
+   notice of a session that ended: hub#441), never its last row cut off. */
 @media (max-height: 740px) {
   .pinpad__keys {
     --pinpad-key: 56px;
+    gap: 8px;
   }
 }
 </style>

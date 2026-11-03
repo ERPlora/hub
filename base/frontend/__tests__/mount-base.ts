@@ -27,6 +27,7 @@ import {
 } from '../../../packages/ui/src/sdk/__tests__/live-harness';
 import { OPERATION_ROUTES } from '../../../frontend/generated/operation-routes';
 import { HUB_ASSISTANT } from '../lib/assistant-hub';
+import { forgetAppDistribution } from '../lib/management';
 import type { Business } from '../operations';
 import en from '../locale/en.json';
 import es from '../locale/es.json';
@@ -65,6 +66,39 @@ export function business(fields: Partial<Business> = {}): Business {
 }
 
 export const POLISH = { country: 'PL', country_name: 'Poland', currency: 'PLN', currency_label: 'PLN · Polish Zloty' };
+
+type TauriWindow = { __TAURI__?: { core: { invoke: (command: string, args?: unknown) => Promise<unknown> } } };
+
+/** The installed app's bridge, from the copy it is (`device_context`'s `distribution`: `direct`, `play`, `msstore`);
+ *  its `invoke`, to look at. `leaveInstalledApp` takes it away and forgets the copy (`managementOffered`). */
+export function installedApp(distribution: string) {
+  const invoke = vi.fn(async (command: string) => (command === 'device_context' ? { id: 'd1', distribution } : undefined));
+  (window as TauriWindow).__TAURI__ = { core: { invoke } };
+  return invoke;
+}
+
+export function leaveInstalledApp(): void {
+  delete (window as TauriWindow).__TAURI__;
+  forgetAppDistribution();
+}
+
+/** A click on `element` as a person's tap, and whether the page stopped the link (`defaultPrevented`). The test
+ *  environment never follows the link afterwards (happy-dom would fetch its address). */
+export function tap(element: Element): { defaultPrevented: boolean } {
+  const click = new MouseEvent('click', { bubbles: true, cancelable: true });
+  const seen = { defaultPrevented: false };
+  const last = (event: Event) => {
+    seen.defaultPrevented = event.defaultPrevented;
+    event.preventDefault();
+  };
+  window.addEventListener('click', last);
+  try {
+    element.dispatchEvent(click);
+  } finally {
+    window.removeEventListener('click', last);
+  }
+  return seen;
+}
 
 const BLANK = { template: '<div />' };
 

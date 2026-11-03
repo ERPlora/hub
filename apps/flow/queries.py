@@ -332,6 +332,21 @@ def fixed_value(raw: Any, data: dict) -> Any:
     return None if value is None or (isinstance(value, str) and not value.strip()) else value
 
 
+def pinned_values(run: FlowRun, step: dict, name: str) -> tuple[dict, list[str]]:
+    """``(values, empty)``: the data ``step`` fixes for its tool ``name``, filled in with ``run``'s data as its prompt
+    is, and the names of those empty now (a path not found, a text with nothing in it)."""
+    data = {"input": run.input, "steps": run.outputs}
+    values: dict[str, Any] = {}
+    empty: list[str] = []
+    for field, raw in ((step.get("pinned") or {}).get(name) or {}).items():
+        value = fixed_value(raw, data)
+        if value is None:
+            empty.append(field)
+        else:
+            values[field] = value
+    return values, empty
+
+
 def _tried_pinned(ctx: OperationContext, step: Any, values: dict, unknown_steps: set[str]) -> list[dict]:
     """What «Try it» says of the data an «Ask the assistant» step fixes: each, tool by tool, with the value it would
     have as the card of the change says it (FLOW-F29: a record by its name for whoever may read it, else left out;
@@ -471,7 +486,7 @@ def trigger_of(flow: Flow) -> dict[str, Any]:
         return {
             "kind": "event",
             "event": flow.trigger_event,
-            "filter": flow.trigger_filter,
+            "filter": recipes.fixed_filter(flow),
         }
     if flow.trigger_kind == Flow.Trigger.SCHEDULE:
         schedule = flow.schedule
@@ -508,7 +523,7 @@ def flow_row(flow: Flow) -> dict[str, Any]:
         "name": flow.name,
         "enabled": flow.enabled,
         "trigger": trigger_of(flow),
-        "steps": flow.steps,
+        "steps": recipes.fixed_data(flow, flow.steps),
         "grants": flow.grants,
         "required_grants": required,
         "missing_grants": [name for name in required if name not in flow.grants],
@@ -527,6 +542,7 @@ def flow_row(flow: Flow) -> dict[str, Any]:
             if flow.last_run_id
             else None
         ),
+        "fixed_by_app": recipes.fixed_by_app(flow),
     }
 
 
@@ -1392,9 +1408,11 @@ def proposal_held(run: FlowRun) -> dict | None:
 
 
 def proposal_of(question: Question) -> tuple[Operation, dict] | None:
-    """The change the assistant wants that ``question`` waits on — its action and what it would send —, or ``None``:
-    an «Ask someone first» question, or a change whose action is gone, has none (``proposal_held``)."""
-    proposal = proposal_held(question.run)
+    """The change the assistant wants that ``question`` waits on — its action and what a yes would send, with what its
+    step fixes today put in (FLOW-F36: also a change proposed before its app fixed it) —, or ``None``: an «Ask someone
+    first» question, or a change whose action is gone, has none (``proposal_held``)."""
+    run = question.run
+    proposal = proposal_held(run)
     op = registry.get(str(proposal.get("operation") or "")) if proposal else None
     if op is None:
         return None
@@ -1402,7 +1420,10 @@ def proposal_of(question: Question) -> tuple[Operation, dict] | None:
         arguments = json.loads(proposal.get("arguments") or "{}")
     except ValueError:
         arguments = {}
-    return op, arguments if isinstance(arguments, dict) else {}
+    step = recipes.fixed_data(question.flow, run.definition["steps"])[run.step_index]
+    fixed, empty = pinned_values(run, step, op.name)
+    sent = {name: value for name, value in (arguments if isinstance(arguments, dict) else {}).items() if name not in empty}
+    return op, {**sent, **fixed}
 
 
 def question_row(ctx: OperationContext, question: Question) -> dict[str, Any]:

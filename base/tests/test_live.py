@@ -17,7 +17,9 @@ from base.events import (
     FILE_EVENTS,
     HUB_DATA_RESET,
     HUB_REGISTERED,
+    HUB_RESET_PROGRESSED,
     HUB_STATE_APPLIED,
+    HUB_USAGE_MEASURED,
     IMPORT_UNDONE,
 )
 
@@ -54,9 +56,12 @@ def test_the_three_queries_and_their_events():
         "base.notice.list": sorted({*declared("notices"), HUB_STATE_APPLIED, *APP_EVENTS}),
         # Apps (APP-BASE-4): the photo gives or takes the right to a paid module; the business turns them on and off.
         "base.app.list": sorted({HUB_STATE_APPLIED, *APP_EVENTS}),
-        "base.plan.usage": [HUB_STATE_APPLIED],
+        # The photo, and the night that measured the business's own database (BASE-F40, base.usage).
+        "base.plan.usage": [HUB_STATE_APPLIED, HUB_USAGE_MEASURED],
         "base.blueprint.list": sorted({HUB_STATE_APPLIED, *DATA}),
         "base.import.list": sorted(DATA),
+        # The copies of the business's data and its last reset: each step the worker tells, and the reset done (S2b).
+        "base.hub.dumps": sorted([HUB_RESET_PROGRESSED, HUB_DATA_RESET]),
         # Business settings (APP-BASE-6): the SaaS registers the business again when it changes on erplora.com.
         "base.business.get": [HUB_REGISTERED],
         # System (APP-BASE-7): the failed events, and the photo or the business (they turn the app they were for on or

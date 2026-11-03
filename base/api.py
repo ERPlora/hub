@@ -34,6 +34,7 @@ from base.schemas import (
     FileReadIn,
     FileRenameIn,
     FileUploadIn,
+    HubDumpLinkIn,
     HubResetIn,
     ImportIdIn,
     ImportUndoIn,
@@ -81,18 +82,30 @@ async def app_list(request):
     return await run_operation(request, queries.app_list)
 
 
-# Turning an app on or off, with the plan's limit (PLAN-HUB §9): the app's id in the body.
+# Turning an app on or off, with the plan's limit (PLAN-HUB §9): the app's id in the body. While a hub's own database
+# gets the app's tables (S3) the same answer comes with 202: accepted, the worker finishes it.
+from django.http import JsonResponse  # noqa: E402
+
 from base.schemas import AppChangeIn  # noqa: E402
+
+
+def _accepted_while_creating(answer):
+    return JsonResponse(answer.model_dump(mode="json"), status=202) if answer.state == "creating" else answer
 
 
 @bind(router, "base.app.enable", "/apps/enable")
 async def app_enable(request, data: AppChangeIn):
-    return await run_operation(request, services.app_enable, data)
+    return _accepted_while_creating(await run_operation(request, services.app_enable, data))
 
 
 @bind(router, "base.app.disable", "/apps/disable")
 async def app_disable(request, data: AppChangeIn):
     return await run_operation(request, services.app_disable, data)
+
+
+@bind(router, "base.app.retry", "/apps/retry")
+async def app_retry(request, data: AppChangeIn):
+    return _accepted_while_creating(await run_operation(request, services.app_retry, data))
 
 
 @bind(router, "base.plan.usage", "/system/plan")
@@ -150,6 +163,16 @@ async def dataset_list(request):
 @bind(router, "base.hub.reset", "/settings/data/reset")
 async def hub_reset(request, data: HubResetIn):
     return await run_operation(request, services.hub_reset, data)
+
+
+@bind(router, "base.hub.dumps", "/settings/data/dumps")
+async def hub_dumps(request):
+    return await run_operation(request, queries.hub_dumps)
+
+
+@bind(router, "base.hub.dump_link", "/settings/data/dumps/link")
+async def hub_dump_link(request, data: Query[HubDumpLinkIn]):
+    return await run_operation(request, queries.hub_dump_link, data)
 
 
 # ── Business settings and the hub's context (APP-BASE-6) ──

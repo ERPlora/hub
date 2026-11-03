@@ -107,7 +107,7 @@ const amountLabel = computed(() => (props.splitting && !cash.value ? 'sale.check
       @click="emit('split')"
     >
       <HubIcon
-        name="ion:swap-vertical-outline"
+        name="ion:swap-horizontal-outline"
         aria-hidden="true"
       />
       {{ $t('sale.checkout.splitPayment') }}

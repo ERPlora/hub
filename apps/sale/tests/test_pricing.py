@@ -304,6 +304,47 @@ def test_a_fixed_ticket_amount_is_shared_by_weight_after_the_percents():
     assert [item.line_total for item in result.lines] == [96, 97, 97]
 
 
+def test_the_ticket_discount_amount_is_what_the_ticket_discount_takes_off_be_it_a_percent_or_fixed():
+    # hub#457: 2 × 1.50 + 5.50 with 10 % off the check: the ticket discount takes 0.85 off, not 0.
+    result = value(
+        [line(150, "2", "restaurant.drink"), line(550, category="restaurant.food")],
+        tax_included=True,
+        ticket_percent=Decimal("10"),
+        close=fake_close,
+    )
+    assert (result.total, result.ticket_discount_amount) == (765, 85)
+    # A fixed amount takes off just that.
+    result = value([line(100), line(100), line(100)], tax_included=True, ticket_amount=30, close=fake_close)
+    assert result.ticket_discount_amount == 30
+    # Both: the percent first, then the fixed amount on what is left.
+    result = value([line(1000), line(500)], tax_included=True, ticket_percent=Decimal("10"), ticket_amount=50, close=fake_close)
+    assert (result.total, result.ticket_discount_amount) == (1300, 200)
+    # Without a ticket discount there is nothing to say.
+    assert value([line(1000)], tax_included=True, close=fake_close).ticket_discount_amount == 0
+
+
+def test_the_ticket_discount_amount_leaves_out_the_line_discounts_comps_and_vouchers():
+    # A line's own −50 % is the line's (it is already in its row); the ticket's 10 % comes off what is left.
+    result = value(
+        [line(1000, line_percent=Decimal("50")), line(1000)],
+        tax_included=True,
+        ticket_percent=Decimal("10"),
+        close=fake_close,
+    )
+    assert (result.total, result.discount_amount, result.ticket_discount_amount) == (1350, 650, 150)
+    # A comp and a line a voucher pays are worth nothing: the ticket takes nothing off them.
+    result = value(
+        [line(900, cost=400, is_gift=True), line(2500, covered=True), line(1000)],
+        tax_included=True,
+        ticket_percent=Decimal("10"),
+        close=fake_close,
+    )
+    assert (result.total, result.ticket_discount_amount) == (900, 100)
+    # Without VAT in the prices it is said as the lines are, before tax: 10 % of 10.00 + 5.00.
+    result = value([line(1000), line(500)], tax_included=False, ticket_percent=Decimal("10"), close=fake_close)
+    assert (result.subtotal, result.ticket_discount_amount) == (1350, 150)
+
+
 def test_a_fixed_amount_bigger_than_the_check_is_refused():
     with pytest.raises(Conflict) as refusal:
         value([line(100)], tax_included=True, ticket_amount=101, close=fake_close)

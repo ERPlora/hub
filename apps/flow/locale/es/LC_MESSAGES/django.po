@@ -18,11 +18,11 @@ msgstr ""
 msgid "Automations"
 msgstr "Automatizaciones"
 
-msgid "Rules that run on their own, on a schedule or when you run them: the repetitive work, done for you."
-msgstr "Reglas que se cumplen solas, con un horario o cuando las ejecutas: el trabajo repetitivo, hecho por ti."
+msgid "Rules that run on their own when something happens, on a schedule or by hand: repetitive work, done for you."
+msgstr "Reglas que se cumplen solas cuando pasa algo, con un horario o cuando las ejecutas: el trabajo repetitivo, hecho por ti."
 
-msgid "Automations runs the repetitive work for you: every day, week or month at a time, on a date, or when you run it, it does what you told it, such as leaving a task or a note on a customer's card. Start from a ready-made card, allow it only what it needs, try it without effects, turn it on and read in plain words what it did each time. Starting on its own when something happens in your business comes in a later version."
-msgstr "Automatizaciones hace por ti el trabajo repetitivo: cada día, semana o mes a una hora, en una fecha, o cuando la ejecutas, hace lo que le dijiste, como dejar una tarea o una nota en la ficha de un cliente. Empieza por una tarjeta hecha, permítele solo lo que necesita, pruébala sin efectos, enciéndela y lee en palabras qué hizo cada vez. Arrancar sola cuando pasa algo en tu negocio llega en una versión posterior."
+msgid "Automations runs the repetitive work for you: when something happens in your business, every day, week or month at a time, on a date, or when you run it, it does what you told it, such as leaving a task or a note on a customer's card. Start from a ready-made card or ask the assistant to draft one, allow it only what it needs, try it without effects, turn it on and read in plain words what it did each time."
+msgstr "Automatizaciones hace por ti el trabajo repetitivo: cuando pasa algo en tu negocio, cada día, semana o mes a una hora, en una fecha, o cuando la ejecutas, hace lo que le dijiste, como dejar una tarea o una nota en la ficha de un cliente. Empieza por una tarjeta hecha o pide al asistente que te prepare una, permítele solo lo que necesita, pruébala sin efectos, enciéndela y lee en palabras qué hizo cada vez."
 
 msgid "Something happens"
 msgstr "Pasa algo"
@@ -489,6 +489,20 @@ msgstr "huella de la receta"
 
 msgid "This business has not turned that automation on: there is nothing to change."
 msgstr "Este negocio no ha encendido esa automatización: no hay nada que cambiar."
+
+msgid ""
+"«%(app)s» puts a condition on «%(field)s»: give it another value, start it "
+"with something else or make a copy."
+msgstr ""
+"«%(app)s» pone una condición en «%(field)s»: dale otro valor, haz que "
+"empiece con otra cosa o haz una copia."
+
+msgid ""
+"«%(app)s» fixes «%(field)s» of «%(name)s»: give it another value, take "
+"«%(name)s» off what it may use or make a copy."
+msgstr ""
+"«%(app)s» fija «%(field)s» de «%(name)s»: dale otro valor, quita «%(name)s» "
+"de lo que puede usar o haz una copia."
 
 msgid "No app of this business brings that automation."
 msgstr "Ninguna app de este negocio trae esa automatización."

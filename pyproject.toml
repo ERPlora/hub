@@ -36,6 +36,10 @@ dev = [
     "anthropic>=1.13.0",
     "respx>=0.23",
     "pytest-xdist>=3.8.0",
+    # The S3 of the tests: moto in server mode (ThreadedMotoServer: flask and flask-cors) behind boto3, never a mock.
+    "moto[s3]>=5.2",
+    "flask>=3.1",
+    "flask-cors>=6",
 ]
 
 [tool.uv]

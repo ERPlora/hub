@@ -431,6 +431,7 @@ const saving = computed(() => create.pending.value || update.pending.value || sw
           :steps="doc.steps"
           :errors="errors"
           :pick="pickFor(0)"
+          :fixed-by-app="flow?.fixed_by_app ?? null"
           @update:model-value="setTrigger"
           @toggle="toggleStep('trigger')"
         />
@@ -451,6 +452,7 @@ const saving = computed(() => create.pending.value || update.pending.value || sw
             :choices="choicesFor(index)"
             :pick="pickFor(index)"
             :pick-call="step.kind === 'http' ? pickFor(index, true) : undefined"
+            :fixed-by-app="flow?.fixed_by_app ?? null"
             @update:step="updateStep(index, $event)"
             @remove="remove(index)"
             @toggle="toggleStep(step.id)"

@@ -26,22 +26,27 @@ function capitalize(text: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
-function appName(label: string, catalog: CatalogOut | null | undefined): string {
+/** The app's visible name, in the person's language, from the catalog; `null` while it cannot be named (the catalog
+ *  still on its way, not read, or an app that is not on): its internal label is never shown. */
+function appName(label: string, catalog: CatalogOut | null | undefined): string | null {
   return (
     catalog?.events.find((event) => event.app === label)?.app_name ??
     catalog?.actions.find((action) => action.app === label)?.app_name ??
-    label
+    null
   );
 }
 
-/** «a sale is charged», or «Customers: group deleted» for an event without a phrase. */
+/** «a sale is charged», or «Customers: group deleted» for an event without a phrase («Group deleted» while its app
+ *  cannot be named). */
 export function eventLabel(name: string, catalog: CatalogOut | null | undefined, p: Phrasing): string {
   const curated = `flow.events.${key(name)}`;
   if (p.te(curated)) return p.t(curated);
   const [app = name, entity = '', fact = ''] = name.split('.');
   const factKey = `flow.facts.${fact}`;
   const factWord = p.te(factKey) ? p.t(factKey) : humanize(fact);
-  return `${appName(app, catalog)}: ${humanize(entity)} ${factWord}`.trim();
+  const what = `${humanize(entity)} ${factWord}`.trim();
+  const named = appName(app, catalog);
+  return named ? `${named}: ${what}` : capitalize(what);
 }
 
 /** The host of a call's address written by hand (`api.example.com`), or `null`. */
@@ -59,7 +64,8 @@ export function actionLabel(name: string, catalog: CatalogOut | null | undefined
   const [app = name, entity = '', verb = ''] = name.split('.');
   const verbKey = `flow.verbs.${verb}`;
   const verbWord = p.te(verbKey) ? p.t(verbKey) : humanize(verb);
-  return `${verbWord} · ${appName(app, catalog)} (${humanize(entity)})`;
+  const named = appName(app, catalog);
+  return named ? `${verbWord} · ${named} (${humanize(entity)})` : `${verbWord} (${humanize(entity)})`;
 }
 
 /** «Title», or «Party size» for a field without a word. */

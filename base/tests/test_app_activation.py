@@ -12,6 +12,7 @@ import psycopg
 import pytest
 from django.apps import apps
 from django.db import IntegrityError, connections, transaction
+from live.assistant import description
 from live.context import OperationContext, Scope
 from live.errors import AppInactive, Conflict, NotFound, OperationError, PermissionDenied
 from live.live_registry import live_registry
@@ -182,7 +183,9 @@ def test_a_business_the_saas_registers_is_born_with_every_app_off():
                       timezone="Europe/Madrid", language="es", vertical="restaurant"),
     )
 
-    assert Hub.objects.get(slug="nuevo").status == "ready"
+    # Requested, with its own database to make (round 2026-10-30, S2a): its template carries no app turned on
+    # (base/tenancy/tests/test_provision.py), and nothing turns one on before it is ready.
+    assert Hub.objects.get(slug="nuevo").status == "requested"
     assert modules_on(Scope("host", "nuevo")) == set()
     assert rows("nuevo") == {}
 
@@ -205,24 +208,6 @@ def test_a_demo_is_born_with_every_app_off():
     assert rows(demo.slug) == {}
 
 
-@pytest.mark.django_db
-def test_the_local_hubs_are_seeded_with_every_app_on_and_keep_what_they_chose():
-    """``seed_local_hubs`` leaves the developer's hubs as every hub of before round 2026-10-27: every app on, the
-    roots chosen; a local hub that already changed its apps keeps them."""
-    from live.context import system_context
-
-    from base import registry
-    from base.schemas import HubSeedLocalIn
-
-    set_rows("b", task="on*", staff="on")
-    seed = get("base.hub.seed_local")
-
-    seed(system_context(registry.REGISTRY_SCOPE), HubSeedLocalIn(slugs=["c", "b"]))
-
-    graph = activation.module_graph()
-    assert rows("c") == activation.every_on(graph)
-    assert modules_on(Scope("host", "b")) == {"task", "staff"}
-
 
 def test_the_hubs_admin_shows_the_rows_and_changes_none(rf):
     """The Hub's admin (hubs.erplora.com/admin) shows each business's apps as they are; turning one on or off is
@@ -244,7 +229,7 @@ def test_the_states_are_named_in_spanish_as_the_screen_names_them():
     from django.utils import translation
 
     with translation.override("es"):
-        assert [str(label) for _, label in AppActivation.State.choices] == ["Activada", "Desactivada"]
+        assert [str(label) for _, label in AppActivation.State.choices] == ["Activada", "Desactivada", "Activándose", "No se ha podido activar"]
 
 
 # ── Turning one on ──────────────────────────────────────────────────────────────────────────────────────────
@@ -262,9 +247,9 @@ def test_the_commands_are_for_who_runs_the_business_and_told_to_the_assistant():
     for name in ("base.app.enable", "base.app.disable"):
         op = get(name)
         assert (op.kind, op.permission, op.input, op.output) == ("command", ADMIN, AppChangeIn, AppChangeOut)
-        assert op.ai["description"].strip()
-    assert get("base.app.enable").ai["risk"] == "normal"
-    assert get("base.app.disable").ai["risk"] == "high"
+        assert description(op)
+    assert get("base.app.enable").ai.risk == "normal"
+    assert get("base.app.disable").ai.risk == "high"
 
 
 @pytest.mark.django_db

@@ -113,28 +113,32 @@ def test_navigation_is_the_old_four_tabs_and_the_settings():
 
 def test_every_operation_is_described_for_the_assistant():
     # The assistant uses the app by voice and text with the user's own session: it sees every
-    # operation, and a write says how risky it is (high: money moves or a sale is corrected).
-    from live.operations import registry
+    # operation but the reactions only the system runs, and a write says how risky it is (high:
+    # money moves or a sale is corrected); a read never asks to confirm.
+    from live.operations import AI, INTERNAL, registry
 
     ops = {name: op for name, op in registry.items() if name.startswith("sale.")}
     assert ops
+    internal = {name for name, op in ops.items() if op.ai is INTERNAL}
+    assert internal == {"sale.customer.reassign", "sale.sale.record_invoice"}
     for name, op in ops.items():
-        assert isinstance(op.ai, dict) and str(op.ai.get("description", "")).strip(), (
-            name
-        )
+        if name in internal:
+            continue
+        assert isinstance(op.ai, AI) and op.ai.description.strip(), name
         if op.kind == "command":
-            assert op.ai.get("risk") in {"normal", "high"}, name
+            assert op.ai.risk in {"normal", "high"}, name
         else:
-            assert "risk" not in op.ai, name
+            assert op.ai.risk == "normal", name
 
 
 def test_the_money_and_fiscal_writes_are_high_risk():
+    from live.assistant import risk
     from live.operations import registry
 
     high = {
         name
         for name, op in registry.items()
-        if name.startswith("sale.") and op.ai.get("risk") == "high"
+        if name.startswith("sale.") and risk(op) == "high"
     }
     assert {
         "sale.sale.complete",

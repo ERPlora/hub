@@ -4,7 +4,8 @@
 // optional course, are left out), the supplements with their sign and the reason the button cannot add yet; two
 // coffees, two supplements; charged by card at the closed price plus every supplement, with its dishes on the
 // receipt (F07, F08). A pack to take away is split per dish on the receipt, 6,00 → 4,15 at 10 % and 1,85 at 21 %
-// (F09). The worker's outbox relay — run here as each tick runs it: the e2e stack runs no worker — lowers each
+// (F09). The worker's outbox relay — run here as each tick runs it, in `a`'s database: the e2e stack's worker
+// relays nothing — lowers each
 // dish's stock and never the menu's (F10). A menu sent from «Current order» reaches the kitchen dish by dish,
 // under the menu's kitchen name, and the kitchen display shows them under the menu's header (F11; the fire through
 // the relay is apps/combo/tests/test_relay.py). Each screen in 390×844, 834×1112 and 1440×900 (`APP-COMBO-COMBO-Fnn-<w>`).
@@ -70,7 +71,7 @@ function relayPass(): void {
     '    done = relay.run(timezone.now())',
     '    if not (done.taken or done.delivered): break',
   ].join('\n');
-  const out = spawnSync('uv', ['run', 'python', 'manage.py', 'shell', '-c', code], { cwd: HUB_DIR, env: process.env, encoding: 'utf8' });
+  const out = spawnSync('uv', ['run', 'python', 'manage.py', 'shell', '--hub', 'a', '-c', code], { cwd: HUB_DIR, env: process.env, encoding: 'utf8' });
   expect(out.status, `relay pass: ${out.stderr}`).toBe(0);
 }
 

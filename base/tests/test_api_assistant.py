@@ -13,7 +13,9 @@ from base.tests.fake_gateway import gateway, signed  # noqa: F401 - the fixture
 pytestmark = pytest.mark.django_db
 
 HOST = {"HTTP_HOST": "a.localhost:8000"}
-ASK = {"role": "user", "content": "¿cuántos elementos tengo?"}
+#: A question that names the app it asks about: «elementos» is no tool's word (the demo items say no asks), and since
+#: live#22 a «¿cuántos…?» of nothing a tool knows brings no list at all.
+ASK = {"role": "user", "content": "¿cuántos elementos tengo en Demo?"}
 
 
 async def _read(stream) -> bytes:
@@ -166,6 +168,47 @@ def test_a_long_answer_can_be_reported_whole(client, make_user, gateway):
 # ── A write a manager may approve (BASE-G118, with APP-BASE-5's approvals): the chat asks as the screen does ────────
 
 APPROVED_CREATE = {"demo.item.create": "Create an item"}
+
+
+# ── Who asks, told to the model (hub#585, BASE-F100) ────────────────────────────────────────────────────────────
+
+
+def _instructions_sent(gateway) -> str:
+    return " ".join(gateway.sent("/internal/assistant/chat/stream")[0].body["instructions"].split())
+
+
+def test_the_model_is_told_the_role_of_an_employee_and_what_a_manager_must_approve(client, make_user, gateway):
+    """hub#585: an employee asked to switch an app off and the model, never told whom it served, looked for another
+    way until «too many steps», or told the state of something else as if it were the app's. What the gateway gets
+    names their role as the screens do, in their language, who can do what it cannot, and the write their app lets a
+    manager approve (``demo.item.add_line``), offered to them as its button on the screen is."""
+    client.force_login(make_user("eva", host="a", role="hub_employee"))
+    gateway.turn({"type": "response", "output": [], "usage": {}, "continuation": None})
+    ask = {"role": "user", "content": "añade una línea de 2 cafés al elemento Mesa 4"}
+    frames(post(client, "/assistant/turn", {"messages": [ask]}, HTTP_ACCEPT_LANGUAGE="es"))
+
+    sent = _instructions_sent(gateway)
+    assert "You talk to the «Empleado» of this business: your tools are the ones this role may use" in sent
+    assert (
+        "say plainly that it is not available to them here, because their role cannot do it or because its app is not "
+        "on, and that a manager or the owner can"
+    ) in sent
+    offered = gateway.sent("/internal/assistant/chat/stream")[0].body["tools"]
+    assert "demo__item__add_line" in [tool["name"] for tool in offered]
+    approval = sent.split("This person needs a manager's approval to run ")[1].split(": before you call one")[0]
+    assert "`demo__item__add_line`" in approval.split(", ")
+
+
+def test_a_manager_who_may_do_it_is_asked_for_no_approval(client, make_user, gateway):
+    client.force_login(make_user("mario", host="a", role="hub_manager"))
+    gateway.turn({"type": "response", "output": [], "usage": {}, "continuation": None})
+    ask = {"role": "user", "content": "add a line of 2 coffees to the item Mesa 4"}
+    frames(post(client, "/assistant/turn", {"messages": [ask]}, HTTP_ACCEPT_LANGUAGE="en"))
+
+    sent = _instructions_sent(gateway)
+    assert "You talk to the «Manager» of this business" in sent
+    assert "the owner or an administrator can" in sent
+    assert "approv" not in sent
 
 
 @pytest.fixture

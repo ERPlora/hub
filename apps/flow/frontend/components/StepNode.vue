@@ -16,7 +16,7 @@ import { computed } from 'vue';
 import { usePhrasing } from '../composables/usePhrasing';
 import { type DataChoice, delayParts, type DelayUnit, NOTIFY_OPERATION, secondsOf } from '../lib/document';
 import { actionLabel, describeClause, describeStep, fieldLabel } from '../lib/phrasing';
-import type { CatalogOut, Condition, FieldOut, Step } from '../operations';
+import type { CatalogOut, Condition, FieldOut, FixedByAppOut, Step } from '../operations';
 import AskStepPanel from './AskStepPanel.vue';
 import AssistantStepPanel from './AssistantStepPanel.vue';
 import ConditionRows from './ConditionRows.vue';
@@ -39,6 +39,8 @@ const props = defineProps<{
   pick: () => Promise<string | null>;
   /** The picker of a call's values, which also offers the secrets and the call's key (FLOW-F27). */
   pickCall?: () => Promise<string | null>;
+  /** What the app of the recipe it was built from fixes (FLOW-F36), for «Ask the assistant». */
+  fixedByApp?: FixedByAppOut | null;
 }>();
 const emit = defineEmits<{ 'update:step': [step: Step]; remove: []; toggle: [] }>();
 const phrasing = usePhrasing();
@@ -461,6 +463,7 @@ const summary = computed(() => {
           :catalog="catalog"
           :errors="errors"
           :pick="pick"
+          :fixed-by-app="fixedByApp"
           @update:step="emit('update:step', $event)"
         />
         <StepOptions

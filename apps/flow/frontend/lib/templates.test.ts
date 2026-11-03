@@ -112,6 +112,16 @@ describe('the gallery', () => {
     expect(missingApps(TEMPLATES, EVERYTHING)).toEqual([]);
   });
 
+  it('has a word for every app a card may need, so the hidden ones never name an app by its internal name (hub#476)', () => {
+    const needed = missingApps(TEMPLATES, { events: [], actions: [] });
+    expect(needed).toEqual(expect.arrayContaining(['task', 'verifactu', 'reservation']));
+    // Read from each catalog itself: the Spanish one falls back to the English word, which would hide a missing one.
+    for (const [locale, words] of [['en', en.flow.gallery.apps], ['es', es.flow.gallery.apps]] as const) {
+      const named: Record<string, string> = words;
+      expect(needed.filter((app) => !named[app]?.trim()), locale).toEqual([]);
+    }
+  });
+
   it('knows when the business already has a card, and how it is', () => {
     const welcome = templateById('welcome')!;
     const p = phrasing();

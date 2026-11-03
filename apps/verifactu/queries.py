@@ -13,7 +13,7 @@ from operator import and_
 from uuid import UUID
 
 from django.conf import settings
-from django.db.models import Case, Count, Q, QuerySet, When
+from django.db.models import Case, Count, Min, Q, QuerySet, When
 from django.utils import timezone, translation
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext, Scope, system_context
@@ -22,6 +22,7 @@ from live.operations import get as get_operation
 from live.operations import operation
 
 from apps.invoice.models import Invoice, Issuer
+from base import activation
 from base import operations as platform
 from apps.verifactu import (
     certificates,
@@ -75,6 +76,9 @@ RECORD_NOT_FOUND = _("Record not found.")
 INVOICE_NOT_FOUND = _("Invoice not found.")
 #: The waits that are a past attempt's failure, kept on the record (the rest are computed when read).
 ATTEMPT_FAILURES = ("unreachable", "refused", "unknown", "aeat_fault", "xml_invalid")
+#: The wait of a business's record that ERPlora's own hub cannot present yet: it does not know the business's id
+#: (``presenter``, hub#454). Kept on the record by the pass that found it, told until the business is linked.
+UNREGISTERED = "hub_unregistered"
 #: Days before its expiry from which the own certificate is announced (VERIFACTU-F34).
 EXPIRY_WARNING_DAYS = 30
 RECORD_EVENTS_SHOWN = 20
@@ -255,6 +259,17 @@ def _server_problem(environment: str) -> str:
     return ""
 
 
+def presenter(scope: Scope, config: Config, issuer_nif: str) -> str | None:
+    """Who ERPlora's gateway is told presents ``issuer_nif``'s records (its ``hub``): ``scope``'s business by its slug
+    (saas#29). ERPlora's own hub presents ERPlora's own records only (``PLATFORM_HUB_SLUG``); a business's record its
+    pass sees (the worker's fixed scope while the tables are shared, phase 1) goes as that business, by the id
+    erplora.com gave it (``Config.hub_id``, which the SaaS takes as well as a slug), never as ERPlora: the gateway
+    would refuse it (409 ``nif_mismatch``, hub#454). ``None`` without that id: nothing can be presented yet."""
+    if not platform.is_platform_hub(scope) or issuer_nif == settings.PLATFORM_ISSUER_TAX_ID:
+        return scope.key
+    return str(config.hub_id) if config.hub_id is not None else None
+
+
 def route_problem(config: Config, environment: str, scope: Scope | None) -> str:
     """Why nothing can be carried to the AEAT of ``environment`` now (a wait code), or ``""`` (VERIFACTU-F04, F08):
     the route's own lack first, then the server's in production (no gateway, closed). It keeps the queue waiting
@@ -342,7 +357,7 @@ def waiting_of(record: Record, config: Config, scope: Scope | None) -> list[dict
     ).first()
     if control and control.next_send_at and control.next_send_at > timezone.now():
         reasons.append(wait("aeat_wait", at=_local_time(control.next_send_at)))
-    if record.wait_reason in ATTEMPT_FAILURES:
+    if record.wait_reason in ATTEMPT_FAILURES or (record.wait_reason == UNREGISTERED and config.hub_id is None):
         reasons.append(wait(record.wait_reason, record.wait_detail))
     return reasons
 
@@ -800,29 +815,34 @@ def compliance_summary(ctx: OperationContext, data: NoInput) -> ComplianceSummar
     )
 
 
-#: Why VeriFactu refuses to go off while its queue holds records (VERIFACTU-F32): one, or how many.
-STILL_TO_SEND_ONE = _(
-    "VeriFactu still has 1 record to send to the AEAT. Wait until it is sent or fix it before turning it off."
-)
-STILL_TO_SEND = _(
-    "VeriFactu still has %(count)s records to send to the AEAT. Wait until they are sent or fix them before turning "
-    "it off."
-)
+#: This app's label: what ``base.activation`` names its state by.
+VERIFACTU = "verifactu"
+#: Why VeriFactu never goes off once on, in Spain (VERIFACTU-F32, FIX-HUB-VERIFACTU-NEVER-OFF-ONCE-ON).
+NEVER_OFF = _("VeriFactu can't be turned off once it's on: the law requires your invoices to keep reaching the AEAT.")
 
 
 def disable_refusal(ctx: OperationContext) -> str | None:
-    """VERIFACTU-F32: why the app may not go off yet, in ``ctx``'s language, or ``None``. While a record is not in the
-    AEAT (``Record.UNSENT``: pending, its retry waiting included, or sent without an answer) turning it off would stop
-    its send; what the AEAT answered is out of the queue (a rejected one is corrected with a new record, which counts
-    again). Read in the hub of the active context, inside ``base.app.disable``'s transaction. Outside Spain no record
-    is ever sent, so turning it off stops nothing: never refused (the records are kept)."""
-    if outside_spain(ctx.scope):
-        return None
-    count = Record.objects.filter(status__in=Record.UNSENT).count()
-    if not count:
+    """VERIFACTU-F32: why the app may not go off, in ``ctx``'s language, or ``None``. In Spain, never once on: from
+    then on the business's invoices reach the AEAT, VERI*FACTU binds it at least to the end of the natural year
+    (RD 1007/2023, Orden HAC/1177/2024) and ERPlora keeps no other way of recording them, so whatever its queue holds
+    the answer is the same (FIX-HUB-VERIFACTU-NEVER-OFF-ONCE-ON). A business without a country (a demo) is in Spain.
+    One that never got on (its tables being made, or making them failed: ``base.activation``) sealed nothing, so
+    nothing binds it yet. Outside Spain no record is ever sent, so turning it off stops nothing: never refused (the
+    records are kept). Both are read in the hub of the active context, inside ``base.app.disable``'s transaction."""
+    if not activation.states_of(ctx.scope)[VERIFACTU].on or outside_spain(ctx.scope):
         return None
     with translation.override(ctx.language):
-        return str(STILL_TO_SEND_ONE) if count == 1 else str(STILL_TO_SEND) % {"count": count}
+        return str(NEVER_OFF)
+
+
+def oldest_unsent_at() -> dt.datetime | None:
+    """hub#488: since when the oldest production record not in the AEAT yet (``Record.UNSENT``: pending, its retry
+    waiting included, or sent without an answer) waits, or ``None``: the platform's ``OldestPendingAgeSeconds``, read
+    in the database of the active context. A record of the AEAT's test environment files nothing, so it never counts;
+    what the AEAT answered is out of the queue."""
+    return Record.objects.filter(status__in=Record.UNSENT, environment=Environment.PRODUCTION).aggregate(
+        oldest=Min("created_at")
+    )["oldest"]
 
 
 @operation(

@@ -3,6 +3,8 @@
 // the reason the page passes) when there is nothing, and a spinner until the first answer.
 import { describe, expect, it } from 'vitest';
 
+import { HubIcon } from '@erplora/ui/shell';
+
 import { click, mountSale } from '../../__tests__/mount-sale';
 import { product } from './__tests__/fixtures';
 import ProductGrid from './ProductGrid.vue';
@@ -26,6 +28,9 @@ describe('ProductGrid', () => {
     const open = m.find('pos-open-price-tile');
     expect(open.find('.pos-tile__name').text()).toBe('Open price');
     expect(open.find('.pos-tile__price').text()).toBe('+ €');
+    // The tag of the open price is not a discount: outlined, as in the current product (the filled one says
+    // «a discount is set», on the check's line and foot).
+    expect(open.findComponent(HubIcon).props('name')).toBe('ion:pricetag-outline');
   });
 
   it('hands a picked product up and opens the open price from its tile', async () => {

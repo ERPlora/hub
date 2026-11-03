@@ -154,8 +154,16 @@ class VerifactuConfig(LiveAppConfig):
     ]
 
     def can_disable(self, ctx) -> str | None:
-        """VERIFACTU-F32: the platform's ``base.app.disable`` asks before turning the app off: refused, with how many,
-        while a record is not in the AEAT yet (``queries.disable_refusal``), whose send would stop."""
+        """VERIFACTU-F32: the platform's ``base.app.disable`` asks before turning the app off: in Spain it never goes
+        off once on, with the legal reason (``queries.disable_refusal``); outside Spain it goes off."""
         from apps.verifactu import queries  # the models are not loaded yet when this module is
 
         return queries.disable_refusal(ctx)
+
+    def fiscal_pending_since(self):
+        """hub#488: the platform's metrics (``base.metrics``) ask, in each database they read, since when the oldest
+        production record not in the AEAT yet waits (``queries.oldest_unsent_at``), or ``None``: its age pages the
+        team after 5 minutes (``ERPlora/Fiscal`` ``OldestPendingAgeSeconds``)."""
+        from apps.verifactu import queries  # the models are not loaded yet when this module is
+
+        return queries.oldest_unsent_at()

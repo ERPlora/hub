@@ -28,6 +28,8 @@ ENV_KEYS = (
     "DB_NAME",
     "DB_USER",
     "DB_PASSWORD",
+    "DB_MIGRATOR_USER",
+    "DB_MIGRATOR_PASSWORD",
     "DB_HOST",
     "DB_PORT",
     "SAAS_URL",
@@ -67,6 +69,9 @@ ENV_KEYS = (
     "AWS_STORAGE_BUCKET_NAME",
     "AWS_REGION",
     "MEDIA_ROOT",
+    "METRICS_ENABLED",
+    "METER_ENABLED",
+    "PGBOUNCER_MAX_DB_CONNECTIONS",
 )
 # Local development opts in with DEBUG=True (the .env of a checkout); nothing else turns it on.
 DEVELOPMENT_ENV = {"DEBUG": "True"}
@@ -102,9 +107,11 @@ def test_live_precedes_daphne_so_its_runserver_wins():
 
 
 def test_base_precedes_the_admin_so_its_admin_templates_win():
-    # base/templates/admin/base_site.html adds the chosen hub's banner (round 13, PLAN §18.1).
+    # base/templates/admin/base_site.html adds the chosen hub's banner (round 13, PLAN §18.1). Django's admin is
+    # installed through its config with the Hub's own site (base/admin_site.py: a hub's model only with a business).
     installed = settings.INSTALLED_APPS
-    assert installed.index("base") < installed.index("django.contrib.admin")
+    assert "django.contrib.admin" not in installed
+    assert installed.index("base") < installed.index("base.admin_site.AdminConfig")
 
 
 def test_the_platform_host_is_hubs_and_no_customer_can_take_it():
@@ -310,6 +317,15 @@ def test_the_fiscal_certificate_key_comes_from_the_environment(load_settings):
     )
 
 
+def test_the_worker_publishes_its_metrics_only_where_the_environment_turns_them_on(load_settings):
+    """hub#488: CloudWatch's PutMetricData only where the task role may call it (prod's worker, aws stacks/prod); pre,
+    local development and the tests have no such permission, so a missing variable publishes nothing."""
+    assert load_settings(**PRODUCTION_ENV)["METRICS_ENABLED"] is False
+    assert load_settings(**DEVELOPMENT_ENV)["METRICS_ENABLED"] is False
+    assert load_settings(**PRODUCTION_ENV, METRICS_ENABLED="true")["METRICS_ENABLED"] is True
+    assert load_settings(**PRODUCTION_ENV, METRICS_ENABLED="false")["METRICS_ENABLED"] is False
+
+
 def test_the_internal_saas_url_defaults_to_the_public_one(load_settings):
     # Locally (and wherever the SaaS has no private name) /internal goes where the browser goes.
     assert (
@@ -460,9 +476,8 @@ def test_a_request_the_alb_forwarded_over_https_is_secure():
 
 
 def test_the_cache_is_valkey_when_set_else_local_memory(load_settings):
-    assert load_settings(**DEVELOPMENT_ENV)["CACHES"] == {
-        "default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache"}
-    }
+    # Local memory that refuses what the Valkey cluster of AWS refuses (base/cache.py, hub#440).
+    assert load_settings(**DEVELOPMENT_ENV)["CACHES"] == {"default": {"BACKEND": "base.cache.ClusterLocMemCache"}}
     loaded = load_settings(**PRODUCTION_ENV, VALKEY_URL="rediss://cache.example:6379")
     # A prefix per project on the shared Valkey, a TTL on every key (never TIMEOUT=None) and 2 s
     # socket timeouts, as saas-next's.
@@ -893,8 +908,9 @@ XDIST_SUFFIXES = ("", "_gw0", "_gw9", "_gw10", "_gw999")
 
 def names_the_suite_derives(databases: dict) -> list[str]:
     """Every database the suite may create from these settings, with and without xdist's suffix: the test databases
-    and, from control's, both test hubs' and every template's (``base.tenancy.names``, which refuses a name past
-    PostgreSQL's 63 characters instead of truncating it)."""
+    and, from control's, both test hubs', a demo's (``<control>_demo_<hex>``, the longest; round 2026-10-30 of PLAN-DB)
+    and every template's (``base.tenancy.names``, which refuses a name past PostgreSQL's 63 characters instead of
+    truncating it)."""
     from base import catalog
     from base.tenancy import names
     from base.tenancy.tests import hubs
@@ -905,14 +921,15 @@ def names_the_suite_derives(databases: dict) -> list[str]:
         control = databases["default"]["TEST"]["NAME"] + suffix
         derived += [control, *(databases[alias]["TEST"]["NAME"] + suffix for alias in ("shared", "hub_template"))]
         derived += [names.hub_db_name(control, hub_id) for hub_id in (hubs.HUB_A_ID, hubs.HUB_B_ID)]
+        derived += [names.demo_db_name(control, hubs.HUB_A_ID)]
         derived += [names.template_db_name(control, vertical) for vertical in verticals]
     return derived
 
 
 @pytest.mark.parametrize(
     "requested",
-    # "ñ" * 13: 13 characters but 26 bytes, past the 24 that fit (PostgreSQL's limit counts bytes).
-    ["test_hub_next", "test_hub_sup", "t" * 24, "t" * 25, LONG_TEST_DB_NAME, "t" * 63, "ñ" * 13, "ñ" * 40, "t" * 100],
+    # "ñ" * 10: 10 characters but 20 bytes, past the 19 that fit (PostgreSQL's limit counts bytes).
+    ["test_hub_next", "test_hub_sup", "t" * 19, "t" * 20, LONG_TEST_DB_NAME, "t" * 63, "ñ" * 10, "ñ" * 40, "t" * 100],
 )
 def test_every_database_the_suite_derives_from_any_test_db_name_fits_in_postgres(load_settings, requested):
     """A worker never counts characters: whatever TEST_DB_NAME it sets, every name fits (TODO.md, hub#188, hub#204)."""
@@ -926,7 +943,7 @@ def test_every_database_the_suite_derives_from_any_test_db_name_fits_in_postgres
 
 def test_a_test_db_name_that_fits_is_kept_as_it_is(load_settings):
     # --reuse-db and the fleet's sweep.sh find a short name's databases by that name.
-    for requested in ("test_hub_next", "t" * 24):
+    for requested in ("test_hub_next", "t" * 19):
         databases = load_settings(**DEVELOPMENT_ENV, TEST_DB_NAME=requested)["DATABASES"]
         assert databases["default"]["TEST"]["NAME"] == requested
 
@@ -940,13 +957,26 @@ def test_a_long_test_db_name_is_shortened_the_same_every_run_and_apart_from_anot
         assert (databases["default"]["NAME"], databases["hub_template"]["NAME"]) == ("pre_hub", "pre_hub_template")
         return {alias: databases[alias]["TEST"]["NAME"] for alias in ("default", "shared", "hub_template")}
 
-    shortened = f"test_hub_next_f_{hashlib.sha256(LONG_TEST_DB_NAME.encode()).hexdigest()[:8]}"
+    # 19 characters fit (a demo's ``_demo_<hex>`` and xdist's ``_gw999`` after them): its first 10, ``_`` and 8.
+    shortened = f"test_hub_n_{hashlib.sha256(LONG_TEST_DB_NAME.encode()).hexdigest()[:8]}"
     assert test_names(LONG_TEST_DB_NAME) == {
         "default": shortened,
         "shared": f"{shortened}_shared",
         "hub_template": f"{shortened}_template",
     }
     assert test_names(OTHER_LONG_TEST_DB_NAME)["default"] not in (shortened, OTHER_LONG_TEST_DB_NAME)
+
+
+def test_the_migrators_role_is_the_default_connections_only_in_development(load_settings):
+    """Locally (and in the suite) the compose Postgres's user is every role; in AWS only the worker and hub-migrate
+    carry DB_MIGRATOR_* (aws stacks/prod/apps.tf), and without them there is no migrator (base.tenancy.credentials)."""
+    development = load_settings(**DEVELOPMENT_ENV, DB_USER="hub", DB_PASSWORD="hub-pw")
+    production = load_settings(**PRODUCTION_ENV, DB_USER="hub_app", DB_PASSWORD="app-pw")
+    worker = load_settings(**PRODUCTION_ENV, DB_MIGRATOR_USER="hub_migrator", DB_MIGRATOR_PASSWORD="migrator-pw")
+
+    assert (development["DB_MIGRATOR_USER"], development["DB_MIGRATOR_PASSWORD"]) == ("hub", "hub-pw")
+    assert (production["DB_MIGRATOR_USER"], production["DB_MIGRATOR_PASSWORD"]) == ("", "")
+    assert (worker["DB_MIGRATOR_USER"], worker["DB_MIGRATOR_PASSWORD"]) == ("hub_migrator", "migrator-pw")
 
 
 def test_the_hubs_template_alias_is_named_after_control_and_reaches_it_directly_in_development(load_settings):
@@ -978,6 +1008,18 @@ def test_in_aws_the_hubs_go_through_the_pgbouncer_sidecar_without_tls_to_it(load
     assert (template["HOST"], template["PORT"]) == ("127.0.0.1", 6432)
     assert template["OPTIONS"] == {"connect_timeout": 5, "application_name": "hub", "prepare_threshold": None}
     assert loaded["DATABASE_ROUTERS"] == ["base.routers.SharedRouter", "base.tenancy.router.TenantRouter"]
+
+
+def test_what_pgbouncer_gives_each_database_is_prod_s_unless_the_environment_says(load_settings):
+    """No plan gets more at once than this (``base.tenancy.limits``): 6 in prod, 3 in pre (aws ``stacks/*/apps.tf``)."""
+    assert load_settings(**PRODUCTION_ENV)["PGBOUNCER_MAX_DB_CONNECTIONS"] == 6
+    assert load_settings(**PRODUCTION_ENV, PGBOUNCER_MAX_DB_CONNECTIONS="3")["PGBOUNCER_MAX_DB_CONNECTIONS"] == 3
+
+
+def test_the_meter_is_on_where_requests_are_served_unless_the_environment_says(load_settings):
+    assert load_settings(**PRODUCTION_ENV)["METER_ENABLED"] is True
+    assert load_settings(**DEVELOPMENT_ENV)["METER_ENABLED"] is True
+    assert load_settings(**PRODUCTION_ENV, METER_ENABLED="false")["METER_ENABLED"] is False
 
 
 def test_the_shared_alias_opens_one_short_connection_without_a_pool(load_settings):
@@ -1024,12 +1066,17 @@ def test_production_shared_alias_without_its_password_refuses_to_start(load_sett
 
 
 def test_the_shared_router_goes_first(load_settings):
-    # Phase 2's TenantRouter goes after it and never touches `shared`.
-    assert settings.DATABASE_ROUTERS[0] == "base.routers.SharedRouter"
-    assert (
-        load_settings(**PRODUCTION_ENV)["DATABASE_ROUTERS"][0]
-        == "base.routers.SharedRouter"
-    )
+    # Phase 2's TenantRouter goes after it and never touches `shared`. The tests put one of theirs in front, for their
+    # businesses written before the tenancy only (base/tenancy/tests/legacy.py): never production's settings.
+    assert settings.DATABASE_ROUTERS == [
+        "base.tenancy.tests.legacy.LegacyTablesRouter",
+        "base.routers.SharedRouter",
+        "base.tenancy.router.TenantRouter",
+    ]
+    assert load_settings(**PRODUCTION_ENV)["DATABASE_ROUTERS"] == [
+        "base.routers.SharedRouter",
+        "base.tenancy.router.TenantRouter",
+    ]
 
 
 def test_the_static_files_finders_add_the_documentation_images_of_the_modules():
@@ -1071,7 +1118,8 @@ def test_the_workbook_translation_model_has_a_default_and_comes_from_the_environ
 
 def test_the_test_run_keeps_its_cache_in_memory_even_with_a_valkey_in_the_environment():
     # conftest.py empties the cache around every test (base.throttle's attempt counts): pointed at a real Valkey, that
-    # would wipe whatever it holds. The test settings keep the process's memory whatever VALKEY_URL says.
+    # would wipe whatever it holds. The test settings keep the process's memory whatever VALKEY_URL says, refusing what
+    # the Valkey cluster of AWS refuses (base/cache.py, hub#440): a call on keys of different slots fails every test.
     env = {**os.environ, "VALKEY_URL": "rediss://valkey.invalid:6379/0", "DJANGO_SETTINGS_MODULE": "config.settings_pytest"}
     result = subprocess.run(
         [sys.executable, "-c", "from django.conf import settings; print(settings.CACHES['default']['BACKEND'])"],
@@ -1082,5 +1130,5 @@ def test_the_test_run_keeps_its_cache_in_memory_even_with_a_valkey_in_the_enviro
         timeout=60,
     )
     assert result.returncode == 0, result.stderr
-    assert result.stdout.strip() == "django.core.cache.backends.locmem.LocMemCache"
-    assert settings.CACHES["default"]["BACKEND"] == "django.core.cache.backends.locmem.LocMemCache"
+    assert result.stdout.strip() == "base.cache.ClusterLocMemCache"
+    assert settings.CACHES["default"]["BACKEND"] == "base.cache.ClusterLocMemCache"

@@ -49,7 +49,9 @@ def po_entries(path: Path) -> dict[str, tuple[str, bool]]:
         starts_entry = line.startswith("msgctxt ") or (line.startswith("msgid ") and current != "msgctxt")
         if starts_entry or (line.startswith("#") and current == "msgstr"):
             flush()
-            parts, fuzzy, current = {"msgctxt": [], "msgid": [], "msgstr": []}, False, None
+            # A ``#, fuzzy`` above a ``msgctxt`` or ``msgid`` belongs to the entry they open: only what comes after a
+            # ``msgstr`` forgets it.
+            parts, fuzzy, current = {"msgctxt": [], "msgid": [], "msgstr": []}, fuzzy and current is None, None
         if line.startswith("#,") and "fuzzy" in line:
             fuzzy = True
         elif line.startswith(("msgctxt ", "msgid ", "msgstr ")):
@@ -61,10 +63,6 @@ def po_entries(path: Path) -> dict[str, tuple[str, bool]]:
     return entries
 
 
-def msgids(entries) -> set[str]:
-    return {key.split("\x04")[-1] for key in entries}
-
-
 def lazy_constants(module) -> list:
     """Every module-level lazy text (``_("…")``) of ``module``."""
     return [
@@ -73,14 +71,15 @@ def lazy_constants(module) -> list:
 
 
 def visible_texts() -> set[str]:
-    """The English source of every lazy text the app shows (menu, store, admin, choices, messages) and the titles of
-    its schemas."""
+    """How the catalog keys every lazy text the app shows (menu, Home, store, admin, choices, messages) and the titles
+    of its schemas."""
     config = apps.get_app_config("table")
     lazies = [
         config.verbose_name,
         config.summary,
         config.description,
         *(nav.label for nav in config.navigation),
+        *(text for step in config.setup for text in (step.title, step.description)),
     ]
     lazies += (
         lazy_constants(queries) + lazy_constants(services) + lazy_constants(schemas)
@@ -105,7 +104,15 @@ def visible_texts() -> set[str]:
     ):
         lazies += list(choices.labels)
     with translation.override("en"):
-        return {str(text) for text in lazies} | {"Table %(number)s"} | schema_titles()
+        return {source(text) for text in lazies} | {"Table %(number)s"} | schema_titles()
+
+
+def source(text) -> str:
+    """How the catalog keys a lazy text: its English, or ``context\x04English`` for a ``pgettext_lazy`` (a text that
+    goes back to ``_()`` while its entry keeps the context is missing from the catalog: it would say another app's
+    Spanish)."""
+    args = getattr(text, "_args", ())
+    return f"{args[0]}\x04{args[1]}" if len(args) == 2 else str(text)
 
 
 def schema_titles() -> set[str]:
@@ -120,6 +127,39 @@ def schema_titles() -> set[str]:
     }
 
 
+def test_the_reader_sees_a_fuzzy_mark_with_and_without_a_context(tmp_path):
+    """gettext does not use a fuzzy translation, so the screen stays in English: the reader has to see the mark on its
+    own entry, also above a ``msgctxt``, and the entry behind it must not inherit it."""
+    po = tmp_path / "django.po"
+    po.write_text(
+        'msgid ""\n'
+        'msgstr ""\n'
+        '"Language: es\\n"\n'
+        "\n"
+        "#, fuzzy\n"
+        'msgid "Plain"\n'
+        'msgstr "Llano"\n'
+        "\n"
+        'msgid "Behind plain"\n'
+        'msgstr "Tras llano"\n'
+        "\n"
+        "#, fuzzy\n"
+        'msgctxt "table"\n'
+        'msgid "With context"\n'
+        'msgstr "Con contexto"\n'
+        "\n"
+        'msgid "Behind context"\n'
+        'msgstr "Tras contexto"\n',
+        encoding="utf-8",
+    )
+    assert po_entries(po) == {
+        "Plain": ("Llano", True),
+        "Behind plain": ("Tras llano", False),
+        "table\x04With context": ("Con contexto", True),
+        "Behind context": ("Tras contexto", False),
+    }
+
+
 def test_every_entry_has_a_spanish_translation():
     entries = po_entries(LOCALE / "django.po")
     assert entries
@@ -128,8 +168,19 @@ def test_every_entry_has_a_spanish_translation():
     ] == []
 
 
+def test_a_text_with_a_context_is_looked_up_with_it():
+    """``pgettext_lazy`` only finds the entry with its ``msgctxt``: the comparison with the catalog has to see the
+    context, or a text that goes back to ``_()`` passes while the screen says another app's Spanish."""
+    assert {
+        "table\x04active",
+        "table check\x04Open",
+        "table hold\x04Held",
+    } <= visible_texts()
+
+
 def test_every_visible_text_is_in_the_catalog():
-    assert visible_texts() - msgids(po_entries(LOCALE / "django.po")) == set()
+    assert len(visible_texts()) > 120  # positive control: the collection found the app's texts
+    assert visible_texts() - set(po_entries(LOCALE / "django.po")) == set()
 
 
 def test_the_compiled_catalog_is_current():

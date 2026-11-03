@@ -8,7 +8,7 @@ from django.conf import settings
 from django.utils import translation
 from live.live_registry import live_registry
 from live.meta import Category, LiveAppConfig, Nav, Widget, module_configs, permissions_for_role
-from live.operations import registry
+from live.operations import INTERNAL, registry
 
 from apps.staff import events as E
 from apps.staff import queries, services  # noqa: F401  (importing them registers the operations)
@@ -36,6 +36,7 @@ QUERIES = {
     "staff.commission.summary",
     "staff.commission.report",
     "staff.role.list",
+    "staff.role.resolve",
     "staff.schedule.list",
     "staff.schedule.detail",
     "staff.availability.for_member",
@@ -170,8 +171,16 @@ def test_the_operations_of_the_app():
     assert {name for name, op in operations.items() if op.kind == "command"} == COMMANDS
 
 
+#: The reads that are no assistant tool: the check of a new member's role before its card (hub#538).
+INTERNAL_READS = {"staff.role.resolve"}
+
+
 def test_every_operation_tells_the_assistant_what_it_does():
-    for name, op in staff_operations().items():
+    operations = staff_operations()
+    assert {name for name, op in operations.items() if op.ai is INTERNAL} == INTERNAL_READS
+    for name, op in operations.items():
+        if name in INTERNAL_READS:
+            continue
         assert isinstance(op.ai, dict), name
         assert str(op.ai.get("description", "")).strip(), name
         if op.kind == "command":
@@ -182,7 +191,9 @@ def test_every_operation_tells_the_assistant_what_it_does():
 
 def test_the_high_risk_commands():
     assert {
-        name for name, op in staff_operations().items() if op.ai.get("risk") == "high"
+        name
+        for name, op in staff_operations().items()
+        if isinstance(op.ai, dict) and op.ai.get("risk") == "high"
     } == HIGH_RISK
 
 

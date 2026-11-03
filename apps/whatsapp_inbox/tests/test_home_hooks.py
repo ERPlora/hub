@@ -234,3 +234,41 @@ def test_a_customer_writing_to_hub_b_re_runs_the_bell_and_the_notices_of_b_and_t
     affected = live_registry.affected({event for _, payload in notes for event in payload["events"]})
     assert {"base.bell.counters", "base.notice.list"} <= affected
     assert heard(on_a, timeout=0.5) == []
+
+
+# ── What the plan includes, in System › «Usage and plan» (BASE-F40) ──────────────────────────────────────────────────
+
+
+def meter(ctx=None) -> dict:
+    """The inbox's meter, through base's own hook, as ``base.plan.usage`` reads it."""
+    from base import home
+
+    config = apps.get_app_config("whatsapp_inbox")
+    (found,) = home.plan_meters(ctx or ctx_for("hub_owner"), [config])
+    return found
+
+
+@pytest.mark.django_db
+def test_the_messages_of_the_month_against_what_the_plan_includes():
+    connect(version=1, monthly_limit=150, monthly_usage=40, usage_month="2026-10")
+
+    assert meter() == {"key": "whatsapp_inbox", "label": "WhatsApp", "used": 40, "limit": 150, "available": True}
+
+
+@pytest.mark.django_db
+def test_last_month_s_figure_is_nothing_spent_this_month():
+    connect(version=1, monthly_limit=150, monthly_usage=150, usage_month="2026-09")
+
+    assert (meter()["used"], meter()["limit"]) == (0, 150)
+
+
+@pytest.mark.django_db
+def test_a_plan_that_includes_none_says_zero():
+    connect(version=1, monthly_limit=0, monthly_usage=0, usage_month="2026-10")
+
+    assert (meter()["used"], meter()["limit"]) == (0, 0)
+
+
+@pytest.mark.django_db
+def test_before_erplora_com_sent_any_figure_it_says_nothing_never_a_zero():
+    assert (meter()["used"], meter()["limit"], meter()["available"]) == (None, None, True)

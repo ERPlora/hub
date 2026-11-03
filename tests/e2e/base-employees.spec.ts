@@ -1,7 +1,8 @@
 // Employees and the API's documentation (APP-BASE-5; the old hub's EmployeesPage, docs/reference/old-hub/employees-*.png
 // and settings-permissions-*.png) in the three viewports, as the owner of hub `a`: «Staff» with the plan's places and how
-// each person gets in, «Roles», «API keys» (hub `a` still shares phase 1's database: «Not available yet», and the way to
-// the documentation) and «Approvals» (nobody approved anything yet); a person's page, giving and taking away a badge
+// each person gets in, «Roles», «API keys» (hub `a` has its own database since S2a: «New key» and the way to the
+// documentation; one that shares control's says «Not available yet»: ApiKeysPanel.test.ts) and «Approvals» (nobody
+// approved anything yet); a person's page, giving and taking away a badge
 // (one per run: phase 1 keeps every hub's badges in one table); the API's documentation, hidden, shown from Settings ›
 // General and read; and the employee, who has no «API keys» nor «Approvals» and whose `#apikeys` opens «Staff». Each
 // flow leaves its capture `APP-BASE-5-<G key>-<width>` once nothing scrolls sideways.
@@ -115,8 +116,10 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
   test(`BASE-G146 BASE-G149 BASE-G145 — API keys and Approvals at ${width}`, async ({ browser }) => {
     const { context, page } = await signedIn(browser, viewport, '/employees#apikeys');
     const problems = await collectProblems(page);
-    // Hub `a` shares phase 1's database: no key yet, and the way to the documentation.
-    await expect(testid(page, 'api-keys-unavailable')).toContainText('API keys are not available yet in this business.');
+    // Hub `a` has its own database (round 2026-10-30 of PLAN-DB, S2a): its keys can be made, and the way to the
+    // documentation. None is made here: the business stays as the other specs find it.
+    await expect(testid(page, 'api-keys-new')).toBeVisible();
+    await expect(testid(page, 'api-keys-unavailable')).toHaveCount(0);
     await expect(testid(page, 'api-keys-docs')).toHaveAttribute('href', '/api-docs');
     await snap(page, 'BASE-G146', width);
     await tab(page, 'approvals');
@@ -164,7 +167,8 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     await testid(page, 'api-docs-open').click();
     await expect(page).toHaveURL(/\/api-docs$/);
     await expect(shown(page).locator('[data-testid="api-docs-section"]').first()).toBeVisible();
-    await expect(testid(page, 'api-docs-keys-soon')).toBeVisible();
+    // `a` has its own database (S2a): its keys can be made, so no «coming soon» (a shared one says it: ApiDocsPage.test.ts).
+    await expect(testid(page, 'api-docs-keys-soon')).toHaveCount(0);
     const route = shown(page).locator('[data-testid="api-docs-route"]').first();
     await route.locator('summary').click();
     await expect(route).toHaveAttribute('open', '');

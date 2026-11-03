@@ -184,6 +184,31 @@ describe('ThreadView', () => {
     });
   });
 
+  // gh:hub#439: the installed app opens nothing on a `_blank` link; its system browser does (`open_external_url`).
+  it('in the installed app, an attachment and a photo open in the system browser', async () => {
+    const invoke = vi.fn(async () => undefined);
+    (window as { __TAURI__?: unknown }).__TAURI__ = { core: { invoke } };
+    try {
+      const s = await setup({
+        messages: [
+          message({ id: 'm1', kind: 'document', body: '', media_url: 'https://erplora.com/whatsapp/media/abc', media_mime_type: 'application/pdf', media_filename: 'presupuesto.pdf' }),
+          message({ id: 'm2', kind: 'image', body: '', media_url: 'https://erplora.com/whatsapp/media/photo', media_mime_type: 'image/jpeg' }),
+        ],
+      });
+      for (const [link, url] of [
+        [s.wrapper.find('[data-testid="whatsapp-inbox-message-media"] a:not(.wa-bubble__photo)'), 'https://erplora.com/whatsapp/media/abc'],
+        [s.wrapper.find('a.wa-bubble__photo'), 'https://erplora.com/whatsapp/media/photo'],
+      ] as const) {
+        const tap = new MouseEvent('click', { bubbles: true, cancelable: true });
+        link.element.dispatchEvent(tap);
+        await vi.waitFor(() => expect(invoke).toHaveBeenCalledWith('open_external_url', { url }));
+        expect(tap.defaultPrevented).toBe(true);
+      }
+    } finally {
+      delete (window as { __TAURI__?: unknown }).__TAURI__;
+    }
+  });
+
   it('opens an attachment at erplora.com in a new tab, named by its kind, file and caption', async () => {
     const s = await setup({
       messages: [

@@ -109,8 +109,9 @@ export interface AppRow {
   /** Bought on erplora.com; the Store has its price. */
   premium: boolean;
   right: AppRight;
-  /** «off»: the business turned it off (or never on); «blocked»: no right to it (phase 2 adds activating and failed). */
-  state: 'on' | 'off' | 'blocked';
+  /** «off»: the business turned it off (or never on); «blocked»: no right to it; «creating»: its tables are being made
+   *  in the business's own database; «failed»: making them failed (tried again later, or `base.app.retry`). */
+  state: 'on' | 'off' | 'blocked' | 'creating' | 'failed';
   /** Turned on by the business itself (what the plan's limit counts); what came along with another app is not. */
   chosen: boolean;
   /** The first screen of its menu this person may open; null: no «Open». */
@@ -138,10 +139,11 @@ export interface AppChangeIn {
   app: string;
 }
 
-/** `base.AppChangeOut`: the app as it is now, and the apps that went on (or off) with it. */
+/** `base.AppChangeOut`: the app as it is now, and the apps that went on (or off) with it; «creating» (202): its tables
+ *  are being made, and `base.app.list` says when it is on. */
 export interface AppChange {
   app: string;
-  state: 'on' | 'off';
+  state: 'on' | 'off' | 'creating';
   chosen: boolean;
   along: { id: string; name: string }[];
 }
@@ -152,12 +154,93 @@ export interface PlanLimit {
   limit: number | null;
 }
 
-/** `base.PlanUsageOut`: «Plan and limits» of System. */
+/** `base.DatabaseUsageOut`: the size of the business's own database, as the last night measured it (BASE-F40). */
+export interface DatabaseUsage {
+  /** False while the business shares its database with others: no size of its own yet. */
+  available: boolean;
+  /** Its size in bytes; null before the first night measured it. */
+  bytes: number | null;
+  /** The day (UTC, `YYYY-MM-DD`) it was measured; null before the first night. */
+  day: string | null;
+}
+
+/** `base.FilesUsageOut`: what the business's files and those of its apps take up, as the last night measured it. */
+export interface FilesUsage {
+  /** What they take up, in bytes; null before the first night. */
+  bytes: number | null;
+  /** The day (UTC, `YYYY-MM-DD`) it was measured; null before the first night. */
+  day: string | null;
+  /** The space the plan includes, in bytes; null: no limit, or the plan is not known. */
+  limit: number | null;
+  /** How much of that space they take up; null without a limit or a figure. */
+  percent: number | null;
+  /** Null without a limit or a figure. */
+  status: 'within' | 'near' | 'full' | null;
+}
+
+/** `base.ConnectionsUsageOut`: the business's capacity, what it does at once in its database against what it really has. */
+export interface ConnectionsUsage {
+  /** The most connections at once today; null: not measured today yet. */
+  peak_today: number | null;
+  /** What its plan includes or, if less, what the service gives; null: the plan is not known. */
+  limit: number | null;
+  /** The times in the last 7 days somebody got an error because there was no room; null: never counted yet. */
+  busy_last_7_days: number | null;
+  /** Since when they are counted (`YYYY-MM-DD`), when that is less than the 7 days. */
+  busy_since: string | null;
+  /** Whether a bigger plan would give it more at once. */
+  bigger_plan_gives_more: boolean;
+}
+
+/** `base.RequestsUsageOut`: the requests the business has served this calendar month (UTC). */
+export interface RequestsUsage {
+  /** How many; null: never counted yet. */
+  this_month: number | null;
+  /** Since when they are counted (`YYYY-MM-DD`), when that is after day 1. */
+  since: string | null;
+}
+
+/** `base.ActivityUsageOut`: the people with activity in the business. */
+export interface ActivityUsage {
+  /** With activity in the last 5 minutes; null in a demo. */
+  active_now: number | null;
+  /** In the 30 days the last night measured ends; null before the first night. */
+  last_30_days: number | null;
+  /** The day (UTC, `YYYY-MM-DD`) that night measured; null before the first night. */
+  day: string | null;
+}
+
+/** `base.PlanMeterOut`: what an app on says its plan includes this month (`base.home.plan_meters`). */
+export interface PlanMeter {
+  /** The app it is of. */
+  key: string;
+  /** What it is called, in the person's language. */
+  label: string;
+  /** How much of it is spent; null: not measured yet, or it could not be read. */
+  used: number | null;
+  /** How much the plan includes; 0: the plan includes none; null: as above. */
+  limit: number | null;
+  /** False when its app could not be read now. */
+  available: boolean;
+}
+
+/** `base.PlanUsageOut`: System › «Usage and plan». A figure not measured yet is null, never a zero. */
 export interface PlanUsage {
   /** Whether the Hub has the business's plan from erplora.com yet. */
   known: boolean;
+  /** A demo: nothing of it is measured. */
+  demo: boolean;
+  /** The plan the business is on (`free`, `starter`…); null: not known. */
+  plan_slug: string | null;
   people: PlanLimit;
   devices: PlanLimit;
+  apps: PlanLimit;
+  database: DatabaseUsage;
+  files: FilesUsage;
+  connections: ConnectionsUsage;
+  requests: RequestsUsage;
+  activity: ActivityUsage;
+  meters: PlanMeter[];
 }
 
 // ── Data: blueprints, imports and reset (APP-BASE-2) ──
@@ -316,7 +399,39 @@ export interface HubReset {
   /** False in phase 1: the business shares its database with other hubs. */
   available: boolean;
   sections: ResetSection[];
+  /** Always empty: the worker empties after copying (`base.hub.dumps` says how it went). */
   apps: Removal[];
+  /** `planned`: the plan only (dry run); `copying`: asked, the copy is being made, then the sections are emptied. */
+  status: 'planned' | 'copying';
+}
+
+/** How the last reset went (`base.ResetStateOut`). */
+export type ResetState = 'copying' | 'emptying' | 'done' | 'failed';
+
+export interface ResetProgress {
+  state: ResetState;
+  sections: BlueprintApp[];
+  requested_by: string;
+  /** Why it failed: `dumps_unavailable`, `dump_failed`, `emptying_failed` or `hub_not_ready`; empty otherwise. */
+  error: string;
+  removed: Removal[];
+  finished_at: string | null;
+}
+
+/** A copy of the business's data (`base.HubDumpOut`): before a reset, or when the business was deleted. */
+export interface HubDump {
+  id: string;
+  kind: 'reset' | 'offboarding';
+  created_at: string;
+  bytes: number;
+}
+
+/** `base.HubDumpsOut`: the copies (newest first) and the last reset. */
+export interface HubDumps {
+  /** False while the business shares its database with others: no copy is ever made then. */
+  available: boolean;
+  reset: ResetProgress | null;
+  dumps: HubDump[];
 }
 
 // ── Business settings (APP-BASE-6) ──
@@ -726,6 +841,7 @@ declare module '@erplora/ui/sdk' {
     'base.app.list': { input: NoInput; output: AppList };
     'base.app.enable': { input: AppChangeIn; output: AppChange };
     'base.app.disable': { input: AppChangeIn; output: AppChange };
+    'base.app.retry': { input: AppChangeIn; output: AppChange };
     'base.plan.usage': { input: NoInput; output: PlanUsage };
     // ── Data (APP-BASE-2) ──
     'base.blueprint.list': { input: NoInput; output: { templates: Template[]; empty: boolean } };
@@ -742,6 +858,9 @@ declare module '@erplora/ui/sdk' {
       input: { apps?: string[]; confirm?: string; dry_run?: boolean };
       output: HubReset;
     };
+    'base.hub.dumps': { input: NoInput; output: HubDumps };
+    // 503 `base.dumps_unavailable` when the copy cannot be linked now; 404 when it is no longer kept.
+    'base.hub.dump_link': { input: { id: string }; output: { url: string; expires_at: string } };
     // ── Business settings (APP-BASE-6) ──
     'base.business.get': { input: NoInput; output: Business };
     // The shared image library (round 2026-10-30): 503 `base.image_library_unavailable` when it cannot be read.

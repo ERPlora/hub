@@ -3,17 +3,22 @@
 // «Undo an import»: one row per import that can be undone (live `base.import.list`), confirmed without typing (it can
 // be imported again), then what was removed per app; a refusal stays in the dialog with its reason (hub#2720: the old
 // screen said nothing). «Reset the business»: the plan per section (`base.hub.reset` with `dry_run`), what never goes,
-// and — when the business has its own database — the sections ticked, emptied after typing its name. In phase 1 the
-// business shares its database with others: the screen says so and offers no red button (the server refuses too).
+// and — when the business has its own database — the sections ticked and, after typing its name, asked: the worker
+// copies the business's data first and only then empties them (round 2026-10-30 of PLAN-DB, decision 2). The live
+// `base.hub.dumps` tells each step — copying, emptying, done with what went (the plan read again), or failed with
+// nothing emptied, why, and «Try again» with the same sections — and lists the copies below («Copies», DumpsCard);
+// while one runs, no second one is offered. In phase 1 the business shares its database with others: the screen says
+// so and offers no red button (the server refuses too).
 import { ConfirmDialog, EmptyState, type FormModalError, InlineFeedback } from '@erplora/ui/components';
 import { type ApiError, useLive, useLiveClient } from '@erplora/ui/sdk';
 import { useSession } from '@erplora/ui/shell';
 import { IonButton, IonCheckbox, IonSkeletonText } from '@ionic/vue';
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 import { useBaseI18n } from '../../lib/i18n';
-import type { HubReset, ImportRow, Removal } from '../../operations';
+import type { BlueprintApp, HubReset, ImportRow, Removal, ResetProgress } from '../../operations';
+import DumpsCard from './DumpsCard.vue';
 import '../../data.css';
 
 const { t, locale } = useBaseI18n();
@@ -23,6 +28,8 @@ const router = useRouter();
 const admin = session.can('base.administer_hub');
 const client = useLiveClient();
 const imports = admin ? useLive('base.import.list', {}) : undefined;
+const copies = admin ? useLive('base.hub.dumps', {}) : undefined;
+const copiesFailed = computed(() => copies?.status.value === 'error' && copies.data.value === undefined);
 
 const undoable = computed(() => (imports?.data.value?.imports ?? []).filter((row) => row.undoable));
 
@@ -82,7 +89,30 @@ const chosen = ref(new Set<string>());
 const resetOpen = ref(false);
 const resetPending = ref(false);
 const resetError = ref<FormModalError | null>(null);
-const reset = ref<{ text: string; problems: string[]; failed: boolean }[]>([]);
+// The sections just asked, said at once as «copying» until the live copies tell the next step.
+const asked = ref<BlueprintApp[] | null>(null);
+const progress = computed<ResetProgress | null>(() =>
+  asked.value
+    ? { state: 'copying', sections: asked.value, requested_by: '', error: '', removed: [], finished_at: null }
+    : (copies?.data.value?.reset ?? null),
+);
+const busy = computed(() => progress.value?.state === 'copying' || progress.value?.state === 'emptying');
+const sectionNames = computed(() => (progress.value?.sections ?? []).map((section) => section.label).join(', '));
+const reset = computed(() => (progress.value?.state === 'done' ? removalLines(progress.value.removed) : []));
+const FAILURES = ['dumps_unavailable', 'dump_failed', 'emptying_failed', 'hub_not_ready'];
+const failure = computed(() => {
+  const error = progress.value?.state === 'failed' ? progress.value.error : '';
+  return t(`base.data.reset.failed.${FAILURES.includes(error) ? error : 'dump_failed'}`);
+});
+
+watch(
+  () => copies?.data.value,
+  (now, before) => {
+    if (now !== before) asked.value = null;
+    // Done: what each section has now.
+    if (now?.reset?.state === 'done' && before !== undefined && before.reset?.state !== 'done') void readPlan();
+  },
+);
 
 async function readPlan(): Promise<void> {
   planFailed.value = false;
@@ -114,13 +144,13 @@ async function runReset(): Promise<void> {
   if (!plan.value || !picked.value.length) return;
   resetPending.value = true;
   resetError.value = null;
+  const sections = picked.value.map((section) => ({ id: section.id, label: section.label }));
   try {
-    const answer = await client.api.call('base.hub.reset', {
-      apps: picked.value.map((section) => section.id),
+    await client.api.call('base.hub.reset', {
+      apps: sections.map((section) => section.id),
       confirm: plan.value.confirm_with,
     });
-    reset.value = removalLines(answer.apps);
-    plan.value = answer;
+    asked.value = sections;
     chosen.value = new Set();
     resetOpen.value = false;
   } catch (error) {
@@ -128,6 +158,14 @@ async function runReset(): Promise<void> {
   } finally {
     resetPending.value = false;
   }
+}
+
+/** «Try again» of a reset that failed: the same sections (those that still have rows), confirmed again. */
+function retryReset(): void {
+  const offered = new Set((plan.value?.sections ?? []).map((section) => section.id));
+  chosen.value = new Set((progress.value?.sections ?? []).map((section) => section.id).filter((id) => offered.has(id)));
+  resetError.value = null;
+  resetOpen.value = true;
 }
 
 function exportFirst(): void {
@@ -233,6 +271,13 @@ function exportFirst(): void {
       <p class="data-hint">
         {{ t('base.data.reset.keeps') }}
       </p>
+      <p
+        v-if="plan?.available"
+        class="data-hint"
+        data-testid="reset-copy-first"
+      >
+        {{ t('base.data.reset.copyFirst') }}
+      </p>
 
       <InlineFeedback
         v-if="planFailed"
@@ -306,6 +351,41 @@ function exportFirst(): void {
           </li>
         </ul>
         <InlineFeedback
+          v-if="busy && progress"
+          tone="info"
+          class="data-result"
+          role="status"
+          data-testid="reset-progress"
+          :heading="
+            progress.state === 'copying'
+              ? t('base.data.reset.progress.copying')
+              : t('base.data.reset.progress.emptying', { sections: sectionNames })
+          "
+        >
+          <template v-if="progress.state === 'copying'">
+            {{ t('base.data.reset.progress.copyingHint', { sections: sectionNames }) }}
+          </template>
+        </InlineFeedback>
+        <InlineFeedback
+          v-else-if="progress?.state === 'failed'"
+          tone="danger"
+          class="data-result"
+          data-testid="reset-failed"
+          :heading="t('base.data.reset.failed.heading')"
+        >
+          {{ failure }}
+          <template #actions>
+            <ion-button
+              size="small"
+              fill="outline"
+              data-testid="reset-failed-retry"
+              @click="retryReset"
+            >
+              {{ t('base.data.reset.failed.retry') }}
+            </ion-button>
+          </template>
+        </InlineFeedback>
+        <InlineFeedback
           v-if="reset.length"
           tone="success"
           class="data-result"
@@ -331,15 +411,22 @@ function exportFirst(): void {
               </ul>
             </li>
           </ul>
+          <p class="data-hint">
+            {{ t('base.data.reset.keptCopy') }}
+          </p>
         </InlineFeedback>
         <div
           v-if="plan.available && plan.sections.length"
           class="data-actions"
         >
+          <span
+            v-if="busy"
+            class="data-hint"
+          >{{ t('base.data.reset.busy') }}</span>
           <ion-button
             color="danger"
             data-testid="reset-submit"
-            :disabled="!picked.length"
+            :disabled="!picked.length || busy"
             @click="resetError = null; resetOpen = true"
           >
             {{ t('base.data.reset.submit') }}
@@ -347,6 +434,12 @@ function exportFirst(): void {
         </div>
       </template>
     </section>
+
+    <DumpsCard
+      :dumps="copies?.data.value"
+      :failed="copiesFailed"
+      @retry="copies?.refresh()"
+    />
 
     <ConfirmDialog
       v-model:open="undoOpen"

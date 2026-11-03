@@ -26,4 +26,9 @@ describe('CustomerImportButton', () => {
     const m = await mountCustomer(CustomerImportButton, { props: { busy: true } });
     expect((m.wrapper.get('[data-testid="customer-import"]').element as HTMLElement & { disabled?: boolean }).disabled).toBe(true);
   });
+
+  it('wears the product’s icon, cloud-upload-outline', async () => {
+    const m = await mountCustomer(CustomerImportButton, { props: { busy: false } });
+    expect(m.wrapper.get('[data-testid="customer-import"]').findComponent({ name: 'HubIcon' }).props('name')).toBe('ion:cloud-upload-outline');
+  });
 });

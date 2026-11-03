@@ -58,6 +58,7 @@ from apps.verifactu.models import (
 )
 from apps.verifactu.queries import (
     OUTSIDE_SPAIN,
+    UNREGISTERED,
     aeat_row,
     blockers,
     can_cancel,
@@ -72,6 +73,7 @@ from apps.verifactu.queries import (
     issuer_identity,
     own_certificate,
     own_certificate_material,
+    presenter,
     production_open,
     refuse_outside_spain,
     route_problem,
@@ -881,6 +883,9 @@ def _send_chain(
             certificate = own_certificate_material(config)
         except certificates.CertificateUnreadable:
             problem = "own_certificate_unreadable"
+    hub = None if problem else presenter(ctx.scope, config, issuer_nif)
+    if not problem and hub is None:
+        problem = UNREGISTERED
     if problem:
         if strict:
             raise Conflict(
@@ -973,7 +978,7 @@ def _send_chain(
         return
     incident = "<sum1:Incidencia>S</sum1:Incidencia>" in whole
     reply = gateway.submit(
-        hub=ctx.scope.key,
+        hub=hub,
         nif=issuer_nif,
         environment=environment,
         route=config.route,
@@ -1465,8 +1470,14 @@ def _query_page(
             str(AEAT_UNREACHABLE) % {"detail": str(error)},
             code="verifactu.aeat_unreachable",
         ) from None
+    hub = presenter(ctx.scope, config, nif)
+    if hub is None:
+        raise Conflict(
+            str(CANNOT_SEND) % {"why": wait_reason_text(UNREGISTERED)},
+            code=f"verifactu.{UNREGISTERED}",
+        )
     reply = gateway.query(
-        hub=ctx.scope.key,
+        hub=hub,
         nif=nif,
         environment=environment,
         route=config.route,
@@ -1681,9 +1692,12 @@ def run_diagnostic(ctx: OperationContext, data: NoInput) -> DiagnosticOut:
     nif = issuer_identity()[0]
     codes = blockers(config, config.environment, ctx.scope)
     gateway_ready, gateway_detail, refusal = None, "", ""
-    if gateway.configured() and "own_certificate_unreadable" not in codes:
+    hub = presenter(ctx.scope, config, nif)
+    if hub is None:
+        codes.append(UNREGISTERED)
+    elif gateway.configured() and "own_certificate_unreadable" not in codes:
         reply = gateway.probe(
-            hub=ctx.scope.key,
+            hub=hub,
             nif=nif,
             environment=config.environment,
             route=config.route,

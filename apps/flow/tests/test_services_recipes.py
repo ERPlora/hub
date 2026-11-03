@@ -187,14 +187,19 @@ def test_turning_off_one_never_turned_on_or_deleted_is_a_not_found():
 
 
 def owner_rewrote_it(enabled: bool = True) -> str:
-    """The recipe turned on, then rewritten by the owner, with another permission, built from an older version."""
+    """The recipe turned on, then rewritten by the owner, with another permission, built from an older version. Its
+    app's condition is not taken off (FLOW-F36): the owner gives it another value."""
     flow_id = str(run("flow.recipe.enable", {"recipe": REF}).flow.id)
     run(
         "flow.flow.update",
         {
             "id": flow_id,
             "name": "My gap",
-            "trigger": {"kind": "event", "event": "appointment.appointment.cancelled"},
+            "trigger": {
+                "kind": "event",
+                "event": "appointment.appointment.cancelled",
+                "filter": {"input.by_customer": {"eq": False}},
+            },
             "steps": [{"id": "s1", "kind": "command", "operation": "customer.note.add", "params": {"customer_id": "input.customer_id", "content": "Cancelled"}}],
         },
     )

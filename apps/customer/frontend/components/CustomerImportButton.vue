@@ -29,7 +29,7 @@ function onChange(): void {
   >
     <HubIcon
       slot="start"
-      name="ion:file-tray-outline"
+      name="ion:cloud-upload-outline"
     />
     {{ $t('customer.importCsv.button') }}
   </ion-button>

@@ -35,13 +35,16 @@ import hashlib
 import io
 import json
 import logging
+import os
 import secrets
+import socket
 import time
 import unicodedata
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Mapping
+from contextlib import contextmanager
 from contextvars import ContextVar
 from functools import partial
-from uuid import UUID
+from uuid import UUID, uuid7
 
 import pydantic
 from django.conf import settings
@@ -54,7 +57,8 @@ from django.core.files.base import ContentFile
 from django.core.files.storage import storages
 from django.core.validators import validate_email
 from django.db import IntegrityError, connection, transaction
-from django.db.models import Max, Q
+from django.db.models import Count, F, Max, PositiveIntegerField, Q, Value
+from django.db.models.functions import Greatest
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.http import HttpRequest
@@ -65,7 +69,8 @@ from live.errors import Conflict, InvalidPayload, NotFound, OperationError, Perm
 from live.live_registry import ALL_EVENTS
 from live.models import OutboxEvent
 from live.operations import get as get_operation
-from live.operations import INTERNAL, atomic, operation
+from live.operations import AI, INTERNAL, atomic, operation
+from live.operations import on_commit
 from live.outbox import notify, record_event
 from live.slugs import DEMO_SLUG_PREFIX, validate_hub_slug
 from PIL import Image as PILImage
@@ -108,6 +113,11 @@ from base.schemas import (
 from base import api_keys
 from base.models import ApiKey
 from base.throttle import client_key
+from base.tenancy import names as database_names
+from base.tenancy.connections import control_name
+from base.tenancy.context import HUB_SCOPE_KIND
+from control.models import Cluster, HubActivityDaily, HubDue, HubDump, HubUsageDaily, HubVisit, UsageRun
+from django.db.models import Exists, OuterRef
 from base.schemas import (
     BlueprintImportIn,
     BlueprintSourceIn,
@@ -136,11 +146,15 @@ from base.schemas import (
     HubRegisterOut,
     HubRegistryIn,
     HubRestoreIn,
+    HubCutFinishIn,
+    HubCutFinishOut,
     HubSeedLocalIn,
     HubSeedLocalOut,
     HubStateIn,
     HubUserSyncIn,
     HubUserSyncOut,
+    HubResetApplyIn,
+    HubResetApplyOut,
     HubResetIn,
     HubResetOut,
     HubStateOut,
@@ -246,22 +260,31 @@ def _note_the_owner(
     credential: str = SessionOwner.Credential.ACCOUNT,
 ) -> None:
     """Note whose and where the new session is (``SessionOwner``), so ``base.session.revoke`` finds it by index, and
-    on which device and with which credential it was opened.
+    on which device and with which credential it was opened; and, on a hub, that its person came in today
+    (``control.HubVisit``, its nightly use and who is active now).
 
     ``login`` gives the session a new key and saves it, unless it flushed another user's session first: then it has
     no key until it is saved, which happens here, in the login's transaction.
     """
     if request.session.session_key is None:
         request.session.save()
+    host = session_host(request) or ""
     SessionOwner.objects.update_or_create(
         session_id=request.session.session_key,
         defaults={
             "saas_user_id": saas_user_id,
-            "host": session_host(request) or "",
+            "host": host,
             "device_id": None if device is None else device.pk,
             "credential": credential,
         },
     )
+    if host and host != PLATFORM_SESSION_HOST:
+        # Who came into the business today (its nightly use, ``base.usage``): once a day, whatever the logins; what they
+        # do next keeps ``last_seen_at`` going (``base.meter``).
+        now = timezone.now()
+        HubVisit.objects.bulk_create(
+            [HubVisit(host=host, day=now.date(), saas_user_id=saas_user_id, last_seen_at=now)], ignore_conflicts=True
+        )
 
 
 @transaction.atomic  # control's: the account's copy, its Membership and the session
@@ -399,20 +422,25 @@ def _note_an_event_recorded_by_the_delivery(sender, instance: OutboxEvent, creat
 
 
 def relay_take_events(
-    now: dt.datetime, *, listeners: Callable[[OutboxEvent], list[str]], limit: int, max_depth: int
+    now: dt.datetime,
+    *,
+    listeners: Callable[[OutboxEvent], list[str]],
+    limit: int,
+    max_depth: int,
+    of_hubs: bool = True,
 ) -> int:
     """Take up to ``limit`` events nobody took yet, oldest first: one delivery per app of ``listeners(event)``,
-    and the event's ``delivered_at`` (taken) in the same transaction. Returns how many it took.
+    and the event's ``delivered_at`` (taken) in the same transaction. Returns how many it took. ``of_hubs=False``
+    (control's outbox): a business's event is never taken there.
 
     ``SELECT … FOR UPDATE SKIP LOCKED``: a second worker (a deploy overlaps the old one and the new one) skips the
     events this one holds, and once it commits they are taken.
     """
     with atomic():
-        taken = list(
-            OutboxEvent.objects.select_for_update(skip_locked=True)
-            .filter(delivered_at__isnull=True)
-            .order_by("created_at", "id")[:limit]
-        )
+        events = OutboxEvent.objects.select_for_update(skip_locked=True).filter(delivered_at__isnull=True)
+        if not of_hubs:
+            events = events.exclude(scope_kind=HUB_SCOPE_KIND)
+        taken = list(events.order_by("created_at", "id")[:limit])
         _hand_over(taken, now=now, depth=0, listeners=listeners, max_depth=max_depth)
     return len(taken)
 
@@ -425,6 +453,7 @@ def relay_deliver_next(
     max_depth: int,
     max_attempts: int,
     backoff: Callable[[int], dt.timedelta],
+    of_hubs: bool = True,
 ) -> tuple[EventDelivery, bool] | None:
     """Claim one delivery due at ``now`` (the oldest event first), run its app's reaction and mark it, all in
     one transaction; returns ``(delivery, delivered)``, or ``None`` when nothing is due.
@@ -436,13 +465,12 @@ def relay_deliver_next(
     warning with its code; anything else, and the delivery given up, as an error with its traceback.
     """
     with atomic():
-        delivery = (
-            EventDelivery.objects.select_for_update(skip_locked=True, of=("self",))
-            .select_related("event")
-            .filter(status=EventDelivery.Status.PENDING, next_attempt_at__lte=now)
-            .order_by("event__created_at", "event_id", "app_label")
-            .first()
+        due = EventDelivery.objects.select_for_update(skip_locked=True, of=("self",)).filter(
+            status=EventDelivery.Status.PENDING, next_attempt_at__lte=now
         )
+        if not of_hubs:
+            due = due.exclude(event__scope_kind=HUB_SCOPE_KIND)
+        delivery = due.select_related("event").order_by("event__created_at", "event_id", "app_label").first()
         if delivery is None:
             return None
         delivery.attempts += 1
@@ -578,12 +606,14 @@ def _slug_taken() -> Conflict:
     ai=INTERNAL,
 )
 def hub_register(ctx: OperationContext, data: HubRegistryIn) -> dict:
-    """Register the SaaS's business ``data.id`` (or update its name, slug, country…): ``ready`` at once in phase 1.
+    """Register the SaaS's business ``data.id`` (or update its name, slug, country…): ``requested``, with a database of
+    its own to make (round 2026-10-30 of PLAN-DB, decision 1: never control's), due in the worker's ``hub_due``.
 
     A customer's slug never takes a demo's ``demo-…`` nor a reserved name (``base.slug_invalid``); one that is
     another hub's is ``base.slug_taken``. A cancelled hub is restored first (``base.hub_cancelled``); a purged one
-    never comes back (``hub_purged``). The SaaS hears ``ready`` after the COMMIT when the row is new or was not
-    ready yet; a rename, idempotent, says nothing.
+    never comes back (``hub_purged``). The worker clones its database (``base.tenancy.provision``) and the SaaS hears
+    ``ready`` from it; an update of a hub still being prepared keeps it due (a failed one is tried again now), and
+    one of a ready hub, idempotent, says nothing.
     """
     internal_only(ctx)
     try:
@@ -609,43 +639,50 @@ def hub_register(ctx: OperationContext, data: HubRegistryIn) -> dict:
     if created:
         try:
             with transaction.atomic():
-                hub = Hub.objects.create(id=data.id, status=Hub.Status.READY, ready_at=now, **fields)
+                hub = Hub.objects.create(
+                    id=data.id,
+                    status=Hub.Status.REQUESTED,
+                    db_name=database_names.hub_db_name(control_name(), data.id),
+                    **fields,
+                )
         except IntegrityError:
             # A concurrent call took the slug, or registered this same id first (then it is an update).
             hub = Hub.objects.select_for_update().filter(pk=data.id).first()
             if hub is None:
                 raise _slug_taken() from None
             created = False
-    was_ready = created
     if not created:
         _refuse_purged(hub)
         if hub.status == Hub.Status.CANCELLED:
             raise Conflict(gettext("This hub was cancelled: restore it first."), code="base.hub_cancelled")
-        was_ready = hub.status == Hub.Status.READY
         for field, value in fields.items():
             setattr(hub, field, value)
-        if not was_ready:
-            hub.status, hub.ready_at = Hub.Status.READY, now
+        if hub.status in registry.PREPARING_STATUSES and not hub.db_name:
+            # Never prepared before round 2026-10-30: it has no data in control's database, and gets its own.
+            hub.db_name = database_names.hub_db_name(control_name(), hub.id)
+        if hub.status == Hub.Status.FAILED:
+            # The SaaS asks again: the next attempt is now, not at the end of its wait.
+            hub.next_attempt_at = now
         try:
             with transaction.atomic():
                 hub.save()
         except IntegrityError:
             raise _slug_taken() from None
+    if hub.status in registry.PREPARING_STATUSES:
+        HubDue.mark_due(hub, now)
     record_event(ctx, events.HUB_REGISTERED, {"id": str(hub.id), "slug": hub.slug, "created": created})
     # Registered as the platform (/internal): Settings › Business (APP-BASE-6) listens on the business's channel, so a
     # name, zone or language changed on erplora.com shows without reloading, after the COMMIT as the photo's.
     transaction.on_commit(partial(notify, Scope("host", hub.slug), [events.HUB_REGISTERED]), robust=True)
-    if created or not was_ready:
-        transaction.on_commit(partial(report_ready, hub.id), robust=True)
     return {**hub_answer(hub), "created": created}
 
 
 def report_ready(hub_id: UUID) -> None:
     """Tell the SaaS that ``hub_id`` is ready: ``POST {SAAS_INTERNAL_URL}/internal/hubs/{id}/ready``, signed v1 + v2.
 
-    Called after the COMMIT that made it ready, never inside it. It never raises: a failure is logged and not
-    retried, because the SaaS asks ``GET /internal/hubs/{id}`` about a sign-up without its ``ready`` two minutes
-    later (``reconcile_hub_states``) and marks it itself.
+    Called after the COMMIT that made it ready (:func:`provision_ready`, the worker's), never inside it. It never
+    raises: a failure is logged and not retried, because the SaaS asks ``GET /internal/hubs/{id}`` about a sign-up
+    without its ``ready`` two minutes later (``reconcile_hub_states``) and marks it itself.
     """
     path = READY_PATH.format(id=hub_id)
     body = json.dumps({"id": str(hub_id)}).encode()
@@ -675,8 +712,9 @@ def hub_state_apply(ctx: OperationContext, data: HubStateIn) -> dict:
     applies and the block waits for the next one); both in this same transaction, so their notices go out after its
     COMMIT (a block out of contract keeps nothing). Its ``members`` apply on the business's memberships
     (:func:`_apply_members`) and on its people in its own database (``base.hub_user.sync``), in this transaction
-    too. Its modules and plan are read where they are kept: the right
-    to a paid app (``base.entitlement``) and «Plan and limits» (``base.plan.usage``) follow this photo.
+    too; a business whose database is still being made has its people there when its seeding applies the photo
+    (:func:`apply_kept_photo`: the SaaS sends it right after the registration). Its modules and plan are read where they are kept: the right
+    to a paid app (``base.entitlement``) and «Usage and plan» (``base.plan.usage``) follow this photo.
     """
     internal_only(ctx)
     hub = _locked_hub(data.id)
@@ -685,13 +723,17 @@ def hub_state_apply(ctx: OperationContext, data: HubStateIn) -> dict:
     was_open = not registry.is_suspended(hub)
     hub.state, hub.state_version = data.photo, data.version
     hub.save(update_fields=["state", "state_version", "updated_at"])
-    if data.verifactu is not None or data.status is not None:
+    # A hub whose database is not made yet (being made, or cancelled or failed before it ever was) keeps the photo on
+    # its row: its seeding applies it (:func:`apply_kept_photo`), as turning an app on does for that app's block.
+    reachable = registry.database_is_made(hub)
+    if reachable and (data.verifactu is not None or data.status is not None):
         _sync_verifactu(hub, data)
-    if data.whatsapp is not None:
+    if reachable and data.whatsapp is not None:
         _sync_whatsapp(hub, data)
     if data.members is not None:
         left = _apply_members(hub, data.members)
-        _sync_hub_users(hub, data.members, left)
+        if reachable:
+            _sync_hub_users(hub, data.members, left)
     record_event(ctx, events.HUB_STATE_APPLIED, {"id": str(hub.id), "version": data.version})
     # Applied as the platform (/internal): its own notice goes to the platform's channel. The live queries that
     # follow the photo (base/live.py) listen on the business's, which hears it after the COMMIT too.
@@ -761,11 +803,6 @@ def acting_hub_user(ctx: OperationContext) -> HubUser | None:
     return ensure_hub_user(ctx.actor)
 
 
-def _shared_database_hosts() -> list[str]:
-    """Phase 1's shared database (S1–S4): every business whose rows it still holds (``db_name=""``)."""
-    return list(Hub.objects.filter(db_name="").values_list("slug", flat=True))
-
-
 # Not an assistant tool: the SaaS's photo (/internal), no person.
 @operation(
     "base.hub_user.sync", kind="command", permission=None, input=HubUserSyncIn, output=HubUserSyncOut, ai=INTERNAL
@@ -773,11 +810,9 @@ def _shared_database_hosts() -> list[str]:
 def hub_user_sync(ctx: OperationContext, data: HubUserSyncIn) -> dict:
     """Make the people of the business's database say what the SaaS's photo lists (its ``members``), before they ever
     enter: who is new is made, with the name and the email the photo says (what it leaves out stays as it was); who is
-    no longer in the business keeps their name on what they signed and is no longer active. In a hub with its own
-    database, that is everyone the photo leaves out (its people are only this business's); in phase 1's shared one,
-    which holds every business's, only those the photo just took out (``left``), unless another business there still
-    has them. The photo's own transaction calls it in the business's database (:func:`hub_state_apply`), after the
-    memberships changed."""
+    no longer in the business keeps their name on what they signed and is no longer active: everyone the photo leaves
+    out, since a business's database holds only its own people (S5). The photo's own transaction calls it in the
+    business's database (:func:`hub_state_apply`), after the memberships changed; ``left`` is the SaaS's, unused here."""
     internal_only(ctx)
     made = updated = 0
     listed = set()
@@ -794,23 +829,14 @@ def hub_user_sync(ctx: OperationContext, data: HubUserSyncIn) -> dict:
             made += 1
         elif _bring_up_to_date(person, wanted):
             updated += 1
-    from base.tenancy.context import current_hub
-
-    hub = current_hub()
-    if hub is not None and hub.db_name:
-        gone = HubUser.objects.filter(username__startswith=SAAS_USERNAME_PREFIX, is_active=True).exclude(
-            username__in=listed
-        )
-    else:
-        leaving = {username_for(str(saas_user_id)) for saas_user_id in data.left} - listed
-        staying = Membership.objects.filter(user__username__in=leaving, host__in=_shared_database_hosts())
-        gone = HubUser.objects.filter(username__in=leaving - set(staying.values_list("user__username", flat=True)))
+    gone = HubUser.objects.filter(username__startswith=SAAS_USERNAME_PREFIX, is_active=True).exclude(
+        username__in=listed
+    )
     return {"made": made, "updated": updated, "left": gone.update(is_active=False)}
 
 
 def _sync_hub_users(hub: Hub, members: list, left: list[str]) -> None:
-    """The photo's people in the business's own database (``base.hub_user.sync``), and who just left it: the same
-    transaction while it shares control's (phase 1, S1–S4)."""
+    """The photo's people in the business's own database (``base.hub_user.sync``), and who just left it."""
     from base.tenancy.context import use_hub
 
     with use_hub(hub):
@@ -913,7 +939,7 @@ def _sync_verifactu(hub: Hub, data: HubStateIn) -> None:
         raise InvalidPayload(
             f"The verifactu block is out of contract: {invalid}", code="internal.payload_invalid"
         ) from None
-    # The hub's own operation, in its database: the same transaction while it shares control's (phase 1, S1–S4).
+    # The hub's own operation, in its database.
     # Off in the business (base.activation), its block waits: turning VeriFactu on applies the photo kept then.
     scope = Scope("host", hub.slug)
     with use_hub(hub):
@@ -982,13 +1008,17 @@ def _sync_photo_blocks(hub: Hub, labels: Iterable[str]) -> None:
 # Not an assistant tool: the platform's door (/internal, the SaaS), no person.
 @operation("base.hub.cancel", kind="command", permission=None, input=HubCancelIn, output=HubOut, ai=INTERNAL)
 def hub_cancel(ctx: OperationContext, data: HubCancelIn) -> dict:
-    """The SaaS deleted the business: its host answers 410 from now on; its members and data stay, for a restore."""
+    """The SaaS deleted the business: its host answers 410 from now on; its members and data stay, for a restore. A
+    business with a finished database of its own is due for its copy (``offboarding``, the worker's)."""
     internal_only(ctx)
     hub = _locked_hub(data.id)
     _refuse_purged(hub)
     if hub.status != Hub.Status.CANCELLED:
         hub.status, hub.cancelled_at = Hub.Status.CANCELLED, timezone.now()
         hub.save(update_fields=["status", "cancelled_at", "updated_at"])
+        if offboarding_due(hub):
+            # Its copy, by the worker (round 2026-10-30 of PLAN-DB, proposal (a)): the SaaS's mail and panel link to it.
+            HubDue.mark_due(hub, hub.cancelled_at)
         record_event(ctx, events.HUB_CANCELLED, {"id": str(hub.id)})
         transaction.on_commit(partial(_wake_open_apps, hub.slug), robust=True)
     return hub_answer(hub)
@@ -997,13 +1027,25 @@ def hub_cancel(ctx: OperationContext, data: HubCancelIn) -> dict:
 # Not an assistant tool: the platform's door (/internal, the SaaS), no person.
 @operation("base.hub.restore", kind="command", permission=None, input=HubRestoreIn, output=HubOut, ai=INTERNAL)
 def hub_restore(ctx: OperationContext, data: HubRestoreIn) -> dict:
-    """Bring a cancelled hub back (``ready``); a hub that never ended stays as it is; a purged one is ``hub_purged``."""
+    """Bring a cancelled hub back (``ready``, or ``requested`` again if its database was never finished, or never
+    made: a business of phase 1 that left before the cut of S5 is made one from nothing, as a sign-up); a hub that
+    never ended stays as it is; a purged one is ``hub_purged``."""
     internal_only(ctx)
     hub = _locked_hub(data.id)
     _refuse_purged(hub)
     if hub.status == Hub.Status.CANCELLED:
-        hub.status, hub.cancelled_at = Hub.Status.READY, None
-        hub.save(update_fields=["status", "cancelled_at", "updated_at"])
+        if not hub.db_name:
+            hub.db_name, hub.ready_at = database_names.hub_db_name(control_name(), hub.id), None
+            hub.save(update_fields=["db_name", "ready_at", "updated_at"])
+        # Its own database never finished (cancelled while it was being made): it is made again, not opened.
+        unfinished = hub.ready_at is None
+        hub.status = Hub.Status.REQUESTED if unfinished else Hub.Status.READY
+        hub.cancelled_at = None
+        # A copy of its leaving that failed is no longer owed: a second leaving starts from the first wait.
+        hub.attempts, hub.last_error, hub.next_attempt_at = 0, "", None
+        hub.save(update_fields=["status", "cancelled_at", "attempts", "last_error", "next_attempt_at", "updated_at"])
+        if hub.status == Hub.Status.REQUESTED:
+            HubDue.mark_due(hub)
         record_event(ctx, events.HUB_RESTORED, {"id": str(hub.id)})
     return hub_answer(hub)
 
@@ -1018,12 +1060,17 @@ def hub_restore(ctx: OperationContext, data: HubRestoreIn) -> dict:
     ai=INTERNAL,
 )
 def hub_seed_local(ctx: OperationContext, data: HubSeedLocalIn) -> dict:
-    """Leave the local hubs ``data.slugs`` ready in the registry, with an id of their own (``seed_local_hubs``), and
-    every app on, its roots chosen, as every hub of before round 2026-10-27 (a business is born with every app off).
+    """Leave the local hubs ``data.slugs`` in the registry, with an id of their own (``seed_local_hubs``), each with a
+    database of its own, and every app on, its roots chosen, as every hub of before round 2026-10-27 (a business is
+    born with every app off).
 
+    A new one is born ``requested`` with its database's name (``<control>_<hex>``) and due, and the command makes it
+    (``base.tenancy.provision``, every app's tables and every app on: :func:`turn_every_app_on`); a local hub of phase 1
+    left on control's database (``db_name=""``) gets its own the same way: since S5 nothing is served from control's.
     Local development only (the command checks ``DEBUG``): they are no business of the SaaS's, so the SaaS hears
-    nothing. Idempotent: a hub already ready stays as it is; one left cancelled is ready again; the apps of one that
-    already turned some on or off stay as they are.
+    nothing. Idempotent: a hub already ready stays as it is, on its database; one left cancelled is ready again (or
+    made again, if its own database was never finished); the apps of one that already turned some on or off stay as
+    they are, and one left with no app at all has every app on again.
     """
     from base.tenancy.context import use_hub
 
@@ -1031,20 +1078,486 @@ def hub_seed_local(ctx: OperationContext, data: HubSeedLocalIn) -> dict:
     now = timezone.now()
     hubs = []
     for slug in data.slugs:
+        new_id = uuid7()
         hub, created = Hub.objects.select_for_update().get_or_create(
-            slug=slug, defaults={"status": Hub.Status.READY, "ready_at": now}
+            slug=slug,
+            defaults={
+                "id": new_id,
+                "status": Hub.Status.REQUESTED,
+                "db_name": database_names.hub_db_name(control_name(), new_id),
+            },
         )
-        with use_hub(hub):
-            _every_app_on(slug)
         outcome = "created" if created else "already_ready"
-        if not created and hub.status != Hub.Status.READY:
-            hub.status, hub.ready_at, hub.cancelled_at = Hub.Status.READY, now, None
-            hub.save(update_fields=["status", "ready_at", "cancelled_at", "updated_at"])
-            outcome = "ready_again"
+        if not hub.db_name:
+            hub.db_name = database_names.hub_db_name(control_name(), hub.id)
+            hub.status, hub.ready_at, hub.cancelled_at = Hub.Status.REQUESTED, None, None
+            hub.save(update_fields=["db_name", "status", "ready_at", "cancelled_at", "updated_at"])
+            outcome = "requested"
+        elif hub.status != Hub.Status.READY:
+            if hub.status == Hub.Status.CANCELLED:
+                made = hub.ready_at is not None
+                hub.status = Hub.Status.READY if made else Hub.Status.REQUESTED
+                hub.cancelled_at = None
+                hub.save(update_fields=["status", "cancelled_at", "updated_at"])
+                outcome = "ready_again" if made else "requested"
+            elif not created:
+                outcome = "requested"
+        if hub.status != Hub.Status.READY:
+            HubDue.mark_due(hub, now)
+        else:
+            # Made already, in its own database: every app on again there if it has none (its seeding turned them on
+            # the first time: turn_every_app_on).
+            with use_hub(hub):
+                _every_app_on(slug)
         if outcome != "already_ready":
             record_event(ctx, events.HUB_REGISTERED, {"id": str(hub.id), "slug": slug, "created": created})
         hubs.append({"slug": slug, "outcome": outcome})
     return {"hubs": hubs}
+
+
+def turn_every_app_on(hub: Hub) -> None:
+    """Inside ``use_hub(hub)``: every app on in the local hub ``hub`` (the seeding of ``seed_local_hubs``'s
+    databases). Outside any operation, before the hub serves anything: its activations' cache is forgotten at once,
+    after the write."""
+    _every_app_on(hub.slug, then=lambda forget: forget())
+
+
+# ── The provisioning's writes in control (round 2026-10-30 of PLAN-DB, S2a; PLAN-DB §6 and §8) ─────────────────────
+#
+# ``base.tenancy.provision`` makes a hub's database in steps; each step writes control here, in a short transaction of
+# its own, never holding a row while the database is cloned or migrated. Who works on a hub holds its ``hub_due`` lease
+# (``SELECT … FOR UPDATE SKIP LOCKED``, ``lease_until``), renewed at each step: two workers, or the worker and a
+# command, never prepare the same hub at once.
+
+#: The waits before a failed preparation is tried again: 1 min, 5 min, 15 min, then every hour (PLAN-DB §6).
+PROVISION_RETRY_SECONDS = (60, 300, 900, 3600)
+#: The longest error a failed preparation keeps (``Hub.last_error``).
+LAST_ERROR_MAX = 2000
+
+
+class ProvisioningStopped(Exception):
+    """The hub left its preparation meanwhile (cancelled, its demo ended): nothing more is done for it."""
+
+
+class ProvisioningFailed(Exception):
+    """A step of a preparation that failed for a reason with a name (``no_cluster_available``,
+    ``template_missing``…)."""
+
+    def __init__(self, code: str, message: str):
+        super().__init__(f"{code}: {message}")
+        self.code = code
+        self.message = message
+
+
+def retry_delay(attempts: int) -> dt.timedelta:
+    """How long a preparation that failed ``attempts`` times waits before the next."""
+    return dt.timedelta(seconds=PROVISION_RETRY_SECONDS[min(attempts, len(PROVISION_RETRY_SECONDS)) - 1])
+
+
+@contextmanager
+def _control_transaction():
+    """A transaction of control's own (the registry's and ``hub_due``'s writes), whatever context the caller runs in
+    (the worker, a command, an operation of the platform): ``live.operations.atomic`` on control's alias."""
+    from base.tenancy.context import use_control
+
+    with use_control(), atomic():
+        yield
+
+
+def registry_row(hub_id: UUID) -> Hub | None:
+    """The registry's row of ``hub_id``, its cluster with it, as it is now."""
+    return Hub.objects.select_related("cluster").filter(pk=hub_id).first()
+
+
+#: The statuses of a hub whose own database the worker serves (its outbox, its tasks): a ready one, and a business
+#: that left but keeps its database, whose records still to send must reach the AEAT (working rules §15).
+SERVED_STATUSES = (Hub.Status.READY, Hub.Status.CANCELLED, Hub.Status.ARCHIVING)
+
+
+def hubs_to_serve(now: dt.datetime) -> list[Hub]:
+    """The hubs with their own database the worker relays the outbox and runs the tasks of, each in its database, by
+    id: ready ones and businesses that left but keep it (cancelled, being archived); never one being made, dropped or
+    purged, a demo whose time is up, nor one moving to another cluster (its database is being copied)."""
+    return list(
+        Hub.objects.filter(status__in=SERVED_STATUSES, moving_to__isnull=True)
+        .exclude(db_name="")
+        .exclude(is_demo=True, expires_at__lte=now)
+        .select_related("cluster")
+        .order_by("id")
+    )
+
+
+def registry_row_by_slug(slug: str) -> Hub | None:
+    """The registry's row of ``slug``, its cluster with it, as it is now (``seed_local_hubs``)."""
+    return Hub.objects.select_related("cluster").filter(slug=slug).first()
+
+
+#: This process's name on the leases it holds (``HubDue.lease_owner``): host, pid and a draw of its own.
+LEASE_OWNER = f"{socket.gethostname()}:{os.getpid()}:{secrets.token_hex(4)}"
+
+
+def _free(now: dt.datetime) -> Q:
+    return Q(lease_until__isnull=True) | Q(lease_until__lte=now)
+
+
+def _leased(hub_id: UUID, now: dt.datetime, lease: dt.timedelta, owner: str) -> None:
+    """Renew ``owner``'s lease of ``hub_id``; ``ProvisioningStopped`` when it is no longer ``owner``'s (it ran out and
+    another worker took it): nothing more is written for it here."""
+    if not HubDue.objects.filter(pk=hub_id, lease_owner=owner).update(lease_until=now + lease):
+        raise ProvisioningStopped(f"the lease of {hub_id} is no longer {owner}'s: another worker holds it now.")
+
+
+def _take(hub_id: UUID, now: dt.datetime, lease: dt.timedelta, owner: str) -> None:
+    HubDue.objects.filter(pk=hub_id).update(lease_until=now + lease, lease_owner=owner)
+
+
+def claim_hub(hub_id: UUID, now: dt.datetime, lease: dt.timedelta, *, owner: str = LEASE_OWNER) -> Hub | None:
+    """Make ``hub_id`` due now and take its lease for ``owner`` (this process); ``None`` when someone else holds it
+    (or no such hub)."""
+    with _control_transaction():
+        hub = Hub.objects.filter(pk=hub_id).first()
+        if hub is None:
+            return None
+        HubDue.mark_due(hub, now)
+        free = HubDue.objects.select_for_update(skip_locked=True).filter(_free(now), pk=hub_id).exists()
+        if not free:
+            return None
+        _take(hub_id, now, lease, owner)
+    return registry_row(hub_id)
+
+
+def claim_next_due_hub(now: dt.datetime, lease: dt.timedelta, *, owner: str = LEASE_OWNER) -> UUID | None:
+    """Take for ``owner`` the lease of the hub due longest by ``now`` that nobody holds: one at a time, right before
+    it is worked on, so no lease runs out while it waits its turn in a pass. Never a ready hub's (a demo whose time is
+    up aside): its ring is its apps' to set up (``base.worker._activations``, S3), which keep their own time, or its
+    data work's, whose pass takes it."""
+    with _control_transaction():
+        due = (
+            HubDue.objects.select_for_update(skip_locked=True, of=("self",))
+            .filter(_free(now), due_at__lte=now)
+            .exclude(Q(hub__status=Hub.Status.READY) & ~Q(hub__is_demo=True, hub__expires_at__lte=now))
+            .order_by("due_at")
+            .values_list("hub_id", flat=True)
+            .first()
+        )
+        if due is None:
+            return None
+        _take(due, now, lease, owner)
+    return due
+
+
+def release_hub(hub_id: UUID, now: dt.datetime, *, owner: str = LEASE_OWNER) -> None:
+    """Give ``owner``'s lease of ``hub_id`` back: due again when it still has work (a retry, a demo to drop, a reset to
+    do, the copy of a business that left: at its ``next_attempt_at`` when the last try failed), else gone. A lease that
+    is no longer ``owner``'s is left alone."""
+    with _control_transaction():
+        hub = Hub.objects.filter(pk=hub_id).first()
+        due = HubDue.objects.select_for_update().filter(pk=hub_id, lease_owner=owner)
+        if not due.exists():
+            return
+        if hub is not None and (
+            hub.status == Hub.Status.FAILED or (hub.status == Hub.Status.DROPPING and hub.next_attempt_at)
+        ):
+            due.update(due_at=hub.next_attempt_at or now, lease_until=None, lease_owner="")
+        elif hub is not None and (
+            hub.status in registry.PREPARING_STATUSES
+            or (hub.is_demo and hub.status in (Hub.Status.EXPIRED, Hub.Status.DROPPING))
+            or hub.reset_requested_at is not None
+        ):
+            due.update(due_at=now, lease_until=None, lease_owner="")
+        elif hub is not None and offboarding_due(hub):
+            due.update(due_at=hub.next_attempt_at or now, lease_until=None, lease_owner="")
+        else:
+            due.delete()
+
+
+def place_hub(hub_id: UUID) -> Hub:
+    """Put ``hub_id`` on a cluster unless it is on one: the open one with the fewest hubs, under its ``max_hubs``.
+
+    Without any ``Cluster`` row, the settings' own server (``cluster`` stays empty). With rows and none open with room,
+    ``no_cluster_available``: never the settings' server then. The clusters are locked while it counts, so two
+    placements at once never pass a limit.
+    """
+    with _control_transaction():
+        hub = Hub.objects.select_for_update().get(pk=hub_id)
+        if hub.cluster_id is not None:
+            return registry_row(hub_id)
+        clusters = list(Cluster.objects.select_for_update().order_by("name"))
+        if not clusters:
+            return registry_row(hub_id)
+        placed = dict(
+            Hub.objects.filter(cluster__in=clusters)
+            .exclude(status=Hub.Status.PURGED)
+            .values_list("cluster")
+            .annotate(count=Count("pk"))
+        )
+        # The hubs on their way to a cluster (``control.hub.move``) take their place there already.
+        for cluster_id, count in Hub.objects.filter(moving_to__in=clusters).values_list("moving_to").annotate(
+            count=Count("pk")
+        ):
+            placed[cluster_id] = placed.get(cluster_id, 0) + count
+        room = [
+            cluster
+            for cluster in clusters
+            if cluster.is_open and (cluster.max_hubs == 0 or placed.get(cluster.pk, 0) < cluster.max_hubs)
+        ]
+        if not room:
+            raise ProvisioningFailed("no_cluster_available", "No open database cluster has room for a new hub.")
+        hub.cluster = min(room, key=lambda cluster: (placed.get(cluster.pk, 0), cluster.name))
+        hub.save(update_fields=["cluster", "updated_at"])
+    return registry_row(hub_id)
+
+
+def _preparing(hub_id: UUID, now: dt.datetime) -> Hub:
+    hub = Hub.objects.select_for_update(of=("self",)).select_related("cluster").get(pk=hub_id)
+    if hub.status not in registry.PREPARING_STATUSES or (hub.is_demo and registry.is_gone(hub, now)):
+        raise ProvisioningStopped(f"{hub.slug} is {hub.status}: its preparation stops.")
+    return hub
+
+
+def provision_step(
+    hub_id: UUID, status: str, now: dt.datetime, lease: dt.timedelta, *, owner: str = LEASE_OWNER
+) -> Hub:
+    """Note that ``hub_id`` is at the step ``status`` of its preparation and renew ``owner``'s lease;
+    ``ProvisioningStopped`` when it left its preparation meanwhile or the lease is no longer ``owner``'s."""
+    with _control_transaction():
+        hub = _preparing(hub_id, now)
+        _leased(hub_id, now, lease, owner)
+        if hub.status != status:
+            hub.status = status
+            hub.save(update_fields=["status", "updated_at"])
+    return hub
+
+
+def provision_ready(
+    hub_id: UUID,
+    now: dt.datetime,
+    schema_apps: dict[str, str],
+    *,
+    tell_saas: bool = True,
+    owner: str = LEASE_OWNER,
+    seeded_version: int | None = None,
+) -> Hub | None:
+    """``hub_id`` is ready: its schema as the migrator left it; a business's SaaS hears it after the COMMIT (unless
+    ``tell_saas`` is false: the local hubs). ``ProvisioningStopped`` if the lease is no longer ``owner``'s.
+
+    ``seeded_version``: the version of the SaaS's photo its seeding applied. With its row locked (as
+    :func:`hub_state_apply` locks it), a newer photo that came meanwhile, kept on the row only, means it is not ready
+    yet: ``None``, and the seeding applies that one first."""
+    with _control_transaction():
+        hub = _preparing(hub_id, now)
+        if not HubDue.objects.filter(pk=hub_id, lease_owner=owner).exists():
+            raise ProvisioningStopped(f"the lease of {hub_id} is no longer {owner}'s: another worker holds it now.")
+        if seeded_version is not None and hub.state_version != seeded_version:
+            return None
+        hub.status, hub.ready_at = Hub.Status.READY, now
+        hub.attempts, hub.last_error, hub.next_attempt_at = 0, "", None
+        hub.schema_apps, hub.schema_state = schema_apps, Hub.SchemaState.CURRENT
+        hub.save(
+            update_fields=[
+                "status",
+                "ready_at",
+                "attempts",
+                "last_error",
+                "next_attempt_at",
+                "schema_apps",
+                "schema_state",
+                "updated_at",
+            ]
+        )
+        if tell_saas and not hub.is_demo:
+            # A demo's SaaS asks for it (``GET /internal/hubs/{id}``) and keeps no row to tell.
+            transaction.on_commit(partial(report_ready, hub.id), robust=True)
+    return hub
+
+
+def provision_failed(hub_id: UUID, now: dt.datetime, error: str, *, owner: str = LEASE_OWNER) -> Hub | None:
+    """The preparation of ``hub_id`` failed with ``error``: ``failed``, tried again after :func:`retry_delay`.
+
+    ``None`` when the hub left its preparation meanwhile, or its lease is no longer ``owner``'s: nothing is noted."""
+    with _control_transaction():
+        try:
+            hub = _preparing(hub_id, now)
+        except ProvisioningStopped:
+            return None
+        if not HubDue.objects.filter(pk=hub_id, lease_owner=owner).exists():
+            return None
+        hub.attempts += 1
+        hub.status, hub.last_error = Hub.Status.FAILED, error[:LAST_ERROR_MAX]
+        hub.next_attempt_at = now + retry_delay(hub.attempts)
+        hub.save(update_fields=["status", "attempts", "last_error", "next_attempt_at", "updated_at"])
+        HubDue.objects.filter(pk=hub_id).update(due_at=hub.next_attempt_at)
+    return hub
+
+
+def demo_dropping(hub_id: UUID, now: dt.datetime, lease: dt.timedelta, *, owner: str = LEASE_OWNER) -> Hub | None:
+    """The demo ``hub_id``, which ended, is being dropped (``dropping``, its lease renewed); ``None`` if it is no demo
+    that ended, was purged already, or whose last drop failed and waits for its ``next_attempt_at``.
+
+    Its first drop starts its counters again: a preparation that had failed is no drop that failed."""
+    with _control_transaction():
+        hub = Hub.objects.select_for_update(of=("self",)).select_related("cluster").filter(pk=hub_id).first()
+        if hub is None or not hub.is_demo or hub.status == Hub.Status.PURGED or not registry.is_gone(hub, now):
+            return None
+        if hub.status == Hub.Status.DROPPING and hub.next_attempt_at is not None and hub.next_attempt_at > now:
+            return None
+        _leased(hub_id, now, lease, owner)
+        if hub.status != Hub.Status.DROPPING:
+            hub.status = Hub.Status.DROPPING
+            hub.attempts, hub.last_error, hub.next_attempt_at = 0, "", None
+            hub.save(update_fields=["status", "attempts", "last_error", "next_attempt_at", "updated_at"])
+    return hub
+
+
+def demo_drop_failed(hub_id: UUID, now: dt.datetime, error: str, *, owner: str = LEASE_OWNER) -> None:
+    """The drop of the demo ``hub_id`` failed with ``error``: noted, and tried again after :func:`retry_delay` (its
+    ``hub_due`` waits for it: never every tick). Nothing is noted once its lease is no longer ``owner``'s."""
+    with _control_transaction():
+        hub = Hub.objects.select_for_update().filter(pk=hub_id, status=Hub.Status.DROPPING).first()
+        if hub is None or not HubDue.objects.filter(pk=hub_id, lease_owner=owner).exists():
+            return
+        hub.attempts += 1
+        hub.last_error = f"drop_failed: {error}"[:LAST_ERROR_MAX]
+        hub.next_attempt_at = now + retry_delay(hub.attempts)
+        hub.save(update_fields=["attempts", "last_error", "next_attempt_at", "updated_at"])
+        HubDue.objects.filter(pk=hub_id).update(due_at=hub.next_attempt_at)
+
+
+def apply_kept_photo(hub: Hub) -> None:
+    """Inside ``use_hub(hub)``: apply the SaaS's photo kept on its row (its seeding: the photo came while its database
+    was being made): its people (``base.hub_user.sync``, which leaves out whoever it no longer lists) and the blocks
+    that belong to the apps it has on."""
+    from base import relay
+
+    photo = hub.state if isinstance(hub.state, dict) else {}
+    if hub.state_version and photo.get("members") is not None:
+        hub_user_sync(
+            system_context(Scope("host", hub.slug)), HubUserSyncIn(members=photo["members"], left=[])
+        )
+    _sync_photo_blocks(hub, relay.active_apps(Scope("host", hub.slug)))
+
+
+# ── The cut of S5: the businesses of phase 1 get their own database (``base.tenancy.cut``) ───────────────────────
+
+
+def hubs_on_control() -> list[Hub]:
+    """The businesses whose data phase 1 kept in control's database (``db_name`` empty), by slug: what the cut gives a
+    database of its own, a demo aside (it ends on its own). None that was purged."""
+    return list(
+        Hub.objects.filter(db_name="", is_demo=False)
+        .exclude(status__in=PURGED_STATUSES)
+        .select_related("cluster")
+        .order_by("slug")
+    )
+
+
+def copy_all_went_to() -> str:
+    """The business control's rows were copied into by a cut (``copy_all``), or ``""``: they go to one business,
+    once."""
+    found = (
+        OutboxEvent.objects.filter(name=events.HUB_CUT, payload__mode="copy_all")
+        .order_by("created_at")
+        .values_list("payload__slug", flat=True)
+        .first()
+    )
+    return found or ""
+
+
+def holds_hub_lease(hub_id: UUID, *, owner: str = LEASE_OWNER) -> bool:
+    """Whether ``hub_id``'s lease is still ``owner``'s (this process's): run out or not, nobody else took it."""
+    return HubDue.objects.filter(pk=hub_id, lease_owner=owner).exists()
+
+
+def renew_hub_lease(hub_id: UUID, now: dt.datetime, lease: dt.timedelta, *, owner: str = LEASE_OWNER) -> None:
+    """Renew ``owner``'s lease of the ready hub ``hub_id`` (a cut of it runs); ``ProvisioningStopped`` when it is no
+    longer ``owner``'s."""
+    with _control_transaction():
+        _leased(hub_id, now, lease, owner)
+
+
+def platform_hub_register(slug: str) -> Hub:
+    """ERPlora's platform hub in the registry (``manage.py create_platform_hub``): its row, ``is_platform``, born
+    ``requested`` with its own database's name, as a sign-up, but not due: the command makes it itself, under its
+    lease, and the worker's pass over ``hub_due`` never takes it first. The one already there otherwise. Never a
+    business's row: the slug is reserved (``live.slugs``)."""
+    with _control_transaction():
+        hub = Hub.objects.select_for_update().filter(slug=slug).first()
+        if hub is not None:
+            return hub
+        new_id = uuid7()
+        hub = Hub.objects.create(
+            id=new_id,
+            slug=slug,
+            status=Hub.Status.REQUESTED,
+            db_name=database_names.hub_db_name(control_name(), new_id),
+            is_platform=True,
+        )
+    return registry_row(hub.id)
+
+
+# Not an assistant tool: the cut's last step (manage.py cut_shared_hubs), no person.
+@operation(
+    "base.hub.cut_finish",
+    kind="command",
+    permission=None,
+    input=HubCutFinishIn,
+    output=HubCutFinishOut,
+    ai=INTERNAL,
+)
+def hub_cut_finish(ctx: OperationContext, data: HubCutFinishIn) -> dict:
+    """The business of phase 1 ``data.id`` works on its own database from now on (the cut of S5): ``db_name``, the
+    schema its database has, and ``base.hub.cut`` in control's outbox with how it was made (``mode``), the rows copied
+    into it and control's copy taken before (``dump``), in one transaction.
+
+    Only the platform runs it, refused before anything is read. Refused (409 ``base.hub_already_cut``) when the business
+    got a database meanwhile (another cut of it finished first) or is no longer ready, (409 ``base.hub_cut_lease_lost``)
+    when its lease is no longer this process's (it ran out and another cut took it: the database may be that one's),
+    and (409
+    ``base.hub_copy_all_taken``) a copy of control's rows when another business got them already (two runs that
+    raced: they go to one business, once); ``done: false`` when a newer
+    photo of the SaaS's came after ``seeded_version`` was applied: the cut applies it and asks again."""
+    internal_only(ctx)
+    if data.mode == "copy_all":
+        # Every business still on control's, in one order: two copies at once wait for each other, and the second one
+        # reads the first one's event.
+        list(Hub.objects.select_for_update().filter(Q(db_name="") | Q(pk=data.id)).order_by("pk").values_list("pk"))
+    hub = _locked_hub(data.id)
+    if hub.db_name or hub.status != Hub.Status.READY:
+        raise Conflict(
+            gettext("This business already works on its own database, or is not ready."),
+            code="base.hub_already_cut",
+        )
+    if not holds_hub_lease(hub.id):
+        raise Conflict(
+            gettext("Another process is cutting this business now: this cut stops."),
+            code="base.hub_cut_lease_lost",
+        )
+    went_to = copy_all_went_to()
+    if data.mode == "copy_all" and went_to and went_to != hub.slug:
+        raise Conflict(
+            gettext("Control's rows already went to another business: they are copied once."),
+            code="base.hub_copy_all_taken",
+        )
+    if data.seeded_version is not None and hub.state_version != data.seeded_version:
+        return {"done": False}
+    hub.db_name = data.database
+    hub.schema_apps, hub.schema_state = data.schema_apps, Hub.SchemaState.CURRENT
+    hub.save(update_fields=["db_name", "schema_apps", "schema_state", "updated_at"])
+    record_event(
+        ctx,
+        events.HUB_CUT,
+        {
+            "id": str(hub.id),
+            "slug": hub.slug,
+            "mode": data.mode,
+            "database": data.database,
+            "copied": {table: rows for table, rows in data.copied.items() if rows},
+            "dump": data.dump,
+        },
+    )
+    # What any process kept of its apps came from control's rows: from now on they are its database's.
+    on_commit(partial(activation.forget, hub.slug))
+    return {"done": True}
 
 
 # ── The demos (plan 2026-10-17, §1.6 and §1.7) ───────────────────────────────────────────────────────────────────
@@ -1073,8 +1586,15 @@ def _demo_ttl() -> dt.timedelta:
     return dt.timedelta(minutes=settings.DEMO_TTL_MINUTES)
 
 
+#: The statuses of a demo that is not over yet: the reaper ends it once its hour is up, an admin may end it by hand.
+OPEN_DEMO_STATUSES = frozenset({*registry.PREPARING_STATUSES, Hub.Status.READY})
+#: The statuses of a browser's live demo (one per browser, under the cap): being made or ready. One whose preparation
+#: failed is not: the browser gets another and that one ends.
+LIVE_DEMO_STATUSES = OPEN_DEMO_STATUSES - {Hub.Status.FAILED}
+
+
 def _demo_out(hub: Hub, *, created: bool) -> dict:
-    return {"id": hub.id, "slug": hub.slug, "expires_at": hub.expires_at, "created": created}
+    return {"id": hub.id, "slug": hub.slug, "status": hub.status, "expires_at": hub.expires_at, "created": created}
 
 
 def _demo_status(hub: Hub) -> dict:
@@ -1082,9 +1602,9 @@ def _demo_status(hub: Hub) -> dict:
 
 
 def _live_demo_of(session_key: str, now: dt.datetime) -> Hub | None:
-    """The demo of this browser that is still on, or ``None``."""
+    """The demo of this browser that is still on (being made or ready), or ``None``."""
     return Hub.objects.filter(
-        is_demo=True, status=Hub.Status.READY, demo_session_key=session_key, expires_at__gt=now
+        is_demo=True, status__in=LIVE_DEMO_STATUSES, demo_session_key=session_key, expires_at__gt=now
     ).first()
 
 
@@ -1095,9 +1615,14 @@ def _demo_full() -> OperationError:
 
 
 def _platform_or_its_admin(ctx: OperationContext) -> None:
-    """The platform, or one of its admins in the Hub admin (staff and superuser, ``platform_admin``); nobody else."""
+    """The platform, or one of its admins in the Hub admin (staff and superuser, ``platform_admin``) on the platform's
+    own scope (``REGISTRY_SCOPE``); nobody else: on a business's host, staff is no more than anyone there (review of
+    hub#490)."""
+    from base.tenancy.context import PLATFORM_SCOPE_KIND
+
     actor = ctx.actor
-    if getattr(actor, "is_staff", False) and getattr(actor, "is_superuser", False):
+    on_the_platform = ctx.scope.kind == PLATFORM_SCOPE_KIND
+    if on_the_platform and getattr(actor, "is_staff", False) and getattr(actor, "is_superuser", False):
         return
     internal_only(ctx)
 
@@ -1114,40 +1639,55 @@ def _locked_demo(slug: str) -> Hub:
 def demo_create(ctx: OperationContext, data: DemoCreateIn) -> dict:
     """This browser's demo: its live one (``created`` false, nothing spent), or a new, empty ``demo-<8 hex>``.
 
-    A new one is ready at once (phase 1 has no database to clone, plan §1.5) and ends ``DEMO_TTL_MINUTES`` from now;
-    ``vertical`` is only noted (the verticals' seed comes with the blueprints). Beyond ``MAX_CONCURRENT_DEMOS`` live
-    demos it is ``base.demo_full`` (503). The count and the new row hold :data:`DEMO_CAP_LOCK`, so two calls at the
-    same instant never pass the cap: the second counts once the first has committed. A demo of this browser that ran
-    out and the reaper has not purged yet is marked ``expired`` first: it frees the browser for a new one (one live
-    demo per browser, a unique constraint).
+    A new one is ``requested`` with a database of its own to make (``<control>_demo_<hex>``, cloned from its
+    vertical's template by the worker; round 2026-10-30 of PLAN-DB): the SaaS waits for ``ready`` on
+    ``GET /internal/hubs/{id}`` before it asks for a code. It ends ``DEMO_TTL_MINUTES`` from now. Beyond
+    ``MAX_CONCURRENT_DEMOS`` live demos (being made or ready) it is ``base.demo_full`` (503). The count and the new row
+    hold :data:`DEMO_CAP_LOCK`, so two calls at the same instant never pass the cap and one browser never gets two: the
+    second looks again once the first has committed. A demo of this browser that ran out and the reaper has not purged
+    yet, or whose preparation failed, is marked ``expired`` and due first (the reaper drops it): it frees the browser for
+    a new one.
     """
     internal_only(ctx)
     now = timezone.now()
     live = _live_demo_of(data.session_key, now)
     if live is not None:
         return _demo_out(live, created=False)
-    Hub.objects.filter(
-        is_demo=True, status=Hub.Status.READY, demo_session_key=data.session_key, expires_at__lte=now
-    ).update(status=Hub.Status.EXPIRED, updated_at=now)
+    ended = Hub.objects.filter(
+        Q(expires_at__lte=now) | Q(status=Hub.Status.FAILED),
+        is_demo=True,
+        status__in=OPEN_DEMO_STATUSES,
+        demo_session_key=data.session_key,
+    )
+    for hub in ended:
+        HubDue.mark_due(hub, now)
+    ended.update(status=Hub.Status.EXPIRED, updated_at=now)
     with connection.cursor() as cursor:
         cursor.execute(DEMO_CAP_LOCK)
-    live_demos = Hub.objects.filter(is_demo=True, status=Hub.Status.READY, expires_at__gt=now).count()
+    # Under the lock: a call of this browser that made its demo meanwhile has committed it.
+    live = _live_demo_of(data.session_key, now)
+    if live is not None:
+        return _demo_out(live, created=False)
+    live_demos = Hub.objects.filter(is_demo=True, status__in=LIVE_DEMO_STATUSES, expires_at__gt=now).count()
     if live_demos >= settings.MAX_CONCURRENT_DEMOS:
         raise _demo_full()
     for _draw in range(DEMO_SLUG_DRAWS):
         slug = f"{DEMO_SLUG_PREFIX}{secrets.token_hex(4)}"
         try:
             with atomic():
+                demo_id = uuid7()
                 hub = Hub.objects.create(
+                    id=demo_id,
                     slug=slug,
                     is_demo=True,
-                    status=Hub.Status.READY,
-                    ready_at=now,
+                    status=Hub.Status.REQUESTED,
+                    db_name=database_names.demo_db_name(control_name(), demo_id),
                     expires_at=now + _demo_ttl(),
                     demo_session_key=data.session_key,
                     vertical=data.vertical or "",
                     language=data.language,
                 )
+                HubDue.mark_due(hub, now)
         except IntegrityError:
             # Either another call of this browser made its demo first (then it is that one), or the address is taken.
             live = _live_demo_of(data.session_key, now)
@@ -1172,7 +1712,8 @@ def demo_code_create(ctx: OperationContext, data: DemoCodeIn) -> dict:
     """A one-time code into the demo ``data.slug`` for the browser that owns it, valid ``DEMO_CODE_TTL_SECONDS``.
 
     Only its sha256 is kept. 404 when no demo has the slug, 410 ``base.hub_gone`` once it ended, 403
-    ``base.demo_not_owner`` for another browser (the SaaS sends that browser back to its door).
+    ``base.demo_not_owner`` for another browser (the SaaS sends that browser back to its door), 503
+    ``base.hub_preparing`` while its database is being made (the SaaS waits for ``ready`` first).
     """
     internal_only(ctx)
     now = timezone.now()
@@ -1183,6 +1724,12 @@ def demo_code_create(ctx: OperationContext, data: DemoCodeIn) -> dict:
         raise OperationError(gettext("This demo has ended."), code="base.hub_gone", status=410)
     if not secrets.compare_digest(hub.demo_session_key.encode(), data.session_key.encode()):
         raise PermissionDenied(gettext("This demo is another browser's."), code="base.demo_not_owner")
+    if registry.is_preparing(hub):
+        raise OperationError(
+            gettext("This demo is still being prepared; try again in a few seconds."),
+            code=registry.HUB_PREPARING,
+            status=503,
+        )
     code = secrets.token_urlsafe(32)
     expires_at = now + dt.timedelta(seconds=auth.DEMO_CODE_TTL_SECONDS)
     DemoCode.objects.create(hub=hub, code_hash=_code_hash(code), language=data.language, expires_at=expires_at)
@@ -1244,16 +1791,17 @@ def open_demo_session(request: HttpRequest, hub: Hub):
 def demo_expire(ctx: OperationContext, data: DemoSlugIn) -> dict:
     """End the demo ``data.slug`` now: its host answers 410 at once and the reaper purges it on its next pass.
 
-    For the platform (``manage.py demo_expire``) and its admins (the Hub admin's «Expire now»). A demo that already
-    ended stays as it is.
+    For the platform (``manage.py demo_expire``) and its admins (the Hub admin's «Expire now»), being made or ready. A
+    demo that already ended stays as it is.
     """
     _platform_or_its_admin(ctx)
     hub = _locked_demo(data.slug)
-    if hub.status == Hub.Status.READY:
+    if hub.status in OPEN_DEMO_STATUSES:
         now = timezone.now()
         hub.status = Hub.Status.EXPIRED
         hub.expires_at = min(hub.expires_at, now) if hub.expires_at is not None else now
         hub.save(update_fields=["status", "expires_at", "updated_at"])
+        HubDue.mark_due(hub, now)
         record_event(ctx, events.DEMO_EXPIRED, {"id": str(hub.id), "slug": hub.slug})
     return _demo_status(hub)
 
@@ -1261,8 +1809,9 @@ def demo_expire(ctx: OperationContext, data: DemoSlugIn) -> dict:
 # Not an assistant tool: the SaaS's door to the demo (/internal), no person.
 @operation("base.demo.purge", kind="command", permission=None, input=DemoSlugIn, output=DemoStatusOut, ai=INTERNAL)
 def demo_purge(ctx: OperationContext, data: DemoSlugIn) -> dict:
-    """Purge the demo ``data.slug``, which ended: its codes, its owner and its role go, and :func:`purge_demo_data`
-    gets it; the row stays ``purged`` as a tombstone (410) for ``DEMO_TOMBSTONE_DAYS``.
+    """Purge the demo ``data.slug``, which ended: its codes, its owner and its role go; the row stays ``purged`` as a
+    tombstone (410) for ``DEMO_TOMBSTONE_DAYS``. Rows only: its database went before, outside any transaction of
+    control (:func:`purge_demo_data`, from ``base.tenancy.provision.drop``).
 
     The reaper's, one transaction per demo. A demo still on is ``base.demo_live``; one already purged stays as it is.
     """
@@ -1275,7 +1824,6 @@ def demo_purge(ctx: OperationContext, data: DemoSlugIn) -> dict:
     DemoCode.objects.filter(hub=hub).delete()
     Membership.objects.filter(host=hub.slug).delete()
     get_user_model().objects.filter(username=demo_username_for(hub.slug)).delete()
-    purge_demo_data(hub)
     hub.status, hub.purged_at = Hub.Status.PURGED, timezone.now()
     hub.save(update_fields=["status", "purged_at", "updated_at"])
     record_event(ctx, events.DEMO_PURGED, {"id": str(hub.id), "slug": hub.slug})
@@ -1283,37 +1831,59 @@ def demo_purge(ctx: OperationContext, data: DemoSlugIn) -> dict:
 
 
 def purge_demo_data(hub: Hub) -> None:
-    """Delete what the demo ``hub`` wrote in the apps: in phase 1, nothing, on purpose.
+    """Delete what the demo ``hub`` wrote in the apps: its whole database, ``DROP DATABASE … WITH (FORCE)`` on its
+    cluster (``base.tenancy.ops``), outside any transaction, and only its own ``<control>_demo_<hex>`` (a row that names
+    another database is refused); it is never emptied nor reused.
 
-    Phase 1 has one database: the apps' tables are shared by every demo, by ``a``/``b`` and by the businesses, and
-    their rows carry no ``hub_id`` (CLAUDE.md «Tenencia del Hub»), so nothing tells a demo's rows from anyone else's
-    and deleting any would delete someone else's (the limitation Ioan accepted, plan 2026-10-17 §1.7). Phase 2 gives
-    each demo its own database, cloned from ``hub_template_<vertical>``, and this is where it goes:
-    ``DROP DATABASE demo_<hex> WITH (FORCE)``.
+    A demo made before round 2026-10-30 (``db_name`` empty) kept its rows in the database every hub of phase 1 shares,
+    where nothing tells them from anyone else's (plan 2026-10-17 §1.7): nothing is deleted for it. A database already
+    gone is no failure; one the server refuses to drop fails the purge, which the reaper tries again.
     """
-    return None
+    if not hub.db_name:
+        return
+    from base.tenancy import ops
+
+    own = database_names.demo_db_name(control_name(), hub.id)
+    if not hub.is_demo or hub.db_name != own:
+        raise database_names.InvalidDatabaseName(
+            f"{hub.db_name!r} is not the demo {hub.slug}'s own database ({own!r}): nothing is dropped."
+        )
+    ops.drop_database(hub.db_name, cluster=hub.cluster)
 
 
 def reap_demos(now: dt.datetime | None = None) -> int:
     """Purge every demo that ended by ``now`` (its time ran out, or it was expired by hand); return how many.
 
-    The worker's (``base.worker``, every ``REAPER_INTERVAL_SECONDS``) and ``manage.py demo_expire``'s. Each demo is
-    purged in its own transaction (``base.demo.purge``): one that fails is logged and the others are purged; it is
-    tried again on the next pass. Then the tombstones older than ``DEMO_TOMBSTONE_DAYS`` are forgotten.
+    The worker's (``base.worker``, every ``REAPER_INTERVAL_SECONDS``) and ``manage.py demo_expire``'s. Every demo
+    that ended is marked ``expired`` and due (``hub_due``) first, then dropped and purged under its lease
+    (``base.tenancy.provision.drop``: its database, then ``base.demo.purge`` in its own transaction). One that fails,
+    or whose lease the worker holds (it was still being made), is logged or left, and the others are purged; the worker
+    takes it again as due. Then the tombstones older than ``DEMO_TOMBSTONE_DAYS`` are forgotten.
     """
+    from base.tenancy import provision
+
     now = now or timezone.now()
-    ended = Hub.objects.filter(
-        Q(status=Hub.Status.READY, expires_at__lte=now) | Q(status=Hub.Status.EXPIRED), is_demo=True
-    ).values_list("slug", flat=True)
-    ctx = system_context(REGISTRY_SCOPE)
+    ended = list(
+        Hub.objects.filter(
+            Q(status__in=OPEN_DEMO_STATUSES, expires_at__lte=now)
+            | Q(status__in=(Hub.Status.EXPIRED, Hub.Status.DROPPING)),
+            is_demo=True,
+        ).only("id", "slug")
+    )
+    with _control_transaction():
+        Hub.objects.filter(pk__in=[hub.pk for hub in ended], status__in=OPEN_DEMO_STATUSES).update(
+            status=Hub.Status.EXPIRED, updated_at=now
+        )
+        for hub in ended:
+            HubDue.mark_due(hub, now)
     purged = 0
-    for slug in list(ended):
+    for hub in ended:
         try:
-            demo_purge(ctx, DemoSlugIn(slug=slug))
+            dropped = provision.drop(hub, now=now)
         except Exception:
-            logger.exception("base.demo.purge_failed demo=%s: it is tried again on the next pass.", slug)
+            logger.exception("base.demo.purge_failed demo=%s: it is tried again on the next pass.", hub.slug)
             continue
-        purged += 1
+        purged += dropped
     reap_demo_tombstones(now)
     return purged
 
@@ -1345,7 +1915,16 @@ def _who(ctx: OperationContext) -> str:
     permission=ADMINISTER_HUB,
     input=BlueprintSourceIn,
     output=BlueprintSummaryOut,
-    ai={"description": "Says what a template of the catalogue brings, app by app, before loading it; it writes nothing."},
+    ai=AI(
+        description="Says what a template of the catalogue brings, app by app, before loading it; it writes nothing.",
+        asks={
+            "en": ("what does the hair salon template bring?", "before loading it, what's inside the bar template?"),
+            "es": (
+                "antes de cargarla, ¿qué incluye la plantilla de bar?",
+                "¿qué viene en la plantilla de restaurante?",
+            ),
+        },
+    ),
 )
 def blueprint_inspect(ctx: OperationContext, data: BlueprintSourceIn) -> dict:
     """What a template or an uploaded file brings and what of it would load here (BASE-G104, BASE-G105).
@@ -1364,14 +1943,24 @@ def blueprint_inspect(ctx: OperationContext, data: BlueprintSourceIn) -> dict:
     permission=ADMINISTER_HUB,
     input=BlueprintImportIn,
     output=ImportOut,
-    ai={
-        "description": "Loads a template of the catalogue (a restaurant, a hair salon…) into this business: turns on "
-        "its apps that are off (with the apps they need, within the plan's limit of apps), then loads its menu or "
-        "services, its tables and the rest of its apps' data, app by app; what is already there is left as it was. "
-        "Returns the report of what went in, with why an app could not be turned on. Never brings people, PINs or "
-        "fiscal data.",
-        "risk": "high",
-    },
+    ai=AI(
+        description=(
+            "Loads a template of the catalogue (a restaurant, a hair salon…) into this business: turns on its apps "
+            "that are off (with the apps they need, within the plan's limit of apps), then loads its menu or services, "
+            "its tables and the rest of its apps' data, app by app; what is already there is left as it was. Returns "
+            "the report of what went in, with why an app could not be turned on. Never brings people, PINs or fiscal "
+            "data."
+        ),
+        risk="high",
+        asks={
+            "en": (
+                "load the restaurant template",
+                "set me up like a hair salon",
+                "fill the business with the café starter menu",
+            ),
+            "es": ("carga la plantilla de restaurante", "quiero empezar con la plantilla de bar"),
+        },
+    ),
 )
 def blueprint_import(ctx: OperationContext, data: BlueprintImportIn) -> dict:
     """Load a template, a file or what a load left out (BASE-G103–G107) and keep its report and the rows it created.
@@ -1422,11 +2011,17 @@ def blueprint_import(ctx: OperationContext, data: BlueprintImportIn) -> dict:
     permission=ADMINISTER_HUB,
     input=ImportUndoIn,
     output=ImportUndoOut,
-    ai={
-        "description": "Undoes one load of a template or a file: removes exactly the rows it brought; what was made "
-        "afterwards stays.",
-        "risk": "high",
-    },
+    ai=AI(
+        description=(
+            "Undoes one load of a template or a file: removes exactly the rows it brought; what was made afterwards "
+            "stays."
+        ),
+        risk="high",
+        asks={
+            "en": ("undo the template I just loaded", "take back that import, it was the wrong file"),
+            "es": ("deshaz la plantilla que acabo de cargar", "echa atrás esa importación, era el archivo equivocado"),
+        },
+    ),
 )
 def import_undo(ctx: OperationContext, data: ImportUndoIn) -> dict:
     """Remove exactly the rows one load created (BASE-G108), once."""
@@ -1443,6 +2038,167 @@ def import_undo(ctx: OperationContext, data: ImportUndoIn) -> dict:
         return {"id": load.pk, "apps": removed["apps"]}
 
 
+# ── The nightly use of each business (base.usage; round 2026-10-30 of PLAN-DB, proposal (j)) ───────────────────────
+
+
+def usage_run_claim(day: dt.date, now: dt.datetime, takeover: dt.timedelta) -> bool:
+    """Claim the measurement of ``day``: whether this worker measures it (no run yet, or one left unfinished for
+    ``takeover``); a finished night is never measured again."""
+    with _control_transaction():
+        run = UsageRun.objects.select_for_update().filter(day=day).first()
+        if run is None:
+            UsageRun.objects.create(day=day, started_at=now)
+            return True
+        if run.finished_at is not None or run.started_at > now - takeover:
+            return False
+        run.started_at = now
+        run.save(update_fields=["started_at"])
+        return True
+
+
+def usage_run_finished(day: dt.date, hubs: int, now: dt.datetime) -> None:
+    with _control_transaction():
+        UsageRun.objects.filter(day=day).update(finished_at=now, hubs=hubs)
+
+
+def usage_ready(day: dt.date) -> bool:
+    """Whether the night of ``day`` was measured to its end."""
+    return UsageRun.objects.filter(day=day, finished_at__isnull=False).exists()
+
+
+def hubs_to_measure() -> tuple[list[Hub], int]:
+    """The hubs with their own database whose use is measured (a ready one, a business that left with its database
+    finished; never a demo, nor one being made, dropped or gone), and how many hubs still share control's."""
+    with_own = (
+        Hub.objects.exclude(db_name="")
+        .filter(Q(status=Hub.Status.READY) | Q(status__in=SERVED_STATUSES, ready_at__isnull=False))
+        .filter(is_demo=False)
+        .select_related("cluster")
+        .order_by("id")
+    )
+    shared = Hub.objects.filter(db_name="", is_demo=False, status__in=SERVED_STATUSES).count()
+    return list(with_own), shared
+
+
+def active_people(host: str, day: dt.date, window_days: int) -> tuple[int, int]:
+    """The people with activity in ``host`` on ``day``, and in the ``window_days`` that end it."""
+    visits = HubVisit.objects.filter(host=host)
+    on_day = visits.filter(day=day).values("saas_user_id").distinct().count()
+    in_window = (
+        visits.filter(day__gt=day - dt.timedelta(days=window_days), day__lte=day)
+        .values("saas_user_id")
+        .distinct()
+        .count()
+    )
+    return on_day, in_window
+
+
+def usage_recorded(
+    hub_id: UUID,
+    day: dt.date,
+    *,
+    db_bytes: int,
+    s3_bytes: int,
+    active_users_1d: int,
+    active_users_30d: int,
+    now: dt.datetime,
+) -> None:
+    """Keep what ``hub_id`` used on ``day`` (measured again, its figures replace the day's); its live queries hear it
+    after the COMMIT."""
+    with _control_transaction():
+        HubUsageDaily.objects.update_or_create(
+            hub_id=hub_id,
+            day=day,
+            defaults={
+                "db_bytes": db_bytes,
+                "s3_bytes": s3_bytes,
+                "active_users_1d": active_users_1d,
+                "active_users_30d": max(active_users_30d, active_users_1d),
+                "measured_at": now,
+            },
+        )
+        slug = Hub.objects.filter(pk=hub_id).values_list("slug", flat=True).first()
+    if slug:
+        notify(Scope("host", slug), [events.HUB_USAGE_MEASURED])
+
+
+def activity_recorded(hub_id: UUID, day: dt.date, *, requests: int = 0, peak: int = 0, busy: int = 0) -> bool:
+    """Add what a process counted of ``hub_id`` on ``day`` (``base.meter``) to its row, made if it is the first; several
+    tasks write at once, so it is added in the database, never read first. ``False``: the hub is gone, nothing to keep."""
+
+    def add() -> int:
+        return HubActivityDaily.objects.filter(hub_id=hub_id, day=day).update(
+            requests=F("requests") + requests,
+            peak_connections=Greatest(F("peak_connections"), Value(peak), output_field=PositiveIntegerField()),
+            busy_requests=F("busy_requests") + busy,
+        )
+
+    with _control_transaction():
+        if add():
+            return True
+        if not Hub.objects.filter(pk=hub_id).exists():
+            return False
+        _, created = HubActivityDaily.objects.get_or_create(
+            hub_id=hub_id,
+            day=day,
+            defaults={"requests": requests, "peak_connections": peak, "busy_requests": busy},
+        )
+        if not created:  # another task made it meanwhile
+            add()
+    return True
+
+
+def people_seen(host: str, day: dt.date, last_seen: Mapping[str, dt.datetime]) -> None:
+    """Note who had activity in ``host`` on ``day`` and when last (``base.meter``): their visit of the day, made if it is
+    the first. Two tasks may write out of order by up to a pass: a moment against a window of minutes, which it does not
+    change, so one upsert is enough."""
+    with _control_transaction():
+        HubVisit.objects.bulk_create(
+            [
+                HubVisit(host=host, day=day, saas_user_id=person, last_seen_at=moment)
+                for person, moment in last_seen.items()
+            ],
+            update_conflicts=True,
+            unique_fields=["host", "day", "saas_user_id"],
+            update_fields=["last_seen_at"],
+        )
+
+
+def expired_dumps_forgotten(*, before: dt.datetime) -> int:
+    """Forget the copies made before ``before``: the bucket's lifecycle rule deleted them (90 days)."""
+    with _control_transaction():
+        forgotten, _ = HubDump.objects.filter(created_at__lt=before).delete()
+    return forgotten
+
+
+def visits_forgotten(*, before: dt.date) -> int:
+    """Forget the visits older than ``before``: no window counts them any more."""
+    with _control_transaction():
+        forgotten, _ = HubVisit.objects.filter(day__lt=before).delete()
+    return forgotten
+
+
+# ── The copies of a hub's data (round 2026-10-30 of PLAN-DB, decision 2; base.tenancy.dumps) ─────────────────────────
+
+
+def dump_key_taken(key: str) -> bool:
+    """Whether a copy is already kept at ``key`` (two copies of a hub in the same second get the next second)."""
+    from base.tenancy.context import use_control
+
+    with use_control():
+        return HubDump.objects.filter(key=key).exists()
+
+
+def dump_recorded(
+    hub_id: UUID, *, kind: str, key: str, size: int, created_at: dt.datetime, requested_by: str = ""
+) -> HubDump:
+    """Keep in control the copy of ``hub_id`` just uploaded to ``key``."""
+    with _control_transaction():
+        return HubDump.objects.create(
+            hub_id=hub_id, kind=kind, key=key, bytes=size, created_at=created_at, requested_by=requested_by[:150]
+        )
+
+
 def same_name(typed: str, name: str) -> bool:
     """The name typed is the business's: spaces around and inside collapsed, case ignored, accents kept — what the
     confirmation dialog of the screen (``ConfirmDialog`` of ``@erplora/ui``) already asked."""
@@ -1454,10 +2210,11 @@ def same_name(typed: str, name: str) -> bool:
 
 
 def has_own_database(hub: Hub | None) -> bool:
-    """The hub keeps its business in its own database (phase 2's S5): emptying it touches no other hub.
+    """The hub keeps its business in its own database: emptying it touches no other hub.
 
-    In phase 1 every hub with ``db_name=""`` shares one database (plan 2026-10-22-fase-2-tenencia, decision 1), and
-    an app's rows are everyone's: a reset would empty them for all.
+    Since S5 every business served has one (``base.tenancy.cut``); one without it (phase 1's, before its cut) is never
+    served, and only the suite's tests written before the tenancy still run one (``base/tenancy/tests/legacy.py``),
+    where an app's rows are everyone's: a reset would empty them for all, so these refusals stay.
     """
     return bool(hub is not None and hub.db_name)
 
@@ -1468,16 +2225,31 @@ def has_own_database(hub: Hub | None) -> bool:
     permission=ADMINISTER_HUB,
     input=HubResetIn,
     output=HubResetOut,
-    ai={
-        "description": "With dry_run, says what each app of this business would lose if emptied and what name must be "
-        "typed to confirm. Without it, empties the apps chosen for good, given the business's name typed exactly.",
-        "risk": "high",
-    },
+    ai=AI(
+        description=(
+            "With dry_run, says what each app of this business would lose if emptied and what name must be typed to "
+            "confirm. Without it, given the business's name typed exactly, copies all of the business's data and then "
+            "empties the apps chosen for good, in the background: Settings › Data shows when it is done and keeps the "
+            "copy."
+        ),
+        risk="high",
+        # Only for live.E020 (it checks the whole app): base.assistant.NOT_FROM_CHAT keeps this out of the chat
+        # (pinned by base/tests/test_assistant.py).
+        asks={
+            "en": ("wipe all the data and start over", "empty the business, I want to start from scratch"),
+            "es": ("borra todos los datos y empezamos de cero", "vacía el negocio, quiero empezar de nuevo"),
+        },
+    ),
 )
 def hub_reset(ctx: OperationContext, data: HubResetIn) -> dict:
-    """The plan of what each app would lose, or empty the apps chosen with the business's name typed (BASE-G109).
+    """The plan of what each app would lose, or the reset of the apps chosen asked, with the business's name typed
+    (BASE-G109): a copy of its database first, by the worker, and only then the sections emptied (round 2026-10-30 of
+    PLAN-DB, decision 2; «The reset of a business», below).
 
-    Without the business's own database the reset is refused before anything of it is read (PLAN-DB §14.14)."""
+    Without the business's own database the reset is refused before anything of it is read (PLAN-DB §14.14); without a
+    bucket for its copy it is unavailable (503); while one runs, a second one waits for it (409)."""
+    from base.tenancy import dumps
+
     with translation.override(ctx.language):
         hub = Hub.objects.filter(slug=ctx.scope.key).first()
         available = has_own_database(hub)
@@ -1497,6 +2269,7 @@ def hub_reset(ctx: OperationContext, data: HubResetIn) -> dict:
             "available": available,
             "sections": sections,
             "apps": [],
+            "status": "planned",
         }
         if data.dry_run:
             return answer
@@ -1512,9 +2285,187 @@ def hub_reset(ctx: OperationContext, data: HubResetIn) -> dict:
                 gettext("The name does not match."),
                 fields={"confirm": gettext("Type the business's name exactly as it is shown.")},
             )
+        if not dumps.configured():
+            raise _dumps_unavailable()
+        reset_requested(hub.id, chosen, language=ctx.language, requested_by=_who(ctx), now=timezone.now())
+        on_commit(partial(reset_progressed, hub.slug))
+        return {**answer, "status": "copying"}
+
+
+# ── The reset of a business (round 2026-10-30 of PLAN-DB, decision 2, proposal (f)) ─────────────────────────────────
+# Asked by who runs it (``base.hub.reset``), done by the worker (``base.worker``, the data pass): a copy of its database
+# first (``base.tenancy.dumps``, ``reset``) and, only if it was kept, the sections emptied in its database
+# (``base.hub.reset_apply``), the event ``base.hub.data_reset`` recorded there. ``Hub.reset_requested_at`` is set while
+# it is to do; ``Hub.reset_sections`` keeps what was asked and how it went, for Settings › Data (``base.hub.dumps``):
+# ``state`` copying → emptying → done, or failed with its ``error`` (``dumps_unavailable``, ``dump_failed``,
+# ``emptying_failed``, ``hub_not_ready``) and nothing emptied. Each step is told to the hub's live queries after its
+# COMMIT in control (``base.hub.reset_progressed``).
+
+#: The states of a reset; a failed one is asked again from the screen («Try again»).
+RESET_STATES = ("copying", "emptying", "done", "failed")
+
+
+def _dumps_unavailable() -> OperationError:
+    return OperationError(
+        gettext("The copy of the data cannot be made right now, so nothing was emptied. Try again later."),
+        code="base.dumps_unavailable",
+        status=503,
+    )
+
+
+def reset_progressed(slug: str) -> None:
+    """Tell the hub's live queries that its reset moved on (after the COMMIT that moved it)."""
+    notify(Scope("host", slug), [events.HUB_RESET_PROGRESSED])
+
+
+def reset_requested(hub_id: UUID, apps: list[str], *, language: str, requested_by: str, now: dt.datetime) -> None:
+    """Ask for the reset of ``apps`` on ``hub_id``: due for the worker now. ``base.reset_in_progress`` while another
+    one is to do."""
+    with _control_transaction():
+        hub = Hub.objects.select_for_update().get(pk=hub_id)
+        if hub.reset_requested_at is not None:
+            raise Conflict(
+                gettext("The business is already being reset. Wait for it to finish."), code="base.reset_in_progress"
+            )
+        hub.reset_requested_at = now
+        hub.reset_sections = {
+            "apps": list(apps),
+            "language": language,
+            "requested_by": requested_by,
+            "state": "copying",
+            "error": "",
+            "removed": [],
+            "dump": None,
+            "finished_at": None,
+        }
+        hub.save(update_fields=["reset_requested_at", "reset_sections", "updated_at"])
+        HubDue.mark_due(hub, now)
+
+
+def reset_moved(hub_id: UUID, *, state: str, owner: str = LEASE_OWNER, **changes) -> Hub:
+    """Note that the reset of ``hub_id`` moved to ``state`` (with ``changes``: its ``error``, ``dump``, ``removed``),
+    under ``owner``'s lease (``ProvisioningStopped`` when another worker holds it now); a done or failed one is no
+    longer to do. Its live queries hear it after the COMMIT."""
+    if state not in RESET_STATES:
+        raise ValueError(f"No such state of a reset: {state!r}.")
+    now = timezone.now()
+    with _control_transaction():
+        hub = Hub.objects.select_for_update().get(pk=hub_id)
+        _holds(hub_id, owner, now)
+        sections = {**(hub.reset_sections or {}), **changes, "state": state}
+        if state in ("done", "failed"):
+            sections["finished_at"] = now.isoformat()
+            hub.reset_requested_at = None
+        hub.reset_sections = sections
+        hub.save(update_fields=["reset_requested_at", "reset_sections", "updated_at"])
+    reset_progressed(hub.slug)
+    return hub
+
+
+def _holds(hub_id: UUID, owner: str, now: dt.datetime) -> None:
+    """``ProvisioningStopped`` unless ``owner`` holds the lease of ``hub_id`` now: what another worker took over is
+    left to it."""
+    if not HubDue.objects.filter(pk=hub_id, lease_owner=owner, lease_until__gt=now).exists():
+        raise ProvisioningStopped(f"the lease of {hub_id} is no longer {owner}'s: another worker holds it now.")
+
+
+def renew_lease(hub_id: UUID, lease: dt.timedelta, *, owner: str = LEASE_OWNER) -> None:
+    """Renew ``owner``'s lease of ``hub_id`` for ``lease`` from now (a long copy's heartbeat);
+    ``ProvisioningStopped`` when another worker holds it now."""
+    with _control_transaction():
+        _leased(hub_id, timezone.now(), lease, owner)
+
+
+# Not an assistant tool: the worker's step of a reset it already copied, no person.
+@operation(
+    "base.hub.reset_apply",
+    kind="command",
+    permission=None,
+    input=HubResetApplyIn,
+    output=HubResetApplyOut,
+    ai=INTERNAL,
+)
+def hub_reset_apply(ctx: OperationContext, data: HubResetApplyIn) -> dict:
+    """Empty the sections of a reset whose copy was kept (``base.worker``), in the hub's own database, in one
+    transaction: every row of them goes, or none (a failure rolls back the rows already removed). Never on phase 1's
+    shared database (PLAN-DB §14.14); only the platform runs it, refused to anyone else first (review of hub#490)."""
+    internal_only(ctx)
+    hub = Hub.objects.filter(slug=ctx.scope.key).first()
+    if not has_own_database(hub):
+        raise Conflict(
+            gettext("Resetting the business is not available yet. Undo a load instead, or remove what you want from each app."),
+            code="base.reset_shared_database",
+        )
+    chosen = list(dict.fromkeys(data.apps))
+    with translation.override(ctx.language):
         removed = blueprint.reset(ctx, chosen)
-        record_event(ctx, events.HUB_DATA_RESET, {"apps": chosen})
-        return {**answer, "sections": blueprint.reset_plan(ctx), "apps": removed["apps"]}
+    record_event(ctx, events.HUB_DATA_RESET, {"apps": chosen})
+    return {"apps": removed["apps"]}
+
+
+# ── A business that leaves: its copy (round 2026-10-30 of PLAN-DB, proposal (a)) ───────────────────────────────────
+# ``base.hub.cancel`` makes a business with a finished database of its own due; the worker copies it once
+# (``offboarding``) and the database stays (its 90 days; ``restore`` brings it back). A copy that fails is tried again
+# at ``next_attempt_at`` (1 min, 5 min, 15 min, then every hour), with ``attempts`` and ``last_error`` on the row.
+
+
+def _offboarding_copied(hub_ref, cancelled_at) -> Exists:
+    return Exists(
+        HubDump.objects.filter(hub_id=hub_ref, kind=HubDump.Kind.OFFBOARDING, created_at__gte=cancelled_at)
+    )
+
+
+def offboarding_due(hub: Hub) -> bool:
+    """Whether ``hub`` left with a finished database of its own and has no copy of this leaving yet."""
+    return bool(
+        hub.status == Hub.Status.CANCELLED
+        and hub.db_name
+        and hub.ready_at is not None
+        and hub.cancelled_at is not None
+        and not HubDump.objects.filter(
+            hub_id=hub.pk, kind=HubDump.Kind.OFFBOARDING, created_at__gte=hub.cancelled_at
+        ).exists()
+    )
+
+
+def claim_next_data_hub(now: dt.datetime, lease: dt.timedelta, *, owner: str = LEASE_OWNER) -> UUID | None:
+    """Take for ``owner`` the lease of the hub due longest by ``now``, that nobody holds, with data work to do: a reset
+    asked, or the copy of a business that left."""
+    leaving = (
+        Q(hub__status=Hub.Status.CANCELLED, hub__ready_at__isnull=False, hub__cancelled_at__isnull=False)
+        & ~Q(hub__db_name="")
+        & ~_offboarding_copied(OuterRef("hub_id"), OuterRef("hub__cancelled_at"))
+    )
+    with _control_transaction():
+        due = (
+            HubDue.objects.select_for_update(skip_locked=True, of=("self",))
+            .filter(_free(now), due_at__lte=now)
+            .filter(Q(hub__reset_requested_at__isnull=False) | leaving)
+            .order_by("due_at")
+            .values_list("hub_id", flat=True)
+            .first()
+        )
+        if due is None:
+            return None
+        _take(due, now, lease, owner)
+    return due
+
+
+def offboarding_copy_failed(hub_id: UUID, now: dt.datetime, error: str, *, owner: str = LEASE_OWNER) -> None:
+    """The copy of a business that left failed: tried again at its next attempt."""
+    with _control_transaction():
+        hub = Hub.objects.select_for_update().get(pk=hub_id)
+        _holds(hub_id, owner, timezone.now())
+        hub.attempts += 1
+        hub.last_error = error[:2000]
+        hub.next_attempt_at = now + retry_delay(hub.attempts)
+        hub.save(update_fields=["attempts", "last_error", "next_attempt_at", "updated_at"])
+
+
+def offboarding_copied(hub_id: UUID) -> None:
+    """The copy of a business that left was kept: nothing more to try."""
+    with _control_transaction():
+        Hub.objects.filter(pk=hub_id).update(attempts=0, last_error="", next_attempt_at=None, updated_at=timezone.now())
 
 
 # ── System: the failed events (APP-BASE-7) ─────────────────────────────────────────────────────────────────────────
@@ -1529,12 +2480,17 @@ def hub_reset(ctx: OperationContext, data: HubResetIn) -> dict:
     permission=ADMINISTER_HUB,
     input=FailedEventIn,
     output=FailedEventOutId,
-    ai={
-        "description": "Resends one failed event of this hub (by its id, from the list of failed events) once its "
-        "cause is fixed: it goes back to the queue with its attempts at zero, for the app that could not take it "
-        "only. Refused when that app is no longer on in this business.",
-        "risk": "normal",
-    },
+    ai=AI(
+        description=(
+            "Resends one failed event of this hub (by its id, from the list of failed events) once its cause is fixed: "
+            "it goes back to the queue with its attempts at zero, for the app that could not take it only. Refused "
+            "when that app is no longer on in this business."
+        ),
+        asks={
+            "en": ("retry that failed event", "send the stuck invoicing event again"),
+            "es": ("reintenta ese evento caído", "vuelve a mandar el evento de facturación que se quedó atascado"),
+        },
+    ),
 )
 def failed_event_retry(ctx: OperationContext, data: FailedEventIn) -> dict:
     """HUB-F55: ``pending`` again, due now, attempts at zero; the relay takes it on its next tick."""
@@ -1558,12 +2514,17 @@ def failed_event_retry(ctx: OperationContext, data: FailedEventIn) -> dict:
     permission=ADMINISTER_HUB,
     input=FailedEventRetryAllIn,
     output=FailedEventCountOut,
-    ai={
-        "description": "Resends every failed event of this hub that can be resent (also those beyond the first page "
-        "of the list), once the cause of a passing failure is fixed. Those for an app that is no longer on stay. "
-        "Says how many went back to the queue.",
-        "risk": "normal",
-    },
+    ai=AI(
+        description=(
+            "Resends every failed event of this hub that can be resent (also those beyond the first page of the list), "
+            "once the cause of a passing failure is fixed. Those for an app that is no longer on stay. Says how many "
+            "went back to the queue."
+        ),
+        asks={
+            "en": ("retry all the failed events", "the printer is back, resend everything that failed"),
+            "es": ("reintenta todos los eventos caídos", "vuelve a mandar todos los eventos que fallaron"),
+        },
+    ),
 )
 def failed_event_retry_all(ctx: OperationContext, data: FailedEventRetryAllIn) -> dict:
     """HUB-F56: every ``dead`` delivery of the hub whose app is on; another worker's rows wait (``SKIP LOCKED``)."""
@@ -1591,13 +2552,19 @@ def failed_event_retry_all(ctx: OperationContext, data: FailedEventRetryAllIn) -
     permission=ADMINISTER_HUB,
     input=FailedEventDiscardIn,
     output=FailedEventOutId,
-    ai={
-        "description": "Discards one failed event of this hub for good (by its id), with an optional reason: it is "
-        "never delivered again and is kept with who discarded it, when and why. Only when it must not be delivered "
-        "(a duplicate, already done by hand): discarding a sale's event for Invoicing leaves that sale without its "
-        "invoice.",
-        "risk": "high",
-    },
+    ai=AI(
+        description=(
+            "Discards one failed event of this hub for good (by its id), with an optional reason: it is never "
+            "delivered again and is kept with who discarded it, when and why. Only when it must not be delivered (a "
+            "duplicate, already done by hand): discarding a sale's event for Invoicing leaves that sale without its "
+            "invoice."
+        ),
+        risk="high",
+        asks={
+            "en": ("discard that failed event, I already did it by hand", "drop the duplicate event that failed"),
+            "es": ("descarta ese evento caído, ya lo hice a mano", "olvídate del evento duplicado que falló"),
+        },
+    ),
 )
 def failed_event_discard(ctx: OperationContext, data: FailedEventDiscardIn) -> dict:
     """HUB-F57: closed as ``discarded`` with who, when and why; the row and its last error stay for the audit."""
@@ -1826,11 +2793,16 @@ def _actor_label(ctx: OperationContext) -> str:
     permission=ADMINISTER_HUB,
     input=DeviceModeIn,
     output=DeviceCurrentOut,
-    ai={
-        "description": "Makes the device the person is using shared (a till several people use: PIN, a shift) or "
-        "personal (one person's: no PIN, 30 days). Only on the device itself.",
-        "risk": "normal",
-    },
+    ai=AI(
+        description=(
+            "Makes the device the person is using shared (a till several people use: PIN, a shift) or personal (one "
+            "person's: no PIN, 30 days). Only on the device itself."
+        ),
+        asks={
+            "en": ("make this tablet a shared till", "this laptop is only mine, set it to personal"),
+            "es": ("pon esta tablet como caja compartida", "este portátil es solo mío, que no pida PIN"),
+        },
+    ),
 )
 def device_mode_set(ctx: OperationContext, data: DeviceModeIn) -> dict:
     """«This device» (BASE-G72): the mode of the browser that asks, never another's. The sessions opened from now on
@@ -1860,10 +2832,13 @@ def _device(device_id) -> TrustedDevice:
     permission=ADMINISTER_HUB,
     input=DeviceRenameIn,
     output=DeviceByIdIn,
-    ai={
-        "description": "Names a device of the hub after its place («Bar», «Kitchen», «Office laptop»).",
-        "risk": "normal",
-    },
+    ai=AI(
+        description="Names a device of the hub after its place («Bar», «Kitchen», «Office laptop»).",
+        asks={
+            "en": ("call this tablet Bar", "rename the old iPad to Kitchen"),
+            "es": ("llama a esta tablet «Barra»", "renombra el iPad viejo como «Terraza»"),
+        },
+    ),
 )
 def device_rename(ctx: OperationContext, data: DeviceRenameIn) -> dict:
     """«Name it» (BASE-G64): the one thing of a device the business decides."""
@@ -1887,11 +2862,17 @@ def device_rename(ctx: OperationContext, data: DeviceRenameIn) -> dict:
     permission=ADMINISTER_HUB,
     input=DeviceByIdIn,
     output=DeviceRemoveOut,
-    ai={
-        "description": "Removes a lost device from the hub: its session ends at once and the PIN stops working on "
-        "it until someone signs in with an account on it again. Removing the one in hand signs the person out.",
-        "risk": "high",
-    },
+    ai=AI(
+        description=(
+            "Removes a lost device from the hub: its session ends at once and the PIN stops working on it until "
+            "someone signs in with an account on it again. Removing the one in hand signs the person out."
+        ),
+        risk="high",
+        asks={
+            "en": ("we lost the terrace tablet, remove it", "kick the stolen phone out of the business"),
+            "es": ("hemos perdido la tablet de la terraza, quítala", "echa del negocio el móvil que nos robaron"),
+        },
+    ),
 )
 def device_remove(ctx: OperationContext, data: DeviceByIdIn) -> dict:
     """«Remove this device» (BASE-G65): the device is cut off, not its people; whoever has an account can enter on it
@@ -1910,10 +2891,17 @@ def device_remove(ctx: OperationContext, data: DeviceByIdIn) -> dict:
     permission=ADMINISTER_HUB,
     input=DevicePruneIn,
     output=DevicePruneOut,
-    ai={
-        "description": "Removes at once the devices of the hub nobody used in 30 days, never the one in hand.",
-        "risk": "high",
-    },
+    ai=AI(
+        description="Removes at once the devices of the hub nobody used in 30 days, never the one in hand.",
+        risk="high",
+        asks={
+            "en": ("clean out the devices nobody has used in 30 days", "remove the old devices we don't use"),
+            "es": (
+                "limpia los dispositivos que nadie usa desde hace 30 días",
+                "quita los aparatos viejos que ya no se usan",
+            ),
+        },
+    ),
 )
 def device_prune(ctx: OperationContext, data: DevicePruneIn) -> dict:
     """«Remove the unused» (BASE-G66): those nobody entered on in 30 days, as BASE-G65 removes one."""
@@ -1937,11 +2925,27 @@ def _remove_devices(ids: list) -> None:
     permission=ADMINISTER_HUB,
     input=AccessSettingsUpdateIn,
     output=AccessSettingsOut,
-    ai={
-        "description": "Changes how the business asks who is at the till: show the PIN pad or not, ask again after "
-        "1, 5, 10, 15 or 30 minutes without use or once per shift, and PINs of 4 or 6 digits.",
-        "risk": "high",
-    },
+    ai=AI(
+        description=(
+            "Changes how the business asks who is at the till: show the PIN pad or not, ask again after 1, 5, 10, 15 "
+            "or 30 minutes without use or once per shift, and PINs of 4 or 6 digits."
+        ),
+        risk="high",
+        asks={
+            "en": (
+                "ask for the PIN again after 5 minutes",
+                "make the PINs 6 digits",
+                "stop showing the PIN pad on the till",
+                "only ask for the PIN once per shift",
+            ),
+            "es": (
+                "que pida el PIN cada 10 minutos",
+                "pon los PIN de 6 cifras",
+                "quita el teclado del PIN de la caja",
+                "que solo pida el PIN una vez por turno",
+            ),
+        },
+    ),
 )
 def access_settings_update(ctx: OperationContext, data: AccessSettingsUpdateIn) -> dict:
     """The «PIN pad» card (BASE-G62, G151): only the fields sent change. The PINs of the other length keep working
@@ -1977,11 +2981,13 @@ def _profile(user) -> Profile:
     permission=VIEW_HOME,
     input=ProfileUpdateIn,
     output=ProfileOut,
-    ai={
-        "description": "Saves the person's own name, last name and contact email in this hub (not their sign-in "
-        "email).",
-        "risk": "normal",
-    },
+    ai=AI(
+        description="Saves the person's own name, last name and contact email in this hub (not their sign-in email).",
+        asks={
+            "en": ("change my last name to García", "my contact email is now ana@bar.com"),
+            "es": ("cambia mi apellido a García", "mi correo de contacto ahora es ana@bar.com"),
+        },
+    ),
 )
 def profile_update(ctx: OperationContext, data: ProfileUpdateIn) -> dict:
     """«Save my data» (BASE-G125): how the person appears in this hub. The contact email gives and takes no access."""
@@ -2008,10 +3014,13 @@ def profile_update(ctx: OperationContext, data: ProfileUpdateIn) -> dict:
     permission=VIEW_HOME,
     input=PreferencesIn,
     output=PreferencesOut,
-    ai={
-        "description": "Sets the person's own language (Spanish, English or the business's) and appearance.",
-        "risk": "normal",
-    },
+    ai=AI(
+        description="Sets the person's own language (Spanish, English or the business's) and appearance.",
+        asks={
+            "en": ("switch me to English", "put the app in dark mode", "change my language to Spanish"),
+            "es": ("ponme el idioma en inglés", "quiero el modo oscuro", "cámbiame la apariencia a clara"),
+        },
+    ),
 )
 def preferences_set(ctx: OperationContext, data: PreferencesIn) -> dict:
     """«Preferences» (BASE-G125): saved as chosen and applied at once; empty = the business's. They follow the person
@@ -2083,7 +3092,13 @@ def _is_image(raw: bytes, pillow_format: str) -> bool:
     permission=VIEW_HOME,
     input=AvatarRemoveIn,
     output=AvatarOut,
-    ai={"description": "Removes the photo of the person's own profile.", "risk": "normal"},
+    ai=AI(
+        description="Removes the photo of the person's own profile.",
+        asks={
+            "en": ("remove my profile picture", "take the picture off my profile"),
+            "es": ("quita mi foto de perfil", "no quiero foto en mi perfil"),
+        },
+    ),
 )
 def avatar_remove(ctx: OperationContext, data: AvatarRemoveIn) -> dict:
     """«Remove» (BASE-G125): the profile forgets its photo (the file, named by its content, may be someone else's)."""
@@ -2125,13 +3140,18 @@ def _person_answer(ctx: OperationContext, person_id: str) -> dict:
     permission=ADMINISTER_HUB,
     input=PersonIn,
     output=PersonDetailOut,
-    ai={
-        "description": "Takes a person's PIN away (a forgotten or shared one): they stop entering with it at the "
-        "shared tills and keep entering with their erplora.com account. The owner's, only the owner.",
-        "risk": "high",
-        # The card names whose PIN goes, not the id the model sends (BASE-F98).
-        "preview": {"operation": "base.person.detail", "fields": ["name", "email"]},
-    },
+    ai=AI(
+        description=(
+            "Takes a person's PIN away (a forgotten or shared one): they stop entering with it at the shared tills and "
+            "keep entering with their erplora.com account. The owner's, only the owner."
+        ),
+        risk="high",
+        preview={"operation": "base.person.detail", "fields": ["name", "email"]},
+        asks={
+            "en": ("Ana forgot her PIN, remove it", "take away Luis's PIN, he shared it"),
+            "es": ("quítale el PIN a Luis, lo ha compartido", "Ana ha olvidado su PIN, bórraselo"),
+        },
+    ),
 )
 def person_pin_remove(ctx: OperationContext, data: PersonIn) -> dict:
     """«Remove the PIN» (BASE-G139): the PIN goes at once, the badge and the account stay."""
@@ -2202,10 +3222,13 @@ def person_badge_set(ctx: OperationContext, data: BadgeSetIn) -> dict:
     permission=ADMINISTER_HUB,
     input=PersonIn,
     output=PersonDetailOut,
-    ai={
-        "description": "Takes a person's badge away (a lost card): it stops opening the till; their PIN and account stay.",
-        "risk": "normal",
-    },
+    ai=AI(
+        description="Takes a person's badge away (a lost card): it stops opening the till; their PIN and account stay.",
+        asks={
+            "en": ("Luis lost his card, take his badge away", "remove Marta's badge"),
+            "es": ("Luis ha perdido la tarjeta, quítale la placa", "quita la placa de Marta"),
+        },
+    ),
 )
 def person_badge_remove(ctx: OperationContext, data: PersonIn) -> dict:
     """«Remove the badge» (BASE-G140): the card stops opening anything; a lost one never leaves anybody out."""
@@ -2329,11 +3352,24 @@ def api_key_rotate(ctx: OperationContext, data: ApiKeyIdIn) -> dict:
     permission=ADMINISTER_HUB,
     input=ApiKeyIdIn,
     output=ApiKeyRevokeOut,
-    ai={
-        "description": "Revokes an API key: any system using it loses access at once, for good. The key stays listed "
-        "as revoked.",
-        "risk": "high",
-    },
+    ai=AI(
+        description=(
+            "Revokes an API key: any system using it loses access at once, for good. The key stays listed as revoked."
+        ),
+        risk="high",
+        asks={
+            "en": (
+                "revoke the old Shopify key",
+                "cut off the key the accountant was using",
+                "kill that API key, it leaked",
+            ),
+            "es": (
+                "revoca la clave de la tienda online",
+                "córtale el acceso a la clave de la gestoría",
+                "anula esa clave de API, se ha filtrado",
+            ),
+        },
+    ),
 )
 def api_key_revoke(ctx: OperationContext, data: ApiKeyIdIn) -> dict:
     """«Revoke» (BASE-G148): at once and for good; the key is kept, for the record."""
@@ -2540,11 +3576,16 @@ from base.schemas import ApiDocSettingsIn, ApiDocSettingsOut, ApiDocSettingsUpda
     permission=ADMINISTER_HUB,
     input=ApiDocSettingsUpdateIn,
     output=ApiDocSettingsOut,
-    ai={
-        "description": "Shows or hides the documentation of this business's API (for whoever connects another "
-        "system); it comes hidden.",
-        "risk": "normal",
-    },
+    ai=AI(
+        description=(
+            "Shows or hides the documentation of this business's API (for whoever connects another system); it comes "
+            "hidden."
+        ),
+        asks={
+            "en": ("show the API docs to our developer", "hide the API documentation again"),
+            "es": ("publica la documentación de la API para el programador", "oculta otra vez la doc de la API"),
+        },
+    ),
 )
 def api_doc_settings_update(ctx: OperationContext, data: ApiDocSettingsUpdateIn) -> dict:
     """«Show the API documentation» (BASE-G100): saved at once."""
@@ -2588,12 +3629,21 @@ def _file_bytes(content_base64: str) -> bytes:
     input=FileUploadIn,
     output=FileSavedOut,
     expose_api=True,
-    ai={
-        "description": "Keeps a file the person attached in the business's files, in a folder by its path (the "
-        "folder «Facturas»; empty: the top). Never overwrites: a taken name becomes «name (1).ext». 25 MB at most; "
-        "programs are refused.",
-        "risk": "normal",
-    },
+    ai=AI(
+        description=(
+            "Keeps a file the person attached in the business's files, in a folder by its path (the folder «Facturas»; "
+            "empty: the top). Never overwrites: a taken name becomes «name (1).ext». 25 MB at most; programs are "
+            "refused."
+        ),
+        asks={
+            "en": ("upload the contract I attached", "keep this photo in our files", "save this PDF in our files"),
+            "es": (
+                "archiva esta foto en los documentos",
+                "guarda este PDF en los archivos",
+                "sube el archivo que te he adjuntado",
+            ),
+        },
+    ),
 )
 def file_upload(ctx: OperationContext, data: FileUploadIn) -> dict:
     """BASE-G83: keep the file, numbered when its name is taken, within the plan's space."""
@@ -2618,11 +3668,16 @@ def file_upload(ctx: OperationContext, data: FileUploadIn) -> dict:
     input=FileFolderCreateIn,
     output=FilePathOut,
     expose_api=True,
-    ai={
-        "description": "Makes a new, empty folder in the business's files, inside another by its path (the folder "
-        "«Facturas»; empty: the top). Refused when that name is taken there.",
-        "risk": "normal",
-    },
+    ai=AI(
+        description=(
+            "Makes a new, empty folder in the business's files, inside another by its path (the folder «Facturas»; "
+            "empty: the top). Refused when that name is taken there."
+        ),
+        asks={
+            "en": ("make a folder called Invoices", "create a 2026 folder inside Contracts"),
+            "es": ("hazme una carpeta 2026 dentro de Contratos", "crea una carpeta para los contratos"),
+        },
+    ),
 )
 def file_create_folder(ctx: OperationContext, data: FileFolderCreateIn) -> dict:
     """BASE-G83: a new folder, never over a file or folder of that name."""
@@ -2639,11 +3694,16 @@ def file_create_folder(ctx: OperationContext, data: FileFolderCreateIn) -> dict:
     input=FileRenameIn,
     output=FilePathOut,
     expose_api=True,
-    ai={
-        "description": "Gives a file or a folder of the business's files another name, where it is (the file "
-        "«Facturas/marzo.pdf» becomes «abril.pdf»). Refused when the new name is taken there.",
-        "risk": "normal",
-    },
+    ai=AI(
+        description=(
+            "Gives a file or a folder of the business's files another name, where it is (the file «Facturas/marzo.pdf» "
+            "becomes «abril.pdf»). Refused when the new name is taken there."
+        ),
+        asks={
+            "en": ("rename march.pdf to april.pdf", "call that folder Suppliers instead"),
+            "es": ("renombra marzo.pdf como abril.pdf", "renombra la carpeta Viejos como «Archivo 2024»"),
+        },
+    ),
 )
 def file_rename(ctx: OperationContext, data: FileRenameIn) -> dict:
     """BASE-G85: a new name in the same folder; a folder takes everything in it along."""
@@ -2661,12 +3721,17 @@ def file_rename(ctx: OperationContext, data: FileRenameIn) -> dict:
     input=FileMoveIn,
     output=FilePathOut,
     expose_api=True,
-    ai={
-        "description": "Moves a file or a folder of the business's files into another folder, both by their path "
-        "(the file «marzo.pdf» into the folder «Facturas»; empty: the top). Never overwrites, and a folder never "
-        "goes inside itself.",
-        "risk": "normal",
-    },
+    ai=AI(
+        description=(
+            "Moves a file or a folder of the business's files into another folder, both by their path (the file "
+            "«marzo.pdf» into the folder «Facturas»; empty: the top). Never overwrites, and a folder never goes inside "
+            "itself."
+        ),
+        asks={
+            "en": ("move march.pdf into Invoices", "put the contracts folder inside Legal"),
+            "es": ("mueve marzo.pdf a la carpeta Facturas", "mete la carpeta de contratos dentro de Legal"),
+        },
+    ),
 )
 def file_move(ctx: OperationContext, data: FileMoveIn) -> dict:
     """BASE-G85: to another folder; deleting where it was and uploading where it goes."""
@@ -2685,11 +3750,17 @@ def file_move(ctx: OperationContext, data: FileMoveIn) -> dict:
     input=FileDeleteIn,
     output=FileDeletedOut,
     expose_api=True,
-    ai={
-        "description": "Deletes a file of the business's files, or a folder and everything in it, by its path (the "
-        "folder «Facturas/2025»). There is no bin: it cannot be undone.",
-        "risk": "high",
-    },
+    ai=AI(
+        description=(
+            "Deletes a file of the business's files, or a folder and everything in it, by its path (the folder "
+            "«Facturas/2025»). There is no bin: it cannot be undone."
+        ),
+        risk="high",
+        asks={
+            "en": ("delete the old 2025 folder", "throw away march.pdf from our files"),
+            "es": ("borra la carpeta de 2025", "elimina marzo.pdf de los archivos"),
+        },
+    ),
 )
 def file_delete(ctx: OperationContext, data: FileDeleteIn) -> dict:
     """BASE-G86: the file, or the folder and everything in it; no bin."""
@@ -2759,7 +3830,8 @@ def _assistant_refusal(outcome: str, code: str, message: str) -> "assistant.Tool
 def _assistant_answer(ctx, tools, call, decision, *, stopped: bool):
     """Run one pending ``call`` (a read alone; a write with the person's yes) → ``(outcome, card)``: the card when the
     write still waits for its answer, with what it will do when its app declares a preview (BASE-F98); one that
-    cannot be read is the write's outcome, and no card is shown."""
+    cannot be read is the write's outcome, and no card is shown. Neither is one for data the write would refuse
+    (live#17): the model hears which (``invalid_payload``) and asks again with them corrected."""
     op = assistant.operation_of(call.name, tools)
     if op is None:
         return _assistant_refusal("refused", "not_available", NOT_AVAILABLE), None
@@ -2773,6 +3845,9 @@ def _assistant_answer(ctx, tools, call, decision, *, stopped: bool):
         arguments = None
     if not isinstance(arguments, dict):
         return assistant.run_tool(ctx, op, call.arguments), None
+    refused = assistant.invalid_arguments(op, arguments)
+    if refused is not None:
+        return refused, None
     card = assistant.card(op, arguments, ctx.language, ctx)
     if decision is None or decision.call_id != call.call_id:
         if card["blocked"]:
@@ -2822,8 +3897,8 @@ def assistant_turn(ctx: OperationContext, data: AssistantTurnIn) -> dict:
     """A turn of the Hub's assistant made ready (BASE-G111, G115…G119, G121): the reads the model asked for run as the
     person; a write shows its card and runs only with the person's yes (``decision``; «Cancel all» = ``stop``); a tool
     this person was not offered never runs. Then what goes to the gateway: the tools of what was asked, by relevance,
-    and the instructions (with the checklist, read again, in ``setup``). Past ``assistant.MAX_ROUNDS`` rounds of tools
-    it goes no further (``stop``)."""
+    and the instructions (with the person's role and the writes a manager must approve, hub#585; with the checklist,
+    read again, in ``setup``). Past ``assistant.MAX_ROUNDS`` rounds of tools it goes no further (``stop``)."""
     if ctx.actor is None:
         raise Unauthorized(gettext("Sign in to talk to the assistant."))
     tools = assistant.catalog(ctx)
@@ -2867,12 +3942,16 @@ def assistant_turn(ctx: OperationContext, data: AssistantTurnIn) -> dict:
         # gh:hub#1045: the card paints an amount (its schema's ``money`` mark) in the business's currency, with its decimals.
         currency = business.get("currency") or "EUR"
         card["money"] = {"currency": currency, "decimals": business.get("currency_decimals", 2)}
+    offered = assistant.relevant(tools, asked[-2:], ctx.language)
     text = assistant.instructions(
         language=ctx.language,
         currency=business.get("currency") or "EUR",
         decimals=business.get("currency_decimals", 2),
         business=business.get("name") or "",
         screens=_assistant_screens(ctx),
+        role=_assistant_role(ctx),
+        # What is offered without its permission is a write a manager may approve (``assistant.catalog``).
+        approvable=[op.name for op in offered if not ctx.has(op.permission)],
     )
     if data.setup:
         text += "\n\n" + assistant.setup_block(_assistant_read(ctx, "base.setup.status"))
@@ -2885,11 +3964,19 @@ def assistant_turn(ctx: OperationContext, data: AssistantTurnIn) -> dict:
         "executed": executed,
         "confirm": card,
         "pending": [p.model_dump() for p in pending],
-        "tools": [assistant.tool_spec(op) for op in assistant.relevant(tools, asked[-2:], ctx.language)],
+        "tools": [assistant.tool_spec(op) for op in offered],
         "instructions": text,
         "continuation": data.continuation,
         "stop": stop,
     }
+
+
+def _assistant_role(ctx: OperationContext) -> str:
+    """The role in this business of whom the assistant serves (hub#585): their ``Membership``'s; "" for an actor with
+    none here (an API key, ERPlora's staff)."""
+    if not hasattr(ctx.actor, "get_username"):
+        return ""
+    return Membership.objects.filter(user=ctx.actor, host=ctx.scope.key).values_list("role", flat=True).first() or ""
 
 
 def _gateway_failure(code: str, message: str) -> OperationError:
@@ -2994,12 +4081,25 @@ def _reply_to(answer: bytes) -> str | None:
     permission=VIEW_HOME,
     input=SupportReportIn,
     output=SupportReportOut,
-    ai={
-        "description": "Sends erplora.com's support team a problem the person describes: a short subject and what "
-        "happened. Their account, this business, the screen and the browser go with it, and support answers by email "
-        "to their account. Only for a person who entered with their erplora.com account, never with a PIN.",
-        "risk": "normal",
-    },
+    ai=AI(
+        description=(
+            "Sends erplora.com's support team a problem the person describes: a short subject and what happened. Their "
+            "account, this business, the screen and the browser go with it, and support answers by email to their "
+            "account. Only for a person who entered with their erplora.com account, never with a PIN."
+        ),
+        asks={
+            "en": (
+                "tell support the payment screen freezes",
+                "report a bug: the totals don't add up",
+                "send ERPlora a problem",
+            ),
+            "es": (
+                "reporta un fallo: no me cuadran los totales",
+                "mándale una incidencia a ERPlora",
+                "avisa a soporte de que la app se queda colgada",
+            ),
+        },
+    ),
     # It waits on erplora.com: no transaction holds the hub's connection meanwhile.
     database=False,
 )
@@ -3053,14 +4153,37 @@ def support_report(ctx: OperationContext, data: SupportReportIn) -> dict:
 # ── Apps turned on and off by the business, with the plan's limit (PLAN-HUB §9; BASE-F18, F19, F23–F25) ────────────
 # The rules are base.activation's; here, their rows (base.AppActivation) under a lock of the business's rows, so two
 # people at once never both pass the limit, and the events. Turning an app off never drops its tables.
+#
+# In a hub with its own database (S3; PLAN-DB §7, spec 2026-10-11 «tablas al activar») an app whose tables its database
+# does not have yet (``Hub.schema_apps``, what the migrator confirmed) is ``creating``: the answer says so (the route's
+# 202), the event ``base.app.activation_requested`` is recorded and the hub's ``hub_due`` rung after the COMMIT; the
+# worker makes its tables (``ensure_schema``) and turns it on (``base.app.activation_settle``: ``base.app.enabled``, its
+# live notice), or ``failed`` with why, tried again at 1, 5 and 15 minutes and then every hour, or by hand
+# (``base.app.retry``). What it needs goes in the same plan. One whose tables it has is on at once, as in phase 1. A
+# business without its own database turns every app on at once (proposal (i) of round 2026-10-30): since S5 none is
+# served, only the suite's tests written before the tenancy still have one (``base/tenancy/tests/legacy.py``).
+from functools import cache as _cache  # noqa: E402
 from typing import Any  # noqa: E402
 
 from live.meta import module_configs  # noqa: E402
-from live.operations import on_commit as after_commit  # noqa: E402
+from live.operations import on_commit as after_commit  # noqa: E402,F811
 
 from base import activation, entitlement, home  # noqa: E402
+from base.activation import CREATING, FAILED, ON  # noqa: E402
 from base.models import AppActivation  # noqa: E402
-from base.schemas import AppChangeIn, AppChangeOut  # noqa: E402
+from base.schemas import AppActivationSettleIn, AppActivationSettleOut, AppChangeIn, AppChangeOut  # noqa: E402
+from base.tenancy import migrator  # noqa: E402
+
+#: The waits before the worker makes the tables of an app that failed again: 1 min, 5 min, 15 min, then every hour (as a
+#: hub's preparation, PLAN-DB §6 and §7).
+ACTIVATION_RETRY_SECONDS = (60, 300, 900, 3600)
+#: How long an app waits when another run holds its hub's schema (PLAN-DB §7: the activation is queued again +30 s).
+ACTIVATION_LOCKED_SECONDS = 30
+#: How long an app asked by a newer code waits for a worker of that code (PLAN-DB §7: any other worker queues it +60 s).
+ACTIVATION_NEWER_CODE_SECONDS = 60
+#: How long an app waits for a worker of its code before it fails as ``code_behind`` (PLAN-DB §7: 10 minutes, the
+#: alarm's threshold): after a rollback none is coming, and the business tries again, asked by the code that runs now.
+ACTIVATION_CODE_BEHIND_AFTER = dt.timedelta(minutes=10)
 
 
 class AppLimitReached(OperationError):
@@ -3137,30 +4260,90 @@ def _locked_states(ctx: OperationContext, graph: dict) -> dict[str, activation.A
 
 
 def _write_states(host: str, changes: dict[str, activation.Activation]) -> None:
-    """Write ``changes`` and, after the COMMIT of the running change, forget what the cache kept of the business."""
+    """Write ``changes`` and, after the COMMIT of the running change, forget what the cache kept of the business. A row
+    that goes ``creating`` waits for no time (the worker takes it now) and keeps its failed attempts; one that goes on or
+    off has none left."""
     after_commit(partial(activation.forget, host))
     now = timezone.now()
     existing = set(AppActivation.objects.filter(host=host, app__in=list(changes)).values_list("app", flat=True))
     for label, row in changes.items():
         if label in existing:
-            AppActivation.objects.filter(host=host, app=label).update(state=row.state, chosen=row.chosen, changed_at=now)
+            settled = {"target": _code_leaf(label)} if row.state == CREATING else {"attempts": 0, "last_error": ""}
+            AppActivation.objects.filter(host=host, app=label).update(
+                state=row.state, chosen=row.chosen, changed_at=now, next_attempt_at=None, **settled
+            )
     AppActivation.objects.bulk_create(
-        AppActivation(host=host, app=label, state=row.state, chosen=row.chosen)
+        AppActivation(
+            host=host,
+            app=label,
+            state=row.state,
+            chosen=row.chosen,
+            target=_code_leaf(label) if row.state == CREATING else "",
+        )
         for label, row in changes.items()
         if label not in existing
     )
 
 
-def _every_app_on(host: str) -> None:
+@_cache
+def _code_leaves() -> dict[str, str]:
+    """This code's last migration of each app (its migrations never change while the process runs)."""
+    return dict(migrator.code_migrations().leaves)
+
+
+def _code_leaf(label: str) -> str:
+    """The last migration of ``label`` in this code, which its tables are made to; ``""`` for an app without any."""
+    return _code_leaves().get(label, "")
+
+
+def _apps_without_migrations() -> frozenset[str]:
+    """The modules with no migration: created in every hub by definition (they have no tables)."""
+    return frozenset(activation.module_graph()) - set(_code_leaves())
+
+
+def _apps_created(hub: Hub | None) -> frozenset[str] | None:
+    """The modules whose tables ``hub``'s own database has: what the migrator confirmed (``Hub.schema_apps``; the
+    worker's ``ensure_schema`` makes what it lacks and is a no-op for what it has) and those without migrations;
+    ``None`` for a hub that shares phase 1's database, where every app has them."""
+    if not has_own_database(hub):
+        return None
+    return frozenset(hub.schema_apps or ()) | _apps_without_migrations()
+
+
+def _tables_first(
+    changes: dict[str, activation.Activation],
+    current: dict[str, activation.Activation],
+    created: frozenset[str] | None,
+) -> dict[str, activation.Activation]:
+    """``changes`` as they are written: when an app they turn on lacks its tables, every app they turn on is
+    ``creating`` (one plan, PLAN-DB §7); an app already on stays on."""
+    turning_on = [label for label, row in changes.items() if row.on and not current[label].on]
+    if created is None or all(label in created for label in turning_on):
+        return changes
+    return {
+        label: activation.Activation(CREATING, row.chosen) if label in turning_on else row
+        for label, row in changes.items()
+    }
+
+
+def _ring(hub: Hub) -> None:
+    """The hub has tables to make: due in ``hub_due`` now, so the worker takes it at its next tick (after the COMMIT of
+    the change that asked for them; on control)."""
+    HubDue.mark_due(hub, timezone.now())
+
+
+def _every_app_on(host: str, *, then: Callable[[Callable[[], None]], object] | None = None) -> None:
     """Write down every app on in ``host``'s business, its roots chosen (``base.activation.every_on``), unless it has
-    rows already: what the migration ``base.0017`` left every hub of before round 2026-10-27 (``seed_local_hubs``)."""
+    rows already: what the migration ``base.0017`` left every hub of before round 2026-10-27 (``seed_local_hubs``).
+
+    Its activations' cache is forgotten after the operation's COMMIT, or by ``then`` outside one (a hub's seeding)."""
     if AppActivation.objects.filter(host=host).exists():
         return
-    after_commit(partial(activation.forget, host))
     AppActivation.objects.bulk_create(
         AppActivation(host=host, app=label, state=row.state, chosen=row.chosen)
         for label, row in activation.every_on(activation.module_graph()).items()
     )
+    (then or after_commit)(partial(activation.forget, host))
 
 
 def _turn_on_listed(ctx: OperationContext, listed: Iterable[str], selected: set[str]) -> dict[str, str]:
@@ -3168,7 +4351,9 @@ def _turn_on_listed(ctx: OperationContext, listed: Iterable[str], selected: set[
     some) that are off here, each through ``base.app.enable``: its plan's limit, its rights, what it needs along and
     its event, as if the person turned it on in Apps. Their roots first, chosen, so what they need comes along and
     does not count against the limit (as a vertical's template, ``base.activation.template``); then any listed app
-    still off. An app refused stays off and its reason is returned, by app: the rest are turned on and load."""
+    still off. An app refused stays off and its reason is returned, by app: the rest are turned on and load. One whose
+    tables its hub's own database is still making (``creating``) loads nothing yet, and its reason says to load again
+    once it is on (the load's «Retry» brings what it left out)."""
     graph = activation.module_graph()
     wanted = [app for app in dict.fromkeys(listed) if app in graph and (not selected or app in selected)]
     roots = activation.roots(set(wanted) | activation.needs(wanted, graph), graph)
@@ -3179,9 +4364,15 @@ def _turn_on_listed(ctx: OperationContext, listed: Iterable[str], selected: set[
         if app not in blocked and activation.states_of(ctx.scope)[app].on:
             continue
         try:
-            enable(ctx, AppChangeIn(app=app))
+            answer = enable(ctx, AppChangeIn(app=app))
         except OperationError as refusal:
             refused[app] = refusal.message
+            continue
+        if answer.state == CREATING:
+            with translation.override(ctx.language):
+                refused[app] = gettext(
+                    "It is being set up for this business. Load the template again in a minute to bring its data."
+                )
     return refused
 
 
@@ -3201,7 +4392,7 @@ def _names_said(ctx: OperationContext, labels: list[str]) -> str:
 
 
 def _app_answer(label: str, row: activation.Activation, along: list[dict[str, str]]) -> dict:
-    return {"app": label, "state": row.state, "chosen": row.on and row.chosen, "along": along}
+    return {"app": label, "state": row.state, "chosen": row.wanted and row.chosen, "along": along}
 
 
 @operation(
@@ -3210,17 +4401,24 @@ def _app_answer(label: str, row: activation.Activation, along: list[dict[str, st
     permission=ADMINISTER_HUB,
     input=AppChangeIn,
     output=AppChangeOut,
-    ai={
-        "description": "Turns on one of this business's apps (by its id in base.app.list), with the apps it needs, "
-        "which come along: it shows in the menu and can be used, with the data it had. Refused when the plan's "
-        "limit of apps is reached (turn one off, or upgrade the plan on erplora.com) or a paid app is not subscribed.",
-        "risk": "normal",
-    },
+    ai=AI(
+        description=(
+            "Turns on one of this business's apps (by its id in base.app.list), with the apps it needs, which come "
+            "along: it shows in the menu and can be used, with the data it had. Refused when the plan's limit of apps "
+            "is reached (turn one off, or upgrade the plan on erplora.com) or a paid app is not subscribed."
+        ),
+        asks={
+            "en": ("turn on the customers app", "activate the bookings app", "can you turn on the kitchen module?"),
+            "es": ("activa la app de clientes", "ponme la app de cocina", "activa el módulo de citas"),
+        },
+    ),
 )
 def app_enable(ctx: OperationContext, data: AppChangeIn) -> dict:
     """BASE-F18/F24: the app on and chosen, and what it needs on along with it (not chosen: it does not count). A
     paid one without its right (or needing one) is 402 ``app_entitlement_blocked``; one more chosen app at the plan's
-    limit, 402 ``base.app_limit_reached`` (a lower limit than the chosen ones turns nothing off: it only refuses this)."""
+    limit, 402 ``base.app_limit_reached`` (a lower limit than the chosen ones turns nothing off: it only refuses this).
+    In a hub with its own database whose tables for it (or for what it needs) are not made yet, ``creating`` (202):
+    the worker makes them and turns it on; one that failed is tried again."""
     with activation.changing(ctx.scope.key):
         return _enable(ctx, data)
 
@@ -3233,11 +4431,14 @@ def _enable(ctx: OperationContext, data: AppChangeIn) -> dict:
     for label in [data.app, *sorted(activation.needs([data.app], graph))]:
         if label in blocked:
             raise entitlement.refused(label, ctx.language)
-    if not activation.enabling(data.app, activation.states_of(ctx.scope), graph):
-        return _app_answer(data.app, activation.Activation(activation.ON, True), [])
+    current = activation.states_of(ctx.scope)
+    if not activation.enabling(data.app, current, graph):
+        return _unchanged(hub, data.app, current[data.app])
     current = _locked_states(ctx, graph)
     changes = activation.enabling(data.app, current, graph)
-    if changes.get(data.app, current[data.app]).chosen and not (current[data.app].on and current[data.app].chosen):
+    if not changes:
+        return _unchanged(hub, data.app, current[data.app])
+    if changes.get(data.app, current[data.app]).chosen and not (current[data.app].wanted and current[data.app].chosen):
         limit = queries.app_limit(hub)
         shown = {config.label for config in home.shown_modules(demo_hub=bool(hub and hub.is_demo))}
         enabled = activation.chosen_on(current, among=shown)
@@ -3249,12 +4450,25 @@ def _enable(ctx: OperationContext, data: AppChangeIn) -> dict:
                     limit,
                 ) % {"count": limit}
             raise AppLimitReached(message, max_apps=limit, enabled=enabled)
+    changes = _tables_first(changes, current, _apps_created(hub))
     _write_states(ctx.scope.key, changes)
-    if hub is not None and not hub.is_demo:
-        _sync_photo_blocks(hub, changes)
+    on_now = [label for label, row in changes.items() if row.on]
+    if hub is not None and not hub.is_demo and on_now:
+        _sync_photo_blocks(hub, on_now)
     along = [label for label in changes if label != data.app]
-    record_event(ctx, events.APP_ENABLED, {"app": data.app, "along": along})
-    return _app_answer(data.app, activation.Activation(activation.ON, True), _named(ctx, along))
+    answer = changes.get(data.app, current[data.app])
+    if any(row.state == CREATING for row in changes.values()):
+        after_commit(partial(_ring, hub))
+    name = events.APP_ACTIVATION_REQUESTED if answer.state == CREATING else events.APP_ENABLED
+    record_event(ctx, name, {"app": data.app, "along": along})
+    return _app_answer(data.app, answer, _named(ctx, along))
+
+
+def _unchanged(hub: Hub | None, label: str, row: activation.Activation) -> dict:
+    """Turning on an app on and chosen already, or being created (its hub rung again: a ring lost is found again)."""
+    if row.state == CREATING:
+        after_commit(partial(_ring, hub))
+    return _app_answer(label, row, [])
 
 
 @operation(
@@ -3263,12 +4477,26 @@ def _enable(ctx: OperationContext, data: AppChangeIn) -> dict:
     permission=ADMINISTER_HUB,
     input=AppChangeIn,
     output=AppChangeOut,
-    ai={
-        "description": "Turns off one of this business's apps (by its id in base.app.list): it leaves everyone's menu "
-        "and its screens stop opening; the apps that came along only with it go off too. Nothing is deleted: turned "
-        "on again, it has its data. Refused while another app on needs it, or when the app itself says why not yet.",
-        "risk": "high",
-    },
+    ai=AI(
+        description=(
+            "Turns off one of this business's apps (by its id in base.app.list): it leaves everyone's menu and its "
+            "screens stop opening; the apps that came along only with it go off too. Nothing is deleted: turned on "
+            "again, it has its data. Refused while another app on needs it, or when the app itself says why not yet."
+        ),
+        risk="high",
+        asks={
+            "en": (
+                "turn off the reservations app",
+                "we don't use tables anymore, switch that app off",
+                "deactivate the loyalty module",
+            ),
+            "es": (
+                "desactiva la app de reservas",
+                "apaga la app de mesas, ya no la usamos",
+                "quita el módulo de fidelización, no lo necesitamos",
+            ),
+        },
+    ),
 )
 def app_disable(ctx: OperationContext, data: AppChangeIn) -> dict:
     """BASE-F23/F25: the app off, and what came along only with it. 409 ``base.app_required`` while an app on needs
@@ -3281,10 +4509,10 @@ def app_disable(ctx: OperationContext, data: AppChangeIn) -> dict:
 def _disable(ctx: OperationContext, data: AppChangeIn) -> dict:
     _business_module(ctx, data.app, _business_hub(ctx))
     graph = activation.module_graph()
-    if not activation.states_of(ctx.scope)[data.app].on:
+    if not activation.states_of(ctx.scope)[data.app].wanted:
         return _app_answer(data.app, activation.OFF_ROW, [])
     current = _locked_states(ctx, graph)
-    if not current[data.app].on:
+    if not current[data.app].wanted:
         return _app_answer(data.app, activation.OFF_ROW, [])
     needed = activation.required_by(data.app, current, graph)
     if needed:
@@ -3301,3 +4529,199 @@ def _disable(ctx: OperationContext, data: AppChangeIn) -> dict:
     along = [label for label in changes if label != data.app]
     record_event(ctx, events.APP_DISABLED, {"app": data.app, "along": along})
     return _app_answer(data.app, activation.OFF_ROW, _named(ctx, along))
+
+
+@operation(
+    "base.app.retry",
+    kind="command",
+    permission=ADMINISTER_HUB,
+    input=AppChangeIn,
+    output=AppChangeOut,
+    ai=AI(
+        description=(
+            "Tries again to set up one of this business's apps that could not be turned on (its state «failed» in "
+            "base.app.list), with what it needs that failed too: it is set up in a moment and then shows in the menu. "
+            "Refused for an app that is not waiting for it."
+        ),
+        asks={
+            "en": (
+                "the bookings app could not be turned on, try again",
+                "retry setting up the kitchen app",
+                "try turning on the website app again",
+            ),
+            "es": (
+                "la app de reservas no se pudo activar, inténtalo otra vez",
+                "reintenta preparar la app de cocina",
+                "vuelve a intentar activar la web",
+            ),
+        },
+    ),
+)
+def app_retry(ctx: OperationContext, data: AppChangeIn) -> dict:
+    """BASE-F21/F22: an app whose tables could not be made (``failed``) is ``creating`` again now, with what it needs
+    that failed too, and its hub rung (the worker also tries again by itself). 409 ``base.app_not_failed`` for any
+    other app, and in a hub that shares phase 1's database, where nothing is ever made later."""
+    with activation.changing(ctx.scope.key):
+        hub = _business_hub(ctx)
+        _business_module(ctx, data.app, hub)
+        current = _locked_states(ctx, activation.module_graph()) if has_own_database(hub) else None
+        if current is None or current[data.app].state != FAILED:
+            raise Conflict(gettext("This app is not waiting to be set up again."), code="base.app_not_failed")
+        graph = activation.module_graph()
+        closure = {data.app, *activation.needs([data.app], graph)}
+        changes = {
+            label: activation.Activation(CREATING, row.chosen)
+            for label, row in current.items()
+            if label in closure and row.state == FAILED
+        }
+        _write_states(ctx.scope.key, changes)
+        after_commit(partial(_ring, hub))
+        along = [label for label in changes if label != data.app]
+        record_event(ctx, events.APP_ACTIVATION_REQUESTED, {"app": data.app, "along": along})
+        return _app_answer(data.app, changes[data.app], _named(ctx, along))
+
+
+def activation_hubs(now: dt.datetime) -> list[Hub]:
+    """The hubs whose apps the worker sets up now (S3): ready, with their own database, whose ``hub_due`` came and
+    nobody holds. Never one being made, dropped or gone, a demo whose time is up, nor one moving to another cluster
+    (``moving_to``: tables made while its database is copied would stay behind; its ring waits for the move). By id."""
+    return list(
+        Hub.objects.filter(status=Hub.Status.READY, moving_to__isnull=True)
+        .exclude(db_name="")
+        .exclude(is_demo=True, expires_at__lte=now)
+        .filter(due__due_at__lte=now)
+        .filter(Q(due__lease_until__isnull=True) | Q(due__lease_until__lte=now))
+        .select_related("cluster")
+        .order_by("id")
+    )
+
+
+def ring_activations(hub: Hub, at: dt.datetime) -> None:
+    """``hub`` has apps to set up by ``at``: due in ``hub_due`` then, or earlier if it already is (the sweep's ring)."""
+    with _control_transaction():
+        HubDue.mark_due(hub, at)
+
+
+def activations_rung_at(hub_id: UUID, at: dt.datetime | None) -> None:
+    """After the worker looked into a ready hub's apps: its ring moves to ``at`` (the next of them to set up: a retry,
+    one put off), or ends with ``None``, unless the hub has other work due (a reset, the copy of a business that left)
+    or another worker holds its row. The pass over the hubs due leaves a ready hub's ring alone (``claim_next_due_hub``),
+    so its time is kept."""
+    now = timezone.now()
+    with _control_transaction():
+        hub = Hub.objects.filter(pk=hub_id).first()
+        due = HubDue.objects.select_for_update().filter(pk=hub_id).first()
+        if hub is None or (due is not None and due.lease_until is not None and due.lease_until > now):
+            return
+        if at is not None:
+            if due is None:
+                HubDue.mark_due(hub, at)
+            else:
+                HubDue.objects.filter(pk=hub_id).update(due_at=at)
+        elif due is not None and hub.reset_requested_at is None and not offboarding_due(hub):
+            due.delete()
+
+
+def hubs_visited_since(day: dt.date) -> frozenset[str]:
+    """The hubs (by slug) someone had activity in since ``day`` (a login, or anything done in a session that stayed open:
+    ``base.meter``): the active ones, which the sweep looks into more often."""
+    return frozenset(HubVisit.objects.filter(day__gte=day).values_list("host", flat=True).distinct())
+
+
+def _activation_retry_delay(attempts: int) -> dt.timedelta:
+    """How long an app whose tables failed ``attempts`` times in a row waits before the next try."""
+    return dt.timedelta(seconds=ACTIVATION_RETRY_SECONDS[min(attempts, len(ACTIVATION_RETRY_SECONDS)) - 1])
+
+
+# Not an assistant tool: the worker's step after making a hub's tables, no person.
+@operation(
+    "base.app.activation_settle",
+    kind="command",
+    permission=None,
+    input=AppActivationSettleIn,
+    output=AppActivationSettleOut,
+    ai=INTERNAL,
+)
+def app_activation_settle(ctx: OperationContext, data: AppActivationSettleIn) -> dict:
+    """The worker's step after ``ensure_schema`` in a hub's own database (``base.worker``), as the platform.
+
+    Of the apps it took that are still waiting (``creating``, or ``failed``: one turned off meanwhile stays off, its
+    tables made): ``created`` turns on those whose tables the hub now has (``base.app.enabled``, one per app the business
+    chose, with what came along; then their photo's blocks, as an app turned on at once) and leaves the rest ``failed``;
+    ``failed`` leaves them ``failed`` with ``attempts`` + 1, the error and the next try (1, 5, 15 min, then every hour;
+    ``base.app.activation_failed``); ``locked`` and ``newer_code`` put them off (30 s, 60 s), still ``creating``. Never
+    on phase 1's shared database (409 ``base.app_shared_database``); only the platform runs it, anyone else refused
+    before anything is read (as ``base.hub.reset_apply``, review of hub#490)."""
+    internal_only(ctx)
+    host = ctx.scope.key
+    hub = _business_hub(ctx)
+    if not has_own_database(hub):
+        raise Conflict(
+            gettext("This business shares its database: its apps are turned on at once."),
+            code="base.app_shared_database",
+        )
+    with activation.changing(host):
+        graph = activation.module_graph()
+        current = _locked_states(ctx, graph)
+        now = timezone.now()
+        asked = [label for label in dict.fromkeys(data.apps) if label in current and current[label].state in (CREATING, FAILED)]
+        after_commit(partial(activation.forget, host))
+        after_commit(partial(_ring_next, hub, host))
+        behind: list[str] = []
+        if data.outcome == "newer_code":
+            # Waited for a worker of its code since it was asked for (``changed_at``): after a rollback none is coming.
+            since = dict(AppActivation.objects.filter(host=host, app__in=asked).values_list("app", "changed_at"))
+            behind = [label for label in asked if since[label] <= now - ACTIVATION_CODE_BEHIND_AFTER]
+        if data.outcome == "locked" or (data.outcome == "newer_code" and not behind):
+            wait = ACTIVATION_LOCKED_SECONDS if data.outcome == "locked" else ACTIVATION_NEWER_CODE_SECONDS
+            AppActivation.objects.filter(host=host, app__in=asked).update(next_attempt_at=now + dt.timedelta(seconds=wait))
+            return {"on": [], "failed": [], "waiting": asked}
+        created = _apps_created(hub)
+        made = [label for label in asked if data.outcome == "created" and (created is None or label in created)]
+        failed = behind or [label for label in asked if label not in made]
+        if made:
+            _write_states(host, {label: activation.Activation(ON, current[label].chosen) for label in made})
+            if hub is not None and not hub.is_demo:
+                _sync_photo_blocks(hub, made)
+            _record_enabled(ctx, made, current, graph)
+        if failed:
+            kind = {"failed": "schema_failed", "newer_code": "code_behind"}.get(data.outcome, "not_created")
+            error = {
+                "schema_failed": data.error,
+                "code_behind": "code_behind: asked by a code no worker runs any more (a rollback): turn it on again.",
+                "not_created": "not_created: the migrator ended without its tables.",
+            }[kind]
+            for label in failed:
+                attempts = AppActivation.objects.get(host=host, app=label).attempts + 1
+                AppActivation.objects.filter(host=host, app=label).update(
+                    state=FAILED,
+                    attempts=attempts,
+                    last_error=error[:LAST_ERROR_MAX],
+                    next_attempt_at=now + _activation_retry_delay(attempts),
+                    changed_at=now,
+                )
+            record_event(ctx, events.APP_ACTIVATION_FAILED, {"apps": failed, "error": kind})
+            logger.warning("base.app.activation_failed hub=%s apps=%s: %s", host, ",".join(failed), error[:300])
+        return {"on": made, "failed": failed, "waiting": []}
+
+
+def _ring_next(hub: Hub, host: str) -> None:
+    """After the COMMIT of a settle (inside the hub's database): its ring moves to the next app to set up, or ends."""
+    activations_rung_at(hub.pk, queries.activation_next_at(host))
+
+
+def _record_enabled(
+    ctx: OperationContext, made: list[str], current: dict[str, activation.Activation], graph: dict
+) -> None:
+    """``base.app.enabled`` for each app the business chose that went on, with what came along with it; one that came
+    along with none of them (its chooser on already) gets its own."""
+    chosen = [label for label in made if current[label].chosen]
+    along_any: set[str] = set()
+    for label in chosen:
+        along = sorted(other for other in made if other not in chosen and other in activation.needs([label], graph))
+        along_any.update(along)
+        record_event(ctx, events.APP_ENABLED, {"app": label, "along": along})
+    for label in made:
+        if label not in chosen and label not in along_any:
+            record_event(ctx, events.APP_ENABLED, {"app": label, "along": []})
+

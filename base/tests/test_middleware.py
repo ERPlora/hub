@@ -12,7 +12,7 @@ import re
 from urllib.parse import parse_qs, urlencode, urlsplit
 
 import pytest
-from django.urls import clear_script_prefix, set_script_prefix
+from django.urls import clear_script_prefix, reverse, set_script_prefix
 
 from base import health
 
@@ -196,6 +196,34 @@ def prod_domain(settings):
     settings.ALLOWED_HOSTS = PROD_HOSTS
     settings.HUB_BASE_DOMAIN = "erplora.com"
     settings.LIVE = {**settings.LIVE, "hub_slug_min_length": 3}
+
+
+@pytest.mark.usefixtures("prod_domain")
+def test_nobody_can_open_a_screen_of_the_platform_hub_though_its_row_is_ready(client, superuser):
+    """ERPlora's own hub has its row, but its slug is reserved (``live.slugs``): its host is no hub's, before the registry
+    is read, so no page, API call or jump reaches «Usage and plan» there, with a session or with a key. On the platform
+    host the staff only get the admin. Should this ever open, that screen would promise it a plan the SaaS never sends."""
+    from base.models import Hub
+
+    Hub.objects.create(slug="erplora", status="ready", is_platform=True)
+    host = "erplora.erplora.com"
+
+    def closed():
+        assert browse(client, "/system", host).status_code == 404
+        assert browse(client, "/auth/login", host).status_code == 404
+        assert browse(client, "/auth/callback", host).status_code == 404
+        for path in ("/api/system/plan", "/api/live"):
+            for headers in ({}, {"HTTP_AUTHORIZATION": "Bearer erpk_live_any"}):
+                api = client.get(path, HTTP_HOST=host, **headers)
+                assert (api.status_code, api.json()["error"]["code"]) == (404, "not_found")
+
+    closed()
+    client.force_login(superuser)
+    closed()
+
+    for path in ("/system", "/api/system/plan"):
+        page = browse(client, path, "hubs.erplora.com")
+        assert (page.status_code, page["Location"]) == (302, reverse("admin:index"))
 
 
 @pytest.mark.usefixtures("prod_domain")
@@ -457,8 +485,9 @@ class TestTheRegistryGate:
         response = client.post("/auth/callback", {"code": "c1"}, HTTP_HOST="acme.localhost:8000")
         assert (response.status_code, response.json()["error"]["code"]) == (410, "base.hub_gone")
 
-    def test_a_hub_being_prepared_is_503_and_asks_to_come_back(self, client, hub):
-        hub("acme", status="requested")
+    @pytest.mark.parametrize("status", ["requested", "creating", "migrating", "seeding", "failed"])
+    def test_a_hub_being_prepared_is_503_and_asks_to_come_back(self, client, hub, status):
+        hub("acme", status=status)
         response = browse(client, "/", "acme.localhost:8000")
         assert (response.status_code, response["Retry-After"]) == (503, "30")
         html = response.content.decode()
@@ -477,6 +506,33 @@ class TestTheRegistryGate:
         api = client.get("/api/me", HTTP_HOST="acme.localhost:8000")
         assert (page.status_code, api.status_code) == (status, status)
         assert not page.has_header("Retry-After") and not api.has_header("Retry-After")
+
+    # A hub moving to another cluster (round 2026-10-30b of PLAN-DB, decision 3; control.hub.move): closed for the few
+    # seconds its database is copied, then back on its new cluster.
+    def test_a_hub_moving_to_another_cluster_is_503_under_maintenance_and_asks_to_come_back(self, client, hub):
+        from control.models import Cluster
+
+        hub("acme", moving_to=Cluster.objects.create(name="next", host="writer-next.example"))
+        page = browse(client, "/", "acme.localhost:8000")
+        api = client.get("/api/me", HTTP_HOST="acme.localhost:8000")
+        assert (page.status_code, page["Retry-After"]) == (503, "30")
+        html = page.content.decode()
+        assert '<meta http-equiv="refresh" content="10">' in html
+        assert "This business is under maintenance" in html and "It takes a few minutes." in html
+        assert (api.status_code, api["Retry-After"], api.json()["error"]["code"]) == (503, "30", "base.hub_maintenance")
+        assert "for a few minutes" in api.json()["error"]["message"]
+
+    def test_a_hub_under_maintenance_says_so_in_spanish(self, client, hub):
+        from control.models import Cluster
+
+        hub("acme", moving_to=Cluster.objects.create(name="next", host="writer-next.example"))
+        page = client.get("/", HTTP_HOST="acme.localhost:8000", HTTP_ACCEPT=HTML, HTTP_ACCEPT_LANGUAGE="es")
+        api = client.get("/api/me", HTTP_HOST="acme.localhost:8000", HTTP_ACCEPT_LANGUAGE="es")
+        assert "Este negocio está en mantenimiento" in page.content.decode()
+        assert "Tarda unos minutos." in page.content.decode()
+        assert api.json()["error"]["message"] == (
+            "Este hub está en mantenimiento unos minutos; vuelve a intentarlo enseguida."
+        )
 
     def test_the_api_of_a_hub_being_prepared_is_the_503_envelope(self, client, hub):
         hub("acme", status="failed")

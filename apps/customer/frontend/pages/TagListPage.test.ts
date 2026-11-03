@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
 import { pageOf } from '../__tests__/fixtures';
-import { EMPLOYEE, flush, MANAGER, type MountOptions, mountCustomer } from '../__tests__/mount-customer';
+import { EMPLOYEE, flush, MANAGER, type MountOptions, mountCustomer, VIEWER } from '../__tests__/mount-customer';
 import EntityDeleteDialog from '../components/EntityDeleteDialog.vue';
 import TagFormModal from '../components/TagFormModal.vue';
 import type { TagRow } from '../operations';
@@ -96,14 +96,21 @@ describe('TagListPage', () => {
     expect(s.wrapper.findComponent(EntityDeleteDialog).props()).toMatchObject({ kind: 'tags', target: { id: 't2', name: 'Odd' } });
   });
 
-  it('the manager does not delete; the employee only sees', async () => {
+  it('the manager does not delete; the employee adds and edits with a manager’s approval, never deletes', async () => {
     const manager = await setup({ session: MANAGER });
     await manager.show(PAGE);
     expect(manager.prop<{ id: string }[]>('actions').map((a) => a.id)).toEqual(['edit']);
     const employee = await setup({ session: EMPLOYEE });
     await employee.show(PAGE);
-    expect(employee.prop<{ id: string }[]>('actions')).toEqual([]);
-    expect(employee.wrapper.find('[data-testid="customer-tags-add"]').exists()).toBe(false);
+    expect(employee.prop<{ id: string }[]>('actions').map((a) => a.id)).toEqual(['edit']);
+    expect(employee.wrapper.find('[data-testid="customer-tags-add"]').exists()).toBe(true);
+  });
+
+  it('who only views neither adds, edits nor deletes', async () => {
+    const viewer = await setup({ session: VIEWER });
+    await viewer.show(PAGE);
+    expect(viewer.prop<{ id: string }[]>('actions')).toEqual([]);
+    expect(viewer.wrapper.find('[data-testid="customer-tags-add"]').exists()).toBe(false);
   });
 
   it('empty: «No tags.»; Spanish', async () => {
@@ -111,6 +118,13 @@ describe('TagListPage', () => {
     await s.show(pageOf([]));
     expect(s.wrapper.findComponent(EmptyState).props('heading')).toBe('Sin etiquetas.');
     expect(s.wrapper.findComponent(AppPage).props('title')).toBe('Etiquetas de clientes');
+  });
+
+  it('wears the product’s icon, pricetags, on each card and on the empty list', async () => {
+    const s = await setup();
+    await s.show(pageOf([]));
+    expect(s.wrapper.findComponent(EmptyState).props('icon')).toBe('pricetags');
+    expect(s.prop<(row: unknown) => string>('cardIcon')(PAGE.rows[0])).toBe('ion:pricetags');
   });
 });
 

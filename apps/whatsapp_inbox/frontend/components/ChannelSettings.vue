@@ -9,7 +9,8 @@
 // WhatsApp Manager the Hub cannot fill is not sent nor edited here) and Text;
 // «Add template» and a row open the form (F29, F30), Delete asks first (F31), «Send to Meta again» hands
 // over again what did not get there. Between the month and the templates, «What do you use it for?» (AutoReplyCards,
-// F15–F18), only for a business with Reservas on.
+// F15–F18), only for a business with Reservas on. «Upgrade plan» sells, so only on the web (surface.ts), and leaves
+// the Hub by `openExternalLink` (gh:hub#439: the installed app opens nothing on a `_blank` link).
 import {
   ConfirmDialog,
   type DataTableAction,
@@ -20,7 +21,7 @@ import {
   UsageMeter,
 } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
-import { useSession } from '@erplora/ui/shell';
+import { openExternalLink, useSession, useSurface } from '@erplora/ui/shell';
 import { computed, ref } from 'vue';
 
 import AutoReplyCards from './AutoReplyCards.vue';
@@ -35,6 +36,7 @@ import type { TemplateListIn, TemplateOut } from '../operations';
 
 const t = useT();
 const session = useSession();
+const { isWeb } = useSurface();
 const { data: channel, error: channelError } = useLive('whatsapp_inbox.channel.get', {});
 // From 80 % of the month's messages, how many are left (WHATSAPP_INBOX-F13).
 const left = computed(() => nearCap(channel.value));
@@ -198,12 +200,13 @@ function onAction({ actionId, row }: { actionId: string; row: TemplateOut }): vo
         </p>
       </template>
       <a
-        v-if="(channel.cap_reached || left) && channel.plans_url"
+        v-if="isWeb && (channel.cap_reached || left) && channel.plans_url"
         class="wa-settings__upgrade"
         data-testid="whatsapp-inbox-settings-upgrade"
         :href="channel.plans_url"
         target="_blank"
         rel="noopener"
+        @click="openExternalLink(channel.plans_url, $event)"
       >{{ $t('whatsapp_inbox.upgradePlan') }}</a>
     </section>
 

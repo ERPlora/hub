@@ -59,8 +59,8 @@ class MenuGroup(Schema):
 
 class AppState(Schema):
     label: str
-    # "off": no right to it (base.entitlement) or turned off by the business (base.activation); "activating" is
-    # phase 2's, while its tables are made.
+    # "off": no right to it (base.entitlement), turned off by the business, or its tables could not be made
+    # (base.activation); "activating" while the hub's own database gets its tables (S3).
     state: Literal["on", "activating", "off"]
 
 
@@ -183,15 +183,36 @@ class HubRestoreIn(Schema):
     id: UUID
 
 
+class HubCutFinishIn(Schema):
+    """The last step of the cut of a business of phase 1 (``base.tenancy.cut``): its database made, its rows copied
+    (``copied``: rows per table, none when it was made again) and seeded with the SaaS's photo of ``seeded_version``."""
+
+    id: UUID
+    mode: Literal["recreate", "copy_all"]
+    database: str
+    schema_apps: dict[str, str]
+    copied: dict[str, int]
+    dump: str = ""
+    seeded_version: int | None = None
+
+
+class HubCutFinishOut(Schema):
+    """``done``: the business now works on its own database; false when a newer photo came while it was seeded (the
+    cut applies it and asks again)."""
+
+    done: bool
+
+
 class HubSeedLocalIn(Schema):
-    """``manage.py seed_local_hubs``: the local hubs to leave ready (``a`` and ``b``)."""
+    """``manage.py seed_local_hubs``: the local hubs to leave ready (``a`` and ``b``), each with a database of its own
+    (``requested``, the command makes it)."""
 
     slugs: list[str]
 
 
 class SeededHub(Schema):
     slug: str
-    outcome: Literal["created", "ready_again", "already_ready"]
+    outcome: Literal["created", "ready_again", "already_ready", "requested"]
 
 
 class HubSeedLocalOut(Schema):
@@ -225,10 +246,12 @@ class DemoCreateIn(Schema):
 
 
 class DemoOut(Schema):
-    """The browser's demo; ``created`` says whether this call made it (201) or it was the live one (200)."""
+    """The browser's demo; ``created`` says whether this call made it (202, ``requested``) or it was the live one
+    (200); ``status`` is the registry's (``ready`` once its database is made)."""
 
     id: UUID
     slug: str
+    status: str
     expires_at: dt.datetime
     created: bool
 
@@ -381,10 +404,12 @@ class AppOut(Schema):
     #: Where its right comes from: ``free``, ``plan``, ``purchase``, ``required`` (with an app that needs it) or
     #: ``missing``.
     right: Literal["free", "plan", "purchase", "required", "missing"]
-    #: ``on``, ``off`` (the business turned it off, or never on), or ``blocked`` while the business has no right to
-    #: it (phase 2 adds activating and failed).
-    state: Literal["on", "off", "blocked"]
-    #: The business turned it on itself (what the plan's limit counts); what came along with another app is not.
+    #: ``on``, ``off`` (the business turned it off, or never on), ``blocked`` while the business has no right to it;
+    #: in a hub with its own database, ``creating`` while its tables are made and ``failed`` when making them failed
+    #: (tried again later, or by hand: ``base.app.retry``).
+    state: Literal["on", "off", "blocked", "creating", "failed"]
+    #: The business turned it on itself (what the plan's limit counts, also while it is being set up); what came along
+    #: with another app is not.
     chosen: bool
     #: The first screen of its menu this person may open; ``None``: «Open» is not offered.
     path: str | None
@@ -417,13 +442,30 @@ class AppNameOut(Schema):
 
 
 class AppChangeOut(Schema):
-    """The app as it is now, and the apps that went on (or off) with it."""
+    """The app as it is now, and the apps that went on (or off) with it. ``creating``: its tables are being made in the
+    hub's own database (202); the Apps screen follows it until it is on (``base.app.list``)."""
 
     app: str
-    state: Literal["on", "off"]
+    state: Literal["on", "off", "creating"]
     chosen: bool
     #: Turned on with it because it needs them, or off with it because nothing else needs them any more; by name.
     along: list[AppNameOut]
+
+
+class AppActivationSettleIn(Schema):
+    """The worker's step after making a hub's tables (``base.worker``): the apps it took and how it went."""
+
+    apps: list[str] = Field(description="The apps whose tables it made, or tried to.")
+    #: ``created``: ``ensure_schema`` ended; ``failed``: it raised (``error``, why); ``locked``: another run held the
+    #: hub's schema; ``newer_code``: the request is of a newer code than the worker's.
+    outcome: Literal["created", "failed", "locked", "newer_code"]
+    error: str = ""
+
+
+class AppActivationSettleOut(Schema):
+    on: list[str]
+    failed: list[str]
+    waiting: list[str]
 
 
 class PlanUsageIn(Schema):
@@ -437,13 +479,114 @@ class LimitOut(Schema):
     limit: int | None
 
 
+class DatabaseUsageOut(Schema):
+    """The size of the business's own database, as the last night measured it (``base.usage``)."""
+
+    available: bool = Field(
+        description="False while the business shares its database with others: it has no size of its own yet."
+    )
+    bytes: int | None = Field(description="Its size in bytes; None before the first night measured it.")
+    day: dt.date | None = Field(description="The day (UTC) it was measured; None before the first night.")
+
+
+class FilesUsageOut(Schema):
+    """What the business's files and those of its apps take up, as the last night measured it, against its plan."""
+
+    bytes: int | None = Field(description="What they take up, in bytes; None before the first night measured it.")
+    day: dt.date | None = Field(description="The day (UTC) it was measured; None before the first night.")
+    limit: int | None = Field(description="The space the plan includes, in bytes; None: no limit, or the plan is not known.")
+    percent: int | None = Field(description="How much of that space they take up; None without a limit or a figure.")
+    status: Literal["within", "near", "full"] | None = Field(
+        description="Within the limit, close to it (from 80 %) or reached; None without a limit or a figure."
+    )
+
+
+class ConnectionsUsageOut(Schema):
+    """The business's capacity: what it does at once in its database against what it really has."""
+
+    peak_today: int | None = Field(description="The most connections at once today; None: not measured today yet.")
+    limit: int | None = Field(
+        description="What it really has at once: what its plan includes or, if less, what the service gives. None: the plan is not known."
+    )
+    busy_last_7_days: int | None = Field(
+        description="The times in the last 7 days somebody got an error because there was no room; None: never counted yet."
+    )
+    busy_since: dt.date | None = Field(
+        description="Since when they are counted, when that is less than the 7 days; otherwise None."
+    )
+    bigger_plan_gives_more: bool = Field(description="Whether a bigger plan would give it more at once.")
+
+
+class RequestsUsageOut(Schema):
+    """The requests the business has served this calendar month (UTC)."""
+
+    this_month: int | None = Field(description="How many; None: never counted yet.")
+    since: dt.date | None = Field(description="Since when they are counted, when that is after day 1; otherwise None.")
+
+
+class ActivityUsageOut(Schema):
+    """The people with activity in the business; the plan's places are ``people`` of the same answer."""
+
+    active_now: int | None = Field(description="With activity in the last 5 minutes; None in a demo.")
+    last_30_days: int | None = Field(description="In the 30 days the last night measured ends; None before the first night.")
+    day: dt.date | None = Field(description="The day (UTC) that night measured; None before the first night.")
+
+
+class PlanMeterOut(Schema):
+    """What an app on says its plan includes this month (``base.home.plan_meters``), such as WhatsApp's messages."""
+
+    key: str = Field(description="The app it is of.")
+    label: str = Field(description="What it is called, in the person's language.")
+    used: int | None = Field(description="How much of it is spent; None: not measured yet, or it could not be read.")
+    limit: int | None = Field(description="How much the plan includes; 0: the plan includes none; None: as above.")
+    available: bool = Field(description="False when its app could not be read now.")
+
+
 class PlanUsageOut(Schema):
-    """``base.plan.usage``: the plan's limits (the SaaS's photo, ``plan``) against what the business uses."""
+    """``base.plan.usage``: the plan's limits (the SaaS's photo, ``plan``) against what the business uses. A figure not
+    measured yet comes as None, never as a zero."""
 
     #: Whether the Hub has the business's plan from erplora.com (a demo, or a business without a photo yet, has not).
     known: bool
+    #: A demo: nothing of it is measured, and its data is deleted when it ends.
+    demo: bool
+    plan_slug: str | None = Field(description="The plan the business is on (free, starter…); None: not known.")
     people: LimitOut
     devices: LimitOut
+    apps: LimitOut
+    database: DatabaseUsageOut
+    files: FilesUsageOut
+    connections: ConnectionsUsageOut
+    requests: RequestsUsageOut
+    activity: ActivityUsageOut
+    meters: list[PlanMeterOut]
+
+
+class UsageListIn(Schema):
+    """``GET /internal/usage``: the day (UTC) the SaaS asks for, and where its last page ended."""
+
+    day: dt.date
+    cursor: UUID | None = None
+
+
+class UsageRowOut(Schema):
+    id: UUID
+    s3_bytes: int
+    db_bytes: int
+    active_users_1d: int
+    active_users_30d: int
+    #: What the day's serving tasks counted (``control.HubActivityDaily``); null: nothing counted that day.
+    requests: int | None
+    peak_connections: int | None
+    busy_requests: int | None
+
+
+class UsageListOut(Schema):
+    """One page of the day's use (saas ``hubs/README.md``, «Contrato para el Hub»)."""
+
+    day: dt.date
+    hubs: list[UsageRowOut]
+    next_cursor: str | None
 
 
 # ── Data: blueprints, imports and reset (APP-BASE-2) ──
@@ -701,7 +844,89 @@ class HubResetOut(Schema):
         description="False in phase 1: the business shares its database with other hubs, so nothing can be emptied."
     )
     sections: list[ResetSectionOut] = Field(description="The apps with rows: what each one would lose.")
-    apps: list[RemovalOut] = Field(description="What was removed (empty in a plan).")
+    apps: list[RemovalOut] = Field(
+        description="Always empty: the worker empties the sections after copying the data (base.hub.dumps says how it "
+        "went)."
+    )
+    status: Literal["planned", "copying"] = Field(
+        description="planned: only the plan (dry_run). copying: asked; the business's data is being copied, then the "
+        "sections chosen are emptied."
+    )
+
+
+
+class HubResetApplyIn(Schema):
+    """The worker's emptying of a reset it already copied (``base.hub.reset_apply``)."""
+
+    apps: list[str] = Field(min_length=1, max_length=200, description="The sections (apps) to empty.")
+
+
+class HubResetApplyOut(Schema):
+    apps: list[RemovalOut] = Field(description="What was removed of each section, and what could not be.")
+
+
+
+class HubDumpsIn(Schema):
+    """No input: the copies of the business of the request."""
+
+
+class ResetSectionNameOut(Schema):
+    id: str
+    label: str
+
+
+class ResetStateOut(Schema):
+    """How the last reset of the business went (``Hub.reset_sections``): asked, copying, emptying, done or failed."""
+
+    state: Literal["copying", "emptying", "done", "failed"]
+    sections: list[ResetSectionNameOut] = Field(description="The sections asked, by name.")
+    requested_by: str
+    error: str = Field(
+        description="Why it failed: dumps_unavailable, dump_failed, emptying_failed or hub_not_ready; empty otherwise."
+    )
+    removed: list[RemovalOut] = Field(description="What was removed of each section (done).")
+    finished_at: dt.datetime | None
+
+
+class HubDumpOut(Schema):
+    id: UUID
+    kind: Literal["reset", "offboarding"]
+    created_at: dt.datetime
+    bytes: int
+
+
+class HubDumpsOut(Schema):
+    """``base.hub.dumps``: the copies of the business's data (newest first) and its last reset."""
+
+    available: bool = Field(
+        description="False while the business shares its database with others: no copy is ever made then."
+    )
+    reset: ResetStateOut | None
+    dumps: list[HubDumpOut]
+
+
+class HubDumpLinkIn(Schema):
+    id: UUID = Field(description="The copy's id (base.hub.dumps).")
+
+
+class HubDumpLinkOut(Schema):
+    url: str = Field(description="A link that downloads the copy, for 15 minutes.")
+    expires_at: dt.datetime
+
+
+class InternalDumpOut(Schema):
+    id: str = Field(description="Its key in the bucket.")
+    kind: Literal["reset", "offboarding"]
+    created_at: dt.datetime
+    bytes: int
+    url: str
+
+
+class InternalDumpsOut(Schema):
+    """``GET /internal/hubs/{id}/dumps`` (saas ``hubs/README.md``, «Contrato para el Hub»)."""
+
+    available: bool
+    dumps: list[InternalDumpOut]
 
 
 # ── Business settings and the hub's context (APP-BASE-6) ──
@@ -1460,6 +1685,11 @@ class AssistantFieldOut(Schema):
     signed: bool = Field(
         default=False,
         description="An amount its app declares signed (a difference): written with its sign, «+» over.",
+    )
+    named: bool = Field(
+        default=False,
+        description="A list whose every item the server said in words (a record by its name, a moment, a value by its "
+        "label, an amount): the card says its items; without it, how many it carries (`live.assistant.NAMED`).",
     )
     money: AssistantMoneyOut | None = Field(
         default=None,

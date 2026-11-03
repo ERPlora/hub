@@ -10,7 +10,6 @@ import DraftTray from '../components/DraftTray.vue';
 import FlowList from '../components/FlowList.vue';
 import FlowGallery from '../components/FlowGallery.vue';
 import QuestionInbox from '../components/QuestionInbox.vue';
-import RecipeRepairs from '../components/RecipeRepairs.vue';
 import AutomationsPage from './AutomationsPage.vue';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
@@ -134,13 +133,21 @@ describe('AutomationsPage: review 2026-10-15, item 5', () => {
 });
 
 describe('AutomationsPage: the ready-made automations the apps bring (FLOW-F33 to F36)', () => {
-  it('what needs a repair sits above «Your automations»', async () => {
+  it('a fix its app made never waits for the owner: nothing to press above «Your automations»', async () => {
+    // FIX-HUB-FLOW-FACTORY-SAFETY-FIX-WAITS-FOR-THE-OWNERS-UPDATE: its app's condition already counts, so the old
+    // «… starts in more cases than it should» with «Update it» would say what is no longer true.
     const m = await setup('/flow/automations', [flow('f1')]);
-    const repairs = m.wrapper.findComponent(RecipeRepairs);
-    expect(repairs.exists()).toBe(true);
-    const order = [...m.wrapper.element.querySelectorAll('*')];
-    expect(order.indexOf(repairs.element as Element)).toBeLessThan(order.indexOf(m.wrapper.findComponent(FlowList).element as Element));
-    expect(m.params('flow.recipe.list')).toEqual([{}]);
+    const installed = { flow_id: 'f1', name: 'My gap', enabled: true, outdated: true, missing_grants: [], repair: { 'input.by_customer': { eq: true } } };
+    const gap = {
+      ref: 'appointment/customer_cancelled', app: 'appointment', app_name: 'Appointments', icon: 'ion:calendar-outline',
+      id: 'customer_cancelled', name: 'Fill the gap when a customer cancels', summary: '', description: '',
+      trigger: { kind: 'event', event: 'appointment.appointment.cancelled' }, steps: [], grants: [], installed,
+    };
+    await m.result('flow.recipe.list', { recipes: [gap], set_aside: [] });
+    await settle();
+    expect(m.wrapper.find('[data-testid=flow-repairs]').exists()).toBe(false);
+    expect(m.wrapper.find('[data-testid="flow-repair-appointment/customer_cancelled"]').exists()).toBe(false);
+    expect(m.wrapper.text()).not.toContain('starts in more cases than it should');
   });
 });
 

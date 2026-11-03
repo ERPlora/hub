@@ -15,7 +15,7 @@ class AttendanceConfig(LiveAppConfig):
     verbose_name = _("Time clock")
     # `ion:time-outline` is the Schedules app's on the apps page; the fingerprint the market uses waits
     # in UI-REQUESTS.md.
-    icon = "ion:log-in-outline"
+    icon = "ion:finger-print-outline"
     category = Category.PEOPLE
     premium = False
     # The public store's texts (round 16, PLAN §21), which register_apps writes to shared.app.

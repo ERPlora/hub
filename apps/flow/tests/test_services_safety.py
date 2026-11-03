@@ -8,6 +8,8 @@
 - Whoever grants may only grant what they may do themselves.
 """
 
+from dataclasses import replace
+
 import pytest
 from live.context import Scope
 from live.errors import InvalidPayload, PermissionDenied
@@ -71,7 +73,7 @@ def test_a_step_acts_only_with_its_own_permission_so_an_operation_s_checks_still
     # Even were voiding not high risk, the step holds «sale.add_sale» (its operation's) and the reads of
     # Sales, never «sale.void_sale»: a check with something on it stays as it is.
     op = get("sale.order.void")
-    monkeypatch.setattr(op, "ai", {**op.ai, "risk": "normal"})
+    monkeypatch.setattr(op, "ai", replace(op.ai, risk="normal"))
     flow = make_flow(trigger_kind="manual", steps=[VOID], grants=["sale.order.void"])
     result = run("flow.flow.run", {"id": str(flow.id), "input": {"order_id": str(check_with_a_line.id)}})
     assert (result.status, result.error_code) == ("failed", "permission_denied")

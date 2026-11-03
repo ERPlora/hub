@@ -36,6 +36,11 @@ describe('FloorTile', () => {
     expect(t.el.getAttribute('aria-label')).toBe('Table 4 · Dining room · 4 pax · Occupied · 3 guests · 35 min · Served by Luis');
   });
 
+  it('one guest is said in the singular, in English and in Spanish (hub#462)', async () => {
+    expect((await tile(occupied({ guests: 1 }))).el.getAttribute('aria-label')).toContain('· Occupied · 1 guest · 35 min ·');
+    expect((await tile(occupied({ guests: 1 }), {}, 'es')).el.getAttribute('aria-label')).toContain('· 1 comensal · 35 min ·');
+  });
+
   it('a reservation of today paints its name and its hour, and an erased customer says so', async () => {
     const hold = { label: 'Maximiliana Fernández', erased: false, held_from: '2026-10-14T18:00:00Z', held_until: '2026-10-14T20:00:00Z', party_size: 4, reserving: true };
     const t = await tile(tableRow({ status: 'reserved', hold }), {}, 'es');

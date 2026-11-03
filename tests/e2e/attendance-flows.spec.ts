@@ -4,8 +4,9 @@
 // An employee clocks a day with a break (F01, F02) and reads their own month (F06); a manager clocks
 // someone else by name (F12), sees who is in (F11) and the whole team (F07), finds a forgotten day waiting
 // for review (F05), closes it with a reason (F08), reads its history (F09) and exports the month (F10); the
-// settings fix the workplace and the review hours (F04), while «Require location» stays off and every
-// device clocks as the counter (F03, partial). What the specs create carries `E2EAtt` and goes away.
+// settings fix the workplace and the review hours (F04) and «Require location» says it applies to the devices
+// marked personal, while a browser that is not one clocks as the counter (F03; the personal device, in
+// attendance-device-location.spec.ts). What the specs create carries `E2EAtt` and goes away.
 import { readFileSync } from 'node:fs';
 
 import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
@@ -290,7 +291,7 @@ for (const vp of VIEWPORTS) {
     }
   });
 
-  test(`ATTENDANCE-F03, F04 at ${vp.label}: the settings fix the workplace and the review hours; every device clocks as the counter`, async ({ browser }) => {
+  test(`ATTENDANCE-F03, F04 at ${vp.label}: the settings fix the workplace and the review hours; a browser that is not a personal device clocks as the counter`, async ({ browser }) => {
     psql('delete from attendance_attendancesettings');
     const owner = await signedIn(browser, '/attendance/settings', size);
     try {
@@ -308,10 +309,9 @@ for (const vp of VIEWPORTS) {
       });
       expect(past, `the settings fit ${vp.label}`).toBeLessThanOrEqual(0);
 
-      // F03 (partial): «Require location» stays off and says why.
-      await expect(view.locator('[data-testid=attendance-settings-require_location]')).toHaveClass(/toggle-disabled/);
-      await expect(view.locator('[data-testid=attendance-settings-location-pending]')).toContainText("whether a device is the counter POS or someone's own phone");
-      await snap(page, 'F03', vp.label);
+      // F03: «Require location» can be turned on, and says it is asked only of a device marked personal, and where.
+      await expect(view.locator('[data-testid=attendance-settings-require_location]')).not.toHaveClass(/toggle-disabled/);
+      await expect(view.locator('[data-testid=attendance-settings-location-devices]')).toContainText('in Settings › This device.');
 
       // F04: the workplace from this device, and the review hours (a wrong value is pointed at first).
       await view.locator('[data-testid=attendance-settings-use-location]').click();
@@ -329,7 +329,7 @@ for (const vp of VIEWPORTS) {
       const saved = await api<Settings>(context, A, 'GET', '/attendance/settings');
       expect([saved.data.workplace_set, saved.data.auto_close_after_hours, saved.data.require_location]).toEqual([true, 10, false]);
 
-      // F03: even with the location asked for (the API takes it), the browser clocks as the counter POS:
+      // F03: with the location asked for, a browser that is not a personal device clocks as the counter POS:
       // no position is read and the day keeps no coordinates.
       expect((await api(context, A, 'POST', '/attendance/settings', { require_location: true })).status).toBe(200);
       const meId = await member(context, `${TAG}${vp.label}Counter`, 'owner@');

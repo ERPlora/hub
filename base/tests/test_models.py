@@ -78,7 +78,19 @@ class TestHub:
         assert hub.pk.version == 7
 
     def test_the_statuses_are_the_registry_s(self):
-        assert Hub.Status.values == ["requested", "ready", "failed", "cancelled", "expired", "purged"]
+        assert Hub.Status.values == [
+            "requested",
+            "creating",
+            "migrating",
+            "seeding",
+            "ready",
+            "failed",
+            "cancelled",
+            "expired",
+            "purged",
+            "archiving",
+            "dropping",
+        ]
 
     def test_a_slug_names_one_hub(self):
         Hub.objects.create(slug="acme")

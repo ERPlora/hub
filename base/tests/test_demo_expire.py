@@ -26,9 +26,11 @@ OWNER = hashlib.sha256(b"ana's browser").hexdigest()
 
 
 def entered_demo() -> str:
-    """A demo its browser entered: a code spent and the owner's session open; its slug."""
+    """A demo its browser entered: made ready by the worker (``base.tenancy.provision``), a code spent and the
+    owner's session open; its slug."""
     ctx = system_context(REGISTRY_SCOPE)
     slug = demo_create(ctx, DemoCreateIn(session_key=OWNER)).slug
+    Hub.objects.filter(slug=slug).update(status="ready")
     redeemed = redeem_demo_code(slug, demo_code_create(ctx, DemoCodeIn(slug=slug, session_key=OWNER)).code)
     request = RequestFactory().post("/auth/callback")
     SessionMiddleware(lambda request: None).process_request(request)

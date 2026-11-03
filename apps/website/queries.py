@@ -378,12 +378,15 @@ def public_reviews(ctx: OperationContext, data: NoIn) -> dict:
 
 def page_cache_key(slug: str, version: int, lang: str, day: str, currency: str) -> str:
     """The rendered page of ``slug``'s publication ``version`` in ``lang`` on ``day`` (the opening hours mark today),
-    priced in ``currency`` (the business's), for this deploy's bundle."""
-    return f"website:home:{slug}:{version}:{lang}:{day}:{currency}:{settings.APP_VERSION}"
+    priced in ``currency`` (the business's), for this deploy's bundle.
+
+    The slug is the hash tag (``{<slug>}``) of the page's and the catalog's keys: :func:`forget_cached` drops them in
+    one call, which the Valkey cluster accepts only for keys of one slot (``base/cache.py``)."""
+    return f"website:home:{{{slug}}}:{version}:{lang}:{day}:{currency}:{settings.APP_VERSION}"
 
 
 def catalog_cache_key(slug: str, version: int, lang: str, currency: str) -> str:
-    return f"website:catalog:{slug}:{version}:{lang}:{currency}"
+    return f"website:catalog:{{{slug}}}:{version}:{lang}:{currency}"
 
 
 def forget_cached(slug: str, version: int, currency: str) -> None:

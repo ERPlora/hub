@@ -10,7 +10,9 @@ passwords. Idempotent: every step checks or converges, so N runs leave the same 
    logs) and the timeouts per role: 15 s / 5 s for the app roles and ``hub_shared``, none for the
    migrators. No RLS and no ``BYPASSRLS`` anywhere (PLAN-DB §10).
 2. The master becomes a member of both migrators (``INHERIT``, ``SET``): PostgreSQL 16+ asks it to
-   ``CREATE DATABASE … OWNER`` them and to run their statements after ``SET ROLE`` (spec §3.3).
+   ``CREATE DATABASE … OWNER`` them and to run their statements after ``SET ROLE`` (spec §3.3). ``hub_migrator``
+   becomes a member of ``pg_signal_backend``: its ``DROP DATABASE … WITH (FORCE)`` of a demo ends the sessions still
+   on it (review of hub#471).
 3. Databases ``hub`` (control) and ``hub_template`` (no vertical, only ``base``) owned by
    ``hub_migrator``, and ``saas`` owned by ``saas_migrator``.
 4. ``REVOKE ALL … FROM PUBLIC`` on each; ``CONNECT, TEMPORARY`` to ``hub_app`` and ``hub_admin``
@@ -196,6 +198,7 @@ def bootstrap(
             )
         for migrator in (n.hub_migrator, n.saas_migrator):
             step(f"membership in {migrator}", _ensure_membership, admin, migrator)
+        step(f"pg_signal_backend for {n.hub_migrator}", _ensure_signal_backend, admin, n.hub_migrator)
         for database, owner, grants in database_access:
             step(f"database {database}", _ensure_database, admin, database, owner)
             step(
@@ -306,6 +309,16 @@ def _ensure_membership(conn: psycopg.Connection, role: str) -> str:
             sql.Identifier(role)
         )
     )
+    return "created"
+
+
+def _ensure_signal_backend(conn: psycopg.Connection, role: str) -> str:
+    """``role`` (``hub_migrator``) in ``pg_signal_backend``: its ``DROP DATABASE … WITH (FORCE)`` of a demo ends the
+    sessions of ``hub_app`` still on it (review of hub#471, I3). The master grants it with its ADMIN option (RDS:
+    ``rds_superuser``)."""
+    if _exists(conn, "SELECT 1 WHERE pg_has_role(%s, 'pg_signal_backend', 'MEMBER')", role):
+        return "exists"
+    conn.execute(sql.SQL("GRANT pg_signal_backend TO {}").format(sql.Identifier(role)))
     return "created"
 
 

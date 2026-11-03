@@ -156,3 +156,15 @@ def test_names():
     assert str(a_printer()) == "Till"
     assert str(Settings()) == "printing settings"
     assert str(a_job(reference="T-000123")) == "receipt T-000123"
+
+
+def test_a_job_names_each_document_the_renderer_paints_and_no_other():
+    """The labels of a job's document (the queue's and the assistant's card's words for it) are those of the eight the
+    renderer paints, in its order: a new one comes with its label or nowhere."""
+    from typing import get_args
+
+    from apps.printing.documents import DOCUMENT_TYPES
+    from apps.printing.schemas import DocumentType
+
+    assert PrintJob.DocumentType.values == list(DOCUMENT_TYPES) == list(get_args(DocumentType))
+    assert PrintJob._meta.get_field("document_type").choices == PrintJob.DocumentType.choices

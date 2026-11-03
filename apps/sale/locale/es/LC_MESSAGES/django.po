@@ -236,6 +236,9 @@ msgstr "cerrada el"
 msgid "voided by"
 msgstr "anulada por"
 
+msgid "joined with"
+msgstr "juntada con"
+
 msgid "open check"
 msgstr "cuenta abierta"
 

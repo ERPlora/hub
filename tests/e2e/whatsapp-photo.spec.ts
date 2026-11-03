@@ -7,10 +7,12 @@
 // row of `a`'s WhatsApp channel, whose version the next photo must exceed (`whatsapp_inbox.channel.sync` ignores an
 // equal or older one), so a row left by a seed would make a later run's erplora.com, on a database made afresh, push
 // photos the channel never takes. whatsapp-photo.test.ts makes every spec that seeds call it last in its `afterAll`.
+// A spec that never seeds but drives the inbox keeps the photo with `keepPhoto()` first (hub#528: erplora.com pushes
+// it when it answers the Hub), and puts it back the same way.
 import { expect, test } from '@playwright/test';
 
 import { psql } from './helpers';
-import { cleanUp, metaGraph, pushChannel, restorePhoto, seedErplora } from './whatsapp-helpers';
+import { cleanUp, keepPhoto, metaGraph, pushChannel, restorePhoto, seedErplora } from './whatsapp-helpers';
 
 /** `a`'s photo as the Hub keeps it: its version and its state. */
 const photo = (): unknown =>
@@ -47,6 +49,29 @@ test('the photo of a and its channel go back, plan and versions, to the ones bef
   expect(channel()).toEqual(channelBefore);
 
   // Nothing seeded since: putting it back again changes nothing.
+  restorePhoto();
+  expect(photo()).toEqual(before);
+  expect(channel()).toEqual(channelBefore);
+});
+
+test('hub#528 — a spec that never seeds keeps the photo first and gets it back, whatever erplora.com pushed meanwhile', () => {
+  cleanUp();
+  const before = photo();
+  const channelBefore = channel();
+  keepPhoto();
+  // What erplora.com pushes when it answers the Hub (fix-whatsapp-inbox-template-header-thumbnail: Meta refuses the
+  // seed's made-up permission, the number is to reconnect): a newer photo on its Free plan, and the channel's state.
+  // Written here, not seeded: the seed keeps the photo itself, and this proves that keepPhoto() alone did.
+  psql(
+    "update base_hub set state = state || jsonb_build_object('plan', jsonb_build_object('slug', 'free', 'max_devices', 1, " +
+      "'max_apps', 20)), state_version = state_version + 1 where slug = 'a'",
+  );
+  pushChannel({ status: 'reconnect_needed' });
+  expect(photo()).not.toEqual(before);
+  expect(channel()).not.toEqual(channelBefore);
+
+  // Kept again (another scope of the spec, or a seed after it): what was found first stays.
+  keepPhoto();
   restorePhoto();
   expect(photo()).toEqual(before);
   expect(channel()).toEqual(channelBefore);

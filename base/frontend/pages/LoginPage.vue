@@ -7,7 +7,7 @@
 // HUB_SHELL-F04 trap). On top, what happened: the session ended, or another device's entry ended it («Upgrade plan»).
 import { InlineFeedback } from '@erplora/ui/components';
 import { ApiError, useLiveClient } from '@erplora/ui/sdk';
-import { HubIcon, toggleTheme } from '@erplora/ui/shell';
+import { HubIcon, openExternalLink, toggleTheme, useSurface } from '@erplora/ui/shell';
 import { IonContent, IonLabel, IonPage, IonSegment, IonSegmentButton, IonSpinner } from '@ionic/vue';
 import { computed, onBeforeUnmount, onMounted, ref, watchEffect } from 'vue';
 import { useRoute } from 'vue-router';
@@ -22,6 +22,8 @@ const REREAD_MS = 60_000;
 const { t } = useBaseI18n();
 const route = useRoute();
 const client = useLiveClient();
+// «Upgrade plan» sells, so only on the web (surface.ts); its click goes the Hub's one way out (gh:hub#439).
+const { isWeb } = useSurface();
 
 const next = computed(() => nextWithHash(safeNext(route.query.next), route.hash));
 const notice = computed(() => {
@@ -107,7 +109,7 @@ onBeforeUnmount(() => {
       </button>
       <main class="access__column">
         <span
-          class="erp-logo md"
+          class="erp-logo md access__logo"
           aria-hidden="true"
         >
           <i class="erp-nw" /><i class="erp-n" /><i class="erp-ne" />
@@ -130,12 +132,13 @@ onBeforeUnmount(() => {
         >
           {{ notice === 'ended' ? t('base.access.notice.ended') : t('base.access.notice.deviceLimit') }}
           <a
-            v-if="notice === 'device_limit' && door?.plan_url"
+            v-if="isWeb && notice === 'device_limit' && door?.plan_url"
             class="access__upgrade"
             data-testid="access-upgrade"
             :href="door.plan_url"
             target="_blank"
             rel="noopener"
+            @click="openExternalLink(door.plan_url, $event)"
           >{{ t('base.access.notice.upgrade') }}</a>
         </InlineFeedback>
 
@@ -376,5 +379,37 @@ onBeforeUnmount(() => {
   margin: 0;
   font-size: 0.75rem;
   color: var(--ion-color-medium);
+}
+
+/* A screen that is not tall (a tablet in landscape, 776 px under the native app's status bar, less in its browser; a
+   laptop; a phone): less room around the logo, a smaller logo and a tighter card, so the PIN pad's four rows (the 0
+   and erase) fit without scrolling, even under the notice of a session that ended (hub#441). */
+@media (max-height: 960px) {
+  .access__column {
+    padding: 12px 16px;
+    gap: 8px;
+  }
+
+  .erp-logo.access__logo {
+    --u: 0.444px;
+  }
+
+  .access__card {
+    padding: 12px 16px;
+    gap: 8px;
+  }
+
+  .access__pin,
+  .access__account {
+    gap: 6px;
+  }
+}
+
+/* A low screen (a phone 667 px tall; a tablet's or a laptop's browser): the notice of a session that ended keeps its
+   two lines with less room around them, so the pad under it keeps its last row, the 0 and erase, on screen (hub#441). */
+@media (max-height: 740px) {
+  .access__notice {
+    --padding: 8px 12px;
+  }
 }
 </style>

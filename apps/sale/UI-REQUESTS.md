@@ -2,6 +2,8 @@
 
 Lo que las páginas de Ventas / TPV necesitan de `@erplora/ui` (o de la plataforma) y todavía no está.
 Mientras tanto usan lo más parecido que ya existe (dicho en cada punto); se cambia en cuanto llegue.
+Repasado en el cierre de la app (CLOSE-SALE, 2026-10-31) contra `packages/ui` y `packages/live`: lo que ya
+llegó salió de la lista; ningún punto de los que quedan rompe un flujo (todos tienen su sustituto en uso).
 
 ## Iconos
 
@@ -23,8 +25,10 @@ Mientras tanto usan lo más parecido que ya existe (dicho en cada punto); se cam
 
 ## Formato
 
-- **Formateadores de dinero, porcentaje y cantidad** en `@erplora/ui/components/format` (hoy
-  `frontend/lib/format.ts`, con `Intl.NumberFormat`; mismo pedido que `customer`).
+- **Formateadores de porcentaje y cantidad** en `@erplora/ui/components/format` (hoy
+  `frontend/lib/format.ts`, con `Intl.NumberFormat`; mismo pedido que `customer`). `formatMoney` y
+  `formatDateTime` ya están en `@erplora/ui`; Ventas sigue con su propio `formatMoney` hasta que lleguen los
+  otros dos y se cambie todo de una vez.
 
 ## Back office
 
@@ -67,24 +71,17 @@ Lo que piden Ventas, el documento de venta, Anular y Devolver (`pages/SalesPage.
 - **Selector con búsqueda en el servidor**: «Devolver por» usa `components/sales/PaymentMethodPicker.vue`
   (busca en `sale.payment_method.list`, 20 por página). El filtro «Pago» de Ventas ya es el `lookup` del
   embudo de `DataTable`.
-- **Impresora de red** (app Impresión): hoy el documento, «Reimprimir» y la cuenta del TPV se imprimen
-  con el diálogo del navegador (`lib/print.ts`, `printPaper`).
 
 ## Cobro
 
 Lo que pide la hoja **Cobro** (`frontend/components/checkout/`, `lib/checkout/methods.ts`).
 
-- `ion:swap-horizontal-outline` — botón **Repartir el cobro** y forma de pago de tipo transferencia, los
-  iconos del producto actual. Hoy: `ion:swap-vertical-outline`.
 - `ion:ellipsis-horizontal-circle-outline` — forma de pago «otra» sin nombre conocido. Hoy:
   `ion:wallet-outline`.
-- `ion:gift-outline` — forma de pago de regalo. Hoy: `ion:ticket-outline`, el de los vales.
 - `ion:document-text-outline` — recuadro de los datos del cliente ya completo («Esta venta sale como
   factura completa»). Hoy: `ion:receipt-outline`.
 - **Marca de Bizum** (el SVG de marca del producto actual) como icono horneado de `@erplora/ui`: nada de
   SVG sueltos. Hoy: `ion:phone-portrait-outline`.
-- **Aviso de advertencia** (`toastWarning`) en `@erplora/ui/shell`: el toque en «Cobrar» bloqueado y en
-  el efectivo por encima del límite usan `toast(mensaje, 'warning')`.
 
 ## POS
 
@@ -92,11 +89,10 @@ Lo que pide la pantalla **Vender** (`pages/PosPage.vue`, `frontend/components/po
 
 - `ion:pause-circle-outline` — botón **Aparcar esta cuenta** de la cabecera. Hoy: `ion:time-outline`.
 - `ion:gift-outline` / `ion:gift` — botón **Invitar / quitar invitación** de la línea. Hoy:
-  `ion:sparkles-outline` (en verde cuando está invitada).
+  `ion:sparkles-outline` (en verde cuando está invitada). `ion:gift-outline` ya está registrado; falta el
+  relleno, `ion:gift`, para la línea invitada: se cambian los dos juntos.
 - `ion:chatbox-ellipses-outline` / `ion:chatbox-ellipses` — botón **Nota** de la línea y la nota bajo
   ella. Hoy: `ion:chatbubbles-outline` (en el color primario cuando hay nota).
-- `ion:pricetag` (relleno) — descuento puesto en la línea o en la cuenta. Hoy: `ion:pricetag-outline` en
-  el color de aviso.
 - `ion:print-outline` — botón **Imprimir cuenta** del pie y la impresora de la precuenta. Hoy:
   `ion:receipt-outline`.
 - `ion:expand-outline` / `ion:contract-outline` — **Pantalla completa** / **Salir de pantalla completa**
@@ -122,7 +118,5 @@ Lo que pide la pantalla **Vender** (`pages/PosPage.vue`, `frontend/components/po
   ventana, «Cargar más») en `@erplora/ui`: hoy `composables/pos/useLiveWindows.ts`.
 - **Escalón de la cantidad en la línea de la cuenta**: `OrderLineOut` no trae el incremento congelado
   de la unidad, así que el selector sube y baja de uno en uno y una cantidad que no encaja la rechaza el
-  servidor («La cantidad no encaja con el escalón del producto»).
-- **Catálogo de venta por categoría**: `inventory.product.list_for_sale` no filtra por categoría, así
-  que la rejilla lee `inventory.product.list` (`is_active`, `category_id`, por nombre) y marca «Falta el
-  IVA» con su `needs_tax_setup`.
+  servidor («La cantidad no encaja con el escalón del producto (…).»). Es de la propia Ventas
+  (`OrderLineOut`), no de `@erplora/ui`: se queda aquí para no perderlo.

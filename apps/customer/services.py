@@ -18,7 +18,7 @@ from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import Conflict, InvalidPayload, NotFound
 from live.ninja import FIELD_MESSAGES
-from live.operations import INTERNAL, atomic, operation
+from live.operations import AI, INTERNAL, atomic, operation
 from live.outbox import record_event
 
 from apps.customer import events
@@ -351,12 +351,24 @@ def lock_customers(ids) -> list[UUID]:
     permission="customer.manage",
     input=CustomerIn,
     output=CustomerDetailOut,
-    ai={
-        "description": "Creates a new customer; only the name is required. The phone is saved in international "
-        "format (+34600111222), a number without prefix read in the business's country; one that is not a phone "
-        "of its country is refused.",
-        "risk": "normal",
-    },
+    ai=AI(
+        "Creates a new customer; only the name is required. The phone is saved in international format "
+        "(+34600111222), a number without prefix read in the business's country; one that is not a phone of its "
+        "country is refused.",
+        asks={
+            "en": (
+                "add Ana as a customer, her number is 600 111 222",
+                "new client: Marta López",
+                "save Luis with his email luis@gmail.com",
+            ),
+            "es": (
+                "apúntame a Ana con su teléfono 600 111 222",
+                "da de alta a la clienta Marta López",
+                "nueva clienta: Lucía, lucia@gmail.com",
+                "crea un cliente que se llama Luis",
+            ),
+        },
+    ),
 )
 def create_customer(ctx: OperationContext, data: CustomerIn) -> dict:
     values = data.model_dump()
@@ -372,12 +384,19 @@ def create_customer(ctx: OperationContext, data: CustomerIn) -> dict:
     permission="customer.manage",
     input=CustomerPatchIn,
     output=CustomerDetailOut,
-    ai={
-        "description": "Updates a customer's card, by its id or its exact name, phone or email: only the fields "
-        "sent change, and with field_values its custom fields too, in one write: required fields must end up "
-        "filled and values must match their type, or nothing is saved.",
-        "risk": "normal",
-    },
+    ai=AI(
+        "Updates a customer's card, by its id or its exact name, phone or email: only the fields sent change, and "
+        "with field_values its custom fields too, in one write: required fields must end up filled and values must "
+        "match their type, or nothing is saved.",
+        asks={
+            "en": ("change Marta's email", "Luis has a new number: 611 222 333", "update Carmen's address"),
+            "es": (
+                "cámbiale el email a Marta",
+                "Luis tiene móvil nuevo: 611 222 333",
+                "pon que Carmen vive en Valencia",
+            ),
+        },
+    ),
 )
 def update_customer(ctx: OperationContext, data: CustomerPatchIn) -> dict:
     customer = find_customer(data.id, data.customer, lock=True)
@@ -483,11 +502,15 @@ def _already_imported(values: dict) -> bool:
     permission="customer.manage",
     input=ImportIn,
     output=ImportOut,
-    ai={
-        "description": "Creates customers in bulk from up to 50 rows of a CSV file: each row is checked on its own, "
-        "the bad ones are skipped with their reason and the rest are created without consent.",
-        "risk": "high",
-    },
+    ai=AI(
+        "Creates customers in bulk from up to 50 rows of a CSV file: each row is checked on its own, the bad ones "
+        "are skipped with their reason and the rest are created without consent.",
+        risk="high",
+        asks={
+            "en": ("import my customers from this file", "bring in my clients from this CSV"),
+            "es": ("súbeme los clientes de este fichero", "carga los clientes de este CSV"),
+        },
+    ),
 )
 def import_customers(ctx: OperationContext, data: ImportIn) -> dict:
     rows = []
@@ -563,11 +586,14 @@ def _set_members(
     permission="customer.manage",
     input=SetGroupsIn,
     output=CustomerDetailOut,
-    ai={
-        "description": "Sets a customer's groups, by id or by name, replacing the previous selection; an empty "
-        "selection takes them all off.",
-        "risk": "normal",
-    },
+    ai=AI(
+        "Sets a customer's groups, by id or by name, replacing the previous selection; an empty selection takes them "
+        "all off.",
+        asks={
+            "en": ("put Ana in the VIP group", "take Luis out of all groups"),
+            "es": ("mete a Ana en el grupo VIP", "saca a Luis de los grupos", "pon a Marta en Empresas"),
+        },
+    ),
 )
 def set_groups(ctx: OperationContext, data: SetGroupsIn) -> dict:
     customer = find_customer(data.id, data.customer, lock=True)
@@ -588,11 +614,14 @@ def set_groups(ctx: OperationContext, data: SetGroupsIn) -> dict:
     permission="customer.manage",
     input=SetTagsIn,
     output=CustomerDetailOut,
-    ai={
-        "description": "Sets a customer's tags, by id or by name, replacing the previous selection; an empty "
-        "selection takes them all off.",
-        "risk": "normal",
-    },
+    ai=AI(
+        "Sets a customer's tags, by id or by name, replacing the previous selection; an empty selection takes them "
+        "all off.",
+        asks={
+            "en": ("tag Javier as a regular", "remove all tags from Sara"),
+            "es": ("ponle la etiqueta habitual a Javier", "quítale las etiquetas a Sara"),
+        },
+    ),
 )
 def set_tags(ctx: OperationContext, data: SetTagsIn) -> dict:
     customer = find_customer(data.id, data.customer, lock=True)
@@ -613,12 +642,16 @@ def set_tags(ctx: OperationContext, data: SetTagsIn) -> dict:
     permission="customer.delete",
     input=CustomerRefIn,
     output=DeletedOut,
-    ai={
-        "description": "Deletes a customer's card: it leaves every list, the till and the phone lookup, but keeps "
-        "its data, purchases and orders (erasing personal data is customer.customer.erase). Repeating it on a "
-        "card already gone answers well.",
-        "risk": "high",
-    },
+    ai=AI(
+        "Deletes a customer's card: it leaves every list, the till and the phone lookup, but keeps its data, "
+        "purchases and orders (erasing personal data is customer.customer.erase). Repeating it on a card already "
+        "gone answers well.",
+        risk="high",
+        asks={
+            "en": ("delete this customer", "remove Pedro from my clients"),
+            "es": ("borra a este cliente", "elimina la ficha de Pedro", "quita a Ana de clientes"),
+        },
+    ),
 )
 def delete_customer(ctx: OperationContext, data: CustomerRefIn) -> dict:
     customer = find_customer(data.id, data.customer, lock=True, live=False)
@@ -636,12 +669,16 @@ def delete_customer(ctx: OperationContext, data: CustomerRefIn) -> dict:
     permission="customer.merge",
     input=MergeIn,
     output=CustomerDetailOut,
-    ai={
-        "description": "Merges a duplicate card (absorbed) into the one that stays: the survivor keeps its data and "
-        "fills only its empty fields, notes are appended and figures summed; activity, custom values, groups, tags, "
-        "purchases, orders and consent move to it, and the duplicate is retired. Cannot be undone.",
-        "risk": "high",
-    },
+    ai=AI(
+        "Merges a duplicate card (absorbed) into the one that stays: the survivor keeps its data and fills only its "
+        "empty fields, notes are appended and figures summed; activity, custom values, groups, tags, purchases, "
+        "orders and consent move to it, and the duplicate is retired. Cannot be undone.",
+        risk="high",
+        asks={
+            "en": ("merge the two Marta cards", "Ana's in there twice, combine them"),
+            "es": ("Ana López está repetida, júntala con la otra", "tengo a Marta duplicada, únelas"),
+        },
+    ),
 )
 def merge_customers(ctx: OperationContext, data: MergeIn) -> dict:
     survivor_id = find_customer(data.id, data.customer).id
@@ -754,12 +791,16 @@ def _merge_health(survivor: Customer, absorbed: Customer) -> None:
     permission="customer.erase",
     input=EraseIn,
     output=ErasedOut,
-    ai={
-        "description": "GDPR erasure of a customer's personal data: the card keeps its id and figures, its contact, "
-        "tax and address data, notes, activity, custom values and memberships are erased, and one audit entry "
-        "(who, when, why) stays. Purchases and orders are kept. Irreversible; repeating it changes nothing.",
-        "risk": "high",
-    },
+    ai=AI(
+        "GDPR erasure of a customer's personal data: the card keeps its id and figures, its contact, tax and address "
+        "data, notes, activity, custom values and memberships are erased, and one audit entry (who, when, why) "
+        "stays. Purchases and orders are kept. Irreversible; repeating it changes nothing.",
+        risk="high",
+        asks={
+            "en": ("Pedro wants all his data wiped", "GDPR request: erase Lucía's personal data"),
+            "es": ("aplica el derecho al olvido a Lucía", "borra los datos personales de Sara por la RGPD"),
+        },
+    ),
 )
 def erase_customer(ctx: OperationContext, data: EraseIn) -> dict:
     customer = find_customer(data.id, data.customer, lock=True, live=False)
@@ -820,11 +861,22 @@ def _erase_card(ctx: OperationContext, customer: Customer, reason: str) -> None:
     permission="customer.manage",
     input=NoteIn,
     output=ActivityRow,
-    ai={
-        "description": "Adds a note to a customer's card, by its id or exact name, phone or email; the note shows "
-        "at the top of its activity with who wrote it and when.",
-        "risk": "normal",
-    },
+    ai=AI(
+        "Adds a note to a customer's card, by its id or exact name, phone or email; the note shows at the top of its "
+        "activity with who wrote it and when.",
+        asks={
+            "en": (
+                "add a note to Luis",
+                "note that Marta likes her coffee black",
+                "jot down that Carmen prefers mornings",
+            ),
+            "es": (
+                "añade una nota a Marta: prefiere venir por la tarde",
+                "apunta que Carmen prefiere las mañanas",
+                "apunta que Luis viene siempre con su perro",
+            ),
+        },
+    ),
 )
 def add_note(ctx: OperationContext, data: NoteIn) -> Activity:
     customer = find_customer(data.customer_id, data.customer, lock=True)
@@ -849,11 +901,20 @@ def add_note(ctx: OperationContext, data: NoteIn) -> Activity:
     permission="customer.record_activity",
     input=ActivityIn,
     output=ActivityRow,
-    ai={
-        "description": "Records an entry of another app in a customer's activity history (a visit, a booking), "
-        "with that app's own key, title and data.",
-        "risk": "normal",
-    },
+    ai=AI(
+        "Records an entry of another app in a customer's activity history (a visit, a booking), with that app's own "
+        "key, title and data.",
+        asks={
+            "en": (
+                "log Ana's visit to the tasting in her history",
+                "put on Luis's timeline that he came to the workshop",
+            ),
+            "es": (
+                "deja constancia en la ficha de Luis de la visita de hoy",
+                "apunta en el historial de Ana que vino a la cata",
+            ),
+        },
+    ),
 )
 def add_activity(ctx: OperationContext, data: ActivityIn) -> Activity:
     customer = find_customer(data.customer_id, data.customer, lock=True)
@@ -949,12 +1010,20 @@ def _record_consent(ctx: OperationContext, data, state: str) -> Consent:
     permission="customer.manage",
     input=ConsentGrantIn,
     output=ConsentRow,
-    ai={
-        "description": "Records that a customer GAVE consent for a purpose and channel, as a new fact with its "
-        "evidence: the exact words shown and their version, where and when, the card's own address on that "
-        "channel at that moment, and who wrote it down (from the session). Only after the customer said yes.",
-        "risk": "normal",
-    },
+    ai=AI(
+        "Records that a customer GAVE consent (opted in, said yes) for a purpose, marketing by default, on a channel "
+        "(email, SMS, WhatsApp, phone or post), as a new fact with its evidence: the exact words shown and their "
+        "version, where and when, the card's own address on that channel at that moment, and who wrote it down (from "
+        "the session). Only after the customer said yes.",
+        asks={
+            "en": ("Ana says yes to WhatsApp offers", "Luis agreed to marketing emails"),
+            "es": (
+                "Ana quiere las ofertas por WhatsApp",
+                "Luis acepta que le mandemos emails",
+                "Marta nos da permiso para los SMS",
+            ),
+        },
+    ),
 )
 def grant_consent(ctx: OperationContext, data: ConsentGrantIn) -> Consent:
     return _record_consent(ctx, data, Consent.State.GRANTED)
@@ -966,11 +1035,15 @@ def grant_consent(ctx: OperationContext, data: ConsentGrantIn) -> Consent:
     permission="customer.manage",
     input=ConsentWithdrawIn,
     output=ConsentRow,
-    ai={
-        "description": "Records that a customer WITHDREW consent for a purpose and channel, as a new fact in force "
-        "at once, for the card's own address on that channel; the grant it revokes is kept. The reason is optional.",
-        "risk": "normal",
-    },
+    ai=AI(
+        "Records that a customer WITHDREW consent (opted out, unsubscribed, asked to stop) for a purpose and channel "
+        "(email, SMS, WhatsApp, phone or post), as a new fact in force at once, for the card's own address on that "
+        "channel; the grant it revokes is kept. The reason is optional.",
+        asks={
+            "en": ("Luis wants to stop the emails", "unsubscribe Marta from WhatsApp messages"),
+            "es": ("Luis ya no quiere más emails", "Carmen se da de baja de la publicidad"),
+        },
+    ),
 )
 def withdraw_consent(ctx: OperationContext, data: ConsentWithdrawIn) -> Consent:
     return _record_consent(ctx, data, Consent.State.WITHDRAWN)
@@ -1129,11 +1202,14 @@ def update_health(ctx: OperationContext, data: HealthIn) -> dict:
     permission="customer.manage",
     input=OrderLinkIn,
     output=OrderCustomerOut,
-    ai={
-        "description": "Puts a customer on an open order (at most one per order; a new one replaces the old), or "
-        "takes the customer off when none is given.",
-        "risk": "normal",
-    },
+    ai=AI(
+        "Puts a customer on an open order (at most one per order; a new one replaces the old), or takes the customer "
+        "off when none is given.",
+        asks={
+            "en": ("put this order on Ana", "this tab is Luis's", "take the customer off this order"),
+            "es": ("Ana es la clienta de este pedido", "quita el cliente de este pedido"),
+        },
+    ),
 )
 def link_order(ctx: OperationContext, data: OrderLinkIn) -> dict:
     unlinking = data.customer_id is None and not (data.customer or "").strip()
@@ -1187,6 +1263,9 @@ def _stage_after_void(stage: str, purchases_left: int) -> str:
     return stage
 
 
+# The sale app's reaction to a paid sale, never a person's tool: records the sale in its customer's history once
+# (the same sale twice counts once), adding it to the purchases, the spend and the last purchase and moving the
+# stage forward.
 @operation(
     "customer.purchase.record",
     kind="command",
@@ -1194,11 +1273,7 @@ def _stage_after_void(stage: str, purchases_left: int) -> str:
     permission="customer.record_purchase",
     input=PurchaseRecordIn,
     output=PurchaseRecordOut,
-    ai={
-        "description": "System only: records a paid sale in its customer's history once (the same sale twice counts "
-        "once), adding it to the purchases, the spend and the last purchase and moving the stage forward.",
-        "risk": "high",
-    },
+    ai=INTERNAL,
 )
 def record_purchase(ctx: OperationContext, data: PurchaseRecordIn) -> dict:
     nothing = {"sale_id": data.sale_id, "recorded": False}
@@ -1254,17 +1329,15 @@ def record_purchase(ctx: OperationContext, data: PurchaseRecordIn) -> dict:
     return {"sale_id": data.sale_id, "recorded": True}
 
 
+# The sale app's reaction to a voided sale, never a person's tool: marks its purchase as voided (kept in the
+# history), takes it off the purchases and the spend, recomputes the last purchase and steps the stage back. Once.
 @operation(
     "customer.purchase.void",
     kind="command",
     permission="customer.record_purchase",
     input=PurchaseVoidIn,
     output=PurchaseVoidOut,
-    ai={
-        "description": "System only: when a sale is voided, marks its purchase as voided (kept in the history), takes "
-        "it off the purchases and the spend, recomputes the last purchase and steps the stage back. Once.",
-        "risk": "high",
-    },
+    ai=INTERNAL,
 )
 def void_purchase(ctx: OperationContext, data: PurchaseVoidIn) -> dict:
     nothing = {"sale_id": data.sale_id, "voided": False}
@@ -1315,18 +1388,16 @@ def void_purchase(ctx: OperationContext, data: PurchaseVoidIn) -> dict:
 VOID_ATTEMPTS = 3
 
 
+# The sale app's reaction to a refund of a paid sale (all or part), never a person's tool: records the refund as a
+# line of its own in its customer's history and takes what came back off the spend; the purchases, the last
+# purchase and the stage stay. Once per refund.
 @operation(
     "customer.purchase.refund",
     kind="command",
     permission="customer.record_purchase",
     input=PurchaseRefundIn,
     output=PurchaseRefundOut,
-    ai={
-        "description": "System only: when a paid sale is refunded (all or part), records the refund as a line of "
-        "its own in its customer's history and takes what came back off the spend; the purchases, the last "
-        "purchase and the stage stay. Once per refund.",
-        "risk": "high",
-    },
+    ai=INTERNAL,
 )
 def refund_purchase(ctx: OperationContext, data: PurchaseRefundIn) -> dict:
     nothing = {"sale_id": data.sale_id, "refund_id": data.refund_id, "refunded": False}
@@ -1429,10 +1500,13 @@ def _with_count(instance):
     permission="customer.configure",
     input=GroupIn,
     output=GroupRow,
-    ai={
-        "description": "Creates a customer group (name unique among the active groups, description, color, order).",
-        "risk": "normal",
-    },
+    ai=AI(
+        "Creates a customer group (name unique among the active groups, description, color, order).",
+        asks={
+            "en": ("create a VIP customer group", "make a new group for corporate clients"),
+            "es": ("crea un grupo de clientes VIP", "quiero un grupo nuevo para las empresas"),
+        },
+    ),
 )
 def create_group(ctx: OperationContext, data: GroupIn) -> dict:
     group = CustomerGroup(**data.model_dump())
@@ -1447,10 +1521,14 @@ def create_group(ctx: OperationContext, data: GroupIn) -> dict:
     permission="customer.configure",
     input=GroupPatchIn,
     output=GroupRow,
-    ai={
-        "description": "Updates a customer group, by its id or current name: name, description, color, order, and whether it is active.",
-        "risk": "normal",
-    },
+    ai=AI(
+        "Updates a customer group, by its id or current name: name, description, color, order, and whether it is "
+        "active.",
+        asks={
+            "en": ("rename the VIP group to Gold", "make the Corporate group red"),
+            "es": ("cambia el nombre del grupo VIP a Oro", "ponle color rojo al grupo Empresas"),
+        },
+    ),
 )
 def update_group(ctx: OperationContext, data: GroupPatchIn) -> dict:
     group = find_group(data.id, data.group, lock=True)
@@ -1466,10 +1544,14 @@ def update_group(ctx: OperationContext, data: GroupPatchIn) -> dict:
     permission="customer.delete",
     input=GroupRefIn,
     output=DeletedOut,
-    ai={
-        "description": "Deletes a customer group, by its id or name; the customers in it lose it.",
-        "risk": "high",
-    },
+    ai=AI(
+        "Deletes a customer group, by its id or name; the customers in it lose it.",
+        risk="high",
+        asks={
+            "en": ("delete the summer group", "get rid of the Corporate group"),
+            "es": ("borra el grupo de verano", "ya no quiero el grupo Empresas, quítalo"),
+        },
+    ),
 )
 def delete_group(ctx: OperationContext, data: GroupRefIn) -> dict:
     group = find_group(data.id, data.group, lock=True)
@@ -1485,10 +1567,13 @@ def delete_group(ctx: OperationContext, data: GroupRefIn) -> dict:
     permission="customer.configure",
     input=TagIn,
     output=TagRow,
-    ai={
-        "description": "Creates a customer tag (name unique among the active tags, and color).",
-        "risk": "normal",
-    },
+    ai=AI(
+        "Creates a customer tag (name unique among the active tags, and color).",
+        asks={
+            "en": ("create a vegan tag", "I need a new tag called regular"),
+            "es": ("crea la etiqueta habitual", "nueva etiqueta: vegano"),
+        },
+    ),
 )
 def create_tag(ctx: OperationContext, data: TagIn) -> dict:
     tag = CustomerTag(**data.model_dump())
@@ -1503,10 +1588,13 @@ def create_tag(ctx: OperationContext, data: TagIn) -> dict:
     permission="customer.configure",
     input=TagPatchIn,
     output=TagRow,
-    ai={
-        "description": "Updates a customer tag, by its id or current name: name, color and whether it is active.",
-        "risk": "normal",
-    },
+    ai=AI(
+        "Updates a customer tag, by its id or current name: name, color and whether it is active.",
+        asks={
+            "en": ("rename the vegan tag to vegetarian", "make the VIP tag green"),
+            "es": ("cambia la etiqueta vegano a vegetariano", "ponle color verde a la etiqueta VIP"),
+        },
+    ),
 )
 def update_tag(ctx: OperationContext, data: TagPatchIn) -> dict:
     tag = find_tag(data.id, data.tag, lock=True)
@@ -1522,10 +1610,14 @@ def update_tag(ctx: OperationContext, data: TagPatchIn) -> dict:
     permission="customer.delete",
     input=TagRefIn,
     output=DeletedOut,
-    ai={
-        "description": "Deletes a customer tag, by its id or name; the customers that had it lose it.",
-        "risk": "high",
-    },
+    ai=AI(
+        "Deletes a customer tag, by its id or name; the customers that had it lose it.",
+        risk="high",
+        asks={
+            "en": ("delete the vegan tag", "get rid of the regular tag"),
+            "es": ("borra la etiqueta vegano", "quita la etiqueta de habitual, ya no la usamos"),
+        },
+    ),
 )
 def delete_tag(ctx: OperationContext, data: TagRefIn) -> dict:
     tag = find_tag(data.id, data.tag, lock=True)
@@ -1541,11 +1633,17 @@ def delete_tag(ctx: OperationContext, data: TagRefIn) -> dict:
     permission="customer.configure",
     input=FieldIn,
     output=FieldRow,
-    ai={
-        "description": "Creates a custom field on every customer's card: name, type (text, number, date, boolean, "
-        "select, textarea), options of a select, order and whether it is required when the card is saved in full.",
-        "risk": "normal",
-    },
+    ai=AI(
+        "Creates a custom field on every customer's card: name, type (text, number, date, boolean, select, "
+        "textarea), options of a select, order and whether it is required when the card is saved in full.",
+        asks={
+            "en": ("add a custom field for shoe size", "I want a field for the pet's name on every card"),
+            "es": (
+                "añade un campo para la talla de camiseta",
+                "quiero apuntar en cada ficha el nombre de su mascota",
+            ),
+        },
+    ),
 )
 def create_field(ctx: OperationContext, data: FieldIn) -> CustomField:
     field = CustomField(**data.model_dump())
@@ -1560,11 +1658,18 @@ def create_field(ctx: OperationContext, data: FieldIn) -> CustomField:
     permission="customer.configure",
     input=FieldPatchIn,
     output=FieldRow,
-    ai={
-        "description": "Updates a custom field, by its id or current name; its type cannot change once cards have "
-        "values, and a select keeps at least one option.",
-        "risk": "normal",
-    },
+    ai=AI(
+        "Updates a custom field, by its id or current name; its type cannot change once cards have values, and a "
+        "select keeps at least one option.",
+        asks={
+            "en": ("make the shoe size field required", "add an XL option to the size field"),
+            "es": (
+                "haz obligatorio el campo talla",
+                "añade la opción XL al campo talla",
+                "cambia el nombre del campo mascota",
+            ),
+        },
+    ),
 )
 def update_field(ctx: OperationContext, data: FieldPatchIn) -> CustomField:
     field = find_field(data.id, data.field, lock=True)
@@ -1599,10 +1704,14 @@ def update_field(ctx: OperationContext, data: FieldPatchIn) -> CustomField:
     permission="customer.configure",
     input=FieldRefIn,
     output=DeletedOut,
-    ai={
-        "description": "Deletes a custom field, by its id or name, and the values every card had in it.",
-        "risk": "high",
-    },
+    ai=AI(
+        "Deletes a custom field, by its id or name, and the values every card had in it.",
+        risk="high",
+        asks={
+            "en": ("delete the shoe size field", "remove the pet field from the cards"),
+            "es": ("borra el campo talla", "quita el campo de mascota de las fichas"),
+        },
+    ),
 )
 def delete_field(ctx: OperationContext, data: FieldRefIn) -> dict:
     field = find_field(data.id, data.field, lock=True)

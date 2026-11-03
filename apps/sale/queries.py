@@ -30,7 +30,7 @@ from live.errors import (
     NotFound,
     PermissionDenied,
 )
-from live.operations import operation
+from live.operations import AI, operation
 
 from apps.sale import pricing
 from apps.sale.models import (
@@ -230,9 +230,19 @@ def authoriser(ctx: OperationContext) -> str:
     permission="sale.view_sale",
     input=EmptyIn,
     output=BusinessDayOut,
-    ai={
-        "description": "Today's date in the business's time zone (the business day sales are numbered and counted in)."
-    },
+    ai=AI(
+        description="Today's date in the business's time zone (the business day sales are numbered and counted in).",
+        asks={
+            "en": (
+                "what's the business date today?",
+                "which day is the till on right now?",
+            ),
+            "es": (
+                "¿a qué día estamos para el negocio?",
+                "¿en qué fecha va la caja ahora mismo?",
+            ),
+        },
+    ),
 )
 def business_day(ctx: OperationContext, params: EmptyIn) -> dict:
     return {"today": business_today()}
@@ -283,10 +293,22 @@ def settings_row(settings: Settings) -> dict:
     permission="sale.manage_settings",
     input=EmptyIn,
     output=SettingsOut,
-    ai={
-        "description": "Read the till settings: payment methods allowed, products and services shown, customer required, "
-        "discounts and their cap, parked checks, prices with VAT, default document and the receipt's texts."
-    },
+    ai=AI(
+        description="Read the till settings: payment methods allowed, products and services shown, customer required, "
+        "discounts and their cap, parked checks, prices with VAT, default document and the receipt's texts.",
+        asks={
+            "en": (
+                "what's the till configured to do?",
+                "what's the most discount we allow?",
+                "what does the receipt footer say?",
+            ),
+            "es": (
+                "¿cómo tengo configurado el TPV?",
+                "¿cuál es el descuento máximo que dejamos?",
+                "¿qué pone al pie del ticket?",
+            ),
+        },
+    ),
 )
 def get_settings(ctx: OperationContext, params: EmptyIn) -> dict:
     return settings_row(current_settings())
@@ -298,9 +320,21 @@ def get_settings(ctx: OperationContext, params: EmptyIn) -> dict:
     permission="sale.view_sale",
     input=EmptyIn,
     output=SettingsOut,
-    ai={
-        "description": "Read the till settings the till needs to sell (the same fields, readable by whoever sells)."
-    },
+    ai=AI(
+        description="Read the till settings the till needs to sell, readable by whoever sells: payment methods "
+        "allowed, products and services shown, customer required, discounts and their cap, parked checks, prices with "
+        "VAT included or not, default document and the receipt's texts.",
+        asks={
+            "en": (
+                "can I park checks on this till?",
+                "do our prices include VAT?",
+            ),
+            "es": (
+                "¿puedo dejar cuentas aparcadas?",
+                "¿los precios del TPV van con IVA?",
+            ),
+        },
+    ),
 )
 def get_pos_settings(ctx: OperationContext, params: EmptyIn) -> dict:
     return settings_row(current_settings())
@@ -423,10 +457,22 @@ def held_methods(ids: Iterable[UUID]) -> set[UUID]:
     input=PaymentMethodListIn,
     output=PaymentMethodPage,
     expose_api=True,
-    ai={
-        "description": "List the active payment methods in the order of the charge sheet, with their type (cash, card, "
-        "transfer, other) and whether the till settings let them charge today."
-    },
+    ai=AI(
+        description="List the active payment methods in the order of the charge sheet, with their type (cash, card, "
+        "transfer, other) and whether the till settings let them charge today.",
+        asks={
+            "en": (
+                "which payment methods do we take?",
+                "do we accept Bizum?",
+                "what can they pay with here?",
+            ),
+            "es": (
+                "¿qué formas de pago aceptamos?",
+                "¿se puede pagar con Bizum?",
+                "¿con qué me pueden pagar?",
+            ),
+        },
+    ),
 )
 def list_payment_methods(ctx: OperationContext, params: PaymentMethodListIn) -> dict:
     with translation.override(ctx.language):
@@ -556,10 +602,20 @@ def _ordering(column: str, direction: str, *ties: str) -> list:
     permission="sale.view_sale",
     input=DepartmentListIn,
     output=DepartmentPage,
-    ai={
-        "description": "List the departments of the till's open price, in the order they are shown, with the tax category "
-        "each one charges at and its rate today."
-    },
+    ai=AI(
+        description="List the departments of the till's open price, in the order they are shown, with the tax category "
+        "each one charges at and its rate today.",
+        asks={
+            "en": (
+                "what sections do we have for open prices?",
+                "which VAT does the drinks section charge?",
+            ),
+            "es": (
+                "¿qué secciones tengo para el precio libre?",
+                "¿a qué IVA va la sección de bebidas?",
+            ),
+        },
+    ),
 )
 def list_departments(ctx: OperationContext, params: DepartmentListIn) -> dict:
     with translation.override(ctx.language):
@@ -591,9 +647,19 @@ def quick_note_row(note: QuickNote) -> dict:
     permission="sale.view_sale",
     input=QuickNoteListIn,
     output=QuickNotePage,
-    ai={
-        "description": "List the quick notes the line-note sheet of the till offers, in the order they are shown."
-    },
+    ai=AI(
+        description="List the quick notes the line-note sheet of the till offers, in the order they are shown.",
+        asks={
+            "en": (
+                "what notes can waiters pick for a dish?",
+                "show me the kitchen notes we have",
+            ),
+            "es": (
+                "¿qué notas pueden elegir los camareros?",
+                "enséñame las notas de cocina que tenemos",
+            ),
+        },
+    ),
 )
 def list_quick_notes(ctx: OperationContext, params: QuickNoteListIn) -> dict:
     notes = QuickNote.objects.filter(is_deleted=False)
@@ -1231,6 +1297,7 @@ def order_detail(order: Order) -> dict:
         "created_at": order.created_at,
         "updated_at": order.updated_at,
         "lines": [order_line_row(line) for line in lines],
+        "merged_into_id": order.merged_into_id,
     }
 
 
@@ -1241,10 +1308,22 @@ def order_detail(order: Order) -> dict:
     input=OrderRefIn,
     output=OrderOut,
     expose_api=True,
-    ai={
-        "description": "Get an open check with the lines left to charge (each with its frozen price, quantity, discount, comp, "
-        "note, professional and kitchen round), its ticket discount and its provisional total."
-    },
+    ai=AI(
+        description="Get an open check with the lines left to charge (each with its frozen price, quantity, discount, comp, "
+        "note, professional and kitchen round), its ticket discount and its provisional total.",
+        asks={
+            "en": (
+                "what's on table 4's check?",
+                "how much is that open tab so far?",
+                "what did the terrace order?",
+            ),
+            "es": (
+                "¿qué lleva la cuenta de la mesa 4?",
+                "¿cuánto va la cuenta de la terraza?",
+                "¿qué han pedido en la 6?",
+            ),
+        },
+    ),
 )
 def get_order(ctx: OperationContext, params: OrderRefIn) -> dict:
     return order_detail(find_order(params.order_id))
@@ -1257,9 +1336,22 @@ def get_order(ctx: OperationContext, params: OrderRefIn) -> dict:
     input=OrderListIn,
     output=OrderPage,
     expose_api=True,
-    ai={
-        "description": "List the open checks of the business (or of another status), newest first, with their title and total."
-    },
+    ai=AI(
+        description="List the open checks of the business (a table's, a tab, a parked ticket: what is still to "
+        "charge), or of another status, newest first, with their title and total.",
+        asks={
+            "en": (
+                "which checks are still open?",
+                "any tabs left unpaid?",
+                "show me the parked tickets",
+            ),
+            "es": (
+                "¿qué cuentas hay abiertas?",
+                "¿queda alguna mesa sin cobrar?",
+                "enséñame las cuentas aparcadas",
+            ),
+        },
+    ),
 )
 def list_orders(ctx: OperationContext, params: OrderListIn) -> dict:
     orders = Order.objects.annotate(
@@ -1418,10 +1510,21 @@ def loose_lines(
     permission="sale.view_sale",
     input=PreviewIn,
     output=PreviewOut,
-    ai={
-        "description": "Value a charge WITHOUT charging nor writing anything: an open check (all of it, or some lines) or loose "
-        "lines. Same arithmetic as the charge: total, taxable base, tax by rate, discounts and comps in cents, and each line."
-    },
+    ai=AI(
+        description="How much a charge would come to, WITHOUT charging nor writing anything: an open check (a table's: "
+        "all of it, or some lines) or loose lines. Same arithmetic as the charge: total, taxable base, tax by rate, "
+        "discounts and comps in cents, and each line.",
+        asks={
+            "en": (
+                "how much would table 4 come to?",
+                "what's the total with VAT if I charge just the drinks?",
+            ),
+            "es": (
+                "¿cuánto les sale la mesa 4 si cobro ya?",
+                "calcúlame el total con IVA solo de las bebidas",
+            ),
+        },
+    ),
 )
 def preview(ctx: OperationContext, params: PreviewIn) -> dict:
     settings = current_settings()
@@ -1457,7 +1560,7 @@ def preview(ctx: OperationContext, params: PreviewIn) -> dict:
         "tax_total": valuation.tax_total,
         "discount_amount": valuation.discount_amount,
         "discount_percent": percent,
-        "ticket_discount_amount": amount,
+        "ticket_discount_amount": valuation.ticket_discount_amount,
         "gift_total": valuation.gift_total,
         "total": valuation.total,
         "breakdown": breakdown_rows(valuation.breakdown),
@@ -1647,10 +1750,22 @@ def sale_detail(sale: Sale, *, already: bool = False) -> dict:
     input=SaleRefIn,
     output=SaleOut,
     expose_api=True,
-    ai={
-        "description": "Get a sale by its id or its number (e.g. 20261014-0007): header, lines with their VAT, tenders with "
-        "tendered and change, the tax breakdown, what was refunded and, if voided, why."
-    },
+    ai=AI(
+        description="Get a sale by its id or its number (e.g. 20261014-0007): header, lines with their VAT, tenders with "
+        "tendered and change, the tax breakdown, what was refunded and, if voided, why.",
+        asks={
+            "en": (
+                "show me sale 20261014-0007",
+                "what was on the last ticket?",
+                "how did they pay sale 12?",
+            ),
+            "es": (
+                "enséñame la venta 20261014-0007",
+                "¿qué llevaba el último ticket?",
+                "¿cómo pagaron la venta 12?",
+            ),
+        },
+    ),
 )
 def get_sale(ctx: OperationContext, params: SaleRefIn) -> dict:
     with translation.override(ctx.language):
@@ -1663,10 +1778,20 @@ def get_sale(ctx: OperationContext, params: SaleRefIn) -> dict:
     permission="sale.view_sale",
     input=SaleByKeyIn,
     output=SaleByKeyOut,
-    ai={
-        "description": "Find the sale recorded with a charge attempt's key: a charge whose answer was lost resolves to the "
-        "very sale it created instead of a second one."
-    },
+    ai=AI(
+        description="Find the sale recorded with a charge attempt's key: a charge whose answer was lost resolves to the "
+        "very sale it created instead of a second one.",
+        asks={
+            "en": (
+                "the card charge froze, did it go through?",
+                "did that payment get recorded or should I charge again?",
+            ),
+            "es": (
+                "se quedó colgado al cobrar, ¿entró el cobro?",
+                "¿se llegó a guardar el pago o lo cobro otra vez?",
+            ),
+        },
+    ),
 )
 def sale_by_key(ctx: OperationContext, params: SaleByKeyIn) -> dict:
     sale = Sale.objects.filter(idempotency_key=params.idempotency_key).first()
@@ -1712,10 +1837,22 @@ def sale_row(sale: Sale) -> dict:
     input=SaleListIn,
     output=SalePage,
     expose_api=True,
-    ai={
-        "description": "List the sales, newest first: search by number or customer; filter by status (completed, voided, "
-        "refunded), main payment method, customer, professional, business days (inclusive) and total in cents."
-    },
+    ai=AI(
+        description="List the sales, newest first: search by number or customer; filter by status (completed, voided, "
+        "refunded), main payment method, customer, professional, business days (inclusive) and total in cents.",
+        asks={
+            "en": (
+                "show me yesterday's sales",
+                "what did Ana López buy this month?",
+                "find the card sales from Monday",
+            ),
+            "es": (
+                "enséñame las ventas de ayer",
+                "¿qué ha comprado Ana López este mes?",
+                "busca las ventas pagadas con tarjeta",
+            ),
+        },
+    ),
 )
 def list_sales(ctx: OperationContext, params: SaleListIn) -> dict:
     sales = Sale.objects.annotate(
@@ -1811,11 +1948,24 @@ def declared_tax_kind(sales) -> str | None:
     permission="sale.view_reports",
     input=PeriodIn,
     output=StatsOut,
-    ai={
-        "description": "Sales figures of a period of business days (inclusive; empty = all): tickets, revenue (refunds taken "
-        "off), average ticket, taxable base, tax, discounts, refunds and voided sales, in cents; and the tax the "
-        "sales were declared with (VAT, IGIC, IPSI; empty when they mix taxes)."
-    },
+    ai=AI(
+        description="How the business is doing in a period of business days (a week, a month, a quarter; inclusive; "
+        "empty = all): tickets, revenue (refunds taken off), average ticket, taxable base, tax, discounts, refunds and "
+        "voided sales, in cents; and the tax the sales were declared with (VAT, IGIC, IPSI; empty when they mix "
+        "taxes).",
+        asks={
+            "en": (
+                "how are we doing this month?",
+                "what's the average ticket this week?",
+                "what VAT did we charge last quarter?",
+            ),
+            "es": (
+                "¿cómo vamos este mes?",
+                "¿cuál es el ticket medio de la semana?",
+                "¿cuánto IVA hemos cobrado este trimestre?",
+            ),
+        },
+    ),
 )
 def stats(ctx: OperationContext, params: PeriodIn) -> dict:
     sales = _period(Sale.objects.all(), params)
@@ -1861,9 +2011,22 @@ def _revenue_by_day(first: dt.date, last: dt.date) -> dict[dt.date, int]:
     permission="sale.view_reports",
     input=EmptyIn,
     output=TodayOut,
-    ai={
-        "description": "What was sold today (business day) in cents, refunds taken off, and how many tickets."
-    },
+    ai=AI(
+        description="What was sold today (business day) in cents, refunds taken off, and how many tickets.",
+        asks={
+            "en": (
+                "what have I sold today?",
+                "how much did we take today?",
+                "how many tickets so far today?",
+            ),
+            "es": (
+                "¿cuánto llevo hoy?",
+                "¿qué vendí hoy?",
+                "¿cuánto hemos hecho hoy?",
+                "¿cuántos tickets van hoy?",
+            ),
+        },
+    ),
 )
 def today(ctx: OperationContext, params: EmptyIn) -> dict:
     day = business_today()
@@ -1881,9 +2044,19 @@ def today(ctx: OperationContext, params: EmptyIn) -> dict:
     permission="sale.view_reports",
     input=EmptyIn,
     output=LastDaysOut,
-    ai={
-        "description": "What was sold each of the last seven business days, today included, oldest first, 0 on a day without sales."
-    },
+    ai=AI(
+        description="What was sold each of the last seven business days, today included, oldest first, 0 on a day without sales.",
+        asks={
+            "en": (
+                "how did the last seven days go?",
+                "show me sales day by day this past week",
+            ),
+            "es": (
+                "¿cómo han ido los últimos siete días?",
+                "¿cuánto hicimos cada día esta semana?",
+            ),
+        },
+    ),
 )
 def last_7_days(ctx: OperationContext, params: EmptyIn) -> dict:
     last = business_today()
@@ -1900,11 +2073,23 @@ def last_7_days(ctx: OperationContext, params: EmptyIn) -> dict:
     input=PeriodIn,
     output=ByStaffOut,
     expose_api=True,
-    ai={
-        "description": "What each professional sold in a period of business days: their lines (a line's own professional wins "
+    ai=AI(
+        description="What each professional sold in a period of business days: their lines (a line's own professional wins "
         "over the sale's), the sales they served, gross, base and tax in cents, what refunds gave back on their lines "
-        "and the revenue left, which is what a commission is on. For the per-professional close."
-    },
+        "and the revenue left, which is what a commission is on. For the per-professional close.",
+        asks={
+            "en": (
+                "how much did each waiter sell this month?",
+                "what did Laura bring in this week?",
+                "work out the stylists' commissions",
+            ),
+            "es": (
+                "¿cuánto ha facturado cada peluquera este mes?",
+                "¿cuánto vendió Laura esta semana?",
+                "¿qué comisión le toca a cada uno?",
+            ),
+        },
+    ),
 )
 def by_staff(ctx: OperationContext, params: PeriodIn) -> dict:
     lines = SaleLine.objects.filter(sale__status__in=COUNTED)
@@ -2033,10 +2218,20 @@ def tender_options(sale: Sale) -> list[dict]:
     input=SaleRefIn,
     output=RefundOptionsOut,
     expose_api=True,
-    ai={
-        "description": "What a sale can still give back: for each tender, what it charged, what it already returned, what is "
-        "left and whether it can go back through its own method; for each line, the units already returned and left."
-    },
+    ai=AI(
+        description="What a sale can still give back: for each tender, what it charged, what it already returned, what is "
+        "left and whether it can go back through its own method; for each line, the units already returned and left.",
+        asks={
+            "en": (
+                "how much can I still give back on that sale?",
+                "what's left to refund on ticket 12?",
+            ),
+            "es": (
+                "¿cuánto se puede devolver todavía de esa venta?",
+                "¿qué queda por devolver del ticket 12?",
+            ),
+        },
+    ),
 )
 def refund_options(ctx: OperationContext, params: SaleRefIn) -> dict:
     sale = find_sale(params.sale_id, params.sale)
@@ -2092,9 +2287,19 @@ def refund_row(refund: Refund) -> dict:
     input=SaleRefIn,
     output=RefundListOut,
     expose_api=True,
-    ai={
-        "description": "List the refunds of a sale, newest first, with their amount, reason and who made them."
-    },
+    ai=AI(
+        description="List the refunds of a sale, newest first, with their amount, reason and who made them.",
+        asks={
+            "en": (
+                "what refunds did that sale have?",
+                "who gave money back on ticket 7?",
+            ),
+            "es": (
+                "¿qué devoluciones tiene esa venta?",
+                "¿quién hizo la devolución del ticket 7?",
+            ),
+        },
+    ),
 )
 def list_refunds(ctx: OperationContext, params: SaleRefIn) -> dict:
     sale = find_sale(params.sale_id, params.sale)
@@ -2112,9 +2317,19 @@ def list_refunds(ctx: OperationContext, params: SaleRefIn) -> dict:
     input=RefundByKeyIn,
     output=RefundByKeyOut,
     expose_api=True,
-    ai={
-        "description": "Find the refund recorded with a refund attempt's key, so a retry recovers it instead of refunding twice."
-    },
+    ai=AI(
+        description="Find the refund recorded with a refund attempt's key, so a retry recovers it instead of refunding twice.",
+        asks={
+            "en": (
+                "the refund froze halfway, did it go through?",
+                "was that refund saved or do I do it again?",
+            ),
+            "es": (
+                "se cortó al devolver, ¿se hizo la devolución?",
+                "¿quedó hecha la devolución que se colgó?",
+            ),
+        },
+    ),
 )
 def refund_by_key(ctx: OperationContext, params: RefundByKeyIn) -> dict:
     refund = Refund.objects.filter(idempotency_key=params.idempotency_key).first()

@@ -58,7 +58,13 @@ def po_entries(path: Path) -> dict[str, tuple[str, bool]]:
         )
         if starts_entry:
             flush()
-            parts, fuzzy, current = {"msgctxt": [], "msgid": [], "msgstr": []}, False, None
+            # A ``#, fuzzy`` read after an entry's end belongs to the entry this line opens;
+            # only an end forgets it.
+            parts, fuzzy, current = (
+                {"msgctxt": [], "msgid": [], "msgstr": []},
+                fuzzy and current is None,
+                None,
+            )
         if line.startswith("#,") and "fuzzy" in line:
             fuzzy = True
         elif line.startswith(("msgctxt ", "msgid ", "msgstr ")):
@@ -117,13 +123,88 @@ def schema_titles() -> set[str]:
     return titles
 
 
+def untranslated(entries: dict[str, tuple[str, bool]]) -> list[str]:
+    """The keys gettext shows in English: no ``msgstr``, or a ``#, fuzzy`` one it skips."""
+    return [key for key, (msgstr, fuzzy) in entries.items() if not msgstr or fuzzy]
+
+
 def test_every_entry_has_a_spanish_translation():
     entries = po_entries(LOCALE / "django.po")
     assert entries
-    untranslated = [
-        msgid for msgid, (msgstr, fuzzy) in entries.items() if not msgstr or fuzzy
+    assert untranslated(entries) == []
+
+
+def test_the_reader_sees_a_fuzzy_mark_with_and_without_a_context(tmp_path):
+    """gettext skips a ``#, fuzzy`` translation (the screen says the English), so the reader
+    has to see the mark above a ``msgid`` and above a ``msgctxt``, with or without other
+    comments, and never pass it on (hub#492)."""
+    po = tmp_path / "django.po"
+    po.write_text(
+        "\n".join(
+            [
+                "#, fuzzy",
+                'msgid ""',
+                'msgstr ""',
+                '"Content-Type: text/plain; charset=UTF-8\\n"',
+                "",
+                'msgid "Header follows"',
+                'msgstr "Tras la cabecera"',
+                "",
+                "#, fuzzy",
+                'msgid "Plain"',
+                'msgstr "Llano"',
+                'msgid "Right after a fuzzy one"',
+                'msgstr "Justo después"',
+                "",
+                "#. A note for the translator",
+                "#: apps/staff/services.py:1",
+                "#, fuzzy, python-format",
+                'msgid "With comments %(name)s"',
+                'msgstr "Con comentarios %(name)s"',
+                "",
+                "#, fuzzy",
+                'msgctxt "staff member status"',
+                'msgid "Active"',
+                'msgstr "Activo"',
+                'msgctxt "staff member status"',
+                'msgid "Inactive"',
+                'msgstr ""',
+                '"Inactivo"',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    assert po_entries(po) == {
+        "Header follows": ("Tras la cabecera", False),
+        "Plain": ("Llano", True),
+        "Right after a fuzzy one": ("Justo después", False),
+        "With comments %(name)s": ("Con comentarios %(name)s", True),
+        "staff member status\x04Active": ("Activo", True),
+        "staff member status\x04Inactive": ("Inactivo", False),
+    }
+
+
+def test_a_fuzzy_mark_in_staffs_own_catalog_is_seen(tmp_path):
+    """The catalog staff ships, with ``#, fuzzy`` above its first entry and above its first
+    entry with a context: the reader flags exactly those two, so the translation guard above
+    fails on them (hub#492)."""
+    lines = (LOCALE / "django.po").read_text(encoding="utf-8").splitlines()
+    first_msgid = next(
+        n for n, line in enumerate(lines) if line.startswith("msgid ") and line != 'msgid ""'
+    )
+    first_msgctxt = next(n for n, line in enumerate(lines) if line.startswith("msgctxt "))
+    for n in sorted((first_msgid, first_msgctxt), reverse=True):
+        lines.insert(n, "#, fuzzy")
+    marked = tmp_path / "django.po"
+    marked.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    assert [lines[first_msgid + 1], lines[first_msgctxt + 2]] == [
+        'msgid "Staff"',
+        'msgctxt "staff member status"',
     ]
-    assert untranslated == []
+    fuzzy = [key for key, (_, is_fuzzy) in po_entries(marked).items() if is_fuzzy]
+    assert fuzzy == ["Staff", "staff member status\x04Active"]
+    assert untranslated(po_entries(marked)) == ["Staff", "staff member status\x04Active"]
 
 
 def test_every_visible_text_is_in_the_catalog():

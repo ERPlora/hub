@@ -16,6 +16,8 @@ from django.utils.translation import gettext_noop
 from ninja import Field, Schema
 from pydantic import BeforeValidator, ConfigDict, JsonValue, StringConstraints, model_validator
 
+from base.schemas import names
+
 T = TypeVar("T")
 
 #: An A4 page is a document with its styles and its QR inline, not a file upload.
@@ -37,6 +39,15 @@ A4_ONCE = _("An A4 page prints once: ask for another job for another copy.")
 JOB = gettext_noop("Job")
 ATTEMPT = gettext_noop("Attempt")
 REFERENCE = gettext_noop("Reference")
+
+# The assistant's card names the record a write acts on by these reads (base/assistant.py ``REFERS``), run as whoever
+# asks, never by its id: a printer and a device by their names, as the Printers and Devices screens; a job as the queue
+# titles it («Receipt T-000123»). Whoever prints or sets up the printers reads them all.
+A_PRINTER = names("printing.printer.get", by="printer_id")
+A_DEVICE = names("printing.device.detail", by="device_id")
+A_JOB = names("printing.job.get", by="job_id", name=("label",))
+#: A printer of a list of them, by its id (a device's printers).
+PrinterId = Annotated[UUID, Field(json_schema_extra=A_PRINTER)]
 
 _SCRIPT = re.compile(r"<\s*script\b", re.IGNORECASE)
 
@@ -160,7 +171,7 @@ class PrinterIn(Closed):
 
 
 class PrinterRefIn(Closed):
-    printer_id: UUID | None = Field(None, description="The printer's id.")
+    printer_id: UUID | None = Field(None, description="The printer's id.", json_schema_extra=A_PRINTER)
     printer: Name | None = Field(None, description="Its name, when the id is not known («Kitchen»).")
 
     @model_validator(mode="after")
@@ -332,6 +343,15 @@ class JobOut(Schema):
     cancel_reason: str = Field(description="Why.")
 
 
+class JobDetailOut(JobOut):
+    """One job as the queue shows it, with its title."""
+
+    label: str = Field(
+        description="How the queue titles it, in the reader's language: its document and its number («Receipt "
+        "T-000123»), or what it is when it has none («Open the drawer»)."
+    )
+
+
 class JobCreateOut(Schema):
     job: JobOut | None = Field(description="The job queued (or the one already queued with that key); none = nothing.")
     duplicate: bool = Field(description="A job with that key was already in the queue: nothing new was queued.")
@@ -350,7 +370,7 @@ class JobListIn(PageIn):
 
 
 class JobRefIn(Closed):
-    job_id: UUID | None = Field(None, title=JOB, description="The job's id.")
+    job_id: UUID | None = Field(None, title=JOB, description="The job's id.", json_schema_extra=A_JOB)
     reference: _text(64, 1) | None = Field(
         None, description="The number of its document (T-000123), when the id is not known: its newest job."
     )
@@ -399,7 +419,7 @@ class JobSummaryOut(Schema):
 
 
 class JobClaimIn(Closed):
-    printers: list[UUID] = Field(
+    printers: list[PrinterId] = Field(
         min_length=1,
         max_length=MAX_CLAIM_PRINTERS,
         description="The printers this device reaches (their ids): the ones it was set up with.",
@@ -439,13 +459,13 @@ class JobClaimOut(Schema):
 
 
 class JobCompleteIn(Closed):
-    job_id: UUID = Field(title=JOB, description="The job the device printed.")
+    job_id: UUID = Field(title=JOB, description="The job the device printed.", json_schema_extra=A_JOB)
     device: DeviceName = Field(description="The own id of the device that printed it: the one that took it.")
     attempt: int = Field(ge=1, title=ATTEMPT, description="The hand-out it printed (the `attempts` it was given).")
 
 
 class JobFailIn(Closed):
-    job_id: UUID = Field(title=JOB, description="The job the device could not print.")
+    job_id: UUID = Field(title=JOB, description="The job the device could not print.", json_schema_extra=A_JOB)
     device: DeviceName = Field(description="The own id of the device that could not print it: the one that has it.")
     attempt: int = Field(ge=1, title=ATTEMPT, description="The hand-out that failed (the `attempts` it was given).")
     error: DeviceError = Field(
@@ -486,20 +506,22 @@ class DeviceOut(Schema):
 
 class DeviceRegisterIn(Closed):
     name: Name = Field(description="The device's name, as the business calls it: Counter till, Kitchen tablet.")
-    printers: list[UUID] = Field(
+    printers: list[PrinterId] = Field(
         max_length=MAX_CLAIM_PRINTERS, description="The active printers this device reaches and prints for (their ids)."
     )
 
 
 class DeviceRefIn(Closed):
     device_id: UUID = Field(
-        title=gettext_noop("Device"), description="The device's registration id (printing.device.list)."
+        title=gettext_noop("Device"),
+        description="The device's registration id (printing.device.list).",
+        json_schema_extra=A_DEVICE,
     )
 
 
 class DeviceUpdateIn(DeviceRefIn):
     name: Name | None = Field(None, description="Its new name.")
-    printers: list[UUID] | None = Field(
+    printers: list[PrinterId] | None = Field(
         None, max_length=MAX_CLAIM_PRINTERS, description="The active printers it reaches from now on (their ids)."
     )
 

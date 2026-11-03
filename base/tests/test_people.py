@@ -15,9 +15,11 @@ import pytest
 from django.contrib.auth.hashers import make_password
 from django.core.cache import cache
 from django.utils import timezone
+from live.assistant import description
 from live.context import OperationContext, Scope
 from live.errors import OperationError
 from live.models import OutboxEvent
+from live.operations import AI
 from live.operations import get as get_operation
 
 from base import access, services
@@ -431,6 +433,6 @@ class TestTheRoutes:
     @pytest.mark.parametrize("name", sorted(op for _, _, op in PEOPLE_ROUTES))
     def test_each_tells_the_assistant_what_it_does(self, name):
         op = get_operation(name)
-        assert isinstance(op.ai, dict) and op.ai["description"].strip()
+        assert description(op)
         if op.kind == "command":
-            assert op.ai["risk"] in {"normal", "high"}
+            assert (op.ai.risk if isinstance(op.ai, AI) else op.ai["risk"]) in {"normal", "high"}

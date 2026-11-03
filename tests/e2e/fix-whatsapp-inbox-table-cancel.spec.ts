@@ -20,7 +20,7 @@ import { A, api, capture, HUB_DIR, psql, REPO_DIR, shown } from './helpers';
 import { confirmDialog, parkedEvent, RELAY, signedIn } from './flow-helpers';
 import { noHorizontalScroll, settled, VIEWPORTS } from './schedule-helpers';
 import { STACK } from './stack';
-import { cleanUp as inboxCleanUp, e2ePhone, pushChannel, receive } from './whatsapp-helpers';
+import { cleanUp as inboxCleanUp, e2ePhone, keepPhoto, pushChannel, receive, restorePhoto } from './whatsapp-helpers';
 
 const KEY = 'FIX-HUB-WHATSAPP-INBOX-AUTO-REPLY-CANNOT-CANCEL-A-RESERVATION';
 const OTHER_KEY = 'FIX-HUB-WHATSAPP-INBOX-TABLE-REPLY-CAN-CANCEL-ANOTHER-CUSTOMERS-RESERVATION';
@@ -76,10 +76,10 @@ function cleanUp(): void {
   saasSql("delete from assistant_assistantusage where hub_id = (select id from hubs_hub where slug = 'a')");
 }
 
-/** One tick of the worker's relay (this stack runs no worker): the outbox event `id` handed to Automations' reaction.
+/** One tick of the worker's relay (in `a`'s database: the e2e stack's worker relays nothing): the outbox event `id` handed to Automations' reaction.
  *  It does not block this process: the provider the SaaS asks lives here, and must answer. */
 async function relay(id: string): Promise<void> {
-  await promisify(execFile)('uv', ['run', 'python', 'manage.py', 'shell', '-c', RELAY], {
+  await promisify(execFile)('uv', ['run', 'python', 'manage.py', 'shell', '--hub', 'a', '-c', RELAY], {
     cwd: HUB_DIR,
     env: { ...process.env, FLOW_EVENT: id },
   });
@@ -117,6 +117,7 @@ async function openTheBook(context: BrowserContext): Promise<void> {
 }
 
 test.beforeAll(async () => {
+  keepPhoto();
   provider = await startProvider(PROVIDER_PORT);
   const seeded = saasSql("select base_url from assistant_aiprovider where slug = 'e2e-local'");
   expect(seeded, `the SaaS ${SAAS_DB} is not seeded with this provider: README «El asistente»`).toBe(provider.url);
@@ -130,6 +131,7 @@ test.beforeEach(() => {
 test.afterAll(async () => {
   cleanUp();
   await provider?.close();
+  restorePhoto();
 });
 
 for (const viewport of VIEWPORTS) {

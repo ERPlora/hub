@@ -50,7 +50,7 @@
       "parked": "Aparcada"
     },
     "pax": "{count} pax",
-    "guestsCount": "{count} comensales",
+    "guestsCount": "{count} comensal | {count} comensales",
     "minutes": "{minutes} min",
     "servedBy": "Atiende {name}",
     "reservedFor": "Reservada para {name}",
@@ -149,7 +149,7 @@
       },
       "delete": {
         "title": "¿Borrar la zona?",
-        "impact": "{count} mesas en esta zona. Una zona con mesas no se puede borrar: mueve o borra antes sus mesas.",
+        "impact": "{count} mesa en esta zona. Una zona con mesas no se puede borrar: muévela o bórrala antes. | {count} mesas en esta zona. Una zona con mesas no se puede borrar: mueve o borra antes sus mesas.",
         "confirm": "Borrar zona"
       },
       "loadError": "No se pudieron cargar las zonas"
@@ -208,7 +208,7 @@
       },
       "close": {
         "title": "¿Cerrar la sesión?",
-        "impact": "Mesa {number} · {count} comensales. La mesa queda libre y la sesión pasa al histórico. Si su cuenta sigue abierta en Ventas, primero cóbrala, pásala a otra mesa o elimínala desde el TPV.",
+        "impact": "Mesa {number} · {count} comensal. La mesa queda libre y la sesión pasa al histórico. Si su cuenta sigue abierta en Ventas, primero cóbrala, pásala a otra mesa o elimínala desde el TPV. | Mesa {number} · {count} comensales. La mesa queda libre y la sesión pasa al histórico. Si su cuenta sigue abierta en Ventas, primero cóbrala, pásala a otra mesa o elimínala desde el TPV.",
         "confirm": "Cerrar sesión"
       },
       "delete": {

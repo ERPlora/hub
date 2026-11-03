@@ -18,7 +18,7 @@ import {
   StatusPill,
 } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
-import { AppPage, useSession } from '@erplora/ui/shell';
+import { AppPage, openExternalLink, useSession, useSurface } from '@erplora/ui/shell';
 import { computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
@@ -71,8 +71,10 @@ table.followResult(result);
 const blocked = computed(() => blockingError(error.value));
 
 const { data: channel } = useLive('whatsapp_inbox.channel.get', {});
-/** «Upgrade plan» at the cap: for whoever configures, and only with erplora.com to send them to. */
-const upgradeUrl = computed(() => (canConfigure.value && channel.value?.plans_url) || '');
+/** «Upgrade plan» at the cap: for whoever configures, only with erplora.com to send them to, and only on the web (it
+ *  sells: surface.ts); its click leaves the Hub by `openExternalLink` (gh:hub#439). */
+const { isWeb } = useSurface();
+const upgradeUrl = computed(() => (isWeb.value && canConfigure.value && channel.value?.plans_url) || '');
 // From 80 % of the month's messages, how many are left (WHATSAPP_INBOX-F13).
 const left = computed(() => nearCap(channel.value));
 
@@ -225,6 +227,7 @@ const columns = computed<DataTableColumn<ConversationOut>[]>(() => [
             :href="upgradeUrl"
             target="_blank"
             rel="noopener"
+            @click="openExternalLink(upgradeUrl, $event)"
           >{{ $t('whatsapp_inbox.upgradePlan') }}</a>
         </template>
       </InlineFeedback>
@@ -244,6 +247,7 @@ const columns = computed<DataTableColumn<ConversationOut>[]>(() => [
             :href="upgradeUrl"
             target="_blank"
             rel="noopener"
+            @click="openExternalLink(upgradeUrl, $event)"
           >{{ $t('whatsapp_inbox.upgradePlan') }}</a>
         </template>
       </InlineFeedback>

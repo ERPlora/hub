@@ -641,6 +641,19 @@ class RoleOut(Schema):
     member_count: int = Field(description="Active people with this role.")
 
 
+
+class RoleResolveIn(Schema):
+    """The role a member would take, as staff.member.create takes it: by id or by name."""
+
+    role_id: UUID | None = Field(None, description=D_ROLE_ID)
+    role: Text100 | None = Field(None, description=D_ROLE)
+
+
+class RoleResolveOut(Schema):
+    id: UUID | None = Field(description="The role's id; none when no role was given.")
+    name: str | None = Field(description="The role's name; none when no role was given.")
+
+
 RolePage = Page[RoleOut]
 
 

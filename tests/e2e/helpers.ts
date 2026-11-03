@@ -14,6 +14,7 @@ import { fileURLToPath } from 'node:url';
 
 import { type Browser, type BrowserContext, type Cookie, expect, type Locator, type Page, test } from '@playwright/test';
 
+import { hubDatabases, plan } from './hub-databases';
 import { mailDirFrom, readMailCode } from './mail';
 import { isConnectionRefused, withRetry } from './retry';
 import { STACK } from './stack';
@@ -572,15 +573,33 @@ export async function emptyOfTemplateData(context: BrowserContext, origin: strin
   throw new Error('the business could not be emptied of what a template brings');
 }
 
+/** How long the run's worker may take to make an app's tables in a business's own database (S3): its tick, the
+ *  migrations of the app and what it needs, and its settle. */
+export const APP_SET_UP_MS = 60_000;
+
 /**
  * Turns on `apps` in the business at `origin`, as the person of `context` who runs it, through Apps' own command
  * (`POST /api/apps/enable`, `base.app.enable`): a business is born with every app off (PLAN-HUB round 2026-10-27).
- * One already on changes nothing.
+ * One already on changes nothing. In a business whose own database lacks an app's tables (a demo, a new business:
+ * S3) the answer is 202 «creating» and the run's worker makes them: it waits until `base.app.list` says it is on.
  */
 export async function turnOn(context: BrowserContext, origin: string, ...apps: string[]): Promise<void> {
   for (const app of apps) {
-    const answer = await api(context, origin, 'POST', '/apps/enable', { app });
-    expect(answer.status, `turn on ${app}: ${JSON.stringify(answer.data)}`).toBe(200);
+    const answer = await api<{ state: string }>(context, origin, 'POST', '/apps/enable', { app });
+    const said = `turn on ${app}: ${answer.status} ${JSON.stringify(answer.data)}`;
+    expect([200, 202], said).toContain(answer.status);
+    if (answer.status === 202) {
+      expect(answer.data.state, said).toBe('creating');
+      await expect
+        .poll(
+          async () => {
+            const listed = await api<{ apps: { id: string; state: string }[] }>(context, origin, 'GET', '/apps');
+            return listed.data.apps.find((row) => row.id === app)?.state;
+          },
+          { message: `${app} set up by the worker`, timeout: APP_SET_UP_MS },
+        )
+        .toBe('on');
+    }
   }
 }
 
@@ -837,11 +856,48 @@ export function listenerRows(): { pid: number; backend_start: string }[] {
     });
 }
 
-export function psql(sql: string): string {
-  return execSync(`docker compose exec -T postgres psql -U hub -d ${STACK.database} -At -c "${sql}"`, {
+/** `sql` on the database `database` of compose's Postgres, as its superuser `hub`. */
+function psqlOn(database: string, sql: string): string {
+  return execSync(`docker compose exec -T postgres psql -U hub -d ${database} -At -c "${sql}"`, {
     cwd: REPO_DIR,
     encoding: 'utf8',
   }).trim();
+}
+
+/** Each hub's own database, from the stack's registry (read once per hub; one that shares control's is control's). */
+const hubDatabase = hubDatabases(STACK.database, (sql) => psqlOn(STACK.database, sql));
+
+/** Where each scratch table of this run's specs was made (`hub-databases.ts`), kept between calls. */
+const scratchTables = new Map<string, string>();
+
+/** The database the scratch table `table` is in, control's or `hub`'s, when this process never noted it: Playwright
+ * starts a new worker process after a failed test, and a spec's `afterAll` there must still find its copy. */
+function scratchTableOf(table: string, hub: string): string | undefined {
+  return [STACK.database, hubDatabase(hub)].find(
+    (database) => psqlOn(database, `select to_regclass('\\"${table}\\"') is not null`) === 't',
+  );
+}
+
+/** `sql` where its tables live (`hub-databases.ts`): each statement on control's tables in the stack's control
+ * database, on any other in `hub`'s own (`a` unless the spec names another; round 2026-10-30 of PLAN-DB, S2a), the
+ * ones in a row on one database in one call; what they print, in order. A statement that names both is refused. */
+export function psql(sql: string, hub = 'a'): string {
+  return plan(sql, hub, STACK.database, hubDatabase, scratchTables, (table) => scratchTableOf(table, hub))
+    .map((run) => psqlOn(run.database, run.sql))
+    .filter(Boolean)
+    .join('\n');
+}
+
+/** The usernames of every account of `email` (control's ``auth_user``), quoted for the `in (…)` of a statement on a
+ * hub's tables, which cannot read control's; `null` when it has none, which matches nothing. */
+export function usernamesOf(email: string): string {
+  return psql(`select string_agg(quote_literal(username), ',') from auth_user where email = '${email}'`) || 'null';
+}
+
+/** The person (``base.HubUser``) of the account `email` in `hub`'s database: its username is control's (``auth_user``),
+ * the person the hub's; '' when it has none yet. */
+export function hubUserIdOf(email: string, hub = 'a'): string {
+  return psql(`select id from base_hubuser where username in (${usernamesOf(email)})`, hub);
 }
 
 /** Decodes the `s=` of a `/api/live` URL (base64url JSON) into its subscriptions. */

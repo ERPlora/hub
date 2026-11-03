@@ -58,7 +58,7 @@ test.afterAll(async () => {
  *  as the outbox relay does on every tick (`RELAY`); the assistant is asked after that COMMIT. Unlike `workerCalls`, it
  *  does not block this process while it waits: the provider the SaaS asks lives here, and must answer. */
 async function workerAsks(flowId: string): Promise<void> {
-  await promisify(execFile)('uv', ['run', 'python', 'manage.py', 'shell', '-c', RELAY], {
+  await promisify(execFile)('uv', ['run', 'python', 'manage.py', 'shell', '--hub', 'a', '-c', RELAY], {
     cwd: HUB_DIR,
     env: { ...process.env, FLOW_EVENT: parkedEvent(flowId) },
   });

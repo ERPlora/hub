@@ -181,6 +181,18 @@ class PrintJob(UUIDModel):
         TEST_PAGE = "test_page", _("Test page")
         DRAWER = "drawer", _("Open the drawer")
 
+    class DocumentType(models.TextChoices):
+        """The documents the renderer paints (``documents.DOCUMENT_TYPES``), by the queue's word for each."""
+
+        RECEIPT = "receipt", _("Receipt")
+        KITCHEN_ORDER = "kitchen_order", _("Kitchen order")
+        INVOICE = "invoice", _("Invoice")
+        DELIVERY_NOTE = "delivery_note", _("Delivery note")
+        BARCODE_LABEL = "barcode_label", _("Barcode label")
+        CASH_SESSION_REPORT = "cash_session_report", _("Cash session report")
+        PREBILL = "prebill", _("Pre-bill")
+        GENERIC = "generic", _("Document")
+
     class Format(models.TextChoices):
         RECEIPT = "receipt", _("Receipt paper")
         A4 = "a4", _("A4")
@@ -195,7 +207,7 @@ class PrintJob(UUIDModel):
 
     job_key = models.CharField(_("job key"), max_length=128, unique=True)
     kind = models.CharField(_("kind"), max_length=16, choices=Kind.choices, default=Kind.DOCUMENT)
-    document_type = models.CharField(_("document type"), max_length=32, blank=True)
+    document_type = models.CharField(_("document type"), max_length=32, choices=DocumentType.choices, blank=True)
     document = models.JSONField(_("document"), default=dict, blank=True, encoder=DjangoJSONEncoder)
     html = models.TextField(_("A4 page"), blank=True)
     format = models.CharField(_("paper"), max_length=16, choices=Format.choices, default=Format.RECEIPT)

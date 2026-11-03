@@ -11,7 +11,7 @@
 // this very device for anybody else (BASE-F84), as an open price, a line sent to the kitchen voided and a
 // check with something on it deleted do (`apps.py` `approvals`).
 import { useCommand } from '@erplora/ui/sdk';
-import { toastError, useSession } from '@erplora/ui/shell';
+import { toast as notify, toastError, useSession } from '@erplora/ui/shell';
 import { computed, type ComputedRef, type Ref, shallowRef } from 'vue';
 
 import { mergeableLine, mergeableServiceLine, plusOne } from '../../components/pos/till';
@@ -31,6 +31,8 @@ export interface TillOptions {
   settings: () => SettingsOut | undefined;
   /** A check was just opened: the page links its customer to it. */
   onOpened?: (orderId: string) => void;
+  /** The check on screen was joined with another (SALE-F24): the till now shows that one; the page reads its customer. */
+  onJoined?: (orderId: string) => void;
 }
 
 export interface Till {
@@ -68,7 +70,7 @@ export interface Till {
   park(label: string): Promise<WriteResult>;
   voidCheck(): Promise<WriteResult>;
   resume(orderId: string): void;
-  /** The live `sale.order.get` of the check on screen. */
+  /** The live `sale.order.get` of the check on screen; joined with another, the till follows the one that stays. */
   follow(next: OrderOut): void;
   /** The check on screen no longer exists. */
   gone(): void;
@@ -379,8 +381,21 @@ export function useTill(options: TillOptions): Till {
   function follow(next: OrderOut): void {
     if (next.id !== check.id.value) return;
     if (next.status !== 'open') {
-      // A write of this screen in flight (a void, a charge) closes it itself: its answer tells.
-      if (inFlight.value > 0) return;
+      // A write of this screen in flight answers first (a void or a charge of its own closes the check itself, and
+      // then this is somebody else's check); whatever it left is decided once it has.
+      if (inFlight.value > 0) {
+        void tail.then(() => follow(next));
+        return;
+      }
+      // Joined with another check (Tables' «Merge», here or on another device): nothing was closed, its lines
+      // are in the one that stays, and the till shows that one.
+      const joined = next.merged_into_id;
+      if (joined) {
+        resume(joined);
+        options.onJoined?.(joined);
+        void notify(t('sale.pos.checkJoined'));
+        return;
+      }
       release();
       void toastError(t('sale.pos.checkGone'));
       return;

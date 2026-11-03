@@ -1,10 +1,11 @@
 // The rules of Settings › Data that are not the server's (the old hub's `ExportPanel.vue`, `import-retry.ts`,
 // `data-table-labels.ts` and `blueprint-hero.ts`): pure, so each one is pinned here once.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import en from '../locale/en.json';
 import type { AppDatasets, ImportRow, LoadReport, Template } from '../operations';
 import {
+  downloadFrom,
   base64ToBlob,
   bytesToBase64,
   cardOutcome,
@@ -254,5 +255,18 @@ describe('the templates card of the Home (BASE-G131, BASE-F02)', () => {
       kind: 'failed',
       missing: [],
     });
+  });
+});
+
+describe('downloadFrom', () => {
+  it('hands the browser the link through a link of its own, never added to the page', () => {
+    const clicked: string[] = [];
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+      clicked.push(this.href);
+    });
+    downloadFrom('https://erplora-prod-hub-dumps.s3.eu-west-1.amazonaws.com/0a/x.dump?X-Amz-Expires=900');
+    expect(clicked).toEqual(['https://erplora-prod-hub-dumps.s3.eu-west-1.amazonaws.com/0a/x.dump?X-Amz-Expires=900']);
+    expect(document.querySelectorAll('a')).toHaveLength(0);
+    click.mockRestore();
   });
 });

@@ -1,0 +1,78 @@
+{
+  "$schema": "../probes.schema.json",
+  "probes": [
+    {
+      "id": "owner.es.sale.sale.today",
+      "app": "sale",
+      "tool": "sale.sale.today",
+      "role": "owner",
+      "language": "es",
+      "phrase": "¿cuánto dinero ha entrado hoy por ventas?",
+      "expect": "read"
+    },
+    {
+      "id": "owner.en.sale.sale.list",
+      "app": "sale",
+      "tool": "sale.sale.list",
+      "role": "owner",
+      "language": "en",
+      "phrase": "list the sales we rang up last Saturday",
+      "expect": "read"
+    },
+    {
+      "id": "owner.es.customer.customer.create",
+      "app": "customer",
+      "tool": "customer.customer.create",
+      "role": "owner",
+      "language": "es",
+      "phrase": "guárdame a Rocío Pérez como clienta, su móvil es 611 222 333",
+      "expect": "card"
+    },
+    {
+      "id": "owner.es.sale.payment_method.create",
+      "app": "sale",
+      "tool": "sale.payment_method.create",
+      "role": "owner",
+      "language": "es",
+      "phrase": "que se pueda cobrar con PayPal también",
+      "expect": "card"
+    },
+    {
+      "id": "employee.es.customer.customer.list",
+      "app": "customer",
+      "tool": "customer.customer.list",
+      "role": "employee",
+      "language": "es",
+      "phrase": "¿me sacas la lista de clientes que tenemos apuntados?",
+      "expect": "read"
+    },
+    {
+      "id": "employee.en.base.app.disable",
+      "app": "base",
+      "tool": "base.app.disable",
+      "role": "employee",
+      "language": "en",
+      "phrase": "Can you switch the bookings module off? Nobody uses it.",
+      "expect": "refused",
+      "notes": "Only who runs the business turns apps on and off (base.administer_hub)."
+    },
+    {
+      "id": "owner.en.base.docs.search",
+      "app": "base",
+      "tool": "base.docs.search",
+      "role": "owner",
+      "language": "en",
+      "phrase": "how do I hook up a receipt printer to the till?",
+      "expect": "docs"
+    },
+    {
+      "id": "employee.es.base.docs.search",
+      "app": "base",
+      "tool": "base.docs.search",
+      "role": "employee",
+      "language": "es",
+      "phrase": "¿para qué sirve el modo compartido de la tablet?",
+      "expect": "docs"
+    }
+  ]
+}

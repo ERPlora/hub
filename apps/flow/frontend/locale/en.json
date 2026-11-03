@@ -88,10 +88,7 @@
       "hidden": "Some automations your apps bring are hidden: they need {apps}.",
       "invalid": "«{name}» cannot be offered: {reason}",
       "loadError": "The automations your apps bring could not be read.",
-      "repairNotice": "«{name}» was set up with an older version of {app} that starts in more cases than it should.",
-      "repairHint": "Updating it only changes when it starts: its steps, permissions and switch stay as they are.",
-      "repair": "Update it",
-      "repaired": "«{name}» now only starts when it should."
+      "setByApp": "Set by {app}: you can change it, not take it off."
     },
     "gallery": {
       "heading": "Ready-made automations",
@@ -1645,6 +1642,7 @@
       "descending": "Descending",
       "destination": "Destination",
       "device": "Device",
+      "device_id": "Device",
       "difference": "Difference",
       "difference_max": "Difference max",
       "difference_min": "Difference min",
@@ -2640,7 +2638,38 @@
       "templatesError": "Your WhatsApp templates could not be read.",
       "noTemplates": "You have no approved templates yet: create one in WhatsApp › Settings.",
       "missing": "«{name}» is not among your approved WhatsApp templates: WhatsApp will not send it.",
-      "variable": "Value {n}"
+      "variable": "Value {n}",
+      "fileKinds": {
+        "IMAGE": "Photo",
+        "VIDEO": "Video",
+        "DOCUMENT": "Document"
+      },
+      "fileName": "{kind}: {name} · {size}",
+      "fileNone": "No file chosen",
+      "fileReading": "Reading the file…",
+      "fileChoose": "Choose file",
+      "fileChange": "Change file",
+      "fileUploading": "Uploading…",
+      "fileRules": {
+        "IMAGE": "JPEG or PNG, up to 5 MB.",
+        "VIDEO": "MP4, up to 16 MB.",
+        "DOCUMENT": "PDF, up to 25 MB."
+      },
+      "fileGoes": "The customer gets the template with this file at the top.",
+      "fileMissing": {
+        "IMAGE": "This template goes with a photo at the top: choose it, or WhatsApp will not send it.",
+        "VIDEO": "This template goes with a video at the top: choose it, or WhatsApp will not send it.",
+        "DOCUMENT": "This template goes with a document at the top: choose it, or WhatsApp will not send it."
+      },
+      "fileWrongType": {
+        "IMAGE": "Choose a JPEG or PNG photo.",
+        "VIDEO": "Choose an MP4 video.",
+        "DOCUMENT": "Choose a PDF document."
+      },
+      "fileTooHeavy": "This file weighs more than {mb} MB: choose a lighter one.",
+      "fileUploadFailed": "The file could not be uploaded. Try again.",
+      "fileGone": "The file this step had chosen is no longer kept: choose it again.",
+      "fileReadFailed": "The file of this step could not be read."
     },
     "inbox": {
       "heading": "Waiting for your answer",

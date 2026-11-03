@@ -3,6 +3,8 @@
 // (Clock in, or Start/End break and Clock out), «Today» (Worked and Breaks, running) and «Recent days».
 // Everything comes live (`attendance.record.current`, `attendance.settings.get`); a command answers with
 // the server's time («Clocked in at 09:00.») or the server's refusal, and the screen follows the stream.
+// Whether this device is the counter POS or someone's own phone is the platform's (`base.device.current`,
+// BASE-F62), followed live as the other two.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { EMPLOYEE, click, errorFrame, flush, mountAttendance } from '../__tests__/mount-attendance';
@@ -16,7 +18,6 @@ vi.mock('../lib/geo', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../lib/geo')>()),
   getPosition: geo.getPosition,
 }));
-vi.mock('../lib/device', () => ({ deviceMode: () => device.mode }));
 
 const NOW = '2026-10-06T08:30:00Z'; // 10:30 in Madrid
 
@@ -67,6 +68,10 @@ const SETTINGS: SettingsOut = {
   updated_at: null,
 };
 
+function thisDevice(mode: 'shared' | 'personal', known = true) {
+  return { known, mode, mode_set_by: known ? 'Eva Ruiz' : '', mode_set_at: known ? NOW : null };
+}
+
 const OPEN = current({
   open: day(),
   today: { date: '2026-10-06', worked_seconds: 5400, break_seconds: 0, running: 'work' },
@@ -87,6 +92,7 @@ async function setup(data: CurrentOut | null = current(), settings: SettingsOut 
   if (data) {
     await m.result('attendance.record.current', data);
     await m.result('attendance.settings.get', settings);
+    await m.result('base.device.current', thisDevice(device.mode));
   }
   const text = (id: string) => m.find(id).exists() ? m.find(id).text() : null;
   const has = (id: string) => m.find(id).exists();
@@ -307,6 +313,25 @@ describe('ClockPage from a personal device when the business asks for the locati
     await click(s.find('attendance-clock-out').element);
     await flush();
     expect(s.sent()).toEqual([{ method: 'POST', path: '/api/attendance/clock_out', query: {}, body: {} }]);
+  });
+
+  it('follows the device: made personal while the page is open, it asks from the next clock-in', async () => {
+    geo.getPosition.mockResolvedValue({ lat: 40.4173, lng: -3.7038, accuracy_m: 9.5 });
+    const s = await setup(current(), REQUIRED);
+    expect(s.params('base.device.current')).toEqual([{}]);
+    expect(s.has('attendance-clock-location-note')).toBe(false);
+    await s.result('base.device.current', thisDevice('personal'), {}, 2);
+    expect(s.text('attendance-clock-location-note')).toContain('Your location is checked');
+    s.answerBy({ '/api/attendance/clock_in': [200, day({ source: 'personal', in_distance_m: 55.5, in_within_radius: true })] });
+    await click(s.find('attendance-clock-in').element);
+    await flush();
+    expect(s.sent()[0].body).toEqual({ lat: 40.4173, lng: -3.7038, accuracy_m: 9.5 });
+  });
+
+  it('a browser the Hub does not know yet clocks as the counter POS', async () => {
+    const s = await setup(current(), REQUIRED);
+    await s.result('base.device.current', thisDevice('shared', false), {}, 2);
+    expect(s.has('attendance-clock-location-note')).toBe(false);
   });
 
   it('the counter POS is never asked, whatever the settings', async () => {

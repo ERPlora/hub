@@ -53,7 +53,7 @@ from apps.flow.queries import (
     asked_first,
     catalog_operations,
     catalog_problems,
-    fixed_value,
+    pinned_values,
     grantable_operations,
     needs_a_person,
     operation_problem,
@@ -122,6 +122,16 @@ DISABLED = _("This automation is paused: turn it on to run it.")
 DRAFT_DECIDED = _("That draft was already decided.")
 GRANT_BEYOND_CALLER = _("You cannot allow what you may not do yourself: «%(name)s».")
 RECIPE_NOT_ON = _("This business has not turned that automation on: there is nothing to change.")
+#: What its app fixes on an automation built from one of its recipes is not taken off from it (FLOW-F36): the ways
+#: out are another value, taking that tool off the step, starting it with something else, or a copy (the owner's).
+FIXED_CLAUSE = _(
+    "«%(app)s» puts a condition on «%(field)s»: give it another value, start it with something else or make a copy."
+)
+FIXED_PIN = _(
+    "«%(app)s» fixes «%(field)s» of «%(name)s»: give it another value, take «%(name)s» off what it may use or make a copy."
+)
+#: The code of that refusal.
+RECIPE_FIXED_CODE = "flow.recipe_fixed"
 SECRETS_KEY_MISSING = _(
     "This server cannot keep secrets yet: its encryption key is missing. Nothing was saved."
 )
@@ -192,6 +202,36 @@ def _apply_trigger(flow: Flow, trigger: Any) -> None:
         else {}
     )
     flow.run_at = trigger.at if trigger.kind == "at" else None
+
+
+def _taken_off(flow: Flow, trigger: Any, steps: list[Any] | None) -> None:
+    """Refuses, by field, a change that leaves out what its app fixes on ``flow`` (FLOW-F36): a condition of its «Only
+    when…» while it starts on the recipe's event, or a datum of an «Ask the assistant» step (or leaves it empty) while
+    that step may use its tool. Saved, it would come back on reading it without a word."""
+    fixed = recipes.fixed_by_app(flow)
+    if fixed is None:
+        return
+    problems: dict[str, str] = {}
+    if trigger is not None and trigger.kind == "event" and trigger.event == fixed["event"]:
+        gone = next((path for path in fixed["filter"] if path not in (trigger.filter or {})), None)
+        if gone is not None:
+            problems["trigger.filter"] = str(FIXED_CLAUSE) % {"app": fixed["app_name"], "field": gone}
+    for index, step in enumerate(steps or []):
+        wanted = fixed["pinned"].get(step.id) if step.kind == "assistant" else None
+        for tool, fields in (wanted or {}).items():
+            have = (step.pinned or {}).get(tool) or {}
+            gone = next((field for field in fields if _blank(have.get(field))), None)
+            if tool in step.tools and gone is not None:
+                problems[f"steps.{index}.pinned"] = str(FIXED_PIN) % {
+                    "app": fixed["app_name"], "field": gone, "name": tool
+                }
+                break
+    if problems:
+        raise InvalidPayload(next(iter(problems.values())), code=RECIPE_FIXED_CODE, fields=problems)
+
+
+def _blank(value: Any) -> bool:
+    return value is None or (isinstance(value, str) and not value.strip())
 
 
 def _check(trigger: Any, steps: list[Any] | None, now: dt.datetime, saved_at: dt.datetime | None = None) -> None:
@@ -289,13 +329,15 @@ def create_flow(ctx: OperationContext, data: CreateIn) -> dict:
     ai={
         "description": "Change an automation, by its id or its name: its name, what starts it or its steps (to turn "
         "it on or pause it, `flow.flow.set_enabled`). Only what is sent changes; its permissions stay. Changing the trigger or the steps "
-        "raises its version, and what is already running goes on with the version it started with.",
+        "raises its version, and what is already running goes on with the version it started with. What its app fixes "
+        "on one built from a recipe (`fixed_by_app` of `flow.flow.detail`) cannot be left out: give it another value.",
         "risk": "normal",
     },
 )
 def update_flow(ctx: OperationContext, data: UpdateIn) -> dict:
     now = timezone.now()
     flow = resolve_flow(data.id, data.flow, lock=True)
+    _taken_off(flow, data.trigger, data.steps)
     _check(data.trigger, data.steps, now, saved_at=flow.run_at)
     changed_document = False
     if data.name is not None:
@@ -396,10 +438,10 @@ def duplicate_flow(ctx: OperationContext, data: FlowRefIn) -> dict:
         enabled=False,
         trigger_kind=original.trigger_kind,
         trigger_event=original.trigger_event,
-        trigger_filter=original.trigger_filter,
+        trigger_filter=recipes.fixed_filter(original),
         schedule=original.schedule,
         run_at=original.run_at,
-        steps=original.steps,
+        steps=recipes.fixed_data(original, original.steps),
         language=ctx.language,
         created_by=_actor(ctx),
         updated_by=_actor(ctx),
@@ -635,11 +677,13 @@ def repair_recipe(ctx: OperationContext, data: RecipeRefIn) -> dict:
     recipe = recipes.find(data.recipe)
     flow = _recipe_flow(recipe.ref)
     missing = recipes.missing_clauses(recipe, flow)
-    if missing:
+    steps = recipes.fixed_data(flow, flow.steps)
+    if missing or steps != flow.steps:
         flow.trigger_filter = {**flow.trigger_filter, **missing}
+        flow.steps = steps
         flow.version += 1
         flow.updated_by = _actor(ctx)
-        flow.save(update_fields=["trigger_filter", "version", "updated_by", "updated_at"])
+        flow.save(update_fields=["trigger_filter", "steps", "version", "updated_by", "updated_at"])
         record_event(ctx, events.FLOW_UPDATED, {"id": str(flow.id), "version": flow.version})
     return flow_row(flow)
 
@@ -1147,16 +1191,7 @@ def _spec(op: Operation, step: dict) -> dict:
 def _pinned(run: FlowRun, step: dict, op: Operation) -> tuple[dict, list[str]]:
     """``(values, empty)``: the data the step fixes for ``op``, filled in with the run's data as its prompt is, and
     the names of those empty now (a path not found, a text with nothing in it)."""
-    data = {"input": run.input, "steps": run.outputs}
-    values: dict[str, Any] = {}
-    empty: list[str] = []
-    for name, raw in ((step.get("pinned") or {}).get(op.name) or {}).items():
-        value = fixed_value(raw, data)
-        if value is None:
-            empty.append(name)
-        else:
-            values[name] = value
-    return values, empty
+    return pinned_values(run, step, op.name)
 
 
 def _with_pinned(arguments: str, values: dict) -> str:
@@ -1190,12 +1225,18 @@ def _instructions(ctx: OperationContext, flow: Flow, step: dict) -> str:
     return f"{text}\n\n{UNATTENDED % {'name': flow.name}} {mode}"
 
 
+def _step_of(run: FlowRun, flow: Flow) -> dict:
+    """The step ``run`` is on, as its automation was when it started, with the data its app fixes today (FLOW-F36):
+    also a run started before its app fixed them."""
+    return recipes.fixed_data(flow, run.definition["steps"])[run.step_index]
+
+
 def _assistant_run(run_id: uuid.UUID) -> tuple[FlowRun | None, dict]:
     """The run whose «Ask the assistant» step is thinking, locked, and that step; ``None`` for any other."""
     run = FlowRun.objects.select_for_update(of=("self",)).select_related("flow").filter(pk=run_id).first()
     if run is None or run.status != FlowRun.Status.CALLING:
         return None, {}
-    step = run.definition["steps"][run.step_index]
+    step = _step_of(run, run.flow)
     return (run, step) if step["kind"] == "assistant" else (None, {})
 
 
@@ -1252,7 +1293,7 @@ def claim_assistant(ctx: OperationContext, data: RunRefIn) -> dict:
     if run is None:
         return {"claimed": False}
     flow = run.flow
-    step = run.definition["steps"][run.step_index]
+    step = _step_of(run, flow)
     if step["kind"] != "assistant":
         return {"claimed": False}
     with translation.override(flow.language):
@@ -1443,9 +1484,19 @@ def _make_proposal(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, 
         if _fail(ctx, run, step, _own("flow.not_allowed", ASSISTANT_GONE_KEY, operation=name), now):
             _go_on(ctx, run, flow, now)
         return
-    outcome = hub_assistant.run_tool(_step_context(ctx, run, flow, op), op, str(proposal.get("arguments") or "{}"))
-    _log(run, step, "assistant_used", now, operation=op.name, ok=outcome.outcome == "ok")
-    told = [{"role": "tool", "tool_call_id": proposal["call_id"], "content": outcome.content}]
+    # What the step fixes goes in again: a change proposed before its app fixed that datum is never made as the
+    # assistant chose it (FLOW-F36), and one whose fixed datum is empty now is not made.
+    fixed, empty = _pinned(run, step, op)
+    if empty:
+        told_empty = PINNED_EMPTY_TOLD % {"fields": ", ".join(f"«{name}»" for name in empty)}
+        content = hub_assistant.error_content(PINNED_EMPTY_CODE, told_empty)
+        _log(run, step, "assistant_pinned_empty", now, operation=op.name, fields=empty)
+    else:
+        arguments = _with_pinned(str(proposal.get("arguments") or "{}"), fixed)
+        outcome = hub_assistant.run_tool(_step_context(ctx, run, flow, op), op, arguments)
+        _log(run, step, "assistant_used", now, operation=op.name, ok=outcome.outcome == "ok")
+        content = outcome.content
+    told = [{"role": "tool", "tool_call_id": proposal["call_id"], "content": content}]
     told += [{"role": "tool", "tool_call_id": call_id, "content": NOT_MADE} for call_id in proposal.get("later") or []]
     rounds = turn["rounds"] + 1
     run.outputs = {
@@ -1566,7 +1617,7 @@ def answer_question(ctx: OperationContext, data: AnswerIn) -> dict:
     question.decided_by, question.decided_at, question.note = who, now, data.note
     question.save(update_fields=["status", "decided_by", "decided_at", "note"])
     record_event(ctx, events.QUESTION_ANSWERED, {"id": str(question.id), "run_id": str(run.id)})
-    step = run.definition["steps"][run.step_index]
+    step = _step_of(run, flow)
     with translation.override(flow.language):
         _log(run, step, "answered", now, approved=data.approve, by=who, note=data.note)
         if goes_on and step["kind"] == "assistant":
@@ -1833,7 +1884,9 @@ def react(ctx: OperationContext, data: ReactIn) -> dict:
         if flow is None or FlowRun.objects.filter(flow=flow, trigger_key=key).exists():
             skipped += 1
             continue
-        if not document.readable(flow.trigger_filter):
+        # What its recipe excludes today counts too, whenever it was built (FLOW-F36).
+        wanted = recipes.fixed_filter(flow)
+        if not document.readable(wanted):
             # Never «does not hold» in silence (hub#1766): the owner reads why in its history.
             run = _start(
                 ctx,
@@ -1849,9 +1902,7 @@ def react(ctx: OperationContext, data: ReactIn) -> dict:
             with translation.override(flow.language):
                 _finish(ctx, run, FlowRun.Status.FAILED, now, _own("flow.filter_unreadable"))
             continue
-        if not document.holds(
-            flow.trigger_filter, {"input": data.payload, "steps": {}}
-        ):
+        if not document.holds(wanted, {"input": data.payload, "steps": {}}):
             skipped += 1
             continue
         run = _start(

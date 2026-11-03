@@ -136,7 +136,9 @@ test('apps and Home, fast and repeated: the address and the page stay in step', 
   await expect(page.locator('ion-router-outlet > .ion-page:not(.ion-page-hidden)')).toHaveCount(1);
 });
 
-// hub#2489 / hub#2325: with a flaky network, tapping an app opened nothing and said nothing.
+// hub#2489 / hub#2325: with a flaky network, tapping an app opened nothing and said nothing. Since gh:hub#438 the
+// notice is the shell router's, for every way of opening a screen (`view-load.ts` of @erplora/ui): the browser still
+// says «online» here, the server does not answer for the file, so the screen stays and the notice names the app.
 test('an app whose page does not load says so, with a Retry; never silent', async ({ page }) => {
   await login(page, A);
   await page.goto('/demo/items');
@@ -147,7 +149,7 @@ test('an app whose page does not load says so, with a Retry; never silent', asyn
   const target = otherApps(sheet).filter({ hasText: /^\s*Customers\s*$/ });
   const name = (await target.getAttribute('title'))!;
   await target.click();
-  const toast = page.locator('ion-toast#apps-launcher-open');
+  const toast = page.locator('ion-toast#view-load-failed');
   await expect(toast).toBeVisible();
   await expect(toast).toContainText(name);
   await expect(page).toHaveURL(`${A}/demo/items`);

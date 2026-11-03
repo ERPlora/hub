@@ -24,6 +24,7 @@ from base import api_keys
 from base.models import ApiKey, Membership
 from base.tenancy import context
 from base.tenancy.tests import hubs
+from base.tenancy.tests.legacy import use_legacy
 
 pytestmark = pytest.mark.usefixtures("no_test_fallback")
 
@@ -186,18 +187,18 @@ def test_the_watch_fails_a_block_that_reaches_any_other_hub(hub_a, hub_b):
         with hubs.assert_only_alias(hubs.HUB_A_ALIAS):
             listed(hub_b)
 
-    # Phase 1's shared tables in control's database are no hub's own either: a hub's table read there fails it.
+    # What phase 1 left in control's tables is no hub's own either: a hub's table read there fails it.
     with pytest.raises(AssertionError, match="demo_item"):
-        with hubs.assert_only_alias(hubs.HUB_A_ALIAS), context.use_shared_database():
+        with hubs.assert_only_alias(hubs.HUB_A_ALIAS), use_legacy():
             list(Item.objects.all())
 
 
 @HUB_DB
 def test_a_key_planted_in_the_shared_tables_never_opens_a_hub_with_its_own_database(client, hub_a):
-    # A key row left in phase 1's shared tables (by hand, or by a business before it moved) is nobody's: A looks for
-    # its keys in its own database only.
+    # A key row left in control's tables by phase 1 (by hand, or by a business before its cut) is nobody's: A looks
+    # for its keys in its own database only.
     token = api_keys.new_token()
-    with context.use_shared_database():
+    with use_legacy():
         ApiKey.objects.create(
             name="Planted", prefix=token[: api_keys.PREFIX_LENGTH], token_digest=api_keys.digest(token), mode="full"
         )

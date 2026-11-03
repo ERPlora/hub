@@ -22,7 +22,7 @@
 // figure in the three viewports; the maximum goes back to what it was.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, api, EMPLOYEE, login, OWNER, psql, shot, shown, untilStill } from './helpers';
+import { A, api, EMPLOYEE, login, OWNER, psql, shot, shown, untilStill, usernamesOf } from './helpers';
 import { cleanUp as cleanCustomers, createCard, e2eName } from './customer-helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { ensureIssuer, snapshotSeries } from './invoice-helpers';
@@ -67,8 +67,8 @@ async function usernameOf(context: BrowserContext): Promise<string> {
   return psql(`SELECT username FROM base_hubuser WHERE id = '${id}'`);
 }
 
-/** Every account of `email` in this hub's database: the cleanup leaves none of them with what this file made. */
-const accountsOf = (email: string): string => `SELECT username FROM auth_user WHERE email = '${email}'`;
+/** Every account of `email` (their usernames, read from control's): the cleanup leaves none of them with what this file made. */
+const accountsOf = (email: string): string => usernamesOf(email);
 
 /**
  * No PIN of the owner's left behind, in any of their accounts (the business's way in stays erplora.com's), and no

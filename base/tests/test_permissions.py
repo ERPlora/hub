@@ -1,4 +1,5 @@
-"""Permissions of a user on a host: superuser → *, else the customer role of its Membership on that host.
+"""Permissions of a user on a host: the customer role of its Membership on that host (a superuser's ``*`` is the
+platform scope's alone: ERPlora's staff is no customer, tests/test_guardrails_permissions.py).
 
 Owner and admin get every permission of every app; manager and employee, what each app declares.
 """
@@ -36,9 +37,9 @@ def test_anonymous_has_nothing():
     assert permissions_for(AnonymousUser(), A) == frozenset()
 
 
-def test_superuser_has_everything_on_every_host(superuser):
-    assert permissions_for(superuser, A) == {"*"}
-    assert permissions_for(superuser, Scope("host", "zzz")) == {"*"}
+def test_a_superuser_without_a_membership_has_nothing_on_a_host(superuser):
+    assert permissions_for(superuser, A) == frozenset()
+    assert permissions_for(superuser, Scope("host", "zzz")) == frozenset()
 
 
 def test_inactive_user_has_nothing(make_user):

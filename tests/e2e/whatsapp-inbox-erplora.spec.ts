@@ -287,7 +287,7 @@ test('WHATSAPP_INBOX-F11: erasing a customer’s card empties her conversations 
   await erase.locator('[data-testid=customer-erase-submit]').click();
   await page.waitForURL(/\/customer\/customers$/);
   // The worker's part: the outbox relay hands `customer.customer.erased` to the inbox's reaction, as on every tick.
-  execFileSync('uv', ['run', 'python', 'manage.py', 'shell', '-c', RELAY], { cwd: HUB_DIR, encoding: 'utf8' });
+  execFileSync('uv', ['run', 'python', 'manage.py', 'shell', '--hub', 'a', '-c', RELAY], { cwd: HUB_DIR, encoding: 'utf8' });
 
   await page.goto('/whatsapp_inbox/inbox');
   await shown(page).locator('[data-testid=whatsapp-inbox-search] input').fill(phone.slice(3));

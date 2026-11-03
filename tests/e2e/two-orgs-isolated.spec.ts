@@ -1,9 +1,10 @@
 // PoC §8.1 (second half): a write in business `b` never reaches the open screens of `a`, and the
-// other way round. Phase 1 shares the rows (one database), so a reload DOES show them: only the
-// live notice is per business (WORKBOOK «Antes de empezar»).
+// other way round. Since S2a (round 2026-10-30 of PLAN-DB) each business has its own database, so a
+// reload does not show them either: b's row is in b's database and nowhere in a's (phase 1 shared the
+// rows, and only the live notice was per business).
 import { type Page, expect, test } from '@playwright/test';
 
-import { A, B, createViaPage, hostPage, listReady, record, row, rowNames, shot, uniqueName, watchForRow } from './helpers';
+import { A, B, createViaPage, hostPage, listReady, psql, record, row, rowNames, shot, uniqueName, watchForRow } from './helpers';
 
 const QUIET_MS = 2000;
 
@@ -39,17 +40,25 @@ test('a write in b does not reach a within 2 s, and the other way round', async 
   const aToB = await writeAndWatch(a.page, b.page, nameA);
   await b.page.screenshot({ path: shot('03-b-after-write-in-a') });
 
-  // Control: the rows exist for both (shared database in phase 1); a reload of `a` shows b's row.
+  // Each business's rows live in its own database: a reload of `a` never shows b's row, nor of `b` a's, and each row
+  // is in its business's database only.
   await a.page.reload();
   await listReady(a.page);
   const aReloadShowsB = (await rowNames(a.page)).includes(nameB);
+  await b.page.reload();
+  await listReady(b.page);
+  const bReloadShowsA = (await rowNames(b.page)).includes(nameA);
+  const count = (name: string, hub: string) => Number(psql(`select count(*) from demo_item where name = '${name}'`, hub));
+  const rows = { bInA: count(nameB, 'a'), bInB: count(nameB, 'b'), aInA: count(nameA, 'a'), aInB: count(nameA, 'b') };
 
-  record('03-two-orgs-isolated', { quietMs: QUIET_MS, bToA, aToB, aReloadShowsB });
+  record('03-two-orgs-isolated', { quietMs: QUIET_MS, bToA, aToB, aReloadShowsB, bReloadShowsA, rows });
   expect(bToA.sameRows).toBe(true);
   expect(bToA.leaked).toBe(false);
   expect(aToB.sameRows).toBe(true);
   expect(aToB.leaked).toBe(false);
-  expect(aReloadShowsB).toBe(true);
+  expect(aReloadShowsB).toBe(false);
+  expect(bReloadShowsA).toBe(false);
+  expect(rows).toEqual({ bInA: 0, bInB: 1, aInA: 1, aInB: 0 });
 
   await a.context.close();
   await b.context.close();

@@ -61,17 +61,27 @@ Sin variables, el e2e va contra la pila compartida: Hub en `:8000` (Vite `:5173`
 
 ## Varias ejecuciones a la vez
 
-Cada ejecución en paralelo es **una pila propia**, con sus puertos, su SaaS y **su BD**. En la fase 1 todo el
-negocio de los hubs `a` y `b` vive en la BD de control (`DB_NAME`), así que una BD propia aísla todos los datos
-de la ejecución: dos pilas sobre `hub` se pisan (el 16-10-2026, el cobro en efectivo de una cayó en el turno de
-caja abierto de la otra y `cash-register-shift.spec.ts` falló).
+Cada ejecución en paralelo es **una pila propia**, con sus puertos, su SaaS y **su BD**. Desde S2a (ronda
+2026-10-30 de PLAN-DB) cada hub tiene su propia BD: la de control (`DB_NAME`) guarda el registro, las cuentas y las
+sesiones, y el negocio de `a`, de `b` y de cada negocio que una spec da de alta vive en la suya (`<DB_NAME>_<hex>`,
+la columna `db_name` de `base_hub`), que hace `seed_local_hubs` para `a` y `b` y el worker para el resto. Una BD de
+control propia aísla todos los datos de la ejecución: dos pilas sobre `hub` se pisan (el 16-10-2026, el cobro en
+efectivo de una cayó en el turno de caja abierto de la otra y `cash-register-shift.spec.ts` falló).
+
+`psql()` (`helpers.ts`) corre cada sentencia donde viven sus tablas (`hub-databases.ts`): las de control (`base_hub`,
+`base_democode`, `control_*`, `auth_*`, `django_*`, `base_membership`, `base_sessionowner`) en `DB_NAME` y el resto en
+la BD del hub (`a` si la spec no pasa otro), las seguidas de una misma BD en una sola llamada. Las tablas de copia de
+una spec (`e2e…`) van a la BD donde se crearon, y lo que no nombra ninguna tabla (`pg_notify`) va a la de control, donde
+escucha lo vivo. Para un `manage.py shell -c` sobre los datos de un hub, `--hub <slug>`. Una sentencia que nombra tablas de las dos BD no puede correr en
+ninguna y falla diciendo cómo partirla: primero se lee lo de control (`usernamesOf`, el id de `a`) y se pasa el valor
+a la sentencia del hub.
 
 | Variable | Qué aísla | Quién la lee |
 |---|---|---|
 | `E2E_HUB_PORT` | puerto del `runserver` del Hub | las specs (`stack.ts`) |
 | `VITE_DEV_PORT` | puerto del Vite del Hub | `config/settings.py` (entorno o `.env`; `runserver` se la pasa a su Vite), `vite.config.ts` y specs (solo el entorno) |
 | `SAAS_URL` | el SaaS propio, donde va el login | `config/settings.py`, specs |
-| `DB_NAME` | la BD de la ejecución (control + negocio de `a`/`b`) | `config/settings.py`, specs (`psql()`) |
+| `DB_NAME` | la BD de control de la ejecución (y, por su nombre, las de sus hubs: `<DB_NAME>_<hex>`) | `config/settings.py`, specs (`psql()`) |
 | `E2E_MAIL_DIR` | la carpeta de correo del SaaS propio (código de acceso) | specs (`mail.ts`) |
 | `E2E_SAAS_DB` | la BD del SaaS propio, si no es `saas_e2e_<Hub+1>` (con el Hub en `:8000`, `saas`) | `global-setup.ts` y las specs que la leen (`stack.ts`) |
 
@@ -86,8 +96,9 @@ Reglas que el e2e hace cumplir:
   de la primera spec y dice qué exportar.
 - `node tests/e2e/database.ts` crea la BD de `DB_NAME` si falta y la migra (control y hubs); es idempotente y
   conserva sus filas, así que se repite tras añadir una migración. Va **antes** de arrancar `runserver`, que no
-  arranca sin su BD. `--drop` la borra al terminar, nunca a la fuerza: con el `runserver` vivo, falla y lo dice.
-  Solo toca BD e2e.
+  arranca sin su BD. `--drop` la borra al terminar, con las BD de sus hubs (`<DB_NAME>_<hex>`, las de demo
+  `<DB_NAME>_demo_<hex>`) y sus plantillas, nunca a la fuerza: con el `runserver` vivo, falla y lo dice. Solo toca BD
+  e2e.
 - Ese mismo paso deja en el `.env` del checkout las dos claves Fernet con las que cifra el Hub: la
   `FISCAL_CERTIFICATE_KEY` de los certificados de prueba (sin ella, «Mi certificado» de `verifactu-config.spec.ts`
   recibe un 409) y la `FLOW_SECRETS_KEY` de los secretos de las automatizaciones (sin ella, la caja «Secretos» de
@@ -96,6 +107,12 @@ Reglas que el e2e hace cumplir:
   entorno, dice en una línea qué hizo con cada una (nunca su valor) y, si alguna no es una clave, falla sin escribir
   nada (`fernet-keys.ts`).
 - Si la BD e2e aún no existe, `global-setup.ts` lo dice con la orden que la crea.
+- Pasadas las comprobaciones, `global-setup.ts` arranca el `manage.py run_worker --databases-only` de este checkout
+  sobre `DB_NAME` (y `SHARED_DB_NAME` = la BD del SaaS de la pila, donde registra las apps) y lo para con `SIGTERM` al
+  acabar la ejecución: desde S2a (ronda 2026-10-30 de PLAN-DB) un negocio o una demo que se dan de alta durante la
+  ejecución quedan `requested` hasta que el worker hace su BD. Solo hace eso (y borra las demos que acaban): ni releva
+  el outbox ni corre tareas, que las specs juegan ellas mismas (`manage.py shell --hub a`); un worker que releva a la vez
+  se les adelanta. Si el worker no dice «waiting for work» en 60 s, o sale antes, la ejecución para con lo que dijo.
 - Las specs entran con las cuentas de demo del SaaS (`owner@example.com` y `employee@example.com`, con acceso a `a` y
   `b`), que crea `manage.py demo_seed` del SaaS (en la receta, por medio de `whatsapp_hub_seed.py`, abajo). `global-setup.ts`
   las busca en la BD del SaaS de la pila (`E2E_SAAS_DB`, por defecto `saas_e2e_<Hub+1>`; con un solo `select`, sin escribir
@@ -215,6 +232,113 @@ La cuenta del e2e está en inglés: la spec comprueba las cadenas `en`.
 Si la misma pila corre también specs de WhatsApp, su SaaS arranca como dice «WhatsApp» (abajo), con estas mismas
 variables más las del Graph: nunca con un `SSL_CERT_FILE` escrito a mano.
 
+## La QA del asistente con el modelo real (`qa/assistant-battery.spec.ts`)
+
+La batería de QA del asistente del Hub (`docs/plans/2026-10-31-qa-asistente.md` de erplora-next: bloque B, 21 a 34, y
+C35 a C37) con el **modelo de verdad** y el **índice de documentación de verdad**: una prueba por punto. Se salta sin
+`QA_REAL_PROVIDER=1`, así que la suite y la CI nunca la corren (gasta tokens de verdad, unos 20 turnos). Pide una pila
+propia (arriba, «Varias ejecuciones a la vez») con el SaaS arrancado con `ASSISTANT_SERVICE_PROVIDER=openai` (las
+huellas de la búsqueda; sin `e2e-local`), y en el entorno de la ejecución:
+
+- `QA_QWEN_API_KEY` y `QA_OPENAI_API_KEY`: las claves, solo en el entorno. Nunca en el repo, en el informe ni en una
+  captura: el informe y su JSON pasan por `redact` antes de escribirse.
+- `E2E_SAAS_DIR`: el checkout del SaaS de la pila.
+
+En cada invocación, antes del primer punto: `register_apps` del Hub en el esquema `shared` de la BD del SaaS de la
+pila (la documentación de las apps), los proveedores reales por las operaciones del propio SaaS (`SEED_PY` de
+`assistant-battery.ts`: `qwen`, compatible con OpenAI, contesta con `qwen3.7-plus`; `openai`, de reserva con
+`gpt-5.4-mini` y de las huellas) e `index_docs` (idempotente: solo calcula lo nuevo); una vez por ejecución, los mensajes
+del mes de `a` a cero. Al acabar, pase o falle, su `afterAll` saca del SaaS de la pila las claves (las de etiqueta `qa`) y
+la cuenta de personal con la que siembra (`CLEANUP_PY`): las claves nunca se quedan en la BD. Se niega a sembrar en la BD
+compartida `saas` o en una que no sea `…e2e…`. Cada punto pregunta en una conversación nueva, en `es` (C37 en `en`), guarda lo que pasó por
+`/api/assistant/turn` (herramientas, tarjeta, extractos de `base.docs.search`, errores), confirma la tarjeta de los
+«hazlo» escribiendo la palabra que pide (los demás la cancelan), comprueba el registro por la API del Hub y escribe
+`.artifacts/qa/<ejecución>/assistant-battery-B.md` (el informe, punto a punto) y `.artifacts/qa/<ejecución>/<punto>-<slug>.png`:
+cada ejecución en su carpeta, así que repetir puntos nunca pisa la evidencia de otra. Una prueba falla
+si falla su veredicto automático (`verdictOf`, probado con Vitest en `assistant-battery.test.ts`); la redacción de la
+respuesta nunca se comprueba: la lee una persona en el informe. C35 pone el mes de `a` al 80 % para ver moverse el pie
+(solo se pinta desde ahí, BASE-G122) y lo devuelve a lo gastado.
+
+```bash
+# Con la pila en marcha (Hub 8894, SaaS 8895 en el ejemplo) y sus variables exportadas:
+export QA_REAL_PROVIDER=1 E2E_SAAS_DIR=<saas-wt> QA_QWEN_API_KEY=… QA_OPENAI_API_KEY=…
+CI=1 pnpm e2e tests/e2e/qa/assistant-battery.spec.ts
+# Volver a preguntar algunos puntos en el informe de una ejecución anterior (su id, el de la cabecera del informe):
+QA_BATTERY_RUN=<id> CI=1 pnpm e2e tests/e2e/qa/assistant-battery.spec.ts --grep C35
+```
+
+## Las sondas del asistente: capa 2 con el modelo real (`qa/assistant-probes.spec.ts`)
+
+La capa 2 de la QA del asistente (`docs/plans/2026-10-31-asistente-conocimiento-y-qa.md` de erplora-next, §1.5): una
+**sonda** es una frase natural **nueva** para una herramienta, escrita como la teclearía una persona de un rol en un
+idioma, y lo que el turno tiene que hacer. Nunca es una de las `asks` de la herramienta (eso ya lo mide la capa 1 en cada
+PR): mide que el asistente generaliza. Las sondas viven en `qa/probes/*.json` (esquema `qa/probes.schema.json`; el corpus
+que se va ampliando), y cada una dice:
+
+- `id` (único entre todos los ficheros), `app`, `tool` (el nombre de la operación, `sale.sale.today`), `role`
+  (`owner`, `admin`, `manager` o `employee`), `language` (`en` o `es`) y `phrase`;
+- `expect`:
+  - `read`: esa lectura es la primera herramienta del negocio que llama el modelo y no sale tarjeta;
+  - `card`: la primera tarjeta es la de esa escritura y no sale otra detrás (una escritura equivocada ofrecida
+    primero es un fallo del producto);
+  - `refused`: el rol no tiene la herramienta, no corre nada del negocio, no sale tarjeta y la respuesta nombra el
+    permiso o un rol («permiso», «rol», «propietario», «encargado», «administrador»; «permission», «role», «owner»,
+    «manager», «admin») junto a una negación. Un «no puedo» suelto no cuenta: sale FAIL con su texto para que lo
+    juzgue una persona;
+  - `docs`: `base.docs.search` devuelve extractos, la respuesta nombra uno (su título, una parte del título o su ruta)
+    y no corre nada del negocio;
+- `decide`, solo en `card`: `cancel` (por defecto: se cancela y no cambia nada) o `confirm` (se confirma y la escritura
+  tiene que salir bien; solo con datos del negocio sembrado);
+- `lookups`, solo en `read`: las lecturas que el modelo puede hacer antes para buscar algo (`sale.business_day.get`);
+- `notes`, libre.
+
+Antes de preguntar, cada sonda se comprueba contra el catálogo exportado (`manage.py export_assistant_catalog`) de su rol
+e idioma y del dueño en los dos idiomas: la frase no está vacía ni copia una `ask` de la herramienta en ningún idioma
+(sin contar mayúsculas, acentos, signos ni espacios: «¿Cuánto vendí hoy?» es «cuanto vendi hoy»), la herramienta existe y
+es de esa app, `read` es una lectura y `card` una escritura que el rol tiene, `refused` es una herramienta del dueño que el
+rol no tiene y cada `lookups` es otra lectura que el rol tiene. Si no encaja, la sonda sale **N/A** y no se gasta ningún turno: hay que
+arreglar la sonda, no el producto.
+
+La spec se salta sin `QA_REAL_PROVIDER=1` (gasta tokens de verdad; nunca en la CI) y pide lo mismo que la batería de
+arriba: pila propia, el SaaS con `ASSISTANT_SERVICE_PROVIDER=openai`, `E2E_SAAS_DIR` y las dos claves en el entorno.
+Una vez por ejecución hace la siembra de la batería (proveedores reales, índice de documentación), da de alta en el
+SaaS de la pila un encargado y un administrador de `a` (`qa-manager@example.com` / `manager` y `qa-admin@example.com` /
+`admin`; el dueño y el empleado son los de `demo_seed`) y enciende todas las apps de `a`, como supone el catálogo. Al
+acabar, pase o falle, su `afterAll` saca del SaaS de la pila las claves (`qa`) y esas cuentas (`CLEANUP_PY`), igual que
+la batería; por eso cada invocación vuelve a sembrarlas. Tampoco escribe nunca en la BD compartida `saas` ni en una que no
+sea `…e2e…`: se niega antes de sembrar. Cada
+sonda entra con su rol, en una conversación nueva y con su idioma, vacía antes los mensajes del mes de `a` y escribe
+`.artifacts/qa/<ejecución>/assistant-probes.md` (el informe: PASS, FAIL y N/A, la herramienta que eligió el modelo y
+los 300 primeros caracteres de la respuesta), su JSON y `.artifacts/qa/<ejecución>/<sonda>.png`; nada de eso se sube.
+El veredicto (`probeVerdict`) y la carga de los ficheros están en `assistant-probes.ts`, probados con Vitest en
+`assistant-probes.test.ts`.
+
+```bash
+# Con la pila en marcha y sus variables exportadas (como la batería):
+export QA_REAL_PROVIDER=1 E2E_SAAS_DIR=<saas-wt> QA_QWEN_API_KEY=… QA_OPENAI_API_KEY=…
+CI=1 pnpm e2e tests/e2e/qa/assistant-probes.spec.ts                       # todo qa/probes/
+QA_PROBES=tests/e2e/qa/probes/sale-customer-base.json CI=1 pnpm e2e tests/e2e/qa/assistant-probes.spec.ts
+# Repetir algunas sondas en el informe de una ejecución anterior:
+QA_PROBES_RUN=<id> CI=1 pnpm e2e tests/e2e/qa/assistant-probes.spec.ts --grep employee.es
+```
+
+**El esqueleto** (`pnpm qa:probes`) saca el catálogo de un rol e idioma y escribe un fichero de sondas con la frase
+**vacía** para que la escriba quien hace la QA: por cada app, `--sample N` herramientas del rol (2 por defecto,
+lecturas y escrituras alternadas) y otras tantas del dueño que el rol no tiene (`refused`), más `--docs N` sondas de
+documentación (1 por defecto); `--all` las toma todas. `expect` sale de la herramienta (lectura → `read`, escritura →
+`card`) y `notes`, de su descripción. Con la misma `--seed` sale la misma muestra; por defecto va a
+`.artifacts/qa/probes-<rol>-<idioma>-<semilla>.json`, y solo cuando tiene las frases escritas se copia a `qa/probes/`.
+
+```bash
+pnpm -s qa:probes --role employee --language es --apps sale,customer --sample 2
+pnpm -s qa:probes --role owner --language en --all --out probes-owner-en.json
+```
+
+**El agente** `qa-assistant-hub` (definición fuera del repo, en la configuración de los agentes de erplora-next) hace
+la vuelta entera: pila propia sobre `origin/main`, catálogo y esqueleto por rol e idioma, escribe las frases (nuevas,
+ambiguas, como las diría esa persona; nunca las `asks`), corre la spec, abre una issue por fallo del producto (no de la
+sonda) y sube las sondas nuevas en una PR. Por defecto, 2 herramientas por app y rol; «completa» = `--all`.
+
 ## WhatsApp (`whatsapp-*.spec.ts`)
 
 Las specs de WhatsApp usan el SaaS de la pila de verdad, y Meta lo hace el Graph de la ejecución
@@ -237,6 +361,14 @@ llamada saliente, también en las de `http://`: hasta que una spec de WhatsApp a
 asistente respondía 502 al Hub (`FileNotFoundError` de httpx) y `fix-flow-assistant-step.spec.ts` caía sin decir por
 qué. Si la orden falla (argumentos que no entiende o la autoridad que no se puede crear), lo dice en una línea y el
 SaaS arranca sin esas variables: las specs de WhatsApp paran entonces en segundos nombrando lo que falta.
+
+Con el Graph en marcha, erplora.com también empuja la foto de `a` (con su plan Gratis) cuando **contesta** al Hub, no
+solo al sembrar: una plantilla mandada a revisión que Meta rechaza por el permiso inventado de la siembra (`meta_code=190`)
+marca el número para reconectar y la foto va detrás. Por eso **toda spec que maneja la bandeja** (importa
+`whatsapp-helpers.ts`), siembre o no, guarda la foto de `a` con `keepPhoto()` en su `beforeAll` (o con `seedErplora`, que
+la llama) y la repone con `restorePhoto()` como último paso de su `afterAll`; `whatsapp-photo.test.ts` lo exige. Sin eso,
+`fix-whatsapp-inbox-template-header-thumbnail.spec.ts` dejaba `a` en el plan Gratis para el resto de la pasada y nueve
+specs posteriores caían con 401 o con 402 `base.app_limit_reached` (hub#528).
 
 ```bash
 # El SaaS de la pila (8031, Hub en 8030), desde su worktree; <hub-wt> es el worktree del Hub de la pila:

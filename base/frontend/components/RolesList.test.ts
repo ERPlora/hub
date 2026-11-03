@@ -3,7 +3,7 @@
 // changed on erplora.com. A catalogue that cannot be read says so.
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { EMPLOYEE, errorFrame, flush, mountBase, subId } from '../__tests__/mount-base';
+import { EMPLOYEE, errorFrame, flush, installedApp, leaveInstalledApp, mountBase, subId, tap } from '../__tests__/mount-base';
 import type { HubRoleRow } from '../operations';
 import RolesList from './RolesList.vue';
 
@@ -27,6 +27,7 @@ async function open(options: Parameters<typeof mountBase>[1] = {}) {
 }
 
 afterEach(() => {
+  leaveInstalledApp();
   document.head.innerHTML = '';
   document.body.innerHTML = '';
 });
@@ -59,6 +60,27 @@ describe('RolesList', () => {
     const other = await open({ session: EMPLOYEE });
     await other.result(other.call, 'base.role.list', { roles: ROLES });
     expect(other.wrapper.find('[data-testid="roles-change"]').exists()).toBe(false);
+  });
+
+  // gh:hub#439: the installed app opens nothing on a `_blank` link; the system browser does.
+  it('in the installed app «Change roles on erplora.com» opens the system browser; the Google Play copy has none', async () => {
+    embed({ name: 'Bar', plan_url: '', members_url: MEMBERS_URL });
+    const invoke = installedApp('direct');
+    const m = await open();
+    await m.result(m.call, 'base.role.list', { roles: ROLES });
+    await flush();
+    const click = tap(m.wrapper.get('[data-testid="roles-change"]').element);
+    await flush();
+    expect(click.defaultPrevented).toBe(true);
+    expect(invoke).toHaveBeenCalledWith('open_external_url', { url: MEMBERS_URL });
+    m.wrapper.unmount();
+
+    leaveInstalledApp();
+    installedApp('play');
+    const play = await open();
+    await play.result(play.call, 'base.role.list', { roles: ROLES });
+    await flush();
+    expect(play.wrapper.find('[data-testid="roles-change"]').exists()).toBe(false);
   });
 
   it('a catalogue that cannot be read says so', async () => {

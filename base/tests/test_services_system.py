@@ -11,6 +11,7 @@ import psycopg
 import pytest
 from django.db import connections
 from django.utils import timezone
+from live.assistant import description
 from live.context import OperationContext, Scope
 from live.errors import Conflict, NotFound, PermissionDenied
 from live.live_registry import live_registry
@@ -60,7 +61,7 @@ def recorded(name):
 def test_each_command_is_for_who_runs_the_business_and_told_to_the_assistant(name, db):
     op = get(name)
     assert (op.kind, op.permission) == ("command", ADMIN)
-    assert op.ai and op.ai["description"]
+    assert description(op)
 
 
 # ── Resend one (BASE-G92) ────────────────────────────────────────────────────────────────────────────────────

@@ -47,6 +47,7 @@ test('the footer tabs move between Customers, Groups, Tags and Fields; a row ope
   await expect(shown(page).locator('[data-testid=tab-customers]')).toHaveClass(/segment-button-checked/);
   await shown(page).locator('[data-testid=topbar-back]').click();
   await page.waitForURL(/\/customer\/customers$/);
+  if (process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
 });
 
 test('every page at 390 / 834 / 1440 without horizontal scroll; the phone shows cards', async ({ page, context }) => {
