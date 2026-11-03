@@ -12,8 +12,9 @@
 // Reservations names Tables, which came along only with it, and «Activar» brings both back, naming it (BASE-F19,
 // BASE-F23, BASE-F24); Tables while Reservations needs it is refused with what to turn off first, in a notice that
 // stays until it is closed (BASE-F25, hub#2594); and VeriFactu, with a ticket whose record is not in the AEAT yet,
-// refuses with its own reason (BASE-F25, VERIFACTU-F32). That ticket is issued through Invoicing's API and deleted
-// after the run with its record (`cleanInvoices`), the numbering given back.
+// offers no «Desactivar» and says its own reason on its row, as the server does when asked directly (BASE-F25,
+// VERIFACTU-F32, hub#618). That ticket is issued through Invoicing's API and deleted after the run with its record
+// (`cleanInvoices`), the numbering given back.
 // flow: BASE-F18 BASE-F19 BASE-F23 BASE-F24 BASE-F25 BASE-F26
 import { execFileSync } from 'node:child_process';
 import { createHmac } from 'node:crypto';
@@ -439,7 +440,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
 for (const [label, viewport] of Object.entries(VIEWPORTS)) {
   const width = Number(label);
 
-  test(`BASE-F25 — «Desactivar» VeriFactu with a record still to send to the AEAT is refused with its reason, at ${width}`, async ({ browser }) => {
+  test(`BASE-F25 — VeriFactu with a record still to send to the AEAT offers no «Desactivar» and says its reason, at ${width}`, async ({ browser }) => {
     await pushPhoto(GRATIS);
     const { context, page } = await signedInSpanish(browser, viewport, '/apps');
     try {
@@ -458,18 +459,15 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await search(page, 'VeriFactu');
       const before = [stored('verifactu'), stored('invoice')]; // VeriFactu chosen, Invoicing along with it (`baseline`)
       expect(before).toEqual(['on:true', 'on:false']);
-      await testid(page, 'apps-row-verifactu-toggle').click();
-      const askOff = page.locator('.ep-confirm-dialog').last();
-      await expect(askOff).toContainText('¿Desactivar VeriFactu?');
-      await askOff.getByRole('button', { name: 'Desactivar' }).click();
-
-      // VeriFactu's own reason, in Spanish, in the notice that stays; nothing changed.
-      const refused = testid(page, 'apps-refused');
-      await expect(refused).toContainText('No se ha cambiado nada');
-      await expect(refused).toContainText(
-        'VeriFactu no se puede desactivar una vez activada: la ley obliga a que tus facturas sigan llegando a la AEAT.',
-      );
+      // VeriFactu's own reason, in Spanish, on its row, and nothing to press; nothing changed.
+      const neverOff = 'VeriFactu no se puede desactivar una vez activada: la ley obliga a que tus facturas sigan llegando a la AEAT.';
+      await expect(appRow(page, 'verifactu').locator('[data-testid="apps-refusal"]')).toHaveText(neverOff);
+      await expect(testid(page, 'apps-row-verifactu-toggle')).toHaveCount(0);
       await expect(appRow(page, 'verifactu').locator('[data-testid="apps-state"]')).toHaveText('Activa');
+      // The server says the same if asked anyway.
+      const direct = await api<{ error: { code: string; message: string; app: string } }>(context, A, 'POST', '/apps/disable', { app: 'verifactu' });
+      expect(direct.status).toBe(409);
+      expect(direct.data.error).toMatchObject({ code: 'base.app_vetoed', message: neverOff, app: 'verifactu' });
       expect([stored('verifactu'), stored('invoice')], 'nothing written').toEqual(before);
       expect(await menuApps(page)).toEqual(expect.arrayContaining(['VeriFactu', 'Facturación']));
       await snap(page, 'vetoed', width);

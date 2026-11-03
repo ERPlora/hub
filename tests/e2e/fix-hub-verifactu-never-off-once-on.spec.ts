@@ -1,13 +1,14 @@
 // VeriFactu never goes off once on, in Spain (FIX-HUB-VERIFACTU-NEVER-OFF-ONCE-ON), in the three viewports, as the
-// owner of hub `a`: with VeriFactu on and no record left to send to the AEAT, «Desactivar» in Apps is still refused
-// with the legal reason — in Spanish, and in English for a Hub in English — and VeriFactu stays «Activa», with its row
-// and Invoicing's untouched and both still in the topbar's «My apps». Each viewport leaves its capture
-// `FIX-HUB-VERIFACTU-NEVER-OFF-ONCE-ON-<width>` (the Spanish refusal) and `…-en-<width>`. Nothing is written: a
-// refusal changes no row, so there is nothing to put back.
-// flow: VERIFACTU-F32
+// owner of hub `a`: with VeriFactu on and no record left to send to the AEAT, Apps offers no «Desactivar» and says the
+// legal reason on its row (hub#618), Invoicing's row says VeriFactu needs it and why, never «turn VeriFactu off first»
+// (hub#619), in Spanish and in English for a Hub in English; the server refuses it all the same when asked directly,
+// and VeriFactu stays «Activa», with both rows untouched and both apps still in the topbar's «My apps». Each viewport
+// leaves its capture `FIX-HUB-VERIFACTU-NEVER-OFF-ONCE-ON-<width>` (in Spanish) and `…-en-<width>`. Nothing is written:
+// a refusal changes no row, so there is nothing to put back.
+// flow: VERIFACTU-F32 BASE-F25
 import { type Browser, expect, type Page, test } from '@playwright/test';
 
-import { A, capture, horizontalOverflow, hostPage, login, psql, shown } from './helpers';
+import { A, api, capture, horizontalOverflow, hostPage, login, psql, shown } from './helpers';
 
 const VIEWPORTS = {
   390: { width: 390, height: 844 },
@@ -18,6 +19,8 @@ const VIEWPORTS = {
 const NEVER_OFF_ES =
   'VeriFactu no se puede desactivar una vez activada: la ley obliga a que tus facturas sigan llegando a la AEAT.';
 const NEVER_OFF_EN = "VeriFactu can't be turned off once it's on: the law requires your invoices to keep reaching the AEAT.";
+const INVOICING_ES = `Facturación no se puede desactivar: hace falta para VeriFactu. ${NEVER_OFF_ES}`;
+const INVOICING_EN = `Invoicing can't be turned off: VeriFactu needs it. ${NEVER_OFF_EN}`;
 
 const testid = (page: Page, id: string) => shown(page).locator(`[data-testid="${id}"]`);
 const appRow = (page: Page, id: string) => shown(page).locator(`[data-testid="apps-row"][data-id="${id}"]`);
@@ -53,13 +56,12 @@ async function signedInSpanish(browser: Browser, viewport: { width: number; heig
   return { context, page };
 }
 
-/** «Turn off» VeriFactu in Apps, confirmed in the dialog that asks: `title` and `confirm` in the page's language. */
-async function turnOffVerifactu(page: Page, labels: { search: string; title: string; confirm: string }): Promise<void> {
-  await testid(page, 'apps-search').locator('input').fill(labels.search);
-  await testid(page, 'apps-row-verifactu-toggle').click();
-  const askOff = page.locator('.ep-confirm-dialog').last();
-  await expect(askOff).toContainText(labels.title);
-  await askOff.getByRole('button', { name: labels.confirm, exact: true }).click();
+/** The list searched for `name` (the rows are paged): `id`'s row says `reason` and offers nothing to turn it off. */
+async function saysWhyItStaysOn(page: Page, name: string, id: string, reason: string, active: string): Promise<void> {
+  await testid(page, 'apps-search').locator('input').fill(name);
+  await expect(appRow(page, id).locator('[data-testid="apps-state"]')).toHaveText(active);
+  await expect(appRow(page, id).locator('[data-testid="apps-refusal"]')).toHaveText(reason);
+  await expect(testid(page, `apps-row-${id}-toggle`)).toHaveCount(0);
 }
 
 /** The capture once the screen settled and nothing scrolls sideways. */
@@ -74,22 +76,26 @@ test.describe.configure({ mode: 'serial' });
 for (const [label, viewport] of Object.entries(VIEWPORTS)) {
   const width = Number(label);
 
-  test(`VERIFACTU-F32 — «Desactivar» VeriFactu with nothing left to send is refused with the legal reason and it stays on, at ${width}`, async ({ browser }) => {
+  test(`VERIFACTU-F32 — Apps offers no «Desactivar» for VeriFactu with nothing left to send, says the legal reason and it stays on, at ${width}`, async ({ browser }) => {
     expect(stored('verifactu'), 'VeriFactu on in a (seed_local_hubs: every app on)').toMatch(/^on:/);
     expect(stillToSend(), 'no record of a is still to send to the AEAT').toBe(0);
     const before = [stored('verifactu'), stored('invoice')];
 
     const spanish = await signedInSpanish(browser, viewport, '/apps');
     try {
-      const { page } = spanish;
-      await turnOffVerifactu(page, { search: 'VeriFactu', title: '¿Desactivar VeriFactu?', confirm: 'Desactivar' });
-
-      const refused = testid(page, 'apps-refused');
-      await expect(refused).toContainText('No se ha cambiado nada');
-      await expect(refused).toContainText(NEVER_OFF_ES);
-      await expect(appRow(page, 'verifactu').locator('[data-testid="apps-state"]')).toHaveText('Activa');
-      expect([stored('verifactu'), stored('invoice')], 'nothing written').toEqual(before);
+      const { context, page } = spanish;
+      await saysWhyItStaysOn(page, 'Facturación', 'invoice', INVOICING_ES, 'Activa');
+      await saysWhyItStaysOn(page, 'VeriFactu', 'verifactu', NEVER_OFF_ES, 'Activa');
       await snap(page, `FIX-HUB-VERIFACTU-NEVER-OFF-ONCE-ON-${width}`);
+
+      // The server refuses it all the same when asked directly: the legal reason, and for Invoicing whose it is.
+      const direct = await api<{ error: { code: string; message: string; app: string } }>(context, A, 'POST', '/apps/disable', { app: 'verifactu' });
+      expect(direct.status).toBe(409);
+      expect(direct.data.error).toMatchObject({ code: 'base.app_vetoed', message: NEVER_OFF_ES, app: 'verifactu' });
+      const invoicing = await api<{ error: { code: string; message: string; app: string } }>(context, A, 'POST', '/apps/disable', { app: 'invoice' });
+      expect(invoicing.status).toBe(409);
+      expect(invoicing.data.error).toMatchObject({ code: 'base.app_vetoed', message: INVOICING_ES, app: 'verifactu' });
+      expect([stored('verifactu'), stored('invoice')], 'nothing written').toEqual(before);
       expect(await menuApps(page)).toEqual(expect.arrayContaining(['VeriFactu', 'Facturación']));
     } finally {
       await spanish.context.close();
@@ -97,12 +103,8 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
 
     const { context, page } = await hostPage(browser, A, { viewport, next: '/apps' });
     try {
-      await turnOffVerifactu(page, { search: 'VeriFactu', title: 'Turn off VeriFactu?', confirm: 'Turn off' });
-
-      const refused = testid(page, 'apps-refused');
-      await expect(refused).toContainText('Nothing was changed');
-      await expect(refused).toContainText(NEVER_OFF_EN);
-      await expect(appRow(page, 'verifactu').locator('[data-testid="apps-state"]')).toHaveText('Active');
+      await saysWhyItStaysOn(page, 'Invoicing', 'invoice', INVOICING_EN, 'Active');
+      await saysWhyItStaysOn(page, 'VeriFactu', 'verifactu', NEVER_OFF_EN, 'Active');
       expect([stored('verifactu'), stored('invoice')], 'nothing written').toEqual(before);
       await snap(page, `FIX-HUB-VERIFACTU-NEVER-OFF-ONCE-ON-en-${width}`);
     } finally {
