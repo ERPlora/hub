@@ -2374,13 +2374,15 @@ Pasos:
      que dice, citando de qué sección sale; si la documentación no lo cubre, lo dice en lugar de inventarlo.
   6. Si el asistente acaba sin decir nada, la burbuja dice «(sin respuesta)».
   7. «Detener» corta lo que faltaba: lo ya escrito se queda, con «Detenido.» debajo.
-  8. Bajo cada respuesta terminada, «Leer en voz alta» la lee con la voz del propio dispositivo, si la tiene, y
-     «Dejar de leer» la para.
+  8. Bajo cada respuesta terminada, «Leer en voz alta» la lee con la voz elegida en la cabecera del panel: una de las
+     dos voces de ERPlora del idioma de la pantalla (la primera, hasta que se elige otra; el dispositivo recuerda la
+     elección) o la «Voz del dispositivo», si la tiene. «Dejar de leer» la para.
 Entra: lo que escribe la persona; la conversación entera viaja con cada pregunta (BASE-F102).
 Sale: la pregunta a erplora.com, que la responde y la cuenta en los mensajes del mes (BASE-F104).
 Si falla: sin conexión, con el servicio caído, sin plan o sin mensajes: BASE-F106 y BASE-F104. Si la documentación no
 se puede consultar en ese momento, el asistente lo dice y no contesta de memoria. «Detener» no deshace una acción que
-ya se había hecho.
+ya se había hecho. Si la voz de ERPlora no puede leer la respuesta en ese momento, la lee la del dispositivo; si
+tampoco hay, bajo la respuesta dice «No se ha podido leer la respuesta en voz alta. Inténtalo de nuevo.».
 Implicados: BASE-F102, BASE-F104, BASE-F106
 
 ### BASE-F94 Adjuntar un archivo o dictar por voz
@@ -3296,19 +3298,30 @@ Implicados: ACCOUNTS-F38, BASE-F40
   `base.person.detail`), la
   comparación del servidor (`confirmed`, como `ConfirmDialog`: sin mayúsculas ni espacios de los extremos),
   `run_tool` (la operación como la persona; `PermissionDenied`, `AppInactive` y `Unauthorized` → `refused`) y las
-  puertas firmadas del SaaS (`/internal/assistant/chat/stream`, `usage`, `report`, `docs/search` y
-  `/internal/speech/transcribe`, con el HMAC de `base.signing`).
+  puertas firmadas del SaaS (`/internal/assistant/chat/stream`, `usage`, `report`, `docs/search`,
+  `/internal/speech/transcribe` y `/internal/speech/synthesize`, con el HMAC de `base.signing`).
 - Operaciones del asistente, todas con `base.view_home` y `ai=` «Not an assistant tool»: `base.assistant.turn`
   (command: corre las lecturas pendientes, para en la tarjeta de una escritura hasta su `decision`, corta a las
   `MAX_ROUNDS` = 6 rondas con `assistant.too_many_steps`; el «sí» a una escritura que la persona no puede hacer y un
   responsable puede aprobar responde `requires_elevation` para esa misma petición y, repetida con el pase, la corre
   con ese permiso más y gasta el pase en su transacción (`_assistant_approved` + `base.approval_spend`), y arma las
   instrucciones con las pantallas que puede enlazar
-  y, con `setup`, la lista de `base.setup.status` releída), `base.assistant.usage` (query), `base.assistant.report` y
-  `base.assistant.transcribe` (command). Rutas en `base/api.py` (`/api/assistant/turn`, `usage`, `report`,
-  `transcribe`): el turno responde en streaming (`text/event-stream`, `turn_response`) a **una** petición `fetch` +
-  `ReadableStream` que se cierra al acabar (tramas `text`, `executed`, `confirm`, `usage`, `error` y `done`), no una
-  segunda SSE permanente (PLAN §14). El navegador nunca habla con la pasarela ni con un proveedor.
+  y, con `setup`, la lista de `base.setup.status` releída), `base.assistant.usage` (query), `base.assistant.report`,
+  `base.assistant.transcribe` y `base.assistant.speak` (command). Rutas en `base/api.py` (`/api/assistant/turn`,
+  `usage`, `report`, `transcribe`, `speak`): el turno responde en streaming (`text/event-stream`, `turn_response`) a
+  **una** petición `fetch` + `ReadableStream` que se cierra al acabar (tramas `text`, `executed`, `confirm`, `usage`,
+  `error` y `done`), no una segunda SSE permanente (PLAN §14). El navegador nunca habla con la pasarela ni con un
+  proveedor.
+- **Leer en voz alta con la voz del servidor** (ronda 2026-11-03n, PLAN-HUB §73): `base.assistant.speak` (`database=False`)
+  pide a erplora.com el mp3 de una respuesta (`text` de 1 a 4096 caracteres, sin espacios de los extremos; `language`,
+  `es` o `en`, la de la pantalla si no viene y el inglés para cualquier otra; `voice`, un id del catálogo de
+  `@erplora/ui` `voices.ts`, o ninguna: la primera del idioma). Espera hasta 65 s (`SPEECH_TIMEOUT`, más que los 60 s
+  que erplora.com espera al proveedor). La ruta devuelve el mp3 (`audio/mpeg`, `no-store`), o la salida JSON (el mp3 en
+  base64) a quien solo acepta JSON. Sin voz configurada en erplora.com (`speech_unavailable`,
+  `assistant.provider_not_configured`) responde 503 `base.assistant_speech_unavailable`; cualquier otro fallo (4xx,
+  5xx, tiempo agotado, una respuesta que no es audio), 503 `base.assistant_speech_failed`; los dos dejan su línea en el
+  log. El panel lo reproduce desde un `blob:` (CSP `media-src 'self' blob:` y el origen del SaaS) y, si falla, lee con
+  la voz del dispositivo (`HUB_ASSISTANT.speak` = `speakAloud`, `base/frontend/lib/assistant-hub.ts`).
 - **La documentación de ERPlora** (saas ASSISTANT-F28; ronda 2026-10-30e, plan `docs/plans/2026-10-30-asistente-saas.md`
   de la raíz, tarea T5): `base.docs.search` (query, `base.view_home`, `database=False`, `ai=AI(…)`; herramienta
   `base__docs__search`, en `ALWAYS` porque una pregunta de «cómo se hace» no comparte palabras con ella) pregunta al

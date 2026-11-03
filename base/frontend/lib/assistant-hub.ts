@@ -2,6 +2,8 @@
 // own): `configureAssistant(HUB_ASSISTANT)` when the SPA boots (main.ts), and in the test helpers that mount its pieces
 // (`mountBase`, `mount-sale`).
 // - A turn goes to `base.assistant.turn`'s route; the allowance, a dictation and a report through base's operations.
+// - «Read aloud» in a server voice (round 2026-11-03n): the mp3 of `base.assistant.speak`'s route; when it fails, the
+//   panel reads with the device's voice.
 // - Whoever sees the Home uses it (BASE-G110); whoever administers the business upgrades the plan, on erplora.com's
 //   page the Home's block gives (gh:hub#1259).
 // - A write a manager must approve goes through APP-BASE-5's approvals (BASE-G118): the dialog «An approval is
@@ -10,7 +12,8 @@
 //   action's verb does not say it, `base.assistant.card.operations.<app>.<entity>.<action>`; one per action of every
 //   write the assistant may run, guardrail: base/tests/test_assistant.py), the platform's screens
 //   (`base.assistant.screens.<key>`) and the setup's shortcuts of the empty conversation (BASE-G121).
-import type { AssistantApproval, AssistantConfig } from '@erplora/ui/components';
+import type { AssistantApproval, AssistantConfig, AssistantSpeech } from '@erplora/ui/components';
+import { parseErrorEnvelope, readCookie, readSpaConfig } from '@erplora/ui/sdk';
 
 import type { SetupStatus } from '../operations';
 import en from '../locale/en.json';
@@ -88,6 +91,33 @@ export function hubApproval(ask?: AskApproval): AssistantApproval {
   };
 }
 
+/** The route of `base.assistant.speak`. */
+export const SPEAK_URL = '/api/assistant/speak';
+
+/** The mp3 of `input` read aloud in its server voice, from `base.assistant.speak`'s route; a refusal rejects with the
+ *  envelope's ApiError, and the panel reads with the device's voice instead. */
+export async function speakAloud(
+  input: AssistantSpeech,
+  doc: Document = document,
+  // The SDK's client reads JSON only, never an mp3: same origin and the SDK's CSRF header, as its own calls.
+  // eslint-disable-next-line no-restricted-globals -- see above
+  fetcher: typeof fetch = (...args) => fetch(...args),
+): Promise<Blob> {
+  const config = readSpaConfig(doc);
+  const response = await fetcher(SPEAK_URL, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'audio/mpeg',
+      [config.csrfHeader]: readCookie(doc.cookie, config.csrfCookieName) ?? '',
+    },
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) throw parseErrorEnvelope(response.status, await response.text());
+  return response.blob();
+}
+
 /** base's modules are read when each piece runs, never when this is built: a test that mocks one of them (an app's
  *  `approval` without `approvalPass`) still loads this file through a helper that configures it. */
 export const HUB_ASSISTANT: AssistantConfig = {
@@ -96,6 +126,7 @@ export const HUB_ASSISTANT: AssistantConfig = {
   approval: hubApproval(),
   usage: (client) => client.api.call('base.assistant.usage', {}),
   transcribe: (client, clip) => client.api.call('base.assistant.transcribe', clip),
+  speak: (input) => speakAloud(input),
   report: (client, report) => client.api.call('base.assistant.report', report),
   canUse: (session) => session.can('base.view_home'),
   canUpgrade: (session) => session.can('base.administer_hub'),

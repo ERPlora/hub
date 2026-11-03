@@ -100,7 +100,8 @@ def test_the_csp_header_lets_the_thread_show_the_saas_s_attachments_and_widens_n
     policy = debug_policy(dev_server) if dev_server else base_policy()
     nonce = f"'nonce-{csp_nonce(response)}'"
     assert directives["img-src"] == " ".join([*policy["img-src"], saas])
-    assert directives["media-src"] == f"'self' {saas}"
+    # The assistant's answers read aloud in the server's voice play from a blob: of the page (round 2026-11-03n).
+    assert directives["media-src"] == f"'self' blob: {saas}"
     for name in ("default-src", "script-src", "connect-src"):
         assert directives[name] == " ".join(nonce if value == CSP.NONCE else value for value in policy[name])
 

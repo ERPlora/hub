@@ -1856,6 +1856,35 @@ class AssistantTranscribeOut(Schema):
     language: str
 
 
+#: The longest text read aloud at once: erplora.com's own ceiling (saas ``assistant.media.MAX_SPEECH_CHARS``).
+MAX_SPEECH_CHARS = 4096
+
+
+class AssistantSpeakIn(Schema):
+    text: str = Field(min_length=1, max_length=MAX_SPEECH_CHARS, description="The text to read aloud.")
+    language: str = Field(
+        default="", max_length=16, description="es or en (es-ES too); empty: the screen's. Another one reads in English."
+    )
+    voice: str = Field(
+        default="",
+        max_length=64,
+        description="A server voice of the catalogue (es-ES-Ximena:DragonHDLatestNeural…); empty: the language's first.",
+    )
+
+    @field_validator("text")
+    @classmethod
+    def _something_to_read(cls, text: str) -> str:
+        text = text.strip()
+        if not text:
+            raise ValueError("write the text to read aloud")
+        return text
+
+
+class AssistantSpeakOut(Schema):
+    content_type: str = Field(description="The audio's type: audio/mpeg.")
+    content_base64: str = Field(description="The text read aloud, an mp3 in base64.")
+
+
 # ── Locations (round 2026-10-24b, multi-location) ──────────────────────────────────────────────────────────────────
 
 

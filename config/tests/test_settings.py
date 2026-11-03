@@ -147,12 +147,13 @@ def test_database_comes_from_the_environment(load_settings):
 
 def with_saas_origin(policy: dict, saas_origin: str) -> dict:
     """``policy`` with the SaaS's origin where the Hub's page reaches it: ``form-action`` (the logout's
-    redirect leaves for it), ``img-src`` and ``media-src`` (the WhatsApp attachments it serves)."""
+    redirect leaves for it), ``img-src`` and ``media-src`` (the WhatsApp attachments it serves); ``media-src``
+    also plays the assistant's answers read aloud in the server's voice, a ``blob:`` of the page."""
     return {
         **policy,
         "form-action": [*policy["form-action"], saas_origin],
         "img-src": [*policy["img-src"], saas_origin],
-        "media-src": ["'self'", saas_origin],
+        "media-src": ["'self'", "blob:", saas_origin],
     }
 
 
@@ -254,10 +255,11 @@ def test_the_inbox_shows_photos_and_voice_notes_from_the_saas_s_origin_only(
 ):
     # The SaaS serves a WhatsApp conversation's attachments (/whatsapp/media/<id>): the thread shows the photo
     # and plays the voice note from its origin, and from nowhere else (no `*`, `https:` nor Meta's CDN).
+    # Besides, the page plays its own blob: (the assistant's answer read aloud in the server's voice).
     # Nothing else widens: connect-src keeps the Tauri bridge (ipc:) as live.csp gives it.
     csp = load_settings(**env)["SECURE_CSP"]
     assert csp["img-src"] == [*policy["img-src"], saas_origin]
-    assert csp["media-src"] == ["'self'", saas_origin]
+    assert csp["media-src"] == ["'self'", "blob:", saas_origin]
     for unchanged in ("default-src", "script-src", "connect-src"):
         assert csp[unchanged] == policy[unchanged]
 

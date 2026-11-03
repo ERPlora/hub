@@ -1802,6 +1802,14 @@ msgstr "La grabación es demasiado larga: dicta un mensaje más corto."
 msgid "The audio could not be transcribed: try again."
 msgstr "No se ha podido transcribir el audio: inténtalo de nuevo."
 
+#: base/services.py
+msgid "Reading aloud in the server's voice is not available."
+msgstr "La lectura en voz alta con la voz del servidor no está disponible."
+
+#: base/services.py
+msgid "The answer could not be read aloud: try again."
+msgstr "No se ha podido leer la respuesta en voz alta: inténtalo de nuevo."
+
 #: base/queries.py
 msgid "The assistant's plan could not be read now."
 msgstr "Ahora no se puede leer el plan del asistente."

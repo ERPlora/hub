@@ -433,9 +433,10 @@ SECURE_CSP = debug_policy(VITE_DEV_SERVER) if DEBUG else base_policy()
 saas_origin = "{0.scheme}://{0.netloc}".format(urlsplit(SAAS_URL))
 SECURE_CSP["form-action"] = [*SECURE_CSP["form-action"], saas_origin]
 # The SaaS serves a WhatsApp conversation's photos and voice notes (/whatsapp/media/<id>): the inbox's thread
-# shows and plays them from its origin, and from no other (never Meta's CDN).
+# shows and plays them from its origin, and from no other (never Meta's CDN). The assistant plays an answer read
+# aloud in the server's voice (round 2026-11-03n) from a blob: the page made of /api/assistant/speak's mp3.
 SECURE_CSP["img-src"] = [*SECURE_CSP["img-src"], saas_origin]
-SECURE_CSP["media-src"] = [CSP.SELF, saas_origin]
+SECURE_CSP["media-src"] = [CSP.SELF, "blob:", saas_origin]
 
 # Static files: WhiteNoise. Vite already hashes its build, so no Manifest storage; the SPA build
 # is served under /static/spa/ (Vite's `base`) and its hashed assets are immutable.

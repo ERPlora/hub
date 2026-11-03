@@ -952,6 +952,12 @@ declare module '@erplora/ui/sdk' {
       input: { audio: string; mime_type: string; language?: string };
       output: { text: string; language: string };
     };
+    // «Read aloud» in a server voice (round 2026-11-03n): its route answers the mp3 itself (assistant-hub.ts
+    // `speakAloud`); this output is what an integration that accepts only JSON gets.
+    'base.assistant.speak': {
+      input: { text: string; language?: string; voice?: string };
+      output: { content_type: string; content_base64: string };
+    };
     // «Report a problem» of the user menu (BASE-F108): erplora.com answers the address support writes back to.
     'base.support.report': { input: SupportReportInput; output: { reply_to: string } };
   }
