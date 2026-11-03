@@ -12,7 +12,7 @@ import { execSync } from 'node:child_process';
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { type Provider, startProvider } from './assistant-provider';
-import { A, api, capture, compactBar, exposeMovingInPage, login, psql, REPO_DIR, shown, turnOn, untilStill } from './helpers';
+import { A, api, capture, compactBar, exposeMovingInPage, login, psql, REPO_DIR, shown, turnOffTurnedOn, turnOnMissing, untilStill } from './helpers';
 import { STACK } from './stack';
 
 const KEY = 'FIX-HUB-ATTENDANCE-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS';
@@ -33,8 +33,8 @@ type Day = { id: string; status: string; clock_in_at: string; clock_out_at: stri
 type Detail = Day & { name: string };
 
 let provider: Provider;
-/** The apps this file turned on, in that order: each one only once its `enable` answered 200. The `afterAll` turns off
- *  these and nothing else, so a `beforeAll` that falls before reading `/apps` (the SaaS without its assistant seed)
+/** The apps this file turned on, in that order (`turnOnMissing`): each one only once it is on. The `afterAll` turns off
+ *  these and nothing else, so a `beforeAll` that falls before turning anything on (the SaaS without its assistant seed)
  *  leaves the business as it found it: never Time clock off for the specs that come after. */
 const turnedOn: string[] = [];
 
@@ -63,12 +63,7 @@ test.beforeAll(async ({ browser }) => {
   const context = await browser.newContext();
   const page = await context.newPage();
   await login(page, A, '/');
-  const before = await api<{ apps: { id: string; state: string }[] }>(context, A, 'GET', '/apps');
-  const wasOn = new Set(before.data.apps.filter((app) => app.state === 'on').map((app) => app.id));
-  for (const app of NEEDED.filter((id) => !wasOn.has(id))) {
-    await turnOn(context, A, app);
-    turnedOn.push(app);
-  }
+  await turnOnMissing(context, A, NEEDED, turnedOn);
   await context.close();
 });
 
@@ -83,10 +78,7 @@ test.afterAll(async ({ browser }) => {
   const context = await browser.newContext();
   const page = await context.newPage();
   await login(page, A, '/');
-  for (const app of [...turnedOn].reverse()) {
-    const off = await api(context, A, 'POST', '/apps/disable', { app });
-    expect(off.status, `turn off ${app}: ${JSON.stringify(off.data)}`).toBe(200);
-  }
+  await turnOffTurnedOn(context, A, turnedOn);
   await context.close();
   await provider?.close();
 });
