@@ -126,11 +126,13 @@ export function psqlOn(
 
 const quoted = (values: readonly string[]): string => values.map((value) => `'${value}'`).join(', ');
 
-/** The demo accounts with access to every demo hub, one per line (`accounts.HubMembership` is what the jump checks). */
+/** The demo accounts with access to every demo hub, one per line: the jump lets in the answered members of a business
+ * that still opens (`hubs.member.list_mine` of the SaaS). */
 const SEEDED_ACCOUNTS =
-  'select u.email from accounts_user u join accounts_hubmembership m on m.user_id = u.id ' +
-  `where u.email in (${quoted(DEMO_ACCOUNTS)}) and m.hub_slug in (${quoted(DEMO_HUBS)}) ` +
-  `group by u.email having count(distinct m.hub_slug) = ${DEMO_HUBS.length}`;
+  'select u.email from accounts_user u join hubs_hubmember m on m.user_id = u.id join hubs_hub h on h.id = m.hub_id ' +
+  `where u.email in (${quoted(DEMO_ACCOUNTS)}) and h.slug in (${quoted(DEMO_HUBS)}) ` +
+  "and m.accepted_at is not null and h.status not in ('deleting', 'deleted') " +
+  `group by u.email having count(distinct h.slug) = ${DEMO_HUBS.length}`;
 
 const RECIPE = 'tests/e2e/README.md, «Varias ejecuciones a la vez»';
 const ELSEWHERE = 'export E2E_SAAS_DB=<its database>.';
