@@ -23,7 +23,11 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
 django_application = get_asgi_application()
 
 # After Django is set up: the channel imports the registry's models.
+from base import meter  # noqa: E402
 from base.ws_print import PATH as PRINT_PATH, print_socket  # noqa: E402
+
+# What each business does during the day is counted where its requests are served: here, never in the worker.
+meter.start()
 
 #: The Hub's WebSockets, by path.
 WEBSOCKETS = {PRINT_PATH: print_socket}

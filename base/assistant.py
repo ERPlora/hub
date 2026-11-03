@@ -401,6 +401,7 @@ BASE_SCREENS = {
     "import": "settings",
     "location": "settings",
     "person": "employees",
+    "plan": "system",
     "profile": "profile",
     "role": "employees",
     "setup": "home",
