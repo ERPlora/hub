@@ -40,6 +40,11 @@ export interface BlockState {
   legs: readonly Leg[];
 }
 
+/** The reasons the keypad's keys change, and so the ones written over the keypad; the others go in the foot. */
+export function tenderReason(block: ChargeBlock | null): 'tenderedMissing' | 'tenderedShort' | null {
+  return block?.kind === 'tenderedMissing' || block?.kind === 'tenderedShort' ? block.kind : null;
+}
+
 /** The first reason this charge cannot go through as it stands; `null` when it can. */
 export function chargeBlock(state: BlockState): ChargeBlock | null {
   if (state.requireCustomer && !state.hasCustomer) return { kind: 'customerRequired' };
