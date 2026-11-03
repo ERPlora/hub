@@ -1454,6 +1454,14 @@
       "uploading": "Uploading photo…",
       "notSaved": "The photo could not be saved. Try again.",
       "retry": "Retry"
+    },
+    "print": {
+      "refusal": {
+        "refused": "the document is empty or too large to print",
+        "failed": "the device's print service did not open",
+        "unlinked": "this app is linked to another business",
+        "outdated": "this version of the ERPlora app cannot print; update it"
+      }
     }
   }
 }

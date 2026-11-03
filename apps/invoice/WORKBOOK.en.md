@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:bb0348a63487c043f0db53fa77e906389ddd4d555a1d81e3d69ec6fdc52e5ff3 -->
+<!-- generated from WORKBOOK.md sha256:683eee238bfa4ffbf77fb8f9cf052d63d319fc2c14accb52729df5fc8428ea1d -->
 
 ## What it is for and who it is for
 
@@ -616,7 +616,9 @@ Steps:
 2. With **Printing** and an active system printer with the Receipt function, the A4 invoice goes to that
    printer, with the VeriFactu QR if it has its record, and "Sent to <printer>." reads (PRINTING-F08).
 3. If not (without Printing turned on, without a system printer, or if its VeriFactu record could not be
-   read for that printer), the browser's print dialog opens with the A4 invoice (with VeriFactu, on top
+   read for that printer), the device's print dialog opens (the browser's or, in the installed app, its
+   print screen: the system's dialog, with the printer or "Save as PDF", and the job named "Invoice
+   <number>") with the A4 invoice (with VeriFactu, on top
    the record's QR with "QR tributario:" and "VERI*FACTU", fixed in Spanish by the AEAT; issuer, "Bill
    to", lines, breakdown per rate, totals and the note of what it rectifies), from where it can be saved
    as PDF. While the record arrives, "Print / PDF" waits: the paper never goes out without its QR.
@@ -625,7 +627,9 @@ Steps:
 In: the invoice and its lines.
 Out: the paper; the invoice does not change. Each tap, one paper.
 If it fails: "Could not print the invoice", also if the VeriFactu record of an invoice that has one cannot
-be read (it is not printed without its QR).
+be read (it is not printed without its QR). If the installed app does not open its print screen, the notice
+says why after a colon ("…: this version of the ERPlora app cannot print; update it", "…: the device's print
+service did not open"…).
 Involved: PRINTING-F08, VERIFACTU-F19
 
 ### INVOICE-F19 Mark an invoice as paid

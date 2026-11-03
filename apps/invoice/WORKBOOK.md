@@ -642,8 +642,10 @@ Pasos:
    impresora, con el QR de VeriFactu si tiene su registro, y se lee «Enviado a <impresora>.»
    (PRINTING-F08).
 3. Si no (sin Impresión encendida, sin impresora del sistema, o si no se pudo leer su registro de VeriFactu
-   para esa impresora), se abre el diálogo de impresión del
-   navegador con la factura en A4 (con VeriFactu, arriba el QR del registro con «QR tributario:» y
+   para esa impresora), se abre el diálogo de impresión del dispositivo (el del navegador o, en la app
+   instalada, su pantalla de impresión: el diálogo del sistema, con la impresora o «Guardar como PDF», y el
+   trabajo llamado «Factura <número>») con la factura en A4 (con VeriFactu, arriba el QR del registro con
+   «QR tributario:» y
    «VERI*FACTU»; emisor, «Facturar a», líneas, desglose por tipo, totales y la nota de lo que rectifica),
    desde donde se puede guardar como PDF. Mientras llega el registro, «Imprimir / PDF» espera: el papel
    nunca sale sin su QR.
@@ -652,7 +654,9 @@ Pasos:
 Entra: la factura y sus líneas.
 Sale: el papel; la factura no cambia. Cada pulsación, un papel.
 Si falla: «No se pudo imprimir la factura», también si no se puede leer el registro de VeriFactu de una
-factura que lo tiene (no se imprime sin su QR).
+factura que lo tiene (no se imprime sin su QR). Si la app instalada no abre su pantalla de impresión, el
+aviso dice por qué tras dos puntos («…: esta versión de la app de ERPlora no puede imprimir; actualízala»,
+«…: el servicio de impresión del dispositivo no se abrió»…).
 Implicados: PRINTING-F08, VERIFACTU-F19
 
 ### INVOICE-F19 Marcar una factura como pagada
