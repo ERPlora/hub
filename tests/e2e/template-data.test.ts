@@ -6,7 +6,8 @@
 // base-data.spec.ts left the template's services, products and categories in `a`, and the specs after it found them
 // (SALE-F12's «All» started with a service; WEBSITE-F05's catalogue and website.spec.ts's published page showed six
 // categories instead of two).
-import { readdirSync, readFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -69,6 +70,22 @@ describe('every spec that loads a template into a business', () => {
   });
 });
 
+describe('e2eSpecs', () => {
+  it('finds the specs in subfolders, as Playwright does, and none in the evidence of a run or in installed packages', () => {
+    const root = mkdtempSync(join(tmpdir(), 'e2e-specs-'));
+    try {
+      const files = ['a.spec.ts', 'helpers.ts', 'qa/b.spec.ts', 'qa/deep/c.spec.ts', '.artifacts/d.spec.ts', 'node_modules/e.spec.ts'];
+      for (const file of files) {
+        mkdirSync(dirname(join(root, file)), { recursive: true });
+        writeFileSync(join(root, file), '');
+      }
+      expect(e2eSpecs(root)).toEqual(['a.spec.ts', 'qa/b.spec.ts', 'qa/deep/c.spec.ts']);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+});
+
 describe('leavesTemplateData', () => {
   const loading = (after: string) => `
     ${after}
@@ -113,6 +130,9 @@ describe('leavesTemplateData', () => {
     expect(leavesTemplateData('x.spec.ts', loading('test.beforeEach(async () => { await emptyOfTemplateData(owner, A); });'))).toBe(true);
     const inTry = loading("try { await api(owner, A, 'POST', '/settings/data/imports/undo', { id }); } catch { throw new Error('x'); }");
     expect(leavesTemplateData('x.spec.ts', inTry)).toBe(true);
+    // A `finally` that only closes does not undo: the load stays whenever a step before the undo fails.
+    const notInFinally = loading("try { await api(owner, A, 'POST', '/settings/data/imports/undo', { id }); } finally { await owner.close(); }");
+    expect(leavesTemplateData('x.spec.ts', notInFinally)).toBe(true);
   });
 
   it('leaves alone a spec that loads no template', () => {
