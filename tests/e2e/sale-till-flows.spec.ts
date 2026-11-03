@@ -352,10 +352,15 @@ test('SALE-F17, F18: a check parked and taken back from «Open checks», another
   );
   if (!(await list.isVisible())) await shown(page).locator('[data-testid=pos-open-checks]').click();
   await armed.waitFor({ state: 'hidden' });
+  const disarmedAt = await bin.boundingBox();
   await bin.click();
   await expect(bin).toHaveAttribute('aria-label', ARMED);
   await expect(armed).toBeVisible();
   await expect(armed).toHaveText(ARMED);
+  // The hint takes a line of its own: the armed bin stays where the first tap was, so the second lands on it.
+  const armedAt = await bin.boundingBox();
+  expect(Math.abs(armedAt!.x - disarmedAt!.x), 'the armed bin moved sideways').toBeLessThan(1);
+  expect(Math.abs(armedAt!.y - disarmedAt!.y), 'the armed bin moved up or down').toBeLessThan(1);
   await bin.click();
   await expect(list.locator(`[data-testid=pos-parked-${droppedCheck?.id}]`)).toHaveCount(0);
   expect(await checkOf(context, dropped)).toBeUndefined();
