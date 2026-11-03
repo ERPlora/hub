@@ -97,7 +97,7 @@ def test_the_delete_that_ends_a_business_wakes_its_open_apps_too(client, acme, l
 
 
 def test_every_new_photo_reaches_the_live_queries_of_its_business_only(client, acme, listening):
-    # The live queries that follow the photo (the Home's three, Apps, «Plan and limits»: base/live.py) listen on the
+    # The live queries that follow the photo (the Home's three, Apps, «Usage and plan»: base/live.py) listen on the
     # business's channel; the photo is applied as the platform (/internal), so its event went to the platform's
     # channel only and nothing of the business moved until a reload. Now it reaches the business after the COMMIT,
     # and no other business hears it; a photo already seen tells nobody.

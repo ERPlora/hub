@@ -1167,7 +1167,7 @@ OWN_DATABASE_READS: dict[str, tuple[dict, dict]] = {
     "base.api_key.list": ({}, {"available": False, "keys": []}),
     # Settings › Data's «Copies» and the last reset (S2b).
     "base.hub.dumps": ({}, {"available": False, "reset": None, "dumps": []}),
-    # System's size of the business's database (BASE-F40, S2b): «Plan and limits» reads the same answer, whose people
+    # System's size of the business's database (BASE-F40, S2b): «Usage and plan» reads the same answer, whose people
     # and devices are control's (Membership, SessionOwner) and stay for every business.
     "base.plan.usage": ({}, {"database": {"available": False, "bytes": None, "day": None}}),
 }

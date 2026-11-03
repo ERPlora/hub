@@ -70,6 +70,8 @@ ENV_KEYS = (
     "AWS_REGION",
     "MEDIA_ROOT",
     "METRICS_ENABLED",
+    "METER_ENABLED",
+    "PGBOUNCER_MAX_DB_CONNECTIONS",
 )
 # Local development opts in with DEBUG=True (the .env of a checkout); nothing else turns it on.
 DEVELOPMENT_ENV = {"DEBUG": "True"}
@@ -1006,6 +1008,18 @@ def test_in_aws_the_hubs_go_through_the_pgbouncer_sidecar_without_tls_to_it(load
     assert (template["HOST"], template["PORT"]) == ("127.0.0.1", 6432)
     assert template["OPTIONS"] == {"connect_timeout": 5, "application_name": "hub", "prepare_threshold": None}
     assert loaded["DATABASE_ROUTERS"] == ["base.routers.SharedRouter", "base.tenancy.router.TenantRouter"]
+
+
+def test_what_pgbouncer_gives_each_database_is_prod_s_unless_the_environment_says(load_settings):
+    """No plan gets more at once than this (``base.tenancy.limits``): 6 in prod, 3 in pre (aws ``stacks/*/apps.tf``)."""
+    assert load_settings(**PRODUCTION_ENV)["PGBOUNCER_MAX_DB_CONNECTIONS"] == 6
+    assert load_settings(**PRODUCTION_ENV, PGBOUNCER_MAX_DB_CONNECTIONS="3")["PGBOUNCER_MAX_DB_CONNECTIONS"] == 3
+
+
+def test_the_meter_is_on_where_requests_are_served_unless_the_environment_says(load_settings):
+    assert load_settings(**PRODUCTION_ENV)["METER_ENABLED"] is True
+    assert load_settings(**DEVELOPMENT_ENV)["METER_ENABLED"] is True
+    assert load_settings(**PRODUCTION_ENV, METER_ENABLED="false")["METER_ENABLED"] is False
 
 
 def test_the_shared_alias_opens_one_short_connection_without_a_pool(load_settings):
