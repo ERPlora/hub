@@ -14,6 +14,7 @@ import { fileURLToPath } from 'node:url';
 
 import { type Browser, type BrowserContext, type Cookie, expect, type Locator, type Page, test } from '@playwright/test';
 
+import { turnOffRecorded, turnOnRecording } from './apps-turned-on';
 import { hubDatabases, plan } from './hub-databases';
 import { mailDirFrom, readMailCode } from './mail';
 import { isConnectionRefused, withRetry } from './retry';
@@ -601,6 +602,28 @@ export async function turnOn(context: BrowserContext, origin: string, ...apps: s
         .toBe('on');
     }
   }
+}
+
+/**
+ * Turns on, in their order, the apps of `needed` that are off in the business at `origin` (`turnOn`), and appends each
+ * to `turnedOn` once it is on: the record a spec file's `afterAll` hands to `turnOffTurnedOn`, so it turns off what
+ * this file turned on and nothing else. Called from a `beforeAll`, after whatever may fall first (the check of the
+ * SaaS's assistant provider): a file that fell before turning anything on leaves the business as it found it (hub#480).
+ */
+export async function turnOnMissing(context: BrowserContext, origin: string, needed: readonly string[], turnedOn: string[]): Promise<void> {
+  const listed = await api<{ apps: { id: string; state: string }[] }>(context, origin, 'GET', '/apps');
+  expect(listed.status, `list the apps: ${JSON.stringify(listed.data)}`).toBe(200);
+  const on = new Set(listed.data.apps.filter((app) => app.state === 'on').map((app) => app.id));
+  await turnOnRecording(needed, on, (app) => turnOn(context, origin, app), turnedOn);
+}
+
+/** Turns off, last first, what `turnOnMissing` recorded in `turnedOn`, through Apps' own command
+ *  (`POST /api/apps/disable`, `base.app.disable`): nothing when nothing was turned on (hub#480). */
+export async function turnOffTurnedOn(context: BrowserContext, origin: string, turnedOn: string[]): Promise<void> {
+  await turnOffRecorded(turnedOn, async (app) => {
+    const off = await api(context, origin, 'POST', '/apps/disable', { app });
+    expect(off.status, `turn off ${app}: ${JSON.stringify(off.data)}`).toBe(200);
+  });
 }
 
 /** Deletes every demo item (phase 1: `a` and `b` share them), through the API. */
