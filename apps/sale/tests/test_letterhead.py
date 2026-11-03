@@ -3,10 +3,13 @@ name, tax ID and address of Invoicing's issuer, with the receipt header added un
 A sale with a fiscal document says what that document says, whatever the issuer becomes later. Real sales and the
 real issuer, through their operations."""
 
+import dataclasses
+
 import pytest
 from live.context import OperationContext, Scope
-from live.errors import NotFound, PermissionDenied
+from live.errors import AppInactive, NotFound, PermissionDenied
 from live.live_registry import live_registry
+from live.operations import registry
 
 from apps.sale import events
 from apps.sale.tests.conftest import A, ctx_for, run
@@ -121,6 +124,18 @@ def test_without_invoicing_the_paper_goes_with_the_header(monkeypatch):
     monkeypatch.setattr("apps.sale.queries.ISSUER", "invoice.issuer.not_installed")
     run("invoice.issuer.update", ISSUER)
     run("sale.settings.update", {"receipt_header": "Bar Ana"})
+    assert identity() == ("Bar Ana", "", [])
+
+
+def test_with_invoicing_off_the_paper_goes_with_the_header(monkeypatch):
+    run("invoice.issuer.update", ISSUER)
+    run("sale.settings.update", {"receipt_header": "Bar Ana"})
+    assert identity()[0] == "Salón Aurora S.L."  # positive control: on, it is the issuer
+
+    def off(ctx, data):
+        raise AppInactive("Invoicing is off.")
+
+    monkeypatch.setitem(registry, "invoice.issuer.get", dataclasses.replace(registry["invoice.issuer.get"], fn=off))
     assert identity() == ("Bar Ana", "", [])
 
 

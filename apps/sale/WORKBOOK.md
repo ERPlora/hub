@@ -1727,7 +1727,9 @@ administrador y responsable, los mismos que anulan y devuelven).
   con la sesión de quien vende, su permiso y su app activa, por la única puerta `call_app`: la de la plataforma
   (`base.operations.call`, BASE-F84) con el 409 propio de Ventas cuando esa app no está en el negocio
   (`sale.services_unavailable`, `sale.invoice_unavailable`…); lo que la otra app no acepta es el 422 de Ventas y,
-  dentro de una escritura, corre en un savepoint. Ventas no lleva regla de permisos propia. Mesas (que
+  dentro de una escritura, corre en un savepoint. Lo que nombra el papel (`invoice.issuer.get`, `invoice.invoice.get`
+  y `base.business.get`) se lee como la plataforma, porque quien vende lo imprime aunque no pueda leer Facturación; sin
+  esa app, o apagada, el papel sale con la cabecera del recibo (SALE-F29). Ventas no lleva regla de permisos propia. Mesas (que
   requiere Ventas) solo desde la pantalla «Elegir mesa», también por el nombre de sus operaciones
   (`useLive`/`useCommand`), sin importar nada de `apps/table`. Todo señalado para una ronda nueva de
   PLAN-HUB (este WORKBOOK no edita los planes).

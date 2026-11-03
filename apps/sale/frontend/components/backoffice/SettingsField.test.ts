@@ -69,11 +69,11 @@ describe('SettingsField', () => {
     expect(es.wrapper.findAll('ion-select-option').map((o) => o.element.textContent?.trim())).toEqual(['Tique', 'Factura']);
   });
 
-  it('the receipt header: several lines (name, then address), as long as the server takes', async () => {
+  it('the receipt header: several lines, added under the issuer, as long as the server takes', async () => {
     const s = await setup('receipt_header', { value: 'Bar Pepe\nCalle Mayor 1' });
     const c = s.control();
     expect([c.tagName, c.fill, c.getAttribute('mode'), c.maxlength, c.autoGrow, c.value]).toEqual(['ION-TEXTAREA', 'outline', 'md', 1000, true, 'Bar Pepe\nCalle Mayor 1']);
-    expect(s.text()).toContain('First line = name; the rest = address.');
+    expect(s.text()).toContain("Added under the issuer's name, tax ID and address.");
     await ionValue(c, 'Bar Pepa', 'ionInput');
     expect(s.wrapper.emitted('update:value')?.at(-1)).toEqual(['Bar Pepa']);
   });

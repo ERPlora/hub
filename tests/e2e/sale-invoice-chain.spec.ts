@@ -17,6 +17,7 @@ const YEAR = new Date().getFullYear();
 let tapa: Product;
 let cane: Product;
 let methods: Record<string, string>;
+let issuer: Awaited<ReturnType<typeof ensureIssuer>>;
 
 interface FiscalSale {
   id: string;
@@ -34,7 +35,7 @@ test.beforeAll(async ({ browser }) => {
   const context = await browser.newContext({ baseURL: A });
   const page = await context.newPage();
   await login(page, A, '/sale/pos');
-  await ensureIssuer(context);
+  issuer = await ensureIssuer(context);
   tapa = await createProduct(context, { name: `E2E Tapa ${RUN}`, sku: `E2E-CHAIN-T-${RUN}`, price: 150, tax_category_key: 'restaurant.food' });
   cane = await createProduct(context, { name: `E2E Cane ${RUN}`, sku: `E2E-CHAIN-C-${RUN}`, price: 150, tax_category_key: 'restaurant.drink' });
   const list = await api<{ rows: { id: string; type: string }[] }>(context, A, 'GET', '/sale/payment_methods');
@@ -109,6 +110,12 @@ test('SALE-F04: charged as an invoice, the ticket says the number Invoicing gave
   await expect(receipt.locator('[data-testid=sale-receipt-number]')).toContainText(sale.invoice_number);
   await expect(receipt.locator('[data-testid=sale-receipt-number]')).not.toContainText(sale.number);
   await expect(receipt.locator('[data-testid=sale-receipt-title]')).toHaveText(/Invoice|Factura/);
+  // Both parties on the paper (hub#458): the issuer in Invoicing, and the name, tax ID and address it was issued to.
+  await expect(receipt.locator('[data-testid=sale-receipt-name]')).toHaveText(issuer.legal_name);
+  await expect(receipt.locator('[data-testid=sale-receipt-tax-id]')).toContainText(issuer.tax_id);
+  await expect(receipt.locator('[data-testid=sale-receipt-customer]')).toContainText('e2e Talleres Pérez SL');
+  await expect(receipt.locator('[data-testid=sale-receipt-customer-tax-id]')).toContainText('B12345674');
+  await expect(receipt.locator('[data-testid=sale-receipt-customer-address]')).toContainText('Calle Luna 3, Madrid');
   await page.screenshot({ path: shot('sale-invoice-receipt-1440') });
 });
 
