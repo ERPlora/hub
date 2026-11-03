@@ -621,14 +621,16 @@ Pasos:
 2. Lee la cabecera, las líneas (con su «Precio» sin IVA y antes de descuentos y, si alguna lo tiene, la
    columna «Dto.» con el descuento sin IVA), el desglose y los totales.
 3. Con **VeriFactu**, lee debajo el «Justificante VeriFactu»: el estado del registro en la AEAT, su «CSV»
-   cuando la AEAT ya contestó y el QR, que se puede escanear o abrir con «Validar en la Agencia Tributaria ↗».
+   cuando la AEAT ya contestó y el QR, que se puede escanear o abrir con «Validar en la Agencia Tributaria ↗» (en la
+   app instalada, en el navegador del dispositivo, en cuanto la app acepte esa dirección: ERPlora/app#20).
 4. «Rectifica a», «Sustituye a», «Sustituida por» y las rectificativas abren el documento enlazado.
 5. «← Volver» regresa a la lista.
 Entra: la factura y sus líneas y, con VeriFactu, su registro.
 Sale: nada; solo se lee. La ficha se pone al día sola si mientras tanto se paga, se rectifica o la AEAT
 contesta.
 Si falla: «Factura no encontrada» o el motivo del fallo. Sin VeriFactu, sin registro todavía o sin permiso
-para verlo, la ficha sale sin la tarjeta del justificante.
+para verlo, la ficha sale sin la tarjeta del justificante. En la app instalada, si no puede abrir la página de la
+AEAT, «No se ha podido abrir esa página. Inténtalo de nuevo.».
 Implicados: VERIFACTU-F19
 
 ### INVOICE-F18 Imprimir o guardar en PDF una factura
