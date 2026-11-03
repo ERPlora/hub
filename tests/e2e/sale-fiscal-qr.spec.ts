@@ -3,12 +3,12 @@
 // the AEAT's testing environment: nothing is sent); in Sales, «Document» shows the paper with «Tax QR:», the QR,
 // «VERI*FACTU» and how to check the receipt at the AEAT. In 390×844, 834×1194 and 1440×900. What a run creates — its
 // product `E2E-SQR-<run>`, its sale, its ticket and VeriFactu's record of it — is deleted after it.
-import { type Browser, expect, type Locator, type Page, test } from '@playwright/test';
+import { type Browser, expect, type Page, test } from '@playwright/test';
 
 import { A, api, capture, login, shown } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { ensureIssuer, snapshotSeries } from './invoice-helpers';
-import { chargeByApi, cleanSales, drawerOff, restoreDrawer, shots, stamp } from './sale-helpers';
+import { chargeByApi, cleanSales, drawerOff, numberRow, restoreDrawer, shots, stamp } from './sale-helpers';
 
 const RUN = stamp();
 let product: Product;
@@ -80,54 +80,6 @@ const SIZES = [
   { label: '820x1180', width: 820, height: 1180 },
   { label: '375x667', width: 375, height: 667 },
 ];
-
-/** Where the number and the date and time sit on `paper`: how many lines each takes, whether the date shares the
- *  number's line (after it) or starts right under it, and how far any of them runs past the paper's printable width. */
-interface NumberRow {
-  numberLines: number;
-  dateLines: number;
-  dateBeside: boolean;
-  dateUnder: boolean;
-  overflow: number;
-}
-
-async function numberRow(paper: Locator): Promise<NumberRow> {
-  return paper.evaluate((el) => {
-    const style = getComputedStyle(el);
-    const right = el.getBoundingClientRect().right - parseFloat(style.paddingRight);
-    const lineHeight = parseFloat(style.lineHeight) || parseFloat(style.fontSize) * 1.2;
-    /** The text boxes of `node`, one per piece of a line it wraps onto. */
-    const boxes = (node: Element) => {
-      const range = document.createRange();
-      range.selectNodeContents(node);
-      return [...range.getClientRects()].filter((box) => box.width > 0 && box.height > 0);
-    };
-    /** How many lines `node`'s text takes: its boxes grouped by their top, half a line apart. */
-    const lines = (node: Element) => {
-      const tops = boxes(node).map((box) => box.top).sort((a, b) => a - b);
-      return tops.filter((top, index) => index === 0 || top - tops[index - 1] > lineHeight / 2).length;
-    };
-    const number = el.querySelector('[data-testid=sale-receipt-number]')!;
-    const date = el.querySelector('[data-testid=sale-receipt-datetime]')!;
-    const numberBoxes = boxes(number);
-    const dateBoxes = boxes(date);
-    const numberTop = Math.min(...numberBoxes.map((box) => box.top));
-    const numberBottom = Math.max(...numberBoxes.map((box) => box.bottom));
-    const numberRight = Math.max(...numberBoxes.map((box) => box.right));
-    const dateTop = Math.min(...dateBoxes.map((box) => box.top));
-    const dateLeft = Math.min(...dateBoxes.map((box) => box.left));
-    const dateRight = Math.max(...dateBoxes.map((box) => box.right));
-    return {
-      numberLines: lines(number),
-      dateLines: lines(date),
-      dateBeside: Math.abs(dateTop - numberTop) < lineHeight / 2 && dateLeft >= numberRight,
-      // Right under it, as the next line of the paper: no blank line between them.
-      dateUnder: dateTop >= numberBottom - 1 && dateTop - numberBottom <= 2,
-      // Whole pixels: text set flush right lands a hundredth of a pixel either side of the edge.
-      overflow: Math.max(0, Math.round(Math.max(numberRight, dateRight) - right)),
-    };
-  });
-}
 
 /** The owner on `a` in `language`, on «Sales». */
 async function salesIn(browser: Browser, language: 'en' | 'es'): Promise<Page> {
