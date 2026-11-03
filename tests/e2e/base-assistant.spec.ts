@@ -666,9 +666,9 @@ test('base-assistant-money-mark — in Spanish a payment in another currency say
   await page.setViewportSize({ width: 1440, height: 900 });
   await decide(page, 'cancel');
   await expect(lastAnswer(page)).toContainText('No lo he hecho.');
-  // In yen, without decimals: 1500 is ¥1,500, never «15,00».
+  // In yen, without decimals: 1500 is «1.500 ¥» (its thousands grouped, hub#692), never «15,00».
   await ask(page, `E2E-ASK payment__payment__create ${JSON.stringify({ ...payment, currency: 'JPY' })}`, { settle: false });
-  await expect(card(page)).toContainText(/Caja · 2 nov 2026 · 1500\s¥/);
+  await expect(card(page)).toContainText(/Caja · 2 nov 2026 · 1\.500\s¥/);
   await decide(page, 'cancel');
   await expect(lastAnswer(page)).toContainText('No lo he hecho.');
   if (!wasOn) {
