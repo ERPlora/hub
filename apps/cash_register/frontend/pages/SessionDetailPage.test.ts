@@ -1,7 +1,8 @@
 // Cash register → the detail of a session (CASH_REGISTER-F11, F16; the old `erp-cashregister-session-
 // detail`): «Session detail · S-…» with Back, the summary, the session's movements and counts, and
 // «Print» (the X or Z report to the receipt printer's queue, or on the device when Printing is not on: the
-// browser's dialog; inside the installed app, its print screen, hub#455). A session that does not exist says so; a failed read offers to retry. Everything re-runs by itself.
+// browser's dialog; inside the installed app, its print screen, hub#455). A session that does not exist says so;
+// a failed read offers to retry. Everything re-runs by itself.
 import { AppPage, toastError, toastSuccess } from '@erplora/ui/shell';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 

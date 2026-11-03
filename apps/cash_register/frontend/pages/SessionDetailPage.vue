@@ -4,8 +4,9 @@
 // drawer, the figures by payment method, expected, counted, difference and the notes), the session's
 // «Movements» and «Counts», and «Print»: the X report of an open session or the Z of a closed one, to the
 // receipt printer's queue (Printing's PRINTING-F17), or on the device when Printing is not on in the business
-// (the browser's dialog; inside the installed app, its print screen, hub#455; a refusal says why). A blind count hides «Print» on an open session from whoever may not see the expected
-// cash. Read-only; everything re-runs by itself (a sale, a movement, a count, the close).
+// (the browser's dialog; inside the installed app, its print screen, hub#455; a refusal says why). A blind count
+// hides «Print» on an open session from whoever may not see the expected cash. Read-only; everything re-runs by
+// itself (a sale, a movement, a count, the close).
 import { InlineFeedback } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, HubIcon, toastError, toastSuccess } from '@erplora/ui/shell';
