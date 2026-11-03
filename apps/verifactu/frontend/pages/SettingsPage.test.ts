@@ -3,7 +3,7 @@
 // («Test the connection», presenting nothing, and «Create test invoice» in testing) and «Responsible declaration»
 // (the signed declaration and the identifying data of this system).
 import { toastSuccess } from '@erplora/ui/shell';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { click, EMPLOYEE, flush, ionValue, type MountOptions, mountVerifactu } from '../__tests__/mount-verifactu';
 import type { ConfigOut, DiagnosticOut } from '../operations';
@@ -21,6 +21,12 @@ vi.mock('@erplora/ui/shell', async (importOriginal) => ({
 beforeEach(() => {
   mocks.confirm.mockReset();
   vi.mocked(toastSuccess).mockClear();
+});
+
+type TauriWindow = { __TAURI__?: { core: { invoke: (command: string, args?: unknown) => Promise<unknown> } } };
+
+afterEach(() => {
+  delete (window as TauriWindow).__TAURI__;
 });
 
 const CONFIG: ConfigOut = {
@@ -192,6 +198,16 @@ describe('SettingsPage', () => {
     // IndicadorMultiplesOT is always «S» (ERPlora serves many taxpayers): nothing is pending from the account.
     expect(identity).toMatch(/Serves several taxpayers\s*IndicadorMultiplesOT\s*S/);
     expect(s.find('verifactu-settings-pending-indicator').exists()).toBe(false);
+  });
+
+  it('in the installed app, «Read the signed declaration» opens it in the system browser (gh:hub#518)', async () => {
+    const invoke = vi.fn(() => Promise.resolve());
+    (window as TauriWindow).__TAURI__ = { core: { invoke } };
+    const s = await setup();
+    const tap = new MouseEvent('click', { bubbles: true, cancelable: true });
+    s.find('verifactu-settings-declaration').element.dispatchEvent(tap);
+    expect(tap.defaultPrevented).toBe(true);
+    expect(invoke).toHaveBeenCalledWith('open_external_url', { url: CONFIG.declaration_url });
   });
 
   // FIX-HUB-VERIFACTU-ON-FOR-A-BUSINESS-OUTSIDE-SPAIN: VeriFactu is only for Spain; outside it nothing that would lead

@@ -1,8 +1,9 @@
 // The «VeriFactu receipt» of an open invoice (INVOICE-F17 with VERIFACTU-F19; the old detail's card): the state
 // of its record at the AEAT, its CSV once the AEAT answered, the QR to scan and «Check at the tax agency ↗», which
-// opens the AEAT's own page in another tab. A record of the AEAT's test environment says so.
+// opens the AEAT's own page in another tab (in the installed app, the system browser: gh:hub#518). A record of the AEAT's
+// test environment says so.
 import { StatusPill } from '@erplora/ui/components';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { mountInvoice } from '../__tests__/mount-invoice';
 import VerifactuReceipt from './VerifactuReceipt.vue';
@@ -21,6 +22,12 @@ const RECORD = {
   qr_svg: 'data:image/svg+xml;base64,PHN2Zy8+',
   csv: 'A-ZGTHW2SE4KQ8B2',
 };
+
+type TauriWindow = { __TAURI__?: { core: { invoke: (command: string, args?: unknown) => Promise<unknown> } } };
+
+afterEach(() => {
+  delete (window as TauriWindow).__TAURI__;
+});
 
 async function setup(record: Record<string, unknown> = {}, locale: 'en' | 'es' = 'en') {
   const m = await mountInvoice(VerifactuReceipt, { props: { record: { ...RECORD, ...record } }, locale });
@@ -44,6 +51,16 @@ describe('VerifactuReceipt', () => {
       'noopener noreferrer',
     ]);
     expect(s.find('invoice-verifactu-testing').exists()).toBe(false);
+  });
+
+  it('in the installed app, «Check at the tax agency» opens the AEAT’s page in the system browser', async () => {
+    const invoke = vi.fn(() => Promise.resolve());
+    (window as TauriWindow).__TAURI__ = { core: { invoke } };
+    const s = await setup();
+    const click = new MouseEvent('click', { bubbles: true, cancelable: true });
+    s.find('invoice-verifactu-check').element.dispatchEvent(click);
+    expect(click.defaultPrevented).toBe(true);
+    expect(invoke).toHaveBeenCalledWith('open_external_url', { url: RECORD.qr_url });
   });
 
   it('before the AEAT answers there is no CSV; a rejection is in red; a test record says so', async () => {

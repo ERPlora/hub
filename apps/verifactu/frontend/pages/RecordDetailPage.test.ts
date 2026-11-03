@@ -2,7 +2,7 @@
 // the AEAT yet (or that the AEAT rejected it and what to do), its invoice, its chain, its QR, the AEAT's answer and
 // its XML; «Send now», «Ask the AEAT», «Correct» and «Cancel record» where they apply and for whoever may.
 import { toast, toastSuccess } from '@erplora/ui/shell';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { click, EMPLOYEE, errorFrame, flush, type MountOptions, mountVerifactu } from '../__tests__/mount-verifactu';
 import type { RecordOut } from '../operations';
@@ -26,6 +26,12 @@ beforeEach(() => {
   mocks.confirm.mockReset();
   vi.mocked(toastSuccess).mockClear();
   vi.mocked(toast).mockClear();
+});
+
+type TauriWindow = { __TAURI__?: { core: { invoke: (command: string, args?: unknown) => Promise<unknown> } } };
+
+afterEach(() => {
+  delete (window as TauriWindow).__TAURI__;
 });
 
 const OP = 'verifactu.record.get';
@@ -174,6 +180,16 @@ describe('RecordDetailPage', () => {
     expect([verify.attributes('href'), verify.attributes('target')]).toEqual([RECORD.qr_url, '_blank']);
     expect(s.find('verifactu-record-xml').text()).toContain('<soapenv:Envelope/>');
     expect(s.find('verifactu-record-digest').text()).toContain('Not stamped yet');
+  });
+
+  it('in the installed app, «Verify at the AEAT» opens the AEAT’s page in the system browser (gh:hub#518)', async () => {
+    const invoke = vi.fn(() => Promise.resolve());
+    (window as TauriWindow).__TAURI__ = { core: { invoke } };
+    const s = await setup();
+    const tap = new MouseEvent('click', { bubbles: true, cancelable: true });
+    s.find('verifactu-record-verify').element.dispatchEvent(tap);
+    expect(tap.defaultPrevented).toBe(true);
+    expect(invoke).toHaveBeenCalledWith('open_external_url', { url: RECORD.qr_url });
   });
 
   it('the first record of a chain says so; a record without its XML yet says it is built when it is sent', async () => {
