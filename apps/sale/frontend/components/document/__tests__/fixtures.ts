@@ -1,6 +1,6 @@
 // Fixtures of the sale document's tests: a charged sale (three lines: one with a note, a gift and a
-// weighed one; paid in cash with change) and the receipt settings.
-import type { BreakdownOut, SaleOut, SettingsOut } from '../../../operations';
+// weighed one; paid in cash with change), the business as the paper names it and the receipt settings.
+import type { BreakdownOut, LetterheadOut, SaleOut, SettingsOut } from '../../../operations';
 
 /** The fiscal key of a row of the breakdown: subject VAT of the general regime. */
 export const SUBJECT_VAT: Pick<BreakdownOut, 'tax_type' | 'regime' | 'qualification' | 'exempt_reason'> = {
@@ -20,6 +20,8 @@ export function saleOut(over: Partial<SaleOut> = {}): SaleOut {
     order_id: null,
     customer_id: null,
     customer_name: '',
+    customer_tax_id: '',
+    customer_address: '',
     staff_id: null,
     appointment_id: null,
     tax_included: true,
@@ -172,4 +174,12 @@ export function saleOut(over: Partial<SaleOut> = {}): SaleOut {
   };
 }
 
-export const SETTINGS = { receipt_header: 'Bar Pepe\nCalle Mayor 1\nMadrid', receipt_footer: '¡Gracias por su visita!' } as Pick<SettingsOut, 'receipt_header' | 'receipt_footer'>;
+export const SETTINGS = { receipt_footer: '¡Gracias por su visita!' } as Pick<SettingsOut, 'receipt_footer'>;
+
+/** `sale.letterhead.get` of the sale `s1`: the issuer in Invoicing, with what the receipt header adds. */
+export const LETTERHEAD: LetterheadOut = {
+  sale_id: 's1',
+  name: 'Bar Pepe S.L.',
+  tax_id: 'B12345674',
+  lines: ['Calle Mayor 1, 28001 Madrid (Madrid)', 'Tel. 600 000 000'],
+};

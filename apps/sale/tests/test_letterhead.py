@@ -4,13 +4,15 @@ A sale with a fiscal document says what that document says, whatever the issuer 
 real issuer, through their operations."""
 
 import pytest
-from live.context import OperationContext
+from live.context import OperationContext, Scope
 from live.errors import NotFound, PermissionDenied
 from live.live_registry import live_registry
 
 from apps.sale import events
-from apps.sale.tests.conftest import A, B, ctx_for, run
+from apps.sale.tests.conftest import A, ctx_for, run
 from base.models import Hub
+from base.tenancy.context import use_hub
+from base.tenancy.tests import hubs
 
 pytestmark = pytest.mark.django_db
 
@@ -122,12 +124,17 @@ def test_without_invoicing_the_paper_goes_with_the_header(monkeypatch):
     assert identity() == ("Bar Ana", "", [])
 
 
-def test_one_business_never_prints_the_issuer_of_another():
-    run("invoice.issuer.update", ISSUER)
-    Hub.objects.update_or_create(slug=B.key, defaults={"name": "Peluquería Beta"})
-    in_b = ctx_for(scope=B)
-    assert identity(ctx=in_b) == ("Peluquería Beta", "", [])
-    assert identity()[1] == "B12345674"
+@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@pytest.mark.usefixtures("no_test_fallback")
+def test_one_business_never_prints_the_issuer_of_another(hub_a, hub_b):
+    """Each business in its own database, as production: the issuer written in A does not head B's paper."""
+    in_a, in_b = ctx_for(scope=Scope("host", hub_a.slug)), ctx_for(scope=Scope("host", hub_b.slug))
+    with use_hub(hub_a):
+        run("invoice.issuer.update", ISSUER, in_a)
+    with use_hub(hub_b):
+        assert identity(ctx=in_b) == ("My business", "", [])
+    with use_hub(hub_a):  # positive control: it is there, in its own business
+        assert identity(ctx=in_a)[:2] == ("Salón Aurora S.L.", "B12345674")
 
 
 def test_the_screen_paper_follows_the_issuer_the_header_and_the_sale():

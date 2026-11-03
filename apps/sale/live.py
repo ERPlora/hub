@@ -10,8 +10,6 @@ from apps.tax.events import RULE_EVENTS
 from apps.tax.events import SETTINGS_UPDATED as TAX_SETTINGS_UPDATED
 
 SALES = E.SALE_EVENTS
-#: Invoicing's event, by name: it is no ``requires`` of Sales.
-ISSUER_UPDATED = "invoice.issuer.updated"
 FIGURES = E.FIGURE_EVENTS
 
 live("sale.sale.list", on=SALES)
@@ -31,7 +29,7 @@ live("sale.payment_method.list", on=[E.PAYMENT_METHOD_CREATED, E.SETTINGS_UPDATE
 live("sale.settings.get", on=[E.SETTINGS_UPDATED])
 live("sale.pos_settings.get", on=[E.SETTINGS_UPDATED])
 # The paper's head: the issuer, the receipt header and the document its sale gets (SALE-F29).
-live("sale.letterhead.get", on=[*SALES, E.SETTINGS_UPDATED, ISSUER_UPDATED])
+live("sale.letterhead.get", on=[*SALES, E.SETTINGS_UPDATED, E.ISSUER_UPDATED])
 # Each department shows the rate its category charges today.
 live(
     "sale.department.list",

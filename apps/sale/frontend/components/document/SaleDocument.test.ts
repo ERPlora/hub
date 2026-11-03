@@ -1,5 +1,5 @@
-// The document of one sale (SALE-F29): it follows `sale.sale.get` and the receipt settings
-// (`sale.pos_settings.get`) live, says «Loading document…» until both answered, «Error loading the
+// The document of one sale (SALE-F29): it follows `sale.sale.get`, the business on its paper
+// (`sale.letterhead.get`) and the receipt settings (`sale.pos_settings.get`) live, says «Loading document…» until all answered, «Error loading the
 // document» (with the server's words and Retry) when either fails, and then shows the paper and tells
 // its host the paper is ready to print (or that it failed). With VeriFactu on and readable, a sale with a
 // fiscal document waits for that document's record too: the paper carries its QR, also when reprinted.
@@ -9,7 +9,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { SessionMe } from '@erplora/ui/shell';
 
 import { errorFrame, flush, MANAGER, mountSale } from '../../__tests__/mount-sale';
-import { saleOut, SETTINGS } from './__tests__/fixtures';
+import { LETTERHEAD, saleOut, SETTINGS } from './__tests__/fixtures';
 import PendingDocuments from './PendingDocuments.vue';
 import ReceiptPaper from './ReceiptPaper.vue';
 import SaleDocument from './SaleDocument.vue';
@@ -18,18 +18,49 @@ async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 
   const m = await mountSale(SaleDocument, { props: { saleId: 's1', duplicate: true, ...props }, locale, session });
   const call = await m.live();
   const showSale = (data = saleOut()) => m.result('sale.sale.get', data);
-  const showSettings = () => m.result('sale.pos_settings.get', { ...SETTINGS, updated_at: null });
-  return { ...m, call, showSale, showSettings };
+  const showLetterhead = (data = LETTERHEAD, match = {}) => m.result('sale.letterhead.get', data, match);
+  const showSettings = async () => {
+    await m.result('sale.pos_settings.get', { ...SETTINGS, updated_at: null });
+    await showLetterhead();
+  };
+  return { ...m, call, showSale, showSettings, showLetterhead };
 }
 
 describe('SaleDocument', () => {
-  it('follows the sale and the receipt settings, and says it is loading until both answered', async () => {
+  it('follows the sale, its letterhead and the receipt settings, and says it is loading until all answered', async () => {
     const s = await setup();
     expect(s.params('sale.sale.get')).toEqual([{ sale_id: 's1' }]);
+    expect(s.params('sale.letterhead.get')).toEqual([{ sale_id: 's1' }]);
     expect(s.params('sale.pos_settings.get')).toEqual([{}]);
     expect(s.find('sale-document-loading').text()).toBe('Loading document…');
     await s.showSale();
     expect(s.find('sale-document-loading').exists()).toBe(true);
+    expect(s.wrapper.findComponent(ReceiptPaper).exists()).toBe(false);
+    await s.result('sale.pos_settings.get', { ...SETTINGS, updated_at: null });
+    expect(s.wrapper.findComponent(ReceiptPaper).exists()).toBe(false); // positive control: only the letterhead is missing
+    await s.showLetterhead();
+    expect(s.wrapper.findComponent(ReceiptPaper).props('letterhead')).toEqual(LETTERHEAD);
+  });
+
+  it('never heads a sale’s paper with the letterhead of the sale before it', async () => {
+    const s = await setup();
+    await s.showSale();
+    await s.showSettings();
+    await s.wrapper.setProps({ saleId: 's2' });
+    await s.reopen();
+    await s.result('sale.sale.get', saleOut({ id: 's2' }), { sale_id: 's2' });
+    expect(s.wrapper.findComponent(ReceiptPaper).exists()).toBe(false);
+    await s.showLetterhead({ ...LETTERHEAD, sale_id: 's2', name: 'Otra S.L.' }, { sale_id: 's2' });
+    expect(s.wrapper.findComponent(ReceiptPaper).props('letterhead')).toMatchObject({ sale_id: 's2', name: 'Otra S.L.' });
+  });
+
+  it('a failed letterhead read is a failed document: never a paper without the business', async () => {
+    const s = await setup();
+    await s.showSale();
+    await s.result('sale.pos_settings.get', { ...SETTINGS, updated_at: null });
+    s.call.push(errorFrame(s.subId('sale.letterhead.get'), 'internal_error'));
+    await flush();
+    expect(s.find('sale-document-error').exists()).toBe(true);
     expect(s.wrapper.findComponent(ReceiptPaper).exists()).toBe(false);
   });
 
@@ -55,6 +86,7 @@ describe('SaleDocument', () => {
     expect(s.find('sale-document-loading').exists()).toBe(true);
     await s.reopen();
     await s.result('sale.sale.get', saleOut({ id: 's2', number: '20261014-0008' }), { sale_id: 's2' });
+    await s.showLetterhead({ ...LETTERHEAD, sale_id: 's2' }, { sale_id: 's2' });
     expect(s.wrapper.findComponent(ReceiptPaper).props('sale')).toMatchObject({ id: 's2' });
     expect(s.wrapper.emitted('ready')).toHaveLength(2);
   });

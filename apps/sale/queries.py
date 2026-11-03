@@ -28,6 +28,7 @@ from live.errors import (
     Conflict,
     InvalidPayload,
     NotFound,
+    OperationError,
     PermissionDenied,
 )
 from live.operations import AI, UnknownOperation, get, operation

@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { flush, type MountOptions, mountSale } from '../../__tests__/mount-sale';
 import { printPaper } from '../../lib/print';
-import { saleOut, SETTINGS } from './__tests__/fixtures';
+import { LETTERHEAD, saleOut, SETTINGS } from './__tests__/fixtures';
 import DocumentModal from './DocumentModal.vue';
 import ReceiptPaper from './ReceiptPaper.vue';
 import source from './DocumentModal.vue?raw';
@@ -41,6 +41,7 @@ async function setup(props: Record<string, unknown> = {}, options: MountOptions 
   async function load() {
     await m.result('sale.sale.get', saleOut());
     await m.result('sale.pos_settings.get', { ...SETTINGS, updated_at: null });
+    await m.result('sale.letterhead.get', LETTERHEAD);
   }
   const printButton = () => m.find('sale-document-print');
   const printable = () => !(printButton().element as HTMLElement & { disabled?: boolean }).disabled;

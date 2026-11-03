@@ -859,6 +859,10 @@
     "method": "get",
     "path": "/api/sale/pos_settings"
   },
+  "sale.letterhead.get": {
+    "method": "get",
+    "path": "/api/sale/letterhead"
+  },
   "sale.department.list": {
     "method": "get",
     "path": "/api/sale/departments"

@@ -75,12 +75,15 @@ def test_the_receipt_prints_at_checkout_inside_the_charge(bar, till):
         "Till",
     )
     paper = job.document
-    assert (paper["business_name"], paper["receipt_id"], paper["duplicate"], paper["total"]) == (
-        "Bar Ana",
+    assert (paper["business_name"], paper["vat_number"], paper["receipt_id"], paper["duplicate"], paper["total"]) == (
+        ISSUER["legal_name"],
+        ISSUER["tax_id"],
         out.invoice_number,
         False,
         3.0,
     )
+    # The receipt header goes under the issuer as an addition; its line that repeats the issuer's street stays.
+    assert paper["business_address"].split("\n")[-2:] == ["Bar Ana", "Calle Mayor 1"]
     # Sealed by VeriFactu in the same commit: the QR opens the paper, as on screen.
     assert paper["qr_data"].startswith("https://") and paper["qr_heading"] == "QR tributario:"
 
@@ -182,6 +185,9 @@ def test_the_bill_of_a_check_prints_with_its_lines(bar, till):
     assert (out.queued, out.job_id, out.printer) == (True, job.id, "Till")
     assert (job.document_type, job.reference, job.source_app) == ("prebill", "Table 4", "sale")
     assert job.document["customer_name"] == "Table 4" and job.document["total"] == 3.0
+    # The app's bill prints no ``vat_number``: the business's tax ID closes the address (hub#458).
+    assert job.document["business_name"] == ISSUER["legal_name"]
+    assert job.document["business_address"].split("\n")[-1] == f"Tax ID: {ISSUER['tax_id']}"
     # Each press is a bill of its own; the check stays open and nothing is charged.
     assert run("sale.order.print_bill", {"order_id": str(order.id)}).queued is True
     assert len(jobs()) == 2 and not Sale.objects.exists()
@@ -196,3 +202,39 @@ def test_the_employee_at_the_till_gets_the_receipt_and_the_drawer(bar, till):
     assert out.printed.queued is True
     assert (job.job_key, job.open_drawer) == (f"sale-{out.id}-receipt", True)
     assert job.document["qr_data"].startswith("https://")
+
+
+def test_a_role_that_sells_without_reading_invoicing_still_prints_who_the_business_is(bar, till):
+    """hub#458: the paper reads the issuer as the platform; a custom role or an API key may not read Invoicing."""
+    seller = ctx_for()
+    charge("sale-print-no-reading", ctx=dataclasses.replace(seller, permissions=seller.permissions - {"invoice.view_invoice"}))
+    (job,) = jobs()
+    assert (job.document["business_name"], job.document["vat_number"]) == (ISSUER["legal_name"], ISSUER["tax_id"])
+
+
+def test_a_reprint_says_what_its_document_says_whatever_the_issuer_becomes(bar, till):
+    """hub#458: a copy names the issuer of the original, as on screen."""
+    out = charge("sale-print-reprint")
+    run("invoice.issuer.update", {**ISSUER, "legal_name": "Otro Nombre SL"})
+    run("sale.sale.print", {"sale_id": str(out.id), "duplicate": True})
+    assert [job.document["business_name"] for job in jobs()] == [ISSUER["legal_name"], ISSUER["legal_name"]]
+
+
+def test_a_full_invoice_prints_both_parties(bar, till):
+    """hub#458: the issuer's name and tax ID, and the recipient's name, tax ID and address (RD 1619/2012, art. 6)."""
+    charge(
+        "sale-print-invoice",
+        document_type="invoice",
+        customer_name="Javier Gomez Ruiz",
+        customer_tax_id="76543210S",
+        customer_address="Calle Real 2",
+    )
+    (job,) = jobs()
+    paper = job.document
+    assert job.document_type == "invoice"
+    assert (paper["business_name"], paper["vat_number"]) == (ISSUER["legal_name"], ISSUER["tax_id"])
+    assert (paper["customer_name"], paper["customer_tax_id"], paper["customer_address"]) == (
+        "Javier Gomez Ruiz",
+        "76543210S",
+        "Calle Real 2",
+    )

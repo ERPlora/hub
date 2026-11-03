@@ -87,6 +87,8 @@ CUSTOMER_MERGED = "customer.customer.merged"
 # Invoicing's event (its WORKBOOK fixes the payload: ``invoice_id``, ``number``, ``invoice_type``,
 # ``source_type``, ``sale_id``…): a document issued later than the charge (INVOICE-F06).
 INVOICE_ISSUED = "invoice.invoice.issued"
+# Invoicing's event, by name: it is no ``requires`` of Sales. The papers name its issuer (SALE-F21, SALE-F29).
+ISSUER_UPDATED = "invoice.issuer.updated"
 
 #: Event of another app → the operation of this app that reacts to it.
 REACTIONS = {
