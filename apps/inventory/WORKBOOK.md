@@ -857,7 +857,10 @@ Entra: el SKU, el nombre y el precio del producto; la impresora con la función 
 Impresión. También se pide por el asistente («imprime la etiqueta del champú») o por la API.
 Sale: un trabajo de etiqueta en la cola de Impresión, con el precio en la moneda del negocio.
 Si falla: quien no llega a la cola de impresión (Impresión no está activa, o no puede imprimir) ve el
-diálogo de imprimir del navegador con el código, el SKU y el nombre, sin precio. Un SKU con letras que
+diálogo de imprimir del dispositivo con el código, el SKU y el nombre, sin precio: el del navegador o, en
+la app instalada, su pantalla de impresión (el diálogo del sistema, con la impresora o «Guardar como PDF»).
+Si la app no lo abre, la ficha dice por qué: «No se pudo imprimir la etiqueta del código de barras: esta
+versión de la app de ERPlora no puede imprimir; actualízala» (o el motivo que toque). Un SKU con letras que
 un código de barras no lleva (tildes, eñes) no se dibuja ni se imprime: «Este SKU no se puede pasar a
 código de barras: usa letras sin tilde, números y signos.». Cualquier otro rechazo sale dentro de la
 ficha: «No se pudo imprimir la etiqueta del código de barras: <motivo>».
