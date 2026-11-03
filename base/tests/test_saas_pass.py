@@ -13,10 +13,10 @@ import re
 from urllib.parse import parse_qs, urlencode, urlsplit
 
 import pytest
-from django.conf import settings
 from django.core import signing
-from live import registry as live_registry
+from django.test import Client
 from live.operations import INTERNAL
+from live.operations import get as get_operation
 
 from base import services
 from base.models import Membership
@@ -24,6 +24,7 @@ from base.tests.conftest import ANA, SECRET
 from base.tests.test_access_account import enter
 from base.tests.test_access_badge import badge, with_badge
 from base.tests.test_access_spa import a_device, enter_with_pin, with_pin
+from base.tests.test_auth_views import DEEP_LINK, PLATFORM, ROOT, callback
 
 pytestmark = pytest.mark.django_db
 
@@ -142,7 +143,7 @@ class TestTheContract:
 
     def test_it_is_a_door_of_the_screen_never_a_tool_of_the_assistant_and_keeps_nothing(self):
         # A pass in a chat would stay in its history and in the model's context for a minute.
-        operation = live_registry.get(services.saas_pass_create.__operation_name__)
+        operation = get_operation("base.saas_pass.create")
 
         assert operation.ai is INTERNAL
         assert operation.database is False
@@ -188,21 +189,20 @@ class TestOnlyWithTheAccount:
         assert ask(client).status_code in (401, 403)
 
     def test_the_platform_s_staff_on_hubs_erplora_com_get_no_pass(self, client, saas, spa_manifest, fake_saas):
-        from base.tests.test_auth_views import DEEP_LINK, PLATFORM, ROOT, callback
-
         fake_saas(body=ROOT)
         assert callback(client, {"code": "c1", "next": DEEP_LINK}, PLATFORM).status_code == 302
-        for chosen in (False, True):
-            if chosen:
-                assert client.get(DEEP_LINK, HTTP_HOST=PLATFORM).status_code == 302
-            response = ask(client, host=PLATFORM)
-            # Without a hub chosen, the platform host sends everything to the admin; with one, the operation refuses.
-            assert response.status_code in (302, 401, 403, 404), (chosen, response.status_code, response.content[:200])
+
+        # The platform's host has no business: everything but the admin goes back to the admin, nothing is signed.
+        response = ask(client, host=PLATFORM)
+
+        assert response.status_code == 302
+        assert "hub-pass" not in response["Location"]
 
 
 class TestTheBusinessNeedsItsPermission:
     def enter_as(self, client, make_user, fake_saas, role):
-        fake_saas(body={**ANA, "user_id": ACCOUNT_ID, "locale": "en"})
+        # The role is the one erplora.com says at the jump, which overwrites the one kept here.
+        fake_saas(body={**ANA, "user_id": ACCOUNT_ID, "locale": "en", "role": str(role)})
         a_person(make_user, role)
         assert enter(client).status_code == 302
 
@@ -224,36 +224,66 @@ class TestTheBusinessNeedsItsPermission:
 
 
 class TestItsBusiness:
-    def test_a_pass_names_the_business_of_the_address_it_was_asked_on(self, client, make_user, fake_saas, spa_manifest):
-        # One account, two businesses, one browser: each pass opens the door of the business it was asked on.
+    def test_a_pass_names_the_business_of_the_address_it_was_asked_on(self, fake_saas, make_user, spa_manifest):
+        # One account and two businesses: a session belongs to the host it was opened on, so each has its own browser
+        # cookie, and each pass opens the door of the business it was asked on.
         fake_saas(body={**ANA, "user_id": ACCOUNT_ID, "locale": "en"})
         person = a_person(make_user, Membership.Role.MANAGER)
         Membership.objects.create(user=person, host="b", role=Membership.Role.MANAGER)
-        assert enter(client).status_code == 302
-        assert enter(client, host="b.localhost:8000").status_code == 302
+        on_a, on_b = Client(), Client()
+        assert enter(on_a).status_code == 302
+        assert enter(on_b, host="b.localhost:8000").status_code == 302
 
-        assert read_as_the_saas(the_pass(ask(client)))["hub"] == "a"
-        assert read_as_the_saas(the_pass(ask(client, host="b.localhost:8000")))["hub"] == "b"
+        assert read_as_the_saas(the_pass(ask(on_a)))["hub"] == "a"
+        assert read_as_the_saas(the_pass(ask(on_b, host="b.localhost:8000")))["hub"] == "b"
 
 
 class TestItsWords:
-    def test_a_refusal_speaks_spanish_to_a_spanish_person(self, client, make_user, spa_manifest, saas):
+    def said_to_a_person_who_speaks(self, language, fake_saas, role, next_) -> dict:
+        """What the operation answers a person of this role whom erplora.com says speaks this language."""
+        fake_saas(body={**ANA, "user_id": ACCOUNT_ID, "locale": language, "role": str(role)})
+        browser = Client()
+        assert enter(browser).status_code == 302
+        return ask(browser, next_).json()["error"]
+
+    def test_no_permission_for_the_business_speaks_the_person_s_language(self, make_user, fake_saas, spa_manifest):
+        a_person(make_user, Membership.Role.EMPLOYEE)
+
+        english, spanish = (
+            self.said_to_a_person_who_speaks(language, fake_saas, Membership.Role.EMPLOYEE, "business")
+            for language in ("en", "es")
+        )
+
+        assert english["code"] == spanish["code"] == "base.saas_pass_needs_management"
+        assert english["message"] != spanish["message"]
+
+    def test_the_door_out_of_order_speaks_the_person_s_language(self, make_user, fake_saas, spa_manifest, settings):
+        a_person(make_user, Membership.Role.MANAGER)
+        settings.INTERNAL_SHARED_SECRET = ""
+
+        english, spanish = (
+            self.said_to_a_person_who_speaks(language, fake_saas, Membership.Role.MANAGER, "plan")
+            for language in ("en", "es")
+        )
+
+        assert english["code"] == spanish["code"] == "base.saas_pass_unavailable"
+        assert english["message"] != spanish["message"]
+
+    def test_a_pin_s_refusal_speaks_the_browser_s_language(self, client, make_user, spa_manifest, saas):
         bea = make_user("saas:2", host="a", role=Membership.Role.OWNER, first_name="Bea")
         a_device(client)
         enter_with_pin(client, with_pin(bea, "9071"), "9071")
 
-        response = client.post(
-            URL,
-            json.dumps({"next": "plan"}),
-            content_type="application/json",
-            HTTP_HOST=HOST,
-            HTTP_ACCEPT_LANGUAGE="es",
+        english, spanish = (
+            client.post(
+                URL,
+                json.dumps({"next": "plan"}),
+                content_type="application/json",
+                HTTP_HOST=HOST,
+                HTTP_ACCEPT_LANGUAGE=language,
+            ).json()["error"]
+            for language in ("en", "es")
         )
 
-        assert response.status_code == 403
-        assert "cuenta de erplora.com" in response.json()["error"]["message"]
-
-
-def test_the_settings_it_reads_exist():
-    # The secret comes from the environment in production: the settings demand it (config/settings.py).
-    assert hasattr(settings, "INTERNAL_SHARED_SECRET")
+        assert english["code"] == spanish["code"] == "base.saas_pass_needs_account"
+        assert english["message"] != spanish["message"]

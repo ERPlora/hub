@@ -1756,6 +1756,18 @@ msgid "Sign in with your erplora.com account to report a problem."
 msgstr "Entra con tu cuenta de erplora.com para reportar un problema."
 
 #: base/services.py
+msgid "Sign in with your erplora.com account to go there directly."
+msgstr "Entra con tu cuenta de erplora.com para ir directamente."
+
+#: base/services.py
+msgid "You don't have permission to manage this business on erplora.com."
+msgstr "No tienes permiso para gestionar este negocio en erplora.com."
+
+#: base/services.py
+msgid "We could not open erplora.com directly."
+msgstr "No se ha podido abrir erplora.com directamente."
+
+#: base/services.py
 msgid "Add a subject."
 msgstr "Añade un asunto."
 
@@ -1785,6 +1797,10 @@ msgstr "Ayuda"
 #: base/schemas.py
 msgid "Report subject"
 msgstr "Asunto del informe"
+
+#: base/schemas.py
+msgid "Where to go"
+msgstr "A dónde ir"
 
 #: base/schemas.py
 msgid "What happened?"

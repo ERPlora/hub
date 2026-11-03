@@ -37,12 +37,11 @@ from base import public_home, queries
 from base.access import CREDENTIAL_SESSION_KEY
 from base.auth import SAAS_PANEL_PATH, saas_url
 from base.models import SessionOwner
+from base.permissions import OPEN_MANAGEMENT
 
 SESSION_ME_ID = "session-me"
 HUB_HOME_ID = "hub-home"
 WIDGET_LIST_ID = "widget-list"
-#: Who may open this business on erplora.com's panel from the bar (``base/apps.py``: owner, admin and manager).
-OPEN_MANAGEMENT = "base.open_management"
 #: A path whose last segment has an extension names a file, and no route of the SPA looks like one (its parameters
 #: are ids). It is the fallback rule of connect-history-api-fallback and of ASP.NET Core's ``{*path:nonfile}``. With a
 #: trailing slash too: else ``APPEND_SLASH`` would send ``/robots.txt`` to ``/robots.txt/``, and that to the shell.
