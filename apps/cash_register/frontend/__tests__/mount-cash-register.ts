@@ -119,7 +119,7 @@ export async function mountCash(component: Component, options: MountOptions = {}
   const wrapper = mount(component, {
     props: options.props,
     global: {
-      plugins: [router, createShellI18n({ locale: options.locale ?? 'en', messages: { en, es } })],
+      plugins: [router, createShellI18n({ locale: options.locale ?? 'en', messages: { en: { ...baseEn, ...en }, es: { ...baseEs, ...es } } })],
       provide: { ...app._context.provides, [LIVE_CLIENT_KEY as symbol]: harness.client },
       stubs: options.stubs,
     },
