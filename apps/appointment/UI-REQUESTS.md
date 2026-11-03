@@ -3,7 +3,26 @@
 Lo que las páginas de Citas necesitan de `@erplora/ui` (y de otras apps) y todavía no está. Mientras tanto
 usan lo más parecido que ya existe (dicho en cada punto); se cambia en cuanto llegue.
 
-## `Scheduler` en `@erplora/ui/components` (port de `ok-scheduler`)
+Cerrado al cerrar la app (2026-11-03, contra `@erplora/ui` en `667b7fb`). Ninguna petición rompe un flujo: todas
+tienen su sustituto en uso. Cada una lleva la clave con la que pasa a `## 6` de `MIGRATION.md`. La campana del shell
+y el aviso del sistema de una cita nueva o cancelada (APPOINTMENT-F03 y F28) ya están hechos y salen de esta lista.
+
+## Ya en `@erplora/ui`, sin usar todavía (`appointment:ui-use-landed`)
+
+- `ion:play-circle-outline` — acción **Iniciar** (la del producto actual). Hoy: `ion:sync-outline`.
+- `ion:checkmark-done-outline` — acción **Completar** (la del producto actual). Hoy:
+  `ion:checkmark-circle-outline`.
+
+Los dos están registrados en `packages/ui/src/shell/icons.ts` desde ui#27. Al usarlos, cambiar a la vez
+`frontend/components/AppointmentList.vue` (`ICONS`) y su test.
+
+## Icono que falta (`appointment:ui-icons`; registrarlo en `packages/ui/src/shell/icons.ts`, `ION_ICONS`)
+
+- `ion:repeat-outline` — segmento **Periódicas**. Hoy: `ion:sync-outline`.
+
+Al registrarlo, cambiar `frontend/components/AgendaToolbar.vue` (`VIEWS`) y su test.
+
+## `Scheduler` en `@erplora/ui/components`, port de `ok-scheduler` (`appointment:ui-scheduler`)
 
 - **Qué**: la agenda de recursos del producto actual (`@erplora/outfitkit/ok-scheduler`, que usaba el
   módulo viejo): una fila por recurso, bloques posicionados por hora, arrastrar para mover (pointer
@@ -15,30 +34,21 @@ usan lo más parecido que ya existe (dicho en cada punto); se cambia en cuanto l
 - Al llegar: sustituir los dos componentes y sus tests por el `Scheduler`, conservando los `data-testid`
   que usan los e2e (`appointment-grid-*`, `appointment-week-*`).
 
-## `DateField` y `TimeField` en `@erplora/ui/components` (el día y la hora en el idioma del hub)
+## `DateField` y `TimeField` en `@erplora/ui/components`, el día y la hora en el idioma del negocio (`appointment:ui-date-time-fields`)
 
 - **Qué**: el campo de fecha y el de hora del producto actual (appointments#205, #214, #223): un campo de
-  texto pintado en el idioma del hub (`23/11/2026` en español, `11/23/2026` en inglés; `14:30` o
+  texto pintado en el idioma del negocio (`23/11/2026` en español, `11/23/2026` en inglés; `14:30` o
   `02:30 PM`), con un botón de calendario que abre un selector compacto de un mes (la semana empieza
   donde la empieza el idioma; flechas y Enter), en vez del `input` nativo, que pinta el idioma del
-  dispositivo y no el del hub.
+  dispositivo y no el del negocio. Es la misma petición que `staff:ui-time-date-fields` y
+  `attendance:ui-datetime-field`.
 - **Hoy**: `ion-input type="date"` y `type="time"` (como Horarios, Personal, Ventas e Impuestos) en la
-  barra de la agenda (`appointment-toolbar-calendar`), «Nueva cita» / «Mover» y «Nueva cita periódica».
-  El valor que viaja es el mismo (`AAAA-MM-DD`, `HH:MM`); solo cambia cómo se pinta si el dispositivo
-  está en otro idioma que el hub.
+  barra de la agenda (`appointment-toolbar-calendar`), «Nueva cita» / «Editar la cita» y «Nueva cita
+  periódica». El valor que viaja es el mismo (`AAAA-MM-DD`, `HH:MM`); solo cambia cómo se pinta si el
+  dispositivo está en otro idioma que el negocio.
 - Al llegar: cambiar esos campos conservando sus `data-testid`.
 
-## Iconos (registrarlos en `packages/ui/src/shell/icons.ts`, `ION_ICONS`)
-
-- `ion:play-circle-outline` — acción **Iniciar** (la del producto actual). Hoy: `ion:sync-outline`.
-- `ion:checkmark-done-outline` — acción **Completar** (la del producto actual). Hoy:
-  `ion:checkmark-circle-outline`.
-- `ion:repeat-outline` — segmento **Periódicas**. Hoy: `ion:sync-outline`.
-
-Al registrarlos, cambiar `frontend/components/AppointmentList.vue` (`ICONS`) y
-`frontend/components/AgendaToolbar.vue` (`VIEWS`).
-
-## Personal: no dar de baja con citas futuras sin decidir qué pasa con ellas
+## De Personal: no dar de baja con citas futuras sin decidir qué pasa con ellas (`appointment:staff-block-termination`)
 
 - **Qué** (mercado: Fresha, Square, Phorest, Mindbody, Timely, Shortcuts): al dar de baja a alguien con
   citas futuras, Personal avisa y deja reasignarlas o cancelarlas antes. Citas ofrece la cuenta que
@@ -46,20 +56,3 @@ Al registrarlos, cambiar `frontend/components/AppointmentList.vue` (`ICONS`) y
   `appointment.agenda.lanes`).
 - **Hoy**: Citas reacciona a `staff.member.terminated` pasando sus citas futuras a «Sin asignar» con un
   aviso en la agenda (APPOINTMENT-F25): nada se pierde ni se cancela en silencio.
-
-## Campana del shell (`packages/ui/src/shell`): avisar al equipo de una cita nueva o cancelada
-
-- **Qué** (APPOINTMENT-F28, la campana del producto actual, old-hub:HUB_SHELL-F66): una campana en la barra
-  de arriba que cuenta lo que declaran los módulos y, con permiso del dispositivo, un aviso del sistema por
-  cada aviso nuevo; tocarlo abre la agenda en ese día.
-- **Hecho — el aviso del dispositivo** (FIX-UI-SHELL-BELL-APPOINTMENT-NOTICES): Citas declara `notices` en su
-  `LiveAppConfig` (la reserva y la cancelación de la clienta sobre `appointment.appointment.notices`),
-  `base.notice.list` los rellena y la shell (`device-notices.ts` de `@erplora/ui`) los da una vez por
-  dispositivo con `erplora_notify` de la app instalada; el toque abre `/appointment/agenda?date=…`; en
-  Android pide antes el permiso con su frase. El navegador no avisa (decisión de mercado). e2e:
-  `tests/e2e/fix-ui-shell-appointment-notices.spec.ts`.
-- **Hecho — la campana** (BASE-G137, hub#168): existe y cuenta los `bell` de los módulos.
-- **Hecho — el contador «Citas por confirmar» de Citas en la campana** (FIX-APPOINTMENT-SETUP-HOOKS):
-  `LiveAppConfig.bell` con `appointment.appointment.count_to_confirm`, que lleva a `/appointment/agenda` y se
-  refresca con `TO_CONFIRM_EVENTS`. e2e: `tests/e2e/fix-appointment-setup-hooks.spec.ts`. No queda nada pendiente
-  de este punto.
