@@ -7,12 +7,12 @@
 // production, why records wait (e.g. the authorisation was revoked) and «Back to testing» (asks first; only until the first production
 // record). «Live test»: «Test the connection» (whoever may send), which presents nothing to the AEAT, and «Create test
 // invoice» (owner and admin, in testing), with the last result. «Responsible declaration»: «Read the signed
-// declaration», its version and the identifying data every record carries (VERIFACTU-F12). Outside Spain VeriFactu is not
+// declaration» (a new tab, the system browser in the installed app), its version and the identifying data every record carries (VERIFACTU-F12). Outside Spain VeriFactu is not
 // for the business: «VeriFactu is only for businesses in Spain.» is the one reason in sight, and the switch, «Go live» and
 // the live test are disabled (FIX-HUB-VERIFACTU-ON-FOR-A-BUSINESS-OUTSIDE-SPAIN).
 import { formatDateTime, InlineFeedback, StatusPill, useConfirm } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
-import { AppPage, toastSuccess, useSession } from '@erplora/ui/shell';
+import { AppPage, openExternalLink, toastSuccess, useSession } from '@erplora/ui/shell';
 import { IonButton, IonSpinner, IonToggle } from '@ionic/vue';
 import { computed, shallowRef } from 'vue';
 
@@ -376,6 +376,7 @@ const yesNo = (value: boolean | null) => (value === null ? t('verifactu.settings
           target="_blank"
           rel="noopener"
           data-testid="verifactu-settings-declaration"
+          @click="openExternalLink(config.declaration_url, $event)"
         >{{ $t('verifactu.settings.declarationRead') }} ↗</a>
         <dl
           class="verifactu-settings__fields"
