@@ -909,6 +909,11 @@ Lo que se vio fallar y queda abierto al cerrar la app (2026-11-03), cada cosa co
 - **hub#634** — Una automatización con permiso para confirmar, mover o anular citas no puede cambiar la cita de
   otra profesional.
 - **hub#636** — Una cita que cruza el cambio de hora dura una hora más (octubre) o menos (marzo) de lo reservado.
+- **hub#687** — La hora del negocio no es la misma en la tarjeta del asistente y en las apps cuando la zona del negocio
+  no es la del despliegue (cruza Citas, Horarios, Reservas, Mesas, Cocina, Automatizaciones y la plataforma; hoy la
+  agenda va en Europe/Madrid, ver «Antes de empezar»).
+- **hub#688** — La prueba de antelación mínima de Citas falla el día del cambio de hora y tumba la CI de cualquier PR
+  del Hub en esa hora.
 - **hub#632** — Los importes de cuatro cifras salen sin separador de millares («1234,56 €»).
 - **hub#631**, **hub#633**, **hub#635** y **hub#637** — textos: una traducción «fuzzy» que sale en inglés, siete
   textos en español con las palabras de otra app, la tarjeta de confirmación del asistente que no dice qué
