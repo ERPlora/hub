@@ -22,6 +22,7 @@ from live.operations import get as get_operation
 from live.operations import operation
 
 from apps.invoice.models import Invoice, Issuer
+from base import activation
 from base import operations as platform
 from apps.verifactu import (
     certificates,
@@ -814,6 +815,8 @@ def compliance_summary(ctx: OperationContext, data: NoInput) -> ComplianceSummar
     )
 
 
+#: This app's label: what ``base.activation`` names its state by.
+VERIFACTU = "verifactu"
 #: Why VeriFactu never goes off once on, in Spain (VERIFACTU-F32, FIX-HUB-VERIFACTU-NEVER-OFF-ONCE-ON).
 NEVER_OFF = _("VeriFactu can't be turned off once it's on: the law requires your invoices to keep reaching the AEAT.")
 
@@ -823,9 +826,10 @@ def disable_refusal(ctx: OperationContext) -> str | None:
     then on the business's invoices reach the AEAT, VERI*FACTU binds it at least to the end of the natural year
     (RD 1007/2023, Orden HAC/1177/2024) and ERPlora keeps no other way of recording them, so whatever its queue holds
     the answer is the same (FIX-HUB-VERIFACTU-NEVER-OFF-ONCE-ON). A business without a country (a demo) is in Spain.
-    Outside Spain no record is ever sent, so turning it off stops nothing: never refused (the records are kept). The
-    country is read in the hub of the active context, inside ``base.app.disable``'s transaction."""
-    if outside_spain(ctx.scope):
+    One that never got on (its tables being made, or making them failed: ``base.activation``) sealed nothing, so
+    nothing binds it yet. Outside Spain no record is ever sent, so turning it off stops nothing: never refused (the
+    records are kept). Both are read in the hub of the active context, inside ``base.app.disable``'s transaction."""
+    if not activation.states_of(ctx.scope)[VERIFACTU].on or outside_spain(ctx.scope):
         return None
     with translation.override(ctx.language):
         return str(NEVER_OFF)

@@ -5,8 +5,10 @@ turned VeriFactu on has its invoices reach the AEAT from then on: VERI*FACTU bin
 natural year (RD 1007/2023, Orden HAC/1177/2024) and ERPlora keeps no other way of recording them, so the answer is
 always 409 ``base.app_vetoed`` with the legal reason in the reader's language, and the app stays on — whether records
 are still to send or the AEAT answered all of them. A business without a country (a demo) is in Spain. Outside Spain
-nothing is ever sent (``test_outside_spain``), so it goes off. Each hub reads its own business's country: a business
-outside Spain in hub A turns it off while the one in Spain in hub B is refused.
+nothing is ever sent (``test_outside_spain``), so it goes off. So does one that never got on: its tables still being
+made, or making them failed (S3, ``base.activation``), it sealed nothing and the rule does not bind it yet. Each hub
+reads its own business's country: a business outside Spain in hub A turns it off while the one in Spain in hub B is
+refused.
 """
 
 import pytest
@@ -18,7 +20,7 @@ from live.operations import get
 from apps.verifactu.models import Record
 from apps.verifactu.tests.conftest import A, ctx_for, run
 from base import activation
-from base.models import Hub
+from base.models import AppActivation, Hub
 from base.tenancy import context
 from base.tenancy.tests import hubs
 
@@ -66,12 +68,6 @@ def business_in(country: str, slug: str = "a") -> None:
     Hub.objects.filter(slug=slug).update(country=country)
 
 
-@pytest.fixture
-def no_test_fallback(monkeypatch):
-    """As production: without ``use_hub`` a hub's model fails, nothing falls back on the shared database."""
-    monkeypatch.setattr(context, "_test_fallback", None)
-
-
 @pytest.mark.django_db
 def test_with_nothing_to_send_verifactu_stays_on_and_says_why():
     business_in("ES")
@@ -114,6 +110,17 @@ def test_a_business_without_a_country_is_in_spain_and_is_refused_too():
 
     assert refusal().message == NEVER_OFF
     assert is_on()
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("state", [activation.CREATING, activation.FAILED])
+def test_a_verifactu_that_never_got_on_goes_off(state):
+    business_in("ES")
+    AppActivation.objects.update_or_create(host="a", app="verifactu", defaults={"state": state, "chosen": True})
+
+    assert apps.get_app_config("verifactu").can_disable(admin()) is None
+    assert disable()["state"] == "off"
+    assert activation.states_of(A)["verifactu"].state == activation.OFF
 
 
 @pytest.mark.django_db

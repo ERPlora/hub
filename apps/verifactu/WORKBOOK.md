@@ -913,13 +913,15 @@ Pasos:
    la misma. VeriFactu sigue encendida y sus registros se quedan como estaban. Facturación tampoco se puede apagar,
    porque VeriFactu la necesita.
 3. Un negocio sin país (una demo) es de España: tampoco se apaga.
-4. En un negocio de fuera de España no lo niega nunca: sus registros no se van a enviar, así que apagarla no para
+4. Mientras su estado dice «Activándose…» o «No se ha podido activar» todavía no ha estado encendida ni ha sellado
+   nada: se puede desactivar.
+5. En un negocio de fuera de España no lo niega nunca: sus registros no se van a enviar, así que apagarla no para
    nada; se guardan tal cual.
 Entra: la petición de apagar.
-Sale: nada en España; fuera de España, la app apagada.
+Sale: nada en España con la app encendida; si no, la app apagada.
 Si falla: «VeriFactu no se puede desactivar una vez activada: la ley obliga a que tus facturas sigan llegando a la
 AEAT.».
-Implicados: BASE-F23, BASE-F25
+Implicados: BASE-F21, BASE-F23, BASE-F25
 
 ### VERIFACTU-F33 Cesar la actividad
 <!-- origen: old-hub:HUB-F309 old:verifactu/workflow/control.md#verifactu-f33 -->
@@ -1503,8 +1505,10 @@ Las cerradas quedan tachadas con su motivo; las abiertas dicen dónde siguen.
     `base.app.list`); hasta entonces se enciende y no hace nada.
 16. **Una vez encendida, VeriFactu no se apaga en España** (FIX-HUB-VERIFACTU-NEVER-OFF-ONCE-ON, 2026-11-01; ajuste
     de Ioan del 22/10 en el plan de la fase 2, «Tablas por módulo (S3)»): `disable_refusal` contesta siempre
-    `NEVER_OFF`, salvo fuera de España (decisión 15); sin país (una demo), es España. La AEAT obliga a seguir con
-    VERI*FACTU al menos hasta el fin del año natural (FAQ de su sede) y el mercado no deja apagarlo a mitad de año
+    `NEVER_OFF`, salvo fuera de España (decisión 15) o si nunca llegó a `on` (`creating` o `failed` de S3: no ha
+    sellado nada, y el negocio no se queda atado a una activación que falló); sin país (una demo), es España. La
+    AEAT obliga a seguir con VERI*FACTU al menos hasta el fin del año natural (FAQ de su sede) y el mercado no deja
+    apagarlo a mitad de año
     (Square: la baja se aplica a final de año; Sage 50: baja con fecha 31-12, «irreversible» tras la primera factura
     certificada; B2Brouter, el conector de Business Central: desde 2027 no se desactiva en un ejercicio con envíos;
     Zoho Books: desaconsejado salvo migración). ERPlora no tiene modo «NO VERI*FACTU», así que una baja diferida a

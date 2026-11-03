@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:89229c8cbefd17a1746d321eef6669523c8e93acc45b8b1e4ca815a3e5523e28 -->
+<!-- generated from WORKBOOK.md sha256:8633ae1d5c1e0305eaadfa0065dbfecf10e3d27df42e4e7dbe30553f876cc5d5 -->
 
 ## What it is for and who it is for
 
@@ -876,13 +876,15 @@ Steps:
    AEAT, the answer is the same. VeriFactu stays on and its records stay as they were. Invoicing cannot be turned off
    either, because VeriFactu needs it.
 3. A business without a country (a demo) is in Spain: it does not go off either.
-4. In a business outside Spain it never refuses: its records are not going to be sent, so turning it off stops
+4. While its status says "Turning on…" or "Could not turn on" it has not been on yet nor sealed anything: it can be
+   turned off.
+5. In a business outside Spain it never refuses: its records are not going to be sent, so turning it off stops
    nothing; they are kept as they are.
 In: the request to turn it off.
-Out: nothing in Spain; outside Spain, the app off.
+Out: nothing in Spain with the app on; otherwise, the app off.
 If it fails: "VeriFactu can't be turned off once it's on: the law requires your invoices to keep reaching the
 AEAT.".
-Involved: BASE-F23, BASE-F25
+Involved: BASE-F21, BASE-F23, BASE-F25
 
 ### VERIFACTU-F33 Cease the activity
 Status: discarded — ceasing before the tax agency is the business's census deregistration (form 036/037), outside
