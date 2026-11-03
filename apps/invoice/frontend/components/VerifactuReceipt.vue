@@ -1,10 +1,12 @@
 <script setup lang="ts">
 // The «VeriFactu receipt» card of an open invoice (INVOICE-F17 with VERIFACTU-F19; the old detail's card): the
 // state of its registration record at the AEAT, its CSV once the AEAT answered, the record's QR and «Check at the
-// tax agency ↗», which opens the AEAT's page (the QR's own address) in another tab; a record of the AEAT's test
-// environment says so. Every value is VeriFactu's: the page hands it the record it follows.
+// tax agency ↗», which opens the AEAT's page (the QR's own address) in another tab, and in the installed app in the
+// system browser (`openExternalLink`, gh:hub#518); a record of the AEAT's test environment says so. Every value is
+// VeriFactu's: the page hands it the record it follows.
 import { StatusPill, type StatusPillTone } from '@erplora/ui/components';
 import type { OutputOf } from '@erplora/ui/sdk';
+import { openExternalLink } from '@erplora/ui/shell';
 import { computed } from 'vue';
 
 type FiscalRecord = NonNullable<OutputOf<'verifactu.record.by_invoice'>['record']>;
@@ -57,6 +59,7 @@ const tone = computed<StatusPillTone>(() => TONES[props.record.status] ?? 'neutr
           target="_blank"
           rel="noopener noreferrer"
           data-testid="invoice-verifactu-check"
+          @click="openExternalLink(record.qr_url, $event)"
         >{{ $t('invoice.verifactu.check') }}</a>
       </div>
     </div>

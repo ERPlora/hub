@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:5199a3d54130bb34b55e49e7654f074f06674e95ca7f5f3174255146af160a89 -->
+<!-- generated from WORKBOOK.md sha256:f4a1969716b86551b1265eabdb4533190f44701648983ba076ce892c2725613c -->
 
 ## What it is for and who it is for
 
@@ -224,7 +224,7 @@ Screen notices: the result of each action in a strip on top (green if it went we
 | VERIFACTU-F15 | Send the record to the AEAT and collect its answer | done — the worker sends it through the SaaS gateway; without `VERIFACTU_GATEWAY_URL` the records wait in the queue |
 | VERIFACTU-F16 | Look up the records and their status | done |
 | VERIFACTU-F17 | See the detail of a record and why it waits | done |
-| VERIFACTU-F18 | Verify the QR at the AEAT's site | done |
+| VERIFACTU-F18 | Verify the QR at the AEAT's site | partial — in the installed app the AEAT's site does not open yet: the app has yet to accept its addresses (ERPlora/app#20) |
 | VERIFACTU-F19 | Give the QR and the fiscal status to the ticket and the invoice | done (Sales and Printing ask for it by name) |
 | VERIFACTU-F20 | Send later what could not go out (automatic contingency) | done — the worker runs it every minute (in phase 1, over a single hub) |
 | VERIFACTU-F21 | Process the queue by hand | done |
@@ -504,12 +504,12 @@ Actor: employee, manager, administrator
 Screen: Settings
 Steps:
 1. In **VeriFactu → Settings**, card "Responsible declaration", "Read the signed declaration" opens the one
-   published on erplora.com; next to it, "Declaration version".
+   published on erplora.com (in the installed app, in the device's browser); next to it, "Declaration version".
 2. "Identifying data of this system" shows the producer's data, the installed version and the installation number
    (this business's identifier at ERPlora).
 In: the declaration (fixed in the Hub's version).
 Out: nothing; it is a lookup.
-If it fails: the failure's message.
+If it fails: the failure's message; in the installed app, if it cannot open it, "Could not open that page. Try again.".
 Involved: none
 
 ### VERIFACTU-F13 Record an issued invoice
@@ -628,17 +628,18 @@ If it fails: "Record not found" or the failure's message.
 Involved: VERIFACTU-F15
 
 ### VERIFACTU-F18 Verify the QR at the AEAT's site
-Status: done
+Status: partial — in the installed app the AEAT's site does not open yet: the app has yet to accept its addresses (ERPlora/app#20)
 Actor: employee, manager, administrator, customer
 Screen: Records
 Steps:
-1. In **Records**, "Verify at the AEAT" on the row (or in the detail) opens in another tab the AEAT's verification
-   page with the issuer's tax ID, the number, the date and the amount.
+1. In **Records**, "Verify at the AEAT" on the row (or in the detail) opens in another tab (in the installed app, in the
+   device's browser) the AEAT's verification page with the issuer's tax ID, the number, the date and the amount.
 2. A record born in testing leads to the test site; one from production, to the real site.
 3. The customer does the same by scanning the QR of their ticket or their invoice.
 In: the QR's link set when sealing.
 Out: nothing in the Hub.
-If it fails: a record that has not gone out yet shows at the AEAT as not found; a rejected one, never.
+If it fails: a record that has not gone out yet shows at the AEAT as not found; a rejected one, never. In the installed
+app, if it cannot open the page, "Could not open that page. Try again.".
 Involved: VERIFACTU-F19
 
 ### VERIFACTU-F19 Give the QR and the fiscal status to the ticket and the invoice
