@@ -224,7 +224,7 @@ function onRow(): void {
             :aria-pressed="line.is_gift ? 'true' : 'false'"
             @click.stop="emit('gift')"
           >
-            <HubIcon name="ion:sparkles-outline" />
+            <HubIcon :name="line.is_gift ? 'ion:gift' : 'ion:gift-outline'" />
           </button>
         </span>
         <QtyStepper
