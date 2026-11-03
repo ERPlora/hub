@@ -4,7 +4,8 @@
 // owner tapped «Invite on erplora.com» and «Change on erplora.com» on the tablet and nothing happened. The one way
 // out is `openExternalLink` of `@erplora/ui/shell` on the link's click (ManageLink's «erplora.com»): in the app it
 // hands the address to the system browser (`open_external_url`) and says so when it cannot. Every `_blank` link of
-// base and of the apps goes that way, called on its `@click` or from the function its `@click` names; a
+// base and of the apps goes that way, called on its `@click` or from the function its `@click` names; a link the code
+// builds and clicks (a table row's action: gh:hub#518) hands its click to it in the same function; a
 // `window.open(…, '_blank')` has no such way and is not written. The files still waiting, each with its issue, are
 // listed below; a fixed one leaves the list (the test fails while it stays).
 import { readdirSync, readFileSync } from 'node:fs';
@@ -37,12 +38,7 @@ function sources(): string[] {
 }
 
 /** The files whose `_blank` links still wait for the common way, and why (each one, an issue). */
-const WAITING: Readonly<Record<string, string>> = {
-  'apps/invoice/frontend/components/VerifactuReceipt.vue': 'gh:hub#518 (and the app must take the AEAT’s QR address)',
-  'apps/verifactu/frontend/pages/RecordDetailPage.vue': 'gh:hub#518 (and the app must take the AEAT’s QR address)',
-  'apps/verifactu/frontend/pages/RecordsPage.vue': 'gh:hub#518 (and the app must take the AEAT’s QR address)',
-  'apps/verifactu/frontend/pages/SettingsPage.vue': 'gh:hub#518',
-};
+const WAITING: Readonly<Record<string, string>> = {};
 
 /** An opening tag, with attribute values that may hold a `>` (`@click="a > b"`). */
 const OPENING_TAG = /<([a-zA-Z][\w-]*)((?:\s+[^\s=>"'/]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>"']+))?)*)\s*\/?>/g;
@@ -51,6 +47,8 @@ const NEW_TAB = /(?:^|\s)(?:target\s*=\s*["']_blank["']|(?::|v-bind:)target\s*=\
 /** The click handler of a tag: `@click`, `@click.prevent`, `v-on:click`… */
 const CLICK = /(?:^|\s)(?:@|v-on:)click(?:\.[\w.]+)?\s*=\s*"([^"]*)"/;
 const WINDOW_OPEN_BLANK = /\bwindow\.open\s*\([^)]*['"]_blank['"]/g;
+/** A link built in script for a new tab (`link.target = '_blank'`), clicked by the code (a table row's action). */
+const SCRIPT_NEW_TAB = /\.target\s*=\s*['"]_blank['"]/g;
 
 function lineOf(source: string, index: number): number {
   return source.slice(0, index).split('\n').length;
@@ -83,6 +81,12 @@ function scan(source: string): { stray: number[]; through: number } {
     else stray.push(lineOf(source, match.index));
   }
   for (const match of source.matchAll(WINDOW_OPEN_BLANK)) stray.push(lineOf(source, match.index));
+  for (const match of source.matchAll(SCRIPT_NEW_TAB)) {
+    // It goes the common way when the rest of its function (up to its closing brace) hands its click to it.
+    const end = source.indexOf('\n}', match.index);
+    if (/\bopenExternalLink\s*\(/.test(source.slice(match.index, end < 0 ? undefined : end))) through += 1;
+    else stray.push(lineOf(source, match.index));
+  }
   return { stray: stray.sort((a, b) => a - b), through };
 }
 
@@ -100,6 +104,15 @@ describe('the scanner of the way out', () => {
     const named = '<ion-item :href="url" target="_blank" @click="openIt">x</ion-item>\nfunction openIt(event: Event): void {\n  open.value = false;\n  openExternalLink(url, event);\n}';
     expect(scan(named)).toEqual({ stray: [], through: 1 });
     expect(scan('<a :href="url" @click="a > b && openExternalLink(url, $event)" target="_blank">x</a>')).toEqual({ stray: [], through: 1 });
+  });
+
+  it('catches a link built in script for a new tab unless the rest of its function hands its click to `openExternalLink`', () => {
+    const built = "function verify(url: string): void {\n  const link = document.createElement('a');\n  link.href = url;\n  link.target = '_blank';\n  link.click();\n}";
+    expect(scan(built)).toEqual({ stray: [4], through: 0 });
+    const handed = built.replace('  link.click();', "  link.addEventListener('click', (event) => openExternalLink(url, event));\n  link.click();");
+    expect(scan(handed)).toEqual({ stray: [], through: 1 });
+    // The function's end bounds it: a later function that calls `openExternalLink` does not cover it.
+    expect(scan(`${built}\nfunction other(url: string, event: Event): void {\n  openExternalLink(url, event);\n}`).stray).toEqual([4]);
   });
 
   it('leaves alone a link that stays in the page', () => {
@@ -122,7 +135,7 @@ describe('guardrail: every link of the Hub to another page goes by `openExternal
     expect(fixed).toEqual([]);
   });
 
-  it("reads the links it guards: erplora.com of the menu's foot, inviting, roles, the business, the plan and the apps", () => {
+  it("reads the links it guards: erplora.com of the menu's foot, inviting, roles, the business, the plan, the apps, and VeriFactu's AEAT and declaration", () => {
     const through = Object.fromEntries(found.filter((entry) => entry.through > 0).map((entry) => [entry.file, entry.through]));
     expect(through).toMatchObject({
       'base/frontend/components/ManageLink.vue': 1,
@@ -134,6 +147,10 @@ describe('guardrail: every link of the Hub to another page goes by `openExternal
       'base/frontend/pages/AppsPage.vue': 2,
       'base/frontend/pages/AppBlockedPage.vue': 1,
       'base/frontend/pages/LoginPage.vue': 1,
+      'apps/invoice/frontend/components/VerifactuReceipt.vue': 1,
+      'apps/verifactu/frontend/pages/RecordDetailPage.vue': 1,
+      'apps/verifactu/frontend/pages/RecordsPage.vue': 1,
+      'apps/verifactu/frontend/pages/SettingsPage.vue': 1,
     });
   });
 });
