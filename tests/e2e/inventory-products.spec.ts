@@ -1,6 +1,7 @@
 // Inventory → Products in Chrome against the real Taxes app (apps/inventory/WORKBOOK.md):
 //   - INVENTORY-F01: «+» → «New product», the tax category picked among those Taxes seeds; the
-//     product arrives live, active, not «Not configured»;
+//     product arrives live, active, not «Not configured»; the field a person went to while the form was opening
+//     keeps what they type (hub#700);
 //   - the form's refusals under their field: 422 (a price over the limit) and 409 (a SKU taken);
 //   - INVENTORY-F05: a product whose tax category Taxes deactivated is «Not configured», the sale
 //     catalog says it cannot be sold, and saving it with that category is refused; picking another
@@ -72,6 +73,54 @@ test('INVENTORY-F01: a new product with a tax category of Taxes arrives live, ac
   await expect(shown(page).locator('[data-testid^=inventory-products-unconfigured-]')).toHaveCount(0);
   const saved = await productBySku(context, sku);
   expect([saved.tax_category_key, saved.needs_tax_setup, saved.is_active, saved.stock]).toEqual([GENERIC, false, true, '5.000']);
+});
+
+test('INVENTORY-F01: the field a person went to while the form was opening keeps what they type, and «Save» lights up', async ({ page, context }) => {
+  // hub#700: the dialog says it has opened about half a second after it shows. A person who is already in the SKU by
+  // then stays there; before, the cursor jumped to the name, the text went there and the SKU stayed empty, with «Save» off.
+  const sku = `E2E-OPENING-${stamp()}`;
+  await page.setViewportSize({ width: 834, height: 1112 });
+  await login(page, A, '/inventory/products');
+  await productsReady(page);
+
+  // Inside the page, frame by frame: from outside the first moment the field can take the focus would be a coin toss.
+  const opened = page.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        const form = 'ion-modal[data-testid=inventory-product-form]';
+        document.addEventListener(
+          'didPresent',
+          (event) => {
+            if ((event.target as Element).matches(form)) resolve();
+          },
+          { capture: true },
+        );
+        const goToSku = () => {
+          const input = document.querySelector<HTMLInputElement>(`${form} [data-testid=inventory-product-sku] input`);
+          input?.focus();
+          if (!input || document.activeElement !== input) requestAnimationFrame(goToSku);
+        };
+        requestAnimationFrame(goToSku);
+      }),
+  );
+  await shown(page).locator('[data-testid=inventory-products-add]').click();
+  await opened;
+
+  const form = dialog(page, 'inventory-product-form');
+  const skuInput = form.locator('[data-testid=inventory-product-sku] input');
+  await expect(skuInput).toBeFocused();
+  await page.keyboard.type(sku);
+  await expect(skuInput).toHaveValue(sku);
+  await expect(form.locator('[data-testid=inventory-product-name] input')).toHaveValue('');
+
+  await fill(form, 'inventory-product-name', 'E2E Opening');
+  await pickCombo(page, form.locator('[data-testid=inventory-product-tax]'), 'generic', /(Product — generic|Producto — general).*21/);
+  const save = form.locator('[data-testid=inventory-product-form-submit]');
+  await expect(save).toHaveJSProperty('disabled', false);
+  await save.click();
+  await expect(form).toBeHidden();
+  const saved = await productBySku(context, sku);
+  expect([saved.name, saved.tax_category_key]).toEqual(['E2E Opening', GENERIC]);
 });
 
 test('selectores de Inventario (Combo compartido): the product form searches its tax category and its categories on the server, at every width', async ({
