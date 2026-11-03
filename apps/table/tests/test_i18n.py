@@ -63,10 +63,6 @@ def po_entries(path: Path) -> dict[str, tuple[str, bool]]:
     return entries
 
 
-def msgids(entries) -> set[str]:
-    return {key.split("\x04")[-1] for key in entries}
-
-
 def lazy_constants(module) -> list:
     """Every module-level lazy text (``_("…")``) of ``module``."""
     return [
@@ -75,14 +71,15 @@ def lazy_constants(module) -> list:
 
 
 def visible_texts() -> set[str]:
-    """The English source of every lazy text the app shows (menu, store, admin, choices, messages) and the titles of
-    its schemas."""
+    """How the catalog keys every lazy text the app shows (menu, Home, store, admin, choices, messages) and the titles
+    of its schemas."""
     config = apps.get_app_config("table")
     lazies = [
         config.verbose_name,
         config.summary,
         config.description,
         *(nav.label for nav in config.navigation),
+        *(text for step in config.setup for text in (step.title, step.description)),
     ]
     lazies += (
         lazy_constants(queries) + lazy_constants(services) + lazy_constants(schemas)
@@ -107,7 +104,15 @@ def visible_texts() -> set[str]:
     ):
         lazies += list(choices.labels)
     with translation.override("en"):
-        return {str(text) for text in lazies} | {"Table %(number)s"} | schema_titles()
+        return {source(text) for text in lazies} | {"Table %(number)s"} | schema_titles()
+
+
+def source(text) -> str:
+    """How the catalog keys a lazy text: its English, or ``context\x04English`` for a ``pgettext_lazy`` (a text that
+    goes back to ``_()`` while its entry keeps the context is missing from the catalog: it would say another app's
+    Spanish)."""
+    args = getattr(text, "_args", ())
+    return f"{args[0]}\x04{args[1]}" if len(args) == 2 else str(text)
 
 
 def schema_titles() -> set[str]:
@@ -163,8 +168,19 @@ def test_every_entry_has_a_spanish_translation():
     ] == []
 
 
+def test_a_text_with_a_context_is_looked_up_with_it():
+    """``pgettext_lazy`` only finds the entry with its ``msgctxt``: the comparison with the catalog has to see the
+    context, or a text that goes back to ``_()`` passes while the screen says another app's Spanish."""
+    assert {
+        "table\x04active",
+        "table check\x04Open",
+        "table hold\x04Held",
+    } <= visible_texts()
+
+
 def test_every_visible_text_is_in_the_catalog():
-    assert visible_texts() - msgids(po_entries(LOCALE / "django.po")) == set()
+    assert len(visible_texts()) > 120  # positive control: the collection found the app's texts
+    assert visible_texts() - set(po_entries(LOCALE / "django.po")) == set()
 
 
 def test_the_compiled_catalog_is_current():
