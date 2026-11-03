@@ -107,8 +107,8 @@ HIGH_RISK_CODE = "flow.high_risk"
 #: What needs a person in front that an automation may still be granted, only for an «Ask the assistant» step that
 #: asks first: cancelling a reservation a guest asks to cancel, done once someone who may cancel it says yes (Zapier's
 #: Human in the Loop and n8n's human review gate the step that cannot be undone; Fresha's AI Concierge cancels within
-#: the business's policy). Never what is done in person, money, fiscal records nor erasing. An appointment's waits
-#: for Appointments to take a change from an automation at all (today: «You may only change your own appointments.»).
+#: the business's policy). Never what is done in person, money, fiscal records nor erasing. An appointment's is not in
+#: yet (hub#634), though Appointments already takes an automation's other changes to anyone's appointment.
 ASK_FIRST = frozenset({"reservation.reservation.cancel"})
 NO_SECRET = _("There is no secret called «%(name)s».")
 BAD_HTTP_GRANT = _("«%(name)s» is no address this automation can be allowed to call.")
