@@ -239,7 +239,7 @@ Avisos de la pantalla: el resultado de cada acción en una franja arriba (verde 
 | VERIFACTU-F15 | Enviar el registro a la AEAT y recoger su respuesta | hecho — lo envía el worker por la pasarela del SaaS; sin `VERIFACTU_GATEWAY_URL` los registros esperan en la cola |
 | VERIFACTU-F16 | Consultar los registros y su estado | hecho |
 | VERIFACTU-F17 | Ver el detalle de un registro y por qué espera | hecho |
-| VERIFACTU-F18 | Cotejar el QR en la sede de la AEAT | hecho |
+| VERIFACTU-F18 | Cotejar el QR en la sede de la AEAT | parcial — en la app instalada la sede de la AEAT aún no abre: falta que la app acepte sus direcciones (ERPlora/app#20) |
 | VERIFACTU-F19 | Dar el QR y el estado fiscal al tique y a la factura | hecho (Ventas e Impresión lo piden por nombre) |
 | VERIFACTU-F20 | Enviar después lo que no pudo salir (contingencia automática) | hecho — la corre el worker cada minuto (en la fase 1, sobre un solo hub) |
 | VERIFACTU-F21 | Procesar la cola a mano | hecho |
@@ -522,12 +522,12 @@ Actor: empleado, responsable, administrador
 Pantalla: Ajustes
 Pasos:
 1. En **VeriFactu → Ajustes**, tarjeta «Declaración responsable», «Leer la declaración firmada» abre la
-   publicada en erplora.com; al lado, «Versión de la declaración».
+   publicada en erplora.com (en la app instalada, en el navegador del dispositivo); al lado, «Versión de la declaración».
 2. «Datos identificativos de este sistema» enseña los datos del productor, la versión instalada y el número de
    instalación (el identificador de este negocio en ERPlora).
 Entra: la declaración (fija en la versión del Hub).
 Sale: nada; es consulta.
-Si falla: el mensaje del fallo.
+Si falla: el mensaje del fallo; en la app instalada, si no puede abrirla, «No se ha podido abrir esa página. Inténtalo de nuevo.».
 Implicados: ninguno
 
 ### VERIFACTU-F13 Registrar una factura emitida
@@ -652,17 +652,18 @@ Implicados: VERIFACTU-F15
 
 ### VERIFACTU-F18 Cotejar el QR en la sede de la AEAT
 <!-- origen: fi:hub/domain#modulo-chain-formatos-aeat-huella-sha-256-url-qr old:verifactu/workflow/registro-y-envio.md#verifactu-f18 wf:cadena-fiscal#rec_fiscal-f08 -->
-Estado: hecho
+Estado: parcial — en la app instalada la sede de la AEAT aún no abre: falta que la app acepte sus direcciones (ERPlora/app#20)
 Actor: empleado, responsable, administrador, cliente
 Pantalla: Registros
 Pasos:
-1. En **Registros**, «Cotejar en la AEAT» en la fila (o en la ficha) abre en otra pestaña la página de cotejo
-   de la AEAT con el NIF del emisor, el número, la fecha y el importe.
+1. En **Registros**, «Cotejar en la AEAT» en la fila (o en la ficha) abre en otra pestaña (en la app instalada, en el
+   navegador del dispositivo) la página de cotejo de la AEAT con el NIF del emisor, el número, la fecha y el importe.
 2. Un registro nacido en pruebas lleva a la sede de pruebas; uno de producción, a la sede real.
 3. El cliente hace lo mismo escaneando el QR de su tique o su factura.
 Entra: el enlace del QR fijado al sellar.
 Sale: nada en el Hub.
-Si falla: un registro que aún no ha salido se ve en la AEAT como no encontrado; uno rechazado, nunca.
+Si falla: un registro que aún no ha salido se ve en la AEAT como no encontrado; uno rechazado, nunca. En la app
+instalada, si no puede abrir la página, «No se ha podido abrir esa página. Inténtalo de nuevo.».
 Implicados: VERIFACTU-F19
 
 ### VERIFACTU-F19 Dar el QR y el estado fiscal al tique y a la factura

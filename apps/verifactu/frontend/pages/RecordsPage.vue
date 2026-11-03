@@ -4,8 +4,8 @@
 // Status (a coloured pill) —, the last sealed first, 50 a page, search «Search invoice, issuer or tax ID…» and the
 // filters behind the table's funnel (Date, Type, Total, Environment and Status on their columns, then the
 // invoice type; the total typed in euros). A row, or «View», opens its record;
-// «Verify at the AEAT» opens the QR's link of the AEAT in a new tab. New, sent and answered records come back
-// through the stream by themselves.
+// «Verify at the AEAT» opens the QR's link of the AEAT in a new tab (in the installed app, the system browser:
+// gh:hub#518). New, sent and answered records come back through the stream by themselves.
 import {
   type DataTableAction,
   type DataTableColumn,
@@ -15,7 +15,7 @@ import {
   EmptyState,
   StatusPill,
 } from '@erplora/ui/components';
-import { AppPage } from '@erplora/ui/shell';
+import { AppPage, openExternalLink } from '@erplora/ui/shell';
 import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
 
@@ -118,9 +118,24 @@ function open(row: RecordRowOut): void {
   void router.push(`/verifactu/records/${row.id}`);
 }
 
+/**
+ * «Verify at the AEAT» of a row: the QR's link, clicked as a link is. A browser opens it in a new tab by itself; the
+ * installed app opens nothing on `_blank`, so `openExternalLink` hands it to the system browser (gh:hub#518).
+ */
+function verify(url: string): void {
+  const link = document.createElement('a');
+  link.href = url;
+  link.target = '_blank';
+  link.rel = 'noopener';
+  link.addEventListener('click', (event) => openExternalLink(url, event));
+  document.body.append(link);
+  link.click();
+  link.remove();
+}
+
 function onAction({ actionId, row }: { actionId: string; row: RecordRowOut }): void {
   if (actionId === 'view') open(row);
-  else if (actionId === 'verify') window.open(row.qr_url, '_blank', 'noopener');
+  else if (actionId === 'verify') verify(row.qr_url);
 }
 </script>
 

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:683eee238bfa4ffbf77fb8f9cf052d63d319fc2c14accb52729df5fc8428ea1d -->
+<!-- generated from WORKBOOK.md sha256:4686282ee9dad725583785135d8876acd1a95984b8c6fc219cd18829360084cc -->
 
 ## What it is for and who it is for
 
@@ -597,14 +597,15 @@ Steps:
    "Disc." column with the discount without VAT), the breakdown and the totals.
 3. With **VeriFactu**, read below the "VeriFactu receipt": the status of the record at the AEAT, its
    "CSV" once the AEAT has answered and the QR, which can be scanned or opened with "Check at the tax
-   agency ↗".
+   agency ↗" (in the installed app, in the device's browser, as soon as the app accepts that address: ERPlora/app#20).
 4. "Rectifies", "Replaces", "Replaced by" and the rectifying invoices open the linked document.
 5. "← Back" goes back to the list.
 In: the invoice and its lines and, with VeriFactu, its record.
 Out: nothing; it only reads. The detail updates by itself if meanwhile it is paid, rectified or the AEAT
 answers.
 If it fails: "Invoice not found" or the reason of the failure. Without VeriFactu, without a record yet or
-without permission to see it, the detail shows without the receipt card.
+without permission to see it, the detail shows without the receipt card. In the installed app, if it cannot open the
+AEAT's page, "Could not open that page. Try again.".
 Involved: VERIFACTU-F19
 
 ### INVOICE-F18 Print or save an invoice as PDF
