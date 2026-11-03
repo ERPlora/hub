@@ -31,7 +31,8 @@ registro nuevo. Solo para negocios de España (Canarias, Ceuta y Melilla incluid
   paneles del Inicio.
 - **La cadena** (F26–F29): verificarla, consultar lo que tiene la AEAT, recuperarla desde la AEAT tras restaurar
   una copia y continuar la de otra aplicación.
-- **Apagar** (F32): la plataforma no la deja apagar mientras haya registros que la AEAT aún no tiene.
+- **Apagar** (F32): en un negocio de España, una vez encendida no se apaga (la ley obliga a que sus facturas sigan
+  llegando a la AEAT); fuera de España, sí.
 
 ## Ficha
 
