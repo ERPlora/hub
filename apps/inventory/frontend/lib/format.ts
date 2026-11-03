@@ -5,11 +5,15 @@
 // every screen writes them; while it is unknown, a figure without a symbol, never the euro by default. Quantities are
 // exact decimals from the API («2.500», at most three decimals): painted ungrouped and without trailing zeros, as
 // the server's CSV writes them (queries.quantity_text).
+import { formatMoney as writeMoney } from '@erplora/ui/components';
+
 import type { Money } from '../../../../base/frontend/lib/home';
 
 export type { Money };
-export { formatMoney } from '@erplora/ui/components';
 export { useBusinessMoney } from '../../../../base/frontend/lib/money';
+
+/** Minor units in `money`, in `locale`, its thousands grouped («1.234,50 €», «€22.50», «¥1,500»; «22,50» while it is unknown). */
+export const formatMoney: (cents: number, locale: string, money?: Money) => string = writeMoney;
 
 const NO_MONEY_DECIMALS = 2;
 

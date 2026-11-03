@@ -6,11 +6,15 @@
 // digits on, as every screen writes them. Until the business answers an amount is a figure without a symbol, never
 // the euro by default. A percentage discount travels in basis points (1050 = 10,50 %): the form writes and reads
 // it as a percentage with at most two decimals.
+import { formatMoney as writeMoney } from '@erplora/ui/components';
+
 import type { Money } from '../../../../base/frontend/lib/home';
 
 export type { Money };
-export { formatMoney } from '@erplora/ui/components';
 export { useBusinessMoney } from '../../../../base/frontend/lib/money';
+
+/** Minor units in `money`, in `locale`, its thousands grouped («1.234,50 €», «€22.50», «¥1,500»; «22,50» while it is unknown). */
+export const formatMoney: (cents: number, locale: string, money?: Money) => string = writeMoney;
 
 /** The decimals of an amount while the currency is unknown. */
 const UNKNOWN_DECIMALS = 2;

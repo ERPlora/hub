@@ -674,6 +674,8 @@ vende, y si Menús no está activo el TPV no ofrece menús.
   (`inventory.product.list`, activos), de categoría fiscal con `Combo` (`tax.category.list`).
 - Reordenar: `ion-reorder-group` (asa) y los botones subir/bajar, que acaban en la misma operación
   (`reorder`). WCAG 2.5.7: todo lo que se arrastra se puede hacer sin arrastrar.
+- **Millares**: los importes agrupan los millares también con cuatro cifras («1.234,56 €»; `formatMoney` de
+  `@erplora/ui/components`, con `useGrouping: 'always'`, porque el CLDR del español espera a cinco: hub#654).
 - Los importes se leen con `lib/money.ts` (coma o punto, el «1.250» ambiguo se pregunta, el suplemento
   admite signo) y se pintan con `lib/format.ts`, en la moneda del negocio (`useBusinessMoney` de `base`,
   `base.business.get`): sus decimales, los del servidor, nunca los del navegador; su código o su símbolo es

@@ -1073,6 +1073,8 @@ cajero del producto actual es un empleado: lo que tenía (ver, gastar y conceder
   yen no tiene), nunca negativo, la misma unidad que cobra Ventas (service-business-currency: la pantalla la
   lee y la escribe con `useBusinessMoney` de `base`); el descuento en porcentaje, en
   puntos básicos (1050 = 10,50 %).
+- **Millares**: los importes agrupan los millares también con cuatro cifras («1.234,56 €»; `formatMoney` de
+  `@erplora/ui/components`, con `useGrouping: 'always'`, porque el CLDR del español espera a cinco: hub#657).
 - **El paso del Inicio** (PLAN-HUB ronda 2026-10-21; FIX-SERVICE-SETUP-HOOKS): `ServiceConfig.setup` declara el
   `setup` del módulo viejo (`module.json`, services#26): clave `service.catalog`, sobre `service.catalog.status`, hecho
   con `sellable_services` (en oferta y con la categoría fiscal activa), orden 31, `required` (nivel «Importante»),

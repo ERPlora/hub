@@ -6,11 +6,15 @@
 // two decimals, never the euro by default. A calendar date (`YYYY-MM-DD`: a hire date, an absence, a
 // schedule's validity) is a day, not an instant: painted in UTC so it never moves a day. A time is the
 // business's wall clock: `HH:MM:SS` on the wire, `HH:MM` on screen and in a time field.
+import { formatMoney as writeMoney } from '@erplora/ui/components';
+
 import type { Money } from '../../../../base/frontend/lib/home';
 
 export type { Money };
-export { formatMoney } from '@erplora/ui/components';
 export { useBusinessMoney } from '../../../../base/frontend/lib/money';
+
+/** Minor units in `money`, in `locale`, its thousands grouped («1.234,50 €», «€22.50», «¥1,500»; «22,50» while it is unknown). */
+export const formatMoney: (cents: number, locale: string, money?: Money) => string = writeMoney;
 
 const DASH = '—';
 /** The decimals of an amount while the currency is unknown. */
@@ -28,8 +32,11 @@ function decimalMark(locale: string): string {
 /** The symbol of `money` a till of that country prints («€», «zł», «¥»); `''` while it is unknown. */
 export function currencySymbol(locale: string, money?: Money): string {
   if (!money) return '';
-  const format = new Intl.NumberFormat(locale, { style: 'currency', currency: money.currency, currencyDisplay: 'narrowSymbol' });
-  return format.formatToParts(0).find((part) => part.type === 'currency')?.value ?? money.currency;
+  return (
+    new Intl.NumberFormat(locale, { style: 'currency', currency: money.currency, currencyDisplay: 'narrowSymbol' })
+      .formatToParts(0)
+      .find((part) => part.type === 'currency')?.value ?? money.currency
+  );
 }
 
 /** Minor units as the figure a person types in a money field, with the decimals of `money` («12,50» in
