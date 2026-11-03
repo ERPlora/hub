@@ -1,7 +1,8 @@
 // Cash register → the detail of a session (CASH_REGISTER-F11, F16; the old `erp-cashregister-session-
 // detail`): «Session detail · S-…» with Back, the summary, the session's movements and counts, and
-// «Print» (the X or Z report to the receipt printer's queue, or through the browser when Printing is not
-// on). A session that does not exist says so; a failed read offers to retry. Everything re-runs by itself.
+// «Print» (the X or Z report to the receipt printer's queue, or on the device when Printing is not on: the
+// browser's dialog; inside the installed app, its print screen, hub#455). A session that does not exist says so;
+// a failed read offers to retry. Everything re-runs by itself.
 import { AppPage, toastError, toastSuccess } from '@erplora/ui/shell';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -11,6 +12,7 @@ import ClosingReport from '../components/ClosingReport.vue';
 import SessionCounts from '../components/SessionCounts.vue';
 import SessionLines from '../components/SessionLines.vue';
 import SessionSummary from '../components/SessionSummary.vue';
+import { PrintRefused } from '../../../../base/frontend/lib/print-paper';
 import * as print from '../lib/print';
 import SessionDetailPage from './SessionDetailPage.vue';
 
@@ -59,7 +61,7 @@ describe('SessionDetailPage', () => {
   it('«Print» sends the report to the receipt printer and says where (CASH_REGISTER-F16)', async () => {
     const m = await setup();
     await m.result(OP, SESSION);
-    const printed = vi.spyOn(print, 'printPaper').mockImplementation(() => {});
+    const printed = vi.spyOn(print, 'printPaper').mockResolvedValue(undefined);
     m.answer(200, QUEUED);
     await click(m.find('cash-register-detail-print').element);
     expect(m.sent()).toEqual([{ method: 'POST', path: '/api/cash_register/sessions/print', query: {}, body: { session_id: 's1' } }]);
@@ -78,18 +80,38 @@ describe('SessionDetailPage', () => {
   it('without Printing on in the business the browser prints the report alone', async () => {
     const m = await setup();
     await m.result(OP, SESSION);
-    const printed = vi.spyOn(print, 'printPaper').mockImplementation(() => {});
+    const printed = vi.spyOn(print, 'printPaper').mockResolvedValue(undefined);
     m.answer(200, BROWSER);
     await click(m.find('cash-register-detail-print').element);
     expect(printed).toHaveBeenCalledOnce();
     expect((printed.mock.calls[0][0] as HTMLElement).dataset.testid).toBe('cash-register-report');
+    // Titled with the report and the session: the print job's name and the file «Save as PDF» proposes (hub#455).
+    expect(printed.mock.calls[0][1]).toEqual({ title: 'Cash closing (Z) · S-261014-0001' });
     expect(vi.mocked(toastSuccess)).not.toHaveBeenCalled();
+  });
+
+  it('an open session prints its partial report, titled so (hub#455)', async () => {
+    const m = await setup('es');
+    await m.result(OP, { ...SESSION, status: 'open', expected_hidden: false });
+    const printed = vi.spyOn(print, 'printPaper').mockResolvedValue(undefined);
+    m.answer(200, { ...BROWSER, report: 'x' });
+    await click(m.find('cash-register-detail-print').element);
+    expect(printed.mock.calls[0][1]).toEqual({ title: 'Informe parcial (X) · S-261014-0001' });
+  });
+
+  it('in the installed app, a print the app refuses says why (hub#455)', async () => {
+    const m = await setup();
+    await m.result(OP, SESSION);
+    vi.spyOn(print, 'printPaper').mockRejectedValue(new PrintRefused('outdated', 'Command print_document not found'));
+    m.answer(200, BROWSER);
+    await click(m.find('cash-register-detail-print').element);
+    expect(vi.mocked(toastError)).toHaveBeenCalledExactlyOnceWith('Could not print: this version of the ERPlora app cannot print; update it');
   });
 
   it('a refusal says «Could not print» with the server\'s words, and nothing prints', async () => {
     const m = await setup();
     await m.result(OP, SESSION);
-    const printed = vi.spyOn(print, 'printPaper').mockImplementation(() => {});
+    const printed = vi.spyOn(print, 'printPaper').mockResolvedValue(undefined);
     m.answer(409, { error: { code: 'printing.no_printer', message: 'There is no receipt printer.' } });
     await click(m.find('cash-register-detail-print').element);
     expect(vi.mocked(toastError)).toHaveBeenCalledWith('Could not print. There is no receipt printer.');
@@ -123,7 +145,7 @@ describe('SessionDetailPage', () => {
       await m.result(OP, SESSION);
       vi.setSystemTime(new Date(2026, 9, 14, 21, 45));
       let printed = '';
-      vi.spyOn(print, 'printPaper').mockImplementation((paper) => {
+      vi.spyOn(print, 'printPaper').mockImplementation(async (paper) => {
         printed = paper.textContent ?? '';
       });
       m.answer(200, BROWSER);

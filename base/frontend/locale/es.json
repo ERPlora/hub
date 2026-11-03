@@ -1454,6 +1454,14 @@
       "uploading": "Subiendo foto…",
       "notSaved": "No se pudo guardar la foto. Inténtalo de nuevo.",
       "retry": "Reintentar"
+    },
+    "print": {
+      "refusal": {
+        "refused": "el documento está vacío o es demasiado grande para imprimirlo",
+        "failed": "el servicio de impresión del dispositivo no se abrió",
+        "unlinked": "esta app está vinculada a otro negocio",
+        "outdated": "esta versión de la app de ERPlora no puede imprimir; actualízala"
+      }
     }
   }
 }

@@ -71,10 +71,13 @@ describe('SaleDocument', () => {
     const paper = s.wrapper.findComponent(ReceiptPaper);
     expect(paper.props()).toMatchObject({ duplicate: true, sale: saleOut() });
     expect(paper.props('settings')).toMatchObject(SETTINGS);
-    const ready = s.wrapper.emitted('ready') as HTMLElement[][];
+    const ready = s.wrapper.emitted('ready') as [HTMLElement, string][];
     expect(ready).toHaveLength(1);
     expect(ready[0][0]).toBe(paper.element);
     expect(ready[0][0].classList.contains('sale-receipt')).toBe(true);
+    // The document's title (the print job, the PDF's name) is the number on the paper: the sale's while it has no
+    // fiscal one.
+    expect(ready[0][1]).toBe('20261014-0007');
   });
 
   it('another sale asked while open never shows (nor prints) the previous one’s paper', async () => {
@@ -171,6 +174,8 @@ describe('SaleDocument', () => {
       await s.result(QR, { record: RECORD });
       expect(s.wrapper.findComponent(ReceiptPaper).props('record')).toEqual(RECORD);
       expect(s.wrapper.emitted('ready')).toHaveLength(1);
+      // Its title is the fiscal number Invoicing gave it.
+      expect((s.wrapper.emitted('ready') as [HTMLElement, string][])[0][1]).toBe('TICKET-2026-000031');
     });
 
     it('a document VeriFactu has no record of yet prints without QR', async () => {

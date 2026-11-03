@@ -540,13 +540,17 @@ Pasos:
    se cerró sola), el fondo, el esperado y, línea a línea, las ventas por forma de pago, devoluciones,
    entradas, salidas, invitaciones, el esperado y, en el Z, el contado y el descuadre.
 4. Sin Impresión encendida o sin ninguna impresora de recibos activa, sale el diálogo de impresión del
-   navegador con el mismo informe (en la cola esperaría para siempre).
+   dispositivo con el mismo informe (en la cola esperaría para siempre): el del navegador o, en la app
+   instalada, su pantalla de impresión (el diálogo del sistema, con la impresora o «Guardar como PDF»),
+   titulado con el informe y la sesión («Cierre de caja (Z) · S-…»).
 Entra: el resumen de la sesión, el mismo que enseña la pantalla.
-Sale: un trabajo en la cola de recibos de Impresión (o el papel del navegador). Cada «Imprimir» es un papel
+Sale: un trabajo en la cola de recibos de Impresión (o el papel del dispositivo). Cada «Imprimir» es un papel
 nuevo.
-Si falla: «No se pudo imprimir.» con el motivo de Impresión (por ejemplo, sin permiso de imprimir). Con el
-arqueo ciego, quien no puede ver el esperado no ve «Imprimir» en una sesión abierta (el informe lleva el
-esperado); en una cerrada sí.
+Si falla: «No se pudo imprimir.» con el motivo de Impresión (por ejemplo, sin permiso de imprimir); si la app
+instalada no abre su pantalla de impresión, con el suyo («…: esta versión de la app de ERPlora no puede
+imprimir; actualízala», «…: el servicio de impresión del dispositivo no se abrió»…). Con el arqueo ciego,
+quien no puede ver el esperado no ve «Imprimir» en una sesión abierta (el informe lleva el esperado); en una
+cerrada sí.
 Implicados: CASH_REGISTER-F11, PRINTING-F17
 
 ### CASH_REGISTER-F17 Ver los cobros fuera de turno
