@@ -330,10 +330,32 @@ test('SALE-F17, F18: a check parked and taken back from «Open checks», another
   );
   if (!(await list.isVisible())) await shown(page).locator('[data-testid=pos-open-checks]').click();
 
-  // F18: the bin arms on the first tap and deletes on the second.
+  // F18: the bin arms on the first tap and says so on screen, under its check (hub#463); the second deletes it.
+  const ARMED = 'Tap again to delete — this voids the check';
   const bin = list.locator(`[data-testid=pos-parked-${droppedCheck?.id}-delete]`);
+  const armed = list.locator(`[data-testid=pos-parked-${droppedCheck?.id}-confirm]`);
+  await shots(
+    page,
+    'APP-SALE-SALE-F18-armed',
+    async (p) => {
+      await cartReady(p);
+      const open = shown(p).locator('[data-testid=pos-checks]');
+      if (!(await open.isVisible())) await shown(p).locator('[data-testid=pos-open-checks]').click();
+      await open.waitFor({ state: 'visible' });
+      const hint = open.locator(`[data-testid=pos-parked-${droppedCheck?.id}-confirm]`);
+      // Disarmed first, so this tap arms the bin instead of deleting the check.
+      await hint.waitFor({ state: 'hidden' });
+      await open.locator(`[data-testid=pos-parked-${droppedCheck?.id}-delete]`).click();
+      await expect(hint).toHaveText(ARMED);
+    },
+    { width: 1440, height: 900 },
+  );
+  if (!(await list.isVisible())) await shown(page).locator('[data-testid=pos-open-checks]').click();
+  await armed.waitFor({ state: 'hidden' });
   await bin.click();
-  await expect(bin).toHaveAttribute('aria-label', 'Tap again to delete — this voids the check');
+  await expect(bin).toHaveAttribute('aria-label', ARMED);
+  await expect(armed).toBeVisible();
+  await expect(armed).toHaveText(ARMED);
   await bin.click();
   await expect(list.locator(`[data-testid=pos-parked-${droppedCheck?.id}]`)).toHaveCount(0);
   expect(await checkOf(context, dropped)).toBeUndefined();
