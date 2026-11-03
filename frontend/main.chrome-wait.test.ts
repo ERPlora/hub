@@ -19,7 +19,7 @@ vi.mock('@erplora/ui/sdk', async (importOriginal) => ({
 // Each piece a stub of its own (`__esModule`: Vue takes `default` from a module it recognises); the one beside the pane
 // never settles.
 vi.mock('../base/frontend/components/TopbarChrome.vue', () => ({ __esModule: true, default: { render: () => null } }));
-vi.mock('../base/frontend/components/UpgradePlanLink.vue', () => ({ __esModule: true, default: { render: () => null } }));
+vi.mock('../base/frontend/components/SidebarFooter.vue', () => ({ __esModule: true, default: { render: () => null } }));
 vi.mock('../base/frontend/components/BlockingStrip.vue', () => ({ __esModule: true, default: { render: () => null } }));
 vi.mock('../base/frontend/components/BackgroundChrome.vue', () => new Promise(() => undefined));
 

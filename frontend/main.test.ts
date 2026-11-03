@@ -104,14 +104,18 @@ describe('main.ts', () => {
     expect(importBoot.home).toBe(true);
   });
 
-  it("plugs base's pieces into the chrome: the assistant and the bell in the topbar, «Upgrade plan» in the menu, the blocking strip, and the device's notices and the assistant's panel beside the pane", async () => {
+  it("plugs base's pieces into the chrome: the assistant and the bell in the topbar, «Upgrade plan» and «Manage on erplora.com» at the menu's foot, the blocking strip, and the device's notices and the assistant's panel beside the pane", async () => {
     const chrome = importBoot.chrome as Record<string, unknown>;
     expect(Object.keys(chrome).sort()).toEqual(['background', 'notice', 'sidebarFooter', 'topbar']);
     for (const piece of Object.values(chrome)) expect(piece).toBeTruthy();
     // APP-BASE-9: loaded on demand; what each one loads.
     const loaded = async (piece: unknown) =>
       ((await (piece as { __asyncLoader: () => Promise<{ __name?: string }> }).__asyncLoader()) ?? {}).__name;
-    expect([await loaded(chrome.topbar), await loaded(chrome.background)]).toEqual(['TopbarChrome', 'BackgroundChrome']);
+    expect([await loaded(chrome.topbar), await loaded(chrome.sidebarFooter), await loaded(chrome.background)]).toEqual([
+      'TopbarChrome',
+      'SidebarFooter',
+      'BackgroundChrome',
+    ]);
   });
 
   // BASE-G120: signing out forgets the assistant's conversation of the tab, from the menu and from the idle lock.

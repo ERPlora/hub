@@ -7,11 +7,11 @@ Lo que no entra todavía: ver «Lo que queda fuera».
 > Manual de usuario y especificación de `base`, la plataforma del Hub: siempre está, no se activa ni se
 > apaga. Esta primera parte describe el **Inicio**, la pantalla a la que se llega al entrar en el negocio
 > (el del hub viejo: saludo, «Mis apps», la lista de lo que falta por configurar, los paneles de las apps y
-> la actividad), con lo que acompaña a cualquier pantalla: la campana, «erplora.com», «Mejorar plan» y la franja que
-> avisa cuando todavía no se puede facturar. También «Apps», «Uso y plan» de Sistema y las plantillas: la
-> tarjeta del Inicio y Ajustes › Datos y copias (importar, exportar, deshacer y restablecer). El acceso (entrar con la
-> cuenta, con PIN o con la placa, cambiar de usuario, Mi perfil y los dispositivos) está en sus propias pantallas,
-> más abajo.
+> la actividad), con lo que acompaña a cualquier pantalla: la campana, «Mejorar plan», «Gestionar en
+> erplora.com» y la franja que avisa cuando todavía no se puede facturar. También «Apps», «Uso y plan» de
+> Sistema y las plantillas: la tarjeta del Inicio y Ajustes › Datos y copias (importar, exportar, deshacer y
+> restablecer). El acceso (entrar con la cuenta, con PIN o con la placa, cambiar de usuario, Mi perfil y los
+> dispositivos) está en sus propias pantallas, más abajo.
 > Y «Archivos»: los documentos del negocio, en carpetas; y el asistente, en su panel, al final.
 
 ## Para qué sirve y para quién
@@ -84,13 +84,6 @@ La tabla de las últimas ventas: «Fecha», «Venta», «Cliente», «Método»,
 «Buscar actividad…», el embudo de filtros (método y estado), el orden, la vista de tarjetas y «Columnas».
 Se abre también con el enlace del Inicio terminado en `#actividad`.
 
-### «erplora.com» de la barra
-Arriba a la derecha, entre «Mis apps» y los destellos del asistente: una nube y «erplora.com» («Gestionar en
-erplora.com» al pasar por encima). Abre este negocio en el panel de erplora.com: en una pestaña nueva en el navegador y,
-en la app instalada, en el navegador del dispositivo. Solo lo tienen el propietario, el administrador y el encargado, y
-solo si entraron con su cuenta: nunca en una sesión abierta con PIN o con la placa. En la app de Google Play no está.
-En un móvil va dentro de «Más opciones», la primera, como «Gestionar en erplora.com».
-
 ### La campana
 Arriba a la derecha, después de «Mis apps» y de los destellos del asistente; en un móvil, las dos van dentro de
 «Más opciones», que lleva su número. Su número suma los avisos pendientes; al tocarla, una fila por aviso («Eventos
@@ -101,11 +94,18 @@ A la izquierda (en el móvil, desde el botón de la barra): la persona arriba y 
 grupos, «Inicio», «Empleados», «Archivos» · «Apps», «Sistema», «API», «Ajustes». Cada una sale solo a quien puede abrir
 su pantalla: «Sistema», a quien administra el negocio; «API», mientras la documentación de la API está mostrada
 (BASE-F91), y aparece o se va al cambiar el interruptor, sin recargar. Un empleado ve «Inicio», «Empleados»,
-«Archivos», «Apps» y «Ajustes». Abajo, el código QR y «Mejorar plan».
+«Archivos», «Apps» y «Ajustes». Abajo, el código QR, «Mejorar plan» y «Gestionar en erplora.com».
 
 ### «Mejorar plan»
-Al pie del menú lateral, entre el código QR y la marca. Abre la página del plan de este negocio en
+Al pie del menú lateral, entre el código QR y «Gestionar en erplora.com». Abre la página del plan de este negocio en
 erplora.com, en una pestaña nueva. Solo en el navegador: en la app instalada no está.
+
+### «Gestionar en erplora.com»
+Al pie del menú lateral, justo debajo de «Mejorar plan», con el icono de enlace externo; con el menú plegado a sus
+iconos (escritorio), queda solo el icono, que dice «Gestionar en erplora.com» al pasar por encima. Abre este negocio en
+el panel de erplora.com: en una pestaña nueva en el navegador y, en la app instalada, en el navegador del dispositivo.
+Solo lo tienen el propietario, el administrador y el encargado, y solo si entraron con su cuenta: nunca en una sesión
+abierta con PIN o con la placa. No vende, así que también está en la app instalada, salvo en la de Google Play.
 
 ### El menú de usuario
 Se abre tocando a la persona, arriba del menú lateral. Primero «Perfil» y, en una caja compartida de un negocio
@@ -632,22 +632,23 @@ Implicados: BASE-F40
 <!-- origen: old-hub:HUB_SHELL-F129 -->
 Estado: descartado — sin el pase de un solo uso: si el navegador no tiene abierta la sesión de erplora.com, se entra con la cuenta al llegar; el pase es sobre todo de erplora.com (saas#190)
 Actor: propietario, administrador, responsable, empleado
-Pantalla: Menú lateral, barra de arriba
+Pantalla: Menú lateral
 Pasos:
   1. Al pie del menú lateral, bajo el código QR y alineado con él, está «Mejorar plan». Lo ve cualquier
      perfil; lo que se puede hacer al llegar lo decide erplora.com según quién entre. Con el menú plegado a
      sus iconos (escritorio), queda solo su icono, que dice «Mejorar plan» al pasar por encima. Solo en el
      navegador: en la app instalada no está.
   2. Lo pulsa: se abre en una pestaña nueva la página del plan de este negocio en erplora.com.
-  3. El propietario, el administrador o el encargado que entró con su cuenta tiene además, arriba a la derecha,
-     «erplora.com», con una nube (en un móvil, «Gestionar en erplora.com», la primera de «Más opciones»).
+  3. El propietario, el administrador o el encargado que entró con su cuenta tiene además, justo debajo de
+     «Mejorar plan», «Gestionar en erplora.com», con el icono de enlace externo (en el menú plegado, solo el icono).
+     No vende: también está en la app instalada, salvo en la de Google Play.
   4. Lo pulsa: se abre este negocio en el panel de erplora.com, en una pestaña nueva; en la app instalada, en el
      navegador del dispositivo. El Hub se queda donde estaba.
 Entra: el negocio en el que está.
 Sale: nada guardado en el hub.
 Si falla: si el hub no sabe a qué negocio pertenece, ninguno de los dos sale (nunca un botón que no hace nada). Si la
 app instalada no consigue abrir el navegador, lo dice: «No se ha podido abrir esa página. Inténtalo de nuevo.». Un
-empleado, una sesión abierta con PIN o con la placa y la app de Google Play no tienen «erplora.com».
+empleado, una sesión abierta con PIN o con la placa y la app de Google Play no tienen «Gestionar en erplora.com».
 Implicados: BASE-F40
 
 ### BASE-F12 Pedirle al asistente que repase la configuración
@@ -3106,7 +3107,9 @@ Implicados: ACCOUNTS-F38, BASE-F40
   apariencia propia); `plan_url` y `account_url` solo en una sesión abierta con la cuenta
   (gh:hub#2506), y `manage_url` (`SAAS_URL/dashboard/businesses/<id del hub>`, BASE-F11) además solo con el permiso
   `base.open_management` (propietario y administrador por `base.*`; el encargado, a mano en `base/apps.py`: no tiene
-  `base.administer_hub`). Lo pinta `TopbarChrome.vue` (`topbar-manage`; en el móvil, `topbar-chrome-more-manage`),
+  `base.administer_hub`). Lo pinta `ManageLink.vue` (`menu-manage`, `ion:open-outline`) al pie del menú lateral,
+  justo debajo de «Mejorar plan» (`UpgradePlanLink.vue`): los dos van en `SidebarFooter.vue`, la pieza
+  `sidebarFooter` de `createShell` en `frontend/main.ts`; la barra de arriba solo lleva los destellos y la campana. Es
   un enlace con `target=_blank rel=noopener` que en la app instalada pasa por `openExternalLink` de
   `@erplora/ui/shell` (`open_external_url`); `base/frontend/lib/management.ts` lo oculta en la copia de Google Play
   (`device_context` → `distribution: "play"`, gh:hub#1897) y no lo enseña hasta que la app contesta. Es el único
@@ -3115,7 +3118,8 @@ Implicados: ACCOUNTS-F38, BASE-F40
   «Cambiar roles», «Abrir en erplora.com», «Cambiar en erplora.com») llevan además `managementOffered()`, y lo que
   vende («Mejorar plan» del acceso, de WhatsApp…) va con `isWeb`; lo vigila `frontend/external-links.test.ts`, con
   su lista de espera por issue (VeriFactu y la factura: gh:hub#518). Tests:
-  `base/tests/test_spa.py`, `test_access_spa.py`, `ShellChrome.test.ts`, `lib/management.test.ts`; e2e
+  `base/tests/test_spa.py`, `test_access_spa.py`, `ManageLink.test.ts`, `SidebarFooter.test.ts`,
+  `ShellChrome.test.ts`, `lib/management.test.ts`; e2e
   `tests/e2e/base-chrome.spec.ts` y `base-access.spec.ts` (BASE-G56). En `frontend/main.ts`, el menú de usuario lleva «Perfil» y «Cambiar de usuario», y `startWayIn`
   (`base/frontend/lib/access.ts`) arma el bloqueo por inactividad con esos minutos (gh:hub#2537, #2677: no hay
   lectura aparte que pueda fallar), pinta la apariencia propia y, tras un cambio de usuario (anunciado en
