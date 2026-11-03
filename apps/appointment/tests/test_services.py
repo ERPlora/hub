@@ -524,6 +524,31 @@ def test_editing_notes_or_contact_writes_only_that(salon):
     assert actions(out.id)[-1] == "rescheduled"
 
 
+def test_the_notes_of_an_appointment_the_agenda_cannot_edit_still_change(salon):
+    # F22: «Edit» is only on a pending or confirmed one not charged; the notes of any other one (done,
+    # cancelled, no-show, charged…) still change through the same operation, e.g. from the assistant.
+    others = [
+        make_appointment(salon.lucia, salon.ana, [salon.cut], at(MONDAY, "09:00"), status=status)
+        for status in ("in_progress", "completed", "cancelled", "no_show")
+    ]
+    others.append(
+        make_appointment(
+            salon.lucia, salon.ana, [salon.cut], at(MONDAY, "15:00"), sale_id=uuid.uuid7()
+        )
+    )
+    for appointment in others:
+        edited = run(
+            "appointment.appointment.update",
+            {"id": str(appointment.id), "notes": "Colour 6.1", "internal_notes": "Pays cash"},
+        )
+        assert (edited.status, edited.notes, edited.internal_notes) == (
+            appointment.status,
+            "Colour 6.1",
+            "Pays cash",
+        )
+    assert len(events("appointment.appointment.updated")) == len(others)
+
+
 # ── States (F03, F05, F07, F08, F09) ──────────────────────────────────────────────────────────
 
 
