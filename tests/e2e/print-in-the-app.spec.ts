@@ -7,7 +7,7 @@
 // The business's printers are switched off for the run and back on after it; what it makes is deleted after it.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, api, login, psql, shot, shown } from './helpers';
+import { A, api, capture, login, psql, shown } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { cleanInvoices, ensureIssuer, issuedIds, snapshotSeries } from './invoice-helpers';
 import { chargeByApi, cleanSales, drawerOff, restoreDrawer, stamp } from './sale-helpers';
@@ -20,7 +20,7 @@ let printersOn: string[] = [];
 const sessions = new Set<string>();
 
 /** The window the app prints in (ERPlora/app `src-tauri/src/lib.rs`, `print_document`): no script, no address. */
-const PRINT_WINDOW_CSP = "default-src 'none'; style-src 'unsafe-inline'; img-src data: blob: https:";
+const PRINT_WINDOW_CSP = "default-src 'none'; style-src 'unsafe-inline'; img-src data: blob: https:; font-src data: https:";
 
 interface Printed {
   /** Every `html` the app was asked to print. */
@@ -67,17 +67,17 @@ function expectStandalone(html: string, title: string): void {
 
 /** The document painted as the print window paints it (its CSP, no script), screenshotted. */
 async function paintAsTheApp(page: Page, html: string, name: string): Promise<void> {
-  const window = await page.context().newPage();
+  const printWindow = await page.context().newPage();
   const errors: string[] = [];
-  window.on('console', (message) => {
+  printWindow.on('console', (message) => {
     if (message.type() === 'error') errors.push(message.text());
   });
-  await window.setViewportSize({ width: 820, height: 1180 });
-  await window.setContent(html.replace('<head>', `<head><meta http-equiv="Content-Security-Policy" content="${PRINT_WINDOW_CSP}">`));
-  await expect(window.locator('body > *').first()).toBeVisible();
-  await window.screenshot({ path: shot(`APP-PRINT-${name}`), fullPage: true });
+  await printWindow.setViewportSize({ width: 820, height: 1180 });
+  await printWindow.setContent(html.replace('<head>', `<head><meta http-equiv="Content-Security-Policy" content="${PRINT_WINDOW_CSP}">`));
+  await expect(printWindow.locator('body > *').first()).toBeVisible();
+  await capture(printWindow, `APP-PRINT-${name}`, { fullPage: true });
   expect(errors, 'the print window refuses nothing of the paper').toEqual([]);
-  await window.close();
+  await printWindow.close();
 }
 
 test.beforeAll(async ({ browser }) => {
@@ -137,7 +137,7 @@ test('SALE-F29: «Print» on a sale\'s document opens the app\'s print screen wi
   await paintAsTheApp(page, html, 'SALE-F29');
 });
 
-test('SALE-F21: «Print» on the bill opens the app\'s print screen; an app that cannot print says why', async ({ page, context }) => {
+test('SALE-F21: «Print» on the bill opens the app\'s print screen with the bill alone', async ({ page, context }) => {
   await appBridge(context);
   await login(page, A, '/sale/pos');
   await shown(page).locator('[data-testid=pos-till]').waitFor({ state: 'visible' });
@@ -167,7 +167,9 @@ test('SALE-F21: an app from before the print screen says, in Spanish too, to upd
     await appBridge(context, 'Command print_document not found');
     const page = await context.newPage();
     await login(page, A, '/sale/pos');
-    await page.evaluate((lang) => localStorage.setItem('erplora.language', lang), language);
+    // The Hub's language cookie, as the sign-in sets it from the account.
+    await context.addCookies([{ name: 'django_language', value: language, domain: new URL(A).hostname, path: '/' }]);
+    await page.goto(`${A}/sale/pos`);
     await shown(page).locator('[data-testid=pos-till]').waitFor({ state: 'visible' });
     await shown(page).locator('[data-testid=pos-search-trigger]').click();
     const search = page.locator('[data-testid=pos-search]');

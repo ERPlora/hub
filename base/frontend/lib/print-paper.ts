@@ -4,10 +4,10 @@
 // PrintManager, the desktop's print window). In a browser nothing changes: the caller opens the browser's dialog.
 //
 // The document stands on its own, because the window that prints it runs no script, allows no stylesheet and has no
-// address of the hub (CSP `default-src 'none'; style-src 'unsafe-inline'; img-src data: blob: https:`): the paper's
-// own markup, the page's CSS rules that dress the paper (inline, in one `<style>`) and its images at their full
-// address. It is a string read from the DOM (`outerHTML`, `cssText`), never written back into the page, so Trusted
-// Types have nothing to say.
+// address of the hub (CSP `default-src 'none'; style-src 'unsafe-inline'; img-src data: blob: https:;
+// font-src data: https:`): the paper's own markup, the page's CSS rules that dress the paper (inline, in one
+// `<style>`) and its images at their full address. It is a string read from the DOM (`outerHTML`, `cssText`), never
+// written back into the page, so Trusted Types have nothing to say.
 import { nativeBridge } from '@erplora/ui/shell';
 
 /** The app's command for the system's print screen (ERPlora/app `src-tauri/src/lib.rs`). */
