@@ -19,6 +19,19 @@ from base.tests.test_bootstrap import VARIABLES, connect_as, create_master, drop
 pytestmark = pytest.mark.django_db
 
 
+def bootstrapped(names, passwords, conninfo) -> list:
+    """The bootstrap with this module's RDS-like master, with no extension: it creates only trusted ones, as
+    ``test_bootstrap.Cluster.rerun`` says."""
+    return bootstrap.bootstrap(
+        passwords=passwords,
+        names=names,
+        conninfo=conninfo,
+        require_extensions=False,
+        template_extensions=(),
+        saas_extensions=(),
+    )
+
+
 @pytest.fixture(scope="module")
 def cluster():
     prefix = f"test_bss_{os.getpid()}_"
@@ -27,7 +40,7 @@ def cluster():
         conninfo = create_master(prefix)
         names = bootstrap.Names.with_prefix(prefix)
         passwords = {role: f"pw-{role}" for role in VARIABLES}
-        steps = bootstrap.bootstrap(passwords=passwords, names=names, conninfo=conninfo, require_extensions=False)
+        steps = bootstrapped(names, passwords, conninfo)
         yield names, passwords, conninfo, steps
     finally:
         drop_prefixed(prefix)
@@ -47,10 +60,18 @@ def test_the_migrator_may_end_the_sessions_of_a_database_it_drops(cluster):
     ]
 
 
+def test_its_master_is_asked_for_no_extension(cluster):
+    """It creates only trusted ones (``test_bootstrap.py``) and pgvector is none: asking for it stops the bootstrap on a
+    server that has it, as ``compose.yaml``'s, and only skips the step on CI's, which has not. This fails on both."""
+    _names, _passwords, _conninfo, steps = cluster
+
+    assert [str(step) for step in steps if step.subject.startswith("extension ")] == []
+
+
 def test_a_second_run_finds_it_granted(cluster):
     names, passwords, conninfo, _steps = cluster
 
-    again = bootstrap.bootstrap(passwords=passwords, names=names, conninfo=conninfo, require_extensions=False)
+    again = bootstrapped(names, passwords, conninfo)
 
     assert [str(step) for step in again if "pg_signal_backend" in step.subject] == [
         f"pg_signal_backend for {names.hub_migrator}: exists"

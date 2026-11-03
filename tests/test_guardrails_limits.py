@@ -19,15 +19,17 @@ from types import SimpleNamespace
 import pytest
 from django.contrib.auth import get_user_model
 from django.db import OperationalError, connections, transaction
+from django.utils import timezone
 from live.context import OperationContext, Scope
 from live.executor import Executor, Stream, Subscription
 from live.operations import get as get_operation
 
-from base import access
+from base import access, registry, services
 from base.models import Membership
 from base.tenancy import connections as tenancy_connections
 from base.tenancy import context, identity, limits, names
 from base.tenancy.tests import hubs
+from control.models import Hub
 
 HUB_DB_COMMITTED = pytest.mark.django_db(databases=hubs.HUB_DATABASES, transaction=True)
 SHORT_WAIT = 0.3
@@ -376,3 +378,130 @@ def test_every_hubs_alias_runs_on_the_limited_engine_and_the_migrators_does_not(
         hubs.forget_aliases(before)
     for session_alias in (hubs.HUB_A_ALIAS, hubs.HUB_B_ALIAS):
         assert connections.settings[session_alias]["ENGINE"] == limits.ENGINE
+
+
+# ── ERPlora's own hub: the row says it, with no photo, and a business without one stays on Free's ───────────────────
+
+
+PLATFORM_AT_ONCE = 6
+PLATFORM_TIMEOUT = "30s"
+
+
+def as_platform(hub):
+    """The row as ``create_platform_hub`` left it in prod and in pre: ``is_platform``, no photo, ``state_version`` 0. It is
+    born so, so every process sees it from its first use: the fixture opened this one as a business, and that limiter goes."""
+    Hub.objects.filter(pk=hub.pk).update(is_platform=True)
+    hub.refresh_from_db()
+    assert (hub.state, hub.state_version) == ({}, 0)
+    limits._limiters.pop(tenancy_connections.hub_alias(hub), None)
+    return hub
+
+
+@contextmanager
+def several_held_open(hub, how_many: int) -> Iterator[None]:
+    if how_many == 0:
+        yield
+        return
+    with held_open(hub), several_held_open(hub, how_many - 1):
+        yield
+
+
+def statement_timeout_in_a_transaction(hub) -> str:
+    with context.use_hub(hub):
+        alias = context.current_alias()
+        with transaction.atomic(using=alias), connections[alias].cursor() as cursor:
+            cursor.execute("SHOW statement_timeout")
+            return cursor.fetchone()[0]
+
+
+@HUB_DB_COMMITTED
+@pytest.mark.parametrize("way", WAYS_IN.values(), ids=WAYS_IN.keys())
+def test_the_platform_hub_lets_in_what_a_business_without_a_photo_cannot(hub_a, hub_b, settings, short_wait, way):
+    """Two real hubs: the same second transaction gets in on the platform's, and answers 503 on the business's."""
+    settings.PGBOUNCER_MAX_DB_CONNECTIONS = PLATFORM_AT_ONCE
+    platform = as_platform(hub_a)
+
+    with held_open(platform):
+        way(platform)
+
+    with held_open(hub_b), pytest.raises(limits.HubBusy):
+        way(hub_b)
+
+
+@HUB_DB_COMMITTED
+def test_the_platform_hub_stops_at_what_pgbouncer_gives(hub_a, settings, short_wait):
+    settings.PGBOUNCER_MAX_DB_CONNECTIONS = PLATFORM_AT_ONCE
+    platform = as_platform(hub_a)
+
+    with several_held_open(platform, PLATFORM_AT_ONCE - 1):
+        a_transaction_by_hand(platform)
+        with held_open(platform), pytest.raises(limits.HubBusy):
+            a_transaction_by_hand(platform)
+
+
+@HUB_DB_COMMITTED
+def test_every_transaction_of_the_platform_hub_carries_its_own_timeout_and_a_business_keeps_free_s(hub_a, hub_b):
+    platform = as_platform(hub_a)
+
+    assert statement_timeout_in_a_transaction(platform) == PLATFORM_TIMEOUT
+    assert statement_timeout_in_a_transaction(hub_b) == "5s"
+
+
+@HUB_DB_COMMITTED
+def test_a_statement_past_free_s_five_seconds_is_not_cancelled_on_the_platform_hub(hub_a):
+    platform = as_platform(hub_a)
+
+    with context.use_hub(platform):
+        alias = context.current_alias()
+        with transaction.atomic(using=alias), connections[alias].cursor() as cursor:
+            cursor.execute("SELECT pg_sleep(5.2)")
+
+
+@HUB_DB_COMMITTED
+def test_only_the_business_without_a_photo_is_logged_as_free(hub_a, hub_b, caplog):
+    caplog.set_level("WARNING", logger="base.tenancy.limits")
+    platform = as_platform(hub_a)
+    # A process that has opened neither yet: the fixtures already told hub_b's, once for its photo.
+    limits._limiters.clear()
+
+    a_statement_alone(platform)
+    a_statement_alone(hub_b)
+
+    told = [record.getMessage() for record in caplog.records if "base.hub_limits_free" in record.getMessage()]
+    assert len(told) == 1
+    assert hubs.HUB_B_ALIAS in told[0]
+
+
+@HUB_DB_COMMITTED
+def test_a_process_whose_limiter_was_already_made_is_corrected_by_the_first_use_hub(hub_a):
+    """The first ``use_hub`` of the row that is already in prod, with no step by hand: ``state_version`` 0 is above the -1
+    of a limiter nobody configured."""
+    platform = as_platform(hub_a)
+    early = limits.limiter_for(hubs.HUB_A_ALIAS)
+    assert early.limits == limits.FREE
+
+    assert statement_timeout_in_a_transaction(platform) == PLATFORM_TIMEOUT
+
+    assert limits.limiter_for(hubs.HUB_A_ALIAS) is early
+    assert early.limits.statement_timeout_seconds == 30
+    assert early.hub_id == platform.pk
+
+
+ROWS = {
+    "the host gate": lambda hub: registry.hub_by_slug(hub.slug),
+    "the worker": lambda hub: next(row for row in services.hubs_to_serve(timezone.now()) if row.pk == hub.pk),
+    "the registry by id": lambda hub: services.registry_row(hub.pk),
+    "the registry by slug": lambda hub: services.registry_row_by_slug(hub.slug),
+    "a row without the field loaded": lambda hub: Hub.objects.defer("is_platform").get(pk=hub.pk),
+}
+
+
+@HUB_DB_COMMITTED
+@pytest.mark.parametrize("read", ROWS.values(), ids=ROWS.keys())
+def test_the_row_every_way_in_reads_says_it_is_the_platform_s(hub_a, read):
+    """A row that came without the field must never get Free's in silence."""
+    as_platform(hub_a)
+    with context.use_control():
+        row = read(hub_a)
+
+    assert statement_timeout_in_a_transaction(row) == PLATFORM_TIMEOUT

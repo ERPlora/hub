@@ -19,7 +19,9 @@ Each cut holds the hub's ``hub_due`` lease (another cut, or the worker, never wo
 and its ``db_name`` empty until its last step (``base.hub.cut_finish``: ``db_name``, its schema and ``base.hub.cut``
 in control's outbox, in one transaction), so its host answers 503 throughout. A cut that breaks drops what it made and
 leaves the business as it was: the next run does it again from the start. A business that already has its own
-database is left alone. Control's tables are never emptied nor dropped: a later contract migration renames them.
+database is left alone. Control's tables are never emptied nor dropped: ``control/0007`` renames them once every ready
+business has its database, and from then on there is nothing to copy, so :data:`COPY_ALL` is refused (a recreate reads
+nothing of theirs and goes on working).
 
 Control is read, and the new database written, by the migrator on direct connections to their writers
 (``base.tenancy.connections.migrator_conninfo``), as ``pg_dump`` and the migrator do.
@@ -60,6 +62,11 @@ LEASE = provision.LEASE
 #: no model's).
 KEPT_TABLES = frozenset({HubIdentity._meta.db_table})
 _IDENTIFIER = re.compile(r"^[a-z_][a-z0-9_]*$")
+#: Why a copy is refused when control holds no table of the hubs' apps under its name: it would bring nothing, in silence.
+NOTHING_TO_COPY = (
+    "control holds no table of the hubs' apps under its name (control/0007 renames them): a copy would bring nothing. "
+    "Use --recreate."
+)
 
 
 class CutError(RuntimeError):
@@ -102,6 +109,20 @@ def _quoted(table: str) -> str:
     if not _IDENTIFIER.match(table):
         raise CutError(f"{table!r} is no table name of ours.")
     return f'"{table}"'
+
+
+def _apps_tables_in(conn: psycopg.Connection) -> set[str]:
+    """The tables of the hubs' apps that ``conn``'s database holds under their names, the outbox aside (it is control's
+    too)."""
+    return (_tables(conn) & set(tables_to_copy())) - set(outbox_tables())
+
+
+def holds_apps_tables() -> bool:
+    """Whether control still holds tables of the hubs' apps under their names: without them a copy has nothing to take."""
+    with _control() as source:
+        found = _apps_tables_in(source)
+        source.rollback()
+    return bool(found)
 
 
 def rows_of(table: str, slug: str) -> tuple[str, list[str]]:
@@ -295,6 +316,8 @@ def copy_rows(hub, *, heartbeat: Callable[[], object] | None = None) -> dict[str
     rows copied."""
     slug = hub.slug
     with _control() as source, _connect(hub.db_name, hub.cluster, autocommit=True) as target:
+        if not _apps_tables_in(source):
+            raise CutError(NOTHING_TO_COPY)
         in_control = _tables(source) & set(tables_to_copy())
         present = in_control & _tables(target)
         left_behind = {table: _count(source, table, slug) for table in sorted(in_control - present)}

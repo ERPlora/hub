@@ -6,7 +6,15 @@ and each of them carries its plan's ``statement_timeout``: Free 1 and 5 s, Start
 (each plan above doubles). Both come from the SaaS's photo kept on the hub's row, ``Hub.state["plan"]``
 (``max_db_connections``, ``statement_timeout_seconds``); a photo without a usable plan, or no photo yet, gets Free's,
 logged once per photo. A newer photo (a greater ``state_version``) resizes the process's limiter at once, without a
-restart; an older or equal one changes nothing. PgBouncer's ``max_db_connections`` stays the hard ceiling per database.
+restart; an older or equal one changes nothing.
+
+ERPlora's own hub (``Hub.is_platform``) is nobody's customer: the SaaS does not know it, so it has no photo and never will,
+and its row says what it gets, :data:`PLATFORM`, whatever a photo said. :func:`hub_limits` is that rule, the one the limiter
+and ``base.plan.usage`` both follow.
+
+No plan gets more at once than PgBouncer gives each database (``settings.PGBOUNCER_MAX_DB_CONNECTIONS``): 6 in prod, so
+a Pro's 12 are 6 here. Past that, a transaction would wait 10 s in PgBouncer and fail with no ``base.hub_busy``, which
+the meter would never count (PLAN-HUB §66, correction).
 
 Who applies them: the hubs' database engine (:data:`ENGINE`, ``base.tenancy.backend``), which every hub's alias runs on
 (``base.tenancy.connections``). Its connection takes a place of its alias's :class:`Limiter` at the first statement of
@@ -14,21 +22,28 @@ each transaction (Django's ``atomic`` of an operation, of ``live.operations.atom
 statement alone, which is a transaction of its own) and gives it back at its ``COMMIT``, ``ROLLBACK`` or when the
 connection closes; its first statement runs after ``SET LOCAL statement_timeout``. No statement on a hub's alias runs
 without a place: one that finds none waits :data:`SLOT_WAIT_SECONDS` and answers 503 ``base.hub_busy``
-(:class:`HubBusy`), logged with the hub's alias, so the limits can be adjusted by measuring. Control's database and a
-hub of phase 1's shared database (``db_name=""``, ``default``) are not limited; the migrator's direct alias (``__ddl``)
-neither: its passes have their own budget (``base.tenancy.migrator``).
+(:class:`HubBusy`), logged with the hub's alias, so the limits can be adjusted by measuring. Every place taken tells the
+meter how many are in use (``base.meter``, never a statement of its own, and never holding the limiter's lock). The
+failure is counted only when it reaches a client (:meth:`HubBusy.reached_client`): the live executor tries a query again
+after it, and a try nobody saw must not tell an owner to upgrade (BASE-F40). A demo is not measured. Control's database
+and a hub of phase 1's shared database (``db_name=""``, ``default``) are not limited; the migrator's direct alias
+(``__ddl``) neither: its passes have their own budget (``base.tenancy.migrator``).
 """
 
 import logging
 import threading
 import time
+import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
+from django.conf import settings
 from django.utils.translation import gettext
 from live.errors import OperationError
 from psycopg import sql
+
+from base import meter
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +65,11 @@ class PlanLimits:
 
 #: The Free plan's, and what a hub whose photo names no usable plan gets.
 FREE = PlanLimits(max_transactions=1, statement_timeout_seconds=5)
+#: ERPlora's own hub, with no plan: it issues every customer's invoice in one VeriFactu chain, and a send to the AEAT holds
+#: its transaction up to 45 s (``apps.verifactu.gateway``), so one place would close the hub meanwhile. As many at once as
+#: Standard, what PgBouncer gives each database in prod. Twice the paid plans' timeout, as its one chain only grows, but
+#: never without one: a hung statement holds one of these few places.
+PLATFORM = PlanLimits(max_transactions=6, statement_timeout_seconds=30)
 
 
 class HubBusy(OperationError):
@@ -60,13 +80,39 @@ class HubBusy(OperationError):
     code = "base.hub_busy"
     retry_after = RETRY_AFTER_SECONDS
 
+    def __init__(self, message: str, *, hub_id: uuid.UUID | None = None) -> None:
+        super().__init__(message)
+        self.hub_id = hub_id
+        self._counted = False
+
+    def reached_client(self) -> None:
+        """Somebody got this failure (``live``: a route's envelope, a live stream's last frame; ``base.middleware``: a
+        page's 503): one more request with no room for its hub, once, however many doors it goes through."""
+        if self.hub_id is not None and not self._counted:
+            self._counted = True
+            meter.count_busy(self.hub_id)
+
 
 def _positive(value: Any) -> int | None:
     return value if isinstance(value, int) and not isinstance(value, bool) and value > 0 else None
 
 
+def _ceiling() -> int | None:
+    """What PgBouncer gives each database, when the setting makes sense."""
+    return _positive(settings.PGBOUNCER_MAX_DB_CONNECTIONS)
+
+
+def _within_the_ceiling(transactions: int, timeout: int) -> PlanLimits:
+    ceiling = _ceiling()
+    return PlanLimits(
+        max_transactions=transactions if ceiling is None else min(transactions, ceiling),
+        statement_timeout_seconds=timeout,
+    )
+
+
 def plan_limits(state: Any) -> PlanLimits | None:
-    """The limits the photo ``state`` (``Hub.state``) gives its hub, or ``None`` when it names no usable plan."""
+    """The limits the photo ``state`` (``Hub.state``) gives its hub, or ``None`` when it names no usable plan: what the
+    plan includes or, if that is less, what PgBouncer gives."""
     plan = state.get("plan") if isinstance(state, Mapping) else None
     if not isinstance(plan, Mapping):
         return None
@@ -74,7 +120,34 @@ def plan_limits(state: Any) -> PlanLimits | None:
     timeout = _positive(plan.get("statement_timeout_seconds"))
     if transactions is None or timeout is None:
         return None
-    return PlanLimits(max_transactions=transactions, statement_timeout_seconds=timeout)
+    return _within_the_ceiling(transactions, timeout)
+
+
+def _is_platform(hub: Any) -> bool:
+    return bool(getattr(hub, "is_platform", False))
+
+
+def hub_limits(hub: Any) -> PlanLimits | None:
+    """The limits of the registry's row ``hub``, or ``None`` when its photo names no usable plan (Free's apply then):
+    ERPlora's own hub gets :data:`PLATFORM`, within what PgBouncer gives, by its row and whatever a photo said; a business,
+    what its photo says."""
+    if _is_platform(hub):
+        return _within_the_ceiling(PLATFORM.max_transactions, PLATFORM.statement_timeout_seconds)
+    return plan_limits(getattr(hub, "state", None))
+
+
+def bigger_plan_gives_more(state: Any) -> bool:
+    """Whether a bigger plan would give the hub of the photo ``state`` more at once: only while what it has, by the
+    limiter's own rule (its plan's limits, or Free's without a usable plan), is less than PgBouncer gives. Told by its own
+    photo, without knowing the other plans."""
+    ceiling = _ceiling()
+    return ceiling is not None and (plan_limits(state) or FREE).max_transactions < ceiling
+
+
+def bigger_plan_gives_hub_more(hub: Any) -> bool:
+    """Whether a bigger plan would give the registry's row ``hub`` more at once: never ERPlora's own hub, which has no plan
+    to grow out of."""
+    return not _is_platform(hub) and bigger_plan_gives_more(getattr(hub, "state", None))
 
 
 class Slot:
@@ -95,12 +168,14 @@ class Slot:
 class Limiter:
     """The places of one hub's alias in this process: a semaphore whose size follows the hub's photo."""
 
-    def __init__(self, limits: PlanLimits, *, version: int, alias: str) -> None:
+    def __init__(self, limits: PlanLimits, *, version: int, alias: str, hub_id: uuid.UUID | None = None) -> None:
         self._condition = threading.Condition()
         self._limits = limits
         self._version = version
         self._in_use = 0
         self.alias = alias
+        #: Whose figures the meter keeps; ``None``: nobody's (a demo, or an alias no hub configured).
+        self.hub_id = hub_id
 
     @property
     def limits(self) -> PlanLimits:
@@ -129,7 +204,12 @@ class Limiter:
         """A place, waiting at most ``wait`` seconds for one; :class:`HubBusy` (logged) when none came."""
         started = time.monotonic()
         with self._condition:
-            if not self._condition.wait_for(lambda: self._in_use < self._limits.max_transactions, timeout=wait):
+            room = self._condition.wait_for(lambda: self._in_use < self._limits.max_transactions, timeout=wait)
+            if room:
+                self._in_use += 1
+                in_use = self._in_use
+                slot = Slot(self, self._limits)
+            else:
                 logger.warning(
                     "base.hub_busy alias=%s: %s transaction(s) at once already (plan: %s), none ended in %.1f s.",
                     self.alias,
@@ -137,9 +217,11 @@ class Limiter:
                     self._limits.max_transactions,
                     time.monotonic() - started,
                 )
-                raise HubBusy(gettext("Too many requests. Try again in a moment."))
-            self._in_use += 1
-            return Slot(self, self._limits)
+        if not room:
+            raise HubBusy(gettext("Too many requests. Try again in a moment."), hub_id=self.hub_id)
+        if self.hub_id is not None:
+            meter.note_peak(self.hub_id, in_use)
+        return slot
 
     def _give_back(self) -> None:
         with self._condition:
@@ -164,18 +246,21 @@ def _free_for(alias: str, version: int, why: str) -> PlanLimits:
 
 
 def configure(alias: str, hub: Any) -> Limiter:
-    """The limiter of ``hub``'s alias in this process, made or resized from its photo (``Hub.state``,
-    ``Hub.state_version``) when that photo is newer than the one it follows: what registering the alias does
-    (``base.tenancy.connections.register_hub_alias``), at every ``use_hub``."""
+    """The limiter of ``hub``'s alias in this process, made or resized from its row (:func:`hub_limits`) when its photo's
+    ``Hub.state_version`` is newer than the one it follows: what registering the alias does
+    (``base.tenancy.connections.register_hub_alias``), at every ``use_hub``. One :func:`limiter_for` made first, at version
+    -1 and for nobody, takes the hub's limits and whose figures to keep."""
     version = getattr(hub, "state_version", 0) or 0
     with _lock:
         limiter = _limiters.get(alias)
         if limiter is not None and version <= limiter.version:
             return limiter
-        limits = plan_limits(getattr(hub, "state", None)) or _free_for(alias, version, "its photo names no usable plan")
+        limits = hub_limits(hub) or _free_for(alias, version, "its photo names no usable plan")
+        hub_id = None if getattr(hub, "is_demo", False) else getattr(hub, "pk", None)
         if limiter is None:
-            limiter = _limiters[alias] = Limiter(limits, version=version, alias=alias)
+            limiter = _limiters[alias] = Limiter(limits, version=version, alias=alias, hub_id=hub_id)
         else:
+            limiter.hub_id = hub_id
             limiter.resize(limits, version=version)
         return limiter
 

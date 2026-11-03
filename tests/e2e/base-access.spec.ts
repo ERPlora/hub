@@ -2,7 +2,7 @@
 // BASE-G64 BASE-G65 BASE-G66 BASE-G72 BASE-G81 BASE-G125 BASE-G126 BASE-G151 (base/WORKBOOK.md, «Acceso»; APP-BASE-3)
 // The way in of a business on the Free plan (one device at a time), two people and two browsers: the owner enters with
 // their erplora.com account on a first device (A), names themselves (the side menu takes the name at once) and chooses
-// a PIN in «My profile», names the device in Settings and sees it in use in System › «Plan and limits»; the employee enters with theirs on a till (B), which asks them to create their PIN and ends A's
+// a PIN in «My profile», names the device in Settings and sees it in use in System › «Usage and plan»; the employee enters with theirs on a till (B), which asks them to create their PIN and ends A's
 // session (the plan covers one device). On B: sign out (the PIN pad), a wrong and a right PIN, a badge, «Switch user»
 // over the screen in use, the idle lock, a session that ends, removing the unused device and the one in hand. Fresh
 // accounts signed up on the SaaS's screens and a business created through its API, as the panel creates it
@@ -282,15 +282,16 @@ test('BASE-G72 BASE-G151 BASE-G62 BASE-G63 BASE-G64: Settings › General shows 
   });
 });
 
-test('BASE-G81: «Plan and limits» counts the devices in use: the one in hand, of the one the Free plan covers', async () => {
+test('BASE-F40 BASE-G81: «Usage and plan» counts the devices in use: the one in hand, of the one the Free plan covers', async () => {
   const page = owner.page;
-  await page.goto(`${origin}/system#plan`);
-  const devices = shown(page).getByTestId('system-plan-devices');
-  await expect(devices.getByTestId('system-plan-devices-used')).toHaveText('1');
-  await expect(devices).toContainText('Up to 1');
-  await expect(devices).toContainText('With a session open now.');
+  await page.goto(`${origin}/system#usage`);
+  const devices = shown(page).getByTestId('system-usage-row-devices');
+  await expect(devices).toContainText('1 of 1');
+  // At its limit, «Full»: a Free business with its one device in use is fine, and nothing turns amber for it.
+  await expect(devices).toContainText('Full');
+  await expect(shown(page).getByTestId('system-usage-verdict')).toContainText('Devices at the limit: to add more, upgrade the plan.');
   await atEverySize(page, 'BASE-G81', async () => {
-    await expect(shown(page).getByTestId('system-plan-devices-used')).toHaveText('1');
+    await expect(shown(page).getByTestId('system-usage-row-devices')).toContainText('1 of 1');
     await toTop(page);
   });
 });

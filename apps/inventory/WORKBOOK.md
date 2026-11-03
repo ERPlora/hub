@@ -1020,7 +1020,7 @@ imagen JPG, PNG o WebP.». Si el artículo se guardó y la foto no, el panel lo 
 guardado, pero la foto no: <motivo>») con «Reintentar», que solo vuelve a subir la foto, y el artículo se
 queda con la foto que tenía; el motivo es, sin espacio en el plan, «No queda espacio para ese archivo: tu
 plan incluye <espacio>.» y, si el almacén no contesta, «No se pudo guardar la foto. Inténtalo de nuevo.».
-Implicados: INVENTORY-F01, INVENTORY-F02, INVENTORY-F04, INVENTORY-F32, BASE-F28
+Implicados: INVENTORY-F01, INVENTORY-F02, INVENTORY-F04, INVENTORY-F32, BASE-F40
 
 ### INVENTORY-F32 La foto en la ficha del TPV
 <!-- origen: nuevo (decisión de Ioan del 2026-10-30; hoy la baldosa del TPV pinta las iniciales sobre un degradado, SALE-F01) -->

@@ -1,10 +1,10 @@
-// Apps and System › «Plan and limits» of the Hub (APP-BASE-4; the old hub's AppsPage and SystemPage,
+// Apps and System › «Usage and plan» of the Hub (APP-BASE-4; the old hub's AppsPage and SystemPage,
 // docs/reference/old-hub/apps-*.png, apps-all-*.png, apps-paid-*.png and system-plan-*.png) in the three viewports,
 // as the owner of hub `a`: «My apps» with each app's state and «Open», «Add apps» (`#all`) with its search and
 // neither «Paid» nor «Price» (every app in every plan, PLAN §32: no app of this deployment is sold apart, so an old
 // link to `#paid` opens «Add apps»), and the plan's limits against
 // the people of the business — followed live: the SaaS's photo with a plan moves the screen without a reload. The
-// employee reads the apps too (no notice cuts the list on a phone: gh:hub#2570) and is told that «Plan and limits»
+// employee reads the apps too (no notice cuts the list on a phone: gh:hub#2570) and is told that «Usage and plan»
 // is for whoever runs the business. Each flow leaves its capture `APP-BASE-4-<G key>-<width>` once nothing scrolls
 // sideways. A paid app without its right (BASE-G74, BASE-G132, BASE-G134) cannot be reached here: no module of the
 // deployment is premium; the Vitest of AppsPage and AppBlockedPage and base/tests/test_entitlement.py cover it.
@@ -156,47 +156,45 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     await context.close();
   });
 
-  test(`BASE-G81 — Plan and limits at ${width}, followed live`, async ({ browser }) => {
-    // «Plan and limits» is System's second tab (APP-BASE-7): `/system` opens Resources, as the old hub did.
-    const { context, page } = await signedIn(browser, viewport, '/system#plan');
+  test(`BASE-F40 BASE-G81 — what the plan includes at ${width}, followed live`, async ({ browser }) => {
+    const { context, page } = await signedIn(browser, viewport, '/system#usage');
     // A photo without a plan: the limits are not known yet, never a made-up figure.
     await pushPhoto();
     await page.reload();
-    await expect(testid(page, 'system-plan-unknown')).toBeVisible();
-    await expect(testid(page, 'system-plan-status')).toHaveCount(0);
+    await expect(testid(page, 'system-usage-unknown')).toBeVisible();
+    await expect(testid(page, 'system-usage-verdict')).toHaveCount(0);
     const used = people();
     expect(used, 'the owner is a member of a').toBeGreaterThan(0);
-    const peopleCard = testid(page, 'system-plan-people');
-    await expect(peopleCard).toContainText(String(used));
+    const peopleRow = testid(page, 'system-usage-row-people');
+    await expect(peopleRow).toContainText(String(used));
     await snap(page, 'BASE-G81-unknown', width);
 
     // A plan with no limit (0), without a reload: the people of the business and «No limit».
     await pushPhoto({ slug: 'standard', max_users: 0, max_devices: 0 });
-    await expect(testid(page, 'system-plan-unknown')).toHaveCount(0);
-    await expect(peopleCard).toContainText(String(used));
-    await expect(peopleCard).toContainText('No limit');
-    await expect(testid(page, 'system-plan-status')).toContainText('Within the limit');
+    await expect(testid(page, 'system-usage-unknown')).toHaveCount(0);
+    await expect(peopleRow).toContainText(`${used} · No limit`);
+    await expect(testid(page, 'system-usage-verdict')).toHaveAttribute('data-tone', 'success');
 
-    // The SaaS's photo with every place taken moves the screen without a reload: the bar, «Close to the limit»
-    // and why.
-    await pushPhoto({ slug: 'starter', max_users: used, max_devices: 2 });
-    await expect(testid(page, 'system-plan-full')).toBeVisible();
-    await expect(peopleCard).toContainText(`${used} of ${used}`);
-    await expect(testid(page, 'system-plan-devices')).toContainText('Up to 2');
+    // The SaaS's photo with every place taken moves the screen without a reload: the bar and «Full», and the line stays
+    // green, because a business with all its people in is fine.
+    await pushPhoto({ slug: 'starter', max_users: used, max_devices: 999 });
+    await expect(peopleRow).toContainText(`${used} of ${used}`);
+    await expect(peopleRow).toContainText('Full');
+    await expect(testid(page, 'system-usage-verdict')).toHaveAttribute('data-tone', 'success');
+    await expect(testid(page, 'system-usage-verdict')).toContainText('People at the limit: to add more, upgrade the plan.');
     await snap(page, 'BASE-G81', width);
 
     // Room again: within the plan.
-    await pushPhoto({ slug: 'standard', max_users: used + 5, max_devices: 4 });
-    await expect(testid(page, 'system-plan-full')).toHaveCount(0);
-    await expect(peopleCard).toContainText(`${used} of ${used + 5}`);
-    await expect(testid(page, 'system-plan-status')).toContainText('Within the limit');
+    await pushPhoto({ slug: 'standard', max_users: used + 5, max_devices: 999 });
+    await expect(peopleRow).toContainText(`${used} of ${used + 5}`);
+    await expect(testid(page, 'system-usage-verdict')).not.toContainText('at the limit');
     await snap(page, 'BASE-G81-room', width);
 
     await context.close();
   });
 }
 
-test('BASE-G67 BASE-G81 — the employee reads the apps on a phone, and «Plan and limits» is for whoever runs the business', async ({ browser }) => {
+test('BASE-G67 BASE-G81 — the employee reads the apps on a phone, and «Usage and plan» is for whoever runs the business', async ({ browser }) => {
   const viewport = VIEWPORTS[390];
   const { context, page } = await signedIn(browser, viewport, '/apps', true);
   try {
@@ -206,9 +204,9 @@ test('BASE-G67 BASE-G81 — the employee reads the apps on a phone, and «Plan a
     await expect(testid(page, 'apps-row-demo-open')).toBeInViewport();
     await snap(page, 'BASE-G67-employee', 390);
 
-    await page.goto(`${A}/system#plan`);
-    await expect(testid(page, 'system-plan-denied')).toBeVisible();
-    await expect(testid(page, 'system-plan-retry')).toHaveCount(0);
+    await page.goto(`${A}/system#usage`);
+    await expect(testid(page, 'system-usage-denied')).toBeVisible();
+    await expect(testid(page, 'system-usage-retry')).toHaveCount(0);
     await snap(page, 'BASE-G81-employee', 390);
   } finally {
     await (context as BrowserContext).close();

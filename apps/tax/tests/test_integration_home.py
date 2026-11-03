@@ -24,6 +24,8 @@ from live.outbox import channel_for
 
 from apps.tax.models import TaxCategory, TaxRule
 from apps.tax.tests.conftest import A, B
+from base import activation
+from base.models import AppActivation
 from base.schemas import SetupStatusIn
 from base.services import AppRequired
 
@@ -148,6 +150,8 @@ def turn_off(app: str) -> None:
 @pytest.mark.django_db
 def test_with_taxes_off_the_home_does_not_ask_for_its_rates(generic):
     # base brings only the steps of the modules on in the scope: Taxes off (after the apps that need it), no step.
+    # VeriFactu needs Taxes and never goes off once on in Spain (VERIFACTU-F32): a business with Taxes off never had it.
+    AppActivation.objects.filter(host=A.key, app="verifactu").update(state=activation.OFF, chosen=False)
     turn_off("tax")
     assert step() is None
     assert step(person(scope=B))["state"] == "pending"
