@@ -58,13 +58,13 @@ export const SIDEBAR: ShellSidebar = {
 
 /**
  * base's pieces of the chrome (APP-BASE-1, the old hub's): the assistant's sparkles and the bell at the end of the
- * topbar, «Upgrade plan» in the menu's footer, the blocking strip over every screen and, beside the pane, the device's
- * notices (APPOINTMENT-F28) and the assistant's panel (APP-BASE-9). Each in its own chunk, which `boot` loads beside the
- * first screen's: the hub mounts once they are here (`chromeLoaded`).
+ * topbar, «Upgrade plan» and right below it «Manage on erplora.com» in the menu's footer, the blocking strip over every
+ * screen and, beside the pane, the device's notices (APPOINTMENT-F28) and the assistant's panel (APP-BASE-9). Each in its
+ * own chunk, which `boot` loads beside the first screen's: the hub mounts once they are here (`chromeLoaded`).
  */
 export const CHROME: NonNullable<CreateShellOptions['chrome']> = {
   topbar: defineAsyncComponent(() => import('../base/frontend/components/TopbarChrome.vue')),
-  sidebarFooter: defineAsyncComponent(() => import('../base/frontend/components/UpgradePlanLink.vue')),
+  sidebarFooter: defineAsyncComponent(() => import('../base/frontend/components/SidebarFooter.vue')),
   notice: defineAsyncComponent(() => import('../base/frontend/components/BlockingStrip.vue')),
   background: defineAsyncComponent(() => import('../base/frontend/components/BackgroundChrome.vue')),
 };

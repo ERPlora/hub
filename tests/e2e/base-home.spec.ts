@@ -194,7 +194,7 @@ function liveOps(url: string): string[] {
 }
 
 /** base's four pieces of the chrome (frontend/main.ts `CHROME`), by their module: the source in dev, the chunk in a build. */
-const CHROME_PIECE = /\/(TopbarChrome|UpgradePlanLink|BlockingStrip|BackgroundChrome)[.-]/;
+const CHROME_PIECE = /\/(TopbarChrome|SidebarFooter|BlockingStrip|BackgroundChrome)[.-]/;
 
 // FIX-HUB-BASE-HOME-ONE-STREAM-FLAKY (hub#473's review): base's chrome loaded on demand, after the screen had mounted. On
 // a slow device (the tab's CPU ×6: 7 of 9 runs) its modules came more than 150 ms after the screen's queries, so the
