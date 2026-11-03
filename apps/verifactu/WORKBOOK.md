@@ -1507,11 +1507,11 @@ Las cerradas quedan tachadas con su motivo; las abiertas dicen dónde siguen.
     de Ioan del 22/10 en el plan de la fase 2, «Tablas por módulo (S3)»): `disable_refusal` contesta siempre
     `NEVER_OFF`, salvo fuera de España (decisión 15) o si nunca llegó a `on` (`creating` o `failed` de S3: no ha
     sellado nada, y el negocio no se queda atado a una activación que falló); sin país (una demo), es España. La
-    AEAT obliga a seguir con VERI*FACTU al menos hasta el fin del año natural (FAQ de su sede) y el mercado no deja
-    apagarlo a mitad de año
-    (Square: la baja se aplica a final de año; Sage 50: baja con fecha 31-12, «irreversible» tras la primera factura
-    certificada; B2Brouter, el conector de Business Central: desde 2027 no se desactiva en un ejercicio con envíos;
-    Zoho Books: desaconsejado salvo migración). ERPlora no tiene modo «NO VERI*FACTU», así que una baja diferida a
+    AEAT obliga a seguir con VERI*FACTU al menos hasta el fin del año natural (FAQ de su sede). El mercado se parte: la
+    mayoría no lo apaga a mitad de año (Square: la baja se aplica a final de año; Sage 50: baja con fecha 31-12,
+    «irreversible» tras la primera factura certificada; B2Brouter, el conector de Business Central: desde 2027 no se
+    desactiva en un ejercicio con envíos) y otros lo dejan con aviso (Zoho Books: desaconsejado salvo migración).
+    «Nunca» es más estricto que el año natural: ERPlora no tiene modo «NO VERI*FACTU», así que una baja diferida a
     fin de año dejaría al negocio sin registro de sus facturas: la regla es «nunca», sin baja programada. Sustituye a
     la negativa por registros pendientes (hub#267; el aviso con cuántos de hub#2595 queda sin objeto). Solo
     `base.app.disable` apaga una app: bajar de plan no apaga nada (BASE-F24), la foto del SaaS no apaga apps, una
