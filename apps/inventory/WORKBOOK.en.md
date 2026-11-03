@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:c4d64e8c13ebb7cef563355ebdc2bdbc6d2aaf1840629f09f232c879f3e3fb07 -->
+<!-- generated from WORKBOOK.md sha256:3b1b2b58c309226dfe5370e72564ca2a24744bf13e6c055d1067a0ae0ee0ebcc -->
 
 ## What it is for and who it is for
 
@@ -262,7 +262,8 @@ Status: done
 Actor: administrator, manager
 Screen: Products
 Steps:
-1. In **Products**, tap **+**: the form's panel opens.
+1. In **Products**, tap **+**: the form's panel opens, with the cursor in Name; if you already went to
+   another field while it opens, the cursor stays where you are and what you type goes there.
 2. Type Name, SKU and Price. The price takes "2.20", "1,234.56" or whatever is pasted from the
    screen; on leaving the field it is rewritten in the business's format. Optional are "Cost
    (<currency>)" (the business's: "Cost (PLN)" in Poland), "Initial stock", "Low stock threshold"
