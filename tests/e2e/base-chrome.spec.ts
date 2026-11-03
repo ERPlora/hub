@@ -1,17 +1,18 @@
 // The Hub's pieces of the shell's chrome (ERPlora/ui#19), as a person sees them at 390, 834 and 1440:
 // - «Upgrade plan» at the foot of the side menu (BASE-F11): lined up with the QR above it and inside the menu, and on
 //   the rail (≥992 px, the menu folded to its icons) only its icon, still named, inside the 68 px;
+// - «Manage on erplora.com» right below it (BASE-F11): this business on erplora.com's panel, in a new tab, for who runs
+//   it; on the rail only its icon, still named. The bar no longer has it, nor «More options» on a phone; an employee's
+//   menu has none.
 // - the strip «You cannot invoice yet» (BASE-F01) between the bar and the screen's content, at its own height;
 // - the user menu's «My account» (PLAN-SAAS §1.1): erplora.com's page, in a new tab; its «Report a problem» is the
 //   hub's own dialog (BASE-F108, tests/e2e/base-report-problem.spec.ts);
-// - «erplora.com» of the bar (BASE-F11): this business on erplora.com's panel, in a new tab, for who runs it; on a
-//   phone, the first row of «More options». An employee's bar has none.
 // No module of main declares a ⛔ step yet (Invoicing's comes with its own task), so the strip's test serves the page
 // a `base.setup.status` with one pending: the live stream is answered by the test, every other query stays loading.
 // flow: BASE-F01 BASE-F11
 import { expect, type Locator, type Page, type Route, test } from '@playwright/test';
 
-import { A, decodeSubs, EMPLOYEE, login, psql, shot, shown, untilStill } from './helpers';
+import { A, capture, decodeSubs, EMPLOYEE, login, psql, shot, shown, untilStill } from './helpers';
 import { STACK } from './stack';
 
 const VIEWPORTS = [
@@ -216,57 +217,98 @@ test('the user menu opens «My account» on erplora.com, in a new tab; «Report 
   }
 });
 
-test('BASE-F11 — «erplora.com» in the bar opens the business on erplora.com in a new tab; an employee has none', async ({ page, browser }) => {
+/** How many elements outside the side menu lead to `href` (ion-button and ion-item carry it as a property). */
+const linksOutsideMenu = (page: Page, href: string): Promise<number> =>
+  page.evaluate(
+    (to) => [...document.querySelectorAll('*')].filter((el) => (el as HTMLAnchorElement).href === to && !el.closest('ion-menu')).length,
+    href,
+  );
+
+test('BASE-F11 — «Manage on erplora.com», right below «Upgrade plan», opens the business on erplora.com in a new tab; the bar has none; an employee has none', async ({ page, browser }) => {
   await login(page, A, '/');
   // The owner's session for the fleet's visual sweep (`ui-clip-sweep.sh --storage-state`), when asked.
   if (process.env.E2E_SAVE_STORAGE_STATE) await page.context().storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
   const hubId = psql("SELECT id FROM base_hub WHERE slug = 'a'");
   const address = `${STACK.saas}/dashboard/businesses/${hubId}`;
+  const menu = page.locator('ion-menu');
+  const foot = menu.locator('ion-footer.sidebar-foot');
+  const upgrade = menu.locator('[data-testid="upgrade-plan"]');
+  const link = menu.locator('[data-testid="menu-manage"]');
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
     await page.goto(`${A}/`);
     await expect(shown(page).locator('[data-testid="setup-progress"]')).toBeVisible();
     await expect(shown(page).locator('ion-skeleton-text:visible, [data-testid="widgets-loading"]:visible')).toHaveCount(0);
-    let link: Locator;
     if (vp.width < 768) {
-      // On a phone it folds into «More options», with the assistant and the bell, as in the old hub.
-      await expect(shown(page).getByTestId('topbar-manage')).toHaveCount(0);
+      // On a phone «More options» folds the assistant and the bell, and nothing else.
       const presented = page.evaluate(
         () => new Promise<void>((resolve) => document.addEventListener('ionPopoverDidPresent', () => resolve(), { once: true })),
       );
       await shown(page).getByTestId('topbar-chrome-more').click();
       await presented;
-      const row = page.locator('ion-popover [data-testid="topbar-chrome-more-manage"]');
-      await expect(row).toContainText('Manage on erplora.com');
-      link = row.locator('a.item-native');
+      const rows = page.locator('ion-popover ion-item[data-testid^="topbar-chrome-more-"]');
+      await expect(rows).toHaveCount(2);
+      expect(await rows.evaluateAll((items) => items.map((item) => item.getAttribute('data-testid')))).toEqual([
+        'topbar-chrome-more-assistant',
+        'topbar-chrome-more-bell',
+      ]);
+      expect(await linksOutsideMenu(page, address), `«More options» leads nowhere near erplora.com at ${vp.label}`).toBe(0);
+      const dismissed = page.evaluate(
+        () => new Promise<void>((resolve) => document.addEventListener('ionPopoverDidDismiss', () => resolve(), { once: true })),
+      );
+      await page.keyboard.press('Escape');
+      await dismissed;
     } else {
-      const button = shown(page).getByTestId('topbar-manage');
-      await expect(button).toContainText('erplora.com');
-      await expect(button).toHaveAttribute('title', 'Manage on erplora.com');
-      // ion-button paints its own link from them, in its shadow root.
-      link = button.locator('a.button-native');
+      await expect(shown(page).getByTestId('assistant-button')).toBeVisible();
+      expect(await linksOutsideMenu(page, address), `the bar leads nowhere near erplora.com at ${vp.label}`).toBe(0);
     }
+    if (vp.width < PINNED_MIN) await shown(page).locator('ion-menu-button').click();
+    await expect(link).toBeVisible();
+    await expect(link).toContainText('Manage on erplora.com');
+    await expect(link).toHaveAttribute('title', 'Manage on erplora.com');
     await expect(link).toHaveAttribute('href', address);
     await expect(link).toHaveAttribute('target', '_blank');
     await expect(link).toHaveAttribute('rel', 'noopener');
-    await untilStill(page);
-    await page.screenshot({ path: shot(`FIX-HUB-BASE-MANAGE-ON-ERPLORA-LINK-${vp.label}`) });
+    // Right below «Upgrade plan», on its same edges (the drawer slides in: measured once it settled).
+    await expect
+      .poll(async () => {
+        const [at, above] = await Promise.all([boxOf(link), boxOf(upgrade)]);
+        return near(at.left, above.left) && near(at.right, above.right) && at.top >= above.bottom - 0.5;
+      }, { message: `«Manage on erplora.com» right below «Upgrade plan» at ${vp.label}` })
+      .toBe(true);
+    expect(await sidewaysOverflow(foot), `the menu's foot fits at ${vp.label}`).toBeLessThanOrEqual(0);
+    await capture(page, `FIX-HUB-BASE-MANAGE-ON-ERPLORA-LINK-${vp.label}`);
     if (vp.width === 1440) {
       // Tapped, the panel opens in a tab of its own and the hub stays where it was.
-      const [tab] = await Promise.all([page.waitForEvent('popup'), shown(page).getByTestId('topbar-manage').click()]);
+      const [tab] = await Promise.all([page.waitForEvent('popup'), link.click()]);
       await tab.waitForURL((url) => url.href.startsWith(address));
       await tab.close();
       await expect(page).toHaveURL(`${A}/`);
-    } else if (vp.width < 768) {
-      await page.keyboard.press('Escape');
     }
   }
 
-  // An employee does not run the business: their bar has the assistant and the bell, and no «erplora.com».
+  // On the rail (desktop only): the icon alone, named for the screen reader and the tooltip, inside the 68 px.
+  const rail = shown(page).locator('[data-testid="topbar-rail"]');
+  await rail.click();
+  await expect(page.locator('ion-split-pane.rail')).toHaveCount(1);
+  await expect.poll(async () => (await boxOf(menu)).right, { message: 'the menu folded to the rail' }).toBeLessThanOrEqual(RAIL + 0.5);
+  await expect(link).toBeVisible();
+  await expect(link.getByText('Manage on erplora.com')).toBeHidden();
+  await expect(link).toHaveAccessibleName('Manage on erplora.com');
+  const [at, side] = await Promise.all([boxOf(link), boxOf(menu)]);
+  expect(at.left, 'inside the rail').toBeGreaterThanOrEqual(side.left - 0.5);
+  expect(at.right, 'inside the rail').toBeLessThanOrEqual(side.right + 0.5);
+  expect(await sidewaysOverflow(link), 'the rail\'s «Manage on erplora.com» fits').toBeLessThanOrEqual(0);
+  await capture(page, 'FIX-HUB-BASE-MANAGE-ON-ERPLORA-LINK-rail-1440');
+  await rail.click();
+  await expect(page.locator('ion-split-pane.rail')).toHaveCount(0);
+
+  // An employee does not run the business: their bar has the assistant and the bell, and their menu no «Manage on
+  // erplora.com».
   const context = await browser.newContext({ locale: 'en-US', viewport: { width: 1440, height: 900 } });
   const employee = await context.newPage();
   await login(employee, A, '/', EMPLOYEE);
   await expect(shown(employee).getByTestId('assistant-button')).toBeVisible();
-  await expect(shown(employee).getByTestId('topbar-manage')).toHaveCount(0);
+  await expect(employee.locator('ion-menu [data-testid="menu-manage"]')).toHaveCount(0);
   await context.close();
 });

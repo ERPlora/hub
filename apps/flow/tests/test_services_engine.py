@@ -530,8 +530,8 @@ def test_a_finished_run_keeps_no_copy_of_what_its_steps_read(clock):
     assert Task.objects.get().title == "Call Ana López"
 
 
-# The phase-1 worker (FLOW-F22, FLOW-F23): `run_worker` calls `base.scheduler.run_due` every tick, on
-# one fixed scope; these tests go through that same scheduler, with the tasks flow declares.
+# The worker's minute (FLOW-F22, FLOW-F23), through the scheduler it calls every tick, with the tasks flow declares and
+# no scope: `WORKER_SCOPE_SLUG`'s, here `a`'s. In production each business runs on its own (`test_worker_parked_runs.py`).
 
 
 def _flow_tasks():

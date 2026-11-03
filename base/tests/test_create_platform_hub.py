@@ -217,6 +217,23 @@ def test_execute_makes_the_platform_hub_its_own_database_and_sets_its_issuer_the
 
 
 @pytest.mark.usefixtures("no_test_fallback", "made_for_real")
+def test_the_hub_it_makes_is_on_its_own_limits_with_no_photo_and_no_step_by_hand(monkeypatch):
+    from base.tenancy import limits
+    from base.tenancy.context import current_alias, use_hub
+    from control.models import Hub
+
+    command("--execute")
+    monkeypatch.setattr(limits, "_limiters", {})
+
+    hub = Hub.objects.get(slug=PLATFORM.key)
+    with use_hub(hub):
+        limiter = limits.limiter_for(current_alias())
+
+    assert (hub.state, hub.state_version) == ({}, 0)
+    assert limiter.limits == limits.PlanLimits(max_transactions=6, statement_timeout_seconds=30)
+
+
+@pytest.mark.usefixtures("no_test_fallback", "made_for_real")
 def test_without_execute_a_missing_platform_hub_is_only_said():
     from control.models import Hub
 

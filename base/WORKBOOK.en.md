@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:1123c182329c846f87764cd6fb0ab73b9be5d7d7c85984fe7f0f617f8fd8e94d -->
+<!-- generated from WORKBOOK.md sha256:b1a7447d8550c9cec8f57c1785e1b7253d1b2bb556534ba89b149c031b358039 -->
 
 ## What it is for and who it is for
 
@@ -70,13 +70,6 @@ The table of the latest sales: "Date", "Sale", "Customer", "Method", "Amount" an
 "Search activity…", the filters funnel (method and status), the order, the cards view and "Columns". It
 also opens with the Home's link ending in `#actividad`.
 
-### "erplora.com" of the bar
-At the top right, between "My apps" and the assistant's sparkles: a cloud and "erplora.com" ("Manage on erplora.com"
-on hover). It opens this business on erplora.com's panel: in a new tab in the browser and, in the installed app, in
-the device's browser. Only the owner, the administrator and the manager have it, and only if they came in with their
-account: never in a session opened with a PIN or with the badge. The Google Play app does not have it.
-On a phone it goes inside "More options", the first one, as "Manage on erplora.com".
-
 ### The bell
 At the top right, after "My apps" and the assistant's sparkles; on a phone, both go inside "More options", which
 carries its number. Its number adds up the pending notices; tapped, one row per notice ("Failed events (2)") that
@@ -87,11 +80,18 @@ On the left (on a phone, from the bar's button): the person at the top and the p
 "Home", "Employees", "Files" · "Apps", "System", "API", "Settings". Each one shows only to whoever may open its screen:
 "System", to whoever runs the business; "API", while the API documentation is shown (BASE-F91), and it appears or goes
 when the switch changes, without reloading. An employee sees "Home", "Employees", "Files", "Apps" and "Settings". At
-the bottom, the QR code and "Upgrade plan".
+the bottom, the QR code, "Upgrade plan" and "Manage on erplora.com".
 
 ### "Upgrade plan"
-At the foot of the side menu, between the QR code and the brand. It opens this business's plan page on
+At the foot of the side menu, between the QR code and "Manage on erplora.com". It opens this business's plan page on
 erplora.com, in a new tab. Only in the browser: the installed app does not have it.
+
+### "Manage on erplora.com"
+At the foot of the side menu, right below "Upgrade plan", with the external link icon; with the menu folded to its
+icons (desktop), only the icon stays, which says "Manage on erplora.com" on hover. It opens this business on
+erplora.com's panel: in a new tab in the browser and, in the installed app, in the device's browser. Only the owner,
+the administrator and the manager have it, and only if they came in with their account: never in a session opened
+with a PIN or with the badge. It does not sell, so the installed app has it too, except the Google Play one.
 
 ### The user menu
 It opens by tapping the person, at the top of the side menu. First "Profile" and, on a shared till of a business
@@ -614,22 +614,23 @@ Involved: BASE-F40
 ### BASE-F11 Go to erplora.com to manage or upgrade the plan
 Status: discarded — without the one-time pass: if the browser does not have the erplora.com session open, you sign in with the account on arrival; the pass belongs mostly to erplora.com (saas#190)
 Actor: owner, administrator, manager, employee
-Screen: Side menu, top bar
+Screen: Side menu
 Steps:
   1. At the foot of the side menu, under the QR code and lined up with it, is "Upgrade plan". Any profile
      sees it; what can be done on arriving is decided by erplora.com according to who comes in. With the
      menu folded to its icons (desktop), only its icon stays, which says "Upgrade plan" on hover. Only in the
      browser: the installed app does not have it.
   2. They tap it: this business's plan page on erplora.com opens in a new tab.
-  3. The owner, the administrator or the manager who came in with their account also has, at the top right,
-     "erplora.com", with a cloud (on a phone, "Manage on erplora.com", the first one of "More options").
+  3. The owner, the administrator or the manager who came in with their account also has, right below
+     "Upgrade plan", "Manage on erplora.com", with the external link icon (on the folded menu, only the icon).
+     It does not sell: the installed app has it too, except the Google Play one.
   4. They tap it: this business opens on erplora.com's panel, in a new tab; in the installed app, in the device's
      browser. The Hub stays where it was.
 In: the business they are in.
 Out: nothing saved in the hub.
 If it fails: if the hub does not know which business it belongs to, neither of the two shows (never a button that
 does nothing). If the installed app cannot open the browser, it says so: "Could not open that page. Try again.". An
-employee, a session opened with a PIN or with the badge and the Google Play app do not have "erplora.com".
+employee, a session opened with a PIN or with the badge and the Google Play app do not have "Manage on erplora.com".
 Involved: BASE-F40
 
 ### BASE-F12 Ask the assistant to go over the setup
@@ -2441,10 +2442,16 @@ Steps:
   1. The assistant works with the session of whoever is in front of it: it sees and does what that person would see
      and do with their buttons, in the business's apps that are on, and nothing else. An action they have no
      permission for is not offered to the assistant, which tells them so; one its app lets a manager approve is, as
-     its button on the screen is.
-  2. That action comes with its card, like any other. Tapping "Run it" opens "An approval is needed", the same as on
-     the screen: a manager taps their face and types their PIN, or swipes their badge, and the action is done once,
-     with whoever asked for it as its author. It is recorded in **Employees › Approvals**.
+     its button on the screen is. The assistant knows the role it talks to (owner, administrator, manager or
+     employee, said in the language of the conversation) and that its tools are that role's: asked for something none
+     of them does, it neither looks for another way nor tells the state of something else, but says in one sentence
+     that it is not available to them here, because their role cannot do it or because that app is not on, and who
+     can (to an employee, a manager or the owner; to a manager, the owner or an administrator) or on which screen it
+     is done.
+  2. That action comes with its card, like any other, and the assistant says beforehand that the card will ask a
+     manager to approve it. Tapping "Run it" opens "An approval is needed", the same as on the screen: a manager taps
+     their face and types their PIN, or swipes their badge, and the action is done once, with whoever asked for it as
+     its author. It is recorded in **Employees › Approvals**.
   3. If nobody approves it ("Cancel"), it is not done: the receipt reads "Not done, cancelled: …" and the assistant
      knows it.
   4. If it tries anyway an action without permission that nobody can approve, it is not done: the receipt reads "Not

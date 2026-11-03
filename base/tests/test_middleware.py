@@ -12,7 +12,7 @@ import re
 from urllib.parse import parse_qs, urlencode, urlsplit
 
 import pytest
-from django.urls import clear_script_prefix, set_script_prefix
+from django.urls import clear_script_prefix, reverse, set_script_prefix
 
 from base import health
 
@@ -196,6 +196,34 @@ def prod_domain(settings):
     settings.ALLOWED_HOSTS = PROD_HOSTS
     settings.HUB_BASE_DOMAIN = "erplora.com"
     settings.LIVE = {**settings.LIVE, "hub_slug_min_length": 3}
+
+
+@pytest.mark.usefixtures("prod_domain")
+def test_nobody_can_open_a_screen_of_the_platform_hub_though_its_row_is_ready(client, superuser):
+    """ERPlora's own hub has its row, but its slug is reserved (``live.slugs``): its host is no hub's, before the registry
+    is read, so no page, API call or jump reaches «Usage and plan» there, with a session or with a key. On the platform
+    host the staff only get the admin. Should this ever open, that screen would promise it a plan the SaaS never sends."""
+    from base.models import Hub
+
+    Hub.objects.create(slug="erplora", status="ready", is_platform=True)
+    host = "erplora.erplora.com"
+
+    def closed():
+        assert browse(client, "/system", host).status_code == 404
+        assert browse(client, "/auth/login", host).status_code == 404
+        assert browse(client, "/auth/callback", host).status_code == 404
+        for path in ("/api/system/plan", "/api/live"):
+            for headers in ({}, {"HTTP_AUTHORIZATION": "Bearer erpk_live_any"}):
+                api = client.get(path, HTTP_HOST=host, **headers)
+                assert (api.status_code, api.json()["error"]["code"]) == (404, "not_found")
+
+    closed()
+    client.force_login(superuser)
+    closed()
+
+    for path in ("/system", "/api/system/plan"):
+        page = browse(client, path, "hubs.erplora.com")
+        assert (page.status_code, page["Location"]) == (302, reverse("admin:index"))
 
 
 @pytest.mark.usefixtures("prod_domain")

@@ -1517,14 +1517,23 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   idempotencia por `trigger_key` hace que un reintento no ejecute dos veces. FLOW-F21 se prueba por el relay
   real (`tests/test_relay.py`: una pasada del worker entrega el aviso de Clientes, la segunda no repite nada, y
   un aviso del negocio B arranca su ejecución en B y solo B lo oye).
-- **Fase 1**: el worker (`run_worker`) corre cada minuto las dos tareas programadas (`fire_due`,
-  `resume_due`) como el sistema, en un único ámbito fijo (`WORKER_SCOPE_SLUG`); como en la fase 1 todos
-  los hubs comparten tablas, ve todas las automatizaciones (FLOW-F22 y F23, probado pasando por
-  `base.scheduler.run_due`). Desde la ronda 2026-10-20 de PLAN-HUB el worker reparte además el outbox en
-  cada tick (5 s, `base/relay.py`): entrega a `flow` los avisos de las demás apps y sus propios
-  `flow.run.parked` (`REACTIONS = {"*": "flow.run.react", "flow.run.parked": "flow.run.call"}`), con su id y
-  su actor. El motor se prueba entregando a `events.react` (o `events.deliver`) avisos **reales** del
-  outbox, hechos por las operaciones reales de otras apps, y las llamadas con una pasada real del relay.
+- **Dónde corre** (desde el corte de la tenencia, hub#602): el worker (`run_worker`) entra en cada negocio que sirve,
+  en su BD y en su propio ámbito (`base.worker._serve_hub`: `use_hub` y `Scope("host", slug)`), y allí corre cada minuto
+  las dos tareas programadas (`fire_due`, `resume_due`) como el sistema: solo ve las automatizaciones de ese negocio
+  (FLOW-F22 y F23). `WORKER_SCOPE_SLUG` solo queda para `base.scheduler.run_due` sin ámbito, el de los tests escritos
+  antes de la tenencia (`base/tenancy/tests/legacy.py`, `worker_pass`, por los que esos tests aún pasan por el ámbito
+  fijo), y una operación con el ámbito de otro negocio dentro de `use_hub` se rechaza (`HubContextMismatch`). Desde la
+  ronda 2026-10-20 de PLAN-HUB el worker reparte además el outbox de cada negocio en cada tick (5 s, `base/relay.py`):
+  entrega a `flow` los avisos de las demás apps y sus propios `flow.run.parked`
+  (`REACTIONS = {"*": "flow.run.react", "flow.run.parked": "flow.run.call"}`), con su id y su actor. El motor se prueba
+  entregando a `events.react` (o `events.deliver`) avisos **reales** del outbox, hechos por las operaciones reales de
+  otras apps, y las llamadas con una pasada real del relay.
+- **Una ejecución recién aparcada** (FLOW-F27, F37 y F38): sus pasos la dejan en `calling` con `resume_at` = ahora, sin
+  que nadie la tenga aún, y la alcanzan dos caminos: el relay (`flow.run.parked` → `flow.run.call`) y el barrido de
+  `resume_due`, que también es el que reenvía un paso cuyo proceso murió al vencer su plazo. Los dos despachan con el
+  ámbito del negocio, y `claim_assistant` y `claim_call` dejan que solo uno lo haga: ni dos turnos ni dos llamadas, caiga
+  el tick en el minuto que caiga. Lo prueba `tests/test_worker_parked_runs.py` por el camino real del worker, con dos
+  negocios con BD propia.
 - **Lo que ya no se puede leer** (hub#1766): un «Solo cuando…» o un «Solo sigue si…» guardado con una
   forma que el motor no entiende (escrito en crudo desde el admin o por una versión anterior) nunca se
   evalúa como «no se cumple»: la ejecución se para con `flow.filter_unreadable` o
@@ -1708,9 +1717,7 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   palabras de otra app (hub#497); la pregunta o la tarjeta de un paso que cobra no reconoce su importe como
   dinero (hub#498); la tarjeta de confirmación del asistente llama «Registro» a la automatización o a la ejecución
   (hub#499) y dice «N elementos» en los permisos de un flujo sin decir cuáles (hub#504, con `base`).
-- **Trabajo encolado del carril** (cola de la migración, sin issue todavía): una ejecución aparcada que se reanuda
-  sale como el hub de la plataforma y la respuesta de mesa por WhatsApp no le llega al cliente
-  (FIX-HUB-FLOW-RESUME-DUE-SENDS-A-PARKED-RUN-AS-THE-PLATFORM-HUB); un paso no puede pedir cita para un
+- **Trabajo encolado del carril** (cola de la migración, sin issue todavía): un paso no puede pedir cita para un
   profesional (FIX-HUB-FLOW-STEP-CANNOT-BOOK-FOR-A-PROFESSIONAL) ni confirmar, mover o anular una cita
   (FIX-HUB-FLOW-STEP-CANNOT-CHANGE-AN-APPOINTMENT).
 - **«Necesita tu atención»** (eventos que no se entregaron): el reparto del worker ya entrega los avisos a esta

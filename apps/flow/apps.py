@@ -53,8 +53,8 @@ class FlowConfig(LiveAppConfig):
     navigation = [
         Nav("automations", _("Automations"), "ion:sync-outline", "/flow/automations")
     ]
-    # FLOW-F22 and FLOW-F23: the worker runs them every minute as the system (cron in UTC): phase 1 on
-    # its one fixed scope, phase 2 on every hub.
+    # FLOW-F22 and FLOW-F23: the worker runs them every minute as the system (cron in UTC), in each business it
+    # serves, in its database and on its scope (base.worker._serve_hub).
     scheduled_tasks = [
         {
             "name": "fire_due",

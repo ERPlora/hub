@@ -1153,20 +1153,11 @@ msgstr "Eventos AEAT recientes"
 
 #: apps/verifactu/queries.py
 msgid ""
-"VeriFactu still has 1 record to send to the AEAT. Wait until it is sent or "
-"fix it before turning it off."
+"VeriFactu can't be turned off once it's on: the law requires your invoices "
+"to keep reaching the AEAT."
 msgstr ""
-"VeriFactu aún tiene 1 registro por enviar a la AEAT. Espera a que se envíe o "
-"arréglalo antes de desactivarla."
-
-#: apps/verifactu/queries.py
-#, python-format
-msgid ""
-"VeriFactu still has %(count)s records to send to the AEAT. Wait until they "
-"are sent or fix them before turning it off."
-msgstr ""
-"VeriFactu aún tiene %(count)s registros por enviar a la AEAT. Espera a que se "
-"envíen o arréglalos antes de desactivarla."
+"VeriFactu no se puede desactivar una vez activada: la ley obliga a que tus "
+"facturas sigan llegando a la AEAT."
 
 #: apps/verifactu/queries.py
 msgid "VeriFactu is only for businesses in Spain."

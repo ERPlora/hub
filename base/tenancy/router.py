@@ -15,7 +15,7 @@ does.
 ``allow_relation`` compares databases, not aliases (``hub_x`` and ``hub_x__ddl`` are one database). ``allow_migrate``:
 control's models (and the outbox's, contextual) on ``default``; a hub's only on a migrator's ``…__ddl`` alias, never on
 ``default``: since S5 control holds control's tables alone (phase 1's businesses got their own databases,
-``base.tenancy.cut``; the tables they left in control are never migrated again, a contract migration renames them).
+``base.tenancy.cut``; the tables they left in control are never migrated again, ``control/0007`` renames them).
 """
 
 from django.db import DEFAULT_DB_ALIAS, connections

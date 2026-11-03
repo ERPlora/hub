@@ -558,3 +558,110 @@ def test_the_control_database_is_never_limited():
 
     assert timeout != "5s"
     assert limits._limiters == {}
+
+
+# ── ERPlora's own hub: no photo, no plan, limits of its own ───────────────────────────────────────────────────────────
+
+
+#: Standard's at once, what PgBouncer gives each database in prod; twice the paid plans' statement timeout.
+THE_PLATFORM_S = limits.PlanLimits(max_transactions=6, statement_timeout_seconds=30)
+PLATFORM_ALIAS = "hub_" + "e" * 32
+
+
+def row_of(*, is_platform, state=None, version=0, pk=ACME):
+    """A registry's row as ``use_hub`` hands it: the platform hub stays on ``state_version`` 0 for ever."""
+    return SimpleNamespace(pk=pk, is_demo=False, is_platform=is_platform, state=state or {}, state_version=version)
+
+
+def free_warnings(caplog):
+    return [record.getMessage() for record in caplog.records if "base.hub_limits_free" in record.getMessage()]
+
+
+def test_the_platform_hub_needs_no_photo_for_limits_of_its_own_and_is_never_told_free(caplog, settings):
+    caplog.set_level(logging.WARNING, logger="base.tenancy.limits")
+    settings.PGBOUNCER_MAX_DB_CONNECTIONS = 6
+
+    limiter = limits.configure(PLATFORM_ALIAS, row_of(is_platform=True))
+
+    assert limiter.limits == THE_PLATFORM_S
+    assert free_warnings(caplog) == []
+
+
+@pytest.mark.parametrize(
+    ("ceiling", "at_once"),
+    [(6, 6), (3, 3), (1, 1), (12, 6), (0, 6), (-1, 6)],
+    ids=["prod", "fewer", "one", "more-than-it-asks", "ceiling-zero", "ceiling-negative"],
+)
+def test_the_platform_hub_never_passes_pgbouncer_and_a_senseless_ceiling_leaves_it_bounded(settings, ceiling, at_once):
+    settings.PGBOUNCER_MAX_DB_CONNECTIONS = ceiling
+
+    limiter = limits.configure(PLATFORM_ALIAS, row_of(is_platform=True))
+
+    assert limiter.limits == limits.PlanLimits(at_once, THE_PLATFORM_S.statement_timeout_seconds)
+
+
+@pytest.mark.parametrize(
+    "state",
+    [
+        {"plan": FREE_PLAN},
+        {"plan": {"slug": "pro", "max_db_connections": 12, "statement_timeout_seconds": 15}},
+        {"plan": {"slug": "broken", "max_db_connections": 0}},
+        {"plan": "standard"},
+    ],
+    ids=["free", "pro", "broken", "not-a-plan"],
+)
+def test_a_photo_changes_nothing_on_the_platform_hub(caplog, settings, state):
+    """What it gets comes from its row: whatever a photo said, it is no plan's customer."""
+    caplog.set_level(logging.WARNING, logger="base.tenancy.limits")
+    settings.PGBOUNCER_MAX_DB_CONNECTIONS = 6
+
+    limiter = limits.configure(PLATFORM_ALIAS, row_of(is_platform=True, state=state, version=7))
+
+    assert limiter.limits == THE_PLATFORM_S
+    assert free_warnings(caplog) == []
+
+
+def test_a_business_is_not_the_platform_hub_whatever_its_photo_says(caplog):
+    caplog.set_level(logging.WARNING, logger="base.tenancy.limits")
+
+    without_a_photo = limits.configure("hub_" + "1" * 32, row_of(is_platform=False))
+    on_starter = limits.configure("hub_" + "2" * 32, row_of(is_platform=False, state={"plan": STARTER}, version=1))
+    no_field_at_all = limits.configure("hub_" + "3" * 32, photo())
+
+    assert without_a_photo.limits == limits.FREE
+    assert on_starter.limits == limits.PlanLimits(3, 15)
+    assert no_field_at_all.limits == limits.FREE
+    assert len(free_warnings(caplog)) == 2
+
+
+def test_a_limiter_made_before_the_row_came_takes_the_platform_s_limits_at_its_first_use(settings):
+    """``limiter_for`` makes one of Free's at version -1, for nobody: the first ``use_hub``, at version 0, corrects it."""
+    settings.PGBOUNCER_MAX_DB_CONNECTIONS = 6
+    early = limits.limiter_for(PLATFORM_ALIAS)
+    assert (early.limits, early.version, early.hub_id) == (limits.FREE, -1, None)
+
+    limiter = limits.configure(PLATFORM_ALIAS, row_of(is_platform=True))
+
+    assert limiter is early
+    assert (limiter.limits, limiter.version, limiter.hub_id) == (THE_PLATFORM_S, 0, ACME)
+
+
+def test_the_platform_hub_stays_on_version_zero_with_its_limits_at_every_use(caplog, settings):
+    caplog.set_level(logging.WARNING, logger="base.tenancy.limits")
+    settings.PGBOUNCER_MAX_DB_CONNECTIONS = 6
+    row = row_of(is_platform=True)
+
+    first = limits.configure(PLATFORM_ALIAS, row)
+    again = limits.configure(PLATFORM_ALIAS, row)
+
+    assert again is first
+    assert (again.limits, again.version) == (THE_PLATFORM_S, 0)
+    assert free_warnings(caplog) == []
+
+
+def test_the_platform_hub_is_measured_as_any_business(heard):
+    limiter = limits.configure(PLATFORM_ALIAS, row_of(is_platform=True))
+
+    limiter.take(wait=0).release()
+
+    assert heard.peaks == [(ACME, 1)]

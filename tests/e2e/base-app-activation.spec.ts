@@ -467,7 +467,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       const refused = testid(page, 'apps-refused');
       await expect(refused).toContainText('No se ha cambiado nada');
       await expect(refused).toContainText(
-        /VeriFactu aún tiene (1 registro|\d+ registros) por enviar a la AEAT\. Espera a que se envíe?n? o arréglalos? antes de desactivarla\./,
+        'VeriFactu no se puede desactivar una vez activada: la ley obliga a que tus facturas sigan llegando a la AEAT.',
       );
       await expect(appRow(page, 'verifactu').locator('[data-testid="apps-state"]')).toHaveText('Activa');
       expect([stored('verifactu'), stored('invoice')], 'nothing written').toEqual(before);
