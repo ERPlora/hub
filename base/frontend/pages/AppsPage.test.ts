@@ -44,6 +44,7 @@ function app(id: string, fields: Partial<AppRow> = {}): AppRow {
     path: `/${id}/home`,
     requires: [],
     required_by: [],
+    refusal: null,
     ...fields,
   };
 }
@@ -516,6 +517,65 @@ describe('AppsPage', () => {
       expect(refused(m).text()).toContain('Flows could not be changed: Boom.');
       expect(toastError).not.toHaveBeenCalled();
       expect(m.wrapper.find('[data-testid="apps-row-flow-toggle"]').attributes('disabled')).toBeUndefined();
+    });
+
+    describe('what an app refuses is said beforehand (hub#618, hub#694)', () => {
+      const NEVER_OFF = 'VeriFactu can’t be turned off once it’s on.';
+      const ONLY_THERE = 'VeriFactu is only for businesses in Spain.';
+      const row = (m: Awaited<ReturnType<typeof open>>, id: string) => m.wrapper.find(`[data-testid="apps-row"][data-id="${id}"]`);
+
+      it('one on that never goes off offers no «Turn off», says why and stays «Active»', async () => {
+        const m = await open('/apps');
+        await m.result(m.call, 'base.app.list', {
+          ...LIST,
+          apps: [app('verifactu', { name: 'VeriFactu', refusal: NEVER_OFF }), TAX],
+        });
+
+        expect(m.wrapper.find('[data-testid="apps-row-verifactu-toggle"]').exists()).toBe(false);
+        expect(row(m, 'verifactu').find('[data-testid="apps-refusal"]').text()).toBe(NEVER_OFF);
+        expect(row(m, 'verifactu').find('[data-testid="apps-state"]').text()).toBe('Active');
+        // «Open» is still there: only turning it off is refused.
+        expect(m.wrapper.find('[data-testid="apps-row-verifactu-open"]').exists()).toBe(true);
+        // The app next to it goes on as ever.
+        expect(m.wrapper.find('[data-testid="apps-row-tax-toggle"]').text()).toContain('Turn off');
+        expect(row(m, 'tax').find('[data-testid="apps-refusal"]').exists()).toBe(false);
+      });
+
+      it('one off that does not go on offers no «Turn on» and says it is not available, and why', async () => {
+        const m = await open('/apps#all');
+        await m.result(m.call, 'base.app.list', {
+          ...LIST,
+          apps: [app('verifactu', { name: 'VeriFactu', state: 'off', chosen: false, path: null, refusal: ONLY_THERE })],
+        });
+
+        expect(m.wrapper.find('[data-testid="apps-row-verifactu-toggle"]').exists()).toBe(false);
+        expect(row(m, 'verifactu').find('[data-testid="apps-state"]').text()).toBe('Not available');
+        expect(row(m, 'verifactu').find('[data-testid="apps-refusal"]').text()).toBe(ONLY_THERE);
+      });
+
+      it('in Spanish too', async () => {
+        const m = await open('/apps#all', { locale: 'es' });
+        await m.result(m.call, 'base.app.list', {
+          ...LIST,
+          apps: [app('verifactu', { name: 'VeriFactu', state: 'off', chosen: false, path: null, refusal: ONLY_THERE })],
+        });
+
+        expect(row(m, 'verifactu').find('[data-testid="apps-state"]').text()).toBe('No disponible');
+      });
+
+      it('who does not run the business can do nothing about it: not the reason, only that it is not available', async () => {
+        const m = await open('/apps#all', { session: EMPLOYEE });
+        await m.result(m.call, 'base.app.list', {
+          ...LIST,
+          apps: [
+            app('verifactu', { name: 'VeriFactu', state: 'off', chosen: false, path: null, refusal: ONLY_THERE }),
+            app('invoice', { name: 'Invoicing', refusal: NEVER_OFF }),
+          ],
+        });
+
+        expect(m.wrapper.find('[data-testid="apps-refusal"]').exists()).toBe(false);
+        expect(row(m, 'verifactu').find('[data-testid="apps-state"]').text()).toBe('Not available');
+      });
     });
 
     it('who does not run the business turns nothing on or off', async () => {
