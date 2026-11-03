@@ -8,7 +8,7 @@
 // page from the row (their PIN and badge). On a phone each person is a card. A list that cannot be read says so.
 // Both links leave the Hub by `openExternalLink` (gh:hub#439: the installed app opens nothing on a `_blank` link, its
 // system browser does), and «Invite on erplora.com», a way to erplora.com's panel, never in the Google Play copy
-// (`managementOffered`, as «erplora.com» of the bar, gh:hub#1897).
+// (`managementOffered`, as «Manage on erplora.com» at the menu's foot, gh:hub#1897).
 import { DataTable, type DataTableColumn, InlineFeedback, StatusPill } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
 import { HubIcon, openExternalLink, useSession, useSurface } from '@erplora/ui/shell';

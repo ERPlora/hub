@@ -16,7 +16,7 @@
   "base-assistant.spec.ts": 1,
   "base-bell-clock.spec.ts": 1,
   "base-blocking-strip.spec.ts": 1,
-  "base-chrome.spec.ts": 5,
+  "base-chrome.spec.ts": 4,
   "base-data.spec.ts": 1,
   "base-deep-link.spec.ts": 1,
   "base-employees.spec.ts": 1,
