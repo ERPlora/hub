@@ -47,6 +47,7 @@ from apps.sale.schemas import (
     SaleByKeyIn,
     SaleListIn,
     SalePrintIn,
+    LetterheadIn,
     SaleRefIn,
     SettingsPatchIn,
     VoidIn,
@@ -298,6 +299,11 @@ async def settings_update(request, data: SettingsPatchIn):
 @bind(router, "sale.pos_settings.get", "/sale/pos_settings")
 async def pos_settings_get(request):
     return await run_operation(request, queries.get_pos_settings)
+
+
+@bind(router, "sale.letterhead.get", "/sale/letterhead")
+async def letterhead_get(request, params: Query[LetterheadIn]):
+    return await run_operation(request, queries.get_letterhead, params)
 
 
 # Departments and quick notes

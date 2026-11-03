@@ -150,7 +150,8 @@ class SettingsFields(Schema):
     )
     receipt_header: str = Field(
         max_length=1000,
-        description="Receipt header: first line the name, the rest the address.",
+        description="Lines the paper adds under the issuer's name, tax ID and address; without an issuer, first line "
+        "the name, the rest the address.",
     )
     receipt_footer: str = Field(max_length=1000, description="Receipt footer.")
     receipt_footer_image: str = Field(
@@ -216,7 +217,8 @@ class SettingsPatchIn(Closed):
     receipt_header: str | None = Field(
         None,
         max_length=1000,
-        description="Receipt header: first line the name, the rest the address.",
+        description="Lines the paper adds under the issuer's name, tax ID and address; without an issuer, first line "
+        "the name, the rest the address.",
     )
     receipt_footer: str | None = Field(
         None, max_length=1000, description="Receipt footer."
@@ -1156,6 +1158,19 @@ class PaperOut(Schema):
     printer: str | None = Field(description="The printer it went to.")
 
 
+class LetterheadIn(Schema):
+    sale_id: UUID | None = Field(
+        None, description="The sale whose paper it heads: its fiscal document's issuer. None: today's, for a bill."
+    )
+
+
+class LetterheadOut(Schema):
+    sale_id: UUID | None = Field(description="The sale it was asked for, if any.")
+    name: str = Field(description="The business's name on paper: the issuer's legal name.")
+    tax_id: str = Field(description="The business's tax ID; empty without an issuer.")
+    lines: list[str] = Field(description="What goes under the name: the address, then the receipt header's lines.")
+
+
 class SaleOut(Schema):
     id: UUID = Field(description="The sale's id.")
     number: str = Field(description="Its number, AAAAMMDD-NNNN.")
@@ -1165,6 +1180,8 @@ class SaleOut(Schema):
     order_id: UUID | None = Field(description="The check it came from.")
     customer_id: UUID | None = Field(description="The customer's card.")
     customer_name: str = Field(description="The customer's name as printed.")
+    customer_tax_id: str = Field(description="The recipient's tax ID, on a full invoice; empty on a ticket.")
+    customer_address: str = Field(description="The recipient's address, on a full invoice; empty on a ticket.")
     staff_id: UUID | None = Field(description="Who served it.")
     appointment_id: UUID | None = Field(description="The appointment it charged.")
     tax_included: bool = Field(description="Prices include VAT.")
