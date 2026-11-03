@@ -3,9 +3,10 @@
 // «Charge» is whole inside the drawer and above the section tab bar, and a finger on it reaches it (on a 320x568
 // phone it lay under the tab bar: the tap fell on «Quick notes»); what sits between the bar and the foot scrolls, so
 // the check's line is reached too; the controls of the check's bar never sit on one
-// another, nor does their text spill out of them («Assign customer» sat on «Open checks»); and the charge sheet opened
-// from there shows its whole cash keypad above its foot as soon as it opens where it fits (375x667: the last row
-// peeked half under «Charge»), and once scrolled to its end where it does not (320x568). The worst case of a real
+// another, nor does their text spill out of them («Assign customer» sat on «Open checks»), and the customer's button
+// keeps its words wherever two lines of them fit, as it always read there; and the charge sheet opened from there
+// shows its whole cash keypad above its foot as soon as it opens (375x667: the last row peeked half under «Charge»;
+// 320x568: three rows lay under it). A tablet and a desktop keep what they had. The worst case of a real
 // business: the red strip of a hub that cannot issue invoices yet takes 138 px over the till (hub `a`'s issuer is
 // parked for the run and put back after it), with Tables and Kitchen on (their button and the «Check» / «Current
 // order» tabs). What a run creates, its product `E2E-CARTFIT-<run>` and its check, is deleted after it.
@@ -20,10 +21,17 @@ const KEY = 'FIX-HUB-630-CART-PHONE';
 const PARKED = 'e2e_sale_cart_phone_fit_issuer';
 const RUN = stamp();
 const SIZES = [
-  /** The narrowest phone (an iPhone SE of the first generation): the sheet's keypad is reached by scrolling it. */
-  { label: '320x568', width: 320, height: 568, keypadOnOpen: false },
-  /** The fleet's low phone (an iPhone SE): the whole keypad fits the sheet as it opens. */
-  { label: '375x667', width: 375, height: 667, keypadOnOpen: true },
+  /** The narrowest phone (an iPhone SE of the first generation): the customer's button is only its icon. */
+  { label: '320x568', width: 320, height: 568, customerText: false },
+  /** The commonest Android width, with the least room where the button still has its words. */
+  { label: '360x640', width: 360, height: 640, customerText: true },
+  /** The fleet's low phone (an iPhone SE). */
+  { label: '375x667', width: 375, height: 667, customerText: true },
+] as const;
+/** Where the check is not a phone's low drawer: nothing of this fix may change what they read. */
+const WIDE = [
+  { label: '820x1180', width: 820, height: 1180 },
+  { label: '1440x900', width: 1440, height: 900 },
 ] as const;
 /** A fraction of a pixel of rounding between two boxes that touch. */
 const EDGE = 0.5;
@@ -170,22 +178,58 @@ async function keysAboveFoot(sheet: Locator, where: string): Promise<void> {
   for (const key of places.keys) expect.soft(key.bottom, `«${key.id}» above the foot at ${where}`).toBeLessThanOrEqual(places.foot + EDGE);
 }
 
-/** The sheet's scroller at its end (again until it holds: a scroll while the sheet still grows into place is lost). */
-async function toTheEnd(sheet: Locator): Promise<void> {
-  const box = sheet.locator('.sale-checkout');
-  await expect
-    .poll(() => box.evaluate((el) => (el.scrollTo({ top: el.scrollHeight }), el.scrollHeight - el.clientHeight - el.scrollTop)), {
-      message: 'the sheet scrolled to its end',
-    })
-    .toBeLessThanOrEqual(1);
+/** The customer's button: its words whole inside it where it has them, only its icon and its name where it does not. */
+async function customerButton(page: Page, name: string, hasText: boolean, where: string): Promise<void> {
+  const trigger = shown(page).locator('[data-testid=pos-cart] [data-testid=customer-search-trigger]');
+  const label = trigger.locator('.customer-search__label');
+  // Ionic hands the host's aria-label to its native button: the name a screen reader reads.
+  const read = await trigger.evaluate((el) => el.shadowRoot?.querySelector('button')?.getAttribute('aria-label') ?? el.getAttribute('aria-label'));
+  expect(read, `the button is named at ${where}`).toBe(name);
+  if (!hasText) {
+    await expect(label, `only its icon at ${where}`).toBeHidden();
+    return;
+  }
+  await expect(label, `its words at ${where}`).toBeVisible();
+  // No line cut away: as tall as it would be with no limit of lines (a word too wide for the button breaks into one more).
+  const cut = await label.evaluate((el) => {
+    const limited = el.getBoundingClientRect().height;
+    el.style.setProperty('-webkit-line-clamp', 'none');
+    const whole = el.getBoundingClientRect().height;
+    el.style.removeProperty('-webkit-line-clamp');
+    return whole - limited;
+  });
+  expect.soft(cut, `its words whole at ${where}`).toBeLessThanOrEqual(0.5);
 }
 
-async function cartFits(page: Page, size: (typeof SIZES)[number], lang: 'en' | 'es'): Promise<void> {
+/** A customer whose name does not fit: two lines at most, ended in «…», inside the button and clear of the next control. */
+async function aLongNameStaysInside(page: Page, where: string): Promise<void> {
+  const trigger = shown(page).locator('[data-testid=pos-cart] [data-testid=customer-search-trigger]');
+  const fit = await trigger.evaluate((el) => {
+    const label = el.querySelector('.customer-search__label') as HTMLElement;
+    const before = label.textContent;
+    label.textContent = 'María del Carmen Fernández de la Peña Rodríguez';
+    const box = el.getBoundingClientRect();
+    const words = label.getBoundingClientRect();
+    const lineHeight = parseFloat(getComputedStyle(label).lineHeight);
+    const checks = el.closest('.pos-toolbar')?.querySelector('[data-testid=pos-open-checks]')?.getBoundingClientRect();
+    const seen = { lines: Math.round(words.height / lineHeight), hidden: label.scrollHeight > label.clientHeight, inside: words.left >= box.left && words.right <= box.right && words.top >= box.top && words.bottom <= box.bottom, clear: !!checks && box.right <= checks.left + 0.5 };
+    label.textContent = before;
+    return seen;
+  });
+  expect.soft(fit.lines, `a long name in two lines at ${where}`).toBeLessThanOrEqual(2);
+  expect.soft(fit.hidden, `the rest of a long name is cut at ${where}`).toBe(true);
+  expect.soft(fit.inside, `a long name inside its button at ${where}`).toBe(true);
+  expect.soft(fit.clear, `a long name clear of «Open checks» at ${where}`).toBe(true);
+}
+
+async function cartFits(page: Page, size: (typeof SIZES)[number], lang: 'en' | 'es', assign: string): Promise<void> {
   const where = `${lang} ${size.label}`;
   await page.setViewportSize({ width: size.width, height: size.height });
   await expect(shown(page).locator('[data-testid=blocking-strip]'), 'the strip of a hub that cannot issue invoices yet').toBeVisible();
   const drawer = await openDrawer(page);
   await barInOrder(page, where);
+  await customerButton(page, assign, size.customerText, where);
+  if (size.customerText) await aLongNameStaysInside(page, where);
   await lineWithinReach(page, where);
   const charge = await chargeWithinReach(page, drawer, where);
   await capture(page, `${KEY}-${lang}-cart-${size.label}`);
@@ -196,11 +240,7 @@ async function cartFits(page: Page, size: (typeof SIZES)[number], lang: 'en' | '
   await expect(sheet.locator('[data-testid=sale-checkout-keypad]')).toBeVisible();
   await expect(sheet.locator('[data-testid=sale-checkout-total]')).toContainText(/\d/);
   await settled(page);
-  if (size.keypadOnOpen) {
-    expect(await sheet.locator('.sale-checkout').evaluate((el) => el.scrollTop), `the sheet as it opens at ${where}`).toBe(0);
-  } else {
-    await toTheEnd(sheet);
-  }
+  expect(await sheet.locator('.sale-checkout').evaluate((el) => el.scrollTop), `the sheet as it opens at ${where}`).toBe(0);
   await keysAboveFoot(sheet, where);
   await capture(page, `${KEY}-${lang}-sheet-${size.label}`);
 
@@ -208,6 +248,28 @@ async function cartFits(page: Page, size: (typeof SIZES)[number], lang: 'en' | '
   await expect(sheet).toBeHidden();
   await shown(page).locator('[data-testid=pos-cart-close]').click();
   await expect(drawer).toBeHidden();
+}
+
+/** The tablet's drawer and the desktop's column: the button in one line, «Charge» in reach, and the line in view. */
+async function wideKeepsItsBar(page: Page, size: (typeof WIDE)[number], lang: 'en' | 'es', assign: string): Promise<void> {
+  const where = `${lang} ${size.label}`;
+  await page.setViewportSize({ width: size.width, height: size.height });
+  const phone = await tillIsPhone(page);
+  if (phone) await expect(shown(page).locator('[data-testid=pos-cart-drawer]')).toBeHidden();
+  await openTillCart(page);
+  await settled(page);
+  await barInOrder(page, where);
+  await customerButton(page, assign, true, where);
+  const lines = await shown(page).locator('[data-testid=pos-cart] .customer-search__label').evaluate((el) => Math.round(el.getBoundingClientRect().height / parseFloat(getComputedStyle(el).lineHeight)));
+  expect(lines, `the button in one line at ${where}`).toBe(1);
+  await lineWithinReach(page, where);
+  await expect(shown(page).locator('[data-testid=pos-charge]')).toBeVisible();
+  await shown(page).locator('[data-testid=pos-charge]').click({ trial: true, timeout: 5_000 });
+  await capture(page, `${KEY}-${lang}-wide-${size.label}`);
+  if (phone) {
+    await shown(page).locator('[data-testid=pos-cart-close]').click();
+    await expect(shown(page).locator('[data-testid=pos-cart-drawer]')).toBeHidden();
+  }
 }
 
 const LANGUAGES = [
@@ -239,7 +301,13 @@ for (const { name, lang, locale, assign } of LANGUAGES) {
 
     for (const size of SIZES) {
       test(size.label, async () => {
-        await cartFits(page, size, lang);
+        await cartFits(page, size, lang, assign);
+      });
+    }
+
+    for (const size of WIDE) {
+      test(size.label, async () => {
+        await wideKeepsItsBar(page, size, lang, assign);
       });
     }
   });

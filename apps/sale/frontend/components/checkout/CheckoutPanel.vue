@@ -513,8 +513,8 @@ function openDrawer(): void {
   background: var(--ion-background-color, #fff);
 }
 
-/* A low phone (375x667): a tighter head and figure, so the whole cash keypad stands above the foot as the sheet
-   opens; the keys keep their size (hub#630). Lower still (320x568) the sheet scrolls to them. */
+/* A low phone (375x667, 360x640): a tighter sheet, so the whole cash keypad stands above the foot as it opens; the
+   keys and the tap targets keep their size (hub#630). */
 @media (max-width: 820px) and (max-height: 700px) {
   .sheet-h {
     margin-bottom: 0;
@@ -524,6 +524,42 @@ function openDrawer(): void {
   .pay-total {
     margin: 0 0 0.5rem;
     font-size: 2rem;
+  }
+
+  .pay,
+  .pay :deep(.checkout-tender) {
+    gap: 0.6rem;
+  }
+
+  .pay :deep(.pay-methods) {
+    margin-bottom: 0;
+  }
+
+  .sheet-foot {
+    padding: 0.5rem 1rem calc(0.5rem + var(--ion-safe-area-bottom, 0px));
+  }
+}
+
+/* Lower still (320x568): the figure goes up beside the title, between it and «Close» (the foot's «Charge» says it too).
+   Only when nothing stands above it: a note or an error keeps the figure on its own row. */
+@media (max-width: 820px) and (max-height: 620px) {
+  .pay-total:first-child {
+    display: flex;
+    justify-content: flex-end;
+    margin: -2.5rem 2.75rem 0.4rem 4.5rem;
+    font-size: 1.6rem;
+    line-height: 2.5rem;
+    white-space: nowrap;
+  }
+
+  .pay-part,
+  .pay-remaining {
+    margin-top: 0;
+  }
+
+  .pay,
+  .pay :deep(.checkout-tender) {
+    gap: 0.4rem;
   }
 }
 

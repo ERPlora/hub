@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:e976f879d0e7c84e85fbb3d9cae9de09699db6d356774532981fe7c2973dab4a -->
+<!-- generated from WORKBOOK.md sha256:a7f4ad93235c970875970b658a596438fcd0fe38c378fdfe126d2e426f6201af -->
 
 ## What it is for and who it is for
 
@@ -124,8 +124,9 @@ areas:
   if there is one, "Total" (the one the server works out), the discount button, the printer ("Print
   bill") and "Charge · <amount>". In the phone's drawer the top bar and the footer with "Charge" always
   stay in view, above the tab bar, also on a 320×568 phone; what is in between (title, chips, tabs and
-  lines) scrolls. Where the customer button's text does not fit, it keeps only its icon: the customer
-  chip in the heading already names them (hub#630).
+  lines) scrolls. The customer button reads in two lines at most (a longer name ends in "…"); where they
+  do not fit, on a 320 px phone, it keeps only its icon, and the customer chip in the heading already
+  names them (hub#630).
 
 **Speak** (the strip's microphone key; only for whoever may use the assistant and on a device that can
 record): press it and speak. While it records it turns red, is called "Stop" and "Listening…" shows
@@ -282,8 +283,9 @@ Steps:
    button, which shows the total).
 4. In the **Charge** sheet, with cash chosen, enter the amount tendered on the keypad; the change shows
    large above the keypad, in the row that until then asks for the amount, and the keys do not move under
-   the finger while typing (hub#456). On a low phone (375×667) the whole keypad sits above the footer as
-   soon as the sheet opens; on a lower one (320×568), by scrolling the sheet (hub#630).
+   the finger while typing (hub#456). On a low phone, also on a 320×568 one, the whole keypad sits above
+   the footer as soon as the sheet opens; on the 320×568 one the amount moves up beside the title
+   (hub#630).
 5. Press "Charge <total>".
 6. The sheet closes, the check is left empty and the **Sale document** opens with the ticket. With
    **Printing**, the charge asks the queue for the ticket in its very transaction, according to its

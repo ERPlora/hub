@@ -137,8 +137,9 @@ zonas:
   servidor), el botón de descuento, la impresora («Imprimir cuenta») y «Cobrar · <importe>». En el
   cajón del móvil la barra de arriba y el pie con «Cobrar» se quedan siempre a la vista, encima de la
   barra de pestañas, también en un teléfono de 320×568; lo de en medio (título, chips, pestañas y
-  líneas) se desplaza. Donde no cabe el texto del botón de cliente, se queda en su icono: el chip de
-  cliente de la cabecera ya lo nombra (hub#630).
+  líneas) se desplaza. El botón de cliente se lee en dos líneas como mucho (un nombre más largo termina
+  en «…»); donde no caben, en un teléfono de 320 px, se queda en su icono, y el chip de cliente de la
+  cabecera ya lo nombra (hub#630).
 
 **Hablar** (la tecla del micrófono de la tira; solo a quien puede usar el asistente y en un dispositivo
 que puede grabar): púlsala y habla. Mientras graba se pone roja, se llama «Parar» y debajo sale
@@ -296,8 +297,9 @@ Pasos:
    flotante, que enseña el total).
 4. En la hoja **Cobro**, con efectivo elegido, marca en el teclado el importe entregado; el cambio
    sale en grande encima del teclado, en la fila que hasta entonces pide el importe, y las teclas no se
-   mueven bajo el dedo mientras se teclea (hub#456). En un móvil bajo (375×667) el teclado entero queda
-   encima del pie en cuanto se abre la hoja; en uno más bajo (320×568), desplazando la hoja (hub#630).
+   mueven bajo el dedo mientras se teclea (hub#456). En un móvil bajo, también en uno de 320×568, el
+   teclado entero queda encima del pie en cuanto se abre la hoja; en el de 320×568 el importe sube junto
+   al título (hub#630).
 5. Pulsa «Cobrar <total>».
 6. La hoja se cierra, la cuenta queda vacía y se abre el **Documento de venta** con el tique. Con
    **Impresión**, el cobro pide el tique a la cola en su misma transacción, según sus ajustes (y, si
