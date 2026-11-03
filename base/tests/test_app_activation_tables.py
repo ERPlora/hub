@@ -103,7 +103,7 @@ def test_an_app_whose_tables_the_hub_lacks_is_creating_and_the_worker_is_rung_af
         for callback in on_the_hub:
             callback()
 
-    assert answer == {"app": "printing", "state": "creating", "chosen": True, "along": []}
+    assert answer == {"app": "printing", "state": "creating", "chosen": True, "along": [], "already": False}
     assert rows_of(hub_a)["printing"] == (CREATING, True)
     assert HubDue.objects.get(hub_id=hub_a.pk).due_at <= timezone.now()
     assert outbox(hub_a) == [(events.APP_ACTIVATION_REQUESTED, {"app": "printing", "along": []})]
@@ -130,7 +130,7 @@ def test_an_app_whose_tables_the_hub_has_is_on_at_once(hub_a):
 
     answer = run(hub_a, "base.app.enable", "printing")
 
-    assert answer == {"app": "printing", "state": "on", "chosen": True, "along": []}
+    assert answer == {"app": "printing", "state": "on", "chosen": True, "along": [], "already": False}
     assert rows_of(hub_a)["printing"] == (ON, True)
     assert not HubDue.objects.filter(hub_id=hub_a.pk).exists()
     assert [name for name, _ in outbox(hub_a)] == [events.APP_ENABLED]
@@ -143,7 +143,7 @@ def test_turning_on_again_one_being_created_changes_nothing_and_rings_again(hub_
     with django_capture_on_commit_callbacks(using=hubs.HUB_A_ALIAS, execute=True):
         answer = run(hub_a, "base.app.enable", "printing")
 
-    assert answer == {"app": "printing", "state": "creating", "chosen": True, "along": []}
+    assert answer == {"app": "printing", "state": "creating", "chosen": True, "along": [], "already": True}
     assert rows_of(hub_a)["printing"] == (CREATING, True)
     assert HubDue.objects.filter(hub_id=hub_a.pk).exists()
     assert outbox(hub_a) == []
@@ -197,7 +197,7 @@ def test_a_failed_app_is_tried_again_by_hand(hub_a, django_capture_on_commit_cal
     with django_capture_on_commit_callbacks(using=hubs.HUB_A_ALIAS, execute=True):
         answer = run(hub_a, "base.app.retry", "printing")
 
-    assert answer == {"app": "printing", "state": "creating", "chosen": True, "along": []}
+    assert answer == {"app": "printing", "state": "creating", "chosen": True, "along": [], "already": False}
     with use_hub(Hub.objects.get(pk=hub_a.pk)):
         row = AppActivation.objects.get(host=hub_a.slug, app="printing")
     assert (row.state, row.next_attempt_at, row.attempts) == (CREATING, None, 3)
@@ -224,6 +224,32 @@ def test_turning_on_a_failed_app_tries_it_again_too(hub_a):
 
     assert answer["state"] == "creating"
     assert rows_of(hub_a)["printing"] == (CREATING, True)
+
+
+@own
+def test_a_failed_app_is_tried_again_by_its_name_as_the_person_says_it(hub_a):
+    """hub#539: ``base.app.retry`` takes the app as ``base.app.enable`` and ``base.app.disable`` do, by its name too."""
+    given(hub_a, printing="failed*")
+
+    answer = run(hub_a, "base.app.retry", "Printing")
+
+    assert answer == {"app": "printing", "state": "creating", "chosen": True, "along": [], "already": False}
+    assert rows_of(hub_a)["printing"] == (CREATING, True)
+
+
+@own
+def test_which_app_a_name_names_tells_it_being_set_up_or_failed_as_the_apps_screen_does(hub_a):
+    """hub#539: ``base.app.get`` (the read before the assistant's card) says the state ``base.app.list`` says."""
+    given(hub_a, printing="creating*", website="failed*", sale="on*", tax="on", customer="on", created=["sale", "tax", "customer"])
+    op = get("base.app.get")
+
+    with use_hub(Hub.objects.get(pk=hub_a.pk)):
+        said = {
+            name: op(as_admin(hub_a), op.input.model_validate({"app": name})).model_dump(mode="json")["state"]
+            for name in ("Printing", "Website", "sale", "Invoicing")
+        }
+
+    assert said == {"Printing": "creating", "Website": "failed", "sale": "on", "Invoicing": "off"}
 
 
 @pytest.mark.django_db
@@ -286,7 +312,7 @@ def test_the_route_answers_202_while_its_tables_are_made_and_200_once_on(client,
         input = AppChangeIn
 
         def __call__(self, ctx, data):
-            return AppChangeOut(app=data.app, state=state, chosen=True, along=[])
+            return AppChangeOut(app=data.app, state=state, chosen=True, along=[], already=False)
 
     monkeypatch.setattr(services, "app_enable", Answering())
     user = get_user_model().objects.create(username="ana")
@@ -299,7 +325,7 @@ def test_the_route_answers_202_while_its_tables_are_made_and_200_once_on(client,
 
     assert (answered.status_code, answered.json()) == (
         status,
-        {"app": "printing", "state": state, "chosen": True, "along": []},
+        {"app": "printing", "state": state, "chosen": True, "along": [], "already": False},
     )
 
 
