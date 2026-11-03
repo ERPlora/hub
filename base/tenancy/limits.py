@@ -10,7 +10,7 @@ restart; an older or equal one changes nothing.
 
 ERPlora's own hub (``Hub.is_platform``) is nobody's customer: the SaaS does not know it, so it has no photo and never will,
 and its row says what it gets, :data:`PLATFORM`, whatever a photo said. :func:`hub_limits` is that rule, the one the limiter
-and what the owner reads (``base.queries``) both follow.
+and ``base.plan.usage`` both follow.
 
 No plan gets more at once than PgBouncer gives each database (``settings.PGBOUNCER_MAX_DB_CONNECTIONS``): 6 in prod, so
 a Pro's 12 are 6 here. Past that, a transaction would wait 10 s in PgBouncer and fail with no ``base.hub_busy``, which
