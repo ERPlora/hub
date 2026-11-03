@@ -1,6 +1,7 @@
 // The foot of the charge sheet (SALE-F01–F06): one button that says what it does and for how much —
 // «Charge €42.50», «Charge €42.50 by card», «Charging…» while it goes —; when it cannot charge yet, the
-// reason written above it and its short form on the button, which stays tappable and answers; a refusal
+// reason written above it (those the keypad's keys change are written over the keypad: CheckoutTender) and
+// its short form on the button, which stays tappable and answers; a refusal
 // in the server's words; a lost answer said as such, with «Check in Sales» when nobody knows.
 import { HubIcon } from '@erplora/ui/shell';
 import { describe, expect, it } from 'vitest';
@@ -63,10 +64,17 @@ describe('CheckoutFoot: the button', () => {
 });
 
 describe('CheckoutFoot: why it cannot charge', () => {
-  it('cash with nothing typed: the reason above, and the button keeps the amount', async () => {
+  it('cash with nothing typed: the button keeps the amount, and a tap answers what to do', async () => {
     const s = await setup(block({ kind: 'tenderedMissing' }));
-    expect(s.reason().text()).toBe('Enter the amount tendered on the keypad');
     expect([s.label(), s.confirm().getAttribute('aria-disabled'), s.confirm().disabled]).toEqual(['Charge €42.50', 'true', false]);
+    await click(s.confirm());
+    expect(s.wrapper.emitted('blocked')).toEqual([[{ kind: 'tenderedMissing' }, 'Enter the amount tendered on the keypad']]);
+  });
+
+  it('hub#456: what the keys change is not written here: the foot keeps its height while the amount is typed', async () => {
+    for (const kind of ['tenderedMissing', 'tenderedShort'] as const) {
+      expect((await setup(block({ kind }))).reason().exists(), kind).toBe(false);
+    }
   });
 
   it('a tap on a blocked button answers with the reason instead of charging', async () => {
@@ -78,7 +86,7 @@ describe('CheckoutFoot: why it cannot charge', () => {
 
   it('says each reason, short on the button and whole above it', async () => {
     const cases: [ChargeBlock, string, string | null][] = [
-      [{ kind: 'tenderedShort' }, 'The amount tendered does not cover the total', 'The amount tendered does not cover the total'],
+      [{ kind: 'tenderedShort' }, 'The amount tendered does not cover the total', null],
       [{ kind: 'remaining', amount: 2250 }, '€22.50 still to cover', '€22.50 still to cover before the sale can be charged.'],
       [{ kind: 'cashLimit', limit: 100000 }, 'Cash not allowed', 'The law does not allow cash for sales of €1,000.00 or more. Charge it by card or Bizum.'],
       [{ kind: 'recipient' }, "Enter the customer's details", null],
@@ -157,7 +165,9 @@ describe('CheckoutFoot: Spanish', () => {
     expect((await setup({ busy: true }, 'es')).label()).toBe('Cobrando…');
     expect((await setup(block({ kind: 'remaining', amount: 2250 }), 'es')).label()).toBe('Faltan 22,50 €');
     expect((await setup(block({ kind: 'recipient' }), 'es')).label()).toBe('Faltan los datos del cliente');
-    expect((await setup(block({ kind: 'tenderedMissing' }), 'es')).reason().text()).toBe('Marca en el teclado el importe entregado');
+    const missing = await setup(block({ kind: 'tenderedMissing' }), 'es');
+    await click(missing.confirm());
+    expect(missing.wrapper.emitted('blocked')).toEqual([[{ kind: 'tenderedMissing' }, 'Marca en el teclado el importe entregado']]);
     expect((await setup(block({ kind: 'tenderedShort' }), 'es')).label()).toBe('Lo entregado no cubre el total');
     const unknown = await setup({ failure: { kind: 'unknown' } }, 'es');
     expect(unknown.error().text()).toBe('No hemos podido confirmar si el cobro se completó. Compruébalo en Ventas antes de volver a cobrar.');

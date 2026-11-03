@@ -4,7 +4,7 @@
 // whatever the screen says; this only spares the trip and says it before the tap.
 import { describe, expect, it } from 'vitest';
 
-import { type BlockState, chargeBlock } from './blocks';
+import { type BlockState, chargeBlock, tenderReason } from './blocks';
 import type { Leg, TenderMethod } from './tender';
 
 const CASH: TenderMethod = { id: 'm-cash', display_name: 'Cash', type: 'cash', requires_change: true };
@@ -77,5 +77,16 @@ describe('chargeBlock', () => {
   it('a business that requires a customer blocks without one, before anything else', () => {
     expect(chargeBlock({ ...READY, requireCustomer: true, documentType: 'invoice', typed: 0 })).toEqual({ kind: 'customerRequired' });
     expect(chargeBlock({ ...READY, requireCustomer: true, hasCustomer: true })).toBeNull();
+  });
+});
+
+describe('tenderReason', () => {
+  it('names only the reasons the keys of the keypad change: nothing tendered and too little', () => {
+    expect(tenderReason({ kind: 'tenderedMissing' })).toBe('tenderedMissing');
+    expect(tenderReason({ kind: 'tenderedShort' })).toBe('tenderedShort');
+    expect(tenderReason({ kind: 'remaining', amount: 100 })).toBeNull();
+    expect(tenderReason({ kind: 'customerRequired' })).toBeNull();
+    expect(tenderReason({ kind: 'cashLimit', limit: 100000 })).toBeNull();
+    expect(tenderReason(null)).toBeNull();
   });
 });

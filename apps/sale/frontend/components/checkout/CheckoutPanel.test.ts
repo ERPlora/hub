@@ -253,8 +253,10 @@ describe('CheckoutPanel: cash (SALE-F01)', () => {
     const s = await setup();
     await s.type('4', '0');
     expect(s.label()).toBe('The amount tendered does not cover the total');
+    expect(s.text('sale-checkout-block-reason')).toBe('The amount tendered does not cover the total');
     await s.type('clear', '5', '0');
     expect(s.text('sale-checkout-change')).toBe('Change €7.50');
+    expect(s.find('sale-checkout-block-reason').exists()).toBe(false);
     expect([s.label(), s.confirm().getAttribute('aria-disabled')]).toEqual(['Charge €42.50', null]);
   });
 
@@ -481,6 +483,15 @@ describe('CheckoutPanel: a business that requires a customer (SALE-F05)', () => 
     await click(s.find('sale-checkout-method-m-card').element);
     expect(s.label()).toBe('Customer required');
     expect(s.text('sale-checkout-block-reason')).toBe('This business requires a customer on every sale. Choose one to carry on with the charge.');
+  });
+
+  it('in cash, that one reason is the only one on the sheet, and the keys still give the change', async () => {
+    const s = await setup({ settings: { ...SETTINGS, require_customer: true } });
+    expect(s.wrapper.findAll('[data-testid="sale-checkout-block-reason"]').map((reason) => reason.text())).toEqual([
+      'This business requires a customer on every sale. Choose one to carry on with the charge.',
+    ]);
+    await s.type('5', '0');
+    expect(s.text('sale-checkout-change')).toBe('Change €7.50');
   });
 });
 

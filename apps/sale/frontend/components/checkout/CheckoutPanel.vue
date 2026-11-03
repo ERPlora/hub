@@ -358,6 +358,7 @@ function openDrawer(): void {
           :change="tender.change.value"
           :total="total"
           :remaining="tender.remaining.value"
+          :block="block"
           @pick="pick"
           @key="tender.press"
           @split="tender.startSplit"
