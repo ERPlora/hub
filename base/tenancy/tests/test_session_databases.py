@@ -30,7 +30,9 @@ KEPT_TABLE = "kept_from_the_last_run"
 
 def _databases_of(session: str) -> set[str]:
     with hubs._maintenance() as conn:
-        return {row[0] for row in conn.execute("SELECT datname FROM pg_database WHERE starts_with(datname, %s)", [session])}
+        return {
+            row[0] for row in conn.execute("SELECT datname FROM pg_database WHERE starts_with(datname, %s)", [session])
+        }
 
 
 @pytest.fixture
@@ -115,7 +117,9 @@ def test_a_lone_test_follows_the_session_s_options_on_its_database(session_name,
     with hubs._maintenance(session) as conn:
         conn.execute(sql.SQL("CREATE TABLE {} ()").format(sql.Identifier(KEPT_TABLE)))
 
-    _assert_passed({log: _start(session, "test_ask_for_the_test_database", log, *options, SESSION_PROBE_REPORT=str(report))})
+    _assert_passed(
+        {log: _start(session, "test_ask_for_the_test_database", log, *options, SESSION_PROBE_REPORT=str(report))}
+    )
 
     assert json.loads(report.read_text()) == {"default": session}
     # Kept at the end with --reuse-db as pytest-django keeps its own; made anew with --create-db.
