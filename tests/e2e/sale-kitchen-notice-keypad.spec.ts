@@ -9,19 +9,13 @@
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, capture, login, psql, shown, untilStill } from './helpers';
-import { cleanInventory, createProduct, type Product } from './inventory-helpers';
-import { type Box, cleanSales, drawerOff, holdNotices, noticeBox, openTillCart, restoreDrawer, stamp } from './sale-helpers';
+import { cleanInventory, type Product } from './inventory-helpers';
+import { type Box, cleanSales, dishForTheTill, eachNoticeSize, holdNotices, noticeBox, openTillCart, restoreDrawer, stamp } from './sale-helpers';
 
 const KEY = 'FIX-HUB-732-NOTICE';
 const RUN = stamp();
 /** The default of `toast()`. */
 const NOTICE_MS = 2600;
-const SIZES = [
-  { label: '1440x900', width: 1440, height: 900 },
-  { label: '820x1180', width: 820, height: 1180 },
-  { label: '375x667', width: 375, height: 667 },
-  { label: '320x568', width: 320, height: 568 },
-] as const;
 const LANGUAGES = [
   { name: 'English', lang: 'en', locale: 'en-US', sent: 'Order 1 sent to the kitchen.', separator: '.' },
   { name: 'Spanish', lang: 'es', locale: 'es-ES', sent: 'Comanda 1 enviada a cocina.', separator: ',' },
@@ -53,13 +47,7 @@ function cleanUp(): void {
 
 test.beforeAll(async ({ browser }) => {
   cleanUp();
-  const context = await browser.newContext({ baseURL: A });
-  const page = await context.newPage();
-  await login(page, A, '/sale/pos');
-  // Cash without a cash session: the drawer's lock is sale-cash-gate.spec.ts's.
-  await drawerOff(context);
-  dish = await createProduct(context, { name: `E2E KNOTICE Dish ${RUN}`, sku: `E2E-KNOTICE-${RUN}`, price: 700, tax_category_key: 'restaurant.food' });
-  await context.close();
+  dish = await dishForTheTill(browser, 'KNOTICE', RUN);
 });
 
 test.afterAll(() => {
@@ -106,36 +94,28 @@ async function tap(page: Page, sheet: Locator, key: string): Promise<void> {
 
 for (const { name, lang, locale, sent, separator } of LANGUAGES) {
   test.describe(`SALE-F01, SALE-F20: in ${name}, the kitchen's notice leaves the keypad of the charge sheet free`, () => {
-    for (const size of SIZES) {
-      test(size.label, async ({ browser }) => {
-        const context = await browser.newContext({ baseURL: A, locale, viewport: { width: size.width, height: size.height } });
-        try {
-          const page = await context.newPage();
-          const sheet = await chargeUnsentDish(page, context, lang);
-          const notice = page.locator('ion-toast').filter({ hasText: sent });
-          await expect(sheet.locator('[data-testid=sale-checkout-keypad]')).toBeVisible();
-          await expect(notice, 'the notice is on screen with the sheet').toBeVisible();
-          await untilStill(page);
-          await capture(page, `${KEY}-${lang}-${size.label}`);
+    eachNoticeSize(locale, async (page, context, size) => {
+      const sheet = await chargeUnsentDish(page, context, lang);
+      const notice = page.locator('ion-toast').filter({ hasText: sent });
+      await expect(sheet.locator('[data-testid=sale-checkout-keypad]')).toBeVisible();
+      await expect(notice, 'the notice is on screen with the sheet').toBeVisible();
+      await untilStill(page);
+      await capture(page, `${KEY}-${lang}-${size.label}`);
 
-          const { answers, keypad, toast } = await read(sheet, notice);
-          for (const [key, answer] of Object.entries(answers)) expect.soft(answer, `the middle of «${key}» at ${size.label}`).toBe('the key');
-          const overKeys = toast.top < keypad.bottom && toast.bottom > keypad.top && toast.left < keypad.right && toast.right > keypad.left;
-          expect.soft(overKeys, `the notice ${JSON.stringify(toast)} clear of the keypad ${JSON.stringify(keypad)}`).toBe(false);
-          expect.soft(toast.top, 'the notice whole on screen, at the top').toBeGreaterThanOrEqual(0);
-          expect.soft(toast.bottom, 'the notice whole on screen, at the bottom').toBeLessThanOrEqual(size.height);
-          expect.soft(toast.right - toast.left, 'the notice not squeezed').toBeGreaterThan(200);
+      const { answers, keypad, toast } = await read(sheet, notice);
+      for (const [key, answer] of Object.entries(answers)) expect.soft(answer, `the middle of «${key}» at ${size.label}`).toBe('the key');
+      const overKeys = toast.top < keypad.bottom && toast.bottom > keypad.top && toast.left < keypad.right && toast.right > keypad.left;
+      expect.soft(overKeys, `the notice ${JSON.stringify(toast)} clear of the keypad ${JSON.stringify(keypad)}`).toBe(false);
+      expect.soft(toast.top, 'the notice whole on screen, at the top').toBeGreaterThanOrEqual(0);
+      expect.soft(toast.bottom, 'the notice whole on screen, at the bottom').toBeLessThanOrEqual(size.height);
+      expect.soft(toast.right - toast.left, 'the notice not squeezed').toBeGreaterThan(200);
 
-          // The amount, typed with the notice on screen: the last row's keys take the finger too.
-          for (const key of ['1', '0', 'dot', '5']) await tap(page, sheet, key);
-          await expect.soft(sheet.locator('[data-testid=sale-checkout-tendered]'), 'tendered').toContainText(`10${separator}50`);
-          await expect.soft(notice, 'the notice still on screen while typing').toBeVisible();
-          await tap(page, sheet, 'clear');
-          await expect.soft(sheet.locator('[data-testid=sale-checkout-tendered]'), 'cleared').not.toContainText(`10${separator}50`);
-        } finally {
-          await context.close();
-        }
-      });
-    }
+      // The amount, typed with the notice on screen: the last row's keys take the finger too.
+      for (const key of ['1', '0', 'dot', '5']) await tap(page, sheet, key);
+      await expect.soft(sheet.locator('[data-testid=sale-checkout-tendered]'), 'tendered').toContainText(`10${separator}50`);
+      await expect.soft(notice, 'the notice still on screen while typing').toBeVisible();
+      await tap(page, sheet, 'clear');
+      await expect.soft(sheet.locator('[data-testid=sale-checkout-tendered]'), 'cleared').not.toContainText(`10${separator}50`);
+    });
   });
 }

@@ -10,8 +10,8 @@
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, capture, login, psql, settled, shown, untilStill } from './helpers';
-import { cleanInventory, createProduct, type Product } from './inventory-helpers';
-import { type Box, cleanSales, drawerOff, holdNotices, noticeBox, openTillCart, restoreDrawer, stamp, tillIsPhone } from './sale-helpers';
+import { cleanInventory, type Product } from './inventory-helpers';
+import { type Box, cleanSales, dishForTheTill, eachNoticeSize, holdNotices, noticeBox, openTillCart, restoreDrawer, stamp, tillIsPhone } from './sale-helpers';
 
 const KEY = 'FIX-HUB-755-ERROR-NOTICE';
 /** Hub `a`'s issuer, parked while the run needs the strip of a hub that cannot issue invoices yet. */
@@ -19,12 +19,6 @@ const PARKED = 'e2e_sale_kitchen_error_issuer';
 const RUN = stamp();
 /** How long this notice lasts. */
 const NOTICE_MS = 4500;
-const SIZES = [
-  { label: '1440x900', width: 1440, height: 900 },
-  { label: '820x1180', width: 820, height: 1180 },
-  { label: '375x667', width: 375, height: 667 },
-  { label: '320x568', width: 320, height: 568 },
-] as const;
 const LANGUAGES = [
   { name: 'English', lang: 'en', locale: 'en-US', notSent: 'The order could not be sent to the kitchen. Try again.' },
   { name: 'Spanish', lang: 'es', locale: 'es-ES', notSent: 'No se ha podido enviar la comanda a cocina. Inténtalo de nuevo.' },
@@ -36,13 +30,7 @@ test.beforeAll(async ({ browser }) => {
   cleanSales();
   cleanInventory();
   psql([`drop table if exists ${PARKED}`, `create table ${PARKED} as select * from invoice_issuer`, 'delete from invoice_issuer'].join('; '));
-  const context = await browser.newContext({ baseURL: A });
-  const page = await context.newPage();
-  await login(page, A, '/sale/pos');
-  // Cash without a cash session: the drawer's lock is sale-cash-gate.spec.ts's.
-  await drawerOff(context);
-  dish = await createProduct(context, { name: `E2E KERROR Dish ${RUN}`, sku: `E2E-KERROR-${RUN}`, price: 700, tax_category_key: 'restaurant.food' });
-  await context.close();
+  dish = await dishForTheTill(browser, 'KERROR', RUN);
 });
 
 test.afterAll(() => {
@@ -113,38 +101,30 @@ async function bothButtonsFree(notice: Locator, charge: Locator, send: Locator, 
 
 for (const { name, lang, locale, notSent } of LANGUAGES) {
   test.describe(`SALE-F20, SALE-F01: in ${name}, the notice of a round not sent leaves «Charge» free`, () => {
-    for (const size of SIZES) {
-      test(size.label, async ({ browser }) => {
-        const context = await browser.newContext({ baseURL: A, locale, viewport: { width: size.width, height: size.height } });
-        try {
-          const page = await context.newPage();
-          const sends = await checkWithKitchenDown(page, context, lang);
-          const till = shown(page);
-          const charge = till.locator('[data-testid=pos-charge]');
-          const send = till.locator('[data-testid=pos-kitchen-send]');
-          const notice = page.locator('ion-toast').filter({ hasText: notSent });
+    eachNoticeSize(locale, async (page, context, size) => {
+      const sends = await checkWithKitchenDown(page, context, lang);
+      const till = shown(page);
+      const charge = till.locator('[data-testid=pos-charge]');
+      const send = till.locator('[data-testid=pos-kitchen-send]');
+      const notice = page.locator('ion-toast').filter({ hasText: notSent });
 
-          await till.locator('[data-testid=pos-cart-tab-round]').click();
-          await expect(send).toBeVisible();
-          await send.click();
-          await expect.poll(sends, 'the send that fails').toBe(1);
-          await bothButtonsFree(notice, charge, send, size.height, `at ${size.label}, after «Send order»`);
-          await capture(page, `${KEY}-${lang}-${size.label}`);
+      await till.locator('[data-testid=pos-cart-tab-round]').click();
+      await expect(send).toBeVisible();
+      await send.click();
+      await expect.poll(sends, 'the send that fails').toBe(1);
+      await bothButtonsFree(notice, charge, send, size.height, `at ${size.label}, after «Send order»`);
+      await capture(page, `${KEY}-${lang}-${size.label}`);
 
-          // Trying again with the notice on screen: the finger lands on «Charge», which sends the round first.
-          const first = await notice.getAttribute('id');
-          const at = (await charge.boundingBox())!;
-          await page.mouse.click(at.x + at.width / 2, at.y + at.height / 2);
-          await expect.poll(sends, 'a tap on «Charge» sends the round again').toBe(2);
-          await expect.soft(page.locator('[data-testid=sale-checkout-modal]'), 'nothing is charged with the round not sent').toBeHidden();
-          // The second notice closes the first before it opens: what is measured next is the new one.
-          await expect(page.locator(`ion-toast[id="${first}"]`), 'the new notice takes the place of the first').toHaveCount(0);
-          await bothButtonsFree(notice, charge, send, size.height, `at ${size.label}, after «Charge»`);
-          if (await tillIsPhone(page)) await expect.soft(till.locator('[data-testid=pos-cart-drawer]'), 'the check stays open').toBeVisible();
-        } finally {
-          await context.close();
-        }
-      });
-    }
+      // Trying again with the notice on screen: the finger lands on «Charge», which sends the round first.
+      const first = await notice.getAttribute('id');
+      const at = (await charge.boundingBox())!;
+      await page.mouse.click(at.x + at.width / 2, at.y + at.height / 2);
+      await expect.poll(sends, 'a tap on «Charge» sends the round again').toBe(2);
+      await expect.soft(page.locator('[data-testid=sale-checkout-modal]'), 'nothing is charged with the round not sent').toBeHidden();
+      // The second notice closes the first before it opens: what is measured next is the new one.
+      await expect(page.locator(`ion-toast[id="${first}"]`), 'the new notice takes the place of the first').toHaveCount(0);
+      await bothButtonsFree(notice, charge, send, size.height, `at ${size.label}, after «Charge»`);
+      if (await tillIsPhone(page)) await expect.soft(till.locator('[data-testid=pos-cart-drawer]'), 'the check stays open').toBeVisible();
+    });
   });
 }
