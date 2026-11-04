@@ -71,6 +71,7 @@ from apps.service.queries import find_service
 from apps.staff.models import Member
 from apps.staff.queries import member_availability, own_member, resolve_member
 from apps.staff.schemas import AvailabilityIn
+from base.business import business_zone, zone_name
 
 VIEW_ALL = "appointment.view_appointment"
 VIEW_OWN = "appointment.view_own_appointment"
@@ -125,16 +126,6 @@ def verdict_message(code: str) -> str:
 
 
 # ── The business's clock and settings ────────────────────────────────────────────────────────
-
-
-def business_zone():
-    """The business's time zone (phase 1: ``settings.TIME_ZONE``; the Hub keeps no zone yet)."""
-    return timezone.get_current_timezone()
-
-
-def zone_name() -> str:
-    zone = business_zone()
-    return getattr(zone, "key", str(zone))
 
 
 def now() -> dt.datetime:

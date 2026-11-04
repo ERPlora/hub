@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:22e3edf446a9536d235faeb3e5de36f038f4be54f9f85965d5a78d7790670721 -->
+<!-- generated from WORKBOOK.md sha256:474715766d514f240d05e5e8139b49786547d11d5cba9769a39e7b7cc9026cf4 -->
 
 ## What it is for and who it is for
 
@@ -111,7 +111,7 @@ written (cut at 280 characters, whole under the pointer), and below «Rating and
 relevant first, as Google orders them.»;
 the contact as chips with an icon (phone, email),
 WhatsApp as a button and the socials as pills; the opening hours as a list with **today** highlighted (the business's
-day, in the hub's time zone; Madrid's without one); the address in a card with **Open the map**. A footer in columns:
+day, in the hub's time zone; the deployment's without one); the address in a card with **Open the map**. A footer in columns:
 the name and the footer's line, links to the sections and **Log in**, and last the credit «© <year> ERPlora» (opened
 apart). Motion is only a hover's transition (and none
 when the system asks for less). The browser's tab shows the logo or, without one, the name's initial in the main

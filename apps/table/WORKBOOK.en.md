@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:87ae36b4eef9ac46c0343d99f15cf986db941331103d193167c62b143a455493 -->
+<!-- generated from WORKBOOK.md sha256:dd9c53806f807b9f8071855e9c85f70b4bd37c08733a2564f89b46e3c54e7973 -->
 
 ## What it is for and who it is for
 
@@ -68,7 +68,7 @@ ERPlora does not invent flows: it adopts the ones the market has already proven.
 - Tables needs **Sales** (the check of each table is an open check of Sales) and **Customers** (the
   customer of a table and forgetting their name). They are switched on with it and are not switched off
   while Tables is on.
-- The times (opening, closing, bookings) are the business's: in this phase, **Europe/Madrid**.
+- The times (opening, closing, bookings) are the business's, in its time zone.
 
 Initial setup, step by step:
 

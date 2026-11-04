@@ -1,16 +1,20 @@
-"""The business's own data as the Hub shows it (APP-BASE-6): its currency and the names of what the SaaS registered.
+"""The business's own data as the Hub shows it (APP-BASE-6): its clock, its currency and the names of what the SaaS
+registered.
 
 The SaaS owns the business's name, country, time zone and language (CLAUDE.md, «Contrato SaaS ↔ Hub»): it pushes them
 in ``PUT /internal/hubs/{id}`` and the Hub keeps them in its registry, never asking. The currency is not chosen
 anywhere: it is the one the business's country pays in (CLDR, through Babel), as Square, SumUp or Zettle fix it by the
 merchant's country; a business without a country (a demo) is in euros, ERPlora's market. Names come in the person's
 language, with a capital letter (CLDR writes «euro», «español»); a code CLDR does not know is shown as it is. An
-amount is written here and nowhere else in the server (``money_text``), as the browser writes it.
+amount is written here and nowhere else in the server (``money_text``), as the browser writes it. So is the clock:
+``business_zone`` is the one reading of the business's time zone, for every hour told to a person and every wall-clock
+time read from one (hub#687).
 """
 
 import datetime as dt
 import unicodedata
 from decimal import Decimal
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from babel import Locale, UnknownLocaleError
 from babel.numbers import (
@@ -23,11 +27,36 @@ from babel.numbers import (
 from django.conf import settings
 from django.utils import timezone, translation
 
+from base.tenancy.context import current_hub
+
 #: The currency of a business without a country (a demo): ERPlora's market.
 DEFAULT_CURRENCY = "EUR"
 #: Changes of currency newer than the CLDR that Babel ships: country → (currency, since). Bulgaria adopted the euro on
 #: 1 January 2026; Babel 2.18 still gives the lev with no end.
 ADOPTED_SINCE: dict[str, tuple[str, dt.date]] = {"BG": ("EUR", dt.date(2026, 1, 1))}
+
+
+def zone_of(name: str) -> dt.tzinfo:
+    """The zone ``name`` (IANA) says, or the deployment's when it says none Python knows."""
+    try:
+        return ZoneInfo(name)
+    # Empty or malformed: ValueError; unknown («Mars/Olympus», a folder like «America»): ZoneInfoNotFoundError.
+    except (ZoneInfoNotFoundError, ValueError):
+        return timezone.get_current_timezone()
+
+
+def business_zone() -> dt.tzinfo:
+    """The clock of the business at work: the zone of the hub of the active context (``control.Hub.timezone``), the
+    deployment's on the platform's or when it has none. Raises ``HubContextMissing`` with no context, as a hub's model
+    does: no hour is told on a clock nobody chose."""
+    hub = current_hub()
+    return zone_of(hub.timezone if hub else "")
+
+
+def zone_name(zone: dt.tzinfo | None = None) -> str:
+    """The IANA name of ``zone``, by default the business's: what a screen shows and what the browser reads."""
+    zone = zone or business_zone()
+    return getattr(zone, "key", str(zone))
 
 
 def currency_of(country: str, *, today: dt.date | None = None) -> str:

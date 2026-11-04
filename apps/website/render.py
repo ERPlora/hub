@@ -17,7 +17,7 @@ minor unit, so a page painted after the business's country changes is in the new
 answers the same shape.
 
 The header invites to write (WhatsApp, else the contact section) and to come (the address), and the opening hours
-mark today, the business's own day (:func:`local_day`, in the hub's time zone; Spain's when it has none): the caller
+mark today, the business's own day (:func:`local_day`, in the hub's time zone; the deployment's when it has none): the caller
 passes it, and the public home keeps one page per day.
 """
 
@@ -26,7 +26,6 @@ import math
 from html import escape
 from typing import Any
 from urllib.parse import quote
-from zoneinfo import ZoneInfo
 
 from babel.numbers import format_decimal
 from django.template.loader import render_to_string
@@ -37,12 +36,10 @@ from live.markdown import render_markdown
 
 from apps.website.palettes import BLACK, WHITE, mix, resolve, rgb
 from apps.website.schemas import DAYS, TEMPLATES, Content, Theme
-from base.business import money_text
+from base.business import money_text, zone_of
 
 #: The sections between the hero and the footer, in their order.
 BODY_SECTIONS = ("about", "catalog", "gallery", "reviews", "contact", "location")
-#: The business's time zone when its hub has none: ERPlora sells in Spain.
-DEFAULT_TIME_ZONE = "Europe/Madrid"
 #: Google's page to write a review of a place (its Place ID after it).
 WRITE_REVIEW_URL = "https://search.google.com/local/writereview?placeid="
 #: The longest review text a card shows; the whole text goes in its title.
@@ -50,14 +47,9 @@ REVIEW_CHARS = 280
 
 
 def local_day(time_zone: str = "", now: dt.datetime | None = None) -> str:
-    """Today (``mon`` … ``sun``) where the business is: in ``time_zone`` (the hub's), or in Spain's when it has none or
-    names none that exists."""
-    try:
-        zone = ZoneInfo(time_zone or DEFAULT_TIME_ZONE)
-    # Unknown («Mars/Olympus», a folder like «America»): ZoneInfoNotFoundError, a KeyError; malformed: ValueError.
-    except KeyError, ValueError:
-        zone = ZoneInfo(DEFAULT_TIME_ZONE)
-    return DAYS[(now or timezone.now()).astimezone(zone).weekday()]
+    """Today (``mon`` … ``sun``) where the business is: in ``time_zone`` (the hub's), or in the deployment's when it has
+    none or names none that exists."""
+    return DAYS[(now or timezone.now()).astimezone(zone_of(time_zone)).weekday()]
 
 
 def _eyebrows() -> dict[str, str]:
