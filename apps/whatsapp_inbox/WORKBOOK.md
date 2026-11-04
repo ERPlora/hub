@@ -1338,7 +1338,8 @@ corrigen borrando los datos de la conversación, nunca editando), con borrado pa
 - `message.received` dice a qué mensaje **del Hub** contesta (`reply_to_message_id`: solo uno con
   `origin=hub` de esa conversación) y la opción (`reply_id`), los dos siempre presentes. Ningún evento
   lleva el número, el nombre ni el texto: el outbox se guarda días después de un borrado.
-- Zona horaria de la fase 1: `Europe/Madrid` (el mes del tope y las horas de la bandeja).
+- Zona horaria: las horas de la bandeja, en la del negocio (`useBusinessZone`, hub#779); el mes del tope sigue en
+  `Europe/Madrid` (`clock.py`, hub#771).
 
 ### Retención (RGPD)
 
