@@ -888,6 +888,8 @@ agenda tuya que enseñar.».
   28/03/2027, a las 04:07). La hora de fin de `availability.slots` es la de pared real, y la ventana de la agenda
   (`calendar_end_hour`) se comprueba contra ella. La tarjeta de la agenda se pinta hasta esa hora de fin; una cita
   que acaba a una hora de pared igual o anterior a su inicio (dentro de la hora repetida) se pinta con su duración.
+  Las citas guardadas antes de este arreglo con el fin de la suma de pared las corrige la migración
+  `0003_end_in_real_minutes` (fin = inicio + minutos reales; no toca las que ya estaban bien).
 - **Recurrencias** con `python-dateutil` (`rrule`; mantenida, decenas de colaboradores, desde 2003):
   diaria, semanal, quincenal y mensual (mismo día del mes, el último en un mes corto), con fin por fecha
   o por número de citas contado desde el inicio de la serie.
