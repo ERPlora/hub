@@ -92,9 +92,9 @@ describe("RecordsPage on the business's clock (hub#779)", () => {
   });
 
   it('starts on the month of the business, once it says its zone', async () => {
-    // 23:30 UTC on 31 October is still October in the Canaries and already November in Madrid.
-    vi.setSystemTime(new Date('2026-10-31T23:30:00Z'));
-    const s = await setup({}, 'Atlantic/Canary');
+    // 02:00 UTC on 1 November is still October in New York, November in UTC and in Madrid.
+    vi.setSystemTime(new Date('2026-11-01T02:00:00Z'));
+    const s = await setup({}, 'America/New_York');
     await s.reopen();
     expect(s.list()).toEqual([{ ...OCTOBER, sort: '-clock_in_at', limit: 50, offset: 0 }]);
     vi.setSystemTime(new Date(NOW));

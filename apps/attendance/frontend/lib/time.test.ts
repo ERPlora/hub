@@ -33,8 +33,10 @@ describe("the business's zone (hub#779)", () => {
     expect(localDateTime(NIGHT, CANARY)).toBe('2026-11-02 23:30');
     expect(toLocalInput(NIGHT, CANARY)).toBe('2026-11-02T23:30');
     expect(monthOf(Date.parse('2026-10-31T23:30:00Z'), CANARY)).toBe('2026-10');
+    expect(monthOf(Date.parse('2026-10-31T23:30:00Z'), MADRID)).toBe('2026-11');
     expect(timeOfDay(NIGHT, '2026-11-02', 'en', CANARY)).toBe('23:30');
-    expect(timeOfDay('2026-11-03T04:00:00Z', '2026-11-02', 'es', CANARY)).toBe('04:00 (3/11)');
+    // A night shift's day: 23:30 UTC of the 3rd is the 3rd in the Canaries, already the 4th in Madrid.
+    expect(timeOfDay('2026-11-03T23:30:00Z', '2026-11-02', 'es', CANARY)).toBe('23:30 (3/11)');
   });
 
   it('until the business answers it is on the device, never a zone written by hand', () => {

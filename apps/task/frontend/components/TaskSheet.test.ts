@@ -58,8 +58,9 @@ async function setup(options: { session?: typeof OWNER; locale?: 'en' | 'es'; de
 
 describe('TaskSheet', () => {
   it("tells when on the business's clock (hub#779)", async () => {
-    const s = await setup({ detail: { ...TASK, status: 'done', completed_at: '2026-11-02T09:00:00Z' }, timezone: 'Atlantic/Canary' });
-    expect(s.text('task-sheet-completed')).toBe('Completed: 02/11/2026, 09:00');
+    const s = await setup({ detail: { ...TASK, status: 'done', completed_at: '2026-10-15T09:00:00Z' }, timezone: 'Atlantic/Canary' });
+    // 09:00 UTC is 10:00 in the Canaries in October (UTC+1), 11:00 in Madrid.
+    expect(s.text('task-sheet-completed')).toBe('Completed: 15/10/2026, 10:00');
   });
 
   it('follows the task, its subtasks and its comments live', async () => {

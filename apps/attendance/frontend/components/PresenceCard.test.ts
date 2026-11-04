@@ -40,8 +40,9 @@ describe('PresenceCard (ATTENDANCE-F11)', () => {
 
   it("says since when on the business's clock (hub#779)", async () => {
     const s = await setup('en', 'Atlantic/Canary');
-    await s.result('attendance.presence.list', page([{ ...ANA, clock_in_at: '2026-11-02T09:00:00Z' }]));
-    expect(s.find('attendance-presence-row').text().replace(/\s+/g, ' ')).toBe('Ana López since 09:00');
+    await s.result('attendance.presence.list', page([ANA]));
+    // 07:00 UTC is 08:00 in the Canaries in October (UTC+1), 09:00 in Madrid.
+    expect(s.find('attendance-presence-row').text().replace(/\s+/g, ' ')).toBe('Ana López since 08:00');
   });
 
   it('says when nobody is in', async () => {

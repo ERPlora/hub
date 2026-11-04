@@ -54,9 +54,9 @@ describe("TasksPage on the business's clock (hub#779)", () => {
   afterEach(() => vi.useRealTimers());
 
   it("a task due today is not late until the business's midnight", async () => {
-    // 23:30 UTC on 2 November is still the 2nd in the Canaries and already the 3rd in Madrid.
-    const s = await setup({ timezone: 'Atlantic/Canary' });
-    vi.useFakeTimers({ now: new Date('2026-11-02T23:30:00Z'), toFake: ['Date'] });
+    // 02:00 UTC on 3 November is still the 2nd in New York, the 3rd in UTC and in Madrid.
+    const s = await setup({ timezone: 'America/New_York' });
+    vi.useFakeTimers({ now: new Date('2026-11-03T02:00:00Z'), toFake: ['Date'] });
     await s.show(page([task({ id: 't1', due_date: '2026-11-02', status: 'todo' })]));
     expect(s.rows()[0].find('[data-testid="task-due"]').attributes('aria-label')).toBe('Due today');
   });
