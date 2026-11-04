@@ -883,6 +883,14 @@ agenda tuya que enseñar.».
   reales**, no en horas del reloj: el día del cambio de hora, 24 h de antelación acaban a otra hora de
   pared (a las 10:00 de la víspera del día de 23 h, la primera hora que las respeta son las 11:00; en la
   del día de 25 h, las 09:00), y `queries.now()` da el instante en UTC para que la suma sea de tiempo real.
+  La **duración** de una cita también cuenta tiempo real (`engine.ends_at`, en crear, lote, mover, series, horas
+  libres y `availability.check`): 60 minutos son 60 minutos también la noche del cambio de hora, y lo que cambia
+  es la hora de pared en que acaba (el 25/10/2026, las 01:37 + 90 min acaban a las 02:07 de la segunda vuelta; el
+  28/03/2027, a las 04:07). La hora de fin de `availability.slots` es la de pared real, y la ventana de la agenda
+  (`calendar_end_hour`) se comprueba contra ella. La tarjeta de la agenda se pinta hasta esa hora de fin; una cita
+  que acaba a una hora de pared igual o anterior a su inicio (dentro de la hora repetida) se pinta con su duración.
+  Las citas guardadas antes de este arreglo con el fin de la suma de pared las corrige la migración
+  `0003_end_in_real_minutes` (fin = inicio + minutos reales; no toca las que ya estaban bien).
 - **Recurrencias** con `python-dateutil` (`rrule`; mantenida, decenas de colaboradores, desde 2003):
   diaria, semanal, quincenal y mensual (mismo día del mes, el último en un mes corto), con fin por fecha
   o por número de citas contado desde el inicio de la serie.
@@ -929,7 +937,6 @@ Lo que se vio fallar y queda abierto al cerrar la app (2026-11-03), cada cosa co
   (cruza APPOINTMENT-F22).
 - **hub#634** — Anular una cita con «Que me lo pregunte» (confirmar, mover y editar la cita de otra profesional ya lo
   hace una automatización con su permiso, desde FIX-HUB-FLOW-STEP-CANNOT-BOOK-FOR-A-PROFESSIONAL).
-- **hub#636** — Una cita que cruza el cambio de hora dura una hora más (octubre) o menos (marzo) de lo reservado.
 - **hub#687** — La hora del negocio no es la misma en la tarjeta del asistente y en las apps cuando la zona del negocio
   no es la del despliegue (cruza Citas, Horarios, Reservas, Mesas, Cocina, Automatizaciones y la plataforma; hoy la
   agenda va en Europe/Madrid, ver «Antes de empezar»).
