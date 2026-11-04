@@ -1253,7 +1253,7 @@ def business_get(ctx: OperationContext, data: BusinessIn) -> dict:
         ctx,
         name=hub.name,
         country=hub.country,
-        zone=hub.timezone or settings.TIME_ZONE,
+        zone=business.zone_name(business.zone_of(hub.timezone)),
         language=hub.language or settings.LANGUAGE_CODE,
         demo=hub.is_demo,
         settings_url="" if hub.is_demo else saas_url(f"{SAAS_PANEL_PATH}/businesses/{hub.id}/settings"),
@@ -2361,7 +2361,7 @@ def approval_export(ctx: OperationContext, data: ApprovalExportIn) -> dict:
     for row in _approvals_kept(data, currency):
         writer.writerow(
             [
-                timezone.localtime(row.created_at).strftime("%Y-%m-%d %H:%M"),
+                timezone.localtime(row.created_at, business.business_zone()).strftime("%Y-%m-%d %H:%M"),
                 _approval_cell(approval_action(row.operation, row.figures, currency)),
                 _approval_cell(row.approved_by_name),
                 _approval_cell(row.requested_by_name),

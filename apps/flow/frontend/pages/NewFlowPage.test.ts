@@ -30,6 +30,12 @@ async function setup(path: string) {
 }
 
 describe('NewFlowPage', () => {
+  it("follows the business's clock for the moments its editor says (hub#687)", async () => {
+    const m = await mountFlow(NewFlowPage, { path: '/flow/automations/new', answers: { '/api/flow/catalog': [200, { events: [], actions: [] }] } });
+    await m.live();
+    expect(m.params('base.business.get')).toEqual([{}]);
+  });
+
   it('a blank automation', async () => {
     const m = await setup('/flow/automations/new');
     await settle();
