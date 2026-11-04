@@ -813,7 +813,9 @@ Pasos:
    cocina.»; las líneas quedan marcadas con su ronda («Comanda N») y la hora de envío, y la llama se desarma.
    Un doble envío no manda nada dos veces.
 3. Al pulsar «Cobrar» con algo pendiente, se envía primero a cocina y después se abre el cobro: nadie paga
-   un plato que no se va a preparar. Si el envío falla, no se abre el cobro y se dice por qué.
+   un plato que no se va a preparar. El aviso de la comanda sale entonces arriba de la pantalla, para poder
+   tocar el teclado del cobro (SALE-F01) desde el primer momento. Si el envío falla, no se abre el cobro y se
+   dice por qué.
 4. Una línea enviada queda bloqueada: ni cantidad, ni nota, ni descuento, ni invitación.
 5. Para quitar un plato ya enviado, pulsa ⊗ «Anular este artículo» en su línea: se abre «Anular
    «<artículo>»» con «Ya se envió a cocina. Sale de la cuenta y se guarda el motivo. Tiene que
