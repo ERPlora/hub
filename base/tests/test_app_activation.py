@@ -675,6 +675,23 @@ def test_that_sentence_is_said_in_the_language_of_who_asks(monkeypatch):
 
 
 @pytest.mark.django_db
+def test_one_that_refuses_itself_says_its_own_reason_even_while_another_app_needs_it(monkeypatch):
+    """«Turn off Tasks first» would be a dead end: Tasks goes off, and then Staff still refuses."""
+    monkeypatch.setattr(apps.get_app_config("staff"), "can_disable", lambda ctx: "Staff is busy.", raising=False)
+    monkeypatch.setattr(apps.get_app_config("task"), "can_disable", lambda ctx: None, raising=False)
+    set_rows(task="on*", staff="on")
+
+    assert by_id(app_list())["staff"]["refusal"] == "Staff is busy."
+    with pytest.raises(Conflict) as refused:
+        disable("staff")
+
+    error = refused.value.envelope()["error"]
+    assert (error["code"], error["app"]) == ("base.app_vetoed", "staff")
+    assert refused.value.message == "Staff is busy."
+    assert rows()["staff"] == Activation(ON, False)
+
+
+@pytest.mark.django_db
 def test_while_none_of_those_that_need_it_refuses_it_still_says_which_to_turn_off_first(monkeypatch):
     monkeypatch.setattr(apps.get_app_config("task"), "can_disable", lambda ctx: None, raising=False)
     set_rows(task="on*", staff="on")
@@ -949,6 +966,20 @@ def test_an_app_off_is_still_listed_with_its_icon_and_name():
     document = by_id(app_list())
     assert set(document) == set(activation.module_graph())
     assert all(app["state"] == "off" and app["icon"] and app["name"] for app in document.values())
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("state", ["on*", "off"])
+def test_a_paid_app_without_its_right_gives_no_reason_of_its_own_on_or_off(monkeypatch, state):
+    """What it lacks is the right: «blocked» sends the person to erplora.com, and no reason of the app's competes."""
+    config = apps.get_app_config("task")
+    monkeypatch.setattr(config, "premium", True)
+    monkeypatch.setattr(config, "can_enable", lambda ctx: "Only in Spain.", raising=False)
+    monkeypatch.setattr(config, "can_disable", lambda ctx: "Tasks are open.", raising=False)
+    set_rows(task=state, staff="on")
+
+    row = by_id(app_list())["task"]
+    assert (row["state"], row["refusal"]) == ("blocked", None)
 
 
 @pytest.mark.django_db
