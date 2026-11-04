@@ -50,6 +50,7 @@ from apps.appointment.queries import (
     ADD_OWN,
     APPOINTMENT_NOT_FOUND,
     BUSY,
+    CHANGE_ALL,
     CHANGE_OWN,
     CUSTOMER_SOURCES,
     MOVABLE,
@@ -936,6 +937,8 @@ def mark_no_show(ctx: OperationContext, data: AppointmentRefIn) -> dict:
         "reason; its time becomes free. on_behalf_of_customer=true (with the customer) when she cancels herself: it "
         "must be hers and the business's cancellation policy applies. Ask the person before doing it.",
         "risk": "high",
+        # An automation cancels anybody's (``is_own``), so a yes to it is only of someone who may too (FLOW-F28).
+        "yes_permission": CHANGE_ALL,
     },
 )
 def cancel(ctx: OperationContext, data: CancelIn) -> dict:

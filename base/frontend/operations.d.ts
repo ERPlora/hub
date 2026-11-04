@@ -119,6 +119,8 @@ export interface AppRow {
   /** What it needs, transitively (it comes along with it), and the apps on that need it (they go off first): ids. */
   requires: string[];
   required_by: string[];
+  /** Why turning it on (when off) or off (when on) is refused, in the reader's language: neither is offered. */
+  refusal: string | null;
 }
 
 /** `base.AppListOut`. */

@@ -76,6 +76,7 @@ from apps.flow.queries import (
     proposal_held,
     PERSON_PARAMS,
     words_for,
+    yes_permission,
 )
 from apps.flow.schemas import (
     AnsweredOut,
@@ -1561,11 +1562,11 @@ def _carry_on(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, left:
 
 def _may_say_yes(ctx: OperationContext, run: FlowRun) -> None:
     """A yes to the assistant's change that needs a person in front (cancelling a booking, ``ASK_FIRST``) is only of
-    someone who may make it themselves: the yes lends nothing (the old engine's «no elevation»); the change still runs
-    as the automation."""
+    someone who may make it themselves, whoever's it is (``yes_permission``): the yes lends nothing (the old engine's
+    «no elevation»); the change still runs as the automation."""
     proposal = (run.outputs.get(TURN) or {}).get("proposal") or {}
     op = grantable_operations().get(str(proposal.get("operation") or ""))
-    if op is not None and needs_a_person(op) and not ctx.has(op.permission):
+    if op is not None and needs_a_person(op) and not ctx.has(yes_permission(op)):
         message = str(APPROVAL_BEYOND_YOU) % {"name": action_label(op, ctx.language)}
         raise PermissionDenied(message, code="flow.approval_beyond_you")
 

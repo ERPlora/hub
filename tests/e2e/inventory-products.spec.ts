@@ -253,13 +253,14 @@ test('INVENTORY-F05: a product whose tax category Taxes deactivated is «Not con
  *  (`roomy`: the row has room for the whole chip). */
 const CHIP_VIEWPORTS = [
   { label: '390', width: 390, height: 844, roomy: false },
+  { label: '820', width: 820, height: 1180, roomy: false },
   { label: '834', width: 834, height: 1112, roomy: false },
   { label: '1280', width: 1280, height: 800, roomy: true },
   { label: '1440', width: 1440, height: 900, roomy: true },
 ];
 
 // flow: INVENTORY-F05 (chip «Sin configurar» de Productos)
-test('INVENTORY-F05 · FIX-INVENTORY-PRODUCTS-UNCONFIGURED-CHIP-CLIPPED: the «Not configured» chip keeps its icon in sight and its text whole or ending in «…», at every width', async ({
+test('INVENTORY-F05 · FIX-INVENTORY-PRODUCTS-UNCONFIGURED-CHIP-CLIPPED: the «Not configured» chip keeps its icon in sight and reads those words, whole or ending in «…», at every width', async ({
   page,
   context,
   browser,
@@ -280,7 +281,7 @@ test('INVENTORY-F05 · FIX-INVENTORY-PRODUCTS-UNCONFIGURED-CHIP-CLIPPED: the «N
     for (const vp of CHIP_VIEWPORTS) {
       await page.setViewportSize({ width: vp.width, height: vp.height });
       await expect(marker).toBeVisible();
-      const options = { within: '[role=cell], .data-table__field-value', whole: vp.roomy, titled: true };
+      const options = { within: '[role=cell], .data-table__field-value', whole: vp.roomy, reads: 'Not configured', titled: true };
       const fit = await settledChipFit(marker, options, `list at ${vp.label}`);
       record(`FIX-INVENTORY-PRODUCTS-UNCONFIGURED-CHIP-CLIPPED-${vp.label}`, { ...fit.metrics, problems: fit.problems });
       await page.screenshot({ path: shot(`FIX-INVENTORY-PRODUCTS-UNCONFIGURED-CHIP-CLIPPED-${vp.label}`) });
@@ -312,7 +313,7 @@ test('INVENTORY-F05 · FIX-INVENTORY-PRODUCTS-UNCONFIGURED-CHIP-CLIPPED: the «N
       for (const vp of CHIP_VIEWPORTS) {
         await es.setViewportSize({ width: vp.width, height: vp.height });
         await expect(chip).toBeVisible();
-        const options = { within: '[role=cell], .data-table__field-value', whole: vp.roomy, titled: true };
+        const options = { within: '[role=cell], .data-table__field-value', whole: vp.roomy, reads: 'Sin configurar', titled: true };
         const fit = await settledChipFit(chip, options, `Spanish list at ${vp.label}`);
         record(`FIX-INVENTORY-PRODUCTS-UNCONFIGURED-CHIP-CLIPPED-es-${vp.label}`, { ...fit.metrics, problems: fit.problems });
         await capture(es, `FIX-INVENTORY-PRODUCTS-UNCONFIGURED-CHIP-CLIPPED-es-${vp.label}`);
@@ -320,6 +321,72 @@ test('INVENTORY-F05 · FIX-INVENTORY-PRODUCTS-UNCONFIGURED-CHIP-CLIPPED: the «N
     } finally {
       await spanish.close();
     }
+  } finally {
+    psql(`update tax_taxcategory set is_active = true where key = '${key}'`);
+  }
+});
+
+/** The tablets of hub#703: upright, whose row is the shortest of room while it stays a list, and on their side, where
+ *  the side menu takes its part of the width. */
+const TABLET_VIEWPORTS = [
+  { label: '820', width: 820, height: 1180 },
+  { label: '834', width: 834, height: 1112 },
+  { label: '1024', width: 1024, height: 768 },
+  { label: '1180', width: 1180, height: 820 },
+];
+
+// flow: INVENTORY-F05 (chip «Sin configurar» de Productos, en la tableta)
+test('INVENTORY-F05 · hub#703: on a tablet the «Not configured» chip reads its words beside a long name, and the list keeps to its box', async ({
+  page,
+  context,
+  browser,
+}) => {
+  await login(page, A, '/inventory/dashboard');
+  const key = `e2e.tablet_${stamp().toLowerCase()}`;
+  const created = await api(context, A, 'POST', '/tax/categories', { key, name: 'E2E tablet chip tax' });
+  expect(created.status).toBe(201);
+  const long = await createProduct(context, { name: 'Croquetas caseras de jamón ibérico', sku: `E2E-TABLET-${stamp()}`, tax_category_key: key });
+  await createProduct(context, { name: 'E2E Tablet wine', sku: `E2E-TABLET-2-${stamp()}`, tax_category_key: key });
+  psql(`update tax_taxcategory set is_active = false where key = '${key}'`);
+  try {
+    const languages = [
+      { code: 'en', locale: 'en-GB', reads: 'Not configured' },
+      { code: 'es', locale: 'es-ES', reads: 'Sin configurar' },
+    ];
+    for (const language of languages) {
+      const own = await browser.newContext({ baseURL: A, viewport: { width: 820, height: 1180 }, locale: language.locale });
+      try {
+        const tablet = await own.newPage();
+        await login(tablet, A, '/inventory/dashboard');
+        await own.addCookies([{ name: 'django_language', value: language.code, domain: new URL(A).hostname, path: '/' }]);
+        await tablet.goto(`${A}/inventory/products?status=unconfigured`);
+        await expect(tablet.locator('html')).toHaveAttribute('lang', new RegExp(`^${language.code}`));
+        await productsReady(tablet);
+        // The session, for ui-clip-sweep.sh over this same page.
+        if (process.env.E2E_SAVE_STORAGE_STATE) await own.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
+        const chip = shown(tablet).locator(`[data-testid=inventory-products-unconfigured-${long.id}]`);
+        for (const vp of TABLET_VIEWPORTS) {
+          await tablet.setViewportSize({ width: vp.width, height: vp.height });
+          await expect(chip).toBeVisible();
+          const options = { within: '[role=cell]', reads: language.reads, titled: true };
+          const fit = await settledChipFit(chip, options, `${language.code} list at ${vp.label}`);
+          record(`hub-703-chip-${language.code}-${vp.label}`, { ...fit.metrics, problems: fit.problems });
+          const scroll = shown(tablet).locator('.data-table__scroll').first();
+          await expect.soft(scroll.evaluate((el) => el.scrollWidth - el.clientWidth), `${language.code} list at ${vp.label} keeps to its box`).resolves.toBeLessThanOrEqual(0);
+          await capture(tablet, `hub-703-chip-${language.code}-${vp.label}`);
+        }
+      } finally {
+        await own.close();
+      }
+    }
+
+    // The mark gone, its room goes with it: the row's actions come back out of «⋮».
+    psql(`update tax_taxcategory set is_active = true where key = '${key}'`);
+    await page.setViewportSize({ width: 820, height: 1180 });
+    await page.goto(`${A}/inventory/products`);
+    await productsReady(page);
+    await searchProducts(page, long.sku);
+    await expect(shown(page).locator(`[data-testid=inventory-products-row-${long.id}-receive]`)).toBeVisible();
   } finally {
     psql(`update tax_taxcategory set is_active = true where key = '${key}'`);
   }
