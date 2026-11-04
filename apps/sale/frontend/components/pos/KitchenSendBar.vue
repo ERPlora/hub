@@ -1,7 +1,8 @@
 <script setup lang="ts">
 // The send bar of «Current order» (SALE-F20; Kitchen's KITCHEN-F18): «Send order (N)» and, beside it, the rush
 // flame. Armed, the button says «Send RUSH (N)» and the round goes urgent; a send disarms it. The page sends
-// (`send`, with whether it is a rush) through Kitchen.
+// (`send`, with whether it is a rush) through Kitchen. It stays pinned at the bottom of what scrolls in the check
+// (PosCart's `pos-cart-middle`) while that leaves room for the tabs and a line; lower, it scrolls with them (hub#787).
 import { HubIcon } from '@erplora/ui/shell';
 import { IonButton } from '@ionic/vue';
 import { shallowRef } from 'vue';
@@ -49,11 +50,23 @@ function send(): void {
 
 <style scoped>
 .pos-kitchen-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
   display: flex;
+  flex: none;
   gap: 0.5rem;
   align-items: center;
   padding: 0.5rem 0.75rem;
+  background: var(--ion-background-color, #fff);
   border-top: 1px solid var(--ion-border-color, #e6e3db);
+}
+/* Measured: pinned, the bar (67 px) leaves 141 px at this height, the tabs (64 px with their label in two lines) and most
+   of a line (115 px); in less it would sit on what the waiter came to read (hub#787). */
+@container pos-cart-middle (max-height: 13rem) {
+  .pos-kitchen-bar {
+    position: static;
+  }
 }
 .pos-kitchen-bar__rush {
   display: inline-flex;

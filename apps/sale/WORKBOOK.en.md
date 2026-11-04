@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:a999ae2cfd6a741b72cac49f8804084294da3f699b4e0ba38e362b07947f6444 -->
+<!-- generated from WORKBOOK.md sha256:630c115aad47bde84e1514f498ed8b0053b27c68bd4d394625312ec1d5efbae7 -->
 
 ## What it is for and who it is for
 
@@ -787,6 +787,10 @@ Steps:
    kitchen." shows at the top of the screen, so "Charge" (SALE-F01) can be pressed without waiting for it
    to go; the lines are marked with their round ("Order N") and the time sent, and the flame disarms. A
    double send never sends anything twice.
+   In the phone's drawer, "Send order" and the flame stay pinned above the foot while they leave room for
+   the tabs and a line; on a lower phone, such as a 320×568 one with the red strip on top, they scroll with
+   them, after the lines, and "Charge" stays in view. The same goes for the side column of a screen just as low,
+   such as a 1024×600 tablet with the strip (hub#787).
 3. On pressing "Charge" with something pending, it is sent to the kitchen first and then the charge
    opens: nobody pays for a dish that is not going to be made. The order's notice shows at the top here
    too, so the charge keypad (SALE-F01) can be tapped from the first moment. If the send fails, the

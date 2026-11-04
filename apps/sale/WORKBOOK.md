@@ -813,6 +813,10 @@ Pasos:
    «Comanda N enviada a cocina.», para poder pulsar «Cobrar» (SALE-F01) sin esperar a que se vaya; las líneas
    quedan marcadas con su ronda («Comanda N») y la hora de envío, y la llama se desarma. Un doble envío no
    manda nada dos veces.
+   En el cajón del móvil, «Enviar comanda» y la llama se quedan fijos sobre el pie mientras dejan sitio a las
+   pestañas y a una línea; en un móvil más bajo, como uno de 320×568 con la franja roja de arriba, se desplazan
+   con ellas, detrás de las líneas, y «Cobrar» sigue a la vista. Lo mismo en la columna lateral de una pantalla igual
+   de baja, como una tableta de 1024×600 con la franja (hub#787).
 3. Al pulsar «Cobrar» con algo pendiente, se envía primero a cocina y después se abre el cobro: nadie paga
    un plato que no se va a preparar. El aviso de la comanda también sale arriba, para poder tocar el teclado
    del cobro (SALE-F01) desde el primer momento. Si el envío falla, no se abre el cobro y se dice por qué.
