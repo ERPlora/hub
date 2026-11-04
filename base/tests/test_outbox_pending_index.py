@@ -88,21 +88,35 @@ def record_an_event(conn: psycopg.Connection, scope_key: str = "registry") -> No
     )
 
 
-def wait_for_the_build_behind_a_write(database: str, process: subprocess.Popen) -> None:
-    """Until the statement of ``process`` is waiting for the write still open on the outbox."""
+def leave_an_invalid_index(database: str) -> None:
+    """Two pending events and what a build cut halfway leaves under the name: an invalid index, serving no query."""
+    with hubs._maintenance(database) as conn:
+        record_an_event(conn)
+        record_an_event(conn)
+        with pytest.raises(psycopg.errors.UniqueViolation):
+            conn.execute(
+                sql.SQL("CREATE UNIQUE INDEX CONCURRENTLY {} ON live_outboxevent (scope_key)").format(
+                    sql.Identifier(INDEX)
+                )
+            )
+    assert the_index(database)[1] is False
+
+
+def wait_for_the_statement_behind_a_write(database: str, process: subprocess.Popen) -> None:
+    """Until the first statement of ``process`` on the index is waiting for the write still open on the outbox."""
     deadline = time.monotonic() + BUILD_STARTS_WITHIN
     with hubs._maintenance() as conn:
         while time.monotonic() < deadline:
-            assert process.poll() is None, f"The migration ended before the build: {process.stderr.read()[-3000:]}"
+            assert process.poll() is None, f"The migration ended before its statement: {process.stderr.read()[-3000:]}"
             waiting = conn.execute(
                 "SELECT count(*) FROM pg_stat_activity WHERE datname = %s AND wait_event_type = 'Lock' "
                 "AND query LIKE %s",
-                [database, f"CREATE INDEX%{INDEX}%"],
+                [database, f"%INDEX%{INDEX}%"],
             ).fetchone()[0]
             if waiting:
                 return
             time.sleep(0.1)
-    pytest.fail(f"The index's build did not start within {BUILD_STARTS_WITHIN:g} s.")
+    pytest.fail(f"The statement on the index did not start within {BUILD_STARTS_WITHIN:g} s.")
 
 
 @contextmanager
@@ -150,9 +164,13 @@ def test_control_and_a_hub_have_the_same_indexes_on_the_tables_they_share(contro
     assert in_control == indexes_of_the_tables_control_and_a_hub_share(hub_databases.a)
 
 
-def test_a_write_goes_on_while_the_index_is_being_built(control_without_the_index):
-    """A control database with data gets the index under its traffic: nobody's write waits for the build."""
+@pytest.mark.parametrize("cut_build", [False, True], ids=["no index yet", "an invalid index to replace"])
+def test_a_write_goes_on_while_the_index_is_being_built(control_without_the_index, cut_build):
+    """A control database with data gets the index under its traffic: nobody's write waits for the build, nor for the
+    drop of what a build cut halfway left."""
     database = control_without_the_index
+    if cut_build:
+        leave_an_invalid_index(database)
     process = None
     with hubs._maintenance(database) as open_write, hubs._maintenance(database) as new_write:
         new_write.execute("SET lock_timeout = '2s'")
@@ -162,7 +180,7 @@ def test_a_write_goes_on_while_the_index_is_being_built(control_without_the_inde
                 process = subprocess.Popen(
                     _migrate_command(), stdout=subprocess.PIPE, stderr=subprocess.PIPE, **_deploy_options(database)
                 )
-                wait_for_the_build_behind_a_write(database, process)
+                wait_for_the_statement_behind_a_write(database, process)
 
                 record_an_event(new_write, "new")
 
@@ -177,22 +195,13 @@ def test_a_write_goes_on_while_the_index_is_being_built(control_without_the_inde
     with hubs._maintenance(database) as conn:
         conn.execute("SET enable_seqscan = off")
         pending = conn.execute("SELECT count(*) FROM live_outboxevent WHERE delivered_at IS NULL").fetchone()[0]
-    assert pending == 2
+    assert pending == (4 if cut_build else 2)
 
 
 def test_an_index_a_failed_build_left_invalid_is_built_again(control_without_the_index):
     """A build cut halfway leaves an invalid index under the name, serving no query: the next deploy replaces it."""
     database = control_without_the_index
-    with hubs._maintenance(database) as conn:
-        record_an_event(conn)
-        record_an_event(conn)
-        with pytest.raises(psycopg.errors.UniqueViolation):
-            conn.execute(
-                sql.SQL("CREATE UNIQUE INDEX CONCURRENTLY {} ON live_outboxevent (scope_key)").format(
-                    sql.Identifier(INDEX)
-                )
-            )
-    assert the_index(database)[1] is False
+    leave_an_invalid_index(database)
 
     migrate(database)
 
