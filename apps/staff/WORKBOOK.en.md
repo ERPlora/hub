@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:a0554b0f2d2ddde971bc16bf98ca94d6ab4e17147895f843c617bf15ea84d427 -->
+<!-- generated from WORKBOOK.md sha256:556fe91971e7d107e096c8f7a189a1fe3cb6c111407bd08ae3e4e86bfb99efd9 -->
 
 ## What it is for and who it is for
 
@@ -313,6 +313,7 @@ Steps:
 1. A person with their account linked to their record (STAFF-F03) opens what is theirs.
 2. They see their record with **their own** rate and commission (without the HR notes), and their time
    off with its reason and its notes.
+3. The record is read-only: a single button, **Close**.
 In: the account they get in with (it cannot be faked).
 Out: nothing changes. Without a linked record, the answer comes empty.
 If it fails: without a record or without time off, empty.

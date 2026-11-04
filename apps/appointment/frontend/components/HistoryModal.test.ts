@@ -1,4 +1,5 @@
 // APPOINTMENT-F10: «History» of a row opens «Appointment history» with its number and its lines.
+import { FormModal } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { AppointmentRow } from '../operations';
@@ -23,8 +24,17 @@ describe('HistoryModal', () => {
     // Read only: one «Close», no «Cancel» beside it.
     expect(m.inDoc('appointment-history-modal-cancel')).toBeNull();
     expect(m.inDoc('appointment-history-modal-submit')).toBeNull();
-    expect(m.inDoc('appointment-history-close')?.textContent?.trim()).toBe('Close');
-    await click(m.inDoc('appointment-history-close'));
+    expect(m.inDoc('appointment-history-modal')?.querySelectorAll('.ep-form-modal__footer ion-button')).toHaveLength(1);
+    expect(m.inDoc('appointment-history-modal-done')?.textContent?.trim()).toBe('Close');
+    // The common read-only window, not a footer of its own (hub#711).
+    expect(m.wrapper.findComponent(FormModal).props('readonly')).toBe(true);
+    await click(m.inDoc('appointment-history-modal-done'));
     expect(m.wrapper.emitted('update:open')?.at(-1)).toEqual([false]);
+  });
+
+  it('speaks Spanish: «Cerrar»', async () => {
+    const m = await mountAppointment(HistoryModal, { props: { open: true, appointment: { id: 'a1', number: 'APT-7' } as AppointmentRow }, locale: 'es' });
+    await settle();
+    expect(m.inDoc('appointment-history-modal-done')?.textContent?.trim()).toBe('Cerrar');
   });
 });
