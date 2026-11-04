@@ -3,13 +3,12 @@ the settings, «is it open?» and the hours of a range of days.
 
 The rules are engine.py's: these operations only load the business's rows (``load_calendar``) and hand
 them over, so «is it open?» and the appointment book's hours can never disagree. The business's zone is
-the Hub's; in phase 1, ``settings.TIME_ZONE`` (Europe/Madrid).
+the Hub's (``base.business.business_zone``).
 """
 
 import datetime as dt
 from typing import Any
 from uuid import UUID
-from zoneinfo import ZoneInfo
 
 from django.db.models import F, Prefetch, Q, QuerySet
 from django.utils import formats, timezone, translation
@@ -43,6 +42,7 @@ from apps.schedule.schemas import (
     SpecialDayPage,
     WeekOut,
 )
+from base.business import business_zone, zone_name
 
 SPECIAL_DAY_NOT_FOUND = _("That special day does not exist in this business.")
 OVERRIDE_NOT_FOUND = _("That temporary change does not exist in this business.")
@@ -66,16 +66,6 @@ OVERRIDE_SORTS = {
 
 
 # ── The business's clock ───────────────────────────────────────────────────────────────────────
-
-
-def business_zone() -> ZoneInfo:
-    """The business's time zone (phase 1: ``settings.TIME_ZONE``, the Hub keeps no zone yet)."""
-    return timezone.get_current_timezone()
-
-
-def zone_name() -> str:
-    zone = business_zone()
-    return getattr(zone, "key", str(zone))
 
 
 def day_label(day: dt.date, language: str) -> str:
