@@ -3587,6 +3587,13 @@ Implicados: HUBS-F18, HUBS-F19, HUBS-F20, PUBLIC-F34 (el mismo borrado de ficher
   `base.cache.ClusterLocMemCache`, la memoria del proceso con esa misma regla y el mismo error: lo que fallaría en
   AWS falla antes en el test.
 
+- **`Hub.cluster` vacío es el servidor por defecto** (hub#614), el de los settings: es un valor válido, no un dato por
+  rellenar, y con él conecta, migra, mide y se traslada el hub (`base.tenancy.connections`, `credentials`, `migrator`,
+  `control.hub.move`). Por eso ese servidor no se da de alta como fila `Cluster`: una fila cambia el camino de conexión
+  de sus hubs (y sus credenciales, si lleva secreto), y desde la primera ningún hub nuevo cae ya en el de los settings
+  (`place_hub`). El admin de Hubs lo dice con palabras en la lista, su filtro y la ficha (`control/admin.py`), salvo en
+  un hub sin BD hecha (`base.registry.database_is_made`): en preparación, cancelado antes de estar listo o ya borrado.
+
 ## Lo que queda fuera
 
 Al cerrar la app (2026-11-01) ninguno de sus flujos quedó a medias: los que no entran están `descartado`, cada uno
