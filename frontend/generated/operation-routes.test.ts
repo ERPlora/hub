@@ -238,7 +238,7 @@ describe('OPERATION_ROUTES', () => {
     });
   });
 
-  it('binds the forty routed service operations to apps/service/api.py (the reactions and the sessions of the till have no route)', () => {
+  it('binds the forty-three routed service operations to apps/service/api.py (the reactions and the writes over the sessions of the till have no route)', () => {
     expect(OPERATION_ROUTES).toMatchObject({
       'service.service.list': { method: 'get', path: '/api/service/services' },
       'service.service.create': { method: 'post', path: '/api/service/services' },
@@ -281,8 +281,11 @@ describe('OPERATION_ROUTES', () => {
       'service.grant.adjust': { method: 'post', path: '/api/service/grants/adjust' },
       'service.grant.redeem': { method: 'post', path: '/api/service/grants/redeem' },
       'service.movement.list': { method: 'get', path: '/api/service/movements' },
+      'service.assignment.get': { method: 'get', path: '/api/service/assignments/detail' },
+      'service.grant.get': { method: 'get', path: '/api/service/grants/detail' },
+      'service.session.get': { method: 'get', path: '/api/service/sessions/detail' },
     });
-    expect(Object.keys(OPERATION_ROUTES).filter((op) => op.startsWith('service.'))).toHaveLength(40);
+    expect(Object.keys(OPERATION_ROUTES).filter((op) => op.startsWith('service.'))).toHaveLength(43);
   });
 
   it('binds the nineteen cash register operations to apps/cash_register/api.py: queries by GET, commands by POST', () => {
