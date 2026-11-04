@@ -413,6 +413,7 @@ En la pantalla Archivos:
 | BASE-F106 | El asistente sin conexión, con el servicio caído o sin plan | hecho |
 | BASE-F107 | Pasar la QA maestra del Hub | hecho |
 | BASE-F108 | Reportar un problema a soporte | hecho |
+| BASE-F109 | Borrar un negocio eliminado pasados sus 90 días | parcial — un negocio con documentos guarda su base de datos hasta que exista el archivo fiscal (hub#738) |
 
 ### BASE-F01 Ver lo que le falta por configurar al negocio
 <!-- origen: fi:hub/app-web#setup-status-estado-de-configuracion-de-modulos-adr-0063 -->
@@ -2790,6 +2791,35 @@ intentarlo en unos minutos.»; si erplora.com no responde o no puede enviarlo, u
 para escribir directamente. En los dos casos lo escrito se queda y se puede volver a enviar.
 Implicados: ACCOUNTS-F38, BASE-F40
 
+### BASE-F109 Borrar un negocio eliminado pasados sus 90 días
+<!-- origen: nuevo (hub#599; PLAN-DB §6 «Baja»: lo que pasa el día 90) -->
+Estado: parcial — un negocio con documentos guarda su base de datos hasta que exista el archivo fiscal (hub#738)
+Actor: nadie: lo hace el Hub solo, sin que nadie pulse nada
+Pantalla: Ninguna; la dirección del negocio sigue diciendo «Este hub ya no está disponible.»
+Pasos:
+  1. Un negocio eliminado en erplora.com (HUBS-F18, HUBS-F20) cumple 90 días. Hasta ese momento su base de datos se
+     queda intacta y se puede recuperar.
+  2. El Hub mira si guarda documentos: ventas, facturas, registros de VeriFactu, cobros, movimientos de caja, pedidos
+     de la tienda o compras de un cliente, en cualquier estado y aunque la app esté apagada. Si guarda alguno, se
+     detiene aquí: el negocio sigue eliminado, con su base de datos, y lo vuelve a mirar al día siguiente.
+  3. Sin documentos, hace la copia final de sus datos, que se guarda 90 días en el almacén de copias. Mientras se
+     hace, el negocio aún se puede recuperar y erplora.com sigue viendo sus copias. Al terminar vuelve a mirar si
+     guarda documentos, por si entró alguno durante la copia.
+  4. Borra la base de datos de ese negocio, y solo esa. Desde aquí ya no vuelve.
+  5. Queda solo una marca, sin nombre ni datos, para que su dirección siga diciendo «Este hub ya no está disponible.»;
+     sus personas y sus sesiones se van con ella.
+Entra: el negocio eliminado y sus 90 días cumplidos. Nunca una demo, que se borra a su manera al caducar, el negocio
+de la plataforma ni uno que se está moviendo de servidor.
+Sale: la copia final y la base de datos borrada, con el evento `base.hub.purged`; desde ahí erplora.com ya no lista
+sus copias. O, con documentos, la base de datos guardada y en la fila del negocio el motivo
+(`fiscal_archive_missing: <apps>`).
+Si falla: una copia que falla no borra nada, y sin almacén de copias tampoco; una copia o un borrado que falla se
+reintenta (1 min, 5 min, 15 min y luego cada hora) con el error anotado en la fila, sin hacer otra copia si ya la había.
+Si una app no se puede leer, la base de datos se queda. Una fila que no nombra la base de datos propia del negocio no
+borra nada (`invalid_database_name`). Un negocio recuperado durante la copia sigue abierto con su base de datos; ya
+borrándose, erplora.com recibe `hub_purged`. Si el Hub se apaga a media copia, el siguiente la retoma.
+Implicados: HUBS-F18, HUBS-F19, HUBS-F20
+
 ## Para quien lo mantiene
 
 - Las tres consultas vivas del Inicio son de `base/queries.py`, con permiso `base.view_home` y ruta ninja en
@@ -3533,6 +3563,8 @@ con su issue, y llegan con ella. Después llegaron BASE-F21 y BASE-F22 (hub#601)
 
 - **Avisar por correo al dueño cuando debe ampliar (BASE-F40)**: el mercado lo da por supuesto, pero lo manda erplora.com
   (ronda 2026-11-01f de PLAN-HUB y PLAN-SAAS §28) y lleva su flujo y su issue allí.
+- **El archivo fiscal y el borrado de un negocio con documentos (BASE-F109)**, hub#738: hasta que exista, guarda su
+  base de datos pasados los 90 días; el prefijo de sus ficheros en el almacén sigue en hub#613.
 - **La fila de salud del Inicio (BASE-F02)**, hub#573: un punto de extensión más en `LiveAppConfig` y su uso en
   Impresión y la Bandeja de WhatsApp.
 - **El pase en «Mejorar plan» del asistente y de la Bandeja de WhatsApp (BASE-F11)**, hub#723: el asistente exige cambiar

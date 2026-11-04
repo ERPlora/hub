@@ -839,3 +839,9 @@ def load_health(customer: Customer) -> dict:
 )
 def health_detail(ctx: OperationContext, data: HealthDetailIn) -> dict:
     return load_health(find_customer(data.customer_id, data.customer))
+
+
+def keeps_fiscal_documents() -> bool:
+    """Whether this database holds the card sales of its customers (``fiscal_documents_kept`` on this app's config), of any status: a draft counts
+    too, for what it asks is whether a database can go, and that cannot be undone."""
+    return Purchase.objects.exists()

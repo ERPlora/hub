@@ -1156,3 +1156,9 @@ def get_currency(ctx: OperationContext, params: EmptyIn) -> dict:
             "bills": table.get("bills", []),
             "coins": table.get("coins", []),
         }
+
+
+def keeps_fiscal_documents() -> bool:
+    """Whether this database holds its cash movements (``fiscal_documents_kept`` on this app's config), of any status: a draft counts
+    too, for what it asks is whether a database can go, and that cannot be undone."""
+    return Movement.objects.exists()
