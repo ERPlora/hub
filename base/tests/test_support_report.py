@@ -298,7 +298,8 @@ class TestRefused:
 
         report(client, description="My card is 4242 4242 4242 4242")
 
-        assert "4242" not in caplog.text
+        # Whole words of the text: alone, «4242» can be the line a logger wrote from, which caplog.text shows (hub#796).
+        assert "My card" not in caplog.text and "4242 4242" not in caplog.text
 
     def test_the_messages_speak_spanish_to_a_spanish_person(self, client, account, fake_saas, settings):
         fake_saas(raises=ConnectionRefusedError("refused"))
