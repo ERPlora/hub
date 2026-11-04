@@ -216,6 +216,38 @@ def no_test_fallback(monkeypatch):
 
 
 @pytest.fixture(scope="session")
+def django_db_setup(django_db_setup, request, django_db_blocker, django_db_keepdb, django_db_createdb):
+    """The session's test database for any test that asks for this fixture, whatever else the session selects.
+
+    pytest-django makes it only for a selection with a ``django_db`` mark or a ``db`` fixture. Without one, ``default``
+    would stay the developer's database and whatever asks for this (``hub_databases``, ``db_dsn``…) would go on there,
+    under names every such session shares (``base/tenancy/tests/test_session_databases.py``). So it is made here, with
+    the options pytest-django follows, and only if pytest-django did not.
+    """
+    from django.db import DEFAULT_DB_ALIAS
+    from django.test.utils import setup_databases, teardown_databases
+
+    from base.tenancy.tests import hubs
+
+    if hubs.on_the_test_database():
+        yield
+        return
+    verbosity = request.config.option.verbose
+    with django_db_blocker.unblock():
+        made = setup_databases(
+            verbosity=verbosity,
+            interactive=False,
+            aliases={DEFAULT_DB_ALIAS},
+            serialized_aliases=set(),
+            keepdb=django_db_keepdb and not django_db_createdb,
+        )
+    yield
+    if not django_db_keepdb:
+        with django_db_blocker.unblock():
+            teardown_databases(made, verbosity=verbosity)
+
+
+@pytest.fixture(scope="session")
 def hub_databases(django_db_setup, django_db_blocker):
     """The template and the two hubs' databases of this session (``base/tenancy/tests/hubs.py``), dropped at its end."""
     from base.tenancy.tests import hubs

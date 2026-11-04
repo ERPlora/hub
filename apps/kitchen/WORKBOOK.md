@@ -298,8 +298,8 @@ Pantalla: ninguna
 Pasos:
 1. El camarero envía la ronda (KITCHEN-F18) o Ventas la envía sola (por el asistente o la API); la
    que envía Ventas sola llega a Cocina un momento después, sin que nadie haga nada.
-2. Cocina abre una comanda con el número del día (`AAAAMMDD-NNNN`, el día del negocio, hora de
-   Madrid), la ronda de la cuenta, la etiqueta de la cuenta («Mesa 4»), el tipo, la prioridad y el
+2. Cocina abre una comanda con el número del día (`AAAAMMDD-NNNN`, el día del negocio, en su
+   zona horaria), la ronda de la cuenta, la etiqueta de la cuenta («Mesa 4»), el tipo, la prioridad y el
    camarero.
 3. Cada línea que no es un servicio es un plato, en el orden de la cuenta, mandado a su estación
    (KITCHEN-F04); un menú, un plato por cada plato elegido (KITCHEN-F06). Las líneas de servicio no se
@@ -980,8 +980,9 @@ que no tiene ningún papel: solo el sistema (`*`).
 - **Estación eliminada**: no se encuentra ni por id ni por nombre (`kitchen.station_not_found`) y ya no
   sale entre los botones; la pantalla que la recordaba vuelve a «Todas» en vez de quedarse vacía para
   siempre (eliminarla exige que no tenga platos por hacer ni enrutado, F03).
-- **Zona horaria**: fase 1, la del negocio es `settings.TIME_ZONE` (Europe/Madrid): día del número y
-  horas del Historial.
+- **Zona horaria**: la del hub (`base.business.business_zone`): día del número y horas del Historial.
+- **Millares**: los importes agrupan los millares también con cuatro cifras («1.234,56 €»; `formatMoney` de
+  `@erplora/ui/components`, con `useGrouping: 'always'`, porque el CLDR del español espera a cinco: hub#655).
 - **Moneda**: el Total de Comandas va en la moneda del negocio (`useBusinessMoney` de `base`, la de
   `base.business.get`) con los decimales del servidor, nunca los de `Intl` (el forint) ni un euro por defecto:
   mientras el negocio no contesta, una cifra sin símbolo. El `total` del servidor ya va en unidades menores de la

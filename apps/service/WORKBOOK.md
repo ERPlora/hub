@@ -75,7 +75,7 @@ depende de él.
 Los importes (el precio de un servicio y el de cada profesional, el precio cerrado y el descuento en importe
 de un bono, lo pagado por un bono) van en **la moneda del negocio**, la de su país, la que dice **Ajustes →
 Negocio** (euros en España, złoty en Polonia, yenes en Japón), con sus decimales (el yen no tiene), escritos
-con coma o punto: «1500» es un precio de 1500 yenes en Japón y de 1500,00 € en España, y Ventas lo cobra igual.
+con coma o punto: «1500» es un precio de 1500 yenes en Japón y de 1.500,00 € en España, y Ventas lo cobra igual.
 Mientras el negocio no contesta, un importe sale como una cifra sin símbolo, nunca en euros. Los ejemplos de
 este documento son de un negocio de España, en euros.
 
@@ -902,7 +902,8 @@ habla) y la API, con las mismas reglas y los mismos permisos. Un servicio, una c
 nombran por su id o por su nombre; un profesional, por su nombre; una clienta, por su nombre o su
 teléfono. Si un nombre vale para varios, se dice cuáles y se pide que elija (409
 `service.service_ambiguous`, `service.category_ambiguous`, `service.package_ambiguous`,
-`staff.ambiguous_member`, `customer.customer_ambiguous`).
+`staff.ambiguous_member`, `customer.customer_ambiguous`). Antes de cambiar nada, el asistente pide confirmar con su
+tarjeta (BASE-F97), que nombra cada registro como lo nombran las pantallas, nunca por su id.
 
 ### Lo que ofrece: consultas (leen, no cambian nada)
 
@@ -919,6 +920,9 @@ teléfono. Si un nombre vale para varios, se dice cuáles y se pide que elija (4
 | Quién puede hacer un servicio | ver servicios | F33 | `service.assignment.eligible` |
 | Los bonos del catálogo (y los eliminados que alguien compró) | ver bonos | F12, F13 | `service.package.list` |
 | Un bono con sus líneas | ver bonos | F13 | `service.package.get` |
+| Una asignación por su id: el servicio, el profesional y sus minutos y precio propios, con la `label` con la que la nombra la tarjeta del asistente (BASE-F97) | ver servicios | F32 | `service.assignment.get` |
+| Un bono vendido por su id: el bono, la clienta, el día de la venta y su saldo, con su `label` | ver saldos de bonos | F17, F18, F21, F22 | `service.grant.get` |
+| Una sesión de un bono vendido por su id: el bono, la clienta, el servicio y su estado, con su `label` | ver saldos de bonos | F23, F24, F26, F27 | `service.session.get` |
 | Los bonos vendidos, de un bono o de una clienta, con su saldo | ver saldos de bonos | F15, F16 | `service.grant.list` |
 | Los bonos sin cliente | ver bonos sin cliente | F30 | `service.grant.list_orphans` |
 | Si un bono vendido se puede anular y por qué no | anular bonos | F17 | `service.grant.void_check` |
@@ -928,7 +932,8 @@ teléfono. Si un nombre vale para varios, se dice cuáles y se pide que elija (4
 | Los movimientos de un bono | ver saldos de bonos | F19 | `service.movement.list` |
 | Hasta cinco imágenes de la librería para la foto de un servicio, por su nombre y tituladas en el idioma del negocio; no pone ninguna | ver servicios | F34 | `service.service.suggest_image` |
 
-Todas, menos las comprobaciones y las imágenes propuestas, se pueden seguir en vivo.
+Todas, menos las comprobaciones, las imágenes propuestas y las lecturas de una asignación, un bono vendido o una
+sesión, se pueden seguir en vivo.
 
 ### Lo que ofrece: acciones (cambian datos)
 
@@ -1068,6 +1073,8 @@ cajero del producto actual es un empleado: lo que tenía (ver, gastar y conceder
   yen no tiene), nunca negativo, la misma unidad que cobra Ventas (service-business-currency: la pantalla la
   lee y la escribe con `useBusinessMoney` de `base`); el descuento en porcentaje, en
   puntos básicos (1050 = 10,50 %).
+- **Millares**: los importes agrupan los millares también con cuatro cifras («1.234,56 €»; `formatMoney` de
+  `@erplora/ui/components`, con `useGrouping: 'always'`, porque el CLDR del español espera a cinco: hub#657).
 - **El paso del Inicio** (PLAN-HUB ronda 2026-10-21; FIX-SERVICE-SETUP-HOOKS): `ServiceConfig.setup` declara el
   `setup` del módulo viejo (`module.json`, services#26): clave `service.catalog`, sobre `service.catalog.status`, hecho
   con `sellable_services` (en oferta y con la categoría fiscal activa), orden 31, `required` (nivel «Importante»),
@@ -1134,6 +1141,15 @@ cajero del producto actual es un empleado: lo que tenía (ver, gastar y conceder
 - Asistente: toda operación declara `ai` (descripción; en las acciones, `risk`: `high` en archivar,
   eliminar categorías y bonos, anular, ajustar, alta de golpe y ajustes) y todo campo de entrada su
   `description`.
+- La tarjeta de confirmación del asistente (BASE-F97) nombra cada registro que una escritura señala por su id con las
+  marcas `refers` de `schemas.py` (`A_SERVICE`, `A_CATEGORY`, `A_PACKAGE`, `AN_ASSIGNMENT`, `A_GRANT`, `A_SESSION`,
+  `A_MEMBER`, `A_CUSTOMER`), leídas como quien pregunta: el servicio, la categoría, el bono y la clienta por su nombre,
+  el profesional por su nombre completo, la asignación por el servicio y el profesional («Corte · Ana López»), el bono
+  vendido por el bono, la clienta y el día de la venta, porque una clienta puede tener dos iguales («Bono 5 cortes ·
+  Lucía Pérez · 3 oct 2026»), y la sesión por el bono, la clienta y el servicio («Bono 5 cortes · Lucía Pérez · Corte»).
+  Quien no puede ver clientas lee el bono y la sesión sin la clienta. El id lleva su título («Servicio», «Categoría»,
+  «Paquete», «Profesional del servicio», «Bono vendido», «Sesión del bono», «Sesiones del bono»), nunca «Registro». Sin
+  persona detrás, sin permiso o con un id de otro negocio, el registro queda fuera, nunca su id (hub#676).
 - El admin de Django del Hub tiene **CRUD completo** sobre todos los modelos (ronda 12, PLAN §17);
   una escritura cruda del admin no pasa por las reglas ni deja aviso, salvo la del árbol de categorías.
 - Fase 1: el ámbito es la primera parte del Host y los datos se comparten entre `a` y `b`, como en
@@ -1182,6 +1198,8 @@ cajero del producto actual es un empleado: lo que tenía (ver, gastar y conceder
   la sección de su IVA) y se concede con la concesión (asistente o API, F14) diciendo la venta.
 - **Importar servicios desde un fichero**: como en el producto actual, el alta de golpe es del
   asistente y la API.
+- **Decir en la tarjeta del asistente de qué venta, cita, línea de la cuenta o devolución se trata**: son datos de
+  Ventas y de Citas, que no son requisito de Servicios, así que la tarjeta los deja fuera (hub#756).
 
 ## Lo que NO hace, a propósito
 

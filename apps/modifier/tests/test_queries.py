@@ -4,11 +4,11 @@ of the till, the groups of a product (F06) and the valuation of what was chosen 
 import uuid
 
 import pytest
-from live.errors import Conflict, NotFound
+from live.errors import Conflict, NotFound, PermissionDenied
 
 from apps.modifier.models import ModifierGroup, ModifierOption
 
-from .conftest import FOOD, GENERIC, make_category, make_product, run
+from .conftest import FOOD, GENERIC, ctx_with, make_category, make_product, run
 
 pytestmark = pytest.mark.django_db
 
@@ -65,8 +65,8 @@ def test_a_link_to_a_deleted_product_or_category_does_not_count():
     mains = make_category()
     link("Sauces", product_id=str(burger.id))
     link("Sauces", category_id=str(mains.id))
-    run("inventory.product.delete", {"id": str(burger.id)})
-    run("inventory.category.delete", {"id": str(mains.id)})
+    run("inventory.product.delete", {"product": "Burger"})
+    run("inventory.category.delete", {"category": "Mains"})
     assert run("modifier.group.list", {}).rows[0].link_count == 0
 
 
@@ -106,6 +106,60 @@ def test_a_group_by_its_id_or_its_name():
     assert error.value.code == "modifier.group_ambiguous"
     with pytest.raises(NotFound):
         run("modifier.group.get", {"id": str(uuid.uuid7())})
+
+
+def test_an_option_by_its_id_says_its_group_as_the_question_of_two_with_one_name_does():
+    of_drinks = option(group("Drinks").name, "Large")
+    of_chips = option(group("Chips").name, "Large")
+    assert run("modifier.option.get", {"id": str(of_drinks.id)}, role="hub_employee").label == "Large (Drinks)"
+    assert run("modifier.option.get", {"id": str(of_chips.id)}).label == "Large (Chips)"
+    # By its name too, as every reference of the app; two with one name ask which.
+    assert run("modifier.option.get", {"option": "Large", "group": "Chips"}).id == of_chips.id
+    with pytest.raises(Conflict) as error:
+        run("modifier.option.get", {"option": "Large"})
+    assert error.value.code == "modifier.option_ambiguous"
+    with pytest.raises(NotFound):
+        run("modifier.option.get", {"id": str(uuid.uuid7())})
+
+
+def test_a_link_by_its_id_says_its_group_and_what_it_hangs_from():
+    group("Sauces")
+    to_product = link("Sauces", product_id=str(make_product("Burger", tax=GENERIC).id))
+    to_category = link("Sauces", category_id=str(make_category("Mains").id))
+    assert run("modifier.link.get", {"id": str(to_product.id)}, role="hub_employee").label == "Sauces · Burger"
+    assert run("modifier.link.get", {"id": str(to_category.id)}).label == "Sauces · Mains"
+    # By the group and the target too, as every reference of the app.
+    assert run("modifier.link.get", {"group": "Sauces", "product": "Burger"}).id == to_product.id
+    assert run("modifier.link.get", {"group": "Sauces", "category": "Mains"}).id == to_category.id
+    with pytest.raises(NotFound):
+        run("modifier.link.get", {"id": str(uuid.uuid7())})
+
+
+def test_a_link_to_what_is_deleted_is_not_there():
+    group("Sauces")
+    burger = make_product("Burger", tax=GENERIC)
+    to_product = link("Sauces", product_id=str(burger.id))
+    assert run("modifier.link.get", {"id": str(to_product.id)}).label == "Sauces · Burger"
+    run("inventory.product.delete", {"product": "Burger"})
+    with pytest.raises(NotFound):
+        run("modifier.link.get", {"id": str(to_product.id)})
+
+
+def test_a_category_by_its_id_or_its_name_while_it_lives():
+    mains = make_category("Mains")
+    assert run("modifier.category.get", {"id": str(mains.id)}, role="hub_employee").name == "Mains"
+    assert run("modifier.category.get", {"category": "mains"}).id == mains.id
+    run("inventory.category.delete", {"category": "Mains"})
+    with pytest.raises(NotFound):
+        run("modifier.category.get", {"id": str(mains.id)})
+    with pytest.raises(NotFound):
+        run("modifier.category.get", {"id": str(uuid.uuid7())})
+
+
+@pytest.mark.parametrize("read", ["modifier.option.get", "modifier.link.get", "modifier.category.get"])
+def test_each_read_by_id_asks_to_see_the_modifiers(read):
+    with pytest.raises(PermissionDenied):
+        run(read, {"id": str(uuid.uuid7())}, ctx=ctx_with("modifier.manage"))
 
 
 def test_tied_groups_follow_the_list_s_direction():

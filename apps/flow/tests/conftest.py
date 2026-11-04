@@ -63,6 +63,36 @@ def english():
 
 
 @pytest.fixture
+def no_pauses(monkeypatch):
+    """The assistant's door retries at once."""
+    from apps.flow import gateway
+
+    monkeypatch.setattr(gateway, "PAUSES", (0, 0))
+
+
+@pytest.fixture
+def worker(monkeypatch, django_capture_on_commit_callbacks):
+    """One pass of the outbox relay, as the worker runs it every tick (base.relay); ``worker.request`` runs an operation
+    as a request does, with what its COMMIT leaves for after it."""
+    from django.db.backends.base.base import BaseDatabaseWrapper
+
+    from base import relay
+
+    monkeypatch.setattr(BaseDatabaseWrapper, "close_if_unusable_or_obsolete", lambda self: None)
+
+    def tick():
+        with django_capture_on_commit_callbacks(execute=True):
+            return relay.run(timezone.now())
+
+    def request(name, data, ctx=None):
+        with django_capture_on_commit_callbacks(execute=True):
+            return run(name, data, ctx)
+
+    tick.request = request
+    return tick
+
+
+@pytest.fixture
 def make_user(db):
     def make(username: str = "ana", *, host: str | None = "a", role: str = Membership.Role.ADMIN, first_name: str = ""):
         user = get_user_model().objects.create_user(username=username, password="pw", first_name=first_name)

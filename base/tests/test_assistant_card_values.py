@@ -98,9 +98,8 @@ def test_a_table_booking_says_its_day_its_time_and_through_what(language, expect
 
 
 def test_a_moment_with_its_offset_is_said_in_the_businesss_zone_and_a_wall_clock_one_as_it_is():
-    """Without the person at hand (an automation's card), the deployment's zone (Europe/Madrid): the one every app
-    reads a wall-clock time in. An instant of another zone is said at the business's hour; the wall-clock time the
-    model sent (the app books it at the business's hour) as it is, summer or winter."""
+    """Outside a hub, the deployment's zone (Europe/Madrid). An instant of another zone is said at the business's hour;
+    the wall-clock time the model sent (the app books it at the business's hour) as it is, summer or winter."""
     op = get("appointment.appointment.create")
     def start(sent: str) -> str:
         return values(assistant.card(op, {**BOOKING, "start": sent}, "es"))["start"]
@@ -112,9 +111,10 @@ def test_a_moment_with_its_offset_is_said_in_the_businesss_zone_and_a_wall_clock
 
 @pytest.mark.django_db
 def test_a_moment_is_said_in_the_zone_of_the_business_the_person_works_in():
-    """With the person at hand, the business's own zone (Settings › Business: ``base.business.get``)."""
-    Hub.objects.update_or_create(slug="a", defaults={"name": "Bar A", "timezone": "Atlantic/Canary"})
-    card = assistant.card(get("appointment.appointment.create"), BOOKING, "es", ctx=ctx())
+    """In the person's hub, the business's own zone (Settings › Business), the clock every app reads."""
+    hub, _ = Hub.objects.update_or_create(slug="a", defaults={"name": "Bar A", "timezone": "Atlantic/Canary"})
+    with use_hub(hub):
+        card = assistant.card(get("appointment.appointment.create"), BOOKING, "es", ctx=ctx())
     assert values(card)["start"] == "2 nov 2026, 9:00"
 
 
@@ -353,19 +353,19 @@ def test_no_list_of_texts_sent_as_they_are_is_named():
 #: them out. An attempt key (``attempt_key``) is no reference. Only ever lower: an app that marks its own lowers its
 #: number here, and none comes in.
 UNNAMED_REFERENCES = {
-    "appointment": 34,
+    "appointment": 25,
     "combo": 25,
     "customer": 22,
     "demo": 3,
     "inventory": 15,
     "invoice": 1,
     "kitchen": 23,
-    "modifier": 14,
     "online_booking": 7,
     "payment": 8,
-    "sale": 101,
     "schedule": 4,
-    "service": 35,
+    # The sale and the appointment a voucher or a session came from, the line of an order that holds a session and the
+    # reference of a return: data of apps Services does not require, so it reads none of them (hub#756).
+    "service": 6,
     "staff": 15,
     "task": 15,
     "tax": 4,
@@ -378,7 +378,6 @@ UNNAMED_REFERENCES = {
 #: or those their ``choices_of`` mark names —, by app: their card says that value as sent. Only ever lower, as above.
 UNLABELLED_LISTS = {
     "kitchen": 1,
-    "sale": 3,
     "tax": 5,
     "website": 4,
     "whatsapp_inbox": 2,
@@ -445,6 +444,9 @@ class UnnamedIn(Schema):
     )
     mode: Literal["kiosk", "frobnicated"]
     source: Literal["counter", "phone"]
+    served: Literal["dine_in", "takeaway"] = Field(json_schema_extra={"choices_of": "kitchen.order_type"})
+    served_badly: Literal["dine_in", "teleport"] = Field(json_schema_extra={"choices_of": "kitchen.order_type"})
+    each_served: list[Literal["dine_in", "takeaway"]] = Field(json_schema_extra={"choices_of": "kitchen.order_type"})
 
 
 UNNAMED = Operation(
@@ -460,8 +462,8 @@ UNNAMED = Operation(
 
 
 def test_the_ratchet_counts_a_reference_nobody_marks_and_a_list_nobody_labels():
-    assert unnamed(UNNAMED) == (["member_id"], ["mode"])
-    assert by_app([UNNAMED, UNNAMED]) == ({"appointment": 2}, {"appointment": 2})
+    assert unnamed(UNNAMED) == (["member_id"], ["mode", "served_badly"])
+    assert by_app([UNNAMED, UNNAMED]) == ({"appointment": 2}, {"appointment": 4})
 
 
 class MarkedIn(Schema):
@@ -491,6 +493,9 @@ KNOWN = json.loads(
 #: Every datum the screen knows by its name that a write's schema titles itself, and what its card calls it in
 #: Spanish: the title its app wrote, never the generic word for its name («Registro: 5 (Terraza)»).
 TITLED_IN_SPANISH = {
+    **{f"appointment.appointment.{action}:id": "Cita" for action in (
+        "cancel", "charge", "complete", "confirm", "delete", "mark_no_show", "reschedule", "start", "update",
+    )},
     "attendance.record.close_for_terminated:id": "Persona",
     "base.api_key.revoke:id": "Clave de API",
     "base.device.remove:id": "Dispositivo",
@@ -499,9 +504,21 @@ TITLED_IN_SPANISH = {
     "base.failed_event.retry:id": "Evento caído",
     "base.import.undo:id": "Importación",
     "base.support.report:description": "¿Qué pasó?",
+    **{f"modifier.group.{action}:id": "Grupo" for action in ("delete", "update")},
+    "modifier.link.detach:id": "Se aplica a",
+    **{f"modifier.option.{action}:id": "Opción" for action in ("delete", "update")},
     **{f"pricing.price_item.{action}:id": "Precio" for action in ("remove", "update")},
     **{f"pricing.price_list.{action}:id": "Tarifa" for action in ("activate", "deactivate", "set_default", "update")},
     **{f"pricing.rule.{action}:id": "Regla de descuento" for action in ("activate", "deactivate", "update")},
+    **{f"sale.department.{action}:id": "Sección" for action in ("delete", "update")},
+    **{f"sale.quick_note.{action}:id": "Nota rápida" for action in ("delete", "update")},
+    **{f"service.assignment.{action}:id": "Profesional del servicio" for action in ("remove", "update")},
+    **{f"service.category.{action}:id": "Categoría" for action in ("delete", "update")},
+    **{f"service.grant.{action}:id": "Bono vendido" for action in ("adjust", "redeem", "void")},
+    **{f"service.package.{action}:id": "Paquete" for action in ("delete", "update")},
+    **{f"service.service.{action}:id": "Servicio" for action in ("archive", "restore", "set_image", "update")},
+    "service.session.release:id": "Sesión del bono",
+    **{f"service.session.{action}:ids": "Sesiones del bono" for action in ("return", "settle")},
     **{f"table.session.{action}:id": "Cuenta" for action in (
         "close", "delete", "link_order", "merge", "park", "restore", "set_guests", "split", "transfer",
     )},

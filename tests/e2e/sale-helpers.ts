@@ -5,9 +5,10 @@
 // `afterAll` (the fiscal documents Invoicing issued for its sales go first: a document keeps its sale).
 // What a run creates is named `E2E-…` (products), `e2e.…` (customers) or `e2e …` (departments, quick
 // notes, check titles); its sales are found by their lines.
-import { type BrowserContext, expect, type Locator, type Page } from '@playwright/test';
+import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, psql, shot, shown } from './helpers';
+import { A, api, login, psql, shot, shown } from './helpers';
+import { createProduct, type Product } from './inventory-helpers';
 import { cleanInvoices, issuedIds } from './invoice-helpers';
 
 export const VIEWPORTS = [
@@ -109,6 +110,87 @@ export async function openTillCart(page: Page): Promise<void> {
   await expect(till).toHaveClass(/pos-till--cart-open/);
 }
 
+/** The sizes where a notice of the till is read: the fleet's three and the lowest phone. */
+const NOTICE_SIZES = [
+  { label: '1440x900', width: 1440, height: 900 },
+  { label: '820x1180', width: 820, height: 1180 },
+  { label: '375x667', width: 375, height: 667 },
+  { label: '320x568', width: 320, height: 568 },
+] as const;
+
+/** One test per size of `NOTICE_SIZES`, each on a page of its own in `locale`, closed after it. */
+export function eachNoticeSize(
+  locale: string,
+  run: (page: Page, context: BrowserContext, size: (typeof NOTICE_SIZES)[number]) => Promise<void>,
+): void {
+  for (const size of NOTICE_SIZES) {
+    test(size.label, async ({ browser }) => {
+      const context = await browser.newContext({ baseURL: A, locale, viewport: { width: size.width, height: size.height } });
+      try {
+        await run(await context.newPage(), context, size);
+      } finally {
+        await context.close();
+      }
+    });
+  }
+}
+
+/** For a `beforeAll`: cash without a cash session (the drawer's lock is sale-cash-gate.spec.ts's) and a dish of the run
+ *  to sell, `E2E <label> Dish <run>`, whose SKU is `E2E-<label>-<run>`. */
+export async function dishForTheTill(browser: Browser, label: string, run: string): Promise<Product> {
+  const context = await browser.newContext({ baseURL: A });
+  const page = await context.newPage();
+  await login(page, A, '/sale/pos');
+  await drawerOff(context);
+  const dish = await createProduct(context, { name: `E2E ${label} Dish ${run}`, sku: `E2E-${label}-${run}`, price: 700, tax_category_key: 'restaurant.food' });
+  await context.close();
+  return dish;
+}
+
+/** The till in `lang`, with `dish` on a check of its own and that check on screen. */
+export async function checkWithDish(page: Page, context: BrowserContext, lang: string, dish: Product): Promise<void> {
+  await login(page, A, '/sale/pos');
+  await context.addCookies([{ name: 'django_language', value: lang, domain: new URL(A).hostname, path: '/' }]);
+  await page.reload();
+  await shown(page).locator(`[data-testid=pos-product-${dish.id}]`).click();
+  await expect(shown(page).locator('[data-testid^=pos-line-]').filter({ hasText: dish.name }).first()).toBeAttached();
+  await openTillCart(page);
+}
+
+/** A box on screen, in the window's pixels. */
+export interface Box {
+  top: number;
+  bottom: number;
+  left: number;
+  right: number;
+}
+
+/** Notices that last `ms` stay until the spec has read them, for a page not loaded yet: where a notice sits is the
+ *  point, not how long it lasts, and read without this a check passes once the notice has gone by itself. No other
+ *  timer changes. */
+export async function holdNotices(page: Page, ms: number): Promise<void> {
+  await page.addInitScript((noticeMs) => {
+    const original = window.setTimeout.bind(window);
+    window.setTimeout = ((run: TimerHandler, after?: number, ...rest: unknown[]) =>
+      original(run, after === noticeMs ? 600_000 : after, ...rest)) as typeof window.setTimeout;
+  }, ms);
+}
+
+/** The notice's own box: the host of an `ion-toast` fills the screen. */
+export function noticeBox(notice: Locator): Promise<Box> {
+  return notice.evaluate((el) => {
+    const box = el.shadowRoot!.querySelector('.toast-wrapper')!.getBoundingClientRect();
+    return { top: box.top, bottom: box.bottom, left: box.left, right: box.right };
+  });
+}
+
+/** The notice whole on a screen `height` high, and not squeezed; `where` says at which step of the spec. */
+export function expectNoticeWhole(box: Box, height: number, where = ''): void {
+  expect.soft(box.top, `the notice whole on screen, at the top ${where}`).toBeGreaterThanOrEqual(0);
+  expect.soft(box.bottom, `the notice whole on screen, at the bottom ${where}`).toBeLessThanOrEqual(height);
+  expect.soft(box.right - box.left, `the notice not squeezed ${where}`).toBeGreaterThan(200);
+}
+
 /** Screenshots of the page in the three viewports, each once `ready` says it painted. */
 export async function shots(page: Page, name: string, ready: (page: Page) => Promise<void>, restore = { width: 1280, height: 860 }): Promise<void> {
   for (const viewport of VIEWPORTS) {
@@ -118,6 +200,9 @@ export async function shots(page: Page, name: string, ready: (page: Page) => Pro
   }
   await page.setViewportSize(restore);
 }
+
+/** Whether two boxes on screen share any of their pixels. */
+export const overlap = (a: Box, b: Box): boolean => a.top < b.bottom && a.bottom > b.top && a.left < b.right && a.right > b.left;
 
 /** Whether the cash register was on before a spec switched it off (`null`: the spec did not touch it). */
 let drawerWasOn: boolean | null = null;
@@ -241,17 +326,24 @@ export async function numberRow(paper: Locator): Promise<NumberRow> {
     const numberBoxes = boxes(number);
     const dateBoxes = boxes(date);
     const numberTop = Math.min(...numberBoxes.map((box) => box.top));
-    const numberBottom = Math.max(...numberBoxes.map((box) => box.bottom));
     const numberRight = Math.max(...numberBoxes.map((box) => box.right));
     const dateTop = Math.min(...dateBoxes.map((box) => box.top));
     const dateLeft = Math.min(...dateBoxes.map((box) => box.left));
     const dateRight = Math.max(...dateBoxes.map((box) => box.right));
+    // How far the date's text is from the number's, against the height of a line. Both are set in the same font, so its
+    // text box cancels out: between text boxes, a box is as tall as the machine's font says, and `ReceiptPaper.vue` asks
+    // for a font the Hub does not serve (hub#731: 3.5 px of nothing on a Mac, with no blank line on the paper). The boxes
+    // of the two flex items would not do either: they touch with padding inside them or a row that stretches them.
+    const dateStyle = getComputedStyle(date);
+    const dateFontSize = parseFloat(dateStyle.fontSize);
+    const dateLineHeight = parseFloat(dateStyle.lineHeight) || dateFontSize * 1.2;
+    const lineGap = dateTop - Math.max(...numberBoxes.map((box) => box.top)) - dateLineHeight;
     return {
       numberLines: lines(number),
       dateLines: lines(date),
       dateBeside: Math.abs(dateTop - numberTop) < lineHeight / 2 && dateLeft >= numberRight,
-      // Right under it, as the next line of the paper: no blank line between them.
-      dateUnder: dateTop >= numberBottom - 1 && dateTop - numberBottom <= 2,
+      // Right under it, as the next line of the paper: no blank line between them, not even inside a line twice the font.
+      dateUnder: lineGap >= -1 && lineGap <= 2 && dateLineHeight < 2 * dateFontSize,
       // Whole pixels: text set flush right lands a hundredth of a pixel either side of the edge.
       overflow: Math.max(0, Math.round(Math.max(numberRight, dateRight) - right)),
     };

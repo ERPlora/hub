@@ -56,8 +56,8 @@ ERPlora no inventa flujos: adopta los que el mercado ya probó.
   Ajustes → Cajones**; al abrir la sesión se elige uno. Con uno solo se elige solo.
 - **Moneda**: la del negocio, la de su país, con sus decimales: el euro en España, el esloti en Polonia. Todos los
   importes de Caja van en ella, y el arqueo enseña sus billetes y monedas.
-- **Zona horaria**: la del negocio. En esta fase, la hora de Madrid (`Europe/Madrid`) para todos: de
-  ella salen el día de negocio, el número de sesión y la hora del cierre automático.
+- **Zona horaria**: la del negocio: de ella sale la hora del cierre automático. El día de negocio y el número de sesión
+  aún salen de la hora de Madrid (`Europe/Madrid`) para todos (hub#771).
 
 Configuración inicial, paso a paso:
 
@@ -566,7 +566,8 @@ Pasos:
    - con una sesión olvidada pasado su corte (F10): lo de después del corte;
    - con una sesión abierta: las rezagadas del turno anterior, confirmadas mientras se cerraba (su Z
      ya no las recoge).
-2. Pulsa «Ver» para ver la lista (cuándo, tipo, importe, método y documento).
+2. Pulsa «Ver» para ver la lista (cuándo, tipo, importe, método y documento). Es solo de lectura: un
+   único botón, **Cerrar**.
 3. Al abrir la sesión, cuenta ese efectivo en el fondo: ya está en el cajón (la ventana de abrir lo
    recuerda).
 Entra: los cobros, anulaciones y devoluciones de Ventas que no cayeron en ninguna sesión.
@@ -738,6 +739,9 @@ cajero del producto actual es un empleado.
   declara `apps.py` como tarea programada (`*/5 * * * *`, `collapse`), que corre el worker
   (`base/scheduler.py`, 2026-10-15), y
   `session.open` lo aplica antes de abrir.
+- **Millares**: los importes agrupan los millares también con cuatro cifras («1.234,56 €»; `formatMoney` de
+  `@erplora/ui/components`, con `useGrouping: 'always'`, porque el CLDR del español espera a cinco: hub#653). Un
+  billete o moneda (`formatFace`) se escribe con la misma regla y sin decimales si es entero («5.000 Ft»).
 - **Monedas**: la del negocio es la de su país, que da `base.business.get` desde el registro de este hub (APP-BASE-6),
   y en el hub propio de ERPlora (sin registro en la fase 1, `create_platform_hub`, con todas las apps activas), la del
   país de su emisor (`PLATFORM_ISSUER_COUNTRY`). En el servidor, `business_currency` de Ventas (`apps.sale.queries`,
@@ -750,9 +754,9 @@ cajero del producto actual es un empleado.
   sale con el símbolo del negocio. Los billetes y monedas de 18 monedas viven en `queries.DENOMINATIONS` (las mismas
   del producto actual).
   El total de un arqueo lo suma el servidor; un billete o moneda de otra moneda es 422.
-- **Zona horaria (fase 1)**: `Europe/Madrid` (`TIME_ZONE` del Hub) para todos los negocios: día de
-  negocio, número de sesión y corte del cierre automático. Cuando el Hub guarde la zona de cada negocio,
-  saldrá de ahí.
+- **Zona horaria**: el corte del cierre automático y la hora que dice su aviso son del reloj del negocio
+  (`base.business.business_zone`). El día de negocio y el número de sesión siguen en `TIME_ZONE` (`Europe/Madrid`) para
+  todos los negocios (hub#771).
 - **Inicio** (ronda PLAN-HUB 2026-10-21; FIX-CASH_REGISTER-SETUP-HOOKS): `setup` y `widgets` de `apps.py`, los
   del `module.json` viejo (sin `bell`). El paso `cash_register.drawer` lee `updated_at` de
   `cash_register.settings.get` (orden 90, no `required`, permiso `cash_register.manage_settings`, refresco por

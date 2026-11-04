@@ -77,7 +77,7 @@ ERPlora no inventa flujos: adopta los que el mercado ya probó.
 - Mesas necesita **Ventas** (la cuenta de cada mesa es una cuenta abierta de Ventas) y **Clientes**
   (el cliente de una mesa y el olvido de su nombre). Se encienden con ella y no se apagan mientras
   Mesas esté encendida.
-- Las horas (apertura, cierre, reservas) son las del negocio: en esta fase, **Europe/Madrid**.
+- Las horas (apertura, cierre, reservas) son las del negocio, en su zona horaria.
 
 Configuración inicial, paso a paso:
 
@@ -1014,7 +1014,7 @@ Ventas (`sale.add_sale`), que tienen los cuatro papeles.
 - **Cerrar a mano una mesa cuya cuenta de Ventas está vacía** (sin líneas ni cobros) la anula con
   `sale.order.void` con la sesión de quien cierra: Ventas deja anular una cuenta vacía a quien monta
   cuentas (`sale.add_sale`), sin `sale.void_sale`. Mesas nunca amplía los permisos de nadie.
-- **Hora del negocio**: fase 1, `settings.TIME_ZONE` (Europe/Madrid); las retenciones de Reservas
+- **Hora del negocio**: `base.business.business_zone` (la zona del hub); las retenciones de Reservas
   traen fecha y hora de pared y se guardan con esa zona. «Hoy» en el plano es el día del negocio.
 - **Asistente**: cada operación declara `ai` (descripción; `risk: "high"` en cerrar, trasladar,
   fusionar, borrar zonas, mesas y cuentas) y cada campo de `schemas.py` su `description`.
@@ -1074,6 +1074,8 @@ Ventas (`sale.add_sale`), que tienen los cuatro papeles.
     servidor; lo cobrado, en la moneda en que se cobró, que no se reescribe; mientras el negocio no
     contesta, la cifra sin símbolo): el producto actual los pintaba siempre en euros
     (`table-business-currency`).
+26. **Los importes agrupan los millares** también con cuatro cifras («1.234,56 €»; `formatMoney` de
+    `@erplora/ui/components`, con `useGrouping: 'always'`, porque el CLDR del español espera a cinco: hub#658).
 
 ### Lo que NO hace, a propósito
 

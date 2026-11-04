@@ -35,6 +35,7 @@ function app(id: string, fields: Partial<AppRow> = {}): AppRow {
     path: `/${id}`,
     requires: [],
     required_by: [],
+    refusal: null,
     ...fields,
   };
 }
@@ -119,6 +120,15 @@ describe('turning an app on or off (PLAN-HUB §9)', () => {
       ['task', false, true],
       ['flow', true, false],
       ['stock', false, false],
+    ]);
+  });
+
+  it('neither is offered for an app that refuses it: the server would always say no (hub#618, hub#694)', () => {
+    const NEVER_OFF = app('verifactu', { refusal: 'It never goes off.' });
+    const ONLY_THERE = app('flow', { state: 'off', chosen: false, path: null, refusal: 'Only in Spain.' });
+    expect([NEVER_OFF, ONLY_THERE].map((row) => [row.id, canTurnOn(row), canTurnOff(row)])).toEqual([
+      ['verifactu', false, false],
+      ['flow', false, false],
     ]);
   });
 

@@ -499,6 +499,48 @@ export async function hostPage(
   return { context, page };
 }
 
+/** The owner of `a` on `next`, with the Hub in Spanish (its language cookie, as the language picker leaves it). */
+export async function signedInSpanish(
+  browser: Browser,
+  viewport: { width: number; height: number },
+  next: string,
+): Promise<{ context: BrowserContext; page: Page }> {
+  const context = await browser.newContext({ baseURL: A, viewport, locale: 'es-ES' });
+  const page = await context.newPage();
+  await login(page, A, next);
+  await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
+  // A reload, not a goto: the login already left the page on `next`, and a goto to the same address with a hash
+  // would not load it again.
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('lang', /^es/);
+  return { context, page };
+}
+
+/** The capture once the screen settled and nothing scrolls sideways. */
+export async function settledCapture(page: Page, name: string): Promise<void> {
+  await expect(shown(page).locator('ion-skeleton-text:visible')).toHaveCount(0);
+  expect(await horizontalOverflow(page), `${name}: no sideways scroll`).toBeLessThanOrEqual(0);
+  await capture(page, name);
+}
+
+/** What the page on screen marks with this `data-testid`. */
+export const testid = (page: Page, id: string): Locator => shown(page).locator(`[data-testid="${id}"]`);
+
+/** `id`'s row in the Apps screen. */
+export const appRow = (page: Page, id: string): Locator => shown(page).locator(`[data-testid="apps-row"][data-id="${id}"]`);
+
+/** The names the topbar's «My apps» (the menu of the apps, from the session) lists now. */
+export async function menuApps(page: Page): Promise<string[]> {
+  await testid(page, 'topbar-apps').click();
+  const sheet = page.locator('[data-testid="apps-launcher"]').last();
+  const tiles = sheet.locator('[data-testid="apps-launcher-app"]');
+  await expect(tiles.first()).toBeVisible();
+  const names = (await tiles.allInnerTexts()).map((name) => name.trim());
+  await sheet.locator('[data-testid="apps-launcher-close"]').click();
+  await expect(sheet).toBeHidden();
+  return names;
+}
+
 /** The demo's API with the context's session (setup and server-side evidence, never the check). */
 export async function api<T>(
   context: BrowserContext,

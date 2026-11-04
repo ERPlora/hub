@@ -50,6 +50,7 @@ from apps.appointment.queries import (
     ADD_OWN,
     APPOINTMENT_NOT_FOUND,
     BUSY,
+    CHANGE_ALL,
     CHANGE_OWN,
     CUSTOMER_SOURCES,
     MOVABLE,
@@ -394,7 +395,7 @@ def _create(
         staff=member,
         staff_name=member.full_name,
         start=start,
-        end=start + dt.timedelta(minutes=minutes),
+        end=engine.ends_at(start, minutes),
         duration_minutes=minutes,
         status=S.PENDING if pending else S.CONFIRMED,
         source=source,
@@ -466,7 +467,7 @@ def create_appointment(ctx: OperationContext, data: AppointmentCreateIn) -> dict
         ctx,
         member,
         start,
-        start + dt.timedelta(minutes=minutes),
+        engine.ends_at(start, minutes),
         customer=by_customer,
         confirm_overlap=data.confirm_overlap,
     )
@@ -511,12 +512,12 @@ def bulk_create(ctx: OperationContext, data: BulkCreateIn) -> dict:
         ctx,
         member,
         engine.wall(starts[0], zone).date(),
-        engine.wall(starts[-1] + dt.timedelta(minutes=minutes), zone).date(),
+        engine.wall(engine.ends_at(starts[-1], minutes), zone).date(),
     )
     settings = current_settings()
     created = []
     for start in starts:
-        end = start + dt.timedelta(minutes=minutes)
+        end = engine.ends_at(start, minutes)
         try:
             _judge(
                 ctx,
@@ -622,7 +623,7 @@ def _move(
             else appointment.duration_minutes
         )
     new_start = start or appointment.start
-    new_end = new_start + dt.timedelta(minutes=minutes)
+    new_end = engine.ends_at(new_start, minutes)
     _judge(
         ctx,
         member,
@@ -936,6 +937,8 @@ def mark_no_show(ctx: OperationContext, data: AppointmentRefIn) -> dict:
         "reason; its time becomes free. on_behalf_of_customer=true (with the customer) when she cancels herself: it "
         "must be hers and the business's cancellation policy applies. Ask the person before doing it.",
         "risk": "high",
+        # An automation cancels anybody's (``is_own``), so a yes to it is only of someone who may too (FLOW-F28).
+        "yes_permission": CHANGE_ALL,
     },
 )
 def cancel(ctx: OperationContext, data: CancelIn) -> dict:
@@ -1279,7 +1282,7 @@ def _book_window(
             except engine.NonexistentTime:
                 start, code = None, "invalid_start"
         if code is None:
-            end = start + dt.timedelta(minutes=minutes)
+            end = engine.ends_at(start, minutes)
             code = engine.verdict(agenda, start, end, now=now(), customer=True)
         if code:
             report["skipped"].append(

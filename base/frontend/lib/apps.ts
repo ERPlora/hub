@@ -66,15 +66,16 @@ function namesOf(ids: readonly string[], apps: readonly AppRow[]): string[] {
   return ids.map((id) => names.get(id) ?? id).sort((a, b) => a.localeCompare(b));
 }
 
-/** «Turn on»: an app that is off (one without its right is bought on erplora.com, never turned on here). */
+/** «Turn on»: an app that is off (one without its right is bought on erplora.com, never turned on here) and that the
+ *  server would not refuse (its `refusal`: the row says why instead, hub#694). */
 export function canTurnOn(app: AppRow): boolean {
-  return app.state === 'off';
+  return app.state === 'off' && !app.refusal;
 }
 
 /** «Turn off»: an app the business turned on: on, being set up or that could not be (it gives up on it; its tables, if
- *  any were made, stay). */
+ *  any were made, stay), and that the server would not refuse (its `refusal`: the row says why instead, hub#618). */
 export function canTurnOff(app: AppRow): boolean {
-  return isWanted(app);
+  return isWanted(app) && !app.refusal;
 }
 
 /** «Retry»: an app whose tables could not be made in the business's own database (`base.app.retry`). */

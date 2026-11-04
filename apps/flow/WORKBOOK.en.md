@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:26a125565b5be807c9ced65c58096ea9a2eb0c82dd442bb73dcf868035ed694e -->
+<!-- generated from WORKBOOK.md sha256:3d5d3be165cdbf13a3ff373933fe6049cdeed51997bbfbc9d9641c52cbf9d097 -->
 
 ## What it is for and who it is for
 
@@ -68,7 +68,7 @@ automations; **starting from a template** of the gallery; and what the assistant
 2. Automations use **notices and actions of other apps**: the gallery and the drop-downs only offer those of
    the apps that are on in the business. Nine of the ten cards in the gallery create a **task**, so they need
    the **Tasks** app; without it the gallery hides them and says what is missing.
-3. Schedules are read in the business's time: in phase 1, **Europe/Madrid**.
+3. Schedules are read in the business's time, in its time zone.
 
 Initial setup, step by step:
 
@@ -434,8 +434,9 @@ Out: the automation's full list of permissions (`flow.flow.granted`). Before the
 nothing to allow: the tab says so and asks to save.
 If it fails: if the list names something that does not exist in the business, or something that needs a
 person in front (cancelling, refunding, erasing data, sending to the tax agency, seating a group that
-arrives…), it is refused whole and it says what. The only exception is "Cancel a reservation": it is allowed
-when an **Ask the assistant** step with "Ask me first" uses it (FLOW-F37), and only then. Nobody grants what
+arrives…), it is refused whole and it says what. The only exceptions are "Cancel a reservation" and "Cancel an
+appointment": they are allowed when an **Ask the assistant** step with "Ask me first" uses them (FLOW-F37), and only
+then. Nobody grants what
 they cannot do themselves: "You cannot allow what you may not do yourself: "…"." (nor an integration with
 its key). Each step acts only with the permission it was granted, never with all those of whoever set it
 up. Booking with only the name and phone of whoever books finds or creates their customer card without
@@ -787,7 +788,7 @@ there (`flow.question.asked`); the history says "Asked managers; waiting for an 
 Changing the automation afterwards does not change a question already asked. **Try it** says "Would ask …
 and wait up to … hours" with the question filled in as it will go out, without asking. A yes to this question
 does not open the door to what needs a person in front: the steps after it still cannot cancel, refund or
-erase. To cancel a reservation when someone says yes, ask the assistant for it with "Ask me first"
+erase. To cancel a reservation or an appointment when someone says yes, ask the assistant for it with "Ask me first"
 (FLOW-F37, F38).
 If it fails: an empty question, or a wait of less than an hour or more than 30 days, is not saved; a
 question that names a secret is not either.
@@ -1025,8 +1026,8 @@ Steps:
    at the moment of asking.
 3. In **What it may use**, choose with **Add a read or an action** what the assistant will be able to look
    up or do (only those the assistant knows how to use show); × removes one. With none, it can only answer
-   with words: "Nothing yet: it can only answer with words.". "Cancel a reservation" only shows with "Ask me
-   first", and the card warns: "Only after a yes from someone who may do it themselves: "Cancel a
+   with words: "Nothing yet: it can only answer with words.". "Cancel a reservation" and "Cancel an appointment" only
+   show with "Ask me first", and the card warns: "Only after a yes from someone who may do it themselves: "Cancel a
    reservation".".
 4. If you want a query or an action to always receive a piece of data the assistant does not decide, in
    **Fixed data** choose with **Fix a datum** which one ("On behalf of the customer", of "Cancel a
@@ -1048,7 +1049,8 @@ filled in, without asking it, and each fixed piece of data with the value it wou
 used because it is left empty (FLOW-F13). Each query or action it names starts asking for its permission.
 If it fails: an empty request, more than 10 turns, or a request with a secret are not saved; nor is something
 the business does not have, that needs a person in front or that the assistant cannot use ("The assistant
-cannot use "…"."), next to **What it may use**. With "Cancel a reservation" in and "On its own", neither:
+cannot use "…"."), next to **What it may use**. With "Cancel a reservation" or "Cancel an appointment" in and "On its
+own", neither:
 ""…" needs a person's yes first: choose "Ask me first".". Next to **Fixed data**, a fixed piece of data of
 something it cannot use is not saved (""…" has fixed data but the assistant may not use it: add it to what it
 may use or remove its fixed data."), nor one that query or action does not have (""…" is no datum of "…"."),
@@ -1085,11 +1087,15 @@ Steps:
      comes within 15 minutes; later it counts as a first turn (a message of the month, FLOW-F39). A no, or
      nobody answering in 72 hours, cancels the run without doing anything, and the history says the action
      that was not done ("Cancelled: Marta answered no to "Cancel a reservation".", FLOW-F29, F30). "Cancel a
-     reservation" is only approved by someone who can also cancel reservations: anyone else is told "Only
-     someone who may do it themselves can say yes to "Cancel a reservation"." and the question keeps waiting;
+     reservation" is only approved by someone who can also cancel reservations, and "Cancel an appointment" by someone
+     who can change any professional's appointments (someone who can only change their own will not do): anyone else
+     is told "Only someone who may do it themselves can say yes to "Cancel a reservation"." and the question keeps
+     waiting. The card says which appointment it is (whose, when and with whom) to whoever may see it; it is cancelled
+     as the customer would cancel it: outside the business's policy it is not, and the assistant hears so and can say
+     it (APPOINTMENT-F06);
    - with "On its own", it is done on the spot, as the automation, with the same checks as its button on the
      screen; if it asks for several at once, they are all done and it gets back what happened with each one.
-     Cancelling a reservation is never offered to it this way.
+     Cancelling a reservation or an appointment is never offered to it this way.
 5. When it answers without asking for anything else, the history says "The assistant answered: "…"" and the
    run carries on with the steps after it.
 In: the request, what the step names and the automation has been granted, and the run's data.
@@ -1110,7 +1116,7 @@ over while it thinks, it asks again after 5 minutes, from what it had already do
 the action is no longer granted, it is not done, and the notice names it as the history does: ""…" is no
 longer allowed or available, so the assistant's change was not made."; if the action no longer exists, "That
 action is no longer allowed or available, so the assistant's change was not made.".
-Involved: FLOW-F16, FLOW-F24, FLOW-F25, FLOW-F29, FLOW-F30, FLOW-F37, FLOW-F39
+Involved: APPOINTMENT-F06, FLOW-F16, FLOW-F24, FLOW-F25, FLOW-F29, FLOW-F30, FLOW-F37, FLOW-F39
 
 ### FLOW-F39 The SaaS serves an automation's AI step
 Status: done

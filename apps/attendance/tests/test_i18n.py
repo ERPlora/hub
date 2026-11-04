@@ -10,6 +10,8 @@ import pytest
 from django.apps import apps
 from django.utils import translation
 from django.utils.functional import Promise
+from django.utils.translation import gettext_lazy
+from live.meta import Nav
 from live.operations import registry
 
 from apps.attendance import queries, schemas, services
@@ -70,7 +72,7 @@ def module_texts(module) -> list[Promise]:
 
 
 def visible_texts() -> set[str]:
-    """The English source of every lazy text the app shows (menu, store, admin, choices, messages)."""
+    """The catalogue key of every lazy text the app shows (menu, store, admin, choices, messages)."""
     config = apps.get_app_config("attendance")
     lazies = [
         config.verbose_name,
@@ -92,7 +94,13 @@ def visible_texts() -> set[str]:
     for choices in (Record.Status, Record.Source):
         lazies += list(choices.labels)
     with translation.override("en"):
-        return {str(text) for text in lazies} | schema_titles()
+        return {source(text) for text in lazies} | schema_titles()
+
+
+def source(text) -> str:
+    """How the catalogue keys a lazy text: its English, or ``context\x04English`` for a ``pgettext_lazy``."""
+    args = getattr(text, "_args", ())
+    return f"{args[0]}\x04{args[1]}" if len(args) == 2 else str(text)
 
 
 def schema_titles() -> set[str]:
@@ -185,10 +193,25 @@ def test_a_fuzzy_mark_in_attendances_own_catalog_is_seen(tmp_path):
     assert untranslated(po_entries(marked)) == ["Time clock", "attendance menu\x04Clock in"]
 
 
+def missing_from_catalog() -> set[str]:
+    """The visible texts the catalogue has no entry for, each compared by its whole key."""
+    return visible_texts() - set(po_entries(LOCALE / "django.po"))
+
+
 def test_every_visible_text_is_in_the_catalog():
     assert len(visible_texts()) > 60  # positive control: the collection found the app's texts
-    msgids = {key.split("\x04")[-1] for key in po_entries(LOCALE / "django.po")}
-    assert visible_texts() - msgids == set()
+    assert missing_from_catalog() == set()
+
+
+def test_a_text_that_loses_its_context_is_missing_from_the_catalog(monkeypatch):
+    """A label put back without its context while the catalogue keeps only the contexted entry: gettext never finds
+    that entry, so Spanish says another app's words, or the English if no app has it (hub#493). The guard above has to
+    fail on it. The message goes in a variable because ``makemessages`` would take a literal for a text of the app."""
+    message = "Records"
+    label = gettext_lazy(message)
+    config = apps.get_app_config("attendance")
+    monkeypatch.setattr(config, "navigation", [Nav("records", label, "ion:list-outline", "/attendance/records")])
+    assert missing_from_catalog() == {message}
 
 
 def test_the_compiled_catalog_is_current():

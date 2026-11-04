@@ -42,7 +42,8 @@ thread of its own (:class:`Background`, one piece at a time, its own connections
 2026-10-31b, C8): the loop starts them and goes on, so a copy of minutes never holds the relay, the tasks, VeriFactu or
 the hubs due. ``_data`` takes one hub with data work due (``base.services.claim_next_data_hub``, under its lease): a reset asked (its database copied by
 ``base.tenancy.dumps``, then, only if the copy was kept, its sections emptied by ``base.hub.reset_apply`` in its
-database) or the copy of a business that left (tried again later when it fails); ``_usage`` measures the last UTC day
+database), the copy of a business that left (tried again later when it fails), or, past its 90 days, its final copy and
+the drop of its database (``base.tenancy.offboarding``; not while it keeps fiscal documents); ``_usage`` measures the last UTC day
 once it ended (``base.usage``, 00:15 UTC, before the SaaS collects it at 01:15; once a night whichever worker claims it).
 Neither runs with ``databases_only``. On the way out the worker waits for them :data:`BACKGROUND_GRACE_SECONDS` at most:
 a copy hears the stop, kills ``pg_dump`` and gives its lease back, and its work stays due. A third thread moves the hubs
@@ -87,7 +88,7 @@ from live.operations import get as get_operation
 
 from base import activation, catalog, metrics, outbound, queries, relay, scheduler, services, usage
 from base.services import reap_demos
-from base.tenancy import dumps, migrator, move, provision
+from base.tenancy import dumps, migrator, move, offboarding, provision
 from base.tenancy.connections import close_hub_aliases, close_this_threads_connections
 from base.schemas import AppActivationSettleIn, HubResetApplyIn
 from base.tenancy.context import use_control, use_hub
@@ -394,7 +395,8 @@ def _code() -> migrator.CodeMigrations:
 
 def _data(now: dt.datetime, stop: threading.Event | None = None) -> None:
     """The data work of one hub due by ``now``, under its lease (round 2026-10-30 of PLAN-DB, decision 2 and proposal
-    (a)): a reset asked (its database copied, then its sections emptied) or the copy of a business that left. It runs in
+    (a)): a reset asked (its database copied, then its sections emptied), the copy of a business that left, or a business
+    past its 90 days (``base.tenancy.offboarding``). It runs in
     the worker's data thread (:class:`Background`), one hub at a time: a copy takes a while, and the loop goes on
     meanwhile. A failure is logged and the work stays due (a lease lost is left to its holder); ``stop`` set stops the
     copy in course (``pg_dump`` killed), its lease given back and the work left due for the next worker."""
@@ -413,6 +415,8 @@ def _data(now: dt.datetime, stop: threading.Event | None = None) -> None:
             cancelled = stop.is_set if stop is not None else None
             if hub is not None and hub.reset_requested_at is not None:
                 _reset(hub, cancelled)
+            elif hub is not None and services.past_retention(hub, now):
+                offboarding.retire(hub.pk, now, cancelled)
             elif hub is not None and services.offboarding_due(hub):
                 _offboarding_copy(hub, now, cancelled)
     except dumps.DumpStopped:

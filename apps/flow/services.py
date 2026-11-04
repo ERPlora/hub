@@ -76,6 +76,7 @@ from apps.flow.queries import (
     proposal_held,
     PERSON_PARAMS,
     words_for,
+    yes_permission,
 )
 from apps.flow.schemas import (
     AnsweredOut,
@@ -111,6 +112,7 @@ from apps.flow.schemas import (
 )
 from base import assistant as hub_assistant
 from base import outbound
+from base.business import business_zone
 
 logger = logging.getLogger(__name__)
 
@@ -172,11 +174,6 @@ _CALL_FAILURES = {
 
 def _actor(ctx: OperationContext) -> str:
     return "" if ctx.actor is None else str(ctx.actor)[:128]
-
-
-def _business_zone() -> dt.tzinfo:
-    """The business's time zone (phase 1: ``settings.TIME_ZONE``, Europe/Madrid)."""
-    return timezone.get_default_timezone()
 
 
 # --- The document on an automation ------------------------------------------------------------------
@@ -249,7 +246,7 @@ def _next_fire(flow: Flow, now: dt.datetime) -> dt.datetime | None:
     if not flow.enabled:
         return None
     if flow.trigger_kind == Flow.Trigger.SCHEDULE:
-        return document.next_fire(flow.schedule, now, _business_zone())
+        return document.next_fire(flow.schedule, now, business_zone())
     if flow.trigger_kind == Flow.Trigger.AT and flow.run_at and flow.run_at > now:
         return flow.run_at
     return None
@@ -1565,11 +1562,11 @@ def _carry_on(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, left:
 
 def _may_say_yes(ctx: OperationContext, run: FlowRun) -> None:
     """A yes to the assistant's change that needs a person in front (cancelling a booking, ``ASK_FIRST``) is only of
-    someone who may make it themselves: the yes lends nothing (the old engine's «no elevation»); the change still runs
-    as the automation."""
+    someone who may make it themselves, whoever's it is (``yes_permission``): the yes lends nothing (the old engine's
+    «no elevation»); the change still runs as the automation."""
     proposal = (run.outputs.get(TURN) or {}).get("proposal") or {}
     op = grantable_operations().get(str(proposal.get("operation") or ""))
-    if op is not None and needs_a_person(op) and not ctx.has(op.permission):
+    if op is not None and needs_a_person(op) and not ctx.has(yes_permission(op)):
         message = str(APPROVAL_BEYOND_YOU) % {"name": action_label(op, ctx.language)}
         raise PermissionDenied(message, code="flow.approval_beyond_you")
 
@@ -1956,13 +1953,13 @@ def fire_due(ctx: OperationContext, data: DueIn) -> dict:
     )
     fired = 0
     for flow in due:
-        key = f"{flow.trigger_kind}:{flow.next_fire_at.astimezone(_business_zone()).isoformat()}"
+        key = f"{flow.trigger_kind}:{flow.next_fire_at.astimezone(business_zone()).isoformat()}"
         if not FlowRun.objects.filter(flow=flow, trigger_key=key).exists():
             run = _start(ctx, flow, kind=flow.trigger_kind, key=key, input={}, now=now)
             _advance(ctx, run, flow, now)
             fired += 1
         flow.next_fire_at = (
-            document.next_fire(flow.schedule, now, _business_zone())
+            document.next_fire(flow.schedule, now, business_zone())
             if flow.trigger_kind == Flow.Trigger.SCHEDULE
             else None
         )

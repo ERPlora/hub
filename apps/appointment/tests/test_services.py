@@ -19,6 +19,7 @@ from apps.appointment.models import Appointment, BlockedTime, Counter, History, 
 from base.api_keys import KeyCaller
 
 from .conftest import (
+    MADRID,
     MONDAY,
     assign,
     at,
@@ -361,6 +362,104 @@ def test_the_customer_cancels_only_with_the_notice_in_real_hours(salon, monkeypa
     )
     refused("appointment.cancellation_notice_required", lambda: cancel(close))
     assert cancel(far).status == "cancelled"
+
+
+AUTUMN = dt.date(2026, 10, 25)  # Madrid's day of 25 hours: 03:00 goes back to 02:00
+SPRING = dt.date(2027, 3, 28)  # Madrid's day of 23 hours: 02:00 jumps to 03:00
+ACROSS_THE_CHANGE = [
+    pytest.param(AUTUMN, "01:37", 90, "2026-10-25T02:07:00+01:00", id="25h-day-90-min"),
+    pytest.param(AUTUMN, "02:30", 60, "2026-10-25T02:30:00+01:00", id="25h-day-60-min"),
+    pytest.param(SPRING, "01:37", 90, "2027-03-28T04:07:00+02:00", id="23h-day-90-min"),
+    pytest.param(SPRING, "01:30", 60, "2027-03-28T03:30:00+02:00", id="23h-day-60-min"),
+]
+
+
+def assert_lasts_real_time(appointment_id, minutes: int, end: str) -> None:
+    """Read back in UTC, the subtraction counts real time, not the wall clock's."""
+    saved = Appointment.objects.get(pk=appointment_id)
+    assert saved.end - saved.start == dt.timedelta(minutes=minutes)
+    assert saved.end.astimezone(MADRID).isoformat() == end
+    assert saved.duration_minutes == minutes
+
+
+@pytest.mark.parametrize(("day", "start", "minutes", "end"), ACROSS_THE_CHANGE)
+def test_an_appointment_lasts_its_real_minutes_the_nights_the_clock_changes(salon, monkeypatch, day, start, minutes, end):
+    pin_clock(monkeypatch, at(day, "00:01"))
+    out = book(salon, start, day=day, duration_minutes=minutes)
+    assert out.end.isoformat() == end
+    assert_lasts_real_time(out.id, minutes, end)
+
+
+@pytest.mark.parametrize(("day", "start", "minutes", "end"), ACROSS_THE_CHANGE)
+def test_an_appointment_moved_onto_the_change_lasts_its_real_minutes(salon, monkeypatch, day, start, minutes, end):
+    pin_clock(monkeypatch, at(day, "00:01"))
+    booked = book(salon, "10:00", day=day, duration_minutes=minutes)
+    moved = run("appointment.appointment.reschedule", {"id": str(booked.id), "start": wall(day, start)})
+    assert moved.end.isoformat() == end
+    assert_lasts_real_time(booked.id, minutes, end)
+
+
+@pytest.mark.parametrize(("day", "start", "minutes", "end"), ACROSS_THE_CHANGE)
+def test_a_batch_books_each_time_for_its_real_minutes(salon, monkeypatch, day, start, minutes, end):
+    pin_clock(monkeypatch, at(day, "00:01"))
+    out = run(
+        "appointment.appointment.bulk_create",
+        {
+            "customer_id": str(salon.lucia.id),
+            "services": [{"service_id": str(salon.cut.id)}],
+            "staff_id": str(salon.ana.id),
+            "duration_minutes": minutes,
+            "starts": [wall(day, start)],
+        },
+    )
+    assert_lasts_real_time(out.rows[0].id, minutes, end)
+
+
+def test_the_night_the_clock_jumps_a_booking_is_judged_up_to_its_real_end(salon, monkeypatch):
+    # 00:30 + 3 real hours ends at 04:30 on the wall: 04:00 is taken (the wall clock's sum ended at 03:30).
+    pin_clock(monkeypatch, at(SPRING, "00:01"))
+    make_settings(allow_overlapping=False)
+    book(salon, "04:00", day=SPRING)
+    refused("appointment.slot_taken", lambda: book(salon, "00:30", day=SPRING, duration_minutes=180))
+
+
+def test_the_night_the_clock_goes_back_a_booking_is_judged_up_to_its_real_end(salon, monkeypatch):
+    # 01:00 + 2.5 real hours ends at 02:30 the second time: 03:00 is free (the wall clock's sum ended at 03:30).
+    pin_clock(monkeypatch, at(AUTUMN, "00:01"))
+    make_settings(allow_overlapping=False)
+    book(salon, "03:00", day=AUTUMN)
+    out = book(salon, "01:00", day=AUTUMN, duration_minutes=150)
+    assert_lasts_real_time(out.id, 150, "2026-10-25T02:30:00+01:00")
+
+
+def batch_at(salon, day: dt.date, start: str, minutes: int):
+    return run(
+        "appointment.appointment.bulk_create",
+        {
+            "customer_id": str(salon.lucia.id),
+            "services": [{"service_id": str(salon.cut.id)}],
+            "staff_id": str(salon.ana.id),
+            "duration_minutes": minutes,
+            "starts": [wall(day, start)],
+        },
+    )
+
+
+def test_the_night_the_clock_jumps_a_batch_is_judged_up_to_its_real_end(salon, monkeypatch):
+    # 00:30 + 3 real hours ends at 04:30 on the wall: 04:00 is taken (the wall clock's sum ended at 03:30).
+    pin_clock(monkeypatch, at(SPRING, "00:01"))
+    make_settings(allow_overlapping=False)
+    book(salon, "04:00", day=SPRING)
+    refused("appointment.slot_taken", lambda: batch_at(salon, SPRING, "00:30", 180))
+
+
+def test_the_night_the_clock_goes_back_a_batch_is_judged_up_to_its_real_end(salon, monkeypatch):
+    # 01:00 + 2.5 real hours ends at 02:30 the second time: 03:00 is free (the wall clock's sum ended at 03:30).
+    pin_clock(monkeypatch, at(AUTUMN, "00:01"))
+    make_settings(allow_overlapping=False)
+    book(salon, "03:00", day=AUTUMN)
+    out = batch_at(salon, AUTUMN, "01:00", 150)
+    assert_lasts_real_time(out.rows[0].id, 150, "2026-10-25T02:30:00+01:00")
 
 
 def test_a_time_the_clock_change_skips_is_a_422_on_the_start(salon):

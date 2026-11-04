@@ -23,14 +23,20 @@ The rules, without the database: ``base.services`` (``base.app.enable``, ``base.
 - **The plan's limit**: the SaaS's photo carries ``plan.max_apps`` (0, or no key: no limit), how many modules the
   business may *choose*; the ones brought along do not count. A photo with a lower limit than the chosen ones (a plan
   lowered) turns nothing off: it only refuses turning on one more (PLAN §32, point 3).
-- **An app's veto**: a module may refuse to go off while it has something unfinished (VeriFactu with records the AEAT
-  has not accepted yet, VERIFACTU-F32) by defining ``can_disable(self, ctx) -> str | None`` on its ``LiveAppConfig``:
-  the reason, in the person's language, or ``None``. It runs in the transaction of ``base.app.disable``, in the
+- **An app's refusal**: a module may refuse to go off (VeriFactu once on in Spain, VERIFACTU-F32) by defining
+  ``can_disable(self, ctx) -> str | None`` on its ``LiveAppConfig``, and to go on (VeriFactu outside Spain,
+  VERIFACTU-F01) by defining ``can_enable`` alike: the reason, in the person's language, or ``None``. Each runs in the
+  transaction of ``base.app.disable`` or ``base.app.enable``, and when ``base.app.list`` says it beforehand, in the
   language of who asks (``ctx.language``), so a hook that only calls ``gettext`` already answers in it.
 
 What is off is also out of everything that asks which apps are on (``base.relay.active_apps``): its operations answer
 404 ``app_inactive`` (``base.entitlement.operation_database``), the relay and the Home leave it out and the menu does
 not list it. Its tables are never dropped: turned on again, it has its data.
+
+**What the router asks** (:func:`has_tables`, ``base.tenancy.router``, on every query of a hub's model): whether a module
+has its tables in a hub's own database, from the row the context holds (``Hub.schema_apps``, read when the context
+opened), so what a business has costs no call; only what that row does not list is asked of control's row through the
+cache. Tables are never dropped: a row that lists a module is right however old it is, one that does not may be behind.
 """
 
 import logging
@@ -68,9 +74,18 @@ OFF_APPS_TTL = 60
 #: «activating». Kept and forgotten with the apps off; read only when both are kept. One call per key: the two keys hash
 #: to different slots of the Valkey cluster, which refuses a call on both (``base.cache``).
 CREATING_APPS_CACHE = "base.apps_creating:"
+#: The modules whose tables a hub's own database has, as control's row says (``Hub.schema_apps``), kept and forgotten with
+#: them: what is refused is read from control once a minute at most. Behind, it can only say «not yet» (PLAN-DB §9).
+CREATED_APPS_CACHE = "base.apps_created:"
+#: What the migrator always notes of a database it confirmed: a row without it knows nothing of what that database has.
+CONFIRMED_BY = "base"
 
 #: The hosts whose rows the running change wrote and has not committed yet: what it reads of them is never kept.
 _changing: ContextVar[frozenset[str]] = ContextVar("base_activation_changing", default=frozenset())
+
+#: The hooks a module refuses by (:func:`refusals`): to go off, and to go on.
+CAN_DISABLE = "can_disable"
+CAN_ENABLE = "can_enable"
 
 #: ``{label: what it requires}``, a module's direct ``requires`` (acyclic: ``live.checks``).
 Graph = Mapping[str, Iterable[str]]
@@ -195,6 +210,13 @@ def disabling(label: str, current: Mapping[str, Activation], graph: Graph) -> di
     return {other: OFF_ROW for other in [label, *sorted(off - {label})]}
 
 
+def keeping_on(label: str, current: Mapping[str, Activation], graph: Graph) -> list[str]:
+    """Whose refusal to go off keeps ``label`` on: the modules wanted on that need it (they would have to go off first)
+    and itself; with none, itself and what would go off along with it."""
+    needed = required_by(label, current, graph)
+    return [*needed, label] if needed else list(disabling(label, current, graph))
+
+
 def chosen_on(current: Mapping[str, Activation], *, among: Iterable[str] | None = None) -> int:
     """How many modules wanted on the business chose (``among`` those, if given): what the plan's limit counts, those
     whose tables are being made included."""
@@ -213,20 +235,31 @@ def plan_limit(photo: Any) -> int | None:
     return limit
 
 
-def veto(labels: Iterable[str], *, ctx: Any, configs: Iterable[Any] | None = None) -> tuple[str, str] | None:
-    """The first of ``labels`` whose ``can_disable(ctx)`` gives a reason, with it; ``None`` when none refuses. Each
-    hook runs in the language of who asks: its reason is said in it, whatever the process runs in."""
+def refusals(
+    labels: Iterable[str], *, ctx: Any, hook: str = CAN_DISABLE, configs: Iterable[Any] | None = None
+) -> dict[str, str]:
+    """``{label: its reason}`` of those of ``labels`` whose ``hook`` (:data:`CAN_DISABLE`, :data:`CAN_ENABLE`) gives one,
+    in the order of ``labels``. Each hook runs once, in the language of who asks: its reason is said in it, whatever the
+    process runs in."""
     by_label = {config.label: config for config in (module_configs() if configs is None else configs)}
     language = getattr(ctx, "language", None)
+    said: dict[str, str] = {}
     for label in labels:
-        hook = getattr(by_label.get(label), "can_disable", None)
-        if not callable(hook):
+        ask = getattr(by_label.get(label), hook, None)
+        if not callable(ask):
             continue
         with translation.override(language) if language else nullcontext():
-            reason = hook(ctx)
+            reason = ask(ctx)
         if isinstance(reason, str) and reason.strip():
-            return label, reason.strip()
-    return None
+            said[label] = reason.strip()
+    return said
+
+
+def veto(
+    labels: Iterable[str], *, ctx: Any, hook: str = CAN_DISABLE, configs: Iterable[Any] | None = None
+) -> tuple[str, str] | None:
+    """The first of ``labels`` that refuses by ``hook``, with its reason (:func:`refusals`); ``None`` when none does."""
+    return next(iter(refusals(labels, ctx=ctx, hook=hook, configs=configs).items()), None)
 
 
 def is_platform(scope: Scope) -> bool:
@@ -265,6 +298,49 @@ def creating_apps(scope: Scope) -> frozenset[str]:
     return _kept(scope)[1]
 
 
+def has_tables(hub: Any, label: str) -> bool:
+    """Whether ``label``'s tables are in ``hub``'s own database, as far as control knows: only a module may lack them.
+
+    What the row in hand lists has them, for free: this runs on every query. A row never confirmed (:data:`CONFIRMED_BY`:
+    ``migrator.is_behind`` says so too, and the next ``migrate_hubs`` confirms it) says nothing, and nothing is refused
+    on it. Only what a confirmed row does not list goes on: it may be a row read before the tables were made, so it asks
+    what control says now, through the cache."""
+    recorded = hub.schema_apps or ()
+    if label in recorded or CONFIRMED_BY not in recorded:
+        return True
+    if label not in module_graph():
+        return True
+    created = _created_apps(hub)
+    return created is None or label in created
+
+
+def _created_apps(hub: Any) -> frozenset[str] | None:
+    """What control says now of ``hub``'s database, from the cache when it has it, else from its row (kept); ``None`` when
+    it says nothing: no row, no database of its own or a row never confirmed. A cache that does not answer is logged and
+    the row is read: never a guess."""
+    key = CREATED_APPS_CACHE + hub.slug
+    try:
+        kept = cache.get(key)
+    except Exception:
+        logger.exception("base.activation.cache_unavailable: what %s has created is read from its row.", hub.slug)
+        kept = None
+    if isinstance(kept, list):
+        return frozenset(kept)
+    from base import services  # base.services imports this module
+
+    row = services.registry_row(hub.pk)
+    if row is None or CONFIRMED_BY not in (row.schema_apps or ()):
+        return None
+    created = services.apps_created(row)
+    if created is None:
+        return None
+    try:
+        cache.set(key, sorted(created), OFF_APPS_TTL)
+    except Exception:
+        logger.exception("base.activation.cache_unavailable: what %s has created was read and not kept.", hub.slug)
+    return created
+
+
 def _kept(scope: Scope) -> tuple[frozenset[str], frozenset[str]]:
     """``(off, creating)`` of ``scope``'s business, from the cache when it has both, else from its rows (kept, unless
     the running change wrote them)."""
@@ -297,10 +373,11 @@ def changing(host: str) -> Iterator[None]:
 
 
 def forget(host: str) -> None:
-    """Drop ``host``'s apps off from the cache: after the COMMIT of a change, the next read sees it, in every process.
-    A cache that does not answer is logged; what it kept ends with its timeout."""
+    """Drop what is kept of ``host``'s apps from the cache: after the COMMIT of a change or the migrator's run
+    (``migrator.ensure_schema``), the next read sees it, in every process. A cache that does not answer is logged; what
+    it kept ends with its timeout."""
     try:
-        for key in (OFF_APPS_CACHE + host, CREATING_APPS_CACHE + host):
+        for key in (OFF_APPS_CACHE + host, CREATING_APPS_CACHE + host, CREATED_APPS_CACHE + host):
             cache.delete(key)
     except Exception:
         logger.exception("base.activation.cache_unavailable: the apps off of %s could not be forgotten.", host)
