@@ -565,22 +565,24 @@ def test_a_business_outside_spain_gets_no_verifactu_from_a_template_and_the_load
 
 
 def test_an_app_that_refuses_to_go_on_with_rows_in_the_blueprint_leaves_the_load_partial(born, load, monkeypatch):
-    """Its rows did not load: that is not complete, whatever the reason."""
-    monkeypatch.setattr(apps.get_app_config("service"), "can_enable", lambda ctx: "Not here.", raising=False)
+    """Its rows did not load: that is not complete, whatever the reason. The only other app of the file goes on, so
+    nothing else can make the load partial."""
+    monkeypatch.setattr(apps.get_app_config("table"), "can_enable", lambda ctx: "Not here.", raising=False)
 
-    loaded = load(born, template="hair_salon.es")
+    loaded = load(born, file_base64=a_file(data={"table.zone": [{"name": "Terrace"}]}, apps=("website", "table")))
 
-    service = next(app for app in loaded.report.apps if app.id == "service")
-    assert (service.status, service.reason) == ("inactive", "Not here.")
+    table = next(app for app in loaded.report.apps if app.id == "table")
+    assert (table.status, table.reason) == ("inactive", "Not here.")
     assert loaded.status == "partial"
 
 
-def test_an_app_the_plan_leaves_off_still_leaves_the_load_partial_even_without_rows(born, load):
-    """A better plan changes that one, so the load is not over; only what can never go on here is."""
+def test_an_app_the_plan_leaves_off_leaves_the_load_partial_even_without_rows(born, load):
+    """A better plan changes that one, so the load is not over; only what can never go on here is. Neither app has rows
+    and the plan's limit is the only thing that leaves one off."""
     with_max_apps("c", 1)
 
-    loaded = load(born, template="restaurant.es")
+    loaded = load(born, file_base64=a_file(data={}, apps=("website", "printing")))
 
     off = [app for app in loaded.report.apps if app.status == "inactive"]
-    assert [app for app in off if not app.datasets and app.reason]
+    assert [(len(app.datasets), bool(app.reason)) for app in off] == [(0, True)]
     assert loaded.status == "partial"
