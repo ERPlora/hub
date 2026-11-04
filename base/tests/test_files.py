@@ -21,12 +21,17 @@ from django.core.files.base import ContentFile
 from django.core.files.storage import FileSystemStorage, InMemoryStorage, storages
 from django.utils import translation
 from django.utils.translation import gettext
+from live.context import system_context
 from live.errors import Conflict, InvalidPayload, NotFound, OperationError
+from live.operations import get
 from storages.backends.s3 import S3Storage
 from storages.utils import clean_name, safe_join
 
-from base import files
+from base import files, registry
+from base.models import Hub
+from base.schemas import HubStateIn
 from base.storage import hub_prefix
+from base.tests.test_files_api import b64, http, owner, raw
 
 A = uuid.UUID("0199c4b0-0000-7000-8000-00000000000a")
 B = uuid.UUID("0199c4b0-0000-7000-8000-00000000000b")
@@ -303,6 +308,91 @@ def test_past_the_plan_s_space_one_refusal_says_the_same_for_every_app_that_keep
         "en": "There is no space left for that file: your plan includes 1 GB.",
         "es": "No queda espacio para ese archivo: tu plan incluye 1 GB.",
     }
+
+
+KEPT = {"a.pdf": b"a" * 60, "b.pdf": b"b" * 60, "Facturas/c.pdf": b"c" * 60}
+BOUGHT_DOWN_SPACE = {"used_bytes": 180, "limit_bytes": 100}
+
+
+def with_space(slug, space):
+    """A newer photo of ``slug`` whose plan includes ``space`` bytes, through the door the SaaS uses."""
+    hub = Hub.objects.get(slug=slug)
+    answer = get("base.hub.state_apply")(
+        system_context(registry.REGISTRY_SCOPE),
+        HubStateIn(id=hub.id, version=hub.state_version + 1, photo={"plan": {"max_storage_bytes": space}}),
+    )
+    assert answer.applied
+
+
+def post_files(client, action, host="a.localhost:8000", **body):
+    return http(client, "post", f"/api/files/{action}", host=host, data=body, content_type="application/json")
+
+
+def upload_over_http(client, name, size, host="a.localhost:8000"):
+    return post_files(client, "upload", host=host, folder="", name=name, content_base64=b64(b"x" * size))
+
+
+def listed(client):
+    return [http(client, "get", "/api/files", data={"folder": folder}).json() for folder in ("", "Facturas")]
+
+
+def assert_reads(client, path, content):
+    response = raw(client, path)
+    assert response.status_code == 200
+    assert b"".join(response.streaming_content) == content
+
+
+@pytest.fixture
+def bought_down(client, make_user, store):
+    """``KEPT`` under a plan of 1 MB, then bought down to 100 bytes: 180 used, 100 allowed. Over HTTP and with the
+    SaaS's photo, because the plan only reaches the files through the operations. Gives what was listed before."""
+    for path, content in KEPT.items():
+        put(store, Hub.objects.get(slug="a").id, path, content)
+    owner(client, make_user)
+    with_space("a", 1024**2)
+    before = listed(client)
+    with_space("a", 100)
+    return before
+
+
+@pytest.mark.django_db
+def test_a_lower_plan_loses_no_file_and_only_refuses_one_more(client, make_user, bought_down):
+    # PLAN-SAAS §31, rule 5: what exceeds the new plan stays and is used; nothing more goes in until it is under the
+    # limit.
+    frozen = [{**seen, "space": BOUGHT_DOWN_SPACE} for seen in bought_down]
+    assert listed(client) == frozen
+    for path, content in KEPT.items():
+        assert_reads(client, path, content)
+
+    refused = upload_over_http(client, "one-more.pdf", 1)
+    assert refused.status_code == 409
+    assert refused.json()["error"]["code"] == "base.file_no_space"
+    assert listed(client) == frozen
+
+    # Under the limit again, what fits goes in and what does not stays out.
+    for path in ("a.pdf", "b.pdf"):
+        assert post_files(client, "delete", path=path).status_code == 200
+    assert upload_over_http(client, "too-big.pdf", 41).status_code == 409
+    assert upload_over_http(client, "fits.pdf", 40).status_code == 200
+
+    # Another business's plan is its own: this business's lower plan refuses it nothing.
+    owner(client, make_user, "b")
+    assert upload_over_http(client, "theirs.pdf", 1024, host="b.localhost:8000").status_code == 200
+
+
+@pytest.mark.django_db
+def test_a_lower_plan_leaves_what_is_there_in_use(client, bought_down):
+    # PLAN-SAAS §31, rule 5, «and is used»: none of these adds a byte, and BASE-F73 and BASE-F75 give no refusal for
+    # the space.
+    assert post_files(client, "folder", parent="", name="Contratos").status_code == 200
+    assert post_files(client, "rename", path="a.pdf", name="renombrado.pdf").status_code == 200
+    assert post_files(client, "move", path="b.pdf", to="Facturas").status_code == 200
+
+    assert_reads(client, "renombrado.pdf", KEPT["a.pdf"])
+    assert_reads(client, "Facturas/b.pdf", KEPT["b.pdf"])
+    top, in_facturas = listed(client)
+    assert {folder["path"] for folder in top["folders"]} == {"Contratos", "Facturas"}
+    assert top["space"] == in_facturas["space"] == BOUGHT_DOWN_SPACE
 
 
 def test_an_upload_into_a_folder_that_is_not_there_is_refused(store):
