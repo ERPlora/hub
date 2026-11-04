@@ -10,6 +10,7 @@ from decimal import ROUND_HALF_UP, Decimal
 from typing import Any
 from uuid import UUID
 
+from babel.dates import format_date
 from django.db.models import Count, F, Q, QuerySet, Value
 from django.db.models.functions import Concat
 from django.utils import timezone
@@ -20,6 +21,7 @@ from live.errors import AppInactive, Conflict, InvalidPayload, NotFound, Permiss
 from live.operations import INTERNAL, UnknownOperation, get, operation
 
 from apps.staff.models import Member, Role, Schedule, StaffSettings, TimeOff
+from base.business import babel_locale
 from base.models import HubUser, Membership
 from base.queries import hub_user_of
 from apps.staff.schemas import (
@@ -47,15 +49,17 @@ from apps.staff.schemas import (
     MyTimeOffIn,
     PageIn,
     RoleListIn,
+    RoleOut,
     RolePage,
     RoleResolveIn,
     RoleResolveOut,
     ScheduleListIn,
-    ScheduleOut,
+    ScheduleDetailOut,
     SchedulePage,
     SettingsGetIn,
     SettingsOut,
     TimeOffDetailOut,
+    TimeOffNamedOut,
     TimeOffDetailPage,
     TimeOffListIn,
     TimeOffPage,
@@ -540,6 +544,23 @@ def list_roles(ctx: OperationContext, params: RoleListIn) -> dict:
     return _page(_sorted(roles, params.sort, ROLE_ORDER), params)
 
 
+# Not an assistant tool: what names a role on the card of a write (``schemas.A_ROLE``), retired too, since a retired
+# one can be brought back; the model finds them in ``staff.role.list``.
+@operation(
+    "staff.role.detail",
+    kind="query",
+    permission="staff.view",
+    input=ByIdIn,
+    output=RoleOut,
+    ai=INTERNAL,
+)
+def role_detail(ctx: OperationContext, data: ByIdIn) -> Role:
+    role = load_role(data.id)
+    if role is None:
+        raise NotFound(str(ROLE_NOT_FOUND))
+    return role
+
+
 def load_role(role_id: UUID) -> Role | None:
     return with_member_count(Role.objects.filter(pk=role_id)).first()
 
@@ -579,13 +600,14 @@ def list_schedules(ctx: OperationContext, params: ScheduleListIn) -> dict:
     kind="query",
     permission="staff.view",
     input=ByIdIn,
-    output=ScheduleOut,
+    output=ScheduleDetailOut,
     ai={"description": "Returns one work schedule with its weekly working hours."},
 )
 def schedule_detail(ctx: OperationContext, data: ByIdIn) -> Schedule:
     schedule = load_schedule(data.id)
     if schedule is None:
         raise NotFound(str(SCHEDULE_NOT_FOUND))
+    schedule.label = f"{schedule.member.full_name} · {schedule.name}"
     return schedule
 
 
@@ -787,6 +809,34 @@ def time_off_detail(ctx: OperationContext, data: ByIdIn) -> TimeOff:
     if time_off is None:
         raise NotFound(str(TIME_OFF_NOT_FOUND))
     return time_off
+
+
+# Not an assistant tool: what names a request on the card of a write (``schemas.A_TIME_OFF``). The detail holds its
+# reason and needs a right an employee withdrawing their own does not have; this says what their list already shows.
+@operation(
+    "staff.time_off.get",
+    kind="query",
+    permission="staff.view_time_off",
+    input=ByIdIn,
+    output=TimeOffNamedOut,
+    ai=INTERNAL,
+)
+def get_time_off(ctx: OperationContext, data: ByIdIn) -> TimeOff:
+    time_off = live_time_off().filter(pk=data.id).first()
+    if time_off is None:
+        raise NotFound(str(TIME_OFF_NOT_FOUND))
+    days = _days_of(time_off, ctx.language)
+    time_off.label = f"{time_off.member_name} · {time_off.leave_type_label} · {days}"
+    return time_off
+
+
+def _days_of(time_off: TimeOff, language: str) -> str:
+    """Its days as the card writes a date: the one day, or the first and the last."""
+    locale = babel_locale(language)
+    first = format_date(time_off.start_date, "medium", locale=locale)
+    if time_off.end_date == time_off.start_date:
+        return first
+    return f"{first} – {format_date(time_off.end_date, 'medium', locale=locale)}"
 
 
 @operation(

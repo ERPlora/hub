@@ -368,7 +368,6 @@ UNNAMED_REFERENCES = {
     # reads none of them and base.E009 refuses a mark (hub#756). The one that came in, the sale's line (hub#769), is the
     # same datum as the sale beside it on service.grant.create: naming them is that issue's to decide.
     "service": 7,
-    "staff": 15,
     "task": 15,
     "tax": 4,
     "verifactu": 6,
@@ -521,6 +520,10 @@ TITLED_IN_SPANISH = {
     **{f"service.service.{action}:id": "Servicio" for action in ("archive", "restore", "set_image", "update")},
     "service.session.release:id": "Sesión del bono",
     **{f"service.session.{action}:ids": "Sesiones del bono" for action in ("return", "settle")},
+    **{f"staff.member.{action}:id": "Miembro del personal" for action in ("deactivate", "terminate", "update")},
+    "staff.role.update:id": "Rol",
+    **{f"staff.schedule.{action}:id": "Horario" for action in ("delete", "set_active", "update")},
+    **{f"staff.time_off.{action}:id": "Ausencia" for action in ("approve", "cancel", "reject")},
     **{f"table.session.{action}:id": "Cuenta" for action in (
         "close", "delete", "link_order", "merge", "park", "restore", "set_guests", "split", "transfer",
     )},
