@@ -20,7 +20,7 @@ from django.conf import settings
 from django.core import checks
 from django.utils import timezone, translation
 from live.context import OperationContext, Scope
-from live.assistant import NAMED, REFERS
+from live.assistant import CHOICES_OF, NAMED, REFERS, choices_of
 from live.errors import NotFound
 from live.operations import Operation, get, registry
 from ninja import Field, Schema
@@ -374,10 +374,9 @@ UNNAMED_REFERENCES = {
     "whatsapp_inbox": 14,
 }
 
-#: The closed lists (``enum`` of text) of the assistant's writes with a value the models of their app give no label,
-#: by app: their card says that value as sent. Only ever lower, as above.
+#: The closed lists (``enum`` of text) of the assistant's writes with a value the models give no label — of their app,
+#: or those their ``choices_of`` mark names —, by app: their card says that value as sent. Only ever lower, as above.
 UNLABELLED_LISTS = {
-    "invoice": 1,
     "kitchen": 1,
     "sale": 3,
     "tax": 5,
@@ -401,10 +400,13 @@ def unnamed(op: Operation) -> tuple[list[str], list[str]]:
         if prop.get("format") == "uuid" and assistant.refers_of(prop) is None and not is_attempt_key(prop):
             references.append(path)
         choices = [value for value in prop.get("enum", []) if isinstance(value, str) and value]
-        if choices and not all(assistant._choice_label(op.app_label, entity, name, value) for value in choices):
+        app_label, field_name = choices_of(op.app_label, name, prop)
+        if choices and not all(assistant._choice_label(app_label, entity, field_name, value) for value in choices):
             lists.append(path)
         if isinstance(prop.get("items"), dict):
-            walk(name, prop["items"], f"{path}[]", depth + 1)
+            # A list's mark names the values of its items, as it does on the card.
+            mark = {CHOICES_OF: prop[CHOICES_OF]} if CHOICES_OF in prop else {}
+            walk(name, {**mark, **prop["items"]}, f"{path}[]", depth + 1)
         for inner, inner_prop in prop.get("properties", {}).items():
             walk(inner, inner_prop, f"{path}.{inner}", depth + 1)
 
@@ -460,6 +462,22 @@ UNNAMED = Operation(
 def test_the_ratchet_counts_a_reference_nobody_marks_and_a_list_nobody_labels():
     assert unnamed(UNNAMED) == (["member_id"], ["mode"])
     assert by_app([UNNAMED, UNNAMED]) == ({"appointment": 2}, {"appointment": 2})
+
+
+class MarkedIn(Schema):
+    how: Literal["counter", "phone"] | None = Field(None, json_schema_extra={CHOICES_OF: "source"})
+    ways: list[Literal["counter", "phone"]] = Field([], json_schema_extra={CHOICES_OF: "source"})
+    odd: Literal["counter", "frobnicated"] = Field("counter", json_schema_extra={CHOICES_OF: "source"})
+    elsewhere: Literal["counter", "phone"] = Field("counter", json_schema_extra={CHOICES_OF: "demo.source"})
+
+
+MARKED = dataclasses.replace(UNNAMED, name="appointment.appointment.marked", input=MarkedIn, output=MarkedIn)
+
+
+def test_the_ratchet_reads_a_closed_list_by_the_field_its_mark_names_as_the_card_does():
+    """hub#708: a marked datum is no unnamed list when that field names every value, by itself or through a list; a value
+    the field does not name, or a field another app does not have, still counts."""
+    assert unnamed(MARKED)[1] == ["odd", "elsewhere"]
 
 
 # ── A datum the screen knows by its name, titled by its app (FIX-HUB-BASE-ASSISTANT-DANGER-CARD-CALLS-THE-RECORD-BY-ITS-FIELD-NAME) ──

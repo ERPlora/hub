@@ -4,10 +4,12 @@ Settings › Data's (APP-BASE-2) that read or load a file take it in base64 in t
 any other view; both are commands (POST): reading what a file brings writes nothing, but no query string carries it.
 """
 
+import base64
+
 from asgiref.sync import sync_to_async
 from django.core.files.storage import storages
 from live.ninja import bind, run_operation
-from ninja import Query, Router
+from ninja import Query, Router, Status
 from ninja.decorators import decorate_view
 
 from django.http import HttpResponse
@@ -84,9 +86,7 @@ async def app_list(request):
 
 # Turning an app on or off, with the plan's limit (PLAN-HUB §9): the app by its name or its id in the body; which app
 # a name names, by ``base.app.get`` (hub#539). While a hub's own database gets the app's tables (S3) the same answer
-# comes with 202: accepted, the worker finishes it.
-from django.http import JsonResponse  # noqa: E402
-
+# comes with 202: accepted, the worker finishes it. Both codes are in the OpenAPI, with the same schema.
 from base.schemas import AppChangeIn, AppRefIn  # noqa: E402
 
 
@@ -96,10 +96,10 @@ async def app_get(request, params: Query[AppRefIn]):
 
 
 def _accepted_while_creating(answer):
-    return JsonResponse(answer.model_dump(mode="json"), status=202) if answer.state == "creating" else answer
+    return Status(202, answer) if answer.state == "creating" else answer
 
 
-@bind(router, "base.app.enable", "/apps/enable")
+@bind(router, "base.app.enable", "/apps/enable", status=(200, 202))
 async def app_enable(request, data: AppChangeIn):
     return _accepted_while_creating(await run_operation(request, services.app_enable, data))
 
@@ -109,7 +109,7 @@ async def app_disable(request, data: AppChangeIn):
     return await run_operation(request, services.app_disable, data)
 
 
-@bind(router, "base.app.retry", "/apps/retry")
+@bind(router, "base.app.retry", "/apps/retry", status=(200, 202))
 async def app_retry(request, data: AppChangeIn):
     return _accepted_while_creating(await run_operation(request, services.app_retry, data))
 
@@ -484,8 +484,8 @@ async def api_doc_settings_update(request, data: ApiDocSettingsUpdateIn):
 # ── Assistant (APP-BASE-9) ──────────────────────────────────────────────────────────────────────────────────────
 
 from base import assistant  # noqa: E402 - the assistant's block keeps its imports with it
-from base.schemas import AssistantReportIn, AssistantTranscribeIn, AssistantTurnIn  # noqa: E402
-from base.schemas import SupportReportIn  # noqa: E402
+from base.schemas import AssistantReportIn, AssistantSpeakIn, AssistantTranscribeIn, AssistantTurnIn  # noqa: E402
+from base.schemas import SaasPassIn, SupportReportIn  # noqa: E402
 
 #: A turn's body: the conversation and the attachments of its last question, in base64 (the gateway takes 32 MB).
 MAX_ASSISTANT_TURN_BODY = 32 * 1024 * 1024
@@ -519,10 +519,40 @@ async def support_report(request, data: SupportReportIn):
     return await run_operation(request, services.support_report, data)
 
 
+@bind(router, "base.saas_pass.create", "/saas-pass")
+async def saas_pass_create(request, data: SaasPassIn):
+    return await run_operation(request, services.saas_pass_create, data)
+
+
 @bind(router, "base.assistant.transcribe", "/assistant/transcribe")
 @decorate_view(accept_body_up_to(MAX_ASSISTANT_AUDIO_BODY))
 async def assistant_transcribe(request, data: AssistantTranscribeIn):
     return await run_operation(request, services.assistant_transcribe, data)
+
+
+# The panel plays the mp3 itself (a ``blob:`` of the answer, CSP ``media-src``); an integration that accepts only JSON
+# gets the operation's output, the mp3 in base64. A refusal is the error envelope either way.
+@bind(
+    router,
+    "base.assistant.speak",
+    "/assistant/speak",
+    openapi_extra={
+        "responses": {
+            200: {
+                "description": "The text read aloud: the mp3, or the operation's JSON when only JSON is accepted.",
+                "content": {"audio/mpeg": {"schema": {"type": "string", "format": "binary"}}},
+            }
+        }
+    },
+)
+async def assistant_speak(request, data: AssistantSpeakIn):
+    spoken = await run_operation(request, services.assistant_speak, data)
+    accepts = request.headers.get("Accept", "")
+    if "application/json" in accepts and "audio/mpeg" not in accepts:
+        return spoken
+    return HttpResponse(
+        base64.b64decode(spoken.content_base64), content_type=spoken.content_type, headers={"Cache-Control": "no-store"}
+    )
 
 
 # ── Locations (round 2026-10-24b, multi-location) ──────────────────────────────────────────────────────────────────

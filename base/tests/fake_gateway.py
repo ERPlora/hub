@@ -31,6 +31,11 @@ class Reply:
     headers: dict[str, str] = field(default_factory=dict)
     #: Hang up after this many frames, without ``[DONE]`` (a connection that dies half way).
     cut_after: int | None = None
+    #: A body that is not JSON (the mp3 of ``/internal/speech/synthesize``), sent as it is with ``content_type``.
+    content: bytes | None = None
+    content_type: str = "application/octet-stream"
+    #: Seconds the door waits before it answers (a gateway slower than the Hub waits for).
+    delay: float = 0.0
 
 
 @dataclass
@@ -101,6 +106,8 @@ class FakeGateway:
                 reply = fake._next(self.path) or Reply(
                     status=404, json={"error": {"code": "hub_unknown", "message": "No such business."}}
                 )
+                if reply.delay:
+                    time.sleep(reply.delay)
                 self.send_response(reply.status)
                 for name, value in reply.headers.items():
                     self.send_header(name, value)
@@ -113,6 +120,12 @@ class FakeGateway:
                         line = frame if isinstance(frame, str) else json.dumps(frame)
                         self.wfile.write(f"data: {line}\n\n".encode())
                         self.wfile.flush()
+                    return
+                if reply.content is not None:
+                    self.send_header("Content-Type", reply.content_type)
+                    self.send_header("Content-Length", str(len(reply.content)))
+                    self.end_headers()
+                    self.wfile.write(reply.content)
                     return
                 payload = json.dumps(reply.json).encode()
                 self.send_header("Content-Type", "application/json")

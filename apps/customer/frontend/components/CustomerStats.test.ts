@@ -4,7 +4,6 @@
 import { describe, expect, it } from 'vitest';
 
 import { business, errorFrame, flush, JAPANESE, mountCustomer, POLISH, subId } from '../__tests__/mount-customer';
-import { formatMoney } from '../lib/money';
 import CustomerStats from './CustomerStats.vue';
 import source from './CustomerStats.vue?raw';
 
@@ -24,7 +23,7 @@ describe('CustomerStats: «Revenue» in the business\'s currency (customer-busin
     const pl = await setup('es');
     await pl.result(pl.call, 'base.business.get', business(POLISH));
     await pl.result(pl.call, 'customer.customer.stats', STATS);
-    expect(revenue(pl)).toBe('1234,56 zł');
+    expect(revenue(pl)).toBe('1.234,56 zł');
 
     const jp = await setup();
     await jp.result(jp.call, 'base.business.get', business(JAPANESE));
@@ -63,7 +62,7 @@ describe('CustomerStats', () => {
       'Revenue',
     ]);
     expect(['total', 'active', 'vip'].map((k) => s.kpi(k).find('.customer-kpi__value').text())).toEqual(['12', '9', '2']);
-    expect(s.kpi('revenue').find('.customer-kpi__value').text()).toBe(formatMoney(123456, 'en'));
+    expect(s.kpi('revenue').find('.customer-kpi__value').text()).toBe('1,234.56');
     expect(['total', 'active', 'vip', 'revenue'].map((k) => s.kpi(k).attributes('data-value'))).toEqual([
       '12',
       '9',
@@ -95,11 +94,13 @@ describe('CustomerStats', () => {
       'VIP',
       'Ingresos',
     ]);
-    expect(s.kpi('revenue').find('.customer-kpi__value').text()).toBe(formatMoney(123456, 'es'));
+    expect(s.kpi('revenue').find('.customer-kpi__value').text()).toBe('1.234,56');
   });
 
-  it('lays the figures in a grid that fits two on a phone (cards of at least 9.5rem)', () => {
-    expect(source).toMatch(/grid-template-columns:\s*repeat\(auto-fill,\s*minmax\(9\.5rem,\s*1fr\)\)/);
+  // Measured in the browser by tests/e2e/base-money-grouping.spec.ts: two on a phone, and a figure on one line.
+  it('lets the cards share each row, two on a phone (cards of at least 9.5rem)', () => {
+    expect(source).toMatch(/flex-wrap:\s*wrap/);
+    expect(source).toMatch(/flex:\s*1 1 9\.5rem/);
   });
 
   it('has no OutfitKit tag and formats nothing by hand', () => {

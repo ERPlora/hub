@@ -130,6 +130,16 @@ def wall(day: dt.date, hhmm: str) -> str:
     return f"{day.isoformat()}T{hhmm}"
 
 
+def pin_clock(monkeypatch, instant: dt.datetime) -> None:
+    """Pins Django's clock (``django.utils.timezone.now``, what the app calls «now») to ``instant``.
+
+    It reads in UTC, as Django's does: adding a ``timedelta`` to a ``ZoneInfo`` instant would count wall-clock
+    hours, and a test of the days the clock changes would not be measuring what production does.
+    """
+    reading = instant.astimezone(dt.UTC)
+    monkeypatch.setattr("django.utils.timezone.now", lambda: reading)
+
+
 # Builders: Schedules (the business's hours)
 
 

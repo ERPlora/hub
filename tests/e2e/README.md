@@ -229,6 +229,10 @@ CI=1 pnpm e2e tests/e2e/base-assistant.spec.ts --workers=1
 
 La cuenta del e2e está en inglés: la spec comprueba las cadenas `en`.
 
+`base-assistant-voice.spec.ts` («Leer en voz alta») depende de `ASSISTANT_SERVER_VOICE` del `runserver` del Hub: sin
+ella (lo normal, ronda 2026-11-04a) corre el caso de la voz del dispositivo y salta los de la voz del servidor; con
+`ASSISTANT_SERVER_VOICE=True`, al revés. Para cubrirlo todo, se corre una vez con cada valor.
+
 Las specs del asistente de cada app (`<app>-assistant.spec.ts`) encienden en su `beforeAll` las apps que necesitan y que
 están apagadas en `a` con `turnOnMissing(context, A, NEEDED, turnedOn)` (`helpers.ts`), que apunta cada una en
 `turnedOn` cuando ya está encendida, y su `afterAll` apaga solo eso, de la última a la primera, con

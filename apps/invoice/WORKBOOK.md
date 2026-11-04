@@ -418,9 +418,10 @@ Pasos:
    hoy, sus líneas y la base, los impuestos y el total en negativo; si la factura ya tenía rectificativas
    por diferencias, también lo que queda por rectificar de ella.
 5. Después sale «¿Ejecutar esta acción?» con el «Número» de la factura y el «Motivo» y, en
-   «Lo que va a pasar», la rectificativa que va a nacer: el «Tipo de rectificativa», el «Siguiente número»
-   de la serie (tampoco queda reservado) y la «Base imponible», el «Impuesto» y el «Total» en negativo,
-   con la moneda del negocio. Escribe «CONFIRMAR» y pulsa «Ejecutar». Se emite esa misma rectificativa,
+   «Lo que va a pasar», la rectificativa que va a nacer: el «Tipo de rectificativa» por su nombre, nunca solo
+   por su código («Rectificativa: resto de causas (R4)»; también si el asistente lo pide al rectificar), el
+   «Siguiente número» de la serie (tampoco queda reservado) y la «Base imponible», el «Impuesto» y el «Total»
+   en negativo, con la moneda del negocio. Escribe «CONFIRMAR» y pulsa «Ejecutar». Se emite esa misma rectificativa,
    a tu nombre, igual que desde la ventana: en **Facturas** la original sale «Cancelada» y hay una
    «Rectificativa» nueva fechada hoy.
 6. Si pulsas «Cancelar», no se emite nada: la factura sigue «Emitida» y el asistente dice que no se hizo.

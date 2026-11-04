@@ -91,8 +91,6 @@ CI=1 pnpm e2e tests/e2e/appointment-charge.spec.ts
 - **hub#636** — Una cita que cruza el cambio de hora dura una hora más (octubre) o menos (marzo) de lo reservado.
 - **hub#687** — La hora del negocio no es la misma en la tarjeta del asistente y en las apps cuando la zona del negocio no
   es la del despliegue (la agenda va en Europe/Madrid).
-- **hub#688** — La prueba de antelación mínima falla el día del cambio de hora y tumba la CI de cualquier PR del Hub en
-  esa hora.
 - **hub#632** — Los importes de cuatro cifras salen sin separador de millares.
 - **hub#631**, **hub#633**, **hub#635** y **hub#637** — una traducción «fuzzy» en inglés, siete textos en español
   con las palabras de otra app y dos fallos de la tarjeta de confirmación del asistente.

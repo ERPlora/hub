@@ -19,6 +19,8 @@ from base.tenancy.context import PLATFORM_SCOPE_KIND
 #: its devices and the way in (APP-BASE-3). Here, not in ``base.queries``, so ``base.services`` can name them too.
 VIEW_HOME = "base.view_home"
 ADMINISTER_HUB = "base.administer_hub"
+#: Who may open this business on erplora.com's panel from the bar (``base/apps.py``: owner, admin and manager).
+OPEN_MANAGEMENT = "base.open_management"
 
 #: Customer roles that run the hub: every permission of every app, whether the app lists them or not.
 FULL_ACCESS_ROLES = frozenset({Membership.Role.OWNER, Membership.Role.ADMIN})

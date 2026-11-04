@@ -124,6 +124,18 @@ describe('CartLine: actions', () => {
     expect(m.find('pos-line-l1-discount').findComponent(HubIcon).props('name')).toBe('ion:pricetag-outline');
   });
 
+  it('the gift button is an outlined gift until the line is comped, then a filled green one', async () => {
+    const open = await setup();
+    const giftButton = open.find('pos-line-l1-gift');
+    expect(giftButton.findComponent(HubIcon).props('name')).toBe('ion:gift-outline');
+    expect(giftButton.classes()).not.toContain('pos-line__icon--success');
+    const comped = await setup({ is_gift: true, gift_reason: 'Birthday' });
+    const compedButton = comped.find('pos-line-l1-gift');
+    expect(compedButton.findComponent(HubIcon).props('name')).toBe('ion:gift');
+    expect(compedButton.classes()).toContain('pos-line__icon--success');
+    expect(compedButton.attributes('aria-pressed')).toBe('true');
+  });
+
   it('no discount button when the business does not allow discounts', async () => {
     const m = await setup({}, { allowDiscounts: false });
     expect(m.find('pos-line-l1-discount').exists()).toBe(false);

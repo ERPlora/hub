@@ -6,9 +6,9 @@
 // only: it sells). People are invited, given a role and removed on erplora.com («Members» of the business: HUBS-F24…
 // F27), which `hub-home` names only for a session opened with the account; who runs the business opens a person's
 // page from the row (their PIN and badge). On a phone each person is a card. A list that cannot be read says so.
-// Both links leave the Hub by `openExternalLink` (gh:hub#439: the installed app opens nothing on a `_blank` link, its
-// system browser does), and «Invite on erplora.com», a way to erplora.com's panel, never in the Google Play copy
-// (`managementOffered`, as «Manage on erplora.com» at the menu's foot, gh:hub#1897).
+// «Invite on erplora.com» leaves the Hub by `openExternalLink` (gh:hub#439: the installed app opens nothing on a `_blank`
+// link, its system browser does), never in the Google Play copy (`managementOffered`, as «Manage on erplora.com» at the
+// menu's foot, gh:hub#1897). «Upgrade plan» goes with the pass (BASE-F11, `useSaasPass`), already signed in.
 import { DataTable, type DataTableColumn, InlineFeedback, StatusPill } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
 import { HubIcon, openExternalLink, useSession, useSurface } from '@erplora/ui/shell';
@@ -19,6 +19,7 @@ import { type HubHome, readJsonBlock } from '../lib/home';
 import { useBaseI18n } from '../lib/i18n';
 import { managementOffered } from '../lib/management';
 import { accessKeys, roleKey } from '../lib/people';
+import { useSaasPass } from '../lib/saas-pass';
 import type { Person } from '../operations';
 
 const { t, locale } = useBaseI18n();
@@ -30,6 +31,7 @@ const admin = computed(() => session.can('base.administer_hub'));
 const home = readJsonBlock<HubHome>('hub-home');
 const membersUrl = home?.members_url ?? '';
 const planUrl = home?.plan_url ?? '';
+const { openSaasPass } = useSaasPass();
 const offered = managementOffered();
 
 const { data, status, refresh } = useLive('base.person.list', {});
@@ -110,7 +112,7 @@ function open(row: Person): void {
           :href="planUrl"
           target="_blank"
           rel="noopener"
-          @click="openExternalLink(planUrl, $event)"
+          @click="openSaasPass('plan', planUrl, $event)"
         >{{ t('base.plan.upgrade') }}</a>
       </template>
     </InlineFeedback>
