@@ -22,6 +22,7 @@ import json
 from collections import defaultdict
 from pathlib import Path
 
+import pytest
 from django.apps import apps
 
 from apps.flow import queries
@@ -70,6 +71,22 @@ def test_the_catalog_reaches_every_module_with_actions():
 
 def test_every_field_an_action_asks_for_or_leaves_has_its_words():
     assert without_words(catalog_names()) == {}
+
+
+@pytest.mark.parametrize("language", ["en", "es"])
+@pytest.mark.parametrize("action", ["sale__record__get", "combo__option__get"])
+def test_a_read_that_names_a_record_on_the_assistants_card_has_a_name_of_its_own(action, language):
+    """The catalog offers every operation with a declared permission, these reads too: without a name of their own the
+    editor composes one from their id («Get · Sales & POS (Record)»)."""
+    assert queries.catalog_operations()[action.replace("__", ".")]
+    actions = json.loads((LOCALE / f"{language}.json").read_text(encoding="utf-8"))["flow"]["actions"]
+    assert actions.get(action, "").strip()
+
+
+def test_every_action_that_takes_a_grant_means_a_voucher_and_says_so():
+    """``grant_id`` is a voucher sold in every action that asks for it or leaves it, as the Sales card calls it."""
+    assert {name.split(".")[0] for name in (where.split()[0] for where in catalog_names()["grant_id"])} == {"sale", "service"}
+    assert (words("en")["grant_id"], words("es")["grant_id"]) == ("Voucher", "Bono")
 
 
 # --- What the events bring ------------------------------------------------------------------------
