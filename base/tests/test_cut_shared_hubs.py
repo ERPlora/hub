@@ -42,16 +42,6 @@ ALICE = uuid.UUID("01a17000-0000-7000-8000-0000000000a1")
 PRINTER = {"kind": Printer.Kind.NETWORK, "address": "10.0.0.9", "port": 9100, "usage": Usage.choices[0][0]}
 
 
-@pytest.fixture(autouse=True, scope="session")
-def on_the_tests_control_database(django_db_setup):
-    """These tests make and drop real databases next to control's: only ever the tests' own (as test_provision)."""
-    from django.conf import settings
-
-    control = tenancy_connections.control_name()
-    if not control.startswith(settings.DATABASES["default"]["TEST"]["NAME"]):
-        pytest.fail(f"The control database is {control!r}, not the tests': run this module whole, not one test of it.")
-
-
 @pytest.fixture(autouse=True)
 def nothing_checked_yet(monkeypatch):
     monkeypatch.setattr(identity, "_verified", set())

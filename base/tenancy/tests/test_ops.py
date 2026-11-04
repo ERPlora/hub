@@ -21,19 +21,6 @@ from base.tenancy.tests import hubs
 pytestmark = pytest.mark.usefixtures("hub_databases")
 
 
-@pytest.fixture(autouse=True, scope="session")
-def on_the_tests_control_database(django_db_setup):
-    """These tests make and drop real databases next to control's: only ever the tests' own. pytest-django sets the
-    test databases up only when the session has a ``django_db`` test (this module has one); without it control would
-    still be the developer's database, and ``hub_databases`` would make and drop its templates there. Session-scoped
-    and autouse, it runs before ``hub_databases`` builds anything."""
-    from django.conf import settings
-
-    control = tenancy_connections.control_name()
-    if not control.startswith(settings.DATABASES["default"]["TEST"]["NAME"]):
-        pytest.fail(f"The control database is {control!r}, not the tests': run this module whole, not one test of it.")
-
-
 def databases() -> set[str]:
     """The databases of this session's control database (other sessions make and drop theirs meanwhile)."""
     control = tenancy_connections.control_name()

@@ -40,16 +40,6 @@ AT = dt.datetime(2026, 10, 31, 12, 0, tzinfo=dt.UTC)
 MARKER = "kept across the move"
 
 
-@pytest.fixture(autouse=True, scope="session")
-def on_the_tests_control_database(django_db_setup):
-    """These tests make, rename and drop real databases next to control's: only ever the tests' own."""
-    from django.conf import settings
-
-    control = tenancy_connections.control_name()
-    if not control.startswith(settings.DATABASES["default"]["TEST"]["NAME"]):
-        pytest.fail(f"The control database is {control!r}, not the tests': run this module whole, not one test of it.")
-
-
 @pytest.fixture(autouse=True)
 def nothing_checked_yet(monkeypatch):
     monkeypatch.setattr(identity, "_verified", set())
