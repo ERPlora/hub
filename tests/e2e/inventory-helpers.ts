@@ -141,14 +141,14 @@ export async function rowAction(page: Page, id: string, action: string): Promise
 
 /** How a «Not configured» chip sits in its box (`within`: the table cell, the card's value or the form's field):
  *  what is wrong with it (none = its icon in sight and its text on one line, whole or ending in «…»; `whole`: it
- *  has to be whole; `titled`: its `title` is its whole text) and its measurements for the report. A part is in
- *  sight when it lies inside the box and inside every box between them that clips (`overflow` not `visible`, the
- *  chip itself included). */
+ *  has to be whole; `reads`: these words of its text end before what the chip cuts, its «…» included; `titled`: its
+ *  `title` is its whole text) and its measurements for the report. A part is in sight when it lies inside the box
+ *  and inside every box between them that clips (`overflow` not `visible`, the chip itself included). */
 export async function chipFit(
   chip: Locator,
-  options: { within: string; whole?: boolean; titled?: boolean },
+  options: { within: string; whole?: boolean; reads?: string; titled?: boolean },
 ): Promise<{ problems: string[]; metrics: Record<string, unknown> }> {
-  return chip.evaluate((el, { within: selector, whole: mustFit, titled }) => {
+  return chip.evaluate((el, { within: selector, whole: mustFit, reads, titled }) => {
     const px = (n: number) => Math.round(n * 10) / 10;
     const box = el.closest(selector);
     if (!box) return { problems: [`no ${selector} around the chip`], metrics: {} };
@@ -201,6 +201,21 @@ export async function chipFit(
     if (!textAt.ok) problems.push(`its text (${textAt.at}) is cut by a box around it (${textAt.sight})`);
     const title = el.getAttribute('title');
     if (titled && title !== whole) problems.push(`its title «${title}» is not its whole text «${whole}»`);
+    // The words have to be read: where they end against the end of the line, which the «…» (at most an em wide) takes.
+    let wordsEnd: number | null = null;
+    let cutAt: number | null = null;
+    if (reads) {
+      const start = (text.textContent ?? '').indexOf(reads);
+      if (start < 0) problems.push(`its text «${whole}» does not say «${reads}»`);
+      else {
+        const words = document.createRange();
+        words.setStart(text, start);
+        words.setEnd(text, start + reads.length);
+        wordsEnd = px(words.getBoundingClientRect().right);
+        cutAt = px(painter.getBoundingClientRect().right - (parseFloat(style.paddingRight) || 0) - (fits ? 0 : parseFloat(style.fontSize) || 0));
+        if (wordsEnd > cutAt) problems.push(`«${reads}» ends at ${wordsEnd} but the chip cuts it at ${cutAt}`);
+      }
+    }
     return {
       problems,
       metrics: {
@@ -208,6 +223,7 @@ export async function chipFit(
         chip: chipAt.at,
         icon: iconAt?.at,
         text: { at: textAt.at, scrollWidth: painter.scrollWidth, clientWidth: painter.clientWidth, fits, ellipsis, lines },
+        words: { reads, end: wordsEnd, cut: cutAt },
         title,
         whole,
       },
