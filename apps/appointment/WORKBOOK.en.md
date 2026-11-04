@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:85b3ae030c6e124fbbb03f11dbe92eba9e432b7dc71fc2e45d3aaac0919f4364 -->
+<!-- generated from WORKBOOK.md sha256:f9d9c8b8c5028026e45c1d5880e5f2e6073852023f884a5a266e5670b9dd6ec3 -->
 
 ## What it is for and who it is for
 
@@ -47,7 +47,7 @@ Who uses it:
    being booked.
 4. In **Schedules**, confirm the business's week and set the public holidays. A day without any opening
    hours rule (neither the week nor an exception) lets anyone book at any time.
-5. The agenda always paints the **business clock** (in phase 1, Europe/Madrid), never the device's: if the
+5. The agenda always paints the **business clock**, in its time zone, never the device's: if the
    device is in another time zone, a notice says so.
 6. Check the Appointments **Settings** (notice periods, overlaps, cancellation by the customer, calendar
    window).
