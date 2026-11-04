@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:fd728c6aa7e95884b333f4c7980f31ff2410bb88e5e2b27dafeba08766bdbe54 -->
+<!-- generated from WORKBOOK.md sha256:7820aa11e88470baebf04cba27cdedfdd571b70328f0d61b26bea6a9c9480bfe -->
 
 ## What it is for and who it is for
 
@@ -52,8 +52,9 @@ Checked against the market sweep of the current module (20/08/2026) and against 
 - Without **Sales** nobody asks for the groups at the till; without **Kitchen** the kitchen ticket does
   not carry them. Both talk to Modifiers through its services, never through its tables.
 - Supplements go in **the business's currency**, its country's, the one **Settings → Business** shows
-  (euros in Spain, złoty in Poland), with its decimals on screen and in **whole cents** (that currency's
-  smallest unit) through the API; they can be negative (a discount) or zero (free).
+  (euros in Spain, złoty in Poland), with its decimals and grouped from four digits on screen
+  ("+1.234,56 €") and in **whole cents** (that currency's smallest unit) through the API; they can be
+  negative (a discount) or zero (free).
 
 Initial setup, step by step:
 
