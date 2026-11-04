@@ -4,16 +4,11 @@
 // counts it in), written with the platform's `formatMoney`: its thousands grouped from four digits on, as every screen
 // writes them; until it is known an amount is a figure without a symbol, never the euro by default. Its decimals come
 // from the server, never from the browser's Intl (which gives none to the forint).
-import { formatMoney as writeMoney } from '@erplora/ui/components';
-
 import type { Money } from '../../../../base/frontend/lib/home';
 import type { SettingsOut } from '../operations';
 
 export type { Money };
-export { useBusinessMoney } from '../../../../base/frontend/lib/money';
-
-/** Minor units in `money`, in `locale`, its thousands grouped («1.234,50 €», «€22.50», «¥1,500»; «22,50» while it is unknown). */
-export const formatMoney: (cents: number, locale: string, money?: Money) => string = writeMoney;
+export { formatMoney, useBusinessMoney } from '../../../../base/frontend/lib/money';
 
 export type Semaphore = 'ok' | 'warning' | 'critical' | 'off';
 

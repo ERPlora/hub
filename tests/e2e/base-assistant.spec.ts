@@ -9,7 +9,7 @@
 // flow: BASE-G120 BASE-G121 BASE-G122 BASE-G123 BASE-G124
 import { execSync } from 'node:child_process';
 
-import { type Browser, expect, type Locator, type Page, test } from '@playwright/test';
+import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { CLAIM_ANSWER, DICTATION, GREETING, type Provider, startProvider, STEPS_SAID } from './assistant-provider';
 import { A, api, capture, compactBar, EMPLOYEE, exposeMovingInPage, login, REPO_DIR, shot, shown, turnOn, untilStill } from './helpers';
@@ -79,6 +79,21 @@ const receipt = (page: Page): Locator => panel(page).locator('[data-testid="assi
 async function decide(page: Page, button: 'submit' | 'cancel'): Promise<void> {
   await card(page).locator(`[data-testid="assistant-confirm-${button}"]`).click();
   await expect(card(page)).toBeHidden();
+}
+
+/** Cancels the card: nothing is recorded, and the assistant says so. */
+async function refuse(page: Page): Promise<void> {
+  await decide(page, 'cancel');
+  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
+}
+
+/** Turns payment off if the test found it off, and closes the context. */
+async function leavePayment(context: BrowserContext, wasOn: boolean): Promise<void> {
+  if (!wasOn) {
+    const off = await api(context, A, 'POST', '/apps/disable', { app: 'payment' });
+    expect(off.status, `turn off payment: ${JSON.stringify(off.data)}`).toBe(200);
+  }
+  await context.close();
 }
 
 /** The topbar's way to the assistant: the sparkles, or on a phone «More options» (the sparkles folded with the bell). */
@@ -629,13 +644,8 @@ test('base-assistant-money-mark — in Spanish a payment says its amount in the 
     await capture(page, `${KEY}-${vp.label}`);
   }
   await page.setViewportSize({ width: 1440, height: 900 });
-  await decide(page, 'cancel');
-  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
-  if (!wasOn) {
-    const off = await api(context, A, 'POST', '/apps/disable', { app: 'payment' });
-    expect(off.status, `turn off payment: ${JSON.stringify(off.data)}`).toBe(200);
-  }
-  await context.close();
+  await refuse(page);
+  await leavePayment(context, wasOn);
 });
 
 // flow: base-assistant-money-mark (BASE-F97)
@@ -664,18 +674,12 @@ test('base-assistant-money-mark — in Spanish a payment in another currency say
     await capture(page, `${KEY}-${vp.label}`);
   }
   await page.setViewportSize({ width: 1440, height: 900 });
-  await decide(page, 'cancel');
-  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
+  await refuse(page);
   // In yen, without decimals: 1500 is «1.500 ¥» (its thousands grouped, hub#692), never «15,00».
   await ask(page, `E2E-ASK payment__payment__create ${JSON.stringify({ ...payment, currency: 'JPY' })}`, { settle: false });
   await expect(card(page)).toContainText(/Caja · 2 nov 2026 · 1\.500\s¥/);
-  await decide(page, 'cancel');
-  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
-  if (!wasOn) {
-    const off = await api(context, A, 'POST', '/apps/disable', { app: 'payment' });
-    expect(off.status, `turn off payment: ${JSON.stringify(off.data)}`).toBe(200);
-  }
-  await context.close();
+  await refuse(page);
+  await leavePayment(context, wasOn);
 });
 
 type SentCard = { fields: { name: string; kind: string; value: unknown; money?: unknown }[] };

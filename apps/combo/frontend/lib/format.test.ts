@@ -52,16 +52,16 @@ describe('formatDelta', () => {
     expect(formatDelta(0, 'en', PLN)).toBe('');
   });
 
-  it('carries its sign and no symbol until the business answers', () => {
-    expect(formatDelta(200, 'es')).toBe('+2,00');
-    expect(formatDelta(-50, 'en')).toBe('-0.50');
-  });
-
   it('groups the thousands of a supplement like any other amount (hub#654)', () => {
     expect(plain(formatDelta(123456, 'es', EUR))).toBe('+1.234,56 €');
     expect(plain(formatDelta(-123456, 'es', EUR))).toBe('-1.234,56 €');
     expect(formatDelta(123456, 'es')).toBe('+1.234,56');
     expect(plain(formatDelta(-123456, 'en', PLN))).toBe('-zł 1,234.56');
+  });
+
+  it('carries its sign and no symbol until the business answers', () => {
+    expect(formatDelta(200, 'es')).toBe('+2,00');
+    expect(formatDelta(-50, 'en')).toBe('-0.50');
   });
 });
 

@@ -4,15 +4,12 @@
 // forint), written with the platform's `formatMoney`: its thousands grouped from four digits on, as every screen
 // writes them. Until the business answers an amount is a figure without a symbol, never the euro by default. A
 // supplement shows its sign, as the till does.
-import { formatMoney as writeMoney } from '@erplora/ui/components';
-
 import type { Money } from '../../../../base/frontend/lib/home';
+import { formatMoney } from '../../../../base/frontend/lib/money';
 
 export type { Money };
+export { formatMoney };
 export { useBusinessMoney } from '../../../../base/frontend/lib/money';
-
-/** Minor units in `money`, in `locale`, its thousands grouped («1.234,50 €», «€22.50», «¥1,500»; «22,50» while it is unknown). */
-export const formatMoney: (cents: number, locale: string, money?: Money) => string = writeMoney;
 
 /** The decimals of an amount while the currency is unknown. */
 const UNKNOWN_DECIMALS = 2;
