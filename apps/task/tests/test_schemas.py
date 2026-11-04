@@ -20,6 +20,8 @@ from apps.task.schemas import (
     TaskPatchIn,
     TaskRefIn,
 )
+from base.models import Hub
+from base.tenancy.context import use_hub
 
 
 def errors(schema, **data) -> dict[str, str]:
@@ -123,3 +125,9 @@ def test_the_lists_declare_their_filters_and_sorts():
     assert "status" in errors(TaskListIn, status="paused")
     assert TaskMineIn(due_within_days=7).due_within_days == 7
     assert "due_within_days" in errors(TaskMineIn, due_within_days=-1)
+
+
+def test_a_moment_is_the_day_it_falls_on_in_the_businesss_zone():
+    # 23:30 UTC on 2 November is still the 2nd in the Canaries and already the 3rd in Madrid (hub#779).
+    with use_hub(Hub(slug="a", timezone="Atlantic/Canary")):
+        assert TaskIn(title="t", due_date="2026-11-02T23:30:00Z").due_date == dt.date(2026, 11, 2)

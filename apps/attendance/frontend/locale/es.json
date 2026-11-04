@@ -114,6 +114,7 @@
       "invalidClockIn": "Indica la fecha y la hora de entrada.",
       "invalidCorrection": "La salida tiene que ser posterior a la entrada.",
       "reasonRequired": "Escribe un motivo de al menos 3 caracteres.",
+      "zoneUnread": "No se ha podido leer la zona horaria del negocio y esta corrección aún no se puede guardar. Recarga la página para volver a intentarlo.",
       "corrected": "Jornada corregida."
     },
     "history": {

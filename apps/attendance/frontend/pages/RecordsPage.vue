@@ -27,6 +27,7 @@ import { computed, ref } from 'vue';
 import CorrectionModal from '../components/CorrectionModal.vue';
 import HistoryModal from '../components/HistoryModal.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
+import { useBusinessZone } from '../../../../base/frontend/lib/zone';
 import PresenceCard from '../components/PresenceCard.vue';
 import { useLiveList } from '../composables/useLiveList';
 import { useServerNow } from '../composables/useServerNow';
@@ -51,9 +52,12 @@ const locale = useLocale();
 const team = computed(() => session.can('attendance.view_all'));
 const canCorrect = computed(() => session.can('attendance.correct'));
 
-const month = ref(monthOf(Date.now()));
+const zone = useBusinessZone();
+/** The month the person chose; until then, the business's current one, once it says its zone. */
+const chosenMonth = ref<string | null>(null);
+const month = computed(() => chosenMonth.value ?? monthOf(Date.now(), zone.value));
 const months = computed(() => {
-  const offered = recentMonths(monthOf(Date.now()), MONTHS_OFFERED);
+  const offered = recentMonths(monthOf(Date.now(), zone.value), MONTHS_OFFERED);
   return offered.includes(month.value) ? offered : [...offered, month.value];
 });
 const person = ref<ComboOption | null>(null);
@@ -73,7 +77,7 @@ function narrowed(): boolean {
 
 function setMonth(value: unknown): void {
   if (typeof value !== 'string' || !value || value === month.value) return;
-  month.value = value;
+  chosenMonth.value = value;
   table.restart({ narrowed: narrowed() });
 }
 
@@ -116,8 +120,8 @@ const columns = computed<DataTableColumn<RecordOut>[]>(() => [
         { key: 'member_name', label: t('attendance.records.columns.person'), sortable: true, priority: 'high', width: 'minmax(10rem, 2fr)' } as DataTableColumn<RecordOut>,
       ]
     : []),
-  { key: 'clock_in_at', label: t('attendance.records.columns.in'), sortable: true, format: (_, row) => timeOfDay(row.clock_in_at, row.work_date, locale.value) },
-  { key: 'clock_out_at', label: t('attendance.records.columns.out'), sortable: true, format: (_, row) => timeOfDay(row.clock_out_at, row.work_date, locale.value) },
+  { key: 'clock_in_at', label: t('attendance.records.columns.in'), sortable: true, format: (_, row) => timeOfDay(row.clock_in_at, row.work_date, locale.value, zone.value) },
+  { key: 'clock_out_at', label: t('attendance.records.columns.out'), sortable: true, format: (_, row) => timeOfDay(row.clock_out_at, row.work_date, locale.value, zone.value) },
   // Yields before the rest when the list is narrow (the worked time already takes the breaks off); the
   // cards and the column chooser still show it.
   { key: 'break_minutes', label: t('attendance.records.columns.breaks'), align: 'right', priority: 'low', format: (_, row) => String(breakMinutes(row)) },
