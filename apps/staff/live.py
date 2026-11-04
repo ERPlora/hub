@@ -29,8 +29,9 @@ live("staff.member.mine", on=[*MEMBER_ALL, ROLE_UPDATED])
 live("staff.member.compensation", on=[*MEMBER_ALL, ROLE_UPDATED])
 live("staff.member.stats", on=[*MEMBER_ALL, *TIME_OFF_ALL])
 live("staff.commission.summary", on=[*MEMBER_ALL, ROLE_UPDATED])
-# Sales' events, by name (Sales is no requirement): a charge, a void or a refund changes what was sold.
-SALE_FIGURES = ["sale.sale.completed", "sale.sale.voided", "sale.sale.refunded"]
+# Sales' events, by name (Sales is no requirement): a charge, a void, a refund or a line that turns out to have paid
+# for a voucher changes what was sold.
+SALE_FIGURES = ["sale.sale.completed", "sale.sale.voided", "sale.sale.refunded", "sale.sale.voucher_line_changed"]
 live("staff.commission.report", on=[*MEMBER_ALL, ROLE_UPDATED, *SALE_FIGURES])
 # «Members» of a role counts the active people.
 live("staff.role.list", on=[*ROLE_ALL, *MEMBER_ALL])
