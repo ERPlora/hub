@@ -1,6 +1,7 @@
 // STAFF-F08 «Ver mi propia ficha»: whoever has a record linked to their account opens «My record»
 // from Staff and reads it — name, role, email, phone, employee ID, status, bookable, hire date and,
 // theirs only, their hourly rate and commission (never the HR notes). Read only: «Close».
+import { FormModal } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { MemberMineOut } from '../operations';
@@ -73,9 +74,16 @@ describe('MyRecordModal (STAFF-F08)', () => {
 
   it('is read only: one «Close», no Save', async () => {
     const s = await setup();
+    expect(s.inDoc('staff-my-record')?.querySelectorAll('.ep-form-modal__footer ion-button')).toHaveLength(1);
     expect(s.inDoc('staff-my-record-submit')).toBeNull();
+    expect(s.inDoc('staff-my-record-cancel')).toBeNull();
     await click(s.inDoc('staff-my-record-done'));
     expect(s.wrapper.emitted('update:open')?.at(-1)).toEqual([false]);
+  });
+
+  it('uses the common read-only window, not a footer of its own (hub#711)', async () => {
+    const s = await setup();
+    expect(s.wrapper.findComponent(FormModal).props('readonly')).toBe(true);
   });
 
   it('speaks Spanish', async () => {
