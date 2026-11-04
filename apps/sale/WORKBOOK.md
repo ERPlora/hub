@@ -809,13 +809,13 @@ Pasos:
    con lo que falta por enviar; la pestaña dice cuántos artículos esperan («Comanda actual, 2 artículos por
    enviar»). Sin nada pendiente, «Todo está enviado».
 2. En «Comanda actual», revisa cantidades y quién atiende y pulsa «Enviar comanda (N)». Para que salga
-   urgente, arma antes la llama de su lado: el botón pasa a «Enviar URGENTE (N)». Sale «Comanda N enviada a
-   cocina.»; las líneas quedan marcadas con su ronda («Comanda N») y la hora de envío, y la llama se desarma.
-   Un doble envío no manda nada dos veces.
+   urgente, arma antes la llama de su lado: el botón pasa a «Enviar URGENTE (N)». Sale arriba de la pantalla
+   «Comanda N enviada a cocina.», para poder pulsar «Cobrar» (SALE-F01) sin esperar a que se vaya; las líneas
+   quedan marcadas con su ronda («Comanda N») y la hora de envío, y la llama se desarma. Un doble envío no
+   manda nada dos veces.
 3. Al pulsar «Cobrar» con algo pendiente, se envía primero a cocina y después se abre el cobro: nadie paga
-   un plato que no se va a preparar. El aviso de la comanda sale entonces arriba de la pantalla, para poder
-   tocar el teclado del cobro (SALE-F01) desde el primer momento. Si el envío falla, no se abre el cobro y se
-   dice por qué.
+   un plato que no se va a preparar. El aviso de la comanda también sale arriba, para poder tocar el teclado
+   del cobro (SALE-F01) desde el primer momento. Si el envío falla, no se abre el cobro y se dice por qué.
 4. Una línea enviada queda bloqueada: ni cantidad, ni nota, ni descuento, ni invitación.
 5. Para quitar un plato ya enviado, pulsa ⊗ «Anular este artículo» en su línea: se abre «Anular
    «<artículo>»» con «Ya se envió a cocina. Sale de la cuenta y se guarda el motivo. Tiene que
@@ -837,8 +837,8 @@ línea enviada, avisa de la línea anulada con su motivo.
 Si falla: sin nada pendiente, «No hay nada nuevo que enviar a cocina.»; si Cocina no responde, sale arriba de la
 pantalla, para poder volver a pulsar «Cobrar» o «Enviar comanda» sin esperar a que se vaya, «No se ha
 podido enviar la comanda a cocina. Inténtalo de nuevo.» y no se cobra. Si la comanda se envía pero su hoja
-no se imprime, el TPV avisa «Comanda N enviada a cocina, pero no se imprimió. Revisa la impresora de
-cocina en Impresión.». Pedir que se quite una línea ya
+no se imprime, el TPV avisa, también arriba, «Comanda N enviada a cocina, pero no se imprimió. Revisa la
+impresora de cocina en Impresión.». Pedir que se quite una línea ya
 enviada la rechaza: «Esa línea ya no se puede quitar: ya se envió a cocina (anúlala con un motivo), ya está
 cobrada o ya no está en una cuenta abierta.». Anular una línea sin enviar, cobrada, ya anulada o sin motivo
 se rechaza con «Esa línea no se puede anular…». Sin Cocina activa no hay pestañas ni envío: la cuenta se
