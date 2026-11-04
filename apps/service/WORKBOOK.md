@@ -75,7 +75,7 @@ depende de él.
 Los importes (el precio de un servicio y el de cada profesional, el precio cerrado y el descuento en importe
 de un bono, lo pagado por un bono) van en **la moneda del negocio**, la de su país, la que dice **Ajustes →
 Negocio** (euros en España, złoty en Polonia, yenes en Japón), con sus decimales (el yen no tiene), escritos
-con coma o punto: «1500» es un precio de 1500 yenes en Japón y de 1500,00 € en España, y Ventas lo cobra igual.
+con coma o punto: «1500» es un precio de 1500 yenes en Japón y de 1.500,00 € en España, y Ventas lo cobra igual.
 Mientras el negocio no contesta, un importe sale como una cifra sin símbolo, nunca en euros. Los ejemplos de
 este documento son de un negocio de España, en euros.
 
@@ -1077,6 +1077,8 @@ cajero del producto actual es un empleado: lo que tenía (ver, gastar y conceder
   yen no tiene), nunca negativo, la misma unidad que cobra Ventas (service-business-currency: la pantalla la
   lee y la escribe con `useBusinessMoney` de `base`); el descuento en porcentaje, en
   puntos básicos (1050 = 10,50 %).
+- **Millares**: los importes agrupan los millares también con cuatro cifras («1.234,56 €»; `formatMoney` de
+  `@erplora/ui/components`, con `useGrouping: 'always'`, porque el CLDR del español espera a cinco: hub#657).
 - **El paso del Inicio** (PLAN-HUB ronda 2026-10-21; FIX-SERVICE-SETUP-HOOKS): `ServiceConfig.setup` declara el
   `setup` del módulo viejo (`module.json`, services#26): clave `service.catalog`, sobre `service.catalog.status`, hecho
   con `sellable_services` (en oferta y con la categoría fiscal activa), orden 31, `required` (nivel «Importante»),

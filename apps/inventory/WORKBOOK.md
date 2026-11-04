@@ -1240,6 +1240,8 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
   ocho unidades son un registro en código (`models.UNIT_SPECS`: tipo, factor como fracción exacta y
   escalón), no una tabla: el negocio nunca crea unidades. Una cantidad fuera del escalón es 409
   `inventory.off_grid_quantity` con su campo; nunca se redondea. Dinero en céntimos enteros.
+- **Millares**: los importes agrupan los millares también con cuatro cifras («1.234,56 €»; `formatMoney` de
+  `@erplora/ui/components`, con `useGrouping: 'always'`, porque el CLDR del español espera a cinco: hub#525).
 - **Campos de importe** (precio, coste, coste unitario; F01, F02, F13): se escriben y se leen con los decimales de
   la moneda del negocio (`useBusinessMoney`, los del servidor, nunca los del navegador). Si el panel se abre antes de
   que `base.business.get` conteste, el precio y el coste que la persona no ha tocado se reescriben desde lo guardado
@@ -1522,7 +1524,6 @@ Las hace cumplir la app por cualquier puerta (pantalla, asistente, API).
 
 ## Lo que queda fuera
 
-- **Los importes de cuatro cifras sin separador de millares** («1234,56 €»), hub#525.
 - **La tarjeta de confirmación del asistente no dice qué registro toca una escritura**, hub#526.
 - Las peticiones a `@erplora/ui` de `UI-REQUESTS.md` (iconos, `KpiCard`, `Combo` múltiple, importar y
   exportar CSV y panel lateral del `DataTable`, formateadores, `useI18n` y ayudas de test): ninguna rompe
