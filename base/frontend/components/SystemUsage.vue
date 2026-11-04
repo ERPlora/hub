@@ -4,17 +4,17 @@
 // upgrade (`lib/plan-usage.ts`), then what the plan includes, the fullest first, and what no plan limits. The assistant's
 // messages wait on erplora.com, so they are asked apart, once the plan is known; failing touches their own row and keeps the
 // line from saying green, with «Retry».
-// «Upgrade plan» goes by BASE-F11's rule (`lib/plan-link.ts`). What was not measured yet says so, never with a zero; a demo
+// «Upgrade plan» goes by BASE-F11's rule (`lib/plan-link.ts`) and with its pass (`lib/saas-pass.ts`). What was not measured yet says so, never with a zero; a demo
 // says it is not measured; without the plan, what is in use goes with no limit, bar, pill or verdict.
 import { InlineFeedback, StatusPill, UsageMeter } from '@erplora/ui/components';
 import { useLive, useLiveClient } from '@erplora/ui/sdk';
-import { openExternalLink } from '@erplora/ui/shell';
 import { IonButton } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
 import { formatSize } from '../lib/files';
 import { useBaseI18n } from '../lib/i18n';
 import { usePlanLink } from '../lib/plan-link';
+import { useSaasPass } from '../lib/saas-pass';
 import { type AssistantRead, type Motive, usageRows, type UsageRow, verdictOf } from '../lib/plan-usage';
 
 const { t, locale } = useBaseI18n();
@@ -23,6 +23,7 @@ const client = useLiveClient();
 const { data: usage, status, refresh } = useLive('base.plan.usage', {});
 const failed = computed(() => status.value === 'error' && usage.value === undefined);
 const { planUrl, offered } = usePlanLink();
+const { openSaasPass } = useSaasPass();
 
 const assistant = ref<AssistantRead>(null);
 
@@ -204,7 +205,7 @@ function pillTone(row: UsageRow) {
           :href="planUrl"
           target="_blank"
           rel="noopener"
-          @click="openExternalLink(planUrl, $event)"
+          @click="openSaasPass('plan', planUrl, $event)"
         >{{ t('base.plan.upgrade') }}</a>
         <p
           v-else
