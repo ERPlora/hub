@@ -5,8 +5,12 @@ Until this migration nobody delivered the outbox: every event since the first de
 (``delivered_at`` empty). Delivering them now would apply days of history at once (stock lowered again for old
 sales, kitchen rounds of days ago, purchases counted twice), so the backlog is marked as handed over without a
 delivery: the relay starts with what comes after it. Reverting gives back exactly those events (the ones without a
-delivery) and drops the table. ``base_outbox_pending`` is the relay's way to the events it has not taken yet: a
-partial index, a handful of rows, so a tick never reads the whole outbox.
+delivery) and drops the table.
+
+The relay's way to the events it has not taken yet, the partial index ``base_outbox_pending``, is ``live``'s now
+(``live/0003``, hub#704). This migration made it by hand on every database deployed before that, and ``live/0003`` keeps
+those. It was edited after being applied because ``RunSQL`` leaves nothing in the state that a later migration could
+take back: its ``CREATE`` would fail after ``live/0003`` and its ``DROP`` would take ``live``'s index.
 """
 
 import uuid
@@ -14,8 +18,6 @@ import uuid
 import django.db.models.deletion
 from django.db import migrations, models
 from django.utils import timezone
-
-PENDING_INDEX = "base_outbox_pending"
 
 
 def hold_back_the_backlog(apps, schema_editor):
@@ -65,8 +67,4 @@ class Migration(migrations.Migration):
             },
         ),
         migrations.RunPython(hold_back_the_backlog, release_the_backlog),
-        migrations.RunSQL(
-            f"CREATE INDEX {PENDING_INDEX} ON live_outboxevent (created_at, id) WHERE delivered_at IS NULL",
-            f"DROP INDEX {PENDING_INDEX}",
-        ),
     ]
