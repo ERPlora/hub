@@ -594,7 +594,8 @@ def test_erasing_a_card_empties_the_reason_a_session_came_back(cut, lucia):
 
 
 def paid_voucher(cut, lucia, *, amount=10000, uses=3, name="Bono de 100"):
-    return make_grant(make_package(name, [cut], max_uses=uses), lucia, amount=amount)
+    """A voucher that says the line of the till that charged it (Sales keeps that line out of who sold it)."""
+    return make_grant(make_package(name, [cut], max_uses=uses), lucia, amount=amount, sale_line_id=uuid.uuid7())
 
 
 def spend(grant, cut, lucia):
@@ -698,13 +699,26 @@ def test_a_session_spent_outside_the_till_takes_its_share_of_the_price(cut, luci
 
 
 def test_a_voucher_given_for_free_is_worth_nothing_per_session(cut, lucia):
-    grant = paid_voucher(cut, lucia, amount=0)
+    grant = make_grant(make_package("Regalo", [cut], max_uses=3), lucia, amount=0)
     assert spend(grant, cut, lucia) == 0
+
+
+def test_a_paid_voucher_that_does_not_say_its_line_is_worth_nothing_per_session(cut, lucia):
+    # hub#769: its money may already count for who sold it, on a line nobody named: its sessions must not count again.
+    limited = make_grant(make_package("Sin línea", [cut], max_uses=3), lucia, amount=10000)
+    assert [spend(limited, cut, lucia), spend(limited, cut, lucia)] == [0, 0]
+    unlimited = make_grant(make_package("Sin línea ni límite", [cut], max_uses=None), lucia, amount=10000)
+    assert spend(unlimited, cut, lucia) == 0
+    outside = make_grant(make_package("Sin línea fuera", [cut], max_uses=3), lucia, amount=10000)
+    spent = run("service.grant.redeem", {"id": str(outside.id), "service_id": str(cut.id)})
+    assert Redemption.objects.get(pk=spent.id).value == 0
 
 
 def test_an_unlimited_voucher_has_no_sessions_to_divide_its_price_by(cut, lucia):
     grant = paid_voucher(cut, lucia, uses=None)
     assert spend(grant, cut, lucia) is None
+    given = make_grant(make_package("Regalo sin límite", [cut], max_uses=None), lucia, amount=0)
+    assert spend(given, cut, lucia) is None
 
 
 def test_the_catalog_changing_later_does_not_move_the_voucher_sold(cut, lucia):

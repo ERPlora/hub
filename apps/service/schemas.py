@@ -943,7 +943,13 @@ class GrantIn(In):
     net_amount: Cents = Field(0, description="Taxable base of that amount, in cents (minor units of the business's currency).")
     tax_amount: Cents = Field(0, description="VAT of that amount, in cents (minor units of the business's currency).")
     sale_id: UUID | None = Field(
-        None, description="The sale that paid it (Sales), if any."
+        None,
+        description="The sale that charged it (Sales), if it went through the till: its line stops counting for who "
+        "sold it and each session counts for who does it. A voucher with an amount that does not say it counts for "
+        "nobody as its sessions are done.",
+    )
+    sale_line_id: UUID | None = Field(
+        None, description="The line of that sale that charged it; only needed when the sale charged several (Sales)."
     )
     granted_at: datetime | None = Field(
         None,

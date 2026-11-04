@@ -518,8 +518,8 @@ Pasos:
    Inactivas ni las dadas de baja), su ficha, su cuenta (vacía si no tiene), nombre, rol y comisión,
    también las de comisión 0.
 3. Para saber lo que ha ganado cada profesional, abre **Personal → Comisiones**. Sale «Hoy»: lo que ha
-   vendido cada persona en el día del negocio, con lo devuelto ya restado y sumado lo que valen las
-   sesiones de bono que hizo (SALE-F28), su comisión y lo que le
+   vendido cada persona en el día del negocio, con lo devuelto ya restado, sin los bonos que vendió y
+   sumado lo que valen las sesiones de bono que hizo (SALE-F28), su comisión y lo que le
    corresponde (vendido × comisión ÷ 100, redondeado a la unidad más pequeña de la moneda del negocio, el
    céntimo en euros, una sola vez por persona; media unidad sube). Arriba, el total vendido y el total de
    comisiones.
@@ -529,8 +529,8 @@ Pasos:
    profesional de la cita) o, si la línea no dice quién, quien atendió la cuenta. Con «Yo» en el TPV, es
    quien tenía la sesión, si su cuenta tiene ficha en Personal; si no, esa venta no cuenta para nadie.
 Entra: la tarifa y la comisión de cada ficha y, de Ventas, la producción de cada profesional en el periodo
-(ya resta lo devuelto: lo que vuelve, a quien lo vendió; y suma el valor de sus sesiones de bono). Ventas
-es opcional.
+(ya resta lo devuelto: lo que vuelve, a quien lo vendió; deja fuera los bonos que vendió y suma el valor de
+sus sesiones de bono). Ventas es opcional.
 Sale: solo lectura.
 Si falla: sin permiso de compensación, «No tienes permiso»; sin Ventas, «Las comisiones salen de las ventas»; con «Hasta» antes que «Desde»,
 «La fecha de fin no puede ser anterior a la de inicio.» bajo «Hasta»; con un solo día, «Un periodo

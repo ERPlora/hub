@@ -602,8 +602,12 @@ def session_value(grant_id: UUID) -> int | None:
     """What the next session delivered of a voucher sold is worth (SERVICE-F24), with its row locked by the caller:
     what is left of the price paid ÷ the sessions not delivered yet, half up, so 100.00 in 3 sessions is 33.33 + 33.34
     + 33.33 and what is delivered adds up to what was paid, to the cent, through courtesies, corrections and sessions
-    given back. An unlimited voucher has no sessions to divide by: ``None``."""
+    given back. An unlimited voucher has no sessions to divide by: ``None``. A paid voucher that does not say the line
+    that charged it is worth 0: that money may already count for who sold it (a voucher from before this, one granted
+    without its sale), and nothing counts twice."""
     grant = grants().get(pk=grant_id)
+    if grant.amount and grant.sale_line_id is None:
+        return 0
     total = balance(grant).max_uses
     if total is None:
         return None

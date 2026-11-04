@@ -499,6 +499,9 @@ msgstr "devuelta con el documento"
 msgid "reason it came back"
 msgstr "motivo de la devolución"
 
+msgid "sale line"
+msgstr "línea de la venta"
+
 msgid "value"
 msgstr "valor"
 

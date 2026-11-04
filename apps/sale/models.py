@@ -624,6 +624,11 @@ class SaleLine(UUIDModel):
     voucher_value = models.PositiveBigIntegerField(
         _("voucher session value"), default=0, db_default=0
     )
+    # What of this line paid for vouchers sold on it, as Services says when it grants them (SERVICE-F14): the money is
+    # still the sale's, but it is no production of who sold it: it counts as each session is done (SALE-F28).
+    voucher_sold_amount = models.PositiveBigIntegerField(
+        _("paid for vouchers"), default=0, db_default=0
+    )
     # SALE-F11: the names of the options charged inside the line (the receipt prints them under it), and, on
     # the child line of an option of another tax category, the line of the dish it hangs from.
     modifiers = models.JSONField(

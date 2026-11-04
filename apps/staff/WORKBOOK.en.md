@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:d93f02ba3815193bfb5feb79f17d3ff8b377b1ff763348a43c003857795c5e5f -->
+<!-- generated from WORKBOOK.md sha256:b780af5bb11ed6a45ff92398f99ef858909d8ed1370d4ac0c1a78d3a64c173c1 -->
 
 ## What it is for and who it is for
 
@@ -481,8 +481,8 @@ Steps:
    Inactive nor the terminated ones), their record, their account (empty if they have none), name, role
    and commission, also those with commission 0.
 3. To know what each professional has earned, open **Staff → Commissions**. "Today" shows: what each person
-   has sold in the business's day, with what was refunded already taken off and what the voucher sessions
-   they did are worth added (SALE-F28), their commission and what is
+   has sold in the business's day, with what was refunded already taken off, without the vouchers they sold
+   and with what the voucher sessions they did are worth added (SALE-F28), their commission and what is
    due to them (sold × commission ÷ 100, rounded to the smallest unit of the business's currency, the cent
    in euros, only once per person; half a unit rounds up). At the top, the total sold and the total of
    commissions.
@@ -492,8 +492,8 @@ Steps:
    the till, that is whoever was signed in, if their account has a record in Staff; otherwise that sale
    counts for nobody.
 In: each record's rate and commission and, from Sales, each professional's production in the period (refunds
-already taken off: what comes back goes to whoever sold it; and the value of their voucher sessions added).
-Sales is optional.
+already taken off: what comes back goes to whoever sold it; the vouchers they sold left out and the value of
+their voucher sessions added). Sales is optional.
 Out: read only.
 If it fails: without the pay permission, "You do not have permission"; without Sales, "Commissions come
 from the sales"; with "To" before "From", "The end date cannot be before the start date." under "To";

@@ -244,7 +244,7 @@ def test_a_till_delivering_a_session_waits_for_the_other_to_read_what_is_left_of
     import uuid
 
     customer = make_customer()
-    grant = make_grant(make_package("Bono", [cut], max_uses=3), customer, amount=10000)
+    grant = make_grant(make_package("Bono", [cut], max_uses=3), customer, amount=10000, sale_line_id=uuid.uuid7())
     first, second = (hold_for(grant, cut, uuid.uuid7())() for _ in range(2))
     delivered, finish = threading.Event(), threading.Event()
 

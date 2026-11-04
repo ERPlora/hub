@@ -442,6 +442,8 @@ export interface GrantIn {
   net_amount?: number;
   tax_amount?: number;
   sale_id?: string | null;
+  /** The line of that sale that charged it; only needed when the sale charged several. */
+  sale_line_id?: string | null;
   granted_at?: string | null;
   note?: string;
 }

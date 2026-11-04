@@ -467,17 +467,22 @@ Actor: empleado, responsable, asistente
 Pantalla: asistente
 Pasos:
 1. Pide al asistente que conceda el bono a la clienta (por su nombre o su teléfono), con el importe
-   cobrado y la venta si los hay.
+   cobrado y la venta que lo cobró. Si esa venta cobró varias líneas, también cuál de ellas.
 2. El bono sale en **Bonos vendidos** de ese bono (SERVICE-F16).
 Entra: el bono del catálogo, vivo y activo, y la clienta (Clientes).
 Sale: un bono vendido con la titular, la fecha, el importe y los «Usos» y la «Vigencia» del catálogo
 congelados; la caducidad cuenta desde ese momento (`service.grant.granted`). No sale ningún documento
-fiscal: lo emite la venta del bono.
+fiscal: lo emite la venta del bono. Diciendo la venta, esa parte de su línea deja de ser producción de quien
+lo vendió: la comisión va sobre las sesiones hechas (SALE-F28). Sin decirla, el bono se concede igual, pero
+sus sesiones no cuentan para nadie (SERVICE-F24): su dinero puede estar ya contado en quien lo vendió.
 Si falla: «Elige el cliente al que pertenece el bono…» si no se dice; «Ese paquete no existe en este
 negocio.» si el bono se eliminó o está desactivado; una fecha de compra futura, «Un bono no se puede
 comprar en el futuro.» (alargar un bono es **Ajustar**, SERVICE-F18), y una sin zona horaria, que la
-diga; un nombre de clienta que vale para varias, la lista para elegir.
-Implicados: CUSTOMER-F01
+diga; un nombre de clienta que vale para varias, la lista para elegir. De la venta: «Esa venta cobró varias
+líneas: di cuál pagó el bono: …», «Esa línea no es de esa venta.», «A esa línea le quedan … para pagar
+bonos: no puede pagar uno de ….» y «Esa venta se anuló: no pagó ningún bono.»; quien no puede cobrar no puede
+decirlo. Nada se concede.
+Implicados: CUSTOMER-F01, SALE-F28, SERVICE-F24
 
 ### SERVICE-F15 Consultar los bonos de una clienta
 <!-- origen: fi:modules/services#query-services-packages-balance old:services/workflow/bonos.md#services-f15 -->
@@ -524,11 +529,12 @@ Pasos:
 3. Escribe el Motivo (obligatorio) y pulsa **Anular**.
 Entra: la compra y el motivo.
 Sale: el bono deja de poder gastarse y queda como rastro, con quién, cuándo y el motivo
-(`service.grant.voided`). No mueve dinero ni emite documento.
+(`service.grant.voided`). No mueve dinero ni emite documento. Si una línea de una venta lo pagó, esa parte
+vuelve a contar para quien la vendió, hasta que una devolución diga otra cosa (SALE-F28).
 Si falla: «Ese bono ya se ha usado: no se puede anular.», «Ese bono ya estaba anulado.» o «Indica
 por qué se anula este bono: el motivo queda en su registro.». Si otra caja gasta una sesión a la vez,
 la anulación espera y recibe el motivo real.
-Implicados: SERVICE-F16, SALE-F32
+Implicados: SERVICE-F16, SALE-F28, SALE-F32
 
 ### SERVICE-F18 Regalar sesiones, alargar la caducidad o corregir el saldo
 <!-- origen: wf:peluqueria-dia#rec_peluqueria-f14 old:services/workflow/bonos.md#services-f18 -->
@@ -668,7 +674,9 @@ el cobro con la misma clave no gasta dos veces. Cada sesión queda con **lo que 
 lo que queda del precio pagado ÷ las sesiones que le quedan por entregar, al céntimo (media unidad sube).
 100,00 € en 3 sesiones son 33,33 + 33,34 + 33,33: lo entregado suma justo lo pagado, también con
 cortesías, correcciones y sesiones devueltas. Un bono regalado (0 €) da 0, y uno sin límite no tiene
-entre qué dividir y no da valor. Ventas lo guarda en la línea para la producción de quien la hace (SALE-F28).
+entre qué dividir y no da valor. Un bono con importe que no dice la línea que lo cobró da 0 (SERVICE-F14), como
+los vendidos antes de existir esta cifra. Ventas lo guarda en la línea para la producción de quien la hace
+(SALE-F28).
 Si falla: nada se cobra y la cuenta sigue igual si una sesión ya no está reservada («La sesión
 reservada de «{name}» ya no está reservada (pasó su día o se soltó). Quita el bono de la línea y vuelve
 a aplicarlo.»), si la venta no es de la titular del bono («El bono «{name}» es de otro cliente: cobra la
@@ -963,7 +971,7 @@ sesión, se pueden seguir en vivo.
 | Crea un bono con sus líneas | crear bonos | F12 | `service.package.create` |
 | Cambia un bono (solo lo enviado; las líneas no) | editar bonos | F13 | `service.package.update` |
 | Elimina un bono del catálogo | eliminar bonos | F13 | `service.package.delete` |
-| Concede un bono a una clienta | conceder bonos | F14 | `service.grant.create` |
+| Concede un bono a una clienta y le dice a Ventas qué línea lo pagó | conceder bonos | F14 | `service.grant.create` |
 | Anula un bono vendido sin usar | anular bonos | F17 | `service.grant.void` |
 | Regala o quita sesiones, o alarga la caducidad | ajustar bonos | F18 | `service.grant.adjust` |
 | Gasta una sesión | gastar sesiones | F21 | `service.grant.redeem` |
@@ -1029,6 +1037,11 @@ con la sesión de quien vende, como hace con Inventario.
   - al anular la venta, `service.session.return` con todas sus sesiones (`reference` = la venta) y,
     al devolverla, con las de las líneas que vuelven (`reference` = la devolución).
   Para pintar el hueco, el cobro lee `service.grant.tender_options` (`customer_id`, `service_id`).
+- **La línea que vendió un bono (F14, F17)**: es lo único que Servicios le pide a Ventas, también por nombre y con
+  la sesión de quien concede. `service.grant.create`, con importe y venta, llama a `sale.sale.voucher_sold`
+  (`sale_id`, `line_id`, `amount`) y guarda en `sale_line_id` la línea que le devuelve; `service.grant.void` llama a
+  `sale.sale.voucher_unsold` (`line_id`, `amount`). Sin Ventas en el negocio no hay cifra de la que apartarla:
+  no se llama, el bono no guarda línea y sus sesiones no cuentan.
   Servicios guarda la venta y la línea de la cuenta como identificadores opacos (`sale_id`,
   `order_line_id`): Ventas no es requisito de Servicios ni Servicios de Ventas.
 
@@ -1201,8 +1214,8 @@ cajero del producto actual es un empleado: lo que tenía (ver, gastar y conceder
   con la línea marcada como servicio y el IVA que mandaba el cobro); aquí toda línea necesita una
   categoría fiscal y un bono del catálogo no la tiene. Mientras, el bono se cobra a precio libre (con
   la sección de su IVA) y se concede con la concesión (asistente o API, F14) diciendo la venta.
-- **Que la venta de un bono no cuente como producción de quien lo vende** (hub#769): mientras se cobre a
-  precio libre, su línea cuenta para quien atiende la cuenta y, después, cada sesión para quien la hace.
+- **Enlazar a su venta un bono concedido sin decirla** (F14, hub#786): el bono sigue sin contar para quien hace
+  sus sesiones. Le pasa también a los vendidos antes de esa cifra.
 - **La sesión gastada fuera del cobro en la producción de quien la hizo** (F21, hub#770).
 - **Importar servicios desde un fichero**: como en el producto actual, el alta de golpe es del
   asistente y la API.

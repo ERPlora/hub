@@ -2141,9 +2141,9 @@ def last_7_days(ctx: OperationContext, params: EmptyIn) -> dict:
     ai=AI(
         description="What each professional sold in a period of business days: their lines (a line's own professional wins "
         "over the sale's), the sales they served, gross, base and tax in cents, what refunds gave back on their lines "
-        "and the revenue left; what the voucher sessions they did are worth (no money of the period: the voucher was "
-        "paid when it was sold); and their production, revenue plus sessions, which is what a commission is on. For "
-        "the per-professional close.",
+        "and the revenue left; what of it paid for vouchers they sold; what the voucher sessions they did are worth (no "
+        "money of the period: the voucher was paid when it was sold); and their production, the revenue without the "
+        "vouchers sold plus the sessions, which is what a commission is on. For the per-professional close.",
         asks={
             "en": (
                 "how much did each waiter sell this month?",
@@ -2172,6 +2172,7 @@ def by_staff(ctx: OperationContext, params: PeriodIn) -> dict:
             sales_count=Count("sale", distinct=True),
             gross=Sum("line_total"),
             net=Sum("net_amount"),
+            voucher_sold=Sum("voucher_sold_amount"),
             # A session that came back (SALE-F32) is no longer theirs; a voided sale is not counted at all.
             sessions=Sum(
                 "voucher_value",
@@ -2180,11 +2181,12 @@ def by_staff(ctx: OperationContext, params: PeriodIn) -> dict:
             ),
         )
     )
-    refunded = _refunded_by_staff(params)
+    refunded, voucher_sold_back = _refunded_by_staff(params)
     totals = []
     for row in rows:
         given_back = refunded.get(row["served_by"], 0)
         revenue = row["gross"] - given_back
+        voucher_sold = row["voucher_sold"] - voucher_sold_back.get(row["served_by"], 0)
         totals.append(
             {
                 "staff_id": row["served_by"],
@@ -2194,16 +2196,18 @@ def by_staff(ctx: OperationContext, params: PeriodIn) -> dict:
                 "tax_total": row["gross"] - row["net"],
                 "refunded_total": given_back,
                 "total_revenue": revenue,
+                "voucher_sold_total": voucher_sold,
                 "voucher_total": row["sessions"],
-                "production_total": revenue + row["sessions"],
+                "production_total": revenue - voucher_sold + row["sessions"],
             }
         )
     totals.sort(key=lambda total: (-total["production_total"], total["staff_id"]))
     return {"rows": totals}
 
 
-def _refunded_by_staff(params: PeriodIn) -> dict[UUID, int]:
-    """What the refunds of the period's sales gave back on each professional's lines (SALE-F31), in cents.
+def _refunded_by_staff(params: PeriodIn) -> tuple[dict[UUID, int], dict[UUID, int]]:
+    """What the refunds of the period's sales gave back on each professional's lines (SALE-F31), in cents, and how much
+    of what those lines paid for vouchers went with it: a line never pays for more than it has left.
 
     The refunds of a sale are taken in the order they were made, against what each line has left to give
     back (what it charged minus what earlier refunds already took off it). A refund's money goes first to
@@ -2221,6 +2225,7 @@ def _refunded_by_staff(params: PeriodIn) -> dict[UUID, int]:
         .order_by("sale_id", "created_at", "id")
     )
     given: dict[UUID, int] = {}
+    voucher_sold_back: dict[UUID, int] = {}
     for _sale_id, of_sale in groupby(refunds, key=attrgetter("sale_id")):
         of_sale = list(of_sale)
         sale = of_sale[0].sale
@@ -2246,7 +2251,10 @@ def _refunded_by_staff(params: PeriodIn) -> dict[UUID, int]:
             served_by = line.staff_id or sale.staff_id
             if served_by is not None:
                 given[served_by] = given.get(served_by, 0) + line.line_total - have
-    return given
+                voucher_sold_back[served_by] = voucher_sold_back.get(served_by, 0) + max(
+                    line.voucher_sold_amount - have, 0
+                )
+    return given, voucher_sold_back
 
 
 def _take_off(left: list[int], shares: list[int]) -> list[int]:

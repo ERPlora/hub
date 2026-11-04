@@ -531,8 +531,8 @@ class CommissionReportRow(Schema):
     )
     commission_rate: Decimal = Field(description="Commission, in percent.")
     sold: int = Field(
-        description="What they sold in the period, refunds taken off and the value of the voucher sessions they did "
-        "added, in cents."
+        description="What they sold in the period, refunds and the vouchers they sold taken off and the value of the "
+        "voucher sessions they did added, in cents."
     )
     commission: int = Field(description="sold x rate / 100, in cents, rounded half up once.")
 

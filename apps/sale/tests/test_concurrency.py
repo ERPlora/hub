@@ -33,6 +33,7 @@ from apps.sale.models import (
     Refund,
     Sale,
     SaleCounter,
+    SaleLine,
 )
 from apps.sale.tests.conftest import A, run
 
@@ -287,6 +288,42 @@ def test_two_tills_paying_with_the_last_session_one_wins_and_the_other_hears_why
         for line in Order.objects.get(pk=first.id).lines.all()
     ] + [line.voucher_session_id for line in Order.objects.get(pk=second.id).lines.all()]
     assert len([session for session in covered if session]) == 1
+
+
+def test_a_second_voucher_on_a_line_waits_for_the_first_and_does_not_fit(coffee, last_session):
+    # SERVICE-F14: read before the first grant's COMMIT, both would fit and the line would pay for more than it charged.
+    from apps.service.models import Grant
+
+    haircut, lucia, _grant = last_session
+    sale = charge("voucher-line-0001", lines=[{"product": "COF"}], payments=[{"method": "card"}])()
+    total = sale.lines[0].line_total
+    package = svc(
+        "service.package.create",
+        {"name": "Bono de la línea", "max_uses": 3, "items": [{"service_id": str(haircut.id)}]},
+    )
+    data = {"package_id": str(package.id), "customer_id": str(lucia.id), "amount": total, "sale_id": str(sale.id)}
+    granted, finish = threading.Event(), threading.Event()
+
+    def first():
+        with transaction.atomic():
+            svc("service.grant.create", data)
+            granted.set()
+            finish.wait(10)
+
+    def second():
+        granted.wait(10)
+        return svc("service.grant.create", data)
+
+    def let_the_first_commit():
+        # Time for the second to reach the line's lock (or, without it, to read and be granted) first.
+        granted.wait(10)
+        time.sleep(0.5)
+        finish.set()
+
+    results = at_once(first, second, let_the_first_commit)
+    assert getattr(results[1], "code", None) == "sale.voucher_over_line"
+    assert Grant.objects.filter(package=package.id).count() == 1
+    assert SaleLine.objects.get(pk=sale.lines[0].id).voucher_sold_amount == total
 
 
 def test_charging_a_check_and_voiding_it_at_once_spend_or_release_its_session(

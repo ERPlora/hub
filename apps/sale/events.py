@@ -23,6 +23,7 @@ SALE_VOIDED = "sale.sale.voided"
 SALE_REFUNDED = "sale.sale.refunded"
 SALE_REASSIGNED = "sale.sale.reassigned"
 SALE_INVOICED = "sale.sale.invoiced"
+SALE_VOUCHER_LINE_CHANGED = "sale.sale.voucher_line_changed"
 ORDER_OPENED = "sale.order.opened"
 ORDER_CHANGED = "sale.order.changed"
 ORDER_FIRED = "sale.order.fired"
@@ -47,6 +48,7 @@ ALL = [
     SALE_REFUNDED,
     SALE_REASSIGNED,
     SALE_INVOICED,
+    SALE_VOUCHER_LINE_CHANGED,
     ORDER_OPENED,
     ORDER_CHANGED,
     ORDER_FIRED,
@@ -68,7 +70,7 @@ ALL = [
 #: The events that change what a sale says (lists, figures, documents).
 SALE_EVENTS = [SALE_COMPLETED, SALE_VOIDED, SALE_REFUNDED, SALE_REASSIGNED, SALE_INVOICED]
 #: The events that move the sales figures (what was sold, how many tickets): a charge, a void, a refund.
-FIGURE_EVENTS = [SALE_COMPLETED, SALE_VOIDED, SALE_REFUNDED]
+FIGURE_EVENTS = [SALE_COMPLETED, SALE_VOIDED, SALE_REFUNDED, SALE_VOUCHER_LINE_CHANGED]
 #: The events that change what an open check says.
 ORDER_EVENTS = [
     ORDER_OPENED,

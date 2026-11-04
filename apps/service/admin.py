@@ -254,6 +254,7 @@ class GrantAdmin(admin.ModelAdmin):
         "granted_at",
         "source",
         "sale_id",
+        "sale_line_id",
         "amount",
         "net_amount",
         "tax_amount",

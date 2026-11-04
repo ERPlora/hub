@@ -11,14 +11,15 @@ breaking it at the COMMIT, and one deleted meanwhile is refused as one deleted b
 """
 
 import datetime as dt
+from typing import Any
 
 from django.db import IntegrityError
 from django.db.models import F
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
-from live.errors import Conflict, InvalidPayload, NotFound
-from live.operations import atomic, operation
+from live.errors import AppInactive, Conflict, InvalidPayload, NotFound
+from live.operations import UnknownOperation, atomic, operation
 from live.outbox import record_event
 
 from apps.customer.models import Customer
@@ -115,6 +116,7 @@ from apps.staff.queries import resolve_member
 from apps.tax.models import TaxCategory
 from apps.tax.queries import held_categories
 from base import images
+from base.operations import call
 
 TAX_REQUIRED = _("Pick a tax category: without one the service cannot be charged.")
 TAX_UNKNOWN = _("That tax category does not exist in Taxes or is deactivated.")
@@ -1082,6 +1084,16 @@ def _grant_payload(grant: Grant) -> dict:
     }
 
 
+def _tell_sales(ctx: OperationContext, name: str, data: dict) -> Any:
+    """Sales' operation ``name``, asked by name for the caller: Sales is no requirement of Services (its permission
+    applies and its refusals reach the caller as they are). ``None`` without Sales in the business (absent or off):
+    there is no figure to keep the voucher's line out of."""
+    try:
+        return call(ctx, name, data)
+    except (UnknownOperation, AppInactive):
+        return None
+
+
 @operation(
     "service.grant.create",
     kind="command",
@@ -1091,7 +1103,9 @@ def _grant_payload(grant: Grant) -> dict:
     expose_api=True,
     ai={
         "description": "Grant (sell) a voucher of the catalog to a customer (by name or phone), with the amount paid "
-        "and the sale if any: its uses and validity are frozen and its expiry counts from the purchase.",
+        "and the sale that charged it (and its line, if the sale charged several): its uses and validity are frozen "
+        "and its expiry counts from the purchase. If it was charged at the till, say the sale: without it, its "
+        "sessions count for nobody's commission.",
         "risk": "normal",
     },
 )
@@ -1100,11 +1114,22 @@ def create_grant(ctx: OperationContext, data: GrantIn) -> dict:
     if not package.is_active:
         raise NotFound(str(PACKAGE_NOT_FOUND), code="service.package_not_found")
     customer = find_customer(data.customer_id, data.customer, lock=True)
+    # A voucher given away charged nothing: no line has anything to leave out.
+    sold_on = (
+        _tell_sales(
+            ctx,
+            "sale.sale.voucher_sold",
+            {"sale_id": data.sale_id, "line_id": data.sale_line_id, "amount": data.amount},
+        )
+        if data.amount and (data.sale_id or data.sale_line_id)
+        else None
+    )
     grant = Grant.objects.create(
         package=package,
         customer=customer,
         granted_at=data.granted_at or timezone.now(),
-        sale_id=data.sale_id,
+        sale_id=sold_on.sale_id if sold_on else data.sale_id,
+        sale_line_id=sold_on.line_id if sold_on else None,
         amount=data.amount,
         net_amount=data.net_amount,
         tax_amount=data.tax_amount,
@@ -1144,6 +1169,10 @@ def void_grant(ctx: OperationContext, data: VoidIn) -> dict:
         void_reason=data.reason,
         updated_at=timezone.now(),
     )
+    if grant.sale_line_id is not None:
+        _tell_sales(
+            ctx, "sale.sale.voucher_unsold", {"line_id": grant.sale_line_id, "amount": grant.amount}
+        )
     record_event(ctx, events.GRANT_VOIDED, _grant_payload(grant))
     return load_grant(ctx, grant.id)
 

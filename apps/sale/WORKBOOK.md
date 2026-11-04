@@ -1036,8 +1036,13 @@ cuenta en el día de su venta y se reparte al céntimo: con lo que nadie atendi�
 periodo. Además, lo que valen las **sesiones de bono** que hizo cada profesional (SALE-F27, SERVICE-F24),
 fijado al cobrar cada una; una sesión de un bono sin límite, que no tiene entre qué dividir, cuenta el
 precio de su línea. No es dinero del periodo (el bono se pagó al venderlo), así que no está en los
-«Ingresos». Lo que queda más esas sesiones es su **producción**, sobre la que va la comisión. La sesión
-que vuelve, por devolución o anulando la venta, deja de contar.
+«Ingresos». La sesión que vuelve, por devolución o anulando la venta, deja de contar. Lo que una línea pagó
+por un **bono vendido** (Servicios lo dice al concederlo, SERVICE-F14) sigue en «Ingresos», pero no es
+producción de quien lo vendió, sin pasar nunca de lo que a esa línea le queda tras las devoluciones. La
+**producción**, sobre la que va la comisión, es lo que queda sin esos bonos más las sesiones: un bono de
+100,00 € en 3 sesiones, vendido por A y hecho por B, da 0 a A y 100,00 € a B, y suma los «Ingresos» del periodo.
+Las ventas cobradas antes siguen como estaban: su línea cuenta para quien la vendió y las sesiones de esos
+bonos no cuentan para nadie, así que nada cuenta dos veces.
 Si falla: «Error cargando métricas» (las cifras salen como «—»); si no se pueden leer los últimos 7 días,
 «No se han podido leer los últimos 7 días.». Vacía: «Aún no hay ventas.». Quien
 no tiene permiso de informes ve la tabla, sin las cifras. Un total que no es un importe dice «Escribe
@@ -1355,7 +1360,7 @@ diciendo cuáles (409 `*_ambiguous`).
 | Las cifras de un periodo de días del negocio, con el impuesto con que se declararon sus ventas (vacío si mezclan impuestos) | informes | F28 | `sale.sale.stats` |
 | Lo vendido hoy y los tiques de hoy | informes | F28 | `sale.sale.today` |
 | Lo vendido cada uno de los últimos 7 días | informes | F28 | `sale.sale.last_7_days` |
-| Lo vendido por cada profesional en un periodo: bruto, base, impuesto, lo devuelto de sus líneas, lo que queda, lo que valen las sesiones de bono que hizo y su producción (sobre la que va la comisión) | informes | F16, F28 | `sale.sale.by_staff` |
+| Lo vendido por cada profesional en un periodo: bruto, base, impuesto, lo devuelto de sus líneas, lo que queda, lo que pagó bonos que vendió, lo que valen las sesiones de bono que hizo y su producción (sobre la que va la comisión) | informes | F16, F28 | `sale.sale.by_staff` |
 | Lo que cobraría una cuenta, o unas líneas, sin cobrar nada (total, base, IVA, descuentos, desglose y líneas) | ver ventas | F01, F21, F22 | `sale.checkout.preview` |
 | Las cuentas abiertas (o de otro estado), con búsqueda por título y páginas | ver ventas | F17 | `sale.order.list` |
 | Una cuenta con sus líneas sin cobrar | ver ventas | F17, F19 | `sale.order.get` |
@@ -1415,6 +1420,7 @@ secciones, las notas rápidas y lo devolvible se pueden seguir en vivo.
 | Venta anulada | Anular | La venta, su número, motivo, quién y cuándo, total, cliente, cuenta y documento | `sale.sale.voided` |
 | Venta devuelta | Devolver | La venta, la devolución, el importe, el motivo, si queda devuelta del todo, los cobros y las líneas devueltas | `sale.sale.refunded` |
 | Ventas re-apuntadas | Unir fichas | La ficha que queda y la absorbida | `sale.sale.reassigned` |
+| Una línea pagó un bono, o ya no | Servicios concede o anula un bono diciendo su venta | La venta y la línea | `sale.sale.voucher_line_changed` |
 | Venta con su documento | Un documento que no se pudo emitir en el cobro, la anulación o la devolución se emite después (reintento del cobro, «Emitir ahora» o la reacción de Facturación) | La venta, el documento, su número, la devolución (`refund_id`) o si es el de la anulación (`void`); uno por documento | `sale.sale.invoiced` |
 | Cuenta abierta | Abrir o dividir | La cuenta | `sale.order.opened` |
 | Cuenta cambiada | Cualquier cambio de líneas, descuentos o título | La cuenta | `sale.order.changed` |
@@ -1911,8 +1917,8 @@ administrador y responsable, los mismos que anulan y devuelven).
 - **Marcar una cuenta «para llevar» en el TPV** (F12): la cuenta no tiene canal; un menú se cobra según
   su propio ajuste en Menús y combos («en el local» o «para llevar», COMBO-F09). Un menú «en el local»
   que el cliente se lleva no se parte por plato.
-- **Que la venta de un bono no cuente como producción de quien lo vende** (hub#769): cobrado a precio libre,
-  cuenta para quien atiende la cuenta, y cada sesión, para quien la hace.
+- **Enlazar a su venta un bono concedido sin decirla** (SERVICE-F14, hub#786): su línea sigue contando para quien
+  lo vendió y sus sesiones, para nadie.
 - **Vender un bono en el TPV** (SERVICE-F14) y, con ello, concederlo al cobrar y anularlo al anular o
   devolver su venta (el aviso «se vendió en esta venta y se anulará con ella»): el TPV del producto
   actual no lo ofrecía (solo el asistente o la API, con el IVA que mandaba el cobro) y aquí toda línea

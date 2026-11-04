@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:ad4fd8f8b3de2ab5fba788899f11d1232aded5b1443b9507b35da6c5b9885437 -->
+<!-- generated from WORKBOOK.md sha256:bbc26a01f35a31f3605f9687be4312b8f0721a84c5e63c8c3eaac53345ec767f -->
 
 ## What it is for and who it is for
 
@@ -1005,8 +1005,13 @@ Each refund counts on its sale's day and is shared out to the cent: with what no
 to the period's "Revenue". On top of that, what the **voucher sessions** each professional did are worth
 (SALE-F27, SERVICE-F24), fixed as each one is charged; a session of a voucher with no limit, which has
 nothing to divide by, counts the price of its line. It is not money of the period (the voucher was paid
-when it was sold), so it is not in "Revenue". What is left plus those sessions is their **production**,
-which the commission goes on. A session that comes back, by a refund or by voiding the sale, stops counting.
+when it was sold), so it is not in "Revenue". A session that comes back, by a refund or by voiding the sale,
+stops counting. What a line paid for a **voucher sold** (Services says so when granting it, SERVICE-F14) stays in
+"Revenue", but it is no production of whoever sold it, never going over what that line has left after refunds.
+Their **production**, which the commission goes on, is what is left without those vouchers plus the sessions: a
+voucher of 100.00 € in 3 sessions, sold by A and done by B, gives 0 to A and 100.00 € to B, and adds up to the
+period's "Revenue". Sales charged before stay as they were: their line counts for whoever sold it and the
+sessions of those vouchers count for nobody, so nothing counts twice.
 If it fails: "Error loading metrics" (the figures show as "—"); if the last 7 days cannot be read, "The
 last 7 days could not be read.". Empty: "No sales yet.". Whoever lacks the reports permission sees the
 table, without the figures. A total that is not an amount says "Type an amount, like 12.50" under its
@@ -1308,7 +1313,7 @@ id, its name or its type ("cash", "card"). If a name matches several, it is refu
 | The figures of a period of business days, with the tax its sales were declared with (empty if they mix taxes) | reports | F28 | `sale.sale.stats` |
 | What was sold today and today's tickets | reports | F28 | `sale.sale.today` |
 | What was sold on each of the last 7 days | reports | F28 | `sale.sale.last_7_days` |
-| What each professional sold in a period: gross, base, tax, what was refunded of their lines, what is left, what the voucher sessions they did are worth and their production (what the commission goes on) | reports | F16, F28 | `sale.sale.by_staff` |
+| What each professional sold in a period: gross, base, tax, what was refunded of their lines, what is left, what paid for vouchers they sold, what the voucher sessions they did are worth and their production (what the commission goes on) | reports | F16, F28 | `sale.sale.by_staff` |
 | What a check, or some lines, would charge, without charging anything (total, base, VAT, discounts, breakdown and lines) | see sales | F01, F21, F22 | `sale.checkout.preview` |
 | The open checks (or of another state), with search by title and pages | see sales | F17 | `sale.order.list` |
 | A check with its uncharged lines | see sales | F17, F19 | `sale.order.get` |
@@ -1368,6 +1373,7 @@ the quick notes and what is refundable can be followed live.
 | Sale voided | Void | The sale, its number, reason, who and when, total, customer, check and document | `sale.sale.voided` |
 | Sale refunded | Refund | The sale, the refund, the amount, the reason, whether it is left fully refunded, the payments and the refunded lines | `sale.sale.refunded` |
 | Sales re-pointed | Merge records | The record that stays and the absorbed one | `sale.sale.reassigned` |
+| A line paid for a voucher, or no longer | Services grants or voids a voucher saying its sale | The sale and the line | `sale.sale.voucher_line_changed` |
 | Sale with its document | A document that could not be issued in the charge, the void or the refund is issued later (the charge's retry, "Issue now" or Invoicing's reaction) | The sale, the document, its number, the refund (`refund_id`) or whether it is the void's (`void`); one per document | `sale.sale.invoiced` |
 | Check opened | Open or split | The check | `sale.order.opened` |
 | Check changed | Any change of lines, discounts or title | The check | `sale.order.changed` |
