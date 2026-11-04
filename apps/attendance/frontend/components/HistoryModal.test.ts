@@ -68,6 +68,7 @@ describe('HistoryModal (ATTENDANCE-F09)', () => {
     const item = s.inDoc('attendance-history-list')?.querySelector('[data-testid="attendance-history-item"]')?.textContent;
     expect(item).toContain('Marta Jefa · 2026-10-06 09:00');
     expect(item).toContain('Before: 2026-10-05 08:00 → — (Needs review)');
+    expect(item).toContain('After: 2026-10-05 08:00 → 2026-10-05 16:00 (Closed)');
   });
 
   it('asks for the history of the day when it opens and lists it newest first', async () => {

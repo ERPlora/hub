@@ -58,7 +58,9 @@ describe("TasksPage on the business's clock (hub#779)", () => {
     const s = await setup({ timezone: 'America/New_York' });
     vi.useFakeTimers({ now: new Date('2026-11-03T02:00:00Z'), toFake: ['Date'] });
     await s.show(page([task({ id: 't1', due_date: '2026-11-02', status: 'todo' })]));
-    expect(s.rows()[0].find('[data-testid="task-due"]').attributes('aria-label')).toBe('Due today');
+    const due = s.rows()[0].find('[data-testid="task-due"]');
+    expect(due.attributes('aria-label')).toBe('Due today');
+    expect(due.classes()).toContain('task-due--today');
   });
 });
 

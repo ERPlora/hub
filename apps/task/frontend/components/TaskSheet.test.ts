@@ -61,6 +61,24 @@ describe('TaskSheet', () => {
     const s = await setup({ detail: { ...TASK, status: 'done', completed_at: '2026-10-15T09:00:00Z' }, timezone: 'Atlantic/Canary' });
     // 09:00 UTC is 10:00 in the Canaries in October (UTC+1), 11:00 in Madrid.
     expect(s.text('task-sheet-completed')).toBe('Completed: 15/10/2026, 10:00');
+    // 08:00 UTC, when the task was created.
+    expect(s.text('task-sheet-created')).toBe('Created: 15/10/2026, 09:00');
+    // 10:30 UTC, the newest comment.
+    expect(s.text('task-sheet-comment-c2')).toContain('Bea Ruiz · 15/10/2026, 11:30');
+  });
+
+  it("calls a task late only after the business's midnight (hub#779)", async () => {
+    // 02:00 UTC on 3 November is still the 2nd in New York, the 3rd in UTC and in Madrid.
+    const s = await setup({ detail: { ...TASK, due_date: '2026-11-02', status: 'todo' }, timezone: 'America/New_York' });
+    vi.useFakeTimers({ now: new Date('2026-11-03T02:00:00Z'), toFake: ['Date'] });
+    try {
+      await s.result('base.business.get', { timezone: 'America/New_York' }, {}, 2);
+      await s.result(DETAIL, { ...TASK, due_date: '2026-11-02', status: 'todo', title: 'Again' }, {}, 2);
+      expect(s.el('task-sheet-due-value').getAttribute('aria-label')).toBe('Due today');
+      expect(s.el('task-sheet-due-value').className).toContain('task-sheet__due--today');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('follows the task, its subtasks and its comments live', async () => {

@@ -203,6 +203,7 @@ async function onAction({ actionId, row }: { actionId: string; row: TaskOut }): 
   }
 }
 
+const dueClass = (row: TaskOut): string => `task-due task-due--${dueTone(row.due_date, row.status, zone.value)}`;
 const dueLabel = (row: TaskOut): string | undefined => {
   const tone = dueTone(row.due_date, row.status, zone.value);
   return tone === 'none' ? undefined : t(tone === 'overdue' ? 'task.due.overdue' : 'task.due.today');
@@ -308,7 +309,7 @@ const dueLabel = (row: TaskOut): string | undefined => {
       <template #due="{ row }">
         <span
           data-testid="task-due"
-          :class="`task-due task-due--${dueTone(pill(row).due_date, pill(row).status, zone)}`"
+          :class="dueClass(pill(row))"
           :aria-label="dueLabel(pill(row))"
           :title="dueLabel(pill(row))"
         >{{ formatDay(pill(row).due_date, locale) }}</span>
@@ -369,7 +370,7 @@ const dueLabel = (row: TaskOut): string | undefined => {
       <template #due="{ row }">
         <span
           data-testid="task-due"
-          :class="`task-due task-due--${dueTone(pill(row).due_date, pill(row).status, zone)}`"
+          :class="dueClass(pill(row))"
           :aria-label="dueLabel(pill(row))"
           :title="dueLabel(pill(row))"
         >{{ formatDay(pill(row).due_date, locale) }}</span>

@@ -71,7 +71,19 @@ describe('CorrectionModal (ATTENDANCE-F08)', () => {
     await settle();
     expect(s.save().disabled).toBe(false);
     // Filled again on the business's clock, and what was written stays.
-    expect([s.field('clock_in').value, s.field('reason').value]).toEqual(['2026-10-05T08:02', 'Forgot to clock out']);
+    expect([s.field('clock_in').value, s.field('clock_out').value, s.field('reason').value]).toEqual([
+      '2026-10-05T08:02',
+      '2026-10-05T16:05',
+      'Forgot to clock out',
+    ]);
+  });
+
+  it('a time typed before the business says its zone stays as it was typed (hub#779)', async () => {
+    const s = await setup(DAY, 'en', null);
+    await ionValue(s.field('clock_out'), '2026-10-05T16:30', 'ionInput');
+    await s.result('base.business.get', { timezone: 'Atlantic/Canary' });
+    await settle();
+    expect(s.field('clock_out').value).toBe('2026-10-05T16:30');
   });
 
   it('shows the day and its times in business time, with an empty reason', async () => {
