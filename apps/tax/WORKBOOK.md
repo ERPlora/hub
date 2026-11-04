@@ -61,9 +61,10 @@ No decide el precio, no emite facturas ni habla con la AEAT, y no guarda el paí
 - Las reglas de fábrica son solo de España. Un negocio de otro país (cuando la cuenta de ERPlora lo traiga)
   tendrá que crear las suyas (TAX-F04); ni el aviso «Tus impuestos» ni el paso del Inicio (TAX-F17) lo
   detectan todavía, porque cuentan las reglas de cualquier país.
-- **«Hoy» es la hora de Madrid** en la fase 1: Impuestos todavía no usa la zona horaria del negocio.
-  El día en que cambia un tipo (TAX-F07) empieza a medianoche de Madrid; en Canarias (TAX-F11), una
-  hora antes de su medianoche. Cuando use la del negocio, «hoy» será el suyo.
+- **«Hoy» es el del negocio**, en su zona horaria: en Impuestos, el día en que cambia un tipo (TAX-F07) empieza a su
+  medianoche, también en Canarias (TAX-F11). **El cobro aún no**: una venta se cobra con el tipo de su día, y ese día
+  sigue en la hora de Madrid, porque llega al registro de VeriFactu y cambia con las fechas de la factura (hub#772): en
+  Canarias, el tipo nuevo se cobra desde una hora antes de su medianoche.
 
 Configuración inicial, paso a paso:
 
@@ -506,7 +507,7 @@ Pasos:
 2. Se obtiene la base, la cuota, el total, el tipo combinado, la calificación, la regla aplicada y el
    desglose por componente.
 Entra: importe en céntimos, categoría, país (de entrada, el del negocio con su territorio fiscal,
-TAX-F11), región y fecha (de entrada, hoy; en la fase 1, hoy en Madrid). Si se dice un país, se
+TAX-F11), región y fecha (de entrada, hoy). Si se dice un país, se
 calcula en ese país y en la región que se diga, sin el territorio del negocio.
 Sale: solo la respuesta; no guarda nada ni avisa. Sin el impuesto incluido, la cuota de cada componente
 es base × tipo redondeada al céntimo, la mitad hacia arriba. Con el impuesto incluido, la base es el
@@ -744,9 +745,9 @@ cajero del producto actual es un empleado.
 - **El país del negocio**: es `DEFAULT_COUNTRY` (`ES`) hasta que el Hub reciba el de la cuenta del SaaS con
   el registro de la fase 2 (`PUT /internal/hubs/{id}` → `control.Hub`); no se edita en el Hub (BASE-G97
   sigue `no hecho` por eso).
-- **«Hoy» en la zona del negocio**: en la fase 1 es el de Madrid (`settings.TIME_ZONE`), también en
-  Canarias, donde un cambio de tipo empieza una hora antes de su medianoche (la zona horaria del negocio en
-  dos fuentes es una contradicción señalada en la ronda CLOSE-SCHEDULE de `PLAN-HUB.md`).
+- **«Hoy» en la zona del negocio** (`business_today`, por `base.business.business_zone`, hub#771). Quien cobra dice su
+  día: Ventas pasa `on` (`sale_day`), aún en `TIME_ZONE` hasta hub#772, y Facturación el suyo; el `line_defaults` de
+  Facturación solo propone un tipo, con el «hoy» de aquí.
 - **Tipos de fábrica de IGIC, IPSI, recargo de equivalencia o de otros países**: no se siembran, a propósito
   (un tipo inventado se declararía); los crea el negocio (TAX-F04, TAX-F06, TAX-F11).
 - **`useServerTable`/`useLiveList` y `formatPercent`/`formatDate` en `@erplora/ui`**: siguen en
@@ -782,7 +783,7 @@ cajero del producto actual es un empleado.
    además de por su clave o su id: el asistente se usa por voz.
 6. **La región se comprueba contra la lista ISO 3166-2** (`pycountry`), no solo por su forma: una región
    que no existe nunca casaría.
-7. **La fecha por defecto del cálculo es la del negocio**, no la UTC (en la fase 1, la de Madrid).
+7. **La fecha por defecto del cálculo es la del negocio**, no la UTC.
 8. **Un componente sale debajo de su raíz** en la lista de reglas.
 9. **El cajero** es un empleado: recibe `tax.view` (ver y calcular).
 10. **`restaurant.alcohol` se siembra al 10 %** (antes, 21 %): las bebidas alcohólicas servidas para

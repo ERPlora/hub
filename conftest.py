@@ -1,9 +1,10 @@
 """Fixtures shared by every hub-next test."""
 
+import datetime as dt
 import json
 
 import pytest
-from django.utils import translation
+from django.utils import timezone, translation
 
 from config import testing
 
@@ -309,3 +310,37 @@ def hub_aliases_forgotten():
     hubs.forget_aliases(before)
 
 
+
+
+#: 23:30 in the Canaries (on UTC in November), already 00:30 of the 3rd in Madrid, the deployment's clock.
+CANARY_NIGHT = dt.datetime(2026, 11, 2, 23, 30, tzinfo=dt.UTC)
+
+
+@pytest.fixture
+def canary_at_night(monkeypatch):
+    """A business in another zone than the deployment's, in the hour they disagree on the day: it is 2 November 2026
+    there and the 3rd on the deployment's clock (hub#771)."""
+    from base.models import Hub
+    from base.tenancy.context import use_hub
+
+    monkeypatch.setattr(timezone, "now", lambda: CANARY_NIGHT)
+    with use_hub(Hub(slug="a", timezone="Atlantic/Canary")):
+        yield
+
+
+@pytest.fixture
+def across_a_change_of_zone(monkeypatch):
+    """What ``make()`` gives at one single instant in a business that moves from the Canaries to Madrid and back: the
+    2nd, the 3rd and the 2nd again. A number of the day must carry on its day's count, never repeat one (hub#771)."""
+    from base.models import Hub
+    from base.tenancy.context import use_hub
+
+    def across(make):
+        monkeypatch.setattr(timezone, "now", lambda: CANARY_NIGHT)
+        made = []
+        for zone in ("Atlantic/Canary", "Europe/Madrid", "Atlantic/Canary"):
+            with use_hub(Hub(slug="a", timezone=zone)):
+                made.append(make())
+        return made
+
+    return across

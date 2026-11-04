@@ -109,8 +109,7 @@ nadie a propósito y deja sin promociones a una charcutería.
    y mete en él a sus clientes.
 3. Sin ninguna tarifa ni regla, todo se cobra al precio de la ficha: instalar Tarifas no cambia nada
    hasta que creas la primera.
-4. «Hoy» y las fechas de las tarifas y las reglas son el día del negocio: en la fase 1, la zona horaria
-   del Hub, **Europe/Madrid**. La divisa del negocio es la de su país, la que dice **Ajustes → Negocio**
+4. «Hoy» y las fechas de las tarifas y las reglas son el día del negocio, en su zona horaria. La divisa del negocio es la de su país, la que dice **Ajustes → Negocio**
    (el euro en España, el esloti en Polonia).
 
 ## Pantallas
@@ -625,8 +624,8 @@ Ventas **no** requiere Tarifas y Tarifas no toca Ventas. Lo que se pide a Ventas
   negocio) y nada guardado se reescribe. La pantalla la lee con `useBusinessMoney` de `base` (los decimales
   del servidor, nunca los de `Intl`; mientras no contesta, una cifra sin símbolo y sin «Hacer general»)
   (FIX-HUB-PRICING-CHARGES-IN-EUR-WHATEVER-THE-COUNTRY).
-- El «hoy» es `timezone.localdate()` (fase 1: `TIME_ZONE` = Europe/Madrid); `pricing.price.resolve`
-  toma `when` y los tests nunca leen el reloj real.
+- El «hoy» es el del reloj del negocio (`base.business.business_zone`, hub#771), también el día de un `when`;
+  `pricing.price.resolve` toma `when` y los tests nunca leen el reloj real.
 - Asistente: toda operación declara `ai={"description"…}` (`risk` solo en las acciones: `high` en
   elegir o quitar la general, desactivar o activar una tarifa, quitar un precio y desactivar una regla) y
   todo campo de entrada lleva `description`.

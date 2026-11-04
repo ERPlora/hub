@@ -111,6 +111,7 @@ from apps.sale.queries import (
     ratio_of,
     refresh_combos,
     returned_by_line,
+    sale_day,
     sale_detail,
     sessions_to_return,
     settings_row,
@@ -2236,7 +2237,7 @@ def _complete(ctx: OperationContext, data: CompleteIn, *, over_limit: bool) -> d
         )
 
     now = timezone.now()
-    day = timezone.localdate(now)
+    day = sale_day(now)
     parts = charge_parts(lines)
     valuation = valuate(
         parts,

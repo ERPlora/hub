@@ -738,9 +738,9 @@ El cajero del producto actual ya no existe como papel: lo que veía (el director
   primera y deciden sobre lo que dejó. Aprobar, rechazar, cancelar y tocar un horario bloquean la ficha
   y luego la fila; una ficha dada de baja mientras tanto da «no existe». Hay tests con hilos de cada
   carrera.
-- El «hoy» es `timezone.localdate()` (`business_today()` de `queries.py`; en la fase 1, `TIME_ZONE`),
-  aunque `control.Hub.timezone` ya guarda la zona de cada hub (hub#63): la contradicción está señalada
-  en las rondas CLOSE-SCHEDULE y CLOSE-STAFF de `PLAN-HUB.md`.
+- El «hoy» es el del reloj del negocio (`business_today()` de `queries.py`, por `base.business.business_zone`,
+  hub#771). Las comisiones piden las ventas por su día, que aún va en `TIME_ZONE` (`sale_day` de Ventas, hub#772): en
+  otra zona, lo cobrado en la hora de diferencia cuenta en el día siguiente.
 - **Millares**: los importes agrupan los millares también con cuatro cifras («1.234,56 €»; `formatMoney` de
   `@erplora/ui/components`, con `useGrouping: 'always'`, porque el CLDR del español espera a cinco: hub#494).
 - Dinero en unidades menores enteras de la moneda del negocio (`hourly_rate`; céntimos en euros); la

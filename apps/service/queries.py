@@ -95,7 +95,7 @@ from apps.service.schemas import (
 from apps.staff.models import Member
 from apps.staff.queries import resolve_member
 from base import images
-from base.business import babel_locale
+from base.business import babel_locale, business_zone
 from base.queries import business_language, image_library
 
 SERVICE_NOT_FOUND = _("That service does not exist in this business.")
@@ -1119,7 +1119,7 @@ def list_grants(ctx: OperationContext, params: GrantListIn) -> dict:
 )
 def get_grant(ctx: OperationContext, data: ByIdIn) -> dict:
     grant = find_grant(data.id)
-    sold_on = format_date(timezone.localtime(grant.granted_at).date(), "medium", locale=babel_locale(ctx.language))
+    sold_on = format_date(timezone.localdate(grant.granted_at, business_zone()), "medium", locale=babel_locale(ctx.language))
     return {**grant_row(ctx, grant), "label": _named(grant.package.name, _customer_name(ctx, grant), sold_on)}
 
 

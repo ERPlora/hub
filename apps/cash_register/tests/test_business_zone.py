@@ -36,3 +36,17 @@ def test_the_refusal_past_the_cut_off_says_the_hour_the_business_set():
             run("cash_register.session.closing_summary", {"closing_balance": 10000})
     assert refused.value.code == "cash_register.session_auto_close_due"
     assert "04:00" in str(refused.value)
+
+
+def test_a_session_opened_before_the_businesss_midnight_is_of_that_day(canary_at_night):
+    session = open_session(10000)
+    assert (session.business_day, session.number) == (dt.date(2026, 11, 2), "S-261102-0001")
+
+
+def test_a_business_that_changes_zone_never_repeats_a_session_number(across_a_change_of_zone):
+    def open_and_close():
+        number = open_session(10000).number
+        run("cash_register.session.close", {"closing_balance": 10000})
+        return number
+
+    assert across_a_change_of_zone(open_and_close) == ["S-261102-0001", "S-261103-0001", "S-261102-0002"]

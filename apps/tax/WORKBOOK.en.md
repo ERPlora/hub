@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:a96f2af5a216b788834f261af6dedfd06ce1171254a9c251cdf8e8acece87ea6 -->
+<!-- generated from WORKBOOK.md sha256:b9cd3b8c7581cc0580a1feffb075a12d286f9f85330ad1e2d33ebc1d8ab42fc7 -->
 
 ## What it is for and who it is for
 
@@ -52,9 +52,10 @@ country.
 - The factory rules are only Spain's. A business of another country (when the ERPlora account brings it)
   will have to create its own (TAX-F04); neither the "Your taxes" notice nor the step of the Home (TAX-F17)
   detect it yet, because they count the rules of any country.
-- **"Today" is Madrid time** in phase 1: Taxes does not use the business's time zone yet. The day a rate
-  changes (TAX-F07) starts at midnight in Madrid; in the Canary Islands (TAX-F11), one hour before their
-  midnight. When it uses the business's, "today" will be its own.
+- **"Today" is the business's**, in its time zone: in Taxes, the day a rate changes (TAX-F07) starts at its
+  midnight, in the Canary Islands too (TAX-F11). **Charging not yet**: a sale is charged at the rate of its day, and
+  that day is still Madrid time, because it reaches the VeriFactu record and changes with the invoice's dates
+  (hub#772): in the Canary Islands, the new rate is charged from one hour before their midnight.
 
 Initial setup, step by step:
 
@@ -473,7 +474,7 @@ Steps:
 2. The base, the tax amount, the total, the combined rate, the qualification, the applied rule and the
    breakdown by component are obtained.
 In: amount in cents, category, country (at first, the business's with its tax region, TAX-F11), region and
-date (at first, today; in phase 1, today in Madrid). If a country is given, it calculates in that country
+date (at first, today). If a country is given, it calculates in that country
 and in the region given, without the business's region.
 Out: only the answer; it saves nothing and announces nothing. Without the tax included, each component's
 tax is base × rate rounded to the cent, half up. With the tax included, the base is the amount ÷ (1 +

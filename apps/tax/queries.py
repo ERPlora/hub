@@ -54,6 +54,8 @@ from apps.tax.schemas import (
     TaxSettingsOut,
     normalize_text,
 )
+from base.business import business_zone
+from base.business import business_zone
 
 CATEGORY_NOT_FOUND = _("This tax category does not exist.")
 RULE_NOT_FOUND = _("This tax rule no longer exists.")
@@ -131,8 +133,9 @@ class Resolution:
 
 
 def business_today() -> dt.date:
-    """The business's today (the Hub's time zone), not UTC: the till sells on the local date."""
-    return timezone.localdate()
+    """The business's today, on its clock (hub#771): a rule ends at its midnight. A sale says its own day to what it
+    charges (``on``, Sales' ``sale_day``)."""
+    return timezone.localdate(timezone=business_zone())
 
 
 def _in_force(rules: QuerySet, on: dt.date) -> QuerySet:

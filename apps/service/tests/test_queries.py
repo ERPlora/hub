@@ -195,6 +195,11 @@ def test_a_voucher_sold_by_its_id_says_what_it_is_whose_and_when_in_the_readers_
     assert error.value.code == "service.grant_not_found"
 
 
+def test_a_voucher_says_the_day_it_was_sold_on_the_businesss_clock(canary_at_night):
+    grant = make_grant(make_package("Bono", services=[make_service("Corte")], sessions=5), make_customer("Lucía Pérez"))
+    assert run("service.grant.get", ByIdIn(id=grant.id)).label == "Bono · Lucía Pérez · Nov 2, 2026"
+
+
 def test_a_voucher_sold_says_its_owner_only_to_who_may_see_customers():
     grant = sold_on_the_third_of_october()
     without = ctx_for().permissions - {"customer.view"}

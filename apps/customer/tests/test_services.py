@@ -2259,6 +2259,17 @@ def test_a_test_in_the_future_or_a_result_without_its_date_saves_nothing():
 
 
 @pytest.mark.django_db
+def test_a_test_is_in_the_future_only_past_the_businesss_midnight(canary_at_night):
+    ana = card("Ana")
+    grant_health(ana)
+    with pytest.raises(InvalidPayload) as refused:
+        run("customer.health.update", HealthIn(customer_id=ana.id, sensitivity_test_on=date(2026, 11, 3)))
+    assert refused.value.code == "customer.date_in_future"
+    record = run("customer.health.update", HealthIn(customer_id=ana.id, sensitivity_test_on=date(2026, 11, 2)))
+    assert record.sensitivity_test_on == date(2026, 11, 2)
+
+
+@pytest.mark.django_db
 def test_health_on_a_card_that_is_gone_or_by_who_does_not_manage_cards_is_refused():
     ana = card("Ana", deleted_at=timezone.now())
     for name, data in (
