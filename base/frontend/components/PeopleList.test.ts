@@ -2,7 +2,7 @@
 // how each one gets in, their role and whether they entered yet; the plan's places and, when every one is taken, why;
 // inviting and changing roles on erplora.com («Members» of the business). A list that cannot be read says so.
 import { applySurface } from '@erplora/ui/shell';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { EMPLOYEE, errorFrame, flush, installedApp, leaveInstalledApp, mountBase, subId, tap } from '../__tests__/mount-base';
 import type { Person, Seats } from '../operations';
@@ -108,6 +108,22 @@ describe('PeopleList', () => {
     expect(full.text()).toContain('Tu plan tiene todas las plazas ocupadas');
     expect(full.text()).toContain('Quita en erplora.com a alguien que ya no trabaje aquí, o pasa a un plan con más plazas.');
     expect(full.get('a[data-testid="people-upgrade"]').attributes('href')).toBe(PLAN_URL);
+  });
+
+  it('its «Upgrade plan» goes with the pass, already signed in on erplora.com', async () => {
+    embed({ name: 'Bar', plan_url: PLAN_URL, members_url: MEMBERS_URL });
+    const tab = { opener: {}, location: { href: 'about:blank' } };
+    const open_ = vi.spyOn(window, 'open').mockReturnValue(tab as unknown as Window);
+    const url = 'http://localhost:8001/hub-pass/?pass=abc';
+    const m = await open({ onApi: () => Response.json({ url }) });
+    await m.result(m.call, 'base.person.list', { people: PEOPLE, seats: { known: true, used: 3, limit: 3, full: true } });
+
+    tap(m.wrapper.get('a[data-testid="people-upgrade"]').element);
+    await flush();
+
+    expect(JSON.parse(m.net.api.at(-1)!.init.body as string)).toEqual({ next: 'plan' });
+    expect(tab.location.href).toBe(url);
+    open_.mockRestore();
   });
 
   it('«Upgrade plan» sells: never on the app surfaces', async () => {

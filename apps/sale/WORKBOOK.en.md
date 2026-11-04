@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:729e1b57931a379294b21ef70433ce63bb45e1eba7fe85e49bff49e2c5354333 -->
+<!-- generated from WORKBOOK.md sha256:a4c47c80ad8b117950bf4adde9226555fd15ae5e7d01abc3956c5e54cd23d847 -->
 
 ## What it is for and who it is for
 
@@ -122,7 +122,11 @@ areas:
   kitchen only shows its quantity, "Order N" and the ⊗ button "Void this item"; one paid with a voucher,
   "Already paid · <voucher>", 0.00 € and only the button to remove it). Footer: the "Ticket discount" row
   if there is one, "Total" (the one the server works out), the discount button, the printer ("Print
-  bill") and "Charge · <amount>".
+  bill") and "Charge · <amount>". In the phone's drawer the top bar and the footer with "Charge" always
+  stay in view, above the tab bar, also on a 320×568 phone; what is in between (title, chips, tabs and
+  lines) scrolls. The customer button reads in two lines at most (a longer name ends in "…"); where they
+  do not fit, on a 320 px phone, it keeps only its icon, and the customer chip in the heading already
+  names them (hub#630).
 
 **Speak** (the strip's microphone key; only for whoever may use the assistant and on a device that can
 record): press it and speak. While it records it turns red, is called "Stop" and "Listening…" shows
@@ -279,7 +283,9 @@ Steps:
    button, which shows the total).
 4. In the **Charge** sheet, with cash chosen, enter the amount tendered on the keypad; the change shows
    large above the keypad, in the row that until then asks for the amount, and the keys do not move under
-   the finger while typing (hub#456).
+   the finger while typing (hub#456). On a low phone, also on a 320×568 one, the whole keypad sits above
+   the footer as soon as the sheet opens; on the 320×568 one the amount moves up beside the title
+   (hub#630).
 5. Press "Charge <total>".
 6. The sheet closes, the check is left empty and the **Sale document** opens with the ticket. With
    **Printing**, the charge asks the queue for the ticket in its very transaction, according to its
@@ -781,8 +787,9 @@ Steps:
    kitchen." shows; the lines are marked with their round ("Order N") and the time sent, and the flame
    disarms. A double send never sends anything twice.
 3. On pressing "Charge" with something pending, it is sent to the kitchen first and then the charge
-   opens: nobody pays for a dish that is not going to be made. If the send fails, the charge does not
-   open and it says why.
+   opens: nobody pays for a dish that is not going to be made. The order's notice then shows at the top of
+   the screen, so the charge keypad (SALE-F01) can be tapped from the first moment. If the send fails, the
+   charge does not open and it says why.
 4. A sent line is locked: no quantity, no note, no discount, no comp.
 5. To take off a dish already sent, press ⊗ "Void this item" on its line: "Void «<article>»" opens with
    "It was already sent to the kitchen. It comes off the check and the reason is kept. A manager has to

@@ -326,6 +326,17 @@ describe('ProductFormModal: editing', () => {
   describe('the business answers after the form opened (flow INVENTORY-F02)', () => {
     const NOT_AMOUNT = 'This is not an amount. Type a figure, for example 12.50.';
 
+    it('a new product: the name and SKU typed before keep, and «Save» lights up once its tax category is chosen', async () => {
+      const s = await setup({}, { business: null });
+      await s.type('inventory-product-name', 'Coffee');
+      await s.type('inventory-product-sku', 'CAF-1');
+      await s.answer(JAPANESE);
+      expect([s.el('inventory-product-name')?.value, s.el('inventory-product-sku')?.value]).toEqual(['Coffee', 'CAF-1']);
+      expect(s.el('inventory-product-form-submit')?.disabled).toBe(true);
+      await s.choose('inventory-product-tax', 'product.generic');
+      expect(s.el('inventory-product-form-submit')?.disabled).toBe(false);
+    });
+
     it('an untouched price and cost are rewritten from the product with the yen’s decimals, and «Save changes» sends neither', async () => {
       const s = await setup({ product: product({ price: 220, cost: 80 }) }, { business: null });
       expect([s.el('inventory-product-price')?.value, s.el('inventory-product-cost')?.value]).toEqual(['2.20', '0.80']);

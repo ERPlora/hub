@@ -1,7 +1,10 @@
 // The Hub's configuration of the shared assistant (`@erplora/ui/components`; the SaaS mounts the same chat with its
-// own): `configureAssistant(HUB_ASSISTANT)` when the SPA boots (main.ts), and in the test helpers that mount its pieces
-// (`mountBase`, `mount-sale`).
+// own): `configureAssistant(hubAssistant(doc))` when the SPA boots (main.ts), and `HUB_ASSISTANT` in the test helpers
+// that mount its pieces (`mountBase`, `mount-sale`).
 // - A turn goes to `base.assistant.turn`'s route; the allowance, a dictation and a report through base's operations.
+// - «Read aloud» in a server voice (round 2026-11-03n): the mp3 of `base.assistant.speak`'s route; when it fails, the
+//   panel reads with the device's voice. Only where the page says erplora.com has a voice (`hub-home.server_voice`,
+//   off by default since round 2026-11-04a, `hubAssistant`): else no choice of voice and no request, the device reads.
 // - Whoever sees the Home uses it (BASE-G110); whoever administers the business upgrades the plan, on erplora.com's
 //   page the Home's block gives (gh:hub#1259).
 // - A write a manager must approve goes through APP-BASE-5's approvals (BASE-G118): the dialog «An approval is
@@ -10,7 +13,8 @@
 //   action's verb does not say it, `base.assistant.card.operations.<app>.<entity>.<action>`; one per action of every
 //   write the assistant may run, guardrail: base/tests/test_assistant.py), the platform's screens
 //   (`base.assistant.screens.<key>`) and the setup's shortcuts of the empty conversation (BASE-G121).
-import type { AssistantApproval, AssistantConfig } from '@erplora/ui/components';
+import type { AssistantApproval, AssistantConfig, AssistantSpeech } from '@erplora/ui/components';
+import { parseErrorEnvelope, readCookie, readSpaConfig } from '@erplora/ui/sdk';
 
 import type { SetupStatus } from '../operations';
 import en from '../locale/en.json';
@@ -88,6 +92,35 @@ export function hubApproval(ask?: AskApproval): AssistantApproval {
   };
 }
 
+/** The route of `base.assistant.speak`. */
+export const SPEAK_URL = '/api/assistant/speak';
+
+/** The mp3 of `input` read aloud in its server voice, from `base.assistant.speak`'s route; a refusal rejects with the
+ *  envelope's ApiError, and the panel reads with the device's voice instead. Its `signal` (the person stopped the
+ *  reading before the audio arrived) aborts the request. */
+export async function speakAloud(
+  { signal, ...input }: AssistantSpeech,
+  doc: Document = document,
+  // The SDK's client reads JSON only, never an mp3: same origin and the SDK's CSRF header, as its own calls.
+  // eslint-disable-next-line no-restricted-globals -- see above
+  fetcher: typeof fetch = (...args) => fetch(...args),
+): Promise<Blob> {
+  const config = readSpaConfig(doc);
+  const response = await fetcher(SPEAK_URL, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'audio/mpeg',
+      [config.csrfHeader]: readCookie(doc.cookie, config.csrfCookieName) ?? '',
+    },
+    body: JSON.stringify(input),
+    signal,
+  });
+  if (!response.ok) throw parseErrorEnvelope(response.status, await response.text());
+  return response.blob();
+}
+
 /** base's modules are read when each piece runs, never when this is built: a test that mocks one of them (an app's
  *  `approval` without `approvalPass`) still loads this file through a helper that configures it. */
 export const HUB_ASSISTANT: AssistantConfig = {
@@ -104,3 +137,10 @@ export const HUB_ASSISTANT: AssistantConfig = {
   placeKey,
   screenKey: platformScreenKey,
 };
+
+/** The Hub's configuration for the page `doc`: `HUB_ASSISTANT`, with the server's voice (`speak`) only where the page
+ *  says erplora.com has one (`hub-home.server_voice`, `ASSISTANT_SERVER_VOICE`). */
+export function hubAssistant(doc: Document = document): AssistantConfig {
+  if (readJsonBlock<HubHome>('hub-home', doc)?.server_voice !== true) return HUB_ASSISTANT;
+  return { ...HUB_ASSISTANT, speak: (input) => speakAloud(input, doc) };
+}

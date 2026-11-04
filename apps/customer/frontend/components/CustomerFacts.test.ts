@@ -7,7 +7,6 @@ import { describe, expect, it } from 'vitest';
 
 import { DETAIL } from '../__tests__/fixtures';
 import { business, JAPANESE, mountCustomer, POLISH } from '../__tests__/mount-customer';
-import { formatMoney } from '../lib/money';
 import type { CustomerDetailOut } from '../operations';
 import CustomerFacts from './CustomerFacts.vue';
 
@@ -37,6 +36,17 @@ describe('CustomerFacts: «Spent» in the business\'s currency (customer-busines
     await s.live();
     expect(spent(s)).toBe('45.50');
   });
+
+  it('an amount of four figures groups its thousands, in both languages (hub#512)', async () => {
+    const big = { ...DETAIL, total_spent: 123456 };
+    const es = await setup(big, 'es');
+    await es.result(await es.live(), 'base.business.get', business());
+    expect(spent(es)).toBe('1.234,56 €');
+
+    const en = await setup(big);
+    await en.result(await en.live(), 'base.business.get', business());
+    expect(spent(en)).toBe('€1,234.56');
+  });
 });
 
 describe('CustomerFacts', () => {
@@ -52,7 +62,7 @@ describe('CustomerFacts', () => {
       ['Source', 'Walk-in'],
       ['Preferred channel', 'Email'],
       ['Purchases', '3'],
-      ['Spent', formatMoney(4550, 'en')],
+      ['Spent', '45.50'],
       ['Last purchase', formatDateTime('2026-10-01T10:00:00Z', 'en')],
       ['Active', 'Yes'],
       ['Birthday', 'Feb 3, 1990'],

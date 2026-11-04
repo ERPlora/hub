@@ -6,11 +6,12 @@
 // once the person leaves it (or `showError`, after a save attempt); the server's message for the field
 // wins. A phone's decimal keyboard has no minus: the ± button at its end turns a supplement into a
 // discount and back.
+import { formatMoney } from '@erplora/ui/components';
 import { IonButton, IonInput } from '@ionic/vue';
 import { computed, ref } from 'vue';
 
 import { useLocale, useT } from '../composables/useT';
-import { formatMoney, type Money } from '../lib/format';
+import type { Money } from '../lib/format';
 import { normaliseMoneyText, parseMoney } from '../lib/money';
 
 const props = withDefaults(
