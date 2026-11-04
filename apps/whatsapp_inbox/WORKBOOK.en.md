@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:75fde3d7c5585f467709eab15cc449c75e66fe7b4e7c347d9bebf92d97027d4b -->
+<!-- generated from WORKBOOK.md sha256:345936839c9864a5d039ddeddbbe480516b9a7969303567f5ce51a53d9fddeac -->
 
 ## What it is for and who it is for
 
@@ -160,7 +160,7 @@ touched ("Meta only lets you change the category of a template it rejected.").
 | WHATSAPP_INBOX-F19 | Choose the slot by writing instead of tapping | done | common |
 | WHATSAPP_INBOX-F20 | When the assistant cannot answer | done | common |
 | WHATSAPP_INBOX-F21 | The customer asks for an appointment on WhatsApp | discarded — not offered: after your **Approve**, Appointments refuses the appointment the assistant proposes (F14); today she is answered from the inbox and the appointment is booked by hand in the Agenda (hub#514) | hair salon |
-| WHATSAPP_INBOX-F22 | The customer cancels or moves her appointment on WhatsApp | discarded — not offered, for the same reason as F21, and cancelling an appointment cannot be entrusted to an automation either; today it is cancelled or moved by hand from the Agenda (hub#514) | hair salon |
+| WHATSAPP_INBOX-F22 | The customer cancels or moves her appointment on WhatsApp | discarded — not offered: the appointments answer is not in the gallery (F21). Automations can already cancel it after your **Approve** (FLOW-F28), but today it is cancelled or moved by hand from the Agenda (hub#514) | hair salon |
 | WHATSAPP_INBOX-F23 | The customer gets the notice when the salon confirms | done | hair salon |
 | WHATSAPP_INBOX-F24 | The guest asks for a table on WhatsApp | done | restaurant |
 | WHATSAPP_INBOX-F25 | The guest cancels or changes their table on WhatsApp | done | restaurant |
@@ -597,16 +597,17 @@ Involved: APPOINTMENT-F02, APPOINTMENT-F18, CUSTOMER-F10, CUSTOMER-F26, FLOW-F37
 WHATSAPP_INBOX-F19, WHATSAPP_INBOX-F20
 
 ### WHATSAPP_INBOX-F22 The customer cancels or moves her appointment on WhatsApp
-Status: discarded — not offered, for the same reason as F21: Appointments does not accept an automation's changes,
-and cancelling an appointment cannot be entrusted to it either (cancelling a table can: F25); today it is cancelled
-or moved by hand from the Agenda (hub#514)
+Status: discarded — not offered: the appointments answer is not in the gallery (F21). Automations can already cancel
+an appointment after your **Approve** (FLOW-F28), as with a table (F25), but today it is cancelled or moved by hand from
+the Agenda (hub#514)
 Actor: customer, owner
 Screen: WhatsApp: the customer's chat; Automations
 Steps:
 1. The customer writes `no puedo ir` or `¿me la cambias al jueves?`.
 2. Her latest appointment is looked up by her number.
-3. Cancel: it is cancelled with the salon's rules (whether it is allowed and how far ahead); outside the deadline she
-   is told and the appointment stays.
+3. Cancel: the cancellation waits for you in **Waiting for your answer**; with **Approve** from someone who can change
+   any professional's appointments, it is cancelled with the salon's rules (whether it is allowed and how far ahead);
+   outside the deadline she is told and the appointment stays.
 4. Move: she is offered slots and the change of the same appointment, with the same professional and the same
    service, waits for you in **Waiting for your answer**; with **Approve** it is moved.
 5. She gets the answer with what happened.

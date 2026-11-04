@@ -9,10 +9,10 @@
 // flow: BASE-G120 BASE-G121 BASE-G122 BASE-G123 BASE-G124
 import { execSync } from 'node:child_process';
 
-import { type Browser, expect, type Locator, type Page, test } from '@playwright/test';
+import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { CLAIM_ANSWER, DICTATION, GREETING, type Provider, startProvider, STEPS_SAID } from './assistant-provider';
-import { A, api, capture, compactBar, EMPLOYEE, exposeMovingInPage, login, REPO_DIR, shot, shown, turnOn, untilStill } from './helpers';
+import { A, api, capture, compactBar, EMPLOYEE, exposeMovingInPage, login, REPO_DIR, shot, shown, turnOffTurnedOn, turnOnMissing, untilStill } from './helpers';
 import { cleanPricing, CODE as PRICING_CODE, createProduct, post, TAG as PRICING_TAG } from './pricing-helpers';
 import { STACK } from './stack';
 
@@ -93,10 +93,23 @@ async function home(page: Page): Promise<void> {
 async function openPanel(page: Page): Promise<void> {
   if ((await panel(page).getAttribute('data-open')) !== 'true') {
     await opener(page).click();
-    if (compactBar(page)) await page.locator('ion-popover [data-testid="topbar-chrome-more-assistant"]').click();
+    if (compactBar(page)) {
+      const row = page.locator('ion-popover [data-testid="topbar-chrome-more-assistant"]');
+      await row.click();
+      // While Ionic dismisses the menu, its focus trap keeps the keyboard out of the composer (hub#742), as in `decide`.
+      await expect(row).toHaveCount(0);
+    }
   }
   await expect(panel(page)).toHaveAttribute('data-open', 'true');
   await expect(box(page)).toBeVisible();
+}
+
+/** The panel open on the home at a computer's size, with the app in Spanish: where a card's words are looked at. */
+async function openPanelInSpanish(page: Page): Promise<void> {
+  await page.context().addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await home(page);
+  await openPanel(page);
 }
 
 /** Writes `text` and sends it with Enter; resolves when the turn has ended (the composer offers «Send» again). */
@@ -161,6 +174,43 @@ async function confirmationSettled(page: Page): Promise<boolean> {
         moving.length === 0
       );
     });
+}
+
+/** A context of its own signed in on `a` with `needed` on, and what that took (`turnedOn`, for `turnOffTurnedOn`). */
+async function signedInWith(browser: Browser, needed: readonly string[]): Promise<{ context: BrowserContext; page: Page; turnedOn: string[] }> {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await login(page, A, '/');
+  const turnedOn: string[] = [];
+  await turnOnMissing(context, A, needed, turnedOn);
+  return { context, page, turnedOn };
+}
+
+/** Cancels the Spanish card at a computer's size: nothing was done, and the answer says so. */
+async function cancelAtComputerSize(page: Page): Promise<void> {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await decide(page, 'cancel');
+  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
+}
+
+/** The page saved as `name` once nothing moves. */
+async function captureStill(page: Page, name: string): Promise<void> {
+  await untilStill(page);
+  await capture(page, name);
+}
+
+/** The dangerous card saved as `name`, with «Confirmation» focused and nothing moving. */
+async function captureConfirmation(page: Page, name: string): Promise<void> {
+  await confirmationReady(page);
+  await untilStill(page);
+  expect(await confirmationSettled(page), `${name} caught before it settled`).toBe(true);
+  await capture(page, name);
+}
+
+/** Leaves `a` with the apps it had and closes the context. */
+async function leave(context: BrowserContext, turnedOn: string[]): Promise<void> {
+  await turnOffTurnedOn(context, A, turnedOn);
+  await context.close();
 }
 
 async function freshPage(browser: Browser, credentials = EMPLOYEE): Promise<Page> {
@@ -256,6 +306,21 @@ test('hub-e2e-capture — capture() keeps the panel open after a turn at 390, 83
     await expect(lastAnswer(page)).toBeVisible();
     await capture(page, `${KEY}-${vp.label}`);
   }
+});
+
+// hub#742: on a phone the panel opens from «More options», and while Ionic dismisses that menu its focus trap keeps the
+// keyboard out of the composer: Enter reached nothing and «Hola» stayed in the box. The menu's way out is slowed, so a
+// run never gets past that moment by luck (a loaded machine did).
+test('hub-e2e-open-panel — on a phone the panel takes a question with Enter as soon as it has opened from «More options»', async ({ page }) => {
+  await login(page, A, '/');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await home(page);
+  const devtools = await page.context().newCDPSession(page);
+  await devtools.send('Animation.enable');
+  await devtools.send('Animation.setPlaybackRate', { playbackRate: 0.05 });
+  await openPanel(page);
+  await ask(page, 'Hola');
+  await expect(lastAnswer(page)).toHaveText(GREETING);
 });
 
 test('BASE-G121 — «Ask the assistant» on the setup card opens it on the setup; a shortcut asks at once', async ({ page }) => {
@@ -443,14 +508,9 @@ test('BASE-F97 BASE-F98 — in Spanish the card names every datum in Spanish, al
     await expect(card(page)).toContainText('Cambiar en Ajustes. Revisa cada dato antes de seguir.');
     await expect(card(page)).toContainText('Volver a pedir tras (minutos): 10');
     await expect(card(page)).toContainText('Dígitos del PIN: 6');
-    await confirmationReady(page);
-    await untilStill(page);
-    expect(await confirmationSettled(page), `${KEY}-${vp.label} caught before it settled`).toBe(true);
-    await capture(page, `${KEY}-${vp.label}`);
+    await captureConfirmation(page, `${KEY}-${vp.label}`);
   }
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await decide(page, 'cancel');
-  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
+  await cancelAtComputerSize(page);
   await expect(panel(page).locator('[data-testid="assistant-receipt"]').last()).toHaveText('No se hizo, cancelado: Cambiar en Ajustes');
   expect((await api(context, A, 'GET', '/access/settings')).data).toEqual(before.data);
   await context.close();
@@ -465,10 +525,7 @@ test('assistant-card — in Spanish an object datum (a WhatsApp template) is sai
   const context = await browser.newContext();
   const page = await context.newPage();
   await login(page, A, '/');
-  await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await home(page);
-  await openPanel(page);
+  await openPanelInSpanish(page);
   const send = {
     to: '+34600111222',
     template: { name: 'cita_recordatorio', language: 'es', variables: ['Ana', '10:00'] },
@@ -481,14 +538,9 @@ test('assistant-card — in Spanish an object datum (a WhatsApp template) is sai
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
     await expect(card(page)).toContainText('Plantilla: cita_recordatorio · es · Ana, 10:00');
-    await confirmationReady(page);
-    await untilStill(page);
-    expect(await confirmationSettled(page), `${KEY}-${vp.label} caught before it settled`).toBe(true);
-    await capture(page, `${KEY}-${vp.label}`);
+    await captureConfirmation(page, `${KEY}-${vp.label}`);
   }
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await decide(page, 'cancel');
-  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
+  await cancelAtComputerSize(page);
   await context.close();
 });
 
@@ -498,16 +550,8 @@ test('assistant-card — in Spanish an object datum (a WhatsApp template) is sai
 // asked again with its key, as a retry, is still one job.
 test('base-assistant-card-attempt-keys — in Spanish a print leaves its key out of the card and runs with it: asked twice, it is one job', async ({ browser }) => {
   const KEY = 'FIX-HUB-BASE-ASSISTANT-CARD-SHOWS-ATTEMPT-KEYS';
-  const context = await browser.newContext();
-  const page = await context.newPage();
-  await login(page, A, '/');
-  const before = await api<{ apps: { id: string; state: string }[] }>(context, A, 'GET', '/apps');
-  const wasOn = before.data.apps.some((app) => app.id === 'printing' && app.state === 'on');
-  await turnOn(context, A, 'printing');
-  await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await home(page);
-  await openPanel(page);
+  const { context, page, turnedOn } = await signedInWith(browser, ['printing']);
+  await openPanelInSpanish(page);
   const stamp = Date.now();
   const product = `Café ${stamp}`;
   const jobKey = `e2e-attempt-${stamp}`;
@@ -521,8 +565,7 @@ test('base-assistant-card-attempt-keys — in Spanish a print leaves its key out
     // The document by the queue's word for it, never as the model sent it (FIX-HUB-PRINTING-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS).
     await expect(card(page)).toContainText(`Crear en Impresión: Etiqueta de código de barras · ${product}`);
     await expect(card(page)).not.toContainText(jobKey);
-    await untilStill(page);
-    await capture(page, `${KEY}-${vp.label}`);
+    await captureStill(page, `${KEY}-${vp.label}`);
   }
   await page.setViewportSize({ width: 1440, height: 900 });
   // The Hub's receipt says it ran, and so does the answer: a job that can be cancelled is no refusal.
@@ -539,26 +582,16 @@ test('base-assistant-card-attempt-keys — in Spanish a print leaves its key out
   await expect(panel(page).locator('[data-testid="assistant-receipt"]')).toHaveCount(2);
   await expect(lastAnswer(page)).toHaveText('Hecho.');
   expect(await jobs()).toHaveLength(1);
-  if (!wasOn) {
-    const off = await api(context, A, 'POST', '/apps/disable', { app: 'printing' });
-    expect(off.status, `turn off printing: ${JSON.stringify(off.data)}`).toBe(200);
-  }
-  await context.close();
+  await leave(context, turnedOn);
 });
 
 // flow: whatsapp_inbox-assistant-card (WHATSAPP_INBOX-F33 sigue hecho)
 // FIX-HUB-WHATSAPP-INBOX-ATTEMPT-KEYS-UNMARKED: sending a template with a document header, the card left the file out
 // (it could only name it by its id) and called the message's key a datum to judge unless it looked like an id: now the
-// file goes by the name it was chosen with and the key never shows, whatever its shape. Cancelled: nothing is sent.
+// file goes by the name it was chosen with and the key never shows. Cancelled: nothing is sent.
 test('whatsapp_inbox-assistant-card — in Spanish a template names its header file by its name and leaves the message key out', async ({ browser }) => {
   const KEY = 'FIX-HUB-WHATSAPP-INBOX-ATTEMPT-KEYS-UNMARKED';
-  const context = await browser.newContext();
-  const page = await context.newPage();
-  await login(page, A, '/');
-  const before = await api<{ apps: { id: string; state: string }[] }>(context, A, 'GET', '/apps');
-  const wasOn = (id: string) => before.data.apps.some((app) => app.id === id && app.state === 'on');
-  const turnedOn = ['customer', 'whatsapp_inbox'].filter((id) => !wasOn(id));
-  await turnOn(context, A, ...turnedOn);
+  const { context, page, turnedOn } = await signedInWith(browser, ['customer', 'whatsapp_inbox']);
   const stamp = Date.now();
   const file = `carta-${stamp}.pdf`;
   const pdf = Buffer.from(`%PDF-1.7\n${'\u0000'.repeat(64)}`, 'latin1').toString('base64');
@@ -568,12 +601,9 @@ test('whatsapp_inbox-assistant-card — in Spanish a template names its header f
     content_base64: pdf,
   });
   expect(kept.status, `keep the header's file: ${JSON.stringify(kept.data)}`).toBe(201);
-  await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await home(page);
-  await openPanel(page);
-  // A key as a model may write it: not an id, so only its mark keeps it off the card.
-  const messageKey = `e2e-attempt-${stamp}`;
+  await openPanelInSpanish(page);
+  // A UUID, as the screen generates it: anything else is refused before the card (`invalid_arguments`, hub#741).
+  const messageKey = crypto.randomUUID();
   const send = {
     to: '+34600111222',
     template: { name: 'carta_del_dia', language: 'es', header_sample: kept.data.id },
@@ -587,19 +617,10 @@ test('whatsapp_inbox-assistant-card — in Spanish a template names its header f
     await expect(card(page)).toContainText(`Plantilla: carta_del_dia · es · ${file}`);
     await expect(card(page)).not.toContainText(messageKey);
     await expect(card(page)).not.toContainText(kept.data.id);
-    await confirmationReady(page);
-    await untilStill(page);
-    expect(await confirmationSettled(page), `${KEY}-${vp.label} caught before it settled`).toBe(true);
-    await capture(page, `${KEY}-${vp.label}`);
+    await captureConfirmation(page, `${KEY}-${vp.label}`);
   }
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await decide(page, 'cancel');
-  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
-  for (const app of [...turnedOn].reverse()) {
-    const off = await api(context, A, 'POST', '/apps/disable', { app });
-    expect(off.status, `turn off ${app}: ${JSON.stringify(off.data)}`).toBe(200);
-  }
-  await context.close();
+  await cancelAtComputerSize(page);
+  await leave(context, turnedOn);
 });
 
 // flow: base-assistant-money-mark (BASE-F97)
@@ -608,16 +629,8 @@ test('whatsapp_inbox-assistant-card — in Spanish a template names its header f
 // its words, «15,00 €». Cancelled: nothing is recorded.
 test('base-assistant-money-mark — in Spanish a payment says its amount in the business’s currency, never in its minor unit', async ({ browser }) => {
   const KEY = 'FIX-HUB-BASE-ASSISTANT-MONEY-KNOWN-ONLY-BY-DESCRIPTION-WORDS';
-  const context = await browser.newContext();
-  const page = await context.newPage();
-  await login(page, A, '/');
-  const before = await api<{ apps: { id: string; state: string }[] }>(context, A, 'GET', '/apps');
-  const wasOn = before.data.apps.some((app) => app.id === 'payment' && app.state === 'on');
-  await turnOn(context, A, 'payment');
-  await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await home(page);
-  await openPanel(page);
+  const { context, page, turnedOn } = await signedInWith(browser, ['payment']);
+  await openPanelInSpanish(page);
   const payment = { method: 'Caja', payment_date: '2026-11-02', amount: 1500, beneficiary_name: 'Cafés del Sur' };
   await ask(page, `E2E-ASK payment__payment__create ${JSON.stringify(payment)}`, { settle: false });
   await expect(card(page)).toBeVisible();
@@ -625,17 +638,10 @@ test('base-assistant-money-mark — in Spanish a payment says its amount in the 
     await page.setViewportSize({ width: vp.width, height: vp.height });
     await expect(card(page)).toContainText(/Caja · 2 nov 2026 · 15,00\s€/);
     await expect(card(page)).not.toContainText('1500');
-    await untilStill(page);
-    await capture(page, `${KEY}-${vp.label}`);
+    await captureStill(page, `${KEY}-${vp.label}`);
   }
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await decide(page, 'cancel');
-  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
-  if (!wasOn) {
-    const off = await api(context, A, 'POST', '/apps/disable', { app: 'payment' });
-    expect(off.status, `turn off payment: ${JSON.stringify(off.data)}`).toBe(200);
-  }
-  await context.close();
+  await cancelAtComputerSize(page);
+  await leave(context, turnedOn);
 });
 
 // flow: base-assistant-money-mark (BASE-F97)
@@ -643,16 +649,8 @@ test('base-assistant-money-mark — in Spanish a payment says its amount in the 
 // the currency its write names, with that currency's decimals (none in yen), as Stripe or Square show it. Cancelled.
 test('base-assistant-money-mark — in Spanish a payment in another currency says its amount in it, with its decimals', async ({ browser }) => {
   const KEY = 'FIX-HUB-BASE-ASSISTANT-MONEY-KNOWN-ONLY-BY-DESCRIPTION-WORDS-USD';
-  const context = await browser.newContext();
-  const page = await context.newPage();
-  await login(page, A, '/');
-  const before = await api<{ apps: { id: string; state: string }[] }>(context, A, 'GET', '/apps');
-  const wasOn = before.data.apps.some((app) => app.id === 'payment' && app.state === 'on');
-  await turnOn(context, A, 'payment');
-  await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await home(page);
-  await openPanel(page);
+  const { context, page, turnedOn } = await signedInWith(browser, ['payment']);
+  await openPanelInSpanish(page);
   const payment = { method: 'Caja', payment_date: '2026-11-02', amount: 1500, beneficiary_name: 'Cafés del Sur', currency: 'USD' };
   await ask(page, `E2E-ASK payment__payment__create ${JSON.stringify(payment)}`, { settle: false });
   await expect(card(page)).toBeVisible();
@@ -660,22 +658,15 @@ test('base-assistant-money-mark — in Spanish a payment in another currency say
     await page.setViewportSize({ width: vp.width, height: vp.height });
     await expect(card(page)).toContainText(/Caja · 2 nov 2026 · 15,00\s\$/);
     await expect(card(page)).not.toContainText('€');
-    await untilStill(page);
-    await capture(page, `${KEY}-${vp.label}`);
+    await captureStill(page, `${KEY}-${vp.label}`);
   }
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await decide(page, 'cancel');
-  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
+  await cancelAtComputerSize(page);
   // In yen, without decimals: 1500 is ¥1,500, never «15,00».
   await ask(page, `E2E-ASK payment__payment__create ${JSON.stringify({ ...payment, currency: 'JPY' })}`, { settle: false });
   await expect(card(page)).toContainText(/Caja · 2 nov 2026 · 1500\s¥/);
   await decide(page, 'cancel');
   await expect(lastAnswer(page)).toContainText('No lo he hecho.');
-  if (!wasOn) {
-    const off = await api(context, A, 'POST', '/apps/disable', { app: 'payment' });
-    expect(off.status, `turn off payment: ${JSON.stringify(off.data)}`).toBe(200);
-  }
-  await context.close();
+  await leave(context, turnedOn);
 });
 
 type SentCard = { fields: { name: string; kind: string; value: unknown; money?: unknown }[] };
@@ -706,22 +697,14 @@ async function sentCard(page: Page): Promise<SentCard> {
 test('base-assistant-money-mark — in Spanish a price set on a list in another currency says it in that currency', async ({ browser }) => {
   const KEY = 'FIX-HUB-BASE-ASSISTANT-MONEY-KNOWN-ONLY-BY-DESCRIPTION-WORDS-LIST-USD';
   const NEEDED = ['inventory', 'customer', 'pricing'];
-  const context = await browser.newContext();
-  const page = await context.newPage();
-  await login(page, A, '/');
-  const before = await api<{ apps: { id: string; state: string }[] }>(context, A, 'GET', '/apps');
-  const wasOn = new Set(before.data.apps.filter((app) => app.state === 'on').map((app) => app.id));
-  await turnOn(context, A, ...NEEDED.filter((id) => !wasOn.has(id)));
+  const { context, page, turnedOn } = await signedInWith(browser, NEEDED);
   cleanPricing();
   const product = `${PRICING_TAG} Champú ${Date.now().toString(36)}`;
   await createProduct(context, product, `${PRICING_CODE}-USD`, 1250);
   for (const [code, currency] of [[`${PRICING_CODE}USD`, 'USD'], [`${PRICING_CODE}PLN`, 'PLN']]) {
     await post(context, '/pricing/price_lists', { code, name: `${PRICING_TAG} ${currency}`, currency });
   }
-  await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await home(page);
-  await openPanel(page);
+  await openPanelInSpanish(page);
   const price = { product, price_list: `${PRICING_CODE}USD`, price: 1500 };
   const sent = sentCard(page);
   await ask(page, `E2E-ASK pricing__price_item__add ${JSON.stringify(price)}`, { settle: false });
@@ -735,23 +718,16 @@ test('base-assistant-money-mark — in Spanish a price set on a list in another 
     await page.setViewportSize({ width: vp.width, height: vp.height });
     await expect(card(page)).toContainText(new RegExp(`${PRICING_CODE}USD · 15,00\\s\\$`));
     await expect(card(page)).not.toContainText('€');
-    await untilStill(page);
-    await capture(page, `${KEY}-${vp.label}`);
+    await captureStill(page, `${KEY}-${vp.label}`);
   }
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await decide(page, 'cancel');
-  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
+  await cancelAtComputerSize(page);
   // In zlotys, the list's, never the business's euros.
   await ask(page, `E2E-ASK pricing__price_item__add ${JSON.stringify({ ...price, price_list: `${PRICING_CODE}PLN` })}`, { settle: false });
   await expect(card(page)).toContainText(new RegExp(`${PRICING_CODE}PLN · 15,00\\szł`));
   await decide(page, 'cancel');
   await expect(lastAnswer(page)).toContainText('No lo he hecho.');
   cleanPricing();
-  for (const app of [...NEEDED].reverse().filter((id) => !wasOn.has(id))) {
-    const off = await api(context, A, 'POST', '/apps/disable', { app });
-    expect(off.status, `turn off ${app}: ${JSON.stringify(off.data)}`).toBe(200);
-  }
-  await context.close();
+  await leave(context, turnedOn);
 });
 
 // flow: base-assistant-money-mark (BASE-F97)
@@ -762,21 +738,21 @@ test('base-assistant-money-mark — in Spanish a price set on a list in another 
 test('base-assistant-money-mark — in Spanish an amount inside a datum and one on top arrive as the same money', async ({ browser }) => {
   const KEY = 'FIX-HUB-BASE-ASSISTANT-MONEY-KNOWN-ONLY-BY-DESCRIPTION-WORDS-NESTED';
   const NEEDED = ['customer', 'tax', 'sale'];
-  const context = await browser.newContext();
-  const page = await context.newPage();
-  await login(page, A, '/');
-  const before = await api<{ apps: { id: string; state: string }[] }>(context, A, 'GET', '/apps');
-  const wasOn = new Set(before.data.apps.filter((app) => app.state === 'on').map((app) => app.id));
-  await turnOn(context, A, ...NEEDED.filter((id) => !wasOn.has(id)));
-  await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await home(page);
-  await openPanel(page);
-  const sale = { discount_amount: 150, payments: [{ method: 'Efectivo', amount: 1350 }] };
+  const { context, page, turnedOn } = await signedInWith(browser, NEEDED);
+  await openPanelInSpanish(page);
+  // A charge the write takes (hub#729: `invalid_arguments` refuses any other before the card): its key and a loose line,
+  // because only a counter sale carries a discount of its own (a check's lives in the check).
+  const sale = {
+    idempotency_key: `e2e-charge-${Date.now().toString(36)}`,
+    open_lines: [{ unit_price: 1500, tax_category_key: 'service.generic', name: 'E2E Corte' }],
+    discount_amount: 150,
+    payments: [{ method: 'Efectivo', amount: 1350 }],
+  };
   const sent = sentCard(page);
   await ask(page, `E2E-ASK sale__sale__complete ${JSON.stringify(sale)}`, { settle: false });
   await expect(card(page)).toBeVisible();
   const fields = (await sent).fields;
+  expect(fields.map((field) => field.name)).not.toContain('idempotency_key');
   const top = fields.find((field) => field.name === 'discount_amount');
   const payments = fields.find((field) => field.name === 'payments');
   expect(top).toMatchObject({ kind: 'money', value: 150 });
@@ -787,17 +763,10 @@ test('base-assistant-money-mark — in Spanish an amount inside a datum and one 
     await page.setViewportSize({ width: vp.width, height: vp.height });
     await expect(card(page)).toContainText(/1,50\s€/);
     await expect(card(page)).not.toContainText(/EUR|US\$|1350/);
-    await untilStill(page);
-    await capture(page, `${KEY}-${vp.label}`);
+    await captureStill(page, `${KEY}-${vp.label}`);
   }
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await decide(page, 'cancel');
-  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
-  for (const app of [...NEEDED].reverse().filter((id) => !wasOn.has(id))) {
-    const off = await api(context, A, 'POST', '/apps/disable', { app });
-    expect(off.status, `turn off ${app}: ${JSON.stringify(off.data)}`).toBe(200);
-  }
-  await context.close();
+  await cancelAtComputerSize(page);
+  await leave(context, turnedOn);
 });
 
 // flow: assistant-card (BASE-F97)
@@ -811,13 +780,9 @@ test('assistant-card — in Spanish a booking says its day and time and its chan
   await login(page, A, '/');
   // A business is born with every app off: Appointments and the apps it needs, off again at the end if they were.
   const needed = ['customer', 'service', 'staff', 'schedule', 'appointment'];
-  const before = await api<{ apps: { id: string; state: string }[] }>(context, A, 'GET', '/apps');
-  const wasOn = new Set(before.data.apps.filter((app) => app.state === 'on').map((app) => app.id));
-  await turnOn(context, A, ...needed);
-  await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await home(page);
-  await openPanel(page);
+  const turnedOn: string[] = [];
+  await turnOnMissing(context, A, needed, turnedOn);
+  await openPanelInSpanish(page);
   const ids = ['0192f0b2-1111-7000-8000-000000000001', '0192f0b2-2222-7000-8000-000000000002', '0192f0b2-3333-7000-8000-000000000003'];
   const booking = { customer_id: ids[0], services: [{ service_id: ids[1] }], staff_id: ids[2], start: '2026-11-02T10:00:00+01:00', source: 'counter' };
   await ask(page, `E2E-ASK appointment__appointment__create ${JSON.stringify(booking)}`, { settle: false });
@@ -826,17 +791,10 @@ test('assistant-card — in Spanish a booking says its day and time and its chan
     await page.setViewportSize({ width: vp.width, height: vp.height });
     await expect(card(page)).toContainText('Crear en Citas: 1 elemento · 2 nov 2026, 10:00 · Mostrador');
     for (const raw of ['2026-11-02', '+01:00', 'counter', ...ids]) await expect(card(page)).not.toContainText(raw);
-    await untilStill(page);
-    await capture(page, `${KEY}-${vp.label}`);
+    await captureStill(page, `${KEY}-${vp.label}`);
   }
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await decide(page, 'cancel');
-  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
-  for (const app of [...needed].reverse().filter((id) => !wasOn.has(id))) {
-    const off = await api(context, A, 'POST', '/apps/disable', { app });
-    expect(off.status, `turn off ${app}: ${JSON.stringify(off.data)}`).toBe(200);
-  }
-  await context.close();
+  await cancelAtComputerSize(page);
+  await leave(context, turnedOn);
 });
 
 // flow: assistant-card (BASE-F97)
@@ -873,14 +831,9 @@ test('assistant-card — in Spanish removing a device names it as Settings › D
     // FIX-HUB-BASE-ASSISTANT-DANGER-CARD-CALLS-THE-RECORD-BY-ITS-FIELD-NAME: by the title its schema gives it, never «Registro».
     await expect(card(page)).toContainText('Dispositivo: Barra');
     await expect(card(page)).not.toContainText(device!.id);
-    await confirmationReady(page);
-    await untilStill(page);
-    expect(await confirmationSettled(page), `${KEY}-${vp.label} caught before it settled`).toBe(true);
-    await capture(page, `${KEY}-${vp.label}`);
+    await captureConfirmation(page, `${KEY}-${vp.label}`);
   }
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await decide(page, 'cancel');
-  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
+  await cancelAtComputerSize(page);
   const after = await api<{ devices: Device[] }>(context, A, 'GET', '/devices');
   expect(after.data.devices.map((row) => row.id)).toContain(device!.id);
   await rename(device!.name);
@@ -900,9 +853,8 @@ test('RESERVATION-F06 — booking a table, the card names the customer; moving a
   const page = await context.newPage();
   await login(page, A, '/');
   const needed = ['customer', 'table', 'schedule', 'reservation'];
-  const before = await api<{ apps: { id: string; state: string }[] }>(context, A, 'GET', '/apps');
-  const wasOn = new Set(before.data.apps.filter((app) => app.state === 'on').map((app) => app.id));
-  await turnOn(context, A, ...needed);
+  const turnedOn: string[] = [];
+  await turnOnMissing(context, A, needed, turnedOn);
   await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
   const made = async <T>(path: string, body: unknown): Promise<T> => {
     const answer = await api<T>(context, A, 'POST', path, body);
@@ -948,12 +900,9 @@ test('RESERVATION-F06 — booking a table, the card names the customer; moving a
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
     await expect(card(page)).toContainText(`Crear en Reservas: ${label}`);
-    await untilStill(page);
-    await capture(page, `${KEY}-create-${vp.label}`);
+    await captureStill(page, `${KEY}-create-${vp.label}`);
   }
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await decide(page, 'cancel');
-  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
+  await cancelAtComputerSize(page);
 
   // Moving it to table 7: which reservation, as the book's dialog says it, and the new table by its number.
   await ask(page, `E2E-ASK reservation__reservation__update ${JSON.stringify({ id: booked.id, table_id: table.id })}`, { settle: false });
@@ -962,12 +911,9 @@ test('RESERVATION-F06 — booking a table, the card names the customer; moving a
     await page.setViewportSize({ width: vp.width, height: vp.height });
     await expect(card(page)).toContainText(`Cambiar en Reservas: ${label} · 7`);
     for (const raw of [date, ...ids]) await expect(card(page)).not.toContainText(raw);
-    await untilStill(page);
-    await capture(page, `${KEY}-${vp.label}`);
+    await captureStill(page, `${KEY}-${vp.label}`);
   }
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await decide(page, 'cancel');
-  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
+  await cancelAtComputerSize(page);
   const after = await api<{ table_id: string | null }>(context, A, 'GET', `/reservation/reservations/detail?id=${booked.id}`);
   expect(after.data.table_id).toBeNull();
 
@@ -981,11 +927,7 @@ test('RESERVATION-F06 — booking a table, the card names the customer; moving a
   await gone('/table/tables/delete', table.id);
   await gone('/table/zones/delete', zone.id);
   await gone('/customer/customers/delete', customer.id);
-  for (const app of [...needed].reverse().filter((id) => !wasOn.has(id))) {
-    const off = await api(context, A, 'POST', '/apps/disable', { app });
-    expect(off.status, `turn off ${app}: ${JSON.stringify(off.data)}`).toBe(200);
-  }
-  await context.close();
+  await leave(context, turnedOn);
 });
 
 // flow: FLOW-F03 FLOW-F24 (the card: BASE-F97)
@@ -1001,9 +943,8 @@ test('FLOW-F03 — pausing an automation, the card names it; resuming a run, its
   const page = await context.newPage();
   await login(page, A, '/');
   const needed = ['task', 'flow'];
-  const before = await api<{ apps: { id: string; state: string }[] }>(context, A, 'GET', '/apps');
-  const wasOn = new Set(before.data.apps.filter((app) => app.state === 'on').map((app) => app.id));
-  await turnOn(context, A, ...needed);
+  const turnedOn: string[] = [];
+  await turnOnMissing(context, A, needed, turnedOn);
   await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
   const stamp = String(Date.now() % 10_000).padStart(4, '0');
   const name = `Bienvenida ${stamp}`;
@@ -1039,14 +980,9 @@ test('FLOW-F03 — pausing an automation, the card names it; resuming a run, its
     await expect(card(page)).toContainText(`Registro: ${name}`);
     await expect(card(page)).toContainText('Encendida: No');
     await expect(card(page)).not.toContainText(flow.id);
-    await confirmationReady(page);
-    await untilStill(page);
-    expect(await confirmationSettled(page), `${KEY}-${vp.label} caught before it settled`).toBe(true);
-    await capture(page, `${KEY}-${vp.label}`);
+    await captureConfirmation(page, `${KEY}-${vp.label}`);
   }
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await decide(page, 'cancel');
-  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
+  await cancelAtComputerSize(page);
 
   // Resuming the run: which one, as the History says it, with its automation in front.
   await ask(page, `E2E-ASK flow__run__retry ${JSON.stringify({ id: ran.data.id })}`, { settle: false });
@@ -1056,14 +992,9 @@ test('FLOW-F03 — pausing an automation, the card names it; resuming a run, its
     await expect(card(page)).toContainText('Reintentar en Automatizaciones. Revisa cada dato antes de seguir.');
     await expect(card(page)).toContainText(`Registro: ${label}`);
     await expect(card(page)).not.toContainText(ran.data.id);
-    await confirmationReady(page);
-    await untilStill(page);
-    expect(await confirmationSettled(page), `${KEY}-run-${vp.label} caught before it settled`).toBe(true);
-    await capture(page, `${KEY}-run-${vp.label}`);
+    await captureConfirmation(page, `${KEY}-run-${vp.label}`);
   }
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await decide(page, 'cancel');
-  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
+  await cancelAtComputerSize(page);
   const after = await api<{ enabled: boolean }>(context, A, 'GET', `/flow/flows/detail?id=${flow.id}`);
   expect(after.data.enabled).toBe(true);
   const still = await api<{ status: string }>(context, A, 'GET', `/flow/runs/detail?id=${ran.data.id}`);
@@ -1072,11 +1003,7 @@ test('FLOW-F03 — pausing an automation, the card names it; resuming a run, its
   // What the test made, deleted (its history stays, as Automations keeps it); and the apps it turned on, off again.
   const gone = await api(context, A, 'POST', '/flow/flows/delete', { id: flow.id });
   expect(gone.status, JSON.stringify(gone.data)).toBe(200);
-  for (const app of [...needed].reverse().filter((id) => !wasOn.has(id))) {
-    const off = await api(context, A, 'POST', '/apps/disable', { app });
-    expect(off.status, `turn off ${app}: ${JSON.stringify(off.data)}`).toBe(200);
-  }
-  await context.close();
+  await leave(context, turnedOn);
 });
 
 // flow: BASE-F98 (Acciones peligrosas: escribir para confirmar; `hecho`) y BASE-F97 (la tarjeta): una acción peligrosa puede enseñar dentro de su tarjeta la vista previa que declara su app
@@ -1110,14 +1037,9 @@ test('BASE-F98 — a dangerous card shows what will happen, as its app reads it 
     // FIX-HUB-BASE-ASSISTANT-CARD-SHOWS-RAW-VALUES: the person by their name, as Employees reads it, never by the id sent.
     await expect(card(page)).toContainText(`Persona: ${employee!.name}`);
     await expect(card(page)).not.toContainText(employee!.id);
-    await confirmationReady(page);
-    await untilStill(page);
-    expect(await confirmationSettled(page), `${KEY}-${vp.label} caught before it settled`).toBe(true);
-    await capture(page, `${KEY}-${vp.label}`);
+    await captureConfirmation(page, `${KEY}-${vp.label}`);
   }
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await decide(page, 'cancel');
-  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
+  await cancelAtComputerSize(page);
   await expect(panel(page).locator('[data-testid="assistant-receipt"]').last()).toHaveText('No se hizo, cancelado: Quitar en Empleados');
   // A person this business does not have: the preview cannot be read, so no card; the receipt says it failed.
   await ask(page, 'E2E-ASK base__person__pin_remove {"person":"saas:0"}');
