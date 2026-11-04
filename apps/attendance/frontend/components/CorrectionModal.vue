@@ -4,12 +4,15 @@
 // screen can judge it judges first (a clock-out after the clock-in, a reason of at least 3); the rest
 // (an overlap with another day of the person, a second open day, a time in the future) is the server's,
 // and its refusal stays here. An untouched time keeps the stored instant to the second; a changed one is
-// sent as the business's wall clock, which the server reads in the business's zone.
+// sent as the business's wall clock, which the server reads in the business's zone: so it cannot be saved
+// until the business says its zone, nor a time written on another clock be sent as if it were on that one.
+// When the zone cannot be read the dialog says so: a save button that stays off with no reason is a dead end.
 import { FormModal } from '@erplora/ui/components';
 import { useCommand } from '@erplora/ui/sdk';
 import { IonInput, IonTextarea } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import { useBusinessClock } from '../../../../base/frontend/lib/zone';
 import { useLocale, useT } from '../composables/useT';
 import { formatDay, toLocalInput } from '../lib/time';
 import type { RecordOut } from '../operations';
@@ -28,6 +31,9 @@ const open = defineModel<boolean>('open', { default: false });
 const t = useT();
 const locale = useLocale();
 const { run, error, pending } = useCommand('attendance.record.correct');
+const { zone, unread } = useBusinessClock();
+/** The command's refusal first; else why it cannot be saved. */
+const problem = computed(() => error.value ?? (unread.value ? { message: t('attendance.correct.zoneUnread') } : null));
 
 const clockIn = ref('');
 const clockOut = ref('');
@@ -39,14 +45,22 @@ watch(
   open,
   (isOpen) => {
     if (!isOpen || !props.record) return;
-    clockIn.value = toLocalInput(props.record.clock_in_at);
-    clockOut.value = props.record.clock_out_at ? toLocalInput(props.record.clock_out_at) : '';
+    clockIn.value = toLocalInput(props.record.clock_in_at, zone.value);
+    clockOut.value = props.record.clock_out_at ? toLocalInput(props.record.clock_out_at, zone.value) : '';
     reason.value = '';
     local.value = {};
     error.value = null;
   },
   { immediate: true },
 );
+
+// A time still showing the stored one follows the business's clock when it answers or changes; a typed one stays.
+watch(zone, (next, previous) => {
+  const day = props.record;
+  if (!open.value || !day) return;
+  if (clockIn.value === toLocalInput(day.clock_in_at, previous)) clockIn.value = toLocalInput(day.clock_in_at, next);
+  if (day.clock_out_at && clockOut.value === toLocalInput(day.clock_out_at, previous)) clockOut.value = toLocalInput(day.clock_out_at, next);
+});
 
 const heading = computed(() => {
   const day = props.record;
@@ -60,7 +74,7 @@ const text = (value: unknown): string => (value === null || value === undefined 
 
 /** The stored instant when the field still shows it; else what was typed (business wall clock). */
 function instant(typed: string, stored: string | null): string {
-  return stored && typed === toLocalInput(stored) ? stored : typed;
+  return stored && typed === toLocalInput(stored, zone.value) ? stored : typed;
 }
 
 async function save(): Promise<void> {
@@ -98,7 +112,8 @@ async function save(): Promise<void> {
     :submit-label="$t('attendance.correct.save')"
     submit-icon="ion:create-outline"
     :pending="pending"
-    :error="error"
+    :submit-disabled="!zone"
+    :error="problem"
     @submit="save"
   >
     <template #default="{ fieldErrors }">
