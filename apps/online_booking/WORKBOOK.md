@@ -47,7 +47,7 @@ del negocio.
    del negocio. La página ofrece solo las horas que la agenda daría a la clienta.
 4. Abre **Reservas online → Ajustes**, enciende **Página pública activada** y pulsa **Guardar**. Mientras
    está apagada, la página dice que el negocio no acepta reservas online.
-5. Todas las horas son las del **reloj del negocio** (en la fase 1, Europe/Madrid).
+5. Todas las horas son las del **reloj del negocio**, en su zona horaria.
 
 ## Pantallas
 

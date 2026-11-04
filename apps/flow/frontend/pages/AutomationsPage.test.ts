@@ -29,6 +29,14 @@ async function setup(path = '/flow/automations', all: FlowOut[] = []) {
 }
 
 describe('AutomationsPage', () => {
+  it("says when an automation starts once on the business's clock (hub#687)", async () => {
+    const once = flow('f1', { trigger: { kind: 'at', at: '2026-11-02T10:00:00+01:00' } });
+    const m = await setup('/flow/automations', [once]);
+    await m.result('flow.flow.list', page([once], 1, 50), { sort: '-updated_at', limit: 50, offset: 0 });
+    await m.result('base.business.get', { currency: 'EUR', currency_decimals: 2, timezone: 'Asia/Tokyo' });
+    expect(m.wrapper.text()).toContain('Nov 2, 2026, 6:00 PM');
+  });
+
   it('sits under «Automations» with «New automation», the drafts and the gallery', async () => {
     const m = await setup();
     expect(m.wrapper.findComponent(AppPage).props('title')).toBe('Automations');

@@ -9,11 +9,13 @@ import type { StatusPillTone } from '@erplora/ui/components';
 import type { CatalogOut, ClauseOut, LogEntry, RunStatus, Step, Trigger } from '../operations';
 import { callOrigin, delayParts, isPath, valueToParts } from './document';
 
-/** The translator the phrasing needs: `t` and `te` of the app, and its language. */
+/** The translator the phrasing needs: `t` and `te` of the app, its language and the business's clock. */
 export interface Phrasing {
   t: (key: string, named?: Record<string, unknown>) => string;
   te: (key: string) => boolean;
   locale: string;
+  /** The business's time zone; unknown until it answers. */
+  timeZone?: string;
 }
 
 const key = (name: string): string => name.replaceAll('.', '__');
@@ -91,10 +93,10 @@ export function pathLabel(path: string, steps: readonly Step[], catalog: Catalog
 }
 
 /** A date and time in the business's zone, in the person's language. */
-export function formatDate(iso: string, locale: string): string {
+export function formatDate(iso: string, locale: string, timeZone?: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso;
-  return new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Europe/Madrid' }).format(date);
+  return new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short', timeZone }).format(date);
 }
 
 /** «When a sale is charged», «Every Friday at 18:00», «Only when you press Run»… */
@@ -109,7 +111,7 @@ export function describeTrigger(trigger: Trigger, catalog: CatalogOut | null | u
     if (trigger.every === 'month') return p.t('flow.trigger.describe.month', { day: trigger.day ?? 1, time: trigger.time });
     return p.t('flow.trigger.describe.day', { time: trigger.time });
   }
-  if (trigger.kind === 'at') return trigger.at ? p.t('flow.trigger.describe.at', { date: formatDate(trigger.at, p.locale) }) : p.t('flow.trigger.describe.noDate');
+  if (trigger.kind === 'at') return trigger.at ? p.t('flow.trigger.describe.at', { date: formatDate(trigger.at, p.locale, p.timeZone) }) : p.t('flow.trigger.describe.noDate');
   return p.t('flow.trigger.describe.manual');
 }
 
@@ -219,7 +221,7 @@ export function describeLog(entry: LogEntry, steps: readonly Step[], catalog: Ca
         clauses: (entry.failed ?? []).map((clause) => describeClause(clause, steps, catalog, p)).join('; '),
       });
     case 'waiting':
-      return p.t('flow.history.log.waiting', { date: formatDate(entry.until ?? entry.at, p.locale) });
+      return p.t('flow.history.log.waiting', { date: formatDate(entry.until ?? entry.at, p.locale, p.timeZone) });
     case 'waited':
       return p.t('flow.history.log.waited', { duration: describeDuration(entry.seconds ?? 0, p) });
     case 'resumed':
@@ -229,7 +231,7 @@ export function describeLog(entry: LogEntry, steps: readonly Step[], catalog: Ca
     case 'called':
       return p.t('flow.history.log.called', { host: entry.host ?? '', status: entry.status ?? '' });
     case 'asking':
-      return p.t('flow.history.log.asking', { who: p.t(`flow.ask.roles.${entry.role || 'admin'}`), date: formatDate(entry.until ?? entry.at, p.locale) });
+      return p.t('flow.history.log.asking', { who: p.t(`flow.ask.roles.${entry.role || 'admin'}`), date: formatDate(entry.until ?? entry.at, p.locale, p.timeZone) });
     case 'answered': {
       const said = p.t(entry.approved ? 'flow.history.log.answeredYes' : 'flow.history.log.answeredNo', { who: entry.by ?? '' });
       return entry.note ? `${said}: «${entry.note}»` : said;
@@ -243,7 +245,7 @@ export function describeLog(entry: LogEntry, steps: readonly Step[], catalog: Ca
     case 'assistant_answered':
       return p.t('flow.history.log.assistantAnswered', { text: entry.text ?? '' });
     case 'assistant_proposed':
-      return p.t('flow.history.log.assistantProposed', { action, date: formatDate(entry.until ?? entry.at, p.locale) });
+      return p.t('flow.history.log.assistantProposed', { action, date: formatDate(entry.until ?? entry.at, p.locale, p.timeZone) });
     case 'assistant_pinned_empty':
       return p.t('flow.history.log.assistantPinnedEmpty', { action, fields: (entry.fields ?? []).map((name) => `«${fieldLabel(name, p)}»`).join(', ') });
     case 'skipped':

@@ -24,9 +24,11 @@ import FlowGallery from '../components/FlowGallery.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import QuestionInbox from '../components/QuestionInbox.vue';
 import { useCatalog } from '../composables/useCatalog';
+import { provideBusinessClock } from '../composables/usePhrasing';
 import { wording } from '../lib/refusal';
 import type { FlowOut } from '../operations';
 
+provideBusinessClock();
 const route = useRoute();
 const router = useRouter();
 const session = useSession();
