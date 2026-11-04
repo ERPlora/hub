@@ -88,8 +88,6 @@ CI=1 pnpm e2e tests/e2e/appointment-charge.spec.ts
 - **hub#527** — En un negocio de otro país, un teléfono escrito sin prefijo se guarda y se busca como español.
 - **hub#634** — Anular una cita con «Que me lo pregunte» (confirmar, mover y editar la cita de otra profesional ya lo
   hace una automatización con su permiso).
-- **hub#687** — La hora del negocio no es la misma en la tarjeta del asistente y en las apps cuando la zona del negocio no
-  es la del despliegue (la agenda va en Europe/Madrid).
 - **hub#632** — Los importes de cuatro cifras salen sin separador de millares.
 - **hub#631**, **hub#633**, **hub#635** y **hub#637** — una traducción «fuzzy» en inglés, siete textos en español
   con las palabras de otra app y dos fallos de la tarjeta de confirmación del asistente.

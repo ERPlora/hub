@@ -47,7 +47,7 @@ Who uses it:
    being booked.
 4. In **Schedules**, confirm the business's week and set the public holidays. A day without any opening
    hours rule (neither the week nor an exception) lets anyone book at any time.
-5. The agenda always paints the **business clock** (in phase 1, Europe/Madrid), never the device's: if the
+5. The agenda always paints the **business clock**, in its time zone, never the device's: if the
    device is in another time zone, a notice says so.
 6. Check the Appointments **Settings** (notice periods, overlaps, cancellation by the customer, calendar
    window).

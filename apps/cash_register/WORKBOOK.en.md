@@ -48,8 +48,8 @@ ERPlora does not invent flows: it adopts the ones the market has already proven.
   Settings → Drawers**; when opening the session one is chosen. With only one, it is chosen by itself.
 - **Currency**: the business's, its country's, with its decimals: the euro in Spain, the zloty in Poland. Every
   amount of Cash register is in it, and the count shows its notes and coins.
-- **Time zone**: the business's. In this phase, Madrid time (`Europe/Madrid`) for everyone: the business
-  day, the session number and the auto-close time come from it.
+- **Time zone**: the business's: the auto-close time comes from it. The business day and the session number still come
+  from Madrid time (`Europe/Madrid`) for everyone (hub#771).
 
 Initial setup, step by step:
 

@@ -68,7 +68,7 @@ automations; **starting from a template** of the gallery; and what the assistant
 2. Automations use **notices and actions of other apps**: the gallery and the drop-downs only offer those of
    the apps that are on in the business. Nine of the ten cards in the gallery create a **task**, so they need
    the **Tasks** app; without it the gallery hides them and says what is missing.
-3. Schedules are read in the business's time: in phase 1, **Europe/Madrid**.
+3. Schedules are read in the business's time, in its time zone.
 
 Initial setup, step by step:
 

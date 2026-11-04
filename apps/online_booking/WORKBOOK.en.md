@@ -37,7 +37,7 @@ from there respects the business's notice.
    business's. The page offers only the times the diary would give the customer.
 4. Open **Online booking → Settings**, switch on **Public page on** and press **Save**. While it is off,
    the page says that the business does not take online bookings.
-5. Every time is on the **business's clock** (in phase 1, Europe/Madrid).
+5. Every time is on the **business's clock**, in its time zone.
 
 ## Screens
 

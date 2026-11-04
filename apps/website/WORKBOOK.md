@@ -123,7 +123,7 @@ reseña** (se abren en Google) y hasta cinco tarjetas con la inicial y el nombre
 cuándo la escribió (enlazado a la reseña), sus estrellas y su texto tal cual lo escribió (cortado a 280 caracteres,
 entero al pasar el ratón), y debajo «Valoración y reseñas de Google Maps. Las más relevantes primero, como las ordena
 Google.»; el contacto en fichas con icono (teléfono, correo), WhatsApp como botón y las redes como píldoras; el horario
-en una lista con **hoy** resaltado (el día del negocio, en la zona horaria del hub; sin zona, la de Madrid); la
+en una lista con **hoy** resaltado (el día del negocio, en la zona horaria del hub; sin zona, la del despliegue); la
 dirección en una tarjeta con **Abrir el mapa**. Pie en columnas: nombre y la línea del pie, enlaces a las secciones y
 **Entrar**, y al final la firma «© <año> ERPlora» (se abre aparte). Solo hay transiciones al pasar el ratón (y ninguna
 si el sistema pide menos movimiento). La pestaña del navegador lleva el logotipo o, sin él, la inicial del nombre en
@@ -517,7 +517,7 @@ las tres lecturas públicas de los visitantes (`website.public.*`).
   `website:catalog:{<slug>}:<versión>:<idioma>:<moneda>`; la copia publicada guarda el precio sin formato, en la
   unidad menor de la moneda, y `render.price_label` lo divide entre `10 ** decimales` de esa moneda: si el país del
   negocio cambia, la clave cambia y la página se repinta en la nueva sin volver a publicar; el día es el del negocio,
-  `render.local_day` con la zona horaria del hub o `Europe/Madrid` si no tiene: el horario resalta hoy, así que cada
+  `render.local_day` con la zona horaria del hub o la del despliegue si no tiene (`base.business.zone_of`): el horario resalta hoy, así que cada
   día tiene su página; la vista previa usa el mismo día, `queries.business_day`): publicar cambia la versión y un
   despliegue cambia los ficheros del paquete, así que nunca se sirve una página rancia; tras el COMMIT de publicar o
   desconectar se borran las entradas de la versión anterior en la moneda del negocio. `Cache-Control: public, max-age=60`, sin cookies, y `Vary: Accept-Language,

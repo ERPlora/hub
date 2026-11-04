@@ -77,8 +77,7 @@ And this is decided here (same comparison):
 
 1. Turn on **Schedules** (it comes with the hair salon and the restaurant). It already has a default week
    (SCHEDULE-F12): Monday to Friday from 09:00 to 18:00, Saturday and Sunday closed.
-2. The business's time zone is the Hub's (SCHEDULE-F09): the whole schedule is read with that clock. In
-   phase 1 it is Madrid's.
+2. The business's time zone is the Hub's (SCHEDULE-F09): the whole schedule is read with that clock.
 3. In **Schedules → Hours**, tap **Yes, these are my hours** if the default week is yours
    (SCHEDULE-F03), or edit the days that change (SCHEDULE-F02). Until you do, the Home reminds you with
    "Confirm your opening hours".

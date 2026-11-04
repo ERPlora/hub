@@ -48,6 +48,15 @@ describe('WaitlistPage', () => {
   });
   afterEach(() => vi.useRealTimers());
 
+  it("adds a guest on the business's today, not the deployment's (hub#687)", async () => {
+    // 23:30 in the Canaries, already the next day in Madrid.
+    vi.setSystemTime(new Date('2026-11-02T23:30:00Z'));
+    const s = await setup();
+    await s.result('reservation.settings.get', { timezone: 'Atlantic/Canary' });
+    const form = s.wrapper.findComponent(WaitlistFormModal as unknown as Component);
+    expect((form.props() as Record<string, unknown>).day).toBe('2026-11-02');
+  });
+
   it('lists who waits in the order they were written down', async () => {
     const s = await setup();
     expect(s.list()).toEqual([{ sort: 'position', limit: 50, offset: 0 }]);
