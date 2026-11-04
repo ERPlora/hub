@@ -8,7 +8,6 @@ import { IonInput } from '@ionic/vue';
 import { describe, expect, it } from 'vitest';
 
 import { flush, mountModifier } from '../__tests__/mount-modifier';
-import { formatMoney } from '../lib/format';
 import MoneyInput from './MoneyInput.vue';
 
 type Control = HTMLElement & { errorText?: string };
@@ -72,7 +71,7 @@ describe('MoneyInput', () => {
   it('«1.250» gives both readings', async () => {
     const s = await setup({ modelValue: '1.250', showError: true });
     expect(s.errorText()).toBe(
-      `This amount can be read in two ways: «1.250» could be ${formatMoney(125000, 'en')} or ${formatMoney(125, 'en')}. Write the decimals so there is no doubt.`,
+      'This amount can be read in two ways: «1.250» could be 1,250.00 or 1.25. Write the decimals so there is no doubt.',
     );
   });
 
@@ -85,7 +84,7 @@ describe('MoneyInput', () => {
     await s.input().setValue('1.250');
     await s.blur();
     expect(s.errorText()?.replace(/\s/g, ' ')).toBe(
-      'Este importe se puede leer de dos maneras: «1.250» tanto puede ser 1250,00 zł como 1,25 zł. Escribe los decimales para que no haya duda.',
+      'Este importe se puede leer de dos maneras: «1.250» tanto puede ser 1.250,00 zł como 1,25 zł. Escribe los decimales para que no haya duda.',
     );
     await s.input().setValue('1,00 €');
     await s.blur();

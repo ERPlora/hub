@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:ed840a901ff341f3a14d4b4245851d2f0bd4544c5c94005c7afa55c504af1199 -->
+<!-- generated from WORKBOOK.md sha256:0e3572f32666b849a731ae8676e417ac6b496e477c1edaee8e5d39f5b1e7e192 -->
 
 ## What it is for and who it is for
 
@@ -823,14 +823,16 @@ Steps:
    "Revenue".
 2. "Customers" counts the cards still in the list; "Active", those with the "Active" checkbox ticked;
    "VIP", those of the "VIP" stage, and "Revenue" adds up what all of them have spent, in the business's
-   currency.
+   currency, grouped from four digits ("1.234,56 €"; in English, "€1,234.56").
 3. The figures change by themselves, without reloading, when someone adds, edits, deletes, merges or
    erases the data of a card, or when a sale with a customer is charged, voided or refunded.
 In: nothing: they count all the cards still in the list, not only those the table's search or filters
 let through.
 Out: nothing; read only.
 If it fails: "The figures could not be loaded" in their place, and the table keeps working. While they
-arrive, each figure shows "…". On the phone they go two by two, so the table can still be seen below.
+arrive, each figure shows "…". On the phone they go two by two, so the table can still be seen below; a
+figure never breaks across two lines: one that does not fit ("1.234.567,89 €") drops with its card to a
+row of its own.
 Involved: none
 
 ### CUSTOMER-F32 Note allergies or the sensitivity test with their permission

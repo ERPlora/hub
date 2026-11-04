@@ -5,7 +5,8 @@ for ``pg_restore`` 18: the full copy that restores the business, not «Export as
 uploads it to the bucket ``HUB_DUMPS_BUCKET`` (aws's ``s3_dumps.tf``: written by the worker, listed and presigned by the
 web, never deleted by either; each copy expires after 90 days by the bucket's lifecycle rule) at
 ``<hex>/<AAAAMMDDTHHMMSSZ>-<kind>.dump`` (UTC; ``reset`` before «Reset the business» empties it, ``offboarding`` when the
-business leaves). It keeps a ``control.HubDump`` row for it (``base.services``: the ORM's door). Only the worker dumps:
+business leaves and again as its final copy after its 90 days, ``base.tenancy.offboarding``). It keeps a
+``control.HubDump`` row for it (``base.services``: the ORM's door). Only the worker dumps:
 
 - as the migrator (``hub_migrator``, whose credentials the web never has), on a direct connection to the hub's writer
   (``base.tenancy.connections.migrator_conninfo``: never PgBouncer, where ``pg_dump`` loses its session's state), to

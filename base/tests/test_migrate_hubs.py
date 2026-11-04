@@ -198,23 +198,24 @@ def test_hubs_at_the_leaf_are_not_opened(small, make_hub):
 
 
 def test_only_the_hubs_with_a_complete_database_of_their_own_are_migrated(small, make_database, make_hub):
-    """Ready, cancelled (kept to come back) and expired (until its purge), once their database was made; never one on
-    control's database, one being made (the worker's), a failed one or a purged one, nor one cancelled or expired
-    before its database was ever made (a sign-up deleted while requested, or after failing): there is nothing to
+    """Ready, cancelled or archiving (kept to come back) and expired (until its purge), once their database was made;
+    never one on control's database, one being made (the worker's), a failed one or a purged one, nor one cancelled or
+    expired before its database was ever made (a sign-up deleted while requested, or after failing): there is nothing to
     migrate, and a deploy must not stop for it (review of round 5)."""
     made = timezone.now()
     alive = [make_hub(make_database(), status=Hub.Status.READY, ready_at=made)] + [
-        make_hub(make_database(), status=status, ready_at=made) for status in (Hub.Status.CANCELLED, Hub.Status.EXPIRED)
+        make_hub(make_database(), status=status, ready_at=made)
+        for status in (Hub.Status.CANCELLED, Hub.Status.ARCHIVING, Hub.Status.EXPIRED)
     ]
     make_hub("")
-    for status in (Hub.Status.REQUESTED, Hub.Status.FAILED, Hub.Status.PURGED):
+    for status in (Hub.Status.REQUESTED, Hub.Status.FAILED, Hub.Status.DROPPING, Hub.Status.PURGED):
         make_hub(missing_database(), status=status)
     for status in (Hub.Status.CANCELLED, Hub.Status.EXPIRED):
         make_hub(missing_database(), status=status)  # never ready: no database
 
     out = migrate_hubs()
 
-    assert "migrate_hubs: hubs: 3 migrated, 0 left behind, 0 up to date." in out
+    assert "migrate_hubs: hubs: 4 migrated, 0 left behind, 0 up to date." in out
     for hub in alive:
         hub.refresh_from_db()
         assert hub.schema_apps == at_the_leaf()

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:c8f5691aa10094384e8021efa9dc6f23e370a72dc24b90d006ee8aa86d7b99d9 -->
+<!-- generated from WORKBOOK.md sha256:fe71e6566a78c5d3a9fd03b34f7a2e9c5fcad5b40bd18072bda237380586201a -->
 
 ## What it is for and who it is for
 
@@ -866,7 +866,8 @@ whoever speaks) and the API, with the same rules and the same permissions. A ser
 voucher are named by their id or by their name; a professional, by their name; a customer, by her name or
 her phone. If a name fits several, it says which and asks to choose (409
 `service.service_ambiguous`, `service.category_ambiguous`, `service.package_ambiguous`,
-`staff.ambiguous_member`, `customer.customer_ambiguous`).
+`staff.ambiguous_member`, `customer.customer_ambiguous`). Before changing anything, the assistant asks for
+confirmation with its card (BASE-F97), which names each record as the screens name it, never by its id.
 
 ### What it offers: queries (they read and change nothing)
 
@@ -883,6 +884,9 @@ her phone. If a name fits several, it says which and asks to choose (409
 | Who can perform a service | view services | F33 | `service.assignment.eligible` |
 | The vouchers of the catalogue (and the deleted ones someone bought) | view vouchers | F12, F13 | `service.package.list` |
 | A voucher with its lines | view vouchers | F13 | `service.package.get` |
+| An assignment by its id: the service, the professional and their own minutes and price, with the `label` the assistant's card (BASE-F97) names it by | view services | F32 | `service.assignment.get` |
+| A sold voucher by its id: the voucher, the customer, the day it was sold and its balance, with its `label` | view voucher balances | F17, F18, F21, F22 | `service.grant.get` |
+| A session of a sold voucher by its id: the voucher, the customer, the service and its status, with its `label` | view voucher balances | F23, F24, F26, F27 | `service.session.get` |
 | The sold vouchers, of a voucher or of a customer, with their balance | view voucher balances | F15, F16 | `service.grant.list` |
 | The vouchers with no customer | view vouchers with no customer | F30 | `service.grant.list_orphans` |
 | Whether a sold voucher can be voided and why not | void vouchers | F17 | `service.grant.void_check` |
@@ -892,7 +896,8 @@ her phone. If a name fits several, it says which and asks to choose (409
 | A voucher's movements | view voucher balances | F19 | `service.movement.list` |
 | Up to five images of the library for a service's photo, by its name and titled in the business's language; it sets none | view services | F34 | `service.service.suggest_image` |
 
-All of them, except the checks and the images proposed, can be followed live.
+All of them, except the checks, the images proposed and the reads of an assignment, a sold voucher or a session, can
+be followed live.
 
 ### What it offers: actions (they change data)
 

@@ -123,9 +123,13 @@ USAGE_PATH = "/internal/assistant/usage"
 REPORT_PATH = "/internal/assistant/report"
 DOCS_PATH = "/internal/assistant/docs/search"
 TRANSCRIBE_PATH = "/internal/speech/transcribe"
+SYNTHESIZE_PATH = "/internal/speech/synthesize"
 #: A door that answers at once; the turn waits longer for its model, piece by piece.
 TIMEOUT_SECONDS = 15
 TURN_TIMEOUT = httpx.Timeout(15.0, read=120.0)
+#: Reading aloud waits for the voices' provider, which erplora.com waits up to 60 s for (saas ``assistant.media``): a
+#: little longer here, so a slow provider comes back as erplora.com's own refusal, never as the Hub hanging up first.
+SPEECH_TIMEOUT = httpx.Timeout(15.0, read=65.0)
 
 
 # ── Tools ────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -806,22 +810,43 @@ def _error_of(status: int, body: Any) -> dict:
     return error if isinstance(error, dict) else {}
 
 
-def _post(path: str, payload: dict) -> dict:
+def _send(path: str, payload: dict, timeout: float | httpx.Timeout) -> httpx.Response:
+    """``payload`` signed to ``path``: erplora.com's answer, or a ``GatewayError`` (logged) when it never got there or
+    refused it."""
     url, body, headers = _signed(path, payload)
     try:
-        response = httpx.post(url, content=body, headers=headers, timeout=TIMEOUT_SECONDS)
+        response = httpx.post(url, content=body, headers=headers, timeout=timeout)
     except httpx.HTTPError as problem:
         _log_unreachable(path, payload.get("hub"), problem)
         raise GatewayError("assistant.unreachable") from None
-    try:
-        answer = response.json()
-    except ValueError:
-        answer = None
     if response.status_code >= 300:
-        error = _error_of(response.status_code, answer)
+        error = _error_of(response.status_code, _json_of(response))
         _log_refused(path, payload.get("hub"), response.status_code, error)
         raise GatewayError(str(error.get("code") or "assistant.unavailable"), response.status_code, error)
+    return response
+
+
+def _json_of(response: httpx.Response) -> Any:
+    try:
+        return response.json()
+    except ValueError:
+        return None
+
+
+def _post(path: str, payload: dict) -> dict:
+    answer = _json_of(_send(path, payload, TIMEOUT_SECONDS))
     return answer if isinstance(answer, dict) else {}
+
+
+def _post_audio(path: str, payload: dict) -> dict:
+    """The audio a door answers (``/internal/speech/synthesize``'s mp3): ``{audio, content_type}``; an answer that is
+    no audio is a refusal too."""
+    response = _send(path, payload, SPEECH_TIMEOUT)
+    kind = response.headers.get("Content-Type", "").split(";")[0].strip().lower()
+    if not kind.startswith("audio/") or not response.content:
+        _log_refused(path, payload.get("hub"), response.status_code, {"code": "assistant.not_audio"})
+        raise GatewayError("assistant.not_audio", response.status_code)
+    return {"audio": response.content, "content_type": kind}
 
 
 def usage(scope: Scope) -> dict:
@@ -843,6 +868,16 @@ def transcribe(scope: Scope, *, audio: str, mime_type: str, language: str) -> di
     """The text of a dictation (``audio`` in base64): ``{text, language}``."""
     answer = _post(TRANSCRIBE_PATH, {"hub": scope.key, "audio": audio, "mime_type": mime_type, "language": language})
     return {"text": str(answer.get("text") or ""), "language": str(answer.get("language") or language)}
+
+
+def speak(scope: Scope, *, text: str, language: str, voice: str) -> dict:
+    """``text`` read aloud by erplora.com in ``voice`` (its catalogue's id; none, the language's first): the mp3 and its
+    type, ``{audio, content_type}``. The voices are Spanish and English, as the documentation: any other language
+    reads in English."""
+    payload = {"hub": scope.key, "text": text, "language": docs_language(language)}
+    if voice:
+        payload["voice"] = voice
+    return _post_audio(SYNTHESIZE_PATH, payload)
 
 
 def docs_language(language: str) -> str:

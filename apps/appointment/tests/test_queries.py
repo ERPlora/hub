@@ -26,6 +26,7 @@ from .conftest import (
     make_settings,
     make_shift,
     make_time_off,
+    pin_clock,
     run,
     wall,
 )
@@ -511,25 +512,62 @@ def test_a_service_nobody_is_assigned_to_is_offered_with_the_whole_bookable_team
     assert [s.staff_ids for s in out.slots] == [[salon.ana.id]]
 
 
-def test_the_customer_is_offered_only_what_keeps_the_notice(salon):
+@pytest.mark.parametrize(
+    ("today", "clock", "asked", "first"),
+    [
+        pytest.param(dt.date(2026, 11, 9), "10:00", dt.date(2026, 11, 10), "10:00", id="ordinary-day"),
+        # hub#688: from here tomorrow's midnight is 24 h 28 min away, so the whole day keeps the notice.
+        pytest.param(dt.date(2026, 10, 25), "00:32", dt.date(2026, 10, 26), "00:00", id="25h-day-before-1am"),
+        pytest.param(dt.date(2026, 10, 25), "01:30", dt.date(2026, 10, 26), "01:00", id="25h-day-after-1am"),
+        pytest.param(dt.date(2026, 10, 24), "10:00", dt.date(2026, 10, 25), "09:00", id="eve-of-the-25h-day"),
+        pytest.param(dt.date(2027, 3, 28), "00:32", dt.date(2027, 3, 29), "02:00", id="23h-day"),
+        pytest.param(dt.date(2027, 3, 27), "10:00", dt.date(2027, 3, 28), "11:00", id="eve-of-the-23h-day"),
+    ],
+)
+def test_the_customer_is_offered_only_what_keeps_the_notice(salon, monkeypatch, today, clock, asked, first):
+    """24 hours of notice are 24 real hours: the days the clock changes they end at another wall time."""
+    instant = at(today, clock).astimezone(dt.UTC)
+    pin_clock(monkeypatch, instant)
     make_settings(
         min_booking_notice=24 * 60,
         slot_interval=60,
         calendar_start_hour=0,
         calendar_end_hour=24,
     )
-    tomorrow = timezone.localdate() + dt.timedelta(days=1)
-    make_day(tomorrow.weekday(), ("00:00", "00:00"))
+    make_day(asked.weekday(), ("00:00", "00:00"))
     desk = run(
-        "appointment.availability.slots", {"date": tomorrow, "duration_minutes": 60}
-    )
+        "appointment.availability.slots", {"date": asked, "duration_minutes": 60}
+    ).slots
     customer = run(
         "appointment.availability.slots",
-        {"date": tomorrow, "duration_minutes": 60, "for_customer": True},
-    )
-    assert len(customer.slots) < len(desk.slots)
-    assert all(not slot.within_notice for slot in customer.slots)
-    assert any(slot.within_notice for slot in desk.slots)
+        {"date": asked, "duration_minutes": 60, "for_customer": True},
+    ).slots
+    hours = [f"{slot.start:%H:%M}" for slot in desk]
+    assert hours[0] == "00:00"  # The front desk sees the whole day: the notice only marks its hours.
+    keeps = hours.index(first)
+    assert [f"{slot.start:%H:%M}" for slot in customer] == hours[keeps:]
+    assert all(not slot.within_notice for slot in customer)
+    assert [f"{slot.start:%H:%M}" for slot in desk if slot.within_notice] == hours[:keeps]
+    # ``instant`` is in UTC, so these subtractions count real time, not the wall clock's.
+    notice = dt.timedelta(hours=24)
+    assert all(slot.start - instant >= notice for slot in customer)
+    assert all(slot.start - instant < notice for slot in desk if slot.within_notice)
+
+
+@pytest.mark.parametrize(
+    ("day", "start", "minutes", "end"),
+    [
+        pytest.param(dt.date(2026, 10, 25), "02:30", 60, "2026-10-25T02:30:00+01:00", id="25h-day"),
+        pytest.param(dt.date(2027, 3, 28), "01:30", 60, "2027-03-28T03:30:00+02:00", id="23h-day"),
+    ],
+)
+def test_a_free_time_says_its_real_end_on_the_business_clock(salon, monkeypatch, day, start, minutes, end):
+    pin_clock(monkeypatch, at(day, "00:01"))
+    make_settings(slot_interval=30, calendar_start_hour=0, calendar_end_hour=24)
+    make_day(day.weekday(), ("00:00", "00:00"))
+    slots = run("appointment.availability.slots", {"date": day, "duration_minutes": minutes}).slots
+    found = {f"{slot.start:%H:%M}": slot for slot in slots}
+    assert found[start].end.isoformat() == end
 
 
 # A time's verdict
@@ -594,6 +632,27 @@ def test_approved_time_off_without_a_schedule_refuses_and_the_business_alone_ign
         == "outside_staff_hours"
     )
     assert run("appointment.availability.check", asked).available is True
+
+
+@pytest.mark.parametrize(
+    ("day", "taken", "start", "minutes", "code"),
+    [
+        # 00:30 + 3 real hours ends at 04:30 on the wall: 04:00 is taken (the wall clock's sum ended at 03:30).
+        pytest.param(dt.date(2027, 3, 28), "04:00", "00:30", 180, "overlap", id="23h-day-taken"),
+        # 01:00 + 2.5 real hours ends at 02:30 the second time: 03:00 is free (the wall clock's sum ended at 03:30).
+        pytest.param(dt.date(2026, 10, 25), "03:00", "01:00", 150, None, id="25h-day-free"),
+    ],
+)
+def test_a_times_verdict_counts_its_real_end_the_nights_the_clock_changes(salon, monkeypatch, day, taken, start, minutes, code):
+    pin_clock(monkeypatch, at(day, "00:01"))
+    make_settings(allow_overlapping=False)
+    make_day(day.weekday(), ("00:00", "00:00"))
+    make_appointment(salon.lucia, salon.ana, [salon.cut], at(day, taken), number="APT-THERE")
+    out = run(
+        "appointment.availability.check",
+        {"start": wall(day, start), "duration_minutes": minutes, "staff": "Ana"},
+    )
+    assert (out.available, out.code) == (code is None, code)
 
 
 # Blocks, series and settings

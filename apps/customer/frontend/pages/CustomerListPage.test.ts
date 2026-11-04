@@ -29,7 +29,6 @@ import CustomerCreateModal from '../components/CustomerCreateModal.vue';
 import CustomerExportButton from '../components/CustomerExportButton.vue';
 import CustomerStats from '../components/CustomerStats.vue';
 import ImportReport from '../components/ImportReport.vue';
-import { formatMoney } from '../lib/money';
 import CustomerListPage from './CustomerListPage.vue';
 import source from './CustomerListPage.vue?raw';
 import { listFillProblems } from '../../../../frontend/testing/list-fill';
@@ -152,8 +151,8 @@ describe('CustomerListPage: the screen', () => {
     expect(s.wrapper.findAll('[data-testid="customer-list-stage"]').map((c) => c.text())).toEqual(['Active', 'VIP']);
     expect(s.wrapper.findAll('[data-testid="customer-list-phone"]').map((c) => c.text())).toEqual(['+34 600 111 222', '+34 600 111 222']);
     expect(s.wrapper.findAll('[data-testid="customer-list-spent"]').map((c) => c.text())).toEqual([
-      formatMoney(4550, 'en'),
-      formatMoney(4550, 'en'),
+      '45.50',
+      '45.50',
     ]);
   });
 
@@ -446,6 +445,19 @@ describe('CustomerListPage: the business\'s currency (customer-business-currency
     await s.result(s.call, BUSINESS, business());
     await s.show(PAGE);
     expect(spent(s)).toEqual(['€45.50', '€45.50']);
+  });
+
+  it('an amount of four figures groups its thousands, in both languages (hub#512)', async () => {
+    const big = { ...PAGE, rows: [row('c1', 'Ana García', { total_spent: 123456 })], total: 1 };
+    const es = await setup({ locale: 'es' });
+    await es.result(es.call, BUSINESS, business());
+    await es.show(big);
+    expect(spent(es)).toEqual(['1.234,56 €']);
+
+    const en = await setup();
+    await en.result(en.call, BUSINESS, business());
+    await en.show(big);
+    expect(spent(en)).toEqual(['€1,234.56']);
   });
 
   it('until the business answers, «Spent» is a figure without a symbol, never euros', async () => {

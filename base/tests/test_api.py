@@ -132,7 +132,10 @@ def test_the_spas_route_map_names_every_base_route(settings):
         ("GET", "/api/assistant/usage", "base.assistant.usage"),
         ("POST", "/api/assistant/report", "base.assistant.report"),
         ("POST", "/api/assistant/transcribe", "base.assistant.transcribe"),
+        # «Read aloud» in the server's voice (round 2026-11-03n): the mp3 of an answer.
+        ("POST", "/api/assistant/speak", "base.assistant.speak"),
         ("POST", "/api/support/report", "base.support.report"),
+        ("POST", "/api/saas-pass", "base.saas_pass.create"),
     } | {(method, f"/api{path}", op) for method, path, op in WAY_IN | PEOPLE | KEYS | APPROVALS | API_DOCS | LOCATIONS | CATALOG_IMAGES}
 
 

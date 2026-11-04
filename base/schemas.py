@@ -1844,6 +1844,16 @@ class SupportReportOut(Schema):
     reply_to: str
 
 
+class SaasPassIn(Schema):
+    #: Where the pass leads on erplora.com: this business's plan or this business (ACCOUNTS-F29 of the SaaS).
+    next: Literal["plan", "business"] = Field(title=gettext_noop("Where to go"))
+
+
+class SaasPassOut(Schema):
+    #: erplora.com's door with the signed pass: it opens for a minute, once.
+    url: str
+
+
 class AssistantTranscribeIn(Schema):
     # 2 MB of audio is 2 796 204 characters of base64 (the gateway's own limit).
     audio: str = Field(min_length=1, max_length=2_800_000, description="The recording, in base64.")
@@ -1854,6 +1864,35 @@ class AssistantTranscribeIn(Schema):
 class AssistantTranscribeOut(Schema):
     text: str
     language: str
+
+
+#: The longest text read aloud at once: erplora.com's own ceiling (saas ``assistant.media.MAX_SPEECH_CHARS``).
+MAX_SPEECH_CHARS = 4096
+
+
+class AssistantSpeakIn(Schema):
+    text: str = Field(min_length=1, max_length=MAX_SPEECH_CHARS, description="The text to read aloud.")
+    language: str = Field(
+        default="", max_length=16, description="es or en (es-ES too); empty: the screen's. Another one reads in English."
+    )
+    voice: str = Field(
+        default="",
+        max_length=64,
+        description="A server voice of the catalogue (es-ES-Ximena:DragonHDLatestNeural…); empty: the language's first.",
+    )
+
+    @field_validator("text")
+    @classmethod
+    def _something_to_read(cls, text: str) -> str:
+        text = text.strip()
+        if not text:
+            raise ValueError("write the text to read aloud")
+        return text
+
+
+class AssistantSpeakOut(Schema):
+    content_type: str = Field(description="The audio's type: audio/mpeg.")
+    content_base64: str = Field(description="The text read aloud, an mp3 in base64.")
 
 
 # ── Locations (round 2026-10-24b, multi-location) ──────────────────────────────────────────────────────────────────

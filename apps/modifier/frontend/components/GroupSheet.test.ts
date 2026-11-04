@@ -101,6 +101,21 @@ describe('GroupSheet', () => {
     expect(s.text('modifier-sheet-options-loading')).toBe('Loading…');
   });
 
+  it('a supplement of four figures groups its thousands, in both languages (hub#656)', async () => {
+    const dear = page([option('o2', { name: 'Cheese', price_delta: 123456 }), option('o3', { name: 'Soda', price_delta: -123456 })], 2, 20);
+    for (const [locale, plus, minus] of [['es', /Cheese.*\+1\.234,56 €/, /Soda.*-1\.234,56 €/], ['en', /Cheese.*\+€1,234\.56/, /Soda.*-€1,234\.56/]] as const) {
+      const s = await setup({ locale });
+      await s.result('base.business.get', business());
+      await s.result('modifier.group.get', SAUCES);
+      await s.result('modifier.option.list', dear);
+      await s.result('modifier.link.list', page(LINKS, 2, 20));
+      await settle();
+      expect(s.text('modifier-sheet-options-row-o2')).toMatch(plus);
+      expect(s.text('modifier-sheet-options-row-o3')).toMatch(minus);
+      s.wrapper.unmount();
+    }
+  });
+
   it('says the group and its rule, each option with its supplement, and each target', async () => {
     const s = await filled();
     expect(s.text('modifier-sheet-title')).toBe('Group — Sauces');

@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { sessionChanged } from '../lib/access';
 
-import { EMPLOYEE, errorFrame, flush, mountBase, OWNER, subId } from '../__tests__/mount-base';
+import { EMPLOYEE, errorFrame, flush, mountBase, OWNER, subId, tap } from '../__tests__/mount-base';
 import type { AppList, AppRow } from '../operations';
 import AppsPage from './AppsPage.vue';
 
@@ -461,6 +461,26 @@ describe('AppsPage', () => {
       expect(sessionChanged).not.toHaveBeenCalled();
       expect(toastError).not.toHaveBeenCalled();
       expect(refused(m).exists()).toBe(false);
+    });
+
+    it('its «Upgrade plan» goes with the pass, already signed in on erplora.com', async () => {
+      const tab = { opener: {}, location: { href: 'about:blank' } };
+      const windowOpen = vi.spyOn(window, 'open').mockReturnValue(tab as unknown as Window);
+      const url = 'http://localhost:8001/hub-pass/?pass=abc';
+      const limit = refusal(402, { code: 'base.app_limit_reached', message: 'server words', max_apps: 20, enabled: 20 });
+      const m = await open('/apps#all', {
+        onApi: (call) => (call.url.includes('/saas-pass') ? Response.json({ url }) : limit()),
+      });
+      await m.result(m.call, 'base.app.list', { ...APPS, enabled: 20 });
+      await m.wrapper.find('[data-testid="apps-row-flow-toggle"]').trigger('click');
+      await flush();
+
+      tap(m.wrapper.find('[data-testid="apps-limit-upgrade"]').element);
+      await flush();
+
+      expect(JSON.parse(m.net.api.at(-1)!.init.body as string)).toEqual({ next: 'plan' });
+      expect(tab.location.href).toBe(url);
+      windowOpen.mockRestore();
     });
 
     it('in Spanish, and inside the installed app without the link', async () => {

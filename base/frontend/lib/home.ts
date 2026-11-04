@@ -48,6 +48,8 @@ export interface HubHome {
   members_url?: string;
   /** This business on erplora.com's panel (the bar's «erplora.com», BASE-F11); empty for who may not open it. */
   manage_url?: string;
+  /** Whether erplora.com reads the assistant's answers aloud in its voices (`ASSISTANT_SERVER_VOICE`, round 2026-11-04a). */
+  server_voice?: boolean;
 }
 
 // ── «Finish setting up your business» (BASE-G22, BASE-G130, BASE-G164) ────────────────────────────────────
