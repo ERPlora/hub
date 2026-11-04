@@ -39,3 +39,6 @@ class BaseConfig(LiveAppConfig):
         # one of the print hosts' presence (base.E006), the Home the one of the bell's clock (base.E007) and the file
         # server the one of the folders the apps declare (base.E010).
         from base import home, media, scheduler, ws_print  # noqa: F401
+        from base.tenancy import deletion
+
+        deletion.install()

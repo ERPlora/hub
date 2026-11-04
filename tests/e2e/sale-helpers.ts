@@ -5,9 +5,10 @@
 // `afterAll` (the fiscal documents Invoicing issued for its sales go first: a document keeps its sale).
 // What a run creates is named `E2E-…` (products), `e2e.…` (customers) or `e2e …` (departments, quick
 // notes, check titles); its sales are found by their lines.
-import { type BrowserContext, expect, type Locator, type Page } from '@playwright/test';
+import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, psql, shot, shown } from './helpers';
+import { A, api, login, psql, shot, shown } from './helpers';
+import { createProduct, type Product } from './inventory-helpers';
 import { cleanInvoices, issuedIds } from './invoice-helpers';
 
 export const VIEWPORTS = [
@@ -107,6 +108,70 @@ export async function openTillCart(page: Page): Promise<void> {
     await till.locator('[data-testid=pos-cart-fab]').click();
   }
   await expect(till).toHaveClass(/pos-till--cart-open/);
+}
+
+/** The sizes where a notice of the till is read: the fleet's three and the lowest phone. */
+const NOTICE_SIZES = [
+  { label: '1440x900', width: 1440, height: 900 },
+  { label: '820x1180', width: 820, height: 1180 },
+  { label: '375x667', width: 375, height: 667 },
+  { label: '320x568', width: 320, height: 568 },
+] as const;
+
+/** One test per size of `NOTICE_SIZES`, each on a page of its own in `locale`, closed after it. */
+export function eachNoticeSize(
+  locale: string,
+  run: (page: Page, context: BrowserContext, size: (typeof NOTICE_SIZES)[number]) => Promise<void>,
+): void {
+  for (const size of NOTICE_SIZES) {
+    test(size.label, async ({ browser }) => {
+      const context = await browser.newContext({ baseURL: A, locale, viewport: { width: size.width, height: size.height } });
+      try {
+        await run(await context.newPage(), context, size);
+      } finally {
+        await context.close();
+      }
+    });
+  }
+}
+
+/** For a `beforeAll`: cash without a cash session (the drawer's lock is sale-cash-gate.spec.ts's) and a dish of the run
+ *  to sell, `E2E <label> Dish <run>`, whose SKU is `E2E-<label>-<run>`. */
+export async function dishForTheTill(browser: Browser, label: string, run: string): Promise<Product> {
+  const context = await browser.newContext({ baseURL: A });
+  const page = await context.newPage();
+  await login(page, A, '/sale/pos');
+  await drawerOff(context);
+  const dish = await createProduct(context, { name: `E2E ${label} Dish ${run}`, sku: `E2E-${label}-${run}`, price: 700, tax_category_key: 'restaurant.food' });
+  await context.close();
+  return dish;
+}
+
+/** A box on screen, in the window's pixels. */
+export interface Box {
+  top: number;
+  bottom: number;
+  left: number;
+  right: number;
+}
+
+/** Notices that last `ms` stay until the spec has read them, for a page not loaded yet: where a notice sits is the
+ *  point, not how long it lasts, and read without this a check passes once the notice has gone by itself. No other
+ *  timer changes. */
+export async function holdNotices(page: Page, ms: number): Promise<void> {
+  await page.addInitScript((noticeMs) => {
+    const original = window.setTimeout.bind(window);
+    window.setTimeout = ((run: TimerHandler, after?: number, ...rest: unknown[]) =>
+      original(run, after === noticeMs ? 600_000 : after, ...rest)) as typeof window.setTimeout;
+  }, ms);
+}
+
+/** The notice's own box: the host of an `ion-toast` fills the screen. */
+export function noticeBox(notice: Locator): Promise<Box> {
+  return notice.evaluate((el) => {
+    const box = el.shadowRoot!.querySelector('.toast-wrapper')!.getBoundingClientRect();
+    return { top: box.top, bottom: box.bottom, left: box.left, right: box.right };
+  });
 }
 
 /** Screenshots of the page in the three viewports, each once `ready` says it painted. */
