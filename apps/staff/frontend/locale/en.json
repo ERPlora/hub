@@ -283,13 +283,13 @@
       "to": "To",
       "totals": {
         "label": "Totals of the period",
-        "sold": "Sold",
+        "sold": "Production",
         "commission": "Commissions"
       },
       "columns": {
         "name": "Name",
         "role": "Role",
-        "sold": "Sold",
+        "sold": "Production",
         "rate": "Commission %",
         "commission": "Commission"
       },

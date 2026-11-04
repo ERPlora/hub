@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:b780af5bb11ed6a45ff92398f99ef858909d8ed1370d4ac0c1a78d3a64c173c1 -->
+<!-- generated from WORKBOOK.md sha256:b38e7a67f02a9b89bb0fcbb05b6db3d946b520f6fc270981df961f4dbc840b95 -->
 
 ## What it is for and who it is for
 
@@ -109,12 +109,12 @@ working day of **Settings** already in place.
 At the top, the period: "Today" (on entering), "Yesterday", "This week" (since Monday), "This month"
 (since the 1st) or "Custom", which opens "From" and "To" with the days that were on screen; next to it,
 the days it counts. On a phone, the period is chosen in the "Period" drop-down, with the same options.
-Below, two figures: **Sold** and **Commissions** of the period, in the business's currency, like every
+Below, two figures: **Production** and **Commissions** of the period, in the business's currency, like every
 amount of the list. Then the list with the search "Search
-professional…" and columns **Name, Role, Sold, Commission %** and **Commission**: each person who can earn
+professional…" and columns **Name, Role, Production, Commission %** and **Commission**: each person who can earn
 a commission (Active or On leave), also without sales and with commission 0, and whoever sold in the
 period even if they are no longer here ("No longer works here" or "Inactive" next to the name). It sorts by
-name, role, sold or commission. On a phone, one card per person. It updates by itself when a sale is
+name, role, production or commission. On a phone, one card per person. It updates by itself when a sale is
 charged, voided or refunded and when a record changes.
 
 ### Staff settings

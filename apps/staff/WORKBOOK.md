@@ -121,12 +121,12 @@ descanso, Fin descanso** (o «No trabaja»), con la jornada por defecto de **Aju
 Arriba, el periodo: «Hoy» (al entrar), «Ayer», «Esta semana» (desde el lunes), «Este mes» (desde el
 día 1) o «Personalizado», que abre «Desde» y «Hasta» con los días que había en pantalla; al lado, los
 días que cuenta. En el móvil, el periodo se elige en el desplegable «Periodo», con las mismas opciones.
-Debajo, dos cifras: **Vendido** y **Comisiones** del periodo, en la moneda del negocio, como cada importe
+Debajo, dos cifras: **Producción** y **Comisiones** del periodo, en la moneda del negocio, como cada importe
 de la lista. Después, la lista con
-buscador «Buscar profesional…» y columnas **Nombre, Rol, Vendido, Comisión %** y **Comisión**: cada
+buscador «Buscar profesional…» y columnas **Nombre, Rol, Producción, Comisión %** y **Comisión**: cada
 persona que puede cobrar comisión (Activa o De baja), también sin ventas y con comisión 0, y quien vendió
 en el periodo aunque ya no esté («Ya no trabaja aquí» o «Inactivo» junto al nombre). Se ordena por
-nombre, rol, vendido o comisión. En el móvil, una tarjeta por persona. Se pone al día sola al cobrar, anular
+nombre, rol, producción o comisión. En el móvil, una tarjeta por persona. Se pone al día sola al cobrar, anular
 o devolver una venta y al cambiar una ficha.
 
 ### Ajustes de Personal
