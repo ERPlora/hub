@@ -2822,6 +2822,10 @@ Implicados: HUBS-F18, HUBS-F19, HUBS-F20
 
 ## Para quien lo mantiene
 
+- **Orden de una lista** (`base/ordering.py`, regla hub#2355 del producto viejo): `list_order(*columnas, descending=…,
+  nulls_last=…)` devuelve lo que necesita `order_by`, con todas las columnas y después el `id` en la dirección de la
+  lista: la descendente es la ascendente leída al revés, empates incluidos, y las páginas ni repiten ni pierden filas.
+  Una app no escribe su propia copia. La usan Clientes, Asistencia y Ventas; las demás siguen con la suya hasta hub#768.
 - Las tres consultas vivas del Inicio son de `base/queries.py`, con permiso `base.view_home` y ruta ninja en
   `base/api.py` (`GET /api/home/setup`, `/home/widgets`, `/home/bell`): `base.setup.status` (también
   herramienta del asistente, `ai=`), `base.widget.list` y `base.bell.counters`. Las reglas puras viven en

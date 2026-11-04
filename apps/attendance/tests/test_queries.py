@@ -289,6 +289,29 @@ def test_the_sort_and_the_pages(person, clock):
     )
 
 
+def test_ties_go_by_id_in_the_lists_own_direction(person, clock):
+    """hub#684 (the rule of hub#2355, as in Sales, Cash register, Inventory and Tasks): a descending list is
+    the ascending one read backwards, ties included, and its pages neither repeat nor lose rows. Same person,
+    day, status and (empty) clock-out: only the id tells these days apart."""
+    clock(NOW)
+    ana, ctx = person(role="hub_manager")
+    by_id = sorted(
+        day(ana, f"2026-10-01T0{hour}:00", status="needs_review").id
+        for hour in range(4)
+    )
+
+    def listed(sort, **page):
+        data = {"sort": sort, **page}
+        return [r.id for r in run("attendance.record.list", data, ctx).rows]
+
+    for column in ("work_date", "member_name", "status", "clock_out_at", "id"):
+        assert listed(column) == by_id, column
+        assert listed(f"-{column}") == by_id[::-1], f"-{column}"
+    assert [
+        row for offset in (0, 2) for row in listed("-status", limit=2, offset=offset)
+    ] == by_id[::-1]
+
+
 def test_a_corrected_day_says_how_many_times(person, clock):
     clock(NOW)
     ana, ctx = person()

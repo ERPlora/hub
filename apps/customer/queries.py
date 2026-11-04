@@ -68,6 +68,7 @@ from apps.customer.schemas import (
 from apps.customer.search import normalize, search_term
 from base import operations as platform
 from base.business import currency_decimals
+from base.ordering import list_order
 
 CUSTOMER_UNAVAILABLE = _("This customer is no longer available.")
 NO_CUSTOMER_MATCHES = _("No customer matches “%(reference)s”.")
@@ -295,13 +296,8 @@ def page(rows: QuerySet, params: PageIn) -> dict:
 
 
 def _ordered(rows: QuerySet, column: str, descending: bool) -> QuerySet:
-    """``rows`` by ``column``, empties last, the id as the tie-break so that pages never overlap."""
-    expression = (
-        F(column).desc(nulls_last=True)
-        if descending
-        else F(column).asc(nulls_last=True)
-    )
-    return rows.order_by(expression, "id")
+    """``rows`` by ``column``, empties last, the id in the list's direction as the tie-break."""
+    return rows.order_by(*list_order(column, descending=descending, nulls_last=True))
 
 
 def _filtered_customers(params: CustomerFilters) -> QuerySet:
