@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // Schedules → Settings (SCHEDULE-F08, F09; WORKBOOK «Pantallas · Ajustes»): on top, read only, «Business
-// timezone» with its name and the note (it is the Hub's: in phase 1, Madrid's); below, «Week starts»
+// timezone» with its name and the note (it is the Hub's); below, «Week starts»
 // (Monday or Sunday; another stored day is offered too) and «Save» (`schedule.settings.update`) for
 // whoever may change the settings. «Week starts» only shows once the settings were read: a value never
 // read would be the default dressed as the business's choice. A refused save is said above the form.

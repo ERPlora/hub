@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:c9b8fc875a03cd3c0a770de2fc3214c8c2fbd808d5fe045a77604fc13431ed53 -->
+<!-- generated from WORKBOOK.md sha256:61580bb8b74083f96622badc06425148faeb5ea243249f7b523bfdcec91e9628 -->
 
 ## What it is for and who it is for
 
@@ -37,7 +37,7 @@ from there respects the business's notice.
    business's. The page offers only the times the diary would give the customer.
 4. Open **Online booking → Settings**, switch on **Public page on** and press **Save**. While it is off,
    the page says that the business does not take online bookings.
-5. Every time is on the **business's clock** (in phase 1, Europe/Madrid).
+5. Every time is on the **business's clock**, in its time zone.
 
 ## Screens
 

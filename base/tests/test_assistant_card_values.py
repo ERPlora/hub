@@ -98,9 +98,8 @@ def test_a_table_booking_says_its_day_its_time_and_through_what(language, expect
 
 
 def test_a_moment_with_its_offset_is_said_in_the_businesss_zone_and_a_wall_clock_one_as_it_is():
-    """Without the person at hand (an automation's card), the deployment's zone (Europe/Madrid): the one every app
-    reads a wall-clock time in. An instant of another zone is said at the business's hour; the wall-clock time the
-    model sent (the app books it at the business's hour) as it is, summer or winter."""
+    """Outside a hub, the deployment's zone (Europe/Madrid). An instant of another zone is said at the business's hour;
+    the wall-clock time the model sent (the app books it at the business's hour) as it is, summer or winter."""
     op = get("appointment.appointment.create")
     def start(sent: str) -> str:
         return values(assistant.card(op, {**BOOKING, "start": sent}, "es"))["start"]
@@ -112,9 +111,10 @@ def test_a_moment_with_its_offset_is_said_in_the_businesss_zone_and_a_wall_clock
 
 @pytest.mark.django_db
 def test_a_moment_is_said_in_the_zone_of_the_business_the_person_works_in():
-    """With the person at hand, the business's own zone (Settings › Business: ``base.business.get``)."""
-    Hub.objects.update_or_create(slug="a", defaults={"name": "Bar A", "timezone": "Atlantic/Canary"})
-    card = assistant.card(get("appointment.appointment.create"), BOOKING, "es", ctx=ctx())
+    """In the person's hub, the business's own zone (Settings › Business), the clock every app reads."""
+    hub, _ = Hub.objects.update_or_create(slug="a", defaults={"name": "Bar A", "timezone": "Atlantic/Canary"})
+    with use_hub(hub):
+        card = assistant.card(get("appointment.appointment.create"), BOOKING, "es", ctx=ctx())
     assert values(card)["start"] == "2 nov 2026, 9:00"
 
 
@@ -353,7 +353,7 @@ def test_no_list_of_texts_sent_as_they_are_is_named():
 #: them out. An attempt key (``attempt_key``) is no reference. Only ever lower: an app that marks its own lowers its
 #: number here, and none comes in.
 UNNAMED_REFERENCES = {
-    "appointment": 34,
+    "appointment": 25,
     "combo": 25,
     "customer": 22,
     "demo": 3,
@@ -492,6 +492,9 @@ KNOWN = json.loads(
 #: Every datum the screen knows by its name that a write's schema titles itself, and what its card calls it in
 #: Spanish: the title its app wrote, never the generic word for its name («Registro: 5 (Terraza)»).
 TITLED_IN_SPANISH = {
+    **{f"appointment.appointment.{action}:id": "Cita" for action in (
+        "cancel", "charge", "complete", "confirm", "delete", "mark_no_show", "reschedule", "start", "update",
+    )},
     "attendance.record.close_for_terminated:id": "Persona",
     "base.api_key.revoke:id": "Clave de API",
     "base.device.remove:id": "Dispositivo",

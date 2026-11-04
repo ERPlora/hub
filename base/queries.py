@@ -10,7 +10,7 @@ import datetime as dt
 import io
 import re
 import unicodedata
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from typing import Any
 from uuid import UUID
 
@@ -392,6 +392,26 @@ def notice_list(ctx: OperationContext, data: NoticeListIn) -> dict:
 # ── Apps (APP-BASE-4) ──────────────────────────────────────────────────────────────────────────────────────────
 
 
+def app_off_refusal(
+    ctx: OperationContext, label: str, current: Mapping[str, activation.Activation], graph: activation.Graph, said: Mapping[str, str]
+) -> tuple[str, str] | None:
+    """Why ``label`` can't go off because an app refuses, as ``(who refuses, what the person reads)``, from ``said``
+    (``base.activation.refusals``); ``None`` when none of those it depends on does. One an app on needs says that app's
+    reason, never «turn it off first», which nobody can do while it refuses (hub#619)."""
+    who = next((other for other in activation.keeping_on(label, current, graph) if other in said), None)
+    if who is None:
+        return None
+    if who not in activation.required_by(label, current, graph):
+        return who, said[who]
+    names = {config.label: config.verbose_name for config in module_configs()}
+    with translation.override(ctx.language):
+        return who, gettext("%(app)s can't be turned off: %(needed_by)s needs it. %(reason)s") % {
+            "app": names[label],
+            "needed_by": names[who],
+            "reason": said[who],
+        }
+
+
 # Not an assistant tool: the Apps screen's own read; the assistant knows the apps by its catalogue.
 @operation("base.app.list", kind="query", permission=VIEW_HOME, input=AppListIn, output=AppListOut, ai=INTERNAL)
 def app_list(ctx: OperationContext, data: AppListIn) -> dict:
@@ -399,7 +419,8 @@ def app_list(ctx: OperationContext, data: AppListIn) -> dict:
     SaaS's catalog), with where its right comes from and its state (``base.entitlement``: ``blocked`` without it;
     else ``on`` or ``off`` as the business turned it, ``base.activation``), whether the business chose it, the first
     screen this person may open, what it needs (it comes along with it) and the apps on that need it (they go off
-    first); and the plan's limit of chosen apps against the chosen ones on (PLAN-HUB §9), erplora.com's Store and its
+    first), and why turning it on or off would be refused (hub#618, hub#694: the screen never offers what is always
+    refused); and the plan's limit of chosen apps against the chosen ones on (PLAN-HUB §9), erplora.com's Store and its
     plans of this business.
 
     Read again when an app's state changes (its live notice, in every process with the list open: AppsFollower on every
@@ -423,6 +444,21 @@ def app_list(ctx: OperationContext, data: AppListIn) -> dict:
             return "blocked"
         return current[label].state if current[label].wanted else "off"
 
+    # Each hook once for the whole list: a row asking its own would read the business's country once per row.
+    wont_go_off = activation.refusals([label for label, row in current.items() if row.wanted], ctx=ctx)
+    wont_go_on = activation.refusals(
+        [label for label, row in current.items() if not row.on], ctx=ctx, hook=activation.CAN_ENABLE
+    )
+
+    def refusal(label: str) -> str | None:
+        if label in blocked:
+            return None
+        if current[label].wanted:
+            refused = app_off_refusal(ctx, label, current, graph, wont_go_off)
+            return refused[1] if refused else None
+        coming = activation.enabling(label, current, graph)
+        return next((wont_go_on[other] for other in coming if other in wont_go_on), None)
+
     with translation.override(ctx.language):
         return {
             "apps": [
@@ -442,6 +478,7 @@ def app_list(ctx: OperationContext, data: AppListIn) -> dict:
                     "required_by": [
                         label for label in activation.required_by(config.label, current, graph) if label in shown
                     ],
+                    "refusal": refusal(config.label),
                 }
                 for config in configs
             ],
@@ -1253,7 +1290,7 @@ def business_get(ctx: OperationContext, data: BusinessIn) -> dict:
         ctx,
         name=hub.name,
         country=hub.country,
-        zone=hub.timezone or settings.TIME_ZONE,
+        zone=business.zone_name(business.zone_of(hub.timezone)),
         language=hub.language or settings.LANGUAGE_CODE,
         demo=hub.is_demo,
         settings_url="" if hub.is_demo else saas_url(f"{SAAS_PANEL_PATH}/businesses/{hub.id}/settings"),
@@ -2361,7 +2398,7 @@ def approval_export(ctx: OperationContext, data: ApprovalExportIn) -> dict:
     for row in _approvals_kept(data, currency):
         writer.writerow(
             [
-                timezone.localtime(row.created_at).strftime("%Y-%m-%d %H:%M"),
+                timezone.localtime(row.created_at, business.business_zone()).strftime("%Y-%m-%d %H:%M"),
                 _approval_cell(approval_action(row.operation, row.figures, currency)),
                 _approval_cell(row.approved_by_name),
                 _approval_cell(row.requested_by_name),

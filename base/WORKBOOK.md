@@ -786,9 +786,11 @@ Entra: la app elegida, las que necesita y lo que el negocio tiene contratado en 
 Sale: la app en marcha en este negocio, elegida por él: cuenta para el límite de apps de su plan.
 Si falla: con el límite del plan alcanzado no se activa nada y sale «El límite de apps de tu plan»: «Has llegado al
 límite de 20 apps de tu plan. Mejora el plan o desactiva una.», con «Mejorar plan» para quien administra en el
-navegador (en la app instalada no sale). Una app de pago sin contratar no ofrece «Activar» (BASE-F20). Cualquier
-otro fallo sale en un aviso con el nombre de la app y el motivo, que se queda hasta cerrarlo.
-Implicados: APPS-F07
+navegador (en la app instalada no sale). Una app de pago sin contratar no ofrece «Activar» (BASE-F20). Una app que
+este negocio no puede usar tampoco: sale «No disponible» y, para quien administra, el motivo debajo («VeriFactu solo
+es para negocios de España.», VERIFACTU-F01). Cualquier otro fallo sale en un aviso con el nombre de la app y el
+motivo, que se queda hasta cerrarlo.
+Implicados: APPS-F07, VERIFACTU-F01
 
 ### BASE-F19 Saber qué más viene con una app
 <!-- origen: old-hub:HUB_SHELL-F110 -->
@@ -891,8 +893,8 @@ Pasos:
      la pone con su nombre entero y, si ya estaba desactivada, el asistente lo dice y no cambia nada.
 Entra: las apps del negocio, lo que necesita cada una y cuáles eligió el negocio.
 Sale: la app apagada en este negocio, y las que llegaron solo con ella, con sus datos intactos.
-Si falla: si otra app en marcha la necesita, o la propia app se niega, no cambia nada (BASE-F25). Con «Cancelar»,
-tampoco. Desde el asistente, un nombre que vale para varias apps no saca tarjeta: pregunta cuál (BASE-F24).
+Si falla: si otra app en marcha la necesita, no cambia nada; si no se puede desactivar, no ofrece «Desactivar»
+(BASE-F25). Con «Cancelar», tampoco cambia nada. Desde el asistente, un nombre que vale para varias apps no saca tarjeta: pregunta cuál (BASE-F24).
 Implicados: VERIFACTU-F32
 
 ### BASE-F24 Activar una app
@@ -926,18 +928,21 @@ Estado: hecho
 Actor: administrador
 Pantalla: Apps
 Pasos:
-  1. Quien administra pulsa «Desactivar» en una app que otra en marcha necesita (por ejemplo, «Mesas» mientras
-     «Reservas» está activada), o en una que se niega mientras tiene algo suyo a medias (VeriFactu, con registros
-     que la AEAT aún no ha aceptado: VERIFACTU-F32).
-  2. El hub no cambia nada: encima de la tabla sale «No se ha cambiado nada» con lo que hay que hacer antes,
-     «Desactiva antes Reservas.» (sin preguntar), o, tras confirmar, con el motivo de la propia app en el idioma de
-     quien lo pide: «VeriFactu aún tiene 1 registro por enviar a la AEAT. Espera a que se envíe o arréglalo antes de
-     desactivarla.».
-  3. El aviso se queda hasta que se cierra o se activa o desactiva otra app; la app sigue «Activa».
+  1. Una app que se niega a desactivarse no ofrece «Desactivar»: debajo de su estado, quien administra lee el motivo
+     de la propia app en su idioma: «VeriFactu no se puede desactivar una vez activada: la ley obliga a que tus
+     facturas sigan llegando a la AEAT.» (VERIFACTU-F32).
+  2. Tampoco lo ofrecen las apps que esa necesita, que no se pueden desactivar antes, y cada una dice por cuál:
+     «Facturación no se puede desactivar: hace falta para VeriFactu. VeriFactu no se puede desactivar una vez
+     activada: la ley obliga a que tus facturas sigan llegando a la AEAT.».
+  3. Quien administra pulsa «Desactivar» en una app que otra en marcha necesita y que sí se puede desactivar (por
+     ejemplo, «Mesas» mientras «Reservas» está activada). El hub no cambia nada: encima de la tabla sale «No se ha
+     cambiado nada» con lo que hay que hacer antes, «Desactiva antes Reservas.» (sin preguntar).
+  4. El aviso se queda hasta que se cierra o se activa o desactiva otra app; la app sigue «Activa».
 Entra: las apps en marcha que la necesitan, o el motivo de la app que se niega.
 Sale: nada.
-Si falla: sin motivo propio de la app, el mismo aviso dice que no se ha podido cambiar, con el nombre de la app y lo
-que ha contestado el hub.
+Si falla: si aun así se pide por el asistente o por la API, el hub contesta el mismo motivo y no cambia nada. Sin
+motivo propio de la app, el mismo aviso dice que no se ha podido cambiar, con el nombre de la app y lo que ha
+contestado el hub.
 Implicados: VERIFACTU-F32
 
 ### BASE-F26 Entender por qué una app no se abre
@@ -3031,9 +3036,12 @@ Implicados: HUBS-F18, HUBS-F19, HUBS-F20
   ERPlora y el ámbito del worker lo tienen todo encendido siempre, `activation.is_platform`; `base/activation.py`).
   `base.blueprint.import` enciende antes de cargar las apps que lista el manifiesto (sus raíces, elegidas, por
   `base.app.enable`: tope, derechos y evento); la que no puede encender sale `inactive` con su `reason` en el
-  informe. `base.app.enable`/`base.app.disable`
-  (`POST /api/apps/enable|disable`, `base.administer_hub`: cierre de `requires`, 409 `base.app_required`, veto
-  `can_disable` del `LiveAppConfig` → 409 `base.app_vetoed`, 402 `base.app_limit_reached` con `max_apps`/`enabled`;
+  informe. La que nunca se enciende en este negocio (`can_enable`) no se promete en la revisión (`inactive`, no `turns_on`)
+  y, sin filas suyas en el blueprint, no deja la carga a medias ni ofrece un reintento que no cambiaría nada (hub#694). `base.app.enable`/`base.app.disable`
+  (`POST /api/apps/enable|disable`, `base.administer_hub`: cierre de `requires`, 409 `base.app_required`, negativas
+  `can_disable` y `can_enable` del `LiveAppConfig` → 409 `base.app_vetoed`, que `base.app.list` adelanta en el `refusal`
+  de cada fila, con cada gancho una sola vez por lista (hub#618, hub#694), y la de una app que otra en marcha necesita
+  dice el motivo de esa otra, nunca «Desactiva antes» (`app_off_refusal`, hub#619), 402 `base.app_limit_reached` con `max_apps`/`enabled`;
   bajar de plan no apaga nada). Una app apagada da 404 `app_inactive` y sale del menú, del relay y del asistente
   (caché `base.apps_off:<host>`, olvidada al COMMIT). Una app cuyas tablas la BD del hub aún no tiene (`Hub.schema_apps`;
   las plantillas traen las de todas las portables, así que solo pasa con la que llega con un código posterior) da 202
@@ -3046,7 +3054,7 @@ Implicados: HUBS-F18, HUBS-F19, HUBS-F20
   fila sin confirmar (sin `base`) no niega nada, y el alias `__ddl` del migrador nunca pregunta. El índice del admin deja
   fuera esas apps y su página vuelve al índice con el aviso. No cubre SQL crudo ni el JOIN de un `select_related`. `last_error` no llega a la pantalla, que dice «No se ha podido activar»: se queda en la fila, y el
   evento `base.app.activation_failed` lleva su código. La sesión da `activating` a la que se prepara y `off` a la que falló, y ninguna
-  de las dos sale en el menú. El veto de VeriFactu está en su app (VERIFACTU-F32). El gancho `can_disable(ctx)` corre en `translation.override(ctx.language)`: un
+  de las dos sale en el menú. El veto de VeriFactu está en su app (VERIFACTU-F32). Los ganchos `can_disable(ctx)` y `can_enable(ctx)` corren en `translation.override(ctx.language)`: un
   `gettext` a secas ya responde en el idioma de quien pide (gh:hub#2595). En Apps, la negativa (409 o cualquier otro
   fallo al cambiar) es un `InlineFeedback` `apps-refused` que se queda hasta cerrarlo o hasta el siguiente cambio,
   nunca un toast (gh:hub#2594). Re-triados en FIX-HUB-BASE-APP-ACTIVATION-WORKBOOK-AND-FLOWS: F18, F19, F23–F25
@@ -3131,6 +3139,12 @@ Implicados: HUBS-F18, HUBS-F19, HUBS-F20
   `#data`; `#tax` abre Negocio; `lib/data.ts`) y `components/settings/{BusinessPanel,TicketsPanel,SettingsRow}.vue`.
   Tests: `base/tests/test_business.py`, `test_queries_business.py`, `test_business_live.py`; e2e
   `tests/e2e/base-settings-business.spec.ts`, con el Hub y el SaaS reales.
+- **La hora del negocio** (hub#687): la zona la lee un solo sitio, `base.business.business_zone()`: la del hub en el que se
+  trabaja (`control.Hub.timezone`, la manda el SaaS), la del despliegue en la plataforma o si no tiene una que Python
+  conozca (`zone_of`); sin contexto, `HubContextMissing`, como un modelo de hub. La usan la tarjeta del asistente, los
+  avisos del Inicio y los textos de las automatizaciones (`base.home.moment`), el CSV de autorizaciones y las apps; una
+  lectura nueva del reloj del despliegue la para `tests/test_guardrails_zone.py`. Lo que aún lo lee: hub#771 (el «hoy» y
+  el día de los números) y hub#772 (lo fiscal).
 - **Acceso (APP-BASE-3: BASE-F52…F71).** Modelos de hub en `base/models.py`: `TrustedDevice` (el dispositivo:
   `token_digest` = SHA-256 del token de 256 bits de la cookie `hub_device`, httpOnly; nunca el token; `mode`
   `shared`/`personal` con quién y cuándo, `name`, `agent`, última persona y entrada, `ended_reason` `device_limit`),

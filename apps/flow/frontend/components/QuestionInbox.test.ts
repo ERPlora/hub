@@ -50,6 +50,7 @@ async function setup(rows: QuestionOut[] = [Q], props: Record<string, unknown> =
   const m = await mountFlow(QuestionInbox, { props, locale });
   await m.live();
   await m.result(OP, { rows });
+  await m.result('base.business.get', { currency: 'EUR', currency_decimals: 2, timezone: 'Europe/Madrid' });
   return m;
 }
 
@@ -59,6 +60,12 @@ function data(m: Awaited<ReturnType<typeof setup>>, id: string): string[] {
 }
 
 describe('QuestionInbox', () => {
+  it("says when silence counts on the business's clock (hub#687)", async () => {
+    const m = await setup();
+    await m.result('base.business.get', { currency: 'EUR', currency_decimals: 2, timezone: 'Atlantic/Canary' });
+    expect(m.find('flow-question-silence-q1').text()).toContain('Oct 16, 2026, 11:00 AM');
+  });
+
   it('shows each question with who it was asked of and what a no and silence do', async () => {
     const m = await setup();
     expect(m.find('flow-question-title-q1').text()).toBe('Refund 12,50 € to Ana?');
