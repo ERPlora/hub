@@ -13,6 +13,7 @@ dropped when the session ends. The rows in control (``hub_a``, ``hub_b``) are th
 :func:`watched` and :func:`assert_only_alias` see every statement of every thread by alias: «A never reaches B».
 """
 
+import time
 import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -82,6 +83,40 @@ def _maintenance(dbname: str = "postgres"):
         autocommit=True,
     ) as conn:
         yield conn
+
+
+#: The sessions clients hold open on a database, as ``(pid, application_name, state, last query)``. Only client backends:
+#: the server's own processes are listed with a ``datname`` too, and they are nobody's to close. An autovacuum worker
+#: on ``pg_database`` (every ``CREATE DATABASE`` of the suite dirties it) works from whichever database it is sent to, a
+#: database just made included: it counted as a session in hub#819's CI.
+CLIENT_SESSIONS = """
+    SELECT pid, application_name, state, left(query, 100) FROM pg_stat_activity
+    WHERE datname = %s AND backend_type = 'client backend' ORDER BY pid
+"""
+#: How long ``assert_nobody_on`` waits for the sessions on a database to end, and how often it looks: a client's
+#: ``close()`` returns before its server process has left ``pg_stat_activity``, so a connection just closed is still
+#: counted for a moment (hub#484's CI); one still there after the wait is a connection left open.
+SESSIONS_END_WAIT = 5.0
+SESSIONS_END_POLL = 0.05
+
+
+def client_sessions_on(name: str) -> list[tuple]:
+    """Who is connected to the database ``name`` now (:data:`CLIENT_SESSIONS`)."""
+    with _maintenance() as conn:
+        return conn.execute(CLIENT_SESSIONS, [name]).fetchall()
+
+
+def assert_nobody_on(name: str, *, wait: float = SESSIONS_END_WAIT) -> None:
+    """Fail unless every client's session on the database ``name`` has ended within ``wait`` seconds, naming the ones
+    still there."""
+    deadline = time.monotonic() + wait
+    with _maintenance() as conn:  # autocommit: each look is a new snapshot of pg_stat_activity
+        while True:
+            left = conn.execute(CLIENT_SESSIONS, [name]).fetchall()
+            if not left or time.monotonic() >= deadline:
+                break
+            time.sleep(SESSIONS_END_POLL)
+    assert not left, f"still connected to {name} after {wait:g} s, as (pid, application_name, state, query): {left}"
 
 
 def _drop(conn, name: str, control: str) -> None:

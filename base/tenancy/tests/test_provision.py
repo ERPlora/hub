@@ -127,12 +127,6 @@ def test_a_business_is_born_with_its_own_database_its_identity_and_its_schema(re
     assert told == [hub.id]
 
 
-def connected_to(name: str) -> int:
-    """How many sessions the server has open on the database ``name``."""
-    with hubs._maintenance() as conn:
-        return conn.execute("SELECT count(*) FROM pg_stat_activity WHERE datname = %s", [name]).fetchone()[0]
-
-
 def test_a_preparation_leaves_no_connection_open_to_the_database_it_made(registry, told):
     """Review of hub#471 (I1): each hub's migrator connection and its own are closed when its preparation ends, not at
     the end of the worker's pass (twenty hubs a pass would hold twenty, and a demo's DROP would have to force them)."""
@@ -140,7 +134,7 @@ def test_a_preparation_leaves_no_connection_open_to_the_database_it_made(registr
 
     assert provision.provision(hub) is True
 
-    assert connected_to(hub.db_name) == 0
+    hubs.assert_nobody_on(hub.db_name)
 
 
 def test_a_failed_preparation_leaves_no_connection_open_either(registry, monkeypatch, told):
@@ -153,7 +147,8 @@ def test_a_failed_preparation_leaves_no_connection_open_either(registry, monkeyp
 
     assert provision.provision(hub) is False
 
-    assert fresh(hub).status == "failed" and connected_to(hub.db_name) == 0
+    assert fresh(hub).status == "failed"
+    hubs.assert_nobody_on(hub.db_name)
 
 
 def test_once_born_its_hub_reads_its_own_database_and_control_hears_none_of_its_business(registry, told):
