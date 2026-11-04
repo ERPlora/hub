@@ -31,11 +31,10 @@ import CatalogNotices from './CatalogNotices.vue';
 import CategoryStrip from './CategoryStrip.vue';
 import FiscalNotice from './FiscalNotice.vue';
 import ComboTiles from './ComboTiles.vue';
-import ProductFollower from './ProductFollower.vue';
+import LiveFollower from './LiveFollower.vue';
 import ProductGrid from './ProductGrid.vue';
 import ProductSearch from './ProductSearch.vue';
 import ScreenMenu from './ScreenMenu.vue';
-import ServiceFollower from './ServiceFollower.vue';
 import ServiceGrid from './ServiceGrid.vue';
 import SpeakKey from './SpeakKey.vue';
 import { SERVICES } from './till';
@@ -216,17 +215,19 @@ watch(
     />
     <FiscalNotice v-if="fiscal" />
     <CatalogNotices :tap-notice="tapNotice?.text ?? null" />
-    <ProductFollower
+    <LiveFollower
       v-if="tapNotice?.product"
+      :id="tapNotice.product.id"
       :key="tapNotice.product.id"
-      :product-id="tapNotice.product.id"
-      @product="settle"
+      op="inventory.product.get"
+      @answer="settle"
     />
-    <ServiceFollower
+    <LiveFollower
       v-if="tapNotice?.serviceId"
+      :id="tapNotice.serviceId"
       :key="tapNotice.serviceId"
-      :service-id="tapNotice.serviceId"
-      @service="settleService"
+      op="service.service.get"
+      @answer="settleService"
     />
     <InlineFeedback
       v-if="failure && !servicesMode"

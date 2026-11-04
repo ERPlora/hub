@@ -43,6 +43,17 @@ async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 
   return { ...m, grid, gridParams };
 }
 
+/** A refused tap's notice is up; leaving the till for `elsewhere` takes it away, and coming back does not bring it back. */
+async function leavingTheTillDropsTheNotice(s: Awaited<ReturnType<typeof setup>>, elsewhere: string) {
+  expect(s.find('pos-tap-notice').exists()).toBe(true);
+  await s.router.push(elsewhere);
+  await flush();
+  expect(s.find('pos-tap-notice').exists()).toBe(false);
+  await s.router.push('/sale/pos');
+  await flush();
+  expect(s.find('pos-tap-notice').exists()).toBe(false);
+}
+
 describe('PosCatalog: what it asks', () => {
   it('follows the categories by name, the count of «All» and the first 100 articles of every category', async () => {
     const s = await setup();
@@ -210,13 +221,7 @@ describe('PosCatalog: taps', () => {
     const s = await setup();
     await s.result(PRODUCTS, page([product({ id: 'p1', is_sold_out: true })]), { sort: 'name' });
     await click(s.find('pos-product-p1').element);
-    expect(s.find('pos-tap-notice').exists()).toBe(true);
-    await s.router.push('/inventory/products');
-    await flush();
-    expect(s.find('pos-tap-notice').exists()).toBe(false);
-    await s.router.push('/sale/pos');
-    await flush();
-    expect(s.find('pos-tap-notice').exists()).toBe(false);
+    await leavingTheTillDropsTheNotice(s, '/inventory/products');
   });
 
   it('a change of the query alone (the same till) keeps the notice', async () => {
@@ -416,14 +421,7 @@ describe('PosCatalog: the services of Services (SALE-F38)', () => {
     });
 
     it('leaving the till takes the notice away; coming back does not bring it back', async () => {
-      const s = await refused();
-      expect(s.find('pos-tap-notice').exists()).toBe(true);
-      await s.router.push('/service/services');
-      await flush();
-      expect(s.find('pos-tap-notice').exists()).toBe(false);
-      await s.router.push('/sale/pos');
-      await flush();
-      expect(s.find('pos-tap-notice').exists()).toBe(false);
+      await leavingTheTillDropsTheNotice(await refused(), '/service/services');
     });
   });
 
