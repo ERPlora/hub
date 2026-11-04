@@ -83,6 +83,8 @@ test.beforeAll(async ({ browser }) => {
   const page = await context.newPage();
   await login(page, A, '/');
   await turnOnMissing(context, A, NEEDED, turnedOn);
+  // The owner's session for the fleet's visual sweep (`ui-clip-sweep.sh --storage-state`), when asked.
+  if (process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
   await context.close();
 });
 
