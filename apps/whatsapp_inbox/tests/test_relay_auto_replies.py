@@ -645,13 +645,8 @@ def appointment_answer() -> Flow:
 
 def bea_books(customer_id, *, when: str = "10:00") -> Appointment:
     """Bea's appointment for ``customer_id`` next Monday, far enough ahead of any cancellation notice."""
-    from apps.customer.models import Customer as Card
-
-    return make_appointment(Card.objects.get(pk=customer_id), bea(), [make_service("Haircut")], at(next_weekday(0), when))
-
-
-def bea():
-    return make_member("Bea", "Ruiz")
+    bea = make_member("Bea", "Ruiz")
+    return make_appointment(Customer.objects.get(pk=customer_id), bea, [make_service("Haircut")], at(next_weekday(0), when))
 
 
 def test_a_customer_cancels_her_appointment_with_any_professional_after_the_owner_s_yes(
