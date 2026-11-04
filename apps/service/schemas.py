@@ -67,8 +67,8 @@ VOUCHER_SESSIONS = gettext_noop("Voucher sessions")
 # The assistant's card names the record a write acts on by these reads (base/assistant.py ``REFERS``), run as whoever
 # asks, never by its id: a service, a category, a package and a customer by their names, a professional by their full
 # name; who does what by the service and the professional; a voucher sold and its sessions by the package, the owner and
-# the day it was sold or the service of the session, as two vouchers of one package may be told apart. The sale, the
-# appointment and the line of an order are of apps Services does not require: the card leaves them out.
+# the day it was sold or the service of the session, as two vouchers of one package may be told apart. The sale and its
+# line, the appointment and the line of an order are of apps Services does not require: the card leaves them out.
 A_SERVICE = names("service.service.get")
 A_CATEGORY = names("service.category.get")
 A_PACKAGE = names("service.package.get")

@@ -1343,7 +1343,7 @@
     },
     "fields": {
       "production_total": "Producción total",
-      "sale_line_id": "Línea de la venta",
+      "sale_line_id": "Línea de venta",
       "title": "Título",
       "description": "Descripción",
       "priority": "Prioridad",

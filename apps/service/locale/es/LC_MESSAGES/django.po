@@ -500,7 +500,7 @@ msgid "reason it came back"
 msgstr "motivo de la devolución"
 
 msgid "sale line"
-msgstr "línea de la venta"
+msgstr "línea de venta"
 
 msgid "value"
 msgstr "valor"

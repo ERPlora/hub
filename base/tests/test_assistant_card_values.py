@@ -364,9 +364,11 @@ UNNAMED_REFERENCES = {
     "payment": 8,
     "sale": 101,
     "schedule": 4,
-    # The sale and the appointment a voucher or a session came from, the line of an order that holds a session and the
-    # reference of a return: data of apps Services does not require, so it reads none of them (hub#756).
-    "service": 6,
+    # The sale and the appointment a voucher or a session came from, the line of a sale that charged a voucher, the line
+    # of an order that holds a session and the reference of a return: data of apps Services does not require, so it
+    # reads none of them and base.E009 refuses a mark (hub#756). The one that came in, the sale's line (hub#769), is the
+    # same datum as the sale beside it on service.grant.create: naming them is that issue's to decide.
+    "service": 7,
     "staff": 15,
     "task": 15,
     "tax": 4,
