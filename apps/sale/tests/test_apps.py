@@ -120,7 +120,7 @@ def test_every_operation_is_described_for_the_assistant():
     ops = {name: op for name, op in registry.items() if name.startswith("sale.")}
     assert ops
     internal = {name for name, op in ops.items() if op.ai is INTERNAL}
-    assert internal == {"sale.customer.reassign", "sale.sale.record_invoice"}
+    assert internal == {"sale.customer.reassign", "sale.record.get", "sale.sale.record_invoice"}
     for name, op in ops.items():
         if name in internal:
             continue
