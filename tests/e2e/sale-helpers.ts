@@ -109,6 +109,33 @@ export async function openTillCart(page: Page): Promise<void> {
   await expect(till).toHaveClass(/pos-till--cart-open/);
 }
 
+/** A box on screen, in the window's pixels. */
+export interface Box {
+  top: number;
+  bottom: number;
+  left: number;
+  right: number;
+}
+
+/** Notices that last `ms` stay until the spec has read them, for a page not loaded yet: where a notice sits is the
+ *  point, not how long it lasts, and read without this a check passes once the notice has gone by itself. No other
+ *  timer changes. */
+export async function holdNotices(page: Page, ms: number): Promise<void> {
+  await page.addInitScript((noticeMs) => {
+    const original = window.setTimeout.bind(window);
+    window.setTimeout = ((run: TimerHandler, after?: number, ...rest: unknown[]) =>
+      original(run, after === noticeMs ? 600_000 : after, ...rest)) as typeof window.setTimeout;
+  }, ms);
+}
+
+/** The notice's own box: the host of an `ion-toast` fills the screen. */
+export function noticeBox(notice: Locator): Promise<Box> {
+  return notice.evaluate((el) => {
+    const box = el.shadowRoot!.querySelector('.toast-wrapper')!.getBoundingClientRect();
+    return { top: box.top, bottom: box.bottom, left: box.left, right: box.right };
+  });
+}
+
 /** Screenshots of the page in the three viewports, each once `ready` says it painted. */
 export async function shots(page: Page, name: string, ready: (page: Page) => Promise<void>, restore = { width: 1280, height: 860 }): Promise<void> {
   for (const viewport of VIEWPORTS) {

@@ -10,10 +10,11 @@ import { type BrowserContext, expect, type Locator, type Page, test } from '@pla
 
 import { A, capture, login, psql, shown, untilStill } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
-import { cleanSales, drawerOff, openTillCart, restoreDrawer, stamp } from './sale-helpers';
+import { type Box, cleanSales, drawerOff, holdNotices, noticeBox, openTillCart, restoreDrawer, stamp } from './sale-helpers';
 
 const KEY = 'FIX-HUB-732-NOTICE';
 const RUN = stamp();
+/** The default of `toast()`. */
 const NOTICE_MS = 2600;
 const SIZES = [
   { label: '1440x900', width: 1440, height: 900 },
@@ -25,13 +26,6 @@ const LANGUAGES = [
   { name: 'English', lang: 'en', locale: 'en-US', sent: 'Order 1 sent to the kitchen.', separator: '.' },
   { name: 'Spanish', lang: 'es', locale: 'es-ES', sent: 'Comanda 1 enviada a cocina.', separator: ',' },
 ] as const;
-
-interface Box {
-  top: number;
-  bottom: number;
-  left: number;
-  right: number;
-}
 
 let dish: Product;
 
@@ -78,12 +72,7 @@ test.afterAll(() => {
 
 /** A check of its own with a dish not sent, its till in the language under test, and the sheet opened by «Charge». */
 async function chargeUnsentDish(page: Page, context: BrowserContext, lang: string): Promise<Locator> {
-  // A notice's timer (2600 is the default of `toast()`) waits for the spec to read it; no other timer changes.
-  await page.addInitScript((noticeMs) => {
-    const original = window.setTimeout.bind(window);
-    window.setTimeout = ((run: TimerHandler, ms?: number, ...rest: unknown[]) =>
-      original(run, ms === noticeMs ? 600_000 : ms, ...rest)) as typeof window.setTimeout;
-  }, NOTICE_MS);
+  await holdNotices(page, NOTICE_MS);
   await login(page, A, '/sale/pos');
   await context.addCookies([{ name: 'django_language', value: lang, domain: new URL(A).hostname, path: '/' }]);
   await page.reload();
@@ -96,10 +85,7 @@ async function chargeUnsentDish(page: Page, context: BrowserContext, lang: strin
 
 /** What the middle of each key answers to, the keys' boxes and the notice's own (its host fills the screen), all in one read. */
 async function read(sheet: Locator, notice: Locator): Promise<{ answers: Record<string, string>; keypad: Box; toast: Box }> {
-  const toast = await notice.evaluate((el) => {
-    const box = el.shadowRoot!.querySelector('.toast-wrapper')!.getBoundingClientRect();
-    return { top: box.top, bottom: box.bottom, left: box.left, right: box.right };
-  });
+  const toast = await noticeBox(notice);
   const { answers, keypad } = await sheet.locator('[data-testid=sale-checkout-keypad]').evaluate((pad) => {
     const answered: Record<string, string> = {};
     for (const key of pad.querySelectorAll<HTMLElement>('button')) {

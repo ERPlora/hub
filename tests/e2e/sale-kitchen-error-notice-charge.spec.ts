@@ -11,12 +11,13 @@ import { type BrowserContext, expect, type Locator, type Page, test } from '@pla
 
 import { A, capture, login, psql, settled, shown, untilStill } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
-import { cleanSales, drawerOff, openTillCart, restoreDrawer, stamp, tillIsPhone } from './sale-helpers';
+import { type Box, cleanSales, drawerOff, holdNotices, noticeBox, openTillCart, restoreDrawer, stamp, tillIsPhone } from './sale-helpers';
 
 const KEY = 'FIX-HUB-755-ERROR-NOTICE';
 /** Hub `a`'s issuer, parked while the run needs the strip of a hub that cannot issue invoices yet. */
 const PARKED = 'e2e_sale_kitchen_error_issuer';
 const RUN = stamp();
+/** How long this notice lasts. */
 const NOTICE_MS = 4500;
 const SIZES = [
   { label: '1440x900', width: 1440, height: 900 },
@@ -28,13 +29,6 @@ const LANGUAGES = [
   { name: 'English', lang: 'en', locale: 'en-US', notSent: 'The order could not be sent to the kitchen. Try again.' },
   { name: 'Spanish', lang: 'es', locale: 'es-ES', notSent: 'No se ha podido enviar la comanda a cocina. Inténtalo de nuevo.' },
 ] as const;
-
-interface Box {
-  top: number;
-  bottom: number;
-  left: number;
-  right: number;
-}
 
 let dish: Product;
 
@@ -67,12 +61,7 @@ test.afterAll(() => {
 /** A check of its own with a dish not sent, its till in the language under test and the kitchen refusing: returns how
  *  many sends the kitchen has been asked for so far. */
 async function checkWithKitchenDown(page: Page, context: BrowserContext, lang: string): Promise<() => number> {
-  // This notice's timer waits for the spec to read it; no other timer changes.
-  await page.addInitScript((noticeMs) => {
-    const original = window.setTimeout.bind(window);
-    window.setTimeout = ((run: TimerHandler, ms?: number, ...rest: unknown[]) =>
-      original(run, ms === noticeMs ? 600_000 : ms, ...rest)) as typeof window.setTimeout;
-  }, NOTICE_MS);
+  await holdNotices(page, NOTICE_MS);
   let sends = 0;
   await page.route('**/kitchen/tickets/send', async (route) => {
     sends += 1;
@@ -98,14 +87,6 @@ async function reach(button: Locator): Promise<{ answer: string; box: Box }> {
       answer: hit && el.contains(hit) ? 'the button' : (hit?.tagName.toLowerCase() ?? 'nothing'),
       box: { top: r.top, bottom: r.bottom, left: r.left, right: r.right },
     };
-  });
-}
-
-/** The notice's own box: its host fills the screen. */
-function noticeBox(notice: Locator): Promise<Box> {
-  return notice.evaluate((el) => {
-    const r = el.shadowRoot!.querySelector('.toast-wrapper')!.getBoundingClientRect();
-    return { top: r.top, bottom: r.bottom, left: r.left, right: r.right };
   });
 }
 
