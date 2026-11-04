@@ -9,6 +9,7 @@ that still shares phase 1's database keeps turning apps on at once (proposal (i)
 import datetime as dt
 
 import pytest
+from django.apps import apps
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 from live.context import OperationContext, Scope
@@ -214,6 +215,20 @@ def test_only_a_failed_app_is_tried_again(hub_a, state):
         run(hub_a, "base.app.retry", "printing")
 
     assert refused.value.code == "base.app_not_failed"
+
+
+@own
+def test_a_failed_app_that_refuses_to_go_on_is_not_tried_again(hub_a, monkeypatch):
+    """hub#694: «Retry» turns an app on as «Turn on» does: the app may refuse it, and it stays as it is."""
+    monkeypatch.setattr(apps.get_app_config("printing"), "can_enable", lambda ctx: "Not here.", raising=False)
+    given(hub_a, printing="failed*")
+
+    with pytest.raises(Conflict) as refused:
+        run(hub_a, "base.app.retry", "printing")
+
+    assert (refused.value.code, refused.value.message) == ("base.app_vetoed", "Not here.")
+    assert rows_of(hub_a)["printing"] == (FAILED, True)
+    assert outbox(hub_a) == []
 
 
 @own

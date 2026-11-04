@@ -14,6 +14,7 @@ a second one waits for the first. Each one only for who runs the hub.
 import base64
 
 import pytest
+from django.apps import apps
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from live.context import OperationContext, Scope, system_context
@@ -21,6 +22,7 @@ from live.errors import Conflict, InvalidPayload, NotFound, OperationError, Perm
 from live.models import OutboxEvent
 from live.operations import get
 
+from apps.verifactu.queries import enable_refusal
 from base import activation, blueprint, events as base_events, relay, services
 from base.catalog import template_apps
 from base.models import AppActivation, Hub, ImportBatch, Membership
@@ -546,15 +548,41 @@ def test_an_app_already_on_is_left_as_it_is(owner, load):
     assert total(owner, "inventory.product.list") == 16
 
 
-def test_a_business_outside_spain_gets_verifactu_from_a_template_as_apps_would_give_it(born, load):
-    """VeriFactu files only for Spain (VERIFACTU-F01, hub#274): outside it, turning it on is allowed and it stays
-    inert, so nothing refuses it. The template turns it on through the same ``base.app.enable`` as Apps: on, with no
-    reason against it, and the rest of the template loads."""
+def test_a_business_outside_spain_gets_no_verifactu_from_a_template_and_the_load_is_complete(born, load):
+    """VeriFactu does not go on outside Spain (VERIFACTU-F01, hub#694): the template asks through the same
+    ``base.app.enable`` as Apps and is told no. Nothing of it was lost and no retry would change that, so the load is
+    complete, and it says why VeriFactu stays out."""
     Hub.objects.filter(slug="c").update(country="PL")
 
     loaded = load(born, template="restaurant.es")
 
     verifactu = next(app for app in loaded.report.apps if app.id == "verifactu")
-    assert verifactu.reason == ""
-    assert "verifactu" in modules_on()
+    assert verifactu.status == "inactive"
+    assert verifactu.reason == enable_refusal(born)
+    assert "verifactu" not in modules_on()
+    assert "invoice" in modules_on()
     assert loaded.status == "complete"
+
+
+def test_an_app_that_refuses_to_go_on_with_rows_in_the_blueprint_leaves_the_load_partial(born, load, monkeypatch):
+    """Its rows did not load: that is not complete, whatever the reason. The only other app of the file goes on, so
+    nothing else can make the load partial."""
+    monkeypatch.setattr(apps.get_app_config("table"), "can_enable", lambda ctx: "Not here.", raising=False)
+
+    loaded = load(born, file_base64=a_file(data={"table.zone": [{"name": "Terrace"}]}, apps=("website", "table")))
+
+    table = next(app for app in loaded.report.apps if app.id == "table")
+    assert (table.status, table.reason) == ("inactive", "Not here.")
+    assert loaded.status == "partial"
+
+
+def test_an_app_the_plan_leaves_off_leaves_the_load_partial_even_without_rows(born, load):
+    """A better plan changes that one, so the load is not over; only what can never go on here is. Tables goes on with
+    its rows; the plan's limit leaves off the only other app, which has none."""
+    with_max_apps("c", 1)
+
+    loaded = load(born, file_base64=a_file(apps=("table", "printing")))
+
+    off = [app for app in loaded.report.apps if app.status == "inactive"]
+    assert [(app.id, len(app.datasets), bool(app.reason)) for app in off] == [("printing", 0, True)]
+    assert loaded.status == "partial"
