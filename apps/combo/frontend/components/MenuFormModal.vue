@@ -304,6 +304,11 @@ function retryPhoto(): void {
   display: grid;
   gap: 14px;
 }
+/* The chosen way of selling on as many lines as it takes: on one, «Se consume en el local (servicio de restauración)»
+   is wider than a phone and the grid's column, and so every field, grows to it (hub#760). */
+.combo-menu-form ion-select::part(text) {
+  white-space: normal;
+}
 .combo-menu-form__help {
   margin: 0;
   font-size: 0.85rem;
