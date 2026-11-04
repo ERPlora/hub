@@ -133,7 +133,8 @@
         "blocked": "Necesita suscripción",
         "off": "Desactivada",
         "creating": "Activándose…",
-        "failed": "No se ha podido activar"
+        "failed": "No se ha podido activar",
+        "unavailable": "No disponible"
       },
       "right": {
         "free": "Gratis",

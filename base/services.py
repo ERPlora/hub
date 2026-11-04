@@ -4461,7 +4461,8 @@ class AppRequired(Conflict):
 
 
 class AppVetoed(Conflict):
-    """An app refused to go off (its ``can_disable``): 409, with its reason as the message and its id."""
+    """An app refused to go off or on (its ``can_disable``, ``can_enable``): 409, with its reason as the message and
+    its id."""
 
     def __init__(self, message: str, *, app: str) -> None:
         super().__init__(message, code="base.app_vetoed")
@@ -4649,8 +4650,8 @@ def _app_answer(label: str, row: activation.Activation, along: list[dict[str, st
         "description": "Turns on one of this business's apps (by its name as the person says it, or its id), with the "
         "apps it needs, which come along: it shows in the menu and can be used, with the data it had. Refused when the "
         "plan's limit of apps is reached (turn one off, or upgrade the plan on erplora.com), a paid app is not "
-        "subscribed or the name fits several apps (ask which one). state=creating: it is being set up and is on in a "
-        "moment. already=true: it was on (or being set up) already, nothing changed.",
+        "subscribed, the app itself says why not or the name fits several apps (ask which one). state=creating: it is "
+        "being set up and is on in a moment. already=true: it was on (or being set up) already, nothing changed.",
         "risk": "normal",
         "check": "base.app.get",
         "asks": {
@@ -4662,7 +4663,8 @@ def _app_answer(label: str, row: activation.Activation, along: list[dict[str, st
 def app_enable(ctx: OperationContext, data: AppChangeIn) -> dict:
     """BASE-F18/F24: the app on and chosen, and what it needs on along with it (not chosen: it does not count). A
     paid one without its right (or needing one) is 402 ``app_entitlement_blocked``; one more chosen app at the plan's
-    limit, 402 ``base.app_limit_reached`` (a lower limit than the chosen ones turns nothing off: it only refuses this).
+    limit, 402 ``base.app_limit_reached`` (a lower limit than the chosen ones turns nothing off: it only refuses this);
+    409 ``base.app_vetoed`` when it, or what would come along, refuses (``can_enable``, hub#694).
     In a hub with its own database whose tables for it (or for what it needs) are not made yet, ``creating`` (202):
     the worker makes them and turns it on; one that failed is tried again."""
     with activation.changing(ctx.scope.key):
@@ -4684,6 +4686,11 @@ def _enable(ctx: OperationContext, data: AppChangeIn) -> dict:
     changes = activation.enabling(app, current, graph)
     if not changes:
         return _unchanged(hub, app, current[app])
+    vetoed = activation.veto(
+        [label for label in changes if not current[label].on], ctx=ctx, hook=activation.CAN_ENABLE
+    )
+    if vetoed is not None:
+        raise AppVetoed(vetoed[1], app=vetoed[0])
     if changes.get(app, current[app]).chosen and not (current[app].wanted and current[app].chosen):
         limit = queries.app_limit(hub)
         shown = {config.label for config in home.shown_modules(demo_hub=bool(hub and hub.is_demo))}
@@ -4748,8 +4755,9 @@ def _unchanged(hub: Hub | None, label: str, row: activation.Activation) -> dict:
 )
 def app_disable(ctx: OperationContext, data: AppChangeIn) -> dict:
     """BASE-F23/F25: the app off, and what came along only with it. 409 ``base.app_required`` while an app on needs
-    it (naming the ones to turn off first); 409 ``base.app_vetoed`` when it, or one that would go off with it, refuses
-    (``can_disable``, FIX-BASE-APP-TURN-OFF-VETO). Its tables are never dropped."""
+    it (naming the ones to turn off first); 409 ``base.app_vetoed`` when it, one that would go off with it or one of
+    those that need it refuses (``can_disable``, FIX-BASE-APP-TURN-OFF-VETO, hub#619: nobody can turn off first one that
+    refuses). Its tables are never dropped."""
     with activation.changing(ctx.scope.key):
         return _disable(ctx, data)
 
@@ -4762,6 +4770,10 @@ def _disable(ctx: OperationContext, data: AppChangeIn) -> dict:
     current = _locked_states(ctx, graph)
     if not current[app].wanted:
         return _app_answer(app, activation.OFF_ROW, [], already=True)
+    said = activation.refusals(activation.keeping_on(app, current, graph), ctx=ctx)
+    refused = queries.app_off_refusal(ctx, app, current, graph, said)
+    if refused is not None:
+        raise AppVetoed(refused[1], app=refused[0])
     needed = activation.required_by(app, current, graph)
     if needed:
         # The ones to turn off: those chosen (what came along goes off with them).
@@ -4770,9 +4782,6 @@ def _disable(ctx: OperationContext, data: AppChangeIn) -> dict:
             message = gettext("Turn off %(apps)s first.") % {"apps": _names_said(ctx, first)}
         raise AppRequired(message, required_by=needed)
     changes = activation.disabling(app, current, graph)
-    vetoed = activation.veto(list(changes), ctx=ctx)
-    if vetoed is not None:
-        raise AppVetoed(vetoed[1], app=vetoed[0])
     _write_states(ctx.scope.key, changes)
     along = [label for label in changes if label != app]
     record_event(ctx, events.APP_DISABLED, {"app": app, "along": along})
@@ -4810,8 +4819,9 @@ def _disable(ctx: OperationContext, data: AppChangeIn) -> dict:
 def app_retry(ctx: OperationContext, data: AppChangeIn) -> dict:
     """BASE-F21/F22: an app whose tables could not be made (``failed``) is ``creating`` again now, with what it needs
     that failed too, and its hub rung (the worker also tries again by itself). 409 ``base.app_not_failed`` for any
-    other app, and in a hub that shares phase 1's database, where nothing is ever made later. The app by its name or its
-    id, as ``base.app.enable`` takes it (hub#539)."""
+    other app, and in a hub that shares phase 1's database, where nothing is ever made later; 409 ``base.app_vetoed``
+    when it refuses to go on (``can_enable``, as «Turn on»). The app by its name or its id, as ``base.app.enable`` takes
+    it (hub#539)."""
     with activation.changing(ctx.scope.key):
         hub = _business_hub(ctx)
         app = _business_module(ctx, data.app, hub).label
@@ -4825,6 +4835,9 @@ def app_retry(ctx: OperationContext, data: AppChangeIn) -> dict:
             for label, row in current.items()
             if label in closure and row.state == FAILED
         }
+        vetoed = activation.veto(changes, ctx=ctx, hook=activation.CAN_ENABLE)
+        if vetoed is not None:
+            raise AppVetoed(vetoed[1], app=vetoed[0])
         _write_states(ctx.scope.key, changes)
         after_commit(partial(_ring, hub))
         along = [label for label in changes if label != app]
