@@ -26,3 +26,22 @@
   white-space: nowrap;
   border: 0;
 }
+
+/* The templates card and its pending load (BlueprintCard, BlueprintCardPending). */
+.blueprint-card-heading {
+  margin: 0 0 4px;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.blueprint-card-text {
+  margin: 0 0 12px;
+  color: var(--ion-color-medium);
+}
+
+.blueprint-card-busy {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}

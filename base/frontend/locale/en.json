@@ -255,7 +255,8 @@
           "file": "This import came from a file uploaded by hand, so it cannot be retried by itself. Upload the file again and choose only what failed.",
           "versionGone": "The version of the template this import used is no longer in the catalogue, so it was not retried: another version could load different data.",
           "complete": "Everything of this import went in: there is nothing to retry.",
-          "undone": "This import was undone, so there is nothing to retry."
+          "undone": "This import was undone, so there is nothing to retry.",
+          "waiting": "What is missing is coming by itself as soon as its apps are ready: there is nothing to retry yet."
         }
       },
       "status": {
@@ -267,7 +268,9 @@
         "discarded": "Left out",
         "inactive": "App off",
         "unknown": "Not in this business",
-        "notSelected": "Not chosen"
+        "notSelected": "Not chosen",
+        "waiting": "Being set up",
+        "setupFailed": "Could not be set up"
       },
       "import": {
         "adminOnly": "Only an administrator can see and import templates.",
@@ -321,7 +324,8 @@
         "retrying": "Retrying…",
         "retryError": "The retry failed: {reason}",
         "templates": "See the templates",
-        "home": "Go to Home"
+        "home": "Go to Home",
+        "waiting": "Still loading: what is missing comes in by itself as soon as its apps are ready. You can leave this screen."
       },
       "export": {
         "adminOnly": "Only an administrator can export the business.",
@@ -431,7 +435,11 @@
       "cutTitle": "The setup did not finish",
       "cutHint": "Part of it may be in already. Check it in Settings › Data before trying again.",
       "report": "See the report",
-      "continue": "Continue"
+      "continue": "Continue",
+      "pendingTitle": "Your apps are being set up",
+      "pendingHint": "Their data will load by itself as soon as they are ready: {apps}. You can carry on.",
+      "failingTitle": "An app could not be set up yet",
+      "failingHint": "It keeps trying by itself and its data will load when it works: {apps}. In the report you can try again now."
     },
     "system": {
       "tabs": {

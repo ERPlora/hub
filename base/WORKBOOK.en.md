@@ -829,7 +829,7 @@ Out: the activation asked for again (`base.app.activation_requested`).
 If it fails: if it fails again, it says so again with its "Retry". If it was no longer waiting, because another device
 tried it again, a notice shows with the app's name and "This app is not waiting to be set up again.", which stays
 until it is closed. From the assistant, a name that fits several apps, or none, shows no card (BASE-F24).
-Involved: none
+Involved: BASE-F32
 
 ### BASE-F22 Follow an app being turned on while moving around
 Status: done
@@ -848,7 +848,7 @@ Steps:
 In: how the activation is going.
 Out: the app running in this business (`base.app.enabled`).
 If it fails: BASE-F21.
-Involved: none
+Involved: BASE-F32
 
 ### BASE-F23 Turn an app off
 Status: done
@@ -1025,7 +1025,8 @@ Steps:
      PINs, fiscal data) shows in "Never loaded here".
   3. Untick the apps not wanted and tap "Import" ("Importing…"), or "Choose another" to go back.
   4. When it ends, the report shows (BASE-F32). What the business already had stays as it was: nothing is
-     duplicated nor overwritten.
+     duplicated nor overwritten. If an app of the template is still being set up (BASE-F22), its part comes in by
+     itself as soon as it is ready, with no coming back and nothing to tap.
 In: the template or the file and the apps ticked.
 Out: the apps ticked that were off, turned on before loading, with the ones they need and within the plan's
 limit of apps, as if they were turned on in Apps (`base.app.enabled`); in each app ticked, what it brings and
@@ -1035,7 +1036,8 @@ If it fails: "The import failed: {reason}" and it stays on the review; with no a
 one app." and it cannot be imported; if none of its apps can be turned on here, "Nothing of this file can
 load in your business: none of its apps can be turned on here.". An app that could not be turned on (the
 plan's limit of apps, an app the plan does not include) stays off, loads nothing and the report says why;
-the rest loads.
+the rest loads. A file is not kept: if one of its apps is still being set up, its row says "It is being set up for
+this business. Upload the file again in a minute to bring its data.".
 Involved: INVENTORY-F12
 
 ### BASE-F32 Read the import report
@@ -1044,16 +1046,26 @@ Actor: owner, administrator
 Screen: Settings · Data and backups › Import
 Steps:
   1. When it ends, "Import report" with how it went: "Everything went in.", "Not everything went in." or
-     "Nothing went in.".
+     "Nothing went in.". If an app of the template is still being set up (BASE-F22), "Still loading: what is missing
+     comes in by itself as soon as its apps are ready. You can leave this screen.", with nothing to tap.
   2. One row per app with its label: "Applied", "You had it already", "Applied in part", "Failed", "Nothing
-     to copy", "Left out", "App off", "Not in this business" or "Not chosen". Below, for each part, "{created}
-     created · {already} already there · {failed} failed" and, of what failed, its name and the reason.
+     to copy", "Left out", "App off", "Not in this business", "Not chosen", "Being set up" or "Could not be set up".
+     Below, for each part, "{created} created · {already} already there · {failed} failed" and, of what failed, its
+     name and the reason.
   3. What was left out on purpose shows in "Left out on purpose".
   4. "See the templates" goes back to the catalogue; "Go to Home" leads to the Home.
+  5. When the app is ready, its part loads by itself and the report gets up to date without reloading, whether this
+     screen is open or not: on coming back, it is in.
 In: the import's report.
-Out: nothing; the report stays kept in the business.
-If it fails: a label the screen does not know shows as "Failed" with its own text, never as a success.
-Involved: none
+Out: nothing; the report stays kept in the business. What loaded later counts in that same import: it is undone with
+it (BASE-F34).
+If it fails: a label the screen does not know shows as "Failed" with its own text, never as a success. If the app
+cannot be set up, its row says "Could not be set up" with "It could not be set up yet. It keeps trying by itself and
+its data will load as soon as it works; «Retry what is missing» tries again now." (BASE-F21). If meanwhile the app is
+turned off, the import is undone, the business is reset or the template's version changes, nothing of it loads and its
+row says why. If the load fails once the app is ready, the app stays on and its row says "Failed" with "Something went
+wrong loading this part; nothing else was affected.", with "Retry what is missing".
+Involved: BASE-F21, BASE-F22, BASE-F34
 
 ### BASE-F33 Come back to the report of an import that did not go in whole and retry
 Status: done
@@ -1061,7 +1073,8 @@ Actor: owner, administrator
 Screen: Settings · Data and backups › Import
 Steps:
   1. On opening "Import", if the last import did not go in whole and was not undone, its report shows first,
-     with "This is the report of your last import of {name} ({date}). Not everything went in.".
+     with "This is the report of your last import of {name} ({date}). Not everything went in." or, if it still waits
+     for an app being set up, with "Still loading…" and without "Retry what is missing", which is not needed (BASE-F32).
   2. If it came from a template, tap "Retry what is missing" ("Retrying…"): the same version of the template
      is loaded again and only what was missing goes in; what already went in is neither touched nor
      duplicated. The new report shows.
@@ -1089,10 +1102,11 @@ Steps:
   4. "Import undone:" shows with one line per app ("{app} — {n} rows removed"); what could not be removed
      (something another app still uses) shows apart with its reason. What each section has gets up to date.
 In: the import chosen.
-Out: exactly the rows it brought removed; what was created afterwards stays (`base.import.undone`).
+Out: exactly the rows it brought removed, also what came in later because it waited for an app, and what it still
+waited for no longer comes in; what was created afterwards stays (`base.import.undone`).
 If it fails: the reason shows in the dialog itself, which does not close (the old hub said nothing); an
 import already undone, "This load was undone already.".
-Involved: none
+Involved: BASE-F32
 
 ### BASE-F35 Export a backup or a template
 Status: done
@@ -1178,14 +1192,19 @@ Steps:
   2. Tap "Use this one": "Preparing «{name}»…" while its apps are turned on and it loads, with no screens in
      between.
   3. In the same card, "Your apps and your catalogue are ready" ("What is left only you can answer: your
-     business's details. They are in the list below.") with "Continue", which closes it.
+     business's details. They are in the list below.") with "Continue", which closes it. If an app is still being set
+     up, first "Your apps are being set up" ("Their data will load by itself as soon as they are ready: {apps}. You can
+     carry on.") with "See the report" and "Continue"; the card turns to "Your apps and your catalogue are ready" by
+     itself when it comes in, with nothing to tap.
   4. Without reloading, the Home gets up to date: "Finish setting up your business" counts as done the steps
      the template solved and the panels refresh. The same after loading a template or a file from "Data and
      backups".
 In: the templates and whether the business is still empty.
 Out: what the template brings, as in BASE-F31 (`base.blueprint.imported`).
 If it fails: if not everything went in, "Not everything went in" with "These did not go in: {apps}." (or
-"Something else did not go in.") and "See the report"; if it could not be opened, "That template could not
+"Something else did not go in.") and "See the report"; if an app could not be set up, "An app could not be set up
+yet" with "It keeps trying by itself and its data will load when it works: {apps}. In the report you can try again
+now." and "See the report"; if it could not be opened, "That template could not
 be opened" with "Nothing has changed in your business: {reason}" and "Try again"; if it was cut halfway,
 "The setup did not finish" with "Part of it may be in already. Check it in Settings › Data before trying
 again." and "See the report", with no retry. If the templates cannot be read, "The templates to start with

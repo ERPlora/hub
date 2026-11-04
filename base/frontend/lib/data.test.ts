@@ -16,11 +16,13 @@ import {
   exportInput,
   freshExportChoice,
   MAX_FILE_BYTES,
+  pendingApps,
   RETRY_BLOCKED_KEY,
   selectAll,
   settingsTab,
   STATUS_KEY,
   statusPill,
+  stillLoading,
   templateMatches,
   toggleApp,
   toggleData,
@@ -206,6 +208,8 @@ describe('the import (BASE-G103–G107)', () => {
     expect(statusPill('partial')).toEqual({ tone: 'warning', key: 'base.data.status.partial' });
     expect(statusPill('failed')).toEqual({ tone: 'danger', key: 'base.data.status.failed' });
     expect(statusPill('exploded')).toEqual({ tone: 'danger', key: 'base.data.status.failed', raw: 'exploded' });
+    expect(statusPill('waiting')).toEqual({ tone: 'info', key: 'base.data.status.waiting' });
+    expect(statusPill('setup_failed')).toEqual({ tone: 'danger', key: 'base.data.status.setupFailed' });
   });
 
   it('has a sentence for every status and every reason a load cannot be retried', () => {
@@ -230,6 +234,21 @@ describe('the import (BASE-G103–G107)', () => {
     };
     expect(unloaded(report)).toEqual(['Tables', 'Services', 'Pricing']);
   });
+
+  it('counts an app that could not be set up among what did not go in; one being set up is still coming', () => {
+    const report: LoadReport = {
+      status: 'partial',
+      dropped: [],
+      apps: [
+        { id: 'service', label: 'Services', status: 'setup_failed', reason: 'It could not be set up yet.', datasets: [] },
+        { id: 'printing', label: 'Printing', status: 'waiting', reason: 'Being set up.', datasets: [] },
+      ],
+    };
+    expect(unloaded(report)).toEqual(['Services']);
+    expect(pendingApps(report)).toEqual({ settingUp: ['Printing'], failing: ['Services'] });
+    expect(stillLoading(report)).toBe(true);
+    expect(stillLoading({ ...report, apps: [report.apps[0]] })).toBe(false);
+  });
 });
 
 describe('the templates card of the Home (BASE-G131, BASE-F02)', () => {
@@ -246,6 +265,16 @@ describe('the templates card of the Home (BASE-G131, BASE-F02)', () => {
 
   it('says how a load from the card went: ready, partial with what did not go in, or not started', () => {
     expect(cardOutcome(load())).toEqual({ kind: 'ready', missing: [] });
+    const waiting = load({
+      status: 'partial',
+      report: { status: 'partial', dropped: [], apps: [{ id: 'service', label: 'Services', status: 'waiting', datasets: [] }] },
+    });
+    expect(cardOutcome(waiting)).toEqual({ kind: 'pending', load: waiting });
+    const failing = load({
+      status: 'partial',
+      report: { status: 'partial', dropped: [], apps: [{ id: 'service', label: 'Services', status: 'setup_failed', datasets: [] }] },
+    });
+    expect(cardOutcome(failing)).toEqual({ kind: 'pending', load: failing });
     const partial = load({
       status: 'partial',
       report: { status: 'partial', dropped: [], apps: [{ id: 'table', label: 'Tables', status: 'failed', datasets: [] }] },

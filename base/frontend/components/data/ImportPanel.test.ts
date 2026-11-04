@@ -177,6 +177,44 @@ describe('ImportPanel', () => {
     expect(m.wrapper.get('[data-testid="review-error"]').text()).toContain('The import failed: The app refused it.');
   });
 
+  it('the report follows the load live: what waited for its app comes in without pressing anything (hub#609)', async () => {
+    const waiting = load({
+      status: 'partial',
+      retry: false,
+      retry_blocked: 'waiting',
+      report: { status: 'partial', dropped: [], apps: [{ id: 'service', label: 'Services', status: 'waiting', reason: 'Being set up.', datasets: [] }] },
+    });
+    const m = await panel({
+      '/api/settings/data/blueprints/inspect': () => Response.json(summary()),
+      '/api/settings/data/blueprints/import': () => Response.json(waiting),
+    });
+    await m.wrapper.get('[data-testid="templates-row-restaurant.es-use"]').trigger('click');
+    await settle();
+    await m.wrapper.get('[data-testid="review-import"]').trigger('click');
+    await settle();
+    expect(m.wrapper.find('[data-testid="report-waiting"]').exists()).toBe(true);
+    expect(m.wrapper.find('[data-testid="report-retry"]').exists()).toBe(false);
+
+    // The list the load's row comes in, as the worker's event re-runs it: nothing was pressed.
+    await m.result(m.call, 'base.import.list', { imports: [load({ id: waiting.id })], unfinished: null }, 2);
+    await settle();
+
+    expect(m.wrapper.find('[data-testid="report-waiting"]').exists()).toBe(false);
+    expect(m.wrapper.get('[data-testid="report-status"]').text()).toContain('Everything went in.');
+  });
+
+  it('the report stays on the load it answered until the list has it', async () => {
+    const m = await panel({
+      '/api/settings/data/blueprints/inspect': () => Response.json(summary()),
+      '/api/settings/data/blueprints/import': () => Response.json(load()),
+    }, { imports: [load({ id: '0192f0aa-0000-7000-8000-0000000000ff', name: 'Another', status: 'failed' })], unfinished: null });
+    await m.wrapper.get('[data-testid="templates-row-restaurant.es-use"]').trigger('click');
+    await settle();
+    await m.wrapper.get('[data-testid="review-import"]').trigger('click');
+    await settle();
+    expect(m.wrapper.get('[data-testid="report-status"]').text()).toContain('Everything went in.');
+  });
+
   it('opens with the last import that did not go in whole, retries it and goes on to the catalogue', async () => {
     const m = await panel(
       { '/api/settings/data/blueprints/import': () => Response.json(load({ id: 'again' })) },

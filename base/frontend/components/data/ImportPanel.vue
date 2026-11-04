@@ -3,7 +3,8 @@
 // with the last import that did not go in whole, when there is one (its report, «Retry what is missing», «See the
 // templates»); otherwise «Choose what to load»: the catalogue and «Upload from file». Choosing reads the template or
 // the file (`base.blueprint.inspect`, nothing written) → «Review what it brings» → `base.blueprint.import` → its
-// report. What cannot be read says why and stays on the choice; an import refused stays on the review.
+// report, which follows the load live: what waited for an app being set up comes in by itself (hub#609). What cannot be
+// read says why and stays on the choice; an import refused stays on the review.
 import { EmptyState, InlineFeedback } from '@erplora/ui/components';
 import { type ApiError, useCommand, useLive } from '@erplora/ui/sdk';
 import { HubIcon, useSession } from '@erplora/ui/shell';
@@ -43,6 +44,13 @@ const fileInput = ref<HTMLInputElement | null>(null);
 const unfinished = computed(() =>
   step.value.kind === 'choose' && !pastUnfinished.value ? (imports?.data.value?.unfinished ?? null) : null,
 );
+
+/** The load on the report, as the live list has it now; until the list has it, as the import answered. */
+const reported = computed(() => {
+  if (step.value.kind !== 'report') return null;
+  const { load } = step.value;
+  return imports?.data.value?.imports.find((row) => row.id === load.id) ?? load;
+});
 
 const reason = (error: unknown) => (error as ApiError | undefined)?.message ?? String(error);
 
@@ -147,11 +155,11 @@ function toCatalogue(): void {
   />
 
   <ImportReport
-    v-else-if="step.kind === 'report'"
-    :load="step.load"
+    v-else-if="reported"
+    :load="reported"
     :retrying="importer.pending.value"
     :retry-error="retryError"
-    @retry="retry(step.load)"
+    @retry="retry(reported)"
     @templates="toCatalogue"
   />
 
