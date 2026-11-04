@@ -339,6 +339,7 @@ Pasos:
 1. Una persona con su cuenta vinculada a su ficha (STAFF-F03) abre lo suyo.
 2. Ve su ficha con **su propia** tarifa y comisión (sin las notas de RRHH), y sus ausencias con su
    motivo y sus notas.
+3. La ficha es solo de lectura: un único botón, **Cerrar**.
 Entra: la cuenta con la que entra (no se puede falsear).
 Sale: nada cambia. Sin ficha vinculada, la respuesta viene vacía.
 Si falla: sin ficha o sin ausencias, vacío.
