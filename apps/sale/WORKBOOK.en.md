@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:e5e6522a68029a2cd85239bbc2d93ce23d9d65baf60a784e03ed451a67c12272 -->
+<!-- generated from WORKBOOK.md sha256:a999ae2cfd6a741b72cac49f8804084294da3f699b4e0ba38e362b07947f6444 -->
 
 ## What it is for and who it is for
 
@@ -809,7 +809,8 @@ In: the check's pending lines.
 Out: the lines with their round and the kitchen order open in Kitchen, a rush if the flame was armed
 (announces: order sent, with the lines, their notes, their modifiers, the dishes of each menu and who
 serves); on voiding a sent line, it announces the voided line with its reason.
-If it fails: with nothing pending, "There is nothing new to send to the kitchen."; if Kitchen does not
+If it fails: with nothing pending, "There is nothing new to send to the kitchen."; at the top of the screen, so
+"Charge" or "Send order" can be pressed again without waiting for it to go, if Kitchen does not
 answer, "The order could not be sent to the kitchen. Try again." and nothing is charged. If the order is
 sent but its slip does not print, the POS warns, at the top too, "Order N sent to the kitchen, but it did
 not print. Check the kitchen printer in Printing.". Asking to remove a line already sent is refused: "That line can

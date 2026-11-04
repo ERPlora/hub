@@ -491,7 +491,9 @@ async function sendRound(rush: boolean): Promise<boolean> {
     return true;
   }
   if (sent.code && NOTHING_TO_SEND.has(sent.code)) return true;
-  void toastError(sent.message);
+  // hub#755: the cart stays to try again, and at the bottom the notice would lie over «Charge»: a tap there would
+  // fall on the notice and send nothing.
+  void toast(sent.message, 'danger', 4500, undefined, undefined, 'top');
   return false;
 }
 
