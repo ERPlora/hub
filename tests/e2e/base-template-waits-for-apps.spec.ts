@@ -7,7 +7,7 @@
 // `base.app.activation_settle`, which loads what waited. The DDL and two real databases are pytest's
 // (base/tests/test_blueprint_waits_for_apps.py). Captures `BASE-TEMPLATE-WAITS-<step>-<width>`.
 // flow: BASE-F31 BASE-F32 BASE-F33 BASE-F38
-import { type BrowserContext, expect, type Page, test } from '@playwright/test';
+import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import {
   A,
@@ -23,6 +23,9 @@ import {
   testid,
   untilStill,
 } from './helpers';
+
+// A control that never comes fails in half a minute and says which, instead of eating the whole test.
+test.use({ actionTimeout: 30_000 });
 
 const VIEWPORTS = {
   375: { width: 375, height: 667 },
@@ -73,6 +76,12 @@ function backToNormal(): void {
   );
 }
 
+/** The rows were written here, not by an operation: reading the Apps list makes the Hub's process forget what it kept of
+ * them, as the live notice of a real change does (`base.app.list`). */
+async function appsReadAgain(context: BrowserContext): Promise<void> {
+  expect((await api(context, A, 'GET', '/apps')).status).toBe(200);
+}
+
 async function snap(page: Page, key: string, width: number): Promise<void> {
   await expect(shown(page).locator('ion-skeleton-text:visible')).toHaveCount(0);
   await untilStill(page);
@@ -80,11 +89,12 @@ async function snap(page: Page, key: string, width: number): Promise<void> {
   await page.screenshot({ path: shot(`BASE-TEMPLATE-WAITS-${key}-${width}`) });
 }
 
-/** Settings › Data › Import, the template chosen and imported as it comes. */
+/** Settings › Data › Import, the template chosen and imported as it comes: its report says it waits. */
 async function loadIt(page: Page): Promise<void> {
   const row = shown(page).locator(`[data-testid="templates-row"][data-id="${TEMPLATE}"]`);
   await row.locator('[data-testid$="-use"]').click();
   await testid(page, 'review-import').click();
+  await expect(testid(page, 'report-waiting')).toBeVisible();
 }
 
 const appRow = (page: Page) => testid(page, 'report').locator(`[data-testid="report-app"][data-id="${APP}"]`);
@@ -105,22 +115,40 @@ test.afterAll(async ({ browser }) => {
   const { context } = await hostPage(browser, A, { next: '/' });
   try {
     backToNormal();
+    await appsReadAgain(context);
     await emptyOfTemplateData(context, A);
   } finally {
     await context.close();
   }
 });
 
+/** `body`, in Spanish on `next`, with `a` empty of what a template brings and Services held back; then `a` as it was. */
+async function withHeldBack(
+  browser: Browser,
+  viewport: { width: number; height: number },
+  next: string,
+  body: (context: BrowserContext, page: Page) => Promise<void>,
+): Promise<void> {
+  test.setTimeout(240_000);
+  const { context, page } = await signedInSpanish(browser, viewport, next);
+  try {
+    await appsReadAgain(context);
+    await emptyOfTemplateData(context, A);
+    heldBack();
+    await appsReadAgain(context);
+    await page.reload();
+    await body(context, page);
+  } finally {
+    await context.close();
+    backToNormal();
+  }
+}
+
 for (const [label, viewport] of Object.entries(VIEWPORTS)) {
   const width = Number(label);
 
   test(`BASE-F32 — what waited for its app comes in by itself, on the report, at ${width}`, async ({ browser }) => {
-    test.setTimeout(240_000);
-    const { context, page } = await signedInSpanish(browser, viewport, '/settings#data');
-    try {
-      await emptyOfTemplateData(context, A);
-      heldBack();
-      await page.reload();
+    await withHeldBack(browser, viewport, '/settings#data', async (context, page) => {
       await loadIt(page);
 
       await expect(testid(page, 'report-waiting')).toContainText('lo que falta entrará solo');
@@ -134,23 +162,14 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await expect(testid(page, 'report-status')).toHaveText('Todo ha entrado.', { timeout: APP_SET_UP_MS });
       await expect(appRow(page).locator('[data-testid="report-app-status"]')).toHaveText('Aplicado');
       await expect(testid(page, 'report-waiting')).toHaveCount(0);
-      expect(await services(context)).toBe(SERVICES);
+      await expect.poll(() => services(context), { timeout: APP_SET_UP_MS }).toBe(SERVICES);
       await snap(page, 'done', width);
-    } finally {
-      await context.close();
-      backToNormal();
-    }
+    });
   });
 
   test(`BASE-F33 — it comes in with nobody on the screen, and the report waits for who comes back, at ${width}`, async ({ browser }) => {
-    test.setTimeout(240_000);
-    const { context, page } = await signedInSpanish(browser, viewport, '/settings#data');
-    try {
-      await emptyOfTemplateData(context, A);
-      heldBack();
-      await page.reload();
+    await withHeldBack(browser, viewport, '/settings#data', async (context, page) => {
       await loadIt(page);
-      await expect(testid(page, 'report-waiting')).toBeVisible();
 
       // Coming back while it waits: its report opens first, still saying so, with nothing to press.
       await page.reload();
@@ -165,25 +184,17 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await page.goto('/settings#data');
       await expect(shown(page).locator('[data-testid="templates-row"]').first()).toBeVisible();
       await expect(testid(page, 'report')).toHaveCount(0);
-    } finally {
-      await context.close();
-      backToNormal();
-    }
+    });
   });
 
   test(`BASE-F32 — an app that could not be set up says so, and the retry brings it, at ${width}`, async ({ browser }) => {
-    test.setTimeout(240_000);
-    const { context, page } = await signedInSpanish(browser, viewport, '/settings#data');
-    try {
-      await emptyOfTemplateData(context, A);
-      heldBack();
-      await page.reload();
+    await withHeldBack(browser, viewport, '/settings#data', async (context, page) => {
       await loadIt(page);
-      await expect(testid(page, 'report-waiting')).toBeVisible();
 
       failing();
       await page.reload();
 
+      await expect(testid(page, 'report-failing')).toContainText('Servicios');
       await expect(appRow(page).locator('[data-testid="report-app-status"]')).toHaveText('No se ha podido preparar');
       await expect(appRow(page).locator('[data-testid="report-app-reason"]')).toContainText('Se sigue intentando sola');
       await expect(testid(page, 'report-waiting')).toHaveCount(0);
@@ -193,20 +204,12 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
 
       await expect(testid(page, 'report-status')).toHaveText('Todo ha entrado.', { timeout: APP_SET_UP_MS });
       await expect(appRow(page).locator('[data-testid="report-app-status"]')).toHaveText('Aplicado');
-      expect(await services(context)).toBe(SERVICES);
-    } finally {
-      await context.close();
-      backToNormal();
-    }
+      await expect.poll(() => services(context), { timeout: APP_SET_UP_MS }).toBe(SERVICES);
+    });
   });
 
   test(`BASE-F38 — the Home's card says it comes by itself and turns ready, at ${width}`, async ({ browser }) => {
-    test.setTimeout(240_000);
-    const { context, page } = await signedInSpanish(browser, viewport, '/');
-    try {
-      await emptyOfTemplateData(context, A);
-      heldBack();
-      await page.reload();
+    await withHeldBack(browser, viewport, '/', async (context, page) => {
       await shown(page).locator(`[data-testid="blueprint-card-use-${TEMPLATE}"]`).click();
 
       await expect(testid(page, 'blueprint-card-pending')).toContainText('Tus apps se están preparando');
@@ -218,11 +221,8 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
 
       await expect(testid(page, 'blueprint-card-outcome')).toContainText('Ya tienes tus apps y tu catálogo', { timeout: APP_SET_UP_MS });
       await expect(testid(page, 'blueprint-card-pending')).toHaveCount(0);
-      expect(await services(context)).toBe(SERVICES);
+      await expect.poll(() => services(context), { timeout: APP_SET_UP_MS }).toBe(SERVICES);
       await snap(page, 'card-ready', width);
-    } finally {
-      await context.close();
-      backToNormal();
-    }
+    });
   });
 }

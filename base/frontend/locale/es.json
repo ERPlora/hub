@@ -325,7 +325,8 @@
         "retryError": "El reintento falló: {reason}",
         "templates": "Ver las plantillas",
         "home": "Ir al inicio",
-        "waiting": "Aún se está cargando: lo que falta entrará solo en cuanto sus apps estén listas. Puedes salir de esta pantalla."
+        "waiting": "Aún se está cargando: lo que falta entrará solo en cuanto sus apps estén listas. Puedes salir de esta pantalla.",
+        "failing": "Aún no se ha podido preparar: {apps}. Se sigue intentando sola y sus datos se cargarán en cuanto funcione."
       },
       "export": {
         "adminOnly": "Solo un administrador puede exportar el negocio.",

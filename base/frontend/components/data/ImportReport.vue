@@ -11,7 +11,7 @@ import { IonButton } from '@ionic/vue';
 import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 
-import { RETRY_BLOCKED_KEY, statusPill, stillLoading } from '../../lib/data';
+import { pendingApps, RETRY_BLOCKED_KEY, statusPill, stillLoading } from '../../lib/data';
 import { useBaseI18n } from '../../lib/i18n';
 import type { ImportRow } from '../../operations';
 import '../../data.css';
@@ -32,6 +32,7 @@ const HEADLINE = {
 } as const;
 const headline = computed(() => HEADLINE[props.load.report.status] ?? HEADLINE.failed);
 const waiting = computed(() => stillLoading(props.load.report));
+const failing = computed(() => pendingApps(props.load.report).failing);
 
 const when = computed(() => {
   const date = new Date(props.load.created_at);
@@ -84,6 +85,14 @@ function pill(status: string): { tone: ReturnType<typeof statusPill>['tone']; la
       data-testid="report-status"
     >
       {{ t(headline.key) }}
+    </InlineFeedback>
+    <InlineFeedback
+      v-if="failing.length"
+      tone="danger"
+      class="report-notice"
+      data-testid="report-failing"
+    >
+      {{ t('base.data.report.failing', { apps: failing.join(', ') }) }}
     </InlineFeedback>
 
     <ul class="data-rows">

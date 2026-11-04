@@ -1060,7 +1060,8 @@ In: the import's report.
 Out: nothing; the report stays kept in the business. What loaded later counts in that same import: it is undone with
 it (BASE-F34).
 If it fails: a label the screen does not know shows as "Failed" with its own text, never as a success. If the app
-cannot be set up, its row says "Could not be set up" with "It could not be set up yet. It keeps trying by itself and
+cannot be set up, at the top it says "Could not be set up yet: {apps}. It keeps trying by itself and its data will load
+as soon as it works." and its row, "Could not be set up" with "It could not be set up yet. It keeps trying by itself and
 its data will load as soon as it works; «Retry what is missing» tries again now." (BASE-F21). If meanwhile the app is
 turned off, the import is undone, the business is reset or the template's version changes, nothing of it loads and its
 row says why. If the load fails once the app is ready, the app stays on and its row says "Failed" with "Something went

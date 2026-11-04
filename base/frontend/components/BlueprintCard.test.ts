@@ -5,7 +5,7 @@
 // again») or cut halfway —; once seen, the card stays until «Continue» or «Not now».
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { load, template } from '../__tests__/data-fixtures';
+import { load, template, waitingLoad } from '../__tests__/data-fixtures';
 import { EMPLOYEE, errorFrame, flush, memoryStorage, mountBase, subId } from '../__tests__/mount-base';
 import { SESSION_CHANGED } from '../lib/access';
 import BlueprintCard from './BlueprintCard.vue';
@@ -22,12 +22,7 @@ async function settle() {
   for (let i = 0; i < 4; i += 1) await flush();
 }
 
-const WAITING_LOAD = load({
-  status: 'partial',
-  retry: false,
-  retry_blocked: 'waiting',
-  report: { status: 'partial', dropped: [], apps: [{ id: 'service', label: 'Services', status: 'waiting', reason: 'Being set up.', datasets: [] }] },
-});
+const WAITING_LOAD = waitingLoad();
 
 async function card(answer: () => Response = () => Response.json(load()), list = { templates: TEMPLATES, empty: true }) {
   const bodies: unknown[] = [];

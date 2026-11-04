@@ -4,7 +4,7 @@
 // and stays on the choice; an import refused stays on the review with the reason.
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { load, summary, template } from '../../__tests__/data-fixtures';
+import { load, summary, template, waitingLoad } from '../../__tests__/data-fixtures';
 import { EMPLOYEE, flush, mountBase } from '../../__tests__/mount-base';
 import type { ImportRow } from '../../operations';
 import { SESSION_CHANGED } from '../../lib/access';
@@ -45,6 +45,22 @@ async function panel(answers: Record<string, () => Response> = {}, imports: { im
 
 async function settle() {
   for (let i = 0; i < 4; i += 1) await flush();
+}
+
+/** The panel past its review: the template chosen and imported, answered with `row`. */
+async function imported(row: ImportRow, imports?: { imports: ImportRow[]; unfinished: ImportRow | null }) {
+  const m = await panel(
+    {
+      '/api/settings/data/blueprints/inspect': () => Response.json(summary()),
+      '/api/settings/data/blueprints/import': () => Response.json(row),
+    },
+    imports,
+  );
+  await m.wrapper.get('[data-testid="templates-row-restaurant.es-use"]').trigger('click');
+  await settle();
+  await m.wrapper.get('[data-testid="review-import"]').trigger('click');
+  await settle();
+  return m;
 }
 
 describe('ImportPanel', () => {
@@ -178,20 +194,8 @@ describe('ImportPanel', () => {
   });
 
   it('the report follows the load live: what waited for its app comes in without pressing anything (hub#609)', async () => {
-    const waiting = load({
-      status: 'partial',
-      retry: false,
-      retry_blocked: 'waiting',
-      report: { status: 'partial', dropped: [], apps: [{ id: 'service', label: 'Services', status: 'waiting', reason: 'Being set up.', datasets: [] }] },
-    });
-    const m = await panel({
-      '/api/settings/data/blueprints/inspect': () => Response.json(summary()),
-      '/api/settings/data/blueprints/import': () => Response.json(waiting),
-    });
-    await m.wrapper.get('[data-testid="templates-row-restaurant.es-use"]').trigger('click');
-    await settle();
-    await m.wrapper.get('[data-testid="review-import"]').trigger('click');
-    await settle();
+    const waiting = waitingLoad();
+    const m = await imported(waiting);
     expect(m.wrapper.find('[data-testid="report-waiting"]').exists()).toBe(true);
     expect(m.wrapper.find('[data-testid="report-retry"]').exists()).toBe(false);
 
@@ -204,14 +208,8 @@ describe('ImportPanel', () => {
   });
 
   it('the report stays on the load it answered until the list has it', async () => {
-    const m = await panel({
-      '/api/settings/data/blueprints/inspect': () => Response.json(summary()),
-      '/api/settings/data/blueprints/import': () => Response.json(load()),
-    }, { imports: [load({ id: '0192f0aa-0000-7000-8000-0000000000ff', name: 'Another', status: 'failed' })], unfinished: null });
-    await m.wrapper.get('[data-testid="templates-row-restaurant.es-use"]').trigger('click');
-    await settle();
-    await m.wrapper.get('[data-testid="review-import"]').trigger('click');
-    await settle();
+    const another = load({ id: '0192f0aa-0000-7000-8000-0000000000ff', name: 'Another', status: 'failed' });
+    const m = await imported(load(), { imports: [another], unfinished: null });
     expect(m.wrapper.get('[data-testid="report-status"]').text()).toContain('Everything went in.');
   });
 

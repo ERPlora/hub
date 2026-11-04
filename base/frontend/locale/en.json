@@ -325,7 +325,8 @@
         "retryError": "The retry failed: {reason}",
         "templates": "See the templates",
         "home": "Go to Home",
-        "waiting": "Still loading: what is missing comes in by itself as soon as its apps are ready. You can leave this screen."
+        "waiting": "Still loading: what is missing comes in by itself as soon as its apps are ready. You can leave this screen.",
+        "failing": "Could not be set up yet: {apps}. It keeps trying by itself and its data will load as soon as it works."
       },
       "export": {
         "adminOnly": "Only an administrator can export the business.",

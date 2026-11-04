@@ -1098,7 +1098,8 @@ Entra: el informe de la importación.
 Sale: nada; el informe queda guardado en el negocio. Lo que se cargó después cuenta en esa misma importación: se deshace
 con ella (BASE-F34).
 Si falla: una etiqueta que la pantalla no conoce sale como «Falló» con su texto tal cual, nunca como un
-éxito. Si la app no se puede preparar, su fila dice «No se ha podido preparar» con «Aún no se ha podido preparar. Se
+éxito. Si la app no se puede preparar, arriba dice «Aún no se ha podido preparar: {apps}. Se sigue intentando sola y sus
+datos se cargarán en cuanto funcione.» y su fila, «No se ha podido preparar» con «Aún no se ha podido preparar. Se
 sigue intentando sola y sus datos se cargarán en cuanto funcione; «Reintentar lo que falta» lo intenta otra vez
 ahora.» (BASE-F21). Si mientras tanto la app se desactiva, la importación se deshace, el negocio se restablece o cambia
 la versión de la plantilla, no se carga nada suyo y su fila dice por qué. Si la carga falla ya con la app lista, la
