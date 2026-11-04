@@ -153,6 +153,11 @@ function toldPreview(): Record<string, unknown> {
 const euros = (cents: number) => `${(cents / 100).toFixed(2)} €`;
 const previewBlock = (page: Page): Locator => card(page).locator('[data-testid="assistant-confirm-preview"]');
 const asked = (number: string) => `E2E-RECTIFY ${number} rectifica la factura ${number} porque ${REASON}`;
+/** The card says a rectification's kind by the name the models give it, never by its code (hub#708). */
+const KIND_R1 = {
+  en: 'Type of rectifying invoice: Rectifying invoice: error founded in law and art. 80 One, Two and Six (R1)',
+  es: 'Tipo de rectificativa: Rectificativa: error fundado en derecho y art. 80 Uno, Dos y Seis (R1)',
+};
 
 test('INVOICE-F08 — «rectify invoice <number> because the price was wrong»: the preview first, then the dangerous card; «Cancel» issues nothing, the typed word issues it', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -191,7 +196,7 @@ test('INVOICE-F08 — «rectify invoice <number> because the price was wrong»: 
   // And what it will do: the rectifying invoice of that preview, its amounts as money (EUR, the business's currency).
   await expect(previewBlock(page)).toContainText('What will happen');
   await expect(previewBlock(page).locator('li')).toHaveText([
-    'Type of rectifying invoice: R1',
+    KIND_R1.en,
     `Next number: ${expected.next_number}`,
     'Tax base: -€100.00',
     'Tax: -€21.00',
@@ -310,7 +315,7 @@ test('INVOICE-F08 — in Spanish the rectification card shows what will happen: 
   const invoice = await anInvoice(context);
   const said = (await previewOf(context, invoice.number)).next_number;
   const lines = [
-    'Tipo de rectificativa: R1',
+    KIND_R1.es,
     `Siguiente número: ${said}`,
     'Base imponible: -100,00 €',
     'Impuesto: -21,00 €',
@@ -387,8 +392,8 @@ test('BASE-F97 — with the business moved to Poland, the rectification card say
       const said = (await previewOf(context, invoice.number)).next_number;
       const lines =
         language === 'en'
-          ? ['Type of rectifying invoice: R1', `Next number: ${said}`, 'Tax base: -€100.00', 'Tax: -€21.00', 'Total: -€121.00']
-          : ['Tipo de rectificativa: R1', `Siguiente número: ${said}`, 'Base imponible: -100,00 €', 'Impuesto: -21,00 €', 'Total: -121,00 €'];
+          ? [KIND_R1.en, `Next number: ${said}`, 'Tax base: -€100.00', 'Tax: -€21.00', 'Total: -€121.00']
+          : [KIND_R1.es, `Siguiente número: ${said}`, 'Base imponible: -100,00 €', 'Impuesto: -21,00 €', 'Total: -121,00 €'];
       for (const vp of VIEWPORTS) {
         await page.setViewportSize({ width: vp.width, height: vp.height });
         await expect(previewBlock(page).locator('li')).toHaveText(lines);

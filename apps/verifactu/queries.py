@@ -1098,3 +1098,9 @@ def representation_model(ctx: OperationContext, data: NoInput) -> Representation
         content_type="application/pdf",
         content_base64=base64.b64encode(content).decode("ascii"),
     )
+
+
+def keeps_fiscal_documents() -> bool:
+    """Whether this database holds its records for the tax authority (``fiscal_documents_kept`` on this app's config), of any status: a draft counts
+    too, for what it asks is whether a database can go, and that cannot be undone."""
+    return Record.objects.exists()

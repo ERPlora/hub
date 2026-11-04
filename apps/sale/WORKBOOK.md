@@ -134,7 +134,12 @@ zonas:
   «Invitación», nota y profesional debajo; botones de descuento, nota, invitación y el selector de
   cantidad (una línea enviada a cocina solo enseña su cantidad, «Comanda N» y el botón ⊗ «Anular
   este artículo»; una pagada con bono, «Ya pagado · <bono>», 0,00 € y solo el botón de quitarla). Pie: la fila «Descuento del ticket» si lo hay, «Total» (el que calcula el
-  servidor), el botón de descuento, la impresora («Imprimir cuenta») y «Cobrar · <importe>».
+  servidor), el botón de descuento, la impresora («Imprimir cuenta») y «Cobrar · <importe>». En el
+  cajón del móvil la barra de arriba y el pie con «Cobrar» se quedan siempre a la vista, encima de la
+  barra de pestañas, también en un teléfono de 320×568; lo de en medio (título, chips, pestañas y
+  líneas) se desplaza. El botón de cliente se lee en dos líneas como mucho (un nombre más largo termina
+  en «…»); donde no caben, en un teléfono de 320 px, se queda en su icono, y el chip de cliente de la
+  cabecera ya lo nombra (hub#630).
 
 **Hablar** (la tecla del micrófono de la tira; solo a quien puede usar el asistente y en un dispositivo
 que puede grabar): púlsala y habla. Mientras graba se pone roja, se llama «Parar» y debajo sale
@@ -292,7 +297,9 @@ Pasos:
    flotante, que enseña el total).
 4. En la hoja **Cobro**, con efectivo elegido, marca en el teclado el importe entregado; el cambio
    sale en grande encima del teclado, en la fila que hasta entonces pide el importe, y las teclas no se
-   mueven bajo el dedo mientras se teclea (hub#456).
+   mueven bajo el dedo mientras se teclea (hub#456). En un móvil bajo, también en uno de 320×568, el
+   teclado entero queda encima del pie en cuanto se abre la hoja; en el de 320×568 el importe sube junto
+   al título (hub#630).
 5. Pulsa «Cobrar <total>».
 6. La hoja se cierra, la cuenta queda vacía y se abre el **Documento de venta** con el tique. Con
    **Impresión**, el cobro pide el tique a la cola en su misma transacción, según sus ajustes (y, si
@@ -806,7 +813,9 @@ Pasos:
    cocina.»; las líneas quedan marcadas con su ronda («Comanda N») y la hora de envío, y la llama se desarma.
    Un doble envío no manda nada dos veces.
 3. Al pulsar «Cobrar» con algo pendiente, se envía primero a cocina y después se abre el cobro: nadie paga
-   un plato que no se va a preparar. Si el envío falla, no se abre el cobro y se dice por qué.
+   un plato que no se va a preparar. El aviso de la comanda sale entonces arriba de la pantalla, para poder
+   tocar el teclado del cobro (SALE-F01) desde el primer momento. Si el envío falla, no se abre el cobro y se
+   dice por qué.
 4. Una línea enviada queda bloqueada: ni cantidad, ni nota, ni descuento, ni invitación.
 5. Para quitar un plato ya enviado, pulsa ⊗ «Anular este artículo» en su línea: se abre «Anular
    «<artículo>»» con «Ya se envió a cocina. Sale de la cuenta y se guarda el motivo. Tiene que
@@ -1499,6 +1508,10 @@ administrador y responsable, los mismos que anulan y devuelven).
   `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/` y un `tests/test_<fichero>.py`
   por fichero, más `tests/test_integration_*.py` con Impuestos, Clientes, Inventario, Servicios,
   Facturación, Caja y Citas reales.
+- **Orden de las listas** (`base.ordering.list_order`; regla hub#2355 del producto viejo): en Ventas, Secciones y Notas
+  rápidas, la columna elegida y sus desempates van todos en la dirección de la lista, así que la descendente es la
+  ascendente leída al revés, empates incluidos. Las secciones desempatan por nombre e `id`; las notas, por texto e
+  `id`; las ventas, por `id`.
 - **`requires = ["tax", "customer"]`**. `Sale.customer` y `Department.tax_category` son claves
   ajenas. **Inventario no es requisito** (PLAN §20.5): la línea guarda una copia del producto (id como
   UUID sin clave ajena, nombre, SKU, unidad, precio, coste y categoría fiscal) y el producto se lee con

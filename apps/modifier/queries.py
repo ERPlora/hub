@@ -18,16 +18,22 @@ from live.errors import Conflict, NotFound
 from live.operations import operation
 
 from apps.inventory.models import ProductCategory, Unit
-from apps.inventory.queries import find_product
+from apps.inventory.queries import find_category, find_product
 from apps.modifier.models import ModifierGroup, ModifierLink, ModifierOption
 from apps.modifier.schemas import (
+    CategoryRefIn,
+    CategoryRefOut,
     GroupListIn,
     GroupOut,
     GroupRefIn,
+    LinkDetailOut,
     LinkListIn,
     LinkOut,
+    LinkRefIn,
+    OptionDetailOut,
     OptionListIn,
     OptionOut,
+    OptionRefIn,
     Page,
     ResolveIn,
     ResolveOut,
@@ -38,6 +44,7 @@ from apps.modifier.schemas import (
 GROUP_NOT_FOUND = _("This group does not exist.")
 GROUP_AMBIGUOUS = _("«%(said)s» names several groups: %(names)s. Say which one.")
 OPTION_NOT_FOUND = _("This option does not exist.")
+LINK_NOT_FOUND = _("This group does not apply there.")
 OPTION_AMBIGUOUS = _(
     "«%(said)s» names several options: %(names)s. Say which one, or its group."
 )
@@ -117,9 +124,7 @@ def find_option(
             options, (Q(name__iexact=said), Q(name__icontains=said))
         )
         if len(candidates) > 1:
-            names = ", ".join(
-                f"{option.name} ({option.group.name})" for option in candidates[:5]
-            )
+            names = ", ".join(_option_label(option) for option in candidates[:5])
             raise Conflict(
                 str(OPTION_AMBIGUOUS) % {"said": said, "names": names},
                 code="modifier.option_ambiguous",
@@ -130,6 +135,10 @@ def find_option(
     if option is None:
         raise NotFound(str(OPTION_NOT_FOUND))
     return option
+
+
+def _option_label(option: ModifierOption) -> str:
+    return f"{option.name} ({option.group.name})"
 
 
 def _first_match(queryset, lookups) -> list:
@@ -292,6 +301,23 @@ def get_group(ctx: OperationContext, data: GroupRefIn) -> dict:
     return group_row(find_group(data.id, data.group, rows=groups_with_counts()))
 
 
+@operation(
+    "modifier.category.get",
+    kind="query",
+    permission="modifier.view",
+    input=CategoryRefIn,
+    output=CategoryRefOut,
+    expose_api=True,
+    ai={
+        "description": "Name by its id, or find by its name, the Inventory category a modifier group applies to, as "
+        "the list of what a group applies to names it."
+    },
+)
+def get_category(ctx: OperationContext, data: CategoryRefIn) -> dict:
+    category = find_category(data.id, data.category)
+    return {"id": category.id, "name": category.name}
+
+
 # The options (MODIFIER-F04)
 
 
@@ -319,6 +345,23 @@ def list_options(ctx: OperationContext, params: OptionListIn) -> dict:
     if params.search:
         options = options.filter(Q(name__icontains=params.search) | Q(kitchen_name__icontains=params.search))
     return _page(options.order_by(*order), params, option_row)
+
+
+@operation(
+    "modifier.option.get",
+    kind="query",
+    permission="modifier.view",
+    input=OptionRefIn,
+    output=OptionDetailOut,
+    expose_api=True,
+    ai={
+        "description": "Get one option of a modifier group, named by its id or its name (and its group, when two "
+        "groups have one with that name), with its supplement in cents and the group it belongs to."
+    },
+)
+def get_option(ctx: OperationContext, data: OptionRefIn) -> dict:
+    option = find_option(data.id, data.option, data.group_id, data.group)
+    return {**option_row(option), "label": _option_label(option)}
 
 
 # The links (MODIFIER-F05)
@@ -373,6 +416,34 @@ def groups_for_product(product) -> list[ModifierGroup]:
         .order_by("sort_order", Lower("name"), "id")
     )
     return [group for group in groups if group.options.all()]
+
+
+@operation(
+    "modifier.link.get",
+    kind="query",
+    permission="modifier.view",
+    input=LinkRefIn,
+    output=LinkDetailOut,
+    expose_api=True,
+    ai={
+        "description": "Get one link between a modifier group and what it applies to: by the link's id, or by the "
+        "group and the product (id, SKU or name) or category (id or name). One to something deleted is not there."
+    },
+)
+def get_link(ctx: OperationContext, data: LinkRefIn) -> dict:
+    links = ModifierLink.objects.filter(LIVE_LINK).select_related("group", "product", "category")
+    if data.id is not None:
+        link = links.filter(pk=data.id).first()
+    else:
+        group = find_group(data.group_id, data.group)
+        if data.product_id is not None or data.product is not None:
+            link = links.filter(group=group, product=find_product(data.product_id, data.product)).first()
+        else:
+            link = links.filter(group=group, category=find_category(data.category_id, data.category)).first()
+    if link is None:
+        raise NotFound(str(LINK_NOT_FOUND))
+    row = link_row(link)
+    return {**row, "label": f"{row['group_name']} · {row['product_name'] or row['category_name']}"}
 
 
 def _target_option(option: ModifierOption) -> dict:

@@ -2,8 +2,8 @@
 // reads and types them in the business's currency (`useBusinessMoney`, the platform's: its country's, with the
 // decimals the server counts it in, never the browser's Intl, which gives the forint none). Until the business
 // answers an amount is a figure without a symbol, never the euro by default. A record that kept its own currency
-// (a purchase) is painted in it. Until `@erplora/ui/components/format` has a money formatter (UI-REQUESTS.md),
-// this is the one place the app turns minor units into text and what a person types into minor units.
+// (a purchase) is painted in it. An amount is written with the platform's `formatMoney` (`@erplora/ui/components`);
+// this is the one place the app says which money a record is in and turns what a person types into minor units.
 import type { Money } from '../../../../base/frontend/lib/home';
 
 export type { Money };
@@ -12,34 +12,6 @@ export { useBusinessMoney } from '../../../../base/frontend/lib/money';
 const FALLBACK_LOCALE = 'en';
 /** The decimals of an amount while the currency is unknown. */
 const UNKNOWN_DECIMALS = 2;
-
-const formatters = new Map<string, Intl.NumberFormat>();
-
-function formatter(locale: string, money: Money | undefined): Intl.NumberFormat {
-  const decimals = money?.decimals ?? UNKNOWN_DECIMALS;
-  const key = `${locale}|${money?.currency ?? ''}|${decimals}`;
-  let found = formatters.get(key);
-  if (!found) {
-    const digits = { minimumFractionDigits: decimals, maximumFractionDigits: decimals };
-    // The symbol a till of that country prints («zł», «¥»); until the business is known, the figure alone.
-    const style: Intl.NumberFormatOptions = money ? { style: 'currency', currency: money.currency, currencyDisplay: 'narrowSymbol' } : {};
-    try {
-      found = new Intl.NumberFormat(locale, { ...style, ...digits });
-    } catch (error) {
-      if (!(error instanceof RangeError) || locale === FALLBACK_LOCALE) throw error;
-      found = formatter(FALLBACK_LOCALE, money);
-    }
-    formatters.set(key, found);
-  }
-  return found;
-}
-
-/** Minor units in `money`, in `locale` («zł 1,234.56», «1234,56 €», «¥1,250»; «1,234.56» while it is unknown);
- *  nothing to show is «—». */
-export function formatMoney(cents: number | null | undefined, locale: string, money?: Money): string {
-  if (cents === null || cents === undefined || Number.isNaN(cents)) return '—';
-  return formatter(locale, money).format(cents / 10 ** (money?.decimals ?? UNKNOWN_DECIMALS));
-}
 
 /** The money of a record: the currency it kept, with the decimals the server says, else the business's. */
 export function recordMoney(record: { currency?: unknown; currency_decimals?: number | null }, business?: Money): Money | undefined {

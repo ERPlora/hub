@@ -29,7 +29,8 @@ never an exception out of the worker's pass. A hub cancelled, or a demo that end
 
 :func:`drop` ends a demo that ended: ``dropping``, its database dropped (``DROP DATABASE … WITH (FORCE)``, that one
 only) and its rows purged (``base.demo.purge``). A business that leaves is not dropped here: it stays ``cancelled``
-with its database (S2b dumps it and drops it after its 90 days).
+with its database, and after its 90 days ``base.tenancy.offboarding`` copies it and drops it, unless it keeps fiscal
+documents.
 
 Control is written through ``base.services`` only (its doors to the ORM); the databases are made through
 ``base.tenancy.ops`` and reached through ``base.tenancy.connections``.

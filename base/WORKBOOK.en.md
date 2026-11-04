@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:52e1d6a5c85766f3b143a946f75a4f1bdf1a21191e6cebc36313004b874cb3be -->
+<!-- generated from WORKBOOK.md sha256:4a26cdfb34e95755f07d2535df2950acd45ea51576cce1dc802f1ee914964906 -->
 
 ## What it is for and who it is for
 
@@ -84,12 +84,14 @@ the bottom, the QR code, "Upgrade plan" and "Manage on erplora.com".
 
 ### "Upgrade plan"
 At the foot of the side menu, between the QR code and "Manage on erplora.com". It opens this business's plan page on
-erplora.com, in a new tab. Only in the browser: the installed app does not have it.
+erplora.com, in a new tab and already signed in with their account, without typing the password again. Only in the
+browser: the installed app does not have it.
 
 ### "Manage on erplora.com"
 At the foot of the side menu, right below "Upgrade plan", with the external link icon; with the menu folded to its
 icons (desktop), only the icon stays, which says "Manage on erplora.com" on hover. It opens this business on
-erplora.com's panel: in a new tab in the browser and, in the installed app, in the device's browser. Only the owner,
+erplora.com's panel, already signed in with their account: in a new tab in the browser and, in the installed app, in
+the device's browser. Only the owner,
 the administrator and the manager have it, and only if they came in with their account: never in a session opened
 with a PIN or with the badge. It does not sell, so the installed app has it too, except the Google Play one.
 
@@ -306,7 +308,7 @@ On the Employees screens and the API documentation:
 | BASE-F08 | Keep the panels up to date without reloading | done |
 | BASE-F09 | Look at the recent activity | done |
 | BASE-F10 | See in the bell the notices between apps that were not delivered | done |
-| BASE-F11 | Go to erplora.com to manage or upgrade the plan | discarded |
+| BASE-F11 | Go to erplora.com to manage or upgrade the plan | done |
 | BASE-F12 | Ask the assistant to go over the setup | done |
 | BASE-F13 | Lose access on a role change or on leaving the business | done |
 | BASE-F14 | See the business's apps | done |
@@ -404,6 +406,7 @@ On the Employees screens and the API documentation:
 | BASE-F106 | The assistant without a connection, with the service down or without a plan | done |
 | BASE-F107 | Pass the master QA of the Hub | done |
 | BASE-F108 | Report a problem to support | done |
+| BASE-F109 | Delete a deleted business after its 90 days | partial — a business with documents keeps its database until the fiscal archive exists (hub#738) |
 
 ### BASE-F01 See what the business still has to set up
 Status: done
@@ -612,7 +615,7 @@ back.".
 Involved: BASE-F40
 
 ### BASE-F11 Go to erplora.com to manage or upgrade the plan
-Status: discarded — without the one-time pass: if the browser does not have the erplora.com session open, you sign in with the account on arrival; the pass belongs mostly to erplora.com (saas#190)
+Status: done
 Actor: owner, administrator, manager, employee
 Screen: Side menu
 Steps:
@@ -620,18 +623,25 @@ Steps:
      sees it; what can be done on arriving is decided by erplora.com according to who comes in. With the
      menu folded to its icons (desktop), only its icon stays, which says "Upgrade plan" on hover. Only in the
      browser: the installed app does not have it.
-  2. They tap it: this business's plan page on erplora.com opens in a new tab.
+  2. They tap it: this business's plan page on erplora.com opens in a new tab, already signed in with their
+     account: they do not type the password again even if that browser did not have the erplora.com session open.
   3. The owner, the administrator or the manager who came in with their account also has, right below
      "Upgrade plan", "Manage on erplora.com", with the external link icon (on the folded menu, only the icon).
      It does not sell: the installed app has it too, except the Google Play one.
-  4. They tap it: this business opens on erplora.com's panel, in a new tab; in the installed app, in the device's
-     browser. The Hub stays where it was.
+  4. They tap it: this business opens on erplora.com's panel, already signed in with their account, in a new tab; in
+     the installed app, in the device's browser. The Hub stays where it was.
 In: the business they are in.
-Out: nothing saved in the hub.
+Out: nothing saved in the hub. A one-time pass of one minute goes to erplora.com, of the account of whoever taps and of
+this business; erplora.com checks again that this account belongs to this business.
 If it fails: if the hub does not know which business it belongs to, neither of the two shows (never a button that
-does nothing). If the installed app cannot open the browser, it says so: "Could not open that page. Try again.". An
-employee, a session opened with a PIN or with the badge and the Google Play app do not have "Manage on erplora.com".
-Involved: BASE-F40
+does nothing). If the installed app cannot open the browser, it says so: "Could not open that page. Try again.". If the
+pass does not come (the server gives an error or does not answer in 8 seconds), the usual address opens: erplora.com
+asks to sign in with the account and goes on to the same place. If the browser blocks the new tab, the link itself opens
+that address. With the pass spent or the minute gone, erplora.com says so and offers to sign in and go on there; to an
+account that no longer belongs to this business it says it does not (ACCOUNTS-F29). "Upgrade plan" in the assistant's
+panel and in the WhatsApp Inbox do not carry the pass yet and ask to sign in (hub#723). An employee, a session opened with
+a PIN or with the badge and the Google Play app do not have "Manage on erplora.com".
+Involved: BASE-F40, ACCOUNTS-F29
 
 ### BASE-F12 Ask the assistant to go over the setup
 Status: done
@@ -2262,13 +2272,17 @@ Steps:
      instead of making it up.
   6. If the assistant ends without saying anything, the bubble reads "(no answer)".
   7. "Stop" cuts what was left: what was already written stays, with "Stopped." below.
-  8. Under each finished answer, "Read aloud" reads it with the device's own voice, if it has one, and "Stop
-     reading" stops it.
+  8. Under each finished answer, "Read aloud" reads it with the device's voice, if it has one, and "Stop reading"
+     stops it. If ERPlora has its own voices turned on (not today), the panel's header lets the person choose between
+     the two for the screen's language (the first one, until another is chosen; the device remembers the choice) and
+     the "Device voice".
 In: what the person writes; the whole conversation travels with each question (BASE-F102).
 Out: the question to erplora.com, which answers it and counts it in the month's messages (BASE-F104).
 If it fails: without a connection, with the service down, without a plan or without messages: BASE-F106 and BASE-F104.
 If the documentation cannot be searched at that moment, the assistant says so and does not answer from memory. "Stop"
-does not undo an action that had already been done.
+does not undo an action that had already been done. If ERPlora's voice cannot read the answer at that moment, the
+device's voice reads it; if there is none either, below the answer it says "The answer could not be read aloud. Try
+again.".
 Involved: BASE-F102, BASE-F104, BASE-F106
 
 ### BASE-F94 Attach a file or dictate by voice
@@ -2362,7 +2376,8 @@ Steps:
      cita_recordatorio · es · Ana, 10:00"; of a till count, the notes and coins counted remain: "50: 2"). A date and a
      time show as they are written in the person's language and at the business's hour ("Nov 2, 2026, 10:00 AM"; a day
      alone, "Nov 2, 2026"; a time alone, "9:30 PM"); a value of a closed list, with the name its app gives it ("Front
-     desk", not the internal value); and a record, by its name when its app lets whoever asks read it ("Person: Eva
+     desk", not the internal value), also that of a datum its app does not call like the field that names it
+     ("Rectifying invoice: other causes (R4)", not "R4"); and a record, by its name when its app lets whoever asks read it ("Person: Eva
      Gil"): otherwise the card leaves it out, never by its code. Nor does it put the key its app uses to avoid doing
      the same thing twice on a retry (charging, sending a WhatsApp, printing): nobody can judge it, and the action
      receives it all the same when it runs. Everything shows in the person's language, also the
@@ -2653,3 +2668,31 @@ If it fails: after five reports in an hour (the hub's and erplora.com's together
 again in a few minutes."; if erplora.com does not answer or cannot send it, a notice with the support address to
 write to directly. In both cases what was written stays and can be sent again.
 Involved: ACCOUNTS-F38, BASE-F40
+
+### BASE-F109 Delete a deleted business after its 90 days
+Status: partial — a business with documents keeps its database until the fiscal archive exists (hub#738)
+Actor: nobody: the Hub does it by itself, nobody presses anything
+Screen: None; the business's address goes on saying "This hub is no longer available."
+Steps:
+  1. A business deleted on erplora.com (HUBS-F18, HUBS-F20) reaches its 90 days. Until then its database stays intact
+     and it can be restored.
+  2. The Hub checks whether it keeps documents: sales, invoices, VeriFactu records, payments, cash movements, shop
+     orders or a customer's purchases, in any status and even with the app turned off. If it keeps any, it stops here:
+     the business stays deleted, with its database, and is checked again the next day.
+  3. Without documents, it makes the final copy of its data, kept for 90 days in the copies store. Meanwhile the
+     business can still be restored and erplora.com still sees its copies. When it ends it checks again for
+     documents, in case one came in during the copy.
+  4. It drops that business's database, and only that one. From here it never comes back.
+  5. Only a mark stays, with no name or data, so its address goes on saying "This hub is no longer available."; its
+     people and their sessions go with it.
+In: the deleted business and its 90 days over. Never a demo, which is deleted its own way when it expires, the
+platform's business or one moving to another server.
+Out: the final copy and the database dropped, with the event `base.hub.purged`; from there erplora.com no longer
+lists its copies. Or, with documents, the database kept and on the business's row the reason
+(`fiscal_archive_missing: <apps>`).
+If it fails: a copy that fails drops nothing, and neither does having no copies store; a copy or a drop that fails is
+tried again (1 min, 5 min, 15 min, then every hour) with the error noted on the row, with no second copy if there
+already was one. If an app cannot be read, the database stays. A row that does not name the business's own database
+drops nothing (`invalid_database_name`). A business restored during the copy stays open with its database; once it is
+being dropped, erplora.com gets `hub_purged`. If the Hub shuts down mid-copy, the next one takes it up.
+Involved: HUBS-F18, HUBS-F19, HUBS-F20

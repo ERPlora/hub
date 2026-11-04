@@ -278,7 +278,8 @@ Estado: hecho
 Actor: administrador, responsable
 Pantalla: Productos
 Pasos:
-1. En **Productos**, pulsa **+**: se abre el panel del formulario.
+1. En **Productos**, pulsa **+**: se abre el panel del formulario, con el cursor en Nombre; si mientras
+   se abre ya has entrado en otro campo, el cursor se queda donde estás y lo que escribes va ahí.
 2. Escribe Nombre, SKU y Precio. El precio admite «2,20», «1.234,56» o lo que se pegue de la
    pantalla; al salir del campo se reescribe en el formato del negocio. Son opcionales «Coste
    (<moneda>)» (la del negocio: «Coste (PLN)» en Polonia), «Stock inicial», «Umbral stock bajo» (vacío = 10), «EAN-13» y «Descripción».

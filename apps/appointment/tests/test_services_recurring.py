@@ -16,11 +16,13 @@ from live.models import OutboxEvent
 from apps.appointment.models import Appointment, History, Recurring
 
 from .conftest import (
+    MADRID,
     MONDAY,
     at,
     make_settings,
     make_special_day,
     make_time_off,
+    pin_clock,
     run,
     wall,
 )
@@ -48,6 +50,78 @@ def occurrences(series_id) -> list[dt.date]:
         .order_by("occurrence_date")
         .values_list("occurrence_date", flat=True)
     )
+
+
+@pytest.mark.parametrize(
+    ("day", "time", "minutes", "end"),
+    [
+        pytest.param(dt.date(2026, 10, 25), "01:37", 90, "2026-10-25T02:07:00+01:00", id="25h-day-90-min"),
+        pytest.param(dt.date(2026, 10, 25), "02:30", 60, "2026-10-25T02:30:00+01:00", id="25h-day-60-min"),
+        pytest.param(dt.date(2027, 3, 28), "01:37", 90, "2027-03-28T04:07:00+02:00", id="23h-day-90-min"),
+    ],
+)
+def test_a_series_date_on_the_night_the_clock_changes_lasts_its_real_minutes(salon, monkeypatch, day, time, minutes, end):
+    pin_clock(monkeypatch, at(day, "00:01"))
+    make_settings(min_booking_notice=0)
+    out = create(
+        salon,
+        start_date=day.isoformat(),
+        day_of_week=day.weekday(),
+        time=time,
+        duration_minutes=minutes,
+        max_occurrences=1,
+    )
+    assert out.skipped == []
+    first = Appointment.objects.get(recurring_id=out.recurring.id, occurrence_date=day)
+    assert first.end - first.start == dt.timedelta(minutes=minutes)  # Read in UTC: real time.
+    assert first.end.astimezone(MADRID).isoformat() == end
+
+
+def one_date_series(salon, day: dt.date, time: str, minutes: int) -> object:
+    return create(
+        salon,
+        start_date=day.isoformat(),
+        day_of_week=day.weekday(),
+        time=time,
+        duration_minutes=minutes,
+        max_occurrences=1,
+    )
+
+
+def test_the_night_the_clock_jumps_a_series_date_is_judged_up_to_its_real_end(salon, monkeypatch):
+    # 00:30 + 3 real hours ends at 04:30 on the wall: 04:00 is taken (the wall clock's sum ended at 03:30).
+    spring = dt.date(2027, 3, 28)
+    pin_clock(monkeypatch, at(spring, "00:01"))
+    make_settings(min_booking_notice=0, allow_overlapping=False)
+    run(
+        "appointment.appointment.create",
+        {
+            "customer_id": str(salon.lucia.id),
+            "services": [{"service_id": str(salon.cut.id)}],
+            "staff_id": str(salon.ana.id),
+            "start": wall(spring, "04:00"),
+        },
+    )
+    out = one_date_series(salon, spring, "00:30", 180)
+    assert [(skip.occurrence_date, skip.code) for skip in out.skipped] == [(spring, "overlap")]
+
+
+def test_the_night_the_clock_goes_back_a_series_date_is_judged_up_to_its_real_end(salon, monkeypatch):
+    # 01:00 + 2.5 real hours ends at 02:30 the second time: 03:00 is free (the wall clock's sum ended at 03:30).
+    autumn = dt.date(2026, 10, 25)
+    pin_clock(monkeypatch, at(autumn, "00:01"))
+    make_settings(min_booking_notice=0, allow_overlapping=False)
+    run(
+        "appointment.appointment.create",
+        {
+            "customer_id": str(salon.lucia.id),
+            "services": [{"service_id": str(salon.cut.id)}],
+            "staff_id": str(salon.ana.id),
+            "start": wall(autumn, "03:00"),
+        },
+    )
+    out = one_date_series(salon, autumn, "01:00", 150)
+    assert out.skipped == [] and occurrences(out.recurring.id) == [autumn]
 
 
 def test_creating_a_series_books_its_window(salon):

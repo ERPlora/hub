@@ -187,6 +187,21 @@ describe('AppointmentFormModal: New appointment', () => {
     expect(s.field('minutes').value).toBe('50');
   });
 
+  it('the total of four figures groups its thousands, in both languages (hub#632)', async () => {
+    const dear = page([
+      { id: 'cut', name: 'Haircut', price: 100000, duration_minutes: 30, is_bookable: true },
+      { id: 'colour', name: 'Colour', price: 23456, duration_minutes: 60, is_bookable: true },
+    ]);
+    for (const [locale, total] of [['es', '1.234,56\u00a0€'], ['en', '€1,234.56']] as const) {
+      const s = await setup({}, locale);
+      s.answerBy({ ...READS, '/api/service/services/for_sale': [200, dear] });
+      await s.addService('cut', 'Haircut');
+      await s.addService('colour', 'Colour');
+      expect(s.inDoc('appointment-form-total')?.textContent).toContain(total);
+      s.wrapper.unmount();
+    }
+  });
+
   it('sends the minutes only when typed, and a free time fills the time', async () => {
     const s = await setup();
     await fillNew(s);

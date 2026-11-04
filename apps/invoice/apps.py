@@ -100,3 +100,10 @@ class InvoiceConfig(LiveAppConfig):
             refresh_on=SERIES_EVENTS,
         ),
     ]
+
+    def fiscal_documents_kept(self) -> bool:
+        """hub#599: the platform asks (``base.tenancy.offboarding``) before it drops the database of a business that
+        left: Its invoices here are documents nothing archives yet (PLAN-DB §6), so the database stays."""
+        from apps.invoice import queries  # the models are not loaded yet when this module is
+
+        return queries.keeps_fiscal_documents()

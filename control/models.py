@@ -93,8 +93,9 @@ class Hub(models.Model):
     schema checked) → ``seeding`` (what the sign-up brought) → ``ready``, or ``failed`` with its ``attempts``, its
     ``last_error`` and its ``next_attempt_at`` (1 min, 5 min, 15 min, then every hour) until it is ready; then
     ``cancelled`` (the SaaS deleted the business; ``restore`` brings it back) or, for a demo, ``expired`` →
-    ``dropping`` → ``purged``. ``archiving`` and the business's ``dropping`` are S2b's (the dump and the drop after
-    the 90 days). The host gate answers 404 to a slug without a row, 410 to one that is gone and 503 to one still
+    ``dropping`` → ``purged``. A business past its 90 days goes ``archiving`` (its final copy) → ``dropping`` →
+    ``purged`` (``base.tenancy.offboarding``), unless it keeps fiscal documents: then it stays ``cancelled``. The host
+    gate answers 404 to a slug without a row, 410 to one that is gone and 503 to one still
     being prepared. ``state`` is the SaaS's last photo (``PUT …/state``) as it came, with its
     monotonic ``state_version``: an older or equal one changes nothing. ``demo_session_key`` is the sha256 of the
     SaaS's browser session that owns a demo, never the session key itself.

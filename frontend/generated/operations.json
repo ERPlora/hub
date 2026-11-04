@@ -1055,6 +1055,10 @@
     "method": "get",
     "path": "/api/service/assignments"
   },
+  "service.assignment.get": {
+    "method": "get",
+    "path": "/api/service/assignments/detail"
+  },
   "service.assignment.eligible": {
     "method": "get",
     "path": "/api/service/assignments/eligible"
@@ -1094,6 +1098,14 @@
   "service.grant.list": {
     "method": "get",
     "path": "/api/service/grants"
+  },
+  "service.grant.get": {
+    "method": "get",
+    "path": "/api/service/grants/detail"
+  },
+  "service.session.get": {
+    "method": "get",
+    "path": "/api/service/sessions/detail"
   },
   "service.grant.create": {
     "method": "post",
@@ -2591,9 +2603,21 @@
     "method": "post",
     "path": "/api/modifier/options/delete"
   },
+  "modifier.option.get": {
+    "method": "get",
+    "path": "/api/modifier/options/detail"
+  },
   "modifier.link.list": {
     "method": "get",
     "path": "/api/modifier/links"
+  },
+  "modifier.link.get": {
+    "method": "get",
+    "path": "/api/modifier/links/detail"
+  },
+  "modifier.category.get": {
+    "method": "get",
+    "path": "/api/modifier/categories/detail"
   },
   "modifier.link.attach": {
     "method": "post",
@@ -3003,8 +3027,16 @@
     "method": "post",
     "path": "/api/assistant/transcribe"
   },
+  "base.assistant.speak": {
+    "method": "post",
+    "path": "/api/assistant/speak"
+  },
   "base.support.report": {
     "method": "post",
     "path": "/api/support/report"
+  },
+  "base.saas_pass.create": {
+    "method": "post",
+    "path": "/api/saas-pass"
   }
 }
