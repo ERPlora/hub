@@ -492,6 +492,9 @@ KNOWN = json.loads(
 #: Every datum the screen knows by its name that a write's schema titles itself, and what its card calls it in
 #: Spanish: the title its app wrote, never the generic word for its name («Registro: 5 (Terraza)»).
 TITLED_IN_SPANISH = {
+    **{f"appointment.appointment.{action}:id": "Cita" for action in (
+        "cancel", "charge", "complete", "confirm", "delete", "mark_no_show", "reschedule", "start", "update",
+    )},
     "attendance.record.close_for_terminated:id": "Persona",
     "base.api_key.revoke:id": "Clave de API",
     "base.device.remove:id": "Dispositivo",

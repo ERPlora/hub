@@ -402,3 +402,6 @@ def test_the_card_of_the_yes_says_which_appointment_it_cancels(gateway, worker, 
     assert not any(str(beas.id) in str(value) for value in said_values)
     [hidden] = run("flow.question.list", {}, ctx_for(permissions=ONLY_THEIR_OWN)).rows
     assert not any(salon.lucia.name in str(field.value) for field in hidden.fields)
+    [spanish] = run("flow.question.list", {}, ctx_for(permissions=MAY_CANCEL, language="es")).rows
+    assert spanish.action == "Anular una cita"
+    assert [field.label for field in spanish.fields if salon.lucia.name in str(field.value)] == ["Cita"]

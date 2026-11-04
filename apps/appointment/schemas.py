@@ -12,6 +12,7 @@ from typing import Annotated, Generic, Literal, TypeVar
 from uuid import UUID
 
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import gettext_noop
 from ninja import Field, Schema
 from pydantic import (
     ConfigDict,
@@ -188,7 +189,9 @@ class StaffOf(In):
 
 
 class AppointmentRefIn(In):
-    id: UUID | None = Field(None, description="The appointment's id.", json_schema_extra=AN_APPOINTMENT)
+    id: UUID | None = Field(
+        None, title=gettext_noop("Appointment"), description="The appointment's id.", json_schema_extra=AN_APPOINTMENT
+    )
     number: _text(24, 1) | None = Field(
         None,
         validate_default=True,
