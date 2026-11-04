@@ -28,7 +28,7 @@ import { useBusinessZone } from '../../../../base/frontend/lib/zone';
 import { useLiveList } from '../composables/useLiveList';
 import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
-import { dueTone, formatDay, isClosed, PRIORITY_TONE, STATUS_TONE } from '../lib/format';
+import { dueTone as dueToneOn, formatDay, isClosed, PRIORITY_TONE, STATUS_TONE } from '../lib/format';
 import { keepCompletedInPlace } from '../lib/mine';
 import type { TaskListIn, TaskOut, TaskPriority, TaskSort, TaskStatus } from '../operations';
 import { taskTabs } from '../tabs';
@@ -40,6 +40,8 @@ const session = useSession();
 const t = useT();
 const locale = useLocale();
 const zone = useBusinessZone();
+/** What the cells of the two tables paint, on the business's clock. */
+const dueTone = (due: string | null | undefined, status: TaskStatus) => dueToneOn(due, status, zone.value);
 const canAdd = computed(() => session.can('task.add'));
 
 // «All» and «My tasks»
@@ -203,9 +205,8 @@ async function onAction({ actionId, row }: { actionId: string; row: TaskOut }): 
   }
 }
 
-const dueClass = (row: TaskOut): string => `task-due task-due--${dueTone(row.due_date, row.status, zone.value)}`;
 const dueLabel = (row: TaskOut): string | undefined => {
-  const tone = dueTone(row.due_date, row.status, zone.value);
+  const tone = dueTone(row.due_date, row.status);
   return tone === 'none' ? undefined : t(tone === 'overdue' ? 'task.due.overdue' : 'task.due.today');
 };
 </script>
@@ -309,7 +310,7 @@ const dueLabel = (row: TaskOut): string | undefined => {
       <template #due="{ row }">
         <span
           data-testid="task-due"
-          :class="dueClass(pill(row))"
+          :class="`task-due task-due--${dueTone(pill(row).due_date, pill(row).status)}`"
           :aria-label="dueLabel(pill(row))"
           :title="dueLabel(pill(row))"
         >{{ formatDay(pill(row).due_date, locale) }}</span>
@@ -370,7 +371,7 @@ const dueLabel = (row: TaskOut): string | undefined => {
       <template #due="{ row }">
         <span
           data-testid="task-due"
-          :class="dueClass(pill(row))"
+          :class="`task-due task-due--${dueTone(pill(row).due_date, pill(row).status)}`"
           :aria-label="dueLabel(pill(row))"
           :title="dueLabel(pill(row))"
         >{{ formatDay(pill(row).due_date, locale) }}</span>
