@@ -322,12 +322,15 @@ Pasos:
 6. Hacerlo en nombre de la clienta no da más permisos: quien lo anota solo cambia las citas que ya
    podía cambiar (un empleado, las suyas, y no se las pasa a un compañero). Una persona del equipo
    puede cancelar fuera de la política; una automatización, nunca.
+7. Una automatización solo cancela si pregunta antes: un paso **Pedírselo al asistente** con «Que me lo pregunte», al
+   que se le permite, y tras el sí de quien puede cambiar las citas de cualquier profesional; entonces vale para la
+   cita de cualquiera, con la misma política (FLOW-F28, FLOW-F38). Sin esa pregunta, no puede.
 Entra: la cita de la clienta y los ajustes de cancelación y de antelación.
 Sale: la cita cancelada o movida, su línea «Lo pidió la clienta» y el aviso
 `appointment.appointment.cancelled` o `appointment.appointment.rescheduled`.
 Si falla: `appointment.customer_cancellation_disabled`, `appointment.cancellation_notice_required`,
 `appointment.too_soon`, `appointment.appointment_not_found` o `permission_denied`.
-Implicados: ninguno
+Implicados: FLOW-F28, FLOW-F38
 
 ### APPOINTMENT-F07 Empezar el servicio
 <!-- origen: wf:peluqueria-dia#rec_peluqueria-f08 fi:modules/appointments#command-appointments-appointments-start old:appointments/workflow/agenda.md#appointments-f07 qa:modules/appointments/check-in-and-in-progress wf:whatsapp-cita#rec_wa_cita-f10 -->
@@ -862,6 +865,13 @@ agenda tuya que enseñar.».
   la cita por WhatsApp (WHATSAPP_INBOX-F21 y F22). Tests: `test_services.py`
   (`test_what_is_not_a_person_*`, `test_a_person_with_their_own_permission_*`) y
   `apps/flow/tests/test_services_appointment_steps.py`.
+- **Cancelar desde una automatización** (hub#634): `appointment.appointment.cancel` sigue siendo `risk: "high"`, así que
+  solo lo recibe un paso que pregunta antes (`ASK_FIRST` de Automatizaciones). Como `is_own` le da a la automatización
+  las citas de todo el equipo, la operación declara `ai.yes_permission = change_appointment`: con «solo las suyas», un
+  sí prestaría lo que esa persona no puede hacer. Sigue juzgada como la clienta (`cancel`: `not by_person`).
+- **Cómo se nombra una cita en una tarjeta**: `AppointmentRefIn.id` lleva la marca `refers` a
+  `appointment.appointment.get` y su `label` (clienta, día, hora y profesional, sin los que falten), y el título
+  «Cita»; quien no puede leerla no ve el dato. Vale para la tarjeta del chat y para «Esperan tu respuesta».
 - **Solapes con bloqueo**: reservar, mover y editar bloquean antes la ficha del profesional
   (`resolve_member(lock=True)`, por id en orden fijo cuando son dos), así que dos reservas del mismo
   profesional a la vez se esperan y la segunda ve la primera (`tests/test_concurrency.py`). Con los
@@ -935,8 +945,6 @@ Lo que se vio fallar y queda abierto al cerrar la app (2026-11-03), cada cosa co
 - **hub#577** — Citas enseña los precios en euros aunque el negocio sea de un país con otra moneda (BASE-F50).
 - **hub#527** — En un negocio de otro país, un teléfono escrito sin prefijo se guarda y se busca como español
   (cruza APPOINTMENT-F22).
-- **hub#634** — Anular una cita con «Que me lo pregunte» (confirmar, mover y editar la cita de otra profesional ya lo
-  hace una automatización con su permiso, desde FIX-HUB-FLOW-STEP-CANNOT-BOOK-FOR-A-PROFESSIONAL).
 - **hub#631**, **hub#633**, **hub#635** y **hub#637** — textos: una traducción «fuzzy» que sale en inglés, siete
   textos en español con las palabras de otra app, la tarjeta de confirmación del asistente que no dice qué
   registro toca y la que nombra en inglés algunos datos («Confirm Overlap»).

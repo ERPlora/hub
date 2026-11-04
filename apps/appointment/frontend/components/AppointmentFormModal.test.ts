@@ -55,6 +55,7 @@ const BOOKED: AppointmentOut = {
   updated_at: '2026-10-14T10:00:00+02:00',
   start_date_label: 'Monday, October 19, 2026',
   start_time_label: '10:00',
+  label: 'Lucía · Monday · 10:00 · Ana',
 };
 
 const SERVICES = page([
