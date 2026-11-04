@@ -41,6 +41,7 @@ from apps.verifactu.models import Record
 from base import catalog, relay, services, worker
 from base.catalog import RegisterResult
 from base.models import EventDelivery
+from base.tenancy.tests import hubs
 
 A = Scope("host", "a")
 B = Scope("host", "b")
@@ -761,3 +762,25 @@ def test_two_workers_never_deliver_the_same_event_to_the_same_app(committed_till
     assert len(seen) == len(set(seen))
     assert stock() == Decimal("8")
     assert StockMovement.objects.filter(movement_type="sale").count() == 1
+
+
+def test_a_hubs_outbox_has_one_pending_index_and_it_is_base_outbox_pending(hub_databases):
+    """``base/0006`` owns the index that takes a tick straight to the events not taken yet (PLAN-HUB, round 2026-10-20).
+    Without it a tick reads the whole outbox; a second one on the same condition costs every write and serves no query.
+    """
+    with hubs._maintenance(hub_databases.a) as conn:
+        names = [
+            row[0]
+            for row in conn.execute(
+                """
+                SELECT index_class.relname
+                FROM pg_index AS outbox_index
+                JOIN pg_class AS index_class ON index_class.oid = outbox_index.indexrelid
+                WHERE outbox_index.indrelid = 'live_outboxevent'::regclass
+                  AND pg_get_expr(outbox_index.indpred, outbox_index.indrelid) LIKE '%delivered_at IS NULL%'
+                ORDER BY index_class.relname
+                """
+            ).fetchall()
+        ]
+
+    assert names == ["base_outbox_pending"]
