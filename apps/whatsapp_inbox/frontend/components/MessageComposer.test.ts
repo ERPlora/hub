@@ -187,7 +187,9 @@ describe('MessageComposer: internal note (WHATSAPP_INBOX-F36)', () => {
 
   it('speaks Spanish', async () => {
     const s = await setup({}, 'es');
-    const until = formatDateTime('2026-10-16T09:50:00Z', 'es', { timeZone: 'Europe/Madrid' });
+    await s.live();
+    await s.result('base.business.get', { timezone: 'Atlantic/Canary' });
+    const until = formatDateTime('2026-10-16T09:50:00Z', 'es', { timeZone: 'Atlantic/Canary' });
     expect(s.find('whatsapp-inbox-composer-window').text()).toBe(`Puedes escribir libremente hasta el ${until}.`);
     expect(s.send().textContent?.trim()).toBe('Enviar');
   });

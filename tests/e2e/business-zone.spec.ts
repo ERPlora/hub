@@ -10,7 +10,7 @@ import { type Browser, type BrowserContext, expect, test } from '@playwright/tes
 import { manualFlow, signedIn } from './flow-helpers';
 import { A, api, login, psql, shown } from './helpers';
 import { VIEWPORTS } from './schedule-helpers';
-import { cleanUp as cleanInbox, e2ePhone, PREFIX, receive } from './whatsapp-helpers';
+import { cleanUp as cleanInbox, e2ePhone, keepPhoto, PREFIX, receive, restorePhoto } from './whatsapp-helpers';
 
 const ZONE = 'Atlantic/Canary';
 const DEVICE = 'Asia/Tokyo';
@@ -78,6 +78,7 @@ function cleanUp(): void {
 }
 
 test.beforeAll(() => {
+  keepPhoto();
   cleanUp();
   saved = psql("select timezone from base_hub where slug = 'a'");
   psql(`update base_hub set timezone = '${ZONE}' where slug = 'a'`);
@@ -88,6 +89,7 @@ test.afterAll(() => {
   if (process.env.E2E_SAVE_STORAGE_STATE) return;
   psql(`update base_hub set timezone = '${saved}' where slug = 'a'`);
   cleanUp();
+  restorePhoto();
 });
 
 test.beforeEach(cleanUp);
