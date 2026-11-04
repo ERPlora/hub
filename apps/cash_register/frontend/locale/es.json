@@ -156,7 +156,6 @@
     },
     "unassignedList": {
       "title": "Cobros fuera de turno",
-      "close": "Cerrar",
       "empty": "Todas las líneas de venta están en un turno."
     },
     "detail": {

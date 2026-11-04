@@ -1,10 +1,7 @@
 // How the WhatsApp inbox shows when a message was said and what an attachment is (ported from the
 // product's `ui/lib/message-time.ts` and `message-media.ts`). The inbox reads every instant on the
-// BUSINESS clock — phase 1 has no settings per business: Madrid's — never the device's: a tablet on
-// the wrong zone must not move a customer's message by hours. Pages never format by hand: they call these.
-
-/** The business's IANA zone (phase 1: every business is in Madrid, as the server's `clock.py`). */
-export const BUSINESS_ZONE = 'Europe/Madrid';
+// BUSINESS clock, not the device's: a tablet on the wrong zone must not move a customer's message by hours.
+// Pages never format by hand: they call these.
 
 export interface MessageTimeOptions {
   /** The reader's language (`en`, `es`). */
@@ -14,11 +11,13 @@ export interface MessageTimeOptions {
   /** Keep the time next to «yesterday» or the date (the thread). The list is compact without it. */
   withTime?: boolean;
   now?: Date;
-  timeZone?: string;
+  /** The business's IANA zone (`useBusinessZone`, hub#779): required so that no screen forgets it, `undefined`
+   *  until the business answers, and `Intl` then uses the device's, never a zone written here. */
+  timeZone: string | undefined;
 }
 
 /** `YYYY-MM-DD` of an instant on the business calendar. */
-function businessDay(instant: Date, timeZone: string): string {
+function businessDay(instant: Date, timeZone: string | undefined): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(instant);
 }
 
@@ -34,7 +33,7 @@ export function formatMessageTime(value: string | null | undefined, opts: Messag
   if (!raw) return '';
   const instant = new Date(raw);
   if (Number.isNaN(instant.getTime())) return raw;
-  const timeZone = opts.timeZone ?? BUSINESS_ZONE;
+  const { timeZone } = opts;
   const locale = opts.locale || 'en';
   let time: string;
   let date: string;

@@ -1,10 +1,9 @@
 // How the task screens paint days, moments, tones and tags (pages never format by hand). A due date is
 // a pure day: painted without moving it across time zones (tasks#23: 00:00 UTC went back a day west of
-// Greenwich). «Today» is the business's day, Europe/Madrid in phase 1 (WORKBOOK «Antes de empezar»).
+// Greenwich). «Today» is the business's day, on the clock it is given (hub#779; WORKBOOK «Antes de empezar»).
 import { describe, expect, it } from 'vitest';
 
 import {
-  BUSINESS_TIME_ZONE,
   businessToday,
   dueTone,
   formatDay,
@@ -16,23 +15,34 @@ import {
   tagsText,
 } from './format';
 
+const MADRID = 'Europe/Madrid';
+const CANARY = 'Atlantic/Canary';
+
 describe('task format', () => {
-  it('reads today in Madrid, not in UTC nor in the browser', () => {
-    expect(BUSINESS_TIME_ZONE).toBe('Europe/Madrid');
+  it('reads today on the clock it is given, not in UTC nor in the browser', () => {
     // 23:30 UTC on 14 October is already the 15th in Madrid (UTC+2).
-    expect(businessToday(new Date('2026-10-14T23:30:00Z'))).toBe('2026-10-15');
-    expect(businessToday(new Date('2026-10-14T21:30:00Z'))).toBe('2026-10-14');
+    expect(businessToday(MADRID, new Date('2026-10-14T23:30:00Z'))).toBe('2026-10-15');
+    expect(businessToday(MADRID, new Date('2026-10-14T21:30:00Z'))).toBe('2026-10-14');
+    // 23:30 UTC on 2 November is still the 2nd in the Canaries (UTC) and the 3rd in Madrid (hub#779).
+    expect(businessToday(CANARY, new Date('2026-11-02T23:30:00Z'))).toBe('2026-11-02');
+    expect(businessToday(MADRID, new Date('2026-11-02T23:30:00Z'))).toBe('2026-11-03');
+  });
+
+  it("is due today until the business's midnight, not the deployment's (hub#779)", () => {
+    const night = new Date('2026-11-02T23:30:00Z');
+    expect(dueTone('2026-11-02', 'todo', CANARY, night)).toBe('today');
+    expect(dueTone('2026-11-02', 'todo', MADRID, night)).toBe('overdue');
   });
 
   it('says overdue before today and due today on the day, only while the task is open', () => {
     const now = new Date('2026-10-15T10:00:00Z');
-    expect(dueTone('2026-10-14', 'todo', now)).toBe('overdue');
-    expect(dueTone('2026-10-15', 'in_progress', now)).toBe('today');
-    expect(dueTone('2026-10-16', 'blocked', now)).toBe('none');
-    expect(dueTone(null, 'todo', now)).toBe('none');
+    expect(dueTone('2026-10-14', 'todo', MADRID, now)).toBe('overdue');
+    expect(dueTone('2026-10-15', 'in_progress', MADRID, now)).toBe('today');
+    expect(dueTone('2026-10-16', 'blocked', MADRID, now)).toBe('none');
+    expect(dueTone(null, 'todo', MADRID, now)).toBe('none');
     // A closed task is not late: there is nothing left to do with it.
-    expect(dueTone('2026-10-01', 'done', now)).toBe('none');
-    expect(dueTone('2026-10-01', 'cancelled', now)).toBe('none');
+    expect(dueTone('2026-10-01', 'done', MADRID, now)).toBe('none');
+    expect(dueTone('2026-10-01', 'cancelled', MADRID, now)).toBe('none');
   });
 
   it('paints a due day in the order of the language, the same day everywhere, and a dash without one', () => {
@@ -42,9 +52,16 @@ describe('task format', () => {
     expect(formatDay('', 'es')).toBe('—');
   });
 
-  it('paints a moment with its time in Madrid', () => {
-    expect(formatMoment('2026-10-14T23:30:00Z', 'es')).toBe('15/10/2026, 01:30');
-    expect(formatMoment(null, 'es')).toBe('—');
+  it('paints a moment with its time on the clock it is given', () => {
+    expect(formatMoment('2026-10-14T23:30:00Z', 'es', MADRID)).toBe('15/10/2026, 01:30');
+    expect(formatMoment('2026-11-02T23:30:00Z', 'es', CANARY)).toBe('02/11/2026, 23:30');
+    expect(formatMoment(null, 'es', MADRID)).toBe('—');
+  });
+
+  it('until the business answers it is on the device, never a zone written by hand', () => {
+    const moment = new Date('2026-11-02T23:30:00Z');
+    const device = new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit' });
+    expect(businessToday(undefined, moment)).toBe(device.format(moment));
   });
 
   it('gives each status and priority a tone, colour never the only carrier (the label goes inside)', () => {
