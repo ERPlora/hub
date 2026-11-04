@@ -8,6 +8,8 @@
 #   the other. A rerun of the bootstrap gives nothing back: it only sets the default privileges of future tables.
 # - The role is the environment's (``hub_app``, ``pre_hub_app`` in pre), as ``base.tenancy.ops`` names it for a hub's
 #   database. A server without that role (local development, the suite) has nobody to close them to: said, not failed.
+#   It is the second exception, after control/0007, to «a migration never imports app code»: the roles' names are said
+#   in one place, so it holds as long as ``base.tenancy.ops`` does.
 # - ``hub_admin`` keeps its ``SELECT``: support's ``pg_dump`` of control (PLAN-DB §10) stops at the first table it
 #   cannot read, these tables keep rows nobody deleted, and that role is never the application's.
 # - The list goes by the name alone, not by the inventory: a retired table whose model is gone later is still one.
@@ -29,7 +31,7 @@ SUFFIX = "_shared_20261101"
 #: returns.
 APP_PRIVILEGES = "SELECT, INSERT, UPDATE, DELETE"
 #: ``has_table_privilege`` answers true if the role holds any of them.
-ANY_PRIVILEGE = "SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER"
+ANY_PRIVILEGE = "SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER, MAINTAIN"
 STILL_OPEN = """
     SELECT c.relname, pg_get_userbyid(c.relowner) FROM pg_class c
     WHERE pg_table_is_visible(c.oid) AND c.relname = ANY(%s) AND has_table_privilege(%s, c.oid, %s)

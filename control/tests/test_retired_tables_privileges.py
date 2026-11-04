@@ -31,8 +31,9 @@ BEFORE = "0006_hub_activity"
 HUB_TABLE = "printing_printer"
 RETIRED = f"{HUB_TABLE}_shared_20261101"
 OTHER_RETIRED = "printing_printdevice_shared_20261101"
-#: Every privilege ``has_table_privilege`` takes on a table, as the issue's check asks for each.
-ANY_PRIVILEGE = "SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER"
+#: Every privilege ``has_table_privilege`` takes on a table (``MAINTAIN`` since PostgreSQL 17).
+EVERY_PRIVILEGE = ("SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE", "REFERENCES", "TRIGGER", "MAINTAIN")
+ANY_PRIVILEGE = ", ".join(EVERY_PRIVILEGE)
 
 
 def migration():
@@ -87,8 +88,8 @@ NONE_ALLOWED = {"SELECT": False, "INSERT": False, "UPDATE": False, "DELETE": Fal
 # ── The deploy: ``manage.py migrate`` as ``hub-migrate`` runs it, the migrator's role and production's settings ──────
 
 
-def migrate(cluster: Cluster, *args: str) -> None:
-    done = subprocess.run(
+def run_migrate(cluster: Cluster, *args: str) -> subprocess.CompletedProcess:
+    return subprocess.run(
         [sys.executable, "manage.py", "migrate", *args, "--noinput", "--verbosity", "0"],
         cwd=Path(__file__).resolve().parents[2],
         env={
@@ -102,6 +103,10 @@ def migrate(cluster: Cluster, *args: str) -> None:
         text=True,
         timeout=600,
     )
+
+
+def migrate(cluster: Cluster, *args: str) -> None:
+    done = run_migrate(cluster, *args)
     assert done.returncode == 0, done.stderr[-3000:]
 
 
@@ -118,6 +123,26 @@ def test_the_deploy_takes_the_retired_tables_from_the_app_and_stepping_back_retu
     migrate(cluster, "control", BEFORE)
 
     assert what_the_app_can_do(cluster, HUB_TABLE) == ALL_ALLOWED
+
+
+def test_a_deploy_that_cannot_close_one_fails_closes_none_and_records_nothing(cluster):
+    # The migration's own transaction: ``as_migrator`` below brings one of the test's.
+    foreign = f"foreign_{RETIRED}"
+    migrate(cluster, "control", BEFORE)
+    make_tables(cluster, HUB_TABLE)
+    with superuser(cluster.names.control) as conn:
+        conn.execute(f'CREATE TABLE "{foreign}" (id int)')
+        conn.execute(f'GRANT SELECT ON "{foreign}" TO "{cluster.role("hub_migrator")}"')
+        conn.execute(f'GRANT INSERT ON "{foreign}" TO "{cluster.role("hub_app")}"')
+
+    done = run_migrate(cluster, "control")
+
+    assert done.returncode != 0
+    assert "RetiredTablesStillOpen" in done.stderr
+    assert what_the_app_can_do(cluster, RETIRED) == ALL_ALLOWED
+    with superuser(cluster.names.control) as conn:
+        recorded = conn.execute("SELECT 1 FROM django_migrations WHERE app = 'control' AND name = %s", [MIGRATION])
+        assert recorded.fetchone() is None
 
 
 # ── The migration's steps, as the migrator, on the cluster's control database ─────────────────────────────────────
@@ -231,18 +256,19 @@ def test_stepping_back_returns_exactly_what_it_took(cluster, as_migrator):
 
 def test_a_table_the_migrator_cannot_close_stops_the_deploy_and_closes_none(cluster, as_migrator):
     # PostgreSQL only warns when who revokes is not the owner: what the app still holds is read back.
-    foreign = f"foreign_{RETIRED}"
+    foreign = {privilege: f"foreign_{privilege.lower()}_{RETIRED}" for privilege in EVERY_PRIVILEGE}
     make_tables(cluster, RETIRED)
     with superuser(cluster.names.control) as conn:
-        conn.execute(f'CREATE TABLE "{foreign}" (id int)')
-        conn.execute(f'GRANT SELECT ON "{foreign}" TO "{cluster.role("hub_migrator")}"')
-        conn.execute(f'GRANT INSERT ON "{foreign}" TO "{cluster.role("hub_app")}"')
+        for privilege, table in foreign.items():
+            conn.execute(f'CREATE TABLE "{table}" (id int)')
+            conn.execute(f'GRANT SELECT ON "{table}" TO "{cluster.role("hub_migrator")}"')
+            conn.execute(f'GRANT {privilege} ON "{table}" TO "{cluster.role("hub_app")}"')
 
     with pytest.raises(migration().RetiredTablesStillOpen) as stopped:
         as_migrator(migration().forwards)
 
     assert stopped.value.code == "control.retired_table_still_open"
-    assert stopped.value.tables == [foreign]
+    assert stopped.value.tables == sorted(foreign.values())
     assert what_the_app_can_do(cluster, RETIRED) == ALL_ALLOWED
 
 
