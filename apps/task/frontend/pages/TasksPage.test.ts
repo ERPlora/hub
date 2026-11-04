@@ -6,7 +6,7 @@
 // Start and Complete where they apply; the row and Detail open the sheet; «+» opens «New task».
 import { DataTable, EmptyState, InlineFeedback, StatusPill } from '@erplora/ui/components';
 import { AppPage } from '@erplora/ui/shell';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
 import type { TaskOut } from '../operations';
@@ -33,9 +33,10 @@ const ROWS = [
   task({ id: 't3', number: 'TSK-20261015-0003', title: 'Fix the sign', status: 'done', completed_at: '2026-10-15T09:00:00Z', due_date: '2020-01-01' }),
 ];
 
-async function setup(options: MountOptions & { me?: unknown } = {}) {
+async function setup(options: MountOptions & { me?: unknown; timezone?: string } = {}) {
   const m = await mountTask(TasksPage, { path: '/task/tasks', ...options });
   await m.live();
+  await m.result('base.business.get', { timezone: options.timezone ?? 'Europe/Madrid' });
   if (options.me !== null) await m.result(ME, options.me ?? { member: { id: 'm9' } });
   const tables = () => m.wrapper.findAllComponents(DataTable as unknown as Component);
   const table = () => tables()[0];
@@ -48,6 +49,18 @@ async function setup(options: MountOptions & { me?: unknown } = {}) {
       .map((a) => a.id);
   return { ...m, table, prop, rows, cells, actions, show: (data: unknown, op: typeof ALL | typeof MINE = ALL) => m.result(op, data) };
 }
+
+describe("TasksPage on the business's clock (hub#779)", () => {
+  afterEach(() => vi.useRealTimers());
+
+  it("a task due today is not late until the business's midnight", async () => {
+    // 23:30 UTC on 2 November is still the 2nd in the Canaries and already the 3rd in Madrid.
+    const s = await setup({ timezone: 'Atlantic/Canary' });
+    vi.useFakeTimers({ now: new Date('2026-11-02T23:30:00Z'), toFake: ['Date'] });
+    await s.show(page([task({ id: 't1', due_date: '2026-11-02', status: 'todo' })]));
+    expect(s.rows()[0].find('[data-testid="task-due"]').attributes('aria-label')).toBe('Due today');
+  });
+});
 
 describe('TasksPage · All', () => {
   it('follows every task, the newest first, 50 from the first', async () => {

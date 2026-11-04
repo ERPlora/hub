@@ -70,15 +70,45 @@ beforeEach(() => {
 });
 afterEach(() => vi.useRealTimers());
 
-async function setup(options: MountOptions = {}) {
+async function setup(options: MountOptions = {}, timezone = 'Europe/Madrid') {
   const m = await mountAttendance(RecordsPage, { path: '/attendance/records', ...options });
   await m.live();
+  await m.result('base.business.get', { timezone });
   const table = () => m.wrapper.findComponent(DataTable as unknown as Component);
   const prop = <T = unknown>(name: string) => (table().props() as Record<string, unknown>)[name] as T;
   const rows = () => m.wrapper.findAll('[data-testid="attendance-records-row"]');
   const cells = (i: number) => rows()[i].findAll('[role="cell"]').map((c) => c.text().trim());
   return { ...m, table, prop, rows, cells, list: () => m.params(OP), show: (data: unknown) => m.result(OP, data) };
 }
+
+describe("RecordsPage on the business's clock (hub#779)", () => {
+  it('paints each hour on it', async () => {
+    const s = await setup({}, 'Atlantic/Canary');
+    await s.show(page(ROWS));
+    // 07:00 UTC of the open day, and 07:02 and 15:05 of the closed one, in the Canaries in October (UTC+1), an hour
+    // less than in Madrid.
+    expect(s.cells(0).slice(2, 4)).toEqual(['08:00', '—']);
+    expect(s.cells(1).slice(2, 4)).toEqual(['08:02', '16:05']);
+  });
+
+  it('starts on the month of the business, once it says its zone', async () => {
+    // 23:30 UTC on 31 October is still October in the Canaries and already November in Madrid.
+    vi.setSystemTime(new Date('2026-10-31T23:30:00Z'));
+    const s = await setup({}, 'Atlantic/Canary');
+    await s.reopen();
+    expect(s.list()).toEqual([{ ...OCTOBER, sort: '-clock_in_at', limit: 50, offset: 0 }]);
+    vi.setSystemTime(new Date(NOW));
+  });
+
+  it('a month the person chose stays when the zone answers again', async () => {
+    const s = await setup({}, 'Atlantic/Canary');
+    const month = s.find('attendance-records-month');
+    month.element.dispatchEvent(new CustomEvent('ionChange', { detail: { value: '2026-09' } }));
+    await flush();
+    await s.result('base.business.get', { timezone: 'Asia/Tokyo' }, {}, 2);
+    expect(s.list()).toEqual([{ date_from: '2026-09-01', date_to: '2026-09-30', sort: '-clock_in_at', limit: 50, offset: 0 }]);
+  });
+});
 
 describe('RecordsPage for a manager (ATTENDANCE-F07)', () => {
   it('follows the team’s days of this month, newest first, 50 from the first', async () => {

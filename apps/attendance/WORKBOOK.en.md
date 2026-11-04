@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:512fd03b23a46220f82d419f451a91f8182f620705f1f7a718474e5929ad77b7 -->
+<!-- generated from WORKBOOK.md sha256:c7279bc5f747858560ec4a987fcfad3775cb3679225d335b10e4c85062c8c201 -->
 
 ## What it is for and who it is for
 
@@ -435,7 +435,7 @@ The notices never carry the position or the reason of a correction (personal dat
 - `staff.member.terminated` → `attendance.record.close_for_terminated` (ATTENDANCE-F13), delivered by the
   worker's outbox relay once per notice.
 - `staff.member.updated` and `staff.member.terminated` repaint the lists (a person's name or status).
-- From the platform: the session and the business's time zone (phase 1: `Europe/Madrid`).
+- From the platform: the session and the business's time zone.
 
 ### Who can do what
 

@@ -51,7 +51,7 @@ async function setup(
   locale: 'en' | 'es' = 'en',
   extra: { channel?: ChannelOut | null; session?: typeof EMPLOYEE } = {},
 ) {
-  // The composer subscribes to nothing until «Template» is pressed: no stream to open here.
+  // The composer follows only the business's zone until «Template» is pressed: a test of the hour opens the stream.
   const props = { conversation: conversation(over), now: NOW, ...(extra.channel !== undefined ? { channel: extra.channel } : {}) };
   const m = await mountInbox(MessageComposer, { props, locale, session: extra.session });
   await settle();
@@ -72,7 +72,9 @@ describe('MessageComposer: reply (WHATSAPP_INBOX-F32)', () => {
     expect(s.send().disabled).toBe(true);
     await ionValue(s.text(), 'Sí, mañana a las 10', 'ionInput');
     expect(s.send().disabled).toBe(false);
-    const until = formatDateTime('2026-10-16T09:50:00Z', 'en', { timeZone: 'Europe/Madrid' });
+    await s.live();
+    await s.result('base.business.get', { timezone: 'Atlantic/Canary' });
+    const until = formatDateTime('2026-10-16T09:50:00Z', 'en', { timeZone: 'Atlantic/Canary' });
     expect(s.find('whatsapp-inbox-composer-window').text()).toBe(`You can write freely until ${until}.`);
   });
 

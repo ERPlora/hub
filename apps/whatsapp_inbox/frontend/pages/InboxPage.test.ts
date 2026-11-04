@@ -62,9 +62,10 @@ const CONNECTED: ChannelOut = {
   plans_url: 'http://localhost:8001/store/plans',
 };
 
-async function setup(options: MountOptions = {}, channel: ChannelOut = CONNECTED) {
+async function setup(options: MountOptions = {}, channel: ChannelOut = CONNECTED, timezone = 'Europe/Madrid') {
   const m = await mountInbox(InboxPage, options);
   await m.live();
+  await m.result('base.business.get', { timezone });
   await m.result(CHANNEL, channel);
   const table = () => m.wrapper.findComponent(DataTable as unknown as Component);
   const prop = <T = unknown>(name: string) => (table().props() as Record<string, unknown>)[name] as T;
@@ -72,6 +73,20 @@ async function setup(options: MountOptions = {}, channel: ChannelOut = CONNECTED
 }
 
 describe('InboxPage: the live list', () => {
+  it("says when each conversation last moved on the business's clock (hub#779)", async () => {
+    const s = await setup({}, CONNECTED, 'Atlantic/Canary');
+    await s.result(LIST, PAGE);
+    const columns = s.prop<{ key: string; format?: (v: unknown, r: ConversationOut) => string }[]>('columns');
+    const when = columns.find((c) => c.key === 'last_message_at')!;
+    vi.useFakeTimers({ now: new Date('2026-10-15T10:00:00Z'), toFake: ['Date'] });
+    try {
+      // 08:30 UTC is 09:30 in the Canaries in October (UTC+1), 10:30 in Madrid.
+      expect(when.format!('2026-10-15T08:30:00Z', PAGE.rows[0])).toBe('09:30');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('while the list loads, the table says it is loading, never «0 conversations» (gh:pm#611)', async () => {
     const s = await setup();
     expect(s.prop('loading')).toBe(true);

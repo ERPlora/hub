@@ -38,9 +38,11 @@ const DAY: RecordOut = {
   as_of: '2026-10-06T08:30:00Z',
 };
 
-async function setup(record: RecordOut = DAY, locale: 'en' | 'es' = 'en') {
+async function setup(record: RecordOut = DAY, locale: 'en' | 'es' = 'en', timezone: string | null = 'Europe/Madrid') {
   const m = await mountAttendance(CorrectionModal, { props: { open: false, record, team: true }, locale, path: '/attendance/records' });
   await m.wrapper.setProps({ 'onUpdate:open': (open: boolean) => m.wrapper.setProps({ open }) });
+  await m.live();
+  if (timezone) await m.result('base.business.get', { timezone });
   await m.wrapper.setProps({ open: true });
   await settle();
   const field = (name: string) => m.inDoc(`attendance-correct-${name}`) as Control;
@@ -49,6 +51,29 @@ async function setup(record: RecordOut = DAY, locale: 'en' | 'es' = 'en') {
 }
 
 describe('CorrectionModal (ATTENDANCE-F08)', () => {
+  it("shows each time on the business's clock and keeps an untouched one to the second (hub#779)", async () => {
+    const s = await setup(DAY, 'en', 'Atlantic/Canary');
+    // 07:02 UTC is 08:02 in the Canaries in October (UTC+1), 09:02 in Madrid.
+    expect([s.field('clock_in').value, s.field('clock_out').value]).toEqual(['2026-10-05T08:02', '2026-10-05T16:05']);
+    s.answerBy({ '/api/attendance/records/correct': [200, DAY] });
+    await ionValue(s.field('clock_out'), '2026-10-05T16:30', 'ionInput');
+    await ionValue(s.field('reason'), 'Forgot to clock out', 'ionInput');
+    await click(s.save());
+    await settle();
+    expect(s.sent()[0].body).toMatchObject({ clock_in_at: DAY.clock_in_at, clock_out_at: '2026-10-05T16:30' });
+  });
+
+  it('cannot be saved until the business says its zone: what is typed is read on its clock (hub#779)', async () => {
+    const s = await setup(DAY, 'en', null);
+    expect(s.save().disabled).toBe(true);
+    await ionValue(s.field('reason'), 'Forgot to clock out', 'ionInput');
+    await s.result('base.business.get', { timezone: 'Atlantic/Canary' });
+    await settle();
+    expect(s.save().disabled).toBe(false);
+    // Filled again on the business's clock, and what was written stays.
+    expect([s.field('clock_in').value, s.field('reason').value]).toEqual(['2026-10-05T08:02', 'Forgot to clock out']);
+  });
+
   it('shows the day and its times in business time, with an empty reason', async () => {
     const s = await setup();
     expect(s.inDoc('attendance-correct')?.getAttribute('aria-label')).toBe('Correct working day');

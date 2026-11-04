@@ -86,9 +86,15 @@ beforeEach(() => {
 });
 afterEach(() => vi.useRealTimers());
 
-async function setup(data: CurrentOut | null = current(), settings: SettingsOut = SETTINGS, locale: 'en' | 'es' = 'en') {
+async function setup(
+  data: CurrentOut | null = current(),
+  settings: SettingsOut = SETTINGS,
+  locale: 'en' | 'es' = 'en',
+  timezone = 'Europe/Madrid',
+) {
   const m = await mountAttendance(ClockPage, { session: EMPLOYEE, locale, path: '/attendance/clock' });
   await m.live();
+  await m.result('base.business.get', { timezone });
   if (data) {
     await m.result('attendance.record.current', data);
     await m.result('attendance.settings.get', settings);
@@ -342,5 +348,16 @@ describe('ClockPage from a personal device when the business asks for the locati
     await flush();
     expect(geo.getPosition).not.toHaveBeenCalled();
     expect(s.sent()[0].body).toEqual({});
+  });
+});
+
+describe("ClockPage on the business's clock (hub#779)", () => {
+  it('says the time, since when and each day on it', async () => {
+    // 07:00 and 08:30 UTC are 08:00 and 09:30 in the Canaries in October (UTC+1), an hour less than in Madrid.
+    const open = day({ clock_in_at: '2026-10-06T07:00:00Z' });
+    const s = await setup(current({ open, recent: [open] }), SETTINGS, 'en', 'Atlantic/Canary');
+    expect(s.text('attendance-clock-now')).toBe('It is 09:30');
+    expect(s.text('attendance-clock-status')).toBe('Clocked in since 08:00');
+    expect(s.wrapper.findAll('[data-testid="attendance-clock-recent-row"]')[0].text()).toContain('08:00 – …');
   });
 });

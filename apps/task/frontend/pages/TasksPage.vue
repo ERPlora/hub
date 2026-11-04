@@ -24,6 +24,7 @@ import { computed, ref, watch } from 'vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import TaskFormModal from '../components/TaskFormModal.vue';
 import TaskSheet from '../components/TaskSheet.vue';
+import { useBusinessZone } from '../../../../base/frontend/lib/zone';
 import { useLiveList } from '../composables/useLiveList';
 import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
@@ -38,6 +39,7 @@ const PRIORITIES: readonly TaskPriority[] = ['low', 'medium', 'high', 'urgent'];
 const session = useSession();
 const t = useT();
 const locale = useLocale();
+const zone = useBusinessZone();
 const canAdd = computed(() => session.can('task.add'));
 
 // «All» and «My tasks»
@@ -202,7 +204,7 @@ async function onAction({ actionId, row }: { actionId: string; row: TaskOut }): 
 }
 
 const dueLabel = (row: TaskOut): string | undefined => {
-  const tone = dueTone(row.due_date, row.status);
+  const tone = dueTone(row.due_date, row.status, zone.value);
   return tone === 'none' ? undefined : t(tone === 'overdue' ? 'task.due.overdue' : 'task.due.today');
 };
 </script>
@@ -306,7 +308,7 @@ const dueLabel = (row: TaskOut): string | undefined => {
       <template #due="{ row }">
         <span
           data-testid="task-due"
-          :class="`task-due task-due--${dueTone(pill(row).due_date, pill(row).status)}`"
+          :class="`task-due task-due--${dueTone(pill(row).due_date, pill(row).status, zone)}`"
           :aria-label="dueLabel(pill(row))"
           :title="dueLabel(pill(row))"
         >{{ formatDay(pill(row).due_date, locale) }}</span>
@@ -367,7 +369,7 @@ const dueLabel = (row: TaskOut): string | undefined => {
       <template #due="{ row }">
         <span
           data-testid="task-due"
-          :class="`task-due task-due--${dueTone(pill(row).due_date, pill(row).status)}`"
+          :class="`task-due task-due--${dueTone(pill(row).due_date, pill(row).status, zone)}`"
           :aria-label="dueLabel(pill(row))"
           :title="dueLabel(pill(row))"
         >{{ formatDay(pill(row).due_date, locale) }}</span>

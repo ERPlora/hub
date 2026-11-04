@@ -41,11 +41,12 @@ const COMMENTS_PAGE = page([
   { id: 'c1', task_id: 't1', text: 'On it', author_id: null, author_name: null, created_at: '2026-10-15T09:00:00Z' },
 ]);
 
-async function setup(options: { session?: typeof OWNER; locale?: 'en' | 'es'; detail?: unknown } = {}) {
+async function setup(options: { session?: typeof OWNER; locale?: 'en' | 'es'; detail?: unknown; timezone?: string } = {}) {
   const m = await mountTask(TaskSheet, { props: { open: true, taskId: 't1' }, session: options.session, locale: options.locale });
   await m.wrapper.setProps({ 'onUpdate:open': (open: boolean) => m.wrapper.setProps({ open }) });
   await settle();
   await m.live();
+  await m.result('base.business.get', { timezone: options.timezone ?? 'Europe/Madrid' });
   await m.result(DETAIL, options.detail ?? TASK);
   await m.result(SUBTASKS, page([SUB]));
   await m.result(COMMENTS, COMMENTS_PAGE);
@@ -56,6 +57,11 @@ async function setup(options: { session?: typeof OWNER; locale?: 'en' | 'es'; de
 }
 
 describe('TaskSheet', () => {
+  it("tells when on the business's clock (hub#779)", async () => {
+    const s = await setup({ detail: { ...TASK, status: 'done', completed_at: '2026-11-02T09:00:00Z' }, timezone: 'Atlantic/Canary' });
+    expect(s.text('task-sheet-completed')).toBe('Completed: 02/11/2026, 09:00');
+  });
+
   it('follows the task, its subtasks and its comments live', async () => {
     const s = await setup();
     expect(s.params(DETAIL)).toEqual([{ id: 't1' }]);

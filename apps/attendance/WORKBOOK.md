@@ -458,7 +458,7 @@ Los avisos nunca llevan la posición ni el motivo de una corrección (datos pers
   relay del outbox del worker una sola vez por aviso.
 - `staff.member.updated` y `staff.member.terminated` vuelven a pintar las listas (el nombre o el
   estado de una persona).
-- De la plataforma: la sesión y la zona horaria del negocio (fase 1: `Europe/Madrid`).
+- De la plataforma: la sesión y la zona horaria del negocio.
 
 ### Quién puede qué
 
@@ -511,8 +511,10 @@ Los avisos nunca llevan la posición ni el motivo de una corrección (datos pers
 - Una corrección guarda `is_system` y el nombre de quien la hizo (`created_by_name`): si su usuario se
   borra, sigue siendo suya y no del «Sistema».
 - `close_for_terminated` solo actúa sobre una ficha dada de baja.
-- El «hoy» y el día de una jornada son los del negocio: `timezone.localdate()` (fase 1, `TIME_ZONE` =
-  `Europe/Madrid`). Las horas se guardan en UTC (`timestamptz`).
+- El «hoy», el día de una jornada y toda hora que se dice o se teclea son los del negocio (hub#779): en el servidor,
+  `base.business.business_zone` (`business_date`, el CSV, `Instant` sin desfase); en la pantalla, `useBusinessZone`, que
+  `lib/time.ts` pide en cada función. Las horas se guardan en UTC (`timestamptz`). «Corregir jornada» no se puede
+  guardar hasta que el negocio dice su zona: lo tecleado se lee en su reloj.
 - Las duraciones se calculan en el servidor en segundos «a fecha de» (`as_of`); la pantalla las hace
   correr sola a partir de ahí, sin preguntar cada segundo. Una jornada «Por revisar» sin salida no tiene
   tiempo trabajado (vacío): contar «hasta ahora» sumaría días que nadie trabajó.
