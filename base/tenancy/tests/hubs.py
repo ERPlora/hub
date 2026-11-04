@@ -88,6 +88,19 @@ def _drop(conn, name: str, control: str) -> None:
     conn.execute(sql.SQL("DROP DATABASE IF EXISTS {} WITH (FORCE)").format(names.identifier(name, control=control)))
 
 
+def on_the_test_database() -> bool:
+    """``default`` is this session's test database, not the developer's: what the root conftest's ``django_db_setup``
+    leaves it as."""
+    connection = connections[DEFAULT_DB_ALIAS]
+    return connection.settings_dict["NAME"] == connection.creation._get_test_db_name()
+
+
+def _assert_on_the_test_database() -> None:
+    assert on_the_test_database(), (
+        f"default is {tenancy_connections.control_name()!r}, not this session's test database"
+    )
+
+
 @pytest.fixture(name="db")
 def committed_database(django_db_setup, django_db_blocker):
     """The test database without a test case around it, for a test of the migrator: what it writes is committed.
@@ -101,10 +114,7 @@ def committed_database(django_db_setup, django_db_blocker):
     from control.models import Hub
 
     with django_db_blocker.unblock():
-        connection = connections["default"]
-        assert connection.settings_dict["NAME"] == connection.creation._get_test_db_name(), (
-            f"default is {connection.settings_dict['NAME']!r}, not this session's test database"
-        )
+        _assert_on_the_test_database()
         before = set(Hub.objects.filter(slug__in=LOCAL_HUBS).values_list("slug", flat=True))
         yield
         # The root conftest's local_hubs writes them for any test with a db: committed here, so taken back.
@@ -178,7 +188,10 @@ def forget_aliases(before: dict) -> None:
 
 
 def build() -> HubDatabases:
-    """Make the template and both hubs' databases, then register both hubs' aliases for the rest of the session."""
+    """Make the template and both hubs' databases, then register both hubs' aliases for the rest of the session.
+
+    Only under this session's test database: their names derive from ``default``'s, and they are dropped first."""
+    _assert_on_the_test_database()
     before = connections.settings
     try:
         built = _build()
