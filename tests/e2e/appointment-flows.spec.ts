@@ -255,8 +255,15 @@ FLOW_VIEWPORTS.forEach((vp, index) => {
       await expect(history).toBeVisible();
       await expect(history).toContainText('Time changed');
       await expect(history).toContainText('Booked');
+      await expect(history.locator('[data-testid=appointment-history-modal-cancel]')).toHaveCount(0);
+      await expect(history.locator('[data-testid=appointment-history-modal-submit]')).toHaveCount(0);
       await capture(page, 'APPOINTMENT-F10');
+      // Both ways out of a read-only window: Escape, and its one «Close» (hub#711).
       await page.keyboard.press('Escape');
+      await expect(history).toBeHidden();
+      await rowAction(page, 'appointment-list', first.id, 'history');
+      await expect(history).toBeVisible();
+      await history.locator('[data-testid=appointment-history-modal-done]').click();
       await expect(history).toBeHidden();
 
       // APPOINTMENT-F03: a booking she made herself waits («N to confirm») until the business confirms it.
