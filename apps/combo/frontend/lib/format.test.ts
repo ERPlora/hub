@@ -32,6 +32,16 @@ describe('formatMoney', () => {
     expect(formatMoney(1350, 'es')).toBe('13,50');
     expect(formatMoney(1350, 'en')).toBe('13.50');
   });
+
+  // hub#654: Spanish CLDR waits for five digits; every screen of the Hub groups from four on.
+  it('groups the thousands from four digits on, in every language, with or without the currency', () => {
+    expect(plain(formatMoney(123456, 'es', EUR))).toBe('1.234,56 €');
+    expect(plain(formatMoney(123456789, 'es', EUR))).toBe('1.234.567,89 €');
+    expect(formatMoney(123456, 'en', EUR)).toBe('€1,234.56');
+    expect(plain(formatMoney(1500, 'es', JPY))).toBe('1.500 ¥');
+    expect(formatMoney(123456, 'es')).toBe('1.234,56');
+    expect(plain(formatMoney(99999, 'es', EUR))).toBe('999,99 €');
+  });
 });
 
 describe('formatDelta', () => {
@@ -40,6 +50,13 @@ describe('formatDelta', () => {
     expect(plain(formatDelta(-50, 'en', PLN))).toBe('-zł 0.50');
     expect(formatDelta(200, 'en', JPY)).toBe('+¥200');
     expect(formatDelta(0, 'en', PLN)).toBe('');
+  });
+
+  it('groups the thousands of a supplement like any other amount (hub#654)', () => {
+    expect(plain(formatDelta(123456, 'es', EUR))).toBe('+1.234,56 €');
+    expect(plain(formatDelta(-123456, 'es', EUR))).toBe('-1.234,56 €');
+    expect(formatDelta(123456, 'es')).toBe('+1.234,56');
+    expect(plain(formatDelta(-123456, 'en', PLN))).toBe('-zł 1,234.56');
   });
 
   it('carries its sign and no symbol until the business answers', () => {

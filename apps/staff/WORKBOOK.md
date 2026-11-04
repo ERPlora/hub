@@ -738,6 +738,8 @@ El cajero del producto actual ya no existe como papel: lo que veía (el director
 - El «hoy» es `timezone.localdate()` (`business_today()` de `queries.py`; en la fase 1, `TIME_ZONE`),
   aunque `control.Hub.timezone` ya guarda la zona de cada hub (hub#63): la contradicción está señalada
   en las rondas CLOSE-SCHEDULE y CLOSE-STAFF de `PLAN-HUB.md`.
+- **Millares**: los importes agrupan los millares también con cuatro cifras («1.234,56 €»; `formatMoney` de
+  `@erplora/ui/components`, con `useGrouping: 'always'`, porque el CLDR del español espera a cinco: hub#494).
 - Dinero en unidades menores enteras de la moneda del negocio (`hourly_rate`; céntimos en euros); la
   comisión es `Decimal(5, 2)` de 0 a 100. La pantalla pinta y lee los importes con `useBusinessMoney` de
   `base` (`base.business.get`: la moneda del país y los decimales que cuenta el servidor, nunca los de

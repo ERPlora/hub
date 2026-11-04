@@ -13,8 +13,6 @@ migración con su clave `inventory:ui-…`. Ninguno rompe un flujo: todos tienen
   - `ion:close-circle-outline` — cifra **Agotados** del panel; hoy `ion:close-outline` (`pages/DashboardPage.vue`).
   - `ion:pricetag-outline` — cifra **Valor de existencias**; hoy `ion:wallet-outline`.
   - `ion:cloud-upload-outline` — botón **Importar CSV**; hoy `ion:cloud-outline` (`components/CsvButtons.vue`).
-- **`formatMoney`** (`@erplora/ui/components/format`): la app sigue con su `lib/format.ts`. Ninguno de los
-  dos agrupa los millares de un importe de cuatro cifras en español («1234,56 €»): eso lo lleva hub#525.
 
 ## Iconos (`inventory:ui-icons`)
 
