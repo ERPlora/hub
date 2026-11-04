@@ -2822,6 +2822,10 @@ Implicados: HUBS-F18, HUBS-F19, HUBS-F20
 
 ## Para quien lo mantiene
 
+- **Orden de una lista** (`base/ordering.py`, regla hub#2355 del producto viejo): `list_order(*columnas, descending=…,
+  nulls_last=…)` devuelve lo que necesita `order_by`, con todas las columnas y después el `id` en la dirección de la
+  lista: la descendente es la ascendente leída al revés, empates incluidos, y las páginas ni repiten ni pierden filas.
+  Una app no escribe su propia copia. La usan Clientes, Asistencia y Ventas; las demás siguen con la suya hasta hub#768.
 - Las tres consultas vivas del Inicio son de `base/queries.py`, con permiso `base.view_home` y ruta ninja en
   `base/api.py` (`GET /api/home/setup`, `/home/widgets`, `/home/bell`): `base.setup.status` (también
   herramienta del asistente, `ai=`), `base.widget.list` y `base.bell.counters`. Las reglas puras viven en
@@ -3035,7 +3039,12 @@ Implicados: HUBS-F18, HUBS-F19, HUBS-F20
   las plantillas traen las de todas las portables, así que solo pasa con la que llega con un código posterior) da 202
   `creating` (el OpenAPI documenta 200 y 202 con el mismo esquema, hub#705): el worker las crea (`_activations`, `base.app.activation_settle`) o la deja `failed` con `attempts`,
   `last_error` y `next_attempt_at` (1, 5 y 15 min, luego cada hora), y `base.app.retry` la vuelve a pedir (BASE-F21, F22;
-  S3, hub#601). `last_error` no llega a la pantalla, que dice «No se ha podido activar»: se queda en la fila, y el
+  S3, hub#601). Fuera de una operación (un `events.py`, el admin, una tarea) tocar un modelo de esa app da el mismo 404: el `TenantRouter`
+  lanza `AppNotCreated` antes de mandar SQL (hub#608). Lo decide `base.activation.has_tables`: lo que lista la fila que el
+  contexto ya tiene pasa sin consulta ni caché; lo que no lista se pregunta a control por `base.apps_created:<host>`,
+  olvidada con `activation.forget` y al acabar `ensure_schema`, porque esa fila puede ser de antes de crear las tablas. Una
+  fila sin confirmar (sin `base`) no niega nada, y el alias `__ddl` del migrador nunca pregunta. El índice del admin deja
+  fuera esas apps y su página vuelve al índice con el aviso. No cubre SQL crudo ni el JOIN de un `select_related`. `last_error` no llega a la pantalla, que dice «No se ha podido activar»: se queda en la fila, y el
   evento `base.app.activation_failed` lleva su código. La sesión da `activating` a la que se prepara y `off` a la que falló, y ninguna
   de las dos sale en el menú. El veto de VeriFactu está en su app (VERIFACTU-F32). El gancho `can_disable(ctx)` corre en `translation.override(ctx.language)`: un
   `gettext` a secas ya responde en el idioma de quien pide (gh:hub#2595). En Apps, la negativa (409 o cualquier otro

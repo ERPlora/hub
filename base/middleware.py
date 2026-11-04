@@ -54,7 +54,9 @@ own database yet (phase 1's, before its cut: S5) answers 503 ``base.hub_maintena
 whose every place in this process is taken (its plan's transactions at once, ``base.tenancy.limits``) answers 503
 ``base.hub_busy`` with ``Retry-After``, whether that happens while checking its database, in
 ``SaasLoginRequiredMiddleware`` (the website, a till's device) or in the view (the API's routes answer it themselves,
-with the same envelope): the envelope, or for a page (the admin, the website) its message as text.
+with the same envelope): the envelope, or for a page (the admin, the website) its message as text. A view that touches
+a module whose tables the business does not have yet (``AppNotCreated``, ``base.tenancy.router``) answers its 404
+``app_inactive`` the same way; the admin's page goes back to its index, saying so.
 
 ``SessionHostMiddleware`` (phase 2, S1): a session is a session of the host it was opened on (the login notes it);
 on another hub's host, or on the platform host, it is anonymous (401).
@@ -308,11 +310,14 @@ class HubDatabaseMiddleware:
         return tenancy_context.use_hub(resolved)
 
     def process_exception(self, request: HttpRequest, exception: Exception) -> HttpResponse | None:
-        """A view that found its hub busy (the admin's, a page's) answers 503 instead of 500. On the platform host with
-        no business chosen, a page of a hub's model (which only a business's database holds) goes back to the admin's
-        index, saying what to do; anything else is left to Django."""
+        """A view that found its hub busy (the admin's, a page's) answers 503 instead of 500, and one that touched a module
+        the business has not created its 404 instead of 500. On the platform host with no business chosen, a page of a
+        hub's model (which only a business's database holds) goes back to the admin's index, saying what to do; anything
+        else is left to Django."""
         if isinstance(exception, tenancy_limits.HubBusy):
             return self._busy(request, exception)
+        if isinstance(exception, tenancy_context.AppNotCreated):
+            return self._not_created(request, exception)
         if not (isinstance(exception, tenancy_context.HubContextMissing) and getattr(request, "platform_host", False)):
             return None
         from django.contrib import messages
@@ -325,6 +330,19 @@ class HubDatabaseMiddleware:
             ),
         )
         return HttpResponseRedirect(reverse("admin:index"))
+
+    @staticmethod
+    def _not_created(request: HttpRequest, refused: tenancy_context.AppNotCreated) -> HttpResponse:
+        """404 ``app_inactive``: the envelope; the admin's page, its index with what it says; another page, the index
+        itself included (going back to it would be a loop), its message."""
+        if _wants_envelope(request):
+            return _envelope(refused.status, refused.code, refused.message)
+        if getattr(request, "platform_host", False) and request.path_info != _route("admin:index"):
+            from django.contrib import messages
+
+            messages.warning(request, refused.message)
+            return HttpResponseRedirect(reverse("admin:index"))
+        return HttpResponse(refused.message, status=refused.status, content_type="text/plain; charset=utf-8")
 
     @staticmethod
     def _busy(request: HttpRequest, busy: tenancy_limits.HubBusy) -> HttpResponse:
