@@ -45,7 +45,8 @@ def po_entries(path: Path) -> dict[str, tuple[str, bool]]:
         starts_entry = line.startswith("msgid ") or (line.startswith("#") and current == "msgstr")
         if starts_entry:
             flush()
-            parts, fuzzy, current = {"msgid": [], "msgstr": []}, False, None
+            # A ``#, fuzzy`` above a ``msgid`` belongs to the entry it opens: only what comes after a ``msgstr`` forgets it.
+            parts, fuzzy, current = {"msgid": [], "msgstr": []}, fuzzy and current is None, None
         if line.startswith("#,") and "fuzzy" in line:
             fuzzy = True
         elif line.startswith(("msgid ", "msgstr ")):
@@ -119,6 +120,35 @@ def schema_titles() -> set[str]:
         if op.app_label == "tax"
         for field in op.input.model_fields.values()
         if field.title
+    }
+
+
+def test_the_reader_sees_a_fuzzy_mark_on_its_own_entry(tmp_path):
+    """gettext does not use a fuzzy translation, so the screen stays in English: the reader has to see the mark on its
+    own entry. Neither the entry behind it nor the one behind a fuzzy header (what ``makemessages`` writes in a new
+    catalog) inherits it."""
+    po = tmp_path / "django.po"
+    po.write_text(
+        "#, fuzzy\n"
+        'msgid ""\n'
+        'msgstr ""\n'
+        '"Language: es\\n"\n'
+        "\n"
+        'msgid "Behind the header"\n'
+        'msgstr "Tras la cabecera"\n'
+        "\n"
+        "#, fuzzy\n"
+        'msgid "Marked"\n'
+        'msgstr "Marcada"\n'
+        "\n"
+        'msgid "Behind the mark"\n'
+        'msgstr "Tras la marca"\n',
+        encoding="utf-8",
+    )
+    assert po_entries(po) == {
+        "Behind the header": ("Tras la cabecera", False),
+        "Marked": ("Marcada", True),
+        "Behind the mark": ("Tras la marca", False),
     }
 
 

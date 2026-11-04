@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:4686282ee9dad725583785135d8876acd1a95984b8c6fc219cd18829360084cc -->
+<!-- generated from WORKBOOK.md sha256:6fdfbdc642c7d0c06a61b3af146844a8b1609b0a42f9d887d6bc7455bf457c35 -->
 
 ## What it is for and who it is for
 
@@ -395,7 +395,8 @@ Steps:
    today's date, its lines and the base, the taxes and the total, negative; if the invoice already had
    rectifying invoices by differences, also what is left to rectify of it.
 5. Then "Run this action?" comes with the invoice's "Number" and the "Reason" and, in "What will happen",
-   the rectifying invoice about to be born: the "Type of rectifying invoice", the series' "Next number"
+   the rectifying invoice about to be born: the "Type of rectifying invoice" by its name, never by its code alone
+   ("Rectifying invoice: other causes (R4)"; also when the assistant asks for it when rectifying), the series' "Next number"
    (not reserved either) and the "Tax base", the "Tax" and the "Total", negative, in the business's
    currency. Type "CONFIRM" and tap "Run". That same rectifying invoice is issued, in your name, just as
    from the window: in **Invoices** the original shows "Cancelled" and there is a new "Rectifying" dated

@@ -37,6 +37,10 @@ function sources(): string[] {
     .sort();
 }
 
+/** The one other door out: it opens its own blank tab, synchronously in the click, to fill in once the operation signs
+ *  the pass (BASE-F11; a browser blocks a new window after an `await`). Everything else goes by `openExternalLink`. */
+const SECOND_DOOR = 'base/frontend/lib/saas-pass.ts';
+
 /** The files whose `_blank` links still wait for the common way, and why (each one, an issue). */
 const WAITING: Readonly<Record<string, string>> = {};
 
@@ -54,19 +58,22 @@ function lineOf(source: string, index: number): number {
   return source.slice(0, index).split('\n').length;
 }
 
-/** Whether the function `name` defined in `source` (declared or as an arrow) calls `openExternalLink`. */
+/** A call of one of the Hub's doors out. */
+const DOOR_OUT = /\b(?:openExternalLink|openSaasPass)\s*\(/;
+
+/** Whether the function `name` defined in `source` (declared or as an arrow) calls a door out. */
 function handlerOpensOutside(source: string, name: string): boolean {
   const start = source.search(new RegExp(`(?:function\\s+${name}\\s*\\(|const\\s+${name}\\s*=)`));
   if (start < 0) return false;
   const end = source.indexOf('\n}', start);
-  return /\bopenExternalLink\s*\(/.test(source.slice(start, end < 0 ? undefined : end));
+  return DOOR_OUT.test(source.slice(start, end < 0 ? undefined : end));
 }
 
-/** Whether a tag's click goes the common way: `openExternalLink(…)` itself, or a function of the file that calls it. */
+/** Whether a tag's click goes a common way: a door out itself, or a function of the file that calls it. */
 function clickOpensOutside(source: string, tag: string): boolean {
   const handler = CLICK.exec(tag)?.[1].trim();
   if (!handler) return false;
-  if (/\bopenExternalLink\s*\(/.test(handler)) return true;
+  if (DOOR_OUT.test(handler)) return true;
   const named = /^([A-Za-z_$][\w$]*)(?:\s*\(.*\))?$/.exec(handler)?.[1];
   return named !== undefined && handlerOpensOutside(source, named);
 }
@@ -115,6 +122,12 @@ describe('the scanner of the way out', () => {
     expect(scan(`${built}\nfunction other(url: string, event: Event): void {\n  openExternalLink(url, event);\n}`).stray).toEqual([4]);
   });
 
+  it('takes the link whose click goes by the pass to erplora.com, directly or named', () => {
+    expect(scan(`<a :href="url" target="_blank" @click="openSaasPass('plan', url, $event)">x</a>`)).toEqual({ stray: [], through: 1 });
+    const named = `<a :href="url" target="_blank" @click="go">x</a>\nfunction go(event: Event): void {\n  openSaasPass('plan', url, event);\n}`;
+    expect(scan(named)).toEqual({ stray: [], through: 1 });
+  });
+
   it('leaves alone a link that stays in the page', () => {
     expect(scan('<a :href="url" rel="noopener">x</a><ion-button :href="url">y</ion-button>')).toEqual({ stray: [], through: 0 });
   });
@@ -125,9 +138,15 @@ describe('guardrail: every link of the Hub to another page goes by `openExternal
 
   it('no `_blank` link skips it, besides the files still waiting with their issue', () => {
     const stray = found
-      .filter(({ file, stray }) => stray.length > 0 && !(file in WAITING))
+      .filter(({ file, stray }) => stray.length > 0 && !(file in WAITING) && file !== SECOND_DOOR)
       .flatMap(({ file, stray }) => stray.map((line) => `${file}:${line}`));
     expect(stray).toEqual([]);
+  });
+
+  it('the second door opens one tab of its own, and in the installed app leaves by `openExternalLink`', () => {
+    const source = readFileSync(join(HUB_DIR, SECOND_DOOR), 'utf8');
+    expect(scan(source).stray).toHaveLength(1);
+    expect(source).toMatch(/\bopenExternalLink\s*\(/);
   });
 
   it('a file of the waiting list still waits: once fixed it leaves the list', () => {

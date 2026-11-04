@@ -40,6 +40,15 @@ def english():
         yield
 
 
+@pytest.fixture
+def no_fallback(monkeypatch):
+    """As production: without ``use_hub`` a hub's model fails, nothing falls back on the shared database (the tests
+    with the hubs ``hub_a`` and ``hub_b`` of the root conftest, each with its own database)."""
+    from base.tenancy import context
+
+    monkeypatch.setattr(context, "_test_fallback", None)
+
+
 def ctx_for(
     role: str = "hub_admin",
     scope: Scope = A,

@@ -15,6 +15,7 @@ from apps.service.schemas import (
     AssignIn,
     AssignmentListIn,
     AssignmentPatchIn,
+    AssignmentRefIn,
     ByIdIn,
     CategoryIn,
     CategoryListIn,
@@ -41,6 +42,7 @@ from apps.service.schemas import (
     ServiceListIn,
     ServicePatchIn,
     ServiceRefIn,
+    SessionRefIn,
     SettingsIn,
     VoidIn,
 )
@@ -151,6 +153,11 @@ async def assignment_list(request, params: Query[AssignmentListIn]):
     return await run_operation(request, queries.list_assignments, params)
 
 
+@bind(router, "service.assignment.get", "/service/assignments/detail")
+async def assignment_get(request, params: Query[ByIdIn]):
+    return await run_operation(request, queries.get_assignment, params)
+
+
 @bind(router, "service.assignment.eligible", "/service/assignments/eligible")
 async def assignment_eligible(request, params: Query[EligibleIn]):
     return await run_operation(request, queries.eligible, params)
@@ -167,7 +174,7 @@ async def assignment_update(request, data: AssignmentPatchIn):
 
 
 @bind(router, "service.assignment.remove", "/service/assignments/remove")
-async def assignment_remove(request, data: ByIdIn):
+async def assignment_remove(request, data: AssignmentRefIn):
     return await run_operation(request, services.remove_assignment, data)
 
 
@@ -210,6 +217,16 @@ async def grant_list(request, params: Query[GrantListIn]):
 @bind(router, "service.grant.list_orphans", "/service/grants/orphans")
 async def grant_orphans(request, params: Query[PageIn]):
     return await run_operation(request, queries.list_orphans, params)
+
+
+@bind(router, "service.grant.get", "/service/grants/detail")
+async def grant_get(request, params: Query[ByIdIn]):
+    return await run_operation(request, queries.get_grant, params)
+
+
+@bind(router, "service.session.get", "/service/sessions/detail")
+async def session_get(request, params: Query[SessionRefIn]):
+    return await run_operation(request, queries.get_session, params)
 
 
 @bind(router, "service.grant.void_check", "/service/grants/void_check")

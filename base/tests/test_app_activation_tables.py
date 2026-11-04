@@ -329,6 +329,75 @@ def test_the_route_answers_202_while_its_tables_are_made_and_200_once_on(client,
     )
 
 
+@pytest.mark.django_db  # the host gate reads the registry's row of `a` (base.middleware)
+@pytest.mark.parametrize("path", ["/api/apps/enable", "/api/apps/retry"])
+def test_the_openapi_of_a_route_that_can_accept_documents_200_and_202_with_the_same_schema(client, path):
+    served = client.get("/api/openapi.json", HTTP_HOST="a.localhost:8000").json()
+
+    assert {
+        status: response["content"]["application/json"]["schema"]["$ref"]
+        for status, response in served["paths"][path]["post"]["responses"].items()
+    } == {"200": "#/components/schemas/AppChangeOut", "202": "#/components/schemas/AppChangeOut"}
+
+
+@pytest.mark.django_db  # the host gate reads the registry's row of `a` (base.middleware)
+def test_the_openapi_of_disable_only_documents_200_because_it_never_accepts(client):
+    served = client.get("/api/openapi.json", HTTP_HOST="a.localhost:8000").json()
+
+    assert list(served["paths"]["/api/apps/disable"]["post"]["responses"]) == ["200"]
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(("state", "status"), [("creating", 202), ("on", 200)])
+def test_the_retry_route_answers_202_while_its_tables_are_made_and_200_once_on(client, state, status, monkeypatch):
+    import json
+
+    from django.contrib.auth import get_user_model
+
+    from base import services
+    from base.models import Membership
+    from base.schemas import AppChangeIn, AppChangeOut
+
+    class Answering:
+        input = AppChangeIn
+
+        def __call__(self, ctx, data):
+            return AppChangeOut(app=data.app, state=state, chosen=True, along=[], already=False)
+
+    monkeypatch.setattr(services, "app_retry", Answering())
+    user = get_user_model().objects.create(username="ana")
+    Membership.objects.create(user=user, host="a", role=Membership.Role.OWNER)
+    client.force_login(user)
+
+    answered = client.post(
+        "/api/apps/retry", json.dumps({"app": "printing"}), content_type="application/json", HTTP_HOST="a.localhost:8000"
+    )
+
+    assert (answered.status_code, answered.json()) == (
+        status,
+        {"app": "printing", "state": state, "chosen": True, "along": [], "already": False},
+    )
+
+
+@own
+@pytest.mark.parametrize(("route", "printing"), [("/api/apps/enable", OFF), ("/api/apps/retry", "failed*")])
+def test_a_real_request_for_an_app_the_hub_lacks_answers_202_creating(client, make_user, hub_a, route, printing):
+    import json
+
+    given(hub_a, printing=printing)
+    client.force_login(make_user("ana", host=hub_a.slug, role="hub_owner"))
+
+    answered = client.post(
+        route, json.dumps({"app": "printing"}), content_type="application/json", HTTP_HOST=f"{hub_a.slug}.localhost:8000"
+    )
+
+    assert (answered.status_code, answered.json()) == (
+        202,
+        {"app": "printing", "state": "creating", "chosen": True, "along": [], "already": False},
+    )
+    assert rows_of(hub_a)["printing"] == (CREATING, True)
+
+
 def test_the_retry_route_is_bound_to_its_command(db):
     from django.urls import resolve
 

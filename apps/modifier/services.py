@@ -28,6 +28,7 @@ from apps.modifier.models import (
     ModifierOption,
 )
 from apps.modifier.queries import (
+    LINK_NOT_FOUND,
     find_group,
     find_option,
     load_group,
@@ -63,7 +64,6 @@ OWN_LINE_NOT_POSITIVE = _(
     "An option with its own tax category is billed on a line of its own: its supplement must be more than zero."
 )
 LINK_EXISTS = _("This group already applies there.")
-LINK_NOT_FOUND = _("This group does not apply there.")
 
 #: Run only by the platform (events.py): no role holds it, so no person and no API key reaches it.
 SYSTEM = "modifier.system"

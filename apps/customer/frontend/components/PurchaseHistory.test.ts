@@ -7,7 +7,6 @@ import { describe, expect, it } from 'vitest';
 
 import { pageOf } from '../__tests__/fixtures';
 import { business, errorFrame, flush, type MountOptions, mountCustomer, POLISH, subId } from '../__tests__/mount-customer';
-import { formatMoney, type Money } from '../lib/money';
 import type { PurchaseRow } from '../operations';
 import PurchaseHistory from './PurchaseHistory.vue';
 
@@ -24,7 +23,6 @@ const purchase = (id: string, status: PurchaseRow['status'], amount: number): Pu
   void_reason: '',
 });
 const LIST = 'customer.purchase.list';
-const EUR: Money = { currency: 'EUR', decimals: 2 };
 
 async function setup(options: MountOptions = {}) {
   const m = await mountCustomer(PurchaseHistory, { props: { customerId: 'c1' }, ...options });
@@ -52,7 +50,7 @@ describe('PurchaseHistory: the currency of each sale (customer-business-currency
         { ...purchase('p3', 'confirmed', 2550), currency: 'JPY', currency_decimals: 0 },
       ]),
     );
-    expect(amounts(s)).toEqual(['25,50 zł', '10,00 €', '2550 ¥']);
+    expect(amounts(s)).toEqual(['25,50 zł', '10,00 €', '2.550 ¥']);
   });
 
   it('a sale without a currency of its own is in the business\'s, and a bare figure until it answers', async () => {
@@ -61,6 +59,17 @@ describe('PurchaseHistory: the currency of each sale (customer-business-currency
     expect(amounts(s)).toEqual(['25.50']);
     await s.result(s.call, 'base.business.get', business(POLISH));
     expect(amounts(s)).toEqual(['zł 25.50']);
+  });
+
+  it('an amount of four figures groups its thousands, a refund too, in both languages (hub#512)', async () => {
+    const rows = pageOf([purchase('p1', 'confirmed', 123456), purchase('p2', 'refunded', -123456)]);
+    const es = await setup({ locale: 'es' });
+    await es.result(es.call, LIST, rows);
+    expect(amounts(es)).toEqual(['1.234,56 €', '-1.234,56 €']);
+
+    const en = await setup();
+    await en.result(en.call, LIST, rows);
+    expect(amounts(en)).toEqual(['€1,234.56', '-€1,234.56']);
   });
 });
 
@@ -78,7 +87,7 @@ describe('PurchaseHistory', () => {
       formatDateTime('2026-10-01T10:00:00Z', 'en'),
       formatDateTime('2026-10-01T10:00:00Z', 'en'),
     ]);
-    expect(rows.map((r) => r.get('.customer-purchases__amount').text())).toEqual([formatMoney(2550, 'en', EUR), formatMoney(1000, 'en', EUR)]);
+    expect(rows.map((r) => r.get('.customer-purchases__amount').text())).toEqual(['€25.50', '€10.00']);
     expect(s.wrapper.findAllComponents(StatusPill).map((p) => [p.props('label'), p.props('tone')])).toEqual([
       ['Paid', 'success'],
       ['Voided', 'neutral'],
@@ -88,7 +97,7 @@ describe('PurchaseHistory', () => {
   it('a refund is a line of its own, its amount negative, marked «Refund» (CUSTOMER-F22)', async () => {
     const s = await setup();
     await s.result(s.call, LIST, pageOf([purchase('p3', 'refunded', -1210)]));
-    expect(s.wrapper.get('.customer-purchases__amount').text()).toBe(formatMoney(-1210, 'en', EUR));
+    expect(s.wrapper.get('.customer-purchases__amount').text()).toBe('-€12.10');
     expect(s.wrapper.findAllComponents(StatusPill).map((p) => [p.props('label'), p.props('tone')])).toEqual([['Refund', 'warning']]);
     expect(s.wrapper.findAll('[data-testid="customer-purchases-filter"] ion-select-option').map((o) => o.text())).toEqual([
       'All',

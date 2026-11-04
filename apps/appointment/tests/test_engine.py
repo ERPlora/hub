@@ -333,6 +333,54 @@ def test_free_times_skip_the_hour_the_clock_change_skips():
     ]
 
 
+AUTUMN = dt.date(2026, 10, 25)  # Europe/Madrid's day of 25 hours: 03:00 goes back to 02:00
+SPRING = dt.date(2027, 3, 28)  # Europe/Madrid's day of 23 hours: 02:00 jumps to 03:00
+
+
+def dawn(day: dt.date) -> dt.datetime:
+    """«Now» that day, in UTC as Django's clock reads: nothing of the day has gone yet."""
+    return at(day, "00:01").astimezone(dt.UTC)
+
+
+@pytest.mark.parametrize(
+    ("day", "start", "minutes", "end"),
+    [
+        pytest.param(AUTUMN, "01:30", 60, "2026-10-25T02:30:00+02:00", id="25h-day-before-the-change"),
+        pytest.param(AUTUMN, "01:37", 90, "2026-10-25T02:07:00+01:00", id="25h-day-into-the-repeated-hour"),
+        pytest.param(AUTUMN, "02:30", 60, "2026-10-25T02:30:00+01:00", id="25h-day-ends-at-the-wall-time-it-starts"),
+        pytest.param(AUTUMN, "02:45", 30, "2026-10-25T02:15:00+01:00", id="25h-day-ends-before-it-starts-on-the-wall"),
+        pytest.param(SPRING, "01:30", 60, "2027-03-28T03:30:00+02:00", id="23h-day-never-at-a-time-skipped"),
+        pytest.param(SPRING, "01:37", 90, "2027-03-28T04:07:00+02:00", id="23h-day-over-the-change"),
+        pytest.param(SPRING, "00:30", 180, "2027-03-28T04:30:00+02:00", id="23h-day-three-hours"),
+    ],
+)
+def test_a_free_time_ends_its_real_minutes_later_the_nights_the_clock_changes(day, start, minutes, end):
+    diary = agenda(calendar_start_hour=0, calendar_end_hour=24, slot_interval=1)
+    found = {
+        f"{slot.start:%H:%M}": slot
+        for slot in engine.slots(diary, day, minutes, now=dawn(day), customer=False)
+    }
+    assert found[start].end.isoformat() == end  # On the business's clock: the agenda reads it as text.
+    assert found[start].end.astimezone(dt.UTC) - found[start].start.astimezone(dt.UTC) == dt.timedelta(minutes=minutes)
+
+
+def test_a_free_time_that_would_end_past_the_window_on_the_day_of_23_hours_is_not_offered():
+    diary = agenda(calendar_start_hour=1, calendar_end_hour=3, slot_interval=30)
+    # 01:00 ends at 03:00, closing the window; 01:30 at 03:30, past it.
+    assert starts(engine.slots(diary, SPRING, 60, now=dawn(SPRING), customer=False)) == ["01:00"]
+
+
+def test_a_free_time_of_the_repeated_hour_that_fits_the_window_on_the_day_of_25_hours_is_offered():
+    diary = agenda(calendar_start_hour=1, calendar_end_hour=3, slot_interval=30)
+    # 02:30 the first time, plus an hour, is 02:30 the second time: still before the window's 03:00.
+    assert starts(engine.slots(diary, AUTUMN, 60, now=dawn(AUTUMN), customer=False)) == [
+        "01:00",
+        "01:30",
+        "02:00",
+        "02:30",
+    ]
+
+
 # Series (RFC 5545 through dateutil)
 
 

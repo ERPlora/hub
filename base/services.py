@@ -44,6 +44,7 @@ from collections.abc import Callable, Iterable, Mapping
 from contextlib import contextmanager
 from contextvars import ContextVar
 from functools import partial
+from urllib.parse import urlencode
 from uuid import UUID, uuid7
 
 import pydantic
@@ -99,7 +100,7 @@ from base.models import (
 from base.media import AVATARS_FOLDER
 from base.operations import hub_id
 from base.storage import hub_prefix
-from base.permissions import ADMINISTER_HUB, VIEW_HOME
+from base.permissions import ADMINISTER_HUB, OPEN_MANAGEMENT, VIEW_HOME
 from base import people as people_rules
 from base.schemas import (
     ApiKeyCreateIn,
@@ -3779,6 +3780,8 @@ from django.utils.translation import pgettext  # noqa: E402 - the assistant's bl
 from base.schemas import (  # noqa: E402
     AssistantReportIn,
     AssistantReportOut,
+    AssistantSpeakIn,
+    AssistantSpeakOut,
     AssistantTranscribeIn,
     AssistantTranscribeOut,
     AssistantTurnIn,
@@ -4028,6 +4031,43 @@ def assistant_transcribe(ctx: OperationContext, data: AssistantTranscribeIn) -> 
         ) from None
 
 
+#: erplora.com has no voice to read with (no key of the voices' provider): nothing to try again.
+SPEECH_NOT_CONFIGURED = frozenset({"assistant.speech_unavailable", "assistant.provider_not_configured"})
+
+
+def _speech_unavailable() -> OperationError:
+    return _gateway_failure(
+        "base.assistant_speech_unavailable", gettext("Reading aloud in the server's voice is not available.")
+    )
+
+
+@operation(
+    "base.assistant.speak",
+    kind="command",
+    permission=VIEW_HOME,
+    input=AssistantSpeakIn,
+    output=AssistantSpeakOut,
+    ai={"description": "Not an assistant tool (the panel reads an answer aloud in the server's voice the person chose)."},
+    # It waits on erplora.com: no transaction holds the hub's connection meanwhile.
+    database=False,
+)
+def assistant_speak(ctx: OperationContext, data: AssistantSpeakIn) -> dict:
+    """An answer read aloud in the server's voice (round 2026-11-03n, PLAN-HUB §73), by erplora.com: the mp3. When it
+    cannot, the panel reads with the device's voice. With no server voice (``ASSISTANT_SERVER_VOICE`` off, round
+    2026-11-04a) erplora.com is never asked."""
+    if not settings.ASSISTANT_SERVER_VOICE:
+        raise _speech_unavailable()
+    try:
+        spoken = assistant.speak(ctx.scope, text=data.text, language=data.language or ctx.language, voice=data.voice)
+    except assistant.GatewayError as exc:
+        if exc.code in SPEECH_NOT_CONFIGURED:
+            raise _speech_unavailable() from None
+        raise _gateway_failure(
+            "base.assistant_speech_failed", gettext("The answer could not be read aloud: try again.")
+        ) from None
+    return {"content_type": spoken["content_type"], "content_base64": base64.b64encode(spoken["audio"]).decode()}
+
+
 # ── «Report a problem» (BASE-F108; ACCOUNTS-F38 of the SaaS) ────────────────────────────────────────────────────────
 # The user menu's dialog sends it to erplora.com, which mails its support mailbox «Reply-To» the account and limits it
 # per account (SUPPORT_REPORT_RATELIMIT, the panel's and the hub's together): the hub keeps nothing and limits nothing.
@@ -4038,11 +4078,10 @@ SUPPORT_REPORT_PATH = "/internal/support/report"
 REPORT_BROWSER_MAX = 300
 
 
-def _reporting_account(ctx: OperationContext) -> str:
-    """The erplora.com account behind this session, which support answers to: only a session opened with it on this
-    hub. A PIN or a badge on a shared till (gh:hub#2506), a demo's visitor or a call without a session has none, and
-    neither has a session that does not say how it was opened (``CREDENTIAL_SESSION_KEY``): never the account by
-    default."""
+def _session_account(ctx: OperationContext) -> str | None:
+    """The erplora.com account behind this session: only a session opened with it on this hub. A PIN or a badge on a
+    shared till (gh:hub#2506), a demo's visitor or a call without a session has none, and neither has a session that
+    does not say how it was opened (``CREDENTIAL_SESSION_KEY``): never the account by default."""
     request, user = ctx.request, ctx.actor
     username = user.get_username() if hasattr(user, "get_username") else ""
     opened_with = request.session.get(CREDENTIAL_SESSION_KEY) if request is not None else None
@@ -4051,10 +4090,18 @@ def _reporting_account(ctx: OperationContext) -> str:
         or opened_with != SessionOwner.Credential.ACCOUNT
         or getattr(request, "hub", None) is None
     ):
+        return None
+    return saas_user_id_of(user)
+
+
+def _reporting_account(ctx: OperationContext) -> str:
+    """The account support answers to (``_session_account``), or the refusal that says how to report."""
+    account = _session_account(ctx)
+    if account is None:
         raise PermissionDenied(
             gettext("Sign in with your erplora.com account to report a problem."), code="base.support_needs_account"
         )
-    return saas_user_id_of(user)
+    return account
 
 
 def _report_not_sent() -> OperationError:
@@ -4148,6 +4195,57 @@ def support_report(ctx: OperationContext, data: SupportReportIn) -> dict:
         raise _report_not_sent()
     logger.info("base.support_report_sent hub=%s", hub.slug)
     return {"reply_to": reply_to}
+
+
+# ── The pass to erplora.com (BASE-F11; ACCOUNTS-F29 of the SaaS, ``accounts/hub_pass.py``) ──────────────────────────
+# «Upgrade plan» and «erplora.com» arrive already signed in. The Hub signs and the SaaS only checks, so nothing asks the
+# SaaS anything per request (PLAN-SAAS §2). It is signed at the click, never in the shell's HTML: it would expire in a
+# minute and every script of the page could read it. The pass opens a session, so it is never logged.
+from django.core import signing as django_signing  # noqa: E402
+
+from base.schemas import SaasPassIn, SaasPassOut  # noqa: E402
+
+#: erplora.com's door and its salt: a value signed for anything else with the same secret is no pass.
+SAAS_PASS_PATH = "/hub-pass/"
+SAAS_PASS_SALT = "erplora.hub-pass.v1"
+
+
+@operation(
+    "base.saas_pass.create",
+    kind="command",
+    permission=VIEW_HOME,
+    input=SaasPassIn,
+    output=SaasPassOut,
+    # A pass in a chat would stay in its history and in the model's context for a minute.
+    ai=INTERNAL,
+    database=False,
+)
+def saas_pass_create(ctx: OperationContext, data: SaasPassIn) -> dict:
+    """The address of erplora.com with a pass of this person to this business's plan or panel: a minute, one use. The
+    SaaS decides again whether the account is a member; ``business`` here only for who may see that button."""
+    account = _session_account(ctx)
+    if account is None:
+        raise PermissionDenied(
+            gettext("Sign in with your erplora.com account to go there directly."), code="base.saas_pass_needs_account"
+        )
+    if data.next == "business" and not ctx.has(OPEN_MANAGEMENT):
+        raise PermissionDenied(
+            gettext("You don't have permission to manage this business on erplora.com."),
+            code="base.saas_pass_needs_management",
+        )
+    secret = settings.INTERNAL_SHARED_SECRET
+    if not secret:
+        # Django's signer would fall back on SECRET_KEY, and erplora.com would refuse that pass.
+        logger.error("base.saas_pass_unavailable hub=%s: INTERNAL_SHARED_SECRET is empty.", ctx.request.hub.slug)
+        raise OperationError(
+            gettext("We could not open erplora.com directly."), code="base.saas_pass_unavailable", status=503
+        )
+    token = django_signing.dumps(
+        {"user": account, "hub": ctx.request.hub.slug, "next": data.next, "nonce": secrets.token_urlsafe(32)},
+        key=secret,
+        salt=SAAS_PASS_SALT,
+    )
+    return {"url": auth.saas_url(f"{SAAS_PASS_PATH}?{urlencode({'pass': token})}")}
 
 
 # ── Apps turned on and off by the business, with the plan's limit (PLAN-HUB §9; BASE-F18, F19, F23–F25) ────────────

@@ -15,7 +15,7 @@ from live.context import OperationContext, Scope, system_context
 from live.operations import get, registry
 
 from apps.invoice import queries
-from apps.invoice.models import Invoice, InvoiceSeries
+from apps.invoice.models import Invoice, InvoiceSeries, InvoiceType
 from apps.invoice.tests.conftest import ISSUER, ctx_for, run
 from base import assistant
 from base.tenancy.context import use_hub
@@ -258,6 +258,12 @@ def test_a_rectification_dated_another_day_is_refused_even_with_the_word_typed(i
 PREVIEWED = ["invoice_type", "next_number", "base_amount", "tax_amount", "total_amount"]
 
 
+def name_of(code: str, language: str) -> str:
+    """The name the models give a kind of invoice in ``language``: the one the card says it by (hub#708)."""
+    with translation.override(language):
+        return str(InvoiceType(code).label)
+
+
 def preview_of(number: str, language: str) -> list[dict]:
     failure, preview = assistant.preview(
         ctx_for(language=language), get("invoice.invoice.rectify"), {"number": number, "reason": REASON}
@@ -281,7 +287,7 @@ def test_the_rectification_card_shows_the_rectifying_invoice_with_its_amounts_in
     original = an_invoice()
     preview = preview_of(original.number, "es")
     assert [(field["name"], field["kind"], field["value"]) for field in preview] == [
-        ("invoice_type", "text", "R1"),
+        ("invoice_type", "text", name_of("R1", "es")),
         ("next_number", "text", f"RECT-{today.year}-000001"),
         ("base_amount", "money", -10000),
         ("tax_amount", "money", -2100),
@@ -298,7 +304,7 @@ def test_the_card_the_person_sees_carries_that_preview_and_takes_no_number(issue
     card = plan["confirm"]
     assert (card["operation"], card["confirm_word"]) == ("invoice.invoice.rectify", "CONFIRMAR")
     assert [(field["name"], field["value"]) for field in card["preview"]] == [
-        ("invoice_type", "R1"),
+        ("invoice_type", name_of("R1", "es")),
         ("next_number", f"RECT-{today.year}-000001"),
         ("base_amount", -10000),
         ("tax_amount", -2100),
@@ -315,7 +321,7 @@ def test_typing_the_word_issues_exactly_the_number_the_card_said(issuer, today):
     said = {field["name"]: field["value"] for field in turn(rectify)["confirm"]["preview"]}
     turn(rectify, decision={"call_id": "c1", "accepted": True, "typed": "CONFIRMAR"})
     rect = rectifications().get()
-    assert (rect.number, rect.invoice_type, rect.base_amount, rect.tax_amount, rect.total_amount) == (
+    assert (rect.number, name_of(rect.invoice_type, "es"), rect.base_amount, rect.tax_amount, rect.total_amount) == (
         said["next_number"],
         said["invoice_type"],
         said["base_amount"],
@@ -349,6 +355,73 @@ def test_asked_straight_to_rectify_what_cannot_be_the_card_does_not_come_and_say
     ]
     assert json.loads(plan["append"][0]["content"])["error"]["message"] == why
     assert rectifications().count() == 1
+
+
+# ── The kind of a rectification, by its name (hub#708) ─────────────────────────────────────────────────────────────
+# The card said «Tipo de rectificativa: R4» twice over: in what it sends (``rectification_type``, which no field of the
+# models is called) and in what it will do (the preview's ``invoice_type``, an open text). Both now say the name the
+# models give that kind; the write, the model and the fiscal record keep the code.
+
+RECTIFICATION_KINDS = ("R1", "R2", "R3", "R4")
+
+
+@pytest.mark.parametrize(
+    ("language", "named"),
+    [("es", "Rectificativa: resto de causas (R4)"), ("en", "Rectifying invoice: other causes (R4)")],
+)
+def test_the_card_says_the_kind_it_sends_by_its_name(language, named):
+    arguments = {"number": "FACT-2026-000001", "rectification_type": "R4"}
+    assert values(assistant.card(get("invoice.invoice.rectify"), arguments, language))["rectification_type"] == named
+
+
+@pytest.mark.parametrize("language", ["es", "en"])
+@pytest.mark.parametrize("code", RECTIFICATION_KINDS)
+def test_every_kind_a_rectification_takes_has_its_name_on_the_card(code, language):
+    arguments = {"number": "FACT-2026-000001", "rectification_type": code}
+    said_it = values(assistant.card(get("invoice.invoice.rectify"), arguments, language))["rectification_type"]
+    assert said_it == name_of(code, language) != code
+
+
+def test_the_kinds_the_card_names_are_those_its_write_takes():
+    """Positive control of the two above: a kind the write comes to take would need its name here."""
+    schema = get("invoice.invoice.rectify").input.model_json_schema()
+    prop = assistant._resolved(schema["properties"]["rectification_type"], schema.get("$defs", {}))
+    assert tuple(prop["enum"]) == RECTIFICATION_KINDS
+
+
+def previewed_kind(number: str, language: str, **more) -> dict:
+    failure, preview = assistant.preview(
+        ctx_for(language=language), get("invoice.invoice.rectify"), {"number": number, "reason": REASON, **more}
+    )
+    assert failure is None
+    return next(field for field in preview if field["name"] == "invoice_type")
+
+
+@pytest.mark.parametrize("language", ["es", "en"])
+def test_what_the_card_says_it_will_do_names_the_kind_too(issuer, language):
+    original = an_invoice()
+    kind = previewed_kind(original.number, language, rectification_type="R4")
+    assert (kind["kind"], kind["value"]) == ("text", name_of("R4", language))
+
+
+@pytest.mark.parametrize("language", ["es", "en"])
+def test_a_ticket_is_previewed_by_the_name_of_its_own_kind(issuer, language):
+    """A ticket is always R5, whatever was asked: the preview's closed list takes the kind no rectification asks for."""
+    line = {"description": "Café", "quantity": "1", "unit_price": 150, "tax_rate": "10"}
+    ticket = run("invoice.invoice.create", {"series_code": "TICKET", "lines": [line]})
+    kind = previewed_kind(ticket.number, language, rectification_type="R4")
+    assert kind["value"] == name_of("R5", language)
+
+
+def test_the_model_and_the_write_keep_the_code_the_card_names(issuer):
+    """Only the card is in words: the read still tells the model the code, and the record is issued with it."""
+    original = an_invoice()
+    arguments = {"number": original.number, "reason": REASON, "rectification_type": "R4"}
+    told = json.loads(turn(call("invoice.invoice.rectification_preview", arguments))["append"][0]["content"])
+    assert told["invoice_type"] == "R4"
+    plan = turn(call("invoice.invoice.rectify", arguments), decision={"call_id": "c1", "accepted": True, "typed": "CONFIRMAR"})
+    assert [(row["outcome"], row["code"]) for row in plan["executed"]] == [("ok", "")]
+    assert rectifications().get().invoice_type == "R4"
 
 
 # ── The record a write names by its id, by its name (FIX-HUB-INVOICE-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS; base's half
