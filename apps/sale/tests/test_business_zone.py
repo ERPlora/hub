@@ -55,6 +55,15 @@ def test_the_preview_and_the_charge_tax_on_the_same_day(tapa):
     assert (preview.tax_total, preview.total) == (sale.tax_total, sale.total)
 
 
+def test_the_cash_limit_values_the_rest_of_a_check_on_the_day_it_would_be_charged(tapa):
+    run("sale.settings.update", {"default_tax_included": False})
+    order = run("sale.order.open", {"lines": LINES + LINES})
+    first = order.lines[0]
+    preview = run("sale.checkout.preview", {"order_id": str(order.id), "line_ids": [str(first.id)]})
+    # Both lines at 21 % (12.10 € each): at the other day's 10 %, the whole check would be 22 €.
+    assert (preview.total, preview.operation_total) == (1210, 2420)
+
+
 def test_a_section_says_the_rate_the_till_charges(tapa):
     run("sale.department.create", {"name": "Fruit", "tax_category_key": "test.turn"})
     assert run("sale.department.list").rows[0].tax_rate_pct == 21
