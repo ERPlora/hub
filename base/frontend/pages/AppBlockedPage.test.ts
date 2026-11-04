@@ -26,6 +26,7 @@ function app(id: string, fields: Partial<AppRow> = {}): AppRow {
     path: null,
     requires: [],
     required_by: [],
+    refusal: null,
     ...fields,
   };
 }
