@@ -67,6 +67,7 @@ from apps.kitchen.schemas import (
     TicketsOut,
 )
 from apps.sale.models import Order, OrderLine
+from base.business import business_zone, zone_name
 
 TICKET_NOT_FOUND = _("That kitchen ticket does not exist in this business.")
 TICKET_AMBIGUOUS = _(
@@ -106,16 +107,6 @@ FACTORY = {
 
 
 # --- The business's clock ------------------------------------------------------------------------
-
-
-def business_zone():
-    """The business's time zone (phase 1: ``settings.TIME_ZONE``, Europe/Madrid; the Hub keeps no zone yet)."""
-    return timezone.get_current_timezone()
-
-
-def zone_name() -> str:
-    zone = business_zone()
-    return getattr(zone, "key", str(zone))
 
 
 def business_day(moment: dt.datetime) -> dt.date:

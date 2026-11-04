@@ -34,7 +34,6 @@ from collections.abc import AsyncIterator, Collection, Iterable
 from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import httpx
 import pycountry
@@ -74,7 +73,7 @@ from live.operations import Operation, get, registry
 
 from base import activation, approvals, entitlement, signing
 from base.auth import saas_internal_url
-from base.business import babel_locale, currency_decimals
+from base.business import babel_locale, business_zone, currency_decimals
 from base.models import Membership
 from base.operations import HostScopeResolver
 
@@ -228,8 +227,7 @@ def _record_currency(sent: Any, declared: dict, words: "_Words") -> Any:
 @dataclass
 class _Words:
     """The Hub's words of a card (``live.assistant.Words``): the person's language and the person (``ctx``: to read a
-    record's name and its currency as them, and the business's zone; ``None`` for an automation's card, which reads no
-    record); ``currency``, the one its amounts are in when it is not the business's (the one a write names, the one of
+    record's name and its currency as them; ``None`` for an automation's card, which reads no record); ``currency``, the one its amounts are in when it is not the business's (the one a write names, the one of
     the record it names, or a preview's read answers, with the decimals it answers: ``answered``); ``priced`` false
     when the write names one that is none, or a record whose currency cannot be read: its amounts go as sent."""
 
@@ -239,7 +237,6 @@ class _Words:
     currency: str | None = None
     priced: bool = True
     answered: dict | None = None
-    _business: Any = None
 
     @classmethod
     def of_answer(cls, read: Operation, ctx: OperationContext, answer: dict) -> "_Words":
@@ -262,19 +259,6 @@ class _Words:
         read answers it, else as the currency says it."""
         return self.answered if self.answered is not None else self._currency_money()
 
-    def business(self) -> Any:
-        """Settings › Business, read as the person once per card and only when a datum needs it; ``False`` when it
-        cannot be read (no person at hand, or a refusal)."""
-        if self._business is None:
-            failure, answer = (True, None) if self.ctx is None else _run(self.ctx, registry["base.business.get"], {})
-            self._business = answer if failure is None else False
-        return self._business
-
-    def zone(self) -> Any:
-        """The business's zone or else the deployment's, the one every app reads a wall-clock time in."""
-        business = self.business()
-        return (_zone_named(business.timezone) if business else None) or timezone.get_current_timezone()
-
     def amount(self, value: int) -> Any:
         """``value``, an amount in the minor unit of its currency, as the card's screen writes one on top
         (``{"kind": "money", "value": …}``, with its ``money`` when it is in a currency of its own): every amount of a
@@ -294,14 +278,6 @@ class _Words:
         return app_name(self.op)
 
 
-def _zone_named(name: str) -> ZoneInfo | None:
-    """The zone ``name`` (IANA), or ``None`` when Python does not know it."""
-    try:
-        return ZoneInfo(name)
-    except (ZoneInfoNotFoundError, ValueError):
-        return None
-
-
 def _moment(value: str, kind: str, words: _Words) -> str | None:
     """``value`` (ISO 8601: a day, a day and a time, or a time) as the person's language writes it — CLDR's medium day
     and short time, as the screens' ``formatDateTime`` (@erplora/ui) says them —; an instant of another zone at the
@@ -316,7 +292,7 @@ def _moment(value: str, kind: str, words: _Words) -> str | None:
     except ValueError:
         return None
     if moment.tzinfo is not None:
-        moment = moment.astimezone(words.zone()).replace(tzinfo=None)
+        moment = moment.astimezone(business_zone()).replace(tzinfo=None)
     day, hour = format_date(moment.date(), "medium", locale=locale), format_time(moment.time(), "short", locale=locale)
     return get_datetime_format("medium", locale=locale).replace("{1}", day).replace("{0}", hour)
 

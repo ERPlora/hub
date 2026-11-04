@@ -22,7 +22,7 @@ from django.core.cache import cache
 from django.utils import timezone
 from live.models import OutboxEvent
 
-from base.models import AccessSettings, Approval, Membership
+from base.models import AccessSettings, Approval, Hub, Membership
 from base.tenancy.tests.hubs import HUB_DATABASES
 from base.tests.test_people import with_badge, with_pin
 
@@ -339,6 +339,13 @@ class TestTheExport:
             ["2026-10-23 20:05", "Change how the till asks who is there", "Mario", "Ana", "Placa", "Sin usar"],
         ]
         assert "base.access" not in file["csv"]
+
+    def test_its_hours_are_the_businesss_and_not_the_deployments(self, client, adam, eva):
+        """hub#687: 9:00 UTC is 10:00 in Madrid and 9:00 in the Canaries."""
+        Hub.objects.filter(slug="a").update(timezone="Atlantic/Canary")
+        recorded(at=dt.datetime(2026, 11, 2, 9, 0, tzinfo=dt.UTC))
+        client.force_login(adam)
+        assert lines(exported(client))[1][0] == "2026-11-02 09:00"
 
     def test_in_english_too(self, client, adam, eva):
         recorded(way="badge", used=False)

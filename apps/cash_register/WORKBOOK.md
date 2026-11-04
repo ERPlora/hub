@@ -56,8 +56,8 @@ ERPlora no inventa flujos: adopta los que el mercado ya probó.
   Ajustes → Cajones**; al abrir la sesión se elige uno. Con uno solo se elige solo.
 - **Moneda**: la del negocio, la de su país, con sus decimales: el euro en España, el esloti en Polonia. Todos los
   importes de Caja van en ella, y el arqueo enseña sus billetes y monedas.
-- **Zona horaria**: la del negocio. En esta fase, la hora de Madrid (`Europe/Madrid`) para todos: de
-  ella salen el día de negocio, el número de sesión y la hora del cierre automático.
+- **Zona horaria**: la del negocio: de ella sale la hora del cierre automático. El día de negocio y el número de sesión
+  aún salen de la hora de Madrid (`Europe/Madrid`) para todos (hub#771).
 
 Configuración inicial, paso a paso:
 
@@ -751,9 +751,9 @@ cajero del producto actual es un empleado.
   sale con el símbolo del negocio. Los billetes y monedas de 18 monedas viven en `queries.DENOMINATIONS` (las mismas
   del producto actual).
   El total de un arqueo lo suma el servidor; un billete o moneda de otra moneda es 422.
-- **Zona horaria (fase 1)**: `Europe/Madrid` (`TIME_ZONE` del Hub) para todos los negocios: día de
-  negocio, número de sesión y corte del cierre automático. Cuando el Hub guarde la zona de cada negocio,
-  saldrá de ahí.
+- **Zona horaria**: el corte del cierre automático y la hora que dice su aviso son del reloj del negocio
+  (`base.business.business_zone`). El día de negocio y el número de sesión siguen en `TIME_ZONE` (`Europe/Madrid`) para
+  todos los negocios (hub#771).
 - **Inicio** (ronda PLAN-HUB 2026-10-21; FIX-CASH_REGISTER-SETUP-HOOKS): `setup` y `widgets` de `apps.py`, los
   del `module.json` viejo (sin `bell`). El paso `cash_register.drawer` lee `updated_at` de
   `cash_register.settings.get` (orden 90, no `required`, permiso `cash_register.manage_settings`, refresco por
