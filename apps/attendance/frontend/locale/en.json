@@ -114,6 +114,7 @@
       "invalidClockIn": "Enter the clock-in date and time.",
       "invalidCorrection": "The clock-out must be after the clock-in.",
       "reasonRequired": "Write a reason of at least 3 characters.",
+      "zoneUnread": "The business's time zone could not be read, so this correction cannot be saved yet. Reload the page to try again.",
       "corrected": "Working day corrected."
     },
     "history": {

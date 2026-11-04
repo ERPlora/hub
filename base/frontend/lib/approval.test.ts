@@ -9,6 +9,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { APPROVAL_DIALOG_CLASS, APPROVED, approvalPass, approvalQuestion, withApproval } from './approval';
 
+// Every `modalController` here is a spy, so the dialog is never painted; importing the real one only made Vite transform
+// its whole graph inside the budget of the one test that opens it, past Vitest's 5 s on a loaded machine (hub#558).
+vi.mock('../components/ApprovalDialog.vue', () => ({ default: { name: 'ApprovalDialogStandIn' } }));
+
 const QUESTION = { operation: 'sale.sale.void', label: 'Void a sale', fingerprint: 'f'.repeat(64) };
 
 function asksApproval(question = QUESTION): ApiError {
@@ -100,7 +104,11 @@ describe('withApproval', () => {
     });
     await expect(withApproval(run)).resolves.toBe('voided');
     expect(create).toHaveBeenCalledTimes(1);
-    expect(create.mock.calls[0][0]).toMatchObject({ cssClass: APPROVAL_DIALOG_CLASS, componentProps: { question: QUESTION } });
+    expect(create.mock.calls[0][0]).toMatchObject({
+      component: { name: 'ApprovalDialogStandIn' },
+      cssClass: APPROVAL_DIALOG_CLASS,
+      componentProps: { question: QUESTION },
+    });
     expect(present).toHaveBeenCalledTimes(1);
   });
 });

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:512fd03b23a46220f82d419f451a91f8182f620705f1f7a718474e5929ad77b7 -->
+<!-- generated from WORKBOOK.md sha256:6fcd335b94ab3104547fdd7945bfb643a2b76614e19a000f827f262451169956 -->
 
 ## What it is for and who it is for
 
@@ -286,8 +286,9 @@ If it fails: "The clock-out must be after the clock-in." under the clock-out; "T
 working day of this person." (touching is not overlapping: a working day can start at the instant the
 previous one ended); "That person already has another open working day: this one cannot be reopened.";
 a future time, "The time cannot be in the future."; without a reason, "Write a reason of at least 3
-characters.". A refused correction changes nothing and leaves no trace. "Correct" only shows to whoever
-can correct.
+characters.". If the business's time zone cannot be read, "The business's time zone could not be read, so this
+correction cannot be saved yet. Reload the page to try again.", with the button off. A refused correction
+changes nothing and leaves no trace. "Correct" only shows to whoever can correct.
 Involved: ATTENDANCE-F05, ATTENDANCE-F09, ATTENDANCE-F11
 
 ### ATTENDANCE-F09 See who changed a working day, when and why
@@ -435,7 +436,7 @@ The notices never carry the position or the reason of a correction (personal dat
 - `staff.member.terminated` → `attendance.record.close_for_terminated` (ATTENDANCE-F13), delivered by the
   worker's outbox relay once per notice.
 - `staff.member.updated` and `staff.member.terminated` repaint the lists (a person's name or status).
-- From the platform: the session and the business's time zone (phase 1: `Europe/Madrid`).
+- From the platform: the session and the business's time zone.
 
 ### Who can do what
 

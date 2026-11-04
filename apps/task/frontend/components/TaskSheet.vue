@@ -24,6 +24,7 @@ import {
 } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import { useBusinessZone } from '../../../../base/frontend/lib/zone';
 import { useLocale, useT } from '../composables/useT';
 import { dueTone, formatDay, formatMoment, isClosed, PRIORITY_TONE, STATUS_TONE } from '../lib/format';
 import { searchMembers } from '../lib/pickers';
@@ -37,6 +38,7 @@ const open = defineModel<boolean>('open', { default: false });
 
 const t = useT();
 const locale = useLocale();
+const zone = useBusinessZone();
 const session = useSession();
 const client = useLiveClient();
 const findMembers = searchMembers(client);
@@ -152,10 +154,10 @@ async function confirmDelete(): Promise<void> {
 }
 
 const dueLabel = computed(() => {
-  const tone = task.value ? dueTone(task.value.due_date, task.value.status) : 'none';
+  const tone = task.value ? dueTone(task.value.due_date, task.value.status, zone.value) : 'none';
   return tone === 'none' ? undefined : t(tone === 'overdue' ? 'task.due.overdue' : 'task.due.today');
 });
-const dueClass = computed(() => (task.value ? `task-sheet__due--${dueTone(task.value.due_date, task.value.status)}` : ''));
+const dueClass = computed(() => (task.value ? `task-sheet__due--${dueTone(task.value.due_date, task.value.status, zone.value)}` : ''));
 const text = (value: unknown): string => (value === null || value === undefined ? '' : String(value));
 </script>
 
@@ -245,10 +247,10 @@ const text = (value: unknown): string => (value === null || value === undefined 
             :aria-label="dueLabel"
             :title="dueLabel"
           >{{ formatDay(task.due_date, locale) }}</span></span>
-          <span data-testid="task-sheet-completed"><strong>{{ t('task.sheet.completed') }}</strong> {{ formatMoment(task.completed_at, locale) }}</span>
+          <span data-testid="task-sheet-completed"><strong>{{ t('task.sheet.completed') }}</strong> {{ formatMoment(task.completed_at, locale, zone) }}</span>
           <span data-testid="task-sheet-assignee"><strong>{{ t('task.sheet.assignedTo') }}</strong> {{ task.assignee_name ?? t('task.sheet.unassigned') }}</span>
           <span data-testid="task-sheet-project"><strong>{{ t('task.sheet.project') }}</strong> {{ task.project_name ?? '—' }}</span>
-          <span data-testid="task-sheet-created"><strong>{{ t('task.sheet.created') }}</strong> {{ formatMoment(task.created_at, locale) }}</span>
+          <span data-testid="task-sheet-created"><strong>{{ t('task.sheet.created') }}</strong> {{ formatMoment(task.created_at, locale, zone) }}</span>
           <span data-testid="task-sheet-created-by"><strong>{{ t('task.sheet.createdBy') }}</strong> {{ task.created_by_name ?? '—' }}</span>
         </div>
 
@@ -418,7 +420,7 @@ const text = (value: unknown): string => (value === null || value === undefined 
           :data-testid="`task-sheet-comment-${comment.id}`"
         >
           <div class="task-sheet__muted">
-            {{ comment.author_name ?? t('task.sheet.anonymous') }} · {{ formatMoment(comment.created_at, locale) }}
+            {{ comment.author_name ?? t('task.sheet.anonymous') }} · {{ formatMoment(comment.created_at, locale, zone) }}
           </div>
           <p>{{ comment.text }}</p>
         </div>
