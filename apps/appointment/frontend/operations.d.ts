@@ -87,6 +87,8 @@ export interface AppointmentOut extends AppointmentRow {
   start_date_label: string;
   /** Its hour ready to say, 24-hour on the business's clock («10:30»). */
   start_time_label: string;
+  /** The words a card names it by: its customer, day, hour and professional. */
+  label: string;
 }
 
 /** What a customer did herself (G01): a booking or a cancellation, as the notice says it. */
