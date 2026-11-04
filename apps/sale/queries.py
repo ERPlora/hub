@@ -2410,3 +2410,9 @@ def refund_by_key(ctx: OperationContext, params: RefundByKeyIn) -> dict:
         "found": refund is not None,
         "refund": refund_row(refund) if refund else None,
     }
+
+
+def keeps_fiscal_documents() -> bool:
+    """Whether this database holds its sales (``fiscal_documents_kept`` on this app's config), of any status: a draft counts
+    too, for what it asks is whether a database can go, and that cannot be undone."""
+    return Sale.objects.exists()
