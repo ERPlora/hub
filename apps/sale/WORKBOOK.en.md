@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:4db7bcf096445df0fd9ee059fb52cc9216ed5fc99c9a472330eb83c2b05b454f -->
+<!-- generated from WORKBOOK.md sha256:56117209bdfd7f7935803efc498b0d563b84df9a231b7d727d9180c0963298ae -->
 
 ## What it is for and who it is for
 
@@ -784,11 +784,12 @@ Steps:
    With nothing pending, "Everything is sent".
 2. In "Current order", review quantities and who serves and press "Send order (N)". For it to go out as
    a rush, first arm the flame next to it: the button changes to "Send RUSH (N)". "Order N sent to the
-   kitchen." shows; the lines are marked with their round ("Order N") and the time sent, and the flame
-   disarms. A double send never sends anything twice.
+   kitchen." shows at the top of the screen, so "Charge" (SALE-F01) can be pressed without waiting for it
+   to go; the lines are marked with their round ("Order N") and the time sent, and the flame disarms. A
+   double send never sends anything twice.
 3. On pressing "Charge" with something pending, it is sent to the kitchen first and then the charge
-   opens: nobody pays for a dish that is not going to be made. The order's notice then shows at the top of
-   the screen, so the charge keypad (SALE-F01) can be tapped from the first moment. If the send fails, the
+   opens: nobody pays for a dish that is not going to be made. The order's notice shows at the top here
+   too, so the charge keypad (SALE-F01) can be tapped from the first moment. If the send fails, the
    charge does not open and it says why.
 4. A sent line is locked: no quantity, no note, no discount, no comp.
 5. To take off a dish already sent, press ⊗ "Void this item" on its line: "Void «<article>»" opens with
@@ -810,8 +811,8 @@ Out: the lines with their round and the kitchen order open in Kitchen, a rush if
 serves); on voiding a sent line, it announces the voided line with its reason.
 If it fails: with nothing pending, "There is nothing new to send to the kitchen."; if Kitchen does not
 answer, "The order could not be sent to the kitchen. Try again." and nothing is charged. If the order is
-sent but its slip does not print, the POS warns "Order N sent to the kitchen, but it did not print.
-Check the kitchen printer in Printing.". Asking to remove a line already sent is refused: "That line can
+sent but its slip does not print, the POS warns, at the top too, "Order N sent to the kitchen, but it did
+not print. Check the kitchen printer in Printing.". Asking to remove a line already sent is refused: "That line can
 no longer be removed: it was sent to the kitchen (void it with a reason), it is charged or it is no
 longer on an open check.". Voiding a line not sent, charged, already voided or without a reason is
 refused with "That line cannot be voided…". Without Kitchen active there are no tabs and no sending: the
