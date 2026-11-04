@@ -543,8 +543,10 @@ def test_the_customer_is_offered_only_what_keeps_the_notice(salon, monkeypatch, 
         {"date": asked, "duration_minutes": 60, "for_customer": True},
     ).slots
     hours = [f"{slot.start:%H:%M}" for slot in desk]
+    assert hours[0] == "00:00"  # The front desk sees the whole day: the notice only marks its hours.
     keeps = hours.index(first)
     assert [f"{slot.start:%H:%M}" for slot in customer] == hours[keeps:]
+    assert all(not slot.within_notice for slot in customer)
     assert [f"{slot.start:%H:%M}" for slot in desk if slot.within_notice] == hours[:keeps]
     # ``instant`` is in UTC, so these subtractions count real time, not the wall clock's.
     notice = dt.timedelta(hours=24)
