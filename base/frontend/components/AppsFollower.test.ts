@@ -36,6 +36,7 @@ function row(id: string, state: AppRow['state'] = 'on'): AppRow {
     path: state === 'on' ? `/${id}/home` : null,
     requires: [],
     required_by: [],
+    refusal: null,
   };
 }
 

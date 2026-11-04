@@ -416,6 +416,9 @@ class AppOut(Schema):
     #: What it needs, transitively (it comes along with it), and the apps on that need it (they go off first).
     requires: list[str]
     required_by: list[str]
+    #: Why turning it on (off) or off (on) is refused, in the reader's language: an app's own ``can_enable`` or
+    #: ``can_disable``, and the apps it depends on (hub#618, hub#694); ``None``: nothing refuses it.
+    refusal: str | None
 
 
 class AppListOut(Schema):
@@ -687,8 +690,8 @@ class BlueprintDatasetOut(BlueprintPartOut):
 class BlueprintAppSummaryOut(BlueprintAppOut):
     status: Literal["on", "turns_on", "inactive", "unknown"] = Field(
         description="«on»; «turns_on»: off in this hub, the load turns it on first (with the apps it needs) and then "
-        "loads it; «inactive»: off and left off (only its data names it, or the plan gives no right to it), nothing "
-        "of it loads; «unknown»: this hub does not have it."
+        "loads it; «inactive»: off and left off (only its data names it, the plan gives no right to it or the app does "
+        "not go on in this business), nothing of it loads; «unknown»: this hub does not have it."
     )
     datasets: list[BlueprintDatasetOut]
 
