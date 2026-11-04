@@ -8,8 +8,8 @@
 // shows its whole cash keypad above its foot as soon as it opens (375x667: the last row peeked half under «Charge»;
 // 320x568: three rows lay under it), with the words of a total still loading clear of the title on the lowest phone,
 // where the figure shares the title's row. «Current order» leaves the same things in reach, plus its tabs and «Send
-// order» (hub#787: at 320x568 its send bar ate all that scrolled, 0 px, and with it the tabs and the lines). A tablet
-// and a desktop keep what they had. The worst case of a real
+// order» (hub#787: at 320x568 its send bar ate all that scrolled, 0 px, and with it the tabs and the lines), and so does
+// a side column just as low. A tablet and a desktop with room keep what they had. The worst case of a real
 // business: the red strip of a hub that cannot issue invoices yet takes 138 px over the till (hub `a`'s issuer is
 // parked for the run and put back after it), with Tables and Kitchen on (their button and the «Check» / «Current
 // order» tabs). What a run creates, its product `E2E-CARTFIT-<run>` and its check, is deleted after it.
@@ -33,6 +33,11 @@ const SIZES = [
 ] as const;
 /** A phone with room, even under the strip: «Send order» stays pinned while what is above it scrolls (hub#787). */
 const ROOMY = { label: '390x844', width: 390, height: 844 } as const;
+/** A side column with as little height under the strip: a small tablet on its side and a low laptop window. */
+const LOW_COLUMN = [
+  { label: '1024x600', width: 1024, height: 600 },
+  { label: '1280x560', width: 1280, height: 560 },
+] as const;
 /** Where the check is not a phone's low drawer: nothing of this fix may change what they read. */
 const WIDE = [
   { label: '820x1180', width: 820, height: 1180 },
@@ -117,40 +122,40 @@ async function chargeWithinReach(page: Page, drawer: Locator, where: string): Pr
   return charge;
 }
 
+/** What a finger on the middle of `el` touches, run in the page: is it `el`, and what is it if not. */
+function fingerOn(el: Element): { height: number; reached: boolean; hit: string } {
+  const r = el.getBoundingClientRect();
+  const hit = document.elementFromPoint((r.left + r.right) / 2, (r.top + r.bottom) / 2);
+  return { height: r.height, reached: !!hit && el.contains(hit), hit: hit ? `${hit.tagName.toLowerCase()} ${hit.getAttribute('data-testid') ?? ''}`.trim() : 'nothing' };
+}
+
 /** The check's line, scrolled into view inside the drawer: what sits between the bar and the foot scrolls, and a
  *  finger on the line reaches it (squeezed to nothing, the lines would be out of any scroll's reach). */
 async function lineWithinReach(page: Page, where: string): Promise<void> {
   const line = shown(page).locator('[data-testid^=pos-line-]').filter({ hasText: product.name }).first();
   await line.scrollIntoViewIfNeeded();
-  const reach = await line.evaluate((el) => {
-    const r = el.getBoundingClientRect();
-    const hit = document.elementFromPoint((r.left + r.right) / 2, (r.top + r.bottom) / 2);
-    return { height: r.height, reached: !!hit && el.contains(hit), hit: hit ? `${hit.tagName.toLowerCase()} ${hit.getAttribute('data-testid') ?? ''}`.trim() : 'nothing' };
-  });
+  const reach = await line.evaluate(fingerOn);
   expect(reach.height, `the check's line has its height at ${where}`).toBeGreaterThan(0);
   expect(reach.reached, `a finger on the check's line reaches it at ${where} (it touches «${reach.hit}»)`).toBe(true);
 }
 
 /** A control of «Current order», brought to the top of what scrolls as a finger would: its middle answers with itself. */
 async function reachedOnceScrolled(control: Locator, name: string, where: string): Promise<void> {
-  const reach = await control.evaluate((el) => {
-    el.scrollIntoView({ block: 'start' });
-    const r = el.getBoundingClientRect();
-    const hit = document.elementFromPoint((r.left + r.right) / 2, (r.top + r.bottom) / 2);
-    return { height: r.height, reached: !!hit && el.contains(hit), hit: hit ? `${hit.tagName.toLowerCase()} ${hit.getAttribute('data-testid') ?? ''}`.trim() : 'nothing' };
-  });
+  await control.evaluate((el) => el.scrollIntoView({ block: 'start' }));
+  const reach = await control.evaluate(fingerOn);
   expect.soft(reach.height, `«${name}» has its height at ${where}`).toBeGreaterThan(0);
   expect.soft(reach.reached, `a finger on «${name}» reaches it at ${where} (it touches «${reach.hit}»)`).toBe(true);
 }
 
-/** «Current order» in the drawer (hub#787): its two tabs, the line to send, its quantity, the flame and «Send order» are
+/** «Current order» in the drawer, or in a low side column (hub#787): its two tabs, the line to send, its quantity, the flame and «Send order» are
  *  all reached by scrolling (with room, «Send order» is in view from the start, however the rest scrolls), «Charge» stays
  *  where it is, and a real tap on «Check» goes back. */
 async function roundFits(page: Page, size: { label: string; width: number; height: number }, lang: 'en' | 'es'): Promise<void> {
   const where = `${lang} ${size.label}, «Current order»`;
   await page.setViewportSize({ width: size.width, height: size.height });
   await expect(shown(page).locator('[data-testid=blocking-strip]'), 'the strip of a hub that cannot issue invoices yet').toBeVisible();
-  const drawer = await openDrawer(page);
+  const phone = await tillIsPhone(page);
+  const drawer = phone ? await openDrawer(page) : shown(page).locator('[data-testid=pos-cart-drawer]');
   const till = shown(page);
   const check = till.locator('[data-testid=pos-cart-tab-check]');
   const round = till.locator('[data-testid=pos-cart-tab-round]');
@@ -181,8 +186,10 @@ async function roundFits(page: Page, size: { label: string; width: number; heigh
 
   await check.click({ timeout: 5_000 });
   await expect(check).toHaveAttribute('aria-selected', 'true');
-  await till.locator('[data-testid=pos-cart-close]').click();
-  await expect(drawer).toBeHidden();
+  if (phone) {
+    await till.locator('[data-testid=pos-cart-close]').click();
+    await expect(drawer).toBeHidden();
+  }
 }
 
 /** The check's bar: no control on another, every control inside the bar, and the text of each inside its control. */
@@ -383,7 +390,7 @@ for (const { name, lang, locale, assign } of LANGUAGES) {
 
 for (const { name, lang, locale } of LANGUAGES) {
   // A check of their own: a real tap on «Charge», above, sends what is pending, and «Current order» would have nothing.
-  test.describe(`SALE-F20: in ${name}, on a low phone «Current order» keeps its tabs, its lines and «Send order» in reach`, () => {
+  test.describe(`SALE-F20: in ${name}, on a low screen «Current order» keeps its tabs, its lines and «Send order» in reach`, () => {
     let context: BrowserContext;
     let page: Page;
 
@@ -395,7 +402,7 @@ for (const { name, lang, locale } of LANGUAGES) {
       await context.close();
     });
 
-    for (const size of [...SIZES, ROOMY]) {
+    for (const size of [...SIZES, ROOMY, ...LOW_COLUMN]) {
       test(size.label, async () => {
         await roundFits(page, size, lang);
       });

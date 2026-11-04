@@ -789,7 +789,8 @@ Steps:
    double send never sends anything twice.
    In the phone's drawer, "Send order" and the flame stay pinned above the foot while they leave room for
    the tabs and a line; on a lower phone, such as a 320×568 one with the red strip on top, they scroll with
-   them, after the lines, and "Charge" stays in view (hub#787).
+   them, after the lines, and "Charge" stays in view. The same goes for the side column of a screen just as low,
+   such as a 1024×600 tablet with the strip (hub#787).
 3. On pressing "Charge" with something pending, it is sent to the kitchen first and then the charge
    opens: nobody pays for a dish that is not going to be made. The order's notice shows at the top here
    too, so the charge keypad (SALE-F01) can be tapped from the first moment. If the send fails, the

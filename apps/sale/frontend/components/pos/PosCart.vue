@@ -136,8 +136,8 @@ function park(): void {
       @close="checksOpen = false"
     />
     <!-- What sits between the bar and the foot. The side column keeps its heading and scrolls the lines; the phone's
-         drawer scrolls it all as one, so «Charge» stays in view above the tab bar on a low phone (hub#630). The send bar
-         rides here too: outside, it took all of this on a low phone, tabs and lines included (hub#787). -->
+         drawer, and a column just as low, scroll it all as one, so «Charge» stays in view above the tab bar (hub#630). The
+         send bar rides here too: outside, it took all of this when low, tabs and lines included (hub#787). -->
     <div class="pos-cart__scroll">
       <CartHeading
         :label="label"
@@ -274,6 +274,14 @@ function park(): void {
 .pos-cart--drawer .pos-cart__body {
   flex: 1 0 auto;
   overflow: visible;
+}
+/* A side column as low as that, under the red strip of a small tablet: the same, or the lines get 0 px and no way to
+   them (hub#787). The height is the one at which the send bar stops being pinned (KitchenSendBar). */
+@container pos-cart-middle (max-height: 13rem) {
+  .pos-cart__body {
+    flex: 1 0 auto;
+    overflow: visible;
+  }
 }
 .pos-cart__tabs {
   display: grid;
