@@ -215,7 +215,7 @@ export interface CommissionReportRow {
   role_name: string | null;
   status: RecordStatus;
   commission_rate: string;
-  /** What they sold in the period, refunds taken off, in cents. */
+  /** What they sold in the period, refunds taken off and voucher sessions added, in cents. */
   sold: number;
   /** sold × rate ÷ 100 in cents, rounded half up once. */
   commission: number;
