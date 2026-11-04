@@ -5,13 +5,16 @@ business chosen for the session (``/admin/hub/<slug>/``, ``base.admin.open_hub``
 (``base.middleware.HubDatabaseMiddleware``), where only control's models live. There the index and every app's page list
 control's models alone (the registry, the accounts, the sessions); a hub's model (``base.tenancy.inventory``) appears
 once a business is chosen, in its database. A hub's page reached without one goes back to the index, saying so
-(``HubDatabaseMiddleware.process_exception``). It is the default site (``AdminConfig.default_site``), so every
-``@admin.register`` of the apps lands here.
+(``HubDatabaseMiddleware.process_exception``). With a business chosen, a module whose tables it does not have yet
+(``base.activation.has_tables``) is left out the same way: the list runs every model's ``has_add_permission``, and one
+that reads its table (Tax's) would fail every page of the admin. Its page reached by hand answers ``AppNotCreated``.
+It is the default site (``AdminConfig.default_site``), so every ``@admin.register`` of the apps lands here.
 """
 
 from django.contrib import admin
 from django.contrib.admin.apps import AdminConfig as DjangoAdminConfig
 
+from base import activation
 from base.tenancy import context, inventory
 
 
@@ -21,6 +24,12 @@ def _on_control() -> bool:
         return context.current().kind == context.CONTROL
     except context.HubContextMissing:
         return True
+
+
+def _has_its_tables(model) -> bool:
+    """Whether the business the admin works on has the tables of ``model``'s app, as far as control knows."""
+    active = context.current()
+    return active.kind != context.HUB or activation.has_tables(active.hub, model._meta.app_label)
 
 
 class AdminSite(admin.AdminSite):
@@ -35,12 +44,12 @@ class AdminSite(admin.AdminSite):
 
 
 def _only_with_a_business(model_admin) -> None:
-    """Hide ``model_admin``'s model from the index and its app's page while the admin works on control: its rows are a
-    business's, in that business's own database."""
+    """Hide ``model_admin``'s model from the index and its app's page while the admin works on control, its rows being a
+    business's, in that business's own database, and in a business without its module's tables."""
     has_module_permission = model_admin.has_module_permission
 
     def guarded(request) -> bool:
-        return not _on_control() and has_module_permission(request)
+        return not _on_control() and _has_its_tables(model_admin.model) and has_module_permission(request)
 
     model_admin.has_module_permission = guarded
 

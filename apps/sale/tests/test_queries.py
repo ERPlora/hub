@@ -743,6 +743,49 @@ def test_departments_in_their_order_with_their_rate_today():
     ] == ["Meat", "Fruit"]
 
 
+def _department(name: str):
+    data = {"name": name, "tax_category_key": "product.reduced", "sort_order": 10}
+    return run("sale.department.create", data).id
+
+
+def _quick_note(text: str):
+    return run("sale.quick_note.create", {"text": text, "sort_order": 10}).id
+
+
+@pytest.mark.parametrize(
+    ("listing", "create"),
+    [("sale.department.list", _department), ("sale.quick_note.list", _quick_note)],
+)
+def test_rows_tied_on_the_column_go_by_their_label_then_id_in_the_lists_own_direction(
+    listing, create
+):
+    """hub#684 (the rule of hub#2355): a descending list is the ascending one read backwards, ties included."""
+    tied = sorted(create("Tied") for _ in range(3))
+    ascending = [create("Another"), *tied]
+
+    def listed(direction, **page):
+        data = {"sort": "sort_order", "dir": direction, **page}
+        return [row.id for row in run(listing, data).rows]
+
+    assert listed("asc") == ascending
+    assert listed("desc") == ascending[::-1]
+    assert [
+        row for offset in (0, 2) for row in listed("desc", limit=2, offset=offset)
+    ] == ascending[::-1]
+
+
+def test_the_sales_list_settles_its_ties_by_id_in_its_own_direction(catalog):
+    """hub#684: the sales list already followed hub#2355, and holds it now through the shared order."""
+    by_id = sorted(charge(f"list-key-{n:04}").id for n in range(3))
+
+    def listed(direction):
+        data = {"sort": "status", "dir": direction}
+        return [row.id for row in run("sale.sale.list", data).rows]
+
+    assert listed("asc") == by_id
+    assert listed("desc") == by_id[::-1]
+
+
 def test_quick_notes_in_their_order():
     run("sale.quick_note.create", {"text": "no salt", "sort_order": 20})
     run("sale.quick_note.create", {"text": "medium rare", "sort_order": 10})
