@@ -900,8 +900,7 @@ test('RESERVATION-F06 — booking a table, the card names the customer; moving a
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
     await expect(card(page)).toContainText(`Crear en Reservas: ${label}`);
-    await untilStill(page);
-    await capture(page, `${KEY}-create-${vp.label}`);
+    await captureStill(page, `${KEY}-create-${vp.label}`);
   }
   await cancelAtComputerSize(page);
 
@@ -993,10 +992,7 @@ test('FLOW-F03 — pausing an automation, the card names it; resuming a run, its
     await expect(card(page)).toContainText('Reintentar en Automatizaciones. Revisa cada dato antes de seguir.');
     await expect(card(page)).toContainText(`Registro: ${label}`);
     await expect(card(page)).not.toContainText(ran.data.id);
-    await confirmationReady(page);
-    await untilStill(page);
-    expect(await confirmationSettled(page), `${KEY}-run-${vp.label} caught before it settled`).toBe(true);
-    await capture(page, `${KEY}-run-${vp.label}`);
+    await captureConfirmation(page, `${KEY}-run-${vp.label}`);
   }
   await cancelAtComputerSize(page);
   const after = await api<{ enabled: boolean }>(context, A, 'GET', `/flow/flows/detail?id=${flow.id}`);
