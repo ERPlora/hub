@@ -132,8 +132,7 @@
       },
       "mine": {
         "button": "My record",
-        "title": "My record",
-        "close": "Close"
+        "title": "My record"
       }
     },
     "roles": {

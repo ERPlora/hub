@@ -132,8 +132,7 @@
       },
       "mine": {
         "button": "Mi ficha",
-        "title": "Mi ficha",
-        "close": "Cerrar"
+        "title": "Mi ficha"
       }
     },
     "roles": {
