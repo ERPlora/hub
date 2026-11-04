@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:35cdaf9ce6c2d0ea6d26a03383d371a04f3bf3a56e8c1bdcf2553c9d61799645 -->
+<!-- generated from WORKBOOK.md sha256:737645d755bc0caafeb501c9bd8942ff4364d0fd1ec30b68877e3e8a70a10a13 -->
 
 ## What it is for and who it is for
 
@@ -170,7 +170,7 @@ While the live connection is recovered, "Reconnecting…" on top, without erasin
 | RESERVATION-F10 | Mark that they did not show up | done |
 | RESERVATION-F11 | Seat the reservation | done |
 | RESERVATION-F12 | Complete the reservation | done |
-| RESERVATION-F13 | Release the pending reservations nobody confirmed | discarded |
+| RESERVATION-F13 | Release the pending reservations nobody confirmed | done |
 | RESERVATION-F14 | Put someone on the waitlist | done |
 | RESERVATION-F15 | Mark as contacted or remove from the waitlist | done |
 | RESERVATION-F16 | Convert a waitlist entry into a reservation | done |
@@ -391,10 +391,7 @@ is seated.".
 Involved: RESERVATION-F11
 
 ### RESERVATION-F13 Release the pending reservations nobody confirmed
-Status: discarded — the release runs by itself every quarter of an hour and releases the pending ones of
-all the businesses, but it announces it at once only in the platform's business: the Reservations screen
-of the others sees it in its five-minute refresh; announcing it in each business belongs to the worker's
-pass over each business (hub#551)
+Status: done
 Actor: system
 Screen: none
 Steps:
@@ -403,7 +400,7 @@ Steps:
 2. The confirmed ones, the seated ones and those of other days are not touched.
 In: the time.
 Out: the released reservations (announces: `reservation.reservation.unconfirmed_released`, only if it
-released any).
+released any): the Reservations screen open in that business sees it at once.
 If it fails: a pass that fails changes nothing and the next one tries again.
 Involved: RESERVATION-F03
 

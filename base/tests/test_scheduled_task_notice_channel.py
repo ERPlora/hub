@@ -12,6 +12,7 @@ import pytest
 from django.conf import settings
 from django.utils import timezone
 from live import operations as live_operations
+from live.live_registry import live_registry
 
 from base import worker
 from base.tenancy.context import use_control, use_hub
@@ -35,6 +36,7 @@ def no_test_fallback(monkeypatch):
 def nothing_synced_yet(monkeypatch):
     monkeypatch.setattr(worker, "_synced", set())
     monkeypatch.setattr(worker, "_next_hub", None)
+    monkeypatch.setattr(worker, "HUB_PASS_SECONDS", 3600)
 
 
 @pytest.fixture
@@ -52,6 +54,18 @@ def told(monkeypatch):
     return sent
 
 
+def tasks_run_by_the_worker(now: dt.datetime) -> None:
+    """Its first pass writes each hub's schedule, each task due at its next time; the next, days on, runs them."""
+    with use_control():
+        worker._hubs(now)
+    with use_control():
+        worker._hubs(now + dt.timedelta(days=2))
+
+
+def told_to(told: list[tuple[str, list[str]]], event: str) -> set[str]:
+    return {key for key, names in told if event in names}
+
+
 def test_a_flow_schedule_fired_by_the_worker_is_told_on_its_hubs_channel(hub_a, told):
     from apps.flow.models import Flow
 
@@ -67,13 +81,52 @@ def test_a_flow_schedule_fired_by_the_worker_is_told_on_its_hubs_channel(hub_a, 
             grants=["task.task.create"],
             enabled=True,
         )
-    with use_control():
-        worker._hubs(now)  # its schedule written in its database, each task due at its next time
-
-    with use_control():
-        worker._hubs(now + dt.timedelta(days=2))
+    tasks_run_by_the_worker(now)
 
     flow_notices = [(key, names) for key, names in told if any(name.startswith("flow.") for name in names)]
     assert flow_notices, f"the fired schedule was told to nobody: {told}"
     assert {key for key, _ in flow_notices} == {hub_a.slug}
     assert settings.WORKER_SCOPE_SLUG not in {key for key, _ in told}
+
+
+def test_a_reservation_released_by_the_worker_is_told_on_its_hubs_channel_and_no_other(hub_a, hub_b, told):
+    # RESERVATION-F13, hub#551: the book open in that business re-runs at once; the other's hears nothing.
+    from apps.reservation.events import RESERVATION_UNCONFIRMED_RELEASED
+    from apps.reservation.models import Reservation
+
+    now = timezone.now()
+    booking = {"time": dt.time(12, 0), "guest_name": "Ana", "party_size": 2, "duration_minutes": 120}
+    with use_hub(hub_b):
+        stale = Reservation.objects.create(date=now.date() - dt.timedelta(days=2), **booking)
+    with use_hub(hub_a):
+        still_ahead = Reservation.objects.create(date=now.date() + dt.timedelta(days=2), **booking)
+
+    tasks_run_by_the_worker(now)
+
+    with use_hub(hub_b):
+        assert Reservation.objects.get(pk=stale.pk).status == Reservation.Status.CANCELLED
+    with use_hub(hub_a):
+        assert Reservation.objects.get(pk=still_ahead.pk).status == Reservation.Status.PENDING
+    assert told_to(told, RESERVATION_UNCONFIRMED_RELEASED) == {hub_b.slug}
+    assert "reservation.reservation.list" in live_registry.affected([RESERVATION_UNCONFIRMED_RELEASED])
+
+
+def test_carts_expired_by_the_worker_are_told_on_their_hubs_channel_and_no_other(hub_a, hub_b, told):
+    # CART_CHECKOUT-F07: the list open in that business re-runs at once; the other's hears nothing.
+    from apps.cart_checkout.events import CART_EXPIRED
+    from apps.cart_checkout.models import Cart
+
+    now = timezone.now()
+    with use_hub(hub_b):
+        overdue = Cart.objects.create(session_token="sess_overdue", expires_at=now - dt.timedelta(days=1))
+    with use_hub(hub_a):
+        still_on = Cart.objects.create(session_token="sess_still_on", expires_at=now + dt.timedelta(days=1))
+
+    tasks_run_by_the_worker(now)
+
+    with use_hub(hub_b):
+        assert Cart.objects.get(pk=overdue.pk).status == Cart.Status.EXPIRED
+    with use_hub(hub_a):
+        assert Cart.objects.get(pk=still_on.pk).status == Cart.Status.ACTIVE
+    assert told_to(told, CART_EXPIRED) == {hub_b.slug}
+    assert "cart_checkout.cart.list" in live_registry.affected([CART_EXPIRED])

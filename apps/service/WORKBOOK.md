@@ -1114,8 +1114,8 @@ cajero del producto actual es un empleado: lo que tenía (ver, gastar y conceder
   borrado del admin de un servicio borra sus asignaciones y después el servicio. Hay tests con hilos de cada
   carrera.
 - **Tareas programadas**: `scheduled_tasks` del `AppConfig` declara `service.session.expire` cada
-  hora (`0 * * * *`, UTC, `collapse`); hecho — la corre el worker (`base/scheduler.py`, 2026-10-15; en la
-  fase 1, sobre un solo hub). Además, el saldo ya no cuenta una reserva vencida y reservar de nuevo la misma
+  hora (`0 * * * *`, UTC, `collapse`); hecho — la corre el worker (`base/scheduler.py`, 2026-10-15), en cada
+  negocio y con su ámbito (`base.worker._serve_hub`). Además, el saldo ya no cuenta una reserva vencida y reservar de nuevo la misma
   línea marca antes la vencida.
 - **Bonos sin cliente** se calculan desde la ficha de Clientes (eliminada o anonimizada, y no unida a
   otra): no hace falta sellar nada al eliminarla. Unir dos fichas mueve los bonos con la reacción a

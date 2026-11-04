@@ -2,8 +2,7 @@
 Prefijo: RESERVATION
 Alcance MVP: restaurante
 Estado de la app: completa (2026-10-31)
-Lo que no entra todavía: ver «Lo que queda fuera». La liberación sola de las pendientes (F13) queda descartada
-mientras no avise al momento en cada negocio.
+Lo que no entra todavía: ver «Lo que queda fuera».
 
 > Manual de usuario y especificación de la app `reservation`. Se escribe **antes** que el código: no
 > se programa nada que no esté aquí, y cada flujo pasa a `hecho` cuando sus tests están en verde
@@ -183,7 +182,7 @@ Mientras se recupera la conexión en vivo, «Reconectando…» encima, sin borra
 | RESERVATION-F10 | Marcar que no se presentaron | hecho |
 | RESERVATION-F11 | Sentar a la reserva | hecho |
 | RESERVATION-F12 | Completar la reserva | hecho |
-| RESERVATION-F13 | Liberar las reservas pendientes que nadie confirmó | descartado |
+| RESERVATION-F13 | Liberar las reservas pendientes que nadie confirmó | hecho |
 | RESERVATION-F14 | Apuntar en la lista de espera | hecho |
 | RESERVATION-F15 | Marcar contactado o quitar de la lista de espera | hecho |
 | RESERVATION-F16 | Convertir una entrada de la lista de espera en reserva | hecho |
@@ -413,10 +412,7 @@ Implicados: RESERVATION-F11
 
 ### RESERVATION-F13 Liberar las reservas pendientes que nadie confirmó
 <!-- origen: wf:whatsapp-mesa#rec_wa_mesa-f06 old:reservations/workflow/reservas.md#reservations-f13 -->
-Estado: descartado — la liberación corre sola cada cuarto de hora y libera las pendientes de todos los
-negocios, pero avisa al momento solo en el negocio de la plataforma: la pantalla de Reservas de los demás
-la ve en su repaso de cinco minutos; avisar en cada negocio es del recorrido del trabajador por negocio
-(hub#551)
+Estado: hecho
 Actor: sistema
 Pantalla: ninguna
 Pasos:
@@ -425,7 +421,7 @@ Pasos:
 2. Las confirmadas, sentadas y las de otros días no se tocan.
 Entra: la hora.
 Sale: las reservas liberadas (avisa: `reservation.reservation.unconfirmed_released`, solo si liberó
-alguna).
+alguna): la pantalla de Reservas abierta en ese negocio lo ve al momento.
 Si falla: una pasada que falla no cambia nada y la siguiente lo vuelve a intentar.
 Implicados: RESERVATION-F03
 
@@ -844,10 +840,9 @@ la que solo se le autorizó reservar.
   reservas y lista de espera; ids y fechas en solo lectura. Lo que guarda no pasa por las operaciones
   ni deja aviso.
 - **Tarea programada**: `release_unconfirmed_reservations` (`reservation.reservation.release_unconfirmed`,
-  cada 15 minutos, en UTC, `collapse`); la corre el worker (`base/scheduler.py`) como sistema en el ámbito
-  fijo `WORKER_SCOPE_SLUG` de la fase 1: libera las pendientes de toda la BD compartida, pero su aviso vivo
-  sale solo por ese ámbito (F13 `descartado` hasta el recorrido por hub del worker, hub#551; lo trae la
-  «C1» de hub#471).
+  cada 15 minutos, en UTC, `collapse`); la corre el worker (`base/scheduler.py`) como sistema en cada
+  negocio, en su BD y con su ámbito (`base.worker._serve_hub`): libera las pendientes de ese negocio y su aviso
+  vivo llega a la pantalla de Reservas abierta allí y a ninguna de otro (`base/tests/test_scheduled_task_notice_channel.py`).
 - **WhatsApp** (F17, F18): la conversación es la receta `reservation_from_whatsapp` de `whatsapp_inbox`
   (`apps/whatsapp_inbox/recipes.py`, WHATSAPP_INBOX-F24, F25), un paso de asistente con «Que me lo pregunte»
   cuyas herramientas son `reservation.availability.day`, `.availability.tables`, `.reservation.create`,
@@ -917,9 +912,6 @@ la que solo se le autorizó reservar.
 
 ### Lo que queda fuera
 
-- **hub#551 — El aviso al momento de la liberación de pendientes en cada negocio** (F13, `descartado`): la
-  tarea corre en el ámbito fijo de la fase 1 y la pantalla de Reservas de los demás negocios la ve en su
-  repaso de cinco minutos; llega con el recorrido del worker por negocio (hub#471).
 - **hub#547** — Una traducción al español marcada «fuzzy» sale en inglés y su test de traducciones no la ve.
 - **hub#548** — Dos textos en español salen con las palabras de otra app («origen» en vez de «reservada por»).
 - **hub#549** — La tarjeta de confirmación del asistente llama «Registro» a la reserva, la franja o la
