@@ -22,52 +22,12 @@ from apps.invoice.models import (
 )
 from apps.invoice.tests.conftest import ctx_for, run
 from base import assistant
+from base.tests.po import po_entries
 
 APP = Path(apps.get_app_config("invoice").path)
 LOCALE = APP / "locale" / "es" / "LC_MESSAGES"
 TEMPLATE = APP / "templates" / "invoice" / "invoice.html"
 SCREENS = json.loads((APP / "frontend" / "locale" / "es.json").read_text(encoding="utf-8"))["invoice"]
-_STRING = re.compile(r'^"(.*)"$')
-_ESCAPE = re.compile(r"\\(.)")
-_ESCAPES = {"n": "\n", "t": "\t"}
-
-
-def _unescape(text: str) -> str:
-    return _ESCAPE.sub(lambda match: _ESCAPES.get(match.group(1), match.group(1)), text)
-
-
-def po_entries(path: Path) -> dict[str, tuple[str, bool]]:
-    """``msgid → (msgstr, fuzzy)`` of a .po file without plurals (the header is skipped); an entry with a
-    context is keyed as gettext keeps it compiled, ``context\x04msgid``."""
-    entries: dict[str, tuple[str, bool]] = {}
-    parts: dict[str, list[str]] = {"msgctxt": [], "msgid": [], "msgstr": []}
-    fuzzy, current = False, None
-
-    def flush():
-        msgid = _unescape("".join(parts["msgid"]))
-        context = _unescape("".join(parts["msgctxt"]))
-        if msgid:
-            key = f"{context}\x04{msgid}" if context else msgid
-            entries[key] = (_unescape("".join(parts["msgstr"])), fuzzy)
-
-    for line in path.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        starts_entry = line.startswith("msgctxt ") or (
-            line.startswith("msgid ") and current != "msgctxt"
-        ) or (line.startswith("#") and current == "msgstr")
-        if starts_entry:
-            flush()
-            # A ``#, fuzzy`` above a ``msgctxt`` belongs to the entry the context opens: only a new comment forgets it.
-            parts, fuzzy, current = {"msgctxt": [], "msgid": [], "msgstr": []}, fuzzy and current is None, None
-        if line.startswith("#,") and "fuzzy" in line:
-            fuzzy = True
-        elif line.startswith(("msgctxt ", "msgid ", "msgstr ")):
-            current, _, rest = line.partition(" ")
-            parts[current].append(_STRING.match(rest).group(1))
-        elif current and _STRING.match(line):
-            parts[current].append(_STRING.match(line).group(1))
-    flush()
-    return entries
 
 
 def messages_of(module) -> list:
