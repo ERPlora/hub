@@ -49,7 +49,7 @@ class FakeScheduler:
     def sync(self, now: dt.datetime) -> None:
         self.synced.append(now)
 
-    def run_due(self, now: dt.datetime) -> list[str]:
+    def run_due(self, now: dt.datetime, *, scope=None, active=None) -> list[str]:
         self.ticks.append(now)
         if self.failures:
             raise self.failures.pop(0)
