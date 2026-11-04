@@ -2591,9 +2591,21 @@
     "method": "post",
     "path": "/api/modifier/options/delete"
   },
+  "modifier.option.get": {
+    "method": "get",
+    "path": "/api/modifier/options/detail"
+  },
   "modifier.link.list": {
     "method": "get",
     "path": "/api/modifier/links"
+  },
+  "modifier.link.get": {
+    "method": "get",
+    "path": "/api/modifier/links/detail"
+  },
+  "modifier.category.get": {
+    "method": "get",
+    "path": "/api/modifier/categories/detail"
   },
   "modifier.link.attach": {
     "method": "post",

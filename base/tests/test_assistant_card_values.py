@@ -360,12 +360,13 @@ UNNAMED_REFERENCES = {
     "inventory": 15,
     "invoice": 1,
     "kitchen": 23,
-    "modifier": 14,
     "online_booking": 7,
     "payment": 8,
     "sale": 101,
     "schedule": 4,
-    "service": 35,
+    # The sale and the appointment a voucher or a session came from, the line of an order that holds a session and the
+    # reference of a return: data of apps Services does not require, or free text, so it reads none of them (hub#TBD).
+    "service": 6,
     "staff": 15,
     "task": 15,
     "tax": 4,

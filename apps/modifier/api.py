@@ -11,6 +11,7 @@ from ninja import Query, Router
 
 from apps.modifier import queries, services
 from apps.modifier.schemas import (
+    CategoryRefIn,
     GroupIn,
     GroupListIn,
     GroupPatchIn,
@@ -70,6 +71,11 @@ async def option_list(request, params: Query[OptionListIn]):
     return await run_operation(request, queries.list_options, params)
 
 
+@bind(router, "modifier.option.get", "/modifier/options/detail")
+async def option_get(request, params: Query[OptionRefIn]):
+    return await run_operation(request, queries.get_option, params)
+
+
 @bind(router, "modifier.option.create", "/modifier/options", status=201)
 async def option_create(request, data: OptionIn):
     return await run_operation(request, services.create_option, data)
@@ -85,12 +91,22 @@ async def option_delete(request, data: OptionRefIn):
     return await run_operation(request, services.delete_option, data)
 
 
+@bind(router, "modifier.category.get", "/modifier/categories/detail")
+async def category_get(request, params: Query[CategoryRefIn]):
+    return await run_operation(request, queries.get_category, params)
+
+
 # Links
 
 
 @bind(router, "modifier.link.list", "/modifier/links")
 async def link_list(request, params: Query[LinkListIn]):
     return await run_operation(request, queries.list_links, params)
+
+
+@bind(router, "modifier.link.get", "/modifier/links/detail")
+async def link_get(request, params: Query[LinkRefIn]):
+    return await run_operation(request, queries.get_link, params)
 
 
 @bind(router, "modifier.link.attach", "/modifier/links/attach", status=201)
