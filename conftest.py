@@ -206,7 +206,7 @@ def legacy_fallback():
 @pytest.fixture(autouse=True)
 def legacy_worker(request, monkeypatch):
     """The worker's loop serves only the hubs with their own database (S5). A test written before the tenancy that runs
-    it on its businesses (on control's test database) gets phase 1's pass instead of the one over control's outbox:
+    it on its businesses (on control's test database) gets a pass of its own instead of the one over control's outbox:
     their tasks and their events' relay (``base/tenancy/tests/legacy.py``, ``worker_pass``). Not for a test that runs as
     production (``no_test_fallback``) nor for the worker's own (``production_worker``)."""
     if "no_test_fallback" in request.fixturenames or request.node.get_closest_marker("production_worker"):
