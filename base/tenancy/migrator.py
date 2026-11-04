@@ -80,10 +80,10 @@ SESSION_LIMITS = {
 HUB_WORKERS = 4
 #: A hub's run cut by ``lock_timeout`` (a table held by its traffic) is tried this many times (PLAN-DB §7).
 LOCK_TIMEOUT_ATTEMPTS = 3
-#: The hubs whose database is complete: ready, or kept after leaving (a cancelled business, an expired demo until
-#: its purge). One being created is the worker's, which runs ``ensure_schema`` itself; a failed one has no
-#: complete database; a purged one has none.
-MIGRATED_STATUSES = (Hub.Status.READY, Hub.Status.CANCELLED, Hub.Status.EXPIRED)
+#: The hubs whose database is complete: ready, or kept after leaving (a cancelled business, or one whose final copy
+#: is being made, which the worker still serves; an expired demo until its purge). One being created is the worker's,
+#: which runs ``ensure_schema`` itself; a failed one has no complete database; a purged one has none.
+MIGRATED_STATUSES = (Hub.Status.READY, Hub.Status.CANCELLED, Hub.Status.ARCHIVING, Hub.Status.EXPIRED)
 #: Where ``CREATE DATABASE`` runs: every database's own catalog is reached from any, and this one always exists.
 OPS_DATABASE = "postgres"
 #: Cloning a template fails while anyone is connected to its source (55006, after PostgreSQL's own 5 s wait): it is
