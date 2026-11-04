@@ -6,9 +6,11 @@ import { StatusPill } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
 import { IonSpinner } from '@ionic/vue';
 
+import { useBusinessZone } from '../../../../base/frontend/lib/zone';
 import { formatTime } from '../lib/time';
 
 const { data, status } = useLive('attendance.presence.list', { limit: 100 });
+const zone = useBusinessZone();
 </script>
 
 <template>
@@ -57,7 +59,7 @@ const { data, status } = useLive('attendance.presence.list', { limit: 100 });
       >
         <strong>{{ row.member_name }}</strong>
         <!-- The leading spaces keep the words apart for a screen reader, not only for the eye. -->
-        <span class="attendance-presence__since">{{ ` ${$t('attendance.presence.since', { time: formatTime(row.clock_in_at) })}` }}</span>
+        <span class="attendance-presence__since">{{ ` ${$t('attendance.presence.since', { time: formatTime(row.clock_in_at, zone) })}` }}</span>
         <template v-if="row.break_started_at">
           {{ ' ' }}<StatusPill
             size="sm"

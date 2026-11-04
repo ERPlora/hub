@@ -1,7 +1,7 @@
 """The WhatsApp inbox's clock: one seam for every «now», so the tests never read the real time.
 
-Phase 1 has no settings per business: its time zone is Madrid's (the month of the allowance, the
-times of the inbox).
+The month of the allowance is still Madrid's: the times of the inbox are said on the business's clock by its screens
+(hub#779), and this month is hub#771's.
 """
 
 import datetime as dt
