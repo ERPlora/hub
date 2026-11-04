@@ -18,13 +18,14 @@ import {
   StatusPill,
 } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
-import { AppPage, openExternalLink, useSession, useSurface } from '@erplora/ui/shell';
+import { AppPage, useSession, useSurface } from '@erplora/ui/shell';
 import { computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 import ConversationPanel from '../components/ConversationPanel.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import { useBusinessZone } from '../../../../base/frontend/lib/zone';
+import PlanUpgradeLink from '../components/PlanUpgradeLink.vue';
 import { useLiveList } from '../composables/useLiveList';
 import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
@@ -74,7 +75,7 @@ const blocked = computed(() => blockingError(error.value));
 
 const { data: channel } = useLive('whatsapp_inbox.channel.get', {});
 /** «Upgrade plan» at the cap: for whoever configures, only with erplora.com to send them to, and only on the web (it
- *  sells: surface.ts); its click leaves the Hub by `openExternalLink` (gh:hub#439). */
+ *  sells: surface.ts). */
 const { isWeb } = useSurface();
 const upgradeUrl = computed(() => (isWeb.value && canConfigure.value && channel.value?.plans_url) || '');
 // From 80 % of the month's messages, how many are left (WHATSAPP_INBOX-F13).
@@ -223,14 +224,10 @@ const columns = computed<DataTableColumn<ConversationOut>[]>(() => [
           v-if="upgradeUrl"
           #actions
         >
-          <a
-            class="wa-inbox__link"
+          <PlanUpgradeLink
             data-testid="whatsapp-inbox-upgrade"
-            :href="upgradeUrl"
-            target="_blank"
-            rel="noopener"
-            @click="openExternalLink(upgradeUrl, $event)"
-          >{{ $t('whatsapp_inbox.upgradePlan') }}</a>
+            :url="upgradeUrl"
+          />
         </template>
       </InlineFeedback>
       <InlineFeedback
@@ -243,14 +240,10 @@ const columns = computed<DataTableColumn<ConversationOut>[]>(() => [
           v-if="upgradeUrl"
           #actions
         >
-          <a
-            class="wa-inbox__link"
+          <PlanUpgradeLink
             data-testid="whatsapp-inbox-upgrade"
-            :href="upgradeUrl"
-            target="_blank"
-            rel="noopener"
-            @click="openExternalLink(upgradeUrl, $event)"
-          >{{ $t('whatsapp_inbox.upgradePlan') }}</a>
+            :url="upgradeUrl"
+          />
         </template>
       </InlineFeedback>
       <InlineFeedback

@@ -12,7 +12,7 @@ import { execSync } from 'node:child_process';
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { CLAIM_ANSWER, DICTATION, GREETING, type Provider, startProvider, STEPS_SAID } from './assistant-provider';
-import { A, api, capture, compactBar, EMPLOYEE, exposeMovingInPage, login, REPO_DIR, shot, shown, turnOffTurnedOn, turnOnMissing, untilStill } from './helpers';
+import { A, api, capture, compactBar, EMPLOYEE, exposeMovingInPage, login, REPO_DIR, shot, shown, turnOffTurnedOn, turnOnMissing, untilStill, upgradeLandsInside } from './helpers';
 import { cleanPricing, CODE as PRICING_CODE, createProduct, post, TAG as PRICING_TAG } from './pricing-helpers';
 import { STACK } from './stack';
 
@@ -1113,6 +1113,9 @@ test('BASE-G122 — from 80 % the foot says what is left and each answer moves i
   await expect(foot).toHaveText(/^You have used all 30 messages of this month\. They renew on \S+ 1\.$/);
   await expect(panel(page).locator('[data-testid="assistant-upgrade"]')).toHaveCount(1);
   await shots(page, 'BASE-G122-spent');
+  await page.setViewportSize({ width: 1440, height: 900 });
+  // With no session of erplora.com in this browser, the answer's «Upgrade plan» still lands inside it (BASE-F11, hub#723).
+  await upgradeLandsInside(page, failure.locator('[data-testid="assistant-upgrade"]'));
 
   const employee = await freshPage(browser);
   await employee.setViewportSize({ width: 1440, height: 900 });

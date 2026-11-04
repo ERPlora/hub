@@ -6,7 +6,9 @@
 // approvals (BASE-G118); and the empty conversation offers the setup's shortcuts (BASE-G121).
 import {
   type AssistantCard,
+  AssistantPanel,
   createAssistant,
+  installAssistant,
   type PendingCall,
   type TurnBody,
   type TurnFrame,
@@ -16,7 +18,7 @@ import { ApiError } from '@erplora/ui/sdk';
 import type { ShellSession } from '@erplora/ui/shell';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { EMPLOYEE, memoryStorage, mountBase, OWNER } from '../__tests__/mount-base';
+import { EMPLOYEE, flush, memoryStorage, mountBase, OWNER, tap } from '../__tests__/mount-base';
 import en from '../locale/en.json';
 import es from '../locale/es.json';
 import type { SetupItem, SetupStatus } from '../operations';
@@ -187,6 +189,73 @@ describe('HUB_ASSISTANT: who', () => {
     block.textContent = JSON.stringify({ plan_url: 'https://erplora.com/hubs/a/plan' });
     document.body.append(block);
     expect(HUB_ASSISTANT.planUrl!()).toBe('https://erplora.com/hubs/a/plan');
+  });
+});
+
+// A click on the panel runs outside any component's setup: the pass goes through the page's client, as the allowance.
+describe('«Upgrade plan» of the panel goes with the pass (BASE-F11, hub#723)', () => {
+  const PLAN = 'https://erplora.com/dashboard/store/plans?business=b1';
+  const SIGNED = 'https://erplora.com/hub-pass/?pass=abc%3A123';
+  const refused = () => Response.json({ error: { code: 'base.saas_pass_needs_account', message: 'No.' } }, { status: 403 });
+
+  async function panelWithoutAPlan(saasPass: () => Response) {
+    const block = Object.assign(document.createElement('script'), { type: 'application/json', id: 'hub-home' });
+    block.textContent = JSON.stringify({ plan_url: PLAN });
+    document.body.append(block);
+    const assistant = createAssistant({ storage: memoryStorage(), openStorage: memoryStorage(), post: async () => undefined });
+    installAssistant(assistant);
+    const m = await mountBase(AssistantPanel, {
+      stubs: { AssistantConfirm: true, AssistantReport: true },
+      onApi: ({ url }) =>
+        url.includes('/saas-pass') ? saasPass() : Response.json({ used: 0, limit: 0, resets_at: null, demo: false }),
+    });
+    assistant.setOpen(true);
+    for (let i = 0; i < 3; i += 1) await flush();
+    const tab = { opener: {} as unknown, location: { href: 'about:blank' } };
+    const open = vi.spyOn(window, 'open').mockReturnValue(tab as unknown as Window);
+    return { ...m, link: m.wrapper.get('[data-testid="assistant-no-plan-upgrade"]'), tab, open };
+  }
+
+  afterEach(() => {
+    installAssistant(undefined);
+    vi.restoreAllMocks();
+  });
+
+  it('opens the blank tab in the click, keeps the link from opening another, and sends the tab to the signed address', async () => {
+    const m = await panelWithoutAPlan(() => Response.json({ url: SIGNED }));
+    expect(m.link.attributes('href')).toBe(PLAN);
+
+    const seen = tap(m.link.element);
+
+    expect(m.open).toHaveBeenCalledWith('about:blank', '_blank');
+    expect(seen.defaultPrevented).toBe(true);
+    await flush();
+    expect(m.tab.location.href).toBe(SIGNED);
+    expect(m.tab.opener).toBeNull();
+    const [pass] = m.net.api.filter((call) => call.url.includes('/saas-pass'));
+    expect(JSON.parse(pass.init.body as string)).toEqual({ next: 'plan' });
+  });
+
+  it('when the pass is refused, the tab goes to the plan page the Home gives', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const m = await panelWithoutAPlan(refused);
+
+    tap(m.link.element);
+    await flush();
+
+    expect(m.tab.location.href).toBe(PLAN);
+    expect(error).toHaveBeenCalled();
+  });
+
+  it('when the browser blocks the tab, the link itself opens the plan page and nothing is signed', async () => {
+    const m = await panelWithoutAPlan(() => Response.json({ url: SIGNED }));
+    m.open.mockReturnValue(null);
+
+    const seen = tap(m.link.element);
+    await flush();
+
+    expect(seen.defaultPrevented).toBe(false);
+    expect(m.net.api.filter((call) => call.url.includes('/saas-pass'))).toEqual([]);
   });
 });
 

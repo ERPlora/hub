@@ -4,7 +4,7 @@
 // `await`, so the blank tab opens in the click and gets its address when the pass comes. The installed app has no tabs:
 // the address goes to the device's browser by `openExternalLink`. Whatever goes wrong the usual address opens, which
 // still works, asking to sign in: a button that does nothing is the defect this must never bring back.
-import { useCommand } from '@erplora/ui/sdk';
+import { type LiveClient, useCommand } from '@erplora/ui/sdk';
 import { nativeBridge, openExternalLink } from '@erplora/ui/shell';
 
 export type SaasPassNext = 'plan' | 'business';
@@ -12,8 +12,9 @@ export type SaasPassNext = 'plan' | 'business';
 /** How long a person looks at a blank tab before it gets the usual address: the request itself has no time limit. */
 export const SIGN_TIMEOUT_MS = 8000;
 
-export function useSaasPass(): { openSaasPass: (next: SaasPassNext, usual: string, event: Event) => void } {
-  const { run } = useCommand('base.saas_pass.create');
+/** `client`: for a click outside any component's setup (the assistant's panel hands its own); the page's otherwise. */
+export function useSaasPass(client?: LiveClient): { openSaasPass: (next: SaasPassNext, usual: string, event: Event) => void } {
+  const { run } = useCommand('base.saas_pass.create', { client });
 
   /** The address to open: the signed one, or the usual one when it fails or takes too long. */
   function addressOf(next: SaasPassNext, usual: string): Promise<string> {

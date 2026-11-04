@@ -9,8 +9,8 @@
 // WhatsApp Manager the Hub cannot fill is not sent nor edited here) and Text;
 // «Add template» and a row open the form (F29, F30), Delete asks first (F31), «Send to Meta again» hands
 // over again what did not get there. Between the month and the templates, «What do you use it for?» (AutoReplyCards,
-// F15–F18), only for a business with Reservas on. «Upgrade plan» sells, so only on the web (surface.ts), and leaves
-// the Hub by `openExternalLink` (gh:hub#439: the installed app opens nothing on a `_blank` link).
+// F15–F18), only for a business with Reservas on. «Upgrade plan» sells, so only on the web (surface.ts), and goes with
+// the pass (`PlanUpgradeLink`).
 import {
   ConfirmDialog,
   type DataTableAction,
@@ -21,11 +21,12 @@ import {
   UsageMeter,
 } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
-import { openExternalLink, useSession, useSurface } from '@erplora/ui/shell';
+import { useSession, useSurface } from '@erplora/ui/shell';
 import { computed, ref } from 'vue';
 
 import AutoReplyCards from './AutoReplyCards.vue';
 import NumberConnection from './NumberConnection.vue';
+import PlanUpgradeLink from './PlanUpgradeLink.vue';
 import TemplateFormModal from './TemplateFormModal.vue';
 
 import { useLiveList } from '../composables/useLiveList';
@@ -199,15 +200,12 @@ function onAction({ actionId, row }: { actionId: string; row: TemplateOut }): vo
           {{ $t('whatsapp_inbox.settings.nearCap', { left: left.left, limit: left.limit }) }}
         </p>
       </template>
-      <a
+      <PlanUpgradeLink
         v-if="isWeb && (channel.cap_reached || left) && channel.plans_url"
         class="wa-settings__upgrade"
         data-testid="whatsapp-inbox-settings-upgrade"
-        :href="channel.plans_url"
-        target="_blank"
-        rel="noopener"
-        @click="openExternalLink(channel.plans_url, $event)"
-      >{{ $t('whatsapp_inbox.upgradePlan') }}</a>
+        :url="channel.plans_url"
+      />
     </section>
 
     <!-- «What do you use it for?» (F15–F18): only where an answer can book, so nobody else asks Automatizaciones. -->
@@ -308,7 +306,5 @@ function onAction({ actionId, row }: { actionId: string; row: TemplateOut }): vo
 .wa-settings__upgrade {
   display: inline-block;
   margin-top: 0.25rem;
-  color: var(--ion-color-primary);
-  font-weight: 600;
 }
 </style>
