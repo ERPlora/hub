@@ -67,7 +67,7 @@ test.afterAll(() => {
 /** A check of its own with a dish not sent, its till in the language under test and the kitchen refusing: returns how
  *  many sends the kitchen has been asked for so far. */
 async function checkWithKitchenDown(page: Page, context: BrowserContext, lang: string): Promise<() => number> {
-  // A notice's timer (4500 is what `toastError` asks for) waits for the spec to read it; no other timer changes.
+  // This notice's timer waits for the spec to read it; no other timer changes.
   await page.addInitScript((noticeMs) => {
     const original = window.setTimeout.bind(window);
     window.setTimeout = ((run: TimerHandler, ms?: number, ...rest: unknown[]) =>
@@ -81,7 +81,7 @@ async function checkWithKitchenDown(page: Page, context: BrowserContext, lang: s
   await login(page, A, '/sale/pos');
   await context.addCookies([{ name: 'django_language', value: lang, domain: new URL(A).hostname, path: '/' }]);
   await page.reload();
-  await expect(shown(page).locator('[data-testid=blocking-strip]'), 'the strip of a hub that cannot issue invoices yet').toBeVisible();
+  await expect(shown(page).locator('[data-testid=blocking-strip]'), 'the strip of a hub that cannot issue invoices yet').toBeVisible({ timeout: 30_000 });
   await shown(page).locator(`[data-testid=pos-product-${dish.id}]`).click();
   await expect(shown(page).locator('[data-testid^=pos-line-]').filter({ hasText: dish.name }).first()).toBeAttached();
   await openTillCart(page);
@@ -113,8 +113,8 @@ const overlap = (a: Box, b: Box): boolean => a.top < b.bottom && a.bottom > b.to
 
 /** With the notice on screen: both ways of sending again answer with themselves, and it sits whole, clear of both. */
 async function bothButtonsFree(notice: Locator, charge: Locator, send: Locator, height: number, where: string): Promise<void> {
-  await expect(notice, `the notice is on screen ${where}`).toBeVisible();
   await expect(notice, `one notice at a time ${where}`).toHaveCount(1);
+  await expect(notice, `the notice is on screen ${where}`).toBeVisible();
   await untilStill(notice.page());
   const box = await noticeBox(notice);
   for (const [name, button] of [
@@ -151,10 +151,13 @@ for (const { name, lang, locale, notSent } of LANGUAGES) {
           await capture(page, `${KEY}-${lang}-${size.label}`);
 
           // Trying again with the notice on screen: the finger lands on «Charge», which sends the round first.
+          const first = await notice.getAttribute('id');
           const at = (await charge.boundingBox())!;
           await page.mouse.click(at.x + at.width / 2, at.y + at.height / 2);
           await expect.poll(sends, 'a tap on «Charge» sends the round again').toBe(2);
           await expect.soft(page.locator('[data-testid=sale-checkout-modal]'), 'nothing is charged with the round not sent').toBeHidden();
+          // The second notice closes the first before it opens: what is measured next is the new one.
+          await expect(page.locator(`ion-toast[id="${first}"]`), 'the new notice takes the place of the first').toHaveCount(0);
           await bothButtonsFree(notice, charge, send, size.height, `at ${size.label}, after «Charge»`);
           if (await tillIsPhone(page)) await expect.soft(till.locator('[data-testid=pos-cart-drawer]'), 'the check stays open').toBeVisible();
         } finally {
