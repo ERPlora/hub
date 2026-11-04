@@ -98,10 +98,9 @@ describe('CustomerStats', () => {
   });
 
   // Measured in the browser by tests/e2e/base-money-grouping.spec.ts: two on a phone, and a figure on one line.
-  it('lets the cards share each row, two on a phone (cards of at least 9.5rem), and never breaks a figure', () => {
+  it('lets the cards share each row, two on a phone (cards of at least 9.5rem)', () => {
     expect(source).toMatch(/flex-wrap:\s*wrap/);
     expect(source).toMatch(/flex:\s*1 1 9\.5rem/);
-    expect(source).toMatch(/white-space:\s*nowrap/);
   });
 
   it('has no OutfitKit tag and formats nothing by hand', () => {

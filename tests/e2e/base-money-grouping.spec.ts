@@ -113,6 +113,7 @@ async function twoOnARow(page: Page, where: string): Promise<void> {
   const tops = [await top('total'), await top('active'), await top('vip'), await top('revenue')];
   expect(tops[0], `${where}: «Customers» and «Active» share a row`).toBe(tops[1]);
   expect(tops[2], `${where}: «VIP» and «Revenue» share a row`).toBe(tops[3]);
+  expect(tops[2], `${where}: two rows, not four cards on one`).toBeGreaterThan(tops[0] ?? Number.POSITIVE_INFINITY);
 }
 
 test.beforeAll(async ({ browser }) => {

@@ -106,7 +106,6 @@ const figures = computed(() => {
   font-size: 1.75rem;
   font-weight: 700;
   line-height: 1.1;
-  white-space: nowrap;
 }
 
 .customer-stats__error {
