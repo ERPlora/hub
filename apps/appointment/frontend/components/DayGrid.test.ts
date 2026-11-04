@@ -125,6 +125,17 @@ describe('DayGrid', () => {
     expect(s.block('a2').attributes('style')).toContain('width: 48px');
   });
 
+  it('an hour over the jump is seen in a window that opens after its start plus its length', async () => {
+    // 01:30 plus 60 real minutes ends at 03:30 on the wall; its start plus its length would end at 02:30, before 03:00.
+    const s = await setup(
+      [row('a1', 's1', '10:00', 60, { start: '2027-03-28T01:30:00+01:00', end: '2027-03-28T03:30:00+02:00' })],
+      { day: '2027-03-28', startHour: 3, endHour: 6 },
+    );
+    const style = s.block('a1').attributes('style');
+    expect(style).toContain('left: 0px');
+    expect(style).toContain('width: 48px');
+  });
+
   it('two appointments the jump of the clock makes overlap on the wall take a track each', async () => {
     const s = await setup(
       [

@@ -432,6 +432,36 @@ def test_the_night_the_clock_goes_back_a_booking_is_judged_up_to_its_real_end(sa
     assert_lasts_real_time(out.id, 150, "2026-10-25T02:30:00+01:00")
 
 
+def batch_at(salon, day: dt.date, start: str, minutes: int):
+    return run(
+        "appointment.appointment.bulk_create",
+        {
+            "customer_id": str(salon.lucia.id),
+            "services": [{"service_id": str(salon.cut.id)}],
+            "staff_id": str(salon.ana.id),
+            "duration_minutes": minutes,
+            "starts": [wall(day, start)],
+        },
+    )
+
+
+def test_the_night_the_clock_jumps_a_batch_is_judged_up_to_its_real_end(salon, monkeypatch):
+    # 00:30 + 3 real hours ends at 04:30 on the wall: 04:00 is taken (the wall clock's sum ended at 03:30).
+    pin_clock(monkeypatch, at(SPRING, "00:01"))
+    make_settings(allow_overlapping=False)
+    book(salon, "04:00", day=SPRING)
+    refused("appointment.slot_taken", lambda: batch_at(salon, SPRING, "00:30", 180))
+
+
+def test_the_night_the_clock_goes_back_a_batch_is_judged_up_to_its_real_end(salon, monkeypatch):
+    # 01:00 + 2.5 real hours ends at 02:30 the second time: 03:00 is free (the wall clock's sum ended at 03:30).
+    pin_clock(monkeypatch, at(AUTUMN, "00:01"))
+    make_settings(allow_overlapping=False)
+    book(salon, "03:00", day=AUTUMN)
+    out = batch_at(salon, AUTUMN, "01:00", 150)
+    assert_lasts_real_time(out.rows[0].id, 150, "2026-10-25T02:30:00+01:00")
+
+
 def test_a_time_the_clock_change_skips_is_a_422_on_the_start(salon):
     spring = dt.date(2027, 3, 28)
     make_settings(max_advance_booking=0)
