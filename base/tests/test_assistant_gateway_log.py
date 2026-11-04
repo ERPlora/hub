@@ -21,6 +21,7 @@ QUESTION = "cuanto vendi hoy en la mesa 4"
 AUDIO = "UklGRiQAAABXQVZFZm10IBAAAAABAAEA"
 TURN_PATH = "/internal/assistant/chat/stream"
 TRANSCRIBE_PATH = "/internal/speech/transcribe"
+SYNTHESIZE_PATH = "/internal/speech/synthesize"
 
 
 def frames_of(**kwargs):
@@ -88,6 +89,7 @@ def test_a_refusal_with_no_envelope_still_says_its_status(gateway, caplog):
     "door, path",
     [
         (lambda: assistant.transcribe(A, audio=AUDIO, mime_type="audio/webm", language="es"), TRANSCRIBE_PATH),
+        (lambda: assistant.speak(A, text=QUESTION, language="es", voice=""), SYNTHESIZE_PATH),
         (lambda: assistant.usage(A), "/internal/assistant/usage"),
         (
             lambda: assistant.report(A, message_id="m1", reason="other", comment="", question=QUESTION, answer="x"),
@@ -124,6 +126,27 @@ def test_a_dictation_that_never_reaches_erplora_says_how(settings, caplog):
     line = only_line(caplog)
     assert line.startswith("base.assistant.gateway_unreachable ")
     assert f"path={TRANSCRIBE_PATH}" in line and "kind=ConnectError" in line
+    says_nothing_of_the_person(caplog)
+
+
+def test_a_reading_aloud_that_never_reaches_erplora_says_how(settings, caplog):
+    settings.SAAS_INTERNAL_URL = "http://127.0.0.1:9"
+    with pytest.raises(assistant.GatewayError):
+        assistant.speak(A, text=QUESTION, language="es", voice="")
+    line = only_line(caplog)
+    assert line.startswith("base.assistant.gateway_unreachable ")
+    assert f"path={SYNTHESIZE_PATH}" in line and "kind=ConnectError" in line
+    says_nothing_of_the_person(caplog)
+
+
+def test_a_reading_aloud_answered_with_no_audio_leaves_its_line(gateway, caplog):
+    """A 200 that is no mp3 (a proxy's page, an empty body) plays nothing: the log says so, never the text."""
+    gateway.reply(SYNTHESIZE_PATH, json={"text": QUESTION})
+    with pytest.raises(assistant.GatewayError):
+        assistant.speak(A, text=QUESTION, language="es", voice="")
+    line = only_line(caplog)
+    assert line.startswith("base.assistant.gateway_refused ")
+    assert f"path={SYNTHESIZE_PATH}" in line and "status=200" in line and "code=assistant.not_audio" in line
     says_nothing_of_the_person(caplog)
 
 

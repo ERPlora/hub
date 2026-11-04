@@ -185,6 +185,19 @@ describe('main.ts', () => {
     expect(configured).toBe(HUB_ASSISTANT);
   });
 
+  it('configures the server’s voice only when the page says there is one (hub-home server_voice)', async () => {
+    document.body.insertAdjacentHTML('beforeend', `<script id="hub-home" type="application/json">${JSON.stringify({ server_voice: true })}</script>`);
+    const shell = fakeShell();
+    configureAssistant(undefined);
+    let configured: { speak?: unknown } | undefined;
+    vi.mocked(createShell).mockImplementationOnce(async () => {
+      configured = assistantConfig();
+      return shell as never;
+    });
+    await main.boot({});
+    expect(typeof configured?.speak).toBe('function');
+  });
+
   it('on import, globs the real app catalogues (the demo pages would show raw keys otherwise)', () => {
     const messages = importBoot.messages as Record<string, { demo: { items: { title: string } } }>;
     expect([messages.en.demo.items.title, messages.es.demo.items.title]).toEqual(['Demo items', 'Elementos']);
