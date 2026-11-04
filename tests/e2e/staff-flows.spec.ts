@@ -269,7 +269,10 @@ test('STAFF-F08: «My record» shows the employee their own record with their ow
     await expect(record).toContainText(mine.full_name);
     await expect(record).toContainText(/14[.,]50/);
     await threeShots(page, 'STAFF-F08', () => record);
+    await expect(page.locator('[data-testid=staff-my-record-cancel]')).toHaveCount(0);
+    await expect(page.locator('[data-testid=staff-my-record-submit]')).toHaveCount(0);
     await page.locator('[data-testid=staff-my-record-done]').click();
+    await expect(record).toBeHidden();
   } finally {
     await context.close();
     const admin = await signedIn(browser, '/staff/members');

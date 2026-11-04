@@ -3,7 +3,7 @@
 Who sees what: a caller with ``task.view_all`` sees every task; anyone else, their own — the ones
 assigned to their staff record (the one linked to their account) and the ones they created. A task the
 caller does not see does not exist for them (404, never 403). «Today» is the business's day
-(``timezone.localdate()``, phase 1 ``TIME_ZONE`` = Europe/Madrid). A task may be named by its id, its
+(``business_today``, on the clock of ``base.business.business_zone``). A task may be named by its id, its
 number or its title, a project by its id, its code or its name: the assistant speaks names.
 """
 
@@ -31,6 +31,7 @@ from live.errors import Conflict, NotFound
 from live.operations import operation
 
 from apps.staff.queries import actor_user_id, own_member
+from base.business import business_zone
 from base.models import HubUser
 from apps.task.models import Comment, Project, Task
 from apps.task.schemas import (
@@ -126,8 +127,8 @@ class Caller:
 
 
 def business_today() -> dt.date:
-    """Today in the business's time zone (phase 1: ``settings.TIME_ZONE``)."""
-    return timezone.localdate()
+    """Today in the business's time zone, the one its screens call «due today» on (hub#779)."""
+    return timezone.localdate(timezone=business_zone())
 
 
 # --- Tasks -----------------------------------------------------------------------------------------

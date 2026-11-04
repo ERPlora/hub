@@ -9,8 +9,10 @@ hubs with their database (round 2026-10-30b of PLAN-DB, decision 1 of Ioan; tran
   protects it). A deletion is logged once its operation deleted the cluster, never before.
 - **Hubs** is the registry's admin (``base.admin.HubAdmin``: read only, «Expire now») with each hub's database
   (``db_name``, or control's while it shares it), cluster, schema and size, filtered by cluster, status and schema.
-  The sizes come from ``control.cluster.sizes``, once per cluster on the page, kept ten minutes; a cluster that
-  cannot be measured is said in a warning and its hubs show no size.
+  An empty ``Hub.cluster`` is the settings' own server, and the list, its filter and the hub's page say so in words
+  («default server») once the hub's database was made (``base.registry.database_is_made``). The sizes come from
+  ``control.cluster.sizes``, once per cluster on the page, kept ten minutes; a cluster that cannot be measured is said
+  in a warning and its hubs show no size.
 
 Only the platform's admins (staff and superuser) add, change, close or delete; support reads (its ``view_*``
 permissions). Nothing here writes the ORM: every write is an operation, called with the staff member's context.
@@ -31,7 +33,7 @@ from live.context import OperationContext
 from live.errors import OperationError
 
 from base import admin as base_admin
-from base.registry import REGISTRY_SCOPE
+from base.registry import REGISTRY_SCOPE, database_is_made
 from control.models import Cluster, Hub
 from control.queries import cluster_sizes
 from control.schemas import ClusterIdIn, ClusterIn, ClusterSizesIn, ClusterUpdateIn, HubIdIn, HubMoveIn
@@ -56,6 +58,11 @@ def is_platform_admin(request: HttpRequest) -> bool:
 
 def no_limit() -> str:
     return pgettext("cluster limit", "no limit")
+
+
+def default_server() -> str:
+    """What an empty ``Hub.cluster`` means: the settings' own server (``base.tenancy.connections``)."""
+    return pgettext("hub cluster", "default server")
 
 
 def sizes_of(request: HttpRequest, cluster_id) -> dict[str, int] | None:
@@ -259,6 +266,14 @@ class MoveToClusterForm(forms.Form):
 MOVE_TEMPLATE = "admin/control/hub/move_to_cluster.html"
 
 
+class ClusterListFilter(admin.RelatedFieldListFilter):
+    """The filter by cluster, whose choice for the hubs on none is called what it is: the default server."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.empty_value_display = default_server()
+
+
 # The registry's admin is base's (read only, «Expire now»); control's adds where each hub's data lives.
 admin.site.unregister(Hub)
 
@@ -280,9 +295,18 @@ class HubAdmin(base_admin.HubAdmin):
         "vertical",
         "created_at",
     )
-    list_filter = ("status", "cluster", "schema_state", "is_demo")
+    list_filter = ("status", ("cluster", ClusterListFilter), "schema_state", "is_demo")
     list_select_related = ("cluster", "moving_to")
     actions = [*base_admin.HubAdmin.actions, "move_to_cluster", "cancel_the_move"]
+    # Never a form's field, even on the page of a hub on no cluster, where ``on_cluster`` takes its place.
+    exclude = ("cluster",)
+
+    def get_readonly_fields(self, request: HttpRequest, obj=None):
+        """A hub's page says an empty ``cluster`` as the list does; one on a cluster keeps Django's link to it."""
+        fields = super().get_readonly_fields(request, obj)
+        if obj is None or obj.cluster_id:
+            return fields
+        return ["on_cluster" if field == "cluster" else field for field in fields]
 
     @admin.action(description=gettext_lazy("Move to cluster…"), permissions=["move"])
     def move_to_cluster(self, request: HttpRequest, queryset):
@@ -366,7 +390,12 @@ class HubAdmin(base_admin.HubAdmin):
 
     @admin.display(description=gettext_lazy("cluster"), ordering="cluster__name")
     def on_cluster(self, hub: Hub) -> str:
-        here = hub.cluster.name if hub.cluster_id else self.get_empty_value_display()
+        if hub.cluster_id:
+            here = hub.cluster.name
+        elif hub.db_name and database_is_made(hub):
+            here = default_server()
+        else:
+            here = self.get_empty_value_display()
         return f"{here} → {hub.moving_to.name}" if hub.moving_to_id else here
 
     @admin.display(description=pgettext_lazy("hub database", "size"))
