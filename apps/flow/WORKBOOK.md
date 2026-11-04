@@ -1544,8 +1544,9 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   en su BD y en su propio ámbito (`base.worker._serve_hub`: `use_hub` y `Scope("host", slug)`), y allí corre cada minuto
   las dos tareas programadas (`fire_due`, `resume_due`) como el sistema: solo ve las automatizaciones de ese negocio
   (FLOW-F22 y F23). `WORKER_SCOPE_SLUG` solo queda para `base.scheduler.run_due` sin ámbito, el de los tests escritos
-  antes de la tenencia (`base/tenancy/tests/legacy.py`, `worker_pass`, por los que esos tests aún pasan por el ámbito
-  fijo), y una operación con el ámbito de otro negocio dentro de `use_hub` se rechaza (`HubContextMismatch`). Desde la
+  antes de la tenencia que llaman a una tarea directamente; los que pasan por el bucle del worker
+  (`base/tenancy/tests/legacy.py`, `worker_pass`) corren las tareas en el ámbito de su negocio, como `_serve_hub`
+  (hub#625), y una operación con el ámbito de otro negocio dentro de `use_hub` se rechaza (`HubContextMismatch`). Desde la
   ronda 2026-10-20 de PLAN-HUB el worker reparte además el outbox de cada negocio en cada tick (5 s, `base/relay.py`):
   entrega a `flow` los avisos de las demás apps y sus propios `flow.run.parked`
   (`REACTIONS = {"*": "flow.run.react", "flow.run.parked": "flow.run.call"}`), con su id y su actor. El motor se prueba
