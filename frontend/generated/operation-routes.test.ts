@@ -358,8 +358,9 @@ describe('the voucher at the till (SALE-F27, SERVICE-F22)', () => {
   it('reads the vouchers that can pay a line from apps/service/api.py and pays it through apps/sale/api.py', () => {
     expect(OPERATION_ROUTES['service.grant.tender_options']).toEqual({ method: 'get', path: '/api/service/grants/tender_options' });
     expect(OPERATION_ROUTES['sale.order.apply_voucher']).toEqual({ method: 'post', path: '/api/sale/orders/apply_voucher' });
-    // Services' session commands run inside Sales' writes: no route.
-    expect(Object.keys(OPERATION_ROUTES).filter((op) => op.startsWith('service.session.'))).toEqual([]);
+    // Services' session commands run inside Sales' writes: no route. The only route of a session is the read that names
+    // it on the assistant's card (hub#676).
+    expect(Object.keys(OPERATION_ROUTES).filter((op) => op.startsWith('service.session.'))).toEqual(['service.session.get']);
   });
 });
 

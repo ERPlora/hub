@@ -365,7 +365,7 @@ UNNAMED_REFERENCES = {
     "sale": 101,
     "schedule": 4,
     # The sale and the appointment a voucher or a session came from, the line of an order that holds a session and the
-    # reference of a return: data of apps Services does not require, or free text, so it reads none of them (hub#TBD).
+    # reference of a return: data of apps Services does not require, so it reads none of them (hub#756).
     "service": 6,
     "staff": 15,
     "task": 15,

@@ -160,7 +160,7 @@ NAMED = {
 #: The sessions a write names at once, by their ids.
 OVER_SESSIONS = ("service.session.return", "service.session.settle")
 #: What no read of Services may name: the sale, the appointment and the line of an order are of apps it does not require,
-#: and the reference of a return is the refund or the void of a sale. Their card leaves them out (the issue this PR opens).
+#: and the reference of a return is the refund or the void of a sale. Their card leaves them out (hub#756).
 LEFT_OUT = {
     "service.grant.create:sale_id",
     "service.grant.redeem:appointment_id",
@@ -398,9 +398,18 @@ def test_who_may_not_see_them_reads_none_of_them_on_the_card(hub_a, no_fallback)
     writes_only = OperationContext(
         scope=Scope("host", hub_a.slug),
         actor="key",
-        permissions=frozenset(get(write).permission for write in NAMED) - {"service.view_service"},
+        permissions=frozenset(get(write).permission for write in NAMED),
         language="es",
     )
+    # Positive control: running a write gives away none of the reads its card names a record by.
+    assert not {
+        "customer.view",
+        "service.view_category",
+        "service.view_package",
+        "service.view_package_balance",
+        "service.view_service",
+        "staff.view",
+    } & writes_only.permissions
     with use_hub(hub_a):
         shown = cards(a_salon(), writes_only)
     assert {write: values(card) for write, card in shown.items()} == left_out_of_every_card()
@@ -473,6 +482,7 @@ def test_whoever_may_run_a_write_reads_the_record_its_card_names():
                 marked = assistant.refers_of(assistant._resolved(prop["items"], defs) if "items" in prop else prop)
                 if marked is None or not mine.has(registry[marked["read"]].permission):
                     unread.append((role, name, datum))
-    # Positive control: the owner runs them all (the settle's ``customer_id`` is replaced by its ``ids`` here).
-    assert checked > 3 * sum(len(data) for data in NAMED.values())
+    # Positive control: the owner and the admin run them all, the manager and the employee what their roles give them
+    # (the settle's ``customer_id`` is replaced by its ``ids`` here).
+    assert checked == 87
     assert unread == []
