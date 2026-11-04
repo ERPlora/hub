@@ -738,6 +738,9 @@ cajero del producto actual es un empleado.
   declara `apps.py` como tarea programada (`*/5 * * * *`, `collapse`), que corre el worker
   (`base/scheduler.py`, 2026-10-15), y
   `session.open` lo aplica antes de abrir.
+- **Millares**: los importes agrupan los millares también con cuatro cifras («1.234,56 €»; `formatMoney` de
+  `@erplora/ui/components`, con `useGrouping: 'always'`, porque el CLDR del español espera a cinco: hub#653). Un
+  billete o moneda (`formatFace`) se escribe con la misma regla y sin decimales si es entero («5.000 Ft»).
 - **Monedas**: la del negocio es la de su país, que da `base.business.get` desde el registro de este hub (APP-BASE-6),
   y en el hub propio de ERPlora (sin registro en la fase 1, `create_platform_hub`, con todas las apps activas), la del
   país de su emisor (`PLATFORM_ISSUER_COUNTRY`). En el servidor, `business_currency` de Ventas (`apps.sale.queries`,

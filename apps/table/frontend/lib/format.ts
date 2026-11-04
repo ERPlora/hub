@@ -4,14 +4,15 @@
 // same two). Money is whole minor units, as Sales charges it: what a check charged in the currency it was
 // charged in (a record is never rewritten), the lines of an open check in the business's (`useBusinessMoney`,
 // the platform's: its country's), with the decimals the server counts, never the browser's Intl (which gives
-// the forint none). Until the business answers an amount is a figure without a symbol, never the euro by default.
+// the forint none), written with the platform's `formatMoney`: its thousands grouped from four digits on, as every
+// screen writes them. Until the business answers an amount is a figure without a symbol, never the euro by default.
+import { formatMoney as writeMoney } from '@erplora/ui/components';
+
 import type { Money } from '../../../../base/frontend/lib/home';
 
 export type { Money };
 export { useBusinessMoney } from '../../../../base/frontend/lib/money';
 
-/** The decimals of an amount while its currency is unknown. */
-const UNKNOWN_DECIMALS = 2;
 const MINUTE = 60_000;
 
 const formats = new Map<string, Intl.DateTimeFormat>();
@@ -82,23 +83,10 @@ export function clockTime(iso: string | null | undefined, now: Date, locale: str
   return dateFormat(locale, timeZone, options).format(date);
 }
 
-const moneyFormats = new Map<string, Intl.NumberFormat>();
-
-/** Minor units in `money`, in `locale` («42,50 zł», «€22.50», «¥1,250»; «22,50» while it is unknown); nothing
+/** Minor units in `money`, in `locale` («1.042,50 zł», «€22.50», «¥1,250»; «22,50» while it is unknown); nothing
  *  charged is '—', never zero. */
 export function formatMoney(cents: number | null | undefined, locale: string, money?: Money): string {
-  if (cents === null || cents === undefined) return '—';
-  const decimals = money?.decimals ?? UNKNOWN_DECIMALS;
-  const key = `${locale}|${money?.currency ?? ''}|${decimals}`;
-  let found = moneyFormats.get(key);
-  if (!found) {
-    const digits = { minimumFractionDigits: decimals, maximumFractionDigits: decimals };
-    // The symbol a till of that country prints («zł», «¥»); until the currency is known, the figure alone.
-    const style: Intl.NumberFormatOptions = money ? { style: 'currency', currency: money.currency, currencyDisplay: 'narrowSymbol' } : {};
-    found = new Intl.NumberFormat(locale, { ...style, ...digits });
-    moneyFormats.set(key, found);
-  }
-  return found.format(cents / 10 ** decimals);
+  return cents === null || cents === undefined ? '—' : writeMoney(cents, locale, money);
 }
 
 /** The money of a charge: the currency it was charged in, with the decimals the server says, else `business`'s. */
