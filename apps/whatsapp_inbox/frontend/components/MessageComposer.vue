@@ -14,8 +14,8 @@ import { openExternalLink, useSession, useSurface } from '@erplora/ui/shell';
 import { IonButton, IonSegment, IonSegmentButton, IonTextarea } from '@ionic/vue';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 
+import { useBusinessZone } from '../../../../base/frontend/lib/zone';
 import { useLocale, useT } from '../composables/useT';
-import { BUSINESS_ZONE } from '../lib/format';
 import { noAllowance } from '../lib/plan';
 import type { ChannelOut, ConversationDetailOut } from '../operations';
 import TemplateSendModal from './TemplateSendModal.vue';
@@ -33,6 +33,7 @@ const props = withDefaults(
 
 const t = useT();
 const locale = useLocale();
+const zone = useBusinessZone();
 const mode = ref<'reply' | 'note'>('reply');
 const text = ref('');
 const noteText = ref('');
@@ -85,7 +86,7 @@ const windowOpen = computed(() => {
   const end = props.conversation.window_expires_at;
   return props.conversation.window_open && !!end && new Date(end).getTime() > clock.value;
 });
-const until = computed(() => formatDateTime(props.conversation.window_expires_at, locale.value, { timeZone: BUSINESS_ZONE }));
+const until = computed(() => formatDateTime(props.conversation.window_expires_at, locale.value, { timeZone: zone.value }));
 
 async function reply(): Promise<void> {
   const body = text.value.trim();

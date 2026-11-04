@@ -4,7 +4,7 @@ the assistant's tools: every input field carries a ``description``).
 Cross-field rules are field validators on the later field (``info.data`` holds the earlier ones), so a
 422 names the field to fix. A person is named by id or by name, because the assistant speaks names;
 none of the two means the caller. Times travel as ISO 8601: with an offset they are that instant;
-without one they are the business's wall clock (phase 1, ``settings.TIME_ZONE``). Durations are seconds.
+without one they are the business's wall clock (``base.business.business_zone``). Durations are seconds.
 """
 
 import datetime as dt
@@ -17,6 +17,7 @@ from django.utils.translation import gettext_noop
 from ninja import Field, Schema
 from pydantic import AfterValidator, StringConstraints, ValidationInfo, field_validator
 
+from base.business import business_zone
 from base.schemas import names
 
 T = TypeVar("T")
@@ -56,7 +57,7 @@ def _text(max_length: int, min_length: int = 0):
 def _business_time(value: dt.datetime) -> dt.datetime:
     """An instant: a time without offset is read on the business's wall clock."""
     if timezone.is_naive(value):
-        return timezone.make_aware(value, timezone.get_default_timezone())
+        return timezone.make_aware(value, business_zone())
     return value
 
 

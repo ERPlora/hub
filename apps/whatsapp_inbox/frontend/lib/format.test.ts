@@ -1,18 +1,30 @@
 // When a WhatsApp message was said, as a person reads it (ported from the product's
 // `ui/lib/message-time.test.ts`): the time if it is from today, «yesterday», or the date if older —
-// always on the BUSINESS clock (phase 1: Madrid), never the device's. And the media kind and the
+// always on the BUSINESS clock it is given (hub#779), never a zone written here. And the media kind and the
 // attachment's file name the thread paints.
 import { describe, expect, it } from 'vitest';
 
-import { BUSINESS_ZONE, formatMessageTime, mediaKind, safeMediaUrl } from './format';
+import { formatMessageTime, mediaKind, safeMediaUrl } from './format';
 
 // 2026-09-02 12:00 in Madrid (UTC+2 in summer).
 const NOW = new Date('2026-09-02T10:00:00Z');
-const MADRID = { locale: 'es', now: NOW, yesterday: 'Ayer' };
+const MADRID = { locale: 'es', now: NOW, yesterday: 'Ayer', timeZone: 'Europe/Madrid' };
+const CANARY = { ...MADRID, timeZone: 'Atlantic/Canary' };
 
 describe('formatMessageTime — list form (compact)', () => {
-  it('phase 1 reads every business on Madrid’s clock', () => {
-    expect(BUSINESS_ZONE).toBe('Europe/Madrid');
+  it('reads each message on the clock it is given (UTC 08:00 → 09:00 in the Canaries in summer) (hub#779)', () => {
+    expect(formatMessageTime('2026-09-02T08:00:00+00:00', CANARY)).toBe('09:00');
+  });
+
+  it('«today» and «yesterday» are the days of that clock (23:30 UTC on 2 November is the 3rd in Madrid) (hub#779)', () => {
+    const night = new Date('2026-11-02T23:30:00Z');
+    expect(formatMessageTime('2026-11-02T08:00:00+00:00', { ...CANARY, now: night })).toBe('08:00');
+    expect(formatMessageTime('2026-11-02T08:00:00+00:00', { ...MADRID, now: night })).toBe('Ayer');
+  });
+
+  it('until the business answers it is on the device, never a zone written by hand', () => {
+    const device = new Date('2026-09-02T08:00:00Z').toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+    expect(formatMessageTime('2026-09-02T08:00:00+00:00', { ...MADRID, timeZone: undefined })).toBe(device);
   });
 
   it('today shows only the time, on the business clock (UTC 08:00 → 10:00 in Madrid)', () => {

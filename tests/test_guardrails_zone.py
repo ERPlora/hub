@@ -24,7 +24,7 @@ ALWAYS_THE_DEPLOYMENTS = frozenset(
     {"get_current_timezone", "get_current_timezone_name", "get_default_timezone", "get_default_timezone_name"}
 )
 
-#: What still reads the deployment's clock, per file. An hour told to a person, only in hub#772 and hub#779.
+#: What still reads the deployment's clock, per file. An hour told to a person, only in hub#772.
 KNOWN_READINGS = {
     # hub#771: a business's «today» and the day of its numbers.
     "apps/cart_checkout/services.py": 1,
@@ -35,8 +35,6 @@ KNOWN_READINGS = {
     "apps/sale/services.py": 1,
     "apps/service/queries.py": 1,
     "apps/staff/queries.py": 1,
-    "apps/task/queries.py": 1,
-    "apps/task/schemas.py": 1,
     "apps/tax/queries.py": 1,
     "apps/whatsapp_inbox/clock.py": 1,
     # hub#772: an invoice's dates and VeriFactu's records and notices, fiscal: only under Ioan's supervision.
@@ -44,9 +42,6 @@ KNOWN_READINGS = {
     "apps/invoice/services.py": 4,
     "apps/verifactu/queries.py": 1,
     "apps/verifactu/services.py": 6,
-    # hub#779: the time clock, whose server and screen change together.
-    "apps/attendance/queries.py": 2,
-    "apps/attendance/schemas.py": 1,
     # ERPlora's own hub has no zone of its own: Settings › Business shows the deployment's (``base.business.get``).
     "base/queries.py": 1,
 }
@@ -67,10 +62,6 @@ KNOWN_ZONES_BY_HAND = {
     "apps/sale/frontend/components/pos/KitchenTickets.vue": 1,
     "apps/table/frontend/pages/FloorPlanPage.vue": 1,
     "apps/table/frontend/pages/SessionsPage.vue": 1,
-    # hub#779: the zone they tell every hour in.
-    "apps/attendance/frontend/lib/time.ts": 1,
-    "apps/task/frontend/lib/format.ts": 1,
-    "apps/whatsapp_inbox/frontend/lib/format.ts": 1,
 }
 
 
