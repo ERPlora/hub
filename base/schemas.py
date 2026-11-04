@@ -1881,7 +1881,7 @@ class AssistantSpeakIn(Schema):
     voice: str = Field(
         default="",
         max_length=64,
-        description="A server voice of the catalogue (es-ES-Ximena:DragonHDLatestNeural…); empty: the language's first.",
+        description="A voice of erplora.com's engine; empty: its own for the language.",
     )
 
     @field_validator("text")

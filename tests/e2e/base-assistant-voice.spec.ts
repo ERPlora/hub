@@ -3,10 +3,10 @@
 // with, so the device's `speechSynthesis.speak` is recorded at the edge.
 // - By default there is no server voice (round 2026-11-04a, `ASSISTANT_SERVER_VOICE` off): the panel offers no choice
 //   of voice and reads with the device's, never asking the Hub.
-// - With the stack's Hub started with `ASSISTANT_SERVER_VOICE=True` (round 2026-11-03n, PLAN-HUB §73): the panel's head
-//   offers the two voices of the screen's language and the device's own, and «Read aloud» asks the Hub
-//   (`/api/assistant/speak`), which asks the SaaS (`/internal/speech/synthesize`). No stack has a key of the voices'
-//   provider: the Hub answers 503 in its envelope and the panel reads with the device's voice, with no unhandled error.
+// - With the stack's Hub started with `ASSISTANT_SERVER_VOICE=True` (round 2026-11-03n, PLAN-HUB §73): nothing to choose
+//   (`@erplora/ui` names no voices since saas#242, and the Hub gives none), and «Read aloud» asks the Hub
+//   (`/api/assistant/speak`), which asks the SaaS (`/internal/speech/synthesize`). The SaaS has no engine that reads:
+//   the Hub answers 503 in its envelope and the panel reads with the device's voice, with no unhandled error.
 //   And the server's audio plays from a `blob:` under the Hub's real CSP (`media-src`): there, and only there, the Hub's
 //   answer is replaced in the browser by a short silence made here (a WAV), the one way to hear a server voice without a
 //   key; a CSP without `blob:` makes the player fail and the device read instead, which the test catches.
@@ -119,26 +119,13 @@ test('BASE-F93 — with no server voice (the default) there is no choice of voic
   expect(problems).toEqual([]);
 });
 
-test('BASE-F93 — the head offers the two voices of the language and the device’s; without the server’s voice the device reads the answer', async ({ page }) => {
+test('BASE-F93 — with the server’s voice on there is nothing to choose: the Hub asks the SaaS, which has none, and the device reads the answer', async ({ page }) => {
   const problems = watchProblems(page);
   await recordDevice(page);
   await answered(page);
   test.skip(!(await serverVoice(page)), 'the stack has no server voice (ASSISTANT_SERVER_VOICE off, the default)');
 
-  // The voices of Spanish, the first one chosen until the person picks another, and the device's own.
-  await expect(voice(page)).toHaveJSProperty('value', 'es-ES-Ximena:DragonHDLatestNeural');
-  // Opened at each size: a popover keeps the place it was opened at.
-  const options = page.locator('ion-select-popover ion-radio');
-  for (const vp of VIEWPORTS) {
-    await page.setViewportSize({ width: vp.width, height: vp.height });
-    await voice(page).click();
-    await expect(options).toHaveText(['Ximena', 'Tristan', 'Voz del dispositivo']);
-    await capture(page, `${KEY}-voices-${vp.label}`);
-    // Closed by keeping the voice chosen (Escape would also close the panel).
-    await options.first().click();
-    await expect(page.locator('ion-select-popover')).toHaveCount(0);
-    await expect(panel(page)).toHaveAttribute('data-open', 'true');
-  }
+  await expect(voice(page)).toHaveCount(0);
 
   // «Leer en voz alta»: the Hub asks the SaaS, which has no voice here; the device reads it instead.
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -150,7 +137,7 @@ test('BASE-F93 — the head offers the two voices of the language and the device
   expect(JSON.parse(response.request().postData() ?? '{}')).toEqual({
     text: GREETING,
     language: 'es',
-    voice: 'es-ES-Ximena:DragonHDLatestNeural',
+    voice: '',
   });
   await expect.poll(() => deviceSaid(page)).toEqual([{ text: GREETING, lang: 'es-ES' }]);
   await expect(listen(page)).toHaveText('Leer en voz alta');
