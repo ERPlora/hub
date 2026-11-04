@@ -20,8 +20,10 @@ import pytest
 from django.db.backends.base.base import BaseDatabaseWrapper
 from django.utils import timezone
 
+from apps.appointment.models import Appointment
+from apps.appointment.tests.conftest import at, make_appointment, make_member, make_service, make_settings, next_weekday
 from apps.customer.models import Customer
-from apps.flow.models import FlowRun, Question
+from apps.flow.models import Flow, FlowRun, Question
 from apps.flow.queries import TURN
 from apps.reservation.models import Reservation, WaitlistEntry
 from apps.reservation.tests.conftest import make_reservation, open_week, set_rules
@@ -616,3 +618,118 @@ def test_the_answer_books_and_waitlists_only_with_the_number_that_writes_whateve
     made = model.objects.get()
     assert (made.customer_id, made.guest_phone) == (card.id, LUCIA)
     assert "guest_phone" not in tool_inputs(gateway.sent(CHAT)[0], tool)  # never the assistant's to say
+
+
+# ── An appointment cancelled from WhatsApp (hub#634; FLOW-F28; what WHATSAPP_INBOX-F22 waits for) ─────────────────────
+#
+# The answer that books appointments is not offered yet (hub#514), so the automation is the table answer's, as whoever
+# manages automations can build it: their card fixed by the step, the cancellation on their behalf and after a yes.
+
+CANCEL_APPOINTMENT = "appointment.appointment.cancel"
+HER_CARD = "{{steps.s6.id}}{{steps.s7.id}}"
+
+
+def appointment_answer() -> Flow:
+    """The inbox's answer with the assistant's step on cancelling an appointment, turned on as the owner does it."""
+    table = run("flow.recipe.enable", {"recipe": TABLE_REF}, ctx_for("hub_owner"))
+    flow = Flow.objects.get(pk=table.flow.id)
+    steps = [dict(step) for step in flow.steps]
+    assistant = next(step for step in steps if step["kind"] == "assistant")
+    assistant["tools"] = [CANCEL_APPOINTMENT]
+    assistant["pinned"] = {CANCEL_APPOINTMENT: {"on_behalf_of_customer": True, "customer_id": HER_CARD}}
+    flow.steps = steps
+    flow.grants = [*flow.grants, CANCEL_APPOINTMENT]
+    flow.save(update_fields=["steps", "grants"])
+    return flow
+
+
+def bea_books(customer_id, *, when: str = "10:00") -> Appointment:
+    """Bea's appointment for ``customer_id`` next Monday, far enough ahead of any cancellation notice."""
+    bea = make_member("Bea", "Ruiz")
+    return make_appointment(Customer.objects.get(pk=customer_id), bea, [make_service("Haircut")], at(next_weekday(0), when))
+
+
+def refused_after_the_yes(gateway, tick, capture, appointment, arguments: dict, she_writes: str, answer: str) -> str:  # noqa: F811
+    """She writes, the assistant wants to cancel with ``arguments`` and the owner says yes: Citas refuses, the appointment
+    stays and what the assistant says then goes to her. The code the assistant heard."""
+    gateway.reply(CHAT, json=wants(CANCEL_APPOINTMENT, arguments))
+    gateway.reply(CHAT, json=said(answer))
+    lucia_writes(she_writes)
+    tick()
+    answer_yes(capture)
+    tick()
+    appointment.refresh_from_db()
+    assert appointment.status == "confirmed"
+    assert outbound()[-1] == answer
+    return json.loads(gateway.sent(CHAT)[1].body["messages"][-1]["content"])["error"]["code"]
+
+
+def test_a_customer_cancels_her_appointment_with_any_professional_after_the_owner_s_yes(
+    gateway, tick, django_capture_on_commit_callbacks  # noqa: F811 - the fixture
+):
+    connect()
+    appointment_answer()
+    door_takes(gateway, 2)
+    card = run("customer.customer.create", {"name": "Lucía Pérez", "phone": "600111222"}, ctx_for("hub_owner"))
+    hers = bea_books(card.id)
+    gateway.reply(CHAT, json=wants(CANCEL_APPOINTMENT, {"id": str(hers.id), "reason": "She wrote to cancel"}))
+    gateway.reply(CHAT, json=said("Hecho: tu cita del lunes queda anulada."))
+    lucia_writes("No puedo ir a mi cita")
+
+    tick()
+
+    hers.refresh_from_db()
+    assert hers.status == "confirmed"  # it waits for the yes
+    assert outbound() == [THANKS]
+
+    answer_yes(django_capture_on_commit_callbacks)
+    tick()
+
+    hers.refresh_from_db()
+    assert (hers.status, hers.cancelled_by_customer, hers.cancellation_reason) == ("cancelled", True, "She wrote to cancel")
+    assert outbound()[-1] == "Hecho: tu cita del lunes queda anulada."
+    assert FlowRun.objects.get().status == FlowRun.Status.SUCCEEDED
+
+
+def test_the_answer_never_cancels_another_customer_s_appointment_even_after_the_yes(
+    gateway, tick, django_capture_on_commit_callbacks  # noqa: F811 - the fixture
+):
+    """WHATSAPP_INBOX-F22: «never someone else's». Whatever the assistant sends, it goes on the card of the number that
+    writes, and Citas answers as if that appointment did not exist."""
+    connect()
+    appointment_answer()
+    door_takes(gateway, 2)
+    run("customer.customer.create", {"name": "Lucía Pérez", "phone": "600111222"}, ctx_for("hub_owner"))
+    marta = run("customer.customer.create", {"name": "Marta Gil", "phone": "600333444"}, ctx_for("hub_owner"))
+    hers = bea_books(marta.id)
+    code = refused_after_the_yes(
+        gateway,
+        tick,
+        django_capture_on_commit_callbacks,
+        hers,
+        {"id": str(hers.id), "customer_id": str(marta.id)},
+        "Anula la cita de Marta",
+        "No encuentro esa cita a tu nombre.",
+    )
+    assert code == "appointment.appointment_not_found"
+
+
+def test_out_of_the_salon_s_policy_the_answer_tells_her_and_the_appointment_stays(
+    gateway, tick, django_capture_on_commit_callbacks  # noqa: F811 - the fixture
+):
+    connect()
+    appointment_answer()
+    door_takes(gateway, 2)
+    make_settings(cancellation_notice_hours=24 * 365)
+    card = run("customer.customer.create", {"name": "Lucía Pérez", "phone": "600111222"}, ctx_for("hub_owner"))
+    hers = bea_books(card.id)
+    code = refused_after_the_yes(
+        gateway,
+        tick,
+        django_capture_on_commit_callbacks,
+        hers,
+        {"id": str(hers.id)},
+        "No puedo ir a mi cita",
+        "Tu cita ya no se puede anular por aquí.",
+    )
+    assert code == "appointment.cancellation_notice_required"

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:4a26cdfb34e95755f07d2535df2950acd45ea51576cce1dc802f1ee914964906 -->
+<!-- generated from WORKBOOK.md sha256:55dd2d40338994b7ff7ff36f7408ae0651f5a109d95d961c750f1307739f295d -->
 
 ## What it is for and who it is for
 
@@ -764,9 +764,10 @@ Out: the app running in this business, chosen by it: it counts towards its plan'
 If it fails: with the plan's limit reached nothing is turned on and "Your plan’s app limit" shows: "You have
 reached the 20-app limit of your plan. Upgrade your plan or turn one off.", with "Upgrade plan" for whoever runs
 the business in the browser (not in the installed app). A paid app not subscribed to offers no "Turn on"
-(BASE-F20). Any other failure shows in a notice with the app's name and the reason, which stays until it is
-closed.
-Involved: APPS-F07
+(BASE-F20). Neither does an app this business cannot use: it shows "Not available" and, for whoever runs the
+business, the reason below it ("VeriFactu is only for businesses in Spain.", VERIFACTU-F01). Any other failure shows
+in a notice with the app's name and the reason, which stays until it is closed.
+Involved: APPS-F07, VERIFACTU-F01
 
 ### BASE-F19 Know what else comes with an app
 Status: done
@@ -865,8 +866,8 @@ Steps:
      its whole name and, if it was off already, the assistant says so and nothing changes.
 In: the business's apps, what each one needs and which ones the business chose.
 Out: the app turned off in this business, and the ones that came only with it, with their data intact.
-If it fails: if another running app needs it, or the app itself refuses, nothing changes (BASE-F25). With
-"Cancel", nothing either. From the assistant, a name that fits several apps shows no card: it asks which one
+If it fails: if another running app needs it, nothing changes; if it cannot be turned off, it offers no "Turn off"
+(BASE-F25). With "Cancel", nothing changes either. From the assistant, a name that fits several apps shows no card: it asks which one
 (BASE-F24).
 Involved: VERIFACTU-F32
 
@@ -899,18 +900,21 @@ Status: done
 Actor: administrator
 Screen: Apps
 Steps:
-  1. Whoever runs the business presses "Turn off" on an app another running one needs (for instance, "Tables"
-     while "Reservations" is on), or on one that refuses while it has something of its own halfway (VeriFactu,
-     with records the AEAT has not accepted yet: VERIFACTU-F32).
-  2. The hub changes nothing: above the table "Nothing was changed" shows with what has to be done first, "Turn
-     off Reservations first." (without asking), or, after confirming, with the app's own reason in the language of
-     who asks: "VeriFactu still has 1 record to send to the AEAT. Wait until it is sent or fix it before turning it
-     off.".
-  3. The notice stays until it is closed or another app is turned on or off; the app stays "Active".
+  1. An app that refuses to be turned off offers no "Turn off": below its status, whoever runs the business reads the
+     app's own reason in their language: "VeriFactu can't be turned off once it's on: the law requires your invoices
+     to keep reaching the AEAT." (VERIFACTU-F32).
+  2. Neither do the apps that one needs, which cannot be turned off first, and each says which one it is for:
+     "Invoicing can't be turned off: VeriFactu needs it. VeriFactu can't be turned off once it's on: the law requires
+     your invoices to keep reaching the AEAT.".
+  3. Whoever runs the business presses "Turn off" on an app another running one needs and that can be turned off (for
+     instance, "Tables" while "Reservations" is on). The hub changes nothing: above the table "Nothing was changed"
+     shows with what has to be done first, "Turn off Reservations first." (without asking).
+  4. The notice stays until it is closed or another app is turned on or off; the app stays "Active".
 In: the running apps that need it, or the reason of the app that refuses.
 Out: nothing.
-If it fails: without a reason of the app's own, the same notice says it could not be changed, with the app's name
-and what the hub answered.
+If it fails: if it is asked for anyway through the assistant or the API, the hub answers the same reason and changes
+nothing. Without a reason of the app's own, the same notice says it could not be changed, with the app's name and
+what the hub answered.
 Involved: VERIFACTU-F32
 
 ### BASE-F26 Understand why an app does not open

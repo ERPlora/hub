@@ -58,7 +58,7 @@ from live.errors import InvalidPayload, NotFound, OperationError
 from live.meta import module_configs
 from live.operations import get
 
-from base import images
+from base import activation, images
 from base.catalog import template_apps
 from base.entitlement import blocked_apps
 from base.relay import active_apps
@@ -471,13 +471,15 @@ def summary(ctx: OperationContext, bundle: Bundle, *, seed: Template | None) -> 
     manifest_ = bundle.manifest
     listed = set(manifest_["apps"])
     backup = manifest_["purpose"] == PURPOSE_BACKUP
+    # What the load would be told no by (VeriFactu outside Spain, hub#694) is not promised beforehand.
+    wont_go_on = activation.refusals(listed - on, ctx=ctx, hook=activation.CAN_ENABLE)
     apps = []
     for app in _apps_of(bundle):
         if app not in known:
             status = UNKNOWN
         elif app in on:
             status = ON
-        elif app in listed and app not in blocked:
+        elif app in listed and app not in blocked and app not in wont_go_on:
             status = TURNS_ON
         else:
             status = INACTIVE
@@ -582,7 +584,16 @@ def apply(ctx: OperationContext, bundle: Bundle, *, apps: set[str] | None,
                 created[dataset.key] = loaded.created
             loads[dataset.key] = _dataset_report(dataset, loaded, rows)
         app_reports = [_app_report(app, bundle, apps, on, known, loads, refused or {}) for app in _apps_of(bundle)]
-        report = {"status": _overall(app_reports, created), "apps": app_reports, "dropped": list(bundle.dropped)}
+        # An app that never goes on in this business, with nothing of it in the blueprint, lost nothing and no retry
+        # would change it: the load is not left unfinished by it (hub#694).
+        rowless = [
+            report["id"]
+            for report in app_reports
+            if report["status"] == INACTIVE and not any(part.key in bundle.data for part in datasets_of(report["id"]))
+        ]
+        never_here = activation.refusals(rowless, ctx=ctx, hook=activation.CAN_ENABLE)
+        counted = [report for report in app_reports if report["id"] not in never_here]
+        report = {"status": _overall(counted, created), "apps": app_reports, "dropped": list(bundle.dropped)}
     return Applied(report=report, created=created)
 
 
