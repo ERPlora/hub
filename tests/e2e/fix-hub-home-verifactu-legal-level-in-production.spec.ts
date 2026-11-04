@@ -128,13 +128,6 @@ async function onHome(
 const card = (page: Page): Locator => shown(page).locator('[data-testid="setup-card"]');
 const row = (page: Page): Locator => card(page).locator(`[data-testid="setup-row"][data-key="${STEP}"]`);
 
-/** «Ver todo» when the fold keeps the step out of sight: on a phone it shows 2 rows, and a hub without its tax details
- *  has «Los datos de tu negocio» (⛔, before VeriFactu's) pending too (FIX-INVOICE-SETUP-HOOKS). */
-async function unfolded(page: Page): Promise<void> {
-  await expect(card(page)).toHaveAttribute('aria-busy', 'false');
-  const toggle = card(page).locator('[data-testid="setup-toggle"]');
-  if ((await row(page).count()) === 0 && (await toggle.count()) && (await toggle.textContent())?.trim() === 'Ver todo') await toggle.click();
-}
 const strip = (page: Page): Locator => shown(page).locator('[data-testid="blocking-strip"]');
 /** The strip's line of the step (another ⛔, as the business's tax details, may stand beside it). */
 const named = (page: Page, title: string): Locator =>
@@ -151,9 +144,16 @@ for (const size of SIZES) {
       const config = await api<{ environment: string; issue_blocker: { code: string } | null }>(context, A, 'GET', '/verifactu/config');
       expect(config.status).toBe(200);
       expect([config.data.environment, config.data.issue_blocker?.code]).toEqual(['production', 'representation_not_approved']);
-      await unfolded(page);
+      // Folded, a phone's two rows included: the ⛔ goes before the «Importante» ones, with no «Ver todo» to press, and
+      // what it leaves out of the fold is one press away (hub#801).
+      await expect(card(page)).toHaveAttribute('aria-busy', 'false');
+      const rows = card(page).locator('[data-testid="setup-row"]');
+      await expect(rows.first().locator('[data-testid="setup-pill"]')).toHaveText('Necesario para facturar');
       await expect(row(page).locator('.setup-row-title')).toHaveText('Configura VeriFactu');
       await expect(row(page).locator('[data-testid="setup-pill"]')).toHaveText('Necesario para facturar');
+      const folded = await rows.count();
+      await card(page).locator('[data-testid="setup-toggle"]').click();
+      await expect.poll(() => rows.count()).toBeGreaterThan(folded);
 
       // On «Actividad» the strip stands over the screen: the consequence, the step and its «Configurar».
       await page.goto(`${A}/#actividad`);
