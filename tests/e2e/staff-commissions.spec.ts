@@ -5,14 +5,18 @@
 // a new charge painted live, «Yesterday» and a custom range whose «To» before «From» is said under «To».
 // Seen at 390×844, 834×1112 and 1440×900 (`.artifacts/FIX-STAFF-COMMISSION-SCREEN-<width>.png`). An
 // employee has no Commissions tab, the page tells them «You do not have permission» and the API refuses.
+// A session of a voucher (SALE-F27) charges nothing and still counts for who did it, at its value (hub#685);
+// whoever sold the voucher counts nothing for it (hub#769).
 // Setup goes through the apps' own APIs (Staff, Inventory, Sales); what the run creates is named «E2E…»
 // and removed after it (and before, if a run died half-way).
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
+import { cleanUp as cleanCustomers, createCard, e2eName } from './customer-helpers';
 import { A, api, type Credentials, EMPLOYEE, login, psql, shot, shown } from './helpers';
 import { cleanInventory, createProduct } from './inventory-helpers';
 import { snapshotSeries } from './invoice-helpers';
 import { chargeByApi, cleanSales, type SaleOut, stamp } from './sale-helpers';
+import { cleanUp as cleanServices, named, post } from './service-helpers';
 
 const TAG = 'E2E';
 const SKU = `E2E-COM-${stamp()}`;
@@ -55,6 +59,8 @@ test.beforeAll(() => {
 test.afterAll(() => {
   cleanSales();
   cleanInventory();
+  cleanServices();
+  cleanCustomers();
   cleanupStaff();
 });
 
@@ -153,6 +159,41 @@ test('STAFF-F21 (paso 3: la comisión del día): the owner sees what each profes
 
     await pickPeriod(page, 'today');
     await expect(rowOf(page, ana.id)).toContainText('€3.90');
+  } finally {
+    await context.close();
+  }
+});
+
+test('STAFF-F21 (paso 3: la comisión del día): who sold a voucher counts nothing for it; a session counts for who did it, at the voucher\'s price ÷ its sessions', async ({ browser }) => {
+  test.setTimeout(180_000);
+  const { context, page } = await signedIn(browser, '/staff/commissions');
+  try {
+    const ana = await member(context, 'Ana', '15');
+    const bea = await member(context, 'Bea', '15');
+    const cut = await post<{ id: string }>(context, '/service/services', { name: named('Corte'), price: 2500, tax_category_key: 'service.generic' });
+    const lucia = await createCard(context, { name: e2eName('Lucía') });
+    const voucher = await post<{ id: string }>(context, '/service/packages', { name: named('Bono 3'), max_uses: 3, items: [{ service_id: cut.id }] });
+    // Charged at the till at an open price, on Ana, and granted saying that sale.
+    const sold = await chargeByApi(context, {
+      open_lines: [{ name: 'e2e Bono', unit_price: 10000, tax_category_key: 'service.generic', staff_id: ana.id }],
+      payments: CARD,
+    });
+    const grant = await post<{ id: string }>(context, '/service/grants', { package_id: voucher.id, customer_id: lucia.id, amount: 10000, sale_id: sold.id });
+    const check = await post<{ id: string; lines: { id: string }[] }>(context, '/sale/orders', {
+      label: 'e2e voucher session',
+      service_lines: [{ service_id: cut.id, staff_id: bea.id }],
+    });
+    await post(context, '/sale/orders/apply_voucher', { order_id: check.id, line_id: check.lines[0].id, grant_id: grant.id }, 200);
+    const sale = await chargeByApi(context, { order_id: check.id, customer_id: lucia.id });
+    expect(sale.total).toBe(0);
+    // The server: 100.00 € in 3 sessions, the first 33.33 €, at 15 % = 4.9995 → 5.00 €.
+    expect(await reported(context, bea.id)).toMatchObject({ sold: 3333, commission: 500 });
+    expect(await reported(context, ana.id)).toMatchObject({ sold: 0, commission: 0 });
+
+    await page.goto(`${A}/staff/commissions`);
+    await expect(rowOf(page, bea.id)).toContainText('€33.33');
+    await expect(rowOf(page, bea.id)).toContainText('€5.00');
+    await expect(rowOf(page, ana.id)).toContainText('€0.00');
   } finally {
     await context.close();
   }
