@@ -714,6 +714,26 @@ msgstr "bono"
 msgid "voucher name"
 msgstr "nombre del bono"
 
+msgid "voucher session value"
+msgstr "valor de la sesión del bono"
+
+msgid "paid for vouchers"
+msgstr "pagado en bonos"
+
+msgid "That line is not in that sale."
+msgstr "Esa línea no es de esa venta."
+
+#, python-format
+msgid "That sale charged several lines: say which one paid for the voucher: %(lines)s."
+msgstr "Esa venta cobró varias líneas: di cuál pagó el bono: %(lines)s."
+
+#, python-format
+msgid "That line has %(left)s left to pay for vouchers: it cannot pay for one of %(amount)s."
+msgstr "A esa línea le quedan %(left)s para pagar bonos: no puede pagar uno de %(amount)s."
+
+msgid "That sale was voided: it paid for no voucher."
+msgstr "Esa venta se anuló: no pagó ningún bono."
+
 msgid "sessions left on the voucher"
 msgstr "sesiones que le quedaban al bono"
 
