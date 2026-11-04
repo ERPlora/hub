@@ -15,6 +15,8 @@
   the notice (marked); with overlaps allowed it also sees a taken time. The customer sees neither.
 - **The clock** is the business's: an instant is shown on it (``wall``) and a wall time read on it
   (``aware``); a wall time the change of time skips does not exist, a repeated one is its first time.
+  What lasts counts real time (``ends_at``): the nights the clock changes, 60 minutes are 60 minutes and
+  end at another wall time.
 - **Series** repeat by RFC 5545 rules through ``dateutil.rrule``: every day, every week or two on a
   weekday (the first one from the start date), or every month on the start date's day (the last day of
   a shorter month); they end on a date (included) or after a number of dates counted from the start.
@@ -138,6 +140,16 @@ def midnight(day: dt.date, zone: ZoneInfo) -> dt.datetime:
     return aware(dt.datetime.combine(day, dt.time()), zone)
 
 
+def ends_at(start: dt.datetime, minutes: int) -> dt.datetime:
+    """The instant something that starts at ``start`` and lasts ``minutes`` of real time ends, in UTC.
+
+    In UTC because Python adds to and compares two times of one ``ZoneInfo`` by their wall clock: the nights the
+    clock changes the sum would end an hour off, and an end at the wall time of its start (02:30 the first time
+    plus an hour) would not read as after it. ``wall`` and ``astimezone`` show it on the business's clock.
+    """
+    return start.astimezone(dt.UTC) + dt.timedelta(minutes=minutes)
+
+
 # ── Can this time be booked? ───────────────────────────────────────────────────────────────────
 
 
@@ -235,18 +247,19 @@ def slots(
     last = rules.calendar_end_hour * 60
     step = max(1, rules.slot_interval)
     notice = now + dt.timedelta(minutes=rules.min_notice)
+    midnight_wall = dt.datetime.combine(day, dt.time())
+    window_end = midnight_wall + dt.timedelta(minutes=last)
     out: list[Slot] = []
-    for minute in range(first, last - minutes + 1, step):
-        moment = dt.datetime.combine(day, dt.time()) + dt.timedelta(minutes=minute)
+    for minute in range(first, last, step):
         try:
-            start = aware(moment, agenda.zone)
+            start = aware(midnight_wall + dt.timedelta(minutes=minute), agenda.zone)
         except NonexistentTime:
             continue
-        end = start + dt.timedelta(minutes=minutes)
-        if start < now:
+        end = ends_at(start, minutes)
+        if start < now or wall(end, agenda.zone) > window_end:
             continue
         if verdict(agenda, start, end, now=now, customer=customer) is None:
-            out.append(Slot(start, end, within_notice=start < notice))
+            out.append(Slot(start, end.astimezone(agenda.zone), within_notice=start < notice))
     return out
 
 

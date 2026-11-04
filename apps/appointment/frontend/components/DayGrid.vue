@@ -16,7 +16,7 @@ import type { OutputOf } from '@erplora/ui/sdk';
 import { computed, ref } from 'vue';
 
 import { useLocale, useT } from '../composables/useT';
-import { formatTime, minutesOf } from '../lib/clock';
+import { formatTime, minutesOf, wallLength } from '../lib/clock';
 import { allows, customerLabel } from '../lib/states';
 import type { AppointmentRow, BlockedTimeOut, LaneOut } from '../operations';
 
@@ -93,6 +93,8 @@ const keptMessage = computed(() => {
 
 const pad = (n: number): string => String(n).padStart(2, '0');
 const hhmm = (minute: number): string => `${pad(Math.floor(minute / 60))}:${pad(minute % 60)}`;
+/** What an appointment takes on this axis, the wall clock's: up to the time it really ends. */
+const onTheWall = (row: AppointmentRow): number => wallLength(row.start, row.end, row.duration_minutes);
 
 /** Minute of the day of a wall-clock `YYYY-MM-DDTHH:MM`: 0 before the day, 1440 after it. */
 function minuteOfDay(wall: string): number {
@@ -151,7 +153,7 @@ const placed = computed(() => {
       const start = minutesOf(row.start);
       let track = ends.findIndex((end) => end <= start);
       if (track === -1) track = ends.length;
-      ends[track] = start + row.duration_minutes;
+      ends[track] = start + onTheWall(row);
       tracks.set(row.id, track);
     }
     const count = Math.max(1, ends.length);
@@ -171,7 +173,7 @@ function horizontal(startMinute: number, minutes: number): { left: number; width
 }
 
 function blockStyle(row: AppointmentRow): Record<string, string> {
-  const span = horizontal(minutesOf(row.start), row.duration_minutes) ?? { left: 0, width: 0 };
+  const span = horizontal(minutesOf(row.start), onTheWall(row)) ?? { left: 0, width: 0 };
   const place = placed.value.get(row.id) ?? { top: 2, height: LANE_HEIGHT - 4 };
   const style: Record<string, string> = {
     left: `${span.left}px`,
@@ -187,7 +189,7 @@ function blockStyle(row: AppointmentRow): Record<string, string> {
 }
 
 const visibleRows = (lane: Lane) =>
-  props.appointments.filter((row) => laneKeyOf(row) === lane.key && horizontal(minutesOf(row.start), row.duration_minutes));
+  props.appointments.filter((row) => laneKeyOf(row) === lane.key && horizontal(minutesOf(row.start), onTheWall(row)));
 
 function laneBlocks(lane: Lane): Array<{ block: BlockedTimeOut; left: number; width: number }> {
   const out = [];
