@@ -122,6 +122,15 @@ def lucia_writes(text: str = "Mesa para 4 el sábado a las 21", **fields) -> Non
     receive("wamid.IN", "34600111222", contact_name="Lucía", text=text, sent_at=NOW.isoformat(), **fields)
 
 
+def card_made_and_what_was_asked(gateway):  # noqa: F811 - the fixture
+    """The card WhatsApp made for Lucía, the one signed turn the assistant was asked and its prompt."""
+    card = Customer.objects.get()
+    assert (card.name, card.phone, card.source) == ("Lucía", LUCIA, "whatsapp")
+    [asked] = gateway.sent(CHAT)
+    assert signed(asked)
+    return card, asked, asked.body["messages"][0]["content"]
+
+
 def test_a_guest_with_no_card_gets_one_from_whatsapp_and_the_assistant_hears_their_words_alone(gateway, tick):  # noqa: F811
     restaurant()
     door_takes(gateway, 2)
@@ -130,11 +139,7 @@ def test_a_guest_with_no_card_gets_one_from_whatsapp_and_the_assistant_hears_the
 
     tick()
 
-    card = Customer.objects.get()
-    assert (card.name, card.phone, card.source) == ("Lucía", LUCIA, "whatsapp")
-    [asked] = gateway.sent(CHAT)
-    assert signed(asked)
-    prompt = asked.body["messages"][0]["content"]
+    card, asked, prompt = card_made_and_what_was_asked(gateway)
     assert "\n———\nMesa para 4 el sábado a las 21\n———\n" in prompt  # their words alone on their lines
     assert LUCIA in prompt and str(card.id) not in prompt  # their card is fixed on a booking, never told
     assert outbound() == [THANKS, "¿Para cuántas personas?"]
@@ -679,11 +684,7 @@ def test_she_has_no_card_asks_for_an_appointment_and_after_the_owner_s_yes_it_is
     tick()
 
     assert outbound() == [DIARY_THANKS]
-    card = Customer.objects.get()
-    assert (card.name, card.phone, card.source) == ("Lucía", LUCIA, "whatsapp")
-    [asked] = gateway.sent(CHAT)
-    assert signed(asked)
-    prompt = asked.body["messages"][0]["content"]
+    card, asked, prompt = card_made_and_what_was_asked(gateway)
     assert "\n———\n¿Tenéis hueco el lunes a las 10 para un corte?\n———\n" in prompt  # her words alone on their lines
     assert LUCIA in prompt and str(card.id) not in prompt  # her card is fixed on a booking, never told
     assert offered(asked) == [
