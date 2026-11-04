@@ -19,9 +19,10 @@ const BEA: PresenceOut = { ...ANA, record_id: 'r2', member_id: 'm2', member_name
 
 const page = (rows: PresenceOut[]) => ({ rows, total: rows.length, limit: 100, offset: 0 });
 
-async function setup(locale: 'en' | 'es' = 'en') {
+async function setup(locale: 'en' | 'es' = 'en', timezone = 'Europe/Madrid') {
   const m = await mountAttendance(PresenceCard, { locale, path: '/attendance/records' });
   await m.live();
+  await m.result('base.business.get', { timezone });
   return m;
 }
 
@@ -35,6 +36,13 @@ describe('PresenceCard (ATTENDANCE-F11)', () => {
     expect(rows).toEqual(['Ana López since 09:00', 'Bea Ruiz since 09:00 On break']);
     await s.result('attendance.presence.list', page([ANA]), {}, 2);
     expect(s.find('attendance-presence-count').text()).toBe('1 clocked in');
+  });
+
+  it("says since when on the business's clock (hub#779)", async () => {
+    const s = await setup('en', 'Atlantic/Canary');
+    await s.result('attendance.presence.list', page([ANA]));
+    // 07:00 UTC is 08:00 in the Canaries in October (UTC+1), 09:00 in Madrid.
+    expect(s.find('attendance-presence-row').text().replace(/\s+/g, ' ')).toBe('Ana López since 08:00');
   });
 
   it('says when nobody is in', async () => {

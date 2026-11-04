@@ -6,7 +6,8 @@ against that limit, its secret and the total size of its hubs' databases, and it
 (``control.cluster.create``/``update``/``close``/``delete``): the form shows what the operation refused on its field
 (a secret that does not resolve, a writer under its hubs), «Close to new hubs» closes the chosen ones, and one that
 holds hubs is never deleted. Admin › Hubs adds to the registry's columns (``base.admin``) each hub's database, cluster,
-schema and size (``control.cluster.sizes``, one measure per cluster and page), with filters by cluster and status.
+schema and size (``control.cluster.sizes``, one measure per cluster and page), with filters by cluster and status; a
+hub on no cluster says it is on the default server, the settings' own, wherever it has a database (hub#614).
 Only the platform's admins (staff and superuser) change anything; support reads. On the platform host only.
 """
 
@@ -19,6 +20,7 @@ from django.conf import settings
 from django.contrib import admin
 from django.contrib.admin.models import ADDITION, CHANGE, DELETION, LogEntry
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 from live.models import OutboxEvent
 
 from base import admin as base_admin
@@ -32,6 +34,7 @@ CLUSTERS = "/admin/control/cluster/"
 HUBS = "/admin/control/hub/"
 SECRET = "erplora/prod/clusters/cluster-2"
 SIZE = re.compile(r"\d[\d.,]*\s(?:bytes|KB|MB|GB)")
+DEFAULT_SERVER = "default server"
 
 
 @pytest.fixture(autouse=True)
@@ -126,6 +129,17 @@ def row_of(html: str, text: str) -> str:
     """The changelist's row (``<tr>…</tr>``) that says ``text``."""
     [row] = [row for row in re.findall(r"<tr.*?</tr>", html, re.S) if text in row]
     return row
+
+
+def cluster_cell(row: str) -> str:
+    """What a row of the hubs' changelist says in its cluster column."""
+    [cell] = re.findall(r'class="field-on_cluster[^"]*">(.*?)</t[dh]>', row, re.S)
+    return cell
+
+
+def read_only_values(html: str, field: str) -> list[str]:
+    """What a hub's own page says in the read-only ``field``: none when the page has no such field."""
+    return re.findall(rf'field-{field}\b.*?<div class="readonly">(.*?)</div>', html, re.S)
 
 
 class TestClusters:
@@ -386,6 +400,92 @@ class TestHubs:
         assert ">a<" in on_none and ">acme<" not in on_none
         ready_on_it = page(client, HUBS, cluster__id__exact=str(cluster.pk), status__exact="ready")
         assert ">acme<" in ready_on_it and ">bistro<" not in ready_on_it
+
+
+class TestTheDefaultServer:
+    """An empty ``Hub.cluster`` is the settings' own server (hub#614): the registry says it instead of «-»."""
+
+    def test_a_hub_on_no_cluster_says_it_is_on_the_default_server(self, client, root, hub_databases):
+        cluster = local_cluster()
+        Hub.objects.create(slug="acme", status=Hub.Status.READY, cluster=cluster, db_name=hub_databases.a)
+        Hub.objects.create(slug="corner", status=Hub.Status.READY, db_name=hub_databases.b)
+
+        html = page(client, HUBS)
+
+        assert cluster_cell(row_of(html, ">corner<")) == DEFAULT_SERVER
+        assert cluster_cell(row_of(html, ">acme<")) == "local"
+
+    @pytest.mark.parametrize(
+        "status", [Hub.Status.READY, Hub.Status.CANCELLED, Hub.Status.EXPIRED, Hub.Status.ARCHIVING]
+    )
+    def test_a_hub_whose_database_was_made_says_it(self, client, root, status):
+        Hub.objects.create(slug="acme", status=status, db_name=f"hub_{uuid.uuid7().hex}", ready_at=timezone.now())
+
+        assert cluster_cell(row_of(page(client, HUBS), ">acme<")) == DEFAULT_SERVER
+
+    @pytest.mark.parametrize(
+        "status, was_ready",
+        [
+            (Hub.Status.REQUESTED, False),  # Not made yet: a cluster may still take it.
+            (Hub.Status.SEEDING, False),
+            (Hub.Status.FAILED, False),  # No database for certain (no_cluster_available, say), and it is tried again.
+            (Hub.Status.CANCELLED, False),  # base.hub.cancel takes a hub that was never ready: it never got a database.
+            (Hub.Status.DROPPING, True),
+            (Hub.Status.PURGED, True),
+        ],
+    )
+    def test_a_hub_with_no_database_to_point_at_claims_no_server(self, client, root, status, was_ready):
+        Hub.objects.create(
+            slug="acme",
+            status=status,
+            db_name=f"hub_{uuid.uuid7().hex}",
+            ready_at=timezone.now() if was_ready else None,
+        )
+
+        assert cluster_cell(row_of(page(client, HUBS), ">acme<")) == "-"
+
+    def test_a_hub_without_a_database_of_its_own_claims_no_server(self, client, root):
+        Hub.objects.create(slug="acme", status=Hub.Status.READY, db_name="")
+
+        assert cluster_cell(row_of(page(client, HUBS), ">acme<")) == "-"
+
+    def test_a_hub_leaving_it_says_where_from_and_where_to(self, client, root, hub_databases):
+        target = a_cluster(name="cluster-2", host="writer-2.example")
+        Hub.objects.create(slug="acme", status=Hub.Status.READY, db_name=hub_databases.a, moving_to=target)
+
+        assert cluster_cell(row_of(page(client, HUBS), ">acme<")) == f"{DEFAULT_SERVER} → cluster-2"
+
+    def test_the_filter_by_cluster_calls_it_by_its_name(self, client, root):
+        a_cluster()  # Without any cluster there is only one server, and Django shows no filter.
+
+        choices = re.findall(r'<a href="\?cluster__isnull=True"[^>]*>(.*?)</a>', page(client, HUBS), re.S)
+
+        assert [choice.strip() for choice in choices] == [DEFAULT_SERVER]
+
+    def test_a_hubs_own_page_says_it_too(self, client, root, hub_databases):
+        hub = Hub.objects.create(slug="corner", status=Hub.Status.READY, db_name=hub_databases.b)
+
+        html = page(client, f"{HUBS}{hub.pk}/change/")
+
+        assert read_only_values(html, "on_cluster") == [DEFAULT_SERVER]
+        assert read_only_values(html, "cluster") == []
+
+    def test_a_hub_on_a_cluster_keeps_its_link_on_its_own_page(self, client, root, hub_databases):
+        cluster = local_cluster()
+        hub = Hub.objects.create(slug="acme", status=Hub.Status.READY, cluster=cluster, db_name=hub_databases.a)
+
+        html = page(client, f"{HUBS}{hub.pk}/change/")
+
+        [value] = read_only_values(html, "cluster")
+        assert f'href="{CLUSTERS}{cluster.pk}/change/"' in value
+        assert read_only_values(html, "on_cluster") == []
+
+    def test_it_speaks_spanish(self, client, root, hub_databases):
+        Hub.objects.create(slug="corner", status=Hub.Status.READY, db_name=hub_databases.b)
+
+        response = client.get(HUBS, HTTP_HOST=PLATFORM, HTTP_ACCEPT_LANGUAGE="es")
+
+        assert cluster_cell(row_of(response.content.decode(), ">corner<")) == "servidor por defecto"
 
 
 def test_its_words_are_translated():

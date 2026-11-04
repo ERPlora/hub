@@ -207,6 +207,11 @@ msgctxt "cluster limit"
 msgid "no limit"
 msgstr "sin límite"
 
+#: admin.py
+msgctxt "hub cluster"
+msgid "default server"
+msgstr "servidor por defecto"
+
 msgctxt "cluster limit"
 msgid "limit"
 msgstr "límite"

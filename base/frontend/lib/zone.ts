@@ -5,6 +5,14 @@ import { useLive } from '@erplora/ui/sdk';
 import { computed, type ComputedRef } from 'vue';
 
 export function useBusinessZone(): ComputedRef<string | undefined> {
-  const { data } = useLive('base.business.get', {});
-  return computed(() => data.value?.timezone);
+  return useBusinessClock().zone;
+}
+
+/** The same zone, and whether it could not be read: the screen that cannot go on without it has to say so. */
+export function useBusinessClock(): { zone: ComputedRef<string | undefined>; unread: ComputedRef<boolean> } {
+  const { data, status } = useLive('base.business.get', {});
+  return {
+    zone: computed(() => data.value?.timezone),
+    unread: computed(() => !data.value && (status.value === 'error' || status.value === 'reconnecting')),
+  };
 }

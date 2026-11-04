@@ -62,7 +62,7 @@ from apps.staff.models import Member
 from base.models import HubUser
 from base.ordering import list_order
 from base.queries import hub_user_of
-from base.business import babel_locale
+from base.business import babel_locale, business_zone
 
 MEMBER_NOT_FOUND = _("That person does not exist in Staff.")
 AMBIGUOUS_MEMBER = _("Several people match “%(name)s”: %(matches)s. Say which one.")
@@ -394,8 +394,8 @@ def day_name(record: Record) -> str:
 
 
 def business_date(instant: dt.datetime) -> dt.date:
-    """The business's calendar day of an instant (phase 1: ``settings.TIME_ZONE``, Europe/Madrid)."""
-    return timezone.localdate(instant)
+    """The business's calendar day of an instant, on its clock (hub#779)."""
+    return timezone.localdate(instant, business_zone())
 
 
 # ── Operations ──────────────────────────────────────────────────────────────────────────────────
@@ -549,7 +549,7 @@ def _local(instant: dt.datetime | None) -> str:
     return (
         ""
         if instant is None
-        else timezone.localtime(instant).strftime("%Y-%m-%d %H:%M")
+        else timezone.localtime(instant, business_zone()).strftime("%Y-%m-%d %H:%M")
     )
 
 
