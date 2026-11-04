@@ -147,6 +147,16 @@ export async function dishForTheTill(browser: Browser, label: string, run: strin
   return dish;
 }
 
+/** The till in `lang`, with `dish` on a check of its own and that check on screen. */
+export async function checkWithDish(page: Page, context: BrowserContext, lang: string, dish: Product): Promise<void> {
+  await login(page, A, '/sale/pos');
+  await context.addCookies([{ name: 'django_language', value: lang, domain: new URL(A).hostname, path: '/' }]);
+  await page.reload();
+  await shown(page).locator(`[data-testid=pos-product-${dish.id}]`).click();
+  await expect(shown(page).locator('[data-testid^=pos-line-]').filter({ hasText: dish.name }).first()).toBeAttached();
+  await openTillCart(page);
+}
+
 /** A box on screen, in the window's pixels. */
 export interface Box {
   top: number;
@@ -174,6 +184,13 @@ export function noticeBox(notice: Locator): Promise<Box> {
   });
 }
 
+/** The notice whole on a screen `height` high, and not squeezed; `where` says at which step of the spec. */
+export function expectNoticeWhole(box: Box, height: number, where = ''): void {
+  expect.soft(box.top, `the notice whole on screen, at the top ${where}`).toBeGreaterThanOrEqual(0);
+  expect.soft(box.bottom, `the notice whole on screen, at the bottom ${where}`).toBeLessThanOrEqual(height);
+  expect.soft(box.right - box.left, `the notice not squeezed ${where}`).toBeGreaterThan(200);
+}
+
 /** Screenshots of the page in the three viewports, each once `ready` says it painted. */
 export async function shots(page: Page, name: string, ready: (page: Page) => Promise<void>, restore = { width: 1280, height: 860 }): Promise<void> {
   for (const viewport of VIEWPORTS) {
@@ -183,6 +200,9 @@ export async function shots(page: Page, name: string, ready: (page: Page) => Pro
   }
   await page.setViewportSize(restore);
 }
+
+/** Whether two boxes on screen share any of their pixels. */
+export const overlap = (a: Box, b: Box): boolean => a.top < b.bottom && a.bottom > b.top && a.left < b.right && a.right > b.left;
 
 /** Whether the cash register was on before a spec switched it off (`null`: the spec did not touch it). */
 let drawerWasOn: boolean | null = null;
