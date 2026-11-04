@@ -85,6 +85,7 @@ from apps.printing.schemas import (
     SettingsPatchIn,
 )
 from base import operations as platform
+from base.business import business_zone
 
 logger = logging.getLogger(__name__)
 
@@ -539,7 +540,8 @@ def test_printer(ctx: OperationContext, data: PrinterRefIn) -> dict:
                 {
                     "printer": printer.name,
                     "business": business_name or "ERPlora",
-                    "when": timezone.localtime(),
+                    # Without its zone: a template would show an aware time on Django's current one.
+                    "when": timezone.localtime(timezone.now(), business_zone()).replace(tzinfo=None),
                     "language": ctx.language,
                 },
             )
