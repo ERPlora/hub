@@ -1193,3 +1193,9 @@ def platform_health(ctx: OperationContext, data: PlatformHealthIn) -> dict:
     if _ask_verifactu(ctx, VERIFACTU_CONFIG, {}) is None:
         return {"ready": False, "detail": str(PLATFORM_VERIFACTU_MISSING)}
     return {"ready": True, "detail": ""}
+
+
+def keeps_fiscal_documents() -> bool:
+    """Whether this database holds its invoices (``fiscal_documents_kept`` on this app's config), of any status: a draft counts
+    too, for what it asks is whether a database can go, and that cannot be undone."""
+    return Invoice.objects.exists()

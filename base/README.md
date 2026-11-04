@@ -40,6 +40,8 @@ por `/internal`.
   quién pregunta, pide confirmación con su tarjeta (y escribir para confirmar lo peligroso), tiene su límite de uso
   por plan y se le informa de una respuesta mala.
 - **La QA maestra del Hub y el reporte a soporte** (F107, F108).
+- **El borrado de un negocio eliminado** (F109): pasados sus 90 días, su copia final y su base de datos borrada; con
+  documentos, la guarda hasta que exista el archivo fiscal (hub#738).
 
 ## Lo que queda fuera
 

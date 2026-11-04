@@ -13,6 +13,7 @@ import {
   formatTime,
   minutesOf,
   timeOf,
+  wallLength,
   todayIn,
   wallInput,
   wallNowIn,
@@ -25,6 +26,16 @@ describe('the business clock', () => {
     const start = '2026-10-19T09:05:00+02:00';
     expect([dayOf(start), timeOf(start), minutesOf(start)]).toEqual(['2026-10-19', '09:05', 545]);
     expect(timeOf('2026-10-19T23:30:00-05:00')).toBe('23:30');
+  });
+
+  it('measures what a booking takes on the wall clock, which the nights the clock changes is not its real length', () => {
+    expect(wallLength('2026-10-19T10:00:00+02:00', '2026-10-19T11:30:00+02:00', 90)).toBe(90);
+    expect(wallLength('2026-10-19T23:30:00+02:00', '2026-10-20T00:30:00+02:00', 60)).toBe(60);
+    expect(wallLength('2027-03-28T01:30:00+01:00', '2027-03-28T03:30:00+02:00', 60)).toBe(120);
+    expect(wallLength('2026-10-25T01:37:00+02:00', '2026-10-25T02:07:00+01:00', 90)).toBe(30);
+    // The repeated hour: on the wall it takes nothing or less, so it keeps its real length and is still seen.
+    expect(wallLength('2026-10-25T02:30:00+02:00', '2026-10-25T02:30:00+01:00', 60)).toBe(60);
+    expect(wallLength('2026-10-25T02:45:00+02:00', '2026-10-25T02:15:00+01:00', 30)).toBe(30);
   });
 
   it('asks today of the business’s zone', () => {
