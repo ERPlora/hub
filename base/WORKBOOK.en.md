@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:4bf4a3dd9f3e2223ef8b564bc727e4a33b6c857d3c4621fd6f78fc727cbcf230 -->
+<!-- generated from WORKBOOK.md sha256:55dd2d40338994b7ff7ff36f7408ae0651f5a109d95d961c750f1307739f295d -->
 
 ## What it is for and who it is for
 
@@ -406,6 +406,7 @@ On the Employees screens and the API documentation:
 | BASE-F106 | The assistant without a connection, with the service down or without a plan | done |
 | BASE-F107 | Pass the master QA of the Hub | done |
 | BASE-F108 | Report a problem to support | done |
+| BASE-F109 | Delete a deleted business after its 90 days | partial — a business with documents keeps its database until the fiscal archive exists (hub#738) |
 
 ### BASE-F01 See what the business still has to set up
 Status: done
@@ -2671,3 +2672,31 @@ If it fails: after five reports in an hour (the hub's and erplora.com's together
 again in a few minutes."; if erplora.com does not answer or cannot send it, a notice with the support address to
 write to directly. In both cases what was written stays and can be sent again.
 Involved: ACCOUNTS-F38, BASE-F40
+
+### BASE-F109 Delete a deleted business after its 90 days
+Status: partial — a business with documents keeps its database until the fiscal archive exists (hub#738)
+Actor: nobody: the Hub does it by itself, nobody presses anything
+Screen: None; the business's address goes on saying "This hub is no longer available."
+Steps:
+  1. A business deleted on erplora.com (HUBS-F18, HUBS-F20) reaches its 90 days. Until then its database stays intact
+     and it can be restored.
+  2. The Hub checks whether it keeps documents: sales, invoices, VeriFactu records, payments, cash movements, shop
+     orders or a customer's purchases, in any status and even with the app turned off. If it keeps any, it stops here:
+     the business stays deleted, with its database, and is checked again the next day.
+  3. Without documents, it makes the final copy of its data, kept for 90 days in the copies store. Meanwhile the
+     business can still be restored and erplora.com still sees its copies. When it ends it checks again for
+     documents, in case one came in during the copy.
+  4. It drops that business's database, and only that one. From here it never comes back.
+  5. Only a mark stays, with no name or data, so its address goes on saying "This hub is no longer available."; its
+     people and their sessions go with it.
+In: the deleted business and its 90 days over. Never a demo, which is deleted its own way when it expires, the
+platform's business or one moving to another server.
+Out: the final copy and the database dropped, with the event `base.hub.purged`; from there erplora.com no longer
+lists its copies. Or, with documents, the database kept and on the business's row the reason
+(`fiscal_archive_missing: <apps>`).
+If it fails: a copy that fails drops nothing, and neither does having no copies store; a copy or a drop that fails is
+tried again (1 min, 5 min, 15 min, then every hour) with the error noted on the row, with no second copy if there
+already was one. If an app cannot be read, the database stays. A row that does not name the business's own database
+drops nothing (`invalid_database_name`). A business restored during the copy stays open with its database; once it is
+being dropped, erplora.com gets `hub_purged`. If the Hub shuts down mid-copy, the next one takes it up.
+Involved: HUBS-F18, HUBS-F19, HUBS-F20
