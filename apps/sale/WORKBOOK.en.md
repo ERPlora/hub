@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:a7f4ad93235c970875970b658a596438fcd0fe38c378fdfe126d2e426f6201af -->
+<!-- generated from WORKBOOK.md sha256:a4c47c80ad8b117950bf4adde9226555fd15ae5e7d01abc3956c5e54cd23d847 -->
 
 ## What it is for and who it is for
 
@@ -787,8 +787,9 @@ Steps:
    kitchen." shows; the lines are marked with their round ("Order N") and the time sent, and the flame
    disarms. A double send never sends anything twice.
 3. On pressing "Charge" with something pending, it is sent to the kitchen first and then the charge
-   opens: nobody pays for a dish that is not going to be made. If the send fails, the charge does not
-   open and it says why.
+   opens: nobody pays for a dish that is not going to be made. The order's notice then shows at the top of
+   the screen, so the charge keypad (SALE-F01) can be tapped from the first moment. If the send fails, the
+   charge does not open and it says why.
 4. A sent line is locked: no quantity, no note, no discount, no comp.
 5. To take off a dish already sent, press ⊗ "Void this item" on its line: "Void «<article>»" opens with
    "It was already sent to the kitchen. It comes off the check and the reason is kept. A manager has to
