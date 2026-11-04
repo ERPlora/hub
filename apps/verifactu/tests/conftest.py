@@ -93,6 +93,21 @@ def manual(lines=None, **more):
     return run("invoice.invoice.create", data)
 
 
+def business_in(country: str, slug: str = "a") -> None:
+    """The country erplora.com registered for the business of ``slug`` (``PUT /internal/hubs/{id}``)."""
+    from base.models import Hub  # the models are not loaded yet when this module is
+
+    Hub.objects.filter(slug=slug).update(country=country)
+
+
+@pytest.fixture
+def poland_and_spain(hub_a, hub_b, no_test_fallback) -> tuple[Scope, Scope]:
+    """The scopes of two real hubs: ``hub_a``'s business registered in Poland, ``hub_b``'s in Spain."""
+    business_in("PL", hub_a.slug)
+    business_in("ES", hub_b.slug)
+    return Scope("host", hub_a.slug), Scope("host", hub_b.slug)
+
+
 @pytest.fixture(autouse=True)
 def english():
     with translation.override("en"):
