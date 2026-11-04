@@ -57,7 +57,7 @@ Quién la usa:
    reservarle.
 4. En **Horarios**, confirma la semana del negocio y pon los festivos. Un día sin ninguna regla de
    horario (ni semana ni excepción) deja reservar a cualquier hora.
-5. La agenda pinta siempre el **reloj del negocio** (en la fase 1, Europe/Madrid), nunca el del
+5. La agenda pinta siempre el **reloj del negocio**, en su zona horaria, nunca el del
    dispositivo: si el dispositivo está en otra zona, un aviso lo dice.
 6. Revisa los **Ajustes** de Citas (antelaciones, solapes, cancelación de la clienta, ventana del
    calendario).
@@ -878,8 +878,8 @@ agenda tuya que enseñar.».
   bloqueada en la transacción de la reserva; nunca secuencias.
 - **Reloj**: los instantes se guardan con zona (UTC) y salen en la del negocio; una hora sin zona que
   llega es de pared del negocio, y una que no existe por el cambio de hora se rechaza
-  (`appointment.invalid_local_time`). Fase 1: la zona es `settings.TIME_ZONE` (Europe/Madrid), como en
-  Horarios y Personal. Las antelaciones mínimas, para reservar y para cancelar, se cuentan en **horas
+  (`appointment.invalid_local_time`). La zona es la del hub (`base.business.business_zone`), como en
+  Horarios. Las antelaciones mínimas, para reservar y para cancelar, se cuentan en **horas
   reales**, no en horas del reloj: el día del cambio de hora, 24 h de antelación acaban a otra hora de
   pared (a las 10:00 de la víspera del día de 23 h, la primera hora que las respeta son las 11:00; en la
   del día de 25 h, las 09:00), y `queries.now()` da el instante en UTC para que la suma sea de tiempo real.
@@ -937,9 +937,6 @@ Lo que se vio fallar y queda abierto al cerrar la app (2026-11-03), cada cosa co
   (cruza APPOINTMENT-F22).
 - **hub#634** — Anular una cita con «Que me lo pregunte» (confirmar, mover y editar la cita de otra profesional ya lo
   hace una automatización con su permiso, desde FIX-HUB-FLOW-STEP-CANNOT-BOOK-FOR-A-PROFESSIONAL).
-- **hub#687** — La hora del negocio no es la misma en la tarjeta del asistente y en las apps cuando la zona del negocio
-  no es la del despliegue (cruza Citas, Horarios, Reservas, Mesas, Cocina, Automatizaciones y la plataforma; hoy la
-  agenda va en Europe/Madrid, ver «Antes de empezar»).
 - **hub#631**, **hub#633**, **hub#635** y **hub#637** — textos: una traducción «fuzzy» que sale en inglés, siete
   textos en español con las palabras de otra app, la tarjeta de confirmación del asistente que no dice qué
   registro toca y la que nombra en inglés algunos datos («Confirm Overlap»).

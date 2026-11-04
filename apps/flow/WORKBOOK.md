@@ -79,7 +79,7 @@ que escribe el asistente nace **borrador**.
 2. Las automatizaciones usan **avisos y acciones de otras apps**: la galería y los desplegables solo
    ofrecen los de las apps activas en el negocio. Nueve de las diez tarjetas de la galería crean una
    **tarea**, así que necesitan la app **Tareas**; sin ella la galería las esconde y dice qué falta.
-3. Los horarios se leen en la hora del negocio: en la fase 1, **Europe/Madrid**.
+3. Los horarios se leen en la hora del negocio, en su zona horaria.
 
 Configuración inicial, paso a paso:
 

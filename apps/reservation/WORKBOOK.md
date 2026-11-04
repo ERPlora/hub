@@ -75,7 +75,7 @@ dudas abiertas del producto actual se resolvieron así; la investigación, con s
 - Reservas necesita **Mesas** (la mesa de cada reserva y su retención en el plano), **Clientes** (la
   ficha de cada cliente) y **Horarios** (el horario del negocio). Se encienden con ella y no se apagan
   mientras Reservas esté encendida. Mesas trae con ella **Ventas**.
-- Las horas son las del negocio: en esta fase, **Europe/Madrid**. Una reserva guarda su día y su hora
+- Las horas son las del negocio, en su zona horaria. Una reserva guarda su día y su hora
   de pared («el jueves a las 21:00»), como se dicen por teléfono.
 - **Franjas**: sin una franja para ese día de la semana no se puede reservar nada. Es la causa número
   uno de «no hay disponibilidad».
@@ -823,7 +823,7 @@ la que solo se le autorizó reservar.
   receta `reservation_confirmed` de WhatsApp busca la conversación por ese número exacto (F19). Las
   filas anteriores las pasó a E.164 la migración `0002_guest_phone_e164` (reglas de `to_e164` copiadas,
   país `ES` de la fase 1; lo que no es número válido se queda como estaba).
-- **Hora del negocio**: fase 1, `settings.TIME_ZONE` (Europe/Madrid). El día y la hora se guardan de
+- **Hora del negocio**: la zona del hub (`base.business.business_zone`). El día y la hora se guardan de
   pared; «ahora» es la hora del negocio. Lo que dura cuenta tiempo real (`engine.Window.of` con la zona,
   instantes en UTC; en `queries.py`, `window_of` y `starts_at`): la estancia (la mesa que pisa la puerta,
   las mesas libres de F23, el motivo «La mesa 5 ya tiene una reserva de 21:00 a 23:00.» y el fin de cada
