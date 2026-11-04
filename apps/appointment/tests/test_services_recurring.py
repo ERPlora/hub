@@ -16,11 +16,13 @@ from live.models import OutboxEvent
 from apps.appointment.models import Appointment, History, Recurring
 
 from .conftest import (
+    MADRID,
     MONDAY,
     at,
     make_settings,
     make_special_day,
     make_time_off,
+    pin_clock,
     run,
     wall,
 )
@@ -48,6 +50,31 @@ def occurrences(series_id) -> list[dt.date]:
         .order_by("occurrence_date")
         .values_list("occurrence_date", flat=True)
     )
+
+
+@pytest.mark.parametrize(
+    ("day", "time", "minutes", "end"),
+    [
+        pytest.param(dt.date(2026, 10, 25), "01:37", 90, "2026-10-25T02:07:00+01:00", id="25h-day-90-min"),
+        pytest.param(dt.date(2026, 10, 25), "02:30", 60, "2026-10-25T02:30:00+01:00", id="25h-day-60-min"),
+        pytest.param(dt.date(2027, 3, 28), "01:37", 90, "2027-03-28T04:07:00+02:00", id="23h-day-90-min"),
+    ],
+)
+def test_a_series_date_on_the_night_the_clock_changes_lasts_its_real_minutes(salon, monkeypatch, day, time, minutes, end):
+    pin_clock(monkeypatch, at(day, "00:01"))
+    make_settings(min_booking_notice=0)
+    out = create(
+        salon,
+        start_date=day.isoformat(),
+        day_of_week=day.weekday(),
+        time=time,
+        duration_minutes=minutes,
+        max_occurrences=1,
+    )
+    assert out.skipped == []
+    first = Appointment.objects.get(recurring_id=out.recurring.id, occurrence_date=day)
+    assert first.end - first.start == dt.timedelta(minutes=minutes)  # Read in UTC: real time.
+    assert first.end.astimezone(MADRID).isoformat() == end
 
 
 def test_creating_a_series_books_its_window(salon):

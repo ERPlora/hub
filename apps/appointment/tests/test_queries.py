@@ -554,6 +554,22 @@ def test_the_customer_is_offered_only_what_keeps_the_notice(salon, monkeypatch, 
     assert all(slot.start - instant < notice for slot in desk if slot.within_notice)
 
 
+@pytest.mark.parametrize(
+    ("day", "start", "minutes", "end"),
+    [
+        pytest.param(dt.date(2026, 10, 25), "02:30", 60, "2026-10-25T02:30:00+01:00", id="25h-day"),
+        pytest.param(dt.date(2027, 3, 28), "01:30", 60, "2027-03-28T03:30:00+02:00", id="23h-day"),
+    ],
+)
+def test_a_free_time_says_its_real_end_on_the_business_clock(salon, monkeypatch, day, start, minutes, end):
+    pin_clock(monkeypatch, at(day, "00:01"))
+    make_settings(slot_interval=30, calendar_start_hour=0, calendar_end_hour=24)
+    make_day(day.weekday(), ("00:00", "00:00"))
+    slots = run("appointment.availability.slots", {"date": day, "duration_minutes": minutes}).slots
+    found = {f"{slot.start:%H:%M}": slot for slot in slots}
+    assert found[start].end.isoformat() == end
+
+
 # A time's verdict
 
 
@@ -616,6 +632,27 @@ def test_approved_time_off_without_a_schedule_refuses_and_the_business_alone_ign
         == "outside_staff_hours"
     )
     assert run("appointment.availability.check", asked).available is True
+
+
+@pytest.mark.parametrize(
+    ("day", "taken", "start", "minutes", "code"),
+    [
+        # 00:30 + 3 real hours ends at 04:30 on the wall: 04:00 is taken (the wall clock's sum ended at 03:30).
+        pytest.param(dt.date(2027, 3, 28), "04:00", "00:30", 180, "overlap", id="23h-day-taken"),
+        # 01:00 + 2.5 real hours ends at 02:30 the second time: 03:00 is free (the wall clock's sum ended at 03:30).
+        pytest.param(dt.date(2026, 10, 25), "03:00", "01:00", 150, None, id="25h-day-free"),
+    ],
+)
+def test_a_times_verdict_counts_its_real_end_the_nights_the_clock_changes(salon, monkeypatch, day, taken, start, minutes, code):
+    pin_clock(monkeypatch, at(day, "00:01"))
+    make_settings(allow_overlapping=False)
+    make_day(day.weekday(), ("00:00", "00:00"))
+    make_appointment(salon.lucia, salon.ana, [salon.cut], at(day, taken), number="APT-THERE")
+    out = run(
+        "appointment.availability.check",
+        {"start": wall(day, start), "duration_minutes": minutes, "staff": "Ana"},
+    )
+    assert (out.available, out.code) == (code is None, code)
 
 
 # Blocks, series and settings
