@@ -18,9 +18,18 @@ const HUF: Money = { currency: 'HUF', decimals: 2 };
 describe('formatMoney', () => {
   it('paints whole cents as euros in the page language', () => {
     expect(plain(formatMoney(2250, 'es', EUR))).toBe('22,50 €');
-    expect(formatMoney(123456, 'es', EUR)).toMatch(/^1\.?234,56\s€$/);
+    expect(formatMoney(123456, 'es', EUR)).toMatch(/^1\.234,56\s€$/);
     expect(formatMoney(2250, 'en', EUR)).toBe('€22.50');
     expect(formatMoney(0, 'en', EUR)).toBe('€0.00');
+  });
+
+  // hub#657: Spanish CLDR waits for five digits; every screen of the Hub groups from four on.
+  it('groups the thousands from four digits on, in every language, with or without the currency', () => {
+    expect(formatMoney(123456789, 'es', EUR)).toMatch(/^1\.234\.567,89\s€$/);
+    expect(formatMoney(123456, 'en', EUR)).toBe('€1,234.56');
+    expect(formatMoney(1500, 'es', JPY)).toMatch(/^1\.500\s¥$/);
+    expect(formatMoney(123456, 'es')).toBe('1.234,56');
+    expect(formatMoney(99999, 'es', EUR)).toMatch(/^999,99\s€$/);
   });
 
   it('paints minor units in the business currency it is given', () => {

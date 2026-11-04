@@ -58,6 +58,16 @@ describe('formatMoney', () => {
     expect(formatMoney(2450, 'es')).toBe('24,50');
     expect(formatMoney(2450, 'en', undefined)).toBe('24.50');
   });
+
+  // hub#655: Spanish CLDR waits for five digits; every screen of the Hub groups from four on.
+  it('groups the thousands from four digits on, in every language, with or without the currency', () => {
+    expect(formatMoney(123456, 'es', EUR)).toBe('1.234,56\u00a0€');
+    expect(formatMoney(123456789, 'es', EUR)).toBe('1.234.567,89\u00a0€');
+    expect(formatMoney(123456, 'en', EUR)).toBe('€1,234.56');
+    expect(formatMoney(1500, 'es', { currency: 'JPY', decimals: 0 })).toBe('1.500\u00a0¥');
+    expect(formatMoney(123456, 'es')).toBe('1.234,56');
+    expect(formatMoney(99999, 'es', EUR)).toBe('999,99\u00a0€');
+  });
 });
 
 describe('formatDateTime', () => {

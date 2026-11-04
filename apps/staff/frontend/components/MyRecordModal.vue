@@ -3,7 +3,6 @@
 // page follows live), read only, with their own hourly rate and commission — never the HR notes, which
 // the server does not send here. «Close» is its only button.
 import { FormModal } from '@erplora/ui/components';
-import { IonButton } from '@ionic/vue';
 import { computed } from 'vue';
 
 import { useLocale, useT } from '../composables/useT';
@@ -46,7 +45,7 @@ const fields = computed<Array<[string, string]>>(() => {
     v-model:open="open"
     testid="staff-my-record"
     :title="$t('staff.members.mine.title')"
-    @submit="open = false"
+    readonly
   >
     <dl
       class="staff-record"
@@ -62,14 +61,6 @@ const fields = computed<Array<[string, string]>>(() => {
         <dd>{{ value }}</dd>
       </div>
     </dl>
-    <template #footer>
-      <ion-button
-        data-testid="staff-my-record-done"
-        @click="open = false"
-      >
-        {{ $t('staff.members.mine.close') }}
-      </ion-button>
-    </template>
   </FormModal>
 </template>
 

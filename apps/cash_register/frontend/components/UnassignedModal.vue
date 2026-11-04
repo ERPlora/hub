@@ -14,8 +14,7 @@ const open = defineModel<boolean>('open', { required: true });
     v-model:open="open"
     testid="cash-register-unassigned"
     :title="$t('cash_register.unassignedList.title')"
-    :submit-label="$t('cash_register.unassignedList.close')"
-    @submit="open = false"
+    readonly
   >
     <SessionLines
       v-if="open"
