@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:f9d9c8b8c5028026e45c1d5880e5f2e6073852023f884a5a266e5670b9dd6ec3 -->
+<!-- generated from WORKBOOK.md sha256:0ed0f1b96b590866bb1b04285bfa48db096d54d7fd83172f93fa52ec53a8822d -->
 
 ## What it is for and who it is for
 
@@ -316,12 +316,15 @@ Steps:
 6. Doing it on behalf of the customer does not give more permissions: whoever notes it down only changes
    the appointments they could already change (an employee, their own, and they do not hand them over to
    a colleague). A person of the team can cancel outside the policy; an automation, never.
+7. An automation only cancels if it asks first: an **Ask the assistant** step with "Ask me first" that is allowed to,
+   after a yes from someone who can change any professional's appointments; then it works on anyone's appointment,
+   under the same policy (FLOW-F28, FLOW-F38). Without that question, it cannot.
 In: the customer's appointment and the cancellation and notice settings.
 Out: the cancelled or moved appointment, its "Requested by the customer" line and the
 `appointment.appointment.cancelled` or `appointment.appointment.rescheduled` event.
 If it fails: `appointment.customer_cancellation_disabled`, `appointment.cancellation_notice_required`,
 `appointment.too_soon`, `appointment.appointment_not_found` or `permission_denied`.
-Involved: none
+Involved: FLOW-F28, FLOW-F38
 
 ### APPOINTMENT-F07 Start the service
 Status: done

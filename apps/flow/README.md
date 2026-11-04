@@ -76,8 +76,8 @@ CI=1 pnpm e2e tests/e2e/flow-flows.spec.ts tests/e2e/flow-steps.spec.ts tests/e2
 - **hub#497**, **hub#498**, **hub#499** y **hub#504** — fallos vistos en la migración: textos en español con las
   palabras de otra app, el importe de un paso que cobra que no se dice como dinero, y la tarjeta del asistente que
   llama «Registro» a la automatización o dice «N elementos» en sus permisos.
-- Trabajo encolado del carril: la reanudación de una ejecución aparcada, y anular una cita con «Que me lo pregunte»
-  (hub#634); reservar, mover, confirmar y editar la cita de cualquier profesional ya los hace un paso con su permiso.
+- Trabajo encolado del carril: la reanudación de una ejecución aparcada. Reservar, mover, confirmar y editar la cita de
+  cualquier profesional ya los hace un paso con su permiso; anularla, solo «Que me lo pregunte» tras el sí (hub#634).
 - Lo que no hace a propósito (bifurcaciones, lienzo de nodos, encender o conceder sin confirmarlo, automatizar lo que
   necesita a una persona delante…) y lo demás que queda fuera: «Lo que NO hace, a propósito» y «Qué queda fuera» del
   WORKBOOK.

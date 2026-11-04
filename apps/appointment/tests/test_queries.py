@@ -288,6 +288,20 @@ def test_an_appointment_gives_its_day_and_hour_ready_to_read_in_the_callers_lang
     assert booked.start_time_label == "16:05" and booked.start_date_label.startswith("lunes, ")
 
 
+def test_an_appointment_says_the_words_a_card_names_it_by(salon):
+    # hub#634: whoever says yes to cancelling it reads whose it is, when and with whom, never its id.
+    late = make_appointment(salon.lucia, salon.ana, [salon.cut], at(dt.date(2030, 3, 5), "10:30"))
+    said = run("appointment.appointment.get", {"id": str(late.id)}, language="es")
+    assert said.label == f"{salon.lucia.name} · martes, 5 de marzo de 2030 · 10:30 · {said.staff_name}"
+
+
+def test_the_words_of_an_appointment_leave_out_what_it_no_longer_has(salon):
+    # Her data erased (the name goes) and its professional gone: no empty piece between the separators.
+    late = make_appointment(salon.lucia, salon.ana, [salon.cut], at(dt.date(2030, 3, 5), "10:30"))
+    Appointment.objects.filter(pk=late.id).update(customer_name="", staff_name="", staff=None)
+    assert run("appointment.appointment.get", {"id": str(late.id)}).label == "Tuesday, March 5, 2030 · 10:30"
+
+
 # Counters
 
 
