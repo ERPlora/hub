@@ -999,7 +999,7 @@ motivo en la hoja y se deshace el bono. El descuento máximo sin responsable se 
 por pagar: una línea pagada con bono no cuenta. Sin permiso para gastar sesiones, el hueco no
 aparece. Sin Servicios activa en el negocio el hueco tampoco aparece y, si se apaga con líneas pagadas
 con bono, cobrarlas se rechaza («Servicios no está activa en este negocio…»).
-Implicados: SERVICE-F22, SERVICE-F23, SERVICE-F24, SERVICE-F25, SALE-F28
+Implicados: SERVICE-F22, SERVICE-F23, SERVICE-F24, SERVICE-F25, SALE-F28, STAFF-F21
 
 ### SALE-F28 Consultar el historial y las cifras de ventas
 <!-- origen: fi:modules/sales#query-sales-by_staff wf:peluqueria-dia#rec_peluqueria-f15 fi:modules/sales#query-sales-last_7_days fi:modules/sales#query-sales-list fi:modules/sales#query-sales-stats fi:modules/sales#query-sales-today old:sales/workflow/historial-y-correcciones.md#sales-f28 fi:modules/sales#widget-sales-last_7_days fi:modules/sales#widget-sales-recent_activity fi:modules/sales#widget-sales-tickets_today fi:modules/sales#widget-sales-today -->
@@ -1044,7 +1044,7 @@ no tiene permiso de informes ve la tabla, sin las cifras. Un total que no es un 
 un importe, como 12,50» bajo su campo, y una fecha final anterior a la inicial, «La fecha final no
 puede ser anterior a la inicial.»; ninguno de los dos filtra y manda el periodo. En el Inicio, un panel
 de un día sin ventas dice 0, y uno que no se puede leer, «No disponible».
-Implicados: STAFF-F21, BASE-F06, BASE-F07, BASE-F08
+Implicados: STAFF-F21, BASE-F06, BASE-F07, BASE-F08, SALE-F27, SERVICE-F24
 
 ### SALE-F29 Ver y reimprimir el documento de una venta
 <!-- origen: fi:hub/app-web#print-on-sale-auto-impresion-del-ticket-al-cerrar-venta old-hub:HUB_SHELL-F70 fi:modules/sales#query-sales-get fi:modules/sales#query-sales-lines old:sales/workflow/historial-y-correcciones.md#sales-f29 wf:cadena-fiscal#rec_fiscal-f07 -->
@@ -1907,6 +1907,8 @@ administrador y responsable, los mismos que anulan y devuelven).
 - **Marcar una cuenta «para llevar» en el TPV** (F12): la cuenta no tiene canal; un menú se cobra según
   su propio ajuste en Menús y combos («en el local» o «para llevar», COMBO-F09). Un menú «en el local»
   que el cliente se lleva no se parte por plato.
+- **Que la venta de un bono no cuente como producción de quien lo vende** (hub#769): cobrado a precio libre,
+  cuenta para quien atiende la cuenta, y cada sesión, para quien la hace.
 - **Vender un bono en el TPV** (SERVICE-F14) y, con ello, concederlo al cobrar y anularlo al anular o
   devolver su venta (el aviso «se vendió en esta venta y se anulará con ella»): el TPV del producto
   actual no lo ofrecía (solo el asistente o la API, con el IVA que mandaba el cobro) y aquí toda línea

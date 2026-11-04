@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:6abc2fdc2c1fafc7d822eb87d0800874067ee42133384100c89cead72636794f -->
+<!-- generated from WORKBOOK.md sha256:ad4fd8f8b3de2ab5fba788899f11d1232aded5b1443b9507b35da6c5b9885437 -->
 
 ## What it is for and who it is for
 
@@ -968,7 +968,7 @@ discount without a manager is measured on what is left to pay: a line paid with 
 Without the permission to spend sessions, the slot does not appear. Without Services active in the
 business the slot does not appear either and, if it is turned off with lines paid with a voucher,
 charging them is refused ("Services is not active in this business…").
-Involved: SERVICE-F22, SERVICE-F23, SERVICE-F24, SERVICE-F25, SALE-F28
+Involved: SERVICE-F22, SERVICE-F23, SERVICE-F24, SERVICE-F25, SALE-F28, STAFF-F21
 
 ### SALE-F28 Look up the sales history and figures
 Status: done
@@ -1013,7 +1013,7 @@ table, without the figures. A total that is not an amount says "Type an amount, 
 field, and an end date before the start one, "The end date cannot be before the start date."; neither of
 them filters and the period rules. On Home, a panel for a day with no sales says 0, and one that cannot
 be read, "Unavailable".
-Involved: STAFF-F21, BASE-F06, BASE-F07, BASE-F08
+Involved: STAFF-F21, BASE-F06, BASE-F07, BASE-F08, SALE-F27, SERVICE-F24
 
 ### SALE-F29 See and reprint a sale's document
 Status: done

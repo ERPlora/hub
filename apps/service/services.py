@@ -1442,7 +1442,7 @@ def _owner_matches(session: Redemption, customer_id) -> bool:
     output=SessionsOut,
     ai={
         "description": "Sales' step when a sale is charged: the sessions held for its lines paid with vouchers are "
-        "delivered for good and linked to the sale. Refused, delivering none, if one is no longer held (its day "
+        "delivered for good and linked to the sale, each with what it is worth from then on. Refused, delivering none, if one is no longer held (its day "
         "passed, it was released) or the sale's customer does not own the voucher. Repeating it for the same sale "
         "changes nothing.",
         "risk": "high",

@@ -945,14 +945,9 @@ class TimeOffFieldsIn(Schema):
         return self
 
 
-class TimeOffIn(TimeOffFieldsIn):
-    member_id: UUID | None = Field(None, description=D_MEMBER_ID)
-    member: MemberName | None = Field(None, validate_default=True, description=D_MEMBER)
-
-    @field_validator("member")
-    @classmethod
-    def _named(cls, value: str | None, info: ValidationInfo) -> str | None:
-        return _member_named(value, info, "member_id")
+# The member goes after the fields (the order the assistant reads them in): the bases are collected last to first.
+class TimeOffIn(MemberOfIn, TimeOffFieldsIn):
+    pass
 
 
 class TimeOffRequestIn(TimeOffFieldsIn):
