@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:0dceb6e2c41bfb662f4f6c85fc571108518581e959fccd4d26685cab5351d789 -->
+<!-- generated from WORKBOOK.md sha256:0a516a5c61be89f7c5f6fa5517c564e25030dde970a1ee4f03e5e96176eaea85 -->
 
 ## What it is for and who it is for
 
@@ -84,12 +84,14 @@ the bottom, the QR code, "Upgrade plan" and "Manage on erplora.com".
 
 ### "Upgrade plan"
 At the foot of the side menu, between the QR code and "Manage on erplora.com". It opens this business's plan page on
-erplora.com, in a new tab. Only in the browser: the installed app does not have it.
+erplora.com, in a new tab and already signed in with their account, without typing the password again. Only in the
+browser: the installed app does not have it.
 
 ### "Manage on erplora.com"
 At the foot of the side menu, right below "Upgrade plan", with the external link icon; with the menu folded to its
 icons (desktop), only the icon stays, which says "Manage on erplora.com" on hover. It opens this business on
-erplora.com's panel: in a new tab in the browser and, in the installed app, in the device's browser. Only the owner,
+erplora.com's panel, already signed in with their account: in a new tab in the browser and, in the installed app, in
+the device's browser. Only the owner,
 the administrator and the manager have it, and only if they came in with their account: never in a session opened
 with a PIN or with the badge. It does not sell, so the installed app has it too, except the Google Play one.
 
@@ -306,7 +308,7 @@ On the Employees screens and the API documentation:
 | BASE-F08 | Keep the panels up to date without reloading | done |
 | BASE-F09 | Look at the recent activity | done |
 | BASE-F10 | See in the bell the notices between apps that were not delivered | done |
-| BASE-F11 | Go to erplora.com to manage or upgrade the plan | discarded |
+| BASE-F11 | Go to erplora.com to manage or upgrade the plan | done |
 | BASE-F12 | Ask the assistant to go over the setup | done |
 | BASE-F13 | Lose access on a role change or on leaving the business | done |
 | BASE-F14 | See the business's apps | done |
@@ -612,7 +614,7 @@ back.".
 Involved: BASE-F40
 
 ### BASE-F11 Go to erplora.com to manage or upgrade the plan
-Status: discarded — without the one-time pass: if the browser does not have the erplora.com session open, you sign in with the account on arrival; the pass belongs mostly to erplora.com (saas#190)
+Status: done
 Actor: owner, administrator, manager, employee
 Screen: Side menu
 Steps:
@@ -620,18 +622,25 @@ Steps:
      sees it; what can be done on arriving is decided by erplora.com according to who comes in. With the
      menu folded to its icons (desktop), only its icon stays, which says "Upgrade plan" on hover. Only in the
      browser: the installed app does not have it.
-  2. They tap it: this business's plan page on erplora.com opens in a new tab.
+  2. They tap it: this business's plan page on erplora.com opens in a new tab, already signed in with their
+     account: they do not type the password again even if that browser did not have the erplora.com session open.
   3. The owner, the administrator or the manager who came in with their account also has, right below
      "Upgrade plan", "Manage on erplora.com", with the external link icon (on the folded menu, only the icon).
      It does not sell: the installed app has it too, except the Google Play one.
-  4. They tap it: this business opens on erplora.com's panel, in a new tab; in the installed app, in the device's
-     browser. The Hub stays where it was.
+  4. They tap it: this business opens on erplora.com's panel, already signed in with their account, in a new tab; in
+     the installed app, in the device's browser. The Hub stays where it was.
 In: the business they are in.
-Out: nothing saved in the hub.
+Out: nothing saved in the hub. A one-time pass of one minute goes to erplora.com, of the account of whoever taps and of
+this business; erplora.com checks again that this account belongs to this business.
 If it fails: if the hub does not know which business it belongs to, neither of the two shows (never a button that
-does nothing). If the installed app cannot open the browser, it says so: "Could not open that page. Try again.". An
-employee, a session opened with a PIN or with the badge and the Google Play app do not have "Manage on erplora.com".
-Involved: BASE-F40
+does nothing). If the installed app cannot open the browser, it says so: "Could not open that page. Try again.". If the
+pass does not come (the server gives an error or does not answer in 8 seconds), the usual address opens: erplora.com
+asks to sign in with the account and goes on to the same place. If the browser blocks the new tab, the link itself opens
+that address. With the pass spent or the minute gone, erplora.com says so and offers to sign in and go on there; to an
+account that no longer belongs to this business it says it does not (ACCOUNTS-F29). "Upgrade plan" in the assistant's
+panel and in the WhatsApp Inbox do not carry the pass yet and ask to sign in (hub#723). An employee, a session opened with
+a PIN or with the badge and the Google Play app do not have "Manage on erplora.com".
+Involved: BASE-F40, ACCOUNTS-F29
 
 ### BASE-F12 Ask the assistant to go over the setup
 Status: done

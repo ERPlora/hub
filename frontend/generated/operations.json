@@ -3010,5 +3010,9 @@
   "base.support.report": {
     "method": "post",
     "path": "/api/support/report"
+  },
+  "base.saas_pass.create": {
+    "method": "post",
+    "path": "/api/saas-pass"
   }
 }

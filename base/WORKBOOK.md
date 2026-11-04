@@ -98,12 +98,14 @@ su pantalla: «Sistema», a quien administra el negocio; «API», mientras la do
 
 ### «Mejorar plan»
 Al pie del menú lateral, entre el código QR y «Gestionar en erplora.com». Abre la página del plan de este negocio en
-erplora.com, en una pestaña nueva. Solo en el navegador: en la app instalada no está.
+erplora.com, en una pestaña nueva y ya dentro con su cuenta, sin volver a escribir la contraseña. Solo en el navegador:
+en la app instalada no está.
 
 ### «Gestionar en erplora.com»
 Al pie del menú lateral, justo debajo de «Mejorar plan», con el icono de enlace externo; con el menú plegado a sus
 iconos (escritorio), queda solo el icono, que dice «Gestionar en erplora.com» al pasar por encima. Abre este negocio en
-el panel de erplora.com: en una pestaña nueva en el navegador y, en la app instalada, en el navegador del dispositivo.
+el panel de erplora.com, ya dentro con su cuenta: en una pestaña nueva en el navegador y, en la app instalada, en el
+navegador del dispositivo.
 Solo lo tienen el propietario, el administrador y el encargado, y solo si entraron con su cuenta: nunca en una sesión
 abierta con PIN o con la placa. No vende, así que también está en la app instalada, salvo en la de Google Play.
 
@@ -313,7 +315,7 @@ En la pantalla Archivos:
 | BASE-F08 | Mantener los paneles al día sin recargar | hecho |
 | BASE-F09 | Consultar la actividad reciente | hecho |
 | BASE-F10 | Ver en la campana los avisos entre apps que no se entregaron | hecho |
-| BASE-F11 | Ir a erplora.com a gestionar o mejorar el plan | descartado |
+| BASE-F11 | Ir a erplora.com a gestionar o mejorar el plan | hecho |
 | BASE-F12 | Pedirle al asistente que repase la configuración | hecho |
 | BASE-F13 | Perder el acceso al cambiar de rol o al salir del negocio | hecho |
 | BASE-F14 | Ver las apps del negocio | hecho |
@@ -630,7 +632,7 @@ Implicados: BASE-F40
 
 ### BASE-F11 Ir a erplora.com a gestionar o mejorar el plan
 <!-- origen: old-hub:HUB_SHELL-F129 -->
-Estado: descartado — sin el pase de un solo uso: si el navegador no tiene abierta la sesión de erplora.com, se entra con la cuenta al llegar; el pase es sobre todo de erplora.com (saas#190)
+Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Menú lateral
 Pasos:
@@ -638,18 +640,25 @@ Pasos:
      perfil; lo que se puede hacer al llegar lo decide erplora.com según quién entre. Con el menú plegado a
      sus iconos (escritorio), queda solo su icono, que dice «Mejorar plan» al pasar por encima. Solo en el
      navegador: en la app instalada no está.
-  2. Lo pulsa: se abre en una pestaña nueva la página del plan de este negocio en erplora.com.
+  2. Lo pulsa: se abre en una pestaña nueva la página del plan de este negocio en erplora.com, ya dentro con su
+     cuenta: no vuelve a escribir la contraseña aunque ese navegador no tuviera abierta la sesión de erplora.com.
   3. El propietario, el administrador o el encargado que entró con su cuenta tiene además, justo debajo de
      «Mejorar plan», «Gestionar en erplora.com», con el icono de enlace externo (en el menú plegado, solo el icono).
      No vende: también está en la app instalada, salvo en la de Google Play.
-  4. Lo pulsa: se abre este negocio en el panel de erplora.com, en una pestaña nueva; en la app instalada, en el
-     navegador del dispositivo. El Hub se queda donde estaba.
+  4. Lo pulsa: se abre este negocio en el panel de erplora.com, ya dentro con su cuenta, en una pestaña nueva; en la
+     app instalada, en el navegador del dispositivo. El Hub se queda donde estaba.
 Entra: el negocio en el que está.
-Sale: nada guardado en el hub.
+Sale: nada guardado en el hub. A erplora.com va un pase de un solo uso y de un minuto, de la cuenta de quien pulsa y de
+este negocio; erplora.com vuelve a comprobar que esa cuenta es de este negocio.
 Si falla: si el hub no sabe a qué negocio pertenece, ninguno de los dos sale (nunca un botón que no hace nada). Si la
-app instalada no consigue abrir el navegador, lo dice: «No se ha podido abrir esa página. Inténtalo de nuevo.». Un
-empleado, una sesión abierta con PIN o con la placa y la app de Google Play no tienen «Gestionar en erplora.com».
-Implicados: BASE-F40
+app instalada no consigue abrir el navegador, lo dice: «No se ha podido abrir esa página. Inténtalo de nuevo.». Si el
+pase no llega (el servidor da un error o no contesta en 8 segundos), se abre la dirección de siempre: erplora.com pide
+entrar con la cuenta y sigue hasta el mismo sitio. Si el navegador bloquea la pestaña nueva, abre esa dirección el
+propio enlace. Con el pase gastado o pasado el minuto, erplora.com lo dice y ofrece entrar y seguir allí; a una cuenta
+que ya no es de este negocio le dice que no lo es (ACCOUNTS-F29). «Mejorar plan» del panel del asistente y de la Bandeja
+de WhatsApp aún no llevan el pase y piden entrar (hub#723). Un empleado, una sesión abierta con PIN o con la placa y la
+app de Google Play no tienen «Gestionar en erplora.com».
+Implicados: BASE-F40, ACCOUNTS-F29
 
 ### BASE-F12 Pedirle al asistente que repase la configuración
 <!-- origen: old-hub:HUB_SHELL-F30 -->
@@ -3118,6 +3127,20 @@ Implicados: ACCOUNTS-F38, BASE-F40
   `avatars/` del almacén del hub, servida solo a una sesión: `AVATARS_FOLDER` de `base/media.py`). Eventos
   `base.pin.set`, `base.device.mode_changed|renamed|removed|pruned`, `base.access.settings_changed` y
   `base.profile.updated`; `base/live.py` sigue con ellos las caras, los dispositivos, el dial y el perfil.
+- El pase a erplora.com (BASE-F11; ACCOUNTS-F29 del SaaS): `base.saas_pass.create` (`base/services.py`, `ai=INTERNAL`:
+  en un chat se quedaría en su historial; `database=False`) firma al pulsar, nunca en el HTML de `hub-home`, donde
+  caducaría en un minuto y lo leería cualquier script: `signing.dumps({user, hub, next, nonce}, key=INTERNAL_SHARED_SECRET,
+  salt="erplora.hub-pass.v1")`, y devuelve `SAAS_URL/hub-pass/?pass=…`. Solo en una sesión abierta con la cuenta
+  (`_session_account`; si no, `base.saas_pass_needs_account`: nunca PIN, placa ni demo); `next=business`, además, con
+  `base.open_management` (`base.saas_pass_needs_management`); sin secreto, 503 `base.saas_pass_unavailable`, porque el
+  firmante de Django caería en `SECRET_KEY`. No se consulta al SaaS (PLAN-SAAS §2) y el pase no va a ningún log.
+  `base/frontend/lib/saas-pass.ts` (`useSaasPass`) es la segunda puerta de salida del Hub: abre `about:blank` dentro del
+  clic (tras un `await` el navegador la bloquea), le quita `opener` y le pone la dirección al llegar; en la app instalada
+  la saca por `openExternalLink`. Un error u 8 s sin respuesta (`SIGN_TIMEOUT_MS`: `client.api.call` no tiene tiempo
+  límite) abren la dirección de siempre, que sigue en el `href`. Lo usan `UpgradePlanLink`, `SystemUsage`, `PeopleList` y
+  `AppsPage` (`plan`) y `ManageLink` (`business`); el asistente y la Bandeja de WhatsApp, aún no (hub#723). Tests:
+  `base/tests/test_saas_pass.py`, `lib/saas-pass.test.ts`, `frontend/external-links.test.ts`; e2e
+  `tests/e2e/base-chrome.spec.ts`.
 - `base/spa.py` incrusta en `hub-home` `access` (`credential`, `switch_user`, `idle_minutes`) y `preferences` (la
   apariencia propia); `plan_url` y `account_url` solo en una sesión abierta con la cuenta
   (gh:hub#2506), y `manage_url` (`SAAS_URL/dashboard/businesses/<id del hub>`, BASE-F11) además solo con el permiso
@@ -3125,14 +3148,14 @@ Implicados: ACCOUNTS-F38, BASE-F40
   `base.administer_hub`). Lo pinta `ManageLink.vue` (`menu-manage`, `ion:open-outline`) al pie del menú lateral,
   justo debajo de «Mejorar plan» (`UpgradePlanLink.vue`): los dos van en `SidebarFooter.vue`, la pieza
   `sidebarFooter` de `createShell` en `frontend/main.ts`; la barra de arriba solo lleva los destellos y la campana. Es
-  un enlace con `target=_blank rel=noopener` que en la app instalada pasa por `openExternalLink` de
-  `@erplora/ui/shell` (`open_external_url`); `base/frontend/lib/management.ts` lo oculta en la copia de Google Play
-  (`device_context` → `distribution: "play"`, gh:hub#1897) y no lo enseña hasta que la app contesta. Es el único
-  camino de salida del Hub (gh:hub#439): todo enlace `_blank` de `base/frontend` y de las apps llama a
-  `openExternalLink` en su `@click` (o en la función que nombra), los que llevan al panel de erplora.com («Invitar»,
+  un enlace con `target=_blank rel=noopener` que al pulsarlo lleva el pase y en la app instalada sale por
+  `openExternalLink` de `@erplora/ui/shell` (`open_external_url`); `base/frontend/lib/management.ts` lo oculta en la copia
+  de Google Play (`device_context` → `distribution: "play"`, gh:hub#1897) y no lo enseña hasta que la app contesta. Esos
+  son los dos únicos caminos de salida del Hub (gh:hub#439): todo enlace `_blank` de `base/frontend` y de las apps llama a
+  `openExternalLink` u `openSaasPass` en su `@click` (o en la función que nombra), los que llevan al panel de erplora.com («Invitar»,
   «Cambiar roles», «Abrir en erplora.com», «Cambiar en erplora.com») llevan además `managementOffered()`, y lo que
   vende («Mejorar plan» del acceso, de WhatsApp…) va con `isWeb`; lo vigila `frontend/external-links.test.ts`, con
-  su lista de espera por issue (VeriFactu y la factura: gh:hub#518). Tests:
+  su lista de espera por issue, hoy vacía. Tests:
   `base/tests/test_spa.py`, `test_access_spa.py`, `ManageLink.test.ts`, `SidebarFooter.test.ts`,
   `ShellChrome.test.ts`, `lib/management.test.ts`; e2e
   `tests/e2e/base-chrome.spec.ts` y `base-access.spec.ts` (BASE-G56). En `frontend/main.ts`, el menú de usuario lleva «Perfil» y «Cambiar de usuario», y `startWayIn`
@@ -3504,14 +3527,15 @@ Implicados: ACCOUNTS-F38, BASE-F40
 ## Lo que queda fuera
 
 Al cerrar la app (2026-11-01) ninguno de sus flujos quedó a medias: los que no entran están `descartado`, cada uno
-con su issue, y llegan con ella. Después llegaron BASE-F21 y BASE-F22 (hub#601), BASE-F37 y BASE-G157 (hub#580) y BASE-F40
-(hub#603).
+con su issue, y llegan con ella. Después llegaron BASE-F21 y BASE-F22 (hub#601), BASE-F37 y BASE-G157 (hub#580), BASE-F40
+(hub#603) y BASE-F11 (hub#716).
 
 - **Avisar por correo al dueño cuando debe ampliar (BASE-F40)**: el mercado lo da por supuesto, pero lo manda erplora.com
   (ronda 2026-11-01f de PLAN-HUB y PLAN-SAAS §28) y lleva su flujo y su issue allí.
 - **La fila de salud del Inicio (BASE-F02)**, hub#573: un punto de extensión más en `LiveAppConfig` y su uso en
   Impresión y la Bandeja de WhatsApp.
-- **El pase de un solo uso a erplora.com (BASE-F11)**, saas#190, sobre todo del SaaS.
+- **El pase en «Mejorar plan» del asistente y de la Bandeja de WhatsApp (BASE-F11)**, hub#723: el asistente exige cambiar
+  `ERPlora/ui`; hasta entonces esos dos abren la dirección de siempre, que pide entrar.
 - **Las notas de cada versión (BASE-F41)**, hub#576.
 - **Citas en la moneda del negocio (BASE-F50)**, hub#577, de `apps/appointment`.
 - **La vista previa de .xlsx y .docx y el .json plegable (BASE-F74)**, hub#578.

@@ -1844,6 +1844,16 @@ class SupportReportOut(Schema):
     reply_to: str
 
 
+class SaasPassIn(Schema):
+    #: Where the pass leads on erplora.com: this business's plan or this business (ACCOUNTS-F29 of the SaaS).
+    next: Literal["plan", "business"] = Field(title=gettext_noop("Where to go"))
+
+
+class SaasPassOut(Schema):
+    #: erplora.com's door with the signed pass: it opens for a minute, once.
+    url: str
+
+
 class AssistantTranscribeIn(Schema):
     # 2 MB of audio is 2 796 204 characters of base64 (the gateway's own limit).
     audio: str = Field(min_length=1, max_length=2_800_000, description="The recording, in base64.")
