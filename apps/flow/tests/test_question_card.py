@@ -26,6 +26,7 @@ from apps.flow.queries import TURN
 from base import relay
 from base.models import Hub, Membership
 from base.schemas import names
+from base.tenancy.context import use_hub
 from base.tests.fake_gateway import gateway  # noqa: F401 - the fixture
 
 from .conftest import ctx_for, make_flow, run
@@ -198,11 +199,12 @@ def test_a_record_is_named_only_for_whoever_may_read_it(gateway, clock, worker, 
 
 
 def test_a_moment_is_said_at_the_businesss_hour(gateway, clock, worker, plan, eva):
-    """The business's own zone (Settings › Business), read as whoever opens the inbox."""
+    """The business's own zone (Settings › Business), in the hub whoever opens the inbox works in."""
     clock(NOON)
-    Hub.objects.update_or_create(slug="a", defaults={"name": "Bar A", "timezone": "Atlantic/Canary"})
+    hub, _ = Hub.objects.update_or_create(slug="a", defaults={"name": "Bar A", "timezone": "Atlantic/Canary"})
     question = waiting(worker, gateway, PLAN.name, CHORE)
-    assert values(row_of(question, OWNER))["due_at"] == "2 nov 2026, 9:00"
+    with use_hub(hub):
+        assert values(row_of(question, OWNER))["due_at"] == "2 nov 2026, 9:00"
 
 
 def test_a_booking_s_services_are_a_list_never_its_ids(gateway, clock, worker):

@@ -562,6 +562,8 @@ def test_turning_one_off_turns_off_what_came_with_it_and_records_its_event():
 
 @pytest.mark.django_db
 def test_one_another_app_on_needs_is_refused_with_409_naming_them():
+    # Outside Spain, where VeriFactu can go off: turning it off first is something the person can do (hub#619).
+    Hub.objects.filter(slug="a").update(country="PL")
     set_rows(verifactu="on*", invoice="on", sale="on", tax="on", customer="on", cash_register="on*")
 
     with pytest.raises(Conflict) as refused:
@@ -645,11 +647,201 @@ def test_what_would_go_off_along_may_veto_too(monkeypatch):
 
 
 @pytest.mark.django_db
+def test_one_needed_by_an_app_that_refuses_says_why_instead_of_asking_the_impossible(monkeypatch):
+    """hub#619: «Turn off Tasks first» is an instruction nobody can follow while Tasks refuses to go off."""
+    monkeypatch.setattr(apps.get_app_config("task"), "can_disable", lambda ctx: "Tasks are open.", raising=False)
+    set_rows(task="on*", staff="on")
+
+    with pytest.raises(Conflict) as refused:
+        disable("staff")
+
+    error = refused.value.envelope()["error"]
+    assert (refused.value.status, error["code"], error["app"]) == (409, "base.app_vetoed", "task")
+    assert refused.value.message == "Staff can't be turned off: Tasks needs it. Tasks are open."
+    assert "required_by" not in error
+    assert rows()["staff"] == Activation(ON, False)
+    assert recorded(events.APP_DISABLED) == []
+
+
+@pytest.mark.django_db
+def test_that_sentence_is_said_in_the_language_of_who_asks(monkeypatch):
+    monkeypatch.setattr(apps.get_app_config("task"), "can_disable", lambda ctx: "Hay tareas abiertas.", raising=False)
+    set_rows(task="on*", staff="on")
+
+    with pytest.raises(Conflict) as refused:
+        disable("staff", context=ctx(language="es"))
+
+    assert refused.value.message == "Personal no se puede desactivar: hace falta para Tareas. Hay tareas abiertas."
+
+
+@pytest.mark.django_db
+def test_one_that_refuses_itself_says_its_own_reason_even_while_another_app_needs_it(monkeypatch):
+    """«Turn off Tasks first» would be a dead end: Tasks goes off, and then Staff still refuses."""
+    monkeypatch.setattr(apps.get_app_config("staff"), "can_disable", lambda ctx: "Staff is busy.", raising=False)
+    monkeypatch.setattr(apps.get_app_config("task"), "can_disable", lambda ctx: None, raising=False)
+    set_rows(task="on*", staff="on")
+
+    assert by_id(app_list())["staff"]["refusal"] == "Staff is busy."
+    with pytest.raises(Conflict) as refused:
+        disable("staff")
+
+    error = refused.value.envelope()["error"]
+    assert (error["code"], error["app"]) == ("base.app_vetoed", "staff")
+    assert refused.value.message == "Staff is busy."
+    assert rows()["staff"] == Activation(ON, False)
+
+
+@pytest.mark.django_db
+def test_while_none_of_those_that_need_it_refuses_it_still_says_which_to_turn_off_first(monkeypatch):
+    monkeypatch.setattr(apps.get_app_config("task"), "can_disable", lambda ctx: None, raising=False)
+    set_rows(task="on*", staff="on")
+
+    with pytest.raises(Conflict) as refused:
+        disable("staff")
+
+    assert refused.value.envelope()["error"]["code"] == "base.app_required"
+    assert refused.value.message == "Turn off Tasks first."
+
+
+@pytest.mark.django_db
 def test_an_app_without_a_reason_lets_it_go(monkeypatch):
     monkeypatch.setattr(apps.get_app_config("task"), "can_disable", lambda ctx: None, raising=False)
     set_rows(task="on*", staff="on")
     disable("task")
     assert rows()["task"] == Activation(OFF, False)
+
+
+# ── What an app refuses, said beforehand (hub#618, hub#619, hub#694) ─────────────────────────────────────────────
+
+
+@pytest.mark.django_db
+def test_an_app_may_refuse_to_go_on_with_its_reason(monkeypatch):
+    seen = []
+
+    def refuse(context):
+        seen.append(context.scope)
+        return f"Not for {context.scope.key}."
+
+    monkeypatch.setattr(apps.get_app_config("task"), "can_enable", refuse, raising=False)
+    set_rows(flow="on*")
+
+    with pytest.raises(Conflict) as refused:
+        enable("task")
+
+    error = refused.value.envelope()["error"]
+    assert (refused.value.status, error["code"], error["app"]) == (409, "base.app_vetoed", "task")
+    assert refused.value.message == "Not for a."
+    assert seen == [A]
+    assert rows()["task"] == Activation(OFF, False)
+    assert recorded(events.APP_ENABLED) == []
+
+
+@pytest.mark.django_db
+def test_what_would_come_along_may_refuse_too_and_nothing_goes_on(monkeypatch):
+    monkeypatch.setattr(apps.get_app_config("staff"), "can_enable", lambda ctx: "No staff here.", raising=False)
+    set_rows(flow="on*")
+
+    with pytest.raises(Conflict) as refused:
+        enable("task")
+
+    assert refused.value.envelope()["error"]["app"] == "staff"
+    assert refused.value.message == "No staff here."
+    assert (rows()["task"], rows()["staff"]) == (Activation(OFF, False), Activation(OFF, False))
+
+
+@pytest.mark.django_db
+def test_the_refusal_to_go_on_is_said_in_the_language_of_who_asks(monkeypatch):
+    from django.utils.translation import gettext
+
+    monkeypatch.setattr(
+        apps.get_app_config("task"), "can_enable", lambda ctx: gettext("Turn off %(apps)s first.") % {"apps": "X"}, raising=False
+    )
+    set_rows(flow="on*")
+
+    with pytest.raises(Conflict) as refused:
+        enable("task", context=ctx(language="es"))
+
+    assert refused.value.message == "Desactiva antes X."
+
+
+@pytest.mark.django_db
+def test_an_app_already_on_is_never_asked_to_go_on(monkeypatch):
+    """Choosing what came along turns nothing on: an app that refuses to go on stays as it is, chosen by the person."""
+    monkeypatch.setattr(apps.get_app_config("staff"), "can_enable", lambda ctx: "No staff here.", raising=False)
+    set_rows(task="on*", staff="on")
+
+    answer = enable("staff")
+
+    assert (answer["state"], answer["chosen"]) == ("on", True)
+
+
+@pytest.mark.django_db
+def test_the_list_says_why_an_app_on_cannot_go_off(monkeypatch):
+    monkeypatch.setattr(apps.get_app_config("task"), "can_disable", lambda ctx: "Tasks are open.", raising=False)
+    set_rows(task="on*", staff="on", flow="on*")
+
+    apps_ = by_id(app_list())
+
+    assert apps_["task"]["refusal"] == "Tasks are open."
+    assert apps_["staff"]["refusal"] == "Staff can't be turned off: Tasks needs it. Tasks are open."
+    assert apps_["flow"]["refusal"] is None
+
+
+@pytest.mark.django_db
+def test_the_list_says_why_what_would_go_off_along_keeps_an_app_on(monkeypatch):
+    monkeypatch.setattr(apps.get_app_config("staff"), "can_disable", lambda ctx: "Staff is busy.", raising=False)
+    set_rows(task="on*", staff="on")
+
+    assert by_id(app_list())["task"]["refusal"] == "Staff is busy."
+
+
+@pytest.mark.django_db
+def test_the_list_says_why_an_app_off_cannot_go_on(monkeypatch):
+    monkeypatch.setattr(apps.get_app_config("staff"), "can_enable", lambda ctx: "No staff here.", raising=False)
+    set_rows(flow="on*")
+
+    apps_ = by_id(app_list())
+
+    assert (apps_["staff"]["state"], apps_["staff"]["refusal"]) == ("off", "No staff here.")
+    assert apps_["task"]["refusal"] == "No staff here."  # it would bring Staff along
+    assert apps_["flow"]["refusal"] is None
+
+
+@pytest.mark.django_db
+def test_the_list_never_asks_the_hook_of_the_other_direction(monkeypatch):
+    monkeypatch.setattr(apps.get_app_config("task"), "can_disable", lambda ctx: "Tasks are open.", raising=False)
+    monkeypatch.setattr(apps.get_app_config("flow"), "can_enable", lambda ctx: "Not here.", raising=False)
+    set_rows(task="off", flow="on*")
+
+    apps_ = by_id(app_list())
+
+    assert (apps_["task"]["refusal"], apps_["flow"]["refusal"]) == (None, None)
+
+
+@pytest.mark.django_db
+def test_the_list_asks_each_hook_once(monkeypatch):
+    calls = []
+
+    def refuse(ctx):
+        calls.append(ctx.scope)
+        return "Tasks are open."
+
+    monkeypatch.setattr(apps.get_app_config("task"), "can_disable", refuse, raising=False)
+    set_rows(task="on*", staff="on")
+
+    app_list()
+
+    assert calls == [A]
+
+
+@pytest.mark.django_db
+def test_the_list_says_it_in_the_language_of_who_reads(monkeypatch):
+    monkeypatch.setattr(apps.get_app_config("task"), "can_disable", lambda ctx: "Hay tareas abiertas.", raising=False)
+    set_rows(task="on*", staff="on")
+
+    apps_ = by_id(app_list(language="es"))
+
+    assert apps_["staff"]["refusal"] == "Personal no se puede desactivar: hace falta para Tareas. Hay tareas abiertas."
 
 
 @pytest.mark.django_db
@@ -774,6 +966,20 @@ def test_an_app_off_is_still_listed_with_its_icon_and_name():
     document = by_id(app_list())
     assert set(document) == set(activation.module_graph())
     assert all(app["state"] == "off" and app["icon"] and app["name"] for app in document.values())
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("state", ["on*", "off"])
+def test_a_paid_app_without_its_right_gives_no_reason_of_its_own_on_or_off(monkeypatch, state):
+    """What it lacks is the right: «blocked» sends the person to erplora.com, and no reason of the app's competes."""
+    config = apps.get_app_config("task")
+    monkeypatch.setattr(config, "premium", True)
+    monkeypatch.setattr(config, "can_enable", lambda ctx: "Only in Spain.", raising=False)
+    monkeypatch.setattr(config, "can_disable", lambda ctx: "Tasks are open.", raising=False)
+    set_rows(task=state, staff="on")
+
+    row = by_id(app_list())["task"]
+    assert (row["state"], row["refusal"]) == ("blocked", None)
 
 
 @pytest.mark.django_db

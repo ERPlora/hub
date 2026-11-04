@@ -71,7 +71,7 @@ from apps.table.schemas import (
     ZonePage,
     ZoneRefIn,
 )
-from base.business import currency_decimals
+from base.business import business_zone, currency_decimals, zone_name
 
 #: A reservation paints its table Reserved this long before it starts (WORKBOOK «Referencia adoptada»).
 RESERVED_LEAD = dt.timedelta(minutes=60)
@@ -129,16 +129,6 @@ LIVE_STATUSES = [TableSession.Status.OPEN, TableSession.Status.PARKED]
 
 
 # --- The business's clock ------------------------------------------------------------------------
-
-
-def business_zone():
-    """The business's time zone (phase 1: ``settings.TIME_ZONE``; the Hub keeps no zone yet)."""
-    return timezone.get_current_timezone()
-
-
-def zone_name() -> str:
-    zone = business_zone()
-    return getattr(zone, "key", str(zone))
 
 
 def end_of_today(now: dt.datetime) -> dt.datetime:

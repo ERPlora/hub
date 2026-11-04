@@ -44,7 +44,7 @@ reservada o fuera de servicio, cuántos comensales hay, desde cuándo y quién l
 | Admin | Django admin con CRUD en `hubs.erplora.com` (PLAN §17–§18) |
 
 Las decisiones de diseño (el estado de la mesa se calcula al leer, las retenciones, la concurrencia, lo que
-se lee de Ventas, la zona horaria de la fase 1) están en «Para quien lo mantiene» del WORKBOOK; las de la
+se lee de Ventas, la zona horaria) están en «Para quien lo mantiene» del WORKBOOK; las de la
 migración, en las rondas 2026-10-21 (APP-TABLE y CLOSE-TABLE) de `PLAN-HUB.md` (raíz de erplora-next).
 
 ## Tests
