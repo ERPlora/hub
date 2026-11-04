@@ -437,7 +437,8 @@ Pasos:
    lleva cada dato tal cual.
 Entra: las acciones y consultas de las apps activas, el último aviso real de ese tipo y lo que dejan los
 pasos anteriores. Los datos se nombran en el idioma de la pantalla («Número de venta», «Teléfono del
-cliente»), nunca con su nombre interno.
+cliente») y con la palabra de la app que los tiene («Sección», como en Ventas / TPV), nunca con su
+nombre interno.
 Sale: los pasos, al **Guardar**. Cada acción o consulta que se nombra pasa a pedir su permiso (FLOW-F12).
 Si falla: el servidor rechaza al guardar una acción o una consulta que no existe en el negocio, un dato
 de un paso que no va antes, una condición vacía o una espera fuera de rango, junto al paso.

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:3d5d3be165cdbf13a3ff373933fe6049cdeed51997bbfbc9d9641c52cbf9d097 -->
+<!-- generated from WORKBOOK.md sha256:e9fe06547b4237fd5b4f20473575a3d0afcb1ff8bc327035ffdd7df286efbb75 -->
 
 ## What it is for and who it is for
 
@@ -410,8 +410,8 @@ Steps:
    notice brings comes out as it is, because the notice does not say whether it is money. What goes to
    another action, to another system or to an "Only continue if…" carries each piece of data as it is.
 In: the actions and queries of the active apps, the last real notice of that kind and what the previous
-steps leave. Data are named in the screen's language ("Sale number", "Customer phone"), never with their
-internal name.
+steps leave. Data are named in the screen's language ("Sale number", "Customer phone") and with the word of the
+app they belong to ("Section", as in Sales & POS), never with their internal name.
 Out: the steps, on **Save**. Each action or query that is named starts asking for its permission
 (FLOW-F12).
 If it fails: the server refuses on saving an action or a query that does not exist in the business, data of

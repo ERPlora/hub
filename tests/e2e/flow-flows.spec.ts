@@ -355,6 +355,40 @@ const PAYMENT_QUERIES: Array<[string, string]> = [
   ['payment.method.list', 'Buscar métodos de pago'],
 ];
 
+/** Runs `steps` signed in as the owner of hub `a`, in Spanish; the session goes with them. */
+async function asSpanishOwner(
+  browser: Browser,
+  viewport: { width: number; height: number },
+  steps: (page: Page) => Promise<void>,
+): Promise<void> {
+  const context = await browser.newContext({ baseURL: A, viewport, locale: 'es-ES' });
+  const page = await context.newPage();
+  try {
+    await login(page, A, '/');
+    await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
+    await steps(page);
+  } finally {
+    await context.close();
+  }
+}
+
+/** `asSpanishOwner` on the editor of a new automation. */
+async function inSpanishEditor(
+  browser: Browser,
+  viewport: { width: number; height: number },
+  steps: (page: Page, editor: Locator) => Promise<void>,
+): Promise<void> {
+  await asSpanishOwner(browser, viewport, async (page) => {
+    await page.goto(`${A}/flow/automations/new`);
+    await expect(page.locator('html')).toHaveAttribute('lang', /^es/);
+    // The owner's Spanish session for the fleet's visual sweep (`ui-clip-sweep.sh --storage-state`), when asked.
+    if (process.env.E2E_SAVE_STORAGE_STATE) await page.context().storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
+    const editor = shown(page);
+    await expect(editor.locator('[data-testid=flow-editor-nosteps]')).toBeVisible();
+    await steps(page, editor);
+  });
+}
+
 /** Opens the list of the `Combo` `testid` (once open, it covers its own field) filtered by `query`; its options. */
 async function search(page: Page, testid: string, query: string): Promise<Locator> {
   const input = shown(page).locator(`[data-testid=${testid}] input`);
@@ -365,17 +399,7 @@ async function search(page: Page, testid: string, query: string): Promise<Locato
 
 for (const viewport of VIEWPORTS) {
   test(`FLOW-F10 y FLOW-F11: the triggers and steps of Payments say its own words in Spanish at ${viewport.label}`, async ({ browser }) => {
-    const context = await browser.newContext({ baseURL: A, viewport, locale: 'es-ES' });
-    const page = await context.newPage();
-    try {
-      await login(page, A, '/');
-      await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
-      await page.goto(`${A}/flow/automations/new`);
-      await expect(page.locator('html')).toHaveAttribute('lang', /^es/);
-      // The owner's Spanish session for the fleet's visual sweep (`ui-clip-sweep.sh --storage-state`), when asked.
-      if (process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
-      const editor = shown(page);
-      await expect(editor.locator('[data-testid=flow-editor-nosteps]')).toBeVisible();
+    await inSpanishEditor(browser, viewport, async (page, editor) => {
 
       // FLOW-F10: «Elige qué pasa». Sales' own keeps «forma de pago»; none of Payments' answers to it.
       await editor.locator('[data-testid=flow-trigger-open]').click();
@@ -413,9 +437,58 @@ for (const viewport of VIEWPORTS) {
       for (const [query, words] of PAYMENT_QUERIES) {
         await expect(page.locator(`[data-testid="flow-step-action-s2-option-${query}"]`)).toContainText(words);
       }
-    } finally {
-      await context.close();
-    }
+    });
+  });
+}
+
+// flow: FLOW-F10 FLOW-F11 · FIX-FLOW-SALE-SECTION-WORD — in Spanish, what the «Secciones» tab of Sales lists is a «sección»
+// here too: in what starts an automation, in what a step does and in the datum it asks for, never a «departamento».
+// Nothing is saved. Each width leaves its capture of the steps' list.
+const SALE_SECTION_EVENTS: Array<[string, string]> = [
+  ['sale.department.created', 'se crea una sección de ventas'],
+  ['sale.department.deleted', 'se borra una sección de ventas'],
+  ['sale.department.updated', 'cambia una sección de ventas'],
+];
+const SALE_SECTION_COMMANDS: Array<[string, string]> = [
+  ['sale.department.create', 'Crear una sección de ventas'],
+  ['sale.department.delete', 'Borrar una sección de ventas'],
+  ['sale.department.update', 'Cambiar una sección de ventas'],
+];
+
+for (const viewport of VIEWPORTS) {
+  test(`FLOW-F10 y FLOW-F11: a section of Sales goes by that word in Spanish at ${viewport.label}`, async ({ browser }) => {
+    await inSpanishEditor(browser, viewport, async (page, editor) => {
+
+      // FLOW-F10: «Elige qué pasa».
+      await editor.locator('[data-testid=flow-trigger-open]').click();
+      await choose(page, 'flow-trigger-kind', 'Pasa algo');
+      await expect(await search(page, 'flow-trigger-event', 'departamento')).toHaveCount(0);
+      await search(page, 'flow-trigger-event', 'sección de ventas');
+      for (const [event, words] of SALE_SECTION_EVENTS) {
+        await expect(page.locator(`[data-testid="flow-trigger-event-option-${event}"]`)).toContainText(words);
+      }
+      await page.locator('[data-testid="flow-trigger-event-option-sale.department.created"]').click();
+      await expect(editor.locator('[data-testid=flow-trigger-open]')).toContainText('Cuando se crea una sección de ventas');
+
+      // FLOW-F11: «Qué hacer», «Qué consultar» and the datum the step asks for.
+      await editor.locator('[data-testid=flow-editor-add-command]').click();
+      await expect(await search(page, 'flow-step-action-s1', 'departamento')).toHaveCount(0);
+      await search(page, 'flow-step-action-s1', 'sección de ventas');
+      for (const [action, words] of SALE_SECTION_COMMANDS) {
+        await expect(page.locator(`[data-testid="flow-step-action-s1-option-${action}"]`)).toContainText(words);
+      }
+      await noHorizontalScroll(page, viewport.label);
+      await settled(page);
+      await page.screenshot({ path: shot(`FIX-FLOW-SALE-SECTION-WORD-steps-${viewport.label}`) });
+      await page.locator('[data-testid="flow-step-action-s1-option-sale.department.update"]').click();
+      await choose(page, 'flow-step-addinfo-s1', 'Sección');
+      await expect(editor.locator('[data-testid=flow-step-param-s1-department]')).toContainText('Sección');
+      await editor.locator('[data-testid=flow-editor-add-query]').click();
+      await search(page, 'flow-step-action-s2', 'secciones de ventas');
+      await expect(page.locator('[data-testid="flow-step-action-s2-option-sale.department.list"]')).toContainText(
+        'Buscar secciones de ventas',
+      );
+    });
   });
 }
 
@@ -424,15 +497,7 @@ for (const viewport of VIEWPORTS) {
 // its internal name made readable («Start date label»). Nothing is saved.
 for (const viewport of VIEWPORTS) {
   test(`FLOW-F11: what a read of an appointment leaves is named in Spanish at ${viewport.label}`, async ({ browser }) => {
-    const context = await browser.newContext({ baseURL: A, viewport, locale: 'es-ES' });
-    const page = await context.newPage();
-    try {
-      await login(page, A, '/');
-      await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
-      await page.goto(`${A}/flow/automations/new`);
-      await expect(page.locator('html')).toHaveAttribute('lang', /^es/);
-      const editor = shown(page);
-      await expect(editor.locator('[data-testid=flow-editor-nosteps]')).toBeVisible();
+    await inSpanishEditor(browser, viewport, async (page, editor) => {
 
       // «Consultar algo» → «Leer una cita»; then «Solo sigue si…», whose «Dato» offers what the read leaves.
       await editor.locator('[data-testid=flow-editor-add-query]').click();
@@ -477,9 +542,7 @@ for (const viewport of VIEWPORTS) {
       await picker.locator('[data-testid=flow-picker-close]').click();
       await expect(picker).toBeHidden();
       await noHorizontalScroll(page, viewport.label);
-    } finally {
-      await context.close();
-    }
+    });
   });
 }
 
@@ -505,11 +568,7 @@ async function nameCut(page: Page): Promise<boolean> {
 
 for (const viewport of [{ label: '375', width: 375, height: 667 }, ...VIEWPORTS]) {
   test(`FLOW-F11: the editor's name is never cut mid-letter at ${viewport.label}`, async ({ browser }) => {
-    const context = await browser.newContext({ baseURL: A, viewport, locale: 'es-ES' });
-    const page = await context.newPage();
-    try {
-      await login(page, A, '/');
-      await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
+    await asSpanishOwner(browser, viewport, async (page) => {
       for (const mode of ['ios', 'md']) {
         await page.goto(`${A}/flow/automations/new?ionic:mode=${mode}`);
         await expect(page.locator('html')).toHaveAttribute('lang', /^es/);
@@ -535,8 +594,6 @@ for (const viewport of [{ label: '375', width: 375, height: 667 }, ...VIEWPORTS]
           await page.screenshot({ path: shot('FIX-HUB-FLOW-EDITOR-FIELD-LABELS-ENGLISH-375-title-long') });
         }
       }
-    } finally {
-      await context.close();
-    }
+    });
   });
 }

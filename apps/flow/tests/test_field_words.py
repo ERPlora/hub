@@ -96,6 +96,41 @@ def test_every_action_that_takes_a_grant_means_a_voucher_and_says_so():
     }
 
 
+def flow_texts(node: object, path: str = "flow") -> dict[str, str]:
+    """Every text of the catalog under ``node``, by its dotted key."""
+    if isinstance(node, str):
+        return {path: node}
+    children = node.items() if isinstance(node, dict) else enumerate(node)
+    return {text: value for key, child in children for text, value in flow_texts(child, f"{path}.{key}").items()}
+
+
+@pytest.mark.parametrize("language", ["en", "es"])
+def test_a_sales_department_goes_by_the_word_sales_gives_it(language):
+    """Sales shows a ``sale.department`` as a section (its «Sections» tab, the card of its assistant), so whoever builds an
+    automation has to recognize it by that same word. It is read from the Sales catalog: if Sales changes its word, these
+    texts follow. The keys stay, they are the operations' and events' names."""
+    sale = json.loads((Path(apps.get_app_config("sale").path) / "frontend" / "locale" / f"{language}.json").read_text(encoding="utf-8"))
+    one, many = (sale["sale"]["departments"]["entity"][size] for size in ("one", "many"))
+    flow = json.loads((LOCALE / f"{language}.json").read_text(encoding="utf-8"))["flow"]
+
+    assert {action: flow["actions"][f"sale__department__{action}"].count(one) for action in ("create", "update", "delete")} == {
+        "create": 1,
+        "update": 1,
+        "delete": 1,
+    }
+    assert flow["actions"]["sale__department__list"].count(many) == 1
+    assert {event: flow["events"][f"sale__department__{event}"].count(one) for event in ("created", "updated", "deleted")} == {
+        "created": 1,
+        "updated": 1,
+        "deleted": 1,
+    }
+    assert {field: flow["fields"][field] for field in ("department", "department_id")} == {
+        "department": one.capitalize(),
+        "department_id": one.capitalize(),
+    }
+    assert [key for key, text in flow_texts(flow).items() if "department" in text.lower() or "departament" in text.lower()] == []
+
+
 # --- What the events bring ------------------------------------------------------------------------
 
 _FUNCTIONS = (ast.FunctionDef, ast.AsyncFunctionDef)
