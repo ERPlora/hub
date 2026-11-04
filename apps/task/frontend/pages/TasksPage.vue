@@ -24,10 +24,11 @@ import { computed, ref, watch } from 'vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import TaskFormModal from '../components/TaskFormModal.vue';
 import TaskSheet from '../components/TaskSheet.vue';
+import { useBusinessZone } from '../../../../base/frontend/lib/zone';
 import { useLiveList } from '../composables/useLiveList';
 import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
-import { dueTone, formatDay, isClosed, PRIORITY_TONE, STATUS_TONE } from '../lib/format';
+import { dueTone as dueToneOn, formatDay, isClosed, PRIORITY_TONE, STATUS_TONE } from '../lib/format';
 import { keepCompletedInPlace } from '../lib/mine';
 import type { TaskListIn, TaskOut, TaskPriority, TaskSort, TaskStatus } from '../operations';
 import { taskTabs } from '../tabs';
@@ -38,6 +39,9 @@ const PRIORITIES: readonly TaskPriority[] = ['low', 'medium', 'high', 'urgent'];
 const session = useSession();
 const t = useT();
 const locale = useLocale();
+const zone = useBusinessZone();
+/** What the cells of the two tables paint, on the business's clock. */
+const dueTone = (due: string | null | undefined, status: TaskStatus) => dueToneOn(due, status, zone.value);
 const canAdd = computed(() => session.can('task.add'));
 
 // «All» and «My tasks»

@@ -18,6 +18,7 @@ import { IonButton } from '@ionic/vue';
 import { computed, nextTick, reactive, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 
+import { useBusinessZone } from '../../../../base/frontend/lib/zone';
 import { useLocale, useT } from '../composables/useT';
 import { formatMessageTime, headerFileKind, mediaKind, safeMediaUrl } from '../lib/format';
 import { kindLabel, reactionsByMessage, timeline } from '../lib/thread';
@@ -44,6 +45,7 @@ const SETTINGS = '/whatsapp_inbox/settings';
 
 const t = useT();
 const locale = useLocale();
+const zone = useBusinessZone();
 const router = useRouter();
 const session = useSession();
 const items = computed(() => timeline(props.messages, props.notes));
@@ -51,7 +53,7 @@ const reactions = computed(() => reactionsByMessage(props.messages));
 const log = ref<HTMLElement | null>(null);
 
 function when(value: string): string {
-  return formatMessageTime(value, { locale: locale.value, yesterday: t('whatsapp_inbox.yesterday'), withTime: true, now: props.now ?? new Date() });
+  return formatMessageTime(value, { locale: locale.value, yesterday: t('whatsapp_inbox.yesterday'), withTime: true, now: props.now ?? new Date(), timeZone: zone.value });
 }
 
 /** Meta's type when there is nothing else to show (a location, a button reply). */

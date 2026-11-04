@@ -121,12 +121,12 @@ descanso, Fin descanso** (o «No trabaja»), con la jornada por defecto de **Aju
 Arriba, el periodo: «Hoy» (al entrar), «Ayer», «Esta semana» (desde el lunes), «Este mes» (desde el
 día 1) o «Personalizado», que abre «Desde» y «Hasta» con los días que había en pantalla; al lado, los
 días que cuenta. En el móvil, el periodo se elige en el desplegable «Periodo», con las mismas opciones.
-Debajo, dos cifras: **Vendido** y **Comisiones** del periodo, en la moneda del negocio, como cada importe
+Debajo, dos cifras: **Producción** y **Comisiones** del periodo, en la moneda del negocio, como cada importe
 de la lista. Después, la lista con
-buscador «Buscar profesional…» y columnas **Nombre, Rol, Vendido, Comisión %** y **Comisión**: cada
+buscador «Buscar profesional…» y columnas **Nombre, Rol, Producción, Comisión %** y **Comisión**: cada
 persona que puede cobrar comisión (Activa o De baja), también sin ventas y con comisión 0, y quien vendió
 en el periodo aunque ya no esté («Ya no trabaja aquí» o «Inactivo» junto al nombre). Se ordena por
-nombre, rol, vendido o comisión. En el móvil, una tarjeta por persona. Se pone al día sola al cobrar, anular
+nombre, rol, producción o comisión. En el móvil, una tarjeta por persona. Se pone al día sola al cobrar, anular
 o devolver una venta y al cambiar una ficha.
 
 ### Ajustes de Personal
@@ -519,7 +519,8 @@ Pasos:
    Inactivas ni las dadas de baja), su ficha, su cuenta (vacía si no tiene), nombre, rol y comisión,
    también las de comisión 0.
 3. Para saber lo que ha ganado cada profesional, abre **Personal → Comisiones**. Sale «Hoy»: lo que ha
-   vendido cada persona en el día del negocio, con lo devuelto ya restado, su comisión y lo que le
+   vendido cada persona en el día del negocio, con lo devuelto ya restado, sin los bonos que vendió y
+   sumado lo que valen las sesiones de bono que hizo (SALE-F28), su comisión y lo que le
    corresponde (vendido × comisión ÷ 100, redondeado a la unidad más pequeña de la moneda del negocio, el
    céntimo en euros, una sola vez por persona; media unidad sube). Arriba, el total vendido y el total de
    comisiones.
@@ -528,14 +529,15 @@ Pasos:
 5. Cuenta lo que se atribuyó a cada persona en Ventas: la línea que hizo ella (la de una cita, a la
    profesional de la cita) o, si la línea no dice quién, quien atendió la cuenta. Con «Yo» en el TPV, es
    quien tenía la sesión, si su cuenta tiene ficha en Personal; si no, esa venta no cuenta para nadie.
-Entra: la tarifa y la comisión de cada ficha y, de Ventas, lo vendido por cada profesional en el periodo
-(ya resta lo devuelto: lo que vuelve, a quien lo vendió). Ventas es opcional.
+Entra: la tarifa y la comisión de cada ficha y, de Ventas, la producción de cada profesional en el periodo
+(ya resta lo devuelto: lo que vuelve, a quien lo vendió; deja fuera los bonos que vendió y suma el valor de
+sus sesiones de bono). Ventas es opcional.
 Sale: solo lectura.
 Si falla: sin permiso de compensación, «No tienes permiso»; sin Ventas, «Las comisiones salen de las ventas»; con «Hasta» antes que «Desde»,
 «La fecha de fin no puede ser anterior a la de inicio.» bajo «Hasta»; con un solo día, «Un periodo
 personalizado necesita su primer y su último día.»; con más de dos años, «Pide como mucho 731 días de
 una vez.».
-Implicados: SALE-F16, SALE-F28
+Implicados: SALE-F16, SALE-F27, SALE-F28
 
 ### STAFF-F22 Cambiar los ajustes de Personal
 <!-- origen: old-hub:HUB_SHELL-F43 old-hub:HUB_SHELL-F44 fi:modules/staff#command-staff-settings-update fi:modules/staff#query-staff-settings-get fi:modules/staff#settings-bloque old:staff/workflow/pago-y-ajustes.md#staff-f22 -->

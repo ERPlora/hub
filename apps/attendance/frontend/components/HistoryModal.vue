@@ -8,6 +8,7 @@ import { useLiveClient } from '@erplora/ui/sdk';
 import { IonButton, IonSpinner } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import { useBusinessZone } from '../../../../base/frontend/lib/zone';
 import { useLocale, useT } from '../composables/useT';
 import { formatDay, localDateTime } from '../lib/time';
 import type { CorrectionOut, RecordOut, RecordStatus } from '../operations';
@@ -22,6 +23,7 @@ const open = defineModel<boolean>('open', { default: false });
 const client = useLiveClient();
 const t = useT();
 const locale = useLocale();
+const zone = useBusinessZone();
 
 const items = ref<CorrectionOut[]>([]);
 const loading = ref(false);
@@ -51,7 +53,7 @@ watch(
 const heading = computed(() => (props.record ? `${props.record.member_name} · ${formatDay(props.record.work_date, locale.value)}` : ''));
 
 function span(start: string | null, end: string | null, status: RecordStatus): string {
-  return `${localDateTime(start)} → ${localDateTime(end)} (${t(`attendance.status.${status}`)})`;
+  return `${localDateTime(start, zone.value)} → ${localDateTime(end, zone.value)} (${t(`attendance.status.${status}`)})`;
 }
 </script>
 
@@ -98,7 +100,7 @@ function span(start: string | null, end: string | null, status: RecordStatus): s
         data-testid="attendance-history-item"
       >
         <h3>
-          {{ item.is_system ? $t('attendance.history.system') : item.created_by_name }} · {{ localDateTime(item.created_at) }}
+          {{ item.is_system ? $t('attendance.history.system') : item.created_by_name }} · {{ localDateTime(item.created_at, zone) }}
         </h3>
         <p>{{ $t('attendance.history.before') }}: {{ span(item.old_clock_in_at, item.old_clock_out_at, item.old_status) }}</p>
         <p>{{ $t('attendance.history.after') }}: {{ span(item.new_clock_in_at, item.new_clock_out_at, item.new_status) }}</p>

@@ -60,6 +60,14 @@ async function setup(props: Record<string, unknown>, locale: 'en' | 'es' = 'en',
 }
 
 describe('ThreadView', () => {
+  it("tells each message on the business's clock (hub#779)", async () => {
+    const s = await setup({ messages: [message()] });
+    await s.live();
+    await s.result('base.business.get', { timezone: 'Atlantic/Canary' });
+    // 09:00 UTC is 10:00 in the Canaries in October (UTC+1), 11:00 in Madrid.
+    expect(s.bubbles()[0].text()).toContain('10:00');
+  });
+
   it('paints messages and notes oldest first, each on its side', async () => {
     const s = await setup({
       messages: [
@@ -71,7 +79,6 @@ describe('ThreadView', () => {
     const bubbles = s.bubbles();
     expect(bubbles.map((b) => b.attributes('data-side'))).toEqual(['inbound', 'note', 'outbound']);
     expect(bubbles[0].text()).toContain('Hola, ¿tenéis hora mañana?');
-    expect(bubbles[0].text()).toContain('11:00'); // 09:00 UTC on the business clock (Madrid, UTC+2)
     expect(bubbles[1].text()).toContain('Internal note');
     expect(bubbles[1].text()).toContain('Ana');
     expect(bubbles[2].text()).toContain('Read');

@@ -69,8 +69,7 @@ producto de este tamaño.
    **Personal** y, si van a entrar al Hub, vincula su ficha con su cuenta: así cada una ve «Mis
    tareas».
 2. Si quieres agrupar, crea los **proyectos** en **Tareas → Proyectos** (TASK-F12).
-3. «Hoy» (vencida, vence hoy, el número del día) es el día del negocio: en la fase 1, la zona
-   horaria del Hub, **Europe/Madrid**.
+3. «Hoy» (vencida, vence hoy, el número del día) es el día del negocio, en su zona horaria.
 
 ## Pantallas
 
@@ -502,8 +501,8 @@ cliente o a un compañero).
 - Las listas ordenan por su columna con los vacíos al final y desempatan por `id` en la misma dirección
   (`base.ordering.list_order_for`; regla del producto actual, hub#2355, como Ventas, Caja e Inventario): la fila tocada no salta
   y las páginas no repiten ni pierden filas (hub#2352).
-- El «hoy» es `timezone.localdate()` (zona del negocio; en la fase 1, `TIME_ZONE` = Europe/Madrid);
-  las páginas calculan «vencida» y «vence hoy» en esa misma zona.
+- El «hoy» es `business_today` (`base.business.business_zone`, hub#779); las páginas calculan «vencida» y «vence hoy»
+  en esa misma zona (`useBusinessZone`), para que la pantalla y el filtro «Vencidas» no se contradigan.
 - Asistente: toda operación declara `ai={"description"…}` (`risk` solo en las acciones; `high` al
   borrar una tarea o un proyecto) y todo campo de entrada lleva `description`.
 - El admin de Django del Hub tiene **CRUD completo** sobre los cuatro modelos (ronda 12, PLAN §17); una
