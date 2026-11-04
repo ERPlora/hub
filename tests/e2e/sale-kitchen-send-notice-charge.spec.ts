@@ -10,10 +10,10 @@
 // What a run creates, the product `E2E-KSEND-<run>`, its checks and their kitchen tickets, is deleted after it.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, capture, login, shown, untilStill } from './helpers';
+import { capture, shown, untilStill } from './helpers';
 import { cleanInventory, type Product } from './inventory-helpers';
 import { parkIssuer, unparkIssuer } from './invoice-helpers';
-import { type Box, cleanSales, dishForTheTill, eachNoticeSize, holdNotices, noticeBox, openTillCart, overlap, restoreDrawer, stamp } from './sale-helpers';
+import { type Box, checkWithDish, cleanSales, dishForTheTill, eachNoticeSize, expectNoticeWhole, holdNotices, noticeBox, overlap, restoreDrawer, stamp } from './sale-helpers';
 
 const KEY = 'FIX-HUB-748-NOTICE';
 /** Hub `a`'s issuer, parked while the run needs the strip of a hub that cannot issue invoices yet. */
@@ -51,13 +51,8 @@ test.afterAll(() => {
 
 /** A check of its own with a dish, its till in the language under test, the round sent with «Send order». */
 async function sendRound(page: Page, context: BrowserContext, lang: string): Promise<void> {
-  await login(page, A, '/sale/pos');
-  await context.addCookies([{ name: 'django_language', value: lang, domain: new URL(A).hostname, path: '/' }]);
-  await page.reload();
+  await checkWithDish(page, context, lang, dish);
   await expect(shown(page).locator('[data-testid=blocking-strip]'), 'the strip of a hub that cannot issue invoices yet').toBeVisible({ timeout: 30_000 });
-  await shown(page).locator(`[data-testid=pos-product-${dish.id}]`).click();
-  await expect(shown(page).locator('[data-testid^=pos-line-]').filter({ hasText: dish.name }).first()).toBeAttached();
-  await openTillCart(page);
   await shown(page).locator('[data-testid=pos-cart-tab-round]').click();
   await shown(page).locator('[data-testid=pos-kitchen-send]').click();
   await expect(shown(page).locator('[data-testid=pos-cart-round-empty]'), 'the round left «Current order»').toBeVisible();
@@ -88,9 +83,7 @@ async function chargeAnswersATap(page: Page, notice: Locator, size: { label: str
   expect.soft(answer, `the middle of «Charge» at ${size.label}`).toBe('«Charge»');
   expect.soft(overlap(toast, charge), `the notice ${JSON.stringify(toast)} clear of «Charge» ${JSON.stringify(charge)}`).toBe(false);
   expect.soft(toastOnTop, 'the notice painted over what it shares the screen with').toBe(true);
-  expect.soft(toast.top, 'the notice whole on screen, at the top').toBeGreaterThanOrEqual(0);
-  expect.soft(toast.bottom, 'the notice whole on screen, at the bottom').toBeLessThanOrEqual(size.height);
-  expect.soft(toast.right - toast.left, 'the notice not squeezed').toBeGreaterThan(200);
+  expectNoticeWhole(toast, size.height);
 
   // A real finger, not a forced click: on the notice it would close nothing and open nothing.
   await page.mouse.click((charge.left + charge.right) / 2, (charge.top + charge.bottom) / 2);

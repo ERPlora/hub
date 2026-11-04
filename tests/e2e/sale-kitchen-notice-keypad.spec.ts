@@ -8,9 +8,9 @@
 // `E2E-KNOTICE-<run>`, its checks and their kitchen tickets, is deleted after it.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, capture, login, psql, shown, untilStill } from './helpers';
+import { capture, psql, shown, untilStill } from './helpers';
 import { cleanInventory, type Product } from './inventory-helpers';
-import { type Box, cleanSales, dishForTheTill, eachNoticeSize, holdNotices, noticeBox, openTillCart, overlap, restoreDrawer, stamp } from './sale-helpers';
+import { type Box, checkWithDish, cleanSales, dishForTheTill, eachNoticeSize, expectNoticeWhole, holdNotices, noticeBox, overlap, restoreDrawer, stamp } from './sale-helpers';
 
 const KEY = 'FIX-HUB-732-NOTICE';
 const RUN = stamp();
@@ -61,12 +61,7 @@ test.afterAll(() => {
 /** A check of its own with a dish not sent, its till in the language under test, and the sheet opened by «Charge». */
 async function chargeUnsentDish(page: Page, context: BrowserContext, lang: string): Promise<Locator> {
   await holdNotices(page, NOTICE_MS);
-  await login(page, A, '/sale/pos');
-  await context.addCookies([{ name: 'django_language', value: lang, domain: new URL(A).hostname, path: '/' }]);
-  await page.reload();
-  await shown(page).locator(`[data-testid=pos-product-${dish.id}]`).click();
-  await expect(shown(page).locator('[data-testid^=pos-line-]').filter({ hasText: dish.name }).first()).toBeAttached();
-  await openTillCart(page);
+  await checkWithDish(page, context, lang, dish);
   await shown(page).locator('[data-testid=pos-charge]').click();
   return page.locator('[data-testid=sale-checkout-modal]');
 }
@@ -106,9 +101,7 @@ for (const { name, lang, locale, sent, separator } of LANGUAGES) {
       for (const [key, answer] of Object.entries(answers)) expect.soft(answer, `the middle of «${key}» at ${size.label}`).toBe('the key');
       const overKeys = overlap(toast, keypad);
       expect.soft(overKeys, `the notice ${JSON.stringify(toast)} clear of the keypad ${JSON.stringify(keypad)}`).toBe(false);
-      expect.soft(toast.top, 'the notice whole on screen, at the top').toBeGreaterThanOrEqual(0);
-      expect.soft(toast.bottom, 'the notice whole on screen, at the bottom').toBeLessThanOrEqual(size.height);
-      expect.soft(toast.right - toast.left, 'the notice not squeezed').toBeGreaterThan(200);
+      expectNoticeWhole(toast, size.height);
 
       // The amount, typed with the notice on screen: the last row's keys take the finger too.
       for (const key of ['1', '0', 'dot', '5']) await tap(page, sheet, key);

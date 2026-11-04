@@ -9,10 +9,10 @@
 // checks, is deleted after it.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, capture, login, settled, shown, untilStill } from './helpers';
+import { capture, settled, shown, untilStill } from './helpers';
 import { cleanInventory, type Product } from './inventory-helpers';
 import { parkIssuer, unparkIssuer } from './invoice-helpers';
-import { type Box, cleanSales, dishForTheTill, eachNoticeSize, holdNotices, noticeBox, openTillCart, overlap, restoreDrawer, stamp, tillIsPhone } from './sale-helpers';
+import { type Box, checkWithDish, cleanSales, dishForTheTill, eachNoticeSize, expectNoticeWhole, holdNotices, noticeBox, overlap, restoreDrawer, stamp, tillIsPhone } from './sale-helpers';
 
 const KEY = 'FIX-HUB-755-ERROR-NOTICE';
 /** Hub `a`'s issuer, parked while the run needs the strip of a hub that cannot issue invoices yet. */
@@ -56,13 +56,8 @@ async function checkWithKitchenDown(page: Page, context: BrowserContext, lang: s
     sends += 1;
     await route.fulfill({ status: 500, json: { error: { code: 'internal_error', message: 'The kitchen did not answer.' } } });
   });
-  await login(page, A, '/sale/pos');
-  await context.addCookies([{ name: 'django_language', value: lang, domain: new URL(A).hostname, path: '/' }]);
-  await page.reload();
+  await checkWithDish(page, context, lang, dish);
   await expect(shown(page).locator('[data-testid=blocking-strip]'), 'the strip of a hub that cannot issue invoices yet').toBeVisible({ timeout: 30_000 });
-  await shown(page).locator(`[data-testid=pos-product-${dish.id}]`).click();
-  await expect(shown(page).locator('[data-testid^=pos-line-]').filter({ hasText: dish.name }).first()).toBeAttached();
-  await openTillCart(page);
   await settled(page);
   return () => sends;
 }
@@ -93,9 +88,7 @@ async function bothButtonsFree(notice: Locator, charge: Locator, send: Locator, 
     expect.soft(answer, `the middle of «${name}» ${where}`).toBe('the button');
     expect.soft(overlap(box, at), `the notice ${JSON.stringify(box)} clear of «${name}» ${JSON.stringify(at)} ${where}`).toBe(false);
   }
-  expect.soft(box.top, `the notice whole on screen, at the top, ${where}`).toBeGreaterThanOrEqual(0);
-  expect.soft(box.bottom, `the notice whole on screen, at the bottom, ${where}`).toBeLessThanOrEqual(height);
-  expect.soft(box.right - box.left, `the notice not squeezed ${where}`).toBeGreaterThan(200);
+  expectNoticeWhole(box, height, where);
 }
 
 for (const { name, lang, locale, notSent } of LANGUAGES) {
