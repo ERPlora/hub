@@ -306,5 +306,7 @@ function onAction({ actionId, row }: { actionId: string; row: TemplateOut }): vo
 .wa-settings__upgrade {
   display: inline-block;
   margin-top: 0.25rem;
+  color: var(--ion-color-primary);
+  font-weight: 600;
 }
 </style>

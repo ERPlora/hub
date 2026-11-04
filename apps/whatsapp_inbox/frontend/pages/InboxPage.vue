@@ -225,6 +225,7 @@ const columns = computed<DataTableColumn<ConversationOut>[]>(() => [
           #actions
         >
           <PlanUpgradeLink
+            class="wa-inbox__link"
             data-testid="whatsapp-inbox-upgrade"
             :url="upgradeUrl"
           />
@@ -241,6 +242,7 @@ const columns = computed<DataTableColumn<ConversationOut>[]>(() => [
           #actions
         >
           <PlanUpgradeLink
+            class="wa-inbox__link"
             data-testid="whatsapp-inbox-upgrade"
             :url="upgradeUrl"
           />

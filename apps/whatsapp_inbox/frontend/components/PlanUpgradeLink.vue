@@ -15,17 +15,9 @@ const { openSaasPass } = useSaasPass();
 
 <template>
   <a
-    class="wa-plan-upgrade"
     :href="url"
     target="_blank"
     rel="noopener"
     @click="openSaasPass('plan', url, $event)"
   >{{ $t('whatsapp_inbox.upgradePlan') }}</a>
 </template>
-
-<style scoped>
-.wa-plan-upgrade {
-  color: var(--ion-color-primary);
-  font-weight: 600;
-}
-</style>

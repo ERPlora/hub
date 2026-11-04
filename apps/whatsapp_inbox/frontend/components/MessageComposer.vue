@@ -169,6 +169,7 @@ watch(
           #actions
         >
           <PlanUpgradeLink
+            class="wa-composer__link"
             data-testid="whatsapp-inbox-composer-upgrade"
             :url="upgradeUrl"
           />
@@ -278,6 +279,10 @@ watch(
 }
 .wa-composer__hint {
   color: var(--ion-color-medium-shade);
+}
+.wa-composer__link {
+  color: var(--ion-color-primary);
+  font-weight: 600;
 }
 .wa-composer__actions {
   display: flex;
