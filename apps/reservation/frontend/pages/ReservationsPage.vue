@@ -34,7 +34,7 @@ import { allows, type RowAction, statusTone } from '../lib/states';
 import type { ReservationOut, ReservationStatus } from '../operations';
 import { reservationTabs } from '../tabs';
 
-/** The zone until the settings say the business's (phase 1: Europe/Madrid, as the server). */
+/** The zone until the settings say the business's. */
 const FALLBACK_ZONE = 'Europe/Madrid';
 const STATUSES: readonly ReservationStatus[] = ['pending', 'confirmed', 'seated', 'completed', 'cancelled', 'no_show'];
 

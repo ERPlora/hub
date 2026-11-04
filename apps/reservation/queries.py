@@ -6,7 +6,7 @@ screens name it by, which the assistant's card says instead of the id (schemas.p
 Shared with services.py, inside the command's own transaction: the business's clock, the rules, the
 lookups of a reservation, a waitlist entry, a slot or a blocked date as a person says it, and everything the gate (engine.py)
 reads — the slots of a day with what they hold, its blocks, its opening hours (Schedules) and a table's
-facts (Tables). The business's zone is the Hub's; in phase 1, ``settings.TIME_ZONE`` (Europe/Madrid).
+facts (Tables). The business's zone is the Hub's (``base.business.business_zone``).
 """
 
 import datetime as dt
@@ -59,7 +59,7 @@ from apps.schedule.queries import day_label, get_week, hours_for_range
 from apps.schedule.schemas import HoursRangeIn, NoParamsIn
 from apps.table.models import Table
 from apps.table.queries import natural_key, table_label
-from base.business import babel_locale
+from base.business import babel_locale, business_zone, zone_name
 
 S = Reservation.Status
 #: What a slot counts (the old gate's rule): every reservation not cancelled nor a no-show.
@@ -87,16 +87,6 @@ BLOCK_AMBIGUOUS = _("That date is blocked at several times: say which one by its
 
 
 # ── The business's clock and rules ───────────────────────────────────────────────────────────────
-
-
-def business_zone():
-    """The business's time zone (phase 1: ``settings.TIME_ZONE``; the Hub keeps no zone yet)."""
-    return timezone.get_current_timezone()
-
-
-def zone_name() -> str:
-    zone = business_zone()
-    return getattr(zone, "key", str(zone))
 
 
 def business_now() -> dt.datetime:
