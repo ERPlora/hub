@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:4db7bcf096445df0fd9ee059fb52cc9216ed5fc99c9a472330eb83c2b05b454f -->
+<!-- generated from WORKBOOK.md sha256:8709182bbca490bb4a193ce2db894c5ff8e6495ceef36e59900a8092b0656c89 -->
 
 ## What it is for and who it is for
 
@@ -786,6 +786,9 @@ Steps:
    a rush, first arm the flame next to it: the button changes to "Send RUSH (N)". "Order N sent to the
    kitchen." shows; the lines are marked with their round ("Order N") and the time sent, and the flame
    disarms. A double send never sends anything twice.
+   In the phone's drawer, "Send order" and the flame stay pinned above the foot while they leave room for
+   the tabs and a line; on a lower phone, such as a 320×568 one with the red strip on top, they scroll with
+   them, after the lines, and "Charge" stays in view (hub#787).
 3. On pressing "Charge" with something pending, it is sent to the kitchen first and then the charge
    opens: nobody pays for a dish that is not going to be made. The order's notice then shows at the top of
    the screen, so the charge keypad (SALE-F01) can be tapped from the first moment. If the send fails, the
