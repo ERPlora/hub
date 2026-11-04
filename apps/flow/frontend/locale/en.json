@@ -846,6 +846,8 @@
       "whatsapp_inbox__note__deleted": "a note of a WhatsApp conversation is deleted"
     },
     "actions": {
+      "combo__option__get": "Read a choice of a set menu",
+      "sale__record__get": "Read the name of a sales record",
       "task__task__create": "Create a task",
       "task__task__complete": "Complete a task",
       "task__task__assign": "Assign a task",
@@ -1342,6 +1344,10 @@
       "send": "Send"
     },
     "fields": {
+      "dish_id": "Dish",
+      "modifier_id": "Modifier",
+      "quick_note_id": "Quick note",
+      "sale_line_id": "Sale line",
       "title": "Title",
       "description": "Description",
       "priority": "Priority",
@@ -1741,9 +1747,9 @@
       "get_quantity": "Get quantity",
       "gift_reason": "Gift reason",
       "gift_total": "Gift total",
-      "grant_count": "Grant count",
-      "grant_id": "Grant",
-      "granted_at": "Granted at",
+      "grant_count": "Vouchers sold",
+      "grant_id": "Voucher",
+      "granted_at": "Sold on",
       "gross_total": "Gross total",
       "group": "Group",
       "group_count": "Group count",

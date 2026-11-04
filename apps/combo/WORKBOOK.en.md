@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:8ad8dcb8ff062e1378428431f31755fc73493bd9b139d5be8f26e25432cb3c0a -->
+<!-- generated from WORKBOOK.md sha256:6f0407f2fa7fa1a7cffd6b39272648b9805961ed263392e949a92b5e5e4f0157 -->
 
 ## What it is for and who it is for
 
@@ -481,6 +481,7 @@ fits several, it says which ones and asks to choose (`combo.combo_ambiguous`, `c
 |---|---|---|---|
 | The menus, with search, filters and order, in pages of up to 100 (live) | view | F01 | `combo.combo.list` |
 | A menu with its courses and its choices, whether it is on the till and why not (live) | view | F05, F06, F12 | `combo.combo.get` |
+| A choice of a menu, by its id: only to name the dish on the assistant's card (SALE-F20) | view | F07 | `combo.option.get` |
 | The till's menu catalogue: the ones that can be sold, with their courses and their available choices (live) | view | F07 | `combo.combo.for_sale` |
 | The line of a menu with what was chosen: amount, components and tax split | view | F08, F09, F10, F11 | `combo.combo.resolve` |
 | Up to five images of the library for a menu's photo, by its name; it sets none | view | F14 | `combo.combo.suggest_image` |

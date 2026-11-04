@@ -566,7 +566,8 @@ Pasos:
    - con una sesión olvidada pasado su corte (F10): lo de después del corte;
    - con una sesión abierta: las rezagadas del turno anterior, confirmadas mientras se cerraba (su Z
      ya no las recoge).
-2. Pulsa «Ver» para ver la lista (cuándo, tipo, importe, método y documento).
+2. Pulsa «Ver» para ver la lista (cuándo, tipo, importe, método y documento). Es solo de lectura: un
+   único botón, **Cerrar**.
 3. Al abrir la sesión, cuenta ese efectivo en el fondo: ya está en el cajón (la ventana de abrir lo
    recuerda).
 Entra: los cobros, anulaciones y devoluciones de Ventas que no cayeron en ninguna sesión.
@@ -738,6 +739,9 @@ cajero del producto actual es un empleado.
   declara `apps.py` como tarea programada (`*/5 * * * *`, `collapse`), que corre el worker
   (`base/scheduler.py`, 2026-10-15), y
   `session.open` lo aplica antes de abrir.
+- **Millares**: los importes agrupan los millares también con cuatro cifras («1.234,56 €»; `formatMoney` de
+  `@erplora/ui/components`, con `useGrouping: 'always'`, porque el CLDR del español espera a cinco: hub#653). Un
+  billete o moneda (`formatFace`) se escribe con la misma regla y sin decimales si es entero («5.000 Ft»).
 - **Monedas**: la del negocio es la de su país, que da `base.business.get` desde el registro de este hub (APP-BASE-6),
   y en el hub propio de ERPlora (sin registro en la fase 1, `create_platform_hub`, con todas las apps activas), la del
   país de su emisor (`PLATFORM_ISSUER_COUNTRY`). En el servidor, `business_currency` de Ventas (`apps.sale.queries`,

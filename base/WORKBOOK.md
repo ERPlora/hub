@@ -2484,7 +2484,7 @@ Pasos:
      datos, no sale tarjeta (ver «Si falla»); si no, el importe sale tal como se escribió y la acción la rechaza al
      ejecutarse. Si la acción se hace sobre algo que tiene su propia moneda, sale en
      la de eso: añadir una línea a un carrito en dólares dice «12,50 $», y poner un precio en una tarifa en yenes,
-     «1500 ¥»; si eso no se puede leer (no existe o quien pregunta no puede verlo), el importe sale tal como se
+     «1.500 ¥»; si eso no se puede leer (no existe o quien pregunta no puede verlo), el importe sale tal como se
      escribió y lo decide la acción. Todos los importes de una tarjeta se escriben igual, arriba o dentro de un dato
      que agrupa otros: «1,50 $» en los dos, nunca «1,50 US$» al lado. Uno de «Lo que va a pasar» que su app da en otra moneda sale en la
      suya: rectificar una factura emitida en euros dice «Total: -121,00 €» aunque el negocio cobre ya en złoty, y el asistente lo dice en
@@ -3577,6 +3577,13 @@ Implicados: HUBS-F18, HUBS-F19, HUBS-F20
   (`base.files:{<hex>}:…`, `website:home:{<slug>}:…`). En local y en los tests la caché es
   `base.cache.ClusterLocMemCache`, la memoria del proceso con esa misma regla y el mismo error: lo que fallaría en
   AWS falla antes en el test.
+
+- **`Hub.cluster` vacío es el servidor por defecto** (hub#614), el de los settings: es un valor válido, no un dato por
+  rellenar, y con él conecta, migra, mide y se traslada el hub (`base.tenancy.connections`, `credentials`, `migrator`,
+  `control.hub.move`). Por eso ese servidor no se da de alta como fila `Cluster`: una fila cambia el camino de conexión
+  de sus hubs (y sus credenciales, si lleva secreto), y desde la primera ningún hub nuevo cae ya en el de los settings
+  (`place_hub`). El admin de Hubs lo dice con palabras en la lista, su filtro y la ficha (`control/admin.py`), salvo en
+  un hub sin BD hecha (`base.registry.database_is_made`): en preparación, cancelado antes de estar listo o ya borrado.
 
 ## Lo que queda fuera
 
