@@ -846,6 +846,8 @@
       "whatsapp_inbox__note__deleted": "se borra una nota de una conversación de WhatsApp"
     },
     "actions": {
+      "combo__option__get": "Leer una opción de un menú",
+      "sale__record__get": "Leer el nombre de un registro de ventas",
       "task__task__create": "Crear una tarea",
       "task__task__complete": "Completar una tarea",
       "task__task__assign": "Asignar una tarea",
@@ -1342,8 +1344,11 @@
       "send": "Enviar"
     },
     "fields": {
+      "dish_id": "Plato",
+      "modifier_id": "Suplemento",
+      "quick_note_id": "Nota rápida",
+      "sale_line_id": "Línea de la venta",
       "production_total": "Producción total",
-      "sale_line_id": "Línea de venta",
       "title": "Título",
       "description": "Descripción",
       "priority": "Prioridad",
@@ -1746,9 +1751,9 @@
       "get_quantity": "Cantidad de regalo",
       "gift_reason": "Motivo de la invitación",
       "gift_total": "Total invitado",
-      "grant_count": "Permisos",
-      "grant_id": "Permiso",
-      "granted_at": "Fecha del permiso",
+      "grant_count": "Bonos vendidos",
+      "grant_id": "Bono",
+      "granted_at": "Fecha de venta",
       "gross_total": "Total bruto",
       "group": "Grupo",
       "group_count": "Grupos",

@@ -362,7 +362,6 @@ UNNAMED_REFERENCES = {
     "kitchen": 23,
     "online_booking": 7,
     "payment": 8,
-    "sale": 101,
     "schedule": 4,
     # The sale and the appointment a voucher or a session came from, the line of a sale that charged a voucher, the line
     # of an order that holds a session and the reference of a return: data of apps Services does not require, so it
@@ -381,7 +380,6 @@ UNNAMED_REFERENCES = {
 #: or those their ``choices_of`` mark names —, by app: their card says that value as sent. Only ever lower, as above.
 UNLABELLED_LISTS = {
     "kitchen": 1,
-    "sale": 3,
     "tax": 5,
     "website": 4,
     "whatsapp_inbox": 2,
@@ -448,6 +446,9 @@ class UnnamedIn(Schema):
     )
     mode: Literal["kiosk", "frobnicated"]
     source: Literal["counter", "phone"]
+    served: Literal["dine_in", "takeaway"] = Field(json_schema_extra={"choices_of": "kitchen.order_type"})
+    served_badly: Literal["dine_in", "teleport"] = Field(json_schema_extra={"choices_of": "kitchen.order_type"})
+    each_served: list[Literal["dine_in", "takeaway"]] = Field(json_schema_extra={"choices_of": "kitchen.order_type"})
 
 
 UNNAMED = Operation(
@@ -463,8 +464,8 @@ UNNAMED = Operation(
 
 
 def test_the_ratchet_counts_a_reference_nobody_marks_and_a_list_nobody_labels():
-    assert unnamed(UNNAMED) == (["member_id"], ["mode"])
-    assert by_app([UNNAMED, UNNAMED]) == ({"appointment": 2}, {"appointment": 2})
+    assert unnamed(UNNAMED) == (["member_id"], ["mode", "served_badly"])
+    assert by_app([UNNAMED, UNNAMED]) == ({"appointment": 2}, {"appointment": 4})
 
 
 class MarkedIn(Schema):
@@ -511,6 +512,8 @@ TITLED_IN_SPANISH = {
     **{f"pricing.price_item.{action}:id": "Precio" for action in ("remove", "update")},
     **{f"pricing.price_list.{action}:id": "Tarifa" for action in ("activate", "deactivate", "set_default", "update")},
     **{f"pricing.rule.{action}:id": "Regla de descuento" for action in ("activate", "deactivate", "update")},
+    **{f"sale.department.{action}:id": "Sección" for action in ("delete", "update")},
+    **{f"sale.quick_note.{action}:id": "Nota rápida" for action in ("delete", "update")},
     **{f"service.assignment.{action}:id": "Profesional del servicio" for action in ("remove", "update")},
     **{f"service.category.{action}:id": "Categoría" for action in ("delete", "update")},
     **{f"service.grant.{action}:id": "Bono vendido" for action in ("adjust", "redeem", "void")},

@@ -134,6 +134,26 @@ describe('ProductsPage: the list', () => {
     expect([form.props('open'), (form.props('product') as { id: string }).id]).toEqual([true, 'p3']);
   });
 
+  it('hub#703: Status keeps the room to read «Not configured» only while a row carries it, and a refresh leaves the columns alone', async () => {
+    const s = await setup();
+    const columns = () => s.prop<Array<{ key: string; minWidth?: string }>>('columns');
+    const floor = () => columns().find((c) => c.key === 'status')?.minWidth;
+    await s.show(page([COFFEE, MASSAGE], 2));
+    expect(floor(), 'a list of switches fits the common floor').toBeUndefined();
+
+    await s.show(LIST, 2);
+    expect(floor()).toBe('10.5rem');
+    expect(columns().filter((c) => c.minWidth).map((c) => c.key), 'no other column asks for more').toEqual(['status']);
+
+    // The table judges its box again when the columns change: a live refresh that keeps the chip must not make it.
+    const before = columns();
+    await s.show(page([OLD, COFFEE], 2), 3);
+    expect(columns()).toBe(before);
+
+    await s.show(page([COFFEE], 1), 4);
+    expect(floor(), 'the chip gone, the room goes with it').toBeUndefined();
+  });
+
   it('the switch activates or deactivates the product; a refusal is said above the table', async () => {
     const s = await setup({}, () => ok(COFFEE));
     await s.show(LIST);

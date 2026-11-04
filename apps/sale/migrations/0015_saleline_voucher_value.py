@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('sale', '0013_order_merged_into'),
+        ('sale', '0014_alter_sale_customer_id_type'),
     ]
 
     operations = [
