@@ -1011,7 +1011,7 @@ def availability_check(ctx: OperationContext, data: CheckIn) -> dict:
     minutes = data.duration_minutes or sum(
         line["duration_minutes"] for line in lines_for(member, services)
     )
-    end = start + dt.timedelta(minutes=minutes)
+    end = engine.ends_at(start, minutes)
     zone = business_zone()
     agenda = load_agenda(
         ctx,

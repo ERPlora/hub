@@ -56,6 +56,27 @@ SAY_WHOSE_VOUCHERS = _("Say whose vouchers: the customer's id, name or phone.")
 MOMENT_WITHOUT_ZONE = _("Give the moment with its time zone.")
 #: How the Services screens name the data the models do not (the assistant's card names each datum by its title).
 TAX_CATEGORY = gettext_noop("Tax category")
+SERVICE = gettext_noop("Service")
+CATEGORY = gettext_noop("Category")
+PACKAGE = gettext_noop("Package")
+ASSIGNMENT = gettext_noop("Professional of a service")
+VOUCHER_SOLD = gettext_noop("Voucher sold")
+VOUCHER_SESSION = gettext_noop("Voucher session")
+VOUCHER_SESSIONS = gettext_noop("Voucher sessions")
+
+# The assistant's card names the record a write acts on by these reads (base/assistant.py ``REFERS``), run as whoever
+# asks, never by its id: a service, a category, a package and a customer by their names, a professional by their full
+# name; who does what by the service and the professional; a voucher sold and its sessions by the package, the owner and
+# the day it was sold or the service of the session, as two vouchers of one package may be told apart. The sale, the
+# appointment and the line of an order are of apps Services does not require: the card leaves them out.
+A_SERVICE = names("service.service.get")
+A_CATEGORY = names("service.category.get")
+A_PACKAGE = names("service.package.get")
+AN_ASSIGNMENT = names("service.assignment.get", name=("label",))
+A_GRANT = names("service.grant.get", name=("label",))
+A_SESSION = names("service.session.get", name=("label",))
+A_MEMBER = names("staff.member.detail", name=("full_name",))
+A_CUSTOMER = names("customer.customer.detail")
 #: How far ahead of this server's clock a purchase may be dated (the till's clock may run fast).
 CLOCK_SKEW = timedelta(minutes=5)
 
@@ -178,7 +199,7 @@ def _named(value_id, said, message):
 
 
 class ServiceRefIn(In):
-    id: UUID | None = Field(None, description="The service's id.")
+    id: UUID | None = Field(None, title=SERVICE, description="The service's id.", json_schema_extra=A_SERVICE)
     service: Said | None = Field(
         None,
         description="The service's name, when its id is not known (e.g. said aloud).",
@@ -197,7 +218,6 @@ AN_IMAGE = names("base.catalog_image.get", by="reference", name=("title",))
 
 
 class ServiceImageIn(ServiceRefIn):
-    id: UUID | None = Field(None, description="The service's id.", json_schema_extra=names("service.service.get"))
     image: Annotated[str, StringConstraints(strip_whitespace=True, max_length=200)] = Field(
         title=gettext_noop("Image"),
         description="The image the service shows: an image of the shared library by its reference, "
@@ -218,7 +238,7 @@ class ServiceImageSuggestIn(ServiceRefIn):
 
 
 class CategoryRefIn(In):
-    id: UUID | None = Field(None, description="The category's id.")
+    id: UUID | None = Field(None, title=CATEGORY, description="The category's id.", json_schema_extra=A_CATEGORY)
     category: Said | None = Field(
         None, description="The category's name, when its id is not known."
     )
@@ -230,7 +250,7 @@ class CategoryRefIn(In):
 
 
 class PackageRefIn(In):
-    id: UUID | None = Field(None, description="The package's id.")
+    id: UUID | None = Field(None, title=PACKAGE, description="The package's id.", json_schema_extra=A_PACKAGE)
     package: Said | None = Field(
         None, description="The package's name, when its id is not known."
     )
@@ -328,7 +348,7 @@ class ServiceIn(In):
     max_capacity: int = Field(
         1, ge=1, le=1000, description="How many customers one slot serves."
     )
-    category_id: UUID | None = Field(None, description="Its service category, by id.")
+    category_id: UUID | None = Field(None, description="Its service category, by id.", json_schema_extra=A_CATEGORY)
     category: Said | None = Field(None, description="Its service category, by name.")
     description: LongText = Field("", description="Free description.")
     short_description: LongText = Field("", description="A one-line description.")
@@ -387,7 +407,7 @@ class ServicePatchIn(ServiceRefIn):
     )
     max_capacity: int | None = Field(None, ge=1, le=1000, description="New capacity.")
     category_id: UUID | None = Field(
-        None, description="New category by id; null leaves it without a category."
+        None, description="New category by id; null leaves it without a category.", json_schema_extra=A_CATEGORY
     )
     category: Said | None = Field(None, description="New category by name.")
     description: LongText | None = Field(None, description="New description.")
@@ -531,7 +551,7 @@ class CategoryIn(In):
     )
     description: LongText = Field("", description="Free description.")
     parent_id: UUID | None = Field(
-        None, description="The category it goes inside, by id; none = a root category."
+        None, description="The category it goes inside, by id; none = a root category.", json_schema_extra=A_CATEGORY
     )
     parent: Said | None = Field(
         None, description="The category it goes inside, by name."
@@ -549,7 +569,7 @@ class CategoryPatchIn(CategoryRefIn):
     name: Name | None = Field(None, description="New name.")
     description: LongText | None = Field(None, description="New description.")
     parent_id: UUID | None = Field(
-        None, description="New parent by id; null makes it a root category."
+        None, description="New parent by id; null makes it a root category.", json_schema_extra=A_CATEGORY
     )
     parent: Said | None = Field(None, description="New parent by name.")
     icon: Icon | None = Field(None, description="New icon.")
@@ -653,9 +673,9 @@ class EligibleIn(PageIn):
 class AssignIn(In):
     """Assigning someone who already has the service changes their own duration and price."""
 
-    service_id: UUID | None = Field(None, description="The service, by id.")
+    service_id: UUID | None = Field(None, description="The service, by id.", json_schema_extra=A_SERVICE)
     service: Said | None = Field(None, description="The service, by name.")
-    member_id: UUID | None = Field(None, description="The professional (Staff), by id.")
+    member_id: UUID | None = Field(None, description="The professional (Staff), by id.", json_schema_extra=A_MEMBER)
     member: Said | None = Field(None, description="The professional (Staff), by name.")
     custom_duration: Minutes | None = Field(
         None, description="Their own duration in minutes; none = the service's."
@@ -674,7 +694,11 @@ class AssignIn(In):
         return self
 
 
-class AssignmentPatchIn(ByIdIn):
+class AssignmentRefIn(ByIdIn):
+    id: UUID = Field(title=ASSIGNMENT, description="The id of the record.", json_schema_extra=AN_ASSIGNMENT)
+
+
+class AssignmentPatchIn(AssignmentRefIn):
     """Only the fields sent change; ``null`` removes an own duration or price."""
 
     custom_duration: Minutes | None = Field(
@@ -715,6 +739,10 @@ class AssignmentOut(Schema):
     )
 
 
+class AssignmentDetailOut(AssignmentOut):
+    label: str = Field(description="How a person tells it apart: the service and the professional, «Haircut · Ana López».")
+
+
 class EligibleOut(Schema):
     member_id: UUID
     full_name: str
@@ -753,7 +781,7 @@ class PackageListIn(PageIn):
 
 
 class PackageLineIn(In):
-    service_id: UUID | None = Field(None, description="The service, by id.")
+    service_id: UUID | None = Field(None, description="The service, by id.", json_schema_extra=A_SERVICE)
     service: Said | None = Field(None, description="The service, by name.")
     sessions: int = Field(
         1, ge=1, le=1000, description="Sessions of this service the voucher includes."
@@ -903,10 +931,10 @@ class GrantListIn(PageIn):
 
 
 class GrantIn(In):
-    package_id: UUID | None = Field(None, description="The package sold, by id.")
+    package_id: UUID | None = Field(None, description="The package sold, by id.", json_schema_extra=A_PACKAGE)
     package: Said | None = Field(None, description="The package sold, by name.")
     customer_id: UUID | None = Field(
-        None, description="The customer who owns it (Customers), by id."
+        None, description="The customer who owns it (Customers), by id.", json_schema_extra=A_CUSTOMER
     )
     customer: Said | None = Field(
         None, description="The customer who owns it, by name, phone or email."
@@ -982,6 +1010,13 @@ class GrantOut(Schema):
     )
 
 
+class GrantDetailOut(GrantOut):
+    label: str = Field(
+        description="How a person tells it apart: the package, its owner if the reader may see customers and the day "
+        "it was sold, «5 haircuts · Lucía Pérez · Oct 3, 2026»."
+    )
+
+
 class OrphanOut(Schema):
     id: UUID
     package_id: UUID
@@ -998,7 +1033,11 @@ class GrantCreatedOut(GrantOut):
     pass
 
 
-class VoidIn(ByIdIn):
+class GrantRefIn(ByIdIn):
+    id: UUID = Field(title=VOUCHER_SOLD, description="The id of the record.", json_schema_extra=A_GRANT)
+
+
+class VoidIn(GrantRefIn):
     reason: Note = Field(
         description="Why it is voided, in the operator's words; it stays on its record."
     )
@@ -1018,7 +1057,7 @@ class VoidCheckOut(Schema):
     used: int
 
 
-class AdjustIn(ByIdIn):
+class AdjustIn(GrantRefIn):
     uses_delta: int = Field(
         0,
         ge=-100,
@@ -1055,9 +1094,9 @@ class AdjustCheckOut(Schema):
     reason: Literal["", "already_voided"]
 
 
-class RedeemIn(ByIdIn):
+class RedeemIn(GrantRefIn):
     service_id: UUID | None = Field(
-        None, description="The service performed, by id; the voucher must cover it."
+        None, description="The service performed, by id; the voucher must cover it.", json_schema_extra=A_SERVICE
     )
     service: Said | None = Field(None, description="The service performed, by name.")
     appointment_id: UUID | None = Field(
@@ -1200,9 +1239,9 @@ TenderOptionPage = Page[TenderOptionOut]
 
 
 class HoldIn(In):
-    grant_id: UUID = Field(description="The voucher sold whose session pays the line.")
+    grant_id: UUID = Field(description="The voucher sold whose session pays the line.", json_schema_extra=A_GRANT)
     service_id: UUID = Field(
-        description="The service of the line; the voucher must cover it."
+        description="The service of the line; the voucher must cover it.", json_schema_extra=A_SERVICE
     )
     order_line_id: UUID = Field(
         description="The line of the open check (Sales) the session pays: one session per line."
@@ -1210,25 +1249,27 @@ class HoldIn(In):
 
 
 class SessionRefIn(In):
-    id: UUID = Field(description="The session of the voucher.")
+    id: UUID = Field(title=VOUCHER_SESSION, description="The session of the voucher.", json_schema_extra=A_SESSION)
 
 
 class SettleIn(In):
-    ids: list[UUID] = Field(
+    ids: list[Annotated[UUID, Field(json_schema_extra=A_SESSION)]] = Field(
         min_length=1,
         max_length=100,
+        title=VOUCHER_SESSIONS,
         description="The sessions held for the lines the sale charges.",
     )
     sale_id: UUID = Field(description="The sale charged (Sales).")
     customer_id: UUID | None = Field(
-        description="The sale's customer: it must own the vouchers."
+        description="The sale's customer: it must own the vouchers.", json_schema_extra=A_CUSTOMER
     )
 
 
 class ReturnIn(In):
-    ids: list[UUID] = Field(
+    ids: list[Annotated[UUID, Field(json_schema_extra=A_SESSION)]] = Field(
         min_length=1,
         max_length=100,
+        title=VOUCHER_SESSIONS,
         description="The sessions spent in the sale that come back.",
     )
     reference: UUID = Field(
@@ -1253,6 +1294,13 @@ class SessionOut(Schema):
         description="Sessions the voucher has left now; null = unlimited."
     )
     voucher_expired: bool = Field(description="The voucher is past its expiry.")
+
+
+class SessionDetailOut(SessionOut):
+    label: str = Field(
+        description="How a person tells it apart: the package, its owner if the reader may see customers and the "
+        "service, «5 haircuts · Lucía Pérez · Haircut»."
+    )
 
 
 class SessionsOut(Schema):

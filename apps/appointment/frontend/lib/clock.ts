@@ -41,6 +41,16 @@ export function minutesOf(moment: string): number {
   return hours * 60 + minutes;
 }
 
+/**
+ * The minutes a booking takes on the business's wall clock, from a server time to a later one. The nights the clock
+ * changes it is not its real length: an hour over the jump takes two. An end at or before its start on the wall (the
+ * repeated hour) takes nothing there, so it keeps `minutes`, its real length, and is still seen.
+ */
+export function wallLength(start: string, end: string, minutes: number): number {
+  const length = (asUtc(dayOf(end), timeOf(end)).getTime() - asUtc(dayOf(start), timeOf(start)).getTime()) / 60_000;
+  return length > 0 ? length : minutes;
+}
+
 /** Today in the business's zone. */
 export function todayIn(zone: string, now: Date = new Date()): string {
   try {

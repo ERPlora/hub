@@ -7,15 +7,20 @@ import uuid
 
 import pytest
 from django.utils import timezone
+from live.context import OperationContext
 from live.errors import Conflict, NotFound, PermissionDenied
 from live.operations import get
 
 from apps.service.models import Assignment, GrantAdjustment, ServiceSettings
 from apps.service.schemas import (
     AdjustCheckOut,
+    AssignmentDetailOut,
     AssignmentListIn,
     AssignmentPage,
     ByIdIn,
+    GrantDetailOut,
+    SessionDetailOut,
+    SessionRefIn,
     CatalogStatusOut,
     CategoryListIn,
     CategoryOut,
@@ -49,6 +54,7 @@ from apps.service.schemas import (
 )
 
 from .conftest import (
+    A,
     ctx_for,
     make_category,
     make_customer,
@@ -111,7 +117,10 @@ def tax():
         ),
         ("service.package.list", PackageListIn, PackagePage, "service.view_package"),
         ("service.package.get", PackageRefIn, PackageOut, "service.view_package"),
+        ("service.assignment.get", ByIdIn, AssignmentDetailOut, "service.view_service"),
         ("service.grant.list", GrantListIn, GrantPage, "service.view_package_balance"),
+        ("service.grant.get", ByIdIn, GrantDetailOut, "service.view_package_balance"),
+        ("service.session.get", SessionRefIn, SessionDetailOut, "service.view_package_balance"),
         ("service.grant.list_orphans", PageIn, OrphanPage, "service.view_orphan_grant"),
         ("service.grant.void_check", ByIdIn, VoidCheckOut, "service.void_grant"),
         ("service.grant.adjust_check", ByIdIn, AdjustCheckOut, "service.adjust_grant"),
@@ -144,6 +153,78 @@ def test_declarations(name, input, output, permission):
         permission,
         True,
     )
+
+
+# ── A record by its id, as the assistant's card names it ────────────────────────────────────────
+
+
+def test_an_assignment_by_its_id_says_the_service_and_the_professional():
+    service, member = make_service("Corte"), make_member("Ana", "López")
+    assignment = Assignment.objects.create(service=service, member=member)
+    found = run("service.assignment.get", ByIdIn(id=assignment.id), role="hub_employee")
+    assert (found.id, found.label) == (assignment.id, "Corte · Ana López")
+
+
+def test_an_assignment_of_a_professional_who_left_is_not_there():
+    member = make_member("Ana", "López", status="terminated")
+    assignment = Assignment.objects.create(service=make_service("Corte"), member=member)
+    with pytest.raises(NotFound) as error:
+        run("service.assignment.get", ByIdIn(id=assignment.id))
+    assert error.value.code == "service.assignment_not_found"
+    with pytest.raises(NotFound):
+        run("service.assignment.get", ByIdIn(id=uuid.uuid7()))
+
+
+def sold_on_the_third_of_october():
+    from apps.service.models import Grant
+
+    package = make_package("Bono 5 cortes", services=[make_service("Corte")], sessions=5)
+    grant = make_grant(package, make_customer("Lucía Pérez"))
+    Grant.objects.filter(pk=grant.pk).update(granted_at=dt.datetime(2026, 10, 3, 12, tzinfo=dt.UTC))
+    return grant
+
+
+def test_a_voucher_sold_by_its_id_says_what_it_is_whose_and_when_in_the_readers_language():
+    grant = sold_on_the_third_of_october()
+    op = get("service.grant.get")
+    spanish = op(OperationContext(scope=A, actor="t", permissions=ctx_for().permissions, language="es"), ByIdIn(id=grant.id))
+    assert (spanish.id, spanish.label) == (grant.id, "Bono 5 cortes · Lucía Pérez · 3 oct 2026")
+    assert run("service.grant.get", ByIdIn(id=grant.id)).label == "Bono 5 cortes · Lucía Pérez · Oct 3, 2026"
+    with pytest.raises(NotFound) as error:
+        run("service.grant.get", ByIdIn(id=uuid.uuid7()))
+    assert error.value.code == "service.grant_not_found"
+
+
+def test_a_voucher_sold_says_its_owner_only_to_who_may_see_customers():
+    grant = sold_on_the_third_of_october()
+    without = ctx_for().permissions - {"customer.view"}
+    found = get("service.grant.get")(ctx_for(permissions=without), ByIdIn(id=grant.id))
+    assert found.label == "Bono 5 cortes · Oct 3, 2026"
+
+
+def test_a_session_by_its_id_says_its_voucher_its_owner_and_its_service():
+    grant = sold_on_the_third_of_october()
+    corte = grant.package.items.get().service
+    session = make_redemption(grant, corte)
+    found = run("service.session.get", SessionRefIn(id=session.id), role="hub_employee")
+    assert (found.id, found.grant_id, found.label) == (session.id, grant.id, "Bono 5 cortes · Lucía Pérez · Corte")
+    without = ctx_for().permissions - {"customer.view"}
+    assert get("service.session.get")(ctx_for(permissions=without), SessionRefIn(id=session.id)).label == "Bono 5 cortes · Corte"
+
+
+def test_a_session_with_no_service_leaves_it_out_and_one_that_is_not_there_is_refused():
+    session = make_redemption(sold_on_the_third_of_october())
+    assert run("service.session.get", SessionRefIn(id=session.id)).label == "Bono 5 cortes · Lucía Pérez"
+    with pytest.raises(NotFound) as error:
+        run("service.session.get", SessionRefIn(id=uuid.uuid7()))
+    assert error.value.code == "service.session_not_found"
+
+
+@pytest.mark.parametrize("read", ["service.assignment.get", "service.grant.get", "service.session.get"])
+def test_each_read_by_id_asks_for_its_permission(read):
+    op = get(read)
+    with pytest.raises(PermissionDenied):
+        op(ctx_for(permissions=frozenset()), op.input(id=uuid.uuid7()))
 
 
 # ── Services ──────────────────────────────────────────────────────────────────────────────────
