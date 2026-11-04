@@ -21,7 +21,7 @@ from django.db.models import Count, Prefetch, Q, QuerySet
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext, Scope
 from live.errors import Conflict, NotFound
-from live.operations import operation
+from live.operations import INTERNAL, operation
 
 from apps.combo.models import ChoiceGroup, ChoiceOption, Combo
 from apps.combo.schemas import (
@@ -32,6 +32,8 @@ from apps.combo.schemas import (
     ComboPage,
     ComboRefIn,
     ForSaleIn,
+    OptionOut,
+    OptionRefIn,
     ResolvedOut,
     ResolveIn,
     SaleComboPage,
@@ -464,6 +466,22 @@ def list_combos(ctx: OperationContext, params: ComboListIn) -> dict:
 )
 def get_combo(ctx: OperationContext, data: ComboRefIn) -> dict:
     return detail_row(find_combo(data.id, data.combo, rows=with_tree(Combo.objects.all())), images.Urls(ctx.scope))
+
+
+@operation(
+    "combo.option.get",
+    kind="query",
+    permission="combo.view",
+    input=OptionRefIn,
+    output=OptionOut,
+    ai=INTERNAL,
+)
+def get_option(ctx: OperationContext, data: OptionRefIn) -> dict:
+    """One choice of a menu: what names a dish on the assistant's card; the model reads them with the menu."""
+    option = find_option(
+        data.id, combo_id=data.combo_id, combo=data.combo, group_id=data.group_id, group=data.group, product=data.product
+    )
+    return option_row(option, takeaway_targets())
 
 
 @operation(

@@ -506,6 +506,7 @@ para varios, se dice cuáles y se pide que elija (`combo.combo_ambiguous`, `comb
 |---|---|---|---|
 | Los menús, con búsqueda, filtros y orden, en páginas de hasta 100 (en vivo) | ver | F01 | `combo.combo.list` |
 | Un menú con sus platos y sus elecciones, si sale en el TPV y por qué no (en vivo) | ver | F05, F06, F12 | `combo.combo.get` |
+| Una elección de un menú, por su id: solo para nombrar el plato en la tarjeta del asistente (SALE-F20) | ver | F07 | `combo.option.get` |
 | El catálogo de menús del TPV: los que se pueden vender, con sus platos y sus elecciones disponibles (en vivo) | ver | F07 | `combo.combo.for_sale` |
 | La línea de un menú con lo elegido: importe, componentes y reparto fiscal | ver | F08, F09, F10, F11 | `combo.combo.resolve` |
 | Hasta cinco imágenes de la librería para la foto de un menú, por su nombre; no pone ninguna | ver | F14 | `combo.combo.suggest_image` |
