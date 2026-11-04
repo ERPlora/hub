@@ -297,6 +297,14 @@ def hub_b(request, hub_databases):
 
 
 @pytest.fixture(autouse=True)
+def custom_domains_forgotten():
+    """A test's own domains are rolled back with it: each test's first question reads the map (``base.custom_domains``)."""
+    from base import custom_domains
+
+    custom_domains.forget()
+
+
+@pytest.fixture(autouse=True)
 def hub_aliases_forgotten():
     """Every alias a test registers (``use_hub``, the migrator) is closed and forgotten after it, so the next test
     case starts from the settings' own aliases (``base/tenancy/tests/hubs.py``, ``forget_aliases``)."""

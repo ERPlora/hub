@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:55dd2d40338994b7ff7ff36f7408ae0651f5a109d95d961c750f1307739f295d -->
+<!-- generated from WORKBOOK.md sha256:754692c54777a1f184fbc51b2ebbcb2b5232dc19d11aaa992dd15893e17bed88 -->
 
 ## What it is for and who it is for
 
@@ -407,6 +407,7 @@ On the Employees screens and the API documentation:
 | BASE-F107 | Pass the master QA of the Hub | done |
 | BASE-F108 | Report a problem to support | done |
 | BASE-F109 | Delete a deleted business after its 90 days | partial — a business with documents keeps its database until the fiscal archive exists (hub#738) |
+| BASE-F110 | Open the business's website on its own domain | done |
 
 ### BASE-F01 See what the business still has to set up
 Status: done
@@ -2700,3 +2701,19 @@ already was one. If an app cannot be read, the database stays. A row that does n
 drops nothing (`invalid_database_name`). A business restored during the copy stays open with its database; once it is
 being dropped, erplora.com gets `hub_purged`. If the Hub shuts down mid-copy, the next one takes it up.
 Involved: HUBS-F18, HUBS-F19, HUBS-F20
+
+### BASE-F110 Open the business's website on its own domain
+<!-- origin: new (saas#195, HUBS-F17; PLAN-SAAS §37, point 2) -->
+Status: done (the address and what it serves; connecting the domain is erplora.com's HUBS-F17, which shows it on the panel)
+Actor: anyone, without an account
+Screen: The business's public page (WEBSITE-F10), on its domain
+Steps:
+  1. Someone opens the business's domain (for example, www.minegocio.es) on a phone, a tablet or a computer.
+  2. The business's published page shows, with its photos, in the browser's language.
+  3. **Log in** leads to the business's address on erplora.com: the app and the way in stay only there.
+In: a domain erplora.com has said is that business's.
+Out: the business's public website and its images, without cookies; nothing else: no app, no API, no way in. With a session
+of the business open in that browser it shows the same, because the session does not reach another domain.
+If it fails: a domain nobody connected opens nothing. If the business removes it, is cancelled or suspended, or has no
+published page, the domain says there is nothing there. A business being prepared or moved asks to come back in a moment.
+Involved: HUBS-F17, WEBSITE-F10

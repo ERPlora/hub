@@ -38,6 +38,11 @@ def public_policy() -> dict[str, list[str]]:
     return policy
 
 
+def own_domain_policy() -> dict[str, list[str]]:
+    """The public page's policy on a business's own domain, where ``/csp-report/`` is not (HUBS-F17): no report."""
+    return {directive: sources for directive, sources in public_policy().items() if directive != "report-uri"}
+
+
 def preview_policy() -> dict[str, list[str]]:
     """The preview's policy: the public one, framed only by the hub's own pages (the editor)."""
     return {**public_policy(), "frame-ancestors": [CSP.SELF]}

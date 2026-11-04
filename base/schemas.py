@@ -7,12 +7,16 @@ The registry's (``Hub…``) are the bodies of the SaaS's ``/internal/hubs/{id}``
 """
 
 import datetime as dt
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
+from django.conf import settings
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.core.validators import DomainNameValidator
+from django.http.request import validate_host
 from django.utils.translation import gettext_noop
 from ninja import Schema
-from pydantic import Field, field_validator
+from pydantic import AfterValidator, Field, field_validator
 
 
 def names(read: str, by: str = "id", name: tuple[str, ...] = ("name",)) -> dict:
@@ -119,6 +123,23 @@ class MemberIn(Schema):
     name: str | None = None
 
 
+def custom_domain_of_photo(value: str | None) -> str | None:
+    """The domain a photo names, lowercase and without a final dot: a host name of a public domain, in its ASCII form,
+    that the Hub does not answer already (``ALLOWED_HOSTS``), or it would put a website on another business's host."""
+    if value is None:
+        return None
+    domain = value.lower().removesuffix(".")
+    try:
+        DomainNameValidator(accept_idna=False)(domain)
+    except DjangoValidationError:
+        raise ValueError("not a domain name in its ASCII form") from None
+    if domain.rpartition(".")[2].isdigit():
+        raise ValueError("an IP address is no domain")
+    if validate_host(domain, settings.ALLOWED_HOSTS):
+        raise ValueError("a host the Hub already answers")
+    return domain
+
+
 class HubStateIn(Schema):
     """``PUT /internal/hubs/{id}/state``: the SaaS's photo (``photo``, as it came) and the parts the Hub applies."""
 
@@ -128,6 +149,7 @@ class HubStateIn(Schema):
     verifactu: dict[str, Any] | None = None
     whatsapp: dict[str, Any] | None = None
     members: list[MemberIn] | None = None
+    custom_domain: Annotated[str | None, AfterValidator(custom_domain_of_photo)] = None
     photo: dict[str, Any]
 
 
