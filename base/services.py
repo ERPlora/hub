@@ -3780,6 +3780,8 @@ from django.utils.translation import pgettext  # noqa: E402 - the assistant's bl
 from base.schemas import (  # noqa: E402
     AssistantReportIn,
     AssistantReportOut,
+    AssistantSpeakIn,
+    AssistantSpeakOut,
     AssistantTranscribeIn,
     AssistantTranscribeOut,
     AssistantTurnIn,
@@ -4027,6 +4029,43 @@ def assistant_transcribe(ctx: OperationContext, data: AssistantTranscribeIn) -> 
         raise _gateway_failure(
             "base.assistant_transcribe_failed", gettext("The audio could not be transcribed: try again.")
         ) from None
+
+
+#: erplora.com has no voice to read with (no key of the voices' provider): nothing to try again.
+SPEECH_NOT_CONFIGURED = frozenset({"assistant.speech_unavailable", "assistant.provider_not_configured"})
+
+
+def _speech_unavailable() -> OperationError:
+    return _gateway_failure(
+        "base.assistant_speech_unavailable", gettext("Reading aloud in the server's voice is not available.")
+    )
+
+
+@operation(
+    "base.assistant.speak",
+    kind="command",
+    permission=VIEW_HOME,
+    input=AssistantSpeakIn,
+    output=AssistantSpeakOut,
+    ai={"description": "Not an assistant tool (the panel reads an answer aloud in the server's voice the person chose)."},
+    # It waits on erplora.com: no transaction holds the hub's connection meanwhile.
+    database=False,
+)
+def assistant_speak(ctx: OperationContext, data: AssistantSpeakIn) -> dict:
+    """An answer read aloud in the server's voice (round 2026-11-03n, PLAN-HUB §73), by erplora.com: the mp3. When it
+    cannot, the panel reads with the device's voice. With no server voice (``ASSISTANT_SERVER_VOICE`` off, round
+    2026-11-04a) erplora.com is never asked."""
+    if not settings.ASSISTANT_SERVER_VOICE:
+        raise _speech_unavailable()
+    try:
+        spoken = assistant.speak(ctx.scope, text=data.text, language=data.language or ctx.language, voice=data.voice)
+    except assistant.GatewayError as exc:
+        if exc.code in SPEECH_NOT_CONFIGURED:
+            raise _speech_unavailable() from None
+        raise _gateway_failure(
+            "base.assistant_speech_failed", gettext("The answer could not be read aloud: try again.")
+        ) from None
+    return {"content_type": spoken["content_type"], "content_base64": base64.b64encode(spoken["audio"]).decode()}
 
 
 # ── «Report a problem» (BASE-F108; ACCOUNTS-F38 of the SaaS) ────────────────────────────────────────────────────────

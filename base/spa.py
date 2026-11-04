@@ -27,6 +27,7 @@ session or without and whatever it accepts. A crawler reads no HTML as the hub's
 «no rules»), and a browser's ``/favicon.ico`` leaves no ``csrftoken`` on the website's visitor.
 """
 
+from django.conf import settings
 from django.http import HttpRequest, HttpResponse
 from django.urls import reverse
 from django.views.decorators.http import require_safe
@@ -99,6 +100,8 @@ def _shell(request: HttpRequest) -> HttpResponse:
             "manage_url": saas_url(f"{SAAS_PANEL_PATH}/businesses/{hub.id}") if account and _may_manage(request) else "",
             "access": way_in,
             "preferences": queries.appearance_of(request.user),
+            # The assistant's server voice (round 2026-11-04a): without it, the panel reads with the device's voice.
+            "server_voice": settings.ASSISTANT_SERVER_VOICE,
         }
         widgets = _widgets(request)
         if widgets is not None:

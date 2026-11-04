@@ -4,6 +4,8 @@ Settings › Data's (APP-BASE-2) that read or load a file take it in base64 in t
 any other view; both are commands (POST): reading what a file brings writes nothing, but no query string carries it.
 """
 
+import base64
+
 from asgiref.sync import sync_to_async
 from django.core.files.storage import storages
 from live.ninja import bind, run_operation
@@ -484,7 +486,7 @@ async def api_doc_settings_update(request, data: ApiDocSettingsUpdateIn):
 # ── Assistant (APP-BASE-9) ──────────────────────────────────────────────────────────────────────────────────────
 
 from base import assistant  # noqa: E402 - the assistant's block keeps its imports with it
-from base.schemas import AssistantReportIn, AssistantTranscribeIn, AssistantTurnIn  # noqa: E402
+from base.schemas import AssistantReportIn, AssistantSpeakIn, AssistantTranscribeIn, AssistantTurnIn  # noqa: E402
 from base.schemas import SaasPassIn, SupportReportIn  # noqa: E402
 
 #: A turn's body: the conversation and the attachments of its last question, in base64 (the gateway takes 32 MB).
@@ -528,6 +530,31 @@ async def saas_pass_create(request, data: SaasPassIn):
 @decorate_view(accept_body_up_to(MAX_ASSISTANT_AUDIO_BODY))
 async def assistant_transcribe(request, data: AssistantTranscribeIn):
     return await run_operation(request, services.assistant_transcribe, data)
+
+
+# The panel plays the mp3 itself (a ``blob:`` of the answer, CSP ``media-src``); an integration that accepts only JSON
+# gets the operation's output, the mp3 in base64. A refusal is the error envelope either way.
+@bind(
+    router,
+    "base.assistant.speak",
+    "/assistant/speak",
+    openapi_extra={
+        "responses": {
+            200: {
+                "description": "The text read aloud: the mp3, or the operation's JSON when only JSON is accepted.",
+                "content": {"audio/mpeg": {"schema": {"type": "string", "format": "binary"}}},
+            }
+        }
+    },
+)
+async def assistant_speak(request, data: AssistantSpeakIn):
+    spoken = await run_operation(request, services.assistant_speak, data)
+    accepts = request.headers.get("Accept", "")
+    if "application/json" in accepts and "audio/mpeg" not in accepts:
+        return spoken
+    return HttpResponse(
+        base64.b64decode(spoken.content_base64), content_type=spoken.content_type, headers={"Cache-Control": "no-store"}
+    )
 
 
 # ── Locations (round 2026-10-24b, multi-location) ──────────────────────────────────────────────────────────────────
