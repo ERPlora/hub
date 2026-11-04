@@ -878,7 +878,10 @@ agenda tuya que enseñar.».
 - **Reloj**: los instantes se guardan con zona (UTC) y salen en la del negocio; una hora sin zona que
   llega es de pared del negocio, y una que no existe por el cambio de hora se rechaza
   (`appointment.invalid_local_time`). Fase 1: la zona es `settings.TIME_ZONE` (Europe/Madrid), como en
-  Horarios y Personal.
+  Horarios y Personal. Las antelaciones mínimas, para reservar y para cancelar, se cuentan en **horas
+  reales**, no en horas del reloj: el día del cambio de hora, 24 h de antelación acaban a otra hora de
+  pared (a las 10:00 de la víspera del día de 23 h, la primera hora que las respeta son las 11:00; en la
+  del día de 25 h, las 09:00), y `queries.now()` da el instante en UTC para que la suma sea de tiempo real.
 - **Recurrencias** con `python-dateutil` (`rrule`; mantenida, decenas de colaboradores, desde 2003):
   diaria, semanal, quincenal y mensual (mismo día del mes, el último en un mes corto), con fin por fecha
   o por número de citas contado desde el inicio de la serie.

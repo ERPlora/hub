@@ -30,6 +30,7 @@ from .conftest import (
     make_service,
     make_settings,
     make_shift,
+    pin_clock,
     run,
     wall,
 )
@@ -295,6 +296,71 @@ def test_an_automation_cancels_only_within_the_customers_policy(salon, actor):
     make_settings(allow_customer_cancellation=True, cancellation_notice_hours=24 * 30)
     refused("appointment.cancellation_notice_required", lambda: cancel(actor))
     assert cancel(TESTER).status == "cancelled"
+
+
+@pytest.mark.parametrize(
+    ("clock", "too_soon", "in_time"),
+    [
+        pytest.param(
+            (dt.date(2026, 10, 25), "00:32"),
+            (dt.date(2026, 10, 25), "23:00"),
+            (dt.date(2026, 10, 26), "00:00"),
+            id="25h-day",
+        ),
+        pytest.param(
+            (dt.date(2026, 10, 24), "10:00"),
+            (dt.date(2026, 10, 25), "08:00"),
+            (dt.date(2026, 10, 25), "09:00"),
+            id="eve-of-the-25h-day",
+        ),
+        pytest.param(
+            (dt.date(2027, 3, 28), "00:32"),
+            (dt.date(2027, 3, 29), "01:00"),
+            (dt.date(2027, 3, 29), "02:00"),
+            id="23h-day",
+        ),
+        pytest.param(
+            (dt.date(2027, 3, 27), "10:00"),
+            (dt.date(2027, 3, 28), "10:00"),
+            (dt.date(2027, 3, 28), "11:00"),
+            id="eve-of-the-23h-day",
+        ),
+    ],
+)
+def test_the_customers_booking_keeps_the_notice_in_real_hours(salon, monkeypatch, clock, too_soon, in_time):
+    pin_clock(monkeypatch, at(*clock))
+    make_settings(min_booking_notice=24 * 60)
+    refused("appointment.too_soon", lambda: book(salon, too_soon[1], day=too_soon[0], source="online"))
+    assert book(salon, in_time[1], day=in_time[0], source="online").start == at(*in_time)
+
+
+@pytest.mark.parametrize(
+    ("clock", "too_late", "in_time"),
+    [
+        pytest.param(
+            (dt.date(2026, 10, 24), "10:00"),
+            (dt.date(2026, 10, 25), "08:00"),
+            (dt.date(2026, 10, 25), "09:00"),
+            id="eve-of-the-25h-day",
+        ),
+        pytest.param(
+            (dt.date(2027, 3, 27), "10:00"),
+            (dt.date(2027, 3, 28), "10:00"),
+            (dt.date(2027, 3, 28), "11:00"),
+            id="eve-of-the-23h-day",
+        ),
+    ],
+)
+def test_the_customer_cancels_only_with_the_notice_in_real_hours(salon, monkeypatch, clock, too_late, in_time):
+    pin_clock(monkeypatch, at(*clock))
+    make_settings(allow_customer_cancellation=True, cancellation_notice_hours=24)
+    close = book(salon, too_late[1], day=too_late[0])
+    far = book(salon, in_time[1], day=in_time[0])
+    cancel = lambda booked: run(  # noqa: E731
+        "appointment.appointment.cancel", {"id": str(booked.id)}, actor="flow_run:0190a1b2"
+    )
+    refused("appointment.cancellation_notice_required", lambda: cancel(close))
+    assert cancel(far).status == "cancelled"
 
 
 def test_a_time_the_clock_change_skips_is_a_422_on_the_start(salon):

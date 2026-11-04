@@ -26,6 +26,7 @@ from .conftest import (
     make_settings,
     make_shift,
     make_time_off,
+    pin_clock,
     run,
     wall,
 )
@@ -511,25 +512,44 @@ def test_a_service_nobody_is_assigned_to_is_offered_with_the_whole_bookable_team
     assert [s.staff_ids for s in out.slots] == [[salon.ana.id]]
 
 
-def test_the_customer_is_offered_only_what_keeps_the_notice(salon):
+@pytest.mark.parametrize(
+    ("today", "clock", "asked", "first"),
+    [
+        pytest.param(dt.date(2026, 11, 9), "10:00", dt.date(2026, 11, 10), "10:00", id="ordinary-day"),
+        # hub#688: from here tomorrow's midnight is 24 h 28 min away, so the whole day keeps the notice.
+        pytest.param(dt.date(2026, 10, 25), "00:32", dt.date(2026, 10, 26), "00:00", id="25h-day-before-1am"),
+        pytest.param(dt.date(2026, 10, 25), "01:30", dt.date(2026, 10, 26), "01:00", id="25h-day-after-1am"),
+        pytest.param(dt.date(2026, 10, 24), "10:00", dt.date(2026, 10, 25), "09:00", id="eve-of-the-25h-day"),
+        pytest.param(dt.date(2027, 3, 28), "00:32", dt.date(2027, 3, 29), "02:00", id="23h-day"),
+        pytest.param(dt.date(2027, 3, 27), "10:00", dt.date(2027, 3, 28), "11:00", id="eve-of-the-23h-day"),
+    ],
+)
+def test_the_customer_is_offered_only_what_keeps_the_notice(salon, monkeypatch, today, clock, asked, first):
+    """24 hours of notice are 24 real hours: the days the clock changes they end at another wall time."""
+    instant = at(today, clock).astimezone(dt.UTC)
+    pin_clock(monkeypatch, instant)
     make_settings(
         min_booking_notice=24 * 60,
         slot_interval=60,
         calendar_start_hour=0,
         calendar_end_hour=24,
     )
-    tomorrow = timezone.localdate() + dt.timedelta(days=1)
-    make_day(tomorrow.weekday(), ("00:00", "00:00"))
+    make_day(asked.weekday(), ("00:00", "00:00"))
     desk = run(
-        "appointment.availability.slots", {"date": tomorrow, "duration_minutes": 60}
-    )
+        "appointment.availability.slots", {"date": asked, "duration_minutes": 60}
+    ).slots
     customer = run(
         "appointment.availability.slots",
-        {"date": tomorrow, "duration_minutes": 60, "for_customer": True},
-    )
-    assert len(customer.slots) < len(desk.slots)
-    assert all(not slot.within_notice for slot in customer.slots)
-    assert any(slot.within_notice for slot in desk.slots)
+        {"date": asked, "duration_minutes": 60, "for_customer": True},
+    ).slots
+    hours = [f"{slot.start:%H:%M}" for slot in desk]
+    keeps = hours.index(first)
+    assert [f"{slot.start:%H:%M}" for slot in customer] == hours[keeps:]
+    assert [f"{slot.start:%H:%M}" for slot in desk if slot.within_notice] == hours[:keeps]
+    # ``instant`` is in UTC, so these subtractions count real time, not the wall clock's.
+    notice = dt.timedelta(hours=24)
+    assert all(slot.start - instant >= notice for slot in customer)
+    assert all(slot.start - instant < notice for slot in desk if slot.within_notice)
 
 
 # A time's verdict
