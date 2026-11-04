@@ -1074,6 +1074,8 @@ Ventas (`sale.add_sale`), que tienen los cuatro papeles.
     servidor; lo cobrado, en la moneda en que se cobró, que no se reescribe; mientras el negocio no
     contesta, la cifra sin símbolo): el producto actual los pintaba siempre en euros
     (`table-business-currency`).
+26. **Los importes agrupan los millares** también con cuatro cifras («1.234,56 €»; `formatMoney` de
+    `@erplora/ui/components`, con `useGrouping: 'always'`, porque el CLDR del español espera a cinco: hub#658).
 
 ### Lo que NO hace, a propósito
 
