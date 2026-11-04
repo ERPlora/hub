@@ -9,7 +9,7 @@ holds it yet. Two ways reach it: the outbox relay (``flow.run.parked`` → ``flo
 turns or two calls: the claim of the step holds it for one.
 
 Real databases, committed: the session's ``hub_a`` and ``hub_b``. The suite's ``legacy.worker_pass`` is not this path:
-it stands in for phase 1's worker and runs the tasks on the fixed scope.
+with every business's rows in one database, it runs the tasks on the scope of one of them.
 """
 
 import datetime as dt
