@@ -36,7 +36,7 @@ from base import registry, services
 from base.schemas import HubGetIn
 from base.tenancy import connections as tenancy_connections
 from base.tenancy import dumps, names, ops, provision
-from base.tenancy.context import use_hub
+from base.tenancy.context import AppNotCreated, use_hub
 from control.models import Hub, HubDump
 
 logger = logging.getLogger(__name__)
@@ -55,6 +55,8 @@ def fiscal_documents_kept(hub: Hub) -> list[str]:
             try:
                 if ask():
                     kept.append(config.label)
+            except AppNotCreated:
+                continue
             except ProgrammingError as error:
                 if not isinstance(error.__cause__, errors.UndefinedTable):
                     raise
