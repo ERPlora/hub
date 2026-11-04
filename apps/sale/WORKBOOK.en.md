@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:a4c47c80ad8b117950bf4adde9226555fd15ae5e7d01abc3956c5e54cd23d847 -->
+<!-- generated from WORKBOOK.md sha256:c666e2658d4c3b277b02bd07cdd34fe379142b2909f606a48812fb51d7bcbc9b -->
 
 ## What it is for and who it is for
 
@@ -784,11 +784,12 @@ Steps:
    With nothing pending, "Everything is sent".
 2. In "Current order", review quantities and who serves and press "Send order (N)". For it to go out as
    a rush, first arm the flame next to it: the button changes to "Send RUSH (N)". "Order N sent to the
-   kitchen." shows; the lines are marked with their round ("Order N") and the time sent, and the flame
-   disarms. A double send never sends anything twice.
+   kitchen." shows at the top of the screen, so "Charge" (SALE-F01) can be pressed without waiting for it
+   to go; the lines are marked with their round ("Order N") and the time sent, and the flame disarms. A
+   double send never sends anything twice.
 3. On pressing "Charge" with something pending, it is sent to the kitchen first and then the charge
-   opens: nobody pays for a dish that is not going to be made. The order's notice then shows at the top of
-   the screen, so the charge keypad (SALE-F01) can be tapped from the first moment. If the send fails, the
+   opens: nobody pays for a dish that is not going to be made. The order's notice shows at the top here
+   too, so the charge keypad (SALE-F01) can be tapped from the first moment. If the send fails, the
    charge does not open and it says why.
 4. A sent line is locked: no quantity, no note, no discount, no comp.
 5. To take off a dish already sent, press ⊗ "Void this item" on its line: "Void «<article>»" opens with
@@ -810,13 +811,14 @@ Out: the lines with their round and the kitchen order open in Kitchen, a rush if
 serves); on voiding a sent line, it announces the voided line with its reason.
 If it fails: with nothing pending, "There is nothing new to send to the kitchen."; if Kitchen does not
 answer, "The order could not be sent to the kitchen. Try again." and nothing is charged. If the order is
-sent but its slip does not print, the POS warns "Order N sent to the kitchen, but it did not print.
-Check the kitchen printer in Printing.". Asking to remove a line already sent is refused: "That line can
+sent but its slip does not print, the POS warns, at the top too, "Order N sent to the kitchen, but it did
+not print. Check the kitchen printer in Printing.". Asking to remove a line already sent is refused: "That line can
 no longer be removed: it was sent to the kitchen (void it with a reason), it is charged or it is no
 longer on an open check.". Voiding a line not sent, charged, already voided or without a reason is
 refused with "That line cannot be voided…". Without Kitchen active there are no tabs and no sending: the
 check is charged as always.
-Involved: KITCHEN-F05, KITCHEN-F18, KITCHEN-F19, KITCHEN-F20, KITCHEN-F29, BASE-F84
+Through the assistant: its confirmation card says the check (by its title or, with none, by its amount), the line, the product, the service, the menu and who serves by their name, and the order type in Kitchen's words, never by an id; what the person asking may not see, or what is no longer there, stays off the card (BASE-F97).
+Involved: KITCHEN-F05, KITCHEN-F18, KITCHEN-F19, KITCHEN-F20, KITCHEN-F29, BASE-F84, BASE-F97
 
 ### SALE-F21 Print the bill for the table (pre-bill)
 Status: done
@@ -1202,7 +1204,8 @@ Out: the section (name, VAT category, position). What was already sold keeps the
 charged with.
 If it fails: a VAT category that does not exist is refused next to its field. A section someone else
 already deleted: "That section is no longer in this business. Reload the list and try again.".
-Involved: TAX-F01
+Through the assistant: its confirmation card says the section by its name, never by an id; one that is no longer there stays off the card (BASE-F97).
+Involved: TAX-F01, BASE-F97
 
 ### SALE-F36 Prepare the quick notes
 Status: done
@@ -1259,13 +1262,15 @@ Steps:
    has that permission. The booked price rules over the professional's.
 In: the services on offer, their rate, their minimum and maximum and their tax category, from Services;
 the professional's own price (their assignments, `service.assignment.list`); the appointment and what it
-booked, from Appointments (`appointment.appointment.get`).
+booked, from Appointments (`appointment.appointment.get`); the refused service, while its notice is
+showing (`service.service.get`).
 Out: a service line with the service, its frozen price and the service's tax category; it moves no
 stock.
 If it fails: a service without a tax category shows "VAT missing" and does not go in ("Cannot be sold: no
-tax category. VAT needs to be set up."); an archived one, "That service is no longer offered…"; an amount
-outside the service's minimum and maximum, "That amount is outside what the service allows (<minimum> –
-<maximum>).". A booked price that does not match the appointment: "That is not the price the appointment
+tax category. VAT needs to be set up."); that notice goes away on its own as soon as the service has a
+category, without touching anything else, and also on leaving **Sell**. An archived one, "That service is
+no longer offered…"; an amount outside the service's minimum and maximum, "That amount is outside what the
+service allows (<minimum> – <maximum>).". A booked price that does not match the appointment: "That is not the price the appointment
 booked for this service: it is cancelled, it is another customer's, it did not book this service or it
 booked it cheaper." (409 on its field). Without Services active, "Services" does not show in the strip.
 Involved: SERVICE-F09, SERVICE-F03, SERVICE-F31, APPOINTMENT-F17
@@ -1315,6 +1320,7 @@ id, its name or its type ("cash", "card"). If a name matches several, it is refu
 | For each payment of a sale, what was refunded and what is left, and for each line what already came back | see sales | F31 | `sale.refund.options` |
 | A sale's refunds, with the state and the number of their corrective invoice | see sales | F31 | `sale.refund.list` |
 | The refund recorded with a key | see sales | F31 | `sale.refund.by_idempotency_key` |
+| The name of a record a write of Sales touches, by its id: only for the assistant's card; what does not exist or the person asking may not read goes unnamed | see sales | F20, F35 | `sale.record.get` |
 
 The sales, the figures, the checks, the charge preview, the payment methods, the settings, the sections,
 the quick notes and what is refundable can be followed live.
@@ -1390,7 +1396,8 @@ the quick notes and what is refundable can be followed live.
 - **Staff** (optional): the team for the "Served by" chip and the record of whoever is signed in
   (`staff.member.current`, without Staff's permission), to which the charge attributes "Me".
 - **Services** (optional): its services on offer (`service.service.list_for_sale`, and
-  `service.service.get` when the line is added), the client's vouchers for a service
+  `service.service.get` when the line is added and while the notice of a refused one lasts), the client's
+  vouchers for a service
   (`service.grant.tender_options`) and the voucher sessions: it holds, releases, spends and gives them
   back by calling its operations by name (`service.session.hold`, `.release`, `.settle`, `.return`), with
   the session of whoever sells and in the same transaction; a professional's own price

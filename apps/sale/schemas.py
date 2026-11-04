@@ -19,6 +19,7 @@ from pydantic import ConfigDict, StringConstraints, field_validator, model_valid
 
 from apps.customer.tax_ids import InvalidCountry, normalize_country
 from apps.tax.schemas import TerritoryTaxKind
+from base.schemas import names
 
 T = TypeVar("T")
 
@@ -48,6 +49,7 @@ CHECK_DISCOUNT_ON_THE_CHECK = _(
     "The discount of an open check is set on the check itself, not at the charge."
 )
 COUNTRY_CODE = _("Enter the country's ISO code, e.g. ES, FR or GB.")
+ONE_RECORD = _("Say one record, by its id.")
 
 # How the Sales screens name the data the models do not (the assistant's card names each datum by its title).
 LINE = gettext_noop("Line")
@@ -56,6 +58,31 @@ SERVICE_LINES = gettext_noop("Services")
 COMBO_LINES = gettext_noop("Menus")
 # A counter sale's fixed ticket discount, named as an open check's (its model's name is the sale's total, «Discounts»).
 FIXED_DISCOUNT = gettext_noop("Fixed-amount discount")
+
+# The assistant's card names the record a write acts on by these reads (base/assistant.py ``REFERS``), run as whoever
+# asks, never by its id: a sale by its number, a customer by their card, and the rest by ``sale.record.get``, the one
+# door to what Sales names itself and to the apps it does not require (``base.E009`` lets a mark name only its own or
+# a required app's read).
+A_SALE = names("sale.sale.get", by="sale_id", name=("number",))
+A_CUSTOMER = names("customer.customer.detail")
+A_DEPARTMENT = names("sale.record.get", by="department_id")
+A_QUICK_NOTE = names("sale.record.get", by="quick_note_id")
+A_METHOD = names("sale.record.get", by="method_id")
+A_CHECK = names("sale.record.get", by="order_id")
+A_CHECK_LINE = names("sale.record.get", by="line_id")
+A_SALE_LINE = names("sale.record.get", by="sale_line_id")
+A_TENDER = names("sale.record.get", by="payment_id")
+A_PRODUCT = names("sale.record.get", by="product_id")
+A_SERVICE = names("sale.record.get", by="service_id")
+A_MENU = names("sale.record.get", by="combo_id")
+A_DISH = names("sale.record.get", by="dish_id")
+A_MODIFIER = names("sale.record.get", by="modifier_id")
+A_MEMBER = names("sale.record.get", by="staff_id")
+A_BOOKING = names("sale.record.get", by="appointment_id")
+A_VOUCHER = names("sale.record.get", by="grant_id")
+#: One of the lines of a check a write takes, by its id, and one of the options of Modifiers a line carries.
+CheckLineId = Annotated[UUID, Field(json_schema_extra=A_CHECK_LINE)]
+ModifierId = Annotated[UUID, Field(json_schema_extra=A_MODIFIER)]
 
 
 def _text(max_length: int, min_length: int = 0) -> type[str]:
@@ -312,7 +339,9 @@ class DepartmentIn(Closed):
 
 
 class DepartmentRefIn(Closed):
-    id: UUID | None = Field(None, description="The department's id.")
+    id: UUID | None = Field(
+        None, title=gettext_noop("Section"), description="The department's id.", json_schema_extra=A_DEPARTMENT
+    )
     department: _text(60, 1) | None = Field(
         None, description="Its name, when its id is not known."
     )
@@ -357,7 +386,9 @@ class QuickNoteIn(Closed):
 
 
 class QuickNoteRefIn(Closed):
-    id: UUID | None = Field(None, description="The quick note's id.")
+    id: UUID | None = Field(
+        None, title=gettext_noop("Quick note"), description="The quick note's id.", json_schema_extra=A_QUICK_NOTE
+    )
     quick_note: _text(80, 1) | None = Field(
         None, title=gettext_noop("Quick note"), description="Its text, when its id is not known."
     )
@@ -388,6 +419,7 @@ class LineFields(Closed):
     staff_id: UUID | None = Field(
         None,
         description="Who serves this line (a member of Staff); empty = the check's.",
+        json_schema_extra=A_MEMBER,
     )
     is_gift: bool = Field(False, description="True: a comp, charged at 0.")
     gift_reason: _text(200) = Field("", description="Why it is a comp.")
@@ -396,11 +428,11 @@ class LineFields(Closed):
 class ProductLineIn(LineFields):
     """A line of Inventory's catalog: its price, unit and tax category come from the catalog."""
 
-    product_id: UUID | None = Field(None, description="The product's id.")
+    product_id: UUID | None = Field(None, description="The product's id.", json_schema_extra=A_PRODUCT)
     product: Said | None = Field(
         None, title=gettext_noop("Product"), description="The product's SKU or name, when its id is not known."
     )
-    option_ids: list[UUID] = Field(
+    option_ids: list[ModifierId] = Field(
         default_factory=list,
         max_length=MAX_OPTIONS,
         title=gettext_noop("Modifiers"),
@@ -419,7 +451,7 @@ class ProductLineIn(LineFields):
 class ComboChoiceIn(Closed):
     """A dish picked in a menu of Menus (COMBO-F08): by the choice's id, or by its product (and course)."""
 
-    option_id: UUID | None = Field(None, description="The choice's id (combo.combo.for_sale).")
+    option_id: UUID | None = Field(None, description="The choice's id (combo.combo.for_sale).", json_schema_extra=A_DISH)
     product: Said | None = Field(
         None, description="The SKU or name of the product picked, when the choice's id is not known."
     )
@@ -440,7 +472,7 @@ class ComboChoiceIn(Closed):
 class ComboLineFields(LineFields):
     """A menu of Menus with the dishes picked: Menus checks it and prices it, and the line keeps its answer."""
 
-    combo_id: UUID | None = Field(None, description="The menu's id (combo.combo.for_sale).")
+    combo_id: UUID | None = Field(None, description="The menu's id (combo.combo.for_sale).", json_schema_extra=A_MENU)
     combo: Said | None = Field(None, description="The menu's name, when its id is not known.")
     choices: list[ComboChoiceIn] = Field(
         default_factory=list,
@@ -466,10 +498,10 @@ class OpenLineFields(LineFields):
 
     unit_price: Cents = Field(description="The amount typed, in cents, per unit.")
     department_id: UUID | None = Field(
-        None, description="The department it is charged at."
+        None, title=gettext_noop("Section"), description="The department it is charged at.", json_schema_extra=A_DEPARTMENT
     )
     department: _text(60, 1) | None = Field(
-        None, description="The department's name, when its id is not known."
+        None, title=gettext_noop("Section"), description="The department's name, when its id is not known."
     )
     tax_category_key: _text(80, 1) | None = Field(
         None,
@@ -497,7 +529,9 @@ class OpenLineIn(OpenLineFields):
 class ServiceLineFields(LineFields):
     """A line of a service of the Services app: its name, price and tax category come from it."""
 
-    service_id: UUID | None = Field(None, description="The service's id (Services).")
+    service_id: UUID | None = Field(
+        None, title=gettext_noop("Service"), description="The service's id (Services).", json_schema_extra=A_SERVICE
+    )
     service: Said | None = Field(
         None, description="The service's name, when its id is not known."
     )
@@ -529,7 +563,7 @@ class OrderOpenIn(Closed):
     label: Label = Field("", description="The check's title, e.g. Ana — terrace.")
     notes: _text(1000) = Field("", description="Notes of the check.")
     appointment_id: UUID | None = Field(
-        None, description="The appointment (Appointments) this check charges."
+        None, description="The appointment (Appointments) this check charges.", json_schema_extra=A_BOOKING
     )
     lines: list[ProductLineIn] = Field(
         default_factory=list,
@@ -557,43 +591,44 @@ class OrderOpenIn(Closed):
 
 
 class OrderRefIn(Closed):
-    order_id: UUID = Field(description="The open check's id.")
+    order_id: UUID = Field(description="The open check's id.", json_schema_extra=A_CHECK)
 
 
 class OrderAddLineIn(ProductLineIn):
     model_config = ConfigDict(extra="forbid")
 
-    order_id: UUID = Field(description="The open check's id.")
+    order_id: UUID = Field(description="The open check's id.", json_schema_extra=A_CHECK)
 
 
 class OrderAddOpenLineIn(OpenLineFields):
     model_config = ConfigDict(extra="forbid")
 
-    order_id: UUID = Field(description="The open check's id.")
+    order_id: UUID = Field(description="The open check's id.", json_schema_extra=A_CHECK)
 
 
 class OrderAddServiceLineIn(ServiceLineFields):
     model_config = ConfigDict(extra="forbid")
 
-    order_id: UUID = Field(description="The open check's id.")
+    order_id: UUID = Field(description="The open check's id.", json_schema_extra=A_CHECK)
 
 
 class OrderAddComboLineIn(ComboLineFields):
     model_config = ConfigDict(extra="forbid")
 
-    order_id: UUID = Field(description="The open check's id.")
+    order_id: UUID = Field(description="The open check's id.", json_schema_extra=A_CHECK)
 
 
 class OrderLineRefIn(Closed):
-    order_id: UUID = Field(description="The open check's id.")
-    line_id: UUID = Field(title=LINE, description="The line's id.")
+    order_id: UUID = Field(description="The open check's id.", json_schema_extra=A_CHECK)
+    line_id: UUID = Field(title=LINE, description="The line's id.", json_schema_extra=A_CHECK_LINE)
 
 
 class OrderApplyVoucherIn(OrderLineRefIn):
     grant_id: UUID = Field(
         title=gettext_noop("Voucher"),
         description="The voucher sold (Services) whose session pays the line: one of the customer's, read with "
-        "service.grant.tender_options."
+        "service.grant.tender_options.",
+        json_schema_extra=A_VOUCHER,
     )
 
 
@@ -610,7 +645,7 @@ class OrderUpdateLineIn(OrderLineRefIn):
 
 class OrderSetLineStaffIn(OrderLineRefIn):
     staff_id: UUID | None = Field(
-        description="Who did it (a member of Staff); empty = the check's professional."
+        description="Who did it (a member of Staff); empty = the check's professional.", json_schema_extra=A_MEMBER
     )
 
 
@@ -621,8 +656,8 @@ class OrderVoidLineIn(OrderLineRefIn):
 
 
 class OrderSplitIn(Closed):
-    order_id: UUID = Field(description="The check to split.")
-    line_ids: list[UUID] = Field(
+    order_id: UUID = Field(description="The check to split.", json_schema_extra=A_CHECK)
+    line_ids: list[CheckLineId] = Field(
         default_factory=list,
         max_length=MAX_LINES,
         title=gettext_noop("Lines to move"),
@@ -633,13 +668,19 @@ class OrderSplitIn(Closed):
 
 class OrderMergeIn(Closed):
     from_order_id: UUID = Field(
-        title=gettext_noop("From check"), description="The check that is absorbed (it ends voided)."
+        title=gettext_noop("From check"),
+        description="The check that is absorbed (it ends voided).",
+        json_schema_extra=A_CHECK,
     )
-    to_order_id: UUID = Field(title=gettext_noop("Into check"), description="The check that stays with every line.")
+    to_order_id: UUID = Field(
+        title=gettext_noop("Into check"),
+        description="The check that stays with every line.",
+        json_schema_extra=A_CHECK,
+    )
 
 
 class OrderSetDiscountIn(Closed):
-    order_id: UUID = Field(description="The open check's id.")
+    order_id: UUID = Field(description="The open check's id.", json_schema_extra=A_CHECK)
     discount_percent: Percent = Field(
         description="Ticket discount in %, 0 to 100; 0 removes it."
     )
@@ -655,26 +696,30 @@ class OrderSetLineDiscountIn(OrderLineRefIn):
 
 
 class OrderSetLabelIn(Closed):
-    order_id: UUID = Field(description="The open check's id.")
+    order_id: UUID = Field(description="The open check's id.", json_schema_extra=A_CHECK)
     label: Label = Field(description="Its title, e.g. Table 4 or Ana — terrace.")
 
 
 class OrderSetAppointmentIn(Closed):
-    order_id: UUID = Field(description="The open check's id.")
+    order_id: UUID = Field(description="The open check's id.", json_schema_extra=A_CHECK)
     appointment_id: UUID | None = Field(
-        description="The appointment it charges; empty unlinks it."
+        description="The appointment it charges; empty unlinks it.", json_schema_extra=A_BOOKING
     )
 
 
 class OrderFireIn(Closed):
     order_id: UUID = Field(
-        description="The open check whose pending lines go to the kitchen."
+        description="The open check whose pending lines go to the kitchen.", json_schema_extra=A_CHECK
     )
     label: Label = Field(
         "", description="What the kitchen reads as the check's name, e.g. Table 4."
     )
+    # The kitchen's own words: it requires Sales and the mark only reads its models' metadata, no data of it.
     channel: Literal["dine_in", "takeaway", "delivery"] = Field(
-        "dine_in", title=gettext_noop("Order type"), description="dine_in, takeaway or delivery."
+        "dine_in",
+        title=gettext_noop("Order type"),
+        description="dine_in, takeaway or delivery.",
+        json_schema_extra={"choices_of": "kitchen.order_type"},
     )
     priority: _text(20) = Field(
         "", title=gettext_noop("Priority"), description="Priority the kitchen shows, e.g. urgent."
@@ -684,6 +729,36 @@ class OrderFireIn(Closed):
         title=gettext_noop("Served by"),
         description="Who attends the check as the till names it («Atiende»); empty: who sends it.",
     )
+
+
+class RecordRefIn(Closed):
+    """One record a write of Sales names, by its id: exactly one (``sale.record.get``)."""
+
+    department_id: UUID | None = Field(None, description="A section of the open price.")
+    quick_note_id: UUID | None = Field(None, description="A quick note.")
+    method_id: UUID | None = Field(None, description="A payment method.")
+    order_id: UUID | None = Field(None, description="An open check.")
+    line_id: UUID | None = Field(None, description="A line of an open check.")
+    sale_line_id: UUID | None = Field(None, description="A line of a sale.")
+    payment_id: UUID | None = Field(None, description="A tender of a sale.")
+    product_id: UUID | None = Field(None, description="A product of Inventory.")
+    service_id: UUID | None = Field(None, description="A service of Services.")
+    combo_id: UUID | None = Field(None, description="A menu of Menus.")
+    dish_id: UUID | None = Field(None, description="A choice of a menu of Menus.")
+    modifier_id: UUID | None = Field(None, description="An option of Modifiers.")
+    staff_id: UUID | None = Field(None, description="A member of Staff.")
+    appointment_id: UUID | None = Field(None, description="An appointment of Appointments.")
+    grant_id: UUID | None = Field(None, description="A voucher sold, of Services.")
+
+    @model_validator(mode="after")
+    def _one(self):
+        if sum(getattr(self, name) is not None for name in type(self).model_fields) != 1:
+            raise ValueError(str(ONE_RECORD))
+        return self
+
+
+class RecordOut(Schema):
+    name: str = Field(description="What the screens call it, in the reader's language.")
 
 
 class OrderListIn(PageIn):
@@ -864,8 +939,8 @@ class OrderFireOut(Schema):
 class ChargeLinesIn(Schema):
     """What is charged: an open check (all its lines, or some) or loose lines (a counter sale)."""
 
-    order_id: UUID | None = Field(None, description="The open check to charge.")
-    line_ids: list[UUID] = Field(
+    order_id: UUID | None = Field(None, description="The open check to charge.", json_schema_extra=A_CHECK)
+    line_ids: list[CheckLineId] = Field(
         default_factory=list,
         max_length=MAX_LINES,
         title=gettext_noop("Lines to charge"),
@@ -920,7 +995,7 @@ class PreviewIn(ChargeLinesIn):
 
 
 class PaymentIn(Closed):
-    method_id: UUID | None = Field(None, description="The payment method's id.")
+    method_id: UUID | None = Field(None, description="The payment method's id.", json_schema_extra=A_METHOD)
     method: _text(60, 1) | None = Field(
         None,
         description="Its name or its type (cash, card…), when its id is not known.",
@@ -962,7 +1037,7 @@ class CompleteIn(ChargeLinesIn):
     document_type: DocumentType | None = Field(
         None, description="ticket or invoice; the settings' default when empty."
     )
-    customer_id: UUID | None = Field(None, description="The customer's card.")
+    customer_id: UUID | None = Field(None, description="The customer's card.", json_schema_extra=A_CUSTOMER)
     customer: _text(200, 1) | None = Field(
         None,
         description="The customer's name, phone or email, when the id is not known.",
@@ -985,10 +1060,10 @@ class CompleteIn(ChargeLinesIn):
         description="Invoice abroad: 02 EU VAT, 03 passport, 04 foreign tax id, 05 residence certificate, 06 other, 07 not registered.",
     )
     staff_id: UUID | None = Field(
-        None, description="Who served the sale (a member of Staff)."
+        None, description="Who served the sale (a member of Staff).", json_schema_extra=A_MEMBER
     )
     appointment_id: UUID | None = Field(
-        None, description="Counter sale: the appointment it charges."
+        None, description="Counter sale: the appointment it charges.", json_schema_extra=A_BOOKING
     )
     notes: _text(1000) = Field("", description="Notes of the sale.")
 
@@ -1240,7 +1315,7 @@ class SaleOut(Schema):
 
 
 class SaleRefIn(Closed):
-    sale_id: UUID | None = Field(None, description="The sale's id.")
+    sale_id: UUID | None = Field(None, description="The sale's id.", json_schema_extra=A_SALE)
     sale: _text(24, 1) | None = Field(
         None, description="Its number, e.g. 20261014-0007, when the id is not known."
     )
@@ -1417,16 +1492,17 @@ class VoidIn(SaleRefIn):
 
 
 class AllocationIn(Closed):
-    payment_id: UUID = Field(description="The tender of the sale the money comes off.")
+    payment_id: UUID = Field(description="The tender of the sale the money comes off.", json_schema_extra=A_TENDER)
     amount: PositiveCents = Field(description="What goes back on it, in cents.")
     to_method_id: UUID | None = Field(
         None,
         description="Another payment method to give it back by; empty = the tender's own.",
+        json_schema_extra=A_METHOD,
     )
 
 
 class RefundLineIn(Closed):
-    line_id: UUID = Field(description="A line of the sale that comes back.")
+    line_id: UUID = Field(description="A line of the sale that comes back.", json_schema_extra=A_SALE_LINE)
     quantity: Quantity | None = Field(
         None, description="How many units come back; empty = all that is left."
     )

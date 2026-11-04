@@ -3,7 +3,7 @@ the assistant's contract of every operation (``ai`` and described input fields).
 
 from django.apps import apps
 from live.meta import Category, LiveAppConfig, Nav, module_configs, permissions_for_role
-from live.operations import registry
+from live.operations import INTERNAL, registry
 
 from apps.combo import queries, services  # noqa: F401  (importing them registers the operations)
 
@@ -15,7 +15,11 @@ QUERIES = {
     "combo.combo.resolve",
     # The menu's image (COMBO-F14).
     "combo.combo.suggest_image",
+    # What names a dish on the assistant's card (hub#561): the model reads them with their menu.
+    "combo.option.get",
 }
+#: The reads that are no assistant tool.
+INTERNAL_READS = {"combo.option.get"}
 COMMANDS = {
     "combo.combo.create",
     "combo.combo.update",
@@ -129,7 +133,11 @@ def test_the_operations_of_the_app():
 
 
 def test_every_operation_tells_the_assistant_what_it_does():
-    for name, op in combo_operations().items():
+    operations = combo_operations()
+    assert {name for name, op in operations.items() if op.ai is INTERNAL} == INTERNAL_READS
+    for name, op in operations.items():
+        if name in INTERNAL_READS:
+            continue
         assert isinstance(op.ai, dict), name
         assert str(op.ai.get("description", "")).strip(), name
         expected = {"description", "risk"} if op.kind == "command" else {"description"}
@@ -140,7 +148,7 @@ def test_every_operation_tells_the_assistant_what_it_does():
 
 def test_the_high_risk_commands():
     assert {
-        name for name, op in combo_operations().items() if op.ai.get("risk") == "high"
+        name for name, op in combo_operations().items() if op.ai is not INTERNAL and op.ai.get("risk") == "high"
     } == HIGH_RISK
 
 
@@ -156,7 +164,7 @@ def test_every_input_field_is_described_for_the_assistant():
 
 def test_every_operation_but_the_reaction_is_open_to_api_keys():
     exposed = {name for name, op in combo_operations().items() if op.expose_api}
-    assert exposed == (QUERIES | COMMANDS) - {"combo.option.drop_product"}
+    assert exposed == (QUERIES | COMMANDS) - {"combo.option.drop_product"} - INTERNAL_READS
 
 
 def test_reading_needs_view_and_writing_needs_manage():

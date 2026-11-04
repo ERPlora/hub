@@ -429,6 +429,18 @@ class OrderLine(UUIDModel):
         return self.voucher_session_id is not None
 
 
+class ForeignIdType(models.TextChoices):
+    """The AEAT's kinds of document of a foreign customer (``IDType``; a Spanish NIF has none), by the words the
+    recipient form of Invoicing gives them, an app Sales does not require (``apps.customer.tax_ids.ID_TYPES``)."""
+
+    EU_VAT = "02", _("EU VAT number")
+    PASSPORT = "03", _("Passport")
+    FOREIGN_TAX_ID = "04", _("Tax ID of their country")
+    RESIDENCE_CERTIFICATE = "05", _("Residence certificate")
+    OTHER = "06", _("Other document")
+    NOT_REGISTERED = "07", _("Not registered")
+
+
 class FiscalStatus(models.TextChoices):
     """What Invoicing answered when the sale, its void or a refund asked for its fiscal document, in the
     same transaction (no Invoicing app → «unavailable»; a refusal → «pending», issued later by
@@ -494,7 +506,12 @@ class Sale(UUIDModel):
         _("customer country"), max_length=2, blank=True, default="", db_default=""
     )
     customer_id_type = models.CharField(
-        _("customer document type"), max_length=2, blank=True, default="", db_default=""
+        _("customer document type"),
+        max_length=2,
+        blank=True,
+        default="",
+        db_default="",
+        choices=ForeignIdType.choices,
     )
     staff_id = models.UUIDField(_("served by"), null=True, blank=True)
     appointment_id = models.UUIDField(_("appointment"), null=True, blank=True)

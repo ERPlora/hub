@@ -172,6 +172,17 @@ def test_inspecting_a_file_says_what_it_brings_and_what_never_travels(owner):
     assert [part.travels for app in backup.apps for part in app.datasets] == [True, True]
 
 
+@pytest.mark.parametrize(("country", "verifactu"), [("PL", "inactive"), ("ES", "turns_on")])
+def test_the_review_does_not_promise_an_app_that_will_not_go_on_here(born, country, verifactu):
+    """hub#694: outside Spain the load will leave VeriFactu off, so what it says beforehand is that, not «turns on»."""
+    Hub.objects.filter(slug="c").update(country=country)
+
+    statuses = {app.id: app.status for app in call(born, "base.blueprint.inspect", template="restaurant.es").apps}
+
+    assert statuses["verifactu"] == verifactu
+    assert statuses["invoice"] == "turns_on"
+
+
 def test_an_app_off_the_blueprint_lists_is_said_to_turn_on_and_one_it_does_not_list_stays_off(born):
     """The load turns on the apps its manifest lists (round 2026-10-27); an app named only by its data is not."""
     summary = call(born, "base.blueprint.inspect", file_base64=a_file(apps=("table",)))

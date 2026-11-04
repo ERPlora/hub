@@ -587,3 +587,6 @@ msgstr "Cubrir el hueco de la cita {{input.number}}"
 
 msgid "Leaves you the task, so you remember to offer the free time."
 msgstr "Te deja la tarea, para que te acuerdes de ofrecer ese hueco."
+
+msgid "Appointment"
+msgstr "Cita"
