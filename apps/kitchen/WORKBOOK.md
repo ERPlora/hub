@@ -981,6 +981,8 @@ que no tiene ningún papel: solo el sistema (`*`).
   sale entre los botones; la pantalla que la recordaba vuelve a «Todas» en vez de quedarse vacía para
   siempre (eliminarla exige que no tenga platos por hacer ni enrutado, F03).
 - **Zona horaria**: la del hub (`base.business.business_zone`): día del número y horas del Historial.
+- **Millares**: los importes agrupan los millares también con cuatro cifras («1.234,56 €»; `formatMoney` de
+  `@erplora/ui/components`, con `useGrouping: 'always'`, porque el CLDR del español espera a cinco: hub#655).
 - **Moneda**: el Total de Comandas va en la moneda del negocio (`useBusinessMoney` de `base`, la de
   `base.business.get`) con los decimales del servidor, nunca los de `Intl` (el forint) ni un euro por defecto:
   mientras el negocio no contesta, una cifra sin símbolo. El `total` del servidor ya va en unidades menores de la
