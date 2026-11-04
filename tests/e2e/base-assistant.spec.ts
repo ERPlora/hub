@@ -1128,6 +1128,27 @@ test('BASE-G122 — from 80 % the foot says what is left and each answer moves i
   await employee.context().close();
 });
 
+test('BASE-G122 — with a plan without the assistant the foot says so, and its «Upgrade plan» lands inside erplora.com (BASE-F11)', async ({ page }) => {
+  // The plan `a` has on erplora.com, or Free without a subscription (`effective_plan`).
+  const plan =
+    "coalesce((select s.plan_id from hubs_subscription s join hubs_hub h on h.id = s.hub_id where h.slug = 'a'), (select id from hubs_plan where slug = 'free'))";
+  const allowance = saasSql(`select assistant_messages_per_month from hubs_plan where id = ${plan}`);
+  saasSql(`update hubs_plan set assistant_messages_per_month = 0 where id = ${plan}`);
+  try {
+    await login(page, A, '/');
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await home(page);
+    await openPanel(page);
+    const foot = panel(page).locator('[data-testid="assistant-no-plan"]');
+    await expect(foot).toContainText('Your plan does not include the assistant.');
+    await shots(page, 'BASE-G122-no-plan');
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await upgradeLandsInside(page, foot.locator('[data-testid="assistant-no-plan-upgrade"]'));
+  } finally {
+    saasSql(`update hubs_plan set assistant_messages_per_month = ${allowance} where id = ${plan}`);
+  }
+});
+
 test('BASE-G123 — «Report a problem» sends the answer with its question and a reason', async ({ page }) => {
   await login(page, A, '/');
   await page.setViewportSize({ width: 1440, height: 900 });
