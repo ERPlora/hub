@@ -598,6 +598,23 @@ def balance(grant: Grant, now: dt.datetime | None = None) -> Balance:
     )
 
 
+def session_value(grant_id: UUID) -> int | None:
+    """What the next session delivered of a voucher sold is worth (SERVICE-F24), with its row locked by the caller:
+    what is left of the price paid ÷ the sessions not delivered yet, half up, so 100.00 in 3 sessions is 33.33 + 33.34
+    + 33.33 and what is delivered adds up to what was paid, to the cent, through courtesies, corrections and sessions
+    given back. An unlimited voucher has no sessions to divide by: ``None``."""
+    grant = grants().get(pk=grant_id)
+    total = balance(grant).max_uses
+    if total is None:
+        return None
+    delivered = Redemption.objects.filter(grant_id=grant_id, status=Redemption.Status.CONSUMED).aggregate(
+        count=Count("id"), value=Coalesce(Sum("value"), 0)
+    )
+    amount_left = max(grant.amount - delivered["value"], 0)
+    sessions_left = max(total - delivered["count"], 1)
+    return (2 * amount_left + sessions_left) // (2 * sessions_left)
+
+
 def _named(*parts: str | None) -> str:
     """How a person tells a voucher or a session apart: what is known of it, what is not left out."""
     return " · ".join(part for part in parts if part)
@@ -682,6 +699,7 @@ def session_rows(ids) -> list[dict]:
                 "order_line_id": session.order_line_id,
                 "hold_until": session.hold_until,
                 "sale_id": session.sale_id,
+                "value": session.value,
                 "remaining": state.remaining,
                 "voucher_expired": state.is_expired,
             }

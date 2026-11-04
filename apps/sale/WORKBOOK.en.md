@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:a4c47c80ad8b117950bf4adde9226555fd15ae5e7d01abc3956c5e54cd23d847 -->
+<!-- generated from WORKBOOK.md sha256:6abc2fdc2c1fafc7d822eb87d0800874067ee42133384100c89cead72636794f -->
 
 ## What it is for and who it is for
 
@@ -952,7 +952,9 @@ Steps:
    check's line keeps the voucher that pays it.
 In: the client's vouchers and their balance, from Services.
 Out: the check's line paid with a session held in Services (announces: check changed); when charged, the
-sale with the line at 0.00 € and the session spent in the same operation (SERVICE-F24). Removing the
+sale with the line at 0.00 € and the session spent in the same operation (SERVICE-F24). The sale's line
+keeps what that session is worth when it is charged, for the production of whoever does it (SALE-F28): it
+goes into no total or document, and changing the voucher later does not move it. Removing the
 line, voiding it or deleting the check releases the session (SERVICE-F23); splitting or merging checks
 carries it with its line. A line paid with a voucher does not change quantity, comp or discount: the
 voucher is undone first.
@@ -966,7 +968,7 @@ discount without a manager is measured on what is left to pay: a line paid with 
 Without the permission to spend sessions, the slot does not appear. Without Services active in the
 business the slot does not appear either and, if it is turned off with lines paid with a voucher,
 charging them is refused ("Services is not active in this business…").
-Involved: SERVICE-F22, SERVICE-F23, SERVICE-F24, SERVICE-F25
+Involved: SERVICE-F22, SERVICE-F23, SERVICE-F24, SERVICE-F25, SALE-F28
 
 ### SALE-F28 Look up the sales history and figures
 Status: done
@@ -1000,7 +1002,11 @@ commission) already takes off what was refunded: what goes back, to whoever sold
 back with nothing that is worth anything (only money, a comp or a voucher's session), to everyone on that
 sale according to what each one has left to refund after the earlier refunds, so nobody goes below 0.
 Each refund counts on its sale's day and is shared out to the cent: with what nobody served, it adds up
-to the period's "Revenue".
+to the period's "Revenue". On top of that, what the **voucher sessions** each professional did are worth
+(SALE-F27, SERVICE-F24), fixed as each one is charged; a session of a voucher with no limit, which has
+nothing to divide by, counts the price of its line. It is not money of the period (the voucher was paid
+when it was sold), so it is not in "Revenue". What is left plus those sessions is their **production**,
+which the commission goes on. A session that comes back, by a refund or by voiding the sale, stops counting.
 If it fails: "Error loading metrics" (the figures show as "—"); if the last 7 days cannot be read, "The
 last 7 days could not be read.". Empty: "No sales yet.". Whoever lacks the reports permission sees the
 table, without the figures. A total that is not an amount says "Type an amount, like 12.50" under its
@@ -1302,7 +1308,7 @@ id, its name or its type ("cash", "card"). If a name matches several, it is refu
 | The figures of a period of business days, with the tax its sales were declared with (empty if they mix taxes) | reports | F28 | `sale.sale.stats` |
 | What was sold today and today's tickets | reports | F28 | `sale.sale.today` |
 | What was sold on each of the last 7 days | reports | F28 | `sale.sale.last_7_days` |
-| What each professional sold in a period: gross, base, tax, what was refunded of their lines and what is left (what the commission goes on) | reports | F16, F28 | `sale.sale.by_staff` |
+| What each professional sold in a period: gross, base, tax, what was refunded of their lines, what is left, what the voucher sessions they did are worth and their production (what the commission goes on) | reports | F16, F28 | `sale.sale.by_staff` |
 | What a check, or some lines, would charge, without charging anything (total, base, VAT, discounts, breakdown and lines) | see sales | F01, F21, F22 | `sale.checkout.preview` |
 | The open checks (or of another state), with search by title and pages | see sales | F17 | `sale.order.list` |
 | A check with its uncharged lines | see sales | F17, F19 | `sale.order.get` |

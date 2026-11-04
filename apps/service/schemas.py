@@ -1294,6 +1294,11 @@ class SessionOut(Schema):
         description="Sessions the voucher has left now; null = unlimited."
     )
     voucher_expired: bool = Field(description="The voucher is past its expiry.")
+    value: int | None = Field(
+        description="What the session is worth, VAT included, in cents (minor units of the business's currency): "
+        "what is left of the voucher's price ÷ the sessions it has left, fixed when delivered; null until then and "
+        "on an unlimited voucher."
+    )
 
 
 class SessionDetailOut(SessionOut):

@@ -2149,7 +2149,9 @@ def last_7_days(ctx: OperationContext, params: EmptyIn) -> dict:
     ai=AI(
         description="What each professional sold in a period of business days: their lines (a line's own professional wins "
         "over the sale's), the sales they served, gross, base and tax in cents, what refunds gave back on their lines "
-        "and the revenue left, which is what a commission is on. For the per-professional close.",
+        "and the revenue left; what the voucher sessions they did are worth (no money of the period: the voucher was "
+        "paid when it was sold); and their production, revenue plus sessions, which is what a commission is on. For "
+        "the per-professional close.",
         asks={
             "en": (
                 "how much did each waiter sell this month?",
@@ -2178,12 +2180,19 @@ def by_staff(ctx: OperationContext, params: PeriodIn) -> dict:
             sales_count=Count("sale", distinct=True),
             gross=Sum("line_total"),
             net=Sum("net_amount"),
+            # A session that came back (SALE-F32) is no longer theirs; a voided sale is not counted at all.
+            sessions=Sum(
+                "voucher_value",
+                filter=~Exists(RefundLine.objects.filter(sale_line=OuterRef("pk"))),
+                default=0,
+            ),
         )
     )
     refunded = _refunded_by_staff(params)
     totals = []
     for row in rows:
         given_back = refunded.get(row["served_by"], 0)
+        revenue = row["gross"] - given_back
         totals.append(
             {
                 "staff_id": row["served_by"],
@@ -2192,10 +2201,12 @@ def by_staff(ctx: OperationContext, params: PeriodIn) -> dict:
                 "net_total": row["net"],
                 "tax_total": row["gross"] - row["net"],
                 "refunded_total": given_back,
-                "total_revenue": row["gross"] - given_back,
+                "total_revenue": revenue,
+                "voucher_total": row["sessions"],
+                "production_total": revenue + row["sessions"],
             }
         )
-    totals.sort(key=lambda total: (-total["total_revenue"], total["staff_id"]))
+    totals.sort(key=lambda total: (-total["production_total"], total["staff_id"]))
     return {"rows": totals}
 
 

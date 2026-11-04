@@ -714,6 +714,9 @@ msgstr "bono"
 msgid "voucher name"
 msgstr "nombre del bono"
 
+msgid "voucher session value"
+msgstr "valor de la sesión del bono"
+
 msgid "sessions left on the voucher"
 msgstr "sesiones que le quedaban al bono"
 

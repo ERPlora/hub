@@ -220,6 +220,7 @@ class RedemptionInline(admin.TabularInline):
         "appointment_id",
         "sale_id",
         "settled_at",
+        "value",
         "note",
         "actor",
         "redeemed_at",

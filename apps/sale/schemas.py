@@ -1395,13 +1395,20 @@ class StaffTotal(Schema):
         description="What the refunds of those sales gave back on their lines, in cents."
     )
     total_revenue: int = Field(
-        description="What their lines charged, refunds taken off, in cents: what their commission is on."
+        description="What their lines charged, refunds taken off, in cents."
+    )
+    voucher_total: int = Field(
+        description="What the voucher sessions they did are worth, those that came back taken off, in cents: the "
+        "voucher's price ÷ its sessions, fixed at each charge. No money of the period: it was paid when it was sold."
+    )
+    production_total: int = Field(
+        description="Their revenue plus their voucher sessions, in cents: what their commission is on."
     )
 
 
 class ByStaffOut(Schema):
     rows: list[StaffTotal] = Field(
-        description="One row per professional, the one who sold most (refunds taken off) first."
+        description="One row per professional, the one who produced most (revenue plus voucher sessions) first."
     )
 
 

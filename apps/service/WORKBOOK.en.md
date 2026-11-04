@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:fe71e6566a78c5d3a9fd03b34f7a2e9c5fcad5b40bd18072bda237380586201a -->
+<!-- generated from WORKBOOK.md sha256:69ee03deb7104fbf7b1ffbdc19be01f8e257d0eb379eeca10b4fbcf22ef15800 -->
 
 ## What it is for and who it is for
 
@@ -519,7 +519,8 @@ Steps:
 In: the purchase, the quantities and the reason.
 Out: a separate movement with who, when, how much and why (`service.grant.adjusted`), which shows in
 **Movements** as **Courtesy** or **Correction**; the purchase is not rewritten. It revives an expired or
-used-up voucher.
+used-up voucher. The sessions already delivered keep their value; the ones left share what is left of the
+price (SERVICE-F24).
 If it fails: "Say why this voucher is being adjusted…", "Add or remove at least one session, or add at
 least one day.", "You cannot take away more sessions than the customer has left.", "That voucher has no
 session limit…", "That voucher never expires…" or "That voucher was already voided.".
@@ -563,8 +564,9 @@ Steps:
 2. Ask the assistant to spend a session of a voucher the customer bought, and if you want say which
    service was done and link it to the appointment or the sale.
 In: the purchase of the voucher; the service, the appointment and the sale, as a reference.
-Out: a **Delivered** session at once (`service.grant.redeemed`), which counts against the "Uses". It
-issues no tax document.
+Out: a **Delivered** session at once (`service.grant.redeemed`), which counts against the "Uses" and takes
+its share of the price (SERVICE-F24). It does not say who did it, so it counts in nobody's production
+(hub#770). It issues no tax document.
 If it fails: "This voucher was voided: it can no longer be used.", "This voucher has no sessions left.",
 "This voucher has expired.", "This voucher does not cover that service. A voucher of haircuts pays for
 haircuts, not for the shampoo." or "That voucher sale does not exist in this business.". Two tills that
@@ -635,13 +637,18 @@ Steps:
    by voiding the sale (SERVICE-F27).
 In: the held sessions of the charged lines, the sale and its customer (Sales).
 Out: the sessions spent for good and linked to the sale (`service.session.settled`). Repeating the charge
-with the same key does not spend twice.
+with the same key does not spend twice. Each session keeps **what it is worth**, which does not move again:
+what is left of the price paid ÷ the sessions it has left to deliver, to the cent (half a unit rounds up).
+100.00 € in 3 sessions is 33.33 + 33.34 + 33.33: what is delivered adds up to exactly what was paid, also
+with courtesies, corrections and sessions given back. A voucher given away (0 €) gives 0, and one with no
+limit has nothing to divide by and gives no value. Sales keeps it on the line for the production of whoever
+does it (SALE-F28).
 If it fails: nothing is charged and the check stays the same if a session is no longer held ("The session
 held from «{name}» is no longer held (its day passed or it was released). Take the voucher off the line
 and apply it again."), or if the sale is not the voucher owner's ("The voucher «{name}» belongs to another
 customer: charge the sale to its owner or take the voucher off the line."). If Services is not active in
 the business, it is not charged either.
-Involved: SALE-F01, SALE-F22, SALE-F27
+Involved: SALE-F01, SALE-F22, SALE-F27, SALE-F28
 
 ### SERVICE-F25 The held session nobody charges comes back on its own
 Status: done (on reading and with the hourly task)
@@ -671,7 +678,8 @@ Steps:
 3. Tap the refund button: the session alone can be given back, with no money.
 In: the sessions spent in that sale (each line of the sale keeps them).
 Out: the session back in the voucher, with who, when and the refund document
-(`service.session.returned`); in **Movements**, **Given back**. It moves no money and issues no
+(`service.session.returned`); in **Movements**, **Given back**. Its share of the price goes back to the
+voucher for the sessions left. It moves no money and issues no
 document; if the voucher has already expired, the session is recorded but cannot be spent until it is
 extended (SERVICE-F18). The same refund repeated gives back a single session.
 If it fails: "That session was already given back by another refund.". If Services is not active in the
@@ -688,8 +696,8 @@ Steps:
    expired.
 3. In **Movements** each one shows as **Given back**, with who voided it, the time and the reason.
 In: the voided sale, who and the reason; the sessions spent in that sale.
-Out: the sessions back in their voucher (`service.session.returned`). It moves no money and issues no tax
-document.
+Out: the sessions back in their voucher (`service.session.returned`), and their share of the price with
+them. It moves no money and issues no tax document.
 If it fails: repeating the void does not give back twice. If Services is not active in the business, the
 sale is not voided and the window says so.
 Involved: SALE-F30
@@ -982,7 +990,7 @@ with the session of whoever sells, as it does with Inventory.
     `order_line_id`) and it keeps on the line the session it gets back;
   - when undoing it, removing the line, voiding it or deleting the check, `service.session.release` (`id`);
   - when charging, `service.session.settle` (`ids` of the charged lines, `sale_id`, `customer_id` of the
-    sale);
+    sale) and keeps on each line what its session is worth (`value`; empty, on a voucher with no limit);
   - when voiding the sale, `service.session.return` with all its sessions (`reference` = the sale) and,
     when refunding it, with those of the lines that go back (`reference` = the refund).
   To paint the slot, the checkout reads `service.grant.tender_options` (`customer_id`, `service_id`).

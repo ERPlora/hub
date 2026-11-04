@@ -544,7 +544,8 @@ Pasos:
 Entra: la compra, las cantidades y el motivo.
 Sale: un movimiento aparte con quién, cuándo, cuánto y por qué (`service.grant.adjusted`), que sale en
 **Movimientos** como **Cortesía** o **Corrección**; la compra no se reescribe. Revive un bono caducado
-o agotado.
+o agotado. Las sesiones ya entregadas conservan su valor; las que quedan se reparten lo que queda del
+precio (SERVICE-F24).
 Si falla: «Indica por qué se ajusta este bono…», «Añade o quita al menos una sesión, o añade al menos
 un día.», «No puedes quitar más sesiones de las que le quedan al cliente.», «Ese bono no tiene límite
 de sesiones…», «Ese bono no caduca…» o «Ese bono ya estaba anulado.».
@@ -590,8 +591,9 @@ Pasos:
 2. Pide al asistente que gaste una sesión de un bono comprado por la clienta, y si quieres que diga
    qué servicio se hizo y la enlace a la cita o a la venta.
 Entra: la compra del bono; el servicio, la cita y la venta, como referencia.
-Sale: una sesión **Entregada** al momento (`service.grant.redeemed`), que cuenta contra los «Usos».
-No emite documento fiscal.
+Sale: una sesión **Entregada** al momento (`service.grant.redeemed`), que cuenta contra los «Usos» y se
+lleva su parte del precio (SERVICE-F24). No dice quién la hizo, así que no cuenta en la producción de nadie
+(hub#770). No emite documento fiscal.
 Si falla: «Este bono está anulado: ya no se puede usar.», «Este bono ya no tiene sesiones
 disponibles.», «Este bono ha caducado.», «Este bono no cubre ese servicio. Un bono de cortes paga
 cortes, no el champú.» o «Esa venta de bono no existe en este negocio.». Dos cajas que gastan la
@@ -662,13 +664,17 @@ Pasos:
    anulando la venta (SERVICE-F27).
 Entra: las sesiones reservadas de las líneas cobradas, la venta y su clienta (Ventas).
 Sale: las sesiones gastadas para siempre y enlazadas a la venta (`service.session.settled`). Repetir
-el cobro con la misma clave no gasta dos veces.
+el cobro con la misma clave no gasta dos veces. Cada sesión queda con **lo que vale**, que ya no se mueve:
+lo que queda del precio pagado ÷ las sesiones que le quedan por entregar, al céntimo (media unidad sube).
+100,00 € en 3 sesiones son 33,33 + 33,34 + 33,33: lo entregado suma justo lo pagado, también con
+cortesías, correcciones y sesiones devueltas. Un bono regalado (0 €) da 0, y uno sin límite no tiene
+entre qué dividir y no da valor. Ventas lo guarda en la línea para la producción de quien la hace (SALE-F28).
 Si falla: nada se cobra y la cuenta sigue igual si una sesión ya no está reservada («La sesión
 reservada de «{name}» ya no está reservada (pasó su día o se soltó). Quita el bono de la línea y vuelve
 a aplicarlo.»), si la venta no es de la titular del bono («El bono «{name}» es de otro cliente: cobra la
 venta a nombre de su titular o quita el bono de la línea.»). Si Servicios no está activa en el
 negocio, tampoco se cobra.
-Implicados: SALE-F01, SALE-F22, SALE-F27
+Implicados: SALE-F01, SALE-F22, SALE-F27, SALE-F28
 
 ### SERVICE-F25 La sesión retenida que nadie cobra vuelve sola
 <!-- origen: wf:peluqueria-dia#rec_peluqueria-f10 old:services/workflow/cobro-y-devolucion.md#services-f25 -->
@@ -700,7 +706,8 @@ Pasos:
 3. Pulsa el botón de devolver: se puede devolver solo la sesión, sin dinero.
 Entra: las sesiones gastadas en esa venta (las guarda cada línea de la venta).
 Sale: la sesión de vuelta en el bono, con quién, cuándo y el documento de devolución
-(`service.session.returned`); en **Movimientos**, **Devuelta**. No mueve dinero ni emite documento;
+(`service.session.returned`); en **Movimientos**, **Devuelta**. Su parte del precio vuelve al bono para
+las sesiones que quedan. No mueve dinero ni emite documento;
 si el bono ya caducó, la sesión consta pero no se puede gastar hasta alargarlo (SERVICE-F18). La
 misma devolución repetida devuelve una sola sesión.
 Si falla: «Esa sesión ya se devolvió en otra devolución.». Si Servicios no está activa en el negocio,
@@ -717,8 +724,8 @@ Pasos:
 2. En la misma operación, cada sesión gastada en esa venta vuelve a su bono, aunque haya caducado.
 3. En **Movimientos** cada una sale como **Devuelta**, con quien anuló, la hora y el motivo.
 Entra: la venta anulada, quién y el motivo; las sesiones gastadas en esa venta.
-Sale: las sesiones de vuelta en su bono (`service.session.returned`). No mueve dinero ni emite
-documento fiscal.
+Sale: las sesiones de vuelta en su bono (`service.session.returned`), y con ellas su parte del precio.
+No mueve dinero ni emite documento fiscal.
 Si falla: repetir la anulación no devuelve dos veces. Si Servicios no está activa en el negocio, la
 venta no se anula y se avisa en la ventana.
 Implicados: SALE-F30
@@ -1018,7 +1025,7 @@ con la sesión de quien vende, como hace con Inventario.
     `order_line_id`) y guarda en la línea la sesión que le devuelve;
   - al deshacerlo, quitar la línea, anularla o eliminar la cuenta, `service.session.release` (`id`);
   - al cobrar, `service.session.settle` (`ids` de las líneas cobradas, `sale_id`, `customer_id` de la
-    venta);
+    venta) y guarda en cada línea lo que vale su sesión (`value`; vacío, en un bono sin límite);
   - al anular la venta, `service.session.return` con todas sus sesiones (`reference` = la venta) y,
     al devolverla, con las de las líneas que vuelven (`reference` = la devolución).
   Para pintar el hueco, el cobro lee `service.grant.tender_options` (`customer_id`, `service_id`).
@@ -1194,6 +1201,9 @@ cajero del producto actual es un empleado: lo que tenía (ver, gastar y conceder
   con la línea marcada como servicio y el IVA que mandaba el cobro); aquí toda línea necesita una
   categoría fiscal y un bono del catálogo no la tiene. Mientras, el bono se cobra a precio libre (con
   la sección de su IVA) y se concede con la concesión (asistente o API, F14) diciendo la venta.
+- **Que la venta de un bono no cuente como producción de quien lo vende** (hub#769): mientras se cobre a
+  precio libre, su línea cuenta para quien atiende la cuenta y, después, cada sesión para quien la hace.
+- **La sesión gastada fuera del cobro en la producción de quien la hizo** (F21, hub#770).
 - **Importar servicios desde un fichero**: como en el producto actual, el alta de golpe es del
   asistente y la API.
 - **Decir en la tarjeta del asistente de qué venta, cita, línea de la cuenta o devolución se trata**: son datos de

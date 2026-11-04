@@ -785,8 +785,10 @@ export interface LastDaysOut {
 }
 
 export interface ByStaffOut {
-  /** `refunded_total`: what refunds gave back on their lines; `total_revenue`: gross minus that, what a
-   *  commission is on. One row per professional, the most revenue first. */
+  /** `refunded_total`: what refunds gave back on their lines; `total_revenue`: gross minus that;
+   *  `voucher_total`: what the voucher sessions they did are worth, no money of the period;
+   *  `production_total`: revenue plus sessions, what a commission is on. One row per professional, the most
+   *  production first. */
   rows: {
     staff_id: string;
     sales_count: number;
@@ -795,6 +797,8 @@ export interface ByStaffOut {
     tax_total: number;
     refunded_total: number;
     total_revenue: number;
+    voucher_total: number;
+    production_total: number;
   }[];
 }
 

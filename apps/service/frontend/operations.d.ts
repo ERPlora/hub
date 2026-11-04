@@ -569,6 +569,8 @@ export interface SessionDetailOut {
   /** Sessions the voucher has left now; null = unlimited. */
   remaining: number | null;
   voucher_expired: boolean;
+  /** What it is worth in cents, fixed when delivered; null until then and on an unlimited voucher. */
+  value: number | null;
   /** How the assistant's card names it (hub#676): the package, its owner if the reader may see customers and the
    *  service. */
   label: string;

@@ -278,3 +278,52 @@ def test_the_pay_permission_alone_does_not_open_the_sales_figures():
 def test_a_sale_charged_voided_or_refunded_re_runs_the_report():
     for event in ("sale.sale.completed", "sale.sale.voided", "sale.sale.refunded"):
         assert "staff.commission.report" in live_registry.affected([event]), event
+
+
+# A session of a voucher (SALE-F27): no money that day, and the work is still theirs
+
+
+def platform(name, data):
+    op = get(name)
+    return op(system_context(A), op.input.model_validate(data))
+
+
+def session_for(member, key):
+    """A session of a voucher of 3 paid 100.00 pays a line of a service ``member`` does, charged."""
+    service = platform(
+        "service.service.create", {"name": f"Cut {key}", "price": 2500, "tax_category_key": "service.generic"}
+    )
+    owner = platform("customer.customer.create", {"name": f"Lucía {key}"})
+    package = platform(
+        "service.package.create",
+        {"name": f"Bono {key}", "max_uses": 3, "items": [{"service_id": str(service.id)}]},
+    )
+    grant = platform(
+        "service.grant.create",
+        {"package_id": str(package.id), "customer_id": str(owner.id), "amount": 10000},
+    )
+    order = run(
+        "sale.order.open",
+        {"service_lines": [{"service_id": str(service.id), "staff_id": str(member.id)}]},
+    )
+    order = run(
+        "sale.order.apply_voucher",
+        {"order_id": str(order.id), "line_id": str(order.lines[0].id), "grant_id": str(grant.id)},
+    )
+    return run(
+        "sale.sale.complete",
+        {"idempotency_key": key, "order_id": str(order.id), "customer_id": str(owner.id)},
+    )
+
+
+def test_a_professional_earns_their_rate_on_the_voucher_session_they_did(catalog):
+    # flow: STAFF-F21 (hub#685): what a session is worth (the voucher's price ÷ its sessions) counts in «sold».
+    ana = make_member("Ana", commission_rate=Decimal("15"))
+    charge("commission-0001", ("SHP", ana))
+    session_for(ana, "commission-0002")
+
+    page = report()
+
+    # 1.21 + 33.33 = 34.54 → 15 % = 5.181 → 5.18.
+    assert figures(page) == [("Ana López", 3454, Decimal("15.00"), 518)]
+    assert (page.total_sold, page.total_commission) == (3454, 518)

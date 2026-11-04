@@ -571,6 +571,9 @@ class Redemption(UUIDModel):
     return_reason = models.CharField(
         _("reason it came back"), max_length=500, blank=True
     )
+    # What it is worth, VAT included, fixed when it is delivered and never moved again (SERVICE-F24). Empty while
+    # it is not delivered, and on an unlimited voucher, which has no sessions to divide its price by.
+    value = models.PositiveBigIntegerField(_("value"), null=True, blank=True)
 
     class Meta:
         verbose_name = _("voucher session")

@@ -984,6 +984,8 @@ Pasos:
 Entra: los bonos de la clienta y su saldo, de Servicios.
 Sale: la línea de la cuenta pagada con una sesión reservada de Servicios (avisa: cuenta cambiada);
 al cobrar, la venta con la línea a 0,00 € y la sesión gastada en la misma operación (SERVICE-F24).
+La línea de la venta guarda lo que vale esa sesión al cobrarla, para la producción de quien la hace
+(SALE-F28): no entra en ningún total ni documento, y cambiar después el bono no lo mueve.
 Quitar la línea, anularla o eliminar la cuenta suelta la sesión (SERVICE-F23); dividir o juntar
 cuentas la lleva con su línea. Una línea pagada con bono no cambia de cantidad, invitación ni
 descuento: se deshace el bono antes.
@@ -997,7 +999,7 @@ motivo en la hoja y se deshace el bono. El descuento máximo sin responsable se 
 por pagar: una línea pagada con bono no cuenta. Sin permiso para gastar sesiones, el hueco no
 aparece. Sin Servicios activa en el negocio el hueco tampoco aparece y, si se apaga con líneas pagadas
 con bono, cobrarlas se rechaza («Servicios no está activa en este negocio…»).
-Implicados: SERVICE-F22, SERVICE-F23, SERVICE-F24, SERVICE-F25
+Implicados: SERVICE-F22, SERVICE-F23, SERVICE-F24, SERVICE-F25, SALE-F28
 
 ### SALE-F28 Consultar el historial y las cifras de ventas
 <!-- origen: fi:modules/sales#query-sales-by_staff wf:peluqueria-dia#rec_peluqueria-f15 fi:modules/sales#query-sales-last_7_days fi:modules/sales#query-sales-list fi:modules/sales#query-sales-stats fi:modules/sales#query-sales-today old:sales/workflow/historial-y-correcciones.md#sales-f28 fi:modules/sales#widget-sales-last_7_days fi:modules/sales#widget-sales-recent_activity fi:modules/sales#widget-sales-tickets_today fi:modules/sales#widget-sales-today -->
@@ -1031,7 +1033,11 @@ la comisión) ya resta lo devuelto: lo que vuelve, a quien lo vendió; el dinero
 valga (solo dinero, una invitación o la sesión de un bono), a todos los de esa venta según lo que a cada
 uno le queda por devolver tras las devoluciones anteriores, así que nadie baja de 0. Cada devolución
 cuenta en el día de su venta y se reparte al céntimo: con lo que nadie atendió, suma los «Ingresos» del
-periodo.
+periodo. Además, lo que valen las **sesiones de bono** que hizo cada profesional (SALE-F27, SERVICE-F24),
+fijado al cobrar cada una; una sesión de un bono sin límite, que no tiene entre qué dividir, cuenta el
+precio de su línea. No es dinero del periodo (el bono se pagó al venderlo), así que no está en los
+«Ingresos». Lo que queda más esas sesiones es su **producción**, sobre la que va la comisión. La sesión
+que vuelve, por devolución o anulando la venta, deja de contar.
 Si falla: «Error cargando métricas» (las cifras salen como «—»); si no se pueden leer los últimos 7 días,
 «No se han podido leer los últimos 7 días.». Vacía: «Aún no hay ventas.». Quien
 no tiene permiso de informes ve la tabla, sin las cifras. Un total que no es un importe dice «Escribe
@@ -1349,7 +1355,7 @@ diciendo cuáles (409 `*_ambiguous`).
 | Las cifras de un periodo de días del negocio, con el impuesto con que se declararon sus ventas (vacío si mezclan impuestos) | informes | F28 | `sale.sale.stats` |
 | Lo vendido hoy y los tiques de hoy | informes | F28 | `sale.sale.today` |
 | Lo vendido cada uno de los últimos 7 días | informes | F28 | `sale.sale.last_7_days` |
-| Lo vendido por cada profesional en un periodo: bruto, base, impuesto, lo devuelto de sus líneas y lo que queda (sobre lo que va la comisión) | informes | F16, F28 | `sale.sale.by_staff` |
+| Lo vendido por cada profesional en un periodo: bruto, base, impuesto, lo devuelto de sus líneas, lo que queda, lo que valen las sesiones de bono que hizo y su producción (sobre la que va la comisión) | informes | F16, F28 | `sale.sale.by_staff` |
 | Lo que cobraría una cuenta, o unas líneas, sin cobrar nada (total, base, IVA, descuentos, desglose y líneas) | ver ventas | F01, F21, F22 | `sale.checkout.preview` |
 | Las cuentas abiertas (o de otro estado), con búsqueda por título y páginas | ver ventas | F17 | `sale.order.list` |
 | Una cuenta con sus líneas sin cobrar | ver ventas | F17, F19 | `sale.order.get` |

@@ -12,7 +12,7 @@ from uuid import uuid7
 
 import pytest
 from django.utils import timezone, translation
-from live.context import system_context
+from live.context import Scope, system_context
 from live.errors import Conflict, PermissionDenied
 from live.models import OutboxEvent
 from live.operations import get, registry
@@ -20,6 +20,8 @@ from live.operations import get, registry
 from apps.sale.models import Order, OrderLine, Refund, Sale, SaleCounter, SaleLine
 from apps.sale.tests.conftest import A, ctx_for, run
 from apps.service.models import Grant, Redemption
+from base.tenancy.context import use_hub
+from base.tenancy.tests import hubs
 
 pytestmark = pytest.mark.django_db
 
@@ -900,3 +902,206 @@ def test_a_line_paid_with_a_voucher_goes_back_whole_its_session_is_never_split(h
     assert refusal.value.code == "sale.refund_voucher_line_whole"
     assert not Refund.objects.exists()
     assert Redemption.objects.get(pk=SaleLine.objects.get(pk=line.id).voucher_session_id).status == "consumed"
+
+
+# ── What a session counts for whoever does it (SALE-F28, SERVICE-F24) ────────────────────────
+
+
+def voucher_of_100(owner, service, *, uses=3, name="Bono de 100"):
+    """A voucher of ``uses`` sessions, paid 100.00 (``voucher`` above)."""
+    return voucher(owner, service, name=name, uses=uses)
+
+
+def spend_session(grant, service, owner, key, *, staff=None, sale_staff=None, ctx=None):
+    """One session of ``grant`` pays a check of one line of ``service`` that ``staff`` does, charged."""
+    order = run(
+        "sale.order.open",
+        {
+            "service_lines": [
+                {"service_id": str(service.id), **({"staff_id": str(staff)} if staff else {})}
+            ]
+        },
+        ctx,
+    )
+    order = pay_with(order, order.lines[0].id, grant, ctx)
+    return charge(
+        order,
+        key=key,
+        customer_id=str(owner.id),
+        ctx=ctx,
+        **({"staff_id": str(sale_staff)} if sale_staff else {}),
+    )
+
+
+def by_staff(**params):
+    return {row.staff_id: row for row in run("sale.sale.by_staff", params).rows}
+
+
+def test_a_session_counts_for_who_does_it_though_the_line_charged_nothing(haircut, lucia):
+    # flow: SALE-F28 (REC_PELUQUERIA-F15): the reproduction of hub#685, gross_total 0 and nothing else to read.
+    ana = uuid7()
+    sale = spend_session(voucher_of_100(lucia, haircut), haircut, lucia, "value-0001", staff=ana)
+    assert (sale.total, SaleLine.objects.get(sale=sale.id).voucher_value) == (0, 3333)
+    row = by_staff()[ana]
+    assert (row.sales_count, row.voucher_total, row.production_total) == (1, 3333, 3333)
+    # Nothing was charged today: the money figures stay what they say, and square with the period's revenue.
+    assert (row.gross_total, row.net_total, row.tax_total, row.total_revenue) == (0, 0, 0, 0)
+    assert run("sale.sale.stats", {}).total_revenue == 0
+
+
+def test_the_three_sessions_of_a_voucher_of_100_euros_add_up_to_what_was_paid(haircut, lucia):
+    ana, bea = uuid7(), uuid7()
+    grant = voucher_of_100(lucia, haircut)
+    spend_session(grant, haircut, lucia, "value-0001", staff=ana)
+    spend_session(grant, haircut, lucia, "value-0002", staff=bea)
+    spend_session(grant, haircut, lucia, "value-0003", staff=ana)
+    rows = by_staff()
+    assert (rows[ana].voucher_total, rows[bea].voucher_total) == (3333 + 3333, 3334)
+    assert rows[ana].voucher_total + rows[bea].voucher_total == 10000
+
+
+def test_a_line_that_names_nobody_counts_for_who_serves_the_check(haircut, lucia):
+    ana, bea = uuid7(), uuid7()
+    grant = voucher_of_100(lucia, haircut)
+    spend_session(grant, haircut, lucia, "value-0001", sale_staff=ana)
+    spend_session(grant, haircut, lucia, "value-0002", staff=bea, sale_staff=ana)
+    rows = by_staff()
+    assert (rows[ana].voucher_total, rows[bea].voucher_total) == (3333, 3334)
+
+
+def test_what_was_charged_is_not_rewritten_when_the_voucher_changes_later(haircut, lucia):
+    # flow: SALE-F27: the value is fixed at the charge, like the name of the voucher on the line.
+    ana = uuid7()
+    grant = voucher_of_100(lucia, haircut)
+    spend_session(grant, haircut, lucia, "value-0001", staff=ana)
+    svc(
+        "service.package.update",
+        {"id": str(grant.package_id), "max_uses": 10, "fixed_price": 90000},
+    )
+    svc("service.grant.adjust", {"id": str(grant.id), "uses_delta": 5, "reason": "courtesy"})
+    assert by_staff()[ana].voucher_total == 3333
+
+
+def test_a_session_keeps_counting_with_services_off(haircut, lucia, services_off):
+    ana = uuid7()
+    spend_session(voucher_of_100(lucia, haircut), haircut, lucia, "value-0001", staff=ana)
+    services_off()
+    assert by_staff()[ana].production_total == 3333
+
+
+def test_voiding_the_sale_takes_the_session_off_who_did_it(haircut, lucia):
+    ana = uuid7()
+    grant = voucher_of_100(lucia, haircut)
+    sale = spend_session(grant, haircut, lucia, "value-0001", staff=ana)
+    run("sale.sale.void", {"sale_id": str(sale.id), "reason": "wrong customer"})
+    assert ana not in by_staff()
+    # Its share went back to the voucher, for the session spent in its place.
+    bea = uuid7()
+    spend_session(grant, haircut, lucia, "value-0002", staff=bea)
+    assert by_staff()[bea].voucher_total == 3333
+
+
+def test_refunding_the_session_takes_it_off_who_did_it_though_no_money_moved(haircut, lucia):
+    ana = uuid7()
+    grant = voucher_of_100(lucia, haircut)
+    kept = spend_session(grant, haircut, lucia, "value-0001", staff=ana)
+    back = spend_session(grant, haircut, lucia, "value-0002", staff=ana)
+    done = refund(back, lines=[back.lines[0]], key="value-refund-0001")
+    assert done.total == 0
+    row = by_staff()[ana]
+    assert (row.voucher_total, row.production_total, row.refunded_total) == (3333, 3333, 0)
+    assert SaleLine.objects.get(sale=kept.id).voucher_value == 3333
+    # The sale that went back stays with its value: a sale is never edited.
+    assert SaleLine.objects.get(sale=back.id).voucher_value == 3334
+
+
+def test_a_professional_whose_only_session_came_back_counts_nothing(haircut, lucia):
+    ana = uuid7()
+    sale = spend_session(voucher_of_100(lucia, haircut), haircut, lucia, "value-0001", staff=ana)
+    refund(sale, lines=[sale.lines[0]], key="value-refund-0001")
+    row = by_staff()[ana]
+    assert (row.sales_count, row.voucher_total, row.production_total) == (1, 0, 0)
+
+
+def test_a_session_and_money_add_up_in_what_the_commission_goes_on(haircut, colour, lucia):
+    # Bea charged more money, Ana made more with the session: the list goes by what each one produced.
+    ana, bea = uuid7(), uuid7()
+    grant = voucher_of_100(lucia, haircut, uses=1)
+    order = run(
+        "sale.order.open",
+        {
+            "service_lines": [
+                {"service_id": str(haircut.id), "staff_id": str(ana)},
+                {"service_id": str(haircut.id), "staff_id": str(ana)},
+                {"service_id": str(haircut.id), "staff_id": str(bea)},
+                {"service_id": str(haircut.id), "staff_id": str(bea)},
+            ]
+        },
+    )
+    order = pay_with(order, order.lines[0].id, grant)
+    charge(order, key="value-0001", customer_id=str(lucia.id), payments=[{"method": "card"}])
+    rows = run("sale.sale.by_staff", {}).rows
+    assert [
+        (row.staff_id, row.gross_total, row.total_revenue, row.voucher_total, row.production_total)
+        for row in rows
+    ] == [
+        (ana, 2500, 2500, 10000, 12500),
+        (bea, 5000, 5000, 0, 5000),
+    ]
+    assert sum(row.total_revenue for row in rows) == run("sale.sale.stats", {}).total_revenue
+
+
+def test_a_session_of_an_unlimited_voucher_counts_at_the_price_of_its_line(haircut, lucia):
+    # There are no sessions to divide by: like a salon's till (Meevo), at the service's own price, frozen on the line.
+    ana = uuid7()
+    grant = voucher(lucia, haircut, name="Bono sin límite", uses=None)
+    spend_session(grant, haircut, lucia, "value-0001", staff=ana)
+    assert by_staff()[ana].voucher_total == 2500
+
+
+def test_a_line_no_voucher_pays_is_worth_no_session(haircut, lucia):
+    ana = uuid7()
+    order = run(
+        "sale.order.open", {"service_lines": [{"service_id": str(haircut.id), "staff_id": str(ana)}]}
+    )
+    sale = charge(order, key="value-0001", payments=[{"method": "card"}])
+    assert SaleLine.objects.get(sale=sale.id).voucher_value == 0
+    row = by_staff()[ana]
+    assert (row.voucher_total, row.production_total) == (0, 2500)
+
+
+def test_the_session_counts_on_the_business_day_of_its_sale(haircut, lucia):
+    ana = uuid7()
+    sale = spend_session(voucher_of_100(lucia, haircut), haircut, lucia, "value-0001", staff=ana)
+    day = Sale.objects.get(pk=sale.id).business_day
+    assert by_staff(date_from=str(day), date_to=str(day))[ana].voucher_total == 3333
+    assert ana not in by_staff(date_from=str(day + dt.timedelta(days=1)))
+
+
+@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@pytest.mark.usefixtures("no_test_fallback")
+def test_a_session_in_one_business_counts_nothing_in_another(hub_a, hub_b):
+    in_a, in_b = ctx_for(scope=Scope("host", hub_a.slug)), ctx_for(scope=Scope("host", hub_b.slug))
+    ana = uuid7()
+    with use_hub(hub_b):
+        cut = run(
+            "service.service.create",
+            {"name": "Haircut", "price": 2500, "tax_category_key": "service.generic"},
+            in_b,
+        )
+        owner = run("customer.customer.create", {"name": "Lucía Pérez"}, in_b)
+        package = run(
+            "service.package.create",
+            {"name": "Bono de 100", "max_uses": 3, "items": [{"service_id": str(cut.id)}]},
+            in_b,
+        )
+        grant = run(
+            "service.grant.create",
+            {"package_id": str(package.id), "customer_id": str(owner.id), "amount": 10000},
+            in_b,
+        )
+        spend_session(grant, cut, owner, "value-b-0001", staff=ana, ctx=in_b)
+        # Positive control: it counts, in its own business.
+        assert [row.voucher_total for row in run("sale.sale.by_staff", {}, in_b).rows] == [3333]
+    with use_hub(hub_a):
+        assert run("sale.sale.by_staff", {}, in_a).rows == []

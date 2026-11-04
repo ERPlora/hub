@@ -2307,10 +2307,12 @@ def _complete(ctx: OperationContext, data: CompleteIn, *, over_limit: bool) -> d
         raise Conflict(
             str(CHECKOUT_IN_PROGRESS), code="sale.checkout_in_progress"
         ) from None
-    # The sessions held for the lines a voucher pays are delivered with the sale, or nothing is charged.
+    # The sessions held for the lines a voucher pays are delivered with the sale, or nothing is charged; what each
+    # is worth from now on stays on its line.
     covered = [line.voucher_session_id for line in lines if line.voucher_session_id]
+    session_values = {}
     if covered:
-        call_services(
+        settled = call_services(
             ctx,
             "service.session.settle",
             {
@@ -2319,8 +2321,9 @@ def _complete(ctx: OperationContext, data: CompleteIn, *, over_limit: bool) -> d
                 "customer_id": card.id if card else None,
             },
         )
+        session_values = {session.id: session.value for session in settled.rows}
     sale_lines = SaleLine.objects.bulk_create(
-        _sale_lines(sale, parts, valuation)
+        _sale_lines(sale, parts, valuation, session_values)
     )
     payments = SalePayment.objects.bulk_create(
         [
@@ -2396,7 +2399,19 @@ def _complete(ctx: OperationContext, data: CompleteIn, *, over_limit: bool) -> d
     return {**detail, "printed": printed}
 
 
-def _sale_lines(sale: Sale, parts: list[OrderLine], valuation) -> list[SaleLine]:
+def _voucher_value(line: OrderLine, session_values: dict) -> int:
+    """What the session paying ``line`` is worth to who does it (SALE-F28): what Services fixed on delivering it. An
+    unlimited voucher has no sessions to divide its price by (``None``): the price of the line, as a salon's till counts
+    it. A line no voucher pays is worth no session."""
+    if line.voucher_session_id is None:
+        return 0
+    value = session_values[line.voucher_session_id]
+    return line.unit_price if value is None else value
+
+
+def _sale_lines(
+    sale: Sale, parts: list[OrderLine], valuation, session_values: dict
+) -> list[SaleLine]:
     """The fiscal copy of each part charged (``charge_parts``): a line of the check with the names of the
     options charged inside it, and a child line of an option under the line of its dish."""
     rows: list[SaleLine] = []
@@ -2433,6 +2448,7 @@ def _sale_lines(sale: Sale, parts: list[OrderLine], valuation) -> list[SaleLine]
             voucher_session_id=line.voucher_session_id,
             voucher_grant_id=line.voucher_grant_id,
             voucher_name=line.voucher_name,
+            voucher_value=_voucher_value(line, session_values),
             tax_category_key=out.tax_category_key,
             tax_rate=out.tax_rate,
             tax_country_code=out.tax_country_code,

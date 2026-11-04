@@ -59,6 +59,7 @@ from apps.service.queries import (
     load_service,
     lock_grant,
     redeem_refusal,
+    session_value,
     settings_row,
     void_refusal,
 )
@@ -1224,6 +1225,7 @@ def redeem(ctx: OperationContext, data: RedeemIn) -> dict:
         sale_id=data.sale_id,
         note=data.note,
         actor=_actor(ctx),
+        value=session_value(grant.id),
     )
     record_event(
         ctx,
@@ -1465,8 +1467,12 @@ def settle_sessions(ctx: OperationContext, data: SettleIn) -> dict:
             )
         pending.append(session)
     for session in pending:
+        # One by one, the next one's share read after this one's: the voucher's row is locked (``_lock_sessions``).
         Redemption.objects.filter(pk=session.pk).update(
-            status=CONSUMED, settled_at=now, sale_id=data.sale_id
+            status=CONSUMED,
+            settled_at=now,
+            sale_id=data.sale_id,
+            value=session_value(session.grant_id),
         )
         record_event(
             ctx,
