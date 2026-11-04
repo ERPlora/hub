@@ -238,7 +238,7 @@ export interface RectificationPreviewOut {
     total_amount: number;
     remaining: number;
   };
-  invoice_type: string;
+  invoice_type: InvoiceType;
   reason: string;
   series_code: string;
   next_number: string;

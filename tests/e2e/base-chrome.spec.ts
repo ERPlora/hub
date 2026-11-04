@@ -279,7 +279,8 @@ test('BASE-F11 — «Manage on erplora.com», right below «Upgrade plan», open
     expect(await sidewaysOverflow(foot), `the menu's foot fits at ${vp.label}`).toBeLessThanOrEqual(0);
     await capture(page, `FIX-HUB-BASE-MANAGE-ON-ERPLORA-LINK-${vp.label}`);
     if (vp.width === 1440) {
-      // Tapped, the panel opens in a tab of its own and the hub stays where it was.
+      // Tapped, the panel opens in a tab of its own and the hub stays where it was. Its address carries the pass; the
+      // spec below shows what the pass is for.
       const [tab] = await Promise.all([page.waitForEvent('popup'), link.click()]);
       await tab.waitForURL((url) => url.href.startsWith(address));
       await tab.close();
@@ -311,4 +312,71 @@ test('BASE-F11 — «Manage on erplora.com», right below «Upgrade plan», open
   await expect(shown(employee).getByTestId('assistant-button')).toBeVisible();
   await expect(employee.locator('ion-menu [data-testid="menu-manage"]')).toHaveCount(0);
   await context.close();
+});
+
+/** erplora.com's door for the pass the Hub signs (ACCOUNTS-F29 of the SaaS). */
+const PASS_DOOR = `${STACK.saas}/hub-pass/?pass=`;
+
+test('BASE-F11 — with no session of erplora.com in this browser, «Upgrade plan» and «Manage on erplora.com» land inside it, each with a pass of its own that works once; a pass that cannot be signed opens the usual address', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await login(page, A, '/');
+  const hubId = psql("SELECT id FROM base_hub WHERE slug = 'a'");
+  const context = page.context();
+  const menu = page.locator('ion-menu');
+  const plan = menu.locator('[data-testid="upgrade-plan"]');
+  const passes: string[] = [];
+  context.on('request', (request) => {
+    if (request.url().startsWith(PASS_DOOR)) passes.push(request.url());
+  });
+  /** Only the SaaS's cookies (host `localhost`): the hub's session, on `a.localhost`, stays. */
+  const leaveErplora = () => context.clearCookies({ domain: new URL(STACK.saas).hostname });
+
+  const doors = [
+    {
+      name: 'plan',
+      button: plan,
+      lands: `${STACK.saas}/dashboard/store/plans?business=${hubId}`,
+      inside: 'store-plans',
+    },
+    {
+      name: 'business',
+      button: menu.locator('[data-testid="menu-manage"]'),
+      lands: `${STACK.saas}/dashboard/businesses/${hubId}`,
+      inside: 'business-header',
+    },
+  ];
+  for (const door of doors) {
+    await leaveErplora();
+    const [tab] = await Promise.all([page.waitForEvent('popup'), door.button.click()]);
+    await tab.waitForURL((url) => url.href.startsWith(door.lands));
+    // Inside: what only a session sees, never the sign-in form.
+    await expect(tab.getByTestId(door.inside)).toBeVisible();
+    await expect(tab.getByTestId('login-form')).toHaveCount(0);
+    expect(await tab.evaluate(() => window.opener), 'the new tab cannot reach back into the hub').toBeNull();
+    // One tab, not two: the click did not also follow the link.
+    expect(context.pages(), `one tab for «${door.name}»`).toHaveLength(2);
+    await capture(tab, `BASE-F11-pass-${door.name}-1440`);
+    await tab.close();
+    await expect(page).toHaveURL(`${A}/`);
+  }
+  expect(passes, 'each click went through the door with its own pass').toHaveLength(2);
+  expect(new Set(passes).size, 'never the same pass twice').toBe(2);
+
+  // Spent: in another browser the same address opens nothing, and erplora.com says it expired.
+  await leaveErplora();
+  const again = await context.newPage();
+  await again.goto(passes[0]);
+  await expect(again).toHaveURL(/\/login\/error\?code=pass_expired/);
+  await again.close();
+
+  // The pass cannot be signed: the button still goes to the usual address, which asks to sign in.
+  await leaveErplora();
+  const throughTheDoor = passes.length;
+  await page.route('**/api/saas-pass', (route) => route.abort());
+  const [tab] = await Promise.all([page.waitForEvent('popup'), plan.click()]);
+  await expect(tab.getByTestId('login-form')).toBeVisible();
+  expect(passes, 'no pass this time').toHaveLength(throughTheDoor);
+  expect(decodeURIComponent(tab.url()), 'signing in goes on to the plan').toContain(`/dashboard/store/plans?business=${hubId}`);
+  await tab.close();
+  await page.unroute('**/api/saas-pass');
 });

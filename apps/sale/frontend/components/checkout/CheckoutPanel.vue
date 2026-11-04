@@ -513,6 +513,67 @@ function openDrawer(): void {
   background: var(--ion-background-color, #fff);
 }
 
+/* A low phone (375x667, 360x640): a tighter sheet, so the whole cash keypad stands above the foot as it opens; the
+   keys and the tap targets keep their size (hub#630). */
+@media (max-width: 820px) and (max-height: 700px) {
+  .sheet-h {
+    margin-bottom: 0;
+    padding-top: 0.4rem;
+  }
+
+  .pay-total {
+    margin: 0 0 0.5rem;
+    font-size: 2rem;
+  }
+
+  .pay,
+  .pay :deep(.checkout-tender) {
+    gap: 0.6rem;
+  }
+
+  .pay :deep(.pay-methods) {
+    margin-bottom: 0;
+  }
+
+  .sheet-foot {
+    padding: 0.5rem 1rem calc(0.5rem + var(--ion-safe-area-bottom, 0px));
+  }
+}
+
+/* Lower still (320x568): the figure goes up beside the title, between it and «Close» (the foot's «Charge» says it too).
+   Only when nothing stands above it: a note or an error keeps the figure on its own row. */
+@media (max-width: 820px) and (max-height: 620px) {
+  .pay-total:first-child {
+    display: flex;
+    justify-content: flex-end;
+    margin: -2.5rem 2.75rem 0.4rem 4.5rem;
+    font-size: 1.6rem;
+    line-height: 2.5rem;
+    white-space: nowrap;
+  }
+
+  /* The words of a total still loading are wider than the figure: smaller, so they stay clear of the title. */
+  .pay-total:first-child .pay-total__loading {
+    gap: 0.35rem;
+    font-size: 0.8rem;
+  }
+
+  .pay-total:first-child .pay-total__loading ion-spinner {
+    width: 1.2rem;
+    height: 1.2rem;
+  }
+
+  .pay-part,
+  .pay-remaining {
+    margin-top: 0;
+  }
+
+  .pay,
+  .pay :deep(.checkout-tender) {
+    gap: 0.4rem;
+  }
+}
+
 /* From 821 px, two columns as on Square or Shopify POS: the figure and what the sale is on the left, the
    method, the amount and the keypad on the right, from the figure down to the foot. Each column scrolls
    on its own; `.pay` steps aside so its two groups are the grid's items. */
