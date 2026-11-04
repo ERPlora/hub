@@ -1061,6 +1061,10 @@ asistente. Lo que en el producto actual tenía el perfil «Cajero» lo tiene aqu
   `queries.py`, `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/` y un
   `tests/test_<fichero>.py` por fichero. Además, `phones.py` (la lectura E.164) y `search.py` (el
   texto de búsqueda), sin ORM.
+- **Orden de las listas** (`_ordered`, con `base.ordering.list_order`; regla hub#2355 del producto viejo): fichas,
+  grupos, etiquetas, campos y compras van por la columna elegida y desempatan por `id`, todo en la dirección de la
+  lista y con los vacíos al final en las dos. La lista descendente es la ascendente leída al revés, empates incluidos,
+  y el CSV sale en el mismo orden. Lo fija `test_ties_go_by_id_in_the_lists_own_direction`, por lista.
 - `phones.py` lee el teléfono con `phonenumbers` (el port de Python de libphonenumber) y exige un
   número válido de su país; sus tests son el contrato del SDK del producto actual
   (`crates/guest-sdk/tests/phone_test.rs`), corregido donde ese SDK, que solo copiaba longitudes, se
