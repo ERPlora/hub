@@ -138,6 +138,9 @@ function priceLabel(app: AppRow): string {
   return t(`base.appsPage.right.${app.right}`);
 }
 
+/** Whoever reads a row's reason gets a column with room for it: a sentence, not a strip of a dozen short lines. */
+const statesSayWhy = computed(() => mayManage.value && apps.value.some((app) => app.refusal));
+
 const columns = computed<DataTableColumn<AppRow>[]>(() => [
   { key: 'name', label: t('base.appsPage.columns.app'), cell: 'app', priority: 'high' },
   {
@@ -171,6 +174,7 @@ const columns = computed<DataTableColumn<AppRow>[]>(() => [
     key: 'state',
     label: t('base.appsPage.columns.state'),
     cell: 'state',
+    ...(statesSayWhy.value ? { width: 'minmax(15rem, 1.5fr)' } : {}),
     sortValue: (row) => stateLabel(row),
     filter: catalogue.value
       ? {

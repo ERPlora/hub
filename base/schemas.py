@@ -690,8 +690,8 @@ class BlueprintDatasetOut(BlueprintPartOut):
 class BlueprintAppSummaryOut(BlueprintAppOut):
     status: Literal["on", "turns_on", "inactive", "unknown"] = Field(
         description="«on»; «turns_on»: off in this hub, the load turns it on first (with the apps it needs) and then "
-        "loads it; «inactive»: off and left off (only its data names it, or the plan gives no right to it), nothing "
-        "of it loads; «unknown»: this hub does not have it."
+        "loads it; «inactive»: off and left off (only its data names it, the plan gives no right to it or the app does "
+        "not go on in this business), nothing of it loads; «unknown»: this hub does not have it."
     )
     datasets: list[BlueprintDatasetOut]
 

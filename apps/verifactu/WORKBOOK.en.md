@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:00e5da29d809c2c4a255e0394476272ac0d35ca01fe7bf5e64d0fd0a644e793e -->
+<!-- generated from WORKBOOK.md sha256:4e38cd837b096b0333fbd17b15b21043572cc8bff1dc2ea8bc55a62037d41f71 -->
 
 ## What it is for and who it is for
 
@@ -253,8 +253,8 @@ Steps:
    environment.
 3. Only in a business in Spain. In one from another country (that of its erplora.com account), Apps does not offer
    it: it shows "Not available" with "VeriFactu is only for businesses in Spain." and no "Turn on", and the hub answers
-   the same if asked through the assistant or the API. A hair salon or restaurant template loads everything else and
-   says why VeriFactu stays out.
+   the same if asked through the assistant or the API. A hair salon or restaurant template does not promise to turn it
+   on, loads everything else and ends complete, with no "Retry", saying why VeriFactu stays out.
 4. If it was already on in a business from another country, it does nothing and can be turned off: invoices go out without a record or QR, **VeriFactu → Settings** and **VeriFactu → Configuration**
    say on top "VeriFactu is only for businesses in Spain." without offering anything that leads to the AEAT, and
    whatever asks to record or send something answers the same.

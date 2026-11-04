@@ -269,8 +269,8 @@ Pasos:
    pruebas.
 3. Solo en un negocio de España. En uno de otro país (el de su cuenta de erplora.com), Apps no la ofrece: sale
    «No disponible» con «VeriFactu solo es para negocios de España.» y sin «Activar», y el hub contesta lo mismo si se
-   pide por el asistente o por la API. Una plantilla de peluquería o de restaurante carga todo lo demás y dice por
-   qué VeriFactu se queda fuera.
+   pide por el asistente o por la API. Una plantilla de peluquería o de restaurante no promete encenderla, carga todo
+   lo demás y queda completa, sin «Reintentar», diciendo por qué VeriFactu se queda fuera.
 4. Si ya estaba encendida en un negocio de otro país, no hace nada y se puede desactivar: las facturas salen sin registro ni QR, **VeriFactu → Ajustes** y **VeriFactu → Configuración** dicen
    arriba «VeriFactu solo es para negocios de España.» sin ofrecer nada que lleve a la AEAT, y lo que pida registrar o enviar algo contesta lo mismo.
 Entra: nada más que la orden.

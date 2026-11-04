@@ -135,10 +135,10 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
 
 // hub#619: «Mis apps» in Spain, with VeriFactu on: what it needs says why it stays, a long sentence in a table column. It
 // wraps and is read whole, never cut at the edge of the column, where the legal reason would be lost.
-for (const [label, viewport] of Object.entries(VIEWPORTS)) {
-  test(`BASE-F25 — the reason a row gives is read whole, not cut at its column, at ${label}`, async ({ browser }) => {
+for (const [label, viewport] of Object.entries(VIEWPORTS)) for (const tab of ['/apps', '/apps#all']) {
+  test(`BASE-F25 — the reason a row gives is read whole, not cut at its column, on ${tab} at ${label}`, async ({ browser }) => {
     await registerBusinessIn(registration, 'ES');
-    const { context, page } = await signedInSpanish(browser, viewport, '/apps');
+    const { context, page } = await signedInSpanish(browser, viewport, tab);
     try {
       const reasons = shown(page).locator('[data-testid="apps-refusal"]');
       await expect(reasons.first()).toBeVisible();
@@ -150,6 +150,11 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
           .map((box) => `${box.scrollWidth} > ${box.clientWidth}`),
       );
       expect(cut, 'every reason fits the width of its box').toEqual([]);
+      // In the table of a tablet or a desk the column gives it room: a sentence is not a strip of a dozen short lines.
+      if (viewport.width > 640) {
+        const widths = await reasons.evaluateAll((all) => all.map((reason) => reason.getBoundingClientRect().width));
+        expect(Math.min(...widths), 'the narrowest reason, in px').toBeGreaterThanOrEqual(240);
+      }
     } finally {
       await context.close();
     }
