@@ -1223,7 +1223,7 @@
       "staff__time_off__approve": "Approve time off",
       "staff__time_off__cancel": "Cancel time off",
       "staff__time_off__create": "Record time off",
-      "staff__time_off__get": "Read a time-off request without its reason",
+      "staff__time_off__get": "Read a time off without its reason",
       "staff__time_off__detail": "Read a time off",
       "staff__time_off__list": "Look for time off",
       "staff__time_off__mine": "Read my time off",
