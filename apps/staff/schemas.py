@@ -530,7 +530,10 @@ class CommissionReportRow(Schema):
         description="active or on_leave (who can earn a commission); inactive or terminated when they sold in the period."
     )
     commission_rate: Decimal = Field(description="Commission, in percent.")
-    sold: int = Field(description="What they sold in the period, refunds taken off, in cents.")
+    sold: int = Field(
+        description="What they sold in the period, refunds and the vouchers they sold taken off and the value of the "
+        "voucher sessions they did added, in cents."
+    )
     commission: int = Field(description="sold x rate / 100, in cents, rounded half up once.")
 
 
@@ -942,14 +945,9 @@ class TimeOffFieldsIn(Schema):
         return self
 
 
-class TimeOffIn(TimeOffFieldsIn):
-    member_id: UUID | None = Field(None, description=D_MEMBER_ID)
-    member: MemberName | None = Field(None, validate_default=True, description=D_MEMBER)
-
-    @field_validator("member")
-    @classmethod
-    def _named(cls, value: str | None, info: ValidationInfo) -> str | None:
-        return _member_named(value, info, "member_id")
+# The member goes after the fields (the order the assistant reads them in): the bases are collected last to first.
+class TimeOffIn(MemberOfIn, TimeOffFieldsIn):
+    pass
 
 
 class TimeOffRequestIn(TimeOffFieldsIn):

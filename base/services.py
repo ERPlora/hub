@@ -1824,8 +1824,8 @@ def demo_expire(ctx: OperationContext, data: DemoSlugIn) -> dict:
 @operation("base.demo.purge", kind="command", permission=None, input=DemoSlugIn, output=DemoStatusOut, ai=INTERNAL)
 def demo_purge(ctx: OperationContext, data: DemoSlugIn) -> dict:
     """Purge the demo ``data.slug``, which ended: its codes, its owner and its role go; the row stays ``purged`` as a
-    tombstone (410) for ``DEMO_TOMBSTONE_DAYS``. Rows only: its database went before, outside any transaction of
-    control (:func:`purge_demo_data`, from ``base.tenancy.provision.drop``).
+    tombstone (410) for ``DEMO_TOMBSTONE_DAYS``. Rows only: its database and its files went before, outside any
+    transaction of control (:func:`purge_demo_data`, from ``base.tenancy.provision.drop``).
 
     The reaper's, one transaction per demo. A demo still on is ``base.demo_live``; one already purged stays as it is.
     """
@@ -1845,24 +1845,26 @@ def demo_purge(ctx: OperationContext, data: DemoSlugIn) -> dict:
 
 
 def purge_demo_data(hub: Hub) -> None:
-    """Delete what the demo ``hub`` wrote in the apps: its whole database, ``DROP DATABASE … WITH (FORCE)`` on its
-    cluster (``base.tenancy.ops``), outside any transaction, and only its own ``<control>_demo_<hex>`` (a row that names
-    another database is refused); it is never emptied nor reused.
+    """Delete what the demo ``hub`` wrote: its whole database, ``DROP DATABASE … WITH (FORCE)`` on its cluster
+    (``base.tenancy.ops``), outside any transaction, and only its own ``<control>_demo_<hex>`` (a row that names another
+    database, or no demo, is refused and loses nothing); it is never emptied nor reused. Then its files, its prefix in
+    the store and no other (:func:`base.files.delete_hub_files`).
 
     A demo made before round 2026-10-30 (``db_name`` empty) kept its rows in the database every hub of phase 1 shares,
-    where nothing tells them from anyone else's (plan 2026-10-17 §1.7): nothing is deleted for it. A database already
-    gone is no failure; one the server refuses to drop fails the purge, which the reaper tries again.
+    where nothing tells them from anyone else's (plan 2026-10-17 §1.7): only its files are deleted. A database already
+    gone is no failure; one the server refuses to drop, or a store that does not delete, fails the purge, which the
+    reaper tries again.
     """
-    if not hub.db_name:
-        return
     from base.tenancy import ops
 
     own = database_names.demo_db_name(control_name(), hub.id)
-    if not hub.is_demo or hub.db_name != own:
+    if not hub.is_demo or hub.db_name not in ("", own):
         raise database_names.InvalidDatabaseName(
             f"{hub.db_name!r} is not the demo {hub.slug}'s own database ({own!r}): nothing is dropped."
         )
-    ops.drop_database(hub.db_name, cluster=hub.cluster)
+    if hub.db_name:
+        ops.drop_database(hub.db_name, cluster=hub.cluster)
+    files.delete_hub_files(storages["hub_files"], hub.id)
 
 
 def reap_demos(now: dt.datetime | None = None) -> int:
@@ -1870,9 +1872,9 @@ def reap_demos(now: dt.datetime | None = None) -> int:
 
     The worker's (``base.worker``, every ``REAPER_INTERVAL_SECONDS``) and ``manage.py demo_expire``'s. Every demo
     that ended is marked ``expired`` and due (``hub_due``) first, then dropped and purged under its lease
-    (``base.tenancy.provision.drop``: its database, then ``base.demo.purge`` in its own transaction). One that fails,
-    or whose lease the worker holds (it was still being made), is logged or left, and the others are purged; the worker
-    takes it again as due. Then the tombstones older than ``DEMO_TOMBSTONE_DAYS`` are forgotten.
+    (``base.tenancy.provision.drop``: its database and its files, then ``base.demo.purge`` in its own transaction). One
+    that fails, or whose lease the worker holds (it was still being made), is logged or left, and the others are purged;
+    the worker takes it again as due. Then the tombstones older than ``DEMO_TOMBSTONE_DAYS`` are forgotten.
     """
     from base.tenancy import provision
 
@@ -2582,9 +2584,9 @@ def final_copy_kept(hub: Hub) -> bool:
 # Not an assistant tool: the worker's last step of a business past its 90 days, no person.
 @operation("base.hub.purge", kind="command", permission=None, input=HubGetIn, output=HubOut, ai=INTERNAL)
 def hub_purge(ctx: OperationContext, data: HubGetIn) -> dict:
-    """The database of the business ``data.id`` went (``base.tenancy.offboarding``): its people lose their way in and
-    the row stays ``purged`` as a tombstone (its host answers 410, forever), with nothing of the business on it: no
-    name, no photo. Its cluster is let go, or a tombstone would keep that cluster from ever being deleted.
+    """The database and the files of the business ``data.id`` went (``base.tenancy.offboarding``): its people lose their
+    way in and the row stays ``purged`` as a tombstone (its host answers 410, forever), with nothing of the business on
+    it: no name, no photo. Its cluster is let go, or a tombstone would keep that cluster from ever being deleted.
 
     Rows only, in one transaction of control. One that is not ``dropping`` is ``base.hub_not_dropping`` (a demo has
     ``base.demo.purge``); one already purged stays as it is."""

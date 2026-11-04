@@ -588,3 +588,158 @@ def test_erasing_a_card_empties_the_reason_a_session_came_back(cut, lucia):
     )
     session.refresh_from_db()
     assert session.return_reason == ""
+
+
+# ── What a session is worth (SERVICE-F24, SALE-F28) ─────────────────────────────────────────
+
+
+def paid_voucher(cut, lucia, *, amount=10000, uses=3, name="Bono de 100"):
+    """A voucher that says the line of the till that charged it (Sales keeps that line out of who sold it)."""
+    return make_grant(make_package(name, [cut], max_uses=uses), lucia, amount=amount, sale_line_id=uuid.uuid7())
+
+
+def spend(grant, cut, lucia):
+    """One session of ``grant`` held and delivered on a sale of its own; what it came to be worth."""
+    return settle([hold(grant, cut).id], uuid.uuid7(), lucia.id).rows[0].value
+
+
+def adjust(grant, uses_delta):
+    return run(
+        "service.grant.adjust",
+        {"id": str(grant.id), "uses_delta": uses_delta, "reason": "courtesy"},
+    )
+
+
+def test_three_sessions_of_100_euros_add_up_to_the_cent(cut, lucia):
+    # flow: SERVICE-F24: what is left of the price ÷ the sessions left, half up; nothing lost, nothing made up.
+    grant = paid_voucher(cut, lucia)
+    worth = [spend(grant, cut, lucia) for _ in range(3)]
+    assert worth == [3333, 3334, 3333]
+    assert sum(worth) == 10000
+
+
+def test_sessions_delivered_together_are_worth_the_same_as_one_by_one(cut, lucia):
+    grant = paid_voucher(cut, lucia)
+    held = [hold(grant, cut).id for _ in range(3)]
+    out = settle(held, uuid.uuid7(), lucia.id)
+    assert [row.value for row in out.rows] == [3333, 3334, 3333]
+    assert list(
+        Redemption.objects.filter(pk__in=held).order_by("id").values_list("value", flat=True)
+    ) == [3333, 3334, 3333]
+
+
+def test_a_session_is_worth_nothing_until_it_is_delivered(cut, lucia):
+    grant = paid_voucher(cut, lucia)
+    held = hold(grant, cut)
+    assert held.value is None
+    assert Redemption.objects.get(pk=held.id).value is None
+
+
+def test_a_held_session_nobody_charged_takes_no_share_of_the_price(cut, lucia):
+    grant = paid_voucher(cut, lucia)
+    released = hold(grant, cut)
+    run("service.session.release", {"id": str(released.id)}, role="hub_employee")
+    # Still in its hold when the next one is delivered: it is one of the sessions left, with no money taken.
+    hold(grant, cut)
+    assert spend(grant, cut, lucia) == 3333
+
+
+def test_delivering_the_same_sale_again_does_not_value_the_session_again(cut, lucia):
+    grant = paid_voucher(cut, lucia)
+    held = hold(grant, cut)
+    sale = uuid.uuid7()
+    assert settle([held.id], sale, lucia.id).rows[0].value == 3333
+    adjust(grant, 3)
+    assert settle([held.id], sale, lucia.id).rows[0].value == 3333
+    assert Redemption.objects.get(pk=held.id).value == 3333
+
+
+def test_a_courtesy_session_shares_what_is_left_of_the_price(cut, lucia):
+    # The money paid does not grow: the voucher is never worth more than it was paid for.
+    grant = paid_voucher(cut, lucia)
+    worth = [spend(grant, cut, lucia)]
+    adjust(grant, 1)
+    worth += [spend(grant, cut, lucia) for _ in range(3)]
+    assert worth == [3333, 2222, 2223, 2222]
+    assert sum(worth) == 10000
+
+
+def test_a_session_taken_off_leaves_its_share_to_the_ones_left(cut, lucia):
+    grant = paid_voucher(cut, lucia)
+    worth = [spend(grant, cut, lucia)]
+    adjust(grant, -1)
+    worth.append(spend(grant, cut, lucia))
+    assert worth == [3333, 6667]
+
+
+def test_a_session_given_back_gives_its_share_back_to_the_voucher(cut, lucia):
+    grant = paid_voucher(cut, lucia)
+    first = hold(grant, cut)
+    sale = uuid.uuid7()
+    second = hold(grant, cut)
+    settled = settle([first.id, second.id], sale, lucia.id)
+    assert [row.value for row in settled.rows] == [3333, 3334]
+    run(
+        "service.session.return",
+        {"ids": [str(second.id)], "reference": str(uuid.uuid7()), "reason": "did not come"},
+    )
+    # What it was worth stays on its own row: its trail never moves.
+    assert Redemption.objects.get(pk=second.id).value == 3334
+    worth = [spend(grant, cut, lucia), spend(grant, cut, lucia)]
+    assert worth == [3334, 3333]
+    assert 3333 + sum(worth) == 10000
+
+
+def test_a_session_spent_outside_the_till_takes_its_share_of_the_price(cut, lucia):
+    # flow: SERVICE-F21: nobody's production (it does not say who did it), but the sessions left are one fewer.
+    grant = paid_voucher(cut, lucia)
+    outside = run("service.grant.redeem", {"id": str(grant.id), "service_id": str(cut.id)})
+    assert Redemption.objects.get(pk=outside.id).value == 3333
+    assert [spend(grant, cut, lucia), spend(grant, cut, lucia)] == [3334, 3333]
+
+
+def test_a_voucher_given_for_free_is_worth_nothing_per_session(cut, lucia):
+    grant = make_grant(make_package("Regalo", [cut], max_uses=3), lucia, amount=0)
+    assert spend(grant, cut, lucia) == 0
+
+
+def test_a_paid_voucher_that_does_not_say_its_line_is_worth_nothing_per_session(cut, lucia):
+    # hub#769: its money may already count for who sold it, on a line nobody named: its sessions must not count again.
+    limited = make_grant(make_package("Sin línea", [cut], max_uses=3), lucia, amount=10000)
+    assert [spend(limited, cut, lucia), spend(limited, cut, lucia)] == [0, 0]
+    unlimited = make_grant(make_package("Sin línea ni límite", [cut], max_uses=None), lucia, amount=10000)
+    assert spend(unlimited, cut, lucia) == 0
+    outside = make_grant(make_package("Sin línea fuera", [cut], max_uses=3), lucia, amount=10000)
+    spent = run("service.grant.redeem", {"id": str(outside.id), "service_id": str(cut.id)})
+    assert Redemption.objects.get(pk=spent.id).value == 0
+
+
+def test_an_unlimited_voucher_has_no_sessions_to_divide_its_price_by(cut, lucia):
+    grant = paid_voucher(cut, lucia, uses=None)
+    assert spend(grant, cut, lucia) is None
+    given = make_grant(make_package("Regalo sin límite", [cut], max_uses=None), lucia, amount=0)
+    assert spend(given, cut, lucia) is None
+
+
+def test_the_catalog_changing_later_does_not_move_the_voucher_sold(cut, lucia):
+    # The price paid and the sessions were frozen when it was sold (SERVICE-F14).
+    grant = paid_voucher(cut, lucia)
+    first = spend(grant, cut, lucia)
+    run(
+        "service.package.update",
+        {"id": str(grant.package_id), "max_uses": 10, "fixed_price": 50000},
+    )
+    assert [first, spend(grant, cut, lucia), spend(grant, cut, lucia)] == [3333, 3334, 3333]
+
+
+def test_a_voucher_repaired_by_hand_never_breaks_a_charge(cut, lucia):
+    # Support repairs sessions in the admin (test_admin): more delivered than it has, or worth more than it was paid.
+    over = paid_voucher(cut, lucia, uses=2, name="Bono de más")
+    held = hold(over, cut)
+    for _ in range(2):
+        make_redemption(over, cut, status=Redemption.Status.CONSUMED, value=1000)
+    assert settle([held.id], uuid.uuid7(), lucia.id).rows[0].value == 8000
+    spent = paid_voucher(cut, lucia, name="Bono gastado")
+    held = hold(spent, cut)
+    make_redemption(spent, cut, status=Redemption.Status.CONSUMED, value=20000)
+    assert settle([held.id], uuid.uuid7(), lucia.id).rows[0].value == 0
