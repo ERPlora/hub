@@ -29,8 +29,9 @@ from apps.reservation.models import Reservation, WaitlistEntry
 from apps.reservation.tests.conftest import make_reservation, open_week, set_rules
 from apps.whatsapp_inbox.models import Conversation, Message
 from apps.whatsapp_inbox.tests.conftest import NOW, connect, ctx_for, receive, run
-from base import catalog, scheduler, worker
+from base import catalog, worker
 from base.catalog import RegisterResult
+from base.models import TaskSchedule
 from base.tests.fake_gateway import gateway, signed  # noqa: F401 - the fixture
 
 pytestmark = pytest.mark.django_db
@@ -49,17 +50,11 @@ SORRY = (
 
 @pytest.fixture
 def tick(monkeypatch, django_capture_on_commit_callbacks):
-    """One turn of the worker's real loop (``test_relay_notify.py``'s): the relay, then what each COMMIT left for
-    after it (the deliveries to erplora.com, the assistant's turns). ``tick(later)`` runs it with its clock ``later``
-    than now (a second by default).
-
-    The apps' scheduled tasks are not these tests': they are scheduled a day ahead (the worker's own ``sync`` keeps a
-    known task's clock), so whichever minute a tick lands on, only the relay runs. A tick that crossed the minute ran
-    ``flow.run.resume_due`` before the relay, and in phase 1 it takes the run waiting on the assistant on the worker's
-    fixed scope (``WORKER_SCOPE_SLUG``), not the business's: the guest got the thanks last (CI run 41094697959)."""
+    """One turn of the worker's real loop (``test_relay_notify.py``'s): the tasks due and the relay, then what each
+    COMMIT left for after it (the deliveries to erplora.com, the assistant's turns). ``tick(later)`` runs it with its
+    clock ``later`` than now (a second by default)."""
     monkeypatch.setattr(catalog, "register_apps", lambda: REGISTERED)
     monkeypatch.setattr(BaseDatabaseWrapper, "close_if_unusable_or_obsolete", lambda self: None)
-    scheduler.sync(timezone.now() + dt.timedelta(days=1))
 
     def run_once(later: dt.timedelta = dt.timedelta(seconds=1)) -> None:
         stop = threading.Event()
@@ -465,6 +460,15 @@ def test_the_answer_never_cancels_the_reservation_of_another_number(
     assert "reservation.customer_mismatch" in json.dumps(told)
     assert outbound()[-1] == "No encuentro ninguna reserva a tu nombre."
     assert [seen.body["hub"] for seen in gateway.sent(CHAT)] == ["a", "a"]  # both turns, the business's own
+
+
+def test_a_tick_past_the_minute_runs_the_minute_s_tasks(tick):
+    """What ``past_the_minute`` stands on: that tick does run ``flow.run.resume_due``, or the test above measures
+    nothing of the minute it lands on (hub#625)."""
+    tick()
+    tick(dt.timedelta(minutes=2))
+
+    assert TaskSchedule.objects.get(app_label="flow", name="resume_due").last_run is not None
 
 
 def tool_inputs(seen, name: str) -> set[str]:
