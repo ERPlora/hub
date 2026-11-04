@@ -38,8 +38,6 @@ interface Box {
 
 let dish: Product;
 
-test.describe.configure({ mode: 'serial' });
-
 test.beforeAll(async ({ browser }) => {
   cleanSales();
   cleanInventory();
