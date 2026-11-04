@@ -540,10 +540,6 @@ Los avisos nunca llevan la posición ni el motivo de una corrección (datos pers
 
 ## Lo que queda fuera
 
-- **Una traducción al español marcada «fuzzy» sale en inglés** y su test de traducciones no lo ve
-  (hub#491).
-- **Un texto que pierde su contexto sale con la traducción de otra app** y su test de catálogo no lo ve
-  (hub#493).
 - **Suprimir las jornadas pasados los cuatro años** (y con ellas su posición): se conservan; la
   supresión automática no está (como attendance#7 del producto actual).
 - **Iconos propios** (café, play, ubicación, localizar, guardar): pedidos en `UI-REQUESTS.md`; mientras, iconos

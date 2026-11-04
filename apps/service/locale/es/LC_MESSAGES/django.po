@@ -569,3 +569,24 @@ msgstr "imagen"
 #: schemas.py
 msgid "Image"
 msgstr "Imagen"
+
+msgid "Service"
+msgstr "Servicio"
+
+msgid "Category"
+msgstr "Categoría"
+
+msgid "Package"
+msgstr "Paquete"
+
+msgid "Professional of a service"
+msgstr "Profesional del servicio"
+
+msgid "Voucher sold"
+msgstr "Bono vendido"
+
+msgid "Voucher session"
+msgstr "Sesión del bono"
+
+msgid "Voucher sessions"
+msgstr "Sesiones del bono"

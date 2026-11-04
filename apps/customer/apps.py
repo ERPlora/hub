@@ -91,3 +91,10 @@ class CustomerConfig(LiveAppConfig):
             path="/customer/fields",
         ),
     ]
+
+    def fiscal_documents_kept(self) -> bool:
+        """hub#599: the platform asks (``base.tenancy.offboarding``) before it drops the database of a business that
+        left: The card sales of its customers (a manual entry has no sale behind it) here are documents nothing archives yet (PLAN-DB §6), so the database stays."""
+        from apps.customer import queries  # the models are not loaded yet when this module is
+
+        return queries.keeps_fiscal_documents()

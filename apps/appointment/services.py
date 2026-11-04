@@ -394,7 +394,7 @@ def _create(
         staff=member,
         staff_name=member.full_name,
         start=start,
-        end=start + dt.timedelta(minutes=minutes),
+        end=engine.ends_at(start, minutes),
         duration_minutes=minutes,
         status=S.PENDING if pending else S.CONFIRMED,
         source=source,
@@ -466,7 +466,7 @@ def create_appointment(ctx: OperationContext, data: AppointmentCreateIn) -> dict
         ctx,
         member,
         start,
-        start + dt.timedelta(minutes=minutes),
+        engine.ends_at(start, minutes),
         customer=by_customer,
         confirm_overlap=data.confirm_overlap,
     )
@@ -511,12 +511,12 @@ def bulk_create(ctx: OperationContext, data: BulkCreateIn) -> dict:
         ctx,
         member,
         engine.wall(starts[0], zone).date(),
-        engine.wall(starts[-1] + dt.timedelta(minutes=minutes), zone).date(),
+        engine.wall(engine.ends_at(starts[-1], minutes), zone).date(),
     )
     settings = current_settings()
     created = []
     for start in starts:
-        end = start + dt.timedelta(minutes=minutes)
+        end = engine.ends_at(start, minutes)
         try:
             _judge(
                 ctx,
@@ -622,7 +622,7 @@ def _move(
             else appointment.duration_minutes
         )
     new_start = start or appointment.start
-    new_end = new_start + dt.timedelta(minutes=minutes)
+    new_end = engine.ends_at(new_start, minutes)
     _judge(
         ctx,
         member,
@@ -1279,7 +1279,7 @@ def _book_window(
             except engine.NonexistentTime:
                 start, code = None, "invalid_start"
         if code is None:
-            end = start + dt.timedelta(minutes=minutes)
+            end = engine.ends_at(start, minutes)
             code = engine.verdict(agenda, start, end, now=now(), customer=True)
         if code:
             report["skipped"].append(

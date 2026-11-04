@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:7820aa11e88470baebf04cba27cdedfdd571b70328f0d61b26bea6a9c9480bfe -->
+<!-- generated from WORKBOOK.md sha256:111b767314cccaaa7222b0c57689db66add06672a52c2329ea97930b5a1cdb5b -->
 
 ## What it is for and who it is for
 
@@ -321,7 +321,8 @@ Everything can be asked for through the screens, the assistant (by voice or by t
 own session) and the API, with the same rules and the same permissions. Designed for voice: a group is
 named by its id or its name ("group Sauces"), an option by its id or its name and its group ("option No
 onion of Extras"), a product by its id, its SKU or its name and a category by its id or its name. If a
-name fits several, it is refused saying which ones (409 `*_ambiguous`).
+name fits several, it is refused saying which ones (409 `*_ambiguous`). Before changing anything, the assistant asks
+for confirmation with its card (BASE-F97), which names each record as the screens name it, never by its id.
 
 ### What it offers: queries (they read, they change nothing)
 
@@ -330,7 +331,10 @@ name fits several, it is refused saying which ones (409 `*_ambiguous`).
 | The groups, with search, filters (name, required), order and pages (up to 100) | view | F01 | `modifier.group.list` |
 | A group by its id or its name | view | F03 | `modifier.group.get` |
 | The options, of a group or all of them, with search and pages | view | F04, F07 | `modifier.option.list` |
+| An option by its id or its name and its group, with the `label` the assistant's card (BASE-F97) names it by: "No onion (Extras)" | view | F04 | `modifier.option.get` |
 | The links, of a group, of a product or of a category, with pages | view | F05 | `modifier.link.list` |
+| A link by its id, or by its group and its product or category, with its `label`: "Sauces · Burger" | view | F05 | `modifier.link.get` |
+| An Inventory category by its id or its name, as the list of links names it | view | F05 | `modifier.category.get` |
 | The groups with their options of a product (its own and those of all its categories, once each) | view | F06 | `modifier.group.for_target` |
 | The check and pricing of some chosen options for a product: price, names, tax category, total to add and kitchen text | view | F07, F08 | `modifier.selection.resolve` |
 

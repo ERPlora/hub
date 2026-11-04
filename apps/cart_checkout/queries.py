@@ -493,3 +493,9 @@ def list_orders(ctx: OperationContext, params: OrderListIn) -> dict:
 )
 def get_order(ctx: OperationContext, data: OrderRefIn) -> dict:
     return order_row(find_order(data.order_id, data.order_number))
+
+
+def keeps_fiscal_documents() -> bool:
+    """Whether this database holds its shop orders (``fiscal_documents_kept`` on this app's config), of any status: a draft counts
+    too, for what it asks is whether a database can go, and that cannot be undone."""
+    return Order.objects.exists()
