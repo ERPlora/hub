@@ -1928,6 +1928,11 @@ msgid "%(app)s is turned off in this business."
 msgstr "%(app)s está desactivada en este negocio."
 
 #: base/queries.py
+#, python-format
+msgid "%(app)s can't be turned off: %(needed_by)s needs it. %(reason)s"
+msgstr "%(app)s no se puede desactivar: hace falta para %(needed_by)s. %(reason)s"
+
+#: base/queries.py
 msgid "No app has that name or id."
 msgstr "Ninguna app tiene ese nombre o identificador."
 
