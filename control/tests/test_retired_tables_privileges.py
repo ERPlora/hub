@@ -10,17 +10,22 @@ import logging
 import os
 import subprocess
 import sys
+import uuid
 from pathlib import Path
 
 import pytest
 from django.apps import apps as global_apps
 from django.db import DEFAULT_DB_ALIAS, connections
+from django.db.migrations.state import ProjectState
 
-from base.tenancy import bootstrap
+from base.tenancy import bootstrap, names
+from base.tenancy import connections as tenancy_connections
+from base.tenancy.tests import hubs
 from base.tests.test_bootstrap import VARIABLES, Cluster, allowed, create_master, drop_prefixed, superuser
 
 MIGRATION = "0008_retired_tables_no_app_access"
 RENAME = "0007_hub_tables_renamed_shared"
+LEGACY_ROUTER = "base.tenancy.tests.legacy.LegacyTablesRouter"
 BEFORE = "0006_hub_activity"
 #: A table of a hub's app (``base.tenancy.inventory``), as ``control/0007`` finds it in control and what it leaves.
 HUB_TABLE = "printing_printer"
@@ -266,6 +271,25 @@ def test_with_nothing_retired_it_does_not_even_look_for_the_role(cluster, as_mig
     as_migrator(migration().backwards)
 
     assert what_the_app_can_do(cluster, "still_in_use") == ALL_ALLOWED
+
+
+def test_a_hubs_real_database_is_never_touched(hub_databases, django_db_blocker, settings, monkeypatch):
+    # TenantRouter migrates the control app on control's alias alone; a hub's database never gets this far.
+    settings.DATABASE_ROUTERS = [router for router in settings.DATABASE_ROUTERS if router != LEGACY_ROUTER]
+
+    def looked_for_tables(connection):
+        raise AssertionError(f"the migration ran on {connection.alias}")
+
+    monkeypatch.setattr(migration(), "_retired", looked_for_tables)
+    name = names.hub_db_name(hub_databases.control, uuid.uuid7())
+    with django_db_blocker.unblock(), hubs.clone_of_the_template(hub_databases, name):
+        ddl = connections[tenancy_connections.register_ddl_alias(name)]
+        state = ProjectState()
+        operation = migration().Migration.operations[0]
+        with ddl.schema_editor() as editor:
+            operation.database_forwards("control", editor, state, state)
+            operation.database_backwards("control", editor, state, state)
+        ddl.close()
 
 
 def test_it_closes_the_names_control_0007_gives():
