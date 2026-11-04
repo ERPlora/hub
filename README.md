@@ -485,3 +485,10 @@ las apps y las de Django: `hub-migrate` las aplica todas), cada una contra el es
 El paso del despliegue posterior (el contract), las migraciones ya desplegadas antes de la regla y las de Django van en
 su lista `ACCEPTED`: una entrada nueva se justifica en su PR (la del contract, con la PR de su primer paso), y una que ya
 no rompe nada hace caer el test.
+
+**Una operación sin modelo** (`RunSQL`, o `RunPython` sin `hints`) de `base` o `live` cuenta como de hub: en control se
+salta y la migración queda registrada igual (`base/0006`, hub#751). Si tiene que llegar a control, lleva
+`hints={"model_name": "<modelo contextual o de control>"}`: `eventdelivery`, no `outboxevent`, que bajo `base` cuenta como
+de hub. Lo comprueba `base/tests/test_outbox_pending_index.py`, con la configuración de producción: control y un hub
+tienen los mismos índices en las tablas que comparten. Un índice sobre una tabla con tráfico se construye `CONCURRENTLY`
+(`atomic = False`), y la migración retira antes el inválido que haya dejado una construcción cortada (`base/0023`).
