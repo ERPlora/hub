@@ -11,73 +11,34 @@
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, capture, login, psql, shown, untilStill } from './helpers';
-import { cleanInventory, createProduct, type Product } from './inventory-helpers';
-import { cleanSales, drawerOff, openTillCart, restoreDrawer, stamp } from './sale-helpers';
+import { cleanInventory, type Product } from './inventory-helpers';
+import { type Box, cleanSales, dishForTheTill, eachNoticeSize, holdNotices, noticeBox, openTillCart, restoreDrawer, stamp } from './sale-helpers';
 
 const KEY = 'FIX-HUB-748-NOTICE';
 /** Hub `a`'s issuer, parked while the run needs the strip of a hub that cannot issue invoices yet. */
 const PARKED = 'e2e_sale_kitchen_send_notice_issuer';
 const RUN = stamp();
-/** The durations of `toast()` for a plain notice and for a warning that the sheet did not print. */
-const NOTICE_MS = [2600, 4500];
-const SIZES = [
-  { label: '1440x900', width: 1440, height: 900 },
-  { label: '820x1180', width: 820, height: 1180 },
-  { label: '375x667', width: 375, height: 667 },
-  { label: '320x568', width: 320, height: 568 },
-] as const;
-const PHONES = SIZES.filter((size) => size.width < 500);
+/** How long `toast()` shows a plain notice and a warning that the sheet did not print. */
+const SENT_MS = 2600;
+const NOT_PRINTED_MS = 4500;
 const LANGUAGES = [
   { name: 'English', lang: 'en', locale: 'en-US', sent: 'Order 1 sent to the kitchen.', notPrinted: 'Order 1 sent to the kitchen, but it did not print.' },
   { name: 'Spanish', lang: 'es', locale: 'es-ES', sent: 'Comanda 1 enviada a cocina.', notPrinted: 'Comanda 1 enviada a cocina, pero no se imprimió.' },
 ] as const;
 
-interface Box {
-  top: number;
-  bottom: number;
-  left: number;
-  right: number;
-}
-
 let dish: Product;
 
-/** The kitchen tickets of this file's checks (their dishes name the lines of its product), before the sales: a ticket
- *  names the check's lines. */
-function cleanRun(): void {
-  const lines = "select id from sale_orderline where sku like 'E2E-KSEND-%'";
-  const tickets = `select distinct ticket_id from kitchen_ticketitem where sale_line_id in (${lines}) or name like 'E2E KSEND %'`;
-  psql(
-    [
-      `create temp table e2e_ksend_tickets as ${tickets}`,
-      "delete from printing_printjob where source_app = 'kitchen' and reference in (select number from kitchen_ticket where id in (select ticket_id from e2e_ksend_tickets))",
-      'delete from kitchen_logentry where ticket_id in (select ticket_id from e2e_ksend_tickets)',
-      'delete from kitchen_ticketitem where ticket_id in (select ticket_id from e2e_ksend_tickets)',
-      'delete from kitchen_ticket where id in (select ticket_id from e2e_ksend_tickets)',
-    ].join('; '),
-  );
-}
-
-function cleanUp(): void {
-  cleanRun();
+test.beforeAll(async ({ browser }) => {
   cleanSales();
   cleanInventory();
-}
-
-test.beforeAll(async ({ browser }) => {
-  cleanUp();
   psql([`drop table if exists ${PARKED}`, `create table ${PARKED} as select * from invoice_issuer`, 'delete from invoice_issuer'].join('; '));
-  const context = await browser.newContext({ baseURL: A });
-  const page = await context.newPage();
-  await login(page, A, '/sale/pos');
-  // Cash without a cash session: the drawer's lock is sale-cash-gate.spec.ts's.
-  await drawerOff(context);
-  dish = await createProduct(context, { name: `E2E KSEND Dish ${RUN}`, sku: `E2E-KSEND-${RUN}`, price: 700, tax_category_key: 'restaurant.food' });
-  await context.close();
+  dish = await dishForTheTill(browser, 'KSEND', RUN);
 });
 
 test.afterAll(() => {
   try {
-    cleanUp();
+    cleanSales();
+    cleanInventory();
   } finally {
     try {
       restoreDrawer();
@@ -89,15 +50,10 @@ test.afterAll(() => {
 
 /** A check of its own with a dish, its till in the language under test, the round sent with «Send order». */
 async function sendRound(page: Page, context: BrowserContext, lang: string): Promise<void> {
-  // A notice's timer (see `NOTICE_MS`) waits for the spec to read it; no other timer changes.
-  await page.addInitScript((noticeMs) => {
-    const original = window.setTimeout.bind(window);
-    window.setTimeout = ((run: TimerHandler, ms?: number, ...rest: unknown[]) =>
-      original(run, noticeMs.includes(ms ?? 0) ? 600_000 : ms, ...rest)) as typeof window.setTimeout;
-  }, NOTICE_MS);
   await login(page, A, '/sale/pos');
   await context.addCookies([{ name: 'django_language', value: lang, domain: new URL(A).hostname, path: '/' }]);
   await page.reload();
+  await expect(shown(page).locator('[data-testid=blocking-strip]'), 'the strip of a hub that cannot issue invoices yet').toBeVisible({ timeout: 30_000 });
   await shown(page).locator(`[data-testid=pos-product-${dish.id}]`).click();
   await expect(shown(page).locator('[data-testid^=pos-line-]').filter({ hasText: dish.name }).first()).toBeAttached();
   await openTillCart(page);
@@ -106,13 +62,10 @@ async function sendRound(page: Page, context: BrowserContext, lang: string): Pro
   await expect(shown(page).locator('[data-testid=pos-cart-round-empty]'), 'the round left «Current order»').toBeVisible();
 }
 
-/** The notice's own box (its host fills the screen), what answers on its middle, and the same for «Charge», in one read. */
+/** The notice's box and whether it answers on its middle, and the same for «Charge», with everything on screen still. */
 async function read(page: Page, notice: Locator): Promise<{ toast: Box; toastOnTop: boolean; charge: Box; answer: string }> {
-  const { toast, toastOnTop } = await notice.evaluate((el) => {
-    const box = el.shadowRoot!.querySelector('.toast-wrapper')!.getBoundingClientRect();
-    const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
-    return { toast: { top: box.top, bottom: box.bottom, left: box.left, right: box.right }, toastOnTop: hit === el };
-  });
+  const toast = await noticeBox(notice);
+  const toastOnTop = await notice.evaluate((el, box) => document.elementFromPoint((box.left + box.right) / 2, (box.top + box.bottom) / 2) === el, toast);
   const { charge, answer } = await shown(page)
     .locator('[data-testid=pos-charge]')
     .evaluate((button) => {
@@ -147,41 +100,29 @@ async function chargeAnswersATap(page: Page, notice: Locator, size: { label: str
 
 for (const { name, lang, locale, sent, notPrinted } of LANGUAGES) {
   test.describe(`SALE-F20, SALE-F01: in ${name}, the notice of «Send order» leaves «Charge» free`, () => {
-    for (const size of SIZES) {
-      test(size.label, async ({ browser }) => {
-        const context = await browser.newContext({ baseURL: A, locale, viewport: { width: size.width, height: size.height } });
-        try {
-          const page = await context.newPage();
-          await sendRound(page, context, lang);
-          const notice = page.locator('ion-toast').filter({ hasText: sent });
-          await expect(notice).toBeVisible();
-          await capture(page, `${KEY}-${lang}-${size.label}`);
-          await chargeAnswersATap(page, notice, size);
-        } finally {
-          await context.close();
-        }
-      });
-    }
+    eachNoticeSize(locale, async (page, context, size) => {
+      await holdNotices(page, SENT_MS);
+      await sendRound(page, context, lang);
+      const notice = page.locator('ion-toast').filter({ hasText: sent });
+      await expect(notice).toBeVisible();
+      await capture(page, `${KEY}-${lang}-${size.label}`);
+      await chargeAnswersATap(page, notice, size);
+    });
+  });
 
-    for (const size of PHONES) {
-      test(`${size.label}: the round whose sheet did not print`, async ({ browser }) => {
-        const context = await browser.newContext({ baseURL: A, locale, viewport: { width: size.width, height: size.height } });
-        try {
-          const page = await context.newPage();
-          // The real answer of the send, plus the one field that says its sheet did not print (KITCHEN-F08).
-          await page.route('**/kitchen/tickets/send', async (route) => {
-            const response = await route.fetch();
-            await route.fulfill({ response, json: { ...(await response.json()), print_error: 'no printer for usage kitchen' } });
-          });
-          await sendRound(page, context, lang);
-          const notice = page.locator('ion-toast').filter({ hasText: notPrinted });
-          await expect(notice).toBeVisible();
-          await capture(page, `${KEY}-not-printed-${lang}-${size.label}`);
-          await chargeAnswersATap(page, notice, size);
-        } finally {
-          await context.close();
-        }
+  test.describe(`SALE-F20, SALE-F01: in ${name}, the notice of a round whose sheet did not print leaves «Charge» free`, () => {
+    eachNoticeSize(locale, async (page, context, size) => {
+      await holdNotices(page, NOT_PRINTED_MS);
+      // The real answer of the send, plus the one field that says its sheet did not print (KITCHEN-F08).
+      await page.route('**/kitchen/tickets/send', async (route) => {
+        const response = await route.fetch();
+        await route.fulfill({ response, json: { ...(await response.json()), print_error: 'no printer for usage kitchen' } });
       });
-    }
+      await sendRound(page, context, lang);
+      const notice = page.locator('ion-toast').filter({ hasText: notPrinted });
+      await expect(notice).toBeVisible();
+      await capture(page, `${KEY}-not-printed-${lang}-${size.label}`);
+      await chargeAnswersATap(page, notice, size);
+    });
   });
 }
