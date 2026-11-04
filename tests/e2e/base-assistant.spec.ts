@@ -87,6 +87,18 @@ async function refuse(page: Page): Promise<void> {
   await expect(lastAnswer(page)).toContainText('No lo he hecho.');
 }
 
+/** The card says `written` and never `never` at every size, captured there; then back on the desk size. */
+async function cardSays(page: Page, key: string, written: RegExp, never: string): Promise<void> {
+  for (const vp of VIEWPORTS) {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    await expect(card(page)).toContainText(written);
+    await expect(card(page)).not.toContainText(never);
+    await untilStill(page);
+    await capture(page, `${key}-${vp.label}`);
+  }
+  await page.setViewportSize({ width: 1440, height: 900 });
+}
+
 /** Turns payment off if the test found it off, and closes the context. */
 async function leavePayment(context: BrowserContext, wasOn: boolean): Promise<void> {
   if (!wasOn) {
@@ -636,14 +648,7 @@ test('base-assistant-money-mark — in Spanish a payment says its amount in the 
   const payment = { method: 'Caja', payment_date: '2026-11-02', amount: 1500, beneficiary_name: 'Cafés del Sur' };
   await ask(page, `E2E-ASK payment__payment__create ${JSON.stringify(payment)}`, { settle: false });
   await expect(card(page)).toBeVisible();
-  for (const vp of VIEWPORTS) {
-    await page.setViewportSize({ width: vp.width, height: vp.height });
-    await expect(card(page)).toContainText(/Caja · 2 nov 2026 · 15,00\s€/);
-    await expect(card(page)).not.toContainText('1500');
-    await untilStill(page);
-    await capture(page, `${KEY}-${vp.label}`);
-  }
-  await page.setViewportSize({ width: 1440, height: 900 });
+  await cardSays(page, KEY, /Caja · 2 nov 2026 · 15,00\s€/, '1500');
   await refuse(page);
   await leavePayment(context, wasOn);
 });
@@ -666,14 +671,7 @@ test('base-assistant-money-mark — in Spanish a payment in another currency say
   const payment = { method: 'Caja', payment_date: '2026-11-02', amount: 1500, beneficiary_name: 'Cafés del Sur', currency: 'USD' };
   await ask(page, `E2E-ASK payment__payment__create ${JSON.stringify(payment)}`, { settle: false });
   await expect(card(page)).toBeVisible();
-  for (const vp of VIEWPORTS) {
-    await page.setViewportSize({ width: vp.width, height: vp.height });
-    await expect(card(page)).toContainText(/Caja · 2 nov 2026 · 15,00\s\$/);
-    await expect(card(page)).not.toContainText('€');
-    await untilStill(page);
-    await capture(page, `${KEY}-${vp.label}`);
-  }
-  await page.setViewportSize({ width: 1440, height: 900 });
+  await cardSays(page, KEY, /Caja · 2 nov 2026 · 15,00\s\$/, '€');
   await refuse(page);
   // In yen, without decimals: 1500 is «1.500 ¥» (its thousands grouped, hub#692), never «15,00».
   await ask(page, `E2E-ASK payment__payment__create ${JSON.stringify({ ...payment, currency: 'JPY' })}`, { settle: false });
@@ -735,21 +733,12 @@ test('base-assistant-money-mark — in Spanish a price set on a list in another 
     value: 1500,
     money: { currency: 'USD', decimals: 2 },
   });
-  for (const vp of VIEWPORTS) {
-    await page.setViewportSize({ width: vp.width, height: vp.height });
-    await expect(card(page)).toContainText(new RegExp(`${PRICING_CODE}USD · 15,00\\s\\$`));
-    await expect(card(page)).not.toContainText('€');
-    await untilStill(page);
-    await capture(page, `${KEY}-${vp.label}`);
-  }
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await decide(page, 'cancel');
-  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
+  await cardSays(page, KEY, new RegExp(`${PRICING_CODE}USD · 15,00\\s\\$`), '€');
+  await refuse(page);
   // In zlotys, the list's, never the business's euros.
   await ask(page, `E2E-ASK pricing__price_item__add ${JSON.stringify({ ...price, price_list: `${PRICING_CODE}PLN` })}`, { settle: false });
   await expect(card(page)).toContainText(new RegExp(`${PRICING_CODE}PLN · 15,00\\szł`));
-  await decide(page, 'cancel');
-  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
+  await refuse(page);
   cleanPricing();
   for (const app of [...NEEDED].reverse().filter((id) => !wasOn.has(id))) {
     const off = await api(context, A, 'POST', '/apps/disable', { app });
