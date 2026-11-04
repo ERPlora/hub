@@ -133,21 +133,22 @@ describe('checklistView (BASE-G22, BASE-G130)', () => {
   });
 
   it('collapsed: the ⛔ come first whatever the server\'s order, so a phone\'s two rows never hide them (hub#801)', () => {
+    // Keys against the alphabet: only the server's order puts each level in this order.
     const items = [
-      item('a.f1', { order: 30 }),
-      item('a.f2', { order: 31 }),
-      item('a.legal', { level: 'legal', order: 40 }),
+      item('z.f1', { order: 30 }),
+      item('m.f2', { order: 31 }),
+      item('z.legal', { level: 'legal', order: 40 }),
       item('a.f3', { order: 50 }),
       item('a.settled', { level: 'legal', state: 'done', order: 55 }),
       item('a.legal2', { level: 'legal', order: 60 }),
       item('a.rec', { level: 'recommended', order: 70 }),
     ];
     const phone = checklistView(status(items), { maxRows: PHONE_MAX_VISIBLE_ROWS });
-    expect(phone.rows.map((i) => i.key)).toEqual(['a.legal', 'a.legal2']);
+    expect(phone.rows.map((i) => i.key)).toEqual(['z.legal', 'a.legal2']);
     expect(phone.hidden).toBe(5);
     // Each level keeps the server's order among its own steps.
     const desk = checklistView(status(items), { maxRows: MAX_VISIBLE_ROWS });
-    expect(desk.rows.map((i) => i.key)).toEqual(['a.legal', 'a.legal2', 'a.f1', 'a.f2', 'a.f3']);
+    expect(desk.rows.map((i) => i.key)).toEqual(['z.legal', 'a.legal2', 'z.f1', 'm.f2', 'a.f3']);
     // Expanded stays as the server sent it.
     const all = checklistView(status(items), { expanded: true, maxRows: PHONE_MAX_VISIBLE_ROWS });
     expect(all.rows.map((i) => i.key)).toEqual(items.map((i) => i.key));
