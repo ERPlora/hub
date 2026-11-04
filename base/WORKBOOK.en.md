@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:52ef63bc21576a77c10c868d7c88121235446016c1ddf8f69687445e83171011 -->
+<!-- generated from WORKBOOK.md sha256:0a516a5c61be89f7c5f6fa5517c564e25030dde970a1ee4f03e5e96176eaea85 -->
 
 ## What it is for and who it is for
 
@@ -2271,13 +2271,17 @@ Steps:
      instead of making it up.
   6. If the assistant ends without saying anything, the bubble reads "(no answer)".
   7. "Stop" cuts what was left: what was already written stays, with "Stopped." below.
-  8. Under each finished answer, "Read aloud" reads it with the device's own voice, if it has one, and "Stop
-     reading" stops it.
+  8. Under each finished answer, "Read aloud" reads it with the device's voice, if it has one, and "Stop reading"
+     stops it. If ERPlora has its own voices turned on (not today), the panel's header lets the person choose between
+     the two for the screen's language (the first one, until another is chosen; the device remembers the choice) and
+     the "Device voice".
 In: what the person writes; the whole conversation travels with each question (BASE-F102).
 Out: the question to erplora.com, which answers it and counts it in the month's messages (BASE-F104).
 If it fails: without a connection, with the service down, without a plan or without messages: BASE-F106 and BASE-F104.
 If the documentation cannot be searched at that moment, the assistant says so and does not answer from memory. "Stop"
-does not undo an action that had already been done.
+does not undo an action that had already been done. If ERPlora's voice cannot read the answer at that moment, the
+device's voice reads it; if there is none either, below the answer it says "The answer could not be read aloud. Try
+again.".
 Involved: BASE-F102, BASE-F104, BASE-F106
 
 ### BASE-F94 Attach a file or dictate by voice
