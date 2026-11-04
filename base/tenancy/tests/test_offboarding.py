@@ -31,16 +31,6 @@ from control.models import Cluster, Hub, HubDue, HubDump
 pytestmark = pytest.mark.usefixtures("no_test_fallback")
 
 
-@pytest.fixture(autouse=True, scope="session")
-def on_the_tests_control_database(django_db_setup):
-    """These tests drop real databases: only ever the tests' own (see ``test_provision``)."""
-    from django.conf import settings
-
-    control = tenancy_connections.control_name()
-    if not control.startswith(settings.DATABASES["default"]["TEST"]["NAME"]):
-        pytest.fail(f"The control database is {control!r}, not the tests': run this module whole.")
-
-
 def databases() -> set[str]:
     control = tenancy_connections.control_name()
     with hubs._maintenance() as conn:

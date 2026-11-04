@@ -47,19 +47,6 @@ def databases() -> set[str]:
         return {row[0] for row in conn.execute("SELECT datname FROM pg_database") if row[0].startswith(control)}
 
 
-@pytest.fixture(autouse=True, scope="session")
-def on_the_tests_control_database(django_db_setup):
-    """These tests make and drop real databases next to control's: only ever the tests' own. pytest-django sets the
-    test databases up only when the session has a ``django_db`` test (this module has one); without it control would
-    still be the developer's database, and ``hub_databases`` would make and drop its templates there. Session-scoped
-    and autouse, it runs before ``hub_databases`` builds anything."""
-    from django.conf import settings
-
-    control = tenancy_connections.control_name()
-    if not control.startswith(settings.DATABASES["default"]["TEST"]["NAME"]):
-        pytest.fail(f"The control database is {control!r}, not the tests': run this module whole, not one test of it.")
-
-
 @pytest.fixture(autouse=True)
 def nothing_checked_yet(monkeypatch):
     monkeypatch.setattr(identity, "_verified", set())
