@@ -2825,7 +2825,11 @@ Implicados: HUBS-F18, HUBS-F19, HUBS-F20
 - **Orden de una lista** (`base/ordering.py`, regla hub#2355 del producto viejo): `list_order(*columnas, descending=…,
   nulls_last=…)` devuelve lo que necesita `order_by`, con todas las columnas y después el `id` en la dirección de la
   lista: la descendente es la ascendente leída al revés, empates incluidos, y las páginas ni repiten ni pierden filas.
-  Una app no escribe su propia copia. La usan Clientes, Asistencia y Ventas; las demás siguen con la suya hasta hub#768.
+  `list_order_for(sort, *desempates, columns=…, nulls_last=…)` es lo mismo para un `sort` que dice su dirección con un
+  «-» delante, y `columns` dice qué columnas ordena cuando no es la de su nombre. Una columna puede ser una expresión
+  (`Lower("name")`), y la nombrada dos veces cuenta donde aparece primero. Una app no escribe su propia copia; solo
+  Facturación y Verifactu conservan la suya, en zona fiscal validada (hub#789). Sus pruebas por lista usan
+  `base/tests/ordering.py`.
 - Las tres consultas vivas del Inicio son de `base/queries.py`, con permiso `base.view_home` y ruta ninja en
   `base/api.py` (`GET /api/home/setup`, `/home/widgets`, `/home/bell`): `base.setup.status` (también
   herramienta del asistente, `ai=`), `base.widget.list` y `base.bell.counters`. Las reglas puras viven en

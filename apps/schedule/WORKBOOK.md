@@ -539,7 +539,7 @@ horario» de «Termina de configurar tu negocio» (SCHEDULE-F03).
   de la semana delante («martes, 5 de marzo de 2030»; `translation.override` + `formats.date_format`).
   Vive aquí porque Citas y Reservas lo necesitan y Horarios es requisito de las dos; no es una operación ni
   tiene ruta.
-- **Listas**: `_sorted` ordena por la columna y desempata por `id` en la misma dirección (`desc` → `-id`,
+- **Listas**: `base.ordering.list_order` ordena por la columna y desempata por `id` en la misma dirección (`desc` → `-id`,
   regla hub#2355 del producto actual), así que la fila tocada no salta y las páginas no repiten ni pierden
   filas.
 - **«¿Abierto?» sin `when` depende del reloj**: es «ahora» en el momento de ejecutarse. Seguida en vivo,

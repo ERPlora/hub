@@ -614,6 +614,9 @@ vende, y si Menús no está activo el TPV no ofrece menús.
 
 ## Para quien lo mantiene
 
+- **Orden de la lista de menús** (`base.ordering.list_order`; regla hub#2355 del producto viejo): la columna elegida,
+  después el nombre y al final el `id`, todo en la dirección de la lista: la descendente es la ascendente leída al revés,
+  empates incluidos. Lo fija `test_ties_read_backwards_in_a_descending_list`.
 - Anatomía completa: `apps.py`, `models.py`, `migrations/`, `schemas.py`, `queries.py`,
   `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/` y un
   `tests/test_<fichero>.py` por fichero, más `test_integration_inventory.py`,

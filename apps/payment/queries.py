@@ -8,7 +8,7 @@ them); a payment by its id or its reference. services.py uses them too, inside i
 
 from uuid import UUID
 
-from django.db.models import F, Q, QuerySet
+from django.db.models import Q, QuerySet
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import Conflict, NotFound
@@ -27,6 +27,7 @@ from apps.payment.schemas import (
     PaymentRefIn,
 )
 from base.business import currency_decimals
+from base.ordering import list_order_for
 
 METHOD_NOT_FOUND = _("That payment method does not exist in this business.")
 METHOD_AMBIGUOUS = _(
@@ -165,22 +166,6 @@ def payment_row(payment: Payment, *, whole: bool = False) -> dict:
 # --- Lists ----------------------------------------------------------------------------------------
 
 
-def _sorted(rows: QuerySet, sort: str, columns: dict, tie: tuple[str, ...]) -> QuerySet:
-    """``rows`` by ``sort`` (a column, ``-`` first for descending), then ``tie`` and ``id``, all in
-    the same direction: the newest payment date first, and on one day the last recorded first."""
-    descending = sort.startswith("-")
-    fields = columns[sort.removeprefix("-")]
-    rest = [field for field in tie if field not in fields]
-    return rows.order_by(
-        *(
-            F(field).desc(nulls_last=True)
-            if descending
-            else F(field).asc(nulls_last=True)
-            for field in (*fields, *rest, "id")
-        )
-    )
-
-
 def _page(rows: QuerySet, params, row) -> dict:
     total = rows.count()
     window = rows[params.offset : params.offset + params.limit]
@@ -252,7 +237,7 @@ def list_payments(ctx: OperationContext, params: PaymentListIn) -> dict:
         )
     )
     return _page(
-        _sorted(payments, params.sort, PAYMENT_ORDER, ("created_at",)),
+        payments.order_by(*list_order_for(params.sort, "created_at", columns=PAYMENT_ORDER, nulls_last=True)),
         params,
         payment_row,
     )
@@ -304,7 +289,9 @@ def list_methods(ctx: OperationContext, params: MethodListIn) -> dict:
     if params.is_active is not None:
         methods = methods.filter(is_active=params.is_active)
     return _page(
-        _sorted(methods, params.sort, METHOD_ORDER, ("name",)), params, method_row
+        methods.order_by(*list_order_for(params.sort, "name", columns=METHOD_ORDER, nulls_last=True)),
+        params,
+        method_row,
     )
 
 

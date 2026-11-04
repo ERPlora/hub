@@ -13,6 +13,8 @@ from live.errors import NotFound
 
 from apps.appointment.models import Appointment, History
 
+from base.tests.ordering import assert_reads_backwards, listed_with
+
 from .conftest import (
     MONDAY,
     assign,
@@ -753,3 +755,26 @@ def test_the_settings_are_the_factory_ones_until_saved_with_the_business_zone():
     make_settings(slot_interval=20)
     assert run("appointment.settings.get").slot_interval == 20
     assert Appointment.objects.count() == 0
+
+
+def _tied_appointments(salon):
+    rows = [make_appointment(salon.lucia, salon.ana, [salon.cut], at(MONDAY, f"{hour:02}:00")) for hour in range(9, 13)]
+    return [row.id for row in rows], {"date_from": MONDAY}
+
+
+def _tied_series(salon):
+    return [make_series(salon).id for _ in range(4)], {}
+
+
+@pytest.mark.parametrize(
+    ("operation", "tied", "column"),
+    [
+        ("appointment.appointment.list", _tied_appointments, "status"),
+        ("appointment.recurring.list", _tied_series, "time"),
+    ],
+)
+def test_ties_go_by_id_in_the_lists_own_direction(salon, operation, tied, column):
+    """hub#768 (the rule of hub#2355): a descending list is the ascending one read backwards, ties included, and its
+    pages neither repeat nor lose rows."""
+    ids, filters = tied(salon)
+    assert_reads_backwards(listed_with(run, operation, column, **filters), sorted(ids))

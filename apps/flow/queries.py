@@ -42,6 +42,7 @@ from base import assistant as hub_assistant
 from base.business import babel_locale, currency_decimals, money_text
 from base.home import ISO_HOUR, moment
 from base.operations import business_currency
+from base.ordering import list_order_for
 from apps.flow.models import Draft, Flow, FlowRun, Question, Secret
 from apps.flow.schemas import (
     CatalogIn,
@@ -546,12 +547,7 @@ def flow_row(flow: Flow) -> dict[str, Any]:
     }
 
 
-_FLOW_SORTS = {
-    "-updated_at": ("-updated_at", "id"),
-    "updated_at": ("updated_at", "id"),
-    "name": (Lower("name"), "id"),
-    "-name": (Lower("name").desc(), "-id"),
-}
+_FLOW_SORTS = {"name": (Lower("name"),)}
 
 
 @operation(
@@ -577,7 +573,7 @@ def list_flows(ctx: OperationContext, data: FlowListIn) -> dict:
     if data.trigger_kind is not None:
         flows = flows.filter(trigger_kind=data.trigger_kind)
     total = flows.count()
-    page = with_last_run(flows.order_by(*_FLOW_SORTS[data.sort]))[
+    page = with_last_run(flows.order_by(*list_order_for(data.sort, columns=_FLOW_SORTS)))[
         data.offset : data.offset + data.limit
     ]
     return {

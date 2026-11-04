@@ -1055,6 +1055,10 @@ cajero del producto actual es un empleado: lo que tenía (ver, gastar y conceder
 
 ## Para quien lo mantiene
 
+- **Orden de las listas** (`base.ordering.list_order_for`; regla hub#2355 del producto viejo): servicios, categorías y
+  paquetes van por la columna elegida, después por su orden y su nombre, y al final por `id`, todo en la dirección de la
+  lista y con los vacíos al final en las dos: la descendente es la ascendente leída al revés, empates incluidos. Lo fija
+  `test_ties_read_backwards_in_a_descending_list`, por lista.
 - Anatomía completa de una app (copia de `apps/tax`): `apps.py`, `models.py`, `migrations/`,
   `schemas.py`, `queries.py`, `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`,
   `frontend/` y un `tests/test_<fichero>.py` por fichero, más `tests/test_integration_tax.py`,

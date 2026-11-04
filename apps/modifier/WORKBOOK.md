@@ -439,7 +439,7 @@ cajero del producto actual es un empleado.
   llamada (sin N+1 por grupo), acotada por las 100 opciones como mucho de cada grupo (409
   `modifier.group_full`). El resto de listas pagina (hasta 100); los empates de la columna se desempatan por
   nombre y por `id` en la dirección de la lista: en descendente es la ascendente leída al revés, empates
-  incluidos (`_ordered`, nota vigente del 2026-09-28, hub#2355). El catálogo entero de opciones por
+  incluidos (`base.ordering`, nota vigente del 2026-09-28, hub#2355). El catálogo entero de opciones por
   `sort_order` va antes por el orden y el nombre de sus grupos, en los dos sentidos. Lo fijan los
   `test_tied_*` de `tests/test_queries.py`, con las filas creadas fuera de orden.
 - **Dinero**: céntimos enteros con signo, entre −99.999.999 y 99.999.999. Una opción con categoría
