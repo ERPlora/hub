@@ -456,6 +456,8 @@ class RectificationPreviewIn(InvoiceRefIn):
         title=gettext_noop("Type of rectifying invoice"),
         description="R1 error founded in law and art. 80 One, Two and Six LIVA (default), R2 insolvency, R3 bad "
         "debts, R4 other causes. A simplified invoice (ticket) is always rectified as R5.",
+        # No field of the models has this name: the assistant's card says each code by the kinds of ``invoice_type``.
+        json_schema_extra={"choices_of": "invoice_type"},
     )
 
 
@@ -855,10 +857,11 @@ class PreviewLineOut(Schema):
 class RectificationPreviewOut(Schema):
     """The rectifying invoice that rectifying would issue now, before it is issued (INVOICE-F08): nothing is written.
     ``invoice.invoice.rectify`` shows its type, next number and amounts on its card (BASE-F98): their titles are the
-    names the Facturas screens give them, and an amount says «in cents» to be shown as money."""
+    names the Facturas screens give them, its type a closed list said by its name, and an amount says «in cents» to be
+    shown as money."""
 
     original: RectifiedOut = Field(description="The invoice it rectifies.")
-    invoice_type: str = Field(
+    invoice_type: InvoiceTypeCode = Field(
         title=gettext_noop("Type of rectifying invoice"),
         description="The rectification's type: R1–R4 for an invoice, R5 for a ticket.",
     )

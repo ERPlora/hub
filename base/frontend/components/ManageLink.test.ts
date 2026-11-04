@@ -5,7 +5,7 @@
 import { applySurface } from '@erplora/ui/shell';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { flush, mountBase } from '../__tests__/mount-base';
+import { flush, mountBase, tap } from '../__tests__/mount-base';
 import { forgetAppDistribution } from '../lib/management';
 import ManageLink from './ManageLink.vue';
 
@@ -33,6 +33,7 @@ afterEach(() => {
   delete (window as TauriWindow).__TAURI__;
   forgetAppDistribution();
   document.head.innerHTML = '';
+  vi.restoreAllMocks();
 });
 
 describe('ManageLink', () => {
@@ -47,16 +48,30 @@ describe('ManageLink', () => {
       'noopener',
     ]);
     expect(link.get('ion-icon').attributes('name')).toBe('open-outline');
-    // In a browser the link itself opens the tab: its click is left alone (read as it reaches the document, then
-    // stopped there, so the test's page navigates nowhere).
-    let leftAlone: boolean | undefined;
-    const watch = (event: Event) => {
-      leftAlone = !event.defaultPrevented;
-      event.preventDefault();
-    };
-    document.addEventListener('click', watch, { once: true });
-    link.element.dispatchEvent(click());
-    expect(leftAlone).toBe(true);
+  });
+
+  it('its click asks for the pass to the business and opens it, already signed in on erplora.com', async () => {
+    embed({ name: 'Bar', plan_url: '', manage_url: MANAGE_URL });
+    const tab = { opener: {}, location: { href: 'about:blank' } };
+    const open = vi.spyOn(window, 'open').mockReturnValue(tab as unknown as Window);
+    const url = 'https://erplora.com/hub-pass/?pass=abc';
+    const m = await mountBase(ManageLink, { onApi: () => Response.json({ url }) });
+
+    expect(tap(m.wrapper.get('a[data-testid="menu-manage"]').element).defaultPrevented).toBe(true);
+    await flush();
+
+    expect(open).toHaveBeenCalledWith('about:blank', '_blank');
+    expect(JSON.parse(m.net.api[0].init.body as string)).toEqual({ next: 'business' });
+    expect(tab.location.href).toBe(url);
+  });
+
+  it('when the browser blocks the tab, its click is left alone and the link opens the usual address', async () => {
+    embed({ name: 'Bar', plan_url: '', manage_url: MANAGE_URL });
+    vi.spyOn(window, 'open').mockReturnValue(null);
+    const m = await mountBase(ManageLink);
+
+    expect(tap(m.wrapper.get('a[data-testid="menu-manage"]').element).defaultPrevented).toBe(false);
+    expect(m.net.api).toEqual([]);
   });
 
   it("on the rail keeps only its icon, as the menu's other labels, and still says where it goes", async () => {
@@ -75,17 +90,18 @@ describe('ManageLink', () => {
     expect((await mountBase(ManageLink)).wrapper.find('[data-testid="menu-manage"]').exists()).toBe(false);
   });
 
-  it('does not sell, so the installed app has it too, and its click opens the system browser', async () => {
+  it('does not sell, so the installed app has it too, and its click opens the pass in the system browser', async () => {
     embed({ name: 'Bar', manage_url: MANAGE_URL });
     applySurface('mobile');
     const invoke = installedApp(Promise.resolve({ id: 'd1', distribution: 'direct' }));
-    const m = await mountBase(ManageLink);
+    const url = 'https://erplora.com/hub-pass/?pass=abc';
+    const m = await mountBase(ManageLink, { onApi: () => Response.json({ url }) });
     await flush();
     const event = click();
     m.wrapper.get('[data-testid="menu-manage"]').element.dispatchEvent(event);
     await flush();
     expect(event.defaultPrevented).toBe(true);
-    expect(invoke).toHaveBeenCalledWith('open_external_url', { url: MANAGE_URL });
+    expect(invoke).toHaveBeenCalledWith('open_external_url', { url });
   });
 
   it('paints nothing until the installed app says which copy it is, and never in the Google Play copy', async () => {

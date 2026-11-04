@@ -1,51 +1,16 @@
 // Money on the customer screens (WORKBOOK «Reglas que no se rompen»: money travels in minor units; the
 // screen paints and the «Spent» filter is typed in the business's currency, flow customer-business-currency).
-// One formatter and one parser, so no page formats or scales by hand. The decimals are the server's
-// (`currency_decimals`), never the browser's Intl; while the business has not answered, a figure without a
-// symbol, never the euro by default.
+// One parser, so no page scales by hand (an amount is written with the platform's `formatMoney`). The decimals are
+// the server's (`currency_decimals`), never the browser's Intl; while the business has not answered, a figure without
+// a symbol, never the euro by default.
 import { describe, expect, it } from 'vitest';
 
-import { centsFromAmount, formatMoney, type Money, readAmount, recordMoney } from './money';
+import { centsFromAmount, type Money, readAmount, recordMoney } from './money';
 
 const EUR: Money = { currency: 'EUR', decimals: 2 };
 const PLN: Money = { currency: 'PLN', decimals: 2 };
 const JPY: Money = { currency: 'JPY', decimals: 0 };
 const KWD: Money = { currency: 'KWD', decimals: 3 };
-/** CLDR (the server) counts the forint in fillér; the browser's Intl gives it none. */
-const HUF: Money = { currency: 'HUF', decimals: 2 };
-
-const plain = (text: string) => text.replace(/\s/g, ' ');
-
-describe('formatMoney', () => {
-  it('paints minor units in the money it is given, in the page language', () => {
-    expect(plain(formatMoney(123456, 'en', PLN))).toBe('zł 1,234.56');
-    expect(plain(formatMoney(123456, 'es', PLN))).toBe('1234,56 zł');
-    expect(formatMoney(123456, 'en', EUR)).toBe('€1,234.56');
-    expect(plain(formatMoney(123456, 'es', EUR))).toBe('1234,56 €');
-    expect(formatMoney(0, 'en', EUR)).toBe('€0.00');
-  });
-
-  it('uses the decimals the server counts, never the browser’s', () => {
-    expect(formatMoney(1250, 'en', JPY)).toBe('¥1,250');
-    expect(plain(formatMoney(12500, 'en', KWD))).toBe('KWD 12.500');
-    expect(plain(formatMoney(123456, 'en', HUF))).toBe('Ft 1,234.56');
-  });
-
-  it('is a figure without a symbol while the money is unknown, never euros', () => {
-    expect(formatMoney(123456, 'en')).toBe('1,234.56');
-    expect(plain(formatMoney(123456, 'es'))).toBe('1234,56');
-    expect(formatMoney(123456, 'en')).not.toContain('€');
-  });
-
-  it('says «—» when there is nothing to show', () => {
-    expect(formatMoney(null, 'en', PLN)).toBe('—');
-    expect(formatMoney(undefined, 'es')).toBe('—');
-  });
-
-  it('falls back to English for a language tag it cannot read', () => {
-    expect(plain(formatMoney(100, 'not a tag!', PLN))).toBe('zł 1.00');
-  });
-});
 
 describe('recordMoney', () => {
   it('is the record’s own currency with its decimals: a record is never rewritten', () => {

@@ -5,11 +5,11 @@
 // its sale was paid in (a record is never rewritten), one without, in the business's (customer-business-currency).
 // New on the card:
 // the product only gave them through the assistant.
-import { formatDateTime, StatusPill } from '@erplora/ui/components';
+import { formatDateTime, formatMoney, StatusPill } from '@erplora/ui/components';
 import { IonButton, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref } from 'vue';
 
-import { formatMoney, recordMoney, useBusinessMoney } from '../lib/money';
+import { recordMoney, useBusinessMoney } from '../lib/money';
 import { windowsOf } from '../lib/useListState';
 import { useLiveList } from '../lib/useLiveList';
 import { useCustomerI18n } from '../lib/useCustomerI18n';

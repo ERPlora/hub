@@ -3,10 +3,11 @@
 // VIP and Revenue (in the business's currency: customer-business-currency), followed live from
 // `customer.customer.stats`; a write anywhere re-runs it on the server. The cards are the product's `ok-kpi` (label over a big value) rebuilt here until
 // `@erplora/ui` has a KPI card (UI-REQUESTS.md).
+import { formatMoney } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
 import { computed } from 'vue';
 
-import { formatMoney, useBusinessMoney } from '../lib/money';
+import { useBusinessMoney } from '../lib/money';
 import { useCustomerI18n } from '../lib/useCustomerI18n';
 
 const { locale } = useCustomerI18n();
@@ -67,9 +68,11 @@ const figures = computed(() => {
 </template>
 
 <style scoped>
+/* The cards share the whole row, and a figure never breaks: a card too narrow for it grows, and moves to a row of its
+   own when it does not fit beside another («1.234.567,89 €» on a phone). */
 .customer-stats {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
   margin: 0 0 1rem;
 }
@@ -77,6 +80,7 @@ const figures = computed(() => {
 /* The product's `ok-kpi`: a card with the label (muted, uppercase) over the value (big, bold). */
 .customer-kpi {
   box-sizing: border-box;
+  flex: 1 1 9.5rem;
   display: flex;
   flex-direction: column;
   gap: 0.375rem;

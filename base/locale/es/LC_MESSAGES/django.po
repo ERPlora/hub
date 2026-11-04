@@ -1756,6 +1756,18 @@ msgid "Sign in with your erplora.com account to report a problem."
 msgstr "Entra con tu cuenta de erplora.com para reportar un problema."
 
 #: base/services.py
+msgid "Sign in with your erplora.com account to go there directly."
+msgstr "Entra con tu cuenta de erplora.com para ir directamente."
+
+#: base/services.py
+msgid "You don't have permission to manage this business on erplora.com."
+msgstr "No tienes permiso para gestionar este negocio en erplora.com."
+
+#: base/services.py
+msgid "We could not open erplora.com directly."
+msgstr "No se ha podido abrir erplora.com directamente."
+
+#: base/services.py
 msgid "Add a subject."
 msgstr "Añade un asunto."
 
@@ -1787,6 +1799,10 @@ msgid "Report subject"
 msgstr "Asunto del informe"
 
 #: base/schemas.py
+msgid "Where to go"
+msgstr "A dónde ir"
+
+#: base/schemas.py
 msgid "What happened?"
 msgstr "¿Qué pasó?"
 
@@ -1801,6 +1817,14 @@ msgstr "La grabación es demasiado larga: dicta un mensaje más corto."
 #: base/services.py
 msgid "The audio could not be transcribed: try again."
 msgstr "No se ha podido transcribir el audio: inténtalo de nuevo."
+
+#: base/services.py
+msgid "Reading aloud in the server's voice is not available."
+msgstr "La lectura en voz alta con la voz del servidor no está disponible."
+
+#: base/services.py
+msgid "The answer could not be read aloud: try again."
+msgstr "No se ha podido leer la respuesta en voz alta: inténtalo de nuevo."
 
 #: base/queries.py
 msgid "The assistant's plan could not be read now."

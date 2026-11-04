@@ -28,9 +28,8 @@ const SIZES = [
   { label: '375x667', width: 375, height: 667 },
   /** A tall phone, where the whole sheet fits. */
   { label: '390x844', width: 390, height: 844 },
-  /** The narrowest phone: the longest reason takes two lines of the row over the keypad. Its till's «Charge» is under
-   *  the tab bar (hub#630): the button's own click event opens the sheet there, as a tap that reached it would. */
-  { label: '320x568', width: 320, height: 568, chargeUnderTabBar: true },
+  /** The narrowest phone: the longest reason takes two lines of the row over the keypad. */
+  { label: '320x568', width: 320, height: 568 },
 ] as const;
 type KeyId = '0' | '1' | '5' | 'clear' | 'dot';
 /** The issue's way of tendering: the two digits that cover the total, then what makes them another figure. */
@@ -65,11 +64,9 @@ async function aCheck(page: Page): Promise<void> {
   await expect(shown(page).locator('[data-testid^=pos-line-]').filter({ hasText: product.name }).first()).toBeAttached();
 }
 
-async function openSheet(page: Page, chargeUnderTabBar = false): Promise<Locator> {
+async function openSheet(page: Page): Promise<Locator> {
   await openTillCart(page);
-  const charge = shown(page).locator('[data-testid=pos-charge]');
-  if (chargeUnderTabBar) await charge.dispatchEvent('click');
-  else await charge.click();
+  await shown(page).locator('[data-testid=pos-charge]').click();
   const sheet = page.locator('[data-testid=sale-checkout-modal]');
   await expect(sheet.locator('[data-testid=sale-checkout-keypad]')).toBeVisible();
   await expect(sheet.locator('[data-testid=sale-checkout-total]')).toContainText(/\d/);
@@ -123,7 +120,7 @@ async function totalOf(sheet: Locator): Promise<number> {
 
 async function keypadStaysStill(page: Page, size: (typeof SIZES)[number], lang: 'en' | 'es'): Promise<void> {
   await page.setViewportSize({ width: size.width, height: size.height });
-  const sheet = await openSheet(page, 'chargeUnderTabBar' in size);
+  const sheet = await openSheet(page);
   const at = await places(page, sheet);
   const where = `${lang} ${size.label}`;
   // Every key whole above the foot, where a finger reaches it: the foot sticks to the bottom of a low screen, over what scrolls.
