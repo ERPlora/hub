@@ -19,10 +19,12 @@ uploads and the listings after each walk the files once. What the apps keep is c
 stays exact for the plan's limit.
 
 These functions take the store and the hub's id, and raise ``live`` errors in the language that is active: the
-operations (``base.queries``, ``base.services``) give them the hub of the request and the plan's space.
+operations (``base.queries``, ``base.services``) give them the hub of the request and the plan's space. One does not:
+:func:`delete_hub_files`, which empties the whole prefix of a hub that is gone, for the worker that purges it.
 """
 
 import datetime as dt
+import itertools
 import logging
 import os
 import posixpath
@@ -79,6 +81,8 @@ BLOCKED_EXTENSIONS = frozenset(
 STORE_ERRORS = (OSError, BotoCoreError, ClientError)
 #: What listing a name that is no folder raises: missing, or a file (on disk; in memory, ``FileExistsError``).
 NOT_A_FOLDER = (FileNotFoundError, NotADirectoryError, FileExistsError)
+#: The keys one ``DeleteObjects`` takes at most.
+S3_DELETE_BATCH = 1000
 
 Preview = Literal["image", "pdf", "text", "table", "json", "audio", "video", ""]
 #: The type a file is served with and how the screen shows it, by extension. Our own table, not ``mimetypes``: the
@@ -713,6 +717,45 @@ def delete(store: Storage, hub: uuid.UUID, path: str) -> dict:
     finally:
         _changed(hub)
     return {"path": path, "folder": kind == "folder"}
+
+
+# ── A hub that is gone (PLAN-DB §6 «Baja», step 4) ───────────────────────────────────────────────────────────────
+
+
+class HubFilesNotDeleted(Exception):
+    """Part of a hub's prefix may still be in the store: who purges the hub notes it and tries again, never done."""
+
+
+def delete_hub_files(store: Storage, hub: uuid.UUID) -> None:
+    """Delete everything under ``hub``'s prefix, its Files and what its apps keep beside them, and no key of any other
+    hub: only its database's end calls this (``base.services.purge_demo_data``, ``base.tenancy.offboarding``), the hub
+    never comes back. Safe to run again: nothing left is no failure.
+
+    In a versioned bucket a key leaves a delete marker, and its old version goes with the bucket's lifecycle rule."""
+    prefix = hub_prefix(hub)
+    try:
+        keys = [f"{prefix}/{item.key}" for item in scan(store, prefix)]
+        if isinstance(store, S3Storage):
+            _delete_s3_keys(store, prefix, keys)
+        else:
+            for key in keys:
+                store.delete(key)
+            _prune(store, prefix)
+    except (*STORE_ERRORS, OperationError) as error:
+        cause = error.__cause__ or error
+        raise HubFilesNotDeleted(f"{prefix}: {type(cause).__name__}: {cause}") from error
+
+
+def _delete_s3_keys(store: S3Storage, prefix: str, keys: list[str]) -> None:
+    """``DeleteObjects`` answers 200 and lists the keys it did not delete: boto3 raises nothing for those. The row the
+    failure ends on keeps no file's name of the business, only how many and why."""
+    s3 = store.connection.meta.client
+    for batch in itertools.batched(keys, S3_DELETE_BATCH):
+        answer = s3.delete_objects(
+            Bucket=store.bucket_name, Delete={"Objects": [{"Key": key} for key in batch], "Quiet": True}
+        )
+        if refused := answer.get("Errors"):
+            raise HubFilesNotDeleted(f"{prefix}: {len(refused)} of {len(batch)} keys stayed: {refused[0]['Code']}")
 
 
 def space_limit(state: object) -> int | None:

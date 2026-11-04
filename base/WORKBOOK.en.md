@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:1cca148b549418fc202c21f89a57606e99298f90507e948ed36665c2b8a451a0 -->
+<!-- generated from WORKBOOK.md sha256:df6391cbcd2f95c9d88e60c3f1bd71921485055f953dce9c4f3ebb12e05c14ea -->
 
 ## What it is for and who it is for
 
@@ -2687,16 +2687,19 @@ Steps:
      business can still be restored and erplora.com still sees its copies. When it ends it checks again for
      documents, in case one came in during the copy.
   4. It drops that business's database, and only that one. From here it never comes back.
-  5. Only a mark stays, with no name or data, so its address goes on saying "This hub is no longer available."; its
+  5. It deletes its files from the store, those of Files and those its apps keep, and only its own.
+  6. Only a mark stays, with no name or data, so its address goes on saying "This hub is no longer available."; its
      people and their sessions go with it.
 In: the deleted business and its 90 days over. Never a demo, which is deleted its own way when it expires, the
 platform's business or one moving to another server.
-Out: the final copy and the database dropped, with the event `base.hub.purged`; from there erplora.com no longer
-lists its copies. Or, with documents, the database kept and on the business's row the reason
+Out: the final copy, and the database and the files gone, with the event `base.hub.purged`; from there erplora.com no
+longer lists its copies. Or, with documents, the database and the files kept and on the business's row the reason
 (`fiscal_archive_missing: <apps>`).
 If it fails: a copy that fails drops nothing, and neither does having no copies store; a copy or a drop that fails is
 tried again (1 min, 5 min, 15 min, then every hour) with the error noted on the row, with no second copy if there
-already was one. If an app cannot be read, the database stays. A row that does not name the business's own database
-drops nothing (`invalid_database_name`). A business restored during the copy stays open with its database; once it is
-being dropped, erplora.com gets `hub_purged`. If the Hub shuts down mid-copy, the next one takes it up.
-Involved: HUBS-F18, HUBS-F19, HUBS-F20
+already was one. If the store does not delete its files, the business stays being dropped, with no mark and
+`files_purge_failed` on the row, and it is tried again the same way. If an app cannot be read, the database stays. A row
+that does not name the business's own database drops nothing (`invalid_database_name`). A business restored during the
+copy stays open with its database; once it is being dropped, erplora.com gets `hub_purged`. If the Hub shuts down
+mid-copy, the next one takes it up.
+Involved: HUBS-F18, HUBS-F19, HUBS-F20, PUBLIC-F34 (the same deletion of files, when a demo is retired)
