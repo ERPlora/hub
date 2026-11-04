@@ -2806,19 +2806,21 @@ Pasos:
      hace, el negocio aún se puede recuperar y erplora.com sigue viendo sus copias. Al terminar vuelve a mirar si
      guarda documentos, por si entró alguno durante la copia.
   4. Borra la base de datos de ese negocio, y solo esa. Desde aquí ya no vuelve.
-  5. Queda solo una marca, sin nombre ni datos, para que su dirección siga diciendo «Este hub ya no está disponible.»;
+  5. Borra sus ficheros del almacén, los de Archivos y los que guardan sus apps, y solo los suyos.
+  6. Queda solo una marca, sin nombre ni datos, para que su dirección siga diciendo «Este hub ya no está disponible.»;
      sus personas y sus sesiones se van con ella.
 Entra: el negocio eliminado y sus 90 días cumplidos. Nunca una demo, que se borra a su manera al caducar, el negocio
 de la plataforma ni uno que se está moviendo de servidor.
-Sale: la copia final y la base de datos borrada, con el evento `base.hub.purged`; desde ahí erplora.com ya no lista
-sus copias. O, con documentos, la base de datos guardada y en la fila del negocio el motivo
-(`fiscal_archive_missing: <apps>`).
+Sale: la copia final, y la base de datos y los ficheros borrados, con el evento `base.hub.purged`; desde ahí
+erplora.com ya no lista sus copias. O, con documentos, la base de datos y los ficheros guardados y en la fila del
+negocio el motivo (`fiscal_archive_missing: <apps>`).
 Si falla: una copia que falla no borra nada, y sin almacén de copias tampoco; una copia o un borrado que falla se
 reintenta (1 min, 5 min, 15 min y luego cada hora) con el error anotado en la fila, sin hacer otra copia si ya la había.
-Si una app no se puede leer, la base de datos se queda. Una fila que no nombra la base de datos propia del negocio no
-borra nada (`invalid_database_name`). Un negocio recuperado durante la copia sigue abierto con su base de datos; ya
-borrándose, erplora.com recibe `hub_purged`. Si el Hub se apaga a media copia, el siguiente la retoma.
-Implicados: HUBS-F18, HUBS-F19, HUBS-F20
+Si el almacén no borra sus ficheros, el negocio sigue borrándose, sin marca, con `files_purge_failed` en la fila, y se
+reintenta igual. Si una app no se puede leer, la base de datos se queda. Una fila que no nombra la base de datos propia
+del negocio no borra nada (`invalid_database_name`). Un negocio recuperado durante la copia sigue abierto con su base
+de datos; ya borrándose, erplora.com recibe `hub_purged`. Si el Hub se apaga a media copia, el siguiente la retoma.
+Implicados: HUBS-F18, HUBS-F19, HUBS-F20, PUBLIC-F34 (el mismo borrado de ficheros, al retirar una demo)
 
 ## Para quien lo mantiene
 
@@ -3234,6 +3236,13 @@ Implicados: HUBS-F18, HUBS-F19, HUBS-F20
   hilo principal). Tests: `base/tests/test_files.py`, `test_files_api.py`, el Vitest de cada pieza y el e2e
   `tests/e2e/base-files.spec.ts` (tres tamaños, el empleado y el hub B que nunca ve los de A) y
   `tests/e2e/fix-base-plan-space-check.spec.ts` (el tope en español: Archivos y la web dicen la misma frase).
+- Al purgar un hub, `base.files.delete_hub_files` borra su prefijo entero (`base.storage.hub_prefix`) y ningún otro: lo
+  llaman `base.services.purge_demo_data` (demo, PUBLIC-F34) y `base.tenancy.offboarding` (baja, BASE-F109), siempre tras el
+  `DROP` (PLAN-DB §6 «Baja», paso 4), fuera de toda transacción y antes de la fila. Un fallo es `HubFilesNotDeleted`, también
+  las claves que `DeleteObjects` rechaza dentro de un 200: el hub sigue `dropping` con el error en `last_error`
+  (`drop_failed: HubFilesNotDeleted: …`, `files_purge_failed: …`) y se reintenta; nunca queda `purged` con ficheros. El
+  bucket tiene versionado: la clave deja su marcador de borrado y la versión antigua se va a los 90 días por la regla
+  `noncurrent` de aws (`s3.tf`). Tests: `base/tests/test_files_delete_hub.py`, `test_offboarding.py`, `test_provision.py`.
 - **`/p/media/<hex>/<nombre>`** (`base/media.py`, FIX-HUB-BASE-MEDIA-DOES-NOT-SERVE-WHATSAPP-INBOX-SAMPLES): sirve, desde el
   host de su hub y nunca el de otro, solo las carpetas del almacén que declara cada app en su `LiveAppConfig`:
   `public_media` (cualquiera; caché pública de un año: `website/img/`, las imágenes de la web) y `members_media` (solo una
@@ -3564,7 +3573,7 @@ con su issue, y llegan con ella. Después llegaron BASE-F21 y BASE-F22 (hub#601)
 - **Avisar por correo al dueño cuando debe ampliar (BASE-F40)**: el mercado lo da por supuesto, pero lo manda erplora.com
   (ronda 2026-11-01f de PLAN-HUB y PLAN-SAAS §28) y lleva su flujo y su issue allí.
 - **El archivo fiscal y el borrado de un negocio con documentos (BASE-F109)**, hub#738: hasta que exista, guarda su
-  base de datos pasados los 90 días; el prefijo de sus ficheros en el almacén sigue en hub#613.
+  base de datos y sus ficheros pasados los 90 días.
 - **La fila de salud del Inicio (BASE-F02)**, hub#573: un punto de extensión más en `LiveAppConfig` y su uso en
   Impresión y la Bandeja de WhatsApp.
 - **El pase en «Mejorar plan» del asistente y de la Bandeja de WhatsApp (BASE-F11)**, hub#723: el asistente exige cambiar
