@@ -228,6 +228,8 @@ for (const size of VIEWPORTS) {
     const { context, page } = await spanish(browser, { width: size.width, height: size.height });
     try {
       const overflow = () => horizontalOverflow(page);
+      // Folded, whatever fits: the ⛔ is the first row, with no «Ver todo» to press (hub#801; a phone has room for two).
+      await expect(card(page).locator('[data-testid="setup-row"]').first()).toHaveAttribute('data-key', IDENTITY);
       await expect(pill(page, IDENTITY)).toHaveText('Necesario para facturar');
       await row(page, IDENTITY).evaluate((element) => element.scrollIntoView({ block: 'start' }));
       await untilStill(page);
