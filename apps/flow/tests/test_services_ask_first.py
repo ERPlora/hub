@@ -16,20 +16,16 @@ import json
 from zoneinfo import ZoneInfo
 
 import pytest
-from django.db.backends.base.base import BaseDatabaseWrapper
-from django.utils import timezone
 from live.context import system_context
 from live.errors import InvalidPayload, PermissionDenied
 
-from apps.flow import gateway as flow_gateway
 from apps.flow import queries, recipes
 from apps.flow.models import Flow, FlowRun, Question
-from base import relay
 from base.tests.fake_gateway import gateway  # noqa: F401 - the fixture
 
 from .conftest import A, ctx_for, make_flow, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("no_pauses")]
 
 MADRID = ZoneInfo("Europe/Madrid")
 NOON = dt.datetime(2026, 10, 15, 12, 0, tzinfo=MADRID)
@@ -39,28 +35,6 @@ CANCEL = "reservation.reservation.cancel"
 #: Whoever manages automations and may cancel a reservation, and whoever manages them but may not.
 MAY_CANCEL = {"flow.view", "flow.manage", "flow.answer", "flow.answer_manager", "reservation.view_reservation", "reservation.change_reservation"}
 MAY_NOT_CANCEL = {"flow.view", "flow.manage", "flow.answer", "flow.answer_manager", "reservation.view_reservation"}
-
-
-@pytest.fixture(autouse=True)
-def no_pauses(monkeypatch):
-    monkeypatch.setattr(flow_gateway, "PAUSES", (0, 0))
-
-
-@pytest.fixture
-def worker(monkeypatch, django_capture_on_commit_callbacks):
-    """One pass of the outbox relay, as the worker runs it every tick (base.relay)."""
-    monkeypatch.setattr(BaseDatabaseWrapper, "close_if_unusable_or_obsolete", lambda self: None)
-
-    def tick():
-        with django_capture_on_commit_callbacks(execute=True):
-            return relay.run(timezone.now())
-
-    def request(name, data, ctx=None):
-        with django_capture_on_commit_callbacks(execute=True):
-            return run(name, data, ctx)
-
-    tick.request = request
-    return tick
 
 
 @pytest.fixture

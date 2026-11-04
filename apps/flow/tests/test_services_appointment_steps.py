@@ -15,8 +15,6 @@ runs with its own permission, so the customer's cancellation policy goes on judg
 import json
 
 import pytest
-from django.db.backends.base.base import BaseDatabaseWrapper
-from django.utils import timezone
 from live.errors import InvalidPayload, PermissionDenied
 
 from apps.appointment.models import Appointment
@@ -31,15 +29,13 @@ from apps.appointment.tests.conftest import (  # noqa: F401 - anytime is a fixtu
     make_settings,
     wall,
 )
-from apps.flow import gateway as flow_gateway
 from apps.flow.models import Flow, FlowRun, Question
 from base import assistant as hub_assistant
-from base import relay
 from base.tests.fake_gateway import gateway  # noqa: F401 - the fixture
 
 from .conftest import ctx_for, make_flow, run
 
-pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("anytime")]
+pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("anytime", "no_pauses")]
 
 CHAT = "/internal/assistant/chat"
 QUOTA = {"used": 1, "limit": 30, "resets_at": "2026-11-01T00:00:00Z", "demo": False}
@@ -60,28 +56,6 @@ MAY_CANCEL = MANAGES_FLOWS | {
 }
 ONLY_THEIR_OWN = MANAGES_FLOWS | {"appointment.view_own_appointment", "appointment.change_own_appointment"}
 MAY_NOT_CANCEL = MANAGES_FLOWS | {"appointment.view_appointment"}
-
-
-@pytest.fixture(autouse=True)
-def no_pauses(monkeypatch):
-    monkeypatch.setattr(flow_gateway, "PAUSES", (0, 0))
-
-
-@pytest.fixture
-def worker(monkeypatch, django_capture_on_commit_callbacks):
-    """One pass of the outbox relay, as the worker runs it every tick (base.relay)."""
-    monkeypatch.setattr(BaseDatabaseWrapper, "close_if_unusable_or_obsolete", lambda self: None)
-
-    def tick():
-        with django_capture_on_commit_callbacks(execute=True):
-            return relay.run(timezone.now())
-
-    def request(name, data, ctx=None):
-        with django_capture_on_commit_callbacks(execute=True):
-            return run(name, data, ctx)
-
-    tick.request = request
-    return tick
 
 
 @pytest.fixture

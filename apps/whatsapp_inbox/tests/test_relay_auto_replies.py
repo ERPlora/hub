@@ -649,6 +649,21 @@ def bea_books(customer_id, *, when: str = "10:00") -> Appointment:
     return make_appointment(Customer.objects.get(pk=customer_id), bea, [make_service("Haircut")], at(next_weekday(0), when))
 
 
+def refused_after_the_yes(gateway, tick, capture, appointment, arguments: dict, she_writes: str, answer: str) -> str:  # noqa: F811
+    """She writes, the assistant wants to cancel with ``arguments`` and the owner says yes: Citas refuses, the appointment
+    stays and what the assistant says then goes to her. The code the assistant heard."""
+    gateway.reply(CHAT, json=wants(CANCEL_APPOINTMENT, arguments))
+    gateway.reply(CHAT, json=said(answer))
+    lucia_writes(she_writes)
+    tick()
+    answer_yes(capture)
+    tick()
+    appointment.refresh_from_db()
+    assert appointment.status == "confirmed"
+    assert outbound()[-1] == answer
+    return json.loads(gateway.sent(CHAT)[1].body["messages"][-1]["content"])["error"]["code"]
+
+
 def test_a_customer_cancels_her_appointment_with_any_professional_after_the_owner_s_yes(
     gateway, tick, django_capture_on_commit_callbacks  # noqa: F811 - the fixture
 ):
@@ -687,19 +702,16 @@ def test_the_answer_never_cancels_another_customer_s_appointment_even_after_the_
     run("customer.customer.create", {"name": "Lucía Pérez", "phone": "600111222"}, ctx_for("hub_owner"))
     marta = run("customer.customer.create", {"name": "Marta Gil", "phone": "600333444"}, ctx_for("hub_owner"))
     hers = bea_books(marta.id)
-    gateway.reply(CHAT, json=wants(CANCEL_APPOINTMENT, {"id": str(hers.id), "customer_id": str(marta.id)}))
-    gateway.reply(CHAT, json=said("No encuentro esa cita a tu nombre."))
-    lucia_writes("Anula la cita de Marta")
-
-    tick()
-    answer_yes(django_capture_on_commit_callbacks)
-    tick()
-
-    hers.refresh_from_db()
-    assert hers.status == "confirmed"
-    told = json.loads(gateway.sent(CHAT)[1].body["messages"][-1]["content"])
-    assert told["error"]["code"] == "appointment.appointment_not_found"
-    assert outbound()[-1] == "No encuentro esa cita a tu nombre."
+    code = refused_after_the_yes(
+        gateway,
+        tick,
+        django_capture_on_commit_callbacks,
+        hers,
+        {"id": str(hers.id), "customer_id": str(marta.id)},
+        "Anula la cita de Marta",
+        "No encuentro esa cita a tu nombre.",
+    )
+    assert code == "appointment.appointment_not_found"
 
 
 def test_out_of_the_salon_s_policy_the_answer_tells_her_and_the_appointment_stays(
@@ -711,16 +723,13 @@ def test_out_of_the_salon_s_policy_the_answer_tells_her_and_the_appointment_stay
     make_settings(cancellation_notice_hours=24 * 365)
     card = run("customer.customer.create", {"name": "Lucía Pérez", "phone": "600111222"}, ctx_for("hub_owner"))
     hers = bea_books(card.id)
-    gateway.reply(CHAT, json=wants(CANCEL_APPOINTMENT, {"id": str(hers.id)}))
-    gateway.reply(CHAT, json=said("Tu cita ya no se puede anular por aquí."))
-    lucia_writes("No puedo ir a mi cita")
-
-    tick()
-    answer_yes(django_capture_on_commit_callbacks)
-    tick()
-
-    hers.refresh_from_db()
-    assert hers.status == "confirmed"
-    told = json.loads(gateway.sent(CHAT)[1].body["messages"][-1]["content"])
-    assert told["error"]["code"] == "appointment.cancellation_notice_required"
-    assert outbound()[-1] == "Tu cita ya no se puede anular por aquí."
+    code = refused_after_the_yes(
+        gateway,
+        tick,
+        django_capture_on_commit_callbacks,
+        hers,
+        {"id": str(hers.id)},
+        "No puedo ir a mi cita",
+        "Tu cita ya no se puede anular por aquí.",
+    )
+    assert code == "appointment.cancellation_notice_required"
