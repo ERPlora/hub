@@ -40,7 +40,16 @@ describe('formatMoney', () => {
 
   it('a business in Japan reads yen with the decimals the server counts (none): 1500 is ¥1,500', () => {
     expect(formatMoney(1500, 'en', YEN)).toBe('¥1,500');
-    expect(plain(formatMoney(1500, 'es', YEN))).toBe('1500 ¥');
+    expect(plain(formatMoney(1500, 'es', YEN))).toBe('1.500 ¥');
+  });
+
+  // hub#494: Spanish CLDR waits for five digits; every screen of the Hub groups from four on.
+  it('groups the thousands from four digits on, in every language, with or without the currency', () => {
+    expect(plain(formatMoney(123456, 'es', EURO))).toBe('1.234,56 €');
+    expect(plain(formatMoney(123456789, 'es', EURO))).toBe('1.234.567,89 €');
+    expect(formatMoney(123456, 'en', EURO)).toBe('€1,234.56');
+    expect(formatMoney(123456, 'es')).toBe('1.234,56');
+    expect(plain(formatMoney(99999, 'es', EURO))).toBe('999,99 €');
   });
 
   it('until the business answers, a figure without a symbol, never euros', () => {
@@ -63,6 +72,8 @@ describe('moneyText and centsFromText (the hourly-rate field)', () => {
     expect(moneyText(1250, 'es')).toBe('12,50');
     expect(moneyText(1250, 'en')).toBe('12.50');
     expect(moneyText(0, 'en')).toBe('0.00');
+    // What a person types is never grouped, whatever the screen paints: `centsFromText` refuses «1.234,56».
+    expect(moneyText(123456, 'es')).toBe('1234,56');
   });
 
   it('reads what a person types back into whole cents, with a comma or a point', () => {
