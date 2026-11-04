@@ -27,10 +27,10 @@ def a_process_of_the_server_on(name: str) -> Iterator[psycopg.Connection]:
         leader.pgconn.send_query(b"SELECT pg_sleep(60)")
         deadline = time.monotonic() + WORKER_START_WAIT
         query = "SELECT 1 FROM pg_stat_activity WHERE leader_pid = %s AND backend_type = 'parallel worker'"
-        while not watcher.execute(query, [pid]).fetchone():
-            assert time.monotonic() < deadline, "no parallel worker came: the control proves nothing"
-            time.sleep(hubs.SESSIONS_END_POLL)
         try:
+            while not watcher.execute(query, [pid]).fetchone():
+                assert time.monotonic() < deadline, "no parallel worker came: the control proves nothing"
+                time.sleep(hubs.SESSIONS_END_POLL)
             yield leader
         finally:
             watcher.execute("SELECT pg_cancel_backend(%s)", [pid])
