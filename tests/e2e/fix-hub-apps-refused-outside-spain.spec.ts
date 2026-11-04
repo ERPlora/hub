@@ -114,15 +114,42 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await expect(reasonOf(page)).toHaveCount(0);
       await snap(page, `${KEY}-es-off-${width}`);
 
+      // «Activar» asks first only when it brings Invoicing back on with it (BASE-F18): decided by what is stored, never
+      // by whether the dialog happened to be on screen yet.
+      const bringsInvoice = psql("select state from base_appactivation where host = 'a' and app = 'invoice'") !== 'on';
       await testid(page, 'apps-row-verifactu-toggle').click();
-      const askOn = page.locator('.ep-confirm-dialog');
-      if (await askOn.last().isVisible().catch(() => false)) {
-        await askOn.last().getByRole('button', { name: 'Activar', exact: true }).click();
+      if (bringsInvoice) {
+        const askOn = page.locator('.ep-confirm-dialog').last();
+        await expect(askOn).toContainText('¿Activar VeriFactu?');
+        await askOn.getByRole('button', { name: 'Activar', exact: true }).click();
       }
       await expect(stateOf(page)).toHaveText('Instalada');
       await expect(reasonOf(page)).toHaveText(NEVER_OFF_ES);
       await expect(testid(page, 'apps-row-verifactu-toggle')).toHaveCount(0);
       await snap(page, `${KEY}-es-on-${width}`);
+    } finally {
+      await context.close();
+    }
+  });
+}
+
+// hub#619: «Mis apps» in Spain, with VeriFactu on: what it needs says why it stays, a long sentence in a table column. It
+// wraps and is read whole, never cut at the edge of the column, where the legal reason would be lost.
+for (const [label, viewport] of Object.entries(VIEWPORTS)) {
+  test(`BASE-F25 — the reason a row gives is read whole, not cut at its column, at ${label}`, async ({ browser }) => {
+    await registerBusinessIn(registration, 'ES');
+    const { context, page } = await signedInSpanish(browser, viewport, '/apps');
+    try {
+      const reasons = shown(page).locator('[data-testid="apps-refusal"]');
+      await expect(reasons.first()).toBeVisible();
+      await expect(reasons.first()).toContainText('la ley obliga');
+      const cut = await reasons.evaluateAll((all) =>
+        all
+          .map((reason) => reason.parentElement as HTMLElement)
+          .filter((box) => box.scrollWidth > box.clientWidth)
+          .map((box) => `${box.scrollWidth} > ${box.clientWidth}`),
+      );
+      expect(cut, 'every reason fits the width of its box').toEqual([]);
     } finally {
       await context.close();
     }
