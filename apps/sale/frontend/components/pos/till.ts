@@ -8,6 +8,9 @@ import type { OrderLineOut } from '../../operations';
 // one source, in base.
 export { initials, tileGradient } from '../../../../../base/frontend/lib/item-image';
 
+/** The reads of one record by its id the till follows (`LiveFollower.vue`), by name: Sales requires neither app. */
+export type FollowedRead = 'inventory.product.get' | 'service.service.get';
+
 const timeFormats = new Map<string, Intl.DateTimeFormat>();
 
 /** The hour and minutes in the reader's language («9:05», «9:05 AM»): a parked check's default title. */
