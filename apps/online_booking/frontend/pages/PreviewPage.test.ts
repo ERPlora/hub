@@ -86,6 +86,16 @@ async function chooseUpToATime(s: Awaited<ReturnType<typeof setup>>) {
 }
 
 describe('PreviewPage', () => {
+  it('a price of four figures groups its thousands, in both languages (hub#632)', async () => {
+    const dear = { ...ROUTES, '/api/online_booking/public/services': [200, page([{ ...SERVICES[0], price: 123456 }], 1, 100)] } as typeof ROUTES;
+    const es = await setup({ locale: 'es' }, dear);
+    expect(es.el('service-v1')?.textContent).toContain('1.234,56\u00a0€ · 30');
+    es.wrapper.unmount();
+
+    const en = await setup({}, dear);
+    expect(en.el('service-v1')?.textContent).toContain('€1,234.56 · 30 min');
+  });
+
   it('opens with the page’s texts and the services booked online', async () => {
     const s = await setup();
     expect(s.el('title')?.textContent).toContain('Salón Lucía');

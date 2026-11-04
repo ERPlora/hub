@@ -63,8 +63,9 @@ Contrastada con el barrido de mercado del módulo actual (20/08/2026) y con la r
 - Sin **Ventas** nadie pregunta los grupos en el TPV; sin **Cocina** la comanda no los lleva. Las dos
   hablan con Suplementos por sus servicios, nunca por sus tablas.
 - Los suplementos van en **la moneda del negocio**, la de su país, la que dice **Ajustes → Negocio** (euros
-  en España, złoty en Polonia), con sus decimales en pantalla y en **céntimos enteros** (la unidad más
-  pequeña de esa moneda) por la API; pueden ser negativos (un descuento) o cero (gratis).
+  en España, złoty en Polonia), con sus decimales y agrupados desde cuatro cifras en pantalla («+1.234,56 €»)
+  y en **céntimos enteros** (la unidad más pequeña de esa moneda) por la API; pueden ser negativos (un
+  descuento) o cero (gratis).
 
 Configuración inicial, paso a paso:
 
