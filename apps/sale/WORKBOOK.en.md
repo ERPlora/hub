@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:bbc26a01f35a31f3605f9687be4312b8f0721a84c5e63c8c3eaac53345ec767f -->
+<!-- generated from WORKBOOK.md sha256:e755954d64390b23558207e3a9511764c42a4e81f0fc11236a7397d772d29a48 -->
 
 ## What it is for and who it is for
 
@@ -1270,13 +1270,15 @@ Steps:
    has that permission. The booked price rules over the professional's.
 In: the services on offer, their rate, their minimum and maximum and their tax category, from Services;
 the professional's own price (their assignments, `service.assignment.list`); the appointment and what it
-booked, from Appointments (`appointment.appointment.get`).
+booked, from Appointments (`appointment.appointment.get`); the refused service, while its notice is
+showing (`service.service.get`).
 Out: a service line with the service, its frozen price and the service's tax category; it moves no
 stock.
 If it fails: a service without a tax category shows "VAT missing" and does not go in ("Cannot be sold: no
-tax category. VAT needs to be set up."); an archived one, "That service is no longer offered…"; an amount
-outside the service's minimum and maximum, "That amount is outside what the service allows (<minimum> –
-<maximum>).". A booked price that does not match the appointment: "That is not the price the appointment
+tax category. VAT needs to be set up."); that notice goes away on its own as soon as the service has a
+category, without touching anything else, and also on leaving **Sell**. An archived one, "That service is
+no longer offered…"; an amount outside the service's minimum and maximum, "That amount is outside what the
+service allows (<minimum> – <maximum>).". A booked price that does not match the appointment: "That is not the price the appointment
 booked for this service: it is cancelled, it is another customer's, it did not book this service or it
 booked it cheaper." (409 on its field). Without Services active, "Services" does not show in the strip.
 Involved: SERVICE-F09, SERVICE-F03, SERVICE-F31, APPOINTMENT-F17
@@ -1402,7 +1404,8 @@ the quick notes and what is refundable can be followed live.
 - **Staff** (optional): the team for the "Served by" chip and the record of whoever is signed in
   (`staff.member.current`, without Staff's permission), to which the charge attributes "Me".
 - **Services** (optional): its services on offer (`service.service.list_for_sale`, and
-  `service.service.get` when the line is added), the client's vouchers for a service
+  `service.service.get` when the line is added and while the notice of a refused one lasts), the client's
+  vouchers for a service
   (`service.grant.tender_options`) and the voucher sessions: it holds, releases, spends and gives them
   back by calling its operations by name (`service.session.hold`, `.release`, `.settle`, `.return`), with
   the session of whoever sells and in the same transaction; a professional's own price

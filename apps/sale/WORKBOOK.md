@@ -1317,13 +1317,15 @@ Pasos:
    precio reservado manda sobre el de la profesional.
 Entra: los servicios en oferta, su tarifa, su mínimo y su máximo y su categoría fiscal, de Servicios;
 el precio propio de la profesional (sus asignaciones, `service.assignment.list`); la cita y lo que
-reservó, de Citas (`appointment.appointment.get`).
+reservó, de Citas (`appointment.appointment.get`); el servicio rechazado, mientras su aviso está a la
+vista (`service.service.get`).
 Sale: una línea de servicio con el servicio, su precio congelado y la categoría fiscal del servicio;
 no mueve stock.
 Si falla: un servicio sin categoría fiscal sale «Falta el IVA» y no entra («No se puede vender: sin
-categoría fiscal. Falta configurar el IVA.»); uno archivado, «Ese servicio ya no se ofrece…»; un
-importe fuera del mínimo y el máximo del servicio, «Ese importe está fuera de lo que admite el
-servicio (<mínimo> – <máximo>).». Un precio reservado que no casa con la cita: «Ese no es el precio
+categoría fiscal. Falta configurar el IVA.»); ese aviso se va solo en cuanto el servicio tiene
+categoría, sin tocar nada más, y también al salir de **Vender**. Uno archivado, «Ese servicio ya no se
+ofrece…»; un importe fuera del mínimo y el máximo del servicio, «Ese importe está fuera de lo que admite
+el servicio (<mínimo> – <máximo>).». Un precio reservado que no casa con la cita: «Ese no es el precio
 que reservó la cita para este servicio: está cancelada, es de otra clienta, no reservó este servicio o
 lo reservó más barato.» (409 en su campo). Sin Servicios activa, «Servicios» no sale en la tira.
 Implicados: SERVICE-F09, SERVICE-F03, SERVICE-F31, APPOINTMENT-F17
@@ -1449,7 +1451,8 @@ secciones, las notas rápidas y lo devolvible se pueden seguir en vivo.
 - **Personal** (opcional): el equipo para el chip «Atiende» y la ficha de quien tiene la sesión
   (`staff.member.current`, sin permiso de Personal), a la que el cobro atribuye «Yo».
 - **Servicios** (opcional): sus servicios en oferta (`service.service.list_for_sale`, y
-  `service.service.get` al añadir la línea), los bonos de la clienta para un servicio
+  `service.service.get` al añadir la línea y mientras dura el aviso de uno rechazado), los bonos de la
+  clienta para un servicio
   (`service.grant.tender_options`) y las sesiones de bono: las reserva, las suelta, las gasta y las
   devuelve llamando a sus operaciones por nombre (`service.session.hold`, `.release`, `.settle`,
   `.return`), con la sesión de quien vende y en la misma transacción; el precio propio de una
