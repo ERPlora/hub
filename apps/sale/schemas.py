@@ -1460,6 +1460,24 @@ class LastDaysOut(Schema):
     )
 
 
+class VoucherSoldIn(Closed):
+    sale_id: UUID | None = Field(None, description="The sale that charged the voucher.")
+    line_id: UUID | None = Field(
+        None, description="The line of it that charged the voucher; only needed when it charged several."
+    )
+    amount: Cents = Field(description="What was paid for the voucher, VAT included, in cents.")
+
+
+class VoucherUnsoldIn(Closed):
+    line_id: UUID = Field(description="The line that charged the voucher.")
+    amount: Cents = Field(description="What was paid for the voucher, VAT included, in cents.")
+
+
+class VoucherLineOut(Schema):
+    sale_id: UUID = Field(description="The sale that charged the voucher.")
+    line_id: UUID = Field(description="The line of it that charged the voucher.")
+
+
 class StaffTotal(Schema):
     staff_id: UUID = Field(description="The member of Staff.")
     sales_count: int = Field(description="Sales where they served at least one line.")
@@ -1470,13 +1488,25 @@ class StaffTotal(Schema):
         description="What the refunds of those sales gave back on their lines, in cents."
     )
     total_revenue: int = Field(
-        description="What their lines charged, refunds taken off, in cents: what their commission is on."
+        description="What their lines charged, refunds taken off, in cents."
+    )
+    voucher_sold_total: int = Field(
+        description="What of that paid for vouchers they sold, in cents: the money is the sale's, but it is no "
+        "production of theirs: it counts as each session is done."
+    )
+    voucher_total: int = Field(
+        description="What the voucher sessions they did are worth, those that came back taken off, in cents: the "
+        "voucher's price ÷ its sessions, fixed at each charge. No money of the period: it was paid when it was sold."
+    )
+    production_total: int = Field(
+        description="Their revenue without the vouchers they sold, plus the voucher sessions they did, in cents: "
+        "what their commission is on."
     )
 
 
 class ByStaffOut(Schema):
     rows: list[StaffTotal] = Field(
-        description="One row per professional, the one who sold most (refunds taken off) first."
+        description="One row per professional, the one who produced most first."
     )
 
 

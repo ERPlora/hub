@@ -636,6 +636,16 @@ class SaleLine(UUIDModel):
     voucher_session_id = models.UUIDField(_("voucher session"), null=True, blank=True)
     voucher_grant_id = models.UUIDField(_("voucher"), null=True, blank=True)
     voucher_name = models.CharField(_("voucher name"), max_length=200, blank=True)
+    # What the voucher's session is worth to who does the line (SALE-F28), fixed at the charge as Services said it: no
+    # money of this sale (the voucher was paid when it was sold), so it is in no total and in no document.
+    voucher_value = models.PositiveBigIntegerField(
+        _("voucher session value"), default=0, db_default=0
+    )
+    # What of this line paid for vouchers sold on it, as Services says when it grants them (SERVICE-F14): the money is
+    # still the sale's, but it is no production of who sold it: it counts as each session is done (SALE-F28).
+    voucher_sold_amount = models.PositiveBigIntegerField(
+        _("paid for vouchers"), default=0, db_default=0
+    )
     # SALE-F11: the names of the options charged inside the line (the receipt prints them under it), and, on
     # the child line of an option of another tax category, the line of the dish it hangs from.
     modifiers = models.JSONField(

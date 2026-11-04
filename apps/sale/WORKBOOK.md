@@ -834,7 +834,8 @@ Entra: las líneas pendientes de la cuenta.
 Sale: las líneas con su ronda y la comanda abierta en Cocina, urgente si se armó la llama (avisa: comanda
 enviada, con las líneas, sus notas, sus suplementos, los platos de cada menú y quién atiende); al anular una
 línea enviada, avisa de la línea anulada con su motivo.
-Si falla: sin nada pendiente, «No hay nada nuevo que enviar a cocina.»; si Cocina no responde, «No se ha
+Si falla: sin nada pendiente, «No hay nada nuevo que enviar a cocina.»; si Cocina no responde, sale arriba de la
+pantalla, para poder volver a pulsar «Cobrar» o «Enviar comanda» sin esperar a que se vaya, «No se ha
 podido enviar la comanda a cocina. Inténtalo de nuevo.» y no se cobra. Si la comanda se envía pero su hoja
 no se imprime, el TPV avisa, también arriba, «Comanda N enviada a cocina, pero no se imprimió. Revisa la
 impresora de cocina en Impresión.». Pedir que se quite una línea ya
@@ -985,6 +986,8 @@ Pasos:
 Entra: los bonos de la clienta y su saldo, de Servicios.
 Sale: la línea de la cuenta pagada con una sesión reservada de Servicios (avisa: cuenta cambiada);
 al cobrar, la venta con la línea a 0,00 € y la sesión gastada en la misma operación (SERVICE-F24).
+La línea de la venta guarda lo que vale esa sesión al cobrarla, para la producción de quien la hace
+(SALE-F28): no entra en ningún total ni documento, y cambiar después el bono no lo mueve.
 Quitar la línea, anularla o eliminar la cuenta suelta la sesión (SERVICE-F23); dividir o juntar
 cuentas la lleva con su línea. Una línea pagada con bono no cambia de cantidad, invitación ni
 descuento: se deshace el bono antes.
@@ -998,7 +1001,7 @@ motivo en la hoja y se deshace el bono. El descuento máximo sin responsable se 
 por pagar: una línea pagada con bono no cuenta. Sin permiso para gastar sesiones, el hueco no
 aparece. Sin Servicios activa en el negocio el hueco tampoco aparece y, si se apaga con líneas pagadas
 con bono, cobrarlas se rechaza («Servicios no está activa en este negocio…»).
-Implicados: SERVICE-F22, SERVICE-F23, SERVICE-F24, SERVICE-F25
+Implicados: SERVICE-F22, SERVICE-F23, SERVICE-F24, SERVICE-F25, SALE-F28, STAFF-F21
 
 ### SALE-F28 Consultar el historial y las cifras de ventas
 <!-- origen: fi:modules/sales#query-sales-by_staff wf:peluqueria-dia#rec_peluqueria-f15 fi:modules/sales#query-sales-last_7_days fi:modules/sales#query-sales-list fi:modules/sales#query-sales-stats fi:modules/sales#query-sales-today old:sales/workflow/historial-y-correcciones.md#sales-f28 fi:modules/sales#widget-sales-last_7_days fi:modules/sales#widget-sales-recent_activity fi:modules/sales#widget-sales-tickets_today fi:modules/sales#widget-sales-today -->
@@ -1032,14 +1035,23 @@ la comisión) ya resta lo devuelto: lo que vuelve, a quien lo vendió; el dinero
 valga (solo dinero, una invitación o la sesión de un bono), a todos los de esa venta según lo que a cada
 uno le queda por devolver tras las devoluciones anteriores, así que nadie baja de 0. Cada devolución
 cuenta en el día de su venta y se reparte al céntimo: con lo que nadie atendió, suma los «Ingresos» del
-periodo.
+periodo. Además, lo que valen las **sesiones de bono** que hizo cada profesional (SALE-F27, SERVICE-F24),
+fijado al cobrar cada una; una sesión de un bono sin límite, que no tiene entre qué dividir, cuenta el
+precio de su línea. No es dinero del periodo (el bono se pagó al venderlo), así que no está en los
+«Ingresos». La sesión que vuelve, por devolución o anulando la venta, deja de contar. Lo que una línea pagó
+por un **bono vendido** (Servicios lo dice al concederlo, SERVICE-F14) sigue en «Ingresos», pero no es
+producción de quien lo vendió, sin pasar nunca de lo que a esa línea le queda tras las devoluciones. La
+**producción**, sobre la que va la comisión, es lo que queda sin esos bonos más las sesiones: un bono de
+100,00 € en 3 sesiones, vendido por A y hecho por B, da 0 a A y 100,00 € a B, y suma los «Ingresos» del periodo.
+Las ventas cobradas antes siguen como estaban: su línea cuenta para quien la vendió y las sesiones de esos
+bonos no cuentan para nadie, así que nada cuenta dos veces.
 Si falla: «Error cargando métricas» (las cifras salen como «—»); si no se pueden leer los últimos 7 días,
 «No se han podido leer los últimos 7 días.». Vacía: «Aún no hay ventas.». Quien
 no tiene permiso de informes ve la tabla, sin las cifras. Un total que no es un importe dice «Escribe
 un importe, como 12,50» bajo su campo, y una fecha final anterior a la inicial, «La fecha final no
 puede ser anterior a la inicial.»; ninguno de los dos filtra y manda el periodo. En el Inicio, un panel
 de un día sin ventas dice 0, y uno que no se puede leer, «No disponible».
-Implicados: STAFF-F21, BASE-F06, BASE-F07, BASE-F08
+Implicados: STAFF-F21, BASE-F06, BASE-F07, BASE-F08, SALE-F27, SERVICE-F24
 
 ### SALE-F29 Ver y reimprimir el documento de una venta
 <!-- origen: fi:hub/app-web#print-on-sale-auto-impresion-del-ticket-al-cerrar-venta old-hub:HUB_SHELL-F70 fi:modules/sales#query-sales-get fi:modules/sales#query-sales-lines old:sales/workflow/historial-y-correcciones.md#sales-f29 wf:cadena-fiscal#rec_fiscal-f07 -->
@@ -1353,7 +1365,7 @@ diciendo cuáles (409 `*_ambiguous`).
 | Las cifras de un periodo de días del negocio, con el impuesto con que se declararon sus ventas (vacío si mezclan impuestos) | informes | F28 | `sale.sale.stats` |
 | Lo vendido hoy y los tiques de hoy | informes | F28 | `sale.sale.today` |
 | Lo vendido cada uno de los últimos 7 días | informes | F28 | `sale.sale.last_7_days` |
-| Lo vendido por cada profesional en un periodo: bruto, base, impuesto, lo devuelto de sus líneas y lo que queda (sobre lo que va la comisión) | informes | F16, F28 | `sale.sale.by_staff` |
+| Lo vendido por cada profesional en un periodo: bruto, base, impuesto, lo devuelto de sus líneas, lo que queda, lo que pagó bonos que vendió, lo que valen las sesiones de bono que hizo y su producción (sobre la que va la comisión) | informes | F16, F28 | `sale.sale.by_staff` |
 | Lo que cobraría una cuenta, o unas líneas, sin cobrar nada (total, base, IVA, descuentos, desglose y líneas) | ver ventas | F01, F21, F22 | `sale.checkout.preview` |
 | Las cuentas abiertas (o de otro estado), con búsqueda por título y páginas | ver ventas | F17 | `sale.order.list` |
 | Una cuenta con sus líneas sin cobrar | ver ventas | F17, F19 | `sale.order.get` |
@@ -1414,6 +1426,7 @@ secciones, las notas rápidas y lo devolvible se pueden seguir en vivo.
 | Venta anulada | Anular | La venta, su número, motivo, quién y cuándo, total, cliente, cuenta y documento | `sale.sale.voided` |
 | Venta devuelta | Devolver | La venta, la devolución, el importe, el motivo, si queda devuelta del todo, los cobros y las líneas devueltas | `sale.sale.refunded` |
 | Ventas re-apuntadas | Unir fichas | La ficha que queda y la absorbida | `sale.sale.reassigned` |
+| Una línea pagó un bono, o ya no | Servicios concede o anula un bono diciendo su venta | La venta y la línea | `sale.sale.voucher_line_changed` |
 | Venta con su documento | Un documento que no se pudo emitir en el cobro, la anulación o la devolución se emite después (reintento del cobro, «Emitir ahora» o la reacción de Facturación) | La venta, el documento, su número, la devolución (`refund_id`) o si es el de la anulación (`void`); uno por documento | `sale.sale.invoiced` |
 | Cuenta abierta | Abrir o dividir | La cuenta | `sale.order.opened` |
 | Cuenta cambiada | Cualquier cambio de líneas, descuentos o título | La cuenta | `sale.order.changed` |
@@ -1911,6 +1924,8 @@ administrador y responsable, los mismos que anulan y devuelven).
 - **Marcar una cuenta «para llevar» en el TPV** (F12): la cuenta no tiene canal; un menú se cobra según
   su propio ajuste en Menús y combos («en el local» o «para llevar», COMBO-F09). Un menú «en el local»
   que el cliente se lleva no se parte por plato.
+- **Enlazar a su venta un bono concedido sin decirla** (SERVICE-F14, hub#786): su línea sigue contando para quien
+  lo vendió y sus sesiones, para nadie.
 - **Vender un bono en el TPV** (SERVICE-F14) y, con ello, concederlo al cobrar y anularlo al anular o
   devolver su venta (el aviso «se vendió en esta venta y se anulará con ella»): el TPV del producto
   actual no lo ofrecía (solo el asistente o la API, con el IVA que mandaba el cobro) y aquí toda línea

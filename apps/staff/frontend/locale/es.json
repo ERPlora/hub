@@ -132,8 +132,7 @@
       },
       "mine": {
         "button": "Mi ficha",
-        "title": "Mi ficha",
-        "close": "Cerrar"
+        "title": "Mi ficha"
       }
     },
     "roles": {
@@ -283,13 +282,13 @@
       "to": "Hasta",
       "totals": {
         "label": "Totales del periodo",
-        "sold": "Vendido",
+        "sold": "Producción",
         "commission": "Comisiones"
       },
       "columns": {
         "name": "Nombre",
         "role": "Rol",
-        "sold": "Vendido",
+        "sold": "Producción",
         "rate": "Comisión %",
         "commission": "Comisión"
       },

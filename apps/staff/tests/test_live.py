@@ -24,7 +24,7 @@ TIME_OFF = [
 ]
 SCHEDULE = [events.SCHEDULE_CREATED, events.SCHEDULE_UPDATED, events.SCHEDULE_DELETED]
 # Sales' events, cited by name in live.py: Sales is no requirement of Staff.
-SALE_FIGURES = ["sale.sale.completed", "sale.sale.voided", "sale.sale.refunded"]
+SALE_FIGURES = ["sale.sale.completed", "sale.sale.voided", "sale.sale.refunded", "sale.sale.voucher_line_changed"]
 
 
 def staff_queries():

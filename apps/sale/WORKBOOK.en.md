@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:c666e2658d4c3b277b02bd07cdd34fe379142b2909f606a48812fb51d7bcbc9b -->
+<!-- generated from WORKBOOK.md sha256:a999ae2cfd6a741b72cac49f8804084294da3f699b4e0ba38e362b07947f6444 -->
 
 ## What it is for and who it is for
 
@@ -809,7 +809,8 @@ In: the check's pending lines.
 Out: the lines with their round and the kitchen order open in Kitchen, a rush if the flame was armed
 (announces: order sent, with the lines, their notes, their modifiers, the dishes of each menu and who
 serves); on voiding a sent line, it announces the voided line with its reason.
-If it fails: with nothing pending, "There is nothing new to send to the kitchen."; if Kitchen does not
+If it fails: with nothing pending, "There is nothing new to send to the kitchen."; at the top of the screen, so
+"Charge" or "Send order" can be pressed again without waiting for it to go, if Kitchen does not
 answer, "The order could not be sent to the kitchen. Try again." and nothing is charged. If the order is
 sent but its slip does not print, the POS warns, at the top too, "Order N sent to the kitchen, but it did
 not print. Check the kitchen printer in Printing.". Asking to remove a line already sent is refused: "That line can
@@ -954,7 +955,9 @@ Steps:
    check's line keeps the voucher that pays it.
 In: the client's vouchers and their balance, from Services.
 Out: the check's line paid with a session held in Services (announces: check changed); when charged, the
-sale with the line at 0.00 € and the session spent in the same operation (SERVICE-F24). Removing the
+sale with the line at 0.00 € and the session spent in the same operation (SERVICE-F24). The sale's line
+keeps what that session is worth when it is charged, for the production of whoever does it (SALE-F28): it
+goes into no total or document, and changing the voucher later does not move it. Removing the
 line, voiding it or deleting the check releases the session (SERVICE-F23); splitting or merging checks
 carries it with its line. A line paid with a voucher does not change quantity, comp or discount: the
 voucher is undone first.
@@ -968,7 +971,7 @@ discount without a manager is measured on what is left to pay: a line paid with 
 Without the permission to spend sessions, the slot does not appear. Without Services active in the
 business the slot does not appear either and, if it is turned off with lines paid with a voucher,
 charging them is refused ("Services is not active in this business…").
-Involved: SERVICE-F22, SERVICE-F23, SERVICE-F24, SERVICE-F25
+Involved: SERVICE-F22, SERVICE-F23, SERVICE-F24, SERVICE-F25, SALE-F28, STAFF-F21
 
 ### SALE-F28 Look up the sales history and figures
 Status: done
@@ -1002,14 +1005,23 @@ commission) already takes off what was refunded: what goes back, to whoever sold
 back with nothing that is worth anything (only money, a comp or a voucher's session), to everyone on that
 sale according to what each one has left to refund after the earlier refunds, so nobody goes below 0.
 Each refund counts on its sale's day and is shared out to the cent: with what nobody served, it adds up
-to the period's "Revenue".
+to the period's "Revenue". On top of that, what the **voucher sessions** each professional did are worth
+(SALE-F27, SERVICE-F24), fixed as each one is charged; a session of a voucher with no limit, which has
+nothing to divide by, counts the price of its line. It is not money of the period (the voucher was paid
+when it was sold), so it is not in "Revenue". A session that comes back, by a refund or by voiding the sale,
+stops counting. What a line paid for a **voucher sold** (Services says so when granting it, SERVICE-F14) stays in
+"Revenue", but it is no production of whoever sold it, never going over what that line has left after refunds.
+Their **production**, which the commission goes on, is what is left without those vouchers plus the sessions: a
+voucher of 100.00 € in 3 sessions, sold by A and done by B, gives 0 to A and 100.00 € to B, and adds up to the
+period's "Revenue". Sales charged before stay as they were: their line counts for whoever sold it and the
+sessions of those vouchers count for nobody, so nothing counts twice.
 If it fails: "Error loading metrics" (the figures show as "—"); if the last 7 days cannot be read, "The
 last 7 days could not be read.". Empty: "No sales yet.". Whoever lacks the reports permission sees the
 table, without the figures. A total that is not an amount says "Type an amount, like 12.50" under its
 field, and an end date before the start one, "The end date cannot be before the start date."; neither of
 them filters and the period rules. On Home, a panel for a day with no sales says 0, and one that cannot
 be read, "Unavailable".
-Involved: STAFF-F21, BASE-F06, BASE-F07, BASE-F08
+Involved: STAFF-F21, BASE-F06, BASE-F07, BASE-F08, SALE-F27, SERVICE-F24
 
 ### SALE-F29 See and reprint a sale's document
 Status: done
@@ -1307,7 +1319,7 @@ id, its name or its type ("cash", "card"). If a name matches several, it is refu
 | The figures of a period of business days, with the tax its sales were declared with (empty if they mix taxes) | reports | F28 | `sale.sale.stats` |
 | What was sold today and today's tickets | reports | F28 | `sale.sale.today` |
 | What was sold on each of the last 7 days | reports | F28 | `sale.sale.last_7_days` |
-| What each professional sold in a period: gross, base, tax, what was refunded of their lines and what is left (what the commission goes on) | reports | F16, F28 | `sale.sale.by_staff` |
+| What each professional sold in a period: gross, base, tax, what was refunded of their lines, what is left, what paid for vouchers they sold, what the voucher sessions they did are worth and their production (what the commission goes on) | reports | F16, F28 | `sale.sale.by_staff` |
 | What a check, or some lines, would charge, without charging anything (total, base, VAT, discounts, breakdown and lines) | see sales | F01, F21, F22 | `sale.checkout.preview` |
 | The open checks (or of another state), with search by title and pages | see sales | F17 | `sale.order.list` |
 | A check with its uncharged lines | see sales | F17, F19 | `sale.order.get` |
@@ -1368,6 +1380,7 @@ the quick notes and what is refundable can be followed live.
 | Sale voided | Void | The sale, its number, reason, who and when, total, customer, check and document | `sale.sale.voided` |
 | Sale refunded | Refund | The sale, the refund, the amount, the reason, whether it is left fully refunded, the payments and the refunded lines | `sale.sale.refunded` |
 | Sales re-pointed | Merge records | The record that stays and the absorbed one | `sale.sale.reassigned` |
+| A line paid for a voucher, or no longer | Services grants or voids a voucher saying its sale | The sale and the line | `sale.sale.voucher_line_changed` |
 | Sale with its document | A document that could not be issued in the charge, the void or the refund is issued later (the charge's retry, "Issue now" or Invoicing's reaction) | The sale, the document, its number, the refund (`refund_id`) or whether it is the void's (`void`); one per document | `sale.sale.invoiced` |
 | Check opened | Open or split | The check | `sale.order.opened` |
 | Check changed | Any change of lines, discounts or title | The check | `sale.order.changed` |
