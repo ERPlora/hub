@@ -12,16 +12,18 @@ from django.db.models import Sum
 def value_delivered_sessions(apps, schema_editor):
     Grant = apps.get_model("service", "Grant")
     Redemption = apps.get_model("service", "Redemption")
-    alias = schema_editor.connection.alias
     pending = (
-        Redemption.objects.using(alias)
+        Redemption.objects.using(schema_editor.connection.alias)
         .filter(status="consumed", value__isnull=True, grant__max_uses__isnull=False)
         .order_by("grant_id", "redeemed_at", "id")
     )
     valued = []
     for grant_id, sessions in groupby(pending, key=attrgetter("grant_id")):
-        grant = Grant.objects.using(alias).get(pk=grant_id)
-        adjusted = grant.adjustments.using(alias).aggregate(total=Sum("uses_delta"))["total"] or 0
+        grant = Grant.objects.using(schema_editor.connection.alias).get(pk=grant_id)
+        adjusted = (
+            grant.adjustments.using(schema_editor.connection.alias).aggregate(total=Sum("uses_delta"))["total"]
+            or 0
+        )
         sessions_left = grant.max_uses + adjusted
         amount_left = grant.amount
         for session in sessions:
@@ -30,7 +32,7 @@ def value_delivered_sessions(apps, schema_editor):
             amount_left -= session.value
             sessions_left -= 1
             valued.append(session)
-    Redemption.objects.using(alias).bulk_update(valued, ["value"], batch_size=500)
+    Redemption.objects.using(schema_editor.connection.alias).bulk_update(valued, ["value"], batch_size=500)
 
 
 class Migration(migrations.Migration):
