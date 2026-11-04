@@ -4542,7 +4542,7 @@ def _apps_without_migrations() -> frozenset[str]:
     return frozenset(activation.module_graph()) - set(_code_leaves())
 
 
-def _apps_created(hub: Hub | None) -> frozenset[str] | None:
+def apps_created(hub: Hub | None) -> frozenset[str] | None:
     """The modules whose tables ``hub``'s own database has: what the migrator confirmed (``Hub.schema_apps``; the
     worker's ``ensure_schema`` makes what it lacks and is a no-op for what it has) and those without migrations;
     ``None`` for a hub that shares phase 1's database, where every app has them."""
@@ -4701,7 +4701,7 @@ def _enable(ctx: OperationContext, data: AppChangeIn) -> dict:
                     limit,
                 ) % {"count": limit}
             raise AppLimitReached(message, max_apps=limit, enabled=enabled)
-    changes = _tables_first(changes, current, _apps_created(hub))
+    changes = _tables_first(changes, current, apps_created(hub))
     _write_states(ctx.scope.key, changes)
     on_now = [label for label, row in changes.items() if row.on]
     if hub is not None and not hub.is_demo and on_now:
@@ -4938,7 +4938,7 @@ def app_activation_settle(ctx: OperationContext, data: AppActivationSettleIn) ->
             wait = ACTIVATION_LOCKED_SECONDS if data.outcome == "locked" else ACTIVATION_NEWER_CODE_SECONDS
             AppActivation.objects.filter(host=host, app__in=asked).update(next_attempt_at=now + dt.timedelta(seconds=wait))
             return {"on": [], "failed": [], "waiting": asked}
-        created = _apps_created(hub)
+        created = apps_created(hub)
         made = [label for label in asked if data.outcome == "created" and (created is None or label in created)]
         failed = behind or [label for label in asked if label not in made]
         if made:

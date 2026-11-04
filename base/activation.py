@@ -32,6 +32,11 @@ The rules, without the database: ``base.services`` (``base.app.enable``, ``base.
 What is off is also out of everything that asks which apps are on (``base.relay.active_apps``): its operations answer
 404 ``app_inactive`` (``base.entitlement.operation_database``), the relay and the Home leave it out and the menu does
 not list it. Its tables are never dropped: turned on again, it has its data.
+
+**What the router asks** (:func:`has_tables`, ``base.tenancy.router``, on every query of a hub's model): whether a module
+has its tables in a hub's own database, from the row the context holds (``Hub.schema_apps``, read when the context
+opened), so what a business has costs no call; only what that row does not list is asked of control's row through the
+cache. Tables are never dropped: a row that lists a module is right however old it is, one that does not may be behind.
 """
 
 import logging
@@ -69,6 +74,11 @@ OFF_APPS_TTL = 60
 #: «activating». Kept and forgotten with the apps off; read only when both are kept. One call per key: the two keys hash
 #: to different slots of the Valkey cluster, which refuses a call on both (``base.cache``).
 CREATING_APPS_CACHE = "base.apps_creating:"
+#: The modules whose tables a hub's own database has, as control's row says (``Hub.schema_apps``), kept and forgotten with
+#: them: what is refused is read from control once a minute at most. Behind, it can only say «not yet» (PLAN-DB §9).
+CREATED_APPS_CACHE = "base.apps_created:"
+#: What the migrator always notes of a database it confirmed: a row without it knows nothing of what that database has.
+CONFIRMED_BY = "base"
 
 #: The hosts whose rows the running change wrote and has not committed yet: what it reads of them is never kept.
 _changing: ContextVar[frozenset[str]] = ContextVar("base_activation_changing", default=frozenset())
@@ -288,6 +298,49 @@ def creating_apps(scope: Scope) -> frozenset[str]:
     return _kept(scope)[1]
 
 
+def has_tables(hub: Any, label: str) -> bool:
+    """Whether ``label``'s tables are in ``hub``'s own database, as far as control knows: only a module may lack them.
+
+    What the row in hand lists has them, for free: this runs on every query. A row never confirmed (:data:`CONFIRMED_BY`:
+    ``migrator.is_behind`` says so too, and the next ``migrate_hubs`` confirms it) says nothing, and nothing is refused
+    on it. Only what a confirmed row does not list goes on: it may be a row read before the tables were made, so it asks
+    what control says now, through the cache."""
+    recorded = hub.schema_apps or ()
+    if label in recorded or CONFIRMED_BY not in recorded:
+        return True
+    if label not in module_graph():
+        return True
+    created = _created_apps(hub)
+    return created is None or label in created
+
+
+def _created_apps(hub: Any) -> frozenset[str] | None:
+    """What control says now of ``hub``'s database, from the cache when it has it, else from its row (kept); ``None`` when
+    it says nothing: no row, no database of its own or a row never confirmed. A cache that does not answer is logged and
+    the row is read: never a guess."""
+    key = CREATED_APPS_CACHE + hub.slug
+    try:
+        kept = cache.get(key)
+    except Exception:
+        logger.exception("base.activation.cache_unavailable: what %s has created is read from its row.", hub.slug)
+        kept = None
+    if isinstance(kept, list):
+        return frozenset(kept)
+    from base import services  # base.services imports this module
+
+    row = services.registry_row(hub.pk)
+    if row is None or CONFIRMED_BY not in (row.schema_apps or ()):
+        return None
+    created = services.apps_created(row)
+    if created is None:
+        return None
+    try:
+        cache.set(key, sorted(created), OFF_APPS_TTL)
+    except Exception:
+        logger.exception("base.activation.cache_unavailable: what %s has created was read and not kept.", hub.slug)
+    return created
+
+
 def _kept(scope: Scope) -> tuple[frozenset[str], frozenset[str]]:
     """``(off, creating)`` of ``scope``'s business, from the cache when it has both, else from its rows (kept, unless
     the running change wrote them)."""
@@ -320,10 +373,11 @@ def changing(host: str) -> Iterator[None]:
 
 
 def forget(host: str) -> None:
-    """Drop ``host``'s apps off from the cache: after the COMMIT of a change, the next read sees it, in every process.
-    A cache that does not answer is logged; what it kept ends with its timeout."""
+    """Drop what is kept of ``host``'s apps from the cache: after the COMMIT of a change or the migrator's run
+    (``migrator.ensure_schema``), the next read sees it, in every process. A cache that does not answer is logged; what
+    it kept ends with its timeout."""
     try:
-        for key in (OFF_APPS_CACHE + host, CREATING_APPS_CACHE + host):
+        for key in (OFF_APPS_CACHE + host, CREATING_APPS_CACHE + host, CREATED_APPS_CACHE + host):
             cache.delete(key)
     except Exception:
         logger.exception("base.activation.cache_unavailable: the apps off of %s could not be forgotten.", host)

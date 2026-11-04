@@ -221,6 +221,75 @@ def test_pages_are_stable_with_the_id_as_tie_break():
     assert [page.total for page in pages] == [5, 5, 5]
 
 
+def _tied_cards():
+    return [card("Same", total_spent=500).id for _ in range(4)], {}, CustomerListIn
+
+
+def _tied_groups():
+    rows = [CustomerGroup.objects.create(name=f"Group {n}") for n in range(4)]
+    return [row.id for row in rows], {}, GroupListIn
+
+
+def _tied_tags():
+    rows = [CustomerTag.objects.create(name=f"Tag {n}") for n in range(4)]
+    return [row.id for row in rows], {}, TagListIn
+
+
+def _tied_fields():
+    rows = [CustomField.objects.create(name=f"Field {n}") for n in range(4)]
+    return [row.id for row in rows], {}, FieldListIn
+
+
+def _tied_purchases():
+    owner = card("Owner")
+    rows = [
+        Purchase.objects.create(
+            customer=owner,
+            sale_id=uuid.uuid7(),
+            amount=700,
+            status="confirmed",
+            recorded_at=NOW,
+        )
+        for _ in range(4)
+    ]
+    return [row.id for row in rows], {"customer_id": owner.id}, PurchaseListIn
+
+
+@pytest.mark.parametrize(
+    ("operation", "tied", "column"),
+    [
+        ("customer.customer.list", _tied_cards, "total_spent"),
+        ("customer.customer.list", _tied_cards, "last_purchase_at"),
+        ("customer.group.list", _tied_groups, "sort_order"),
+        ("customer.tag.list", _tied_tags, "color"),
+        ("customer.field.list", _tied_fields, "field_type"),
+        ("customer.purchase.list", _tied_purchases, "amount"),
+    ],
+)
+def test_ties_go_by_id_in_the_lists_own_direction(operation, tied, column):
+    """hub#684 (the rule of hub#2355, as in Sales, Cash register, Inventory and Tasks): a descending list is
+    the ascending one read backwards, ties included, and its pages neither repeat nor lose rows."""
+    ids, filters, schema = tied()
+    by_id = sorted(ids)
+
+    def listed(descending, **page):
+        params = schema(sort=column, descending=descending, **filters, **page)
+        return [row.id for row in run(operation, params).rows]
+
+    assert listed(False) == by_id
+    assert listed(True) == by_id[::-1]
+    assert [
+        row for offset in (0, 2) for row in listed(True, limit=2, offset=offset)
+    ] == by_id[::-1]
+
+
+def test_the_export_settles_its_ties_the_way_the_list_does():
+    ids = [card(f"Tie {n}", total_spent=500) for n in range(3)]
+    in_order = [row.name for row in sorted(ids, key=lambda row: row.id)]
+    _, rows = exported(sort="total_spent", descending=True)
+    assert [row["name"] for row in rows] == in_order[::-1]
+
+
 def test_deleted_merged_and_erased_cards_are_left_out_but_inactive_ones_stay():
     card("Alive")
     card("Inactive", is_active=False)
