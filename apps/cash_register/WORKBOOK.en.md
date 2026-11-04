@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:f0fcfe5137d4e79567dc9e0f32e61698392c2eb6992531a47ea59fc39c4f46e3 -->
+<!-- generated from WORKBOOK.md sha256:49e563eb9ca2df02b38a08ae193c009e8d8b00dd0173ec4263f7fd3ab64d52f1 -->
 
 ## What it is for and who it is for
 
@@ -541,7 +541,8 @@ Steps:
    - with a session forgotten past its cut-off (F10): what came after the cut-off;
    - with a session open: the stragglers of the previous shift, confirmed while it was being closed (its Z
      no longer picks them up).
-2. Tap "View" to see the list (when, type, amount, method and document).
+2. Tap "View" to see the list (when, type, amount, method and document). It is read-only: a single
+   button, **Close**.
 3. When opening the session, count that cash in the float: it is already in the drawer (the opening window
    reminds you).
 In: the charges, voids and refunds from Sales that fell in no session.

@@ -13,8 +13,9 @@
 // order» tabs). What a run creates, its product `E2E-CARTFIT-<run>` and its check, is deleted after it.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, capture, login, psql, settled, shown } from './helpers';
+import { A, capture, login, settled, shown } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
+import { parkIssuer, unparkIssuer } from './invoice-helpers';
 import { cleanSales, drawerOff, openTillCart, restoreDrawer, stamp, tillIsPhone } from './sale-helpers';
 
 const KEY = 'FIX-HUB-630-CART-PHONE';
@@ -46,7 +47,7 @@ let other: Product;
 test.describe.configure({ mode: 'serial' });
 
 test.beforeAll(async ({ browser }) => {
-  psql([`drop table if exists ${PARKED}`, `create table ${PARKED} as select * from invoice_issuer`, 'delete from invoice_issuer'].join('; '));
+  parkIssuer(PARKED);
   const context = await browser.newContext({ baseURL: A });
   const page = await context.newPage();
   await login(page, A, '/sale/pos');
@@ -65,7 +66,7 @@ test.afterAll(() => {
     try {
       restoreDrawer();
     } finally {
-      psql(['delete from invoice_issuer', `insert into invoice_issuer select * from ${PARKED}`, `drop table ${PARKED}`].join('; '));
+      unparkIssuer(PARKED);
     }
   }
 });
