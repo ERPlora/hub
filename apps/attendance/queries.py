@@ -60,6 +60,7 @@ from apps.attendance.schemas import (
 )
 from apps.staff.models import Member
 from base.models import HubUser
+from base.ordering import list_order
 from base.queries import hub_user_of
 from base.business import babel_locale
 
@@ -351,7 +352,8 @@ def scoped_records(ctx: OperationContext, params: RecordListIn, as_of: dt.dateti
     records = annotated(records)
     if params.search:
         records = records.filter(member_name__icontains=params.search)
-    return records.order_by(params.sort, "id")
+    column = params.sort.removeprefix("-")
+    return records.order_by(*list_order(column, descending=params.sort.startswith("-")))
 
 
 def _page(rows: list, total: int, params) -> dict:
