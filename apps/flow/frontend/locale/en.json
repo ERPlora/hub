@@ -1342,6 +1342,8 @@
       "send": "Send"
     },
     "fields": {
+      "production_total": "Production total",
+      "sale_line_id": "Sale line",
       "title": "Title",
       "description": "Description",
       "priority": "Priority",
@@ -1361,6 +1363,9 @@
       "reason": "Reason",
       "original": "Original",
       "rectification_type": "Rectification type",
+      "value": "Value",
+      "voucher_sold_total": "Vouchers sold total",
+      "voucher_total": "Voucher sessions total",
       "whole": "Whole",
       "id": "Id",
       "found": "Found something",

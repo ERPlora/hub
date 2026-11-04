@@ -1342,6 +1342,8 @@
       "send": "Enviar"
     },
     "fields": {
+      "production_total": "Producción total",
+      "sale_line_id": "Línea de la venta",
       "title": "Título",
       "description": "Descripción",
       "priority": "Prioridad",
@@ -1361,6 +1363,9 @@
       "reason": "Motivo",
       "original": "Original",
       "rectification_type": "Tipo de rectificativa",
+      "value": "Valor",
+      "voucher_sold_total": "Total de bonos vendidos",
+      "voucher_total": "Total de sesiones de bono",
       "whole": "Entera",
       "id": "Id",
       "found": "Encontró algo",
