@@ -566,7 +566,8 @@ Pasos:
    - con una sesión olvidada pasado su corte (F10): lo de después del corte;
    - con una sesión abierta: las rezagadas del turno anterior, confirmadas mientras se cerraba (su Z
      ya no las recoge).
-2. Pulsa «Ver» para ver la lista (cuándo, tipo, importe, método y documento).
+2. Pulsa «Ver» para ver la lista (cuándo, tipo, importe, método y documento). Es solo de lectura: un
+   único botón, **Cerrar**.
 3. Al abrir la sesión, cuenta ese efectivo en el fondo: ya está en el cajón (la ventana de abrir lo
    recuerda).
 Entra: los cobros, anulaciones y devoluciones de Ventas que no cayeron en ninguna sesión.
