@@ -20,12 +20,13 @@ const WITHOUT_A_HUB: Record<string, { calls: number; on: string }> = {
   'whatsapp-inbox-plan-cap.spec.ts': { calls: 1, on: "the SaaS's plan of the business" },
 };
 
-/** `source` without its comments, which talk about these calls without making them. */
+/** `source` without its comment lines, which talk about these calls without making them. Line by line, never by matching
+ *  a block's two ends: an opening inside a line comment or a string (a glob, a door's path) would take the code after it
+ *  along, up to the next block's end, and a call there would go unseen. A comment read as code only asks for a listing. */
 function code(source: string): string {
   return source
-    .replace(/\/\*[\s\S]*?\*\//g, '')
     .split('\n')
-    .filter((line) => !line.trimStart().startsWith('//'))
+    .filter((line) => !/^\s*(\/\/|\/\*|\*)/.test(line))
     .join('\n');
 }
 
@@ -34,9 +35,10 @@ function shellsWithoutHub(source: string): number {
   return code(source).match(/manage\.py(?:['"`]\s*,\s*['"`]|\s+)shell\b(?!['"`]\s*,\s*['"`]--hub\b|\s+--hub\b)/g)?.length ?? 0;
 }
 
-/** The specs and helpers of the e2e (not Vitest's own tests) and their text, read once while Vitest collects this file,
- *  like raw-screenshots.test.ts: reading ~290 files inside a test can pass Vitest's 5 s with the machine loaded. */
-const E2E_SOURCES: ReadonlyArray<[string, string]> = readdirSync(E2E_DIR)
+/** The specs and helpers of the e2e, its subfolders' too (`qa/`, whose specs Playwright runs as well), not Vitest's own
+ *  tests, and their text (a subfolder's by its path, `qa/…`), read once while Vitest collects this file, like
+ *  raw-screenshots.test.ts: reading ~290 files inside a test can pass Vitest's 5 s with the machine loaded. */
+const E2E_SOURCES: ReadonlyArray<[string, string]> = readdirSync(E2E_DIR, { recursive: true, encoding: 'utf8' })
   .filter((name) => name.endsWith('.ts') && !name.endsWith('.test.ts'))
   .map((name) => [name, readFileSync(join(E2E_DIR, name), 'utf8')]);
 
@@ -71,5 +73,15 @@ describe('a `manage.py shell` of the e2e names its business', () => {
     expect(shellsWithoutHub("execFile('uv', ['run', 'python', 'manage.py', 'shell', '--hub', 'a', '-c', RELAY]);")).toBe(0);
     expect(shellsWithoutHub('execSync(`uv run python manage.py shell --hub a -c "${code}"`);')).toBe(0);
     expect(shellsWithoutHub('// a one-shot `manage.py shell` of its own\n/** `manage.py shell -c` in the SaaS */\n/**\n * manage.py shell\n */')).toBe(0);
+  });
+
+  it('a `/*` in a line comment or a string hides no call after it', () => {
+    const call = "execFile('uv', ['run', 'python', 'manage.py', 'shell', '-c', RELAY]);";
+    expect(shellsWithoutHub(`// the doors (\`/internal/whatsapp/*\`)\n${call}\n/** the next doc */`)).toBe(1);
+    expect(shellsWithoutHub(`page.route('**/*.png', abort);\n${call}\n/** the next doc */`)).toBe(1);
+  });
+
+  it('reads the specs of the subfolders too', () => {
+    expect(E2E_SOURCES.map(([name]) => name)).toContain(join('qa', 'assistant-probes.spec.ts'));
   });
 });
