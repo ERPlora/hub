@@ -13,7 +13,7 @@
 // business: the red strip of a hub that cannot issue invoices yet takes 138 px over the till (hub `a`'s issuer is
 // parked for the run and put back after it), with Tables and Kitchen on (their button and the «Check» / «Current
 // order» tabs). What a run creates, its product `E2E-CARTFIT-<run>` and its check, is deleted after it.
-import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
+import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, capture, login, psql, settled, shown, untilStill } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
@@ -334,6 +334,20 @@ async function wideKeepsItsBar(page: Page, size: (typeof WIDE)[number], lang: 'e
   }
 }
 
+/** A till of its own in the language under test (the Hub's language cookie, which the sign-in has just set from the
+ *  account), with `product` on its check. */
+async function tillWithALine(browser: Browser, locale: string, lang: string): Promise<{ context: BrowserContext; page: Page }> {
+  const context = await browser.newContext({ baseURL: A, locale, viewport: { width: 1440, height: 900 } });
+  const page = await context.newPage();
+  await login(page, A, '/sale/pos');
+  await context.addCookies([{ name: 'django_language', value: lang, domain: new URL(A).hostname, path: '/' }]);
+  await page.reload();
+  await shown(page).locator('[data-testid=pos-till]').waitFor({ state: 'visible' });
+  await shown(page).locator(`[data-testid=pos-product-${product.id}]`).click();
+  await expect(shown(page).locator('[data-testid^=pos-line-]').filter({ hasText: product.name }).first()).toBeAttached();
+  return { context, page };
+}
+
 const LANGUAGES = [
   { name: 'English', lang: 'en', locale: 'en-US', assign: 'Assign customer' },
   { name: 'Spanish', lang: 'es', locale: 'es-ES', assign: 'Asignar cliente' },
@@ -345,16 +359,8 @@ for (const { name, lang, locale, assign } of LANGUAGES) {
     let page: Page;
 
     test.beforeAll(async ({ browser }) => {
-      context = await browser.newContext({ baseURL: A, locale, viewport: { width: 1440, height: 900 } });
-      page = await context.newPage();
-      await login(page, A, '/sale/pos');
-      // In the language under test (the Hub's language cookie, which the sign-in has just set from the account).
-      await context.addCookies([{ name: 'django_language', value: lang, domain: new URL(A).hostname, path: '/' }]);
-      await page.reload();
-      await shown(page).locator('[data-testid=pos-till]').waitFor({ state: 'visible' });
+      ({ context, page } = await tillWithALine(browser, locale, lang));
       await expect(shown(page).locator('[data-testid=customer-search-trigger]'), 'the bar in the language under test').toContainText(assign);
-      await shown(page).locator(`[data-testid=pos-product-${product.id}]`).click();
-      await expect(shown(page).locator('[data-testid^=pos-line-]').filter({ hasText: product.name }).first()).toBeAttached();
     });
 
     test.afterAll(async () => {
@@ -367,12 +373,6 @@ for (const { name, lang, locale, assign } of LANGUAGES) {
       });
     }
 
-    for (const size of [...SIZES, ROOMY]) {
-      test(`${size.label}: «Current order»`, async () => {
-        await roundFits(page, size, lang);
-      });
-    }
-
     for (const size of WIDE) {
       test(size.label, async () => {
         await wideKeepsItsBar(page, size, lang, assign);
@@ -382,18 +382,33 @@ for (const { name, lang, locale, assign } of LANGUAGES) {
 }
 
 for (const { name, lang, locale } of LANGUAGES) {
+  // A check of their own: a real tap on «Charge», above, sends what is pending, and «Current order» would have nothing.
+  test.describe(`SALE-F20: in ${name}, on a low phone «Current order» keeps its tabs, its lines and «Send order» in reach`, () => {
+    let context: BrowserContext;
+    let page: Page;
+
+    test.beforeAll(async ({ browser }) => {
+      ({ context, page } = await tillWithALine(browser, locale, lang));
+    });
+
+    test.afterAll(async () => {
+      await context.close();
+    });
+
+    for (const size of [...SIZES, ROOMY]) {
+      test(size.label, async () => {
+        await roundFits(page, size, lang);
+      });
+    }
+  });
+}
+
+for (const { name, lang, locale } of LANGUAGES) {
   // A marked line: the total of the whole check is already followed by the till, the total of a part has no earlier
   // answer to show while the new one is held back (and it is what a real part charge shows on a slow network).
   test(`SALE-F01: in ${name}, at 320x568 the sheet's total still being worked out stays between its title and «Close»`, async ({ browser }) => {
-    const context = await browser.newContext({ baseURL: A, locale, viewport: { width: 1440, height: 900 } });
-    const page = await context.newPage();
-    await login(page, A, '/sale/pos');
-    await context.addCookies([{ name: 'django_language', value: lang, domain: new URL(A).hostname, path: '/' }]);
-    await page.reload();
-    await shown(page).locator('[data-testid=pos-till]').waitFor({ state: 'visible' });
-    await shown(page).locator(`[data-testid=pos-product-${product.id}]`).click();
+    const { context, page } = await tillWithALine(browser, locale, lang);
     const line = shown(page).locator('[data-testid^=pos-line-]').filter({ hasText: product.name }).first();
-    await expect(line).toBeAttached();
     await shown(page).locator(`[data-testid=pos-product-${other.id}]`).click();
     await expect(shown(page).locator('[data-testid^=pos-line-]').filter({ hasText: other.name }).first()).toBeAttached();
     await line.locator('[data-testid$=-mark]').click();
