@@ -1399,8 +1399,8 @@ class VoucherUnsoldIn(Closed):
 
 
 class VoucherLineOut(Schema):
-    sale_id: UUID
-    line_id: UUID
+    sale_id: UUID = Field(description="The sale that charged the voucher.")
+    line_id: UUID = Field(description="The line of it that charged the voucher.")
 
 
 class StaffTotal(Schema):

@@ -70,7 +70,7 @@ ALL = [
 #: The events that change what a sale says (lists, figures, documents).
 SALE_EVENTS = [SALE_COMPLETED, SALE_VOIDED, SALE_REFUNDED, SALE_REASSIGNED, SALE_INVOICED]
 #: The events that move the sales figures (what was sold, how many tickets): a charge, a void, a refund.
-FIGURE_EVENTS = [SALE_COMPLETED, SALE_VOIDED, SALE_REFUNDED, SALE_VOUCHER_LINE_CHANGED]
+FIGURE_EVENTS = [SALE_COMPLETED, SALE_VOIDED, SALE_REFUNDED]
 #: The events that change what an open check says.
 ORDER_EVENTS = [
     ORDER_OPENED,
