@@ -838,7 +838,8 @@ Entra: las líneas pendientes de la cuenta.
 Sale: las líneas con su ronda y la comanda abierta en Cocina, urgente si se armó la llama (avisa: comanda
 enviada, con las líneas, sus notas, sus suplementos, los platos de cada menú y quién atiende); al anular una
 línea enviada, avisa de la línea anulada con su motivo.
-Si falla: sin nada pendiente, «No hay nada nuevo que enviar a cocina.»; si Cocina no responde, «No se ha
+Si falla: sin nada pendiente, «No hay nada nuevo que enviar a cocina.»; si Cocina no responde, sale arriba de la
+pantalla, para poder volver a pulsar «Cobrar» o «Enviar comanda» sin esperar a que se vaya, «No se ha
 podido enviar la comanda a cocina. Inténtalo de nuevo.» y no se cobra. Si la comanda se envía pero su hoja
 no se imprime, el TPV avisa, también arriba, «Comanda N enviada a cocina, pero no se imprimió. Revisa la
 impresora de cocina en Impresión.». Pedir que se quite una línea ya
@@ -846,7 +847,8 @@ enviada la rechaza: «Esa línea ya no se puede quitar: ya se envió a cocina (a
 cobrada o ya no está en una cuenta abierta.». Anular una línea sin enviar, cobrada, ya anulada o sin motivo
 se rechaza con «Esa línea no se puede anular…». Sin Cocina activa no hay pestañas ni envío: la cuenta se
 cobra como siempre.
-Implicados: KITCHEN-F05, KITCHEN-F18, KITCHEN-F19, KITCHEN-F20, KITCHEN-F29, BASE-F84
+Por el asistente: su tarjeta de confirmación dice la cuenta (por su título o, sin título, por su importe), la línea, el producto, el servicio, el menú y quién atiende por su nombre, el tipo de pedido con las palabras de Cocina, nunca por un identificador; lo que quien pregunta no puede ver, o lo que ya no está, no sale en la tarjeta (BASE-F97).
+Implicados: KITCHEN-F05, KITCHEN-F18, KITCHEN-F19, KITCHEN-F20, KITCHEN-F29, BASE-F84, BASE-F97
 
 ### SALE-F21 Imprimir la cuenta para la mesa (precuenta)
 <!-- origen: qa:verticals/restaurant/07-payment-and-fiscal qa:modules/sales/guest-check wf:restaurante-dia#rec_restaurante-f09 old:sales/workflow/sala-y-cocina.md#sales-f21 -->
@@ -1249,7 +1251,8 @@ Sale: la sección (nombre, categoría de IVA, posición). Lo ya vendido conserva
 con que se cobró.
 Si falla: una categoría de IVA que no existe se rechaza junto a su campo. Una sección que otro ya
 borró: «Esa sección ya no está en este negocio. Recarga la lista y vuelve a intentarlo.».
-Implicados: TAX-F01
+Por el asistente: su tarjeta de confirmación dice la sección por su nombre, nunca por un identificador; una que ya no está no sale en la tarjeta (BASE-F97).
+Implicados: TAX-F01, BASE-F97
 
 ### SALE-F36 Preparar las notas rápidas
 <!-- origen: old:sales/workflow/configuracion.md#sales-f36 -->
@@ -1368,6 +1371,7 @@ diciendo cuáles (409 `*_ambiguous`).
 | Por cada cobro de una venta, lo devuelto y lo que queda, y por cada línea lo que ya volvió | ver ventas | F31 | `sale.refund.options` |
 | Las devoluciones de una venta, con el estado y el número de su rectificativa | ver ventas | F31 | `sale.refund.list` |
 | La devolución grabada con una clave | ver ventas | F31 | `sale.refund.by_idempotency_key` |
+| El nombre de un registro que una escritura de Ventas toca, por su id: solo para la tarjeta del asistente; lo que no existe o quien pregunta no puede leer no se nombra | ver ventas | F20, F35 | `sale.record.get` |
 
 Las ventas, las cifras, las cuentas, la previsión del cobro, los medios de pago, los ajustes, las
 secciones, las notas rápidas y lo devolvible se pueden seguir en vivo.
@@ -1931,9 +1935,8 @@ administrador y responsable, los mismos que anulan y devuelven).
   en el IVA del tique; el producto la aplazó tras el MVP (pm#100). Mientras, la propina en efectivo se anota
   en Caja como «Entrada» (CASH_REGISTER-F05). Issue hub#562.
 - **Fallos vistos que quedan como issue** (`migration-leftover`): hub#558 (dos pruebas del precio libre
-  del TPV fallan por tiempo con la máquina cargada), hub#560 (seis textos en español salen con las
-  palabras de otra app) y hub#561 (la tarjeta de confirmación del asistente no dice qué registro toca una
-  escritura de Ventas). Y, en la cadena de arreglos de Ventas, hub#442: el aviso de agotado se queda en el
+  del TPV fallan por tiempo con la máquina cargada) y hub#560 (seis textos en español salen con las
+  palabras de otra app). Y, en la cadena de arreglos de Ventas, hub#442: el aviso de agotado se queda en el
   TPV tras volver a poner el artículo a la venta (F07).
 
 ### Dudas abiertas
