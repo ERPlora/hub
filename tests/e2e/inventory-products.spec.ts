@@ -55,6 +55,7 @@ test('INVENTORY-F01: a new product with a tax category of Taxes arrives live, ac
   const form = dialog(page, 'inventory-product-form');
   await expect(form).toBeVisible();
   await expect(form.locator('[data-testid=inventory-product-form-submit]')).toHaveJSProperty('disabled', true);
+  await expect(form.locator('[data-testid=inventory-product-name] input')).toBeFocused();
   await fill(form, 'inventory-product-name', 'E2E Coffee');
   await fill(form, 'inventory-product-sku', sku);
   await fill(form, 'inventory-product-price', '2,20');
