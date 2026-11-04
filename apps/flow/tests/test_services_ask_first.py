@@ -7,9 +7,8 @@ who writes «cancel my table» gets it done once a person says yes (Zapier's Hum
 and n8n's human review gate the irreversible step; Odoo's approval rules gate a button behind an allowed group;
 Fresha's AI Concierge cancels within the business's cancellation policy). Never on its own, never as a plain step,
 never what is done in person (seating), never money, fiscal records or erasing. The yes is a person's who may cancel
-themselves (the old engine's «no elevation»); the change still runs as the automation. Cancelling an appointment is not
-in yet (hub#634): Appointments takes an automation's booking and its other changes to anyone's appointment, judged as
-the customer (test_services_appointment_steps.py), but cancelling one is not offered to «Ask me first».
+themselves (the old engine's «no elevation»); the change still runs as the automation. Cancelling an appointment goes
+the same way (hub#634): test_services_appointment_steps.py.
 """
 
 import datetime as dt
@@ -37,7 +36,6 @@ NOON = dt.datetime(2026, 10, 15, 12, 0, tzinfo=MADRID)
 CHAT = "/internal/assistant/chat"
 QUOTA = {"used": 1, "limit": 30, "resets_at": "2026-11-01T00:00:00Z", "demo": False}
 CANCEL = "reservation.reservation.cancel"
-CANCEL_APPOINTMENT = "appointment.appointment.cancel"
 #: Whoever manages automations and may cancel a reservation, and whoever manages them but may not.
 MAY_CANCEL = {"flow.view", "flow.manage", "flow.answer", "flow.answer_manager", "reservation.view_reservation", "reservation.change_reservation"}
 MAY_NOT_CANCEL = {"flow.view", "flow.manage", "flow.answer", "flow.answer_manager", "reservation.view_reservation"}
@@ -164,11 +162,19 @@ def test_whoever_grants_a_cancellation_may_cancel_themselves():
 
 
 @pytest.mark.parametrize(
-    "name", ["reservation.reservation.seat", "reservation.reservation.delete", "reservation.reservation.no_show", "sale.order.void", CANCEL_APPOINTMENT]
+    "name",
+    [
+        "reservation.reservation.seat",
+        "reservation.reservation.delete",
+        "reservation.reservation.no_show",
+        "sale.order.void",
+        "appointment.appointment.delete",
+        "appointment.appointment.mark_no_show",
+    ],
 )
 def test_what_is_not_cancelling_a_booking_needs_a_person_in_front_even_asking_first(name):
     # Seating is done at the door (FIX-HUB-FLOW-STEP-RESERVATION-BY-PHONE-DENIED); erasing, a no-show (it may charge
-    # the deposit) and money or fiscal records are never decided from an inbox; an appointment, not yet (above).
+    # the deposit) and money or fiscal records are never decided from an inbox.
     with pytest.raises(InvalidPayload) as refused:
         run("flow.flow.create", document(assistant(tools=[name])))
     assert refused.value.code in ("flow.high_risk", "invalid_payload")
@@ -210,7 +216,7 @@ def test_the_catalog_offers_a_cancellation_only_to_ask_first():
     actions = {action.name: action for action in run("flow.catalog.read", {}).actions}
     assert actions[CANCEL].ask_first is True and actions[CANCEL].assistant is True
     assert actions["reservation.reservation.create"].ask_first is False
-    assert not {"reservation.reservation.seat", "reservation.reservation.delete", "sale.order.void", CANCEL_APPOINTMENT} & set(actions)
+    assert not {"reservation.reservation.seat", "reservation.reservation.delete", "sale.order.void"} & set(actions)
 
 
 # ── Running it (FLOW-F38, FLOW-F29) ──────────────────────────────────────────────────────────────────

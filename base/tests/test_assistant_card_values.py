@@ -353,7 +353,7 @@ def test_no_list_of_texts_sent_as_they_are_is_named():
 #: them out. An attempt key (``attempt_key``) is no reference. Only ever lower: an app that marks its own lowers its
 #: number here, and none comes in.
 UNNAMED_REFERENCES = {
-    "appointment": 34,
+    "appointment": 25,
     "combo": 25,
     "customer": 22,
     "demo": 3,

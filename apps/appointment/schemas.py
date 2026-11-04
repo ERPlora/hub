@@ -21,6 +21,8 @@ from pydantic import (
     model_validator,
 )
 
+from base.schemas import names
+
 T = TypeVar("T")
 
 #: A booking lasts at most a day.
@@ -31,6 +33,9 @@ MAX_BATCH = 50
 MAX_BULK_DELETE = 100
 #: The longest range the agenda reads at once (two months: a week view and its neighbours).
 MAX_RANGE_DAYS = 62
+
+#: How the assistant's card names an appointment, by what its read answers and never by its id (base/assistant.py).
+AN_APPOINTMENT = names("appointment.appointment.get", name=("label",))
 
 SAY_WHICH_CUSTOMER = _("Say which customer: her id, or her name, phone or email.")
 SAY_WHICH_STAFF = _("Say which professional: their id, or their name.")
@@ -183,7 +188,7 @@ class StaffOf(In):
 
 
 class AppointmentRefIn(In):
-    id: UUID | None = Field(None, description="The appointment's id.")
+    id: UUID | None = Field(None, description="The appointment's id.", json_schema_extra=AN_APPOINTMENT)
     number: _text(24, 1) | None = Field(
         None,
         validate_default=True,
@@ -561,6 +566,9 @@ class AppointmentOut(AppointmentRow):
         "marzo de 2030)."
     )
     start_time_label: str = Field(description="Its hour ready to say, 24-hour on the business's clock (e.g. 10:30).")
+    label: str = Field(
+        description="The words a card names it by, in the caller's language: its customer, day, hour and professional."
+    )
 
 
 class AppointmentPage(Page[AppointmentRow]):
