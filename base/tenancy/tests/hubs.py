@@ -85,10 +85,11 @@ def _maintenance(dbname: str = "postgres"):
         yield conn
 
 
-#: The sessions clients hold open on a database, as ``(pid, application_name, state, last query)``. Only client backends:
-#: the server's own processes are listed with a ``datname`` too, and they are nobody's to close. An autovacuum worker
-#: on ``pg_database`` (every ``CREATE DATABASE`` of the suite dirties it) works from whichever database it is sent to, a
-#: database just made included: it counted as a session in hub#819's CI.
+#: The sessions clients hold open on a database. Only client backends: the server's own processes are listed with a
+#: ``datname`` too, and they are nobody's to close. An autovacuum worker on ``pg_database`` (every ``CREATE DATABASE`` of
+#: the suite dirties it) works from whichever database it is sent to, a database just made included: it counted as a
+#: session in hub#819's CI.
+CLIENT_SESSIONS_COLUMNS = "(pid, application_name, state, last query)"
 CLIENT_SESSIONS = """
     SELECT pid, application_name, state, left(query, 100) FROM pg_stat_activity
     WHERE datname = %s AND backend_type = 'client backend' ORDER BY pid
@@ -116,7 +117,7 @@ def assert_nobody_on(name: str, *, wait: float = SESSIONS_END_WAIT) -> None:
             if not left or time.monotonic() >= deadline:
                 break
             time.sleep(SESSIONS_END_POLL)
-    assert not left, f"still connected to {name} after {wait:g} s, as (pid, application_name, state, query): {left}"
+    assert not left, f"still connected to {name} after {wait:g} s, as {CLIENT_SESSIONS_COLUMNS}: {left}"
 
 
 def _drop(conn, name: str, control: str) -> None:

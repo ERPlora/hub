@@ -1,5 +1,5 @@
-"""What the tests call «nobody connected» (``hubs.client_sessions_on``, ``hubs.assert_nobody_on``): a connection our code
-left open fails, whatever else the server is doing on that database does not."""
+"""What the tests call «nobody connected» (``hubs.client_sessions_on``, ``hubs.assert_nobody_on``): a connection our
+code left open fails, whatever else the server is doing on that database does not."""
 
 import threading
 import time
