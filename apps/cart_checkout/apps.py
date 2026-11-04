@@ -61,3 +61,10 @@ class CartCheckoutConfig(LiveAppConfig):
         Nav("carts", _("Carts"), "lucide:shopping-bag", "/cart_checkout/carts"),
         Nav("orders", _("Orders"), "ion:receipt-outline", "/cart_checkout/orders"),
     ]
+
+    def fiscal_documents_kept(self) -> bool:
+        """hub#599: the platform asks (``base.tenancy.offboarding``) before it drops the database of a business that
+        left: Its shop orders (no sale backs them: «paid» is a mark) here are documents nothing archives yet (PLAN-DB §6), so the database stays."""
+        from apps.cart_checkout import queries  # the models are not loaded yet when this module is
+
+        return queries.keeps_fiscal_documents()

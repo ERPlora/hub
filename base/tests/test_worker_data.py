@@ -8,8 +8,8 @@ Every tick the worker takes one hub with data work due (``base.services.claim_ne
   nothing and says so (``failed``, «Try again» on the screen); an emptying that fails keeps the copy and empties
   nothing either;
 - a business that left (``DELETE /internal/hubs/{id}``) with its own database: copied once (``offboarding``); a copy
-  that fails is tried again later (1 min, 5 min, 15 min, then every hour); its database stays (``restore`` still
-  brings it back).
+  that fails is tried again later (1 min, 5 min, 15 min, then every hour); its database stays for its 90 days
+  (``restore`` still brings it back); what follows them is ``base/tenancy/tests/test_offboarding.py``.
 
 Real databases (``hub_a``; ``transaction=True``: the pass releases its connections) and a real S3 (moto's).
 """
