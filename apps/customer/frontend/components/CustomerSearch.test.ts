@@ -116,6 +116,20 @@ describe('CustomerSearch: the button', () => {
     expect(chosen.el('customer-search-trigger')!.textContent?.trim()).toBe('Ana García');
   });
 
+  it('keeps its name when a narrow bar shows only its icon: the text is a label of its own, and the button is named by it', async () => {
+    const none = await setup();
+    const trigger = none.el('customer-search-trigger')!;
+    expect(trigger.querySelector('.customer-search__label')?.textContent?.trim()).toBe('Assign customer');
+    // Ionic hands the host's aria-label to its native button: the name a screen reader reads.
+    const name = (button: HTMLElement) => button.shadowRoot?.querySelector('button')?.getAttribute('aria-label') ?? button.getAttribute('aria-label');
+    expect(name(trigger)).toBe('Assign customer');
+    document.body.innerHTML = '';
+    const chosen = await setup(SNAPSHOT);
+    const named = chosen.el('customer-search-trigger')!;
+    expect(named.querySelector('.customer-search__label')?.textContent?.trim()).toBe('Ana García');
+    expect(name(named)).toBe('Ana García');
+  });
+
   it('opens the search («Choose customer») over the first 20 cards; the sale can open it too', async () => {
     const s = await setup();
     expect(s.el('customer-search-modal')?.querySelector('[data-testid="customer-picker-search"]')).toBeFalsy();

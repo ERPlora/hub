@@ -81,13 +81,20 @@ const lineOf = (page: Page, name: string) => shown(page).locator('[data-testid^=
  *  another, or a tap meant for one lands on the other. */
 async function toolbarOverlaps(page: Page): Promise<string[]> {
   const ids = ['pos-park', 'pos-table-trigger', 'customer-search-trigger', 'pos-open-checks', 'pos-cart-close'];
-  const boxes: { id: string; x: number; right: number }[] = [];
-  for (const id of ids) {
-    const button = shown(page).locator(`[data-testid=pos-cart] [data-testid=${id}]`);
-    if (!(await button.isVisible())) continue;
-    const box = await button.boundingBox();
-    if (box) boxes.push({ id, x: box.x, right: box.x + box.width });
-  }
+  // Every box from one reading of the page: the count on «Open checks» arrives live and moves the bar, so boxes read
+  // one by one can mix two layouts (the customer's button before the count, «Open checks» after it).
+  const boxes = await shown(page)
+    .locator('[data-testid=pos-cart]')
+    .evaluate(
+      (cart, wanted) =>
+        wanted.flatMap((id) => {
+          const button = cart.querySelector(`[data-testid=${id}]`);
+          const r = button?.getBoundingClientRect();
+          if (!button || !r || !r.width || !r.height || getComputedStyle(button).visibility === 'hidden') return [];
+          return [{ id, x: r.left, right: r.right }];
+        }),
+      ids,
+    );
   const span = (box: { x: number; right: number }) => `[${Math.round(box.x)}–${Math.round(box.right)}]`;
   const overlaps: string[] = [];
   for (const [i, a] of boxes.entries()) {
