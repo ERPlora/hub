@@ -1,8 +1,8 @@
 // flow: COMBO-F14 — the photo of a set menu (apps/combo/WORKBOOK.md), in Chrome against the real Menus, Inventory,
 // Sales and Taxes apps and the shared image library the Hub serves, no doubles:
-//   - «Edit details» → «Photo» → «Choose from the library», searched in Spanish («desayuno», a tag of the library's
-//     breakfast tray in its manifest): the image tapped is the menu's after «Save», and the list's thumbnail and the
-//     till's menu tile load it from the library;
+//   - «Edit details» → «Photo» → «Choose from the library», searched in Spanish («desayuno»: the library's breakfast
+//     images answer to it in its manifest): the image tapped is the menu's after «Save», and the list's thumbnail and
+//     the till's menu tile load it from the library;
 //   - «Upload photo» with a PNG made here: uploaded after «Save» and kept as a 512 × 512 WebP in the business's folder;
 //   - screenshots of the till with the menu's photo at 390, 834 and 1440.
 // What this file creates is deleted after it (the menus through the API, which removes their own photo from the
@@ -24,7 +24,7 @@ const RUN = stamp();
 const TAG = 'e2e photo';
 let daily: Menu;
 let house: Menu;
-const LIBRARY_URL = '/p/catalog/hospitality/bandeja_desayuno.webp';
+const LIBRARY_URL = '/p/catalog/hospitality/desayuno_continental.webp';
 
 /** A menu that the till can sell: one course with one product. */
 async function sellableMenu(page: Page, name: string, productId: string): Promise<Menu> {
@@ -101,15 +101,19 @@ test('COMBO-F14: a library image is the menu’s photo in the list and on its ti
   const library = dialog(page, 'combo-menu-form-image-library-modal');
   await expect(library).toBeVisible();
   await library.locator('[data-testid=combo-menu-form-image-library-modal-search] input').fill('desayuno');
-  const choice = library.locator('[data-testid=combo-menu-form-image-library-modal-image-hospitality-bandeja_desayuno]');
+  const choice = library.locator('[data-testid=combo-menu-form-image-library-modal-image-hospitality-desayuno_continental]');
   await expect(choice).toBeVisible();
+  // Second of what was found, which proves two things whatever the library becomes (hub#730): the whole library does not
+  // list it there, so the search ran, and a tap that took any image would not bring this one.
+  const found = library.locator('[data-testid^=combo-menu-form-image-library-modal-image-]');
+  await expect(found.nth(1)).toHaveAttribute('data-testid', /-desayuno_continental$/);
   await choice.click();
   await expect(library).toBeHidden();
   await expect(form.locator('[data-testid=combo-menu-form-image-preview] img')).toHaveAttribute('src', LIBRARY_URL);
   await form.locator('[data-testid=combo-menu-form-submit]').click();
   await expect(form).toBeHidden();
 
-  expect(await detail(page, daily.id)).toMatchObject({ image: 'catalog:hospitality/bandeja_desayuno', image_url: LIBRARY_URL });
+  expect(await detail(page, daily.id)).toMatchObject({ image: 'catalog:hospitality/desayuno_continental', image_url: LIBRARY_URL });
   expect(await photoLoaded(shown(page).locator(`[data-testid=combo-menu-photo-${daily.id}]`).first())).toBe(512);
 
   await login(page, A, '/sale/pos');
