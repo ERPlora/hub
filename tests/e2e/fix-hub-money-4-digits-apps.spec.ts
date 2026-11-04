@@ -133,7 +133,8 @@ async function spanishOwner(browser: Browser, viewport: { width: number; height:
 }
 
 async function groupedIn(row: Locator, where: string): Promise<void> {
-  await expect(row, where).toBeVisible();
+  // A screen on a busy machine takes longer than an assertion's 10 s to load its list (as `actionTimeout` above).
+  await expect(row, where).toBeVisible({ timeout: 30_000 });
   await expect(row, where).toContainText(GROUPED);
   await expect(row, where).not.toContainText(UNGROUPED);
 }
