@@ -180,7 +180,7 @@ categoría de una plantilla que ha rechazado.»).
 | WHATSAPP_INBOX-F19 | Elegir el hueco escribiendo en vez de tocando | hecho | comun |
 | WHATSAPP_INBOX-F20 | Cuando el asistente no puede contestar | hecho | comun |
 | WHATSAPP_INBOX-F21 | La clienta pide cita por WhatsApp | descartado — no se ofrece: tras tu **Aprobar**, Citas rechaza la cita que propone el asistente (F14); hoy se le contesta desde la bandeja y la cita se reserva a mano en la Agenda (hub#514) | peluqueria |
-| WHATSAPP_INBOX-F22 | La clienta anula o mueve su cita por WhatsApp | descartado — no se ofrece, por lo mismo que F21, y anular una cita tampoco se le puede encargar a una automatización; hoy se anula o se mueve a mano desde la Agenda (hub#514) | peluqueria |
+| WHATSAPP_INBOX-F22 | La clienta anula o mueve su cita por WhatsApp | descartado — no se ofrece: la respuesta de citas no está en la galería (F21). Automatizaciones ya puede anularla tras tu **Aprobar** (FLOW-F28), pero hoy se anula o se mueve a mano desde la Agenda (hub#514) | peluqueria |
 | WHATSAPP_INBOX-F23 | La clienta recibe el aviso cuando el salón confirma | hecho | peluqueria |
 | WHATSAPP_INBOX-F24 | El cliente pide mesa por WhatsApp | hecho | restaurante |
 | WHATSAPP_INBOX-F25 | El cliente anula o cambia su mesa por WhatsApp | hecho | restaurante |
@@ -636,16 +636,17 @@ WHATSAPP_INBOX-F19, WHATSAPP_INBOX-F20
 
 ### WHATSAPP_INBOX-F22 La clienta anula o mueve su cita por WhatsApp
 <!-- origen: old:whatsapp_inbox/workflow/respuestas-automaticas.md#whatsapp_inbox-f22 -->
-Estado: descartado — no se ofrece, por lo mismo que F21: Citas no acepta los cambios de una automatización, y
-anular una cita tampoco se le puede encargar (anular una mesa, sí: F25); hoy se anula o se mueve a mano desde la
-Agenda (hub#514)
+Estado: descartado — no se ofrece: la respuesta de citas no está en la galería (F21). Automatizaciones ya puede anular
+una cita tras tu **Aprobar** (FLOW-F28), como una mesa (F25), pero hoy se anula o se mueve a mano desde la Agenda
+(hub#514)
 Actor: cliente, propietario
 Pantalla: WhatsApp: chat del cliente; Automatizaciones
 Pasos:
 1. La clienta escribe `no puedo ir` o `¿me la cambias al jueves?`.
 2. Se busca su última cita por su número.
-3. Anular: se anula con las reglas del salón (si se permite y con qué antelación); fuera de plazo se le dice
-   y la cita sigue.
+3. Anular: la anulación te espera en **Esperan tu respuesta**; con **Aprobar** de quien puede cambiar las citas de
+   cualquier profesional, se anula con las reglas del salón (si se permite y con qué antelación); fuera de plazo se
+   le dice y la cita sigue.
 4. Mover: se le ofrecen huecos y el cambio de la misma cita, con la misma profesional y el mismo servicio, te espera
    en **Esperan tu respuesta**; con **Aprobar** se mueve.
 5. Recibe la respuesta con lo que ha pasado.
@@ -1671,11 +1672,11 @@ Lo que falta, fuera de esta app:
    el paso del asistente solo lleva los permisos de Reservas (`permission_denied`). La respuesta de mesa no lo sufre:
    el paso le fija la ficha por su id (`pinned`, arriba); otra automatización que reserve solo con el teléfono, sí, y
    eso se arregla en Automatizaciones o en Reservas.
-3. **Anular una cita no se puede conceder** (F22; hub#514, FIX-HUB-FLOW-STEP-CANNOT-CHANGE-AN-APPOINTMENT): desde hub#418, Automatizaciones concede
-   `reservation.reservation.cancel` a un paso **Pedírselo al asistente** con «Que me lo pregunte» (FLOW-F28), y la
-   respuesta de mesa lo usa (F25); `appointment.appointment.cancel` sigue fuera (`ASK_FIRST` solo tiene el de
-   Reservas) hasta que Citas acepte los cambios de una automatización, que es lo que falta de F21 (punto 1).
-4. Un «No» o una propuesta caducada paran la ejecución: quien escribe se queda con el acuse (Automatizaciones).
+3. Un «No» o una propuesta caducada paran la ejecución: quien escribe se queda con el acuse (Automatizaciones).
+
+Anular una cita ya se puede conceder (hub#634): `appointment.appointment.cancel` está en `ASK_FIRST` con la clienta
+fijada por el paso (`on_behalf_of_customer`, `customer_id`), como la respuesta de mesa (F25). Lo probado está en
+`tests/test_relay_auto_replies.py`; la receta y su tarjeta vuelven con hub#514.
 
 ### Contradicciones escritas, sin resolver
 
