@@ -1,12 +1,10 @@
 // base-money-thousands-grouping (hub#692): the Hub writes an amount one way, its thousands grouped from four digits on
-// («1.234,56 €», legacy hub#1090), with the platform's `formatMoney` (`@erplora/ui/components`, `format/money.ts`). The
-// apps listed below still carry their own money formatter (`apps/<app>/frontend/lib/format.ts` or `money.ts`), and it keeps
-// Intl's Spanish default, which waits for five digits: «1234,56 €» in one screen beside «1.234,56 €» in the next. This
-// guard counts, by app (and `ui`, the shared package), the currency formats that do not group always, as a ratchet: no
-// number ever goes up, and neither base, `ui` nor an app that is not listed gains one. It only stops the climb, an exact
-// table would not do: each listed app is fixed by a PR of its own, and every merge would turn the others' red.
+// («1.234,56 €», legacy hub#1090), with the platform's `formatMoney` (`@erplora/ui/components`, `format/money.ts`). A
+// money formatter of an app's own keeps Intl's Spanish default, which waits for five digits: «1234,56 €» in one screen
+// beside «1.234,56 €» in the next. This guard looks, by app (and `ui`, the shared package), for the currency formats
+// that do not group always, and there may be none.
 //
-// What it counts: every options object of an `Intl.NumberFormat` that says `style: 'currency'` in the sources of
+// What it looks for: every options object of an `Intl.NumberFormat` that says `style: 'currency'` in the sources of
 // `apps/*/frontend`, `base/frontend` and `packages/ui/src` (`.ts` and the `<script>` of a `.vue`; tests and their
 // helpers left out). One
 // groups when `useGrouping: 'always'` is in it, in an object it spreads (`...digits`) or in the object that spreads it
@@ -24,21 +22,9 @@ import { describe, expect, it } from 'vitest';
 const BASE_FRONTEND = dirname(fileURLToPath(import.meta.url));
 const HUB = resolve(BASE_FRONTEND, '..', '..');
 
-/** The currency formats that do not group always, by app: a ceiling that only ever goes down. An app that fixed its
- *  own lowers its number here, and leaves the list at 0. */
-const UNGROUPED_MONEY_FORMATS: Record<string, number> = {
-  cash_register: 1, // hub#653
-  combo: 1, // hub#654
-  inventory: 1, // hub#525
-  kitchen: 1, // hub#655
-  service: 1, // hub#657
-  staff: 1, // hub#494
-  table: 1, // hub#658
-};
-
-const LOWER_THE_RATCHET =
+const GROUP_THE_AMOUNT =
   'write the amount with formatMoney of @erplora/ui/components (the platform\'s one way to write an amount), or ' +
-  "give the format useGrouping: 'always'; no number of UNGROUPED_MONEY_FORMATS in base/frontend/money-grouping.test.ts is ever raised";
+  "give the format useGrouping: 'always'";
 
 /** `node` without the parentheses, `as` and `satisfies` around it. */
 function bare(node: ts.Expression): ts.Expression {
@@ -280,10 +266,8 @@ describe('guardrail: every amount of the Hub groups its thousands (base-money-th
     expect(ungroupedFormats(component.join('\n'), 'Total.vue')).toEqual([3]);
   });
 
-  it("base and `ui` write every amount grouped, and no app's count of ungrouped formats goes up", () => {
-    const found = ungroupedByApp();
-    const over = Object.fromEntries(Object.entries(found).filter(([app, lines]) => lines.length > (UNGROUPED_MONEY_FORMATS[app] ?? 0)));
-    expect(over, LOWER_THE_RATCHET).toEqual({});
+  it('no app, nor base or `ui`, has a currency format that does not group always', () => {
+    expect(ungroupedByApp(), GROUP_THE_AMOUNT).toEqual({});
     // It reads every frontend file of the Hub (some 1,600): the limit of the guardrails that read a whole tree (60 s,
     // tsconfig.test.ts).
   }, 60_000);
