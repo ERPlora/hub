@@ -21,14 +21,17 @@ import pydantic
 import pytest
 from django.contrib.auth import get_user_model
 from django.contrib.sessions.middleware import SessionMiddleware
+from django.core.files.base import ContentFile
+from django.core.files.storage import storages
 from django.db import connection
 from django.utils import timezone
 from live.context import OperationContext, Scope, system_context
 from live.errors import Conflict, NotFound, OperationError, PermissionDenied
 from live.models import OutboxEvent
 
-from base import registry, services
+from base import files, registry, services
 from base.models import DemoCode, Hub, Membership
+from base.storage import hub_prefix
 from base.tenancy import names, ops, provision
 from base.tenancy.connections import control_name
 from control.models import HubDue
@@ -649,6 +652,44 @@ class TestReaper:
         assert purge_demo_data(hub) is None
         assert {model: model.objects.count() for model in before} == before
         assert dropped == []
+
+    @pytest.fixture
+    def kept(self, settings, tmp_path):
+        """The store on disk, as in local development, with one file of the hub it is given."""
+        settings.STORAGES = {
+            **settings.STORAGES,
+            "hub_files": {"BACKEND": "django.core.files.storage.FileSystemStorage", "OPTIONS": {"location": tmp_path}},
+        }
+
+        def keep(hub: Hub) -> list:
+            storages["hub_files"].save(f"{hub_prefix(hub.id)}/files/menu.pdf", ContentFile(b"bytes"))
+            return files.scan(storages["hub_files"], hub_prefix(hub.id))
+
+        return keep
+
+    def test_a_demo_of_before_its_own_databases_loses_its_files_all_the_same(self, kept):
+        # Nothing tells its rows apart from anyone else's, but its prefix is its own.
+        hub = Hub.objects.create(slug="demo-0000beef", is_demo=True, status="expired")
+        assert kept(hub)
+        purge_demo_data(hub)
+        assert files.scan(storages["hub_files"], hub_prefix(hub.id)) == []
+
+    def test_a_demo_whose_row_names_another_database_keeps_its_files(self, kept, monkeypatch):
+        monkeypatch.setattr(ops, "drop_database", lambda name, *, cluster=None: None)
+        hub = Hub.objects.get(slug=create().slug)
+        stored = kept(hub)
+        hub.db_name = names.hub_db_name(control_name(), hub.id)
+        with pytest.raises(names.InvalidDatabaseName, match="not the demo"):
+            purge_demo_data(hub)
+        assert files.scan(storages["hub_files"], hub_prefix(hub.id)) == stored
+
+    def test_a_business_handed_here_by_mistake_keeps_its_files(self, kept):
+        # Even without a database named: only a demo's purge deletes a demo's files.
+        hub = Hub.objects.create(slug="acme", status="ready")
+        stored = kept(hub)
+        with pytest.raises(names.InvalidDatabaseName, match="not the demo"):
+            purge_demo_data(hub)
+        assert files.scan(storages["hub_files"], hub_prefix(hub.id)) == stored
 
 
 class TestTombstones:

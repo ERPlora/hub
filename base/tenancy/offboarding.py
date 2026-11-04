@@ -5,6 +5,7 @@ The worker's data pass (``base.worker._data``), under the row's lease, takes the
 1. ``archiving``: its final copy (``base.tenancy.dumps``, ``offboarding``); it can still come back (``base.hub.restore``);
 2. ``dropping``: ``DROP DATABASE … WITH (FORCE)``, that database only (``base.tenancy.ops``), outside any transaction;
    from here it never comes back (``hub_purged``);
+   then its files, that business's prefix in the store and no other (``base.files.delete_hub_files``);
 3. ``purged``: ``base.hub.purge``, in one transaction of control, leaves the row as a tombstone.
 
 **A business with fiscal documents is not dropped.** PLAN-DB §6 archives its fiscal records and invoices for 6 years
@@ -14,9 +15,10 @@ it: the worker still serves the business meanwhile) the business stays ``cancell
 why (``fiscal_archive_missing: <apps>``), and is looked at again the next day. An app that cannot be read keeps the
 database too: only an app without tables there has nothing to say.
 
-Each step is safe to run again: a copy kept is not made twice, a database already gone is no failure. Whatever fails
-leaves it in its status with ``attempts``, ``last_error`` and ``next_attempt_at`` (1 min, 5 min, 15 min, then every hour)
-and nothing dropped; a worker that stops leaves it for the next one.
+Each step is safe to run again: a copy kept is not made twice, a database or a file already gone is no failure. Whatever
+fails leaves it in its status with ``attempts``, ``last_error`` and ``next_attempt_at`` (1 min, 5 min, 15 min, then every
+hour): before the drop with nothing dropped, after it still ``dropping``, never ``purged``, until its files are gone too;
+a worker that stops leaves it for the next one.
 
 Control is written through ``base.services`` only (its doors to the ORM); the database is reached through ``use_hub``,
 copied through ``base.tenancy.dumps`` and dropped through ``base.tenancy.ops``.
@@ -26,13 +28,14 @@ import datetime as dt
 import logging
 from collections.abc import Callable
 
+from django.core.files.storage import storages
 from django.db.utils import ProgrammingError
 from django.utils import timezone
 from live.context import system_context
 from live.meta import all_live_app_configs
 from psycopg import errors
 
-from base import registry, services
+from base import files, registry, services
 from base.schemas import HubGetIn
 from base.tenancy import connections as tenancy_connections
 from base.tenancy import dumps, names, ops, provision
@@ -102,10 +105,11 @@ def _retire(hub: Hub, now: dt.datetime, cancelled: Callable[[], bool] | None) ->
     dropping = services.offboarding_dropping(hub.pk, now, provision.LEASE)
     if dropping is None:
         return
-    # Its database first, outside any transaction of control; its row after, in base.hub.purge's own.
+    # Its database first, then its files, outside any transaction of control; its row after, in base.hub.purge's own.
     if dropping.db_name:
         tenancy_connections.close_hub_aliases(dropping)
         ops.drop_database(dropping.db_name, cluster=dropping.cluster)
+    files.delete_hub_files(storages["hub_files"], dropping.pk)
     services.hub_purge(system_context(registry.REGISTRY_SCOPE), HubGetIn(id=dropping.pk))
     logger.info("base.tenancy.offboarding.purged hub=%s database=%s", dropping.slug, dropping.db_name or "-")
 
@@ -130,6 +134,8 @@ def retire(hub_id, now: dt.datetime, cancelled: Callable[[], bool] | None = None
         _failed(hub, failed.code, failed)
     except ops.DatabaseOpsError as refused:
         _failed(hub, "drop_failed", refused)
+    except files.HubFilesNotDeleted as stayed:
+        _failed(hub, "files_purge_failed", stayed)
     except names.InvalidDatabaseName as invalid:
         _failed(hub, "invalid_database_name", invalid)
     except Exception as error:
