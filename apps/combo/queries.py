@@ -103,7 +103,7 @@ CHANNELS_AWAY = frozenset({"takeaway", "delivery"})
 
 #: How many candidates an ambiguous reference lists.
 MAX_CANDIDATES = 5
-#: The list's sort keys → model columns (the name and the id break ties).
+
 
 # --- Finders -----------------------------------------------------------------------------------
 
