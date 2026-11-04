@@ -1,7 +1,8 @@
 <script setup lang="ts">
 // The bar on top of the check, left to right: «Park this check» (only where parked tickets are
-// allowed; nothing to park on an empty check), the slot where the Customers app's button sits, a
-// spacer, «Open checks» with how many others are open, and — in the phone's drawer — «Close».
+// allowed; nothing to park on an empty check), the slot where the Customers app's button sits (it takes the
+// room left; where two lines of its text do not fit, on a 320 px phone, the button shows only its icon — the customer
+// chip in the heading still names them), «Open checks» with how many others are open, and — in the phone's drawer — «Close».
 // Icons the product had that are not registered yet (`pause-circle-outline`) use the closest one
 // (UI-REQUESTS.md, «POS»).
 import { HubIcon } from '@erplora/ui/shell';
@@ -39,7 +40,6 @@ const emit = defineEmits<{ park: []; toggleChecks: []; close: [] }>();
     <div class="pos-toolbar__slot">
       <slot />
     </div>
-    <span class="pos-toolbar__spacer" />
     <ion-button
       fill="clear"
       class="pos-toolbar__icon pos-toolbar__checks"
@@ -100,13 +100,36 @@ const emit = defineEmits<{ park: []; toggleChecks: []; close: [] }>();
   --padding-end: 0.3rem;
   --color: var(--ion-text-color, #1c1b18);
 }
+/* The room between the bar's icons, measured: «Assign customer» in two lines needs 10.5rem beside the table button's
+   2.6rem, which a phone of 360 px has even with the count on «Open checks»; in less, a phone of 320 px, it would sit
+   on «Open checks» (hub#630). */
 .pos-toolbar__slot {
   display: flex;
+  flex: 1 1 0;
   align-items: center;
   min-width: 0;
+  container-type: inline-size;
 }
-.pos-toolbar__spacer {
-  flex: 1;
+.pos-toolbar__slot :deep(.customer-search__trigger) {
+  --padding-start: 0.7rem;
+  --padding-end: 0.7rem;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+}
+/* Two lines at most: a name longer than the room ends in «…». */
+.pos-toolbar__slot :deep(.customer-search__label) {
+  display: -webkit-box;
+  overflow: hidden;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+@container (max-width: 10.5rem) {
+  .pos-toolbar__slot :deep(.customer-search__label) {
+    display: none;
+  }
 }
 .pos-toolbar__badge {
   position: relative;

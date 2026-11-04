@@ -868,14 +868,15 @@ Pasos:
    «Ingresos».
 2. «Clientes» cuenta las fichas que siguen en la lista; «Activos», las que tienen marcada la casilla
    «Activo»; «VIP», las de la etapa «VIP», e «Ingresos» suma lo que han gastado todas ellas, en la moneda
-   del negocio.
+   del negocio, agrupada desde cuatro cifras («1.234,56 €»; en inglés, «€1,234.56»).
 3. Las cifras cambian solas, sin recargar, cuando alguien da de alta, edita, elimina, une o borra los
    datos de una ficha, o cuando se cobra, se anula o se devuelve una venta con cliente.
 Entra: nada: cuentan todas las fichas que siguen en la lista, no solo las que deja ver la búsqueda o
 los filtros de la tabla.
 Sale: nada; solo lectura.
 Si falla: «No se pudieron cargar las cifras» en su sitio, y la tabla sigue funcionando. Mientras
-llegan, cada cifra enseña «…». En el móvil van de dos en dos, para que la tabla se siga viendo debajo.
+llegan, cada cifra enseña «…». En el móvil van de dos en dos, para que la tabla se siga viendo debajo; una
+cifra nunca se parte en dos líneas: la que no cabe («1.234.567,89 €») baja con su tarjeta a una fila propia.
 Implicados: ninguno
 
 ### CUSTOMER-F32 Apuntar alergias o la prueba de sensibilidad con su permiso
@@ -1185,6 +1186,8 @@ asistente. Lo que en el producto actual tenía el perfil «Cajero» lo tiene aqu
 ## Reglas que no se rompen
 
 - **Para crear basta el nombre.** Nada más se exige al dar de alta.
+- **Un importe sale agrupado desde cuatro cifras** («1.234,56 €»; en inglés, «€1,234.56»), en la lista, las
+  cifras, la ficha, la actividad y las compras: lo escribe el formateador de la plataforma, nunca la pantalla.
 - **El teléfono se guarda en E.164 o no se guarda**: toda escritura lo normaliza, y uno que no es un
   número válido de su país rechaza el guardado.
 - **El consentimiento no se pone editando, creando ni importando.** Solo con su acción, que exige la
@@ -1216,7 +1219,6 @@ asistente. Lo que en el producto actual tenía el perfil «Cajero» lo tiene aqu
   de citas de la Bandeja de WhatsApp aún no se ofrece (tras «Aprobar», Citas rechaza la cita de una
   automatización; WHATSAPP_INBOX-F14, F21 y F22). Lo de Clientes está y lo usan ya la respuesta de
   mesas (WHATSAPP_INBOX-F24) y «Crear ficha» de la Bandeja (WHATSAPP_INBOX-F37).
-- **Los importes de cuatro cifras sin separador de millares** («1234,56 €»), hub#512.
 - **La tarjeta de confirmación del asistente no dice qué ficha toca una escritura**, hub#513.
 - **El país del negocio para un teléfono sin prefijo**: se lee siempre como de España (CUSTOMER-F10,
   F11), aunque la plataforma ya guarda el país de cada negocio. Cambiarlo solo en Clientes partiría

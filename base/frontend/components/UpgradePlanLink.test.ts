@@ -2,9 +2,9 @@
 // embedded by base/spa.py), for every profile, in a new tab. It sells, so only on the web: the app surfaces
 // (and the store's copy) have no such button.
 import { applySurface } from '@erplora/ui/shell';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { mountBase } from '../__tests__/mount-base';
+import { flush, mountBase, tap } from '../__tests__/mount-base';
 import UpgradePlanLink from './UpgradePlanLink.vue';
 
 const PLAN_URL = 'http://localhost:8001/store/plans?business=0199a1b2-0000-7000-8000-000000000001';
@@ -18,6 +18,7 @@ function embed(block: object | null) {
 afterEach(() => {
   applySurface('web');
   document.head.innerHTML = '';
+  vi.restoreAllMocks();
 });
 
 describe('UpgradePlanLink', () => {
@@ -31,6 +32,20 @@ describe('UpgradePlanLink', () => {
       '_blank',
       'noopener',
     ]);
+  });
+
+  it('its click asks for the pass to the plan and opens it, already signed in on erplora.com', async () => {
+    embed({ name: 'Bar', plan_url: PLAN_URL });
+    const tab = { opener: {}, location: { href: 'about:blank' } };
+    vi.spyOn(window, 'open').mockReturnValue(tab as unknown as Window);
+    const url = 'http://localhost:8001/hub-pass/?pass=abc';
+    const m = await mountBase(UpgradePlanLink, { onApi: () => Response.json({ url }) });
+
+    tap(m.wrapper.get('a[data-testid="upgrade-plan"]').element);
+    await flush();
+
+    expect(JSON.parse(m.net.api[0].init.body as string)).toEqual({ next: 'plan' });
+    expect(tab.location.href).toBe(url);
   });
 
   it("on the rail keeps only its icon, as the menu's other labels, and still says where it goes", async () => {

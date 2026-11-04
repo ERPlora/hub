@@ -21,7 +21,6 @@ import {
   sent,
   subId,
 } from '../__tests__/mount-customer';
-import { formatMoney, type Money } from '../lib/money';
 import type { ActivityRow } from '../operations';
 import ActivityPanel from './ActivityPanel.vue';
 
@@ -46,7 +45,6 @@ const entry = (id: string, kind: string, extra: Partial<ActivityRow> = {}): Acti
   ...extra,
 });
 const ACTIVITY = 'customer.activity.list';
-const EUR: Money = { currency: 'EUR', decimals: 2 };
 
 async function setup(props: Record<string, unknown> = {}, options: MountOptions = {}) {
   const m = await mountCustomer(ActivityPanel, { props: { customerId: 'c1', canAddNote: true, ...props }, ...options });
@@ -73,6 +71,17 @@ describe('ActivityPanel: the currency of each amount (customer-business-currency
       ]),
     );
     expect(texts(s)).toEqual(['25,50 zł', '10,00 €', '12,50 zł']);
+  });
+
+  it('an amount of four figures groups its thousands, in both languages (hub#512)', async () => {
+    const rows = pageOf([entry('a1', 'purchase_recorded', { data: { amount: 123456, currency: 'EUR' }, currency_decimals: 2 })]);
+    const es = await setup({}, { locale: 'es' });
+    await es.result(es.call, ACTIVITY, rows);
+    expect(texts(es)).toEqual(['1.234,56 €']);
+
+    const en = await setup();
+    await en.result(en.call, ACTIVITY, rows);
+    expect(texts(en)).toEqual(['€1,234.56']);
   });
 });
 
@@ -101,7 +110,7 @@ describe('ActivityPanel: the activity', () => {
     expect(read(0).get('.customer-activity__text').text()).toBe('Prefers mornings');
     expect(read(0).get('.customer-activity__when').text()).toBe(`${formatDateTime('2026-10-02T10:00:00Z', 'en')} · by Ana`);
     expect(read(1).get('.customer-activity__title').text()).toBe('Purchase recorded');
-    expect(read(1).get('.customer-activity__text').text()).toBe(formatMoney(2550, 'en', EUR));
+    expect(read(1).get('.customer-activity__text').text()).toBe('€25.50');
     expect(read(2).get('.customer-activity__title').text()).toBe('Purchase refunded');
     expect(read(2).get('.customer-activity__text').text()).toBe('One cup back');
     expect(read(3).get('.customer-activity__title').text()).toBe('Consent given');

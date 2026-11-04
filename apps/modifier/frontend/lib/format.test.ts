@@ -5,7 +5,7 @@
 // «Required (min. N)», plus « · max. N» and « · repeats».
 import { describe, expect, it } from 'vitest';
 
-import { choiceRule, decimalMark, formatDelta, formatMoney, type Money, moneyDecimals } from './format';
+import { choiceRule, decimalMark, formatDelta, type Money, moneyDecimals } from './format';
 
 const EN: Record<string, string> = {
   'modifier.rule.optional': 'Optional',
@@ -22,21 +22,21 @@ const JPY: Money = { currency: 'JPY', decimals: 0 };
 const spaced = (text: string) => text.replace(/\s/g, ' ');
 
 describe('format', () => {
-  it('paints minor units in the business’s currency, in the page language', () => {
-    expect(spaced(formatMoney(150, 'es', EUR))).toBe('1,50 €');
-    expect(formatMoney(150, 'en', EUR)).toBe('€1.50');
-    expect(spaced(formatMoney(150, 'es', PLN))).toBe('1,50 zł');
-    expect(spaced(formatMoney(150, 'en', PLN))).toBe('zł 1.50');
+  it('a supplement of four figures groups its thousands, with its sign, in both languages (hub#656)', () => {
+    expect(spaced(formatDelta(123456, 'es', 'Gratis', EUR))).toBe('+1.234,56 €');
+    expect(spaced(formatDelta(-123456, 'es', 'Gratis', EUR))).toBe('-1.234,56 €');
+    expect(formatDelta(123456, 'en', 'Free', EUR)).toBe('+€1,234.56');
+    expect(formatDelta(-123456, 'en', 'Free', EUR)).toBe('-€1,234.56');
+    expect(spaced(formatDelta(123456, 'en', 'Free', PLN))).toBe('+zł 1,234.56');
+    expect(formatDelta(123456, 'es', 'Gratis')).toBe('+1.234,56');
+    expect(formatDelta(-123456, 'es', 'Gratis')).toBe('-1.234,56');
   });
 
   it('with the decimals the server counts, never the browser’s: 150 yen is ¥150', () => {
-    expect(formatMoney(150, 'en', JPY)).toBe('¥150');
     expect(formatDelta(150, 'en', 'Free', JPY)).toBe('+¥150');
   });
 
   it('until the business answers, a figure without a symbol: never a euro by default', () => {
-    expect(formatMoney(150, 'es')).toBe('1,50');
-    expect(formatMoney(150, 'en')).toBe('1.50');
     expect(formatDelta(-50, 'es', 'Gratis')).toBe('-0,50');
     expect(formatDelta(100, 'en', 'Free')).toBe('+1.00');
   });

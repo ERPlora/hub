@@ -8,10 +8,10 @@
 //     to leaves the whole team (the diary's rule, as the server applies it).
 //   - Her terms: the minutes and price she does each service at (`service.assignment.eligible`: her own,
 //     or the catalog's), which the server books; a service without her row keeps the catalog's.
-import type { ComboOption, ComboSearch } from '@erplora/ui/components';
+import { type ComboOption, type ComboSearch, formatMoney } from '@erplora/ui/components';
 import type { LiveClient } from '@erplora/ui/sdk';
 
-import { formatMoney } from './format';
+import { APPOINTMENT_MONEY } from './format';
 
 const PAGE = 20;
 const TEAM = 100;
@@ -32,7 +32,7 @@ export function searchBookableServices(client: LiveClient, locale: string, facts
       .filter((row) => row.is_bookable)
       .map((row) => {
         facts.set(row.id, { name: row.name, minutes: row.duration_minutes, price: row.price });
-        return { id: row.id, label: row.name, hint: `${row.duration_minutes} min · ${formatMoney(row.price, locale)}` };
+        return { id: row.id, label: row.name, hint: `${row.duration_minutes} min · ${formatMoney(row.price, locale, APPOINTMENT_MONEY)}` };
       });
   };
 }
