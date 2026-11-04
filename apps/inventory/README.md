@@ -69,7 +69,6 @@ CI=1 pnpm e2e tests/e2e/inventory-products.spec.ts tests/e2e/inventory-flows.spe
 
 ## Qué queda fuera
 
-- **hub#525** — Los importes de cuatro cifras salen sin separador de millares («1234,56 €»).
 - **hub#526** — La tarjeta de confirmación del asistente no dice qué registro toca una escritura.
 - Lo que no hace a propósito (almacenes, lotes, recetas, variantes, cobrar…): «Lo que NO hace, a propósito» del
   WORKBOOK.
