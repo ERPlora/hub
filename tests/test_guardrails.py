@@ -1401,12 +1401,14 @@ def test_no_hub_model_links_to_a_control_model():
 
 #: The one reading of ``pg_stat_activity`` by database in the suite; this very file only names it in its controls.
 SESSIONS_READERS = frozenset({"base/tenancy/tests/hubs.py", "tests/test_guardrails.py"})
-SESSIONS_BY_HAND = re.compile(r"pg_stat_activity\b.{0,40}?\bdatname\s*=\s*%s", re.DOTALL)
+SESSIONS_BY_HAND = re.compile(
+    r"""pg_stat_activity\b.{0,40}?\bdatname\s*=\s*%s(?![\s"']*AND\s+wait_event_type)""", re.DOTALL
+)
 
 
 def sessions_by_hand(source: str) -> list[tuple[int, str]]:
-    """``(line, what)`` for every read of ``pg_stat_activity`` by the name of a database. Who waits for a lock on the
-    test's own (``datname = current_database()``, the concurrency tests) is another question, and stays theirs."""
+    """``(line, what)`` for every read of ``pg_stat_activity`` by the name of a database. Who waits for a lock
+    (``wait_event_type``, the concurrency tests') is another question, and stays theirs."""
     return [
         (source.count("\n", 0, found.start()) + 1, "pg_stat_activity by database")
         for found in SESSIONS_BY_HAND.finditer(source)
@@ -1421,9 +1423,15 @@ def test_the_sessions_scanner_sees_a_count_by_hand_and_leaves_the_lock_waits_alo
         '" AND wait_event_type = \'Lock\' AND pid <> pg_backend_pid()"\n'
     )
 
+    locks_by_name = (
+        '"SELECT count(*) FROM pg_stat_activity WHERE datname = %s AND wait_event_type = \'Lock\' "\n'
+        '"SELECT count(*) FROM pg_stat_activity WHERE datname = %s "\n"  AND wait_event_type = \'Lock\'"\n'
+    )
+
     assert sessions_by_hand(one_line) == [(1, "pg_stat_activity by database")]
     assert sessions_by_hand(split) == [(3, "pg_stat_activity by database")]
     assert sessions_by_hand(locks) == []
+    assert sessions_by_hand(locks_by_name) == []
 
 
 def test_no_test_counts_the_sessions_on_a_database_by_hand():
