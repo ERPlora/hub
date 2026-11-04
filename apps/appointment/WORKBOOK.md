@@ -98,7 +98,8 @@ profesional**, además, **Día · Semana**.
   Profesional (solo los que hacen todos esos servicios), Día, Hora (con las **Horas libres** como
   botones), Min. (la suma de las duraciones, cambiable), Notas para la clienta y Notas internas. Min.
   y el **Total** salen con la duración y el precio propios del profesional elegido para cada servicio
-  (Servicios, «Profesionales que lo hacen»), o los del catálogo si no tiene; es lo que la cita reserva.
+  (Servicios, «Profesionales que lo hacen»), o los del catálogo si no tiene; es lo que la cita reserva. Los
+  importes salen agrupados desde cuatro cifras («1.234,56 €»; en inglés, «€1,234.56»).
   Avisos: «Esta cita empieza en el pasado. Se guardará a esa hora.» y el profesional que no hace un servicio.
 - **Editar** → **Editar la cita**: Día, Hora, Min., Servicios, Profesional, las notas y **Guardar
   cambios**; debajo, el historial. La clienta no se cambia.
@@ -939,7 +940,6 @@ Lo que se vio fallar y queda abierto al cerrar la app (2026-11-03), cada cosa co
 - **hub#687** — La hora del negocio no es la misma en la tarjeta del asistente y en las apps cuando la zona del negocio
   no es la del despliegue (cruza Citas, Horarios, Reservas, Mesas, Cocina, Automatizaciones y la plataforma; hoy la
   agenda va en Europe/Madrid, ver «Antes de empezar»).
-- **hub#632** — Los importes de cuatro cifras salen sin separador de millares («1234,56 €»).
 - **hub#631**, **hub#633**, **hub#635** y **hub#637** — textos: una traducción «fuzzy» que sale en inglés, siete
   textos en español con las palabras de otra app, la tarjeta de confirmación del asistente que no dice qué
   registro toca y la que nombra en inglés algunos datos («Confirm Overlap»).

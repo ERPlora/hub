@@ -12,6 +12,7 @@ import {
   type DataTableFilters,
   DataTable,
   EmptyState,
+  formatMoney,
   InlineFeedback,
 } from '@erplora/ui/components';
 import { AppPage, useSession } from '@erplora/ui/shell';
@@ -26,7 +27,7 @@ import CustomerStats from '../components/CustomerStats.vue';
 import ImportReport from '../components/ImportReport.vue';
 import { STAGES } from '../lib/customerForm';
 import { filterParams, filtersInUse, SOURCES, unreadableAmounts } from '../lib/customerFilters';
-import { formatMoney, useBusinessMoney } from '../lib/money';
+import { useBusinessMoney } from '../lib/money';
 import { formatPhone } from '../lib/phoneDisplay';
 import { customerTabs } from '../lib/tabs';
 import { useCustomerI18n } from '../lib/useCustomerI18n';
