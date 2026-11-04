@@ -86,7 +86,7 @@ class TestThePhoto:
         assert photo(client, custom_domain="www.xn--peluquera-n4a.es").status_code == 200
         assert photo(client, version=2, custom_domain="www.peluquería.es").status_code == 422
 
-    @pytest.mark.parametrize("without", [{}, {"custom_domain": None}])
+    @pytest.mark.parametrize("without", [{}, {"custom_domain": None}, {"custom_domain": ""}])
     def test_a_newer_photo_that_names_none_takes_it_away(self, client, acme, without):
         assert photo(client, version=2, **without).json()["applied"] is True
         assert Hub.objects.get(pk=HUB_ID).custom_domain == ""
@@ -107,7 +107,10 @@ class TestThePhoto:
             "minegocio",
             "10.0.0.10",
             "1.2.3.4",
-            "",
+            # Longer than a domain can be, and than the row keeps: a 500 the SaaS would retry for ever.
+            ".".join(["a" * 63, "b" * 63, "c" * 63, "d" * 58, "com"]),
+            # One final dot is how a domain may be written; another leaves a name no host ever matches.
+            "www.minegocio.es..",
             " www.minegocio.es",
             42,
             ["www.minegocio.es"],

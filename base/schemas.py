@@ -123,12 +123,19 @@ class MemberIn(Schema):
     name: str | None = None
 
 
+#: The longest a domain name can be (RFC 1035) and what ``Hub.custom_domain`` keeps; ``DomainNameValidator`` lets 255 by.
+MAX_DOMAIN_LENGTH = 253
+
+
 def custom_domain_of_photo(value: str | None) -> str | None:
     """The domain a photo names, lowercase and without a final dot: a host name of a public domain, in its ASCII form,
     that the Hub does not answer already (``ALLOWED_HOSTS``), or it would put a website on another business's host."""
-    if value is None:
+    if value is None or value == "":
+        # Nothing named, as null or absent: never a domain, and refusing it would refuse the whole photo.
         return None
     domain = value.lower().removesuffix(".")
+    if len(domain) > MAX_DOMAIN_LENGTH or domain.endswith("."):
+        raise ValueError("not a domain name in its ASCII form")
     try:
         DomainNameValidator(accept_idna=False)(domain)
     except DjangoValidationError:
