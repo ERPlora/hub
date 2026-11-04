@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:56117209bdfd7f7935803efc498b0d563b84df9a231b7d727d9180c0963298ae -->
+<!-- generated from WORKBOOK.md sha256:c666e2658d4c3b277b02bd07cdd34fe379142b2909f606a48812fb51d7bcbc9b -->
 
 ## What it is for and who it is for
 
@@ -817,7 +817,8 @@ no longer be removed: it was sent to the kitchen (void it with a reason), it is 
 longer on an open check.". Voiding a line not sent, charged, already voided or without a reason is
 refused with "That line cannot be voided…". Without Kitchen active there are no tabs and no sending: the
 check is charged as always.
-Involved: KITCHEN-F05, KITCHEN-F18, KITCHEN-F19, KITCHEN-F20, KITCHEN-F29, BASE-F84
+Through the assistant: its confirmation card says the check (by its title or, with none, by its amount), the line, the product, the service, the menu and who serves by their name, and the order type in Kitchen's words, never by an id; what the person asking may not see, or what is no longer there, stays off the card (BASE-F97).
+Involved: KITCHEN-F05, KITCHEN-F18, KITCHEN-F19, KITCHEN-F20, KITCHEN-F29, BASE-F84, BASE-F97
 
 ### SALE-F21 Print the bill for the table (pre-bill)
 Status: done
@@ -1203,7 +1204,8 @@ Out: the section (name, VAT category, position). What was already sold keeps the
 charged with.
 If it fails: a VAT category that does not exist is refused next to its field. A section someone else
 already deleted: "That section is no longer in this business. Reload the list and try again.".
-Involved: TAX-F01
+Through the assistant: its confirmation card says the section by its name, never by an id; one that is no longer there stays off the card (BASE-F97).
+Involved: TAX-F01, BASE-F97
 
 ### SALE-F36 Prepare the quick notes
 Status: done
@@ -1318,6 +1320,7 @@ id, its name or its type ("cash", "card"). If a name matches several, it is refu
 | For each payment of a sale, what was refunded and what is left, and for each line what already came back | see sales | F31 | `sale.refund.options` |
 | A sale's refunds, with the state and the number of their corrective invoice | see sales | F31 | `sale.refund.list` |
 | The refund recorded with a key | see sales | F31 | `sale.refund.by_idempotency_key` |
+| The name of a record a write of Sales touches, by its id: only for the assistant's card; what does not exist or the person asking may not read goes unnamed | see sales | F20, F35 | `sale.record.get` |
 
 The sales, the figures, the checks, the charge preview, the payment methods, the settings, the sections,
 the quick notes and what is refundable can be followed live.

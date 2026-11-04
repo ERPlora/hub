@@ -949,3 +949,39 @@ msgstr "Imprimir como duplicado"
 
 msgid "Refund amount"
 msgstr "Importe a devolver"
+
+msgid "Section"
+msgstr "Sección"
+
+msgid "Say one record, by its id."
+msgstr "Di un registro, por su id."
+
+msgid "Staff is not active in this business."
+msgstr "Personal no está activo en este negocio."
+
+msgid "That line does not exist."
+msgstr "Esa línea no existe."
+
+msgid "That tender does not exist."
+msgstr "Ese cobro no existe."
+
+msgid "EU VAT number"
+msgstr "NIF-IVA de la UE"
+
+msgid "Passport"
+msgstr "Pasaporte"
+
+msgid "Tax ID of their country"
+msgstr "Identificación fiscal de su país"
+
+msgid "Residence certificate"
+msgstr "Certificado de residencia"
+
+msgid "Other document"
+msgstr "Otro documento"
+
+msgid "Not registered"
+msgstr "No censado"
+
+msgid "Service"
+msgstr "Servicio"
