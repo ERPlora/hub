@@ -707,6 +707,15 @@ def test_she_has_no_card_asks_for_an_appointment_and_after_the_owner_s_yes_it_is
     assert "Haircut" in said_values["services"]
     assert "Ana" in said_values["staff_id"]
     assert not any(str(record) in value for record in (card.id, cut.id, ana.id) for value in said_values.values())
+    [spanish] = run("flow.question.list", {}, ctx_for("hub_owner", language="es")).rows
+    assert spanish.action == "Reservar una cita"
+    assert {field.name: field.label for field in spanish.fields} == {
+        "customer_id": "Cliente",
+        "services": "Servicios",
+        "staff_id": "Profesional",
+        "start": "Empieza a las",
+        "source": "Reservada por",
+    }
 
     answer_yes(django_capture_on_commit_callbacks)
     tick()

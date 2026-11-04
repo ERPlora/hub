@@ -326,6 +326,8 @@
       "reviewFirst": "Las reviso yo antes",
       "apps": {
         "flow": "Automatizaciones",
+        "appointment": "Citas",
+        "reservation": "Reservas",
         "customer": "Clientes"
       },
       "appointments": {

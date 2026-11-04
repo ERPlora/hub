@@ -139,6 +139,21 @@ describe('the cards', () => {
     expect(card(page, 'tables').exists()).toBe(true);
   });
 
+  it('without Reservas the appointments card shows alone, and turning it on names no other answer', async () => {
+    mocks.confirm.mockResolvedValue(true);
+    const session = { ...OWNER, apps: OWNER.apps.filter((app) => app.label !== 'reservation') };
+    const page = await mount({
+      session,
+      recipes: shelf({}, [{ ref: TABLE, apps: ['reservation'] }, { ref: TABLE_NOTICE, apps: ['reservation'] }]),
+      api: api(),
+    });
+    expect(card(page, 'tables').exists()).toBe(false);
+    expect(card(page, 'appointments').exists()).toBe(true);
+    await click(page.find('whatsapp-inbox-autoreply-appointments-on').element);
+    expect(mocks.confirm.mock.calls[0][0].consequences).toBeUndefined();
+    expect(commands(page)).toEqual([`enable ${BOOKING}`, `enable ${BOOKING_NOTICE}`]);
+  });
+
   it('without Automatizaciones each card says it needs it and «See apps» leads to the apps', async () => {
     const session = { ...OWNER, apps: OWNER.apps.filter((app) => app.label !== 'flow') };
     const page = await mount({ session });

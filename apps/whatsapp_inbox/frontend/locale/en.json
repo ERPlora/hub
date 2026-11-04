@@ -326,6 +326,8 @@
       "reviewFirst": "I review them first",
       "apps": {
         "flow": "Automations",
+        "appointment": "Appointments",
+        "reservation": "Reservations",
         "customer": "Customers"
       },
       "appointments": {
