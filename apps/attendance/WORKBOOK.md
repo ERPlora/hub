@@ -477,6 +477,10 @@ Los avisos nunca llevan la posición ni el motivo de una corrección (datos pers
   un `tests/test_<fichero>.py` por fichero, más `test_integration_staff.py` (contra Personal real, sin
   dobles), `test_relay.py` (la baja en Personal entregada por el relay real del worker) y
   `test_concurrency.py` (hilos).
+- **Orden de los registros y del CSV** (`scoped_records`, con `base.ordering.list_order`; regla hub#2355 del producto
+  viejo): la columna elegida (`columna`/`-columna`) y el desempate por `id`, en la dirección de la lista: la descendente
+  es la ascendente leída al revés, empates incluidos. Las jornadas sin salida quedan donde las pone Postgres al ordenar
+  por «salida»: al final en ascendente, al principio en descendente.
 - Modelos: `Record` (la jornada), `Break` (la pausa), `Correction` (el rastro, solo se inserta) y
   `AttendanceSettings` (una fila, restricción `attendance_settings_singleton`). UUIDv7, sin `hub_id`.
   `Record.member` es una FK a `staff.Member` con `PROTECT`: una ficha con jornadas no se puede borrar
