@@ -169,8 +169,9 @@ Plan `docs/plans/2026-10-22-fase-2-tenencia.md` de erplora-next; reglas en PLAN-
   La plantilla de test lleva todas las apps del hub (`migrator.portable_apps()`, `base/tests/test_hub_user_links.py`).
   Los tests escritos antes de la tenencia caen en un respaldo solo de la suite (`base/tenancy/tests/legacy.py`, fixture
   de sesión `legacy_fallback`): la BD de control de test lleva también las tablas de hub (`LegacyTablesRouter`, solo en
-  `config/settings_pytest.py`) y el worker les corre el paso de la fase 1 (`legacy_worker`); los de la tenencia y los
-  de cada puerta de entrada lo apagan (`no_test_fallback`), como en producción.
+  `config/settings_pytest.py`) y el worker les corre un paso propio (`legacy_worker`, `worker_pass`): sus tareas en el
+  ámbito del negocio `a` y el relay de sus avisos; los de la tenencia y los de cada puerta de entrada lo apagan
+  (`no_test_fallback`), como en producción.
 
 
 ### Activar una app crea sus tablas (tajada S3)
