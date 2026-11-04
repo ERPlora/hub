@@ -7,8 +7,9 @@
 // run and put back as it was after it.
 import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, horizontalOverflow, login, OWNER, psql, shot, shown, untilStill } from './helpers';
+import { A, horizontalOverflow, login, OWNER, shot, shown, untilStill } from './helpers';
 import { VIEWPORTS } from './inventory-helpers';
+import { parkIssuer, unparkIssuer } from './invoice-helpers';
 
 const KEY = 'FIX-HUB-BASE-BLOCKING-STRIP-SAYS-TICKET-WHERE-INVOICING-SAYS-TIQUE';
 /** The hub's issuer, parked while the run needs a hub without one. */
@@ -19,11 +20,11 @@ const SENTENCE = 'No se podrá emitir ningún tique ni factura hasta que configu
 test.describe.configure({ mode: 'serial' });
 
 test.beforeAll(() => {
-  psql([`drop table if exists ${PARKED}`, `create table ${PARKED} as select * from invoice_issuer`, 'delete from invoice_issuer'].join('; '));
+  parkIssuer(PARKED);
 });
 
 test.afterAll(() => {
-  psql(['delete from invoice_issuer', `insert into invoice_issuer select * from ${PARKED}`, `drop table ${PARKED}`].join('; '));
+  unparkIssuer(PARKED);
 });
 
 /** The owner of `a` in Spanish (the Hub's language cookie, as the sign-in sets it from the account). */
