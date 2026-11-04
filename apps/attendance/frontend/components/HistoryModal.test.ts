@@ -46,7 +46,7 @@ const TRAIL: CorrectionOut[] = [
   },
 ];
 
-async function setup(answer: [number, unknown], locale: 'en' | 'es' = 'en') {
+async function setup(answer: [number, unknown], locale: 'en' | 'es' = 'en', timezone = 'Europe/Madrid') {
   const m = await mountAttendance(HistoryModal, {
     props: { open: false, record: DAY },
     locale,
@@ -57,10 +57,20 @@ async function setup(answer: [number, unknown], locale: 'en' | 'es' = 'en') {
   await m.wrapper.setProps({ open: true });
   await settle();
   await settle();
+  await m.live();
+  await m.result('base.business.get', { timezone });
   return m;
 }
 
 describe('HistoryModal (ATTENDANCE-F09)', () => {
+  it("tells each correction on the business's clock (hub#779)", async () => {
+    const s = await setup([200, { rows: TRAIL, total: 2, limit: 100, offset: 0 }], 'en', 'Atlantic/Canary');
+    const item = s.inDoc('attendance-history-list')?.querySelector('[data-testid="attendance-history-item"]')?.textContent;
+    expect(item).toContain('Marta Jefa · 2026-10-06 09:00');
+    expect(item).toContain('Before: 2026-10-05 08:00 → — (Needs review)');
+    expect(item).toContain('After: 2026-10-05 08:00 → 2026-10-05 16:00 (Closed)');
+  });
+
   it('asks for the history of the day when it opens and lists it newest first', async () => {
     const s = await setup([200, { rows: TRAIL, total: 2, limit: 100, offset: 0 }]);
     expect(s.sent()).toEqual([{ method: 'GET', path: '/api/attendance/corrections', query: { record_id: 'r1', limit: '100' }, body: undefined }]);
