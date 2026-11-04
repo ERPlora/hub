@@ -4504,8 +4504,8 @@ def _app_answer(label: str, row: activation.Activation, along: list[dict[str, st
         "description": "Turns on one of this business's apps (by its name as the person says it, or its id), with the "
         "apps it needs, which come along: it shows in the menu and can be used, with the data it had. Refused when the "
         "plan's limit of apps is reached (turn one off, or upgrade the plan on erplora.com), a paid app is not "
-        "subscribed, the app itself says why not or the name fits several apps (ask which one). state=creating: it is being set up and is on in a "
-        "moment. already=true: it was on (or being set up) already, nothing changed.",
+        "subscribed, the app itself says why not or the name fits several apps (ask which one). state=creating: it is "
+        "being set up and is on in a moment. already=true: it was on (or being set up) already, nothing changed.",
         "risk": "normal",
         "check": "base.app.get",
         "asks": {

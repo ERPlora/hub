@@ -222,7 +222,7 @@ Avisos de la pantalla: el resultado de cada acción en una franja arriba (verde 
 
 | ID | Flujo | Estado |
 |---|---|---|
-| VERIFACTU-F01 | Activar VeriFactu | hecho — encender la app en el Hub es activarla (la activación por hub llega con la fase 2); fuera de España, encendida, no registra ni envía nada (FIX-HUB-VERIFACTU-ON-FOR-A-BUSINESS-OUTSIDE-SPAIN), y que Apps no la ofrezca allí espera un gancho de encendido de la plataforma |
+| VERIFACTU-F01 | Activar VeriFactu | hecho — encender la app en el Hub es activarla (la activación por hub llega con la fase 2); fuera de España, Apps no la ofrece y el hub la niega (`can_enable`, hub#694), y una ya encendida no registra ni envía nada (FIX-HUB-VERIFACTU-ON-FOR-A-BUSINESS-OUTSIDE-SPAIN) |
 | VERIFACTU-F02 | Subir el certificado propio del negocio | hecho — en el Hub; cifrado en la BD del hub con `FISCAL_CERTIFICATE_KEY` |
 | VERIFACTU-F03 | Quitar el certificado propio | hecho — en el Hub |
 | VERIFACTU-F04 | Elegir quién remite: mi certificado o ERPlora | hecho |
@@ -260,20 +260,23 @@ Avisos de la pantalla: el resultado de cada acción en una franja arriba (verde 
 
 ### VERIFACTU-F01 Activar VeriFactu
 <!-- origen: old-hub:HUB-F300 old:verifactu/workflow/configuracion.md#verifactu-f01 -->
-Estado: hecho — encender la app en el Hub es activarla (la activación por hub llega con la fase 2); fuera de España, encendida, no registra ni envía nada (FIX-HUB-VERIFACTU-ON-FOR-A-BUSINESS-OUTSIDE-SPAIN), y que Apps no la ofrezca allí espera un gancho de encendido de la plataforma
+Estado: hecho — encender la app en el Hub es activarla (la activación por hub llega con la fase 2); fuera de España, Apps no la ofrece y el hub la niega (`can_enable`, hub#694), y una ya encendida no registra ni envía nada (FIX-HUB-VERIFACTU-ON-FOR-A-BUSINESS-OUTSIDE-SPAIN)
 Actor: administrador
 Pantalla: Hub: Apps
 Pasos:
 1. En las apps del Hub, enciende **VeriFactu** (se enciende Facturación con ella).
 2. Desde ese momento cada factura que emite Facturación se registra (VERIFACTU-F13) en el entorno de
    pruebas.
-3. Solo en un negocio de España. En uno de otro país (el de su cuenta de erplora.com), VeriFactu encendida no
-   hace nada: las facturas salen sin registro ni QR, **VeriFactu → Ajustes** y **VeriFactu → Configuración** dicen
+3. Solo en un negocio de España. En uno de otro país (el de su cuenta de erplora.com), Apps no la ofrece: sale
+   «No disponible» con «VeriFactu solo es para negocios de España.» y sin «Activar», y el hub contesta lo mismo si se
+   pide por el asistente o por la API. Una plantilla de peluquería o de restaurante carga todo lo demás y dice por
+   qué VeriFactu se queda fuera.
+4. Si ya estaba encendida en un negocio de otro país, no hace nada y se puede desactivar: las facturas salen sin registro ni QR, **VeriFactu → Ajustes** y **VeriFactu → Configuración** dicen
    arriba «VeriFactu solo es para negocios de España.» sin ofrecer nada que lleve a la AEAT, y lo que pida registrar o enviar algo contesta lo mismo.
 Entra: nada más que la orden.
 Sale: la app activa; sin interruptor propio.
 Si falla: lo dice la página de apps del Hub.
-Implicados: INVOICE-F01
+Implicados: INVOICE-F01, BASE-F18
 
 ### VERIFACTU-F02 Subir el certificado propio del negocio
 <!-- origen: fi:hub/runtime#certificado-fiscal-del-negocio-core-adr-0079-0081 fi:hub/server-cloud#settings-capabilities-certificado-fiscal-settings-rs old-hub:HUB-F302 old:verifactu/workflow/configuracion.md#verifactu-f02 qa:modules/verifactu/configure-identity-and-certificate -->
@@ -903,16 +906,18 @@ Implicados: ninguno
 <!-- origen: fi:modules/verifactu#query-verifactu-stats-compliance_summary old-hub:HUB-F314 old-hub:HUB-F316 old:verifactu/workflow/control.md#verifactu-f32 -->
 Estado: hecho — la plataforma pregunta al apagar (`base.app.disable`, hub#256) y VeriFactu responde con su
 `can_disable` (hub#267, FIX-BASE-APP-TURN-OFF-VETO); en España, una vez encendida, no se apaga nunca
-(FIX-HUB-VERIFACTU-NEVER-OFF-ONCE-ON)
+(FIX-HUB-VERIFACTU-NEVER-OFF-ONCE-ON), y Apps ya no ofrece «Desactivar» (hub#618)
 Actor: sistema
 Pantalla: Hub: Apps
 Pasos:
 1. Al apagar VeriFactu en un negocio de España, la plataforma le pregunta y VeriFactu lo niega siempre: una vez
    encendida, las facturas del negocio tienen que seguir llegando a la AEAT (la ley obliga a seguir con VERI*FACTU
-   al menos hasta que acabe el año natural, y ERPlora no tiene otra forma de registrarlas).
+   al menos hasta que acabe el año natural, y ERPlora no tiene otra forma de registrarlas). En **Apps** su fila no
+   ofrece «Desactivar» y dice ese motivo (BASE-F25).
 2. Da igual lo que haya en la cola: con registros por enviar o con todo ya contestado por la AEAT, la respuesta es
    la misma. VeriFactu sigue encendida y sus registros se quedan como estaban. Tampoco se pueden apagar las apps que
-   necesita: Facturación y, por ella, Impuestos, Ventas / TPV y Clientes.
+   necesita: Facturación y, por ella, Impuestos, Ventas / TPV y Clientes; sus filas tampoco lo ofrecen y dicen por
+   qué (hub#619).
 3. Un negocio sin país (una demo) es de España: tampoco se apaga.
 4. Mientras su estado dice «Activándose…» o «No se ha podido activar» todavía no ha estado encendida ni ha sellado
    nada: se puede desactivar.
@@ -1081,6 +1086,7 @@ sellado no añade nada (`already`). En un negocio de fuera de España no reaccio
 | Facturación | Sellar el registro de cada documento dentro de su emisión | `verifactu.record.create` |
 | Ventas, Facturación, Impresión | Poner el QR y el estado fiscal en el tique y la factura | `verifactu.record.by_invoice` |
 | Plataforma (`base.app.disable`) | No apagar VeriFactu una vez encendida (en España) | `can_disable` de `VerifactuConfig` |
+| Plataforma (`base.app.enable`) | No encender VeriFactu fuera de España | `can_enable` de `VerifactuConfig` |
 
 ### Quién puede qué
 
@@ -1500,10 +1506,11 @@ Las cerradas quedan tachadas con su motivo; las abiertas dicen dónde siguen.
     (`disable_refusal` → `None`). Sin país (una demo), es España. El hub propio de ERPlora lee su país como los demás,
     de `base.business.get`, que para él contesta el de su emisor (`PLATFORM_ISSUER_COUNTRY`, hub#329): VeriFactu no
     guarda otra fuente del mismo dato (FIX-HUB-VERIFACTU-OWN-SHORTCUT-FOR-PLATFORM-HUB-COUNTRY). Lo sellado antes en
-    un negocio de fuera no se borra (los registros fiscales nunca se borran): se queda sin enviar, con su motivo. Que
-    **Apps** no la ofrezca encendible fuera de España necesita un gancho de encendido de la plataforma
-    (`can_enable(self, ctx) -> str | None` en `LiveAppConfig`, como `can_disable`, que respeten `base.app.enable` y
-    `base.app.list`); hasta entonces se enciende y no hace nada.
+    un negocio de fuera no se borra (los registros fiscales nunca se borran): se queda sin enviar, con su motivo. **Apps**
+    no la ofrece encendible fuera de España: `can_enable(self, ctx) -> str | None` en `LiveAppConfig`, como
+    `can_disable`, que respetan `base.app.enable`, `base.app.retry` y `base.app.list` (hub#694). Una plantilla de
+    vertical pasa por `base.app.enable`: VeriFactu se queda fuera, con su motivo, y lo demás carga. Una ya encendida
+    se queda como está y no hace nada.
 16. **Una vez encendida, VeriFactu no se apaga en España** (FIX-HUB-VERIFACTU-NEVER-OFF-ONCE-ON, 2026-11-01; ajuste
     de Ioan del 22/10 en el plan de la fase 2, «Tablas por módulo (S3)»): `disable_refusal` contesta siempre
     `NEVER_OFF`, salvo fuera de España (decisión 15) o si nunca llegó a `on` (`creating` o `failed` de S3: no ha
@@ -1608,9 +1615,8 @@ Al cerrar la app (CLOSE-VERIFACTU, 2026-10-27), lo que sigue en la cola fuera de
 - **El paso «Configura VeriFactu» del Inicio fuera de España** (FIX-VERIFACTU-SETUP-STEP-SHOWN-OUTSIDE-SPAIN,
   `hub:base,verifactu`): un negocio de otro país aún lo ve en «Termina de configurar tu negocio»; el arreglo limpio
   necesita `base` (un hub sin país, contradicción 13).
-- **Que Apps no deje encender VeriFactu fuera de España** (FIX-HUB-APPS-ENABLE-REFUSED-OUTSIDE-ITS-COUNTRY,
-  `hub:base,verifactu`): falta el gancho de encendido de la plataforma (`can_enable`, como `can_disable`); hoy se
-  enciende y no hace nada (Decisión 15).
+- ~~**Que Apps no deje encender VeriFactu fuera de España**~~ (FIX-HUB-APPS-ENABLE-REFUSED-OUTSIDE-ITS-COUNTRY) —
+  **cerrada** por hub#694: el gancho `can_enable` de la plataforma (Decisión 15).
 - ~~**La autorización en pruebas**~~ (FIX-FISCAL-TESTING-AUTHORISATION-CONTRADICTION) — **cerrada el 2026-11-03**
   (saas#210, contradicción 11): la pasarela ya no pide el otorgamiento en pruebas, y el registro de pruebas de un
   negocio sin otorgamiento aprobado, que desde hub#454 llega a la pasarela como ese negocio, se presenta a la AEAT de

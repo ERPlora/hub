@@ -15,8 +15,10 @@ from live.errors import Conflict
 from live.models import OutboxEvent
 from live.operations import get
 
+from apps.verifactu.queries import VERIFACTU
 from apps.verifactu.tests.conftest import A
 from base import activation, events, services
+from base.catalog import template_apps
 from base.models import AppActivation, Hub
 from base.tenancy import context
 from base.tenancy.tests import hubs
@@ -138,6 +140,35 @@ def test_a_blueprint_outside_spain_leaves_it_off_with_the_reason_and_turns_on_th
     states = activation.states_of(A)
     assert states["task"].on
     assert not states["verifactu"].wanted
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("vertical", ["hair_salon", "restaurant"])
+def test_a_vertical_template_outside_spain_loads_without_verifactu_and_says_why(vertical):
+    """A hub is born with every app off and a template turns its vertical's on through ``base.app.enable``: outside
+    Spain only VeriFactu stays off, with its reason; everything else the vertical brings goes on, what it needed too."""
+    listed = template_apps(vertical)
+    assert VERIFACTU in listed
+    business_in("PL")
+    verifactu_off()
+
+    refused = services._turn_on_listed(admin(), listed, set())
+
+    assert refused == {VERIFACTU: ONLY_IN_SPAIN}
+    states = activation.states_of(A)
+    assert not states[VERIFACTU].wanted
+    assert [app for app in listed if app != VERIFACTU and not states[app].on] == []
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("vertical", ["hair_salon", "restaurant"])
+def test_a_vertical_template_in_spain_turns_verifactu_on(vertical):
+    listed = template_apps(vertical)
+    business_in("ES")
+    verifactu_off()
+
+    assert services._turn_on_listed(admin(), listed, set()) == {}
+    assert activation.states_of(A)[VERIFACTU].on
 
 
 @pytest.mark.django_db(databases=hubs.HUB_DATABASES)
