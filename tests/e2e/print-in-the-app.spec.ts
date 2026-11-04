@@ -10,7 +10,7 @@ import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 import { A, api, capture, login, psql, shown } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { cleanInvoices, ensureIssuer, issuedIds, snapshotSeries } from './invoice-helpers';
-import { chargeByApi, cleanSales, drawerOff, restoreDrawer, stamp } from './sale-helpers';
+import { chargeByApi, cleanSales, drawerOff, numberRow, restoreDrawer, stamp } from './sale-helpers';
 
 const RUN = stamp();
 let coffee: Product;
@@ -65,8 +65,8 @@ function expectStandalone(html: string, title: string): void {
   expect(html).not.toMatch(/<script/i);
 }
 
-/** The document painted as the print window paints it (its CSP, no script), screenshotted. */
-async function paintAsTheApp(page: Page, html: string, name: string): Promise<void> {
+/** The document painted as the print window paints it (its CSP, no script), screenshotted; `read` looks at it before it closes. */
+async function paintAsTheApp(page: Page, html: string, name: string, read?: (printWindow: Page) => Promise<void>): Promise<void> {
   const printWindow = await page.context().newPage();
   const errors: string[] = [];
   printWindow.on('console', (message) => {
@@ -77,6 +77,7 @@ async function paintAsTheApp(page: Page, html: string, name: string): Promise<vo
   await expect(printWindow.locator('body > *').first()).toBeVisible();
   await capture(printWindow, `APP-PRINT-${name}`, { fullPage: true });
   expect(errors, 'the print window refuses nothing of the paper').toEqual([]);
+  await read?.(printWindow);
   await printWindow.close();
 }
 
@@ -134,7 +135,17 @@ test('SALE-F29: «Print» on a sale\'s document opens the app\'s print screen wi
   // The paper alone: nothing of the page around it.
   expect(html).not.toContain('sale-document-print');
   await expect(page.locator('ion-toast')).toHaveCount(0);
-  await paintAsTheApp(page, html, 'SALE-F29');
+  // The window holds only the rules `paperDocument` carried: the number has to arrive whole there too (hub#695).
+  await paintAsTheApp(page, html, 'SALE-F29', async (printWindow) => {
+    await printWindow.emulateMedia({ media: 'print' });
+    const paper = printWindow.locator('[data-testid=sale-receipt]');
+    await expect(paper).toBeVisible();
+    const row = await numberRow(paper);
+    expect(row.numberLines, `the app's paper: «${number}» on one line`).toBe(1);
+    expect(row.dateLines, "the app's paper: the date and time on one line").toBe(1);
+    expect(row.dateBeside || row.dateUnder, "the app's paper: the date beside the number or right under it").toBe(true);
+    expect(row.overflow, "the app's paper: nothing past the paper").toBe(0);
+  });
 });
 
 test('SALE-F21: «Print» on the bill opens the app\'s print screen with the bill alone', async ({ page, context }) => {

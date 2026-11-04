@@ -86,6 +86,19 @@ describe('ReceiptPaper', () => {
     expect((await paper({ sale: ticket, settings: SETTINGS })).text('sale-receipt-number')).toBe('Tiquet: TICKET-2026-000031');
   });
 
+  // The paper is 80 mm whatever the screen: «Receipt: TICKET-2026-000004» and «Nov 3, 2026, 2:08 PM» do not
+  // fit side by side, and the number broke at its hyphens («TICKET-2026-» / «000004»). The browser measures it in
+  // tests/e2e/sale-fiscal-qr.spec.ts (three sizes and the printed copy); here, the rules that hold it (hub#695).
+  it('never splits the number: it holds on one line and the date and time go right under it when both do not fit (hub#695)', async () => {
+    const ticket = saleOut({ invoice_status: 'issued', invoice_type: 'F2', invoice_number: 'TICKET-2026-000004' });
+    const s = await paper({ sale: ticket, settings: SETTINGS });
+    expect(s.find('sale-receipt-number').find('.sale-receipt__number').text()).toBe('TICKET-2026-000004');
+    const css = source.replace(/\s+/g, ' ');
+    expect(css).toMatch(/\.sale-receipt__number \{[^}]*white-space: nowrap;/);
+    // Wrapped, the date is the paper's next line: no blank row between them.
+    expect(css).toMatch(/\.sale-receipt__meta \{[^}]*flex-wrap: wrap;[^}]*gap: 0 0\.5rem;/);
+  });
+
   it('a ticket whose fiscal document waits says so under its number (never posing as issued)', async () => {
     const s = await paper({ sale: saleOut({ invoice_status: 'pending', invoice_number: '', invoice_type: '' }), settings: SETTINGS });
     expect(s.text('sale-receipt-pending')).toBe('Documento fiscal pendiente');

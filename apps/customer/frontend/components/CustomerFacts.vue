@@ -4,12 +4,12 @@
 // customer-business-currency), Last purchase, Active — and,
 // new, the birthday, anniversary, internal notes and custom fields the product only showed when
 // editing (WORKBOOK «Cambios frente al producto actual»).
-import { formatDateTime } from '@erplora/ui/components';
+import { formatDateTime, formatMoney } from '@erplora/ui/components';
 import { computed } from 'vue';
 
 import { countryName } from '../lib/countries';
 import { formatDay } from '../lib/dates';
-import { formatMoney, useBusinessMoney } from '../lib/money';
+import { useBusinessMoney } from '../lib/money';
 import { formatPhone } from '../lib/phoneDisplay';
 import { useCustomerI18n } from '../lib/useCustomerI18n';
 import type { CustomerDetailOut, CustomFieldValueOut } from '../operations';

@@ -13,8 +13,8 @@
 // which a toast took away before it could be read (hub#2594). The counter says how many of the plan's apps are on
 // (`max_apps`; what came along does not count); at the limit, the notice with «Upgrade plan» (erplora.com's plans,
 // only on the web). The menu of this screen is read again after each change; the other screens of the business
-// follow the live list (AppsFollower). Both links to erplora.com go the Hub's one way out, `openExternalLink`
-// (gh:hub#439: the installed app opens nothing on a `_blank` link). In a business with its own database an app turned on
+// follow the live list (AppsFollower). «Upgrade plan» goes with the pass (BASE-F11, `useSaasPass`) and the Store's link
+// by `openExternalLink` (gh:hub#439: the installed app opens nothing on a `_blank` link). In a business with its own database an app turned on
 // for the first time gets its tables first when its template lacked them (S3): the answer says «creating», the toast
 // «Turning on…» and its row «Turning on…» until the live list says it is on; one that could not be set up says so with
 // «Retry» (`base.app.retry`); both can be turned off.
@@ -51,6 +51,7 @@ import {
   turnsOnWith,
 } from '../lib/apps';
 import { useBaseI18n } from '../lib/i18n';
+import { useSaasPass } from '../lib/saas-pass';
 import type { AppRow } from '../operations';
 
 const { t, locale } = useBaseI18n();
@@ -75,6 +76,7 @@ const mayBuy = computed(() => isWeb.value && session.can('base.administer_hub') 
 const mayManage = computed(() => session.can('base.administer_hub'));
 /** The plan's page on erplora.com, only on the web (the Hub never sells inside the installed app). */
 const planUrl = computed(() => (isWeb.value && mayManage.value ? (data.value?.plan_url ?? '') : ''));
+const { openSaasPass } = useSaasPass();
 /** The app being turned on or off: only its button waits, and no other starts meanwhile. */
 const pending = ref<string | null>(null);
 /** The plan's limit the last «Turn on» hit; cleared by the next change. */
@@ -344,7 +346,7 @@ const emptyHeading = computed(() => t(`base.appsPage.empty.${tab.value}`));
             :href="planUrl"
             target="_blank"
             rel="noopener"
-            @click="openExternalLink(planUrl, $event)"
+            @click="openSaasPass('plan', planUrl, $event)"
           >{{ t('base.plan.upgrade') }}</a>
         </template>
       </InlineFeedback>

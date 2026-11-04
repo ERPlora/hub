@@ -478,13 +478,17 @@ const kitchenTickets = computed(() => kitchenActive.value && session.can('kitche
 /** Nothing new to send (another device sent it, or only services wait): not a failure. */
 const NOTHING_TO_SEND = new Set(['sale.nothing_to_fire', 'kitchen.nothing_to_cook']);
 
-async function sendRound(rush: boolean): Promise<boolean> {
+async function sendRound(rush: boolean, chargeSheetOpens = false): Promise<boolean> {
   // kitchen#82: the ticket names who attends the check («Atiende»); with «Yo», the kitchen names who sends it.
   const sent = await till.sendToKitchen(rush, staff.value.id ? staff.value.name : null);
   if (sent.ok) {
     // hub#2257: sent, but its sheet did not print — said in words (the reason is Printing's, not the waiter's).
-    if (sent.printed === false) void toast(t('sale.pos.kitchen.sentNotPrinted', { n: sent.round ?? '' }), 'warning', 4500);
-    else void toastSuccess(t('sale.pos.kitchen.sent', { n: sent.round ?? '' }));
+    const notPrinted = sent.printed === false;
+    const words = notPrinted ? t('sale.pos.kitchen.sentNotPrinted', { n: sent.round ?? '' }) : t('sale.pos.kitchen.sent', { n: sent.round ?? '' });
+    // hub#732: at the bottom it would lie over the sheet's last row of keys, and a tap there would fall on the notice.
+    if (chargeSheetOpens) void toast(words, notPrinted ? 'warning' : 'success', notPrinted ? 4500 : undefined, undefined, undefined, 'top');
+    else if (notPrinted) void toast(words, 'warning', 4500);
+    else void toastSuccess(words);
     return true;
   }
   if (sent.code && NOTHING_TO_SEND.has(sent.code)) return true;
@@ -499,7 +503,7 @@ async function charge(): Promise<void> {
     return;
   }
   // sales#439: what is pending goes to the kitchen before the charge, or the customer pays for a dish nobody cooks.
-  if (kitchenOn.value && lines.value.some((line) => !line.fired_at && !line.is_service) && !(await sendRound(false))) return;
+  if (kitchenOn.value && lines.value.some((line) => !line.fired_at && !line.is_service) && !(await sendRound(false, true))) return;
   chargingLines = lines.value.map((line) => line.id);
   heldWhileCharging = null;
   charging.value = true;

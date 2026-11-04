@@ -216,6 +216,26 @@ describe('PosCart: «Check» and «Current order» with Kitchen (SALE-F20)', () 
     expect(m.find('pos-cart-tab-check').attributes('aria-selected')).toBe('true');
   });
 
+  it('on a low phone the bar and the foot stay put and what is between them scrolls as one (hub#630)', async () => {
+    const m = await setup({ kitchen: true });
+    const scroll = m.wrapper.find('.pos-cart__scroll');
+    expect(scroll.exists()).toBe(true);
+    // The heading, the tabs and the lines scroll together…
+    expect(scroll.findComponent(CartHeading).exists()).toBe(true);
+    expect(scroll.find('[data-testid="pos-cart-tabs"]').exists()).toBe(true);
+    expect(scroll.findComponent(CartLines).exists()).toBe(true);
+    // …the bar and the foot (with «Charge») never do.
+    expect(scroll.findComponent(CartToolbar).exists()).toBe(false);
+    expect(scroll.findComponent(CartFooter).exists()).toBe(false);
+    await click(m.find('pos-cart-tab-round').element);
+    expect(m.find('pos-kitchen-send').exists()).toBe(true);
+    expect(scroll.find('[data-testid="pos-kitchen-send"]').exists()).toBe(false);
+    // The phone's drawer scrolls the whole middle; the side column keeps its heading and scrolls the lines.
+    expect(m.find('pos-cart').classes()).not.toContain('pos-cart--drawer');
+    const phone = await setup({ drawer: true });
+    expect(phone.find('pos-cart').classes()).toContain('pos-cart--drawer');
+  });
+
   it('with everything sent «Current order» says so and offers no send', async () => {
     const m = await setup({ kitchen: true, order: order({ lines: [SENT] }) }, 'es');
     expect(m.find('pos-cart-tab-round').attributes('aria-label')).toBe('Comanda actual');
