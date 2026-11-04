@@ -6,7 +6,7 @@
 // What this file creates is deleted after it, also when a test fails.
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, login, psql, shot, shown } from './helpers';
+import { A, api, capture, login, psql, shown } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { chargeByApi, cleanSales, stamp } from './sale-helpers';
 import { cleanUp as cleanServices, named, post } from './service-helpers';
@@ -210,7 +210,7 @@ for (const size of SIZES) {
       for (const screen of SCREENS) {
         await page.goto(`${A}${screen.path}`);
         await groupedIn(await screen.row(page), `${screen.issue} ${screen.app} at ${size.label}`);
-        await page.screenshot({ path: shot(`${KEY}-${screen.app}-${size.label}`) });
+        await capture(page, `${KEY}-${screen.app}-${size.label}`);
       }
     } finally {
       await context.close();
