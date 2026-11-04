@@ -292,27 +292,33 @@ def test_two_tills_paying_with_the_last_session_one_wins_and_the_other_hears_why
 
 def test_a_second_voucher_on_a_line_waits_for_the_first_and_does_not_fit(coffee, last_session):
     # SERVICE-F14: read before the first grant's COMMIT, both would fit and the line would pay for more than it charged.
+    # Another voucher for another customer: nothing but the line makes them wait for each other.
     from apps.service.models import Grant
 
     haircut, lucia, _grant = last_session
+    marta = run("customer.customer.create", {"name": "Marta Ruiz"}, system_context(A))
     sale = charge("voucher-line-0001", lines=[{"product": "COF"}], payments=[{"method": "card"}])()
     total = sale.lines[0].line_total
-    package = svc(
-        "service.package.create",
-        {"name": "Bono de la línea", "max_uses": 3, "items": [{"service_id": str(haircut.id)}]},
-    )
-    data = {"package_id": str(package.id), "customer_id": str(lucia.id), "amount": total, "sale_id": str(sale.id)}
+
+    def voucher_for(owner, name):
+        package = svc(
+            "service.package.create",
+            {"name": name, "max_uses": 3, "items": [{"service_id": str(haircut.id)}]},
+        )
+        return {"package_id": str(package.id), "customer_id": str(owner.id), "amount": total, "sale_id": str(sale.id)}
+
+    for_lucia, for_marta = voucher_for(lucia, "Bono de Lucía"), voucher_for(marta, "Bono de Marta")
     granted, finish = threading.Event(), threading.Event()
 
     def first():
         with transaction.atomic():
-            svc("service.grant.create", data)
+            svc("service.grant.create", for_lucia)
             granted.set()
             finish.wait(10)
 
     def second():
         granted.wait(10)
-        return svc("service.grant.create", data)
+        return svc("service.grant.create", for_marta)
 
     def let_the_first_commit():
         # Time for the second to reach the line's lock (or, without it, to read and be granted) first.
@@ -322,7 +328,7 @@ def test_a_second_voucher_on_a_line_waits_for_the_first_and_does_not_fit(coffee,
 
     results = at_once(first, second, let_the_first_commit)
     assert getattr(results[1], "code", None) == "sale.voucher_over_line"
-    assert Grant.objects.filter(package=package.id).count() == 1
+    assert Grant.objects.filter(sale_id=sale.id).count() == 1
     assert SaleLine.objects.get(pk=sale.lines[0].id).voucher_sold_amount == total
 
 

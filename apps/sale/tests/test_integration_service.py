@@ -1315,9 +1315,13 @@ def test_voiding_the_voucher_gives_its_line_back_to_who_sold_it(haircut, lucia):
     seller = uuid7()
     grant = voucher_of_100(lucia, haircut, seller=seller)
     assert by_staff()[seller].production_total == 0
+    notices = OutboxEvent.objects.filter(name="sale.sale.voucher_line_changed")
+    assert notices.count() == 1
     svc("service.grant.void", {"id": str(grant.id), "reason": "wrong customer"})
     row = by_staff()[seller]
     assert (row.voucher_sold_total, row.production_total) == (0, 10000)
+    # The screens hear of this one too.
+    assert notices.count() == 2
     assert last_event("sale.sale.voucher_line_changed")["line_id"] == str(SaleLine.objects.get(name="Bono de 100").id)
     # The same line can pay the voucher granted in its place.
     line = SaleLine.objects.get(name="Bono de 100")
