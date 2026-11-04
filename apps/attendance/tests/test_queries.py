@@ -312,6 +312,20 @@ def test_ties_go_by_id_in_the_lists_own_direction(person, clock):
     ] == by_id[::-1]
 
 
+def test_days_without_a_clock_out_stay_where_the_database_puts_them(person, clock):
+    """hub#684: this list does not ask for empties last, so they go last ascending and first descending."""
+    clock(NOW)
+    ana, ctx = person(role="hub_manager")
+    closed = day(ana, "2026-10-01T07:00", "2026-10-01T15:00").id
+    forgotten = day(ana, "2026-10-02T07:00", status="needs_review").id
+
+    def listed(sort):
+        return [r.id for r in run("attendance.record.list", {"sort": sort}, ctx).rows]
+
+    assert listed("clock_out_at") == [closed, forgotten]
+    assert listed("-clock_out_at") == [forgotten, closed]
+
+
 def test_a_corrected_day_says_how_many_times(person, clock):
     clock(NOW)
     ana, ctx = person()
