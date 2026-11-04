@@ -23,6 +23,7 @@ from django.db import OperationalError, connections, transaction
 from django.db.backends.postgresql.base import DatabaseWrapper as PostgresWrapper
 from django.utils import translation
 
+from base import operations as platform
 from base.tenancy import context, limits
 from base.tenancy.tests import hubs
 
@@ -549,6 +550,29 @@ def test_a_newer_photo_resizes_the_limit_of_the_running_process(hub_a):
 
     assert limiter_of_a(hub_a).limits == limits.PlanLimits(6, 15)
     assert inside == "15s"
+
+
+def show_idle_cut(alias: str) -> str:
+    with connections[alias].cursor() as cursor:
+        cursor.execute("SHOW idle_in_transaction_session_timeout")
+        return cursor.fetchone()[0]
+
+
+@HUB_DB_COMMITTED
+def test_an_allowed_idle_wait_holds_on_the_active_hub_for_its_transaction_only(hub_a):
+    """What an app says for the transaction it is in: the hub's alias, never control's, and over with its COMMIT, so
+    PgBouncer in transaction mode hands no other business a session that changed."""
+    with context.use_hub(hub_a):
+        before = show_idle_cut(hubs.HUB_A_ALIAS)
+        with transaction.atomic(using=hubs.HUB_A_ALIAS):
+            platform.allow_idle_wait(100)
+            inside = show_idle_cut(hubs.HUB_A_ALIAS)
+            control = show_idle_cut("default")
+        after = show_idle_cut(hubs.HUB_A_ALIAS)
+
+    assert inside == "100s"
+    assert control != "100s"
+    assert after == before != "100s"
 
 
 @pytest.mark.django_db
