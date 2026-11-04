@@ -21,7 +21,21 @@ import { createHmac } from 'node:crypto';
 
 import { type Browser, expect, type Page, test } from '@playwright/test';
 
-import { A, api, horizontalOverflow, HUB_DIR, hostPage, login, psql, shot, shown, untilStill } from './helpers';
+import {
+  A,
+  api,
+  appRow,
+  horizontalOverflow,
+  HUB_DIR,
+  hostPage,
+  menuApps,
+  psql,
+  shot,
+  shown,
+  signedInSpanish,
+  testid,
+  untilStill,
+} from './helpers';
 import { cleanInvoices, ensureIssuer, issuedIds, snapshotSeries } from './invoice-helpers';
 import { STACK } from './stack';
 
@@ -104,9 +118,6 @@ test.afterAll(() => {
 test.beforeEach(baseline);
 test.afterEach(baseline);
 
-const testid = (page: Page, id: string) => shown(page).locator(`[data-testid="${id}"]`);
-const appRow = (page: Page, id: string) => shown(page).locator(`[data-testid="apps-row"][data-id="${id}"]`);
-
 /** The list searched for `name`: the rows are paged, an app far down the list is not on screen. */
 async function search(page: Page, name: string): Promise<void> {
   await testid(page, 'apps-search').locator('input').fill(name);
@@ -121,33 +132,8 @@ async function snap(page: Page, key: string, width: number): Promise<void> {
   await page.screenshot({ path: shot(`APP-BASE-ACTIVATION-${key}-${width}`) });
 }
 
-/** The names the topbar's «My apps» (the menu of the apps, from the session) lists now. */
-async function menuApps(page: Page): Promise<string[]> {
-  await testid(page, 'topbar-apps').click();
-  const sheet = page.locator('[data-testid="apps-launcher"]').last();
-  const tiles = sheet.locator('[data-testid="apps-launcher-app"]');
-  await expect(tiles.first()).toBeVisible();
-  const names = (await tiles.allInnerTexts()).map((name) => name.trim());
-  await sheet.locator('[data-testid="apps-launcher-close"]').click();
-  await expect(sheet).toBeHidden();
-  return names;
-}
-
 async function signedIn(browser: Browser, viewport: { width: number; height: number }, next: string) {
   return hostPage(browser, A, { viewport, next });
-}
-
-/** The owner of `a` on `next`, with the Hub in Spanish (its language cookie, as the language picker leaves it). */
-async function signedInSpanish(browser: Browser, viewport: { width: number; height: number }, next: string) {
-  const context = await browser.newContext({ baseURL: A, viewport, locale: 'es-ES' });
-  const page = await context.newPage();
-  await login(page, A, next);
-  await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
-  // A reload, not a goto: the login already left the page on `next`, and a goto to the same address with a hash
-  // would not load it again.
-  await page.reload();
-  await expect(page.locator('html')).toHaveAttribute('lang', /^es/);
-  return { context, page };
 }
 
 /** The toast that says `text` (one at a time: a new one closes the one on screen). */

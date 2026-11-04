@@ -518,7 +518,7 @@ const emptyHeading = computed(() => t(`base.appsPage.empty.${tab.value}`));
 /* Why it is not offered: a sentence of its own, under the pill, that wraps in the table's unwrapped cells. */
 .apps-refusal {
   flex-basis: 100%;
-  color: var(--ion-color-medium-shade, #555);
+  color: var(--ep-text-muted);
   font-size: 0.8125rem;
   line-height: 1.3;
   white-space: normal;

@@ -524,6 +524,8 @@ describe('AppsPage', () => {
       const ONLY_THERE = 'VeriFactu is only for businesses in Spain.';
       const row = (m: Awaited<ReturnType<typeof open>>, id: string) => m.wrapper.find(`[data-testid="apps-row"][data-id="${id}"]`);
 
+      const OFF_HERE = app('verifactu', { name: 'VeriFactu', state: 'off', chosen: false, path: null, refusal: ONLY_THERE });
+
       it('one on that never goes off offers no «Turn off», says why and stays «Active»', async () => {
         const m = await open('/apps');
         await m.result(m.call, 'base.app.list', {
@@ -543,10 +545,7 @@ describe('AppsPage', () => {
 
       it('one off that does not go on offers no «Turn on» and says it is not available, and why', async () => {
         const m = await open('/apps#all');
-        await m.result(m.call, 'base.app.list', {
-          ...LIST,
-          apps: [app('verifactu', { name: 'VeriFactu', state: 'off', chosen: false, path: null, refusal: ONLY_THERE })],
-        });
+        await m.result(m.call, 'base.app.list', { ...LIST, apps: [OFF_HERE] });
 
         expect(m.wrapper.find('[data-testid="apps-row-verifactu-toggle"]').exists()).toBe(false);
         expect(row(m, 'verifactu').find('[data-testid="apps-state"]').text()).toBe('Not available');
@@ -555,10 +554,7 @@ describe('AppsPage', () => {
 
       it('in Spanish too', async () => {
         const m = await open('/apps#all', { locale: 'es' });
-        await m.result(m.call, 'base.app.list', {
-          ...LIST,
-          apps: [app('verifactu', { name: 'VeriFactu', state: 'off', chosen: false, path: null, refusal: ONLY_THERE })],
-        });
+        await m.result(m.call, 'base.app.list', { ...LIST, apps: [OFF_HERE] });
 
         expect(row(m, 'verifactu').find('[data-testid="apps-state"]').text()).toBe('No disponible');
       });
@@ -567,10 +563,7 @@ describe('AppsPage', () => {
         const m = await open('/apps#all', { session: EMPLOYEE });
         await m.result(m.call, 'base.app.list', {
           ...LIST,
-          apps: [
-            app('verifactu', { name: 'VeriFactu', state: 'off', chosen: false, path: null, refusal: ONLY_THERE }),
-            app('invoice', { name: 'Invoicing', refusal: NEVER_OFF }),
-          ],
+          apps: [OFF_HERE, app('invoice', { name: 'Invoicing', refusal: NEVER_OFF })],
         });
 
         expect(m.wrapper.find('[data-testid="apps-refusal"]').exists()).toBe(false);

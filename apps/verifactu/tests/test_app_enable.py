@@ -16,10 +16,10 @@ from live.models import OutboxEvent
 from live.operations import get
 
 from apps.verifactu.queries import VERIFACTU
-from apps.verifactu.tests.conftest import A
+from apps.verifactu.tests.conftest import A, business_in
 from base import activation, events, services
 from base.catalog import template_apps
-from base.models import AppActivation, Hub
+from base.models import AppActivation
 from base.tenancy import context
 from base.tenancy.tests import hubs
 
@@ -34,11 +34,6 @@ def admin(scope: Scope = A, language: str = "en") -> OperationContext:
 def enable(context_: OperationContext | None = None, app: str = "verifactu") -> dict:
     op = get("base.app.enable")
     return op(context_ or admin(), op.input.model_validate({"app": app})).model_dump(mode="json")
-
-
-def business_in(country: str, slug: str = "a") -> None:
-    """The country erplora.com registered for the business of ``slug`` (``PUT /internal/hubs/{id}``)."""
-    Hub.objects.filter(slug=slug).update(country=country)
 
 
 def verifactu_off(host: str = "a") -> None:
@@ -172,10 +167,8 @@ def test_a_vertical_template_in_spain_turns_verifactu_on(vertical):
 
 
 @pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_each_hub_reads_its_own_business_country(hub_a, hub_b, no_test_fallback):
-    of_a, of_b = Scope("host", hub_a.slug), Scope("host", hub_b.slug)
-    business_in("PL", hub_a.slug)
-    business_in("ES", hub_b.slug)
+def test_each_hub_reads_its_own_business_country(hub_a, hub_b, poland_and_spain):
+    of_a, of_b = poland_and_spain
 
     with context.use_hub(hub_a):
         verifactu_off(hub_a.slug)

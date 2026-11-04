@@ -18,9 +18,9 @@ from live.errors import Conflict
 from live.operations import get
 
 from apps.verifactu.models import Record
-from apps.verifactu.tests.conftest import A, ctx_for, run
+from apps.verifactu.tests.conftest import A, business_in, ctx_for, run
 from base import activation
-from base.models import AppActivation, Hub
+from base.models import AppActivation
 from base.tenancy import context
 from base.tenancy.tests import hubs
 
@@ -61,11 +61,6 @@ def refusal(context_: OperationContext | None = None, app: str = "verifactu") ->
 
 def is_on(scope: Scope = A, app: str = "verifactu") -> bool:
     return activation.states_of(scope)[app].on
-
-
-def business_in(country: str, slug: str = "a") -> None:
-    """The country erplora.com registered for the business of ``slug`` (``PUT /internal/hubs/{id}``)."""
-    Hub.objects.filter(slug=slug).update(country=country)
 
 
 @pytest.mark.django_db
@@ -219,10 +214,8 @@ def test_the_list_lets_go_a_verifactu_that_never_got_on(state):
 
 
 @pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_each_hub_reads_its_own_business_country(hub_a, hub_b, no_test_fallback):
-    of_a, of_b = Scope("host", hub_a.slug), Scope("host", hub_b.slug)
-    business_in("PL", hub_a.slug)
-    business_in("ES", hub_b.slug)
+def test_each_hub_reads_its_own_business_country(hub_a, hub_b, poland_and_spain):
+    of_a, of_b = poland_and_spain
 
     with context.use_hub(hub_a):
         assert disable(admin(of_a))["state"] == "off"
@@ -233,10 +226,8 @@ def test_each_hub_reads_its_own_business_country(hub_a, hub_b, no_test_fallback)
 
 
 @pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_each_hub_lists_what_its_own_business_country_refuses(hub_a, hub_b, no_test_fallback):
-    of_a, of_b = Scope("host", hub_a.slug), Scope("host", hub_b.slug)
-    business_in("PL", hub_a.slug)
-    business_in("ES", hub_b.slug)
+def test_each_hub_lists_what_its_own_business_country_refuses(hub_a, hub_b, poland_and_spain):
+    of_a, of_b = poland_and_spain
     op = get("base.app.list")
 
     def refusal_in(scope: Scope) -> str | None:

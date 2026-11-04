@@ -6,9 +6,21 @@
 // English too, at 1440. Captures `FIX-HUB-APPS-REFUSED-OUTSIDE-SPAIN-{pl-on,pl-off,es-off,es-on}-<width>` and
 // `…-pl-off-en-1440`. `a`'s rows and its registration are put back after each test.
 // flow: VERIFACTU-F01 VERIFACTU-F32 BASE-F25
-import { type Browser, expect, type Page, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 
-import { A, api, capture, hostPage, horizontalOverflow, login, psql, type Registration, registerBusinessIn, registrationOf, shown } from './helpers';
+import {
+  A,
+  api,
+  appRow,
+  hostPage,
+  psql,
+  type Registration,
+  registerBusinessIn,
+  registrationOf,
+  settledCapture,
+  signedInSpanish,
+  testid,
+} from './helpers';
 
 const KEY = 'FIX-HUB-APPS-REFUSED-OUTSIDE-SPAIN';
 const VIEWPORTS = {
@@ -25,8 +37,7 @@ const ROWS = 'e2e_apps_refused_outside_spain_rows';
 
 let registration: Registration;
 
-const testid = (page: Page, id: string) => shown(page).locator(`[data-testid="${id}"]`);
-const verifactu = (page: Page) => shown(page).locator('[data-testid="apps-row"][data-id="verifactu"]');
+const verifactu = (page: Page) => appRow(page, 'verifactu');
 const stateOf = (page: Page) => verifactu(page).locator('[data-testid="apps-state"]');
 const reasonOf = (page: Page) => verifactu(page).locator('[data-testid="apps-refusal"]');
 
@@ -34,29 +45,10 @@ const reasonOf = (page: Page) => verifactu(page).locator('[data-testid="apps-ref
 const stored = () =>
   psql("select coalesce((select state || ':' || chosen from base_appactivation where host = 'a' and app = 'verifactu'), 'none')");
 
-/** The owner of `a` on `next`, with the Hub in Spanish (its language cookie, as the language picker leaves it). */
-async function signedInSpanish(browser: Browser, viewport: { width: number; height: number }, next: string) {
-  const context = await browser.newContext({ baseURL: A, viewport, locale: 'es-ES' });
-  const page = await context.newPage();
-  await login(page, A, next);
-  await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
-  // A reload, not a goto: the login already left the page on `next`.
-  await page.reload();
-  await expect(page.locator('html')).toHaveAttribute('lang', /^es/);
-  return { context, page };
-}
-
 /** The list searched for VeriFactu: the rows are paged, an app far down the list is not on screen. */
 async function findIt(page: Page): Promise<void> {
   await testid(page, 'apps-search').locator('input').fill('VeriFactu');
   await expect(verifactu(page)).toBeVisible();
-}
-
-/** The capture once the screen settled and nothing scrolls sideways. */
-async function snap(page: Page, name: string): Promise<void> {
-  await expect(shown(page).locator('ion-skeleton-text:visible')).toHaveCount(0);
-  expect(await horizontalOverflow(page), `${name}: no sideways scroll`).toBeLessThanOrEqual(0);
-  await capture(page, name);
 }
 
 test.describe.configure({ mode: 'serial' });
@@ -87,7 +79,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await findIt(page);
       await expect(stateOf(page)).toHaveText('Instalada');
       await expect(reasonOf(page)).toHaveCount(0);
-      await snap(page, `${KEY}-pl-on-${width}`);
+      await settledCapture(page, `${KEY}-pl-on-${width}`);
 
       await testid(page, 'apps-row-verifactu-toggle').click();
       const askOff = page.locator('.ep-confirm-dialog').last();
@@ -98,7 +90,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await expect(stateOf(page)).toHaveText('No disponible');
       await expect(reasonOf(page)).toHaveText(ONLY_IN_SPAIN_ES);
       await expect(testid(page, 'apps-row-verifactu-toggle')).toHaveCount(0);
-      await snap(page, `${KEY}-pl-off-${width}`);
+      await settledCapture(page, `${KEY}-pl-off-${width}`);
 
       // The server refuses it all the same when asked directly, and changes nothing.
       const direct = await api<{ error: { code: string; message: string; app: string } }>(context, A, 'POST', '/apps/enable', { app: 'verifactu' });
@@ -112,7 +104,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await findIt(page);
       await expect(stateOf(page)).toHaveText('Desactivada');
       await expect(reasonOf(page)).toHaveCount(0);
-      await snap(page, `${KEY}-es-off-${width}`);
+      await settledCapture(page, `${KEY}-es-off-${width}`);
 
       // «Activar» asks first only when it brings Invoicing back on with it (BASE-F18): decided by what is stored, never
       // by whether the dialog happened to be on screen yet.
@@ -126,7 +118,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await expect(stateOf(page)).toHaveText('Instalada');
       await expect(reasonOf(page)).toHaveText(NEVER_OFF_ES);
       await expect(testid(page, 'apps-row-verifactu-toggle')).toHaveCount(0);
-      await snap(page, `${KEY}-es-on-${width}`);
+      await settledCapture(page, `${KEY}-es-on-${width}`);
     } finally {
       await context.close();
     }
@@ -140,7 +132,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) for (const tab of ['/
     await registerBusinessIn(registration, 'ES');
     const { context, page } = await signedInSpanish(browser, viewport, tab);
     try {
-      const reasons = shown(page).locator('[data-testid="apps-refusal"]');
+      const reasons = testid(page, 'apps-refusal');
       await expect(reasons.first()).toBeVisible();
       await expect(reasons.first()).toContainText('la ley obliga');
       const cut = await reasons.evaluateAll((all) =>
@@ -170,7 +162,7 @@ test('VERIFACTU-F01 — in English, the reason and «Not available», at 1440', 
     await expect(stateOf(page)).toHaveText('Not available');
     await expect(reasonOf(page)).toHaveText(ONLY_IN_SPAIN_EN);
     await expect(testid(page, 'apps-row-verifactu-toggle')).toHaveCount(0);
-    await snap(page, `${KEY}-pl-off-en-1440`);
+    await settledCapture(page, `${KEY}-pl-off-en-1440`);
   } finally {
     await context.close();
   }
