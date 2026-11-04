@@ -577,12 +577,12 @@ def test_an_app_that_refuses_to_go_on_with_rows_in_the_blueprint_leaves_the_load
 
 
 def test_an_app_the_plan_leaves_off_leaves_the_load_partial_even_without_rows(born, load):
-    """A better plan changes that one, so the load is not over; only what can never go on here is. Neither app has rows
-    and the plan's limit is the only thing that leaves one off."""
+    """A better plan changes that one, so the load is not over; only what can never go on here is. Tables goes on with
+    its rows; the plan's limit leaves off the only other app, which has none."""
     with_max_apps("c", 1)
 
-    loaded = load(born, file_base64=a_file(data={}, apps=("website", "printing")))
+    loaded = load(born, file_base64=a_file(apps=("table", "printing")))
 
     off = [app for app in loaded.report.apps if app.status == "inactive"]
-    assert [(len(app.datasets), bool(app.reason)) for app in off] == [(0, True)]
+    assert [(app.id, len(app.datasets), bool(app.reason)) for app in off] == [("printing", 0, True)]
     assert loaded.status == "partial"
