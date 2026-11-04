@@ -36,6 +36,12 @@ describe('searchBookableServices', () => {
     ]);
     expect(facts.get('c3')).toEqual({ name: 'Beard', minutes: 15, price: 950 });
   });
+
+  it('a price of four figures groups its thousands, in both languages (hub#632)', async () => {
+    const { client: api } = client({ 'service.service.list_for_sale': () => ({ rows: [sale('c1', 'Keratin', { price: 123456 })] }) });
+    expect(await searchBookableServices(api, 'es', new Map())('')).toEqual([{ id: 'c1', label: 'Keratin', hint: '30 min · 1.234,56\u00a0€' }]);
+    expect(await searchBookableServices(api, 'en', new Map())('')).toEqual([{ id: 'c1', label: 'Keratin', hint: '30 min · €1,234.56' }]);
+  });
 });
 
 describe('eligibleStaff', () => {

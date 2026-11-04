@@ -3003,6 +3003,10 @@
     "method": "post",
     "path": "/api/assistant/transcribe"
   },
+  "base.assistant.speak": {
+    "method": "post",
+    "path": "/api/assistant/speak"
+  },
   "base.support.report": {
     "method": "post",
     "path": "/api/support/report"
