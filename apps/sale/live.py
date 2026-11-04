@@ -18,7 +18,8 @@ live("sale.sale.get", on=SALES)
 live("sale.sale.stats", on=[*FIGURES, TAX_SETTINGS_UPDATED])
 live("sale.sale.today", on=FIGURES)
 live("sale.sale.last_7_days", on=FIGURES)
-live("sale.sale.by_staff", on=FIGURES)
+# A line that turns out to have paid for a voucher moves no money, only who it counts for.
+live("sale.sale.by_staff", on=[*FIGURES, E.SALE_VOUCHER_LINE_CHANGED])
 # A partial charge takes lines off a check without changing anything else of it.
 live("sale.order.list", on=E.ORDER_EVENTS)
 live("sale.order.get", on=E.ORDER_EVENTS)

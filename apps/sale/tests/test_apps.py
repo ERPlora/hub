@@ -113,14 +113,21 @@ def test_navigation_is_the_old_four_tabs_and_the_settings():
 
 def test_every_operation_is_described_for_the_assistant():
     # The assistant uses the app by voice and text with the user's own session: it sees every
-    # operation but the reactions only the system runs, and a write says how risky it is (high:
-    # money moves or a sale is corrected); a read never asks to confirm.
+    # operation but the reactions only the system runs and the steps of Services' grant of a voucher
+    # (asked directly, a line would pay for a voucher nobody granted), and a write says how risky it
+    # is (high: money moves or a sale is corrected); a read never asks to confirm.
     from live.operations import AI, INTERNAL, registry
 
     ops = {name: op for name, op in registry.items() if name.startswith("sale.")}
     assert ops
     internal = {name for name, op in ops.items() if op.ai is INTERNAL}
-    assert internal == {"sale.customer.reassign", "sale.record.get", "sale.sale.record_invoice"}
+    assert internal == {
+        "sale.customer.reassign",
+        "sale.record.get",
+        "sale.sale.record_invoice",
+        "sale.sale.voucher_sold",
+        "sale.sale.voucher_unsold",
+    }
     for name, op in ops.items():
         if name in internal:
             continue

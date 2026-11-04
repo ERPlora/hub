@@ -163,6 +163,7 @@ OVER_SESSIONS = ("service.session.return", "service.session.settle")
 #: and the reference of a return is the refund or the void of a sale. Their card leaves them out (hub#756).
 LEFT_OUT = {
     "service.grant.create:sale_id",
+    "service.grant.create:sale_line_id",
     "service.grant.redeem:appointment_id",
     "service.grant.redeem:sale_id",
     "service.session.hold:order_line_id",
