@@ -184,6 +184,9 @@ export async function shots(page: Page, name: string, ready: (page: Page) => Pro
   await page.setViewportSize(restore);
 }
 
+/** Whether two boxes on screen share any of their pixels. */
+export const overlap = (a: Box, b: Box): boolean => a.top < b.bottom && a.bottom > b.top && a.left < b.right && a.right > b.left;
+
 /** Whether the cash register was on before a spec switched it off (`null`: the spec did not touch it). */
 let drawerWasOn: boolean | null = null;
 

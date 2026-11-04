@@ -9,9 +9,10 @@
 // checks, is deleted after it.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, capture, login, psql, settled, shown, untilStill } from './helpers';
+import { A, capture, login, settled, shown, untilStill } from './helpers';
 import { cleanInventory, type Product } from './inventory-helpers';
-import { type Box, cleanSales, dishForTheTill, eachNoticeSize, holdNotices, noticeBox, openTillCart, restoreDrawer, stamp, tillIsPhone } from './sale-helpers';
+import { parkIssuer, unparkIssuer } from './invoice-helpers';
+import { type Box, cleanSales, dishForTheTill, eachNoticeSize, holdNotices, noticeBox, openTillCart, overlap, restoreDrawer, stamp, tillIsPhone } from './sale-helpers';
 
 const KEY = 'FIX-HUB-755-ERROR-NOTICE';
 /** Hub `a`'s issuer, parked while the run needs the strip of a hub that cannot issue invoices yet. */
@@ -29,7 +30,7 @@ let dish: Product;
 test.beforeAll(async ({ browser }) => {
   cleanSales();
   cleanInventory();
-  psql([`drop table if exists ${PARKED}`, `create table ${PARKED} as select * from invoice_issuer`, 'delete from invoice_issuer'].join('; '));
+  parkIssuer(PARKED);
   dish = await dishForTheTill(browser, 'KERROR', RUN);
 });
 
@@ -41,7 +42,7 @@ test.afterAll(() => {
     try {
       restoreDrawer();
     } finally {
-      psql(['delete from invoice_issuer', `insert into invoice_issuer select * from ${PARKED}`, `drop table ${PARKED}`].join('; '));
+      unparkIssuer(PARKED);
     }
   }
 });
@@ -77,8 +78,6 @@ async function reach(button: Locator): Promise<{ answer: string; box: Box }> {
     };
   });
 }
-
-const overlap = (a: Box, b: Box): boolean => a.top < b.bottom && a.bottom > b.top && a.left < b.right && a.right > b.left;
 
 /** With the notice on screen: both ways of sending again answer with themselves, and it sits whole, clear of both. */
 async function bothButtonsFree(notice: Locator, charge: Locator, send: Locator, height: number, where: string): Promise<void> {

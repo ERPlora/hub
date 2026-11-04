@@ -10,7 +10,7 @@ import { type BrowserContext, expect, type Locator, type Page, test } from '@pla
 
 import { A, capture, login, psql, shown, untilStill } from './helpers';
 import { cleanInventory, type Product } from './inventory-helpers';
-import { type Box, cleanSales, dishForTheTill, eachNoticeSize, holdNotices, noticeBox, openTillCart, restoreDrawer, stamp } from './sale-helpers';
+import { type Box, cleanSales, dishForTheTill, eachNoticeSize, holdNotices, noticeBox, openTillCart, overlap, restoreDrawer, stamp } from './sale-helpers';
 
 const KEY = 'FIX-HUB-732-NOTICE';
 const RUN = stamp();
@@ -104,7 +104,7 @@ for (const { name, lang, locale, sent, separator } of LANGUAGES) {
 
       const { answers, keypad, toast } = await read(sheet, notice);
       for (const [key, answer] of Object.entries(answers)) expect.soft(answer, `the middle of «${key}» at ${size.label}`).toBe('the key');
-      const overKeys = toast.top < keypad.bottom && toast.bottom > keypad.top && toast.left < keypad.right && toast.right > keypad.left;
+      const overKeys = overlap(toast, keypad);
       expect.soft(overKeys, `the notice ${JSON.stringify(toast)} clear of the keypad ${JSON.stringify(keypad)}`).toBe(false);
       expect.soft(toast.top, 'the notice whole on screen, at the top').toBeGreaterThanOrEqual(0);
       expect.soft(toast.bottom, 'the notice whole on screen, at the bottom').toBeLessThanOrEqual(size.height);
