@@ -101,6 +101,7 @@ from base import business
 from base.business import currency_decimals
 from base.models import Approval
 from base.operations import call
+from base.ordering import list_order
 
 #: The currency Spanish law writes its limits in (Ley 7/2012, RD 1619/2012): the law's, not the business's.
 LIMITS_CURRENCY = "EUR"
@@ -662,11 +663,6 @@ def find_tax_category(reference: str, field: str = "tax_category_key") -> TaxCat
     return category
 
 
-def _ordering(column: str, direction: str, *ties: str) -> list:
-    first = F(column).desc() if direction == "desc" else F(column).asc()
-    return [first, *ties]
-
-
 @operation(
     "sale.department.list",
     kind="query",
@@ -696,7 +692,7 @@ def list_departments(ctx: OperationContext, params: DepartmentListIn) -> dict:
         if params.search:
             departments = departments.filter(name__icontains=params.search.strip())
         ordered = departments.order_by(
-            *_ordering(params.sort, params.dir, "name", "id")
+            *list_order(params.sort, "name", descending=params.dir == "desc")
         )
         page = list(ordered[params.offset : params.offset + params.limit])
         rates = department_rates(page)
@@ -736,7 +732,7 @@ def list_quick_notes(ctx: OperationContext, params: QuickNoteListIn) -> dict:
     notes = QuickNote.objects.filter(is_deleted=False)
     if params.search:
         notes = notes.filter(text__icontains=params.search.strip())
-    page = notes.order_by(*_ordering(params.sort, params.dir, "text", "id"))[
+    page = notes.order_by(*list_order(params.sort, "text", descending=params.dir == "desc"))[
         params.offset : params.offset + params.limit
     ]
     return {
@@ -1963,11 +1959,7 @@ def list_sales(ctx: OperationContext, params: SaleListIn) -> dict:
     if params.number:
         sales = sales.filter(number__icontains=params.number.strip())
     columns = _SALE_SORT.get(params.sort, (params.sort,))
-    order = [
-        F(column).desc() if params.dir == "desc" else F(column).asc()
-        for column in columns
-    ]
-    page = sales.order_by(*order, "-id" if params.dir == "desc" else "id")[
+    page = sales.order_by(*list_order(*columns, descending=params.dir == "desc"))[
         params.offset : params.offset + params.limit
     ]
     with translation.override(ctx.language):

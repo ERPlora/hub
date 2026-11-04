@@ -1514,6 +1514,10 @@ administrador y responsable, los mismos que anulan y devuelven).
   `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/` y un `tests/test_<fichero>.py`
   por fichero, más `tests/test_integration_*.py` con Impuestos, Clientes, Inventario, Servicios,
   Facturación, Caja y Citas reales.
+- **Orden de las listas** (`base.ordering.list_order`; regla hub#2355 del producto viejo): en Ventas, Secciones y Notas
+  rápidas, la columna elegida y sus desempates van todos en la dirección de la lista, así que la descendente es la
+  ascendente leída al revés, empates incluidos. Las secciones desempatan por nombre e `id`; las notas, por texto e
+  `id`; las ventas, por `id`.
 - **`requires = ["tax", "customer"]`**. `Sale.customer` y `Department.tax_category` son claves
   ajenas. **Inventario no es requisito** (PLAN §20.5): la línea guarda una copia del producto (id como
   UUID sin clave ajena, nombre, SKU, unidad, precio, coste y categoría fiscal) y el producto se lee con
