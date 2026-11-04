@@ -1,11 +1,11 @@
 // BASE-G98: the Home writes its amounts in the business's currency, as `base.business.get` says it (its country's,
 // with its decimals): followed live, one subscription for the whole tab however many pieces ask, and unknown — never
 // the euro by default — until the business answers or when its read fails.
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, expectTypeOf, it } from 'vitest';
 import { defineComponent, h } from 'vue';
 
 import { business, errorFrame, flush, mountBase, POLISH, subId } from '../__tests__/mount-base';
-import { useBusinessMoney } from './money';
+import { formatMoney, useBusinessMoney } from './money';
 
 /** `pieces` pieces of one screen, each asking for the business's currency. */
 const Probe = defineComponent({
@@ -21,6 +21,18 @@ const read = (wrapper: { findAll: (s: string) => { text: () => string }[] }) =>
 
 afterEach(() => {
   document.body.innerHTML = '';
+});
+
+describe('formatMoney', () => {
+  it('writes minor units with their thousands grouped from four digits on, with or without the currency', () => {
+    expect(formatMoney(123456, 'es', { currency: 'EUR', decimals: 2 })).toMatch(/^1\.234,56\s€$/);
+    expect(formatMoney(1500, 'es', { currency: 'JPY', decimals: 0 })).toMatch(/^1\.500\s¥$/);
+    expect(formatMoney(123456, 'es')).toBe('1.234,56');
+  });
+
+  it('only takes a number: an amount that may be missing does not compile', () => {
+    expectTypeOf(formatMoney).parameter(0).toEqualTypeOf<number>();
+  });
 });
 
 describe('useBusinessMoney', () => {
