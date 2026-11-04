@@ -483,7 +483,7 @@ def test_the_lines_of_a_cart_that_is_not_active_do_not_change(name):
 # ── Orders: initiate (CART_CHECKOUT-F08) ──────────────────────────────────────────────────────
 
 
-def test_the_number_of_an_order_is_of_the_businesss_day(canary_at_night):
+def test_the_number_of_an_order_is_of_the_businesss_day(night_elsewhere):
     make_cart("sess_1", currency="EUR")
     add("sess_1", quantity="1", unit_price=1250)
     assert initiate().order_number == "OS-20261102-0001"

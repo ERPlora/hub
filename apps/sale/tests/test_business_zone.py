@@ -16,12 +16,12 @@ from apps.verifactu.services import _alta_fields
 
 pytestmark = pytest.mark.django_db
 
-#: The day of a sale at 23:30 in the Canaries: the deployment's, until hub#772.
+#: The day of a sale at night in another zone (``night_elsewhere``): the deployment's, until hub#772.
 SALE_DAY = dt.date(2026, 11, 3)
 
 
 @pytest.fixture
-def tapa(product, canary_at_night):
+def tapa(product, night_elsewhere):
     """A product of a category whose rate changes at the turn of the night: 10 % until the 2nd, 21 % from the 3rd."""
     category = TaxCategory.objects.create(key="test.turn", name="Turn of the night")
     TaxRule.objects.create(category=category, country_code="ES", rate_pct="10", valid_to=dt.date(2026, 11, 2))

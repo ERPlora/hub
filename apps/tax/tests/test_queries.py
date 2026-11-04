@@ -467,7 +467,7 @@ def test_the_date_defaults_to_the_business_today(no_seed):
     assert tomorrow.tax == 21
 
 
-def test_a_rate_that_ends_today_applies_until_the_businesss_midnight(no_seed, canary_at_night):
+def test_a_rate_that_ends_today_applies_until_the_businesss_midnight(no_seed, night_elsewhere):
     generic = category()
     rule(generic, "10", valid_to=date(2026, 11, 2))
     rule(generic, "21", valid_from=date(2026, 11, 3))

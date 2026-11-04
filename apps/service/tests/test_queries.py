@@ -195,7 +195,7 @@ def test_a_voucher_sold_by_its_id_says_what_it_is_whose_and_when_in_the_readers_
     assert error.value.code == "service.grant_not_found"
 
 
-def test_a_voucher_says_the_day_it_was_sold_on_the_businesss_clock(canary_at_night):
+def test_a_voucher_says_the_day_it_was_sold_on_the_businesss_clock(night_elsewhere):
     grant = make_grant(make_package("Bono", services=[make_service("Corte")], sessions=5), make_customer("Lucía Pérez"))
     assert run("service.grant.get", ByIdIn(id=grant.id)).label == "Bono · Lucía Pérez · Nov 2, 2026"
 

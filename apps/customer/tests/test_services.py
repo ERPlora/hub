@@ -2259,7 +2259,7 @@ def test_a_test_in_the_future_or_a_result_without_its_date_saves_nothing():
 
 
 @pytest.mark.django_db
-def test_a_test_is_in_the_future_only_past_the_businesss_midnight(canary_at_night):
+def test_a_test_is_in_the_future_only_past_the_businesss_midnight(night_elsewhere):
     ana = card("Ana")
     grant_health(ana)
     with pytest.raises(InvalidPayload) as refused:

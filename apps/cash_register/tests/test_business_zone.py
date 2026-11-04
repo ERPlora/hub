@@ -38,7 +38,7 @@ def test_the_refusal_past_the_cut_off_says_the_hour_the_business_set():
     assert "04:00" in str(refused.value)
 
 
-def test_a_session_opened_before_the_businesss_midnight_is_of_that_day(canary_at_night):
+def test_a_session_opened_before_the_businesss_midnight_is_of_that_day(night_elsewhere):
     session = open_session(10000)
     assert (session.business_day, session.number) == (dt.date(2026, 11, 2), "S-261102-0001")
 

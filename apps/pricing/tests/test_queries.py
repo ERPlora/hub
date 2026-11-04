@@ -426,7 +426,7 @@ def test_without_a_moment_the_line_is_priced_on_the_business_s_today():
     assert (line.unit_price, line.date) == (777, TODAY)
 
 
-def test_without_a_moment_a_list_that_ends_today_applies_until_the_businesss_midnight(canary_at_night, monkeypatch):
+def test_without_a_moment_a_list_that_ends_today_applies_until_the_businesss_midnight(night_elsewhere, monkeypatch):
     monkeypatch.setattr(queries, "business_today", ON_THE_BUSINESSS_CLOCK)
     product = make_product("Shampoo", "SH-1", price=1250)
     make_item(make_list("ENDS", is_default=True, valid_until=dt.date(2026, 11, 2)), product, price=777)
@@ -434,10 +434,10 @@ def test_without_a_moment_a_list_that_ends_today_applies_until_the_businesss_mid
     assert (line.unit_price, line.date) == (777, dt.date(2026, 11, 2))
 
 
-def test_a_moment_is_priced_on_the_day_it_is_for_the_business(canary_at_night):
+def test_a_moment_is_priced_on_the_day_it_is_for_the_business(night_elsewhere):
     product = make_product("Shampoo", "SH-1", price=1250)
     make_item(make_list("ENDS", is_default=True, valid_until=dt.date(2026, 11, 2)), product, price=777)
-    line = resolve(product_id=str(product.id), when="2026-11-02T23:30:00+00:00")
+    line = resolve(product_id=str(product.id), when="2026-11-03T04:30:00+00:00")
     assert (line.unit_price, line.date) == (777, dt.date(2026, 11, 2))
 
 

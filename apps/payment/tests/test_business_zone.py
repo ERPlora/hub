@@ -15,7 +15,7 @@ def recorded(bank):
     return op(ctx_for(), op.input.model_validate(data)).reference
 
 
-def test_the_reference_of_the_day_is_of_the_businesss_day(canary_at_night):
+def test_the_reference_of_the_day_is_of_the_businesss_day(night_elsewhere):
     assert recorded(make_method()) == "PAY-20261102-0001"
 
 

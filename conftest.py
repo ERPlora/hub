@@ -312,33 +312,36 @@ def hub_aliases_forgotten():
 
 
 
-#: 23:30 in the Canaries (on UTC in November), already 00:30 of the 3rd in Madrid, the deployment's clock.
-CANARY_NIGHT = dt.datetime(2026, 11, 2, 23, 30, tzinfo=dt.UTC)
+#: A business's own zone and an instant of the hours it disagrees on the day: 23:30 of 2 November 2026 in Bogotá, already
+#: the 3rd both in Madrid, the deployment's clock, and in UTC, so no reading on either passes for the business's by chance
+#: (in the Canaries, on UTC in November, a reading in UTC would).
+ELSEWHERE = "America/Bogota"
+NIGHT_THERE = dt.datetime(2026, 11, 3, 4, 30, tzinfo=dt.UTC)
 
 
 @pytest.fixture
-def canary_at_night(monkeypatch):
-    """A business in another zone than the deployment's, in the hour they disagree on the day: it is 2 November 2026
-    there and the 3rd on the deployment's clock (hub#771)."""
+def night_elsewhere(monkeypatch):
+    """A business in another zone than the deployment's, at night: it is 2 November 2026 there and the 3rd on the
+    deployment's clock (hub#771)."""
     from base.models import Hub
     from base.tenancy.context import use_hub
 
-    monkeypatch.setattr(timezone, "now", lambda: CANARY_NIGHT)
-    with use_hub(Hub(slug="a", timezone="Atlantic/Canary")):
+    monkeypatch.setattr(timezone, "now", lambda: NIGHT_THERE)
+    with use_hub(Hub(slug="a", timezone=ELSEWHERE)):
         yield
 
 
 @pytest.fixture
 def across_a_change_of_zone(monkeypatch):
-    """What ``make()`` gives at one single instant in a business that moves from the Canaries to Madrid and back: the
+    """What ``make()`` gives at one single instant in a business that moves from another zone to Madrid and back: the
     2nd, the 3rd and the 2nd again. A number of the day must carry on its day's count, never repeat one (hub#771)."""
     from base.models import Hub
     from base.tenancy.context import use_hub
 
     def across(make):
-        monkeypatch.setattr(timezone, "now", lambda: CANARY_NIGHT)
+        monkeypatch.setattr(timezone, "now", lambda: NIGHT_THERE)
         made = []
-        for zone in ("Atlantic/Canary", "Europe/Madrid", "Atlantic/Canary"):
+        for zone in (ELSEWHERE, "Europe/Madrid", ELSEWHERE):
             with use_hub(Hub(slug="a", timezone=zone)):
                 made.append(make())
         return made
