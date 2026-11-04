@@ -176,3 +176,17 @@ def test_no_screen_writes_a_zone_by_hand_but_the_known_ones():
         if len(ZONE_BY_HAND.findall(source)) > KNOWN_ZONES_BY_HAND.get(path, 0)
     }
     assert too_many == {}, "read the business's zone with useBusinessZone or its app's settings (hub#687): " + str(too_many)
+
+
+def test_the_known_readings_name_only_what_still_reads_the_deployments_clock():
+    """A reading that left the list leaves no room behind: an entry older than the code would let a new reading of
+    the deployment's clock into that file unseen (review of hub#687)."""
+    found = {path: len(deployment_readings(source)) for path, source in _sources()}
+    stale = {path: (known, found.get(path, 0)) for path, known in KNOWN_READINGS.items() if known > found.get(path, 0)}
+    assert stale == {}, "take these out of KNOWN_READINGS (known, found): " + str(stale)
+
+
+def test_the_known_zones_by_hand_name_only_what_still_has_one():
+    found = {path: len(ZONE_BY_HAND.findall(source)) for path, source in _screens()}
+    stale = {path: (known, found.get(path, 0)) for path, known in KNOWN_ZONES_BY_HAND.items() if known > found.get(path, 0)}
+    assert stale == {}, "take these out of KNOWN_ZONES_BY_HAND (known, found): " + str(stale)
