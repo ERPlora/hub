@@ -133,7 +133,8 @@
         "blocked": "Needs a subscription",
         "off": "Off",
         "creating": "Turning on…",
-        "failed": "Could not turn on"
+        "failed": "Could not turn on",
+        "unavailable": "Not available"
       },
       "right": {
         "free": "Free",
