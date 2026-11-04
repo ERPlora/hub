@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:0a516a5c61be89f7c5f6fa5517c564e25030dde970a1ee4f03e5e96176eaea85 -->
+<!-- generated from WORKBOOK.md sha256:e27df6f043f311b3100c3ad003241e6373e054671700fc863c6a58757c37d0ab -->
 
 ## What it is for and who it is for
 
@@ -2375,7 +2375,8 @@ Steps:
      cita_recordatorio · es · Ana, 10:00"; of a till count, the notes and coins counted remain: "50: 2"). A date and a
      time show as they are written in the person's language and at the business's hour ("Nov 2, 2026, 10:00 AM"; a day
      alone, "Nov 2, 2026"; a time alone, "9:30 PM"); a value of a closed list, with the name its app gives it ("Front
-     desk", not the internal value); and a record, by its name when its app lets whoever asks read it ("Person: Eva
+     desk", not the internal value), also that of a datum its app does not call like the field that names it
+     ("Rectifying invoice: other causes (R4)", not "R4"); and a record, by its name when its app lets whoever asks read it ("Person: Eva
      Gil"): otherwise the card leaves it out, never by its code. Nor does it put the key its app uses to avoid doing
      the same thing twice on a retry (charging, sending a WhatsApp, printing): nobody can judge it, and the action
      receives it all the same when it runs. Everything shows in the person's language, also the
