@@ -7,13 +7,15 @@
 // keeps its words wherever two lines of them fit, as it always read there; and the charge sheet opened from there
 // shows its whole cash keypad above its foot as soon as it opens (375x667: the last row peeked half under «Charge»;
 // 320x568: three rows lay under it), with the words of a total still loading clear of the title on the lowest phone,
-// where the figure shares the title's row. A tablet and a desktop keep what they had. The worst case of a real
+// where the figure shares the title's row. «Current order» leaves the same things in reach, plus its tabs and «Send
+// order» (hub#787: at 320x568 its send bar ate all that scrolled, 0 px, and with it the tabs and the lines), and so does
+// a side column just as low. A tablet and a desktop with room keep what they had. The worst case of a real
 // business: the red strip of a hub that cannot issue invoices yet takes 138 px over the till (hub `a`'s issuer is
 // parked for the run and put back after it), with Tables and Kitchen on (their button and the «Check» / «Current
 // order» tabs). What a run creates, its product `E2E-CARTFIT-<run>` and its check, is deleted after it.
-import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
+import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, capture, login, settled, shown } from './helpers';
+import { A, capture, login, settled, shown, untilStill } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { parkIssuer, unparkIssuer } from './invoice-helpers';
 import { cleanSales, drawerOff, openTillCart, restoreDrawer, stamp, tillIsPhone } from './sale-helpers';
@@ -29,6 +31,13 @@ const SIZES = [
   { label: '360x640', width: 360, height: 640, customerText: true },
   /** The fleet's low phone (an iPhone SE). */
   { label: '375x667', width: 375, height: 667, customerText: true },
+] as const;
+/** A phone with room, even under the strip: «Send order» stays pinned while what is above it scrolls (hub#787). */
+const ROOMY = { label: '390x844', width: 390, height: 844 } as const;
+/** A side column with as little height under the strip: a small tablet on its side and a low laptop window. */
+const LOW_COLUMN = [
+  { label: '1024x600', width: 1024, height: 600 },
+  { label: '1280x560', width: 1280, height: 560 },
 ] as const;
 /** Where the check is not a phone's low drawer: nothing of this fix may change what they read. */
 const WIDE = [
@@ -114,18 +123,74 @@ async function chargeWithinReach(page: Page, drawer: Locator, where: string): Pr
   return charge;
 }
 
+/** What a finger on the middle of `el` touches, run in the page: is it `el`, and what is it if not. */
+function fingerOn(el: Element): { height: number; reached: boolean; hit: string } {
+  const r = el.getBoundingClientRect();
+  const hit = document.elementFromPoint((r.left + r.right) / 2, (r.top + r.bottom) / 2);
+  return { height: r.height, reached: !!hit && el.contains(hit), hit: hit ? `${hit.tagName.toLowerCase()} ${hit.getAttribute('data-testid') ?? ''}`.trim() : 'nothing' };
+}
+
 /** The check's line, scrolled into view inside the drawer: what sits between the bar and the foot scrolls, and a
  *  finger on the line reaches it (squeezed to nothing, the lines would be out of any scroll's reach). */
 async function lineWithinReach(page: Page, where: string): Promise<void> {
   const line = shown(page).locator('[data-testid^=pos-line-]').filter({ hasText: product.name }).first();
   await line.scrollIntoViewIfNeeded();
-  const reach = await line.evaluate((el) => {
-    const r = el.getBoundingClientRect();
-    const hit = document.elementFromPoint((r.left + r.right) / 2, (r.top + r.bottom) / 2);
-    return { height: r.height, reached: !!hit && el.contains(hit), hit: hit ? `${hit.tagName.toLowerCase()} ${hit.getAttribute('data-testid') ?? ''}`.trim() : 'nothing' };
-  });
+  const reach = await line.evaluate(fingerOn);
   expect(reach.height, `the check's line has its height at ${where}`).toBeGreaterThan(0);
   expect(reach.reached, `a finger on the check's line reaches it at ${where} (it touches «${reach.hit}»)`).toBe(true);
+}
+
+/** A control of «Current order», brought to the top of what scrolls as a finger would: its middle answers with itself. */
+async function reachedOnceScrolled(control: Locator, name: string, where: string): Promise<void> {
+  await control.evaluate((el) => el.scrollIntoView({ block: 'start' }));
+  const reach = await control.evaluate(fingerOn);
+  expect.soft(reach.height, `«${name}» has its height at ${where}`).toBeGreaterThan(0);
+  expect.soft(reach.reached, `a finger on «${name}» reaches it at ${where} (it touches «${reach.hit}»)`).toBe(true);
+}
+
+/** «Current order» in the drawer, or in a low side column (hub#787): its two tabs, the line to send, its quantity, the flame and «Send order» are
+ *  all reached by scrolling (with room, «Send order» is in view from the start, however the rest scrolls), «Charge» stays
+ *  where it is, and a real tap on «Check» goes back. */
+async function roundFits(page: Page, size: { label: string; width: number; height: number }, lang: 'en' | 'es'): Promise<void> {
+  const where = `${lang} ${size.label}, «Current order»`;
+  await page.setViewportSize({ width: size.width, height: size.height });
+  await expect(shown(page).locator('[data-testid=blocking-strip]'), 'the strip of a hub that cannot issue invoices yet').toBeVisible();
+  const phone = await tillIsPhone(page);
+  const drawer = phone ? await openDrawer(page) : shown(page).locator('[data-testid=pos-cart-drawer]');
+  const till = shown(page);
+  const check = till.locator('[data-testid=pos-cart-tab-check]');
+  const round = till.locator('[data-testid=pos-cart-tab-round]');
+  await round.click({ timeout: 5_000 });
+  await expect(round).toHaveAttribute('aria-selected', 'true');
+  await untilStill(page);
+  await capture(page, `${KEY}-${lang}-round-${size.label}`);
+
+  const send = till.locator('[data-testid=pos-kitchen-send]');
+  if (size.label === ROOMY.label) {
+    const middle = await till.locator('[data-testid=pos-cart] .pos-cart__scroll').evaluate((el) => {
+      el.scrollTo(0, 0);
+      return { scrolls: el.scrollHeight > el.clientHeight };
+    });
+    expect(middle.scrolls, `there is something to scroll at ${where}`).toBe(true);
+    await expect(send, `«Send order» pinned at ${where}`).toBeInViewport({ ratio: 1 });
+  }
+  await reachedOnceScrolled(check, 'Check', where);
+  await reachedOnceScrolled(round, 'Current order', where);
+  const line = till.locator('[data-testid^=pos-line-]').filter({ hasText: product.name }).first();
+  await reachedOnceScrolled(line, 'the line to send', where);
+  await line.locator('[data-testid=pos-qty-plus]').click({ trial: true, timeout: 5_000 });
+  await reachedOnceScrolled(till.locator('[data-testid=pos-kitchen-rush]'), 'the flame', where);
+  await reachedOnceScrolled(send, 'Send order', where);
+  await send.click({ trial: true, timeout: 5_000 });
+  await chargeWithinReach(page, drawer, where);
+  await capture(page, `${KEY}-${lang}-round-send-${size.label}`);
+
+  await check.click({ timeout: 5_000 });
+  await expect(check).toHaveAttribute('aria-selected', 'true');
+  if (phone) {
+    await till.locator('[data-testid=pos-cart-close]').click();
+    await expect(drawer).toBeHidden();
+  }
 }
 
 /** The check's bar: no control on another, every control inside the bar, and the text of each inside its control. */
@@ -277,6 +342,20 @@ async function wideKeepsItsBar(page: Page, size: (typeof WIDE)[number], lang: 'e
   }
 }
 
+/** A till of its own in the language under test (the Hub's language cookie, which the sign-in has just set from the
+ *  account), with `product` on its check. */
+async function tillWithALine(browser: Browser, locale: string, lang: string): Promise<{ context: BrowserContext; page: Page }> {
+  const context = await browser.newContext({ baseURL: A, locale, viewport: { width: 1440, height: 900 } });
+  const page = await context.newPage();
+  await login(page, A, '/sale/pos');
+  await context.addCookies([{ name: 'django_language', value: lang, domain: new URL(A).hostname, path: '/' }]);
+  await page.reload();
+  await shown(page).locator('[data-testid=pos-till]').waitFor({ state: 'visible' });
+  await shown(page).locator(`[data-testid=pos-product-${product.id}]`).click();
+  await expect(shown(page).locator('[data-testid^=pos-line-]').filter({ hasText: product.name }).first()).toBeAttached();
+  return { context, page };
+}
+
 const LANGUAGES = [
   { name: 'English', lang: 'en', locale: 'en-US', assign: 'Assign customer' },
   { name: 'Spanish', lang: 'es', locale: 'es-ES', assign: 'Asignar cliente' },
@@ -288,16 +367,8 @@ for (const { name, lang, locale, assign } of LANGUAGES) {
     let page: Page;
 
     test.beforeAll(async ({ browser }) => {
-      context = await browser.newContext({ baseURL: A, locale, viewport: { width: 1440, height: 900 } });
-      page = await context.newPage();
-      await login(page, A, '/sale/pos');
-      // In the language under test (the Hub's language cookie, which the sign-in has just set from the account).
-      await context.addCookies([{ name: 'django_language', value: lang, domain: new URL(A).hostname, path: '/' }]);
-      await page.reload();
-      await shown(page).locator('[data-testid=pos-till]').waitFor({ state: 'visible' });
+      ({ context, page } = await tillWithALine(browser, locale, lang));
       await expect(shown(page).locator('[data-testid=customer-search-trigger]'), 'the bar in the language under test').toContainText(assign);
-      await shown(page).locator(`[data-testid=pos-product-${product.id}]`).click();
-      await expect(shown(page).locator('[data-testid^=pos-line-]').filter({ hasText: product.name }).first()).toBeAttached();
     });
 
     test.afterAll(async () => {
@@ -319,18 +390,33 @@ for (const { name, lang, locale, assign } of LANGUAGES) {
 }
 
 for (const { name, lang, locale } of LANGUAGES) {
+  // A check of their own: a real tap on «Charge», above, sends what is pending, and «Current order» would have nothing.
+  test.describe(`SALE-F20: in ${name}, on a low screen «Current order» keeps its tabs, its lines and «Send order» in reach`, () => {
+    let context: BrowserContext;
+    let page: Page;
+
+    test.beforeAll(async ({ browser }) => {
+      ({ context, page } = await tillWithALine(browser, locale, lang));
+    });
+
+    test.afterAll(async () => {
+      await context.close();
+    });
+
+    for (const size of [...SIZES, ROOMY, ...LOW_COLUMN]) {
+      test(size.label, async () => {
+        await roundFits(page, size, lang);
+      });
+    }
+  });
+}
+
+for (const { name, lang, locale } of LANGUAGES) {
   // A marked line: the total of the whole check is already followed by the till, the total of a part has no earlier
   // answer to show while the new one is held back (and it is what a real part charge shows on a slow network).
   test(`SALE-F01: in ${name}, at 320x568 the sheet's total still being worked out stays between its title and «Close»`, async ({ browser }) => {
-    const context = await browser.newContext({ baseURL: A, locale, viewport: { width: 1440, height: 900 } });
-    const page = await context.newPage();
-    await login(page, A, '/sale/pos');
-    await context.addCookies([{ name: 'django_language', value: lang, domain: new URL(A).hostname, path: '/' }]);
-    await page.reload();
-    await shown(page).locator('[data-testid=pos-till]').waitFor({ state: 'visible' });
-    await shown(page).locator(`[data-testid=pos-product-${product.id}]`).click();
+    const { context, page } = await tillWithALine(browser, locale, lang);
     const line = shown(page).locator('[data-testid^=pos-line-]').filter({ hasText: product.name }).first();
-    await expect(line).toBeAttached();
     await shown(page).locator(`[data-testid=pos-product-${other.id}]`).click();
     await expect(shown(page).locator('[data-testid^=pos-line-]').filter({ hasText: other.name }).first()).toBeAttached();
     await line.locator('[data-testid$=-mark]').click();
