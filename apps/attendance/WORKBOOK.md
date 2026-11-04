@@ -302,7 +302,9 @@ se borra; el aviso de jornada corregida; «Fichados ahora» se actualiza.
 Si falla: «La salida tiene que ser posterior a la entrada.» bajo la salida; «Estas horas se solapan con
 otra jornada de esta persona.» (tocarse no es solaparse: una jornada puede empezar en el instante en
 que acabó la anterior); «Esa persona ya tiene otra jornada abierta: no se puede reabrir esta.»; una
-hora futura, «La hora no puede ser futura.»; sin motivo, «Escribe un motivo de al menos 3 caracteres.».
+hora futura, «La hora no puede ser futura.»; sin motivo, «Escribe un motivo de al menos 3 caracteres.». Si no se
+puede leer la zona horaria del negocio, «No se ha podido leer la zona horaria del negocio y esta corrección aún no
+se puede guardar. Recarga la página para volver a intentarlo.», con el botón desactivado.
 Una corrección rechazada no cambia nada ni deja rastro. «Corregir» solo aparece a quien puede
 corregir.
 Implicados: ATTENDANCE-F05, ATTENDANCE-F09, ATTENDANCE-F11
@@ -514,7 +516,8 @@ Los avisos nunca llevan la posición ni el motivo de una corrección (datos pers
 - El «hoy», el día de una jornada y toda hora que se dice o se teclea son los del negocio (hub#779): en el servidor,
   `base.business.business_zone` (`business_date`, el CSV, `Instant` sin desfase); en la pantalla, `useBusinessZone`, que
   `lib/time.ts` pide en cada función. Las horas se guardan en UTC (`timestamptz`). «Corregir jornada» no se puede
-  guardar hasta que el negocio dice su zona: lo tecleado se lee en su reloj.
+  guardar hasta que el negocio dice su zona, porque lo tecleado se lee en su reloj; si no se puede leer, el diálogo lo
+  dice (`useBusinessClock`).
 - Las duraciones se calculan en el servidor en segundos «a fecha de» (`as_of`); la pantalla las hace
   correr sola a partir de ahí, sin preguntar cada segundo. Una jornada «Por revisar» sin salida no tiene
   tiempo trabajado (vacío): contar «hasta ahora» sumaría días que nadie trabajó.

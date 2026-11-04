@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:c7279bc5f747858560ec4a987fcfad3775cb3679225d335b10e4c85062c8c201 -->
+<!-- generated from WORKBOOK.md sha256:6fcd335b94ab3104547fdd7945bfb643a2b76614e19a000f827f262451169956 -->
 
 ## What it is for and who it is for
 
@@ -286,8 +286,9 @@ If it fails: "The clock-out must be after the clock-in." under the clock-out; "T
 working day of this person." (touching is not overlapping: a working day can start at the instant the
 previous one ended); "That person already has another open working day: this one cannot be reopened.";
 a future time, "The time cannot be in the future."; without a reason, "Write a reason of at least 3
-characters.". A refused correction changes nothing and leaves no trace. "Correct" only shows to whoever
-can correct.
+characters.". If the business's time zone cannot be read, "The business's time zone could not be read, so this
+correction cannot be saved yet. Reload the page to try again.", with the button off. A refused correction
+changes nothing and leaves no trace. "Correct" only shows to whoever can correct.
 Involved: ATTENDANCE-F05, ATTENDANCE-F09, ATTENDANCE-F11
 
 ### ATTENDANCE-F09 See who changed a working day, when and why

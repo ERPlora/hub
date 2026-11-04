@@ -6,12 +6,13 @@
 // and its refusal stays here. An untouched time keeps the stored instant to the second; a changed one is
 // sent as the business's wall clock, which the server reads in the business's zone: so it cannot be saved
 // until the business says its zone, nor a time written on another clock be sent as if it were on that one.
+// When the zone cannot be read the dialog says so: a save button that stays off with no reason is a dead end.
 import { FormModal } from '@erplora/ui/components';
 import { useCommand } from '@erplora/ui/sdk';
 import { IonInput, IonTextarea } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
-import { useBusinessZone } from '../../../../base/frontend/lib/zone';
+import { useBusinessClock } from '../../../../base/frontend/lib/zone';
 import { useLocale, useT } from '../composables/useT';
 import { formatDay, toLocalInput } from '../lib/time';
 import type { RecordOut } from '../operations';
@@ -30,7 +31,9 @@ const open = defineModel<boolean>('open', { default: false });
 const t = useT();
 const locale = useLocale();
 const { run, error, pending } = useCommand('attendance.record.correct');
-const zone = useBusinessZone();
+const { zone, unread } = useBusinessClock();
+/** The command's refusal first; else why it cannot be saved. */
+const problem = computed(() => error.value ?? (unread.value ? { message: t('attendance.correct.zoneUnread') } : null));
 
 const clockIn = ref('');
 const clockOut = ref('');
@@ -110,7 +113,7 @@ async function save(): Promise<void> {
     submit-icon="ion:create-outline"
     :pending="pending"
     :submit-disabled="!zone"
-    :error="error"
+    :error="problem"
     @submit="save"
   >
     <template #default="{ fieldErrors }">

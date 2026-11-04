@@ -5,7 +5,7 @@
 // business's wall clock. The server's refusal (an overlap, a second open day) stays in the dialog.
 import { describe, expect, it, vi } from 'vitest';
 
-import { click, ionValue, mountAttendance, settle } from '../__tests__/mount-attendance';
+import { click, errorFrame, ionValue, mountAttendance, settle } from '../__tests__/mount-attendance';
 import type { RecordOut } from '../operations';
 import CorrectionModal from './CorrectionModal.vue';
 
@@ -76,6 +76,26 @@ describe('CorrectionModal (ATTENDANCE-F08)', () => {
       '2026-10-05T16:05',
       'Forgot to clock out',
     ]);
+  });
+
+  it('says why it cannot be saved when the zone cannot be read, and lets it go when it can (hub#779)', async () => {
+    const s = await setup(DAY, 'en', null);
+    expect(s.inDoc('attendance-correct-error')).toBeNull();
+    s.net.lastStream().push(errorFrame(s.subId('base.business.get'), 'base.boom'));
+    await settle();
+    expect(s.save().disabled).toBe(true);
+    expect(s.inDoc('attendance-correct-error')?.textContent).toContain("The business's time zone could not be read");
+    await s.result('base.business.get', { timezone: 'Atlantic/Canary' });
+    await settle();
+    expect(s.save().disabled).toBe(false);
+    expect(s.inDoc('attendance-correct-error')).toBeNull();
+  });
+
+  it('says it in Spanish too (hub#779)', async () => {
+    const s = await setup(DAY, 'es', null);
+    s.net.lastStream().push(errorFrame(s.subId('base.business.get'), 'base.boom'));
+    await settle();
+    expect(s.inDoc('attendance-correct-error')?.textContent).toContain('No se ha podido leer la zona horaria del negocio');
   });
 
   it('a time typed before the business says its zone stays as it was typed (hub#779)', async () => {
