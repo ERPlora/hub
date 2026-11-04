@@ -266,14 +266,18 @@ def test_a_hub_s_object_on_its_alias_is_refused_and_one_on_the_migrator_s_alias_
 # ── What is never refused ───────────────────────────────────────────────────────────────────────────────────────────
 
 
-def test_a_business_the_migrator_never_confirmed_is_not_refused(two_businesses):
+def test_a_business_the_migrator_never_confirmed_is_not_refused_and_costs_no_call(two_businesses, monkeypatch):
     """``schema_apps`` empty (never confirmed: ``migrator.is_behind``) says nothing of what its database has: the next
-    ``migrate_hubs`` confirms it; meanwhile a business with its tables is not refused them."""
+    ``migrate_hubs`` confirms it; meanwhile a business with its tables is not refused them, nor pays for asking."""
     with_it, _ = two_businesses
     Hub.objects.filter(pk=with_it.pk).update(schema_apps={})
+    cache_calls = counted_cache(monkeypatch)
 
-    with use_hub(fresh(with_it)):
+    with use_hub(fresh(with_it)), CaptureQueriesContext(connections["default"]) as on_control:
         assert PrintJob.objects.count() == 0
+
+    assert len(on_control) == 0
+    assert cache_calls == []
 
 
 def test_a_row_read_again_that_was_never_confirmed_is_not_refused_either(two_businesses):
