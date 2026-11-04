@@ -333,8 +333,16 @@ def start_labels(ctx: OperationContext, start: dt.datetime) -> dict:
     return {"start_date_label": day_label(wall.date(), ctx.language), "start_time_label": f"{wall:%H:%M}"}
 
 
+def appointment_label(appointment: Appointment, said: dict) -> str:
+    """How a card names an appointment: its customer (nothing once her data were erased), its day and hour (``said``,
+    ``start_labels``) and its professional (nothing when it has none)."""
+    parts = (appointment.customer_name, said["start_date_label"], said["start_time_label"], appointment.staff_name)
+    return " · ".join(part for part in parts if part)
+
+
 def detail(ctx: OperationContext, appointment: Appointment) -> dict:
     """An ``AppointmentOut``: everything, contact and notes included (for a person; ``for_caller``)."""
+    said = start_labels(ctx, appointment.start)
     return for_caller(
         ctx,
         {
@@ -349,7 +357,8 @@ def detail(ctx: OperationContext, appointment: Appointment) -> dict:
             "charged_at": appointment.charged_at,
             "created_at": appointment.created_at,
             "updated_at": appointment.updated_at,
-            **start_labels(ctx, appointment.start),
+            **said,
+            "label": appointment_label(appointment, said),
         },
     )
 

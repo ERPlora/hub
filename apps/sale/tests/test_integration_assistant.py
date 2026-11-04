@@ -7,9 +7,12 @@ import json
 import re
 from pathlib import Path
 
+import pytest
 from django.apps import apps
+from live.context import system_context
 from live.operations import get, registry
 
+from apps.sale.tests.conftest import A, ctx_for, run
 from base import assistant
 from base.tests.test_assistant import named_by_the_screen
 
@@ -59,11 +62,27 @@ def test_the_card_names_the_lines_a_check_starts_with_by_their_kind():
     assert labels(assistant.card(open_check, arguments, "en")) == ["Open-price lines", SCREENS_EN["pos"]["services"], "Menus"]
 
 
-def test_the_card_names_a_line_of_the_check_and_the_voucher_that_pays_it():
-    voucher = assistant.card(get("sale.order.apply_voucher"), {"line_id": "x", "grant_id": "y"}, "es")
-    assert labels(voucher) == ["Línea", "Bono"]
-    voucher = assistant.card(get("sale.order.apply_voucher"), {"line_id": "x", "grant_id": "y"}, "en")
-    assert labels(voucher) == ["Line", "Voucher"]
+@pytest.mark.django_db
+@pytest.mark.parametrize(("language", "expected"), [("es", ["Línea", "Bono"]), ("en", ["Line", "Voucher"])])
+def test_the_card_names_a_line_of_the_check_and_the_voucher_that_pays_it(product, customer, language, expected):
+    """With real records: a record the card cannot name is left out (BASE-F97), so an id that is none has no label."""
+    scissors = product("Scissors", "SCI", 1210, "product.generic")
+    order = run("sale.order.open", {"lines": [{"product_id": str(scissors.id)}]})
+    cut = run(
+        "service.service.create", {"name": "Haircut", "price": 2500, "tax_category_key": "service.generic"}, system_context(A)
+    )
+    package = run(
+        "service.package.create",
+        {"name": "Five cuts", "max_uses": 5, "validity_days": None, "items": [{"service_id": str(cut.id)}]},
+        system_context(A),
+    )
+    grant = run(
+        "service.grant.create",
+        {"package_id": str(package.id), "customer_id": str(customer("Lucía Pérez").id), "amount": 10000},
+        system_context(A),
+    )
+    arguments = {"line_id": str(order.lines[0].id), "grant_id": str(grant.id)}
+    assert labels(assistant.card(get("sale.order.apply_voucher"), arguments, language, ctx_for(language=language))) == expected
 
 
 def test_the_card_names_what_goes_to_the_kitchen_as_the_kitchen_reads_it():
@@ -74,8 +93,12 @@ def test_the_card_names_what_goes_to_the_kitchen_as_the_kitchen_reads_it():
     assert labels(assistant.card(fire, arguments, "en")) == ["Order type", "Priority", "Served by"]
 
 
-def test_the_card_names_the_two_checks_of_a_merge_and_the_lines_of_a_split():
-    merge = assistant.card(get("sale.order.merge"), {"from_order_id": "x", "to_order_id": "y"}, "es")
+@pytest.mark.django_db
+def test_the_card_names_the_two_checks_of_a_merge_and_the_lines_of_a_split(product):
+    scissors = product("Scissors", "SCI", 1210, "product.generic")
+    first, second = (run("sale.order.open", {"lines": [{"product_id": str(scissors.id)}]}) for _ in range(2))
+    arguments = {"from_order_id": str(first.id), "to_order_id": str(second.id)}
+    merge = assistant.card(get("sale.order.merge"), arguments, "es", ctx_for(language="es"))
     assert labels(merge) == ["Cuenta de origen", "Cuenta de destino"]
     assert labels(assistant.card(get("sale.order.split"), {"line_ids": []}, "es")) == ["Líneas a mover"]
     assert labels(assistant.card(get("sale.sale.complete"), {"line_ids": []}, "es")) == ["Líneas a cobrar"]

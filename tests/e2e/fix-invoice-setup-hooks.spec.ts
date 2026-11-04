@@ -16,7 +16,7 @@ import { type Browser, type BrowserContext, expect, type Locator, type Page, tes
 
 import { A, api, type Credentials, EMPLOYEE, horizontalOverflow, login, OWNER, psql, shot, shown, untilStill } from './helpers';
 import { stamp, VIEWPORTS } from './inventory-helpers';
-import { ensureIssuer } from './invoice-helpers';
+import { ensureIssuer, parkIssuer, unparkIssuer } from './invoice-helpers';
 
 const KEY = 'FIX-INVOICE-SETUP-HOOKS';
 /** The task that left the red strip as the one notice of Invoices and Series. */
@@ -52,19 +52,12 @@ function noIssuer(): void {
 }
 
 test.beforeAll(() => {
-  psql([`drop table if exists ${PARKED}`, `create table ${PARKED} as select * from invoice_issuer`].join('; '));
-  noIssuer();
+  parkIssuer(PARKED);
 });
 
 test.afterAll(() => {
-  psql(
-    [
-      OWN_SERIES,
-      'delete from invoice_issuer',
-      `insert into invoice_issuer select * from ${PARKED}`,
-      `drop table ${PARKED}`,
-    ].join('; '),
-  );
+  psql(OWN_SERIES);
+  unparkIssuer(PARKED);
 });
 
 /** A person of `a` in Spanish (the Hub's language cookie, as the sign-in sets it from the account), on the Home. */

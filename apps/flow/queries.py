@@ -105,11 +105,10 @@ ASK_FIRST_ONLY = _("«%(name)s» needs a person's yes first: choose «Ask me fir
 #: The code of a refusal of an action that needs a person, when it is saved, granted or run.
 HIGH_RISK_CODE = "flow.high_risk"
 #: What needs a person in front that an automation may still be granted, only for an «Ask the assistant» step that
-#: asks first: cancelling a reservation a guest asks to cancel, done once someone who may cancel it says yes (Zapier's
+#: asks first: cancelling a booking a customer asks to cancel, done once someone who may cancel it says yes (Zapier's
 #: Human in the Loop and n8n's human review gate the step that cannot be undone; Fresha's AI Concierge cancels within
-#: the business's policy). Never what is done in person, money, fiscal records nor erasing. An appointment's is not in
-#: yet (hub#634), though Appointments already takes an automation's other changes to anyone's appointment.
-ASK_FIRST = frozenset({"reservation.reservation.cancel"})
+#: the business's policy). Never what is done in person, money, fiscal records nor erasing.
+ASK_FIRST = frozenset({"reservation.reservation.cancel", "appointment.appointment.cancel"})
 NO_SECRET = _("There is no secret called «%(name)s».")
 BAD_HTTP_GRANT = _("«%(name)s» is no address this automation can be allowed to call.")
 NOT_FOR_THE_ASSISTANT = _("The assistant cannot use «%(name)s».")
@@ -174,6 +173,14 @@ def asks_first(op: Operation) -> bool:
     """An action that needs a person in front that an «Ask me first» step may still propose (``ASK_FIRST``), never
     one done in person."""
     return op.name in ASK_FIRST and needs_a_person(op) and not in_person(op)
+
+
+def yes_permission(op: Operation) -> str | None:
+    """What a person's yes to ``op``'s change needs (``ASK_FIRST``): its own permission or, when that one only reaches
+    what is theirs, the one over everybody's that its app names (``ai.yes_permission``, a key of the ``ai=`` dictionary).
+    The automation's change reaches anybody's (Appointments' ``is_own``), and the yes lends nothing."""
+    declared = op.ai.get("yes_permission") if isinstance(op.ai, dict) else None
+    return declared or op.permission
 
 
 def catalog_operations() -> dict[str, Operation]:
