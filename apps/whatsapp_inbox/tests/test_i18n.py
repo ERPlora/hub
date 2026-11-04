@@ -49,7 +49,9 @@ def po_entries(path: Path) -> dict[str, tuple[str, bool]]:
         starts = line.startswith("msgctxt ") or (line.startswith("msgid ") and current != "msgctxt")
         if starts or (line.startswith("#") and current == "msgstr"):
             flush()
-            parts, fuzzy, current = {"msgctxt": [], "msgid": [], "msgstr": []}, False, None
+            # A ``#, fuzzy`` above a ``msgctxt`` or ``msgid`` belongs to the entry they open: only what comes after a
+            # ``msgstr`` forgets it.
+            parts, fuzzy, current = {"msgctxt": [], "msgid": [], "msgstr": []}, fuzzy and current is None, None
         if line.startswith("#,") and "fuzzy" in line:
             fuzzy = True
         elif line.startswith(("msgctxt ", "msgid ", "msgstr ")):
@@ -122,6 +124,45 @@ def schema_titles() -> set[str]:
         if op.app_label == "whatsapp_inbox"
         for field in op.input.model_fields.values()
         if field.title
+    }
+
+
+def test_the_reader_sees_a_fuzzy_mark_with_and_without_a_context(tmp_path):
+    """gettext does not use a fuzzy translation, so the screen stays in English: the reader has to see the mark on its
+    own entry, also above a ``msgctxt``. Neither the entry behind it nor the one behind a fuzzy header (what
+    ``makemessages`` writes in a new catalog) inherits it."""
+    po = tmp_path / "django.po"
+    po.write_text(
+        "#, fuzzy\n"
+        'msgid ""\n'
+        'msgstr ""\n'
+        '"Language: es\\n"\n'
+        "\n"
+        'msgid "Behind the header"\n'
+        'msgstr "Tras la cabecera"\n'
+        "\n"
+        "#, fuzzy\n"
+        'msgid "Marked"\n'
+        'msgstr "Marcada"\n'
+        "\n"
+        'msgid "Behind the mark"\n'
+        'msgstr "Tras la marca"\n'
+        "\n"
+        "#, fuzzy\n"
+        'msgctxt "a context"\n'
+        'msgid "Marked with a context"\n'
+        'msgstr "Marcada con contexto"\n'
+        "\n"
+        'msgid "Behind the context"\n'
+        'msgstr "Tras el contexto"\n',
+        encoding="utf-8",
+    )
+    assert po_entries(po) == {
+        "Behind the header": ("Tras la cabecera", False),
+        "Marked": ("Marcada", True),
+        "Behind the mark": ("Tras la marca", False),
+        "a context\x04Marked with a context": ("Marcada con contexto", True),
+        "Behind the context": ("Tras el contexto", False),
     }
 
 
