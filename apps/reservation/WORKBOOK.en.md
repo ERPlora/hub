@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:1ea9b651641629fe99ba095dc9ffab2eb00820946aaa4d01aadb75aa22f412b6 -->
+<!-- generated from WORKBOOK.md sha256:35cdaf9ce6c2d0ea6d26a03383d371a04f3bf3a56e8c1bdcf2553c9d61799645 -->
 
 ## What it is for and who it is for
 
@@ -65,7 +65,7 @@ sources, is in "Market research", at the end of this manual.
 - Reservations needs **Tables** (the table of each reservation and its hold on the floor plan),
   **Customers** (the card of each customer) and **Schedules** (the business's opening hours). They are
   switched on with it and are not switched off while Reservations is on. Tables brings **Sales** with it.
-- The times are the business's: in this phase, **Europe/Madrid**. A reservation keeps its day and its
+- The times are the business's, in its time zone. A reservation keeps its day and its
   wall-clock time ("Thursday at 21:00"), as they are said on the phone.
 - **Slots**: without a slot for that weekday nothing can be booked. It is the number one cause of "no
   availability".

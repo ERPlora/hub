@@ -48,6 +48,7 @@ from apps.cash_register.schemas import (
 )
 from apps.sale.models import RefundPayment, Sale, SalePayment
 from apps.sale.queries import business_currency
+from base.business import business_zone
 
 VIEW_EXPECTED = "cash_register.view_expected_totals"
 CASH = "cash"
@@ -691,7 +692,7 @@ def expected_now(session: Session) -> int:
 
 def last_cut_off(now: dt.datetime, at: dt.time) -> dt.datetime:
     """The latest moment at ``at`` (business time) not after ``now``: today's, or yesterday's before it."""
-    local = timezone.localtime(now)
+    local = timezone.localtime(now, business_zone())
     zone = local.tzinfo
     cut = dt.datetime.combine(local.date(), at, tzinfo=zone)
     if cut > local:
@@ -814,7 +815,7 @@ def session_to_close(
     if cut is not None:
         raise Conflict(
             str(AUTO_CLOSE_DUE)
-            % {"number": session.number, "time": f"{timezone.localtime(cut):%H:%M}"},
+            % {"number": session.number, "time": f"{timezone.localtime(cut, business_zone()):%H:%M}"},
             code="cash_register.session_auto_close_due",
         )
     return session

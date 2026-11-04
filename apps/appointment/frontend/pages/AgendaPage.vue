@@ -31,7 +31,7 @@ import { allows } from '../lib/states';
 import type { AppointmentOut, AppointmentRow, AppointmentStatus } from '../operations';
 import { appointmentTabs } from '../tabs';
 
-/** The zone until the settings say the business's (phase 1: Europe/Madrid, as the server). */
+/** The zone until the settings say the business's. */
 const FALLBACK_ZONE = 'Europe/Madrid';
 /** The most appointments a range paints (ten windows of 100). */
 const MAX_ROWS = 1000;

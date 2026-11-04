@@ -15,6 +15,7 @@ import { IonButton, IonInput, IonSpinner } from '@ionic/vue';
 import { computed, ref } from 'vue';
 
 import { useBusinessMoney } from '../../../../base/frontend/lib/money';
+import { useBusinessZone } from '../../../../base/frontend/lib/zone';
 import { useLocale, useT } from '../composables/useT';
 import { formatDate } from '../lib/phrasing';
 import { wording } from '../lib/refusal';
@@ -30,6 +31,7 @@ const rows = computed(() => questions.data.value?.rows ?? []);
 const loadError = computed(() => (questions.error.value ? wording(questions.error.value, t('flow.errors.read')) : ''));
 const shown = computed(() => props.alone || rows.value.length > 0 || !!loadError.value);
 const money = useBusinessMoney();
+const zone = useBusinessZone();
 /** Each question's data, one line each, by its id: none for a question with no change of the assistant. */
 const data = computed(() => {
   const format = { locale: locale.value, money: money.value, t };
@@ -46,7 +48,7 @@ function who(question: QuestionOut): string {
 }
 
 function silence(question: QuestionOut): string {
-  const date = formatDate(question.expires_at, locale.value);
+  const date = formatDate(question.expires_at, locale.value, zone.value);
   if (question.on_timeout === 'no') return t('flow.inbox.silenceNo', { date });
   return t(question.on_timeout === 'stop' ? 'flow.inbox.silenceStop' : 'flow.inbox.silenceContinue', { date });
 }

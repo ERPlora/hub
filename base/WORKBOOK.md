@@ -3039,7 +3039,12 @@ Implicados: HUBS-F18, HUBS-F19, HUBS-F20
   las plantillas traen las de todas las portables, así que solo pasa con la que llega con un código posterior) da 202
   `creating` (el OpenAPI documenta 200 y 202 con el mismo esquema, hub#705): el worker las crea (`_activations`, `base.app.activation_settle`) o la deja `failed` con `attempts`,
   `last_error` y `next_attempt_at` (1, 5 y 15 min, luego cada hora), y `base.app.retry` la vuelve a pedir (BASE-F21, F22;
-  S3, hub#601). `last_error` no llega a la pantalla, que dice «No se ha podido activar»: se queda en la fila, y el
+  S3, hub#601). Fuera de una operación (un `events.py`, el admin, una tarea) tocar un modelo de esa app da el mismo 404: el `TenantRouter`
+  lanza `AppNotCreated` antes de mandar SQL (hub#608). Lo decide `base.activation.has_tables`: lo que lista la fila que el
+  contexto ya tiene pasa sin consulta ni caché; lo que no lista se pregunta a control por `base.apps_created:<host>`,
+  olvidada con `activation.forget` y al acabar `ensure_schema`, porque esa fila puede ser de antes de crear las tablas. Una
+  fila sin confirmar (sin `base`) no niega nada, y el alias `__ddl` del migrador nunca pregunta. El índice del admin deja
+  fuera esas apps y su página vuelve al índice con el aviso. No cubre SQL crudo ni el JOIN de un `select_related`. `last_error` no llega a la pantalla, que dice «No se ha podido activar»: se queda en la fila, y el
   evento `base.app.activation_failed` lleva su código. La sesión da `activating` a la que se prepara y `off` a la que falló, y ninguna
   de las dos sale en el menú. El veto de VeriFactu está en su app (VERIFACTU-F32). El gancho `can_disable(ctx)` corre en `translation.override(ctx.language)`: un
   `gettext` a secas ya responde en el idioma de quien pide (gh:hub#2595). En Apps, la negativa (409 o cualquier otro
@@ -3126,6 +3131,12 @@ Implicados: HUBS-F18, HUBS-F19, HUBS-F20
   `#data`; `#tax` abre Negocio; `lib/data.ts`) y `components/settings/{BusinessPanel,TicketsPanel,SettingsRow}.vue`.
   Tests: `base/tests/test_business.py`, `test_queries_business.py`, `test_business_live.py`; e2e
   `tests/e2e/base-settings-business.spec.ts`, con el Hub y el SaaS reales.
+- **La hora del negocio** (hub#687): la zona la lee un solo sitio, `base.business.business_zone()`: la del hub en el que se
+  trabaja (`control.Hub.timezone`, la manda el SaaS), la del despliegue en la plataforma o si no tiene una que Python
+  conozca (`zone_of`); sin contexto, `HubContextMissing`, como un modelo de hub. La usan la tarjeta del asistente, los
+  avisos del Inicio y los textos de las automatizaciones (`base.home.moment`), el CSV de autorizaciones y las apps; una
+  lectura nueva del reloj del despliegue la para `tests/test_guardrails_zone.py`. Lo que aún lo lee: hub#771 (el «hoy» y
+  el día de los números) y hub#772 (lo fiscal).
 - **Acceso (APP-BASE-3: BASE-F52…F71).** Modelos de hub en `base/models.py`: `TrustedDevice` (el dispositivo:
   `token_digest` = SHA-256 del token de 256 bits de la cookie `hub_device`, httpOnly; nunca el token; `mode`
   `shared`/`personal` con quién y cuándo, `name`, `agent`, última persona y entrada, `ended_reason` `device_limit`),

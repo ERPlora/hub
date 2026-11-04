@@ -23,6 +23,13 @@ async function setup(path = '/flow/automations/f1?tab=permissions') {
 }
 
 describe('FlowEditorPage', () => {
+  it("says when an automation starts once on the business's clock (hub#687)", async () => {
+    const s = await setup('/flow/automations/f1');
+    await s.result('flow.flow.detail', { ...FLOW, trigger: { kind: 'at', at: '2026-11-02T10:00:00+01:00' } });
+    await s.result('base.business.get', { currency: 'EUR', currency_decimals: 2, timezone: 'Asia/Tokyo' });
+    expect(s.wrapper.text()).toContain('Nov 2, 2026, 6:00 PM');
+  });
+
   it('follows the automation of the link and opens the editor on its tab', async () => {
     const s = await setup();
     expect(s.params('flow.flow.detail')).toEqual([{ id: 'f1' }]);

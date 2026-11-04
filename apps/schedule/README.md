@@ -29,7 +29,7 @@ Personal); Citas y Reservas lo leen para no reservar con el negocio cerrado.
 | `LiveAppConfig` | `kind = "app"`, icono `ion:time-outline`, categoría `people`, gratuita (`premium = False`) |
 | Verticales | `hair_salon` y `restaurant` (entra en sus plantillas) |
 | `requires` | `[]`: no conoce a nadie del equipo ni lee otras apps |
-| Usa de otras apps | nada; de la plataforma, la zona horaria (`timezone.get_current_timezone()`, en la fase 1 `settings.TIME_ZONE`) |
+| Usa de otras apps | nada; de la plataforma, la zona horaria (`base.business.business_zone`) |
 | La usan | Citas y Reservas (las dos la requieren): importan `hours_for_range` y `day_label` de `queries.py` (Reservas, también `get_week`) y re-ejecutan sus consultas vivas con sus avisos; la agenda de Citas sigue en vivo `schedule.hours.for_range`; Reservas online, a través de Citas |
 | Pantallas | `/schedule/hours`, `/schedule/special-days` (dos tablas: días especiales y cambios temporales) y `/schedule/settings` |
 | Operaciones | 6 consultas (`queries.py`) y 10 acciones (`services.py`), todas con `ai=`; 16 rutas en `/api/schedule/…`; 5 consultas abiertas a las API keys |

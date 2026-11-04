@@ -47,6 +47,8 @@ from live.live_registry import live_registry
 from live.meta import DeviceNotice, LiveAppConfig, SetupCheck, all_live_app_configs, module_configs
 from live.operations import UnknownOperation, get
 
+from base.business import business_zone
+
 logger = logging.getLogger(__name__)
 
 STATE_DONE = "done"
@@ -431,16 +433,15 @@ ISO_INSTANT = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]
 
 
 def moment(text: str) -> dt.date | dt.time | dt.datetime:
-    """``text``, an ISO day, hour or instant, as Python's: an instant with an offset on the business's clock (Django's
-    current zone: ``TIME_ZONE`` in phase 1, the apps' ``business_zone``), one without as it says. Raises
-    ``ValueError`` for any other text."""
+    """``text``, an ISO day, hour or instant, as Python's: an instant with an offset on the business's clock
+    (``business_zone``), one without as it says. Raises ``ValueError`` for any other text."""
     if ISO_DAY.fullmatch(text):
         return dt.date.fromisoformat(text)
     if ISO_HOUR.fullmatch(text):
         return dt.time.fromisoformat(text)
     if ISO_INSTANT.fullmatch(text):
         value = dt.datetime.fromisoformat(text)
-        return timezone.localtime(value) if timezone.is_aware(value) else value
+        return timezone.localtime(value, business_zone()) if timezone.is_aware(value) else value
     raise ValueError(f"{text!r} is not an ISO day, hour or instant")
 
 

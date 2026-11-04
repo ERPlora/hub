@@ -15,7 +15,7 @@ import {
   InlineFeedback,
   StatusPill,
 } from '@erplora/ui/components';
-import { useCommand } from '@erplora/ui/sdk';
+import { useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { computed, ref, shallowRef } from 'vue';
 
@@ -29,7 +29,7 @@ import { formatDay, formatShortDate, formatTime, todayIn } from '../lib/clock';
 import type { WaitlistOut } from '../operations';
 import { reservationTabs } from '../tabs';
 
-/** The business's zone in phase 1 (the Hub keeps no zone yet): the day a new entry starts on. */
+/** Until the settings answer with the business's zone: the day a new entry starts on. */
 const FALLBACK_ZONE = 'Europe/Madrid';
 
 const session = useSession();
@@ -150,7 +150,8 @@ const overbookRow = shallowRef<WaitlistOut | null>(null);
 const overbookMessage = ref('');
 const removing = shallowRef<WaitlistOut | null>(null);
 
-const today = computed(() => todayIn(FALLBACK_ZONE));
+const { data: settings } = useLive('reservation.settings.get', {});
+const today = computed(() => todayIn(settings.value?.timezone ?? FALLBACK_ZONE));
 const when = (row: WaitlistOut): string => `${formatDay(row.date, locale.value)} · ${formatTime(row.preferred_time, locale.value)}`;
 
 async function attempt(work: () => Promise<void>): Promise<boolean> {
