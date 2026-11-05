@@ -17,8 +17,8 @@ import { saasSql } from './assistant-real';
 import { A, api, capture, psql, shown } from './helpers';
 import { confirmDialog, parkedEvent, signedIn } from './flow-helpers';
 import { noHorizontalScroll, settled, VIEWPORTS } from './schedule-helpers';
-import { answerSpec, chats, customerWrites, relay } from './whatsapp-answer-helpers';
-import { cleanUp as inboxCleanUp, e2ePhone } from './whatsapp-helpers';
+import { answerSpec, chats, customerWrites, openTheBook, relay } from './whatsapp-answer-helpers';
+import { cleanUp as inboxCleanUp, e2ePhone, keepPhoto, restorePhoto } from './whatsapp-helpers';
 
 const TASK = 'FIX-HUB-WHATSAPP-INBOX-RECIPES-USE-ASSISTANT-STEP';
 const ANSWER = 'whatsapp_inbox/reservation_from_whatsapp';
@@ -69,24 +69,16 @@ function cleanUp(): void {
 const built = (ref: string): string =>
   psql(`select enabled::text || ' ' || (deleted_at is null)::text from flow_flow where recipe = '${ref}'`);
 
+test.beforeAll(keepPhoto);
 const provider = answerSpec(cleanUp);
+test.afterAll(restorePhoto);
 
 for (const viewport of VIEWPORTS) {
   test(`WHATSAPP_INBOX-F15 «Book a table» turned on, and a WhatsApp asking for a table is booked after the owner's yes at ${viewport.label}`, async ({ browser }) => {
     test.setTimeout(180_000);
     const { context, page } = await signedIn(browser, '/whatsapp_inbox/settings', viewport);
     try {
-      // The book open that day, all day, whatever the hours of the database (as reservation-book.spec.ts does).
-      const slot = await api(context, A, 'POST', '/reservation/time_slots', { day_of_week: DAY.weekday, start_time: '00:00', end_time: '23:59', max_reservations: SENTINEL });
-      expect(slot.status, JSON.stringify(slot.data)).toBe(201);
-      const open = await api(context, A, 'POST', '/schedule/overrides', {
-        start_date: DAY.date,
-        end_date: DAY.date,
-        reason: OPEN_REASON,
-        is_closed: false,
-        intervals: [{ open_time: '00:00', close_time: '00:00' }],
-      });
-      expect(open.status, JSON.stringify(open.data)).toBe(201);
+      await openTheBook(context, DAY, SENTINEL, OPEN_REASON);
 
       // F15: the card says what it does; on, after a question, with its notice.
       const card = shown(page).locator('[data-testid=whatsapp-inbox-autoreply-tables]');
@@ -139,13 +131,13 @@ for (const viewport of VIEWPORTS) {
       };
       const message = await customerWrites(phone, `E2E-ASK reservation__reservation__create ${JSON.stringify(booking)}`, 'E2E Lucía');
       const flowId = psql(`select id from flow_flow where recipe = '${ANSWER}'`);
-      const before = chats(provider());
+      const before = chats(provider()).length;
       await relay(parkedEvent(flowId));
 
       // The assistant was never told their card nor offered to say it (the step fixes it), was offered only what the
       // answer grants of the Hub's operations (`<app>__<entity>__<action>`; the SaaS adds its own clock), and wanted to
       // book: nothing is booked yet.
-      const turns = provider().seen.filter((seen) => seen.path === '/v1/chat/completions').slice(before);
+      const turns = chats(provider()).slice(before);
       expect(turns).toHaveLength(1);
       expect(JSON.stringify(turns[0].body)).not.toContain(guest.data.id);
       type Tool = { function: { name: string; parameters?: { properties?: Record<string, unknown> } } };
@@ -192,9 +184,9 @@ for (const viewport of VIEWPORTS) {
         `what Reservas answered: ${psql(`select outputs->'_turn'->'messages' from flow_flowrun where flow_id = '${flowId}'`)}`,
       ).toBe(`4 21:00:00 whatsapp ${guest.data.id}`);
       expect(psql(`select count(*) from customer_customer where source = 'whatsapp' and phone like '%${phone.slice(-9)}'`)).toBe('1');
-      const asked = chats(provider());
+      const asked = chats(provider()).length;
       await relay(parkedEvent(flowId));
-      expect(chats(provider())).toBe(asked + 1);
+      expect(chats(provider())).toHaveLength(asked + 1);
       expect(JSON.stringify(provider().seen.at(-1)?.body)).toContain('"role":"tool"');
       expect(psql(`select status from flow_flowrun where flow_id = '${flowId}'`)).toBe('succeeded');
 

@@ -13,13 +13,14 @@
 // flow: WHATSAPP_INBOX-F14 WHATSAPP_INBOX-F16 WHATSAPP_INBOX-F21 WHATSAPP_INBOX-F22 CUSTOMER-F26 FLOW-F33 APPOINTMENT-F18
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
+import { aMonday, salonCleanUp } from './appointment-helpers';
 import { saasSql } from './assistant-real';
 import { confirmDialog, parkedEvent, signedIn } from './flow-helpers';
 import { capture, psql, shown } from './helpers';
 import { noHorizontalScroll, settled, VIEWPORTS } from './schedule-helpers';
 import { post } from './service-helpers';
 import { answerSpec, chats, customerWrites, relay } from './whatsapp-answer-helpers';
-import { cleanUp as inboxCleanUp, e2ePhone } from './whatsapp-helpers';
+import { cleanUp as inboxCleanUp, e2ePhone, keepPhoto, restorePhoto } from './whatsapp-helpers';
 
 const TASK = 'FIX-HUB-WHATSAPP-INBOX-OFFER-BOOK-APPOINTMENTS';
 const ANSWER = 'whatsapp_inbox/appointment_from_whatsapp';
@@ -27,13 +28,6 @@ const NOTICE = 'whatsapp_inbox/appointment_confirmed';
 const THANKS = 'Thanks for writing! Let me check the diary and I will come straight back to you.';
 const TAG = 'E2E WaAppt';
 const CUSTOMER = `${TAG} Marta`;
-/** A Monday five weeks ahead (inside the 90 days of advance and past any notice), as `YYYY-MM-DD`. */
-function aMonday(): string {
-  const day = new Date();
-  day.setUTCDate(day.getUTCDate() + 35 + ((8 - day.getUTCDay()) % 7));
-  return day.toISOString().slice(0, 10);
-}
-
 const DAY = aMonday();
 
 /** The inbox's answers and notices (with their runs and questions), this spec's appointments, cards, service,
@@ -41,22 +35,12 @@ const DAY = aMonday();
 function cleanUp(): void {
   const flows = "select id from flow_flow where recipe like 'whatsapp_inbox/%'";
   const customers = `select id from customer_customer where name like '${TAG}%'`;
-  const appointments = `select id from appointment_appointment where customer_id in (${customers})`;
-  const services = `select id from service_service where name like '${TAG}%'`;
-  const members = `select id from staff_member where first_name like '${TAG}%'`;
   psql(
     [
       `delete from flow_question where flow_id in (${flows})`,
       `delete from flow_flowrun where flow_id in (${flows})`,
       `delete from flow_flow where id in (${flows})`,
-      `delete from appointment_history where appointment_id in (${appointments})`,
-      `delete from appointment_appointmentservice where appointment_id in (${appointments})`,
-      `delete from appointment_appointment where id in (${appointments})`,
-      `delete from schedule_specialdayinterval where special_day_id in (select id from schedule_specialday where name like '${TAG}%')`,
-      `delete from schedule_specialday where name like '${TAG}%'`,
-      `delete from service_assignment where service_id in (${services}) or member_id in (${members})`,
-      `delete from service_service where name like '${TAG}%'`,
-      `delete from staff_member where first_name like '${TAG}%'`,
+      ...salonCleanUp(TAG),
     ].join('; '),
   );
   inboxCleanUp();
@@ -71,7 +55,9 @@ function cleanUp(): void {
   saasSql("delete from assistant_assistantusage where hub_id = (select id from hubs_hub where slug = 'a')");
 }
 
+test.beforeAll(keepPhoto);
 const provider = answerSpec(cleanUp);
+test.afterAll(restorePhoto);
 
 /** The salon: a haircut Bea performs, on `DAY` open from 09:00 to 18:00, reviewing every appointment a customer books
  *  herself (F16), through each app's own API. */
@@ -99,9 +85,9 @@ async function theSalon(context: BrowserContext, stamp: string): Promise<{ servi
 async function askAndApprove(page: Page, phone: string, text: string, viewport: string, says: string[], shot?: string): Promise<void> {
   await customerWrites(phone, text, CUSTOMER);
   const flowId = psql(`select id from flow_flow where recipe = '${ANSWER}'`);
-  const before = chats(provider());
+  const before = chats(provider()).length;
   await relay(parkedEvent(flowId));
-  expect(chats(provider())).toBe(before + 1);
+  expect(chats(provider())).toHaveLength(before + 1);
 
   await page.goto('/flow/automations');
   const question = shown(page)
@@ -119,9 +105,9 @@ async function askAndApprove(page: Page, phone: string, text: string, viewport: 
   await question.locator('[data-testid^=flow-question-yes-]').click();
   await expect(page.locator('ion-toast').filter({ hasText: 'Approved: the automation carries on.' }).last()).toBeVisible();
   await expect(question).toHaveCount(0);
-  const answered = chats(provider());
+  const answered = chats(provider()).length;
   await relay(parkedEvent(flowId));
-  expect(chats(provider()), `${viewport}: the assistant heard what Citas answered`).toBe(answered + 1);
+  expect(chats(provider()), `${viewport}: the assistant heard what Citas answered`).toHaveLength(answered + 1);
   expect(JSON.stringify(provider().seen.at(-1)?.body)).toContain('"role":"tool"');
 }
 
