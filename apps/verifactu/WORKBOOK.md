@@ -101,9 +101,11 @@ la persona no puede usar no aparecen.
 Menú **VeriFactu → Registros**. Título «Registros VeriFactu». Tabla de 50 en 50 (tabla o tarjetas; en el
 móvil, tarjetas con el número de factura como título) con «Seq», «Factura», «Fecha», «Tipo» (Alta /
 Anulación), «F.» (F1…R5), «Emisor», «Total», «Entorno» (Pruebas / Producción) y «Estado» (Pendiente,
-Enviado, Aceptado, Aceptado con errores, Rechazado, en una pastilla de color). Buscador «Buscar factura,
-emisor o NIF…» (número de secuencia, número de factura, nombre o NIF del emisor). Filtros de estado, tipo,
-tipo de factura, entorno, fecha y total (en euros), tras el embudo de la tabla con su contador; un total que no
+Enviado, Aceptado, Aceptado con errores, Rechazado, en una pastilla de color; junto a un alta rechazada o aceptada
+con errores, «Pendiente de subsanar» o «Subsanado», que abre el registro que la subsana: VERIFACTU-F24). Buscador
+«Buscar factura, emisor o NIF…» (número de secuencia, número de factura, nombre o NIF del emisor). Filtros de estado,
+tipo, tipo de factura, subsanación («Pendientes de subsanar» o «Subsanados»), entorno, fecha y total (en euros),
+tras el embudo de la tabla con su contador; un total que no
 es un importe, o una fecha «hasta» anterior a la «desde», se dice bajo su campo y no filtra. Lo último sellado
 sale arriba. Por fila: «Ver» (también
 al pulsar la fila) y «Cotejar en la AEAT» (abre la página de cotejo del QR). La lista se pone al día sola
@@ -115,7 +117,8 @@ Vacía: «Todavía no hay registros. Cada factura que emitas se sella y aparece 
 Se abre desde una fila de **Registros** (`/verifactu/records/<id>`). Arriba, «Registro {número}» con su estado,
 su entorno y «← Volver». Si no está en la AEAT (Pendiente o Enviado), el aviso «Aún no está en la AEAT» con
 el porqué y el cuándo (VERIFACTU-F17). Si fue rechazado, el aviso «La AEAT lo ha rechazado» con qué hacer
-(VERIFACTU-F24). Bloques:
+(VERIFACTU-F24); ya subsanado (también un «Aceptado con errores»), en lugar de qué hacer, «Ya está subsanado con un
+registro nuevo» con el enlace «Ver el registro que lo subsana». Bloques:
 - **Factura**: «Factura», «Fecha de expedición», «Fecha de operación» (si es otra), «Tipo de factura»,
   «Emisor», «NIF del emisor», «Cliente» y «NIF del cliente» (si los hay), «Rectifica a» / «Sustituye a»,
   «Base», «Cuota» y «Total».
@@ -241,7 +244,7 @@ Avisos de la pantalla: el resultado de cada acción en una franja arriba (verde 
 | VERIFACTU-F17 | Ver el detalle de un registro y por qué espera | hecho |
 | VERIFACTU-F18 | Cotejar el QR en la sede de la AEAT | parcial — en la app instalada la sede de la AEAT aún no abre: falta que la app acepte sus direcciones (ERPlora/app#20) |
 | VERIFACTU-F19 | Dar el QR y el estado fiscal al tique y a la factura | hecho (Ventas e Impresión lo piden por nombre) |
-| VERIFACTU-F20 | Enviar después lo que no pudo salir (contingencia automática) | hecho — la corre el worker cada minuto (en la fase 1, sobre un solo hub) |
+| VERIFACTU-F20 | Enviar después lo que no pudo salir (contingencia automática) | hecho — la corre el worker cada minuto, en cada negocio |
 | VERIFACTU-F21 | Procesar la cola a mano | hecho |
 | VERIFACTU-F22 | Reintentar una entrada de la cola | hecho |
 | VERIFACTU-F23 | Descartar una entrada de la cola | descartado — un registro generado no se descarta nunca |
@@ -604,9 +607,9 @@ Sale: el estado y la respuesta en cada registro (avisa `verifactu.record.transmi
 Si falla: sin pasarela configurada, sin datos del productor o sin vía lista, no se manda nada y cada registro
 dice por qué espera (VERIFACTU-F17). Nunca se da por aceptado un registro sin la respuesta de la AEAT. Un negocio
 de fuera de España no envía nada nunca: lo que quedó sellado antes se guarda tal cual, sin salir, y dice por qué.
-El registro de un negocio se presenta siempre como ese negocio, nunca como el hub de ERPlora (hub#454): la pasada
-del hub de ERPlora (el ámbito fijo del worker en la fase 1, que con las tablas compartidas ve los registros de los
-negocios) lo presenta con el id que erplora.com le dio al negocio; sin ese id (aún no ha llegado la foto de su
+El registro de un negocio se presenta siempre como ese negocio, nunca como el hub de ERPlora (hub#454): el worker
+pasa por cada negocio en su BD y con su ámbito. Si la pasada del hub de ERPlora ve un registro con otro NIF que el de
+ERPlora, lo presenta con el id que erplora.com le dio al negocio; sin ese id (aún no ha llegado la foto de su
 cuenta) no se manda nada y el registro espera con «ERPlora todavía no ha vinculado este negocio con su cuenta en
 este servidor» (`hub_unregistered`; «Enviar ahora» → 409 `verifactu.hub_unregistered`), hasta que la foto lo trae.
 Implicados: VERIFACTU-F20, FLOW-F04 (la tarjeta de la galería de Automatizaciones que crea una tarea urgente cuando
@@ -685,7 +688,7 @@ Implicados: INVOICE-F17, INVOICE-F18
 
 ### VERIFACTU-F20 Enviar después lo que no pudo salir (contingencia automática)
 <!-- origen: fi:hub/domain#process_contingency_queue-scheduled-task-trigger-manual-issue-verifactu-7 fi:modules/verifactu#command-handler-nativo-verifactu-contingency-process-process_contingency_queue fi:modules/verifactu#query-verifactu-contingency-list old-hub:HUB-F311 old-hub:HUB_VERIFACTU-F10 old:verifactu/workflow/contingencia.md#verifactu-f20 wf:cadena-fiscal#rec_fiscal-f06 -->
-Estado: hecho — la corre el worker cada minuto (en la fase 1, sobre un solo hub)
+Estado: hecho — la corre el worker cada minuto, en cada negocio
 Actor: sistema
 Pantalla: Contingencia
 Pasos:
@@ -752,9 +755,10 @@ Implicados: VERIFACTU-F24, VERIFACTU-F35
 <!-- origen: wf:cadena-fiscal#rec_fiscal-f12 old-hub:HUB_VERIFACTU-F08 old:verifactu/workflow/contingencia.md#verifactu-f24 -->
 Estado: hecho
 Actor: administrador
-Pantalla: Ficha de registro
+Pantalla: Registros, Ficha de registro
 Pasos:
-1. El registro sale en rojo «Rechazado» en **Registros**; en **Eventos** queda «Envío fallido» con el motivo.
+1. El registro sale en rojo «Rechazado» en **Registros**, y a su lado «Pendiente de subsanar»; en **Eventos** queda
+   «Envío fallido» con el motivo. El filtro «Subsanación» → «Pendientes de subsanar» deja solo los que faltan.
 2. En su ficha, «La AEAT lo ha rechazado» con el código y el mensaje literales de la AEAT y qué hacer: si el
    error está en los datos de la factura (un NIF de cliente que la AEAT no reconoce, un importe), se corrige
    **en Facturación** con una rectificativa; si no (un error de la cadena tras restaurar una copia, un fallo
@@ -765,6 +769,9 @@ Pasos:
    inicial; §9.1.3, «alta por rechazo»); `S` si la AEAT sí la tiene y lo rechazado fue una subsanación
    posterior.
 4. Un «Aceptado con errores» también se puede subsanar (`Subsanacion = S`, `RechazoPrevio = N`; §9.1.2).
+5. Ya subsanado, en **Registros** el de antes dice «Subsanado», que abre el registro que lo subsana, y su ficha,
+   «Ya está subsanado con un registro nuevo» con «Ver el registro que lo subsana». Si la AEAT rechaza también la
+   subsanación, esa sale «Pendiente de subsanar» y se subsana a su vez; la de antes sigue «Subsanado».
 Entra: el registro rechazado o aceptado con errores.
 Sale: el registro de subsanación (avisa `verifactu.record.created`).
 Si falla: solo se subsana un registro de alta rechazado o aceptado con errores, y solo el último de su
@@ -1353,15 +1360,17 @@ app: gh:verifactu#139). Tests: `test_apps.py` (declaración, textos `en` + `es`,
   y los intentos. Se corrige con uno nuevo (subsanación o anulación); una corrección de la factura es una
   rectificativa de Facturación.
 - La tarea programada `process_queue` (`verifactu.contingency.process`, cada minuto, en UTC, `collapse`) la
-  corre el worker (`base/scheduler.py`, desde `base/worker.py`, cada tick de 5 s) como el sistema: su reloj es
-  una fila de `base.TaskSchedule` que el worker escribe al arrancar; cada pasada la toma con
+  corre el worker (`base/scheduler.py`, desde `base/worker.py`, cada tick de 5 s) como el sistema, en cada negocio
+  que sirve, en su BD y con su ámbito (`base.worker._serve_hub`: `use_hub` y `Scope("host", slug)`): su reloj es una
+  fila de `base.TaskSchedule` en esa BD, que el worker escribe la primera vez que lo sirve desde que arrancó; cada
+  pasada la toma con
   `select_for_update(skip_locked=True)` y mueve `next_run` en la misma transacción que el envío, así que dos
   workers a la vez (un despliegue) nunca la corren dos veces, y los minutos perdidos con el worker parado se
   juntan en una sola pasada. Si la pasada falla, se registra en el log, se deshace lo suyo y vuelve al minuto
-  siguiente. En la fase 1 corre sobre un solo hub, `WORKER_SCOPE_SLUG` (por defecto el de plataforma,
-  `PLATFORM_HUB_SLUG`); con las tablas compartidas esa pasada ve los registros de los negocios y presenta cada uno
-  como su negocio, nunca como `erplora` (`queries.presenter`, hub#454); la fase 2 recorre los hubs a los que les toca
-  (`hub_due`), cada uno con `use_hub`.
+  siguiente. La pasada de un negocio ve solo sus registros y los presenta con su slug. También se sirve a un negocio
+  que se fue y conserva su BD (`base.services.hubs_to_serve`), porque lo que le queda por enviar tiene que llegar a
+  la AEAT. Un registro con otro NIF en la pasada del hub de ERPlora (`PLATFORM_HUB_SLUG`) se presenta como ese
+  negocio, nunca como `erplora` (`queries.presenter`, hub#454).
 
 ### Administrador de Django
 
@@ -1609,8 +1618,6 @@ Del bloque fiscal del 2026-10-15 (el resto, en PLAN-HUB §8, «Bloque fiscal: lo
 - **Subsanar y anular en producción sin ruta**: no se rechazan (no son cobros) y esperan en la cola.
 - **Arrastrar y soltar los ficheros** (certificado y otorgamiento): falta el componente de subida en
   `@erplora/ui`; hoy, un botón y el nombre del fichero.
-- **El bucle por hubs del worker** (fase 2): en la fase 1, las tareas programadas corren sobre un solo hub,
-  `WORKER_SCOPE_SLUG`.
 - **`create_platform_hub` solo cuando haya una BD por hub** (fase 2): en la fase 1 hay una sola BD y su emisor
   sería el de todos los hosts; el comando se niega si ya hay otro emisor.
 - **OSS**: la factura de plataforma no lleva el aviso «VAT included — customer VAT number could not be verified»

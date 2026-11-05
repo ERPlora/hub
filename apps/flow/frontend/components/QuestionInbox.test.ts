@@ -115,6 +115,27 @@ describe('QuestionInbox', () => {
     ]);
   });
 
+  it('says each service of a booking by its name, never «1 item» (hub#835, FLOW-F29)', async () => {
+    // The server names each line that carries only its service and marks the list (`named`); one it could not name
+    // (not the reader's to see) counts among the more.
+    const services = {
+      name: 'services',
+      label: 'Services',
+      kind: 'list' as const,
+      value: [{ service_id: 'Haircut' }, { service_id: 'Colour' }],
+      named: true,
+    };
+    const m = await setup([{ ...CHANGE, fields: [services] satisfies QuestionOut['fields'] }]);
+    expect(data(m, 'q2')).toEqual(['Services: Haircut, Colour']);
+    const unseen = { ...services, value: [{ service_id: 'Haircut' }, {}] };
+    const n = await setup([{ ...CHANGE, fields: [unseen] satisfies QuestionOut['fields'] }]);
+    expect(data(n, 'q2')).toEqual(['Services: Haircut and 1 more']);
+    // A name the model wrote as null beside the id does not show: the line still says its service.
+    const beside = { ...services, value: [{ service_id: 'Haircut', service: null }] };
+    const o = await setup([{ ...CHANGE, fields: [beside] satisfies QuestionOut['fields'] }]);
+    expect(data(o, 'q2')).toEqual(['Services: Haircut']);
+  });
+
   it('a question with no change of the assistant lists no data', async () => {
     const m = await setup();
     expect(m.find('flow-question-data-q1').exists()).toBe(false);

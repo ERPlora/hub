@@ -3,14 +3,16 @@
 //     outbox relay will, adds nothing), listed «Pending» with its QR, and its record says why it is not in the AEAT yet;
 //   - VERIFACTU-F14: voiding a charged sale makes Invoicing issue an R5, registered as an alta (never an anulación);
 //   - VERIFACTU-F30: a record issued by error is cancelled from its page with a chained cancellation record;
+//   - VERIFACTU-F24: a rejection says in Records that it is still to correct (the funnel finds it); corrected from
+//     its record, it says «Corrected» and links to the record that corrects it, in the list and in its page;
 //   - VERIFACTU-F21, F10, F31: «Process queue» and «Test the connection» say that nothing can be presented without
 //     ERPlora's gateway (it is never taken as accepted), and the audit trail tells it;
 //   - Records and Events filter behind the table's funnel, with its count, at every width; a total that is not an
 //     amount, or a day «until» before its «from», is said under its field and does not filter.
 // What this file creates is deleted after it (VeriFactu's rows first: a record keeps its invoice).
-import { type BrowserContext, expect, type Page, test } from '@playwright/test';
+import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, login, psql, shot, shown } from './helpers';
+import { A, api, capture, login, psql, record as recordMetrics, shot, shown } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { cleanInvoices, ensureIssuer, issuedIds, snapshotSeries } from './invoice-helpers';
 import { chargeByApi, cleanSales, shots, stamp } from './sale-helpers';
@@ -101,6 +103,76 @@ async function recordOf(context: BrowserContext, invoiceId: string): Promise<Rec
   return res.data.record;
 }
 
+/** The fleet's three widths (`ui-clip-sweep.sh`): a desk, a tablet and a low phone; and a wide desk, where the table's
+ *  Status column has room for the status and «Corrected» side by side. */
+const CELL_VIEWPORTS = [
+  { label: '1440', width: 1440, height: 900 },
+  { label: '820', width: 820, height: 1180 },
+  { label: '375', width: 375, height: 667 },
+  { label: '1920', width: 1920, height: 1080 },
+];
+
+interface Box {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** Where a row's (or card's) status pill and its «Corrected» sit: the pill inside the link and the link's own box. */
+async function correctionCell(row: Locator): Promise<{ status: Box; pill: Box; link: Box; underline: boolean }> {
+  return row.evaluate((element) => {
+    const box = (found: Element | null | undefined) => {
+      if (!found) throw new Error('the status and «Corrected» are painted');
+      const { x, y, width, height } = found.getBoundingClientRect();
+      return { x, y, width, height };
+    };
+    const link = element.querySelector('[data-testid=verifactu-records-correction-corrected]');
+    return {
+      status: box(element.querySelector('[data-testid=verifactu-records-status]')),
+      pill: box(link?.querySelector('.status-pill')),
+      link: box(link),
+      underline: link ? getComputedStyle(link).textDecorationLine !== 'none' : false,
+    };
+  });
+}
+
+/** The first box between `element` and its row that hides what overflows it (a focus ring past its edge would be cut),
+ *  as `tag.class`; `null` when none does. */
+function clippingAncestor(element: Element): string | null {
+  for (let box = element.parentElement; box && !box.matches('[data-testid=verifactu-records-row]'); box = box.parentElement) {
+    const { overflowX, overflowY } = getComputedStyle(box);
+    if ([overflowX, overflowY].some((overflow) => overflow !== 'visible')) return `${box.tagName.toLowerCase()}.${box.className}`;
+  }
+  return null;
+}
+
+/** hub#865 - As the cell looked with the page's own sheet: the status and «Corrected» 4px apart, side by side and centred
+ *  on one line (a card, a wide cell) or one under the other from the same left edge (a narrow cell); the link as tall
+ *  as its pill, never a line of text around it that drops the pill below the status. */
+function expectCorrectionBeside(
+  { status, pill, link, underline }: { status: Box; pill: Box; link: Box; underline: boolean },
+  at: string,
+): 'side by side' | 'stacked' {
+  const boxes = `${at}: ${JSON.stringify({ status, pill, link })}`;
+  expect(underline, `«Corrected» is a pill, not underlined text (${at})`).toBe(false);
+  const sideBySide = status.y < pill.y + pill.height && pill.y < status.y + status.height;
+  if (sideBySide) {
+    const gap = pill.x - (status.x + status.width);
+    expect(gap, `side by side, 4px apart (${boxes})`).toBeGreaterThanOrEqual(3);
+    expect(gap, `side by side, 4px apart (${boxes})`).toBeLessThanOrEqual(5);
+    expect(Math.abs(status.y + status.height / 2 - (pill.y + pill.height / 2)), `centred on one line (${boxes})`).toBeLessThanOrEqual(1);
+  } else {
+    const gap = pill.y - (status.y + status.height);
+    expect(gap, `one under the other, 4px apart (${boxes})`).toBeGreaterThanOrEqual(3);
+    expect(gap, `one under the other, 4px apart (${boxes})`).toBeLessThanOrEqual(5);
+    expect(Math.abs(pill.x - status.x), `from the same left edge (${boxes})`).toBeLessThanOrEqual(0.5);
+  }
+  expect(Math.abs(link.height - pill.height), `the link is as tall as its pill (${boxes})`).toBeLessThanOrEqual(0.5);
+  expect(Math.abs(link.y - pill.y), `the link is as tall as its pill (${boxes})`).toBeLessThanOrEqual(0.5);
+  return sideBySide ? 'side by side' : 'stacked';
+}
+
 async function openRecord(page: Page, record: RecordOut): Promise<void> {
   await page.goto(`${A}/verifactu/records/${record.id}`);
   await expect(shown(page).locator('[data-testid=verifactu-record-title]')).toHaveText(`Record ${record.invoice_number}`);
@@ -174,6 +246,118 @@ test('VERIFACTU-F30: an invoice issued by error is cancelled from its record wit
   const list = shown(page);
   await list.locator('[data-testid=verifactu-records-search] input').fill(issued.number);
   await expect(list.locator('[data-testid=verifactu-records-row]').filter({ hasText: 'Cancellation' })).toHaveCount(1);
+});
+
+test('VERIFACTU-F24: a rejection is listed «Pending correction» and, corrected from its record, links to its correction (hub#857)', async ({
+  page,
+  context,
+}) => {
+  await login(page, A, '/verifactu/records');
+  const issued = await ticket(context);
+  const record = await recordOf(context, issued.id);
+  // The AEAT's rejection as its answer leaves the record (setup: nothing reaches the AEAT from a test).
+  psql(`update verifactu_record set status = 'rejected', aeat_code = '1189', aeat_message = 'e2e rejected' where id = '${record.id}'`);
+  const view = shown(page);
+  const panel = view.locator('[data-testid=verifactu-records-filters-panel]');
+  const toggle = view.locator('[data-testid=verifactu-records-filters-toggle]');
+  const rejected = view.locator(`[data-testid=verifactu-records-row][data-id="${record.id}"]`);
+  const search = async () => {
+    await page.goto(`${A}/verifactu/records`);
+    await view.locator('[data-testid=verifactu-records-search] input').fill(issued.number);
+  };
+  await search();
+  await expect(rejected.locator('[data-testid=verifactu-records-status]')).toHaveText('Rejected');
+  await expect(rejected.locator('[data-testid=verifactu-records-correction-pending]')).toHaveText('Pending correction');
+  // «Correction» → «Pending correction» in the funnel keeps it.
+  await toggle.click();
+  await expect(panel).toBeVisible();
+  await panel.locator('[data-testid=verifactu-records-filter-correction_status]').click();
+  const popover = page.locator('ion-popover.select-popover');
+  await popover.locator('ion-radio').filter({ hasText: /^\s*Pending correction\s*$/ }).click();
+  await expect(popover).toHaveCount(0);
+  await panel.locator('[data-testid=verifactu-records-filters-apply]').click();
+  await expect(panel).toBeHidden();
+  await expect(view.locator('[data-testid=verifactu-records-filters-count]')).toHaveText('1');
+  await expect(rejected).toBeVisible();
+  await shots(page, 'VERIFACTU-F24-records-pending', async (p) => {
+    await expect(shown(p).locator(`[data-testid=verifactu-records-row][data-id="${record.id}"] [data-testid=verifactu-records-correction-pending]`)).toBeVisible();
+  });
+
+  // «Correct» from its record seals the correction; the rejection's page then links to it instead of what to do.
+  await rejected.click();
+  await expect(page).toHaveURL(new RegExp(`/verifactu/records/${record.id}$`));
+  const detail = shown(page);
+  await detail.locator('[data-testid=verifactu-record-correct]').click();
+  const confirm = page.locator('.ep-confirm-dialog').last();
+  await expect(confirm).toContainText(`Correct the record of ${issued.number}?`);
+  await confirm.getByRole('button', { name: 'Correct' }).click();
+  await expect(page.locator('ion-toast').filter({ hasText: `Correction of ${issued.number} sealed` })).toBeVisible();
+  const both = await api<{ rows: (RecordOut & { correction_status: string; corrected_by_id: string | null })[] }>(
+    context,
+    A,
+    'GET',
+    `/verifactu/records?search=${encodeURIComponent(issued.number)}&limit=10`,
+  );
+  const correction = both.data.rows.find((row) => row.id !== record.id);
+  expect(correction, 'the correction is a new record of the same invoice').toBeDefined();
+  expect(both.data.rows.find((row) => row.id === record.id)).toMatchObject({ correction_status: 'corrected', corrected_by_id: correction?.id });
+  const corrected = detail.locator('[data-testid=verifactu-record-corrected]');
+  await expect(corrected).toContainText('Already corrected with a new record');
+  await expect(detail.locator('[data-testid=verifactu-record-rejected]')).not.toContainText('rectify it in Invoicing');
+  await shots(page, 'VERIFACTU-F24-record-corrected', async (p) => {
+    // The page is still scrolled down to «Correct»: the notice is at its top.
+    const notice = shown(p).locator('[data-testid=verifactu-record-corrected]');
+    await notice.scrollIntoViewIfNeeded();
+    await expect(notice).toBeInViewport();
+  });
+  await detail.locator('[data-testid=verifactu-record-corrected-link]').click();
+  await expect(page).toHaveURL(new RegExp(`/verifactu/records/${correction?.id}$`));
+
+  // In Records: no longer pending (the funnel leaves it out); «Corrected» opens the correction, not the rejection.
+  await search();
+  await expect(rejected.locator('[data-testid=verifactu-records-correction-pending]')).toHaveCount(0);
+  const link = rejected.locator('[data-testid=verifactu-records-correction-corrected]');
+  await expect(link).toHaveText('Corrected');
+  // hub#865: the status and «Corrected» beside it, at the three widths: apart, on one line and centred on it (or one
+  // under the other), and the link as tall as its pill.
+  const layouts: string[] = [];
+  for (const viewport of CELL_VIEWPORTS) {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await expect(link).toBeVisible();
+    await link.scrollIntoViewIfNeeded();
+    const cell = await correctionCell(rejected);
+    recordMetrics(`hub-865-records-corrected-${viewport.label}`, cell);
+    layouts.push(expectCorrectionBeside(cell, viewport.label));
+    await capture(page, `VERIFACTU-F24-records-corrected-${viewport.label}`);
+  }
+  // Both ways are measured: a narrow table cell stacks them (1440), a card and the wide cell put them side by side.
+  expect(layouts).toEqual(['stacked', 'side by side', 'side by side', 'side by side']);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  // From the keyboard: Tab from its row reaches «Corrected», and Space opens the record that corrects it, as the click
+  // and Enter do, never the rejected one of its row (which opens on Enter and Space).
+  await rejected.focus();
+  await page.keyboard.press('Tab');
+  await expect(link).toBeFocused();
+  // Its focus ring shows whole: no box around the link cuts it (the page's own sheet once left it clipped in the cell).
+  expect(await link.evaluate((element) => getComputedStyle(element).outlineStyle), 'the focused link draws its ring').not.toBe('none');
+  expect(await link.evaluate(clippingAncestor), 'nothing between the link and its row cuts its ring').toBeNull();
+  await capture(page, 'VERIFACTU-F24-records-corrected-focused-1440');
+  await page.keyboard.press('Space');
+  await expect(page).toHaveURL(new RegExp(`/verifactu/records/${correction?.id}$`));
+  await search();
+  await link.press('Enter');
+  await expect(page).toHaveURL(new RegExp(`/verifactu/records/${correction?.id}$`));
+  await search();
+  await link.click();
+  await expect(page).toHaveURL(new RegExp(`/verifactu/records/${correction?.id}$`));
+  await search();
+  await toggle.click();
+  await panel.locator('[data-testid=verifactu-records-filter-correction_status]').click();
+  await popover.locator('ion-radio').filter({ hasText: /^\s*Pending correction\s*$/ }).click();
+  await expect(popover).toHaveCount(0);
+  await panel.locator('[data-testid=verifactu-records-filters-apply]').click();
+  await expect(rejected).toHaveCount(0);
+  await expect(view.locator('[data-testid=verifactu-records-empty]')).toBeVisible();
 });
 
 test('VERIFACTU-F21, F10 and F31: without the gateway nothing is presented, and the audit trail says so', async ({ page }) => {

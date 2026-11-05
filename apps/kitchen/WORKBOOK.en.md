@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:feca055666ae2e7fc4b5cc438e9758f69d2e3b45a3d62954156b06a099aeef54 -->
+<!-- generated from WORKBOOK.md sha256:a907b3d6f05da2065dcb1fe56b60a9d2853b5ebfa7d9569e16509ca3ede87728 -->
 
 ## What it is for and who it is for
 
@@ -614,8 +614,11 @@ Steps:
 In: the type, the destination, the notes and the dishes.
 Out: a ticket To prepare, round 1, without a check, with the name of whoever creates it (announces: ticket
 created; History "Created"); its dishes go to their station like those of a round.
-If it fails: inside the panel. A ticket without dishes is rejected ("Add at least one dish."). As it hangs
-from no check, charging does not close it.
+If it fails: inside the panel, and what was typed stays. A ticket without dishes is rejected ("Add at least
+one dish."). What the server refuses of a field is marked under that field, with its reason: a quantity of 0
+marks the quantity of that dish ("Ensure this value is greater than 0."), even with empty rows above it, and
+the window brings the field into view if the person was further down. The mark goes when that field changes
+or the dish is removed. As it hangs from no check, charging does not close it.
 Involved: KITCHEN-F04, KITCHEN-F10, KITCHEN-F21, KITCHEN-F24, KITCHEN-F27, INVENTORY-F27
 
 ### KITCHEN-F24 Delete a ticket

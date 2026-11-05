@@ -3,7 +3,9 @@
 // server-side DataTable — Seq, Invoice, Date, Type (Registration / Cancellation), F., Issuer, Total, Environment and
 // Status (a coloured pill) —, the last sealed first, 50 a page, search «Search invoice, issuer or tax ID…» and the
 // filters behind the table's funnel (Date, Type, Total, Environment and Status on their columns, then the
-// invoice type; the total typed in euros). A row, or «View», opens its record;
+// invoice type and the correction; the total typed in euros). Beside its status, a registration the AEAT rejected (or
+// accepted with errors) says «Pending correction», or «Corrected» linking to the record that corrects it
+// (VERIFACTU-F24, hub#857). A row, or «View», opens its record;
 // «Verify at the AEAT» opens the QR's link of the AEAT in a new tab (in the installed app, the system browser:
 // gh:hub#518). New, sent and answered records come back through the stream by themselves.
 import {
@@ -104,9 +106,19 @@ const columns = computed<DataTableColumn<RecordRowOut>[]>(() => [
   },
 ]);
 
-/** The invoice type filters apart: its column is «F.», too short to name a filter. Its codes are the AEAT's. */
+/** The invoice type filters apart: its column is «F.», too short to name a filter. Its codes are the AEAT's. The
+ *  correction too: it is not a column, it is said beside the status. */
 const filterFields = computed<DataTableFilterField[]>(() => [
   { type: 'select', key: 'invoice_type', label: t('verifactu.filters.invoiceType'), options: options(INVOICE_TYPES, (code) => code) },
+  {
+    type: 'select',
+    key: 'correction_status',
+    label: t('verifactu.filters.correction'),
+    options: [
+      { value: 'pending', label: t('verifactu.filters.correctionPending') },
+      { value: 'corrected', label: t('verifactu.filters.correctionCorrected') },
+    ],
+  },
 ]);
 
 const actions = computed<DataTableAction<RecordRowOut>[]>(() => [
@@ -188,12 +200,49 @@ function onAction({ actionId, row }: { actionId: string; row: RecordRowOut }): v
       @retry="refresh()"
     >
       <template #status="{ row }">
+        <!-- The status and, by a rejection, its correction are the cell's own things: the cell puts them side by side
+             or one under the other; the space keeps them apart where they flow as text (a card). -->
         <StatusPill
           size="sm"
           :tone="statusTone(row.status)"
           :label="$t(`verifactu.status.${row.status}`)"
           data-testid="verifactu-records-status"
         />
+        <template v-if="row.correction_status === 'corrected' && row.corrected_by_id">
+          {{ ' ' }}
+          <!-- The link keeps its click and its keys: the row it sits in opens the rejected record on Enter and Space
+               (hub#865). As tall as its pill (`ion-display-inline-flex`): a plain inline box would drop it below. -->
+          <router-link
+            v-slot="{ href, navigate }"
+            custom
+            :to="`/verifactu/records/${row.corrected_by_id}`"
+          >
+            <a
+              class="ion-display-inline-flex"
+              :href="href"
+              :aria-label="$t('verifactu.records.correction.correctedLink')"
+              data-testid="verifactu-records-correction-corrected"
+              @click.stop="navigate"
+              @keydown.enter.stop
+              @keydown.space.prevent.stop="navigate()"
+            >
+              <StatusPill
+                size="sm"
+                tone="success"
+                :label="$t('verifactu.records.correction.corrected')"
+              />
+            </a>
+          </router-link>
+        </template>
+        <template v-else-if="row.correction_status === 'pending'">
+          {{ ' ' }}
+          <StatusPill
+            size="sm"
+            tone="warning"
+            :label="$t('verifactu.records.correction.pending')"
+            data-testid="verifactu-records-correction-pending"
+          />
+        </template>
       </template>
       <template #environment="{ row }">
         <StatusPill
@@ -213,3 +262,4 @@ function onAction({ actionId, row }: { actionId: string; row: RecordRowOut }): v
     </DataTable>
   </AppPage>
 </template>
+

@@ -90,6 +90,19 @@ def test_the_record_list_filters_and_sorts_by_what_it_shows():
     assert "sort" in refused(schemas.RecordListIn, {"sort": "xml"})
 
 
+def test_the_record_list_filters_the_rejections_by_their_correction():
+    for value in ("pending", "corrected"):
+        assert (
+            schemas.RecordListIn.model_validate({"correction_status": value}).correction_status
+            == value
+        )
+    assert schemas.RecordListIn.model_validate({}).correction_status is None
+    # «Nothing to correct» is every other record: not a filter.
+    assert "correction_status" in refused(
+        schemas.RecordListIn, {"correction_status": "not_applicable"}
+    )
+
+
 def test_a_manual_anchor_is_a_64_hexadecimal_fingerprint_with_its_invoice():
     data = schemas.RecoverManualIn.model_validate(
         {

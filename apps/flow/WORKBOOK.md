@@ -437,7 +437,8 @@ Pasos:
    lleva cada dato tal cual.
 Entra: las acciones y consultas de las apps activas, el último aviso real de ese tipo y lo que dejan los
 pasos anteriores. Los datos se nombran en el idioma de la pantalla («Número de venta», «Teléfono del
-cliente»), nunca con su nombre interno.
+cliente») y con la palabra de la app que los tiene («Sección», como en Ventas / TPV), nunca con su
+nombre interno.
 Sale: los pasos, al **Guardar**. Cada acción o consulta que se nombra pasa a pedir su permiso (FLOW-F12).
 Si falla: el servidor rechaza al guardar una acción o una consulta que no existe en el negocio, un dato
 de un paso que no va antes, una condición vacía o una espera fuera de rango, junto al paso.
@@ -857,9 +858,11 @@ Pasos:
    Sus detalles son lo que dijo y, debajo, cada dato que mandaría, uno por línea, como lo dice su tarjeta en el
    chat (BASE-F97): una fecha y una hora en tu idioma y a la hora del negocio («Empieza a las: 2 nov 2026,
    10:00»), un valor de una lista cerrada con el nombre que le da su app («Reservada por: Mostrador»), un
-   importe en la moneda del negocio, un sí o un no como «Sí» o «No», una lista por cuántos elementos lleva
-   («Servicios: 1 elemento») y un registro por su nombre solo si tú puedes verlo; si no, no sale, y nunca
-   por su código. Los datos fijos del paso (FLOW-F37) salen ya puestos, como los mandará («En nombre del
+   importe en la moneda del negocio, un sí o un no como «Sí» o «No», una lista por sus elementos en palabras,
+   como los servicios de una cita («Servicios: Corte de pelo, Tinte»), o, si no se pueden decir (las líneas de
+   una venta, una lista de códigos), por cuántos elementos lleva, y un registro por su nombre solo si tú puedes
+   verlo; si no, no sale, y nunca por su código. Los datos fijos del paso (FLOW-F37) salen ya puestos, como los
+   mandará («En nombre del
    cliente: Lucía Pérez»), aunque el asistente pidiera otro. Un dato vacío no sale. Se lee al abrir la bandeja,
    con lo que cada persona puede ver.
 2. Si quieres, escribe en **Añadir una nota (opcional)**.

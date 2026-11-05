@@ -47,7 +47,7 @@ caja ni de stock. Para cobrar está Ventas.
 | Operaciones | 6 consultas (`queries.py`) y 13 acciones (`services.py`), todas con `ai=` (`risk = "high"` en borrar un carrito, marcar pagado, fallar y borrar los datos de un cliente); rutas en `/api/cart_checkout/…` |
 | Eventos | 13, `cart_checkout.<entidad>.<hecho>` (`events.py`); sin `REACTIONS`: no escucha a nadie |
 | Consultas vivas | las 6 consultas, re-ejecutadas tras el COMMIT de sus eventos (`live.py`) |
-| Tarea programada | `expire_overdue_carts` → `cart_checkout.cart.cleanup_expired`, `*/15 * * * *`, `collapse` (la corre el worker; en la fase 1, sobre su ámbito fijo) |
+| Tarea programada | `expire_overdue_carts` → `cart_checkout.cart.cleanup_expired`, `*/15 * * * *`, `collapse` (la corre el worker, en cada negocio y con su ámbito) |
 | Permisos | `view_cart` (todos, también el empleado), `manage_cart` y `checkout` (responsable, administrador y propietario) |
 | Migraciones | `0001_initial`, `0002_order_email_erasable` |
 | Admin | Django admin con CRUD en `hubs.erplora.com` (PLAN §17–§18) y la acción «Borrar los datos personales de sus clientes», que es la operación `cart_checkout.customer.erase` |
@@ -74,8 +74,6 @@ pnpm e2e tests/e2e/cart-checkout-flows.spec.ts tests/e2e/cart-checkout-api.spec.
 
 ## Qué queda fuera
 
-- El aviso al instante de un carrito que vence solo (F07): en la fase 1 la tarea corre sobre el ámbito del
-  worker; llega con la tenencia de la fase 2.
 - Los iconos propios y las piezas compartidas de [`UI-REQUESTS.md`](UI-REQUESTS.md).
 - Tienda, pasarela, venta, factura, impuestos, envío, stock y enlace con Clientes: «Lo que NO hace, a
   propósito» del WORKBOOK. El canal online hacia Ventas (cart_checkout#12) sigue aplazado.

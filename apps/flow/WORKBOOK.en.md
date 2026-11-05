@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:3d5d3be165cdbf13a3ff373933fe6049cdeed51997bbfbc9d9641c52cbf9d097 -->
+<!-- generated from WORKBOOK.md sha256:d0f1d9db8fc9a749296c44e98fdfd696a61280b7dca502c6c64e367044a97ce6 -->
 
 ## What it is for and who it is for
 
@@ -410,8 +410,8 @@ Steps:
    notice brings comes out as it is, because the notice does not say whether it is money. What goes to
    another action, to another system or to an "Only continue if…" carries each piece of data as it is.
 In: the actions and queries of the active apps, the last real notice of that kind and what the previous
-steps leave. Data are named in the screen's language ("Sale number", "Customer phone"), never with their
-internal name.
+steps leave. Data are named in the screen's language ("Sale number", "Customer phone") and with the word of the
+app they belong to ("Section", as in Sales & POS), never with their internal name.
 Out: the steps, on **Save**. Each action or query that is named starts asking for its permission
 (FLOW-F12).
 If it fails: the server refuses on saving an action or a query that does not exist in the business, data of
@@ -810,7 +810,9 @@ Steps:
    piece of data it would send, one per line, as its card in the chat says it (BASE-F97): a date and a time in
    your language and at the business's time ("Starts at: 2 Nov 2026, 10:00"), a value from a closed list with
    the name its app gives it ("Booked by: Counter"), an amount in the business's currency, a yes or a no as
-   "Yes" or "No", a list by how many items it carries ("Services: 1 item") and a record by its name only if
+   "Yes" or "No", a list by its items in words, such as the services of an appointment ("Services: Haircut,
+   Colour"), or, when they cannot be said (the lines of a sale, a list of codes), by how many items it carries,
+   and a record by its name only if
    you can see it; if not, it does not show, and never by its code. The step's fixed data (FLOW-F37) come out
    already set, as it will send them ("On behalf of the customer: Lucía Pérez"), even if the assistant asked
    for another. An empty piece of data does not show. It is read when the tray opens, with what each person

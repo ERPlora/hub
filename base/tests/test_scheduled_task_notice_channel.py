@@ -2,8 +2,10 @@
 the hub it belongs to, never on the worker's fixed scope (``WORKER_SCOPE_SLUG``, the platform hub in production).
 
 In a hub with its own database the worker runs its tasks in that database and on its scope (``base.worker._hubs``,
-review of hub#471 C1; S3): a schedule of Flows firing at its time is told to that hub's live queries (its History open on
-a screen re-runs without reloading). Real databases: the session's ``hub_a``, committed (``transaction=True``).
+review of hub#471 C1; S3): a schedule of Flows firing at its time, or the carts Cart and checkout expires
+(CART_CHECKOUT-F07), is told to that hub's live queries and to no other's (its History or its list of carts open on a
+screen re-runs without reloading). Real databases: the session's ``hub_a`` and ``hub_b``, committed
+(``transaction=True``).
 """
 
 import datetime as dt
@@ -12,6 +14,7 @@ import pytest
 from django.conf import settings
 from django.utils import timezone
 from live import operations as live_operations
+from live.live_registry import live_registry
 
 from base import worker
 from base.tenancy.context import use_control, use_hub
@@ -20,21 +23,14 @@ from control.models import Hub
 
 pytestmark = [
     pytest.mark.django_db(transaction=True, databases=hubs.HUB_DATABASES),
-    pytest.mark.usefixtures("no_test_fallback"),
+    pytest.mark.usefixtures("no_test_fallback", "a_worker_just_started"),
 ]
 
 
-@pytest.fixture
-def no_test_fallback(monkeypatch):
-    from base.tenancy import context
-
-    monkeypatch.setattr(context, "_test_fallback", None)
-
-
 @pytest.fixture(autouse=True)
-def nothing_synced_yet(monkeypatch):
-    monkeypatch.setattr(worker, "_synced", set())
-    monkeypatch.setattr(worker, "_next_hub", None)
+def every_hub_in_one_pass(monkeypatch):
+    # A loaded machine must not leave the second hub for a later tick than the test runs.
+    monkeypatch.setattr(worker, "HUB_PASS_SECONDS", 3600)
 
 
 @pytest.fixture
@@ -52,6 +48,18 @@ def told(monkeypatch):
     return sent
 
 
+def tasks_run_by_the_worker(now: dt.datetime) -> None:
+    """Its first pass writes each hub's schedule, each task due at its next time; the next, days on, runs them."""
+    with use_control():
+        worker._hubs(now)
+    with use_control():
+        worker._hubs(now + dt.timedelta(days=2))
+
+
+def told_to(told: list[tuple[str, list[str]]], event: str) -> set[str]:
+    return {key for key, names in told if event in names}
+
+
 def test_a_flow_schedule_fired_by_the_worker_is_told_on_its_hubs_channel(hub_a, told):
     from apps.flow.models import Flow
 
@@ -67,13 +75,30 @@ def test_a_flow_schedule_fired_by_the_worker_is_told_on_its_hubs_channel(hub_a, 
             grants=["task.task.create"],
             enabled=True,
         )
-    with use_control():
-        worker._hubs(now)  # its schedule written in its database, each task due at its next time
-
-    with use_control():
-        worker._hubs(now + dt.timedelta(days=2))
+    tasks_run_by_the_worker(now)
 
     flow_notices = [(key, names) for key, names in told if any(name.startswith("flow.") for name in names)]
     assert flow_notices, f"the fired schedule was told to nobody: {told}"
     assert {key for key, _ in flow_notices} == {hub_a.slug}
     assert settings.WORKER_SCOPE_SLUG not in {key for key, _ in told}
+
+
+def test_carts_expired_by_the_worker_are_told_on_their_hubs_channel_and_no_other(hub_a, hub_b, told):
+    # CART_CHECKOUT-F07: the list open in that business re-runs at once; the other's hears nothing.
+    from apps.cart_checkout.events import CART_EXPIRED
+    from apps.cart_checkout.models import Cart
+
+    now = timezone.now()
+    with use_hub(hub_b):
+        overdue = Cart.objects.create(session_token="sess_overdue", expires_at=now - dt.timedelta(days=1))
+    with use_hub(hub_a):
+        still_on = Cart.objects.create(session_token="sess_still_on", expires_at=now + dt.timedelta(days=1))
+
+    tasks_run_by_the_worker(now)
+
+    with use_hub(hub_b):
+        assert Cart.objects.get(pk=overdue.pk).status == Cart.Status.EXPIRED
+    with use_hub(hub_a):
+        assert Cart.objects.get(pk=still_on.pk).status == Cart.Status.ACTIVE
+    assert told_to(told, CART_EXPIRED) == {hub_b.slug}
+    assert "cart_checkout.cart.list" in live_registry.affected([CART_EXPIRED])

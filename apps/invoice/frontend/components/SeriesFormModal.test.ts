@@ -104,6 +104,72 @@ describe('SeriesFormModal: creating', () => {
     expect(prop(s.field('code'), 'errorText')).toBe('There is already a series with that code that year.');
     expect(s.wrapper.emitted('update:open')).toBeUndefined();
   });
+
+  it('a refused type is marked under its field, not only said on top (hub#461)', async () => {
+    const s = await setup();
+    await ionValue(s.field('code'), 'FACT', 'ionInput');
+    s.answer(422, { error: { code: 'invalid_payload', message: 'Check the highlighted details.', fields: { invoice_type: 'Choose a type.' } } });
+    await s.submit();
+    expect(prop(s.field('type'), 'errorText')).toBe('Choose a type.');
+    expect(s.field('type')?.classList.contains('ion-invalid')).toBe(true);
+  });
+
+  describe('what the person corrects stops being said; the next refusal says it again (hub#461)', () => {
+    const REFUSED = {
+      error: {
+        code: 'invalid_payload',
+        message: 'Check the highlighted details.',
+        fields: { code: 'Use letters and digits only.', next_number: 'Write a whole number.' },
+      },
+    };
+
+    /** «New numbering series» with a code typed, refused with its next number. */
+    async function refused() {
+      const s = await setup();
+      await ionValue(s.field('code'), 'FACT', 'ionInput');
+      s.answer(422, REFUSED);
+      await s.submit();
+      return s;
+    }
+
+    /** A person types: the native `input` bubbles out of the field, then Ionic's own event carries the value. */
+    async function type(s: Awaited<ReturnType<typeof setup>>, key: string, value: string) {
+      s.field(key)?.dispatchEvent(new Event('input', { bubbles: true }));
+      await ionValue(s.field(key), value, 'ionInput');
+    }
+
+    const red = (s: Awaited<ReturnType<typeof setup>>, key: string) => !!s.field(key)?.classList.contains('ion-invalid');
+
+    it('the corrected code loses its message, its red and the notice; the next refusal brings them back', async () => {
+      const s = await refused();
+      expect([prop(s.field('code'), 'errorText'), prop(s.field('next-number'), 'errorText')]).toEqual([
+        'Use letters and digits only.',
+        'Write a whole number.',
+      ]);
+
+      await type(s, 'code', 'FACTB');
+      expect(prop(s.field('code'), 'errorText')).toBeFalsy();
+      expect(red(s, 'code')).toBe(false);
+      expect(prop(s.field('next-number'), 'errorText')).toBe('Write a whole number.');
+      expect(s.inDoc('invoice-series-form-error')).toBeNull();
+
+      s.answer(422, REFUSED);
+      await s.submit();
+      expect(s.inDoc('invoice-series-form-error')?.textContent).toContain('Check the highlighted details.');
+      expect(prop(s.field('code'), 'errorText')).toBe('Use letters and digits only.');
+    });
+
+    it('the corrected next number loses its message and its red; the code keeps both', async () => {
+      const s = await refused();
+      expect(red(s, 'next-number')).toBe(true);
+
+      await type(s, 'next-number', '7');
+      expect(prop(s.field('next-number'), 'errorText')).toBeFalsy();
+      expect(red(s, 'next-number')).toBe(false);
+      expect(prop(s.field('code'), 'errorText')).toBe('Use letters and digits only.');
+      expect(red(s, 'code')).toBe(true);
+    });
+  });
 });
 
 describe('SeriesFormModal: editing', () => {

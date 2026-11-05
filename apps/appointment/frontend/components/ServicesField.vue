@@ -1,8 +1,9 @@
 <script setup lang="ts">
 // The «Services» field of the booking and series panels (APPOINTMENT-F01, F12): the services chosen, in
 // order (a cut, then a colour), as chips that can be removed, and a search of the bookable catalog
-// (Services) to add one more — each service once. What it learns of a service it offered (length and
-// price) goes into `facts`, which the panel reads for its minutes and total.
+// (Services) to add one more — each service once, offered with its price in the business's money (BASE-F50).
+// What it learns of a service it offered (length and price) goes into `facts`, which the panel reads for its
+// minutes and total.
 import { Combo, type ComboOption } from '@erplora/ui/components';
 import { useLiveClient } from '@erplora/ui/sdk';
 import { HubIcon } from '@erplora/ui/shell';
@@ -10,6 +11,7 @@ import { IonButton, IonChip, IonLabel } from '@ionic/vue';
 import { computed, nextTick, ref } from 'vue';
 
 import { useLocale, useT } from '../composables/useT';
+import { useBusinessMoney } from '../lib/format';
 import { type ServiceFacts, searchBookableServices } from '../lib/pickers';
 
 const props = withDefaults(
@@ -26,7 +28,8 @@ const services = defineModel<ComboOption[]>({ required: true });
 const t = useT();
 const locale = useLocale();
 const client = useLiveClient();
-const search = computed(() => searchBookableServices(client, locale.value, props.facts));
+const money = useBusinessMoney();
+const search = computed(() => searchBookableServices(client, locale.value, props.facts, money.value));
 /** The Combo's pick, shown for one render and then emptied: the field is ready for the next service
  *  (the Combo paints its v-model when it changes). Remounting it instead would orphan its open list. */
 const adding = ref<ComboOption | null>(null);

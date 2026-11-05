@@ -80,6 +80,141 @@ describe('TicketFormModal', () => {
     expect(f.closed()).toBe(false);
   });
 
+  describe('a refusal by fields (hub#833)', () => {
+    const NOTICE = 'Check the highlighted details.';
+    const ABOVE_ZERO = 'Ensure this value is greater than 0.';
+    const refusal = (fields: Record<string, string>) => [422, { error: { code: 'invalid_payload', message: NOTICE, fields } }] as [number, unknown];
+    const TICKETS = '/api/kitchen/tickets';
+    type Field = Control & { errorText?: unknown };
+    const markOf = (el: Element | null) => {
+      const field = el as Field;
+      return { message: field.errorText || undefined, red: field.classList.contains('ion-invalid') && field.classList.contains('ion-touched') };
+    };
+    const MARKED = (message: string) => ({ message, red: true });
+    const UNMARKED = { message: undefined, red: false };
+    /** A keystroke: Ionic's value event, and the native `input` that bubbles up through the field. */
+    const type = async (el: Element | null, value: string): Promise<void> => {
+      await ionValue(el, value, 'ionInput');
+      el?.dispatchEvent(new Event('input', { bubbles: true }));
+      await settle();
+    };
+
+    /** Two written dishes, «Soup» and «Salad», sent and refused with `fields`. */
+    const twoDishes = async (fields: Record<string, string>) => {
+      const f = await form({}, { [TICKETS]: refusal(fields) });
+      await ionValue(f.field('dish-0-name'), 'Soup', 'ionInput');
+      await click(f.field('add-dish'));
+      await ionValue(f.field('dish-1-name'), 'Salad', 'ionInput');
+      await click(f.field('submit'));
+      return f;
+    };
+
+    it("a quantity of 0 marks that dish's quantity with the server's reason, not only a notice on top", async () => {
+      const f = await form({}, { [TICKETS]: refusal({ 'items.0.quantity': ABOVE_ZERO }) });
+      await ionValue(f.field('dish-0-name'), 'Salad', 'ionInput');
+      await ionValue(f.field('dish-0-quantity'), '0', 'ionInput');
+      await click(f.field('submit'));
+      expect(markOf(f.field('dish-0-quantity'))).toEqual(MARKED(ABOVE_ZERO));
+      expect(f.inDoc('kitchen-ticket-form-error')?.textContent).toContain(NOTICE);
+      expect(f.inDoc('kitchen-ticket-form-error')?.textContent).not.toContain(ABOVE_ZERO);
+      expect(f.field('dish-0-name').value).toBe('Salad');
+      expect(f.closed()).toBe(false);
+    });
+
+    it('the server names a dish by its place in what was sent: an empty row above it is not sent', async () => {
+      const f = await form({}, { [TICKETS]: refusal({ 'items.0.quantity': ABOVE_ZERO }) });
+      await click(f.field('add-dish'));
+      await ionValue(f.field('dish-1-name'), 'Salad', 'ionInput');
+      await ionValue(f.field('dish-1-quantity'), '0', 'ionInput');
+      await click(f.field('submit'));
+      expect(f.sent().at(-1)?.body).toMatchObject({ items: [{ name: 'Salad', quantity: '0' }] });
+      expect(markOf(f.field('dish-1-quantity'))).toEqual(MARKED(ABOVE_ZERO));
+      expect(markOf(f.field('dish-0-quantity'))).toEqual(UNMARKED);
+    });
+
+    it('marks each field of a dish and of the ticket under its own name', async () => {
+      const fields = {
+        order_type: 'Type refused.',
+        label: 'Label refused.',
+        notes: 'Notes refused.',
+        'items.0.name': 'Name refused.',
+        'items.0.quantity': 'Quantity refused.',
+        'items.0.notes': 'Note refused.',
+      };
+      const f = await form({}, { [TICKETS]: refusal(fields) });
+      await ionValue(f.field('dish-0-name'), 'Salad', 'ionInput');
+      await click(f.field('submit'));
+      expect(markOf(f.field('type'))).toEqual(MARKED('Type refused.'));
+      expect(markOf(f.field('label'))).toEqual(MARKED('Label refused.'));
+      expect(markOf(f.field('notes'))).toEqual(MARKED('Notes refused.'));
+      expect(markOf(f.field('dish-0-name'))).toEqual(MARKED('Name refused.'));
+      expect(markOf(f.field('dish-0-quantity'))).toEqual(MARKED('Quantity refused.'));
+      expect(markOf(f.field('dish-0-notes'))).toEqual(MARKED('Note refused.'));
+      expect(f.inDoc('kitchen-ticket-form-error')?.textContent).toContain(NOTICE);
+    });
+
+    it("a dish's product passes its refusal to the Combo", async () => {
+      const f = await form({}, { [TICKETS]: refusal({ 'items.0.product_id': 'Product refused.' }) });
+      f.combo(0)!.vm.$emit('update:modelValue', { id: 'p1', label: 'Burger' });
+      await settle();
+      await click(f.field('submit'));
+      expect(prop(f.combo(0)!, 'errorText')).toBe('Product refused.');
+    });
+
+    it('typing in the marked quantity clears its mark and the notice; the other dish keeps its own', async () => {
+      const f = await twoDishes({ 'items.0.quantity': ABOVE_ZERO, 'items.1.quantity': ABOVE_ZERO });
+      await type(f.field('dish-0-quantity'), '2');
+      expect(markOf(f.field('dish-0-quantity'))).toEqual(UNMARKED);
+      expect(markOf(f.field('dish-1-quantity'))).toEqual(MARKED(ABOVE_ZERO));
+      expect(f.inDoc('kitchen-ticket-form-error')).toBeNull();
+    });
+
+    it('a mark follows its dish when one above it is removed', async () => {
+      const f = await twoDishes({ 'items.1.quantity': ABOVE_ZERO });
+      await click(f.field('dish-0-remove'));
+      expect(f.field('dish-0-name').value).toBe('Salad');
+      expect(markOf(f.field('dish-0-quantity'))).toEqual(MARKED(ABOVE_ZERO));
+    });
+
+    it('a dish added after the refusal is not taken for the refused one', async () => {
+      const f = await form({}, { [TICKETS]: refusal({ 'items.0.quantity': ABOVE_ZERO }) });
+      await click(f.field('add-dish'));
+      await ionValue(f.field('dish-1-name'), 'Soup', 'ionInput');
+      await click(f.field('submit'));
+      await click(f.field('add-dish'));
+      expect(markOf(f.field('dish-0-quantity'))).toEqual(UNMARKED);
+      expect(markOf(f.field('dish-1-quantity'))).toEqual(MARKED(ABOVE_ZERO));
+      expect(markOf(f.field('dish-2-quantity'))).toEqual(UNMARKED);
+    });
+
+    it('removing the refused dish leaves no promise of marks that are gone', async () => {
+      const f = await twoDishes({ 'items.1.quantity': ABOVE_ZERO });
+      expect(f.inDoc('kitchen-ticket-form-error')?.textContent).toContain(NOTICE);
+      await click(f.field('dish-1-remove'));
+      expect(f.inDoc('kitchen-ticket-form-error')).toBeNull();
+    });
+
+    it('what no field of this window shows is said on top, by FormModal, with no promise of marks', async () => {
+      const f = await form({}, { [TICKETS]: refusal({ items: 'Too many dishes.' }) });
+      await ionValue(f.field('dish-0-name'), 'Soup', 'ionInput');
+      await click(f.field('submit'));
+      expect(f.inDoc('kitchen-ticket-form-error')?.textContent).toContain('Too many dishes.');
+      expect(f.inDoc('kitchen-ticket-form-error')?.textContent).not.toContain(NOTICE);
+    });
+
+    it('a new opening starts with nothing marked', async () => {
+      const f = await form({}, { [TICKETS]: refusal({ 'items.0.quantity': ABOVE_ZERO }) });
+      await ionValue(f.field('dish-0-name'), 'Soup', 'ionInput');
+      await click(f.field('submit'));
+      await f.wrapper.setProps({ open: false });
+      await settle();
+      await f.wrapper.setProps({ open: true });
+      await settle();
+      expect(markOf(f.field('dish-0-quantity'))).toEqual(UNMARKED);
+      expect(f.inDoc('kitchen-ticket-form-error')).toBeNull();
+    });
+  });
+
   it('speaks Spanish', async () => {
     const f = await form({}, {}, 'es');
     expect(f.inDoc('kitchen-ticket-form')?.getAttribute('aria-label')).toBe('Nueva comanda');

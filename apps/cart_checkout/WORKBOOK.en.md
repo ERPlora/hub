@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:87fb9ebf29636d7e1fd9237505bec92387def528a7b0860364b863f1b3d00049 -->
+<!-- generated from WORKBOOK.md sha256:b8a6c4bd9e6ded6893c022ec3a5ede909afe10073bdef2a50a07e48bf4e78767 -->
 
 ## What it is for and who it is for
 
@@ -232,8 +232,8 @@ Out: the overdue carts become Expired and the order says how many
 (`cart_checkout.cart.expired`, with the number; with none it announces nothing).
 If it fails: with no overdue carts it answers "0" and announces nothing. A cart with no expiry never expires. With the
 list already open, a cart that expires at that moment still shows "Active" until the list is read
-again: with the next change, when it is opened again or with the Hub's safety re-read (every 5
-minutes). When the order is given by someone of the business, through the assistant or the API, the open list
+again: with the pass of the task that leaves it Expired, with the next change, when it is opened again or with
+the Hub's safety re-read (every 5 minutes). When the order is given by someone of the business, through the assistant or the API, the open list
 is brought up to date at that moment.
 Involved: none
 

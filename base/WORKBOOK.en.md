@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:94f22534d5e6eef39fdfe8385ee6a5ae148e0e6f8390328fcc901b17fd46ad75 -->
+<!-- generated from WORKBOOK.md sha256:dad154ba0d875d56290418045f81cac9ca17c811e5927df15521d579376b572a -->
 
 ## What it is for and who it is for
 
@@ -347,7 +347,7 @@ On the Employees screens and the API documentation:
 | BASE-F47 | Report an error of the screen without anyone asking | done |
 | BASE-F48 | Open Settings and move through its tabs | done |
 | BASE-F49 | See the business's country | done |
-| BASE-F50 | See the business's currency | discarded |
+| BASE-F50 | See the business's currency | done |
 | BASE-F51 | Change the business's language on erplora.com | done |
 | BASE-F52 | Enter with the erplora.com account | done |
 | BASE-F53 | Enter from the erplora.com panel without typing the password again | done |
@@ -1466,7 +1466,7 @@ has no country: "—".
 Involved: HUBS-F15, BASE-F01, BASE-F29
 
 ### BASE-F50 See the business's currency
-Status: discarded — every app is in the business's currency except Appointments, which stays in euros even if the business's country pays in another currency: with Spain and Portugal it adds up, with a country of another currency it does not (hub#577)
+Status: done
 Actor: owner, administrator, manager, employee
 Screen: Settings · Business; Home · Summary and Home · Activity
 Steps:
@@ -1477,6 +1477,8 @@ Steps:
   3. On the Home, the amounts of the panels (such as "Sales, last 7 days") and of "Activity" are in that currency,
      with its symbol and its decimals, as a till of that country prints them: "zł" in a business in Poland, "€" in
      one in Spain. While the business has not answered, the amount shows without a symbol, never in another currency.
+  4. The apps that show prices or amounts are in that same currency, Appointments too (each service's price when
+     booking and the appointment's "Total") and the preview of Online booking (hub#577).
 In: the business's country.
 Out: nothing saved.
 If it fails: as in BASE-F49.
@@ -2400,7 +2402,9 @@ Steps:
      no sign when it balances); a yes or a no, as "Yes" or "No"; a list that its app (the server) names, by its items
      one after another ("Printers: Till, Kitchen"; past four, the first three and how many more: "Till, Kitchen, Bar and
      2 more"; when an item carries a comma, such as a date, separated by semicolons: "Nov 2, 2026, 10:00 AM; Nov 9,
-     2026, 10:00 AM") and any other, such as the lines of a sale or a list of codes, by how many items it carries; and a datum that groups others, such as a WhatsApp template, by its values, without the name of each one ("Template:
+     2026, 10:00 AM"); a list of lines that carry only their record, such as the services of an appointment, the same
+     way, by the name of each ("Services: Haircut, Colour"; one that cannot be named counts among the "more"); and any
+     other, such as the lines of a sale (with their quantity and price) or a list of codes, by how many items it carries; and a datum that groups others, such as a WhatsApp template, by its values, without the name of each one ("Template:
      cita_recordatorio · es · Ana, 10:00"; of a till count, the notes and coins counted remain: "50: 2"). A date and a
      time show as they are written in the person's language and at the business's hour ("Nov 2, 2026, 10:00 AM"; a day
      alone, "Nov 2, 2026"; a time alone, "9:30 PM"); a value of a closed list, with the name its app gives it ("Front

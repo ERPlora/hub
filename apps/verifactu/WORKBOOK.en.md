@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:4e38cd837b096b0333fbd17b15b21043572cc8bff1dc2ea8bc55a62037d41f71 -->
+<!-- generated from WORKBOOK.md sha256:6cc15c59135f6d993161cbbb8956d913d496dc4d29c972705afce9046ece9c66 -->
 
 ## What it is for and who it is for
 
@@ -91,8 +91,10 @@ use do not show.
 Menu **VeriFactu → Records**. Title "VeriFactu records". Table of 50 by 50 (table or cards; on the phone, cards
 with the invoice number as title) with "Seq", "Invoice", "Date", "Type" (Registration / Cancellation), "F."
 (F1…R5), "Issuer", "Total", "Environment" (Testing / Production) and "Status" (Pending, Sent, Accepted, Accepted
-with errors, Rejected, in a coloured pill). Search box "Search invoice, issuer or tax ID…" (sequence number, invoice
-number, issuer's name or tax ID). Filters of status, type, invoice type, environment, date and total (in euros),
+with errors, Rejected, in a coloured pill; beside a registration rejected or accepted with errors, "Pending
+correction" or "Corrected", which opens the record that corrects it: VERIFACTU-F24). Search box "Search invoice, issuer or tax ID…" (sequence number, invoice
+number, issuer's name or tax ID). Filters of status, type, invoice type, correction ("Pending correction" or
+"Corrected"), environment, date and total (in euros),
 behind the table's funnel with its counter; a total that is not an amount, or a "to" date before the "from" one, is
 said under its field and does not filter. The last sealed comes on top. Per row: "View" (also by tapping the row)
 and "Verify at the AEAT" (opens the QR's verification page). The list updates by itself when a record is born,
@@ -104,7 +106,8 @@ results". Loading: "Loading…". Error: the message with "Retry".
 It opens from a row of **Records** (`/verifactu/records/<id>`). On top, "Record {number}" with its status, its
 environment and "← Back". If it is not at the AEAT (Pending or Sent), the notice "Not at the AEAT yet" with the
 why and the when (VERIFACTU-F17). If it was rejected, the notice "The AEAT rejected it" with what to do
-(VERIFACTU-F24). Blocks:
+(VERIFACTU-F24); once corrected (an "Accepted with errors" too), instead of what to do, "Already corrected with a new
+record" with the link "Open the record that corrects it". Blocks:
 - **Invoice**: "Invoice", "Issue date", "Operation date" (if it is another), "Invoice type", "Issuer", "Issuer tax
   ID", "Customer" and "Customer tax ID" (if there are any), "Rectifies" / "Replaces", "Base", "Tax" and "Total".
 - **Fingerprint chain**: "Seq", "Generated at", "Fingerprint", "Previous fingerprint" (or "First record of the
@@ -226,7 +229,7 @@ Screen notices: the result of each action in a strip on top (green if it went we
 | VERIFACTU-F17 | See the detail of a record and why it waits | done |
 | VERIFACTU-F18 | Verify the QR at the AEAT's site | partial — in the installed app the AEAT's site does not open yet: the app has yet to accept its addresses (ERPlora/app#20) |
 | VERIFACTU-F19 | Give the QR and the fiscal status to the ticket and the invoice | done (Sales and Printing ask for it by name) |
-| VERIFACTU-F20 | Send later what could not go out (automatic contingency) | done — the worker runs it every minute (in phase 1, over a single hub) |
+| VERIFACTU-F20 | Send later what could not go out (automatic contingency) | done — the worker runs it every minute, in each business |
 | VERIFACTU-F21 | Process the queue by hand | done |
 | VERIFACTU-F22 | Retry a queue entry | done |
 | VERIFACTU-F23 | Discard a queue entry | discarded — a generated record is never discarded |
@@ -583,9 +586,9 @@ Out: the status and the answer in each record (it announces `verifactu.record.tr
 If it fails: with no gateway configured, no producer's data or no route ready, nothing is sent and each record
 says why it waits (VERIFACTU-F17). A record is never taken as accepted without the AEAT's answer. A business
 outside Spain never sends anything: what was sealed before is kept as it is, without going out, and says why.
-A business's record is always presented as that business, never as ERPlora's hub (hub#454): the pass of ERPlora's
-hub (the worker's fixed scope in phase 1, which sees the businesses' records while the tables are shared) presents
-it with the id erplora.com gave the business; without that id (its account's photo has not arrived yet) nothing is
+A business's record is always presented as that business, never as ERPlora's hub (hub#454): the worker goes
+through each business in its database and on its scope. If the pass of ERPlora's hub sees a record with a tax ID other
+than ERPlora's, it presents it with the id erplora.com gave the business; without that id (its account's photo has not arrived yet) nothing is
 sent and the record waits with "ERPlora has not linked this business to its account on this server yet"
 (`hub_unregistered`; "Send now" → 409 `verifactu.hub_unregistered`) until the photo brings it.
 Involved: VERIFACTU-F20, FLOW-F04 (the card of the Automations gallery that creates an urgent task when the AEAT
@@ -660,7 +663,7 @@ goes out without a VeriFactu QR or receipt.
 Involved: INVOICE-F17, INVOICE-F18
 
 ### VERIFACTU-F20 Send later what could not go out (automatic contingency)
-Status: done — the worker runs it every minute (in phase 1, over a single hub)
+Status: done — the worker runs it every minute, in each business
 Actor: system
 Screen: Contingency
 Steps:
@@ -723,9 +726,10 @@ Involved: VERIFACTU-F24, VERIFACTU-F35
 ### VERIFACTU-F24 Act on a record rejected by the AEAT
 Status: done
 Actor: administrator
-Screen: Record detail
+Screen: Records, Record detail
 Steps:
-1. The record shows in red "Rejected" in **Records**; in **Events** "Submission failed" is left with the reason.
+1. The record shows in red "Rejected" in **Records**, with "Pending correction" beside it; in **Events** "Submission
+   failed" is left with the reason. The "Correction" filter → "Pending correction" leaves only the ones still to do.
 2. In its detail, "The AEAT rejected it" with the AEAT's literal code and message and what to do: if the error is
    in the invoice's data (a customer's tax ID the AEAT does not know, an amount), it is corrected **in Invoicing**
    with a rectifying invoice; if not (a chain error after restoring a backup, a fault of ours), "Correct".
@@ -735,6 +739,9 @@ Steps:
    §9.1.3, "registration after rejection"); `S` if the AEAT does have it and what was rejected was a later
    correction.
 4. An "Accepted with errors" can also be corrected (`Subsanacion = S`, `RechazoPrevio = N`; §9.1.2).
+5. Once corrected, in **Records** the earlier one says "Corrected", which opens the record that corrects it, and its
+   detail, "Already corrected with a new record" with "Open the record that corrects it". If the AEAT rejects the
+   correction too, that one shows "Pending correction" and is corrected in turn; the earlier one stays "Corrected".
 In: the rejected or accepted-with-errors record.
 Out: the correction record (it announces `verifactu.record.created`).
 If it fails: only a registration record rejected or accepted with errors is corrected, and only the last one of its

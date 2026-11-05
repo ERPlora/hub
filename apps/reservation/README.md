@@ -5,11 +5,10 @@ de comensales, dentro del horario del negocio; días u horas bloqueados; cada re
 origen, de Pendiente a Completada; y una lista de espera para quien no cabe. Confirmar aparta la mesa en Mesas y
 sentar abre su cuenta en Ventas. Las reservas que el cliente hace o cambia por WhatsApp entran con sus reglas.
 
-- **Estado**: completa (2026-10-31): 22 de los 23 flujos `RESERVATION-F01` … `F23` están `hecho`. RESERVATION-F17 y
+- **Estado**: completa (2026-11-05): los 23 flujos `RESERVATION-F01` … `F23` están `hecho`. RESERVATION-F17 y
   F18 (reservar, cambiar y anular por WhatsApp) se cerraron al cerrar la app: la conversación es la respuesta
-  «Reservar mesa» de la Bandeja de WhatsApp. RESERVATION-F13 (liberar solas las pendientes) está `descartado` con
-  hub#551: libera, pero avisa al momento solo en el negocio de la plataforma hasta el recorrido del worker por
-  negocio.
+  «Reservar mesa» de la Bandeja de WhatsApp. RESERVATION-F13 (liberar solas las pendientes) volvió a `hecho` con
+  hub#551: el worker libera en cada negocio y en su ámbito, y su pantalla de Reservas lo ve al momento.
 - **Especificación**: [`WORKBOOK.md`](WORKBOOK.md) (en inglés, [`WORKBOOK.en.md`](WORKBOOK.en.md), hasta
   «Para quien lo mantiene»). Lo que se cambie de la app se cambia antes allí.
 - **Peticiones a `@erplora/ui` y a Mesas** que siguen abiertas: [`UI-REQUESTS.md`](UI-REQUESTS.md).
@@ -29,7 +28,8 @@ sentar abre su cuenta en Ventas. Las reservas que el cliente hace o cambia por W
   propia reserva, tras el «Aprobar» del dueño en Automatizaciones; y el aviso por WhatsApp cuando se confirma.
 - **Con Clientes** (F21, F22): unir dos fichas mueve sus reservas; borrar los datos de una ficha los borra de sus
   reservas y entradas, y de los avisos que dejaron.
-- **Liberar las pendientes** (F13, `descartado`, hub#551): la tarea del worker las cancela cada cuarto de hora.
+- **Liberar las pendientes** (F13): la tarea del worker las cancela cada cuarto de hora en cada negocio, y la pantalla
+  de Reservas que ese negocio tiene abierta lo ve al momento.
 
 ## Ficha
 
@@ -43,7 +43,7 @@ sentar abre su cuenta en Ventas. Las reservas que el cliente hace o cambia por W
 | Pantallas | `/reservation/reservations`, `/reservation/waitlist`, `/reservation/availability` y `/reservation/settings` |
 | Operaciones | 11 consultas (`queries.py`) y 20 acciones (`services.py`), todas con `ai=`; 29 rutas en `/api/reservation/…` |
 | Eventos | 16 (`events.py`): `reservation.reservation.{created,updated,status_changed,deleted,unconfirmed_released}`, `reservation.waitlist.{created,updated,deleted,converted}`, `reservation.time_slot.{created,deleted}`, `reservation.blocked_date.{created,deleted}`, `reservation.settings.updated` y `reservation.customer.{reassigned,erased}`; reacciona a `customer.customer.merged` y `customer.customer.erased` |
-| Tarea programada | `release_unconfirmed_reservations` cada 15 minutos (`collapse`), en el ámbito fijo del worker de la fase 1 |
+| Tarea programada | `release_unconfirmed_reservations` cada 15 minutos (`collapse`), en cada negocio y con su ámbito (`base.worker._serve_hub`) |
 | Migraciones | `0001_initial` y `0002_guest_phone_e164` |
 | Admin | Django admin en `hubs.erplora.com`, CRUD completo para soporte; ids y fechas, solo lectura; lo que guarda no pasa por las operaciones ni deja aviso |
 
@@ -63,15 +63,15 @@ CI=1 pnpm e2e tests/e2e/reservation-whatsapp.spec.ts   # pila con SaaS, proveedo
 
 - `test_integration_table.py`, `test_integration_customer.py`, `test_integration_schedule.py` y
   `test_integration_assistant.py` van contra las apps reales; `test_relay.py` y `test_scheduled_release.py`, por el
-  tick real del relay y del scheduler; `test_concurrency.py`, con hilos (el último sitio de una franja).
+  tick real del relay y del scheduler; `test_scheduled_release_per_hub.py`, por el recorrido real del worker sobre
+  dos negocios con su BD (el aviso de la liberación llega a su negocio y no al otro); `test_concurrency.py`, con
+  hilos (el último sitio de una franja).
 - La parte de WhatsApp la prueban además `apps/whatsapp_inbox/tests/test_recipes.py`,
   `test_relay_auto_replies.py` y `test_relay_notify.py`, y las e2e `fix-whatsapp-inbox-recipes-assistant.spec.ts`,
   `fix-whatsapp-inbox-table-cancel.spec.ts` y `flow-send-message.spec.ts`.
 
 ## Qué queda fuera
 
-- **hub#551** — Cuando una reserva pendiente se libera sola, la pantalla de Reservas tarda hasta cinco minutos en
-  verlo (F13).
 - **hub#547** — Una traducción al español marcada «fuzzy» sale en inglés y su test de traducciones no la ve.
 - **hub#548** — Dos textos en español salen con las palabras de otra app («origen» en vez de «reservada por»).
 - **hub#549** — La tarjeta de confirmación del asistente llama «Registro» a la reserva, la franja o la entrada que
