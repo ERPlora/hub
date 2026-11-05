@@ -6,6 +6,7 @@ customer's: the titles of its schemas and the ``verbose_name`` of its models, wi
 import json
 from pathlib import Path
 
+import pytest
 from django.apps import apps
 from live.operations import get, registry
 
@@ -21,6 +22,13 @@ def labels(card: dict) -> list[str]:
     return [field["label"] for field in card["fields"]]
 
 
+@pytest.fixture
+def named(monkeypatch):
+    """Every record a write names by its id comes out named, as a person who may read it sees it: these tests are about
+    what the card calls each datum, and a record nobody names is left out of it (hub#513)."""
+    monkeypatch.setattr(assistant, "_reference", lambda value, prop, words: "Ana López")
+
+
 def customer_writes() -> list:
     return [
         op
@@ -29,7 +37,7 @@ def customer_writes() -> list:
     ]
 
 
-def test_no_datum_of_a_write_of_customer_reaches_a_spanish_card_by_its_technical_name():
+def test_no_datum_of_a_write_of_customer_reaches_a_spanish_card_by_its_technical_name(named):
     """Every write of customer the assistant may ask for, with all its data: each datum by a name of its own in
     Spanish, never the one pydantic makes up."""
     screen = named_by_the_screen()
@@ -44,7 +52,7 @@ def test_no_datum_of_a_write_of_customer_reaches_a_spanish_card_by_its_technical
     assert technical == {}
 
 
-def test_the_card_names_the_duplicate_card_merged_into_the_one_that_stays():
+def test_the_card_names_the_duplicate_card_merged_into_the_one_that_stays(named):
     """«Fusionar con…»: the card that stays is the customer, the one picked is the duplicate the merge screen asks for
     («Buscar la ficha duplicada»), by its id or by its name."""
     merge = get("customer.customer.merge")
@@ -110,7 +118,7 @@ def test_the_card_names_a_note_and_its_author():
     assert labels(assistant.card(note, arguments, "en")) == ["Customer", SCREENS_EN["notes"]["label"], "Author"]
 
 
-def test_the_card_names_the_order_a_customer_is_put_on_as_a_pedido_never_a_sort_order():
+def test_the_card_names_the_order_a_customer_is_put_on_as_a_pedido_never_a_sort_order(named):
     """The card's «Pedidos enlazados» say «Pedido»; the model's verbose name «orden» is also the one of the lists'
     sort order, so the card said «Orden»."""
     assert SCREENS["orders"]["order"].startswith("Pedido ")
