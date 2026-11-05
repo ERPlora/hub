@@ -70,6 +70,14 @@ async function open(options: Parameters<typeof mountBase>[1] = {}) {
 
 const byTestId = (id: string) => document.querySelector(`[data-testid="${id}"]`) as HTMLElement | null;
 
+/** The least «Create key» takes: a name and a box ticked. */
+async function nameAndTick(): Promise<void> {
+  type(byTestId('api-key-form-name')!, 'Tienda');
+  await flush();
+  (byTestId('api-key-form-cart_checkout-read') as HTMLElement).dispatchEvent(new CustomEvent('ionChange', { detail: { checked: true } }));
+  await flush();
+}
+
 beforeEach(() => {
   Object.defineProperty(navigator, 'clipboard', { value: { writeText: vi.fn(() => Promise.resolve()) }, configurable: true });
 });
@@ -146,10 +154,7 @@ describe('ApiKeysPanel', () => {
     const submit = () => byTestId('api-key-form-submit') as HTMLButtonElement;
     expect(byTestId('api-key-form-apps')?.textContent).toContain('Online shop');
     expect(submit().hasAttribute('disabled') || submit().getAttribute('disabled') === 'true').toBe(true);
-    type(byTestId('api-key-form-name')!, 'Tienda');
-    await flush();
-    (byTestId('api-key-form-cart_checkout-read') as HTMLElement).dispatchEvent(new CustomEvent('ionChange', { detail: { checked: true } }));
-    await flush();
+    await nameAndTick();
     submit().click();
     await flush();
     expect(posted(m)).toEqual([
@@ -211,10 +216,7 @@ describe('ApiKeysPanel', () => {
     await m.result(m.call, 'base.api_key.list', LIST);
     await m.wrapper.get('[data-testid="api-keys-new"]').trigger('click');
     await flush();
-    type(byTestId('api-key-form-name')!, 'Tienda');
-    await flush();
-    (byTestId('api-key-form-cart_checkout-read') as HTMLElement).dispatchEvent(new CustomEvent('ionChange', { detail: { checked: true } }));
-    await flush();
+    await nameAndTick();
     (byTestId('api-key-form-submit') as HTMLButtonElement).click();
     await flush();
     expect(byTestId('api-key-form-error')?.textContent?.trim()).toBe(reason);
