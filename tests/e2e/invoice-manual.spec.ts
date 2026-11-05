@@ -1,6 +1,7 @@
 // Invoicing in Chrome, by hand (apps/invoice/WORKBOOK.md), against the real Sales, Customers and Taxes:
 //   - INVOICE-F21: without the issuer, Invoices says once that nothing can be invoiced (base's red strip, no notice of
-//     Invoicing's own under it); its «Set up» opens the issuer page, the owner saves it and the strip goes;
+//     Invoicing's own under it); its «Set up» opens the issuer page, a refused tax ID is said under it until it
+//     is corrected, the owner saves it and the strip goes;
 //   - INVOICE-F16: the manual invoice found in Invoices by its customer;
 //   - INVOICE-F03, F19, F08: a manual invoice from «New invoice» (the server's VAT and number), marked as
 //     paid, then rectified (R1, its reason): the original is cancelled and links its rectifying one;
@@ -73,6 +74,19 @@ test('INVOICE-F21: without the issuer Invoices says so once; «Set up» opens it
     const form = shown(page);
     await expect(form.locator('[data-testid=invoice-issuer-missing]')).toBeVisible();
     for (const [hook, value] of Object.entries(ISSUER)) await form.locator(`[data-testid=invoice-issuer-${hook}] input`).fill(value);
+    // A tax ID the server refuses is said under it, and goes as soon as it is corrected (hub#854).
+    const taxId = form.locator('[data-testid=invoice-issuer-tax-id]');
+    await taxId.locator('input').fill('B12345670');
+    await form.locator('[data-testid=invoice-issuer-save]').click();
+    await expect(taxId.locator('.error-text')).toHaveText('That tax ID is not valid.');
+    await expect(taxId).toHaveClass(/ion-invalid/);
+    await expect(form.locator('[data-testid=invoice-issuer-error]')).toHaveCount(0);
+    await flowShots(page, 'INVOICE-F21-refused', async (p) => {
+      await expect(shown(p).locator('[data-testid=invoice-issuer-tax-id]')).toHaveClass(/ion-invalid/);
+    });
+    await taxId.locator('input').fill(ISSUER['tax-id']);
+    await expect(taxId).not.toHaveClass(/ion-invalid/);
+    await expect(taxId.locator('.error-text')).toBeHidden();
     await form.locator('[data-testid=invoice-issuer-save]').click();
     await expect(page.locator('ion-toast').filter({ hasText: 'Issuer saved.' })).toBeVisible();
     await expect(form.locator('[data-testid=invoice-issuer-missing]')).toHaveCount(0);
