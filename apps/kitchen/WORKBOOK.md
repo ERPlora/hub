@@ -709,7 +709,9 @@ Sale: los ajustes (avisa: ajustes cambiados). «La cocina trabaja con la pantall
 siguiente cobro: lo cobrado antes se sirve a mano.
 Si falla: minutos fuera de 1–120 o volumen fuera de 0–100 se rechazan; el ámbar igual o mayor que el
 rojo, también («El aviso ámbar tiene que llegar antes que el rojo.»). El rechazo sale bajo el
-formulario, con el campo marcado, y lo escrito se queda.
+formulario, con el campo marcado, y lo escrito se queda. Como en las ventanas de formulario, el aviso se quita
+en cuanto se cambia algo y el motivo de un campo en cuanto se corrige ese campo; los dos vuelven si el
+siguiente intento también se rechaza. Un rechazo sin campo se queda hasta el siguiente intento (hub#854).
 Implicados: KITCHEN-F10, KITCHEN-F16, KITCHEN-F17, KITCHEN-F23, KITCHEN-F27
 
 ### KITCHEN-F27 Cerrar las rondas al cobrar la cuenta entera

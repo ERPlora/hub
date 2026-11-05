@@ -244,7 +244,9 @@ móvil, elegir profesional y notas permitidos) y las reglas de Citas.
 Sale: `online_booking.settings.updated` (si cambia algo de la página) y `appointment.settings.updated` (si
 cambia una regla); el interruptor de un servicio, `service.service.updated`.
 Si falla: un color que no es `#RRGGBB`, una URL que no es `http(s)://…`, un número fuera de rango o un texto
-demasiado largo, debajo de su campo; no se guarda nada.
+demasiado largo, debajo de su campo; no se guarda nada. Como en las ventanas de formulario, el aviso se quita
+en cuanto se cambia algo y el motivo de un campo en cuanto se corrige ese campo; los dos vuelven si el
+siguiente intento también se rechaza. Un rechazo sin campo se queda hasta el siguiente intento (hub#854).
 Implicados: APPOINTMENT-F19, SERVICE-F02
 
 ### ONLINE_BOOKING-F08 Ver y buscar las reservas

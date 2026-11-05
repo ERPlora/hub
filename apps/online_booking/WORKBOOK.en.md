@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:cfd3183450073e8104568c9560aeab8dd475ee3b4c8d149d50e9f7ae66257760 -->
+<!-- generated from WORKBOOK.md sha256:11d4b0617f0265bd060a730d299d07a80593c5757a4f0b0583b86a5075571b5d -->
 
 ## What it is for and who it is for
 
@@ -229,7 +229,9 @@ mobile, choosing a professional and notes allowed) and the rules of Appointments
 Out: `online_booking.settings.updated` (if something of the page changes) and `appointment.settings.updated` (if
 a rule changes); a service's switch, `service.service.updated`.
 If it fails: a colour that is not `#RRGGBB`, a URL that is not `http(s)://…`, a number out of range or a text
-too long, under its field; nothing is saved.
+too long, under its field; nothing is saved. As in the form windows, the notice goes as soon as something is
+changed and a field's reason as soon as that field is corrected; both come back if the next try is refused
+too. A refusal that names no field stays until the next try (hub#854).
 Involved: APPOINTMENT-F19, SERVICE-F02
 
 ### ONLINE_BOOKING-F08 See and search the bookings

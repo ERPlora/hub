@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:feca055666ae2e7fc4b5cc438e9758f69d2e3b45a3d62954156b06a099aeef54 -->
+<!-- generated from WORKBOOK.md sha256:fef02d878be2e34f37b21919cc5f8d9729203550b084e3f2c8f710272a4e4804 -->
 
 ## What it is for and who it is for
 
@@ -668,7 +668,9 @@ Out: the settings (announces: settings changed). "The kitchen works from the scr
 charge: what was charged before is served by hand.
 If it fails: minutes outside 1–120 or a volume outside 0–100 are rejected; the amber equal to or greater than
 the red, too ("The amber warning has to come before the red one."). The rejection shows under the form,
-with the field marked, and what was written stays.
+with the field marked, and what was written stays. As in the form windows, the notice goes as soon as
+something is changed and a field's reason as soon as that field is corrected; both come back if the next try
+is refused too. A refusal that names no field stays until the next try (hub#854).
 Involved: KITCHEN-F10, KITCHEN-F16, KITCHEN-F17, KITCHEN-F23, KITCHEN-F27
 
 ### KITCHEN-F27 Close the rounds when the whole check is charged
