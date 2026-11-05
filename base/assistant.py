@@ -51,6 +51,7 @@ from live.assistant import (
     LEFT_OUT,
     MAX_ROUNDS,
     MAX_TOOLS,
+    NAME_OF,
     REFERS,
     ToolOutcome,
     confirmed,
@@ -569,9 +570,7 @@ def _marks(prop: dict, defs: dict, path: str = "", depth: int = 0, mark: str = R
     """Each ``mark`` (``REFERS``, else another) of the schema ``prop`` at any depth, with the path of its datum."""
     if depth > 8:  # a schema that names itself
         return []
-    ref = prop.get("$ref")
-    if ref:
-        prop = {**defs.get(ref.rsplit("/", 1)[-1], {}), **{key: inner for key, inner in prop.items() if key != "$ref"}}
+    prop = _unreferred(prop, defs)
     found = [(path, prop[mark])] if mark in prop else []
     for branch in [*prop.get("anyOf", []), *prop.get("oneOf", []), *prop.get("allOf", [])]:
         found += _marks(branch, defs, path, depth + 1, mark)
@@ -579,6 +578,73 @@ def _marks(prop: dict, defs: dict, path: str = "", depth: int = 0, mark: str = R
         found += _marks(inner, defs, f"{path}.{name}" if path else name, depth + 1, mark)
     if isinstance(prop.get("items"), dict):
         found += _marks(prop["items"], defs, f"{path}[]", depth + 1, mark)
+    return found
+
+
+@checks.register("base")
+def check_names(app_configs=None, **kwargs) -> list[checks.CheckMessage]:
+    """``base.E014``: a text marked ``NAME_OF`` (the name a person says of a record, as a booking's service by its name:
+    hub#860) names a datum of its own object that names a record (``REFERS``, or an id). A mark that names any other
+    leaves the line said by how many, with nothing said at start."""
+    errors: list[checks.CheckMessage] = []
+    for op in registry.values():
+        schema = _schema(op)
+        defs = schema.get("$defs", {})
+        problems = [
+            f"{path}.{name} {problem}" if path else f"{name} {problem}"
+            for path, props in _objects(schema, defs)
+            for name, prop in props.items()
+            for problem in _name_problems(_resolved(prop, defs), props, defs)
+        ]
+        if problems:
+            errors.append(
+                checks.Error(
+                    f"{op.name} marks a name that {'; '.join(problems)}.",
+                    hint='Mark the text json_schema_extra={"name_of": "<the datum of its own object that names the record '
+                    'by its id>"}.',
+                    obj=op.name,
+                    id="base.E014",
+                )
+            )
+    return errors
+
+
+def _name_problems(prop: dict, props: dict, defs: dict) -> list[str]:
+    if NAME_OF not in prop:
+        return []
+    of = prop[NAME_OF]
+    if not isinstance(of, str):
+        return ["is not the name of a datum"]
+    problems = [] if prop.get("type") == "string" else ["is no text"]
+    if of not in props:
+        return [*problems, f"names no {of} of its own object"]
+    record = _resolved(props[of], defs)
+    if REFERS not in record and record.get("format") != "uuid":
+        problems.append(f"names {of}, which is no record")
+    return problems
+
+
+def _unreferred(prop: dict, defs: dict) -> dict:
+    """``prop`` with the schema its ``$ref`` names, what it says itself on top."""
+    ref = prop.get("$ref")
+    if not ref:
+        return prop
+    return {**defs.get(ref.rsplit("/", 1)[-1], {}), **{key: inner for key, inner in prop.items() if key != "$ref"}}
+
+
+def _objects(prop: dict, defs: dict, path: str = "", depth: int = 0) -> list[tuple[str, dict]]:
+    """Each object of the schema ``prop`` at any depth, by the path of its datum, with its properties."""
+    if depth > 8:  # a schema that names itself
+        return []
+    prop = _unreferred(prop, defs)
+    props = prop.get("properties", {})
+    found = [(path, props)] if props else []
+    for branch in [*prop.get("anyOf", []), *prop.get("oneOf", []), *prop.get("allOf", [])]:
+        found += _objects(branch, defs, path, depth + 1)
+    for name, inner in props.items():
+        found += _objects(inner, defs, f"{path}.{name}" if path else name, depth + 1)
+    if isinstance(prop.get("items"), dict):
+        found += _objects(prop["items"], defs, f"{path}[]", depth + 1)
     return found
 
 

@@ -646,6 +646,74 @@ def test_a_mark_is_checked_at_start(monkeypatch, write, why):
     assert write.name in error.msg and why in error.msg
 
 
+# ── A name a person says, checked at start (base.E014) ────────────────────────────────────────────────────────────────
+
+
+def naming(of: object, *, kind: type = str) -> Operation:
+    """A write whose lines carry a record by its id (one marked ``refers``, one only an id), a note, and a datum marked
+    as the name a person says of the record ``of`` names (``name_of``), of the type ``kind``; beside them, at the top,
+    a customer by her id."""
+
+    class NamedLineIn(Schema):
+        thing_id: UUID | None = None
+        person_id: UUID | None = Field(
+            None, json_schema_extra={"refers": {"read": "base.person.detail", "by": "person", "name": "name"}}
+        )
+        note: str | None = None
+        thing: kind | None = Field(None, json_schema_extra={"name_of": of})
+
+    class NamedIn(Schema):
+        customer_id: UUID | None = None
+        lines: list[NamedLineIn] = []
+
+    return Operation(
+        name="demo.item.named",
+        kind="command",
+        permission="demo.manage",
+        input=NamedIn,
+        output=NamedIn,
+        expose_api=False,
+        ai={"description": "Books demo items by their names."},
+        fn=lambda ctx, data: data,
+    )
+
+
+def name_errors() -> list:
+    return [error for error in checks.run_checks(tags=["base"]) if error.id == "base.E014"]
+
+
+def test_the_name_marks_of_every_app_are_sound():
+    """Positive control: Citas marks the name of a booking's service (hub#860), and it is sound."""
+    assert name_errors() == []
+
+
+@pytest.mark.parametrize("of", ["thing_id", "person_id"])
+def test_a_name_of_a_record_of_its_own_line_is_sound(monkeypatch, of):
+    """A record by its id, or marked ``refers``: the card says the line by the name when the record is not there."""
+    write = naming(of)
+    monkeypatch.setitem(registry, write.name, write)
+    assert name_errors() == []
+
+
+@pytest.mark.parametrize(
+    ("write", "why"),
+    [
+        (naming(["thing_id"]), "lines[].thing is not the name of a datum"),
+        (naming("thing_ids"), "lines[].thing names no thing_ids of its own object"),
+        (naming("customer_id"), "lines[].thing names no customer_id of its own object"),
+        (naming("note"), "lines[].thing names note, which is no record"),
+        (naming("thing"), "lines[].thing names thing, which is no record"),
+        (naming("thing_id", kind=int), "lines[].thing is no text"),
+    ],
+)
+def test_a_name_mark_that_names_no_record_of_its_own_object_is_said_at_start(monkeypatch, write, why):
+    """A mark that names a datum the line does not carry (a typo, a record of the write's top), one that is no record
+    or a datum that is no text would leave the line in «1 elemento» with nothing said: it is said at start."""
+    monkeypatch.setitem(registry, write.name, write)
+    [error] = name_errors()
+    assert write.name in error.msg and why in error.msg
+
+
 # ── What a dangerous write will do (BASE-F98): its preview says each datum in words too ───────────────────────────────
 
 
