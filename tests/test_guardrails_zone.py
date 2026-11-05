@@ -26,22 +26,15 @@ ALWAYS_THE_DEPLOYMENTS = frozenset(
 
 #: What still reads the deployment's clock, per file. An hour told to a person, only in hub#772.
 KNOWN_READINGS = {
-    # hub#771: a business's «today» and the day of its numbers.
-    "apps/cart_checkout/services.py": 1,
-    "apps/cash_register/services.py": 1,
-    "apps/customer/services.py": 1,
-    "apps/payment/services.py": 1,
-    "apps/pricing/queries.py": 2,
-    "apps/sale/services.py": 1,
-    "apps/service/queries.py": 1,
-    "apps/staff/queries.py": 1,
-    "apps/tax/queries.py": 1,
-    "apps/whatsapp_inbox/clock.py": 1,
     # hub#772: an invoice's dates and VeriFactu's records and notices, fiscal: only under Ioan's supervision.
     "apps/invoice/queries.py": 3,
     "apps/invoice/services.py": 4,
     "apps/verifactu/queries.py": 1,
     "apps/verifactu/services.py": 6,
+    # hub#772 too, because they reach a record: a sale's day and number, and Taxes' «today», the rate a sale's preview
+    # says and Invoicing's form proposes (``tests/test_guardrails_fiscal_clock.py``).
+    "apps/sale/services.py": 1,
+    "apps/tax/queries.py": 1,
     # ERPlora's own hub has no zone of its own: Settings › Business shows the deployment's (``base.business.get``).
     "base/queries.py": 1,
 }

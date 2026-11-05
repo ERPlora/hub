@@ -45,6 +45,7 @@ from apps.payment.schemas import (
     PaymentRefIn,
 )
 from base import operations as platform
+from base.business import business_zone
 
 METHOD_NAME_TAKEN = _(
     "There is already a payment method with that name. Pick another name."
@@ -328,7 +329,7 @@ def create_payment(ctx: OperationContext, data: PaymentIn) -> dict:
     if recorded is not None:
         return recorded
     method = _method_to_pay_from(data)
-    day = timezone.localdate()
+    day = timezone.localdate(timezone=business_zone())
     actor = _actor(ctx)
     try:
         # The number and the row in one savepoint: an attempt that lost the race to its twin gives its

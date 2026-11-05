@@ -752,7 +752,10 @@ cajero del producto actual es un empleado.
   sigue `no hecho` por eso).
 - **«Hoy» en la zona del negocio**: en la fase 1 es el de Madrid (`settings.TIME_ZONE`), también en
   Canarias, donde un cambio de tipo empieza una hora antes de su medianoche (la zona horaria del negocio en
-  dos fuentes es una contradicción señalada en la ronda CLOSE-SCHEDULE de `PLAN-HUB.md`).
+  dos fuentes es una contradicción señalada en la ronda CLOSE-SCHEDULE de `PLAN-HUB.md`). No se mueve sola: la vista
+  previa de Ventas y `invoice.invoice.line_defaults` toman de él el tipo, que tiene que ser el del día del registro, y
+  ese tipo llega al `TipoImpositivo` y a la `Huella` de VeriFactu. Cambia con las fechas de la factura, con supervisión
+  (hub#772); hasta entonces lo congela `tests/test_guardrails_fiscal_clock.py`.
 - **Tipos de fábrica de IGIC, IPSI, recargo de equivalencia o de otros países**: no se siembran, a propósito
   (un tipo inventado se declararía); los crea el negocio (TAX-F04, TAX-F06, TAX-F11).
 - **`useServerTable`/`useLiveList` y `formatPercent`/`formatDate` en `@erplora/ui`**: siguen en

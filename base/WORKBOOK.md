@@ -3154,7 +3154,9 @@ Implicados: HUBS-F18, HUBS-F19, HUBS-F20, PUBLIC-F34 (el mismo borrado de ficher
   avisos del Inicio y los textos de las automatizaciones (`base.home.moment`), el CSV de autorizaciones y las apps; una
   lectura nueva del reloj del despliegue la para `tests/test_guardrails_zone.py`. En pantalla, `useBusinessZone`
   (`base/frontend/lib/zone.ts`), que también siguen Fichajes, Tareas y la bandeja de WhatsApp (hub#779). Lo que aún lee
-  el reloj del despliegue: hub#771 (el «hoy» y el día de los números) y hub#772 (lo fiscal).
+  el reloj del despliegue es lo que llega a un registro fiscal, y cambia junto y con supervisión (hub#772): las fechas de
+  la factura y las horas de VeriFactu, el día y el número de una venta y el «hoy» de Impuestos; hasta entonces lo congela
+  `tests/test_guardrails_fiscal_clock.py`.
 - **Acceso (APP-BASE-3: BASE-F52…F71).** Modelos de hub en `base/models.py`: `TrustedDevice` (el dispositivo:
   `token_digest` = SHA-256 del token de 256 bits de la cookie `hub_device`, httpOnly; nunca el token; `mode`
   `shared`/`personal` con quién y cuándo, `name`, `agent`, última persona y entrada, `ended_reason` `device_limit`),

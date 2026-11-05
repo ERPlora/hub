@@ -51,7 +51,7 @@ from apps.pricing.schemas import (
     RuleRefIn,
 )
 from base import operations as platform
-from base.business import babel_locale
+from base.business import babel_locale, business_zone
 from base.ordering import list_order
 
 #: Candidates named when a text matches several.
@@ -71,13 +71,13 @@ SERVICE_GET = "service.service.get"
 
 
 def business_today() -> dt.date:
-    """The business's today (the Hub's time zone), not UTC: the till sells on the local date."""
-    return timezone.localdate()
+    """The business's today, on its clock (hub#771): a price list ends at its midnight."""
+    return timezone.localdate(timezone=business_zone())
 
 
 def business_day(moment: dt.datetime | None) -> dt.date:
-    """The business day of ``moment`` (its date in the Hub's time zone); today without one."""
-    return timezone.localdate(moment) if moment is not None else business_today()
+    """The business day of ``moment`` (its date on the business's clock); today without one."""
+    return timezone.localdate(moment, business_zone()) if moment is not None else business_today()
 
 
 def half_up(value: Fraction) -> int:
