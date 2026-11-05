@@ -211,16 +211,18 @@ describe('PreviewPage', () => {
     const NAME = 'Enter the full name.';
     const PHONE = 'That mobile is not a valid number.';
 
-    /** Books with a name and a mobile the server refuses. */
-    async function refused() {
+    /** Books with a name and a mobile (an email and a note too) the server refuses by `fields`. */
+    async function refused(fields: Record<string, string> = { name: NAME, phone: PHONE }) {
       const routes = {
         ...ROUTES,
-        '/api/online_booking/public/book': [422, { error: { code: 'invalid_payload', message: 'Invalid payload', fields: { name: NAME, phone: PHONE } } }],
+        '/api/online_booking/public/book': [422, { error: { code: 'invalid_payload', message: 'Invalid payload', fields } }],
       } as Record<string, [number, unknown]>;
       const s = await setup({}, routes);
       await chooseUpToATime(s);
       await ionValue(s.el('name'), 'M', 'ionInput');
       await ionValue(s.el('phone'), '12', 'ionInput');
+      await ionValue(s.el('email'), 'marta@', 'ionInput');
+      await ionValue(s.el('notes'), 'x'.repeat(10), 'ionInput');
       await click(s.el('book'));
       await settle();
       /** Whether the red notice is on screen. */
@@ -248,6 +250,28 @@ describe('PreviewPage', () => {
       await click(s.el('time-10:30'));
       expect(s.notice()).toBe(false);
       expect([s.says('name'), s.says('phone')]).toEqual([NAME, PHONE]);
+    });
+
+    it.each([
+      ['another service', (s: Awaited<ReturnType<typeof refused>>) => ionChecked(s.el('service-v2'), true)],
+      ['another professional', (s: Awaited<ReturnType<typeof refused>>) => ionValue(s.el('staff'), 'm1', 'ionChange')],
+      ['another day', (s: Awaited<ReturnType<typeof refused>>) => ionValue(s.el('day'), '2030-03-06', 'ionChange')],
+    ])('%s is a change too: the notice goes, and no field’s message', async (_, change) => {
+      const s = await refused();
+      await change(s);
+      expect(s.notice()).toBe(false);
+      expect([s.says('name'), s.says('phone')]).toEqual([NAME, PHONE]);
+    });
+
+    it('the email and the note are fields too: each message goes with its own field', async () => {
+      const EMAIL = 'Enter a valid email address.';
+      const NOTES = 'This business takes no notes.';
+      const s = await refused({ email: EMAIL, notes: NOTES });
+      expect([s.says('email'), s.says('notes')]).toEqual([EMAIL, NOTES]);
+      await ionValue(s.el('email'), 'marta@example.com', 'ionInput');
+      expect([s.says('email'), s.says('notes')]).toEqual(['', NOTES]);
+      await ionValue(s.el('notes'), '', 'ionInput');
+      expect([s.says('email'), s.says('notes')]).toEqual(['', '']);
     });
 
     it('the next refusal says it all again', async () => {
