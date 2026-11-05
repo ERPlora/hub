@@ -10,6 +10,8 @@ from live.operations import get
 
 from apps.task.models import Task
 
+from base.tests.ordering import assert_reads_backwards, listed_with
+
 from .conftest import ctx_for, make_comment, make_member, make_project, make_task
 
 pytestmark = pytest.mark.django_db
@@ -308,6 +310,13 @@ def test_ties_go_by_id_in_the_lists_own_direction():
         assert listed(column) == by_id, column
         assert listed(f"-{column}") == by_id[::-1], f"-{column}"
     assert [row for n in (0, 2) for row in listed("-priority", limit=2, offset=n)] == by_id[::-1]
+
+
+def test_tied_projects_go_by_id_in_the_lists_own_direction():
+    """hub#768 (the rule of hub#2355): a descending list is the ascending one read backwards, ties included, and its
+    pages neither repeat nor lose rows."""
+    by_id = sorted(make_project(f"Tie {n}").id for n in range(4))
+    assert_reads_backwards(listed_with(run, "task.project.list", "is_active"), by_id)
 
 
 # My tasks
