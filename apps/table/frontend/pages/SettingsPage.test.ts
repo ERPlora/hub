@@ -4,7 +4,7 @@
 // says «Settings saved.»; a refusal goes under its field.
 import { describe, expect, it } from 'vitest';
 
-import { click, ionChecked, ionValue, MANAGER, type MountOptions, mountTable } from '../__tests__/mount-table';
+import { click, ionChecked, ionValue, MANAGER, type MountOptions, mountTable, settle } from '../__tests__/mount-table';
 import { SETTINGS } from '../__tests__/tables';
 import SettingsPage from './SettingsPage.vue';
 
@@ -45,6 +45,27 @@ describe('SettingsPage', () => {
       { method: 'POST', path: '/api/table/settings', query: {}, body: { prompt_guests_on_seat: false, timer_warning_minutes: 45 } },
     ]);
     expect(s.field('saved')?.textContent).toContain('Settings saved.');
+  });
+
+  it('a field typed back to what is saved is not sent', async () => {
+    const s = await setup();
+    await s.show(SETTINGS);
+    s.answer(200, { ...SETTINGS, timer_critical_minutes: 120 });
+    await ionValue(s.field('timer_warning_minutes'), '60', 'ionInput');
+    await ionValue(s.field('timer_critical_minutes'), '120', 'ionInput');
+    await click(s.field('save'));
+    expect(s.sent()).toEqual([{ method: 'POST', path: '/api/table/settings', query: {}, body: { timer_critical_minutes: 120 } }]);
+  });
+
+  it('after a save nothing is left as typed: a change saved elsewhere repaints every field', async () => {
+    const s = await setup();
+    await s.show(SETTINGS);
+    s.answer(200, { ...SETTINGS, timer_warning_minutes: 45 });
+    await ionValue(s.field('timer_warning_minutes'), '45', 'ionInput');
+    await click(s.field('save'));
+    await settle();
+    await s.result(OP, { ...SETTINGS, timer_warning_minutes: 50 }, {}, 2);
+    expect(s.field('timer_warning_minutes').value).toBe('50');
   });
 
   it('a refusal goes under its field', async () => {

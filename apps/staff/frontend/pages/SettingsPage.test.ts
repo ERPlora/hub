@@ -72,6 +72,17 @@ describe('SettingsPage (STAFF-F22)', () => {
     expect(s.find('staff-settings-saved').text()).toContain('Settings saved');
   });
 
+  it('after a save nothing is left as typed: a change saved elsewhere repaints every field', async () => {
+    const s = await setup();
+    await s.result('staff.settings.get', PROPOSED);
+    s.answer(200, { ...PROPOSED, default_break_duration: 30 });
+    await ionValue(s.field('default_break_duration'), '30', 'ionInput');
+    await click(s.save());
+    await settle();
+    await s.result('staff.settings.get', { ...PROPOSED, default_break_duration: 45 }, {}, 2);
+    expect(s.field('default_break_duration').value).toBe('45');
+  });
+
   it('a value the server refuses is said under its field and the typed values stay', async () => {
     const s = await setup();
     await s.result('staff.settings.get', PROPOSED);

@@ -85,6 +85,17 @@ describe('SettingsPage', () => {
     expect(s.field('saved')?.textContent).toContain('Settings saved.');
   });
 
+  it('after a save nothing is left as typed: a change saved elsewhere repaints every field', async () => {
+    const s = await setup();
+    await s.show(SETTINGS);
+    s.answer(200, { ...SETTINGS, page_title: 'Book with us' });
+    await ionValue(s.field('page_title'), 'Book with us', 'ionInput');
+    await click(s.field('save'));
+    await settle();
+    await s.result(OP, { ...SETTINGS, page_title: 'Book now' }, {}, 2);
+    expect(s.field('page_title').value).toBe('Book now');
+  });
+
   it('puts a refusal under its field, keeping what was typed', async () => {
     const s = await setup();
     await s.show(SETTINGS);

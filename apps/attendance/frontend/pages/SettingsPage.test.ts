@@ -69,6 +69,16 @@ describe('SettingsPage (ATTENDANCE-F04)', () => {
     expect(s.find('attendance-settings-saved').text()).toContain('Settings saved.');
   });
 
+  it('after a save nothing is left as typed: a change saved elsewhere repaints every field', async () => {
+    const s = await setup();
+    s.answerBy({ '/api/attendance/settings': [200, { ...DEFAULTS, auto_close_after_hours: 10, saved: true }] });
+    await ionValue(s.field('auto_close_after_hours'), '10', 'ionInput');
+    await click(s.field('save'));
+    await settle();
+    await s.result('attendance.settings.get', { ...DEFAULTS, auto_close_after_hours: 14, saved: true }, {}, 2);
+    expect(s.field('auto_close_after_hours').value).toBe('14');
+  });
+
   // ATTENDANCE-F03: the location is asked only of a personal device, which an administrator marks as such on
   // the device itself (BASE-F62, «Settings › This device»): the screen says where.
   it('turns «Require location» on, and says it applies to the devices marked personal', async () => {

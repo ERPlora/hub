@@ -6,7 +6,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { SETTINGS } from '../__tests__/kitchen';
-import { click, EMPLOYEE, errorFrame, flush, ionChecked, ionValue, type MountOptions, mountKitchen } from '../__tests__/mount-kitchen';
+import { click, EMPLOYEE, errorFrame, flush, ionChecked, ionValue, type MountOptions, mountKitchen, settle } from '../__tests__/mount-kitchen';
 import SettingsPage from './SettingsPage.vue';
 
 const play = vi.fn();
@@ -55,6 +55,27 @@ describe('SettingsPage', () => {
       { method: 'POST', path: '/api/kitchen/settings', query: {}, body: { print_pass: true, warning_minutes: 10, sound_tone: 'buzzer' } },
     ]);
     expect(s.field('saved')?.textContent).toContain('Settings saved.');
+  });
+
+  it('a field typed back to what is saved is not sent', async () => {
+    const s = await setup();
+    await s.show(SETTINGS);
+    s.answer(200, { ...SETTINGS, sound_volume: 40 });
+    await ionValue(s.field('warning_minutes'), '15', 'ionInput');
+    await ionValue(s.field('sound_volume'), '40', 'ionInput');
+    await click(s.field('save'));
+    expect(s.sent()).toEqual([{ method: 'POST', path: '/api/kitchen/settings', query: {}, body: { sound_volume: 40 } }]);
+  });
+
+  it('after a save nothing is left as typed: a change saved elsewhere repaints every field', async () => {
+    const s = await setup();
+    await s.show(SETTINGS);
+    s.answer(200, { ...SETTINGS, sound_volume: 40 });
+    await ionValue(s.field('sound_volume'), '40', 'ionInput');
+    await click(s.field('save'));
+    await settle();
+    await s.result('kitchen.settings.get', { ...SETTINGS, sound_volume: 55 }, {}, 2);
+    expect(s.field('sound_volume').value).toBe('55');
   });
 
   it('a refusal goes under its field', async () => {

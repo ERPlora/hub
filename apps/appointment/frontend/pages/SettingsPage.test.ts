@@ -68,6 +68,27 @@ describe('SettingsPage', () => {
     expect(s.field('saved')?.textContent).toContain('Settings saved.');
   });
 
+  it('a field typed back to what is saved is not sent', async () => {
+    const s = await setup();
+    await s.show(SETTINGS);
+    await ionValue(s.field('calendar_start_hour'), '8', 'ionInput');
+    await ionValue(s.field('slot_interval'), '30', 'ionInput');
+    s.answer(200, { ...SETTINGS, slot_interval: 30 });
+    await click(s.field('save'));
+    expect(s.sent()).toEqual([{ method: 'POST', path: '/api/appointment/settings', query: {}, body: { slot_interval: 30 } }]);
+  });
+
+  it('after a save nothing is left as typed: a change saved elsewhere repaints every field', async () => {
+    const s = await setup();
+    await s.show(SETTINGS);
+    await ionValue(s.field('slot_interval'), '30', 'ionInput');
+    s.answer(200, { ...SETTINGS, slot_interval: 30 });
+    await click(s.field('save'));
+    await settle();
+    await s.result(OP, { ...SETTINGS, slot_interval: 45 }, {}, 2);
+    expect(s.field('slot_interval').value).toBe('45');
+  });
+
   it('puts a refusal under its field', async () => {
     const s = await setup();
     await s.show(SETTINGS);
