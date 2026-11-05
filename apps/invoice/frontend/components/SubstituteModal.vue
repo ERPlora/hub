@@ -3,7 +3,8 @@
 // in their name): «Full invoice of ticket <number>», what will happen (the ticket stays; an F3 with the same
 // figures replaces it), the recipient (a card of Customers, or typed) and «Issue full invoice», grey until
 // name, tax ID and address are there. It runs `invoice.invoice.substitute` by the ticket's id, says so,
-// closes and hands the new F3 to the page. A refusal is read inside the window; one of a field, under it.
+// closes and hands the new F3 to the page. A refusal is read inside the window; one of a field, under it,
+// until that field is corrected (FormModal's `fieldErrors`, hub#461).
 import { FormModal } from '@erplora/ui/components';
 import { useCommand } from '@erplora/ui/sdk';
 import { toastSuccess } from '@erplora/ui/shell';
@@ -35,7 +36,6 @@ watch(
 );
 
 const error = computed(() => refusal(command.error.value, t('invoice.substitute.failed')));
-const fieldErrors = computed(() => error.value?.fields ?? {});
 
 async function issue(): Promise<void> {
   const ticket = props.ticket;
@@ -65,16 +65,18 @@ async function issue(): Promise<void> {
     :submit-disabled="!recipientComplete(recipient)"
     @submit="issue"
   >
-    <p
-      class="invoice-substitute__intro"
-      data-testid="invoice-substitute-intro"
-    >
-      {{ $t('invoice.substitute.intro') }}
-    </p>
-    <RecipientFields
-      v-model="recipient"
-      :field-errors="fieldErrors"
-    />
+    <template #default="{ fieldErrors }">
+      <p
+        class="invoice-substitute__intro"
+        data-testid="invoice-substitute-intro"
+      >
+        {{ $t('invoice.substitute.intro') }}
+      </p>
+      <RecipientFields
+        v-model="recipient"
+        :field-errors="fieldErrors"
+      />
+    </template>
   </FormModal>
 </template>
 

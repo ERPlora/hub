@@ -165,6 +165,38 @@ describe('InvoiceCreateModal', () => {
     expect(s.wrapper.emitted('update:open')).toBeUndefined();
   });
 
+  it('correcting a refused field takes away the notice and its message; the next refusal says them again (hub#461)', async () => {
+    const s = await setup();
+    await s.choose('FACT', 'F1');
+    await s.recipient({ ...RECIPIENT, taxId: 'B12345678' });
+    await s.line('Course', '10');
+    const refused = {
+      error: {
+        code: 'invalid_payload',
+        message: 'Check the highlighted details.',
+        fields: { customer_tax_id: 'That tax ID is not valid.', notes: 'Shorten the notes.' },
+      },
+    };
+    s.answer(422, refused);
+    await click(s.submit());
+    const taxId = s.inDoc('invoice-recipient-tax-id') as HTMLElement & { errorText?: string };
+    const notes = s.inDoc('invoice-create-notes') as HTMLElement & { errorText?: string };
+    expect([taxId.errorText, notes.errorText]).toEqual(['That tax ID is not valid.', 'Shorten the notes.']);
+    expect(notes.classList.contains('ion-invalid')).toBe(true);
+
+    // A person types: the native `input` bubbles out of the field, then Ionic's own event carries the value.
+    taxId.dispatchEvent(new Event('input', { bubbles: true }));
+    await ionValue(taxId, 'B12345674', 'ionInput');
+    expect(taxId.errorText).toBeFalsy();
+    expect(notes.errorText).toBe('Shorten the notes.');
+    expect(s.inDoc('invoice-create-error')).toBeNull();
+
+    s.answer(422, refused);
+    await click(s.submit());
+    expect(s.inDoc('invoice-create-error')?.textContent).toContain('Check the highlighted details.');
+    expect(taxId.errorText).toBe('That tax ID is not valid.');
+  });
+
   it('follows what a typed line starts with: the territory’s tax (from Taxes) and its general rate', async () => {
     const s = await setup();
     expect(s.params(DEFAULTS)).toEqual([{}]);
