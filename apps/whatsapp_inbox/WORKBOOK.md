@@ -970,7 +970,8 @@ estrecho, que nunca crea una conversación: solo escribe a la que ya existe con 
 salvo que lleve su prefijo.
 Entra: la plantilla (nombre e idioma), sus variables, el archivo de su cabecera (si lleva foto, vídeo o
 documento: el suyo o el elegido), una clave del mensaje y la conversación o el número. Una automatización
-solo envía las que no piden nada más que sus variables: las de cabecera con archivo, con el suyo.
+envía las mismas que la bandeja sabe rellenar: la de cabecera con archivo sale con el que eligió su paso **Enviar
+un mensaje** (FLOW-F32) o, si no eligió ninguno, con el suyo; sin ninguno de los dos no sale.
 Sale: el mensaje guardado y entregado como en F32; aviso `whatsapp_inbox.message.sent`.
 Si falla: una plantilla de **Marketing** solo se envía a una clienta con ficha y con el consentimiento
 de marketing por WhatsApp dado en Clientes («Esta clienta no ha dado su consentimiento para recibir
@@ -1217,8 +1218,9 @@ Las operaciones del sistema piden `whatsapp_inbox.receive`, que ningún rol tien
   (`models.hub_writes`) las `supported`, y las de cabecera con archivo solo con su archivo elegido aquí: las
   de WhatsApp Manager se editan allí. En la lista, `sendable` es «se envía tal cual», sin elegir
   nada (la de cabecera con archivo, solo con el suyo), y `fillable` «la bandeja la envía» (pidiendo el archivo si no
-  tiene); desde FLOW-F32, el paso «Enviar un mensaje» de una automatización ofrece las `fillable` y la de cabecera con
-  archivo sale con el suyo o con el elegido en el paso (contradicción señalada por CLOSE-FLOW, PLAN-HUB §64).
+  tiene); el paso «Enviar un mensaje» de una automatización (FLOW-F31, F32) ofrece las `fillable`, no solo las
+  `sendable`, y la de cabecera con archivo sale con el elegido en el paso o con el suyo (`message.notify` toma
+  `template.header_sample` como `message.send`; sin ninguno, 422 en `header_sample`).
 - `TemplateSample` (de cada negocio, `host`): el archivo de una cabecera (`header_format` `IMAGE`, `VIDEO` o
   `DOCUMENT`, por sus primeros bytes, nunca por el nombre), su clave en el almacén del hub
   (`hub-<hex>/whatsapp_inbox/samples/<16 hex del sha256>.<ext>`: el mismo archivo dos veces es un objeto),
