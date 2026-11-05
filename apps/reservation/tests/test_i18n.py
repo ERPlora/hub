@@ -144,6 +144,22 @@ def test_spanish_texts_of_the_workbook():
         assert str(services.ENTRY_CONVERTED) == "Esta entrada ya se convirtió en reserva."
 
 
+def test_spanish_says_reservations_own_words_not_an_earlier_apps():
+    """Two labels Reservas shares in English with an app loaded before it come out in Spanish with its own words,
+    the ones its screens and WORKBOOK say: where a reservation came from is its «origen», not Citas' «reservada
+    por»; the setting that asks for an email is «correo obligatorio», not Reservas online's «email obligatorio»
+    (hub#548)."""
+    labels = {
+        "Reservation.source": Reservation._meta.get_field("source").verbose_name,
+        "Settings.require_email": Settings._meta.get_field("require_email").verbose_name,
+    }
+    with translation.override("es"):
+        assert {name: str(label) for name, label in labels.items()} == {
+            "Reservation.source": "origen",
+            "Settings.require_email": "correo obligatorio",
+        }
+
+
 def test_a_refusal_names_the_status_in_spanish():
     with translation.override("es"):
         label = str(Reservation.Status.CONFIRMED.label).lower()
