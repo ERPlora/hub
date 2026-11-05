@@ -5,7 +5,7 @@
 // opens its sheet. Before the fix, the strip left the till 45 to 100 px («Charge» under the tab bar, the cart button out
 // of a finger's reach), and without it the bar and the foot of the check, 180 px, left 0 to 35 px for the lines.
 // A phone upright and a tablet keep what they had: the drawer between the strip and the tab bar, nothing to scroll in
-// the page, the cart button in its corner. What a run creates, its product `E2E-TILLSIDE-<run>`, its check and the
+// the page, the cart button in its corner, the foot in its two rows. What a run creates, its product `E2E-TILLSIDE-<run>`, its check and the
 // issuer of a hub that had none (with it, the strip goes as it does for a business with its data complete), is deleted
 // after it; hub `a`'s issuer is parked only for the runs with the strip.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
@@ -203,6 +203,53 @@ async function sellOnItsSide(page: Page, size: { label: string; width: number; h
   await expect(drawer).toBeHidden();
 }
 
+/** A check with no lines yet, as low as it gets: the cart button opens it, it says what to do, and «Charge» waits in view,
+ *  off, until there is something to charge. */
+async function emptyCheckOnItsSide(page: Page, where: string): Promise<void> {
+  const { width, height } = ON_ITS_SIDE[0];
+  await page.setViewportSize({ width, height });
+  expect(await tillIsPhone(page), `the check is a drawer at ${where}`).toBe(true);
+  const till = shown(page).locator('[data-testid=pos-till]');
+  const drawer = shown(page).locator('[data-testid=pos-cart-drawer]');
+  await expect(drawer).toBeHidden();
+  await settled(page);
+  await till.locator('[data-testid=pos-cart-fab]').click(TAP);
+  await expect(till).toHaveClass(/pos-till--cart-open/);
+  await settled(page);
+  const bottomOf = (target: Locator): Promise<number> => target.evaluate((el) => el.getBoundingClientRect().bottom);
+  const footTop = await drawer.locator('.pos-foot').evaluate((el) => el.getBoundingClientRect().top);
+  await capture(page, `${KEY}-${where.replaceAll(' ', '-')}-empty`);
+  expect.soft(await bottomOf(drawer.locator('[data-testid=pos-cart-empty]')), `«Tap a product» whole above the foot at ${where}`).toBeLessThanOrEqual(footTop + EDGE);
+  // Off, a button takes no finger at all (`pointer-events: none`): only where it lies can be read.
+  const charge = drawer.locator('[data-testid=pos-charge]');
+  await expect(charge, `«Charge» off with nothing to charge at ${where}`).toHaveClass(/button-disabled/);
+  expect.soft(await bottomOf(charge), `«Charge» inside the window at ${where}`).toBeLessThanOrEqual(height + EDGE);
+  // «Current order» with nothing pending says so where it can be read too.
+  await drawer.locator('[data-testid=pos-cart-tab-round]').click(TAP);
+  const allSent = drawer.locator('[data-testid=pos-cart-round-empty] strong');
+  await expect(allSent, `«Nothing to send» at ${where}`).toBeVisible();
+  await capture(page, `${KEY}-${where.replaceAll(' ', '-')}-round-empty`);
+  expect.soft(await bottomOf(allSent), `«Nothing to send» above the foot at ${where}`).toBeLessThanOrEqual(footTop + EDGE);
+  await drawer.locator('[data-testid=pos-cart-tab-check]').click(TAP);
+  await drawer.locator('[data-testid=pos-cart-close]').click(TAP);
+  await expect(drawer).toBeHidden();
+
+  // Upright, both keep the air they always had (2.5rem): the low phone's is not theirs.
+  await page.setViewportSize({ width: UPRIGHT[0].width, height: UPRIGHT[0].height });
+  expect(await tillIsPhone(page), `the check is a drawer at ${UPRIGHT[0].label}`).toBe(true);
+  await expect(drawer).toBeHidden();
+  await settled(page);
+  const airOf = (target: Locator): Promise<string> => target.evaluate((el) => getComputedStyle(el).paddingTop);
+  await till.locator('[data-testid=pos-cart-fab]').click(TAP);
+  await expect(till).toHaveClass(/pos-till--cart-open/);
+  expect.soft(await airOf(drawer.locator('[data-testid=pos-cart-empty]')), `«Tap a product» upright, from ${where}`).toBe('40px');
+  await drawer.locator('[data-testid=pos-cart-tab-round]').click(TAP);
+  expect.soft(await airOf(drawer.locator('[data-testid=pos-cart-round-empty]')), `«Nothing to send» upright, from ${where}`).toBe('40px');
+  await drawer.locator('[data-testid=pos-cart-tab-check]').click(TAP);
+  await drawer.locator('[data-testid=pos-cart-close]').click(TAP);
+  await expect(drawer).toBeHidden();
+}
+
 /** The search over the catalogue, as low as it gets: its field, its result and the line a real tap on it adds. */
 async function searchOnItsSide(page: Page): Promise<void> {
   await page.setViewportSize({ width: ON_ITS_SIDE[0].width, height: ON_ITS_SIDE[0].height });
@@ -324,6 +371,10 @@ for (const strip of [true, false]) {
       test.afterAll(async () => {
         await context.close();
         if (strip) unparkIssuer(PARKED);
+      });
+
+      test('568x320, a check with no lines yet', async () => {
+        await emptyCheckOnItsSide(page, `${lang} 568x320 ${strip ? 'with-strip' : 'no-strip'}`);
       });
 
       for (const size of strip ? ON_ITS_SIDE : [...ON_ITS_SIDE, UNDER_AN_ADDRESS_BAR]) {
