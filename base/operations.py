@@ -12,7 +12,8 @@ is no hub either; :func:`is_platform_host` tells it apart so ``base.middleware``
 Actor = the session's user; permissions from ``base.permissions``. :func:`hub_id`, :func:`is_demo_hub` and
 :func:`is_platform_hub` are what the apps ask about a hub's registry (``base.registry``; a module never reads it), and
 :func:`business_currency` the currency its business charges in (``base.business.get``, read as the platform). An app
-runs another app's operation with :func:`call`.
+runs another app's operation with :func:`call`, and says with :func:`allow_idle_wait` that its transaction waits for
+an answer from outside.
 This is the only piece phase 2 replaces (scope = ``use_hub``): from S1, :meth:`HubContextBuilder.enter` gives a live
 re-run its hub's database (the request's own is ``base.middleware.HubDatabaseMiddleware``'s).
 """
@@ -102,6 +103,12 @@ def business_currency(scope: Scope) -> str:
     silent euro. The one question every app that charges asks (BASE-F50)."""
     read = get_operation(BUSINESS)
     return read(system_context(scope), read.input()).currency
+
+
+def allow_idle_wait(seconds: int) -> None:
+    """The running transaction is about to wait for an answer from outside: it may sit idle for ``seconds``, for that
+    transaction only (``base.tenancy.connections.allow_idle_wait``). An app has no connection of its own to say it on."""
+    tenancy_connections.allow_idle_wait(seconds)
 
 
 def call(ctx: OperationContext, name: str, data: dict, *, unavailable: OperationError | None = None) -> Any:

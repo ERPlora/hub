@@ -34,9 +34,9 @@ settings' own server and the environment's roles.
 import copy
 import threading
 
-from django.db import DEFAULT_DB_ALIAS, connections
+from django.db import DEFAULT_DB_ALIAS, connections, transaction
 
-from base.tenancy import limits, names
+from base.tenancy import context, limits, names
 from base.tenancy.credentials import APP, MIGRATOR, credentials_for
 
 #: The static alias every hub's alias is copied from; nobody connects to it.
@@ -230,6 +230,14 @@ def open_hub_alias(hub) -> str:
     alias = alias_for(hub)
     identity.verify(alias, hub.id)
     return alias
+
+
+def allow_idle_wait(seconds: int) -> None:
+    """The active context's running transaction is about to wait for an answer from outside: Postgres lets it sit idle
+    for ``seconds`` instead of the cluster's ``idle_in_transaction_session_timeout``. ``SET LOCAL``: it ends with the
+    transaction, on its alias only, so PgBouncer in transaction mode hands nobody a session that changed."""
+    with transaction.get_connection(context.current_alias()).cursor() as cursor:
+        cursor.execute(f"SET LOCAL idle_in_transaction_session_timeout = '{int(seconds)}s'")
 
 
 def close_this_threads_connections() -> None:
