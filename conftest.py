@@ -4,6 +4,7 @@ import datetime as dt
 import json
 
 import pytest
+from django.db import connection
 from django.utils import timezone, translation
 
 from config import testing
@@ -13,6 +14,16 @@ ENTRY = "frontend/main.ts"
 
 # Fails the test that leaves a database connection with a session setting changed (config/testing.py).
 session_settings_left_as_found = pytest.fixture(autouse=True)(testing.session_settings_left_as_found)
+
+
+@pytest.fixture(scope="session")
+def django_db_createdb(django_db_createdb, django_db_keepdb, django_db_modify_db_settings):
+    """``--reuse-db`` makes its database again if it lost its factory data, as ``--create-db`` would, and keeps it: a
+    run finds what a new database holds, whatever the run before it left (``testing.lost_its_factory_data``). After
+    ``django_db_modify_db_settings``, which gives the database of an xdist worker its name."""
+    return django_db_createdb or (
+        django_db_keepdb and testing.lost_its_factory_data(connection.creation._get_test_db_name())
+    )
 
 
 @pytest.fixture(autouse=True)
