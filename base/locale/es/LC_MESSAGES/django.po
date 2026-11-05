@@ -256,6 +256,10 @@ msgstr "sesión de la demo"
 msgid "state version"
 msgstr "versión del estado"
 
+#: control/models.py
+msgid "own domain"
+msgstr "dominio propio"
+
 #: models.py:183
 msgid "purged at"
 msgstr "purgado el"

@@ -6,26 +6,7 @@ strong grid: its eyebrow and heading on top, its content in rounded cards below,
 own classes only; the ws-* hooks are in apps/website/frontend/public/site.css.{% endcomment %}
 {% block body %}
 <body class="ws-modern text-break" data-ep-template="modern"{% if preview %} data-ep-preview{% endif %}>
-<header data-ep-section="topbar" class="sticky-top ws-glass">
-  <nav class="navbar navbar-expand-md py-3">
-    <div class="container">
-      <a class="navbar-brand d-flex align-items-center gap-2 fw-bold text-wrap ws-display" href="/">
-        {% if content.topbar.logo %}<img class="ws-logo rounded-3" src="{{ content.topbar.logo.url }}" alt="{{ site_name }}">{% endif %}
-        <span>{{ site_name }}</span>
-      </a>
-      <div class="d-flex align-items-center gap-2 order-md-last">
-        <a class="btn btn-outline-primary rounded-pill px-3" href="/auth/login" data-ep-login>{% translate "Log in" context "website" %}</a>
-        {% if body %}<button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#ws-nav" aria-controls="ws-nav" aria-expanded="false" aria-label="{% translate "Menu" context "website" %}"><span class="navbar-toggler-icon"></span></button>{% endif %}
-      </div>
-      {% if body %}<div class="collapse navbar-collapse justify-content-md-end" id="ws-nav">
-        <ul class="navbar-nav gap-md-1 me-md-3">
-          {% for section in body %}<li class="nav-item"><a class="nav-link fw-medium" href="#{{ section.name }}">{{ section.data.title }}</a></li>
-          {% endfor %}
-        </ul>
-      </div>{% endif %}
-    </div>
-  </nav>
-</header>
+{% include "website/_topbar.html" with content=content body=body site_name=site_name login_url=login_url header_class="sticky-top ws-glass" brand_class="fw-bold text-wrap ws-display" logo_class="rounded-3" login_class="btn btn-outline-primary rounded-pill px-3" collapse_class="justify-content-md-end" menu_class="gap-md-1 me-md-3" link_class="fw-medium" only %}
 <main>
   <section data-ep-section="hero" data-ep-hero="split" class="ws-hero">
     <div class="container">
@@ -59,25 +40,6 @@ own classes only; the ws-* hooks are in apps/website/frontend/public/site.css.{%
   </section>
   {% endfor %}
 </main>
-<footer data-ep-section="footer" class="bg-body-tertiary border-top pt-5 pb-4">
-  <div class="container">
-    <div class="row g-4">
-      <div class="col-md-6 col-lg-5">
-        <a class="d-inline-block fs-5 fw-bold text-reset text-decoration-none ws-display" href="/">{{ site_name }}</a>
-        {% if content.footer.text %}<p class="small text-body-secondary mt-2 mb-0" data-ep-footer-text>{{ content.footer.text }}</p>{% endif %}
-      </div>
-      {% if body %}<div class="col-6 col-md-3 col-lg-4">
-        <ul class="list-unstyled small d-grid gap-2 mb-0">
-          {% for section in body %}<li><a class="text-body-secondary text-decoration-none" href="#{{ section.name }}">{{ section.data.title }}</a></li>
-          {% endfor %}
-        </ul>
-      </div>{% endif %}
-      <div class="col-6 col-md-3 text-md-end">
-        <a class="btn btn-sm btn-primary rounded-pill px-3" href="/auth/login" data-ep-login>{% translate "Log in" context "website" %}</a>
-      </div>
-    </div>
-    <p class="small text-body-secondary border-top mt-4 pt-3 mb-0" data-ep-credit>© {% now "Y" %} <a class="text-reset" href="https://erplora.com" target="_blank" rel="noopener">ERPlora</a></p>
-  </div>
-</footer>
+{% include "website/_footer.html" with content=content body=body site_name=site_name login_url=login_url footer_class="bg-body-tertiary border-top pt-5 pb-4" name_column="col-md-6 col-lg-5" name_class="d-inline-block fs-5 fw-bold text-reset text-decoration-none ws-display" menu_column="col-6 col-md-3 col-lg-4" menu_class="small" login_class="btn btn-sm btn-primary rounded-pill px-3" only %}
 </body>
 {% endblock %}

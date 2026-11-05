@@ -137,6 +137,8 @@ MIDDLEWARE = [
     "django.middleware.csp.ContentSecurityPolicyMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.locale.LocaleMiddleware",
+    # A business's own domain (HUBS-F17) answers here, before the Host is refused: only its website, by no other gate.
+    "base.middleware.CustomDomainMiddleware",
     "django.middleware.common.CommonMiddleware",
     # A host that is no hub (reserved or invalid first label, live.slugs) answers 404 on hub paths.
     "base.middleware.HubHostRequiredMiddleware",

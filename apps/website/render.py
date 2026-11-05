@@ -1,8 +1,9 @@
 """``render_site``: a site's page, the same for the public home (``public_home``) and the editor's preview.
 
-The template is one of four Django templates (``templates/website/templates/<id>.html``, each with its own bar, header,
-section frames and footer, in Bootstrap 5.3's classes only) that share one partial per body section
-(``templates/website/sections/``) and ``templates/website/base.html``. The theme's palette is written as Bootstrap's
+The template is one of four Django templates (``templates/website/templates/<id>.html``, each with its own header and
+section frames, in Bootstrap 5.3's classes only) that share one partial per body section
+(``templates/website/sections/``), their bar and footer (``templates/website/_topbar.html``, ``_footer.html``, each saying
+its own classes) and ``templates/website/base.html``. The theme's palette is written as Bootstrap's
 CSS variables for light and for dark (``_theme``, from ``palettes``); the content and the theme are
 validated again before painting (a row written by hand cannot smuggle markup), and every text goes through Django's
 escaping or, for ``about.text``, through ``live.markdown`` (nh3). The page carries no nonce, no inline script and no
@@ -42,6 +43,8 @@ from base.business import money_text, zone_of
 BODY_SECTIONS = ("about", "catalog", "gallery", "reviews", "contact", "location")
 #: Google's page to write a review of a place (its Place ID after it).
 WRITE_REVIEW_URL = "https://search.google.com/local/writereview?placeid="
+#: Where the team signs in on a hub's own address (``base.auth_views``).
+LOGIN_PATH = "auth/login"
 #: The longest review text a card shows; the whole text goes in its title.
 REVIEW_CHARS = 280
 
@@ -89,12 +92,15 @@ def render_site(
     preview: bool = False,
     today: str | None = None,
     reviews: dict | None = None,
+    hub_address: str = "",
 ) -> str:
     """The page of ``template`` with ``theme`` and ``content`` in ``lang``, for the hub whose slug is ``hub``.
 
     ``currency`` is the business's (ISO 4217), its catalog's prices'; ``catalog`` is the snapshot the catalog section paints; ``preview`` marks the editor's preview (not indexed,
     links inert, no refresh); ``today`` (``mon`` … ``sun``, :func:`local_day`) is marked in the opening hours;
     ``reviews`` is Google's answer for the reviews section's place (``apps.website.reviews``), or ``None``.
+    ``hub_address`` is the business's own address (``https://<slug>.<domain>/``) when the page is painted for its own
+    domain (``public_home``), where neither ``/auth`` nor ``/api`` is: «Log in» goes there and nothing refreshes.
     ``request`` is accepted for symmetry with Django's renderers and never used: the HTML must not depend on who
     asked. Raises ``ValueError`` for an unknown template or an invalid theme or content.
     """
@@ -110,6 +116,8 @@ def render_site(
             "lang": lang,
             "template": template,
             "preview": preview,
+            "login_url": f"{hub_address}{LOGIN_PATH}" if hub_address else f"/{LOGIN_PATH}",
+            "static": bool(hub_address),
             "theme": _theme(valid_theme),
             "site_name": site_name,
             # The letter on the header's gradient when there is no cover.
