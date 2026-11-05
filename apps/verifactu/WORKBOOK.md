@@ -1326,6 +1326,12 @@ app: gh:verifactu#139). Tests: `test_apps.py` (declaración, textos `en` + `es`,
   o caducó, otorgamiento sin aprobar en producción, o el servidor sin pasarela o cerrado). `SendControl` (una fila por `(NIF, entorno)`) guarda `next_send_at` (`TiempoEsperaEnvio` de la última
   respuesta) y es el cerrojo del envío: la pasada la toma con `select_for_update(skip_locked=True)`, así que dos
   pasadas nunca mandan la misma cadena y el sellado (que bloquea `Chain`) no espera a la red.
+- **La llamada a la pasarela espera dentro de la transacción** de la operación, porque sus cerrojos son los que impiden
+  que dos pasadas manden la misma cadena. Esa espera puede pasar de los 30 s en los que el clúster corta una transacción
+  ociosa (`idle_in_transaction_session_timeout`; la pasarela puede tardar 45 s en leer), así que cada llamada (`submit`,
+  `query` y `probe`) amplía antes el corte para su transacción, y solo para ella (`SET LOCAL`,
+  `base.operations.allow_idle_wait`, `gateway.LONGEST_WAIT_SECONDS`): una respuesta lenta de la AEAT se guarda y no gasta
+  un intento ni se reenvía con incidencia (hub#623).
 - Un envío junta los `pending` y `sent` de una cadena en orden de secuencia (hasta 1.000) cuando su primer
   pendiente ya toca (`next_attempt_at`) y la espera de la AEAT pasó. Sin respuesta: `attempts` +1 y espera de
   `5·2^(n−1)` minutos, con tope de 60; petición salida y sin respuesta (tiempo de lectura agotado): `sent`.
