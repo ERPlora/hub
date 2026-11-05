@@ -640,7 +640,8 @@ Pasos:
 4. El asistente mira los huecos libres de verdad. Si su mensaje fija servicio, día y hora y está libre, propone
    reservarla con la profesional que trabaja a esa hora; si no, le contesta con una lista corta y numerada de huecos
    (F19). El asistente nunca elige la hora por ella.
-5. La cita que quiere reservar te espera en Automatizaciones, en **Esperan tu respuesta**, con para quién es; con
+5. La cita que quiere reservar te espera en Automatizaciones, en **Esperan tu respuesta**, con para quién es, con
+   quién y qué servicios, por su nombre («Servicios: Corte de pelo»); con
    **Aprobar** se reserva y ella recibe la respuesta: que la cita está reservada (día, hora y profesional) si el
    salón confirma solo, o que se la ha apuntado y el salón se la confirma, según F16. La cita está en la Agenda.
 6. Con **No**, o si nadie contesta en 72 horas, no se reserva nada y ella se queda con el acuse: contéstale desde la
@@ -1701,7 +1702,8 @@ existe a una cita de otra: `appointment.appointment_not_found`) y `for_customer`
 asistente no los ve y lo que mande por ellos se pisa; `customer` por nombre sigue en su esquema, pero Citas toma la ficha
 por el id antes que cualquier nombre. La tarjeta de **Esperan tu respuesta** nombra la clienta y la profesional porque
 `customer_id` y `staff_id` llevan su marca `refers` (`apps/appointment/schemas.py`); el resto de Citas sigue en hub#635.
-Los servicios salen como «1 elemento»: una lista de objetos no se nombra en la tarjeta (ver «Lo que queda fuera»). La
+Los servicios salen por su nombre: cada uno es una línea que solo lleva su registro (`service_id`, con su marca), y la
+tarjeta dice una lista así por el nombre de cada línea (hub#835, BASE-F97). La
 tarjeta de Ajustes restaura el mutuo excluyente de cuando había dos (`rival`): al encender una, se apaga la otra con su
 aviso, y si algo falla se deshace. Lo probado está en `tests/test_recipes.py` y `tests/test_relay_auto_replies.py` (tras
 el **Aprobar** se comprueba la cita de verdad) y en la e2e `tests/e2e/appointment-whatsapp.spec.ts`.
@@ -1755,8 +1757,6 @@ Resueltas en los planes, y fuera de esta lista:
 
 ### Lo que queda fuera
 
-- **Al aprobar una cita, la tarjeta dice «Servicios: 1 elemento» y no qué servicio es**, hub#835 (FLOW-F29, F21): una
-  lista de objetos no se nombra en la tarjeta, y arreglarlo toca `live` y `ui`.
 - **Una traducción al español marcada «fuzzy» sale en inglés y el test de traducciones no lo ve**, hub#569.
 - **Tres textos salen en español con la palabra de Clientes o Facturación**, hub#570.
 - **La tarjeta de confirmación del asistente no dice qué registro toca una escritura**, hub#571.
