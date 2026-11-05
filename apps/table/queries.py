@@ -72,6 +72,7 @@ from apps.table.schemas import (
     ZoneRefIn,
 )
 from base.business import business_zone, currency_decimals, zone_name
+from base.ordering import list_order_for
 
 #: A reservation paints its table Reserved this long before it starts (WORKBOOK «Referencia adoptada»).
 RESERVED_LEAD = dt.timedelta(minutes=60)
@@ -370,16 +371,6 @@ def _page(queryset, params, row) -> dict:
     }
 
 
-def _ordered(queryset, sort: str, columns: dict):
-    descending = sort.startswith("-")
-    fields = columns[sort.lstrip("-")]
-    order = [
-        F(field).desc(nulls_last=True) if descending else F(field).asc(nulls_last=True)
-        for field in fields
-    ]
-    return queryset.order_by(*order, "-id" if descending else "id")
-
-
 def zone_rows(zones: list[Zone]) -> list[dict]:
     return [
         {
@@ -622,7 +613,7 @@ def list_zones(ctx: OperationContext, params: ZoneListIn) -> dict:
         zones = zones.filter(color=params.color)
     if params.is_active is not None:
         zones = zones.filter(is_active=params.is_active)
-    return _page(_ordered(zones, params.sort, ZONE_ORDER), params, zone_rows)
+    return _page(zones.order_by(*list_order_for(params.sort, columns=ZONE_ORDER, nulls_last=True)), params, zone_rows)
 
 
 @operation(
@@ -689,7 +680,7 @@ def list_tables(ctx: OperationContext, params: TableListIn) -> dict:
     if params.capacity_max is not None:
         rows = rows.filter(capacity__lte=params.capacity_max)
     return _page(
-        _ordered(rows, params.sort, TABLE_ORDER),
+        rows.order_by(*list_order_for(params.sort, columns=TABLE_ORDER, nulls_last=True)),
         params,
         lambda items: table_rows(items, now),
     )
@@ -753,7 +744,8 @@ def list_sessions(ctx: OperationContext, params: SessionListIn) -> dict:
             params.opened_to + dt.timedelta(days=1), dt.time.min, tzinfo=zone
         )
         rows = rows.filter(opened_at__lt=until)
-    return _page(_ordered(rows, params.sort, SESSION_ORDER), params, session_rows)
+    ordered = rows.order_by(*list_order_for(params.sort, columns=SESSION_ORDER, nulls_last=True))
+    return _page(ordered, params, session_rows)
 
 
 @operation(

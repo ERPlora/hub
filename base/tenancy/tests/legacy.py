@@ -9,12 +9,13 @@ apps (:class:`LegacyTablesRouter`, in ``config/settings_pytest.py`` only), and :
 tenancy turn it off (``no_test_fallback``) and run as production does; the tests of the cut write with
 :func:`use_legacy` what phase 1 left in control's tables. The worker's loop serves only the hubs with their own
 database: for the tests that run it on the suite's businesses, :func:`worker_pass` stands in for its pass over
-control's outbox (``conftest.py``, ``legacy_worker``), as phase 1's worker did it.
+control's outbox (``conftest.py``, ``legacy_worker``).
 """
 
 import logging
 
 from django.db import DEFAULT_DB_ALIAS, close_old_connections
+from live.context import Scope
 
 from base.tenancy import context, inventory
 
@@ -22,6 +23,10 @@ logger = logging.getLogger("base.worker")
 
 #: The fallback of the suite's tests written before the tenancy: control's test database, every business's rows in it.
 LEGACY = context.DatabaseContext(kind="legacy", alias=DEFAULT_DB_ALIAS)
+#: Whose the tasks of :func:`worker_pass` are: the suite's business ``a``. Every business's rows share control's test
+#: database and none says whose it is, so a pass runs each task once, on one scope; a run of two businesses going out
+#: each as its own takes two databases (``apps/flow/tests/test_worker_parked_runs.py``).
+BUSINESS = Scope("host", "a")
 
 
 def use_legacy():
@@ -44,15 +49,16 @@ class LegacyTablesRouter:
 
 
 def worker_pass(now) -> None:
-    """Phase 1's tick for the suite's businesses on control's test database, in place of the worker's pass over
-    control's outbox (``base.worker._relay``): the apps' tasks due (their schedule written first, idempotent) and the
-    relay of every event, each pass failing alone, logged, as the worker did before S5."""
+    """The tick of the suite's businesses on control's test database, in place of the worker's pass over control's
+    outbox (``base.worker._relay``): the apps' tasks due (their schedule written first, idempotent) on the business's
+    scope, as ``base.worker._serve_hub`` runs them (the operation of an app off there refuses to run), and the relay of
+    every event, each pass failing alone, logged."""
     from base import relay, scheduler
 
     try:
         with use_legacy():
             scheduler.sync(now)
-            scheduler.run_due(now)
+            scheduler.run_due(now, scope=BUSINESS)
     except Exception:
         logger.exception("worker: the scheduled tasks could not run; the next tick tries again.")
         close_old_connections()

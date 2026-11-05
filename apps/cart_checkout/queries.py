@@ -38,6 +38,7 @@ from apps.cart_checkout.schemas import (
 )
 from base import operations as platform
 from base.business import currency_decimals
+from base.ordering import list_order_for
 
 CART_NOT_FOUND = _("That cart does not exist in this business.")
 CART_AMBIGUOUS = _("“%(said)s” matches several carts: %(codes)s. Say which one.")
@@ -260,20 +261,6 @@ def order_row(order: Order) -> dict:
 # --- Lists ----------------------------------------------------------------------------------------
 
 
-def _sorted(rows: QuerySet, sort: str, columns: dict, tie: tuple[str, ...]) -> QuerySet:
-    """``rows`` by ``sort`` (a column, ``-`` first for descending), then ``tie`` and ``id``, all in the
-    same direction; empty values last."""
-    descending = sort.startswith("-")
-    fields = columns[sort.removeprefix("-")]
-    rest = [field for field in tie if field not in fields]
-    return rows.order_by(
-        *(
-            F(field).desc(nulls_last=True) if descending else F(field).asc(nulls_last=True)
-            for field in (*fields, *rest, "id")
-        )
-    )
-
-
 def _page(rows: QuerySet, params, row: Callable) -> dict:
     total = rows.count()
     window = rows[params.offset : params.offset + params.limit]
@@ -348,7 +335,8 @@ def list_carts(ctx: OperationContext, params: CartListIn) -> dict:
             created_at__lte=params.created_to,
         )
     )
-    return _page(_sorted(carts, params.sort, CART_ORDER, ("created_at",)), params, cart_row)
+    ordered = carts.order_by(*list_order_for(params.sort, "created_at", columns=CART_ORDER, nulls_last=True))
+    return _page(ordered, params, cart_row)
 
 
 @operation(
@@ -406,7 +394,8 @@ def list_items(ctx: OperationContext, params: ItemListIn) -> dict:
             line_total__lte=params.line_total_max,
         ),
     )
-    return _page(_sorted(items, params.sort, ITEM_ORDER, ("created_at",)), params, item_row)
+    ordered = items.order_by(*list_order_for(params.sort, "created_at", columns=ITEM_ORDER, nulls_last=True))
+    return _page(ordered, params, item_row)
 
 
 @operation(
@@ -475,7 +464,8 @@ def list_orders(ctx: OperationContext, params: OrderListIn) -> dict:
             created_at__lte=params.created_to,
         ),
     )
-    return _page(_sorted(orders, params.sort, ORDER_ORDER, ("created_at",)), params, order_row)
+    ordered = orders.order_by(*list_order_for(params.sort, "created_at", columns=ORDER_ORDER, nulls_last=True))
+    return _page(ordered, params, order_row)
 
 
 @operation(
