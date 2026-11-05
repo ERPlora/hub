@@ -771,8 +771,8 @@ def test_she_has_a_card_it_is_booked_on_it_and_no_other_card_is_made(
 def test_the_answer_books_only_on_her_card_as_she_would_whatever_the_assistant_sends(
     gateway, tick, anytime, django_capture_on_commit_callbacks  # noqa: F811 - the fixture
 ):
-    """F21: another card named by id or by name, a booking made as if at the counter and an overlap to push through: the
-    step's fixed data go over what it sends, and Citas takes the card by its id before any name."""
+    """F21: another card named by id or by name and a booking made as if at the counter: the step's fixed data go over
+    what it sends, and Citas takes the card by its id before any name."""
     cut, ana = salon()
     make_settings(auto_confirm_online=False)
     door_takes(gateway, 2)

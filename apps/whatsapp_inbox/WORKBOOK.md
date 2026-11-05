@@ -1751,6 +1751,8 @@ Resueltas en los planes, y fuera de esta lista:
 
 ### Lo que queda fuera
 
+- **Al aprobar una cita, la tarjeta dice «Servicios: 1 elemento» y no qué servicio es**, hub#835 (FLOW-F29, F21): una
+  lista de objetos no se nombra en la tarjeta, y arreglarlo toca `live` y `ui`.
 - **Una traducción al español marcada «fuzzy» sale en inglés y el test de traducciones no lo ve**, hub#569.
 - **Tres textos salen en español con la palabra de Clientes o Facturación**, hub#570.
 - **La tarjeta de confirmación del asistente no dice qué registro toca una escritura**, hub#571.
