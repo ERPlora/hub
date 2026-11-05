@@ -6,7 +6,7 @@
 //   panel reads with the device's voice. Only where the page says erplora.com has a voice (`hub-home.server_voice`,
 //   off by default since round 2026-11-04a, `hubAssistant`): else no choice of voice and no request, the device reads.
 // - Whoever sees the Home uses it (BASE-G110); whoever administers the business upgrades the plan, on erplora.com's
-//   page the Home's block gives (gh:hub#1259).
+//   page the Home's block gives (gh:hub#1259), already signed in: its click goes with the pass (BASE-F11, `useSaasPass`).
 // - A write a manager must approve goes through APP-BASE-5's approvals (BASE-G118): the dialog «An approval is
 //   needed», then the same turn again with the pass in `X-Elevation-Token`.
 // - base's words: the verb of each write (`base.assistant.card.actions.<action>`, or of the whole operation when its
@@ -20,6 +20,7 @@ import type { SetupStatus } from '../operations';
 import en from '../locale/en.json';
 import { type AskApproval, approvalPass, questionOf, withApproval } from './approval';
 import { type HubHome, readJsonBlock } from './home';
+import { useSaasPass } from './saas-pass';
 
 /** The verb of each action a card or a receipt names, base's catalogue; another one is «Do this». */
 const ACTIONS: Readonly<Record<string, string>> = en.base.assistant.card.actions;
@@ -121,6 +122,8 @@ export async function speakAloud(
   return response.blob();
 }
 
+const planUrl = () => readJsonBlock<HubHome>('hub-home')?.plan_url ?? '';
+
 /** base's modules are read when each piece runs, never when this is built: a test that mocks one of them (an app's
  *  `approval` without `approvalPass`) still loads this file through a helper that configures it. */
 export const HUB_ASSISTANT: AssistantConfig = {
@@ -132,7 +135,8 @@ export const HUB_ASSISTANT: AssistantConfig = {
   report: (client, report) => client.api.call('base.assistant.report', report),
   canUse: (session) => session.can('base.view_home'),
   canUpgrade: (session) => session.can('base.administer_hub'),
-  planUrl: () => readJsonBlock<HubHome>('hub-home')?.plan_url ?? '',
+  planUrl,
+  openPlan: (client, event) => useSaasPass(client).openSaasPass('plan', planUrl(), event),
   verbKey: actionKey,
   placeKey,
   screenKey: platformScreenKey,

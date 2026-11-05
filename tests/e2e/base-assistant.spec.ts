@@ -12,7 +12,7 @@ import { execSync } from 'node:child_process';
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { CLAIM_ANSWER, DICTATION, GREETING, type Provider, startProvider, STEPS_SAID } from './assistant-provider';
-import { A, api, capture, compactBar, EMPLOYEE, exposeMovingInPage, login, REPO_DIR, shot, shown, turnOffTurnedOn, turnOnMissing, untilStill } from './helpers';
+import { A, api, capture, compactBar, EMPLOYEE, exposeMovingInPage, login, REPO_DIR, shot, shown, turnOffTurnedOn, turnOnMissing, untilStill, upgradeLandsInside } from './helpers';
 import { cleanPricing, CODE as PRICING_CODE, createProduct, post, TAG as PRICING_TAG } from './pricing-helpers';
 import { STACK } from './stack';
 
@@ -1113,6 +1113,9 @@ test('BASE-G122 — from 80 % the foot says what is left and each answer moves i
   await expect(foot).toHaveText(/^You have used all 30 messages of this month\. They renew on \S+ 1\.$/);
   await expect(panel(page).locator('[data-testid="assistant-upgrade"]')).toHaveCount(1);
   await shots(page, 'BASE-G122-spent');
+  await page.setViewportSize({ width: 1440, height: 900 });
+  // With no session of erplora.com in this browser, the answer's «Upgrade plan» still lands inside it (BASE-F11, hub#723).
+  await upgradeLandsInside(page, failure.locator('[data-testid="assistant-upgrade"]'));
 
   const employee = await freshPage(browser);
   await employee.setViewportSize({ width: 1440, height: 900 });
@@ -1123,6 +1126,27 @@ test('BASE-G122 — from 80 % the foot says what is left and each answer moves i
   await expect(theirs).toContainText('Ask whoever runs the business to upgrade the plan.');
   await expect(theirs.locator('[data-testid="assistant-upgrade"]')).toHaveCount(0);
   await employee.context().close();
+});
+
+test('BASE-G122 — with a plan without the assistant the foot says so, and its «Upgrade plan» lands inside erplora.com (BASE-F11)', async ({ page }) => {
+  // The plan `a` has on erplora.com, or Free without a subscription (`effective_plan`).
+  const plan =
+    "coalesce((select s.plan_id from hubs_subscription s join hubs_hub h on h.id = s.hub_id where h.slug = 'a'), (select id from hubs_plan where slug = 'free'))";
+  const allowance = saasSql(`select assistant_messages_per_month from hubs_plan where id = ${plan}`);
+  saasSql(`update hubs_plan set assistant_messages_per_month = 0 where id = ${plan}`);
+  try {
+    await login(page, A, '/');
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await home(page);
+    await openPanel(page);
+    const foot = panel(page).locator('[data-testid="assistant-no-plan"]');
+    await expect(foot).toContainText('Your plan does not include the assistant.');
+    await shots(page, 'BASE-G122-no-plan');
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await upgradeLandsInside(page, foot.locator('[data-testid="assistant-no-plan-upgrade"]'));
+  } finally {
+    saasSql(`update hubs_plan set assistant_messages_per_month = ${allowance} where id = ${plan}`);
+  }
 });
 
 test('BASE-G123 — «Report a problem» sends the answer with its question and a reason', async ({ page }) => {
