@@ -54,6 +54,7 @@ from apps.tax.schemas import (
     TaxSettingsOut,
     normalize_text,
 )
+from base.ordering import list_order
 
 CATEGORY_NOT_FOUND = _("This tax category does not exist.")
 RULE_NOT_FOUND = _("This tax rule no longer exists.")
@@ -388,12 +389,6 @@ def current_rates(categories: list[TaxCategory], country_code: str, region_code:
     }
 
 
-def _ordering(column: str, direction: str, *tie_breaks: str) -> list:
-    """``column`` in ``direction`` (empty values last), then the tie-breaks, ascending."""
-    expression = F(column).desc(nulls_last=True) if direction == "desc" else F(column).asc(nulls_last=True)
-    return [expression, *tie_breaks]
-
-
 @operation(
     "tax.category.list",
     kind="query",
@@ -432,7 +427,7 @@ def list_categories(ctx: OperationContext, params: CategoryListIn) -> dict:
         if params.is_system is not None:
             categories = categories.filter(is_system=params.is_system)
         column = {"display_name": "shown_name", "display_description": "shown_description"}.get(params.sort, params.sort)
-        ordered = categories.order_by(*_ordering(column, params.dir, "key", "id"))
+        ordered = categories.order_by(*list_order(column, "key", descending=params.dir == "desc", nulls_last=True))
         page = list(ordered[params.offset : params.offset + params.limit])
         country_code, region_code = asked_jurisdiction(params.country_code, params.region_code)
         rates = current_rates(page, country_code, region_code, business_today())
@@ -512,8 +507,6 @@ _GROUPED = (
     "country_code",
     "region_code",
     Coalesce("parent_id", "id"),
-    F("parent_id").asc(nulls_first=True),
-    "id",
 )
 _RULE_COLUMNS = {"tax_category_key": "category__key"}
 
@@ -570,11 +563,10 @@ def list_rules(ctx: OperationContext, params: RuleListIn) -> dict:
                 | Q(region_code__icontains=search)
                 | Q(operation_class__icontains=search)
             )
-        if params.sort == "tax_category_key":
-            first = F("category__key").desc() if params.dir == "desc" else F("category__key").asc()
-            ordered = rules.order_by(first, *_GROUPED[1:])
-        else:
-            ordered = rules.order_by(*_ordering(_RULE_COLUMNS.get(params.sort, params.sort), params.dir, *_GROUPED))
+        column = _RULE_COLUMNS.get(params.sort, params.sort)
+        keys = list_order(column, *_GROUPED, descending=params.dir == "desc", nulls_last=True)
+        # A component comes right under its root whichever the direction: that is how it is recognised (TAX-F03).
+        ordered = rules.order_by(*keys[:-1], F("parent_id").asc(nulls_first=True), keys[-1])
         page = ordered[params.offset : params.offset + params.limit]
         return {
             "rows": [rule_row(rule) for rule in page],
@@ -716,7 +708,7 @@ def list_aliases(ctx: OperationContext, params: AliasListIn) -> dict:
         if params.source:
             aliases = aliases.filter(source=params.source)
         column = _ALIAS_COLUMNS.get(params.sort, params.sort)
-        page = aliases.order_by(*_ordering(column, params.dir, "alias", "id"))[
+        page = aliases.order_by(*list_order(column, "alias", descending=params.dir == "desc", nulls_last=True))[
             params.offset : params.offset + params.limit
         ]
         return {

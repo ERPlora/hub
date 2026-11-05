@@ -97,6 +97,7 @@ from apps.staff.queries import resolve_member
 from base import images
 from base.business import babel_locale, business_zone
 from base.queries import business_language, image_library
+from base.ordering import list_order_for
 
 SERVICE_NOT_FOUND = _("That service does not exist in this business.")
 SERVICE_AMBIGUOUS = _("“%(said)s” matches several services: %(names)s. Say which one.")
@@ -766,7 +767,7 @@ def list_services(ctx: OperationContext, params: ServiceListIn) -> dict:
         )
     )
     return _page(
-        _sorted(services, params.sort, SERVICE_ORDER, ("name", "id")),
+        services.order_by(*list_order_for(params.sort, "name", columns=SERVICE_ORDER, nulls_last=True)),
         params,
         partial(_service_row, urls=images.Urls(ctx.scope)),
     )
@@ -881,7 +882,9 @@ def list_categories(ctx: OperationContext, params: CategoryListIn) -> dict:
     if params.parent_id:
         categories = categories.filter(parent_id=params.parent_id)
     return _page(
-        _sorted(categories, params.sort, CATEGORY_ORDER, ("sort_order", "name", "id")),
+        categories.order_by(
+            *list_order_for(params.sort, "sort_order", "name", columns=CATEGORY_ORDER, nulls_last=True)
+        ),
         params,
         _category_row,
     )
@@ -1045,7 +1048,7 @@ def list_packages(ctx: OperationContext, params: PackageListIn) -> dict:
         if text:
             packages = packages.filter(name__icontains=text)
     return _page(
-        _sorted(packages, params.sort, PACKAGE_ORDER, ("sort_order", "name", "id")),
+        packages.order_by(*list_order_for(params.sort, "sort_order", "name", columns=PACKAGE_ORDER, nulls_last=True)),
         params,
         _package_row,
     )
@@ -1528,20 +1531,6 @@ def _adjustment_row(ctx: OperationContext, adjustment: GrantAdjustment) -> dict:
 def _bounds(**lookups) -> dict:
     """The lookups whose value was given (a filter left empty narrows nothing)."""
     return {lookup: value for lookup, value in lookups.items() if value is not None}
-
-
-def _sorted(
-    rows, sort: str, columns: dict[str, tuple[str, ...]], tie_break: tuple[str, ...]
-):
-    """``rows`` by ``sort`` (a leading «-» reverses it), then by ``tie_break``; nulls last either way."""
-    descending = sort.startswith("-")
-    keys = [
-        F(column).desc(nulls_last=True)
-        if descending
-        else F(column).asc(nulls_last=True)
-        for column in columns[sort.lstrip("-")]
-    ]
-    return rows.order_by(*keys, *tie_break)
 
 
 def _page(queryset, params, row) -> dict:

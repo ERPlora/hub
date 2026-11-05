@@ -624,6 +624,12 @@ cajero del producto actual es un empleado.
 
 ## Para quien lo mantiene
 
+- **Orden de las listas** (`base.ordering.list_order`; regla hub#2355 del producto viejo): categorías, reglas y alias
+  van por la columna elegida, después por su clave natural y al final por `id`, todo en la dirección de la lista y con
+  los vacíos al final en las dos: la descendente es la ascendente leída al revés, empates incluidos. Lo fija
+  `test_ties_read_backwards_in_a_descending_list`, por lista. La única excepción, a propósito: en Reglas un componente
+  sale justo debajo de su raíz en las dos direcciones (TAX-F03), y lo fija
+  `test_a_component_stays_right_under_its_root_in_a_descending_list`.
 - Anatomía de servidor completa: `apps.py`, `models.py` (`TaxCategory`, `TaxRule`, `TaxAlias`, `TaxSettings`),
   `migrations/` (`0002` siembra el catálogo de fábrica, con reverso; `0005` añade `retail.alcohol` sin tocar lo
   que el hub ya tenga; `0006` crea `TaxSettings`), `schemas.py`, `queries.py`, `services.py`, `events.py`,

@@ -647,7 +647,7 @@ Ventas **no** requiere Tarifas y Tarifas no toca Ventas. Lo que se pide a Ventas
   una tarifa siguen en la unidad propia del producto, que la tabla pinta junto a la cantidad («500 g»).
 - Fase 1: el ámbito es la primera parte del Host y los datos se comparten entre `a` y `b`, como en
   `demo`; lo que sí se separa son los avisos en vivo.
-- **Orden de las tablas** (`_ordering`, nota vigente del producto actual del 2026-09-28, hub#2355, como Ventas,
+- **Orden de las tablas** (`base.ordering.list_order`, nota vigente del producto actual del 2026-09-28, hub#2355, como Ventas,
   Caja, Inventario y Tareas): la columna elegida y después el desempate, todo en la dirección de la lista y
   con los vacíos al final en las dos; `desc` es `asc` leído al revés, empates incluidos. Tarifas y reglas
   desempatan por código e `id`; los precios, por cantidad mínima e `id`. Lo fijan los tres

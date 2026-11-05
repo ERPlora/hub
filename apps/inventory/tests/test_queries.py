@@ -44,6 +44,7 @@ from apps.inventory.schemas import (
     UnitListIn,
     UnitPage,
 )
+from base.tests.ordering import assert_reads_backwards, listed_with
 from apps.tax.models import TaxCategory
 
 from .conftest import ctx_for, ctx_with
@@ -832,6 +833,73 @@ def test_saved_settings():
 def test_the_employee_does_not_see_the_settings():
     with pytest.raises(PermissionDenied):
         run("inventory.config.get", ConfigGetIn(), role="hub_employee")
+
+
+# The order of the lists
+
+
+def _tied_products():
+    return [product(f"Item {n}", stock=Decimal("5")).id for n in range(4)]
+
+
+def _tied_low_stock():
+    return [
+        product(f"Item {n}", stock=Decimal("1"), low_stock_threshold=Decimal("2")).id
+        for n in range(4)
+    ]
+
+
+def _tied_categories():
+    return [Category.objects.create(name=f"Group {n}", color="#ff0000").id for n in range(4)]
+
+
+def _tied_movements():
+    item = product("Item")
+    return [movement(item, "sale", Decimal("1"), Decimal("4")).id for _ in range(4)]
+
+
+@pytest.mark.parametrize(
+    ("operation", "schema", "tied", "column"),
+    [
+        ("inventory.product.list", ProductListIn, _tied_products, "stock"),
+        ("inventory.product.list_low_stock", LowStockListIn, _tied_low_stock, "stock"),
+        ("inventory.category.list", CategoryListIn, _tied_categories, "color"),
+        ("inventory.movement.list", MovementListIn, _tied_movements, "qty"),
+    ],
+)
+def test_ties_go_by_id_in_the_lists_own_direction(operation, schema, tied, column):
+    """hub#768 (the rule of hub#2355, as in Customers): a descending list is the ascending one read backwards, ties
+    included, and its pages neither repeat nor lose rows."""
+    assert_reads_backwards(listed_with(run, operation, column, schema=schema), sorted(tied()))
+
+
+@pytest.mark.parametrize(
+    ("operation", "schema", "rows", "column"),
+    [
+        (
+            "inventory.product.export",
+            ProductFiltersIn,
+            lambda: [product(f"Item {n}", stock=Decimal("5")) for n in range(4)],
+            "stock",
+        ),
+        (
+            "inventory.category.export",
+            CategoryFiltersIn,
+            lambda: [Category.objects.create(name=f"Group {n}", color="#ff0000") for n in range(4)],
+            "color",
+        ),
+    ],
+)
+def test_an_export_settles_its_ties_the_way_the_list_does(operation, schema, rows, column):
+    in_order = [row.name for row in sorted(rows(), key=lambda row: row.id)]
+
+    def exported(sort):
+        with translation.override("en"):
+            export = run(operation, schema(sort=sort))
+        return [line[0] for line in read_csv(export, ",")[1:]]
+
+    assert exported(column) == in_order
+    assert exported(f"-{column}") == in_order[::-1]
 
 
 # inventory.product.export and inventory.category.export

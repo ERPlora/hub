@@ -707,6 +707,10 @@ El cajero del producto actual ya no existe como papel: lo que veía (el director
 
 ## Para quien lo mantiene
 
+- **Orden de las listas** (`base.ordering.list_order_for`; regla hub#2355 del producto viejo): fichas, sueldos, roles y
+  ausencias van por la columna elegida y desempatan por `id`, todo en la dirección de la lista y con los vacíos al final
+  en las dos: la descendente es la ascendente leída al revés, empates incluidos. Lo fija
+  `test_ties_go_by_id_in_the_lists_own_direction`, por lista.
 - Anatomía completa de una app (copia de `apps/demo`): `apps.py`, `models.py`, `schemas.py`,
   `queries.py`, `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/` y un
   `tests/test_<fichero>.py` por fichero. Las páginas viven en `frontend/` («Cómo son las páginas»,
