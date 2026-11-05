@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:9774d78a7cc9a99f51c31faf463cc900123daf2b27e2e41bc86d1991a137e768 -->
+<!-- generated from WORKBOOK.md sha256:dbb74e718190308da2a5fee253e6318ff1a4713ae3e67fd2720b88bddcba1ad6 -->
 
 ## What it is for and who it is for
 
@@ -411,10 +411,12 @@ Steps:
    reported this month’s messages yet.".
 2. From 80 % of the month's messages, the inbox warns above the list, for example, "You have 30 of 150 WhatsApp
    messages of your plan left this month."; whoever can configure sees, in the browser, **Upgrade plan**, which opens
-   erplora.com's plans. Below 80 %, nothing. The count moves by itself, without reloading.
+   erplora.com's plans, already signed in with their account (BASE-F11). Below 80 %, nothing. The count moves by itself,
+   without reloading.
 3. At the cap (with a plan that includes none, from the first message), the inbox warns above the list and **Send**
    explains it instead of sending ("Your plan does not include WhatsApp messages: nothing can be sent." when the plan
-   includes none); whoever can configure sees, in the browser, **Upgrade plan**, which opens erplora.com's plans.
+   includes none); whoever can configure sees, in the browser, **Upgrade plan**, which opens erplora.com's plans,
+   already signed in with their account (BASE-F11).
 4. What the customers write is still saved.
 5. When the month changes (erplora.com's, which counts the messages in UTC: in Spain, at 1:00 or 2:00 on the 1st) the
    notice goes away even if erplora.com has not spoken yet; if
@@ -424,8 +426,10 @@ Out: the notice in the inbox and in Settings; nothing is saved.
 If it fails: if erplora.com refuses a send because of the cap (the Hub's figures were behind), the message does not
 reach Meta nor is it counted, it stays "Not delivered" and says so with "This month's WhatsApp messages of your plan
 are spent: nothing can be sent until next month.", never as Meta's reason; if it asks to go slower, it is not the
-cap: the message stays "Not sent" with **Retry**.
-Involved: erplora.com, BASE-F104
+cap: the message stays "Not sent" with **Retry**. If the pass of **Upgrade plan** does not arrive (an error, 8 seconds
+without an answer or a session opened without the account), the usual address opens: erplora.com asks to sign in with
+the account and goes on to the plans.
+Involved: erplora.com, BASE-F11, BASE-F104
 
 ### WHATSAPP_INBOX-F14 Turn on "Book appointments"
 Status: done
@@ -599,7 +603,7 @@ Steps:
    it proposes booking it with the professional who works at that time; if not, it answers with a short numbered list
    of slots (F19). The assistant never chooses the time for her.
 5. The appointment it wants to book waits for you in Automations, in **Waiting for your answer**, with whom it is
-   for; with **Approve** it is booked and she gets the answer: that the appointment is booked (day, time and
+   for, with whom and which services, by their name ("Services: Haircut"); with **Approve** it is booked and she gets the answer: that the appointment is booked (day, time and
    professional) if the salon confirms by itself, or that she has been put down and the salon will confirm it, as
    F16 says. The appointment is in the Agenda.
 6. With **No**, or if nobody answers within 72 hours, nothing is booked and she is left with the acknowledgement:

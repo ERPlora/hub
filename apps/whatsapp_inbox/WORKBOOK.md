@@ -446,11 +446,12 @@ Pasos:
    mes.».
 2. Desde el 80 % de los mensajes del mes, la bandeja lo avisa encima de la lista, por ejemplo, «Te quedan 30 de 150
    mensajes de WhatsApp de tu plan este mes.»; quien puede configurar ve, en el navegador, **Mejorar el plan**, que
-   abre los planes de erplora.com. Por debajo del 80 %, nada. La cuenta se mueve sola, sin recargar.
+   abre los planes de erplora.com ya dentro con su cuenta (BASE-F11). Por debajo del 80 %, nada. La cuenta se mueve
+   sola, sin recargar.
 3. En el tope (con un plan que no incluye ninguno, desde el primer mensaje), la bandeja lo avisa encima de
    la lista y **Enviar** lo explica en vez de enviar («Tu plan no incluye mensajes de WhatsApp: no se puede
    enviar nada.» cuando el plan no incluye ninguno); quien puede configurar ve, en el navegador, **Mejorar el
-   plan**, que abre los planes de erplora.com.
+   plan**, que abre los planes de erplora.com ya dentro con su cuenta (BASE-F11).
 4. Lo que escriben los clientes se sigue guardando.
 5. Al cambiar de mes (el de erplora.com, que cuenta los mensajes en UTC: en España, a la 1:00 o las 2:00 del día 1) el
    aviso se va aunque erplora.com aún no haya hablado; si el plan no incluye mensajes, sigue.
@@ -459,8 +460,10 @@ Sale: el aviso en la bandeja y en Ajustes; nada se guarda.
 Si falla: si erplora.com rechaza un envío por el tope (las cifras del Hub iban por detrás), el mensaje no
 llega a Meta ni se cuenta, queda «No entregado» y lo dice con «Los mensajes de WhatsApp de tu plan de este mes
 están gastados: no se puede enviar nada hasta el mes que viene.», nunca como motivo de Meta; si pide ir más
-despacio, no es el tope: el mensaje queda «No enviado» con **Reintentar**.
-Implicados: erplora.com, BASE-F104
+despacio, no es el tope: el mensaje queda «No enviado» con **Reintentar**. Si el pase de **Mejorar el plan** no llega
+(un error, 8 segundos sin respuesta o una sesión abierta sin la cuenta), se abre la dirección de siempre: erplora.com pide
+entrar con la cuenta y sigue hasta los planes.
+Implicados: erplora.com, BASE-F11, BASE-F104
 
 ### WHATSAPP_INBOX-F14 Activar «Reservar citas»
 <!-- origen: old:whatsapp_inbox/workflow/respuestas-automaticas.md#whatsapp_inbox-f14 -->
@@ -637,7 +640,8 @@ Pasos:
 4. El asistente mira los huecos libres de verdad. Si su mensaje fija servicio, día y hora y está libre, propone
    reservarla con la profesional que trabaja a esa hora; si no, le contesta con una lista corta y numerada de huecos
    (F19). El asistente nunca elige la hora por ella.
-5. La cita que quiere reservar te espera en Automatizaciones, en **Esperan tu respuesta**, con para quién es; con
+5. La cita que quiere reservar te espera en Automatizaciones, en **Esperan tu respuesta**, con para quién es, con
+   quién y qué servicios, por su nombre («Servicios: Corte de pelo»); con
    **Aprobar** se reserva y ella recibe la respuesta: que la cita está reservada (día, hora y profesional) si el
    salón confirma solo, o que se la ha apuntado y el salón se la confirma, según F16. La cita está en la Agenda.
 6. Con **No**, o si nadie contesta en 72 horas, no se reserva nada y ella se queda con el acuse: contéstale desde la
@@ -1698,7 +1702,8 @@ existe a una cita de otra: `appointment.appointment_not_found`) y `for_customer`
 asistente no los ve y lo que mande por ellos se pisa; `customer` por nombre sigue en su esquema, pero Citas toma la ficha
 por el id antes que cualquier nombre. La tarjeta de **Esperan tu respuesta** nombra la clienta y la profesional porque
 `customer_id` y `staff_id` llevan su marca `refers` (`apps/appointment/schemas.py`); el resto de Citas sigue en hub#635.
-Los servicios salen como «1 elemento»: una lista de objetos no se nombra en la tarjeta (ver «Lo que queda fuera»). La
+Los servicios salen por su nombre: cada uno es una línea que solo lleva su registro (`service_id`, con su marca), y la
+tarjeta dice una lista así por el nombre de cada línea (hub#835, BASE-F97). La
 tarjeta de Ajustes restaura el mutuo excluyente de cuando había dos (`rival`): al encender una, se apaga la otra con su
 aviso, y si algo falla se deshace. Lo probado está en `tests/test_recipes.py` y `tests/test_relay_auto_replies.py` (tras
 el **Aprobar** se comprueba la cita de verdad) y en la e2e `tests/e2e/appointment-whatsapp.spec.ts`.
@@ -1752,8 +1757,6 @@ Resueltas en los planes, y fuera de esta lista:
 
 ### Lo que queda fuera
 
-- **Al aprobar una cita, la tarjeta dice «Servicios: 1 elemento» y no qué servicio es**, hub#835 (FLOW-F29, F21): una
-  lista de objetos no se nombra en la tarjeta, y arreglarlo toca `live` y `ui`.
 - **Una traducción al español marcada «fuzzy» sale en inglés y el test de traducciones no lo ve**, hub#569.
 - **Tres textos salen en español con la palabra de Clientes o Facturación**, hub#570.
 - **La tarjeta de confirmación del asistente no dice qué registro toca una escritura**, hub#571.

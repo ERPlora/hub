@@ -192,9 +192,21 @@ FLOW_VIEWPORTS.forEach((vp, index) => {
       await expect(view.locator('[data-testid=service-categories-row]', { hasText: category })).toHaveCount(0);
       expect(psql(`select category_id is null from service_service where id = '${serviceId}'`)).toBe('t');
 
-      // SERVICE-F11: the settings a new service takes.
+      // SERVICE-F11: the settings a new service takes. A refused duration says so on top and under the field,
+      // and both go as soon as it is corrected (hub#821).
       await page.goto(`${A}/service/settings`);
-      await page.locator('[data-testid=service-settings-default_duration] input').fill('45');
+      const duration = page.locator('[data-testid=service-settings-default_duration]');
+      const refused = page.locator('[data-testid=service-settings-save-error]');
+      await duration.locator('input').fill('0');
+      await page.locator('[data-testid=service-settings-save]').click();
+      await expect(refused).toContainText('The settings could not be saved.');
+      await expect(duration.locator('.error-text')).toHaveText('Ensure this value is greater than or equal to 1.');
+      await expect(duration).toHaveClass(/ion-invalid/);
+      await capture('SERVICE-F11-refused');
+      await duration.locator('input').fill('45');
+      await expect(refused).toBeHidden();
+      await expect(duration).not.toHaveClass(/ion-invalid/);
+      await expect(duration.locator('.error-text')).toBeHidden();
       await page.locator('[data-testid=service-settings-save]').click();
       await expect(page.locator('[data-testid=service-settings-saved]')).toContainText('Settings saved.');
       await capture('SERVICE-F11');

@@ -606,7 +606,10 @@ Implicados: ninguno
 Todo se puede pedir por las pantallas, el asistente (por voz o por texto, con la sesión de quien
 habla) y la API, con las mismas reglas y los mismos permisos. Una persona se nombra por su id o por
 su nombre; si el nombre vale para varias, se dice cuáles y se pide que elija
-(`staff.ambiguous_member`).
+(`staff.ambiguous_member`). Antes de cambiar nada, el asistente pide confirmar con su tarjeta (BASE-F97), que nombra
+cada registro como lo nombran las pantallas, nunca por su id: una persona y un rol por su nombre, un horario por de
+quién es y cómo se llama («Ana López · Horario habitual») y una ausencia por de quién es, su tipo y sus días («Ana
+López · Vacaciones · 2 nov 2026 – 5 nov 2026»). Lo que quien pregunta no puede ver no sale.
 
 ### Lo que ofrece: consultas (leen, no cambian nada; todas menos las cuentas y la ficha de la sesión se pueden seguir en vivo)
 
@@ -621,11 +624,13 @@ su nombre; si el nombre vale para varias, se dice cuáles y se pide que elija
 | Lo que ha ganado cada profesional en un periodo (hoy, ayer, esta semana, este mes o dos días): vendido con lo devuelto restado, comisión y totales; dice si el negocio no tiene Ventas | ver la compensación (y las cifras de Ventas) | F21 | `staff.commission.report` |
 | Las cifras: fichas, activos, de baja, inactivos, ausentes hoy y solicitudes pendientes | ver | F23 | `staff.member.stats` |
 | Los roles con sus miembros activos, con filtros y orden | ver | F04, F23 | `staff.role.list` |
+| Un rol por su id, también retirado: lo que lee la tarjeta del asistente para nombrarlo (BASE-F97) | ver | F01, F02, F04, F07 | `staff.role.detail` |
 | Los horarios de una persona con su semana | ver | F13–F15 | `staff.schedule.list` |
-| Un horario con su semana | ver | F14 | `staff.schedule.detail` |
+| Un horario con su semana y la `label` con la que lo nombra la tarjeta del asistente (BASE-F97) | ver | F14, F15 | `staff.schedule.detail` |
 | La disponibilidad de una persona por días | ver | F16 | `staff.availability.for_member` |
 | Las ausencias, sin motivo, con filtros y orden | ver ausencias | F17–F19 | `staff.time_off.list` |
 | Una ausencia con su motivo, sus notas y quién la aprobó | ver el detalle de ausencias | F18 | `staff.time_off.detail` |
+| Una ausencia sin su motivo y con la `label` con la que la nombra la tarjeta del asistente (BASE-F97) | ver ausencias | F18, F19 | `staff.time_off.get` |
 | Quién falta hoy, con el tipo de cada ausencia en el idioma de quien pregunta | ver ausencias | F20 | `staff.time_off.today` |
 | Mis ausencias, con su motivo y sus notas | ver ausencias | F08 | `staff.time_off.mine` |
 | Los ajustes | ver | F22 | `staff.settings.get` |
@@ -768,6 +773,14 @@ El cajero del producto actual ya no existe como papel: lo que veía (el director
   `es` en el catálogo: «Semana», «Miembros del personal») o, si no lo tiene, por el `verbose_name`
   de su campo en el modelo, el que da la ficha; un dato sin ninguno sale con el nombre técnico y lo
   para `tests/test_integration_assistant.py`.
+- La tarjeta de confirmación del asistente (BASE-F97) nombra cada registro que una escritura señala por su id con las
+  marcas `refers` de `schemas.py` (`A_MEMBER`, `A_ROLE`, `A_SCHEDULE`, `A_TIME_OFF`), leídas como quien pregunta.
+  `staff.role.detail` y `staff.time_off.get` son lecturas internas (`ai=INTERNAL`, sin API), porque el modelo encuentra
+  esos registros en sus listas. La segunda existe porque `staff.time_off.detail` trae el motivo y pide un permiso que
+  el rol de empleado no tiene, y un empleado también anula su propia solicitud (STAFF-F19). Lo que no se puede leer se
+  deja fuera:
+  `tests/test_assistant_card_records.py`, y el trinquete `UNNAMED_REFERENCES` de `base/tests/test_assistant_card_values.py`
+  impide que entre un dato sin marca.
 - El admin de Django del Hub tiene **CRUD completo** sobre todos los modelos (ronda 12, PLAN §17),
   para el staff de la plataforma; una escritura cruda del admin no deja aviso.
 - Borrar una ficha en el admin (`MemberAdmin.delete_model`, `delete_queryset` y, en POST,

@@ -355,7 +355,7 @@ En la pantalla Archivos:
 | BASE-F47 | Informar de un error de la pantalla sin que nadie lo pida | hecho |
 | BASE-F48 | Abrir Ajustes y moverse por sus pestañas | hecho |
 | BASE-F49 | Ver el país del negocio | hecho |
-| BASE-F50 | Ver la moneda del negocio | descartado |
+| BASE-F50 | Ver la moneda del negocio | hecho |
 | BASE-F51 | Cambiar el idioma del negocio en erplora.com | hecho |
 | BASE-F52 | Entrar con la cuenta de erplora.com | hecho |
 | BASE-F53 | Entrar desde el panel de erplora.com sin volver a teclear la contraseña | hecho |
@@ -646,7 +646,8 @@ Pasos:
      sus iconos (escritorio), queda solo su icono, que dice «Mejorar plan» al pasar por encima. Solo en el
      navegador: en la app instalada no está.
   2. Lo pulsa: se abre en una pestaña nueva la página del plan de este negocio en erplora.com, ya dentro con su
-     cuenta: no vuelve a escribir la contraseña aunque ese navegador no tuviera abierta la sesión de erplora.com.
+     cuenta: no vuelve a escribir la contraseña aunque ese navegador no tuviera abierta la sesión de erplora.com. Igual
+     desde cualquier otro «Mejorar plan» del Hub: Sistema, Empleados, Apps, el panel del asistente y la Bandeja de WhatsApp.
   3. El propietario, el administrador o el encargado que entró con su cuenta tiene además, justo debajo de
      «Mejorar plan», «Gestionar en erplora.com», con el icono de enlace externo (en el menú plegado, solo el icono).
      No vende: también está en la app instalada, salvo en la de Google Play.
@@ -660,10 +661,9 @@ app instalada no consigue abrir el navegador, lo dice: «No se ha podido abrir e
 pase no llega (el servidor da un error o no contesta en 8 segundos), se abre la dirección de siempre: erplora.com pide
 entrar con la cuenta y sigue hasta el mismo sitio. Si el navegador bloquea la pestaña nueva, abre esa dirección el
 propio enlace. Con el pase gastado o pasado el minuto, erplora.com lo dice y ofrece entrar y seguir allí; a una cuenta
-que ya no es de este negocio le dice que no lo es (ACCOUNTS-F29). «Mejorar plan» del panel del asistente y de la Bandeja
-de WhatsApp aún no llevan el pase y piden entrar (hub#723). Un empleado, una sesión abierta con PIN o con la placa y la
-app de Google Play no tienen «Gestionar en erplora.com».
-Implicados: BASE-F40, ACCOUNTS-F29
+que ya no es de este negocio le dice que no lo es (ACCOUNTS-F29). Un empleado, una sesión abierta con PIN o con la placa
+y la app de Google Play no tienen «Gestionar en erplora.com».
+Implicados: BASE-F40, BASE-F104, WHATSAPP_INBOX-F13, ACCOUNTS-F29
 
 ### BASE-F12 Pedirle al asistente que repase la configuración
 <!-- origen: old-hub:HUB_SHELL-F30 -->
@@ -1526,7 +1526,7 @@ Implicados: HUBS-F15, BASE-F01, BASE-F29
 
 ### BASE-F50 Ver la moneda del negocio
 <!-- origen: old-hub:HUB_SHELL-F158 -->
-Estado: descartado — todas las apps van en la moneda del negocio salvo Citas, que sigue en euros aunque el país del negocio pague en otra moneda: con España y Portugal cuadra, con un país de otra moneda no (hub#577)
+Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Ajustes · Negocio; Inicio · Resumen e Inicio · Actividad
 Pasos:
@@ -1537,6 +1537,8 @@ Pasos:
   3. En el Inicio, los importes de los paneles (como «Ventas últimos 7 días») y de «Actividad» van en esa moneda,
      con su símbolo y sus decimales, como los imprime una caja de ese país: «zł» en un negocio de Polonia, «€» en
      uno de España. Mientras el negocio no ha contestado, el importe sale sin símbolo, nunca en otra moneda.
+  4. Las apps que enseñan precios o importes van en esa misma moneda, también Citas (el precio de cada servicio
+     al reservar y el «Total» de la cita) y la vista previa de Reserva online (hub#577).
 Entra: el país del negocio.
 Sale: nada guardado.
 Si falla: como en BASE-F49.
@@ -2516,8 +2518,10 @@ Pasos:
      vistazo si sobra o falta (el cierre de caja dice «Diferencia: +137,90 €» si sobra, «-4,90 €» si falta y sin signo si cuadra); un sí o un no, como «Sí» o «No»;
      una lista que su app (el servidor) nombra, por sus elementos uno tras otro («Impresoras: Caja, Cocina»; con más
      de cuatro, los tres primeros y cuántos más: «Caja, Cocina, Barra y 2 más»; si un elemento lleva coma, como una
-     fecha, separados por punto y coma: «2 nov 2026, 10:00; 9 nov 2026, 10:00») y cualquier otra, como las líneas de
-     una venta o una lista de códigos, por cuántos elementos lleva; y un dato que agrupa otros, como la plantilla de un WhatsApp, por sus
+     fecha, separados por punto y coma: «2 nov 2026, 10:00; 9 nov 2026, 10:00»); una lista de líneas que solo llevan
+     su registro, como los servicios de una cita, igual, por el nombre de cada uno («Servicios: Corte de pelo, Tinte»;
+     uno que no se puede nombrar cuenta entre los «más»); y cualquier otra, como las líneas de una venta (con su
+     cantidad y su precio) o una lista de códigos, por cuántos elementos lleva; y un dato que agrupa otros, como la plantilla de un WhatsApp, por sus
      valores, sin el nombre de cada uno («Plantilla: cita_recordatorio · es · Ana, 10:00»; del recuento de una caja
      quedan los billetes y monedas contados: «50: 2»). Una fecha y una hora salen como se escriben en el idioma
      de la persona y a la hora del negocio («2 nov 2026, 10:00»; un día solo, «2 nov 2026»; una hora sola,
@@ -2719,14 +2723,15 @@ Pasos:
      «Has usado los 300 mensajes de este mes.» con «Se renuevan el 1 de noviembre.»; también al abrir el panel con
      el mes ya gastado.
   5. Quien administra el negocio ve, en el navegador, «Mejorar plan», que abre en otra pestaña la página del plan
-     en erplora.com; en la app instalada desde la tienda no sale. Quien no administra ve «Pídele a quien administra el
-     negocio que mejore el plan.». No hay paquetes de mensajes: se amplía mejorando de plan.
+     en erplora.com, ya dentro con su cuenta (BASE-F11); en la app instalada desde la tienda no sale. Quien no
+     administra ve «Pídele a quien administra el negocio que mejore el plan.». No hay paquetes de mensajes: se amplía
+     mejorando de plan.
   6. Con un plan sin asistente, el pie dice «Tu plan no incluye el asistente.», con «Mejorar plan» para quien
      administra; el panel se abre igual.
 Entra: los mensajes usados, el límite y el día en que se renuevan, de erplora.com.
 Sale: la página del plan de erplora.com, en otra pestaña. El negocio no lleva su propia cuenta de mensajes.
 Si falla: si no se puede leer el plan, no se enseña nada y se puede preguntar igual: lo que diga erplora.com al
-responder es lo que vale.
+responder es lo que vale. Si el pase de «Mejorar plan» no llega, se abre la dirección de siempre, que pide entrar (BASE-F11).
 Implicados: BASE-F11, BASE-F106
 
 ### BASE-F105 Informar de una respuesta mala
@@ -3212,8 +3217,8 @@ Implicados: HUBS-F17, WEBSITE-F10
   Ventas, Facturación, Inventario, Tarifas, Impresión, Pagos y
   Carrito y pago la leen con `base.operations.business_currency(ctx.scope)`, sin copia propia (las `business_currency(ctx)`
   de `apps/sale/queries.py` y `apps/cart_checkout/queries.py` solo la llaman); en pantalla, Pagos, Carrito y pago,
-  Clientes y Menús y combos la leen con `useBusinessMoney`; Citas aún fija `EUR` en
-  `apps/appointment/frontend/lib/format.ts` (BASE-F50 `descartado`, hub#577). Pantallas: `SettingsPage.vue` (pestañas por hash `#business`, `#tickets`,
+  Clientes, Menús y combos, Citas y la vista previa de Reserva online la leen con `useBusinessMoney` (ninguna fija
+  una moneda; la ficha de prueba de `base.business.get` es `base/frontend/__tests__/business.ts`). Pantallas: `SettingsPage.vue` (pestañas por hash `#business`, `#tickets`,
   `#data`; `#tax` abre Negocio; `lib/data.ts`) y `components/settings/{BusinessPanel,TicketsPanel,SettingsRow}.vue`.
   Tests: `base/tests/test_business.py`, `test_queries_business.py`, `test_business_live.py`; e2e
   `tests/e2e/base-settings-business.spec.ts`, con el Hub y el SaaS reales.
@@ -3273,9 +3278,11 @@ Implicados: HUBS-F17, WEBSITE-F10
   clic (tras un `await` el navegador la bloquea), le quita `opener` y le pone la dirección al llegar; en la app instalada
   la saca por `openExternalLink`. Un error u 8 s sin respuesta (`SIGN_TIMEOUT_MS`: `client.api.call` no tiene tiempo
   límite) abren la dirección de siempre, que sigue en el `href`. Lo usan `UpgradePlanLink`, `SystemUsage`, `PeopleList` y
-  `AppsPage` (`plan`) y `ManageLink` (`business`); el asistente y la Bandeja de WhatsApp, aún no (hub#723). Tests:
-  `base/tests/test_saas_pass.py`, `lib/saas-pass.test.ts`, `frontend/external-links.test.ts`; e2e
-  `tests/e2e/base-chrome.spec.ts`.
+  `AppsPage` (`plan`), `ManageLink` (`business`), `PlanUpgradeLink` de la Bandeja de WhatsApp (`plan`) y `openPlan` de
+  `lib/assistant-hub.ts`, que recibe el clic de «Mejorar plan» del panel de `@erplora/ui` (`plan`) y pasa el cliente del
+  panel a `useSaasPass`, porque ese clic corre fuera del `setup` de un componente. Tests: `base/tests/test_saas_pass.py`,
+  `lib/saas-pass.test.ts`, `lib/assistant-hub.test.ts`, `frontend/external-links.test.ts`; e2e
+  `tests/e2e/base-chrome.spec.ts`, `tests/e2e/base-assistant.spec.ts` y `tests/e2e/whatsapp-inbox-plan-cap.spec.ts`.
 - `base/spa.py` incrusta en `hub-home` `access` (`credential`, `switch_user`, `idle_minutes`) y `preferences` (la
   apariencia propia); `plan_url` y `account_url` solo en una sesión abierta con la cuenta
   (gh:hub#2506), y `manage_url` (`SAAS_URL/dashboard/businesses/<id del hub>`, BASE-F11) además solo con el permiso
@@ -3685,10 +3692,7 @@ con su issue, y llegan con ella. Después llegaron BASE-F21 y BASE-F22 (hub#601)
   base de datos y sus ficheros pasados los 90 días.
 - **La fila de salud del Inicio (BASE-F02)**, hub#573: un punto de extensión más en `LiveAppConfig` y su uso en
   Impresión y la Bandeja de WhatsApp.
-- **El pase en «Mejorar plan» del asistente y de la Bandeja de WhatsApp (BASE-F11)**, hub#723: el asistente exige cambiar
-  `ERPlora/ui`; hasta entonces esos dos abren la dirección de siempre, que pide entrar.
 - **Las notas de cada versión (BASE-F41)**, hub#576.
-- **Citas en la moneda del negocio (BASE-F50)**, hub#577, de `apps/appointment`.
 - **La vista previa de .xlsx y .docx y el .json plegable (BASE-F74)**, hub#578.
 - **Los roles que trae una app (BASE-F82)**, hub#579, con la contradicción entre PLAN-HUB §3 (`RoleActivation`) y
   los cuatro roles de PLAN §22 sin resolver.

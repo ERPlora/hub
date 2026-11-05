@@ -20,7 +20,7 @@ import { join, resolve } from 'node:path';
 
 import { expect, type Page, test } from '@playwright/test';
 
-import { A, api, capture, login, psql, REPO_DIR, SAAS, shot, shown } from './helpers';
+import { A, api, capture, login, psql, REPO_DIR, SAAS, shot, shown, upgradeLandsInside } from './helpers';
 import { FLOW_VIEWPORTS, noHorizontalScroll, settled } from './service-helpers';
 import { STACK } from './stack';
 import { messageSends } from './whatsapp-graph';
@@ -119,6 +119,8 @@ test.describe('a plan without WhatsApp messages', () => {
     await expect(upgrade).toHaveText('Upgrade plan');
     await expect(upgrade).toHaveAttribute('href', `${SAAS}/dashboard/store/plans`);
     await expect(upgrade).toHaveAttribute('target', '_blank');
+    // With no session of erplora.com in this browser it lands inside it, already signed in (BASE-F11, hub#723).
+    await upgradeLandsInside(page, upgrade);
 
     // What the customer writes arrives through erplora.com as always: the cap only limits what is sent.
     const phone = e2ePhone();
@@ -131,7 +133,9 @@ test.describe('a plan without WhatsApp messages', () => {
     await expect(blocked).toContainText('Your plan does not include WhatsApp messages: nothing can be sent.');
     await expect(blocked).toHaveAttribute('data-code', 'cap_reached');
     await expect(panel(page).locator('[data-testid=whatsapp-inbox-composer-send]')).toHaveJSProperty('disabled', true);
-    await expect(panel(page).locator('[data-testid=whatsapp-inbox-composer-upgrade]')).toHaveAttribute('href', `${SAAS}/dashboard/store/plans`);
+    const composerUpgrade = panel(page).locator('[data-testid=whatsapp-inbox-composer-upgrade]');
+    await expect(composerUpgrade).toHaveAttribute('href', `${SAAS}/dashboard/store/plans`);
+    await upgradeLandsInside(page, composerUpgrade);
 
     for (const viewport of FLOW_VIEWPORTS) {
       await page.setViewportSize({ width: viewport.width, height: viewport.height });
@@ -149,7 +153,9 @@ test.describe('a plan without WhatsApp messages', () => {
     const month = shown(page).locator('[data-testid=whatsapp-inbox-settings-month]');
     await expect(month).toContainText('Your plan does not include WhatsApp messages.');
     await expect(month).not.toContainText('No limit');
-    await expect(shown(page).locator('[data-testid=whatsapp-inbox-settings-upgrade]')).toHaveAttribute('href', `${SAAS}/dashboard/store/plans`);
+    const settingsUpgrade = shown(page).locator('[data-testid=whatsapp-inbox-settings-upgrade]');
+    await expect(settingsUpgrade).toHaveAttribute('href', `${SAAS}/dashboard/store/plans`);
+    await upgradeLandsInside(page, settingsUpgrade);
     for (const viewport of FLOW_VIEWPORTS) {
       await page.setViewportSize({ width: viewport.width, height: viewport.height });
       await month.scrollIntoViewIfNeeded();

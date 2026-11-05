@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:1443e5816485631f7325d8d0dc8875a859250fa94bc2437d59fb933b58612a5b -->
+<!-- generated from WORKBOOK.md sha256:dad154ba0d875d56290418045f81cac9ca17c811e5927df15521d579376b572a -->
 
 ## What it is for and who it is for
 
@@ -347,7 +347,7 @@ On the Employees screens and the API documentation:
 | BASE-F47 | Report an error of the screen without anyone asking | done |
 | BASE-F48 | Open Settings and move through its tabs | done |
 | BASE-F49 | See the business's country | done |
-| BASE-F50 | See the business's currency | discarded |
+| BASE-F50 | See the business's currency | done |
 | BASE-F51 | Change the business's language on erplora.com | done |
 | BASE-F52 | Enter with the erplora.com account | done |
 | BASE-F53 | Enter from the erplora.com panel without typing the password again | done |
@@ -627,7 +627,8 @@ Steps:
      menu folded to its icons (desktop), only its icon stays, which says "Upgrade plan" on hover. Only in the
      browser: the installed app does not have it.
   2. They tap it: this business's plan page on erplora.com opens in a new tab, already signed in with their
-     account: they do not type the password again even if that browser did not have the erplora.com session open.
+     account: they do not type the password again even if that browser did not have the erplora.com session open. The
+     same from any other "Upgrade plan" of the Hub: System, Employees, Apps, the assistant's panel and the WhatsApp Inbox.
   3. The owner, the administrator or the manager who came in with their account also has, right below
      "Upgrade plan", "Manage on erplora.com", with the external link icon (on the folded menu, only the icon).
      It does not sell: the installed app has it too, except the Google Play one.
@@ -641,10 +642,9 @@ does nothing). If the installed app cannot open the browser, it says so: "Could 
 pass does not come (the server gives an error or does not answer in 8 seconds), the usual address opens: erplora.com
 asks to sign in with the account and goes on to the same place. If the browser blocks the new tab, the link itself opens
 that address. With the pass spent or the minute gone, erplora.com says so and offers to sign in and go on there; to an
-account that no longer belongs to this business it says it does not (ACCOUNTS-F29). "Upgrade plan" in the assistant's
-panel and in the WhatsApp Inbox do not carry the pass yet and ask to sign in (hub#723). An employee, a session opened with
+account that no longer belongs to this business it says it does not (ACCOUNTS-F29). An employee, a session opened with
 a PIN or with the badge and the Google Play app do not have "Manage on erplora.com".
-Involved: BASE-F40, ACCOUNTS-F29
+Involved: BASE-F40, BASE-F104, WHATSAPP_INBOX-F13, ACCOUNTS-F29
 
 ### BASE-F12 Ask the assistant to go over the setup
 Status: done
@@ -1466,7 +1466,7 @@ has no country: "—".
 Involved: HUBS-F15, BASE-F01, BASE-F29
 
 ### BASE-F50 See the business's currency
-Status: discarded — every app is in the business's currency except Appointments, which stays in euros even if the business's country pays in another currency: with Spain and Portugal it adds up, with a country of another currency it does not (hub#577)
+Status: done
 Actor: owner, administrator, manager, employee
 Screen: Settings · Business; Home · Summary and Home · Activity
 Steps:
@@ -1477,6 +1477,8 @@ Steps:
   3. On the Home, the amounts of the panels (such as "Sales, last 7 days") and of "Activity" are in that currency,
      with its symbol and its decimals, as a till of that country prints them: "zł" in a business in Poland, "€" in
      one in Spain. While the business has not answered, the amount shows without a symbol, never in another currency.
+  4. The apps that show prices or amounts are in that same currency, Appointments too (each service's price when
+     booking and the appointment's "Total") and the preview of Online booking (hub#577).
 In: the business's country.
 Out: nothing saved.
 If it fails: as in BASE-F49.
@@ -2400,7 +2402,9 @@ Steps:
      no sign when it balances); a yes or a no, as "Yes" or "No"; a list that its app (the server) names, by its items
      one after another ("Printers: Till, Kitchen"; past four, the first three and how many more: "Till, Kitchen, Bar and
      2 more"; when an item carries a comma, such as a date, separated by semicolons: "Nov 2, 2026, 10:00 AM; Nov 9,
-     2026, 10:00 AM") and any other, such as the lines of a sale or a list of codes, by how many items it carries; and a datum that groups others, such as a WhatsApp template, by its values, without the name of each one ("Template:
+     2026, 10:00 AM"); a list of lines that carry only their record, such as the services of an appointment, the same
+     way, by the name of each ("Services: Haircut, Colour"; one that cannot be named counts among the "more"); and any
+     other, such as the lines of a sale (with their quantity and price) or a list of codes, by how many items it carries; and a datum that groups others, such as a WhatsApp template, by its values, without the name of each one ("Template:
      cita_recordatorio · es · Ana, 10:00"; of a till count, the notes and coins counted remain: "50: 2"). A date and a
      time show as they are written in the person's language and at the business's hour ("Nov 2, 2026, 10:00 AM"; a day
      alone, "Nov 2, 2026"; a time alone, "9:30 PM"); a value of a closed list, with the name its app gives it ("Front
@@ -2601,14 +2605,15 @@ Steps:
      "You have used all 300 messages of this month." with "They renew on November 1."; also when the panel opens
      with the month already spent.
   5. Whoever runs the business sees, in the browser, "Upgrade plan", which opens the plan's page on erplora.com in
-     another tab; in the app installed from the store it does not show. Whoever does not run it sees "Ask whoever
-     runs the business to upgrade the plan.". There are no message packs: it is extended by upgrading the plan.
+     another tab, already signed in with their account (BASE-F11); in the app installed from the store it does not
+     show. Whoever does not run it sees "Ask whoever runs the business to upgrade the plan.". There are no message packs:
+     it is extended by upgrading the plan.
   6. With a plan without the assistant, the foot says "Your plan does not include the assistant.", with "Upgrade
      plan" for whoever runs the business; the panel opens anyway.
 In: the messages used, the limit and the day they renew, from erplora.com.
 Out: erplora.com's plan page, in another tab. The business does not keep its own count of messages.
 If it fails: if the plan cannot be read, nothing is shown and they can ask anyway: what erplora.com says when
-answering is what counts.
+answering is what counts. If the pass of "Upgrade plan" does not arrive, the usual address opens, which asks to sign in (BASE-F11).
 Involved: BASE-F11, BASE-F106
 
 ### BASE-F105 Report a bad answer
