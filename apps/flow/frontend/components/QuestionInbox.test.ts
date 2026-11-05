@@ -130,6 +130,10 @@ describe('QuestionInbox', () => {
     const unseen = { ...services, value: [{ service_id: 'Haircut' }, {}] };
     const n = await setup([{ ...CHANGE, fields: [unseen] satisfies QuestionOut['fields'] }]);
     expect(data(n, 'q2')).toEqual(['Services: Haircut and 1 more']);
+    // A name the model wrote as null beside the id does not show: the line still says its service.
+    const beside = { ...services, value: [{ service_id: 'Haircut', service: null }] };
+    const o = await setup([{ ...CHANGE, fields: [beside] satisfies QuestionOut['fields'] }]);
+    expect(data(o, 'q2')).toEqual(['Services: Haircut']);
   });
 
   it('a question with no change of the assistant lists no data', async () => {

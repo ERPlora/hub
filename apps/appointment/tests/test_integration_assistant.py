@@ -82,6 +82,18 @@ def test_the_card_names_each_service_a_write_books(write, language, hub_a, no_fa
 
 
 @pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+def test_a_name_the_model_writes_as_null_beside_the_id_still_names_the_service(hub_a, no_fallback):
+    """A model writes the name it does not give as null (``{"service_id": …, "service": null}``): the line still carries
+    only its service, and the card names it."""
+    with use_hub(hub_a):
+        cut = make_service("Corte de pelo")
+        booking = {"services": [{"service_id": str(cut.id), "service": None}]}
+        card = assistant.card(get("appointment.appointment.create"), booking, "es", person(hub_a, "es"))
+        shown = list_field(card, "services")
+    assert (shown["value"], shown.get(NAMED)) == ([{"service_id": "Corte de pelo", "service": None}], True)
+
+
+@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
 @pytest.mark.parametrize("language", ["es", "en"])
 def test_a_service_the_person_may_not_see_is_left_out_never_by_its_id(language, hub_a, no_fallback):
     """Whoever may not read Services sees how many services the booking carries, never which by an id."""
