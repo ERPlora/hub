@@ -1238,7 +1238,10 @@ Entra: nada de otras apps.
 Sale: los ajustes del negocio (una fila). El servidor aplica al cobrar «Permitir efectivo / tarjeta /
 transferencia», «Exigir cliente», «Permitir descuentos», el descuento máximo y los precios con IVA
 incluido; el TPV lee el resto al abrirse.
-Si falla: «No se pudieron guardar los ajustes.». Sin permiso, los campos se bloquean, no hay
+Si falla: «No se pudieron guardar los ajustes.» y, si el rechazo es de un campo, su motivo debajo de él. Como
+en las ventanas de formulario, el aviso se quita en cuanto se cambia algo y el motivo de un campo en cuanto se
+corrige ese campo; los dos vuelven si el siguiente intento también se rechaza. Un rechazo sin campo se queda
+hasta el siguiente intento (hub#854). Sin permiso, los campos se bloquean, no hay
 «Guardar» y sale «No tienes permiso para cambiar estos ajustes. Pídeselo a un administrador si lo
 necesitas.». Si se apagan todos los medios de pago que existen, el TPV y el servidor vuelven a
 aceptar todos los medios activos.

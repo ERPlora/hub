@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:6fdfbdc642c7d0c06a61b3af146844a8b1609b0a42f9d887d6bc7455bf457c35 -->
+<!-- generated from WORKBOOK.md sha256:9dba7004f4658518dc8361799406d520f9883dd8455e0b28bdf98e3966e385de -->
 
 ## What it is for and who it is for
 
@@ -685,7 +685,9 @@ In: what the person types.
 Out: the issuer, which is copied into every document issued from now on (those already issued do not
 change); announces `invoice.issuer.updated`.
 If it fails: without legal name, tax ID or address, under its field; a Spanish tax ID that is not valid,
-"That tax ID is not valid.".
+"That tax ID is not valid.". A field's reason goes as soon as that field is corrected and comes back if the
+next try is refused too; a refusal that names no field shows above the form and stays until the next try
+(hub#854).
 Involved: none
 
 ### INVOICE-F22 Receive the issuer from the ERPlora account

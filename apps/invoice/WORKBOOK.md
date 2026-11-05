@@ -716,7 +716,9 @@ Entra: lo que escribe la persona.
 Sale: el emisor, que se copia en cada documento que se emita desde ahora (los ya emitidos no cambian);
 avisa `invoice.issuer.updated`.
 Si falla: sin razón social, NIF o domicilio, bajo su campo; un NIF español que no es válido, «Ese NIF no
-es válido.».
+es válido.». El motivo de un campo se quita en cuanto se corrige ese campo y vuelve si el siguiente intento
+también se rechaza; un rechazo sin campo sale encima del formulario y se queda hasta el siguiente intento
+(hub#854).
 Implicados: ninguno
 
 ### INVOICE-F22 Recibir el emisor de la cuenta de ERPlora

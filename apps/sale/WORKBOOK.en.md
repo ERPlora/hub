@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:630c115aad47bde84e1514f498ed8b0053b27c68bd4d394625312ec1d5efbae7 -->
+<!-- generated from WORKBOOK.md sha256:12ea08727b24290607e168b43b1a2060c8769fcb936ed919ef3c862f6d0c6af6 -->
 
 ## What it is for and who it is for
 
@@ -1198,7 +1198,10 @@ In: nothing from other apps.
 Out: the business's settings (one row). The server applies when charging "Allow cash / card / bank
 transfer", "Require a customer", "Allow discounts", the maximum discount and prices including VAT; the POS
 reads the rest when it opens.
-If it fails: "Could not save settings.". Without permission, the fields are locked, there is no "Save"
+If it fails: "Could not save settings." and, if the refusal is of a field, its reason under it. As in the
+form windows, the notice goes as soon as something is changed and a field's reason as soon as that field is
+corrected; both come back if the next try is refused too. A refusal that names no field stays until the next
+try (hub#854). Without permission, the fields are locked, there is no "Save"
 and "You do not have permission to change these settings. Ask an administrator if you need to." shows.
 If every payment method that exists is turned off, the POS and the server go back to accepting every
 active method.

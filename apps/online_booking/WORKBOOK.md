@@ -156,7 +156,10 @@ desde el mismo dispositivo («…Inténtalo más tarde o llama al negocio.») o 
 negocio («…Inténtalo dentro de unos minutos.»), o más
 reservas online próximas con el mismo móvil de las que permiten los Ajustes (3 de fábrica: «Este móvil ya
 tiene reservas próximas…», sin decir cuántas). Dos clientas que reservan a la vez la misma hora del mismo
-profesional: entra una y la otra recibe «Esa hora ya no está libre».
+profesional: entra una y la otra recibe «Esa hora ya no está libre». En la vista previa, como en las ventanas de
+formulario, el aviso se quita en cuanto se cambia algo y el motivo de un campo en cuanto se corrige ese campo;
+los dos vuelven si el siguiente intento también se rechaza. Un rechazo sin campo se queda hasta el siguiente
+intento (hub#854).
 Implicados: APPOINTMENT-F02, APPOINTMENT-F18, APPOINTMENT-F19, CUSTOMER-F10, CUSTOMER-F11, SERVICE-F10
 
 ### ONLINE_BOOKING-F02 Confirmar una reserva

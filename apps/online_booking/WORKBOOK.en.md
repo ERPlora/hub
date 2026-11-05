@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:11d4b0617f0265bd060a730d299d07a80593c5757a4f0b0583b86a5075571b5d -->
+<!-- generated from WORKBOOK.md sha256:fe1c91c4472ba1521a3c7ea65fb953c884c535a9f2aedc4d23d7f599b4bba78b -->
 
 ## What it is for and who it is for
 
@@ -147,7 +147,10 @@ from the same device ("…Try again later, or call the business.") or more than 
 business ("…Try again in a few minutes."), or more
 upcoming online bookings with the same mobile than the Settings allow (3 out of the box: "This mobile already
 has upcoming bookings…", without saying how many). Two customers who book the same time of the same
-professional at once: one gets in and the other gets "That time is no longer free".
+professional at once: one gets in and the other gets "That time is no longer free". In the preview, as in the
+form windows, the notice goes as soon as something is changed and a field's reason as soon as that field is
+corrected; both come back if the next try is refused too. A refusal that names no field stays until the next
+try (hub#854).
 Involved: APPOINTMENT-F02, APPOINTMENT-F18, APPOINTMENT-F19, CUSTOMER-F10, CUSTOMER-F11, SERVICE-F10
 
 ### ONLINE_BOOKING-F02 Confirm a booking

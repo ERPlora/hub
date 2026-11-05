@@ -905,7 +905,9 @@ actividad (sin su contenido) y el aviso `customer.health.updated`. Los avisos so
 identificadores. Retirar el permiso BORRA los datos de salud en el mismo paso.
 Si falla: sin el permiso en vigor no se guarda nada: «Registra antes su permiso para guardar datos de
 salud.». Una prueba con fecha futura: «Esta fecha está en el futuro.»; un resultado sin fecha: «Pon la
-fecha de la prueba.». «Este cliente ya no está disponible.» si la ficha ya no está. Quien no gestiona
+fecha de la prueba.», cada uno debajo de su campo: se quita en cuanto se corrige ese campo y vuelve si el
+siguiente intento también se rechaza; lo que no es de un campo sale en el bloque y se queda hasta el siguiente
+intento (hub#854). «Este cliente ya no está disponible.» si la ficha ya no está. Quien no gestiona
 fichas ve el bloque sin botones.
 Implicados: CUSTOMER-F13, CUSTOMER-F16
 
