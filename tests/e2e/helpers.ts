@@ -540,6 +540,11 @@ export async function signedInSpanish(
   return { context, page };
 }
 
+/** Saves the owner's Spanish session for the fleet's visual sweep (`ui-clip-sweep.sh --storage-state`), when asked. */
+export async function saveSessionForTheSweep(context: BrowserContext): Promise<void> {
+  if (process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
+}
+
 /** The capture once the screen settled and nothing scrolls sideways. */
 export async function settledCapture(page: Page, name: string): Promise<void> {
   await expect(shown(page).locator('ion-skeleton-text:visible')).toHaveCount(0);
