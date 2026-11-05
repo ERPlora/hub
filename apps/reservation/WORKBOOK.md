@@ -921,8 +921,6 @@ la que solo se le autorizó reservar.
 
 ### Lo que queda fuera
 
-- **hub#547** — Una traducción al español marcada «fuzzy» sale en inglés y su test de traducciones no la ve.
-- **hub#548** — Dos textos en español salen con las palabras de otra app («origen» en vez de «reservada por»).
 - **hub#549** — La tarjeta de confirmación del asistente llama «Registro» a la reserva, la franja o la
   entrada que va a borrar.
 - **hub#550** — La tarjeta de confirmación del asistente dice la mesa solo por su número, sin su zona.
