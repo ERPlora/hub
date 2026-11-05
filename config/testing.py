@@ -1,4 +1,5 @@
-"""Connections left with a session setting changed, for the autouse fixture of ``conftest.py``.
+"""What the fixtures of ``conftest.py`` check on the test databases: connections left with a session setting changed,
+and a database kept by ``--reuse-db`` that lost its factory data (``lost_its_factory_data``).
 
 The control database's pool (``DATABASES["default"]["OPTIONS"]["pool"]``) hands a connection out again
 as its last user left it, so a session ``SET`` (a lock or statement timeout, a time zone, a role…) made
@@ -14,7 +15,12 @@ the pool at once; psycopg then drops the pending hand-back without closing the c
 
 import pytest
 from django.db import DEFAULT_DB_ALIAS, connections
+from psycopg import OperationalError, errors
 from psycopg.pq import TransactionStatus
+
+#: A table the migrations plant factory rows in, the tax app's catalogue. The flush of a transactional test empties
+#: every table at once, so this one speaks for all of them (``config/tests/test_reuse_db.py`` holds it to that).
+FACTORY_TABLE = "tax_taxcategory"
 
 #: What a session set and did not put back. Django's own time zone, which it sets on every new
 #: connection, is no change.
@@ -22,6 +28,23 @@ CHANGED = (
     "SELECT name, current_setting(name) FROM pg_settings WHERE source = 'session' "
     "AND setting IS DISTINCT FROM reset_val AND NOT (name = 'TimeZone' AND setting = %s)"
 )
+
+
+def lost_its_factory_data(database: str) -> bool:
+    """Whether the test database ``database``, kept by ``--reuse-db``, has no factory data left.
+
+    A ``django_db(transaction=True)`` test empties every table when it ends, the rows the migrations planted too. Those
+    migrations stay applied, so ``migrate`` never plants them again: only making the database again brings them back.
+    Without the database or the table nothing is lost: the ``migrate`` of ``--reuse-db`` makes them, rows included, and
+    says so itself if the server cannot be reached.
+    """
+    from base.tenancy.tests import hubs
+
+    try:
+        with hubs._maintenance(database) as conn:
+            return conn.execute(f"SELECT NOT EXISTS (SELECT FROM {FACTORY_TABLE})").fetchone()[0]
+    except (OperationalError, errors.UndefinedTable):
+        return False
 
 
 def _changed(conn, time_zone: str) -> list[tuple[int, str, str]]:
