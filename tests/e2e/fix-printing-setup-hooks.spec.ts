@@ -9,9 +9,10 @@
 // from it quiets the bell and the card and ticks the step, live; retired, the step is pending again. In each of the three sizes, leaving the capture `FIX-PRINTING-SETUP-HOOKS-<width>` with the bell
 // open. What it makes is «e2e Hooks …», deleted before and after; the devices set up before it are parked (retired)
 // for the run and put back after it.
-import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
+import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, bellBadge, horizontalOverflow, login, openBell, psql, shot, shown, untilStill } from './helpers';
+import { liveStreamsSettled, spanishOwner } from './live-streams';
 import { FLOW_VIEWPORTS, forgetDevices } from './printing-helpers';
 import { stamp } from './sale-helpers';
 
@@ -87,56 +88,8 @@ async function setUpDevice(context: BrowserContext, device: string): Promise<str
   return ((await res.json()) as { id: string }).id;
 }
 
-/** A `/api/live` the page opened: when, and the operations it carries (its `s`, base64 of the subscriptions). */
-interface Stream {
-  at: number;
-  ops: string[];
-}
-
-function streamOf(url: string): Stream {
-  let ops: string[] = [];
-  try {
-    const subscriptions: unknown = JSON.parse(Buffer.from(new URL(url).searchParams.get('s') ?? '', 'base64').toString());
-    if (Array.isArray(subscriptions)) ops = subscriptions.map((subscription: { op?: unknown }) => String(subscription.op));
-  } catch {
-    // Not the SDK's stream: no operations to tell.
-  }
-  return { at: Date.now(), ops };
-}
-
 /** The operations Printing → Devices subscribes, which the Home does not. */
 const DEVICES_OPS = ['printing.device.list', 'printing.printer.list'];
-
-/**
- * The owner on `a` in Spanish, on the Home, with every `/api/live` the page opens: a new stream brings every result
- * again, so a count that changes without one came over the stream already open, re-run by its events.
- */
-async function spanishOwner(browser: Browser, viewport: { width: number; height: number }) {
-  const context = await browser.newContext({ baseURL: A, viewport, locale: 'es-ES' });
-  const page = await context.newPage();
-  const streams: Stream[] = [];
-  page.on('request', (request) => {
-    if (request.url().includes('/api/live')) streams.push(streamOf(request.url()));
-  });
-  await login(page, A, '/');
-  await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
-  await page.goto(`${A}/`);
-  await expect(page.locator('html')).toHaveAttribute('lang', /^es/);
-  await expect(shown(page).locator('[data-testid="home-my-apps"]')).toBeVisible();
-  if (process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
-  return { context, page, streams };
-}
-
-/**
- * Waits until the page has let go of the screen it left (`left`, its operations) and then opened no `/api/live` for a
- * second: every subscription of the screen is declared. A screen left keeps its subscriptions `RELEASE_GRACE_MS` (2 s,
- * `use-live.ts` of `@erplora/ui`) in case it comes back, and only then does the stream reopen without them: a second
- * of quiet can fall inside that grace, and the reopen then brings every result again in the middle of the reading.
- */
-async function settled(streams: Stream[], left: string[] = []): Promise<void> {
-  await expect.poll(() => left.filter((op) => streams.at(-1)?.ops.includes(op)), { timeout: 15_000 }).toEqual([]);
-  await expect.poll(() => Date.now() - (streams.at(-1)?.at ?? 0), { timeout: 15_000 }).toBeGreaterThan(1_000);
-}
 
 const card = (page: Page): Locator => shown(page).locator('[data-testid="setup-card"]');
 const step = (page: Page): Locator => card(page).locator(`[data-testid="setup-row"][data-key="${STEP}"]`);
@@ -183,7 +136,7 @@ FLOW_VIEWPORTS.forEach(({ label, width, height }) => {
       await unfolded(page);
 
       // The Home as it is read: its stream settled before anything changes the bell.
-      await settled(streams, DEVICES_OPS);
+      await liveStreamsSettled(streams, DEVICES_OPS);
       // Settled on the Home's own stream: Devices' subscriptions, released, ride on none of what the page has open.
       expect(DEVICES_OPS.filter((op) => streams.at(-1)?.ops.includes(op)), 'the Home settled with Devices released').toEqual([]);
       const before = await counters(context);
