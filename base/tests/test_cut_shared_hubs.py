@@ -364,6 +364,30 @@ def test_a_cut_that_broke_leaves_the_business_on_control_and_the_next_run_does_i
         assert Printer.objects.filter(pk=rows.printer.pk).count() == 1
 
 
+@pytest.mark.parametrize(
+    ("mode", "breaks"),
+    [("--copy-all", (cut, "copy_rows")), ("--recreate", (cut.services, "apply_kept_photo"))],
+    ids=["copying", "seeding"],
+)
+def test_a_cut_that_broke_after_its_schema_leaves_the_business_s_schema_as_it_was(phase_one, monkeypatch, mode, breaks):
+    """Its database got its schema, then the cut broke and dropped it: control's row says no more than it said before
+    (no ``schema_apps`` of a database that is gone, its ``schema_state`` untouched) (hub#612)."""
+    aurora = phase_one.business("aurora", schema_state=Hub.SchemaState.BEHIND, schema_apps={"gone": "0009_later"})
+    phase_one.rows_of(aurora.slug)
+    before = fresh(aurora)
+
+    def broken(*args, **kwargs):
+        raise RuntimeError("the network went away after the schema")
+
+    monkeypatch.setattr(*breaks, broken)
+    with pytest.raises(CommandError, match="after the schema"):
+        run(mode, aurora.slug, "--no-dump")
+
+    after = fresh(aurora)
+    assert after.db_name == "" and names.hub_db_name(tenancy_connections.control_name(), aurora.id) not in databases()
+    assert (after.schema_apps, after.schema_state) == (before.schema_apps, before.schema_state)
+
+
 def test_while_a_business_is_cut_its_host_answers_503_and_after_it_its_own_database(phase_one, monkeypatch, settings):
     aurora = phase_one.business("aurora")
     phase_one.rows_of(aurora.slug)
