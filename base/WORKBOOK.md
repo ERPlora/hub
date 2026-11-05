@@ -3067,6 +3067,10 @@ Implicados: HUBS-F18, HUBS-F19, HUBS-F20, PUBLIC-F34 (el mismo borrado de ficher
   mirar el registro (`test_nobody_can_open_a_screen_of_the_platform_hub_though_its_row_is_ready`), y si algún día se
   abriera, el aviso de plan desconocido le prometería uno que nunca llega. Tests: `base/tests/test_meter.py`, `test_meter_requests.py` y
   `test_plan_usage_figures.py`.
+- Una transacción que va a esperar una respuesta de fuera lo dice con `base.operations.allow_idle_wait(segundos)`:
+  `SET LOCAL idle_in_transaction_session_timeout` en el alias activo (`base.tenancy.connections.allow_idle_wait`), solo
+  para esa transacción (PgBouncer en modo transacción); todas las demás siguen con los 30 s del clúster. Test:
+  `base/tenancy/tests/test_limits.py`.
 - Pantallas: `base/frontend/pages/AppsPage.vue` (`/apps`, pestañas por hash `#all`/`#paid`, las del hub viejo;
   reglas en `lib/apps.ts`), `SystemPage.vue` (`/system`, cinco pestañas por hash: ver «Sistema (APP-BASE-7)» abajo) y `AppBlockedPage.vue`, que monta la guarda de `lib/app-gate.ts` (`frontend/main.ts`: cada ruta
   de `apps/<id>/frontend/routes.ts` lleva `meta.app`; una app `off` en `base.session.me` monta la página por nombre
