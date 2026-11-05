@@ -366,7 +366,9 @@ Pasos:
    minutos. Sin guardar nunca: se pregunta, 60 y 90 minutos.
 Entra: los tres valores.
 Sale: los ajustes de sala (avisa: `table.settings.updated`).
-Si falla: un valor fuera de rango sale en su campo.
+Si falla: un valor fuera de rango sale en su campo. Como en las ventanas de formulario, el aviso se quita en
+cuanto se cambia algo y el motivo de un campo en cuanto se corrige ese campo; los dos vuelven si el siguiente
+intento también se rechaza. Un rechazo sin campo se queda hasta el siguiente intento (hub#854).
 Implicados: TABLE-F10, TABLE-F22
 
 ### TABLE-F09 Ver cómo está la sala

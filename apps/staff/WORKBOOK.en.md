@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:0e1c46bd1c2121821eaf9ea7b09b45145e28f41fdde3702662cb56fab64226f4 -->
+<!-- generated from WORKBOOK.md sha256:51a52eda1462d50596a1784e84f9c52ef3fc66e08f851f70d0bfb01d9920bda6 -->
 
 ## What it is for and who it is for
 
@@ -519,9 +519,11 @@ a new schedule proposes that working day from Monday to Friday, with the break i
 If it fails: a value outside its range shows under its field and nothing is saved. A working day that ends
 before it starts says "The start time must be before the end time." under "Working day ends (HH:MM)"
 (under "Working day starts (HH:MM)" if only the start was changed), and a break that does not fit in the
-working day, "The break must fall inside the working hours." under the break; nothing is saved. If the
-settings cannot be read, "The settings could not be loaded" with "Retry", without a form: values that are
-not the business's are never offered to be saved.
+working day, "The break must fall inside the working hours." under the break; nothing is saved. As in the form
+windows, the notice goes as soon as something is changed and a field's reason as soon as that field is
+corrected; both come back if the next try is refused too. A refusal that names no field stays until the next
+try (hub#854). If the settings cannot be read, "The settings could not be loaded" with "Retry", without a
+form: values that are not the business's are never offered to be saved.
 Involved: none
 
 ### STAFF-F23 See the figures of the staff and by role

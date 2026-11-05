@@ -97,6 +97,61 @@ describe('IssuerPage', () => {
     expect(prop(s.field('tax-id'), 'errorText')).toBe('That tax ID is not valid.');
   });
 
+  describe('a refusal by fields (hub#854, as FormModal and the Services settings do: ui#102, hub#821)', () => {
+    const TAX_ID = 'That tax ID is not valid.';
+    const POSTAL = 'Ensure this value has at most 5 characters.';
+    const REFUSAL = { error: { code: 'invalid_payload', message: 'Invalid payload', fields: { tax_id: TAX_ID, postal_code: POSTAL } } };
+
+    /** Saves a tax ID and a postal code the server refuses. */
+    async function refused() {
+      const s = await setup();
+      await s.result(OP, SET);
+      s.answer(422, REFUSAL);
+      await ionValue(s.field('tax-id'), 'B1', 'ionInput');
+      await ionValue(s.field('postal-code'), '280011', 'ionInput');
+      await click(s.find('invoice-issuer-save').element);
+      await flush();
+      const says = (key: string) => (prop(s.field(key), 'errorText') as string | undefined) ?? '';
+      const marked = (key: string) => s.field(key).classList.contains('ion-invalid');
+      return { ...s, says, marked };
+    }
+
+    it('says it under the fields only, and a field’s message goes as soon as that field is changed', async () => {
+      const s = await refused();
+      expect(s.find('invoice-issuer-error').exists()).toBe(false);
+      expect([s.says('tax-id'), s.says('postal-code')]).toEqual([TAX_ID, POSTAL]);
+      await ionValue(s.field('tax-id'), 'B12345674', 'ionInput');
+      expect([s.says('tax-id'), s.marked('tax-id')]).toEqual(['', false]);
+      expect([s.says('postal-code'), s.marked('postal-code')]).toEqual([POSTAL, true]);
+    });
+
+    it('a change in another field takes no field’s message away', async () => {
+      const s = await refused();
+      await ionValue(s.field('city'), 'Toledo', 'ionInput');
+      expect([s.says('tax-id'), s.says('postal-code')]).toEqual([TAX_ID, POSTAL]);
+    });
+
+    it('the next refusal says it all again', async () => {
+      const s = await refused();
+      await ionValue(s.field('tax-id'), 'B2', 'ionInput');
+      await ionValue(s.field('postal-code'), '280012', 'ionInput');
+      expect([s.says('tax-id'), s.says('postal-code'), s.find('invoice-issuer-error').exists()]).toEqual(['', '', false]);
+      await click(s.find('invoice-issuer-save').element);
+      await flush();
+      expect([s.says('tax-id'), s.says('postal-code'), s.marked('tax-id')]).toEqual([TAX_ID, POSTAL, true]);
+    });
+
+    it('a refusal that names no field stays until the next try: nothing else says it', async () => {
+      const s = await setup();
+      await s.result(OP, SET);
+      s.answer(409, { error: { code: 'conflict', message: 'Someone else is saving it.' } });
+      await click(s.find('invoice-issuer-save').element);
+      await flush();
+      await ionValue(s.field('city'), 'Toledo', 'ionInput');
+      expect(s.find('invoice-issuer-error').text()).toContain('Someone else is saving it.');
+    });
+  });
+
   it('a manager only looks', async () => {
     const s = await setup({ session: MANAGER });
     await s.result(OP, SET);

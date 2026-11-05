@@ -558,8 +558,11 @@ Si falla: un valor fuera de su rango sale debajo de su campo y no se guarda nada
 acaba antes de empezar dice «La hora de inicio tiene que ser anterior a la de fin.» debajo de «Fin de
 jornada (HH:MM)» (debajo de «Inicio de jornada (HH:MM)» si solo se cambió el inicio), y un descanso
 que no cabe en la jornada, «El descanso debe caer dentro del intervalo de trabajo.» debajo del
-descanso; no se guarda nada. Si los ajustes no se pueden leer, «No se pudieron cargar los ajustes» con
-«Reintentar», sin formulario: nunca se ofrecen para guardar unos valores que no son los del negocio.
+descanso; no se guarda nada. Como en las ventanas de formulario, el aviso se quita en cuanto se cambia algo y
+el motivo de un campo en cuanto se corrige ese campo; los dos vuelven si el siguiente intento también se
+rechaza. Un rechazo sin campo se queda hasta el siguiente intento (hub#854). Si los ajustes no se pueden leer,
+«No se pudieron cargar los ajustes» con «Reintentar», sin formulario: nunca se ofrecen para guardar unos valores
+que no son los del negocio.
 Implicados: ninguno
 
 ### STAFF-F23 Ver las cifras de la plantilla y por rol

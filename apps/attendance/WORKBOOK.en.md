@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:6fcd335b94ab3104547fdd7945bfb643a2b76614e19a000f827f262451169956 -->
+<!-- generated from WORKBOOK.md sha256:95589fcc6f35848d9fb273ea55b88564ac6ffb012fa46835632acf990d04de5b -->
 
 ## What it is for and who it is for
 
@@ -211,7 +211,10 @@ with the location denied, "Use my current location" keeps what was typed and war
 "Location access is denied. Allow location in this browser to read the workplace position, or type the
 coordinates." (in the installed app, which has no browser, "Location access is denied. Allow location in
 your device settings to read the workplace position, or type the coordinates."); whoever is not a
-manager sees the settings read-only.
+manager sees the settings read-only. As in the form windows, the notice goes as soon as something is changed
+and a field's reason as soon as that field is corrected (the coordinates, as the pair they are: correcting one
+takes both reasons away); both come back if the next try is refused too. A refusal that names no field stays
+until the next try (hub#854).
 Involved: ATTENDANCE-F03, ATTENDANCE-F05
 
 ### ATTENDANCE-F05 Flag for review a working day nobody closed

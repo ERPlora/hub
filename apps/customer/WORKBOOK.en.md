@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:0a21d67e9a7effbc6e6f06dc06073006dcac5372b15cd1d36bc8bd41e127cdfd -->
+<!-- generated from WORKBOOK.md sha256:5066a9b20294fe2f27bb814928e63ec4432c2b3979a4e9b39844615141886e3e -->
 
 ## What it is for and who it is for
 
@@ -860,7 +860,9 @@ the health data, with "Health data updated" in the activity (without its content
 the health data in the same step.
 If it fails: without the permission in force nothing is saved: "Record their permission first to keep
 health data.". A test with a future date: "This date is in the future."; a result without a date: "Enter
-the date of the test.". "This customer is no longer available." if the card is no longer there. Whoever
+the date of the test.", each under its field: it goes as soon as that field is corrected and comes back if
+the next try is refused too; what is not of a field shows in the block and stays until the next try
+(hub#854). "This customer is no longer available." if the card is no longer there. Whoever
 does not manage cards sees the block without buttons.
 Involved: CUSTOMER-F13, CUSTOMER-F16
 
