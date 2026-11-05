@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('control', '0007_hub_tables_renamed_shared'),
+        ('control', '0008_retired_tables_no_app_access'),
     ]
 
     operations = [
