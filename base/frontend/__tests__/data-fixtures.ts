@@ -77,3 +77,18 @@ export function load(fields: Partial<ImportRow> = {}): ImportRow {
     ...fields,
   };
 }
+
+/** A load that still waits for an app (hub#609): being set up, or whose setup failed and keeps trying. */
+export function waitingLoad(status: 'waiting' | 'setup_failed' = 'waiting'): ImportRow {
+  const retry = status === 'setup_failed';
+  return load({
+    status: 'partial',
+    retry,
+    retry_blocked: retry ? '' : 'waiting',
+    report: {
+      status: 'partial',
+      dropped: [],
+      apps: [{ id: 'service', label: 'Services', status, reason: 'Why, in words.', datasets: [] }],
+    },
+  });
+}
