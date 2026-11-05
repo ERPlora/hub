@@ -1,7 +1,8 @@
 // The public pages are Bootstrap 5.3 (Ioan, 2026-10-22): every class in the website's Django templates
 // (`apps/website/templates/website/**`) and in the catalog the bundle rebuilds is one of Bootstrap's own, read from
-// the installed `bootstrap.css`, or a `ws-*` hook; no class is computed (`{{ … }}`), so this scan sees them all. Each
-// hook is defined in `site.css`, the one stylesheet of our own, and the stylesheet defines no hook nobody uses.
+// the installed `bootstrap.css`, or a `ws-*` hook; no class is computed (`{{ … }}`), but for what a design passes a
+// component it includes (`{% include … with login_class="btn …" %}`, read here where it is written), so this scan sees
+// them all. Each hook is defined in `site.css`, the one stylesheet of our own, and the stylesheet defines no hook nobody uses.
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -38,13 +39,23 @@ function files(dir: string): string[] {
   });
 }
 
-/** Each `class="…"` of a template, with its Django tags taken out (the classes on both sides of an `{% if %}`). */
+/** What a template passes the components it includes as classes: each `<name>_class="…"` or `<name>_column="…"`. */
+function classesPassed(source: string): { name: string; value: string }[] {
+  return [...source.matchAll(/\{%\s*include\b[\s\S]*?%\}/g)].flatMap(([include]) =>
+    [...include.matchAll(/\b(\w+_(?:class|column))="([^"]*)"/g)].map(([, name, value]) => ({ name, value })),
+  );
+}
+
+/** Each `class="…"` of a template, with its Django tags taken out (the classes on both sides of an `{% if %}`) and what
+ * a design passes it as a component, and each class it passes the components it includes. */
 function templateClasses(path: string): { attribute: string; tokens: string[] }[] {
   const source = readFileSync(path, 'utf8');
-  return [...source.matchAll(/\bclass="([^"]*)"/g)].map(([, attribute]) => ({
-    attribute,
-    tokens: attribute.replace(/\{%[\s\S]*?%\}/g, ' ').split(/\s+/).filter(Boolean),
-  }));
+  const tokensOf = (attribute: string) => attribute.replace(/\{%[\s\S]*?%\}/g, ' ').split(/\s+/).filter(Boolean);
+  const attributes = [...source.matchAll(/\bclass="([^"]*)"/g)].map(([, written]) => {
+    const attribute = written.replace(/\{\{\s*(\w+)\s*\}\}/g, (variable, name: string) => (PASSED.has(name) ? ' ' : variable));
+    return { attribute, tokens: tokensOf(attribute) };
+  });
+  return [...attributes, ...classesPassed(source).map(({ value }) => ({ attribute: value, tokens: tokensOf(value) }))];
 }
 
 function catalogClasses(): string[] {
@@ -67,6 +78,8 @@ function reviewsClasses(): string[] {
 
 const BOOTSTRAP = bootstrapClasses();
 const TEMPLATE_FILES = files(TEMPLATES);
+/** The names of the classes the designs pass the components: the only `{{ … }}` a `class="…"` may hold. */
+const PASSED = new Set(TEMPLATE_FILES.flatMap((path) => classesPassed(readFileSync(path, 'utf8')).map(({ name }) => name)));
 const isHook = (name: string) => /^ws-[a-z0-9-]+$/.test(name);
 const hooksDefined = new Set([...SITE_CSS.replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/\.(ws-[a-z0-9-]+)/g)].map(([, name]) => name));
 
@@ -83,6 +96,10 @@ describe('the public website’s classes', () => {
     expect(names).toEqual(
       expect.arrayContaining([
         'base.html',
+        '_topbar.html',
+        '_footer.html',
+        '_footer_columns.html',
+        '_credit.html',
         'templates/classic.html',
         'templates/modern.html',
         'templates/minimal.html',
