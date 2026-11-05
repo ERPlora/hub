@@ -355,6 +355,21 @@ describe('RecordsPage: whether a rejection is already corrected (VERIFACTU-F24, 
     expect(s.router.currentRoute.value.path).toBe('/verifactu/records/fix-3');
   });
 
+  it('Space on «Corrected» opens the record that corrects it, not the rejected one of its row (hub#865)', async () => {
+    const s = await setup();
+    await s.show(REJECTIONS);
+    const push = vi.spyOn(s.router, 'push');
+    const link = s.rows()[1].get('[data-testid="verifactu-records-correction-corrected"]');
+    // A real key press: it bubbles to the row (which opens on Enter and Space) unless the link keeps it.
+    const space = new KeyboardEvent('keydown', { key: ' ', code: 'Space', bubbles: true, cancelable: true });
+    link.element.dispatchEvent(space);
+    await flush();
+    expect(s.table().emitted('rowClick') ?? [], 'Space on the link is the link’s, not the row’s').toEqual([]);
+    expect(push.mock.calls).toEqual([['/verifactu/records/fix-3']]);
+    expect(s.router.currentRoute.value.path).toBe('/verifactu/records/fix-3');
+    expect(space.defaultPrevented, 'Space opens the record; it does not scroll the page under it').toBe(true);
+  });
+
   it('«Pending correction» in the funnel asks only the rejections still to correct', async () => {
     const s = await setup();
     await s.show(REJECTIONS);
