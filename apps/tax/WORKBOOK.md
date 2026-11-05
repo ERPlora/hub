@@ -624,6 +624,12 @@ cajero del producto actual es un empleado.
 
 ## Para quien lo mantiene
 
+- **Orden de las listas** (`base.ordering.list_order`; regla hub#2355 del producto viejo): categorías, reglas y alias
+  van por la columna elegida, después por su clave natural y al final por `id`, todo en la dirección de la lista y con
+  los vacíos al final en las dos: la descendente es la ascendente leída al revés, empates incluidos. Lo fija
+  `test_ties_read_backwards_in_a_descending_list`, por lista. La única excepción, a propósito: en Reglas un componente
+  sale justo debajo de su raíz en las dos direcciones (TAX-F03), y lo fija
+  `test_a_component_stays_right_under_its_root_in_a_descending_list`.
 - Anatomía de servidor completa: `apps.py`, `models.py` (`TaxCategory`, `TaxRule`, `TaxAlias`, `TaxSettings`),
   `migrations/` (`0002` siembra el catálogo de fábrica, con reverso; `0005` añade `retail.alcohol` sin tocar lo
   que el hub ya tenga; `0006` crea `TaxSettings`), `schemas.py`, `queries.py`, `services.py`, `events.py`,
@@ -746,7 +752,10 @@ cajero del producto actual es un empleado.
   sigue `no hecho` por eso).
 - **«Hoy» en la zona del negocio**: en la fase 1 es el de Madrid (`settings.TIME_ZONE`), también en
   Canarias, donde un cambio de tipo empieza una hora antes de su medianoche (la zona horaria del negocio en
-  dos fuentes es una contradicción señalada en la ronda CLOSE-SCHEDULE de `PLAN-HUB.md`).
+  dos fuentes es una contradicción señalada en la ronda CLOSE-SCHEDULE de `PLAN-HUB.md`). No se mueve sola: la vista
+  previa de Ventas y `invoice.invoice.line_defaults` toman de él el tipo, que tiene que ser el del día del registro, y
+  ese tipo llega al `TipoImpositivo` y a la `Huella` de VeriFactu. Cambia con las fechas de la factura, con supervisión
+  (hub#772); hasta entonces lo congela `tests/test_guardrails_fiscal_clock.py`.
 - **Tipos de fábrica de IGIC, IPSI, recargo de equivalencia o de otros países**: no se siembran, a propósito
   (un tipo inventado se declararía); los crea el negocio (TAX-F04, TAX-F06, TAX-F11).
 - **`useServerTable`/`useLiveList` y `formatPercent`/`formatDate` en `@erplora/ui`**: siguen en

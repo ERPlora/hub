@@ -28,7 +28,7 @@ EMPLOYEE = frozenset({"base.view_home", "demo.view"})
 SYNTHESIZE = "/internal/speech/synthesize"
 #: The first bytes of an mp3 (an ID3 header, then a frame's sync word).
 MP3 = b"ID3\x04\x00\x00\x00\x00\x00\x00\xff\xfb\x90d" + bytes(range(256))
-XIMENA = "es-ES-Ximena:DragonHDLatestNeural"
+A_VOICE = "a-voice"
 
 
 @pytest.fixture(autouse=True)
@@ -64,10 +64,10 @@ def test_reading_aloud_is_the_persons_and_never_a_tool_nor_a_transaction():
 
 def test_an_answer_is_read_aloud_as_an_mp3_in_the_voice_chosen(gateway):
     gateway.reply(SYNTHESIZE, content=MP3, content_type="audio/mpeg")
-    spoken = speak(text="  Tienes 3 mesas abiertas.  ", language="es", voice=XIMENA)
+    spoken = speak(text="  Tienes 3 mesas abiertas.  ", language="es", voice=A_VOICE)
     assert spoken == {"content_type": "audio/mpeg", "content_base64": base64.b64encode(MP3).decode()}
     [seen] = gateway.sent(SYNTHESIZE)
-    assert seen.body == {"hub": "a", "text": "Tienes 3 mesas abiertas.", "language": "es", "voice": XIMENA}
+    assert seen.body == {"hub": "a", "text": "Tienes 3 mesas abiertas.", "language": "es", "voice": A_VOICE}
     assert signed(seen)
 
 
@@ -218,12 +218,12 @@ def test_the_route_is_bound_to_its_operation():
 def test_the_panel_gets_the_mp3_itself(client, make_user, gateway):
     client.force_login(make_user("ana", host="a", role="hub_employee"))
     gateway.reply(SYNTHESIZE, content=MP3, content_type="audio/mpeg")
-    response = post(client, {"text": "Hola", "language": "es", "voice": XIMENA}, HTTP_ACCEPT="audio/mpeg")
+    response = post(client, {"text": "Hola", "language": "es", "voice": A_VOICE}, HTTP_ACCEPT="audio/mpeg")
     assert (response.status_code, response["Content-Type"], response.content) == (200, "audio/mpeg", MP3)
     assert response["Cache-Control"] == "no-store"
     # Through the operation and the signed door of erplora.com (here its fake, a real HTTP server).
     [seen] = gateway.sent(SYNTHESIZE)
-    assert (seen.body["voice"], signed(seen)) == (XIMENA, True)
+    assert (seen.body["voice"], signed(seen)) == (A_VOICE, True)
 
 
 def test_an_integration_that_only_reads_json_gets_the_operations_output(client, make_user, gateway):

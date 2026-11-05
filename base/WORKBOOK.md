@@ -76,7 +76,8 @@ según la hora («Buenos días», «Buenas tardes», «Buenas noches»). Debajo,
 - **«Termina de configurar tu negocio»**: cuántos pasos lleva hechos, una barra y los pasos que faltan,
   cada uno con su icono, su explicación, una etiqueta («Necesario para facturar», «Importante»,
   «Recomendado», «Hecho» o «Todavía no disponible») y «Configurar». Plegada: cinco pasos (dos en el
-  móvil), con «Ver todo» y «Ver menos». Cuando no falta nada: «Tu negocio está listo».
+  móvil), primero los que impiden facturar, con «Ver todo» y «Ver menos». Cuando no falta nada: «Tu negocio
+  está listo».
 - **El tablero de paneles**, con «Personalizar panel» (⋮) arriba a la derecha.
 
 ### Inicio · Actividad
@@ -422,8 +423,10 @@ Actor: propietario, administrador, responsable, empleado
 Pantalla: Inicio · Resumen
 Pasos:
   1. Entra en el Inicio. En «Termina de configurar tu negocio» ve cuántos pasos lleva hechos y una barra.
-  2. Debajo, los pasos que faltan, en el orden que fijan las apps: primero los que impiden facturar
-     («Necesario para facturar», en rojo), luego los «Importante» y al final los «Recomendado».
+  2. Debajo, los pasos que faltan: primero los que impiden facturar («Necesario para facturar», en rojo) y
+     luego los «Importante», cada grupo en el orden que fijan las apps, también en el móvil, donde solo caben
+     dos filas. Los «Recomendado» salen plegada solo si no queda otra cosa. «Ver todo» enseña todos los pasos,
+     también los hechos, en el orden que fijan las apps.
   3. Los de la plataforma son «Tus apps» (encender al menos una app de negocio) y «Tu equipo» (añadir a
      las personas que usarán el TPV); el resto los trae cada app encendida.
   4. Un paso que solo vale para otro país, o que la persona no puede ver, no sale. Un paso cuya
@@ -853,7 +856,7 @@ Si falla: si vuelve a fallar, vuelve a decirlo con su «Reintentar». Si ya no e
 la ha reintentado, sale en un aviso con el nombre de la app y «Esta app no está esperando a que se vuelva a preparar.»,
 que se queda hasta cerrarlo. Desde el asistente, un nombre que vale para varias apps, o para ninguna, no saca tarjeta
 (BASE-F24).
-Implicados: ninguno
+Implicados: BASE-F32
 
 ### BASE-F22 Seguir la activación de una app mientras se navega
 <!-- origen: old-hub:HUB_SHELL-F113 -->
@@ -873,7 +876,7 @@ Pasos:
 Entra: cómo va la activación.
 Sale: la app en marcha en este negocio (`base.app.enabled`).
 Si falla: BASE-F21.
-Implicados: ninguno
+Implicados: BASE-F31, BASE-F32
 
 ### BASE-F23 Desactivar una app
 <!-- origen: old-hub:HUB_SHELL-F122 -->
@@ -1059,7 +1062,8 @@ Pasos:
      el Hub nunca carga (personas, PIN, datos fiscales) sale en «Nunca se carga aquí».
   3. Desmarca las apps que no quiera y pulsa «Importar» («Importando…»), o «Elegir otro» para volver.
   4. Al terminar sale el informe (BASE-F32). Lo que ya había en el negocio se queda como estaba: no se
-     duplica ni se sobrescribe.
+     duplica ni se sobrescribe. Si una app de la plantilla aún se está preparando (BASE-F22), lo suyo entra solo en
+     cuanto queda lista, sin volver ni pulsar nada.
 Entra: la plantilla o el fichero y las apps marcadas.
 Sale: las apps marcadas que estaban desactivadas, activadas antes de cargar, con las que necesitan y dentro
 del tope de apps del plan, como si se activaran en Apps (`base.app.enabled`); en cada app marcada, lo que
@@ -1069,8 +1073,9 @@ Si falla: «La importación falló: {reason}» y se queda en la revisión; sin n
 menos una app.» y no se puede importar; si ninguna de sus apps se puede activar aquí, «Nada de este fichero
 puede cargarse en tu negocio: ninguna de sus apps se puede activar aquí.». Una app que no se pudo activar (el
 tope de apps del plan, una app que el plan no incluye) se queda desactivada, no carga nada y el informe dice
-por qué; el resto se carga.
-Implicados: INVENTORY-F12
+por qué; el resto se carga. Un fichero no se guarda: si una de sus apps aún se está preparando, su fila dice «Se está
+preparando para este negocio. Vuelve a subir el archivo dentro de un minuto para traer sus datos.».
+Implicados: BASE-F22, INVENTORY-F12
 
 ### BASE-F32 Leer el informe de la importación
 <!-- origen: old-hub:HUB_SHELL-F178 -->
@@ -1079,18 +1084,28 @@ Actor: propietario, administrador
 Pantalla: Ajustes · Datos y copias › Importar
 Pasos:
   1. Al terminar, «Informe de la importación» con cómo fue: «Todo ha entrado.», «No todo entró.» o «No ha
-     entrado nada.».
+     entrado nada.». Si una app de la plantilla aún se está preparando (BASE-F22), «Aún se está cargando: lo que
+     falta entrará solo en cuanto sus apps estén listas. Puedes salir de esta pantalla.», sin nada que pulsar.
   2. Una fila por app con su etiqueta: «Aplicado», «Ya lo tenías», «Aplicado en parte», «Falló», «Nada que
-     copiar», «Descartado», «App apagada», «No está en este negocio» o «No elegida». Debajo, por cada parte,
-     «{created} creadas · {already} ya estaban · {failed} fallaron» y, de lo que falló, su nombre y el
-     motivo.
+     copiar», «Descartado», «App apagada», «No está en este negocio», «No elegida», «Preparándose» o «No se ha
+     podido preparar». Debajo, por cada parte, «{created} creadas · {already} ya estaban · {failed} fallaron» y, de
+     lo que falló, su nombre y el motivo.
   3. Lo dejado fuera a propósito sale en «Se ha dejado fuera a propósito».
   4. «Ver las plantillas» vuelve al catálogo; «Ir al inicio» lleva al Inicio.
+  5. Cuando la app queda lista, lo suyo se carga solo y el informe se pone al día sin recargar, esté en esta pantalla
+     o se haya ido: al volver, ya está dentro.
 Entra: el informe de la importación.
-Sale: nada; el informe queda guardado en el negocio.
+Sale: nada; el informe queda guardado en el negocio. Lo que se cargó después cuenta en esa misma importación: se deshace
+con ella (BASE-F34).
 Si falla: una etiqueta que la pantalla no conoce sale como «Falló» con su texto tal cual, nunca como un
-éxito.
-Implicados: ninguno
+éxito. Si la app no se puede preparar, arriba dice «Aún no se ha podido preparar: {apps}. Se sigue intentando sola y sus
+datos se cargarán en cuanto funcione.» y su fila, «No se ha podido preparar» con «Aún no se ha podido preparar. Se
+sigue intentando sola y sus datos se cargarán en cuanto funcione; «Reintentar lo que falta» lo intenta otra vez
+ahora.» (BASE-F21). Si mientras tanto la app se desactiva, la importación se deshace, el negocio se restablece o cambia
+la versión de la plantilla, no se carga nada suyo y su fila dice por qué. Si la carga falla ya con la app lista, la
+app queda activa y su fila dice «Falló» con «Algo falló al cargar esta parte; lo demás no se ha visto afectado.», con
+«Reintentar lo que falta».
+Implicados: BASE-F21, BASE-F22, BASE-F33, BASE-F34
 
 ### BASE-F33 Volver al informe de una importación que no entró entera y reintentar
 <!-- origen: old-hub:HUB_SHELL-F179 -->
@@ -1099,7 +1114,9 @@ Actor: propietario, administrador
 Pantalla: Ajustes · Datos y copias › Importar
 Pasos:
   1. Al abrir «Importar», si la última importación no entró entera y no se deshizo, sale primero su informe,
-     con «Este es el informe de tu última importación de {name} ({date}). No todo entró.».
+     con «Este es el informe de tu última importación de {name} ({date}). No todo entró.» o, si aún espera a una app
+     que se está preparando, con «Aún se está cargando…» y sin «Reintentar lo que falta», que no hace falta (BASE-F32).
+     Cuando entra, ese mismo informe dice «Todo ha entrado.», sin saltar al catálogo.
   2. Si vino de una plantilla, pulsa «Reintentar lo que falta» («Reintentando…»): se vuelve a cargar la misma
      versión de la plantilla y solo entra lo que faltaba; lo que ya entró no se toca ni se duplica. Sale el
      informe nuevo.
@@ -1112,7 +1129,7 @@ Pasos:
 Entra: la última importación y su informe.
 Sale: lo que faltaba, si ahora entra, y el informe nuevo (`base.blueprint.imported`).
 Si falla: «El reintento falló: {reason}» y el informe sigue a la vista.
-Implicados: ninguno
+Implicados: BASE-F32
 
 ### BASE-F34 Deshacer una importación
 <!-- origen: old-hub:HUB_SHELL-F180 -->
@@ -1130,10 +1147,11 @@ Pasos:
      borrar (algo que otra app todavía usa) sale aparte con su motivo. Lo que tiene cada sección se pone al
      día.
 Entra: la importación elegida.
-Sale: borradas exactamente las filas que trajo; lo creado después se queda (`base.import.undone`).
+Sale: borradas exactamente las filas que trajo, también lo que entró después porque esperaba a una app, y lo que aún
+esperaba ya no entra; lo creado después se queda (`base.import.undone`).
 Si falla: el motivo sale en la propia ventana, que no se cierra (en el hub viejo no se decía nada); una
 importación ya deshecha, «Esta importación ya se deshizo.».
-Implicados: ninguno
+Implicados: BASE-F32
 
 ### BASE-F35 Exportar una copia de seguridad o una plantilla
 <!-- origen: old-hub:HUB_SHELL-F173 -->
@@ -1228,14 +1246,19 @@ Pasos:
   2. Pulsa «Usar esta»: «Preparando «{name}»…» mientras se activan sus apps y se carga, sin pantallas
      intermedias.
   3. En la misma tarjeta, «Ya tienes tus apps y tu catálogo» («Lo que queda es lo que solo puedes contestar
-     tú: los datos de tu negocio. Los tienes en la lista de abajo.») con «Continuar», que la cierra.
+     tú: los datos de tu negocio. Los tienes en la lista de abajo.») con «Continuar», que la cierra. Si alguna app aún
+     se está preparando, primero «Tus apps se están preparando» («Sus datos se cargarán solos en cuanto estén listas:
+     {apps}. Puedes seguir trabajando.») con «Ver el informe» y «Continuar»; la tarjeta pasa sola a «Ya tienes tus apps
+     y tu catálogo» cuando entra, sin pulsar nada.
   4. Sin recargar, el Inicio se pone al día: «Termina de configurar tu negocio» cuenta como hechos los pasos
      que resolvió la plantilla y los paneles se refrescan. Igual tras cargar una plantilla o un fichero desde
      «Datos y copias».
 Entra: las plantillas y si el negocio todavía está vacío.
 Sale: lo que trae la plantilla, como en BASE-F31 (`base.blueprint.imported`).
 Si falla: si no entró todo, «No todo ha entrado» con «Estas no han entrado: {apps}.» (o «Hay algo más que
-no ha entrado.») y «Ver el informe»; si no se pudo abrir, «No se ha podido abrir esa plantilla» con «No ha
+no ha entrado.») y «Ver el informe»; si una app no se ha podido preparar, «Una app aún no se ha podido preparar» con
+«Se sigue intentando sola y sus datos se cargarán cuando lo consiga: {apps}. En el informe puedes reintentarlo
+ahora.» y «Ver el informe»; si no se pudo abrir, «No se ha podido abrir esa plantilla» con «No ha
 cambiado nada en tu negocio: {reason}» e «Intentar otra vez»; si se cortó a medias, «La configuración no ha
 terminado» con «Puede que parte ya esté dentro. Compruébalo en Ajustes › Datos antes de volver a
 intentarlo.» y «Ver el informe», sin reintento. Si las plantillas no se pueden leer, «No se han podido
@@ -2832,7 +2855,11 @@ Implicados: HUBS-F18, HUBS-F19, HUBS-F20, PUBLIC-F34 (el mismo borrado de ficher
 - **Orden de una lista** (`base/ordering.py`, regla hub#2355 del producto viejo): `list_order(*columnas, descending=…,
   nulls_last=…)` devuelve lo que necesita `order_by`, con todas las columnas y después el `id` en la dirección de la
   lista: la descendente es la ascendente leída al revés, empates incluidos, y las páginas ni repiten ni pierden filas.
-  Una app no escribe su propia copia. La usan Clientes, Asistencia y Ventas; las demás siguen con la suya hasta hub#768.
+  `list_order_for(sort, *desempates, columns=…, nulls_last=…)` es lo mismo para un `sort` que dice su dirección con un
+  «-» delante, y `columns` dice qué columnas ordena cuando no es la de su nombre. Una columna puede ser una expresión
+  (`Lower("name")`), y la nombrada dos veces cuenta donde aparece primero. Una app no escribe su propia copia; solo
+  Facturación y Verifactu conservan la suya, en zona fiscal validada (hub#789). Sus pruebas por lista usan
+  `base/tests/ordering.py`.
 - Las tres consultas vivas del Inicio son de `base/queries.py`, con permiso `base.view_home` y ruta ninja en
   `base/api.py` (`GET /api/home/setup`, `/home/widgets`, `/home/bell`): `base.setup.status` (también
   herramienta del asistente, `ai=`), `base.widget.list` y `base.bell.counters`. Las reglas puras viven en
@@ -2970,6 +2997,19 @@ Implicados: HUBS-F18, HUBS-F19, HUBS-F20, PUBLIC-F34 (el mismo borrado de ficher
   `base.import.undone` y `base.hub.data_reset`, tras los que se re-ejecutan las consultas vivas del Inicio.
 - `base.ImportBatch` (modelo de hub, migración `0009`) guarda cada importación: informe, filas creadas por parte
   (lo que deshace), origen y versión de la plantilla (lo que reintenta).
+- Una plantilla espera a sus apps (hub#609; BASE-F31–F33, F38): una app `creating` queda en su informe como `waiting`, y
+  esa fila de `ImportBatch` es todo el estado (sin columna, ni cola, ni migración; el idioma de quien cargó va en
+  `report["language"]` mientras espera). Lo que le toca entra en la misma transacción que la enciende:
+  `base.app.activation_settle` (o `base.app.enable`, si tenía las tablas) llama a `services._load_what_waited` →
+  `blueprint.finish_waiting`, que reusa `apply`, con su orden y sus operaciones, en el hub activo. Si el worker muere, no
+  ha pasado ninguna de las dos cosas y el siguiente pase, o el barrido de `_serve_hub` si se perdió el aviso, hace las
+  dos: por eso sobrevive a un reinicio sin nada más. Cómo va la preparación (`setup_failed`) nunca se escribe: se lee de
+  la fila de la app al describir la carga (`describe_load`). Lo que corta la espera: desactivar la app, deshacer la
+  carga, reintentarla (la nueva toma el relevo) y restablecer el negocio (`services._stop_waiting`). Un fichero no se
+  guarda, así que no espera. Una carga que rompe deja la app encendida y su fila en `failed`: una app no se queda sin
+  encender por sus datos. `base.import.list` se re-ejecuta también con `APP_EVENTS`, y `ImportPanel` y
+  `BlueprintCardPending` siguen esa lista. Tests: `base/tests/test_blueprint_waits_for_apps.py`, con dos BD reales y el
+  worker de verdad; e2e `tests/e2e/base-template-waits-for-apps.spec.ts`.
 - Fase 1: los negocios comparten base de datos, así que `base.hub.reset` sin `dry_run` responde 409
   `base.reset_shared_database` (`available: false` en el plan) y «vacío» mira las filas de todos.
 - Frontend: `base/frontend/pages/SettingsPage.vue` (`/settings`, pestaña en el hash `#data`; `/import` y `/export`
@@ -3151,7 +3191,9 @@ Implicados: HUBS-F18, HUBS-F19, HUBS-F20, PUBLIC-F34 (el mismo borrado de ficher
   avisos del Inicio y los textos de las automatizaciones (`base.home.moment`), el CSV de autorizaciones y las apps; una
   lectura nueva del reloj del despliegue la para `tests/test_guardrails_zone.py`. En pantalla, `useBusinessZone`
   (`base/frontend/lib/zone.ts`), que también siguen Fichajes, Tareas y la bandeja de WhatsApp (hub#779). Lo que aún lee
-  el reloj del despliegue: hub#771 (el «hoy» y el día de los números) y hub#772 (lo fiscal).
+  el reloj del despliegue es lo que llega a un registro fiscal, y cambia junto y con supervisión (hub#772): las fechas de
+  la factura y las horas de VeriFactu, el día y el número de una venta y el «hoy» de Impuestos; hasta entonces lo congela
+  `tests/test_guardrails_fiscal_clock.py`.
 - **Acceso (APP-BASE-3: BASE-F52…F71).** Modelos de hub en `base/models.py`: `TrustedDevice` (el dispositivo:
   `token_digest` = SHA-256 del token de 256 bits de la cookie `hub_device`, httpOnly; nunca el token; `mode`
   `shared`/`personal` con quién y cuándo, `name`, `agent`, última persona y entrada, `ended_reason` `device_limit`),
@@ -3409,8 +3451,8 @@ Implicados: HUBS-F18, HUBS-F19, HUBS-F20, PUBLIC-F34 (el mismo borrado de ficher
   recibe `speak` —ni selector de voz ni petición— y lee con la voz del dispositivo, y la operación responde 503
   `base.assistant_speech_unavailable` sin llamar a erplora.com): `base.assistant.speak` (`database=False`)
   pide a erplora.com el mp3 de una respuesta (`text` de 1 a 4096 caracteres, sin espacios de los extremos; `language`,
-  `es` o `en`, la de la pantalla si no viene y el inglés para cualquier otra; `voice`, un id del catálogo de
-  `@erplora/ui` `voices.ts`, o ninguna: la primera del idioma). Espera hasta 65 s (`SPEECH_TIMEOUT`, más que los 60 s
+  `es` o `en`, la de la pantalla si no viene y el inglés para cualquier otra; `voice`, una voz del motor de
+  erplora.com, o ninguna: la suya del idioma; `@erplora/ui` no nombra voces desde saas#242). Espera hasta 65 s (`SPEECH_TIMEOUT`, más que los 60 s
   que erplora.com espera al proveedor). La ruta devuelve el mp3 (`audio/mpeg`, `no-store`), o la salida JSON (el mp3 en
   base64) a quien solo acepta JSON. Sin voz configurada en erplora.com (`assistant.speech_unavailable`,
   `assistant.provider_not_configured`) responde 503 `base.assistant_speech_unavailable`; cualquier otro fallo (4xx,

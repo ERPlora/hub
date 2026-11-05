@@ -11,8 +11,12 @@ import uuid
 from decimal import Decimal
 
 import pytest
+from django.utils import timezone
 from live.context import system_context
 from live.errors import Conflict, NotFound, PermissionDenied
+
+from apps.kitchen.models import Ticket
+from base.tests.ordering import assert_reads_backwards, listed_with
 
 from .conftest import (
     A,
@@ -714,3 +718,19 @@ def test_the_history_names_who_did_it_by_their_name_never_their_session_id(clock
 def test_the_history_needs_its_permission():
     with pytest.raises(PermissionDenied):
         run("kitchen.log.list", {}, ctx_for(permissions={"kitchen.view_ticket"}))
+
+
+def test_ties_go_by_id_in_the_lists_own_direction():
+    """hub#768 (the rule of hub#2355): a descending list is the ascending one read backwards, ties included, and its
+    pages neither repeat nor lose rows."""
+    by_id = sorted(
+        Ticket.objects.create(
+            number=f"20261014-000{n}",
+            day=dt.date(2026, 10, 14),
+            sequence=n,
+            received_at=timezone.now(),
+            status="served",
+        ).id
+        for n in range(1, 5)
+    )
+    assert_reads_backwards(listed_with(run, "kitchen.ticket.list", "status"), by_id)

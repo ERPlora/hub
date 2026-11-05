@@ -1,8 +1,9 @@
 <script setup lang="ts">
-// How the reservations by WhatsApp confirm (WHATSAPP_INBOX-F16), under the «Book a table» card when it is on: Reservas'
-// «confirm new reservations by themselves» (`auto_confirm`), read live and saved at once in Reservas, never in this app.
-// Mounted only under a card that is on, so nobody else subscribes to the rule. Each choice is a full-width row whose
-// words wrap (whatsapp_inbox#285: a segment cut «Las reservas se co…» on a phone).
+// How the bookings by WhatsApp confirm (WHATSAPP_INBOX-F16), under a card of «What do you use it for?» that is on:
+// Citas' «confirm the customer's bookings by themselves» (`auto_confirm_online`) or Reservas' «confirm new
+// reservations by themselves» (`auto_confirm`), read live and saved at once in that app, never in this one. Mounted only
+// under a card that is on, so nobody else subscribes to the rule. Each choice is a full-width row whose words wrap
+// (whatsapp_inbox#285: a segment cut «Las reservas se co…» on a phone).
 import { InlineFeedback } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { IonItem, IonList, IonRadio, IonRadioGroup } from '@ionic/vue';
@@ -12,15 +13,18 @@ import { useT } from '../composables/useT';
 
 type Choice = 'auto' | 'review';
 
+const props = defineProps<{ which: 'appointments' | 'tables' }>();
 const t = useT();
 
-const rule = useLive('reservation.settings.get', {});
-const save = useCommand('reservation.settings.update');
+const appointments = props.which === 'appointments';
+const rule = appointments ? useLive('appointment.settings.get', {}) : useLive('reservation.settings.get', {});
+const saveAppointments = useCommand('appointment.settings.update');
+const saveTables = useCommand('reservation.settings.update');
 
 const saved = computed<Choice | null>(() => {
-  const data = rule.data.value;
+  const data = rule.data.value as { auto_confirm_online?: boolean; auto_confirm?: boolean } | undefined;
   if (!data) return null;
-  return data.auto_confirm ? 'auto' : 'review';
+  return (appointments ? data.auto_confirm_online : data.auto_confirm) ? 'auto' : 'review';
 });
 const chosen = ref<Choice | null>(null);
 const failed = ref(false);
@@ -32,7 +36,8 @@ async function choose(value: Choice): Promise<void> {
   chosen.value = value;
   failed.value = false;
   try {
-    await save.run({ auto_confirm: value === 'auto' });
+    if (appointments) await saveAppointments.run({ auto_confirm_online: value === 'auto' });
+    else await saveTables.run({ auto_confirm: value === 'auto' });
   } catch {
     failed.value = true;
     chosen.value = before;
@@ -43,12 +48,12 @@ async function choose(value: Choice): Promise<void> {
 <template>
   <div
     class="wa-rule"
-    data-testid="whatsapp-inbox-autoreply-tables-confirm"
+    :data-testid="`whatsapp-inbox-autoreply-${which}-confirm`"
   >
     <p
       v-if="chosen === null"
       class="wa-rule__hint"
-      data-testid="whatsapp-inbox-autoreply-tables-confirm-loading"
+      :data-testid="`whatsapp-inbox-autoreply-${which}-confirm-loading`"
     >
       {{ t('whatsapp_inbox.loading') }}
     </p>
@@ -67,7 +72,7 @@ async function choose(value: Choice): Promise<void> {
               justify="start"
               label-placement="end"
             >
-              {{ t('whatsapp_inbox.autoReplies.tables.confirmSelf') }}
+              {{ t(`whatsapp_inbox.autoReplies.${which}.confirmSelf`) }}
             </IonRadio>
           </IonItem>
           <IonItem class="wa-rule__item">
@@ -84,16 +89,16 @@ async function choose(value: Choice): Promise<void> {
       <p
         v-if="chosen === 'review'"
         class="wa-rule__hint"
-        data-testid="whatsapp-inbox-autoreply-tables-review"
+        :data-testid="`whatsapp-inbox-autoreply-${which}-review`"
       >
-        {{ t('whatsapp_inbox.autoReplies.tables.review') }}
+        {{ t(`whatsapp_inbox.autoReplies.${which}.review`) }}
       </p>
     </template>
     <InlineFeedback
       v-if="failed"
       tone="danger"
-      data-testid="whatsapp-inbox-autoreply-tables-confirm-error"
-      :heading="t('whatsapp_inbox.autoReplies.tables.confirmError')"
+      :data-testid="`whatsapp-inbox-autoreply-${which}-confirm-error`"
+      :heading="t(`whatsapp_inbox.autoReplies.${which}.confirmError`)"
     />
   </div>
 </template>

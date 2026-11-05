@@ -38,6 +38,8 @@ from apps.tax.schemas import (
     TaxSettingsOut,
 )
 
+from base.tests.ordering import assert_reads_backwards, listed_with
+
 from .conftest import ctx_for
 
 pytestmark = pytest.mark.django_db
@@ -896,6 +898,67 @@ def test_calculate_naming_the_category_by_voice():
     assert (result.tax_category_key, result.tax) == ("restaurant.food", 1_000)
 
 
+def _tied_categories():
+    return [category(f"tied.{n}").id for n in range(4)]
+
+
+def _tied_aliases():
+    tied = category("tied.category")
+    return [
+        TaxAlias.objects.create(alias=f"alias {n}", category=tied).id for n in range(4)
+    ]
+
+
+def _tied_rules():
+    tied = category("tied.category")
+    return [rule(tied, "21", valid_from=date(2026, n, 1)).id for n in range(1, 5)]
+
+
+@pytest.mark.parametrize(
+    ("operation", "schema", "tied", "column"),
+    [
+        ("tax.category.list", CategoryListIn, _tied_categories, "is_active"),
+        ("tax.alias.list", AliasListIn, _tied_aliases, "source"),
+        ("tax.rule.list", RuleListIn, _tied_rules, "country_code"),
+    ],
+)
+def test_ties_read_backwards_in_a_descending_list(no_seed, operation, schema, tied, column):
+    """hub#768 (the rule of hub#2355, as in Customers): a descending list is the ascending one read backwards, ties
+    included, and its pages neither repeat nor lose rows. Each list breaks a tie by its natural key, then the id."""
+    listed = listed_with(run, operation, column, schema=schema, by_dir=True)
+    assert_reads_backwards(listed, tied())
+
+
+def test_a_rule_with_no_end_date_stays_last_in_both_directions(no_seed):
+    tied = category("tied.category")
+    open_ended = rule(tied, "21", valid_from=date(2026, 1, 1))
+    earlier = rule(tied, "10", valid_from=date(2025, 1, 1), valid_to=date(2025, 6, 30))
+    later = rule(tied, "4", valid_from=date(2025, 7, 1), valid_to=date(2025, 12, 31))
+
+    def listed(direction):
+        return [row.id for row in rules(sort="valid_to", dir=direction).rows]
+
+    assert listed("asc") == [earlier.id, later.id, open_ended.id]
+    assert listed("desc") == [later.id, earlier.id, open_ended.id]
+
+
+def test_a_component_stays_right_under_its_root_in_a_descending_list(no_seed):
+    """TAX: «a component comes right under its root»: the list reads backwards, groups and components too, and the
+    root still leads its group, because that is how a component is recognised."""
+    tied = category("tied.category")
+    first = rule(tied, "21", valid_from=date(2026, 1, 1))
+    first_a = rule(tied, "5.2", parent=first, tax_type="surcharge")
+    first_b = rule(tied, "1.4", parent=first, tax_type="surcharge")
+    second = rule(tied, "10", valid_from=date(2026, 2, 1))
+    second_a = rule(tied, "2.6", parent=second, tax_type="surcharge")
+
+    def listed(direction):
+        return [row.id for row in rules(sort="country_code", dir=direction).rows]
+
+    assert listed("asc") == [first.id, first_a.id, first_b.id, second.id, second_a.id]
+    assert listed("desc") == [second.id, second_a.id, first.id, first_b.id, first_a.id]
+
+
 def test_rule_filters_of_the_screen(no_seed):
     generic = category("product.generic")
     root = rule(generic, "21", regime_key="02")
@@ -930,7 +993,7 @@ def test_aliases_filter_sort_and_only_active(no_seed):
     TaxAlias.objects.create(alias="old", category=books, is_active=False)
     names = lambda **where: [row.alias for row in aliases(**where).rows]  # noqa: E731
     assert names(alias="casera") == ["comida casera"]
-    assert names(sort="tax_category_key", dir="desc") == ["comida casera", "meal", "libros"]
+    assert names(sort="tax_category_key", dir="desc") == ["meal", "comida casera", "libros"]
     assert names(sort="source") == ["comida casera", "libros", "meal"]
     assert all(row.is_active for row in aliases().rows) and aliases().total == 3
 

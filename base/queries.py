@@ -1171,8 +1171,8 @@ def import_list(ctx: OperationContext, data: ImportListIn) -> dict:
     latest = loads[0] if loads else None
     unfinished = latest if latest and latest.status != ImportBatch.Status.COMPLETE and latest.undone_at is None else None
     return {
-        "imports": [blueprint.describe_load(load) for load in loads],
-        "unfinished": blueprint.describe_load(unfinished) if unfinished else None,
+        "imports": [blueprint.describe_load(ctx, load) for load in loads],
+        "unfinished": blueprint.describe_load(ctx, unfinished) if unfinished else None,
     }
 
 
@@ -1195,7 +1195,7 @@ def import_detail(ctx: OperationContext, data: ImportIdIn) -> dict:
     load = ImportBatch.objects.filter(pk=data.id).first()
     if load is None:
         raise NotFound(gettext("This load is not there any more."))
-    return blueprint.describe_load(load)
+    return blueprint.describe_load(ctx, load)
 
 
 @operation(
