@@ -418,7 +418,7 @@ Pantalla: ninguna
 Pasos:
 1. Cada cuarto de hora, las reservas que siguen Pendientes pasados los minutos de los ajustes (15) desde
    su hora se cancelan con el motivo «Liberada: nunca se confirmó» y dejan su hueco libre.
-2. Las confirmadas, sentadas y las de otros días no se tocan.
+2. Las confirmadas, las sentadas y las de días por venir no se tocan.
 Entra: la hora.
 Sale: las reservas liberadas (avisa: `reservation.reservation.unconfirmed_released`, solo si liberó
 alguna): la pantalla de Reservas abierta en ese negocio lo ve al momento.

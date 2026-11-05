@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:737645d755bc0caafeb501c9bd8942ff4364d0fd1ec30b68877e3e8a70a10a13 -->
+<!-- generated from WORKBOOK.md sha256:f77f4b97444300b7ff2e131209b89320579a326c12d3d42919e1cbeb1e204862 -->
 
 ## What it is for and who it is for
 
@@ -397,7 +397,7 @@ Screen: none
 Steps:
 1. Every quarter of an hour, the reservations still Pending once the minutes of the settings (15) have
    passed since their time are cancelled with the reason "Released: never confirmed" and free their place.
-2. The confirmed ones, the seated ones and those of other days are not touched.
+2. The confirmed ones, the seated ones and those of days still to come are not touched.
 In: the time.
 Out: the released reservations (announces: `reservation.reservation.unconfirmed_released`, only if it
 released any): the Reservations screen open in that business sees it at once.
