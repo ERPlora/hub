@@ -1,7 +1,8 @@
 <script setup lang="ts">
 // A record (VERIFACTU-F17, F18, F24, F25, F30, F35; the old detail of `erp-verifactu-records`, now its own page with Back
 // to the list): «Record <number>» with its status and environment; «Not at the AEAT yet» with why and when, or «The
-// AEAT rejected it» with its code, its message and what to do; the invoice's figures, the fingerprint chain, the QR
+// AEAT rejected it» with its code, its message and what to do, or, once corrected, «Already corrected» linking to the
+// record that corrects it (hub#857); the invoice's figures, the fingerprint chain, the QR
 // (and «Verify at the AEAT»: a new tab, the system browser in the installed app), the AEAT's answer with the delivery's fingerprint, the XML and its latest events.
 // «Send now», «Ask the AEAT» (in the queue: it leaves only if the AEAT already has it), «Correct» and «Cancel record»
 // where they apply and for whoever may; a refusal is said right above them.
@@ -230,7 +231,22 @@ async function correctIt(): Promise<void> {
         :heading="$t('verifactu.detail.rejectedTitle')"
       >
         <p>{{ record.aeat_code }} · {{ record.aeat_message }}</p>
-        <p>{{ $t('verifactu.detail.rejectedHelp') }}</p>
+        <p v-if="record.correction_status !== 'corrected'">
+          {{ $t('verifactu.detail.rejectedHelp') }}
+        </p>
+      </InlineFeedback>
+      <InlineFeedback
+        v-if="record.correction_status === 'corrected' && record.corrected_by_id"
+        tone="success"
+        data-testid="verifactu-record-corrected"
+        :heading="$t('verifactu.detail.correctedTitle')"
+      >
+        <router-link
+          :to="`/verifactu/records/${record.corrected_by_id}`"
+          data-testid="verifactu-record-corrected-link"
+        >
+          {{ $t('verifactu.detail.correctedLink') }}
+        </router-link>
       </InlineFeedback>
 
       <section class="verifactu-record__section">

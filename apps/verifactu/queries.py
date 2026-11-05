@@ -13,7 +13,7 @@ from operator import and_
 from uuid import UUID
 
 from django.conf import settings
-from django.db.models import Case, Count, Min, Q, QuerySet, When
+from django.db.models import Case, Count, Min, OuterRef, Q, QuerySet, Subquery, When
 from django.utils import timezone, translation
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext, Scope, system_context
@@ -422,7 +422,7 @@ def summary(record: Record) -> RecordSummaryOut:
     )
 
 
-def _row(record: Record) -> dict:
+def _row(record: Record, corrected_by: UUID | None) -> dict:
     return {
         "id": record.id,
         "sequence": record.sequence,
@@ -437,6 +437,8 @@ def _row(record: Record) -> dict:
         "environment": record.environment,
         "status": record.status,
         "correction": record.correction,
+        "correction_status": correction_status(record, corrected_by),
+        "corrected_by_id": corrected_by,
         "qr_url": record.qr_url,
         "created_at": record.created_at,
     }
@@ -454,14 +456,39 @@ def event_out(event: Event) -> EventOut:
     )
 
 
+CORRECTABLE = (Record.Status.REJECTED, Record.Status.ACCEPTED_WITH_ERRORS)
+
+
+def correctable(record: Record) -> bool:
+    """A registration the AEAT rejected or accepted with errors: what «Correct» acts on (VERIFACTU-F24)."""
+    return record.record_type == Record.Type.ALTA and record.status in CORRECTABLE
+
+
 def can_correct(record: Record) -> bool:
-    """A registration the AEAT rejected or accepted with errors, not corrected yet (VERIFACTU-F24)."""
+    """A correctable registration not corrected yet (VERIFACTU-F24)."""
+    return correctable(record) and not Record.objects.filter(corrects=record).exists()
+
+
+def corrections_of(record) -> QuerySet:
+    """The id of the newest record that corrects ``record`` (a record or an ``OuterRef``), as a one-row query."""
     return (
-        record.record_type == Record.Type.ALTA
-        and record.status
-        in (Record.Status.REJECTED, Record.Status.ACCEPTED_WITH_ERRORS)
-        and not Record.objects.filter(corrects=record).exists()
+        Record.objects.filter(corrects=record)
+        .order_by("-created_at", "-id")
+        .values_list("id", flat=True)[:1]
     )
+
+
+def with_corrections(queryset: QuerySet) -> QuerySet:
+    """Each record with ``corrected_by``, the id of the record that corrects it, in the same SELECT: no query per
+    row of a list (hub#857)."""
+    return queryset.annotate(corrected_by=Subquery(corrections_of(OuterRef("pk"))))
+
+
+def correction_status(record: Record, corrected_by: UUID | None) -> str:
+    """Where a correctable registration stands: ``pending`` or ``corrected``; ``not_applicable`` for any other."""
+    if not correctable(record):
+        return "not_applicable"
+    return "corrected" if corrected_by else "pending"
 
 
 def can_cancel(record: Record) -> bool:
@@ -583,11 +610,14 @@ SORTS = {
     ai={
         "description": "List the VeriFactu billing records, the last sealed first: search by invoice number, "
         "#sequence, issuer's name or tax ID; filter by status (pending, sent, accepted, accepted_with_errors, "
-        "rejected), record type, invoice type, environment, issue date and total in cents."
+        "rejected), record type, invoice type, environment, issue date and total in cents. Each row says whether a "
+        "registration the AEAT rejected or accepted with errors is already corrected (correction_status corrected, "
+        "corrected_by_id the record that corrects it) or still to correct (pending); correction_status=pending lists "
+        "only the ones still to correct, correction_status=corrected only the corrected ones."
     },
 )
 def list_records(ctx: OperationContext, data: RecordListIn) -> dict:
-    queryset = Record.objects.all()
+    queryset = with_corrections(Record.objects.all())
     text = (data.search or "").strip()
     if text.startswith("#") and text[1:].isdigit():
         queryset = queryset.filter(sequence=int(text[1:]))
@@ -612,10 +642,21 @@ def list_records(ctx: OperationContext, data: RecordListIn) -> dict:
         queryset = queryset.filter(total_amount__gte=data.total_amount_from)
     if data.total_amount_to is not None:
         queryset = queryset.filter(total_amount__lte=data.total_amount_to)
+    if data.correction_status:
+        queryset = queryset.filter(
+            record_type=Record.Type.ALTA,
+            status__in=CORRECTABLE,
+            corrected_by__isnull=data.correction_status == "pending",
+        )
     column = SORTS[data.sort or "created_at"]
     prefix = "-" if data.dir == "desc" else ""
     queryset = queryset.order_by(f"{prefix}{column}", f"{prefix}id")
-    return page(queryset, data.limit, data.offset, _row)
+    return page(
+        queryset,
+        data.limit,
+        data.offset,
+        lambda record: _row(record, record.corrected_by),
+    )
 
 
 @operation(
@@ -633,6 +674,7 @@ def list_records(ctx: OperationContext, data: RecordListIn) -> dict:
 )
 def get_record(ctx: OperationContext, data: RecordGetIn) -> RecordOut:
     record = find_record(data.record_id, data.invoice_number)
+    corrected_by = corrections_of(record).first()
     config = config_row()
     # Outside Spain it never goes out: no next attempt, and nothing to send, correct or cancel (each would be refused).
     spanish = not outside_spain(ctx.scope)
@@ -640,7 +682,7 @@ def get_record(ctx: OperationContext, data: RecordGetIn) -> RecordOut:
         :RECORD_EVENTS_SHOWN
     ]
     return RecordOut(
-        **_row(record),
+        **_row(record, corrected_by),
         operation_date=record.operation_date,
         rectification_kind=record.rectification_kind,
         rectified=record.rectified,
@@ -674,7 +716,8 @@ def get_record(ctx: OperationContext, data: RecordGetIn) -> RecordOut:
         aeat_message=record.aeat_message,
         waiting=waiting_of(record, config, ctx.scope),
         can_transmit=spanish and record.status in Record.UNSENT,
-        can_correct=spanish and can_correct(record),
+        can_correct=spanish
+        and correction_status(record, corrected_by) == "pending",
         can_cancel=spanish and can_cancel(record),
         events=[event_out(event) for event in events],
     )

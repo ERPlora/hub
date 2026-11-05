@@ -2,9 +2,9 @@
 // apps/whatsapp_inbox/WORKBOOK.md WHATSAPP_INBOX-F14, F21, F22; apps/customer/WORKBOOK.md CUSTOMER-F26). «Book
 // appointments» is on offer in Automations' gallery and in WhatsApp's settings; the owner turns it on with the salon
 // reviewing new appointments (F16). A customer with no card writes for a haircut at 10:00: she gets a card whose origin
-// is WhatsApp, and after the owner's «Approve» in «Waiting for your answer», which says for whom and with whom, the
-// Diary shows it on its day, Pending. She then asks to come at 12:00 and, after the yes, the Diary shows the new time;
-// then she cancels, and after the yes the Diary shows it Cancelled. Only one answer answers on the number: turning «Book
+// is WhatsApp, and after the owner's «Approve» in «Waiting for your answer», which says for whom, with whom and which
+// service by its name (hub#835: it said «Services: 1 item»), the Diary shows it on its day, Pending. She then asks
+// to come at 12:00 and, after the yes, the Diary shows the new time; then she cancels, and after the yes the Diary shows it Cancelled. Only one answer answers on the number: turning «Book
 // a table» on says so and turns this one off.
 // End to end with the real dependencies, as reservation-whatsapp.spec.ts does: the Hub of this stack, its SaaS's gateway
 // and, behind it, the e2e's provider (assistant-provider.ts, started by this spec; the SaaS seeded with it, README «El
@@ -160,7 +160,7 @@ for (const viewport of VIEWPORTS) {
       await capture(page, `${TASK}-settings-${viewport.label}`);
 
       // F21, CUSTOMER-F26: she has no card yet and asks for a haircut at 10:00; the card is made before the assistant is
-      // asked, and the booking waits saying for whom and with whom.
+      // asked, and the booking waits saying for whom, with whom and which service (hub#835).
       const phone = e2ePhone();
       const booking = { services: [{ service_id: service.id }], staff_id: member.id, start: `${DAY}T10:00` };
       await askAndApprove(
@@ -168,7 +168,7 @@ for (const viewport of VIEWPORTS) {
         phone,
         `A haircut at 10:00, please\nE2E-ASK appointment__appointment__create ${JSON.stringify(booking)}`,
         viewport.label,
-        [CUSTOMER, member.full_name],
+        [CUSTOMER, member.full_name, `Services: ${service.name}`],
         `${TASK}-question-${viewport.label}`,
       );
       expect(psql(`select name || ' ' || source from customer_customer where phone = '${phone}'`)).toBe(`${CUSTOMER} whatsapp`);
