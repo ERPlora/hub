@@ -126,6 +126,12 @@ const sections = computed(() => sent.value.length > 0);
   text-align: center;
   color: var(--ion-color-medium, #8b897f);
 }
+/* A phone on its side: the words fit over the foot instead of being cut by it (hub#800). */
+@media (max-height: 500px) {
+  .pos-lines__empty {
+    padding: 0.5rem 1rem;
+  }
+}
 .pos-secs {
   display: flex;
   flex-direction: column;

@@ -18,7 +18,7 @@ import { type Browser, type BrowserContext, expect, type Locator, type Page, tes
 import { A, capture, login, settled, shown, untilStill } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { parkIssuer, unparkIssuer } from './invoice-helpers';
-import { cleanSales, drawerOff, openTillCart, restoreDrawer, stamp, tillIsPhone } from './sale-helpers';
+import { cleanSales, drawerOff, fingerOn, openTillCart, restoreDrawer, stamp, tillIn, tillIsPhone } from './sale-helpers';
 
 const KEY = 'FIX-HUB-630-CART-PHONE';
 /** Hub `a`'s issuer, parked while the run needs the strip of a hub that cannot issue invoices yet. */
@@ -121,13 +121,6 @@ async function chargeWithinReach(page: Page, drawer: Locator, where: string): Pr
   expect(reach.reached, `a finger on «Charge» reaches it at ${where} (it touches «${reach.hit}»)`).toBe(true);
   await expect(drawer).toBeVisible();
   return charge;
-}
-
-/** What a finger on the middle of `el` touches, run in the page: is it `el`, and what is it if not. */
-function fingerOn(el: Element): { height: number; reached: boolean; hit: string } {
-  const r = el.getBoundingClientRect();
-  const hit = document.elementFromPoint((r.left + r.right) / 2, (r.top + r.bottom) / 2);
-  return { height: r.height, reached: !!hit && el.contains(hit), hit: hit ? `${hit.tagName.toLowerCase()} ${hit.getAttribute('data-testid') ?? ''}`.trim() : 'nothing' };
 }
 
 /** The check's line, scrolled into view inside the drawer: what sits between the bar and the foot scrolls, and a
@@ -347,10 +340,7 @@ async function wideKeepsItsBar(page: Page, size: (typeof WIDE)[number], lang: 'e
 async function tillWithALine(browser: Browser, locale: string, lang: string): Promise<{ context: BrowserContext; page: Page }> {
   const context = await browser.newContext({ baseURL: A, locale, viewport: { width: 1440, height: 900 } });
   const page = await context.newPage();
-  await login(page, A, '/sale/pos');
-  await context.addCookies([{ name: 'django_language', value: lang, domain: new URL(A).hostname, path: '/' }]);
-  await page.reload();
-  await shown(page).locator('[data-testid=pos-till]').waitFor({ state: 'visible' });
+  await tillIn(page, context, lang);
   await shown(page).locator(`[data-testid=pos-product-${product.id}]`).click();
   await expect(shown(page).locator('[data-testid^=pos-line-]').filter({ hasText: product.name }).first()).toBeAttached();
   return { context, page };
