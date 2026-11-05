@@ -139,7 +139,10 @@ class Recurring(UUIDModel):
     max_occurrences = models.PositiveIntegerField(
         _("number of appointments"), null=True, blank=True
     )
-    is_active = models.BooleanField(_("active"), default=True)
+    # Own context: a series is «activa», not Django's «activo» of the same English (hub#633).
+    is_active = models.BooleanField(
+        pgettext_lazy("appointment", "active"), default=True
+    )
     # The series this one continues after an edit «from this occurrence on».
     split_from = models.ForeignKey(
         "self",
@@ -149,11 +152,21 @@ class Recurring(UUIDModel):
         related_name="+",
         verbose_name=_("split from"),
     )
-    deleted_at = models.DateTimeField(_("deleted at"), null=True, blank=True)
-    created_at = models.DateTimeField(_("created at"), auto_now_add=True)
-    updated_at = models.DateTimeField(_("updated at"), auto_now=True)
+    # Own context: a series is a «cita», «borrada», «creada» and «actualizada», not the «eliminado» or «creado»
+    # other apps say for the same English (hub#633).
+    deleted_at = models.DateTimeField(
+        pgettext_lazy("appointment", "deleted at"), null=True, blank=True
+    )
+    created_at = models.DateTimeField(
+        pgettext_lazy("appointment", "created at"), auto_now_add=True
+    )
+    updated_at = models.DateTimeField(
+        pgettext_lazy("appointment", "updated at"), auto_now=True
+    )
     created_by = models.CharField(
-        _("created by"), max_length=ACTOR_MAX_LENGTH, blank=True
+        pgettext_lazy("appointment", "created by"),
+        max_length=ACTOR_MAX_LENGTH,
+        blank=True,
     )
 
     class Meta:
@@ -296,14 +309,26 @@ class Appointment(UUIDModel):
     )
     # The wall-clock date the series generated: the occurrence's key, not where it ended up.
     occurrence_date = models.DateField(_("occurrence"), null=True, blank=True)
-    deleted_at = models.DateTimeField(_("deleted at"), null=True, blank=True)
-    created_at = models.DateTimeField(_("created at"), auto_now_add=True)
-    updated_at = models.DateTimeField(_("updated at"), auto_now=True)
+    # Own context: an appointment is a «cita», «borrada», «creada» and «actualizada», not the «eliminado» or «creado»
+    # other apps say for the same English (hub#633).
+    deleted_at = models.DateTimeField(
+        pgettext_lazy("appointment", "deleted at"), null=True, blank=True
+    )
+    created_at = models.DateTimeField(
+        pgettext_lazy("appointment", "created at"), auto_now_add=True
+    )
+    updated_at = models.DateTimeField(
+        pgettext_lazy("appointment", "updated at"), auto_now=True
+    )
     created_by = models.CharField(
-        _("created by"), max_length=ACTOR_MAX_LENGTH, blank=True
+        pgettext_lazy("appointment", "created by"),
+        max_length=ACTOR_MAX_LENGTH,
+        blank=True,
     )
     updated_by = models.CharField(
-        _("updated by"), max_length=ACTOR_MAX_LENGTH, blank=True
+        pgettext_lazy("appointment", "updated by"),
+        max_length=ACTOR_MAX_LENGTH,
+        blank=True,
     )
 
     class Meta:
@@ -411,7 +436,10 @@ class History(UUIDModel):
     )
     action = models.CharField(_("action"), max_length=16, choices=Action.choices)
     at = models.DateTimeField(_("at"), auto_now_add=True)
-    actor = models.CharField(_("by"), max_length=ACTOR_MAX_LENGTH, blank=True)
+    # Own context: the history says «quién» did each change, not Clientes' «por» of the same English (hub#633).
+    actor = models.CharField(
+        pgettext_lazy("appointment", "by"), max_length=ACTOR_MAX_LENGTH, blank=True
+    )
     by_customer = models.BooleanField(_("requested by the customer"), default=False)
     reason = models.CharField(_("reason"), max_length=500, blank=True)
     old_value = models.JSONField(_("before"), default=dict, blank=True)
