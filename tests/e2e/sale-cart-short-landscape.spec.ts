@@ -10,12 +10,11 @@
 // drawer keep scrolling all as one. Both tabs, in English and in Spanish. What a run creates, its product
 // `E2E-SHORTSIDE-<run>`, its check and the issuer of a hub that had none (with it, the strip goes as it does for a
 // business with its data complete), is deleted after it; hub `a`'s issuer is parked only for the runs with the strip.
-import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
+import { expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, capture, login, settled, shown } from './helpers';
-import { cleanInventory, type Product } from './inventory-helpers';
-import { cleanInvoices, ensureIssuer, parkIssuer, unparkIssuer } from './invoice-helpers';
-import { cleanSales, dishForTheTill, openTillCart, restoreDrawer, stamp, tillIn, tillIsPhone } from './sale-helpers';
+import { capture, settled, shown } from './helpers';
+import { type Product } from './inventory-helpers';
+import { cleanTillAndIssuer, dishWithAnIssuer, openTillCart, stamp, TILL_LANGUAGES, tillIsPhone, tillUnderStrip } from './sale-helpers';
 
 const KEY = 'FIX-HUB-820-SHORT-LANDSCAPE';
 /** Hub `a`'s issuer, parked while a run needs the strip of a hub that cannot issue invoices yet. */
@@ -61,23 +60,10 @@ let dish: Product;
 test.describe.configure({ mode: 'serial' });
 
 test.beforeAll(async ({ browser }) => {
-  dish = await dishForTheTill(browser, 'SHORTSIDE', RUN);
-  // A business with its data complete has no strip; the runs with it park the issuer.
-  const context = await browser.newContext({ baseURL: A });
-  await login(await context.newPage(), A, '/sale/pos');
-  await ensureIssuer(context);
-  await context.close();
+  dish = await dishWithAnIssuer(browser, 'SHORTSIDE', RUN);
 });
 
-test.afterAll(() => {
-  try {
-    cleanSales();
-    cleanInventory();
-    cleanInvoices();
-  } finally {
-    restoreDrawer();
-  }
-});
+test.afterAll(cleanTillAndIssuer);
 
 /** Whether `el` is whole in what the window shows, run in the page: its top, its middle and its bottom answer with
  *  itself under a finger. A scroller that clips it, or a bar pinned over it, answers with something else. */
@@ -169,37 +155,18 @@ async function readsALine(page: Page, size: Size, lang: string): Promise<void> {
   }
 }
 
-const LANGUAGES = [
-  { name: 'English', lang: 'en', locale: 'en-US' },
-  { name: 'Spanish', lang: 'es', locale: 'es-ES' },
-] as const;
-
 for (const strip of [false, true]) {
-  for (const { name, lang, locale } of LANGUAGES) {
+  for (const { name, lang, locale } of TILL_LANGUAGES) {
     test.describe(`SALE-F20: in ${name}, ${strip ? 'under the red strip' : 'without the strip'}, a low side column shows a whole line of the check`, () => {
-      let context: BrowserContext;
-      let page: Page;
-
-      test.beforeAll(async ({ browser }) => {
-        if (strip) parkIssuer(PARKED);
-        context = await browser.newContext({ baseURL: A, locale, viewport: { width: 1440, height: 900 } });
-        page = await context.newPage();
-        await tillIn(page, context, lang);
-        const notice = shown(page).locator('[data-testid=blocking-strip]');
-        if (strip) await expect(notice, 'the strip of a hub that cannot issue invoices yet').toBeVisible();
-        else await expect(notice, 'a hub with its issuer has no strip').toBeHidden();
+      // The dish on the check, still to be sent: «Current order» has its line and its send bar.
+      const till = tillUnderStrip({ strip, parked: PARKED, locale, lang }, async (page) => {
         await shown(page).locator(`[data-testid=pos-product-${dish.id}]`).click(TAP);
         await expect(shown(page).locator('[data-testid^=pos-line-]').filter({ hasText: dish.name }).first()).toBeAttached();
       });
 
-      test.afterAll(async () => {
-        await context.close();
-        if (strip) unparkIssuer(PARKED);
-      });
-
       for (const size of SIZES.filter((s) => s.strip === strip)) {
         test(`${size.label} (${size.kind})`, async () => {
-          await readsALine(page, size, lang);
+          await readsALine(till(), size, lang);
         });
       }
     });
