@@ -224,7 +224,11 @@ denegada, «Usar mi ubicación actual» deja lo escrito y avisa, debajo del bot�
 ubicación está denegado. Permite la ubicación en este navegador para leer la posición del lugar de
 trabajo o escribe las coordenadas.» (en la app instalada, que no tiene navegador, «El acceso a la
 ubicación está denegado. Permite la ubicación en los ajustes del dispositivo para leer la posición del
-lugar de trabajo o escribe las coordenadas.»); quien no es responsable ve los ajustes en solo lectura.
+lugar de trabajo o escribe las coordenadas.»); quien no es responsable ve los ajustes en solo lectura. Como en
+las ventanas de formulario, el aviso se quita en cuanto se cambia algo y el motivo de un campo en cuanto se
+corrige ese campo (las coordenadas, como el par que son: corregir una quita el motivo de las dos); los dos
+vuelven si el siguiente intento también se rechaza. Un rechazo sin campo se queda hasta el siguiente intento
+(hub#854).
 Implicados: ATTENDANCE-F03, ATTENDANCE-F05
 
 ### ATTENDANCE-F05 Marcar para revisar una jornada que nadie cerró

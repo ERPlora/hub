@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:3da52cd8bb7f7f8ab9f3bb37077f6e8efa811dbb031b448ff11bf0cb0cb77c72 -->
+<!-- generated from WORKBOOK.md sha256:1c5234bd6866e2aa1c7c177ef0017aaba893d2f74c8073af27d39aebd1e80db8 -->
 
 ## What it is for and who it is for
 
@@ -558,7 +558,10 @@ Steps:
 In: the current Appointments settings.
 Out: `appointment.settings.updated`.
 If it fails: "The settings could not be saved." with each reason under its field, without losing what was
-written; a calendar that ends before it starts, "The calendar has to end after it starts.".
+written; a calendar that ends before it starts, "The calendar has to end after it starts.". As in the form
+windows, the notice goes as soon as something is changed and a field's reason as soon as that field is
+corrected; both come back if the next try is refused too. A refusal that names no field stays until the next
+try (hub#854).
 Involved: none
 
 ### APPOINTMENT-F20 See a customer's appointments on their card

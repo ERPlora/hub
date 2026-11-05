@@ -4,7 +4,9 @@
 // rules); a change saved elsewhere repaints every field the person has not touched, and «Save» sends only the
 // fields touched and changed (`online_booking.settings.update`: the page's and the diary's, all or nothing).
 // Below, the offered services with their «Online booking» switch, saved at once in Services.
-import { EmptyState, InlineFeedback } from '@erplora/ui/components';
+// A refusal says itself as a FormModal does (`useRefusal`, hub#854): its notice goes as soon as something is
+// changed, each field's message as soon as that field is, and the next refusal says it all again.
+import { EmptyState, InlineFeedback, useRefusal } from '@erplora/ui/components';
 import { type ApiError, useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { IonButton, IonInput, IonSpinner, IonTextarea, IonToggle } from '@ionic/vue';
@@ -36,6 +38,7 @@ const canManage = computed(() => session.can('online_booking.manage_settings'));
 
 const { data, status, error } = useLive('online_booking.settings.get', {});
 const { run, pending, error: saveError } = useCommand('online_booking.settings.update');
+const { fieldErrors, showsError, changed } = useRefusal(saveError);
 
 const form = ref<Form | null>(null);
 const original = ref<Form | null>(null);
@@ -86,10 +89,10 @@ function set<K extends Field>(field: K, value: Form[K]): void {
   form.value = { ...form.value, [field]: value };
   touched.value = new Set([...touched.value, field]);
   saved.value = false;
+  changed(field);
 }
 
 const text = (value: unknown): string => (value === null || value === undefined ? '' : String(value));
-const fieldErrors = computed<Readonly<Record<string, string>>>(() => saveError.value?.fields ?? {});
 const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'ion-touched': !!message });
 
 async function save(): Promise<void> {
@@ -276,12 +279,12 @@ async function toggleService(event: Event, id: string, online: boolean): Promise
         </ion-toggle>
 
         <InlineFeedback
-          v-if="saveError"
+          v-if="showsError"
           tone="danger"
           data-testid="ob-settings-save-error"
           :heading="$t('online_booking.settings.saveError')"
         >
-          {{ saveError.message }}
+          {{ saveError?.message }}
         </InlineFeedback>
         <InlineFeedback
           v-if="saved"
