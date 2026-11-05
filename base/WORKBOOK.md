@@ -415,6 +415,7 @@ En la pantalla Archivos:
 | BASE-F107 | Pasar la QA maestra del Hub | hecho |
 | BASE-F108 | Reportar un problema a soporte | hecho |
 | BASE-F109 | Borrar un negocio eliminado pasados sus 90 días | parcial — un negocio con documentos guarda su base de datos hasta que exista el archivo fiscal (hub#738) |
+| BASE-F110 | Abrir la web del negocio por su dominio propio | hecho |
 
 ### BASE-F01 Ver lo que le falta por configurar al negocio
 <!-- origen: fi:hub/app-web#setup-status-estado-de-configuracion-de-modulos-adr-0063 -->
@@ -2850,8 +2851,39 @@ del negocio no borra nada (`invalid_database_name`). Un negocio recuperado duran
 de datos; ya borrándose, erplora.com recibe `hub_purged`. Si el Hub se apaga a media copia, el siguiente la retoma.
 Implicados: HUBS-F18, HUBS-F19, HUBS-F20, PUBLIC-F34 (el mismo borrado de ficheros, al retirar una demo)
 
+### BASE-F110 Abrir la web del negocio por su dominio propio
+<!-- origen: nuevo (saas#195, HUBS-F17; PLAN-SAAS §37, punto 2) -->
+Estado: hecho (la dirección y lo que sirve; conectar el dominio es HUBS-F17 de erplora.com, que lo enseña en el panel)
+Actor: cualquiera, sin cuenta
+Pantalla: La página pública del negocio (WEBSITE-F10), en su dominio
+Pasos:
+  1. Alguien abre el dominio del negocio (por ejemplo, www.minegocio.es) en un móvil, una tableta o un ordenador.
+  2. Se ve la página publicada del negocio, con sus fotos, en el idioma del navegador.
+  3. **Entrar** lleva a la dirección del negocio en erplora.com: la app y la entrada siguen solo allí.
+Entra: un dominio que erplora.com ha dicho que es de ese negocio.
+Sale: la web pública del negocio y sus imágenes, sin cookies; nada más: ni la app, ni la API, ni el acceso. Con la sesión
+del negocio abierta en ese navegador se ve lo mismo, porque la sesión no llega a otro dominio.
+Si falla: un dominio que nadie ha conectado no abre nada. Si el negocio lo quita, se da de baja o está suspendido, o no
+tiene una página publicada, el dominio dice que no hay nada ahí. Un negocio que se está preparando o mudando pide volver
+en un momento.
+Implicados: HUBS-F17, WEBSITE-F10
+
 ## Para quien lo mantiene
 
+- **Dominio propio de un negocio** (BASE-F110, HUBS-F17, PLAN-SAAS §37 punto 2; `base/custom_domains.py`,
+  `base.middleware.CustomDomainMiddleware`): `ALLOWED_HOSTS` no cambia. El SaaS nombra el dominio en la foto
+  (`custom_domain`: minúsculas, sin puerto, sin punto final, en su forma ASCII; `null`, vacío o ausente, ninguno, porque la
+  foto es entera), que lo guarda en `Hub.custom_domain`, y nunca se le pregunta por petición. Cada proceso guarda en memoria qué
+  dominio es de quién y lo relee cada 30 s (al momento en el proceso que aplicó la foto): un host desconocido sigue siendo
+  el 400 de `CommonMiddleware` **sin una sola lectura**, y uno de los hosts del Hub ni pregunta. Un host conocido se
+  responde en ese middleware, antes de `CommonMiddleware`, y no sigue por la cadena: `/` (la web, `base.public_home`),
+  `/p/media/<su id>/` (sus imágenes públicas) y `/.well-known/erplora-hub` (la sonda del SaaS: `{"hub_id": …}`, sin lectura);
+  cualquier otra ruta es 404 sin lectura, `/api` con su sobre, y nunca se lee la sesión. La página y sus imágenes releen la
+  fila del negocio, como cualquier otro host: `base/tenancy/connections.py` necesita fresco dónde está su base de datos y
+  una fila vieja devolvería el alias a un servidor anterior a una mudanza; esa lectura se hace una vez, y la página lee lo
+  mismo que en su dirección. Un dominio que nombran dos negocios (se está moviendo entre ellos: sus dos fotos llegan en
+  cualquier orden) no es de nadie hasta que el que lo deja manda la suya: se avisa con `base.custom_domain_taken`, no se
+  rechaza ninguna foto y nunca se sirve la web equivocada.
 - **Orden de una lista** (`base/ordering.py`, regla hub#2355 del producto viejo): `list_order(*columnas, descending=…,
   nulls_last=…)` devuelve lo que necesita `order_by`, con todas las columnas y después el `id` en la dirección de la
   lista: la descendente es la ascendente leída al revés, empates incluidos, y las páginas ni repiten ni pierden filas.

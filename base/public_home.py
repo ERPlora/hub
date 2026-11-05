@@ -15,7 +15,9 @@ installed, and only on the first request that asks):
 - ``respond(request: HttpRequest) -> HttpResponse``: the published site's page for ``request.hub`` (the hub the
   host gate left on the request, ``base.middleware.HubHostRequiredMiddleware``). Called only for an anonymous GET or
   HEAD of ``/`` after ``is_published`` said ``True`` on the same request. It sets no cookie and owns its
-  ``Cache-Control``, ``Vary`` and CSP.
+  ``Cache-Control``, ``Vary`` and CSP. On a business's own domain (``base.middleware.CustomDomainMiddleware``, HUBS-F17)
+  ``request.custom_domain`` names it, and only ``/``, its public images and nothing else of the Hub is there: the page
+  sends what it needs of the rest to the business's own address, and raises ``Http404`` if it has nothing to show.
 
 :func:`website_enabled` asks once per request: the gate and the view share the answer.
 """

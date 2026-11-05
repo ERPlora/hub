@@ -433,6 +433,9 @@ def control_as_s5_left_it(django_db_blocker):
         try:
             made = _manage(name, "config.settings_pytest")
             assert made.returncode == 0, made.stderr[-3000:]
+            # What came after it steps back first: applied again, a migration that adds a column finds it there.
+            stepped = _manage(name, "config.settings_pytest", "control", MIGRATION)
+            assert stepped.returncode == 0, stepped.stderr[-3000:]
             with hubs._maintenance(name) as conn:
                 conn.execute("DELETE FROM django_migrations WHERE app = 'control' AND name > %s", [BEFORE])
                 conn.execute("INSERT INTO base_hub_identity (hub_id) VALUES (%s)", [uuid.uuid7()])
@@ -455,6 +458,9 @@ def test_the_deploy_renames_them_a_second_run_changes_nothing_and_stepping_back_
     assert renamed == (found - hub_tables()) | {shared(table) for table in hub_tables()}
     with hubs._maintenance(name) as conn:
         assert conn.execute(f'SELECT count(*) FROM "{shared("base_hub_identity")}"').fetchone()[0] == 1
+    stepped = _manage(name, "config.settings", "control", MIGRATION)
+    assert stepped.returncode == 0, stepped.stderr[-3000:]
+    with hubs._maintenance(name) as conn:
         conn.execute("DELETE FROM django_migrations WHERE app = 'control' AND name > %s", [BEFORE])
 
     again = _manage(name, "config.settings")
