@@ -355,7 +355,7 @@ En la pantalla Archivos:
 | BASE-F47 | Informar de un error de la pantalla sin que nadie lo pida | hecho |
 | BASE-F48 | Abrir Ajustes y moverse por sus pestañas | hecho |
 | BASE-F49 | Ver el país del negocio | hecho |
-| BASE-F50 | Ver la moneda del negocio | descartado |
+| BASE-F50 | Ver la moneda del negocio | hecho |
 | BASE-F51 | Cambiar el idioma del negocio en erplora.com | hecho |
 | BASE-F52 | Entrar con la cuenta de erplora.com | hecho |
 | BASE-F53 | Entrar desde el panel de erplora.com sin volver a teclear la contraseña | hecho |
@@ -1526,7 +1526,7 @@ Implicados: HUBS-F15, BASE-F01, BASE-F29
 
 ### BASE-F50 Ver la moneda del negocio
 <!-- origen: old-hub:HUB_SHELL-F158 -->
-Estado: descartado — todas las apps van en la moneda del negocio salvo Citas, que sigue en euros aunque el país del negocio pague en otra moneda: con España y Portugal cuadra, con un país de otra moneda no (hub#577)
+Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Ajustes · Negocio; Inicio · Resumen e Inicio · Actividad
 Pasos:
@@ -1537,6 +1537,8 @@ Pasos:
   3. En el Inicio, los importes de los paneles (como «Ventas últimos 7 días») y de «Actividad» van en esa moneda,
      con su símbolo y sus decimales, como los imprime una caja de ese país: «zł» en un negocio de Polonia, «€» en
      uno de España. Mientras el negocio no ha contestado, el importe sale sin símbolo, nunca en otra moneda.
+  4. Las apps que enseñan precios o importes van en esa misma moneda, también Citas (el precio de cada servicio
+     al reservar y el «Total» de la cita) y la vista previa de Reserva online (hub#577).
 Entra: el país del negocio.
 Sale: nada guardado.
 Si falla: como en BASE-F49.
@@ -3213,8 +3215,8 @@ Implicados: HUBS-F17, WEBSITE-F10
   Ventas, Facturación, Inventario, Tarifas, Impresión, Pagos y
   Carrito y pago la leen con `base.operations.business_currency(ctx.scope)`, sin copia propia (las `business_currency(ctx)`
   de `apps/sale/queries.py` y `apps/cart_checkout/queries.py` solo la llaman); en pantalla, Pagos, Carrito y pago,
-  Clientes y Menús y combos la leen con `useBusinessMoney`; Citas aún fija `EUR` en
-  `apps/appointment/frontend/lib/format.ts` (BASE-F50 `descartado`, hub#577). Pantallas: `SettingsPage.vue` (pestañas por hash `#business`, `#tickets`,
+  Clientes, Menús y combos, Citas y la vista previa de Reserva online la leen con `useBusinessMoney` (ninguna fija
+  una moneda; la ficha de prueba de `base.business.get` es `base/frontend/__tests__/business.ts`). Pantallas: `SettingsPage.vue` (pestañas por hash `#business`, `#tickets`,
   `#data`; `#tax` abre Negocio; `lib/data.ts`) y `components/settings/{BusinessPanel,TicketsPanel,SettingsRow}.vue`.
   Tests: `base/tests/test_business.py`, `test_queries_business.py`, `test_business_live.py`; e2e
   `tests/e2e/base-settings-business.spec.ts`, con el Hub y el SaaS reales.
@@ -3689,7 +3691,6 @@ con su issue, y llegan con ella. Después llegaron BASE-F21 y BASE-F22 (hub#601)
 - **La fila de salud del Inicio (BASE-F02)**, hub#573: un punto de extensión más en `LiveAppConfig` y su uso en
   Impresión y la Bandeja de WhatsApp.
 - **Las notas de cada versión (BASE-F41)**, hub#576.
-- **Citas en la moneda del negocio (BASE-F50)**, hub#577, de `apps/appointment`.
 - **La vista previa de .xlsx y .docx y el .json plegable (BASE-F74)**, hub#578.
 - **Los roles que trae una app (BASE-F82)**, hub#579, con la contradicción entre PLAN-HUB §3 (`RoleActivation`) y
   los cuatro roles de PLAN §22 sin resolver.
