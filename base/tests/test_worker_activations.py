@@ -62,14 +62,20 @@ def nothing_checked_yet(monkeypatch):
 def no_visit_outlives_its_test(django_db_setup, django_db_blocker):
     """What a test here writes is committed (no test case around it), so a visit it notes would stay for the next run
     on a reused test database, where the nightly measurement's tests count it (hub#874). Set up before ``business``,
-    this is checked after it took its rows back."""
+    this is checked after it took its rows back: its visits and no other (a visit to a host of none of its businesses,
+    noted before, is still there)."""
     from control.models import HubVisit
 
     with django_db_blocker.unblock():
         before = set(HubVisit.objects.values_list("pk", flat=True))
+        elsewhere = HubVisit.objects.create(
+            host=f"elsewhere-{uuid.uuid7().hex[-8:]}", day=timezone.now().date(), saas_user_id="saas:elsewhere"
+        )
     yield
     with django_db_blocker.unblock():
+        kept, _ = HubVisit.objects.filter(pk=elsewhere.pk).delete()
         left = list(HubVisit.objects.exclude(pk__in=before).values_list("host", "day", "saas_user_id"))
+    assert kept == 1, "a visit to a host of no business made here was taken back too"
     assert left == [], f"visits left behind for the next test: {left}"
 
 
