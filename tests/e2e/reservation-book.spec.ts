@@ -14,6 +14,7 @@ import { spawnSync } from 'node:child_process';
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, HUB_DIR, psql, settled, shot, shown, untilStill } from './helpers';
+import { liveStreamsSettled, watchLiveStreams } from './live-streams';
 import { ownerPage, pick, post, rowAction } from './service-helpers';
 
 const STAMP = Date.now().toString(36).toUpperCase();
@@ -463,17 +464,23 @@ test('A pending reservation nobody confirmed turns Cancelled on the open book th
     const past = madrid(-60);
     psql(`update reservation_reservation set date = '${past.date}', time = '${past.time}' where id = '${stale.id}'`);
 
+    const streams = await watchLiveStreams(page);
     await page.reload();
     const view = shown(page);
     await expect(view.locator('[data-testid=reservation-day]')).toHaveAttribute('data-day', TODAY.date);
     if (past.date !== TODAY.date) await view.locator('[data-testid=reservation-day-prev]').click();
     const row = view.locator(`[data-testid=reservation-list-row][data-id="${stale.id}"]`);
     await expect(row).toContainText('Pending');
+    // The book's stream is the open one (every subscription answered, none opened since): a new /api/live would read
+    // the list again and say Cancelled with no notice at all.
+    await liveStreamsSettled(streams);
+    const open = streams.length;
 
     // The quarter of an hour comes: the worker releases it and the book, never reloaded, says so at once (its live
-    // notice; the safety re-read would take five minutes).
+    // notice, over the stream already open; the safety re-read would take five minutes).
     expect(workerReleases()).toContain('reservation.release_unconfirmed_reservations');
     await expect(row).toContainText('Cancelled', { timeout: 15_000 });
+    expect(streams.length, 'the release reached the open book without a new /api/live').toBe(open);
     const detail = await api<{ status: string; cancellation_reason: string }>(context, A, 'GET', `/reservation/reservations/detail?id=${stale.id}`);
     expect(detail.data).toMatchObject({ status: 'cancelled', cancellation_reason: 'unconfirmed' });
     await shots(page, 'RESERVATION-F13', async () => {
