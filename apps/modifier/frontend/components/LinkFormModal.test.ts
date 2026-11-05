@@ -55,6 +55,18 @@ describe('LinkFormModal', () => {
     expect(s.wrapper.emitted('update:open')?.at(-1)).toEqual([false]);
   });
 
+  it('a refused field it does not mark is said on top, with no promise of marks (hub#833)', async () => {
+    const s = await setup();
+    s.target().vm.$emit('update:modelValue', { id: 'p1', label: 'Burger' });
+    await settle();
+    s.answer(422, { error: { code: 'invalid_payload', message: 'Check the highlighted details.', fields: { product_id: 'Refused product.' } } });
+    await click(s.save());
+    const error = s.inDoc('modifier-link-form-error');
+    expect(error?.textContent).toContain('Refused product.');
+    expect(error?.textContent).not.toContain('Check the highlighted details.');
+    expect(s.wrapper.emitted('update:open')).toBeUndefined();
+  });
+
   it('or a category, picked afresh when the kind changes', async () => {
     const s = await setup();
     s.target().vm.$emit('update:modelValue', { id: 'p1', label: 'Burger' });

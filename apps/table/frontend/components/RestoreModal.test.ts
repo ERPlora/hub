@@ -40,6 +40,18 @@ describe('RestoreModal', () => {
     expect(r.closed()).toBe(true);
   });
 
+  it('a refused field it does not mark is said on top, with no promise of marks (hub#833)', async () => {
+    const refusal = { error: { code: 'invalid_payload', message: 'Check the highlighted details.', fields: { table_id: 'Refused table.' } } };
+    const r = await restore({ '/api/table/sessions/restore': [422, refusal] });
+    await r.result(OP, page([tableRow({ id: 't6', number: '6' })], 1, 100));
+    await settle();
+    await ionValue(r.field('table'), 't6');
+    await click(r.field('submit'));
+    expect(r.field('error').textContent).toContain('Refused table.');
+    expect(r.field('error').textContent).not.toContain('Check the highlighted details.');
+    expect(r.closed()).toBe(false);
+  });
+
   it('with no free table, says so', async () => {
     const r = await restore();
     await r.result(OP, page([occupied()], 1, 100));
