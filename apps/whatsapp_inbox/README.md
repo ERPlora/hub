@@ -69,6 +69,6 @@ pnpm e2e tests/e2e/whatsapp-inbox.spec.ts tests/e2e/whatsapp-inbox-erplora.spec.
 
 ## Qué queda fuera
 
-- Los textos de hub#569, hub#570 y hub#571, y los iconos y el hilo de chat pedidos a `@erplora/ui`: «Lo que queda fuera» del
-  WORKBOOK y [`UI-REQUESTS.md`](UI-REQUESTS.md).
+- Los textos de hub#569, hub#570 y hub#571, los servicios por su nombre en la tarjeta de una cita (hub#835) y los iconos y el
+  hilo de chat pedidos a `@erplora/ui`: «Lo que queda fuera» del WORKBOOK y [`UI-REQUESTS.md`](UI-REQUESTS.md).
 - Relacionada, de otras apps: el Inicio no dice de un vistazo si WhatsApp funciona (hub#573, BASE-F02).
