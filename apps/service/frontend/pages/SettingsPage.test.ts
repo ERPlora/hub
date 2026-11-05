@@ -70,6 +70,17 @@ describe('SettingsPage', () => {
     expect(s.field('saved')?.textContent).toContain('Settings saved.');
   });
 
+  // The server knows the default tax category by its key (`default_tax_category_key`), not as the choice on screen.
+  it('choosing another tax category sends its key', async () => {
+    const s = await setup();
+    await s.show(SETTINGS);
+    s.answer(200, { ...SETTINGS, default_tax_category_key: 'service.reduced', default_tax_category_name: 'Service — reduced' });
+    s.tax().vm.$emit('update:modelValue', { id: 'service.reduced', label: 'Service — reduced' });
+    await settle();
+    await click(s.field('save'));
+    expect(s.sent().map((call) => call.body)).toEqual([{ default_tax_category_key: 'service.reduced' }]);
+  });
+
   it('a refusal goes under its field', async () => {
     const s = await setup();
     await s.show(SETTINGS);

@@ -64,6 +64,20 @@ describe('SettingsPage', () => {
     expect(s.field('save-error')?.textContent).toContain(message);
   });
 
+  // RESERVATION-F03 «Si falla» (hub#873), as in the other settings pages: a change takes the notice away and
+  // correcting a field takes its own message away, nobody else's; the next refusal says it all again.
+  it('correcting the refused field takes its message and the notice away, and nobody else’s', async () => {
+    const s = await setup();
+    await s.show(settingsOut());
+    const refused = { min_party_size: 'The minimum guests cannot be more than the maximum.', max_advance_days: 'Ensure this value is less than or equal to 365.' };
+    s.answer(422, { error: { code: 'invalid_payload', message: 'Invalid payload', fields: refused } });
+    await ionValue(s.field('max_advance_days'), '999', 'ionInput');
+    await click(s.field('save'));
+    await ionValue(s.field('min_party_size'), '2', 'ionInput');
+    const says = (name: string) => [s.field(name).errorText ?? '', s.field(name).classList.contains('ion-invalid')];
+    expect([says('min_party_size'), says('max_advance_days'), s.field('save-error') !== null]).toEqual([['', false], [refused.max_advance_days, true], false]);
+  });
+
   it('whoever may not save them is told so', async () => {
     const s = await setup({ session: EMPLOYEE });
     expect(s.field('forbidden')).not.toBeNull();

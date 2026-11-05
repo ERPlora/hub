@@ -112,6 +112,19 @@ describe('SettingsPage (ATTENDANCE-F04)', () => {
     expect(s.sent()[0].body).toEqual({ geofence_radius_m: 250, workplace_lat: 40.4168, workplace_lng: -3.7038 });
   });
 
+  // The workplace is one place: changing either coordinate sends both, and emptying them sends none.
+  it.each([
+    [{ workplace_lat: '40.5' }, { workplace_lat: 40.5, workplace_lng: -3.7 }],
+    [{ workplace_lat: '', workplace_lng: '' }, { workplace_lat: null, workplace_lng: null }],
+  ])('typing %o sends the workplace whole: %o', async (typed, body) => {
+    const s = await setup({ data: { ...DEFAULTS, workplace_lat: 40.4, workplace_lng: -3.7, workplace_set: true } });
+    s.answerBy({ '/api/attendance/settings': [200, DEFAULTS] });
+    for (const [key, value] of Object.entries(typed)) await ionValue(s.field(key), value, 'ionInput');
+    await click(s.field('save'));
+    await settle();
+    expect(s.sent().map((call) => call.body)).toEqual([body]);
+  });
+
   it('a business that asks for the location without a workplace is told', async () => {
     const s = await setup({ data: { ...DEFAULTS, require_location: true } });
     expect(s.field('require_location').checked).toBe(true);
