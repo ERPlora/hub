@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:443dca1e91a6fb3a00a300e9001dab5d86885eb860e94e0bb9548fd0216d3997 -->
+<!-- generated from WORKBOOK.md sha256:df8a83bfc89c7619e05b8eb90bbb379b6cadfcb1a17e4aa2be4b1c1b62f7322c -->
 
 ## What it is for and who it is for
 
@@ -48,8 +48,7 @@ ERPlora does not invent flows: it adopts the ones the market has already proven.
   Settings → Drawers**; when opening the session one is chosen. With only one, it is chosen by itself.
 - **Currency**: the business's, its country's, with its decimals: the euro in Spain, the zloty in Poland. Every
   amount of Cash register is in it, and the count shows its notes and coins.
-- **Time zone**: the business's. In this phase, Madrid time (`Europe/Madrid`) for everyone: the business
-  day, the session number and the auto-close time come from it.
+- **Time zone**: the business's: the auto-close time, the business day and the session number come from it.
 
 Initial setup, step by step:
 
@@ -541,7 +540,8 @@ Steps:
    - with a session forgotten past its cut-off (F10): what came after the cut-off;
    - with a session open: the stragglers of the previous shift, confirmed while it was being closed (its Z
      no longer picks them up).
-2. Tap "View" to see the list (when, type, amount, method and document).
+2. Tap "View" to see the list (when, type, amount, method and document). It is read-only: a single
+   button, **Close**.
 3. When opening the session, count that cash in the float: it is already in the drawer (the opening window
    reminds you).
 In: the charges, voids and refunds from Sales that fell in no session.

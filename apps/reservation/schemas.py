@@ -854,7 +854,7 @@ class SettingsOut(Schema):
         description="Minutes after its time an unconfirmed reservation is released."
     )
     timezone: str = Field(
-        description="The business's time zone (phase 1: Europe/Madrid)."
+        description="The business's time zone."
     )
 
 

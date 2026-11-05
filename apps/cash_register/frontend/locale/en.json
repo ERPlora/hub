@@ -156,7 +156,6 @@
     },
     "unassignedList": {
       "title": "Sale lines in no shift",
-      "close": "Close",
       "empty": "Every sale line is in a shift."
     },
     "detail": {

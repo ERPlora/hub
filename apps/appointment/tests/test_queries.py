@@ -13,6 +13,8 @@ from live.errors import NotFound
 
 from apps.appointment.models import Appointment, History
 
+from base.tests.ordering import assert_reads_backwards, listed_with
+
 from .conftest import (
     MONDAY,
     assign,
@@ -286,6 +288,20 @@ def test_an_appointment_gives_its_day_and_hour_ready_to_read_in_the_callers_lang
         language="es",
     )
     assert booked.start_time_label == "16:05" and booked.start_date_label.startswith("lunes, ")
+
+
+def test_an_appointment_says_the_words_a_card_names_it_by(salon):
+    # hub#634: whoever says yes to cancelling it reads whose it is, when and with whom, never its id.
+    late = make_appointment(salon.lucia, salon.ana, [salon.cut], at(dt.date(2030, 3, 5), "10:30"))
+    said = run("appointment.appointment.get", {"id": str(late.id)}, language="es")
+    assert said.label == f"{salon.lucia.name} · martes, 5 de marzo de 2030 · 10:30 · {said.staff_name}"
+
+
+def test_the_words_of_an_appointment_leave_out_what_it_no_longer_has(salon):
+    # Her data erased (the name goes) and its professional gone: no empty piece between the separators.
+    late = make_appointment(salon.lucia, salon.ana, [salon.cut], at(dt.date(2030, 3, 5), "10:30"))
+    Appointment.objects.filter(pk=late.id).update(customer_name="", staff_name="", staff=None)
+    assert run("appointment.appointment.get", {"id": str(late.id)}).label == "Tuesday, March 5, 2030 · 10:30"
 
 
 # Counters
@@ -753,3 +769,26 @@ def test_the_settings_are_the_factory_ones_until_saved_with_the_business_zone():
     make_settings(slot_interval=20)
     assert run("appointment.settings.get").slot_interval == 20
     assert Appointment.objects.count() == 0
+
+
+def _tied_appointments(salon):
+    rows = [make_appointment(salon.lucia, salon.ana, [salon.cut], at(MONDAY, f"{hour:02}:00")) for hour in range(9, 13)]
+    return [row.id for row in rows], {"date_from": MONDAY}
+
+
+def _tied_series(salon):
+    return [make_series(salon).id for _ in range(4)], {}
+
+
+@pytest.mark.parametrize(
+    ("operation", "tied", "column"),
+    [
+        ("appointment.appointment.list", _tied_appointments, "status"),
+        ("appointment.recurring.list", _tied_series, "time"),
+    ],
+)
+def test_ties_go_by_id_in_the_lists_own_direction(salon, operation, tied, column):
+    """hub#768 (the rule of hub#2355): a descending list is the ascending one read backwards, ties included, and its
+    pages neither repeat nor lose rows."""
+    ids, filters = tied(salon)
+    assert_reads_backwards(listed_with(run, operation, column, **filters), sorted(ids))

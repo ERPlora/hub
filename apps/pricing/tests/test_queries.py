@@ -11,6 +11,7 @@ from live.context import Scope
 from live.errors import Conflict, NotFound
 from live.operations import get
 
+from apps.pricing import queries
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
 
@@ -31,6 +32,10 @@ from .conftest import (
 pytestmark = pytest.mark.django_db
 
 MADRID = ZoneInfo("Europe/Madrid")
+
+
+#: The real ``business_today``: the app's fixture fixes it for every test, before any of them runs.
+ON_THE_BUSINESSS_CLOCK = queries.business_today
 
 
 def run(name, data=None, role="hub_admin"):
@@ -419,6 +424,21 @@ def test_without_a_moment_the_line_is_priced_on_the_business_s_today():
     make_item(make_list("TODAY", is_default=True, valid_from=TODAY, valid_until=TODAY), product, price=777)
     line = run("pricing.price.resolve", {"product_id": str(product.id)})
     assert (line.unit_price, line.date) == (777, TODAY)
+
+
+def test_without_a_moment_a_list_that_ends_today_applies_until_the_businesss_midnight(night_elsewhere, monkeypatch):
+    monkeypatch.setattr(queries, "business_today", ON_THE_BUSINESSS_CLOCK)
+    product = make_product("Shampoo", "SH-1", price=1250)
+    make_item(make_list("ENDS", is_default=True, valid_until=dt.date(2026, 11, 2)), product, price=777)
+    line = run("pricing.price.resolve", {"product_id": str(product.id)})
+    assert (line.unit_price, line.date) == (777, dt.date(2026, 11, 2))
+
+
+def test_a_moment_is_priced_on_the_day_it_is_for_the_business(night_elsewhere):
+    product = make_product("Shampoo", "SH-1", price=1250)
+    make_item(make_list("ENDS", is_default=True, valid_until=dt.date(2026, 11, 2)), product, price=777)
+    line = resolve(product_id=str(product.id), when="2026-11-03T04:30:00+00:00")
+    assert (line.unit_price, line.date) == (777, dt.date(2026, 11, 2))
 
 
 def test_the_highest_quantity_break_reached_wins_inside_a_list():

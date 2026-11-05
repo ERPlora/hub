@@ -764,8 +764,6 @@ def test_two_workers_never_deliver_the_same_event_to_the_same_app(committed_till
     assert StockMovement.objects.filter(movement_type="sale").count() == 1
 
 
-# The mark sets up this session's test database when this test runs alone: without it, control stays the developer's own
-# (``hub``), its hubs' databases are named after it, and TEST_DB_NAME is ignored.
 @pytest.mark.django_db
 def test_a_hubs_outbox_has_one_pending_index_and_it_is_base_outbox_pending(hub_databases):
     """``base/0006`` owns the index that takes a tick straight to the events not taken yet (PLAN-HUB, round 2026-10-20).

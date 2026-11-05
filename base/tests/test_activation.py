@@ -215,10 +215,12 @@ def test_only_the_chosen_modules_on_count():
 
 
 class Config:
-    def __init__(self, label, veto=None):
+    def __init__(self, label, veto=None, on_veto=None):
         self.label = label
         if veto is not None:
             self.can_disable = veto
+        if on_veto is not None:
+            self.can_enable = on_veto
 
 
 def test_an_app_without_a_veto_never_refuses():
@@ -232,6 +234,18 @@ def test_the_first_app_that_refuses_says_why():
 
 def test_a_blank_reason_is_no_refusal():
     assert activation.veto(["task"], ctx=None, configs=[Config("task", lambda ctx: "  ")]) is None
+
+
+def test_refusals_says_what_each_app_that_refuses_says():
+    configs = [Config("sale"), Config("invoice", lambda ctx: None), Config("verifactu", lambda ctx: f"never {ctx}")]
+    assert activation.refusals(["sale", "invoice", "verifactu"], ctx="x", configs=configs) == {"verifactu": "never x"}
+
+
+def test_an_app_may_refuse_to_go_on_by_its_own_hook():
+    configs = [Config("verifactu", lambda ctx: "never off", lambda ctx: "only in Spain"), Config("task")]
+    asked = {"ctx": None, "configs": configs, "hook": activation.CAN_ENABLE}
+    assert activation.veto(["task", "verifactu"], **asked) == ("verifactu", "only in Spain")
+    assert activation.refusals(["task", "verifactu"], **asked) == {"verifactu": "only in Spain"}
 
 
 # ── Its tables being made (S3; PLAN-DB §7): «creating» and «failed» ───────────────────────────────────────────────

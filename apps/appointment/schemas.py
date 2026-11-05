@@ -12,6 +12,7 @@ from typing import Annotated, Generic, Literal, TypeVar
 from uuid import UUID
 
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import gettext_noop
 from ninja import Field, Schema
 from pydantic import (
     ConfigDict,
@@ -20,6 +21,8 @@ from pydantic import (
     field_validator,
     model_validator,
 )
+
+from base.schemas import names
 
 T = TypeVar("T")
 
@@ -31,6 +34,13 @@ MAX_BATCH = 50
 MAX_BULK_DELETE = 100
 #: The longest range the agenda reads at once (two months: a week view and its neighbours).
 MAX_RANGE_DAYS = 62
+
+#: How the assistant's card names an appointment and what booking one takes, by what their reads answer and never by
+#: an id (base/assistant.py).
+AN_APPOINTMENT = names("appointment.appointment.get", name=("label",))
+A_CUSTOMER = names("customer.customer.detail")
+A_SERVICE = names("service.service.get")
+A_MEMBER = names("staff.member.detail", name=("full_name",))
 
 SAY_WHICH_CUSTOMER = _("Say which customer: her id, or her name, phone or email.")
 SAY_WHICH_STAFF = _("Say which professional: their id, or their name.")
@@ -139,7 +149,7 @@ def _named(value, info: ValidationInfo, id_field: str, message) -> object:
 
 
 class ServiceRefIn(In):
-    service_id: UUID | None = Field(None, description="The service's id.")
+    service_id: UUID | None = Field(None, description="The service's id.", json_schema_extra=A_SERVICE)
     service: Said | None = Field(
         None,
         validate_default=True,
@@ -153,7 +163,7 @@ class ServiceRefIn(In):
 
 
 class CustomerOf(In):
-    customer_id: UUID | None = Field(None, description="The customer's card id.")
+    customer_id: UUID | None = Field(None, description="The customer's card id.", json_schema_extra=A_CUSTOMER)
     customer: Said | None = Field(
         None,
         validate_default=True,
@@ -183,7 +193,9 @@ class StaffOf(In):
 
 
 class AppointmentRefIn(In):
-    id: UUID | None = Field(None, description="The appointment's id.")
+    id: UUID | None = Field(
+        None, title=gettext_noop("Appointment"), description="The appointment's id.", json_schema_extra=AN_APPOINTMENT
+    )
     number: _text(24, 1) | None = Field(
         None,
         validate_default=True,
@@ -219,7 +231,7 @@ D_CONFIRM_OVERLAP = "True only after the person saw the overlapping appointments
 class AppointmentCreateIn(CustomerOf):
     services: Services = Field(description=D_SERVICES)
     staff_id: UUID | None = Field(
-        None, description="The professional's id (a staff member)."
+        None, description="The professional's id (a staff member).", json_schema_extra=A_MEMBER
     )
     staff: Said | None = Field(
         None, validate_default=True, description="The professional's name (e.g. Ana)."
@@ -288,7 +300,7 @@ class ForCustomer(In):
         description="True when the customer herself asks (WhatsApp, online): her ownership and the policy apply.",
     )
     customer_id: UUID | None = Field(
-        None, description="The customer asking (with on_behalf_of_customer)."
+        None, description="The customer asking (with on_behalf_of_customer).", json_schema_extra=A_CUSTOMER
     )
     customer: Said | None = Field(
         None,
@@ -314,7 +326,7 @@ class RescheduleIn(AppointmentRefIn, ForCustomer):
         None, description="The new length in minutes; empty keeps it."
     )
     staff_id: UUID | None = Field(
-        None, description="The new professional's id; empty keeps the professional."
+        None, description="The new professional's id; empty keeps the professional.", json_schema_extra=A_MEMBER
     )
     staff: Said | None = Field(None, description="The new professional's name.")
     services: OptionalServices = Field(
@@ -561,6 +573,9 @@ class AppointmentOut(AppointmentRow):
         "marzo de 2030)."
     )
     start_time_label: str = Field(description="Its hour ready to say, 24-hour on the business's clock (e.g. 10:30).")
+    label: str = Field(
+        description="The words a card names it by, in the caller's language: its customer, day, hour and professional."
+    )
 
 
 class AppointmentPage(Page[AppointmentRow]):

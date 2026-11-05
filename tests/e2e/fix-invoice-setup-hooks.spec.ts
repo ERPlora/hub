@@ -16,7 +16,7 @@ import { type Browser, type BrowserContext, expect, type Locator, type Page, tes
 
 import { A, api, type Credentials, EMPLOYEE, horizontalOverflow, login, OWNER, psql, shot, shown, untilStill } from './helpers';
 import { stamp, VIEWPORTS } from './inventory-helpers';
-import { ensureIssuer } from './invoice-helpers';
+import { ensureIssuer, parkIssuer, unparkIssuer } from './invoice-helpers';
 
 const KEY = 'FIX-INVOICE-SETUP-HOOKS';
 /** The task that left the red strip as the one notice of Invoices and Series. */
@@ -52,19 +52,12 @@ function noIssuer(): void {
 }
 
 test.beforeAll(() => {
-  psql([`drop table if exists ${PARKED}`, `create table ${PARKED} as select * from invoice_issuer`].join('; '));
-  noIssuer();
+  parkIssuer(PARKED);
 });
 
 test.afterAll(() => {
-  psql(
-    [
-      OWN_SERIES,
-      'delete from invoice_issuer',
-      `insert into invoice_issuer select * from ${PARKED}`,
-      `drop table ${PARKED}`,
-    ].join('; '),
-  );
+  psql(OWN_SERIES);
+  unparkIssuer(PARKED);
 });
 
 /** A person of `a` in Spanish (the Hub's language cookie, as the sign-in sets it from the account), on the Home. */
@@ -235,6 +228,8 @@ for (const size of VIEWPORTS) {
     const { context, page } = await spanish(browser, { width: size.width, height: size.height });
     try {
       const overflow = () => horizontalOverflow(page);
+      // Folded, whatever fits: the ⛔ is the first row, with no «Ver todo» to press (hub#801; a phone has room for two).
+      await expect(card(page).locator('[data-testid="setup-row"]').first()).toHaveAttribute('data-key', IDENTITY);
       await expect(pill(page, IDENTITY)).toHaveText('Necesario para facturar');
       await row(page, IDENTITY).evaluate((element) => element.scrollIntoView({ block: 'start' }));
       await untilStill(page);

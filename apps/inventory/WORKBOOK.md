@@ -377,7 +377,9 @@ Pasos:
    «Revisar el catálogo» (solo para quien puede cambiar productos): abre **Productos** filtrado
    por «Sin configurar». También se llega filtrando Estado → «Sin configurar».
 2. Cada fila lleva la marca «Sin configurar · Falta la categoría fiscal»: tocarla abre el
-   formulario de edición.
+   formulario de edición. Se lee al menos hasta «Sin configurar» también en la tableta, junto a un
+   nombre largo: mientras alguna fila lleva la marca, su columna no baja de su suelo y las acciones
+   de la fila se pliegan antes al «⋮». Lo que no quepa detrás acaba en «…».
 3. Elige la «Categoría fiscal» y pulsa «Guardar cambios». El producto pasa a «Sí».
 Entra: los productos cuya categoría fiscal ya no está en Impuestos. No se les inventa ninguna.
 Sale: el producto con su categoría fiscal; Inventario avisa del cambio y el TPV deja de marcarlo
@@ -1217,6 +1219,11 @@ API), no solo en la pantalla.
 ## Para quien lo mantiene
 Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
 
+- **Orden de las listas** (`base.ordering.list_order_for`; regla hub#2355 del producto viejo): productos, los de poco
+  stock, categorías y movimientos van por la columna elegida y desempatan por `id`, todo en la dirección de la lista: la
+  descendente es la ascendente leída al revés, empates incluidos, y los CSV salen en el mismo orden. Lo fijan
+  `test_ties_go_by_id_in_the_lists_own_direction` y `test_an_export_settles_its_ties_the_way_the_list_does`, por lista.
+
 ## El servidor (fase de servidor, 2026-10-14)
 
 - **Anatomía**: `apps.py`, `models.py`, `migrations/`, `schemas.py`, `queries.py`, `services.py`,
@@ -1233,6 +1240,8 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
   ocho unidades son un registro en código (`models.UNIT_SPECS`: tipo, factor como fracción exacta y
   escalón), no una tabla: el negocio nunca crea unidades. Una cantidad fuera del escalón es 409
   `inventory.off_grid_quantity` con su campo; nunca se redondea. Dinero en céntimos enteros.
+- **Millares**: los importes agrupan los millares también con cuatro cifras («1.234,56 €»; `formatMoney` de
+  `@erplora/ui/components`, con `useGrouping: 'always'`, porque el CLDR del español espera a cinco: hub#525).
 - **Campos de importe** (precio, coste, coste unitario; F01, F02, F13): se escriben y se leen con los decimales de
   la moneda del negocio (`useBusinessMoney`, los del servidor, nunca los del navegador). Si el panel se abre antes de
   que `base.business.get` conteste, el precio y el coste que la persona no ha tocado se reescriben desde lo guardado
@@ -1515,7 +1524,6 @@ Las hace cumplir la app por cualquier puerta (pantalla, asistente, API).
 
 ## Lo que queda fuera
 
-- **Los importes de cuatro cifras sin separador de millares** («1234,56 €»), hub#525.
 - **La tarjeta de confirmación del asistente no dice qué registro toca una escritura**, hub#526.
 - Las peticiones a `@erplora/ui` de `UI-REQUESTS.md` (iconos, `KpiCard`, `Combo` múltiple, importar y
   exportar CSV y panel lateral del `DataTable`, formateadores, `useI18n` y ayudas de test): ninguna rompe

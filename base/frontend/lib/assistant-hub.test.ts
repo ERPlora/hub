@@ -101,12 +101,12 @@ function spaDocument(cookie = 'csrftoken=tok123'): Document {
 }
 
 const MP3 = new Uint8Array([0x49, 0x44, 0x33, 0x04, 0xff, 0xfb, 0x90, 0x64]);
-const XIMENA = { text: 'Tienes 3 mesas abiertas.', language: 'es' as const, voice: 'es-ES-Ximena:DragonHDLatestNeural' };
+const READING = { text: 'Tienes 3 mesas abiertas.', language: 'es' as const, voice: 'a-voice' };
 
 describe("«Read aloud» in the server's voice (round 2026-11-03n)", () => {
   it("posts the text, its language and its voice to base.assistant.speak's route and hands back the mp3", async () => {
     const fetcher = vi.fn(async () => new Response(MP3, { status: 200, headers: { 'Content-Type': 'audio/mpeg' } }));
-    const audio = await speakAloud(XIMENA, spaDocument(), fetcher);
+    const audio = await speakAloud(READING, spaDocument(), fetcher);
     expect(audio).toBeInstanceOf(Blob);
     expect(audio.type).toBe('audio/mpeg');
     expect(new Uint8Array(await audio.arrayBuffer())).toEqual(MP3);
@@ -118,22 +118,22 @@ describe("«Read aloud» in the server's voice (round 2026-11-03n)", () => {
       'audio/mpeg',
       'application/json',
     ]);
-    expect(JSON.parse(String(init.body))).toEqual(XIMENA);
+    expect(JSON.parse(String(init.body))).toEqual(READING);
   });
 
   it('a reading stopped before its audio arrives aborts the request: the signal goes to fetch, never into the body', async () => {
     const fetcher = vi.fn(async () => new Response(MP3, { status: 200, headers: { 'Content-Type': 'audio/mpeg' } }));
     const stop = new AbortController();
-    await speakAloud({ ...XIMENA, signal: stop.signal }, spaDocument(), fetcher);
+    await speakAloud({ ...READING, signal: stop.signal }, spaDocument(), fetcher);
     const [, init] = fetcher.mock.calls[0] as unknown as [string, RequestInit];
     expect(init.signal).toBe(stop.signal);
-    expect(JSON.parse(String(init.body))).toEqual(XIMENA);
+    expect(JSON.parse(String(init.body))).toEqual(READING);
   });
 
   it("a refusal rejects with the envelope's code and sentence, so the panel reads with the device's voice", async () => {
     const envelope = { error: { code: 'base.assistant_speech_unavailable', message: 'Not available.' } };
     const fetcher = vi.fn(async () => Response.json(envelope, { status: 503 }));
-    const refused = await speakAloud(XIMENA, spaDocument(), fetcher).catch((error: unknown) => error);
+    const refused = await speakAloud(READING, spaDocument(), fetcher).catch((error: unknown) => error);
     expect(refused).toBeInstanceOf(ApiError);
     expect([(refused as ApiError).status, (refused as ApiError).code, (refused as ApiError).message]).toEqual([
       503,
@@ -144,7 +144,7 @@ describe("«Read aloud» in the server's voice (round 2026-11-03n)", () => {
 
   it("a page that is no envelope (a proxy's) still rejects, with its status", async () => {
     const fetcher = vi.fn(async () => new Response('<html>Bad gateway</html>', { status: 502 }));
-    const refused = await speakAloud(XIMENA, spaDocument(), fetcher).catch((error: unknown) => error);
+    const refused = await speakAloud(READING, spaDocument(), fetcher).catch((error: unknown) => error);
     expect(refused).toBeInstanceOf(ApiError);
     expect((refused as ApiError).status).toBe(502);
   });
@@ -164,7 +164,7 @@ describe("«Read aloud» in the server's voice (round 2026-11-03n)", () => {
     vi.stubGlobal('fetch', fetcher);
     const config = hubAssistant(on);
     expect([config.turnUrl, config.transcribe]).toEqual([HUB_ASSISTANT.turnUrl, HUB_ASSISTANT.transcribe]);
-    expect((await config.speak!(XIMENA)).type).toBe('audio/mpeg');
+    expect((await config.speak!(READING)).type).toBe('audio/mpeg');
     const [url, init] = fetcher.mock.calls[0] as unknown as [string, RequestInit];
     expect([url, (init.headers as Record<string, string>)['X-CSRFToken']]).toEqual(['/api/assistant/speak', 'tok123']);
   });

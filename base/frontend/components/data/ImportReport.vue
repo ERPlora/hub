@@ -4,13 +4,14 @@
 // not know is «Failed» with its own text, never a success —, what went wrong (an app of the blueprint the load could
 // not turn on says why: the plan's limit, no right to it), what was left out on purpose, and
 // «Retry what is missing» when the server says it can; when it cannot because the file came by hand or the template's
-// version is gone, the button stays off with why. «See the templates» and «Go to Home» leave the report.
+// version is gone, the button stays off with why. What waits for an app being set up comes in by itself (hub#609): the
+// report says so and offers nothing to press. «See the templates» and «Go to Home» leave the report.
 import { InlineFeedback, StatusPill } from '@erplora/ui/components';
 import { IonButton } from '@ionic/vue';
 import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 
-import { RETRY_BLOCKED_KEY, statusPill } from '../../lib/data';
+import { pendingApps, RETRY_BLOCKED_KEY, statusPill, stillLoading } from '../../lib/data';
 import { useBaseI18n } from '../../lib/i18n';
 import type { ImportRow } from '../../operations';
 import '../../data.css';
@@ -30,6 +31,8 @@ const HEADLINE = {
   failed: { tone: 'danger', key: 'base.data.report.failed' },
 } as const;
 const headline = computed(() => HEADLINE[props.load.report.status] ?? HEADLINE.failed);
+const waiting = computed(() => stillLoading(props.load.report));
+const failing = computed(() => pendingApps(props.load.report).failing);
 
 const when = computed(() => {
   const date = new Date(props.load.created_at);
@@ -60,7 +63,15 @@ function pill(status: string): { tone: ReturnType<typeof statusPill>['tone']; la
     </h3>
 
     <InlineFeedback
-      v-if="unfinished"
+      v-if="waiting"
+      tone="info"
+      class="report-notice"
+      data-testid="report-waiting"
+    >
+      {{ t('base.data.report.waiting') }}
+    </InlineFeedback>
+    <InlineFeedback
+      v-else-if="unfinished && load.status !== 'complete'"
       tone="warning"
       class="report-notice"
       data-testid="report-unfinished"
@@ -74,6 +85,14 @@ function pill(status: string): { tone: ReturnType<typeof statusPill>['tone']; la
       data-testid="report-status"
     >
       {{ t(headline.key) }}
+    </InlineFeedback>
+    <InlineFeedback
+      v-if="failing.length"
+      tone="danger"
+      class="report-notice"
+      data-testid="report-failing"
+    >
+      {{ t('base.data.report.failing', { apps: failing.join(', ') }) }}
     </InlineFeedback>
 
     <ul class="data-rows">
@@ -124,6 +143,7 @@ function pill(status: string): { tone: ReturnType<typeof statusPill>['tone']; la
         <StatusPill
           :tone="pill(app.status).tone"
           :label="pill(app.status).label"
+          :busy="app.status === 'waiting'"
           data-testid="report-app-status"
         />
       </li>

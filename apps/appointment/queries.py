@@ -71,6 +71,8 @@ from apps.service.queries import find_service
 from apps.staff.models import Member
 from apps.staff.queries import member_availability, own_member, resolve_member
 from apps.staff.schemas import AvailabilityIn
+from base.business import business_zone, zone_name
+from base.ordering import list_order_for
 
 VIEW_ALL = "appointment.view_appointment"
 VIEW_OWN = "appointment.view_own_appointment"
@@ -125,16 +127,6 @@ def verdict_message(code: str) -> str:
 
 
 # ── The business's clock and settings ────────────────────────────────────────────────────────
-
-
-def business_zone():
-    """The business's time zone (phase 1: ``settings.TIME_ZONE``; the Hub keeps no zone yet)."""
-    return timezone.get_current_timezone()
-
-
-def zone_name() -> str:
-    zone = business_zone()
-    return getattr(zone, "key", str(zone))
 
 
 def now() -> dt.datetime:
@@ -342,8 +334,16 @@ def start_labels(ctx: OperationContext, start: dt.datetime) -> dict:
     return {"start_date_label": day_label(wall.date(), ctx.language), "start_time_label": f"{wall:%H:%M}"}
 
 
+def appointment_label(appointment: Appointment, said: dict) -> str:
+    """How a card names an appointment: its customer (nothing once her data were erased), its day and hour (``said``,
+    ``start_labels``) and its professional (nothing when it has none)."""
+    parts = (appointment.customer_name, said["start_date_label"], said["start_time_label"], appointment.staff_name)
+    return " · ".join(part for part in parts if part)
+
+
 def detail(ctx: OperationContext, appointment: Appointment) -> dict:
     """An ``AppointmentOut``: everything, contact and notes included (for a person; ``for_caller``)."""
+    said = start_labels(ctx, appointment.start)
     return for_caller(
         ctx,
         {
@@ -358,7 +358,8 @@ def detail(ctx: OperationContext, appointment: Appointment) -> dict:
             "charged_at": appointment.charged_at,
             "created_at": appointment.created_at,
             "updated_at": appointment.updated_at,
-            **start_labels(ctx, appointment.start),
+            **said,
+            "label": appointment_label(appointment, said),
         },
     )
 
@@ -374,15 +375,6 @@ APPOINTMENT_ORDER = {
     "staff_name": ("staff_name",),
     "status": ("status",),
 }
-
-
-def _sorted(
-    rows: QuerySet, sort: str, order: dict, default: tuple[str, ...]
-) -> QuerySet:
-    key = sort.lstrip("-")
-    columns = order.get(key, default)
-    prefix = "-" if sort.startswith("-") else ""
-    return rows.order_by(*(f"{prefix}{column}" for column in columns), f"{prefix}id")
 
 
 def _page(rows: QuerySet, limit: int, offset: int, out) -> dict:
@@ -427,7 +419,7 @@ def list_appointments(ctx: OperationContext, params: AppointmentListIn) -> dict:
             Q(number__icontains=text) | Q(customer_name__icontains=text) | Exists(named)
         )
     page = _page(
-        _sorted(rows, params.sort, APPOINTMENT_ORDER, ("start",)),
+        rows.order_by(*list_order_for(params.sort, columns=APPOINTMENT_ORDER)),
         params.limit,
         params.offset,
         row,
@@ -1173,7 +1165,7 @@ def list_series(ctx: OperationContext, params: RecurringListIn) -> dict:
     if params.staff_id:
         rows = rows.filter(staff_id=params.staff_id)
     return _page(
-        _sorted(rows, params.sort, RECURRING_ORDER, ("customer_name",)),
+        rows.order_by(*list_order_for(params.sort, columns=RECURRING_ORDER)),
         params.limit,
         params.offset,
         series_out,

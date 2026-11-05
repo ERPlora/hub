@@ -1,7 +1,7 @@
 """Read operations of the staff app (``READ ONLY``), and the loaders services.py reuses.
 
 A terminated record is the app's soft delete: no query returns it, nor its schedules or its time
-off. «Today» is the business's day (``timezone.localdate()``), never the UTC one. A staff member may
+off. «Today» is the business's day, on its clock (``business_today``). A staff member may
 be named by id or by name (the assistant speaks names): ``resolve_member``.
 """
 
@@ -20,8 +20,10 @@ from live.errors import AppInactive, Conflict, InvalidPayload, NotFound, Permiss
 from live.operations import INTERNAL, UnknownOperation, get, operation
 
 from apps.staff.models import Member, Role, Schedule, StaffSettings, TimeOff
+from base.business import business_zone
 from base.models import HubUser, Membership
 from base.queries import hub_user_of
+from base.ordering import list_order_for
 from apps.staff.schemas import (
     AccountListIn,
     AccountPage,
@@ -128,7 +130,8 @@ TIME_OFF_ORDER = {
 )
 def list_members(ctx: OperationContext, params: MemberListIn) -> dict:
     """The directory with the old table's filters and sorts; never the pay (STAFF-F09)."""
-    return _page(_sorted(filter_members(live_members(), params), params.sort, MEMBER_ORDER), params)
+    members = filter_members(live_members(), params)
+    return _page(members.order_by(*list_order_for(params.sort, columns=MEMBER_ORDER, nulls_last=True)), params)
 
 
 def filter_members(members: QuerySet[Member], params: MemberListIn) -> QuerySet[Member]:
@@ -229,7 +232,7 @@ def compensation(ctx: OperationContext, params: CompensationListIn) -> dict:
     members = filter_members(live_members(), params)
     if params.id:
         members = members.filter(pk=params.id)
-    return _page(_sorted(members, params.sort, MEMBER_ORDER), params)
+    return _page(members.order_by(*list_order_for(params.sort, columns=MEMBER_ORDER, nulls_last=True)), params)
 
 
 @operation(
@@ -294,14 +297,15 @@ EARNING = (Member.Status.ACTIVE, Member.Status.ON_LEAVE)
     ai={
         "description": "The commission each professional earned in a period of business days: today by "
         "default, yesterday, this week, this month or two days of your own. Per person: what they sold "
-        "(refunds taken off), their rate and their commission, in cents, and the totals. Lists everyone "
+        "(refunds and the vouchers they sold taken off, the value of the voucher sessions they did added), their rate and their "
+        "commission, in cents, and the totals. Lists everyone "
         "who can earn a commission, also without sales, and whoever sold in the period though no longer "
         "active. Without Sales in the business, sales_available is false and nobody is listed."
     },
 )
 def commission_report(ctx: OperationContext, params: CommissionReportIn) -> dict:
-    """STAFF-F21 step 3: what each professional sold in the period (``sale.sale.by_staff``, refunds
-    taken off) times their rate, rounded half up once per person. A sale names its professional by the
+    """STAFF-F21 step 3: what each professional produced in the period (``sale.sale.by_staff``, refunds and vouchers
+    sold taken off, voucher sessions added) times their rate, rounded half up once per person. A sale names its professional by the
     record's id; one with nobody, or with an id of no record, counts for nobody."""
     first, last = report_period(params, business_today())
     sold = _sold_by_staff(ctx, first, last)
@@ -362,14 +366,14 @@ def commission_cents(sold: int, rate: Decimal) -> int:
 
 
 def _sold_by_staff(ctx: OperationContext, first: dt.date, last: dt.date) -> dict[UUID, int] | None:
-    """What each record sold from ``first`` to ``last``, refunds taken off, asked to Sales for the caller
-    (its permission applies); ``None`` when the business has no Sales (absent or off)."""
+    """What each record produced from ``first`` to ``last``, refunds and vouchers sold taken off and voucher sessions added, asked to
+    Sales for the caller (its permission applies); ``None`` when the business has no Sales (absent or off)."""
     try:
         op = get(SALES_BY_STAFF)
         page = op(ctx, op.input.model_validate({"date_from": first, "date_to": last}))
     except (UnknownOperation, AppInactive):
         return None
-    return {row.staff_id: row.total_revenue for row in page.rows}
+    return {row.staff_id: row.production_total for row in page.rows}
 
 
 def live_members() -> QuerySet[Member]:
@@ -428,8 +432,8 @@ def own_member(ctx: OperationContext) -> Member | None:
 
 
 def business_today() -> dt.date:
-    """Today in the business's time zone (phase 1: ``settings.TIME_ZONE``)."""
-    return timezone.localdate()
+    """Today in the business's time zone (hub#771)."""
+    return timezone.localdate(timezone=business_zone())
 
 
 # --- Accounts --------------------------------------------------------------------------------------
@@ -536,7 +540,7 @@ def list_roles(ctx: OperationContext, params: RoleListIn) -> dict:
         roles = roles.filter(member_count__gte=params.member_count_min)
     if params.member_count_max is not None:
         roles = roles.filter(member_count__lte=params.member_count_max)
-    return _page(_sorted(roles, params.sort, ROLE_ORDER), params)
+    return _page(roles.order_by(*list_order_for(params.sort, columns=ROLE_ORDER, nulls_last=True)), params)
 
 
 def load_role(role_id: UUID) -> Role | None:
@@ -768,7 +772,7 @@ def list_time_off(ctx: OperationContext, params: TimeOffListIn) -> dict:
         value = getattr(params, field)
         if value:
             time_off = time_off.filter(**{lookup: value})
-    return _page(_sorted(time_off, params.sort, TIME_OFF_ORDER), params)
+    return _page(time_off.order_by(*list_order_for(params.sort, columns=TIME_OFF_ORDER, nulls_last=True)), params)
 
 
 @operation(
@@ -919,21 +923,6 @@ def settings_out(row: StaffSettings) -> dict:
 
 
 # --- Pages and sorts -------------------------------------------------------------------------------
-
-
-def _sorted(
-    rows: QuerySet[Any], sort: str, columns: dict[str, tuple[str, ...]]
-) -> QuerySet[Any]:
-    """``rows`` by the columns of ``sort`` («-» first = descending), empty values last, then by id."""
-    descending = sort.startswith("-")
-    key = sort.removeprefix("-")
-    order = [
-        F(column).desc(nulls_last=True)
-        if descending
-        else F(column).asc(nulls_last=True)
-        for column in columns[key]
-    ]
-    return rows.order_by(*order, "-id" if descending and key == "id" else "id")
 
 
 def _page(rows: QuerySet[Any], params: PageIn) -> dict:

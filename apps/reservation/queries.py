@@ -6,7 +6,7 @@ screens name it by, which the assistant's card says instead of the id (schemas.p
 Shared with services.py, inside the command's own transaction: the business's clock, the rules, the
 lookups of a reservation, a waitlist entry, a slot or a blocked date as a person says it, and everything the gate (engine.py)
 reads — the slots of a day with what they hold, its blocks, its opening hours (Schedules) and a table's
-facts (Tables). The business's zone is the Hub's; in phase 1, ``settings.TIME_ZONE`` (Europe/Madrid).
+facts (Tables). The business's zone is the Hub's (``base.business.business_zone``).
 """
 
 import datetime as dt
@@ -59,7 +59,8 @@ from apps.schedule.queries import day_label, get_week, hours_for_range
 from apps.schedule.schemas import HoursRangeIn, NoParamsIn
 from apps.table.models import Table
 from apps.table.queries import natural_key, table_label
-from base.business import babel_locale
+from base.business import babel_locale, business_zone, zone_name
+from base.ordering import list_order_for
 
 S = Reservation.Status
 #: What a slot counts (the old gate's rule): every reservation not cancelled nor a no-show.
@@ -87,16 +88,6 @@ BLOCK_AMBIGUOUS = _("That date is blocked at several times: say which one by its
 
 
 # ── The business's clock and rules ───────────────────────────────────────────────────────────────
-
-
-def business_zone():
-    """The business's time zone (phase 1: ``settings.TIME_ZONE``; the Hub keeps no zone yet)."""
-    return timezone.get_current_timezone()
-
-
-def zone_name() -> str:
-    zone = business_zone()
-    return getattr(zone, "key", str(zone))
 
 
 def business_now() -> dt.datetime:
@@ -309,13 +300,6 @@ def _page(queryset, params, row) -> dict:
         "limit": params.limit,
         "offset": params.offset,
     }
-
-
-def _ordered(queryset, sort: str, columns: dict, tail: tuple):
-    descending = sort.startswith("-")
-    fields = columns[sort.lstrip("-")]
-    order = [f"-{field}" if descending else field for field in fields]
-    return queryset.order_by(*order, *tail)
 
 
 def _phone_matches(said: str) -> Q:
@@ -637,7 +621,7 @@ def list_reservations(ctx: OperationContext, params: ReservationListIn) -> dict:
     if params.party_size_to:
         rows = rows.filter(party_size__lte=params.party_size_to)
     return _page(
-        _ordered(rows, params.sort, RESERVATION_SORTS, ("id",)),
+        rows.order_by(*list_order_for(params.sort, columns=RESERVATION_SORTS)),
         params,
         lambda reservation: reservation_out(ctx, reservation),
     )
@@ -787,7 +771,7 @@ def list_slots(ctx: OperationContext, params: TimeSlotListIn) -> dict:
     rows = TimeSlot.objects.filter(is_deleted=False)
     if params.day_of_week is not None:
         rows = rows.filter(day_of_week=params.day_of_week)
-    return _page(_ordered(rows, params.sort, SLOT_SORTS, ("id",)), params, slot_out)
+    return _page(rows.order_by(*list_order_for(params.sort, columns=SLOT_SORTS)), params, slot_out)
 
 
 @operation(
@@ -834,7 +818,7 @@ def list_blocked(ctx: OperationContext, params: BlockedDateListIn) -> dict:
     if params.is_full_day is not None:
         rows = rows.filter(is_full_day=params.is_full_day)
     return _page(
-        _ordered(rows, params.sort, BLOCKED_SORTS, ("id",)), params, blocked_out
+        rows.order_by(*list_order_for(params.sort, columns=BLOCKED_SORTS)), params, blocked_out
     )
 
 
@@ -895,7 +879,7 @@ def list_waitlist(ctx: OperationContext, params: WaitlistListIn) -> dict:
     if params.guest_phone:
         rows = rows.filter(_phone_matches(params.guest_phone))
     return _page(
-        _ordered(rows, params.sort, WAITLIST_SORTS, ("id",)), params, entry_out
+        rows.order_by(*list_order_for(params.sort, columns=WAITLIST_SORTS)), params, entry_out
     )
 
 

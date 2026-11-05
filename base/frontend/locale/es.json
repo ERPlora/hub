@@ -133,7 +133,8 @@
         "blocked": "Necesita suscripción",
         "off": "Desactivada",
         "creating": "Activándose…",
-        "failed": "No se ha podido activar"
+        "failed": "No se ha podido activar",
+        "unavailable": "No disponible"
       },
       "right": {
         "free": "Gratis",
@@ -254,7 +255,8 @@
           "file": "Esta importación vino de un archivo subido a mano, así que no se puede reintentar sola. Vuelve a subir el archivo y elige solo lo que falló.",
           "versionGone": "La versión de la plantilla que usó esta importación ya no está en el catálogo, así que no se ha reintentado: otra versión podría cargar datos distintos.",
           "complete": "Todo lo de esta importación entró: no hay nada que reintentar.",
-          "undone": "Esta importación se deshizo, así que no hay nada que reintentar."
+          "undone": "Esta importación se deshizo, así que no hay nada que reintentar.",
+          "waiting": "Lo que falta entrará solo en cuanto sus apps estén listas: todavía no hay nada que reintentar."
         }
       },
       "status": {
@@ -266,7 +268,9 @@
         "discarded": "Descartado",
         "inactive": "App desactivada",
         "unknown": "No está en este negocio",
-        "notSelected": "No elegida"
+        "notSelected": "No elegida",
+        "waiting": "Preparándose",
+        "setupFailed": "No se ha podido preparar"
       },
       "import": {
         "adminOnly": "Solo un administrador puede ver e importar plantillas.",
@@ -320,7 +324,9 @@
         "retrying": "Reintentando…",
         "retryError": "El reintento falló: {reason}",
         "templates": "Ver las plantillas",
-        "home": "Ir al inicio"
+        "home": "Ir al inicio",
+        "waiting": "Aún se está cargando: lo que falta entrará solo en cuanto sus apps estén listas. Puedes salir de esta pantalla.",
+        "failing": "Aún no se ha podido preparar: {apps}. Se sigue intentando sola y sus datos se cargarán en cuanto funcione."
       },
       "export": {
         "adminOnly": "Solo un administrador puede exportar el negocio.",
@@ -430,7 +436,11 @@
       "cutTitle": "La configuración no ha terminado",
       "cutHint": "Puede que parte ya esté dentro. Compruébalo en Ajustes › Datos antes de volver a intentarlo.",
       "report": "Ver el informe",
-      "continue": "Continuar"
+      "continue": "Continuar",
+      "pendingTitle": "Tus apps se están preparando",
+      "pendingHint": "Sus datos se cargarán solos en cuanto estén listas: {apps}. Puedes seguir trabajando.",
+      "failingTitle": "Una app aún no se ha podido preparar",
+      "failingHint": "Se sigue intentando sola y sus datos se cargarán cuando lo consiga: {apps}. En el informe puedes reintentarlo ahora."
     },
     "system": {
       "tabs": {

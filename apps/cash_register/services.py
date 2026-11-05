@@ -76,6 +76,7 @@ from apps.cash_register.schemas import (
     SettingsOut,
     SettingsPatchIn,
 )
+from base.business import business_zone
 
 SESSION_ALREADY_OPEN = _(
     "There is already an open cash session. Close it before opening another one."
@@ -371,7 +372,7 @@ def open_session(ctx: OperationContext, data: SessionOpenIn) -> dict:
             fields={"opening_balance": str(OPENING_BALANCE_REQUIRED)},
         )
     register = _register_to_open(data)
-    day = timezone.localdate(now)
+    day = timezone.localdate(now, business_zone())
     sequence = _number(day)
     try:
         with atomic():

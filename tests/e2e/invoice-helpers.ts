@@ -80,6 +80,17 @@ export async function restoreIssuer(context: BrowserContext, original: IssuerOut
   expect(res.status, 'the issuer back as it was').toBe(200);
 }
 
+/** Hub `a`'s issuer moved to the table `parked`, for a run that needs a hub without one (the red strip of a hub that
+ *  cannot issue invoices yet). `unparkIssuer` puts it back. */
+export function parkIssuer(parked: string): void {
+  psql([`drop table if exists ${parked}`, `create table ${parked} as select * from invoice_issuer`, 'delete from invoice_issuer'].join('; '));
+}
+
+/** The issuer `parkIssuer` moved to the table `parked`, back in its place as it was. */
+export function unparkIssuer(parked: string): void {
+  psql(['delete from invoice_issuer', `insert into invoice_issuer select * from ${parked}`, `drop table ${parked}`].join('; '));
+}
+
 /** The issuer, set up as the owner would when the hub has none (Invoicing → Issuer). */
 export async function ensureIssuer(context: BrowserContext): Promise<IssuerOut> {
   const current = await issuerNow(context);

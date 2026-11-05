@@ -190,7 +190,7 @@ El componente `CustomerSearch` de Clientes (Venta lo importa por su ruta, de los
 | CUSTOMER-F23 | Ver el historial de compras de un cliente | hecho | común |
 | CUSTOMER-F24 | Ver en la ficha lo que otras apps saben del cliente | hecho | común |
 | CUSTOMER-F25 | Crear la clienta sin salir de la agenda | hecho | peluquería |
-| CUSTOMER-F26 | Crear la ficha de quien pide cita por WhatsApp | descartado — la respuesta automática de citas de WhatsApp aún no se ofrece (hub#514) | peluquería |
+| CUSTOMER-F26 | Crear la ficha de quien pide cita por WhatsApp | hecho | peluquería |
 | CUSTOMER-F27 | Crear, cambiar y eliminar grupos de clientes | hecho | común |
 | CUSTOMER-F28 | Crear, cambiar y eliminar etiquetas de clientes | hecho | común |
 | CUSTOMER-F29 | Definir los campos personalizados de la ficha | hecho | común |
@@ -745,10 +745,7 @@ Implicados: APPOINTMENT-F01, CUSTOMER-F18
 
 ### CUSTOMER-F26 Crear la ficha de quien pide cita por WhatsApp
 <!-- origen: wf:whatsapp-cita#rec_wa_cita-f03 old:customers/workflow/con-otros-modulos.md#customers-f26 -->
-Estado: descartado — la respuesta automática de citas de la Bandeja de WhatsApp aún no se ofrece: tras
-«Aprobar», Citas rechaza la cita de una automatización (WHATSAPP_INBOX-F21). Lo de Clientes está: buscar
-por el número (CUSTOMER-F10) y dar de alta con origen «WhatsApp», que ya usan la respuesta de mesas
-(WHATSAPP_INBOX-F24) y «Crear ficha» de la Bandeja (WHATSAPP_INBOX-F37) (hub#514)
+Estado: hecho
 Actor: asistente
 Pantalla: ninguna
 Pasos:
@@ -1061,6 +1058,10 @@ asistente. Lo que en el producto actual tenía el perfil «Cajero» lo tiene aqu
   `queries.py`, `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/` y un
   `tests/test_<fichero>.py` por fichero. Además, `phones.py` (la lectura E.164) y `search.py` (el
   texto de búsqueda), sin ORM.
+- **Orden de las listas** (`_ordered`, con `base.ordering.list_order`; regla hub#2355 del producto viejo): fichas,
+  grupos, etiquetas, campos y compras van por la columna elegida y desempatan por `id`, todo en la dirección de la
+  lista y con los vacíos al final en las dos. La lista descendente es la ascendente leída al revés, empates incluidos,
+  y el CSV sale en el mismo orden. Lo fija `test_ties_go_by_id_in_the_lists_own_direction`, por lista.
 - `phones.py` lee el teléfono con `phonenumbers` (el port de Python de libphonenumber) y exige un
   número válido de su país; sus tests son el contrato del SDK del producto actual
   (`crates/guest-sdk/tests/phone_test.rs`), corregido donde ese SDK, que solo copiaba longitudes, se
@@ -1215,10 +1216,6 @@ asistente. Lo que en el producto actual tenía el perfil «Cajero» lo tiene aqu
 
 ## Lo que queda fuera
 
-- **Crear la ficha de quien pide cita por WhatsApp (CUSTOMER-F26)**, hub#514: la respuesta automática
-  de citas de la Bandeja de WhatsApp aún no se ofrece (tras «Aprobar», Citas rechaza la cita de una
-  automatización; WHATSAPP_INBOX-F14, F21 y F22). Lo de Clientes está y lo usan ya la respuesta de
-  mesas (WHATSAPP_INBOX-F24) y «Crear ficha» de la Bandeja (WHATSAPP_INBOX-F37).
 - **La tarjeta de confirmación del asistente no dice qué ficha toca una escritura**, hub#513.
 - **El país del negocio para un teléfono sin prefijo**: se lee siempre como de España (CUSTOMER-F10,
   F11), aunque la plataforma ya guarda el país de cada negocio. Cambiarlo solo en Clientes partiría

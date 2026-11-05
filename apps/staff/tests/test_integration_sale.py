@@ -278,3 +278,92 @@ def test_the_pay_permission_alone_does_not_open_the_sales_figures():
 def test_a_sale_charged_voided_or_refunded_re_runs_the_report():
     for event in ("sale.sale.completed", "sale.sale.voided", "sale.sale.refunded"):
         assert "staff.commission.report" in live_registry.affected([event]), event
+
+
+# A voucher (SERVICE-F14, SALE-F27): whoever sold it earns nothing on it; whoever does its sessions, on each one
+
+
+def platform(name, data):
+    op = get(name)
+    return op(system_context(A), op.input.model_validate(data))
+
+
+def voucher_sold_by(seller, key):
+    """A voucher of 3 sessions charged at the till for 100.00 by ``seller`` and granted saying that sale."""
+    service = platform(
+        "service.service.create", {"name": f"Cut {key}", "price": 2500, "tax_category_key": "service.generic"}
+    )
+    owner = platform("customer.customer.create", {"name": f"Lucía {key}"})
+    package = platform(
+        "service.package.create",
+        {"name": f"Bono {key}", "max_uses": 3, "items": [{"service_id": str(service.id)}]},
+    )
+    sold = run(
+        "sale.sale.complete",
+        {
+            "idempotency_key": f"{key}-sold",
+            "open_lines": [
+                {
+                    "name": f"Bono {key}",
+                    "unit_price": 10000,
+                    "tax_category_key": "service.generic",
+                    "staff_id": str(seller.id),
+                }
+            ],
+            "payments": CARD,
+        },
+    )
+    grant = platform(
+        "service.grant.create",
+        {"package_id": str(package.id), "customer_id": str(owner.id), "amount": 10000, "sale_id": str(sold.id)},
+    )
+    return service, owner, grant
+
+
+def session_for(member, voucher, key):
+    """One session of ``voucher`` pays a line of its service that ``member`` does, charged."""
+    service, owner, grant = voucher
+    order = run(
+        "sale.order.open",
+        {"service_lines": [{"service_id": str(service.id), "staff_id": str(member.id)}]},
+    )
+    order = run(
+        "sale.order.apply_voucher",
+        {"order_id": str(order.id), "line_id": str(order.lines[0].id), "grant_id": str(grant.id)},
+    )
+    return run(
+        "sale.sale.complete",
+        {"idempotency_key": key, "order_id": str(order.id), "customer_id": str(owner.id)},
+    )
+
+
+def test_who_sold_a_voucher_earns_nothing_on_it_and_who_does_its_sessions_earns_on_each(catalog):
+    # flow: STAFF-F21 (hub#685, hub#769): the commission goes on the sessions done, never twice on the same money.
+    ana = make_member("Ana", commission_rate=Decimal("15"))
+    bea = make_member("Bea", commission_rate=Decimal("10"))
+    charge("commission-0001", ("SHP", ana))
+    voucher = voucher_sold_by(ana, "commission-0002")
+    session_for(bea, voucher, "commission-0003")
+
+    page = report()
+
+    # Ana: 1.21 of the shampoo; the voucher's 100.00 are not hers → 15 % = 0.18. Bea: 33.33 → 10 % = 3.33.
+    assert figures(page) == [
+        ("Ana López", 121, Decimal("15.00"), 18),
+        ("Bea López", 3333, Decimal("10.00"), 333),
+    ]
+    assert (page.total_sold, page.total_commission) == (3454, 351)
+
+    session_for(bea, voucher, "commission-0004")
+    session_for(bea, voucher, "commission-0005")
+    # The three sessions add up to what was paid, to the cent.
+    assert figures(report())[1] == ("Bea López", 10000, Decimal("10.00"), 1000)
+
+
+def test_at_night_elsewhere_a_sale_earns_on_the_day_it_is_numbered_until_hub_772(catalog, night_elsewhere):
+    # A sale stays on the deployment's clock: charged on the business's 2nd, it counts on the 3rd.
+    ana = make_member("Ana", commission_rate=Decimal("10"))
+    charge("commission-night", ("CUT", None), staff=ana)
+    today = report()
+    assert (today.date_from, today.total_sold) == (dt.date(2026, 11, 2), 0)
+    assert report(date_from="2026-11-03", date_to="2026-11-03").total_sold == 1800

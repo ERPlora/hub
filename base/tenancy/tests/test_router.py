@@ -36,7 +36,9 @@ def restored_settings(monkeypatch):
 def hub_alias():
     """A hub's alias registered as ``use_hub`` would, without touching its (absent) database."""
     hub_id = uuid.uuid7()
-    hub = SimpleNamespace(id=hub_id, slug="acme", db_name=names.hub_db_name(connections.control_name(), hub_id))
+    hub = SimpleNamespace(
+        id=hub_id, slug="acme", db_name=names.hub_db_name(connections.control_name(), hub_id), schema_apps={}
+    )
     return connections.register_hub_alias(hub), hub
 
 

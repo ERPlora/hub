@@ -119,6 +119,8 @@ export interface AppRow {
   /** What it needs, transitively (it comes along with it), and the apps on that need it (they go off first): ids. */
   requires: string[];
   required_by: string[];
+  /** Why turning it on (when off) or off (when on) is refused, in the reader's language: neither is offered. */
+  refusal: string | null;
 }
 
 /** `base.AppListOut`. */
@@ -263,7 +265,7 @@ export type BlueprintPurpose = 'backup' | 'template';
 /** How a dataset of a load went (`base.DatasetStatus`). */
 export type DatasetStatus = 'applied' | 'partial' | 'already' | 'failed' | 'empty' | 'discarded';
 /** How an app of a load went (`base.AppLoadStatus`). */
-export type AppLoadStatus = DatasetStatus | 'inactive' | 'unknown' | 'not_selected';
+export type AppLoadStatus = DatasetStatus | 'inactive' | 'unknown' | 'not_selected' | 'waiting' | 'setup_failed';
 export type ImportStatus = 'complete' | 'partial' | 'failed';
 
 export interface BlueprintApp {
@@ -342,7 +344,7 @@ export interface LoadReport {
   dropped: string[];
 }
 
-export type RetryBlocked = '' | 'file' | 'version_gone' | 'complete' | 'undone';
+export type RetryBlocked = '' | 'file' | 'version_gone' | 'complete' | 'undone' | 'waiting';
 
 /** `base.ImportOut`: one load and its report. */
 export interface ImportRow {

@@ -22,6 +22,17 @@ describe('formatMoney', () => {
     expect(formatMoney(undefined, 'es')).toBe('—');
   });
 
+  // hub#653: Spanish CLDR waits for five digits; every screen of the Hub groups from four on.
+  it('groups the thousands from four digits on, in every language, with or without the currency', () => {
+    expect(plain(formatMoney(123456, 'es', EUR))).toBe('1.234,56 €');
+    expect(plain(formatMoney(123456789, 'es', EUR))).toBe('1.234.567,89 €');
+    expect(plain(formatMoney(123456, 'en', EUR))).toBe('€1,234.56');
+    expect(plain(formatMoney(-123456, 'es', EUR))).toBe('-1.234,56 €');
+    expect(plain(formatMoney(123456, 'es'))).toBe('1.234,56');
+    expect(plain(formatMoney(99999, 'es', EUR))).toBe('999,99 €');
+    expect(plain(formatSignedMoney(123456, 'es', EUR))).toBe('+1.234,56 €');
+  });
+
   it('a difference carries its sign: a surplus «+», a shortage «-», zero none', () => {
     expect(plain(formatSignedMoney(510, 'es', EUR))).toBe('+5,10 €');
     expect(plain(formatSignedMoney(-490, 'es', EUR))).toBe('-4,90 €');
@@ -46,6 +57,13 @@ describe('formatFace', () => {
     expect(plain(formatFace('0.05', 'en', EUR))).toBe('€0.05');
     expect(plain(formatFace('10000', 'en', JPY))).toBe('¥10,000');
     expect(plain(formatFace('0.005', 'en', KWD))).toBe('KWD 0.005');
+  });
+
+  // hub#653: a note of four digits (the forint's and the yen's) reads like any other amount of the screen.
+  it('groups the thousands of a note from four digits on', () => {
+    expect(plain(formatFace('5000', 'es', HUF))).toBe('5.000 Ft');
+    expect(plain(formatFace('1000', 'es', JPY))).toBe('1.000 ¥');
+    expect(plain(formatFace('5000', 'es'))).toBe('5.000');
   });
 });
 
@@ -89,7 +107,7 @@ describe('moneyRefusal', () => {
     expect(moneyRefusal(readMoney('abc'), t, 'es')).toBe('cash_register.money.notAnAmount');
     expect(moneyRefusal(readMoney('-1'), t, 'es')).toBe('cash_register.money.negative');
     expect(plain(moneyRefusal(readMoney('1.250'), t, 'es', EUR) ?? '')).toBe(
-      'cash_register.money.ambiguous {"typed":"1.250","grouped":"1250,00 €","decimal":"1,25 €"}',
+      'cash_register.money.ambiguous {"typed":"1.250","grouped":"1.250,00 €","decimal":"1,25 €"}',
     );
   });
 });
@@ -116,13 +134,13 @@ describe('money of the business (flow business-currency)', () => {
     expect(plain(formatMoney(15050, 'pl', PLN))).toBe('150,50 zł');
     expect(plain(formatSignedMoney(-490, 'en', PLN))).toBe('-zł 4.90');
     expect(plain(formatFace('5', 'pl', PLN))).toBe('5 zł');
-    expect(plain(formatMoney(5003, 'es', JPY))).toBe('5003 ¥');
+    expect(plain(formatMoney(5003, 'es', JPY))).toBe('5.003 ¥');
   });
 
   it('takes the decimals the server counts the money in, not the browser’s: the forint keeps its two', () => {
     // Intl gives the forint no decimals; the server (CLDR, Babel) two: 123450 is 1,234.50 Ft, never 123,450 Ft.
     expect(plain(formatMoney(123450, 'en', HUF))).toBe('Ft 1,234.50');
-    expect(plain(formatMoney(123450, 'hu', HUF))).toBe('1234,50 Ft');
+    expect(plain(formatMoney(123450, 'hu', HUF))).toBe('1 234,50 Ft');
   });
 
   it('until the business’s currency is known a figure has no symbol, never the euro', () => {

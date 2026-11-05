@@ -9,6 +9,7 @@ that still shares phase 1's database keeps turning apps on at once (proposal (i)
 import datetime as dt
 
 import pytest
+from django.apps import apps
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 from live.context import OperationContext, Scope
@@ -214,6 +215,20 @@ def test_only_a_failed_app_is_tried_again(hub_a, state):
         run(hub_a, "base.app.retry", "printing")
 
     assert refused.value.code == "base.app_not_failed"
+
+
+@own
+def test_a_failed_app_that_refuses_to_go_on_is_not_tried_again(hub_a, monkeypatch):
+    """hub#694: «Retry» turns an app on as «Turn on» does: the app may refuse it, and it stays as it is."""
+    monkeypatch.setattr(apps.get_app_config("printing"), "can_enable", lambda ctx: "Not here.", raising=False)
+    given(hub_a, printing="failed*")
+
+    with pytest.raises(Conflict) as refused:
+        run(hub_a, "base.app.retry", "printing")
+
+    assert (refused.value.code, refused.value.message) == ("base.app_vetoed", "Not here.")
+    assert rows_of(hub_a)["printing"] == (FAILED, True)
+    assert outbox(hub_a) == []
 
 
 @own
@@ -424,7 +439,8 @@ def test_an_app_being_created_or_failed_is_out_of_the_relay_and_the_tasks_until_
 
 
 @own
-def test_a_blueprint_turns_on_an_app_still_to_set_up_and_says_to_load_it_again_once_it_is_on(hub_a):
+def test_a_blueprint_turns_on_an_app_still_to_set_up_and_waits_for_it(hub_a):
+    """What it brings then comes by itself, nobody retrying: base/tests/test_blueprint_waits_for_apps.py (hub#609)."""
     given(hub_a, created=["website"])
     op = get("base.blueprint.import")
     with use_hub(Hub.objects.get(pk=hub_a.pk)):
@@ -434,11 +450,11 @@ def test_a_blueprint_turns_on_an_app_still_to_set_up_and_says_to_load_it_again_o
 
     by_app = {app["id"]: app for app in report["report"]["apps"]}
     assert rows_of(hub_a)["printing"] == (CREATING, True)
-    assert by_app["printing"]["status"] == "inactive"
-    assert "Load the template again in a minute" in by_app["printing"]["reason"]
+    assert by_app["printing"]["status"] == "waiting"
+    assert by_app["printing"]["reason"]
     assert rows_of(hub_a)["website"] == (ON, True)
-    assert by_app["website"]["status"] != "inactive"
-    assert report["retry"] is True
+    assert by_app["website"]["status"] not in ("inactive", "waiting")
+    assert (report["retry"], report["retry_blocked"]) == (False, "waiting")
 
 
 @own

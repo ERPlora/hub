@@ -15,6 +15,7 @@ import {
   describeLog,
   describeStep,
   describeTrigger,
+  formatDate,
   eventLabel,
   fieldLabel,
   pathLabel,
@@ -26,7 +27,7 @@ import {
 function phrasing(locale: 'en' | 'es' = 'en'): Phrasing {
   const i18n = createShellI18n({ locale, messages: { en, es } });
   const g = i18n.global as unknown as { t: (key: string, named?: Record<string, unknown>) => string; te: (key: string) => boolean };
-  return { t: (key, named) => (named ? g.t(key, named) : g.t(key)), te: (key) => g.te(key), locale };
+  return { t: (key, named) => (named ? g.t(key, named) : g.t(key)), te: (key) => g.te(key), locale, timeZone: 'Europe/Madrid' };
 }
 
 const CATALOG = {
@@ -195,6 +196,19 @@ describe('pills', () => {
     expect(statePill({ enabled: true, missing_grants: [] }, p)).toEqual({ tone: 'success', label: 'Active' });
     expect(statePill({ enabled: false, missing_grants: [] }, p)).toEqual({ tone: 'neutral', label: 'Paused' });
     expect(statePill({ enabled: true, missing_grants: ['task.task.create'] }, p)).toEqual({ tone: 'warning', label: 'Unfinished' });
+  });
+});
+
+describe('a moment, on the clock of the business (hub#687)', () => {
+  const canary: Phrasing = { ...phrasing('es'), timeZone: 'Atlantic/Canary' };
+
+  it("is said in the business's zone, never in the deployment's nor the device's", () => {
+    expect(formatDate('2026-11-02T10:00:00+01:00', 'es', 'Atlantic/Canary')).toBe('2 nov 2026, 9:00');
+    expect(formatDate('2026-11-02T10:00:00+01:00', 'es', 'Europe/Madrid')).toBe('2 nov 2026, 10:00');
+  });
+
+  it('is said so when an automation starts once on a date', () => {
+    expect(describeTrigger({ kind: 'at', at: '2026-11-02T10:00:00+01:00' }, CATALOG, canary)).toContain('2 nov 2026, 9:00');
   });
 });
 

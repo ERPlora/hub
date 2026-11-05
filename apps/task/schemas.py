@@ -26,6 +26,7 @@ from pydantic import (
 )
 
 from apps.task.models import TEXT_MAX_LENGTH, TITLE_MAX_LENGTH, Task
+from base.business import business_zone
 
 T = TypeVar("T")
 
@@ -96,7 +97,7 @@ def _business_day(value: Any) -> Any:
         except ValueError:
             return value  # pydantic says «Enter a valid date.»
     if isinstance(value, dt.datetime):
-        return timezone.localtime(value).date() if timezone.is_aware(value) else value.date()
+        return timezone.localtime(value, business_zone()).date() if timezone.is_aware(value) else value.date()
     return value
 
 

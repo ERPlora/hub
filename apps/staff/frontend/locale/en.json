@@ -132,8 +132,7 @@
       },
       "mine": {
         "button": "My record",
-        "title": "My record",
-        "close": "Close"
+        "title": "My record"
       }
     },
     "roles": {
@@ -283,13 +282,13 @@
       "to": "To",
       "totals": {
         "label": "Totals of the period",
-        "sold": "Sold",
+        "sold": "Production",
         "commission": "Commissions"
       },
       "columns": {
         "name": "Name",
         "role": "Role",
-        "sold": "Sold",
+        "sold": "Production",
         "rate": "Commission %",
         "commission": "Commission"
       },

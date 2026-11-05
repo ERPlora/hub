@@ -31,7 +31,7 @@ from live.errors import (
     OperationError,
     PermissionDenied,
 )
-from live.operations import AI, UnknownOperation, get, operation
+from live.operations import AI, INTERNAL, UnknownOperation, get, operation
 
 from apps.sale import paper, pricing
 from apps.sale.models import (
@@ -46,6 +46,7 @@ from apps.sale.models import (
     RefundLine,
     Sale,
     SaleLine,
+    SalePayment,
     Settings,
 )
 from apps.sale.schemas import (
@@ -69,6 +70,8 @@ from apps.sale.schemas import (
     ProductLineIn,
     QuickNoteListIn,
     QuickNotePage,
+    RecordOut,
+    RecordRefIn,
     RefundByKeyIn,
     RefundByKeyOut,
     RefundListOut,
@@ -101,6 +104,7 @@ from base import business
 from base.business import currency_decimals
 from base.models import Approval
 from base.operations import call
+from base.ordering import list_order
 
 #: The currency Spanish law writes its limits in (Ley 7/2012, RD 1619/2012): the law's, not the business's.
 LIMITS_CURRENCY = "EUR"
@@ -142,6 +146,9 @@ MENUS_UNAVAILABLE = _(
     "Menus and combos is not active in this business: menus cannot be sold. Sell their dishes on their own."
 )
 APPOINTMENT_UNAVAILABLE = _("Appointments is not active in this business.")
+STAFF_UNAVAILABLE = _("Staff is not active in this business.")
+LINE_NOT_FOUND = _("That line does not exist.")
+TENDER_NOT_FOUND = _("That tender does not exist.")
 BOOKED_PRICE_MISMATCH = _(
     "That is not the price the appointment booked for this service: it is cancelled, it is another "
     "customer's, it did not book this service or it booked it cheaper."
@@ -662,11 +669,6 @@ def find_tax_category(reference: str, field: str = "tax_category_key") -> TaxCat
     return category
 
 
-def _ordering(column: str, direction: str, *ties: str) -> list:
-    first = F(column).desc() if direction == "desc" else F(column).asc()
-    return [first, *ties]
-
-
 @operation(
     "sale.department.list",
     kind="query",
@@ -696,7 +698,7 @@ def list_departments(ctx: OperationContext, params: DepartmentListIn) -> dict:
         if params.search:
             departments = departments.filter(name__icontains=params.search.strip())
         ordered = departments.order_by(
-            *_ordering(params.sort, params.dir, "name", "id")
+            *list_order(params.sort, "name", descending=params.dir == "desc")
         )
         page = list(ordered[params.offset : params.offset + params.limit])
         rates = department_rates(page)
@@ -736,7 +738,7 @@ def list_quick_notes(ctx: OperationContext, params: QuickNoteListIn) -> dict:
     notes = QuickNote.objects.filter(is_deleted=False)
     if params.search:
         notes = notes.filter(text__icontains=params.search.strip())
-    page = notes.order_by(*_ordering(params.sort, params.dir, "text", "id"))[
+    page = notes.order_by(*list_order(params.sort, "text", descending=params.dir == "desc"))[
         params.offset : params.offset + params.limit
     ]
     return {
@@ -768,6 +770,7 @@ UNAVAILABLE = {
     "sale.appointment_unavailable": APPOINTMENT_UNAVAILABLE,
     "sale.modifier_unavailable": MODIFIER_UNAVAILABLE,
     "sale.combo_unavailable": MENUS_UNAVAILABLE,
+    "sale.staff_unavailable": STAFF_UNAVAILABLE,
 }
 
 #: Modifiers' check and valuation of the options chosen for a product (MODIFIER-F07), asked by name.
@@ -1297,6 +1300,73 @@ def find_order(order_id: UUID, *, lock: bool = False) -> Order:
     if order is None:
         raise NotFound(str(ORDER_NOT_FOUND), code="sale.order_not_found")
     return order
+
+
+def _check_name(ctx: OperationContext, order_id: UUID) -> str:
+    """A check as «Open checks» lists it: by its title or, with none, by its amount."""
+    order = find_order(order_id)
+    return order.label or money_text(order.provisional_total, business_currency(ctx))
+
+
+def _check_line_name(ctx: OperationContext, line_id: UUID) -> str:
+    line = OrderLine.objects.live().filter(pk=line_id).first()
+    if line is None:
+        raise NotFound(str(LINE_NOT_FOUND), code="sale.line_not_found")
+    return line.name
+
+
+def _sale_line_name(ctx: OperationContext, line_id: UUID) -> str:
+    line = SaleLine.objects.filter(pk=line_id).first()
+    if line is None:
+        raise NotFound(str(LINE_NOT_FOUND), code="sale.line_not_found")
+    return line.name
+
+
+def _tender_name(ctx: OperationContext, payment_id: UUID) -> str:
+    tender = SalePayment.objects.filter(pk=payment_id).first()
+    if tender is None:
+        raise NotFound(str(TENDER_NOT_FOUND), code="sale.tender_not_found")
+    return method_display_name(tender.method_name)
+
+
+def _named_by(read: str, unavailable_code: str, name: str = "name"):
+    """The name an app Sales does not require gives its record, by its own read and as whoever asks."""
+    return lambda ctx, record_id: getattr(call_app(ctx, read, {"id": record_id}, unavailable_code), name)
+
+
+#: How each record of ``RecordRefIn`` gets its name: Sales' own by their rows, the other apps' by their reads.
+RECORD_NAMES = {
+    "department_id": lambda ctx, record_id: find_department(record_id, None).name,
+    "quick_note_id": lambda ctx, record_id: find_quick_note(record_id, None).text,
+    "method_id": lambda ctx, record_id: find_method(record_id, None).display_name,
+    "order_id": _check_name,
+    "line_id": _check_line_name,
+    "sale_line_id": _sale_line_name,
+    "payment_id": _tender_name,
+    "product_id": _named_by("inventory.product.get", "sale.catalog_unavailable"),
+    "service_id": _named_by("service.service.get", "sale.services_unavailable"),
+    "combo_id": _named_by("combo.combo.get", "sale.combo_unavailable"),
+    "dish_id": _named_by("combo.option.get", "sale.combo_unavailable", "product_name"),
+    "modifier_id": _named_by("modifier.option.get", "sale.modifier_unavailable"),
+    "staff_id": _named_by("staff.member.detail", "sale.staff_unavailable", "full_name"),
+    "appointment_id": _named_by("appointment.appointment.get", "sale.appointment_unavailable", "number"),
+    "grant_id": _named_by("service.grant.get", "sale.services_unavailable", "package_name"),
+}
+
+
+@operation(
+    "sale.record.get",
+    kind="query",
+    permission="sale.view_sale",
+    input=RecordRefIn,
+    output=RecordOut,
+    ai=INTERNAL,
+)
+def get_record(ctx: OperationContext, data: RecordRefIn) -> dict:
+    """The name of one record a write of Sales names, by its id, for the assistant's card (``schemas.A_*``): the screen
+    says it by that name, and the model never needs this read, it names them from its own reads."""
+    field = next(name for name in RECORD_NAMES if getattr(data, name) is not None)
+    return {"name": RECORD_NAMES[field](ctx, getattr(data, field))}
 
 
 def pending_lines(order: Order) -> list[OrderLine]:
@@ -1963,11 +2033,7 @@ def list_sales(ctx: OperationContext, params: SaleListIn) -> dict:
     if params.number:
         sales = sales.filter(number__icontains=params.number.strip())
     columns = _SALE_SORT.get(params.sort, (params.sort,))
-    order = [
-        F(column).desc() if params.dir == "desc" else F(column).asc()
-        for column in columns
-    ]
-    page = sales.order_by(*order, "-id" if params.dir == "desc" else "id")[
+    page = sales.order_by(*list_order(*columns, descending=params.dir == "desc"))[
         params.offset : params.offset + params.limit
     ]
     with translation.override(ctx.language):
@@ -2149,7 +2215,9 @@ def last_7_days(ctx: OperationContext, params: EmptyIn) -> dict:
     ai=AI(
         description="What each professional sold in a period of business days: their lines (a line's own professional wins "
         "over the sale's), the sales they served, gross, base and tax in cents, what refunds gave back on their lines "
-        "and the revenue left, which is what a commission is on. For the per-professional close.",
+        "and the revenue left; what of it paid for vouchers they sold; what the voucher sessions they did are worth (no "
+        "money of the period: the voucher was paid when it was sold); and their production, the revenue without the "
+        "vouchers sold plus the sessions, which is what a commission is on. For the per-professional close.",
         asks={
             "en": (
                 "how much did each waiter sell this month?",
@@ -2178,12 +2246,21 @@ def by_staff(ctx: OperationContext, params: PeriodIn) -> dict:
             sales_count=Count("sale", distinct=True),
             gross=Sum("line_total"),
             net=Sum("net_amount"),
+            voucher_sold=Sum("voucher_sold_amount"),
+            # A session that came back (SALE-F32) is no longer theirs; a voided sale is not counted at all.
+            sessions=Sum(
+                "voucher_value",
+                filter=~Exists(RefundLine.objects.filter(sale_line=OuterRef("pk"))),
+                default=0,
+            ),
         )
     )
-    refunded = _refunded_by_staff(params)
+    refunded, voucher_sold_back = _refunded_by_staff(params)
     totals = []
     for row in rows:
         given_back = refunded.get(row["served_by"], 0)
+        revenue = row["gross"] - given_back
+        voucher_sold = row["voucher_sold"] - voucher_sold_back.get(row["served_by"], 0)
         totals.append(
             {
                 "staff_id": row["served_by"],
@@ -2192,15 +2269,19 @@ def by_staff(ctx: OperationContext, params: PeriodIn) -> dict:
                 "net_total": row["net"],
                 "tax_total": row["gross"] - row["net"],
                 "refunded_total": given_back,
-                "total_revenue": row["gross"] - given_back,
+                "total_revenue": revenue,
+                "voucher_sold_total": voucher_sold,
+                "voucher_total": row["sessions"],
+                "production_total": revenue - voucher_sold + row["sessions"],
             }
         )
-    totals.sort(key=lambda total: (-total["total_revenue"], total["staff_id"]))
+    totals.sort(key=lambda total: (-total["production_total"], total["staff_id"]))
     return {"rows": totals}
 
 
-def _refunded_by_staff(params: PeriodIn) -> dict[UUID, int]:
-    """What the refunds of the period's sales gave back on each professional's lines (SALE-F31), in cents.
+def _refunded_by_staff(params: PeriodIn) -> tuple[dict[UUID, int], dict[UUID, int]]:
+    """What the refunds of the period's sales gave back on each professional's lines (SALE-F31), in cents, and how much
+    of what those lines paid for vouchers went with it: a line never pays for more than it has left.
 
     The refunds of a sale are taken in the order they were made, against what each line has left to give
     back (what it charged minus what earlier refunds already took off it). A refund's money goes first to
@@ -2218,6 +2299,7 @@ def _refunded_by_staff(params: PeriodIn) -> dict[UUID, int]:
         .order_by("sale_id", "created_at", "id")
     )
     given: dict[UUID, int] = {}
+    voucher_sold_back: dict[UUID, int] = {}
     for _sale_id, of_sale in groupby(refunds, key=attrgetter("sale_id")):
         of_sale = list(of_sale)
         sale = of_sale[0].sale
@@ -2243,7 +2325,10 @@ def _refunded_by_staff(params: PeriodIn) -> dict[UUID, int]:
             served_by = line.staff_id or sale.staff_id
             if served_by is not None:
                 given[served_by] = given.get(served_by, 0) + line.line_total - have
-    return given
+                voucher_sold_back[served_by] = voucher_sold_back.get(served_by, 0) + max(
+                    line.voucher_sold_amount - have, 0
+                )
+    return given, voucher_sold_back
 
 
 def _take_off(left: list[int], shares: list[int]) -> list[int]:
@@ -2410,3 +2495,9 @@ def refund_by_key(ctx: OperationContext, params: RefundByKeyIn) -> dict:
         "found": refund is not None,
         "refund": refund_row(refund) if refund else None,
     }
+
+
+def keeps_fiscal_documents() -> bool:
+    """Whether this database holds its sales (``fiscal_documents_kept`` on this app's config), of any status: a draft counts
+    too, for what it asks is whether a database can go, and that cannot be undone."""
+    return Sale.objects.exists()

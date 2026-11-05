@@ -809,13 +809,17 @@ Pasos:
    con lo que falta por enviar; la pestaña dice cuántos artículos esperan («Comanda actual, 2 artículos por
    enviar»). Sin nada pendiente, «Todo está enviado».
 2. En «Comanda actual», revisa cantidades y quién atiende y pulsa «Enviar comanda (N)». Para que salga
-   urgente, arma antes la llama de su lado: el botón pasa a «Enviar URGENTE (N)». Sale «Comanda N enviada a
-   cocina.»; las líneas quedan marcadas con su ronda («Comanda N») y la hora de envío, y la llama se desarma.
-   Un doble envío no manda nada dos veces.
+   urgente, arma antes la llama de su lado: el botón pasa a «Enviar URGENTE (N)». Sale arriba de la pantalla
+   «Comanda N enviada a cocina.», para poder pulsar «Cobrar» (SALE-F01) sin esperar a que se vaya; las líneas
+   quedan marcadas con su ronda («Comanda N») y la hora de envío, y la llama se desarma. Un doble envío no
+   manda nada dos veces.
+   En el cajón del móvil, «Enviar comanda» y la llama se quedan fijos sobre el pie mientras dejan sitio a las
+   pestañas y a una línea; en un móvil más bajo, como uno de 320×568 con la franja roja de arriba, se desplazan
+   con ellas, detrás de las líneas, y «Cobrar» sigue a la vista. Lo mismo en la columna lateral de una pantalla igual
+   de baja, como una tableta de 1024×600 con la franja (hub#787).
 3. Al pulsar «Cobrar» con algo pendiente, se envía primero a cocina y después se abre el cobro: nadie paga
-   un plato que no se va a preparar. El aviso de la comanda sale entonces arriba de la pantalla, para poder
-   tocar el teclado del cobro (SALE-F01) desde el primer momento. Si el envío falla, no se abre el cobro y se
-   dice por qué.
+   un plato que no se va a preparar. El aviso de la comanda también sale arriba, para poder tocar el teclado
+   del cobro (SALE-F01) desde el primer momento. Si el envío falla, no se abre el cobro y se dice por qué.
 4. Una línea enviada queda bloqueada: ni cantidad, ni nota, ni descuento, ni invitación.
 5. Para quitar un plato ya enviado, pulsa ⊗ «Anular este artículo» en su línea: se abre «Anular
    «<artículo>»» con «Ya se envió a cocina. Sale de la cuenta y se guarda el motivo. Tiene que
@@ -834,15 +838,17 @@ Entra: las líneas pendientes de la cuenta.
 Sale: las líneas con su ronda y la comanda abierta en Cocina, urgente si se armó la llama (avisa: comanda
 enviada, con las líneas, sus notas, sus suplementos, los platos de cada menú y quién atiende); al anular una
 línea enviada, avisa de la línea anulada con su motivo.
-Si falla: sin nada pendiente, «No hay nada nuevo que enviar a cocina.»; si Cocina no responde, «No se ha
+Si falla: sin nada pendiente, «No hay nada nuevo que enviar a cocina.»; si Cocina no responde, sale arriba de la
+pantalla, para poder volver a pulsar «Cobrar» o «Enviar comanda» sin esperar a que se vaya, «No se ha
 podido enviar la comanda a cocina. Inténtalo de nuevo.» y no se cobra. Si la comanda se envía pero su hoja
-no se imprime, el TPV avisa «Comanda N enviada a cocina, pero no se imprimió. Revisa la impresora de
-cocina en Impresión.». Pedir que se quite una línea ya
+no se imprime, el TPV avisa, también arriba, «Comanda N enviada a cocina, pero no se imprimió. Revisa la
+impresora de cocina en Impresión.». Pedir que se quite una línea ya
 enviada la rechaza: «Esa línea ya no se puede quitar: ya se envió a cocina (anúlala con un motivo), ya está
 cobrada o ya no está en una cuenta abierta.». Anular una línea sin enviar, cobrada, ya anulada o sin motivo
 se rechaza con «Esa línea no se puede anular…». Sin Cocina activa no hay pestañas ni envío: la cuenta se
 cobra como siempre.
-Implicados: KITCHEN-F05, KITCHEN-F18, KITCHEN-F19, KITCHEN-F20, KITCHEN-F29, BASE-F84
+Por el asistente: su tarjeta de confirmación dice la cuenta (por su título o, sin título, por su importe), la línea, el producto, el servicio, el menú y quién atiende por su nombre, el tipo de pedido con las palabras de Cocina, nunca por un identificador; lo que quien pregunta no puede ver, o lo que ya no está, no sale en la tarjeta (BASE-F97).
+Implicados: KITCHEN-F05, KITCHEN-F18, KITCHEN-F19, KITCHEN-F20, KITCHEN-F29, BASE-F84, BASE-F97
 
 ### SALE-F21 Imprimir la cuenta para la mesa (precuenta)
 <!-- origen: qa:verticals/restaurant/07-payment-and-fiscal qa:modules/sales/guest-check wf:restaurante-dia#rec_restaurante-f09 old:sales/workflow/sala-y-cocina.md#sales-f21 -->
@@ -984,6 +990,8 @@ Pasos:
 Entra: los bonos de la clienta y su saldo, de Servicios.
 Sale: la línea de la cuenta pagada con una sesión reservada de Servicios (avisa: cuenta cambiada);
 al cobrar, la venta con la línea a 0,00 € y la sesión gastada en la misma operación (SERVICE-F24).
+La línea de la venta guarda lo que vale esa sesión al cobrarla, para la producción de quien la hace
+(SALE-F28): no entra en ningún total ni documento, y cambiar después el bono no lo mueve.
 Quitar la línea, anularla o eliminar la cuenta suelta la sesión (SERVICE-F23); dividir o juntar
 cuentas la lleva con su línea. Una línea pagada con bono no cambia de cantidad, invitación ni
 descuento: se deshace el bono antes.
@@ -997,7 +1005,7 @@ motivo en la hoja y se deshace el bono. El descuento máximo sin responsable se 
 por pagar: una línea pagada con bono no cuenta. Sin permiso para gastar sesiones, el hueco no
 aparece. Sin Servicios activa en el negocio el hueco tampoco aparece y, si se apaga con líneas pagadas
 con bono, cobrarlas se rechaza («Servicios no está activa en este negocio…»).
-Implicados: SERVICE-F22, SERVICE-F23, SERVICE-F24, SERVICE-F25
+Implicados: SERVICE-F22, SERVICE-F23, SERVICE-F24, SERVICE-F25, SALE-F28, STAFF-F21
 
 ### SALE-F28 Consultar el historial y las cifras de ventas
 <!-- origen: fi:modules/sales#query-sales-by_staff wf:peluqueria-dia#rec_peluqueria-f15 fi:modules/sales#query-sales-last_7_days fi:modules/sales#query-sales-list fi:modules/sales#query-sales-stats fi:modules/sales#query-sales-today old:sales/workflow/historial-y-correcciones.md#sales-f28 fi:modules/sales#widget-sales-last_7_days fi:modules/sales#widget-sales-recent_activity fi:modules/sales#widget-sales-tickets_today fi:modules/sales#widget-sales-today -->
@@ -1031,14 +1039,23 @@ la comisión) ya resta lo devuelto: lo que vuelve, a quien lo vendió; el dinero
 valga (solo dinero, una invitación o la sesión de un bono), a todos los de esa venta según lo que a cada
 uno le queda por devolver tras las devoluciones anteriores, así que nadie baja de 0. Cada devolución
 cuenta en el día de su venta y se reparte al céntimo: con lo que nadie atendió, suma los «Ingresos» del
-periodo.
+periodo. Además, lo que valen las **sesiones de bono** que hizo cada profesional (SALE-F27, SERVICE-F24),
+fijado al cobrar cada una; una sesión de un bono sin límite, que no tiene entre qué dividir, cuenta el
+precio de su línea. No es dinero del periodo (el bono se pagó al venderlo), así que no está en los
+«Ingresos». La sesión que vuelve, por devolución o anulando la venta, deja de contar. Lo que una línea pagó
+por un **bono vendido** (Servicios lo dice al concederlo, SERVICE-F14) sigue en «Ingresos», pero no es
+producción de quien lo vendió, sin pasar nunca de lo que a esa línea le queda tras las devoluciones. La
+**producción**, sobre la que va la comisión, es lo que queda sin esos bonos más las sesiones: un bono de
+100,00 € en 3 sesiones, vendido por A y hecho por B, da 0 a A y 100,00 € a B, y suma los «Ingresos» del periodo.
+Las ventas cobradas antes siguen como estaban: su línea cuenta para quien la vendió y las sesiones de esos
+bonos no cuentan para nadie, así que nada cuenta dos veces.
 Si falla: «Error cargando métricas» (las cifras salen como «—»); si no se pueden leer los últimos 7 días,
 «No se han podido leer los últimos 7 días.». Vacía: «Aún no hay ventas.». Quien
 no tiene permiso de informes ve la tabla, sin las cifras. Un total que no es un importe dice «Escribe
 un importe, como 12,50» bajo su campo, y una fecha final anterior a la inicial, «La fecha final no
 puede ser anterior a la inicial.»; ninguno de los dos filtra y manda el periodo. En el Inicio, un panel
 de un día sin ventas dice 0, y uno que no se puede leer, «No disponible».
-Implicados: STAFF-F21, BASE-F06, BASE-F07, BASE-F08
+Implicados: STAFF-F21, BASE-F06, BASE-F07, BASE-F08, SALE-F27, SERVICE-F24
 
 ### SALE-F29 Ver y reimprimir el documento de una venta
 <!-- origen: fi:hub/app-web#print-on-sale-auto-impresion-del-ticket-al-cerrar-venta old-hub:HUB_SHELL-F70 fi:modules/sales#query-sales-get fi:modules/sales#query-sales-lines old:sales/workflow/historial-y-correcciones.md#sales-f29 wf:cadena-fiscal#rec_fiscal-f07 -->
@@ -1245,7 +1262,8 @@ Sale: la sección (nombre, categoría de IVA, posición). Lo ya vendido conserva
 con que se cobró.
 Si falla: una categoría de IVA que no existe se rechaza junto a su campo. Una sección que otro ya
 borró: «Esa sección ya no está en este negocio. Recarga la lista y vuelve a intentarlo.».
-Implicados: TAX-F01
+Por el asistente: su tarjeta de confirmación dice la sección por su nombre, nunca por un identificador; una que ya no está no sale en la tarjeta (BASE-F97).
+Implicados: TAX-F01, BASE-F97
 
 ### SALE-F36 Preparar las notas rápidas
 <!-- origen: old:sales/workflow/configuracion.md#sales-f36 -->
@@ -1306,13 +1324,15 @@ Pasos:
    precio reservado manda sobre el de la profesional.
 Entra: los servicios en oferta, su tarifa, su mínimo y su máximo y su categoría fiscal, de Servicios;
 el precio propio de la profesional (sus asignaciones, `service.assignment.list`); la cita y lo que
-reservó, de Citas (`appointment.appointment.get`).
+reservó, de Citas (`appointment.appointment.get`); el servicio rechazado, mientras su aviso está a la
+vista (`service.service.get`).
 Sale: una línea de servicio con el servicio, su precio congelado y la categoría fiscal del servicio;
 no mueve stock.
 Si falla: un servicio sin categoría fiscal sale «Falta el IVA» y no entra («No se puede vender: sin
-categoría fiscal. Falta configurar el IVA.»); uno archivado, «Ese servicio ya no se ofrece…»; un
-importe fuera del mínimo y el máximo del servicio, «Ese importe está fuera de lo que admite el
-servicio (<mínimo> – <máximo>).». Un precio reservado que no casa con la cita: «Ese no es el precio
+categoría fiscal. Falta configurar el IVA.»); ese aviso se va solo en cuanto el servicio tiene
+categoría, sin tocar nada más, y también al salir de **Vender**. Uno archivado, «Ese servicio ya no se
+ofrece…»; un importe fuera del mínimo y el máximo del servicio, «Ese importe está fuera de lo que admite
+el servicio (<mínimo> – <máximo>).». Un precio reservado que no casa con la cita: «Ese no es el precio
 que reservó la cita para este servicio: está cancelada, es de otra clienta, no reservó este servicio o
 lo reservó más barato.» (409 en su campo). Sin Servicios activa, «Servicios» no sale en la tira.
 Implicados: SERVICE-F09, SERVICE-F03, SERVICE-F31, APPOINTMENT-F17
@@ -1349,7 +1369,7 @@ diciendo cuáles (409 `*_ambiguous`).
 | Las cifras de un periodo de días del negocio, con el impuesto con que se declararon sus ventas (vacío si mezclan impuestos) | informes | F28 | `sale.sale.stats` |
 | Lo vendido hoy y los tiques de hoy | informes | F28 | `sale.sale.today` |
 | Lo vendido cada uno de los últimos 7 días | informes | F28 | `sale.sale.last_7_days` |
-| Lo vendido por cada profesional en un periodo: bruto, base, impuesto, lo devuelto de sus líneas y lo que queda (sobre lo que va la comisión) | informes | F16, F28 | `sale.sale.by_staff` |
+| Lo vendido por cada profesional en un periodo: bruto, base, impuesto, lo devuelto de sus líneas, lo que queda, lo que pagó bonos que vendió, lo que valen las sesiones de bono que hizo y su producción (sobre la que va la comisión) | informes | F16, F28 | `sale.sale.by_staff` |
 | Lo que cobraría una cuenta, o unas líneas, sin cobrar nada (total, base, IVA, descuentos, desglose y líneas) | ver ventas | F01, F21, F22 | `sale.checkout.preview` |
 | Las cuentas abiertas (o de otro estado), con búsqueda por título y páginas | ver ventas | F17 | `sale.order.list` |
 | Una cuenta con sus líneas sin cobrar | ver ventas | F17, F19 | `sale.order.get` |
@@ -1362,6 +1382,7 @@ diciendo cuáles (409 `*_ambiguous`).
 | Por cada cobro de una venta, lo devuelto y lo que queda, y por cada línea lo que ya volvió | ver ventas | F31 | `sale.refund.options` |
 | Las devoluciones de una venta, con el estado y el número de su rectificativa | ver ventas | F31 | `sale.refund.list` |
 | La devolución grabada con una clave | ver ventas | F31 | `sale.refund.by_idempotency_key` |
+| El nombre de un registro que una escritura de Ventas toca, por su id: solo para la tarjeta del asistente; lo que no existe o quien pregunta no puede leer no se nombra | ver ventas | F20, F35 | `sale.record.get` |
 
 Las ventas, las cifras, las cuentas, la previsión del cobro, los medios de pago, los ajustes, las
 secciones, las notas rápidas y lo devolvible se pueden seguir en vivo.
@@ -1409,6 +1430,7 @@ secciones, las notas rápidas y lo devolvible se pueden seguir en vivo.
 | Venta anulada | Anular | La venta, su número, motivo, quién y cuándo, total, cliente, cuenta y documento | `sale.sale.voided` |
 | Venta devuelta | Devolver | La venta, la devolución, el importe, el motivo, si queda devuelta del todo, los cobros y las líneas devueltas | `sale.sale.refunded` |
 | Ventas re-apuntadas | Unir fichas | La ficha que queda y la absorbida | `sale.sale.reassigned` |
+| Una línea pagó un bono, o ya no | Servicios concede o anula un bono diciendo su venta | La venta y la línea | `sale.sale.voucher_line_changed` |
 | Venta con su documento | Un documento que no se pudo emitir en el cobro, la anulación o la devolución se emite después (reintento del cobro, «Emitir ahora» o la reacción de Facturación) | La venta, el documento, su número, la devolución (`refund_id`) o si es el de la anulación (`void`); uno por documento | `sale.sale.invoiced` |
 | Cuenta abierta | Abrir o dividir | La cuenta | `sale.order.opened` |
 | Cuenta cambiada | Cualquier cambio de líneas, descuentos o título | La cuenta | `sale.order.changed` |
@@ -1437,7 +1459,8 @@ secciones, las notas rápidas y lo devolvible se pueden seguir en vivo.
 - **Personal** (opcional): el equipo para el chip «Atiende» y la ficha de quien tiene la sesión
   (`staff.member.current`, sin permiso de Personal), a la que el cobro atribuye «Yo».
 - **Servicios** (opcional): sus servicios en oferta (`service.service.list_for_sale`, y
-  `service.service.get` al añadir la línea), los bonos de la clienta para un servicio
+  `service.service.get` al añadir la línea y mientras dura el aviso de uno rechazado), los bonos de la
+  clienta para un servicio
   (`service.grant.tender_options`) y las sesiones de bono: las reserva, las suelta, las gasta y las
   devuelve llamando a sus operaciones por nombre (`service.session.hold`, `.release`, `.settle`,
   `.return`), con la sesión de quien vende y en la misma transacción; el precio propio de una
@@ -1508,6 +1531,10 @@ administrador y responsable, los mismos que anulan y devuelven).
   `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/` y un `tests/test_<fichero>.py`
   por fichero, más `tests/test_integration_*.py` con Impuestos, Clientes, Inventario, Servicios,
   Facturación, Caja y Citas reales.
+- **Orden de las listas** (`base.ordering.list_order`; regla hub#2355 del producto viejo): en Ventas, Secciones y Notas
+  rápidas, la columna elegida y sus desempates van todos en la dirección de la lista, así que la descendente es la
+  ascendente leída al revés, empates incluidos. Las secciones desempatan por nombre e `id`; las notas, por texto e
+  `id`; las ventas, por `id`.
 - **`requires = ["tax", "customer"]`**. `Sale.customer` y `Department.tax_category` son claves
   ajenas. **Inventario no es requisito** (PLAN §20.5): la línea guarda una copia del producto (id como
   UUID sin clave ajena, nombre, SKU, unidad, precio, coste y categoría fiscal) y el producto se lee con
@@ -1581,7 +1608,11 @@ administrador y responsable, los mismos que anulan y devuelven).
   método) los retiene con `FOR KEY SHARE` (`held`, también por id) antes de escribir lo que los apunta: el borrado
   espera y responde «No se puede eliminar», o la escritura que llega después recibe lo mismo que con una sección
   (422 en su campo) o un método (409) que no existen (`tests/test_concurrency.py`).
-- **Numeración**: `SaleCounter` por día del negocio (zona horaria del Hub) con `UPDATE … RETURNING`
+- **El día de una venta sigue en `TIME_ZONE`**, no en la zona del negocio: Facturación copia el día a la
+  `operation_date` del registro de VeriFactu y el número a su descripción, y la fecha de emisión y el tipo del cobro están
+  en ese mismo reloj. Cambian juntos, con supervisión (hub#772); hasta entonces lo congela
+  `tests/test_guardrails_fiscal_clock.py`.
+- **Numeración**: `SaleCounter` por el día de la venta con `UPDATE … RETURNING`
   (asignar `F("last") + 1` y guardar: Django devuelve el valor con `RETURNING`), en la transacción del
   cobro: un rechazo no gasta número y nunca hay huecos. `AAAAMMDD-NNNN`, cuatro cifras como mínimo
   (la 10.000 es `AAAAMMDD-10000`). Sin secuencias de Postgres.
@@ -1901,6 +1932,8 @@ administrador y responsable, los mismos que anulan y devuelven).
 - **Marcar una cuenta «para llevar» en el TPV** (F12): la cuenta no tiene canal; un menú se cobra según
   su propio ajuste en Menús y combos («en el local» o «para llevar», COMBO-F09). Un menú «en el local»
   que el cliente se lleva no se parte por plato.
+- **Enlazar a su venta un bono concedido sin decirla** (SERVICE-F14, hub#786): su línea sigue contando para quien
+  lo vendió y sus sesiones, para nadie.
 - **Vender un bono en el TPV** (SERVICE-F14) y, con ello, concederlo al cobrar y anularlo al anular o
   devolver su venta (el aviso «se vendió en esta venta y se anulará con ella»): el TPV del producto
   actual no lo ofrecía (solo el asistente o la API, con el IVA que mandaba el cobro) y aquí toda línea
@@ -1920,9 +1953,8 @@ administrador y responsable, los mismos que anulan y devuelven).
   en el IVA del tique; el producto la aplazó tras el MVP (pm#100). Mientras, la propina en efectivo se anota
   en Caja como «Entrada» (CASH_REGISTER-F05). Issue hub#562.
 - **Fallos vistos que quedan como issue** (`migration-leftover`): hub#558 (dos pruebas del precio libre
-  del TPV fallan por tiempo con la máquina cargada), hub#560 (seis textos en español salen con las
-  palabras de otra app) y hub#561 (la tarjeta de confirmación del asistente no dice qué registro toca una
-  escritura de Ventas). Y, en la cadena de arreglos de Ventas, hub#442: el aviso de agotado se queda en el
+  del TPV fallan por tiempo con la máquina cargada) y hub#560 (seis textos en español salen con las
+  palabras de otra app). Y, en la cadena de arreglos de Ventas, hub#442: el aviso de agotado se queda en el
   TPV tras volver a poner el artículo a la venta (F07).
 
 ### Dudas abiertas
