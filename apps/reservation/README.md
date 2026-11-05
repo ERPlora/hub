@@ -43,7 +43,7 @@ sentar abre su cuenta en Ventas. Las reservas que el cliente hace o cambia por W
 | Pantallas | `/reservation/reservations`, `/reservation/waitlist`, `/reservation/availability` y `/reservation/settings` |
 | Operaciones | 11 consultas (`queries.py`) y 20 acciones (`services.py`), todas con `ai=`; 29 rutas en `/api/reservation/…` |
 | Eventos | 16 (`events.py`): `reservation.reservation.{created,updated,status_changed,deleted,unconfirmed_released}`, `reservation.waitlist.{created,updated,deleted,converted}`, `reservation.time_slot.{created,deleted}`, `reservation.blocked_date.{created,deleted}`, `reservation.settings.updated` y `reservation.customer.{reassigned,erased}`; reacciona a `customer.customer.merged` y `customer.customer.erased` |
-| Tarea programada | `release_unconfirmed_reservations` cada 15 minutos (`collapse`), en el ámbito fijo del worker de la fase 1 |
+| Tarea programada | `release_unconfirmed_reservations` cada 15 minutos (`collapse`), en cada negocio y con su ámbito (`base.worker._serve_hub`) |
 | Migraciones | `0001_initial` y `0002_guest_phone_e164` |
 | Admin | Django admin en `hubs.erplora.com`, CRUD completo para soporte; ids y fechas, solo lectura; lo que guarda no pasa por las operaciones ni deja aviso |
 
