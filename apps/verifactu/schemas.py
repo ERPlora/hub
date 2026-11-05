@@ -47,6 +47,9 @@ InvoiceTypeCode = Literal["F1", "F2", "F3", "R1", "R2", "R3", "R4", "R5"]
 KindCode = Literal[*Event.Kind.values]
 SeverityCode = Literal[*Event.Severity.values]
 RepresentationCode = Literal[*Config.Representation.values]
+# Where a registration the AEAT rejected or accepted with errors stands (VERIFACTU-F24): not corrected yet, or
+# corrected by a newer record; any other record has nothing to correct.
+CorrectionStatusCode = Literal["not_applicable", "pending", "corrected"]
 
 
 def _text(max_length: int, *, min_length: int = 0):
@@ -130,6 +133,13 @@ class RecordRowOut(Schema):
         description="pending, sent, accepted, accepted_with_errors or rejected."
     )
     correction: bool = Field(description="Whether it is a correction (subsanación).")
+    correction_status: CorrectionStatusCode = Field(
+        description="A registration the AEAT rejected or accepted with errors: pending (not corrected yet) or corrected "
+        "(a newer record corrects it: corrected_by_id); not_applicable for every other record."
+    )
+    corrected_by_id: UUID | None = Field(
+        description="The record that corrects this one (its subsanación); none while it is not corrected."
+    )
     qr_url: str = Field(description="The AEAT's verification link (its QR).")
     created_at: dt.datetime = Field(description="When it was sealed.")
 
@@ -561,6 +571,11 @@ class RecordListIn(PageIn):
     )
     total_amount_to: int | None = Field(
         None, description="Total of at most this many cents.", json_schema_extra={"money": True}
+    )
+    correction_status: Literal["pending", "corrected"] | None = Field(
+        None,
+        description="Only the registrations the AEAT rejected or accepted with errors that are not corrected yet "
+        "(pending) or that a newer record already corrects (corrected).",
     )
     sort: (
         Literal[
