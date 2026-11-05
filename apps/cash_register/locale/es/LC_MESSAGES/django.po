@@ -89,6 +89,7 @@ msgstr "cajón"
 msgid "drawers"
 msgstr "cajones"
 
+msgctxt "cash register"
 msgid "business day"
 msgstr "día de negocio"
 
@@ -101,6 +102,7 @@ msgstr "contador de sesiones"
 msgid "session counters"
 msgstr "contadores de sesiones"
 
+msgctxt "cash session status"
 msgid "Open"
 msgstr "Abierta"
 
@@ -182,6 +184,7 @@ msgstr "importe"
 msgid "payment method type"
 msgstr "tipo de forma de pago"
 
+msgctxt "cash register"
 msgid "payment method"
 msgstr "forma de pago"
 
@@ -191,6 +194,7 @@ msgstr "concepto"
 msgid "sale"
 msgstr "venta"
 
+msgctxt "cash register"
 msgid "sale number"
 msgstr "número de venta"
 
@@ -209,6 +213,7 @@ msgstr "invitaciones a coste"
 msgid "when"
 msgstr "cuándo"
 
+msgctxt "cash register"
 msgid "by"
 msgstr "quién"
 
