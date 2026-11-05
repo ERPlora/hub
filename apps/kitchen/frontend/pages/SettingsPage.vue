@@ -4,7 +4,9 @@
 // until the business saves); a change saved elsewhere repaints every field the person has not touched, and
 // «Save» sends only the fields touched and changed (`kitchen.settings.update`), so it never undoes someone
 // else's change. «Test sound» rings the tone and volume on screen. A refusal goes under its field.
-import { InlineFeedback } from '@erplora/ui/components';
+// A refusal says itself as a FormModal does (`useRefusal`, hub#854): its notice goes as soon as something is
+// changed, each field's message as soon as that field is, and the next refusal says it all again.
+import { InlineFeedback, useRefusal } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { IonButton, IonInput, IonSelect, IonSelectOption, IonSpinner, IonToggle } from '@ionic/vue';
@@ -43,6 +45,7 @@ const loadFailed = computed(
   () => status.value === 'error' && !!error.value && error.value.code !== 'app_inactive' && error.value.code !== 'permission_denied',
 );
 const { run, pending, error: saveError } = useCommand('kitchen.settings.update');
+const { fieldErrors, showsError, changed } = useRefusal(saveError);
 const chime = new Chime();
 
 const form = ref<Form | null>(null);
@@ -101,10 +104,10 @@ function set<K extends keyof Form>(field: K, value: Form[K]): void {
   form.value = { ...form.value, [field]: value };
   touched.value = new Set([...touched.value, field]);
   saved.value = false;
+  changed(field);
 }
 
 const text = (value: unknown): string => (value === null || value === undefined ? '' : String(value));
-const fieldErrors = computed<Readonly<Record<string, string>>>(() => saveError.value?.fields ?? {});
 const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'ion-touched': !!message });
 
 function testSound(): void {
@@ -261,12 +264,12 @@ async function save(): Promise<void> {
           </ion-select-option>
         </ion-select>
         <InlineFeedback
-          v-if="saveError"
+          v-if="showsError"
           tone="danger"
           data-testid="kitchen-settings-save-error"
           :heading="$t('kitchen.settings.saveError')"
         >
-          {{ saveError.message }}
+          {{ saveError?.message }}
         </InlineFeedback>
         <InlineFeedback
           v-if="saved"

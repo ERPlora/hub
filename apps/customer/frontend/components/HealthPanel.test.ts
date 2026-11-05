@@ -4,8 +4,9 @@
 // warning) and «Edit» saves them; «Withdraw permission» asks first, because it erases the data.
 import { formatDateTime } from '@erplora/ui/components';
 import { toastSuccess } from '@erplora/ui/shell';
-import { IonInput, IonTextarea } from '@ionic/vue';
+import { IonInput, IonSelect, IonTextarea } from '@ionic/vue';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { Component } from 'vue';
 
 import { errorFrame, flush, json, type MountOptions, mountCustomer, refusal, sent, subId } from '../__tests__/mount-customer';
 import { formatDay } from '../lib/dates';
@@ -203,6 +204,69 @@ describe('HealthPanel: editing the data', () => {
     s.net.onApi(() => refusal(409, 'customer.health_consent_required', 'Record their permission first to keep health data.'));
     await s.submit();
     expect(s.wrapper.get('[data-testid="customer-health-failure"]').text()).toContain('Record their permission first to keep health data.');
+  });
+
+  describe('a refusal by fields (hub#854, as FormModal and the Services settings do: ui#102, hub#821)', () => {
+    const ALLERGIES = 'Ensure this value has at most 2000 characters.';
+    const DATE = 'Enter the date of the test.';
+    const RESULT = 'A result needs the date of the test.';
+
+    /** Saves the three fields and the server refuses each of them. */
+    async function refused() {
+      const s = await setup(GRANTED);
+      await s.click('customer-health-edit');
+      s.net.onApi(() =>
+        refusal(422, 'invalid_payload', 'Invalid payload', { allergies: ALLERGIES, sensitivity_test_on: DATE, sensitivity_test_result: RESULT }),
+      );
+      await s.wrapper.findComponent(IonTextarea).setValue('Latex');
+      await s.wrapper.findComponent(IonSelect).setValue('positive');
+      await s.submit();
+      const control = { allergies: IonTextarea, sensitivity_test_on: IonInput, sensitivity_test_result: IonSelect } as const;
+      const field = (key: keyof typeof control) => s.wrapper.findComponent(control[key] as Component);
+      /** A field's message; Ionic's default for none is not a string. */
+      const says = (key: 'allergies' | 'sensitivity_test_on') => {
+        const text = (field(key).props() as Record<string, unknown>).errorText;
+        return typeof text === 'string' ? text : '';
+      };
+      const marked = (key: keyof typeof control) => field(key).classes().includes('ion-invalid');
+      return { ...s, field, says, marked };
+    }
+
+    it('says it under the fields only, and a field’s message goes as soon as that field is changed', async () => {
+      const s = await refused();
+      expect(s.has('customer-health-failure')).toBe(false);
+      expect([s.says('allergies'), s.says('sensitivity_test_on'), s.marked('sensitivity_test_result')]).toEqual([ALLERGIES, DATE, true]);
+      await s.field('sensitivity_test_on').setValue('2026-10-12');
+      expect([s.says('sensitivity_test_on'), s.marked('sensitivity_test_on')]).toEqual(['', false]);
+      await s.field('sensitivity_test_result').setValue('negative');
+      expect(s.marked('sensitivity_test_result')).toBe(false);
+      expect([s.says('allergies'), s.marked('allergies')]).toEqual([ALLERGIES, true]);
+    });
+
+    it('the next refusal says it all again', async () => {
+      const s = await refused();
+      await s.field('allergies').setValue('Latex, PPD');
+      await s.field('sensitivity_test_on').setValue('2026-10-12');
+      expect([s.says('allergies'), s.says('sensitivity_test_on')]).toEqual(['', '']);
+      await s.submit();
+      expect([s.says('allergies'), s.says('sensitivity_test_on'), s.marked('sensitivity_test_result')]).toEqual([ALLERGIES, DATE, true]);
+    });
+
+    it('opening the form again says nothing of the last refusal', async () => {
+      const s = await refused();
+      await s.click('customer-health-edit-cancel');
+      await s.click('customer-health-edit');
+      expect([s.says('allergies'), s.says('sensitivity_test_on'), s.marked('sensitivity_test_result')]).toEqual(['', '', false]);
+    });
+
+    it('a refusal that names no field stays until the next try: nothing else says it', async () => {
+      const s = await setup(GRANTED);
+      await s.click('customer-health-edit');
+      s.net.onApi(() => refusal(409, 'customer.health_consent_required', 'Record their permission first to keep health data.'));
+      await s.submit();
+      await s.wrapper.findComponent(IonTextarea).setValue('Latex');
+      expect(s.wrapper.get('[data-testid="customer-health-failure"]').text()).toContain('Record their permission first to keep health data.');
+    });
   });
 });
 

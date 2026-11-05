@@ -7,7 +7,10 @@
 // (`attendance.settings.get`: the defaults until the business saves): a change saved elsewhere repaints every
 // field the person has not touched. «Save» sends only what changed (`attendance.settings.update`); what the
 // screen can judge it judges first and the server's 422 goes under each field. Whoever may not save reads them.
-import { InlineFeedback } from '@erplora/ui/components';
+// A refusal says itself as a FormModal does (`useRefusal`, hub#854): its notice goes as soon as something is
+// changed, each field's message as soon as that field is (either coordinate's, as the pair they are), and the
+// next refusal says it all again.
+import { InlineFeedback, useRefusal } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, HubIcon, nativeBridge, useSession } from '@erplora/ui/shell';
 import { IonButton, IonInput, IonSelect, IonSelectOption, IonSpinner, IonToggle } from '@ionic/vue';
@@ -43,6 +46,8 @@ const canEdit = computed(() => session.can('attendance.manage_settings'));
 
 const { data, status, error, refresh } = useLive('attendance.settings.get', {});
 const { run, pending, error: saveError } = useCommand('attendance.settings.update');
+/** What the server's refusal still says by field: the fields changed since it lose their message. */
+const { fieldErrors: serverFieldErrors, showsError, changed } = useRefusal(saveError);
 const blocked = computed(() => blockingError(error.value));
 
 const form = ref<Form | null>(null);
@@ -90,15 +95,16 @@ function set<K extends keyof Form>(field: K, value: Form[K]): void {
   touched.value = new Set([...touched.value, field]);
   saved.value = false;
   problem.value = '';
-  // Fixing a field lifts its mark; the coordinates are judged as a pair.
+  // Fixing a field lifts its mark, the screen's and the server's; the coordinates are judged as a pair.
   const pair: (keyof Form)[] = field === 'workplace_lat' || field === 'workplace_lng' ? ['workplace_lat', 'workplace_lng'] : [field];
+  pair.forEach((key) => changed(key));
   if (pair.some((key) => key in judged.value)) {
     judged.value = Object.fromEntries(Object.entries(judged.value).filter(([key]) => !pair.includes(key as keyof Form)));
   }
 }
 
 const text = (value: unknown): string => (value === null || value === undefined ? '' : String(value));
-const fieldErrors = computed<Readonly<Record<string, string>>>(() => ({ ...(saveError.value?.fields ?? {}), ...judged.value }));
+const fieldErrors = computed<Readonly<Record<string, string>>>(() => ({ ...serverFieldErrors.value, ...judged.value }));
 const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'ion-touched': !!message });
 
 const workplaceMissing = computed(() => !!form.value?.require_location && (!form.value.workplace_lat.trim() || !form.value.workplace_lng.trim()));
@@ -228,11 +234,11 @@ async function useMyLocation(): Promise<void> {
           {{ $t('attendance.settings.readOnly') }}
         </InlineFeedback>
         <InlineFeedback
-          v-if="saveError"
+          v-if="showsError"
           tone="danger"
           data-testid="attendance-settings-error"
         >
-          {{ saveError.message }}
+          {{ saveError?.message }}
         </InlineFeedback>
         <InlineFeedback
           v-if="saved"
