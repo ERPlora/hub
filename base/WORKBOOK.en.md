@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:1cca148b549418fc202c21f89a57606e99298f90507e948ed36665c2b8a451a0 -->
+<!-- generated from WORKBOOK.md sha256:8167fc6de9faf75477600c1a38e9227bd16053b60e332a3a2f642a2262e1b976 -->
 
 ## What it is for and who it is for
 
@@ -61,8 +61,8 @@ by the hour ("Good morning", "Good afternoon", "Good evening"). Below, in this o
   first. On a phone, with six apps or more, the first four and "View all apps".
 - **"Finish setting up your business"**: how many steps are done, a bar and the steps left, each with its
   icon, its explanation, a label ("Needed to invoice", "Important", "Recommended", "Done" or "Not
-  available yet") and "Set up". Folded: five steps (two on a phone), with "View all" and "Show less".
-  When nothing is left: "Your business is ready".
+  available yet") and "Set up". Folded: five steps (two on a phone), first the ones that stop invoicing,
+  with "View all" and "Show less". When nothing is left: "Your business is ready".
 - **The board of panels**, with "Customize panel" (⋮) at the top right.
 
 ### Home · Activity
@@ -415,8 +415,10 @@ Screen: Home · Summary
 Steps:
   1. They come into the Home. In "Finish setting up your business" they see how many steps are done and a
      bar.
-  2. Below, the steps left, in the order the apps set: first the ones that stop invoicing ("Needed to
-     invoice", in red), then the "Important" ones and last the "Recommended" ones.
+  2. Below, the steps left: first the ones that stop invoicing ("Needed to invoice", in red) and then the
+     "Important" ones, each group in the order the apps set, also on a phone, where only two rows fit. The
+     "Recommended" ones show folded only if nothing else is left. "View all" shows every step, the done ones
+     too, in the order the apps set.
   3. The platform's are "Your apps" (turn on at least one business app) and "Your team" (add the people
      who will use the till); the rest come from each app that is on.
   4. A step that only applies to another country, or that the person may not see, does not show. A step
@@ -2687,16 +2689,19 @@ Steps:
      business can still be restored and erplora.com still sees its copies. When it ends it checks again for
      documents, in case one came in during the copy.
   4. It drops that business's database, and only that one. From here it never comes back.
-  5. Only a mark stays, with no name or data, so its address goes on saying "This hub is no longer available."; its
+  5. It deletes its files from the store, those of Files and those its apps keep, and only its own.
+  6. Only a mark stays, with no name or data, so its address goes on saying "This hub is no longer available."; its
      people and their sessions go with it.
 In: the deleted business and its 90 days over. Never a demo, which is deleted its own way when it expires, the
 platform's business or one moving to another server.
-Out: the final copy and the database dropped, with the event `base.hub.purged`; from there erplora.com no longer
-lists its copies. Or, with documents, the database kept and on the business's row the reason
+Out: the final copy, and the database and the files gone, with the event `base.hub.purged`; from there erplora.com no
+longer lists its copies. Or, with documents, the database and the files kept and on the business's row the reason
 (`fiscal_archive_missing: <apps>`).
 If it fails: a copy that fails drops nothing, and neither does having no copies store; a copy or a drop that fails is
 tried again (1 min, 5 min, 15 min, then every hour) with the error noted on the row, with no second copy if there
-already was one. If an app cannot be read, the database stays. A row that does not name the business's own database
-drops nothing (`invalid_database_name`). A business restored during the copy stays open with its database; once it is
-being dropped, erplora.com gets `hub_purged`. If the Hub shuts down mid-copy, the next one takes it up.
-Involved: HUBS-F18, HUBS-F19, HUBS-F20
+already was one. If the store does not delete its files, the business stays being dropped, with no mark and
+`files_purge_failed` on the row, and it is tried again the same way. If an app cannot be read, the database stays. A row
+that does not name the business's own database drops nothing (`invalid_database_name`). A business restored during the
+copy stays open with its database; once it is being dropped, erplora.com gets `hub_purged`. If the Hub shuts down
+mid-copy, the next one takes it up.
+Involved: HUBS-F18, HUBS-F19, HUBS-F20, PUBLIC-F34 (the same deletion of files, when a demo is retired)

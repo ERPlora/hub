@@ -87,3 +87,11 @@ def test_the_settings_re_run_the_methods_allowed_and_the_preview():
         "sale.checkout.preview",
     } <= affected
 
+
+
+def test_a_line_that_paid_for_a_voucher_re_runs_who_it_counts_for_and_no_money_figure():
+    # SALE-F28: it moves no money: the figures of what was charged do not re-run for it.
+    queries = sale_queries()
+    assert "sale.sale.voucher_line_changed" in queries["sale.sale.by_staff"]
+    for money in ("sale.sale.stats", "sale.sale.today", "sale.sale.last_7_days"):
+        assert "sale.sale.voucher_line_changed" not in queries[money]
