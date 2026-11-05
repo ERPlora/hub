@@ -36,7 +36,6 @@ SPANISH = Path("locale", "es", "LC_MESSAGES", "django.mo")
 SHADOWED = {
     "appointment": 7,
     "cash_register": 5,
-    "combo": 1,
     "flow": 7,
     "kitchen": 7,
     "modifier": 2,

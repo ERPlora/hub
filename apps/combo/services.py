@@ -14,6 +14,7 @@ from uuid import UUID
 from django.db import IntegrityError
 from django.db.models import Max
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import pgettext_lazy
 from live.context import OperationContext
 from live.errors import Conflict, InvalidPayload, NotFound
 from live.operations import atomic, operation
@@ -65,7 +66,8 @@ from base import images
 TAX_REQUIRED = _(
     "A menu eaten in needs its own VAT category: without it, it cannot be billed."
 )
-TAX_UNKNOWN = _("That tax category does not exist in Taxes.")
+# Its own context: it goes under the menu form's «Tipo de IVA», and Sale says the same English with «categoría fiscal».
+TAX_UNKNOWN = pgettext_lazy("combo", "That tax category does not exist in Taxes.")
 GROUP_EXISTS = _("That menu already has a course “%(name)s”.")
 TOO_MANY_GROUPS = _("A menu holds %(max)s courses at most.")
 OPTION_EXISTS = _(

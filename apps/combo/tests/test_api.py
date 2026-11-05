@@ -270,6 +270,23 @@ def test_a_refusal_on_a_field_is_a_422_with_its_field(admin_client):
 
 
 @pytest.mark.django_db
+def test_an_unknown_vat_category_is_refused_in_spanish_with_the_name_of_its_field(admin_client):
+    """The menu form's field is «Tipo de IVA» and COMBO-F02 says so: Sale's «categoría fiscal», an earlier app's
+    Spanish of the same English, does not speak for it (hub#664)."""
+    response = admin_client.post(
+        "/api/combo/combos",
+        json.dumps({"name": "x", "tax_category_key": "nope.nope"}),
+        content_type="application/json",
+        HTTP_HOST="a.localhost",
+        HTTP_ACCEPT_LANGUAGE="es",
+    )
+    assert response.status_code == 422
+    assert response.json()["error"]["fields"] == {
+        "tax_category_key": "Ese tipo de IVA no existe en Impuestos."
+    }
+
+
+@pytest.mark.django_db
 def test_a_domain_refusal_is_a_409_with_its_code(admin_client):
     combo = make_combo()
     make_group(combo, "Starters")
