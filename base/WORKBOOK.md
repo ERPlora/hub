@@ -76,7 +76,8 @@ según la hora («Buenos días», «Buenas tardes», «Buenas noches»). Debajo,
 - **«Termina de configurar tu negocio»**: cuántos pasos lleva hechos, una barra y los pasos que faltan,
   cada uno con su icono, su explicación, una etiqueta («Necesario para facturar», «Importante»,
   «Recomendado», «Hecho» o «Todavía no disponible») y «Configurar». Plegada: cinco pasos (dos en el
-  móvil), con «Ver todo» y «Ver menos». Cuando no falta nada: «Tu negocio está listo».
+  móvil), primero los que impiden facturar, con «Ver todo» y «Ver menos». Cuando no falta nada: «Tu negocio
+  está listo».
 - **El tablero de paneles**, con «Personalizar panel» (⋮) arriba a la derecha.
 
 ### Inicio · Actividad
@@ -423,8 +424,10 @@ Actor: propietario, administrador, responsable, empleado
 Pantalla: Inicio · Resumen
 Pasos:
   1. Entra en el Inicio. En «Termina de configurar tu negocio» ve cuántos pasos lleva hechos y una barra.
-  2. Debajo, los pasos que faltan, en el orden que fijan las apps: primero los que impiden facturar
-     («Necesario para facturar», en rojo), luego los «Importante» y al final los «Recomendado».
+  2. Debajo, los pasos que faltan: primero los que impiden facturar («Necesario para facturar», en rojo) y
+     luego los «Importante», cada grupo en el orden que fijan las apps, también en el móvil, donde solo caben
+     dos filas. Los «Recomendado» salen plegada solo si no queda otra cosa. «Ver todo» enseña todos los pasos,
+     también los hechos, en el orden que fijan las apps.
   3. Los de la plataforma son «Tus apps» (encender al menos una app de negocio) y «Tu equipo» (añadir a
      las personas que usarán el TPV); el resto los trae cada app encendida.
   4. Un paso que solo vale para otro país, o que la persona no puede ver, no sale. Un paso cuya
