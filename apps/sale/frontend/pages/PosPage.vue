@@ -941,12 +941,14 @@ onBeforeUnmount(() => {
     flex: 1 0 auto;
     grid-template-rows: auto;
   }
-  /* 81 px are all the page shows on the lowest phone under the strip, and the button with its count fits in them. */
+  /* Measured: 77 px are all the page shows on the lowest phone under the strip. At the touch minimum, and 0.25rem into the
+     catalogue's padding, the button and its count fit in them at both ends of the scroll. */
   .pos-till--phone .pos-till__fab {
     position: sticky;
     bottom: 0;
     align-self: flex-end;
-    height: 3.25rem;
+    height: 3rem;
+    margin-bottom: -0.25rem;
   }
   .pos-till--phone .pos-till__cart {
     position: fixed;

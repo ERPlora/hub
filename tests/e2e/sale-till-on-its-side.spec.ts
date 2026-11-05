@@ -98,6 +98,18 @@ async function tapTheTabs(page: Page, where: string): Promise<void> {
   await expect(drawer.locator('[data-testid=pos-cart-tab-check]'), `«Check» at ${where}`).toHaveAttribute('aria-selected', 'true');
 }
 
+/** «Open checks» opens whole inside the window, as low as it gets, and a tap beside it closes it. */
+async function openChecksFit(page: Page, height: number, where: string): Promise<void> {
+  const drawer = shown(page).locator('[data-testid=pos-cart-drawer]');
+  await drawer.locator('[data-testid=pos-open-checks]').click(TAP);
+  const checks = drawer.locator('[data-testid=pos-checks]');
+  await expect(checks, `«Open checks» at ${where}`).toBeVisible();
+  const bottom = await checks.evaluate((el) => el.getBoundingClientRect().bottom);
+  expect.soft(bottom, `«Open checks» inside the window at ${where}`).toBeLessThanOrEqual(height + EDGE);
+  await drawer.locator('[data-testid=pos-checks-backdrop]').click({ ...TAP, position: { x: 8, y: 8 } });
+  await expect(checks).toBeHidden();
+}
+
 /** A whole sale's taps, at the size the page is at now, from the catalogue to the charge sheet. */
 async function sellOnItsSide(page: Page, size: { label: string; width: number; height: number }, strip: boolean, lang: string): Promise<void> {
   const where = `${lang} ${size.label} ${strip ? 'with-strip' : 'no-strip'}`;
@@ -116,18 +128,24 @@ async function sellOnItsSide(page: Page, size: { label: string; width: number; h
   await expect(total, `the product on the check at ${where}`).not.toHaveText(before);
   await capture(page, `${KEY}-${where.replaceAll(' ', '-')}-catalogue`);
 
-  // The cart button whole in what the page shows, wherever the catalogue is scrolled: its count too, 6 px over it.
+  // The cart button whole in what the page shows, at both ends of the catalogue's scroll (the tap above moved it): its
+  // count too, 6 px over it. Under an address bar with the strip nothing fits; that size is not sold here.
   await settled(page);
-  const button = await fab.evaluate((el) => {
-    const box = el.getBoundingClientRect();
-    const view = el.closest('.ion-page');
-    const under = view?.querySelector('.page-notice')?.getBoundingClientRect().bottom ?? 0;
-    const over = view?.querySelector('ion-footer.section-tabbar')?.getBoundingClientRect().top ?? 0;
-    const content = view?.querySelector('ion-content')?.getBoundingClientRect();
-    return { top: box.top, bottom: box.bottom, from: Math.max(under, content?.top ?? 0), to: over };
-  });
-  expect.soft(button.top - 6, `the cart button below what is above it at ${where}`).toBeGreaterThanOrEqual(button.from - EDGE);
-  expect.soft(button.bottom, `the cart button above the tab bar at ${where}`).toBeLessThanOrEqual(button.to + EDGE);
+  for (const end of ['top', 'bottom'] as const) {
+    const button = await fab.evaluate(async (el, to) => {
+      const view = el.closest('.ion-page');
+      const content = view?.querySelector('ion-content') as (Element & { getScrollElement(): Promise<HTMLElement> }) | null;
+      const scroller = await content?.getScrollElement();
+      if (scroller) scroller.scrollTop = to === 'top' ? 0 : scroller.scrollHeight;
+      await new Promise((frame) => requestAnimationFrame(frame));
+      const box = el.getBoundingClientRect();
+      const under = view?.querySelector('.page-notice')?.getBoundingClientRect().bottom ?? 0;
+      const over = view?.querySelector('ion-footer.section-tabbar')?.getBoundingClientRect().top ?? 0;
+      return { top: box.top, bottom: box.bottom, from: Math.max(under, content?.getBoundingClientRect().top ?? 0), to: over };
+    }, end);
+    expect.soft(button.top - 6, `the cart button below what is above it at ${where}, scrolled to the ${end}`).toBeGreaterThanOrEqual(button.from - EDGE);
+    expect.soft(button.bottom, `the cart button above the tab bar at ${where}, scrolled to the ${end}`).toBeLessThanOrEqual(button.to + EDGE);
+  }
 
   await fab.click(TAP);
   await expect(till).toHaveClass(/pos-till--cart-open/);
@@ -144,7 +162,7 @@ async function sellOnItsSide(page: Page, size: { label: string; width: number; h
   if (size.height >= ON_ITS_SIDE[0].height) expect.soft(peek, `the first line shows as the drawer opens at ${where}`).toBeGreaterThanOrEqual(LINE_PEEK);
 
   // The bar and the foot, on screen as the drawer opens, with nothing on top of them.
-  for (const id of ['pos-cart-close', 'pos-open-checks', 'pos-prebill', 'pos-charge']) {
+  for (const id of ['pos-cart-close', 'pos-open-checks', 'customer-search-trigger', 'pos-ticket-discount', 'pos-prebill', 'pos-charge']) {
     const control = drawer.locator(`[data-testid=${id}]`);
     const reach = await touches(control);
     expect.soft(reach.reached, `a finger on «${id}» reaches it at ${where} (it touches «${reach.hit}»)`).toBe(true);
@@ -153,6 +171,7 @@ async function sellOnItsSide(page: Page, size: { label: string; width: number; h
 
   await tapTheLine(page, where);
   await tapTheTabs(page, where);
+  await openChecksFit(page, size.height, where);
 
   // A real tap on «Charge» opens the sheet, and its way out works too.
   await drawer.locator('[data-testid=pos-charge]').click(TAP);
