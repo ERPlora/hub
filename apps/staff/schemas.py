@@ -160,6 +160,20 @@ D_ROLE_ID = (
 D_ROLE = "Name of the role, when its id is not known (an active role of this business)."
 #: A person of the business by their id in its database: the card names them (``base.hub_user.get``).
 A_PERSON = names("base.hub_user.get")
+# The assistant's card names the record a write acts on by these reads (base/assistant.py ``REFERS``), run as whoever
+# asks, never by its id. A schedule says whose it is and a time-off request whose, of what kind and which days: everyone
+# may have a «Regular schedule», and one person can ask for several absences.
+A_MEMBER = names("staff.member.detail", name=("full_name",))
+A_ROLE = names("staff.role.detail")
+A_SCHEDULE = names("staff.schedule.detail", name=("label",))
+A_TIME_OFF = names("staff.time_off.get", name=("label",))
+# What the card calls the record a write acts on.
+MEMBER = gettext_noop("Staff member")
+ROLE = gettext_noop("Role")
+SCHEDULE = gettext_noop("Schedule")
+TIME_OFF = gettext_noop("Time off")
+#: A person of the team by their id, named on the card; or by their name in ``member`` (``_said_by``).
+MemberId = Annotated[UUID | None, Field(title=MEMBER, description=D_MEMBER_ID, json_schema_extra=A_MEMBER)]
 D_USER_ID = "Id of the business user (account) the record hangs from; one user, one live record."
 D_HIRE_DATE = "Hire date (YYYY-MM-DD)."
 D_BOOKABLE = "Whether the person takes appointments."
@@ -180,6 +194,11 @@ def _member_named(value: str | None, info: ValidationInfo, id_field: str) -> str
     if value is None and id_field in info.data and info.data[id_field] is None:
         raise ValueError(str(NO_MEMBER))
     return value
+
+
+def _said_by(id_field: str):
+    """The validator of ``member`` in a schema that says a person by ``id_field`` or by their name."""
+    return field_validator("member")(lambda value, info: _member_named(value, info, id_field))
 
 
 # Pages: every list is paginated, limit ≤ 100.
@@ -229,23 +248,17 @@ class DeletedOut(Schema):
 
 
 class MemberRefIn(Schema):
-    id: UUID | None = Field(None, description=D_MEMBER_ID)
+    id: MemberId = None
     member: MemberName | None = Field(None, validate_default=True, description=D_MEMBER)
 
-    @field_validator("member")
-    @classmethod
-    def _named(cls, value: str | None, info: ValidationInfo) -> str | None:
-        return _member_named(value, info, "id")
+    _named = _said_by("id")
 
 
 class MemberOfIn(Schema):
-    member_id: UUID | None = Field(None, description=D_MEMBER_ID)
+    member_id: MemberId = None
     member: MemberName | None = Field(None, validate_default=True, description=D_MEMBER)
 
-    @field_validator("member")
-    @classmethod
-    def _named(cls, value: str | None, info: ValidationInfo) -> str | None:
-        return _member_named(value, info, "member_id")
+    _named = _said_by("member_id")
 
 
 # Members
@@ -300,7 +313,7 @@ class MemberIn(Schema):
     email: Email = Field("", description=D_EMAIL)
     phone: Phone = Field("", description=D_PHONE)
     employee_number: EmployeeNumber = Field("", description=D_EMPLOYEE_NUMBER)
-    role_id: UUID | None = Field(None, description=D_ROLE_ID)
+    role_id: UUID | None = Field(None, title=ROLE, description=D_ROLE_ID, json_schema_extra=A_ROLE)
     role: Text100 | None = Field(None, description=D_ROLE)
     user_id: UUID | None = Field(None, description=D_USER_ID, json_schema_extra=A_PERSON)
     hire_date: dt.date | None = Field(None, description=D_HIRE_DATE)
@@ -327,7 +340,7 @@ class MemberPatchIn(MemberRefIn):
     phone: Phone | None = Field(None, description=D_PHONE)
     employee_number: EmployeeNumber | None = Field(None, description=D_EMPLOYEE_NUMBER)
     role_id: UUID | None = Field(
-        None, description=D_ROLE_ID + " Send null to remove the role."
+        None, title=ROLE, description=D_ROLE_ID + " Send null to remove the role.", json_schema_extra=A_ROLE
     )
     role: Text100 | None = Field(None, description=D_ROLE)
     user_id: UUID | None = Field(
@@ -369,7 +382,7 @@ class BulkMemberIn(Schema):
     last_name: Text100 = Field(description=D_LAST_NAME)
     email: _text(254) = Field("", description=D_EMAIL)
     phone: Phone = Field("", description=D_PHONE)
-    role_id: UUID | None = Field(None, description=D_ROLE_ID)
+    role_id: UUID | None = Field(None, title=ROLE, description=D_ROLE_ID, json_schema_extra=A_ROLE)
     role: Text100 | None = Field(None, description=D_ROLE)
     # Any text up to 100: a date that does not parse skips its row (invalid_hire_date), not the batch.
     hire_date: _text(100) | None = Field(None, description=D_HIRE_DATE)
@@ -623,7 +636,7 @@ class RoleIn(Schema):
 class RolePatchIn(Schema):
     """Only the fields sent are changed; ``null`` leaves a field as it is."""
 
-    id: UUID = Field(description="The role's id.")
+    id: UUID = Field(title=ROLE, description="The role's id.", json_schema_extra=A_ROLE)
     name: Name | None = Field(None, description="New name.")
     description: Text500 | None = Field(None, description="New description.")
     color: Color | None = Field(None, description="New colour as #RRGGBB.")
@@ -751,21 +764,17 @@ class ScheduleIn(Schema):
         None, description="Last day it applies (YYYY-MM-DD); empty = no end."
     )
     days: Week = Field(title=WEEK, description=D_DAYS)
-    member_id: UUID | None = Field(None, description=D_MEMBER_ID)
+    member_id: MemberId = None
     member: MemberName | None = Field(None, validate_default=True, description=D_MEMBER)
 
     _valid_range = field_validator("effective_until")(_valid_range)
-
-    @field_validator("member")
-    @classmethod
-    def _named(cls, value: str | None, info: ValidationInfo) -> str | None:
-        return _member_named(value, info, "member_id")
+    _named = _said_by("member_id")
 
 
 class ScheduleUpdateIn(Schema):
     """Replaces the week. The other fields keep their value when not sent; ``null`` clears a date."""
 
-    id: UUID = Field(description="The schedule's id.")
+    id: UUID = Field(title=SCHEDULE, description="The schedule's id.", json_schema_extra=A_SCHEDULE)
     name: Text100 | None = Field(
         None, description="New name; empty = «Regular schedule»."
     )
@@ -783,8 +792,12 @@ class ScheduleUpdateIn(Schema):
     _valid_range = field_validator("effective_until")(_valid_range)
 
 
+class ScheduleRefIn(Schema):
+    id: UUID = Field(title=SCHEDULE, description="The schedule's id.", json_schema_extra=A_SCHEDULE)
+
+
 class SetActiveIn(Schema):
-    id: UUID = Field(description="The schedule's id.")
+    id: UUID = Field(title=SCHEDULE, description="The schedule's id.", json_schema_extra=A_SCHEDULE)
     is_active: bool = Field(
         description="false: the schedule never governs a day; true: it does again."
     )
@@ -794,10 +807,7 @@ class ScheduleListIn(PageIn):
     member_id: UUID | None = Field(None, description=D_MEMBER_ID)
     member: MemberName | None = Field(None, validate_default=True, description=D_MEMBER)
 
-    @field_validator("member")
-    @classmethod
-    def _named(cls, value: str | None, info: ValidationInfo) -> str | None:
-        return _member_named(value, info, "member_id")
+    _named = _said_by("member_id")
 
 
 class DayOut(Schema):
@@ -819,6 +829,10 @@ class ScheduleOut(Schema):
     days: list[DayOut] = Field(
         description="The working days; a weekday missing is a day off."
     )
+
+
+class ScheduleDetailOut(ScheduleOut):
+    label: str = Field(description="Whose it is and its name: what tells it from another person's of that name.")
 
 
 SchedulePage = Page[ScheduleOut]
@@ -954,6 +968,10 @@ class TimeOffRequestIn(TimeOffFieldsIn):
     """The caller's own time off: the member is the one linked to the caller's user."""
 
 
+class TimeOffRefIn(Schema):
+    id: UUID = Field(title=TIME_OFF, description="The time-off request's id.", json_schema_extra=A_TIME_OFF)
+
+
 class TimeOffListIn(PageIn):
     search: Search | None = Field(
         None, description="Text to look for in the person's name."
@@ -1018,6 +1036,12 @@ class TimeOffOut(Schema):
     status: TimeOffStatus
     approved_by_id: UUID | None = Field(description="The business user who approved it.")
     approved_at: dt.datetime | None
+
+
+class TimeOffNamedOut(TimeOffOut):
+    """A time-off request as the list says it, never with its reason, and how the card names it."""
+
+    label: str = Field(description="Whose it is, of what kind and which days, in the caller's language.")
 
 
 class TimeOffDetailOut(TimeOffOut):

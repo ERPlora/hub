@@ -26,12 +26,14 @@ from apps.staff.schemas import (
     RolePatchIn,
     ScheduleIn,
     ScheduleListIn,
+    ScheduleRefIn,
     ScheduleUpdateIn,
     SetActiveIn,
     SettingsIn,
     TerminateIn,
     TimeOffIn,
     TimeOffListIn,
+    TimeOffRefIn,
     TimeOffRequestIn,
     TodayIn,
 )
@@ -162,7 +164,7 @@ async def schedule_set_active(request, data: SetActiveIn):
 
 
 @bind(router, "staff.schedule.delete", "/staff/schedules/delete")
-async def schedule_delete(request, data: ByIdIn):
+async def schedule_delete(request, data: ScheduleRefIn):
     return await run_operation(request, services.delete_schedule, data)
 
 
@@ -205,17 +207,17 @@ async def time_off_request(request, data: TimeOffRequestIn):
 
 
 @bind(router, "staff.time_off.approve", "/staff/time_off/approve")
-async def time_off_approve(request, data: ByIdIn):
+async def time_off_approve(request, data: TimeOffRefIn):
     return await run_operation(request, services.approve_time_off, data)
 
 
 @bind(router, "staff.time_off.reject", "/staff/time_off/reject")
-async def time_off_reject(request, data: ByIdIn):
+async def time_off_reject(request, data: TimeOffRefIn):
     return await run_operation(request, services.reject_time_off, data)
 
 
 @bind(router, "staff.time_off.cancel", "/staff/time_off/cancel")
-async def time_off_cancel(request, data: ByIdIn):
+async def time_off_cancel(request, data: TimeOffRefIn):
     return await run_operation(request, services.cancel_time_off, data)
 
 
