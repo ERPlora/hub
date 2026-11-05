@@ -65,6 +65,7 @@ msgstr "confirmar solas las reservas nuevas"
 msgid "phone required"
 msgstr "teléfono obligatorio"
 
+msgctxt "reservation"
 msgid "email required"
 msgstr "correo obligatorio"
 
@@ -192,6 +193,7 @@ msgstr "mesa"
 msgid "status"
 msgstr "estado"
 
+msgctxt "reservation"
 msgid "booked through"
 msgstr "origen"
 
