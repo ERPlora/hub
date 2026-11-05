@@ -3,7 +3,9 @@
 #   bash .github/scripts/download-tool.sh <url> <sha256> <output>
 # A passing error of the server (a 5xx, a cut connection, an answer that hangs) is retried, so one
 # bad answer of GitHub does not turn a PR red (hub#830): ATTEMPTS attempts in all, RETRY_DELAY_SECONDS
-# apart, each cut at ATTEMPT_TIMEOUT_SECONDS (GitHub's 504 came after 2 minutes of waiting). When every
+# apart, each cut at ATTEMPT_TIMEOUT_SECONDS (GitHub's 504 came after 2 minutes of waiting); with the
+# defaults the worst case is 5 x 60 s + 4 x 10 s = 340 s, or 410 s when the server asks to wait with
+# Retry-After (the 350 s budget below plus one attempt), inside test.yml's 15-minute job. When every
 # attempt fails, or the file is not the pinned one, it fails with an ::error:: that names the URL;
 # <output> only appears when the file matches its pin.
 #
@@ -40,11 +42,15 @@ rm -f "$partial"
 trap 'rm -f "$partial"' EXIT
 
 # --retry-all-errors: curl's --retry alone gives up on a cut connection. RETRY_DELAY_SECONDS=0 leaves
-# the wait to curl's own backoff (1 s, doubling each time).
+# the wait to curl's own backoff (1 s, doubling each time). --retry-max-time: a Retry-After of the
+# server longer than --retry-delay replaces it, so a 429/503 asking for minutes would outlast the job;
+# past this budget curl gives up at once instead of waiting it out, and a curl that gives up that way
+# can still exit 0 with nothing downloaded (curl 8.22 does), so a missing file is a failure too.
+budget=$((attempts * (timeout + delay)))
 if ! curl --fail --silent --show-error --location \
   --retry "$((attempts - 1))" --retry-delay "$delay" --retry-all-errors --max-time "$timeout" \
-  --output "$partial" "$url"; then
-  fail "could not download $url: the $attempts attempt(s) failed (curl's error above); if GitHub is down, re-run the job once it answers"
+  --retry-max-time "$budget" --output "$partial" "$url" || [ ! -f "$partial" ]; then
+  fail "could not download $url (curl's error above): it gave up after $attempts attempt(s) or ${budget} s of retries; if GitHub is down, re-run the job once it answers"
 fi
 
 actual="$(sha256sum "$partial" | cut -d ' ' -f 1)"

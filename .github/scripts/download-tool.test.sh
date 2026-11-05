@@ -26,7 +26,8 @@ TOOL_SHA256=f2213272f0fb904d9f87a72441b1413265729d57a354ad8f77bfd77dbf922fcf
 
 # The fake server: one answer per request, from the plan in argv[1], one word per answer, the last
 # word repeating: 200 (the tool), 504 or any other status (a short error body), cut (closes the
-# connection without answering) or hang (answers the tool after 4 s). Each request is logged to
+# connection without answering), hang (answers the tool after 4 s) or wait (a 503 that asks to come
+# back in 20 s with Retry-After). Each request is logged to
 # argv[3] as "<path> <answer>"; the port it listens on goes to argv[4].
 cat > "$root/server.py" <<'PYEOF'
 import http.server
@@ -56,9 +57,11 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return
         if answer == "hang":
             time.sleep(4)
-        status = 200 if answer in ("200", "hang") else int(answer)
+        status = 200 if answer in ("200", "hang") else 503 if answer == "wait" else int(answer)
         body = tool if status == 200 else b"error\n"
         self.send_response(status)
+        if answer == "wait":
+            self.send_header("Retry-After", "20")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
@@ -74,7 +77,7 @@ PYEOF
 
 # download <plan> [<sha256>] [VAR=value...]: serves <plan> and runs download-tool.sh against it with 3
 # attempts, 1 s apart, each cut at 2 s; the VARs override that environment. Sets status (its exit
-# code), url and work: $work/out.log (its output), $work/requests (one line per request the server
+# code), elapsed (its seconds), url and work: $work/out.log (its output), $work/requests (one line per request the server
 # got) and $work/tool.tar.gz (the output it was asked for).
 download() {
   local plan="$1" sha256="${2:-$TOOL_SHA256}" port=""
@@ -97,8 +100,10 @@ download() {
   fi
   url="http://127.0.0.1:$port/actionlint_1.7.12_linux_amd64.tar.gz"
   status=0
+  local started="$SECONDS"
   env ATTEMPTS=3 RETRY_DELAY_SECONDS=1 ATTEMPT_TIMEOUT_SECONDS=2 "$@" \
     bash "$here/download-tool.sh" "$url" "$sha256" "$work/tool.tar.gz" > "$work/out.log" 2>&1 || status=$?
+  elapsed=$((SECONDS - started))
   kill "$server_pid" 2> /dev/null || true
   wait "$server_pid" 2> /dev/null || true
   server_pid=""
@@ -117,6 +122,8 @@ check() {
 
 # requests: how many requests the server got.
 requests() { wc -l < "$work/requests" | tr -d ' '; }
+# took_under <seconds>: the download ended before <seconds>.
+took_under() { [ "$elapsed" -lt "$1" ]; }
 # downloaded: green, the output is the pinned tool and no ::error:: was written.
 downloaded() {
   [ "$status" -eq 0 ] && cmp -s "$root/tool" "$work/tool.tar.gz" && ! grep -q '::error::' "$work/out.log"
@@ -153,6 +160,12 @@ check "ATTEMPTS=1 tries once" 'refused "$url" && [ "$(requests)" = 1 ]'
 
 download "cut"
 check "a connection always cut ends in red" 'refused "$url" && [ "$(requests)" = 3 ]'
+
+# A Retry-After longer than --retry-delay replaces it: without a budget, a 429/503 asking for minutes
+# outlasts the job's timeout and the ::error:: is never written.
+download "wait"
+check "a Retry-After past the retries' budget ends in red at once instead of waiting it out" \
+  'refused "$url" && [ "$(requests)" = 1 ] && took_under 5'
 
 download "200" "$(printf '0%.0s' $(seq 64))"
 check "a file that is not the pinned one ends in red, naming its URL and SHA-256" \
