@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:1443e5816485631f7325d8d0dc8875a859250fa94bc2437d59fb933b58612a5b -->
+<!-- generated from WORKBOOK.md sha256:0f47a363d794b29d125367063ab63a198a1a6e3e3979ad8691bdec97d8e63eaf -->
 
 ## What it is for and who it is for
 
@@ -2400,7 +2400,9 @@ Steps:
      no sign when it balances); a yes or a no, as "Yes" or "No"; a list that its app (the server) names, by its items
      one after another ("Printers: Till, Kitchen"; past four, the first three and how many more: "Till, Kitchen, Bar and
      2 more"; when an item carries a comma, such as a date, separated by semicolons: "Nov 2, 2026, 10:00 AM; Nov 9,
-     2026, 10:00 AM") and any other, such as the lines of a sale or a list of codes, by how many items it carries; and a datum that groups others, such as a WhatsApp template, by its values, without the name of each one ("Template:
+     2026, 10:00 AM"); a list of lines that carry only their record, such as the services of an appointment, the same
+     way, by the name of each ("Services: Haircut, Colour"; one that cannot be named counts among the "more"); and any
+     other, such as the lines of a sale (with their quantity and price) or a list of codes, by how many items it carries; and a datum that groups others, such as a WhatsApp template, by its values, without the name of each one ("Template:
      cita_recordatorio · es · Ana, 10:00"; of a till count, the notes and coins counted remain: "50: 2"). A date and a
      time show as they are written in the person's language and at the business's hour ("Nov 2, 2026, 10:00 AM"; a day
      alone, "Nov 2, 2026"; a time alone, "9:30 PM"); a value of a closed list, with the name its app gives it ("Front

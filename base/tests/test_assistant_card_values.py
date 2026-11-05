@@ -138,7 +138,7 @@ def test_a_record_named_by_its_id_never_reaches_the_card_by_it(language):
     shown = values(assistant.card(get("appointment.appointment.create"), BOOKING, language))
     assert "customer_id" not in shown and "staff_id" not in shown
     assert shown["customer"] == "Ana López"
-    # Still one service: a list says how many it carries.
+    # Its service left out (nobody at hand reads it): the screen counts it among the more, never by its id (hub#835).
     assert shown["services"] == [{}]
 
 
