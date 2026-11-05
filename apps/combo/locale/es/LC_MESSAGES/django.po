@@ -314,6 +314,7 @@ msgid ""
 msgstr "Un menú que se consume en el local necesita su propio tipo de IVA: sin él no se puede facturar."
 
 #: services.py:62
+msgctxt "combo"
 msgid "That tax category does not exist in Taxes."
 msgstr "Ese tipo de IVA no existe en Impuestos."
 
