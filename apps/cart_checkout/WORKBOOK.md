@@ -247,8 +247,8 @@ Sale: los carritos vencidos pasan a Expirado y la orden dice cuántos
 (`cart_checkout.cart.expired`, con el número; sin ninguno no avisa).
 Si falla: sin carritos vencidos contesta «0» y no avisa. Un carrito sin caducidad no caduca nunca. Con la
 lista ya abierta, un carrito que vence en ese momento sigue pintado «Activo» hasta que la lista se vuelve a
-leer: con el siguiente cambio, al volver a abrirla o con la relectura de seguridad del Hub (cada 5
-minutos). Cuando la orden la da alguien del negocio, por el asistente o la API, la lista abierta se pone
+leer: con la pasada de la tarea que lo deja Expirado, con el siguiente cambio, al volver a abrirla o con la
+relectura de seguridad del Hub (cada 5 minutos). Cuando la orden la da alguien del negocio, por el asistente o la API, la lista abierta se pone
 al día en ese momento.
 Implicados: ninguno
 
@@ -473,9 +473,9 @@ sin vínculo con Inventario, y el cliente es un email y un nombre sin vínculo c
 - **Caducidad**: el estado efectivo se calcula al leer (activo + `expires_at` pasado = `expired`), en
   las listas, el detalle, el filtro y las guardas de las acciones. `cart_checkout.cart.cleanup_expired`
   lo guarda; la tarea `expire_overdue_carts` (cada 15 min, en UTC, `catch_up: collapse`) la declara
-  `apps.py` y la corre el worker del Hub (`base.scheduler`; `tests/test_scheduled_expiry.py`). En la fase
-  1 corre sobre su ámbito fijo (`WORKER_SCOPE_SLUG`): su aviso no llega a las listas abiertas en otro
-  negocio, que se ponen al día con la relectura de 5 minutos.
+  `apps.py` y la corre el worker del Hub (`base.scheduler`; `tests/test_scheduled_expiry.py`), en
+  cada negocio, en su BD y con su ámbito (`base.worker._serve_hub`): su aviso llega a las listas abiertas en
+  ese negocio y a ninguna de otro (`base/tests/test_scheduled_task_notice_channel.py`).
 - **Numeración sin huecos**: `OS-AAAAMMDD-NNNN` con el día del negocio, en su zona (`base.business.business_zone`, hub#771; un cambio
   de zona sigue la cuenta de ese día, nunca repite número), del contador del día subido con `UPDATE … RETURNING` dentro de la transacción del pedido; nunca una secuencia. Todas las
   comprobaciones van antes, así que un rechazo no gasta número. Probado con hilos y sesiones reales.
@@ -583,10 +583,6 @@ Tests:
 
 ## Lo que queda fuera
 
-- **El aviso al instante de un carrito que vence solo** (CART_CHECKOUT-F07): la tarea de cada 15
-  minutos corre en la fase 1 sobre el ámbito del worker, así que una lista abierta en el negocio no se
-  entera hasta el siguiente cambio, hasta que se vuelve a abrir o hasta la relectura de 5 minutos. Con la
-  tenencia de la fase 2 la tarea corre en cada hub y avisa a los suyos.
 - **Iconos propios** (`ion:bag-check-outline` y `ion:checkmark-done-outline` del producto actual) y las
   **piezas compartidas** que la app lleva copiadas (tabla de servidor viva, lector de importes): pedidos
   en `UI-REQUESTS.md`, sin llegar a `@erplora/ui` al cerrar la app.

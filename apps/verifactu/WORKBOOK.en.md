@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:64aff266fc753a4cd351125acf4259f772295b4712db2725a6f1e522ee3d5d15 -->
+<!-- generated from WORKBOOK.md sha256:6cc15c59135f6d993161cbbb8956d913d496dc4d29c972705afce9046ece9c66 -->
 
 ## What it is for and who it is for
 
@@ -229,7 +229,7 @@ Screen notices: the result of each action in a strip on top (green if it went we
 | VERIFACTU-F17 | See the detail of a record and why it waits | done |
 | VERIFACTU-F18 | Verify the QR at the AEAT's site | partial — in the installed app the AEAT's site does not open yet: the app has yet to accept its addresses (ERPlora/app#20) |
 | VERIFACTU-F19 | Give the QR and the fiscal status to the ticket and the invoice | done (Sales and Printing ask for it by name) |
-| VERIFACTU-F20 | Send later what could not go out (automatic contingency) | done — the worker runs it every minute (in phase 1, over a single hub) |
+| VERIFACTU-F20 | Send later what could not go out (automatic contingency) | done — the worker runs it every minute, in each business |
 | VERIFACTU-F21 | Process the queue by hand | done |
 | VERIFACTU-F22 | Retry a queue entry | done |
 | VERIFACTU-F23 | Discard a queue entry | discarded — a generated record is never discarded |
@@ -586,9 +586,9 @@ Out: the status and the answer in each record (it announces `verifactu.record.tr
 If it fails: with no gateway configured, no producer's data or no route ready, nothing is sent and each record
 says why it waits (VERIFACTU-F17). A record is never taken as accepted without the AEAT's answer. A business
 outside Spain never sends anything: what was sealed before is kept as it is, without going out, and says why.
-A business's record is always presented as that business, never as ERPlora's hub (hub#454): the pass of ERPlora's
-hub (the worker's fixed scope in phase 1, which sees the businesses' records while the tables are shared) presents
-it with the id erplora.com gave the business; without that id (its account's photo has not arrived yet) nothing is
+A business's record is always presented as that business, never as ERPlora's hub (hub#454): the worker goes
+through each business in its database and on its scope. If the pass of ERPlora's hub sees a record with a tax ID other
+than ERPlora's, it presents it with the id erplora.com gave the business; without that id (its account's photo has not arrived yet) nothing is
 sent and the record waits with "ERPlora has not linked this business to its account on this server yet"
 (`hub_unregistered`; "Send now" → 409 `verifactu.hub_unregistered`) until the photo brings it.
 Involved: VERIFACTU-F20, FLOW-F04 (the card of the Automations gallery that creates an urgent task when the AEAT
@@ -663,7 +663,7 @@ goes out without a VeriFactu QR or receipt.
 Involved: INVOICE-F17, INVOICE-F18
 
 ### VERIFACTU-F20 Send later what could not go out (automatic contingency)
-Status: done — the worker runs it every minute (in phase 1, over a single hub)
+Status: done — the worker runs it every minute, in each business
 Actor: system
 Screen: Contingency
 Steps:

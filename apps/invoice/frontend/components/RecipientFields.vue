@@ -3,9 +3,10 @@
 // customer search of Customers (picking a card fills the fields with a COPY of its tax details; removing
 // it keeps what is written), «Name or company name», «Country» (Customers' list, Spain first), «Document
 // type» (only abroad; a new country resets it to the usual one there), «Tax ID» and «Address». What the
-// server refused is said under its field (`fieldErrors`, by the command's field names).
+// server refused is said under its field (`fieldErrors`, by the command's field names, which each field
+// also goes by). The form around takes a message away once its field changes (FormModal's rule).
 import { IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
-import { computed, shallowRef, watch } from 'vue';
+import { computed, shallowRef, useTemplateRef, watch } from 'vue';
 
 import CustomerSearch, { countryOptions, type CustomerSnapshot } from '../../../customer/frontend/components/CustomerSearch.vue';
 import { useLocale } from '../composables/useT';
@@ -26,10 +27,38 @@ const locale = useLocale();
 const countries = computed(() => countryOptions(locale.value));
 const card = shallowRef<CustomerSnapshot | null>(null);
 const choosing = shallowRef(false);
+const root = useTemplateRef<HTMLElement>('root');
 
 watch(card, (picked) => {
   model.value = picked ? recipientFrom(picked) : { ...model.value, customerId: null };
 });
+
+/** Each field by the command's name, with what the server judges it on: a tax ID is checked against its
+ *  country and its document type. */
+const JUDGED_ON: Readonly<Record<string, readonly (keyof Recipient)[]>> = {
+  customer_name: ['name'],
+  customer_country: ['country'],
+  customer_id_type: ['idType', 'country'],
+  customer_tax_id: ['taxId', 'country', 'idType'],
+  customer_address: ['address'],
+};
+
+function fieldNamed(name: string): Element | undefined {
+  return [...(root.value?.querySelectorAll('ion-input, ion-select') ?? [])].find((el) => (el as { name?: unknown }).name === name);
+}
+
+// Typing tells the form around which field changed; a picked card, or a tax ID judged again under a new
+// country or document type, would not (hub#461). Each field whose judgement changed says it with a native
+// `input`, as typing does (after a keystroke the field says it twice, which changes nothing).
+watch(
+  model,
+  (now, before) => {
+    for (const [name, keys] of Object.entries(JUDGED_ON)) {
+      if (keys.some((key) => now[key] !== before[key])) fieldNamed(name)?.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+  },
+  { flush: 'post' },
+);
 
 type TextField = 'name' | 'taxId' | 'address';
 
@@ -51,6 +80,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
 
 <template>
   <div
+    ref="root"
     class="invoice-recipient"
     data-testid="invoice-recipient"
   >
@@ -60,6 +90,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
     />
     <ion-input
       data-testid="invoice-recipient-name"
+      name="customer_name"
       :label="$t('invoice.recipient.name')"
       label-placement="floating"
       fill="outline"
@@ -73,6 +104,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
     />
     <ion-select
       data-testid="invoice-recipient-country"
+      name="customer_country"
       :label="$t('invoice.recipient.country')"
       label-placement="floating"
       fill="outline"
@@ -94,12 +126,15 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
     <ion-select
       v-if="model.country !== HOME_COUNTRY"
       data-testid="invoice-recipient-id-type"
+      name="customer_id_type"
       :label="$t('invoice.recipient.idType')"
       label-placement="floating"
       fill="outline"
       mode="md"
       interface="popover"
       :value="model.idType"
+      :error-text="fieldErrors.customer_id_type"
+      :class="invalid(fieldErrors.customer_id_type)"
       @ion-change="setIdType($event.detail.value)"
     >
       <ion-select-option
@@ -112,6 +147,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
     </ion-select>
     <ion-input
       data-testid="invoice-recipient-tax-id"
+      name="customer_tax_id"
       :label="$t('invoice.recipient.taxId')"
       label-placement="floating"
       fill="outline"
@@ -125,6 +161,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
     />
     <ion-input
       data-testid="invoice-recipient-address"
+      name="customer_address"
       :label="$t('invoice.recipient.address')"
       label-placement="floating"
       fill="outline"
