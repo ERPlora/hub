@@ -56,7 +56,10 @@ class Settings(UUIDModel):
         _("confirm new reservations automatically"), default=False
     )
     require_phone = models.BooleanField(_("phone required"), default=True)
-    require_email = models.BooleanField(_("email required"), default=False)
+    # Own context: Reservas online says the same English «email obligatorio» (hub#548).
+    require_email = models.BooleanField(
+        pgettext_lazy("reservation", "email required"), default=False
+    )
     no_show_window_minutes = models.PositiveSmallIntegerField(
         _("release an unconfirmed reservation after (minutes)"), default=15
     )
@@ -226,7 +229,11 @@ class Reservation(Audited):
         _("status"), max_length=12, choices=Status.choices, default=Status.PENDING
     )
     source = models.CharField(
-        _("booked through"), max_length=12, choices=Source.choices, default=Source.PHONE
+        # Own context: Citas says the same English «reservada por» (hub#548).
+        pgettext_lazy("reservation", "booked through"),
+        max_length=12,
+        choices=Source.choices,
+        default=Source.PHONE,
     )
     # Visible to the guest; the internal one may hold health data (an allergy, a wheelchair).
     notes = models.TextField(_("notes"), blank=True)
