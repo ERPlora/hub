@@ -104,7 +104,7 @@ export interface RecordRowOut {
   status: RecordStatus;
   correction: boolean;
   correction_status: CorrectionStatus;
-  /** The record that corrects it (its latest correction), if any. */
+  /** The record that corrects it, if any. */
   corrected_by_id: string | null;
   qr_url: string;
   created_at: string;

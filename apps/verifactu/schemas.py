@@ -137,7 +137,7 @@ class RecordRowOut(Schema):
         "errors and no correction yet, corrected once a new record corrects it, not_applicable otherwise."
     )
     corrected_by_id: UUID | None = Field(
-        description="The record that corrects it (its latest correction), if any."
+        description="The record that corrects it, if any."
     )
     qr_url: str = Field(description="The AEAT's verification link (its QR).")
     created_at: dt.datetime = Field(description="When it was sealed.")

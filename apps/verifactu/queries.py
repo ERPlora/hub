@@ -432,18 +432,15 @@ def correctable(record: Record) -> bool:
 
 
 def with_correction(queryset: QuerySet) -> QuerySet:
-    """Each record with ``corrected_by_id``, the record that corrects it (its latest), if any (VERIFACTU-F24): one
-    subquery for the whole page, never a query per row."""
-    latest = (
-        Record.objects.filter(corrects=OuterRef("pk"))
-        .order_by("-created_at", "-id")
-        .values("id")[:1]
-    )
-    return queryset.annotate(corrected_by_id=Subquery(latest))
+    """Each record with ``corrected_by_id``, the record that corrects it, if any (VERIFACTU-F24): one subquery for the
+    whole page, never a query per row. A record is corrected once (``verifactu.record.correct`` locks it and refuses a
+    second)."""
+    correction = Record.objects.filter(corrects=OuterRef("pk")).values("id")[:1]
+    return queryset.annotate(corrected_by_id=Subquery(correction))
 
 
 def corrected_by(record: Record) -> UUID | None:
-    """The record that corrects ``record`` (its latest), if any: the list's subquery, for one record."""
+    """The record that corrects ``record``, if any: the list's subquery, for one record."""
     return (
         with_correction(Record.objects.filter(pk=record.pk))
         .values_list("corrected_by_id", flat=True)
