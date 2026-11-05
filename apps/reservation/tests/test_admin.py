@@ -5,6 +5,8 @@ the app so support can repair; it does not go through the operations' rules and 
 database fills in (ids and timestamps) is shown, not edited.
 """
 
+import re
+
 import pytest
 from django.contrib import admin
 from django.contrib.auth import get_user_model
@@ -135,3 +137,37 @@ def test_support_can_repair_a_reservation_through_the_admin(client, superuser):
         reservation.status,
         f"{reservation.time:%H:%M}",
     ) == (5, "confirmed", "21:30")
+
+
+@pytest.mark.django_db
+def test_the_reservations_list_in_spanish_says_where_a_reservation_came_from_as_reservas_does(client, superuser):
+    """The column and the filter of a reservation's source read «Origen», as Reservas' own screens and WORKBOOK say
+    it, next to the «Estado» of the status; not Citas' «reservada por» of the same English (hub#548)."""
+    make_reservation()
+    client.force_login(superuser)
+    response = client.get(
+        "/admin/reservation/reservation/", HTTP_HOST="hubs.localhost", HTTP_ACCEPT_LANGUAGE="es"
+    )
+    assert response.status_code == 200
+    page = response.content.decode()
+    assert '<details data-filter-title="estado"' in page  # the page is in Spanish: the status' filter
+    assert '<details data-filter-title="origen"' in page  # the source's filter
+    header = re.search(r'class="sortable column-source">\s*<div class="text"><a [^>]*>([^<]*)</a>', page)
+    assert header and header.group(1) == "Origen"  # the source's column
+    assert "eservada por" not in page
+
+
+@pytest.mark.django_db
+def test_the_settings_in_spanish_say_email_required_as_reservas_does(client, superuser):
+    """The setting that asks each reservation for an email reads «Correo obligatorio», as Reservas' settings screen
+    and WORKBOOK say it, under its «Teléfono obligatorio»; not Reservas online's «email obligatorio» (hub#548)."""
+    rules = set_rules(require_email=True)
+    client.force_login(superuser)
+    response = client.get(
+        f"/admin/reservation/settings/{rules.pk}/change/", HTTP_HOST="hubs.localhost", HTTP_ACCEPT_LANGUAGE="es"
+    )
+    assert response.status_code == 200
+    page = response.content.decode()
+    assert 'for="id_require_phone">Teléfono obligatorio</label>' in page  # the page is in Spanish
+    assert 'for="id_require_email">Correo obligatorio</label>' in page
+    assert "mail obligatorio" not in page
