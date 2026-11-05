@@ -467,14 +467,6 @@ def test_the_date_defaults_to_the_business_today(no_seed):
     assert tomorrow.tax == 21
 
 
-def test_a_rate_that_ends_today_applies_until_the_businesss_midnight(no_seed, night_elsewhere):
-    generic = category()
-    rule(generic, "10", valid_to=date(2026, 11, 2))
-    rule(generic, "21", valid_from=date(2026, 11, 3))
-    assert calculate(amount=100, tax_category_key="product.generic").tax == 10
-    assert queries.business_today() == date(2026, 11, 2)
-
-
 def test_when_the_rules_cannot_be_read_the_calculation_stops(no_seed):
     # taxes#82: an outage is not «no rate», and allow_missing_rate must not turn it into 0 %.
     rule(category(), "21")

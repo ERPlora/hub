@@ -739,8 +739,8 @@ El cajero del producto actual ya no existe como papel: lo que veía (el director
   y luego la fila; una ficha dada de baja mientras tanto da «no existe». Hay tests con hilos de cada
   carrera.
 - El «hoy» es el del reloj del negocio (`business_today()` de `queries.py`, por `base.business.business_zone`,
-  hub#771). Las comisiones piden las ventas por su día, que aún va en `TIME_ZONE` (`sale_day` de Ventas, hub#772): en
-  otra zona, lo cobrado en la hora de diferencia cuenta en el día siguiente.
+  hub#771). Las comisiones piden las ventas por su día, que aún va en `TIME_ZONE` (hub#772): en otra zona, lo cobrado en
+  las horas en que los dos relojes no coinciden en el día cuenta en el de Madrid.
 - **Millares**: los importes agrupan los millares también con cuatro cifras («1.234,56 €»; `formatMoney` de
   `@erplora/ui/components`, con `useGrouping: 'always'`, porque el CLDR del español espera a cinco: hub#494).
 - Dinero en unidades menores enteras de la moneda del negocio (`hourly_rate`; céntimos en euros); la

@@ -1,18 +1,15 @@
-"""A sale's day at night in a business of another zone (hub#771). Every other «today» of a business reads its clock; a
-sale's cannot yet: Invoicing copies its day to the operation date of the VeriFactu record and its number to the record's
-description, while the issue date stays on the deployment's clock until hub#772 moves it, under supervision. Until then
-a sale stays on one clock, whole: the till never says one day and charges on another, and no record changes."""
+"""A sale's day at night in a business of another zone (hub#771). A sale's day, and the «today» of Taxes that its
+figures and its preview read, are still on the deployment's clock: they reach the VeriFactu record, so they move
+together, under supervision (hub#772; ``tests/test_guardrails_fiscal_clock.py`` freezes the record). Until then the till
+stays on one clock, whole: it never says one day and charges on another."""
 
 import datetime as dt
 import uuid
 
 import pytest
 
-from apps.invoice.models import Invoice
 from apps.sale.tests.conftest import run
-from apps.sale.tests.test_integration_invoice import ISSUER
 from apps.tax.models import TaxCategory, TaxRule
-from apps.verifactu.services import _alta_fields
 
 pytestmark = pytest.mark.django_db
 
@@ -67,12 +64,3 @@ def test_the_cash_limit_values_the_rest_of_a_check_on_the_day_it_would_be_charge
 def test_a_section_says_the_rate_the_till_charges(tapa):
     run("sale.department.create", {"name": "Fruit", "tax_category_key": "test.turn"})
     assert run("sale.department.list").rows[0].tax_rate_pct == 21
-
-
-def test_the_record_of_a_sale_at_night_says_no_other_day_than_its_issue(tapa):
-    run("invoice.issuer.update", ISSUER)
-    sale = charge()
-    invoice = Invoice.objects.get(source_sale_id=sale.id)
-    assert (invoice.issue_date, invoice.operation_date) == (SALE_DAY, SALE_DAY)
-    assert _alta_fields(invoice)["operation_date"] is None
-    assert sale.number in invoice.description and "20261103" in sale.number

@@ -361,7 +361,7 @@ def test_who_sold_a_voucher_earns_nothing_on_it_and_who_does_its_sessions_earns_
 
 
 def test_at_night_elsewhere_a_sale_earns_on_the_day_it_is_numbered_until_hub_772(catalog, night_elsewhere):
-    # A sale stays on the deployment's clock (``sale_day``): charged on the business's 2nd, it counts on the 3rd.
+    # A sale stays on the deployment's clock: charged on the business's 2nd, it counts on the 3rd.
     ana = make_member("Ana", commission_rate=Decimal("10"))
     charge("commission-night", ("CUT", None), staff=ana)
     today = report()

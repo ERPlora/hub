@@ -93,6 +93,7 @@ from apps.tax.models import TaxCategory
 from apps.tax.queries import (
     business_jurisdiction,
     business_tax_kind,
+    business_today,
     category_by_reference,
     current_rates,
 )
@@ -201,13 +202,6 @@ TYPE_SETTING = {
 # ── The business ─────────────────────────────────────────────────────────────────────────────────
 
 
-def sale_day(moment: dt.datetime | None = None) -> dt.date:
-    """The day a sale is numbered, taxed and counted on: the one reading of it. Still the deployment's, not the
-    business's: Invoicing copies it to the operation date of the VeriFactu record and the number to its description,
-    while the issue date is on this clock too, so it moves with the invoice's dates, under supervision (hub#772)."""
-    return timezone.localdate(moment)
-
-
 def business_currency(ctx: OperationContext) -> str:
     """The currency of ``ctx``'s business (ISO 4217), the one a sale charged now keeps: the one question every app that
     charges asks (``base.operations.business_currency``, BASE-F50), on ERPlora's own hub too, never a copy of its own.
@@ -247,7 +241,7 @@ def authoriser(ctx: OperationContext) -> str:
     input=EmptyIn,
     output=BusinessDayOut,
     ai=AI(
-        description="The day the till is on: the business day sales are numbered and counted in.",
+        description="Today's date in the business's time zone (the business day sales are numbered and counted in).",
         asks={
             "en": (
                 "what's the business date today?",
@@ -261,7 +255,7 @@ def authoriser(ctx: OperationContext) -> str:
     ),
 )
 def business_day(ctx: OperationContext, params: EmptyIn) -> dict:
-    return {"today": sale_day()}
+    return {"today": business_today()}
 
 
 def missing_tax(name: str) -> str:
@@ -592,7 +586,7 @@ def department_row(department: Department, rates: dict) -> dict:
 
 def department_rates(departments: list[Department]) -> dict:
     categories = list({d.tax_category_id: d.tax_category for d in departments}.values())
-    return current_rates(categories, *business_jurisdiction(), sale_day())
+    return current_rates(categories, *business_jurisdiction(), business_today())
 
 
 def _find_named(
@@ -1691,14 +1685,11 @@ def preview(ctx: OperationContext, params: PreviewIn) -> dict:
         )
         percent, amount, version = params.discount_percent, params.discount_amount, None
     parts = charge_parts(lines)
-    # The rates of the day the charge will be taxed on.
-    day = sale_day()
     valuation = valuate(
         parts,
         discount_percent=percent,
         discount_amount=amount,
         tax_included=settings.default_tax_included,
-        on=day,
     )
     country = business_country()
     return {
@@ -1741,7 +1732,7 @@ def preview(ctx: OperationContext, params: PreviewIn) -> dict:
             }
             for line, out in zip(parts, valuation.lines, strict=True)
         ],
-        "operation_total": operation_total(order, closes, valuation, on=day),
+        "operation_total": operation_total(order, closes, valuation),
         "cash_limit": CASH_LIMIT.get(country),
         "ticket_limit": TICKET_LIMIT.get(country),
     }
@@ -2177,7 +2168,7 @@ def _revenue_by_day(first: dt.date, last: dt.date) -> dict[dt.date, int]:
     ),
 )
 def today(ctx: OperationContext, params: EmptyIn) -> dict:
-    day = sale_day()
+    day = business_today()
     sales = Sale.objects.filter(status__in=COUNTED, business_day=day)
     return {
         "day": day,
@@ -2207,7 +2198,7 @@ def today(ctx: OperationContext, params: EmptyIn) -> dict:
     ),
 )
 def last_7_days(ctx: OperationContext, params: EmptyIn) -> dict:
-    last = sale_day()
+    last = business_today()
     first = last - dt.timedelta(days=6)
     totals = _revenue_by_day(first, last)
     days = [first + dt.timedelta(days=offset) for offset in range(7)]
