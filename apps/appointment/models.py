@@ -101,7 +101,32 @@ class Counter(UUIDModel):
         return f"{self.day:%Y%m%d}: {self.last_number}"
 
 
-class Recurring(UUIDModel):
+class Audited(UUIDModel):
+    """When an appointment or a series was created, changed and deleted, and who created it.
+
+    Its own context, as a «cita»: «borrada», «creada» and «actualizada», not the «eliminado» or «creado» other apps
+    say for the same English (hub#633)."""
+
+    deleted_at = models.DateTimeField(
+        pgettext_lazy("appointment", "deleted at"), null=True, blank=True
+    )
+    created_at = models.DateTimeField(
+        pgettext_lazy("appointment", "created at"), auto_now_add=True
+    )
+    updated_at = models.DateTimeField(
+        pgettext_lazy("appointment", "updated at"), auto_now=True
+    )
+    created_by = models.CharField(
+        pgettext_lazy("appointment", "created by"),
+        max_length=ACTOR_MAX_LENGTH,
+        blank=True,
+    )
+
+    class Meta:
+        abstract = True
+
+
+class Recurring(Audited):
     """A repeating booking: who, what, with whom and its rule; each date it books is an appointment."""
 
     class Frequency(models.TextChoices):
@@ -151,22 +176,6 @@ class Recurring(UUIDModel):
         blank=True,
         related_name="+",
         verbose_name=_("split from"),
-    )
-    # Own context: a series is a «cita», «borrada», «creada» and «actualizada», not the «eliminado» or «creado»
-    # other apps say for the same English (hub#633).
-    deleted_at = models.DateTimeField(
-        pgettext_lazy("appointment", "deleted at"), null=True, blank=True
-    )
-    created_at = models.DateTimeField(
-        pgettext_lazy("appointment", "created at"), auto_now_add=True
-    )
-    updated_at = models.DateTimeField(
-        pgettext_lazy("appointment", "updated at"), auto_now=True
-    )
-    created_by = models.CharField(
-        pgettext_lazy("appointment", "created by"),
-        max_length=ACTOR_MAX_LENGTH,
-        blank=True,
     )
 
     class Meta:
@@ -232,7 +241,7 @@ class RecurringService(UUIDModel):
         return f"{self.recurring_id} #{self.position}"
 
 
-class Appointment(UUIDModel):
+class Appointment(Audited):
     """A booking: a customer, one or more services and a professional at a time on the business's clock."""
 
     # Short labels carry a context: Django merges the apps' catalogues, and another app may translate
@@ -309,22 +318,7 @@ class Appointment(UUIDModel):
     )
     # The wall-clock date the series generated: the occurrence's key, not where it ended up.
     occurrence_date = models.DateField(_("occurrence"), null=True, blank=True)
-    # Own context: an appointment is a «cita», «borrada», «creada» and «actualizada», not the «eliminado» or «creado»
-    # other apps say for the same English (hub#633).
-    deleted_at = models.DateTimeField(
-        pgettext_lazy("appointment", "deleted at"), null=True, blank=True
-    )
-    created_at = models.DateTimeField(
-        pgettext_lazy("appointment", "created at"), auto_now_add=True
-    )
-    updated_at = models.DateTimeField(
-        pgettext_lazy("appointment", "updated at"), auto_now=True
-    )
-    created_by = models.CharField(
-        pgettext_lazy("appointment", "created by"),
-        max_length=ACTOR_MAX_LENGTH,
-        blank=True,
-    )
+    # Own context, as Audited's (hub#633).
     updated_by = models.CharField(
         pgettext_lazy("appointment", "updated by"),
         max_length=ACTOR_MAX_LENGTH,
