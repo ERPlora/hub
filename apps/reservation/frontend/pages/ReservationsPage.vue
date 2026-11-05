@@ -31,7 +31,7 @@ import { useLiveList } from '../composables/useLiveList';
 import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
 import { formatShortDate, formatTime, todayIn, wallNowIn } from '../lib/clock';
-import { allows, cancellationNote, type RowAction, statusTone } from '../lib/states';
+import { allows, cancellationNote, type RowAction, shortNote, statusTone } from '../lib/states';
 import type { ReservationOut, ReservationStatus } from '../operations';
 import { reservationTabs } from '../tabs';
 
@@ -299,17 +299,22 @@ function onAction({ actionId, row }: { actionId: string; row: ReservationOut }):
         <span :class="{ 'reservation-list__erased': !row.guest_name }">{{ guestOf(row) }}</span>
       </template>
       <template #status="{ row }">
-        <StatusPill
-          size="sm"
-          :tone="statusTone(row.status)"
-          :label="$t(`reservation.status.${row.status}`)"
-        />
-        <ion-note
-          v-if="cancellationNote(row, t)"
-          data-testid="reservation-list-reason"
-        >
-          {{ cancellationNote(row, t) }}
-        </ion-note>
+        <!-- One box (not a span: the cell cuts its spans to one line), so a cancelled one's reason runs on after the
+             pill, a space apart, and wraps under it, in the list as in the card. -->
+        <div>
+          <StatusPill
+            size="sm"
+            :tone="statusTone(row.status)"
+            :label="$t(`reservation.status.${row.status}`)"
+          />
+          {{ ' ' }}<ion-note
+            v-if="cancellationNote(row, t)"
+            data-testid="reservation-list-reason"
+            :title="cancellationNote(row, t)"
+          >
+            {{ shortNote(cancellationNote(row, t)) }}
+          </ion-note>
+        </div>
       </template>
       <template #empty>
         <EmptyState

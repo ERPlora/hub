@@ -53,6 +53,17 @@ export function cancellationNote(row: Pick<ReservationOut, 'status' | 'cancellat
   return reason === UNCONFIRMED ? t('reservation.list.unconfirmed') : t('reservation.list.cancelReason', { reason });
 }
 
+/** The room a reason has in the row and the card: about three lines of the Status cell. */
+const NOTE_ROOM = 60;
+
+/** `note` shortened to the room of a row, at a word, ending in «…» (the panel and the row's title keep it whole). */
+export function shortNote(note: string): string {
+  if (note.length <= NOTE_ROOM) return note;
+  const cut = note.slice(0, NOTE_ROOM - 1);
+  const word = cut.lastIndexOf(' ');
+  return `${(word > NOTE_ROOM / 2 ? cut.slice(0, word) : cut).trimEnd()}…`;
+}
+
 /** What the day bar says about the next slot. `open`/`full` carry the slot. */
 export type NextSlot = { state: 'open' | 'full'; slot: SlotLoadOut } | { state: 'over' | 'no-service' | 'closed' };
 

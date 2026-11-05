@@ -245,6 +245,20 @@ describe('ReservationsPage: why a reservation was cancelled (RESERVATION-F09, F1
     ]);
   });
 
+  it('a long reason is shortened at a word, ending in «…», and kept whole in its title (the panel shows it whole)', async () => {
+    const long = 'The guest called to say she is ill and will book again next week for six people on the terrace';
+    const s = await setup();
+    await s.show([reservationRow({ id: 'r8', status: 'cancelled', cancellation_reason: long })]);
+    const [reason] = reasons(s);
+    const said = en.reservation.list.cancelReason.replace('{reason}', long);
+    expect(reason.attributes('title')).toBe(said);
+    const shown = reason.text().trim();
+    expect(shown.endsWith('…')).toBe(true);
+    expect(shown.length).toBeLessThanOrEqual(60);
+    expect(said.startsWith(shown.slice(0, -1))).toBe(true);
+    expect(said.charAt(shown.length - 1)).toBe(' ');
+  });
+
   it('speaks Spanish: the typed reason stays as typed', async () => {
     const s = await setup({ locale: 'es' });
     await s.show([BY_STAFF, RELEASED]);
