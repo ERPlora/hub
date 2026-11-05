@@ -80,6 +80,7 @@ from base import images
 from base import operations as platform
 from base.business import money_text
 from base.queries import business_language, image_library
+from base.ordering import list_order_for
 
 PRODUCT_NOT_FOUND = _("This product does not exist in this hub.")
 CATEGORY_NOT_FOUND = _("This category no longer exists.")
@@ -377,7 +378,7 @@ def list_low_stock(ctx: OperationContext, params: LowStockListIn) -> dict:
         "pricing_unit",
     )
     return _page(
-        products.order_by(params.sort, _tie_break(params.sort)),
+        products.order_by(*list_order_for(params.sort)),
         params,
         lambda product: {field: getattr(product, field) for field in fields},
     )
@@ -425,7 +426,7 @@ def filter_products(products, params: ProductFiltersIn):
             category__slug__iexact=params.category
         )
         products = products.filter(pk__in=links.filter(said).values("product_id"))
-    return products.order_by(params.sort, "id")
+    return products.order_by(*list_order_for(params.sort))
 
 
 # Categories
@@ -498,7 +499,7 @@ def _filter_categories(categories, params: CategoryFiltersIn):
             product_count__lte=params.product_count_max,
         )
     )
-    return categories.order_by(params.sort, _tie_break(params.sort))
+    return categories.order_by(*list_order_for(params.sort))
 
 
 # The ledger
@@ -535,7 +536,7 @@ def list_movements(ctx: OperationContext, params: MovementListIn) -> dict:
         )
     )
     return _page(
-        movements.order_by(params.sort, _tie_break(params.sort)), params, _movement_row
+        movements.order_by(*list_order_for(params.sort)), params, _movement_row
     )
 
 
@@ -718,10 +719,6 @@ def quantity_text(value: Decimal) -> str:
 def _bounds(**lookups) -> dict:
     """The lookups whose value was given (a filter left empty narrows nothing)."""
     return {lookup: value for lookup, value in lookups.items() if value is not None}
-
-
-def _tie_break(sort: str) -> str:
-    return "-id" if sort.startswith("-") else "id"
 
 
 def _page(queryset, params, row) -> dict:

@@ -234,6 +234,30 @@ export const uniqueName = (prefix: string): string => `${prefix} ${Date.now().to
 
 /** The SaaS (`erplora.com` in production): the only login page a hub has. */
 export const SAAS = STACK.saas;
+
+/** «Upgrade plan» pressed in a browser with no session of erplora.com (BASE-F11): a tab of its own lands inside `a`'s
+ *  plans by a pass, never on the sign-in form, and cannot reach back into the hub. */
+export async function upgradeLandsInside(page: Page, link: Locator): Promise<void> {
+  const context = page.context();
+  // Only the SaaS's cookies (host `localhost`): the hub's session, on `a.localhost`, stays.
+  await context.clearCookies({ domain: new URL(SAAS).hostname });
+  const inside = `${SAAS}/dashboard/store/plans?business=${psql("SELECT id FROM base_hub WHERE slug = 'a'")}`;
+  const passes: string[] = [];
+  const seen = (request: { url(): string }) => {
+    if (request.url().startsWith(`${SAAS}/hub-pass/?pass=`)) passes.push(request.url());
+  };
+  context.on('request', seen);
+  const before = context.pages().length;
+  const [tab] = await Promise.all([page.waitForEvent('popup'), link.click()]);
+  await tab.waitForURL((url) => url.href.startsWith(inside));
+  await expect(tab.getByTestId('store-plans')).toBeVisible();
+  await expect(tab.getByTestId('login-form')).toHaveCount(0);
+  expect(await tab.evaluate(() => window.opener), 'the new tab cannot reach back into the hub').toBeNull();
+  expect(context.pages(), 'one tab, not two: the click did not also follow the link').toHaveLength(before + 1);
+  expect(passes, 'through the door with one pass').toHaveLength(1);
+  context.off('request', seen);
+  await tab.close();
+}
 /**
  * Whether `page` is on the SaaS (its login): what its console says there is the SaaS's, judged by the SaaS's own
  * suite. Its headless API answers 401 while nobody is signed in (allauth's protocol), and Chrome logs each one.
@@ -514,6 +538,11 @@ export async function signedInSpanish(
   await page.reload();
   await expect(page.locator('html')).toHaveAttribute('lang', /^es/);
   return { context, page };
+}
+
+/** Saves the owner's Spanish session for the fleet's visual sweep (`ui-clip-sweep.sh --storage-state`), when asked. */
+export async function saveSessionForTheSweep(context: BrowserContext): Promise<void> {
+  if (process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
 }
 
 /** The capture once the screen settled and nothing scrolls sideways. */
@@ -982,6 +1011,17 @@ export function decodeSubs(url: string): unknown[] {
 /** The secret `/internal` is signed with; the local default of both projects. */
 const INTERNAL_SECRET = process.env.INTERNAL_SHARED_SECRET || 'local-internal-shared-secret';
 
+/** `PUT <path>` on the Hub's `/internal` door, with `body` signed the way erplora.com signs it. */
+export async function internalPut(path: string, body: string): Promise<Response> {
+  const timestamp = String(Math.floor(Date.now() / 1000));
+  const signature = createHmac('sha256', INTERNAL_SECRET).update(`${timestamp}.${body}`).digest('hex');
+  return fetch(`http://127.0.0.1:${STACK.hubPort}${path}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'X-Erplora-Timestamp': timestamp, 'X-Erplora-Signature': signature },
+    body,
+  });
+}
+
 /** A hub's registration as erplora.com sent it (`base_hub`): read before a run moves its business, put back after. */
 export interface Registration {
   id: string;
@@ -1004,14 +1044,7 @@ export function registrationOf(slug: string): Registration {
 /** erplora.com registers `registration`'s business in `country`, the way the SaaS does (`PUT /internal/hubs/{id}`,
  *  signed): its currency is then its country's. */
 export async function registerBusinessIn(registration: Registration, country: string): Promise<void> {
-  const body = JSON.stringify({ ...registration, country });
-  const timestamp = String(Math.floor(Date.now() / 1000));
-  const signature = createHmac('sha256', INTERNAL_SECRET).update(`${timestamp}.${body}`).digest('hex');
-  const response = await fetch(`http://127.0.0.1:${STACK.hubPort}/internal/hubs/${registration.id}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json', 'X-Erplora-Timestamp': timestamp, 'X-Erplora-Signature': signature },
-    body,
-  });
+  const response = await internalPut(`/internal/hubs/${registration.id}`, JSON.stringify({ ...registration, country }));
   const answer = await response.text();
   expect(response.status, answer).toBe(200);
   expect(psql(`select country from base_hub where slug = '${registration.slug}'`)).toBe(country);

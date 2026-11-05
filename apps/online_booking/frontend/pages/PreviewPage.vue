@@ -3,15 +3,16 @@
 // reserva»): the customer's flow with the same public operations the page of base (`/p/<slug>/book`, Django
 // templates) will call in-process — services, a professional or «No preference», a day and a free time, name
 // and mobile, book; then the booking seen and cancelled with the personal link. One-shot calls of the API
-// client (what is public is not followed live). Never part of a production build.
-import { formatMoney, InlineFeedback } from '@erplora/ui/components';
+// client (what is public is not followed live). A price is in the business's money (BASE-F50: «20,00 zł» in Poland,
+// the figure alone until it answers), as the diary paints it. Never part of a production build.
+import { InlineFeedback } from '@erplora/ui/components';
 import { ApiError, useLiveClient } from '@erplora/ui/sdk';
 import { AppPage } from '@erplora/ui/shell';
 import { IonButton, IonCheckbox, IonInput, IonSelect, IonSelectOption, IonSpinner, IonTextarea } from '@ionic/vue';
 import { computed, onMounted, ref, watch } from 'vue';
 
 import { dayOf, formatDay, formatTime, timeOf } from '../../../appointment/frontend/lib/clock';
-import { APPOINTMENT_MONEY } from '../../../appointment/frontend/lib/format';
+import { formatMoney, useBusinessMoney } from '../../../appointment/frontend/lib/format';
 import { useLocale, useT } from '../composables/useT';
 import type {
   BookedOut,
@@ -28,6 +29,7 @@ const SERVICE_WINDOW = 100;
 const client = useLiveClient();
 const t = useT();
 const locale = useLocale();
+const money = useBusinessMoney();
 
 const asError = (failure: unknown): ApiError =>
   failure instanceof ApiError ? failure : new ApiError(0, 'client_error', failure instanceof Error ? failure.message : String(failure));
@@ -51,7 +53,7 @@ onMounted(async () => {
 
 function priceAndLength(service: PublicServiceOut): string {
   const parts = [
-    service.price === null ? '' : formatMoney(service.price, locale.value, APPOINTMENT_MONEY),
+    service.price === null ? '' : formatMoney(service.price, locale.value, money.value),
     service.duration_minutes === null ? '' : t('online_booking.preview.minutes', { n: service.duration_minutes }),
   ];
   return parts.filter(Boolean).join(' · ');

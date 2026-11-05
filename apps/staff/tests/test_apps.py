@@ -37,11 +37,13 @@ QUERIES = {
     "staff.commission.report",
     "staff.role.list",
     "staff.role.resolve",
+    "staff.role.detail",
     "staff.schedule.list",
     "staff.schedule.detail",
     "staff.availability.for_member",
     "staff.time_off.list",
     "staff.time_off.detail",
+    "staff.time_off.get",
     "staff.time_off.today",
     "staff.time_off.mine",
     "staff.settings.get",
@@ -171,8 +173,9 @@ def test_the_operations_of_the_app():
     assert {name for name, op in operations.items() if op.kind == "command"} == COMMANDS
 
 
-#: The reads that are no assistant tool: the check of a new member's role before its card (hub#538).
-INTERNAL_READS = {"staff.role.resolve"}
+#: The reads that are no assistant tool: the check of a new member's role before its card (hub#538), and what names a
+#: role and a time-off request on the card of a write (hub#495).
+INTERNAL_READS = {"staff.role.resolve", "staff.role.detail", "staff.time_off.get"}
 
 
 def test_every_operation_tells_the_assistant_what_it_does():

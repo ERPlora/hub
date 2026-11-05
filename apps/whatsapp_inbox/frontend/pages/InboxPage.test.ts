@@ -9,7 +9,7 @@ import { AppPage, applySurface } from '@erplora/ui/shell';
 import { describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
-import { click, EMPLOYEE, errorFrame, flush, type MountOptions, mountInbox } from '../__tests__/mount-inbox';
+import { click, EMPLOYEE, errorFrame, flush, followUpgrade, type MountOptions, mountInbox, SIGNED } from '../__tests__/mount-inbox';
 import ConversationPanel from '../components/ConversationPanel.vue';
 import type { ChannelOut, ConversationOut } from '../operations';
 import InboxPage from './InboxPage.vue';
@@ -298,6 +298,18 @@ describe('InboxPage: the channel notices (WHATSAPP_INBOX-F01, F02, F13)', () => 
     expect(employee.find('whatsapp-inbox-upgrade').exists()).toBe(false);
     const unlinked = await setup({}, { ...none, plans_url: '' });
     expect(unlinked.find('whatsapp-inbox-upgrade').exists()).toBe(false);
+  });
+
+  it('«Upgrade plan» goes with the pass, at the cap and near it: already signed in on erplora.com (BASE-F11, hub#723)', async () => {
+    for (const channel of [
+      { ...CONNECTED, monthly_usage: 150, cap_reached: true },
+      { ...CONNECTED, monthly_usage: 120 },
+    ]) {
+      const s = await setup({}, channel);
+      s.answer(200, { url: SIGNED });
+      expect(await followUpgrade(s.find('whatsapp-inbox-upgrade').element)).toBe(SIGNED);
+      expect(s.sent()).toEqual([{ method: 'POST', path: '/api/saas-pass', query: {}, body: { next: 'plan' } }]);
+    }
   });
 
   it('a number reconnected (or a new month) takes its notice away by itself, without reloading (gh:hub#2064)', async () => {

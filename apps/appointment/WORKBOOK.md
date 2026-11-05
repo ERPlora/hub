@@ -99,7 +99,9 @@ profesional**, además, **Día · Semana**.
   botones), Min. (la suma de las duraciones, cambiable), Notas para la clienta y Notas internas. Min.
   y el **Total** salen con la duración y el precio propios del profesional elegido para cada servicio
   (Servicios, «Profesionales que lo hacen»), o los del catálogo si no tiene; es lo que la cita reserva. Los
-  importes salen agrupados desde cuatro cifras («1.234,56 €»; en inglés, «€1,234.56»).
+  importes van en la moneda del negocio, la de su país, con sus decimales (BASE-F50: «65,00 zł» en un negocio de
+  Polonia; sin símbolo mientras el negocio no contesta, nunca en euros por defecto) y salen agrupados desde cuatro
+  cifras («1.234,56 €»; en inglés, «€1,234.56»).
   Avisos: «Esta cita empieza en el pasado. Se guardará a esa hora.» y el profesional que no hace un servicio.
 - **Editar** → **Editar la cita**: Día, Hora, Min., Servicios, Profesional, las notas y **Guardar
   cambios**; debajo, el historial. La clienta no se cambia.
@@ -862,7 +864,7 @@ agenda tuya que enseñar.».
   («You may only book your own appointments.»), y una API key abierta sobre `appointment.appointment.create` tampoco.
   No presta nada: sin el permiso, `@operation` lo rechaza; una persona sigue con «las suyas»; ver una cita sigue
   pidiendo `view_appointment` (`find_appointment`). Lo usan los pasos de Automatizaciones (FLOW-F12) y desbloquea
-  la cita por WhatsApp (WHATSAPP_INBOX-F21 y F22). Tests: `test_services.py`
+  la cita por WhatsApp (WHATSAPP_INBOX-F21 y F22, hub#514). Tests: `test_services.py`
   (`test_what_is_not_a_person_*`, `test_a_person_with_their_own_permission_*`) y
   `apps/flow/tests/test_services_appointment_steps.py`.
 - **Cancelar desde una automatización** (hub#634): `appointment.appointment.cancel` sigue siendo `risk: "high"`, así que
@@ -940,9 +942,6 @@ agenda tuya que enseñar.».
 
 Lo que se vio fallar y queda abierto al cerrar la app (2026-11-03), cada cosa con su issue (`migration-leftover`):
 
-- **hub#514** — Una clienta nueva que pide cita por WhatsApp no se queda con ficha: la respuesta automática de citas
-  no se ofrece (APPOINTMENT-F18 por la Bandeja de WhatsApp).
-- **hub#577** — Citas enseña los precios en euros aunque el negocio sea de un país con otra moneda (BASE-F50).
 - **hub#527** — En un negocio de otro país, un teléfono escrito sin prefijo se guarda y se busca como español
   (cruza APPOINTMENT-F22).
 - **hub#631**, **hub#633**, **hub#635** y **hub#637** — textos: una traducción «fuzzy» que sale en inglés, siete

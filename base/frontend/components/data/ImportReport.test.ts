@@ -4,7 +4,7 @@
 // to Home». A status this screen does not know is painted as «Failed» with its own text, never as a success.
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { load } from '../../__tests__/data-fixtures';
+import { load, waitingLoad } from '../../__tests__/data-fixtures';
 import { flush, mountBase } from '../../__tests__/mount-base';
 import type { ImportRow } from '../../operations';
 import ImportReport from './ImportReport.vue';
@@ -92,6 +92,42 @@ describe('ImportReport', () => {
       'You have reached the 1-app limit of your plan.',
     );
     expect(m.wrapper.find('[data-id="table"] [data-testid="report-app-reason"]').exists()).toBe(false);
+  });
+
+  it('says what waits for its app comes by itself, with no retry to press and a way out (hub#609)', async () => {
+    const m = await report({ load: waitingLoad() });
+    expect(m.wrapper.get('[data-testid="report-waiting"]').text()).toContain('comes in by itself');
+    expect(m.wrapper.find('[data-testid="report-status"]').exists()).toBe(false);
+    expect(pills(m)).toEqual([['service', 'Being set up']]);
+    expect(m.wrapper.get('[data-id="service"] [data-testid="report-app-status"]').classes()).toContain('status-pill--busy');
+    expect(m.wrapper.get('[data-id="service"] [data-testid="report-app-reason"]').text()).toBe('Why, in words.');
+    expect(m.wrapper.find('[data-testid="report-retry"]').exists()).toBe(false);
+    expect(m.wrapper.find('[data-testid="report-retry-blocked"]').exists()).toBe(false);
+    expect(m.wrapper.get('[data-testid="report-home"]').text()).toBe('Go to Home');
+  });
+
+  it('says it in Spanish too, and on the last import it opens with', async () => {
+    const m = await report({ load: waitingLoad(), unfinished: true }, 'es');
+    expect(m.wrapper.get('[data-testid="report-waiting"]').text()).toContain('entrará solo');
+    expect(m.wrapper.find('[data-testid="report-unfinished"]').exists()).toBe(false);
+    expect(pills(m)).toEqual([['service', 'Preparándose']]);
+  });
+
+  it('an app that could not be set up says so with its reason, and the retry is there', async () => {
+    const m = await report({ load: waitingLoad('setup_failed') }, 'es');
+    expect(m.wrapper.find('[data-testid="report-waiting"]').exists()).toBe(false);
+    expect(m.wrapper.get('[data-testid="report-status"]').text()).toContain('No todo entró.');
+    expect(pills(m)).toEqual([['service', 'No se ha podido preparar']]);
+    expect(m.wrapper.get('[data-id="service"] [data-testid="report-app-status"]').classes()).not.toContain('status-pill--busy');
+    expect(m.wrapper.get('[data-id="service"] [data-testid="report-app-reason"]').text()).toBe('Why, in words.');
+    expect(m.wrapper.find('[data-testid="report-retry"]').exists()).toBe(true);
+    // The report can be long: the failure is named at its top, not only on its row.
+    expect(m.wrapper.get('[data-testid="report-failing"]').text()).toContain('Services');
+  });
+
+  it('names no failure when no app failed', async () => {
+    const m = await report({ load: waitingLoad() });
+    expect(m.wrapper.find('[data-testid="report-failing"]').exists()).toBe(false);
   });
 
   it('heads the last unfinished import with its name and date', async () => {

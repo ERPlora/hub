@@ -1,10 +1,11 @@
 """Fixtures shared by every hub-next test."""
 
+import datetime as dt
 import json
 
 import pytest
 from django.db import connection
-from django.utils import translation
+from django.utils import timezone, translation
 
 from config import testing
 
@@ -308,6 +309,14 @@ def hub_b(request, hub_databases):
 
 
 @pytest.fixture(autouse=True)
+def custom_domains_forgotten():
+    """A test's own domains are rolled back with it: each test's first question reads the map (``base.custom_domains``)."""
+    from base import custom_domains
+
+    custom_domains.forget()
+
+
+@pytest.fixture(autouse=True)
 def hub_aliases_forgotten():
     """Every alias a test registers (``use_hub``, the migrator) is closed and forgotten after it, so the next test
     case starts from the settings' own aliases (``base/tenancy/tests/hubs.py``, ``forget_aliases``)."""
@@ -320,3 +329,40 @@ def hub_aliases_forgotten():
     hubs.forget_aliases(before)
 
 
+
+
+#: A business's own zone and an instant of the hours it disagrees on the day: 23:30 of 2 November 2026 in Bogotá, already
+#: the 3rd both in Madrid, the deployment's clock, and in UTC, so no reading on either passes for the business's by chance
+#: (in the Canaries, on UTC in November, a reading in UTC would).
+ELSEWHERE = "America/Bogota"
+NIGHT_THERE = dt.datetime(2026, 11, 3, 4, 30, tzinfo=dt.UTC)
+
+
+@pytest.fixture
+def night_elsewhere(monkeypatch):
+    """A business in another zone than the deployment's, at night: it is 2 November 2026 there and the 3rd on the
+    deployment's clock (hub#771)."""
+    from base.models import Hub
+    from base.tenancy.context import use_hub
+
+    monkeypatch.setattr(timezone, "now", lambda: NIGHT_THERE)
+    with use_hub(Hub(slug="a", timezone=ELSEWHERE)):
+        yield
+
+
+@pytest.fixture
+def across_a_change_of_zone(monkeypatch):
+    """What ``make()`` gives at one single instant in a business that moves from another zone to Madrid and back: the
+    2nd, the 3rd and the 2nd again. A number of the day must carry on its day's count, never repeat one (hub#771)."""
+    from base.models import Hub
+    from base.tenancy.context import use_hub
+
+    def across(make):
+        monkeypatch.setattr(timezone, "now", lambda: NIGHT_THERE)
+        made = []
+        for zone in (ELSEWHERE, "Europe/Madrid", ELSEWHERE):
+            with use_hub(Hub(slug="a", timezone=zone)):
+                made.append(make())
+        return made
+
+    return across

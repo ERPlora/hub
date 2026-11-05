@@ -30,6 +30,7 @@ def ctx_for(
     scope: Scope = A,
     actor: object = "tester",
     permissions: set[str] | None = None,
+    language: str = "en",
 ) -> OperationContext:
     """The context a caller with ``role`` on ``scope`` gets (permissions from the apps' AppConfig).
 
@@ -38,7 +39,7 @@ def ctx_for(
     """
     if permissions is None:
         permissions = permissions_for_role(all_live_app_configs(), role)
-    return OperationContext(scope=scope, actor=actor, permissions=permissions)
+    return OperationContext(scope=scope, actor=actor, permissions=permissions, language=language)
 
 
 @pytest.fixture(autouse=True)

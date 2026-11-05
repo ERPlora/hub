@@ -24,6 +24,16 @@ describe('vite.config', () => {
     expect(config.base).toBe('/static/spa/');
   });
 
+  it('lets a page on a business\'s own domain of the e2e (*.test) load the dev bundle, and no other site', () => {
+    const origins = (config.server?.cors as { origin: RegExp[] }).origin;
+    const allowed = (origin: string): boolean => origins.some((rule) => rule.test(origin));
+    expect(allowed('http://www.minegocio.test:21950')).toBe(true);
+    expect(allowed('http://a.localhost:8000')).toBe(true);
+    expect(allowed('http://127.0.0.1:8000')).toBe(true);
+    expect(allowed('https://www.minegocio.es')).toBe(false);
+    expect(allowed('http://www.minegocio.test.example.com')).toBe(false);
+  });
+
   it('uses the shared ERPlora plugins (Vue, baked icons, Tailwind, defines)', () => {
     expect(pluginNames(config.plugins)).toEqual(expect.arrayContaining(['vite:vue', 'unplugin-icons', 'erplora:defines']));
   });

@@ -3,25 +3,22 @@
 // dependencies: the Hub of this stack, its SaaS's gateway (`/internal/assistant/chat`) and, behind it, the e2e's
 // provider (assistant-provider.ts, an OpenAI-compatible server on 127.0.0.1 that this spec starts): no mock between the
 // Hub and the provider. The SaaS must be seeded with that provider (README «El asistente»).
-// No card books appointments (F14). The owner turns «Book a table» on (its answer and its notice, in Automations'
+// The owner turns «Book a table» on (its answer and its notice, in Automations'
 // gallery too: FLOW-F33); the message of a guest who wrote before (their card, come by WhatsApp, already in Customers)
 // comes in as erplora.com pushes it; the worker's relay hands its event to Automations, whose run reads it, thanks them,
 // finds their card and asks the assistant with only what the answer was granted, never naming that card: the step fixes
 // it on the booking (FLOW-F38); the reservation it wants, with only their name and phone, waits in «Waiting for your
 // answer» with whom it is for, and the owner's «Approve» books it in Reservas, on that card.
 // «Turn off» pauses both, never deleting them (F17).
-// flow: WHATSAPP_INBOX-F15 WHATSAPP_INBOX-F14 WHATSAPP_INBOX-F17 WHATSAPP_INBOX-F24 FLOW-F33 FLOW-F12
-import { execFile, execSync } from 'node:child_process';
-import { promisify } from 'node:util';
-
+// flow: WHATSAPP_INBOX-F15 WHATSAPP_INBOX-F17 WHATSAPP_INBOX-F24 FLOW-F33 FLOW-F12
 import { expect, test } from '@playwright/test';
 
-import { type Provider, startProvider } from './assistant-provider';
-import { A, api, capture, HUB_DIR, psql, REPO_DIR, shown } from './helpers';
-import { confirmDialog, parkedEvent, RELAY, signedIn } from './flow-helpers';
+import { saasSql } from './assistant-real';
+import { A, api, capture, psql, shown } from './helpers';
+import { confirmDialog, parkedEvent, signedIn } from './flow-helpers';
 import { noHorizontalScroll, settled, VIEWPORTS } from './schedule-helpers';
-import { STACK } from './stack';
-import { cleanUp as inboxCleanUp, e2ePhone, keepPhoto, pushChannel, receive, restorePhoto } from './whatsapp-helpers';
+import { answerSpec, chats, customerWrites, openTheBook, relay } from './whatsapp-answer-helpers';
+import { cleanUp as inboxCleanUp, e2ePhone, keepPhoto, restorePhoto } from './whatsapp-helpers';
 
 const TASK = 'FIX-HUB-WHATSAPP-INBOX-RECIPES-USE-ASSISTANT-STEP';
 const ANSWER = 'whatsapp_inbox/reservation_from_whatsapp';
@@ -30,15 +27,6 @@ const THANKS = 'Thanks for writing! Let me check the reservations book and I wil
 /** How the book's slot and the open day this spec makes are known again (slots have no name). */
 const SENTINEL = 78;
 const OPEN_REASON = 'E2E WhatsApp table open';
-const PROVIDER_PORT = Number(process.env.E2E_AI_PROVIDER_PORT ?? STACK.hubPort + 2);
-const SAAS_DB = process.env.E2E_SAAS_DB ?? (STACK.hubPort === 8000 ? 'saas' : `saas_e2e_${STACK.hubPort + 1}`);
-
-let provider: Provider;
-
-function saasSql(sql: string): string {
-  return execSync(`docker compose exec -T postgres psql -U hub -d ${SAAS_DB} -At -c "${sql}"`, { cwd: REPO_DIR, encoding: 'utf8' }).trim();
-}
-
 /** The business's day `days` from today (Madrid in phase 1) and its weekday, Monday 0. */
 function madridDay(days: number): { date: string; weekday: number } {
   const date = new Date(Date.now() + days * 86_400_000).toLocaleDateString('en-CA', { timeZone: 'Europe/Madrid' });
@@ -81,55 +69,18 @@ function cleanUp(): void {
 const built = (ref: string): string =>
   psql(`select enabled::text || ' ' || (deleted_at is null)::text from flow_flow where recipe = '${ref}'`);
 
-/** One tick of the worker's relay (in `a`'s database: the e2e stack's worker relays nothing): the outbox event `id` handed to Automations' reaction,
- *  and what it leaves for after its COMMIT made at once. It does not block this process: the provider the SaaS asks
- *  lives here, and must answer. */
-async function relay(id: string): Promise<void> {
-  await promisify(execFile)('uv', ['run', 'python', 'manage.py', 'shell', '--hub', 'a', '-c', RELAY], {
-    cwd: HUB_DIR,
-    env: { ...process.env, FLOW_EVENT: id },
-  });
-}
-
-const chats = (): number => provider.seen.filter((seen) => seen.path === '/v1/chat/completions').length;
-
-test.beforeAll(async () => {
-  keepPhoto();
-  provider = await startProvider(PROVIDER_PORT);
-  const seeded = saasSql("select base_url from assistant_aiprovider where slug = 'e2e-local'");
-  expect(seeded, `the SaaS ${SAAS_DB} is not seeded with this provider: README «El asistente»`).toBe(provider.url);
-});
-
-test.beforeEach(() => {
-  cleanUp();
-  pushChannel({ status: 'connected' });
-});
-
-test.afterAll(async () => {
-  cleanUp();
-  await provider?.close();
-  restorePhoto();
-});
+test.beforeAll(keepPhoto);
+const provider = answerSpec(cleanUp);
+test.afterAll(restorePhoto);
 
 for (const viewport of VIEWPORTS) {
   test(`WHATSAPP_INBOX-F15 «Book a table» turned on, and a WhatsApp asking for a table is booked after the owner's yes at ${viewport.label}`, async ({ browser }) => {
     test.setTimeout(180_000);
     const { context, page } = await signedIn(browser, '/whatsapp_inbox/settings', viewport);
     try {
-      // The book open that day, all day, whatever the hours of the database (as reservation-book.spec.ts does).
-      const slot = await api(context, A, 'POST', '/reservation/time_slots', { day_of_week: DAY.weekday, start_time: '00:00', end_time: '23:59', max_reservations: SENTINEL });
-      expect(slot.status, JSON.stringify(slot.data)).toBe(201);
-      const open = await api(context, A, 'POST', '/schedule/overrides', {
-        start_date: DAY.date,
-        end_date: DAY.date,
-        reason: OPEN_REASON,
-        is_closed: false,
-        intervals: [{ open_time: '00:00', close_time: '00:00' }],
-      });
-      expect(open.status, JSON.stringify(open.data)).toBe(201);
+      await openTheBook(context, DAY, SENTINEL, OPEN_REASON);
 
-      // F14: no card books appointments. F15: the card says what it does; on, after a question, with its notice.
-      await expect(shown(page).locator('[data-testid=whatsapp-inbox-autoreply-appointments]')).toHaveCount(0);
+      // F15: the card says what it does; on, after a question, with its notice.
       const card = shown(page).locator('[data-testid=whatsapp-inbox-autoreply-tables]');
       await expect(card).toContainText('Book a table');
       await expect(card).toContainText('Off');
@@ -178,20 +129,15 @@ for (const viewport of VIEWPORTS) {
         party_size: 4,
         source: 'whatsapp',
       };
-      const message = receive(phone, `E2E-ASK reservation__reservation__create ${JSON.stringify(booking)}`, 'E2E Lucía');
-      const received = psql(
-        `select id from live_outboxevent where name = 'whatsapp_inbox.message.received' and payload->>'id' = '${message.id}'`,
-      );
-      expect(received, 'whatsapp_inbox.message.received of the message in the outbox').not.toBe('');
-      await relay(received);
+      const message = await customerWrites(phone, `E2E-ASK reservation__reservation__create ${JSON.stringify(booking)}`, 'E2E Lucía');
       const flowId = psql(`select id from flow_flow where recipe = '${ANSWER}'`);
-      const before = chats();
+      const before = chats(provider()).length;
       await relay(parkedEvent(flowId));
 
       // The assistant was never told their card nor offered to say it (the step fixes it), was offered only what the
       // answer grants of the Hub's operations (`<app>__<entity>__<action>`; the SaaS adds its own clock), and wanted to
       // book: nothing is booked yet.
-      const turns = provider.seen.filter((seen) => seen.path === '/v1/chat/completions').slice(before);
+      const turns = chats(provider()).slice(before);
       expect(turns).toHaveLength(1);
       expect(JSON.stringify(turns[0].body)).not.toContain(guest.data.id);
       type Tool = { function: { name: string; parameters?: { properties?: Record<string, unknown> } } };
@@ -238,10 +184,10 @@ for (const viewport of VIEWPORTS) {
         `what Reservas answered: ${psql(`select outputs->'_turn'->'messages' from flow_flowrun where flow_id = '${flowId}'`)}`,
       ).toBe(`4 21:00:00 whatsapp ${guest.data.id}`);
       expect(psql(`select count(*) from customer_customer where source = 'whatsapp' and phone like '%${phone.slice(-9)}'`)).toBe('1');
-      const asked = chats();
+      const asked = chats(provider()).length;
       await relay(parkedEvent(flowId));
-      expect(chats()).toBe(asked + 1);
-      expect(JSON.stringify(provider.seen.at(-1)?.body)).toContain('"role":"tool"');
+      expect(chats(provider())).toHaveLength(asked + 1);
+      expect(JSON.stringify(provider().seen.at(-1)?.body)).toContain('"role":"tool"');
       expect(psql(`select status from flow_flowrun where flow_id = '${flowId}'`)).toBe('succeeded');
 
       // F17: off from the same card, both paused and kept.

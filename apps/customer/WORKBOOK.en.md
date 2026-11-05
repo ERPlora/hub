@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:0e3572f32666b849a731ae8676e417ac6b496e477c1edaee8e5d39f5b1e7e192 -->
+<!-- generated from WORKBOOK.md sha256:0a21d67e9a7effbc6e6f06dc06073006dcac5372b15cd1d36bc8bd41e127cdfd -->
 
 ## What it is for and who it is for
 
@@ -176,7 +176,7 @@ components).
 | CUSTOMER-F23 | See a customer's purchase history | done | common |
 | CUSTOMER-F24 | See on the card what other apps know about the customer | done | common |
 | CUSTOMER-F25 | Create the client without leaving the agenda | done | hair salon |
-| CUSTOMER-F26 | Create the card of whoever asks for an appointment on WhatsApp | discarded — WhatsApp's automatic appointment answer is not offered yet (hub#514) | hair salon |
+| CUSTOMER-F26 | Create the card of whoever asks for an appointment on WhatsApp | done | hair salon |
 | CUSTOMER-F27 | Create, change and delete customer groups | done | common |
 | CUSTOMER-F28 | Create, change and delete customer tags | done | common |
 | CUSTOMER-F29 | Define the card's custom fields | done | common |
@@ -709,10 +709,7 @@ assign" again. Whoever does not manage cards does not see "+ New customer".
 Involved: APPOINTMENT-F01, CUSTOMER-F18
 
 ### CUSTOMER-F26 Create the card of whoever asks for an appointment on WhatsApp
-Status: discarded — the WhatsApp inbox's automatic appointment answer is not offered yet: after
-"Approve", Appointments refuses an automation's appointment (WHATSAPP_INBOX-F21). The Customers part is
-there: looking up by the number (CUSTOMER-F10) and adding with source "WhatsApp", which the table answer
-(WHATSAPP_INBOX-F24) and the inbox's "Create card" (WHATSAPP_INBOX-F37) already use (hub#514)
+Status: done
 Actor: assistant
 Screen: none
 Steps:

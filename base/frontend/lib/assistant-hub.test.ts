@@ -6,7 +6,9 @@
 // approvals (BASE-G118); and the empty conversation offers the setup's shortcuts (BASE-G121).
 import {
   type AssistantCard,
+  AssistantPanel,
   createAssistant,
+  installAssistant,
   type PendingCall,
   type TurnBody,
   type TurnFrame,
@@ -16,7 +18,7 @@ import { ApiError } from '@erplora/ui/sdk';
 import type { ShellSession } from '@erplora/ui/shell';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { EMPLOYEE, memoryStorage, mountBase, OWNER } from '../__tests__/mount-base';
+import { EMPLOYEE, flush, memoryStorage, mountBase, OWNER, tap } from '../__tests__/mount-base';
 import en from '../locale/en.json';
 import es from '../locale/es.json';
 import type { SetupItem, SetupStatus } from '../operations';
@@ -101,12 +103,12 @@ function spaDocument(cookie = 'csrftoken=tok123'): Document {
 }
 
 const MP3 = new Uint8Array([0x49, 0x44, 0x33, 0x04, 0xff, 0xfb, 0x90, 0x64]);
-const XIMENA = { text: 'Tienes 3 mesas abiertas.', language: 'es' as const, voice: 'es-ES-Ximena:DragonHDLatestNeural' };
+const READING = { text: 'Tienes 3 mesas abiertas.', language: 'es' as const, voice: 'a-voice' };
 
 describe("«Read aloud» in the server's voice (round 2026-11-03n)", () => {
   it("posts the text, its language and its voice to base.assistant.speak's route and hands back the mp3", async () => {
     const fetcher = vi.fn(async () => new Response(MP3, { status: 200, headers: { 'Content-Type': 'audio/mpeg' } }));
-    const audio = await speakAloud(XIMENA, spaDocument(), fetcher);
+    const audio = await speakAloud(READING, spaDocument(), fetcher);
     expect(audio).toBeInstanceOf(Blob);
     expect(audio.type).toBe('audio/mpeg');
     expect(new Uint8Array(await audio.arrayBuffer())).toEqual(MP3);
@@ -118,22 +120,22 @@ describe("«Read aloud» in the server's voice (round 2026-11-03n)", () => {
       'audio/mpeg',
       'application/json',
     ]);
-    expect(JSON.parse(String(init.body))).toEqual(XIMENA);
+    expect(JSON.parse(String(init.body))).toEqual(READING);
   });
 
   it('a reading stopped before its audio arrives aborts the request: the signal goes to fetch, never into the body', async () => {
     const fetcher = vi.fn(async () => new Response(MP3, { status: 200, headers: { 'Content-Type': 'audio/mpeg' } }));
     const stop = new AbortController();
-    await speakAloud({ ...XIMENA, signal: stop.signal }, spaDocument(), fetcher);
+    await speakAloud({ ...READING, signal: stop.signal }, spaDocument(), fetcher);
     const [, init] = fetcher.mock.calls[0] as unknown as [string, RequestInit];
     expect(init.signal).toBe(stop.signal);
-    expect(JSON.parse(String(init.body))).toEqual(XIMENA);
+    expect(JSON.parse(String(init.body))).toEqual(READING);
   });
 
   it("a refusal rejects with the envelope's code and sentence, so the panel reads with the device's voice", async () => {
     const envelope = { error: { code: 'base.assistant_speech_unavailable', message: 'Not available.' } };
     const fetcher = vi.fn(async () => Response.json(envelope, { status: 503 }));
-    const refused = await speakAloud(XIMENA, spaDocument(), fetcher).catch((error: unknown) => error);
+    const refused = await speakAloud(READING, spaDocument(), fetcher).catch((error: unknown) => error);
     expect(refused).toBeInstanceOf(ApiError);
     expect([(refused as ApiError).status, (refused as ApiError).code, (refused as ApiError).message]).toEqual([
       503,
@@ -144,7 +146,7 @@ describe("«Read aloud» in the server's voice (round 2026-11-03n)", () => {
 
   it("a page that is no envelope (a proxy's) still rejects, with its status", async () => {
     const fetcher = vi.fn(async () => new Response('<html>Bad gateway</html>', { status: 502 }));
-    const refused = await speakAloud(XIMENA, spaDocument(), fetcher).catch((error: unknown) => error);
+    const refused = await speakAloud(READING, spaDocument(), fetcher).catch((error: unknown) => error);
     expect(refused).toBeInstanceOf(ApiError);
     expect((refused as ApiError).status).toBe(502);
   });
@@ -164,7 +166,7 @@ describe("«Read aloud» in the server's voice (round 2026-11-03n)", () => {
     vi.stubGlobal('fetch', fetcher);
     const config = hubAssistant(on);
     expect([config.turnUrl, config.transcribe]).toEqual([HUB_ASSISTANT.turnUrl, HUB_ASSISTANT.transcribe]);
-    expect((await config.speak!(XIMENA)).type).toBe('audio/mpeg');
+    expect((await config.speak!(READING)).type).toBe('audio/mpeg');
     const [url, init] = fetcher.mock.calls[0] as unknown as [string, RequestInit];
     expect([url, (init.headers as Record<string, string>)['X-CSRFToken']]).toEqual(['/api/assistant/speak', 'tok123']);
   });
@@ -187,6 +189,73 @@ describe('HUB_ASSISTANT: who', () => {
     block.textContent = JSON.stringify({ plan_url: 'https://erplora.com/hubs/a/plan' });
     document.body.append(block);
     expect(HUB_ASSISTANT.planUrl!()).toBe('https://erplora.com/hubs/a/plan');
+  });
+});
+
+// A click on the panel runs outside any component's setup: the pass goes through the page's client, as the allowance.
+describe('«Upgrade plan» of the panel goes with the pass (BASE-F11, hub#723)', () => {
+  const PLAN = 'https://erplora.com/dashboard/store/plans?business=b1';
+  const SIGNED = 'https://erplora.com/hub-pass/?pass=abc%3A123';
+  const refused = () => Response.json({ error: { code: 'base.saas_pass_needs_account', message: 'No.' } }, { status: 403 });
+
+  async function panelWithoutAPlan(saasPass: () => Response) {
+    const block = Object.assign(document.createElement('script'), { type: 'application/json', id: 'hub-home' });
+    block.textContent = JSON.stringify({ plan_url: PLAN });
+    document.body.append(block);
+    const assistant = createAssistant({ storage: memoryStorage(), openStorage: memoryStorage(), post: async () => undefined });
+    installAssistant(assistant);
+    const m = await mountBase(AssistantPanel, {
+      stubs: { AssistantConfirm: true, AssistantReport: true },
+      onApi: ({ url }) =>
+        url.includes('/saas-pass') ? saasPass() : Response.json({ used: 0, limit: 0, resets_at: null, demo: false }),
+    });
+    assistant.setOpen(true);
+    for (let i = 0; i < 3; i += 1) await flush();
+    const tab = { opener: {} as unknown, location: { href: 'about:blank' } };
+    const open = vi.spyOn(window, 'open').mockReturnValue(tab as unknown as Window);
+    return { ...m, link: m.wrapper.get('[data-testid="assistant-no-plan-upgrade"]'), tab, open };
+  }
+
+  afterEach(() => {
+    installAssistant(undefined);
+    vi.restoreAllMocks();
+  });
+
+  it('opens the blank tab in the click, keeps the link from opening another, and sends the tab to the signed address', async () => {
+    const m = await panelWithoutAPlan(() => Response.json({ url: SIGNED }));
+    expect(m.link.attributes('href')).toBe(PLAN);
+
+    const seen = tap(m.link.element);
+
+    expect(m.open).toHaveBeenCalledWith('about:blank', '_blank');
+    expect(seen.defaultPrevented).toBe(true);
+    await flush();
+    expect(m.tab.location.href).toBe(SIGNED);
+    expect(m.tab.opener).toBeNull();
+    const [pass] = m.net.api.filter((call) => call.url.includes('/saas-pass'));
+    expect(JSON.parse(pass.init.body as string)).toEqual({ next: 'plan' });
+  });
+
+  it('when the pass is refused, the tab goes to the plan page the Home gives', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const m = await panelWithoutAPlan(refused);
+
+    tap(m.link.element);
+    await flush();
+
+    expect(m.tab.location.href).toBe(PLAN);
+    expect(error).toHaveBeenCalled();
+  });
+
+  it('when the browser blocks the tab, the link itself opens the plan page and nothing is signed', async () => {
+    const m = await panelWithoutAPlan(() => Response.json({ url: SIGNED }));
+    m.open.mockReturnValue(null);
+
+    const seen = tap(m.link.element);
+    await flush();
+
+    expect(seen.defaultPrevented).toBe(false);
+    expect(m.net.api.filter((call) => call.url.includes('/saas-pass'))).toEqual([]);
   });
 });
 
