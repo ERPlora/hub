@@ -3,6 +3,8 @@
 //     outbox relay will, adds nothing), listed «Pending» with its QR, and its record says why it is not in the AEAT yet;
 //   - VERIFACTU-F14: voiding a charged sale makes Invoicing issue an R5, registered as an alta (never an anulación);
 //   - VERIFACTU-F30: a record issued by error is cancelled from its page with a chained cancellation record;
+//   - VERIFACTU-F24: a rejection says in Records that it is still to correct (the funnel finds it); corrected from
+//     its record, it says «Corrected» and links to the record that corrects it, in the list and in its page;
 //   - VERIFACTU-F21, F10, F31: «Process queue» and «Test the connection» say that nothing can be presented without
 //     ERPlora's gateway (it is never taken as accepted), and the audit trail tells it;
 //   - Records and Events filter behind the table's funnel, with its count, at every width; a total that is not an
@@ -174,6 +176,91 @@ test('VERIFACTU-F30: an invoice issued by error is cancelled from its record wit
   const list = shown(page);
   await list.locator('[data-testid=verifactu-records-search] input').fill(issued.number);
   await expect(list.locator('[data-testid=verifactu-records-row]').filter({ hasText: 'Cancellation' })).toHaveCount(1);
+});
+
+test('VERIFACTU-F24: a rejection is listed «Pending correction» and, corrected from its record, links to its correction (hub#857)', async ({
+  page,
+  context,
+}) => {
+  await login(page, A, '/verifactu/records');
+  const issued = await ticket(context);
+  const record = await recordOf(context, issued.id);
+  // The AEAT's rejection as its answer leaves the record (setup: nothing reaches the AEAT from a test).
+  psql(`update verifactu_record set status = 'rejected', aeat_code = '1189', aeat_message = 'e2e rejected' where id = '${record.id}'`);
+  const view = shown(page);
+  const panel = view.locator('[data-testid=verifactu-records-filters-panel]');
+  const toggle = view.locator('[data-testid=verifactu-records-filters-toggle]');
+  const rejected = view.locator(`[data-testid=verifactu-records-row][data-id="${record.id}"]`);
+  const search = async () => {
+    await page.goto(`${A}/verifactu/records`);
+    await view.locator('[data-testid=verifactu-records-search] input').fill(issued.number);
+  };
+  await search();
+  await expect(rejected.locator('[data-testid=verifactu-records-status]')).toHaveText('Rejected');
+  await expect(rejected.locator('[data-testid=verifactu-records-correction-pending]')).toHaveText('Pending correction');
+  // «Correction» → «Pending correction» in the funnel keeps it.
+  await toggle.click();
+  await expect(panel).toBeVisible();
+  await panel.locator('[data-testid=verifactu-records-filter-correction_status]').click();
+  const popover = page.locator('ion-popover.select-popover');
+  await popover.locator('ion-radio').filter({ hasText: /^\s*Pending correction\s*$/ }).click();
+  await expect(popover).toHaveCount(0);
+  await panel.locator('[data-testid=verifactu-records-filters-apply]').click();
+  await expect(panel).toBeHidden();
+  await expect(view.locator('[data-testid=verifactu-records-filters-count]')).toHaveText('1');
+  await expect(rejected).toBeVisible();
+  await shots(page, 'VERIFACTU-F24-records-pending', async (p) => {
+    await expect(shown(p).locator(`[data-testid=verifactu-records-row][data-id="${record.id}"] [data-testid=verifactu-records-correction-pending]`)).toBeVisible();
+  });
+
+  // «Correct» from its record seals the correction; the rejection's page then links to it instead of what to do.
+  await rejected.click();
+  await expect(page).toHaveURL(new RegExp(`/verifactu/records/${record.id}$`));
+  const detail = shown(page);
+  await detail.locator('[data-testid=verifactu-record-correct]').click();
+  const confirm = page.locator('.ep-confirm-dialog').last();
+  await expect(confirm).toContainText(`Correct the record of ${issued.number}?`);
+  await confirm.getByRole('button', { name: 'Correct' }).click();
+  await expect(page.locator('ion-toast').filter({ hasText: `Correction of ${issued.number} sealed` })).toBeVisible();
+  const both = await api<{ rows: (RecordOut & { correction_status: string; corrected_by_id: string | null })[] }>(
+    context,
+    A,
+    'GET',
+    `/verifactu/records?search=${encodeURIComponent(issued.number)}&limit=10`,
+  );
+  const correction = both.data.rows.find((row) => row.id !== record.id);
+  expect(correction, 'the correction is a new record of the same invoice').toBeDefined();
+  expect(both.data.rows.find((row) => row.id === record.id)).toMatchObject({ correction_status: 'corrected', corrected_by_id: correction?.id });
+  const corrected = detail.locator('[data-testid=verifactu-record-corrected]');
+  await expect(corrected).toContainText('Already corrected with a new record');
+  await expect(detail.locator('[data-testid=verifactu-record-rejected]')).not.toContainText('rectify it in Invoicing');
+  await shots(page, 'VERIFACTU-F24-record-corrected', async (p) => {
+    // The page is still scrolled down to «Correct»: the notice is at its top.
+    const notice = shown(p).locator('[data-testid=verifactu-record-corrected]');
+    await notice.scrollIntoViewIfNeeded();
+    await expect(notice).toBeInViewport();
+  });
+  await detail.locator('[data-testid=verifactu-record-corrected-link]').click();
+  await expect(page).toHaveURL(new RegExp(`/verifactu/records/${correction?.id}$`));
+
+  // In Records: no longer pending (the funnel leaves it out); «Corrected» opens the correction, not the rejection.
+  await search();
+  await expect(rejected.locator('[data-testid=verifactu-records-correction-pending]')).toHaveCount(0);
+  const link = rejected.locator('[data-testid=verifactu-records-correction-corrected]');
+  await expect(link).toHaveText('Corrected');
+  await shots(page, 'VERIFACTU-F24-records-corrected', async (p) => {
+    await expect(shown(p).locator(`[data-testid=verifactu-records-row][data-id="${record.id}"] [data-testid=verifactu-records-correction-corrected]`)).toBeVisible();
+  });
+  await link.click();
+  await expect(page).toHaveURL(new RegExp(`/verifactu/records/${correction?.id}$`));
+  await search();
+  await toggle.click();
+  await panel.locator('[data-testid=verifactu-records-filter-correction_status]').click();
+  await popover.locator('ion-radio').filter({ hasText: /^\s*Pending correction\s*$/ }).click();
+  await expect(popover).toHaveCount(0);
+  await panel.locator('[data-testid=verifactu-records-filters-apply]').click();
+  await expect(rejected).toHaveCount(0);
+  await expect(view.locator('[data-testid=verifactu-records-empty]')).toBeVisible();
 });
 
 test('VERIFACTU-F21, F10 and F31: without the gateway nothing is presented, and the audit trail says so', async ({ page }) => {

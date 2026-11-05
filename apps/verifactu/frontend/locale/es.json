@@ -62,7 +62,10 @@
       "invoiceType": "Tipo de factura",
       "environment": "Entorno",
       "amountInvalid": "Escribe un importe en euros, como 12,50.",
-      "dateOrder": "La fecha final no puede ser anterior a la inicial."
+      "dateOrder": "La fecha final no puede ser anterior a la inicial.",
+      "correction": "Subsanación",
+      "correctionPending": "Pendientes de subsanar",
+      "correctionCorrected": "Subsanados"
     },
     "records": {
       "title": "Registros VeriFactu",
@@ -90,6 +93,11 @@
       "actions": {
         "view": "Ver",
         "verify": "Cotejar en la AEAT"
+      },
+      "correction": {
+        "pending": "Pendiente de subsanar",
+        "corrected": "Subsanado",
+        "correctedLink": "Subsanado: ver el registro que lo subsana"
       }
     },
     "detail": {
@@ -136,6 +144,8 @@
       "waitingWhenResolved": "Sale solo, en orden y declarado como envío tardío, en cuanto se resuelva.",
       "rejectedTitle": "La AEAT lo ha rechazado",
       "rejectedHelp": "Si el error está en la factura (un NIF de cliente que la AEAT no reconoce, un importe), rectifícala en Facturación. Si no (la cadena tras restaurar una copia, un fallo nuestro), subsana el registro.",
+      "correctedTitle": "Ya está subsanado con un registro nuevo",
+      "correctedLink": "Ver el registro que lo subsana",
       "verify": "Cotejar en la AEAT",
       "transmit": "Enviar ahora",
       "transmitted": "Enviado: {accepted} aceptados, {rejected} rechazados, {waiting} en espera.",
