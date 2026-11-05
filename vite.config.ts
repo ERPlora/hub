@@ -9,6 +9,7 @@ import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { erploraVite } from '@erplora/ui/vite';
+import { defaultAllowedOrigins } from 'vite';
 import { defineConfig } from 'vitest/config';
 
 const DEV_HOST = 'localhost';
@@ -39,6 +40,9 @@ export default defineConfig({
     strictPort: true,
     // The page comes from `<hub>.localhost:8000`: asset URLs must point back at this server.
     origin: `http://${DEV_HOST}:${DEV_PORT}`,
+    // What Vite allows, and a business's own domain in the e2e (`.test`, reserved: base.middleware, HUBS-F17). A module
+    // script is fetched with CORS, and in production this bundle is the page's own origin's.
+    cors: { origin: [defaultAllowedOrigins, /^http:\/\/[^/:]+\.test(?::\d+)?$/] },
     hmr: { host: DEV_HOST, port: DEV_PORT },
   },
   test: {

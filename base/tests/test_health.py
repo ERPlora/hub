@@ -13,7 +13,7 @@ from django.db import OperationalError, connection
 from django.db.migrations.loader import MigrationLoader
 from django.db.migrations.recorder import MigrationRecorder
 
-from base import health
+from base import health, registry
 
 
 @pytest.fixture(autouse=True)
@@ -34,12 +34,19 @@ def test_healthz_is_ok_on_any_host_without_the_database(client, host):
     assert response.json() == {"status": "ok"}
 
 
-def test_other_paths_still_validate_the_host(client):
+@pytest.fixture
+def nobody_has_a_domain(monkeypatch):
+    """A host outside ALLOWED_HOSTS may read who has which domain, at most every so often (base.custom_domains): no
+    business has one here. Without a django_db mark, any other query on these paths would fail the test."""
+    monkeypatch.setattr(registry, "custom_domains", list)
+
+
+def test_other_paths_still_validate_the_host(client, nobody_has_a_domain):
     response = client.get("/demo/items", HTTP_HOST="evil.example.com")
     assert response.status_code == 400
 
 
-def test_only_the_exact_path_is_answered(client):
+def test_only_the_exact_path_is_answered(client, nobody_has_a_domain):
     response = client.get("/healthz/extra", HTTP_HOST="evil.example.com")
     assert response.status_code == 400
 
