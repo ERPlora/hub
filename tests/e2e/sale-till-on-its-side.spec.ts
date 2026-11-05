@@ -28,6 +28,10 @@ const ON_ITS_SIDE = [
 /** The lowest of them in a browser, under its address bar (56 px). Only without the strip: with it, 21 px are left
  *  between the strip and the tab bar, less than a cart button; the strip itself would have to give way. */
 const UNDER_AN_ADDRESS_BAR = { label: '568x264', width: 568, height: 264 } as const;
+/** As low, but so wide that one row of the catalogue does not fill the page. */
+const LOW_AND_WIDE = { label: '1280x500', width: 1280, height: 500 } as const;
+/** The page's own margin under the till. */
+const PAGE_MARGIN = 16;
 /** Where the till is laid out as it always was. */
 const UPRIGHT = [
   { label: '390x844', width: 390, height: 844 },
@@ -131,12 +135,21 @@ async function sellOnItsSide(page: Page, size: { label: string; width: number; h
       if (scroller) scroller.scrollTop = to === 'top' ? 0 : scroller.scrollHeight;
       await new Promise((frame) => requestAnimationFrame(frame));
       const box = el.getBoundingClientRect();
+      const tillBox = el.closest('[data-testid=pos-till]')?.getBoundingClientRect();
       const under = view?.querySelector('.page-notice')?.getBoundingClientRect().bottom ?? 0;
       const over = view?.querySelector('ion-footer.section-tabbar')?.getBoundingClientRect().top ?? 0;
-      return { top: box.top, bottom: box.bottom, from: Math.max(under, content?.getBoundingClientRect().top ?? 0), to: over };
+      return {
+        top: box.top,
+        bottom: box.bottom,
+        left: box.left,
+        middle: ((tillBox?.left ?? 0) + (tillBox?.right ?? 0)) / 2,
+        from: Math.max(under, content?.getBoundingClientRect().top ?? 0),
+        to: over,
+      };
     }, end);
     expect.soft(button.top - 6, `the cart button below what is above it at ${where}, scrolled to the ${end}`).toBeGreaterThanOrEqual(button.from - EDGE);
     expect.soft(button.bottom, `the cart button above the tab bar at ${where}, scrolled to the ${end}`).toBeLessThanOrEqual(button.to + EDGE);
+    expect.soft(button.left, `the cart button in its corner, not across the till, at ${where}, scrolled to the ${end}`).toBeGreaterThan(button.middle);
   }
 
   await fab.click(TAP);
@@ -248,6 +261,49 @@ async function searchOnItsSide(page: Page): Promise<void> {
   await expect(result).toBeVisible();
   await capture(page, `${KEY}-search`);
   await addsOneItem(till, result, 'the search');
+}
+
+/** A ticket discount on the lowest phone: its row over the total and the buttons, and «Charge» still in reach. */
+async function discountOnItsSide(page: Page, where: string): Promise<void> {
+  const { width, height } = ON_ITS_SIDE[0];
+  await page.setViewportSize({ width, height });
+  const till = shown(page).locator('[data-testid=pos-till]');
+  const drawer = shown(page).locator('[data-testid=pos-cart-drawer]');
+  await expect(drawer).toBeHidden();
+  await settled(page);
+  await addsOneItem(till, till.locator(`[data-testid=pos-product-${product.id}]`), where);
+  await till.locator('[data-testid=pos-cart-fab]').click(TAP);
+  await expect(till).toHaveClass(/pos-till--cart-open/);
+  await drawer.locator('[data-testid=pos-ticket-discount]').click(TAP);
+  const apply = page.locator('[data-testid=pos-discount-apply]');
+  const sheet = page.locator('ion-modal').filter({ has: apply });
+  await sheet.locator('[data-testid=pos-key-1]').click(TAP);
+  await sheet.locator('[data-testid=pos-key-0]').click(TAP);
+  await apply.click(TAP);
+  await expect(apply).toBeHidden();
+  await expect(drawer.locator('.pos-foot__discount')).toBeVisible();
+  await settled(page);
+  const rows = await drawer.evaluate((el) => ({
+    discount: el.querySelector('.pos-foot__discount')?.getBoundingClientRect().bottom ?? 0,
+    total: el.querySelector('.pos-foot__total')?.getBoundingClientRect().top ?? 0,
+  }));
+  expect.soft(rows.discount, `the discount over the total at ${where}`).toBeLessThanOrEqual(rows.total + EDGE);
+  const charge = await drawer.locator('[data-testid=pos-charge]').evaluate(fingerOn);
+  expect.soft(charge.reached, `a finger on «Charge» reaches it with a discount at ${where} (it touches «${charge.hit}»)`).toBe(true);
+  expect.soft(charge.bottom, `«Charge» inside the window with a discount at ${where}`).toBeLessThanOrEqual(height + EDGE);
+  await drawer.locator('[data-testid=pos-cart-close]').click(TAP);
+  await expect(drawer).toBeHidden();
+}
+
+/** A window as low but wide: the catalogue does not fill the page, and the till's box still does. */
+async function fillsThePage(page: Page, where: string): Promise<void> {
+  await page.setViewportSize({ width: LOW_AND_WIDE.width, height: LOW_AND_WIDE.height });
+  expect(await tillIsPhone(page), `the check is a drawer at ${where}`).toBe(true);
+  await settled(page);
+  const gap = await shown(page)
+    .locator('[data-testid=pos-till]')
+    .evaluate((el) => (el.closest('.ion-page')?.querySelector('ion-footer.section-tabbar')?.getBoundingClientRect().top ?? 0) - el.getBoundingClientRect().bottom);
+  expect.soft(gap, `the till down to the page's margin at ${where}`).toBeLessThanOrEqual(PAGE_MARGIN + EDGE);
 }
 
 /** The layout of a till that has room: nothing on its side has reached it. */
@@ -373,6 +429,16 @@ for (const strip of [true, false]) {
       for (const size of UPRIGHT) {
         test(`${size.label} keeps its layout`, async () => {
           await keepsItsLayout(page, size, `${lang} ${size.label} ${strip ? 'with-strip' : 'no-strip'}`);
+        });
+      }
+
+      if (!strip) {
+        test('568x320, a check with a ticket discount', async () => {
+          await discountOnItsSide(page, `${lang} 568x320 no-strip`);
+        });
+
+        test(`${LOW_AND_WIDE.label}, the till fills the page`, async () => {
+          await fillsThePage(page, `${lang} ${LOW_AND_WIDE.label} no-strip`);
         });
       }
     });

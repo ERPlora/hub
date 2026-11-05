@@ -159,8 +159,7 @@ export async function tillIn(page: Page, context: BrowserContext, lang: string):
 export async function checkWithDish(page: Page, context: BrowserContext, lang: string, dish: Product): Promise<void> {
   await tillIn(page, context, lang);
   await shown(page).locator(`[data-testid=pos-product-${dish.id}]`).click();
-  // Not the default 10 s: the first line opens the check, and on a loaded machine it arrived just after them (hub#800).
-  await expect(shown(page).locator('[data-testid^=pos-line-]').filter({ hasText: dish.name }).first()).toBeAttached({ timeout: 30_000 });
+  await expect(shown(page).locator('[data-testid^=pos-line-]').filter({ hasText: dish.name }).first()).toBeAttached();
   await openTillCart(page);
 }
 
