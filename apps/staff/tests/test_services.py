@@ -32,7 +32,6 @@ from apps.staff.models import (
 from apps.staff.schemas import (
     BulkCreatedOut,
     BulkCreateIn,
-    ByIdIn,
     DeletedOut,
     MemberDetailOut,
     MemberIn,
@@ -43,6 +42,7 @@ from apps.staff.schemas import (
     RolePatchIn,
     ScheduleIn,
     ScheduleOut,
+    ScheduleRefIn,
     ScheduleUpdateIn,
     SetActiveIn,
     SettingsIn,
@@ -51,6 +51,7 @@ from apps.staff.schemas import (
     TerminateIn,
     TimeOffDetailOut,
     TimeOffIn,
+    TimeOffRefIn,
     TimeOffRequestIn,
 )
 
@@ -173,7 +174,7 @@ def update(as_role="hub_admin", **fields):
             ScheduleOut,
             False,
         ),
-        ("staff.schedule.delete", "staff.manage_settings", ByIdIn, DeletedOut, False),
+        ("staff.schedule.delete", "staff.manage_settings", ScheduleRefIn, DeletedOut, False),
         (
             "staff.time_off.create",
             "staff.manage_time_off",
@@ -191,21 +192,21 @@ def update(as_role="hub_admin", **fields):
         (
             "staff.time_off.approve",
             "staff.manage_time_off",
-            ByIdIn,
+            TimeOffRefIn,
             TimeOffDetailOut,
             False,
         ),
         (
             "staff.time_off.reject",
             "staff.manage_time_off",
-            ByIdIn,
+            TimeOffRefIn,
             TimeOffDetailOut,
             False,
         ),
         (
             "staff.time_off.cancel",
             "staff.request_time_off",
-            ByIdIn,
+            TimeOffRefIn,
             TimeOffDetailOut,
             False,
         ),
@@ -895,13 +896,13 @@ def test_set_active_and_delete():
     run(
         "staff.schedule.set_active", SetActiveIn(id=schedule.id, is_active=False)
     )  # no change, no event
-    assert run("staff.schedule.delete", ByIdIn(id=schedule.id)) == DeletedOut(
+    assert run("staff.schedule.delete", ScheduleRefIn(id=schedule.id)) == DeletedOut(
         id=schedule.id
     )
     assert not Schedule.objects.exists() and not ScheduleDay.objects.exists()
     assert names() == [events.SCHEDULE_UPDATED, events.SCHEDULE_DELETED]
     with pytest.raises(NotFound):
-        run("staff.schedule.delete", ByIdIn(id=schedule.id))
+        run("staff.schedule.delete", ScheduleRefIn(id=schedule.id))
 
 
 def test_an_employee_does_not_manage_schedules():
@@ -1059,7 +1060,7 @@ def test_my_own_request_must_not_overlap_either(make_user):
 
 
 def decide(action, leave, role="hub_admin", **ctx):
-    return run(f"staff.time_off.{action}", ByIdIn(id=leave.id), role, **ctx)
+    return run(f"staff.time_off.{action}", TimeOffRefIn(id=leave.id), role, **ctx)
 
 
 def test_approve_stamps_who_and_when(make_user):
@@ -1441,8 +1442,8 @@ def test_two_overlapping_approvals_at_once_keep_one():
     second = TimeOff.objects.create(member=member, start_date=dt.date(2026, 10, 13), end_date=dt.date(2026, 10, 14))
 
     outcome = _race(
-        lambda: get("staff.time_off.approve")(ctx_for(), ByIdIn(id=first.id)),
-        lambda: get("staff.time_off.approve")(ctx_for(), ByIdIn(id=second.id)),
+        lambda: get("staff.time_off.approve")(ctx_for(), TimeOffRefIn(id=first.id)),
+        lambda: get("staff.time_off.approve")(ctx_for(), TimeOffRefIn(id=second.id)),
     )
 
     assert isinstance(outcome.get("error"), Conflict) and outcome["error"].code == "staff.overlapping_time_off"
@@ -1456,8 +1457,8 @@ def test_an_employee_cannot_cancel_a_request_approved_while_they_were_cancelling
     leave = make_time_off(make_member(user=me.person), "2026-10-12")
 
     outcome = _race(
-        lambda: get("staff.time_off.approve")(ctx_for(), ByIdIn(id=leave.id)),
-        lambda: get("staff.time_off.cancel")(ctx_for("hub_employee", actor=me), ByIdIn(id=leave.id)),
+        lambda: get("staff.time_off.approve")(ctx_for(), TimeOffRefIn(id=leave.id)),
+        lambda: get("staff.time_off.cancel")(ctx_for("hub_employee", actor=me), TimeOffRefIn(id=leave.id)),
     )
 
     assert isinstance(outcome.get("error"), PermissionDenied)
@@ -1472,7 +1473,7 @@ def test_a_record_terminated_while_approving_is_not_found():
 
     outcome = _race(
         lambda: get("staff.member.terminate")(ctx_for(), TerminateIn(id=member.id)),
-        lambda: get("staff.time_off.approve")(ctx_for(), ByIdIn(id=leave.id)),
+        lambda: get("staff.time_off.approve")(ctx_for(), TimeOffRefIn(id=leave.id)),
     )
 
     assert isinstance(outcome.get("error"), NotFound), outcome
@@ -1486,7 +1487,7 @@ def test_a_record_terminated_while_approving_is_not_found():
     [
         lambda schedule: get("staff.schedule.update")(ctx_for(), ScheduleUpdateIn(id=schedule.id, days=WEEK)),
         lambda schedule: get("staff.schedule.set_active")(ctx_for(), SetActiveIn(id=schedule.id, is_active=False)),
-        lambda schedule: get("staff.schedule.delete")(ctx_for(), ByIdIn(id=schedule.id)),
+        lambda schedule: get("staff.schedule.delete")(ctx_for(), ScheduleRefIn(id=schedule.id)),
     ],
 )
 def test_a_schedule_of_a_record_terminated_meanwhile_is_not_found(command):
