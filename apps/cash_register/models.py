@@ -10,6 +10,10 @@
 - ``Count`` is a count of the drawer by notes and coins (or its total).
 
 Money is in whole cents and a stored amount is never negative: its sign comes from its type.
+
+A label the cash register says in the same English as an app loaded before it (demo, customer, inventory, sale) goes
+through ``pgettext_lazy`` with a context of its own, so Spanish says the cash register's word and not that app's
+(``base/tests/test_locale_modules.py``).
 """
 
 import datetime as dt
@@ -20,6 +24,7 @@ from django.db.models import F, Q
 from django.db.models.functions import Lower
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import pgettext_lazy
 from live.models import UUIDModel
 
 from apps.sale.models import PaymentMethod
@@ -115,7 +120,7 @@ class Register(UUIDModel):
 class SessionCounter(UUIDModel):
     """The last session number given on a business day."""
 
-    day = models.DateField(_("business day"), unique=True)
+    day = models.DateField(pgettext_lazy("cash register", "business day"), unique=True)
     last = models.PositiveIntegerField(_("last number"), default=0)
 
     class Meta:
@@ -131,11 +136,12 @@ class Session(UUIDModel):
     """A shift of the drawer. Once closed it never changes: corrections go to the open one."""
 
     class Status(models.TextChoices):
-        OPEN = "open", _("Open")
+        # Its own context: a session is «Abierta» like it is «Cerrada»; demo says the same English with «Abierto».
+        OPEN = "open", pgettext_lazy("cash session status", "Open")
         CLOSED = "closed", _("Closed")
 
     number = models.CharField(_("number"), max_length=24, unique=True)
-    business_day = models.DateField(_("business day"))
+    business_day = models.DateField(pgettext_lazy("cash register", "business day"))
     sequence = models.PositiveIntegerField(_("number of the day"))
     register = models.ForeignKey(
         Register,
@@ -253,7 +259,9 @@ class Movement(UUIDModel):
         choices=PaymentMethod.Type.choices,
         default=PaymentMethod.Type.CASH,
     )
-    method_name = models.CharField(_("payment method"), max_length=60, blank=True)
+    method_name = models.CharField(
+        pgettext_lazy("cash register", "payment method"), max_length=60, blank=True
+    )
     description = models.CharField(_("concept"), max_length=255, blank=True)
     sale = models.ForeignKey(
         "sale.Sale",
@@ -263,7 +271,9 @@ class Movement(UUIDModel):
         related_name="+",
         verbose_name=_("sale"),
     )
-    sale_number = models.CharField(_("sale number"), max_length=24, blank=True)
+    sale_number = models.CharField(
+        pgettext_lazy("cash register", "sale number"), max_length=24, blank=True
+    )
     document_type = models.CharField(_("document"), max_length=8, blank=True)
     sale_payment = models.ForeignKey(
         "sale.SalePayment",
@@ -283,7 +293,9 @@ class Movement(UUIDModel):
     )
     gift_total = models.BigIntegerField(_("comps at cost"), default=0)
     created_at = models.DateTimeField(_("when"), default=timezone.now)
-    created_by = models.CharField(_("by"), max_length=ACTOR_MAX_LENGTH, blank=True)
+    created_by = models.CharField(
+        pgettext_lazy("cash register", "by"), max_length=ACTOR_MAX_LENGTH, blank=True
+    )
 
     class Meta:
         verbose_name = _("cash movement")
