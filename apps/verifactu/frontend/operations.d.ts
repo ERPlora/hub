@@ -12,6 +12,8 @@ export type Environment = 'testing' | 'production';
 export type Route = 'erplora' | 'own';
 export type CertificateKind = 'seal' | 'representative' | 'personal' | 'unknown';
 export type InvoiceType = 'F1' | 'F2' | 'F3' | 'R1' | 'R2' | 'R3' | 'R4' | 'R5';
+/** Whether a registration the AEAT rejected or accepted with errors has its correction (VERIFACTU-F24). */
+export type CorrectionStatus = 'not_applicable' | 'pending' | 'corrected';
 export type EventKind =
   | 'record_created'
   | 'deferred'
@@ -101,6 +103,9 @@ export interface RecordRowOut {
   environment: Environment;
   status: RecordStatus;
   correction: boolean;
+  correction_status: CorrectionStatus;
+  /** The record that corrects it (its latest correction), if any. */
+  corrected_by_id: string | null;
   qr_url: string;
   created_at: string;
 }
@@ -319,6 +324,8 @@ export interface RecordListIn extends PageIn {
   record_type?: RecordType;
   invoice_type?: InvoiceType;
   environment?: Environment;
+  /** Only the rejections (or acceptances with errors) left to correct, or only the corrected ones. */
+  correction_status?: Exclude<CorrectionStatus, 'not_applicable'>;
   issue_date_from?: string;
   issue_date_to?: string;
   total_amount_from?: number;

@@ -1,7 +1,8 @@
 <script setup lang="ts">
 // A record (VERIFACTU-F17, F18, F24, F25, F30, F35; the old detail of `erp-verifactu-records`, now its own page with Back
-// to the list): «Record <number>» with its status and environment; «Not at the AEAT yet» with why and when, or «The
-// AEAT rejected it» with its code, its message and what to do; the invoice's figures, the fingerprint chain, the QR
+// to the list): «Record <number>» with its status, whether a rejection (or an acceptance with errors) is corrected
+// («Corrected», a link to the record that corrects it, or «Pending correction») and its environment; «Not at the AEAT
+// yet» with why and when, or «The AEAT rejected it» with its code, its message and what to do; the invoice's figures, the fingerprint chain, the QR
 // (and «Verify at the AEAT»: a new tab, the system browser in the installed app), the AEAT's answer with the delivery's fingerprint, the XML and its latest events.
 // «Send now», «Ask the AEAT» (in the queue: it leaves only if the AEAT already has it), «Correct» and «Cancel record»
 // where they apply and for whoever may; a refusal is said right above them.
@@ -13,6 +14,7 @@ import { IonButton, IonSpinner } from '@ionic/vue';
 import { computed, shallowRef } from 'vue';
 
 import CancelRecordModal from '../components/CancelRecordModal.vue';
+import CorrectionMark from '../components/CorrectionMark.vue';
 import PageNotices from '../components/PageNotices.vue';
 import { useLocale, useT } from '../composables/useT';
 import { formatDate, formatMoney } from '../lib/format';
@@ -195,6 +197,10 @@ async function correctIt(): Promise<void> {
           data-testid="verifactu-record-status"
           :tone="statusTone(record.status)"
           :label="$t(`verifactu.status.${record.status}`)"
+        />
+        <CorrectionMark
+          :status="record.correction_status"
+          :corrected-by-id="record.corrected_by_id"
         />
         <StatusPill
           :tone="environmentTone(record.environment)"

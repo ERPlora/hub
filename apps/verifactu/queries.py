@@ -13,7 +13,7 @@ from operator import and_
 from uuid import UUID
 
 from django.conf import settings
-from django.db.models import Case, Count, Min, Q, QuerySet, When
+from django.db.models import Case, Count, Min, OuterRef, Q, QuerySet, Subquery, When
 from django.utils import timezone, translation
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext, Scope, system_context
@@ -422,7 +422,44 @@ def summary(record: Record) -> RecordSummaryOut:
     )
 
 
-def _row(record: Record) -> dict:
+#: A registration the AEAT rejected or accepted with errors: what a correction answers (VERIFACTU-F24).
+CORRECTABLE = Q(record_type=Record.Type.ALTA, status__in=Record.CORRECTABLE)
+
+
+def correctable(record: Record) -> bool:
+    """A registration the AEAT rejected or accepted with errors: what a correction answers (VERIFACTU-F24)."""
+    return record.record_type == Record.Type.ALTA and record.status in Record.CORRECTABLE
+
+
+def with_correction(queryset: QuerySet) -> QuerySet:
+    """Each record with ``corrected_by_id``, the record that corrects it (its latest), if any (VERIFACTU-F24): one
+    subquery for the whole page, never a query per row."""
+    latest = (
+        Record.objects.filter(corrects=OuterRef("pk"))
+        .order_by("-created_at", "-id")
+        .values("id")[:1]
+    )
+    return queryset.annotate(corrected_by_id=Subquery(latest))
+
+
+def corrected_by(record: Record) -> UUID | None:
+    """The record that corrects ``record`` (its latest), if any: the list's subquery, for one record."""
+    return (
+        with_correction(Record.objects.filter(pk=record.pk))
+        .values_list("corrected_by_id", flat=True)
+        .get()
+    )
+
+
+def correction_status(record: Record, corrected_by_id: UUID | None) -> str:
+    """``corrected`` once a new record corrects it, ``pending`` while a rejection (or an acceptance with errors) waits
+    for its correction, ``not_applicable`` otherwise (VERIFACTU-F24)."""
+    if corrected_by_id is not None:
+        return "corrected"
+    return "pending" if correctable(record) else "not_applicable"
+
+
+def _row(record: Record, corrected_by_id: UUID | None) -> dict:
     return {
         "id": record.id,
         "sequence": record.sequence,
@@ -437,6 +474,8 @@ def _row(record: Record) -> dict:
         "environment": record.environment,
         "status": record.status,
         "correction": record.correction,
+        "correction_status": correction_status(record, corrected_by_id),
+        "corrected_by_id": corrected_by_id,
         "qr_url": record.qr_url,
         "created_at": record.created_at,
     }
@@ -456,12 +495,7 @@ def event_out(event: Event) -> EventOut:
 
 def can_correct(record: Record) -> bool:
     """A registration the AEAT rejected or accepted with errors, not corrected yet (VERIFACTU-F24)."""
-    return (
-        record.record_type == Record.Type.ALTA
-        and record.status
-        in (Record.Status.REJECTED, Record.Status.ACCEPTED_WITH_ERRORS)
-        and not Record.objects.filter(corrects=record).exists()
-    )
+    return correctable(record) and not Record.objects.filter(corrects=record).exists()
 
 
 def can_cancel(record: Record) -> bool:
@@ -583,11 +617,13 @@ SORTS = {
     ai={
         "description": "List the VeriFactu billing records, the last sealed first: search by invoice number, "
         "#sequence, issuer's name or tax ID; filter by status (pending, sent, accepted, accepted_with_errors, "
-        "rejected), record type, invoice type, environment, issue date and total in cents."
+        "rejected), record type, invoice type, environment, issue date and total in cents. Each row says whether a "
+        "rejection (or an acceptance with errors) is corrected and by which record (correction_status: pending, "
+        "corrected or not_applicable; corrected_by_id); correction_status=pending lists the ones left to correct."
     },
 )
 def list_records(ctx: OperationContext, data: RecordListIn) -> dict:
-    queryset = Record.objects.all()
+    queryset = with_correction(Record.objects.all())
     text = (data.search or "").strip()
     if text.startswith("#") and text[1:].isdigit():
         queryset = queryset.filter(sequence=int(text[1:]))
@@ -612,10 +648,19 @@ def list_records(ctx: OperationContext, data: RecordListIn) -> dict:
         queryset = queryset.filter(total_amount__gte=data.total_amount_from)
     if data.total_amount_to is not None:
         queryset = queryset.filter(total_amount__lte=data.total_amount_to)
+    if data.correction_status == "corrected":
+        queryset = queryset.filter(corrected_by_id__isnull=False)
+    elif data.correction_status == "pending":
+        queryset = queryset.filter(CORRECTABLE, corrected_by_id__isnull=True)
     column = SORTS[data.sort or "created_at"]
     prefix = "-" if data.dir == "desc" else ""
     queryset = queryset.order_by(f"{prefix}{column}", f"{prefix}id")
-    return page(queryset, data.limit, data.offset, _row)
+    return page(
+        queryset,
+        data.limit,
+        data.offset,
+        lambda record: _row(record, record.corrected_by_id),
+    )
 
 
 @operation(
@@ -640,7 +685,7 @@ def get_record(ctx: OperationContext, data: RecordGetIn) -> RecordOut:
         :RECORD_EVENTS_SHOWN
     ]
     return RecordOut(
-        **_row(record),
+        **_row(record, corrected_by(record)),
         operation_date=record.operation_date,
         rectification_kind=record.rectification_kind,
         rectified=record.rectified,

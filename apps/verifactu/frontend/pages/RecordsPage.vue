@@ -3,7 +3,9 @@
 // server-side DataTable — Seq, Invoice, Date, Type (Registration / Cancellation), F., Issuer, Total, Environment and
 // Status (a coloured pill) —, the last sealed first, 50 a page, search «Search invoice, issuer or tax ID…» and the
 // filters behind the table's funnel (Date, Type, Total, Environment and Status on their columns, then the
-// invoice type; the total typed in euros). A row, or «View», opens its record;
+// invoice type and the correction; the total typed in euros). Beside the status of a rejection (or an acceptance with
+// errors), «Corrected» (a link to the record that corrects it) or «Pending correction» (VERIFACTU-F24). A row, or
+// «View», opens its record;
 // «Verify at the AEAT» opens the QR's link of the AEAT in a new tab (in the installed app, the system browser:
 // gh:hub#518). New, sent and answered records come back through the stream by themselves.
 import {
@@ -19,12 +21,13 @@ import { AppPage, openExternalLink } from '@erplora/ui/shell';
 import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
 
+import CorrectionMark from '../components/CorrectionMark.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
 import { backwardsDays, filterParams, filtersInUse, unreadableAmounts } from '../lib/filters';
 import { formatDate, formatMoney } from '../lib/format';
-import { ENVIRONMENTS, environmentTone, INVOICE_TYPES, RECORD_TYPES, STATUSES, statusTone } from '../lib/record';
+import { CORRECTION_FILTERS, ENVIRONMENTS, environmentTone, INVOICE_TYPES, RECORD_TYPES, STATUSES, statusTone } from '../lib/record';
 import type { RecordListIn, RecordRowOut } from '../operations';
 import { verifactuTabs } from '../tabs';
 
@@ -104,9 +107,16 @@ const columns = computed<DataTableColumn<RecordRowOut>[]>(() => [
   },
 ]);
 
-/** The invoice type filters apart: its column is «F.», too short to name a filter. Its codes are the AEAT's. */
+/** The invoice type filters apart: its column is «F.», too short to name a filter. Its codes are the AEAT's. The
+ *  correction has no column of its own: it shows beside the status. */
 const filterFields = computed<DataTableFilterField[]>(() => [
   { type: 'select', key: 'invoice_type', label: t('verifactu.filters.invoiceType'), options: options(INVOICE_TYPES, (code) => code) },
+  {
+    type: 'select',
+    key: 'correction_status',
+    label: t('verifactu.filters.correction'),
+    options: options(CORRECTION_FILTERS, (code) => t(`verifactu.correction.${code}`)),
+  },
 ]);
 
 const actions = computed<DataTableAction<RecordRowOut>[]>(() => [
@@ -193,6 +203,11 @@ function onAction({ actionId, row }: { actionId: string; row: RecordRowOut }): v
           :tone="statusTone(row.status)"
           :label="$t(`verifactu.status.${row.status}`)"
           data-testid="verifactu-records-status"
+        />
+        <CorrectionMark
+          size="sm"
+          :status="row.correction_status"
+          :corrected-by-id="row.corrected_by_id"
         />
       </template>
       <template #environment="{ row }">

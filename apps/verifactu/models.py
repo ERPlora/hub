@@ -273,6 +273,9 @@ class Record(UUIDModel):
     UNSENT = ("pending", "sent")
     #: Registered by the AEAT.
     IN_AEAT = ("accepted", "accepted_with_errors")
+    #: What a correction (subsanación) answers, in a registration: the AEAT rejected it or accepted it with errors
+    #: (VERIFACTU-F24).
+    CORRECTABLE = ("rejected", "accepted_with_errors")
 
     record_type = models.CharField(_("record type"), max_length=9, choices=Type.choices)
     environment = models.CharField(

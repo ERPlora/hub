@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:4e38cd837b096b0333fbd17b15b21043572cc8bff1dc2ea8bc55a62037d41f71 -->
+<!-- generated from WORKBOOK.md sha256:e91c8e76b9d6f2c214d083c0616383251e8c9af67b77aa2ec1dd9b769880c452 -->
 
 ## What it is for and who it is for
 
@@ -91,9 +91,11 @@ use do not show.
 Menu **VeriFactu → Records**. Title "VeriFactu records". Table of 50 by 50 (table or cards; on the phone, cards
 with the invoice number as title) with "Seq", "Invoice", "Date", "Type" (Registration / Cancellation), "F."
 (F1…R5), "Issuer", "Total", "Environment" (Testing / Production) and "Status" (Pending, Sent, Accepted, Accepted
-with errors, Rejected, in a coloured pill). Search box "Search invoice, issuer or tax ID…" (sequence number, invoice
-number, issuer's name or tax ID). Filters of status, type, invoice type, environment, date and total (in euros),
-behind the table's funnel with its counter; a total that is not an amount, or a "to" date before the "from" one, is
+with errors, Rejected, in a coloured pill). Beside the status of a registration rejected or accepted with errors,
+"Corrected" (a link to the new record that corrects it) or "Pending correction" (VERIFACTU-F24). Search box "Search
+invoice, issuer or tax ID…" (sequence number, invoice number, issuer's name or tax ID). Filters of status, type,
+invoice type, correction ("Pending correction" or "Corrected"), environment, date and total (in euros), behind the
+table's funnel with its counter; a total that is not an amount, or a "to" date before the "from" one, is
 said under its field and does not filter. The last sealed comes on top. Per row: "View" (also by tapping the row)
 and "Verify at the AEAT" (opens the QR's verification page). The list updates by itself when a record is born,
 leaves or changes on any device.
@@ -101,8 +103,9 @@ Empty: "No records yet. Every invoice you issue is sealed and listed here."; wit
 results". Loading: "Loading…". Error: the message with "Retry".
 
 ### Record detail
-It opens from a row of **Records** (`/verifactu/records/<id>`). On top, "Record {number}" with its status, its
-environment and "← Back". If it is not at the AEAT (Pending or Sent), the notice "Not at the AEAT yet" with the
+It opens from a row of **Records** (`/verifactu/records/<id>`). On top, "Record {number}" with its status,
+"Corrected" (a link to the record that corrects it) or "Pending correction" if it is a registration rejected or
+accepted with errors (VERIFACTU-F24), its environment and "← Back". If it is not at the AEAT (Pending or Sent), the notice "Not at the AEAT yet" with the
 why and the when (VERIFACTU-F17). If it was rejected, the notice "The AEAT rejected it" with what to do
 (VERIFACTU-F24). Blocks:
 - **Invoice**: "Invoice", "Issue date", "Operation date" (if it is another), "Invoice type", "Issuer", "Issuer tax
@@ -725,7 +728,9 @@ Status: done
 Actor: administrator
 Screen: Record detail
 Steps:
-1. The record shows in red "Rejected" in **Records**; in **Events** "Submission failed" is left with the reason.
+1. The record shows in red "Rejected" in **Records**, with "Pending correction" beside it (an "Accepted with
+   errors" too); the correction filter "Pending correction" leaves only the ones left. In **Events** "Submission
+   failed" is left with the reason.
 2. In its detail, "The AEAT rejected it" with the AEAT's literal code and message and what to do: if the error is
    in the invoice's data (a customer's tax ID the AEAT does not know, an amount), it is corrected **in Invoicing**
    with a rectifying invoice; if not (a chain error after restoring a backup, a fault of ours), "Correct".
@@ -735,8 +740,13 @@ Steps:
    §9.1.3, "registration after rejection"); `S` if the AEAT does have it and what was rejected was a later
    correction.
 4. An "Accepted with errors" can also be corrected (`Subsanacion = S`, `RechazoPrevio = N`; §9.1.2).
+5. From then on the rejected one says "Corrected" in **Records** and in its detail, with a link to the new record; if
+   the AEAT also rejects the correction, it shows "Pending correction" until its own. Only the link between the two
+   is read: what was registered does not change.
 In: the rejected or accepted-with-errors record.
-Out: the correction record (it announces `verifactu.record.created`).
+Out: the correction record (it announces `verifactu.record.created`); `verifactu.record.list` and
+`verifactu.record.get` say per row `correction_status` (`pending`, `corrected` or `not_applicable`) and
+`corrected_by_id`, and the list filters by `correction_status`.
 If it fails: only a registration record rejected or accepted with errors is corrected, and only the last one of its
 invoice: "This record cannot be corrected: only the last record of a registration the AEAT rejected or accepted
 with errors can.".
@@ -958,7 +968,7 @@ invoice** (`TICKET-2026-000012`) or by its sequence; an issuer, by its tax ID.
 | What it gives | Who can | Flows | Service |
 |---|---|---|---|
 | The configuration: environment, route, own certificate (holder, tax ID, kind, expiry; never its material), status of the authorisation, producer's data, declaration | view | F02, F04, F08, F09, F12 | `verifactu.config.get` |
-| The records, with search, filters, sorting and pages (up to 100) | view | F16 | `verifactu.record.list` |
+| The records, with search, filters (also the ones pending correction), whether each rejection is corrected, sorting and pages (up to 100) | view | F16, F24 | `verifactu.record.list` |
 | A record, by its id or by its invoice's number, with its QR, its XML and why it waits | view | F17, F18 | `verifactu.record.get` |
 | The current record of an invoice (QR, CSV, status) | view | F19 | `verifactu.record.by_invoice` |
 | The queue: the records not yet at the AEAT | view | F20–F22 | `verifactu.contingency.list` |

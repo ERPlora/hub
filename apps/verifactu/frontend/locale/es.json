@@ -62,7 +62,13 @@
       "invoiceType": "Tipo de factura",
       "environment": "Entorno",
       "amountInvalid": "Escribe un importe en euros, como 12,50.",
-      "dateOrder": "La fecha final no puede ser anterior a la inicial."
+      "dateOrder": "La fecha final no puede ser anterior a la inicial.",
+      "correction": "Subsanación"
+    },
+    "correction": {
+      "pending": "Pendiente de subsanar",
+      "corrected": "Subsanado",
+      "open": "Subsanado: abrir el registro que lo subsana"
     },
     "records": {
       "title": "Registros VeriFactu",

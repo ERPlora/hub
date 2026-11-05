@@ -9,6 +9,8 @@ Cases from the current module's ``list_filters``, ``record_detail_fields``, ``ev
 import datetime as dt
 
 import pytest
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from django.utils import timezone, translation
 from live.context import system_context
 from pydantic import ValidationError
@@ -152,6 +154,103 @@ def test_sort_by_a_column_with_a_stable_tie_break(three):
 def test_pages(three):
     page = run("verifactu.record.list", {"limit": 2, "offset": 2})
     assert (len(page.rows), page.total) == (1, 3)
+
+
+# Whether a rejection is corrected (VERIFACTU-F24)
+
+
+@pytest.fixture
+def rejections(three):
+    """The first rejected and corrected with a new record, the second rejected and not yet, the third accepted with
+    errors and not yet."""
+    corrected, uncorrected, with_errors = three
+    Record.objects.filter(pk__in=[corrected.id, uncorrected.id]).update(status="rejected")
+    Record.objects.filter(pk=with_errors.id).update(status="accepted_with_errors")
+    correction = run("verifactu.record.correct", {"record_id": str(corrected.id)}).record.id
+    return corrected, uncorrected, with_errors, correction
+
+
+def marks(page) -> dict:
+    return {row.id: (row.correction_status, row.corrected_by_id) for row in page.rows}
+
+
+def test_each_rejection_says_whether_a_new_record_corrected_it(rejections):
+    corrected, uncorrected, with_errors, correction = rejections
+    assert marks(run("verifactu.record.list")) == {
+        corrected.id: ("corrected", correction),
+        uncorrected.id: ("pending", None),
+        with_errors.id: ("pending", None),
+        correction: ("not_applicable", None),  # the correction itself waits in the queue
+    }
+
+
+def test_a_rejected_correction_is_left_to_correct_until_its_own_correction(rejections):
+    corrected, _, _, correction = rejections
+    Record.objects.filter(pk=correction).update(status="rejected")
+    assert marks(run("verifactu.record.list"))[correction] == ("pending", None)
+    second = run("verifactu.record.correct", {"record_id": str(correction)}).record.id
+    rows = marks(run("verifactu.record.list"))
+    assert (rows[corrected.id], rows[correction]) == (
+        ("corrected", correction),
+        ("corrected", second),
+    )
+
+
+def test_a_cancellation_or_a_record_the_aeat_accepted_is_never_left_to_correct(issuer):
+    alta = ticket()
+    Record.objects.filter(pk=alta.id).update(status="accepted")
+    anulacion = run(
+        "verifactu.record.cancel",
+        {"invoice_number": alta.invoice_number, "reason": "Duplicated ticket"},
+    ).record.id
+    Record.objects.filter(pk=anulacion).update(status="rejected")
+    assert marks(run("verifactu.record.list")) == {
+        alta.id: ("not_applicable", None),
+        anulacion: ("not_applicable", None),
+    }
+
+
+def test_the_rejections_left_to_correct_and_the_corrected_ones_are_filtered(rejections):
+    corrected, uncorrected, with_errors, _ = rejections
+    left = run("verifactu.record.list", {"correction_status": "pending"})
+    assert (set(marks(left)), left.total) == ({uncorrected.id, with_errors.id}, 2)
+    assert numbers(run("verifactu.record.list", {"correction_status": "corrected"})) == [
+        corrected.invoice_number
+    ]
+    assert numbers(
+        run("verifactu.record.list", {"correction_status": "pending", "status": "rejected"})
+    ) == [uncorrected.invoice_number]
+    with pytest.raises(ValidationError):
+        run("verifactu.record.list", {"correction_status": "not_applicable"})
+
+
+def test_the_rejections_detail_names_the_record_that_corrects_it(rejections):
+    corrected, uncorrected, _, correction = rejections
+    detail = run("verifactu.record.get", {"record_id": str(corrected.id)})
+    assert (detail.correction_status, detail.corrected_by_id, detail.can_correct) == (
+        "corrected",
+        correction,
+        False,
+    )
+    detail = run("verifactu.record.get", {"record_id": str(uncorrected.id)})
+    assert (detail.correction_status, detail.corrected_by_id, detail.can_correct) == (
+        "pending",
+        None,
+        True,
+    )
+
+
+def test_the_marks_cost_no_query_per_row(rejections):
+    def queries() -> int:
+        with CaptureQueriesContext(connection) as read:
+            run("verifactu.record.list")
+        return len(read)
+
+    before = queries()
+    more = ticket()
+    Record.objects.filter(pk=more.id).update(status="rejected")
+    run("verifactu.record.correct", {"record_id": str(more.id)})
+    assert queries() == before
 
 
 # A record (VERIFACTU-F17, F18)

@@ -1,7 +1,8 @@
 // VeriFactu → Records (VERIFACTU-F16, F18; the old `erp-verifactu-records`): the live `verifactu.record.list` in a
 // server-side DataTable — Seq, Invoice, Date, Type, F., Issuer, Total, Environment, Status —, the last sealed first,
 // 50 a page, search «Search invoice, issuer or tax ID…» and the filters behind the table's funnel. A row opens its record; «Verify at
-// the AEAT» opens the QR's link. Every state of the screen and the tabbar.
+// the AEAT» opens the QR's link. By each rejection, whether it is corrected (VERIFACTU-F24). Every state of the screen
+// and the tabbar.
 import { DataTable, EmptyState } from '@erplora/ui/components';
 import { AppPage } from '@erplora/ui/shell';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -59,6 +60,8 @@ const row = (number: string, over: Partial<RecordRowOut> = {}): RecordRowOut => 
   environment: 'testing',
   status: 'pending',
   correction: false,
+  correction_status: 'not_applicable',
+  corrected_by_id: null,
   qr_url: `https://prewww2.aeat.es/wlpl/TIKE-CONT/ValidarQR?numserie=${number}`,
   created_at: '2026-10-14T10:00:00Z',
   ...over,
@@ -158,6 +161,32 @@ describe('RecordsPage', () => {
     expect(invoke).toHaveBeenCalledWith('open_external_url', { url: PAGE.rows[0].qr_url });
   });
 
+  it('by each rejection (or acceptance with errors): «Corrected», a link to the new record, or «Pending correction» (VERIFACTU-F24)', async () => {
+    const s = await setup();
+    await s.show({
+      rows: [
+        row('TICKET-2026-000003', { status: 'rejected', correction_status: 'corrected', corrected_by_id: 'new-3' }),
+        row('TICKET-2026-000002', { status: 'accepted_with_errors', correction_status: 'pending' }),
+        row('TICKET-2026-000001', { status: 'accepted' }),
+      ],
+      total: 3,
+      limit: 50,
+      offset: 0,
+    });
+    const mark = (i: number, testid: string) => s.rows()[i].find(`[data-testid="${testid}"]`);
+    expect(mark(0, 'verifactu-records-status').text()).toContain('Rejected');
+    expect(mark(0, 'verifactu-correction-corrected').attributes('href')).toBe('/verifactu/records/new-3');
+    expect(mark(0, 'verifactu-correction-corrected').text()).toBe('Corrected');
+    expect(mark(1, 'verifactu-correction-pending').text()).toBe('Pending correction');
+    expect(mark(1, 'verifactu-correction-corrected').exists()).toBe(false);
+    expect([mark(2, 'verifactu-correction-pending').exists(), mark(2, 'verifactu-correction-corrected').exists()]).toEqual([false, false]);
+    // The link opens the new record, not the rejected one its row would open.
+    const push = vi.spyOn(s.router, 'push');
+    await mark(0, 'verifactu-correction-corrected').trigger('click');
+    await flush();
+    expect(push.mock.calls).toEqual([['/verifactu/records/new-3']]);
+  });
+
   it('says there are no records yet, or no results with a search', async () => {
     const s = await setup();
     await s.show(EMPTY);
@@ -208,8 +237,19 @@ describe('RecordsPage: the filters behind the table funnel (FIX-DATATABLE-HUB-FI
     expect(options('environment')?.map((o) => o.value)).toEqual(['testing', 'production']);
     expect(options('status')?.map((o) => o.value)).toEqual(['pending', 'sent', 'accepted', 'accepted_with_errors', 'rejected']);
     const fields = s.prop<Filter[]>('filterFields');
-    expect(fields.map((f) => [f.key, f.label, f.type])).toEqual([['invoice_type', 'Invoice type', 'select']]);
+    expect(fields.map((f) => [f.key, f.label, f.type])).toEqual([
+      ['invoice_type', 'Invoice type', 'select'],
+      ['correction_status', 'Correction', 'select'],
+    ]);
     expect(fields[0].options?.map((o) => [o.value, o.label])).toEqual(['F1', 'F2', 'F3', 'R1', 'R2', 'R3', 'R4', 'R5'].map((code) => [code, code]));
+    expect(fields[1].options?.map((o) => [o.value, o.label])).toEqual([
+      ['pending', 'Pending correction'],
+      ['corrected', 'Corrected'],
+    ]);
+    const es = await setup({ locale: 'es' });
+    await es.show(PAGE);
+    const spanish = es.prop<Filter[]>('filterFields')[1];
+    expect([spanish.label, spanish.options?.map((o) => o.label)]).toEqual(['Subsanación', ['Pendiente de subsanar', 'Subsanado']]);
   });
 
   it('the funnel panel applies on «Apply»: every filter, the totals in cents, and counts them', async () => {
@@ -228,6 +268,7 @@ describe('RecordsPage: the filters behind the table funnel (FIX-DATATABLE-HUB-FI
     set('environment', 'ionChange', 'testing');
     set('status', 'ionChange', 'rejected');
     set('invoice_type', 'ionChange', 'F2');
+    set('correction_status', 'ionChange', 'pending');
     await flush();
     await s.reopen();
     expect(s.params(OP), 'the panel edits a draft: nothing is asked before «Apply»').toEqual([{ sort: 'created_at', dir: 'desc', limit: 50, offset: 0 }]);
@@ -244,13 +285,14 @@ describe('RecordsPage: the filters behind the table funnel (FIX-DATATABLE-HUB-FI
         environment: 'testing',
         status: 'rejected',
         invoice_type: 'F2',
+        correction_status: 'pending',
         sort: 'created_at',
         dir: 'desc',
         limit: 50,
         offset: 0,
       },
     ]);
-    expect(s.find('verifactu-records-filters-count').text()).toBe('6');
+    expect(s.find('verifactu-records-filters-count').text()).toBe('7');
   });
 
   it('a total that is not an amount, or a day «until» before its «from», is said under it and does not filter', async () => {

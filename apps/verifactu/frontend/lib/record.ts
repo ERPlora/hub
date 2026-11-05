@@ -2,12 +2,14 @@
 // the server knows (apps/verifactu/models.py) and the tone of a status, an environment and a severity.
 import type { StatusPillTone } from '@erplora/ui/components';
 
-import type { AeatState, Environment, EventKind, InvoiceType, RecordStatus, RecordType, Severity } from '../operations';
+import type { AeatState, CorrectionStatus, Environment, EventKind, InvoiceType, RecordStatus, RecordType, Severity } from '../operations';
 
 export const STATUSES: readonly RecordStatus[] = ['pending', 'sent', 'accepted', 'accepted_with_errors', 'rejected'];
 export const RECORD_TYPES: readonly RecordType[] = ['alta', 'anulacion'];
 export const ENVIRONMENTS: readonly Environment[] = ['testing', 'production'];
 export const INVOICE_TYPES: readonly InvoiceType[] = ['F1', 'F2', 'F3', 'R1', 'R2', 'R3', 'R4', 'R5'];
+/** What the Records list filters by correction (VERIFACTU-F24): the ones left to correct first. */
+export const CORRECTION_FILTERS: readonly Exclude<CorrectionStatus, 'not_applicable'>[] = ['pending', 'corrected'];
 /** The states the AEAT's query gives a record it holds, as it names them. */
 export const AEAT_STATES: readonly AeatState[] = ['Correcto', 'AceptadoConErrores', 'Anulado'];
 export const SEVERITIES: readonly Severity[] = ['debug', 'info', 'warning', 'error', 'critical'];

@@ -101,9 +101,12 @@ la persona no puede usar no aparecen.
 Menú **VeriFactu → Registros**. Título «Registros VeriFactu». Tabla de 50 en 50 (tabla o tarjetas; en el
 móvil, tarjetas con el número de factura como título) con «Seq», «Factura», «Fecha», «Tipo» (Alta /
 Anulación), «F.» (F1…R5), «Emisor», «Total», «Entorno» (Pruebas / Producción) y «Estado» (Pendiente,
-Enviado, Aceptado, Aceptado con errores, Rechazado, en una pastilla de color). Buscador «Buscar factura,
+Enviado, Aceptado, Aceptado con errores, Rechazado, en una pastilla de color). Junto al estado de un alta rechazada
+o aceptada con errores, «Subsanado» (enlace al registro nuevo que la subsana) o «Pendiente de subsanar»
+(VERIFACTU-F24). Buscador «Buscar factura,
 emisor o NIF…» (número de secuencia, número de factura, nombre o NIF del emisor). Filtros de estado, tipo,
-tipo de factura, entorno, fecha y total (en euros), tras el embudo de la tabla con su contador; un total que no
+tipo de factura, subsanación («Pendiente de subsanar» o «Subsanado»), entorno, fecha y total (en euros), tras el
+embudo de la tabla con su contador; un total que no
 es un importe, o una fecha «hasta» anterior a la «desde», se dice bajo su campo y no filtra. Lo último sellado
 sale arriba. Por fila: «Ver» (también
 al pulsar la fila) y «Cotejar en la AEAT» (abre la página de cotejo del QR). La lista se pone al día sola
@@ -113,7 +116,8 @@ Vacía: «Todavía no hay registros. Cada factura que emitas se sella y aparece 
 
 ### Ficha de registro
 Se abre desde una fila de **Registros** (`/verifactu/records/<id>`). Arriba, «Registro {número}» con su estado,
-su entorno y «← Volver». Si no está en la AEAT (Pendiente o Enviado), el aviso «Aún no está en la AEAT» con
+«Subsanado» (enlace al registro que lo subsana) o «Pendiente de subsanar» si es un alta rechazada o aceptada con
+errores (VERIFACTU-F24), su entorno y «← Volver». Si no está en la AEAT (Pendiente o Enviado), el aviso «Aún no está en la AEAT» con
 el porqué y el cuándo (VERIFACTU-F17). Si fue rechazado, el aviso «La AEAT lo ha rechazado» con qué hacer
 (VERIFACTU-F24). Bloques:
 - **Factura**: «Factura», «Fecha de expedición», «Fecha de operación» (si es otra), «Tipo de factura»,
@@ -754,7 +758,9 @@ Estado: hecho
 Actor: administrador
 Pantalla: Ficha de registro
 Pasos:
-1. El registro sale en rojo «Rechazado» en **Registros**; en **Eventos** queda «Envío fallido» con el motivo.
+1. El registro sale en rojo «Rechazado» en **Registros**, con «Pendiente de subsanar» al lado (también un «Aceptado
+   con errores»); el filtro de subsanación «Pendiente de subsanar» deja solo los que faltan. En **Eventos** queda
+   «Envío fallido» con el motivo.
 2. En su ficha, «La AEAT lo ha rechazado» con el código y el mensaje literales de la AEAT y qué hacer: si el
    error está en los datos de la factura (un NIF de cliente que la AEAT no reconoce, un importe), se corrige
    **en Facturación** con una rectificativa; si no (un error de la cadena tras restaurar una copia, un fallo
@@ -765,8 +771,13 @@ Pasos:
    inicial; §9.1.3, «alta por rechazo»); `S` si la AEAT sí la tiene y lo rechazado fue una subsanación
    posterior.
 4. Un «Aceptado con errores» también se puede subsanar (`Subsanacion = S`, `RechazoPrevio = N`; §9.1.2).
+5. Desde ese momento el rechazado dice «Subsanado» en **Registros** y en su ficha, con enlace al registro nuevo; si
+   la AEAT rechaza también la subsanación, esta sale «Pendiente de subsanar» hasta la suya. Solo se lee el enlace
+   entre los dos: lo registrado no cambia.
 Entra: el registro rechazado o aceptado con errores.
-Sale: el registro de subsanación (avisa `verifactu.record.created`).
+Sale: el registro de subsanación (avisa `verifactu.record.created`); `verifactu.record.list` y
+`verifactu.record.get` dicen por fila `correction_status` (`pending`, `corrected` o `not_applicable`) y
+`corrected_by_id`, y la lista filtra por `correction_status`.
 Si falla: solo se subsana un registro de alta rechazado o aceptado con errores, y solo el último de su
 factura: «Este registro no se puede subsanar: solo se subsana el último registro de un alta que la AEAT rechazó o
 aceptó con errores.».
@@ -997,7 +1008,7 @@ factura** (`TICKET-2026-000012`) o por su secuencia; un emisor, por su NIF.
 | Qué da | Quién puede | Flujos | Servicio |
 |---|---|---|---|
 | La configuración: entorno, vía, certificado propio (titular, NIF, tipo, caducidad; nunca su material), estado de la autorización, datos del productor, declaración | ver | F02, F04, F08, F09, F12 | `verifactu.config.get` |
-| Los registros, con búsqueda, filtros, orden y páginas (hasta 100) | ver | F16 | `verifactu.record.list` |
+| Los registros, con búsqueda, filtros (también los pendientes de subsanar), si cada rechazo está subsanado, orden y páginas (hasta 100) | ver | F16, F24 | `verifactu.record.list` |
 | Un registro, por su id o por el número de su factura, con su QR, su XML y por qué espera | ver | F17, F18 | `verifactu.record.get` |
 | El registro vigente de una factura (QR, CSV, estado) | ver | F19 | `verifactu.record.by_invoice` |
 | La cola: los registros que aún no están en la AEAT | ver | F20–F22 | `verifactu.contingency.list` |

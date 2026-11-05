@@ -44,6 +44,8 @@ TypeCode = Literal[*Record.Type.values]
 EnvironmentCode = Literal[*Config.Environment.values]
 RouteCode = Literal[*Config.Route.values]
 InvoiceTypeCode = Literal["F1", "F2", "F3", "R1", "R2", "R3", "R4", "R5"]
+#: Whether a registration the AEAT rejected or accepted with errors has its correction (VERIFACTU-F24).
+CorrectionStatusCode = Literal["not_applicable", "pending", "corrected"]
 KindCode = Literal[*Event.Kind.values]
 SeverityCode = Literal[*Event.Severity.values]
 RepresentationCode = Literal[*Config.Representation.values]
@@ -130,6 +132,13 @@ class RecordRowOut(Schema):
         description="pending, sent, accepted, accepted_with_errors or rejected."
     )
     correction: bool = Field(description="Whether it is a correction (subsanación).")
+    correction_status: CorrectionStatusCode = Field(
+        description="Whether it has been corrected: pending for a registration the AEAT rejected or accepted with "
+        "errors and no correction yet, corrected once a new record corrects it, not_applicable otherwise."
+    )
+    corrected_by_id: UUID | None = Field(
+        description="The record that corrects it (its latest correction), if any."
+    )
     qr_url: str = Field(description="The AEAT's verification link (its QR).")
     created_at: dt.datetime = Field(description="When it was sealed.")
 
@@ -549,6 +558,10 @@ class RecordListIn(PageIn):
     )
     environment: EnvironmentCode | None = Field(
         None, description="Only testing or only production."
+    )
+    correction_status: Literal["pending", "corrected"] | None = Field(
+        None,
+        description="Only the rejections (or acceptances with errors) left to correct, or only the corrected ones.",
     )
     issue_date_from: dt.date | None = Field(
         None, description="Invoices issued on this day or later."

@@ -50,6 +50,8 @@ const RECORD: RecordOut = {
   environment: 'testing',
   status: 'pending',
   correction: false,
+  correction_status: 'not_applicable',
+  corrected_by_id: null,
   qr_url: 'https://prewww2.aeat.es/wlpl/TIKE-CONT/ValidarQR?nif=B12345674&numserie=TICKET-2026-000002',
   created_at: '2026-10-14T10:00:00Z',
   operation_date: null,
@@ -169,6 +171,18 @@ describe('RecordDetailPage', () => {
     expect(notice.text()).toContain('The AEAT rejected it');
     expect(notice.text()).toContain('1189');
     expect(notice.text()).toContain('rectify it in Invoicing');
+  });
+
+  it('a corrected rejection links to the record that corrects it; one left to correct says so (VERIFACTU-F24)', async () => {
+    const corrected = await setup({ status: 'rejected', correction_status: 'corrected', corrected_by_id: 'r9', can_correct: false });
+    const link = corrected.find('verifactu-correction-corrected');
+    expect([link.text(), link.attributes('href')]).toEqual(['Corrected', '/verifactu/records/r9']);
+    expect(corrected.find('verifactu-record-correct').exists()).toBe(false);
+    const pending = await setup({ status: 'accepted_with_errors', correction_status: 'pending', can_correct: true });
+    expect(pending.find('verifactu-correction-pending').text()).toBe('Pending correction');
+    expect(pending.find('verifactu-record-correct').exists()).toBe(true);
+    const none = await setup();
+    expect([none.find('verifactu-correction-pending').exists(), none.find('verifactu-correction-corrected').exists()]).toEqual([false, false]);
   });
 
   it('shows its chain, its QR and its XML', async () => {
