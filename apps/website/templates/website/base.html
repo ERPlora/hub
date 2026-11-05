@@ -1,5 +1,5 @@
 {% load i18n hub_assets %}<!doctype html>
-<html lang="{{ lang }}" data-bs-theme="{{ theme.first_paint }}" data-ep-mode="{{ theme.mode }}">
+<html lang="{{ lang }}" data-bs-theme="{{ theme.first_paint }}" data-ep-mode="{{ theme.mode }}"{% if static %} data-ep-static{% endif %}>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
