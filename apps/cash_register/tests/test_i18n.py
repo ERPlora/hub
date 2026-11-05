@@ -111,6 +111,29 @@ def test_spanish_texts():
         assert str(models.Movement.Type.OUT.label) == "Salida"
 
 
+def test_spanish_says_the_cash_registers_own_words_not_an_earlier_apps():
+    """Five labels the cash register shares in English with an app loaded before it (demo, customer, inventory,
+    sale) come out in Spanish with its own words, the ones its WORKBOOK names: an open session is «Abierta» like a
+    closed one is «Cerrada», not demo's «Abierto» (hub#660)."""
+    labels = {
+        "Session.status=open": models.Session.Status.OPEN.label,
+        "Session.business_day": models.Session._meta.get_field("business_day").verbose_name,
+        "SessionCounter.day": models.SessionCounter._meta.get_field("day").verbose_name,
+        "Movement.method_name": models.Movement._meta.get_field("method_name").verbose_name,
+        "Movement.sale_number": models.Movement._meta.get_field("sale_number").verbose_name,
+        "Movement.created_by": models.Movement._meta.get_field("created_by").verbose_name,
+    }
+    with translation.override("es"):
+        assert {name: str(label) for name, label in labels.items()} == {
+            "Session.status=open": "Abierta",
+            "Session.business_day": "día de negocio",
+            "SessionCounter.day": "día de negocio",
+            "Movement.method_name": "forma de pago",
+            "Movement.sale_number": "número de venta",
+            "Movement.created_by": "quién",
+        }
+
+
 @pytest.mark.django_db
 def test_an_error_message_follows_the_language_of_the_request(client, make_user):
     client.force_login(make_user("boss", host="a", role="hub_admin"))
