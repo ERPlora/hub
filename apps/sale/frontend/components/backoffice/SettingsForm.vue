@@ -6,11 +6,12 @@
 // old «You do not have permission to change these settings…». Untouched, a row follows the server; what is
 // being written is never overwritten. «Save» sends only what changed (the server keeps the rest) and says
 // «Settings saved.»; a refusal says «Could not save settings.» with the server's words and marks the
-// fields it names. A read that fails (or that the server refuses) shows no values at all: never the
+// fields it names: the notice goes once something changes, a field's mark once that field does. A read
+// that fails (or that the server refuses) shows no values at all: never the
 // factory ones as if they were the business's. `editable` is fixed for the life of the form: the page
 // remounts it when the person changes. The rows that name the tax («Prices include VAT») name the business
 // territory's, read here with the settings so the stream opens with both (`useTaxName`).
-import { InlineFeedback } from '@erplora/ui/components';
+import { InlineFeedback, useRefusal } from '@erplora/ui/components';
 import { type UseLive, useCommand, useLive } from '@erplora/ui/sdk';
 import { HubIcon, toastSuccess } from '@erplora/ui/shell';
 import { IonButton, IonCard, IonCardContent, IonList, IonSpinner } from '@ionic/vue';
@@ -82,10 +83,11 @@ const discountBlank = computed(() => String(valueOf('max_discount_percent')).tri
 const canSave = computed(() => props.editable && Object.keys(changes.value).length > 0 && !discountBlank.value && !update.pending.value);
 
 const saveError = computed(() => refusal(update.error.value, ''));
-const fieldErrors = computed(() => update.error.value?.fields ?? {});
+const { fieldErrors, showsError, changed } = useRefusal(saveError);
 
 function set(key: SettingsKey, value: Draft): void {
   edits.value = { ...edits.value, [key]: value };
+  changed(key);
 }
 
 async function save(): Promise<void> {
@@ -188,13 +190,13 @@ const failed = computed(() => !server.value && status.value === 'error' && !forb
       </ion-card>
 
       <InlineFeedback
-        v-if="saveError"
+        v-if="showsError"
         tone="danger"
         icon="alert-circle-outline"
         data-testid="sale-settings-save-error"
         :heading="$t('sale.settings.saveError')"
       >
-        {{ saveError.message }}
+        {{ saveError?.message }}
       </InlineFeedback>
 
       <p
