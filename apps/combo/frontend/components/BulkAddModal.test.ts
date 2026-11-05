@@ -131,6 +131,18 @@ describe('BulkAddModal', () => {
     expect(s.wrapper.emitted('update:open')?.at(-1)).toEqual([false]);
   });
 
+  it('a refused field it does not mark is said on top, with no promise of marks (hub#833)', async () => {
+    const s = await setup();
+    await ionChecked(s.box('p3'), true);
+    const refusal = { error: { code: 'invalid_payload', message: 'Check the highlighted details.', fields: { product_ids: 'Refused products.' } } };
+    s.answerBy({ '/api/combo/options/bulk_create': [422, refusal] });
+    await click(s.submit());
+    const error = s.inDoc('combo-bulk-error');
+    expect(error?.textContent).toContain('Refused products.');
+    expect(error?.textContent).not.toContain('Check the highlighted details.');
+    expect(s.wrapper.emitted('update:open')).toBeUndefined();
+  });
+
   it('searches the catalogue on the server', async () => {
     const s = await setup();
     // ion-searchbar waits for the typing to stop (its `debounce`) before it says ionInput.

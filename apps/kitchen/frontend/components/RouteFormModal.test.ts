@@ -56,6 +56,17 @@ describe('RouteFormModal', () => {
     expect(f.sent().map((call) => call.body)).toEqual([{ station_id: 'st-bar', category_id: 'c1' }]);
   });
 
+  it('a refused field it does not mark is said on top, with no promise of marks (hub#833)', async () => {
+    const refusal = { error: { code: 'invalid_payload', message: 'Check the highlighted details.', fields: { product_id: 'Refused product.' } } };
+    const f = await form({ station: 'st-grill' }, { '/api/kitchen/routing': [422, refusal] });
+    f.combo('kitchen-route-form-product')!.vm.$emit('update:modelValue', { id: 'p1', label: 'Burger' });
+    await settle();
+    await click(f.field('submit'));
+    expect(f.field('error').textContent).toContain('Refused product.');
+    expect(f.field('error').textContent).not.toContain('Check the highlighted details.');
+    expect(f.closed()).toBe(false);
+  });
+
   it('a refusal shows in the dialog', async () => {
     const refusal = { error: { code: 'kitchen.station_inactive', message: 'That station is switched off: switch it on or choose another one.' } };
     const f = await form({ station: 'st-grill' }, { '/api/kitchen/routing': [409, refusal] });
