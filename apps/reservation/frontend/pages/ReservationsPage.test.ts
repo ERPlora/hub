@@ -12,7 +12,6 @@ import { click, EMPLOYEE, flush, ionValue, type MountOptions, mountReservation, 
 import { dayOut, reservationRow, settingsOut } from '../__tests__/rows';
 import DayBar from '../components/DayBar.vue';
 import en from '../locale/en.json';
-import es from '../locale/es.json';
 import ReservationFormModal from '../components/ReservationFormModal.vue';
 import StepDialog from '../components/StepDialog.vue';
 import ReservationsPage from './ReservationsPage.vue';
@@ -262,7 +261,8 @@ describe('ReservationsPage: why a reservation was cancelled (RESERVATION-F09, F1
   it('speaks Spanish: the typed reason stays as typed', async () => {
     const s = await setup({ locale: 'es' });
     await s.show([BY_STAFF, RELEASED]);
-    expect(shown(s)).toEqual([es.reservation.list.cancelReason.replace('{reason}', 'Plans changed'), es.reservation.list.unconfirmed]);
+    // The Spanish words themselves, not the catalogue read back: a message left in English would pass that.
+    expect(shown(s)).toEqual(['Motivo: Plans changed', 'Liberada: nunca se confirmó']);
   });
 });
 

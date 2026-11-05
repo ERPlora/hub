@@ -11,7 +11,6 @@ import CustomerSearch from '../../../customer/frontend/components/CustomerSearch
 import { click, ionValue, mountReservation, settle } from '../__tests__/mount-reservation';
 import { freeTable, reservationRow } from '../__tests__/rows';
 import en from '../locale/en.json';
-import es from '../locale/es.json';
 import ReservationFormModal from './ReservationFormModal.vue';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
@@ -244,8 +243,9 @@ describe('ReservationFormModal: why it was cancelled (RESERVATION-F09, F13)', ()
 
   it('says the book released it because nobody confirmed it (the code `unconfirmed`, translated)', async () => {
     const s = await setup({ reservation: reservationRow({ status: 'cancelled', cancellation_reason: 'unconfirmed' }) }, 'es');
-    expect(banner(s)?.props('heading')).toBe(es.reservation.list.unconfirmed);
-    expect(s.inDoc('reservation-form-notes-only')?.textContent).toContain(es.reservation.list.unconfirmed);
+    // The Spanish words themselves, not the catalogue read back: a message left in English would pass that.
+    expect(banner(s)?.props('heading')).toBe('Liberada: nunca se confirmó');
+    expect(s.inDoc('reservation-form-notes-only')?.textContent).toContain('Liberada: nunca se confirmó');
   });
 
   it('says nothing more without a reason, or when it is not cancelled', async () => {
