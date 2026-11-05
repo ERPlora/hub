@@ -262,8 +262,10 @@ test('SALE-F01: on a phone with a notch and a home bar, the drawer on its side k
   await settled(page);
   const seen = await till.evaluate((el) => {
     const box = (id: string) => el.querySelector(`[data-testid=${id}]`)?.getBoundingClientRect();
-    return { close: box('pos-cart-close'), charge: box('pos-charge') };
+    const drawer = el.querySelector('[data-testid=pos-cart-drawer]');
+    return { close: box('pos-cart-close'), charge: box('pos-charge'), behindEdges: drawer ? getComputedStyle(drawer).backgroundColor : '' };
   });
+  expect.soft(seen.behindEdges, 'the room left for the notch is the drawer’s, not a gap onto the shade').not.toBe('rgba(0, 0, 0, 0)');
   expect.soft(seen.close?.top ?? 0, 'the bar under the notch').toBeGreaterThanOrEqual(12);
   expect.soft(seen.close?.right ?? 667, '«Close» clear of the notch').toBeLessThanOrEqual(667 - 44 + EDGE);
   expect.soft(seen.charge?.right ?? 667, '«Charge» clear of the notch').toBeLessThanOrEqual(667 - 44 + EDGE);
