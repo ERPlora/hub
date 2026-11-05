@@ -14,11 +14,11 @@ import { IonButton, IonSpinner } from '@ionic/vue';
 import { computed, shallowRef } from 'vue';
 
 import CancelRecordModal from '../components/CancelRecordModal.vue';
-import CorrectionMark from '../components/CorrectionMark.vue';
+import RecordStatus from '../components/RecordStatus.vue';
 import PageNotices from '../components/PageNotices.vue';
 import { useLocale, useT } from '../composables/useT';
 import { formatDate, formatMoney } from '../lib/format';
-import { environmentTone, statusTone } from '../lib/record';
+import { environmentTone } from '../lib/record';
 import { refusal } from '../lib/refusal';
 
 const props = defineProps<{ id: string }>();
@@ -193,14 +193,9 @@ async function correctIt(): Promise<void> {
         >
           {{ $t('verifactu.detail.title', { number: record.invoice_number }) }}
         </h2>
-        <StatusPill
-          data-testid="verifactu-record-status"
-          :tone="statusTone(record.status)"
-          :label="$t(`verifactu.status.${record.status}`)"
-        />
-        <CorrectionMark
-          :status="record.correction_status"
-          :corrected-by-id="record.corrected_by_id"
+        <RecordStatus
+          :record="record"
+          testid="verifactu-record-status"
         />
         <StatusPill
           :tone="environmentTone(record.environment)"

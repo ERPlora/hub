@@ -21,13 +21,13 @@ import { AppPage, openExternalLink } from '@erplora/ui/shell';
 import { computed, ref } from 'vue';
 import { useRouter } from 'vue-router';
 
-import CorrectionMark from '../components/CorrectionMark.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
+import RecordStatus from '../components/RecordStatus.vue';
 import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
 import { backwardsDays, filterParams, filtersInUse, unreadableAmounts } from '../lib/filters';
 import { formatDate, formatMoney } from '../lib/format';
-import { CORRECTION_FILTERS, ENVIRONMENTS, environmentTone, INVOICE_TYPES, RECORD_TYPES, STATUSES, statusTone } from '../lib/record';
+import { CORRECTION_FILTERS, ENVIRONMENTS, environmentTone, INVOICE_TYPES, RECORD_TYPES, STATUSES } from '../lib/record';
 import type { RecordListIn, RecordRowOut } from '../operations';
 import { verifactuTabs } from '../tabs';
 
@@ -198,16 +198,10 @@ function onAction({ actionId, row }: { actionId: string; row: RecordRowOut }): v
       @retry="refresh()"
     >
       <template #status="{ row }">
-        <StatusPill
+        <RecordStatus
           size="sm"
-          :tone="statusTone(row.status)"
-          :label="$t(`verifactu.status.${row.status}`)"
-          data-testid="verifactu-records-status"
-        />
-        <CorrectionMark
-          size="sm"
-          :status="row.correction_status"
-          :corrected-by-id="row.corrected_by_id"
+          :record="row"
+          testid="verifactu-records-status"
         />
       </template>
       <template #environment="{ row }">

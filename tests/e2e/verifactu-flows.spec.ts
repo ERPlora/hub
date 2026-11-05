@@ -5,7 +5,8 @@
 //   - VERIFACTU-F16, F18: Records lists the run's record, found by its invoice, with «Verify at the AEAT»;
 //   - VERIFACTU-F17, F25, F35: its record says why it waits; «Send now» and «Ask the AEAT» say why nothing reached
 //     the AEAT (this server has no gateway), and the record stays in the queue;
-//   - VERIFACTU-F24: a record the AEAT rejected says so and what to do, and «Correct» seals a new record;
+//   - VERIFACTU-F24: a record the AEAT rejected says so and what to do, and «Correct» seals a new record; Records says
+//     by each rejection «Corrected» (a link to the new record) or «Pending correction» and filters the ones left;
 //   - VERIFACTU-F30: «Cancel record» asks why before sealing the cancellation;
 //   - VERIFACTU-F20, F21, F22: the queue lists what is not in the AEAT; «Process queue» and «Retry» answer;
 //   - VERIFACTU-F31: Events tells what happened, the latest first;
@@ -183,6 +184,88 @@ test('VERIFACTU-F24: a rejected record says what to do and «Correct» seals a n
   await expect(page.locator('ion-toast').filter({ hasText: `Correction of ${record.invoice_number} sealed` })).toBeVisible();
   const rows = psql(`select status || ':' || correction from verifactu_record where invoice_number = '${record.invoice_number}' order by sequence`);
   expect(rows.split('\n')).toEqual(['rejected:false', 'pending:true']);
+});
+
+test('VERIFACTU-F24: Records says by each rejection «Corrected» (a link to the new record) or «Pending correction», and filters the ones left', async ({
+  page,
+  context,
+}) => {
+  await login(page, A, '/verifactu/records');
+  const corrected = await ticket(context);
+  const left = await ticket(context);
+  // The AEAT's answer, as the sending leaves it on a rejection (the real answers: the Python suite's fixtures).
+  psql(
+    `update verifactu_record set status = 'rejected', aeat_code = '1189', aeat_message = 'e2e: Falta Destinatarios' where id in ('${corrected.id}', '${left.id}')`,
+  );
+  const sealed = await api<{ record: { id: string } }>(context, A, 'POST', '/verifactu/records/correct', { record_id: corrected.id });
+  expect(sealed.status, 'the first rejection is corrected with a new record').toBeLessThan(300);
+  const correction = sealed.data.record.id;
+
+  await page.goto(`${A}/verifactu/records`);
+  const list = shown(page);
+  const rowsOf = (number: string) => list.locator('[data-testid=verifactu-records-row]').filter({ hasText: number });
+  const rejectedOf = (number: string) =>
+    rowsOf(number).filter({ has: page.locator('[data-testid=verifactu-records-status]', { hasText: 'Rejected' }) });
+  const link = rejectedOf(corrected.invoice_number).locator('[data-testid=verifactu-correction-corrected]');
+  const pending = rejectedOf(left.invoice_number).locator('[data-testid=verifactu-correction-pending]');
+  // The list follows itself: the correction sealed by the API already shows, and its rejection says so.
+  await expect(link).toHaveText('Corrected');
+  await expect(link).toHaveAttribute('href', `/verifactu/records/${correction}`);
+  await expect(pending).toHaveText('Pending correction');
+  // The correction itself waits in the queue: nothing to correct, no mark.
+  const queued = rowsOf(corrected.invoice_number).filter({ has: page.locator('[data-testid=verifactu-records-status]', { hasText: 'Pending' }) });
+  await expect(queued).toHaveCount(1);
+  await expect(queued.locator('[data-testid^=verifactu-correction-]')).toHaveCount(0);
+  await flowShots(page, 'F24-records', async (p) => {
+    const view = shown(p);
+    const row = view.locator('[data-testid=verifactu-records-row]').filter({ hasText: corrected.invoice_number }).filter({ has: p.locator('[data-testid=verifactu-correction-corrected]') });
+    await seen(row.locator('[data-testid=verifactu-correction-corrected]'));
+    await expect(view.locator('[data-testid=verifactu-records-row]').filter({ hasText: left.invoice_number }).locator('[data-testid=verifactu-correction-pending]')).toBeVisible();
+    // The status and its mark never touch: side by side with a gap (a card), or one under the other (a narrow cell).
+    const status = await row.locator('[data-testid=verifactu-records-status]').boundingBox();
+    const mark = await row.locator('[data-testid=verifactu-correction-corrected]').boundingBox();
+    if (!status || !mark) throw new Error('the status and its mark are painted');
+    const sameLine = status.y < mark.y + mark.height && mark.y < status.y + status.height;
+    const gap = sameLine ? mark.x - (status.x + status.width) : mark.y - (status.y + status.height);
+    expect(gap, `the status and «Corrected» apart (${sameLine ? 'side by side' : 'stacked'})`).toBeGreaterThanOrEqual(3);
+  });
+
+  // «Pending correction» behind the funnel leaves only the ones left to correct.
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const panel = list.locator('[data-testid=verifactu-records-filters-panel]');
+  await list.locator('[data-testid=verifactu-records-filters-toggle]').click();
+  await expect(panel).toBeVisible();
+  await panel.locator('[data-testid=verifactu-records-filter-correction_status]').click();
+  const popover = page.locator('ion-popover.select-popover');
+  await popover.locator('ion-radio').filter({ hasText: /^\s*Pending correction\s*$/ }).click();
+  await expect(popover).toHaveCount(0);
+  await panel.locator('[data-testid=verifactu-records-filters-apply]').click();
+  await expect(panel).toBeHidden();
+  await expect(list.locator('[data-testid=verifactu-records-filters-count]')).toHaveText('1');
+  await expect(rejectedOf(left.invoice_number)).toHaveCount(1);
+  await expect(rowsOf(corrected.invoice_number)).toHaveCount(0);
+  await expect(list.locator('[data-testid=verifactu-records-row]').filter({ hasNotText: 'Pending correction' })).toHaveCount(0);
+  await flowShots(page, 'F24-records-filter', async (p) => {
+    await seen(shown(p).locator('[data-testid=verifactu-records-row]').filter({ hasText: left.invoice_number }));
+  });
+
+  // The rejection's detail links to the record that corrects it; the link opens it (not the rejected row).
+  await page.goto(`${A}/verifactu/records/${corrected.id}`);
+  const detail = shown(page);
+  await expect(detail.locator('[data-testid=verifactu-record-status]')).toHaveText('Rejected');
+  await expect(detail.locator('[data-testid=verifactu-record-correct]')).toHaveCount(0);
+  await flowShots(page, 'F24-record-corrected', async (p) => {
+    await seen(shown(p).locator('[data-testid=verifactu-correction-corrected]'));
+  });
+  await detail.locator('[data-testid=verifactu-correction-corrected]').click();
+  await expect(page).toHaveURL(new RegExp(`/verifactu/records/${correction}$`));
+  await expect(shown(page).locator('[data-testid=verifactu-record-status]')).toHaveText('Pending');
+
+  // From the list, too: the link goes to the new record, never to the rejected one its row opens.
+  await page.goto(`${A}/verifactu/records`);
+  await shown(page).locator('[data-testid=verifactu-records-search] input').fill(corrected.invoice_number);
+  await rejectedOf(corrected.invoice_number).locator('[data-testid=verifactu-correction-corrected]').click();
+  await expect(page).toHaveURL(new RegExp(`/verifactu/records/${correction}$`));
 });
 
 test('VERIFACTU-F30: «Cancel record» asks why before sealing the cancellation', async ({ page, context }) => {
