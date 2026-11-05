@@ -125,7 +125,7 @@ async function fit(page: Page, end: Locator): Promise<Fit> {
     document.body.append(twin);
     const needed = twin.getBoundingClientRect().width;
     twin.remove();
-    const box = (field.closest('ion-input') as HTMLElement).getBoundingClientRect();
+    const box = (field.closest<HTMLElement>('ion-input') as HTMLElement).getBoundingClientRect();
     return { x: box.x, box: box.width, room: field.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight), needed };
   });
   return { ...own, gap: await iconGap(page, await input.screenshot()) };
