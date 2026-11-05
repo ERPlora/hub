@@ -59,6 +59,8 @@ const row = (number: string, over: Partial<RecordRowOut> = {}): RecordRowOut => 
   environment: 'testing',
   status: 'pending',
   correction: false,
+  correction_status: 'not_applicable',
+  corrected_by_id: null,
   qr_url: `https://prewww2.aeat.es/wlpl/TIKE-CONT/ValidarQR?numserie=${number}`,
   created_at: '2026-10-14T10:00:00Z',
   ...over,
@@ -208,8 +210,15 @@ describe('RecordsPage: the filters behind the table funnel (FIX-DATATABLE-HUB-FI
     expect(options('environment')?.map((o) => o.value)).toEqual(['testing', 'production']);
     expect(options('status')?.map((o) => o.value)).toEqual(['pending', 'sent', 'accepted', 'accepted_with_errors', 'rejected']);
     const fields = s.prop<Filter[]>('filterFields');
-    expect(fields.map((f) => [f.key, f.label, f.type])).toEqual([['invoice_type', 'Invoice type', 'select']]);
+    expect(fields.map((f) => [f.key, f.label, f.type])).toEqual([
+      ['invoice_type', 'Invoice type', 'select'],
+      ['correction_status', 'Correction', 'select'],
+    ]);
     expect(fields[0].options?.map((o) => [o.value, o.label])).toEqual(['F1', 'F2', 'F3', 'R1', 'R2', 'R3', 'R4', 'R5'].map((code) => [code, code]));
+    expect(fields[1].options?.map((o) => [o.value, o.label])).toEqual([
+      ['pending', 'Pending correction'],
+      ['corrected', 'Corrected'],
+    ]);
   });
 
   it('the funnel panel applies on «Apply»: every filter, the totals in cents, and counts them', async () => {
@@ -282,6 +291,92 @@ describe('RecordsPage: the filters behind the table funnel (FIX-DATATABLE-HUB-FI
     expect(s.prop('filterErrors')).toEqual({ total_amount_to: 'Input should be a valid integer.' });
     expect(s.prop('error')).toBeUndefined();
     expect(s.rows()).toHaveLength(2);
+  });
+});
+
+describe('RecordsPage: whether a rejection is already corrected (VERIFACTU-F24, hub#857)', () => {
+  const REJECTIONS = {
+    rows: [
+      row('TICKET-2026-000004', { sequence: 4, status: 'rejected', correction_status: 'pending' }),
+      row('TICKET-2026-000003', { sequence: 3, status: 'rejected', correction_status: 'corrected', corrected_by_id: 'fix-3' }),
+      row('TICKET-2026-000002', { sequence: 2, status: 'accepted_with_errors', correction_status: 'pending' }),
+      row('TICKET-2026-000001', { sequence: 1, status: 'accepted' }),
+    ],
+    total: 4,
+    limit: 50,
+    offset: 0,
+  };
+  const marks = (s: Awaited<ReturnType<typeof setup>>) =>
+    s.rows().map((r) => ({
+      pending: r.find('[data-testid="verifactu-records-correction-pending"]').exists()
+        ? plain(r.get('[data-testid="verifactu-records-correction-pending"]').text().trim())
+        : null,
+      corrected: r.find('[data-testid="verifactu-records-correction-corrected"]').exists()
+        ? [
+            plain(r.get('[data-testid="verifactu-records-correction-corrected"]').text().trim()),
+            r.get('[data-testid="verifactu-records-correction-corrected"]').attributes('href'),
+          ]
+        : null,
+    }));
+
+  it('beside its status, a rejection still to correct says so and a corrected one links to its correction', async () => {
+    const s = await setup();
+    await s.show(REJECTIONS);
+    expect(marks(s)).toEqual([
+      { pending: 'Pending correction', corrected: null },
+      { pending: null, corrected: ['Corrected', '/verifactu/records/fix-3'] },
+      { pending: 'Pending correction', corrected: null },
+      { pending: null, corrected: null },
+    ]);
+    const link = s.rows()[1].get('[data-testid="verifactu-records-correction-corrected"]');
+    expect(link.attributes('aria-label')).toBe('Corrected: open the record that corrects it');
+    const es = await setup({ locale: 'es' });
+    await es.show(REJECTIONS);
+    expect(marks(es).slice(0, 2)).toEqual([
+      { pending: 'Pendiente de subsanar', corrected: null },
+      { pending: null, corrected: ['Subsanado', '/verifactu/records/fix-3'] },
+    ]);
+    expect(es.rows()[1].get('[data-testid="verifactu-records-correction-corrected"]').attributes('aria-label')).toBe(
+      'Subsanado: ver el registro que lo subsana',
+    );
+  });
+
+  it('«Corrected» opens the record that corrects it, not the rejected one of its row (click or Enter)', async () => {
+    const s = await setup();
+    await s.show(REJECTIONS);
+    const push = vi.spyOn(s.router, 'push');
+    const link = () => s.rows()[1].get('[data-testid="verifactu-records-correction-corrected"]');
+    await link().trigger('keydown', { key: 'Enter' });
+    await flush();
+    expect(push, 'Enter on the link is the link’s, not the row’s').not.toHaveBeenCalled();
+    await link().trigger('click');
+    await flush();
+    expect(push.mock.calls).toEqual([['/verifactu/records/fix-3']]);
+    expect(s.router.currentRoute.value.path).toBe('/verifactu/records/fix-3');
+  });
+
+  it('«Pending correction» in the funnel asks only the rejections still to correct', async () => {
+    const s = await setup();
+    await s.show(REJECTIONS);
+    await s.find('verifactu-records-filters-toggle').trigger('click');
+    await flush();
+    const panel = s.find('verifactu-records-filters-panel');
+    panel
+      .get('[data-testid="verifactu-records-filter-correction_status"]')
+      .element.dispatchEvent(new CustomEvent('ionChange', { detail: { value: 'pending' } }));
+    await flush();
+    await panel.get('[data-testid="verifactu-records-filters-apply"]').trigger('click');
+    await flush();
+    await s.reopen();
+    expect(s.params(OP)).toEqual([{ correction_status: 'pending', sort: 'created_at', dir: 'desc', limit: 50, offset: 0 }]);
+    expect(s.find('verifactu-records-filters-count').text()).toBe('1');
+    // Nothing left to correct: the filtered list says «No results», not «No records yet».
+    await s.show(EMPTY);
+    expect(s.wrapper.findComponent(EmptyState).props('heading')).toBe('No results');
+    const es = await setup({ locale: 'es' });
+    await es.show(REJECTIONS);
+    const options = es.prop<Array<{ key: string; label: string; options?: Array<{ value: string; label: string }> }>>('filterFields')[1];
+    expect([options.label, options.options?.map((o) => o.label)]).toEqual(['Subsanación', ['Pendientes de subsanar', 'Subsanados']]);
   });
 });
 
