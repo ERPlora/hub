@@ -163,6 +163,20 @@ class TestCreate:
         # Said on its field: the field itself, or a path inside it (``scopes.cart_checkout.0``).
         assert any(key.split(".")[0] == field for key in response.json()["error"]["fields"])
 
+    @pytest.mark.parametrize(
+        ("fields", "field"),
+        [
+            ({"name": "  "}, "name"),
+            ({"mode": "per_app", "scopes": {}}, "scopes"),
+            ({"mode": "per_app", "scopes": {"nope": ["read"]}}, "scopes"),
+        ],
+    )
+    def test_a_field_is_refused_in_words_a_person_can_read(self, admin_on_a, hub_a, fields, field):
+        # A form says on top what no field shows (FormModal, hub#833): a code or an app's id would reach the person.
+        body = {"name": "Gestoría", "rate_per_minute": 60, "mode": "full", "scopes": {}, **fields}
+        error = post(admin_on_a, host(hub_a), "/keys", body).json()["error"]
+        assert error["fields"] == {field: error["message"]}
+
     def test_only_who_runs_the_business(self, client, hub_a):
         client.force_login(member(hub_a.slug, role="hub_manager", username="saas:4"))
         response = post(client, host(hub_a), "/keys", {"name": "X", "rate_per_minute": 60, "mode": "full", "scopes": {}})
