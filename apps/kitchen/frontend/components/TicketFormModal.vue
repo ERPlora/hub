@@ -2,7 +2,8 @@
 // «New ticket» (WORKBOOK «Pantallas · Comandas»; KITCHEN-F23): Type (it starts at the settings' default),
 // Destination and Notes (optional) and its dishes — a product of the catalogue (searched as the person
 // types) or the dish written by hand, its quantity and a note — with «Add dish» and «Remove dish».
-// «Create ticket» only with a dish; each dish goes to its station on the server. A refusal shows here.
+// «Create ticket» only with a dish; each dish goes to its station on the server. A refusal shows here, each
+// reason under its field (hub#833).
 import { Combo, type ComboOption, FormModal } from '@erplora/ui/components';
 import { useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { HubIcon } from '@erplora/ui/shell';
@@ -39,6 +40,9 @@ const type = ref<OrderType>(props.defaultType);
 const label = ref('');
 const notes = ref('');
 const dishes = ref<Dish[]>([dish()]);
+/** The dishes of the last try, in the order sent: the server names one by its place there
+ *  (`items.0.quantity`), not by its row, because an empty row is not sent and rows come and go. */
+const sent = ref<number[]>([]);
 
 watch(
   open,
@@ -57,13 +61,28 @@ const named = (entry: Dish) => entry.product !== null || entry.name.trim() !== '
 const ready = computed(() => dishes.value.some(named));
 const text = (value: unknown): string => (value === null || value === undefined ? '' : String(value));
 
+/** How a field takes its refusal: the message under it, red while it has one, and the name by which
+ *  FormModal tells that it was corrected, though another dish was refused with the same words. */
+function refused(fieldErrors: Readonly<Record<string, string>>, name: string | undefined) {
+  const errorText = name ? fieldErrors[name] : undefined;
+  return { name, errorText, class: { 'ion-invalid': !!errorText, 'ion-touched': !!errorText } };
+}
+
+/** A field of a dish as the server names it, if that dish was in the last try. */
+function dishField(entry: Dish, field: string): string | undefined {
+  const place = sent.value.indexOf(entry.key);
+  return place < 0 ? undefined : `items.${place}.${field}`;
+}
+
 function update(index: number, change: Partial<Dish>): void {
   dishes.value = dishes.value.map((entry, i) => (i === index ? { ...entry, ...change } : entry));
 }
 
-function remove(index: number): void {
+function remove(index: number, event: Event): void {
   dishes.value = dishes.value.filter((_, i) => i !== index);
   if (!dishes.value.length) dishes.value = [dish()];
+  // No field heard it, and its marks may be the ones the notice points at: the form hears a native `input`, as from a Combo.
+  event.target?.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
 function item(entry: Dish): ManualItemIn {
@@ -72,13 +91,15 @@ function item(entry: Dish): ManualItemIn {
 }
 
 async function save(): Promise<void> {
+  const sending = dishes.value.filter(named);
+  sent.value = sending.map((entry) => entry.key);
   let saved: TicketOut;
   try {
     saved = await command.run({
       order_type: type.value,
       label: label.value.trim(),
       notes: notes.value.trim(),
-      items: dishes.value.filter(named).map(item),
+      items: sending.map(item),
     });
   } catch {
     return; // The dialog paints the error; what was typed stays.
@@ -100,122 +121,132 @@ async function save(): Promise<void> {
     :submit-disabled="!ready"
     @submit="save"
   >
-    <div class="kitchen-ticket-form">
-      <ion-select
-        data-testid="kitchen-ticket-form-type"
-        :value="type"
-        :label="t('kitchen.form.type')"
-        label-placement="floating"
-        fill="outline"
-        mode="md"
-        interface="popover"
-        @ion-change="type = $event.detail.value"
-      >
-        <ion-select-option
-          v-for="value in TYPES"
-          :key="value"
-          :value="value"
-        >
-          {{ t(`kitchen.orderType.${value}`) }}
-        </ion-select-option>
-      </ion-select>
-      <ion-input
-        data-testid="kitchen-ticket-form-label"
-        :value="label"
-        :label="t('kitchen.form.label')"
-        :placeholder="t('kitchen.form.labelPlaceholder')"
-        label-placement="floating"
-        fill="outline"
-        mode="md"
-        :maxlength="120"
-        @ion-input="label = text($event.detail.value)"
-      />
-      <ion-textarea
-        data-testid="kitchen-ticket-form-notes"
-        :value="notes"
-        :label="t('kitchen.form.notes')"
-        label-placement="floating"
-        fill="outline"
-        mode="md"
-        :maxlength="2000"
-        :auto-grow="true"
-        @ion-input="notes = text($event.detail.value)"
-      />
-      <h3 class="kitchen-ticket-form__title">
-        {{ t('kitchen.form.dishes') }}
-      </h3>
-      <div
-        v-for="(entry, index) in dishes"
-        :key="entry.key"
-        class="kitchen-ticket-form__dish"
-        :data-testid="`kitchen-ticket-form-dish-${index}`"
-      >
-        <Combo
-          :model-value="entry.product"
-          :testid="`kitchen-ticket-form-dish-${index}-product`"
-          :search="findProducts"
-          :label="t('kitchen.form.product')"
-          clearable
-          @update:model-value="update(index, { product: $event })"
-        />
-        <ion-input
-          v-if="!entry.product"
-          :data-testid="`kitchen-ticket-form-dish-${index}-name`"
-          :value="entry.name"
-          :label="t('kitchen.form.name')"
+    <template #default="{ fieldErrors }">
+      <div class="kitchen-ticket-form">
+        <ion-select
+          data-testid="kitchen-ticket-form-type"
+          :value="type"
+          :label="t('kitchen.form.type')"
           label-placement="floating"
           fill="outline"
           mode="md"
-          :maxlength="200"
-          @ion-input="update(index, { name: text($event.detail.value) })"
-        />
-        <div class="kitchen-ticket-form__row">
-          <ion-input
-            :data-testid="`kitchen-ticket-form-dish-${index}-quantity`"
-            :value="entry.quantity"
-            type="number"
-            inputmode="decimal"
-            min="0"
-            :label="t('kitchen.form.quantity')"
-            label-placement="floating"
-            fill="outline"
-            mode="md"
-            @ion-input="update(index, { quantity: text($event.detail.value) })"
-          />
-          <ion-input
-            :data-testid="`kitchen-ticket-form-dish-${index}-notes`"
-            :value="entry.notes"
-            :label="t('kitchen.form.note')"
-            label-placement="floating"
-            fill="outline"
-            mode="md"
-            :maxlength="255"
-            @ion-input="update(index, { notes: text($event.detail.value) })"
-          />
-          <ion-button
-            fill="clear"
-            color="medium"
-            :data-testid="`kitchen-ticket-form-dish-${index}-remove`"
-            :aria-label="t('kitchen.form.removeDish')"
-            :title="t('kitchen.form.removeDish')"
-            @click="remove(index)"
+          interface="popover"
+          v-bind="refused(fieldErrors, 'order_type')"
+          @ion-change="type = $event.detail.value"
+        >
+          <ion-select-option
+            v-for="value in TYPES"
+            :key="value"
+            :value="value"
           >
-            <HubIcon name="ion:trash-outline" />
-          </ion-button>
-        </div>
-      </div>
-      <ion-button
-        fill="outline"
-        data-testid="kitchen-ticket-form-add-dish"
-        @click="dishes = [...dishes, dish()]"
-      >
-        <HubIcon
-          slot="start"
-          name="ion:add-outline"
+            {{ t(`kitchen.orderType.${value}`) }}
+          </ion-select-option>
+        </ion-select>
+        <ion-input
+          data-testid="kitchen-ticket-form-label"
+          :value="label"
+          :label="t('kitchen.form.label')"
+          :placeholder="t('kitchen.form.labelPlaceholder')"
+          label-placement="floating"
+          fill="outline"
+          mode="md"
+          :maxlength="120"
+          v-bind="refused(fieldErrors, 'label')"
+          @ion-input="label = text($event.detail.value)"
         />
-        {{ t('kitchen.form.addDish') }}
-      </ion-button>
-    </div>
+        <ion-textarea
+          data-testid="kitchen-ticket-form-notes"
+          :value="notes"
+          :label="t('kitchen.form.notes')"
+          label-placement="floating"
+          fill="outline"
+          mode="md"
+          :maxlength="2000"
+          :auto-grow="true"
+          v-bind="refused(fieldErrors, 'notes')"
+          @ion-input="notes = text($event.detail.value)"
+        />
+        <h3 class="kitchen-ticket-form__title">
+          {{ t('kitchen.form.dishes') }}
+        </h3>
+        <div
+          v-for="(entry, index) in dishes"
+          :key="entry.key"
+          class="kitchen-ticket-form__dish"
+          :data-testid="`kitchen-ticket-form-dish-${index}`"
+        >
+          <Combo
+            :model-value="entry.product"
+            :testid="`kitchen-ticket-form-dish-${index}-product`"
+            :search="findProducts"
+            :label="t('kitchen.form.product')"
+            :error-text="refused(fieldErrors, dishField(entry, 'product_id')).errorText"
+            clearable
+            @update:model-value="update(index, { product: $event })"
+          />
+          <ion-input
+            v-if="!entry.product"
+            :data-testid="`kitchen-ticket-form-dish-${index}-name`"
+            :value="entry.name"
+            :label="t('kitchen.form.name')"
+            label-placement="floating"
+            fill="outline"
+            mode="md"
+            :maxlength="200"
+            v-bind="refused(fieldErrors, dishField(entry, 'name'))"
+            @ion-input="update(index, { name: text($event.detail.value) })"
+          />
+          <div class="kitchen-ticket-form__row">
+            <ion-input
+              :data-testid="`kitchen-ticket-form-dish-${index}-quantity`"
+              :value="entry.quantity"
+              type="number"
+              inputmode="decimal"
+              min="0"
+              :label="t('kitchen.form.quantity')"
+              label-placement="floating"
+              fill="outline"
+              mode="md"
+              v-bind="refused(fieldErrors, dishField(entry, 'quantity'))"
+              @ion-input="update(index, { quantity: text($event.detail.value) })"
+            />
+            <ion-input
+              :data-testid="`kitchen-ticket-form-dish-${index}-notes`"
+              :value="entry.notes"
+              :label="t('kitchen.form.note')"
+              label-placement="floating"
+              fill="outline"
+              mode="md"
+              :maxlength="255"
+              v-bind="refused(fieldErrors, dishField(entry, 'notes'))"
+              @ion-input="update(index, { notes: text($event.detail.value) })"
+            />
+            <ion-button
+              class="kitchen-ticket-form__remove"
+              fill="clear"
+              color="medium"
+              :data-testid="`kitchen-ticket-form-dish-${index}-remove`"
+              :aria-label="t('kitchen.form.removeDish')"
+              :title="t('kitchen.form.removeDish')"
+              @click="remove(index, $event)"
+            >
+              <HubIcon name="ion:trash-outline" />
+            </ion-button>
+          </div>
+        </div>
+        <ion-button
+          fill="outline"
+          data-testid="kitchen-ticket-form-add-dish"
+          @click="dishes = [...dishes, dish()]"
+        >
+          <HubIcon
+            slot="start"
+            name="ion:add-outline"
+          />
+          {{ t('kitchen.form.addDish') }}
+        </ion-button>
+      </div>
+    </template>
   </FormModal>
 </template>
 
@@ -239,6 +270,10 @@ async function save(): Promise<void> {
   display: grid;
   grid-template-columns: 7rem 1fr auto;
   gap: 8px;
-  align-items: center;
+  /* A field's message grows it downwards: the row stays level at the top (hub#833). */
+  align-items: start;
+}
+.kitchen-ticket-form__remove {
+  margin-top: 8px;
 }
 </style>

@@ -147,11 +147,17 @@ export async function dishForTheTill(browser: Browser, label: string, run: strin
   return dish;
 }
 
-/** The till in `lang`, with `dish` on a check of its own and that check on screen. */
-export async function checkWithDish(page: Page, context: BrowserContext, lang: string, dish: Product): Promise<void> {
+/** The till on screen in `lang` (the Hub's language cookie, which the sign-in has just set from the account). */
+export async function tillIn(page: Page, context: BrowserContext, lang: string): Promise<void> {
   await login(page, A, '/sale/pos');
   await context.addCookies([{ name: 'django_language', value: lang, domain: new URL(A).hostname, path: '/' }]);
   await page.reload();
+  await shown(page).locator('[data-testid=pos-till]').waitFor({ state: 'visible' });
+}
+
+/** The till in `lang`, with `dish` on a check of its own and that check on screen. */
+export async function checkWithDish(page: Page, context: BrowserContext, lang: string, dish: Product): Promise<void> {
+  await tillIn(page, context, lang);
   await shown(page).locator(`[data-testid=pos-product-${dish.id}]`).click();
   await expect(shown(page).locator('[data-testid^=pos-line-]').filter({ hasText: dish.name }).first()).toBeAttached();
   await openTillCart(page);
@@ -163,6 +169,14 @@ export interface Box {
   bottom: number;
   left: number;
   right: number;
+}
+
+/** What a finger on the middle of `el` touches, run in the page (`locator.evaluate(fingerOn)`): is it `el`, what is it if
+ *  not, and where `el` lies. */
+export function fingerOn(el: Element): { height: number; bottom: number; reached: boolean; hit: string } {
+  const r = el.getBoundingClientRect();
+  const hit = document.elementFromPoint((r.left + r.right) / 2, (r.top + r.bottom) / 2);
+  return { height: r.height, bottom: r.bottom, reached: !!hit && el.contains(hit), hit: hit ? `${hit.tagName.toLowerCase()} ${hit.getAttribute('data-testid') ?? ''}`.trim() : 'nothing' };
 }
 
 /** Notices that last `ms` stay until the spec has read them, for a page not loaded yet: where a notice sits is the

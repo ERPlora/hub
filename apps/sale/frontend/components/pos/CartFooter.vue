@@ -154,4 +154,26 @@ const discountLabel = computed(() => {
   --background-focused: var(--ion-color-medium-shade, #808289);
   opacity: 0.75;
 }
+/* A phone on its side: the total beside the buttons where they fit, so that its 69 px instead of 119 leave the lines in
+   view between the tabs and the foot (hub#800). Narrower, as in a low phone upright, each keeps its own row. */
+@media (max-height: 500px) {
+  .pos-foot {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.25rem 0.75rem;
+  }
+  .pos-foot__discount {
+    flex: 1 0 100%;
+    margin: 0;
+  }
+  .pos-foot__total {
+    flex: 1 0 auto;
+    gap: 0.5rem;
+    margin: 0;
+  }
+  .pos-foot__actions {
+    flex: 99 1 20rem;
+  }
+}
 </style>

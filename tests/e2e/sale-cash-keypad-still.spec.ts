@@ -11,7 +11,7 @@ import { type BrowserContext, expect, type Locator, type Page, test } from '@pla
 
 import { A, capture, login, painted, shown } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
-import { cleanSales, drawerOff, openTillCart, restoreDrawer, stamp } from './sale-helpers';
+import { cleanSales, drawerOff, openTillCart, restoreDrawer, stamp, tillIn } from './sale-helpers';
 
 const KEY = 'FIX-HUB-456-KEYPAD';
 /** Long enough for a figure on screen to catch up with a tap, short enough for a run that fails at every size. */
@@ -165,10 +165,7 @@ for (const { name, lang, locale, tendered } of LANGUAGES) {
     test.beforeAll(async ({ browser }) => {
       context = await browser.newContext({ baseURL: A, locale, viewport: { width: 1440, height: 900 } });
       page = await context.newPage();
-      await login(page, A, '/sale/pos');
-      // In the language under test (the Hub's language cookie, which the sign-in has just set from the account).
-      await context.addCookies([{ name: 'django_language', value: lang, domain: new URL(A).hostname, path: '/' }]);
-      await page.reload();
+      await tillIn(page, context, lang);
       if (process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
       await aCheck(page);
       const sheet = await openSheet(page);
