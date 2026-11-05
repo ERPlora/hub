@@ -32,6 +32,9 @@ control), then run over ``base/`` and ``apps/`` (outside ``tests/``).
     business in ``default``, and an API key is refused for that reason (never let through by a session). Since S5 such
     a business is not served at all; the checks stay, the suite's fallback still has one (``base/tenancy/tests/
     legacy.py``). Unlike (a)–(f), these run operations on the test database.
+(i) The tests read who is connected to a database in one place (``sessions_by_hand``): ``base/tenancy/tests/hubs.py``,
+    which counts only clients' sessions. A count of its own also counts the server's processes on that database, an
+    autovacuum worker among them, and falls now and then with nothing broken (hub#819).
 
 Every ninja route bound to an operation is ``config/tests/test_api.py`` (``ensure_api_parity``);
 ``/admin/`` on a tenant's host → 404 is ``base/tests/test_middleware.py``.
@@ -1391,4 +1394,57 @@ def test_no_hub_model_links_to_a_control_model():
     assert offenders == [], (
         "A hub's model lives in the hub's database, where control's tables are not: link a person of the business "
         f"to base.HubUser, never to settings.AUTH_USER_MODEL, auth, control or base.Membership: {offenders}"
+    )
+
+
+# ── (i) The tests read who is connected to a database in one place (hub#819) ─────────────────────────────────────────
+
+#: The one reading of ``pg_stat_activity`` by database in the suite; this very file only names it in its controls.
+SESSIONS_READERS = frozenset({"base/tenancy/tests/hubs.py", "tests/test_guardrails.py"})
+SESSIONS_BY_HAND = re.compile(
+    r"""pg_stat_activity\b.{0,40}?\bdatname\s*=\s*%s(?![\s"']*AND\s+wait_event_type)""", re.DOTALL
+)
+
+
+def sessions_by_hand(source: str) -> list[tuple[int, str]]:
+    """``(line, what)`` for every read of ``pg_stat_activity`` by the name of a database. Who waits for a lock
+    (``wait_event_type``, the concurrency tests') is another question, and stays theirs."""
+    return [
+        (source.count("\n", 0, found.start()) + 1, "pg_stat_activity by database")
+        for found in SESSIONS_BY_HAND.finditer(source)
+    ]
+
+
+def test_the_sessions_scanner_sees_a_count_by_hand_and_leaves_the_lock_waits_alone():
+    one_line = 'conn.execute("SELECT count(*) FROM pg_stat_activity WHERE datname = %s", [name])\n'
+    split = 'x = 1\ncursor.execute(\n    "SELECT pid FROM pg_stat_activity "\n    "WHERE datname = %s", [name]\n)\n'
+    locks = (
+        '"SELECT count(*) FROM pg_stat_activity WHERE datname = current_database()"\n'
+        '" AND wait_event_type = \'Lock\' AND pid <> pg_backend_pid()"\n'
+    )
+
+    locks_by_name = (
+        '"SELECT count(*) FROM pg_stat_activity WHERE datname = %s AND wait_event_type = \'Lock\' "\n'
+        '"SELECT count(*) FROM pg_stat_activity WHERE datname = %s "\n"  AND wait_event_type = \'Lock\'"\n'
+    )
+
+    assert sessions_by_hand(one_line) == [(1, "pg_stat_activity by database")]
+    assert sessions_by_hand(split) == [(3, "pg_stat_activity by database")]
+    assert sessions_by_hand(locks) == []
+    assert sessions_by_hand(locks_by_name) == []
+
+
+def test_no_test_counts_the_sessions_on_a_database_by_hand():
+    files = suite_files(HUB_DIR)
+    # A walk gone blind, or a reader that moved, would let the check pass.
+    assert {PurePosixPath(path) for path in SESSIONS_READERS} <= set(files)
+    assert sessions_by_hand((HUB_DIR / "base/tenancy/tests/hubs.py").read_text())
+
+    offenders = _offenders(
+        lambda path: [] if str(path) in SESSIONS_READERS else sessions_by_hand((HUB_DIR / path).read_text()), files
+    )
+
+    assert offenders == [], (
+        "`pg_stat_activity` lists the server's own processes too: an autovacuum worker on the database makes such a "
+        f"count fall now and then with nothing broken. Use hubs.client_sessions_on or hubs.assert_nobody_on: {offenders}"
     )

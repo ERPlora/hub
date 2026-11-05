@@ -149,13 +149,6 @@ def recorded(hub: Hub) -> set[str]:
         return {name for (name,) in conn.execute("SELECT DISTINCT app FROM django_migrations")}
 
 
-def sessions_on(hub: Hub) -> list:
-    with hubs._maintenance() as conn:
-        return conn.execute(
-            "SELECT pid FROM pg_stat_activity WHERE datname = %s AND pid <> pg_backend_pid()", [hub.db_name]
-        ).fetchall()
-
-
 def run_pass(now: dt.datetime | None = None) -> None:
     worker._activations(now or timezone.now())
 
@@ -237,7 +230,7 @@ def test_the_pass_leaves_no_connection_to_the_hubs_database_open(business):
 
     run_pass()
 
-    assert sessions_on(a) == []
+    hubs.assert_nobody_on(a.db_name)
 
 
 # ── Spec §14, 4: a failure leaves it failed with why, never on; the next try finishes it ────────────────────────
