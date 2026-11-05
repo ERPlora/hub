@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:c2de03ab83ebafa7dd52deba33b6ec8e373edd69b90040cc70e63e02290f6aea -->
+<!-- generated from WORKBOOK.md sha256:0e1c46bd1c2121821eaf9ea7b09b45145e28f41fdde3702662cb56fab64226f4 -->
 
 ## What it is for and who it is for
 
@@ -566,7 +566,10 @@ Involved: none
 Everything can be asked for through the screens, the assistant (by voice or by text, with the session of
 whoever speaks) and the API, with the same rules and the same permissions. A person is named by their id or
 by their name; if the name fits several, it says which ones and asks to choose
-(`staff.ambiguous_member`).
+(`staff.ambiguous_member`). Before changing anything, the assistant asks for confirmation with its card (BASE-F97),
+which names each record as the screens name it, never by its id: a person and a role by their name, a schedule by
+whose it is and what it is called ("Ana López · Regular schedule") and a time-off request by whose it is, its type and
+its days ("Ana López · Vacation · Nov 2, 2026 – Nov 5, 2026"). What the person asking cannot see is left out.
 
 ### What it offers: queries (they read and change nothing; all but the accounts and the session's record can be followed live)
 
@@ -581,11 +584,13 @@ by their name; if the name fits several, it says which ones and asks to choose
 | What each professional earned in a period (today, yesterday, this week, this month or two days): sold with refunds taken off, commission and totals; it says if the business has no Sales | see the pay (and the Sales figures) | F21 | `staff.commission.report` |
 | The figures: records, active, on leave, inactive, away today and pending requests | see | F23 | `staff.member.stats` |
 | The roles with their active members, with filters and sorting | see | F04, F23 | `staff.role.list` |
+| A role by its id, also a retired one: what the assistant's card reads to name it (BASE-F97) | see | F01, F02, F04, F07 | `staff.role.detail` |
 | A person's schedules with their week | see | F13–F15 | `staff.schedule.list` |
-| A schedule with its week | see | F14 | `staff.schedule.detail` |
+| A schedule with its week and the `label` the assistant's card names it by (BASE-F97) | see | F14, F15 | `staff.schedule.detail` |
 | A person's availability by days | see | F16 | `staff.availability.for_member` |
 | The time off, without reason, with filters and sorting | see time off | F17–F19 | `staff.time_off.list` |
 | One time off with its reason, its notes and who approved it | see the time-off detail | F18 | `staff.time_off.detail` |
+| One time off without its reason and with the `label` the assistant's card names it by (BASE-F97) | see time off | F18, F19 | `staff.time_off.get` |
 | Who is away today, with the type of each time off in the language of whoever asks | see time off | F20 | `staff.time_off.today` |
 | My time off, with its reason and its notes | see time off | F08 | `staff.time_off.mine` |
 | The settings | see | F22 | `staff.settings.get` |
