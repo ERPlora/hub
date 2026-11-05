@@ -54,6 +54,21 @@ Cada paso espera una sexta parte del tiempo del test (30 s con los 180 s de `pla
 sale cuando el SaaS dice que el código no vale; si aún no ha contestado, el error dice «the SaaS did not answer
 the code within … ms».
 
+## Contar los streams de una página
+
+Una spec que demuestra que un cambio llegó «por el stream ya abierto» cuenta los `/api/live` de su página con
+`watchLiveStreams` y `liveStreamsSettled` (`live-streams.ts`). Antes de empezar a contar, y de provocar el cambio, espera a
+lo que de verdad dice que ese stream es el abierto, en lugar de a un rato sin peticiones:
+
+- **Que la pantalla de la que viene lo haya soltado** (`left`, las operaciones que solo lee esa pantalla). El SDK conserva
+  sus suscripciones 2 s por si vuelve (`RELEASE_GRACE_MS`) y solo entonces reabre el stream sin ellas: con la máquina
+  cargada, esa reapertura caía entre el recuento y la comprobación (hub#814).
+- **Que el stream haya contestado todas sus suscripciones.** El Hub retiene los frames de una pasada hasta que acaba (10 s
+  medidos con la máquina cargada): un cambio hecho antes llega en esa pasada, tarde, y no dice nada de los avisos.
+
+Lo lee de las DevTools del navegador (`Network.streamResourceContent`), sin tocar la página. Si no llega a tiempo, la
+prueba cae diciendo qué faltaba («the last /api/live answered 12 of its 16 subscriptions»).
+
 ## La pila compartida
 
 Sin variables, el e2e va contra la pila compartida: Hub en `:8000` (Vite `:5173`), SaaS en `:8001` y las BD
