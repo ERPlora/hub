@@ -9,7 +9,6 @@ from django.apps import apps
 from django.utils import translation
 from live.operations import registry
 
-from apps.invoice.tests.test_i18n import po_entries
 from apps.verifactu import admin as verifactu_admin
 from apps.verifactu import models, queries, schemas, services
 from apps.verifactu.models import (
@@ -24,6 +23,7 @@ from apps.verifactu.models import (
     Record,
     SendControl,
 )
+from base.tests.po import po_entries
 
 APP = Path(apps.get_app_config("verifactu").path)
 LOCALE = APP / "locale" / "es" / "LC_MESSAGES"
