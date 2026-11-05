@@ -1,0 +1,3 @@
+duplicados tests/e2e/whatsapp-answer-helpers.ts es la pieza compartida extraída en hub#514: coincide con las copias de las specs que aún no se han mudado a ella (hub#837)
+duplicados tests/e2e/appointment-helpers.ts es la pieza compartida extraída en hub#514: coincide con las copias de las specs que aún no se han mudado a ella (hub#837)
+duplicados tests/e2e/assistant-card-helpers.ts es la pieza compartida de las pruebas de la tarjeta del asistente, extraída en hub#495: coincide con las copias de las specs que aún no se han mudado a ella (hub#837)

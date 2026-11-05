@@ -18,7 +18,8 @@
 the key lives in each database, so it is per hub), it brings the platform (``base``, ``live``), the apps the hub's
 database already has and ``add`` (closed by ``requires``) to the code's leaf with ``migrate_apps``, then writes down in
 control what that database has (``Hub.schema_apps``: its ``django_migrations`` rules) and ``schema_state = current``,
-and forgets what any process kept of it (``base.activation.forget``). It never steps back and never deletes a table.
+on a row that names it (a cut names it in its last step, which records it then), and forgets what any process kept
+of it (``base.activation.forget``). It never steps back and never deletes a table.
 ``pending_control``, ``pending_template`` and ``is_behind`` are ``migrate_hubs --check``: what a run would apply, applying
 nothing.
 
@@ -535,11 +536,13 @@ def ensure_schema(
 ) -> list[str]:
     """Bring ``hub``'s own database to the code's leaf; return what it applied, as ``<app>.<migration>`` in order.
 
-    The platform, the apps its database already has and ``add`` (with what they require) are migrated; then control's
-    row learns what the database has (``schema_apps``, the last migration of each app; the labels of a code that no
-    longer has them are kept) and ``schema_state = current``, and what any process kept of it is forgotten: an app just
-    made is never refused by a list of before (``base.activation.has_tables``). ``SchemaLocked`` after ``lock_wait``
-    seconds if another run holds the database; ``HubWithoutDatabase`` for a hub still on control's, which is never touched.
+    The platform, the apps its database already has and ``add`` (with what they require) are migrated; then ``hub``
+    learns what the database has (``schema_apps``, the last migration of each app; the labels of a code that no longer
+    has them are kept) and ``schema_state = current``, and so does control's row if it names that database (a cut's
+    does not until its last step, ``base.hub.cut_finish``, which records it then: a cut that breaks before leaves the
+    row as it was), and what any process kept of it is forgotten: an app just made is never refused by a list of before
+    (``base.activation.has_tables``). ``SchemaLocked`` after ``lock_wait`` seconds if another run holds the database;
+    ``HubWithoutDatabase`` for a hub still on control's, which is never touched.
     ``heartbeat``: called between apps (:func:`migrate_apps`), the worker's lease renewed while a hub is made.
     """
     if not hub.db_name:
@@ -553,7 +556,8 @@ def ensure_schema(
     )
     installed = {app.label for app in django_apps.get_app_configs()}
     schema_apps = {label: name for label, name in (hub.schema_apps or {}).items() if label not in installed} | has
-    Hub.objects.filter(pk=hub.pk).update(
+    # Only a row that names this database learns it: a cut's records it with its name, in its last step.
+    Hub.objects.filter(pk=hub.pk, db_name=hub.db_name).update(
         schema_apps=schema_apps, schema_state=Hub.SchemaState.CURRENT, updated_at=timezone.now()
     )
     hub.schema_apps = schema_apps

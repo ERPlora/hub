@@ -95,8 +95,9 @@ from apps.service.schemas import (
 from apps.staff.models import Member
 from apps.staff.queries import resolve_member
 from base import images
-from base.business import babel_locale
+from base.business import babel_locale, business_zone
 from base.queries import business_language, image_library
+from base.ordering import list_order_for
 
 SERVICE_NOT_FOUND = _("That service does not exist in this business.")
 SERVICE_AMBIGUOUS = _("“%(said)s” matches several services: %(names)s. Say which one.")
@@ -598,6 +599,27 @@ def balance(grant: Grant, now: dt.datetime | None = None) -> Balance:
     )
 
 
+def session_value(grant_id: UUID) -> int | None:
+    """What the next session delivered of a voucher sold is worth (SERVICE-F24), with its row locked by the caller:
+    what is left of the price paid ÷ the sessions not delivered yet, half up, so 100.00 in 3 sessions is 33.33 + 33.34
+    + 33.33 and what is delivered adds up to what was paid, to the cent, through courtesies, corrections and sessions
+    given back. An unlimited voucher has no sessions to divide by: ``None``. A paid voucher that does not say the line
+    that charged it is worth 0: that money may already count for who sold it (a voucher from before this, one granted
+    without its sale), and nothing counts twice."""
+    grant = grants().get(pk=grant_id)
+    if grant.amount and grant.sale_line_id is None:
+        return 0
+    total = balance(grant).max_uses
+    if total is None:
+        return None
+    delivered = Redemption.objects.filter(grant_id=grant_id, status=Redemption.Status.CONSUMED).aggregate(
+        count=Count("id"), value=Coalesce(Sum("value"), 0)
+    )
+    amount_left = max(grant.amount - delivered["value"], 0)
+    sessions_left = max(total - delivered["count"], 1)
+    return (2 * amount_left + sessions_left) // (2 * sessions_left)
+
+
 def _named(*parts: str | None) -> str:
     """How a person tells a voucher or a session apart: what is known of it, what is not left out."""
     return " · ".join(part for part in parts if part)
@@ -682,6 +704,7 @@ def session_rows(ids) -> list[dict]:
                 "order_line_id": session.order_line_id,
                 "hold_until": session.hold_until,
                 "sale_id": session.sale_id,
+                "value": session.value,
                 "remaining": state.remaining,
                 "voucher_expired": state.is_expired,
             }
@@ -744,7 +767,7 @@ def list_services(ctx: OperationContext, params: ServiceListIn) -> dict:
         )
     )
     return _page(
-        _sorted(services, params.sort, SERVICE_ORDER, ("name", "id")),
+        services.order_by(*list_order_for(params.sort, "name", columns=SERVICE_ORDER, nulls_last=True)),
         params,
         partial(_service_row, urls=images.Urls(ctx.scope)),
     )
@@ -859,7 +882,9 @@ def list_categories(ctx: OperationContext, params: CategoryListIn) -> dict:
     if params.parent_id:
         categories = categories.filter(parent_id=params.parent_id)
     return _page(
-        _sorted(categories, params.sort, CATEGORY_ORDER, ("sort_order", "name", "id")),
+        categories.order_by(
+            *list_order_for(params.sort, "sort_order", "name", columns=CATEGORY_ORDER, nulls_last=True)
+        ),
         params,
         _category_row,
     )
@@ -1023,7 +1048,7 @@ def list_packages(ctx: OperationContext, params: PackageListIn) -> dict:
         if text:
             packages = packages.filter(name__icontains=text)
     return _page(
-        _sorted(packages, params.sort, PACKAGE_ORDER, ("sort_order", "name", "id")),
+        packages.order_by(*list_order_for(params.sort, "sort_order", "name", columns=PACKAGE_ORDER, nulls_last=True)),
         params,
         _package_row,
     )
@@ -1097,7 +1122,7 @@ def list_grants(ctx: OperationContext, params: GrantListIn) -> dict:
 )
 def get_grant(ctx: OperationContext, data: ByIdIn) -> dict:
     grant = find_grant(data.id)
-    sold_on = format_date(timezone.localtime(grant.granted_at).date(), "medium", locale=babel_locale(ctx.language))
+    sold_on = format_date(timezone.localdate(grant.granted_at, business_zone()), "medium", locale=babel_locale(ctx.language))
     return {**grant_row(ctx, grant), "label": _named(grant.package.name, _customer_name(ctx, grant), sold_on)}
 
 
@@ -1506,20 +1531,6 @@ def _adjustment_row(ctx: OperationContext, adjustment: GrantAdjustment) -> dict:
 def _bounds(**lookups) -> dict:
     """The lookups whose value was given (a filter left empty narrows nothing)."""
     return {lookup: value for lookup, value in lookups.items() if value is not None}
-
-
-def _sorted(
-    rows, sort: str, columns: dict[str, tuple[str, ...]], tie_break: tuple[str, ...]
-):
-    """``rows`` by ``sort`` (a leading «-» reverses it), then by ``tie_break``; nulls last either way."""
-    descending = sort.startswith("-")
-    keys = [
-        F(column).desc(nulls_last=True)
-        if descending
-        else F(column).asc(nulls_last=True)
-        for column in columns[sort.lstrip("-")]
-    ]
-    return rows.order_by(*keys, *tie_break)
 
 
 def _page(queryset, params, row) -> dict:

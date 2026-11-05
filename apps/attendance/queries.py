@@ -60,9 +60,9 @@ from apps.attendance.schemas import (
 )
 from apps.staff.models import Member
 from base.models import HubUser
-from base.ordering import list_order
+from base.ordering import list_order_for
 from base.queries import hub_user_of
-from base.business import babel_locale
+from base.business import babel_locale, business_zone
 
 MEMBER_NOT_FOUND = _("That person does not exist in Staff.")
 AMBIGUOUS_MEMBER = _("Several people match “%(name)s”: %(matches)s. Say which one.")
@@ -352,8 +352,7 @@ def scoped_records(ctx: OperationContext, params: RecordListIn, as_of: dt.dateti
     records = annotated(records)
     if params.search:
         records = records.filter(member_name__icontains=params.search)
-    column = params.sort.removeprefix("-")
-    return records.order_by(*list_order(column, descending=params.sort.startswith("-")))
+    return records.order_by(*list_order_for(params.sort))
 
 
 def _page(rows: list, total: int, params) -> dict:
@@ -394,8 +393,8 @@ def day_name(record: Record) -> str:
 
 
 def business_date(instant: dt.datetime) -> dt.date:
-    """The business's calendar day of an instant (phase 1: ``settings.TIME_ZONE``, Europe/Madrid)."""
-    return timezone.localdate(instant)
+    """The business's calendar day of an instant, on its clock (hub#779)."""
+    return timezone.localdate(instant, business_zone())
 
 
 # ── Operations ──────────────────────────────────────────────────────────────────────────────────
@@ -549,7 +548,7 @@ def _local(instant: dt.datetime | None) -> str:
     return (
         ""
         if instant is None
-        else timezone.localtime(instant).strftime("%Y-%m-%d %H:%M")
+        else timezone.localtime(instant, business_zone()).strftime("%Y-%m-%d %H:%M")
     )
 
 

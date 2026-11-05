@@ -1,11 +1,11 @@
 // How the time clock paints instants, days and durations (pages never format by hand). Every wall-clock
-// time and calendar day is the BUSINESS's, never the device's: a manager checking the shop from abroad
-// sees the day the employee clocked in. Phase 1 has one zone, the Hub's `TIME_ZONE` (Europe/Madrid);
-// the business's own zone arrives with the hub's settings. Durations come from the server in seconds,
-// as of its `as_of`, and run on from there with the page's clock.
+// time and calendar day is the BUSINESS's, not the device's: a manager checking the shop from abroad sees
+// the day the employee clocked in. Each takes that zone (`useBusinessZone`, hub#779), required so that no
+// screen forgets it: `undefined` until the business answers, and `Intl` then uses the device's, never a
+// zone written here. Durations come from the server in seconds, as of its `as_of`, and run on from there
+// with the page's clock.
 
-/** The business's time zone (phase 1: the Hub's `TIME_ZONE`). */
-export const BUSINESS_TIME_ZONE = 'Europe/Madrid';
+type Zone = string | undefined;
 
 const DASH = '—';
 
@@ -17,19 +17,29 @@ interface Parts {
   minute: string;
 }
 
-const partsFormat = new Intl.DateTimeFormat('en-US', {
-  timeZone: BUSINESS_TIME_ZONE,
-  hourCycle: 'h23',
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-  hour: '2-digit',
-  minute: '2-digit',
-});
+/** Built once per zone: every row of a table asks for one. */
+const partsFormats = new Map<Zone, Intl.DateTimeFormat>();
 
-function partsOf(ms: number): Parts {
+function partsFormat(timeZone: Zone): Intl.DateTimeFormat {
+  let found = partsFormats.get(timeZone);
+  if (!found) {
+    found = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      hourCycle: 'h23',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+    partsFormats.set(timeZone, found);
+  }
+  return found;
+}
+
+function partsOf(ms: number, timeZone: Zone): Parts {
   const out: Record<string, string> = {};
-  for (const part of partsFormat.formatToParts(new Date(ms))) if (part.type !== 'literal') out[part.type] = part.value;
+  for (const part of partsFormat(timeZone).formatToParts(new Date(ms))) if (part.type !== 'literal') out[part.type] = part.value;
   return { year: out.year, month: out.month, day: out.day, hour: out.hour === '24' ? '00' : out.hour, minute: out.minute };
 }
 
@@ -43,10 +53,10 @@ const whole = (n: number): number => (Number.isFinite(n) && n > 0 ? Math.floor(n
 const pad2 = (n: number): string => String(n).padStart(2, '0');
 
 /** Business wall-clock `HH:MM` of an instant; `''` when it is missing or unreadable. */
-export function formatTime(iso: string | null | undefined): string {
+export function formatTime(iso: string | null | undefined, timeZone: Zone): string {
   const ms = readable(iso);
   if (ms === null) return '';
-  const p = partsOf(ms);
+  const p = partsOf(ms, timeZone);
   return `${p.hour}:${p.minute}`;
 }
 
@@ -79,39 +89,39 @@ export function formatDay(day: string, locale: string): string {
 }
 
 /** Business `YYYY-MM-DD` of an instant. */
-export function localDate(iso: string): string {
-  const p = partsOf(Date.parse(iso));
+export function localDate(iso: string, timeZone: Zone): string {
+  const p = partsOf(Date.parse(iso), timeZone);
   return `${p.year}-${p.month}-${p.day}`;
 }
 
 /** Business `YYYY-MM-DD HH:MM` of an instant (the history's and the CSV's form). */
-export function localDateTime(iso: string | null | undefined): string {
+export function localDateTime(iso: string | null | undefined, timeZone: Zone): string {
   const ms = readable(iso);
   if (ms === null) return DASH;
-  const p = partsOf(ms);
+  const p = partsOf(ms, timeZone);
   return `${p.year}-${p.month}-${p.day} ${p.hour}:${p.minute}`;
 }
 
 /** `HH:MM`, with the day when it is not the day of the clock-in (a night shift); `—` when missing. */
-export function timeOfDay(iso: string | null | undefined, workDate: string, locale: string): string {
+export function timeOfDay(iso: string | null | undefined, workDate: string, locale: string, timeZone: Zone): string {
   const ms = readable(iso);
   if (ms === null) return DASH;
-  const p = partsOf(ms);
+  const p = partsOf(ms, timeZone);
   const time = `${p.hour}:${p.minute}`;
   if (`${p.year}-${p.month}-${p.day}` === workDate) return time;
-  const day = new Intl.DateTimeFormat(locale, { timeZone: BUSINESS_TIME_ZONE, day: '2-digit', month: '2-digit' }).format(new Date(ms));
+  const day = new Intl.DateTimeFormat(locale, { timeZone, day: '2-digit', month: '2-digit' }).format(new Date(ms));
   return `${time} (${day})`;
 }
 
 /** The value of a `datetime-local` field showing an instant in business time. */
-export function toLocalInput(iso: string): string {
-  const p = partsOf(Date.parse(iso));
+export function toLocalInput(iso: string, timeZone: Zone): string {
+  const p = partsOf(Date.parse(iso), timeZone);
   return `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}`;
 }
 
 /** The business month `YYYY-MM` of an instant. */
-export function monthOf(ms: number): string {
-  const p = partsOf(ms);
+export function monthOf(ms: number, timeZone: Zone): string {
+  const p = partsOf(ms, timeZone);
   return `${p.year}-${p.month}`;
 }
 

@@ -3,7 +3,9 @@
 // server-side DataTable — Seq, Invoice, Date, Type (Registration / Cancellation), F., Issuer, Total, Environment and
 // Status (a coloured pill) —, the last sealed first, 50 a page, search «Search invoice, issuer or tax ID…» and the
 // filters behind the table's funnel (Date, Type, Total, Environment and Status on their columns, then the
-// invoice type; the total typed in euros). A row, or «View», opens its record;
+// invoice type and the correction; the total typed in euros). Beside its status, a registration the AEAT rejected (or
+// accepted with errors) says «Pending correction», or «Corrected» linking to the record that corrects it
+// (VERIFACTU-F24, hub#857). A row, or «View», opens its record;
 // «Verify at the AEAT» opens the QR's link of the AEAT in a new tab (in the installed app, the system browser:
 // gh:hub#518). New, sent and answered records come back through the stream by themselves.
 import {
@@ -104,9 +106,19 @@ const columns = computed<DataTableColumn<RecordRowOut>[]>(() => [
   },
 ]);
 
-/** The invoice type filters apart: its column is «F.», too short to name a filter. Its codes are the AEAT's. */
+/** The invoice type filters apart: its column is «F.», too short to name a filter. Its codes are the AEAT's. The
+ *  correction too: it is not a column, it is said beside the status. */
 const filterFields = computed<DataTableFilterField[]>(() => [
   { type: 'select', key: 'invoice_type', label: t('verifactu.filters.invoiceType'), options: options(INVOICE_TYPES, (code) => code) },
+  {
+    type: 'select',
+    key: 'correction_status',
+    label: t('verifactu.filters.correction'),
+    options: [
+      { value: 'pending', label: t('verifactu.filters.correctionPending') },
+      { value: 'corrected', label: t('verifactu.filters.correctionCorrected') },
+    ],
+  },
 ]);
 
 const actions = computed<DataTableAction<RecordRowOut>[]>(() => [
@@ -188,12 +200,37 @@ function onAction({ actionId, row }: { actionId: string; row: RecordRowOut }): v
       @retry="refresh()"
     >
       <template #status="{ row }">
-        <StatusPill
-          size="sm"
-          :tone="statusTone(row.status)"
-          :label="$t(`verifactu.status.${row.status}`)"
-          data-testid="verifactu-records-status"
-        />
+        <span class="verifactu-records__status">
+          <StatusPill
+            size="sm"
+            :tone="statusTone(row.status)"
+            :label="$t(`verifactu.status.${row.status}`)"
+            data-testid="verifactu-records-status"
+          />
+          <!-- The link is its own: a click or an Enter on it never opens the row's (rejected) record. -->
+          <router-link
+            v-if="row.correction_status === 'corrected' && row.corrected_by_id"
+            class="verifactu-records__corrected"
+            :to="`/verifactu/records/${row.corrected_by_id}`"
+            :aria-label="$t('verifactu.records.correction.correctedLink')"
+            data-testid="verifactu-records-correction-corrected"
+            @click.stop
+            @keydown.enter.stop
+          >
+            <StatusPill
+              size="sm"
+              tone="success"
+              :label="$t('verifactu.records.correction.corrected')"
+            />
+          </router-link>
+          <StatusPill
+            v-else-if="row.correction_status === 'pending'"
+            size="sm"
+            tone="warning"
+            :label="$t('verifactu.records.correction.pending')"
+            data-testid="verifactu-records-correction-pending"
+          />
+        </span>
       </template>
       <template #environment="{ row }">
         <StatusPill
@@ -213,3 +250,24 @@ function onAction({ actionId, row }: { actionId: string; row: RecordRowOut }): v
     </DataTable>
   </AppPage>
 </template>
+
+<style scoped>
+/* The status and, under a rejection, its correction: side by side, or one under the other in a narrow cell. */
+.verifactu-records__status {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+  max-width: 100%;
+}
+.verifactu-records__corrected {
+  display: inline-flex;
+  max-width: 100%;
+  text-decoration: none;
+  border-radius: var(--ep-radius-pill, 999px);
+}
+.verifactu-records__corrected:focus-visible {
+  outline: 2px solid var(--ep-primary, var(--ion-color-primary, #0054e9));
+  outline-offset: 2px;
+}
+</style>

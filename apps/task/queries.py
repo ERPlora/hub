@@ -3,7 +3,7 @@
 Who sees what: a caller with ``task.view_all`` sees every task; anyone else, their own — the ones
 assigned to their staff record (the one linked to their account) and the ones they created. A task the
 caller does not see does not exist for them (404, never 403). «Today» is the business's day
-(``timezone.localdate()``, phase 1 ``TIME_ZONE`` = Europe/Madrid). A task may be named by its id, its
+(``business_today``, on the clock of ``base.business.business_zone``). A task may be named by its id, its
 number or its title, a project by its id, its code or its name: the assistant speaks names.
 """
 
@@ -31,7 +31,9 @@ from live.errors import Conflict, NotFound
 from live.operations import operation
 
 from apps.staff.queries import actor_user_id, own_member
+from base.business import business_zone
 from base.models import HubUser
+from base.ordering import list_order_for
 from apps.task.models import Comment, Project, Task
 from apps.task.schemas import (
     CommentListIn,
@@ -126,8 +128,8 @@ class Caller:
 
 
 def business_today() -> dt.date:
-    """Today in the business's time zone (phase 1: ``settings.TIME_ZONE``)."""
-    return timezone.localdate()
+    """Today in the business's time zone, the one its screens call «due today» on (hub#779)."""
+    return timezone.localdate(timezone=business_zone())
 
 
 # --- Tasks -----------------------------------------------------------------------------------------
@@ -322,7 +324,8 @@ def filter_tasks(tasks: QuerySet[Task], params: TaskListIn) -> QuerySet[Task]:
 def list_tasks(ctx: OperationContext, params: TaskListIn) -> dict:
     caller = Caller(ctx)
     tasks = filter_tasks(annotated(caller.visible(Task.objects.all()), caller), params)
-    return _page(_sorted(tasks, params.sort, TASK_ORDER), params, lambda task: task_row(task, caller))
+    ordered = tasks.order_by(*list_order_for(params.sort, columns=TASK_ORDER, nulls_last=True))
+    return _page(ordered, params, lambda task: task_row(task, caller))
 
 
 @operation(
@@ -501,7 +504,8 @@ def list_projects(ctx: OperationContext, params: ProjectListIn) -> dict:
         projects = projects.filter(is_active=params.is_active)
     if params.owner_id:
         projects = projects.filter(owner_id=params.owner_id)
-    return _page(_sorted(projects, params.sort, PROJECT_ORDER), params, project_row)
+    ordered = projects.order_by(*list_order_for(params.sort, columns=PROJECT_ORDER, nulls_last=True))
+    return _page(ordered, params, project_row)
 
 
 @operation(
@@ -519,19 +523,6 @@ def project_detail(ctx: OperationContext, data: ProjectRefIn) -> dict:
 
 
 # --- Helpers ---------------------------------------------------------------------------------------
-
-
-def _sorted(rows: QuerySet[Any], sort: str, columns: dict[str, tuple[str, ...]]) -> QuerySet[Any]:
-    """``rows`` by the columns of ``sort`` («-» first = descending), empty values last, then by id in
-    the same direction (the old product's rule, hub#2355): a touched row keeps its place and pages
-    neither repeat nor lose rows."""
-    descending = sort.startswith("-")
-    key = sort.removeprefix("-")
-    order = [
-        F(column).desc(nulls_last=True) if descending else F(column).asc(nulls_last=True)
-        for column in columns[key]
-    ]
-    return rows.order_by(*order, "-id" if descending else "id")
 
 
 def _page(rows: QuerySet[Any], params: PageIn, row) -> dict:

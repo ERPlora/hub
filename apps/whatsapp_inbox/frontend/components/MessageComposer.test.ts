@@ -7,7 +7,7 @@ import { formatDateTime } from '@erplora/ui/components';
 import { applySurface } from '@erplora/ui/shell';
 import { describe, expect, it, vi } from 'vitest';
 
-import { click, EMPLOYEE, flush, ionValue, mountInbox, settle } from '../__tests__/mount-inbox';
+import { click, EMPLOYEE, flush, followUpgrade, ionValue, mountInbox, settle, SIGNED } from '../__tests__/mount-inbox';
 import type { ChannelOut, ConversationDetailOut } from '../operations';
 import MessageComposer from './MessageComposer.vue';
 import TemplateSendModal from './TemplateSendModal.vue';
@@ -51,7 +51,7 @@ async function setup(
   locale: 'en' | 'es' = 'en',
   extra: { channel?: ChannelOut | null; session?: typeof EMPLOYEE } = {},
 ) {
-  // The composer subscribes to nothing until «Template» is pressed: no stream to open here.
+  // The composer follows only the business's zone until «Template» is pressed: a test of the hour opens the stream.
   const props = { conversation: conversation(over), now: NOW, ...(extra.channel !== undefined ? { channel: extra.channel } : {}) };
   const m = await mountInbox(MessageComposer, { props, locale, session: extra.session });
   await settle();
@@ -72,7 +72,9 @@ describe('MessageComposer: reply (WHATSAPP_INBOX-F32)', () => {
     expect(s.send().disabled).toBe(true);
     await ionValue(s.text(), 'Sí, mañana a las 10', 'ionInput');
     expect(s.send().disabled).toBe(false);
-    const until = formatDateTime('2026-10-16T09:50:00Z', 'en', { timeZone: 'Europe/Madrid' });
+    await s.live();
+    await s.result('base.business.get', { timezone: 'Atlantic/Canary' });
+    const until = formatDateTime('2026-10-16T09:50:00Z', 'en', { timeZone: 'Atlantic/Canary' });
     expect(s.find('whatsapp-inbox-composer-window').text()).toBe(`You can write freely until ${until}.`);
   });
 
@@ -185,7 +187,9 @@ describe('MessageComposer: internal note (WHATSAPP_INBOX-F36)', () => {
 
   it('speaks Spanish', async () => {
     const s = await setup({}, 'es');
-    const until = formatDateTime('2026-10-16T09:50:00Z', 'es', { timeZone: 'Europe/Madrid' });
+    await s.live();
+    await s.result('base.business.get', { timezone: 'Atlantic/Canary' });
+    const until = formatDateTime('2026-10-16T09:50:00Z', 'es', { timeZone: 'Atlantic/Canary' });
     expect(s.find('whatsapp-inbox-composer-window').text()).toBe(`Puedes escribir libremente hasta el ${until}.`);
     expect(s.send().textContent?.trim()).toBe('Enviar');
   });
@@ -234,6 +238,13 @@ describe('MessageComposer: the plan’s messages (WHATSAPP_INBOX-F13)', () => {
     } finally {
       applySurface('web');
     }
+  });
+
+  it('«Upgrade plan» goes with the pass: already signed in on erplora.com (BASE-F11, hub#723)', async () => {
+    const s = await setup(BLOCKED, 'en', { channel: CHANNEL });
+    s.answer(200, { url: SIGNED });
+    expect(await followUpgrade(s.find('whatsapp-inbox-composer-upgrade').element)).toBe(SIGNED);
+    expect(s.sent()).toEqual([{ method: 'POST', path: '/api/saas-pass', query: {}, body: { next: 'plan' } }]);
   });
 
   it('the month spent keeps its own words, with «Upgrade plan»; without the channel, only the words', async () => {

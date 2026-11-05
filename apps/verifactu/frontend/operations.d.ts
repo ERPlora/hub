@@ -87,6 +87,10 @@ export interface WaitOut {
   message: string;
 }
 
+/** Where a registration the AEAT rejected or accepted with errors stands (VERIFACTU-F24): not corrected yet
+ *  (`pending`) or corrected by a newer record (`corrected`); any other record has nothing to correct. */
+export type CorrectionStatus = 'not_applicable' | 'pending' | 'corrected';
+
 export interface RecordRowOut {
   id: string;
   sequence: number;
@@ -101,6 +105,9 @@ export interface RecordRowOut {
   environment: Environment;
   status: RecordStatus;
   correction: boolean;
+  correction_status: CorrectionStatus;
+  /** The record that corrects this one; null while it is not corrected. */
+  corrected_by_id: string | null;
   qr_url: string;
   created_at: string;
 }
@@ -323,6 +330,8 @@ export interface RecordListIn extends PageIn {
   issue_date_to?: string;
   total_amount_from?: number;
   total_amount_to?: number;
+  /** Only the rejections (and accepted with errors) still to correct, or only the corrected ones. */
+  correction_status?: 'pending' | 'corrected';
   sort?: 'created_at' | 'sequence' | 'invoice_number' | 'issue_date' | 'invoice_type' | 'issuer_name' | 'total_amount' | 'environment' | 'status';
   dir?: SortDir;
 }

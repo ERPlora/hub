@@ -121,12 +121,12 @@ descanso, Fin descanso** (o «No trabaja»), con la jornada por defecto de **Aju
 Arriba, el periodo: «Hoy» (al entrar), «Ayer», «Esta semana» (desde el lunes), «Este mes» (desde el
 día 1) o «Personalizado», que abre «Desde» y «Hasta» con los días que había en pantalla; al lado, los
 días que cuenta. En el móvil, el periodo se elige en el desplegable «Periodo», con las mismas opciones.
-Debajo, dos cifras: **Vendido** y **Comisiones** del periodo, en la moneda del negocio, como cada importe
+Debajo, dos cifras: **Producción** y **Comisiones** del periodo, en la moneda del negocio, como cada importe
 de la lista. Después, la lista con
-buscador «Buscar profesional…» y columnas **Nombre, Rol, Vendido, Comisión %** y **Comisión**: cada
+buscador «Buscar profesional…» y columnas **Nombre, Rol, Producción, Comisión %** y **Comisión**: cada
 persona que puede cobrar comisión (Activa o De baja), también sin ventas y con comisión 0, y quien vendió
 en el periodo aunque ya no esté («Ya no trabaja aquí» o «Inactivo» junto al nombre). Se ordena por
-nombre, rol, vendido o comisión. En el móvil, una tarjeta por persona. Se pone al día sola al cobrar, anular
+nombre, rol, producción o comisión. En el móvil, una tarjeta por persona. Se pone al día sola al cobrar, anular
 o devolver una venta y al cambiar una ficha.
 
 ### Ajustes de Personal
@@ -519,7 +519,8 @@ Pasos:
    Inactivas ni las dadas de baja), su ficha, su cuenta (vacía si no tiene), nombre, rol y comisión,
    también las de comisión 0.
 3. Para saber lo que ha ganado cada profesional, abre **Personal → Comisiones**. Sale «Hoy»: lo que ha
-   vendido cada persona en el día del negocio, con lo devuelto ya restado, su comisión y lo que le
+   vendido cada persona en el día del negocio, con lo devuelto ya restado, sin los bonos que vendió y
+   sumado lo que valen las sesiones de bono que hizo (SALE-F28), su comisión y lo que le
    corresponde (vendido × comisión ÷ 100, redondeado a la unidad más pequeña de la moneda del negocio, el
    céntimo en euros, una sola vez por persona; media unidad sube). Arriba, el total vendido y el total de
    comisiones.
@@ -528,14 +529,15 @@ Pasos:
 5. Cuenta lo que se atribuyó a cada persona en Ventas: la línea que hizo ella (la de una cita, a la
    profesional de la cita) o, si la línea no dice quién, quien atendió la cuenta. Con «Yo» en el TPV, es
    quien tenía la sesión, si su cuenta tiene ficha en Personal; si no, esa venta no cuenta para nadie.
-Entra: la tarifa y la comisión de cada ficha y, de Ventas, lo vendido por cada profesional en el periodo
-(ya resta lo devuelto: lo que vuelve, a quien lo vendió). Ventas es opcional.
+Entra: la tarifa y la comisión de cada ficha y, de Ventas, la producción de cada profesional en el periodo
+(ya resta lo devuelto: lo que vuelve, a quien lo vendió; deja fuera los bonos que vendió y suma el valor de
+sus sesiones de bono). Ventas es opcional.
 Sale: solo lectura.
 Si falla: sin permiso de compensación, «No tienes permiso»; sin Ventas, «Las comisiones salen de las ventas»; con «Hasta» antes que «Desde»,
 «La fecha de fin no puede ser anterior a la de inicio.» bajo «Hasta»; con un solo día, «Un periodo
 personalizado necesita su primer y su último día.»; con más de dos años, «Pide como mucho 731 días de
 una vez.».
-Implicados: SALE-F16, SALE-F28
+Implicados: SALE-F16, SALE-F27, SALE-F28
 
 ### STAFF-F22 Cambiar los ajustes de Personal
 <!-- origen: old-hub:HUB_SHELL-F43 old-hub:HUB_SHELL-F44 fi:modules/staff#command-staff-settings-update fi:modules/staff#query-staff-settings-get fi:modules/staff#settings-bloque old:staff/workflow/pago-y-ajustes.md#staff-f22 -->
@@ -604,7 +606,10 @@ Implicados: ninguno
 Todo se puede pedir por las pantallas, el asistente (por voz o por texto, con la sesión de quien
 habla) y la API, con las mismas reglas y los mismos permisos. Una persona se nombra por su id o por
 su nombre; si el nombre vale para varias, se dice cuáles y se pide que elija
-(`staff.ambiguous_member`).
+(`staff.ambiguous_member`). Antes de cambiar nada, el asistente pide confirmar con su tarjeta (BASE-F97), que nombra
+cada registro como lo nombran las pantallas, nunca por su id: una persona y un rol por su nombre, un horario por de
+quién es y cómo se llama («Ana López · Horario habitual») y una ausencia por de quién es, su tipo y sus días («Ana
+López · Vacaciones · 2 nov 2026 – 5 nov 2026»). Lo que quien pregunta no puede ver no sale.
 
 ### Lo que ofrece: consultas (leen, no cambian nada; todas menos las cuentas y la ficha de la sesión se pueden seguir en vivo)
 
@@ -619,11 +624,13 @@ su nombre; si el nombre vale para varias, se dice cuáles y se pide que elija
 | Lo que ha ganado cada profesional en un periodo (hoy, ayer, esta semana, este mes o dos días): vendido con lo devuelto restado, comisión y totales; dice si el negocio no tiene Ventas | ver la compensación (y las cifras de Ventas) | F21 | `staff.commission.report` |
 | Las cifras: fichas, activos, de baja, inactivos, ausentes hoy y solicitudes pendientes | ver | F23 | `staff.member.stats` |
 | Los roles con sus miembros activos, con filtros y orden | ver | F04, F23 | `staff.role.list` |
+| Un rol por su id, también retirado: lo que lee la tarjeta del asistente para nombrarlo (BASE-F97) | ver | F01, F02, F04, F07 | `staff.role.detail` |
 | Los horarios de una persona con su semana | ver | F13–F15 | `staff.schedule.list` |
-| Un horario con su semana | ver | F14 | `staff.schedule.detail` |
+| Un horario con su semana y la `label` con la que lo nombra la tarjeta del asistente (BASE-F97) | ver | F14, F15 | `staff.schedule.detail` |
 | La disponibilidad de una persona por días | ver | F16 | `staff.availability.for_member` |
 | Las ausencias, sin motivo, con filtros y orden | ver ausencias | F17–F19 | `staff.time_off.list` |
 | Una ausencia con su motivo, sus notas y quién la aprobó | ver el detalle de ausencias | F18 | `staff.time_off.detail` |
+| Una ausencia sin su motivo y con la `label` con la que la nombra la tarjeta del asistente (BASE-F97) | ver ausencias | F18, F19 | `staff.time_off.get` |
 | Quién falta hoy, con el tipo de cada ausencia en el idioma de quien pregunta | ver ausencias | F20 | `staff.time_off.today` |
 | Mis ausencias, con su motivo y sus notas | ver ausencias | F08 | `staff.time_off.mine` |
 | Los ajustes | ver | F22 | `staff.settings.get` |
@@ -705,6 +712,10 @@ El cajero del producto actual ya no existe como papel: lo que veía (el director
 
 ## Para quien lo mantiene
 
+- **Orden de las listas** (`base.ordering.list_order_for`; regla hub#2355 del producto viejo): fichas, sueldos, roles y
+  ausencias van por la columna elegida y desempatan por `id`, todo en la dirección de la lista y con los vacíos al final
+  en las dos: la descendente es la ascendente leída al revés, empates incluidos. Lo fija
+  `test_ties_go_by_id_in_the_lists_own_direction`, por lista.
 - Anatomía completa de una app (copia de `apps/demo`): `apps.py`, `models.py`, `schemas.py`,
   `queries.py`, `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/` y un
   `tests/test_<fichero>.py` por fichero. Las páginas viven en `frontend/` («Cómo son las páginas»,
@@ -736,9 +747,9 @@ El cajero del producto actual ya no existe como papel: lo que veía (el director
   primera y deciden sobre lo que dejó. Aprobar, rechazar, cancelar y tocar un horario bloquean la ficha
   y luego la fila; una ficha dada de baja mientras tanto da «no existe». Hay tests con hilos de cada
   carrera.
-- El «hoy» es `timezone.localdate()` (`business_today()` de `queries.py`; en la fase 1, `TIME_ZONE`),
-  aunque `control.Hub.timezone` ya guarda la zona de cada hub (hub#63): la contradicción está señalada
-  en las rondas CLOSE-SCHEDULE y CLOSE-STAFF de `PLAN-HUB.md`.
+- El «hoy» es el del reloj del negocio (`business_today()` de `queries.py`, por `base.business.business_zone`,
+  hub#771). Las comisiones piden las ventas por su día, que aún va en `TIME_ZONE` (hub#772): en otra zona, lo cobrado en
+  las horas en que los dos relojes no coinciden en el día cuenta en el de Madrid.
 - **Millares**: los importes agrupan los millares también con cuatro cifras («1.234,56 €»; `formatMoney` de
   `@erplora/ui/components`, con `useGrouping: 'always'`, porque el CLDR del español espera a cinco: hub#494).
 - Dinero en unidades menores enteras de la moneda del negocio (`hourly_rate`; céntimos en euros); la
@@ -762,6 +773,14 @@ El cajero del producto actual ya no existe como papel: lo que veía (el director
   `es` en el catálogo: «Semana», «Miembros del personal») o, si no lo tiene, por el `verbose_name`
   de su campo en el modelo, el que da la ficha; un dato sin ninguno sale con el nombre técnico y lo
   para `tests/test_integration_assistant.py`.
+- La tarjeta de confirmación del asistente (BASE-F97) nombra cada registro que una escritura señala por su id con las
+  marcas `refers` de `schemas.py` (`A_MEMBER`, `A_ROLE`, `A_SCHEDULE`, `A_TIME_OFF`), leídas como quien pregunta.
+  `staff.role.detail` y `staff.time_off.get` son lecturas internas (`ai=INTERNAL`, sin API), porque el modelo encuentra
+  esos registros en sus listas. La segunda existe porque `staff.time_off.detail` trae el motivo y pide un permiso que
+  el rol de empleado no tiene, y un empleado también anula su propia solicitud (STAFF-F19). Lo que no se puede leer se
+  deja fuera:
+  `tests/test_assistant_card_records.py`, y el trinquete `UNNAMED_REFERENCES` de `base/tests/test_assistant_card_values.py`
+  impide que entre un dato sin marca.
 - El admin de Django del Hub tiene **CRUD completo** sobre todos los modelos (ronda 12, PLAN §17),
   para el staff de la plataforma; una escritura cruda del admin no deja aviso.
 - Borrar una ficha en el admin (`MemberAdmin.delete_model`, `delete_queryset` y, en POST,

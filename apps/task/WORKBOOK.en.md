@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:c77d7e53dbe95cdea21e86f09fbe2a01e5fa68c230869dba2ba11f0e0d6446ab -->
+<!-- generated from WORKBOOK.md sha256:b5467242c005c8a8e6eebb96dba253571929ae7e35903b08b1b49dca4309261a -->
 
 ## What it is for and who it is for
 
@@ -59,8 +59,7 @@ asking for it.
    are going to sign in to the Hub, link their record to their account: that way each one sees "My
    tasks".
 2. If you want to group them, create the **projects** in **Tasks → Projects** (TASK-F12).
-3. "Today" (overdue, due today, the number of the day) is the business's day: in phase 1, the Hub's
-   time zone, **Europe/Madrid**.
+3. "Today" (overdue, due today, the number of the day) is the business's day, in its time zone.
 
 ## Screens
 

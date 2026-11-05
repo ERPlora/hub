@@ -10,7 +10,7 @@ deletes logically, and until its event is delivered (F09) the link is still in t
 from collections import Counter
 from uuid import UUID
 
-from django.db.models import Count, F, Prefetch, Q
+from django.db.models import Count, Prefetch, Q
 from django.db.models.functions import Coalesce, Lower
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
@@ -40,6 +40,7 @@ from apps.modifier.schemas import (
     TargetIn,
     TargetOut,
 )
+from base.ordering import list_order, list_order_for
 
 GROUP_NOT_FOUND = _("This group does not exist.")
 GROUP_AMBIGUOUS = _("«%(said)s» names several groups: %(names)s. Say which one.")
@@ -243,15 +244,6 @@ def _page(queryset, params, row) -> dict:
     }
 
 
-def _ordered(order: dict, sort: str, *before) -> list:
-    """The order of ``sort`` (a leading «-» is descending): ``before``, the column and its tie-breaks, all in
-    the list's direction, so a descending list is the ascending one read backwards, ties included (hub#2355)."""
-    keys = [*before, *order[sort.lstrip("-")]]
-    if not sort.startswith("-"):
-        return keys
-    return [(F(key) if isinstance(key, str) else key).desc() for key in keys]
-
-
 # The groups (MODIFIER-F01, F03)
 
 
@@ -282,7 +274,7 @@ def list_groups(ctx: OperationContext, params: GroupListIn) -> dict:
             else groups.filter(min_choices=0)
         )
     return _page(
-        groups.order_by(*_ordered(_GROUP_ORDER, params.sort)), params, group_row
+        groups.order_by(*list_order_for(params.sort, columns=_GROUP_ORDER)), params, group_row
     )
 
 
@@ -341,7 +333,9 @@ def list_options(ctx: OperationContext, params: OptionListIn) -> dict:
     elif params.sort.lstrip("-") == "sort_order":
         # The whole catalog in the till's order: by its groups' order and name, then each group's own.
         by_group = ("group__sort_order", Lower("group__name"), "group_id")
-    order = _ordered(_OPTION_ORDER, params.sort, *by_group)
+    order = list_order(
+        *by_group, *_OPTION_ORDER[params.sort.removeprefix("-")], descending=params.sort.startswith("-")
+    )
     if params.search:
         options = options.filter(Q(name__icontains=params.search) | Q(kitchen_name__icontains=params.search))
     return _page(options.order_by(*order), params, option_row)

@@ -228,8 +228,8 @@ describe('PosCart: «Check» and «Current order» with Kitchen (SALE-F20)', () 
     expect(scroll.findComponent(CartToolbar).exists()).toBe(false);
     expect(scroll.findComponent(CartFooter).exists()).toBe(false);
     await click(m.find('pos-cart-tab-round').element);
-    expect(m.find('pos-kitchen-send').exists()).toBe(true);
-    expect(scroll.find('[data-testid="pos-kitchen-send"]').exists()).toBe(false);
+    // «Send order» rides with them: outside, on a low phone it ate all of what scrolls, tabs and lines (hub#787).
+    expect(scroll.find('[data-testid="pos-kitchen-send"]').exists()).toBe(true);
     // The phone's drawer scrolls the whole middle; the side column keeps its heading and scrolls the lines.
     expect(m.find('pos-cart').classes()).not.toContain('pos-cart--drawer');
     const phone = await setup({ drawer: true });

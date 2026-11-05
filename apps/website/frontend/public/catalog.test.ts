@@ -121,6 +121,18 @@ describe('hydrateCatalog', () => {
     expect(document.querySelector('[data-ep-block] h3')?.textContent).toBe('Old');
   });
 
+  it('asks nothing on a business’s own domain, where /api is not', async () => {
+    const doc = page();
+    doc.documentElement.setAttribute('data-ep-static', '');
+    const fetchImpl = vi.fn();
+    try {
+      await hydrateCatalog(doc, fetchImpl);
+    } finally {
+      doc.documentElement.removeAttribute('data-ep-static');
+    }
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
   it('leaves the editor’s preview and a page without a catalog alone', async () => {
     const fetchImpl = answer(FRESH);
     await hydrateCatalog(page(SNAPSHOT, true), fetchImpl);

@@ -432,6 +432,9 @@ class Grant(UUIDModel):
     )
     # The sale that paid it, when there is one: an opaque id of the Sales app (not a requirement).
     sale_id = models.UUIDField(_("sale"), null=True, blank=True)
+    # The line of that sale that charged it (opaque too), if it said so. A paid voucher without it does not count as its
+    # sessions are done: its money may already count for who sold it, on a line nobody named (SERVICE-F24).
+    sale_line_id = models.UUIDField(_("sale line"), null=True, blank=True)
     amount = models.PositiveBigIntegerField(_("amount paid"), default=0)
     net_amount = models.PositiveBigIntegerField(_("net amount"), default=0)
     tax_amount = models.PositiveBigIntegerField(_("tax amount"), default=0)
@@ -571,6 +574,9 @@ class Redemption(UUIDModel):
     return_reason = models.CharField(
         _("reason it came back"), max_length=500, blank=True
     )
+    # What it is worth, VAT included, fixed when it is delivered and never moved again (SERVICE-F24). Empty while
+    # it is not delivered, and on an unlimited voucher, which has no sessions to divide its price by.
+    value = models.PositiveBigIntegerField(_("value"), null=True, blank=True)
 
     class Meta:
         verbose_name = _("voucher session")

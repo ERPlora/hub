@@ -6,18 +6,18 @@
 // connected (or to reconnect: WHATSAPP_INBOX-F02), the month spent (or a plan that includes none:
 // WHATSAPP_INBOX-F13, with «Upgrade plan» for whoever configures) or no erplora.com, nothing is offered and
 // the reason is said. A refusal keeps the text with its reason, and sending it again carries the same key:
-// never sent twice. «Upgrade plan» sells, so only on the web (surface.ts), and leaves the Hub by `openExternalLink`
-// (gh:hub#439: the installed app opens nothing on a `_blank` link).
+// never sent twice. «Upgrade plan» sells, so only on the web (surface.ts), and goes with the pass (`PlanUpgradeLink`).
 import { formatDateTime, InlineFeedback } from '@erplora/ui/components';
 import { useCommand } from '@erplora/ui/sdk';
-import { openExternalLink, useSession, useSurface } from '@erplora/ui/shell';
+import { useSession, useSurface } from '@erplora/ui/shell';
 import { IonButton, IonSegment, IonSegmentButton, IonTextarea } from '@ionic/vue';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 
+import { useBusinessZone } from '../../../../base/frontend/lib/zone';
 import { useLocale, useT } from '../composables/useT';
-import { BUSINESS_ZONE } from '../lib/format';
 import { noAllowance } from '../lib/plan';
 import type { ChannelOut, ConversationDetailOut } from '../operations';
+import PlanUpgradeLink from './PlanUpgradeLink.vue';
 import TemplateSendModal from './TemplateSendModal.vue';
 
 const props = withDefaults(
@@ -33,6 +33,7 @@ const props = withDefaults(
 
 const t = useT();
 const locale = useLocale();
+const zone = useBusinessZone();
 const mode = ref<'reply' | 'note'>('reply');
 const text = ref('');
 const noteText = ref('');
@@ -85,7 +86,7 @@ const windowOpen = computed(() => {
   const end = props.conversation.window_expires_at;
   return props.conversation.window_open && !!end && new Date(end).getTime() > clock.value;
 });
-const until = computed(() => formatDateTime(props.conversation.window_expires_at, locale.value, { timeZone: BUSINESS_ZONE }));
+const until = computed(() => formatDateTime(props.conversation.window_expires_at, locale.value, { timeZone: zone.value }));
 
 async function reply(): Promise<void> {
   const body = text.value.trim();
@@ -167,14 +168,11 @@ watch(
           v-if="upgradeUrl"
           #actions
         >
-          <a
+          <PlanUpgradeLink
             class="wa-composer__link"
             data-testid="whatsapp-inbox-composer-upgrade"
-            :href="upgradeUrl"
-            target="_blank"
-            rel="noopener"
-            @click="openExternalLink(upgradeUrl, $event)"
-          >{{ $t('whatsapp_inbox.upgradePlan') }}</a>
+            :url="upgradeUrl"
+          />
         </template>
       </InlineFeedback>
       <InlineFeedback

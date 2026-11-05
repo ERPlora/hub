@@ -47,5 +47,5 @@ por `/internal`.
 
 El detalle está en «Lo que queda fuera» del [`WORKBOOK.md`](WORKBOOK.md): las cifras de uso y el aviso de ampliar de
 Sistema › Recursos (hub#603), la fila de salud del Inicio (hub#573), el pase a
-erplora.com (saas#190), las notas de versión (hub#576), Citas en la moneda del negocio (hub#577), la vista previa de
-.xlsx y .docx (hub#578) y los roles que trae una app (hub#579).
+erplora.com (saas#190), las notas de versión (hub#576), la vista previa de .xlsx y .docx (hub#578) y los roles que
+trae una app (hub#579).

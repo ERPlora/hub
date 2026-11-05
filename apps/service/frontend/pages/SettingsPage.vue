@@ -3,8 +3,10 @@
 // only for whoever may save them. The values come live (`service.settings.get`: the factory ones until
 // the business saves); a change saved elsewhere repaints every field the person has not touched, and
 // «Save» sends only the fields the person touched and changed (`service.settings.update`), so it never
-// undoes someone else's change. The default tax category is searched in Taxes; empty removes it.
-import { Combo, type ComboOption, InlineFeedback } from '@erplora/ui/components';
+// undoes someone else's change. The default tax category is searched in Taxes; empty removes it. A
+// refusal says itself as a FormModal does (`useRefusal`, hub#821): its notice goes as soon as something
+// is changed, each field's message as soon as that field is, and the next refusal says it all again.
+import { Combo, type ComboOption, InlineFeedback, useRefusal } from '@erplora/ui/components';
 import { useCommand, useLive, useLiveClient } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { IonButton, IonInput, IonSpinner, IonToggle } from '@ionic/vue';
@@ -27,6 +29,8 @@ const LABELS: Record<(typeof NUMBERS)[number] | (typeof SWITCHES)[number], strin
 };
 
 type Form = Record<(typeof NUMBERS)[number], string> & Record<(typeof SWITCHES)[number], boolean> & { tax: ComboOption | null };
+/** The name the server gives each field in a refusal, when it is not the form's own. */
+const REFUSED_AS: Partial<Record<keyof Form, string>> = { tax: 'default_tax_category_key' };
 
 const session = useSession();
 const t = useT();
@@ -37,6 +41,7 @@ const canManage = computed(() => session.can('service.manage_settings'));
 
 const { data, status, error } = useLive('service.settings.get', {});
 const { run, pending, error: saveError } = useCommand('service.settings.update');
+const { fieldErrors, showsError, changed } = useRefusal(saveError);
 
 const form = ref<Form | null>(null);
 /** What the server has (the last result of the stream, or of a save). */
@@ -100,10 +105,10 @@ function set<K extends keyof Form>(field: K, value: Form[K]): void {
   form.value = { ...form.value, [field]: value };
   touched.value = new Set([...touched.value, field]);
   saved.value = false;
+  changed(REFUSED_AS[field] ?? field);
 }
 
 const text = (value: unknown): string => (value === null || value === undefined ? '' : String(value));
-const fieldErrors = computed<Readonly<Record<string, string>>>(() => saveError.value?.fields ?? {});
 const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'ion-touched': !!message });
 
 async function save(): Promise<void> {
@@ -200,12 +205,12 @@ async function save(): Promise<void> {
           {{ t(LABELS[field]) }}
         </ion-toggle>
         <InlineFeedback
-          v-if="saveError"
+          v-if="showsError"
           tone="danger"
           data-testid="service-settings-save-error"
           :heading="$t('service.settings.saveError')"
         >
-          {{ saveError.message }}
+          {{ saveError?.message }}
         </InlineFeedback>
         <InlineFeedback
           v-if="saved"

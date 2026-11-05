@@ -215,7 +215,7 @@ export interface CommissionReportRow {
   role_name: string | null;
   status: RecordStatus;
   commission_rate: string;
-  /** What they sold in the period, refunds taken off, in cents. */
+  /** What they sold in the period, refunds taken off and voucher sessions added, in cents. */
   sold: number;
   /** sold × rate ÷ 100 in cents, rounded half up once. */
   commission: number;
@@ -355,6 +355,11 @@ export interface ScheduleOut {
   days: DayOut[];
 }
 
+export interface ScheduleDetailOut extends ScheduleOut {
+  /** Whose it is and its name: what tells it from another person's of that name. */
+  label: string;
+}
+
 export interface DeletedOut {
   id: string;
 }
@@ -486,7 +491,7 @@ declare module '@erplora/ui/sdk' {
     'staff.role.create': { input: RoleIn; output: RoleOut };
     'staff.role.update': { input: RolePatchIn; output: RoleOut };
     'staff.schedule.list': { input: ScheduleListIn; output: Page<ScheduleOut> };
-    'staff.schedule.detail': { input: ByIdIn; output: ScheduleOut };
+    'staff.schedule.detail': { input: ByIdIn; output: ScheduleDetailOut };
     'staff.schedule.create': { input: ScheduleIn; output: ScheduleOut };
     'staff.schedule.update': { input: ScheduleUpdateIn; output: ScheduleOut };
     'staff.schedule.set_active': { input: SetActiveIn; output: ScheduleOut };

@@ -239,6 +239,42 @@ def test_charging_and_releasing_a_session_at_once_do_one_or_the_other(cut):
     assert status in ("consumed", "released")
 
 
+def test_a_till_delivering_a_session_waits_for_the_other_to_read_what_is_left_of_the_price(cut):
+    # SERVICE-F24: read before the first till's COMMIT, the second would be worth 33.33, not 33.34.
+    import uuid
+
+    customer = make_customer()
+    grant = make_grant(make_package("Bono", [cut], max_uses=3), customer, amount=10000, sale_line_id=uuid.uuid7())
+    first, second = (hold_for(grant, cut, uuid.uuid7())() for _ in range(2))
+    delivered, finish = threading.Event(), threading.Event()
+
+    def deliver(session):
+        return run(
+            "service.session.settle",
+            {"ids": [str(session.id)], "sale_id": str(uuid.uuid7()), "customer_id": str(customer.id)},
+        )
+
+    def first_till():
+        with transaction.atomic():
+            deliver(first)
+            delivered.set()
+            finish.wait(10)
+
+    def second_till():
+        delivered.wait(10)
+        deliver(second)
+
+    def let_the_first_commit():
+        # Time for the second till to reach the voucher's lock (or, without it, to read and answer) first.
+        delivered.wait(10)
+        time.sleep(0.5)
+        finish.set()
+
+    results = at_once(first_till, second_till, let_the_first_commit)
+    assert results == [None, None, None]
+    assert [Redemption.objects.get(pk=session.id).value for session in (first, second)] == [3333, 3334]
+
+
 # ── The writes that name a row ──────────────────────────────────────────────────────────────────
 
 #: A deletion gives up after this on a row another session holds (a real one waits for its COMMIT).

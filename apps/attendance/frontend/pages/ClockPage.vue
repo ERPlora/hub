@@ -15,6 +15,7 @@ import { IonButton, IonSpinner } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
+import { useBusinessZone } from '../../../../base/frontend/lib/zone';
 import { useServerNow } from '../composables/useServerNow';
 import { useLocale, useT } from '../composables/useT';
 import { GeoError, type GeoErrorCode, getPosition } from '../lib/geo';
@@ -35,6 +36,7 @@ const GEO_KEYS: Record<GeoErrorCode, string> = {
 
 const t = useT();
 const locale = useLocale();
+const zone = useBusinessZone();
 
 const { data, status, error, refresh } = useLive('attendance.record.current', {});
 // The server's clock (its `as_of`), ticking every second: never the device's own.
@@ -71,7 +73,7 @@ const breaks = computed(() => {
   const day = data.value;
   return day ? liveSeconds(day.today.break_seconds, day.as_of, now.value, day.today.running === 'break') : 0;
 });
-const nowText = computed(() => formatTime(new Date(now.value).toISOString()));
+const nowText = computed(() => formatTime(new Date(now.value).toISOString(), zone.value));
 
 function geoText(failure: unknown): string {
   const code = failure instanceof GeoError ? failure.code : 'unavailable';
@@ -82,7 +84,7 @@ function geoText(failure: unknown): string {
 async function send(run: () => Promise<RecordOut>, doneKey: string, at: (day: RecordOut) => string | null): Promise<RecordOut | null> {
   try {
     const day = await run();
-    notice.value = { kind: 'success', text: t(doneKey, { time: formatTime(at(day)) }) };
+    notice.value = { kind: 'success', text: t(doneKey, { time: formatTime(at(day), zone.value) }) };
     return day;
   } catch (failure) {
     notice.value = { kind: 'error', text: (failure as ApiError).message || t('attendance.clock.loadError') };
@@ -160,7 +162,7 @@ async function toggleBreak(): Promise<void> {
 }
 
 function endOf(day: RecordOut): string {
-  if (day.clock_out_at) return formatTime(day.clock_out_at);
+  if (day.clock_out_at) return formatTime(day.clock_out_at, zone.value);
   return day.status === 'open' ? '…' : t('attendance.clock.noClockOut');
 }
 </script>
@@ -238,10 +240,10 @@ function endOf(day: RecordOut): string {
               {{ $t('attendance.clock.statusOut') }}
             </template>
             <template v-else-if="onBreak">
-              {{ $t('attendance.clock.statusOnBreak', { time: formatTime(openDay.break_started_at) }) }}
+              {{ $t('attendance.clock.statusOnBreak', { time: formatTime(openDay.break_started_at, zone) }) }}
             </template>
             <template v-else>
-              {{ $t('attendance.clock.statusIn', { time: formatTime(openDay.clock_in_at) }) }}
+              {{ $t('attendance.clock.statusIn', { time: formatTime(openDay.clock_in_at, zone) }) }}
             </template>
           </p>
           <div v-if="openDay">
@@ -394,7 +396,7 @@ function endOf(day: RecordOut): string {
               >
                 <div class="attendance-clock__day-text">
                   <strong>{{ formatDay(day.work_date, locale) }}</strong>
-                  <span>{{ formatTime(day.clock_in_at) }} – {{ endOf(day) }}</span>
+                  <span>{{ formatTime(day.clock_in_at, zone) }} – {{ endOf(day) }}</span>
                 </div>
                 <div class="attendance-clock__day-end">
                   <span v-if="day.clock_out_at && day.worked_seconds !== null">{{ formatHm(day.worked_seconds) }}</span>

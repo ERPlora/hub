@@ -18,12 +18,14 @@ import {
   StatusPill,
 } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
-import { AppPage, openExternalLink, useSession, useSurface } from '@erplora/ui/shell';
+import { AppPage, useSession, useSurface } from '@erplora/ui/shell';
 import { computed, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 import ConversationPanel from '../components/ConversationPanel.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
+import { useBusinessZone } from '../../../../base/frontend/lib/zone';
+import PlanUpgradeLink from '../components/PlanUpgradeLink.vue';
 import { useLiveList } from '../composables/useLiveList';
 import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
@@ -41,6 +43,7 @@ const canConfigure = computed(() => session.can('whatsapp_inbox.configure'));
 const SETTINGS = '/whatsapp_inbox/settings';
 const t = useT();
 const locale = useLocale();
+const zone = useBusinessZone();
 const route = useRoute();
 const router = useRouter();
 
@@ -72,7 +75,7 @@ const blocked = computed(() => blockingError(error.value));
 
 const { data: channel } = useLive('whatsapp_inbox.channel.get', {});
 /** «Upgrade plan» at the cap: for whoever configures, only with erplora.com to send them to, and only on the web (it
- *  sells: surface.ts); its click leaves the Hub by `openExternalLink` (gh:hub#439). */
+ *  sells: surface.ts). */
 const { isWeb } = useSurface();
 const upgradeUrl = computed(() => (isWeb.value && canConfigure.value && channel.value?.plans_url) || '');
 // From 80 % of the month's messages, how many are left (WHATSAPP_INBOX-F13).
@@ -103,7 +106,7 @@ watch(openId, (id) => {
 });
 
 function when(value: unknown): string {
-  return formatMessageTime(value as string | null, { locale: locale.value, yesterday: t('whatsapp_inbox.yesterday') });
+  return formatMessageTime(value as string | null, { locale: locale.value, yesterday: t('whatsapp_inbox.yesterday'), timeZone: zone.value });
 }
 
 /** The last message as the list shows it: its text; a photo, a file or a location named by its type. */
@@ -221,14 +224,11 @@ const columns = computed<DataTableColumn<ConversationOut>[]>(() => [
           v-if="upgradeUrl"
           #actions
         >
-          <a
+          <PlanUpgradeLink
             class="wa-inbox__link"
             data-testid="whatsapp-inbox-upgrade"
-            :href="upgradeUrl"
-            target="_blank"
-            rel="noopener"
-            @click="openExternalLink(upgradeUrl, $event)"
-          >{{ $t('whatsapp_inbox.upgradePlan') }}</a>
+            :url="upgradeUrl"
+          />
         </template>
       </InlineFeedback>
       <InlineFeedback
@@ -241,14 +241,11 @@ const columns = computed<DataTableColumn<ConversationOut>[]>(() => [
           v-if="upgradeUrl"
           #actions
         >
-          <a
+          <PlanUpgradeLink
             class="wa-inbox__link"
             data-testid="whatsapp-inbox-upgrade"
-            :href="upgradeUrl"
-            target="_blank"
-            rel="noopener"
-            @click="openExternalLink(upgradeUrl, $event)"
-          >{{ $t('whatsapp_inbox.upgradePlan') }}</a>
+            :url="upgradeUrl"
+          />
         </template>
       </InlineFeedback>
       <InlineFeedback

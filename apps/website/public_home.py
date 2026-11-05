@@ -13,17 +13,24 @@ served. The response sets no cookie, carries the public CSP
 visitor. Only the hub's own site is shown, under the same guard as the public API (``queries.live_version``). Google's
 reviews are asked when the page is rendered and nothing is kept for its place (``services.refresh_reviews``; a failure
 is kept 10 minutes and the site's last good answer shows meanwhile).
+
+On the business's own domain (HUBS-F17, ``request.custom_domain``) only the page and its images are there, neither
+``/auth`` nor ``/api``, so it is another page, kept apart: «Log in» goes to the business's own address, the page's script
+asks nothing of the API (``data-ep-static``), so its catalog is read when it is painted and it is kept what the API keeps
+that catalog, a minute, and it names no address for its reports. With nothing to show it is not found: there is no
+sign-in to send a visitor to.
 """
 
 from django.core.cache import cache
-from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
+from django.http import Http404, HttpRequest, HttpResponse, HttpResponseRedirect
 from django.utils.cache import patch_vary_headers
 from django.utils.translation import get_supported_language_variant
 from django.utils.translation.trans_real import parse_accept_lang_header
 from live.context import Scope
 
 from apps.website import queries, services
-from apps.website.csp import public_policy
+from apps.website.csp import own_domain_policy, public_policy
+from apps.website.qr import public_url
 from apps.website.render import local_day, render_site
 from base.business import currency_of
 
@@ -46,12 +53,16 @@ def is_published(hub) -> bool:
 def respond(request: HttpRequest) -> HttpResponse:
     """The live publication's page for ``request.hub``, from the cache or rendered once."""
     slug, scope = request.hub.slug, _scope(request.hub)
+    own_domain = bool(getattr(request, "custom_domain", ""))
     language, today = visitor_language(request), local_day(request.hub.timezone)
     currency = currency_of(request.hub.country)
-    html = cache.get(queries.page_cache_key(slug, queries.live_version(scope), language, today, currency))
+    version = queries.live_version(scope)
+    html = cache.get(queries.page_cache_key(slug, version, language, today, currency, own_domain=own_domain))
     if html is None:
         page = queries.published_page(scope)
         if page is None:
+            if own_domain:
+                raise Http404("This business has no website to show.")
             return HttpResponseRedirect(OFFLINE_FALLBACK)
         # Google is asked here only when nothing is kept for the place (at most 5 s a call); then what is kept.
         services.refresh_reviews(scope, page["content"])
@@ -62,15 +73,20 @@ def respond(request: HttpRequest) -> HttpResponse:
             language,
             hub=slug,
             currency=currency,
-            catalog=page.get("catalog"),
+            catalog=queries.live_catalog(scope, page["content"]) if own_domain else page.get("catalog"),
             today=today,
             reviews=queries.shown_reviews(slug, page["content"], page.get("reviews_snapshot")),
+            hub_address=public_url(slug) if own_domain else "",
         )
-        cache.set(queries.page_cache_key(slug, page["version"], language, today, currency), html, queries.PAGE_TTL)
+        cache.set(
+            queries.page_cache_key(slug, page["version"], language, today, currency, own_domain=own_domain),
+            html,
+            queries.CATALOG_TTL if own_domain else queries.PAGE_TTL,
+        )
     response = HttpResponse(html, content_type="text/html; charset=utf-8")
     response["Cache-Control"] = CACHE_CONTROL
     patch_vary_headers(response, ["Accept-Language", "Cookie"])
-    response._csp_config = public_policy()
+    response._csp_config = own_domain_policy() if own_domain else public_policy()
     return response
 
 

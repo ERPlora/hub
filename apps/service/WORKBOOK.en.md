@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:7d7ac58784beca2967b8389a853899d587cfbc7a0f0d99cb470367b6e6b7ee72 -->
+<!-- generated from WORKBOOK.md sha256:1944551ee9337ab6f59daece75a1bb3e8731a39b180505548a9268fcc4c2cc16 -->
 
 ## What it is for and who it is for
 
@@ -394,7 +394,9 @@ assistant, API and add in one go); the form brings the default tax category chos
 "Show prices" and "Show duration" are used by the Online booking page: without them it does not show the
 price or the duration of each service.
 If it fails: "The settings could not be saved." and the reason below the field (a duration of 0, a tax
-category that does not exist).
+category that does not exist). As in the form windows, the notice goes as soon as something is changed and
+a field's reason as soon as that field is corrected; both come back if the next try is refused too. A
+refusal that names no field stays until the next try (hub#821).
 Involved: SERVICE-F01, SERVICE-F06, ONLINE_BOOKING-F01
 
 ### SERVICE-F12 Create a voucher
@@ -445,17 +447,22 @@ Actor: employee, manager, assistant
 Screen: assistant
 Steps:
 1. Ask the assistant to grant the voucher to the customer (by her name or her phone), with the amount
-   charged and the sale if there are any.
+   charged and the sale that charged it. If that sale charged several lines, also which of them.
 2. The voucher shows in **Sold vouchers** of that voucher (SERVICE-F16).
 In: the voucher of the catalogue, live and active, and the customer (Customers).
 Out: a sold voucher with the owner, the date, the amount and the "Uses" and the "Validity" of the
 catalogue frozen; the expiry counts from that moment (`service.grant.granted`). No tax document comes
-out: the sale of the voucher issues it.
+out: the sale of the voucher issues it. Saying the sale, that part of its line stops being production of whoever
+sold it: the commission goes on the sessions done (SALE-F28). Without saying it, the voucher is granted all the
+same, but its sessions count for nobody (SERVICE-F24): its money may already count for whoever sold it.
 If it fails: "Pick the customer this voucher belongs to…" if it is not said; "That package does not exist
 in this business." if the voucher was deleted or is deactivated; a purchase date in the future, "A voucher
 cannot be bought in the future." (extending a voucher is **Adjust**, SERVICE-F18), and one without a time
-zone, asking for it; a customer name that fits several, the list to choose from.
-Involved: CUSTOMER-F01
+zone, asking for it; a customer name that fits several, the list to choose from. From the sale: "That sale
+charged several lines: say which one paid for the voucher: …", "That line is not in that sale.", "That line has
+… left to pay for vouchers: it cannot pay for one of ….", and "That sale was voided: it paid for no voucher.";
+whoever cannot charge cannot say it. Nothing is granted.
+Involved: CUSTOMER-F01, SALE-F28, SERVICE-F24
 
 ### SERVICE-F15 Look up a customer's vouchers
 Status: done (assistant and API)
@@ -500,11 +507,12 @@ Steps:
 3. Type the Reason (required) and tap **Void**.
 In: the purchase and the reason.
 Out: the voucher can no longer be spent and stays as a trace, with who, when and the reason
-(`service.grant.voided`). It moves no money and issues no document.
+(`service.grant.voided`). It moves no money and issues no document. If a line of a sale paid for it, that part
+counts for whoever sold it again, until a refund says otherwise (SALE-F28).
 If it fails: "That voucher was already used: it cannot be voided.", "That voucher was already voided." or
 "Say why this voucher is being voided: the reason stays on its record.". If another till spends a session
 at the same time, the void waits and gets the real reason.
-Involved: SERVICE-F16, SALE-F32
+Involved: SERVICE-F16, SALE-F28, SALE-F32
 
 ### SERVICE-F18 Give sessions, extend the expiry or correct the balance
 Status: done
@@ -519,7 +527,8 @@ Steps:
 In: the purchase, the quantities and the reason.
 Out: a separate movement with who, when, how much and why (`service.grant.adjusted`), which shows in
 **Movements** as **Courtesy** or **Correction**; the purchase is not rewritten. It revives an expired or
-used-up voucher.
+used-up voucher. The sessions already delivered keep their value; the ones left share what is left of the
+price (SERVICE-F24).
 If it fails: "Say why this voucher is being adjusted…", "Add or remove at least one session, or add at
 least one day.", "You cannot take away more sessions than the customer has left.", "That voucher has no
 session limit…", "That voucher never expires…" or "That voucher was already voided.".
@@ -563,8 +572,9 @@ Steps:
 2. Ask the assistant to spend a session of a voucher the customer bought, and if you want say which
    service was done and link it to the appointment or the sale.
 In: the purchase of the voucher; the service, the appointment and the sale, as a reference.
-Out: a **Delivered** session at once (`service.grant.redeemed`), which counts against the "Uses". It
-issues no tax document.
+Out: a **Delivered** session at once (`service.grant.redeemed`), which counts against the "Uses" and takes
+its share of the price (SERVICE-F24). It does not say who did it, so it counts in nobody's production
+(hub#770). It issues no tax document.
 If it fails: "This voucher was voided: it can no longer be used.", "This voucher has no sessions left.",
 "This voucher has expired.", "This voucher does not cover that service. A voucher of haircuts pays for
 haircuts, not for the shampoo." or "That voucher sale does not exist in this business.". Two tills that
@@ -635,13 +645,19 @@ Steps:
    by voiding the sale (SERVICE-F27).
 In: the held sessions of the charged lines, the sale and its customer (Sales).
 Out: the sessions spent for good and linked to the sale (`service.session.settled`). Repeating the charge
-with the same key does not spend twice.
+with the same key does not spend twice. Each session keeps **what it is worth**, which does not move again:
+what is left of the price paid ÷ the sessions it has left to deliver, to the cent (half a unit rounds up).
+100.00 € in 3 sessions is 33.33 + 33.34 + 33.33: what is delivered adds up to exactly what was paid, also
+with courtesies, corrections and sessions given back. A voucher given away (0 €) gives 0, and one with no
+limit has nothing to divide by and gives no value. A voucher with an amount that does not say the line that
+charged it gives 0 (SERVICE-F14), like those sold before this figure existed. Sales keeps it on the line for the
+production of whoever does it (SALE-F28).
 If it fails: nothing is charged and the check stays the same if a session is no longer held ("The session
 held from «{name}» is no longer held (its day passed or it was released). Take the voucher off the line
 and apply it again."), or if the sale is not the voucher owner's ("The voucher «{name}» belongs to another
 customer: charge the sale to its owner or take the voucher off the line."). If Services is not active in
 the business, it is not charged either.
-Involved: SALE-F01, SALE-F22, SALE-F27
+Involved: SALE-F01, SALE-F22, SALE-F27, SALE-F28
 
 ### SERVICE-F25 The held session nobody charges comes back on its own
 Status: done (on reading and with the hourly task)
@@ -671,7 +687,8 @@ Steps:
 3. Tap the refund button: the session alone can be given back, with no money.
 In: the sessions spent in that sale (each line of the sale keeps them).
 Out: the session back in the voucher, with who, when and the refund document
-(`service.session.returned`); in **Movements**, **Given back**. It moves no money and issues no
+(`service.session.returned`); in **Movements**, **Given back**. Its share of the price goes back to the
+voucher for the sessions left. It moves no money and issues no
 document; if the voucher has already expired, the session is recorded but cannot be spent until it is
 extended (SERVICE-F18). The same refund repeated gives back a single session.
 If it fails: "That session was already given back by another refund.". If Services is not active in the
@@ -688,8 +705,8 @@ Steps:
    expired.
 3. In **Movements** each one shows as **Given back**, with who voided it, the time and the reason.
 In: the voided sale, who and the reason; the sessions spent in that sale.
-Out: the sessions back in their voucher (`service.session.returned`). It moves no money and issues no tax
-document.
+Out: the sessions back in their voucher (`service.session.returned`), and their share of the price with
+them. It moves no money and issues no tax document.
 If it fails: repeating the void does not give back twice. If Services is not active in the business, the
 sale is not voided and the window says so.
 Involved: SALE-F30
@@ -920,7 +937,7 @@ be followed live.
 | Creates a voucher with its lines | create vouchers | F12 | `service.package.create` |
 | Changes a voucher (only what is sent; not the lines) | edit vouchers | F13 | `service.package.update` |
 | Deletes a voucher from the catalogue | delete vouchers | F13 | `service.package.delete` |
-| Grants a voucher to a customer | grant vouchers | F14 | `service.grant.create` |
+| Grants a voucher to a customer and tells Sales which line paid for it | grant vouchers | F14 | `service.grant.create` |
 | Voids an unused sold voucher | void vouchers | F17 | `service.grant.void` |
 | Gives or takes sessions, or extends the expiry | adjust vouchers | F18 | `service.grant.adjust` |
 | Spends a session | spend sessions | F21 | `service.grant.redeem` |
@@ -982,10 +999,15 @@ with the session of whoever sells, as it does with Inventory.
     `order_line_id`) and it keeps on the line the session it gets back;
   - when undoing it, removing the line, voiding it or deleting the check, `service.session.release` (`id`);
   - when charging, `service.session.settle` (`ids` of the charged lines, `sale_id`, `customer_id` of the
-    sale);
+    sale) and keeps on each line what its session is worth (`value`; empty, on a voucher with no limit);
   - when voiding the sale, `service.session.return` with all its sessions (`reference` = the sale) and,
     when refunding it, with those of the lines that go back (`reference` = the refund).
   To paint the slot, the checkout reads `service.grant.tender_options` (`customer_id`, `service_id`).
+- **The line that sold a voucher (F14, F17)**: the one thing Services asks of Sales, also by name and with the
+  session of whoever grants. `service.grant.create`, with an amount and a sale, calls `sale.sale.voucher_sold`
+  (`sale_id`, `line_id`, `amount`) and keeps in `sale_line_id` the line it answers; `service.grant.void` calls
+  `sale.sale.voucher_unsold` (`line_id`, `amount`). Without Sales in the business there is no figure to keep it
+  out of: it is not called, the voucher keeps no line and its sessions do not count.
   Services keeps the sale and the check's line as opaque identifiers (`sale_id`,
   `order_line_id`): Sales is not a requirement of Services nor Services of Sales.
 

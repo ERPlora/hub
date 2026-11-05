@@ -311,6 +311,8 @@
       "turnOn": "Activar",
       "turnOff": "Desactivar",
       "notNow": "Ahora no",
+      "exclusive": "Solo una respuesta automática puede contestar en tu número: al activar esta se apaga «{other}».",
+      "both": "“{other}” también está encendida: cada mensaje recibe dos respuestas automáticas. Desactiva la que no uses.",
       "onlyOwner": "Solo un dueño o un administrador puede activarlo.",
       "needsApp": "“{name}” necesita la aplicación {apps}.",
       "seeApps": "Ver aplicaciones",
@@ -324,7 +326,18 @@
       "reviewFirst": "Las reviso yo antes",
       "apps": {
         "flow": "Automatizaciones",
+        "appointment": "Citas",
+        "reservation": "Reservas",
         "customer": "Clientes"
+      },
+      "appointments": {
+        "name": "Reservar citas",
+        "explain": "WhatsApp contesta solo: mira los huecos libres, reserva, mueve o anula la cita de la clienta que escribe cuando tú dices que sí y le contesta.",
+        "confirm": "WhatsApp contestará solo: mira los huecos libres, reserva, mueve o anula la cita de la clienta que escribe cuando tú digas que sí y le contesta. ¿Lo activas?",
+        "done": "Listo. Escríbete desde otro móvil: “quiero cita mañana”.",
+        "confirmSelf": "Las citas se confirman solas",
+        "review": "Cada cita nueva te espera en la Agenda con “Confirmar”.",
+        "confirmError": "No se pudo guardar cómo se confirman las citas. Inténtalo otra vez."
       },
       "tables": {
         "name": "Reservar mesa",

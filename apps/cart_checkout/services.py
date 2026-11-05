@@ -55,6 +55,7 @@ from apps.cart_checkout.schemas import (
     OrderOut,
     OrderRefIn,
 )
+from base.business import business_zone
 
 SESSION_TAKEN = _("There is already a cart with that session.")
 CART_NOT_ACTIVE = _("This cart no longer takes changes: it is %(status)s.")
@@ -448,7 +449,7 @@ def initiate_checkout(ctx: OperationContext, data: CheckoutIn) -> dict:
         raise InvalidPayload(
             str(EMAIL_MISSING), code="invalid_field", fields={"customer_email": str(EMAIL_MISSING)}
         )
-    day = timezone.localdate()
+    day = timezone.localdate(timezone=business_zone())
     actor = _actor(ctx)
     order = Order.objects.create(
         cart=cart,
