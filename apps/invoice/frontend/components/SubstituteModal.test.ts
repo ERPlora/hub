@@ -97,6 +97,7 @@ describe('SubstituteModal', () => {
 
     expect(s.inDoc('invoice-substitute-error')).toBeNull();
     expect(taxId.errorText).toBeFalsy();
+    expect(taxId.classList.contains('ion-invalid')).toBe(false);
 
     s.answer(422, refused);
     await click(s.submitButton());
@@ -115,6 +116,7 @@ describe('SubstituteModal', () => {
     const CARD = { customer_id: 'c1', customer_name: 'Estudio Ana SL', customer_tax_id: 'B12345674', customer_address: 'Calle Sol 5, Madrid', customer_country: 'ES' };
     const said = (s: Awaited<ReturnType<typeof setup>>, key: string) =>
       (s.inDoc(`invoice-recipient-${key}`) as (HTMLElement & { errorText?: string }) | null)?.errorText;
+    const red = (s: Awaited<ReturnType<typeof setup>>, key: string) => !!s.inDoc(`invoice-recipient-${key}`)?.classList.contains('ion-invalid');
 
     async function refused() {
       const s = await setup();
@@ -131,6 +133,7 @@ describe('SubstituteModal', () => {
       await settle();
       expect(said(s, 'tax-id')).toBeFalsy();
       expect(said(s, 'address')).toBeFalsy();
+      expect([red(s, 'tax-id'), red(s, 'address')]).toEqual([false, false]);
       expect(s.inDoc('invoice-substitute-error')).toBeNull();
     });
 
@@ -139,6 +142,7 @@ describe('SubstituteModal', () => {
       await ionValue(s.inDoc('invoice-recipient-country'), 'FR');
       expect(said(s, 'tax-id')).toBeFalsy();
       expect(said(s, 'address')).toBe('Write the whole address.');
+      expect([red(s, 'tax-id'), red(s, 'address')]).toEqual([false, true]);
     });
   });
 

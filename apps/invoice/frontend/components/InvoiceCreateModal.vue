@@ -77,6 +77,7 @@ const error = computed<FormModalError | null>(() => {
   const unknownTerritory = defaults.error.value ? { message: t('invoice.create.defaultsFailed') } : null;
   return refusal(command.error.value, t('invoice.create.failed')) ?? unknownTerritory;
 });
+const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'ion-touched': !!message });
 
 async function issue(): Promise<void> {
   if (!ready.value || command.pending.value) return;
@@ -131,7 +132,7 @@ async function issue(): Promise<void> {
           :maxlength="2000"
           :value="notes"
           :error-text="fieldErrors.notes"
-          :class="{ 'ion-invalid': !!fieldErrors.notes, 'ion-touched': !!fieldErrors.notes }"
+          :class="invalid(fieldErrors.notes)"
           @ion-input="notes = String($event.detail.value ?? '')"
         />
         <InvoiceLinesEditor

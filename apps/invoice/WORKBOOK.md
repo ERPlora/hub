@@ -536,8 +536,10 @@ Si falla: un código vacío o con otra forma, un formato sin el año o sin marca
 salto de línea, o un prefijo o formato con tildes o símbolos como º o ª, salen bajo su campo (el número
 es el `NumSerieFactura` de VeriFactu: solo ASCII imprimible); unos números que con la secuencia más ancha
 pasarían de 60 caracteres, «Los números de esta serie no cabrían en 60 caracteres…» bajo el prefijo o el
-formato; un código que ya existe ese año, «Ya hay una serie con ese código ese año.». El mensaje de un
-campo se va en cuanto se corrige ese campo y vuelve si el siguiente intento también se rechaza.
+formato; un código que ya existe ese año, «Ya hay una serie con ese código ese año.». Cada campo
+rechazado, también el tipo de factura, se marca en rojo con su mensaje debajo y arriba sale «Revisa los
+datos marcados.»; el mensaje y la marca de un campo se van en cuanto se corrige ese campo, el aviso de
+arriba en cuanto se cambia algo, y vuelven si el siguiente intento también se rechaza.
 Implicados: ninguno
 
 ### INVOICE-F13 Cambiar una serie

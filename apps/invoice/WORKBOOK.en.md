@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:f6150c0280cc39c87ad6ea3f90153a977949c4e5c66a84b1b41f53d688757b27 -->
+<!-- generated from WORKBOOK.md sha256:1744727d08f2b64dc9ab807176bca2474ab85a347443d2f4fbbb22cdac020f42 -->
 
 ## What it is for and who it is for
 
@@ -514,8 +514,10 @@ placeholder, with a line break, or a prefix or format with accents or symbols su
 their field (the number is VeriFactu's `NumSerieFactura`: printable ASCII only); numbers that with the
 widest sequence would go over 60 characters, "The numbers of this series would not fit in 60 characters…"
 under the prefix or the format; a code that already exists that year, "There is already a series with
-that code that year.". A field's message goes as soon as that field is corrected and comes back if the
-next try is refused too.
+that code that year.". Each refused field, the invoice type too, is marked red with its message under it
+and "Check the highlighted details." shows on top; a field's message and mark go as soon as that field is
+corrected, the notice on top as soon as anything is changed, and they come back if the next try is
+refused too.
 Involved: none
 
 ### INVOICE-F13 Change a series
