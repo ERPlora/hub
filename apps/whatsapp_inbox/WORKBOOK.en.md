@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:2254a1a366b8787c059fb3fe2c68d2d0a440623e2db9838b8f34e24446253b89 -->
+<!-- generated from WORKBOOK.md sha256:dbb74e718190308da2a5fee253e6318ff1a4713ae3e67fd2720b88bddcba1ad6 -->
 
 ## What it is for and who it is for
 
@@ -603,7 +603,7 @@ Steps:
    it proposes booking it with the professional who works at that time; if not, it answers with a short numbered list
    of slots (F19). The assistant never chooses the time for her.
 5. The appointment it wants to book waits for you in Automations, in **Waiting for your answer**, with whom it is
-   for; with **Approve** it is booked and she gets the answer: that the appointment is booked (day, time and
+   for, with whom and which services, by their name ("Services: Haircut"); with **Approve** it is booked and she gets the answer: that the appointment is booked (day, time and
    professional) if the salon confirms by itself, or that she has been put down and the salon will confirm it, as
    F16 says. The appointment is in the Agenda.
 6. With **No**, or if nobody answers within 72 hours, nothing is booked and she is left with the acknowledgement:
