@@ -40,7 +40,7 @@ import secrets
 import socket
 import time
 import unicodedata
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Collection, Iterable, Mapping
 from contextlib import contextmanager
 from contextvars import ContextVar
 from functools import partial
@@ -1959,9 +1959,10 @@ def blueprint_inspect(ctx: OperationContext, data: BlueprintSourceIn) -> dict:
         description=(
             "Loads a template of the catalogue (a restaurant, a hair salon…) into this business: turns on its apps "
             "that are off (with the apps they need, within the plan's limit of apps), then loads its menu or services, "
-            "its tables and the rest of its apps' data, app by app; what is already there is left as it was. Returns "
-            "the report of what went in, with why an app could not be turned on. Never brings people, PINs or fiscal "
-            "data."
+            "its tables and the rest of its apps' data, app by app; what is already there is left as it was. An app "
+            "still being set up («waiting») brings its data by itself when it is ready: nothing to do but say so. "
+            "Returns the report of what went in, with why an app could not be turned on. Never brings people, PINs or "
+            "fiscal data."
         ),
         risk="high",
         asks={
@@ -1979,19 +1980,23 @@ def blueprint_import(ctx: OperationContext, data: BlueprintImportIn) -> dict:
 
     First it turns on the apps the blueprint lists that are off (round 2026-10-27: a hub is born with every app off),
     each through ``base.app.enable`` and in this transaction; one refused (the plan's limit, no right to it) stays
-    off, loads nothing and its report says why. A backup turns on the apps it lists too."""
+    off, loads nothing and its report says why. A backup turns on the apps it lists too. One whose tables its hub's
+    database is still making (``creating``) is waited for: a template's part of it loads when the worker turns it on
+    (``_load_what_waited``); a file is not kept, so its report says to upload it again."""
     with translation.override(ctx.language):
         retried = None
         if data.retry_of is not None:
             retried = ImportBatch.objects.select_for_update().filter(pk=data.retry_of).first()
             if retried is None:
                 raise NotFound(gettext("This load is not there any more."), code="base.import_not_found")
-            blocked = blueprint.retry_state(retried)
+            blocked = blueprint.retry_state(ctx, retried)
             if blocked:
                 code, message = blueprint.RETRY_BLOCKED[blocked]
                 raise Conflict(str(message), code=code)
             bundle, seed = blueprint.open_source(retried.template_key, "")
             apps = list(retried.apps)
+            # What it still waited for (an app whose setup failed) is this load's now: one report, one load of it.
+            _stop_waiting(ctx, [retried], None, blueprint.STOPPED_RETRIED)
         else:
             bundle, seed = blueprint.open_source(data.template, data.file_base64)
             apps = list(dict.fromkeys(data.apps)) if data.apps is not None else []
@@ -1999,7 +2004,11 @@ def blueprint_import(ctx: OperationContext, data: BlueprintImportIn) -> dict:
         # what loads reads its rows, never the cache of the apps off kept before this change.
         with activation.changing(ctx.scope.key):
             refused = _turn_on_listed(ctx, bundle.manifest["apps"], set(apps))
-            applied = blueprint.apply(ctx, bundle, apps=set(apps) if apps else None, refused=refused)
+            waiting = _being_set_up(ctx, bundle.manifest["apps"], set(apps)) - refused.keys()
+            if seed is None:
+                refused |= dict.fromkeys(waiting, str(blueprint.FILE_BEING_SET_UP))
+                waiting = set()
+            applied = blueprint.apply(ctx, bundle, apps=set(apps) if apps else None, refused=refused, waiting=waiting)
         load = ImportBatch.objects.create(
             name=bundle.manifest["name"],
             source=ImportBatch.Source.CATALOG if seed else ImportBatch.Source.FILE,
@@ -2014,7 +2023,7 @@ def blueprint_import(ctx: OperationContext, data: BlueprintImportIn) -> dict:
             retry_of=retried,
         )
         record_event(ctx, events.BLUEPRINT_IMPORTED, {"id": str(load.pk), "status": load.status})
-        return blueprint.describe_load(load)
+        return blueprint.describe_load(ctx, load)
 
 
 @operation(
@@ -2044,6 +2053,7 @@ def import_undo(ctx: OperationContext, data: ImportUndoIn) -> dict:
         if load.undone_at is not None:
             raise Conflict(gettext("This load was undone already."), code="base.import_undone")
         removed = blueprint.undo(ctx, load.created_rows)
+        _stop_waiting(ctx, [load], None, blueprint.STOPPED_UNDONE)
         load.undone_at = timezone.now()
         load.save(update_fields=["undone_at"])
         record_event(ctx, events.IMPORT_UNDONE, {"id": str(load.pk)})
@@ -2411,6 +2421,7 @@ def hub_reset_apply(ctx: OperationContext, data: HubResetApplyIn) -> dict:
     chosen = list(dict.fromkeys(data.apps))
     with translation.override(ctx.language):
         removed = blueprint.reset(ctx, chosen)
+    _stop_waiting(ctx, _waiting_loads(), None, blueprint.STOPPED_RESET)
     record_event(ctx, events.HUB_DATA_RESET, {"apps": chosen})
     return {"apps": removed["apps"]}
 
@@ -4589,16 +4600,57 @@ def _every_app_on(host: str, *, then: Callable[[Callable[[], None]], object] | N
     (then or after_commit)(partial(activation.forget, host))
 
 
+def _wanted(listed: Iterable[str], selected: set[str], graph: dict) -> list[str]:
+    """The apps of a blueprint's manifest a load turns on: those ``selected``, when the person chose some."""
+    return [app for app in dict.fromkeys(listed) if app in graph and (not selected or app in selected)]
+
+
+def _being_set_up(ctx: OperationContext, listed: Iterable[str], selected: set[str]) -> set[str]:
+    """Which of the apps a load turns on its hub's own database is still making the tables of, read from their rows."""
+    states = activation.states_of(ctx.scope)
+    return {app for app in _wanted(listed, selected, activation.module_graph()) if states[app].state == CREATING}
+
+
+def _waiting_loads() -> list[ImportBatch]:
+    """The loads of this business still waiting for an app, oldest first, locked as what is written on them is."""
+    return list(
+        ImportBatch.objects.select_for_update()
+        .filter(report__apps__contains=[{"status": blueprint.WAITING}], undone_at__isnull=True)
+        .order_by("created_at", "id")
+    )
+
+
+def _stop_waiting(ctx: OperationContext, loads: Iterable[ImportBatch], apps: Collection[str] | None, reason: Any) -> None:
+    """``loads`` stop waiting for ``apps`` (``None``: for any): their report says ``reason``, and they load nothing."""
+    for load in loads:
+        waited = [app for app in blueprint.waiting_apps(load) if apps is None or app in apps]
+        if waited:
+            blueprint.stop_waiting(ctx, load, waited, reason)
+            load.save(update_fields=["report", "status", "created_rows"])
+
+
+def _load_what_waited(ctx: OperationContext, on: Iterable[str]) -> None:
+    """The apps ``on`` just went on: what the loads of this business waited to bring of them comes now, in this same
+    transaction (hub#609). Nothing but those rows says what waits: a worker that dies here undid the app going on, and
+    the next one does both, so nothing is lost or left half done. Oldest first: what is there already is left as it is."""
+    on = set(on)
+    for load in _waiting_loads():
+        waited = set(blueprint.waiting_apps(load)) & on
+        if waited:
+            blueprint.finish_waiting(ctx, load, waited)
+            load.save(update_fields=["report", "status", "created_rows"])
+            record_event(ctx, events.BLUEPRINT_IMPORTED, {"id": str(load.pk), "status": load.status})
+
+
 def _turn_on_listed(ctx: OperationContext, listed: Iterable[str], selected: set[str]) -> dict[str, str]:
     """Before a blueprint loads, turn on the apps its manifest lists (only those ``selected``, when the person chose
     some) that are off here, each through ``base.app.enable``: its plan's limit, its rights, what it needs along and
     its event, as if the person turned it on in Apps. Their roots first, chosen, so what they need comes along and
     does not count against the limit (as a vertical's template, ``base.activation.template``); then any listed app
-    still off. An app refused stays off and its reason is returned, by app: the rest are turned on and load. One whose
-    tables its hub's own database is still making (``creating``) loads nothing yet, and its reason says to load again
-    once it is on (the load's «Retry» brings what it left out)."""
+    still off. An app refused stays off and its reason is returned, by app: the rest are turned on and load, or wait
+    for their tables (``creating``: ``_being_set_up``)."""
     graph = activation.module_graph()
-    wanted = [app for app in dict.fromkeys(listed) if app in graph and (not selected or app in selected)]
+    wanted = _wanted(listed, selected, graph)
     roots = activation.roots(set(wanted) | activation.needs(wanted, graph), graph)
     enable = get_operation("base.app.enable")
     blocked = entitlement.blocked_apps(ctx.scope)
@@ -4607,15 +4659,9 @@ def _turn_on_listed(ctx: OperationContext, listed: Iterable[str], selected: set[
         if app not in blocked and activation.states_of(ctx.scope)[app].on:
             continue
         try:
-            answer = enable(ctx, AppChangeIn(app=app))
+            enable(ctx, AppChangeIn(app=app))
         except OperationError as refusal:
             refused[app] = refusal.message
-            continue
-        if answer.state == CREATING:
-            with translation.override(ctx.language):
-                refused[app] = gettext(
-                    "It is being set up for this business. Load the template again in a minute to bring its data."
-                )
     return refused
 
 
@@ -4714,6 +4760,8 @@ def _enable(ctx: OperationContext, data: AppChangeIn) -> dict:
         after_commit(partial(_ring, hub))
     name = events.APP_ACTIVATION_REQUESTED if answer.state == CREATING else events.APP_ENABLED
     record_event(ctx, name, {"app": app, "along": along})
+    if on_now:
+        _load_what_waited(ctx, on_now)
     return _app_answer(app, answer, _named(ctx, along), already=current[app].on)
 
 
@@ -4785,6 +4833,7 @@ def _disable(ctx: OperationContext, data: AppChangeIn) -> dict:
     _write_states(ctx.scope.key, changes)
     along = [label for label in changes if label != app]
     record_event(ctx, events.APP_DISABLED, {"app": app, "along": along})
+    _stop_waiting(ctx, _waiting_loads(), changes, blueprint.STOPPED_TURNED_OFF)
     return _app_answer(app, activation.OFF_ROW, _named(ctx, along), already=False)
 
 
@@ -4948,6 +4997,7 @@ def app_activation_settle(ctx: OperationContext, data: AppActivationSettleIn) ->
             if hub is not None and not hub.is_demo:
                 _sync_photo_blocks(hub, made)
             _record_enabled(ctx, made, current, graph)
+            _load_what_waited(ctx, made)
         if failed:
             kind = {"failed": "schema_failed", "newer_code": "code_behind"}.get(data.outcome, "not_created")
             error = {

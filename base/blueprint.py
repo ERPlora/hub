@@ -39,8 +39,8 @@ import logging
 import re
 import zipfile
 import zlib
-from collections.abc import Callable, Iterator
-from dataclasses import dataclass, field
+from collections.abc import Callable, Iterable, Iterator, Mapping
+from dataclasses import dataclass, field, replace
 from decimal import Decimal, InvalidOperation
 from functools import cache
 from pathlib import Path
@@ -56,7 +56,7 @@ from django.utils.translation import pgettext_lazy
 from live.context import OperationContext
 from live.errors import InvalidPayload, NotFound, OperationError
 from live.meta import module_configs
-from live.operations import get
+from live.operations import atomic, get
 
 from base import activation, images
 from base.catalog import template_apps
@@ -98,6 +98,12 @@ FORMULA_STARTS = ("=", "+", "-", "@", "\t", "\r")
 # Statuses of a dataset and of an app in the report of a load (the screen names each one, hub#1891).
 APPLIED, PARTIAL, ALREADY, FAILED, EMPTY, DISCARDED = "applied", "partial", "already", "failed", "empty", "discarded"
 INACTIVE, UNKNOWN, NOT_SELECTED = "inactive", "unknown", "not_selected"
+# An app of a template its load turned on and its business's database is still making the tables of (hub#609): the load
+# waits for it and brings what is its by itself when the worker turns it on. Only ``waiting`` is kept on the load; how
+# its setup goes (``setup_failed``) is read from the app's row each time, so a retry or a failure is never out of step.
+WAITING, SETUP_FAILED = "waiting", "setup_failed"
+#: The language of who loaded a load that still waits, kept on its report for what the worker writes on it later.
+REPORT_LANGUAGE = "language"
 # Statuses of an app in a blueprint's summary, before loading it: on here, off and turned on by the load, off and left
 # off (only its data names it, or the plan gives no right to it), or not in this hub.
 ON, TURNS_ON = "on", "turns_on"
@@ -113,6 +119,15 @@ REASONS = {
     "too_new": _("The file was made by a newer version of ERPlora. Update this one to load it."),
 }
 SOMETHING_WENT_WRONG = _("Something went wrong loading this part; nothing else was affected.")
+BEING_SET_UP = _("It is being set up for this business. Its data will load by itself as soon as it is ready: you can "
+                 "leave this screen.")
+SETUP_FAILING = _("It could not be set up yet. It keeps trying by itself and its data will load as soon as it works; "
+                  "«Retry what is missing» tries again now.")
+FILE_BEING_SET_UP = _("It is being set up for this business. Upload the file again in a minute to bring its data.")
+STOPPED_TURNED_OFF = _("It was turned off before it was ready, so nothing of it was loaded.")
+STOPPED_UNDONE = _("This load was undone before the app was ready, so nothing of it was loaded.")
+STOPPED_RETRIED = _("A later load took over what was missing from this one.")
+STOPPED_RESET = _("The business was reset before the app was ready, so nothing of it was loaded.")
 NO_NAME = _("A row has no name.")
 CATEGORY_MISSING = _("«%(row)s»: the category «%(category)s» is not there, so it was left without it.")
 ROW_REFUSED = _("«%(row)s»: %(reason)s")
@@ -426,6 +441,8 @@ RETRY_BLOCKED = {
                                                      "different data.")),
     "complete": ("base.import_complete", _("Everything of this load went in: there is nothing to retry.")),
     "undone": ("base.import_undone", _("This load was undone, so there is nothing to retry.")),
+    "waiting": ("base.import_waiting", _("What is missing is coming by itself as soon as its apps are ready: there is "
+                                         "nothing to retry yet.")),
 }
 
 
@@ -515,23 +532,64 @@ def _apps_of(bundle: Bundle) -> list[str]:
     return list(dict.fromkeys(listed))
 
 
-def retry_state(load: Any) -> str:
-    """Why ``load`` (an ``ImportBatch``) cannot be loaded again, or ``""`` when what did not go in can be."""
+def waiting_apps(load: Any) -> list[str]:
+    """The apps whose data ``load`` (an ``ImportBatch``) still waits to bring (hub#609)."""
+    return [app["id"] for app in load.report.get("apps", []) if app["status"] == WAITING]
+
+
+def _states_of_waiting(ctx: OperationContext, load: Any) -> dict[str, activation.Activation]:
+    """How the apps of the business are, read from their rows, when ``load`` waits for any of them; none otherwise."""
+    return activation.states_of(ctx.scope) if waiting_apps(load) else {}
+
+
+def _state_of(states: dict[str, activation.Activation], app: str) -> str:
+    return states.get(app, activation.OFF_ROW).state
+
+
+def retry_state(ctx: OperationContext, load: Any) -> str:
+    """Why ``load`` (an ``ImportBatch``) cannot be loaded again, or ``""`` when what did not go in can be. While an app
+    it waits for is being set up there is nothing to retry; once that failed, retrying tries it again."""
+    return _retry_state(load, _states_of_waiting(ctx, load))
+
+
+def _retry_state(load: Any, states: dict[str, activation.Activation]) -> str:
     if load.undone_at is not None:
         return "undone"
     if load.status == COMPLETE:
         return "complete"
     if not load.template_key:
         return "file"
+    if any(_state_of(states, app) == activation.CREATING for app in waiting_apps(load)):
+        return "waiting"
     seed = template(load.template_key)
     if seed is None or seed.version != load.template_version:
         return "version_gone"
     return ""
 
 
-def describe_load(load: Any) -> dict:
+def _report_read(ctx: OperationContext, report: dict, states: dict[str, activation.Activation]) -> dict:
+    """A load's report as it reads now, in the language of who asks: an app it waits for says how its setup goes."""
+    if not states:
+        return report
+
+    def read(app: dict) -> dict:
+        if app["status"] != WAITING:
+            return app
+        failing = _state_of(states, app["id"]) == activation.FAILED
+        return {
+            **app,
+            "status": SETUP_FAILED if failing else WAITING,
+            "reason": str(SETUP_FAILING if failing else BEING_SET_UP),
+        }
+
+    with translation.override(ctx.language):
+        return {**report, "apps": [read(app) for app in report["apps"]]}
+
+
+def describe_load(ctx: OperationContext, load: Any) -> dict:
     """An ``ImportBatch`` as the screens read it."""
-    blocked = retry_state(load)
+    states = _states_of_waiting(ctx, load)
+    blocked = _retry_state(load, states)
     rows = sum(len(ids) for ids in load.created_rows.values())
     return {
         "id": load.pk,
@@ -546,21 +604,23 @@ def describe_load(load: Any) -> dict:
         "undoable": load.undone_at is None and rows > 0,
         "retry": not blocked,
         "retry_blocked": blocked,
-        "report": load.report,
+        "report": _report_read(ctx, load.report, states),
     }
 
 
 # ── Loading ──────────────────────────────────────────────────────────────────────────────────────────────────────────
 
 
-def apply(ctx: OperationContext, bundle: Bundle, *, apps: set[str] | None,
-          refused: dict[str, str] | None = None) -> Applied:
+def apply(ctx: OperationContext, bundle: Bundle, *, apps: set[str] | None, refused: dict[str, str] | None = None,
+          waiting: Iterable[str] = ()) -> Applied:
     """Load ``bundle`` app by app (only ``apps`` if given), each part on its own, and say what happened to each.
 
     An app this hub does not have, or does not have on, loads nothing and is told, with why it is off when it could
-    not be turned on (``refused``: its reason by app); personal data loads only from a backup. Every dataset's failure
-    stays in it: what it created before failing is kept and counted for undo.
+    not be turned on (``refused``: its reason by app), or that the load waits for it (``waiting``, being set up:
+    :func:`finish_waiting` brings its part); personal data loads only from a backup. Every dataset's failure stays in
+    it: what it created before failing is kept and counted for undo.
     """
+    waiting = set(waiting)
     with translation.override(ctx.language):
         on = active_apps(ctx.scope)
         known = {config.label for config in module_configs()}
@@ -583,18 +643,93 @@ def apply(ctx: OperationContext, bundle: Bundle, *, apps: set[str] | None,
             if loaded.created:
                 created[dataset.key] = loaded.created
             loads[dataset.key] = _dataset_report(dataset, loaded, rows)
-        app_reports = [_app_report(app, bundle, apps, on, known, loads, refused or {}) for app in _apps_of(bundle)]
-        # An app that never goes on in this business, with nothing of it in the blueprint, lost nothing and no retry
-        # would change it: the load is not left unfinished by it (hub#694).
-        rowless = [
-            report["id"]
-            for report in app_reports
-            if report["status"] == INACTIVE and not any(part.key in bundle.data for part in datasets_of(report["id"]))
+        app_reports = [
+            _app_report(app, bundle, apps, on, known, loads, refused or {}, waiting) for app in _apps_of(bundle)
         ]
-        never_here = activation.refusals(rowless, ctx=ctx, hook=activation.CAN_ENABLE)
-        counted = [report for report in app_reports if report["id"] not in never_here]
-        report = {"status": _overall(counted, created), "apps": app_reports, "dropped": list(bundle.dropped)}
+        report = {
+            "status": _load_status(ctx, bundle.data, app_reports, created),
+            "apps": app_reports,
+            "dropped": list(bundle.dropped),
+        }
+        if any(app["status"] == WAITING for app in app_reports):
+            report[REPORT_LANGUAGE] = ctx.language
     return Applied(report=report, created=created)
+
+
+def _load_status(ctx: OperationContext, data: Mapping[str, list[dict]], app_reports: list[dict],
+                 created: Mapping[str, list[str]]) -> str:
+    """How a whole load went. An app that never goes on in this business, with nothing of it in the blueprint, lost
+    nothing and no retry would change it: the load is not left unfinished by it (hub#694)."""
+    rowless = [
+        report["id"]
+        for report in app_reports
+        if report["status"] == INACTIVE and not any(part.key in data for part in datasets_of(report["id"]))
+    ]
+    never_here = activation.refusals(rowless, ctx=ctx, hook=activation.CAN_ENABLE)
+    return _overall([report for report in app_reports if report["id"] not in never_here], created)
+
+
+def _rewrite(ctx: OperationContext, load: Any, data: Mapping[str, list[dict]], changed: Mapping[str, dict],
+             created: Mapping[str, list[str]] | None = None) -> None:
+    """``load`` (an ``ImportBatch``, its caller saves it) with the reports ``changed`` of its apps and the rows
+    ``created`` added to what it created, so its undo removes those too; a load that waits for nothing keeps no
+    language."""
+    apps = [changed.get(app["id"], app) for app in load.report["apps"]]
+    rows = dict(load.created_rows)
+    for key, ids in (created or {}).items():
+        rows[key] = [*rows.get(key, []), *ids]
+    report = {**load.report, "apps": apps, "status": _load_status(ctx, data, apps, rows)}
+    if not any(app["status"] == WAITING for app in apps):
+        report.pop(REPORT_LANGUAGE, None)
+    load.report, load.status, load.created_rows = report, report["status"], rows
+
+
+def _in_its_language(ctx: OperationContext, load: Any) -> OperationContext:
+    """``ctx``, in the language of who loaded ``load``: what is written on it reads as the rest of its report."""
+    return replace(ctx, language=load.report.get(REPORT_LANGUAGE) or ctx.language)
+
+
+def stop_waiting(ctx: OperationContext, load: Any, apps: Iterable[str], reason: Promise) -> None:
+    """``load`` stops waiting for ``apps``: they load nothing, and its report says ``reason``. Retrying it can still
+    bring them. Its caller saves it."""
+    apps = set(apps)
+    ctx = _in_its_language(ctx, load)
+    seed = template(load.template_key)
+    with translation.override(ctx.language):
+        changed = {
+            app["id"]: {**app, "status": INACTIVE, "reason": str(reason)}
+            for app in load.report["apps"]
+            if app["id"] in apps and app["status"] == WAITING
+        }
+    _rewrite(ctx, load, seed.bundle.data if seed else {}, changed)
+
+
+def finish_waiting(ctx: OperationContext, load: Any, apps: Iterable[str]) -> None:
+    """The part of ``load`` that waited for ``apps``, just turned on, loaded and written on it, in the transaction that
+    turned them on (hub#609; its caller saves it). If the template changed meanwhile it loads nothing, as a retry would
+    not: another version could bring different data. One that breaks leaves the apps on and says so on its report: the
+    app is not held back, and retrying the load brings its part."""
+    apps = set(apps)
+    ctx = _in_its_language(ctx, load)
+    seed = template(load.template_key)
+    if seed is None or seed.version != load.template_version:
+        stop_waiting(ctx, load, apps, RETRY_BLOCKED["version_gone"][1])
+        return
+    try:
+        with atomic():
+            applied = apply(ctx, seed.bundle, apps=apps)
+    except Exception:
+        logger.exception("blueprint: what load %s waited for could not be loaded", load.pk)
+        with translation.override(ctx.language):
+            broken = {
+                app["id"]: {**app, "status": FAILED, "reason": str(SOMETHING_WENT_WRONG)}
+                for app in load.report["apps"]
+                if app["id"] in apps
+            }
+        _rewrite(ctx, load, seed.bundle.data, broken)
+        return
+    reports = {app["id"]: app for app in applied.report["apps"] if app["id"] in apps}
+    _rewrite(ctx, load, seed.bundle.data, reports, applied.created)
 
 
 def _dataset_report(dataset: Dataset, loaded: Loaded, rows: list[dict], *, discarded: bool = False) -> dict:
@@ -621,14 +756,14 @@ def _dataset_report(dataset: Dataset, loaded: Loaded, rows: list[dict], *, disca
 
 
 def _app_report(app: str, bundle: Bundle, chosen: set[str] | None, on: frozenset[str], known: set[str],
-                loads: dict[str, dict], refused: dict[str, str]) -> dict:
+                loads: dict[str, dict], refused: dict[str, str], waiting: set[str]) -> dict:
     report = {"id": app, "label": app_label(app), "status": APPLIED, "reason": "", "datasets": []}
     if chosen is not None and app not in chosen:
         report["status"] = NOT_SELECTED
     elif app not in known:
         report["status"] = UNKNOWN
     elif app not in on:
-        report["status"] = INACTIVE
+        report["status"] = WAITING if app in waiting else INACTIVE
         report["reason"] = refused.get(app, "")
     else:
         report["datasets"] = [loads[dataset.key] for dataset in datasets_of(app) if dataset.key in loads]
@@ -648,9 +783,9 @@ def _app_status(statuses: set[str]) -> str:
 
 def _overall(app_reports: list[dict], created: dict[str, list[str]]) -> str:
     statuses = {app["status"] for app in app_reports}
-    if not statuses & {FAILED, PARTIAL, INACTIVE, UNKNOWN}:
+    if not statuses & {FAILED, PARTIAL, INACTIVE, UNKNOWN, WAITING}:
         return COMPLETE
-    if created or statuses & {APPLIED, ALREADY}:
+    if created or statuses & {APPLIED, ALREADY, WAITING}:
         return PARTIAL
     return FAILED
 

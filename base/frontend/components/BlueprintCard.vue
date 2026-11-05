@@ -5,9 +5,9 @@
 // empty), up to four templates, one per kind of business, in the catalogue's order with «Use this one», «See all
 // templates» (Settings › Data) and «Not now», remembered on this device. «Use this one» turns on the template's apps
 // and loads it in one go (`base.blueprint.import`, never people nor fiscal data) and tells how it went in the card:
-// ready, not all of it (what, also an app it could not turn on; «See the report»), not started (why, «Try again») or
-// cut halfway (no retry: part may be in). Once seen, it stays until «Continue» or «Not now», though the business is no
-// longer empty.
+// ready, still waiting for an app being set up (`BlueprintCardPending`: its data comes by itself, hub#609), not all of
+// it (what, also an app it could not turn on; «See the report»), not started (why, «Try again») or cut halfway (no
+// retry: part may be in). Once seen, it stays until «Continue» or «Not now», though the business is no longer empty.
 import { InlineFeedback } from '@erplora/ui/components';
 import { type ApiError, useLive, useLiveClient } from '@erplora/ui/sdk';
 import { useSession } from '@erplora/ui/shell';
@@ -18,7 +18,8 @@ import { useRouter } from 'vue-router';
 import { sessionChanged } from '../lib/access';
 import { cardOutcome, cardTemplates } from '../lib/data';
 import { useBaseI18n } from '../lib/i18n';
-import type { Template } from '../operations';
+import type { ImportRow, Template } from '../operations';
+import BlueprintCardPending from './BlueprintCardPending.vue';
 import '../home.css';
 
 /** «Not now» on this device (the old hub forgot it on reload: a defect of HUB_SHELL-F26). */
@@ -27,6 +28,7 @@ const DATA_PAGE = '/settings#data';
 
 type Outcome =
   | { kind: 'ready' | 'partial' | 'failed'; missing: string[] }
+  | { kind: 'pending'; load: ImportRow }
   | { kind: 'not-started'; reason: string; template: Template }
   | { kind: 'cut' };
 
@@ -114,7 +116,12 @@ async function use(template: Template): Promise<void> {
       v-else-if="outcome"
       data-testid="blueprint-card-outcome"
     >
-      <template v-if="outcome.kind === 'ready'">
+      <BlueprintCardPending
+        v-if="outcome.kind === 'pending'"
+        :load="outcome.load"
+        @settled="outcome = cardOutcome($event)"
+      />
+      <template v-else-if="outcome.kind === 'ready'">
         <h3 class="blueprint-card-heading">
           {{ t('base.blueprintCard.readyTitle') }}
         </h3>
@@ -232,17 +239,6 @@ async function use(template: Template): Promise<void> {
 </template>
 
 <style scoped>
-.blueprint-card-heading {
-  margin: 0 0 4px;
-  font-size: 1rem;
-  font-weight: 600;
-}
-
-.blueprint-card-text {
-  margin: 0 0 12px;
-  color: var(--ion-color-medium);
-}
-
 .blueprint-card-list {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -284,12 +280,5 @@ async function use(template: Template): Promise<void> {
   flex-wrap: wrap;
   gap: 8px;
   margin-top: 12px;
-}
-
-.blueprint-card-busy {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0;
 }
 </style>
