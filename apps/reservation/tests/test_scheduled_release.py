@@ -1,6 +1,6 @@
 """RESERVATION-F13 as the worker runs it: ``reservation.reservation.release_unconfirmed`` through
-``base.scheduler`` every quarter of an hour, as the system on the scope it is given: here the suite's stand-in; the
-worker's pass over the businesses, on each one's own (``base/tests/test_scheduled_task_notice_channel.py``). A pending reservation whose time passed more than the window (15 minutes) is cancelled as
+``base.scheduler`` every quarter of an hour, as the system on the worker's scope (phase 1: one scope, the
+bookings are shared). A pending reservation whose time passed more than the window (15 minutes) is cancelled as
 «unconfirmed» with one event that says how many; one still inside its window, a confirmed one and one of
 tomorrow stay as they were; the next quarter, with nothing new, releases nothing and says nothing.
 """

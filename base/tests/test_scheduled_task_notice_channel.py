@@ -2,8 +2,10 @@
 the hub it belongs to, never on the worker's fixed scope (``WORKER_SCOPE_SLUG``, the platform hub in production).
 
 In a hub with its own database the worker runs its tasks in that database and on its scope (``base.worker._hubs``,
-review of hub#471 C1; S3): a schedule of Flows firing at its time is told to that hub's live queries (its History open on
-a screen re-runs without reloading). Real databases: the session's ``hub_a``, committed (``transaction=True``).
+review of hub#471 C1; S3): a schedule of Flows firing at its time, or the carts Cart and checkout expires
+(CART_CHECKOUT-F07), is told to that hub's live queries and to no other's (its History or its list of carts open on a
+screen re-runs without reloading). Real databases: the session's ``hub_a`` and ``hub_b``, committed
+(``transaction=True``).
 """
 
 import datetime as dt
@@ -79,28 +81,6 @@ def test_a_flow_schedule_fired_by_the_worker_is_told_on_its_hubs_channel(hub_a, 
     assert flow_notices, f"the fired schedule was told to nobody: {told}"
     assert {key for key, _ in flow_notices} == {hub_a.slug}
     assert settings.WORKER_SCOPE_SLUG not in {key for key, _ in told}
-
-
-def test_a_reservation_released_by_the_worker_is_told_on_its_hubs_channel_and_no_other(hub_a, hub_b, told):
-    # RESERVATION-F13, hub#551: the book open in that business re-runs at once; the other's hears nothing.
-    from apps.reservation.events import RESERVATION_UNCONFIRMED_RELEASED
-    from apps.reservation.models import Reservation
-
-    now = timezone.now()
-    booking = {"time": dt.time(12, 0), "guest_name": "Ana", "party_size": 2, "duration_minutes": 120}
-    with use_hub(hub_b):
-        stale = Reservation.objects.create(date=now.date() - dt.timedelta(days=2), **booking)
-    with use_hub(hub_a):
-        still_ahead = Reservation.objects.create(date=now.date() + dt.timedelta(days=2), **booking)
-
-    tasks_run_by_the_worker(now)
-
-    with use_hub(hub_b):
-        assert Reservation.objects.get(pk=stale.pk).status == Reservation.Status.CANCELLED
-    with use_hub(hub_a):
-        assert Reservation.objects.get(pk=still_ahead.pk).status == Reservation.Status.PENDING
-    assert told_to(told, RESERVATION_UNCONFIRMED_RELEASED) == {hub_b.slug}
-    assert "reservation.reservation.list" in live_registry.affected([RESERVATION_UNCONFIRMED_RELEASED])
 
 
 def test_carts_expired_by_the_worker_are_told_on_their_hubs_channel_and_no_other(hub_a, hub_b, told):
