@@ -2882,7 +2882,9 @@ Implicados: HUBS-F17, WEBSITE-F10
   (`custom_domain`: minúsculas, sin puerto, sin punto final, en su forma ASCII; `null`, vacío o ausente, ninguno, porque la
   foto es entera), que lo guarda en `Hub.custom_domain`, y nunca se le pregunta por petición. Cada proceso guarda en memoria qué
   dominio es de quién y lo relee cada 30 s (al momento en el proceso que aplicó la foto): un host desconocido sigue siendo
-  el 400 de `CommonMiddleware` **sin una sola lectura**, y uno de los hosts del Hub ni pregunta. Un host conocido se
+  el 400 de `CommonMiddleware` **sin una sola lectura** y sin línea en el registro (hub#817: `django.security.DisallowedHost`
+  va a un `NullHandler` en `LOGGING`; el 400 queda en la línea de acceso de daphne y cualquier otro `django.security` sigue
+  en ERROR; `config/tests/test_security_logging.py`), y uno de los hosts del Hub ni pregunta. Un host conocido se
   responde en ese middleware, antes de `CommonMiddleware`, y no sigue por la cadena: `/` (la web, `base.public_home`),
   `/p/media/<su id>/` (sus imágenes públicas) y `/.well-known/erplora-hub` (la sonda del SaaS: `{"hub_id": …}`, sin lectura);
   cualquier otra ruta es 404 sin lectura, `/api` con su sobre, y nunca se lee la sesión. La página y sus imágenes releen la
