@@ -1,21 +1,20 @@
 <script setup lang="ts">
 // Kitchen → Settings (WORKBOOK «Pantallas · Ajustes»; KITCHEN-F26): the old settings tab, only for whoever
 // may save them (`kitchen.change_settings`). The values come live (`kitchen.settings.get`: the factory ones
-// until the business saves); a change saved elsewhere repaints every field the person has not touched, and
-// «Save» sends only the fields touched and changed (`kitchen.settings.update`), so it never undoes someone
-// else's change. «Test sound» rings the tone and volume on screen. A refusal goes under its field.
-// A refusal says itself as a FormModal does (`useRefusal`, hub#854): its notice goes as soon as something is
-// changed, each field's message as soon as that field is, and the next refusal says it all again.
-import { InlineFeedback, useRefusal } from '@erplora/ui/components';
+// until the business saves). The form is every settings page's (`useSettingsForm`, hub#867): a change saved
+// elsewhere repaints every field the person has not touched, «Save» sends only the fields touched and changed
+// (`kitchen.settings.update`), so it never undoes someone else's change, and a refusal says itself as a
+// FormModal does, under its field. «Test sound» rings the tone and volume on screen.
+import { InlineFeedback, useSettingsForm } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { IonButton, IonInput, IonSelect, IonSelectOption, IonSpinner, IonToggle } from '@ionic/vue';
-import { computed, ref, watch } from 'vue';
+import { computed } from 'vue';
 
 import PageNotices from '../components/PageNotices.vue';
 import { useT } from '../composables/useT';
 import { Chime, CHIME_TONES } from '../lib/chime';
-import type { OrderType, SettingsOut, SettingsPatchIn, SoundTone } from '../operations';
+import type { OrderType, SettingsOut, SoundTone } from '../operations';
 import { kitchenTabs } from '../tabs';
 
 const TOGGLES = ['show_timer', 'color_coding', 'sound_enabled', 'print_pass', 'works_from_screen'] as const;
@@ -44,14 +43,12 @@ const { data, status, error, refresh } = useLive('kitchen.settings.get', {});
 const loadFailed = computed(
   () => status.value === 'error' && !!error.value && error.value.code !== 'app_inactive' && error.value.code !== 'permission_denied',
 );
-const { run, pending, error: saveError } = useCommand('kitchen.settings.update');
-const { fieldErrors, showsError, changed } = useRefusal(saveError);
+const { form, dirty, saved, pending, error: saveError, fieldErrors, showsError, set, save } = useSettingsForm(
+  data,
+  useCommand('kitchen.settings.update'),
+  { toForm, numbers: NUMBERS },
+);
 const chime = new Chime();
-
-const form = ref<Form | null>(null);
-const original = ref<Form | null>(null);
-const touched = ref<ReadonlySet<keyof Form>>(new Set());
-const saved = ref(false);
 
 function toForm(settings: SettingsOut): Form {
   return {
@@ -68,64 +65,12 @@ function toForm(settings: SettingsOut): Form {
   };
 }
 
-const changes = computed<SettingsPatchIn>(() => {
-  const now = form.value;
-  const was = original.value;
-  if (!now || !was) return {};
-  const out: Record<string, unknown> = {};
-  for (const key of touched.value) {
-    const value = now[key];
-    const text = typeof value === 'string' ? value.trim() : value;
-    if (text === was[key]) continue;
-    out[key] = typeof text === 'string' && /^\d+$/.test(text) ? Number(text) : text;
-  }
-  return out as SettingsPatchIn;
-});
-const dirty = computed(() => Object.keys(changes.value).length > 0);
-
-watch(
-  data,
-  (settings) => {
-    if (!settings) return;
-    const fresh = toForm(settings);
-    const current = form.value;
-    original.value = fresh;
-    form.value = current
-      ? (Object.fromEntries(
-          Object.keys(fresh).map((key) => [key, touched.value.has(key as keyof Form) ? current[key as keyof Form] : fresh[key as keyof Form]]),
-        ) as Form)
-      : { ...fresh };
-  },
-  { immediate: true },
-);
-
-function set<K extends keyof Form>(field: K, value: Form[K]): void {
-  if (!form.value) return;
-  form.value = { ...form.value, [field]: value };
-  touched.value = new Set([...touched.value, field]);
-  saved.value = false;
-  changed(field);
-}
-
 const text = (value: unknown): string => (value === null || value === undefined ? '' : String(value));
 const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'ion-touched': !!message });
 
 function testSound(): void {
   if (!form.value) return;
   chime.play({ tone: form.value.sound_tone, volume: Number(form.value.sound_volume) || 0 });
-}
-
-async function save(): Promise<void> {
-  if (!dirty.value || pending.value) return;
-  try {
-    const answer = await run(changes.value);
-    original.value = toForm(answer);
-    form.value = toForm(answer);
-    touched.value = new Set();
-    saved.value = true;
-  } catch {
-    saved.value = false; // The page paints the error; what was typed stays.
-  }
 }
 </script>
 
