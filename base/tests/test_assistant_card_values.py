@@ -650,13 +650,13 @@ def test_a_mark_is_checked_at_start(monkeypatch, write, why):
 
 
 def naming(of: object, *, kind: type = str) -> Operation:
-    """A write whose lines carry a record by its id (one marked ``refers``, one only an id), a note, and a datum marked
-    as the name a person says of the record ``of`` names (``name_of``), of the type ``kind``; beside them, at the top,
-    a customer by her id."""
+    """A write whose lines carry a record by its id, one by another text its mark reads (``refers``), a note, and a
+    datum marked as the name a person says of the record ``of`` names (``name_of``), of the type ``kind``; beside them,
+    at the top, a customer by her id."""
 
     class NamedLineIn(Schema):
         thing_id: UUID | None = None
-        person_id: UUID | None = Field(
+        person: str | None = Field(
             None, json_schema_extra={"refers": {"read": "base.person.detail", "by": "person", "name": "name"}}
         )
         note: str | None = None
@@ -687,7 +687,7 @@ def test_the_name_marks_of_every_app_are_sound():
     assert name_errors() == []
 
 
-@pytest.mark.parametrize("of", ["thing_id", "person_id"])
+@pytest.mark.parametrize("of", ["thing_id", "person"])
 def test_a_name_of_a_record_of_its_own_line_is_sound(monkeypatch, of):
     """A record by its id, or marked ``refers``: the card says the line by the name when the record is not there."""
     write = naming(of)
