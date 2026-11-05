@@ -120,6 +120,18 @@ def test_the_card_names_the_zone_of_the_table_and_leaving_a_reservation_without_
     assert labels(assistant.card(update, {"zone": "Terraza", "no_table": True}, "en")) == ["Zone", "No table"]
 
 
+def test_the_card_names_where_a_reservation_came_from_and_the_email_rule_as_reservas_screens_do():
+    """The card names a reservation's source and the rule that asks for an email by Reservas' models, with the words
+    of its form and its settings («Origen», «Correo obligatorio»); not with Citas' «reservada por» or Reservas
+    online's «email obligatorio», apps loaded before it that say the same English (hub#548)."""
+    create = get("reservation.reservation.create")
+    rules = get("reservation.settings.update")
+    assert labels(assistant.card(create, {"source": "phone"}, "es")) == [SCREENS["form"]["source"]]
+    assert labels(assistant.card(rules, {"require_email": True}, "es")) == [SCREENS["settings"]["requireEmail"]]
+    assert labels(assistant.card(create, {"source": "phone"}, "en")) == [SCREENS_EN["form"]["source"]]
+    assert labels(assistant.card(rules, {"require_email": True}, "en")) == [SCREENS_EN["settings"]["requireEmail"]]
+
+
 @pytest.mark.django_db
 def test_the_card_names_the_customer_a_channel_acts_for():
     """WhatsApp changing or cancelling the guest's own reservation: on behalf of her customer card, said by its name.
