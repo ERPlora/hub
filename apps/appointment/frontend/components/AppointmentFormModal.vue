@@ -4,12 +4,13 @@
 // the Services in order (only bookable ones), the Professional (only who does them all: the server's rule
 // read through Services and Staff), the Day and the Time (with the «Free times»), the Min. (the services'
 // sum unless typed) and the notes. The Min. and the Total are the professional's own for each service
-// (Services · «Who does it»), the catalog's where she has none — what the server books. «Add appointment» books it. «Edit appointment» comes filled in, sends
+// (Services · «Who does it»), the catalog's where she has none — what the server books; the Total is in the
+// business's money (BASE-F50: «65,00 zł» in Poland, the figure alone until it answers). «Add appointment» books it. «Edit appointment» comes filled in, sends
 // only what changed (`appointment.appointment.update`) and shows the history below; a series occurrence
 // first asks «This appointment only» / «This and all following» (the latter edits the series from its
 // date). An overlap asks first (409 `appointment.overlap_needs_confirmation`: «Book anyway» sends it again
 // confirmed); any other refusal goes on top, a bad field under it, and what was typed stays.
-import { Combo, type ComboOption, ConfirmDialog, FormModal, formatMoney, InlineFeedback } from '@erplora/ui/components';
+import { Combo, type ComboOption, ConfirmDialog, FormModal, InlineFeedback } from '@erplora/ui/components';
 import { type ApiError, useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { IonButton, IonInput, IonTextarea } from '@ionic/vue';
 import { computed, ref, shallowRef, watch } from 'vue';
@@ -17,7 +18,7 @@ import { computed, ref, shallowRef, watch } from 'vue';
 import CustomerSearch, { type CustomerSnapshot } from '../../../customer/frontend/components/CustomerSearch.vue';
 import { useLocale, useT } from '../composables/useT';
 import { dayOf, timeOf, wallInput } from '../lib/clock';
-import { APPOINTMENT_MONEY } from '../lib/format';
+import { formatMoney, useBusinessMoney } from '../lib/format';
 import { describeUpdate } from '../lib/outcome';
 import { eligibleStaff, ownTerms, type ServiceFacts, type Terms } from '../lib/pickers';
 import type { AppointmentOut, RecurringUpdateIn, UpdateIn } from '../operations';
@@ -52,6 +53,7 @@ const open = defineModel<boolean>('open', { default: false });
 const t = useT();
 const locale = useLocale();
 const client = useLiveClient();
+const money = useBusinessMoney();
 
 const facts = new Map<string, ServiceFacts>();
 /** The chosen professional's own terms for the chosen services (empty: the catalog's, or as booked). */
@@ -354,7 +356,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
             v-if="services.length"
             class="appointment-form__total"
             data-testid="appointment-form-total"
-          >{{ $t('appointment.form.total') }}: {{ formatMoney(total, locale, APPOINTMENT_MONEY) }}</small>
+          >{{ $t('appointment.form.total') }}: {{ formatMoney(total, locale, money) }}</small>
         </div>
         <Combo
           testid="appointment-form-staff"
