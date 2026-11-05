@@ -12,7 +12,7 @@
 // on and run (F18). What a run creates is tagged `E2E FlowF` (plus the ids of the cards it used) and goes.
 import { type Browser, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, login, psql, shot, shown } from './helpers';
+import { A, api, capture, login, psql, shot, shown } from './helpers';
 import { noHorizontalScroll, settled, VIEWPORTS } from './schedule-helpers';
 import { pick, rowAction } from './task-helpers';
 
@@ -478,8 +478,7 @@ for (const viewport of VIEWPORTS) {
         await expect(page.locator(`[data-testid="flow-step-action-s1-option-${action}"]`)).toContainText(words);
       }
       await noHorizontalScroll(page, viewport.label);
-      await settled(page);
-      await page.screenshot({ path: shot(`FIX-FLOW-SALE-SECTION-WORD-steps-${viewport.label}`) });
+      await capture(page, `FIX-FLOW-SALE-SECTION-WORD-steps-${viewport.label}`);
       await page.locator('[data-testid="flow-step-action-s1-option-sale.department.update"]').click();
       await choose(page, 'flow-step-addinfo-s1', 'Sección');
       await expect(editor.locator('[data-testid=flow-step-param-s1-department]')).toContainText('Sección');
