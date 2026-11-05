@@ -41,6 +41,9 @@ const SIZES: readonly Size[] = [
   // Measured beside them: an iPad on its side and a 720p laptop, with the strip.
   { label: '1024x768', width: 1024, height: 768, strip: true, kind: 'short' },
   { label: '1280x720', width: 1280, height: 720, strip: true, kind: 'short' },
+  // That iPad in a browser, under its address bar and tabs: the highest column where a line did not fit in Spanish
+  // (332 px, 110 for the line), whatever the strip does.
+  { label: '1024x672', width: 1024, height: 672, strip: false, kind: 'short' },
   // The lowest columns where a line fits (343 and 360 px: 137 and 138 for the lines), and the desktop.
   { label: '1280x800', width: 1280, height: 800, strip: true, kind: 'roomy' },
   { label: '1024x700', width: 1024, height: 700, strip: false, kind: 'roomy' },
