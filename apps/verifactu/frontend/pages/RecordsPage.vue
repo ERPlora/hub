@@ -200,37 +200,49 @@ function onAction({ actionId, row }: { actionId: string; row: RecordRowOut }): v
       @retry="refresh()"
     >
       <template #status="{ row }">
-        <span class="verifactu-records__status">
-          <StatusPill
-            size="sm"
-            :tone="statusTone(row.status)"
-            :label="$t(`verifactu.status.${row.status}`)"
-            data-testid="verifactu-records-status"
-          />
-          <!-- The link is its own: a click or an Enter on it never opens the row's (rejected) record. -->
+        <!-- The status and, by a rejection, its correction are the cell's own things: the cell puts them side by side
+             or one under the other; the space keeps them apart where they flow as text (a card). -->
+        <StatusPill
+          size="sm"
+          :tone="statusTone(row.status)"
+          :label="$t(`verifactu.status.${row.status}`)"
+          data-testid="verifactu-records-status"
+        />
+        <template v-if="row.correction_status === 'corrected' && row.corrected_by_id">
+          {{ ' ' }}
+          <!-- The link keeps its click and its keys: the row it sits in opens the rejected record on Enter and Space
+               (hub#865). As tall as its pill (`ion-display-inline-flex`): a plain inline box would drop it below. -->
           <router-link
-            v-if="row.correction_status === 'corrected' && row.corrected_by_id"
-            class="verifactu-records__corrected"
+            v-slot="{ href, navigate }"
+            custom
             :to="`/verifactu/records/${row.corrected_by_id}`"
-            :aria-label="$t('verifactu.records.correction.correctedLink')"
-            data-testid="verifactu-records-correction-corrected"
-            @click.stop
-            @keydown.enter.stop
           >
-            <StatusPill
-              size="sm"
-              tone="success"
-              :label="$t('verifactu.records.correction.corrected')"
-            />
+            <a
+              class="ion-display-inline-flex"
+              :href="href"
+              :aria-label="$t('verifactu.records.correction.correctedLink')"
+              data-testid="verifactu-records-correction-corrected"
+              @click.stop="navigate"
+              @keydown.enter.stop
+              @keydown.space.prevent.stop="navigate()"
+            >
+              <StatusPill
+                size="sm"
+                tone="success"
+                :label="$t('verifactu.records.correction.corrected')"
+              />
+            </a>
           </router-link>
+        </template>
+        <template v-else-if="row.correction_status === 'pending'">
+          {{ ' ' }}
           <StatusPill
-            v-else-if="row.correction_status === 'pending'"
             size="sm"
             tone="warning"
             :label="$t('verifactu.records.correction.pending')"
             data-testid="verifactu-records-correction-pending"
           />
-        </span>
+        </template>
       </template>
       <template #environment="{ row }">
         <StatusPill
@@ -251,23 +263,3 @@ function onAction({ actionId, row }: { actionId: string; row: RecordRowOut }): v
   </AppPage>
 </template>
 
-<style scoped>
-/* The status and, under a rejection, its correction: side by side, or one under the other in a narrow cell. */
-.verifactu-records__status {
-  display: inline-flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.25rem;
-  max-width: 100%;
-}
-.verifactu-records__corrected {
-  display: inline-flex;
-  max-width: 100%;
-  text-decoration: none;
-  border-radius: var(--ep-radius-pill, 999px);
-}
-.verifactu-records__corrected:focus-visible {
-  outline: 2px solid var(--ep-primary, var(--ion-color-primary, #0054e9));
-  outline-offset: 2px;
-}
-</style>
