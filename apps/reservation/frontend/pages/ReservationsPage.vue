@@ -4,7 +4,8 @@
 // and its figures (`reservation.availability.day`, live); the list follows the live
 // `reservation.reservation.list` of that day by time — or, searching a guest's name, phone or email, the
 // whole book in calendar order (the old module's rule). Columns Date, Time, Guest, Phone, Party, Table and
-// Status, filters by time, guest, phone, party and status, list or cards, 50 a page. «New reservation» and a
+// Status (a cancelled one says why next to it, F09 and F13), filters by time, guest, phone, party and
+// status, list or cards, 50 a page. «New reservation» and a
 // row open the booking panel; per row Confirm, Seat (it seats the table and opens its check), Complete,
 // Cancel and No-show (asking first), Edit and Delete (the owner and the admin), as its status allows.
 import {
@@ -18,7 +19,7 @@ import {
 } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
-import { IonButton } from '@ionic/vue';
+import { IonButton, IonNote } from '@ionic/vue';
 import { computed, onBeforeUnmount, onMounted, ref, shallowRef, watch } from 'vue';
 
 import { formatPhone } from '../../../customer/frontend/lib/phoneDisplay';
@@ -30,7 +31,7 @@ import { useLiveList } from '../composables/useLiveList';
 import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
 import { formatShortDate, formatTime, todayIn, wallNowIn } from '../lib/clock';
-import { allows, type RowAction, statusTone } from '../lib/states';
+import { allows, cancellationNote, type RowAction, statusTone } from '../lib/states';
 import type { ReservationOut, ReservationStatus } from '../operations';
 import { reservationTabs } from '../tabs';
 
@@ -303,6 +304,12 @@ function onAction({ actionId, row }: { actionId: string; row: ReservationOut }):
           :tone="statusTone(row.status)"
           :label="$t(`reservation.status.${row.status}`)"
         />
+        <ion-note
+          v-if="cancellationNote(row, t)"
+          data-testid="reservation-list-reason"
+        >
+          {{ cancellationNote(row, t) }}
+        </ion-note>
       </template>
       <template #empty>
         <EmptyState
