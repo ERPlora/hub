@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:b54f76a78f8e2ba06eb9cae82b3a9c1b8e0b00bb8ff00f5001309f956b5df880 -->
+<!-- generated from WORKBOOK.md sha256:ae06cf98d09034c8e011b3eec1b3921976e896b2fa68d9692e44b48c54aad8cc -->
 
 ## What it is for and who it is for
 
@@ -2407,8 +2407,10 @@ Steps:
      one after another ("Printers: Till, Kitchen"; past four, the first three and how many more: "Till, Kitchen, Bar and
      2 more"; when an item carries a comma, such as a date, separated by semicolons: "Nov 2, 2026, 10:00 AM; Nov 9,
      2026, 10:00 AM"); a list of lines that carry only their record, such as the services of an appointment, the same
-     way, by the name of each ("Services: Haircut, Colour"; one that cannot be named counts among the "more"); and any
-     other, such as the lines of a sale (with their quantity and price) or a list of codes, by how many items it carries; and a datum that groups others, such as a WhatsApp template, by its values, without the name of each one ("Template:
+     way, by the name of each ("Services: Haircut, Colour"; one that cannot be named counts among the "more"), also
+     when the assistant sends a service by its name because it does not know which one it is ("Services: Colour"; when
+     it sends the service and a name as well, it says the service that is booked); and any other, such as the lines of
+     a sale (with their quantity and price) or a list of codes, by how many items it carries; and a datum that groups others, such as a WhatsApp template, by its values, without the name of each one ("Template:
      cita_recordatorio · es · Ana, 10:00"; of a till count, the notes and coins counted remain: "50: 2"). A date and a
      time show as they are written in the person's language and at the business's hour ("Nov 2, 2026, 10:00 AM"; a day
      alone, "Nov 2, 2026"; a time alone, "9:30 PM"); a value of a closed list, with the name its app gives it ("Front

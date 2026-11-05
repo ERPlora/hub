@@ -2523,8 +2523,10 @@ Pasos:
      de cuatro, los tres primeros y cuántos más: «Caja, Cocina, Barra y 2 más»; si un elemento lleva coma, como una
      fecha, separados por punto y coma: «2 nov 2026, 10:00; 9 nov 2026, 10:00»); una lista de líneas que solo llevan
      su registro, como los servicios de una cita, igual, por el nombre de cada uno («Servicios: Corte de pelo, Tinte»;
-     uno que no se puede nombrar cuenta entre los «más»); y cualquier otra, como las líneas de una venta (con su
-     cantidad y su precio) o una lista de códigos, por cuántos elementos lleva; y un dato que agrupa otros, como la plantilla de un WhatsApp, por sus
+     uno que no se puede nombrar cuenta entre los «más»), también cuando el asistente manda un servicio por su nombre
+     porque no sabe cuál es («Servicios: Tinte»; si manda el servicio y además un nombre, dice el servicio que se
+     reserva); y cualquier otra, como las líneas de una venta (con su cantidad y su precio) o una lista de códigos, por
+     cuántos elementos lleva; y un dato que agrupa otros, como la plantilla de un WhatsApp, por sus
      valores, sin el nombre de cada uno («Plantilla: cita_recordatorio · es · Ana, 10:00»; del recuento de una caja
      quedan los billetes y monedas contados: «50: 2»). Una fecha y una hora salen como se escriben en el idioma
      de la persona y a la hora del negocio («2 nov 2026, 10:00»; un día solo, «2 nov 2026»; una hora sola,
