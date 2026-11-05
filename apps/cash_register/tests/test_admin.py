@@ -16,6 +16,8 @@ from apps.cash_register.models import (
     Settings,
 )
 
+from .conftest import open_session
+
 MODELS = [Settings, Register, Session, SessionCounter, Movement, Count]
 DATES = ("created_at", "updated_at", "opened_at", "closed_at", "counted_at")
 
@@ -55,6 +57,23 @@ def test_ids_and_dates_are_read_only():
         for field in DATES:
             if any(f.name == field for f in model._meta.get_fields()):
                 assert field in readonly, (model.__name__, field)
+
+
+@pytest.mark.django_db
+def test_the_sessions_list_in_spanish_says_open_as_the_cash_register_does(client, superuser):
+    """An open session reads «Abierta», as Caja's own screens and WORKBOOK say it, next to the «Cerrada» of its
+    filter; not «Abierto», demo's Spanish of the same English (hub#660)."""
+    open_session()
+    client.force_login(superuser)
+    response = client.get(
+        "/admin/cash_register/session/", HTTP_HOST="hubs.localhost", HTTP_ACCEPT_LANGUAGE="es"
+    )
+    assert response.status_code == 200
+    page = response.content.decode()
+    assert 'status__exact=closed">Cerrada</a>' in page  # the page is in Spanish: the filter's other status
+    assert 'status__exact=open">Abierta</a>' in page  # the filter
+    assert '<td class="field-status">Abierta</td>' in page  # the open session's row
+    assert "Abierto" not in page
 
 
 def test_a_session_shows_its_movements_and_counts():
