@@ -120,9 +120,12 @@ def test_a_moment_is_said_in_the_zone_of_the_business_the_person_works_in():
 
 def test_what_is_no_moment_no_value_of_its_list_or_no_id_is_shown_as_sent():
     """The write refuses it with its reason; the card makes nothing up, nor hides it."""
-    arguments = {**BOOKING, "start": "mañana a las 10", "source": "carrier pigeon", "staff_id": "Ana"}
+    arguments = {**BOOKING, "start": "mañana a las 10", "source": "carrier pigeon"}
     shown = values(assistant.card(get("appointment.appointment.create"), arguments, "es"))
-    assert (shown["start"], shown["source"], shown["staff_id"]) == ("mañana a las 10", "carrier pigeon", "Ana")
+    assert (shown["start"], shown["source"]) == ("mañana a las 10", "carrier pigeon")
+    # A reference no mark names, with no id in it (Citas names its professional by its mark: hub#514).
+    visit = {"staff_id": "Ana", "start": "2026-11-02T10:00:00+01:00", "source": "phone"}
+    assert values(assistant.card(VISITS, {"first": visit}, "es"))["first"]["staff_id"] == "Ana"
 
 
 # ── A record named by its id ──────────────────────────────────────────────────────────────────────────────────────────
@@ -353,7 +356,7 @@ def test_no_list_of_texts_sent_as_they_are_is_named():
 #: them out. An attempt key (``attempt_key``) is no reference. Only ever lower: an app that marks its own lowers its
 #: number here, and none comes in.
 UNNAMED_REFERENCES = {
-    "appointment": 25,
+    "appointment": 12,
     "combo": 25,
     "customer": 22,
     "demo": 3,

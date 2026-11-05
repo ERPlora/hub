@@ -55,7 +55,8 @@ live("base.plan.usage", on=[HUB_STATE_APPLIED, HUB_USAGE_MEASURED])
 # A load, an undo or a reset re-runs the Home (above: BASE-G131, the Home up to date without reloading), the catalogue
 # (the Home's card asks whether the business is still empty) and the list of loads of Settings › Data.
 live("base.blueprint.list", on=sorted({HUB_STATE_APPLIED, *DATA_EVENTS}))
-live("base.import.list", on=sorted(DATA_EVENTS))
+# A load that waits for an app says how its setup goes (hub#609): the list follows the apps too.
+live("base.import.list", on=sorted({*DATA_EVENTS, *APP_EVENTS}))
 # The copies of the business's data and its last reset (round 2026-10-30 of PLAN-DB, decision 2): each step of a reset
 # the worker takes (copying, emptying, failed; a copy made), and the reset done.
 live("base.hub.dumps", on=sorted([HUB_RESET_PROGRESSED, HUB_DATA_RESET]))

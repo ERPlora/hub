@@ -629,7 +629,17 @@ DatasetStatus = Literal["applied", "partial", "already", "failed", "empty", "dis
 #: How an app of a load went: a dataset's statuses, or «inactive» (not on here), «unknown» (this hub does not have it)
 #: or «not_selected».
 AppLoadStatus = Literal[
-    "applied", "partial", "already", "failed", "empty", "discarded", "inactive", "unknown", "not_selected"
+    "applied",
+    "partial",
+    "already",
+    "failed",
+    "empty",
+    "discarded",
+    "inactive",
+    "unknown",
+    "not_selected",
+    "waiting",
+    "setup_failed",
 ]
 ImportStatus = Literal["complete", "partial", "failed"]
 
@@ -739,8 +749,9 @@ class AppLoadOut(Schema):
     status: AppLoadStatus
     reason: str = Field(
         "",
-        description="Why an app of the blueprint that was off could not be turned on («inactive»), in the person's "
-        "language: the plan's limit of apps, no right to it…; empty otherwise.",
+        description="Why an app of the blueprint that was off could not be turned on («inactive»: the plan's limit of "
+        "apps, no right to it…), or how the one the load waits for goes («waiting»: being set up, its data comes by "
+        "itself; «setup_failed»: it could not be set up yet), in the person's language; empty otherwise.",
     )
     datasets: list[DatasetLoadOut]
 
@@ -763,9 +774,9 @@ class ImportOut(Schema):
     undone: bool
     undoable: bool = Field(description="It created rows and was not undone.")
     retry: bool = Field(description="What did not go in can be loaded again.")
-    retry_blocked: Literal["", "file", "version_gone", "complete", "undone"] = Field(
+    retry_blocked: Literal["", "file", "version_gone", "complete", "undone", "waiting"] = Field(
         description="Why it cannot be retried: «file» (uploaded by hand), «version_gone» (the template changed), "
-        "«complete» (nothing missing), «undone»."
+        "«complete» (nothing missing), «undone», «waiting» (an app is being set up: what is missing comes by itself)."
     )
     report: LoadReportOut
 
@@ -1881,7 +1892,7 @@ class AssistantSpeakIn(Schema):
     voice: str = Field(
         default="",
         max_length=64,
-        description="A server voice of the catalogue (es-ES-Ximena:DragonHDLatestNeural…); empty: the language's first.",
+        description="A voice of erplora.com's engine; empty: its own for the language.",
     )
 
     @field_validator("text")

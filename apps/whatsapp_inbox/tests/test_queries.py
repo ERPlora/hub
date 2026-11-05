@@ -9,6 +9,8 @@ from django.test.utils import CaptureQueriesContext
 from live.errors import Conflict, NotFound, PermissionDenied
 
 from apps.whatsapp_inbox.models import Conversation
+from base.tests.ordering import assert_reads_backwards, listed_with
+
 from apps.whatsapp_inbox.tests.conftest import (
     NOW,
     card,
@@ -493,3 +495,10 @@ def test_the_notices_are_whoever_may_read_the_inbox(three):
         notices(ctx=ctx_for("nobody"))
     with pytest.raises(PermissionDenied):
         waiting_count(ctx_for("nobody"))
+
+
+def test_ties_go_by_id_in_the_lists_own_direction():
+    """hub#768 (the rule of hub#2355): a descending list is the ascending one read backwards, ties included, and its
+    pages neither repeat nor lose rows."""
+    by_id = sorted(Conversation.objects.create(phone=f"+3460011122{n}").id for n in range(4))
+    assert_reads_backwards(listed_with(run, "whatsapp_inbox.conversation.list", "status", by_dir=True), by_id)

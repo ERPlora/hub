@@ -1219,6 +1219,11 @@ API), no solo en la pantalla.
 ## Para quien lo mantiene
 Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
 
+- **Orden de las listas** (`base.ordering.list_order_for`; regla hub#2355 del producto viejo): productos, los de poco
+  stock, categorías y movimientos van por la columna elegida y desempatan por `id`, todo en la dirección de la lista: la
+  descendente es la ascendente leída al revés, empates incluidos, y los CSV salen en el mismo orden. Lo fijan
+  `test_ties_go_by_id_in_the_lists_own_direction` y `test_an_export_settles_its_ties_the_way_the_list_does`, por lista.
+
 ## El servidor (fase de servidor, 2026-10-14)
 
 - **Anatomía**: `apps.py`, `models.py`, `migrations/`, `schemas.py`, `queries.py`, `services.py`,
