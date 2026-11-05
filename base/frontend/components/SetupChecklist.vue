@@ -2,7 +2,7 @@
 // «Finish setting up your business» (BASE-G22, BASE-G130, BASE-G164; hub#372, ADR-0063): ONE live read of
 // `base.setup.status` — the platform's steps and the modules', already ordered and filtered by country,
 // vertical and permission on the server — painted as it comes. «Set up» only where the step's screen exists
-// and the person can do it; a ⛔ only an administrator can do says who can. Folded: ⛔ and 🔴 in sight, at
+// and the person can do it; a ⛔ only an administrator can do says who can. Folded: ⛔ first, then 🔴, at
 // most 5 rows (2 on a phone); «Your apps» is the «My apps» card's, so the fold does not repeat it. While something is
 // left, «Ask the assistant» opens its panel on the setup (BASE-G121).
 import { InlineFeedback, StatusPill, type StatusPillTone } from '@erplora/ui/components';
