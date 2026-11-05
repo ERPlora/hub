@@ -5,7 +5,8 @@
 // cards; `catalog.fixture.json` holds it for both sides' tests) element by element with `textContent`, never
 // `innerHTML`: a name the business typed stays text. A failed read (offline, the visit limit) keeps the snapshot,
 // which is the published catalog. The editor's preview (`data-ep-preview`) is never refreshed: it shows the draft's
-// own catalog.
+// own catalog. Nor is a page on the business's own domain (`data-ep-static`), where `/api` is not: the server read its
+// catalog when it painted it.
 import type { CatalogOut } from '../operations';
 
 export const CATALOG_URL = '/api/website/public/catalog';
@@ -76,7 +77,7 @@ export function catalogNodes(catalog: CatalogOut, empty: string): HTMLElement[] 
 // public catalog, which needs none of them.
 // eslint-disable-next-line no-restricted-globals -- see above
 export async function hydrateCatalog(doc: Document = document, fetchImpl: typeof fetch = fetch): Promise<void> {
-  if (doc.body.hasAttribute('data-ep-preview')) return;
+  if (doc.body.hasAttribute('data-ep-preview') || doc.documentElement.hasAttribute('data-ep-static')) return;
   const block = doc.querySelector<HTMLElement>('[data-ep-block="catalog"]');
   if (!block) return;
   let catalog: CatalogOut;

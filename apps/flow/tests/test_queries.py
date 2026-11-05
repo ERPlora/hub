@@ -18,6 +18,8 @@ from apps.flow import queries
 from apps.flow.models import Draft, Flow, FlowRun
 from apps.task.models import Task
 
+from base.tests.ordering import assert_reads_backwards, listed_with
+
 from .conftest import A, B, TASK_STEP, ctx_for, make_draft, make_flow, make_run, run
 
 pytestmark = pytest.mark.django_db
@@ -594,3 +596,12 @@ def test_a_recipe_this_business_cannot_offer_is_listed_apart_with_its_reason(mon
 def test_only_whoever_may_see_automations_reads_the_recipes():
     with pytest.raises(PermissionDenied):
         run("flow.recipe.list", {}, ctx_for("hub_manager"))
+
+
+@pytest.mark.parametrize("column", ["updated_at", "name"])
+def test_ties_go_by_id_in_the_lists_own_direction(column):
+    """hub#768 (the rule of hub#2355, as in Customers): a descending list is the ascending one read backwards, ties
+    included, and its pages neither repeat nor lose rows."""
+    flows = [make_flow("Same") for _ in range(4)]
+    Flow.objects.update(updated_at=timezone.now())
+    assert_reads_backwards(listed_with(run, "flow.flow.list", column), sorted(flow.id for flow in flows))

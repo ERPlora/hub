@@ -32,7 +32,7 @@ from django.core.cache import cache
 from django.db.models import Q, QuerySet
 from django.utils import translation
 from django.utils.translation import gettext_lazy as _
-from live.context import OperationContext, Scope
+from live.context import OperationContext, Scope, system_context
 from live.errors import AppInactive, NotFound
 from live.operations import INTERNAL, get, operation, registry
 
@@ -345,13 +345,25 @@ def public_catalog(ctx: OperationContext, data: NoIn) -> dict:
     cached = cache.get(key)
     if cached is not None:
         return cached
-    section = Content.model_validate(site.published_content["content"]).catalog
-    if section.hidden:
-        section = CatalogSection(hidden=True)
     with translation.override(ctx.language):
-        view = catalog_view(read_catalog(ctx, section), currency) or {"source": None, "show_prices": True, "groups": []}
+        view = catalog_view(_published_catalog(ctx, site.published_content["content"]), currency) or {
+            "source": None,
+            "show_prices": True,
+            "groups": [],
+        }
     cache.set(key, view, CATALOG_TTL)
     return view
+
+
+def _published_catalog(ctx: OperationContext, content: dict) -> dict[str, Any]:
+    """What the catalog of the published ``content`` shows now: a hidden one, nothing."""
+    section = Content.model_validate(content).catalog
+    return read_catalog(ctx, CatalogSection(hidden=True) if section.hidden else section)
+
+
+def live_catalog(scope: Scope, content: dict) -> dict[str, Any]:
+    """What the catalog of the published ``content`` shows now, for a page that nothing refreshes (``public_home``)."""
+    return _published_catalog(system_context(scope), content)
 
 
 # Not an assistant tool: the public website's read, for its visitors.
@@ -376,13 +388,15 @@ def public_reviews(ctx: OperationContext, data: NoIn) -> dict:
 # The cache
 
 
-def page_cache_key(slug: str, version: int, lang: str, day: str, currency: str) -> str:
+def page_cache_key(slug: str, version: int, lang: str, day: str, currency: str, *, own_domain: bool = False) -> str:
     """The rendered page of ``slug``'s publication ``version`` in ``lang`` on ``day`` (the opening hours mark today),
-    priced in ``currency`` (the business's), for this deploy's bundle.
+    priced in ``currency`` (the business's), for this deploy's bundle; ``own_domain``, the page painted for its own
+    domain, which is another page (``public_home``).
 
     The slug is the hash tag (``{<slug>}``) of the page's and the catalog's keys: :func:`forget_cached` drops them in
     one call, which the Valkey cluster accepts only for keys of one slot (``base/cache.py``)."""
-    return f"website:home:{{{slug}}}:{version}:{lang}:{day}:{currency}:{settings.APP_VERSION}"
+    where = ":own-domain" if own_domain else ""
+    return f"website:home:{{{slug}}}:{version}:{lang}:{day}:{currency}:{settings.APP_VERSION}{where}"
 
 
 def catalog_cache_key(slug: str, version: int, lang: str, currency: str) -> str:
@@ -395,7 +409,12 @@ def forget_cached(slug: str, version: int, currency: str) -> None:
     country changed, is never read again (its key names that currency) and expires."""
     languages = [code for code, _name in settings.LANGUAGES]
     cache.delete_many(
-        [page_cache_key(slug, version, lang, day, currency) for lang in languages for day in DAYS]
+        [
+            page_cache_key(slug, version, lang, day, currency, own_domain=own_domain)
+            for lang in languages
+            for day in DAYS
+            for own_domain in (False, True)
+        ]
         + [catalog_cache_key(slug, version, lang, currency) for lang in languages]
     )
 

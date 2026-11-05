@@ -50,6 +50,8 @@ const RECORD: RecordOut = {
   environment: 'testing',
   status: 'pending',
   correction: false,
+  correction_status: 'not_applicable',
+  corrected_by_id: null,
   qr_url: 'https://prewww2.aeat.es/wlpl/TIKE-CONT/ValidarQR?nif=B12345674&numserie=TICKET-2026-000002',
   created_at: '2026-10-14T10:00:00Z',
   operation_date: null,
@@ -169,6 +171,42 @@ describe('RecordDetailPage', () => {
     expect(notice.text()).toContain('The AEAT rejected it');
     expect(notice.text()).toContain('1189');
     expect(notice.text()).toContain('rectify it in Invoicing');
+    expect(s.find('verifactu-record-corrected').exists(), 'not corrected yet: no link to a correction').toBe(false);
+  });
+
+  it('a rejection already corrected links to the record that corrects it, instead of what to do (hub#857)', async () => {
+    const s = await setup({
+      status: 'rejected',
+      waiting: [],
+      aeat_code: '1189',
+      aeat_message: 'Falta Destinatarios',
+      correction_status: 'corrected',
+      corrected_by_id: 'r9',
+      can_transmit: false,
+      can_correct: false,
+      can_cancel: false,
+    });
+    const rejected = s.find('verifactu-record-rejected');
+    expect(rejected.text()).toContain('1189');
+    expect(rejected.text()).not.toContain('rectify it in Invoicing');
+    const corrected = s.find('verifactu-record-corrected');
+    expect(corrected.text()).toContain('Already corrected with a new record');
+    const link = s.find('verifactu-record-corrected-link');
+    expect([link.text().trim(), link.attributes('href')]).toEqual(['Open the record that corrects it', '/verifactu/records/r9']);
+    await link.trigger('click');
+    await flush();
+    expect(s.router.currentRoute.value.path).toBe('/verifactu/records/r9');
+  });
+
+  it('an «accepted with errors» record already corrected links to its correction too, in Spanish as well', async () => {
+    const s = await setup(
+      { status: 'accepted_with_errors', waiting: [], correction_status: 'corrected', corrected_by_id: 'r9', can_transmit: false, can_correct: false },
+      { locale: 'es' },
+    );
+    expect(s.find('verifactu-record-rejected').exists()).toBe(false);
+    expect(s.find('verifactu-record-corrected').text()).toContain('Ya está subsanado con un registro nuevo');
+    const link = s.find('verifactu-record-corrected-link');
+    expect([link.text().trim(), link.attributes('href')]).toEqual(['Ver el registro que lo subsana', '/verifactu/records/r9']);
   });
 
   it('shows its chain, its QR and its XML', async () => {

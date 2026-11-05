@@ -7,7 +7,7 @@ import { formatDateTime } from '@erplora/ui/components';
 import { applySurface } from '@erplora/ui/shell';
 import { describe, expect, it, vi } from 'vitest';
 
-import { click, EMPLOYEE, flush, ionValue, mountInbox, settle } from '../__tests__/mount-inbox';
+import { click, EMPLOYEE, flush, followUpgrade, ionValue, mountInbox, settle, SIGNED } from '../__tests__/mount-inbox';
 import type { ChannelOut, ConversationDetailOut } from '../operations';
 import MessageComposer from './MessageComposer.vue';
 import TemplateSendModal from './TemplateSendModal.vue';
@@ -238,6 +238,13 @@ describe('MessageComposer: the plan’s messages (WHATSAPP_INBOX-F13)', () => {
     } finally {
       applySurface('web');
     }
+  });
+
+  it('«Upgrade plan» goes with the pass: already signed in on erplora.com (BASE-F11, hub#723)', async () => {
+    const s = await setup(BLOCKED, 'en', { channel: CHANNEL });
+    s.answer(200, { url: SIGNED });
+    expect(await followUpgrade(s.find('whatsapp-inbox-composer-upgrade').element)).toBe(SIGNED);
+    expect(s.sent()).toEqual([{ method: 'POST', path: '/api/saas-pass', query: {}, body: { next: 'plan' } }]);
   });
 
   it('the month spent keeps its own words, with «Upgrade plan»; without the channel, only the words', async () => {

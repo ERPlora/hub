@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:e9fe06547b4237fd5b4f20473575a3d0afcb1ff8bc327035ffdd7df286efbb75 -->
+<!-- generated from WORKBOOK.md sha256:d0f1d9db8fc9a749296c44e98fdfd696a61280b7dca502c6c64e367044a97ce6 -->
 
 ## What it is for and who it is for
 
@@ -810,7 +810,9 @@ Steps:
    piece of data it would send, one per line, as its card in the chat says it (BASE-F97): a date and a time in
    your language and at the business's time ("Starts at: 2 Nov 2026, 10:00"), a value from a closed list with
    the name its app gives it ("Booked by: Counter"), an amount in the business's currency, a yes or a no as
-   "Yes" or "No", a list by how many items it carries ("Services: 1 item") and a record by its name only if
+   "Yes" or "No", a list by its items in words, such as the services of an appointment ("Services: Haircut,
+   Colour"), or, when they cannot be said (the lines of a sale, a list of codes), by how many items it carries,
+   and a record by its name only if
    you can see it; if not, it does not show, and never by its code. The step's fixed data (FLOW-F37) come out
    already set, as it will send them ("On behalf of the customer: Lucía Pérez"), even if the assistant asked
    for another. An empty piece of data does not show. It is read when the tray opens, with what each person

@@ -15,7 +15,8 @@ also takes v2, which the Hub does not send yet):
 ``VERIFACTU_GATEWAY_URL`` (settings, else the environment) is the SaaS's internal URL; empty means there is no
 gateway: nothing is sent and nothing is ever taken as accepted. ``httpx`` (maintained since 2019, 100+
 contributors): 5 s to connect and 45 s to read, longer than the gateway's own wait for the AEAT (5 s to connect,
-30 s to read). How a call ended is the reply's ``kind``:
+30 s to read); :data:`LONGEST_WAIT_SECONDS` is what the transaction around a call has to outlast. How a call ended is
+the reply's ``kind``:
 
 - ``answered``: the gateway answered (the AEAT's answer inside, whatever it says);
 - ``refused``: the gateway will not present it as it is (``404`` ``hub_unknown``, the body's ``hub`` names no hub
@@ -42,6 +43,8 @@ SUBMIT_PATH = "/internal/verifactu/submit"
 QUERY_PATH = "/internal/verifactu/query"
 PROBE_PATH = "/internal/verifactu/probe"
 TIMEOUT = httpx.Timeout(45.0, connect=5.0)
+#: One call's longest wait, every phase of ``TIMEOUT`` at its limit, with a margin (no pool: each call has its own client).
+LONGEST_WAIT_SECONDS = round(TIMEOUT.connect + TIMEOUT.write + TIMEOUT.read) + 5
 #: Statuses whose contract error says the gateway will never present this call as it is.
 REFUSALS = (409, 413, 422)
 #: The one 404 that is a refusal (saas#29): any other 404 is a door not there yet, tried again.

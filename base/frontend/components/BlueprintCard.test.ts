@@ -5,7 +5,7 @@
 // again») or cut halfway —; once seen, the card stays until «Continue» or «Not now».
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { load, template } from '../__tests__/data-fixtures';
+import { load, template, waitingLoad } from '../__tests__/data-fixtures';
 import { EMPLOYEE, errorFrame, flush, memoryStorage, mountBase, subId } from '../__tests__/mount-base';
 import { SESSION_CHANGED } from '../lib/access';
 import BlueprintCard from './BlueprintCard.vue';
@@ -21,6 +21,8 @@ afterEach(() => {
 async function settle() {
   for (let i = 0; i < 4; i += 1) await flush();
 }
+
+const WAITING_LOAD = waitingLoad();
 
 async function card(answer: () => Response = () => Response.json(load()), list = { templates: TEMPLATES, empty: true }) {
   const bodies: unknown[] = [];
@@ -106,6 +108,25 @@ describe('BlueprintCard', () => {
     await m.wrapper.get('[data-testid="blueprint-card-report"]').trigger('click');
     await settle();
     expect(m.router.currentRoute.value.fullPath).toBe('/settings#data');
+  });
+
+  it('a load that waits for an app says its data comes by itself and offers the report (hub#609)', async () => {
+    const m = await card(() => Response.json(WAITING_LOAD));
+    await m.wrapper.get('[data-testid="blueprint-card-use-restaurant.es"]').trigger('click');
+    await settle();
+    expect(m.wrapper.get('[data-testid="blueprint-card-pending"]').text()).toContain('Services');
+    expect(m.wrapper.find('[data-testid="blueprint-card-report"]').exists()).toBe(true);
+    expect(m.wrapper.find('[data-testid="blueprint-card-again"]').exists()).toBe(false);
+  });
+
+  it('turns ready by itself once the load comes in, with nothing pressed', async () => {
+    const m = await card(() => Response.json(WAITING_LOAD));
+    await m.wrapper.get('[data-testid="blueprint-card-use-restaurant.es"]').trigger('click');
+    await settle();
+    await m.result(m.call, 'base.import.list', { imports: [load({ id: WAITING_LOAD.id })], unfinished: null });
+    await settle();
+    expect(m.wrapper.find('[data-testid="blueprint-card-pending"]').exists()).toBe(false);
+    expect(m.wrapper.get('[data-testid="blueprint-card-outcome"]').text()).toContain('Your apps and your catalogue are ready');
   });
 
   it('promises to turn the template\'s apps on, never that they are on already (round 2026-10-27)', async () => {

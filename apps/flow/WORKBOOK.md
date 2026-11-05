@@ -858,9 +858,11 @@ Pasos:
    Sus detalles son lo que dijo y, debajo, cada dato que mandaría, uno por línea, como lo dice su tarjeta en el
    chat (BASE-F97): una fecha y una hora en tu idioma y a la hora del negocio («Empieza a las: 2 nov 2026,
    10:00»), un valor de una lista cerrada con el nombre que le da su app («Reservada por: Mostrador»), un
-   importe en la moneda del negocio, un sí o un no como «Sí» o «No», una lista por cuántos elementos lleva
-   («Servicios: 1 elemento») y un registro por su nombre solo si tú puedes verlo; si no, no sale, y nunca
-   por su código. Los datos fijos del paso (FLOW-F37) salen ya puestos, como los mandará («En nombre del
+   importe en la moneda del negocio, un sí o un no como «Sí» o «No», una lista por sus elementos en palabras,
+   como los servicios de una cita («Servicios: Corte de pelo, Tinte»), o, si no se pueden decir (las líneas de
+   una venta, una lista de códigos), por cuántos elementos lleva, y un registro por su nombre solo si tú puedes
+   verlo; si no, no sale, y nunca por su código. Los datos fijos del paso (FLOW-F37) salen ya puestos, como los
+   mandará («En nombre del
    cliente: Lucía Pérez»), aunque el asistente pidiera otro. Un dato vacío no sale. Se lee al abrir la bandeja,
    con lo que cada persona puede ver.
 2. Si quieres, escribe en **Añadir una nota (opcional)**.
@@ -1306,6 +1308,9 @@ Los avisos llevan ids, nunca nombres ni contenidos.
 
 ## Para quien lo mantiene
 
+- **Orden de la lista** (`base.ordering.list_order_for`; regla hub#2355 del producto viejo): «Tocadas al final» o
+  «Nombre», y el `id` para desempatar, todo en la dirección de la lista: la descendente es la ascendente leída al revés,
+  empates incluidos. Lo fija `test_ties_go_by_id_in_the_lists_own_direction`.
 - **Anatomía**: `apps.py`, `models.py`, `document.py` (el documento de una automatización: rutas de
   datos, plantillas `{{…}}`, condiciones, horarios y permisos que pide; puro, sin base de datos),
   `schemas.py`, `queries.py`, `services.py` (con el motor), `events.py`, `live.py`, `api.py`, `admin.py`,
@@ -1742,12 +1747,11 @@ Los avisos llevan ids, nunca nombres ni contenidos.
 - **«Necesita tu atención»** (eventos que no se entregaron): el reparto del worker ya entrega los avisos a esta
   app y, tras 8 intentos fallidos, da uno por perdido y lo deja anotado; la pantalla que los enseña y los vuelve a
   intentar es la administración de los avisos (PLAN-HUB bloque 7), de la plataforma, y todavía no existe.
-- **El resto de recetas de la Bandeja de WhatsApp** (la cita y la mesa por WhatsApp, que ya pueden usar el paso
-  «Pedírselo al asistente», FLOW-F37, y el aviso de mesa confirmada, que espera a que Reservas diga el día en palabras) y su reparación concreta: las
-  declara esa app en su `recipes.py` sobre este registro; la del aviso de cita confirmada ya está
-  (WHATSAPP_INBOX-F23). Un paso ya puede pedir cita para cualquier profesional (FLOW-F12); la respuesta automática que
-  pide cita a una clienta nueva vuelve cuando la Bandeja la ofrezca otra vez (hub#514). La tarjeta «Contestar los
-  WhatsApp» vuelve cuando la Bandeja declare su aviso.
+- **La tarjeta «Contestar los WhatsApp»** vuelve cuando la Bandeja declare su aviso. Las recetas de la Bandeja las
+  declara esa app en su `recipes.py` sobre este registro: el aviso de cita confirmada (WHATSAPP_INBOX-F23) y el de
+  reserva confirmada (F26), y las respuestas que piden cita y mesa (F14, F15), con el paso «Pedírselo al asistente»
+  (FLOW-F37): un paso ya pide cita para cualquier profesional (FLOW-F12, hub#699), y «WhatsApp → cita reservada» sale en
+  la galería (hub#514).
 - **Encender una receta desde la pantalla de su propia app** (el Hub viejo lo hacía desde la de WhatsApp): hoy
   se enciende desde la galería de Automatizaciones; la pantalla de cada app puede llamar a `flow.recipe.enable`
   cuando la tenga.

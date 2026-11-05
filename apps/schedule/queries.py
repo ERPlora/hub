@@ -10,7 +10,7 @@ import datetime as dt
 from typing import Any
 from uuid import UUID
 
-from django.db.models import F, Prefetch, Q, QuerySet
+from django.db.models import Prefetch, Q, QuerySet
 from django.utils import formats, timezone, translation
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
@@ -43,6 +43,7 @@ from apps.schedule.schemas import (
     WeekOut,
 )
 from base.business import business_zone, zone_name
+from base.ordering import list_order
 
 SPECIAL_DAY_NOT_FOUND = _("That special day does not exist in this business.")
 OVERRIDE_NOT_FOUND = _("That temporary change does not exist in this business.")
@@ -285,17 +286,6 @@ def resolve_override(
 # ── Pages ──────────────────────────────────────────────────────────────────────────────────────
 
 
-def _sorted(
-    rows: QuerySet[Any], sort: str, direction: str, columns: dict[str, tuple[str, ...]]
-) -> QuerySet[Any]:
-    """``rows`` by the columns of ``sort`` in ``direction``, then by id (the stable tie-break)."""
-    descending = direction == "desc"
-    order = [
-        F(column).desc() if descending else F(column).asc() for column in columns[sort]
-    ]
-    return rows.order_by(*order, "-id" if descending else "id")
-
-
 def _page(rows: QuerySet[Any], params: PageIn, out: Any) -> dict:
     return {
         "rows": [
@@ -356,7 +346,7 @@ def list_special_days(ctx: OperationContext, params: SpecialDayListIn) -> dict:
     if params.recurring_yearly is not None:
         rows = rows.filter(recurring_yearly=params.recurring_yearly)
     return _page(
-        _sorted(rows, params.sort, params.dir, SPECIAL_DAY_SORTS),
+        rows.order_by(*list_order(*SPECIAL_DAY_SORTS[params.sort], descending=params.dir == "desc")),
         params,
         special_day_out,
     )
@@ -390,7 +380,7 @@ def list_overrides(ctx: OperationContext, params: OverrideListIn) -> dict:
     if params.is_closed is not None:
         rows = rows.filter(is_closed=params.is_closed)
     return _page(
-        _sorted(rows, params.sort, params.dir, OVERRIDE_SORTS), params, override_out
+        rows.order_by(*list_order(*OVERRIDE_SORTS[params.sort], descending=params.dir == "desc")), params, override_out
     )
 
 

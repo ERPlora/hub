@@ -9,6 +9,8 @@ Cases from the current module's ``list_filters``, ``record_detail_fields``, ``ev
 import datetime as dt
 
 import pytest
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from django.utils import timezone, translation
 from live.context import system_context
 from pydantic import ValidationError
@@ -152,6 +154,124 @@ def test_sort_by_a_column_with_a_stable_tie_break(three):
 def test_pages(three):
     page = run("verifactu.record.list", {"limit": 2, "offset": 2})
     assert (len(page.rows), page.total) == (1, 3)
+
+
+# Corrections in the list (VERIFACTU-F24, hub#857)
+
+
+def correct(record: Record) -> Record:
+    return Record.objects.get(
+        pk=run("verifactu.record.correct", {"record_id": str(record.id)}).record.id
+    )
+
+
+def correction_of(page, record: Record) -> tuple[str, object]:
+    [row] = [row for row in page.rows if row.id == record.id]
+    return row.correction_status, row.corrected_by_id
+
+
+def test_a_rejection_not_corrected_yet_is_pending_in_the_list(three):
+    Record.objects.filter(pk=three[0].id).update(status="rejected")
+    Record.objects.filter(pk=three[1].id).update(status="accepted_with_errors")
+    page = run("verifactu.record.list")
+    assert correction_of(page, three[0]) == ("pending", None)
+    assert correction_of(page, three[1]) == ("pending", None)
+
+
+def test_a_corrected_rejection_points_to_the_record_that_corrects_it(three):
+    Record.objects.filter(pk=three[0].id).update(status="rejected")
+    new = correct(three[0])
+    page = run("verifactu.record.list")
+    assert correction_of(page, three[0]) == ("corrected", new.id)
+    # The correction itself waits in the queue: nothing to correct about it yet.
+    assert correction_of(page, new) == ("not_applicable", None)
+
+
+def test_a_rejected_correction_is_pending_and_its_rejection_stays_corrected(three):
+    # Only the last record of the invoice is corrected (VERIFACTU-F24): the chain of corrections reads one by one.
+    Record.objects.filter(pk=three[0].id).update(status="rejected")
+    first = correct(three[0])
+    Record.objects.filter(pk=first.id).update(status="rejected")
+    page = run("verifactu.record.list")
+    assert correction_of(page, three[0]) == ("corrected", first.id)
+    assert correction_of(page, first) == ("pending", None)
+
+
+@pytest.mark.parametrize("status", ["pending", "sent", "accepted"])
+def test_a_registration_the_aeat_did_not_reject_has_nothing_to_correct(three, status):
+    Record.objects.filter(pk=three[0].id).update(status=status)
+    assert correction_of(run("verifactu.record.list"), three[0]) == (
+        "not_applicable",
+        None,
+    )
+
+
+def test_a_rejected_cancellation_is_not_corrected_but_cancelled_again(three):
+    # «Correct» is for a registration (alta); a rejected cancellation is answered with another cancellation (F30).
+    cancellation = run(
+        "verifactu.record.cancel",
+        {"record_id": str(three[0].id), "reason": "Issued by error"},
+    ).record
+    Record.objects.filter(pk=cancellation.id).update(status="rejected")
+    page = run("verifactu.record.list")
+    [row] = [row for row in page.rows if row.id == cancellation.id]
+    assert (row.record_type, row.correction_status) == ("anulacion", "not_applicable")
+
+
+def test_filters_the_rejections_pending_or_already_corrected(three):
+    Record.objects.filter(pk__in=[three[0].id, three[1].id]).update(status="rejected")
+    Record.objects.filter(pk=three[2].id).update(status="accepted_with_errors")
+    new = correct(three[1])
+    pending = run("verifactu.record.list", {"correction_status": "pending"})
+    assert numbers(pending) == [three[2].invoice_number, three[0].invoice_number]
+    assert pending.total == 2
+    corrected = run("verifactu.record.list", {"correction_status": "corrected"})
+    assert [(row.id, row.corrected_by_id) for row in corrected.rows] == [
+        (three[1].id, new.id)
+    ]
+    # With the other filters, as any other.
+    assert numbers(
+        run(
+            "verifactu.record.list",
+            {"correction_status": "pending", "status": "rejected"},
+        )
+    ) == [three[0].invoice_number]
+
+
+def test_the_corrections_cost_no_query_per_row(issuer):
+    # Reviewer guard (hub#857): one subquery in the page's SELECT, never one query per rejected row.
+    def queries_listing() -> int:
+        with CaptureQueriesContext(connection) as captured:
+            page = run("verifactu.record.list")
+        assert page.total == Record.objects.count()
+        return len(captured)
+
+    one = ticket(1000)
+    Record.objects.filter(pk=one.id).update(status="rejected")
+    with_one = queries_listing()
+    for price in (2000, 3000, 4000):
+        record = ticket(price)
+        Record.objects.filter(pk=record.id).update(status="rejected")
+        correct(record)
+    assert queries_listing() == with_one
+
+
+def test_a_record_says_whether_it_is_corrected_and_by_which(three):
+    Record.objects.filter(pk=three[0].id).update(status="rejected")
+    pending = run("verifactu.record.get", {"record_id": str(three[0].id)})
+    assert (pending.correction_status, pending.corrected_by_id, pending.can_correct) == (
+        "pending",
+        None,
+        True,
+    )
+    new = correct(three[0])
+    corrected = run("verifactu.record.get", {"record_id": str(three[0].id)})
+    assert (
+        corrected.correction_status,
+        corrected.corrected_by_id,
+        corrected.can_correct,
+    ) == ("corrected", new.id, False)
+    assert run("verifactu.record.get", {"record_id": str(new.id)}).corrects_id == three[0].id
 
 
 # A record (VERIFACTU-F17, F18)

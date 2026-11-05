@@ -2,7 +2,6 @@
 
 import gettext
 import json
-import re
 from pathlib import Path
 
 import pytest
@@ -21,55 +20,10 @@ from apps.appointment.models import (
     RecurringService,
     Settings,
 )
+from base.tests.po import po_entries
 
 LOCALE = Path(apps.get_app_config("appointment").path) / "locale" / "es" / "LC_MESSAGES"
 MODELS = (Settings, Counter, Recurring, RecurringService, Appointment, AppointmentService, History, BlockedTime)
-_STRING = re.compile(r'^"(.*)"$')
-_ESCAPE = re.compile(r"\\(.)")
-_ESCAPES = {"n": "\n", "t": "\t"}
-
-
-def _unescape(text: str) -> str:
-    return _ESCAPE.sub(lambda match: _ESCAPES.get(match.group(1), match.group(1)), text)
-
-
-def po_entries(path: Path) -> dict[str, tuple[str, bool]]:
-    """``key → (msgstr, fuzzy)`` of a .po file without plurals (the header is skipped).
-
-    The key is the msgid, or ``context\x04msgid`` for an entry with a ``msgctxt`` (gettext's own key).
-    """
-    entries: dict[str, tuple[str, bool]] = {}
-    parts: dict[str, list[str]] = {"msgctxt": [], "msgid": [], "msgstr": []}
-    fuzzy, current = False, None
-
-    def flush():
-        msgid = _unescape("".join(parts["msgid"]))
-        context = _unescape("".join(parts["msgctxt"]))
-        if msgid:
-            key = f"{context}\x04{msgid}" if context else msgid
-            entries[key] = (_unescape("".join(parts["msgstr"])), fuzzy)
-
-    for line in path.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        starts_entry = (
-            line.startswith("msgctxt ")
-            or (line.startswith("msgid ") and current != "msgctxt")
-            or (line.startswith("#") and current == "msgstr")
-        )
-        if starts_entry:
-            flush()
-            # A ``#, fuzzy`` above a ``msgctxt`` or ``msgid`` belongs to the entry they open: only what comes after a
-            # ``msgstr`` forgets it.
-            parts, fuzzy, current = {"msgctxt": [], "msgid": [], "msgstr": []}, fuzzy and current is None, None
-        if line.startswith("#,") and "fuzzy" in line:
-            fuzzy = True
-        elif line.startswith(("msgctxt ", "msgid ", "msgstr ")):
-            current, _, rest = line.partition(" ")
-            parts[current].append(_STRING.match(rest).group(1))
-        elif current and _STRING.match(line):
-            parts[current].append(_STRING.match(line).group(1))
-    flush()
-    return entries
 
 
 def module_texts(module) -> list[Promise]:
@@ -112,45 +66,6 @@ def visible_texts() -> set[str]:
         lazies += list(choices.labels)
     with translation.override("en"):
         return {str(text) for text in lazies}
-
-
-def test_the_reader_sees_a_fuzzy_mark_with_and_without_a_context(tmp_path):
-    """gettext does not use a fuzzy translation, so the screen stays in English: the reader has to see the mark on its
-    own entry, also above a ``msgctxt``. Neither the entry behind it nor the one behind a fuzzy header (what
-    ``makemessages`` writes in a new catalog) inherits it."""
-    po = tmp_path / "django.po"
-    po.write_text(
-        "#, fuzzy\n"
-        'msgid ""\n'
-        'msgstr ""\n'
-        '"Language: es\\n"\n'
-        "\n"
-        'msgid "Behind the header"\n'
-        'msgstr "Tras la cabecera"\n'
-        "\n"
-        "#, fuzzy\n"
-        'msgid "Marked"\n'
-        'msgstr "Marcada"\n'
-        "\n"
-        'msgid "Behind the mark"\n'
-        'msgstr "Tras la marca"\n'
-        "\n"
-        "#, fuzzy\n"
-        'msgctxt "a context"\n'
-        'msgid "Marked with a context"\n'
-        'msgstr "Marcada con contexto"\n'
-        "\n"
-        'msgid "Behind the context"\n'
-        'msgstr "Tras el contexto"\n',
-        encoding="utf-8",
-    )
-    assert po_entries(po) == {
-        "Behind the header": ("Tras la cabecera", False),
-        "Marked": ("Marcada", True),
-        "Behind the mark": ("Tras la marca", False),
-        "a context\x04Marked with a context": ("Marcada con contexto", True),
-        "Behind the context": ("Tras el contexto", False),
-    }
 
 
 def test_every_entry_has_a_spanish_translation():

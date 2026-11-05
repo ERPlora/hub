@@ -2,7 +2,6 @@
 
 import gettext
 import json
-import re
 from pathlib import Path
 
 import pytest
@@ -13,48 +12,11 @@ from live.errors import InvalidPayload
 from live.operations import registry
 
 from apps.customer import models, queries, schemas, services
+from base.tests.po import po_entries
 
 from .conftest import run
 
 LOCALE = Path(apps.get_app_config("customer").path) / "locale" / "es" / "LC_MESSAGES"
-_STRING = re.compile(r'^"(.*)"$')
-_ESCAPE = re.compile(r"\\(.)")
-_ESCAPES = {"n": "\n", "t": "\t"}
-
-
-def _unescape(text: str) -> str:
-    return _ESCAPE.sub(lambda match: _ESCAPES.get(match.group(1), match.group(1)), text)
-
-
-def po_entries(path: Path) -> dict[str, tuple[str, bool]]:
-    """``msgid → (msgstr, fuzzy)`` of a .po file without plurals or contexts (the header is skipped)."""
-    entries: dict[str, tuple[str, bool]] = {}
-    parts: dict[str, list[str]] = {"msgid": [], "msgstr": []}
-    fuzzy, current = False, None
-
-    def flush():
-        msgid = _unescape("".join(parts["msgid"]))
-        if msgid:
-            entries[msgid] = (_unescape("".join(parts["msgstr"])), fuzzy)
-
-    for line in path.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        starts_entry = line.startswith("msgid ") or (
-            line.startswith("#") and current == "msgstr"
-        )
-        if starts_entry:
-            flush()
-            # A ``#, fuzzy`` above a ``msgid`` belongs to the entry it opens: only what comes after a ``msgstr`` forgets it.
-            parts, fuzzy, current = {"msgid": [], "msgstr": []}, fuzzy and current is None, None
-        if line.startswith("#,") and "fuzzy" in line:
-            fuzzy = True
-        elif line.startswith(("msgid ", "msgstr ")):
-            current, _, rest = line.partition(" ")
-            parts[current].append(_STRING.match(rest).group(1))
-        elif current and _STRING.match(line):
-            parts[current].append(_STRING.match(line).group(1))
-    flush()
-    return entries
 
 
 def lazy_texts_of(module) -> list[Promise]:
@@ -112,35 +74,6 @@ def schema_titles() -> set[str]:
         if op.app_label == "customer"
         for field in op.input.model_fields.values()
         if field.title
-    }
-
-
-def test_the_reader_sees_a_fuzzy_mark_on_its_own_entry(tmp_path):
-    """gettext does not use a fuzzy translation, so the screen stays in English: the reader has to see the mark on its
-    own entry. Neither the entry behind it nor the one behind a fuzzy header (what ``makemessages`` writes in a new
-    catalog) inherits it."""
-    po = tmp_path / "django.po"
-    po.write_text(
-        "#, fuzzy\n"
-        'msgid ""\n'
-        'msgstr ""\n'
-        '"Language: es\\n"\n'
-        "\n"
-        'msgid "Behind the header"\n'
-        'msgstr "Tras la cabecera"\n'
-        "\n"
-        "#, fuzzy\n"
-        'msgid "Marked"\n'
-        'msgstr "Marcada"\n'
-        "\n"
-        'msgid "Behind the mark"\n'
-        'msgstr "Tras la marca"\n',
-        encoding="utf-8",
-    )
-    assert po_entries(po) == {
-        "Behind the header": ("Tras la cabecera", False),
-        "Marked": ("Marcada", True),
-        "Behind the mark": ("Tras la marca", False),
     }
 
 

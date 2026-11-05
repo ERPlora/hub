@@ -5,7 +5,8 @@
 // the Hub read from Google after the page was kept shows at once. It rebuilds the same markup (`reviews.fixture.json`
 // holds it for both sides' tests) element by element with `textContent`, never `innerHTML`: an author's words stay
 // text. A failed read (offline, the visit limit) or an answer with nothing to show keeps what is there. The browser
-// never talks to Google: the Hub does. The editor's preview (`data-ep-preview`) is never refreshed.
+// never talks to Google: the Hub does. The editor's preview (`data-ep-preview`) is never refreshed, nor is a page on
+// the business's own domain (`data-ep-static`), where `/api` is not: what the server painted stays.
 import type { ReviewOut, ReviewsOut, StarKind } from '../operations';
 
 export const REVIEWS_URL = '/api/website/public/reviews';
@@ -97,7 +98,7 @@ export function listNodes(view: ReviewsOut): HTMLElement[] {
 // public reviews, which needs none of them.
 // eslint-disable-next-line no-restricted-globals -- see above
 export async function hydrateReviews(doc: Document = document, fetchImpl: typeof fetch = fetch): Promise<void> {
-  if (doc.body.hasAttribute('data-ep-preview')) return;
+  if (doc.body.hasAttribute('data-ep-preview') || doc.documentElement.hasAttribute('data-ep-static')) return;
   const block = doc.querySelector<HTMLElement>('[data-ep-block="reviews"]');
   if (!block) return;
   let view: ReviewsOut;

@@ -72,6 +72,7 @@ from apps.staff.models import Member
 from apps.staff.queries import member_availability, own_member, resolve_member
 from apps.staff.schemas import AvailabilityIn
 from base.business import business_zone, zone_name
+from base.ordering import list_order_for
 
 VIEW_ALL = "appointment.view_appointment"
 VIEW_OWN = "appointment.view_own_appointment"
@@ -376,15 +377,6 @@ APPOINTMENT_ORDER = {
 }
 
 
-def _sorted(
-    rows: QuerySet, sort: str, order: dict, default: tuple[str, ...]
-) -> QuerySet:
-    key = sort.lstrip("-")
-    columns = order.get(key, default)
-    prefix = "-" if sort.startswith("-") else ""
-    return rows.order_by(*(f"{prefix}{column}" for column in columns), f"{prefix}id")
-
-
 def _page(rows: QuerySet, limit: int, offset: int, out) -> dict:
     return {
         "rows": [out(item) for item in rows[offset : offset + limit]],
@@ -427,7 +419,7 @@ def list_appointments(ctx: OperationContext, params: AppointmentListIn) -> dict:
             Q(number__icontains=text) | Q(customer_name__icontains=text) | Exists(named)
         )
     page = _page(
-        _sorted(rows, params.sort, APPOINTMENT_ORDER, ("start",)),
+        rows.order_by(*list_order_for(params.sort, columns=APPOINTMENT_ORDER)),
         params.limit,
         params.offset,
         row,
@@ -1173,7 +1165,7 @@ def list_series(ctx: OperationContext, params: RecurringListIn) -> dict:
     if params.staff_id:
         rows = rows.filter(staff_id=params.staff_id)
     return _page(
-        _sorted(rows, params.sort, RECURRING_ORDER, ("customer_name",)),
+        rows.order_by(*list_order_for(params.sort, columns=RECURRING_ORDER)),
         params.limit,
         params.offset,
         series_out,

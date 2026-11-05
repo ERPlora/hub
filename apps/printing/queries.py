@@ -39,6 +39,7 @@ from apps.printing.schemas import (
     PrinterStatusOut,
     SettingsOut,
 )
+from base.ordering import list_order
 
 #: Hand-outs a job gets before it fails (the old hub's ``MAX_ATTEMPTS``).
 MAX_ATTEMPTS = 5
@@ -236,12 +237,8 @@ def list_printers(ctx: OperationContext, params: PrinterListIn) -> dict:
     if params.is_active is not None:
         printers = printers.filter(is_active=params.is_active)
     total = printers.count()
-    key = _PRINTER_SORT[params.sort]
-    ordered = (key.desc() if params.dir == "desc" else key.asc()) if not isinstance(key, str) else key
-    if isinstance(key, str) and params.dir == "desc":
-        ordered = f"-{key}"
-    tie = "-id" if params.dir == "desc" else "id"
-    page = _with_queue(printers).order_by(ordered, tie)[params.offset : params.offset + params.limit]
+    order = list_order(_PRINTER_SORT[params.sort], descending=params.dir == "desc")
+    page = _with_queue(printers).order_by(*order)[params.offset : params.offset + params.limit]
     now = timezone.now()
     return {"rows": [printer_row(p, now) for p in page], "total": total, "limit": params.limit, "offset": params.offset}
 
@@ -380,8 +377,9 @@ def list_jobs(ctx: OperationContext, params: JobListIn) -> dict:
     if params.printer_id:
         jobs = jobs.filter(printer_id=params.printer_id)
     total = jobs.count()
-    sign = "-" if params.dir == "desc" else ""
-    page = jobs.order_by(f"{sign}{params.sort}", f"{sign}id")[params.offset : params.offset + params.limit]
+    page = jobs.order_by(*list_order(params.sort, descending=params.dir == "desc"))[
+        params.offset : params.offset + params.limit
+    ]
     now = timezone.now()
     return {"rows": [job_row(job, now) for job in page], "total": total, "limit": params.limit, "offset": params.offset}
 

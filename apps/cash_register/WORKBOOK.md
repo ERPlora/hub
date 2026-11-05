@@ -56,8 +56,7 @@ ERPlora no inventa flujos: adopta los que el mercado ya probó.
   Ajustes → Cajones**; al abrir la sesión se elige uno. Con uno solo se elige solo.
 - **Moneda**: la del negocio, la de su país, con sus decimales: el euro en España, el esloti en Polonia. Todos los
   importes de Caja van en ella, y el arqueo enseña sus billetes y monedas.
-- **Zona horaria**: la del negocio: de ella sale la hora del cierre automático. El día de negocio y el número de sesión
-  aún salen de la hora de Madrid (`Europe/Madrid`) para todos (hub#771).
+- **Zona horaria**: la del negocio: de ella salen la hora del cierre automático, el día de negocio y el número de sesión.
 
 Configuración inicial, paso a paso:
 
@@ -726,8 +725,9 @@ cajero del producto actual es un empleado.
   sesión abierta no le enseña su esperado en ninguna lectura (lista, sesión abierta, detalle), ni
   ningún total que lo sume (ventas, devoluciones, entradas, salidas, invitaciones: vacíos), y su lista
   de movimientos solo trae los apuntados a mano. La regla del saldo negativo usa el esperado real.
-- **Numeración**: `SessionCounter` por día de negocio (zona horaria del Hub) con `UPDATE … RETURNING`
-  en la transacción de la apertura: una apertura rechazada no gasta número. Nunca secuencias.
+- **Numeración**: `SessionCounter` por día de negocio (en su zona) con `UPDATE … RETURNING`
+  en la transacción de la apertura: una apertura rechazada no gasta número y un cambio de zona sigue la cuenta de
+  ese día, nunca repite número. Nunca secuencias.
 - **Concurrencia**: una sola sesión abierta por negocio, con un índice único parcial
   (`status = 'open'`): dos aperturas a la vez abren una y la otra recibe 409
   `cash_register.session_already_open`. Cerrar, apuntar y contar bloquean la fila de la sesión
@@ -754,9 +754,8 @@ cajero del producto actual es un empleado.
   sale con el símbolo del negocio. Los billetes y monedas de 18 monedas viven en `queries.DENOMINATIONS` (las mismas
   del producto actual).
   El total de un arqueo lo suma el servidor; un billete o moneda de otra moneda es 422.
-- **Zona horaria**: el corte del cierre automático y la hora que dice su aviso son del reloj del negocio
-  (`base.business.business_zone`). El día de negocio y el número de sesión siguen en `TIME_ZONE` (`Europe/Madrid`) para
-  todos los negocios (hub#771).
+- **Zona horaria**: el corte del cierre automático, la hora que dice su aviso, el día de negocio y el número de sesión
+  son del reloj del negocio (`base.business.business_zone`, hub#771).
 - **Inicio** (ronda PLAN-HUB 2026-10-21; FIX-CASH_REGISTER-SETUP-HOOKS): `setup` y `widgets` de `apps.py`, los
   del `module.json` viejo (sin `bell`). El paso `cash_register.drawer` lee `updated_at` de
   `cash_register.settings.get` (orden 90, no `required`, permiso `cash_register.manage_settings`, refresco por

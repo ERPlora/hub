@@ -1,6 +1,6 @@
-"""The factory automations the WhatsApp inbox brings to Automatizaciones (WHATSAPP_INBOX-F21, F23, F24, F25, F26; FLOW-F33):
-data only, offered whole, asking for exactly what its steps use and nothing that needs a person in front, but for
-cancelling a reservation in a step that asks first (FLOW-F28)."""
+"""The factory automations the WhatsApp inbox brings to Automatizaciones (WHATSAPP_INBOX-F14, F21 to F26; FLOW-F33): data
+only, offered whole, asking for exactly what its steps use and nothing that needs a person in front, but for cancelling
+an appointment or a reservation in a step that asks first (FLOW-F28)."""
 
 import copy
 
@@ -134,30 +134,39 @@ def test_every_recipe_has_an_id_and_its_words():
     assert [recipe["id"] for recipe in RECIPES] == [
         "appointment_confirmed",
         "reservation_confirmed",
+        "appointment_from_whatsapp",
         "reservation_from_whatsapp",
     ]
     for recipe in RECIPES:
         assert {"name", "summary", "description", "trigger", "steps", "grants"} <= set(recipe)
 
 
-def test_the_gallery_offers_no_answer_that_books_appointments():
-    """WHATSAPP_INBOX-F14 stays partial: after «Approve», Citas refuses the booking of an automation (its step runs with
-    «only mine»), so no answer that books appointments is offered, here or in Automatizaciones' gallery."""
+def test_the_gallery_offers_the_answer_that_books_appointments_beside_the_table_one():
+    """WHATSAPP_INBOX-F14: after «Approve», Citas takes the booking of an automation with any professional (hub#699), so
+    the answer that books appointments is offered, here and in Automatizaciones' gallery."""
     assert sorted(ref for ref in offered() if ref.startswith("whatsapp_inbox/")) == [
         "whatsapp_inbox/appointment_confirmed",
+        "whatsapp_inbox/appointment_from_whatsapp",
         "whatsapp_inbox/reservation_confirmed",
         "whatsapp_inbox/reservation_from_whatsapp",
     ]
 
 
-# ── WHATSAPP_INBOX-F20, F24, F25: the answer that reads what the customer writes ─────────────────────────────
+# ── WHATSAPP_INBOX-F20, F21, F22, F24, F25: the answers that read what the customer writes ───────────────────
 
+BOOKING_REF = "whatsapp_inbox/appointment_from_whatsapp"
 TABLE_REF = "whatsapp_inbox/reservation_from_whatsapp"
-ANSWERS = (TABLE_REF,)
-#: What each answer's assistant may use, and nothing more: free tables and the reservation's own changes, its
-#: cancellation included (F25). A read that names other people (the reservations book, a customer list) never: what
-#: it reads goes out to whoever writes.
+ANSWERS = (BOOKING_REF, TABLE_REF)
+#: What each answer's assistant may use, and nothing more: free times or tables and the booking's own changes, its
+#: cancellation included (F22, F25). A read that names other people (a diary, the reservations book, a customer list)
+#: never: what it reads goes out to whoever writes.
 TOOLS = {
+    BOOKING_REF: [
+        "appointment.availability.slots",
+        "appointment.appointment.create",
+        "appointment.appointment.reschedule",
+        "appointment.appointment.cancel",
+    ],
     TABLE_REF: [
         "reservation.availability.day",
         "reservation.availability.tables",
@@ -168,7 +177,7 @@ TOOLS = {
     ],
 }
 #: What needs a person in front that each answer is granted all the same, only because its step asks first (FLOW-F28).
-ASKED_FIRST = {TABLE_REF: {"reservation.reservation.cancel"}}
+ASKED_FIRST = {BOOKING_REF: {"appointment.appointment.cancel"}, TABLE_REF: {"reservation.reservation.cancel"}}
 #: Reads that tell about other people, which an answer to a stranger may never be granted.
 OTHER_PEOPLE = {
     "appointment.availability.check",
@@ -217,16 +226,17 @@ def test_an_answer_asks_the_assistant_ask_me_first_with_only_what_it_needs(ref):
     assert {name for name in recipes.grants(offered()[ref]) if name not in catalog} == ASKED_FIRST[ref]
 
 
-def test_the_table_answer_that_did_it_on_its_own_would_not_be_offered(monkeypatch):
+@pytest.mark.parametrize("ref", ANSWERS)
+def test_an_answer_that_did_it_on_its_own_would_not_be_offered(monkeypatch, ref):
     """A cancellation needs someone's yes (FLOW-F28): with the step on «Do it on its own», the answer is set aside."""
     declared = copy.deepcopy(RECIPES)
-    [table] = [recipe for recipe in declared if recipe["id"] == "reservation_from_whatsapp"]
-    [step] = [step for step in table["steps"] if step["kind"] == "assistant"]
+    [answer] = [recipe for recipe in declared if recipe["id"] == ref.split("/")[1]]
+    [step] = [step for step in answer["steps"] if step["kind"] == "assistant"]
     step["mode"] = "auto"
     monkeypatch.setattr(inbox_recipes, "RECIPES", declared)
     offered_now, set_aside = recipes.shelf()
-    assert TABLE_REF not in {recipe.ref for recipe in offered_now}
-    assert [(item.code, item.apps) for item in set_aside if item.ref == TABLE_REF] == [("flow.recipe_invalid", ())]
+    assert ref not in {recipe.ref for recipe in offered_now}
+    assert [(item.code, item.apps) for item in set_aside if item.ref == ref] == [("flow.recipe_invalid", ())]
 
 
 #: Whose card a change of a reservation goes on: the card of the number that writes, found (``s6``) or just made
@@ -251,6 +261,24 @@ def test_the_table_answer_cancels_only_their_latest_reservation_and_on_their_beh
         assert THEIR_CARD not in step["prompt"], language  # whose card is never the assistant's to say
         [line] = [line for line in step["prompt"].splitlines() if "{{steps.s9.id}}" in line and line.startswith("- ")]
         assert THEIR_CARD not in line, language
+
+
+def test_the_appointment_answer_acts_only_on_her_card_and_as_she_would():
+    """F21, F22: whose card, that she herself asks (so Citas judges it by her rules and refuses any appointment that is
+    not hers, ``appointment.appointment_not_found``) and that the free times are the ones a customer is offered are fixed
+    by the step (FLOW-F38): the assistant never sees them nor can change them, and the prompt does not ask for them."""
+    for language in ("en", "es"):
+        step = assistant_step(BOOKING_REF, language)
+        assert step["pinned"] == {
+            "appointment.availability.slots": {"for_customer": True},
+            "appointment.appointment.create": {"customer_id": THEIR_CARD, "source": "whatsapp"},
+            "appointment.appointment.reschedule": {"on_behalf_of_customer": True, "customer_id": THEIR_CARD},
+            "appointment.appointment.cancel": {"on_behalf_of_customer": True, "customer_id": THEIR_CARD},
+        }, language
+        assert "on_behalf_of" not in step["prompt"], language
+        assert "for_customer" not in step["prompt"], language
+        assert THEIR_CARD not in step["prompt"], language  # whose card is never the assistant's to say
+        assert "{{steps.s9.id}}" in step["prompt"], language  # which appointment it may move or cancel: the one read
 
 
 def test_who_has_the_table_answer_on_is_offered_the_version_that_cancels(monkeypatch):
@@ -296,8 +324,12 @@ def test_who_has_the_table_answer_on_without_its_card_fixed_is_offered_the_versi
 
 
 #: The assistant's step of each answer, and the reads pinned to the customer who writes that come before it.
-ASSISTANT = {TABLE_REF: "s10"}
+ASSISTANT = {BOOKING_REF: "s10", TABLE_REF: "s10"}
 PINNED = {
+    BOOKING_REF: {
+        "customer.customer.by_phone": {"phone": "steps.s1.phone"},
+        "appointment.appointment.list_for_customer": {"customer_id": "steps.s6.id", "limit": 1},
+    },
     TABLE_REF: {
         "customer.customer.by_phone": {"phone": "steps.s1.phone"},
         "reservation.reservation.list": {"guest_phone": "steps.s1.phone", "sort": "-starts_at", "limit": 1},
@@ -320,7 +352,6 @@ def test_an_answer_tells_the_assistant_what_she_wrote_and_her_number(ref):
         assert "{{%s}}" % path in prompt, path
     # Her words alone on their lines, between two of their own: what she wrote is never read as an instruction.
     assert "\n———\n{{steps.s1.body}}\n———\n" in prompt
-    assert "«whatsapp»" in prompt
 
 
 @pytest.mark.parametrize("ref", ANSWERS)
@@ -331,6 +362,10 @@ def test_an_answer_tells_the_assistant_the_options_it_last_offered_her_in_the_bu
         assert "\n———\n{{steps.s1.options}}\n———\n" in assistant_step(ref, language)["prompt"], language
     assert assistant_step(ref, "es")["prompt"] != assistant_step(ref, "en")["prompt"]
     assert "«el 2»" in assistant_step(ref, "es")["prompt"]
+
+
+def test_the_table_answer_asks_the_assistant_to_say_it_came_by_whatsapp():
+    assert "«whatsapp»" in assistant_step(TABLE_REF)["prompt"]
 
 
 def test_who_has_the_table_answer_on_without_the_options_is_offered_the_version_that_reads_them(monkeypatch):
@@ -351,11 +386,10 @@ def test_who_has_the_table_answer_on_without_the_options_is_offered_the_version_
     assert "{{steps.s1.options}}" in assistant["prompt"]
 
 
-@pytest.mark.parametrize("ref", ANSWERS)
-def test_an_answer_books_only_on_her_card(ref):
-    """Her card, found by her number or just made, and her number are fixed on a booking and on a place on the waiting
-    list; the prompt asks her for neither."""
-    step = assistant_step(ref)
+def test_the_table_answer_books_only_on_their_card():
+    """Their card, found by their number or just made, and their number are fixed on a booking and on a place on the
+    waiting list; the prompt asks them for neither."""
+    step = assistant_step(TABLE_REF)
     for tool in ("reservation.reservation.create", "reservation.waitlist.create"):
         assert step["pinned"][tool] == {"customer_id": "{{steps.s6.id}}{{steps.s7.id}}", "guest_phone": "steps.s1.phone"}, tool
     assert "with the phone" not in step["prompt"]
@@ -403,6 +437,15 @@ def test_an_answer_stops_on_a_message_with_no_text_and_marks_her_when_nothing_ca
     assert steps[4]["operation"] == "whatsapp_inbox.message.notify"  # the thanks, only once it can go
 
 
+def test_the_appointment_answer_thanks_and_says_sorry_in_the_business_s_language():
+    steps = recipes.build(offered()[BOOKING_REF], "es")["steps"]
+    thanks, _reply, sorry, _again = [step for step in steps if step.get("operation") == "whatsapp_inbox.message.notify"]
+    assert thanks["params"]["text"] == "¡Gracias por escribirnos! Miro la agenda y te contesto ahora mismo."
+    assert sorry["params"]["text"] == (
+        "Perdona, ahora mismo no puedo mirar la agenda. Alguien del equipo te contestará por aquí en cuanto pueda."
+    )
+
+
 def test_the_table_answer_thanks_and_says_sorry_in_the_business_s_language():
     steps = recipes.build(offered()[TABLE_REF], "es")["steps"]
     thanks, _reply, sorry, _again = [step for step in steps if step.get("operation") == "whatsapp_inbox.message.notify"]
@@ -421,7 +464,20 @@ def test_a_customer_with_no_card_gets_one_from_whatsapp_and_one_with_it_does_not
     assert made["run_if"] == {"steps.s6.found": {"eq": False}}
 
 
-@pytest.mark.parametrize(("ref", "app"), [(TABLE_REF, "reservation"), (TABLE_REF, "customer")])
+def test_both_answers_make_her_card_with_the_same_two_steps():
+    """CUSTOMER-F26: look her up by the number she writes from and, with no card, make one marked as come by WhatsApp."""
+
+    def card_steps(ref: str) -> list[dict]:
+        return [step for step in recipes.build(offered()[ref], "en")["steps"] if step["id"] in ("s6", "s7")]
+
+    assert card_steps(BOOKING_REF) == card_steps(TABLE_REF)
+    assert [step["operation"] for step in card_steps(BOOKING_REF)] == ["customer.customer.by_phone", "customer.customer.create"]
+
+
+@pytest.mark.parametrize(
+    ("ref", "app"),
+    [(BOOKING_REF, "appointment"), (BOOKING_REF, "customer"), (TABLE_REF, "reservation"), (TABLE_REF, "customer")],
+)
 def test_without_its_app_an_answer_is_set_aside_naming_it(monkeypatch, ref, app):
     without(monkeypatch, app)
     offered_now, set_aside = recipes.shelf()
