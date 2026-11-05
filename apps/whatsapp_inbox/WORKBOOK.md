@@ -452,8 +452,8 @@ Pasos:
    enviar nada.» cuando el plan no incluye ninguno); quien puede configurar ve, en el navegador, **Mejorar el
    plan**, que abre los planes de erplora.com.
 4. Lo que escriben los clientes se sigue guardando.
-5. Al cambiar de mes (en el reloj del negocio) el aviso se va aunque erplora.com aún no haya hablado; si el
-   plan no incluye mensajes, sigue.
+5. Al cambiar de mes (el de erplora.com, que cuenta los mensajes en UTC: en España, a la 1:00 o las 2:00 del día 1) el
+   aviso se va aunque erplora.com aún no haya hablado; si el plan no incluye mensajes, sigue.
 Entra: el consumo y el tope del mes que manda erplora.com (0: el plan no incluye ninguno).
 Sale: el aviso en la bandeja y en Ajustes; nada se guarda.
 Si falla: si erplora.com rechaza un envío por el tope (las cifras del Hub iban por detrás), el mensaje no
@@ -1356,8 +1356,9 @@ corrigen borrando los datos de la conversación, nunca editando), con borrado pa
 - `message.received` dice a qué mensaje **del Hub** contesta (`reply_to_message_id`: solo uno con
   `origin=hub` de esa conversación) y la opción (`reply_id`), los dos siempre presentes. Ningún evento
   lleva el número, el nombre ni el texto: el outbox se guarda días después de un borrado.
-- Zona horaria: las horas de la bandeja, en la del negocio (`useBusinessZone`, hub#779); el mes del tope sigue en
-  `Europe/Madrid` (`clock.py`, hub#771).
+- Zona horaria: las horas de la bandeja, en la del negocio (`useBusinessZone`, hub#779); el mes del tope es el de
+  erplora.com, que lo cuenta en UTC y rechaza por él (`usage_month`): el Hub lo lee en ese mismo reloj
+  (`clock.allowance_month`, hub#771), porque en el del negocio llamaría gastado o nuevo a un mes horas antes que él.
 
 ### Retención (RGPD)
 
