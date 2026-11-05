@@ -388,5 +388,17 @@ msgstr "Se necesita el permiso «%(permission)s»."
 msgid "Week"
 msgstr "Semana"
 
+msgid "Staff member"
+msgstr "Miembro del personal"
+
+msgid "Role"
+msgstr "Rol"
+
+msgid "Schedule"
+msgstr "Horario"
+
+msgid "Time off"
+msgstr "Ausencia"
+
 msgid "Staff members"
 msgstr "Miembros del personal"
