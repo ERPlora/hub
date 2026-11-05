@@ -255,7 +255,19 @@ test('VERIFACTU-F24: Records says by each rejection «Corrected» (a link to the
   await expect(detail.locator('[data-testid=verifactu-record-status]')).toHaveText('Rejected');
   await expect(detail.locator('[data-testid=verifactu-record-correct]')).toHaveCount(0);
   await flowShots(page, 'F24-record-corrected', async (p) => {
-    await seen(shown(p).locator('[data-testid=verifactu-correction-corrected]'));
+    const head = shown(p);
+    await seen(head.locator('[data-testid=verifactu-correction-corrected]'));
+    // «Corrected» beside its status sits on its line (never a few pixels below it), or under it when the head has no room.
+    const status = await head.locator('[data-testid=verifactu-record-status]').boundingBox();
+    // The pill itself, not its link's box: a link taller than its pill once let the pill sit below the status.
+    const mark = await head.locator('[data-testid=verifactu-correction-corrected] .status-pill').boundingBox();
+    if (!status || !mark) throw new Error('the status and «Corrected» are painted');
+    const boxes = JSON.stringify({ status, mark });
+    if (mark.y < status.y + status.height) {
+      expect(Math.abs(status.y + status.height / 2 - (mark.y + mark.height / 2)), `«Corrected» on its status's line: ${boxes}`).toBeLessThanOrEqual(1);
+    } else {
+      expect(mark.x, `«Corrected» wraps to the start of the next line: ${boxes}`).toBeLessThan(status.x);
+    }
   });
   await detail.locator('[data-testid=verifactu-correction-corrected]').click();
   await expect(page).toHaveURL(new RegExp(`/verifactu/records/${correction}$`));

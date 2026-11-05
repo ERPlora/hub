@@ -1,7 +1,8 @@
 // A record's status, the same in the Records list and in the record's detail: its coloured pill and, by a rejection (or an
 // acceptance with errors), whether it is corrected (VERIFACTU-F24): «Corrected», a link to the record that corrects it,
-// or «Pending correction»; nothing more for a record no correction answers. The pills sit together, spaced, and wrap
-// under each other when there is no room.
+// or «Pending correction»; nothing more for a record no correction answers. The pills are words of one line: a space
+// apart where they flow as text (a card), the gap of the box that holds them where it lays them out (a table cell, the
+// detail's head), and under each other when there is no room.
 import { StatusPill } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -10,6 +11,14 @@ import type { RecordRowOut } from '../operations';
 import RecordStatus from './RecordStatus.vue';
 
 type Shown = Pick<RecordRowOut, 'status' | 'correction_status' | 'corrected_by_id'>;
+
+/** What reads between two nodes of one parent (the text a browser flows between them: white space collapses into
+ *  one space). */
+function textBetween(from: Node, to: Node): string {
+  let text = '';
+  for (let node = from.nextSibling; node && node !== to; node = node.nextSibling) text += node.textContent ?? '';
+  return text;
+}
 
 async function setup(record: Partial<Shown>, props: Record<string, unknown> = {}, locale: 'en' | 'es' = 'en') {
   const full: Shown = { status: 'rejected', correction_status: 'not_applicable', corrected_by_id: null, ...record };
@@ -35,8 +44,10 @@ describe('RecordStatus', () => {
     expect(link.element.tagName).toBe('A');
     expect(link.attributes('href')).toBe('/verifactu/records/r9');
     expect(link.attributes('aria-label')).toBe('Corrected: open the record that corrects it');
-    // Both in the one box that spaces them, the status first.
-    expect(link.element.parentElement).toBe(s.find('verifactu-x-status').element.parentElement);
+    // The status first, a space, then the mark: never glued together.
+    const status = s.find('verifactu-x-status').element;
+    expect(link.element.parentElement).toBe(status.parentElement);
+    expect(textBetween(status, link.element)).toMatch(/^\s+$/);
     expect(s.find('verifactu-correction-pending').exists()).toBe(false);
   });
 
@@ -44,7 +55,7 @@ describe('RecordStatus', () => {
     const s = await setup({ correction_status: 'corrected', corrected_by_id: 'r9' });
     const push = vi.spyOn(s.router, 'push');
     const outer = vi.fn();
-    const holder = s.wrapper.element.parentElement as HTMLElement;
+    const holder = s.find('verifactu-x-status').element.parentElement as HTMLElement;
     holder.addEventListener('click', outer);
     holder.addEventListener('keydown', outer);
     const link = s.find('verifactu-correction-corrected');
@@ -64,6 +75,7 @@ describe('RecordStatus', () => {
       ['Pending correction', 'warning'],
     ]);
     expect(s.find('verifactu-correction-pending').text()).toBe('Pending correction');
+    expect(textBetween(s.find('verifactu-x-status').element, s.find('verifactu-correction-pending').element)).toMatch(/^\s+$/);
     expect(s.find('verifactu-correction-corrected').exists()).toBe(false);
   });
 
