@@ -429,6 +429,18 @@ class OrderLine(UUIDModel):
         return self.voucher_session_id is not None
 
 
+class ForeignIdType(models.TextChoices):
+    """The AEAT's kinds of document of a foreign customer (``IDType``; a Spanish NIF has none), by the words the
+    recipient form of Invoicing gives them, an app Sales does not require (``apps.customer.tax_ids.ID_TYPES``)."""
+
+    EU_VAT = "02", _("EU VAT number")
+    PASSPORT = "03", _("Passport")
+    FOREIGN_TAX_ID = "04", _("Tax ID of their country")
+    RESIDENCE_CERTIFICATE = "05", _("Residence certificate")
+    OTHER = "06", _("Other document")
+    NOT_REGISTERED = "07", _("Not registered")
+
+
 class FiscalStatus(models.TextChoices):
     """What Invoicing answered when the sale, its void or a refund asked for its fiscal document, in the
     same transaction (no Invoicing app → «unavailable»; a refusal → «pending», issued later by
@@ -494,7 +506,12 @@ class Sale(UUIDModel):
         _("customer country"), max_length=2, blank=True, default="", db_default=""
     )
     customer_id_type = models.CharField(
-        _("customer document type"), max_length=2, blank=True, default="", db_default=""
+        _("customer document type"),
+        max_length=2,
+        blank=True,
+        default="",
+        db_default="",
+        choices=ForeignIdType.choices,
     )
     staff_id = models.UUIDField(_("served by"), null=True, blank=True)
     appointment_id = models.UUIDField(_("appointment"), null=True, blank=True)
@@ -619,6 +636,16 @@ class SaleLine(UUIDModel):
     voucher_session_id = models.UUIDField(_("voucher session"), null=True, blank=True)
     voucher_grant_id = models.UUIDField(_("voucher"), null=True, blank=True)
     voucher_name = models.CharField(_("voucher name"), max_length=200, blank=True)
+    # What the voucher's session is worth to who does the line (SALE-F28), fixed at the charge as Services said it: no
+    # money of this sale (the voucher was paid when it was sold), so it is in no total and in no document.
+    voucher_value = models.PositiveBigIntegerField(
+        _("voucher session value"), default=0, db_default=0
+    )
+    # What of this line paid for vouchers sold on it, as Services says when it grants them (SERVICE-F14): the money is
+    # still the sale's, but it is no production of who sold it: it counts as each session is done (SALE-F28).
+    voucher_sold_amount = models.PositiveBigIntegerField(
+        _("paid for vouchers"), default=0, db_default=0
+    )
     # SALE-F11: the names of the options charged inside the line (the receipt prints them under it), and, on
     # the child line of an option of another tax category, the line of the dish it hangs from.
     modifiers = models.JSONField(

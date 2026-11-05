@@ -7,12 +7,16 @@ The registry's (``Hub…``) are the bodies of the SaaS's ``/internal/hubs/{id}``
 """
 
 import datetime as dt
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
+from django.conf import settings
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.core.validators import DomainNameValidator
+from django.http.request import validate_host
 from django.utils.translation import gettext_noop
 from ninja import Schema
-from pydantic import Field, field_validator
+from pydantic import AfterValidator, Field, field_validator
 
 
 def names(read: str, by: str = "id", name: tuple[str, ...] = ("name",)) -> dict:
@@ -119,6 +123,30 @@ class MemberIn(Schema):
     name: str | None = None
 
 
+#: The longest a domain name can be (RFC 1035) and what ``Hub.custom_domain`` keeps; ``DomainNameValidator`` lets 255 by.
+MAX_DOMAIN_LENGTH = 253
+
+
+def custom_domain_of_photo(value: str | None) -> str | None:
+    """The domain a photo names, lowercase and without a final dot: a host name of a public domain, in its ASCII form,
+    that the Hub does not answer already (``ALLOWED_HOSTS``), or it would put a website on another business's host."""
+    if value is None or value == "":
+        # Nothing named, as null or absent: never a domain, and refusing it would refuse the whole photo.
+        return None
+    domain = value.lower().removesuffix(".")
+    if len(domain) > MAX_DOMAIN_LENGTH or domain.endswith("."):
+        raise ValueError("not a domain name in its ASCII form")
+    try:
+        DomainNameValidator(accept_idna=False)(domain)
+    except DjangoValidationError:
+        raise ValueError("not a domain name in its ASCII form") from None
+    if domain.rpartition(".")[2].isdigit():
+        raise ValueError("an IP address is no domain")
+    if validate_host(domain, settings.ALLOWED_HOSTS):
+        raise ValueError("a host the Hub already answers")
+    return domain
+
+
 class HubStateIn(Schema):
     """``PUT /internal/hubs/{id}/state``: the SaaS's photo (``photo``, as it came) and the parts the Hub applies."""
 
@@ -128,6 +156,7 @@ class HubStateIn(Schema):
     verifactu: dict[str, Any] | None = None
     whatsapp: dict[str, Any] | None = None
     members: list[MemberIn] | None = None
+    custom_domain: Annotated[str | None, AfterValidator(custom_domain_of_photo)] = None
     photo: dict[str, Any]
 
 
@@ -416,6 +445,9 @@ class AppOut(Schema):
     #: What it needs, transitively (it comes along with it), and the apps on that need it (they go off first).
     requires: list[str]
     required_by: list[str]
+    #: Why turning it on (off) or off (on) is refused, in the reader's language: an app's own ``can_enable`` or
+    #: ``can_disable``, and the apps it depends on (hub#618, hub#694); ``None``: nothing refuses it.
+    refusal: str | None
 
 
 class AppListOut(Schema):
@@ -626,7 +658,17 @@ DatasetStatus = Literal["applied", "partial", "already", "failed", "empty", "dis
 #: How an app of a load went: a dataset's statuses, or «inactive» (not on here), «unknown» (this hub does not have it)
 #: or «not_selected».
 AppLoadStatus = Literal[
-    "applied", "partial", "already", "failed", "empty", "discarded", "inactive", "unknown", "not_selected"
+    "applied",
+    "partial",
+    "already",
+    "failed",
+    "empty",
+    "discarded",
+    "inactive",
+    "unknown",
+    "not_selected",
+    "waiting",
+    "setup_failed",
 ]
 ImportStatus = Literal["complete", "partial", "failed"]
 
@@ -687,8 +729,8 @@ class BlueprintDatasetOut(BlueprintPartOut):
 class BlueprintAppSummaryOut(BlueprintAppOut):
     status: Literal["on", "turns_on", "inactive", "unknown"] = Field(
         description="«on»; «turns_on»: off in this hub, the load turns it on first (with the apps it needs) and then "
-        "loads it; «inactive»: off and left off (only its data names it, or the plan gives no right to it), nothing "
-        "of it loads; «unknown»: this hub does not have it."
+        "loads it; «inactive»: off and left off (only its data names it, the plan gives no right to it or the app does "
+        "not go on in this business), nothing of it loads; «unknown»: this hub does not have it."
     )
     datasets: list[BlueprintDatasetOut]
 
@@ -736,8 +778,9 @@ class AppLoadOut(Schema):
     status: AppLoadStatus
     reason: str = Field(
         "",
-        description="Why an app of the blueprint that was off could not be turned on («inactive»), in the person's "
-        "language: the plan's limit of apps, no right to it…; empty otherwise.",
+        description="Why an app of the blueprint that was off could not be turned on («inactive»: the plan's limit of "
+        "apps, no right to it…), or how the one the load waits for goes («waiting»: being set up, its data comes by "
+        "itself; «setup_failed»: it could not be set up yet), in the person's language; empty otherwise.",
     )
     datasets: list[DatasetLoadOut]
 
@@ -760,9 +803,9 @@ class ImportOut(Schema):
     undone: bool
     undoable: bool = Field(description="It created rows and was not undone.")
     retry: bool = Field(description="What did not go in can be loaded again.")
-    retry_blocked: Literal["", "file", "version_gone", "complete", "undone"] = Field(
+    retry_blocked: Literal["", "file", "version_gone", "complete", "undone", "waiting"] = Field(
         description="Why it cannot be retried: «file» (uploaded by hand), «version_gone» (the template changed), "
-        "«complete» (nothing missing), «undone»."
+        "«complete» (nothing missing), «undone», «waiting» (an app is being set up: what is missing comes by itself)."
     )
     report: LoadReportOut
 
@@ -1844,6 +1887,16 @@ class SupportReportOut(Schema):
     reply_to: str
 
 
+class SaasPassIn(Schema):
+    #: Where the pass leads on erplora.com: this business's plan or this business (ACCOUNTS-F29 of the SaaS).
+    next: Literal["plan", "business"] = Field(title=gettext_noop("Where to go"))
+
+
+class SaasPassOut(Schema):
+    #: erplora.com's door with the signed pass: it opens for a minute, once.
+    url: str
+
+
 class AssistantTranscribeIn(Schema):
     # 2 MB of audio is 2 796 204 characters of base64 (the gateway's own limit).
     audio: str = Field(min_length=1, max_length=2_800_000, description="The recording, in base64.")
@@ -1854,6 +1907,35 @@ class AssistantTranscribeIn(Schema):
 class AssistantTranscribeOut(Schema):
     text: str
     language: str
+
+
+#: The longest text read aloud at once: erplora.com's own ceiling (saas ``assistant.media.MAX_SPEECH_CHARS``).
+MAX_SPEECH_CHARS = 4096
+
+
+class AssistantSpeakIn(Schema):
+    text: str = Field(min_length=1, max_length=MAX_SPEECH_CHARS, description="The text to read aloud.")
+    language: str = Field(
+        default="", max_length=16, description="es or en (es-ES too); empty: the screen's. Another one reads in English."
+    )
+    voice: str = Field(
+        default="",
+        max_length=64,
+        description="A voice of erplora.com's engine; empty: its own for the language.",
+    )
+
+    @field_validator("text")
+    @classmethod
+    def _something_to_read(cls, text: str) -> str:
+        text = text.strip()
+        if not text:
+            raise ValueError("write the text to read aloud")
+        return text
+
+
+class AssistantSpeakOut(Schema):
+    content_type: str = Field(description="The audio's type: audio/mpeg.")
+    content_base64: str = Field(description="The text read aloud, an mp3 in base64.")
 
 
 # ── Locations (round 2026-10-24b, multi-location) ──────────────────────────────────────────────────────────────────

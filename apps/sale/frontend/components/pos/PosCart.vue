@@ -1,7 +1,8 @@
 <script setup lang="ts">
 // The check column (WORKBOOK «Vender» — «Cuenta»; the phone's drawer): the bar (park, Tables' button in
 // the `table` slot and the customer's in the `customer` slot, «Open checks» and its dropdown, «Close»),
-// the heading (title and chips), the lines (they scroll) and the foot (always in view). It paints what
+// the heading (title and chips), the lines (they scroll; in the phone's drawer the heading scrolls with them, hub#630)
+// and the foot (always in view). It paints what
 // the page knows of the check and asks for everything; the page writes (`useTill`). With Kitchen (SALE-F20,
 // `kitchen`), the tabs «Check» and «Current order»: the second one shows only what is pending, says how many
 // items wait (also to a screen reader) and carries the send bar; a send goes up (`send`, with its rush). With
@@ -109,6 +110,7 @@ function park(): void {
   <aside
     id="pos-cart-drawer"
     class="pos-cart"
+    :class="{ 'pos-cart--drawer': drawer }"
     data-testid="pos-cart"
   >
     <CartToolbar
@@ -133,97 +135,102 @@ function park(): void {
       @park="park"
       @close="checksOpen = false"
     />
-    <CartHeading
-      :label="label"
-      :customer-name="customerName"
-      :staff-id="staffId"
-      :staff-name="staffName"
-      :needs-customer="needsCustomer"
-      :table-number="tableNumber ?? null"
-      @rename="emit('rename', $event)"
-      @staff="emit('staff')"
-      @ask-customer="emit('askCustomer')"
-    />
-    <div
-      v-if="kitchen"
-      class="pos-cart__tabs"
-      role="tablist"
-      data-testid="pos-cart-tabs"
-    >
-      <button
-        type="button"
-        role="tab"
-        class="pos-cart__tab"
-        :aria-selected="tab === 'check' ? 'true' : 'false'"
-        data-testid="pos-cart-tab-check"
-        @click="tab = 'check'"
-      >
-        {{ t('sale.pos.kitchen.accountTab') }}
-      </button>
-      <button
-        type="button"
-        role="tab"
-        class="pos-cart__tab"
-        :aria-selected="tab === 'round' ? 'true' : 'false'"
-        :aria-label="roundLabel"
-        data-testid="pos-cart-tab-round"
-        @click="tab = 'round'"
-      >
-        {{ t('sale.pos.kitchen.roundTab') }}
-        <span
-          v-if="pending.length"
-          class="pos-cart__badge"
-          aria-hidden="true"
-          data-testid="pos-cart-tab-round-badge"
-        >{{ pending.length }}</span>
-      </button>
-    </div>
-    <div class="pos-cart__body">
-      <p
-        v-if="roundMode && pending.length"
-        class="pos-cart__hint"
-        data-testid="pos-cart-round-hint"
-      >
-        {{ t('sale.pos.kitchen.roundHint') }}
-      </p>
+    <!-- What sits between the bar and the foot. The side column keeps its heading and scrolls the lines; the phone's
+         drawer, and a column just as low, scroll it all as one, so «Charge» stays in view above the tab bar (hub#630). The
+         send bar rides here too: outside, it took all of this when low, tabs and lines included (hub#787). -->
+    <div class="pos-cart__scroll">
+      <CartHeading
+        :label="label"
+        :customer-name="customerName"
+        :staff-id="staffId"
+        :staff-name="staffName"
+        :needs-customer="needsCustomer"
+        :table-number="tableNumber ?? null"
+        @rename="emit('rename', $event)"
+        @staff="emit('staff')"
+        @ask-customer="emit('askCustomer')"
+      />
       <div
-        v-if="roundMode && !pending.length"
-        class="pos-cart__all-sent"
-        role="status"
-        data-testid="pos-cart-round-empty"
+        v-if="kitchen"
+        class="pos-cart__tabs"
+        role="tablist"
+        data-testid="pos-cart-tabs"
       >
-        <strong>{{ t('sale.pos.kitchen.allSent') }}</strong>
-        <span>{{ t('sale.pos.kitchen.allSentHint') }}</span>
-      </div>
-      <CartLines
-        v-else
-        :lines="shownLines"
-        :marks="marks"
-        :staff-names="staffNames"
-        :allow-discounts="settings.allow_discounts"
-        :busy="busy"
-        @mark="emit('mark', $event)"
-        @quantity="(line, quantity) => emit('quantity', line, quantity)"
-        @discount="emit('lineDiscount', $event)"
-        @note="emit('note', $event)"
-        @gift="emit('gift', $event)"
-        @staff="emit('lineStaff', $event)"
-        @void="emit('voidLine', $event)"
-      >
-        <template
-          v-if="kitchenTickets && order"
-          #sent
+        <button
+          type="button"
+          role="tab"
+          class="pos-cart__tab"
+          :aria-selected="tab === 'check' ? 'true' : 'false'"
+          data-testid="pos-cart-tab-check"
+          @click="tab = 'check'"
         >
-          <KitchenTickets :order-id="order.id" />
-        </template>
-      </CartLines>
+          {{ t('sale.pos.kitchen.accountTab') }}
+        </button>
+        <button
+          type="button"
+          role="tab"
+          class="pos-cart__tab"
+          :aria-selected="tab === 'round' ? 'true' : 'false'"
+          :aria-label="roundLabel"
+          data-testid="pos-cart-tab-round"
+          @click="tab = 'round'"
+        >
+          {{ t('sale.pos.kitchen.roundTab') }}
+          <span
+            v-if="pending.length"
+            class="pos-cart__badge"
+            aria-hidden="true"
+            data-testid="pos-cart-tab-round-badge"
+          >{{ pending.length }}</span>
+        </button>
+      </div>
+      <div class="pos-cart__body">
+        <p
+          v-if="roundMode && pending.length"
+          class="pos-cart__hint"
+          data-testid="pos-cart-round-hint"
+        >
+          {{ t('sale.pos.kitchen.roundHint') }}
+        </p>
+        <div
+          v-if="roundMode && !pending.length"
+          class="pos-cart__all-sent"
+          role="status"
+          data-testid="pos-cart-round-empty"
+        >
+          <strong>{{ t('sale.pos.kitchen.allSent') }}</strong>
+          <span>{{ t('sale.pos.kitchen.allSentHint') }}</span>
+        </div>
+        <CartLines
+          v-else
+          :lines="shownLines"
+          :marks="marks"
+          :staff-names="staffNames"
+          :allow-discounts="settings.allow_discounts"
+          :busy="busy"
+          @mark="emit('mark', $event)"
+          @quantity="(line, quantity) => emit('quantity', line, quantity)"
+          @discount="emit('lineDiscount', $event)"
+          @note="emit('note', $event)"
+          @gift="emit('gift', $event)"
+          @staff="emit('lineStaff', $event)"
+          @void="emit('voidLine', $event)"
+        >
+          <template
+            v-if="kitchenTickets && order"
+            #sent
+          >
+            <KitchenTickets :order-id="order.id" />
+          </template>
+        </CartLines>
+      </div>
+      <KitchenSendBar
+        v-if="roundMode && pending.length"
+        :pending="pending.length"
+        :busy="busy"
+        @send="emit('send', $event)"
+      />
     </div>
-    <KitchenSendBar
-      v-if="roundMode && pending.length"
-      :pending="pending.length"
-      :busy="busy"
-      @send="emit('send', $event)"
-    />
     <CartFooter
       :has-lines="hasLines"
       :total="total"
@@ -249,10 +256,32 @@ function park(): void {
   background: var(--ion-background-color, #fff);
   border-left: 1px solid var(--ion-border-color, #e6e3db);
 }
+/* A scroll container: its automatic minimum height is 0, so it gives way to the bar and the foot. It is also what the
+   send bar measures to know whether it can stay pinned (KitchenSendBar, hub#787). */
+.pos-cart__scroll {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  overflow-y: auto;
+  container: pos-cart-middle / size;
+}
 .pos-cart__body {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+}
+/* The phone's drawer: one scroll for the heading, the tabs and the lines, so the bar and the foot always fit. */
+.pos-cart--drawer .pos-cart__body {
+  flex: 1 0 auto;
+  overflow: visible;
+}
+/* A side column as low as that, under the red strip of a small tablet: the same, or the lines get 0 px and no way to
+   them (hub#787). The height is the one at which the send bar stops being pinned (KitchenSendBar). */
+@container pos-cart-middle (max-height: 13rem) {
+  .pos-cart__body {
+    flex: 1 0 auto;
+    overflow: visible;
+  }
 }
 .pos-cart__tabs {
   display: grid;

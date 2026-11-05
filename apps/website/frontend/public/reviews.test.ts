@@ -82,6 +82,18 @@ describe('hydrateReviews', () => {
     expect(summary().textContent).toBe('3.0');
   });
 
+  it('asks nothing on a business’s own domain, where /api is not', async () => {
+    const doc = page();
+    doc.documentElement.setAttribute('data-ep-static', '');
+    const fetchImpl = vi.fn();
+    try {
+      await hydrateReviews(doc, fetchImpl);
+    } finally {
+      doc.documentElement.removeAttribute('data-ep-static');
+    }
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
   it('leaves the editor’s preview and a page without reviews alone', async () => {
     const fetchImpl = answer(FULL);
     await hydrateReviews(page(SNAPSHOT, true), fetchImpl);

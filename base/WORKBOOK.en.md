@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:52e1d6a5c85766f3b143a946f75a4f1bdf1a21191e6cebc36313004b874cb3be -->
+<!-- generated from WORKBOOK.md sha256:1443e5816485631f7325d8d0dc8875a859250fa94bc2437d59fb933b58612a5b -->
 
 ## What it is for and who it is for
 
@@ -61,8 +61,8 @@ by the hour ("Good morning", "Good afternoon", "Good evening"). Below, in this o
   first. On a phone, with six apps or more, the first four and "View all apps".
 - **"Finish setting up your business"**: how many steps are done, a bar and the steps left, each with its
   icon, its explanation, a label ("Needed to invoice", "Important", "Recommended", "Done" or "Not
-  available yet") and "Set up". Folded: five steps (two on a phone), with "View all" and "Show less".
-  When nothing is left: "Your business is ready".
+  available yet") and "Set up". Folded: five steps (two on a phone), first the ones that stop invoicing,
+  with "View all" and "Show less". When nothing is left: "Your business is ready".
 - **The board of panels**, with "Customize panel" (⋮) at the top right.
 
 ### Home · Activity
@@ -84,12 +84,14 @@ the bottom, the QR code, "Upgrade plan" and "Manage on erplora.com".
 
 ### "Upgrade plan"
 At the foot of the side menu, between the QR code and "Manage on erplora.com". It opens this business's plan page on
-erplora.com, in a new tab. Only in the browser: the installed app does not have it.
+erplora.com, in a new tab and already signed in with their account, without typing the password again. Only in the
+browser: the installed app does not have it.
 
 ### "Manage on erplora.com"
 At the foot of the side menu, right below "Upgrade plan", with the external link icon; with the menu folded to its
 icons (desktop), only the icon stays, which says "Manage on erplora.com" on hover. It opens this business on
-erplora.com's panel: in a new tab in the browser and, in the installed app, in the device's browser. Only the owner,
+erplora.com's panel, already signed in with their account: in a new tab in the browser and, in the installed app, in
+the device's browser. Only the owner,
 the administrator and the manager have it, and only if they came in with their account: never in a session opened
 with a PIN or with the badge. It does not sell, so the installed app has it too, except the Google Play one.
 
@@ -306,7 +308,7 @@ On the Employees screens and the API documentation:
 | BASE-F08 | Keep the panels up to date without reloading | done |
 | BASE-F09 | Look at the recent activity | done |
 | BASE-F10 | See in the bell the notices between apps that were not delivered | done |
-| BASE-F11 | Go to erplora.com to manage or upgrade the plan | discarded |
+| BASE-F11 | Go to erplora.com to manage or upgrade the plan | done |
 | BASE-F12 | Ask the assistant to go over the setup | done |
 | BASE-F13 | Lose access on a role change or on leaving the business | done |
 | BASE-F14 | See the business's apps | done |
@@ -404,6 +406,8 @@ On the Employees screens and the API documentation:
 | BASE-F106 | The assistant without a connection, with the service down or without a plan | done |
 | BASE-F107 | Pass the master QA of the Hub | done |
 | BASE-F108 | Report a problem to support | done |
+| BASE-F109 | Delete a deleted business after its 90 days | partial — a business with documents keeps its database until the fiscal archive exists (hub#738) |
+| BASE-F110 | Open the business's website on its own domain | done |
 
 ### BASE-F01 See what the business still has to set up
 Status: done
@@ -412,8 +416,10 @@ Screen: Home · Summary
 Steps:
   1. They come into the Home. In "Finish setting up your business" they see how many steps are done and a
      bar.
-  2. Below, the steps left, in the order the apps set: first the ones that stop invoicing ("Needed to
-     invoice", in red), then the "Important" ones and last the "Recommended" ones.
+  2. Below, the steps left: first the ones that stop invoicing ("Needed to invoice", in red) and then the
+     "Important" ones, each group in the order the apps set, also on a phone, where only two rows fit. The
+     "Recommended" ones show folded only if nothing else is left. "View all" shows every step, the done ones
+     too, in the order the apps set.
   3. The platform's are "Your apps" (turn on at least one business app) and "Your team" (add the people
      who will use the till); the rest come from each app that is on.
   4. A step that only applies to another country, or that the person may not see, does not show. A step
@@ -612,7 +618,7 @@ back.".
 Involved: BASE-F40
 
 ### BASE-F11 Go to erplora.com to manage or upgrade the plan
-Status: discarded — without the one-time pass: if the browser does not have the erplora.com session open, you sign in with the account on arrival; the pass belongs mostly to erplora.com (saas#190)
+Status: done
 Actor: owner, administrator, manager, employee
 Screen: Side menu
 Steps:
@@ -620,18 +626,25 @@ Steps:
      sees it; what can be done on arriving is decided by erplora.com according to who comes in. With the
      menu folded to its icons (desktop), only its icon stays, which says "Upgrade plan" on hover. Only in the
      browser: the installed app does not have it.
-  2. They tap it: this business's plan page on erplora.com opens in a new tab.
+  2. They tap it: this business's plan page on erplora.com opens in a new tab, already signed in with their
+     account: they do not type the password again even if that browser did not have the erplora.com session open.
   3. The owner, the administrator or the manager who came in with their account also has, right below
      "Upgrade plan", "Manage on erplora.com", with the external link icon (on the folded menu, only the icon).
      It does not sell: the installed app has it too, except the Google Play one.
-  4. They tap it: this business opens on erplora.com's panel, in a new tab; in the installed app, in the device's
-     browser. The Hub stays where it was.
+  4. They tap it: this business opens on erplora.com's panel, already signed in with their account, in a new tab; in
+     the installed app, in the device's browser. The Hub stays where it was.
 In: the business they are in.
-Out: nothing saved in the hub.
+Out: nothing saved in the hub. A one-time pass of one minute goes to erplora.com, of the account of whoever taps and of
+this business; erplora.com checks again that this account belongs to this business.
 If it fails: if the hub does not know which business it belongs to, neither of the two shows (never a button that
-does nothing). If the installed app cannot open the browser, it says so: "Could not open that page. Try again.". An
-employee, a session opened with a PIN or with the badge and the Google Play app do not have "Manage on erplora.com".
-Involved: BASE-F40
+does nothing). If the installed app cannot open the browser, it says so: "Could not open that page. Try again.". If the
+pass does not come (the server gives an error or does not answer in 8 seconds), the usual address opens: erplora.com
+asks to sign in with the account and goes on to the same place. If the browser blocks the new tab, the link itself opens
+that address. With the pass spent or the minute gone, erplora.com says so and offers to sign in and go on there; to an
+account that no longer belongs to this business it says it does not (ACCOUNTS-F29). "Upgrade plan" in the assistant's
+panel and in the WhatsApp Inbox do not carry the pass yet and ask to sign in (hub#723). An employee, a session opened with
+a PIN or with the badge and the Google Play app do not have "Manage on erplora.com".
+Involved: BASE-F40, ACCOUNTS-F29
 
 ### BASE-F12 Ask the assistant to go over the setup
 Status: done
@@ -754,9 +767,10 @@ Out: the app running in this business, chosen by it: it counts towards its plan'
 If it fails: with the plan's limit reached nothing is turned on and "Your plan’s app limit" shows: "You have
 reached the 20-app limit of your plan. Upgrade your plan or turn one off.", with "Upgrade plan" for whoever runs
 the business in the browser (not in the installed app). A paid app not subscribed to offers no "Turn on"
-(BASE-F20). Any other failure shows in a notice with the app's name and the reason, which stays until it is
-closed.
-Involved: APPS-F07
+(BASE-F20). Neither does an app this business cannot use: it shows "Not available" and, for whoever runs the
+business, the reason below it ("VeriFactu is only for businesses in Spain.", VERIFACTU-F01). Any other failure shows
+in a notice with the app's name and the reason, which stays until it is closed.
+Involved: APPS-F07, VERIFACTU-F01
 
 ### BASE-F19 Know what else comes with an app
 Status: done
@@ -816,7 +830,7 @@ Out: the activation asked for again (`base.app.activation_requested`).
 If it fails: if it fails again, it says so again with its "Retry". If it was no longer waiting, because another device
 tried it again, a notice shows with the app's name and "This app is not waiting to be set up again.", which stays
 until it is closed. From the assistant, a name that fits several apps, or none, shows no card (BASE-F24).
-Involved: none
+Involved: BASE-F32
 
 ### BASE-F22 Follow an app being turned on while moving around
 Status: done
@@ -835,7 +849,7 @@ Steps:
 In: how the activation is going.
 Out: the app running in this business (`base.app.enabled`).
 If it fails: BASE-F21.
-Involved: none
+Involved: BASE-F31, BASE-F32
 
 ### BASE-F23 Turn an app off
 Status: done
@@ -855,8 +869,8 @@ Steps:
      its whole name and, if it was off already, the assistant says so and nothing changes.
 In: the business's apps, what each one needs and which ones the business chose.
 Out: the app turned off in this business, and the ones that came only with it, with their data intact.
-If it fails: if another running app needs it, or the app itself refuses, nothing changes (BASE-F25). With
-"Cancel", nothing either. From the assistant, a name that fits several apps shows no card: it asks which one
+If it fails: if another running app needs it, nothing changes; if it cannot be turned off, it offers no "Turn off"
+(BASE-F25). With "Cancel", nothing changes either. From the assistant, a name that fits several apps shows no card: it asks which one
 (BASE-F24).
 Involved: VERIFACTU-F32
 
@@ -889,18 +903,21 @@ Status: done
 Actor: administrator
 Screen: Apps
 Steps:
-  1. Whoever runs the business presses "Turn off" on an app another running one needs (for instance, "Tables"
-     while "Reservations" is on), or on one that refuses while it has something of its own halfway (VeriFactu,
-     with records the AEAT has not accepted yet: VERIFACTU-F32).
-  2. The hub changes nothing: above the table "Nothing was changed" shows with what has to be done first, "Turn
-     off Reservations first." (without asking), or, after confirming, with the app's own reason in the language of
-     who asks: "VeriFactu still has 1 record to send to the AEAT. Wait until it is sent or fix it before turning it
-     off.".
-  3. The notice stays until it is closed or another app is turned on or off; the app stays "Active".
+  1. An app that refuses to be turned off offers no "Turn off": below its status, whoever runs the business reads the
+     app's own reason in their language: "VeriFactu can't be turned off once it's on: the law requires your invoices
+     to keep reaching the AEAT." (VERIFACTU-F32).
+  2. Neither do the apps that one needs, which cannot be turned off first, and each says which one it is for:
+     "Invoicing can't be turned off: VeriFactu needs it. VeriFactu can't be turned off once it's on: the law requires
+     your invoices to keep reaching the AEAT.".
+  3. Whoever runs the business presses "Turn off" on an app another running one needs and that can be turned off (for
+     instance, "Tables" while "Reservations" is on). The hub changes nothing: above the table "Nothing was changed"
+     shows with what has to be done first, "Turn off Reservations first." (without asking).
+  4. The notice stays until it is closed or another app is turned on or off; the app stays "Active".
 In: the running apps that need it, or the reason of the app that refuses.
 Out: nothing.
-If it fails: without a reason of the app's own, the same notice says it could not be changed, with the app's name
-and what the hub answered.
+If it fails: if it is asked for anyway through the assistant or the API, the hub answers the same reason and changes
+nothing. Without a reason of the app's own, the same notice says it could not be changed, with the app's name and
+what the hub answered.
 Involved: VERIFACTU-F32
 
 ### BASE-F26 Understand why an app does not open
@@ -1009,7 +1026,8 @@ Steps:
      PINs, fiscal data) shows in "Never loaded here".
   3. Untick the apps not wanted and tap "Import" ("Importing…"), or "Choose another" to go back.
   4. When it ends, the report shows (BASE-F32). What the business already had stays as it was: nothing is
-     duplicated nor overwritten.
+     duplicated nor overwritten. If an app of the template is still being set up (BASE-F22), its part comes in by
+     itself as soon as it is ready, with no coming back and nothing to tap.
 In: the template or the file and the apps ticked.
 Out: the apps ticked that were off, turned on before loading, with the ones they need and within the plan's
 limit of apps, as if they were turned on in Apps (`base.app.enabled`); in each app ticked, what it brings and
@@ -1019,8 +1037,9 @@ If it fails: "The import failed: {reason}" and it stays on the review; with no a
 one app." and it cannot be imported; if none of its apps can be turned on here, "Nothing of this file can
 load in your business: none of its apps can be turned on here.". An app that could not be turned on (the
 plan's limit of apps, an app the plan does not include) stays off, loads nothing and the report says why;
-the rest loads.
-Involved: INVENTORY-F12
+the rest loads. A file is not kept: if one of its apps is still being set up, its row says "It is being set up for
+this business. Upload the file again in a minute to bring its data.".
+Involved: BASE-F22, INVENTORY-F12
 
 ### BASE-F32 Read the import report
 Status: done
@@ -1028,16 +1047,27 @@ Actor: owner, administrator
 Screen: Settings · Data and backups › Import
 Steps:
   1. When it ends, "Import report" with how it went: "Everything went in.", "Not everything went in." or
-     "Nothing went in.".
+     "Nothing went in.". If an app of the template is still being set up (BASE-F22), "Still loading: what is missing
+     comes in by itself as soon as its apps are ready. You can leave this screen.", with nothing to tap.
   2. One row per app with its label: "Applied", "You had it already", "Applied in part", "Failed", "Nothing
-     to copy", "Left out", "App off", "Not in this business" or "Not chosen". Below, for each part, "{created}
-     created · {already} already there · {failed} failed" and, of what failed, its name and the reason.
+     to copy", "Left out", "App off", "Not in this business", "Not chosen", "Being set up" or "Could not be set up".
+     Below, for each part, "{created} created · {already} already there · {failed} failed" and, of what failed, its
+     name and the reason.
   3. What was left out on purpose shows in "Left out on purpose".
   4. "See the templates" goes back to the catalogue; "Go to Home" leads to the Home.
+  5. When the app is ready, its part loads by itself and the report gets up to date without reloading, whether this
+     screen is open or not: on coming back, it is in.
 In: the import's report.
-Out: nothing; the report stays kept in the business.
-If it fails: a label the screen does not know shows as "Failed" with its own text, never as a success.
-Involved: none
+Out: nothing; the report stays kept in the business. What loaded later counts in that same import: it is undone with
+it (BASE-F34).
+If it fails: a label the screen does not know shows as "Failed" with its own text, never as a success. If the app
+cannot be set up, at the top it says "Could not be set up yet: {apps}. It keeps trying by itself and its data will load
+as soon as it works." and its row, "Could not be set up" with "It could not be set up yet. It keeps trying by itself and
+its data will load as soon as it works; «Retry what is missing» tries again now." (BASE-F21). If meanwhile the app is
+turned off, the import is undone, the business is reset or the template's version changes, nothing of it loads and its
+row says why. If the load fails once the app is ready, the app stays on and its row says "Failed" with "Something went
+wrong loading this part; nothing else was affected.", with "Retry what is missing".
+Involved: BASE-F21, BASE-F22, BASE-F33, BASE-F34
 
 ### BASE-F33 Come back to the report of an import that did not go in whole and retry
 Status: done
@@ -1045,7 +1075,9 @@ Actor: owner, administrator
 Screen: Settings · Data and backups › Import
 Steps:
   1. On opening "Import", if the last import did not go in whole and was not undone, its report shows first,
-     with "This is the report of your last import of {name} ({date}). Not everything went in.".
+     with "This is the report of your last import of {name} ({date}). Not everything went in." or, if it still waits
+     for an app being set up, with "Still loading…" and without "Retry what is missing", which is not needed (BASE-F32).
+     When it comes in, that same report says "Everything went in.", with no jump to the catalogue.
   2. If it came from a template, tap "Retry what is missing" ("Retrying…"): the same version of the template
      is loaded again and only what was missing goes in; what already went in is neither touched nor
      duplicated. The new report shows.
@@ -1057,7 +1089,7 @@ Steps:
 In: the last import and its report.
 Out: what was missing, if it goes in now, and the new report (`base.blueprint.imported`).
 If it fails: "The retry failed: {reason}" and the report stays in sight.
-Involved: none
+Involved: BASE-F32
 
 ### BASE-F34 Undo an import
 Status: done
@@ -1073,10 +1105,11 @@ Steps:
   4. "Import undone:" shows with one line per app ("{app} — {n} rows removed"); what could not be removed
      (something another app still uses) shows apart with its reason. What each section has gets up to date.
 In: the import chosen.
-Out: exactly the rows it brought removed; what was created afterwards stays (`base.import.undone`).
+Out: exactly the rows it brought removed, also what came in later because it waited for an app, and what it still
+waited for no longer comes in; what was created afterwards stays (`base.import.undone`).
 If it fails: the reason shows in the dialog itself, which does not close (the old hub said nothing); an
 import already undone, "This load was undone already.".
-Involved: none
+Involved: BASE-F32
 
 ### BASE-F35 Export a backup or a template
 Status: done
@@ -1162,14 +1195,19 @@ Steps:
   2. Tap "Use this one": "Preparing «{name}»…" while its apps are turned on and it loads, with no screens in
      between.
   3. In the same card, "Your apps and your catalogue are ready" ("What is left only you can answer: your
-     business's details. They are in the list below.") with "Continue", which closes it.
+     business's details. They are in the list below.") with "Continue", which closes it. If an app is still being set
+     up, first "Your apps are being set up" ("Their data will load by itself as soon as they are ready: {apps}. You can
+     carry on.") with "See the report" and "Continue"; the card turns to "Your apps and your catalogue are ready" by
+     itself when it comes in, with nothing to tap.
   4. Without reloading, the Home gets up to date: "Finish setting up your business" counts as done the steps
      the template solved and the panels refresh. The same after loading a template or a file from "Data and
      backups".
 In: the templates and whether the business is still empty.
 Out: what the template brings, as in BASE-F31 (`base.blueprint.imported`).
 If it fails: if not everything went in, "Not everything went in" with "These did not go in: {apps}." (or
-"Something else did not go in.") and "See the report"; if it could not be opened, "That template could not
+"Something else did not go in.") and "See the report"; if an app could not be set up, "An app could not be set up
+yet" with "It keeps trying by itself and its data will load when it works: {apps}. In the report you can try again
+now." and "See the report"; if it could not be opened, "That template could not
 be opened" with "Nothing has changed in your business: {reason}" and "Try again"; if it was cut halfway,
 "The setup did not finish" with "Part of it may be in already. Check it in Settings › Data before trying
 again." and "See the report", with no retry. If the templates cannot be read, "The templates to start with
@@ -2262,13 +2300,17 @@ Steps:
      instead of making it up.
   6. If the assistant ends without saying anything, the bubble reads "(no answer)".
   7. "Stop" cuts what was left: what was already written stays, with "Stopped." below.
-  8. Under each finished answer, "Read aloud" reads it with the device's own voice, if it has one, and "Stop
-     reading" stops it.
+  8. Under each finished answer, "Read aloud" reads it with the device's voice, if it has one, and "Stop reading"
+     stops it. If ERPlora has its own voices turned on (not today), the panel's header lets the person choose between
+     the two for the screen's language (the first one, until another is chosen; the device remembers the choice) and
+     the "Device voice".
 In: what the person writes; the whole conversation travels with each question (BASE-F102).
 Out: the question to erplora.com, which answers it and counts it in the month's messages (BASE-F104).
 If it fails: without a connection, with the service down, without a plan or without messages: BASE-F106 and BASE-F104.
 If the documentation cannot be searched at that moment, the assistant says so and does not answer from memory. "Stop"
-does not undo an action that had already been done.
+does not undo an action that had already been done. If ERPlora's voice cannot read the answer at that moment, the
+device's voice reads it; if there is none either, below the answer it says "The answer could not be read aloud. Try
+again.".
 Involved: BASE-F102, BASE-F104, BASE-F106
 
 ### BASE-F94 Attach a file or dictate by voice
@@ -2362,7 +2404,8 @@ Steps:
      cita_recordatorio · es · Ana, 10:00"; of a till count, the notes and coins counted remain: "50: 2"). A date and a
      time show as they are written in the person's language and at the business's hour ("Nov 2, 2026, 10:00 AM"; a day
      alone, "Nov 2, 2026"; a time alone, "9:30 PM"); a value of a closed list, with the name its app gives it ("Front
-     desk", not the internal value); and a record, by its name when its app lets whoever asks read it ("Person: Eva
+     desk", not the internal value), also that of a datum its app does not call like the field that names it
+     ("Rectifying invoice: other causes (R4)", not "R4"); and a record, by its name when its app lets whoever asks read it ("Person: Eva
      Gil"): otherwise the card leaves it out, never by its code. Nor does it put the key its app uses to avoid doing
      the same thing twice on a retry (charging, sending a WhatsApp, printing): nobody can judge it, and the action
      receives it all the same when it runs. Everything shows in the person's language, also the
@@ -2653,3 +2696,50 @@ If it fails: after five reports in an hour (the hub's and erplora.com's together
 again in a few minutes."; if erplora.com does not answer or cannot send it, a notice with the support address to
 write to directly. In both cases what was written stays and can be sent again.
 Involved: ACCOUNTS-F38, BASE-F40
+
+### BASE-F109 Delete a deleted business after its 90 days
+Status: partial — a business with documents keeps its database until the fiscal archive exists (hub#738)
+Actor: nobody: the Hub does it by itself, nobody presses anything
+Screen: None; the business's address goes on saying "This hub is no longer available."
+Steps:
+  1. A business deleted on erplora.com (HUBS-F18, HUBS-F20) reaches its 90 days. Until then its database stays intact
+     and it can be restored.
+  2. The Hub checks whether it keeps documents: sales, invoices, VeriFactu records, payments, cash movements, shop
+     orders or a customer's purchases, in any status and even with the app turned off. If it keeps any, it stops here:
+     the business stays deleted, with its database, and is checked again the next day.
+  3. Without documents, it makes the final copy of its data, kept for 90 days in the copies store. Meanwhile the
+     business can still be restored and erplora.com still sees its copies. When it ends it checks again for
+     documents, in case one came in during the copy.
+  4. It drops that business's database, and only that one. From here it never comes back.
+  5. It deletes its files from the store, those of Files and those its apps keep, and only its own.
+  6. Only a mark stays, with no name or data, so its address goes on saying "This hub is no longer available."; its
+     people and their sessions go with it.
+In: the deleted business and its 90 days over. Never a demo, which is deleted its own way when it expires, the
+platform's business or one moving to another server.
+Out: the final copy, and the database and the files gone, with the event `base.hub.purged`; from there erplora.com no
+longer lists its copies. Or, with documents, the database and the files kept and on the business's row the reason
+(`fiscal_archive_missing: <apps>`).
+If it fails: a copy that fails drops nothing, and neither does having no copies store; a copy or a drop that fails is
+tried again (1 min, 5 min, 15 min, then every hour) with the error noted on the row, with no second copy if there
+already was one. If the store does not delete its files, the business stays being dropped, with no mark and
+`files_purge_failed` on the row, and it is tried again the same way. If an app cannot be read, the database stays. A row
+that does not name the business's own database drops nothing (`invalid_database_name`). A business restored during the
+copy stays open with its database; once it is being dropped, erplora.com gets `hub_purged`. If the Hub shuts down
+mid-copy, the next one takes it up.
+Involved: HUBS-F18, HUBS-F19, HUBS-F20, PUBLIC-F34 (the same deletion of files, when a demo is retired)
+
+### BASE-F110 Open the business's website on its own domain
+<!-- origin: new (saas#195, HUBS-F17; PLAN-SAAS §37, point 2) -->
+Status: done (the address and what it serves; connecting the domain is erplora.com's HUBS-F17, which shows it on the panel)
+Actor: anyone, without an account
+Screen: The business's public page (WEBSITE-F10), on its domain
+Steps:
+  1. Someone opens the business's domain (for example, www.minegocio.es) on a phone, a tablet or a computer.
+  2. The business's published page shows, with its photos, in the browser's language.
+  3. **Log in** leads to the business's address on erplora.com: the app and the way in stay only there.
+In: a domain erplora.com has said is that business's.
+Out: the business's public website and its images, without cookies; nothing else: no app, no API, no way in. With a session
+of the business open in that browser it shows the same, because the session does not reach another domain.
+If it fails: a domain nobody connected opens nothing. If the business removes it, is cancelled or suspended, or has no
+published page, the domain says there is nothing there. A business being prepared or moved asks to come back in a moment.
+Involved: HUBS-F17, WEBSITE-F10

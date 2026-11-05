@@ -82,6 +82,7 @@ OPEN_OPERATIONS: dict[str, tuple[str, str]] = {
         PLATFORM,
         "The worker empties the sections of a reset whose copy it kept (base.worker), in the business's own database.",
     ),
+    "base.hub.purge": (PLATFORM, "The worker leaves the tombstone of a business past its 90 days."),
     "base.hub.restore": (PLATFORM, "The SaaS restores a cancelled business (/internal)."),
     "base.hub.seed_local": (PLATFORM, "seed_local_hubs registers a and b, in local development only (DEBUG)."),
     "base.hub.state_apply": (PLATFORM, "The SaaS's photo of a business: plan, apps, members and roles (/internal)."),

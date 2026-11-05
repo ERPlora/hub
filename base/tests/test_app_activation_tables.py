@@ -9,6 +9,7 @@ that still shares phase 1's database keeps turning apps on at once (proposal (i)
 import datetime as dt
 
 import pytest
+from django.apps import apps
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 from live.context import OperationContext, Scope
@@ -217,6 +218,20 @@ def test_only_a_failed_app_is_tried_again(hub_a, state):
 
 
 @own
+def test_a_failed_app_that_refuses_to_go_on_is_not_tried_again(hub_a, monkeypatch):
+    """hub#694: «Retry» turns an app on as «Turn on» does: the app may refuse it, and it stays as it is."""
+    monkeypatch.setattr(apps.get_app_config("printing"), "can_enable", lambda ctx: "Not here.", raising=False)
+    given(hub_a, printing="failed*")
+
+    with pytest.raises(Conflict) as refused:
+        run(hub_a, "base.app.retry", "printing")
+
+    assert (refused.value.code, refused.value.message) == ("base.app_vetoed", "Not here.")
+    assert rows_of(hub_a)["printing"] == (FAILED, True)
+    assert outbox(hub_a) == []
+
+
+@own
 def test_turning_on_a_failed_app_tries_it_again_too(hub_a):
     given(hub_a, printing="failed*")
 
@@ -329,6 +344,75 @@ def test_the_route_answers_202_while_its_tables_are_made_and_200_once_on(client,
     )
 
 
+@pytest.mark.django_db  # the host gate reads the registry's row of `a` (base.middleware)
+@pytest.mark.parametrize("path", ["/api/apps/enable", "/api/apps/retry"])
+def test_the_openapi_of_a_route_that_can_accept_documents_200_and_202_with_the_same_schema(client, path):
+    served = client.get("/api/openapi.json", HTTP_HOST="a.localhost:8000").json()
+
+    assert {
+        status: response["content"]["application/json"]["schema"]["$ref"]
+        for status, response in served["paths"][path]["post"]["responses"].items()
+    } == {"200": "#/components/schemas/AppChangeOut", "202": "#/components/schemas/AppChangeOut"}
+
+
+@pytest.mark.django_db  # the host gate reads the registry's row of `a` (base.middleware)
+def test_the_openapi_of_disable_only_documents_200_because_it_never_accepts(client):
+    served = client.get("/api/openapi.json", HTTP_HOST="a.localhost:8000").json()
+
+    assert list(served["paths"]["/api/apps/disable"]["post"]["responses"]) == ["200"]
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(("state", "status"), [("creating", 202), ("on", 200)])
+def test_the_retry_route_answers_202_while_its_tables_are_made_and_200_once_on(client, state, status, monkeypatch):
+    import json
+
+    from django.contrib.auth import get_user_model
+
+    from base import services
+    from base.models import Membership
+    from base.schemas import AppChangeIn, AppChangeOut
+
+    class Answering:
+        input = AppChangeIn
+
+        def __call__(self, ctx, data):
+            return AppChangeOut(app=data.app, state=state, chosen=True, along=[], already=False)
+
+    monkeypatch.setattr(services, "app_retry", Answering())
+    user = get_user_model().objects.create(username="ana")
+    Membership.objects.create(user=user, host="a", role=Membership.Role.OWNER)
+    client.force_login(user)
+
+    answered = client.post(
+        "/api/apps/retry", json.dumps({"app": "printing"}), content_type="application/json", HTTP_HOST="a.localhost:8000"
+    )
+
+    assert (answered.status_code, answered.json()) == (
+        status,
+        {"app": "printing", "state": state, "chosen": True, "along": [], "already": False},
+    )
+
+
+@own
+@pytest.mark.parametrize(("route", "printing"), [("/api/apps/enable", OFF), ("/api/apps/retry", "failed*")])
+def test_a_real_request_for_an_app_the_hub_lacks_answers_202_creating(client, make_user, hub_a, route, printing):
+    import json
+
+    given(hub_a, printing=printing)
+    client.force_login(make_user("ana", host=hub_a.slug, role="hub_owner"))
+
+    answered = client.post(
+        route, json.dumps({"app": "printing"}), content_type="application/json", HTTP_HOST=f"{hub_a.slug}.localhost:8000"
+    )
+
+    assert (answered.status_code, answered.json()) == (
+        202,
+        {"app": "printing", "state": "creating", "chosen": True, "along": [], "already": False},
+    )
+    assert rows_of(hub_a)["printing"] == (CREATING, True)
+
+
 def test_the_retry_route_is_bound_to_its_command(db):
     from django.urls import resolve
 
@@ -355,7 +439,8 @@ def test_an_app_being_created_or_failed_is_out_of_the_relay_and_the_tasks_until_
 
 
 @own
-def test_a_blueprint_turns_on_an_app_still_to_set_up_and_says_to_load_it_again_once_it_is_on(hub_a):
+def test_a_blueprint_turns_on_an_app_still_to_set_up_and_waits_for_it(hub_a):
+    """What it brings then comes by itself, nobody retrying: base/tests/test_blueprint_waits_for_apps.py (hub#609)."""
     given(hub_a, created=["website"])
     op = get("base.blueprint.import")
     with use_hub(Hub.objects.get(pk=hub_a.pk)):
@@ -365,11 +450,11 @@ def test_a_blueprint_turns_on_an_app_still_to_set_up_and_says_to_load_it_again_o
 
     by_app = {app["id"]: app for app in report["report"]["apps"]}
     assert rows_of(hub_a)["printing"] == (CREATING, True)
-    assert by_app["printing"]["status"] == "inactive"
-    assert "Load the template again in a minute" in by_app["printing"]["reason"]
+    assert by_app["printing"]["status"] == "waiting"
+    assert by_app["printing"]["reason"]
     assert rows_of(hub_a)["website"] == (ON, True)
-    assert by_app["website"]["status"] != "inactive"
-    assert report["retry"] is True
+    assert by_app["website"]["status"] not in ("inactive", "waiting")
+    assert (report["retry"], report["retry_blocked"]) == (False, "waiting")
 
 
 @own

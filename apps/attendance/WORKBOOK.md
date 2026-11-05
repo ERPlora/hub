@@ -302,7 +302,9 @@ se borra; el aviso de jornada corregida; «Fichados ahora» se actualiza.
 Si falla: «La salida tiene que ser posterior a la entrada.» bajo la salida; «Estas horas se solapan con
 otra jornada de esta persona.» (tocarse no es solaparse: una jornada puede empezar en el instante en
 que acabó la anterior); «Esa persona ya tiene otra jornada abierta: no se puede reabrir esta.»; una
-hora futura, «La hora no puede ser futura.»; sin motivo, «Escribe un motivo de al menos 3 caracteres.».
+hora futura, «La hora no puede ser futura.»; sin motivo, «Escribe un motivo de al menos 3 caracteres.». Si no se
+puede leer la zona horaria del negocio, «No se ha podido leer la zona horaria del negocio y esta corrección aún no
+se puede guardar. Recarga la página para volver a intentarlo.», con el botón desactivado.
 Una corrección rechazada no cambia nada ni deja rastro. «Corregir» solo aparece a quien puede
 corregir.
 Implicados: ATTENDANCE-F05, ATTENDANCE-F09, ATTENDANCE-F11
@@ -458,7 +460,7 @@ Los avisos nunca llevan la posición ni el motivo de una corrección (datos pers
   relay del outbox del worker una sola vez por aviso.
 - `staff.member.updated` y `staff.member.terminated` vuelven a pintar las listas (el nombre o el
   estado de una persona).
-- De la plataforma: la sesión y la zona horaria del negocio (fase 1: `Europe/Madrid`).
+- De la plataforma: la sesión y la zona horaria del negocio.
 
 ### Quién puede qué
 
@@ -477,6 +479,10 @@ Los avisos nunca llevan la posición ni el motivo de una corrección (datos pers
   un `tests/test_<fichero>.py` por fichero, más `test_integration_staff.py` (contra Personal real, sin
   dobles), `test_relay.py` (la baja en Personal entregada por el relay real del worker) y
   `test_concurrency.py` (hilos).
+- **Orden de los registros y del CSV** (`scoped_records`, con `base.ordering.list_order`; regla hub#2355 del producto
+  viejo): la columna elegida (`columna`/`-columna`) y el desempate por `id`, en la dirección de la lista: la descendente
+  es la ascendente leída al revés, empates incluidos. Las jornadas sin salida quedan donde las pone Postgres al ordenar
+  por «salida»: al final en ascendente, al principio en descendente.
 - Modelos: `Record` (la jornada), `Break` (la pausa), `Correction` (el rastro, solo se inserta) y
   `AttendanceSettings` (una fila, restricción `attendance_settings_singleton`). UUIDv7, sin `hub_id`.
   `Record.member` es una FK a `staff.Member` con `PROTECT`: una ficha con jornadas no se puede borrar
@@ -507,8 +513,11 @@ Los avisos nunca llevan la posición ni el motivo de una corrección (datos pers
 - Una corrección guarda `is_system` y el nombre de quien la hizo (`created_by_name`): si su usuario se
   borra, sigue siendo suya y no del «Sistema».
 - `close_for_terminated` solo actúa sobre una ficha dada de baja.
-- El «hoy» y el día de una jornada son los del negocio: `timezone.localdate()` (fase 1, `TIME_ZONE` =
-  `Europe/Madrid`). Las horas se guardan en UTC (`timestamptz`).
+- El «hoy», el día de una jornada y toda hora que se dice o se teclea son los del negocio (hub#779): en el servidor,
+  `base.business.business_zone` (`business_date`, el CSV, `Instant` sin desfase); en la pantalla, `useBusinessZone`, que
+  `lib/time.ts` pide en cada función. Las horas se guardan en UTC (`timestamptz`). «Corregir jornada» no se puede
+  guardar hasta que el negocio dice su zona, porque lo tecleado se lee en su reloj; si no se puede leer, el diálogo lo
+  dice (`useBusinessClock`).
 - Las duraciones se calculan en el servidor en segundos «a fecha de» (`as_of`); la pantalla las hace
   correr sola a partir de ahí, sin preguntar cada segundo. Una jornada «Por revisar» sin salida no tiene
   tiempo trabajado (vacío): contar «hasta ahora» sumaría días que nadie trabajó.
@@ -540,10 +549,6 @@ Los avisos nunca llevan la posición ni el motivo de una corrección (datos pers
 
 ## Lo que queda fuera
 
-- **Una traducción al español marcada «fuzzy» sale en inglés** y su test de traducciones no lo ve
-  (hub#491).
-- **Un texto que pierde su contexto sale con la traducción de otra app** y su test de catálogo no lo ve
-  (hub#493).
 - **Suprimir las jornadas pasados los cuatro años** (y con ellas su posición): se conservan; la
   supresión automática no está (como attendance#7 del producto actual).
 - **Iconos propios** (café, play, ubicación, localizar, guardar): pedidos en `UI-REQUESTS.md`; mientras, iconos

@@ -222,7 +222,7 @@ Avisos de la pantalla: el resultado de cada acción en una franja arriba (verde 
 
 | ID | Flujo | Estado |
 |---|---|---|
-| VERIFACTU-F01 | Activar VeriFactu | hecho — encender la app en el Hub es activarla (la activación por hub llega con la fase 2); fuera de España, encendida, no registra ni envía nada (FIX-HUB-VERIFACTU-ON-FOR-A-BUSINESS-OUTSIDE-SPAIN), y que Apps no la ofrezca allí espera un gancho de encendido de la plataforma |
+| VERIFACTU-F01 | Activar VeriFactu | hecho — encender la app en el Hub es activarla (la activación por hub llega con la fase 2); fuera de España, Apps no la ofrece y el hub la niega (`can_enable`, hub#694), y una ya encendida no registra ni envía nada (FIX-HUB-VERIFACTU-ON-FOR-A-BUSINESS-OUTSIDE-SPAIN) |
 | VERIFACTU-F02 | Subir el certificado propio del negocio | hecho — en el Hub; cifrado en la BD del hub con `FISCAL_CERTIFICATE_KEY` |
 | VERIFACTU-F03 | Quitar el certificado propio | hecho — en el Hub |
 | VERIFACTU-F04 | Elegir quién remite: mi certificado o ERPlora | hecho |
@@ -239,7 +239,7 @@ Avisos de la pantalla: el resultado de cada acción en una franja arriba (verde 
 | VERIFACTU-F15 | Enviar el registro a la AEAT y recoger su respuesta | hecho — lo envía el worker por la pasarela del SaaS; sin `VERIFACTU_GATEWAY_URL` los registros esperan en la cola |
 | VERIFACTU-F16 | Consultar los registros y su estado | hecho |
 | VERIFACTU-F17 | Ver el detalle de un registro y por qué espera | hecho |
-| VERIFACTU-F18 | Cotejar el QR en la sede de la AEAT | hecho |
+| VERIFACTU-F18 | Cotejar el QR en la sede de la AEAT | parcial — en la app instalada la sede de la AEAT aún no abre: falta que la app acepte sus direcciones (ERPlora/app#20) |
 | VERIFACTU-F19 | Dar el QR y el estado fiscal al tique y a la factura | hecho (Ventas e Impresión lo piden por nombre) |
 | VERIFACTU-F20 | Enviar después lo que no pudo salir (contingencia automática) | hecho — la corre el worker cada minuto (en la fase 1, sobre un solo hub) |
 | VERIFACTU-F21 | Procesar la cola a mano | hecho |
@@ -260,20 +260,23 @@ Avisos de la pantalla: el resultado de cada acción en una franja arriba (verde 
 
 ### VERIFACTU-F01 Activar VeriFactu
 <!-- origen: old-hub:HUB-F300 old:verifactu/workflow/configuracion.md#verifactu-f01 -->
-Estado: hecho — encender la app en el Hub es activarla (la activación por hub llega con la fase 2); fuera de España, encendida, no registra ni envía nada (FIX-HUB-VERIFACTU-ON-FOR-A-BUSINESS-OUTSIDE-SPAIN), y que Apps no la ofrezca allí espera un gancho de encendido de la plataforma
+Estado: hecho — encender la app en el Hub es activarla (la activación por hub llega con la fase 2); fuera de España, Apps no la ofrece y el hub la niega (`can_enable`, hub#694), y una ya encendida no registra ni envía nada (FIX-HUB-VERIFACTU-ON-FOR-A-BUSINESS-OUTSIDE-SPAIN)
 Actor: administrador
 Pantalla: Hub: Apps
 Pasos:
 1. En las apps del Hub, enciende **VeriFactu** (se enciende Facturación con ella).
 2. Desde ese momento cada factura que emite Facturación se registra (VERIFACTU-F13) en el entorno de
    pruebas.
-3. Solo en un negocio de España. En uno de otro país (el de su cuenta de erplora.com), VeriFactu encendida no
-   hace nada: las facturas salen sin registro ni QR, **VeriFactu → Ajustes** y **VeriFactu → Configuración** dicen
+3. Solo en un negocio de España. En uno de otro país (el de su cuenta de erplora.com), Apps no la ofrece: sale
+   «No disponible» con «VeriFactu solo es para negocios de España.» y sin «Activar», y el hub contesta lo mismo si se
+   pide por el asistente o por la API. Una plantilla de peluquería o de restaurante no promete encenderla, carga todo
+   lo demás y queda completa, sin «Reintentar», diciendo por qué VeriFactu se queda fuera.
+4. Si ya estaba encendida en un negocio de otro país, no hace nada y se puede desactivar: las facturas salen sin registro ni QR, **VeriFactu → Ajustes** y **VeriFactu → Configuración** dicen
    arriba «VeriFactu solo es para negocios de España.» sin ofrecer nada que lleve a la AEAT, y lo que pida registrar o enviar algo contesta lo mismo.
 Entra: nada más que la orden.
 Sale: la app activa; sin interruptor propio.
 Si falla: lo dice la página de apps del Hub.
-Implicados: INVOICE-F01
+Implicados: INVOICE-F01, BASE-F18
 
 ### VERIFACTU-F02 Subir el certificado propio del negocio
 <!-- origen: fi:hub/runtime#certificado-fiscal-del-negocio-core-adr-0079-0081 fi:hub/server-cloud#settings-capabilities-certificado-fiscal-settings-rs old-hub:HUB-F302 old:verifactu/workflow/configuracion.md#verifactu-f02 qa:modules/verifactu/configure-identity-and-certificate -->
@@ -522,12 +525,12 @@ Actor: empleado, responsable, administrador
 Pantalla: Ajustes
 Pasos:
 1. En **VeriFactu → Ajustes**, tarjeta «Declaración responsable», «Leer la declaración firmada» abre la
-   publicada en erplora.com; al lado, «Versión de la declaración».
+   publicada en erplora.com (en la app instalada, en el navegador del dispositivo); al lado, «Versión de la declaración».
 2. «Datos identificativos de este sistema» enseña los datos del productor, la versión instalada y el número de
    instalación (el identificador de este negocio en ERPlora).
 Entra: la declaración (fija en la versión del Hub).
 Sale: nada; es consulta.
-Si falla: el mensaje del fallo.
+Si falla: el mensaje del fallo; en la app instalada, si no puede abrirla, «No se ha podido abrir esa página. Inténtalo de nuevo.».
 Implicados: ninguno
 
 ### VERIFACTU-F13 Registrar una factura emitida
@@ -652,17 +655,18 @@ Implicados: VERIFACTU-F15
 
 ### VERIFACTU-F18 Cotejar el QR en la sede de la AEAT
 <!-- origen: fi:hub/domain#modulo-chain-formatos-aeat-huella-sha-256-url-qr old:verifactu/workflow/registro-y-envio.md#verifactu-f18 wf:cadena-fiscal#rec_fiscal-f08 -->
-Estado: hecho
+Estado: parcial — en la app instalada la sede de la AEAT aún no abre: falta que la app acepte sus direcciones (ERPlora/app#20)
 Actor: empleado, responsable, administrador, cliente
 Pantalla: Registros
 Pasos:
-1. En **Registros**, «Cotejar en la AEAT» en la fila (o en la ficha) abre en otra pestaña la página de cotejo
-   de la AEAT con el NIF del emisor, el número, la fecha y el importe.
+1. En **Registros**, «Cotejar en la AEAT» en la fila (o en la ficha) abre en otra pestaña (en la app instalada, en el
+   navegador del dispositivo) la página de cotejo de la AEAT con el NIF del emisor, el número, la fecha y el importe.
 2. Un registro nacido en pruebas lleva a la sede de pruebas; uno de producción, a la sede real.
 3. El cliente hace lo mismo escaneando el QR de su tique o su factura.
 Entra: el enlace del QR fijado al sellar.
 Sale: nada en el Hub.
-Si falla: un registro que aún no ha salido se ve en la AEAT como no encontrado; uno rechazado, nunca.
+Si falla: un registro que aún no ha salido se ve en la AEAT como no encontrado; uno rechazado, nunca. En la app
+instalada, si no puede abrir la página, «No se ha podido abrir esa página. Inténtalo de nuevo.».
 Implicados: VERIFACTU-F19
 
 ### VERIFACTU-F19 Dar el QR y el estado fiscal al tique y a la factura
@@ -902,16 +906,18 @@ Implicados: ninguno
 <!-- origen: fi:modules/verifactu#query-verifactu-stats-compliance_summary old-hub:HUB-F314 old-hub:HUB-F316 old:verifactu/workflow/control.md#verifactu-f32 -->
 Estado: hecho — la plataforma pregunta al apagar (`base.app.disable`, hub#256) y VeriFactu responde con su
 `can_disable` (hub#267, FIX-BASE-APP-TURN-OFF-VETO); en España, una vez encendida, no se apaga nunca
-(FIX-HUB-VERIFACTU-NEVER-OFF-ONCE-ON)
+(FIX-HUB-VERIFACTU-NEVER-OFF-ONCE-ON), y Apps ya no ofrece «Desactivar» (hub#618)
 Actor: sistema
 Pantalla: Hub: Apps
 Pasos:
 1. Al apagar VeriFactu en un negocio de España, la plataforma le pregunta y VeriFactu lo niega siempre: una vez
    encendida, las facturas del negocio tienen que seguir llegando a la AEAT (la ley obliga a seguir con VERI*FACTU
-   al menos hasta que acabe el año natural, y ERPlora no tiene otra forma de registrarlas).
+   al menos hasta que acabe el año natural, y ERPlora no tiene otra forma de registrarlas). En **Apps** su fila no
+   ofrece «Desactivar» y dice ese motivo (BASE-F25).
 2. Da igual lo que haya en la cola: con registros por enviar o con todo ya contestado por la AEAT, la respuesta es
    la misma. VeriFactu sigue encendida y sus registros se quedan como estaban. Tampoco se pueden apagar las apps que
-   necesita: Facturación y, por ella, Impuestos, Ventas / TPV y Clientes.
+   necesita: Facturación y, por ella, Impuestos, Ventas / TPV y Clientes; sus filas tampoco lo ofrecen y dicen por
+   qué (hub#619).
 3. Un negocio sin país (una demo) es de España: tampoco se apaga.
 4. Mientras su estado dice «Activándose…» o «No se ha podido activar» todavía no ha estado encendida ni ha sellado
    nada: se puede desactivar.
@@ -1080,6 +1086,7 @@ sellado no añade nada (`already`). En un negocio de fuera de España no reaccio
 | Facturación | Sellar el registro de cada documento dentro de su emisión | `verifactu.record.create` |
 | Ventas, Facturación, Impresión | Poner el QR y el estado fiscal en el tique y la factura | `verifactu.record.by_invoice` |
 | Plataforma (`base.app.disable`) | No apagar VeriFactu una vez encendida (en España) | `can_disable` de `VerifactuConfig` |
+| Plataforma (`base.app.enable`) | No encender VeriFactu fuera de España | `can_enable` de `VerifactuConfig` |
 
 ### Quién puede qué
 
@@ -1319,6 +1326,12 @@ app: gh:verifactu#139). Tests: `test_apps.py` (declaración, textos `en` + `es`,
   o caducó, otorgamiento sin aprobar en producción, o el servidor sin pasarela o cerrado). `SendControl` (una fila por `(NIF, entorno)`) guarda `next_send_at` (`TiempoEsperaEnvio` de la última
   respuesta) y es el cerrojo del envío: la pasada la toma con `select_for_update(skip_locked=True)`, así que dos
   pasadas nunca mandan la misma cadena y el sellado (que bloquea `Chain`) no espera a la red.
+- **La llamada a la pasarela espera dentro de la transacción** de la operación, porque sus cerrojos son los que impiden
+  que dos pasadas manden la misma cadena. Esa espera puede pasar de los 30 s en los que el clúster corta una transacción
+  ociosa (`idle_in_transaction_session_timeout`; la pasarela puede tardar 45 s en leer), así que cada llamada (`submit`,
+  `query` y `probe`) amplía antes el corte para su transacción, y solo para ella (`SET LOCAL`,
+  `base.operations.allow_idle_wait`, `gateway.LONGEST_WAIT_SECONDS`): una respuesta lenta de la AEAT se guarda y no gasta
+  un intento ni se reenvía con incidencia (hub#623).
 - Un envío junta los `pending` y `sent` de una cadena en orden de secuencia (hasta 1.000) cuando su primer
   pendiente ya toca (`next_attempt_at`) y la espera de la AEAT pasó. Sin respuesta: `attempts` +1 y espera de
   `5·2^(n−1)` minutos, con tope de 60; petición salida y sin respuesta (tiempo de lectura agotado): `sent`.
@@ -1446,13 +1459,13 @@ Las cerradas quedan tachadas con su motivo; las abiertas dicen dónde siguen.
    y `base.operations.is_demo_hub` la lee; como en la fase 1 comparte tablas, su entorno no sale de la configuración
    sino de que es demo: siempre pruebas (`queries.effective_environment`). En la fase 2 lee `control.Hub.is_demo` y
    no cambia nada más.
-11. **La autorización en el entorno de pruebas** — **sigue abierta** (FIX-FISCAL-TESTING-AUTHORISATION-CONTRADICTION,
-   bloqueada; señalada en el cierre de `fiscal_gateway`, saas#82): la pasarela del SaaS (`fiscal_gateway/internal.py`,
-   `_identity`) exige el otorgamiento aprobado por la vía de ERPlora en los dos entornos, y este Hub
-   (`queries._route_sending_problem`) solo lo pide en producción: un negocio nuevo, por la vía por defecto, sella en
-   pruebas y sus registros no llegan a la AEAT de pruebas hasta que ERPlora aprueba su Anexo I. ADR-0360 del producto
-   actual dice «en pruebas no hay nada que autorizar». Es fiscal y queda bajo la supervisión de Ioan
-   (working-rules §15): no se elige lado aquí.
+11. ~~**La autorización en el entorno de pruebas**~~ — **cerrada (2026-11-03, saas#210;
+   FIX-FISCAL-TESTING-AUTHORISATION-CONTRADICTION)**: gana el lado de este Hub (`queries._route_sending_problem`) y de
+   ADR-0360 del producto actual. La autorización se exige por entorno: la pasarela del SaaS (`fiscal_gateway/internal.py`,
+   `_identity`) ya solo pide el otorgamiento aprobado en producción, así que un negocio nuevo, por la vía por defecto,
+   llega a la AEAT de pruebas desde su primer tique; el Anexo I sigue siendo lo que abre el paso a producción
+   (VERIFACTU-F08). En pruebas la pasarela sigue rechazando a un negocio que declara el NIF de ERPlora (409
+   `nif_mismatch`). Decisión y referencias en la ronda 2026-11-03l de `PLAN-SAAS.md` (§33); este Hub no cambia.
 12. **«Fijo tras el primer envío» frente a «tras el primer sellado»** — **sigue abierta** (señalada en PLAN-HUB §4,
    ronda 2026-10-22b): PLAN §30 deja el interruptor en vivo fijo cuando se **envía** la primera factura a la AEAT;
    `verifactu.config.back_to_testing` ya se niega (409 `verifactu.production_has_records`) en cuanto hay un registro
@@ -1499,10 +1512,11 @@ Las cerradas quedan tachadas con su motivo; las abiertas dicen dónde siguen.
     (`disable_refusal` → `None`). Sin país (una demo), es España. El hub propio de ERPlora lee su país como los demás,
     de `base.business.get`, que para él contesta el de su emisor (`PLATFORM_ISSUER_COUNTRY`, hub#329): VeriFactu no
     guarda otra fuente del mismo dato (FIX-HUB-VERIFACTU-OWN-SHORTCUT-FOR-PLATFORM-HUB-COUNTRY). Lo sellado antes en
-    un negocio de fuera no se borra (los registros fiscales nunca se borran): se queda sin enviar, con su motivo. Que
-    **Apps** no la ofrezca encendible fuera de España necesita un gancho de encendido de la plataforma
-    (`can_enable(self, ctx) -> str | None` en `LiveAppConfig`, como `can_disable`, que respeten `base.app.enable` y
-    `base.app.list`); hasta entonces se enciende y no hace nada.
+    un negocio de fuera no se borra (los registros fiscales nunca se borran): se queda sin enviar, con su motivo. **Apps**
+    no la ofrece encendible fuera de España: `can_enable(self, ctx) -> str | None` en `LiveAppConfig`, como
+    `can_disable`, que respetan `base.app.enable`, `base.app.retry` y `base.app.list` (hub#694). Una plantilla de
+    vertical pasa por `base.app.enable`: VeriFactu se queda fuera, con su motivo, y lo demás carga. Una ya encendida
+    se queda como está y no hace nada.
 16. **Una vez encendida, VeriFactu no se apaga en España** (FIX-HUB-VERIFACTU-NEVER-OFF-ONCE-ON, 2026-11-01; ajuste
     de Ioan del 22/10 en el plan de la fase 2, «Tablas por módulo (S3)»): `disable_refusal` contesta siempre
     `NEVER_OFF`, salvo fuera de España (decisión 15) o si nunca llegó a `on` (`creating` o `failed` de S3: no ha
@@ -1607,13 +1621,12 @@ Al cerrar la app (CLOSE-VERIFACTU, 2026-10-27), lo que sigue en la cola fuera de
 - **El paso «Configura VeriFactu» del Inicio fuera de España** (FIX-VERIFACTU-SETUP-STEP-SHOWN-OUTSIDE-SPAIN,
   `hub:base,verifactu`): un negocio de otro país aún lo ve en «Termina de configurar tu negocio»; el arreglo limpio
   necesita `base` (un hub sin país, contradicción 13).
-- **Que Apps no deje encender VeriFactu fuera de España** (FIX-HUB-APPS-ENABLE-REFUSED-OUTSIDE-ITS-COUNTRY,
-  `hub:base,verifactu`): falta el gancho de encendido de la plataforma (`can_enable`, como `can_disable`); hoy se
-  enciende y no hace nada (Decisión 15).
-- **La autorización en pruebas** (FIX-FISCAL-TESTING-AUTHORISATION-CONTRADICTION, bloqueada): contradicción 11, sin
-  elegir lado. Desde hub#454 el registro de pruebas de un negocio sin otorgamiento aprobado llega a la pasarela como
-  ese negocio y espera con su rechazo, `representation_not_approved` («falta que ERPlora apruebe tu autorización
-  firmada para remitir en tu nombre»), en vez de `nif_mismatch`; el lado (si en pruebas hace falta) sigue sin elegir.
+- ~~**Que Apps no deje encender VeriFactu fuera de España**~~ (FIX-HUB-APPS-ENABLE-REFUSED-OUTSIDE-ITS-COUNTRY) —
+  **cerrada** por hub#694: el gancho `can_enable` de la plataforma (Decisión 15).
+- ~~**La autorización en pruebas**~~ (FIX-FISCAL-TESTING-AUTHORISATION-CONTRADICTION) — **cerrada el 2026-11-03**
+  (saas#210, contradicción 11): la pasarela ya no pide el otorgamiento en pruebas, y el registro de pruebas de un
+  negocio sin otorgamiento aprobado, que desde hub#454 llega a la pasarela como ese negocio, se presenta a la AEAT de
+  pruebas en vez de esperar con `representation_not_approved`.
 - **El NIF de ERPlora tecleado por un negocio en la BD compartida** (fase 1, hasta una BD por hub): la pasada del hub
   de ERPlora no distingue ese emisor del de ERPlora y lo presenta como `erplora` (saas#2524); cuando cada hub tenga su
   BD (tenencia), la pasada de cada uno corre en el ámbito de su negocio y presenta con su slug.

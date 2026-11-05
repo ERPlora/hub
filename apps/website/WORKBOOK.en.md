@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:22e3edf446a9536d235faeb3e5de36f038f4be54f9f85965d5a78d7790670721 -->
+<!-- generated from WORKBOOK.md sha256:6a0e550ed7ba1f382520e20ef6129ca84138b01b747feb42662374eee30e903d -->
 
 ## What it is for and who it is for
 
@@ -111,7 +111,7 @@ written (cut at 280 characters, whole under the pointer), and below «Rating and
 relevant first, as Google orders them.»;
 the contact as chips with an icon (phone, email),
 WhatsApp as a button and the socials as pills; the opening hours as a list with **today** highlighted (the business's
-day, in the hub's time zone; Madrid's without one); the address in a card with **Open the map**. A footer in columns:
+day, in the hub's time zone; the deployment's without one); the address in a card with **Open the map**. A footer in columns:
 the name and the footer's line, links to the sections and **Log in**, and last the credit «© <year> ERPlora» (opened
 apart). Motion is only a hover's transition (and none
 when the system asks for less). The browser's tab shows the logo or, without one, the name's initial in the main
@@ -334,8 +334,9 @@ In: the business's address.
 Out: the published page, with its own security policy (no user scripts: only the page's bundle), without cookies and
 kept a minute by the browser; the tab shows the logo or the name's initial.
 If it fails: not published, taken offline or with the app off, the address leads to the team's sign-in; whoever
-makes more than 60 reads a minute from one connection waits a moment.
-Involved: WEBSITE-F07, WEBSITE-F08, WEBSITE-F05, WEBSITE-F11, WEBSITE-F12
+makes more than 60 reads a minute from one connection waits a moment. On the business's own domain (BASE-F110) it is the
+same page: **Log in** leads to its address on erplora.com and, with no page to show, the domain says there is nothing there.
+Involved: WEBSITE-F07, WEBSITE-F08, WEBSITE-F05, WEBSITE-F11, WEBSITE-F12, BASE-F110, HUBS-F17
 
 ### WEBSITE-F11 Show a photo gallery
 <!-- origin: new (a salon's gallery of its work, like Fresha's, Booksy's and Square Online's; PLAN §29, extension of 2026-10-22) -->

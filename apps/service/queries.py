@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from functools import partial
 from uuid import UUID
 
+from babel.dates import format_date
 from django.db.models import (
     Case,
     CharField,
@@ -53,8 +54,12 @@ from apps.service.schemas import (
     AdjustCheckOut,
     AssignmentListIn,
     AssignmentPage,
+    AssignmentDetailOut,
     ByIdIn,
     CatalogStatusOut,
+    GrantDetailOut,
+    SessionDetailOut,
+    SessionRefIn,
     CategoryListIn,
     CategoryOut,
     CategoryPage,
@@ -90,7 +95,9 @@ from apps.service.schemas import (
 from apps.staff.models import Member
 from apps.staff.queries import resolve_member
 from base import images
+from base.business import babel_locale, business_zone
 from base.queries import business_language, image_library
+from base.ordering import list_order_for
 
 SERVICE_NOT_FOUND = _("That service does not exist in this business.")
 SERVICE_AMBIGUOUS = _("“%(said)s” matches several services: %(names)s. Say which one.")
@@ -98,6 +105,8 @@ CATEGORY_NOT_FOUND = _("That category does not exist in this business.")
 CATEGORY_AMBIGUOUS = _(
     "“%(said)s” matches several categories: %(names)s. Say which one."
 )
+ASSIGNMENT_NOT_FOUND = _("That assignment does not exist in this business.")
+SESSION_NOT_FOUND = _("That voucher session does not exist in this business.")
 PACKAGE_NOT_FOUND = _("That package does not exist in this business.")
 PACKAGE_AMBIGUOUS = _("“%(said)s” matches several packages: %(names)s. Say which one.")
 GRANT_NOT_FOUND = _("That voucher sale does not exist in this business.")
@@ -590,6 +599,32 @@ def balance(grant: Grant, now: dt.datetime | None = None) -> Balance:
     )
 
 
+def session_value(grant_id: UUID) -> int | None:
+    """What the next session delivered of a voucher sold is worth (SERVICE-F24), with its row locked by the caller:
+    what is left of the price paid ÷ the sessions not delivered yet, half up, so 100.00 in 3 sessions is 33.33 + 33.34
+    + 33.33 and what is delivered adds up to what was paid, to the cent, through courtesies, corrections and sessions
+    given back. An unlimited voucher has no sessions to divide by: ``None``. A paid voucher that does not say the line
+    that charged it is worth 0: that money may already count for who sold it (a voucher from before this, one granted
+    without its sale), and nothing counts twice."""
+    grant = grants().get(pk=grant_id)
+    if grant.amount and grant.sale_line_id is None:
+        return 0
+    total = balance(grant).max_uses
+    if total is None:
+        return None
+    delivered = Redemption.objects.filter(grant_id=grant_id, status=Redemption.Status.CONSUMED).aggregate(
+        count=Count("id"), value=Coalesce(Sum("value"), 0)
+    )
+    amount_left = max(grant.amount - delivered["value"], 0)
+    sessions_left = max(total - delivered["count"], 1)
+    return (2 * amount_left + sessions_left) // (2 * sessions_left)
+
+
+def _named(*parts: str | None) -> str:
+    """How a person tells a voucher or a session apart: what is known of it, what is not left out."""
+    return " · ".join(part for part in parts if part)
+
+
 def _customer_name(ctx: OperationContext, grant: Grant) -> str | None:
     customer = grant.customer
     return (
@@ -637,6 +672,44 @@ def grant_row(
         "can_adjust": not voided
         and (grant.max_uses is not None or grant.validity_days is not None),
     }
+
+
+def session_rows(ids) -> list[dict]:
+    """``SessionOut`` of each session, in the order given, with its voucher's balance read now."""
+    wanted = list(dict.fromkeys(ids))
+    now = timezone.now()
+    sessions = {
+        session.id: session for session in Redemption.objects.filter(pk__in=wanted)
+    }
+    owners = {
+        grant.id: grant
+        for grant in grants(now).filter(
+            pk__in={session.grant_id for session in sessions.values()}
+        )
+    }
+    rows = []
+    for session_id in wanted:
+        session = sessions[session_id]
+        grant = owners[session.grant_id]
+        state = balance(grant, now)
+        rows.append(
+            {
+                "id": session.id,
+                "grant_id": grant.id,
+                "package_id": grant.package_id,
+                "package_name": grant.package.name,
+                "customer_id": grant.customer_id,
+                "service_id": session.service_id,
+                "status": session.status,
+                "order_line_id": session.order_line_id,
+                "hold_until": session.hold_until,
+                "sale_id": session.sale_id,
+                "value": session.value,
+                "remaining": state.remaining,
+                "voucher_expired": state.is_expired,
+            }
+        )
+    return rows
 
 
 def load_grant(ctx: OperationContext, grant_id: UUID) -> dict:
@@ -694,7 +767,7 @@ def list_services(ctx: OperationContext, params: ServiceListIn) -> dict:
         )
     )
     return _page(
-        _sorted(services, params.sort, SERVICE_ORDER, ("name", "id")),
+        services.order_by(*list_order_for(params.sort, "name", columns=SERVICE_ORDER, nulls_last=True)),
         params,
         partial(_service_row, urls=images.Urls(ctx.scope)),
     )
@@ -809,7 +882,9 @@ def list_categories(ctx: OperationContext, params: CategoryListIn) -> dict:
     if params.parent_id:
         categories = categories.filter(parent_id=params.parent_id)
     return _page(
-        _sorted(categories, params.sort, CATEGORY_ORDER, ("sort_order", "name", "id")),
+        categories.order_by(
+            *list_order_for(params.sort, "sort_order", "name", columns=CATEGORY_ORDER, nulls_last=True)
+        ),
         params,
         _category_row,
     )
@@ -875,6 +950,26 @@ def list_assignments(ctx: OperationContext, params: AssignmentListIn) -> dict:
         "-is_primary", "member__first_name", "member__last_name", "service__name", "id"
     )
     return _page(ordered, params, assignment_row)
+
+
+@operation(
+    "service.assignment.get",
+    kind="query",
+    permission="service.view_service",
+    input=ByIdIn,
+    output=AssignmentDetailOut,
+    expose_api=True,
+    ai={
+        "description": "Get one professional's assignment to a service by its id: the service, the professional and "
+        "their own duration and price, if any."
+    },
+)
+def get_assignment(ctx: OperationContext, data: ByIdIn) -> dict:
+    assignment = _assignments().filter(pk=data.id).first()
+    if assignment is None:
+        raise NotFound(str(ASSIGNMENT_NOT_FOUND), code="service.assignment_not_found")
+    row = assignment_row(assignment)
+    return {**row, "label": f"{row['service_name']} · {row['member_name']}"}
 
 
 @operation(
@@ -953,7 +1048,7 @@ def list_packages(ctx: OperationContext, params: PackageListIn) -> dict:
         if text:
             packages = packages.filter(name__icontains=text)
     return _page(
-        _sorted(packages, params.sort, PACKAGE_ORDER, ("sort_order", "name", "id")),
+        packages.order_by(*list_order_for(params.sort, "sort_order", "name", columns=PACKAGE_ORDER, nulls_last=True)),
         params,
         _package_row,
     )
@@ -1012,6 +1107,44 @@ def list_grants(ctx: OperationContext, params: GrantListIn) -> dict:
         params,
         lambda grant: grant_row(ctx, grant, now),
     )
+
+
+@operation(
+    "service.grant.get",
+    kind="query",
+    permission="service.view_package_balance",
+    input=ByIdIn,
+    output=GrantDetailOut,
+    expose_api=True,
+    ai={
+        "description": "Get one voucher sold by its id: its package, its owner, the day it was sold and its balance."
+    },
+)
+def get_grant(ctx: OperationContext, data: ByIdIn) -> dict:
+    grant = find_grant(data.id)
+    sold_on = format_date(timezone.localdate(grant.granted_at, business_zone()), "medium", locale=babel_locale(ctx.language))
+    return {**grant_row(ctx, grant), "label": _named(grant.package.name, _customer_name(ctx, grant), sold_on)}
+
+
+@operation(
+    "service.session.get",
+    kind="query",
+    permission="service.view_package_balance",
+    input=SessionRefIn,
+    output=SessionDetailOut,
+    expose_api=True,
+    ai={
+        "description": "Get one session of a voucher sold by its id: the voucher it comes from, its owner, the service "
+        "it pays and whether it is held, spent, released, expired or returned."
+    },
+)
+def get_session(ctx: OperationContext, data: SessionRefIn) -> dict:
+    session = Redemption.objects.select_related("service", "grant__package", "grant__customer").filter(pk=data.id).first()
+    if session is None:
+        raise NotFound(str(SESSION_NOT_FOUND), code="service.session_not_found")
+    service = session.service.name if session.service else None
+    label = _named(session.grant.package.name, _customer_name(ctx, session.grant), service)
+    return {**session_rows([session.id])[0], "label": label}
 
 
 @operation(
@@ -1398,20 +1531,6 @@ def _adjustment_row(ctx: OperationContext, adjustment: GrantAdjustment) -> dict:
 def _bounds(**lookups) -> dict:
     """The lookups whose value was given (a filter left empty narrows nothing)."""
     return {lookup: value for lookup, value in lookups.items() if value is not None}
-
-
-def _sorted(
-    rows, sort: str, columns: dict[str, tuple[str, ...]], tie_break: tuple[str, ...]
-):
-    """``rows`` by ``sort`` (a leading «-» reverses it), then by ``tie_break``; nulls last either way."""
-    descending = sort.startswith("-")
-    keys = [
-        F(column).desc(nulls_last=True)
-        if descending
-        else F(column).asc(nulls_last=True)
-        for column in columns[sort.lstrip("-")]
-    ]
-    return rows.order_by(*keys, *tie_break)
 
 
 def _page(queryset, params, row) -> dict:

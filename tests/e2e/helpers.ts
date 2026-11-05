@@ -14,6 +14,7 @@ import { fileURLToPath } from 'node:url';
 
 import { type Browser, type BrowserContext, type Cookie, expect, type Locator, type Page, test } from '@playwright/test';
 
+import { turnOffRecorded, turnOnRecording } from './apps-turned-on';
 import { hubDatabases, plan } from './hub-databases';
 import { mailDirFrom, readMailCode } from './mail';
 import { isConnectionRefused, withRetry } from './retry';
@@ -498,6 +499,48 @@ export async function hostPage(
   return { context, page };
 }
 
+/** The owner of `a` on `next`, with the Hub in Spanish (its language cookie, as the language picker leaves it). */
+export async function signedInSpanish(
+  browser: Browser,
+  viewport: { width: number; height: number },
+  next: string,
+): Promise<{ context: BrowserContext; page: Page }> {
+  const context = await browser.newContext({ baseURL: A, viewport, locale: 'es-ES' });
+  const page = await context.newPage();
+  await login(page, A, next);
+  await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
+  // A reload, not a goto: the login already left the page on `next`, and a goto to the same address with a hash
+  // would not load it again.
+  await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('lang', /^es/);
+  return { context, page };
+}
+
+/** The capture once the screen settled and nothing scrolls sideways. */
+export async function settledCapture(page: Page, name: string): Promise<void> {
+  await expect(shown(page).locator('ion-skeleton-text:visible')).toHaveCount(0);
+  expect(await horizontalOverflow(page), `${name}: no sideways scroll`).toBeLessThanOrEqual(0);
+  await capture(page, name);
+}
+
+/** What the page on screen marks with this `data-testid`. */
+export const testid = (page: Page, id: string): Locator => shown(page).locator(`[data-testid="${id}"]`);
+
+/** `id`'s row in the Apps screen. */
+export const appRow = (page: Page, id: string): Locator => shown(page).locator(`[data-testid="apps-row"][data-id="${id}"]`);
+
+/** The names the topbar's «My apps» (the menu of the apps, from the session) lists now. */
+export async function menuApps(page: Page): Promise<string[]> {
+  await testid(page, 'topbar-apps').click();
+  const sheet = page.locator('[data-testid="apps-launcher"]').last();
+  const tiles = sheet.locator('[data-testid="apps-launcher-app"]');
+  await expect(tiles.first()).toBeVisible();
+  const names = (await tiles.allInnerTexts()).map((name) => name.trim());
+  await sheet.locator('[data-testid="apps-launcher-close"]').click();
+  await expect(sheet).toBeHidden();
+  return names;
+}
+
 /** The demo's API with the context's session (setup and server-side evidence, never the check). */
 export async function api<T>(
   context: BrowserContext,
@@ -601,6 +644,28 @@ export async function turnOn(context: BrowserContext, origin: string, ...apps: s
         .toBe('on');
     }
   }
+}
+
+/**
+ * Turns on, in their order, the apps of `needed` that are off in the business at `origin` (`turnOn`), and appends each
+ * to `turnedOn` once it is on: the record a spec file's `afterAll` hands to `turnOffTurnedOn`, so it turns off what
+ * this file turned on and nothing else. Called from a `beforeAll`, after whatever may fall first (the check of the
+ * SaaS's assistant provider): a file that fell before turning anything on leaves the business as it found it (hub#480).
+ */
+export async function turnOnMissing(context: BrowserContext, origin: string, needed: readonly string[], turnedOn: string[]): Promise<void> {
+  const listed = await api<{ apps: { id: string; state: string }[] }>(context, origin, 'GET', '/apps');
+  expect(listed.status, `list the apps: ${JSON.stringify(listed.data)}`).toBe(200);
+  const on = new Set(listed.data.apps.filter((app) => app.state === 'on').map((app) => app.id));
+  await turnOnRecording(needed, on, (app) => turnOn(context, origin, app), turnedOn);
+}
+
+/** Turns off, last first, what `turnOnMissing` recorded in `turnedOn`, through Apps' own command
+ *  (`POST /api/apps/disable`, `base.app.disable`): nothing when nothing was turned on (hub#480). */
+export async function turnOffTurnedOn(context: BrowserContext, origin: string, turnedOn: string[]): Promise<void> {
+  await turnOffRecorded(turnedOn, async (app) => {
+    const off = await api(context, origin, 'POST', '/apps/disable', { app });
+    expect(off.status, `turn off ${app}: ${JSON.stringify(off.data)}`).toBe(200);
+  });
 }
 
 /** Deletes every demo item (phase 1: `a` and `b` share them), through the API. */
@@ -917,6 +982,17 @@ export function decodeSubs(url: string): unknown[] {
 /** The secret `/internal` is signed with; the local default of both projects. */
 const INTERNAL_SECRET = process.env.INTERNAL_SHARED_SECRET || 'local-internal-shared-secret';
 
+/** `PUT <path>` on the Hub's `/internal` door, with `body` signed the way erplora.com signs it. */
+export async function internalPut(path: string, body: string): Promise<Response> {
+  const timestamp = String(Math.floor(Date.now() / 1000));
+  const signature = createHmac('sha256', INTERNAL_SECRET).update(`${timestamp}.${body}`).digest('hex');
+  return fetch(`http://127.0.0.1:${STACK.hubPort}${path}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'X-Erplora-Timestamp': timestamp, 'X-Erplora-Signature': signature },
+    body,
+  });
+}
+
 /** A hub's registration as erplora.com sent it (`base_hub`): read before a run moves its business, put back after. */
 export interface Registration {
   id: string;
@@ -939,14 +1015,7 @@ export function registrationOf(slug: string): Registration {
 /** erplora.com registers `registration`'s business in `country`, the way the SaaS does (`PUT /internal/hubs/{id}`,
  *  signed): its currency is then its country's. */
 export async function registerBusinessIn(registration: Registration, country: string): Promise<void> {
-  const body = JSON.stringify({ ...registration, country });
-  const timestamp = String(Math.floor(Date.now() / 1000));
-  const signature = createHmac('sha256', INTERNAL_SECRET).update(`${timestamp}.${body}`).digest('hex');
-  const response = await fetch(`http://127.0.0.1:${STACK.hubPort}/internal/hubs/${registration.id}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json', 'X-Erplora-Timestamp': timestamp, 'X-Erplora-Signature': signature },
-    body,
-  });
+  const response = await internalPut(`/internal/hubs/${registration.id}`, JSON.stringify({ ...registration, country }));
   const answer = await response.text();
   expect(response.status, answer).toBe(200);
   expect(psql(`select country from base_hub where slug = '${registration.slug}'`)).toBe(country);

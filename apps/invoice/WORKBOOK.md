@@ -416,9 +416,10 @@ Pasos:
    hoy, sus líneas y la base, los impuestos y el total en negativo; si la factura ya tenía rectificativas
    por diferencias, también lo que queda por rectificar de ella.
 5. Después sale «¿Ejecutar esta acción?» con el «Número» de la factura y el «Motivo» y, en
-   «Lo que va a pasar», la rectificativa que va a nacer: el «Tipo de rectificativa», el «Siguiente número»
-   de la serie (tampoco queda reservado) y la «Base imponible», el «Impuesto» y el «Total» en negativo,
-   con la moneda del negocio. Escribe «CONFIRMAR» y pulsa «Ejecutar». Se emite esa misma rectificativa,
+   «Lo que va a pasar», la rectificativa que va a nacer: el «Tipo de rectificativa» por su nombre, nunca solo
+   por su código («Rectificativa: resto de causas (R4)»; también si el asistente lo pide al rectificar), el
+   «Siguiente número» de la serie (tampoco queda reservado) y la «Base imponible», el «Impuesto» y el «Total»
+   en negativo, con la moneda del negocio. Escribe «CONFIRMAR» y pulsa «Ejecutar». Se emite esa misma rectificativa,
    a tu nombre, igual que desde la ventana: en **Facturas** la original sale «Cancelada» y hay una
    «Rectificativa» nueva fechada hoy.
 6. Si pulsas «Cancelar», no se emite nada: la factura sigue «Emitida» y el asistente dice que no se hizo.
@@ -621,14 +622,16 @@ Pasos:
 2. Lee la cabecera, las líneas (con su «Precio» sin IVA y antes de descuentos y, si alguna lo tiene, la
    columna «Dto.» con el descuento sin IVA), el desglose y los totales.
 3. Con **VeriFactu**, lee debajo el «Justificante VeriFactu»: el estado del registro en la AEAT, su «CSV»
-   cuando la AEAT ya contestó y el QR, que se puede escanear o abrir con «Validar en la Agencia Tributaria ↗».
+   cuando la AEAT ya contestó y el QR, que se puede escanear o abrir con «Validar en la Agencia Tributaria ↗» (en la
+   app instalada, en el navegador del dispositivo, en cuanto la app acepte esa dirección: ERPlora/app#20).
 4. «Rectifica a», «Sustituye a», «Sustituida por» y las rectificativas abren el documento enlazado.
 5. «← Volver» regresa a la lista.
 Entra: la factura y sus líneas y, con VeriFactu, su registro.
 Sale: nada; solo se lee. La ficha se pone al día sola si mientras tanto se paga, se rectifica o la AEAT
 contesta.
 Si falla: «Factura no encontrada» o el motivo del fallo. Sin VeriFactu, sin registro todavía o sin permiso
-para verlo, la ficha sale sin la tarjeta del justificante.
+para verlo, la ficha sale sin la tarjeta del justificante. En la app instalada, si no puede abrir la página de la
+AEAT, «No se ha podido abrir esa página. Inténtalo de nuevo.».
 Implicados: VERIFACTU-F19
 
 ### INVOICE-F18 Imprimir o guardar en PDF una factura
@@ -642,8 +645,10 @@ Pasos:
    impresora, con el QR de VeriFactu si tiene su registro, y se lee «Enviado a <impresora>.»
    (PRINTING-F08).
 3. Si no (sin Impresión encendida, sin impresora del sistema, o si no se pudo leer su registro de VeriFactu
-   para esa impresora), se abre el diálogo de impresión del
-   navegador con la factura en A4 (con VeriFactu, arriba el QR del registro con «QR tributario:» y
+   para esa impresora), se abre el diálogo de impresión del dispositivo (el del navegador o, en la app
+   instalada, su pantalla de impresión: el diálogo del sistema, con la impresora o «Guardar como PDF», y el
+   trabajo llamado «Factura <número>») con la factura en A4 (con VeriFactu, arriba el QR del registro con
+   «QR tributario:» y
    «VERI*FACTU»; emisor, «Facturar a», líneas, desglose por tipo, totales y la nota de lo que rectifica),
    desde donde se puede guardar como PDF. Mientras llega el registro, «Imprimir / PDF» espera: el papel
    nunca sale sin su QR.
@@ -652,7 +657,9 @@ Pasos:
 Entra: la factura y sus líneas.
 Sale: el papel; la factura no cambia. Cada pulsación, un papel.
 Si falla: «No se pudo imprimir la factura», también si no se puede leer el registro de VeriFactu de una
-factura que lo tiene (no se imprime sin su QR).
+factura que lo tiene (no se imprime sin su QR). Si la app instalada no abre su pantalla de impresión, el
+aviso dice por qué tras dos puntos («…: esta versión de la app de ERPlora no puede imprimir; actualízala»,
+«…: el servicio de impresión del dispositivo no se abrió»…).
 Implicados: PRINTING-F08, VERIFACTU-F19
 
 ### INVOICE-F19 Marcar una factura como pagada

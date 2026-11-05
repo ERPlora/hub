@@ -12,10 +12,12 @@ import { useRoute, useRouter } from 'vue-router';
 
 import FlowEditor from '../components/FlowEditor.vue';
 import { useLeaveGuard } from '../composables/useLeaveGuard';
+import { provideBusinessClock } from '../composables/usePhrasing';
 import { emptyDocument, type FlowDocument } from '../lib/document';
 import { markSaved } from '../lib/justSaved';
 import type { DraftOut, FlowOut } from '../operations';
 
+provideBusinessClock();
 const route = useRoute();
 const router = useRouter();
 const draftId = typeof route.query.draft === 'string' ? route.query.draft : '';

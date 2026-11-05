@@ -59,6 +59,7 @@ from apps.sale.models import (
     sale_number,
 )
 from apps.sale.queries import (
+    COUNTED,
     CASH_LIMIT,
     LIMITS_CURRENCY,
     Booking,
@@ -76,6 +77,7 @@ from apps.sale.queries import (
     call_services,
     charge_parts,
     check_grid,
+    business_letterhead,
     current_settings,
     department_rates,
     department_row,
@@ -116,6 +118,9 @@ from apps.sale.queries import (
     valuate,
 )
 from apps.sale.schemas import (
+    VoucherLineOut,
+    VoucherSoldIn,
+    VoucherUnsoldIn,
     COUNTRY_CODE,
     CompleteIn,
     CustomerMergedIn,
@@ -238,6 +243,10 @@ LINE_NOT_COVERABLE = _(
     "Only a line of a service of Services that is not a comp can be paid with a voucher."
 )
 VOUCHER_NEEDS_ONE_UNIT = _("A voucher pays a line of one unit: split the line first.")
+SALE_LINE_NOT_FOUND = _("That line is not in that sale.")
+VOUCHER_LINE_REQUIRED = _("That sale charged several lines: say which one paid for the voucher: %(lines)s.")
+VOUCHER_OVER_LINE = _("That line has %(left)s left to pay for vouchers: it cannot pay for one of %(amount)s.")
+VOUCHER_SALE_VOIDED = _("That sale was voided: it paid for no voucher.")
 LINE_ALREADY_COVERED = _("That line is already paid with a voucher.")
 LINE_NOT_COVERED = _("That line is not paid with any voucher.")
 LINE_COVERED_BY_VOUCHER = _(
@@ -2306,10 +2315,12 @@ def _complete(ctx: OperationContext, data: CompleteIn, *, over_limit: bool) -> d
         raise Conflict(
             str(CHECKOUT_IN_PROGRESS), code="sale.checkout_in_progress"
         ) from None
-    # The sessions held for the lines a voucher pays are delivered with the sale, or nothing is charged.
+    # The sessions held for the lines a voucher pays are delivered with the sale, or nothing is charged; what each
+    # is worth from now on stays on its line.
     covered = [line.voucher_session_id for line in lines if line.voucher_session_id]
+    session_values = {}
     if covered:
-        call_services(
+        settled = call_services(
             ctx,
             "service.session.settle",
             {
@@ -2318,8 +2329,9 @@ def _complete(ctx: OperationContext, data: CompleteIn, *, over_limit: bool) -> d
                 "customer_id": card.id if card else None,
             },
         )
+        session_values = {session.id: session.value for session in settled.rows}
     sale_lines = SaleLine.objects.bulk_create(
-        _sale_lines(sale, parts, valuation)
+        _sale_lines(sale, parts, valuation, session_values)
     )
     payments = SalePayment.objects.bulk_create(
         [
@@ -2395,7 +2407,86 @@ def _complete(ctx: OperationContext, data: CompleteIn, *, over_limit: bool) -> d
     return {**detail, "printed": printed}
 
 
-def _sale_lines(sale: Sale, parts: list[OrderLine], valuation) -> list[SaleLine]:
+def _line_that_sold_voucher(data: VoucherSoldIn) -> SaleLine:
+    """The line ``data`` names, or the one its sale charged, locked. Never guessed: a sale that charged several says
+    which one. One with no line that charged anything answers one of them: nothing fits on it."""
+    lines = SaleLine.objects.select_for_update(of=("self",)).select_related("sale")
+    if data.line_id is not None:
+        named = lines.filter(pk=data.line_id)
+        line = (named.filter(sale_id=data.sale_id) if data.sale_id else named).first()
+        if line is None:
+            raise NotFound(str(SALE_LINE_NOT_FOUND), code="sale.sale_line_not_found")
+        return line
+    sale = find_sale(data.sale_id, None)
+    of_sale = list(lines.filter(sale=sale))
+    charged = [line for line in of_sale if line.line_total > 0]
+    if len(charged) > 1:
+        raise Conflict(
+            str(VOUCHER_LINE_REQUIRED)
+            % {"lines": ", ".join(f"«{line.name}» {money_text(line.line_total, sale.currency)}" for line in charged)},
+            code="sale.voucher_line_required",
+        )
+    return (charged or of_sale)[0]
+
+
+@operation(
+    "sale.sale.voucher_sold",
+    kind="command",
+    permission="sale.take_payment",
+    input=VoucherSoldIn,
+    output=VoucherLineOut,
+    ai=INTERNAL,
+)
+def voucher_sold(ctx: OperationContext, data: VoucherSoldIn) -> dict:
+    """Services' step when it grants a voucher saying the sale that charged it (SERVICE-F14): that much of the line is
+    no production of who sold it (SALE-F28). The sale's money and documents do not move."""
+    line = _line_that_sold_voucher(data)
+    if line.sale.status not in COUNTED:
+        raise Conflict(str(VOUCHER_SALE_VOIDED), code="sale.voucher_sale_voided")
+    left = line.line_total - line.voucher_sold_amount
+    if data.amount > left:
+        currency = line.sale.currency
+        raise Conflict(
+            str(VOUCHER_OVER_LINE)
+            % {"left": money_text(left, currency), "amount": money_text(data.amount, currency)},
+            code="sale.voucher_over_line",
+        )
+    SaleLine.objects.filter(pk=line.pk).update(voucher_sold_amount=F("voucher_sold_amount") + data.amount)
+    record_event(ctx, events.SALE_VOUCHER_LINE_CHANGED, {"sale_id": str(line.sale_id), "line_id": str(line.id)})
+    return {"sale_id": line.sale_id, "line_id": line.id}
+
+
+@operation(
+    "sale.sale.voucher_unsold",
+    kind="command",
+    permission="sale.take_payment",
+    input=VoucherUnsoldIn,
+    output=VoucherLineOut,
+    ai=INTERNAL,
+)
+def voucher_unsold(ctx: OperationContext, data: VoucherUnsoldIn) -> dict:
+    """Services' step when a voucher a line paid for is voided (SERVICE-F17): the line counts for who sold it again."""
+    line = SaleLine.objects.select_for_update().filter(pk=data.line_id).first()
+    if line is None:
+        raise NotFound(str(SALE_LINE_NOT_FOUND), code="sale.sale_line_not_found")
+    SaleLine.objects.filter(pk=line.pk).update(voucher_sold_amount=max(line.voucher_sold_amount - data.amount, 0))
+    record_event(ctx, events.SALE_VOUCHER_LINE_CHANGED, {"sale_id": str(line.sale_id), "line_id": str(line.id)})
+    return {"sale_id": line.sale_id, "line_id": line.id}
+
+
+def _voucher_value(line: OrderLine, session_values: dict) -> int:
+    """What the session paying ``line`` is worth to who does it (SALE-F28): what Services fixed on delivering it. An
+    unlimited voucher has no sessions to divide its price by (``None``): the price of the line, as a salon's till counts
+    it. A line no voucher pays is worth no session."""
+    if line.voucher_session_id is None:
+        return 0
+    value = session_values[line.voucher_session_id]
+    return line.unit_price if value is None else value
+
+
+def _sale_lines(
+    sale: Sale, parts: list[OrderLine], valuation, session_values: dict
+) -> list[SaleLine]:
     """The fiscal copy of each part charged (``charge_parts``): a line of the check with the names of the
     options charged inside it, and a child line of an option under the line of its dish."""
     rows: list[SaleLine] = []
@@ -2432,6 +2523,7 @@ def _sale_lines(sale: Sale, parts: list[OrderLine], valuation) -> list[SaleLine]
             voucher_session_id=line.voucher_session_id,
             voucher_grant_id=line.voucher_grant_id,
             voucher_name=line.voucher_name,
+            voucher_value=_voucher_value(line, session_values),
             tax_category_key=out.tax_category_key,
             tax_rate=out.tax_rate,
             tax_country_code=out.tax_country_code,
@@ -3090,7 +3182,6 @@ def record_invoice(ctx: OperationContext, data: InvoiceIssuedIn) -> dict:
 
 PRINT_JOB = "printing.job.create"
 FISCAL_RECORD = "verifactu.record.by_invoice"
-ISSUER = "invoice.issuer.get"
 NOT_QUEUED = {"queued": False, "job_id": None, "printer": None}
 
 
@@ -3142,16 +3233,6 @@ def _fiscal_record(ctx: OperationContext, sale: SaleOut) -> dict | None:
     return found.record.model_dump() if found.record else None
 
 
-def _issuer_tax_id(ctx: OperationContext) -> str:
-    """The business's tax ID as Invoicing keeps it, for a full invoice's paper; empty when it cannot be read
-    (Printing then refuses the invoice and the screen prints it)."""
-    try:
-        op = get(ISSUER)
-        return op(ctx, op.input.model_validate({})).tax_id
-    except (UnknownOperation, OperationError):
-        return ""
-
-
 def _print_sale(ctx: OperationContext, sale: Sale, detail: SaleOut, *, duplicate: bool, key: str, at_checkout: bool = False) -> dict:
     """The receipt (or the full invoice) of ``sale`` to the receipt printer's queue. ``at_checkout``: the print by
     itself of the charge — it follows the printing settings, and the drawer opens only when cash came in. A
@@ -3167,14 +3248,11 @@ def _print_sale(ctx: OperationContext, sale: Sale, detail: SaleOut, *, duplicate
     with translation.override(ctx.language):
         kind, document = paper.receipt(
             detail,
-            header=settings.receipt_header,
+            letterhead=business_letterhead(ctx, detail.invoice_id),
             footer=settings.receipt_footer,
             decimals=get_currency_precision(currency),
             duplicate=duplicate,
             record=record,
-            issuer_tax_id=_issuer_tax_id(ctx) if detail.document_type == "invoice" else "",
-            customer_tax_id=sale.customer_tax_id,
-            customer_address=sale.customer_address,
         )
     request = {
         "job_key": key,
@@ -3250,10 +3328,11 @@ def print_sale(ctx: OperationContext, data: SalePrintIn) -> dict:
 def print_bill(ctx: OperationContext, data: OrderRefIn) -> dict:
     order = find_order(data.order_id)
     valued = preview(ctx, PreviewIn(order_id=data.order_id))
-    settings = current_settings()
     currency = business_currency(ctx)
     with translation.override(ctx.language):
-        document = paper.bill(valued, label=order.label, header=settings.receipt_header, decimals=get_currency_precision(currency))
+        document = paper.bill(
+            valued, label=order.label, letterhead=business_letterhead(ctx), decimals=get_currency_precision(currency)
+        )
     return _queue_paper(
         ctx,
         {

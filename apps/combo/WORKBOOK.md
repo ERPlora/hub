@@ -506,6 +506,7 @@ para varios, se dice cuáles y se pide que elija (`combo.combo_ambiguous`, `comb
 |---|---|---|---|
 | Los menús, con búsqueda, filtros y orden, en páginas de hasta 100 (en vivo) | ver | F01 | `combo.combo.list` |
 | Un menú con sus platos y sus elecciones, si sale en el TPV y por qué no (en vivo) | ver | F05, F06, F12 | `combo.combo.get` |
+| Una elección de un menú, por su id: solo para nombrar el plato en la tarjeta del asistente (SALE-F20) | ver | F07 | `combo.option.get` |
 | El catálogo de menús del TPV: los que se pueden vender, con sus platos y sus elecciones disponibles (en vivo) | ver | F07 | `combo.combo.for_sale` |
 | La línea de un menú con lo elegido: importe, componentes y reparto fiscal | ver | F08, F09, F10, F11 | `combo.combo.resolve` |
 | Hasta cinco imágenes de la librería para la foto de un menú, por su nombre; no pone ninguna | ver | F14 | `combo.combo.suggest_image` |
@@ -614,6 +615,9 @@ vende, y si Menús no está activo el TPV no ofrece menús.
 
 ## Para quien lo mantiene
 
+- **Orden de la lista de menús** (`base.ordering.list_order`; regla hub#2355 del producto viejo): la columna elegida,
+  después el nombre y al final el `id`, todo en la dirección de la lista: la descendente es la ascendente leída al revés,
+  empates incluidos. Lo fija `test_ties_read_backwards_in_a_descending_list`.
 - Anatomía completa: `apps.py`, `models.py`, `migrations/`, `schemas.py`, `queries.py`,
   `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/` y un
   `tests/test_<fichero>.py` por fichero, más `test_integration_inventory.py`,
@@ -674,6 +678,8 @@ vende, y si Menús no está activo el TPV no ofrece menús.
   (`inventory.product.list`, activos), de categoría fiscal con `Combo` (`tax.category.list`).
 - Reordenar: `ion-reorder-group` (asa) y los botones subir/bajar, que acaban en la misma operación
   (`reorder`). WCAG 2.5.7: todo lo que se arrastra se puede hacer sin arrastrar.
+- **Millares**: los importes agrupan los millares también con cuatro cifras («1.234,56 €»; `formatMoney` de
+  `@erplora/ui/components`, con `useGrouping: 'always'`, porque el CLDR del español espera a cinco: hub#654).
 - Los importes se leen con `lib/money.ts` (coma o punto, el «1.250» ambiguo se pregunta, el suplemento
   admite signo) y se pintan con `lib/format.ts`, en la moneda del negocio (`useBusinessMoney` de `base`,
   `base.business.get`): sus decimales, los del servidor, nunca los del navegador; su código o su símbolo es

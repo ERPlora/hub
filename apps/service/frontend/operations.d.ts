@@ -11,6 +11,7 @@ export type ServiceStatus = 'active' | 'unconfigured' | 'archived';
 export type DiscountType = 'percentage' | 'fixed';
 export type PackageStatus = 'active' | 'archived' | 'deleted';
 export type GrantStatus = 'active' | 'voided';
+export type SessionStatus = 'held' | 'consumed' | 'released' | 'expired' | 'returned';
 export type MovementKind =
   | 'held'
   | 'consumed'
@@ -327,6 +328,11 @@ export interface AssignmentOut {
   price: number;
 }
 
+/** How the assistant's card names it (hub#676): the service and the professional. */
+export interface AssignmentDetailOut extends AssignmentOut {
+  label: string;
+}
+
 export interface EligibleOut {
   member_id: string;
   full_name: string;
@@ -436,6 +442,8 @@ export interface GrantIn {
   net_amount?: number;
   tax_amount?: number;
   sale_id?: string | null;
+  /** The line of that sale that charged it; only needed when the sale charged several. */
+  sale_line_id?: string | null;
   granted_at?: string | null;
   note?: string;
 }
@@ -468,6 +476,12 @@ export interface GrantOut {
   void_reason: string;
   can_void: boolean;
   can_adjust: boolean;
+}
+
+/** How the assistant's card names it (hub#676): the package, its owner if the reader may see customers and the day
+ *  it was sold. */
+export interface GrantDetailOut extends GrantOut {
+  label: string;
 }
 
 export interface OrphanOut {
@@ -535,6 +549,33 @@ export interface RedemptionOut {
   service_name: string | null;
   redeemed_at: string;
   remaining: number | null;
+}
+
+// ── Sessions ───────────────────────────────────────────────────────────────────────────────────
+
+export interface SessionRefIn {
+  id: string;
+}
+
+export interface SessionDetailOut {
+  id: string;
+  grant_id: string;
+  package_id: string;
+  package_name: string;
+  customer_id: string;
+  service_id: string | null;
+  status: SessionStatus;
+  order_line_id: string | null;
+  hold_until: string | null;
+  sale_id: string | null;
+  /** Sessions the voucher has left now; null = unlimited. */
+  remaining: number | null;
+  voucher_expired: boolean;
+  /** What it is worth in cents, fixed when delivered; null until then and on an unlimited voucher. */
+  value: number | null;
+  /** How the assistant's card names it (hub#676): the package, its owner if the reader may see customers and the
+   *  service. */
+  label: string;
 }
 
 // ── Movements ──────────────────────────────────────────────────────────────────────────────────
@@ -610,6 +651,7 @@ declare module '@erplora/ui/sdk' {
     'service.settings.get': { input: NoInput; output: SettingsOut };
     'service.settings.update': { input: SettingsIn; output: SettingsOut };
     'service.assignment.list': { input: AssignmentListIn; output: Page<AssignmentOut> };
+    'service.assignment.get': { input: ByIdIn; output: AssignmentDetailOut };
     'service.assignment.eligible': { input: EligibleIn; output: Page<EligibleOut> };
     'service.assignment.assign': { input: AssignIn; output: AssignmentOut };
     'service.assignment.update': { input: AssignmentPatchIn; output: AssignmentOut };
@@ -621,6 +663,8 @@ declare module '@erplora/ui/sdk' {
     'service.package.delete': { input: PackageRefIn; output: DeletedOut };
     'service.grant.list': { input: GrantListIn; output: Page<GrantOut> };
     'service.grant.list_orphans': { input: PageIn; output: Page<OrphanOut> };
+    'service.grant.get': { input: ByIdIn; output: GrantDetailOut };
+    'service.session.get': { input: SessionRefIn; output: SessionDetailOut };
     'service.grant.void_check': { input: ByIdIn; output: VoidCheckOut };
     'service.grant.adjust_check': { input: ByIdIn; output: AdjustCheckOut };
     'service.grant.redeem_check': { input: RedeemCheckIn; output: RedeemCheckOut };

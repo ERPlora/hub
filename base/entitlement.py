@@ -100,7 +100,7 @@ def operation_database(op, ctx) -> Iterator[str]:
 
     with tenancy.operation_database(op, ctx) as alias:
         if _is_module(op.app_label) and op.app_label in activation.off_apps(ctx.scope):
-            raise AppInactive(_turned_off(op.app_label, ctx.language))
+            raise AppInactive(turned_off(op.app_label, ctx.language))
         with spending(op, ctx, alias) as spent_on:
             yield spent_on
 
@@ -124,7 +124,9 @@ def _config(label: str) -> Any:
         return None
 
 
-def _turned_off(label: str, language: str) -> str:
+def turned_off(label: str, language: str | None) -> str:
+    """What a 404 ``app_inactive`` says of ``label``, in ``language``: of an app that is off, and of one without its
+    tables yet (``base.tenancy.router``)."""
     config = _config(label)
     with translation.override(language):
         name = str(config.verbose_name) if config is not None else label

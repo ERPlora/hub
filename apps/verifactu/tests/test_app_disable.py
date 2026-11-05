@@ -18,9 +18,9 @@ from live.errors import Conflict
 from live.operations import get
 
 from apps.verifactu.models import Record
-from apps.verifactu.tests.conftest import A, ctx_for, run
+from apps.verifactu.tests.conftest import A, business_in, ctx_for, run
 from base import activation
-from base.models import AppActivation, Hub
+from base.models import AppActivation
 from base.tenancy import context
 from base.tenancy.tests import hubs
 
@@ -61,11 +61,6 @@ def refusal(context_: OperationContext | None = None, app: str = "verifactu") ->
 
 def is_on(scope: Scope = A, app: str = "verifactu") -> bool:
     return activation.states_of(scope)[app].on
-
-
-def business_in(country: str, slug: str = "a") -> None:
-    """The country erplora.com registered for the business of ``slug`` (``PUT /internal/hubs/{id}``)."""
-    Hub.objects.filter(slug=slug).update(country=country)
 
 
 @pytest.mark.django_db
@@ -128,23 +123,99 @@ def test_the_reason_is_in_the_language_of_whoever_turns_it_off():
     assert refusal(admin(language="es")).message == NEVER_OFF_ES
 
 
+NAMES = {"invoice": "Invoicing", "tax": "Taxes", "sale": "Sales & POS", "customer": "Customers"}
+NAMES_ES = {"invoice": "Facturación", "tax": "Impuestos", "sale": "Ventas / TPV", "customer": "Clientes"}
+
+
 @pytest.mark.django_db
 @pytest.mark.parametrize("app", ["invoice", "tax", "sale", "customer"])
-def test_what_verifactu_needs_stays_on_with_it(app):
+def test_what_verifactu_needs_stays_on_with_it_and_says_why(app):
+    """hub#619: never «Turn off VeriFactu first», which nobody can do: the real reason, VeriFactu's."""
+    business_in("ES")
+
+    refused = refusal(app=app)
+
+    error = refused.envelope()["error"]
+    assert (refused.status, error["code"], error["app"]) == (409, "base.app_vetoed", "verifactu")
+    assert refused.message == f"{NAMES[app]} can't be turned off: VeriFactu needs it. {NEVER_OFF}"
+    assert is_on(app=app)
+    assert is_on()
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("app", ["invoice", "tax", "sale", "customer"])
+def test_that_reason_is_in_the_language_of_whoever_turns_it_off(app):
+    business_in("ES")
+
+    refused = refusal(admin(language="es"), app=app)
+
+    assert refused.message == f"{NAMES_ES[app]} no se puede desactivar: hace falta para VeriFactu. {NEVER_OFF_ES}"
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("app", ["invoice", "tax", "sale", "customer"])
+def test_outside_spain_turning_verifactu_off_first_is_what_there_is_to_do(app):
+    business_in("PL")
+
     refused = refusal(app=app)
 
     error = refused.envelope()["error"]
     assert (refused.status, error["code"]) == (409, "base.app_required")
     assert "verifactu" in error["required_by"]
-    assert is_on(app=app)
-    assert is_on()
+    assert "VeriFactu" in refused.message
+
+
+# ── What Apps says beforehand (hub#618): it never offers what is always refused ─────────────────────────────────────
+
+
+def rows_of_the_list(language: str = "en") -> dict[str, dict]:
+    op = get("base.app.list")
+    document = op(admin(language=language), op.input()).model_dump(mode="json")
+    return {row["id"]: row for row in document["apps"]}
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("country", ["ES", ""])
+def test_in_spain_the_list_says_verifactu_and_what_it_needs_stay_on(country):
+    business_in(country)
+
+    rows = rows_of_the_list()
+
+    assert rows["verifactu"]["refusal"] == NEVER_OFF
+    for app, name in NAMES.items():
+        assert rows[app]["refusal"] == f"{name} can't be turned off: VeriFactu needs it. {NEVER_OFF}"
+    assert rows["task"]["refusal"] is None
+
+
+@pytest.mark.django_db
+def test_the_list_says_it_in_the_language_of_who_reads():
+    business_in("ES")
+
+    assert rows_of_the_list("es")["verifactu"]["refusal"] == NEVER_OFF_ES
+
+
+@pytest.mark.django_db
+def test_outside_spain_the_list_refuses_nothing_of_a_verifactu_that_is_on():
+    business_in("PL")
+
+    rows = rows_of_the_list()
+
+    assert rows["verifactu"]["state"] == "on"
+    assert {app: rows[app]["refusal"] for app in ("verifactu", *NAMES)} == dict.fromkeys(("verifactu", *NAMES))
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("state", [activation.CREATING, activation.FAILED])
+def test_the_list_lets_go_a_verifactu_that_never_got_on(state):
+    business_in("ES")
+    AppActivation.objects.update_or_create(host="a", app="verifactu", defaults={"state": state, "chosen": True})
+
+    assert rows_of_the_list()["verifactu"]["refusal"] is None
 
 
 @pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_each_hub_reads_its_own_business_country(hub_a, hub_b, no_test_fallback):
-    of_a, of_b = Scope("host", hub_a.slug), Scope("host", hub_b.slug)
-    business_in("PL", hub_a.slug)
-    business_in("ES", hub_b.slug)
+def test_each_hub_reads_its_own_business_country(hub_a, hub_b, poland_and_spain):
+    of_a, of_b = poland_and_spain
 
     with context.use_hub(hub_a):
         assert disable(admin(of_a))["state"] == "off"
@@ -152,3 +223,20 @@ def test_each_hub_reads_its_own_business_country(hub_a, hub_b, no_test_fallback)
     with context.use_hub(hub_b):
         assert refusal(admin(of_b)).message == NEVER_OFF
         assert is_on(of_b)
+
+
+@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+def test_each_hub_lists_what_its_own_business_country_refuses(hub_a, hub_b, poland_and_spain):
+    of_a, of_b = poland_and_spain
+    op = get("base.app.list")
+
+    def refusal_in(scope: Scope) -> str | None:
+        document = op(admin(scope), op.input()).model_dump(mode="json")
+        return {row["id"]: row for row in document["apps"]}["verifactu"]["refusal"]
+
+    with context.use_hub(hub_a):
+        assert is_on(of_a)
+        assert refusal_in(of_a) is None
+    with context.use_hub(hub_b):
+        assert is_on(of_b)
+        assert refusal_in(of_b) == NEVER_OFF

@@ -16,7 +16,7 @@ from uuid import UUID
 
 from babel.numbers import get_currency_precision
 from django.db.models import Count as CountOf
-from django.db.models import Exists, F, OuterRef, Q, Sum
+from django.db.models import Exists, OuterRef, Q, Sum
 from django.db.models.functions import Coalesce, Lower
 from django.utils import timezone, translation
 from django.utils.translation import gettext_lazy as _
@@ -48,6 +48,8 @@ from apps.cash_register.schemas import (
 )
 from apps.sale.models import RefundPayment, Sale, SalePayment
 from apps.sale.queries import business_currency
+from base.business import business_zone
+from base.ordering import list_order
 
 VIEW_EXPECTED = "cash_register.view_expected_totals"
 CASH = "cash"
@@ -691,7 +693,7 @@ def expected_now(session: Session) -> int:
 
 def last_cut_off(now: dt.datetime, at: dt.time) -> dt.datetime:
     """The latest moment at ``at`` (business time) not after ``now``: today's, or yesterday's before it."""
-    local = timezone.localtime(now)
+    local = timezone.localtime(now, business_zone())
     zone = local.tzinfo
     cut = dt.datetime.combine(local.date(), at, tzinfo=zone)
     if cut > local:
@@ -814,7 +816,7 @@ def session_to_close(
     if cut is not None:
         raise Conflict(
             str(AUTO_CLOSE_DUE)
-            % {"number": session.number, "time": f"{timezone.localtime(cut):%H:%M}"},
+            % {"number": session.number, "time": f"{timezone.localtime(cut, business_zone()):%H:%M}"},
             code="cash_register.session_auto_close_due",
         )
     return session
@@ -870,13 +872,7 @@ def list_sessions(ctx: OperationContext, params: SessionListIn) -> dict:
         **{key: value for key, value in exact.items() if value is not None}
     )
     columns = _SESSION_SORT.get(params.sort, (params.sort,))
-    order = [
-        F(column).desc(nulls_last=True)
-        if params.dir == "desc"
-        else F(column).asc(nulls_last=True)
-        for column in columns
-    ]
-    page = sessions.order_by(*order, "-id" if params.dir == "desc" else "id")[
+    page = sessions.order_by(*list_order(*columns, descending=params.dir == "desc", nulls_last=True))[
         params.offset : params.offset + params.limit
     ]
     settings, now = current_settings(), timezone.now()
@@ -1121,9 +1117,8 @@ def count_row(count: Count) -> dict:
 )
 def list_counts(ctx: OperationContext, params: CountListIn) -> dict:
     session = find_session(params.session_id, params.session)
-    direction = "-" if params.dir == "desc" else ""
     counts = Count.objects.filter(session=session).order_by(
-        f"{direction}{params.sort}", f"{direction}id"
+        *list_order(params.sort, descending=params.dir == "desc")
     )
     page = counts[params.offset : params.offset + params.limit]
     return {
@@ -1156,3 +1151,9 @@ def get_currency(ctx: OperationContext, params: EmptyIn) -> dict:
             "bills": table.get("bills", []),
             "coins": table.get("coins", []),
         }
+
+
+def keeps_fiscal_documents() -> bool:
+    """Whether this database holds its cash movements (``fiscal_documents_kept`` on this app's config), of any status: a draft counts
+    too, for what it asks is whether a database can go, and that cannot be undone."""
+    return Movement.objects.exists()

@@ -121,16 +121,19 @@ métricas del inventario.» y el aviso de la tabla con «Reintentar».
 ### Productos
 Tabla con Nombre, SKU, Precio, Stock («—» en un artículo sin control de stock) y Estado: un
 interruptor activo/inactivo, «Sí»/«No» para quien no puede cambiar productos, o la marca «Sin
-configurar · Falta la categoría fiscal»; a su lado, la insignia roja «Agotado» si el artículo está
-agotado. Buscador «Buscar producto…» por nombre o SKU; orden por columna; filtros por nombre, SKU,
-precio desde/hasta, stock desde/hasta y estado («Sí», «No», «Sin configurar», «Agotado»); 50 por
-página; vista de tabla o de tarjetas.
+configurar · Falta la categoría fiscal», entera mientras la fila tiene sitio (también a 1280 px con el
+menú lateral abierto y la columna «Foto») y, si no, acabada en «…» con el texto entero al pasar el
+ratón; a su lado, la insignia roja «Agotado» si el artículo está agotado. Buscador «Buscar
+producto…» por nombre o SKU; orden por columna; filtros por nombre, SKU, precio desde/hasta, stock
+desde/hasta y estado («Sí», «No», «Sin configurar», «Agotado»); 50 por página; vista de tabla o de
+tarjetas.
 
 Botones de la tabla: **+** (dar de alta), importar CSV y exportar CSV, cada uno solo para quien
-tiene ese permiso. Por fila: «Detalles», «Recibir stock» y «Contar stock» (con permiso de stock y
-solo en productos físicos), «Dar de baja stock» (además, solo en artículos con control de stock),
-«Editar», «Marcar agotado» o, si ya lo está, «Volver a poner a la venta» (en el menú «⋮», para quien
-puede cambiar productos) y «Eliminar». Tocar la fila abre la ficha.
+tiene ese permiso. Por fila, a la vista: «Recibir stock» y «Contar stock» (con permiso de stock y
+solo en productos físicos) y «Editar». En el menú «⋮»: «Detalles» (la misma ficha que abre tocar la
+fila), «Dar de baja stock» (además, solo en artículos con control de stock), «Marcar agotado» o, si
+ya lo está, «Volver a poner a la venta» (para quien puede cambiar productos) y «Eliminar». Tocar la
+fila abre la ficha. Si la fila no tiene sitio, también los de la vista pasan al «⋮».
 
 El **+** y «Editar» abren el panel lateral del formulario: Nombre, SKU (bloqueado al editar: «El
 SKU es la identidad del producto: no se edita»), Precio, «Coste (<moneda>)», «Stock inicial» (solo al
@@ -275,7 +278,8 @@ Estado: hecho
 Actor: administrador, responsable
 Pantalla: Productos
 Pasos:
-1. En **Productos**, pulsa **+**: se abre el panel del formulario.
+1. En **Productos**, pulsa **+**: se abre el panel del formulario, con el cursor en Nombre; si mientras
+   se abre ya has entrado en otro campo, el cursor se queda donde estás y lo que escribes va ahí.
 2. Escribe Nombre, SKU y Precio. El precio admite «2,20», «1.234,56» o lo que se pegue de la
    pantalla; al salir del campo se reescribe en el formato del negocio. Son opcionales «Coste
    (<moneda>)» (la del negocio: «Coste (PLN)» en Polonia), «Stock inicial», «Umbral stock bajo» (vacío = 10), «EAN-13» y «Descripción».
@@ -373,7 +377,9 @@ Pasos:
    «Revisar el catálogo» (solo para quien puede cambiar productos): abre **Productos** filtrado
    por «Sin configurar». También se llega filtrando Estado → «Sin configurar».
 2. Cada fila lleva la marca «Sin configurar · Falta la categoría fiscal»: tocarla abre el
-   formulario de edición.
+   formulario de edición. Se lee al menos hasta «Sin configurar» también en la tableta, junto a un
+   nombre largo: mientras alguna fila lleva la marca, su columna no baja de su suelo y las acciones
+   de la fila se pliegan antes al «⋮». Lo que no quepa detrás acaba en «…».
 3. Elige la «Categoría fiscal» y pulsa «Guardar cambios». El producto pasa a «Sí».
 Entra: los productos cuya categoría fiscal ya no está en Impuestos. No se les inventa ninguna.
 Sale: el producto con su categoría fiscal; Inventario avisa del cambio y el TPV deja de marcarlo
@@ -841,8 +847,8 @@ Estado: hecho
 Actor: administrador, responsable, empleado, cajero
 Pantalla: Ficha del producto
 Pasos:
-1. Abre la ficha del producto (toca la fila o «Detalles»): se ve el código de barras de su SKU en una
-   placa blanca, con el SKU debajo, que se lee también con el tema oscuro.
+1. Abre la ficha del producto (toca la fila o «⋮» → «Detalles»): se ve el código de barras de su SKU
+   en una placa blanca, con el SKU debajo, que se lee también con el tema oscuro.
 2. Pulsa «Imprimir código de barras».
 3. La etiqueta (nombre, código de barras y precio) va a la cola de Impresión, a la impresora con la
    función «Etiqueta», y la ficha dice «La etiqueta ha ido a la impresora «<nombre>».». La saca el
@@ -854,7 +860,10 @@ Entra: el SKU, el nombre y el precio del producto; la impresora con la función 
 Impresión. También se pide por el asistente («imprime la etiqueta del champú») o por la API.
 Sale: un trabajo de etiqueta en la cola de Impresión, con el precio en la moneda del negocio.
 Si falla: quien no llega a la cola de impresión (Impresión no está activa, o no puede imprimir) ve el
-diálogo de imprimir del navegador con el código, el SKU y el nombre, sin precio. Un SKU con letras que
+diálogo de imprimir del dispositivo con el código, el SKU y el nombre, sin precio: el del navegador o, en
+la app instalada, su pantalla de impresión (el diálogo del sistema, con la impresora o «Guardar como PDF»).
+Si la app no lo abre, la ficha dice por qué: «No se pudo imprimir la etiqueta del código de barras: esta
+versión de la app de ERPlora no puede imprimir; actualízala» (o el motivo que toque). Un SKU con letras que
 un código de barras no lleva (tildes, eñes) no se dibuja ni se imprime: «Este SKU no se puede pasar a
 código de barras: usa letras sin tilde, números y signos.». Cualquier otro rechazo sale dentro de la
 ficha: «No se pudo imprimir la etiqueta del código de barras: <motivo>».
@@ -1210,6 +1219,11 @@ API), no solo en la pantalla.
 ## Para quien lo mantiene
 Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
 
+- **Orden de las listas** (`base.ordering.list_order_for`; regla hub#2355 del producto viejo): productos, los de poco
+  stock, categorías y movimientos van por la columna elegida y desempatan por `id`, todo en la dirección de la lista: la
+  descendente es la ascendente leída al revés, empates incluidos, y los CSV salen en el mismo orden. Lo fijan
+  `test_ties_go_by_id_in_the_lists_own_direction` y `test_an_export_settles_its_ties_the_way_the_list_does`, por lista.
+
 ## El servidor (fase de servidor, 2026-10-14)
 
 - **Anatomía**: `apps.py`, `models.py`, `migrations/`, `schemas.py`, `queries.py`, `services.py`,
@@ -1226,6 +1240,8 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
   ocho unidades son un registro en código (`models.UNIT_SPECS`: tipo, factor como fracción exacta y
   escalón), no una tabla: el negocio nunca crea unidades. Una cantidad fuera del escalón es 409
   `inventory.off_grid_quantity` con su campo; nunca se redondea. Dinero en céntimos enteros.
+- **Millares**: los importes agrupan los millares también con cuatro cifras («1.234,56 €»; `formatMoney` de
+  `@erplora/ui/components`, con `useGrouping: 'always'`, porque el CLDR del español espera a cinco: hub#525).
 - **Campos de importe** (precio, coste, coste unitario; F01, F02, F13): se escriben y se leen con los decimales de
   la moneda del negocio (`useBusinessMoney`, los del servidor, nunca los del navegador). Si el panel se abre antes de
   que `base.business.get` conteste, el precio y el coste que la persona no ha tocado se reescriben desde lo guardado
@@ -1508,7 +1524,6 @@ Las hace cumplir la app por cualquier puerta (pantalla, asistente, API).
 
 ## Lo que queda fuera
 
-- **Los importes de cuatro cifras sin separador de millares** («1234,56 €»), hub#525.
 - **La tarjeta de confirmación del asistente no dice qué registro toca una escritura**, hub#526.
 - Las peticiones a `@erplora/ui` de `UI-REQUESTS.md` (iconos, `KpiCard`, `Combo` múltiple, importar y
   exportar CSV y panel lateral del `DataTable`, formateadores, `useI18n` y ayudas de test): ninguna rompe

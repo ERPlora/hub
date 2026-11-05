@@ -34,7 +34,6 @@ from collections.abc import AsyncIterator, Collection, Iterable
 from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any
-from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import httpx
 import pycountry
@@ -74,7 +73,7 @@ from live.operations import Operation, get, registry
 
 from base import activation, approvals, entitlement, signing
 from base.auth import saas_internal_url
-from base.business import babel_locale, currency_decimals
+from base.business import babel_locale, business_zone, currency_decimals
 from base.models import Membership
 from base.operations import HostScopeResolver
 
@@ -123,9 +122,13 @@ USAGE_PATH = "/internal/assistant/usage"
 REPORT_PATH = "/internal/assistant/report"
 DOCS_PATH = "/internal/assistant/docs/search"
 TRANSCRIBE_PATH = "/internal/speech/transcribe"
+SYNTHESIZE_PATH = "/internal/speech/synthesize"
 #: A door that answers at once; the turn waits longer for its model, piece by piece.
 TIMEOUT_SECONDS = 15
 TURN_TIMEOUT = httpx.Timeout(15.0, read=120.0)
+#: Reading aloud waits for erplora.com's engine, up to a minute like its other services (saas ``assistant.media``): a
+#: little longer here, so a slow one comes back as erplora.com's own refusal, never as the Hub hanging up first.
+SPEECH_TIMEOUT = httpx.Timeout(15.0, read=65.0)
 
 
 # ── Tools ────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -224,8 +227,7 @@ def _record_currency(sent: Any, declared: dict, words: "_Words") -> Any:
 @dataclass
 class _Words:
     """The Hub's words of a card (``live.assistant.Words``): the person's language and the person (``ctx``: to read a
-    record's name and its currency as them, and the business's zone; ``None`` for an automation's card, which reads no
-    record); ``currency``, the one its amounts are in when it is not the business's (the one a write names, the one of
+    record's name and its currency as them; ``None`` for an automation's card, which reads no record); ``currency``, the one its amounts are in when it is not the business's (the one a write names, the one of
     the record it names, or a preview's read answers, with the decimals it answers: ``answered``); ``priced`` false
     when the write names one that is none, or a record whose currency cannot be read: its amounts go as sent."""
 
@@ -235,7 +237,6 @@ class _Words:
     currency: str | None = None
     priced: bool = True
     answered: dict | None = None
-    _business: Any = None
 
     @classmethod
     def of_answer(cls, read: Operation, ctx: OperationContext, answer: dict) -> "_Words":
@@ -258,19 +259,6 @@ class _Words:
         read answers it, else as the currency says it."""
         return self.answered if self.answered is not None else self._currency_money()
 
-    def business(self) -> Any:
-        """Settings › Business, read as the person once per card and only when a datum needs it; ``False`` when it
-        cannot be read (no person at hand, or a refusal)."""
-        if self._business is None:
-            failure, answer = (True, None) if self.ctx is None else _run(self.ctx, registry["base.business.get"], {})
-            self._business = answer if failure is None else False
-        return self._business
-
-    def zone(self) -> Any:
-        """The business's zone or else the deployment's, the one every app reads a wall-clock time in."""
-        business = self.business()
-        return (_zone_named(business.timezone) if business else None) or timezone.get_current_timezone()
-
     def amount(self, value: int) -> Any:
         """``value``, an amount in the minor unit of its currency, as the card's screen writes one on top
         (``{"kind": "money", "value": …}``, with its ``money`` when it is in a currency of its own): every amount of a
@@ -290,14 +278,6 @@ class _Words:
         return app_name(self.op)
 
 
-def _zone_named(name: str) -> ZoneInfo | None:
-    """The zone ``name`` (IANA), or ``None`` when Python does not know it."""
-    try:
-        return ZoneInfo(name)
-    except (ZoneInfoNotFoundError, ValueError):
-        return None
-
-
 def _moment(value: str, kind: str, words: _Words) -> str | None:
     """``value`` (ISO 8601: a day, a day and a time, or a time) as the person's language writes it — CLDR's medium day
     and short time, as the screens' ``formatDateTime`` (@erplora/ui) says them —; an instant of another zone at the
@@ -312,7 +292,7 @@ def _moment(value: str, kind: str, words: _Words) -> str | None:
     except ValueError:
         return None
     if moment.tzinfo is not None:
-        moment = moment.astimezone(words.zone()).replace(tzinfo=None)
+        moment = moment.astimezone(business_zone()).replace(tzinfo=None)
     day, hour = format_date(moment.date(), "medium", locale=locale), format_time(moment.time(), "short", locale=locale)
     return get_datetime_format("medium", locale=locale).replace("{1}", day).replace("{0}", hour)
 
@@ -806,22 +786,43 @@ def _error_of(status: int, body: Any) -> dict:
     return error if isinstance(error, dict) else {}
 
 
-def _post(path: str, payload: dict) -> dict:
+def _send(path: str, payload: dict, timeout: float | httpx.Timeout) -> httpx.Response:
+    """``payload`` signed to ``path``: erplora.com's answer, or a ``GatewayError`` (logged) when it never got there or
+    refused it."""
     url, body, headers = _signed(path, payload)
     try:
-        response = httpx.post(url, content=body, headers=headers, timeout=TIMEOUT_SECONDS)
+        response = httpx.post(url, content=body, headers=headers, timeout=timeout)
     except httpx.HTTPError as problem:
         _log_unreachable(path, payload.get("hub"), problem)
         raise GatewayError("assistant.unreachable") from None
-    try:
-        answer = response.json()
-    except ValueError:
-        answer = None
     if response.status_code >= 300:
-        error = _error_of(response.status_code, answer)
+        error = _error_of(response.status_code, _json_of(response))
         _log_refused(path, payload.get("hub"), response.status_code, error)
         raise GatewayError(str(error.get("code") or "assistant.unavailable"), response.status_code, error)
+    return response
+
+
+def _json_of(response: httpx.Response) -> Any:
+    try:
+        return response.json()
+    except ValueError:
+        return None
+
+
+def _post(path: str, payload: dict) -> dict:
+    answer = _json_of(_send(path, payload, TIMEOUT_SECONDS))
     return answer if isinstance(answer, dict) else {}
+
+
+def _post_audio(path: str, payload: dict) -> dict:
+    """The audio a door answers (``/internal/speech/synthesize``'s mp3): ``{audio, content_type}``; an answer that is
+    no audio is a refusal too."""
+    response = _send(path, payload, SPEECH_TIMEOUT)
+    kind = response.headers.get("Content-Type", "").split(";")[0].strip().lower()
+    if not kind.startswith("audio/") or not response.content:
+        _log_refused(path, payload.get("hub"), response.status_code, {"code": "assistant.not_audio"})
+        raise GatewayError("assistant.not_audio", response.status_code)
+    return {"audio": response.content, "content_type": kind}
 
 
 def usage(scope: Scope) -> dict:
@@ -843,6 +844,16 @@ def transcribe(scope: Scope, *, audio: str, mime_type: str, language: str) -> di
     """The text of a dictation (``audio`` in base64): ``{text, language}``."""
     answer = _post(TRANSCRIBE_PATH, {"hub": scope.key, "audio": audio, "mime_type": mime_type, "language": language})
     return {"text": str(answer.get("text") or ""), "language": str(answer.get("language") or language)}
+
+
+def speak(scope: Scope, *, text: str, language: str, voice: str) -> dict:
+    """``text`` read aloud by erplora.com in ``voice`` (a voice of its engine; none, its own for the language): the mp3 and its
+    type, ``{audio, content_type}``. The voices are Spanish and English, as the documentation: any other language
+    reads in English."""
+    payload = {"hub": scope.key, "text": text, "language": docs_language(language)}
+    if voice:
+        payload["voice"] = voice
+    return _post_audio(SYNTHESIZE_PATH, payload)
 
 
 def docs_language(language: str) -> str:

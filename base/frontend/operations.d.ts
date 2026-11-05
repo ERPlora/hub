@@ -119,6 +119,8 @@ export interface AppRow {
   /** What it needs, transitively (it comes along with it), and the apps on that need it (they go off first): ids. */
   requires: string[];
   required_by: string[];
+  /** Why turning it on (when off) or off (when on) is refused, in the reader's language: neither is offered. */
+  refusal: string | null;
 }
 
 /** `base.AppListOut`. */
@@ -263,7 +265,7 @@ export type BlueprintPurpose = 'backup' | 'template';
 /** How a dataset of a load went (`base.DatasetStatus`). */
 export type DatasetStatus = 'applied' | 'partial' | 'already' | 'failed' | 'empty' | 'discarded';
 /** How an app of a load went (`base.AppLoadStatus`). */
-export type AppLoadStatus = DatasetStatus | 'inactive' | 'unknown' | 'not_selected';
+export type AppLoadStatus = DatasetStatus | 'inactive' | 'unknown' | 'not_selected' | 'waiting' | 'setup_failed';
 export type ImportStatus = 'complete' | 'partial' | 'failed';
 
 export interface BlueprintApp {
@@ -342,7 +344,7 @@ export interface LoadReport {
   dropped: string[];
 }
 
-export type RetryBlocked = '' | 'file' | 'version_gone' | 'complete' | 'undone';
+export type RetryBlocked = '' | 'file' | 'version_gone' | 'complete' | 'undone' | 'waiting';
 
 /** `base.ImportOut`: one load and its report. */
 export interface ImportRow {
@@ -952,7 +954,15 @@ declare module '@erplora/ui/sdk' {
       input: { audio: string; mime_type: string; language?: string };
       output: { text: string; language: string };
     };
+    // «Read aloud» in a server voice (round 2026-11-03n): its route answers the mp3 itself (assistant-hub.ts
+    // `speakAloud`); this output is what an integration that accepts only JSON gets.
+    'base.assistant.speak': {
+      input: { text: string; language?: string; voice?: string };
+      output: { content_type: string; content_base64: string };
+    };
     // «Report a problem» of the user menu (BASE-F108): erplora.com answers the address support writes back to.
     'base.support.report': { input: SupportReportInput; output: { reply_to: string } };
+    // The pass to erplora.com (BASE-F11): its address, signed at the click, opens for a minute, once.
+    'base.saas_pass.create': { input: { next: 'plan' | 'business' }; output: { url: string } };
   }
 }

@@ -67,6 +67,8 @@ from apps.kitchen.schemas import (
     TicketsOut,
 )
 from apps.sale.models import Order, OrderLine
+from base.business import business_zone, zone_name
+from base.ordering import list_order
 
 TICKET_NOT_FOUND = _("That kitchen ticket does not exist in this business.")
 TICKET_AMBIGUOUS = _(
@@ -106,16 +108,6 @@ FACTORY = {
 
 
 # --- The business's clock ------------------------------------------------------------------------
-
-
-def business_zone():
-    """The business's time zone (phase 1: ``settings.TIME_ZONE``, Europe/Madrid; the Hub keeps no zone yet)."""
-    return timezone.get_current_timezone()
-
-
-def zone_name() -> str:
-    zone = business_zone()
-    return getattr(zone, "key", str(zone))
 
 
 def business_day(moment: dt.datetime) -> dt.date:
@@ -1092,8 +1084,7 @@ def list_tickets(ctx: OperationContext, params: TicketListIn) -> dict:
         value = getattr(params, name)
         if value is not None:
             final = final.filter(**{name: value})
-    prefix = "-" if descending else ""
-    final = final.order_by(f"{prefix}{field_name}", f"{prefix}id")
+    final = final.order_by(*list_order(field_name, descending=descending))
     rows, total = merged_page(
         in_flight,
         final,

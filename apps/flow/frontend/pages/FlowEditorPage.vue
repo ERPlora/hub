@@ -12,10 +12,12 @@ import { useRoute, useRouter } from 'vue-router';
 import FlowEditor from '../components/FlowEditor.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import { useLeaveGuard } from '../composables/useLeaveGuard';
+import { provideBusinessClock } from '../composables/usePhrasing';
 import { useT } from '../composables/useT';
 import { type FlowDocument, fromFlow } from '../lib/document';
 import { takeSaved } from '../lib/justSaved';
 
+provideBusinessClock();
 const route = useRoute();
 const router = useRouter();
 const t = useT();

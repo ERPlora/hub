@@ -1,12 +1,13 @@
 <script setup lang="ts">
-// «Bill», the pre-bill (SALE-F21): the check as the paper taken to the table. The business (the first
-// line of the receipt header, «My business» without one), «Bill», the check's title, now, the customer;
+// «Bill», the pre-bill (SALE-F21): the check as the paper taken to the table. The business as the server
+// names it (`sale.letterhead.get`, hub#458: name, lines and tax ID), «Bill», the check's title, now, the customer;
 // each line with its quantity × price, its amount, its note and «(comp)»; the ticket discount, the VAT
 // breakdown and the total — all of it as `sale.checkout.preview` works it out —, and «Bill — this is
 // not an invoice…». No number, no QR, no payment: it consumes nothing. «Print» asks the printing queue
 // first (`sale.order.print_bill`, PRINTING-F09): queued, a toast names the printer; not queued (Printing
-// off, no receipt printer) or the queue out of reach, the device prints this very paper (`printPaper`); a
-// failure says so. It values the check while it is mounted: the page mounts it only while the bill is open.
+// off, no receipt printer) or the queue out of reach, the device prints this very paper (`printPaper`: inside the
+// installed app, its print screen, hub#455); a failure says so, with the app's reason when it gives one. It values
+// the check while it is mounted: the page mounts it only while the bill is open.
 import { formatDateTime } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { HubIcon, toastError, toastSuccess } from '@erplora/ui/shell';
@@ -17,10 +18,11 @@ import { useLocale, useT } from '../../composables/useT';
 import { taxRow } from '../../lib/breakdown';
 import { dishLabel } from '../../lib/comboChoice';
 import { formatMoney, formatQuantity, useBusinessMoney } from '../../lib/format';
+import { printRefusal, withReason } from '../../../../../base/frontend/lib/print-paper';
 import { printPaper } from '../../lib/print';
 import type { OrderLineOut, OrderOut } from '../../operations';
 
-const props = defineProps<{ order: OrderOut; customerName: string | null; header: string }>();
+const props = defineProps<{ order: OrderOut; customerName: string | null }>();
 const open = defineModel<boolean>('open', { default: false });
 
 const t = useT();
@@ -29,8 +31,10 @@ const businessMoney = useBusinessMoney();
 const paper = useTemplateRef<HTMLElement>('paper');
 
 const { data: valued, error, refresh } = useLive('sale.checkout.preview', () => ({ order_id: props.order.id }));
+const { data: letterhead, error: letterheadError } = useLive('sale.letterhead.get', {});
 
-const business = computed(() => props.header.split('\n')[0]?.trim() || t('sale.pos.docDefaultBusiness'));
+/** A bill is printed whole or not at all: never without what it charges or without who charges it. */
+const failed = computed(() => (error.value && !valued.value) || (letterheadError.value && !letterhead.value));
 const now = computed(() => formatDateTime(new Date(), locale.value));
 
 const amount = (line: OrderLineOut) =>
@@ -63,20 +67,26 @@ async function print(): Promise<void> {
   if (!element || sending.value) return;
   sending.value = true;
   try {
-    const sent = await queue.run({ order_id: props.order.id });
-    if (sent.queued) {
-      void toastSuccess(t('sale.document.queued', { printer: sent.printer ?? '' }));
-      return;
-    }
-  } catch {
-    // The queue could not be asked: the screen's paper still prints (below).
+    if (await queued()) return;
+    // Not queued: the device prints the screen's paper (inside the app, its print screen, hub#455).
+    await printPaper(element, { title: t('sale.pos.prebillTitle') });
+  } catch (failure) {
+    void toastError(withReason(t('sale.pos.prebillPrintFailed'), printRefusal(failure, t)));
   } finally {
     sending.value = false;
   }
+}
+
+/** Asks the printing queue; `true` when a printer took the bill (a toast names it). */
+async function queued(): Promise<boolean> {
   try {
-    printPaper(element);
+    const sent = await queue.run({ order_id: props.order.id });
+    if (!sent.queued) return false;
+    void toastSuccess(t('sale.document.queued', { printer: sent.printer ?? '' }));
+    return true;
   } catch {
-    void toastError(t('sale.pos.prebillPrintFailed'));
+    // The queue could not be asked: the screen's paper still prints.
+    return false;
   }
 }
 </script>
@@ -98,7 +108,7 @@ async function print(): Promise<void> {
           <ion-button
             data-testid="pos-prebill-print"
             :aria-label="$t('sale.pos.print')"
-            :disabled="!valued || sending"
+            :disabled="!valued || !letterhead || sending"
             @click="print"
           >
             <HubIcon
@@ -121,7 +131,7 @@ async function print(): Promise<void> {
     </ion-header>
     <ion-content class="ion-padding pos-prebill__body">
       <div
-        v-if="error && !valued"
+        v-if="failed"
         class="pos-prebill__state"
         role="alert"
         data-testid="pos-prebill-error"
@@ -136,7 +146,7 @@ async function print(): Promise<void> {
         </ion-button>
       </div>
       <div
-        v-else-if="!valued"
+        v-else-if="!valued || !letterhead"
         class="pos-prebill__state"
         data-testid="pos-prebill-loading"
       >
@@ -150,7 +160,18 @@ async function print(): Promise<void> {
         data-testid="pos-prebill-paper"
       >
         <header class="pos-bill__head">
-          <strong class="pos-bill__business">{{ business }}</strong>
+          <strong class="pos-bill__business">{{ letterhead.name }}</strong>
+          <span
+            v-for="(text, index) in letterhead.lines"
+            :key="index"
+            class="pos-bill__address"
+            data-testid="pos-prebill-address"
+          >{{ text }}</span>
+          <span
+            v-if="letterhead.tax_id"
+            class="pos-bill__address"
+            data-testid="pos-prebill-tax-id"
+          >{{ $t('sale.document.taxId', { id: letterhead.tax_id }) }}</span>
           <span class="pos-bill__kind">{{ $t('sale.pos.prebillTitle') }}</span>
           <span
             v-if="order.label"
@@ -252,6 +273,9 @@ async function print(): Promise<void> {
 }
 .pos-bill__business {
   font-size: 1rem;
+}
+.pos-bill__address {
+  font-size: 0.75rem;
 }
 .pos-bill__kind {
   font-weight: 700;

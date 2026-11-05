@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:e05defc19192fa95bb8012233fece21cbff07ef1edaee4b4ae3ab32491095132 -->
+<!-- generated from WORKBOOK.md sha256:e34817c97e71f03aee3695d05efbc32973969441d4e0436a76777dbc6b13e517 -->
 
 ## What it is for and who it is for
 
@@ -109,15 +109,18 @@ with "Retry".
 ### Products
 Table with Name, SKU, Price, Stock ("—" for an item without stock control) and Status: an
 active/inactive switch, "Yes"/"No" for whoever cannot change products, or the mark "Not configured ·
-Missing tax category"; next to it, the red "Sold out" badge if the item is sold out. Search box
-"Search product…" by name or SKU; sorting by column; filters by name, SKU, price from/to, stock
-from/to and status ("Yes", "No", "Not configured", "Sold out"); 50 per page; table or card view.
+Missing tax category", whole while the row has room (also at 1280 px with the side menu open and the
+"Photo" column) and, if not, ending in "…" with the whole text on mouse hover; next to it, the red
+"Sold out" badge if the item is sold out. Search box "Search product…" by name or SKU; sorting by
+column; filters by name, SKU, price from/to, stock from/to and status ("Yes", "No", "Not configured",
+"Sold out"); 50 per page; table or card view.
 
 The table's buttons: **+** (create), import CSV and export CSV, each one only for whoever has that
-permission. Per row: "Details", "Receive stock" and "Count stock" (with stock permission and only on
-physical products), "Write off stock" (also, only on items with stock control), "Edit", "Mark sold
-out" or, if it already is, "Put back on sale" (in the "⋮" menu, for whoever can change products) and
-"Delete". Tapping the row opens the product's card.
+permission. Per row, in sight: "Receive stock" and "Count stock" (with stock permission and only on
+physical products) and "Edit". In the "⋮" menu: "Details" (the same card that tapping the row
+opens), "Write off stock" (also, only on items with stock control), "Mark sold out" or, if it already
+is, "Put back on sale" (for whoever can change products) and "Delete". Tapping the row opens the
+product's card. If the row has no room, the ones in sight go to the "⋮" too.
 
 The **+** and "Edit" open the form's side panel: Name, SKU (locked when editing: "The SKU is the
 product's identity: it is not edited"), Price, "Cost (<currency>)", "Initial stock" (only when
@@ -259,7 +262,8 @@ Status: done
 Actor: administrator, manager
 Screen: Products
 Steps:
-1. In **Products**, tap **+**: the form's panel opens.
+1. In **Products**, tap **+**: the form's panel opens, with the cursor in Name; if you already went to
+   another field while it opens, the cursor stays where you are and what you type goes there.
 2. Type Name, SKU and Price. The price takes "2.20", "1,234.56" or whatever is pasted from the
    screen; on leaving the field it is rewritten in the business's format. Optional are "Cost
    (<currency>)" (the business's: "Cost (PLN)" in Poland), "Initial stock", "Low stock threshold"
@@ -354,7 +358,9 @@ Steps:
    catalogue" (only for whoever can change products): it opens **Products** filtered by "Not
    configured". It can also be reached by filtering Status → "Not configured".
 2. Each row carries the mark "Not configured · Missing tax category": tapping it opens the edit
-   form.
+   form. It reads at least as far as "Not configured" on a tablet too, beside a long name: while any
+   row carries the mark, its column does not go below its floor and the row's actions fold into the
+   "⋮" sooner. Whatever does not fit after that ends in "…".
 3. Choose the "Tax category" and tap "Save changes". The product goes to "Yes".
 In: the products whose tax category is no longer in Taxes. None is made up for them.
 Out: the product with its tax category; Inventory tells of the change and the till stops marking it
@@ -794,7 +800,7 @@ Status: done
 Actor: administrator, manager, employee, cashier
 Screen: Product card
 Steps:
-1. Open the product's card (tap the row or "Details"): the barcode of its SKU shows on a white plate,
+1. Open the product's card (tap the row or "⋮" → "Details"): the barcode of its SKU shows on a white plate,
    with the SKU below, which also reads with the dark theme.
 2. Tap "Print barcode".
 3. The label (name, barcode and price) goes to Printing's queue, to the printer with the "Label"
@@ -807,7 +813,10 @@ In: the product's SKU, name and price; the printer with the "Label" function, fr
 be asked for through the assistant ("print the shampoo's label") or through the API.
 Out: a label job in Printing's queue, with the price in the business's currency.
 If it fails: whoever does not reach the print queue (Printing is not active, or they cannot print) sees
-the browser's print dialog with the code, the SKU and the name, without a price. A SKU with letters a
+the device's print dialog with the code, the SKU and the name, without a price: the browser's or, in the
+installed app, its print screen (the system's dialog, with the printer or "Save as PDF"). If the app does not
+open it, the card says why: "Could not print the barcode label: this version of the ERPlora app cannot
+print; update it" (or the reason that applies). A SKU with letters a
 barcode does not carry (accents, ñ) is neither drawn nor printed: "This SKU cannot be turned into a
 barcode: use letters without accents, digits and signs.". Any other refusal shows inside the card:
 "Could not print the barcode label: <reason>".

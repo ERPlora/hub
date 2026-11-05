@@ -483,12 +483,17 @@ async function sendRound(rush: boolean): Promise<boolean> {
   const sent = await till.sendToKitchen(rush, staff.value.id ? staff.value.name : null);
   if (sent.ok) {
     // hub#2257: sent, but its sheet did not print — said in words (the reason is Printing's, not the waiter's).
-    if (sent.printed === false) void toast(t('sale.pos.kitchen.sentNotPrinted', { n: sent.round ?? '' }), 'warning', 4500);
-    else void toastSuccess(t('sale.pos.kitchen.sent', { n: sent.round ?? '' }));
+    const notPrinted = sent.printed === false;
+    const words = notPrinted ? t('sale.pos.kitchen.sentNotPrinted', { n: sent.round ?? '' }) : t('sale.pos.kitchen.sent', { n: sent.round ?? '' });
+    // At the bottom it would lie over what comes next, and a tap there would fall on the notice: «Charge» after
+    // «Send order» (hub#748), the last row of keys of the sheet when «Charge» itself sent the round (hub#732).
+    void toast(words, notPrinted ? 'warning' : 'success', notPrinted ? 4500 : undefined, undefined, undefined, 'top');
     return true;
   }
   if (sent.code && NOTHING_TO_SEND.has(sent.code)) return true;
-  void toastError(sent.message);
+  // hub#755: the cart stays to try again, and at the bottom the notice would lie over «Charge»: a tap there would
+  // fall on the notice and send nothing.
+  void toast(sent.message, 'danger', 4500, undefined, undefined, 'top');
   return false;
 }
 
@@ -823,7 +828,6 @@ onBeforeUnmount(() => {
         v-model:open="prebillOpen"
         :order="order"
         :customer-name="customerName"
-        :header="settings.receipt_header"
       />
       <CheckoutSheet
         v-if="order"

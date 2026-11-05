@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:bfbd03f10e159b04f29b2a9f5fb686def65542344b133028d36b3a2218d5f5b7 -->
+<!-- generated from WORKBOOK.md sha256:df8a83bfc89c7619e05b8eb90bbb379b6cadfcb1a17e4aa2be4b1c1b62f7322c -->
 
 ## What it is for and who it is for
 
@@ -48,8 +48,7 @@ ERPlora does not invent flows: it adopts the ones the market has already proven.
   Settings → Drawers**; when opening the session one is chosen. With only one, it is chosen by itself.
 - **Currency**: the business's, its country's, with its decimals: the euro in Spain, the zloty in Poland. Every
   amount of Cash register is in it, and the count shows its notes and coins.
-- **Time zone**: the business's. In this phase, Madrid time (`Europe/Madrid`) for everyone: the business
-  day, the session number and the auto-close time come from it.
+- **Time zone**: the business's: the auto-close time, the business day and the session number come from it.
 
 Initial setup, step by step:
 
@@ -515,13 +514,17 @@ Steps:
    itself" if it closed by itself), the float, the expected cash and, line by line, the sales by payment
    method, refunds, cash in, cash out, comps, the expected cash and, in the Z, the counted cash and the
    discrepancy.
-4. With Printing not on or with no active receipt printer, the browser's print dialog shows with the same
-   report (in the queue it would wait forever).
+4. With Printing not on or with no active receipt printer, the device's print dialog shows with the same
+   report (in the queue it would wait forever): the browser's or, in the installed app, its print screen
+   (the system's dialog, with the printer or "Save as PDF"), titled with the report and the session ("Cash
+   closing (Z) · S-…").
 In: the summary of the session, the same one the screen shows.
-Out: a job in the receipt queue of Printing (or the browser's paper). Each "Print" is a new paper.
-If it fails: "Could not print." with the reason from Printing (for example, no permission to print). With
-the blind count, whoever cannot see the expected cash does not see "Print" in an open session (the report
-carries the expected cash); in a closed one they do.
+Out: a job in the receipt queue of Printing (or the device's paper). Each "Print" is a new paper.
+If it fails: "Could not print." with the reason from Printing (for example, no permission to print); if the
+installed app does not open its print screen, with its own ("…: this version of the ERPlora app cannot
+print; update it", "…: the device's print service did not open"…). With the blind count, whoever cannot
+see the expected cash does not see "Print" in an open session (the report carries the expected cash); in a
+closed one they do.
 Involved: CASH_REGISTER-F11, PRINTING-F17
 
 ### CASH_REGISTER-F17 See the sale lines in no shift
@@ -537,7 +540,8 @@ Steps:
    - with a session forgotten past its cut-off (F10): what came after the cut-off;
    - with a session open: the stragglers of the previous shift, confirmed while it was being closed (its Z
      no longer picks them up).
-2. Tap "View" to see the list (when, type, amount, method and document).
+2. Tap "View" to see the list (when, type, amount, method and document). It is read-only: a single
+   button, **Close**.
 3. When opening the session, count that cash in the float: it is already in the drawer (the opening window
    reminds you).
 In: the charges, voids and refunds from Sales that fell in no session.

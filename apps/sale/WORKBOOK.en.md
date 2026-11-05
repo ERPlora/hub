@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:fb4903203aafd7dbe749448d9614f3a90d7fdc2b9393ae5578ca2d0e07ae7a31 -->
+<!-- generated from WORKBOOK.md sha256:630c115aad47bde84e1514f498ed8b0053b27c68bd4d394625312ec1d5efbae7 -->
 
 ## What it is for and who it is for
 
@@ -122,7 +122,11 @@ areas:
   kitchen only shows its quantity, "Order N" and the ⊗ button "Void this item"; one paid with a voucher,
   "Already paid · <voucher>", 0.00 € and only the button to remove it). Footer: the "Ticket discount" row
   if there is one, "Total" (the one the server works out), the discount button, the printer ("Print
-  bill") and "Charge · <amount>".
+  bill") and "Charge · <amount>". In the phone's drawer the top bar and the footer with "Charge" always
+  stay in view, above the tab bar, also on a 320×568 phone; what is in between (title, chips, tabs and
+  lines) scrolls. The customer button reads in two lines at most (a longer name ends in "…"); where they
+  do not fit, on a 320 px phone, it keeps only its icon, and the customer chip in the heading already
+  names them (hub#630).
 
 **Speak** (the strip's microphone key; only for whoever may use the assistant and on a device that can
 record): press it and speak. While it records it turns red, is called "Stop" and "Listening…" shows
@@ -150,10 +154,12 @@ Sheet opened by "Charge". At the top, the big amount (the one the server works o
 <total>" if there are marked lines and "Remaining" when splitting. On one side, the summary ("Receipt" /
 "Invoice", customer), with "Invoice" the customer's details and, with Services, "Lines paid another
 way": each service line of the charge with its voucher slot (SALE-F27). On the other, "Payments taken",
-the payment methods (cash, in a business in Spain not available from €1,000, with its reason),
-"Tendered", "Change" and the keypad in cash, or "Exact amount" and "Charge <amount> on the card terminal,
-then confirm." with another method; "Split the payment" and "Add this payment". Footer: the reason if it
-cannot be charged and "Charge <amount>" ("Charging…" while it goes); with the cash register closed and
+the payment methods (cash, in a business in Spain not available from €1,000, with its reason) and, in
+cash, "Tendered", a row of fixed height with what the amount lacks ("Enter the amount tendered on the
+keypad", "The amount tendered does not cover the total") or, in its place, the large "Change", and the
+keypad, which does not move while typing (hub#456); with another method, "Exact amount" and "Charge
+<amount> on the card terminal, then confirm."; "Split the payment" and "Add this payment". Footer: the
+reason if it cannot be charged (those of the amount tendered go above the keypad) and "Charge <amount>" ("Charging…" while it goes); with the cash register closed and
 cash, the refusal and "Open a cash session".
 
 ### Open checks
@@ -175,7 +181,7 @@ also sees them, and a manager approves it for them with their PIN. Empty: "No sa
 "Loading…"; error: the notice with "Retry".
 
 ### Sale document
-Window with a sale's ticket: the paper as it prints (title "Receipt" or "Invoice", header, the number
+Window with a sale's ticket: the paper as it prints (title "Receipt" or "Invoice", the business with its tax ID, the number
 Invoicing gave it —"Invoice FACT-2026-000012", "Receipt TICKET-2026-000031"— or, without it, the sale's,
 date, lines, one VAT row per tax key, total, payment method, tendered and change, footer), the ✕ and the
 printer. Every print from **Sales** comes out with "DUPLICATE". Error: "Error loading the document".
@@ -276,7 +282,10 @@ Steps:
 3. Press "Charge · <total>" at the foot of the check (on a phone, first open the check with the floating
    button, which shows the total).
 4. In the **Charge** sheet, with cash chosen, enter the amount tendered on the keypad; the change shows
-   large underneath.
+   large above the keypad, in the row that until then asks for the amount, and the keys do not move under
+   the finger while typing (hub#456). On a low phone, also on a 320×568 one, the whole keypad sits above
+   the footer as soon as the sheet opens; on the 320×568 one the amount moves up beside the title
+   (hub#630).
 5. Press "Charge <total>".
 6. The sheet closes, the check is left empty and the **Sale document** opens with the ticket. With
    **Printing**, the charge asks the queue for the ticket in its very transaction, according to its
@@ -292,7 +301,8 @@ check closed. With Invoicing, its ticket (F2) numbered in the year's series in t
 (INVENTORY-F21) and Customers adds the purchase to the record (CUSTOMER-F20). Each line keeps the
 category, rate, country, region and Taxes rule it was charged with.
 If it fails: with no amount tendered the button does not charge and "Enter the amount tendered on the
-keypad" is read; too little, "The amount tendered does not cover the total". An article without VAT shows
+keypad" is read above the keypad; too little, "The amount tendered does not cover the total" (on the button
+too, and a tap says it). An article without VAT shows
 marked "VAT missing" and, when tapped, says "Cannot be sold: no tax category. VAT needs to be set up.";
 a sold-out one shows greyed with "Sold out" and, when tapped, says "«…» is sold out." (SALE-F07). A
 refusal when charging is painted in the sheet with its sentence (e.g. "A product of the ticket is no
@@ -440,7 +450,9 @@ Steps:
 3. What Inventory has marked as sold out shows in the grid and in the search greyed, with "Sold out":
    tapping it does not add it and says "«…» is sold out." with its name. Asking for it through the
    assistant does not add it either. What was already on a check before it sold out is split, merged,
-   printed and charged just the same. As soon as it is back on sale, it can be ordered again.
+   printed and charged just the same. As soon as it is back on sale, it can be ordered again, and the
+   sold-out notice goes away on its own, without touching anything else (the same for "no tax
+   category" as soon as the article has one). On leaving **Sell**, the notice of the last tap goes too.
 4. If Inventory is not active, the grid explains it and you sell at an open price.
 5. With VeriFactu active, if right now it does not allow issuing tickets or invoices (the business
    already invoices in production and its records would have no way to reach the Tax Agency), "Sales
@@ -772,11 +784,17 @@ Steps:
    With nothing pending, "Everything is sent".
 2. In "Current order", review quantities and who serves and press "Send order (N)". For it to go out as
    a rush, first arm the flame next to it: the button changes to "Send RUSH (N)". "Order N sent to the
-   kitchen." shows; the lines are marked with their round ("Order N") and the time sent, and the flame
-   disarms. A double send never sends anything twice.
+   kitchen." shows at the top of the screen, so "Charge" (SALE-F01) can be pressed without waiting for it
+   to go; the lines are marked with their round ("Order N") and the time sent, and the flame disarms. A
+   double send never sends anything twice.
+   In the phone's drawer, "Send order" and the flame stay pinned above the foot while they leave room for
+   the tabs and a line; on a lower phone, such as a 320×568 one with the red strip on top, they scroll with
+   them, after the lines, and "Charge" stays in view. The same goes for the side column of a screen just as low,
+   such as a 1024×600 tablet with the strip (hub#787).
 3. On pressing "Charge" with something pending, it is sent to the kitchen first and then the charge
-   opens: nobody pays for a dish that is not going to be made. If the send fails, the charge does not
-   open and it says why.
+   opens: nobody pays for a dish that is not going to be made. The order's notice shows at the top here
+   too, so the charge keypad (SALE-F01) can be tapped from the first moment. If the send fails, the
+   charge does not open and it says why.
 4. A sent line is locked: no quantity, no note, no discount, no comp.
 5. To take off a dish already sent, press ⊗ "Void this item" on its line: "Void «<article>»" opens with
    "It was already sent to the kitchen. It comes off the check and the reason is kept. A manager has to
@@ -795,15 +813,17 @@ In: the check's pending lines.
 Out: the lines with their round and the kitchen order open in Kitchen, a rush if the flame was armed
 (announces: order sent, with the lines, their notes, their modifiers, the dishes of each menu and who
 serves); on voiding a sent line, it announces the voided line with its reason.
-If it fails: with nothing pending, "There is nothing new to send to the kitchen."; if Kitchen does not
+If it fails: with nothing pending, "There is nothing new to send to the kitchen."; at the top of the screen, so
+"Charge" or "Send order" can be pressed again without waiting for it to go, if Kitchen does not
 answer, "The order could not be sent to the kitchen. Try again." and nothing is charged. If the order is
-sent but its slip does not print, the POS warns "Order N sent to the kitchen, but it did not print.
-Check the kitchen printer in Printing.". Asking to remove a line already sent is refused: "That line can
+sent but its slip does not print, the POS warns, at the top too, "Order N sent to the kitchen, but it did
+not print. Check the kitchen printer in Printing.". Asking to remove a line already sent is refused: "That line can
 no longer be removed: it was sent to the kitchen (void it with a reason), it is charged or it is no
 longer on an open check.". Voiding a line not sent, charged, already voided or without a reason is
 refused with "That line cannot be voided…". Without Kitchen active there are no tabs and no sending: the
 check is charged as always.
-Involved: KITCHEN-F05, KITCHEN-F18, KITCHEN-F19, KITCHEN-F20, KITCHEN-F29, BASE-F84
+Through the assistant: its confirmation card says the check (by its title or, with none, by its amount), the line, the product, the service, the menu and who serves by their name, and the order type in Kitchen's words, never by an id; what the person asking may not see, or what is no longer there, stays off the card (BASE-F97).
+Involved: KITCHEN-F05, KITCHEN-F18, KITCHEN-F19, KITCHEN-F20, KITCHEN-F29, BASE-F84, BASE-F97
 
 ### SALE-F21 Print the bill for the table (pre-bill)
 Status: done
@@ -812,16 +832,21 @@ Actor: employee, manager
 Screen: Check (bill)
 Steps:
 1. With the check on screen, press the footer's printer ("Print bill").
-2. "Bill" opens with the lines, notes, discounts, the VAT breakdown, the total and the title, and the
-   notice "Bill — this is not an invoice. The fiscal receipt is issued on payment.". With a discount on
+2. "Bill" opens with the business (name, address and tax ID of today's issuer, with the "Receipt
+   header" under them as an addition; without an issuer, as SALE-F29 says), the lines, notes, discounts,
+   the VAT breakdown, the total and the title, and the notice "Bill — this is not an invoice. The fiscal receipt is issued on payment.". With a discount on
    the check, the "Discount" row says what it takes off (the same amount as the POS footer, SALE-F14):
    with prices including VAT, the lines minus the discount give the total.
 3. Press the printer at the top: with **Printing** and an active ticket printer, the bill goes to its
    queue and "Sent to <printer>." is read (PRINTING-F09); if not, it goes through the device's print
-   dialog.
+   dialog with the bill alone: the browser's or, in the installed app, its print screen (the system's
+   dialog, with the printer or "Save as PDF").
 In: the open check and its total worked out by the server.
 Out: a paper with no fiscal number; it uses up no numbering and creates no sale. Each press, one bill.
-If it fails: "Bill could not be printed".
+If it fails: "Bill could not be printed". If the installed app does not open its print screen, the notice
+says why after a colon: "…: this version of the ERPlora app cannot print; update it", "…: the device's print
+service did not open", "…: the document is empty or too large to print" or "…: this app is linked to
+another business".
 Involved: PRINTING-F09
 
 ### SALE-F22 Charge only part of the check
@@ -934,7 +959,9 @@ Steps:
    check's line keeps the voucher that pays it.
 In: the client's vouchers and their balance, from Services.
 Out: the check's line paid with a session held in Services (announces: check changed); when charged, the
-sale with the line at 0.00 € and the session spent in the same operation (SERVICE-F24). Removing the
+sale with the line at 0.00 € and the session spent in the same operation (SERVICE-F24). The sale's line
+keeps what that session is worth when it is charged, for the production of whoever does it (SALE-F28): it
+goes into no total or document, and changing the voucher later does not move it. Removing the
 line, voiding it or deleting the check releases the session (SERVICE-F23); splitting or merging checks
 carries it with its line. A line paid with a voucher does not change quantity, comp or discount: the
 voucher is undone first.
@@ -948,7 +975,7 @@ discount without a manager is measured on what is left to pay: a line paid with 
 Without the permission to spend sessions, the slot does not appear. Without Services active in the
 business the slot does not appear either and, if it is turned off with lines paid with a voucher,
 charging them is refused ("Services is not active in this business…").
-Involved: SERVICE-F22, SERVICE-F23, SERVICE-F24, SERVICE-F25
+Involved: SERVICE-F22, SERVICE-F23, SERVICE-F24, SERVICE-F25, SALE-F28, STAFF-F21
 
 ### SALE-F28 Look up the sales history and figures
 Status: done
@@ -982,14 +1009,23 @@ commission) already takes off what was refunded: what goes back, to whoever sold
 back with nothing that is worth anything (only money, a comp or a voucher's session), to everyone on that
 sale according to what each one has left to refund after the earlier refunds, so nobody goes below 0.
 Each refund counts on its sale's day and is shared out to the cent: with what nobody served, it adds up
-to the period's "Revenue".
+to the period's "Revenue". On top of that, what the **voucher sessions** each professional did are worth
+(SALE-F27, SERVICE-F24), fixed as each one is charged; a session of a voucher with no limit, which has
+nothing to divide by, counts the price of its line. It is not money of the period (the voucher was paid
+when it was sold), so it is not in "Revenue". A session that comes back, by a refund or by voiding the sale,
+stops counting. What a line paid for a **voucher sold** (Services says so when granting it, SERVICE-F14) stays in
+"Revenue", but it is no production of whoever sold it, never going over what that line has left after refunds.
+Their **production**, which the commission goes on, is what is left without those vouchers plus the sessions: a
+voucher of 100.00 € in 3 sessions, sold by A and done by B, gives 0 to A and 100.00 € to B, and adds up to the
+period's "Revenue". Sales charged before stay as they were: their line counts for whoever sold it and the
+sessions of those vouchers count for nobody, so nothing counts twice.
 If it fails: "Error loading metrics" (the figures show as "—"); if the last 7 days cannot be read, "The
 last 7 days could not be read.". Empty: "No sales yet.". Whoever lacks the reports permission sees the
 table, without the figures. A total that is not an amount says "Type an amount, like 12.50" under its
 field, and an end date before the start one, "The end date cannot be before the start date."; neither of
 them filters and the period rules. On Home, a panel for a day with no sales says 0, and one that cannot
 be read, "Unavailable".
-Involved: STAFF-F21, BASE-F06, BASE-F07, BASE-F08
+Involved: STAFF-F21, BASE-F06, BASE-F07, BASE-F08, SALE-F27, SERVICE-F24
 
 ### SALE-F29 See and reprint a sale's document
 Status: done
@@ -999,8 +1035,13 @@ Screen: Sale document
 Steps:
 1. In **Sales**, tap the row or the "Document" action; it also opens by itself after charging, the whole
    check or part of it (SALE-F22).
-2. The ticket shows ("Receipt", or "Invoice" if it was charged as an invoice) with its header, the number
-   Invoicing gave it when charging ("Invoice FACT-2026-000012", "Receipt TICKET-2026-000031"; without
+2. The ticket shows ("Receipt", or "Invoice" if it was charged as an invoice). On top, the business: name,
+   address and tax ID of the issuer, those of the sale's fiscal document (a duplicate says what the
+   original said, even if the issuer changes later) or, without a document yet, those Invoicing has today,
+   with the "Receipt header" under them as an addition, without repeating what the issuer already says.
+   Without an issuer set up, the header's first line is the name and the rest the address; without a
+   header, the name the business signed up with. On an invoice, under "Customer", its tax ID and its
+   address. Then, the number Invoicing gave it when charging ("Invoice FACT-2026-000012", "Receipt TICKET-2026-000031"; without
    Invoicing, or while its document is pending, the sale's number), date, lines, one VAT row per tax key
    (an exempt one says its cause: "Exempt (E1)"), total, payment method, tendered and change, and the
    footer. With **VeriFactu**, before the footer goes the fiscal QR: "Tax QR:" above, "VERI*FACTU" below
@@ -1013,7 +1054,9 @@ Steps:
    permission). Once that is fixed, issue it now." with "Issue now".
 3. Press the footer's printer to print it, or "Reprint" on the row. With **Printing** and an active
    ticket printer, the paper goes to its queue and "Sent to <printer>." is read (PRINTING-F08); if not (or
-   with its fiscal document pending), it goes through the device's print dialog. Every print from
+   with its fiscal document pending), it goes through the device's print dialog with the paper alone: the
+   browser's or, in the installed app, its print screen (the system's dialog, with the printer or "Save
+   as PDF"). Every print from
    **Sales** comes out with "DUPLICATE", also with its fiscal QR; only the first paper right after
    charging is the original (and it is a copy if the charge already sent it to the queue).
 4. **Document pending**: in the list, a sale with some fiscal document pending (its own, the corrective
@@ -1022,14 +1065,17 @@ Steps:
    whoever presses it, for everything that is waiting, in order (its ticket or invoice and then the
    corrective invoices) and "Fiscal documents issued." shows. Before that, the hub retries it by itself
    for a few minutes (INVOICE-F06): if the cause is fixed in time, the pill goes away by itself.
-In: the sale, with the number of its fiscal document (which Invoicing gave it in the same charge).
+In: the sale, with the number of its fiscal document (which Invoicing gave it in the same charge), and
+Invoicing's issuer, read by name and as the platform: whoever sells prints those details even if they
+cannot read Invoicing. The paper does not touch the document or its fiscal record.
 Out: the paper; reprinting creates no sale or fiscal document. "Issue now" issues the documents that were
 waiting (announces: sale with its document, one per document).
 If it fails: "Loading document…" and "Error loading the document" (also if the fiscal QR cannot be read:
-the paper never comes out without it). "Could not print". A refused "Issue now" says Invoicing's reason
+the paper never comes out without it). "Could not print"; if the installed app does not open its print
+screen, with the reason after a colon, as in SALE-F21. A refused "Issue now" says Invoicing's reason
 ("Set up the issuer…") and changes nothing; without words from the server, "The documents could not be
 issued. Try again.".
-Involved: INVOICE-F01, INVOICE-F02, INVOICE-F06, INVOICE-F18, PRINTING-F08, VERIFACTU-F19
+Involved: INVOICE-F01, INVOICE-F02, INVOICE-F06, INVOICE-F18, PRINTING-F08, VERIFACTU-F19, SALE-F21, SALE-F34
 
 ### SALE-F30 Void a charged sale
 Status: done
@@ -1143,8 +1189,10 @@ Steps:
 2. Change what you need: "Allow cash", "Allow card", "Allow bank transfer", "Show products in the till",
    "Show services in the till", "Require a customer on every sale", "Allow discounts", "Largest discount
    a cashier may give alone, per discount (%)", "Allow parked tickets", "Prices include VAT", "Issue an
-   invoice when the customer has a tax ID", "Default document" ("Ticket" or "Invoice"), "Receipt header",
-   "Receipt footer", "Footer image (URL)", "Promotional QR URL" and "Promotional QR text".
+   invoice when the customer has a tax ID", "Default document" ("Ticket" or "Invoice"), "Receipt header"
+   (added under the issuer's name, tax ID and address; without an issuer yet, the first line is the name
+   and the rest the address: SALE-F29), "Receipt footer", "Footer image (URL)", "Promotional QR URL" and
+   "Promotional QR text".
 3. Press **Save**: "Settings saved." shows.
 In: nothing from other apps.
 Out: the business's settings (one row). The server applies when charging "Allow cash / card / bank
@@ -1172,7 +1220,8 @@ Out: the section (name, VAT category, position). What was already sold keeps the
 charged with.
 If it fails: a VAT category that does not exist is refused next to its field. A section someone else
 already deleted: "That section is no longer in this business. Reload the list and try again.".
-Involved: TAX-F01
+Through the assistant: its confirmation card says the section by its name, never by an id; one that is no longer there stays off the card (BASE-F97).
+Involved: TAX-F01, BASE-F97
 
 ### SALE-F36 Prepare the quick notes
 Status: done
@@ -1229,13 +1278,15 @@ Steps:
    has that permission. The booked price rules over the professional's.
 In: the services on offer, their rate, their minimum and maximum and their tax category, from Services;
 the professional's own price (their assignments, `service.assignment.list`); the appointment and what it
-booked, from Appointments (`appointment.appointment.get`).
+booked, from Appointments (`appointment.appointment.get`); the refused service, while its notice is
+showing (`service.service.get`).
 Out: a service line with the service, its frozen price and the service's tax category; it moves no
 stock.
 If it fails: a service without a tax category shows "VAT missing" and does not go in ("Cannot be sold: no
-tax category. VAT needs to be set up."); an archived one, "That service is no longer offered…"; an amount
-outside the service's minimum and maximum, "That amount is outside what the service allows (<minimum> –
-<maximum>).". A booked price that does not match the appointment: "That is not the price the appointment
+tax category. VAT needs to be set up."); that notice goes away on its own as soon as the service has a
+category, without touching anything else, and also on leaving **Sell**. An archived one, "That service is
+no longer offered…"; an amount outside the service's minimum and maximum, "That amount is outside what the
+service allows (<minimum> – <maximum>).". A booked price that does not match the appointment: "That is not the price the appointment
 booked for this service: it is cancelled, it is another customer's, it did not book this service or it
 booked it cheaper." (409 on its field). Without Services active, "Services" does not show in the strip.
 Involved: SERVICE-F09, SERVICE-F03, SERVICE-F31, APPOINTMENT-F17
@@ -1266,12 +1317,13 @@ id, its name or its type ("cash", "card"). If a name matches several, it is refu
 | What it gives | Who can | Flows | Service |
 |---|---|---|---|
 | The sales, with search by number or customer, filters (status, payment, customer, professional, days, total), sorting and pages (up to 100); each one says whether it has some fiscal document pending | see sales | F28, F29 | `sale.sale.list` |
-| A whole sale: header, lines, payments, VAT breakdown and what was refunded | see sales | F29 | `sale.sale.get` |
+| A whole sale: header, customer with its tax ID and address (on an invoice), lines, payments, VAT breakdown and what was refunded | see sales | F29 | `sale.sale.get` |
+| The business as the paper names it: name, tax ID and lines (address and receipt header); for a sale, those of its fiscal document | see sales | F21, F29 | `sale.letterhead.get` |
 | The sale recorded with a charge attempt key | see sales | F06 | `sale.sale.by_idempotency_key` |
 | The figures of a period of business days, with the tax its sales were declared with (empty if they mix taxes) | reports | F28 | `sale.sale.stats` |
 | What was sold today and today's tickets | reports | F28 | `sale.sale.today` |
 | What was sold on each of the last 7 days | reports | F28 | `sale.sale.last_7_days` |
-| What each professional sold in a period: gross, base, tax, what was refunded of their lines and what is left (what the commission goes on) | reports | F16, F28 | `sale.sale.by_staff` |
+| What each professional sold in a period: gross, base, tax, what was refunded of their lines, what is left, what paid for vouchers they sold, what the voucher sessions they did are worth and their production (what the commission goes on) | reports | F16, F28 | `sale.sale.by_staff` |
 | What a check, or some lines, would charge, without charging anything (total, base, VAT, discounts, breakdown and lines) | see sales | F01, F21, F22 | `sale.checkout.preview` |
 | The open checks (or of another state), with search by title and pages | see sales | F17 | `sale.order.list` |
 | A check with its uncharged lines | see sales | F17, F19 | `sale.order.get` |
@@ -1284,6 +1336,7 @@ id, its name or its type ("cash", "card"). If a name matches several, it is refu
 | For each payment of a sale, what was refunded and what is left, and for each line what already came back | see sales | F31 | `sale.refund.options` |
 | A sale's refunds, with the state and the number of their corrective invoice | see sales | F31 | `sale.refund.list` |
 | The refund recorded with a key | see sales | F31 | `sale.refund.by_idempotency_key` |
+| The name of a record a write of Sales touches, by its id: only for the assistant's card; what does not exist or the person asking may not read goes unnamed | see sales | F20, F35 | `sale.record.get` |
 
 The sales, the figures, the checks, the charge preview, the payment methods, the settings, the sections,
 the quick notes and what is refundable can be followed live.
@@ -1331,6 +1384,7 @@ the quick notes and what is refundable can be followed live.
 | Sale voided | Void | The sale, its number, reason, who and when, total, customer, check and document | `sale.sale.voided` |
 | Sale refunded | Refund | The sale, the refund, the amount, the reason, whether it is left fully refunded, the payments and the refunded lines | `sale.sale.refunded` |
 | Sales re-pointed | Merge records | The record that stays and the absorbed one | `sale.sale.reassigned` |
+| A line paid for a voucher, or no longer | Services grants or voids a voucher saying its sale | The sale and the line | `sale.sale.voucher_line_changed` |
 | Sale with its document | A document that could not be issued in the charge, the void or the refund is issued later (the charge's retry, "Issue now" or Invoicing's reaction) | The sale, the document, its number, the refund (`refund_id`) or whether it is the void's (`void`); one per document | `sale.sale.invoiced` |
 | Check opened | Open or split | The check | `sale.order.opened` |
 | Check changed | Any change of lines, discounts or title | The check | `sale.order.changed` |
@@ -1359,7 +1413,8 @@ the quick notes and what is refundable can be followed live.
 - **Staff** (optional): the team for the "Served by" chip and the record of whoever is signed in
   (`staff.member.current`, without Staff's permission), to which the charge attributes "Me".
 - **Services** (optional): its services on offer (`service.service.list_for_sale`, and
-  `service.service.get` when the line is added), the client's vouchers for a service
+  `service.service.get` when the line is added and while the notice of a refused one lasts), the client's
+  vouchers for a service
   (`service.grant.tender_options`) and the voucher sessions: it holds, releases, spends and gives them
   back by calling its operations by name (`service.session.hold`, `.release`, `.settle`, `.return`), with
   the session of whoever sells and in the same transaction; a professional's own price

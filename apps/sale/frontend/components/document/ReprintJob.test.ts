@@ -1,16 +1,18 @@
 // «Reprint» on a row of Sales (SALE-F29; the old hidden viewer): it asks the printing queue for the
 // sale's copy first (PRINTING-F08) — queued, a toast names the printer and the job ends —; not queued, the
-// sale's paper is painted out of sight, always a «DUPLICATE», printed through the browser as soon as it is
-// there, and the job ends (`done`). If the document cannot be loaded or the browser refuses, «Could not
-// print» says so.
+// sale's paper is painted out of sight, always a «DUPLICATE», printed on the device as soon as it is there (the
+// browser's dialog; inside the installed app, its print screen, hub#455), and the job ends (`done`). If the
+// document cannot be loaded or the print is refused, «Could not print» says so, with the app's reason.
 import { toastError, toastSuccess } from '@erplora/ui/shell';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { errorFrame, flush, mountSale } from '../../__tests__/mount-sale';
+import { PrintRefused } from '../../../../../base/frontend/lib/print-paper';
 import { printPaper } from '../../lib/print';
-import { saleOut, SETTINGS } from './__tests__/fixtures';
+import { LETTERHEAD, saleOut, SETTINGS } from './__tests__/fixtures';
 import ReceiptPaper from './ReceiptPaper.vue';
 import ReprintJob from './ReprintJob.vue';
+import SaleDocument from './SaleDocument.vue';
 
 vi.mock('@erplora/ui/shell', async (importOriginal) => ({
   ...((await importOriginal()) as object),
@@ -33,6 +35,7 @@ async function setup(locale: 'en' | 'es' = 'en') {
   async function load() {
     await m.result('sale.sale.get', saleOut());
     await m.result('sale.pos_settings.get', { ...SETTINGS, updated_at: null });
+    await m.result('sale.letterhead.get', LETTERHEAD);
   }
   return { ...m, call, load };
 }
@@ -60,9 +63,46 @@ describe('ReprintJob', () => {
     await s.load();
     const paper = s.wrapper.findComponent(ReceiptPaper);
     expect(paper.props('duplicate')).toBe(true);
-    expect(vi.mocked(printPaper).mock.calls).toEqual([[paper.element]]);
+    // Titled with the document's number: the print job's name and the file «Save as PDF» proposes (hub#455).
+    expect(vi.mocked(printPaper).mock.calls).toEqual([[paper.element, { title: '20261014-0007' }]]);
     expect(s.wrapper.emitted('done')).toHaveLength(1);
     expect(toastError).not.toHaveBeenCalled();
+  });
+
+  it('ends the job when the app has printed, not before: the paper stays while the app reads it (hub#455)', async () => {
+    let done = (): void => {};
+    vi.mocked(printPaper).mockReturnValueOnce(new Promise<void>((resolve) => (done = resolve)));
+    const s = await setup();
+    await s.load();
+    expect(printPaper).toHaveBeenCalledOnce();
+    expect(s.wrapper.emitted('done')).toBeUndefined();
+    done();
+    await flush();
+    expect(s.wrapper.emitted('done')).toHaveLength(1);
+    expect(toastError).not.toHaveBeenCalled();
+  });
+
+  it('a paper painted again while the app prints is not printed twice (hub#455)', async () => {
+    let done = (): void => {};
+    vi.mocked(printPaper).mockReturnValueOnce(new Promise<void>((resolve) => (done = resolve)));
+    const s = await setup();
+    await s.load();
+    const paper = s.wrapper.findComponent(ReceiptPaper).element;
+    s.wrapper.findComponent(SaleDocument).vm.$emit('ready', paper, '20261014-0007');
+    await flush();
+    expect(printPaper).toHaveBeenCalledOnce();
+    done();
+    await flush();
+    expect(s.wrapper.emitted('done')).toHaveLength(1);
+  });
+
+  it('in the installed app, a print the app refuses ends the job saying why (hub#455)', async () => {
+    vi.mocked(printPaper).mockRejectedValueOnce(new PrintRefused('unlinked', 'not_the_linked_hub'));
+    const s = await setup('es');
+    await s.load();
+    await flush();
+    expect(toastError).toHaveBeenCalledExactlyOnceWith('No se pudo imprimir: esta app está vinculada a otro negocio');
+    expect(s.wrapper.emitted('done')).toHaveLength(1);
   });
 
   it('a document that cannot be loaded ends the job with «Could not print» and the reason', async () => {

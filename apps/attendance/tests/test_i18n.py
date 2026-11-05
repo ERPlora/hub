@@ -10,58 +10,16 @@ import pytest
 from django.apps import apps
 from django.utils import translation
 from django.utils.functional import Promise
+from django.utils.translation import gettext_lazy
+from live.meta import Nav
 from live.operations import registry
 
 from apps.attendance import queries, schemas, services
 from apps.attendance.models import AttendanceSettings, Break, Correction, Record
+from base.tests.po import po_entries
 
 LOCALE = Path(apps.get_app_config("attendance").path) / "locale" / "es" / "LC_MESSAGES"
 MODELS = (Record, Break, Correction, AttendanceSettings)
-_STRING = re.compile(r'^"(.*)"$')
-_ESCAPE = re.compile(r"\\(.)")
-_ESCAPES = {"n": "\n", "t": "\t"}
-
-
-def _unescape(text: str) -> str:
-    return _ESCAPE.sub(lambda match: _ESCAPES.get(match.group(1), match.group(1)), text)
-
-
-def po_entries(path: Path) -> dict[str, tuple[str, bool]]:
-    """``key → (msgstr, fuzzy)`` of a .po file without plurals (the header is skipped).
-
-    The key is the msgid, or ``context\x04msgid`` for an entry with a ``msgctxt`` (gettext's own key).
-    """
-    entries: dict[str, tuple[str, bool]] = {}
-    parts: dict[str, list[str]] = {"msgctxt": [], "msgid": [], "msgstr": []}
-    fuzzy, current = False, None
-
-    def flush():
-        msgid = _unescape("".join(parts["msgid"]))
-        context = _unescape("".join(parts["msgctxt"]))
-        if msgid:
-            key = f"{context}\x04{msgid}" if context else msgid
-            entries[key] = (_unescape("".join(parts["msgstr"])), fuzzy)
-
-    for line in path.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        starts_entry = (
-            line.startswith("msgctxt ")
-            or (line.startswith("msgid ") and current != "msgctxt")
-            or (line.startswith("#") and current == "msgstr")
-        )
-        if starts_entry:
-            flush()
-            # A ``#, fuzzy`` read after an entry's end belongs to the entry this line opens; only an end forgets it.
-            parts, fuzzy, current = {"msgctxt": [], "msgid": [], "msgstr": []}, fuzzy and current is None, None
-        if line.startswith("#,") and "fuzzy" in line:
-            fuzzy = True
-        elif line.startswith(("msgctxt ", "msgid ", "msgstr ")):
-            current, _, rest = line.partition(" ")
-            parts[current].append(_STRING.match(rest).group(1))
-        elif current and _STRING.match(line):
-            parts[current].append(_STRING.match(line).group(1))
-    flush()
-    return entries
 
 
 def module_texts(module) -> list[Promise]:
@@ -70,7 +28,7 @@ def module_texts(module) -> list[Promise]:
 
 
 def visible_texts() -> set[str]:
-    """The English source of every lazy text the app shows (menu, store, admin, choices, messages)."""
+    """The catalogue key of every lazy text the app shows (menu, store, admin, choices, messages)."""
     config = apps.get_app_config("attendance")
     lazies = [
         config.verbose_name,
@@ -92,7 +50,13 @@ def visible_texts() -> set[str]:
     for choices in (Record.Status, Record.Source):
         lazies += list(choices.labels)
     with translation.override("en"):
-        return {str(text) for text in lazies} | schema_titles()
+        return {source(text) for text in lazies} | schema_titles()
+
+
+def source(text) -> str:
+    """How the catalogue keys a lazy text: its English, or ``context\x04English`` for a ``pgettext_lazy``."""
+    args = getattr(text, "_args", ())
+    return f"{args[0]}\x04{args[1]}" if len(args) == 2 else str(text)
 
 
 def schema_titles() -> set[str]:
@@ -119,76 +83,25 @@ def test_every_entry_has_a_spanish_translation():
     assert untranslated(entries) == []
 
 
-def test_the_reader_sees_a_fuzzy_mark_with_and_without_a_context(tmp_path):
-    """gettext skips a ``#, fuzzy`` translation (the screen says the English), so the reader has to see the mark
-    above a ``msgid`` and above a ``msgctxt``, with or without other comments, and never pass it on (hub#491)."""
-    po = tmp_path / "django.po"
-    po.write_text(
-        "\n".join(
-            [
-                "#, fuzzy",
-                'msgid ""',
-                'msgstr ""',
-                '"Content-Type: text/plain; charset=UTF-8\\n"',
-                "",
-                'msgid "Header follows"',
-                'msgstr "Tras la cabecera"',
-                "",
-                "#, fuzzy",
-                'msgid "Plain"',
-                'msgstr "Llano"',
-                'msgid "Right after a fuzzy one"',
-                'msgstr "Justo después"',
-                "",
-                "#. A note for the translator",
-                "#: apps/attendance/services.py:1",
-                "#, fuzzy, python-format",
-                'msgid "With comments %(name)s"',
-                'msgstr "Con comentarios %(name)s"',
-                "",
-                "#, fuzzy",
-                'msgctxt "attendance menu"',
-                'msgid "Clock in"',
-                'msgstr "Fichar entrada"',
-                'msgctxt "attendance menu"',
-                'msgid "Clock out"',
-                'msgstr ""',
-                '"Fichar salida"',
-                "",
-            ]
-        ),
-        encoding="utf-8",
-    )
-    assert po_entries(po) == {
-        "Header follows": ("Tras la cabecera", False),
-        "Plain": ("Llano", True),
-        "Right after a fuzzy one": ("Justo después", False),
-        "With comments %(name)s": ("Con comentarios %(name)s", True),
-        "attendance menu\x04Clock in": ("Fichar entrada", True),
-        "attendance menu\x04Clock out": ("Fichar salida", False),
-    }
-
-
-def test_a_fuzzy_mark_in_attendances_own_catalog_is_seen(tmp_path):
-    """The catalog attendance ships, with ``#, fuzzy`` above its first entry and above its first entry with a
-    context: the reader flags exactly those two, so the translation guard above fails on them (hub#491)."""
-    lines = (LOCALE / "django.po").read_text(encoding="utf-8").splitlines()
-    first_msgid = next(n for n, line in enumerate(lines) if line.startswith("msgid ") and line != 'msgid ""')
-    first_msgctxt = next(n for n, line in enumerate(lines) if line.startswith("msgctxt "))
-    for n in sorted((first_msgid, first_msgctxt), reverse=True):
-        lines.insert(n, "#, fuzzy")
-    marked = tmp_path / "django.po"
-    marked.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    assert [lines[first_msgid + 1], lines[first_msgctxt + 2]] == ['msgid "Time clock"', 'msgctxt "attendance menu"']
-    fuzzy = [key for key, (_, is_fuzzy) in po_entries(marked).items() if is_fuzzy]
-    assert fuzzy == ["Time clock", "attendance menu\x04Clock in"]
-    assert untranslated(po_entries(marked)) == ["Time clock", "attendance menu\x04Clock in"]
+def missing_from_catalog() -> set[str]:
+    """The visible texts the catalogue has no entry for, each compared by its whole key."""
+    return visible_texts() - set(po_entries(LOCALE / "django.po"))
 
 
 def test_every_visible_text_is_in_the_catalog():
     assert len(visible_texts()) > 60  # positive control: the collection found the app's texts
-    msgids = {key.split("\x04")[-1] for key in po_entries(LOCALE / "django.po")}
-    assert visible_texts() - msgids == set()
+    assert missing_from_catalog() == set()
+
+
+def test_a_text_that_loses_its_context_is_missing_from_the_catalog(monkeypatch):
+    """A label put back without its context while the catalogue keeps only the contexted entry: gettext never finds
+    that entry, so Spanish says another app's words, or the English if no app has it (hub#493). The guard above has to
+    fail on it. The message goes in a variable because ``makemessages`` would take a literal for a text of the app."""
+    message = "Records"
+    label = gettext_lazy(message)
+    config = apps.get_app_config("attendance")
+    monkeypatch.setattr(config, "navigation", [Nav("records", label, "ion:list-outline", "/attendance/records")])
+    assert missing_from_catalog() == {message}
 
 
 def test_the_compiled_catalog_is_current():

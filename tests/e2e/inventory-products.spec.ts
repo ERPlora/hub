@@ -1,12 +1,13 @@
 // Inventory → Products in Chrome against the real Taxes app (apps/inventory/WORKBOOK.md):
 //   - INVENTORY-F01: «+» → «New product», the tax category picked among those Taxes seeds; the
-//     product arrives live, active, not «Not configured»;
+//     product arrives live, active, not «Not configured»; the field a person went to while the form was opening
+//     keeps what they type (hub#700);
 //   - the form's refusals under their field: 422 (a price over the limit) and 409 (a SKU taken);
 //   - INVENTORY-F05: a product whose tax category Taxes deactivated is «Not configured», the sale
 //     catalog says it cannot be sold, and saving it with that category is refused; picking another
 //     one in the form fixes it; its «Not configured» chip keeps its icon in sight and its text whole while the
-//     row has room, or ending in «…» with the whole text as its title, at 390, 834, 1280 and 1440
-//     (FIX-INVENTORY-PRODUCTS-UNCONFIGURED-CHIP-CLIPPED);
+//     row has room, or ending in «…» with the whole text as its title, at 390, 834, 1280 and 1440, in English and
+//     in Spanish (FIX-INVENTORY-PRODUCTS-UNCONFIGURED-CHIP-CLIPPED, hub#530);
 //   - INVENTORY-F11: the export downloads the filtered catalog with the headers the import reads;
 //   - `/inventory` lands on the dashboard and the tabs walk the five sections; screenshots of every page in three
 //     viewports;
@@ -14,7 +15,7 @@
 //     amount it cannot read is said under its field and does not filter.
 import { expect, test } from '@playwright/test';
 
-import { A, api, login, psql, record, shot, shown } from './helpers';
+import { A, api, capture, login, psql, record, shot, shown } from './helpers';
 import {
   cleanInventory,
   createProduct,
@@ -54,6 +55,7 @@ test('INVENTORY-F01: a new product with a tax category of Taxes arrives live, ac
   const form = dialog(page, 'inventory-product-form');
   await expect(form).toBeVisible();
   await expect(form.locator('[data-testid=inventory-product-form-submit]')).toHaveJSProperty('disabled', true);
+  await expect(form.locator('[data-testid=inventory-product-name] input')).toBeFocused();
   await fill(form, 'inventory-product-name', 'E2E Coffee');
   await fill(form, 'inventory-product-sku', sku);
   await fill(form, 'inventory-product-price', '2,20');
@@ -72,6 +74,54 @@ test('INVENTORY-F01: a new product with a tax category of Taxes arrives live, ac
   await expect(shown(page).locator('[data-testid^=inventory-products-unconfigured-]')).toHaveCount(0);
   const saved = await productBySku(context, sku);
   expect([saved.tax_category_key, saved.needs_tax_setup, saved.is_active, saved.stock]).toEqual([GENERIC, false, true, '5.000']);
+});
+
+test('INVENTORY-F01: the field a person went to while the form was opening keeps what they type, and «Save» lights up', async ({ page, context }) => {
+  // hub#700: the dialog says it has opened about half a second after it shows. A person who is already in the SKU by
+  // then stays there; before, the cursor jumped to the name, the text went there and the SKU stayed empty, with «Save» off.
+  const sku = `E2E-OPENING-${stamp()}`;
+  await page.setViewportSize({ width: 834, height: 1112 });
+  await login(page, A, '/inventory/products');
+  await productsReady(page);
+
+  // Inside the page, frame by frame: from outside the first moment the field can take the focus would be a coin toss.
+  const opened = page.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        const form = 'ion-modal[data-testid=inventory-product-form]';
+        document.addEventListener(
+          'didPresent',
+          (event) => {
+            if ((event.target as Element).matches(form)) resolve();
+          },
+          { capture: true },
+        );
+        const goToSku = () => {
+          const input = document.querySelector<HTMLInputElement>(`${form} [data-testid=inventory-product-sku] input`);
+          input?.focus();
+          if (!input || document.activeElement !== input) requestAnimationFrame(goToSku);
+        };
+        requestAnimationFrame(goToSku);
+      }),
+  );
+  await shown(page).locator('[data-testid=inventory-products-add]').click();
+  await opened;
+
+  const form = dialog(page, 'inventory-product-form');
+  const skuInput = form.locator('[data-testid=inventory-product-sku] input');
+  await expect(skuInput).toBeFocused();
+  await page.keyboard.type(sku);
+  await expect(skuInput).toHaveValue(sku);
+  await expect(form.locator('[data-testid=inventory-product-name] input')).toHaveValue('');
+
+  await fill(form, 'inventory-product-name', 'E2E Opening');
+  await pickCombo(page, form.locator('[data-testid=inventory-product-tax]'), 'generic', /(Product — generic|Producto — general).*21/);
+  const save = form.locator('[data-testid=inventory-product-form-submit]');
+  await expect(save).toHaveJSProperty('disabled', false);
+  await save.click();
+  await expect(form).toBeHidden();
+  const saved = await productBySku(context, sku);
+  expect([saved.name, saved.tax_category_key]).toEqual(['E2E Opening', GENERIC]);
 });
 
 test('selectores de Inventario (Combo compartido): the product form searches its tax category and its categories on the server, at every width', async ({
@@ -203,15 +253,17 @@ test('INVENTORY-F05: a product whose tax category Taxes deactivated is «Not con
  *  (`roomy`: the row has room for the whole chip). */
 const CHIP_VIEWPORTS = [
   { label: '390', width: 390, height: 844, roomy: false },
+  { label: '820', width: 820, height: 1180, roomy: false },
   { label: '834', width: 834, height: 1112, roomy: false },
   { label: '1280', width: 1280, height: 800, roomy: true },
   { label: '1440', width: 1440, height: 900, roomy: true },
 ];
 
 // flow: INVENTORY-F05 (chip «Sin configurar» de Productos)
-test('INVENTORY-F05 · FIX-INVENTORY-PRODUCTS-UNCONFIGURED-CHIP-CLIPPED: the «Not configured» chip keeps its icon in sight and its text whole or ending in «…», at every width', async ({
+test('INVENTORY-F05 · FIX-INVENTORY-PRODUCTS-UNCONFIGURED-CHIP-CLIPPED: the «Not configured» chip keeps its icon in sight and reads those words, whole or ending in «…», at every width', async ({
   page,
   context,
+  browser,
 }) => {
   await login(page, A, '/inventory/dashboard');
   const key = `e2e.chip_${stamp().toLowerCase()}`;
@@ -229,7 +281,7 @@ test('INVENTORY-F05 · FIX-INVENTORY-PRODUCTS-UNCONFIGURED-CHIP-CLIPPED: the «N
     for (const vp of CHIP_VIEWPORTS) {
       await page.setViewportSize({ width: vp.width, height: vp.height });
       await expect(marker).toBeVisible();
-      const options = { within: '[role=cell], .data-table__field-value', whole: vp.roomy, titled: true };
+      const options = { within: '[role=cell], .data-table__field-value', whole: vp.roomy, reads: 'Not configured', titled: true };
       const fit = await settledChipFit(marker, options, `list at ${vp.label}`);
       record(`FIX-INVENTORY-PRODUCTS-UNCONFIGURED-CHIP-CLIPPED-${vp.label}`, { ...fit.metrics, problems: fit.problems });
       await page.screenshot({ path: shot(`FIX-INVENTORY-PRODUCTS-UNCONFIGURED-CHIP-CLIPPED-${vp.label}`) });
@@ -244,6 +296,97 @@ test('INVENTORY-F05 · FIX-INVENTORY-PRODUCTS-UNCONFIGURED-CHIP-CLIPPED: the «N
       await page.setViewportSize({ width: vp.width, height: vp.height });
       await settledChipFit(formChip, { within: '.tax-category-select' }, `form at ${vp.label}`);
     }
+
+    // hub#530: the business sees it in Spanish, «Sin configurar · Falta la categoría fiscal», wider than the English
+    // one: whole at 1280 too, beside the «Photo» column (INVENTORY-F32). The Hub's language cookie, as the sign-in
+    // sets it from the account.
+    const spanish = await browser.newContext({ baseURL: A, viewport: { width: 1280, height: 800 }, locale: 'es-ES' });
+    try {
+      const es = await spanish.newPage();
+      await login(es, A, '/inventory/dashboard');
+      await spanish.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
+      await es.goto(`${A}/inventory/products?status=unconfigured`);
+      await expect(es.locator('html')).toHaveAttribute('lang', /^es/);
+      await productsReady(es);
+      const chip = shown(es).locator(`[data-testid=inventory-products-unconfigured-${product.id}]`);
+      await expect(chip).toContainText('Sin configurar · Falta la categoría fiscal');
+      for (const vp of CHIP_VIEWPORTS) {
+        await es.setViewportSize({ width: vp.width, height: vp.height });
+        await expect(chip).toBeVisible();
+        const options = { within: '[role=cell], .data-table__field-value', whole: vp.roomy, reads: 'Sin configurar', titled: true };
+        const fit = await settledChipFit(chip, options, `Spanish list at ${vp.label}`);
+        record(`FIX-INVENTORY-PRODUCTS-UNCONFIGURED-CHIP-CLIPPED-es-${vp.label}`, { ...fit.metrics, problems: fit.problems });
+        await capture(es, `FIX-INVENTORY-PRODUCTS-UNCONFIGURED-CHIP-CLIPPED-es-${vp.label}`);
+      }
+    } finally {
+      await spanish.close();
+    }
+  } finally {
+    psql(`update tax_taxcategory set is_active = true where key = '${key}'`);
+  }
+});
+
+/** The tablets of hub#703: upright, whose row is the shortest of room while it stays a list, and on their side, where
+ *  the side menu takes its part of the width. */
+const TABLET_VIEWPORTS = [
+  { label: '820', width: 820, height: 1180 },
+  { label: '834', width: 834, height: 1112 },
+  { label: '1024', width: 1024, height: 768 },
+  { label: '1180', width: 1180, height: 820 },
+];
+
+// flow: INVENTORY-F05 (chip «Sin configurar» de Productos, en la tableta)
+test('INVENTORY-F05 · hub#703: on a tablet the «Not configured» chip reads its words beside a long name, and the list keeps to its box', async ({
+  page,
+  context,
+  browser,
+}) => {
+  await login(page, A, '/inventory/dashboard');
+  const key = `e2e.tablet_${stamp().toLowerCase()}`;
+  const created = await api(context, A, 'POST', '/tax/categories', { key, name: 'E2E tablet chip tax' });
+  expect(created.status).toBe(201);
+  const long = await createProduct(context, { name: 'Croquetas caseras de jamón ibérico', sku: `E2E-TABLET-${stamp()}`, tax_category_key: key });
+  await createProduct(context, { name: 'E2E Tablet wine', sku: `E2E-TABLET-2-${stamp()}`, tax_category_key: key });
+  psql(`update tax_taxcategory set is_active = false where key = '${key}'`);
+  try {
+    const languages = [
+      { code: 'en', locale: 'en-GB', reads: 'Not configured' },
+      { code: 'es', locale: 'es-ES', reads: 'Sin configurar' },
+    ];
+    for (const language of languages) {
+      const own = await browser.newContext({ baseURL: A, viewport: { width: 820, height: 1180 }, locale: language.locale });
+      try {
+        const tablet = await own.newPage();
+        await login(tablet, A, '/inventory/dashboard');
+        await own.addCookies([{ name: 'django_language', value: language.code, domain: new URL(A).hostname, path: '/' }]);
+        await tablet.goto(`${A}/inventory/products?status=unconfigured`);
+        await expect(tablet.locator('html')).toHaveAttribute('lang', new RegExp(`^${language.code}`));
+        await productsReady(tablet);
+        // The session, for ui-clip-sweep.sh over this same page.
+        if (process.env.E2E_SAVE_STORAGE_STATE) await own.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
+        const chip = shown(tablet).locator(`[data-testid=inventory-products-unconfigured-${long.id}]`);
+        for (const vp of TABLET_VIEWPORTS) {
+          await tablet.setViewportSize({ width: vp.width, height: vp.height });
+          await expect(chip).toBeVisible();
+          const options = { within: '[role=cell]', reads: language.reads, titled: true };
+          const fit = await settledChipFit(chip, options, `${language.code} list at ${vp.label}`);
+          record(`hub-703-chip-${language.code}-${vp.label}`, { ...fit.metrics, problems: fit.problems });
+          const scroll = shown(tablet).locator('.data-table__scroll').first();
+          await expect.soft(scroll.evaluate((el) => el.scrollWidth - el.clientWidth), `${language.code} list at ${vp.label} keeps to its box`).resolves.toBeLessThanOrEqual(0);
+          await capture(tablet, `hub-703-chip-${language.code}-${vp.label}`);
+        }
+      } finally {
+        await own.close();
+      }
+    }
+
+    // The mark gone, its room goes with it: the row's actions come back out of «⋮».
+    psql(`update tax_taxcategory set is_active = true where key = '${key}'`);
+    await page.setViewportSize({ width: 820, height: 1180 });
+    await page.goto(`${A}/inventory/products`);
+    await productsReady(page);
+    await searchProducts(page, long.sku);
+    await expect(shown(page).locator(`[data-testid=inventory-products-row-${long.id}-receive]`)).toBeVisible();
   } finally {
     psql(`update tax_taxcategory set is_active = true where key = '${key}'`);
   }

@@ -2,7 +2,6 @@
 
 import gettext
 import json
-import re
 from pathlib import Path
 
 import pytest
@@ -15,50 +14,11 @@ from live.operations import registry
 from apps.whatsapp_inbox import queries, schemas, services
 from apps.whatsapp_inbox.models import Channel, Conversation, Message, Note, Template
 from apps.whatsapp_inbox.tests.conftest import receive
+from base.tests.po import po_entries
 
 LOCALE = (
     Path(apps.get_app_config("whatsapp_inbox").path) / "locale" / "es" / "LC_MESSAGES"
 )
-_STRING = re.compile(r'^"(.*)"$')
-_ESCAPE = re.compile(r"\\(.)")
-_ESCAPES = {"n": "\n", "t": "\t"}
-
-
-def _unescape(text: str) -> str:
-    return _ESCAPE.sub(lambda match: _ESCAPES.get(match.group(1), match.group(1)), text)
-
-
-def po_entries(path: Path) -> dict[str, tuple[str, bool]]:
-    """``key → (msgstr, fuzzy)`` of a .po file without plurals (the header is skipped).
-
-    The key is the msgid, or ``context\x04msgid`` for an entry with a ``msgctxt``, as the compiled
-    catalog keys it.
-    """
-    entries: dict[str, tuple[str, bool]] = {}
-    parts: dict[str, list[str]] = {"msgctxt": [], "msgid": [], "msgstr": []}
-    fuzzy, current = False, None
-
-    def flush():
-        msgid = _unescape("".join(parts["msgid"]))
-        if msgid:
-            context = _unescape("".join(parts["msgctxt"]))
-            entries[f"{context}\x04{msgid}" if context else msgid] = (_unescape("".join(parts["msgstr"])), fuzzy)
-
-    for line in path.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        starts = line.startswith("msgctxt ") or (line.startswith("msgid ") and current != "msgctxt")
-        if starts or (line.startswith("#") and current == "msgstr"):
-            flush()
-            parts, fuzzy, current = {"msgctxt": [], "msgid": [], "msgstr": []}, False, None
-        if line.startswith("#,") and "fuzzy" in line:
-            fuzzy = True
-        elif line.startswith(("msgctxt ", "msgid ", "msgstr ")):
-            current, _, rest = line.partition(" ")
-            parts[current].append(_STRING.match(rest).group(1))
-        elif current and _STRING.match(line):
-            parts[current].append(_STRING.match(line).group(1))
-    flush()
-    return entries
 
 
 def msgids(path: Path) -> set[str]:

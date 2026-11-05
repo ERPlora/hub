@@ -21,10 +21,20 @@ import en from '../locale/en.json';
 import es from '../locale/es.json';
 import type { SetupItem, SetupStatus } from '../operations';
 import { approvalPass, withApproval } from './approval';
-import { actionKey, HUB_ASSISTANT, hubApproval, placeKey, platformScreenKey, setupShortcuts } from './assistant-hub';
+import {
+  actionKey,
+  HUB_ASSISTANT,
+  hubApproval,
+  placeKey,
+  platformScreenKey,
+  hubAssistant,
+  setupShortcuts,
+  speakAloud,
+} from './assistant-hub';
 
 afterEach(() => {
   document.body.innerHTML = '';
+  vi.unstubAllGlobals();
 });
 
 /** A session that may do what `permissions` says, as the shell's. */
@@ -75,6 +85,88 @@ describe('HUB_ASSISTANT: where things go', () => {
       ['/api/assistant/transcribe', { audio: 'dm96', mime_type: 'audio/webm', language: 'es' }],
       ['/api/assistant/report', report],
     ]);
+  });
+});
+
+/** A page of the Hub as `base/spa.py` serves it: its SPA configuration and the CSRF cookie. */
+function spaDocument(cookie = 'csrftoken=tok123'): Document {
+  const doc = document.implementation.createHTMLDocument('hub');
+  const config = doc.createElement('script');
+  config.id = 'spa-config';
+  config.type = 'application/json';
+  config.textContent = JSON.stringify({ csrfCookieName: 'csrftoken', liveUrl: '/api/live', apiBase: '/api', lang: 'es' });
+  doc.body.append(config);
+  Object.defineProperty(doc, 'cookie', { value: cookie });
+  return doc;
+}
+
+const MP3 = new Uint8Array([0x49, 0x44, 0x33, 0x04, 0xff, 0xfb, 0x90, 0x64]);
+const READING = { text: 'Tienes 3 mesas abiertas.', language: 'es' as const, voice: 'a-voice' };
+
+describe("«Read aloud» in the server's voice (round 2026-11-03n)", () => {
+  it("posts the text, its language and its voice to base.assistant.speak's route and hands back the mp3", async () => {
+    const fetcher = vi.fn(async () => new Response(MP3, { status: 200, headers: { 'Content-Type': 'audio/mpeg' } }));
+    const audio = await speakAloud(READING, spaDocument(), fetcher);
+    expect(audio).toBeInstanceOf(Blob);
+    expect(audio.type).toBe('audio/mpeg');
+    expect(new Uint8Array(await audio.arrayBuffer())).toEqual(MP3);
+    const [url, init] = fetcher.mock.calls[0] as unknown as [string, RequestInit];
+    const headers = init.headers as Record<string, string>;
+    expect([url, init.method, init.credentials]).toEqual(['/api/assistant/speak', 'POST', 'same-origin']);
+    expect([headers['X-CSRFToken'], headers.Accept, headers['Content-Type']]).toEqual([
+      'tok123',
+      'audio/mpeg',
+      'application/json',
+    ]);
+    expect(JSON.parse(String(init.body))).toEqual(READING);
+  });
+
+  it('a reading stopped before its audio arrives aborts the request: the signal goes to fetch, never into the body', async () => {
+    const fetcher = vi.fn(async () => new Response(MP3, { status: 200, headers: { 'Content-Type': 'audio/mpeg' } }));
+    const stop = new AbortController();
+    await speakAloud({ ...READING, signal: stop.signal }, spaDocument(), fetcher);
+    const [, init] = fetcher.mock.calls[0] as unknown as [string, RequestInit];
+    expect(init.signal).toBe(stop.signal);
+    expect(JSON.parse(String(init.body))).toEqual(READING);
+  });
+
+  it("a refusal rejects with the envelope's code and sentence, so the panel reads with the device's voice", async () => {
+    const envelope = { error: { code: 'base.assistant_speech_unavailable', message: 'Not available.' } };
+    const fetcher = vi.fn(async () => Response.json(envelope, { status: 503 }));
+    const refused = await speakAloud(READING, spaDocument(), fetcher).catch((error: unknown) => error);
+    expect(refused).toBeInstanceOf(ApiError);
+    expect([(refused as ApiError).status, (refused as ApiError).code, (refused as ApiError).message]).toEqual([
+      503,
+      'base.assistant_speech_unavailable',
+      'Not available.',
+    ]);
+  });
+
+  it("a page that is no envelope (a proxy's) still rejects, with its status", async () => {
+    const fetcher = vi.fn(async () => new Response('<html>Bad gateway</html>', { status: 502 }));
+    const refused = await speakAloud(READING, spaDocument(), fetcher).catch((error: unknown) => error);
+    expect(refused).toBeInstanceOf(ApiError);
+    expect((refused as ApiError).status).toBe(502);
+  });
+
+  it('without the server’s voice (the default, round 2026-11-04a) the panel gets no speak: no choice of voice, no request', () => {
+    expect(HUB_ASSISTANT.speak).toBeUndefined();
+    const off = spaDocument();
+    off.body.insertAdjacentHTML('beforeend', `<script id="hub-home" type="application/json">${JSON.stringify({ server_voice: false })}</script>`);
+    expect(hubAssistant(off)).toBe(HUB_ASSISTANT);
+    expect(hubAssistant(spaDocument())).toBe(HUB_ASSISTANT);
+  });
+
+  it('with the server’s voice the panel reads through base.assistant.speak’s route, the rest as HUB_ASSISTANT', async () => {
+    const on = spaDocument();
+    on.body.insertAdjacentHTML('beforeend', `<script id="hub-home" type="application/json">${JSON.stringify({ server_voice: true })}</script>`);
+    const fetcher = vi.fn(async () => new Response(MP3, { status: 200, headers: { 'Content-Type': 'audio/mpeg' } }));
+    vi.stubGlobal('fetch', fetcher);
+    const config = hubAssistant(on);
+    expect([config.turnUrl, config.transcribe]).toEqual([HUB_ASSISTANT.turnUrl, HUB_ASSISTANT.transcribe]);
+    expect((await config.speak!(READING)).type).toBe('audio/mpeg');
+    const [url, init] = fetcher.mock.calls[0] as unknown as [string, RequestInit];
+    expect([url, (init.headers as Record<string, string>)['X-CSRFToken']]).toEqual(['/api/assistant/speak', 'tok123']);
   });
 });
 

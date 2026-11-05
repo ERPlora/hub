@@ -63,8 +63,9 @@ Contrastada con el barrido de mercado del módulo actual (20/08/2026) y con la r
 - Sin **Ventas** nadie pregunta los grupos en el TPV; sin **Cocina** la comanda no los lleva. Las dos
   hablan con Suplementos por sus servicios, nunca por sus tablas.
 - Los suplementos van en **la moneda del negocio**, la de su país, la que dice **Ajustes → Negocio** (euros
-  en España, złoty en Polonia), con sus decimales en pantalla y en **céntimos enteros** (la unidad más
-  pequeña de esa moneda) por la API; pueden ser negativos (un descuento) o cero (gratis).
+  en España, złoty en Polonia), con sus decimales y agrupados desde cuatro cifras en pantalla («+1.234,56 €»)
+  y en **céntimos enteros** (la unidad más pequeña de esa moneda) por la API; pueden ser negativos (un
+  descuento) o cero (gratis).
 
 Configuración inicial, paso a paso:
 
@@ -331,7 +332,8 @@ Todo se puede pedir por las pantallas, el asistente (por voz o por texto, con la
 persona) y la API, con las mismas reglas y los mismos permisos. Pensado para la voz: un grupo se nombra
 por su id o su nombre («grupo Salsas»), una opción por su id o su nombre y su grupo («opción Sin cebolla
 de Extras»), un producto por su id, su SKU o su nombre y una categoría por su id o su nombre. Si un
-nombre casa con varios, se rechaza diciendo cuáles (409 `*_ambiguous`).
+nombre casa con varios, se rechaza diciendo cuáles (409 `*_ambiguous`). Antes de cambiar nada, el asistente pide
+confirmar con su tarjeta (BASE-F97), que nombra cada registro como lo nombran las pantallas, nunca por su id.
 
 ### Lo que ofrece: consultas (leen, no cambian nada)
 
@@ -340,7 +342,10 @@ nombre casa con varios, se rechaza diciendo cuáles (409 `*_ambiguous`).
 | Los grupos, con búsqueda, filtros (nombre, obligatorio), orden y páginas (hasta 100) | ver | F01 | `modifier.group.list` |
 | Un grupo por su id o su nombre | ver | F03 | `modifier.group.get` |
 | Las opciones, de un grupo o todas, con búsqueda y páginas | ver | F04, F07 | `modifier.option.list` |
+| Una opción por su id o su nombre y su grupo, con la `label` con la que la nombra la tarjeta del asistente (BASE-F97): «Sin cebolla (Extras)» | ver | F04 | `modifier.option.get` |
 | Los enganches, de un grupo, de un producto o de una categoría, con páginas | ver | F05 | `modifier.link.list` |
+| Un enganche por su id, o por su grupo y su producto o categoría, con su `label`: «Salsas · Hamburguesa» | ver | F05 | `modifier.link.get` |
+| Una categoría de Inventario por su id o su nombre, como la nombra la lista de enganches | ver | F05 | `modifier.category.get` |
 | Los grupos con sus opciones de un producto (los suyos y los de todas sus categorías, una vez cada uno) | ver | F06 | `modifier.group.for_target` |
 | La comprobación y valoración de unas opciones elegidas para un producto: precio, nombres, categoría fiscal, total a sumar y texto de cocina | ver | F07, F08 | `modifier.selection.resolve` |
 
@@ -434,7 +439,7 @@ cajero del producto actual es un empleado.
   llamada (sin N+1 por grupo), acotada por las 100 opciones como mucho de cada grupo (409
   `modifier.group_full`). El resto de listas pagina (hasta 100); los empates de la columna se desempatan por
   nombre y por `id` en la dirección de la lista: en descendente es la ascendente leída al revés, empates
-  incluidos (`_ordered`, nota vigente del 2026-09-28, hub#2355). El catálogo entero de opciones por
+  incluidos (`base.ordering`, nota vigente del 2026-09-28, hub#2355). El catálogo entero de opciones por
   `sort_order` va antes por el orden y el nombre de sus grupos, en los dos sentidos. Lo fijan los
   `test_tied_*` de `tests/test_queries.py`, con las filas creadas fuera de orden.
 - **Dinero**: céntimos enteros con signo, entre −99.999.999 y 99.999.999. Una opción con categoría
@@ -462,7 +467,13 @@ cajero del producto actual es un empleado.
   nombra llevan además un `title` en inglés con su `es` en el catálogo de la app (`option` «Opción»,
   `tax_category_key` «Categoría fiscal propia», el nombre del formulario de opción): así los nombra la
   tarjeta de confirmación del asistente, nunca por el título que pydantic inventa del campo
-  (`tests/test_integration_assistant.py`). `expose_api` en las seis consultas.
+  (`tests/test_integration_assistant.py`). `expose_api` en las nueve consultas.
+- **La tarjeta de confirmación del asistente** (BASE-F97) nombra cada registro que una escritura señala por su id con
+  las marcas `refers` de `schemas.py` (`A_GROUP`, `AN_OPTION`, `A_LINK`, `A_PRODUCT`, `A_CATEGORY`), leídas como quien
+  pregunta: el grupo, el producto y la categoría por su nombre, la opción por su nombre y su grupo, porque dos grupos
+  pueden tener una opción con el mismo nombre, y el enganche por su grupo y lo que engancha. El id lleva su título
+  («Grupo», «Opción», «Se aplica a»), nunca «Registro». Sin persona detrás, sin permiso, con un id de otro negocio o
+  con un enganche a algo borrado, el registro queda fuera, nunca su id (hub#672).
 - **Administrador de Django con CRUD completo** (ronda 12, PLAN §17), solo en `hubs.erplora.com` y para
   el staff: lo que guarda no pasa por las operaciones ni deja aviso, y no aplica sus reglas propias (las
   opciones por defecto dentro del máximo, las 100 opciones por grupo); la base de datos sí le rechaza

@@ -23,6 +23,7 @@ SALE_VOIDED = "sale.sale.voided"
 SALE_REFUNDED = "sale.sale.refunded"
 SALE_REASSIGNED = "sale.sale.reassigned"
 SALE_INVOICED = "sale.sale.invoiced"
+SALE_VOUCHER_LINE_CHANGED = "sale.sale.voucher_line_changed"
 ORDER_OPENED = "sale.order.opened"
 ORDER_CHANGED = "sale.order.changed"
 ORDER_FIRED = "sale.order.fired"
@@ -47,6 +48,7 @@ ALL = [
     SALE_REFUNDED,
     SALE_REASSIGNED,
     SALE_INVOICED,
+    SALE_VOUCHER_LINE_CHANGED,
     ORDER_OPENED,
     ORDER_CHANGED,
     ORDER_FIRED,
@@ -87,6 +89,8 @@ CUSTOMER_MERGED = "customer.customer.merged"
 # Invoicing's event (its WORKBOOK fixes the payload: ``invoice_id``, ``number``, ``invoice_type``,
 # ``source_type``, ``sale_id``…): a document issued later than the charge (INVOICE-F06).
 INVOICE_ISSUED = "invoice.invoice.issued"
+# Invoicing's event, by name: it is no ``requires`` of Sales. The papers name its issuer (SALE-F21, SALE-F29).
+ISSUER_UPDATED = "invoice.issuer.updated"
 
 #: Event of another app → the operation of this app that reacts to it.
 REACTIONS = {

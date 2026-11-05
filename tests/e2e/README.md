@@ -72,7 +72,7 @@ efectivo de una cayó en el turno de caja abierto de la otra y `cash-register-sh
 `base_democode`, `control_*`, `auth_*`, `django_*`, `base_membership`, `base_sessionowner`) en `DB_NAME` y el resto en
 la BD del hub (`a` si la spec no pasa otro), las seguidas de una misma BD en una sola llamada. Las tablas de copia de
 una spec (`e2e…`) van a la BD donde se crearon, y lo que no nombra ninguna tabla (`pg_notify`) va a la de control, donde
-escucha lo vivo. Para un `manage.py shell -c` sobre los datos de un hub, `--hub <slug>`. Una sentencia que nombra tablas de las dos BD no puede correr en
+escucha lo vivo. Para un `manage.py shell -c` sobre los datos de un hub, `--hub <slug>`: sin él mira en control, y `hub-shells.test.ts` no deja pasar uno que no esté en su lista con lo que hace. Una sentencia que nombra tablas de las dos BD no puede correr en
 ninguna y falla diciendo cómo partirla: primero se lee lo de control (`usernamesOf`, el id de `a`) y se pasa el valor
 a la sentencia del hub.
 
@@ -228,6 +228,18 @@ CI=1 pnpm e2e tests/e2e/base-assistant.spec.ts --workers=1
 ```
 
 La cuenta del e2e está en inglés: la spec comprueba las cadenas `en`.
+
+`base-assistant-voice.spec.ts` («Leer en voz alta») depende de `ASSISTANT_SERVER_VOICE` del `runserver` del Hub: sin
+ella (lo normal, ronda 2026-11-04a) corre el caso de la voz del dispositivo y salta los de la voz del servidor; con
+`ASSISTANT_SERVER_VOICE=True`, al revés. Para cubrirlo todo, se corre una vez con cada valor.
+
+Las specs del asistente de cada app (`<app>-assistant.spec.ts`) encienden en su `beforeAll` las apps que necesitan y que
+están apagadas en `a` con `turnOnMissing(context, A, NEEDED, turnedOn)` (`helpers.ts`), que apunta cada una en
+`turnedOn` cuando ya está encendida, y su `afterAll` apaga solo eso, de la última a la primera, con
+`turnOffTurnedOn(context, A, turnedOn)`. Una spec que cae antes de encender nada (el SaaS sin su proveedor: «not seeded
+with this provider») deja el negocio como estaba: nunca apaga Control horario, Personal ni nada que ya estuviera
+encendido para las specs que vienen detrás (hub#480). `apps-turned-on.test.ts` lo vigila: fuera de un `test(…)`, nadie
+llama a `/apps/disable` salvo ese helper.
 
 Si la misma pila corre también specs de WhatsApp, su SaaS arranca como dice «WhatsApp» (abajo), con estas mismas
 variables más las del Graph: nunca con un `SSL_CERT_FILE` escrito a mano.

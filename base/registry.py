@@ -3,7 +3,8 @@
 The host gate (``base.middleware.HubHostRequiredMiddleware``) runs before any operation, so it reads the row of the
 Host's slug here: no row is 404, a hub that is gone 410, one still being prepared 503. The apps ask through
 ``base.operations.is_demo_hub``, never here. Reads only, one indexed lookup by slug each; no cache in phase 1 (a
-cache would delay the 410 of an expired demo). The writes are the operations of ``base.services``.
+cache would delay the 410 of an expired demo), but for the businesses' own domains (:func:`custom_domains`), which
+``base.custom_domains`` keeps a moment in each process. The writes are the operations of ``base.services``.
 """
 
 import datetime as dt
@@ -43,6 +44,19 @@ def hub_by_slug(slug: str) -> Hub | None:
 def hub_id(slug: str) -> uuid.UUID | None:
     """The id of ``slug``'s row, or ``None``."""
     return Hub.objects.filter(slug=slug).values_list("id", flat=True).first()
+
+
+def hub_by_id(hub_id: uuid.UUID) -> Hub | None:
+    """The registry's row of ``hub_id``, or ``None``."""
+    return Hub.objects.filter(pk=hub_id).first()
+
+
+def custom_domains() -> list[tuple[str, uuid.UUID]]:
+    """Each own domain the SaaS's photos named, with its business's id, but for the businesses that left
+    (``base.custom_domains``, which reads this every so often, never per request)."""
+    return list(
+        Hub.objects.exclude(custom_domain="").exclude(status__in=GONE_STATUSES).values_list("custom_domain", "id")
+    )
 
 
 def is_demo(slug: str) -> bool:

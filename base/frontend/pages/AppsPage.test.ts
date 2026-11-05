@@ -10,7 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { sessionChanged } from '../lib/access';
 
-import { EMPLOYEE, errorFrame, flush, mountBase, OWNER, subId } from '../__tests__/mount-base';
+import { EMPLOYEE, errorFrame, flush, mountBase, OWNER, subId, tap } from '../__tests__/mount-base';
 import type { AppList, AppRow } from '../operations';
 import AppsPage from './AppsPage.vue';
 
@@ -44,6 +44,7 @@ function app(id: string, fields: Partial<AppRow> = {}): AppRow {
     path: `/${id}/home`,
     requires: [],
     required_by: [],
+    refusal: null,
     ...fields,
   };
 }
@@ -463,6 +464,26 @@ describe('AppsPage', () => {
       expect(refused(m).exists()).toBe(false);
     });
 
+    it('its «Upgrade plan» goes with the pass, already signed in on erplora.com', async () => {
+      const tab = { opener: {}, location: { href: 'about:blank' } };
+      const windowOpen = vi.spyOn(window, 'open').mockReturnValue(tab as unknown as Window);
+      const url = 'http://localhost:8001/hub-pass/?pass=abc';
+      const limit = refusal(402, { code: 'base.app_limit_reached', message: 'server words', max_apps: 20, enabled: 20 });
+      const m = await open('/apps#all', {
+        onApi: (call) => (call.url.includes('/saas-pass') ? Response.json({ url }) : limit()),
+      });
+      await m.result(m.call, 'base.app.list', { ...APPS, enabled: 20 });
+      await m.wrapper.find('[data-testid="apps-row-flow-toggle"]').trigger('click');
+      await flush();
+
+      tap(m.wrapper.find('[data-testid="apps-limit-upgrade"]').element);
+      await flush();
+
+      expect(JSON.parse(m.net.api.at(-1)!.init.body as string)).toEqual({ next: 'plan' });
+      expect(tab.location.href).toBe(url);
+      windowOpen.mockRestore();
+    });
+
     it('in Spanish, and inside the installed app without the link', async () => {
       applySurface('mobile');
       const m = await open('/apps#all', {
@@ -496,6 +517,58 @@ describe('AppsPage', () => {
       expect(refused(m).text()).toContain('Flows could not be changed: Boom.');
       expect(toastError).not.toHaveBeenCalled();
       expect(m.wrapper.find('[data-testid="apps-row-flow-toggle"]').attributes('disabled')).toBeUndefined();
+    });
+
+    describe('what an app refuses is said beforehand (hub#618, hub#694)', () => {
+      const NEVER_OFF = 'VeriFactu can’t be turned off once it’s on.';
+      const ONLY_THERE = 'VeriFactu is only for businesses in Spain.';
+      const row = (m: Awaited<ReturnType<typeof open>>, id: string) => m.wrapper.find(`[data-testid="apps-row"][data-id="${id}"]`);
+
+      const OFF_HERE = app('verifactu', { name: 'VeriFactu', state: 'off', chosen: false, path: null, refusal: ONLY_THERE });
+
+      it('one on that never goes off offers no «Turn off», says why and stays «Active»', async () => {
+        const m = await open('/apps');
+        await m.result(m.call, 'base.app.list', {
+          ...LIST,
+          apps: [app('verifactu', { name: 'VeriFactu', refusal: NEVER_OFF }), TAX],
+        });
+
+        expect(m.wrapper.find('[data-testid="apps-row-verifactu-toggle"]').exists()).toBe(false);
+        expect(row(m, 'verifactu').find('[data-testid="apps-refusal"]').text()).toBe(NEVER_OFF);
+        expect(row(m, 'verifactu').find('[data-testid="apps-state"]').text()).toBe('Active');
+        // «Open» is still there: only turning it off is refused.
+        expect(m.wrapper.find('[data-testid="apps-row-verifactu-open"]').exists()).toBe(true);
+        // The app next to it goes on as ever.
+        expect(m.wrapper.find('[data-testid="apps-row-tax-toggle"]').text()).toContain('Turn off');
+        expect(row(m, 'tax').find('[data-testid="apps-refusal"]').exists()).toBe(false);
+      });
+
+      it('one off that does not go on offers no «Turn on» and says it is not available, and why', async () => {
+        const m = await open('/apps#all');
+        await m.result(m.call, 'base.app.list', { ...LIST, apps: [OFF_HERE] });
+
+        expect(m.wrapper.find('[data-testid="apps-row-verifactu-toggle"]').exists()).toBe(false);
+        expect(row(m, 'verifactu').find('[data-testid="apps-state"]').text()).toBe('Not available');
+        expect(row(m, 'verifactu').find('[data-testid="apps-refusal"]').text()).toBe(ONLY_THERE);
+      });
+
+      it('in Spanish too', async () => {
+        const m = await open('/apps#all', { locale: 'es' });
+        await m.result(m.call, 'base.app.list', { ...LIST, apps: [OFF_HERE] });
+
+        expect(row(m, 'verifactu').find('[data-testid="apps-state"]').text()).toBe('No disponible');
+      });
+
+      it('who does not run the business can do nothing about it: not the reason, only that it is not available', async () => {
+        const m = await open('/apps#all', { session: EMPLOYEE });
+        await m.result(m.call, 'base.app.list', {
+          ...LIST,
+          apps: [OFF_HERE, app('invoice', { name: 'Invoicing', refusal: NEVER_OFF })],
+        });
+
+        expect(m.wrapper.find('[data-testid="apps-refusal"]').exists()).toBe(false);
+        expect(row(m, 'verifactu').find('[data-testid="apps-state"]').text()).toBe('Not available');
+      });
     });
 
     it('who does not run the business turns nothing on or off', async () => {

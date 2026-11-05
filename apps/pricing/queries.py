@@ -19,7 +19,7 @@ from uuid import UUID
 
 import pydantic
 from babel.numbers import format_decimal
-from django.db.models import CharField, Count, F, OuterRef, Q, QuerySet, Subquery
+from django.db.models import CharField, Count, OuterRef, Q, QuerySet, Subquery
 from django.db.models.functions import Coalesce, Lower
 from django.utils import timezone, translation
 from django.utils.translation import gettext_lazy as _
@@ -51,7 +51,8 @@ from apps.pricing.schemas import (
     RuleRefIn,
 )
 from base import operations as platform
-from base.business import babel_locale
+from base.business import babel_locale, business_zone
+from base.ordering import list_order
 
 #: Candidates named when a text matches several.
 MAX_CANDIDATES = 5
@@ -70,13 +71,13 @@ SERVICE_GET = "service.service.get"
 
 
 def business_today() -> dt.date:
-    """The business's today (the Hub's time zone), not UTC: the till sells on the local date."""
-    return timezone.localdate()
+    """The business's today, on its clock (hub#771): a price list ends at its midnight."""
+    return timezone.localdate(timezone=business_zone())
 
 
 def business_day(moment: dt.datetime | None) -> dt.date:
-    """The business day of ``moment`` (its date in the Hub's time zone); today without one."""
-    return timezone.localdate(moment) if moment is not None else business_today()
+    """The business day of ``moment`` (its date on the business's clock); today without one."""
+    return timezone.localdate(moment, business_zone()) if moment is not None else business_today()
 
 
 def half_up(value: Fraction) -> int:
@@ -88,17 +89,6 @@ def half_up(value: Fraction) -> int:
 
 def in_force(on: dt.date) -> Q:
     return (Q(valid_from__isnull=True) | Q(valid_from__lte=on)) & (Q(valid_until__isnull=True) | Q(valid_until__gte=on))
-
-
-def _ordering(column: str, direction: str, *tie_breaks) -> list:
-    """``column``, then the tie-breaks, all in ``direction`` (empty values last): a descending list is the
-    ascending one read backwards, ties included (hub#2355)."""
-
-    def directed(field):
-        expression = F(field) if isinstance(field, str) else field
-        return expression.desc(nulls_last=True) if direction == "desc" else expression.asc(nulls_last=True)
-
-    return [directed(field) for field in (column, *tie_breaks)]
 
 
 def _page(rows: QuerySet, params, to_row) -> dict:
@@ -337,7 +327,7 @@ def list_price_lists(ctx: OperationContext, params: PriceListListIn) -> dict:
         rows = rows.filter(tax_included__isnull=True)
     elif params.tax_basis:
         rows = rows.filter(tax_included=params.tax_basis == "included")
-    rows = rows.order_by(*_ordering(params.sort, params.dir, Lower("code"), "id"))
+    rows = rows.order_by(*list_order(params.sort, Lower("code"), descending=params.dir == "desc", nulls_last=True))
     return _page(rows, params, list_row)
 
 
@@ -388,7 +378,7 @@ def list_price_items(ctx: OperationContext, params: PriceItemListIn) -> dict:
         )
     rows = rows.annotate(shown_name=Lower(Coalesce("product__name", "service_name", output_field=CharField())))
     column = {"name": "shown_name"}.get(params.sort, params.sort)
-    rows = rows.order_by(*_ordering(column, params.dir, "min_quantity", "id"))
+    rows = rows.order_by(*list_order(column, "min_quantity", descending=params.dir == "desc", nulls_last=True))
     return _page(rows, params, item_row)
 
 
@@ -440,7 +430,7 @@ def list_rules(ctx: OperationContext, params: RuleListIn) -> dict:
         value = getattr(params, column)
         if value:
             rows = rows.filter(**{column: value})
-    rows = rows.order_by(*_ordering(params.sort, params.dir, Lower("code"), "id"))
+    rows = rows.order_by(*list_order(params.sort, Lower("code"), descending=params.dir == "desc", nulls_last=True))
     return _page(rows, params, rule_row)
 
 

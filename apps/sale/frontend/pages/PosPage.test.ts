@@ -895,7 +895,9 @@ describe('PosPage: sending the round to the kitchen (SALE-F20, KITCHEN-F18)', ()
     s.wrapper.findComponent(PosCart).vm.$emit('send', true);
     await settle();
     expect(sends(s)).toEqual([{ order_id: 'o1', priority: 'rush' }]);
-    expect(toastSuccess).toHaveBeenCalledWith('Comanda 1 enviada a cocina.');
+    expect(toast).toHaveBeenCalledTimes(1);
+    expect(toast).toHaveBeenCalledWith('Comanda 1 enviada a cocina.', 'success', undefined, undefined, undefined, 'top');
+    expect(toastSuccess).not.toHaveBeenCalled();
   });
 
   it('the round names who attends the check («Atiende»); with «Yo», nobody: the kitchen names who sends it (kitchen#82)', async () => {
@@ -920,14 +922,22 @@ describe('PosPage: sending the round to the kitchen (SALE-F20, KITCHEN-F18)', ()
     ]);
   });
 
-  it('a round sent whose sheet did not print says so in words, never the raw reason (hub#2257, KITCHEN-F08)', async () => {
+  it('a round sent whose sheet did not print says so in words at the top, never the raw reason (hub#2257, KITCHEN-F08, hub#748)', async () => {
     const s = await setup({ session: WITH_KITCHEN, locale: 'es' });
     await s.addProduct();
     kitchenAnswers(s, () => Response.json({ id: 't1', round_no: 2, print_error: 'no printer for usage kitchen' }));
     s.wrapper.findComponent(PosCart).vm.$emit('send', false);
     await settle();
     expect(toastSuccess).not.toHaveBeenCalled();
-    expect(toast).toHaveBeenCalledWith('Comanda 2 enviada a cocina, pero no se imprimió. Revisa la impresora de cocina en Impresión.', 'warning', 4500);
+    expect(toast).toHaveBeenCalledTimes(1);
+    expect(toast).toHaveBeenCalledWith(
+      'Comanda 2 enviada a cocina, pero no se imprimió. Revisa la impresora de cocina en Impresión.',
+      'warning',
+      4500,
+      undefined,
+      undefined,
+      'top',
+    );
   });
 
   it('charging with lines not sent sends them first, then opens the charge', async () => {
@@ -940,14 +950,59 @@ describe('PosPage: sending the round to the kitchen (SALE-F20, KITCHEN-F18)', ()
     expect(checkout(s).props('open')).toBe(true);
   });
 
-  it('when the round cannot be sent nothing is charged and the till says why', async () => {
+  it('the round a charge sends is said at the top, clear of the sheet’s keypad, and not at the bottom too (hub#732)', async () => {
+    const s = await setup({ session: WITH_KITCHEN, locale: 'es' });
+    await s.addProduct();
+    kitchenAnswers(s, () => Response.json({ id: 't1', round_no: 1 }));
+    s.wrapper.findComponent(PosCart).vm.$emit('charge');
+    await settle();
+    expect(checkout(s).props('open')).toBe(true);
+    expect(toast).toHaveBeenCalledTimes(1);
+    expect(toast).toHaveBeenCalledWith('Comanda 1 enviada a cocina.', 'success', undefined, undefined, undefined, 'top');
+    expect(toastSuccess).not.toHaveBeenCalled();
+  });
+
+  it('a round a charge sends whose sheet did not print is said at the top, for just as long (hub#732, hub#2257)', async () => {
+    const s = await setup({ session: WITH_KITCHEN, locale: 'es' });
+    await s.addProduct();
+    kitchenAnswers(s, () => Response.json({ id: 't1', round_no: 2, print_error: 'no printer for usage kitchen' }));
+    s.wrapper.findComponent(PosCart).vm.$emit('charge');
+    await settle();
+    expect(checkout(s).props('open')).toBe(true);
+    expect(toast).toHaveBeenCalledTimes(1);
+    expect(toast).toHaveBeenCalledWith(
+      'Comanda 2 enviada a cocina, pero no se imprimió. Revisa la impresora de cocina en Impresión.',
+      'warning',
+      4500,
+      undefined,
+      undefined,
+      'top',
+    );
+    expect(toastSuccess).not.toHaveBeenCalled();
+  });
+
+  // hub#755: with the send refused the cart stays, and at the bottom the notice would lie over «Charge» for its 4.5 s.
+  it('when the round cannot be sent nothing is charged and the till says why at the top, clear of «Charge» (hub#755)', async () => {
     const s = await setup({ session: WITH_KITCHEN });
     await s.addProduct();
     kitchenAnswers(s, () => refused('internal_error', 'The kitchen did not answer.', 500));
     s.wrapper.findComponent(PosCart).vm.$emit('charge');
     await settle();
     expect(checkout(s).props('open')).toBe(false);
-    expect(toastError).toHaveBeenCalledWith('The order could not be sent to the kitchen. Try again.');
+    expect(toast).toHaveBeenCalledTimes(1);
+    expect(toast).toHaveBeenCalledWith('The order could not be sent to the kitchen. Try again.', 'danger', 4500, undefined, undefined, 'top');
+    expect(toastError).not.toHaveBeenCalled();
+  });
+
+  it('a «Send order» that cannot be sent says why at the top too, clear of «Charge» (hub#755)', async () => {
+    const s = await setup({ session: WITH_KITCHEN, locale: 'es' });
+    await s.addProduct();
+    kitchenAnswers(s, () => refused('internal_error', 'The kitchen did not answer.', 500));
+    s.wrapper.findComponent(PosCart).vm.$emit('send', false);
+    await settle();
+    expect(toast).toHaveBeenCalledTimes(1);
+    expect(toast).toHaveBeenCalledWith('No se ha podido enviar la comanda a cocina. Inténtalo de nuevo.', 'danger', 4500, undefined, undefined, 'top');
+    expect(toastError).not.toHaveBeenCalled();
   });
 
   it('the cart follows the check’s kitchen tickets with Kitchen on and the right to see them (KITCHEN-F19)', async () => {

@@ -23,6 +23,7 @@ from pydantic import (
 )
 
 from apps.modifier.models import MAX_CHOICES, MAX_DELTA, NAME_MAX_LENGTH
+from base.schemas import names
 
 T = TypeVar("T")
 
@@ -31,14 +32,26 @@ MAX_PICKS = 100
 
 SAY_WHICH_GROUP = _("Say which group: its id, or its name.")
 SAY_WHICH_OPTION = _("Say which option: its id, or its name.")
+SAY_WHICH_CATEGORY = _("Say which category: its id, or its name.")
 SAY_WHICH_PRODUCT = _("Say which product: its id, or its SKU or name.")
 SAY_ONE_TARGET = _("Say one product or one category: its id, or its name.")
 SAY_WHICH_LINK = _("Say which link: its id, or the group and the product or category.")
 MAX_BELOW_MIN = _("The maximum cannot be below the minimum (0 = no ceiling).")
 
 # How the Modifiers screens name the data the models do not (the assistant's card names each datum by its title).
+GROUP = gettext_noop("Group")
 OPTION = gettext_noop("Option")
+APPLIES_TO = gettext_noop("Applies to")
 OWN_TAX_CATEGORY = gettext_noop("Own tax category")
+
+# The assistant's card names the record a write acts on by these reads (base/assistant.py ``REFERS``), run as whoever
+# asks, never by its id: a group, a product and a category by their names; an option by its name and its group, because
+# two groups may have an option with one name; a link by its group and what it hangs from.
+A_GROUP = names("modifier.group.get")
+AN_OPTION = names("modifier.option.get", name=("label",))
+A_LINK = names("modifier.link.get", name=("label",))
+A_PRODUCT = names("inventory.product.get")
+A_CATEGORY = names("modifier.category.get")
 
 GroupSort = Literal[
     "name",
@@ -107,7 +120,7 @@ class Page(Schema, Generic[T]):
 
 
 class GroupRefIn(_Input):
-    id: UUID | None = Field(None, description="The group's id.")
+    id: UUID | None = Field(None, title=GROUP, description="The group's id.", json_schema_extra=A_GROUP)
     group: Said | None = Field(
         None, description="The group's name, when its id is not known (e.g. «Sauces»)."
     )
@@ -122,7 +135,7 @@ class GroupRefIn(_Input):
 class _OwningGroup(_Input):
     """The group an option belongs to or a link hangs: by ``group_id`` or by its name (``group``)."""
 
-    group_id: UUID | None = Field(None, description="The group's id.")
+    group_id: UUID | None = Field(None, description="The group's id.", json_schema_extra=A_GROUP)
     group: Said | None = Field(
         None, description="The group's name, when its id is not known (e.g. «Extras»)."
     )
@@ -234,7 +247,7 @@ class OptionListIn(PageIn):
 
 
 class OptionRefIn(_Input):
-    id: UUID | None = Field(None, description="The option's id.")
+    id: UUID | None = Field(None, title=OPTION, description="The option's id.", json_schema_extra=AN_OPTION)
     option: Said | None = Field(
         None,
         title=OPTION,
@@ -243,6 +256,7 @@ class OptionRefIn(_Input):
     group_id: UUID | None = Field(
         None,
         description="Its group's id, when two groups have an option with that name.",
+        json_schema_extra=A_GROUP,
     )
     group: Said | None = Field(
         None,
@@ -318,11 +332,11 @@ class LinkListIn(PageIn):
 
 
 class _Target(_Input):
-    product_id: UUID | None = Field(None, description="The product's id.")
+    product_id: UUID | None = Field(None, description="The product's id.", json_schema_extra=A_PRODUCT)
     product: Said | None = Field(
         None, description="The product's SKU or name, when its id is not known."
     )
-    category_id: UUID | None = Field(None, description="The category's id.")
+    category_id: UUID | None = Field(None, description="The category's id.", json_schema_extra=A_CATEGORY)
     category: Said | None = Field(
         None, description="The category's name, when its id is not known."
     )
@@ -334,7 +348,7 @@ class _Target(_Input):
 
 
 class LinkIn(_Target):
-    group_id: UUID | None = Field(None, description="The group's id.")
+    group_id: UUID | None = Field(None, description="The group's id.", json_schema_extra=A_GROUP)
     group: Said | None = Field(
         None, description="The group's name, when its id is not known (e.g. «Sauces»)."
     )
@@ -349,8 +363,8 @@ class LinkIn(_Target):
 
 
 class LinkRefIn(_Target):
-    id: UUID | None = Field(None, description="The link's id.")
-    group_id: UUID | None = Field(None, description="The group's id.")
+    id: UUID | None = Field(None, title=APPLIES_TO, description="The link's id.", json_schema_extra=A_LINK)
+    group_id: UUID | None = Field(None, description="The group's id.", json_schema_extra=A_GROUP)
     group: Said | None = Field(
         None, description="The group's name, when its id is not known."
     )
@@ -361,6 +375,19 @@ class LinkRefIn(_Target):
             (self.group_id is None and self.group is None) or self._targets() != 1
         ):
             raise ValueError(str(SAY_WHICH_LINK))
+        return self
+
+
+class CategoryRefIn(_Input):
+    id: UUID | None = Field(None, description="The category's id.")
+    category: Said | None = Field(
+        None, description="The category's name, when its id is not known."
+    )
+
+    @model_validator(mode="after")
+    def _named(self):
+        if self.id is None and self.category is None:
+            raise ValueError(str(SAY_WHICH_CATEGORY))
         return self
 
 
@@ -447,6 +474,19 @@ class LinkOut(Schema):
     )
     category_name: str | None = Field(description="The category's name.")
     created_at: datetime = Field(description="When it was linked.")
+
+
+class OptionDetailOut(OptionOut):
+    label: str = Field(description="How a person tells it apart: its name and its group, «Large (Drinks)».")
+
+
+class LinkDetailOut(LinkOut):
+    label: str = Field(description="How a person tells it apart: its group and what it hangs from, «Sauces · Burger».")
+
+
+class CategoryRefOut(Schema):
+    id: UUID = Field(description="The category's id.")
+    name: str = Field(description="Its name, as Inventory shows it.")
 
 
 class TargetOptionOut(Schema):

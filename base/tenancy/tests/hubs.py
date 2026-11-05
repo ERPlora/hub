@@ -13,6 +13,7 @@ dropped when the session ends. The rows in control (``hub_a``, ``hub_b``) are th
 :func:`watched` and :func:`assert_only_alias` see every statement of every thread by alias: «A never reaches B».
 """
 
+import time
 import uuid
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -84,8 +85,56 @@ def _maintenance(dbname: str = "postgres"):
         yield conn
 
 
+#: The sessions clients hold open on a database. Only client backends: the server's own processes are listed with a
+#: ``datname`` too, and they are nobody's to close. An autovacuum worker on ``pg_database`` (every ``CREATE DATABASE`` of
+#: the suite dirties it) works from whichever database it is sent to, a database just made included: it counted as a
+#: session in hub#819's CI.
+CLIENT_SESSIONS_COLUMNS = "(pid, application_name, state, last query)"
+CLIENT_SESSIONS = """
+    SELECT pid, application_name, state, left(query, 100) FROM pg_stat_activity
+    WHERE datname = %s AND backend_type = 'client backend' ORDER BY pid
+"""
+#: How long ``assert_nobody_on`` waits for the sessions on a database to end, and how often it looks: a client's
+#: ``close()`` returns before its server process has left ``pg_stat_activity``, so a connection just closed is still
+#: counted for a moment (hub#484's CI); one still there after the wait is a connection left open.
+SESSIONS_END_WAIT = 5.0
+SESSIONS_END_POLL = 0.05
+
+
+def client_sessions_on(name: str) -> list[tuple]:
+    """Who is connected to the database ``name`` now (:data:`CLIENT_SESSIONS`)."""
+    with _maintenance() as conn:
+        return conn.execute(CLIENT_SESSIONS, [name]).fetchall()
+
+
+def assert_nobody_on(name: str, *, wait: float = SESSIONS_END_WAIT) -> None:
+    """Fail unless every client's session on the database ``name`` has ended within ``wait`` seconds, naming the ones
+    still there."""
+    deadline = time.monotonic() + wait
+    with _maintenance() as conn:  # autocommit: each look is a new snapshot of pg_stat_activity
+        while True:
+            left = conn.execute(CLIENT_SESSIONS, [name]).fetchall()
+            if not left or time.monotonic() >= deadline:
+                break
+            time.sleep(SESSIONS_END_POLL)
+    assert not left, f"still connected to {name} after {wait:g} s, as {CLIENT_SESSIONS_COLUMNS}: {left}"
+
+
 def _drop(conn, name: str, control: str) -> None:
     conn.execute(sql.SQL("DROP DATABASE IF EXISTS {} WITH (FORCE)").format(names.identifier(name, control=control)))
+
+
+def on_the_test_database() -> bool:
+    """``default`` is this session's test database, not the developer's: what the root conftest's ``django_db_setup``
+    leaves it as."""
+    connection = connections[DEFAULT_DB_ALIAS]
+    return connection.settings_dict["NAME"] == connection.creation._get_test_db_name()
+
+
+def _assert_on_the_test_database() -> None:
+    assert on_the_test_database(), (
+        f"default is {tenancy_connections.control_name()!r}, not this session's test database"
+    )
 
 
 @pytest.fixture(name="db")
@@ -101,10 +150,7 @@ def committed_database(django_db_setup, django_db_blocker):
     from control.models import Hub
 
     with django_db_blocker.unblock():
-        connection = connections["default"]
-        assert connection.settings_dict["NAME"] == connection.creation._get_test_db_name(), (
-            f"default is {connection.settings_dict['NAME']!r}, not this session's test database"
-        )
+        _assert_on_the_test_database()
         before = set(Hub.objects.filter(slug__in=LOCAL_HUBS).values_list("slug", flat=True))
         yield
         # The root conftest's local_hubs writes them for any test with a db: committed here, so taken back.
@@ -178,7 +224,10 @@ def forget_aliases(before: dict) -> None:
 
 
 def build() -> HubDatabases:
-    """Make the template and both hubs' databases, then register both hubs' aliases for the rest of the session."""
+    """Make the template and both hubs' databases, then register both hubs' aliases for the rest of the session.
+
+    Only under this session's test database: their names derive from ``default``'s, and they are dropped first."""
+    _assert_on_the_test_database()
     before = connections.settings
     try:
         built = _build()

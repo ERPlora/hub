@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:ed840a901ff341f3a14d4b4245851d2f0bd4544c5c94005c7afa55c504af1199 -->
+<!-- generated from WORKBOOK.md sha256:0a21d67e9a7effbc6e6f06dc06073006dcac5372b15cd1d36bc8bd41e127cdfd -->
 
 ## What it is for and who it is for
 
@@ -176,7 +176,7 @@ components).
 | CUSTOMER-F23 | See a customer's purchase history | done | common |
 | CUSTOMER-F24 | See on the card what other apps know about the customer | done | common |
 | CUSTOMER-F25 | Create the client without leaving the agenda | done | hair salon |
-| CUSTOMER-F26 | Create the card of whoever asks for an appointment on WhatsApp | discarded — WhatsApp's automatic appointment answer is not offered yet (hub#514) | hair salon |
+| CUSTOMER-F26 | Create the card of whoever asks for an appointment on WhatsApp | done | hair salon |
 | CUSTOMER-F27 | Create, change and delete customer groups | done | common |
 | CUSTOMER-F28 | Create, change and delete customer tags | done | common |
 | CUSTOMER-F29 | Define the card's custom fields | done | common |
@@ -709,10 +709,7 @@ assign" again. Whoever does not manage cards does not see "+ New customer".
 Involved: APPOINTMENT-F01, CUSTOMER-F18
 
 ### CUSTOMER-F26 Create the card of whoever asks for an appointment on WhatsApp
-Status: discarded — the WhatsApp inbox's automatic appointment answer is not offered yet: after
-"Approve", Appointments refuses an automation's appointment (WHATSAPP_INBOX-F21). The Customers part is
-there: looking up by the number (CUSTOMER-F10) and adding with source "WhatsApp", which the table answer
-(WHATSAPP_INBOX-F24) and the inbox's "Create card" (WHATSAPP_INBOX-F37) already use (hub#514)
+Status: done
 Actor: assistant
 Screen: none
 Steps:
@@ -823,14 +820,16 @@ Steps:
    "Revenue".
 2. "Customers" counts the cards still in the list; "Active", those with the "Active" checkbox ticked;
    "VIP", those of the "VIP" stage, and "Revenue" adds up what all of them have spent, in the business's
-   currency.
+   currency, grouped from four digits ("1.234,56 €"; in English, "€1,234.56").
 3. The figures change by themselves, without reloading, when someone adds, edits, deletes, merges or
    erases the data of a card, or when a sale with a customer is charged, voided or refunded.
 In: nothing: they count all the cards still in the list, not only those the table's search or filters
 let through.
 Out: nothing; read only.
 If it fails: "The figures could not be loaded" in their place, and the table keeps working. While they
-arrive, each figure shows "…". On the phone they go two by two, so the table can still be seen below.
+arrive, each figure shows "…". On the phone they go two by two, so the table can still be seen below; a
+figure never breaks across two lines: one that does not fit ("1.234.567,89 €") drops with its card to a
+row of its own.
 Involved: none
 
 ### CUSTOMER-F32 Note allergies or the sensitivity test with their permission

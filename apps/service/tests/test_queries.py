@@ -7,15 +7,20 @@ import uuid
 
 import pytest
 from django.utils import timezone
+from live.context import OperationContext
 from live.errors import Conflict, NotFound, PermissionDenied
 from live.operations import get
 
 from apps.service.models import Assignment, GrantAdjustment, ServiceSettings
 from apps.service.schemas import (
     AdjustCheckOut,
+    AssignmentDetailOut,
     AssignmentListIn,
     AssignmentPage,
     ByIdIn,
+    GrantDetailOut,
+    SessionDetailOut,
+    SessionRefIn,
     CatalogStatusOut,
     CategoryListIn,
     CategoryOut,
@@ -48,7 +53,10 @@ from apps.service.schemas import (
     VoidCheckOut,
 )
 
+from base.tests.ordering import assert_reads_backwards, listed_with
+
 from .conftest import (
+    A,
     ctx_for,
     make_category,
     make_customer,
@@ -70,6 +78,47 @@ def run(name, data=None, role="hub_admin", **ctx):
 
 def names(page) -> list[str]:
     return [row.name for row in page.rows]
+
+
+def test_a_service_without_a_family_stays_last_in_both_directions():
+    tax = make_tax()
+    hair, nails = make_category("Hair"), make_category("Nails")
+    make_service("Cut", tax=tax, category=hair)
+    make_service("Manicure", tax=tax, category=nails)
+    make_service("Loose", tax=tax)
+
+    def listed(sort):
+        return names(run("service.service.list", ServiceListIn(sort=sort)))
+
+    assert listed("category_name") == ["Cut", "Manicure", "Loose"]
+    assert listed("-category_name") == ["Manicure", "Cut", "Loose"]
+
+
+def _tied_services():
+    tax = make_tax()
+    return [make_service(f"Cut {n}", tax=tax, price=2000).id for n in range(4)]
+
+
+def _tied_service_categories():
+    return [make_category(f"Family {n}", sort_order=1).id for n in range(4)]
+
+
+def _tied_packages():
+    return [make_package(f"Bono {n}", sort_order=1).id for n in range(4)]
+
+
+@pytest.mark.parametrize(
+    ("operation", "schema", "tied", "column"),
+    [
+        ("service.service.list", ServiceListIn, _tied_services, "price"),
+        ("service.category.list", CategoryListIn, _tied_service_categories, "sort_order"),
+        ("service.package.list", PackageListIn, _tied_packages, "sort_order"),
+    ],
+)
+def test_ties_read_backwards_in_a_descending_list(operation, schema, tied, column):
+    """hub#768 (the rule of hub#2355, as in Customers): a descending list is the ascending one read backwards, ties
+    included, and its pages neither repeat nor lose rows. A live name is unique, so the name settles these ties."""
+    assert_reads_backwards(listed_with(run, operation, column, schema=schema), tied())
 
 
 @pytest.fixture
@@ -111,7 +160,10 @@ def tax():
         ),
         ("service.package.list", PackageListIn, PackagePage, "service.view_package"),
         ("service.package.get", PackageRefIn, PackageOut, "service.view_package"),
+        ("service.assignment.get", ByIdIn, AssignmentDetailOut, "service.view_service"),
         ("service.grant.list", GrantListIn, GrantPage, "service.view_package_balance"),
+        ("service.grant.get", ByIdIn, GrantDetailOut, "service.view_package_balance"),
+        ("service.session.get", SessionRefIn, SessionDetailOut, "service.view_package_balance"),
         ("service.grant.list_orphans", PageIn, OrphanPage, "service.view_orphan_grant"),
         ("service.grant.void_check", ByIdIn, VoidCheckOut, "service.void_grant"),
         ("service.grant.adjust_check", ByIdIn, AdjustCheckOut, "service.adjust_grant"),
@@ -144,6 +196,83 @@ def test_declarations(name, input, output, permission):
         permission,
         True,
     )
+
+
+# ── A record by its id, as the assistant's card names it ────────────────────────────────────────
+
+
+def test_an_assignment_by_its_id_says_the_service_and_the_professional():
+    service, member = make_service("Corte"), make_member("Ana", "López")
+    assignment = Assignment.objects.create(service=service, member=member)
+    found = run("service.assignment.get", ByIdIn(id=assignment.id), role="hub_employee")
+    assert (found.id, found.label) == (assignment.id, "Corte · Ana López")
+
+
+def test_an_assignment_of_a_professional_who_left_is_not_there():
+    member = make_member("Ana", "López", status="terminated")
+    assignment = Assignment.objects.create(service=make_service("Corte"), member=member)
+    with pytest.raises(NotFound) as error:
+        run("service.assignment.get", ByIdIn(id=assignment.id))
+    assert error.value.code == "service.assignment_not_found"
+    with pytest.raises(NotFound):
+        run("service.assignment.get", ByIdIn(id=uuid.uuid7()))
+
+
+def sold_on_the_third_of_october():
+    from apps.service.models import Grant
+
+    package = make_package("Bono 5 cortes", services=[make_service("Corte")], sessions=5)
+    grant = make_grant(package, make_customer("Lucía Pérez"))
+    Grant.objects.filter(pk=grant.pk).update(granted_at=dt.datetime(2026, 10, 3, 12, tzinfo=dt.UTC))
+    return grant
+
+
+def test_a_voucher_sold_by_its_id_says_what_it_is_whose_and_when_in_the_readers_language():
+    grant = sold_on_the_third_of_october()
+    op = get("service.grant.get")
+    spanish = op(OperationContext(scope=A, actor="t", permissions=ctx_for().permissions, language="es"), ByIdIn(id=grant.id))
+    assert (spanish.id, spanish.label) == (grant.id, "Bono 5 cortes · Lucía Pérez · 3 oct 2026")
+    assert run("service.grant.get", ByIdIn(id=grant.id)).label == "Bono 5 cortes · Lucía Pérez · Oct 3, 2026"
+    with pytest.raises(NotFound) as error:
+        run("service.grant.get", ByIdIn(id=uuid.uuid7()))
+    assert error.value.code == "service.grant_not_found"
+
+
+def test_a_voucher_says_the_day_it_was_sold_on_the_businesss_clock(night_elsewhere):
+    grant = make_grant(make_package("Bono", services=[make_service("Corte")], sessions=5), make_customer("Lucía Pérez"))
+    assert run("service.grant.get", ByIdIn(id=grant.id)).label == "Bono · Lucía Pérez · Nov 2, 2026"
+
+
+def test_a_voucher_sold_says_its_owner_only_to_who_may_see_customers():
+    grant = sold_on_the_third_of_october()
+    without = ctx_for().permissions - {"customer.view"}
+    found = get("service.grant.get")(ctx_for(permissions=without), ByIdIn(id=grant.id))
+    assert found.label == "Bono 5 cortes · Oct 3, 2026"
+
+
+def test_a_session_by_its_id_says_its_voucher_its_owner_and_its_service():
+    grant = sold_on_the_third_of_october()
+    corte = grant.package.items.get().service
+    session = make_redemption(grant, corte)
+    found = run("service.session.get", SessionRefIn(id=session.id), role="hub_employee")
+    assert (found.id, found.grant_id, found.label) == (session.id, grant.id, "Bono 5 cortes · Lucía Pérez · Corte")
+    without = ctx_for().permissions - {"customer.view"}
+    assert get("service.session.get")(ctx_for(permissions=without), SessionRefIn(id=session.id)).label == "Bono 5 cortes · Corte"
+
+
+def test_a_session_with_no_service_leaves_it_out_and_one_that_is_not_there_is_refused():
+    session = make_redemption(sold_on_the_third_of_october())
+    assert run("service.session.get", SessionRefIn(id=session.id)).label == "Bono 5 cortes · Lucía Pérez"
+    with pytest.raises(NotFound) as error:
+        run("service.session.get", SessionRefIn(id=uuid.uuid7()))
+    assert error.value.code == "service.session_not_found"
+
+
+@pytest.mark.parametrize("read", ["service.assignment.get", "service.grant.get", "service.session.get"])
+def test_each_read_by_id_asks_for_its_permission(read):
+    op = get(read)
+    with pytest.raises(PermissionDenied):
+        op(ctx_for(permissions=frozenset()), op.input(id=uuid.uuid7()))
 
 
 # ── Services ──────────────────────────────────────────────────────────────────────────────────
@@ -339,7 +468,7 @@ def test_categories_list_by_order_and_name_with_their_offered_services(tax):
     ]
     assert names(
         run("service.category.list", CategoryListIn(sort="-service_count"))
-    ) == ["Hair", "Nails", "Colour"]
+    ) == ["Hair", "Colour", "Nails"]
     assert run("service.category.get", CategoryRefIn(category="colour")).id == colour.id
     assert run("service.category.get", CategoryRefIn(id=nails.id)).name == "Nails"
 

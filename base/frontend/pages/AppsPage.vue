@@ -13,11 +13,13 @@
 // which a toast took away before it could be read (hub#2594). The counter says how many of the plan's apps are on
 // (`max_apps`; what came along does not count); at the limit, the notice with «Upgrade plan» (erplora.com's plans,
 // only on the web). The menu of this screen is read again after each change; the other screens of the business
-// follow the live list (AppsFollower). Both links to erplora.com go the Hub's one way out, `openExternalLink`
-// (gh:hub#439: the installed app opens nothing on a `_blank` link). In a business with its own database an app turned on
+// follow the live list (AppsFollower). «Upgrade plan» goes with the pass (BASE-F11, `useSaasPass`) and the Store's link
+// by `openExternalLink` (gh:hub#439: the installed app opens nothing on a `_blank` link). In a business with its own database an app turned on
 // for the first time gets its tables first when its template lacked them (S3): the answer says «creating», the toast
 // «Turning on…» and its row «Turning on…» until the live list says it is on; one that could not be set up says so with
-// «Retry» (`base.app.retry`); both can be turned off.
+// «Retry» (`base.app.retry`); both can be turned off. What the server would always refuse is never offered (hub#618,
+// hub#694): the list says it beforehand (`refusal`), the row has no button and, for whoever runs the business, says why;
+// an app off that way is «Not available», not «Off».
 import {
   DataTable,
   EmptyState,
@@ -51,6 +53,7 @@ import {
   turnsOnWith,
 } from '../lib/apps';
 import { useBaseI18n } from '../lib/i18n';
+import { useSaasPass } from '../lib/saas-pass';
 import type { AppRow } from '../operations';
 
 const { t, locale } = useBaseI18n();
@@ -75,6 +78,7 @@ const mayBuy = computed(() => isWeb.value && session.can('base.administer_hub') 
 const mayManage = computed(() => session.can('base.administer_hub'));
 /** The plan's page on erplora.com, only on the web (the Hub never sells inside the installed app). */
 const planUrl = computed(() => (isWeb.value && mayManage.value ? (data.value?.plan_url ?? '') : ''));
+const { openSaasPass } = useSaasPass();
 /** The app being turned on or off: only its button waits, and no other starts meanwhile. */
 const pending = ref<string | null>(null);
 /** The plan's limit the last «Turn on» hit; cleared by the next change. */
@@ -112,7 +116,7 @@ const categories = computed(() =>
 
 function stateLabel(app: AppRow): string {
   if (app.state === 'blocked') return t('base.appsPage.state.blocked');
-  if (app.state === 'off') return t('base.appsPage.state.off');
+  if (app.state === 'off') return t(app.refusal ? 'base.appsPage.state.unavailable' : 'base.appsPage.state.off');
   if (app.state === 'creating') return t('base.appsPage.state.creating');
   if (app.state === 'failed') return t('base.appsPage.state.failed');
   return t(catalogue.value ? 'base.appsPage.state.installed' : 'base.appsPage.state.on');
@@ -133,6 +137,9 @@ function priceLabel(app: AppRow): string {
   }
   return t(`base.appsPage.right.${app.right}`);
 }
+
+/** Whoever reads a row's reason gets a column with room for it: a sentence, not a strip of a dozen short lines. */
+const statesSayWhy = computed(() => mayManage.value && apps.value.some((app) => app.refusal));
 
 const columns = computed<DataTableColumn<AppRow>[]>(() => [
   { key: 'name', label: t('base.appsPage.columns.app'), cell: 'app', priority: 'high' },
@@ -167,6 +174,7 @@ const columns = computed<DataTableColumn<AppRow>[]>(() => [
     key: 'state',
     label: t('base.appsPage.columns.state'),
     cell: 'state',
+    ...(statesSayWhy.value ? { width: 'minmax(15rem, 1.5fr)' } : {}),
     sortValue: (row) => stateLabel(row),
     filter: catalogue.value
       ? {
@@ -344,7 +352,7 @@ const emptyHeading = computed(() => t(`base.appsPage.empty.${tab.value}`));
             :href="planUrl"
             target="_blank"
             rel="noopener"
-            @click="openExternalLink(planUrl, $event)"
+            @click="openSaasPass('plan', planUrl, $event)"
           >{{ t('base.plan.upgrade') }}</a>
         </template>
       </InlineFeedback>
@@ -433,6 +441,11 @@ const emptyHeading = computed(() => t(`base.appsPage.empty.${tab.value}`));
                 class="apps-buy-where"
               >{{ t('base.appsPage.buyWhere') }}</span>
             </template>
+            <span
+              v-if="mayManage && (row as AppRow).refusal"
+              class="apps-refusal"
+              data-testid="apps-refusal"
+            >{{ (row as AppRow).refusal }}</span>
           </span>
         </template>
         <template #empty>
@@ -500,5 +513,14 @@ const emptyHeading = computed(() => t(`base.appsPage.empty.${tab.value}`));
 .apps-buy-where {
   color: var(--ion-color-medium-shade, #555);
   font-size: 0.8125rem;
+}
+
+/* Why it is not offered: a sentence of its own, under the pill, that wraps in the table's unwrapped cells. */
+.apps-refusal {
+  flex-basis: 100%;
+  color: var(--ep-text-muted);
+  font-size: 0.8125rem;
+  line-height: 1.3;
+  white-space: normal;
 }
 </style>

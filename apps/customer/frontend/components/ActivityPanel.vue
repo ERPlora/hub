@@ -4,7 +4,7 @@
 // and re-runs on `customer.note.added`). The activity keeps keys, never sentences: the titles of the
 // app's own kinds are translated here; another app's entry shows its own title. An amount is in the currency its
 // entry carries, one without, in the business's (customer-business-currency).
-import { formatDateTime } from '@erplora/ui/components';
+import { formatDateTime, formatMoney } from '@erplora/ui/components';
 import { useCommand } from '@erplora/ui/sdk';
 import { toastSuccess } from '@erplora/ui/shell';
 import { IonButton, IonTextarea } from '@ionic/vue';
@@ -13,7 +13,7 @@ import { computed, ref, watch } from 'vue';
 import { refusalFields } from '../lib/apiErrors';
 import { windowsOf } from '../lib/useListState';
 import { useLiveList } from '../lib/useLiveList';
-import { formatMoney, recordMoney, useBusinessMoney } from '../lib/money';
+import { recordMoney, useBusinessMoney } from '../lib/money';
 import { useCustomerI18n } from '../lib/useCustomerI18n';
 import type { ActivityRow } from '../operations';
 

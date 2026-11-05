@@ -125,6 +125,11 @@ const STATUS_LABELS: Record<ProductStatus, string> = {
   sold_out: 'inventory.products.soldOut',
 };
 
+/** hub#703 - A row carries the «Not configured» chip: its column needs the room to read those words (a switch fits
+ *  the common floor). A boolean of its own, so a live refresh keeps the very same columns and the table does not
+ *  judge its box again. */
+const anyUnconfigured = computed(() => rows.value.some((row) => row.needs_tax_setup));
+
 const columns = computed<DataTableColumn<Product>[]>(() => [
   // INVENTORY-F32: the photo's thumbnail before the name (its initials without one), in the list and on the cards.
   { key: 'photo', label: t('inventory.products.photo'), sortable: false, cell: 'photo', width: '4rem' },
@@ -144,13 +149,17 @@ const columns = computed<DataTableColumn<Product>[]>(() => [
     label: t('inventory.common.status'),
     align: 'center',
     cell: 'status',
+    // Its icon, «Sin configurar» or «Not configured» and its «…», measured at 820 and 834 (hub#703).
+    minWidth: anyUnconfigured.value ? '10.5rem' : undefined,
     filter: { type: 'select', options: PRODUCT_STATUSES.map((value) => ({ value, label: t(STATUS_LABELS[value]) })) },
   },
 ]);
 
 const isService = (row: Product): boolean => row.product_type === 'service';
 const actions = computed<DataTableAction<Product>[]>(() => [
-  { id: 'detail', label: t('inventory.products.actions.detail'), icon: 'ion:information-circle-outline' },
+  // In «⋮»: tapping the row opens the same sheet. Inline, its button took the room the «Not configured» chip needs
+  // to read whole at 1280 beside the «Photo» column (hub#530).
+  { id: 'detail', label: t('inventory.products.actions.detail'), icon: 'ion:information-circle-outline', menuOnly: true },
   ...(canMove.value
     ? [
         { id: 'receive', label: t('inventory.products.actions.receive'), icon: 'ion:download-outline', hidden: isService },

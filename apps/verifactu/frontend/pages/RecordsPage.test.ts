@@ -4,7 +4,7 @@
 // the AEAT» opens the QR's link. Every state of the screen and the tabbar.
 import { DataTable, EmptyState } from '@erplora/ui/components';
 import { AppPage } from '@erplora/ui/shell';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
 import { errorFrame, flush, type MountOptions, mountVerifactu } from '../__tests__/mount-verifactu';
@@ -19,6 +19,31 @@ vi.mock('@ionic/vue', async (importOriginal) => {
 });
 
 const OP = 'verifactu.record.list';
+
+type TauriWindow = { __TAURI__?: { core: { invoke: (command: string, args?: unknown) => Promise<unknown> } } };
+
+afterEach(() => {
+  delete (window as TauriWindow).__TAURI__;
+});
+
+/** The links clicked on the page while `act` runs: what a browser would open, read as they reach the document
+ *  (stopped there, so the test's page navigates nowhere). */
+async function clickedLinks(act: () => Promise<void>) {
+  const links: { href: string; target: string; rel: string; leftAlone: boolean }[] = [];
+  const watch = (event: Event) => {
+    const link = (event.target as Element).closest('a');
+    if (!link) return;
+    links.push({ href: link.href, target: link.target, rel: link.rel, leftAlone: !event.defaultPrevented });
+    event.preventDefault();
+  };
+  document.addEventListener('click', watch);
+  try {
+    await act();
+  } finally {
+    document.removeEventListener('click', watch);
+  }
+  return links;
+}
 
 const row = (number: string, over: Partial<RecordRowOut> = {}): RecordRowOut => ({
   id: number,
@@ -115,9 +140,22 @@ describe('RecordsPage', () => {
     const push = vi.spyOn(s.router, 'push');
     await s.emit('row-click', PAGE.rows[0]);
     expect(push).toHaveBeenCalledWith('/verifactu/records/TICKET-2026-000002');
-    await s.emit('action', { actionId: 'verify', row: PAGE.rows[0] });
-    expect(open).toHaveBeenCalledWith(PAGE.rows[0].qr_url, '_blank', 'noopener');
+    // A browser opens the QR's link itself: a link to it, for a new tab, clicked and left alone.
+    const links = await clickedLinks(() => s.emit('action', { actionId: 'verify', row: PAGE.rows[0] }));
+    expect(links).toEqual([{ href: PAGE.rows[0].qr_url, target: '_blank', rel: 'noopener', leftAlone: true }]);
+    expect(open).not.toHaveBeenCalled();
+    expect(document.querySelectorAll('a[target="_blank"]')).toHaveLength(0);
     open.mockRestore();
+  });
+
+  it('in the installed app, «Verify at the AEAT» opens the AEAT’s page in the system browser (gh:hub#518)', async () => {
+    const invoke = vi.fn(() => Promise.resolve());
+    (window as TauriWindow).__TAURI__ = { core: { invoke } };
+    const s = await setup();
+    await s.show(PAGE);
+    const links = await clickedLinks(() => s.emit('action', { actionId: 'verify', row: PAGE.rows[0] }));
+    expect(links.map((link) => link.leftAlone)).toEqual([false]);
+    expect(invoke).toHaveBeenCalledWith('open_external_url', { url: PAGE.rows[0].qr_url });
   });
 
   it('says there are no records yet, or no results with a search', async () => {

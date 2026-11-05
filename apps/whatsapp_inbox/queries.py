@@ -9,7 +9,7 @@ import re
 from uuid import UUID
 
 from django.conf import settings
-from django.db.models import Count, F, Q, QuerySet, Value
+from django.db.models import Count, Q, QuerySet, Value
 from django.db.models.functions import Coalesce, Lower, NullIf
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext, Scope
@@ -62,6 +62,7 @@ from apps.whatsapp_inbox.schemas import (
 from base.auth import SAAS_PANEL_PATH
 from base.models import HubUser, Membership
 from base.queries import hub_user_of
+from base.ordering import list_order
 
 CONVERSATION_NOT_FOUND = _("That conversation does not exist in this business.")
 NO_CONVERSATION_MATCHES = _("No conversation matches “%(reference)s”.")
@@ -271,7 +272,7 @@ def send_blocked(row: Channel | None) -> str | None:
         return "not_connected"
     if not gateway.configured():
         return "unconfigured"
-    if row.cap_reached(clock.business_month()):
+    if row.cap_reached(clock.allowance_month()):
         return "cap_reached"
     return None
 
@@ -460,10 +461,7 @@ def list_conversations(ctx: OperationContext, params: ConversationListIn) -> dic
             )
         )
     )
-    column = _SORTS[params.sort]
-    descending = params.dir == "desc"
-    expression = F(column).desc(nulls_last=True) if descending else F(column).asc(nulls_last=True)
-    order = rows.order_by(expression, "-id" if descending else "id")
+    order = rows.order_by(*list_order(_SORTS[params.sort], descending=params.dir == "desc", nulls_last=True))
     return page(order, params, conversation_out)
 
 
@@ -531,7 +529,7 @@ def conversation_summary(ctx: OperationContext, data: SummaryIn) -> dict:
     row = channel(ctx.scope)
     return {
         **counts,
-        "cap_reached": bool(row and row.cap_reached(clock.business_month())),
+        "cap_reached": bool(row and row.cap_reached(clock.allowance_month())),
     }
 
 
@@ -896,7 +894,7 @@ def template_sample_detail(ctx: OperationContext, data: TemplateSampleRefIn) -> 
 )
 def channel_get(ctx: OperationContext, data: ChannelGetIn) -> dict:
     row = channel(ctx.scope) or Channel(host=ctx.scope.key)
-    month = clock.business_month()
+    month = clock.allowance_month()
     return {
         "status": row.status,
         "phone_number": row.phone_number,

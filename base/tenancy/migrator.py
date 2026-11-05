@@ -17,9 +17,10 @@
 ``<db_name>__ddl`` alias, under the schema lock of that database (``pg_try_advisory_lock(hashtext('erplora.schema'))``:
 the key lives in each database, so it is per hub), it brings the platform (``base``, ``live``), the apps the hub's
 database already has and ``add`` (closed by ``requires``) to the code's leaf with ``migrate_apps``, then writes down in
-control what that database has (``Hub.schema_apps``: its ``django_migrations`` rules) and ``schema_state = current``.
-It never steps back and never deletes a table. ``pending_control``, ``pending_template`` and ``is_behind`` are
-``migrate_hubs --check``: what a run would apply, applying nothing.
+control what that database has (``Hub.schema_apps``: its ``django_migrations`` rules) and ``schema_state = current``,
+and forgets what any process kept of it (``base.activation.forget``). It never steps back and never deletes a table.
+``pending_control``, ``pending_template`` and ``is_behind`` are ``migrate_hubs --check``: what a run would apply, applying
+nothing.
 
 The only module of ``base/`` and ``apps/`` that names a connection by hand and takes session advisory locks
 (``tests/test_guardrails.py``): the control database and the hubs' ``__ddl`` aliases are reached directly, never through
@@ -53,7 +54,7 @@ from django.utils import timezone
 from psycopg import errors as pg_errors
 from psycopg import sql
 
-from base import catalog, registry
+from base import activation, catalog, registry
 from base.tenancy import bootstrap, inventory, names
 from base.tenancy import connections as tenancy_connections
 from control.models import Cluster, Hub
@@ -80,10 +81,10 @@ SESSION_LIMITS = {
 HUB_WORKERS = 4
 #: A hub's run cut by ``lock_timeout`` (a table held by its traffic) is tried this many times (PLAN-DB §7).
 LOCK_TIMEOUT_ATTEMPTS = 3
-#: The hubs whose database is complete: ready, or kept after leaving (a cancelled business, an expired demo until
-#: its purge). One being created is the worker's, which runs ``ensure_schema`` itself; a failed one has no
-#: complete database; a purged one has none.
-MIGRATED_STATUSES = (Hub.Status.READY, Hub.Status.CANCELLED, Hub.Status.EXPIRED)
+#: The hubs whose database is complete: ready, or kept after leaving (a cancelled business, or one whose final copy
+#: is being made, which the worker still serves; an expired demo until its purge). One being created is the worker's,
+#: which runs ``ensure_schema`` itself; a failed one has no complete database; a purged one has none.
+MIGRATED_STATUSES = (Hub.Status.READY, Hub.Status.CANCELLED, Hub.Status.ARCHIVING, Hub.Status.EXPIRED)
 #: Where ``CREATE DATABASE`` runs: every database's own catalog is reached from any, and this one always exists.
 OPS_DATABASE = "postgres"
 #: Cloning a template fails while anyone is connected to its source (55006, after PostgreSQL's own 5 s wait): it is
@@ -536,8 +537,9 @@ def ensure_schema(
 
     The platform, the apps its database already has and ``add`` (with what they require) are migrated; then control's
     row learns what the database has (``schema_apps``, the last migration of each app; the labels of a code that no
-    longer has them are kept) and ``schema_state = current``. ``SchemaLocked`` after ``lock_wait`` seconds if another
-    run holds the database; ``HubWithoutDatabase`` for a hub still on control's, which is never touched.
+    longer has them are kept) and ``schema_state = current``, and what any process kept of it is forgotten: an app just
+    made is never refused by a list of before (``base.activation.has_tables``). ``SchemaLocked`` after ``lock_wait``
+    seconds if another run holds the database; ``HubWithoutDatabase`` for a hub still on control's, which is never touched.
     ``heartbeat``: called between apps (:func:`migrate_apps`), the worker's lease renewed while a hub is made.
     """
     if not hub.db_name:
@@ -556,6 +558,7 @@ def ensure_schema(
     )
     hub.schema_apps = schema_apps
     hub.schema_state = Hub.SchemaState.CURRENT
+    activation.forget(hub.slug)
     return applied
 
 

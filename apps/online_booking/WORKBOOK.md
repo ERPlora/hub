@@ -47,7 +47,7 @@ del negocio.
    del negocio. La página ofrece solo las horas que la agenda daría a la clienta.
 4. Abre **Reservas online → Ajustes**, enciende **Página pública activada** y pulsa **Guardar**. Mientras
    está apagada, la página dice que el negocio no acepta reservas online.
-5. Todas las horas son las del **reloj del negocio** (en la fase 1, Europe/Madrid).
+5. Todas las horas son las del **reloj del negocio**, en su zona horaria.
 
 ## Pantallas
 
@@ -126,8 +126,8 @@ Actor: clienta (sin sesión)
 Pantalla: página pública de reservas (`base`); en desarrollo, la vista previa
 Pasos:
 1. Abre la página del negocio: título, mensaje de bienvenida, logo y color de los Ajustes.
-2. Elige uno o varios servicios (hasta 5) de los **reservables online**, con su precio y su duración si
-   Servicios los enseña («Mostrar precios», «Mostrar duración»).
+2. Elige uno o varios servicios (hasta 5) de los **reservables online**, con su precio (agrupado desde cuatro
+   cifras: «1.234,56 €») y su duración si Servicios los enseña («Mostrar precios», «Mostrar duración»).
 3. Si el negocio lo permite, elige profesional entre los que hacen todos esos servicios, o «Sin
    preferencia».
 4. Elige el día: salen las **horas libres** que la agenda daría a la clienta (horario del negocio, turno y

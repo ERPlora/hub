@@ -7,7 +7,8 @@
 // (INVENTORY-F29): the sheet shows the live row, so the button turns once the stream brings it; a
 // refusal is said inside the sheet. The SKU's barcode on its white plate and, for whoever sees products,
 // «Print barcode» (INVENTORY-F25): each press asks Printing's queue for one label and the sheet says which
-// printer takes it, or that it waits for a «Label» printer; without the queue, the browser's print dialog.
+// printer takes it, or that it waits for a «Label» printer; without the queue, the device's print dialog (the
+// browser's; inside the installed app, its print screen, hub#455), and a print refused says why.
 import { FormModal, InlineFeedback } from '@erplora/ui/components';
 import { ApiError, type OutputOf, useCommand } from '@erplora/ui/sdk';
 import { HubIcon, useSession } from '@erplora/ui/shell';
@@ -17,7 +18,8 @@ import { computed, ref, watch } from 'vue';
 import ItemImage from '../../../../base/frontend/components/ItemImage.vue';
 import { useT } from '../composables/useT';
 import { formatMoney, formatQuantity, useBusinessMoney } from '../lib/format';
-import { printInBrowser } from '../lib/print-label';
+import { printRefusal } from '../../../../base/frontend/lib/print-paper';
+import { printLabel as printLabelSheet } from '../lib/print-label';
 import BarcodePlate from './BarcodePlate.vue';
 import type { StockAction } from './StockModal.vue';
 
@@ -62,13 +64,20 @@ async function print(): Promise<void> {
     labelSent.value = { printer: queued.printer_name };
   } catch (failure) {
     const svg = plate.value?.svg;
-    if (failure instanceof ApiError && failure.code === 'inventory.label_queue_unavailable' && svg) {
-      printInBrowser(svg, { sku: p.sku, name: p.name });
-      return;
+    if (!(failure instanceof ApiError && failure.code === 'inventory.label_queue_unavailable' && svg)) return labelFailed(failure);
+    // Without the queue, the device prints the label (inside the installed app, its print screen, hub#455).
+    try {
+      await printLabelSheet(svg, { sku: p.sku, name: p.name });
+    } catch (refused) {
+      labelFailed(refused);
     }
-    const reason = failure instanceof Error ? failure.message : '';
-    error.value = t('inventory.products.label.error', { reason });
   }
+}
+
+/** A label that did not print says why inside the sheet: the app's reason, or the error's words. */
+function labelFailed(failure: unknown): void {
+  const reason = printRefusal(failure, t) ?? (failure instanceof Error ? failure.message : '');
+  error.value = t('inventory.products.label.error', { reason });
 }
 
 async function setSoldOut(value: boolean): Promise<void> {

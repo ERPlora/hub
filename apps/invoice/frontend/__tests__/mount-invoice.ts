@@ -1,6 +1,6 @@
 // Test helper of the invoice app's pages and components, as `mount-sale.ts` is the sale app's: the SDK's live
 // harness (fake clock, fake network serving the stream and the API) on the hub's generated op → route
-// map, the shell's i18n with the invoice catalogues merged in, a session and a memory router.
+// map, the shell's i18n with base's and the invoice catalogues merged in, a session and a memory router.
 // Dialogs: a test that opens one mocks `@ionic/vue`'s IonModal with FormModal's `ionModalStub` (imported
 // from its own file in the mock factory: this helper loads @ionic/vue, the factory must not).
 // `platformNotice` paints a page as the hub does: base's blocking strip over it (`chrome.notice`, frontend/main.ts).
@@ -117,7 +117,8 @@ export async function mountInvoice(component: Component, options: MountOptions =
   // The session is provided app-wide, as createShell does.
   const app = createApp({});
   provideSession(ref(options.session ?? OWNER), ref('live'), { app });
-  const messages = options.platformNotice ? { en: { ...baseEn, ...en }, es: { ...baseEs, ...es } } : { en, es };
+  // Base's catalogue too, as the hub loads it for every app (frontend/main.ts): a print the app refuses says why in it.
+  const messages = { en: { ...baseEn, ...en }, es: { ...baseEs, ...es } };
   const chrome = options.platformNotice ? { [SHELL_CONFIG_KEY as symbol]: { homePath: '/', chrome: { notice: BlockingStrip } } } : {};
   const wrapper = mount(component, {
     props: options.props,

@@ -111,6 +111,21 @@ check("frontend runs lint, typecheck, Vitest and the build",
       all(f"pnpm {task}" in frontend_runs for task in ("lint", "typecheck", "test", "build")))
 check("scripts runs actionlint, shellcheck and the script tests",
       all(needle in scripts_runs for needle in ("actionlint", "shellcheck", ".test.sh")))
+# A passing error of GitHub (a 5xx, a cut connection) while the CI fetches a tool is retried instead of turning a PR
+# red (hub#830): actionlint comes through download-tool.sh, which retries and checks the pin, and no workflow calls a
+# curl that gives up at the first error.
+actionlint_step = next((step for step in steps(tjobs.get("scripts", {})) if "actionlint" in str(step.get("run", ""))), {})
+check("actionlint is downloaded with download-tool.sh",
+      "bash .github/scripts/download-tool.sh" in str(actionlint_step.get("run", "")))
+bare_curls = [
+    f"{path.name}: {step.get('name') or str(step.get('run'))[:40]!r}"
+    for path in sorted(folder.glob("*.yml"))
+    for job in (yaml.safe_load(path.read_text()).get("jobs") or {}).values()
+    for step in steps(job)
+    if "curl " in str(step.get("run", "")) and "--retry-all-errors" not in str(step.get("run", ""))
+]
+check(f"every curl of the workflows retries a passing error (--retry-all-errors){': ' if bare_curls else ''}"
+      + ", ".join(bare_curls), not bare_curls)
 setup_uv = [step for job in tjobs.values() for step in steps(job) if "astral-sh/setup-uv" in str(step.get("uses", ""))]
 check("setup-uv is used", bool(setup_uv))
 check("setup-uv caches by uv.lock",

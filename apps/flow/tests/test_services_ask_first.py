@@ -7,9 +7,8 @@ who writes «cancel my table» gets it done once a person says yes (Zapier's Hum
 and n8n's human review gate the irreversible step; Odoo's approval rules gate a button behind an allowed group;
 Fresha's AI Concierge cancels within the business's cancellation policy). Never on its own, never as a plain step,
 never what is done in person (seating), never money, fiscal records or erasing. The yes is a person's who may cancel
-themselves (the old engine's «no elevation»); the change still runs as the automation. Cancelling an appointment is not
-in yet: Appointments refuses every change an automation makes («You may only change your own appointments.»), so it
-would always fail after the yes.
+themselves (the old engine's «no elevation»); the change still runs as the automation. Cancelling an appointment goes
+the same way (hub#634): test_services_appointment_steps.py.
 """
 
 import datetime as dt
@@ -17,52 +16,25 @@ import json
 from zoneinfo import ZoneInfo
 
 import pytest
-from django.db.backends.base.base import BaseDatabaseWrapper
-from django.utils import timezone
 from live.context import system_context
 from live.errors import InvalidPayload, PermissionDenied
 
-from apps.flow import gateway as flow_gateway
 from apps.flow import queries, recipes
 from apps.flow.models import Flow, FlowRun, Question
-from base import relay
 from base.tests.fake_gateway import gateway  # noqa: F401 - the fixture
 
 from .conftest import A, ctx_for, make_flow, run
 
-pytestmark = pytest.mark.django_db
+pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("no_pauses")]
 
 MADRID = ZoneInfo("Europe/Madrid")
 NOON = dt.datetime(2026, 10, 15, 12, 0, tzinfo=MADRID)
 CHAT = "/internal/assistant/chat"
 QUOTA = {"used": 1, "limit": 30, "resets_at": "2026-11-01T00:00:00Z", "demo": False}
 CANCEL = "reservation.reservation.cancel"
-CANCEL_APPOINTMENT = "appointment.appointment.cancel"
 #: Whoever manages automations and may cancel a reservation, and whoever manages them but may not.
 MAY_CANCEL = {"flow.view", "flow.manage", "flow.answer", "flow.answer_manager", "reservation.view_reservation", "reservation.change_reservation"}
 MAY_NOT_CANCEL = {"flow.view", "flow.manage", "flow.answer", "flow.answer_manager", "reservation.view_reservation"}
-
-
-@pytest.fixture(autouse=True)
-def no_pauses(monkeypatch):
-    monkeypatch.setattr(flow_gateway, "PAUSES", (0, 0))
-
-
-@pytest.fixture
-def worker(monkeypatch, django_capture_on_commit_callbacks):
-    """One pass of the outbox relay, as the worker runs it every tick (base.relay)."""
-    monkeypatch.setattr(BaseDatabaseWrapper, "close_if_unusable_or_obsolete", lambda self: None)
-
-    def tick():
-        with django_capture_on_commit_callbacks(execute=True):
-            return relay.run(timezone.now())
-
-    def request(name, data, ctx=None):
-        with django_capture_on_commit_callbacks(execute=True):
-            return run(name, data, ctx)
-
-    tick.request = request
-    return tick
 
 
 @pytest.fixture
@@ -164,11 +136,19 @@ def test_whoever_grants_a_cancellation_may_cancel_themselves():
 
 
 @pytest.mark.parametrize(
-    "name", ["reservation.reservation.seat", "reservation.reservation.delete", "reservation.reservation.no_show", "sale.order.void", CANCEL_APPOINTMENT]
+    "name",
+    [
+        "reservation.reservation.seat",
+        "reservation.reservation.delete",
+        "reservation.reservation.no_show",
+        "sale.order.void",
+        "appointment.appointment.delete",
+        "appointment.appointment.mark_no_show",
+    ],
 )
 def test_what_is_not_cancelling_a_booking_needs_a_person_in_front_even_asking_first(name):
     # Seating is done at the door (FIX-HUB-FLOW-STEP-RESERVATION-BY-PHONE-DENIED); erasing, a no-show (it may charge
-    # the deposit) and money or fiscal records are never decided from an inbox; an appointment, not yet (above).
+    # the deposit) and money or fiscal records are never decided from an inbox.
     with pytest.raises(InvalidPayload) as refused:
         run("flow.flow.create", document(assistant(tools=[name])))
     assert refused.value.code in ("flow.high_risk", "invalid_payload")
@@ -210,7 +190,7 @@ def test_the_catalog_offers_a_cancellation_only_to_ask_first():
     actions = {action.name: action for action in run("flow.catalog.read", {}).actions}
     assert actions[CANCEL].ask_first is True and actions[CANCEL].assistant is True
     assert actions["reservation.reservation.create"].ask_first is False
-    assert not {"reservation.reservation.seat", "reservation.reservation.delete", "sale.order.void", CANCEL_APPOINTMENT} & set(actions)
+    assert not {"reservation.reservation.seat", "reservation.reservation.delete", "sale.order.void"} & set(actions)
 
 
 # ── Running it (FLOW-F38, FLOW-F29) ──────────────────────────────────────────────────────────────────

@@ -18,7 +18,8 @@ live("sale.sale.get", on=SALES)
 live("sale.sale.stats", on=[*FIGURES, TAX_SETTINGS_UPDATED])
 live("sale.sale.today", on=FIGURES)
 live("sale.sale.last_7_days", on=FIGURES)
-live("sale.sale.by_staff", on=FIGURES)
+# A line that turns out to have paid for a voucher moves no money, only who it counts for.
+live("sale.sale.by_staff", on=[*FIGURES, E.SALE_VOUCHER_LINE_CHANGED])
 # A partial charge takes lines off a check without changing anything else of it.
 live("sale.order.list", on=E.ORDER_EVENTS)
 live("sale.order.get", on=E.ORDER_EVENTS)
@@ -28,6 +29,8 @@ live("sale.checkout.preview", on=[*E.ORDER_EVENTS, E.SETTINGS_UPDATED, *RULE_EVE
 live("sale.payment_method.list", on=[E.PAYMENT_METHOD_CREATED, E.SETTINGS_UPDATED])
 live("sale.settings.get", on=[E.SETTINGS_UPDATED])
 live("sale.pos_settings.get", on=[E.SETTINGS_UPDATED])
+# The paper's head: the issuer, the receipt header and the document its sale gets (SALE-F29).
+live("sale.letterhead.get", on=[*SALES, E.SETTINGS_UPDATED, E.ISSUER_UPDATED])
 # Each department shows the rate its category charges today.
 live(
     "sale.department.list",

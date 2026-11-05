@@ -93,10 +93,13 @@ class Hub(models.Model):
     schema checked) → ``seeding`` (what the sign-up brought) → ``ready``, or ``failed`` with its ``attempts``, its
     ``last_error`` and its ``next_attempt_at`` (1 min, 5 min, 15 min, then every hour) until it is ready; then
     ``cancelled`` (the SaaS deleted the business; ``restore`` brings it back) or, for a demo, ``expired`` →
-    ``dropping`` → ``purged``. ``archiving`` and the business's ``dropping`` are S2b's (the dump and the drop after
-    the 90 days). The host gate answers 404 to a slug without a row, 410 to one that is gone and 503 to one still
+    ``dropping`` → ``purged``. A business past its 90 days goes ``archiving`` (its final copy) → ``dropping`` →
+    ``purged`` (``base.tenancy.offboarding``), unless it keeps fiscal documents: then it stays ``cancelled``. The host
+    gate answers 404 to a slug without a row, 410 to one that is gone and 503 to one still
     being prepared. ``state`` is the SaaS's last photo (``PUT …/state``) as it came, with its
-    monotonic ``state_version``: an older or equal one changes nothing. ``demo_session_key`` is the sha256 of the
+    monotonic ``state_version``: an older or equal one changes nothing. ``custom_domain`` is the own domain that photo
+    names, or empty (HUBS-F17; ``base.custom_domains``): not unique, because a domain moving between two businesses comes
+    in two photos in any order, and while both name it nobody has it. ``demo_session_key`` is the sha256 of the
     SaaS's browser session that owns a demo, never the session key itself.
 
     ``db_name`` is the hub's own database, or empty for a business of phase 1 not cut yet, which is not served (S5,
@@ -138,6 +141,7 @@ class Hub(models.Model):
     demo_session_key = models.CharField(_("demo session"), max_length=64, blank=True)
     state = models.JSONField(pgettext_lazy("hub registry", "state"), default=dict, blank=True)
     state_version = models.PositiveBigIntegerField(_("state version"), default=0)
+    custom_domain = models.CharField(_("own domain"), max_length=253, blank=True, default="", db_default="")
     db_name = models.CharField(
         _("database"), max_length=63, blank=True, default="", db_default="", validators=[db_name_validator]
     )
@@ -193,7 +197,10 @@ class Hub(models.Model):
                 name="base_hub_one_live_demo_per_session",
             )
         ]
-        indexes = [models.Index(fields=["is_demo", "status", "expires_at"], name="base_hub_demo_expiry")]
+        indexes = [
+            models.Index(fields=["is_demo", "status", "expires_at"], name="base_hub_demo_expiry"),
+            models.Index(fields=["custom_domain"], condition=~Q(custom_domain=""), name="base_hub_custom_domain"),
+        ]
 
     def __str__(self) -> str:
         return self.slug

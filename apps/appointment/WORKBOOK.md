@@ -1,7 +1,8 @@
 # Workbook — Citas (app)
 Prefijo: APPOINTMENT
 Alcance MVP: peluquería
-Estado de la app: hecha (servidor y páginas); lo que queda fuera está en «Lo que queda fuera»
+Estado de la app: completa (2026-11-03)
+Lo que no entra todavía: ver «Lo que queda fuera».
 
 > Manual de usuario y especificación de la app `appointment`. Se escribe **antes** que el código: no se
 > programa nada que no esté aquí, y cada flujo pasa a `hecho` cuando sus tests están en verde (servidor
@@ -56,7 +57,7 @@ Quién la usa:
    reservarle.
 4. En **Horarios**, confirma la semana del negocio y pon los festivos. Un día sin ninguna regla de
    horario (ni semana ni excepción) deja reservar a cualquier hora.
-5. La agenda pinta siempre el **reloj del negocio** (en la fase 1, Europe/Madrid), nunca el del
+5. La agenda pinta siempre el **reloj del negocio**, en su zona horaria, nunca el del
    dispositivo: si el dispositivo está en otra zona, un aviso lo dice.
 6. Revisa los **Ajustes** de Citas (antelaciones, solapes, cancelación de la clienta, ventana del
    calendario).
@@ -92,13 +93,14 @@ profesional**, además, **Día · Semana**.
   citas de cada día en orden. Tocar una cita abre su ficha; arrastrarla a otro día u otra fila la
   mueve conservando la hora.
 - **Periódicas**: ver la pantalla [Periódicas](#periódicas).
-- Botón **Añadir cita** → **Nueva cita**: Cliente (buscador «Busca por nombre o teléfono»; si no está,
+- Botón **Añadir cita** → **Nueva cita**: Cliente (buscador «Buscar por nombre, teléfono, email…»; si no está,
   **+ Nuevo cliente** la crea con nombre y teléfono sin salir), Servicios (uno o varios, en orden),
   Profesional (solo los que hacen todos esos servicios), Día, Hora (con las **Horas libres** como
   botones), Min. (la suma de las duraciones, cambiable), Notas para la clienta y Notas internas. Min.
   y el **Total** salen con la duración y el precio propios del profesional elegido para cada servicio
-  (Servicios, «Quién lo hace»), o los del catálogo si no tiene; es lo que la cita reserva.
-  Avisos: «Esta cita empieza en el pasado…» y el profesional que no hace un servicio.
+  (Servicios, «Profesionales que lo hacen»), o los del catálogo si no tiene; es lo que la cita reserva. Los
+  importes salen agrupados desde cuatro cifras («1.234,56 €»; en inglés, «€1,234.56»).
+  Avisos: «Esta cita empieza en el pasado. Se guardará a esa hora.» y el profesional que no hace un servicio.
 - **Editar** → **Editar la cita**: Día, Hora, Min., Servicios, Profesional, las notas y **Guardar
   cambios**; debajo, el historial. La clienta no se cambia.
 - Diálogos: **Cita solapada** (**Reservar igual** / **Elegir otra hora**), **Editar cita periódica**
@@ -113,7 +115,7 @@ botón de añadir abre **Nueva cita periódica** (Cliente, Servicios, Profesiona
 semana, Empieza el, Hora, Min., «Termina el (opcional)», «Número de citas (opcional)») con **Crear
 cita periódica**; editar abre **Editar cita periódica** con «Desde» y **Guardar de esta cita en
 adelante**; el buscador es «Buscar cliente o servicio…». Tras reservar sale solo lo que ha pasado: «{n}
-citas reservadas» y, si alguna no cupo, «{n} no se han podido reservar:» con cada fecha y su motivo (si ya
+citas reservadas» y, si alguna no cupo, «{n} no se han podido reservar» con cada fecha y su motivo (si ya
 estaban todas, «Nada nuevo que reservar: sus {n} citas ya estaban reservadas»), y si quedan fechas, «Las
 fechas desde el {date} aún no están reservadas: pulsa «Reservar citas» en la serie para reservarlas.».
 
@@ -125,8 +127,8 @@ la clienta» cuando fue ella) y qué cambió.
 ### Ajustes de Citas
 Pestaña **Ajustes** (solo para quien puede cambiarlos): «Duración por defecto (minutos)», «Antelación
 mínima para reservar (minutos)» (solo para las reservas de la clienta), «Reservar como máximo con esta
-antelación (días)» (0 = sin límite), «Permitir citas solapadas», «Permitir que la clienta cancele su
-cita», «Antelación mínima para cancelar (horas)», «El calendario empieza a las (hora)», «El calendario
+antelación (días; 0 = sin límite)», «Permitir citas solapadas (el mostrador recibe un aviso antes)»,
+«Permitir que la clienta cancele su cita», «Antelación mínima para cancelar (horas)», «El calendario empieza a las (hora)», «El calendario
 termina a las (hora)», «Intervalo entre huecos (minutos)» y «Confirmar automáticamente las citas que
 reserva la clienta»; botón **Guardar**.
 
@@ -185,7 +187,9 @@ Quien pide algo en nombre de la clienta sin ser una persona del equipo (un paso 
 conversación de WhatsApp, la reserva online) se juzga y se contesta **como la clienta**: no tiene las
 excepciones del mostrador (una hora ya pasada, dentro de la antelación mínima, **Reservar igual** sobre un
 solape, cancelar fuera de la política) y no lee el contacto de la clienta, las notas ni el motivo de una
-cancelación (APPOINTMENT-F01, F06, F18 y F20).
+cancelación (APPOINTMENT-F01, F06, F18 y F20). Como no es nadie del equipo, no tiene citas «suyas»: lo que se le
+permite sobre ellas (reservar, mover, confirmar o editar) vale para las de cualquier profesional, igual que la
+clienta reserva con quien quiera; lo que no se le permite, no lo hace (APPOINTMENT-F01 y F04).
 
 ### APPOINTMENT-F01 Reservar una cita desde la agenda
 <!-- origen: fi:modules/appointments#command-appointments-appointments-create-handler-wasm fi:modules/online_booking#command-online_booking-bookings-create-sql-transaccional old:appointments/workflow/agenda.md#appointments-f01 old:online_booking/WORKFLOW.md#online_booking-f01 qa:modules/appointments/chained-services qa:modules/appointments/create-appointment-without-overlap qa:modules/appointments/walk-in qa:verticals/beauty/03-appointments-and-whatsapp wf:peluqueria-dia#rec_peluqueria-f03 wf:peluqueria-dia#rec_peluqueria-f06 -->
@@ -214,7 +218,8 @@ Si falla: el motivo sale dentro del panel, sin perder lo tecleado: fuera del hor
 profesional no trabaja a esa hora, franja bloqueada, el profesional ya tiene una cita
 (`appointment.slot_taken`), demasiado lejos, la clienta, el servicio o el profesional no existen o no
 se pueden reservar. Desde el mostrador ni la antelación mínima ni una hora ya pasada rechazan (la
-hora pasada solo avisa antes de guardar); una automatización no tiene esas excepciones. Dos personas
+hora pasada solo avisa antes de guardar); una automatización no tiene esas excepciones. Un empleado
+solo reserva para sí; una automatización a la que se permite reservar, con cualquier profesional. Dos personas
 que reservan a la vez el mismo hueco del mismo profesional: entra una y la otra recibe el rechazo.
 Implicados: CUSTOMER-F11, CUSTOMER-F25, CUSTOMER-F30, SERVICE-F10, SERVICE-F33, STAFF-F16, SCHEDULE-F11
 
@@ -225,8 +230,8 @@ Actor: empleado, asistente, clienta
 Pantalla: Agenda (alta y edición)
 Pasos:
 1. Con servicios, profesional y día elegidos aparecen las **Horas libres** como botones.
-2. Las horas candidatas salen cada «Intervalo entre huecos» dentro de la ventana del calendario
-   («empieza a las», «termina a las»). Solo sale la que cabe entera: dentro del horario del negocio
+2. Las horas candidatas salen cada «Intervalo entre huecos (minutos)» dentro de la ventana del calendario
+   («El calendario empieza a las (hora)», «El calendario termina a las (hora)»). Solo sale la que cabe entera: dentro del horario del negocio
    (Horarios: el tramo de ese día o la madrugada del anterior), dentro del turno del profesional y fuera
    de sus ausencias (Personal), sin bloqueo y sin otra cita suya; con los solapes permitidos, una hora
    ocupada también sale. La cita puede terminar justo a la hora de cierre.
@@ -238,8 +243,9 @@ Pasos:
    dice solo a quien puede ver esa agenda (a un empleado, de un compañero, solo «ya tiene una cita»).
 Entra: el horario del negocio, el turno y las ausencias, los bloqueos, las citas y los ajustes.
 Sale: la lista de horas; no guarda nada.
-Si falla: «No se han podido cargar las horas libres» con **Reintentar**; se puede escribir una hora y
-la reserva se juzga al guardar. Sin horas: «No quedan horas libres ese día…».
+Si falla: «No se han podido cargar las horas libres. Puedes escribir una hora igualmente.» con
+**Reintentar**; la hora escrita se juzga al guardar. Sin horas: «No quedan horas libres ese día para este
+profesional. Puedes escribir una hora igualmente.».
 Implicados: SCHEDULE-F11, STAFF-F16, SERVICE-F33
 
 ### APPOINTMENT-F03 Confirmar una cita pendiente
@@ -277,7 +283,9 @@ Sale: la cita movida (servicios nuevos traen su nombre y precio del catálogo y 
 del profesional si la tiene; un profesional nuevo conserva el precio y la duración), su historial y el
 aviso `appointment.appointment.rescheduled`.
 Si falla: el motivo en el panel y en un aviso; un bloque arrastrado vuelve a su sitio. Una cita en
-curso, completada, cancelada o no presentada no se mueve (**Editar** sale en gris).
+curso, completada, cancelada o no presentada no se mueve (**Editar** sale en gris). Un empleado solo mueve
+las suyas; una automatización a la que se permite moverlas, las de cualquier profesional, con las reglas de
+la clienta.
 Implicados: SERVICE-F33, STAFF-F16, SCHEDULE-F11
 
 ### APPOINTMENT-F05 Cancelar una cita desde la agenda
@@ -287,7 +295,8 @@ Actor: empleado (las suyas), responsable, asistente
 Pantalla: Agenda
 Pasos:
 1. Pulsa **Cancelar** en una cita pendiente, confirmada o no presentada.
-2. «Cancelar la cita de Lucía (martes 14, 10:00)?» con el motivo opcional; pulsa **Cancelar la cita**.
+2. «¿Cancelar la cita de Lucía (martes 14, 10:00)? Su hora queda libre.» con el motivo opcional; pulsa
+   **Cancelar la cita**.
 3. La cita pasa a **Cancelada** (el hueco queda libre) y el historial dice «Cancelada», quién y el
    motivo.
 Entra: una cita pendiente, confirmada o no presentada, sin su cuenta abierta en el TPV.
@@ -307,18 +316,21 @@ Pasos:
 2. La cita tiene que ser suya; si no lo es, se contesta igual que si no existiera (no se deja
    averiguar qué citas hay).
 3. Para cancelar se aplica la política: «Permitir que la clienta cancele su cita» y «Antelación mínima
-   para cancelar».
+   para cancelar (horas)».
 4. Para mover se aplican la antelación mínima y las mismas reglas que una reserva de la clienta.
 5. En el historial queda «Lo pidió la clienta» con el motivo, y también quién del equipo lo anotó.
 6. Hacerlo en nombre de la clienta no da más permisos: quien lo anota solo cambia las citas que ya
    podía cambiar (un empleado, las suyas, y no se las pasa a un compañero). Una persona del equipo
    puede cancelar fuera de la política; una automatización, nunca.
+7. Una automatización solo cancela si pregunta antes: un paso **Pedírselo al asistente** con «Que me lo pregunte», al
+   que se le permite, y tras el sí de quien puede cambiar las citas de cualquier profesional; entonces vale para la
+   cita de cualquiera, con la misma política (FLOW-F28, FLOW-F38). Sin esa pregunta, no puede.
 Entra: la cita de la clienta y los ajustes de cancelación y de antelación.
 Sale: la cita cancelada o movida, su línea «Lo pidió la clienta» y el aviso
 `appointment.appointment.cancelled` o `appointment.appointment.rescheduled`.
 Si falla: `appointment.customer_cancellation_disabled`, `appointment.cancellation_notice_required`,
 `appointment.too_soon`, `appointment.appointment_not_found` o `permission_denied`.
-Implicados: ninguno
+Implicados: FLOW-F28, FLOW-F38
 
 ### APPOINTMENT-F07 Empezar el servicio
 <!-- origen: wf:peluqueria-dia#rec_peluqueria-f08 fi:modules/appointments#command-appointments-appointments-start old:appointments/workflow/agenda.md#appointments-f07 qa:modules/appointments/check-in-and-in-progress wf:whatsapp-cita#rec_wa_cita-f10 -->
@@ -400,7 +412,7 @@ Pasos:
 1. En **Periódicas**, pulsa **Nueva cita periódica**.
 2. Elige la clienta, los servicios, el profesional (solo los que los hacen), la repetición (cada día,
    cada semana, cada dos semanas o cada mes), el día de la semana si aplica, el día de inicio, la hora,
-   los minutos y, si quieres, «Termina el» o «Número de citas».
+   los minutos y, si quieres, «Termina el (opcional)» o «Número de citas (opcional)».
 3. Pulsa **Crear cita periódica**: se crea la serie y se reservan sus citas de la ventana
    (APPOINTMENT-F13).
 Entra: la clienta, los servicios y el profesional (Clientes, Servicios y Personal) y los ajustes de
@@ -422,10 +434,11 @@ Pasos:
    pronto) se salta y se lista con su motivo; las demás se reservan. Una fecha que se canceló a mano no
    se vuelve a reservar.
 4. El aviso dice solo lo que ha pasado: «{n} citas reservadas» y, si alguna no cupo, «{n} no se han
-   podido reservar:» con cada fecha y su motivo. Si ya estaban todas: «Nada nuevo que reservar: sus {n}
+   podido reservar» con cada fecha y su motivo. Si ya estaban todas: «Nada nuevo que reservar: sus {n}
    citas ya estaban reservadas».
 5. Si la serie aún no tiene ninguna fecha en la ventana: «Aún no hay nada que reservar: la próxima fecha
-   de esta serie, el {fecha}, queda más lejos que la antelación máxima».
+   de esta serie, el {fecha}, queda más lejos que la antelación máxima. Pulsa «Reservar citas» en la serie
+   cuando se acerque.».
 Entra: una serie activa y la antelación máxima de los ajustes.
 Sale: las citas reservadas, cada una con su aviso `appointment.appointment.created`.
 Si falla: una serie pausada pide reactivarla (`appointment.recurring_inactive`); una sin fechas, «Esta
@@ -456,8 +469,8 @@ Pasos:
 Entra: una serie y la fecha desde la que cambia.
 Sale: la serie partida en dos (la vieja termina el día antes) o, si el cambio empieza en su primera
 fecha, la misma serie editada; el aviso `appointment.recurring.updated`.
-Si falla: «Termina el» antes de la fecha del cambio o del inicio de la serie, en ese campo («El final no
-puede ser anterior al inicio.»).
+Si falla: «Termina el (opcional)» antes de la fecha del cambio o del inicio de la serie, en ese campo («El
+final no puede ser anterior al inicio.»).
 Implicados: ninguno
 
 ### APPOINTMENT-F15 Pausar, reactivar o borrar una serie
@@ -529,8 +542,8 @@ Estado: hecho
 Actor: clienta (WhatsApp, reserva online)
 Pantalla: ninguna
 Pasos:
-1. La automatización ofrece las horas libres (APPOINTMENT-F02) y reserva con origen «WhatsApp» u
-   «Online».
+1. La automatización ofrece las horas libres (APPOINTMENT-F02) y reserva con origen «WhatsApp» o
+   «Reserva online».
 2. Con **Confirmar automáticamente las citas que reserva la clienta** encendido (de fábrica), nace
    **Confirmada**; apagado, nace **Pendiente** y suma en **N por confirmar** y en la campana de la barra de
    arriba («Citas por confirmar»), en todos los dispositivos de quien ve esa agenda. Si un servicio de la cita
@@ -555,7 +568,8 @@ Pasos:
 2. Cambia los ajustes y pulsa **Guardar**: «Ajustes guardados.» Se guarda solo lo que cambia.
 Entra: los ajustes actuales de Citas.
 Sale: `appointment.settings.updated`.
-Si falla: «Revisa los campos marcados y vuelve a guardar.»; «El calendario termina antes de empezar.»
+Si falla: «No se pudieron guardar los ajustes.» con cada motivo bajo su campo, sin perder lo escrito;
+un calendario que termina antes de empezar, «El calendario tiene que terminar después de empezar.».
 Implicados: ninguno
 
 ### APPOINTMENT-F20 Ver las citas de una clienta en su ficha
@@ -591,7 +605,8 @@ Estado: hecho
 Actor: empleado (las suyas), responsable, asistente
 Pantalla: Agenda (Editar) y asistente
 Pasos:
-1. En «Editar la cita» cambia las notas, o pide al asistente corregir el teléfono o el email.
+1. En «Editar la cita» cambia las notas, o pide al asistente corregir el teléfono o el email. **Editar** solo
+   está en una cita pendiente o confirmada sin cobrar; las notas de cualquier otra se cambian por el asistente.
 2. Solo cambia lo que se envía. El teléfono se guarda en formato internacional, con el prefijo del país;
    uno que no es un número válido se rechaza (`appointment.phone_invalid`) y no se guarda nada.
 Entra: una cita.
@@ -638,8 +653,8 @@ Pantalla: ninguna
 Pasos:
 1. En **Personal** se da de baja a alguien (`staff.member.terminated`).
 2. Sus citas futuras pendientes o confirmadas pasan al carril **Sin asignar**, con «Profesional dado de
-   baja: hay que reasignarla» en su historial, y la agenda avisa «{n} citas sin profesional:
-   asígnalas»; se reasignan editándolas o arrastrándolas a otra fila. Sus series se pausan.
+   baja: hay que reasignarla» en su historial, y la agenda avisa «{n} citas no tienen profesional:
+   asígnalas editándolas o arrastrándolas a una fila.». Sus series se pausan.
 3. Desactivar a alguien o marcarlo no reservable no toca sus citas: siguen en su fila con el aviso
    «… ya no admite citas nuevas».
 Entra: el aviso de Personal con el profesional dado de baja.
@@ -814,17 +829,19 @@ la devuelve sin abrir otra (Venta, por su parte, devuelve la cuenta abierta de u
 | Ajustes | sí | sí | no | no | `appointment.manage_settings` |
 
 «Sus propias» citas son las de la ficha de Personal vinculada a su cuenta; un empleado sin ficha
-vinculada ve la agenda vacía con el aviso «Tu cuenta no está vinculada a ninguna ficha de Personal.».
+vinculada ve la agenda vacía con el aviso «Tu cuenta no está vinculada a ninguna ficha de Personal: no hay
+agenda tuya que enseñar.».
 
 ## Para quien lo mantiene
 
 - Anatomía completa (copia de `apps/tax` y `apps/service`): `apps.py`, `models.py`, `migrations/`,
   `schemas.py`, `engine.py` (reglas sin ORM: disponibilidad, horas libres y recurrencias), `queries.py`,
   `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/`, `frontend/` y un
-  `tests/test_<fichero>.py` por fichero, más `test_integration_{customer,service,staff,schedule,sale}.py`
+  `tests/test_<fichero>.py` por fichero, más `test_integration_{customer,service,staff,schedule,sale,home}.py`
   (con las apps reales, sin dobles) y `test_concurrency.py` (hilos).
-- **`requires = ["customer", "service", "staff", "schedule"]`** (choca con el ejemplo del README y de la
-  skill `erplora-apps`, que no incluye `schedule`: Citas lee el horario del negocio en cada reserva).
+- **`requires = ["customer", "service", "staff", "schedule"]`** (choca con el ejemplo de la skill
+  `erplora-apps`, que no incluye `schedule`: Citas lee el horario del negocio en cada reserva; el README del
+  Hub ya no trae ese ejemplo).
   `Appointment.customer` → `customer.Customer`; `Appointment.staff` y `Recurring.staff` →
   `staff.Member`; `AppointmentService.service` y `RecurringService.service` → `service.Service`. Los
   nombres se resuelven con `find_customer`, `find_service` y `resolve_member` de esas apps. La venta es
@@ -836,6 +853,25 @@ vinculada ve la agenda vacía con el aviso «Tu cuenta no está vinculada a ning
   `too_far`, `outside_schedule`, `outside_staff_hours`, `blocked`, `overlap`. `in_past` y `too_soon` solo
   para la clienta y las series; el mostrador los salta. Un día con `source = none` en Horarios no
   restringe (como el producto actual); un día sin horario de Personal solo restringe por ausencias.
+- **«Las suyas» de quien no es una persona** (revisión 2026-11-03, FIX-HUB-FLOW-STEP-CANNOT-BOOK-FOR-A-PROFESSIONAL):
+  `may_book_for` y `may_change` piden `add_appointment`/`change_appointment`, o `add_own_appointment`/
+  `change_own_appointment` sobre una cita de la ficha propia (`is_own`). Quien no es una persona (`by_person`: el paso
+  de una automatización, una API key, la plataforma) no tiene ficha, así que con el permiso «propio» toma las de todo
+  el equipo, y `_judge` lo juzga siempre como la clienta: la que reserva sola elige cualquier profesional (la reserva
+  online ya llama con los permisos de todo el equipo). Antes, un paso al que se concedía reservar o mover nunca podía
+  («You may only book your own appointments.»), y una API key abierta sobre `appointment.appointment.create` tampoco.
+  No presta nada: sin el permiso, `@operation` lo rechaza; una persona sigue con «las suyas»; ver una cita sigue
+  pidiendo `view_appointment` (`find_appointment`). Lo usan los pasos de Automatizaciones (FLOW-F12) y desbloquea
+  la cita por WhatsApp (WHATSAPP_INBOX-F21 y F22, hub#514). Tests: `test_services.py`
+  (`test_what_is_not_a_person_*`, `test_a_person_with_their_own_permission_*`) y
+  `apps/flow/tests/test_services_appointment_steps.py`.
+- **Cancelar desde una automatización** (hub#634): `appointment.appointment.cancel` sigue siendo `risk: "high"`, así que
+  solo lo recibe un paso que pregunta antes (`ASK_FIRST` de Automatizaciones). Como `is_own` le da a la automatización
+  las citas de todo el equipo, la operación declara `ai.yes_permission = change_appointment`: con «solo las suyas», un
+  sí prestaría lo que esa persona no puede hacer. Sigue juzgada como la clienta (`cancel`: `not by_person`).
+- **Cómo se nombra una cita en una tarjeta**: `AppointmentRefIn.id` lleva la marca `refers` a
+  `appointment.appointment.get` y su `label` (clienta, día, hora y profesional, sin los que falten), y el título
+  «Cita»; quien no puede leerla no ve el dato. Vale para la tarjeta del chat y para «Esperan tu respuesta».
 - **Solapes con bloqueo**: reservar, mover y editar bloquean antes la ficha del profesional
   (`resolve_member(lock=True)`, por id en orden fijo cuando son dos), así que dos reservas del mismo
   profesional a la vez se esperan y la segunda ve la primera (`tests/test_concurrency.py`). Con los
@@ -852,8 +888,19 @@ vinculada ve la agenda vacía con el aviso «Tu cuenta no está vinculada a ning
   bloqueada en la transacción de la reserva; nunca secuencias.
 - **Reloj**: los instantes se guardan con zona (UTC) y salen en la del negocio; una hora sin zona que
   llega es de pared del negocio, y una que no existe por el cambio de hora se rechaza
-  (`appointment.invalid_local_time`). Fase 1: la zona es `settings.TIME_ZONE` (Europe/Madrid), como en
-  Horarios y Personal.
+  (`appointment.invalid_local_time`). La zona es la del hub (`base.business.business_zone`), como en
+  Horarios. Las antelaciones mínimas, para reservar y para cancelar, se cuentan en **horas
+  reales**, no en horas del reloj: el día del cambio de hora, 24 h de antelación acaban a otra hora de
+  pared (a las 10:00 de la víspera del día de 23 h, la primera hora que las respeta son las 11:00; en la
+  del día de 25 h, las 09:00), y `queries.now()` da el instante en UTC para que la suma sea de tiempo real.
+  La **duración** de una cita también cuenta tiempo real (`engine.ends_at`, en crear, lote, mover, series, horas
+  libres y `availability.check`): 60 minutos son 60 minutos también la noche del cambio de hora, y lo que cambia
+  es la hora de pared en que acaba (el 25/10/2026, las 01:37 + 90 min acaban a las 02:07 de la segunda vuelta; el
+  28/03/2027, a las 04:07). La hora de fin de `availability.slots` es la de pared real, y la ventana de la agenda
+  (`calendar_end_hour`) se comprueba contra ella. La tarjeta de la agenda se pinta hasta esa hora de fin; una cita
+  que acaba a una hora de pared igual o anterior a su inicio (dentro de la hora repetida) se pinta con su duración.
+  Las citas guardadas antes de este arreglo con el fin de la suma de pared las corrige la migración
+  `0003_end_in_real_minutes` (fin = inicio + minutos reales; no toca las que ya estaban bien).
 - **Recurrencias** con `python-dateutil` (`rrule`; mantenida, decenas de colaboradores, desde 2003):
   diaria, semanal, quincenal y mensual (mismo día del mes, el último en un mes corto), con fin por fecha
   o por número de citas contado desde el inicio de la serie.
@@ -874,6 +921,10 @@ vinculada ve la agenda vacía con el aviso «Tu cuenta no está vinculada a ning
 - Las reacciones (`events.py`) las reparte el relay del outbox del worker (`base/relay.py`, ya en la fase
   1, hub#105): `tests/test_relay.py` las prueba de punta a punta con el bucle real del worker y los avisos
   reales de Venta, Clientes y Personal; `test_integration_*.py`, cada reacción con su app.
+- **Automatización de fábrica** (`recipes.py`, FLOW-F33 de Automatizaciones): «Cubrir el hueco cuando un
+  cliente cancela», una tarea de prioridad alta sobre `appointment.appointment.cancelled` solo cuando lo pidió
+  la clienta (`by_customer`). Citas no importa nada de Automatizaciones: solo declara los datos
+  (`tests/test_recipes.py`).
 
 ## Cómo son las páginas (para quien lo mantiene)
 
@@ -886,6 +937,19 @@ vinculada ve la agenda vacía con el aviso «Tu cuenta no está vinculada a ning
 - Datos solo por `useLive`/`useCommand`; listas en ventanas de 100 (`useLiveWindows`).
 
 ## Lo que queda fuera
+
+Lo que se vio fallar y queda abierto al cerrar la app (2026-11-03), cada cosa con su issue (`migration-leftover`):
+
+- **hub#577** — Citas enseña los precios en euros aunque el negocio sea de un país con otra moneda (BASE-F50).
+- **hub#527** — En un negocio de otro país, un teléfono escrito sin prefijo se guarda y se busca como español
+  (cruza APPOINTMENT-F22).
+- **hub#631**, **hub#633**, **hub#635** y **hub#637** — textos: una traducción «fuzzy» que sale en inglés, siete
+  textos en español con las palabras de otra app, la tarjeta de confirmación del asistente que no dice qué
+  registro toca y la que nombra en inglés algunos datos («Confirm Overlap»).
+- Las peticiones de componentes de [`UI-REQUESTS.md`](UI-REQUESTS.md) (`Scheduler`, `DateField`/`TimeField`, tres
+  iconos y el bloqueo de la baja en Personal): ninguna rompe un flujo.
+
+Lo que no entra, a propósito o hasta otra fase:
 
 - **Volver a activar los avisos negados** desde Sistema (la fila «Los avisos están desactivados» del
   producto actual): hoy, negados en Android, se activan en los ajustes del sistema.

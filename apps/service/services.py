@@ -11,14 +11,15 @@ breaking it at the COMMIT, and one deleted meanwhile is refused as one deleted b
 """
 
 import datetime as dt
+from typing import Any
 
 from django.db import IntegrityError
 from django.db.models import F
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
-from live.errors import Conflict, InvalidPayload, NotFound
-from live.operations import atomic, operation
+from live.errors import AppInactive, Conflict, InvalidPayload, NotFound
+from live.operations import UnknownOperation, atomic, operation
 from live.outbox import record_event
 
 from apps.customer.models import Customer
@@ -40,7 +41,9 @@ from apps.service.models import (
     parent_problem,
 )
 from apps.service.queries import (
+    ASSIGNMENT_NOT_FOUND,
     PACKAGE_NOT_FOUND,
+    SESSION_NOT_FOUND,
     balance,
     current_settings,
     find_category,
@@ -48,6 +51,7 @@ from apps.service.queries import (
     find_package,
     find_service,
     grants,
+    session_rows,
     held_rows,
     load_assignment,
     load_category,
@@ -56,6 +60,7 @@ from apps.service.queries import (
     load_service,
     lock_grant,
     redeem_refusal,
+    session_value,
     settings_row,
     void_refusal,
 )
@@ -68,7 +73,7 @@ from apps.service.schemas import (
     AssignIn,
     AssignmentOut,
     AssignmentPatchIn,
-    ByIdIn,
+    AssignmentRefIn,
     CategoryIn,
     CategoryOut,
     CategoryPatchIn,
@@ -111,6 +116,7 @@ from apps.staff.queries import resolve_member
 from apps.tax.models import TaxCategory
 from apps.tax.queries import held_categories
 from base import images
+from base.operations import call
 
 TAX_REQUIRED = _("Pick a tax category: without one the service cannot be charged.")
 TAX_UNKNOWN = _("That tax category does not exist in Taxes or is deactivated.")
@@ -127,7 +133,6 @@ PACKAGE_NAME_TAKEN = _("There is already a package with that name. Pick another 
 LINE_SERVICE_MISSING = _("That service does not exist in this business.")
 LINE_SERVICE_ARCHIVED = _("That service is archived: it cannot go into a voucher.")
 BULK_INVALID = _("Some services cannot be created: nothing was created.")
-ASSIGNMENT_NOT_FOUND = _("That assignment does not exist in this business.")
 GRANT_ALREADY_VOIDED = _("That voucher was already voided.")
 GRANT_IN_USE = _("That voucher was already used: it cannot be voided.")
 GRANT_UNLIMITED = _(
@@ -155,7 +160,6 @@ REDEEM_REFUSALS = {
     ),
 }
 
-SESSION_NOT_FOUND = _("That voucher session does not exist in this business.")
 LINE_ALREADY_HELD = _("That line already holds a session of a voucher.")
 HOLD_LOST = _(
     "The session held from «%(name)s» is no longer held (its day passed or it was released). Take the voucher "
@@ -881,7 +885,7 @@ def update_assignment(ctx: OperationContext, data: AssignmentPatchIn) -> dict:
     "service.assignment.remove",
     kind="command",
     permission="service.change_service",
-    input=ByIdIn,
+    input=AssignmentRefIn,
     output=DeletedOut,
     expose_api=True,
     ai={
@@ -889,7 +893,7 @@ def update_assignment(ctx: OperationContext, data: AssignmentPatchIn) -> dict:
         "risk": "normal",
     },
 )
-def remove_assignment(ctx: OperationContext, data: ByIdIn) -> dict:
+def remove_assignment(ctx: OperationContext, data: AssignmentRefIn) -> dict:
     assignment = _locked_assignment(data.id)
     payload = _assignment_payload(assignment)
     assignment.delete()
@@ -1080,6 +1084,16 @@ def _grant_payload(grant: Grant) -> dict:
     }
 
 
+def _tell_sales(ctx: OperationContext, name: str, data: dict) -> Any:
+    """Sales' operation ``name``, asked by name for the caller: Sales is no requirement of Services (its permission
+    applies and its refusals reach the caller as they are). ``None`` without Sales in the business (absent or off):
+    there is no figure to keep the voucher's line out of."""
+    try:
+        return call(ctx, name, data)
+    except (UnknownOperation, AppInactive):
+        return None
+
+
 @operation(
     "service.grant.create",
     kind="command",
@@ -1089,7 +1103,9 @@ def _grant_payload(grant: Grant) -> dict:
     expose_api=True,
     ai={
         "description": "Grant (sell) a voucher of the catalog to a customer (by name or phone), with the amount paid "
-        "and the sale if any: its uses and validity are frozen and its expiry counts from the purchase.",
+        "and the sale that charged it (and its line, if the sale charged several): its uses and validity are frozen "
+        "and its expiry counts from the purchase. If it was charged at the till, say the sale: without it, its "
+        "sessions count for nobody's commission.",
         "risk": "normal",
     },
 )
@@ -1098,11 +1114,22 @@ def create_grant(ctx: OperationContext, data: GrantIn) -> dict:
     if not package.is_active:
         raise NotFound(str(PACKAGE_NOT_FOUND), code="service.package_not_found")
     customer = find_customer(data.customer_id, data.customer, lock=True)
+    # A voucher given away charged nothing: no line has anything to leave out.
+    sold_on = (
+        _tell_sales(
+            ctx,
+            "sale.sale.voucher_sold",
+            {"sale_id": data.sale_id, "line_id": data.sale_line_id, "amount": data.amount},
+        )
+        if data.amount and (data.sale_id or data.sale_line_id)
+        else None
+    )
     grant = Grant.objects.create(
         package=package,
         customer=customer,
         granted_at=data.granted_at or timezone.now(),
-        sale_id=data.sale_id,
+        sale_id=sold_on.sale_id if sold_on else data.sale_id,
+        sale_line_id=sold_on.line_id if sold_on else None,
         amount=data.amount,
         net_amount=data.net_amount,
         tax_amount=data.tax_amount,
@@ -1142,6 +1169,10 @@ def void_grant(ctx: OperationContext, data: VoidIn) -> dict:
         void_reason=data.reason,
         updated_at=timezone.now(),
     )
+    if grant.sale_line_id is not None:
+        _tell_sales(
+            ctx, "sale.sale.voucher_unsold", {"line_id": grant.sale_line_id, "amount": grant.amount}
+        )
     record_event(ctx, events.GRANT_VOIDED, _grant_payload(grant))
     return load_grant(ctx, grant.id)
 
@@ -1223,6 +1254,7 @@ def redeem(ctx: OperationContext, data: RedeemIn) -> dict:
         sale_id=data.sale_id,
         note=data.note,
         actor=_actor(ctx),
+        value=session_value(grant.id),
     )
     record_event(
         ctx,
@@ -1336,43 +1368,6 @@ def _lock_sessions(ids) -> dict:
     return sessions
 
 
-def _session_rows(ids) -> list[dict]:
-    """``SessionOut`` of each session, in the order given, with its voucher's balance read now."""
-    wanted = _unique(ids)
-    now = timezone.now()
-    sessions = {
-        session.id: session for session in Redemption.objects.filter(pk__in=wanted)
-    }
-    owners = {
-        grant.id: grant
-        for grant in grants(now).filter(
-            pk__in={session.grant_id for session in sessions.values()}
-        )
-    }
-    rows = []
-    for session_id in wanted:
-        session = sessions[session_id]
-        grant = owners[session.grant_id]
-        state = balance(grant, now)
-        rows.append(
-            {
-                "id": session.id,
-                "grant_id": grant.id,
-                "package_id": grant.package_id,
-                "package_name": grant.package.name,
-                "customer_id": grant.customer_id,
-                "service_id": session.service_id,
-                "status": session.status,
-                "order_line_id": session.order_line_id,
-                "hold_until": session.hold_until,
-                "sale_id": session.sale_id,
-                "remaining": state.remaining,
-                "voucher_expired": state.is_expired,
-            }
-        )
-    return rows
-
-
 def _owner_name(session: Redemption) -> str:
     return Grant.objects.select_related("package").get(pk=session.grant_id).package.name
 
@@ -1426,7 +1421,7 @@ def hold_session(ctx: OperationContext, data: HoldIn) -> dict:
     record_event(
         ctx, events.SESSION_RESERVED, {"id": str(session.id), "grant_id": str(grant.id)}
     )
-    return _session_rows([session.id])[0]
+    return session_rows([session.id])[0]
 
 
 @operation(
@@ -1457,7 +1452,7 @@ def release_session(ctx: OperationContext, data: SessionRefIn) -> dict:
             events.SESSION_RELEASED,
             {"id": str(session.id), "grant_id": str(session.grant_id)},
         )
-    return _session_rows([session.id])[0]
+    return session_rows([session.id])[0]
 
 
 def _owner_matches(session: Redemption, customer_id) -> bool:
@@ -1476,7 +1471,7 @@ def _owner_matches(session: Redemption, customer_id) -> bool:
     output=SessionsOut,
     ai={
         "description": "Sales' step when a sale is charged: the sessions held for its lines paid with vouchers are "
-        "delivered for good and linked to the sale. Refused, delivering none, if one is no longer held (its day "
+        "delivered for good and linked to the sale, each with what it is worth from then on. Refused, delivering none, if one is no longer held (its day "
         "passed, it was released) or the sale's customer does not own the voucher. Repeating it for the same sale "
         "changes nothing.",
         "risk": "high",
@@ -1501,8 +1496,12 @@ def settle_sessions(ctx: OperationContext, data: SettleIn) -> dict:
             )
         pending.append(session)
     for session in pending:
+        # One by one, the next one's share read after this one's: the voucher's row is locked (``_lock_sessions``).
         Redemption.objects.filter(pk=session.pk).update(
-            status=CONSUMED, settled_at=now, sale_id=data.sale_id
+            status=CONSUMED,
+            settled_at=now,
+            sale_id=data.sale_id,
+            value=session_value(session.grant_id),
         )
         record_event(
             ctx,
@@ -1513,7 +1512,7 @@ def settle_sessions(ctx: OperationContext, data: SettleIn) -> dict:
                 "sale_id": str(data.sale_id),
             },
         )
-    return {"rows": _session_rows(data.ids)}
+    return {"rows": session_rows(data.ids)}
 
 
 @operation(
@@ -1596,4 +1595,4 @@ def return_sessions(ctx: OperationContext, data: ReturnIn) -> dict:
                 "reference": str(data.reference),
             },
         )
-    return {"rows": _session_rows(data.ids)}
+    return {"rows": session_rows(data.ids)}

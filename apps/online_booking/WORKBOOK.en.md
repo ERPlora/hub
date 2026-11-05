@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:556d15fc34f43b859550f5a1d367abeacb5d00ab53268bc2b898a5f506a81997 -->
+<!-- generated from WORKBOOK.md sha256:61580bb8b74083f96622badc06425148faeb5ea243249f7b523bfdcec91e9628 -->
 
 ## What it is for and who it is for
 
@@ -37,7 +37,7 @@ from there respects the business's notice.
    business's. The page offers only the times the diary would give the customer.
 4. Open **Online booking → Settings**, switch on **Public page on** and press **Save**. While it is off,
    the page says that the business does not take online bookings.
-5. Every time is on the **business's clock** (in phase 1, Europe/Madrid).
+5. Every time is on the **business's clock**, in its time zone.
 
 ## Screens
 
@@ -116,8 +116,9 @@ Actor: customer (no session)
 Screen: public booking page (`base`); in development, the preview
 Steps:
 1. She opens the business's page: title, welcome message, logo and colour from the Settings.
-2. She picks one or several services (up to 5) among those **booked online**, with their price and their
-   duration if Services shows them ("Show prices", "Show duration").
+2. She picks one or several services (up to 5) among those **booked online**, with their price (grouped
+   from four digits: "1.234,56 €") and their duration if Services shows them ("Show prices", "Show
+   duration").
 3. If the business allows it, she picks a professional among those who do all those services, or "No
    preference".
 4. She picks the day: the **free times** the diary would give the customer show (business hours, the

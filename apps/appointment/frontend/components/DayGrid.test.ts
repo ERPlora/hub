@@ -101,6 +101,65 @@ describe('DayGrid', () => {
     expect(s.wrapper.findAll('[data-testid="appointment-grid-block"]')).toHaveLength(3);
   });
 
+  // hub#636: the axis is the business's wall clock, so the block ends at the wall time the appointment ends at. The
+  // nights the clock changes that is not its start plus its length.
+  it.each([
+    { name: 'an hour over the jump takes two on the wall', day: '2027-03-28', start: '2027-03-28T01:30:00+01:00', end: '2027-03-28T03:30:00+02:00', minutes: 60, left: 144, width: 192 },
+    { name: 'an hour and a half into the repeated hour takes half an hour', day: '2026-10-25', start: '2026-10-25T01:37:00+02:00', end: '2026-10-25T02:07:00+01:00', minutes: 90, left: 155.2, width: 48 },
+  ])('the nights the clock changes: $name', async ({ day, start, end, minutes, left, width }) => {
+    const s = await setup([row('a1', 's1', '10:00', minutes, { start, end })], { day, startHour: 0, endHour: 6 });
+    const style = s.block('a1').attributes('style');
+    expect(style).toContain(`left: ${left}px`);
+    expect(style).toContain(`width: ${width}px`);
+  });
+
+  it('an appointment that ends at or before its start on the wall, in the repeated hour, stays painted for its length', async () => {
+    const s = await setup(
+      [
+        row('a1', 's1', '10:00', 60, { start: '2026-10-25T02:30:00+02:00', end: '2026-10-25T02:30:00+01:00' }),
+        row('a2', 's2', '10:00', 30, { start: '2026-10-25T02:45:00+02:00', end: '2026-10-25T02:15:00+01:00' }),
+      ],
+      { day: '2026-10-25', startHour: 0, endHour: 6 },
+    );
+    expect(s.block('a1').attributes('style')).toContain('width: 96px');
+    expect(s.block('a2').attributes('style')).toContain('width: 48px');
+  });
+
+  it('an hour over the jump is seen in a window that opens after its start plus its length', async () => {
+    // 01:30 plus 60 real minutes ends at 03:30 on the wall; its start plus its length would end at 02:30, before 03:00.
+    const s = await setup(
+      [row('a1', 's1', '10:00', 60, { start: '2027-03-28T01:30:00+01:00', end: '2027-03-28T03:30:00+02:00' })],
+      { day: '2027-03-28', startHour: 3, endHour: 6 },
+    );
+    const style = s.block('a1').attributes('style');
+    expect(style).toContain('left: 0px');
+    expect(style).toContain('width: 48px');
+  });
+
+  it('two appointments the jump of the clock makes overlap on the wall take a track each', async () => {
+    const s = await setup(
+      [
+        row('a1', 's1', '10:00', 60, { start: '2027-03-28T01:30:00+01:00', end: '2027-03-28T03:30:00+02:00' }),
+        row('a2', 's1', '10:00', 30, { start: '2027-03-28T03:00:00+02:00', end: '2027-03-28T03:30:00+02:00' }),
+      ],
+      { day: '2027-03-28', startHour: 0, endHour: 6 },
+    );
+    const top = (id: string) => /top: ([\d.]+)px/.exec(s.block(id).attributes('style') ?? '')?.[1];
+    expect(top('a1')).not.toBe(top('a2'));
+  });
+
+  it('an appointment that ends the next day is painted up to the end of the window', async () => {
+    const s = await setup(
+      [row('a1', 's1', '10:00', 60, { start: '2026-10-19T19:30:00+02:00', end: '2026-10-19T20:30:00+02:00' })],
+    );
+    expect(s.block('a1').attributes('style')).toContain('width: 48px');
+    const overnight = await setup(
+      [row('a2', 's1', '10:00', 60, { start: '2026-10-19T23:30:00+02:00', end: '2026-10-20T00:30:00+02:00' })],
+      { startHour: 22, endHour: 24 },
+    );
+    expect(overnight.block('a2').attributes('style')).toContain('width: 48px');
+  });
+
   // outfitkit#284: a row's name never ends cut with no way to read it: it wraps to a second line and says
   // itself whole on hover or a long press.
   it('a row says its whole name', async () => {

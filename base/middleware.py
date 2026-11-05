@@ -1,4 +1,16 @@
-"""The Hub's request gates: ``HubHostRequiredMiddleware``, ``PlatformHostMiddleware`` and ``SaasLoginRequiredMiddleware``.
+"""The Hub's request gates: ``CustomDomainMiddleware``, ``HubHostRequiredMiddleware``, ``PlatformHostMiddleware`` and
+``SaasLoginRequiredMiddleware``.
+
+``CustomDomainMiddleware`` (HUBS-F17, PLAN-SAAS §37 point 2): a host outside ``ALLOWED_HOSTS``, which stays as it was. A
+host the Hub does not know (``base.custom_domains``, at no read per request: the ALB's last rule lets the scanners
+through) goes on to ``CommonMiddleware``, whose 400 it always was. One it knows, a business's own domain, is answered
+here and never goes further down this chain, so no gate below has to know of it and nothing of the app can be reached by
+it: its ``/``, the business's published website (``base.public_home``), its images (``/p/media/<its id>/``, the public
+ones: no session is ever read here) and the activation's probe (:data:`PROBE_PATH`), and for any other path or a site
+that is not there, 404 (``/api`` with its envelope), before any read. The session's cookie does not reach another domain
+(PLAN-SAAS §1.1), and one sent by hand is not read. A business that left, or suspended, is 404: a visitor of its domain
+has nothing to do with its invoices; one being prepared or moved says to come back (503). The page and its images read
+the business's row again, as every other host does, and it has to name the domain still.
 
 ``HubHostRequiredMiddleware``: a host that is no hub (``HostScopeResolver`` with ``live.slugs``: a reserved name
 such as ``hub`` or ``www``, an invalid label, the bare host, an IP) answers 404 on every hub path (the SPA,
@@ -54,7 +66,9 @@ own database yet (phase 1's, before its cut: S5) answers 503 ``base.hub_maintena
 whose every place in this process is taken (its plan's transactions at once, ``base.tenancy.limits``) answers 503
 ``base.hub_busy`` with ``Retry-After``, whether that happens while checking its database, in
 ``SaasLoginRequiredMiddleware`` (the website, a till's device) or in the view (the API's routes answer it themselves,
-with the same envelope): the envelope, or for a page (the admin, the website) its message as text.
+with the same envelope): the envelope, or for a page (the admin, the website) its message as text. A view that touches
+a module whose tables the business does not have yet (``AppNotCreated``, ``base.tenancy.router``) answers its 404
+``app_inactive`` the same way; the admin's page goes back to its index, saying so.
 
 ``SessionHostMiddleware`` (phase 2, S1): a session is a session of the host it was opened on (the login notes it);
 on another hub's host, or on the platform host, it is anonymous (401).
@@ -69,18 +83,22 @@ from django.contrib.auth.models import AnonymousUser
 from django.contrib.auth.signals import user_logged_in
 from django.core.exceptions import PermissionDenied
 from django.db import DatabaseError
-from django.http import Http404, HttpRequest, HttpResponse, HttpResponseRedirect, JsonResponse
+from django.http import Http404, HttpRequest, HttpResponse, HttpResponseNotAllowed, HttpResponseRedirect, JsonResponse
+from django.http.request import split_domain_port, validate_host
 from django.template.loader import render_to_string
 from django.urls import get_script_prefix, reverse
 from django.dispatch import receiver
+from django.utils.cache import add_never_cache_headers
 from django.utils.deprecation import MiddlewareMixin
 from django.utils.translation import gettext
+from django.views.defaults import page_not_found
 from live.api_errors import DEFAULT_API_PREFIX
 from live.errors import NotFound
 
-from base import meter, registry
+from base import custom_domains, meter, public_home, registry
 from base.auth import admin_hubs_url, saas_url
 from base.health import READYZ_PATH
+from base.media import media
 from base.models import Hub
 from base.operations import HostScopeResolver, is_platform_host
 from base.public_home import website_enabled
@@ -107,6 +125,63 @@ LAUNCH_PATH = "/launch"
 #: The one path of a demo that ended still answered: its login jumps to the SaaS's ``/demo/enter/``, which asks for a
 #: code, hears 410 and tells the visitor the demo ended (the SaaS keeps no row of a demo and is never told otherwise).
 DEMO_ENTRY_PATH = "/auth/login"
+#: What a business's own domain answers the SaaS's probe with, that it reaches this hub: its id and nothing else, which
+#: its website's images already carry. Under ``/.well-known/``, where the WAF lets an HTTP library through.
+PROBE_PATH = "/.well-known/erplora-hub"
+
+
+class CustomDomainMiddleware(MiddlewareMixin):
+    """Placed right before ``CommonMiddleware``: its ``get_host()`` is what refuses a host outside ``ALLOWED_HOSTS``."""
+
+    def process_request(self, request: HttpRequest) -> HttpResponse | None:
+        # By hand on purpose: get_host() is what refuses a host outside ALLOWED_HOSTS. It is only ever looked up in the map.
+        domain, _port = split_domain_port(request.META.get("HTTP_HOST", ""))
+        if not domain or validate_host(domain, settings.ALLOWED_HOSTS):
+            return None
+        hub_id = custom_domains.hub_of(domain)
+        if hub_id is None:
+            return None
+        try:
+            return self._answer(request, domain, hub_id)
+        except Http404 as nothing_here:
+            # Django's plain page, also with DEBUG: its technical one asks get_host(), which would answer 400.
+            return page_not_found(request, nothing_here)
+
+    def _answer(self, request: HttpRequest, domain: str, hub_id) -> HttpResponse:
+        path = request.path_info
+        images = f"/p/media/{hub_id.hex}/"
+        if path not in ("/", PROBE_PATH) and not path.startswith(images):
+            return _not_found(request)
+        if request.method not in ("GET", "HEAD"):
+            return HttpResponseNotAllowed(["GET", "HEAD"])
+        if path == PROBE_PATH:
+            probe = JsonResponse({"hub_id": str(hub_id)})
+            add_never_cache_headers(probe)
+            return probe
+        return self._public_website(request, domain, hub_id, path.removeprefix(images))
+
+    def _public_website(self, request: HttpRequest, domain: str, hub_id, image: str) -> HttpResponse:
+        hub = registry.hub_by_id(hub_id)
+        if hub is None or hub.custom_domain != domain:
+            raise Http404("This domain has been given up.")
+        refusal = registry.refusal(hub)
+        if refusal is not None:
+            if refusal.status != 503:
+                raise Http404("This business serves nothing on its domain.")
+            return _refuse(request, hub, refusal)
+        request.hub, request.custom_domain, request.user = hub, domain, AnonymousUser()
+        try:
+            with tenancy_context.use_hub(hub):
+                _count_the_request(request)
+                if request.path_info != "/":
+                    return media(request, hub.id.hex, image)
+                if not website_enabled(request):
+                    raise Http404("This business has no website to show.")
+                return public_home.respond(request)
+        except tenancy_limits.HubBusy as busy:
+            return HubDatabaseMiddleware._busy(request, busy)
+        except (HubIdentityMismatch, DatabaseError, tenancy_context.HubWithoutDatabase) as error:
+            return HubDatabaseMiddleware._unavailable(request, error)
 
 
 class HubHostRequiredMiddleware(MiddlewareMixin):
@@ -129,42 +204,44 @@ class HubHostRequiredMiddleware(MiddlewareMixin):
         try:
             scope = HostScopeResolver().resolve(request)
         except Http404:
-            return self._not_found(request)
+            return _not_found(request)
         hub = registry.hub_by_slug(scope.key)
         if hub is None:
-            return self._not_found(request)
+            return _not_found(request)
         refusal = registry.refusal(hub, ended=not (hub.is_demo and path == DEMO_ENTRY_PATH))
         if refusal is not None:
-            return self._refuse(request, hub, refusal)
+            return _refuse(request, hub, refusal)
         request.hub = hub
         return None
 
-    def _not_found(self, request: HttpRequest) -> HttpResponse:
-        if _is_api(request):
-            # The envelope of an unknown API path (live.api_errors), in the request's language.
-            error = NotFound(gettext("Not found"))
-            return JsonResponse(error.envelope(), status=error.status)
-        raise Http404("This host is no hub's.")
 
-    def _refuse(self, request: HttpRequest, hub: Hub, refusal: registry.Refusal) -> HttpResponse:
-        """The registry's refusal: its envelope, or its page for a browser (gone, being prepared, under maintenance,
-        suspended)."""
-        if _wants_envelope(request):
-            response = _envelope(refusal.status, refusal.code, refusal.message)
-        elif refusal.code == registry.HUB_GONE:
-            back = saas_url(DEMO_ENDED_PATH if hub.is_demo else LAUNCH_PATH)
-            html = render_to_string(HUB_GONE_TEMPLATE, {"is_demo": hub.is_demo, "back_url": back})
-            response = HttpResponse(html, status=refusal.status)
-        elif refusal.code == registry.HUB_PREPARING:
-            response = HttpResponse(render_to_string(HUB_PREPARING_TEMPLATE), status=refusal.status)
-        elif refusal.code == registry.HUB_MAINTENANCE:
-            response = HttpResponse(render_to_string(HUB_MAINTENANCE_TEMPLATE), status=refusal.status)
-        else:
-            html = render_to_string(HUB_SUSPENDED_TEMPLATE, {"back_url": saas_url(LAUNCH_PATH)})
-            response = HttpResponse(html, status=refusal.status)
-        if refusal.code in (registry.HUB_PREPARING, registry.HUB_MAINTENANCE):
-            response["Retry-After"] = str(PREPARING_RETRY_AFTER_SECONDS)
-        return response
+def _not_found(request: HttpRequest) -> HttpResponse:
+    if _is_api(request):
+        # The envelope of an unknown API path (live.api_errors), in the request's language.
+        error = NotFound(gettext("Not found"))
+        return JsonResponse(error.envelope(), status=error.status)
+    raise Http404("This host is no hub's.")
+
+
+def _refuse(request: HttpRequest, hub: Hub, refusal: registry.Refusal) -> HttpResponse:
+    """The registry's refusal: its envelope, or its page for a browser (gone, being prepared, under maintenance,
+    suspended)."""
+    if _wants_envelope(request):
+        response = _envelope(refusal.status, refusal.code, refusal.message)
+    elif refusal.code == registry.HUB_GONE:
+        back = saas_url(DEMO_ENDED_PATH if hub.is_demo else LAUNCH_PATH)
+        html = render_to_string(HUB_GONE_TEMPLATE, {"is_demo": hub.is_demo, "back_url": back})
+        response = HttpResponse(html, status=refusal.status)
+    elif refusal.code == registry.HUB_PREPARING:
+        response = HttpResponse(render_to_string(HUB_PREPARING_TEMPLATE), status=refusal.status)
+    elif refusal.code == registry.HUB_MAINTENANCE:
+        response = HttpResponse(render_to_string(HUB_MAINTENANCE_TEMPLATE), status=refusal.status)
+    else:
+        html = render_to_string(HUB_SUSPENDED_TEMPLATE, {"back_url": saas_url(LAUNCH_PATH)})
+        response = HttpResponse(html, status=refusal.status)
+    if refusal.code in (registry.HUB_PREPARING, registry.HUB_MAINTENANCE):
+        response["Retry-After"] = str(PREPARING_RETRY_AFTER_SECONDS)
+    return response
 
 
 def _is_api(request: HttpRequest) -> bool:
@@ -308,11 +385,14 @@ class HubDatabaseMiddleware:
         return tenancy_context.use_hub(resolved)
 
     def process_exception(self, request: HttpRequest, exception: Exception) -> HttpResponse | None:
-        """A view that found its hub busy (the admin's, a page's) answers 503 instead of 500. On the platform host with
-        no business chosen, a page of a hub's model (which only a business's database holds) goes back to the admin's
-        index, saying what to do; anything else is left to Django."""
+        """A view that found its hub busy (the admin's, a page's) answers 503 instead of 500, and one that touched a module
+        the business has not created its 404 instead of 500. On the platform host with no business chosen, a page of a
+        hub's model (which only a business's database holds) goes back to the admin's index, saying what to do; anything
+        else is left to Django."""
         if isinstance(exception, tenancy_limits.HubBusy):
             return self._busy(request, exception)
+        if isinstance(exception, tenancy_context.AppNotCreated):
+            return self._not_created(request, exception)
         if not (isinstance(exception, tenancy_context.HubContextMissing) and getattr(request, "platform_host", False)):
             return None
         from django.contrib import messages
@@ -325,6 +405,19 @@ class HubDatabaseMiddleware:
             ),
         )
         return HttpResponseRedirect(reverse("admin:index"))
+
+    @staticmethod
+    def _not_created(request: HttpRequest, refused: tenancy_context.AppNotCreated) -> HttpResponse:
+        """404 ``app_inactive``: the envelope; the admin's page, its index with what it says; another page, the index
+        itself included (going back to it would be a loop), its message."""
+        if _wants_envelope(request):
+            return _envelope(refused.status, refused.code, refused.message)
+        if getattr(request, "platform_host", False) and request.path_info != _route("admin:index"):
+            from django.contrib import messages
+
+            messages.warning(request, refused.message)
+            return HttpResponseRedirect(reverse("admin:index"))
+        return HttpResponse(refused.message, status=refused.status, content_type="text/plain; charset=utf-8")
 
     @staticmethod
     def _busy(request: HttpRequest, busy: tenancy_limits.HubBusy) -> HttpResponse:

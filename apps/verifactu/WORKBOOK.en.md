@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:5199a3d54130bb34b55e49e7654f074f06674e95ca7f5f3174255146af160a89 -->
+<!-- generated from WORKBOOK.md sha256:4e38cd837b096b0333fbd17b15b21043572cc8bff1dc2ea8bc55a62037d41f71 -->
 
 ## What it is for and who it is for
 
@@ -207,7 +207,7 @@ Screen notices: the result of each action in a strip on top (green if it went we
 
 | ID | Flow | Status |
 |---|---|---|
-| VERIFACTU-F01 | Activate VeriFactu | done — turning the app on in the Hub is activating it (activation per hub arrives with phase 2); outside Spain, turned on, it records and sends nothing (FIX-HUB-VERIFACTU-ON-FOR-A-BUSINESS-OUTSIDE-SPAIN), and Apps not offering it there waits for a platform turn-on hook |
+| VERIFACTU-F01 | Activate VeriFactu | done — turning the app on in the Hub is activating it (activation per hub arrives with phase 2); outside Spain, Apps does not offer it and the hub refuses it (`can_enable`, hub#694), and one already on records and sends nothing (FIX-HUB-VERIFACTU-ON-FOR-A-BUSINESS-OUTSIDE-SPAIN) |
 | VERIFACTU-F02 | Upload the business's own certificate | done — in the Hub; encrypted in the hub's DB with `FISCAL_CERTIFICATE_KEY` |
 | VERIFACTU-F03 | Remove the own certificate | done — in the Hub |
 | VERIFACTU-F04 | Choose who files: my certificate or ERPlora | done |
@@ -224,7 +224,7 @@ Screen notices: the result of each action in a strip on top (green if it went we
 | VERIFACTU-F15 | Send the record to the AEAT and collect its answer | done — the worker sends it through the SaaS gateway; without `VERIFACTU_GATEWAY_URL` the records wait in the queue |
 | VERIFACTU-F16 | Look up the records and their status | done |
 | VERIFACTU-F17 | See the detail of a record and why it waits | done |
-| VERIFACTU-F18 | Verify the QR at the AEAT's site | done |
+| VERIFACTU-F18 | Verify the QR at the AEAT's site | partial — in the installed app the AEAT's site does not open yet: the app has yet to accept its addresses (ERPlora/app#20) |
 | VERIFACTU-F19 | Give the QR and the fiscal status to the ticket and the invoice | done (Sales and Printing ask for it by name) |
 | VERIFACTU-F20 | Send later what could not go out (automatic contingency) | done — the worker runs it every minute (in phase 1, over a single hub) |
 | VERIFACTU-F21 | Process the queue by hand | done |
@@ -244,21 +244,24 @@ Screen notices: the result of each action in a strip on top (green if it went we
 | VERIFACTU-F35 | Ask the AEAT whether it already has a queue record | done — in the record's detail, in the Hub's admin and through the API |
 
 ### VERIFACTU-F01 Activate VeriFactu
-Status: done — turning the app on in the Hub is activating it (activation per hub arrives with phase 2); outside Spain, turned on, it records and sends nothing (FIX-HUB-VERIFACTU-ON-FOR-A-BUSINESS-OUTSIDE-SPAIN), and Apps not offering it there waits for a platform turn-on hook
+Status: done — turning the app on in the Hub is activating it (activation per hub arrives with phase 2); outside Spain, Apps does not offer it and the hub refuses it (`can_enable`, hub#694), and one already on records and sends nothing (FIX-HUB-VERIFACTU-ON-FOR-A-BUSINESS-OUTSIDE-SPAIN)
 Actor: administrator
 Screen: Hub: Apps
 Steps:
 1. In the Hub's apps, turn **VeriFactu** on (Invoicing turns on with it).
 2. From that moment every invoice Invoicing issues is recorded (VERIFACTU-F13) in the test
    environment.
-3. Only in a business in Spain. In one from another country (that of its erplora.com account), VeriFactu turned on
-   does nothing: invoices go out without a record or QR, **VeriFactu → Settings** and **VeriFactu → Configuration**
+3. Only in a business in Spain. In one from another country (that of its erplora.com account), Apps does not offer
+   it: it shows "Not available" with "VeriFactu is only for businesses in Spain." and no "Turn on", and the hub answers
+   the same if asked through the assistant or the API. A hair salon or restaurant template does not promise to turn it
+   on, loads everything else and ends complete, with no "Retry", saying why VeriFactu stays out.
+4. If it was already on in a business from another country, it does nothing and can be turned off: invoices go out without a record or QR, **VeriFactu → Settings** and **VeriFactu → Configuration**
    say on top "VeriFactu is only for businesses in Spain." without offering anything that leads to the AEAT, and
    whatever asks to record or send something answers the same.
 In: nothing but the order.
 Out: the app active; no switch of its own.
 If it fails: the Hub's apps page says so.
-Involved: INVOICE-F01
+Involved: INVOICE-F01, BASE-F18
 
 ### VERIFACTU-F02 Upload the business's own certificate
 Status: done — in the Hub; encrypted in the hub's DB with `FISCAL_CERTIFICATE_KEY`
@@ -504,12 +507,12 @@ Actor: employee, manager, administrator
 Screen: Settings
 Steps:
 1. In **VeriFactu → Settings**, card "Responsible declaration", "Read the signed declaration" opens the one
-   published on erplora.com; next to it, "Declaration version".
+   published on erplora.com (in the installed app, in the device's browser); next to it, "Declaration version".
 2. "Identifying data of this system" shows the producer's data, the installed version and the installation number
    (this business's identifier at ERPlora).
 In: the declaration (fixed in the Hub's version).
 Out: nothing; it is a lookup.
-If it fails: the failure's message.
+If it fails: the failure's message; in the installed app, if it cannot open it, "Could not open that page. Try again.".
 Involved: none
 
 ### VERIFACTU-F13 Record an issued invoice
@@ -628,17 +631,18 @@ If it fails: "Record not found" or the failure's message.
 Involved: VERIFACTU-F15
 
 ### VERIFACTU-F18 Verify the QR at the AEAT's site
-Status: done
+Status: partial — in the installed app the AEAT's site does not open yet: the app has yet to accept its addresses (ERPlora/app#20)
 Actor: employee, manager, administrator, customer
 Screen: Records
 Steps:
-1. In **Records**, "Verify at the AEAT" on the row (or in the detail) opens in another tab the AEAT's verification
-   page with the issuer's tax ID, the number, the date and the amount.
+1. In **Records**, "Verify at the AEAT" on the row (or in the detail) opens in another tab (in the installed app, in the
+   device's browser) the AEAT's verification page with the issuer's tax ID, the number, the date and the amount.
 2. A record born in testing leads to the test site; one from production, to the real site.
 3. The customer does the same by scanning the QR of their ticket or their invoice.
 In: the QR's link set when sealing.
 Out: nothing in the Hub.
-If it fails: a record that has not gone out yet shows at the AEAT as not found; a rejected one, never.
+If it fails: a record that has not gone out yet shows at the AEAT as not found; a rejected one, never. In the installed
+app, if it cannot open the page, "Could not open that page. Try again.".
 Involved: VERIFACTU-F19
 
 ### VERIFACTU-F19 Give the QR and the fiscal status to the ticket and the invoice
@@ -865,16 +869,18 @@ Involved: none
 ### VERIFACTU-F32 Prevent turning the app off once on
 Status: done — the platform asks when turning off (`base.app.disable`, hub#256) and VeriFactu answers with its
 `can_disable` (hub#267, FIX-BASE-APP-TURN-OFF-VETO); in Spain, once on, it never goes off
-(FIX-HUB-VERIFACTU-NEVER-OFF-ONCE-ON)
+(FIX-HUB-VERIFACTU-NEVER-OFF-ONCE-ON), and Apps no longer offers "Turn off" (hub#618)
 Actor: system
 Screen: Hub: Apps
 Steps:
 1. When turning VeriFactu off in a business in Spain, the platform asks it and VeriFactu always refuses: once on,
    the business's invoices have to keep reaching the AEAT (the law requires staying with VERI*FACTU at least until
-   the natural year ends, and ERPlora has no other way of recording them).
+   the natural year ends, and ERPlora has no other way of recording them). In **Apps** its row offers no "Turn off"
+   and says that reason (BASE-F25).
 2. Whatever the queue holds makes no difference: with records to send or with everything already answered by the
    AEAT, the answer is the same. VeriFactu stays on and its records stay as they were. The apps it needs cannot be
-   turned off either: Invoicing and, through it, Taxes, Sales & POS and Customers.
+   turned off either: Invoicing and, through it, Taxes, Sales & POS and Customers; their rows do not offer it either
+   and say why (hub#619).
 3. A business without a country (a demo) is in Spain: it does not go off either.
 4. While its status says "Turning on…" or "Could not turn on" it has not been on yet nor sealed anything: it can be
    turned off.
@@ -1042,6 +1048,7 @@ delivered).
 | Invoicing | Seal the record of each document inside its issuing | `verifactu.record.create` |
 | Sales, Invoicing, Printing | Put the QR and the fiscal status on the ticket and the invoice | `verifactu.record.by_invoice` |
 | Platform (`base.app.disable`) | Not turn VeriFactu off once on (in Spain) | `can_disable` of `VerifactuConfig` |
+| Platform (`base.app.enable`) | Not turn VeriFactu on outside Spain | `can_enable` of `VerifactuConfig` |
 
 ### Who can do what
 

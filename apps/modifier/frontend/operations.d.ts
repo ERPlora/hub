@@ -233,6 +233,24 @@ export interface ResolveOut {
   kitchen_text: string;
 }
 
+export interface OptionDetailOut extends OptionOut {
+  label: string;
+}
+
+export interface LinkDetailOut extends LinkOut {
+  label: string;
+}
+
+export interface CategoryRefIn {
+  id?: string;
+  category?: string;
+}
+
+export interface CategoryRefOut {
+  id: string;
+  name: string;
+}
+
 export interface DeletedOut {
   id: string;
 }
@@ -246,10 +264,13 @@ declare module '@erplora/ui/sdk' {
     'modifier.group.update': { input: GroupPatchIn; output: GroupOut };
     'modifier.group.delete': { input: GroupRefIn; output: DeletedOut };
     'modifier.option.list': { input: OptionListIn; output: Page<OptionOut> };
+    'modifier.option.get': { input: OptionRefIn; output: OptionDetailOut };
     'modifier.option.create': { input: OptionIn; output: OptionOut };
     'modifier.option.update': { input: OptionPatchIn; output: OptionOut };
     'modifier.option.delete': { input: OptionRefIn; output: DeletedOut };
     'modifier.link.list': { input: LinkListIn; output: Page<LinkOut> };
+    'modifier.link.get': { input: LinkRefIn; output: LinkDetailOut };
+    'modifier.category.get': { input: CategoryRefIn; output: CategoryRefOut };
     'modifier.link.attach': { input: LinkIn; output: LinkOut };
     'modifier.link.detach': { input: LinkRefIn; output: DeletedOut };
     'modifier.selection.resolve': { input: ResolveIn; output: ResolveOut };

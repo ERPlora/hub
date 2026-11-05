@@ -174,7 +174,7 @@ describe('OPERATION_ROUTES', () => {
     });
   });
 
-  it('binds the 56 routed sale operations to apps/sale/api.py: queries by GET, commands by POST; the reaction to a merge has no route (the territory’s tax is Taxes’ tax.settings.get)', () => {
+  it('binds the 57 routed sale operations to apps/sale/api.py: queries by GET, commands by POST; the reaction to a merge has no route (the territory’s tax is Taxes’ tax.settings.get)', () => {
     const sale = Object.fromEntries(Object.entries(OPERATION_ROUTES).filter(([op]) => op.startsWith('sale.')));
     expect(sale).toEqual({
       'sale.sale.list': { method: 'get', path: '/api/sale/sales' },
@@ -222,6 +222,7 @@ describe('OPERATION_ROUTES', () => {
       'sale.settings.get': { method: 'get', path: '/api/sale/settings' },
       'sale.settings.update': { method: 'post', path: '/api/sale/settings' },
       'sale.pos_settings.get': { method: 'get', path: '/api/sale/pos_settings' },
+      'sale.letterhead.get': { method: 'get', path: '/api/sale/letterhead' },
       'sale.department.list': { method: 'get', path: '/api/sale/departments' },
       'sale.department.create': { method: 'post', path: '/api/sale/departments' },
       'sale.department.update': { method: 'post', path: '/api/sale/departments/update' },
@@ -237,7 +238,7 @@ describe('OPERATION_ROUTES', () => {
     });
   });
 
-  it('binds the forty routed service operations to apps/service/api.py (the reactions and the sessions of the till have no route)', () => {
+  it('binds the forty-three routed service operations to apps/service/api.py (the reactions and the writes over the sessions of the till have no route)', () => {
     expect(OPERATION_ROUTES).toMatchObject({
       'service.service.list': { method: 'get', path: '/api/service/services' },
       'service.service.create': { method: 'post', path: '/api/service/services' },
@@ -280,8 +281,11 @@ describe('OPERATION_ROUTES', () => {
       'service.grant.adjust': { method: 'post', path: '/api/service/grants/adjust' },
       'service.grant.redeem': { method: 'post', path: '/api/service/grants/redeem' },
       'service.movement.list': { method: 'get', path: '/api/service/movements' },
+      'service.assignment.get': { method: 'get', path: '/api/service/assignments/detail' },
+      'service.grant.get': { method: 'get', path: '/api/service/grants/detail' },
+      'service.session.get': { method: 'get', path: '/api/service/sessions/detail' },
     });
-    expect(Object.keys(OPERATION_ROUTES).filter((op) => op.startsWith('service.'))).toHaveLength(40);
+    expect(Object.keys(OPERATION_ROUTES).filter((op) => op.startsWith('service.'))).toHaveLength(43);
   });
 
   it('binds the nineteen cash register operations to apps/cash_register/api.py: queries by GET, commands by POST', () => {
@@ -354,8 +358,9 @@ describe('the voucher at the till (SALE-F27, SERVICE-F22)', () => {
   it('reads the vouchers that can pay a line from apps/service/api.py and pays it through apps/sale/api.py', () => {
     expect(OPERATION_ROUTES['service.grant.tender_options']).toEqual({ method: 'get', path: '/api/service/grants/tender_options' });
     expect(OPERATION_ROUTES['sale.order.apply_voucher']).toEqual({ method: 'post', path: '/api/sale/orders/apply_voucher' });
-    // Services' session commands run inside Sales' writes: no route.
-    expect(Object.keys(OPERATION_ROUTES).filter((op) => op.startsWith('service.session.'))).toEqual([]);
+    // Services' session commands run inside Sales' writes: no route. The only route of a session is the read that names
+    // it on the assistant's card (hub#676).
+    expect(Object.keys(OPERATION_ROUTES).filter((op) => op.startsWith('service.session.'))).toEqual(['service.session.get']);
   });
 });
 

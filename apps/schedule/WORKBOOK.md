@@ -86,8 +86,7 @@ Y se decide aquí (mismo contraste):
 
 1. Activa **Horarios** (viene con la peluquería y el restaurante). Ya tiene una semana por defecto
    (SCHEDULE-F12): de lunes a viernes de 09:00 a 18:00, sábado y domingo cerrados.
-2. La zona horaria del negocio es la del Hub (SCHEDULE-F09): con ese reloj se lee todo el horario. En la
-   fase 1 es la de Madrid.
+2. La zona horaria del negocio es la del Hub (SCHEDULE-F09): con ese reloj se lee todo el horario.
 3. En **Horarios → Horario**, pulsa **Sí, este es mi horario** si la semana por defecto es la tuya
    (SCHEDULE-F03), o edita los días que cambian (SCHEDULE-F02). Hasta que lo hagas, el Inicio te lo
    recuerda con «Confirma tu horario».
@@ -513,14 +512,10 @@ horario» de «Termina de configurar tu negocio» (SCHEDULE-F03).
 - **Dos cambios temporales no se pisan**: las escrituras de cambios temporales bloquean antes la fila de
   ajustes (`select_for_update`), así que dos altas a la vez se esperan y la segunda ve la primera. Un día
   especial repetido lo para la restricción única, traducida al mismo 409.
-- **Zona horaria**: `business_zone()` es `timezone.get_current_timezone()`, que en la fase 1 es
-  `settings.TIME_ZONE` (Europe/Madrid), como «hoy» en Personal e Impuestos. Desde hub#63 el registro del Hub
-  (`base.Hub.timezone`, en la BD de control) guarda la zona que manda el SaaS al dar de alta el hub, y la web
-  pública ya la lee (`apps/website/render.py::local_day`), pero ninguna petición la activa: las dos fuentes
-  dan lo mismo mientras todos los hubs sean de Madrid (contradicción señalada en la ronda CLOSE-SCHEDULE de
-  `PLAN-HUB.md`). Las horas son de pared; un instante con zona se convierte con `zoneinfo` (cambio de hora
-  incluido). Cuando la plataforma active la zona del hub (`timezone.activate`) allí donde corre una
-  operación (petición, consulta viva, worker), `schedule.settings.get` y el motor la leerán sin tocar Horarios.
+- **Zona horaria**: `base.business.business_zone()`, el único sitio que la lee (hub#687): la zona del hub en el que se
+  trabaja (`base.Hub.timezone`, en la BD de control, la manda el SaaS), o la del despliegue si no tiene una que Python
+  conozca. Las horas son de pared; un instante con zona se convierte con `zoneinfo` (cambio de hora incluido). «Hoy» en
+  Impuestos aún es el de `TIME_ZONE` (hub#772).
 - **Librerías**: ninguna nueva. La zona y el cambio de hora son `zoneinfo` y `datetime` de la biblioteca
   estándar (Python 3.14 lee RFC 3339 con `datetime.fromisoformat`). No hay calendario de festivos
   precargado (el módulo viejo tampoco lo tenía), así que `holidays` no hace falta.
@@ -544,7 +539,7 @@ horario» de «Termina de configurar tu negocio» (SCHEDULE-F03).
   de la semana delante («martes, 5 de marzo de 2030»; `translation.override` + `formats.date_format`).
   Vive aquí porque Citas y Reservas lo necesitan y Horarios es requisito de las dos; no es una operación ni
   tiene ruta.
-- **Listas**: `_sorted` ordena por la columna y desempata por `id` en la misma dirección (`desc` → `-id`,
+- **Listas**: `base.ordering.list_order` ordena por la columna y desempata por `id` en la misma dirección (`desc` → `-id`,
   regla hub#2355 del producto actual), así que la fila tocada no salta y las páginas no repiten ni pierden
   filas.
 - **«¿Abierto?» sin `when` depende del reloj**: es «ahora» en el momento de ejecutarse. Seguida en vivo,

@@ -1,0 +1,8 @@
+<footer data-ep-section="footer" class="{{ footer_class }}"{% if footer_theme %} data-bs-theme="{{ footer_theme }}"{% endif %}>
+  <div class="container">
+    <div class="row g-4">
+      {% include "website/_footer_columns.html" with content=content body=body site_name=site_name login_url=login_url name_column=name_column name_class=name_class menu_column=menu_column menu_class=menu_class login_class=login_class only %}
+    </div>
+    {% include "website/_credit.html" with credit_class="small text-body-secondary border-top mt-4 pt-3 mb-0" only %}
+  </div>
+</footer>

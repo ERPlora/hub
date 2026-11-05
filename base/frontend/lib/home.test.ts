@@ -11,7 +11,9 @@ import {
   formatValue,
   greetingSlot,
   heading,
+  MAX_VISIBLE_ROWS,
   orderByUse,
+  PHONE_MAX_VISIBLE_ROWS,
   readJsonBlock,
   recordUse,
   rowsOf,
@@ -130,6 +132,29 @@ describe('checklistView (BASE-G22, BASE-G130)', () => {
     expect(view.hidden).toBe(3);
   });
 
+  it('collapsed: the ⛔ come first whatever the server\'s order, so a phone\'s two rows never hide them (hub#801)', () => {
+    // Keys against the alphabet: only the server's order puts each level in this order.
+    const items = [
+      item('z.f1', { order: 30 }),
+      item('m.f2', { order: 31 }),
+      item('z.legal', { level: 'legal', order: 40 }),
+      item('a.f3', { order: 50 }),
+      item('a.settled', { level: 'legal', state: 'done', order: 55 }),
+      item('a.legal2', { level: 'legal', order: 60 }),
+      item('a.rec', { level: 'recommended', order: 70 }),
+    ];
+    const phone = checklistView(status(items), { maxRows: PHONE_MAX_VISIBLE_ROWS });
+    expect(phone.rows.map((i) => i.key)).toEqual(['z.legal', 'a.legal2']);
+    expect(phone.hidden).toBe(5);
+    // Each level keeps the server's order among its own steps.
+    const desk = checklistView(status(items), { maxRows: MAX_VISIBLE_ROWS });
+    expect(desk.rows.map((i) => i.key)).toEqual(['z.legal', 'a.legal2', 'z.f1', 'm.f2', 'a.f3']);
+    // Expanded stays as the server sent it.
+    const all = checklistView(status(items), { expanded: true, maxRows: PHONE_MAX_VISIBLE_ROWS });
+    expect(all.rows.map((i) => i.key)).toEqual(items.map((i) => i.key));
+    expect(all.hidden).toBe(0);
+  });
+
   it('collapsed with only 🟡 left: shows them instead of an empty body', () => {
     const view = checklistView(status([item('a.rec', { level: 'recommended' })]), {});
     expect(view.rows.map((i) => i.key)).toEqual(['a.rec']);
@@ -180,6 +205,23 @@ describe('formatValue: the business currency (BASE-G98)', () => {
   it('without the business yet, the amount alone, never in a currency it is not', () => {
     expect(formatValue(1250, 'currency', 'es')).toBe('12,50');
     expect(formatValue(1250, 'currency', 'en')).toBe('12.50');
+  });
+
+  it('an amount of four figures groups its thousands, as Sales writes it (base-money-thousands-grouping)', () => {
+    // The Spanish CLDR only groups from five figures: the Home said «1234,56 €» where Sales says «1.234,56 €».
+    expect(formatValue(123456, 'currency', 'es', EUR)).toBe('1.234,56\u00a0€');
+    expect(formatValue('123456', 'currency', 'es', EUR)).toBe('1.234,56\u00a0€');
+    expect(formatValue(123456, 'currency', 'es')).toBe('1.234,56');
+    expect(formatValue(123400, 'currency', 'es', { currency: 'JPY', decimals: 0 })).toBe('123.400\u00a0¥');
+    const list = widget('s.top', { kind: 'bar-list', map: { label: 'name', value: 'total' }, options: { valueFormat: 'currency' } });
+    const view = widgetView(list, { rows: [{ name: 'Café', total: 123456 }] }, 'es', { money: EUR });
+    expect(view).toMatchObject({ kind: 'bar-list', bars: [{ label: 'Café', text: '1.234,56\u00a0€' }] });
+    const kpi = widget('s.total', { kind: 'kpi', map: { value: 'total' }, options: { format: 'currency' } });
+    expect(widgetView(kpi, { total: 987654 }, 'es', { money: EUR })).toMatchObject({ kind: 'kpi', value: '9.876,54\u00a0€' });
+  });
+
+  it('a value that is no amount stays as it came', () => {
+    expect(formatValue('n/a', 'currency', 'es', EUR)).toBe('n/a');
   });
 
   it("a panel's every amount — a sparkline's last value, each bar of a list — is in the business's currency", () => {

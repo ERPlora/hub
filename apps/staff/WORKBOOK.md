@@ -121,12 +121,12 @@ descanso, Fin descanso** (o «No trabaja»), con la jornada por defecto de **Aju
 Arriba, el periodo: «Hoy» (al entrar), «Ayer», «Esta semana» (desde el lunes), «Este mes» (desde el
 día 1) o «Personalizado», que abre «Desde» y «Hasta» con los días que había en pantalla; al lado, los
 días que cuenta. En el móvil, el periodo se elige en el desplegable «Periodo», con las mismas opciones.
-Debajo, dos cifras: **Vendido** y **Comisiones** del periodo, en la moneda del negocio, como cada importe
+Debajo, dos cifras: **Producción** y **Comisiones** del periodo, en la moneda del negocio, como cada importe
 de la lista. Después, la lista con
-buscador «Buscar profesional…» y columnas **Nombre, Rol, Vendido, Comisión %** y **Comisión**: cada
+buscador «Buscar profesional…» y columnas **Nombre, Rol, Producción, Comisión %** y **Comisión**: cada
 persona que puede cobrar comisión (Activa o De baja), también sin ventas y con comisión 0, y quien vendió
 en el periodo aunque ya no esté («Ya no trabaja aquí» o «Inactivo» junto al nombre). Se ordena por
-nombre, rol, vendido o comisión. En el móvil, una tarjeta por persona. Se pone al día sola al cobrar, anular
+nombre, rol, producción o comisión. En el móvil, una tarjeta por persona. Se pone al día sola al cobrar, anular
 o devolver una venta y al cambiar una ficha.
 
 ### Ajustes de Personal
@@ -339,6 +339,7 @@ Pasos:
 1. Una persona con su cuenta vinculada a su ficha (STAFF-F03) abre lo suyo.
 2. Ve su ficha con **su propia** tarifa y comisión (sin las notas de RRHH), y sus ausencias con su
    motivo y sus notas.
+3. La ficha es solo de lectura: un único botón, **Cerrar**.
 Entra: la cuenta con la que entra (no se puede falsear).
 Sale: nada cambia. Sin ficha vinculada, la respuesta viene vacía.
 Si falla: sin ficha o sin ausencias, vacío.
@@ -518,7 +519,8 @@ Pasos:
    Inactivas ni las dadas de baja), su ficha, su cuenta (vacía si no tiene), nombre, rol y comisión,
    también las de comisión 0.
 3. Para saber lo que ha ganado cada profesional, abre **Personal → Comisiones**. Sale «Hoy»: lo que ha
-   vendido cada persona en el día del negocio, con lo devuelto ya restado, su comisión y lo que le
+   vendido cada persona en el día del negocio, con lo devuelto ya restado, sin los bonos que vendió y
+   sumado lo que valen las sesiones de bono que hizo (SALE-F28), su comisión y lo que le
    corresponde (vendido × comisión ÷ 100, redondeado a la unidad más pequeña de la moneda del negocio, el
    céntimo en euros, una sola vez por persona; media unidad sube). Arriba, el total vendido y el total de
    comisiones.
@@ -527,14 +529,15 @@ Pasos:
 5. Cuenta lo que se atribuyó a cada persona en Ventas: la línea que hizo ella (la de una cita, a la
    profesional de la cita) o, si la línea no dice quién, quien atendió la cuenta. Con «Yo» en el TPV, es
    quien tenía la sesión, si su cuenta tiene ficha en Personal; si no, esa venta no cuenta para nadie.
-Entra: la tarifa y la comisión de cada ficha y, de Ventas, lo vendido por cada profesional en el periodo
-(ya resta lo devuelto: lo que vuelve, a quien lo vendió). Ventas es opcional.
+Entra: la tarifa y la comisión de cada ficha y, de Ventas, la producción de cada profesional en el periodo
+(ya resta lo devuelto: lo que vuelve, a quien lo vendió; deja fuera los bonos que vendió y suma el valor de
+sus sesiones de bono). Ventas es opcional.
 Sale: solo lectura.
 Si falla: sin permiso de compensación, «No tienes permiso»; sin Ventas, «Las comisiones salen de las ventas»; con «Hasta» antes que «Desde»,
 «La fecha de fin no puede ser anterior a la de inicio.» bajo «Hasta»; con un solo día, «Un periodo
 personalizado necesita su primer y su último día.»; con más de dos años, «Pide como mucho 731 días de
 una vez.».
-Implicados: SALE-F16, SALE-F28
+Implicados: SALE-F16, SALE-F27, SALE-F28
 
 ### STAFF-F22 Cambiar los ajustes de Personal
 <!-- origen: old-hub:HUB_SHELL-F43 old-hub:HUB_SHELL-F44 fi:modules/staff#command-staff-settings-update fi:modules/staff#query-staff-settings-get fi:modules/staff#settings-bloque old:staff/workflow/pago-y-ajustes.md#staff-f22 -->
@@ -704,6 +707,10 @@ El cajero del producto actual ya no existe como papel: lo que veía (el director
 
 ## Para quien lo mantiene
 
+- **Orden de las listas** (`base.ordering.list_order_for`; regla hub#2355 del producto viejo): fichas, sueldos, roles y
+  ausencias van por la columna elegida y desempatan por `id`, todo en la dirección de la lista y con los vacíos al final
+  en las dos: la descendente es la ascendente leída al revés, empates incluidos. Lo fija
+  `test_ties_go_by_id_in_the_lists_own_direction`, por lista.
 - Anatomía completa de una app (copia de `apps/demo`): `apps.py`, `models.py`, `schemas.py`,
   `queries.py`, `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`, `locale/` y un
   `tests/test_<fichero>.py` por fichero. Las páginas viven en `frontend/` («Cómo son las páginas»,
@@ -735,9 +742,11 @@ El cajero del producto actual ya no existe como papel: lo que veía (el director
   primera y deciden sobre lo que dejó. Aprobar, rechazar, cancelar y tocar un horario bloquean la ficha
   y luego la fila; una ficha dada de baja mientras tanto da «no existe». Hay tests con hilos de cada
   carrera.
-- El «hoy» es `timezone.localdate()` (`business_today()` de `queries.py`; en la fase 1, `TIME_ZONE`),
-  aunque `control.Hub.timezone` ya guarda la zona de cada hub (hub#63): la contradicción está señalada
-  en las rondas CLOSE-SCHEDULE y CLOSE-STAFF de `PLAN-HUB.md`.
+- El «hoy» es el del reloj del negocio (`business_today()` de `queries.py`, por `base.business.business_zone`,
+  hub#771). Las comisiones piden las ventas por su día, que aún va en `TIME_ZONE` (hub#772): en otra zona, lo cobrado en
+  las horas en que los dos relojes no coinciden en el día cuenta en el de Madrid.
+- **Millares**: los importes agrupan los millares también con cuatro cifras («1.234,56 €»; `formatMoney` de
+  `@erplora/ui/components`, con `useGrouping: 'always'`, porque el CLDR del español espera a cinco: hub#494).
 - Dinero en unidades menores enteras de la moneda del negocio (`hourly_rate`; céntimos en euros); la
   comisión es `Decimal(5, 2)` de 0 a 100. La pantalla pinta y lee los importes con `useBusinessMoney` de
   `base` (`base.business.get`: la moneda del país y los decimales que cuenta el servidor, nunca los de
