@@ -54,10 +54,20 @@ test('INVOICE-F12 and F13: a series that continues at 7, renamed, and locked onc
   const form = openDialog(page, 'invoice-series-form');
   await expect(form).toBeVisible();
   await expect(form.locator('[data-testid=invoice-series-year] input')).toHaveValue(String(year));
-  await form.locator('[data-testid=invoice-series-code] input').fill(CODE);
   await form.locator('[data-testid=invoice-series-name] input').fill(`e2e Online ${RUN}`);
   await form.locator('[data-testid=invoice-series-prefix] input').fill(PREFIX);
   await form.locator('[data-testid=invoice-series-next-number] input').fill('7');
+
+  // hub#461: a code of another shape is marked under its field; correcting it takes the mark and the notice away.
+  const code = form.locator('[data-testid=invoice-series-code]');
+  const notice = form.locator('[data-testid=invoice-series-form-error]');
+  await code.locator('input').fill('E2E-?');
+  await form.locator('[data-testid=invoice-series-form-submit]').click();
+  await expect(code).toHaveClass(/ion-invalid/);
+  await expect(notice).toBeVisible();
+  await code.locator('input').fill(CODE);
+  await expect(code).not.toHaveClass(/ion-invalid/);
+  await expect(notice).toBeHidden();
   await flowShots(page, 'INVOICE-F12', async (p) => {
     await expect(openDialog(p, 'invoice-series-form')).toBeVisible();
   });

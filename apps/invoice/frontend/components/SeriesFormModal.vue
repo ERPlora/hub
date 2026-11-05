@@ -6,7 +6,7 @@
 // and next number (it says why: the number is part of the VeriFactu chain); «Next number» is the one the
 // server will hand out. Saving runs `invoice.series.create`, or `invoice.series.update` with only what
 // changed, says so and closes; the table catches up by itself. A refusal stays in the window, under its
-// field when it is one.
+// field when it is one until that field is corrected (FormModal's `fieldErrors`, hub#461).
 import { FormModal, InlineFeedback } from '@erplora/ui/components';
 import { useCommand } from '@erplora/ui/sdk';
 import { toastSuccess } from '@erplora/ui/shell';
@@ -84,10 +84,6 @@ watch(
 );
 
 const error = computed(() => refusal(command.value.error.value, t('invoice.series.form.failed')));
-const fieldErrors = computed<Record<string, string | undefined>>(() => {
-  const fields: Record<string, string | undefined> = { ...(error.value?.fields ?? {}) };
-  return { ...fields, nextNumber: fields.next_number, invoiceType: fields.invoice_type };
-});
 const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'ion-touched': !!message });
 const title = computed(() =>
   editing.value ? t('invoice.series.form.editTitle', { code: props.series?.code ?? '' }) : t('invoice.series.form.createTitle'),
@@ -151,155 +147,158 @@ async function save(): Promise<void> {
     :submit-disabled="!editing && !form.code.trim()"
     @submit="save"
   >
-    <div class="invoice-series-form">
-      <ion-input
-        data-testid="invoice-series-code"
-        :label="$t('invoice.series.form.code')"
-        label-placement="floating"
-        fill="outline"
-        mode="md"
-        autocapitalize="characters"
-        :maxlength="20"
-        :disabled="editing"
-        :value="form.code"
-        :error-text="fieldErrors.code"
-        :class="invalid(fieldErrors.code)"
-        @ion-input="set('code', String($event.detail.value ?? ''))"
-      />
-      <ion-input
-        data-testid="invoice-series-name"
-        :label="$t('invoice.series.form.name')"
-        label-placement="floating"
-        fill="outline"
-        mode="md"
-        :maxlength="120"
-        :value="form.name"
-        :error-text="fieldErrors.name"
-        :class="invalid(fieldErrors.name)"
-        @ion-input="set('name', String($event.detail.value ?? ''))"
-      />
-      <ion-select
-        data-testid="invoice-series-type"
-        :label="$t('invoice.series.form.type')"
-        label-placement="floating"
-        fill="outline"
-        mode="md"
-        interface="popover"
-        :disabled="editing"
-        :value="form.invoiceType"
-        :error-text="fieldErrors.invoiceType"
-        @ion-change="set('invoiceType', $event.detail.value as InvoiceType)"
-      >
-        <ion-select-option
-          v-for="code in TYPE_CODES"
-          :key="code"
-          :value="code"
+    <template #default="{ fieldErrors }">
+      <div class="invoice-series-form">
+        <ion-input
+          data-testid="invoice-series-code"
+          :label="$t('invoice.series.form.code')"
+          label-placement="floating"
+          fill="outline"
+          mode="md"
+          autocapitalize="characters"
+          :maxlength="20"
+          :disabled="editing"
+          :value="form.code"
+          :error-text="fieldErrors.code"
+          :class="invalid(fieldErrors.code)"
+          @ion-input="set('code', String($event.detail.value ?? ''))"
+        />
+        <ion-input
+          data-testid="invoice-series-name"
+          :label="$t('invoice.series.form.name')"
+          label-placement="floating"
+          fill="outline"
+          mode="md"
+          :maxlength="120"
+          :value="form.name"
+          :error-text="fieldErrors.name"
+          :class="invalid(fieldErrors.name)"
+          @ion-input="set('name', String($event.detail.value ?? ''))"
+        />
+        <ion-select
+          data-testid="invoice-series-type"
+          :label="$t('invoice.series.form.type')"
+          label-placement="floating"
+          fill="outline"
+          mode="md"
+          interface="popover"
+          :disabled="editing"
+          :value="form.invoiceType"
+          :error-text="fieldErrors.invoice_type"
+          :class="invalid(fieldErrors.invoice_type)"
+          @ion-change="set('invoiceType', $event.detail.value as InvoiceType)"
         >
-          {{ $t(`invoice.typeNames.${code}`) }}
-        </ion-select-option>
-      </ion-select>
-      <ion-input
-        data-testid="invoice-series-year"
-        :label="$t('invoice.series.form.year')"
-        label-placement="floating"
-        fill="outline"
-        mode="md"
-        inputmode="numeric"
-        :disabled="editing"
-        :value="form.year"
-        :error-text="fieldErrors.year"
-        :class="invalid(fieldErrors.year)"
-        @ion-input="set('year', String($event.detail.value ?? ''))"
-      />
-      <ion-input
-        data-testid="invoice-series-prefix"
-        :label="$t('invoice.series.form.prefix')"
-        label-placement="floating"
-        fill="outline"
-        mode="md"
-        :maxlength="20"
-        :disabled="locked"
-        :value="form.prefix"
-        :error-text="fieldErrors.prefix"
-        :class="invalid(fieldErrors.prefix)"
-        @ion-input="set('prefix', String($event.detail.value ?? ''))"
-      />
-      <ion-input
-        data-testid="invoice-series-format"
-        :label="$t('invoice.series.form.format')"
-        label-placement="floating"
-        fill="outline"
-        mode="md"
-        :maxlength="60"
-        :disabled="locked"
-        :value="form.format"
-        :error-text="fieldErrors.format"
-        :class="invalid(fieldErrors.format)"
-        @ion-input="set('format', String($event.detail.value ?? ''))"
-      />
-      <ion-input
-        data-testid="invoice-series-next-number"
-        :label="$t('invoice.series.form.nextNumber')"
-        label-placement="floating"
-        fill="outline"
-        mode="md"
-        inputmode="numeric"
-        :disabled="locked"
-        :value="form.nextNumber"
-        :error-text="fieldErrors.nextNumber"
-        :class="invalid(fieldErrors.nextNumber)"
-        @ion-input="set('nextNumber', String($event.detail.value ?? ''))"
-      />
-      <p
-        v-if="!editing"
-        class="invoice-series-form__hint"
-        data-testid="invoice-series-code-hint"
-      >
-        {{ $t('invoice.series.form.codeHint') }}
-      </p>
-      <p class="invoice-series-form__hint">
-        {{ $t('invoice.series.form.prefixHint') }}
-      </p>
-      <p
-        class="invoice-series-form__hint"
-        data-testid="invoice-series-format-hint"
-      >
-        {{ $t('invoice.series.form.formatHint') }}
-      </p>
-      <InlineFeedback
-        v-if="locked"
-        tone="warning"
-        icon="lock-closed-outline"
-        data-testid="invoice-series-format-locked"
-      >
-        {{ $t('invoice.series.form.lockedHint') }}
-      </InlineFeedback>
-      <p
-        v-if="series"
-        class="invoice-series-form__hint"
-        data-testid="invoice-series-preview"
-      >
-        {{ $t('invoice.series.form.preview') }}: <strong>{{ series.next_number }}</strong>
-      </p>
-      <ion-item lines="none">
-        <ion-toggle
-          data-testid="invoice-series-active"
-          :checked="form.active"
-          @ion-change="set('active', !!$event.detail.checked)"
+          <ion-select-option
+            v-for="code in TYPE_CODES"
+            :key="code"
+            :value="code"
+          >
+            {{ $t(`invoice.typeNames.${code}`) }}
+          </ion-select-option>
+        </ion-select>
+        <ion-input
+          data-testid="invoice-series-year"
+          :label="$t('invoice.series.form.year')"
+          label-placement="floating"
+          fill="outline"
+          mode="md"
+          inputmode="numeric"
+          :disabled="editing"
+          :value="form.year"
+          :error-text="fieldErrors.year"
+          :class="invalid(fieldErrors.year)"
+          @ion-input="set('year', String($event.detail.value ?? ''))"
+        />
+        <ion-input
+          data-testid="invoice-series-prefix"
+          :label="$t('invoice.series.form.prefix')"
+          label-placement="floating"
+          fill="outline"
+          mode="md"
+          :maxlength="20"
+          :disabled="locked"
+          :value="form.prefix"
+          :error-text="fieldErrors.prefix"
+          :class="invalid(fieldErrors.prefix)"
+          @ion-input="set('prefix', String($event.detail.value ?? ''))"
+        />
+        <ion-input
+          data-testid="invoice-series-format"
+          :label="$t('invoice.series.form.format')"
+          label-placement="floating"
+          fill="outline"
+          mode="md"
+          :maxlength="60"
+          :disabled="locked"
+          :value="form.format"
+          :error-text="fieldErrors.format"
+          :class="invalid(fieldErrors.format)"
+          @ion-input="set('format', String($event.detail.value ?? ''))"
+        />
+        <ion-input
+          data-testid="invoice-series-next-number"
+          :label="$t('invoice.series.form.nextNumber')"
+          label-placement="floating"
+          fill="outline"
+          mode="md"
+          inputmode="numeric"
+          :disabled="locked"
+          :value="form.nextNumber"
+          :error-text="fieldErrors.next_number"
+          :class="invalid(fieldErrors.next_number)"
+          @ion-input="set('nextNumber', String($event.detail.value ?? ''))"
+        />
+        <p
+          v-if="!editing"
+          class="invoice-series-form__hint"
+          data-testid="invoice-series-code-hint"
         >
-          {{ $t('invoice.series.form.active') }}
-        </ion-toggle>
-      </ion-item>
-      <ion-item lines="none">
-        <ion-toggle
-          data-testid="invoice-series-default"
-          :checked="form.isDefault"
-          @ion-change="set('isDefault', !!$event.detail.checked)"
+          {{ $t('invoice.series.form.codeHint') }}
+        </p>
+        <p class="invoice-series-form__hint">
+          {{ $t('invoice.series.form.prefixHint') }}
+        </p>
+        <p
+          class="invoice-series-form__hint"
+          data-testid="invoice-series-format-hint"
         >
-          {{ $t('invoice.series.form.default') }}
-        </ion-toggle>
-      </ion-item>
-    </div>
+          {{ $t('invoice.series.form.formatHint') }}
+        </p>
+        <InlineFeedback
+          v-if="locked"
+          tone="warning"
+          icon="lock-closed-outline"
+          data-testid="invoice-series-format-locked"
+        >
+          {{ $t('invoice.series.form.lockedHint') }}
+        </InlineFeedback>
+        <p
+          v-if="series"
+          class="invoice-series-form__hint"
+          data-testid="invoice-series-preview"
+        >
+          {{ $t('invoice.series.form.preview') }}: <strong>{{ series.next_number }}</strong>
+        </p>
+        <ion-item lines="none">
+          <ion-toggle
+            data-testid="invoice-series-active"
+            :checked="form.active"
+            @ion-change="set('active', !!$event.detail.checked)"
+          >
+            {{ $t('invoice.series.form.active') }}
+          </ion-toggle>
+        </ion-item>
+        <ion-item lines="none">
+          <ion-toggle
+            data-testid="invoice-series-default"
+            :checked="form.isDefault"
+            @ion-change="set('isDefault', !!$event.detail.checked)"
+          >
+            {{ $t('invoice.series.form.default') }}
+          </ion-toggle>
+        </ion-item>
+      </div>
+    </template>
   </FormModal>
 </template>
 
