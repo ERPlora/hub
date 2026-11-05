@@ -5,16 +5,13 @@
 // login, the API and `/internal` even with a session of the business in the browser. A host the Hub does not know is the
 // 400 it always was, and a domain given up joins it. Hub `a`'s photo and its site are put back after, also when a test
 // fails: the other specs expect `/` of `a` to jump to the login.
-import { createHmac } from 'node:crypto';
-
 import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, api, capture, hostPage, psql } from './helpers';
+import { A, api, capture, internalPut, psql } from './helpers';
 import { STACK } from './stack';
-import { atRest, photo } from './website-helpers';
+import { atRest, ownerOfTheSite, photo, type Site } from './website-helpers';
 
 const KEY = 'HUBS-F17-CUSTOM-DOMAIN';
-const SECRET = process.env.INTERNAL_SHARED_SECRET || 'local-internal-shared-secret';
 const DOMAIN = 'www.minegocio.test';
 const UNKNOWN = 'scanner.example.test';
 const ON_DOMAIN = `http://${DOMAIN}:${STACK.hubPort}`;
@@ -26,11 +23,6 @@ const SIZES = [
 ] as const;
 const WIDE = { width: 1440, height: 900 };
 
-interface Site {
-  template: string;
-  theme: Record<string, unknown>;
-  content: Record<string, Record<string, unknown>>;
-}
 
 test.describe.configure({ mode: 'serial' });
 test.use({ launchOptions: { args: [`--host-resolver-rules=MAP ${DOMAIN} 127.0.0.1, MAP ${UNKNOWN} 127.0.0.1`] } });
@@ -45,13 +37,7 @@ let version = Math.floor(Date.now() / 1000);
 async function pushPhoto(customDomain: string | null): Promise<void> {
   version += 1;
   const body = JSON.stringify({ ...photoBefore, hub_id: hubId, slug: 'a', version, custom_domain: customDomain });
-  const timestamp = String(Math.floor(Date.now() / 1000));
-  const signature = createHmac('sha256', SECRET).update(`${timestamp}.${body}`).digest('hex');
-  const response = await fetch(`http://127.0.0.1:${STACK.hubPort}/internal/hubs/${hubId}/state`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json', 'X-Erplora-Timestamp': timestamp, 'X-Erplora-Signature': signature },
-    body,
-  });
+  const response = await internalPut(`/internal/hubs/${hubId}/state`, body);
   const answer = await response.text();
   expect(response.status, answer).toBe(200);
   expect(JSON.parse(answer)).toMatchObject({ applied: true, version });
@@ -66,10 +52,7 @@ async function visitor(browser: Browser, viewport: { width: number; height: numb
 test.beforeAll(async ({ browser }) => {
   [hubId] = psql(`select id from base_hub where slug = 'a'`).split('|');
   photoBefore = JSON.parse(psql(`select state from base_hub where slug = 'a'`) || '{}') as Record<string, unknown>;
-  owner = await hostPage(browser, A, { next: '/website', viewport: WIDE });
-  const site = await api<Site>(owner.context, A, 'GET', '/website/site');
-  expect(site.status).toBe(200);
-  found = site.data;
+  ({ owner, found } = await ownerOfTheSite(browser, WIDE));
   const cover = await api<{ id: string; url: string }>(owner.context, A, 'POST', '/website/images', {
     filename: 'cover.jpg',
     content_type: 'image/jpeg',

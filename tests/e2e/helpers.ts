@@ -982,6 +982,17 @@ export function decodeSubs(url: string): unknown[] {
 /** The secret `/internal` is signed with; the local default of both projects. */
 const INTERNAL_SECRET = process.env.INTERNAL_SHARED_SECRET || 'local-internal-shared-secret';
 
+/** `PUT <path>` on the Hub's `/internal` door, with `body` signed the way erplora.com signs it. */
+export async function internalPut(path: string, body: string): Promise<Response> {
+  const timestamp = String(Math.floor(Date.now() / 1000));
+  const signature = createHmac('sha256', INTERNAL_SECRET).update(`${timestamp}.${body}`).digest('hex');
+  return fetch(`http://127.0.0.1:${STACK.hubPort}${path}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', 'X-Erplora-Timestamp': timestamp, 'X-Erplora-Signature': signature },
+    body,
+  });
+}
+
 /** A hub's registration as erplora.com sent it (`base_hub`): read before a run moves its business, put back after. */
 export interface Registration {
   id: string;
@@ -1004,14 +1015,7 @@ export function registrationOf(slug: string): Registration {
 /** erplora.com registers `registration`'s business in `country`, the way the SaaS does (`PUT /internal/hubs/{id}`,
  *  signed): its currency is then its country's. */
 export async function registerBusinessIn(registration: Registration, country: string): Promise<void> {
-  const body = JSON.stringify({ ...registration, country });
-  const timestamp = String(Math.floor(Date.now() / 1000));
-  const signature = createHmac('sha256', INTERNAL_SECRET).update(`${timestamp}.${body}`).digest('hex');
-  const response = await fetch(`http://127.0.0.1:${STACK.hubPort}/internal/hubs/${registration.id}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json', 'X-Erplora-Timestamp': timestamp, 'X-Erplora-Signature': signature },
-    body,
-  });
+  const response = await internalPut(`/internal/hubs/${registration.id}`, JSON.stringify({ ...registration, country }));
   const answer = await response.text();
   expect(response.status, answer).toBe(200);
   expect(psql(`select country from base_hub where slug = '${registration.slug}'`)).toBe(country);

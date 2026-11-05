@@ -14,6 +14,7 @@ from apps.website.models import Site
 from apps.website.queries import CATALOG_TTL, PAGE_TTL, page_cache_key
 from apps.website.render import local_day
 from apps.website.tests.conftest import A, B, ctx_for, full_content
+from apps.website.tests.test_public_home import publish, run
 from base import custom_domains
 from base.models import Hub
 from base.tenancy.connections import hub_alias
@@ -21,23 +22,11 @@ from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
 from base.tests.test_custom_domains import DOMAIN, HTML, OTHER_DOMAIN, statements  # noqa: F401
 from live.context import Scope
-from live.operations import get
 
 pytestmark = [pytest.mark.django_db, pytest.mark.usefixtures("website_manifest")]
 
 SLUG_HOST = "a.localhost:8000"
 LOGIN_ON_ITS_ADDRESS = 'href="https://a.localhost/auth/login"'
-
-
-def run(name: str, data: dict | None = None, ctx=None):
-    op = get(name)
-    return op(ctx or ctx_for(), op.input(**(data or {})))
-
-
-def publish(template="classic", ctx=None, **overrides):
-    content = full_content(**overrides)
-    run("website.site.save", {"template": template, "theme": {"palette": "forest"}, "content": content}, ctx)
-    return run("website.site.publish", ctx=ctx)
 
 
 def connect(slug: str, domain: str) -> None:
