@@ -82,6 +82,8 @@ test.afterAll(async ({ browser }) => {
 test(`${KEY}: a business in Poland books and previews its services in złoty, never euros, in 390, 834 and 1440`, async ({ page }) => {
   await registerBusinessIn(original, 'PL');
   await login(page, A, '/appointment/agenda');
+  // The owner's session for the fleet's visual sweep (`ui-clip-sweep.sh --storage-state`), when asked.
+  if (process.env.E2E_SAVE_STORAGE_STATE) await page.context().storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
   for (const size of FLOW_VIEWPORTS) {
     const where = `at ${size.label}`;
     await page.setViewportSize({ width: size.width, height: size.height });
