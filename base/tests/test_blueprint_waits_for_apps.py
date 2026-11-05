@@ -560,3 +560,21 @@ def test_only_the_loads_of_the_apps_that_went_on_load(business):
     assert row(hub, "printing").state == ON
     assert by_app(report_of(hub, salon))["service"]["status"] == blueprint.WAITING
     assert "service_service" not in tables(hub)
+
+
+def test_what_the_person_left_unchecked_never_comes_in_later_though_its_app_is_on(business):
+    """Only what waited loads when the app is ready: an app on here but not chosen stays as it was (review of #841)."""
+    hub = business("a")
+    turn_on(hub, "inventory")
+    run_pass()
+
+    load = load_template(hub, choose=("service",))
+    assert by_app(load)["inventory"]["status"] == "not_selected"
+    assert by_app(load)["service"]["status"] == blueprint.WAITING
+    run_pass()
+
+    done = report_of(hub, load)
+    assert count(hub, "service", "Service") == SALON_SERVICES
+    assert count(hub, "inventory", "Product") == 0
+    assert by_app(done)["inventory"]["status"] == "not_selected"
+    assert done["rows"] == SALON_CATEGORIES + SALON_SERVICES
