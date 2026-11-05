@@ -203,6 +203,36 @@ def test_a_422_says_the_field(admin_client):
 
 
 @pytest.mark.django_db
+def test_a_refused_tax_id_says_what_to_do_and_why_in_the_requests_language(admin_client):
+    """hub#461 (INVOICE-F05): never «Invalid payload» on top nor «Enter a valid value.» under the NIF."""
+    wrong = {
+        "invoice_id": "018f0000-0000-7000-8000-000000000000",
+        **RECIPIENT,
+        "customer_tax_id": "B12345678",
+    }
+
+    english = post(admin_client, "/invoice/invoices/substitute", wrong)
+    spanish = post(
+        admin_client,
+        "/invoice/invoices/substitute",
+        wrong,
+        HTTP_ACCEPT_LANGUAGE="es",
+    )
+
+    assert (english.status_code, spanish.status_code) == (422, 422)
+    assert english.json()["error"] == {
+        "code": "invalid_payload",
+        "message": "Check the highlighted details.",
+        "fields": {"customer_tax_id": "That tax ID is not valid."},
+    }
+    assert spanish.json()["error"] == {
+        "code": "invalid_payload",
+        "message": "Revisa los datos marcados.",
+        "fields": {"customer_tax_id": "Ese NIF no es válido."},
+    }
+
+
+@pytest.mark.django_db
 def test_a_409_carries_its_domain_code_in_the_requests_language(admin_client):
     response = post(
         admin_client,

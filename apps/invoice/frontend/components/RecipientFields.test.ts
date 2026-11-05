@@ -81,6 +81,61 @@ describe('RecipientFields', () => {
     expect(prop(s.field('address'), 'errorText')).toBe('This field is required.');
   });
 
+  it('marks a document type the server refused too: the notice on top promises a mark (hub#461)', async () => {
+    const s = await setup({ ...BLANK, country: 'FR', idType: '' }, { fieldErrors: { customer_id_type: 'Choose the kind of document.' } });
+    expect(prop(s.field('id-type'), 'errorText')).toBe('Choose the kind of document.');
+    expect(s.find('invoice-recipient-id-type').classes()).toContain('ion-invalid');
+  });
+
+  describe('tells the form around it which fields changed with no keystroke (hub#461)', () => {
+    // The form takes a field's message away once that field is changed (FormModal's rule, useRefusal).
+    // Typing says so by itself; a picked card, or a tax ID judged again under a new country or document
+    // type, would not: the fields say it with a native `input`, as typing would, by the command's names.
+    const WRONG: Recipient = { ...BLANK, name: 'Talleres Pérez SL', taxId: 'B12345678', address: 'Calle Luna 3' };
+
+    async function listening(modelValue: Recipient) {
+      const s = await setup(modelValue);
+      const told: string[] = [];
+      const hear = (event: Event) => told.push(String((event.target as { name?: unknown }).name));
+      s.wrapper.element.parentElement?.addEventListener('input', hear);
+      const toldNow = () => [...new Set(told.splice(0))].sort();
+      return { ...s, toldNow };
+    }
+
+    it('each field goes by the command’s name of what it holds', async () => {
+      const s = await setup({ ...BLANK, country: 'FR', idType: '02' });
+      expect(['name', 'country', 'id-type', 'tax-id', 'address'].map((key) => prop(s.field(key), 'name'))).toEqual([
+        'customer_name',
+        'customer_country',
+        'customer_id_type',
+        'customer_tax_id',
+        'customer_address',
+      ]);
+    });
+
+    it('a picked card tells every field it filled, and only those', async () => {
+      const s = await listening(WRONG);
+      s.wrapper.findComponent(CustomerSearchStub).vm.$emit('update:modelValue', CARD);
+      await s.wrapper.vm.$nextTick();
+      await s.wrapper.setProps({ modelValue: s.emitted().at(-1) });
+      expect(s.toldNow()).toEqual(['customer_address', 'customer_name', 'customer_tax_id']);
+    });
+
+    it('a new country or document type tells the tax ID too: it is judged with them', async () => {
+      const s = await listening(WRONG);
+      await s.wrapper.setProps({ modelValue: { ...WRONG, country: 'FR', idType: '02' } });
+      expect(s.toldNow()).toEqual(['customer_country', 'customer_id_type', 'customer_tax_id']);
+      await s.wrapper.setProps({ modelValue: { ...WRONG, country: 'FR', idType: '04' } });
+      expect(s.toldNow()).toEqual(['customer_id_type', 'customer_tax_id']);
+    });
+
+    it('a new address tells the address alone', async () => {
+      const s = await listening(WRONG);
+      await s.wrapper.setProps({ modelValue: { ...WRONG, address: 'Calle Luna 3, Madrid' } });
+      expect(s.toldNow()).toEqual(['customer_address']);
+    });
+  });
+
   it('speaks Spanish', async () => {
     const s = await setup({ ...BLANK, country: 'US', idType: '04' }, {}, 'es');
     expect(['name', 'country', 'id-type', 'tax-id', 'address'].map((key) => prop(s.field(key), 'label'))).toEqual([
