@@ -169,8 +169,9 @@ Plan `docs/plans/2026-10-22-fase-2-tenencia.md` de erplora-next; reglas en PLAN-
   La plantilla de test lleva todas las apps del hub (`migrator.portable_apps()`, `base/tests/test_hub_user_links.py`).
   Los tests escritos antes de la tenencia caen en un respaldo solo de la suite (`base/tenancy/tests/legacy.py`, fixture
   de sesión `legacy_fallback`): la BD de control de test lleva también las tablas de hub (`LegacyTablesRouter`, solo en
-  `config/settings_pytest.py`) y el worker les corre el paso de la fase 1 (`legacy_worker`); los de la tenencia y los
-  de cada puerta de entrada lo apagan (`no_test_fallback`), como en producción.
+  `config/settings_pytest.py`) y el worker les corre un paso propio (`legacy_worker`, `worker_pass`): sus tareas en el
+  ámbito del negocio `a` y el relay de sus avisos; los de la tenencia y los de cada puerta de entrada lo apagan
+  (`no_test_fallback`), como en producción.
 
 
 ### Activar una app crea sus tablas (tajada S3)
@@ -485,3 +486,10 @@ las apps y las de Django: `hub-migrate` las aplica todas), cada una contra el es
 El paso del despliegue posterior (el contract), las migraciones ya desplegadas antes de la regla y las de Django van en
 su lista `ACCEPTED`: una entrada nueva se justifica en su PR (la del contract, con la PR de su primer paso), y una que ya
 no rompe nada hace caer el test.
+
+**Una operación sin modelo** (`RunSQL`, o `RunPython` sin `hints`) de `base` o `live` cuenta como de hub: en control se
+salta y la migración queda registrada igual (`base/0006`, hub#751). Si tiene que llegar a control, lleva
+`hints={"model_name": "<modelo contextual o de control>"}`: `eventdelivery`, no `outboxevent`, que bajo `base` cuenta como
+de hub. Lo comprueba `base/tests/test_outbox_pending_index.py`, con la configuración de producción: control y un hub
+tienen los mismos índices en las tablas que comparten. Un índice sobre una tabla con tráfico se construye `CONCURRENTLY`
+(`atomic = False`), y la migración retira antes el inválido que haya dejado una construcción cortada (`base/0023`).

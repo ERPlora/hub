@@ -296,7 +296,8 @@ class TestChoosingMyPin:
         response = set_pin(client, "4826")
         assert (response.status_code, response.json()) == (200, {"set": True})
         cred = Credential.objects.get(username="saas:1")
-        assert identify_hasher(cred.pin_hash).algorithm == "argon2" and "4826" not in cred.pin_hash
+        # Checked, not looked for in the text: a hash is random, and now and then its letters spell the PIN (hub#796).
+        assert identify_hasher(cred.pin_hash).algorithm == "argon2" and pin_matches("saas:1", "4826")
         assert cred.pin_hash.startswith("argon2$argon2id$")
         assert OutboxEvent.objects.filter(name="base.pin.set").count() == 1
 

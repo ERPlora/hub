@@ -25,7 +25,17 @@ from base.tenancy import connections as tenancy_connections
 from base.tenancy import dumps, names, ops, provision
 from base.tenancy.context import current_alias, use_control, use_hub
 from base.tenancy.tests import hubs
-from base.tenancy.tests.s3 import aws_test_credentials, dumps_bucket, moto_s3, no_dumps_bucket, objects  # noqa: F401
+from base.tenancy.tests.s3 import (  # noqa: F401
+    aws_test_credentials,
+    dumps_bucket,
+    hub_files_bucket,
+    hub_files_entry,
+    keep_files,
+    moto_s3,
+    no_dumps_bucket,
+    objects,
+    spy_on_the_purge,
+)
 from control.models import Cluster, Hub, HubDue, HubDump
 
 pytestmark = pytest.mark.usefixtures("no_test_fallback")
@@ -609,6 +619,118 @@ def test_a_business_whose_database_was_never_finished_goes_without_copy_or_gate(
     assert fresh(empty).status == "purged"
     assert fresh(never).status == "purged"
     assert not HubDump.objects.filter(hub__in=[never.pk, empty.pk]).exists()
+
+
+# ── Its files: step 4 of PLAN-DB §6 «Baja», right after the drop (hub#613) ─────────────────────────────────────────
+
+def test_a_business_past_its_90_days_goes_with_its_files_and_every_other_keeps_theirs(
+    business, dumps_bucket, hub_files_bucket, moto_s3
+):
+    gone, within, neighbour = business(left_days_ago=91), business(left_days_ago=89), business(left_days_ago=None)
+    keep_files(gone)
+    kept = keep_files(within) | keep_files(neighbour)
+
+    run_pass()
+    run_pass()
+
+    assert (fresh(gone).status, fresh(within).status, fresh(neighbour).status) == ("purged", "cancelled", "ready")
+    assert set(objects(moto_s3, hub_files_bucket)) == kept
+    assert set(objects(moto_s3, dumps_bucket)) == {HubDump.objects.get(hub=gone).key}, "its final copy is not its files"
+
+
+def test_the_files_go_right_after_the_drop_outside_any_transaction_and_before_the_tombstone(
+    business, dumps_bucket, hub_files_bucket, monkeypatch
+):
+    hub = business(left_days_ago=91)
+    seen = spy_on_the_purge(monkeypatch, lambda: fresh(hub).status)
+
+    run_pass()
+
+    assert seen == ["drop", ("files", hub.pk, False, "dropping")]
+    assert fresh(hub).status == "purged"
+
+
+def test_a_store_that_fails_leaves_it_dropping_noted_and_tried_again_never_purged(
+    business, dumps_bucket, hub_files_bucket, moto_s3, settings, caplog
+):
+    hub = business(left_days_ago=91)
+    keep_files(hub)
+    settings.STORAGES = {**settings.STORAGES, "hub_files": hub_files_entry(moto_s3, "erplora-test-no-such-bucket")}
+    now = timezone.now()
+
+    with caplog.at_level(logging.WARNING, logger="base.tenancy.offboarding"):
+        run_pass(now)
+
+    failed = fresh(hub)
+    assert (failed.status, failed.purged_at) == ("dropping", None), "a purge that left files behind is not done"
+    assert failed.last_error.startswith("files_purge_failed: ")
+    assert failed.attempts == 1
+    assert failed.next_attempt_at > now
+    assert failed.db_name not in databases(), "PLAN-DB §6: the database went first"
+    assert "files_purge_failed" in caplog.text
+
+    run_pass(now)
+    assert fresh(hub).attempts == 1, "nothing before its next attempt"
+
+    settings.STORAGES = {**settings.STORAGES, "hub_files": hub_files_entry(moto_s3, hub_files_bucket)}
+    run_pass(failed.next_attempt_at + dt.timedelta(seconds=1))
+
+    purged = fresh(hub)
+    assert (purged.status, purged.last_error, purged.attempts) == ("purged", "", 0)
+    assert objects(moto_s3, hub_files_bucket) == {}
+    assert HubDump.objects.filter(hub=hub).count() == 1, "the copy already made is not made twice"
+
+
+def test_a_drop_that_fails_keeps_its_files(business, dumps_bucket, hub_files_bucket, moto_s3, monkeypatch):
+    hub = business(left_days_ago=91)
+    kept = keep_files(hub)
+
+    def refused(name, **kwargs):
+        raise ops.DatabaseOpsError("no")
+
+    monkeypatch.setattr(ops, "drop_database", refused)
+
+    run_pass()
+
+    assert fresh(hub).status == "dropping"
+    assert set(objects(moto_s3, hub_files_bucket)) == kept
+
+
+def test_a_business_with_fiscal_documents_keeps_its_files(business, dumps_bucket, hub_files_bucket, moto_s3):
+    hub = business(left_days_ago=91)
+    kept = keep_files(hub)
+    with use_hub(hub):
+        one_sale()
+
+    run_pass()
+
+    assert fresh(hub).status == "cancelled"
+    assert set(objects(moto_s3, hub_files_bucket)) == kept
+
+
+def test_a_row_that_names_a_database_not_its_own_keeps_its_files(business, dumps_bucket, hub_files_bucket, moto_s3):
+    hub, other = business(left_days_ago=91), business(left_days_ago=None)
+    kept = keep_files(hub)
+    Hub.objects.filter(pk=hub.pk).update(db_name=other.db_name)
+
+    run_pass()
+
+    assert fresh(hub).last_error.startswith("invalid_database_name:")
+    assert set(objects(moto_s3, hub_files_bucket)) == kept
+
+
+def test_a_business_whose_database_was_never_made_goes_with_its_files_too(
+    business, dumps_bucket, hub_files_bucket, moto_s3
+):
+    empty = business(left_days_ago=91, ready_at=None)
+    keep_files(empty)
+    Hub.objects.filter(pk=empty.pk).update(db_name="")
+
+    run_pass()
+    run_pass()
+
+    assert fresh(empty).status == "purged"
+    assert objects(moto_s3, hub_files_bucket) == {}
 
 
 # ── The way back, and the doors of the SaaS meanwhile ──────────────────────────────────────────────────────────────

@@ -67,8 +67,8 @@ VOUCHER_SESSIONS = gettext_noop("Voucher sessions")
 # The assistant's card names the record a write acts on by these reads (base/assistant.py ``REFERS``), run as whoever
 # asks, never by its id: a service, a category, a package and a customer by their names, a professional by their full
 # name; who does what by the service and the professional; a voucher sold and its sessions by the package, the owner and
-# the day it was sold or the service of the session, as two vouchers of one package may be told apart. The sale, the
-# appointment and the line of an order are of apps Services does not require: the card leaves them out.
+# the day it was sold or the service of the session, as two vouchers of one package may be told apart. The sale and its
+# line, the appointment and the line of an order are of apps Services does not require: the card leaves them out.
 A_SERVICE = names("service.service.get")
 A_CATEGORY = names("service.category.get")
 A_PACKAGE = names("service.package.get")
@@ -943,7 +943,13 @@ class GrantIn(In):
     net_amount: Cents = Field(0, description="Taxable base of that amount, in cents (minor units of the business's currency).")
     tax_amount: Cents = Field(0, description="VAT of that amount, in cents (minor units of the business's currency).")
     sale_id: UUID | None = Field(
-        None, description="The sale that paid it (Sales), if any."
+        None,
+        description="The sale that charged it (Sales), if it went through the till: its line stops counting for who "
+        "sold it and each session counts for who does it. A voucher with an amount that does not say it counts for "
+        "nobody as its sessions are done.",
+    )
+    sale_line_id: UUID | None = Field(
+        None, description="The line of that sale that charged it; only needed when the sale charged several (Sales)."
     )
     granted_at: datetime | None = Field(
         None,
@@ -1294,6 +1300,11 @@ class SessionOut(Schema):
         description="Sessions the voucher has left now; null = unlimited."
     )
     voucher_expired: bool = Field(description="The voucher is past its expiry.")
+    value: int | None = Field(
+        description="What the session is worth, VAT included, in cents (minor units of the business's currency): "
+        "what is left of the voucher's price ÷ the sessions it has left, fixed when delivered; null until then and "
+        "on an unlimited voucher."
+    )
 
 
 class SessionDetailOut(SessionOut):

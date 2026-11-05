@@ -69,7 +69,7 @@ describe('CommissionsPage', () => {
     expect(s.prop<Array<{ key: string; label: string }>>('columns').map((c) => [c.key, c.label])).toEqual([
       ['full_name', 'Name'],
       ['role_name', 'Role'],
-      ['sold', 'Sold'],
+      ['sold', 'Production'],
       ['commission_rate', 'Commission %'],
       ['commission', 'Commission'],
     ]);
@@ -104,7 +104,7 @@ describe('CommissionsPage', () => {
     await s.result(BUSINESS, business());
     expect(s.find('staff-commissions-total-sold').text()).toContain('…');
     await s.show({ ...REPORT, date_from: '2026-08-17' });
-    expect(s.find('staff-commissions-total-sold').text()).toMatch(/^Sold\s*€37\.33$/);
+    expect(s.find('staff-commissions-total-sold').text()).toMatch(/^Production\s*€37\.33$/);
     expect(s.find('staff-commissions-total-commission').text()).toMatch(/^Commissions\s*€5\.35$/);
     expect(s.find('staff-commissions-days').text()).toBe('08/17/2026 – 08/19/2026');
     await s.result(OP, REPORT, {}, 2);
@@ -207,10 +207,10 @@ describe('CommissionsPage', () => {
     await s.result(BUSINESS, business());
     await s.show(REPORT);
     expect(CHOICES.map((value) => s.chip(value))).toEqual(['Hoy', 'Ayer', 'Esta semana', 'Este mes', 'Personalizado']);
-    expect(s.find('staff-commissions-total-sold').text()).toMatch(/^Vendido\s*37,33\s€$/);
+    expect(s.find('staff-commissions-total-sold').text()).toMatch(/^Producción\s*37,33\s€$/);
     expect(s.find('staff-commissions-total-commission').text()).toMatch(/^Comisiones\s*5,35\s€$/);
     expect(s.find('staff-commissions-days').text()).toBe('19/08/2026');
-    expect(s.prop<Array<{ label: string }>>('columns').map((c) => c.label)).toEqual(['Nombre', 'Rol', 'Vendido', 'Comisión %', 'Comisión']);
+    expect(s.prop<Array<{ label: string }>>('columns').map((c) => c.label)).toEqual(['Nombre', 'Rol', 'Producción', 'Comisión %', 'Comisión']);
     // Intl puts a no-break space before the euro sign.
     expect(s.cells(0).slice(2)).toEqual(['27,21\u00a0€', '15 %', '4,08\u00a0€']);
     expect(s.cells(2)[0]).toContain('Ya no trabaja aquí');
@@ -225,7 +225,7 @@ describe('CommissionsPage: the business\'s currency (staff-business-currency)', 
     await s.result(BUSINESS, business(POLISH));
     await s.show(REPORT);
     expect(s.cells(0).slice(2).map(plain)).toEqual(['27,21 zł', '15 %', '4,08 zł']);
-    expect(plain(s.find('staff-commissions-total-sold').text())).toMatch(/^Vendido\s*37,33 zł$/);
+    expect(plain(s.find('staff-commissions-total-sold').text())).toMatch(/^Producción\s*37,33 zł$/);
     expect(plain(s.find('staff-commissions-total-commission').text())).toMatch(/^Comisiones\s*5,35 zł$/);
     expect(s.wrapper.text()).not.toContain('€');
   });
@@ -241,7 +241,7 @@ describe('CommissionsPage: the business\'s currency (staff-business-currency)', 
     const s = await setup();
     await s.show(REPORT);
     expect(s.cells(0).slice(2)).toEqual(['27.21', '15 %', '4.08']);
-    expect(s.find('staff-commissions-total-sold').text()).toMatch(/^Sold\s*37\.33$/);
+    expect(s.find('staff-commissions-total-sold').text()).toMatch(/^Production\s*37\.33$/);
   });
 });
 
