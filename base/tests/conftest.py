@@ -1,4 +1,5 @@
-"""Fixtures of the base tests: users with a role on a host, and a stand-in for the SaaS."""
+"""Fixtures of the base tests: users with a role on a host, a stand-in for the SaaS, and the worker as a process that has
+just started (``a_worker_just_started``)."""
 
 import json
 
@@ -25,15 +26,6 @@ def no_connection_left_from_an_earlier_test(request):
     marked = request.node.get_closest_marker("django_db") is not None
     if not (marked or {"db", "transactional_db"} & set(request.fixturenames)):
         connections.close_all()
-
-
-@pytest.fixture
-def no_test_fallback(monkeypatch):
-    """A hub's model or operation without its hub entered fails, as outside the tests: nothing falls back to the
-    database the suite's tests written before the tenancy share (``base.tenancy.context._test_fallback``)."""
-    from base.tenancy import context
-
-    monkeypatch.setattr(context, "_test_fallback", None)
 
 
 @pytest.fixture
