@@ -798,6 +798,33 @@ test('assistant-card — in Spanish a booking says its day and time and its chan
 });
 
 // flow: assistant-card (BASE-F97)
+// hub#860: with no id, the assistant sends a booking's service as a person says it («Tinte») and the card said «1
+// elemento»: now it says the service by that name, with the day, the time and the channel in words. Cancelled: nothing
+// is booked.
+test('assistant-card — in Spanish a booking whose service comes by its name says that name, never how many', async ({ browser }) => {
+  const KEY = 'hub-860-service-by-name';
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  await login(page, A, '/');
+  const needed = ['customer', 'service', 'staff', 'schedule', 'appointment'];
+  const turnedOn: string[] = [];
+  await turnOnMissing(context, A, needed, turnedOn);
+  await openPanelInSpanish(page);
+  const ids = ['0192f0b2-1111-7000-8000-000000000001', '0192f0b2-3333-7000-8000-000000000003'];
+  const booking = { customer_id: ids[0], services: [{ service: 'Tinte' }], staff_id: ids[1], start: '2026-11-02T10:00:00+01:00', source: 'counter' };
+  await ask(page, `E2E-ASK appointment__appointment__create ${JSON.stringify(booking)}`, { settle: false });
+  await expect(card(page)).toBeVisible();
+  for (const vp of VIEWPORTS) {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    await expect(card(page)).toContainText('Crear en Citas: Tinte · 2 nov 2026, 10:00 · Mostrador');
+    await expect(card(page)).not.toContainText('elemento');
+    await captureStill(page, `${KEY}-${vp.label}`);
+  }
+  await cancelAtComputerSize(page);
+  await leave(context, turnedOn);
+});
+
+// flow: assistant-card (BASE-F97)
 // FIX-HUB-BASE-ASSISTANT-CARD-SHOWS-RAW-VALUES: a write of the platform that names its record by an id (removing a device,
 // revoking an API key…) no longer said which once the id left the card: now the card names it as its screen does — a
 // device by its name or, with none, by what it is, as Settings › Devices. Revoking an API key names its key the same way

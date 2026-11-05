@@ -2,9 +2,9 @@
 // end to end with its real dependencies: the Hub of this stack, its SaaS's gateway and, behind it, the e2e's provider
 // (assistant-provider.ts; the SaaS seeded with it, README «El asistente»). An automation that asks first, granted
 // «Book an appointment», runs; the worker asks the assistant (`workerAsks`), which wants to book one: its question waits
-// in the inbox with each datum as the chat's card says it (BASE-F97 step 2) — the services by how many, the start as
-// the owner's language writes it, the channel by its name, the professional left out —, never «[{}]», an id or an ISO
-// moment. A no closes it and books nothing. And an «Ask someone first» step whose question inserts a yes or no and an
+// in the inbox with each datum as the chat's card says it (BASE-F97 step 2) — the services by their names (one sent by
+// the name a person says, hub#860; one it cannot name among the more), the start as the owner's language writes it, the
+// channel by its name, the professional left out —, never «[{}]», an id or an ISO moment. A no closes it and books nothing. And an «Ask someone first» step whose question inserts a yes or no and an
 // instant of what the run brought asks it in words («Paid: Yes», the day and the hour as the owner's language writes
 // them at the business's hour), never «true» or an ISO moment.
 // flow: FLOW-F29 FLOW-F38 FLOW-F28
@@ -24,7 +24,7 @@ const TAG = 'E2E FlowCard';
 const PROVIDER_PORT = Number(process.env.E2E_AI_PROVIDER_PORT ?? STACK.hubPort + 2);
 const SAAS_DB = process.env.E2E_SAAS_DB ?? (STACK.hubPort === 8000 ? 'saas' : `saas_e2e_${STACK.hubPort + 1}`);
 const BOOK = 'appointment.appointment.create';
-/** A service and a professional by ids the card cannot name (their schema marks no read): it leaves them out. */
+/** A service and a professional by ids that name nothing in this business: the card leaves them out. */
 const SERVICE = '0192f0b2-2222-7000-8000-000000000002';
 const MEMBER = '0192f0b2-3333-7000-8000-000000000003';
 
@@ -79,7 +79,7 @@ for (const viewport of VIEWPORTS) {
       // The provider's marker: ask for that booking, as the model sends it.
       const booking = {
         customer: 'Ana López',
-        services: [{ service_id: SERVICE }],
+        services: [{ service_id: SERVICE }, { service: 'Tinte' }],
         staff_id: MEMBER,
         start: '2026-11-02T10:00:00+01:00',
         source: 'counter',
@@ -96,13 +96,13 @@ for (const viewport of VIEWPORTS) {
       await expect(card).toBeVisible();
       await expect(card).toContainText('The assistant wants to change something in «Appointments»');
       await expect(card.locator('[data-testid^=flow-question-action-]')).toHaveText('Book an appointment');
-      // Before: «Services: [{}]» in its details, as the model sent it.
+      // Before: «Services: [{}]» in its details, as the model sent it; then «Services: 2 items» (hub#860).
       const text = await card.innerText();
       for (const raw of RAW) expect(text, `${raw} on the card`).not.toMatch(raw);
       const data = card.locator('[data-testid^=flow-question-data-] li');
       await expect(data).toHaveText([
         'Customer: Ana López',
-        'Services: 1 item',
+        'Services: Tinte and 1 more',
         /^Starts at: Nov 2, 2026, \d{1,2}:00\s(AM|PM)$/,
         'Booked through: Front desk',
       ]);
