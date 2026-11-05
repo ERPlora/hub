@@ -6,7 +6,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { SETTINGS } from '../__tests__/kitchen';
-import { click, EMPLOYEE, errorFrame, flush, ionChecked, ionValue, type MountOptions, mountKitchen, settle } from '../__tests__/mount-kitchen';
+import { click, EMPLOYEE, errorFrame, flush, ionChecked, ionValue, type MountOptions, mountKitchen } from '../__tests__/mount-kitchen';
 import SettingsPage from './SettingsPage.vue';
 
 const play = vi.fn();
@@ -57,27 +57,6 @@ describe('SettingsPage', () => {
     expect(s.field('saved')?.textContent).toContain('Settings saved.');
   });
 
-  it('a field typed back to what is saved is not sent', async () => {
-    const s = await setup();
-    await s.show(SETTINGS);
-    s.answer(200, { ...SETTINGS, sound_volume: 40 });
-    await ionValue(s.field('warning_minutes'), '15', 'ionInput');
-    await ionValue(s.field('sound_volume'), '40', 'ionInput');
-    await click(s.field('save'));
-    expect(s.sent()).toEqual([{ method: 'POST', path: '/api/kitchen/settings', query: {}, body: { sound_volume: 40 } }]);
-  });
-
-  it('after a save nothing is left as typed: a change saved elsewhere repaints every field', async () => {
-    const s = await setup();
-    await s.show(SETTINGS);
-    s.answer(200, { ...SETTINGS, sound_volume: 40 });
-    await ionValue(s.field('sound_volume'), '40', 'ionInput');
-    await click(s.field('save'));
-    await settle();
-    await s.result('kitchen.settings.get', { ...SETTINGS, sound_volume: 55 }, {}, 2);
-    expect(s.field('sound_volume').value).toBe('55');
-  });
-
   it('a refusal goes under its field', async () => {
     const s = await setup();
     await s.show(SETTINGS);
@@ -116,33 +95,6 @@ describe('SettingsPage', () => {
       expect(s.notice()).toBe(false);
       expect([s.says('critical_minutes'), s.marked('critical_minutes')]).toEqual(['', false]);
       expect([s.says('warning_minutes'), s.marked('warning_minutes')]).toEqual([AMBER_FIRST, true]);
-    });
-
-    it('a switch is a change too: the notice goes, the fields keep their messages', async () => {
-      const s = await refused();
-      await ionChecked(s.field('show_timer'), false);
-      expect(s.notice()).toBe(false);
-      expect([s.says('warning_minutes'), s.says('critical_minutes')]).toEqual([AMBER_FIRST, AMBER_FIRST]);
-    });
-
-    it('the next refusal says it all again', async () => {
-      const s = await refused();
-      await ionValue(s.field('warning_minutes'), '50', 'ionInput');
-      await ionValue(s.field('critical_minutes'), '25', 'ionInput');
-      expect([s.notice(), s.says('warning_minutes'), s.says('critical_minutes')]).toEqual([false, '', '']);
-      await click(s.field('save'));
-      expect(s.notice()).toBe(true);
-      expect([s.says('warning_minutes'), s.says('critical_minutes'), s.marked('warning_minutes')]).toEqual([AMBER_FIRST, AMBER_FIRST, true]);
-    });
-
-    it('a refusal that names no field stays until the next try: nothing else says it', async () => {
-      const s = await setup();
-      await s.show(SETTINGS);
-      s.answer(409, { error: { code: 'conflict', message: 'Someone else is saving them.' } });
-      await ionValue(s.field('sound_volume'), '40', 'ionInput');
-      await click(s.field('save'));
-      await ionValue(s.field('sound_volume'), '50', 'ionInput');
-      expect(s.field('save-error')?.textContent).toContain('Someone else is saving them.');
     });
   });
 

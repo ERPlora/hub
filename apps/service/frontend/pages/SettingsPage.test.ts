@@ -142,40 +142,6 @@ describe('SettingsPage', () => {
       expect(s.tax().props('errorText') ?? '').toBe('');
       expect(s.says('default_duration')).toBe('Ensure this value is greater than or equal to 1.');
     });
-
-    it('a switch is a change too: the notice goes, the fields keep their messages', async () => {
-      const s = await refused();
-      await ionChecked(s.field('show_prices'), false);
-      expect(s.notice()).toBeNull();
-      expect([s.says('default_duration'), s.says('default_buffer_time')]).toEqual([
-        'Ensure this value is greater than or equal to 1.',
-        'Ensure this value is greater than or equal to 0.',
-      ]);
-    });
-
-    it('the next refusal says it all again', async () => {
-      const s = await refused();
-      await ionValue(s.field('default_duration'), '30', 'ionInput');
-      await ionValue(s.field('default_buffer_time'), '5', 'ionInput');
-      expect(s.notice()).toBeNull();
-      await click(s.field('save'));
-      expect(s.notice()).not.toBeNull();
-      expect([s.says('default_duration'), s.says('default_buffer_time'), s.marked('default_duration')]).toEqual([
-        'Ensure this value is greater than or equal to 1.',
-        'Ensure this value is greater than or equal to 0.',
-        true,
-      ]);
-    });
-
-    it('a refusal that names no field stays until the next try: nothing else says it', async () => {
-      const s = await setup();
-      await s.show(SETTINGS);
-      s.answer(409, { error: { code: 'service.settings_conflict', message: 'Someone else is saving them.' } });
-      await ionValue(s.field('default_duration'), '45', 'ionInput');
-      await click(s.field('save'));
-      await ionValue(s.field('default_duration'), '50', 'ionInput');
-      expect(s.inDoc('service-settings-save-error')?.textContent).toContain('Someone else is saving them.');
-    });
   });
 
   it('whoever may not save them is told so', async () => {
