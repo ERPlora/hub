@@ -1,17 +1,19 @@
 // The searches behind the booking panel's pickers (`Combo` of @erplora/ui): each asks the server for what
 // the person types and turns every row into an option. The required apps' lists are read through their
 // own operations (Services, Staff), never their models.
-//   - A service: the bookable ones of the catalog (`service.service.list_for_sale`), 20 at a time, with
-//     «30 min · €20.00» as a hint; its length and price are kept in `facts` for the panel's minutes.
+//   - A service: the bookable ones of the catalog (`service.service.list_for_sale`), 20 at a time, with its
+//     minutes and price as a hint, the price in the business's money («30 min · 20,00 €» in Spain, «30 min ·
+//     20,00 zł» in Poland; the figure alone until it answers); its length and price are kept in `facts` for
+//     the panel's minutes.
 //   - A professional: the active, bookable team (`staff.member.list`), narrowed, for every service
 //     chosen, to whoever is assigned to it (`service.assignment.eligible`); a service nobody is assigned
 //     to leaves the whole team (the diary's rule, as the server applies it).
 //   - Her terms: the minutes and price she does each service at (`service.assignment.eligible`: her own,
 //     or the catalog's), which the server books; a service without her row keeps the catalog's.
-import { type ComboOption, type ComboSearch, formatMoney } from '@erplora/ui/components';
+import type { ComboOption, ComboSearch } from '@erplora/ui/components';
 import type { LiveClient } from '@erplora/ui/sdk';
 
-import { APPOINTMENT_MONEY } from './format';
+import { formatMoney, type Money } from './format';
 
 const PAGE = 20;
 const TEAM = 100;
@@ -25,14 +27,19 @@ export interface ServiceFacts {
 
 const search = (query: string) => (query.trim() ? { search: query.trim() } : {});
 
-export function searchBookableServices(client: LiveClient, locale: string, facts: Map<string, ServiceFacts>): ComboSearch {
+export function searchBookableServices(
+  client: LiveClient,
+  locale: string,
+  facts: Map<string, ServiceFacts>,
+  money: Money | undefined,
+): ComboSearch {
   return async (query) => {
     const page = await client.api.call('service.service.list_for_sale', { ...search(query), limit: PAGE });
     return page.rows
       .filter((row) => row.is_bookable)
       .map((row) => {
         facts.set(row.id, { name: row.name, minutes: row.duration_minutes, price: row.price });
-        return { id: row.id, label: row.name, hint: `${row.duration_minutes} min · ${formatMoney(row.price, locale, APPOINTMENT_MONEY)}` };
+        return { id: row.id, label: row.name, hint: `${row.duration_minutes} min · ${formatMoney(row.price, locale, money)}` };
       });
   };
 }
