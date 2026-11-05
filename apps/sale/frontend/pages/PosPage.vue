@@ -937,10 +937,6 @@ onBeforeUnmount(() => {
     height: auto;
     min-height: 100%;
   }
-  .pos-till--phone .pos-till__body {
-    flex: 1 0 auto;
-    grid-template-rows: auto;
-  }
   /* Measured: 77 px are all the page shows on the lowest phone under the strip. At the touch minimum, and 0.25rem into the
      catalogue's padding, the button and its count fit in them at both ends of the scroll. */
   .pos-till--phone .pos-till__fab {

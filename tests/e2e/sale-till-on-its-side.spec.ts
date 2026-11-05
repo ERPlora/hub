@@ -246,7 +246,8 @@ async function keepsItsLayout(page: Page, size: (typeof UPRIGHT)[number], where:
       actions: box(el.querySelector('.pos-foot__actions')),
     };
   });
-  expect.soft(seen.total.bottom, `the total over the foot's buttons at ${where}`).toBeLessThanOrEqual(seen.actions.top + EDGE);
+  // The foot's two rows with the air between them they always had (0.65rem): the low phone's one row is not theirs.
+  expect.soft(seen.actions.top - seen.total.bottom, `the total over the foot's buttons at ${where}`).toBeGreaterThanOrEqual(8);
   // The drawer lies inside the till's border of 1 px: over it would be the strip, the top bar or the tab bar.
   expect.soft(Math.abs(seen.drawer.top - seen.till.top), `the drawer starts with the till at ${where}`).toBeLessThanOrEqual(1 + EDGE);
   expect.soft(Math.abs(seen.drawer.bottom - seen.till.bottom), `the drawer ends with the till at ${where}`).toBeLessThanOrEqual(1 + EDGE);
