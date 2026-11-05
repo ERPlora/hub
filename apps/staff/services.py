@@ -50,7 +50,6 @@ from apps.staff.schemas import (
     SCHEDULE_RANGE,
     BulkCreatedOut,
     BulkCreateIn,
-    ByIdIn,
     DeletedOut,
     MemberDetailOut,
     MemberIn,
@@ -61,6 +60,7 @@ from apps.staff.schemas import (
     RolePatchIn,
     ScheduleIn,
     ScheduleOut,
+    ScheduleRefIn,
     ScheduleUpdateIn,
     SetActiveIn,
     SettingsIn,
@@ -70,6 +70,7 @@ from apps.staff.schemas import (
     TimeOffDetailOut,
     TimeOffFieldsIn,
     TimeOffIn,
+    TimeOffRefIn,
     TimeOffRequestIn,
 )
 from base.models import HubUser, Membership
@@ -562,14 +563,14 @@ def set_schedule_active(ctx: OperationContext, data: SetActiveIn) -> Schedule | 
     "staff.schedule.delete",
     kind="command",
     permission="staff.manage_settings",
-    input=ByIdIn,
+    input=ScheduleRefIn,
     output=DeletedOut,
     ai={
         "description": "Deletes a work schedule and its working hours; they stop counting for availability.",
         "risk": "high",
     },
 )
-def delete_schedule(ctx: OperationContext, data: ByIdIn) -> dict:
+def delete_schedule(ctx: OperationContext, data: ScheduleRefIn) -> dict:
     """STAFF-F15: deleting the default one does not make another one the default."""
     schedule = _locked_schedule(data.id)
     member_id = schedule.member_id
@@ -693,14 +694,14 @@ def _register_time_off(
     "staff.time_off.approve",
     kind="command",
     permission="staff.manage_time_off",
-    input=ByIdIn,
+    input=TimeOffRefIn,
     output=TimeOffDetailOut,
     ai={
         "description": "Approves a pending time-off request: its hours leave the person's availability.",
         "risk": "normal",
     },
 )
-def approve_time_off(ctx: OperationContext, data: ByIdIn) -> TimeOff | None:
+def approve_time_off(ctx: OperationContext, data: TimeOffRefIn) -> TimeOff | None:
     """STAFF-F18: refused over another approved absence of the same person; stamps who and when."""
     time_off = _move(data.id, "approve")
     hours = (
@@ -727,11 +728,11 @@ def approve_time_off(ctx: OperationContext, data: ByIdIn) -> TimeOff | None:
     "staff.time_off.reject",
     kind="command",
     permission="staff.manage_time_off",
-    input=ByIdIn,
+    input=TimeOffRefIn,
     output=TimeOffDetailOut,
     ai={"description": "Rejects a pending time-off request.", "risk": "normal"},
 )
-def reject_time_off(ctx: OperationContext, data: ByIdIn) -> TimeOff | None:
+def reject_time_off(ctx: OperationContext, data: TimeOffRefIn) -> TimeOff | None:
     """STAFF-F18."""
     return _finish_move(ctx, _move(data.id, "reject"), "reject")
 
@@ -740,7 +741,7 @@ def reject_time_off(ctx: OperationContext, data: ByIdIn) -> TimeOff | None:
     "staff.time_off.cancel",
     kind="command",
     permission="staff.request_time_off",
-    input=ByIdIn,
+    input=TimeOffRefIn,
     output=TimeOffDetailOut,
     ai={
         "description": "Cancels a pending or approved time-off request (an employee may only withdraw their "
@@ -748,7 +749,7 @@ def reject_time_off(ctx: OperationContext, data: ByIdIn) -> TimeOff | None:
         "risk": "normal",
     },
 )
-def cancel_time_off(ctx: OperationContext, data: ByIdIn) -> TimeOff | None:
+def cancel_time_off(ctx: OperationContext, data: TimeOffRefIn) -> TimeOff | None:
     """STAFF-F19: final; keeps who approved it. Without manage rights, only one's own pending request.
 
     Judged on the locked row: a request approved while the employee was cancelling it is refused.

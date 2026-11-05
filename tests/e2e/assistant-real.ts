@@ -83,10 +83,10 @@ export function cleanUpRealProviders(emails: string[]): void {
 // ── The panel (as base-assistant.spec.ts reads it) ──
 
 export const panel = (page: Page): Locator => page.locator('[data-testid="assistant-panel"]');
-const box = (page: Page): Locator => panel(page).locator('[data-testid="assistant-input"] textarea');
-const answers = (page: Page): Locator => panel(page).locator('[data-testid="assistant-answer"]');
-const card = (page: Page): Locator => page.locator('ion-modal[data-testid="assistant-confirm"]');
-const send = (page: Page): Locator => panel(page).locator('[data-testid="assistant-send"]');
+export const box = (page: Page): Locator => panel(page).locator('[data-testid="assistant-input"] textarea');
+export const answers = (page: Page): Locator => panel(page).locator('[data-testid="assistant-answer"]');
+export const card = (page: Page): Locator => page.locator('ion-modal[data-testid="assistant-confirm"]');
+export const send = (page: Page): Locator => panel(page).locator('[data-testid="assistant-send"]');
 export const foot = (page: Page): Locator => panel(page).locator('[data-testid="assistant-usage"]');
 const opener = (page: Page): Locator =>
   shown(page).locator(compactBar(page) ? '[data-testid="topbar-chrome-more"]' : '[data-testid="assistant-button"]');
