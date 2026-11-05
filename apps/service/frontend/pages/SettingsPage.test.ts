@@ -81,6 +81,92 @@ describe('SettingsPage', () => {
     expect(banner?.props('heading')).toBe('The settings could not be saved.');
   });
 
+  describe('a refusal by fields (hub#821, as FormModal does: ui#88, ui#89)', () => {
+    const REFUSAL = {
+      error: {
+        code: 'invalid_payload',
+        message: 'Invalid payload',
+        fields: {
+          default_duration: 'Ensure this value is greater than or equal to 1.',
+          default_buffer_time: 'Ensure this value is greater than or equal to 0.',
+          default_tax_category_key: 'Unknown tax category.',
+        },
+      },
+    };
+
+    /** Saves a 0 duration and a negative buffer, and the server refuses three fields. */
+    async function refused() {
+      const s = await setup();
+      await s.show(SETTINGS);
+      s.answer(422, REFUSAL);
+      await ionValue(s.field('default_duration'), '0', 'ionInput');
+      await ionValue(s.field('default_buffer_time'), '-1', 'ionInput');
+      await click(s.field('save'));
+      const notice = () => s.inDoc('service-settings-save-error');
+      const says = (name: string) => s.field(name).errorText ?? '';
+      const marked = (name: string) => s.field(name).classList.contains('ion-invalid');
+      return { ...s, notice, says, marked };
+    }
+
+    it('the notice goes as soon as something is changed, and a field’s message as soon as that field is', async () => {
+      const s = await refused();
+      expect(s.notice()).not.toBeNull();
+      expect([s.says('default_duration'), s.says('default_buffer_time'), s.tax().props('errorText')]).toEqual([
+        'Ensure this value is greater than or equal to 1.',
+        'Ensure this value is greater than or equal to 0.',
+        'Unknown tax category.',
+      ]);
+      await ionValue(s.field('default_duration'), '30', 'ionInput');
+      expect(s.notice()).toBeNull();
+      expect([s.says('default_duration'), s.marked('default_duration')]).toEqual(['', false]);
+      expect([s.says('default_buffer_time'), s.marked('default_buffer_time')]).toEqual(['Ensure this value is greater than or equal to 0.', true]);
+      expect(s.tax().props('errorText')).toBe('Unknown tax category.');
+    });
+
+    it('choosing another tax category takes its message away, and nothing else’s', async () => {
+      const s = await refused();
+      s.tax().vm.$emit('update:modelValue', null);
+      await settle();
+      expect(s.notice()).toBeNull();
+      expect(s.tax().props('errorText') ?? '').toBe('');
+      expect(s.says('default_duration')).toBe('Ensure this value is greater than or equal to 1.');
+    });
+
+    it('a switch is a change too: the notice goes, the fields keep their messages', async () => {
+      const s = await refused();
+      await ionChecked(s.field('show_prices'), false);
+      expect(s.notice()).toBeNull();
+      expect([s.says('default_duration'), s.says('default_buffer_time')]).toEqual([
+        'Ensure this value is greater than or equal to 1.',
+        'Ensure this value is greater than or equal to 0.',
+      ]);
+    });
+
+    it('the next refusal says it all again', async () => {
+      const s = await refused();
+      await ionValue(s.field('default_duration'), '30', 'ionInput');
+      await ionValue(s.field('default_buffer_time'), '5', 'ionInput');
+      expect(s.notice()).toBeNull();
+      await click(s.field('save'));
+      expect(s.notice()).not.toBeNull();
+      expect([s.says('default_duration'), s.says('default_buffer_time'), s.marked('default_duration')]).toEqual([
+        'Ensure this value is greater than or equal to 1.',
+        'Ensure this value is greater than or equal to 0.',
+        true,
+      ]);
+    });
+
+    it('a refusal that names no field stays until the next try: nothing else says it', async () => {
+      const s = await setup();
+      await s.show(SETTINGS);
+      s.answer(409, { error: { code: 'service.settings_conflict', message: 'Someone else is saving them.' } });
+      await ionValue(s.field('default_duration'), '45', 'ionInput');
+      await click(s.field('save'));
+      await ionValue(s.field('default_duration'), '50', 'ionInput');
+      expect(s.inDoc('service-settings-save-error')?.textContent).toContain('Someone else is saving them.');
+    });
+  });
+
   it('whoever may not save them is told so', async () => {
     const s = await setup({ session: MANAGER });
     expect(s.field('forbidden')).not.toBeNull();
