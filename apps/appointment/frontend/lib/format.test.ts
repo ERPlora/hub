@@ -27,6 +27,14 @@ describe("the diary's money", () => {
     expect(diary.formatMoney).toBe(platform.formatMoney);
   });
 
+  it('paints cents in the money it is given, in the page language, a zero too', () => {
+    const euro = { currency: 'EUR', decimals: 2 };
+    expect(diary.formatMoney(2250, 'es', euro)).toBe('22,50 €');
+    expect(diary.formatMoney(2250, 'en', euro)).toBe('€22.50');
+    expect(diary.formatMoney(0, 'es', euro)).toBe('0,00 €');
+    expect(diary.formatMoney(0, 'es', { currency: 'PLN', decimals: 2 })).toBe('0,00 zł');
+  });
+
   it('no screen of the diary names a currency of its own', () => {
     const fixed = sources(FRONTEND)
       .filter((path) => /currency:\s*['"`][A-Z]{3}['"`]|['"`]EUR['"`]/.test(readFileSync(path, 'utf8')))

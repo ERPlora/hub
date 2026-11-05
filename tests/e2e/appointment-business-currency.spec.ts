@@ -7,7 +7,7 @@
 // `a`'s registration and whether its online page takes bookings are put back, also when a test fails.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, hostPage, login, registerBusinessIn, registrationOf, type Registration, settled, shot, shown } from './helpers';
+import { A, api, capture, hostPage, login, registerBusinessIn, registrationOf, type Registration, settled, shown } from './helpers';
 import { cleanUp, FLOW_VIEWPORTS, named, noHorizontalScroll, post } from './service-helpers';
 
 const KEY = 'APPOINTMENT-BUSINESS-CURRENCY';
@@ -90,8 +90,7 @@ test(`${KEY}: a business in Poland books and previews its services in złoty, ne
     const { option, form } = await offered(page);
     await expect(option, `the service offered ${where}`).toContainText(inCurrency('zł'));
     await expect(option, `the service offered ${where}`).not.toContainText('€');
-    await settled(page);
-    await page.screenshot({ path: shot(`${KEY}-option-${size.label}`) });
+    await capture(page, `${KEY}-option-${size.label}`);
     await option.click();
     const total = form.locator('[data-testid=appointment-form-total]');
     await expect(total, `the Total ${where}`).toContainText(inCurrency('zł'));
@@ -99,7 +98,7 @@ test(`${KEY}: a business in Poland books and previews its services in złoty, ne
     await total.scrollIntoViewIfNeeded();
     await settled(page);
     await noHorizontalScroll(page, `New appointment ${where}`);
-    await page.screenshot({ path: shot(`${KEY}-${size.label}`) });
+    await capture(page, `${KEY}-${size.label}`);
     await form.locator('[data-testid=appointment-form-cancel]').click();
     await expect(form).toBeHidden();
 
@@ -108,7 +107,7 @@ test(`${KEY}: a business in Poland books and previews its services in złoty, ne
     await expect(row, `the preview ${where}`).not.toContainText('€');
     await settled(page);
     await noHorizontalScroll(page, `the preview ${where}`);
-    await page.screenshot({ path: shot(`${KEY}-preview-${size.label}`) });
+    await capture(page, `${KEY}-preview-${size.label}`);
   }
 });
 
@@ -121,8 +120,7 @@ test(`${KEY}: back in Spain the services are booked and previewed in euros`, asy
   await option.click();
   await expect(form.locator('[data-testid=appointment-form-total]')).toContainText(inCurrency('€'));
   await expect(form.locator('[data-testid=appointment-form-total]')).not.toContainText('zł');
-  await settled(page);
-  await page.screenshot({ path: shot(`${KEY}-es-1440`) });
+  await capture(page, `${KEY}-es-1440`);
   await form.locator('[data-testid=appointment-form-cancel]').click();
   await expect(await previewed(page)).toContainText(inCurrency('€'));
 });
