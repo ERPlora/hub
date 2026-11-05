@@ -2,7 +2,6 @@
 models, the errors and the public page's chrome (``{% translate %}`` in its templates)."""
 
 import gettext
-import json
 import re
 from pathlib import Path
 
@@ -12,48 +11,12 @@ from django.utils import translation
 
 from apps.website import queries, schemas, services
 from apps.website.models import Image, Site
+from base.tests.po import po_entries
 
 APP = Path(apps.get_app_config("website").path)
 LOCALE = APP / "locale" / "es" / "LC_MESSAGES"
 TEMPLATES = APP / "templates" / "website"
 _TRANSLATE = re.compile(r'{%\s*translate\s+"([^"]+)"(?:\s+context\s+"([^"]+)")?\s*%}')
-
-
-def po_entries() -> dict[str | tuple[str, int], str]:
-    """``"<context>\\x04<msgid>"`` (or ``"<msgid>"``) → msgstr; a plural entry gives one ``(key, n)`` → ``msgstr[n]``
-    per form, as ``gettext`` keeps them; a fuzzy entry maps to ``""``."""
-    entries: dict[str | tuple[str, int], str] = {}
-    parts: dict[str, list[str]] = {}
-    fuzzy, current = False, None
-
-    def flush():
-        msgid = "".join(parts.get("msgid", []))
-        if msgid:
-            context = "".join(parts.get("msgctxt", []))
-            key = f"{context}\x04{msgid}" if context else msgid
-            forms = sorted(name for name in parts if name.startswith("msgstr["))
-            if forms:
-                for name in forms:
-                    entries[(key, int(name[7:-1]))] = "" if fuzzy else "".join(parts[name])
-            else:
-                entries[key] = "" if fuzzy else "".join(parts.get("msgstr", []))
-
-    for line in (LOCALE / "django.po").read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if line.startswith(("msgctxt ", "#")) or (line.startswith("msgid ") and current != "msgctxt"):
-            if current and current.startswith("msgstr"):
-                flush()
-                parts, fuzzy = {}, False
-        if line.startswith("#,") and "fuzzy" in line:
-            fuzzy = True
-        elif line.startswith(("msgctxt ", "msgid ", "msgid_plural ", "msgstr ", "msgstr[")):
-            current, _, rest = line.partition(" ")
-            parts[current] = [json.loads(rest)]
-        elif line.startswith('"') and current:
-            parts[current].append(json.loads(line))
-    if current and current.startswith("msgstr"):
-        flush()
-    return entries
 
 
 def visible_texts() -> set[str]:
@@ -96,13 +59,13 @@ def template_texts() -> set[str]:
 
 
 def test_every_entry_has_a_spanish_translation():
-    entries = po_entries()
+    entries = po_entries(LOCALE / "django.po")
     assert entries
-    assert [key for key, msgstr in entries.items() if not msgstr] == []
+    assert [key for key, (msgstr, fuzzy) in entries.items() if not msgstr or fuzzy] == []
 
 
 def test_every_visible_text_and_every_template_text_is_in_the_catalog():
-    known = set(po_entries())
+    known = set(po_entries(LOCALE / "django.po"))
     assert visible_texts() - known == set()
     assert template_texts() and template_texts() - known == set()
 
@@ -110,7 +73,8 @@ def test_every_visible_text_and_every_template_text_is_in_the_catalog():
 def test_the_compiled_catalog_is_current():
     with (LOCALE / "django.mo").open("rb") as compiled:
         catalog = gettext.GNUTranslations(compiled)._catalog
-    assert {key: value for key, value in catalog.items() if key} == po_entries()
+    po = {key: msgstr for key, (msgstr, _) in po_entries(LOCALE / "django.po").items()}
+    assert {key: value for key, value in catalog.items() if key} == po
 
 
 def test_the_store_reads_the_name_without_a_context():
@@ -125,7 +89,6 @@ def test_spanish_texts():
         assert str(apps.get_app_config("website").verbose_name) == "Página web"
         assert str(queries.NOT_PUBLISHED) == "Esta página web no está publicada."
         assert not hasattr(schemas, "CUSTOM_WITHOUT_COLOURS")
-
 
 
 @pytest.mark.django_db
