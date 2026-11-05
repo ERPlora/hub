@@ -154,6 +154,7 @@ class ServiceRefIn(In):
         None,
         validate_default=True,
         description="The service's name, when its id is not known (e.g. Haircut).",
+        json_schema_extra={"name_of": "service_id"},
     )
 
     @field_validator("service")

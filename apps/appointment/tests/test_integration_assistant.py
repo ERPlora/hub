@@ -2,8 +2,10 @@
 service by its name, as the Diary does («Servicios: Corte de pelo, Tinte»), never «1 elemento» nor by its id. A
 booking's services are lines that carry only their record (``[{"service_id": …}]``): the server names each one as
 Services' read answers it to the person asking (the mark ``A_SERVICE``) and marks the list ``named``, so the screen
-says them one after another (live.assistant ``NAMED``; @erplora/ui ``fieldText``). A mark alone is not enough
-(base.E009 only checks the read exists): each write is checked here against the real name."""
+says them one after another (live.assistant ``NAMED``; @erplora/ui ``fieldText``). With no id, the assistant sends the
+service as a person says it (``[{"service": "Tinte"}]``): Citas marks that text a name (``name_of``, hub#860), so the
+card says it too, and beside the id it says the service the booking takes. A mark alone is not enough (base.E009 and
+base.E014 only check its shape): each write is checked here against the real name."""
 
 import json
 
@@ -84,13 +86,87 @@ def test_the_card_names_each_service_a_write_books(write, language, hub_a, no_fa
 @pytest.mark.django_db(databases=hubs.HUB_DATABASES)
 def test_a_name_the_model_writes_as_null_beside_the_id_still_names_the_service(hub_a, no_fallback):
     """A model writes the name it does not give as null (``{"service_id": …, "service": null}``): the line still carries
-    only its service, and the card names it."""
+    only its service, and the card names it. The name beside its record is left out, null or not (hub#860)."""
     with use_hub(hub_a):
         cut = make_service("Corte de pelo")
         booking = {"services": [{"service_id": str(cut.id), "service": None}]}
         card = assistant.card(get("appointment.appointment.create"), booking, "es", person(hub_a, "es"))
         shown = list_field(card, "services")
-    assert (shown["value"], shown.get(NAMED)) == ([{"service_id": "Corte de pelo", "service": None}], True)
+    assert (shown["value"], shown.get(NAMED)) == ([{"service_id": "Corte de pelo"}], True)
+
+
+def services_said(write: str, services: list, ctx: OperationContext) -> tuple:
+    """What the card of ``write`` shows of the booking's ``services`` as sent: its value and whether it is ``named``."""
+    shown = list_field(assistant.card(get(write), {"services": services}, ctx.language, ctx), "services")
+    return shown["value"], shown.get(NAMED, False)
+
+
+@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@pytest.mark.parametrize("language", ["es", "en"])
+@pytest.mark.parametrize("write", sorted(BOOKS_SERVICES))
+def test_the_card_names_a_service_the_assistant_sends_by_its_name(write, language, hub_a, no_fallback):
+    """hub#860: with no id, the assistant sends the service as a person says it (``[{"service": "Tinte"}]``, as its
+    schema invites) and the card said «Servicios: 1 elemento». Citas marks that text a name (``name_of``): the card says
+    it, «Servicios: Tinte», alone or beside a service sent by its id."""
+    with use_hub(hub_a):
+        cut = make_service("Corte de pelo")
+        ctx = person(hub_a, language)
+        alone = services_said(write, [{"service": "Tinte"}], ctx)
+        mixed = services_said(write, [{"service_id": str(cut.id)}, {"service": "Tinte"}], ctx)
+    assert alone == ([{"service": "Tinte"}], True)
+    assert mixed == ([{"service_id": "Corte de pelo"}, {"service": "Tinte"}], True)
+
+
+@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+@pytest.mark.parametrize(
+    ("line", "said"),
+    [
+        ({"service_id": None, "service": "Tinte"}, {"service_id": None, "service": "Tinte"}),
+        ({"service_id": "", "service": "Tinte"}, {"service_id": "", "service": "Tinte"}),
+        ({"service_id": "CUT", "service": ""}, {"service_id": "Corte de pelo"}),
+    ],
+)
+def test_an_empty_id_or_name_beside_the_other_still_names_the_service(line, said, hub_a, no_fallback):
+    """rv-856: a model writes the datum it does not give as null or empty, in either place: the line still says its
+    service, by the name sent or by its record (a null name beside its id: the test above)."""
+    with use_hub(hub_a):
+        cut = make_service("Corte de pelo")
+        sent = {key: str(cut.id) if value == "CUT" else value for key, value in line.items()}
+        shown = services_said("appointment.appointment.create", [sent], person(hub_a, "es"))
+    assert shown == ([said], True)
+
+
+@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+def test_beside_its_id_the_card_says_the_service_booked_never_another_name(hub_a, no_fallback):
+    """The booking takes the service by its id and ignores the name beside it (``resolve_services``): the card says the
+    one it books, «Corte de pelo», not the «Tinte» the model wrote."""
+    with use_hub(hub_a):
+        cut = make_service("Corte de pelo")
+        make_service("Tinte", duration=60)
+        line = {"service_id": str(cut.id), "service": "Tinte"}
+        shown = services_said("appointment.appointment.create", [line], person(hub_a, "es"))
+    assert shown == ([{"service_id": "Corte de pelo"}], True)
+
+
+@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+def test_an_id_written_where_the_name_goes_is_never_said(hub_a, no_fallback):
+    """rv-37: a model that mixes up the two data writes the id in the name's place: an id is no name, the card says how
+    many services the booking carries."""
+    with use_hub(hub_a):
+        cut = make_service("Corte de pelo")
+        shown = services_said("appointment.appointment.create", [{"service": str(cut.id)}], person(hub_a, "es"))
+    assert shown[1] is False
+
+
+@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+def test_a_name_beside_a_service_the_person_may_not_see_never_stands_for_it(hub_a, no_fallback):
+    """Whoever may not read Services sees how many services the booking carries: never the name the model wrote beside
+    an id the booking takes."""
+    with use_hub(hub_a):
+        cut = make_service("Corte de pelo")
+        blind = person(hub_a, "es", without=frozenset({get("service.service.get").permission}))
+        shown = services_said("appointment.appointment.create", [{"service_id": str(cut.id), "service": "Tinte"}], blind)
+    assert shown == ([{}], True)
 
 
 @pytest.mark.django_db(databases=hubs.HUB_DATABASES)
