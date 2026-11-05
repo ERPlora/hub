@@ -187,6 +187,20 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
     });
   });
 
+  test(`BASE-F33 — who came back and stays on the report sees how it ended, with no jump to the catalogue, at ${width}`, async ({ browser }) => {
+    await withHeldBack(browser, viewport, '/settings#data', async (context, page) => {
+      await loadIt(page);
+      await page.reload();
+      await expect(testid(page, 'report-waiting')).toBeVisible();
+
+      released();
+
+      await expect(testid(page, 'report-status')).toHaveText('Todo ha entrado.', { timeout: APP_SET_UP_MS });
+      await expect(shown(page).locator('[data-testid="templates-row"]')).toHaveCount(0);
+      await expect.poll(() => services(context), { timeout: APP_SET_UP_MS }).toBe(SERVICES);
+    });
+  });
+
   test(`BASE-F32 — an app that could not be set up says so, and the retry brings it, at ${width}`, async ({ browser }) => {
     await withHeldBack(browser, viewport, '/settings#data', async (context, page) => {
       await loadIt(page);
@@ -215,6 +229,9 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await expect(testid(page, 'blueprint-card-pending')).toContainText('Tus apps se están preparando');
       await expect(testid(page, 'blueprint-card-pending')).toContainText('Servicios');
       await expect(testid(page, 'blueprint-card-report')).toBeVisible();
+      // Its long text never squeezes the spinner on a phone: Ionic's own size, 28 px.
+      const spinner = await testid(page, 'blueprint-card-pending').locator('ion-spinner').boundingBox();
+      expect(spinner?.width).toBe(28);
       await snap(page, 'card-waiting', width);
 
       released();
