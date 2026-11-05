@@ -192,7 +192,8 @@ test('pricing-assistant-price-currency — in Spanish changing a price of a list
     await page.setViewportSize({ width: vp.width, height: vp.height });
     await expect(card(page)).toContainText(FIFTEEN_DOLLARS);
     await expect(card(page)).not.toContainText('€');
-    await expect(card(page)).not.toContainText('1500');
+    // As a number of its own: the names on the card carry this run's stamp, which may spell it (hub#796).
+    await expect(card(page)).not.toContainText(/\b1500\b/);
     await untilStill(page);
     await capture(page, `${KEY}-${vp.label}`);
   }

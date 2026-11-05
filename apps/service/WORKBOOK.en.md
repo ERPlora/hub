@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:34f8278d35fada59c884f53a1c863796486095d4db72ab24c551451b0f5963ac -->
+<!-- generated from WORKBOOK.md sha256:1944551ee9337ab6f59daece75a1bb3e8731a39b180505548a9268fcc4c2cc16 -->
 
 ## What it is for and who it is for
 
@@ -394,7 +394,9 @@ assistant, API and add in one go); the form brings the default tax category chos
 "Show prices" and "Show duration" are used by the Online booking page: without them it does not show the
 price or the duration of each service.
 If it fails: "The settings could not be saved." and the reason below the field (a duration of 0, a tax
-category that does not exist).
+category that does not exist). As in the form windows, the notice goes as soon as something is changed and
+a field's reason as soon as that field is corrected; both come back if the next try is refused too. A
+refusal that names no field stays until the next try (hub#821).
 Involved: SERVICE-F01, SERVICE-F06, ONLINE_BOOKING-F01
 
 ### SERVICE-F12 Create a voucher

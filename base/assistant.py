@@ -126,8 +126,8 @@ SYNTHESIZE_PATH = "/internal/speech/synthesize"
 #: A door that answers at once; the turn waits longer for its model, piece by piece.
 TIMEOUT_SECONDS = 15
 TURN_TIMEOUT = httpx.Timeout(15.0, read=120.0)
-#: Reading aloud waits for the voices' provider, which erplora.com waits up to 60 s for (saas ``assistant.media``): a
-#: little longer here, so a slow provider comes back as erplora.com's own refusal, never as the Hub hanging up first.
+#: Reading aloud waits for erplora.com's engine, up to a minute like its other services (saas ``assistant.media``): a
+#: little longer here, so a slow one comes back as erplora.com's own refusal, never as the Hub hanging up first.
 SPEECH_TIMEOUT = httpx.Timeout(15.0, read=65.0)
 
 
@@ -847,7 +847,7 @@ def transcribe(scope: Scope, *, audio: str, mime_type: str, language: str) -> di
 
 
 def speak(scope: Scope, *, text: str, language: str, voice: str) -> dict:
-    """``text`` read aloud by erplora.com in ``voice`` (its catalogue's id; none, the language's first): the mp3 and its
+    """``text`` read aloud by erplora.com in ``voice`` (a voice of its engine; none, its own for the language): the mp3 and its
     type, ``{audio, content_type}``. The voices are Spanish and English, as the documentation: any other language
     reads in English."""
     payload = {"hub": scope.key, "text": text, "language": docs_language(language)}

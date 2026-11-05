@@ -1,0 +1,13 @@
+{% load i18n %}<div class="{{ name_column }}">
+  <a class="{{ name_class }}" href="/">{{ site_name }}</a>
+  {% if content.footer.text %}<p class="small text-body-secondary mt-2 mb-0" data-ep-footer-text>{{ content.footer.text }}</p>{% endif %}
+</div>
+{% if body %}<div class="{{ menu_column }}">
+  <ul class="list-unstyled {{ menu_class }} d-grid gap-2 mb-0">
+    {% for section in body %}<li><a class="text-body-secondary text-decoration-none" href="#{{ section.name }}">{{ section.data.title }}</a></li>
+    {% endfor %}
+  </ul>
+</div>{% endif %}
+<div class="col-6 col-md-3 text-md-end">
+  <a class="{{ login_class }}" href="{{ login_url }}" data-ep-login>{% translate "Log in" context "website" %}</a>
+</div>

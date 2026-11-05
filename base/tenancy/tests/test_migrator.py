@@ -53,33 +53,6 @@ def control() -> str:
     return tenancy_connections.control_name()
 
 
-def sessions_on(name: str) -> int:
-    with hubs._maintenance() as conn:
-        return conn.execute("SELECT count(*) FROM pg_stat_activity WHERE datname = %s", [name]).fetchone()[0]
-
-
-#: How long ``assert_nobody_on`` waits for the sessions on a database to end, and how often it looks: a client's
-#: ``close()`` returns before its server process has left ``pg_stat_activity``, so a connection just closed is still
-#: counted for a moment (hub#484's CI); one still there after the wait is a connection left open.
-SESSIONS_END_WAIT = 5.0
-SESSIONS_END_POLL = 0.05
-
-
-def assert_nobody_on(name: str, *, wait: float = SESSIONS_END_WAIT) -> None:
-    """Fail unless every session connected to the database ``name`` has ended within ``wait`` seconds, naming the ones
-    still there."""
-    deadline = time.monotonic() + wait
-    with hubs._maintenance() as conn:  # autocommit: each look is a new snapshot of pg_stat_activity
-        while True:
-            left = conn.execute(
-                "SELECT pid, application_name, state FROM pg_stat_activity WHERE datname = %s ORDER BY pid", [name]
-            ).fetchall()
-            if not left or time.monotonic() >= deadline:
-                break
-            time.sleep(SESSIONS_END_POLL)
-    assert not left, f"still connected to {name} after {wait:g} s, as (pid, application_name, state): {left}"
-
-
 def database_oid(name: str) -> int | None:
     with hubs._maintenance() as conn:
         row = conn.execute("SELECT oid FROM pg_database WHERE datname = %s", [name]).fetchone()
@@ -355,6 +328,22 @@ def test_an_app_the_code_no_longer_knows_stays_in_schema_apps(new_database, make
     assert hub.schema_apps["gone"] == "0009_later"
 
 
+def test_a_database_control_s_row_does_not_name_yet_never_changes_that_row(new_database, make_hub):
+    """Control's row learns what a database has only once it names that database: a cut migrates a business's database
+    before its last step names it (``base.hub.cut_finish`` records its schema then, in one transaction), so a cut that
+    breaks before leaves the row as it was (hub#612). The hub in hand learns it all the same: the last step reads it."""
+    hub = make_hub("", schema_state=Hub.SchemaState.BEHIND, schema_apps={"gone": "0009_later"})
+    hub.db_name = new_database  # in hand only, as a cut holds it until its last step
+    leaf = leaves()
+
+    migrator.ensure_schema(hub)
+
+    assert hub.schema_apps == {"gone": "0009_later", **{label: leaf[label] for label in PLATFORM}}
+    assert hub.schema_state == Hub.SchemaState.CURRENT
+    row = Hub.objects.get(pk=hub.pk)
+    assert (row.db_name, row.schema_apps, row.schema_state) == ("", {"gone": "0009_later"}, Hub.SchemaState.BEHIND)
+
+
 def test_add_creates_the_people_apps_and_what_waited_for_them(new_database, make_hub):
     # Tenancy W10: an appointment hangs from a staff record, and a staff record from the business's own person.
     hub = make_hub(new_database)
@@ -438,7 +427,7 @@ def test_a_failed_run_leaves_neither_the_lock_nor_the_connection(new_database, m
     with pytest.raises(RuntimeError, match="the migration broke"):
         migrator.ensure_schema(hub)
 
-    assert_nobody_on(new_database)
+    hubs.assert_nobody_on(new_database)
     with hubs._maintenance(new_database) as other:
         assert other.execute("SELECT pg_try_advisory_lock(hashtext('erplora.schema'))").fetchone()[0]
     hub.refresh_from_db()
@@ -599,8 +588,8 @@ def test_a_verticals_template_is_cloned_from_the_platforms_with_every_app_off(te
     assert applied and all(name.split(".")[0] not in PLATFORM for name in applied)  # the platform came cloned
     assert hubs.table_names(vertical.db_name) == tables_of(vertical.apps)
     assert rows(vertical.db_name, AppActivation._meta.db_table) == 0  # proposal (h): everything off
-    assert_nobody_on(platform.db_name)  # nobody connected: both clonable
-    assert_nobody_on(vertical.db_name)
+    hubs.assert_nobody_on(platform.db_name)  # nobody connected: both clonable
+    hubs.assert_nobody_on(vertical.db_name)
 
 
 def test_a_verticals_template_gets_its_platforms_access_never_publics(template_name):
@@ -721,7 +710,7 @@ def test_pending_lists_what_a_template_lacks_and_applies_nothing(template_name):
 
     assert migrator.pending_template(template) == [f"tax.{leaf}"]
     assert migrator.pending_template(template) == [f"tax.{leaf}"]
-    assert_nobody_on(template.db_name)
+    hubs.assert_nobody_on(template.db_name)
 
 
 def test_pending_of_a_missing_template_is_what_making_it_applies_and_creates_nothing(template_name):
@@ -750,31 +739,3 @@ def test_the_migrator_never_drops_anything():
     root = Path(__file__).resolve().parents[3]
     for path in ("base/tenancy/migrator.py", "base/management/commands/migrate_hubs.py"):
         assert re.search(r"\bDROP\b", (root / path).read_text()) is None, path
-
-
-# ── These tests' «nobody connected» ─────────────────────────────────────────────────────────────────────────────
-
-
-def test_nobody_on_waits_for_a_session_that_ends_a_moment_after_it_is_asked(new_database):
-    """The race of hub#484's CI (``assert 1 == 0``): a client's ``close()`` returns before its server process has left
-    ``pg_stat_activity``. Here a real session ends half a second after the check starts: an instant count still sees
-    it, and the check waits for it to go."""
-    with hubs._maintenance(new_database) as conn:
-        assert sessions_on(new_database) == 1
-        closing = threading.Timer(0.5, conn.close)
-        closing.start()
-        try:
-            assert_nobody_on(new_database)
-        finally:
-            closing.cancel()
-            closing.join()
-
-
-def test_nobody_on_still_fails_after_its_wait_on_a_session_left_open_naming_it(new_database):
-    with hubs._maintenance(new_database) as conn:
-        started = time.monotonic()
-        with pytest.raises(AssertionError, match=rf"\b{conn.info.backend_pid}\b"):
-            assert_nobody_on(new_database, wait=0.5)
-        waited = time.monotonic() - started
-
-    assert waited >= 0.5

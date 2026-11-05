@@ -1608,7 +1608,11 @@ administrador y responsable, los mismos que anulan y devuelven).
   método) los retiene con `FOR KEY SHARE` (`held`, también por id) antes de escribir lo que los apunta: el borrado
   espera y responde «No se puede eliminar», o la escritura que llega después recibe lo mismo que con una sección
   (422 en su campo) o un método (409) que no existen (`tests/test_concurrency.py`).
-- **Numeración**: `SaleCounter` por día del negocio (zona horaria del Hub) con `UPDATE … RETURNING`
+- **El día de una venta sigue en `TIME_ZONE`**, no en la zona del negocio: Facturación copia el día a la
+  `operation_date` del registro de VeriFactu y el número a su descripción, y la fecha de emisión y el tipo del cobro están
+  en ese mismo reloj. Cambian juntos, con supervisión (hub#772); hasta entonces lo congela
+  `tests/test_guardrails_fiscal_clock.py`.
+- **Numeración**: `SaleCounter` por el día de la venta con `UPDATE … RETURNING`
   (asignar `F("last") + 1` y guardar: Django devuelve el valor con `RETURNING`), en la transacción del
   cobro: un rechazo no gasta número y nunca hay huecos. `AAAAMMDD-NNNN`, cuatro cifras como mínimo
   (la 10.000 es `AAAAMMDD-10000`). Sin secuencias de Postgres.

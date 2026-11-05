@@ -8,7 +8,7 @@ import { AppPage, applySurface } from '@erplora/ui/shell';
 import { describe, expect, it, vi } from 'vitest';
 import type { Component } from 'vue';
 
-import { ADMIN, errorFrame, flush, MANAGER, type MountOptions, mountInbox } from '../__tests__/mount-inbox';
+import { ADMIN, errorFrame, flush, followUpgrade, MANAGER, type MountOptions, mountInbox, SIGNED } from '../__tests__/mount-inbox';
 import type { ChannelOut, TemplateOut } from '../operations';
 import SettingsPage from './SettingsPage.vue';
 
@@ -107,6 +107,14 @@ describe('SettingsPage: the number and the month', () => {
       rel: 'noopener',
     });
     expect(spent.find('whatsapp-inbox-settings-upgrade').text()).toBe('Upgrade plan');
+  });
+
+  it('«Upgrade plan» goes with the pass: already signed in on erplora.com (BASE-F11, hub#723)', async () => {
+    const s = await setup({}, { ...CONNECTED, monthly_usage: 150, cap_reached: true });
+    s.answer(200, { url: SIGNED });
+    const before = s.sent().length;
+    expect(await followUpgrade(s.find('whatsapp-inbox-settings-upgrade').element)).toBe(SIGNED);
+    expect(s.sent().slice(before)).toEqual([{ method: 'POST', path: '/api/saas-pass', query: {}, body: { next: 'plan' } }]);
   });
 
   // «Upgrade plan» sells, and everything that sells is web only (surface.ts): in the installed app the link opened
@@ -320,18 +328,17 @@ describe('SettingsPage: making, changing and deleting templates (WHATSAPP_INBOX-
   });
 });
 
-describe('SettingsPage: «What do you use it for?» (WHATSAPP_INBOX-F15)', () => {
-  it('offers the automatic answer between the month and the templates when Reservas is on', async () => {
-    const session = { ...ADMIN, apps: [{ label: 'flow', state: 'on' as const }, { label: 'reservation', state: 'on' as const }] };
+describe('SettingsPage: «What do you use it for?» (WHATSAPP_INBOX-F14, F15)', () => {
+  it('offers the automatic answers between the month and the templates when Citas or Reservas is on', async () => {
+    const session = { ...ADMIN, apps: [{ label: 'flow', state: 'on' as const }, { label: 'appointment', state: 'on' as const }] };
     const s = await setup({ session });
     const blocks = s.wrapper.findAll('.wa-settings__block').map((block) => block.attributes('data-testid'));
     expect(blocks.indexOf('whatsapp-inbox-autoreply')).toBe(blocks.indexOf('whatsapp-inbox-settings-month') + 1);
     expect(s.params('flow.recipe.list')).toEqual([{}]);
   });
 
-  it('a business without Reservas sees no such block and asks nothing of Automatizaciones, Citas on or not', async () => {
-    const session = { ...ADMIN, apps: [{ label: 'flow', state: 'on' as const }, { label: 'appointment', state: 'on' as const }] };
-    const s = await setup({ session });
+  it('a business with neither Citas nor Reservas sees no such block and asks nothing of Automatizaciones', async () => {
+    const s = await setup();
     expect(s.find('whatsapp-inbox-autoreply').exists()).toBe(false);
     expect(s.params('flow.recipe.list')).toEqual([]);
   });

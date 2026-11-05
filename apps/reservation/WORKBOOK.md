@@ -746,6 +746,10 @@ la que solo se le autorizó reservar.
 
 ## Para quien lo mantiene
 
+- **Orden de las listas** (`base.ordering.list_order_for`; regla hub#2355 del producto viejo): reservas, turnos, días
+  bloqueados y lista de espera van por la columna elegida y desempatan por `id`, todo en la dirección de la lista: la
+  descendente es la ascendente leída al revés, empates incluidos. Lo fija `test_ties_go_by_id_in_the_lists_own_direction`,
+  por lista.
 - Anatomía completa: `apps.py`, `models.py`, `migrations/`, `schemas.py`, `engine.py` (la puerta del
   alta sin base de datos), `queries.py`, `services.py`, `events.py`, `live.py`, `api.py`, `admin.py`,
   `locale/`, `frontend/` y un `tests/test_<fichero>.py` por fichero, más

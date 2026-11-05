@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:345936839c9864a5d039ddeddbbe480516b9a7969303567f5ce51a53d9fddeac -->
+<!-- generated from WORKBOOK.md sha256:dbb74e718190308da2a5fee253e6318ff1a4713ae3e67fd2720b88bddcba1ad6 -->
 
 ## What it is for and who it is for
 
@@ -152,15 +152,15 @@ touched ("Meta only lets you change the category of a template it rejected.").
 | WHATSAPP_INBOX-F11 | Erase a customer's data from their card | done | common |
 | WHATSAPP_INBOX-F12 | Merge two cards of the same customer | done | common |
 | WHATSAPP_INBOX-F13 | See the month's usage and reach the cap | done | common |
-| WHATSAPP_INBOX-F14 | Turn on "Book appointments" | discarded — **Book appointments** is not offered: after your **Approve**, Appointments refuses the appointment the assistant proposes, because an automation only books with the permission for its own appointments; the card comes back when Appointments accepts it (hub#514) | hair salon |
+| WHATSAPP_INBOX-F14 | Turn on "Book appointments" | done | hair salon |
 | WHATSAPP_INBOX-F15 | Turn on "Book a table" | done | restaurant |
 | WHATSAPP_INBOX-F16 | Decide whether WhatsApp bookings confirm by themselves | done | common |
 | WHATSAPP_INBOX-F17 | Turn off an automatic answer | done | common |
 | WHATSAPP_INBOX-F18 | Update an automatic answer to its improved version | done | common |
 | WHATSAPP_INBOX-F19 | Choose the slot by writing instead of tapping | done | common |
 | WHATSAPP_INBOX-F20 | When the assistant cannot answer | done | common |
-| WHATSAPP_INBOX-F21 | The customer asks for an appointment on WhatsApp | discarded — not offered: after your **Approve**, Appointments refuses the appointment the assistant proposes (F14); today she is answered from the inbox and the appointment is booked by hand in the Agenda (hub#514) | hair salon |
-| WHATSAPP_INBOX-F22 | The customer cancels or moves her appointment on WhatsApp | discarded — not offered: the appointments answer is not in the gallery (F21). Automations can already cancel it after your **Approve** (FLOW-F28), but today it is cancelled or moved by hand from the Agenda (hub#514) | hair salon |
+| WHATSAPP_INBOX-F21 | The customer asks for an appointment on WhatsApp | done | hair salon |
+| WHATSAPP_INBOX-F22 | The customer cancels or moves her appointment on WhatsApp | done | hair salon |
 | WHATSAPP_INBOX-F23 | The customer gets the notice when the salon confirms | done | hair salon |
 | WHATSAPP_INBOX-F24 | The guest asks for a table on WhatsApp | done | restaurant |
 | WHATSAPP_INBOX-F25 | The guest cancels or changes their table on WhatsApp | done | restaurant |
@@ -411,44 +411,59 @@ Steps:
    reported this month’s messages yet.".
 2. From 80 % of the month's messages, the inbox warns above the list, for example, "You have 30 of 150 WhatsApp
    messages of your plan left this month."; whoever can configure sees, in the browser, **Upgrade plan**, which opens
-   erplora.com's plans. Below 80 %, nothing. The count moves by itself, without reloading.
+   erplora.com's plans, already signed in with their account (BASE-F11). Below 80 %, nothing. The count moves by itself,
+   without reloading.
 3. At the cap (with a plan that includes none, from the first message), the inbox warns above the list and **Send**
    explains it instead of sending ("Your plan does not include WhatsApp messages: nothing can be sent." when the plan
-   includes none); whoever can configure sees, in the browser, **Upgrade plan**, which opens erplora.com's plans.
+   includes none); whoever can configure sees, in the browser, **Upgrade plan**, which opens erplora.com's plans,
+   already signed in with their account (BASE-F11).
 4. What the customers write is still saved.
-5. When the month changes (on the business's clock) the notice goes away even if erplora.com has not spoken yet; if
+5. When the month changes (erplora.com's, which counts the messages in UTC: in Spain, at 1:00 or 2:00 on the 1st) the
+   notice goes away even if erplora.com has not spoken yet; if
    the plan includes no messages, it stays.
 In: the month's usage and cap that erplora.com sends (0: the plan includes none).
 Out: the notice in the inbox and in Settings; nothing is saved.
 If it fails: if erplora.com refuses a send because of the cap (the Hub's figures were behind), the message does not
 reach Meta nor is it counted, it stays "Not delivered" and says so with "This month's WhatsApp messages of your plan
 are spent: nothing can be sent until next month.", never as Meta's reason; if it asks to go slower, it is not the
-cap: the message stays "Not sent" with **Retry**.
-Involved: erplora.com, BASE-F104
+cap: the message stays "Not sent" with **Retry**. If the pass of **Upgrade plan** does not arrive (an error, 8 seconds
+without an answer or a session opened without the account), the usual address opens: erplora.com asks to sign in with
+the account and goes on to the plans.
+Involved: erplora.com, BASE-F11, BASE-F104
 
 ### WHATSAPP_INBOX-F14 Turn on "Book appointments"
-Status: discarded — **Book appointments** is not offered: after your **Approve** in **Waiting for your answer**,
-Appointments refuses the appointment the assistant proposes, because an automation only books with the permission for
-its own appointments, not on behalf of a professional; until Appointments accepts it, the card does not show in
-Settings nor its automatic answer in the Automations gallery, and the customer who asks for an appointment on
-WhatsApp is answered from the inbox (hub#514)
+Status: done
 Actor: owner, administrator
 Screen: Settings
 Steps:
-1. In **Settings → What do you use it for?**, the **Book appointments** card explains what it does: WhatsApp answers
-   by itself, reads your agenda, offers the free slots and books or moves the appointment of the customer who writes
-   when you say yes.
-2. Press **Turn on** and confirm it: the card turns "On" with **Turn off**.
-3. The appointments' confirmation switch appears (F16).
+1. In **Settings → What do you use it for?**, the **Book appointments** card explains what it does: "WhatsApp answers by
+   itself: it checks the free times, books, moves or cancels the appointment of the customer who writes once you say
+   yes, and answers her.".
+2. Press **Turn on**: "WhatsApp will answer by itself: it checks the free times, books, moves or cancels the appointment
+   of the customer who writes once you say yes, and answers her. Turn it on?" shows, with **Turn on** and **Not now**.
+   If "Book a table" is on, below it says "Only one automatic answer can answer on your number: turning this one on
+   turns «Book a table» off.".
+3. Press **Turn on**: first "Book a table" and its confirmed-reservation notice turn off if they were on, and then the
+   card turns "On" with **Turn off** and says "Done. Write to yourself from another phone: “I want an appointment
+   tomorrow”.".
+4. The confirmation switch appears (F16).
+5. If both end up on from Automations, each card that is on warns: "“Book a table” is on too: each message gets two
+   automatic answers. Turn off the one you do not use." (or naming "Book appointments"); turning one off (F17) removes
+   the warning.
 In: that Appointments, Customers and Automations are active in the business; the assistant is provided by
 erplora.com.
-Out: the appointments' automatic answer and "Tell the customer by WhatsApp when their appointment is confirmed"
-turned on, with exactly the permissions they ask for; the answer asks the assistant with "Ask me first" and what it
-wants to book or move waits for you first in **Waiting for your answer** (F21). Today only the notice can be turned
-on, from Automations (F23).
-If it fails: as in F15, naming Appointments.
-Involved: APPOINTMENT-F18, APPOINTMENT-F19, CUSTOMER-F26, FLOW-F33, FLOW-F37, FLOW-F38, WHATSAPP_INBOX-F15,
-WHATSAPP_INBOX-F21, WHATSAPP_INBOX-F23
+Out: the automations "WhatsApp → appointment booked" and "Tell the customer by WhatsApp when their appointment is
+confirmed" turned on (the first time, with exactly the permissions they ask for) and, if it was on, "WhatsApp → table
+booked" paused: only one automatic answer answers on the number. They show in Automations, under **Comes with "WhatsApp
+inbox"**, and pausing them there leaves this card off. "WhatsApp → appointment booked" asks the assistant with "Ask me
+first": it can only look at the free times and book, move or cancel the appointment of whoever writes; what it wants to
+do waits for you first in **Waiting for your answer** (F21, F22).
+If it fails: the card says the reason, pauses what it got to turn on and turns back on the answer it had turned off, so
+the number is never left without an answer; without permission, "Only an owner or an admin can turn it on."; without
+Automations or without Customers, the card says "“Book appointments” needs the app Automations." (or "Customers") with
+**See apps** and does not offer **Turn on**; without Appointments, the card does not show.
+Involved: APPOINTMENT-F18, APPOINTMENT-F19, CUSTOMER-F26, FLOW-F33, FLOW-F34, FLOW-F35, FLOW-F37, FLOW-F38,
+WHATSAPP_INBOX-F15, WHATSAPP_INBOX-F21, WHATSAPP_INBOX-F22, WHATSAPP_INBOX-F23
 
 ### WHATSAPP_INBOX-F15 Turn on "Book a table"
 Status: done
@@ -458,23 +473,29 @@ Steps:
 1. In **Settings → What do you use it for?**, the **Book a table** card explains what it does: "WhatsApp answers by
    itself: it checks the free tables, books the table of whoever writes once you say yes, and answers them.".
 2. Press **Turn on**: "WhatsApp will answer by itself: it checks the free tables, books the table of whoever writes
-   once you say yes, and answers them. Turn it on?" shows, with **Turn on** and **Not now**.
-3. Press **Turn on**: the card turns "On" with **Turn off** and says "Done. Write to yourself from another phone: “I
-   want a table for two tomorrow”.".
+   once you say yes, and answers them. Turn it on?" shows, with **Turn on** and **Not now**. If "Book appointments" is
+   on, below it says "Only one automatic answer can answer on your number: turning this one on turns «Book appointments»
+   off.".
+3. Press **Turn on**: first "Book appointments" and its confirmed-appointment notice turn off if they were on, and then
+   the card turns "On" with **Turn off** and says "Done. Write to yourself from another phone: “I want a table for two
+   tomorrow”.".
 4. The confirmation switch appears (F16).
+5. With both on from Automations, the same warning as in F14, naming "Book appointments".
 In: that Reservations, Customers and Automations are active in the business; the assistant is provided by
 erplora.com.
 Out: the automations "WhatsApp → table booked" and "Tell the customer by WhatsApp when their reservation is
-confirmed" turned on (the first time, with exactly the permissions they ask for). They show in Automations, under
+confirmed" turned on (the first time, with exactly the permissions they ask for) and, if it was on, "WhatsApp →
+appointment booked" paused: only one automatic answer answers on the number. They show in Automations, under
 **Comes with "WhatsApp inbox"**, and pausing them there leaves this card off. "WhatsApp → table booked" asks the
 assistant with "Ask me first": it can only look at how the day is going and the free tables, and book, change the
 reservation or put on the waiting list whoever writes; what it wants to do waits for you first in **Waiting for your
 answer** (F24).
-If it fails: the card says the reason and pauses what it got to turn on; without permission, "Only an owner or an
-admin can turn it on."; without Automations or without Customers, the card says "“Book a table” needs the app
-Automations." (or "Customers") with **See apps** and does not offer **Turn on**; without Reservations, **What do you
-use it for?** does not show.
-Involved: RESERVATION-F17, CUSTOMER-F26, FLOW-F33, FLOW-F34, FLOW-F35, FLOW-F37, FLOW-F38, WHATSAPP_INBOX-F24,
+If it fails: the card says the reason, pauses what it got to turn on and turns back on the appointments answer it had
+turned off; without permission, "Only an owner or an admin can turn it on."; without Automations or without Customers,
+the card says "“Book a table” needs the app Automations." (or "Customers") with **See apps** and does not offer **Turn
+on**; without Reservations, the card does not show, and without Appointments or Reservations, **What do you use it
+for?** does not either.
+Involved: RESERVATION-F17, CUSTOMER-F26, FLOW-F33, FLOW-F34, FLOW-F35, FLOW-F37, FLOW-F38, WHATSAPP_INBOX-F14, WHATSAPP_INBOX-F24,
 WHATSAPP_INBOX-F26
 
 ### WHATSAPP_INBOX-F16 Decide whether WhatsApp bookings confirm by themselves
@@ -482,19 +503,24 @@ Status: done
 Actor: owner, administrator
 Screen: Settings
 Steps:
-1. With the **Book a table** card "On", choose below **Reservations confirm by themselves** or **I review them
-   first**; each option takes its whole row and its text wraps to the next line on the phone, never cut.
-2. With "I review them first", where they wait shows: "Each new reservation waits for you in Reservations with
-   “Confirm”.".
-3. The change is saved at once in Reservations, not in this app, and decides every new reservation, also the one
-   taken by hand.
-4. In the hair salon, the appointments' switch comes with **Book appointments** (F14).
-In: how Reservations confirms today. Without changing it, Reservations reviews.
-Out: the rule changed in Reservations; the automatic answer reads it before each booking and tells the assistant,
-which tells whoever writes whether it is confirmed or the restaurant will confirm it. With "Reservations confirm by
-themselves", the reservation is born confirmed and that also triggers the notice of F26.
-If it fails: "Could not save how reservations confirm. Try again.", and the switch goes back to how it was.
-Involved: RESERVATION-F04, WHATSAPP_INBOX-F14, WHATSAPP_INBOX-F15, WHATSAPP_INBOX-F26
+1. With the card "On", choose below **Appointments confirm by themselves** (or **Reservations confirm by themselves**)
+   or **I review them first**; each option takes its whole row and its text wraps to the next line on the phone, never
+   cut.
+2. With "I review them first", where they wait shows: "Each new appointment waits for you in the Diary with “Confirm”."
+   or "Each new reservation waits for you in Reservations with “Confirm”.".
+3. The change is saved at once in Appointments or in Reservations, not in this app.
+4. The switch does not cover the same in both businesses: in Appointments it only decides the appointments the customer
+   books herself; in Reservations it decides every new reservation, also the one taken by hand.
+In: how the app that keeps the bookings confirms today. Without changing it, Appointments confirms by itself and
+Reservations reviews.
+Out: the rule changed in Appointments or in Reservations; the automatic answer reads it before each booking and tells
+the assistant, which tells whoever writes whether it is confirmed or the business will confirm it. With "Appointments
+confirm by themselves", the appointment is born confirmed and that also triggers the notice of F23; with "Reservations
+confirm by themselves", the reservation is born confirmed and that also triggers the notice of F26.
+If it fails: "Could not save how appointments confirm. Try again." (or "Could not save how reservations confirm. Try
+again."), and the switch goes back to how it was.
+Involved: APPOINTMENT-F18, APPOINTMENT-F19, RESERVATION-F04, WHATSAPP_INBOX-F14, WHATSAPP_INBOX-F15, WHATSAPP_INBOX-F23,
+WHATSAPP_INBOX-F26
 
 ### WHATSAPP_INBOX-F17 Turn off an automatic answer
 Status: done
@@ -532,7 +558,7 @@ Status: done
 Actor: customer
 Screen: WhatsApp: the customer's chat
 Steps:
-1. The automatic answer offers them a short numbered list of times (F24; in F21, once it is offered).
+1. The automatic answer offers them a short numbered list of times (F21, F24).
 2. They write `el 2`, `la segunda` or `21:30`: the list goes written in the message, with no options to tap.
 3. If what they write points to exactly one of the options offered, it is checked that it is still free and proposed
    as if they had written it in full: it waits for you in **Waiting for your answer** and, with your **Approve**, it
@@ -566,10 +592,7 @@ If it fails: if the mark cannot be set, the apology goes out all the same and th
 Involved: WHATSAPP_INBOX-F09, WHATSAPP_INBOX-F13, WHATSAPP_INBOX-F24
 
 ### WHATSAPP_INBOX-F21 The customer asks for an appointment on WhatsApp
-Status: discarded — not offered: after your **Approve** in **Waiting for your answer**, Appointments refuses the
-appointment the assistant proposes, because an automation only books with the permission for its own appointments,
-not on behalf of a professional; that is why **Book appointments** (F14) does not show, and today the customer is
-answered from the inbox and the appointment is booked by hand in the Agenda (hub#514)
+Status: done
 Actor: customer, owner
 Screen: WhatsApp: the customer's chat; Automations
 Steps:
@@ -580,7 +603,7 @@ Steps:
    it proposes booking it with the professional who works at that time; if not, it answers with a short numbered list
    of slots (F19). The assistant never chooses the time for her.
 5. The appointment it wants to book waits for you in Automations, in **Waiting for your answer**, with whom it is
-   for; with **Approve** it is booked and she gets the answer: that the appointment is booked (day, time and
+   for, with whom and which services, by their name ("Services: Haircut"); with **Approve** it is booked and she gets the answer: that the appointment is booked (day, time and
    professional) if the salon confirms by itself, or that she has been put down and the salon will confirm it, as
    F16 says. The appointment is in the Agenda.
 6. With **No**, or if nobody answers within 72 hours, nothing is booked and she is left with the acknowledgement:
@@ -597,9 +620,7 @@ Involved: APPOINTMENT-F02, APPOINTMENT-F18, CUSTOMER-F10, CUSTOMER-F26, FLOW-F37
 WHATSAPP_INBOX-F19, WHATSAPP_INBOX-F20
 
 ### WHATSAPP_INBOX-F22 The customer cancels or moves her appointment on WhatsApp
-Status: discarded — not offered: the appointments answer is not in the gallery (F21). Automations can already cancel
-an appointment after your **Approve** (FLOW-F28), as with a table (F25), but today it is cancelled or moved by hand from
-the Agenda (hub#514)
+Status: done
 Actor: customer, owner
 Screen: WhatsApp: the customer's chat; Automations
 Steps:
@@ -612,11 +633,11 @@ Steps:
    service, waits for you in **Waiting for your answer**; with **Approve** it is moved.
 5. She gets the answer with what happened.
 In: the message and that customer's latest appointment.
-Out: once it is offered, the appointment cancelled or moved in Appointments as if she cancelled or moved it herself
+Out: the appointment cancelled or moved in Appointments as if she cancelled or moved it herself
 (`appointment.appointment.cancelled`, `appointment.appointment.rescheduled`); never someone else's.
 If it fails: F20; if Appointments refuses it, it is explained to her. With the plan's messages for the month spent,
 nothing is cancelled or moved, she gets no answer and the conversation is left with "Needs attention" (F13).
-Involved: APPOINTMENT-F04, APPOINTMENT-F06, FLOW-F38, WHATSAPP_INBOX-F20
+Involved: APPOINTMENT-F04, APPOINTMENT-F06, FLOW-F28, FLOW-F38, WHATSAPP_INBOX-F14, WHATSAPP_INBOX-F20
 
 ### WHATSAPP_INBOX-F23 The customer gets the notice when the salon confirms
 Status: done

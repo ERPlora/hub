@@ -279,8 +279,9 @@ test('production build: CSP with nonce, strict-dynamic and Trusted Types enforce
   expect(header).toContain("'strict-dynamic'");
   expect(header).toContain("require-trusted-types-for 'script'");
   expect(header).toMatch(/trusted-types default/);
-  expect(header).not.toContain('5173');
-  expect(html).not.toContain('5173');
+  // Vite's port, with its colon: the nonce and the hashes in the assets' names are random and may spell the digits (hub#796).
+  expect(header).not.toContain(':5173');
+  expect(html).not.toContain(':5173');
   expect(html).not.toContain('@vite/client');
   expect(html).toMatch(/<script type="module" src="\/static\/spa\/assets\/main-[^"]+\.js"/);
   expect(scriptTags.length).toBeGreaterThan(0);

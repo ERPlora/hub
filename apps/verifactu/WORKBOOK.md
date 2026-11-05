@@ -101,9 +101,11 @@ la persona no puede usar no aparecen.
 Menú **VeriFactu → Registros**. Título «Registros VeriFactu». Tabla de 50 en 50 (tabla o tarjetas; en el
 móvil, tarjetas con el número de factura como título) con «Seq», «Factura», «Fecha», «Tipo» (Alta /
 Anulación), «F.» (F1…R5), «Emisor», «Total», «Entorno» (Pruebas / Producción) y «Estado» (Pendiente,
-Enviado, Aceptado, Aceptado con errores, Rechazado, en una pastilla de color). Buscador «Buscar factura,
-emisor o NIF…» (número de secuencia, número de factura, nombre o NIF del emisor). Filtros de estado, tipo,
-tipo de factura, entorno, fecha y total (en euros), tras el embudo de la tabla con su contador; un total que no
+Enviado, Aceptado, Aceptado con errores, Rechazado, en una pastilla de color; junto a un alta rechazada o aceptada
+con errores, «Pendiente de subsanar» o «Subsanado», que abre el registro que la subsana: VERIFACTU-F24). Buscador
+«Buscar factura, emisor o NIF…» (número de secuencia, número de factura, nombre o NIF del emisor). Filtros de estado,
+tipo, tipo de factura, subsanación («Pendientes de subsanar» o «Subsanados»), entorno, fecha y total (en euros),
+tras el embudo de la tabla con su contador; un total que no
 es un importe, o una fecha «hasta» anterior a la «desde», se dice bajo su campo y no filtra. Lo último sellado
 sale arriba. Por fila: «Ver» (también
 al pulsar la fila) y «Cotejar en la AEAT» (abre la página de cotejo del QR). La lista se pone al día sola
@@ -115,7 +117,8 @@ Vacía: «Todavía no hay registros. Cada factura que emitas se sella y aparece 
 Se abre desde una fila de **Registros** (`/verifactu/records/<id>`). Arriba, «Registro {número}» con su estado,
 su entorno y «← Volver». Si no está en la AEAT (Pendiente o Enviado), el aviso «Aún no está en la AEAT» con
 el porqué y el cuándo (VERIFACTU-F17). Si fue rechazado, el aviso «La AEAT lo ha rechazado» con qué hacer
-(VERIFACTU-F24). Bloques:
+(VERIFACTU-F24); ya subsanado (también un «Aceptado con errores»), en lugar de qué hacer, «Ya está subsanado con un
+registro nuevo» con el enlace «Ver el registro que lo subsana». Bloques:
 - **Factura**: «Factura», «Fecha de expedición», «Fecha de operación» (si es otra), «Tipo de factura»,
   «Emisor», «NIF del emisor», «Cliente» y «NIF del cliente» (si los hay), «Rectifica a» / «Sustituye a»,
   «Base», «Cuota» y «Total».
@@ -752,9 +755,10 @@ Implicados: VERIFACTU-F24, VERIFACTU-F35
 <!-- origen: wf:cadena-fiscal#rec_fiscal-f12 old-hub:HUB_VERIFACTU-F08 old:verifactu/workflow/contingencia.md#verifactu-f24 -->
 Estado: hecho
 Actor: administrador
-Pantalla: Ficha de registro
+Pantalla: Registros, Ficha de registro
 Pasos:
-1. El registro sale en rojo «Rechazado» en **Registros**; en **Eventos** queda «Envío fallido» con el motivo.
+1. El registro sale en rojo «Rechazado» en **Registros**, y a su lado «Pendiente de subsanar»; en **Eventos** queda
+   «Envío fallido» con el motivo. El filtro «Subsanación» → «Pendientes de subsanar» deja solo los que faltan.
 2. En su ficha, «La AEAT lo ha rechazado» con el código y el mensaje literales de la AEAT y qué hacer: si el
    error está en los datos de la factura (un NIF de cliente que la AEAT no reconoce, un importe), se corrige
    **en Facturación** con una rectificativa; si no (un error de la cadena tras restaurar una copia, un fallo
@@ -765,6 +769,9 @@ Pasos:
    inicial; §9.1.3, «alta por rechazo»); `S` si la AEAT sí la tiene y lo rechazado fue una subsanación
    posterior.
 4. Un «Aceptado con errores» también se puede subsanar (`Subsanacion = S`, `RechazoPrevio = N`; §9.1.2).
+5. Ya subsanado, en **Registros** el de antes dice «Subsanado», que abre el registro que lo subsana, y su ficha,
+   «Ya está subsanado con un registro nuevo» con «Ver el registro que lo subsana». Si la AEAT rechaza también la
+   subsanación, esa sale «Pendiente de subsanar» y se subsana a su vez; la de antes sigue «Subsanado».
 Entra: el registro rechazado o aceptado con errores.
 Sale: el registro de subsanación (avisa `verifactu.record.created`).
 Si falla: solo se subsana un registro de alta rechazado o aceptado con errores, y solo el último de su
@@ -1326,6 +1333,12 @@ app: gh:verifactu#139). Tests: `test_apps.py` (declaración, textos `en` + `es`,
   o caducó, otorgamiento sin aprobar en producción, o el servidor sin pasarela o cerrado). `SendControl` (una fila por `(NIF, entorno)`) guarda `next_send_at` (`TiempoEsperaEnvio` de la última
   respuesta) y es el cerrojo del envío: la pasada la toma con `select_for_update(skip_locked=True)`, así que dos
   pasadas nunca mandan la misma cadena y el sellado (que bloquea `Chain`) no espera a la red.
+- **La llamada a la pasarela espera dentro de la transacción** de la operación, porque sus cerrojos son los que impiden
+  que dos pasadas manden la misma cadena. Esa espera puede pasar de los 30 s en los que el clúster corta una transacción
+  ociosa (`idle_in_transaction_session_timeout`; la pasarela puede tardar 45 s en leer), así que cada llamada (`submit`,
+  `query` y `probe`) amplía antes el corte para su transacción, y solo para ella (`SET LOCAL`,
+  `base.operations.allow_idle_wait`, `gateway.LONGEST_WAIT_SECONDS`): una respuesta lenta de la AEAT se guarda y no gasta
+  un intento ni se reenvía con incidencia (hub#623).
 - Un envío junta los `pending` y `sent` de una cadena en orden de secuencia (hasta 1.000) cuando su primer
   pendiente ya toca (`next_attempt_at`) y la espera de la AEAT pasó. Sin respuesta: `attempts` +1 y espera de
   `5·2^(n−1)` minutos, con tope de 60; petición salida y sin respuesta (tiempo de lectura agotado): `sent`.
