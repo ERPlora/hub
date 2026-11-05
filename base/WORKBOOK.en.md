@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:df6391cbcd2f95c9d88e60c3f1bd71921485055f953dce9c4f3ebb12e05c14ea -->
+<!-- generated from WORKBOOK.md sha256:8167fc6de9faf75477600c1a38e9227bd16053b60e332a3a2f642a2262e1b976 -->
 
 ## What it is for and who it is for
 
@@ -61,8 +61,8 @@ by the hour ("Good morning", "Good afternoon", "Good evening"). Below, in this o
   first. On a phone, with six apps or more, the first four and "View all apps".
 - **"Finish setting up your business"**: how many steps are done, a bar and the steps left, each with its
   icon, its explanation, a label ("Needed to invoice", "Important", "Recommended", "Done" or "Not
-  available yet") and "Set up". Folded: five steps (two on a phone), with "View all" and "Show less".
-  When nothing is left: "Your business is ready".
+  available yet") and "Set up". Folded: five steps (two on a phone), first the ones that stop invoicing,
+  with "View all" and "Show less". When nothing is left: "Your business is ready".
 - **The board of panels**, with "Customize panel" (⋮) at the top right.
 
 ### Home · Activity
@@ -415,8 +415,10 @@ Screen: Home · Summary
 Steps:
   1. They come into the Home. In "Finish setting up your business" they see how many steps are done and a
      bar.
-  2. Below, the steps left, in the order the apps set: first the ones that stop invoicing ("Needed to
-     invoice", in red), then the "Important" ones and last the "Recommended" ones.
+  2. Below, the steps left: first the ones that stop invoicing ("Needed to invoice", in red) and then the
+     "Important" ones, each group in the order the apps set, also on a phone, where only two rows fit. The
+     "Recommended" ones show folded only if nothing else is left. "View all" shows every step, the done ones
+     too, in the order the apps set.
   3. The platform's are "Your apps" (turn on at least one business app) and "Your team" (add the people
      who will use the till); the rest come from each app that is on.
   4. A step that only applies to another country, or that the person may not see, does not show. A step
