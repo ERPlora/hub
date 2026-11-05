@@ -223,6 +223,75 @@ describe('SettingsPage (ATTENDANCE-F04)', () => {
     expect(s.field('auto_close_after_hours').errorText).toBe('Too many');
   });
 
+  describe('a refusal by fields (hub#854, as FormModal and the Services settings do: ui#102, hub#821)', () => {
+    const BOTH = 'Fill in both latitude and longitude, or leave both empty.';
+    const HOURS = 'Ensure this value is less than or equal to 24.';
+    const REFUSAL = { error: { code: 'invalid_payload', message: 'Invalid payload', fields: { workplace_lng: BOTH, auto_close_after_hours: HOURS } } };
+
+    /** Saves a workplace and the hours, and the server refuses the longitude and the hours. */
+    async function refused() {
+      const s = await setup();
+      s.answerBy({ '/api/attendance/settings': [422, REFUSAL] });
+      await ionValue(s.field('workplace_lat'), '40.4', 'ionInput');
+      await ionValue(s.field('workplace_lng'), '-3.7', 'ionInput');
+      await ionValue(s.field('auto_close_after_hours'), '20', 'ionInput');
+      await click(s.field('save'));
+      await settle();
+      /** Whether the red notice is on screen. */
+      const notice = () => s.find('attendance-settings-error').exists();
+      const says = (name: string) => s.field(name).errorText ?? '';
+      const marked = (name: string) => s.field(name).classList.contains('ion-invalid');
+      return { ...s, notice, says, marked };
+    }
+
+    it('the notice goes as soon as something is changed, and a field’s message as soon as that field is', async () => {
+      const s = await refused();
+      expect(s.notice()).toBe(true);
+      expect([s.says('workplace_lng'), s.says('auto_close_after_hours')]).toEqual([BOTH, HOURS]);
+      await ionValue(s.field('auto_close_after_hours'), '10', 'ionInput');
+      expect(s.notice()).toBe(false);
+      expect([s.says('auto_close_after_hours'), s.marked('auto_close_after_hours')]).toEqual(['', false]);
+      expect([s.says('workplace_lng'), s.marked('workplace_lng')]).toEqual([BOTH, true]);
+    });
+
+    // As what the screen judges itself: the workplace is a pair, so fixing either coordinate lifts both marks.
+    it('the coordinates are a pair: changing the latitude lifts the longitude’s message, and not the hours’', async () => {
+      const s = await refused();
+      await ionValue(s.field('workplace_lat'), '40.5', 'ionInput');
+      expect(s.notice()).toBe(false);
+      expect([s.says('workplace_lng'), s.marked('workplace_lng')]).toEqual(['', false]);
+      expect(s.says('auto_close_after_hours')).toBe(HOURS);
+    });
+
+    it('a switch is a change too: the notice goes, the fields keep their messages', async () => {
+      const s = await refused();
+      await ionChecked(s.field('require_location'), true);
+      expect(s.notice()).toBe(false);
+      expect([s.says('workplace_lng'), s.says('auto_close_after_hours')]).toEqual([BOTH, HOURS]);
+    });
+
+    it('the next refusal says it all again', async () => {
+      const s = await refused();
+      await ionValue(s.field('workplace_lng'), '-3.8', 'ionInput');
+      await ionValue(s.field('auto_close_after_hours'), '21', 'ionInput');
+      expect([s.notice(), s.says('workplace_lng'), s.says('auto_close_after_hours')]).toEqual([false, '', '']);
+      await click(s.field('save'));
+      await settle();
+      expect(s.notice()).toBe(true);
+      expect([s.says('workplace_lng'), s.says('auto_close_after_hours'), s.marked('workplace_lng')]).toEqual([BOTH, HOURS, true]);
+    });
+
+    it('a refusal that names no field stays until the next try: nothing else says it', async () => {
+      const s = await setup();
+      s.answerBy({ '/api/attendance/settings': [409, { error: { code: 'conflict', message: 'Someone else is saving them.' } }] });
+      await ionValue(s.field('auto_close_after_hours'), '20', 'ionInput');
+      await click(s.field('save'));
+      await settle();
+      await ionValue(s.field('auto_close_after_hours'), '21', 'ionInput');
+      expect(s.find('attendance-settings-error').text()).toBe('Someone else is saving them.');
+    });
+  });
+
   // The banner up top keeps only the save's errors (the location's go under its button): a failed save still says so.
   it('a failed save says so in the banner up top, not under «Use my current location»', async () => {
     const s = await setup();
