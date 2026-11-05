@@ -396,6 +396,24 @@ def test_a_load_that_breaks_turns_its_app_on_all_the_same_and_says_so_and_can_be
     assert by_app(again)["service"]["status"] == "applied"
 
 
+def test_a_load_broken_by_the_database_leaves_nothing_of_it_and_its_app_still_goes_on(business):
+    """A real error of the database aborts the transaction unless a savepoint holds it: without one the app would never
+    go on, the settle failing every time."""
+    hub = business("a")
+    load = load_template(hub)
+
+    def half_done_then_refused(*args, **kwargs):
+        ImportBatch.objects.create(name="half of it", source="catalog", purpose="template", status="partial")
+        ImportBatch.objects.create(name=None, source="catalog", purpose="template", status="partial")
+
+    with mock.patch.object(blueprint, "apply", side_effect=half_done_then_refused):
+        run_pass()
+
+    assert row(hub, "service").state == ON
+    assert by_app(report_of(hub, load))["service"]["status"] == blueprint.FAILED
+    assert count(hub, "base", "ImportBatch") == 1
+
+
 def test_a_template_whose_version_changed_meanwhile_loads_nothing_and_says_why(business):
     hub = business("a")
     load = load_template(hub)

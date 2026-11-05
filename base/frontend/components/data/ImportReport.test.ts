@@ -99,6 +99,7 @@ describe('ImportReport', () => {
     expect(m.wrapper.get('[data-testid="report-waiting"]').text()).toContain('comes in by itself');
     expect(m.wrapper.find('[data-testid="report-status"]').exists()).toBe(false);
     expect(pills(m)).toEqual([['service', 'Being set up']]);
+    expect(m.wrapper.get('[data-id="service"] [data-testid="report-app-status"]').classes()).toContain('status-pill--busy');
     expect(m.wrapper.get('[data-id="service"] [data-testid="report-app-reason"]').text()).toBe('Why, in words.');
     expect(m.wrapper.find('[data-testid="report-retry"]').exists()).toBe(false);
     expect(m.wrapper.find('[data-testid="report-retry-blocked"]').exists()).toBe(false);
@@ -117,6 +118,7 @@ describe('ImportReport', () => {
     expect(m.wrapper.find('[data-testid="report-waiting"]').exists()).toBe(false);
     expect(m.wrapper.get('[data-testid="report-status"]').text()).toContain('No todo entró.');
     expect(pills(m)).toEqual([['service', 'No se ha podido preparar']]);
+    expect(m.wrapper.get('[data-id="service"] [data-testid="report-app-status"]').classes()).not.toContain('status-pill--busy');
     expect(m.wrapper.get('[data-id="service"] [data-testid="report-app-reason"]').text()).toBe('Why, in words.');
     expect(m.wrapper.find('[data-testid="report-retry"]').exists()).toBe(true);
     // The report can be long: the failure is named at its top, not only on its row.
