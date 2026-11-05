@@ -4,10 +4,10 @@ The harm is an interpreter that aborts on its way out, code 134 after every test
 what a request raises to stderr from a daemon thread, and a daemon thread caught holding stderr's lock as the
 interpreter closes is fatal. The Hub's assistant tests cut conversations on purpose: a turn the Hub stops reading, a
 voice it stops waiting for (``test_assistant_speak.py``: the Hub waits 0.2 s, the door answers in 1 s). Same harm as
-saas#283, same cure (``base/tests/quiet_server.py`` of ERPlora/saas).
+saas#283, same cure (``base/tests/quiet_server.py`` of ERPlora/saas). That every double answering in threads runs on
+it is ``tests/test_guardrails.py`` (j).
 """
 
-import re
 import socket
 import struct
 import subprocess
@@ -23,16 +23,6 @@ from base.tests.fake_gateway import FakeGateway
 REPO = Path(__file__).resolve().parents[2]
 STREAM = "/internal/assistant/chat/stream"
 SYNTHESIZE = "/internal/speech/synthesize"
-#: A server that answers each request in a thread of its own: ``ThreadingHTTPServer`` and its kin make them daemon by
-#: default, so a double runs on the quiet server, the one that hushes their cuts.
-THREADED_SERVER = re.compile(r"\bThreading\w*(?:Server|MixIn)\b|\bdaemon_threads\s*=\s*True\b")
-#: The threaded servers that are not the quiet server, and why none of them leaves a request thread printing that its
-#: client went as the interpreter closes. A path that no longer has one leaves the list.
-ALLOWED = {
-    "base/tests/quiet_server.py": "the quiet server itself",
-    "apps/flow/tests/local_https.py": "joins its request threads (daemon_threads = False) and keeps what they raise",
-    "apps/verifactu/tests/test_slow_gateway.py": "its client waits 45 s for an answer that comes in 6 s: none is cut",
-}
 
 
 def handlers() -> list[threading.Thread]:
@@ -193,49 +183,3 @@ def test_a_request_still_arriving_does_not_hold_the_double_up():
     settle()
 
     assert not held
-
-
-@pytest.mark.parametrize(
-    "source",
-    [
-        'ThreadingHTTPServer(("127.0.0.1", 0), Handler)',
-        "class Mine(ThreadingHTTPServer):",
-        "from http.server import ThreadingHTTPServer as Server",
-        'socketserver.ThreadingTCPServer(("127.0.0.1", 0), Handler)',
-        "class Mine(socketserver.ThreadingMixIn, HTTPServer):",
-        "self._server.daemon_threads = True",
-    ],
-)
-def test_the_guard_sees_every_way_of_a_threaded_server(source):
-    assert THREADED_SERVER.search(source)
-
-
-@pytest.mark.parametrize(
-    "source",
-    [
-        'QuietServer(("127.0.0.1", 0), Handler)',
-        # One thread serves and answers: stopping it waits for the request it is on, so none outlives the test.
-        'HTTPServer(("127.0.0.1", 0), Handler)',
-        "from http.server import BaseHTTPRequestHandler",
-        "    daemon_threads = False",
-    ],
-)
-def test_the_guard_lets_other_servers_be(source):
-    assert not THREADED_SERVER.search(source)
-
-
-def test_a_double_with_request_threads_runs_on_the_quiet_server():
-    files = {
-        str(path.relative_to(REPO))
-        for root in ("base", "control", "config", "apps", "shared", "tests")  # pytest.ini's testpaths
-        for path in (REPO / root).rglob("*.py")
-        if "tests" in path.relative_to(REPO).parts and "node_modules" not in path.parts
-    } - {str(Path(__file__).resolve().relative_to(REPO))}
-    threaded = {path for path in files if THREADED_SERVER.search((REPO / path).read_text())}
-
-    # A walk gone blind would let the check pass: it reaches the assistant's double and a double of another app.
-    assert {"base/tests/fake_gateway.py", "apps/flow/tests/local_https.py"} <= files
-    assert sorted(set(ALLOWED) - threaded) == [], "a path of ALLOWED with no threaded server any more leaves it"
-    assert sorted(threaded - set(ALLOWED)) == [], (
-        "a double that answers in threads of its own runs on base.tests.quiet_server.QuietServer (hub#840)"
-    )
