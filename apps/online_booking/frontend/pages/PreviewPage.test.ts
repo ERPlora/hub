@@ -74,13 +74,21 @@ const ROUTES = {
 async function setup(options: MountOptions = {}, routes = ROUTES) {
   const m = await mountOnlineBooking(PreviewPage, { path: '/online_booking/preview', answers: routes, ...options });
   await settle();
-  const el = (testid: string) => m.inDoc(`ob-preview-${testid}`) as HTMLElement & { value?: unknown; errorText?: string };
+  const el = (testid: string) => m.inDoc(`ob-preview-${testid}`) as HTMLElement & { value?: unknown; errorText?: unknown };
+  /** Whether the red notice of a refused booking is on screen. */
+  const notice = () => el('form-error') !== null;
+  /** A field's message (Ionic's default for none is no string) and its red mark. */
+  const says = (testid: string): string => {
+    const text = el(testid)?.errorText;
+    return typeof text === 'string' ? text : '';
+  };
+  const marked = (testid: string) => !!el(testid)?.classList.contains('ion-invalid');
   /** The business answers (`base.business.get`): the prices are in its currency (BASE-F50). */
   async function businessIn(fields = {}) {
     await m.live();
     await m.result('base.business.get', business(fields));
   }
-  return { ...m, el, businessIn };
+  return { ...m, el, businessIn, notice, says, marked };
 }
 
 async function chooseUpToATime(s: Awaited<ReturnType<typeof setup>>) {
@@ -88,6 +96,14 @@ async function chooseUpToATime(s: Awaited<ReturnType<typeof setup>>) {
   await ionValue(s.el('day'), '2030-03-05', 'ionChange');
   await settle();
   await click(s.el('time-10:00'));
+}
+
+/** Chooses up to a time, types each of `typed` (name, mobile…, by its testid) and presses «Book». */
+async function bookWith(s: Awaited<ReturnType<typeof setup>>, typed: Record<string, string>) {
+  await chooseUpToATime(s);
+  for (const [testid, value] of Object.entries(typed)) await ionValue(s.el(testid), value, 'ionInput');
+  await click(s.el('book'));
+  await settle();
 }
 
 describe('PreviewPage', () => {
@@ -154,11 +170,7 @@ describe('PreviewPage', () => {
 
   it('books with the time, the name and the mobile, and shows the number, the message and the link', async () => {
     const s = await setup();
-    await chooseUpToATime(s);
-    await ionValue(s.el('name'), 'Marta Gil', 'ionInput');
-    await ionValue(s.el('phone'), '612 345 678', 'ionInput');
-    await click(s.el('book'));
-    await settle();
+    await bookWith(s, { name: 'Marta Gil', phone: '612 345 678' });
     expect(s.sent().at(-1)).toEqual({
       method: 'POST',
       path: '/api/online_booking/public/book',
@@ -172,11 +184,7 @@ describe('PreviewPage', () => {
 
   it('sees the booking with the link and cancels it within the policy', async () => {
     const s = await setup();
-    await chooseUpToATime(s);
-    await ionValue(s.el('name'), 'Marta Gil', 'ionInput');
-    await ionValue(s.el('phone'), '612345678', 'ionInput');
-    await click(s.el('book'));
-    await settle();
+    await bookWith(s, { name: 'Marta Gil', phone: '612345678' });
     await click(s.el('view'));
     await settle();
     expect(s.el('status')?.textContent).toContain('Confirmed');
@@ -198,13 +206,85 @@ describe('PreviewPage', () => {
       ],
     } as Record<string, [number, unknown]>;
     const s = await setup({}, routes);
-    await chooseUpToATime(s);
-    await ionValue(s.el('name'), 'Marta', 'ionInput');
-    await ionValue(s.el('phone'), '12', 'ionInput');
-    await click(s.el('book'));
-    await settle();
-    expect(s.el('phone')?.errorText).toBe('That mobile is not a valid number.');
+    await bookWith(s, { name: 'Marta', phone: '12' });
+    expect(s.says('phone')).toBe('That mobile is not a valid number.');
     expect(s.el('form-error')?.textContent).toContain('Invalid payload');
+  });
+
+  describe('a refusal by fields (hub#854, as FormModal and the Services settings do: ui#102, hub#821)', () => {
+    const NAME = 'Enter the full name.';
+    const PHONE = 'That mobile is not a valid number.';
+
+    /** Books with a name and a mobile (an email and a note too) the server refuses by `fields`. */
+    async function refused(fields: Record<string, string> = { name: NAME, phone: PHONE }) {
+      const routes = {
+        ...ROUTES,
+        '/api/online_booking/public/book': [422, { error: { code: 'invalid_payload', message: 'Invalid payload', fields } }],
+      } as Record<string, [number, unknown]>;
+      const s = await setup({}, routes);
+      await bookWith(s, { name: 'M', phone: '12', email: 'marta@', notes: 'x'.repeat(10) });
+      return s;
+    }
+
+    it('the notice goes as soon as something is changed, and a field’s message as soon as that field is', async () => {
+      const s = await refused();
+      expect(s.notice()).toBe(true);
+      expect([s.says('name'), s.says('phone')]).toEqual([NAME, PHONE]);
+      await ionValue(s.el('phone'), '612 345 678', 'ionInput');
+      expect(s.notice()).toBe(false);
+      expect([s.says('phone'), s.marked('phone')]).toEqual(['', false]);
+      expect([s.says('name'), s.marked('name')]).toEqual([NAME, true]);
+    });
+
+    it('another time is a change too: the notice goes, and no field’s message', async () => {
+      const s = await refused();
+      await click(s.el('time-10:30'));
+      expect(s.notice()).toBe(false);
+      expect([s.says('name'), s.says('phone')]).toEqual([NAME, PHONE]);
+    });
+
+    it.each([
+      ['another service', (s: Awaited<ReturnType<typeof refused>>) => ionChecked(s.el('service-v2'), true)],
+      ['another professional', (s: Awaited<ReturnType<typeof refused>>) => ionValue(s.el('staff'), 'm1', 'ionChange')],
+      ['another day', (s: Awaited<ReturnType<typeof refused>>) => ionValue(s.el('day'), '2030-03-06', 'ionChange')],
+    ])('%s is a change too: the notice goes, and no field’s message', async (_, change) => {
+      const s = await refused();
+      await change(s);
+      expect(s.notice()).toBe(false);
+      expect([s.says('name'), s.says('phone')]).toEqual([NAME, PHONE]);
+    });
+
+    it('the email and the note are fields too: each message goes with its own field', async () => {
+      const EMAIL = 'Enter a valid email address.';
+      const NOTES = 'This business takes no notes.';
+      const s = await refused({ email: EMAIL, notes: NOTES });
+      expect([s.says('email'), s.says('notes')]).toEqual([EMAIL, NOTES]);
+      await ionValue(s.el('email'), 'marta@example.com', 'ionInput');
+      expect([s.says('email'), s.says('notes')]).toEqual(['', NOTES]);
+      await ionValue(s.el('notes'), '', 'ionInput');
+      expect([s.says('email'), s.says('notes')]).toEqual(['', '']);
+    });
+
+    it('the next refusal says it all again', async () => {
+      const s = await refused();
+      await ionValue(s.el('name'), 'Ma', 'ionInput');
+      await ionValue(s.el('phone'), '123', 'ionInput');
+      expect([s.notice(), s.says('name'), s.says('phone')]).toEqual([false, '', '']);
+      await click(s.el('book'));
+      await settle();
+      expect([s.notice(), s.says('name'), s.says('phone'), s.marked('phone')]).toEqual([true, NAME, PHONE, true]);
+    });
+
+    it('a refusal that names no field stays until the next try: nothing else says it', async () => {
+      const routes = {
+        ...ROUTES,
+        '/api/online_booking/public/book': [409, { error: { code: 'online_booking.slot_taken', message: 'That time has just been taken.' } }],
+      } as Record<string, [number, unknown]>;
+      const s = await setup({}, routes);
+      await bookWith(s, { name: 'Marta Gil', phone: '612 345 678' });
+      await ionValue(s.el('name'), 'Marta Gil Ruiz', 'ionInput');
+      expect(s.el('form-error')?.textContent).toContain('That time has just been taken.');
+    });
   });
 
   it('says the page is off when the business takes no online bookings', async () => {

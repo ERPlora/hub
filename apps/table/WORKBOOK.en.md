@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:dd9c53806f807b9f8071855e9c85f70b4bd37c08733a2564f89b46e3c54e7973 -->
+<!-- generated from WORKBOOK.md sha256:9df43f7f627bc1f19a595a0b66ca8023b9ef7c221fbee03016dbde86e3df9943 -->
 
 ## What it is for and who it is for
 
@@ -352,7 +352,9 @@ Steps:
    ever saving: it asks, 60 and 90 minutes.
 In: the three values.
 Out: the room settings (announces: `table.settings.updated`).
-If it fails: a value out of range shows in its field.
+If it fails: a value out of range shows in its field. As in the form windows, the notice goes as soon as
+something is changed and a field's reason as soon as that field is corrected; both come back if the next try
+is refused too. A refusal that names no field stays until the next try (hub#854).
 Involved: TABLE-F10, TABLE-F22
 
 ### TABLE-F09 See how the room is

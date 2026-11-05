@@ -186,6 +186,22 @@ FLOW_VIEWPORTS.forEach((vp, index) => {
     test.setTimeout(300_000);
     const { context, page } = await ownerPage(browser, '/appointment/settings', vp);
     try {
+      // APPOINTMENT-F19: a refused end hour says so on top and under its field, and both go as soon as it is
+      // corrected (hub#854).
+      const end = shown(page).locator('[data-testid=appointment-settings-calendar_end_hour]');
+      const refused = shown(page).locator('[data-testid=appointment-settings-save-error]');
+      await expect(end.locator('input')).toBeVisible();
+      const endWas = await end.locator('input').inputValue();
+      await end.locator('input').fill('7');
+      await shown(page).locator('[data-testid=appointment-settings-save]').click();
+      await expect(refused).toContainText('The settings could not be saved.');
+      await expect(end.locator('.error-text')).toHaveText('The calendar has to end after it starts.');
+      await expect(end).toHaveClass(/ion-invalid/);
+      await capture(page, 'APPOINTMENT-F19-refused');
+      await end.locator('input').fill(endWas);
+      await expect(refused).toBeHidden();
+      await expect(end).not.toHaveClass(/ion-invalid/);
+      await expect(end.locator('.error-text')).toBeHidden();
       // APPOINTMENT-F19: a setting changed and saved; only what changed is sent.
       const duration = shown(page).locator('[data-testid=appointment-settings-default_duration] input');
       await expect(duration).toBeVisible();
