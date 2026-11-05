@@ -11,7 +11,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import CustomerSearch from '../../../customer/frontend/components/CustomerSearch.vue';
 import type { AppointmentOut } from '../operations';
-import { click, ionValue, mountAppointment, page, settle } from '../__tests__/mount-appointment';
+import { business, click, ionValue, mountAppointment, page, POLISH, settle } from '../__tests__/mount-appointment';
 import AppointmentFormModal from './AppointmentFormModal.vue';
 import AppointmentHistory from './AppointmentHistory.vue';
 import FreeSlots from './FreeSlots.vue';
@@ -103,7 +103,12 @@ async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 
     });
     await settle();
   }
-  return { ...m, field, submit, servicePicker, staffPicker, addService, pickStaff, pickCustomer };
+  /** The business answers (`base.business.get`): the panel's money is its currency (BASE-F50). */
+  async function businessIn(fields = {}) {
+    await m.live();
+    await m.result('base.business.get', business(fields));
+  }
+  return { ...m, field, submit, servicePicker, staffPicker, addService, pickStaff, pickCustomer, businessIn };
 }
 
 async function fillNew(s: Awaited<ReturnType<typeof setup>>) {
@@ -175,6 +180,7 @@ describe('AppointmentFormModal: New appointment', () => {
       }
       return Response.json(page([]));
     });
+    await s.businessIn();
     await fillNew(s);
     // Ana does a haircut in 45 minutes for €25.00; the colour, nobody's own: the catalog's.
     expect(s.field('minutes').value).toBe('105');
@@ -196,11 +202,22 @@ describe('AppointmentFormModal: New appointment', () => {
     for (const [locale, total] of [['es', '1.234,56\u00a0€'], ['en', '€1,234.56']] as const) {
       const s = await setup({}, locale);
       s.answerBy({ ...READS, '/api/service/services/for_sale': [200, dear] });
+      await s.businessIn();
       await s.addService('cut', 'Haircut');
       await s.addService('colour', 'Colour');
       expect(s.inDoc('appointment-form-total')?.textContent).toContain(total);
       s.wrapper.unmount();
     }
+  });
+
+  it('the total is in the business’s currency: złoty in a business in Poland, a figure alone until it answers (hub#577)', async () => {
+    const s = await setup({}, 'es');
+    await s.addService('cut', 'Haircut');
+    await s.addService('colour', 'Colour');
+    expect(s.inDoc('appointment-form-total')?.textContent).toMatch(/: 65,00$/);
+    await s.businessIn(POLISH);
+    expect(s.inDoc('appointment-form-total')?.textContent).toMatch(/: 65,00\u00a0zł$/);
+    expect(s.inDoc('appointment-form-total')?.textContent).not.toContain('€');
   });
 
   it('sends the minutes only when typed, and a free time fills the time', async () => {

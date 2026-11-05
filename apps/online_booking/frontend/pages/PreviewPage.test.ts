@@ -5,7 +5,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { BookedOut, PageOut, PublicBookingOut, PublicServiceOut, PublicSlotsOut } from '../operations';
-import { click, ionChecked, ionValue, type MountOptions, mountOnlineBooking, page, settle } from '../__tests__/mount-online-booking';
+import { business, click, ionChecked, ionValue, type MountOptions, mountOnlineBooking, page, POLISH, settle } from '../__tests__/mount-online-booking';
 import PreviewPage from './PreviewPage.vue';
 
 const PAGE: PageOut = {
@@ -75,7 +75,12 @@ async function setup(options: MountOptions = {}, routes = ROUTES) {
   const m = await mountOnlineBooking(PreviewPage, { path: '/online_booking/preview', answers: routes, ...options });
   await settle();
   const el = (testid: string) => m.inDoc(`ob-preview-${testid}`) as HTMLElement & { value?: unknown; errorText?: string };
-  return { ...m, el };
+  /** The business answers (`base.business.get`): the prices are in its currency (BASE-F50). */
+  async function businessIn(fields = {}) {
+    await m.live();
+    await m.result('base.business.get', business(fields));
+  }
+  return { ...m, el, businessIn };
 }
 
 async function chooseUpToATime(s: Awaited<ReturnType<typeof setup>>) {
@@ -89,15 +94,26 @@ describe('PreviewPage', () => {
   it('a price of four figures groups its thousands, in both languages (hub#632)', async () => {
     const dear = { ...ROUTES, '/api/online_booking/public/services': [200, page([{ ...SERVICES[0], price: 123456 }], 1, 100)] } as typeof ROUTES;
     const es = await setup({ locale: 'es' }, dear);
+    await es.businessIn();
     expect(es.el('service-v1')?.textContent).toContain('1.234,56\u00a0€ · 30');
     es.wrapper.unmount();
 
     const en = await setup({}, dear);
+    await en.businessIn();
     expect(en.el('service-v1')?.textContent).toContain('€1,234.56 · 30 min');
+  });
+
+  it('a price is in the business’s currency: złoty in a business in Poland, the figure alone until it answers (hub#577)', async () => {
+    const s = await setup({ locale: 'es' });
+    expect(s.el('service-v1')?.textContent).toMatch(/\s20,00 · 30 min/);
+    await s.businessIn(POLISH);
+    expect(s.el('service-v1')?.textContent).toContain('20,00\u00a0zł · 30 min');
+    expect(s.find('ob-preview').text()).not.toContain('€');
   });
 
   it('opens with the page’s texts and the services booked online', async () => {
     const s = await setup();
+    await s.businessIn();
     expect(s.el('title')?.textContent).toContain('Salón Lucía');
     expect(s.find('ob-preview').text()).toContain('Book your next visit');
     expect(s.el('service-v1')?.textContent).toContain('Haircut');
