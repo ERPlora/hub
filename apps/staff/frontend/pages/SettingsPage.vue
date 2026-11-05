@@ -6,7 +6,9 @@
 // sends only the fields the person touched and changed (`staff.settings.update`), so it never undoes
 // someone else's change. The server judges the ranges and the day: its 422 goes under each field. A read that fails
 // before any value came says so with «Retry» and shows no form: nothing unread is ever offered to save.
-import { InlineFeedback } from '@erplora/ui/components';
+// A refusal says itself as a FormModal does (`useRefusal`, hub#854): its notice goes as soon as something is
+// changed, each field's message as soon as that field is, and the next refusal says it all again.
+import { InlineFeedback, useRefusal } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { IonButton, IonInput, IonSpinner } from '@ionic/vue';
@@ -32,6 +34,7 @@ const canSeePay = computed(() => session.can('staff.view_compensation'));
 
 const { data, status, error, refresh } = useLive('staff.settings.get', {});
 const { run, pending, error: saveError } = useCommand('staff.settings.update');
+const { fieldErrors, showsError, changed } = useRefusal(saveError);
 
 const form = ref<Form | null>(null);
 /** The read failed before any value came (not a block): there is nothing to show or save, only «Retry». */
@@ -85,10 +88,10 @@ function set(field: keyof Form, value: string): void {
   form.value = { ...form.value, [field]: value };
   touched.value = new Set([...touched.value, field]);
   saved.value = false;
+  changed(field);
 }
 
 const text = (value: unknown): string => (value === null || value === undefined ? '' : String(value));
-const fieldErrors = computed<Readonly<Record<string, string>>>(() => saveError.value?.fields ?? {});
 const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'ion-touched': !!message });
 
 async function save(): Promise<void> {
@@ -161,11 +164,11 @@ async function save(): Promise<void> {
         @submit.prevent="save"
       >
         <InlineFeedback
-          v-if="saveError"
+          v-if="showsError"
           tone="danger"
           data-testid="staff-settings-error"
         >
-          {{ saveError.message }}
+          {{ saveError?.message }}
         </InlineFeedback>
         <InlineFeedback
           v-if="saved"
