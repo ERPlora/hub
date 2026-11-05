@@ -222,10 +222,9 @@ export interface TemplateListIn extends PageIn {
   status?: TemplateStatus;
   category?: TemplateCategory;
   language?: string;
-  /** true: only what the Hub can send now (approved, not being deleted, no file header). */
-  /** Only what goes as it is (an automation's): a file header only with its own file. */
+  /** true: only what goes as it is, with nothing to choose (a file header only with its own file). */
   sendable?: boolean;
-  /** What the inbox can send: a file header asking for its file when it has none. */
+  /** true: what the inbox and an automation's «Send a message» step send (a file header asks for one if it has none). */
   fillable?: boolean;
 }
 
