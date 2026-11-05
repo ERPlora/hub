@@ -9,19 +9,19 @@
 // the list, and the `E2E-ASK` line in it for the assistant's choice of the option the guest names: a choice it can only
 // make if the «el 2» comes with the list.
 // flow: WHATSAPP_INBOX-F19
-import { execFile, execFileSync, execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { join, resolve } from 'node:path';
-import { promisify } from 'node:util';
 
-import { type BrowserContext, expect, type Page, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 
-import { type Provider, startProvider } from './assistant-provider';
-import { A, api, capture, HUB_DIR, psql, REPO_DIR, shown } from './helpers';
-import { confirmDialog, parkedEvent, RELAY, signedIn } from './flow-helpers';
+import { saasSql } from './assistant-real';
+import { A, api, capture, psql, REPO_DIR, shown } from './helpers';
+import { confirmDialog, parkedEvent, signedIn } from './flow-helpers';
 import { noHorizontalScroll, settled, VIEWPORTS } from './schedule-helpers';
 import { STACK } from './stack';
+import { answerSpec, chats, customerWrites, openTheBook, relay } from './whatsapp-answer-helpers';
 import { NUMBER_ID, TOKEN } from './whatsapp-graph';
-import { cleanUp as inboxCleanUp, e2ePhone, metaGraph, pushChannel, receive, restorePhoto, seedErplora } from './whatsapp-helpers';
+import { cleanUp as inboxCleanUp, e2ePhone, metaGraph, restorePhoto, seedErplora } from './whatsapp-helpers';
 
 const TASK = 'CLOSE-WHATSAPP_INBOX';
 const ANSWER = 'whatsapp_inbox/reservation_from_whatsapp';
@@ -31,15 +31,8 @@ const SENTINEL = 78;
 const OPEN_REASON = 'E2E WhatsApp offered options open';
 /** How many days ahead the booking is: past the minimum notice and within the days ahead of the guest's rules. */
 const AHEAD = 3;
-const PROVIDER_PORT = Number(process.env.E2E_AI_PROVIDER_PORT ?? STACK.hubPort + 2);
 const SAAS_DB = process.env.E2E_SAAS_DB ?? (STACK.hubPort === 8000 ? 'saas' : `saas_e2e_${STACK.hubPort + 1}`);
 const SAAS_DIR = resolve(process.env.E2E_SAAS_DIR || join(REPO_DIR, 'saas'));
-
-let provider: Provider;
-
-function saasSql(sql: string): string {
-  return execSync(`docker compose exec -T postgres psql -U hub -d ${SAAS_DB} -At -c "${sql}"`, { cwd: REPO_DIR, encoding: 'utf8' }).trim();
-}
 
 /** The business's day `days` from today (Madrid in phase 1) and its weekday, Monday 0. */
 function madridDay(days: number): { date: string; weekday: number } {
@@ -92,45 +85,14 @@ for number in PhoneNumber.objects.filter(phone_number_id='${NUMBER_ID}'):
   execFileSync('uv', ['run', 'python', 'manage.py', 'shell', '-c', code], { cwd: SAAS_DIR, env: { ...process.env, DB_NAME: SAAS_DB } });
 }
 
-/** One tick of the worker's relay (in `a`'s database: the e2e stack's worker relays nothing): the outbox event `id`
- *  handed to Automations' reaction. It does not block this process: the provider the SaaS asks lives here, and must
- *  answer. */
-async function relay(id: string): Promise<void> {
-  await promisify(execFile)('uv', ['run', 'python', 'manage.py', 'shell', '--hub', 'a', '-c', RELAY], {
-    cwd: HUB_DIR,
-    env: { ...process.env, FLOW_EVENT: id },
-  });
-}
-
-const chats = () => provider.seen.filter((seen) => seen.path === '/v1/chat/completions');
-
-/** The book open on DAY, all day, whatever the hours of the database, reviewing every new reservation. */
-async function openTheBook(context: BrowserContext): Promise<void> {
-  const slot = await api(context, A, 'POST', '/reservation/time_slots', { day_of_week: DAY.weekday, start_time: '00:00', end_time: '23:59', max_reservations: SENTINEL });
-  expect(slot.status, JSON.stringify(slot.data)).toBe(201);
-  const open = await api(context, A, 'POST', '/schedule/overrides', {
-    start_date: DAY.date,
-    end_date: DAY.date,
-    reason: OPEN_REASON,
-    is_closed: false,
-    intervals: [{ open_time: '00:00', close_time: '00:00' }],
-  });
-  expect(open.status, JSON.stringify(open.data)).toBe(201);
-  const rules = await api(context, A, 'POST', '/reservation/settings', { auto_confirm: false });
-  expect(rules.status, JSON.stringify(rules.data)).toBe(200);
-}
-
 /** The guest writes `text` from `phone` and the answer asks the assistant once: what the user turn of that request
  *  said (the Hub's prompt, with her words and what the business last wrote her). */
 async function writes(phone: string, text: string): Promise<string> {
-  const message = receive(phone, text, GUEST);
-  const received = psql(`select id from live_outboxevent where name = 'whatsapp_inbox.message.received' and payload->>'id' = '${message.id}'`);
-  expect(received, 'whatsapp_inbox.message.received of the message in the outbox').not.toBe('');
-  await relay(received);
-  const before = chats().length;
+  await customerWrites(phone, text, GUEST);
+  const before = chats(provider()).length;
   await relay(parkedEvent(psql(`select id from flow_flow where recipe = '${ANSWER}'`)));
-  expect(chats()).toHaveLength(before + 1);
-  return JSON.stringify(chats().at(-1)?.body);
+  expect(chats(provider())).toHaveLength(before + 1);
+  return JSON.stringify(chats(provider()).at(-1)?.body);
 }
 
 /** What the Hub last wrote to `phone`. */
@@ -154,19 +116,9 @@ test.beforeAll(async () => {
   expect(seedErplora()).toEqual({ delivered: true, hub_error: '' });
   await metaGraph();
   numberSends();
-  provider = await startProvider(PROVIDER_PORT);
-  const seeded = saasSql("select base_url from assistant_aiprovider where slug = 'e2e-local'");
-  expect(seeded, `the SaaS ${SAAS_DB} is not seeded with this provider: README «El asistente»`).toBe(provider.url);
 });
-
-test.beforeEach(() => {
-  cleanUp();
-  pushChannel({ status: 'connected' });
-});
-
-test.afterAll(async () => {
-  cleanUp();
-  await provider?.close();
+const provider = answerSpec(cleanUp);
+test.afterAll(() => {
   seedErplora(); // the seed's made-up permission back, for the specs after this one
   restorePhoto();
 });
@@ -177,7 +129,9 @@ for (const viewport of VIEWPORTS) {
     test.setTimeout(600_000);
     const { context, page } = await signedIn(browser, '/whatsapp_inbox/settings', viewport);
     try {
-      await openTheBook(context);
+      await openTheBook(context, DAY, SENTINEL, OPEN_REASON);
+      const rules = await api(context, A, 'POST', '/reservation/settings', { auto_confirm: false });
+      expect(rules.status, JSON.stringify(rules.data)).toBe(200);
 
       // The owner turns «Book a table» on.
       const card = shown(page).locator('[data-testid=whatsapp-inbox-autoreply-tables]');
@@ -206,9 +160,9 @@ for (const viewport of VIEWPORTS) {
       await expect(question).toContainText(phone);
       await question.locator('[data-testid^=flow-question-yes-]').click();
       await expect(page.locator('ion-toast').filter({ hasText: 'Approved: the automation carries on.' }).last()).toBeVisible();
-      const answered = chats().length;
+      const answered = chats(provider()).length;
       await relay(parkedEvent(psql(`select id from flow_flow where recipe = '${ANSWER}'`)));
-      expect(chats(), `${viewport.label}: the assistant heard what Reservas answered`).toHaveLength(answered + 1);
+      expect(chats(provider()), `${viewport.label}: the assistant heard what Reservas answered`).toHaveLength(answered + 1);
 
       // The book has the second time, Pending.
       const row = await bookRow(page);

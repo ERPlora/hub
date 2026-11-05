@@ -5,8 +5,7 @@ datos fiscales, sus grupos, etiquetas y campos propios, sus notas y su actividad
 publicidad por canal, sus datos de salud con permiso y lo que ha comprado. Es la app de la que más dependen
 las demás: Ventas, Citas, Reservas, la Bandeja de WhatsApp y otras cinco la requieren.
 
-- **Estado**: completa (2026-10-31): 31 de sus 32 flujos, `CUSTOMER-F01` … `F32`, están `hecho`;
-  `CUSTOMER-F26` está `descartado` con su issue (hub#514).
+- **Estado**: completa (2026-11-05): sus 32 flujos, `CUSTOMER-F01` … `F32`, están `hecho`.
 - **Especificación**: [`WORKBOOK.md`](WORKBOOK.md) (en inglés, [`WORKBOOK.en.md`](WORKBOOK.en.md), hasta
   «Para quien lo mantiene»). Lo que se cambie de la app se cambia antes allí.
 - **Peticiones a `@erplora/ui`** que siguen abiertas: [`UI-REQUESTS.md`](UI-REQUESTS.md).
@@ -70,7 +69,7 @@ pnpm e2e tests/e2e/customer-flows.spec.ts tests/e2e/customer-pages.spec.ts tests
 
 ## Qué queda fuera
 
-- `CUSTOMER-F26` (hub#514), los importes sin separador de millares (hub#512), la tarjeta del asistente que
+- Los importes sin separador de millares (hub#512), la tarjeta del asistente que
   no dice qué ficha toca (hub#513) y el país del negocio para un teléfono sin prefijo (hub#527, cruza las apps
   que buscan fichas por teléfono): «Lo que queda fuera» del WORKBOOK.
 - Las peticiones de [`UI-REQUESTS.md`](UI-REQUESTS.md).

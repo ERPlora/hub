@@ -5,6 +5,7 @@
 // (`workerAsks`), which wants to cancel it: nothing is cancelled until the owner says yes in «Waiting for your answer»,
 // whose card says which appointment it is, and then it is cancelled for real.
 // flow: FLOW-F28 FLOW-F12 FLOW-F37 FLOW-F38 APPOINTMENT-F06
+import { aMonday, salonCleanUp } from './appointment-helpers';
 import { execFile, execSync } from 'node:child_process';
 import { promisify } from 'node:util';
 
@@ -29,34 +30,17 @@ function saasSql(sql: string): string {
   return execSync(`docker compose exec -T postgres psql -U hub -d ${SAAS_DB} -At -c "${sql}"`, { cwd: REPO_DIR, encoding: 'utf8' }).trim();
 }
 
-/** A Monday five weeks ahead (inside the 90 days of advance and past any notice), as `YYYY-MM-DD`. */
-function aMonday(): string {
-  const day = new Date();
-  day.setUTCDate(day.getUTCDate() + 35 + ((8 - day.getUTCDay()) % 7));
-  return day.toISOString().slice(0, 10);
-}
-
 const DAY = aMonday();
 
 function cleanUp(): void {
   const flows = `select id from flow_flow where name like '${TAG}%'`;
   const customers = `select id from customer_customer where name like '${TAG}%'`;
-  const appointments = `select id from appointment_appointment where customer_id in (${customers})`;
-  const services = `select id from service_service where name like '${TAG}%'`;
-  const members = `select id from staff_member where first_name like '${TAG}%'`;
   psql(
     [
       `delete from flow_question where flow_id in (${flows})`,
       `delete from flow_flowrun where flow_id in (${flows})`,
       `delete from flow_flow where id in (${flows})`,
-      `delete from appointment_history where appointment_id in (${appointments})`,
-      `delete from appointment_appointmentservice where appointment_id in (${appointments})`,
-      `delete from appointment_appointment where id in (${appointments})`,
-      `delete from schedule_specialdayinterval where special_day_id in (select id from schedule_specialday where name like '${TAG}%')`,
-      `delete from schedule_specialday where name like '${TAG}%'`,
-      `delete from service_assignment where service_id in (${services}) or member_id in (${members})`,
-      `delete from service_service where name like '${TAG}%'`,
-      `delete from staff_member where first_name like '${TAG}%'`,
+      ...salonCleanUp(TAG),
       `delete from customer_activity where customer_id in (${customers})`,
       `delete from customer_consent where customer_id in (${customers})`,
       `delete from customer_customer where name like '${TAG}%'`,

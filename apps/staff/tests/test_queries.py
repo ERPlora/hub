@@ -47,6 +47,8 @@ from apps.staff.schemas import (
     TodayIn,
 )
 
+from base.tests.ordering import assert_reads_backwards, listed_with
+
 from .conftest import ctx_for, make_member, make_role, make_schedule, make_time_off
 
 pytestmark = pytest.mark.django_db
@@ -208,6 +210,36 @@ def test_pages_are_stable_with_id_as_tie_break():
     assert [row.id for page in pages for row in page.rows] == sorted(
         member.id for member in created
     )
+
+
+def _tied_members():
+    return [make_member("Ana", "López").id for _ in range(4)]
+
+
+def _tied_roles():
+    return [make_role(f"Role {n}", color="#ff0000").id for n in range(4)]
+
+
+def _tied_time_off():
+    ana = make_member("Ana", "López")
+    return [make_time_off(ana, f"2026-0{n}-01").id for n in range(1, 5)]
+
+
+@pytest.mark.parametrize(
+    ("operation", "schema", "tied", "column"),
+    [
+        ("staff.member.list", MemberListIn, _tied_members, "status"),
+        ("staff.member.list", MemberListIn, _tied_members, "name"),
+        ("staff.member.compensation", CompensationListIn, _tied_members, "status"),
+        ("staff.role.list", RoleListIn, _tied_roles, "color"),
+        ("staff.time_off.list", TimeOffListIn, _tied_time_off, "leave_type"),
+        ("staff.time_off.list", TimeOffListIn, _tied_time_off, "member_name"),
+    ],
+)
+def test_ties_go_by_id_in_the_lists_own_direction(operation, schema, tied, column):
+    """hub#768 (the rule of hub#2355, as in Customers): a descending list is the ascending one read backwards, ties
+    included, and its pages neither repeat nor lose rows."""
+    assert_reads_backwards(listed_with(run, operation, column, schema=schema), sorted(tied()))
 
 
 def test_an_employee_reads_the_directory_and_a_stranger_does_not():
@@ -1165,6 +1197,13 @@ def test_today_is_the_business_day(frozen_now):
     assert [row.id for row in run("staff.time_off.today", TodayIn()).rows] == [
         starts.id
     ]
+
+
+def test_who_is_away_today_goes_by_the_businesss_midnight(night_elsewhere):
+    away = make_time_off(make_member("Ana"), "2026-11-02", status=TimeOff.Status.APPROVED)
+    make_time_off(make_member("Bea"), "2026-11-03", status=TimeOff.Status.APPROVED)
+    assert [row.id for row in run("staff.time_off.today", TodayIn()).rows] == [away.id]
+    assert run("staff.member.stats", MemberStatsIn()).absent_today == 1
 
 
 # staff.time_off.mine (STAFF-F08)
