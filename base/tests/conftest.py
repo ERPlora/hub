@@ -1,4 +1,5 @@
-"""Fixtures of the base tests: users with a role on a host, and a stand-in for the SaaS."""
+"""Fixtures of the base tests: users with a role on a host, a stand-in for the SaaS, and the worker as a process that has
+just started (``a_worker_just_started``)."""
 
 import json
 
@@ -25,6 +26,16 @@ def no_connection_left_from_an_earlier_test(request):
     marked = request.node.get_closest_marker("django_db") is not None
     if not (marked or {"db", "transactional_db"} & set(request.fixturenames)):
         connections.close_all()
+
+
+@pytest.fixture
+def a_worker_just_started(monkeypatch):
+    """The worker as a process that has just started: no hub's schedule written yet, and its pass over the hubs
+    beginning with the first one."""
+    from base import worker
+
+    monkeypatch.setattr(worker, "_synced", set())
+    monkeypatch.setattr(worker, "_next_hub", None)
 
 
 @pytest.fixture
