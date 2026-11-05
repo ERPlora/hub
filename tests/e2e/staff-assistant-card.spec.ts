@@ -5,42 +5,26 @@
 // `E2E-ASK <tool> <JSON>`): the SaaS must be seeded with it (README of this folder, «El asistente»). Cancelled, nothing
 // changes. What this file creates carries its own prefix (E2ESAC) and goes away; the app it turns on is turned off again.
 // flow: STAFF-F02 STAFF-F04 STAFF-F05 STAFF-F07 STAFF-F15 STAFF-F18 STAFF-F19 BASE-F97
-import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
+import { type BrowserContext, expect, test } from '@playwright/test';
 
-import { type Provider, startProvider } from './assistant-provider';
-import { emptyMonth, openPanel, panel, saasSql } from './assistant-real';
-import { A, api, capture, login, psql, turnOffTurnedOn, turnOnMissing, untilStill } from './helpers';
+import { AN_ID, cancel, cardSpec, datumOf, ownerIn, VIEWPORTS } from './assistant-card-helpers';
+import { card, openPanel } from './assistant-real';
+import { A, api, capture, psql, untilStill } from './helpers';
 import { post, stamp } from './pricing-helpers';
-import { STACK } from './stack';
 
-/** An id as a schema's `format: uuid` takes it: never on a card. */
-const AN_ID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
-const VIEWPORTS = [
-  { label: '375x667', width: 375, height: 667 },
-  { label: '820x1180', width: 820, height: 1180 },
-  { label: '1440x900', width: 1440, height: 900 },
-];
-const PROVIDER_PORT = Number(process.env.E2E_AI_PROVIDER_PORT ?? STACK.hubPort + 2);
 /** A business is born with every app off. */
 const NEEDED = ['staff'];
 const PREFIX = 'E2ESAC';
 const RUN = stamp();
 const WEEK = [{ weekday: 0, start_time: '09:00', end_time: '17:00' }];
-/** How long the first turn of a stack that just started may take. */
-const TURN_MS = 120_000;
 
 /** What each screen calls the record and how a day off reads, by the language of the card. */
 const WORDS = {
   es: { member: 'Miembro del personal', role: 'Rol', schedule: 'Horario', timeOff: 'Ausencia', vacation: 'Vacaciones', days: '2 nov 2026 – 5 nov 2026' },
   en: { member: 'Staff member', role: 'Role', schedule: 'Schedule', timeOff: 'Time off', vacation: 'Vacation', days: 'Nov 2, 2026 – Nov 5, 2026' },
 };
-type Language = keyof typeof WORDS;
 /** The word the card calls a record by when nothing titles it, in each language. */
 const GENERIC = { es: 'Registro', en: 'Record' };
-
-let provider: Provider;
-/** The apps this file turned on (`turnOnMissing`): its `afterAll` turns off these and nothing else. */
-const turnedOn: string[] = [];
 
 /** Deletes what this file created (first names and role names `E2ESAC…`). */
 function cleanUp(): void {
@@ -57,95 +41,7 @@ function cleanUp(): void {
   );
 }
 
-test.beforeAll(async ({ browser }) => {
-  provider = await startProvider(PROVIDER_PORT);
-  const seeded = saasSql("select base_url from assistant_aiprovider where slug = 'e2e-local'");
-  expect(seeded, `the SaaS is not seeded with this provider: README «El asistente»`).toBe(provider.url);
-  const context = await browser.newContext();
-  const page = await context.newPage();
-  await login(page, A, '/');
-  await turnOnMissing(context, A, NEEDED, turnedOn);
-  // The owner's session for the fleet's visual sweep (`ui-clip-sweep.sh --storage-state`), when asked.
-  if (process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
-  await context.close();
-});
-
-test.beforeEach(() => {
-  emptyMonth();
-  cleanUp();
-});
-
-test.afterAll(async ({ browser }) => {
-  cleanUp();
-  const context = await browser.newContext();
-  const page = await context.newPage();
-  await login(page, A, '/');
-  await turnOffTurnedOn(context, A, turnedOn);
-  await context.close();
-  await provider?.close();
-});
-
-// ── The panel and its card ──
-
-const box = (page: Page): Locator => panel(page).locator('[data-testid="assistant-input"] textarea');
-const answers = (page: Page): Locator => panel(page).locator('[data-testid="assistant-answer"]');
-const card = (page: Page): Locator => page.locator('ion-modal[data-testid="assistant-confirm"]');
-
-/** Writes `text` and sends it; resolves once its answer has started (its card is up before the turn ends). */
-async function ask(page: Page, text: string): Promise<void> {
-  await expect(panel(page).locator('[data-testid="assistant-send"]')).toBeVisible({ timeout: 30_000 });
-  const before = await answers(page).count();
-  await box(page).fill(text);
-  await box(page).press('Enter');
-  await expect(answers(page)).toHaveCount(before + 1);
-}
-
-type SentCard = { fields: { name: string; label: string; value: unknown }[] };
-
-/** The card of the confirm frame of a turn's answer (`text/event-stream`: one `data: <JSON>` per frame), if any. */
-function confirmedCard(stream: string): SentCard | undefined {
-  const frames = stream
-    .split('\n')
-    .filter((line) => line.startsWith('data:'))
-    .map((line) => JSON.parse(line.slice(5)) as { type: string; card?: SentCard });
-  return frames.find((frame) => frame.type === 'confirm')?.card;
-}
-
-/** Asks for the write `tool` and returns what its card sends, never saying an id on the way. */
-async function fieldsOf(page: Page, tool: string, data: Record<string, unknown>): Promise<SentCard['fields']> {
-  const answer = page.waitForResponse(
-    async (response) => response.url().endsWith('/api/assistant/turn') && confirmedCard(await response.text()) !== undefined,
-    { timeout: TURN_MS },
-  );
-  await ask(page, `E2E-ASK ${tool} ${JSON.stringify(data)}`);
-  // The card comes with the answer of the turn, which waits for the gateway: seconds on a stack that just started.
-  const { fields } = confirmedCard(await (await answer).text())!;
-  await expect(card(page)).toBeVisible();
-  expect(JSON.stringify(fields)).not.toMatch(AN_ID);
-  await expect(card(page)).not.toContainText(AN_ID);
-  return fields;
-}
-
-/** The datum `name` of the card of `tool`. */
-async function datumOf(page: Page, tool: string, data: Record<string, unknown>, name = 'id'): Promise<{ label: string; value: unknown }> {
-  const fields = await fieldsOf(page, tool, data);
-  const field = fields.find((one) => one.name === name);
-  expect(field, `the card of ${tool} names no ${name}: ${JSON.stringify(fields)}`).toBeDefined();
-  return field!;
-}
-
-async function cancel(page: Page): Promise<void> {
-  await card(page).locator('[data-testid="assistant-confirm-cancel"]').click();
-  await expect(card(page)).toBeHidden();
-}
-
-async function ownerIn(browser: Browser, language: Language): Promise<[BrowserContext, Page]> {
-  const context = await browser.newContext();
-  const page = await context.newPage();
-  await login(page, A, '/');
-  await context.addCookies([{ name: 'django_language', value: language, domain: new URL(A).hostname, path: '/' }]);
-  return [context, page];
-}
+cardSpec(NEEDED, cleanUp);
 
 /** A role, someone who holds it, their schedule and their holiday, through Staff's own API. */
 async function aTeam(context: BrowserContext, tag: string) {

@@ -172,6 +172,8 @@ MEMBER = gettext_noop("Staff member")
 ROLE = gettext_noop("Role")
 SCHEDULE = gettext_noop("Schedule")
 TIME_OFF = gettext_noop("Time off")
+#: A person of the team by their id, named on the card; or by their name in ``member`` (``_said_by``).
+MemberId = Annotated[UUID | None, Field(title=MEMBER, description=D_MEMBER_ID, json_schema_extra=A_MEMBER)]
 D_USER_ID = "Id of the business user (account) the record hangs from; one user, one live record."
 D_HIRE_DATE = "Hire date (YYYY-MM-DD)."
 D_BOOKABLE = "Whether the person takes appointments."
@@ -192,6 +194,11 @@ def _member_named(value: str | None, info: ValidationInfo, id_field: str) -> str
     if value is None and id_field in info.data and info.data[id_field] is None:
         raise ValueError(str(NO_MEMBER))
     return value
+
+
+def _said_by(id_field: str):
+    """The validator of ``member`` in a schema that says a person by ``id_field`` or by their name."""
+    return field_validator("member")(lambda value, info: _member_named(value, info, id_field))
 
 
 # Pages: every list is paginated, limit ≤ 100.
@@ -241,23 +248,17 @@ class DeletedOut(Schema):
 
 
 class MemberRefIn(Schema):
-    id: UUID | None = Field(None, title=MEMBER, description=D_MEMBER_ID, json_schema_extra=A_MEMBER)
+    id: MemberId = None
     member: MemberName | None = Field(None, validate_default=True, description=D_MEMBER)
 
-    @field_validator("member")
-    @classmethod
-    def _named(cls, value: str | None, info: ValidationInfo) -> str | None:
-        return _member_named(value, info, "id")
+    _named = _said_by("id")
 
 
 class MemberOfIn(Schema):
-    member_id: UUID | None = Field(None, title=MEMBER, description=D_MEMBER_ID, json_schema_extra=A_MEMBER)
+    member_id: MemberId = None
     member: MemberName | None = Field(None, validate_default=True, description=D_MEMBER)
 
-    @field_validator("member")
-    @classmethod
-    def _named(cls, value: str | None, info: ValidationInfo) -> str | None:
-        return _member_named(value, info, "member_id")
+    _named = _said_by("member_id")
 
 
 # Members
@@ -763,15 +764,11 @@ class ScheduleIn(Schema):
         None, description="Last day it applies (YYYY-MM-DD); empty = no end."
     )
     days: Week = Field(title=WEEK, description=D_DAYS)
-    member_id: UUID | None = Field(None, title=MEMBER, description=D_MEMBER_ID, json_schema_extra=A_MEMBER)
+    member_id: MemberId = None
     member: MemberName | None = Field(None, validate_default=True, description=D_MEMBER)
 
     _valid_range = field_validator("effective_until")(_valid_range)
-
-    @field_validator("member")
-    @classmethod
-    def _named(cls, value: str | None, info: ValidationInfo) -> str | None:
-        return _member_named(value, info, "member_id")
+    _named = _said_by("member_id")
 
 
 class ScheduleUpdateIn(Schema):
@@ -810,10 +807,7 @@ class ScheduleListIn(PageIn):
     member_id: UUID | None = Field(None, description=D_MEMBER_ID)
     member: MemberName | None = Field(None, validate_default=True, description=D_MEMBER)
 
-    @field_validator("member")
-    @classmethod
-    def _named(cls, value: str | None, info: ValidationInfo) -> str | None:
-        return _member_named(value, info, "member_id")
+    _named = _said_by("member_id")
 
 
 class DayOut(Schema):
