@@ -3423,19 +3423,13 @@ def _checked_scopes(ctx: OperationContext, data: ApiKeyCreateIn) -> dict:
     offered = {app["id"]: app for app in queries.api_apps(ctx)}
     scopes = {app: sorted(set(kinds)) for app, kinds in data.scopes.items() if kinds}
     if not scopes:
-        raise InvalidPayload(
-            gettext("Choose at least one app and what the key may do on it."),
-            code="base.api_key_scopes_required",
-            fields={"scopes": "required"},
-        )
+        message = gettext("Choose at least one app and what the key may do on it.")
+        raise InvalidPayload(message, code="base.api_key_scopes_required", fields={"scopes": message})
     for app, kinds in scopes.items():
         found = offered.get(app)
         if found is None or any(not found[kind] for kind in kinds):
-            raise InvalidPayload(
-                gettext("That app does not publish what the key would do on it."),
-                code="base.api_key_scope_unknown",
-                fields={"scopes": app},
-            )
+            message = gettext("That app does not publish what the key would do on it.")
+            raise InvalidPayload(message, code="base.api_key_scope_unknown", fields={"scopes": message})
     return scopes
 
 
@@ -3462,7 +3456,8 @@ def api_key_create(ctx: OperationContext, data: ApiKeyCreateIn) -> dict:
     _api_keys_available(ctx)
     name = " ".join(data.name.split())
     if not name:
-        raise InvalidPayload(gettext("Give the key a name."), code="base.api_key_name_required", fields={"name": "required"})
+        message = gettext("Give the key a name.")
+        raise InvalidPayload(message, code="base.api_key_name_required", fields={"name": message})
     key = ApiKey(
         name=name,
         mode=data.mode,
