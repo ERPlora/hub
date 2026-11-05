@@ -98,6 +98,15 @@ async function tapTheTabs(page: Page, where: string): Promise<void> {
   await expect(drawer.locator('[data-testid=pos-cart-tab-check]'), `«Check» at ${where}`).toHaveAttribute('aria-selected', 'true');
 }
 
+/** A real tap on `pick` puts one more item on the check, which the cart button counts. Its total proves nothing: it reads
+ *  «—» while the preview is on its way, whatever was tapped. */
+async function addsOneItem(till: Locator, pick: Locator, where: string): Promise<void> {
+  const count = till.locator('[data-testid=pos-cart-fab-count]');
+  const before = (await count.count()) ? Number(await count.innerText()) : 0;
+  await pick.click(TAP);
+  await expect(count, `one more item on the check at ${where}`).toHaveText(String(before + 1));
+}
+
 /** «Open checks» opens whole inside the window, as low as it gets, and a tap beside it closes it. */
 async function openChecksFit(page: Page, height: number, where: string): Promise<void> {
   const drawer = shown(page).locator('[data-testid=pos-cart-drawer]');
@@ -122,10 +131,7 @@ async function sellOnItsSide(page: Page, size: { label: string; width: number; h
 
   // The catalogue answers: the product goes on the check, and the button says so.
   const fab = till.locator('[data-testid=pos-cart-fab]');
-  const total = till.locator('[data-testid=pos-cart-fab-total]');
-  const before = (await total.count()) ? await total.innerText() : '';
-  await till.locator(`[data-testid=pos-product-${product.id}]`).click(TAP);
-  await expect(total, `the product on the check at ${where}`).not.toHaveText(before);
+  await addsOneItem(till, till.locator(`[data-testid=pos-product-${product.id}]`), where);
   await capture(page, `${KEY}-${where.replaceAll(' ', '-')}-catalogue`);
 
   // The cart button whole in what the page shows, at both ends of the catalogue's scroll (the tap above moved it): its
@@ -209,10 +215,7 @@ async function searchOnItsSide(page: Page): Promise<void> {
   const result = search.locator(`[data-testid=pos-search-${product.id}]`);
   await expect(result).toBeVisible();
   await capture(page, `${KEY}-search`);
-  const total = till.locator('[data-testid=pos-cart-fab-total]');
-  const before = (await total.count()) ? await total.innerText() : '';
-  await result.click(TAP);
-  await expect(total, 'the product found goes on the check').not.toHaveText(before);
+  await addsOneItem(till, result, 'the search');
 }
 
 /** The layout of a till that has room: nothing on its side has reached it. */
