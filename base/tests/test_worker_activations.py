@@ -58,6 +58,21 @@ def nothing_checked_yet(monkeypatch):
     monkeypatch.setattr(worker, "_next_hub", None)
 
 
+@pytest.fixture(autouse=True)
+def no_visit_outlives_its_test(django_db_setup, django_db_blocker):
+    """What a test here writes is committed (no test case around it), so a visit it notes would stay for the next run
+    on a reused test database, where the nightly measurement's tests count it (hub#874). Set up before ``business``,
+    this is checked after it took its rows back."""
+    from control.models import HubVisit
+
+    with django_db_blocker.unblock():
+        before = set(HubVisit.objects.values_list("pk", flat=True))
+    yield
+    with django_db_blocker.unblock():
+        left = list(HubVisit.objects.exclude(pk__in=before).values_list("host", "day", "saas_user_id"))
+    assert left == [], f"visits left behind for the next test: {left}"
+
+
 @pytest.fixture(scope="module")
 def platform_template(django_db_setup, django_db_blocker):
     """A template with the platform's tables alone: what a hub's template is for an app ported after it was made. The
@@ -76,7 +91,10 @@ def platform_template(django_db_setup, django_db_blocker):
 @pytest.fixture
 def business(platform_template, django_db_blocker):
     """``business(name, **hub fields)``: a ready business with its own database cloned from the platform's template,
-    its identity written and every app off; its database and its rows dropped after the test."""
+    its identity written and every app off; its database and its rows dropped after the test, the visits to it too
+    (``visited``: a row by host, which deleting the hub leaves)."""
+    from control.models import HubVisit
+
     made: list[Hub] = []
     control = tenancy_connections.control_name()
 
@@ -107,6 +125,7 @@ def business(platform_template, django_db_blocker):
         with hubs._maintenance() as conn:
             for hub in made:
                 hubs._drop(conn, hub.db_name, control)
+        HubVisit.objects.filter(host__in=[hub.slug for hub in made]).delete()
         Hub.objects.filter(pk__in=[hub.pk for hub in made]).delete()
 
 
