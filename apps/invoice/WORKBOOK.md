@@ -299,14 +299,17 @@ Sale: la factura (F1 en una serie de facturas, F2 en una de tiques) con el impue
 precio, cerrado una vez por tipo y repartido entre las líneas por resto mayor (los conceptos suman el
 total impreso), y como descripción de la operación sus conceptos («Curso de corte, Kit de tinte», hasta
 500 caracteres); avisa `invoice.invoice.issued`.
-Si falla: dentro de la ventana, encima de los botones: «Una factura completa necesita el nombre, el NIF
-y la dirección del cliente.», «Ese NIF no es válido.» (bajo el campo), «Línea {n}: el precio no es un
-importe…», una línea con precio que sale a 0,00, una serie inactiva, que no emite facturas o de otro
-año («Esa serie numera otro año…»), un tique por encima del límite de Ventas («Por encima de 3.000,00 €
-no se puede emitir un tique…», RD 1619/2012 art. 4), o la falta de emisor. No se emite nada ni se gasta
-número, y lo escrito se conserva. Si no se puede leer el territorio fiscal, el tipo se llama «Imp. %», sale
-vacío y avisa «No se pudo leer el territorio fiscal del negocio: escribe el tipo de cada línea.»; la
-factura se emite igual, con el impuesto del territorio.
+Si falla: dentro de la ventana, encima de los botones: «Una factura completa necesita el nombre, el NIF y
+la dirección del cliente.», «Ese NIF no es válido.» (bajo el campo), «Línea {n}: el precio no es un
+importe…», una línea con precio que sale a 0,00, una serie inactiva, que no emite facturas o de otro año
+(«Esa serie numera otro año…»), un tique por encima del límite de Ventas («Por encima de 3.000,00 € no se
+puede emitir un tique…», RD 1619/2012 art. 4), o la falta de emisor. No se emite nada ni se gasta número,
+y lo escrito se conserva. El mensaje de un campo se va en cuanto se corrige ese campo (también si lo
+rellena la tarjeta de un cliente, y el del NIF si cambia el país o el tipo de documento), el aviso que
+solo señala campos en cuanto se cambia algo, y los dos vuelven si el siguiente intento también se
+rechaza. Si no se puede leer el territorio fiscal, el tipo se llama «Imp. %», sale vacío y avisa «No se
+pudo leer el territorio fiscal del negocio: escribe el tipo de cada línea.»; la factura se emite igual,
+con el impuesto del territorio.
 Implicados: TAX-F18, CUSTOMER-F17, TAX-F11
 
 ### INVOICE-F04 El cliente pide la factura completa de su tique
@@ -340,9 +343,10 @@ Sale: la F3 en la serie «FACT» del año, con las líneas y los importes del ti
 (misma operación) y la misma fecha de operación; el tique no se toca. Si el tique estaba pagado, la F3
 nace pagada. Avisa `invoice.invoice.issued`. Desde entonces, rectificar o devolver esa venta rectifica
 la F3, no el tique.
-Si falla: sin nombre, NIF o domicilio, rechazo; un NIF español que no es válido, «Ese NIF no es
-válido.» bajo el campo y arriba «Revisa los datos marcados.», que se va en cuanto se cambia algo (y el
-mensaje del campo, en cuanto se corrige ese campo) y vuelve si el siguiente intento también se rechaza; un
+Si falla: sin nombre, NIF o domicilio, rechazo; un NIF español que no es válido, «Ese NIF no es válido.»
+bajo el campo y arriba «Revisa los datos marcados.», que se va en cuanto se cambia algo (y el mensaje del
+campo, en cuanto se corrige ese campo, también si lo rellena la tarjeta de un cliente; el del NIF,
+también si cambia el país o el tipo de documento) y vuelve si el siguiente intento también se rechaza; un
 documento que no es un tique, «Solo un tique (factura simplificada) se puede sustituir por una factura
 completa.». Si el tique ya tiene su F3, responde con ella sin emitir otra ni gastar número.
 Implicados: INVOICE-F04
@@ -530,9 +534,10 @@ ventas y las devoluciones, el código tiene que ser TICKET, FACT o RECT; con otr
 alta manual (si su tipo es F1 o F2).
 Si falla: un código vacío o con otra forma, un formato sin el año o sin marcador de secuencia, con un
 salto de línea, o un prefijo o formato con tildes o símbolos como º o ª, salen bajo su campo (el número
-es el `NumSerieFactura` de VeriFactu: solo ASCII imprimible); unos números que con la secuencia más
-ancha pasarían de 60 caracteres, «Los números de esta serie no cabrían en 60 caracteres…» bajo el
-prefijo o el formato; un código que ya existe ese año, «Ya hay una serie con ese código ese año.».
+es el `NumSerieFactura` de VeriFactu: solo ASCII imprimible); unos números que con la secuencia más ancha
+pasarían de 60 caracteres, «Los números de esta serie no cabrían en 60 caracteres…» bajo el prefijo o el
+formato; un código que ya existe ese año, «Ya hay una serie con ese código ese año.». El mensaje de un
+campo se va en cuanto se corrige ese campo y vuelve si el siguiente intento también se rechaza.
 Implicados: ninguno
 
 ### INVOICE-F13 Cambiar una serie

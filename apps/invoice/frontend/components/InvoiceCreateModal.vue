@@ -10,7 +10,8 @@
 // recipient is complete; a price that is not an amount is said with its line before anything is sent.
 // It runs `invoice.invoice.create` (the server computes the tax, closed once per rate, and numbers it),
 // says «Invoice <number> issued» and closes; the list paints the new row by itself, live. A refusal stays in
-// the window, under its field when it is one (recipient or line), and what was written is kept.
+// the window, under its field when it is one (recipient, notes or line) until that field is corrected
+// (FormModal's `fieldErrors`, hub#461), and what was written is kept.
 import { FormModal, type FormModalError } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { toastSuccess } from '@erplora/ui/shell';
@@ -76,7 +77,6 @@ const error = computed<FormModalError | null>(() => {
   const unknownTerritory = defaults.error.value ? { message: t('invoice.create.defaultsFailed') } : null;
   return refusal(command.error.value, t('invoice.create.failed')) ?? unknownTerritory;
 });
-const fieldErrors = computed(() => error.value?.fields ?? {});
 
 async function issue(): Promise<void> {
   if (!ready.value || command.pending.value) return;
@@ -112,33 +112,36 @@ async function issue(): Promise<void> {
     :submit-disabled="!ready"
     @submit="issue"
   >
-    <div class="invoice-create__fields">
-      <SeriesSelect
-        v-model="seriesCode"
-        v-model:invoice-type="invoiceType"
-      />
-      <RecipientFields
-        v-model="recipient"
-        :field-errors="fieldErrors"
-      />
-      <ion-input
-        data-testid="invoice-create-notes"
-        :label="$t('invoice.create.notes')"
-        label-placement="floating"
-        fill="outline"
-        mode="md"
-        :maxlength="2000"
-        :value="notes"
-        :error-text="fieldErrors.notes"
-        @ion-input="notes = String($event.detail.value ?? '')"
-      />
-      <InvoiceLinesEditor
-        v-model="lines"
-        :field-errors="fieldErrors"
-        :tax="tax"
-        :default-rate="defaultRate"
-      />
-    </div>
+    <template #default="{ fieldErrors }">
+      <div class="invoice-create__fields">
+        <SeriesSelect
+          v-model="seriesCode"
+          v-model:invoice-type="invoiceType"
+        />
+        <RecipientFields
+          v-model="recipient"
+          :field-errors="fieldErrors"
+        />
+        <ion-input
+          data-testid="invoice-create-notes"
+          :label="$t('invoice.create.notes')"
+          label-placement="floating"
+          fill="outline"
+          mode="md"
+          :maxlength="2000"
+          :value="notes"
+          :error-text="fieldErrors.notes"
+          :class="{ 'ion-invalid': !!fieldErrors.notes, 'ion-touched': !!fieldErrors.notes }"
+          @ion-input="notes = String($event.detail.value ?? '')"
+        />
+        <InvoiceLinesEditor
+          v-model="lines"
+          :field-errors="fieldErrors"
+          :tax="tax"
+          :default-rate="defaultRate"
+        />
+      </div>
+    </template>
   </FormModal>
 </template>
 

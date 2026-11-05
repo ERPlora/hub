@@ -104,6 +104,46 @@ describe('SeriesFormModal: creating', () => {
     expect(prop(s.field('code'), 'errorText')).toBe('There is already a series with that code that year.');
     expect(s.wrapper.emitted('update:open')).toBeUndefined();
   });
+
+  it('a refused type is marked under its field, not only said on top (hub#461)', async () => {
+    const s = await setup();
+    await ionValue(s.field('code'), 'FACT', 'ionInput');
+    s.answer(422, { error: { code: 'invalid_payload', message: 'Check the highlighted details.', fields: { invoice_type: 'Choose a type.' } } });
+    await s.submit();
+    expect(prop(s.field('type'), 'errorText')).toBe('Choose a type.');
+    expect(s.field('type')?.classList.contains('ion-invalid')).toBe(true);
+  });
+
+  it('correcting the refused field takes away its message and the notice; the next refusal says them again (hub#461)', async () => {
+    const s = await setup();
+    await ionValue(s.field('code'), 'FACT', 'ionInput');
+    const refused = {
+      error: {
+        code: 'invalid_payload',
+        message: 'Check the highlighted details.',
+        fields: { code: 'Use letters and digits only.', next_number: 'Write a whole number.' },
+      },
+    };
+    s.answer(422, refused);
+    await s.submit();
+    expect([prop(s.field('code'), 'errorText'), prop(s.field('next-number'), 'errorText')]).toEqual([
+      'Use letters and digits only.',
+      'Write a whole number.',
+    ]);
+
+    // A person types: the native `input` bubbles out of the field, then Ionic's own event carries the value.
+    s.field('code')?.dispatchEvent(new Event('input', { bubbles: true }));
+    await ionValue(s.field('code'), 'FACTB', 'ionInput');
+    expect(prop(s.field('code'), 'errorText')).toBeFalsy();
+    expect(s.field('code')?.classList.contains('ion-invalid')).toBe(false);
+    expect(prop(s.field('next-number'), 'errorText')).toBe('Write a whole number.');
+    expect(s.inDoc('invoice-series-form-error')).toBeNull();
+
+    s.answer(422, refused);
+    await s.submit();
+    expect(s.inDoc('invoice-series-form-error')?.textContent).toContain('Check the highlighted details.');
+    expect(prop(s.field('code'), 'errorText')).toBe('Use letters and digits only.');
+  });
 });
 
 describe('SeriesFormModal: editing', () => {

@@ -7,7 +7,7 @@ import { toastSuccess } from '@erplora/ui/shell';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { defineComponent, h } from 'vue';
 
-import { click, ionValue, mountInvoice } from '../__tests__/mount-invoice';
+import { click, ionValue, mountInvoice, settle } from '../__tests__/mount-invoice';
 import RecipientFields from './RecipientFields.vue';
 import SubstituteModal from './SubstituteModal.vue';
 
@@ -102,6 +102,44 @@ describe('SubstituteModal', () => {
     await click(s.submitButton());
     expect(s.inDoc('invoice-substitute-error')?.textContent).toContain('Check the highlighted details.');
     expect(taxId.errorText).toBe('That tax ID is not valid.');
+  });
+
+  describe('what fills a field with no keystroke takes its message away too (hub#461)', () => {
+    const REFUSED = {
+      error: {
+        code: 'invalid_payload',
+        message: 'Check the highlighted details.',
+        fields: { customer_tax_id: 'That tax ID is not valid.', customer_address: 'Write the whole address.' },
+      },
+    };
+    const CARD = { customer_id: 'c1', customer_name: 'Estudio Ana SL', customer_tax_id: 'B12345674', customer_address: 'Calle Sol 5, Madrid', customer_country: 'ES' };
+    const said = (s: Awaited<ReturnType<typeof setup>>, key: string) =>
+      (s.inDoc(`invoice-recipient-${key}`) as (HTMLElement & { errorText?: string }) | null)?.errorText;
+
+    async function refused() {
+      const s = await setup();
+      await s.fill({ ...COMPLETE, taxId: 'B12345678', address: 'Calle' });
+      s.answer(422, REFUSED);
+      await click(s.submitButton());
+      expect([said(s, 'tax-id'), said(s, 'address')]).toEqual(['That tax ID is not valid.', 'Write the whole address.']);
+      return s;
+    }
+
+    it('a picked customer card quiets the fields it fills, and the notice on top', async () => {
+      const s = await refused();
+      s.wrapper.findComponent({ name: 'CustomerSearch' }).vm.$emit('update:modelValue', CARD);
+      await settle();
+      expect(said(s, 'tax-id')).toBeFalsy();
+      expect(said(s, 'address')).toBeFalsy();
+      expect(s.inDoc('invoice-substitute-error')).toBeNull();
+    });
+
+    it('a new country quiets the tax ID, judged with its country, and keeps the address’s message', async () => {
+      const s = await refused();
+      await ionValue(s.inDoc('invoice-recipient-country'), 'FR');
+      expect(said(s, 'tax-id')).toBeFalsy();
+      expect(said(s, 'address')).toBe('Write the whole address.');
+    });
   });
 
   it('speaks Spanish', async () => {
