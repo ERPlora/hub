@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:12ea08727b24290607e168b43b1a2060c8769fcb936ed919ef3c862f6d0c6af6 -->
+<!-- generated from WORKBOOK.md sha256:c678a92d3313ab3d4e65e74a6d2c56772c76cb8cb2450bc3786fd4a93cf14973 -->
 
 ## What it is for and who it is for
 
@@ -280,7 +280,10 @@ Steps:
 2. Tap the article: it goes in as a line of the check. Tapping it again (same professional, no note or
    discount) raises the quantity; the line's selector raises or lowers it, and at 0 the line goes.
 3. Press "Charge · <total>" at the foot of the check (on a phone, first open the check with the floating
-   button, which shows the total).
+   button, which shows the total). On a phone on its side, or in a window just as low (up to 500 px tall),
+   the catalogue scrolls with the page, with the floating button always in view, and the check takes the
+   whole screen, over the red strip and the tab bar: its bar and its foot stay put, "Charge" in view, and
+   what lies between them scrolls (hub#800).
 4. In the **Charge** sheet, with cash chosen, enter the amount tendered on the keypad; the change shows
    large above the keypad, in the row that until then asks for the amount, and the keys do not move under
    the finger while typing (hub#456). On a low phone, also on a 320×568 one, the whole keypad sits above

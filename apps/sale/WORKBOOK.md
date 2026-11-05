@@ -294,7 +294,10 @@ Pasos:
 2. Toca el artículo: entra como línea de la cuenta. Tocarlo otra vez (mismo profesional, sin nota ni
    descuento) sube la cantidad; el selector de la línea la sube o la baja, y a 0 la línea se quita.
 3. Pulsa «Cobrar · <total>» al pie de la cuenta (en el móvil, abre antes la cuenta con el botón
-   flotante, que enseña el total).
+   flotante, que enseña el total). Con el móvil tumbado, o en una ventana igual de baja (hasta 500 px de
+   alto), el catálogo se desplaza con la página, con el botón flotante siempre a la vista, y la cuenta ocupa
+   toda la pantalla, por encima de la franja roja y de la barra de pestañas: su barra y su pie se quedan
+   fijos, «Cobrar» a la vista, y lo que hay entre ellos se desplaza (hub#800).
 4. En la hoja **Cobro**, con efectivo elegido, marca en el teclado el importe entregado; el cambio
    sale en grande encima del teclado, en la fila que hasta entonces pide el importe, y las teclas no se
    mueven bajo el dedo mientras se teclea (hub#456). En un móvil bajo, también en uno de 320×568, el
