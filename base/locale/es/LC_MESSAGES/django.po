@@ -2140,8 +2140,29 @@ msgctxt "app activation"
 msgid "When the worker makes its tables again."
 msgstr "Cuándo vuelve a intentar crear sus tablas."
 
-msgid "It is being set up for this business. Load the template again in a minute to bring its data."
-msgstr "Se está preparando para este negocio. Vuelve a cargar la plantilla en un minuto para traer sus datos."
+msgid "It is being set up for this business. Its data will load by itself as soon as it is ready: you can leave this screen."
+msgstr "Se está preparando para este negocio. Sus datos se cargarán solos en cuanto esté lista: puedes salir de esta pantalla."
+
+msgid "It could not be set up yet. It keeps trying by itself and its data will load as soon as it works; «Retry what is missing» tries again now."
+msgstr "Aún no se ha podido preparar. Se sigue intentando sola y sus datos se cargarán en cuanto funcione; «Reintentar lo que falta» lo intenta otra vez ahora."
+
+msgid "It is being set up for this business. Upload the file again in a minute to bring its data."
+msgstr "Se está preparando para este negocio. Vuelve a subir el archivo dentro de un minuto para traer sus datos."
+
+msgid "It was turned off before it was ready, so nothing of it was loaded."
+msgstr "Se desactivó antes de estar lista, así que no se ha cargado nada suyo."
+
+msgid "This load was undone before the app was ready, so nothing of it was loaded."
+msgstr "Esta importación se deshizo antes de que la app estuviera lista, así que no se ha cargado nada suyo."
+
+msgid "A later load took over what was missing from this one."
+msgstr "Una importación posterior se encargó de lo que le faltaba a esta."
+
+msgid "The business was reset before the app was ready, so nothing of it was loaded."
+msgstr "El negocio se restableció antes de que la app estuviera lista, así que no se ha cargado nada suyo."
+
+msgid "What is missing is coming by itself as soon as its apps are ready: there is nothing to retry yet."
+msgstr "Lo que falta entrará solo en cuanto sus apps estén listas: todavía no hay nada que reintentar."
 
 msgid "This app is not waiting to be set up again."
 msgstr "Esta app no está esperando a que se vuelva a preparar."
