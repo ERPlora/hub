@@ -203,6 +203,23 @@ describe('ApiKeysPanel', () => {
     expect(posted(m)).toEqual([['/api/keys/revoke', { id: '0199aaaa-0000-7000-8000-000000000001' }]]);
   });
 
+  it('a refused field the form does not mark is said once, in words (hub#833)', async () => {
+    const reason = 'That app does not publish what the key would do on it.';
+    const m = await open({
+      onApi: () => Response.json({ error: { code: 'base.api_key_scope_unknown', message: reason, fields: { scopes: reason } } }, { status: 422 }),
+    });
+    await m.result(m.call, 'base.api_key.list', LIST);
+    await m.wrapper.get('[data-testid="api-keys-new"]').trigger('click');
+    await flush();
+    type(byTestId('api-key-form-name')!, 'Tienda');
+    await flush();
+    (byTestId('api-key-form-cart_checkout-read') as HTMLElement).dispatchEvent(new CustomEvent('ionChange', { detail: { checked: true } }));
+    await flush();
+    (byTestId('api-key-form-submit') as HTMLButtonElement).click();
+    await flush();
+    expect(byTestId('api-key-form-error')?.textContent?.trim()).toBe(reason);
+  });
+
   it('a refusal is told from its code', async () => {
     const m = await open({
       onApi: () => Response.json({ error: { code: 'base.api_key_revoked', message: 'server words' } }, { status: 409 }),
