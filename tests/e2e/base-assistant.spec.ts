@@ -769,30 +769,39 @@ test('base-assistant-money-mark — in Spanish an amount inside a datum and one 
   await leave(context, turnedOn);
 });
 
+/** A business is born with every app off: Appointments and the apps it needs, off again at the end if they were. */
+const CITAS = ['customer', 'service', 'staff', 'schedule', 'appointment'];
+/** A customer, a service and a professional by ids that name nothing in this business: the card leaves them out. */
+const [CUSTOMER_ID, SERVICE_ID, MEMBER_ID] = [
+  '0192f0b2-1111-7000-8000-000000000001',
+  '0192f0b2-2222-7000-8000-000000000002',
+  '0192f0b2-3333-7000-8000-000000000003',
+];
+
+/** Asks for a booking of `services` on 2 Nov 2026 at 10:00 through the front desk, its customer and professional by
+ *  `CUSTOMER_ID` and `MEMBER_ID`, and checks at each size that its card says `line` and none of `never`, saved as `key`. */
+async function bookingCardSays(page: Page, services: unknown[], line: string, never: readonly string[], key: string): Promise<void> {
+  const booking = { customer_id: CUSTOMER_ID, services, staff_id: MEMBER_ID, start: '2026-11-02T10:00:00+01:00', source: 'counter' };
+  await ask(page, `E2E-ASK appointment__appointment__create ${JSON.stringify(booking)}`, { settle: false });
+  await expect(card(page)).toBeVisible();
+  for (const vp of VIEWPORTS) {
+    await page.setViewportSize({ width: vp.width, height: vp.height });
+    await expect(card(page)).toContainText(line);
+    for (const raw of never) await expect(card(page)).not.toContainText(raw);
+    await captureStill(page, `${key}-${vp.label}`);
+  }
+}
+
 // flow: assistant-card (BASE-F97)
 // FIX-HUB-BASE-ASSISTANT-CARD-SHOWS-RAW-VALUES: a booking's card said each datum as the model sent it («2026-11-02T10:00:00+01:00»,
 // «counter», the customer's and the professional's ids): now its day and time as the person's language writes them, at the
 // business's hour, its channel by the label Appointments gives it, and nobody by an id. Cancelled: nothing is booked.
 test('assistant-card — in Spanish a booking says its day and time and its channel in words, and nobody by an id', async ({ browser }) => {
-  const KEY = 'FIX-HUB-BASE-ASSISTANT-CARD-SHOWS-RAW-VALUES';
-  const context = await browser.newContext();
-  const page = await context.newPage();
-  await login(page, A, '/');
-  // A business is born with every app off: Appointments and the apps it needs, off again at the end if they were.
-  const needed = ['customer', 'service', 'staff', 'schedule', 'appointment'];
-  const turnedOn: string[] = [];
-  await turnOnMissing(context, A, needed, turnedOn);
+  const { context, page, turnedOn } = await signedInWith(browser, CITAS);
   await openPanelInSpanish(page);
-  const ids = ['0192f0b2-1111-7000-8000-000000000001', '0192f0b2-2222-7000-8000-000000000002', '0192f0b2-3333-7000-8000-000000000003'];
-  const booking = { customer_id: ids[0], services: [{ service_id: ids[1] }], staff_id: ids[2], start: '2026-11-02T10:00:00+01:00', source: 'counter' };
-  await ask(page, `E2E-ASK appointment__appointment__create ${JSON.stringify(booking)}`, { settle: false });
-  await expect(card(page)).toBeVisible();
-  for (const vp of VIEWPORTS) {
-    await page.setViewportSize({ width: vp.width, height: vp.height });
-    await expect(card(page)).toContainText('Crear en Citas: 1 elemento · 2 nov 2026, 10:00 · Mostrador');
-    for (const raw of ['2026-11-02', '+01:00', 'counter', ...ids]) await expect(card(page)).not.toContainText(raw);
-    await captureStill(page, `${KEY}-${vp.label}`);
-  }
+  const raw = ['2026-11-02', '+01:00', 'counter', CUSTOMER_ID, SERVICE_ID, MEMBER_ID];
+  const line = 'Crear en Citas: 1 elemento · 2 nov 2026, 10:00 · Mostrador';
+  await bookingCardSays(page, [{ service_id: SERVICE_ID }], line, raw, 'FIX-HUB-BASE-ASSISTANT-CARD-SHOWS-RAW-VALUES');
   await cancelAtComputerSize(page);
   await leave(context, turnedOn);
 });
@@ -802,24 +811,10 @@ test('assistant-card — in Spanish a booking says its day and time and its chan
 // elemento»: now it says the service by that name, with the day, the time and the channel in words. Cancelled: nothing
 // is booked.
 test('assistant-card — in Spanish a booking whose service comes by its name says that name, never how many', async ({ browser }) => {
-  const KEY = 'hub-860-service-by-name';
-  const context = await browser.newContext();
-  const page = await context.newPage();
-  await login(page, A, '/');
-  const needed = ['customer', 'service', 'staff', 'schedule', 'appointment'];
-  const turnedOn: string[] = [];
-  await turnOnMissing(context, A, needed, turnedOn);
+  const { context, page, turnedOn } = await signedInWith(browser, CITAS);
   await openPanelInSpanish(page);
-  const ids = ['0192f0b2-1111-7000-8000-000000000001', '0192f0b2-3333-7000-8000-000000000003'];
-  const booking = { customer_id: ids[0], services: [{ service: 'Tinte' }], staff_id: ids[1], start: '2026-11-02T10:00:00+01:00', source: 'counter' };
-  await ask(page, `E2E-ASK appointment__appointment__create ${JSON.stringify(booking)}`, { settle: false });
-  await expect(card(page)).toBeVisible();
-  for (const vp of VIEWPORTS) {
-    await page.setViewportSize({ width: vp.width, height: vp.height });
-    await expect(card(page)).toContainText('Crear en Citas: Tinte · 2 nov 2026, 10:00 · Mostrador');
-    await expect(card(page)).not.toContainText('elemento');
-    await captureStill(page, `${KEY}-${vp.label}`);
-  }
+  const line = 'Crear en Citas: Tinte · 2 nov 2026, 10:00 · Mostrador';
+  await bookingCardSays(page, [{ service: 'Tinte' }], line, ['elemento', CUSTOMER_ID, MEMBER_ID], 'hub-860-service-by-name');
   await cancelAtComputerSize(page);
   await leave(context, turnedOn);
 });
