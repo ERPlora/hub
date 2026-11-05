@@ -1,0 +1,20 @@
+{% load i18n %}<header data-ep-section="topbar" class="{{ header_class }}">
+  <nav class="navbar navbar-expand-md py-3{% if nav_class %} {{ nav_class }}{% endif %}"{% if nav_theme %} data-bs-theme="{{ nav_theme }}"{% endif %}>
+    <div class="container">
+      <a class="navbar-brand d-flex align-items-center gap-2 {{ brand_class }}" href="/">
+        {% if content.topbar.logo %}<img class="ws-logo {{ logo_class }}" src="{{ content.topbar.logo.url }}" alt="{{ site_name }}">{% endif %}
+        <span>{{ site_name }}</span>
+      </a>
+      <div class="d-flex align-items-center gap-2 order-md-last">
+        <a class="{{ login_class }}" href="{{ login_url }}" data-ep-login>{% translate "Log in" context "website" %}</a>
+        {% if body %}<button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#ws-nav" aria-controls="ws-nav" aria-expanded="false" aria-label="{% translate "Menu" context "website" %}"><span class="navbar-toggler-icon"></span></button>{% endif %}
+      </div>
+      {% if body %}<div class="collapse navbar-collapse {{ collapse_class }}" id="ws-nav">
+        <ul class="navbar-nav {{ menu_class }}">
+          {% for section in body %}<li class="nav-item"><a class="nav-link{% if link_class %} {{ link_class }}{% endif %}" href="#{{ section.name }}">{{ section.data.title }}</a></li>
+          {% endfor %}
+        </ul>
+      </div>{% endif %}
+    </div>
+  </nav>
+</header>

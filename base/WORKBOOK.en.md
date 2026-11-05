@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:8f2477d3bff2078aaf41f02f0aca29e242ebf4e5806ad2ee4cde355f4410bf1c -->
+<!-- generated from WORKBOOK.md sha256:94f22534d5e6eef39fdfe8385ee6a5ae148e0e6f8390328fcc901b17fd46ad75 -->
 
 ## What it is for and who it is for
 
@@ -407,6 +407,7 @@ On the Employees screens and the API documentation:
 | BASE-F107 | Pass the master QA of the Hub | done |
 | BASE-F108 | Report a problem to support | done |
 | BASE-F109 | Delete a deleted business after its 90 days | partial — a business with documents keeps its database until the fiscal archive exists (hub#738) |
+| BASE-F110 | Open the business's website on its own domain | done |
 
 ### BASE-F01 See what the business still has to set up
 Status: done
@@ -626,7 +627,8 @@ Steps:
      menu folded to its icons (desktop), only its icon stays, which says "Upgrade plan" on hover. Only in the
      browser: the installed app does not have it.
   2. They tap it: this business's plan page on erplora.com opens in a new tab, already signed in with their
-     account: they do not type the password again even if that browser did not have the erplora.com session open.
+     account: they do not type the password again even if that browser did not have the erplora.com session open. The
+     same from any other "Upgrade plan" of the Hub: System, Employees, Apps, the assistant's panel and the WhatsApp Inbox.
   3. The owner, the administrator or the manager who came in with their account also has, right below
      "Upgrade plan", "Manage on erplora.com", with the external link icon (on the folded menu, only the icon).
      It does not sell: the installed app has it too, except the Google Play one.
@@ -640,10 +642,9 @@ does nothing). If the installed app cannot open the browser, it says so: "Could 
 pass does not come (the server gives an error or does not answer in 8 seconds), the usual address opens: erplora.com
 asks to sign in with the account and goes on to the same place. If the browser blocks the new tab, the link itself opens
 that address. With the pass spent or the minute gone, erplora.com says so and offers to sign in and go on there; to an
-account that no longer belongs to this business it says it does not (ACCOUNTS-F29). "Upgrade plan" in the assistant's
-panel and in the WhatsApp Inbox do not carry the pass yet and ask to sign in (hub#723). An employee, a session opened with
+account that no longer belongs to this business it says it does not (ACCOUNTS-F29). An employee, a session opened with
 a PIN or with the badge and the Google Play app do not have "Manage on erplora.com".
-Involved: BASE-F40, ACCOUNTS-F29
+Involved: BASE-F40, BASE-F104, WHATSAPP_INBOX-F13, ACCOUNTS-F29
 
 ### BASE-F12 Ask the assistant to go over the setup
 Status: done
@@ -2600,14 +2601,15 @@ Steps:
      "You have used all 300 messages of this month." with "They renew on November 1."; also when the panel opens
      with the month already spent.
   5. Whoever runs the business sees, in the browser, "Upgrade plan", which opens the plan's page on erplora.com in
-     another tab; in the app installed from the store it does not show. Whoever does not run it sees "Ask whoever
-     runs the business to upgrade the plan.". There are no message packs: it is extended by upgrading the plan.
+     another tab, already signed in with their account (BASE-F11); in the app installed from the store it does not
+     show. Whoever does not run it sees "Ask whoever runs the business to upgrade the plan.". There are no message packs:
+     it is extended by upgrading the plan.
   6. With a plan without the assistant, the foot says "Your plan does not include the assistant.", with "Upgrade
      plan" for whoever runs the business; the panel opens anyway.
 In: the messages used, the limit and the day they renew, from erplora.com.
 Out: erplora.com's plan page, in another tab. The business does not keep its own count of messages.
 If it fails: if the plan cannot be read, nothing is shown and they can ask anyway: what erplora.com says when
-answering is what counts.
+answering is what counts. If the pass of "Upgrade plan" does not arrive, the usual address opens, which asks to sign in (BASE-F11).
 Involved: BASE-F11, BASE-F106
 
 ### BASE-F105 Report a bad answer
@@ -2726,3 +2728,19 @@ that does not name the business's own database drops nothing (`invalid_database_
 copy stays open with its database; once it is being dropped, erplora.com gets `hub_purged`. If the Hub shuts down
 mid-copy, the next one takes it up.
 Involved: HUBS-F18, HUBS-F19, HUBS-F20, PUBLIC-F34 (the same deletion of files, when a demo is retired)
+
+### BASE-F110 Open the business's website on its own domain
+<!-- origin: new (saas#195, HUBS-F17; PLAN-SAAS §37, point 2) -->
+Status: done (the address and what it serves; connecting the domain is erplora.com's HUBS-F17, which shows it on the panel)
+Actor: anyone, without an account
+Screen: The business's public page (WEBSITE-F10), on its domain
+Steps:
+  1. Someone opens the business's domain (for example, www.minegocio.es) on a phone, a tablet or a computer.
+  2. The business's published page shows, with its photos, in the browser's language.
+  3. **Log in** leads to the business's address on erplora.com: the app and the way in stay only there.
+In: a domain erplora.com has said is that business's.
+Out: the business's public website and its images, without cookies; nothing else: no app, no API, no way in. With a session
+of the business open in that browser it shows the same, because the session does not reach another domain.
+If it fails: a domain nobody connected opens nothing. If the business removes it, is cancelled or suspended, or has no
+published page, the domain says there is nothing there. A business being prepared or moved asks to come back in a moment.
+Involved: HUBS-F17, WEBSITE-F10

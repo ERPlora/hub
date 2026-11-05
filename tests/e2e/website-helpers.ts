@@ -1,7 +1,26 @@
 // What the specs of the website editor (website*.spec.ts and the fixes seen in it) share and the rest of the e2e does not.
-import { expect, type Page } from '@playwright/test';
+import { type Browser, type BrowserContext, expect, type Page } from '@playwright/test';
 
-import { settled } from './helpers';
+import { A, api, hostPage, settled } from './helpers';
+
+/** The site as `GET /website/site` answers it: what a spec puts back after. */
+export interface Site {
+  template: string;
+  theme: Record<string, unknown>;
+  content: Record<string, Record<string, unknown>>;
+  is_live: boolean;
+}
+
+/** The owner of `a` on the website's editor at `viewport`, and the site as the run finds it. */
+export async function ownerOfTheSite(
+  browser: Browser,
+  viewport: { width: number; height: number },
+): Promise<{ owner: { context: BrowserContext; page: Page }; found: Site }> {
+  const owner = await hostPage(browser, A, { next: '/website', viewport });
+  const site = await api<Site>(owner.context, A, 'GET', '/website/site');
+  expect(site.status).toBe(200);
+  return { owner, found: site.data };
+}
 
 /**
  * The page at rest for its capture: no focus ring (the website's own step), then the harness's one wait, `settled`

@@ -415,6 +415,7 @@ En la pantalla Archivos:
 | BASE-F107 | Pasar la QA maestra del Hub | hecho |
 | BASE-F108 | Reportar un problema a soporte | hecho |
 | BASE-F109 | Borrar un negocio eliminado pasados sus 90 días | parcial — un negocio con documentos guarda su base de datos hasta que exista el archivo fiscal (hub#738) |
+| BASE-F110 | Abrir la web del negocio por su dominio propio | hecho |
 
 ### BASE-F01 Ver lo que le falta por configurar al negocio
 <!-- origen: fi:hub/app-web#setup-status-estado-de-configuracion-de-modulos-adr-0063 -->
@@ -645,7 +646,8 @@ Pasos:
      sus iconos (escritorio), queda solo su icono, que dice «Mejorar plan» al pasar por encima. Solo en el
      navegador: en la app instalada no está.
   2. Lo pulsa: se abre en una pestaña nueva la página del plan de este negocio en erplora.com, ya dentro con su
-     cuenta: no vuelve a escribir la contraseña aunque ese navegador no tuviera abierta la sesión de erplora.com.
+     cuenta: no vuelve a escribir la contraseña aunque ese navegador no tuviera abierta la sesión de erplora.com. Igual
+     desde cualquier otro «Mejorar plan» del Hub: Sistema, Empleados, Apps, el panel del asistente y la Bandeja de WhatsApp.
   3. El propietario, el administrador o el encargado que entró con su cuenta tiene además, justo debajo de
      «Mejorar plan», «Gestionar en erplora.com», con el icono de enlace externo (en el menú plegado, solo el icono).
      No vende: también está en la app instalada, salvo en la de Google Play.
@@ -659,10 +661,9 @@ app instalada no consigue abrir el navegador, lo dice: «No se ha podido abrir e
 pase no llega (el servidor da un error o no contesta en 8 segundos), se abre la dirección de siempre: erplora.com pide
 entrar con la cuenta y sigue hasta el mismo sitio. Si el navegador bloquea la pestaña nueva, abre esa dirección el
 propio enlace. Con el pase gastado o pasado el minuto, erplora.com lo dice y ofrece entrar y seguir allí; a una cuenta
-que ya no es de este negocio le dice que no lo es (ACCOUNTS-F29). «Mejorar plan» del panel del asistente y de la Bandeja
-de WhatsApp aún no llevan el pase y piden entrar (hub#723). Un empleado, una sesión abierta con PIN o con la placa y la
-app de Google Play no tienen «Gestionar en erplora.com».
-Implicados: BASE-F40, ACCOUNTS-F29
+que ya no es de este negocio le dice que no lo es (ACCOUNTS-F29). Un empleado, una sesión abierta con PIN o con la placa
+y la app de Google Play no tienen «Gestionar en erplora.com».
+Implicados: BASE-F40, BASE-F104, WHATSAPP_INBOX-F13, ACCOUNTS-F29
 
 ### BASE-F12 Pedirle al asistente que repase la configuración
 <!-- origen: old-hub:HUB_SHELL-F30 -->
@@ -2718,14 +2719,15 @@ Pasos:
      «Has usado los 300 mensajes de este mes.» con «Se renuevan el 1 de noviembre.»; también al abrir el panel con
      el mes ya gastado.
   5. Quien administra el negocio ve, en el navegador, «Mejorar plan», que abre en otra pestaña la página del plan
-     en erplora.com; en la app instalada desde la tienda no sale. Quien no administra ve «Pídele a quien administra el
-     negocio que mejore el plan.». No hay paquetes de mensajes: se amplía mejorando de plan.
+     en erplora.com, ya dentro con su cuenta (BASE-F11); en la app instalada desde la tienda no sale. Quien no
+     administra ve «Pídele a quien administra el negocio que mejore el plan.». No hay paquetes de mensajes: se amplía
+     mejorando de plan.
   6. Con un plan sin asistente, el pie dice «Tu plan no incluye el asistente.», con «Mejorar plan» para quien
      administra; el panel se abre igual.
 Entra: los mensajes usados, el límite y el día en que se renuevan, de erplora.com.
 Sale: la página del plan de erplora.com, en otra pestaña. El negocio no lleva su propia cuenta de mensajes.
 Si falla: si no se puede leer el plan, no se enseña nada y se puede preguntar igual: lo que diga erplora.com al
-responder es lo que vale.
+responder es lo que vale. Si el pase de «Mejorar plan» no llega, se abre la dirección de siempre, que pide entrar (BASE-F11).
 Implicados: BASE-F11, BASE-F106
 
 ### BASE-F105 Informar de una respuesta mala
@@ -2850,8 +2852,39 @@ del negocio no borra nada (`invalid_database_name`). Un negocio recuperado duran
 de datos; ya borrándose, erplora.com recibe `hub_purged`. Si el Hub se apaga a media copia, el siguiente la retoma.
 Implicados: HUBS-F18, HUBS-F19, HUBS-F20, PUBLIC-F34 (el mismo borrado de ficheros, al retirar una demo)
 
+### BASE-F110 Abrir la web del negocio por su dominio propio
+<!-- origen: nuevo (saas#195, HUBS-F17; PLAN-SAAS §37, punto 2) -->
+Estado: hecho (la dirección y lo que sirve; conectar el dominio es HUBS-F17 de erplora.com, que lo enseña en el panel)
+Actor: cualquiera, sin cuenta
+Pantalla: La página pública del negocio (WEBSITE-F10), en su dominio
+Pasos:
+  1. Alguien abre el dominio del negocio (por ejemplo, www.minegocio.es) en un móvil, una tableta o un ordenador.
+  2. Se ve la página publicada del negocio, con sus fotos, en el idioma del navegador.
+  3. **Entrar** lleva a la dirección del negocio en erplora.com: la app y la entrada siguen solo allí.
+Entra: un dominio que erplora.com ha dicho que es de ese negocio.
+Sale: la web pública del negocio y sus imágenes, sin cookies; nada más: ni la app, ni la API, ni el acceso. Con la sesión
+del negocio abierta en ese navegador se ve lo mismo, porque la sesión no llega a otro dominio.
+Si falla: un dominio que nadie ha conectado no abre nada. Si el negocio lo quita, se da de baja o está suspendido, o no
+tiene una página publicada, el dominio dice que no hay nada ahí. Un negocio que se está preparando o mudando pide volver
+en un momento.
+Implicados: HUBS-F17, WEBSITE-F10
+
 ## Para quien lo mantiene
 
+- **Dominio propio de un negocio** (BASE-F110, HUBS-F17, PLAN-SAAS §37 punto 2; `base/custom_domains.py`,
+  `base.middleware.CustomDomainMiddleware`): `ALLOWED_HOSTS` no cambia. El SaaS nombra el dominio en la foto
+  (`custom_domain`: minúsculas, sin puerto, sin punto final, en su forma ASCII; `null`, vacío o ausente, ninguno, porque la
+  foto es entera), que lo guarda en `Hub.custom_domain`, y nunca se le pregunta por petición. Cada proceso guarda en memoria qué
+  dominio es de quién y lo relee cada 30 s (al momento en el proceso que aplicó la foto): un host desconocido sigue siendo
+  el 400 de `CommonMiddleware` **sin una sola lectura**, y uno de los hosts del Hub ni pregunta. Un host conocido se
+  responde en ese middleware, antes de `CommonMiddleware`, y no sigue por la cadena: `/` (la web, `base.public_home`),
+  `/p/media/<su id>/` (sus imágenes públicas) y `/.well-known/erplora-hub` (la sonda del SaaS: `{"hub_id": …}`, sin lectura);
+  cualquier otra ruta es 404 sin lectura, `/api` con su sobre, y nunca se lee la sesión. La página y sus imágenes releen la
+  fila del negocio, como cualquier otro host: `base/tenancy/connections.py` necesita fresco dónde está su base de datos y
+  una fila vieja devolvería el alias a un servidor anterior a una mudanza; esa lectura se hace una vez, y la página lee lo
+  mismo que en su dirección. Un dominio que nombran dos negocios (se está moviendo entre ellos: sus dos fotos llegan en
+  cualquier orden) no es de nadie hasta que el que lo deja manda la suya: se avisa con `base.custom_domain_taken`, no se
+  rechaza ninguna foto y nunca se sirve la web equivocada.
 - **Orden de una lista** (`base/ordering.py`, regla hub#2355 del producto viejo): `list_order(*columnas, descending=…,
   nulls_last=…)` devuelve lo que necesita `order_by`, con todas las columnas y después el `id` en la dirección de la
   lista: la descendente es la ascendente leída al revés, empates incluidos, y las páginas ni repiten ni pierden filas.
@@ -3066,6 +3099,10 @@ Implicados: HUBS-F18, HUBS-F19, HUBS-F20, PUBLIC-F34 (el mismo borrado de ficher
   mirar el registro (`test_nobody_can_open_a_screen_of_the_platform_hub_though_its_row_is_ready`), y si algún día se
   abriera, el aviso de plan desconocido le prometería uno que nunca llega. Tests: `base/tests/test_meter.py`, `test_meter_requests.py` y
   `test_plan_usage_figures.py`.
+- Una transacción que va a esperar una respuesta de fuera lo dice con `base.operations.allow_idle_wait(segundos)`:
+  `SET LOCAL idle_in_transaction_session_timeout` en el alias activo (`base.tenancy.connections.allow_idle_wait`), solo
+  para esa transacción (PgBouncer en modo transacción); todas las demás siguen con los 30 s del clúster. Test:
+  `base/tenancy/tests/test_limits.py`.
 - Pantallas: `base/frontend/pages/AppsPage.vue` (`/apps`, pestañas por hash `#all`/`#paid`, las del hub viejo;
   reglas en `lib/apps.ts`), `SystemPage.vue` (`/system`, cinco pestañas por hash: ver «Sistema (APP-BASE-7)» abajo) y `AppBlockedPage.vue`, que monta la guarda de `lib/app-gate.ts` (`frontend/main.ts`: cada ruta
   de `apps/<id>/frontend/routes.ts` lleva `meta.app`; una app `off` en `base.session.me` monta la página por nombre
@@ -3237,9 +3274,11 @@ Implicados: HUBS-F18, HUBS-F19, HUBS-F20, PUBLIC-F34 (el mismo borrado de ficher
   clic (tras un `await` el navegador la bloquea), le quita `opener` y le pone la dirección al llegar; en la app instalada
   la saca por `openExternalLink`. Un error u 8 s sin respuesta (`SIGN_TIMEOUT_MS`: `client.api.call` no tiene tiempo
   límite) abren la dirección de siempre, que sigue en el `href`. Lo usan `UpgradePlanLink`, `SystemUsage`, `PeopleList` y
-  `AppsPage` (`plan`) y `ManageLink` (`business`); el asistente y la Bandeja de WhatsApp, aún no (hub#723). Tests:
-  `base/tests/test_saas_pass.py`, `lib/saas-pass.test.ts`, `frontend/external-links.test.ts`; e2e
-  `tests/e2e/base-chrome.spec.ts`.
+  `AppsPage` (`plan`), `ManageLink` (`business`), `PlanUpgradeLink` de la Bandeja de WhatsApp (`plan`) y `openPlan` de
+  `lib/assistant-hub.ts`, que recibe el clic de «Mejorar plan» del panel de `@erplora/ui` (`plan`) y pasa el cliente del
+  panel a `useSaasPass`, porque ese clic corre fuera del `setup` de un componente. Tests: `base/tests/test_saas_pass.py`,
+  `lib/saas-pass.test.ts`, `lib/assistant-hub.test.ts`, `frontend/external-links.test.ts`; e2e
+  `tests/e2e/base-chrome.spec.ts`, `tests/e2e/base-assistant.spec.ts` y `tests/e2e/whatsapp-inbox-plan-cap.spec.ts`.
 - `base/spa.py` incrusta en `hub-home` `access` (`credential`, `switch_user`, `idle_minutes`) y `preferences` (la
   apariencia propia); `plan_url` y `account_url` solo en una sesión abierta con la cuenta
   (gh:hub#2506), y `manage_url` (`SAAS_URL/dashboard/businesses/<id del hub>`, BASE-F11) además solo con el permiso
@@ -3649,8 +3688,6 @@ con su issue, y llegan con ella. Después llegaron BASE-F21 y BASE-F22 (hub#601)
   base de datos y sus ficheros pasados los 90 días.
 - **La fila de salud del Inicio (BASE-F02)**, hub#573: un punto de extensión más en `LiveAppConfig` y su uso en
   Impresión y la Bandeja de WhatsApp.
-- **El pase en «Mejorar plan» del asistente y de la Bandeja de WhatsApp (BASE-F11)**, hub#723: el asistente exige cambiar
-  `ERPlora/ui`; hasta entonces esos dos abren la dirección de siempre, que pide entrar.
 - **Las notas de cada versión (BASE-F41)**, hub#576.
 - **Citas en la moneda del negocio (BASE-F50)**, hub#577, de `apps/appointment`.
 - **La vista previa de .xlsx y .docx y el .json plegable (BASE-F74)**, hub#578.

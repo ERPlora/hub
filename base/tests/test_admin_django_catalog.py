@@ -9,13 +9,15 @@ of Django that opens a new hole fails here, naming the message to translate; so 
 that marks these entries obsolete (their messages are Django's, not in ``base``'s code).
 """
 
-import re
 from pathlib import Path
 
 import django
 import pytest
+from babel.messages.catalog import Message
 from django.utils import translation
 from django.utils.translation.trans_real import DjangoTranslation
+
+from base.tests.po import po_messages
 
 DJANGO = Path(django.__file__).parent
 #: The Spanish catalogues of Django behind the admin: its own (pages and JavaScript) and Django's core (forms, fields).
@@ -28,79 +30,67 @@ CATALOGUES = {
 SAME_IN_SPANISH = {
     ", ": "the separator of a list of objects reads the same in Spanish",
 }
-ESCAPES = {"n": "\n", "t": "\t", '"': '"', "\\": "\\"}
 
 
-def _text(quoted: str) -> str:
-    return re.sub(r"\\(.)", lambda match: ESCAPES.get(match.group(1), match.group(1)), quoted)
+def messages(path: Path) -> list[Message]:
+    """Django's catalogues are not ours: ``djangojs.po`` declares two plural forms and writes three."""
+    return po_messages(path, strict=False)
 
 
-def entries(path: Path) -> list[dict]:
-    """The live entries of a ``.po``: ``context``, ``msgid``, ``plural``, ``msgstr`` (a list) and ``fuzzy``."""
-    found, entry, field = [], None, None
-    for line in [*path.read_text(encoding="utf-8").splitlines(), ""]:
-        line = line.strip()
-        if not line:
-            if entry and entry.get("msgid"):
-                found.append(entry)
-            entry, field = None, None
-            continue
-        entry = entry or {"context": None, "msgid": "", "plural": None, "msgstr": {}, "fuzzy": False}
-        if line.startswith("#~"):
-            entry["obsolete"] = True
-        elif line.startswith("#,"):
-            entry["fuzzy"] = entry["fuzzy"] or "fuzzy" in line
-        elif line.startswith("#"):
-            continue
-        elif match := re.fullmatch(r'(msgctxt|msgid_plural|msgid|msgstr(?:\[(\d+)\])?) "(.*)"', line):
-            keyword, index, text = match.groups()
-            field = {"msgctxt": "context", "msgid_plural": "plural", "msgid": "msgid"}.get(keyword, ("msgstr", index or "0"))
-            if isinstance(field, tuple):
-                entry["msgstr"][field[1]] = _text(text)
-            else:
-                entry[field] = _text(text)
-        elif line.startswith('"') and field is not None:
-            if isinstance(field, tuple):
-                entry["msgstr"][field[1]] += _text(line[1:-1])
-            else:
-                entry[field] = (entry[field] or "") + _text(line[1:-1])
-    return [entry for entry in found if not entry.get("obsolete")]
+def msgid(message: Message) -> str:
+    return message.id[0] if message.pluralizable else message.id
 
 
-def holes(path: Path) -> list[dict]:
+def holes(path: Path) -> list[Message]:
     """The entries the compiled catalogue leaves out: every ``msgstr`` empty, or fuzzy (``msgfmt`` drops those)."""
-    return [entry for entry in entries(path) if entry["fuzzy"] or not any(entry["msgstr"].values())]
+    return [message for message in messages(path) if message.fuzzy or not any(message.string)]
 
 
-def untranslated(entry: dict, domain: str) -> bool:
-    """Whether ``entry`` still comes out in English with the Spanish catalogues of this project."""
+def untranslated(message: Message, domain: str) -> bool:
+    """Whether ``message`` still comes out in English with the Spanish catalogues of this project."""
     catalogue = DjangoTranslation("es", domain=domain) if domain != "django" else None
+    text, plural = message.id if message.pluralizable else (message.id, None)
     with translation.override("es"):
         if catalogue is None:
-            if entry["plural"]:
-                if entry["context"]:
-                    said = [translation.npgettext(entry["context"], entry["msgid"], entry["plural"], n) for n in (1, 2)]
+            if plural:
+                if message.context:
+                    said = [translation.npgettext(message.context, text, plural, n) for n in (1, 2)]
                 else:
-                    said = [translation.ngettext(entry["msgid"], entry["plural"], n) for n in (1, 2)]
-            elif entry["context"]:
-                said = [translation.pgettext(entry["context"], entry["msgid"])]
+                    said = [translation.ngettext(text, plural, n) for n in (1, 2)]
+            elif message.context:
+                said = [translation.pgettext(message.context, text)]
             else:
-                said = [translation.gettext(entry["msgid"])]
-        elif entry["plural"]:
-            said = [catalogue.ngettext(entry["msgid"], entry["plural"], n) for n in (1, 2)]
+                said = [translation.gettext(text)]
+        elif plural:
+            said = [catalogue.ngettext(text, plural, n) for n in (1, 2)]
         else:
-            said = [catalogue.gettext(entry["msgid"])]
-    english = [entry["msgid"], entry["plural"]] if entry["plural"] else [entry["msgid"]]
+            said = [catalogue.gettext(text)]
+    english = [text, plural] if plural else [text]
     return said == english
 
 
 def test_the_scan_reads_djangos_catalogues():
     """The parser finds Django's translations: «Log out» is «Cerrar sesión» in the admin's own catalogue."""
     path, _ = CATALOGUES["contrib/admin django"]
-    log_out = next(entry for entry in entries(path) if entry["msgid"] == "Log out")
+    log_out = next(message for message in messages(path) if msgid(message) == "Log out")
 
-    assert log_out["msgstr"] == {"0": "Cerrar sesión"}
+    assert log_out.string == "Cerrar sesión"
     assert all(path.exists() for path, _ in CATALOGUES.values())
+
+
+def test_a_hole_is_an_empty_or_fuzzy_entry(tmp_path):
+    """The list below would pass on nothing if this found nothing; how many holes Django has today is up to Django."""
+    po = tmp_path / "django.po"
+    po.write_text(
+        'msgid ""\nmsgstr ""\n"Plural-Forms: nplurals=2; plural=n != 1;\\n"\n\n'
+        'msgid "Translated"\nmsgstr "Traducida"\n\n'
+        'msgid "Empty"\nmsgstr ""\n\n'
+        '#, fuzzy\nmsgid "Fuzzy"\nmsgstr "Dudosa"\n\n'
+        'msgid "One"\nmsgid_plural "Many"\nmsgstr[0] ""\nmsgstr[1] ""\n\n'
+        'msgid "Half"\nmsgid_plural "Halves"\nmsgstr[0] "Media"\nmsgstr[1] ""\n',
+        encoding="utf-8",
+    )
+    assert [msgid(message) for message in holes(po)] == ["Empty", "Fuzzy", "One"]
 
 
 @pytest.mark.parametrize("name", CATALOGUES)
@@ -108,9 +98,9 @@ def test_every_hole_of_djangos_spanish_is_translated_by_ours(name):
     path, domain = CATALOGUES[name]
 
     missing = [
-        entry["msgid"]
-        for entry in holes(path)
-        if entry["msgid"] not in SAME_IN_SPANISH and untranslated(entry, domain)
+        msgid(message)
+        for message in holes(path)
+        if msgid(message) not in SAME_IN_SPANISH and untranslated(message, domain)
     ]
 
     assert missing == [], f"translate in base/locale/es ({domain}.po): {missing}"

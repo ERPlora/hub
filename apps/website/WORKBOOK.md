@@ -351,8 +351,9 @@ Entra: la dirección del negocio.
 Sale: la página publicada, con su propia política de seguridad (sin scripts del usuario: solo el paquete de la
 página), sin cookies y guardada un minuto en el navegador; la pestaña lleva el logotipo o la inicial del nombre.
 Si falla: sin publicar, desconectada o con la app apagada, la dirección lleva al acceso del equipo; quien hace más de
-60 lecturas por minuto desde una misma conexión espera un momento.
-Implicados: WEBSITE-F07, WEBSITE-F08, WEBSITE-F05, WEBSITE-F11, WEBSITE-F12
+60 lecturas por minuto desde una misma conexión espera un momento. Por el dominio propio del negocio (BASE-F110) es la
+misma página: **Entrar** lleva a su dirección de erplora.com y, sin página que enseñar, el dominio dice que no hay nada ahí.
+Implicados: WEBSITE-F07, WEBSITE-F08, WEBSITE-F05, WEBSITE-F11, WEBSITE-F12, BASE-F110, HUBS-F17
 
 ### WEBSITE-F11 Mostrar una galería de fotos
 <!-- origen: nuevo (galería de trabajos del salón, como las de Fresha, Booksy y Square Online; ampliación de PLAN §29 del 2026-10-22) -->
@@ -471,6 +472,16 @@ las tres lecturas públicas de los visitantes (`website.public.*`).
 | Cambiar, subir imágenes, previsualizar, publicar y desconectar | sí | sí | no | no | `website.manage` |
 
 ## Para quien lo mantiene
+
+- **La página en el dominio propio** (BASE-F110, `request.custom_domain`, `public_home.respond`): allí solo están `/` y las
+  imágenes, ni `/auth` ni `/api`, así que es otra página, guardada aparte (`page_cache_key(…, own_domain=True)`): **Entrar**
+  es la dirección absoluta del negocio (`render_site(hub_address=…)`), `<html data-ep-static>` deja a `catalog.ts` y
+  `reviews.ts` sin pedir nada, su catálogo se lee al pintarla (`queries.live_catalog`, nunca la instantánea de la
+  publicación) y se guarda un minuto, lo que la API guarda ese catálogo, en vez de una hora; su CSP no lleva `report-uri`,
+  porque `/csp-report/` tampoco está. Sin página que enseñar, 404.
+- **La barra y el pie de las cuatro plantillas** son componentes (`templates/website/_topbar.html`, `_footer.html`, y sus
+  piezas `_footer_columns.html` y `_credit.html`, que usa también `minimal`, con otro marco): cada plantilla dice sus clases en
+  una línea y el enlace **Entrar** (`login_url`) se escribe en dos sitios, la barra y el pie, nunca en cuatro ficheros.
 
 - **Una fila por hub (andamiaje de la fase 1, PLAN §29)**: hasta la fase 2 las tablas las comparten todos los hubs,
   así que `Site` e `Image` llevan `hub_id` (el `Hub.id` del registro, `base.operations.hub_id`; sin clave foránea,
@@ -650,9 +661,6 @@ las tres lecturas públicas de los visitantes (`website.public.*`).
   `ai=` en toda operación, y estas seis esperan al marcador `INTERNAL` y al check `live.E017`, que aún no existen en
   `packages/live` (ver «Asistente» en «Para quien lo mantiene»). El QR no hace falta como herramienta:
   `website.site.get` ya da la dirección pública.
-- **Dominio propio para la web** (ADR-0502): HUBS-F17, en «Fuera por ahora» (`## 6`) de `MIGRATION.md` y en PLAN-SAAS
-  §8 (ronda 2026-10-22). Llega a la vez con sus tres piezas: la verificación en el SaaS, el certificado en el ALB de
-  `aws` y la resolución por host en `base`. Hasta entonces, la web vive solo en la dirección del hub.
 - **Dos arreglos fuera de la app** (`TODO.md`, vistos en APP-WEBSITE):
   - `FIX-HUB-SPA-STATIC-PROBES-SET-CSRF-COOKIE` (`base/spa.py`), hecho: en el host de un hub, `/favicon.ico`,
     `/robots.txt` o cualquier ruta que nombra un fichero y no tiene URL propia recibe un 404 sin la SPA ni cookie
@@ -666,7 +674,7 @@ las tres lecturas públicas de los visitantes (`website.public.*`).
 ## Lo que NO hace, a propósito
 
 - Una sola página por negocio: sin páginas adicionales ni `/p/<página>`.
-- Sin HTML, CSS ni JS del usuario y sin más plantillas que las cuatro. El dominio propio, en «Lo que queda fuera».
+- Sin HTML, CSS ni JS del usuario y sin más plantillas que las cuatro.
 - El horario no se importa de Horarios; no hay enlace de reservas hasta que exista la página de Reservas online en
   `/p/…`.
 - Las imágenes se guardan tal cual (sin variantes de tamaño ni recorte, y sin quitarles los metadatos EXIF); no se
