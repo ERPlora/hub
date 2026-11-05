@@ -483,6 +483,22 @@ def test_the_lines_of_a_cart_that_is_not_active_do_not_change(name):
 # ── Orders: initiate (CART_CHECKOUT-F08) ──────────────────────────────────────────────────────
 
 
+def test_the_number_of_an_order_is_of_the_businesss_day(night_elsewhere):
+    make_cart("sess_1", currency="EUR")
+    add("sess_1", quantity="1", unit_price=1250)
+    assert initiate().order_number == "OS-20261102-0001"
+
+
+def test_a_business_that_changes_zone_never_repeats_an_order_number(across_a_change_of_zone):
+    make_cart("sess_1", currency="EUR")
+    add("sess_1", quantity="1", unit_price=1250)
+    assert [number for number in across_a_change_of_zone(lambda: initiate().order_number)] == [
+        "OS-20261102-0001",
+        "OS-20261103-0001",
+        "OS-20261102-0002",
+    ]
+
+
 def test_initiating_an_order_copies_the_cart_total_with_its_number_of_the_day():
     make_cart("sess_1", currency="USD")
     add("sess_1", quantity="2", unit_price=1250)

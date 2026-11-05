@@ -13,6 +13,8 @@ from live.errors import Conflict, NotFound, PermissionDenied
 
 from apps.combo.queries import split_amount
 
+from base.tests.ordering import assert_reads_backwards, listed_with
+
 from .conftest import (
     ALCOHOL,
     ALCOHOL_TO_GO,
@@ -737,3 +739,12 @@ def test_a_dish_now_sold_by_weight_is_not_offered_nor_charged():
     for extra in ({}, {"amount": 1350}):
         error = refusal(combo, pick(options["lentils"], options["hake"], options["water"]), **extra)
         assert error.code == "combo.product_not_by_unit"
+
+
+@pytest.mark.parametrize("column", ["price", "sort_order", "is_active", "supply_kind"])
+def test_ties_read_backwards_in_a_descending_list(column):
+    """hub#768 (the rule of hub#2355, as in Customers): a descending list is the ascending one read backwards, ties
+    included, and its pages neither repeat nor lose rows."""
+    menus = [make_combo("Menu A"), make_combo("Menu A"), make_combo("Menu B"), make_combo("Menu B")]
+    expected = sorted(menus, key=lambda menu: (menu.name, menu.id))
+    assert_reads_backwards(listed_with(run, "combo.combo.list", column, by_dir=True), [menu.id for menu in expected])

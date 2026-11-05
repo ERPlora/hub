@@ -13,7 +13,10 @@ from pathlib import Path
 
 import pytest
 from live.errors import Conflict, NotFound, PermissionDenied
+from django.utils import timezone
 from live.operations import get
+
+from apps.payment.models import Payment
 
 from apps.payment.schemas import (
     MethodListIn,
@@ -25,6 +28,8 @@ from apps.payment.schemas import (
     PaymentPage,
     PaymentRefIn,
 )
+
+from base.tests.ordering import assert_reads_backwards, listed_with
 
 from .conftest import ctx_for, make_method, make_payment
 
@@ -399,3 +404,27 @@ def test_find_method_by_name_exact_else_the_only_one_containing_it():
     with pytest.raises(NotFound) as missing:
         find_method(None, "Santander")
     assert missing.value.code == "payment.method_not_found"
+
+
+def _tied_methods():
+    return [make_method(f"Account {n}").id for n in range(4)]
+
+
+def _tied_payments():
+    method = make_method()
+    ids = sorted(make_payment(method, reference=f"PAY-20261014-000{n}").id for n in range(4))
+    Payment.objects.update(created_at=timezone.now())
+    return ids
+
+
+@pytest.mark.parametrize(
+    ("operation", "tied", "column"),
+    [
+        ("payment.method.list", _tied_methods, "method_type"),
+        ("payment.payment.list", _tied_payments, "amount"),
+    ],
+)
+def test_ties_go_by_id_in_the_lists_own_direction(operation, tied, column):
+    """hub#768 (the rule of hub#2355): a descending list is the ascending one read backwards, ties included, and its
+    pages neither repeat nor lose rows."""
+    assert_reads_backwards(listed_with(run, operation, column, schema=get(operation).input), tied())

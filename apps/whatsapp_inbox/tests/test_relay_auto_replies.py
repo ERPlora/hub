@@ -1,15 +1,15 @@
-"""«The guest asks for a table by WhatsApp» (WHATSAPP_INBOX-F20, F24, F25), end to end through the worker's real outbox
-relay, Automatizaciones' engine and erplora.com's doors.
+"""«The guest asks for a table by WhatsApp» (WHATSAPP_INBOX-F20, F24, F25) and «… for an appointment» (F21, F22), end to
+end through the worker's real outbox relay, Automatizaciones' engine and erplora.com's doors.
 
 erplora.com is ``base.tests.fake_gateway`` on 127.0.0.1: its assistant door (``/internal/assistant/chat``) answers
 each turn as scripted and its WhatsApp door (``/internal/whatsapp/send``) takes each message, both called by the Hub's
 real network code. The inbox's automatic answer is turned on as the owner does it; the guest's message comes in
 through the inbox's own door; one tick of the worker hands its event to Automatizaciones, whose run reads the message,
 thanks them, makes their card and asks the assistant with only what the answer was granted. «Ask me first»: the booking
-it wants waits in «Waiting for your answer»; the owner's yes runs Reservas' real operation, whose answer goes back to
-the assistant, and what the assistant says then goes to them. A cancellation too (F25), only of their own reservation:
-Reservas refuses any other on their behalf. When the assistant fails, they get the apology and their conversation stays
-waiting for an answer, marked «Needs attention».
+it wants waits in «Waiting for your answer»; the owner's yes runs Reservas' (or Citas') real operation, whose answer goes
+back to the assistant, and what the assistant says then goes to them. A cancellation too (F22, F25), only of their own
+booking: each app refuses any other on their behalf. When the assistant fails, they get the apology and their
+conversation stays waiting for an answer, marked «Needs attention».
 """
 
 import datetime as dt
@@ -21,7 +21,18 @@ from django.db.backends.base.base import BaseDatabaseWrapper
 from django.utils import timezone
 
 from apps.appointment.models import Appointment
-from apps.appointment.tests.conftest import at, make_appointment, make_member, make_service, make_settings, next_weekday
+from apps.appointment.tests.conftest import (  # noqa: F401 - anytime is a fixture
+    MONDAY,
+    anytime,
+    assign,
+    at,
+    make_appointment,
+    make_member,
+    make_service,
+    make_settings,
+    next_weekday,
+    wall,
+)
 from apps.customer.models import Customer
 from apps.flow.models import Flow, FlowRun, Question
 from apps.flow.queries import TURN
@@ -29,8 +40,9 @@ from apps.reservation.models import Reservation, WaitlistEntry
 from apps.reservation.tests.conftest import make_reservation, open_week, set_rules
 from apps.whatsapp_inbox.models import Conversation, Message
 from apps.whatsapp_inbox.tests.conftest import NOW, connect, ctx_for, receive, run
-from base import catalog, scheduler, worker
+from base import catalog, worker
 from base.catalog import RegisterResult
+from base.models import TaskSchedule
 from base.tests.fake_gateway import gateway, signed  # noqa: F401 - the fixture
 
 pytestmark = pytest.mark.django_db
@@ -40,6 +52,7 @@ SEND = "/internal/whatsapp/send"
 QUOTA = {"used": 1, "limit": 300, "resets_at": "2026-11-01T00:00:00Z", "demo": False}
 REGISTERED = RegisterResult(written=0, retired=0, docs_changed=0, skipped=True)
 TABLE_REF = "whatsapp_inbox/reservation_from_whatsapp"
+BOOKING_REF = "whatsapp_inbox/appointment_from_whatsapp"
 LUCIA = "+34600111222"
 THANKS = "Thanks for writing! Let me check the reservations book and I will come straight back to you."
 SORRY = (
@@ -49,17 +62,11 @@ SORRY = (
 
 @pytest.fixture
 def tick(monkeypatch, django_capture_on_commit_callbacks):
-    """One turn of the worker's real loop (``test_relay_notify.py``'s): the relay, then what each COMMIT left for
-    after it (the deliveries to erplora.com, the assistant's turns). ``tick(later)`` runs it with its clock ``later``
-    than now (a second by default).
-
-    The apps' scheduled tasks are not these tests': they are scheduled a day ahead (the worker's own ``sync`` keeps a
-    known task's clock), so whichever minute a tick lands on, only the relay runs. A tick that crossed the minute ran
-    ``flow.run.resume_due`` before the relay, and in phase 1 it takes the run waiting on the assistant on the worker's
-    fixed scope (``WORKER_SCOPE_SLUG``), not the business's: the guest got the thanks last (CI run 41094697959)."""
+    """One turn of the worker's real loop (``test_relay_notify.py``'s): the tasks due and the relay, then what each
+    COMMIT left for after it (the deliveries to erplora.com, the assistant's turns). ``tick(later)`` runs it with its
+    clock ``later`` than now (a second by default)."""
     monkeypatch.setattr(catalog, "register_apps", lambda: REGISTERED)
     monkeypatch.setattr(BaseDatabaseWrapper, "close_if_unusable_or_obsolete", lambda self: None)
-    scheduler.sync(timezone.now() + dt.timedelta(days=1))
 
     def run_once(later: dt.timedelta = dt.timedelta(seconds=1)) -> None:
         stop = threading.Event()
@@ -115,6 +122,15 @@ def lucia_writes(text: str = "Mesa para 4 el sábado a las 21", **fields) -> Non
     receive("wamid.IN", "34600111222", contact_name="Lucía", text=text, sent_at=NOW.isoformat(), **fields)
 
 
+def card_made_and_what_was_asked(gateway):  # noqa: F811 - the fixture
+    """The card WhatsApp made for Lucía, the one signed turn the assistant was asked and its prompt."""
+    card = Customer.objects.get()
+    assert (card.name, card.phone, card.source) == ("Lucía", LUCIA, "whatsapp")
+    [asked] = gateway.sent(CHAT)
+    assert signed(asked)
+    return card, asked, asked.body["messages"][0]["content"]
+
+
 def test_a_guest_with_no_card_gets_one_from_whatsapp_and_the_assistant_hears_their_words_alone(gateway, tick):  # noqa: F811
     restaurant()
     door_takes(gateway, 2)
@@ -123,11 +139,7 @@ def test_a_guest_with_no_card_gets_one_from_whatsapp_and_the_assistant_hears_the
 
     tick()
 
-    card = Customer.objects.get()
-    assert (card.name, card.phone, card.source) == ("Lucía", LUCIA, "whatsapp")
-    [asked] = gateway.sent(CHAT)
-    assert signed(asked)
-    prompt = asked.body["messages"][0]["content"]
+    card, asked, prompt = card_made_and_what_was_asked(gateway)
     assert "\n———\nMesa para 4 el sábado a las 21\n———\n" in prompt  # their words alone on their lines
     assert LUCIA in prompt and str(card.id) not in prompt  # their card is fixed on a booking, never told
     assert outbound() == [THANKS, "¿Para cuántas personas?"]
@@ -467,6 +479,15 @@ def test_the_answer_never_cancels_the_reservation_of_another_number(
     assert [seen.body["hub"] for seen in gateway.sent(CHAT)] == ["a", "a"]  # both turns, the business's own
 
 
+def test_a_tick_past_the_minute_runs_the_minute_s_tasks(tick):
+    """What ``past_the_minute`` stands on: that tick does run ``flow.run.resume_due``, or the test above measures
+    nothing of the minute it lands on (hub#625)."""
+    tick()
+    tick(dt.timedelta(minutes=2))
+
+    assert TaskSchedule.objects.get(app_label="flow", name="resume_due").last_run is not None
+
+
 def tool_inputs(seen, name: str) -> set[str]:
     [tool] = [tool for tool in seen.body["tools"] if tool["name"] == name.replace(".", "__")]
     return set(tool["parameters"].get("properties", {}))
@@ -620,27 +641,282 @@ def test_the_answer_books_and_waitlists_only_with_the_number_that_writes_whateve
     assert "guest_phone" not in tool_inputs(gateway.sent(CHAT)[0], tool)  # never the assistant's to say
 
 
-# ── An appointment cancelled from WhatsApp (hub#634; FLOW-F28; what WHATSAPP_INBOX-F22 waits for) ─────────────────────
+# ── The customer asks for an appointment by WhatsApp (hub#514; WHATSAPP_INBOX-F14, F21, F22; CUSTOMER-F26) ──────────
 #
-# The answer that books appointments is not offered yet (hub#514), so the automation is the table answer's, as whoever
-# manages automations can build it: their card fixed by the step, the cancellation on their behalf and after a yes.
+# The inbox's answer that books appointments, as the owner turns it on: her card and that she herself asks fixed by the
+# step, a read at once, and a booking, a move or a cancellation after a yes.
 
+CREATE_APPOINTMENT = "appointment.appointment.create"
+RESCHEDULE_APPOINTMENT = "appointment.appointment.reschedule"
 CANCEL_APPOINTMENT = "appointment.appointment.cancel"
-HER_CARD = "{{steps.s6.id}}{{steps.s7.id}}"
+SLOTS = "appointment.availability.slots"
+DIARY_THANKS = "Thanks for writing! Let me check the diary and I will come straight back to you."
+DIARY_SORRY = "Sorry, I cannot check the diary right now. Someone from the team will answer you here as soon as they can."
+
+
+def salon():
+    """The owner's salon: its number connected, a haircut Ana performs and the answer turned on."""
+    connect()
+    cut = make_service("Haircut", price=2000, duration=30)
+    ana = make_member("Ana", "López")
+    assign(cut, ana)
+    run("flow.recipe.enable", {"recipe": BOOKING_REF}, ctx_for("hub_owner"))
+    return cut, ana
+
+
+def booking(cut, ana, start: str = "10:00") -> dict:
+    return {"services": [{"service_id": str(cut.id)}], "staff_id": str(ana.id), "start": wall(MONDAY, start)}
+
+
+def test_she_has_no_card_asks_for_an_appointment_and_after_the_owner_s_yes_it_is_booked_on_the_card_whatsapp_made(
+    gateway, tick, anytime, django_capture_on_commit_callbacks  # noqa: F811 - the fixture
+):
+    """CUSTOMER-F26, F21: the card is made from WhatsApp before the assistant is asked; the booking waits for the yes with
+    whom it is for; on the yes Citas books it for real on that card, pending because the salon reviews first (F16), and
+    the WhatsApp she gets is what the assistant says then."""
+    cut, ana = salon()
+    make_settings(auto_confirm_online=False)
+    door_takes(gateway, 2)
+    gateway.reply(CHAT, json=wants(CREATE_APPOINTMENT, booking(cut, ana)))
+    gateway.reply(CHAT, json=said("¡Apuntada! El salón te confirma el lunes a las 10:00 con Ana."))
+    lucia_writes("¿Tenéis hueco el lunes a las 10 para un corte?")
+
+    tick()
+
+    assert outbound() == [DIARY_THANKS]
+    card, asked, prompt = card_made_and_what_was_asked(gateway)
+    assert "\n———\n¿Tenéis hueco el lunes a las 10 para un corte?\n———\n" in prompt  # her words alone on their lines
+    assert LUCIA in prompt and str(card.id) not in prompt  # her card is fixed on a booking, never told
+    assert offered(asked) == [
+        "appointment__availability__slots",
+        "appointment__appointment__create",
+        "appointment__appointment__reschedule",
+        "appointment__appointment__cancel",
+    ]
+    assert not {"customer_id", "source"} & tool_inputs(asked, CREATE_APPOINTMENT)  # never the assistant's to say
+    assert "for_customer" not in tool_inputs(asked, SLOTS)
+    assert not {"customer_id", "on_behalf_of_customer"} & tool_inputs(asked, RESCHEDULE_APPOINTMENT)
+    assert not {"customer_id", "on_behalf_of_customer"} & tool_inputs(asked, CANCEL_APPOINTMENT)
+    assert Appointment.objects.count() == 0
+    assert FlowRun.objects.get().status == FlowRun.Status.ASKING
+    [waiting] = run("flow.question.list", {}, ctx_for("hub_owner")).rows
+    assert waiting.action == "Book an appointment"
+    said_values = {field.name: str(field.value) for field in waiting.fields}
+    # F21: the owner sees for whom, what and with whom before saying yes, each by its name and never by its id.
+    assert "Lucía" in said_values["customer_id"]
+    assert "Haircut" in said_values["services"]
+    assert "Ana" in said_values["staff_id"]
+    assert not any(str(record) in value for record in (card.id, cut.id, ana.id) for value in said_values.values())
+    [spanish] = run("flow.question.list", {}, ctx_for("hub_owner", language="es")).rows
+    assert spanish.action == "Reservar una cita"
+    assert {field.name: field.label for field in spanish.fields} == {
+        "customer_id": "Cliente",
+        "services": "Servicios",
+        "staff_id": "Profesional",
+        "start": "Empieza a las",
+        "source": "Reservada por",
+    }
+
+    answer_yes(django_capture_on_commit_callbacks)
+    tick()
+
+    appointment = Appointment.objects.get()
+    assert (appointment.customer_id, appointment.staff_id, appointment.source, appointment.status) == (
+        card.id, ana.id, "whatsapp", "pending"
+    )
+    assert (appointment.customer_phone, appointment.start) == (LUCIA, at(MONDAY, "10:00"))
+    assert Customer.objects.count() == 1
+    assert outbound() == [DIARY_THANKS, "¡Apuntada! El salón te confirma el lunes a las 10:00 con Ana."]
+    assert [json.loads(seen.raw)["to"] for seen in gateway.sent(SEND)] == [LUCIA, LUCIA]
+    assert FlowRun.objects.get().status == FlowRun.Status.SUCCEEDED
+    conversation = Conversation.objects.get()
+    assert (conversation.customer_id, conversation.needs_attention) == (card.id, False)
+
+
+def test_when_the_salon_confirms_by_itself_the_appointment_is_confirmed_on_the_yes(
+    gateway, tick, anytime, django_capture_on_commit_callbacks  # noqa: F811 - the fixture
+):
+    """F16: the salon's rule for the bookings a customer makes herself decides, whatever the assistant sends."""
+    cut, ana = salon()
+    make_settings(auto_confirm_online=True)
+    door_takes(gateway, 2)
+    gateway.reply(CHAT, json=wants(CREATE_APPOINTMENT, booking(cut, ana)))
+    gateway.reply(CHAT, json=said("¡Reservada! Te espero el lunes a las 10:00 con Ana."))
+    lucia_writes("Corte el lunes a las 10")
+    tick()
+    answer_yes(django_capture_on_commit_callbacks)
+    tick()
+
+    assert Appointment.objects.get().status == "confirmed"
+
+
+def test_she_has_a_card_it_is_booked_on_it_and_no_other_card_is_made(
+    gateway, tick, anytime, django_capture_on_commit_callbacks  # noqa: F811 - the fixture
+):
+    cut, ana = salon()
+    door_takes(gateway, 2)
+    mine = run("customer.customer.create", {"name": "Lucía Pérez", "phone": "600111222"}, ctx_for("hub_owner"))
+    gateway.reply(CHAT, json=wants(CREATE_APPOINTMENT, booking(cut, ana)))
+    gateway.reply(CHAT, json=said("¡Reservada!"))
+    lucia_writes("Corte el lunes a las 10")
+    tick()
+    answer_yes(django_capture_on_commit_callbacks)
+    tick()
+
+    assert Customer.objects.count() == 1
+    assert Appointment.objects.get().customer_id == mine.id
+    assert str(mine.id) not in gateway.sent(CHAT)[0].body["messages"][0]["content"]
+
+
+def test_the_answer_books_only_on_her_card_as_she_would_whatever_the_assistant_sends(
+    gateway, tick, anytime, django_capture_on_commit_callbacks  # noqa: F811 - the fixture
+):
+    """F21: another card named by id or by name and a booking made as if at the counter: the step's fixed data go over
+    what it sends, and Citas takes the card by its id before any name."""
+    cut, ana = salon()
+    make_settings(auto_confirm_online=False)
+    door_takes(gateway, 2)
+    marta = run("customer.customer.create", {"name": "Marta Gil", "phone": "600333444"}, ctx_for("hub_owner"))
+    arguments = {**booking(cut, ana), "customer_id": str(marta.id), "customer": "Marta Gil", "source": "counter"}
+    gateway.reply(CHAT, json=wants(CREATE_APPOINTMENT, arguments))
+    gateway.reply(CHAT, json=said("¡Apuntada!"))
+    lucia_writes("Reserva una cita para Marta Gil el lunes a las 10")
+    tick()
+    answer_yes(django_capture_on_commit_callbacks)
+    tick()
+
+    appointment = Appointment.objects.get()
+    assert appointment.customer_id != marta.id
+    assert appointment.customer.phone == LUCIA
+    assert (appointment.source, appointment.status) == ("whatsapp", "pending")
+
+
+def test_the_free_times_she_is_offered_are_a_customer_s_and_nothing_waits_for_the_owner(
+    gateway, tick, anytime  # noqa: F811 - the fixture
+):
+    """F21: a read runs at once and its answer goes back to the assistant, and it is the customer's: inside the salon's
+    minimum notice nothing is on offer, whatever the assistant sends."""
+    salon()
+    make_settings(min_booking_notice=60 * 24 * 365 * 10)
+    door_takes(gateway, 2)
+    arguments = {"services": ["Haircut"], "date": MONDAY.isoformat(), "for_customer": False}
+    gateway.reply(CHAT, json=wants(SLOTS, arguments))
+    gateway.reply(CHAT, json=said("Ese día no me quedan huecos."))
+    lucia_writes("¿Qué huecos tenéis el lunes?")
+
+    tick()
+
+    told = gateway.sent(CHAT)[1].body["messages"][-1]
+    assert told["role"] == "tool"
+    assert json.loads(told["content"])["slots"] == []
+    assert Question.objects.count() == 0
+    assert outbound() == [DIARY_THANKS, "Ese día no me quedan huecos."]
+
+
+def test_she_answers_the_2nd_of_the_times_offered_and_the_assistant_hears_that_list(
+    gateway, tick, anytime, django_capture_on_commit_callbacks  # noqa: F811 - the fixture
+):
+    """F19: when she writes «el 2», the assistant hears the list again (what the salon last wrote her, on its own lines)."""
+    cut, ana = salon()
+    door_takes(gateway, 4)
+    offer = "Tengo:\n1. Lunes a las 10:00\n2. Lunes a las 11:30"
+    gateway.reply(CHAT, json=said(offer))
+    gateway.reply(CHAT, json=wants(CREATE_APPOINTMENT, booking(cut, ana, "11:30")))
+    gateway.reply(CHAT, json=said("¡Reservada el lunes a las 11:30!"))
+    lucia_writes("Quiero cita el lunes")
+    tick()
+    assert outbound() == [DIARY_THANKS, offer]
+
+    receive("wamid.IN2", "34600111222", contact_name="Lucía", text="el 2", sent_at=NOW.isoformat())
+    tick()
+
+    _first, second = gateway.sent(CHAT)
+    prompt = second.body["messages"][0]["content"]
+    assert "\n———\nel 2\n———\n" in prompt
+    assert f"\n———\n{offer}\n———\n" in prompt
+    answer_yes(django_capture_on_commit_callbacks)
+    tick()
+
+    assert Appointment.objects.get().start == at(MONDAY, "11:30")
+    assert outbound()[-1] == "¡Reservada el lunes a las 11:30!"
+
+
+def test_when_the_assistant_fails_she_gets_the_diary_s_apology_and_her_conversation_needs_attention(
+    gateway, tick, anytime  # noqa: F811 - the fixture
+):
+    salon()
+    door_takes(gateway, 2)
+    gateway.reply(CHAT, status=429, json={"error": {"code": "assistant.quota_exceeded", "message": "x", "retriable": False}})
+    lucia_writes("Quiero cita")
+
+    tick()
+
+    assert outbound() == [DIARY_THANKS, DIARY_SORRY]
+    assert Conversation.objects.get().needs_attention is True
+    assert Appointment.objects.count() == 0
+
+
+def test_she_moves_her_appointment_and_after_the_owner_s_yes_it_is_at_the_new_time(
+    gateway, tick, anytime, django_capture_on_commit_callbacks  # noqa: F811 - the fixture
+):
+    """F22: her latest appointment is read by her card and told to the assistant; the move waits for the yes, and goes
+    with the same professional and service, as if she moved it herself."""
+    cut, ana = salon()
+    door_takes(gateway, 2)
+    card = run("customer.customer.create", {"name": "Lucía Pérez", "phone": "600111222"}, ctx_for("hub_owner"))
+    hers = make_appointment(Customer.objects.get(pk=card.id), ana, [cut], at(MONDAY, "10:00"))
+    gateway.reply(CHAT, json=wants(RESCHEDULE_APPOINTMENT, {"id": str(hers.id), "start": wall(MONDAY, "12:00")}))
+    gateway.reply(CHAT, json=said("Movida al lunes a las 12:00."))
+    lucia_writes("¿Me la cambias a las 12?")
+
+    tick()
+
+    assert str(hers.id) in gateway.sent(CHAT)[0].body["messages"][0]["content"]
+    hers.refresh_from_db()
+    assert hers.start == at(MONDAY, "10:00")  # it waits for the yes
+    [waiting] = run("flow.question.list", {}, ctx_for("hub_owner")).rows
+    said_values = {field.name: str(field.value) for field in waiting.fields}
+    assert "Lucía" in said_values["customer_id"]  # the owner sees whose and which before saying yes
+    assert "Ana" in said_values["id"]
+
+    answer_yes(django_capture_on_commit_callbacks)
+    tick()
+
+    hers.refresh_from_db()
+    assert (hers.start, hers.staff_id) == (at(MONDAY, "12:00"), ana.id)
+    assert outbound()[-1] == "Movida al lunes a las 12:00."
+
+
+def test_the_answer_never_moves_another_customer_s_appointment_even_after_the_yes(
+    gateway, tick, anytime, django_capture_on_commit_callbacks  # noqa: F811 - the fixture
+):
+    cut, ana = salon()
+    door_takes(gateway, 2)
+    run("customer.customer.create", {"name": "Lucía Pérez", "phone": "600111222"}, ctx_for("hub_owner"))
+    marta = run("customer.customer.create", {"name": "Marta Gil", "phone": "600333444"}, ctx_for("hub_owner"))
+    theirs = make_appointment(Customer.objects.get(pk=marta.id), ana, [cut], at(MONDAY, "10:00"))
+    arguments = {"id": str(theirs.id), "start": wall(MONDAY, "12:00"), "customer_id": str(marta.id), "on_behalf_of_customer": False}
+    gateway.reply(CHAT, json=wants(RESCHEDULE_APPOINTMENT, arguments))
+    gateway.reply(CHAT, json=said("No encuentro esa cita a tu nombre."))
+    lucia_writes("Mueve la cita de Marta a las 12")
+    tick()
+    answer_yes(django_capture_on_commit_callbacks)
+    tick()
+
+    theirs.refresh_from_db()
+    assert theirs.start == at(MONDAY, "10:00")
+    told = json.loads(gateway.sent(CHAT)[1].body["messages"][-1]["content"])
+    assert told["error"]["code"] == "appointment.appointment_not_found"
+    assert outbound()[-1] == "No encuentro esa cita a tu nombre."
+
+
+# ── Her cancellation (hub#634; FLOW-F28; WHATSAPP_INBOX-F22): a person's yes, on the card of the number that writes ───
 
 
 def appointment_answer() -> Flow:
-    """The inbox's answer with the assistant's step on cancelling an appointment, turned on as the owner does it."""
-    table = run("flow.recipe.enable", {"recipe": TABLE_REF}, ctx_for("hub_owner"))
-    flow = Flow.objects.get(pk=table.flow.id)
-    steps = [dict(step) for step in flow.steps]
-    assistant = next(step for step in steps if step["kind"] == "assistant")
-    assistant["tools"] = [CANCEL_APPOINTMENT]
-    assistant["pinned"] = {CANCEL_APPOINTMENT: {"on_behalf_of_customer": True, "customer_id": HER_CARD}}
-    flow.steps = steps
-    flow.grants = [*flow.grants, CANCEL_APPOINTMENT]
-    flow.save(update_fields=["steps", "grants"])
-    return flow
+    """The inbox's answer that books appointments, turned on as the owner does it."""
+    answer = run("flow.recipe.enable", {"recipe": BOOKING_REF}, ctx_for("hub_owner"))
+    return Flow.objects.get(pk=answer.flow.id)
 
 
 def bea_books(customer_id, *, when: str = "10:00") -> Appointment:
@@ -680,7 +956,7 @@ def test_a_customer_cancels_her_appointment_with_any_professional_after_the_owne
 
     hers.refresh_from_db()
     assert hers.status == "confirmed"  # it waits for the yes
-    assert outbound() == [THANKS]
+    assert outbound() == [DIARY_THANKS]
 
     answer_yes(django_capture_on_commit_callbacks)
     tick()

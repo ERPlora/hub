@@ -58,6 +58,7 @@ from apps.service.models import Service
 from apps.service.queries import current_settings as service_settings
 from apps.staff.models import Member
 from apps.staff.queries import resolve_member
+from base.ordering import list_order
 
 VIEW = "online_booking.view_booking"
 PUBLIC = "online_booking.public"
@@ -329,8 +330,7 @@ def list_bookings(ctx: OperationContext, params: BookingListIn) -> dict:
             params.date_from or params.date_to, params.date_to or params.date_from
         )
         rows = rows.filter(start__gte=start, start__lt=end)
-    prefix = "-" if params.dir == "desc" else ""
-    rows = rows.order_by(f"{prefix}{SORT_COLUMNS[params.sort]}", f"{prefix}id")
+    rows = rows.order_by(*list_order(SORT_COLUMNS[params.sort], descending=params.dir == "desc"))
     return {
         "rows": [
             row(item) for item in rows[params.offset : params.offset + params.limit]

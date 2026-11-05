@@ -77,6 +77,9 @@ export interface ChecklistView {
   empty: boolean;
 }
 
+/** The ⛔ before the rest; a stable sort, so each keeps the server's order among its own. */
+const legalFirst = (a: SetupItem, b: SetupItem) => Number(b.level === 'legal') - Number(a.level === 'legal');
+
 export function checklistView(status: SetupStatus | undefined, options: ChecklistOptions): ChecklistView {
   const all = status?.items ?? [];
   const duplicated = (item: SetupItem) => item.state !== 'unavailable' && !!options.alreadyOnScreen?.includes(item.key);
@@ -88,9 +91,10 @@ export function checklistView(status: SetupStatus | undefined, options: Checklis
   let rows: SetupItem[] = [];
   if (options.expanded) rows = items;
   else if (!complete) {
-    // ⛔ and 🔴 in sight, 🟡 folded — unless only 🟡 is left (the card would be a headline over nothing).
+    // ⛔ and 🔴 in sight, 🟡 folded — unless only 🟡 is left (the card would be a headline over nothing). The ⛔ go
+    // first: the server orders by each step's `order`, and on a phone a ⛔ placed lower would not fit (hub#801).
     const left = items.filter((item) => item.state !== 'done');
-    const upfront = left.filter((item) => item.level !== 'recommended');
+    const upfront = left.filter((item) => item.level !== 'recommended').sort(legalFirst);
     rows = (upfront.length ? upfront : left).slice(0, options.maxRows ?? MAX_VISIBLE_ROWS);
   }
   return { total, done, rows, hidden: items.length - rows.length, complete, empty };

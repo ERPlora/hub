@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:b45f54abe3e55782b0c1655eb251c16205ed6d028ad32f7d7e1fb947988f7171 -->
+<!-- generated from WORKBOOK.md sha256:14f75bf9b886fa3166f9d1fde55d4470ac25b68456ed1a911e04c51aa48e4a49 -->
 
 ## What it is for and who it is for
 
@@ -99,8 +99,7 @@ does on purpose, and it leaves a delicatessen without promotions.
    and put its customers in it.
 3. With no price list or rule, everything is charged at the catalog's price: installing Price Lists changes nothing
    until you create the first one.
-4. "Today" and the dates of the price lists and the rules are the business's day: in phase 1, the Hub's
-   time zone, **Europe/Madrid**. The business's currency is its country's, the one **Settings → Business**
+4. "Today" and the dates of the price lists and the rules are the business's day, in its time zone. The business's currency is its country's, the one **Settings → Business**
    says (the euro in Spain, the zloty in Poland).
 
 ## Screens

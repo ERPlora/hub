@@ -195,6 +195,8 @@ export const STATUS_KEY: Record<KnownStatus, string> = {
   inactive: 'base.data.status.inactive',
   unknown: 'base.data.status.unknown',
   not_selected: 'base.data.status.notSelected',
+  waiting: 'base.data.status.waiting',
+  setup_failed: 'base.data.status.setupFailed',
 };
 
 const STATUS_TONE: Record<KnownStatus, StatusPillTone> = {
@@ -207,6 +209,8 @@ const STATUS_TONE: Record<KnownStatus, StatusPillTone> = {
   inactive: 'warning',
   unknown: 'warning',
   not_selected: 'neutral',
+  waiting: 'info',
+  setup_failed: 'danger',
 };
 
 /** A status in words and tone; one this screen does not know is a failure with its own text, never a success. */
@@ -221,14 +225,38 @@ export const RETRY_BLOCKED_KEY: Record<Exclude<RetryBlocked, ''>, string> = {
   version_gone: 'base.data.retry.blocked.versionGone',
   complete: 'base.data.retry.blocked.complete',
   undone: 'base.data.retry.blocked.undone',
+  waiting: 'base.data.retry.blocked.waiting',
 };
 
-/** The apps of a report that did not go in (failed, in part, or off because the load could not turn them on and
- * says why), by name. */
+/** The apps of a report that did not go in (failed, in part, whose setup failed, or off because the load could not
+ * turn them on and says why), by name. */
 export function unloaded(report: LoadReport): string[] {
   return report.apps
-    .filter((app) => app.status === 'failed' || app.status === 'partial' || (app.status === 'inactive' && !!app.reason))
+    .filter(
+      (app) =>
+        app.status === 'failed' ||
+        app.status === 'partial' ||
+        app.status === 'setup_failed' ||
+        (app.status === 'inactive' && !!app.reason),
+    )
     .map((app) => app.label);
+}
+
+/** The apps a load still waits to bring, by name (hub#609): being set up, and whose setup failed and keeps trying. */
+export function pendingApps(report: LoadReport): { settingUp: string[]; failing: string[] } {
+  const named = (status: AppLoadStatus) => report.apps.filter((app) => app.status === status).map((app) => app.label);
+  return { settingUp: named('waiting'), failing: named('setup_failed') };
+}
+
+/** Whether a load still has something to bring from an app's setup, going well or not. */
+export function somethingPending(report: LoadReport): boolean {
+  const { settingUp, failing } = pendingApps(report);
+  return settingUp.length > 0 || failing.length > 0;
+}
+
+/** Whether what is missing of a load is on its way by itself: there is nothing to press. */
+export function stillLoading(report: LoadReport): boolean {
+  return pendingApps(report).settingUp.length > 0;
 }
 
 // ── The Home's templates card (BASE-G131, BASE-F02) ──────────────────────────────────────────────────────────────
@@ -245,8 +273,11 @@ export function cardTemplates(templates: readonly Template[]): Template[] {
   return [...firstOfEachVertical.values()].slice(0, CARD_TEMPLATES);
 }
 
-/** How a load from the card went: all in, in part (what did not), or nothing. */
-export function cardOutcome(load: ImportRow): { kind: 'ready' | 'partial' | 'failed'; missing: string[] } {
+/** How a load from the card went: all in, still waiting for an app, in part (what did not), or nothing. */
+export function cardOutcome(
+  load: ImportRow,
+): { kind: 'ready' | 'partial' | 'failed'; missing: string[] } | { kind: 'pending'; load: ImportRow } {
   if (load.status === 'complete') return { kind: 'ready', missing: [] };
+  if (somethingPending(load.report)) return { kind: 'pending', load };
   return { kind: load.status === 'failed' ? 'failed' : 'partial', missing: unloaded(load.report) };
 }

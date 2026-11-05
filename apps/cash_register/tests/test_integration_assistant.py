@@ -5,7 +5,9 @@ first: the cash count, with its summary before and its confirmation), against th
 expected cash only for whoever may see it; the close is a dangerous write: it waits on its card, names the session
 and the count, and closes only after the person types the word. Cancelling leaves the session open."""
 
+import datetime as dt
 import json
+import re
 import uuid
 from pathlib import Path
 
@@ -87,6 +89,27 @@ def test_the_summary_runs_by_itself_and_tells_the_model_the_session_the_count_th
     assert Session.objects.get(pk=session.id).status == Session.Status.OPEN
 
 
+#: What a blind count keeps from a cashier here: a 100.00 € float and a 1.50 € coffee expect 101.50 €, and 250.00 €
+#: counted are 148.50 € over.
+BLIND_FIGURES = ("10150", "14850")
+#: A moment as a result writes it, down to its microseconds.
+A_MOMENT = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})?")
+
+
+def blind_figures_in(told: str) -> list[str]:
+    """The blind figures that ``told`` says, read without its ids and its moments: random digits that nobody reads as
+    an amount and that now and then spell one (hub#796: a session id ending in ``…10150``, with the product right)."""
+    said = A_MOMENT.sub("", AN_ID.sub("", told))
+    return [figure for figure in BLIND_FIGURES if figure in said]
+
+
+def test_a_blind_figure_is_still_found_beside_an_id_and_a_moment_that_spell_it():
+    told = {"session_id": "01a1a8a0-386b-720b-8153-3c6f85a10150", "opened_at": "2026-11-04T22:13:54.310150Z"}
+    assert blind_figures_in(json.dumps(told)) == []
+    assert blind_figures_in(json.dumps({**told, "expected_balance": 10150})) == ["10150"]
+    assert blind_figures_in(json.dumps({**told, "note": "over by 14850"})) == ["14850"]
+
+
 def test_a_blind_count_keeps_the_expected_from_the_model_when_a_cashier_asks(coffee):
     # gh:cash_register#24, #84: the blind count cannot be opened by asking the assistant.
     run("cash_register.settings.update", {"require_blind_count": True})
@@ -96,7 +119,28 @@ def test_a_blind_count_keeps_the_expected_from_the_model_when_a_cashier_asks(cof
     content = plan["append"][0]["content"]
     told = json.loads(content)
     assert (told["expected_balance"], told["difference"], told["expected_hidden"]) == (None, None, True)
-    assert "10150" not in content and "14850" not in content
+    assert blind_figures_in(content) == []
+
+
+@pytest.mark.parametrize(
+    "drawn",
+    [
+        lambda session: {"id": uuid.UUID(hex=session.id.hex[:-5] + "10150")},  # the run that failed, hub#796
+        lambda session: {"id": uuid.UUID(hex=session.id.hex[:-5] + "14850")},
+        lambda session: {"opened_at": session.opened_at.replace(microsecond=310150) - dt.timedelta(seconds=1)},
+        lambda session: {"opened_at": session.opened_at.replace(microsecond=314850) - dt.timedelta(seconds=1)},
+    ],
+    ids=["id_spells_the_expected", "id_spells_the_difference", "moment_spells_the_expected", "moment_spells_the_difference"],
+)
+def test_a_blind_count_is_not_taken_as_told_by_an_id_or_a_moment_that_happen_to_spell_its_figures(coffee, drawn):
+    run("cash_register.settings.update", {"require_blind_count": True})
+    session = open_session(10000)
+    Session.objects.filter(pk=session.id).update(**drawn(session))  # nothing hangs from a session just opened
+    charge()
+    plan = turn(call("cash_register.session.closing_summary", {"closing_balance": 25000}), role="hub_employee")
+    content = plan["append"][0]["content"]
+    assert any(figure in content for figure in BLIND_FIGURES)  # the draw is really there: this test proves something
+    assert blind_figures_in(content) == []
 
 
 def test_with_the_count_required_the_summary_without_a_count_says_so_and_no_card_comes():
@@ -308,7 +352,7 @@ def test_with_a_blind_count_the_cashiers_card_shows_neither_the_expected_nor_the
     ]
     plan = turn(call("cash_register.session.close", {"closing_balance": 25000}), role="hub_employee")
     assert [field["name"] for field in plan["confirm"]["preview"]] == ["number", "register_name"]
-    assert "10150" not in json.dumps(plan) and "14850" not in json.dumps(plan)
+    assert blind_figures_in(json.dumps(plan)) == []
     # Whoever may see the expected still gets it on the card.
     assert [field["name"] for field in close_preview({"closing_balance": 25000}, role="hub_manager")[1]] == PREVIEWED
 
