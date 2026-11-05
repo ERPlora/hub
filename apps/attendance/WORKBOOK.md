@@ -522,7 +522,7 @@ Los avisos nunca llevan la posición ni el motivo de una corrección (datos pers
   correr sola a partir de ahí, sin preguntar cada segundo. Una jornada «Por revisar» sin salida no tiene
   tiempo trabajado (vacío): contar «hasta ahora» sumaría días que nadie trabajó.
 - La revisión de jornadas olvidadas es la tarea programada `review_stale` (`*/15 * * * *`, `collapse`,
-  en UTC): la corre el worker como sistema (en su ámbito fijo; con la BD por negocio, en cada hub;
+  en UTC): la corre el worker como sistema, en cada negocio y con su ámbito (`base.worker._serve_hub`;
   `tests/test_scheduled_review.py` la pasa por `base.scheduler`) y la aplica también `clock_in` a la
   persona que ficha, para no depender del worker.
 - La reacción a `staff.member.terminated` (ATTENDANCE-F13) se la entrega el relay del outbox del worker
