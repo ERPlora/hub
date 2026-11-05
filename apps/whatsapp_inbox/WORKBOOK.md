@@ -1258,29 +1258,24 @@ corrigen borrando los datos de la conversación, nunca editando), con borrado pa
   evento. La foto que erplora.com empuja entretanto dice lo mismo con una versión mayor, y la siguiente
   sigue ganando.
 - **Cada entrega corre en un hilo propio del proceso** (`base.outbound`: 4 a la vez, hasta 1000 en cola),
-  en el contexto de BD de la operación que la pidió (su `use_hub` o la BD compartida de la fase 1), nunca en
+  en el contexto de BD de la operación que la pidió (su `use_hub`), nunca en
   el bucle que hizo el COMMIT: ni la petición, ni el relay del outbox de todos los hubs, ni las tareas
   programadas del worker esperan a erplora.com (hasta 20 s por llamada) (FIX-HUB-WHATSAPP-INBOX-SLOW-SEND-BLOCKS-RELAY,
   `tests/test_outbound.py`). Un trabajo que se pierde (cola llena, el worker que se para en un despliegue)
   lo recupera el barrido, que lo entrega con la misma clave. La tarea del worker `whatsapp_inbox.delivery.resume` (`*/5 * * * *`, `catch_up: collapse`, declarada en
   `apps.py`) retoma con `SKIP LOCKED`, de 50 en 50, los mensajes `queued`/`sending`, las plantillas
-  `queued`/`sending` y los borrados `pending` (de números y de plantillas) con más de 2 minutos. En la
-  fase 1 el worker la corre con un solo ámbito fijo (`WORKER_SCOPE_SLUG`, `base/scheduler.py`): retoma lo de
-  todos los negocios, y cada mensaje, plantilla o borrado se entrega a erplora.com como el de su negocio
+  `queued`/`sending` y los borrados `pending` (de números y de plantillas) con más de 2 minutos. El
+  worker la corre en cada negocio que sirve, en su BD y con su ámbito (`base.worker._serve_hub`): retoma lo de ese
+  negocio, y cada mensaje, plantilla o borrado se entrega a erplora.com como el de su negocio
   (`Message.host`, `Template.host`, `Conversation.erase_host`), con su contenido; un mensaje o un borrado de
-  número anterior a la migración `0007`, sin negocio guardado, sale con el ámbito del worker, como hasta
-  entonces. En la fase 2 corre en la BD de cada hub. «Reintentar» (`message.retry`) y volver a borrar un
-  número ya borrado (`conversation.erase` por su id) entregan igual, con el negocio de la fila y no con el de
-  quien lo pide desde la bandeja compartida; sin negocio guardado (anterior a `0007`), con el de quien lo pide.
-  Desde una petición de otro hub (la bandeja compartida de la fase 1), esa entrega también sale en el acto: la
-  bandeja le dice a `base.outbound` de qué negocio es el trabajo (`scope=`, en `_after_commit_as`) y su hilo
-  trabaja donde corren las operaciones de ese negocio (la BD compartida de la fase 1), nunca en el contexto de
-  BD de la petición ni en la BD de otro hub (`base.tenancy.context.current_for`); antes caía con
-  `HubContextMismatch` en el log y la entregaba el barrido a los 2–5 minutos
-  (FIX-HUB-WHATSAPP-INBOX-RETRY-OF-ANOTHER-BUSINESS-WAITS-FOR-THE-SWEEP, `tests/test_resume_per_business.py`).
-  El barrido pasa por el mismo camino: corrido en el contexto de un hub de la fase 1 (como lo hará el
-  planificador de la fase 2, un `use_hub` por hub), entrega lo de su negocio en ese contexto y lo de los demás
-  en la BD compartida, en el acto; hoy el worker lo corre en la BD compartida y no cambia nada.
+  número anterior a la migración `0007`, sin negocio guardado, sale con el ámbito de esa pasada, el de ese
+  negocio. «Reintentar» (`message.retry`) y volver a borrar un
+  número ya borrado (`conversation.erase` por su id) entregan igual, con el negocio de la fila; sin negocio
+  guardado (anterior a `0007`), con el de quien lo pide. La entrega dice a `base.outbound` de qué negocio es el
+  trabajo (`scope=`, en `_after_commit_as`) y su hilo trabaja en el contexto de BD activo
+  (`base.tenancy.context.current_for`): una BD de hub solo guarda lo suyo, y una operación de otro negocio allí se
+  rechaza (`HubContextMismatch`), así que ningún trabajo llega a la BD de otro hub. El barrido pasa por el mismo
+  camino, dentro del `use_hub` de cada negocio (`tests/test_resume_per_business.py`).
 - **Un mensaje nunca es «enviado» sin el id de Meta.** Respuestas de erplora.com: 200 con
   `wa_message_id` → `sent`; 409 → `failed` con su motivo (`whatsapp.cap_reached` se guarda como
   `whatsapp_inbox.cap_reached`; `whatsapp.reconnect_needed`, el 190 de Meta, como
@@ -1602,9 +1597,9 @@ abierta sin su SDK; si no la manda, la puerta 11 tendría que sacar la cuenta de
 - Al recibir la foto de estado con la clave `whatsapp` (puerta 4), se la pasa a
   `whatsapp_inbox.channel.sync` con la versión de la foto (hecho desde hub#127).
 - El relay del outbox entrega `customer.customer.created/updated/merged/deleted/erased` a
-  `apps.whatsapp_inbox.events.react` (ya en la fase 1, `base/relay.py`); en la fase 2, el worker ejecuta
-  la tarea `resume_deliveries` de `apps.py` en cada hub (`hub_due`), y el trabajo diferido de esta app
-  corre en el hub de la operación que lo pidió (`base.outbound`).
+  `apps.whatsapp_inbox.events.react` (`base/relay.py`); el worker ejecuta la tarea `resume_deliveries` de
+  `apps.py` en cada negocio que sirve (`base.worker._serve_hub`), y el trabajo diferido de esta app corre en el
+  hub de la operación que lo pidió (`base.outbound`).
 - La campana de la barra superior lee `whatsapp_inbox.conversation.count_awaiting_reply` (la declaración `bell`
   de `apps.py`, con el permiso `whatsapp_inbox.view`), que comparte con `summary` la única definición de
   «esperando respuesta» (`AWAITING_REPLY` de `queries.py`: abierta y con el último mensaje del cliente o
