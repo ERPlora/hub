@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:9dba7004f4658518dc8361799406d520f9883dd8455e0b28bdf98e3966e385de -->
+<!-- generated from WORKBOOK.md sha256:7bcc9e877ee0452b8ab7e2a941f4337715465556b5a157579c7b76de8010c349 -->
 
 ## What it is for and who it is for
 
@@ -288,9 +288,12 @@ address.", "That tax ID is not valid." (under the field), "Line {n}: the price i
 with a price that comes to 0.00, a series that is inactive, does not issue invoices or belongs to another
 year ("That series numbers another year…"), a ticket above the Sales limit ("Above €3,000.00 a ticket
 cannot be issued…", RD 1619/2012 art. 4), or the missing issuer. Nothing is issued, no number is used,
-and what was typed is kept. If the tax territory cannot be read, the rate is called "Tax %", comes empty
-and warns "Could not read the business’s tax territory: type the rate of each line."; the invoice is
-issued anyway, with the territory's tax.
+and what was typed is kept. A field's message goes as soon as that field is corrected (also when a
+customer's card fills it, and the tax ID's when the country or the document type changes), the notice
+that only points at fields as soon as anything is changed, and both come back if the next try is refused
+too. If the tax territory cannot be read, the rate is called "Tax %", comes empty and warns "Could not
+read the business’s tax territory: type the rate of each line."; the invoice is issued anyway, with the
+territory's tax.
 Involved: TAX-F18, CUSTOMER-F17, TAX-F11
 
 ### INVOICE-F04 The customer asks for the full invoice of their ticket
@@ -323,9 +326,12 @@ operation) and the same operation date; the ticket is not touched. If the ticket
 paid. Announces `invoice.invoice.issued`. From then on, rectifying or refunding that sale rectifies the
 F3, not the ticket.
 If it fails: without name, tax ID or address, refusal; a Spanish tax ID that is not valid, "That tax ID
-is not valid."; a document that is not a ticket, "Only a ticket (simplified invoice) can be replaced by a
-full invoice.". If the ticket already has its F3, it answers with it without issuing another or using a
-number.
+is not valid." under the field and "Check the highlighted details." on top, which goes as soon as
+anything is changed (and the field's message, as soon as that field is corrected, also when a customer's
+card fills it; the tax ID's, also when the country or the document type changes) and comes back if the
+next try is refused too; a document that is not a ticket, "Only a ticket (simplified invoice) can be
+replaced by a full invoice.". If the ticket already has its F3, it answers with it without issuing
+another or using a number.
 Involved: INVOICE-F04
 
 ### INVOICE-F06 A charged sale that could not be invoiced
@@ -506,9 +512,12 @@ entry (if its type is F1 or F2).
 If it fails: an empty code or one with another shape, a format without the year or without a sequence
 placeholder, with a line break, or a prefix or format with accents or symbols such as º or ª, show under
 their field (the number is VeriFactu's `NumSerieFactura`: printable ASCII only); numbers that with the
-widest sequence would go over 60 characters, "The numbers of this series would not fit in 60
-characters…" under the prefix or the format; a code that already exists that year, "There is already a
-series with that code that year.".
+widest sequence would go over 60 characters, "The numbers of this series would not fit in 60 characters…"
+under the prefix or the format; a code that already exists that year, "There is already a series with
+that code that year.". Each refused field, the invoice type too, is marked red with its message under it
+and "Check the highlighted details." shows on top; a field's message and mark go as soon as that field is
+corrected, the notice on top as soon as anything is changed, and they come back if the next try is
+refused too.
 Involved: none
 
 ### INVOICE-F13 Change a series

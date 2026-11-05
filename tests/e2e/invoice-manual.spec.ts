@@ -116,12 +116,22 @@ test('INVOICE-F03, F19 and F08: a manual invoice is issued, marked as paid and r
   const dialog = openDialog(page, 'invoice-create');
   await expect(dialog).toBeVisible();
   await dialog.locator('[data-testid=invoice-recipient-name] input').fill(customer);
-  await dialog.locator('[data-testid=invoice-recipient-tax-id] input').fill('12345678Z');
   await dialog.locator('[data-testid=invoice-recipient-address] input').fill('Calle Sol 5, 28013 Madrid');
   await dialog.locator('[data-testid=invoice-line-1-description] input').fill(`e2e Consulting ${RUN}`);
   await dialog.locator('[data-testid=invoice-line-1-quantity] input').fill('2');
   await dialog.locator('[data-testid=invoice-line-1-price] input').fill('50');
   await expect(dialog.locator('[data-testid=invoice-line-1-tax-rate] input')).toHaveValue('21');
+
+  // hub#461: a wrong tax ID is marked under its field and the notice points at it; correcting it takes both away.
+  const taxId = dialog.locator('[data-testid=invoice-recipient-tax-id]');
+  const notice = dialog.locator('[data-testid=invoice-create-error]');
+  await taxId.locator('input').fill('12345678A');
+  await dialog.locator('[data-testid=invoice-create-submit]').click();
+  await expect(taxId).toHaveClass(/ion-invalid/);
+  await expect(notice).toBeVisible();
+  await taxId.locator('input').fill('12345678Z');
+  await expect(taxId).not.toHaveClass(/ion-invalid/);
+  await expect(notice).toBeHidden();
   await dialog.locator('[data-testid=invoice-create-notes] input').fill(`e2e manual ${RUN}`);
   await flowShots(page, 'INVOICE-F03', async (p) => {
     await expect(openDialog(p, 'invoice-create')).toBeVisible();
@@ -200,8 +210,22 @@ test('INVOICE-F05: the customer asks for the full invoice of their ticket, an F3
   const dialog = openDialog(page, 'invoice-substitute');
   await expect(dialog.locator('[data-testid=invoice-substitute-intro]')).toBeVisible();
   await dialog.locator('[data-testid=invoice-recipient-name] input').fill(`e2e Talleres F3 ${RUN}`);
-  await dialog.locator('[data-testid=invoice-recipient-tax-id] input').fill('B12345674');
   await dialog.locator('[data-testid=invoice-recipient-address] input').fill('Calle Luna 3, Madrid');
+
+  // hub#461: a wrong NIF says what to do on top and why under the field, and both go when it is corrected.
+  const taxId = dialog.locator('[data-testid=invoice-recipient-tax-id]');
+  const notice = dialog.locator('[data-testid=invoice-substitute-error]');
+  await taxId.locator('input').fill('B12345678');
+  await dialog.locator('[data-testid=invoice-substitute-submit]').click();
+  await expect(notice).toContainText('Check the highlighted details.');
+  await expect(taxId).toContainText('That tax ID is not valid.');
+  await flowShots(page, 'INVOICE-F05-refused', async (p) => {
+    await expect(openDialog(p, 'invoice-substitute').locator('[data-testid=invoice-substitute-error]')).toBeVisible();
+  });
+  await taxId.locator('input').fill('B12345674');
+  await expect(notice).toBeHidden();
+  await expect(taxId).not.toContainText('That tax ID is not valid.');
+
   await flowShots(page, 'INVOICE-F05', async (p) => {
     await expect(openDialog(p, 'invoice-substitute')).toBeVisible();
   });

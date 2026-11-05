@@ -7,7 +7,7 @@ import { toastSuccess } from '@erplora/ui/shell';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { defineComponent, h } from 'vue';
 
-import { click, mountInvoice } from '../__tests__/mount-invoice';
+import { click, ionValue, mountInvoice, settle } from '../__tests__/mount-invoice';
 import RecipientFields from './RecipientFields.vue';
 import SubstituteModal from './SubstituteModal.vue';
 
@@ -75,11 +75,75 @@ describe('SubstituteModal', () => {
   it('a refusal is read inside the window; one of a field goes under it', async () => {
     const s = await setup();
     await s.fill();
-    s.answer(422, { error: { code: 'invalid_payload', message: 'Invalid payload', fields: { customer_tax_id: 'That tax ID is not valid.' } } });
+    s.answer(422, { error: { code: 'invalid_payload', message: 'Check the highlighted details.', fields: { customer_tax_id: 'That tax ID is not valid.' } } });
     await click(s.submitButton());
-    expect(s.inDoc('invoice-substitute-error')?.textContent).toContain('Invalid payload');
+    expect(s.inDoc('invoice-substitute-error')?.textContent).toContain('Check the highlighted details.');
     expect(s.wrapper.findComponent(RecipientFields).props('fieldErrors')).toEqual({ customer_tax_id: 'That tax ID is not valid.' });
     expect(s.wrapper.emitted('substituted')).toBeUndefined();
+  });
+
+  it('correcting the refused tax ID takes away the notice and the message under it; the next refusal says them again (hub#461)', async () => {
+    const s = await setup();
+    await s.fill({ ...COMPLETE, taxId: 'B12345678' });
+    const refused = { error: { code: 'invalid_payload', message: 'Check the highlighted details.', fields: { customer_tax_id: 'That tax ID is not valid.' } } };
+    s.answer(422, refused);
+    await click(s.submitButton());
+    const taxId = s.inDoc('invoice-recipient-tax-id') as HTMLElement & { errorText?: string };
+    expect(taxId.errorText).toBe('That tax ID is not valid.');
+
+    // A person types: the native `input` bubbles out of the field, then Ionic's own event carries the value.
+    taxId.dispatchEvent(new Event('input', { bubbles: true }));
+    await ionValue(taxId, 'B12345670', 'ionInput');
+
+    expect(s.inDoc('invoice-substitute-error')).toBeNull();
+    expect(taxId.errorText).toBeFalsy();
+    expect(taxId.classList.contains('ion-invalid')).toBe(false);
+
+    s.answer(422, refused);
+    await click(s.submitButton());
+    expect(s.inDoc('invoice-substitute-error')?.textContent).toContain('Check the highlighted details.');
+    expect(taxId.errorText).toBe('That tax ID is not valid.');
+  });
+
+  describe('what fills a field with no keystroke takes its message away too (hub#461)', () => {
+    const REFUSED = {
+      error: {
+        code: 'invalid_payload',
+        message: 'Check the highlighted details.',
+        fields: { customer_tax_id: 'That tax ID is not valid.', customer_address: 'Write the whole address.' },
+      },
+    };
+    const CARD = { customer_id: 'c1', customer_name: 'Estudio Ana SL', customer_tax_id: 'B12345674', customer_address: 'Calle Sol 5, Madrid', customer_country: 'ES' };
+    const said = (s: Awaited<ReturnType<typeof setup>>, key: string) =>
+      (s.inDoc(`invoice-recipient-${key}`) as (HTMLElement & { errorText?: string }) | null)?.errorText;
+    const red = (s: Awaited<ReturnType<typeof setup>>, key: string) => !!s.inDoc(`invoice-recipient-${key}`)?.classList.contains('ion-invalid');
+
+    async function refused() {
+      const s = await setup();
+      await s.fill({ ...COMPLETE, taxId: 'B12345678', address: 'Calle' });
+      s.answer(422, REFUSED);
+      await click(s.submitButton());
+      expect([said(s, 'tax-id'), said(s, 'address')]).toEqual(['That tax ID is not valid.', 'Write the whole address.']);
+      return s;
+    }
+
+    it('a picked customer card quiets the fields it fills, and the notice on top', async () => {
+      const s = await refused();
+      s.wrapper.findComponent({ name: 'CustomerSearch' }).vm.$emit('update:modelValue', CARD);
+      await settle();
+      expect(said(s, 'tax-id')).toBeFalsy();
+      expect(said(s, 'address')).toBeFalsy();
+      expect([red(s, 'tax-id'), red(s, 'address')]).toEqual([false, false]);
+      expect(s.inDoc('invoice-substitute-error')).toBeNull();
+    });
+
+    it('a new country quiets the tax ID, judged with its country, and keeps the address’s message', async () => {
+      const s = await refused();
+      await ionValue(s.inDoc('invoice-recipient-country'), 'FR');
+      expect(said(s, 'tax-id')).toBeFalsy();
+      expect(said(s, 'address')).toBe('Write the whole address.');
+      expect([red(s, 'tax-id'), red(s, 'address')]).toEqual([false, true]);
+    });
   });
 
   it('speaks Spanish', async () => {
