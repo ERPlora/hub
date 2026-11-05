@@ -77,7 +77,7 @@ from live.slugs import DEMO_SLUG_PREFIX, validate_hub_slug
 from PIL import Image as PILImage
 from PIL import UnidentifiedImageError
 
-from base import access, auth, blueprint, events, files, queries, registry, signing, system
+from base import access, auth, blueprint, custom_domains, events, files, queries, registry, signing, system
 from base.access import CREDENTIAL_SESSION_KEY
 from base import assistant
 from base.registry import REGISTRY_SCOPE, hub_answer, internal_only
@@ -719,7 +719,8 @@ def hub_state_apply(ctx: OperationContext, data: HubStateIn) -> dict:
     (:func:`_apply_members`) and on its people in its own database (``base.hub_user.sync``), in this transaction
     too; a business whose database is still being made has its people there when its seeding applies the photo
     (:func:`apply_kept_photo`: the SaaS sends it right after the registration). Its modules and plan are read where they are kept: the right
-    to a paid app (``base.entitlement``) and «Usage and plan» (``base.plan.usage``) follow this photo.
+    to a paid app (``base.entitlement``) and «Usage and plan» (``base.plan.usage``) follow this photo. Its
+    ``custom_domain`` is kept on the row whether it names one or not, as the photo is whole (HUBS-F17).
     """
     internal_only(ctx)
     hub = _locked_hub(data.id)
@@ -728,8 +729,11 @@ def hub_state_apply(ctx: OperationContext, data: HubStateIn) -> dict:
         # before it heard).
         return {"applied": False, "version": hub.state_version}
     was_open = not registry.is_suspended(hub)
-    hub.state, hub.state_version = data.photo, data.version
-    hub.save(update_fields=["state", "state_version", "updated_at"])
+    domain = data.custom_domain or ""
+    if hub.custom_domain != domain:
+        transaction.on_commit(custom_domains.forget, robust=True)
+    hub.state, hub.state_version, hub.custom_domain = data.photo, data.version, domain
+    hub.save(update_fields=["state", "state_version", "custom_domain", "updated_at"])
     # A hub whose database is not made yet (being made, or cancelled or failed before it ever was) keeps the photo on
     # its row: its seeding applies it (:func:`apply_kept_photo`), as turning an app on does for that app's block.
     reachable = registry.database_is_made(hub)

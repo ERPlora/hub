@@ -41,7 +41,8 @@ registry's scope (``base.registry.REGISTRY_SCOPE``):
   newer, with its VeriFactu block, the business's status and its id in ERPlora applied through
   ``verifactu.config.sync`` on the hub's slug, and its ``whatsapp`` (the number's state, door 4 of WhatsApp's
   contract) through ``whatsapp_inbox.channel.sync`` with the photo's version, when the app is on in that business,
-  and its ``members`` (who is in the business, with which role) on the business's memberships;
+  its ``members`` (who is in the business, with which role) on the business's memberships, and its ``custom_domain``
+  (the business's own domain, or none: HUBS-F17) on the row, which ``base.custom_domains`` reads;
 
 ``POST /internal/sessions/revoke`` (``{user_id, hub_id?}``, PLAN-SAAS §2.1) → ``base.session.revoke``, on the same
 scope: 200 ``{ended}`` with the sessions of that SaaS account it ended, on that business or, without it, everywhere
@@ -263,6 +264,8 @@ def hub_state(request: HttpRequest, hub_id: UUID) -> HttpResponse:
             "whatsapp": body.get("whatsapp"),
             # Not a list of members: the operation's input refuses it (422).
             "members": body.get("members"),
+            # Absent is none: the photo is whole. Not a domain: the operation's input refuses it (422).
+            "custom_domain": body.get("custom_domain"),
             "photo": body,
         },
         _registry_context(),
