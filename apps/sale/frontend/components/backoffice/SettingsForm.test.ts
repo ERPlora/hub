@@ -219,14 +219,14 @@ describe('SettingsForm: saving', () => {
       expect([s.notice(), s.says('max_discount_percent'), s.says('receipt_marketing_url')]).toEqual([true, DISCOUNT, LINK]);
     });
 
-    it('a refusal that names no field stays until the next try: nothing else says it', async () => {
+    it('a failure the server did not word says «Could not save settings.» alone, and a change does not take it away', async () => {
       const s = await setup();
       await s.show(SETTINGS);
-      s.answer(409, { error: { code: 'conflict', message: 'Someone else is saving them.' } });
-      await s.type('receipt_footer', 'Thanks!');
+      s.answer(500, { error: { code: 'internal_error', message: 'Traceback (most recent call last)' } });
+      await s.toggle('require_customer', true);
       await click(s.save());
-      await s.type('receipt_footer', 'Thanks a lot!');
-      expect(s.text('sale-settings-save-error')).toContain('Someone else is saving them.');
+      await s.toggle('allow_card', false);
+      expect(s.text('sale-settings-save-error')).toBe('Could not save settings.');
     });
   });
 });
