@@ -70,6 +70,14 @@ async function open(options: Parameters<typeof mountBase>[1] = {}) {
 
 const byTestId = (id: string) => document.querySelector(`[data-testid="${id}"]`) as HTMLElement | null;
 
+/** The least «Create key» takes: a name and a box ticked. */
+async function nameAndTick(): Promise<void> {
+  type(byTestId('api-key-form-name')!, 'Tienda');
+  await flush();
+  (byTestId('api-key-form-cart_checkout-read') as HTMLElement).dispatchEvent(new CustomEvent('ionChange', { detail: { checked: true } }));
+  await flush();
+}
+
 beforeEach(() => {
   Object.defineProperty(navigator, 'clipboard', { value: { writeText: vi.fn(() => Promise.resolve()) }, configurable: true });
 });
@@ -146,10 +154,7 @@ describe('ApiKeysPanel', () => {
     const submit = () => byTestId('api-key-form-submit') as HTMLButtonElement;
     expect(byTestId('api-key-form-apps')?.textContent).toContain('Online shop');
     expect(submit().hasAttribute('disabled') || submit().getAttribute('disabled') === 'true').toBe(true);
-    type(byTestId('api-key-form-name')!, 'Tienda');
-    await flush();
-    (byTestId('api-key-form-cart_checkout-read') as HTMLElement).dispatchEvent(new CustomEvent('ionChange', { detail: { checked: true } }));
-    await flush();
+    await nameAndTick();
     submit().click();
     await flush();
     expect(posted(m)).toEqual([
@@ -201,6 +206,20 @@ describe('ApiKeysPanel', () => {
     (byTestId('api-key-revoke-submit') as HTMLElement).click();
     await flush();
     expect(posted(m)).toEqual([['/api/keys/revoke', { id: '0199aaaa-0000-7000-8000-000000000001' }]]);
+  });
+
+  it('a refused field the form does not mark is said once, in words (hub#833)', async () => {
+    const reason = 'That app does not publish what the key would do on it.';
+    const m = await open({
+      onApi: () => Response.json({ error: { code: 'base.api_key_scope_unknown', message: reason, fields: { scopes: reason } } }, { status: 422 }),
+    });
+    await m.result(m.call, 'base.api_key.list', LIST);
+    await m.wrapper.get('[data-testid="api-keys-new"]').trigger('click');
+    await flush();
+    await nameAndTick();
+    (byTestId('api-key-form-submit') as HTMLButtonElement).click();
+    await flush();
+    expect(byTestId('api-key-form-error')?.textContent?.trim()).toBe(reason);
   });
 
   it('a refusal is told from its code', async () => {
