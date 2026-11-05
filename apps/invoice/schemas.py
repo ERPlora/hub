@@ -9,6 +9,7 @@ with two decimals; quantities have three decimals, as the sale's.
 """
 
 import datetime as dt
+import re
 from decimal import Decimal
 from typing import Annotated, Any, Generic, Literal, TypeVar
 from uuid import UUID
@@ -18,6 +19,7 @@ from django.utils.translation import gettext_lazy as _
 from django.utils.translation import gettext_noop
 from ninja import Field, Schema
 from pydantic import (
+    AfterValidator,
     BeforeValidator,
     PrivateAttr,
     ConfigDict,
@@ -61,6 +63,9 @@ COUNTRY_UNKNOWN = _("Enter an ISO 3166-1 country code, such as ES or FR.")
 FORMAT_INVALID = _(
     "The format needs the year ({year}) and a sequence placeholder ({seq} or {seq:01d}…{seq:09d}), and fits in "
     "one line of 60 characters without accents or symbols such as º or ª."
+)
+SERIES_CODE_INVALID = _(
+    "Use only letters without accents, digits, hyphens (-) and underscores (_), starting with a letter or a digit."
 )
 PREFIX_INVALID = _(
     "The prefix is written without accents or symbols such as º or ª (letters, digits, spaces and - / . _)."
@@ -500,10 +505,20 @@ def _upper_code(value: Any) -> Any:
     return value.strip().upper() if isinstance(value, str) else value
 
 
+def _series_code(value: str) -> str:
+    # Its own message, as the format's: pydantic's pattern would say only «Enter a valid value.» (hub#872).
+    if not re.fullmatch(SERIES_CODE_RE, value):
+        raise ValueError(str(SERIES_CODE_INVALID))
+    return value
+
+
 SeriesCode = Annotated[
     str,
-    StringConstraints(min_length=1, max_length=SERIES_CODE_MAX_LENGTH, pattern=SERIES_CODE_RE),
+    StringConstraints(min_length=1, max_length=SERIES_CODE_MAX_LENGTH),
     BeforeValidator(_upper_code),
+    AfterValidator(_series_code),
+    # The shape stays in the OpenAPI and in the assistant's tool, as when the pattern checked it.
+    Field(json_schema_extra={"pattern": SERIES_CODE_RE}),
 ]
 
 
