@@ -11,9 +11,9 @@
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, capture, login, settled, shown } from './helpers';
-import { cleanInventory, createProduct, type Product } from './inventory-helpers';
+import { cleanInventory, type Product } from './inventory-helpers';
 import { cleanInvoices, ensureIssuer, parkIssuer, unparkIssuer } from './invoice-helpers';
-import { cleanSales, drawerOff, restoreDrawer, stamp, tillIsPhone } from './sale-helpers';
+import { cleanSales, dishForTheTill, fingerOn, restoreDrawer, stamp, tillIn, tillIsPhone } from './sale-helpers';
 
 const KEY = 'FIX-HUB-800-TILL-ON-ITS-SIDE';
 /** Hub `a`'s issuer, parked while a run needs the strip of a hub that cannot issue invoices yet. */
@@ -44,13 +44,11 @@ const LINE_PEEK = 30;
 let product: Product;
 
 test.beforeAll(async ({ browser }) => {
+  product = await dishForTheTill(browser, 'TILLSIDE', RUN);
+  // A business with its data complete has no strip; the runs with it park the issuer.
   const context = await browser.newContext({ baseURL: A });
-  const page = await context.newPage();
-  await login(page, A, '/sale/pos');
-  // Cash without a cash session: the drawer's lock is sale-cash-gate.spec.ts's.
-  await drawerOff(context);
+  await login(await context.newPage(), A, '/sale/pos');
   await ensureIssuer(context);
-  product = await createProduct(context, { name: `E2E Till side ${RUN}`, sku: `E2E-TILLSIDE-${RUN}`, price: 700, tax_category_key: 'restaurant.drink' });
   await context.close();
 });
 
@@ -63,19 +61,6 @@ test.afterAll(() => {
     restoreDrawer();
   }
 });
-
-/** What a finger on the middle of `el` touches, with nothing scrolled first. */
-async function touches(control: Locator): Promise<{ reached: boolean; hit: string; bottom: number }> {
-  return control.evaluate((el) => {
-    const box = el.getBoundingClientRect();
-    const hit = document.elementFromPoint((box.left + box.right) / 2, (box.top + box.bottom) / 2);
-    return {
-      reached: !!hit && (el === hit || el.contains(hit)),
-      hit: hit ? `${hit.tagName.toLowerCase()} ${hit.getAttribute('data-testid') ?? hit.className}`.trim() : 'nothing',
-      bottom: box.bottom,
-    };
-  });
-}
 
 /** The check's line, whose «+» a real tap reaches, however low the window: the quantity goes up by one. */
 async function tapTheLine(page: Page, where: string): Promise<void> {
@@ -170,8 +155,7 @@ async function sellOnItsSide(page: Page, size: { label: string; width: number; h
 
   // The bar and the foot, on screen as the drawer opens, with nothing on top of them.
   for (const id of ['pos-cart-close', 'pos-open-checks', 'customer-search-trigger', 'pos-ticket-discount', 'pos-prebill', 'pos-charge']) {
-    const control = drawer.locator(`[data-testid=${id}]`);
-    const reach = await touches(control);
+    const reach = await drawer.locator(`[data-testid=${id}]`).evaluate(fingerOn);
     expect.soft(reach.reached, `a finger on «${id}» reaches it at ${where} (it touches «${reach.hit}»)`).toBe(true);
     expect.soft(reach.bottom, `«${id}» inside the window at ${where}`).toBeLessThanOrEqual(size.height + EDGE);
   }
@@ -359,11 +343,7 @@ for (const strip of [true, false]) {
         if (strip) parkIssuer(PARKED);
         context = await browser.newContext({ baseURL: A, locale, viewport: { width: 1440, height: 900 } });
         page = await context.newPage();
-        await login(page, A, '/sale/pos');
-        // In the language under test (the Hub's language cookie, which the sign-in has just set from the account).
-        await context.addCookies([{ name: 'django_language', value: lang, domain: new URL(A).hostname, path: '/' }]);
-        await page.reload();
-        await shown(page).locator('[data-testid=pos-till]').waitFor({ state: 'visible' });
+        await tillIn(page, context, lang);
         const notice = shown(page).locator('[data-testid=blocking-strip]');
         if (strip) await expect(notice, 'the strip of a hub that cannot issue invoices yet').toBeVisible();
         else await expect(notice, 'a hub with its issuer has no strip').toBeHidden();
