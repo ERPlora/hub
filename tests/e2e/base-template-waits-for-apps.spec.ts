@@ -14,14 +14,12 @@ import {
   api,
   APP_SET_UP_MS,
   emptyOfTemplateData,
-  horizontalOverflow,
   hostPage,
   psql,
-  shot,
+  settledCapture,
   shown,
   signedInSpanish,
   testid,
-  untilStill,
 } from './helpers';
 
 // A control that never comes fails in half a minute and says which, instead of eating the whole test.
@@ -82,12 +80,8 @@ async function appsReadAgain(context: BrowserContext): Promise<void> {
   expect((await api(context, A, 'GET', '/apps')).status).toBe(200);
 }
 
-async function snap(page: Page, key: string, width: number): Promise<void> {
-  await expect(shown(page).locator('ion-skeleton-text:visible')).toHaveCount(0);
-  await untilStill(page);
-  expect(await horizontalOverflow(page), `${key} at ${width}: no sideways scroll`).toBeLessThanOrEqual(0);
-  await page.screenshot({ path: shot(`BASE-TEMPLATE-WAITS-${key}-${width}`) });
-}
+const snap = (page: Page, key: string, width: number): Promise<void> =>
+  settledCapture(page, `BASE-TEMPLATE-WAITS-${key}-${width}`);
 
 /** Settings › Data › Import, the template chosen and imported as it comes: its report says it waits. */
 async function loadIt(page: Page): Promise<void> {
