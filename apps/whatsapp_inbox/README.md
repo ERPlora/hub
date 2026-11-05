@@ -7,9 +7,7 @@ vuelve a conectar y se desconecta desde Ajustes; y las respuestas automáticas q
 de quien escribe tras tu «Aprobar». El Hub nunca habla con Meta: erplora.com es la única pasarela y le empuja lo que
 llega por `/internal` (el contrato está en «Para quien lo mantiene» del WORKBOOK).
 
-- **Estado**: completa (2026-11-01): 35 de sus 38 flujos, `WHATSAPP_INBOX-F01` … `F38`, están `hecho`;
-  `WHATSAPP_INBOX-F14`, `F21` y `F22` (pedir, mover o anular una cita por WhatsApp) están `descartado` con su issue
-  (hub#514).
+- **Estado**: completa (2026-11-05): sus 38 flujos, `WHATSAPP_INBOX-F01` … `F38`, están `hecho`.
 - **Especificación**: [`WORKBOOK.md`](WORKBOOK.md) (en inglés, [`WORKBOOK.en.md`](WORKBOOK.en.md), hasta
   «Para quien lo mantiene»). Lo que se cambie de la app se cambia antes allí.
 - **Peticiones** a `@erplora/ui` que siguen abiertas: [`UI-REQUESTS.md`](UI-REQUESTS.md).
@@ -71,7 +69,6 @@ pnpm e2e tests/e2e/whatsapp-inbox.spec.ts tests/e2e/whatsapp-inbox-erplora.spec.
 
 ## Qué queda fuera
 
-- `WHATSAPP_INBOX-F14`, `F21` y `F22` (pedir, mover o anular una cita por WhatsApp, hub#514), los textos de
-  hub#569, hub#570 y hub#571, y los iconos y el hilo de chat pedidos a `@erplora/ui`: «Lo que queda fuera» del
-  WORKBOOK y [`UI-REQUESTS.md`](UI-REQUESTS.md).
+- Los textos de hub#569, hub#570 y hub#571, los servicios por su nombre en la tarjeta de una cita (hub#835) y los iconos y el
+  hilo de chat pedidos a `@erplora/ui`: «Lo que queda fuera» del WORKBOOK y [`UI-REQUESTS.md`](UI-REQUESTS.md).
 - Relacionada, de otras apps: el Inicio no dice de un vistazo si WhatsApp funciona (hub#573, BASE-F02).

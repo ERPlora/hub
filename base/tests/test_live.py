@@ -59,7 +59,7 @@ def test_the_three_queries_and_their_events():
         # The photo, and the night that measured the business's own database (BASE-F40, base.usage).
         "base.plan.usage": [HUB_STATE_APPLIED, HUB_USAGE_MEASURED],
         "base.blueprint.list": sorted({HUB_STATE_APPLIED, *DATA}),
-        "base.import.list": sorted(DATA),
+        "base.import.list": sorted({*DATA, *APP_EVENTS}),
         # The copies of the business's data and its last reset: each step the worker tells, and the reset done (S2b).
         "base.hub.dumps": sorted([HUB_RESET_PROGRESSED, HUB_DATA_RESET]),
         # Business settings (APP-BASE-6): the SaaS registers the business again when it changes on erplora.com.

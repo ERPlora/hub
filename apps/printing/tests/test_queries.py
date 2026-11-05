@@ -10,6 +10,8 @@ from live.errors import NotFound, PermissionDenied
 
 from apps.printing.models import Printer, PrintJob
 from apps.printing.queries import PENDING
+from base.tests.ordering import assert_reads_backwards, listed_with
+
 from apps.printing.tests.conftest import ctx_for, enqueue, printer, run
 
 pytestmark = pytest.mark.django_db
@@ -501,3 +503,16 @@ def test_a_job_waiting_without_a_printer_is_only_taken_by_a_device_of_its_own_fu
     assert PrintJob.objects.get().printer_id is None
     summary = {row.usage: row.unattended for row in run("printing.job.summary").usages}
     assert (summary["receipt"], summary["kitchen"]) == (0, 1)
+
+
+@pytest.mark.parametrize(
+    ("operation", "column", "tied"),
+    [
+        ("printing.printer.list", "kind", lambda: [printer(f"Till {n}").id for n in range(4)]),
+        ("printing.job.list", "attempts", lambda: [enqueue().job.id for _ in range(4)]),
+    ],
+)
+def test_ties_go_by_id_in_the_lists_own_direction(operation, column, tied):
+    """hub#768 (the rule of hub#2355): a descending list is the ascending one read backwards, ties included, and its
+    pages neither repeat nor lose rows."""
+    assert_reads_backwards(listed_with(run, operation, column, by_dir=True), sorted(tied()))

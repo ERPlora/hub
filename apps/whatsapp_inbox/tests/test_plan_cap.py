@@ -15,8 +15,11 @@ import respx
 from django.utils.translation import override
 from live.errors import Conflict
 
+from apps.whatsapp_inbox import clock
 from apps.whatsapp_inbox.models import Channel, Conversation, Message
 from apps.whatsapp_inbox.tests.conftest import A, B, NOW, connect, ctx_for, receive, run, system
+from base.models import Hub
+from base.tenancy.context import use_hub
 
 pytestmark = pytest.mark.django_db
 
@@ -97,6 +100,25 @@ def test_a_spent_month_still_says_until_next_month():
     assert spent.code == "whatsapp_inbox.cap_reached"
     assert "next month" in str(spent)
     assert "does not include" not in str(spent)
+
+
+@pytest.mark.parametrize("zone", ["America/New_York", "Atlantic/Canary", "Europe/Madrid", "Asia/Tokyo"])
+def test_a_spent_month_lasts_as_long_as_erplora_com_counts_it_on_any_clock(monkeypatch, zone):
+    # erplora.com counts a UTC month and refuses until it ends, whatever day it already is for the business.
+    connect(monthly_limit=150, monthly_usage=150, usage_month="2026-10")
+    monkeypatch.setattr(clock, "now", lambda: dt.datetime(2026, 10, 31, 23, 30, tzinfo=dt.UTC))
+    with use_hub(Hub(slug="a", timezone=zone)):
+        channel = run("whatsapp_inbox.channel.get", {})
+    assert (channel.monthly_usage, channel.cap_reached) == (150, True)
+
+
+@pytest.mark.parametrize("zone", ["America/New_York", "Atlantic/Canary", "Europe/Madrid", "Asia/Tokyo"])
+def test_the_next_month_starts_when_erplora_com_starts_it_on_any_clock(monkeypatch, zone):
+    connect(monthly_limit=150, monthly_usage=150, usage_month="2026-10")
+    monkeypatch.setattr(clock, "now", lambda: dt.datetime(2026, 11, 1, 0, 30, tzinfo=dt.UTC))
+    with use_hub(Hub(slug="a", timezone=zone)):
+        channel = run("whatsapp_inbox.channel.get", {})
+    assert (channel.monthly_usage, channel.cap_reached) == (0, False)
 
 
 def test_what_customers_write_still_arrives():
