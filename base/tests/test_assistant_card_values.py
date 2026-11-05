@@ -142,6 +142,26 @@ def test_a_record_named_by_its_id_never_reaches_the_card_by_it(language):
     assert shown["services"] == [{}]
 
 
+@pytest.mark.parametrize("write", ["appointment.appointment.create", "appointment.appointment.update"])
+@pytest.mark.parametrize("language", ["es", "en"])
+@pytest.mark.parametrize("blank", ["   ", "\t", "\u00a0"], ids=["spaces", "tab", "no-break space"])
+def test_a_service_whose_name_comes_blank_is_counted_never_said_in_blank(write, language, blank):
+    """hub#879: a model that sends a booking's service by a blank name (``{"service": "   "}``) and the card said
+    «Servicios:» with nothing after it. Blanks name nothing, as an empty name does: the list reaches the screen unnamed,
+    which says «Servicios: 1 elemento»; a real name is still said, and beside its record the record names the line."""
+    op = get(write)
+
+    def services(sent: list) -> tuple:
+        shown = list_field(assistant.card(op, {"services": sent}, language), "services")
+        return shown["value"], shown.get(NAMED, False)
+
+    assert services([{"service": "Tinte"}]) == ([{"service": "Tinte"}], True)
+    assert services([{"service": blank}]) == ([{"service": blank}], False)
+    assert services([{"service": blank, "service_id": None}])[1] is False
+    assert services([{"service": "Tinte"}, {"service": blank}])[1] is False
+    assert services([{"service_id": SERVICE, "service": blank}]) == ([{}], True)
+
+
 class VisitIn(Schema):
     staff_id: UUID
     start: dt.datetime
