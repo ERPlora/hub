@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:60e6b1d19d83b02c9bf9002055f6a898f8651476fd72c284d5e83fae0ac359d8 -->
+<!-- generated from WORKBOOK.md sha256:dbb74e718190308da2a5fee253e6318ff1a4713ae3e67fd2720b88bddcba1ad6 -->
 
 ## What it is for and who it is for
 
@@ -411,10 +411,12 @@ Steps:
    reported this month’s messages yet.".
 2. From 80 % of the month's messages, the inbox warns above the list, for example, "You have 30 of 150 WhatsApp
    messages of your plan left this month."; whoever can configure sees, in the browser, **Upgrade plan**, which opens
-   erplora.com's plans. Below 80 %, nothing. The count moves by itself, without reloading.
+   erplora.com's plans, already signed in with their account (BASE-F11). Below 80 %, nothing. The count moves by itself,
+   without reloading.
 3. At the cap (with a plan that includes none, from the first message), the inbox warns above the list and **Send**
    explains it instead of sending ("Your plan does not include WhatsApp messages: nothing can be sent." when the plan
-   includes none); whoever can configure sees, in the browser, **Upgrade plan**, which opens erplora.com's plans.
+   includes none); whoever can configure sees, in the browser, **Upgrade plan**, which opens erplora.com's plans,
+   already signed in with their account (BASE-F11).
 4. What the customers write is still saved.
 5. When the month changes (erplora.com's, which counts the messages in UTC: in Spain, at 1:00 or 2:00 on the 1st) the
    notice goes away even if erplora.com has not spoken yet; if
@@ -424,8 +426,10 @@ Out: the notice in the inbox and in Settings; nothing is saved.
 If it fails: if erplora.com refuses a send because of the cap (the Hub's figures were behind), the message does not
 reach Meta nor is it counted, it stays "Not delivered" and says so with "This month's WhatsApp messages of your plan
 are spent: nothing can be sent until next month.", never as Meta's reason; if it asks to go slower, it is not the
-cap: the message stays "Not sent" with **Retry**.
-Involved: erplora.com, BASE-F104
+cap: the message stays "Not sent" with **Retry**. If the pass of **Upgrade plan** does not arrive (an error, 8 seconds
+without an answer or a session opened without the account), the usual address opens: erplora.com asks to sign in with
+the account and goes on to the plans.
+Involved: erplora.com, BASE-F11, BASE-F104
 
 ### WHATSAPP_INBOX-F14 Turn on "Book appointments"
 Status: done

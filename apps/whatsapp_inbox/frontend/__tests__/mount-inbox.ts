@@ -8,6 +8,7 @@ import { createShellI18n, provideSession, type SessionMe } from '@erplora/ui/she
 import { LIVE_CLIENT_KEY, type LiveClient, type OpName } from '@erplora/ui/sdk';
 import { fillHappyDomGaps } from '@erplora/ui/testing';
 import { mount } from '@vue/test-utils';
+import { vi } from 'vitest';
 import { type Component, createApp, ref } from 'vue';
 import { createMemoryHistory, createRouter } from 'vue-router';
 
@@ -182,6 +183,22 @@ export async function click(el: Element | null): Promise<void> {
   if (!el) throw new Error('nothing to click');
   el.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
   await settle();
+}
+
+/** What `base.saas_pass.create` signs in these tests. */
+export const SIGNED = 'https://erplora.com/hub-pass/?pass=abc%3A123';
+
+/** Clicks «Upgrade plan» in a browser (`useSaasPass`) and says where its new tab was sent. */
+export async function followUpgrade(link: Element): Promise<string> {
+  const tab = { opener: {} as unknown, location: { href: 'about:blank' } };
+  const open = vi.spyOn(window, 'open').mockReturnValue(tab as unknown as Window);
+  try {
+    link.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    await settle();
+    return tab.location.href;
+  } finally {
+    open.mockRestore();
+  }
 }
 
 export type { LiveClient };

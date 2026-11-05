@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:0f47a363d794b29d125367063ab63a198a1a6e3e3979ad8691bdec97d8e63eaf -->
+<!-- generated from WORKBOOK.md sha256:c697b6e1e2b9d7787eabe85e2db887f668cb187ff71a9fb63ed89c64e57de1ad -->
 
 ## What it is for and who it is for
 
@@ -627,7 +627,8 @@ Steps:
      menu folded to its icons (desktop), only its icon stays, which says "Upgrade plan" on hover. Only in the
      browser: the installed app does not have it.
   2. They tap it: this business's plan page on erplora.com opens in a new tab, already signed in with their
-     account: they do not type the password again even if that browser did not have the erplora.com session open.
+     account: they do not type the password again even if that browser did not have the erplora.com session open. The
+     same from any other "Upgrade plan" of the Hub: System, Employees, Apps, the assistant's panel and the WhatsApp Inbox.
   3. The owner, the administrator or the manager who came in with their account also has, right below
      "Upgrade plan", "Manage on erplora.com", with the external link icon (on the folded menu, only the icon).
      It does not sell: the installed app has it too, except the Google Play one.
@@ -641,10 +642,9 @@ does nothing). If the installed app cannot open the browser, it says so: "Could 
 pass does not come (the server gives an error or does not answer in 8 seconds), the usual address opens: erplora.com
 asks to sign in with the account and goes on to the same place. If the browser blocks the new tab, the link itself opens
 that address. With the pass spent or the minute gone, erplora.com says so and offers to sign in and go on there; to an
-account that no longer belongs to this business it says it does not (ACCOUNTS-F29). "Upgrade plan" in the assistant's
-panel and in the WhatsApp Inbox do not carry the pass yet and ask to sign in (hub#723). An employee, a session opened with
+account that no longer belongs to this business it says it does not (ACCOUNTS-F29). An employee, a session opened with
 a PIN or with the badge and the Google Play app do not have "Manage on erplora.com".
-Involved: BASE-F40, ACCOUNTS-F29
+Involved: BASE-F40, BASE-F104, WHATSAPP_INBOX-F13, ACCOUNTS-F29
 
 ### BASE-F12 Ask the assistant to go over the setup
 Status: done
@@ -2603,14 +2603,15 @@ Steps:
      "You have used all 300 messages of this month." with "They renew on November 1."; also when the panel opens
      with the month already spent.
   5. Whoever runs the business sees, in the browser, "Upgrade plan", which opens the plan's page on erplora.com in
-     another tab; in the app installed from the store it does not show. Whoever does not run it sees "Ask whoever
-     runs the business to upgrade the plan.". There are no message packs: it is extended by upgrading the plan.
+     another tab, already signed in with their account (BASE-F11); in the app installed from the store it does not
+     show. Whoever does not run it sees "Ask whoever runs the business to upgrade the plan.". There are no message packs:
+     it is extended by upgrading the plan.
   6. With a plan without the assistant, the foot says "Your plan does not include the assistant.", with "Upgrade
      plan" for whoever runs the business; the panel opens anyway.
 In: the messages used, the limit and the day they renew, from erplora.com.
 Out: erplora.com's plan page, in another tab. The business does not keep its own count of messages.
 If it fails: if the plan cannot be read, nothing is shown and they can ask anyway: what erplora.com says when
-answering is what counts.
+answering is what counts. If the pass of "Upgrade plan" does not arrive, the usual address opens, which asks to sign in (BASE-F11).
 Involved: BASE-F11, BASE-F106
 
 ### BASE-F105 Report a bad answer

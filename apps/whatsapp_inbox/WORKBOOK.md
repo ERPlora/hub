@@ -446,11 +446,12 @@ Pasos:
    mes.».
 2. Desde el 80 % de los mensajes del mes, la bandeja lo avisa encima de la lista, por ejemplo, «Te quedan 30 de 150
    mensajes de WhatsApp de tu plan este mes.»; quien puede configurar ve, en el navegador, **Mejorar el plan**, que
-   abre los planes de erplora.com. Por debajo del 80 %, nada. La cuenta se mueve sola, sin recargar.
+   abre los planes de erplora.com ya dentro con su cuenta (BASE-F11). Por debajo del 80 %, nada. La cuenta se mueve
+   sola, sin recargar.
 3. En el tope (con un plan que no incluye ninguno, desde el primer mensaje), la bandeja lo avisa encima de
    la lista y **Enviar** lo explica en vez de enviar («Tu plan no incluye mensajes de WhatsApp: no se puede
    enviar nada.» cuando el plan no incluye ninguno); quien puede configurar ve, en el navegador, **Mejorar el
-   plan**, que abre los planes de erplora.com.
+   plan**, que abre los planes de erplora.com ya dentro con su cuenta (BASE-F11).
 4. Lo que escriben los clientes se sigue guardando.
 5. Al cambiar de mes (el de erplora.com, que cuenta los mensajes en UTC: en España, a la 1:00 o las 2:00 del día 1) el
    aviso se va aunque erplora.com aún no haya hablado; si el plan no incluye mensajes, sigue.
@@ -459,8 +460,10 @@ Sale: el aviso en la bandeja y en Ajustes; nada se guarda.
 Si falla: si erplora.com rechaza un envío por el tope (las cifras del Hub iban por detrás), el mensaje no
 llega a Meta ni se cuenta, queda «No entregado» y lo dice con «Los mensajes de WhatsApp de tu plan de este mes
 están gastados: no se puede enviar nada hasta el mes que viene.», nunca como motivo de Meta; si pide ir más
-despacio, no es el tope: el mensaje queda «No enviado» con **Reintentar**.
-Implicados: erplora.com, BASE-F104
+despacio, no es el tope: el mensaje queda «No enviado» con **Reintentar**. Si el pase de **Mejorar el plan** no llega
+(un error, 8 segundos sin respuesta o una sesión abierta sin la cuenta), se abre la dirección de siempre: erplora.com pide
+entrar con la cuenta y sigue hasta los planes.
+Implicados: erplora.com, BASE-F11, BASE-F104
 
 ### WHATSAPP_INBOX-F14 Activar «Reservar citas»
 <!-- origen: old:whatsapp_inbox/workflow/respuestas-automaticas.md#whatsapp_inbox-f14 -->
