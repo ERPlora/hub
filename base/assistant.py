@@ -584,8 +584,8 @@ def _marks(prop: dict, defs: dict, path: str = "", depth: int = 0, mark: str = R
 @checks.register("base")
 def check_names(app_configs=None, **kwargs) -> list[checks.CheckMessage]:
     """``base.E014``: a text marked ``NAME_OF`` (the name a person says of a record, as a booking's service by its name:
-    hub#860) names a datum of its own object that names a record (``REFERS``, or an id). A mark that names any other
-    leaves the line said by how many, with nothing said at start."""
+    hub#860; never an id) names a datum of its own object that names a record (``REFERS``, or an id). A mark that
+    names any other leaves the line said by how many, with nothing said at start."""
     errors: list[checks.CheckMessage] = []
     for op in registry.values():
         schema = _schema(op)
@@ -615,7 +615,8 @@ def _name_problems(prop: dict, props: dict, defs: dict) -> list[str]:
     of = prop[NAME_OF]
     if not isinstance(of, str):
         return ["is not the name of a datum"]
-    problems = [] if prop.get("type") == "string" else ["is no text"]
+    # An id is no text a person says: the card never says one, so the line would stay in «1 elemento».
+    problems = [] if prop.get("type") == "string" and prop.get("format") != "uuid" else ["is no text"]
     if of not in props:
         return [*problems, f"names no {of} of its own object"]
     record = _resolved(props[of], defs)
