@@ -9,6 +9,7 @@ A refusal of erplora.com, or erplora.com out of reach, is said with the address 
 """
 
 import json
+import re
 
 import pytest
 
@@ -298,8 +299,9 @@ class TestRefused:
 
         report(client, description="My card is 4242 4242 4242 4242")
 
-        # Whole words of the text: alone, «4242» can be the line a logger wrote from, which caplog.text shows (hub#796).
-        assert "My card" not in caplog.text and "4242 4242" not in caplog.text
+        # Read without the logger's own «services.py:4332»: that line number can be any four digits (hub#796).
+        logged = re.sub(r"\S+\.py:\d+", "", caplog.text)
+        assert "My card" not in logged and "4242" not in logged
 
     def test_the_messages_speak_spanish_to_a_spanish_person(self, client, account, fake_saas, settings):
         fake_saas(raises=ConnectionRefusedError("refused"))
