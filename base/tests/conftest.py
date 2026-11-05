@@ -28,6 +28,25 @@ def no_connection_left_from_an_earlier_test(request):
 
 
 @pytest.fixture
+def no_test_fallback(monkeypatch):
+    """A hub's model or operation without its hub entered fails, as outside the tests: nothing falls back to the
+    database the suite's tests written before the tenancy share (``base.tenancy.context._test_fallback``)."""
+    from base.tenancy import context
+
+    monkeypatch.setattr(context, "_test_fallback", None)
+
+
+@pytest.fixture
+def a_worker_just_started(monkeypatch):
+    """The worker as a process that has just started: no hub's schedule written yet, and its pass over the hubs
+    beginning with the first one."""
+    from base import worker
+
+    monkeypatch.setattr(worker, "_synced", set())
+    monkeypatch.setattr(worker, "_next_hub", None)
+
+
+@pytest.fixture
 def make_user(db):
     def make(username: str = "ana", *, host: str | None = None, role: str | None = None, **fields):
         user = get_user_model().objects.create_user(username=username, password="pw", **fields)

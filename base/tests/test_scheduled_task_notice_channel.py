@@ -21,21 +21,13 @@ from control.models import Hub
 
 pytestmark = [
     pytest.mark.django_db(transaction=True, databases=hubs.HUB_DATABASES),
-    pytest.mark.usefixtures("no_test_fallback"),
+    pytest.mark.usefixtures("no_test_fallback", "a_worker_just_started"),
 ]
 
 
-@pytest.fixture
-def no_test_fallback(monkeypatch):
-    from base.tenancy import context
-
-    monkeypatch.setattr(context, "_test_fallback", None)
-
-
 @pytest.fixture(autouse=True)
-def nothing_synced_yet(monkeypatch):
-    monkeypatch.setattr(worker, "_synced", set())
-    monkeypatch.setattr(worker, "_next_hub", None)
+def every_hub_in_one_pass(monkeypatch):
+    # A loaded machine must not leave the second hub for a later tick than the test runs.
     monkeypatch.setattr(worker, "HUB_PASS_SECONDS", 3600)
 
 
