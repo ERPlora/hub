@@ -4,13 +4,17 @@
 // —, seats it from the book — the table is Occupied with its check open in Sales — and completes it; keeps
 // the waitlist (add, contacted, convert); and reads the day's occupancy, adds a slot and blocks a date in
 // Availability. It also edits, cancels with a reason, marks a no-show and deletes (F08–F10, F20), confirms by
-// itself (F04), and seats a late party leaving the next reservation of its table Reserved (F11). Every screen in
+// itself (F04), seats a late party leaving the next reservation of its table Reserved (F11) and, with the book
+// open, sees a pending reservation nobody confirmed turn Cancelled the moment the worker releases it (F13). Every screen in
 // three viewports, one capture per flow (`APP-RESERVATION-<flow>-<width>`). What a run creates is named «E2E Rsv
 // <stamp>…» (a zone, its table, guests, slots, a blocked date and a temporary change of Schedules open all day);
 // `afterAll` removes all of it, with the holds, the table's checks and their orders.
+import { spawnSync } from 'node:child_process';
+
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, psql, settled, shot, shown, untilStill } from './helpers';
+import { A, api, HUB_DIR, psql, settled, shot, shown, untilStill } from './helpers';
+import { liveStreamsSettled, watchLiveStreams } from './live-streams';
 import { ownerPage, pick, post, rowAction } from './service-helpers';
 
 const STAMP = Date.now().toString(36).toUpperCase();
@@ -424,6 +428,68 @@ test('Edit a reservation, cancel one with a reason, mark a no-show and delete on
     });
     const deleted = await api(context, A, 'GET', `/reservation/reservations/detail?id=${edited.id}`);
     expect(deleted.status).toBe(404);
+  } finally {
+    await context.close();
+  }
+});
+
+/** The release as the worker's pass over the hubs runs it in `a` (`base.worker._serve_hub`): in `a`'s database and on
+ *  `a`'s scope, so its notice goes on `a`'s channel. The stack's worker runs no task (`run_worker --databases-only`):
+ *  only Reservations' release is made due and run here (another app's task already due is moved to its next time
+ *  unrun, as the worker does with an app that is off); the tasks it went through are returned. */
+function workerReleases(): string[] {
+  const code = [
+    'import json',
+    'from django.utils import timezone',
+    'from live.context import Scope',
+    'from base import scheduler',
+    'from base.models import TaskSchedule',
+    'now = timezone.now()',
+    'scheduler.sync(now)',
+    "TaskSchedule.objects.filter(app_label='reservation', name='release_unconfirmed_reservations').update(next_run=now)",
+    "print(json.dumps(scheduler.run_due(now, scope=Scope('host', 'a'), active=frozenset({'reservation'}))))",
+  ].join('\n');
+  const out = spawnSync('uv', ['run', 'python', 'manage.py', 'shell', '--hub', 'a', '-c', code], { cwd: HUB_DIR, env: process.env, encoding: 'utf8' });
+  expect(out.status, `the worker's release: ${out.stderr}`).toBe(0);
+  return JSON.parse(out.stdout.trim().split('\n').at(-1) ?? '[]') as string[];
+}
+
+// flow: RESERVATION-F13
+test('A pending reservation nobody confirmed turns Cancelled on the open book the moment the worker releases it', async ({ browser }) => {
+  const { context, page } = await ownerPage(browser, '/reservation/reservations');
+  try {
+    // Booked for later, then its time moved an hour back, as a pending one nobody confirmed is when its day comes.
+    const stale = await bookByApi(context, `${TAG} Ona`, SOON_TIME);
+    expect(stale.status).toBe('pending');
+    const past = madrid(-60);
+    psql(`update reservation_reservation set date = '${past.date}', time = '${past.time}' where id = '${stale.id}'`);
+
+    const streams = await watchLiveStreams(page);
+    await page.reload();
+    const view = shown(page);
+    await expect(view.locator('[data-testid=reservation-day]')).toHaveAttribute('data-day', TODAY.date);
+    if (past.date !== TODAY.date) await view.locator('[data-testid=reservation-day-prev]').click();
+    const row = view.locator(`[data-testid=reservation-list-row][data-id="${stale.id}"]`);
+    await expect(row).toContainText('Pending');
+    // The book's stream is the open one (every subscription answered, none opened since): a new /api/live would read
+    // the list again and say Cancelled with no notice at all.
+    await liveStreamsSettled(streams);
+    const open = streams.length;
+
+    // The quarter of an hour comes: the worker releases it and the book, never reloaded, says so at once (its live
+    // notice, over the stream already open; the safety re-read would take five minutes).
+    expect(workerReleases()).toContain('reservation.release_unconfirmed_reservations');
+    await expect(row).toContainText('Cancelled', { timeout: 15_000 });
+    expect(streams.length, 'the release reached the open book without a new /api/live').toBe(open);
+    const detail = await api<{ status: string; cancellation_reason: string }>(context, A, 'GET', `/reservation/reservations/detail?id=${stale.id}`);
+    expect(detail.data).toMatchObject({ status: 'cancelled', cancellation_reason: 'unconfirmed' });
+    await shots(page, 'RESERVATION-F13', async () => {
+      // On a phone the book is cards, painted again on the resize: the status, at the card's foot, is brought into view
+      // once they stand still.
+      await expect(row).toContainText('Cancelled');
+      await untilStill(page);
+      await row.getByText('Cancelled').scrollIntoViewIfNeeded();
+    });
   } finally {
     await context.close();
   }
