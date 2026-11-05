@@ -2,13 +2,14 @@
 // Inventory, Kitchen and Printing apps: a round sent from a check of Sales is moved from its row — «Fire», «Ready»,
 // «Recall», «Ready» again and «Served» — and «⋮ → Reprint» queues its copy (F21, F09); another is cancelled after a
 // dialog that says the check in the till does not change, with its reason (F22, kitchen#166); «New ticket» makes one
-// by hand from page 2 and the list comes back to page 1 to show it (F23, kitchen#133). On a tablet the ticket's
-// number reads whole (kitchen#134). Each screen in 390×844, 834×1112 and 1440×900 (`APP-KITCHEN-<flow>-<size>`). What a
+// by hand from page 2 and the list comes back to page 1 to show it (F23, kitchen#133); a dish refused by the server is
+// marked with its reason, in English and in Spanish, and what no field shows the dialog says itself (F23, hub#833). On a
+// tablet the ticket's number reads whole (kitchen#134). Each screen in 390×844, 834×1112 and 1440×900 (`APP-KITCHEN-<flow>-<size>`). What a
 // run creates — the printer «e2e KTK <run>», products `E2E-KTK-<run>-…`, checks and tickets «e2e ktk <run> …» — is
 // deleted after it.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, psql, shot, shown } from './helpers';
+import { A, api, login, psql, shot, shown } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { cleanSales, stamp } from './sale-helpers';
 import { ownerPage, rowAction, settled } from './service-helpers';
@@ -184,6 +185,116 @@ test('KITCHEN-F22: «Cancel» asks first, says the check in the till does not ch
     expect(await statusOf(context, sent.id)).toBe('cancelled');
     const history = await api<{ rows: { action: string; notes: string }[] }>(context, A, 'GET', `/kitchen/log?ticket_id=${sent.id}`);
     expect(history.data.rows.map((entry) => [entry.action, entry.notes])).toContainEqual(['cancelled', 'Guest left']);
+  } finally {
+    await context.close();
+  }
+});
+
+for (const { lang, locale, reason } of [
+  { lang: 'en', locale: 'en-US', reason: 'Ensure this value is greater than 0.' },
+  { lang: 'es', locale: 'es-ES', reason: 'Debe ser mayor que 0.' },
+]) {
+  test(`KITCHEN-F23 (${lang}): a quantity of 0 marks that dish with the server's reason, until it is corrected (hub#833)`, async ({ browser }) => {
+    const context = await browser.newContext({ baseURL: A, viewport: { width: 1440, height: 900 }, locale });
+    const page = await context.newPage();
+    try {
+      await login(page, A, '/kitchen/tickets');
+      await context.addCookies([{ name: 'django_language', value: lang, domain: new URL(A).hostname, path: '/' }]);
+      await page.goto(`${A}/kitchen/tickets`);
+      await expect(page.locator('html')).toHaveAttribute('lang', new RegExp(`^${lang}`));
+      await shown(page).locator('[data-testid=kitchen-tickets-primary-action]').click();
+      const form = page.locator('ion-modal[data-testid=kitchen-ticket-form]');
+      await expect(form).toBeVisible();
+      const label = `${CHECK} refused ${lang}`;
+      await form.locator('[data-testid=kitchen-ticket-form-label] input').fill(label);
+      // An empty row above it: the server's `items.0` is this dish, the second on screen.
+      await form.locator('[data-testid=kitchen-ticket-form-add-dish]').click();
+      await form.locator('[data-testid=kitchen-ticket-form-dish-1-name] input').fill('Salad');
+      await form.locator('[data-testid=kitchen-ticket-form-dish-1-quantity] input').fill('0');
+
+      const answered = page.waitForResponse((res) => res.request().method() === 'POST' && new URL(res.url()).pathname === '/api/kitchen/tickets');
+      await form.locator('[data-testid=kitchen-ticket-form-submit]').click();
+      const answer = await answered;
+      expect(answer.status()).toBe(422);
+      expect((await answer.json()).error).toMatchObject({ code: 'invalid_payload', fields: { 'items.0.quantity': reason } });
+
+      const quantity = form.locator('[data-testid=kitchen-ticket-form-dish-1-quantity]');
+      await expect(quantity.locator('.error-text')).toBeVisible();
+      await expect(quantity.locator('.error-text')).toHaveText(reason);
+      await expect(form.locator('[data-testid=kitchen-ticket-form-dish-0-quantity] .error-text')).toBeHidden();
+      const banner = form.locator('[data-testid=kitchen-ticket-form-error]');
+      await expect(banner).toBeVisible();
+      await expect(banner).not.toContainText(reason);
+      // The message grows its field downwards: the marked row stays level, like the row of a dish with no mark.
+      const top = async (name: string): Promise<number> => (await form.locator(`[data-testid=kitchen-ticket-form-dish-${name}]`).boundingBox())?.y ?? Number.NaN;
+      expect(await top('1-notes')).toBe(await top('1-quantity'));
+      expect((await top('1-remove')) - (await top('1-quantity'))).toBe((await top('0-remove')) - (await top('0-quantity')));
+      await capture(page, `F23-REFUSED-${lang.toUpperCase()}`, async () => {
+        await quantity.scrollIntoViewIfNeeded();
+        await expect(quantity.locator('.error-text')).toBeInViewport();
+      });
+
+      await quantity.locator('input').fill('2');
+      await expect(quantity.locator('.error-text')).toBeHidden();
+      await expect(banner).toBeHidden();
+      await form.locator('[data-testid=kitchen-ticket-form-submit]').click();
+      await expect(form).toBeHidden();
+      await expect(row(page, label)).toContainText(lang === 'es' ? 'Por preparar' : 'To prepare');
+    } finally {
+      await context.close();
+    }
+  });
+}
+
+test('KITCHEN-F23: on a phone, whoever pressed «Create ticket» below a long ticket is brought to the dish refused (hub#833)', async ({ browser }) => {
+  const { context, page } = await ownerPage(browser, '/kitchen/tickets', { width: 375, height: 667 });
+  try {
+    await shown(page).locator('[data-testid=kitchen-tickets-primary-action]').click();
+    const form = page.locator('ion-modal[data-testid=kitchen-ticket-form]');
+    const field = (name: string): Locator => form.locator(`[data-testid=kitchen-ticket-form-${name}]`);
+    await field('dish-0-name').locator('input').fill('Soup');
+    await field('dish-0-quantity').locator('input').fill('0');
+    for (const [index, name] of ['Salad', 'Bread'].entries()) {
+      await field('add-dish').click();
+      await field(`dish-${index + 1}-name`).locator('input').fill(name);
+    }
+    await field('add-dish').scrollIntoViewIfNeeded();
+    await expect(field('dish-0-quantity')).not.toBeInViewport();
+
+    await field('submit').click();
+
+    await expect(field('dish-0-quantity').locator('.error-text')).toBeVisible();
+    await expect(field('dish-0-quantity')).toBeInViewport({ ratio: 1 });
+  } finally {
+    await context.close();
+  }
+});
+
+test('KITCHEN-F23: what the server refuses and no field of the window shows, the dialog says with no promise of marks (hub#833)', async ({ browser }) => {
+  const { context, page } = await ownerPage(browser, '/kitchen/tickets', { width: 1440, height: 900 });
+  try {
+    await shown(page).locator('[data-testid=kitchen-tickets-primary-action]').click();
+    const form = page.locator('ion-modal[data-testid=kitchen-ticket-form]');
+    await form.locator('[data-testid=kitchen-ticket-form-dish-0-name] input').fill('Salad');
+    // The window never sends a dish without a name: only the request is changed, the refusal is the server's own.
+    await page.route('**/api/kitchen/tickets', async (route) => {
+      const request = route.request();
+      if (request.method() !== 'POST') return route.continue();
+      return route.continue({ postData: JSON.stringify({ ...request.postDataJSON(), items: [{ quantity: '1' }] }) });
+    });
+    const answered = page.waitForResponse((res) => res.request().method() === 'POST' && new URL(res.url()).pathname === '/api/kitchen/tickets');
+    await form.locator('[data-testid=kitchen-ticket-form-submit]').click();
+    const refusal = (await (await answered).json()).error as { code: string; message: string; fields: Record<string, string> };
+    expect(refusal.code).toBe('invalid_payload');
+    const reason = refusal.fields['items.0'];
+    expect(reason).toBeTruthy();
+
+    const banner = form.locator('[data-testid=kitchen-ticket-form-error]');
+    await expect(banner).toContainText(reason as string);
+    await expect(banner).not.toContainText(refusal.message);
+    await capture(page, 'F23-UNSHOWN', async () => {
+      await expect(banner).toBeInViewport();
+    });
   } finally {
     await context.close();
   }
