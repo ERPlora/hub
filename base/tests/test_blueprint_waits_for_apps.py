@@ -48,8 +48,8 @@ pytestmark = pytest.mark.usefixtures("no_test_fallback")
 SALON = "hair_salon.en"
 #: In the seed: 8 services in 4 categories, and 5 products in 1.
 SALON_SERVICES, SALON_CATEGORIES, SALON_PRODUCTS = 8, 4, 5
-#: In the seed: 16 products in 6 categories.
-RESTAURANT, RESTAURANT_PRODUCTS = "restaurant.en", 16
+#: In the seed: 16 products in 6 categories, and 10 tables in 2 zones.
+RESTAURANT, RESTAURANT_PRODUCTS, RESTAURANT_ZONES, RESTAURANT_TABLES = "restaurant.en", 16, 2, 10
 
 
 def as_admin(hub, language: str = "en") -> OperationContext:
@@ -154,6 +154,22 @@ def test_the_whole_template_waits_and_loads_with_nothing_chosen(business):
     assert count(hub, "service", "Service") == SALON_SERVICES
     assert count(hub, "inventory", "Product") == SALON_PRODUCTS
     assert not [app["id"] for app in done["report"]["apps"] if app["status"] == blueprint.WAITING]
+
+
+def test_the_restaurant_template_with_every_app_to_set_up_ends_with_its_menu_its_zones_and_its_tables(business):
+    """The issue as it was seen: a business with no vertical takes «Use this one» with the restaurant's template."""
+    hub = business("a")
+
+    load = load_template(hub, RESTAURANT, choose=())
+    assert by_app(load)["table"]["status"] == blueprint.WAITING
+    run_pass()
+
+    done = report_of(hub, load)
+    assert listed(hub, "inventory.product") == RESTAURANT_PRODUCTS
+    assert listed(hub, "table.zone") == RESTAURANT_ZONES
+    assert listed(hub, "table.table") == RESTAURANT_TABLES
+    assert not [app["id"] for app in done["report"]["apps"] if app["status"] == blueprint.WAITING]
+    assert done["status"] == "complete"
 
 
 def test_what_waited_reads_in_the_language_of_who_loaded_it_though_the_worker_loaded_it(business):

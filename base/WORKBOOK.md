@@ -876,7 +876,7 @@ Pasos:
 Entra: cómo va la activación.
 Sale: la app en marcha en este negocio (`base.app.enabled`).
 Si falla: BASE-F21.
-Implicados: BASE-F32
+Implicados: BASE-F31, BASE-F32
 
 ### BASE-F23 Desactivar una app
 <!-- origen: old-hub:HUB_SHELL-F122 -->
@@ -1075,7 +1075,7 @@ puede cargarse en tu negocio: ninguna de sus apps se puede activar aquí.». Una
 tope de apps del plan, una app que el plan no incluye) se queda desactivada, no carga nada y el informe dice
 por qué; el resto se carga. Un fichero no se guarda: si una de sus apps aún se está preparando, su fila dice «Se está
 preparando para este negocio. Vuelve a subir el archivo dentro de un minuto para traer sus datos.».
-Implicados: INVENTORY-F12
+Implicados: BASE-F22, INVENTORY-F12
 
 ### BASE-F32 Leer el informe de la importación
 <!-- origen: old-hub:HUB_SHELL-F178 -->
@@ -1105,7 +1105,7 @@ ahora.» (BASE-F21). Si mientras tanto la app se desactiva, la importación se d
 la versión de la plantilla, no se carga nada suyo y su fila dice por qué. Si la carga falla ya con la app lista, la
 app queda activa y su fila dice «Falló» con «Algo falló al cargar esta parte; lo demás no se ha visto afectado.», con
 «Reintentar lo que falta».
-Implicados: BASE-F21, BASE-F22, BASE-F34
+Implicados: BASE-F21, BASE-F22, BASE-F33, BASE-F34
 
 ### BASE-F33 Volver al informe de una importación que no entró entera y reintentar
 <!-- origen: old-hub:HUB_SHELL-F179 -->
@@ -1116,6 +1116,7 @@ Pasos:
   1. Al abrir «Importar», si la última importación no entró entera y no se deshizo, sale primero su informe,
      con «Este es el informe de tu última importación de {name} ({date}). No todo entró.» o, si aún espera a una app
      que se está preparando, con «Aún se está cargando…» y sin «Reintentar lo que falta», que no hace falta (BASE-F32).
+     Cuando entra, ese mismo informe dice «Todo ha entrado.», sin saltar al catálogo.
   2. Si vino de una plantilla, pulsa «Reintentar lo que falta» («Reintentando…»): se vuelve a cargar la misma
      versión de la plantilla y solo entra lo que faltaba; lo que ya entró no se toca ni se duplica. Sale el
      informe nuevo.
@@ -1128,7 +1129,7 @@ Pasos:
 Entra: la última importación y su informe.
 Sale: lo que faltaba, si ahora entra, y el informe nuevo (`base.blueprint.imported`).
 Si falla: «El reintento falló: {reason}» y el informe sigue a la vista.
-Implicados: ninguno
+Implicados: BASE-F32
 
 ### BASE-F34 Deshacer una importación
 <!-- origen: old-hub:HUB_SHELL-F180 -->

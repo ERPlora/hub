@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:84abfa68c7e18baca4218fcfd591d7d808cb8ca17529a2a6cfb62539eb7abeb5 -->
+<!-- generated from WORKBOOK.md sha256:8f2477d3bff2078aaf41f02f0aca29e242ebf4e5806ad2ee4cde355f4410bf1c -->
 
 ## What it is for and who it is for
 
@@ -848,7 +848,7 @@ Steps:
 In: how the activation is going.
 Out: the app running in this business (`base.app.enabled`).
 If it fails: BASE-F21.
-Involved: BASE-F32
+Involved: BASE-F31, BASE-F32
 
 ### BASE-F23 Turn an app off
 Status: done
@@ -1038,7 +1038,7 @@ load in your business: none of its apps can be turned on here.". An app that cou
 plan's limit of apps, an app the plan does not include) stays off, loads nothing and the report says why;
 the rest loads. A file is not kept: if one of its apps is still being set up, its row says "It is being set up for
 this business. Upload the file again in a minute to bring its data.".
-Involved: INVENTORY-F12
+Involved: BASE-F22, INVENTORY-F12
 
 ### BASE-F32 Read the import report
 Status: done
@@ -1066,7 +1066,7 @@ its data will load as soon as it works; «Retry what is missing» tries again no
 turned off, the import is undone, the business is reset or the template's version changes, nothing of it loads and its
 row says why. If the load fails once the app is ready, the app stays on and its row says "Failed" with "Something went
 wrong loading this part; nothing else was affected.", with "Retry what is missing".
-Involved: BASE-F21, BASE-F22, BASE-F34
+Involved: BASE-F21, BASE-F22, BASE-F33, BASE-F34
 
 ### BASE-F33 Come back to the report of an import that did not go in whole and retry
 Status: done
@@ -1076,6 +1076,7 @@ Steps:
   1. On opening "Import", if the last import did not go in whole and was not undone, its report shows first,
      with "This is the report of your last import of {name} ({date}). Not everything went in." or, if it still waits
      for an app being set up, with "Still loading…" and without "Retry what is missing", which is not needed (BASE-F32).
+     When it comes in, that same report says "Everything went in.", with no jump to the catalogue.
   2. If it came from a template, tap "Retry what is missing" ("Retrying…"): the same version of the template
      is loaded again and only what was missing goes in; what already went in is neither touched nor
      duplicated. The new report shows.
@@ -1087,7 +1088,7 @@ Steps:
 In: the last import and its report.
 Out: what was missing, if it goes in now, and the new report (`base.blueprint.imported`).
 If it fails: "The retry failed: {reason}" and the report stays in sight.
-Involved: none
+Involved: BASE-F32
 
 ### BASE-F34 Undo an import
 Status: done

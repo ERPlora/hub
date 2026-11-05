@@ -213,6 +213,32 @@ describe('ImportPanel', () => {
     expect(m.wrapper.get('[data-testid="report-status"]').text()).toContain('Everything went in.');
   });
 
+  it('the last import that still waits opens first and, once it comes in, says so instead of jumping to the catalogue', async () => {
+    const waiting = waitingLoad();
+    const m = await panel({}, { imports: [waiting], unfinished: waiting });
+    expect(m.wrapper.find('[data-testid="report-waiting"]').exists()).toBe(true);
+
+    await m.result(m.call, 'base.import.list', { imports: [load({ id: waiting.id })], unfinished: null }, 2);
+    await settle();
+
+    expect(m.wrapper.get('[data-testid="report-status"]').text()).toContain('Everything went in.');
+    expect(m.wrapper.find('[data-testid="report-unfinished"]').exists()).toBe(false);
+    expect(m.wrapper.find('[data-testid="templates-row"]').exists()).toBe(false);
+  });
+
+  it('the last import whose app could not be set up is named as such, and stays when the app manages by itself', async () => {
+    const failing = waitingLoad('setup_failed');
+    const m = await panel({}, { imports: [failing], unfinished: failing });
+    expect(m.wrapper.find('[data-testid="report-unfinished"]').exists()).toBe(true);
+    expect(m.wrapper.find('[data-testid="report-failing"]').exists()).toBe(true);
+
+    await m.result(m.call, 'base.import.list', { imports: [load({ id: failing.id })], unfinished: null }, 2);
+    await settle();
+
+    expect(m.wrapper.get('[data-testid="report-status"]').text()).toContain('Everything went in.');
+    expect(m.wrapper.find('[data-testid="templates-row"]').exists()).toBe(false);
+  });
+
   it('opens with the last import that did not go in whole, retries it and goes on to the catalogue', async () => {
     const m = await panel(
       { '/api/settings/data/blueprints/import': () => Response.json(load({ id: 'again' })) },

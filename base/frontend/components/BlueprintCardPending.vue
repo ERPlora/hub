@@ -6,7 +6,7 @@ import { useLive } from '@erplora/ui/sdk';
 import { IonSpinner } from '@ionic/vue';
 import { computed, watch } from 'vue';
 
-import { pendingApps } from '../lib/data';
+import { pendingApps, somethingPending } from '../lib/data';
 import { useBaseI18n } from '../lib/i18n';
 import type { ImportRow } from '../operations';
 import '../home.css';
@@ -20,8 +20,8 @@ const imports = useLive('base.import.list', {});
 const current = computed(() => imports.data.value?.imports.find((row) => row.id === props.load.id) ?? props.load);
 const pending = computed(() => pendingApps(current.value.report));
 
-watch(pending, ({ settingUp, failing }) => {
-  if (!settingUp.length && !failing.length) emit('settled', current.value);
+watch(current, (load) => {
+  if (!somethingPending(load.report)) emit('settled', load);
 });
 </script>
 

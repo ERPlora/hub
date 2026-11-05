@@ -9,10 +9,10 @@ import { EmptyState, InlineFeedback } from '@erplora/ui/components';
 import { type ApiError, useCommand, useLive } from '@erplora/ui/sdk';
 import { HubIcon, useSession } from '@erplora/ui/shell';
 import { IonButton, IonSpinner } from '@ionic/vue';
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 import { sessionChanged } from '../../lib/access';
-import { bytesToBase64, MAX_FILE_BYTES } from '../../lib/data';
+import { bytesToBase64, MAX_FILE_BYTES, somethingPending } from '../../lib/data';
 import { useBaseI18n } from '../../lib/i18n';
 import type { BlueprintSource, BlueprintSummary, ImportRow, Template } from '../../operations';
 import BlueprintReview from './BlueprintReview.vue';
@@ -23,7 +23,7 @@ import '../../data.css';
 type Step =
   | { kind: 'choose' }
   | { kind: 'review'; source: BlueprintSource; summary: BlueprintSummary }
-  | { kind: 'report'; load: ImportRow };
+  | { kind: 'report'; load: ImportRow; last?: boolean };
 
 const { t } = useBaseI18n();
 const session = useSession();
@@ -43,6 +43,19 @@ const fileInput = ref<HTMLInputElement | null>(null);
 
 const unfinished = computed(() =>
   step.value.kind === 'choose' && !pastUnfinished.value ? (imports?.data.value?.unfinished ?? null) : null,
+);
+
+// A last import that still has something coming stays on its report: when it comes in, it says so (hub#609). Without
+// this it would stop being «unfinished» and the screen would jump to the catalogue with no word of how it ended.
+watch(
+  unfinished,
+  (load) => {
+    if (load && somethingPending(load.report)) {
+      pastUnfinished.value = true;
+      step.value = { kind: 'report', load, last: true };
+    }
+  },
+  { immediate: true },
 );
 
 /** The load on the report, as the live list has it now; until the list has it, as the import answered. */
@@ -157,6 +170,7 @@ function toCatalogue(): void {
   <ImportReport
     v-else-if="reported"
     :load="reported"
+    :unfinished="step.kind === 'report' && step.last"
     :retrying="importer.pending.value"
     :retry-error="retryError"
     @retry="retry(reported)"

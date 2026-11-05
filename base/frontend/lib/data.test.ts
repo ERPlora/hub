@@ -21,6 +21,7 @@ import {
   selectAll,
   settingsTab,
   STATUS_KEY,
+  somethingPending,
   statusPill,
   stillLoading,
   templateMatches,
@@ -248,6 +249,9 @@ describe('the import (BASE-G103–G107)', () => {
     expect(pendingApps(report)).toEqual({ settingUp: ['Printing'], failing: ['Services'] });
     expect(stillLoading(report)).toBe(true);
     expect(stillLoading({ ...report, apps: [report.apps[0]] })).toBe(false);
+    expect(somethingPending({ ...report, apps: [report.apps[0]] })).toBe(true);
+    expect(somethingPending({ ...report, apps: [report.apps[1]] })).toBe(true);
+    expect(somethingPending({ ...report, apps: [] })).toBe(false);
   });
 });
 

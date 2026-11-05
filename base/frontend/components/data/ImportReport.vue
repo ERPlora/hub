@@ -71,7 +71,7 @@ function pill(status: string): { tone: ReturnType<typeof statusPill>['tone']; la
       {{ t('base.data.report.waiting') }}
     </InlineFeedback>
     <InlineFeedback
-      v-else-if="unfinished"
+      v-else-if="unfinished && load.status !== 'complete'"
       tone="warning"
       class="report-notice"
       data-testid="report-unfinished"

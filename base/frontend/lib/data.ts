@@ -248,6 +248,12 @@ export function pendingApps(report: LoadReport): { settingUp: string[]; failing:
   return { settingUp: named('waiting'), failing: named('setup_failed') };
 }
 
+/** Whether a load still has something to bring from an app's setup, going well or not. */
+export function somethingPending(report: LoadReport): boolean {
+  const { settingUp, failing } = pendingApps(report);
+  return settingUp.length > 0 || failing.length > 0;
+}
+
 /** Whether what is missing of a load is on its way by itself: there is nothing to press. */
 export function stillLoading(report: LoadReport): boolean {
   return pendingApps(report).settingUp.length > 0;
@@ -272,7 +278,6 @@ export function cardOutcome(
   load: ImportRow,
 ): { kind: 'ready' | 'partial' | 'failed'; missing: string[] } | { kind: 'pending'; load: ImportRow } {
   if (load.status === 'complete') return { kind: 'ready', missing: [] };
-  const { settingUp, failing } = pendingApps(load.report);
-  if (settingUp.length || failing.length) return { kind: 'pending', load };
+  if (somethingPending(load.report)) return { kind: 'pending', load };
   return { kind: load.status === 'failed' ? 'failed' : 'partial', missing: unloaded(load.report) };
 }
