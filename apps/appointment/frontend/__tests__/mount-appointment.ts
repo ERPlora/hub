@@ -27,6 +27,8 @@ import { ComposableHost } from './composable-host';
 fillHappyDomGaps();
 
 export { BYE, errorFrame, flush, HELLO, resultFrame } from '../../../../packages/ui/src/sdk/__tests__/live-harness';
+/** The platform's business (`base.business.get`): the diary's money is its currency (BASE-F50). */
+export { business, POLISH } from '../../../../base/frontend/__tests__/business';
 
 const ALL = [
   'appointment.view_appointment',

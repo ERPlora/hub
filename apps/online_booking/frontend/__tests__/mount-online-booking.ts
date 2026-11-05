@@ -26,6 +26,8 @@ import es from '../locale/es.json';
 fillHappyDomGaps();
 
 export { BYE, errorFrame, flush, HELLO, resultFrame } from '../../../../packages/ui/src/sdk/__tests__/live-harness';
+/** The platform's business (`base.business.get`): the preview's prices are in its currency (BASE-F50). */
+export { business, POLISH } from '../../../../base/frontend/__tests__/business';
 
 const ALL = [
   'online_booking.view_booking',

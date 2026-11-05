@@ -1,10 +1,11 @@
 // The «Services» field of the booking and series panels: the services chosen, in order, as chips that
-// can be removed, and a search of the bookable catalog to add one more (each once).
+// can be removed, and a search of the bookable catalog to add one more (each once), each offered with its
+// minutes and its price in the business's currency (BASE-F50).
 import { Combo } from '@erplora/ui/components';
 import { describe, expect, it } from 'vitest';
 
 import type { ServiceFacts } from '../lib/pickers';
-import { click, mountAppointment, page, settle } from '../__tests__/mount-appointment';
+import { business, click, mountAppointment, page, POLISH, settle } from '../__tests__/mount-appointment';
 import ServicesField from './ServicesField.vue';
 
 async function setup(modelValue = [{ id: 'cut', label: 'Haircut' }]) {
@@ -47,6 +48,15 @@ describe('ServicesField', () => {
     expect(s.wrapper.emitted('update:modelValue')).toBeUndefined();
     await click(s.wrapper.find('[aria-label="Remove Haircut"]').element);
     expect(s.wrapper.emitted('update:modelValue')?.at(-1)).toEqual([[]]);
+  });
+
+  it('offers each service with its price in the business’s currency, a figure alone until it answers (hub#577)', async () => {
+    const s = await setup();
+    const offered = () => (s.combo().props('search') as (q: string) => Promise<unknown>)('col');
+    expect(await offered()).toEqual([{ id: 'colour', label: 'Colour', hint: '60 min · 45.00' }]);
+    await s.live();
+    await s.result('base.business.get', business(POLISH));
+    expect(await offered()).toEqual([{ id: 'colour', label: 'Colour', hint: '60 min · zł\u00a045.00' }]);
   });
 
   it('asks for the first service by its own name', async () => {

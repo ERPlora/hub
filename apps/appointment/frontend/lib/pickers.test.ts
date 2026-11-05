@@ -4,7 +4,11 @@
 // nobody is assigned to (the diary's rule). Each app's list is read through its own operations.
 import { describe, expect, it, vi } from 'vitest';
 
+import type { Money } from './format';
 import { eligibleStaff, ownTerms, type ServiceFacts, searchBookableServices } from './pickers';
+
+const EURO: Money = { currency: 'EUR', decimals: 2 };
+const ZLOTY: Money = { currency: 'PLN', decimals: 2 };
 
 function client(answers: Record<string, (input: Record<string, unknown>) => unknown>) {
   const call = vi.fn(async (op: string, input: Record<string, unknown>) => answers[op](input));
@@ -28,7 +32,7 @@ describe('searchBookableServices', () => {
       }),
     });
     const facts = new Map<string, ServiceFacts>();
-    const options = await searchBookableServices(api, 'en', facts)(' cut ');
+    const options = await searchBookableServices(api, 'en', facts, EURO)(' cut ');
     expect(call).toHaveBeenCalledWith('service.service.list_for_sale', { search: 'cut', limit: 20 });
     expect(options).toEqual([
       { id: 'c1', label: 'Haircut', hint: '30 min · €20.00' },
@@ -39,8 +43,19 @@ describe('searchBookableServices', () => {
 
   it('a price of four figures groups its thousands, in both languages (hub#632)', async () => {
     const { client: api } = client({ 'service.service.list_for_sale': () => ({ rows: [sale('c1', 'Keratin', { price: 123456 })] }) });
-    expect(await searchBookableServices(api, 'es', new Map())('')).toEqual([{ id: 'c1', label: 'Keratin', hint: '30 min · 1.234,56\u00a0€' }]);
-    expect(await searchBookableServices(api, 'en', new Map())('')).toEqual([{ id: 'c1', label: 'Keratin', hint: '30 min · €1,234.56' }]);
+    expect(await searchBookableServices(api, 'es', new Map(), EURO)('')).toEqual([{ id: 'c1', label: 'Keratin', hint: '30 min · 1.234,56\u00a0€' }]);
+    expect(await searchBookableServices(api, 'en', new Map(), EURO)('')).toEqual([{ id: 'c1', label: 'Keratin', hint: '30 min · €1,234.56' }]);
+  });
+
+  it('a price is in the business’s currency: złoty in a business in Poland, never euros (hub#577)', async () => {
+    const { client: api } = client({ 'service.service.list_for_sale': () => ({ rows: [sale('c1', 'Haircut', { price: 2250 })] }) });
+    expect(await searchBookableServices(api, 'es', new Map(), ZLOTY)('')).toEqual([{ id: 'c1', label: 'Haircut', hint: '30 min · 22,50\u00a0zł' }]);
+    expect(await searchBookableServices(api, 'en', new Map(), ZLOTY)('')).toEqual([{ id: 'c1', label: 'Haircut', hint: '30 min · zł\u00a022.50' }]);
+  });
+
+  it('until the business answers, a price is its figure without a symbol, never euros', async () => {
+    const { client: api } = client({ 'service.service.list_for_sale': () => ({ rows: [sale('c1', 'Haircut', { price: 2250 })] }) });
+    expect(await searchBookableServices(api, 'es', new Map(), undefined)('')).toEqual([{ id: 'c1', label: 'Haircut', hint: '30 min · 22,50' }]);
   });
 });
 

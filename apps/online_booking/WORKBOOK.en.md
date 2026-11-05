@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:61580bb8b74083f96622badc06425148faeb5ea243249f7b523bfdcec91e9628 -->
+<!-- generated from WORKBOOK.md sha256:cfd3183450073e8104568c9560aeab8dd475ee3b4c8d149d50e9f7ae66257760 -->
 
 ## What it is for and who it is for
 
@@ -116,9 +116,9 @@ Actor: customer (no session)
 Screen: public booking page (`base`); in development, the preview
 Steps:
 1. She opens the business's page: title, welcome message, logo and colour from the Settings.
-2. She picks one or several services (up to 5) among those **booked online**, with their price (grouped
-   from four digits: "1.234,56 €") and their duration if Services shows them ("Show prices", "Show
-   duration").
+2. She picks one or several services (up to 5) among those **booked online**, with their price (in the
+   business's currency, its country's —BASE-F50: "20,00 zł" in Poland—, grouped from four digits: "1.234,56 €")
+   and their duration if Services shows them ("Show prices", "Show duration").
 3. If the business allows it, she picks a professional among those who do all those services, or "No
    preference".
 4. She picks the day: the **free times** the diary would give the customer show (business hours, the
