@@ -593,10 +593,17 @@ LOGGING = {
     "formatters": {
         "plain": {"format": "%(asctime)s %(levelname)s %(name)s %(message)s"}
     },
-    "handlers": {"console": {"class": "logging.StreamHandler", "formatter": "plain"}},
+    "handlers": {
+        "console": {"class": "logging.StreamHandler", "formatter": "plain"},
+        "null": {"class": "logging.NullHandler"},
+    },
     "root": {"handlers": ["console"], "level": LOG_LEVEL},
-    # Django's own logger writes once, through the same handler (not also through its DEBUG-only one).
     "loggers": {
-        "django": {"handlers": ["console"], "level": LOG_LEVEL, "propagate": False}
+        # Django's own logger writes once, through the same handler (not also through its DEBUG-only one).
+        "django": {"handlers": ["console"], "level": LOG_LEVEL, "propagate": False},
+        # A Host outside ALLOWED_HOSTS (scanners at the balancer) is still answered 400 and stays in the access log,
+        # but writes no ERROR with its traceback (hub#817; Django's documented way). Any other django.security
+        # event is still an ERROR.
+        "django.security.DisallowedHost": {"handlers": ["null"], "propagate": False},
     },
 }
