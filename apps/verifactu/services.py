@@ -749,6 +749,13 @@ def _mark(ctx: OperationContext, records, code: str, detail: str, tally: _Tally)
     return changed
 
 
+def _outlast_the_gateway() -> None:
+    """A call to the gateway waits inside its operation's transaction, whose locks keep two passes from sending the same
+    chain, and it can take longer than the cluster lets a transaction sit idle: without this, the cut comes first and
+    what the AEAT answered is lost with the transaction (hub#623). Said before every call, for that transaction only."""
+    platform.allow_idle_wait(gateway.LONGEST_WAIT_SECONDS)
+
+
 def _unsent(issuer_nif: str | None = None, environment: str | None = None):
     queryset = Record.objects.filter(status__in=Record.UNSENT)
     if issuer_nif is not None:
@@ -977,6 +984,7 @@ def _send_chain(
         tally.waiting += len(batch)
         return
     incident = "<sum1:Incidencia>S</sum1:Incidencia>" in whole
+    _outlast_the_gateway()
     reply = gateway.submit(
         hub=hub,
         nif=issuer_nif,
@@ -1476,6 +1484,7 @@ def _query_page(
             str(CANNOT_SEND) % {"why": wait_reason_text(UNREGISTERED)},
             code=f"verifactu.{UNREGISTERED}",
         )
+    _outlast_the_gateway()
     reply = gateway.query(
         hub=hub,
         nif=nif,
@@ -1696,6 +1705,7 @@ def run_diagnostic(ctx: OperationContext, data: NoInput) -> DiagnosticOut:
     if hub is None:
         codes.append(UNREGISTERED)
     elif gateway.configured() and "own_certificate_unreadable" not in codes:
+        _outlast_the_gateway()
         reply = gateway.probe(
             hub=hub,
             nif=nif,
