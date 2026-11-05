@@ -21,17 +21,15 @@ const RUN = stamp();
 /** The one step pending in a local hub with no issuer, and where «Configurar» leads. */
 const STEP = 'invoice.business_identity';
 const STEP_ROUTE = '/invoice/issuer';
-/** A phone on its side, and the lowest-widest window still under the cut: a whole row of the catalogue fits. */
-const WHOLE_ROW = [
+/** A phone on its side, and the lowest-widest window still under the cut: a whole row of the catalogue fits. The same
+ *  phones in a browser, under its address bar (568x264, 640x304), have `least`: what `ion-content` keeps at least,
+ *  measured with the strip in one line (21 and 61 px before). */
+const LOW = [
   { label: '568x320', width: 568, height: 320 },
   { label: '640x360', width: 640, height: 360 },
   { label: '667x319', width: 667, height: 319 },
   { label: '667x375', width: 667, height: 375 },
   { label: '1280x500', width: 1280, height: 500 },
-] as const;
-/** The same phones in a browser, under its address bar: the least `ion-content` keeps, measured with the strip in one
- *  line (21 and 61 px before). */
-const UNDER_AN_ADDRESS_BAR = [
   { label: '568x264', width: 568, height: 264, least: 90 },
   { label: '640x304', width: 640, height: 304, least: 130 },
 ] as const;
@@ -111,28 +109,22 @@ async function rowWhole(): Promise<boolean> {
   }, product.id);
 }
 
-/** The cart button whole between the strip and the tab bar, with the content scrolled to its top and to its bottom. */
+/** The cart button whole inside the content, between the strip and the tab bar, with the content scrolled to its top
+ *  and to its bottom (Ionic's own `scrollToTop`/`scrollToBottom`). */
 async function cartButtonWhole(where: string): Promise<void> {
   const fab = shown(page).locator('[data-testid=pos-cart-fab]');
+  const content = shown(page).locator('ion-content');
   await expect(fab, `the cart button at ${where}`).toBeVisible();
   for (const end of ['top', 'bottom'] as const) {
-    const at = await fab.evaluate(async (el, to) => {
-      const view = el.closest('.ion-page');
-      const content = view?.querySelector('ion-content') as (Element & { getScrollElement(): Promise<HTMLElement> }) | null;
-      const scroller = await content?.getScrollElement();
-      if (scroller) scroller.scrollTop = to === 'top' ? 0 : scroller.scrollHeight;
-      await new Promise((frame) => requestAnimationFrame(() => requestAnimationFrame(frame)));
-      const box = el.getBoundingClientRect();
-      const under = view?.querySelector('.page-notice')?.getBoundingClientRect().bottom ?? 0;
-      return {
-        top: box.top,
-        bottom: box.bottom,
-        from: Math.max(under, content?.getBoundingClientRect().top ?? 0),
-        to: view?.querySelector('ion-footer.section-tabbar')?.getBoundingClientRect().top ?? 0,
-      };
+    await content.evaluate(async (el, to) => {
+      const ionContent = el as unknown as { scrollToTop(ms: number): Promise<void>; scrollToBottom(ms: number): Promise<void> };
+      await (to === 'top' ? ionContent.scrollToTop(0) : ionContent.scrollToBottom(0));
     }, end);
-    expect.soft(at.top, `the cart button under the strip at ${where}, scrolled to the ${end}`).toBeGreaterThanOrEqual(at.from - EDGE);
-    expect.soft(at.bottom, `the cart button over the tab bar at ${where}, scrolled to the ${end}`).toBeLessThanOrEqual(at.to + EDGE);
+    await settled(page);
+    const button = (await fab.boundingBox())!;
+    const room = (await content.boundingBox())!;
+    expect.soft(button.y, `the cart button under the strip at ${where}, scrolled to the ${end}`).toBeGreaterThanOrEqual(room.y - EDGE);
+    expect.soft(button.y + button.height, `the cart button over the tab bar at ${where}, scrolled to the ${end}`).toBeLessThanOrEqual(room.y + room.height + EDGE);
   }
 }
 
@@ -152,25 +144,15 @@ async function isOneLine(where: string): Promise<void> {
 }
 
 test.describe('BASE-F01: a phone on its side keeps the strip in one line and room for the till', () => {
-  for (const size of WHOLE_ROW) {
-    test(`${size.label}: one line, and a whole row of the catalogue`, async () => {
+  for (const size of LOW) {
+    const room = 'least' in size ? `at least ${size.least} px for the till (under a browser's address bar)` : 'a whole row of the catalogue';
+    test(`${size.label}: one line, ${room}, and the cart button whole`, async () => {
       await page.setViewportSize({ width: size.width, height: size.height });
       await isOneLine(size.label);
       const box = await layout(size.label);
       measured[size.label] = { strip: box.strip.height, content: box.content.height };
-      expect(await rowWhole(), `a whole row of the catalogue inside the till at ${size.label} (ion-content ${box.content.height} px)`).toBe(true);
-      await capture(page, `${KEY}-${size.label}`);
-      await cartButtonWhole(size.label);
-    });
-  }
-
-  for (const size of UNDER_AN_ADDRESS_BAR) {
-    test(`${size.label} (under a browser's address bar): one line, at least ${size.least} px for the till and its cart button whole`, async () => {
-      await page.setViewportSize({ width: size.width, height: size.height });
-      await isOneLine(size.label);
-      const box = await layout(size.label);
-      measured[size.label] = { strip: box.strip.height, content: box.content.height };
-      expect(box.content.height, `ion-content at ${size.label}`).toBeGreaterThanOrEqual(size.least);
+      if ('least' in size) expect(box.content.height, `ion-content at ${size.label}`).toBeGreaterThanOrEqual(size.least);
+      else expect(await rowWhole(), `a whole row of the catalogue inside the till at ${size.label} (ion-content ${box.content.height} px)`).toBe(true);
       await capture(page, `${KEY}-${size.label}`);
       await cartButtonWhole(size.label);
     });
@@ -183,6 +165,7 @@ test.describe('BASE-F01: a phone on its side keeps the strip in one line and roo
     const strip = shown(page).locator('[data-testid=blocking-strip]');
     await expect(strip.locator('.blocking-strip-title')).toHaveText('Todavía no puedes facturar');
     await expect(strip.locator('ion-button')).toHaveCount(0);
+    await expect(shown(page).locator('[data-testid=invoice-issuer-save]'), 'the issuer form, loaded').toBeAttached();
     const box = await layout('568x264 on the settings');
     expect(box.strip.height, 'the strip in one line on the settings').toBeLessThanOrEqual(ONE_LINE + EDGE);
     await capture(page, `${KEY}-568x264-settings`);
