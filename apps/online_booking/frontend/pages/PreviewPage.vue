@@ -5,7 +5,7 @@
 // and mobile, book; then the booking seen and cancelled with the personal link. One-shot calls of the API
 // client (what is public is not followed live). A price is in the business's money (BASE-F50: «20,00 zł» in Poland,
 // the figure alone until it answers), as the diary paints it. Never part of a production build.
-import { InlineFeedback } from '@erplora/ui/components';
+import { InlineFeedback, useRefusal } from '@erplora/ui/components';
 import { ApiError, useLiveClient } from '@erplora/ui/sdk';
 import { AppPage } from '@erplora/ui/shell';
 import { IonButton, IonCheckbox, IonInput, IonSelect, IonSelectOption, IonSpinner, IonTextarea } from '@ionic/vue';
@@ -71,6 +71,7 @@ const notes = ref('');
 
 function pick(id: string, on: boolean): void {
   chosen.value = on ? [...chosen.value.filter((item) => item !== id), id] : chosen.value.filter((item) => item !== id);
+  changed('service_ids');
 }
 
 /** Who does every chosen service. */
@@ -114,7 +115,8 @@ const wallOf = (moment: string): string => `${dayOf(moment)}T${timeOf(moment)}`;
 const booking = ref(false);
 const bookError = ref<ApiError | null>(null);
 const booked = ref<BookedOut | null>(null);
-const fieldErrors = computed<Readonly<Record<string, string>>>(() => bookError.value?.fields ?? {});
+// What is picked or typed is told by the name the server refuses it with (`start` for the day and the time).
+const { fieldErrors, showsError, changed } = useRefusal(bookError);
 const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'ion-touched': !!message });
 const ready = computed(() => !!start.value && !!name.value.trim() && !!phone.value.trim() && !booking.value);
 
@@ -244,7 +246,7 @@ const text = (value: unknown): string => (value === null || value === undefined 
             fill="outline"
             mode="md"
             interface="popover"
-            @ion-change="staff = text($event.detail.value)"
+            @ion-change="staff = text($event.detail.value); changed('staff_id')"
           >
             <ion-select-option value="">
               {{ $t('online_booking.preview.anyone') }}
@@ -266,7 +268,7 @@ const text = (value: unknown): string => (value === null || value === undefined 
             label-placement="floating"
             fill="outline"
             mode="md"
-            @ion-change="day = text($event.detail.value)"
+            @ion-change="day = text($event.detail.value); changed('start')"
           />
 
           <template v-if="chosen.length && day">
@@ -300,7 +302,7 @@ const text = (value: unknown): string => (value === null || value === undefined 
                 :data-testid="`ob-preview-time-${timeOf(slot.start)}`"
                 size="small"
                 :fill="start === wallOf(slot.start) ? 'solid' : 'outline'"
-                @click="start = wallOf(slot.start)"
+                @click="start = wallOf(slot.start); changed('start')"
               >
                 {{ formatTime(timeOf(slot.start), locale) }}
               </ion-button>
@@ -317,7 +319,7 @@ const text = (value: unknown): string => (value === null || value === undefined 
             :maxlength="200"
             :error-text="fieldErrors.name"
             :class="invalid(fieldErrors.name)"
-            @ion-input="name = text($event.detail.value)"
+            @ion-input="name = text($event.detail.value); changed('name')"
           />
           <ion-input
             data-testid="ob-preview-phone"
@@ -330,7 +332,7 @@ const text = (value: unknown): string => (value === null || value === undefined 
             :maxlength="30"
             :error-text="fieldErrors.phone"
             :class="invalid(fieldErrors.phone)"
-            @ion-input="phone = text($event.detail.value)"
+            @ion-input="phone = text($event.detail.value); changed('phone')"
           />
           <ion-input
             data-testid="ob-preview-email"
@@ -342,7 +344,7 @@ const text = (value: unknown): string => (value === null || value === undefined 
             mode="md"
             :error-text="fieldErrors.email"
             :class="invalid(fieldErrors.email)"
-            @ion-input="email = text($event.detail.value)"
+            @ion-input="email = text($event.detail.value); changed('email')"
           />
           <ion-textarea
             v-if="info.allow_notes"
@@ -355,14 +357,14 @@ const text = (value: unknown): string => (value === null || value === undefined 
             :maxlength="500"
             :error-text="fieldErrors.notes"
             :class="invalid(fieldErrors.notes)"
-            @ion-input="notes = text($event.detail.value)"
+            @ion-input="notes = text($event.detail.value); changed('notes')"
           />
           <InlineFeedback
-            v-if="bookError"
+            v-if="showsError"
             tone="danger"
             data-testid="ob-preview-form-error"
           >
-            {{ bookError.message }}
+            {{ bookError?.message }}
           </InlineFeedback>
           <ion-button
             data-testid="ob-preview-book"

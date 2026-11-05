@@ -172,6 +172,63 @@ describe('SettingsForm: saving', () => {
     expect(toastSuccess).not.toHaveBeenCalled();
     expect(s.control('max_discount_percent').value).toBe('150');
   });
+
+  describe('a refusal by fields (hub#854, as FormModal and the Services settings do: ui#102, hub#821)', () => {
+    const DISCOUNT = 'Input should be less than or equal to 100';
+    const LINK = 'Enter a valid URL.';
+    const REFUSAL = {
+      error: { code: 'invalid_payload', message: 'Some fields are not valid.', fields: { max_discount_percent: DISCOUNT, receipt_marketing_url: LINK } },
+    };
+
+    /** Saves a 150 % discount and a link that is no link, and the server refuses both fields. */
+    async function refused() {
+      const s = await setup();
+      await s.show(SETTINGS);
+      s.answer(422, REFUSAL);
+      await s.type('max_discount_percent', '150');
+      await s.type('receipt_marketing_url', 'not a link');
+      await click(s.save());
+      /** Whether the red notice is on screen. */
+      const notice = () => s.inDoc('sale-settings-save-error') !== null;
+      const says = (key: string) => s.control(key).errorText ?? '';
+      return { ...s, notice, says };
+    }
+
+    it('the notice goes as soon as something is changed, and a field’s message as soon as that field is', async () => {
+      const s = await refused();
+      expect(s.notice()).toBe(true);
+      expect([s.says('max_discount_percent'), s.says('receipt_marketing_url')]).toEqual([DISCOUNT, LINK]);
+      await s.type('max_discount_percent', '15');
+      expect(s.notice()).toBe(false);
+      expect([s.says('max_discount_percent'), s.says('receipt_marketing_url')]).toEqual(['', LINK]);
+    });
+
+    it('a switch is a change too: the notice goes, and no field’s message', async () => {
+      const s = await refused();
+      await s.toggle('allow_transfer', true);
+      expect(s.notice()).toBe(false);
+      expect([s.says('max_discount_percent'), s.says('receipt_marketing_url')]).toEqual([DISCOUNT, LINK]);
+    });
+
+    it('the next refusal says it all again', async () => {
+      const s = await refused();
+      await s.type('max_discount_percent', '120');
+      await s.type('receipt_marketing_url', 'still not a link');
+      expect([s.notice(), s.says('max_discount_percent'), s.says('receipt_marketing_url')]).toEqual([false, '', '']);
+      await click(s.save());
+      expect([s.notice(), s.says('max_discount_percent'), s.says('receipt_marketing_url')]).toEqual([true, DISCOUNT, LINK]);
+    });
+
+    it('a refusal that names no field stays until the next try: nothing else says it', async () => {
+      const s = await setup();
+      await s.show(SETTINGS);
+      s.answer(409, { error: { code: 'conflict', message: 'Someone else is saving them.' } });
+      await s.type('receipt_footer', 'Thanks!');
+      await click(s.save());
+      await s.type('receipt_footer', 'Thanks a lot!');
+      expect(s.text('sale-settings-save-error')).toContain('Someone else is saving them.');
+    });
+  });
 });
 
 describe('SettingsForm: whoever may not change them', () => {

@@ -207,6 +207,75 @@ describe('PreviewPage', () => {
     expect(s.el('form-error')?.textContent).toContain('Invalid payload');
   });
 
+  describe('a refusal by fields (hub#854, as FormModal and the Services settings do: ui#102, hub#821)', () => {
+    const NAME = 'Enter the full name.';
+    const PHONE = 'That mobile is not a valid number.';
+
+    /** Books with a name and a mobile the server refuses. */
+    async function refused() {
+      const routes = {
+        ...ROUTES,
+        '/api/online_booking/public/book': [422, { error: { code: 'invalid_payload', message: 'Invalid payload', fields: { name: NAME, phone: PHONE } } }],
+      } as Record<string, [number, unknown]>;
+      const s = await setup({}, routes);
+      await chooseUpToATime(s);
+      await ionValue(s.el('name'), 'M', 'ionInput');
+      await ionValue(s.el('phone'), '12', 'ionInput');
+      await click(s.el('book'));
+      await settle();
+      /** Whether the red notice is on screen. */
+      const notice = () => s.el('form-error') !== null;
+      const says = (testid: string) => {
+        const text: unknown = s.el(testid)?.errorText;
+        return typeof text === 'string' ? text : '';
+      };
+      const marked = (testid: string) => !!s.el(testid)?.classList.contains('ion-invalid');
+      return { ...s, notice, says, marked };
+    }
+
+    it('the notice goes as soon as something is changed, and a field’s message as soon as that field is', async () => {
+      const s = await refused();
+      expect(s.notice()).toBe(true);
+      expect([s.says('name'), s.says('phone')]).toEqual([NAME, PHONE]);
+      await ionValue(s.el('phone'), '612 345 678', 'ionInput');
+      expect(s.notice()).toBe(false);
+      expect([s.says('phone'), s.marked('phone')]).toEqual(['', false]);
+      expect([s.says('name'), s.marked('name')]).toEqual([NAME, true]);
+    });
+
+    it('another time is a change too: the notice goes, and no field’s message', async () => {
+      const s = await refused();
+      await click(s.el('time-10:30'));
+      expect(s.notice()).toBe(false);
+      expect([s.says('name'), s.says('phone')]).toEqual([NAME, PHONE]);
+    });
+
+    it('the next refusal says it all again', async () => {
+      const s = await refused();
+      await ionValue(s.el('name'), 'Ma', 'ionInput');
+      await ionValue(s.el('phone'), '123', 'ionInput');
+      expect([s.notice(), s.says('name'), s.says('phone')]).toEqual([false, '', '']);
+      await click(s.el('book'));
+      await settle();
+      expect([s.notice(), s.says('name'), s.says('phone'), s.marked('phone')]).toEqual([true, NAME, PHONE, true]);
+    });
+
+    it('a refusal that names no field stays until the next try: nothing else says it', async () => {
+      const routes = {
+        ...ROUTES,
+        '/api/online_booking/public/book': [409, { error: { code: 'online_booking.slot_taken', message: 'That time has just been taken.' } }],
+      } as Record<string, [number, unknown]>;
+      const s = await setup({}, routes);
+      await chooseUpToATime(s);
+      await ionValue(s.el('name'), 'Marta Gil', 'ionInput');
+      await ionValue(s.el('phone'), '612 345 678', 'ionInput');
+      await click(s.el('book'));
+      await settle();
+      await ionValue(s.el('name'), 'Marta Gil Ruiz', 'ionInput');
+      expect(s.el('form-error')?.textContent).toContain('That time has just been taken.');
+    });
+  });
+
   it('says the page is off when the business takes no online bookings', async () => {
     const s = await setup({}, {
       '/api/online_booking/public/page': [
