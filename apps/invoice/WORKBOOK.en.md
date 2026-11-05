@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:1744727d08f2b64dc9ab807176bca2474ab85a347443d2f4fbbb22cdac020f42 -->
+<!-- generated from WORKBOOK.md sha256:0c4bca9c77b496fbfbf8e1171a71965112c6f0412416f0a2d2d7d46ca9987c0e -->
 
 ## What it is for and who it is for
 
@@ -511,8 +511,10 @@ and refunds to use it, the code has to be TICKET, FACT or RECT; with another cod
 entry (if its type is F1 or F2).
 If it fails: an empty code or one with another shape, a format without the year or without a sequence
 placeholder, with a line break, or a prefix or format with accents or symbols such as º or ª, show under
-their field (the number is VeriFactu's `NumSerieFactura`: printable ASCII only); numbers that with the
-widest sequence would go over 60 characters, "The numbers of this series would not fit in 60 characters…"
+their field (the number is VeriFactu's `NumSerieFactura`: printable ASCII only); a code of another shape
+(`E2E-?`) says what it takes, "Use only letters without accents, digits, hyphens (-) and underscores (_),
+starting with a letter or a digit.", to the assistant too, which shows no card (hub#872); numbers that with
+the widest sequence would go over 60 characters, "The numbers of this series would not fit in 60 characters…"
 under the prefix or the format; a code that already exists that year, "There is already a series with
 that code that year.". Each refused field, the invoice type too, is marked red with its message under it
 and "Check the highlighted details." shows on top; a field's message and mark go as soon as that field is
