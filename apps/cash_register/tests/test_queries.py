@@ -8,8 +8,10 @@ from django.utils import timezone
 from live.context import OperationContext
 from live.errors import NotFound, PermissionDenied
 
-from apps.cash_register.models import Session
+from apps.cash_register.models import Count, Session
 from apps.cash_register.queries import DENOMINATIONS, count_total, currency_decimals
+from base.tests.ordering import assert_reads_backwards, listed_with
+
 from apps.cash_register.tests.conftest import A, ctx_for, open_session, run
 
 pytestmark = pytest.mark.django_db
@@ -641,3 +643,42 @@ def _replaced(op, function):
     import dataclasses
 
     return dataclasses.replace(op, fn=function)
+
+
+def _tied_sessions():
+    return [
+        Session.objects.create(
+            number=f"S-261014-000{n}",
+            business_day=dt.date(2026, 10, 14),
+            sequence=n,
+            opening_balance=10000,
+            status=Session.Status.CLOSED,
+            closed_at=timezone.now(),
+            expected_balance=10000,
+            closing_balance=9950,
+            difference=-50,
+        ).id
+        for n in range(1, 5)
+    ], {}
+
+
+def _tied_counts():
+    session = Session.objects.create(
+        number="S-261014-0001", business_day=dt.date(2026, 10, 14), sequence=1, opening_balance=10000
+    )
+    counts = [Count.objects.create(session=session, total=500).id for _ in range(4)]
+    return counts, {"session_id": str(session.id)}
+
+
+@pytest.mark.parametrize(
+    ("operation", "tied", "column"),
+    [
+        ("cash_register.session.list", _tied_sessions, "opening_balance"),
+        ("cash_register.count.list", _tied_counts, "total"),
+    ],
+)
+def test_ties_go_by_id_in_the_lists_own_direction(operation, tied, column):
+    """hub#768 (the rule of hub#2355): a descending list is the ascending one read backwards, ties included, and its
+    pages neither repeat nor lose rows."""
+    ids, filters = tied()
+    assert_reads_backwards(listed_with(run, operation, column, by_dir=True, **filters), sorted(ids))

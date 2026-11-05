@@ -9,7 +9,7 @@ import re
 from uuid import UUID
 
 from django.conf import settings
-from django.db.models import Count, F, Q, QuerySet, Value
+from django.db.models import Count, Q, QuerySet, Value
 from django.db.models.functions import Coalesce, Lower, NullIf
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext, Scope
@@ -62,6 +62,7 @@ from apps.whatsapp_inbox.schemas import (
 from base.auth import SAAS_PANEL_PATH
 from base.models import HubUser, Membership
 from base.queries import hub_user_of
+from base.ordering import list_order
 
 CONVERSATION_NOT_FOUND = _("That conversation does not exist in this business.")
 NO_CONVERSATION_MATCHES = _("No conversation matches “%(reference)s”.")
@@ -460,10 +461,7 @@ def list_conversations(ctx: OperationContext, params: ConversationListIn) -> dic
             )
         )
     )
-    column = _SORTS[params.sort]
-    descending = params.dir == "desc"
-    expression = F(column).desc(nulls_last=True) if descending else F(column).asc(nulls_last=True)
-    order = rows.order_by(expression, "-id" if descending else "id")
+    order = rows.order_by(*list_order(_SORTS[params.sort], descending=params.dir == "desc", nulls_last=True))
     return page(order, params, conversation_out)
 
 

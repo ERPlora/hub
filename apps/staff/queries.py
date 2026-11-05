@@ -22,6 +22,7 @@ from live.operations import INTERNAL, UnknownOperation, get, operation
 from apps.staff.models import Member, Role, Schedule, StaffSettings, TimeOff
 from base.models import HubUser, Membership
 from base.queries import hub_user_of
+from base.ordering import list_order_for
 from apps.staff.schemas import (
     AccountListIn,
     AccountPage,
@@ -128,7 +129,8 @@ TIME_OFF_ORDER = {
 )
 def list_members(ctx: OperationContext, params: MemberListIn) -> dict:
     """The directory with the old table's filters and sorts; never the pay (STAFF-F09)."""
-    return _page(_sorted(filter_members(live_members(), params), params.sort, MEMBER_ORDER), params)
+    members = filter_members(live_members(), params)
+    return _page(members.order_by(*list_order_for(params.sort, columns=MEMBER_ORDER, nulls_last=True)), params)
 
 
 def filter_members(members: QuerySet[Member], params: MemberListIn) -> QuerySet[Member]:
@@ -229,7 +231,7 @@ def compensation(ctx: OperationContext, params: CompensationListIn) -> dict:
     members = filter_members(live_members(), params)
     if params.id:
         members = members.filter(pk=params.id)
-    return _page(_sorted(members, params.sort, MEMBER_ORDER), params)
+    return _page(members.order_by(*list_order_for(params.sort, columns=MEMBER_ORDER, nulls_last=True)), params)
 
 
 @operation(
@@ -537,7 +539,7 @@ def list_roles(ctx: OperationContext, params: RoleListIn) -> dict:
         roles = roles.filter(member_count__gte=params.member_count_min)
     if params.member_count_max is not None:
         roles = roles.filter(member_count__lte=params.member_count_max)
-    return _page(_sorted(roles, params.sort, ROLE_ORDER), params)
+    return _page(roles.order_by(*list_order_for(params.sort, columns=ROLE_ORDER, nulls_last=True)), params)
 
 
 def load_role(role_id: UUID) -> Role | None:
@@ -769,7 +771,7 @@ def list_time_off(ctx: OperationContext, params: TimeOffListIn) -> dict:
         value = getattr(params, field)
         if value:
             time_off = time_off.filter(**{lookup: value})
-    return _page(_sorted(time_off, params.sort, TIME_OFF_ORDER), params)
+    return _page(time_off.order_by(*list_order_for(params.sort, columns=TIME_OFF_ORDER, nulls_last=True)), params)
 
 
 @operation(
@@ -920,21 +922,6 @@ def settings_out(row: StaffSettings) -> dict:
 
 
 # --- Pages and sorts -------------------------------------------------------------------------------
-
-
-def _sorted(
-    rows: QuerySet[Any], sort: str, columns: dict[str, tuple[str, ...]]
-) -> QuerySet[Any]:
-    """``rows`` by the columns of ``sort`` («-» first = descending), empty values last, then by id."""
-    descending = sort.startswith("-")
-    key = sort.removeprefix("-")
-    order = [
-        F(column).desc(nulls_last=True)
-        if descending
-        else F(column).asc(nulls_last=True)
-        for column in columns[key]
-    ]
-    return rows.order_by(*order, "-id" if descending and key == "id" else "id")
 
 
 def _page(rows: QuerySet[Any], params: PageIn) -> dict:

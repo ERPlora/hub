@@ -15,7 +15,7 @@ import pytest
 from live.errors import Conflict, NotFound, PermissionDenied
 from live.operations import get
 
-from apps.cart_checkout.models import Cart
+from apps.cart_checkout.models import Cart, CartItem, Order
 from apps.cart_checkout.schemas import (
     CartDetailOut,
     CartListIn,
@@ -30,6 +30,8 @@ from apps.cart_checkout.schemas import (
     OrderPage,
     OrderRefIn,
 )
+
+from base.tests.ordering import assert_reads_backwards, listed_with
 
 from .conftest import NOW, ctx_for, make_cart, make_item, make_order
 
@@ -413,3 +415,37 @@ def test_the_pages_filter_with_the_declared_filters_only(interface, schema):
     # The old module's filters lived in its manifest; a filter the query does not declare did nothing.
     # The pages build their query as these TypeScript types (vue-tsc checks it); the types are the schema.
     assert ts_fields(interface) == set(schema.model_fields)
+
+
+def _tied_carts():
+    ids = sorted(make_cart(f"sess_{n}", customer_email="ana@example.com").id for n in range(4))
+    Cart.objects.update(created_at=NOW)
+    return ids, {}
+
+
+def _tied_items():
+    cart = make_cart()
+    ids = sorted(make_item(cart, product_ref=f"p-{n}").id for n in range(4))
+    CartItem.objects.update(created_at=NOW)
+    return ids, {"cart_id": str(cart.id)}
+
+
+def _tied_orders():
+    ids = sorted(make_order(make_cart(f"sess_{n}"), order_number=f"OS-20261014-000{n}").id for n in range(4))
+    Order.objects.update(created_at=NOW)
+    return ids, {}
+
+
+@pytest.mark.parametrize(
+    ("operation", "tied", "column"),
+    [
+        ("cart_checkout.cart.list", _tied_carts, "customer_email"),
+        ("cart_checkout.item.list", _tied_items, "unit_price"),
+        ("cart_checkout.order.list", _tied_orders, "customer_email"),
+    ],
+)
+def test_ties_go_by_id_in_the_lists_own_direction(operation, tied, column):
+    """hub#768 (the rule of hub#2355): a descending list is the ascending one read backwards, ties included, and its
+    pages neither repeat nor lose rows."""
+    ids, filters = tied()
+    assert_reads_backwards(listed_with(run, operation, column, **filters), ids)

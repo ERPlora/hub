@@ -1305,6 +1305,9 @@ Los avisos llevan ids, nunca nombres ni contenidos.
 
 ## Para quien lo mantiene
 
+- **Orden de la lista** (`base.ordering.list_order_for`; regla hub#2355 del producto viejo): «Tocadas al final» o
+  «Nombre», y el `id` para desempatar, todo en la dirección de la lista: la descendente es la ascendente leída al revés,
+  empates incluidos. Lo fija `test_ties_go_by_id_in_the_lists_own_direction`.
 - **Anatomía**: `apps.py`, `models.py`, `document.py` (el documento de una automatización: rutas de
   datos, plantillas `{{…}}`, condiciones, horarios y permisos que pide; puro, sin base de datos),
   `schemas.py`, `queries.py`, `services.py` (con el motor), `events.py`, `live.py`, `api.py`, `admin.py`,
