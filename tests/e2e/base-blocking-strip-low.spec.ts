@@ -5,8 +5,9 @@
 // 117 px and left `ion-content` 21 to 132 px between it, the top bar (60) and the tab bar (66). Under a browser's address
 // bar (568x264, 640x304) a row (143 px) cannot fit even with no strip at all (264 − 60 − 66 = 138): there the measure is a
 // floor, with the cart button whole. On a screen of normal height the strip is as it was, sentence and steps named.
-// Hub `a` with no issuer (parked for the run), its owner in Spanish, on the till; the product `E2E-STRIPLOW-<run>` and
-// the cash register switched off for the run are put back after it.
+// Hub `a` with no issuer (parked for the run), its owner in Spanish, on the till, and last in English at the narrowest
+// phone on its side (568 px wide): the one line holds in both catalogues. The product `E2E-STRIPLOW-<run>` and the cash
+// register switched off for the run are put back after it.
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, capture, record, settled, shown } from './helpers';
@@ -21,6 +22,8 @@ const RUN = stamp();
 /** The one step pending in a local hub with no issuer, and where «Configurar» leads. */
 const STEP = 'invoice.business_identity';
 const STEP_ROUTE = '/invoice/issuer';
+/** The strip's title, as base's catalogues word it (`base.blocking.title`). */
+const TITLE = { es: 'Todavía no puedes facturar', en: 'You cannot issue invoices yet' } as const;
 /** A phone on its side, and the lowest-widest window still under the cut: a whole row of the catalogue fits. The same
  *  phones in a browser, under its address bar (568x264, 640x304), have `least`: what `ion-content` keeps at least,
  *  measured with the strip in one line (21 and 61 px before). */
@@ -128,10 +131,10 @@ async function cartButtonWhole(where: string): Promise<void> {
   }
 }
 
-/** One line: the title and «Configurar», no sentence and no step named. */
-async function isOneLine(where: string): Promise<void> {
+/** One line: the title in `lang` and «Configurar», no sentence and no step named. */
+async function isOneLine(where: string, lang: keyof typeof TITLE = 'es'): Promise<void> {
   const strip = shown(page).locator('[data-testid=blocking-strip]');
-  await expect(strip.locator('.blocking-strip-title'), `the title at ${where}`).toHaveText('Todavía no puedes facturar');
+  await expect(strip.locator('.blocking-strip-title'), `the title at ${where}`).toHaveText(TITLE[lang]);
   await expect(strip.locator('.blocking-strip-text'), `no sentence at ${where}`).toHaveCount(0);
   await expect(strip.locator('[data-testid=blocking-item]'), `no step named at ${where}`).toHaveCount(0);
   await expect(strip.locator(`[data-testid="blocking-configure-${STEP}"]`), `«Configurar» at ${where}`).toBeVisible();
@@ -163,7 +166,7 @@ test.describe('BASE-F01: a phone on its side keeps the strip in one line and roo
     await shown(page).locator(`[data-testid="blocking-configure-${STEP}"]`).click();
     await expect(page).toHaveURL(new RegExp(`${STEP_ROUTE}$`));
     const strip = shown(page).locator('[data-testid=blocking-strip]');
-    await expect(strip.locator('.blocking-strip-title')).toHaveText('Todavía no puedes facturar');
+    await expect(strip.locator('.blocking-strip-title')).toHaveText(TITLE.es);
     await expect(strip.locator('ion-button')).toHaveCount(0);
     await expect(shown(page).locator('[data-testid=invoice-issuer-save]'), 'the issuer form, loaded').toBeAttached();
     const box = await layout('568x264 on the settings');
@@ -187,6 +190,24 @@ test.describe('BASE-F01: on a screen of normal height the strip is as it was', (
       measured[size.label] = { strip: box.strip.height, content: box.content.height };
       expect(box.strip.height, `the strip in its three lines at ${size.label}`).toBeGreaterThan(ONE_LINE * 2);
       await capture(page, `${KEY}-${size.label}`);
+    });
+  }
+});
+
+test.describe('BASE-F01: in English, the strip on a phone on its side is one line too', () => {
+  test.beforeAll(async () => {
+    await tillIn(page, context, 'en');
+  });
+
+  // The narrowest phones on their side, upright and under an address bar: a longer title or «Set up» wraps here first.
+  for (const size of [LOW[0], LOW[5]]) {
+    test(`${size.label}: «${TITLE.en}» and «Set up» in one line`, async () => {
+      await page.setViewportSize({ width: size.width, height: size.height });
+      const where = `${size.label} in English`;
+      await isOneLine(where, 'en');
+      const box = await layout(where);
+      measured[where] = { strip: box.strip.height, content: box.content.height };
+      await capture(page, `${KEY}-en-${size.label}`);
     });
   }
 });
