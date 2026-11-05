@@ -927,9 +927,40 @@ onBeforeUnmount(() => {
   display: block;
   background: rgba(0, 0, 0, 0.5);
 }
+/* A phone on its side, or a window as low (hub#800). The top bar, the red strip and the tab bar leave the till 45 to 217 px,
+   and the check's bar and foot alone take 180: pinned to that box, nothing fits. At this height only, the page scrolls the
+   till as one, the catalogue in full and the cart button in view, and the drawer, the modal dialog it says it is, takes
+   the whole page (`.ion-page`, whose `contain: layout` anchors what is fixed) with its bar and foot clear of a phone's
+   edges. */
 @media (max-height: 500px) {
+  .pos-till--phone {
+    height: auto;
+    min-height: 100%;
+  }
+  .pos-till--phone .pos-till__body {
+    flex: 1 0 auto;
+    grid-template-rows: auto;
+  }
+  /* 81 px are all the page shows on the lowest phone under the strip, and the button with its count fits in them. */
+  .pos-till--phone .pos-till__fab {
+    position: sticky;
+    bottom: 0;
+    align-self: flex-end;
+    height: 3.25rem;
+  }
   .pos-till--phone .pos-till__cart {
+    position: fixed;
     width: min(100%, 34rem);
+    padding: var(--ion-safe-area-top, 0px) var(--ion-safe-area-right, 0px) var(--ion-safe-area-bottom, 0px) 0;
+    background: var(--ion-background-color, #fff);
+  }
+  .pos-till--phone .pos-till__backdrop {
+    position: fixed;
+  }
+  /* The content's scroller is a stacking context under the top bar and the tab bar (z-index 10), which would take the
+     drawer's taps: the whole content rises over them while the drawer is open. */
+  :global(ion-content:has(.pos-till--cart-open)) {
+    z-index: 11;
   }
 }
 </style>
