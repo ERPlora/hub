@@ -391,8 +391,8 @@ pago» (el asistente del producto actual ya corría ese riesgo) y ata Pagos a Ve
   moneda ISO 4217, beneficiario, IBAN, concepto, estado, factura del proveedor, motivo de cancelación,
   quién lo creó y quién lo cambió por última vez) y `PaymentCounter` (último número por día). UUIDv7,
   sin `hub_id`.
-- **Referencia** `PAY-AAAAMMDD-NNNN`: el día es el del negocio (`timezone.localdate()`) al
-  registrarlo; el contador sube con `UPDATE … RETURNING` en la transacción del alta (nunca una
+- **Referencia** `PAY-AAAAMMDD-NNNN`: el día es el del negocio, en su zona (`base.business.business_zone`, hub#771), al
+  registrarlo; un cambio de zona sigue la cuenta de ese día, nunca repite número; el contador sube con `UPDATE … RETURNING` en la transacción del alta (nunca una
   secuencia), así que dos altas a la vez no repiten número y un alta rechazada no gasta ninguno. Por
   encima de 9999 al día, el número sale entero (`PAY-20261014-10000`).
 - **Un intento, un pago**: `payment.payment.create` acepta `idempotency_key` (UUID, opcional; columna

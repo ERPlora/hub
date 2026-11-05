@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:345936839c9864a5d039ddeddbbe480516b9a7969303567f5ce51a53d9fddeac -->
+<!-- generated from WORKBOOK.md sha256:fc13087713b862a62e1e9dc31bf62f02e739cf3d7005624b788c530058f0c8ad -->
 
 ## What it is for and who it is for
 
@@ -416,7 +416,8 @@ Steps:
    explains it instead of sending ("Your plan does not include WhatsApp messages: nothing can be sent." when the plan
    includes none); whoever can configure sees, in the browser, **Upgrade plan**, which opens erplora.com's plans.
 4. What the customers write is still saved.
-5. When the month changes (on the business's clock) the notice goes away even if erplora.com has not spoken yet; if
+5. When the month changes (erplora.com's, which counts the messages in UTC: in Spain, at 1:00 or 2:00 on the 1st) the
+   notice goes away even if erplora.com has not spoken yet; if
    the plan includes no messages, it stays.
 In: the month's usage and cap that erplora.com sends (0: the plan includes none).
 Out: the notice in the inbox and in Settings; nothing is saved.

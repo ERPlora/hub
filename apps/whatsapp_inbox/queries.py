@@ -272,7 +272,7 @@ def send_blocked(row: Channel | None) -> str | None:
         return "not_connected"
     if not gateway.configured():
         return "unconfigured"
-    if row.cap_reached(clock.business_month()):
+    if row.cap_reached(clock.allowance_month()):
         return "cap_reached"
     return None
 
@@ -529,7 +529,7 @@ def conversation_summary(ctx: OperationContext, data: SummaryIn) -> dict:
     row = channel(ctx.scope)
     return {
         **counts,
-        "cap_reached": bool(row and row.cap_reached(clock.business_month())),
+        "cap_reached": bool(row and row.cap_reached(clock.allowance_month())),
     }
 
 
@@ -894,7 +894,7 @@ def template_sample_detail(ctx: OperationContext, data: TemplateSampleRefIn) -> 
 )
 def channel_get(ctx: OperationContext, data: ChannelGetIn) -> dict:
     row = channel(ctx.scope) or Channel(host=ctx.scope.key)
-    month = clock.business_month()
+    month = clock.allowance_month()
     return {
         "status": row.status,
         "phone_number": row.phone_number,

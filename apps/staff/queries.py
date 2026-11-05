@@ -1,7 +1,7 @@
 """Read operations of the staff app (``READ ONLY``), and the loaders services.py reuses.
 
 A terminated record is the app's soft delete: no query returns it, nor its schedules or its time
-off. «Today» is the business's day (``timezone.localdate()``), never the UTC one. A staff member may
+off. «Today» is the business's day, on its clock (``business_today``). A staff member may
 be named by id or by name (the assistant speaks names): ``resolve_member``.
 """
 
@@ -20,6 +20,7 @@ from live.errors import AppInactive, Conflict, InvalidPayload, NotFound, Permiss
 from live.operations import INTERNAL, UnknownOperation, get, operation
 
 from apps.staff.models import Member, Role, Schedule, StaffSettings, TimeOff
+from base.business import business_zone
 from base.models import HubUser, Membership
 from base.queries import hub_user_of
 from base.ordering import list_order_for
@@ -431,8 +432,8 @@ def own_member(ctx: OperationContext) -> Member | None:
 
 
 def business_today() -> dt.date:
-    """Today in the business's time zone (phase 1: ``settings.TIME_ZONE``)."""
-    return timezone.localdate()
+    """Today in the business's time zone (hub#771)."""
+    return timezone.localdate(timezone=business_zone())
 
 
 # --- Accounts --------------------------------------------------------------------------------------

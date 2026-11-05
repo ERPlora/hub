@@ -1199,6 +1199,13 @@ def test_today_is_the_business_day(frozen_now):
     ]
 
 
+def test_who_is_away_today_goes_by_the_businesss_midnight(night_elsewhere):
+    away = make_time_off(make_member("Ana"), "2026-11-02", status=TimeOff.Status.APPROVED)
+    make_time_off(make_member("Bea"), "2026-11-03", status=TimeOff.Status.APPROVED)
+    assert [row.id for row in run("staff.time_off.today", TodayIn()).rows] == [away.id]
+    assert run("staff.member.stats", MemberStatsIn()).absent_today == 1
+
+
 # staff.time_off.mine (STAFF-F08)
 
 

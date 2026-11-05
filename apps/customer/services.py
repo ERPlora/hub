@@ -99,6 +99,7 @@ from apps.customer.schemas import (
     TagRefIn,
     TagRow,
 )
+from base.business import business_zone
 
 PHONE_INVALID = _(
     "This is not a valid phone number of its country: check the digits or write it with its "
@@ -1153,7 +1154,7 @@ def update_health(ctx: OperationContext, data: HealthIn) -> dict:
     fact = health_consent(customer)
     if fact is None or fact.state != Consent.State.GRANTED:
         raise Conflict(HEALTH_CONSENT_REQUIRED, code="customer.health_consent_required")
-    if data.sensitivity_test_on and data.sensitivity_test_on > timezone.localdate():
+    if data.sensitivity_test_on and data.sensitivity_test_on > timezone.localdate(timezone=business_zone()):
         raise InvalidPayload(
             DATE_IN_FUTURE,
             code="customer.date_in_future",
