@@ -127,8 +127,10 @@ Plan `docs/plans/2026-10-22-fase-2-tenencia.md` de erplora-next; reglas en PLAN-
   el lock de esquema `pg_try_advisory_lock(hashtext('erplora.schema'))` (otra pasada espera hasta 120 s y si no,
   `schema_locked`), lleva a la hoja del código la plataforma (`base`, `live`), las apps que esa BD ya tiene y las de
   `add` con sus `requires`, y escribe en control lo que tiene (`Hub.schema_apps`: manda el `django_migrations` de la BD
-  del hub) y `schema_state = current`. Un hub sin BD propia (`db_name=""`) da `HubWithoutDatabase`; nunca toca
-  control. Nunca da un paso atrás ni borra una tabla. Toda app del hub cabe en la BD de un hub (tenencia W10: las
+  del hub) y `schema_state = current`, solo en la fila que ya nombra esa BD: la de un corte no la nombra hasta su
+  último paso (`base.hub.cut_finish`, que lo graba entonces), así que un corte que falla antes deja la ficha como
+  estaba (hub#612); quien migre una BD que la fila aún no nombra graba el esquema él mismo. Un hub sin BD propia
+  (`db_name=""`) da `HubWithoutDatabase`; nunca toca control. Nunca da un paso atrás ni borra una tabla. Toda app del hub cabe en la BD de un hub (tenencia W10: las
   personas del negocio son suyas, `base.HubUser`); si una volviera a enlazar un modelo de control, `add=` la rechazaría
   (`AppNotPortable`) y las plantillas la dejarían fuera, y el lint «(h)» de `tests/test_guardrails.py` lo impide antes.
 - **Las plantillas**, en cada servidor donde viven hubs (`CREATE DATABASE … TEMPLATE` solo clona dentro de uno):

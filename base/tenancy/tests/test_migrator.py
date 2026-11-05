@@ -328,6 +328,22 @@ def test_an_app_the_code_no_longer_knows_stays_in_schema_apps(new_database, make
     assert hub.schema_apps["gone"] == "0009_later"
 
 
+def test_a_database_control_s_row_does_not_name_yet_never_changes_that_row(new_database, make_hub):
+    """Control's row learns what a database has only once it names that database: a cut migrates a business's database
+    before its last step names it (``base.hub.cut_finish`` records its schema then, in one transaction), so a cut that
+    breaks before leaves the row as it was (hub#612). The hub in hand learns it all the same: the last step reads it."""
+    hub = make_hub("", schema_state=Hub.SchemaState.BEHIND, schema_apps={"gone": "0009_later"})
+    hub.db_name = new_database  # in hand only, as a cut holds it until its last step
+    leaf = leaves()
+
+    migrator.ensure_schema(hub)
+
+    assert hub.schema_apps == {"gone": "0009_later", **{label: leaf[label] for label in PLATFORM}}
+    assert hub.schema_state == Hub.SchemaState.CURRENT
+    row = Hub.objects.get(pk=hub.pk)
+    assert (row.db_name, row.schema_apps, row.schema_state) == ("", {"gone": "0009_later"}, Hub.SchemaState.BEHIND)
+
+
 def test_add_creates_the_people_apps_and_what_waited_for_them(new_database, make_hub):
     # Tenancy W10: an appointment hangs from a staff record, and a staff record from the business's own person.
     hub = make_hub(new_database)
