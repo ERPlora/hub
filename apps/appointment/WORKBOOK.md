@@ -862,7 +862,7 @@ agenda tuya que enseñar.».
   («You may only book your own appointments.»), y una API key abierta sobre `appointment.appointment.create` tampoco.
   No presta nada: sin el permiso, `@operation` lo rechaza; una persona sigue con «las suyas»; ver una cita sigue
   pidiendo `view_appointment` (`find_appointment`). Lo usan los pasos de Automatizaciones (FLOW-F12) y desbloquea
-  la cita por WhatsApp (WHATSAPP_INBOX-F21 y F22). Tests: `test_services.py`
+  la cita por WhatsApp (WHATSAPP_INBOX-F21 y F22, hub#514). Tests: `test_services.py`
   (`test_what_is_not_a_person_*`, `test_a_person_with_their_own_permission_*`) y
   `apps/flow/tests/test_services_appointment_steps.py`.
 - **Cancelar desde una automatización** (hub#634): `appointment.appointment.cancel` sigue siendo `risk: "high"`, así que
@@ -940,8 +940,6 @@ agenda tuya que enseñar.».
 
 Lo que se vio fallar y queda abierto al cerrar la app (2026-11-03), cada cosa con su issue (`migration-leftover`):
 
-- **hub#514** — Una clienta nueva que pide cita por WhatsApp no se queda con ficha: la respuesta automática de citas
-  no se ofrece (APPOINTMENT-F18 por la Bandeja de WhatsApp).
 - **hub#577** — Citas enseña los precios en euros aunque el negocio sea de un país con otra moneda (BASE-F50).
 - **hub#527** — En un negocio de otro país, un teléfono escrito sin prefijo se guarda y se busca como español
   (cruza APPOINTMENT-F22).
