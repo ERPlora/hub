@@ -334,4 +334,10 @@ function park(): void {
   text-align: center;
   color: var(--ion-color-medium-shade, #636469);
 }
+/* A phone on its side: «All sent» reads over the foot instead of being cut by it (hub#800). */
+@media (max-height: 500px) {
+  .pos-cart__all-sent {
+    padding: 0.5rem 1rem;
+  }
+}
 </style>

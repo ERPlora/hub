@@ -52,6 +52,18 @@ describe('CountModal', () => {
     expect(s.inDoc('cash-register-count-coins')?.querySelectorAll('ion-input')).toHaveLength(8);
   });
 
+  it('a refused field it does not mark is said on top, with no promise of marks (hub#833)', async () => {
+    const s = await setup();
+    await s.result(CURRENCY, EUR);
+    await ionValue(s.box('50'), '2', 'ionInput');
+    s.answer(422, { error: { code: 'invalid_payload', message: 'Check the highlighted details.', fields: { denominations: 'Refused count.' } } });
+    await s.submit();
+    const error = s.inDoc('cash-register-count-error');
+    expect(error?.textContent).toContain('Refused count.');
+    expect(error?.textContent).not.toContain('Check the highlighted details.');
+    expect(s.wrapper.emitted('update:open')).toBeUndefined();
+  });
+
   it('adds the total up as it is typed and sends only the boxes counted', async () => {
     const s = await setup();
     await s.result(CURRENCY, EUR);

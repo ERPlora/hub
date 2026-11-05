@@ -49,6 +49,16 @@ describe('AddModal', () => {
     expect(named.sent().map((call) => call.body)).toEqual([{ zone_id: 'z1', number: 'T1' }]);
   });
 
+  it('a refused field it does not mark is said on top, with no promise of marks (hub#833)', async () => {
+    const refusal = { error: { code: 'invalid_payload', message: 'Check the highlighted details.', fields: { number: 'Refused number.' } } };
+    const a = await add('z1', { '/api/table/tables': [422, refusal] });
+    await ionValue(a.field('table-number'), '1', 'ionInput');
+    await click(a.field('table-submit'));
+    expect(a.field('error').textContent).toContain('Refused number.');
+    expect(a.field('error').textContent).not.toContain('Check the highlighted details.');
+    expect(a.closed()).toBe(false);
+  });
+
   it('a number taken in the zone is refused here', async () => {
     const taken = { error: { code: 'table.number_taken', message: 'There is already a table with that number in this zone.' } };
     const a = await add('z1', { '/api/table/tables': [409, taken] });
