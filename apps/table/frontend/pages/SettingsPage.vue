@@ -4,7 +4,9 @@
 // until the business saves); a change saved elsewhere repaints every field the person has not touched, and
 // «Save» sends only the fields touched and changed (`table.settings.update`), so it never undoes someone
 // else's change. A refusal (the red before the amber) goes under its field.
-import { InlineFeedback } from '@erplora/ui/components';
+// A refusal says itself as a FormModal does (`useRefusal`, hub#854): its notice goes as soon as something is
+// changed, each field's message as soon as that field is, and the next refusal says it all again.
+import { InlineFeedback, useRefusal } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { IonButton, IonInput, IonSpinner, IonToggle } from '@ionic/vue';
@@ -29,6 +31,7 @@ const canManage = computed(() => session.can('table.manage_settings'));
 
 const { data, status, error } = useLive('table.settings.get', {});
 const { run, pending, error: saveError } = useCommand('table.settings.update');
+const { fieldErrors, showsError, changed } = useRefusal(saveError);
 
 const form = ref<Form | null>(null);
 const original = ref<Form | null>(null);
@@ -79,10 +82,10 @@ function set<K extends keyof Form>(field: K, value: Form[K]): void {
   form.value = { ...form.value, [field]: value };
   touched.value = new Set([...touched.value, field]);
   saved.value = false;
+  changed(field);
 }
 
 const text = (value: unknown): string => (value === null || value === undefined ? '' : String(value));
-const fieldErrors = computed<Readonly<Record<string, string>>>(() => saveError.value?.fields ?? {});
 const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'ion-touched': !!message });
 
 async function save(): Promise<void> {
@@ -176,12 +179,12 @@ async function save(): Promise<void> {
           @ion-input="set(field, text($event.detail.value))"
         />
         <InlineFeedback
-          v-if="saveError"
+          v-if="showsError"
           tone="danger"
           data-testid="table-settings-save-error"
           :heading="$t('table.settings.saveError')"
         >
-          {{ saveError.message }}
+          {{ saveError?.message }}
         </InlineFeedback>
         <InlineFeedback
           v-if="saved"

@@ -571,7 +571,10 @@ Pasos:
 Entra: los ajustes actuales de Citas.
 Sale: `appointment.settings.updated`.
 Si falla: «No se pudieron guardar los ajustes.» con cada motivo bajo su campo, sin perder lo escrito;
-un calendario que termina antes de empezar, «El calendario tiene que terminar después de empezar.».
+un calendario que termina antes de empezar, «El calendario tiene que terminar después de empezar.». Como en
+las ventanas de formulario, el aviso se quita en cuanto se cambia algo y el motivo de un campo en cuanto se
+corrige ese campo; los dos vuelven si el siguiente intento también se rechaza. Un rechazo sin campo se queda
+hasta el siguiente intento (hub#854).
 Implicados: ninguno
 
 ### APPOINTMENT-F20 Ver las citas de una clienta en su ficha
