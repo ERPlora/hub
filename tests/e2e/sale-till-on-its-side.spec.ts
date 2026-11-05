@@ -33,8 +33,9 @@ const UPRIGHT = [
   { label: '390x844', width: 390, height: 844 },
   { label: '820x1180', width: 820, height: 1180 },
 ] as const;
-/** A real tap gives up soon: on main it spent its whole test retrying on what sat over the button. */
-const TAP = { timeout: 5_000 };
+/** A real tap gives up well before the test does: on main it spent its whole 180 s retrying on what sat over the button.
+ *  Not less: a tap that landed still waits for the page, and with a loaded machine 5 s ran out on that. */
+const TAP = { timeout: 15_000 };
 /** A fraction of a pixel of rounding between two boxes that touch. */
 const EDGE = 0.5;
 /** What shows of the check's first line as the drawer opens, so nobody has to guess that the lines are further down. */
