@@ -5,7 +5,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { h, ref } from 'vue';
 
-import { click, expectWaitsForTheYen, mountSale, settle } from '../../__tests__/mount-sale';
+import { click, errorFrame, expectSaysTheMoneyUnreadable, expectWaitsForTheYen, mountSale, settle } from '../../__tests__/mount-sale';
 import { plain } from '../../lib/format';
 import DiscountSheet from './DiscountSheet.vue';
 
@@ -125,6 +125,24 @@ describe('DiscountSheet: before the business answers its money (hub#921)', () =>
   it('a percentage reads no money: it does not wait for the business', async () => {
     const m = await setup({}, 'en', { business: null });
     await m.press('1', '0');
+    await click(m.find('pos-discount-apply').element);
+    expect(m.sheet().emitted('apply')).toEqual([[{ percent: '10', amount: 0 }]]);
+  });
+});
+
+describe('DiscountSheet: a business whose money cannot be read (hub#938)', () => {
+  it('a fixed amount says so with «Retry» instead of waiting in grey without a word; once the yen arrives it lights up', async () => {
+    const m = await setup({ amount: 500 }, 'en', { business: null });
+    await m.press('1', '5', '0', '0');
+    await expectSaysTheMoneyUnreadable(m, 'pos-discount-apply', () => m.sheet().emitted('apply') ?? []);
+  });
+
+  it('a percentage reads no money: the failure says nothing there and it still applies', async () => {
+    const m = await setup({}, 'en', { business: null });
+    m.net.lastStream().push(errorFrame(m.subId('base.business.get'), 'base.hub_busy'));
+    await settle();
+    await m.press('1', '0');
+    expect(m.inDoc('base-money-error')).toBeNull();
     await click(m.find('pos-discount-apply').element);
     expect(m.sheet().emitted('apply')).toEqual([[{ percent: '10', amount: 0 }]]);
   });

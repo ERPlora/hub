@@ -5,7 +5,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { h, ref } from 'vue';
 
-import { click, expectWaitsForTheYen, mountSale, settle, taxSettings } from '../../__tests__/mount-sale';
+import { click, expectSaysTheMoneyUnreadable, expectWaitsForTheYen, mountSale, settle, taxSettings } from '../../__tests__/mount-sale';
 import { plain } from '../../lib/format';
 import { page } from './__tests__/fixtures';
 import OpenPriceSheet from './OpenPriceSheet.vue';
@@ -109,5 +109,15 @@ describe('OpenPriceSheet: before the business answers its money (hub#921)', () =
     expect(plain(m.find('pos-open-price-amount').text())).toBe('¥1,500');
     await click(m.add().element);
     expect(m.sheet().emitted('add')).toEqual([[{ unit_price: 1500, department_id: 'd1' }]]);
+  });
+});
+
+describe('OpenPriceSheet: a business whose money cannot be read (hub#938)', () => {
+  it('says so with «Retry» instead of waiting in grey without a word; once the yen arrives «Add» lights up', async () => {
+    const m = await setup({}, 'en', { business: null });
+    await m.press('1', '5', '0', '0');
+    await m.result('sale.department.list', page([department]));
+    await click(m.find('pos-department-d1').element);
+    await expectSaysTheMoneyUnreadable(m, 'pos-open-price-add', () => m.sheet().emitted('add') ?? []);
   });
 });

@@ -5,7 +5,7 @@
 import { toastSuccess } from '@erplora/ui/shell';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { click, expectWaitsForTheYen, ionValue, mountCash } from '../__tests__/mount-cash-register';
+import { click, expectSaysTheMoneyUnreadable, expectWaitsForTheYen, ionValue, mountCash } from '../__tests__/mount-cash-register';
 import { plain } from '../lib/money';
 import MovementModal from './MovementModal.vue';
 
@@ -104,5 +104,15 @@ describe('MovementModal: before the business answers its money (hub#921)', () =>
     await click(m.inDoc('cash-register-movement-submit'));
     expect(m.sent().map((call) => call.body)).toEqual([{ session_id: 's1', type: 'in', amount: 1500, description: 'Change' }]);
     expect(plain(vi.mocked(toastSuccess).mock.calls[0][0])).toBe('Cash-in recorded (¥1,500)');
+  });
+});
+
+describe('MovementModal: a business whose money cannot be read (hub#938)', () => {
+  it('says so with «Retry» instead of waiting in grey without a word; once the yen arrives «Register» lights up', async () => {
+    const m = await mountCash(MovementModal, { props: { open: true, session: SESSION }, business: null });
+    await m.live();
+    await ionValue(m.inDoc('cash-register-movement-amount'), '1500', 'ionInput');
+    await ionValue(m.inDoc('cash-register-movement-concept'), 'Bread', 'ionInput');
+    await expectSaysTheMoneyUnreadable(m, 'cash-register-movement-submit');
   });
 });

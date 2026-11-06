@@ -5,7 +5,7 @@
 import { toastSuccess } from '@erplora/ui/shell';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { click, expectWaitsForTheYen, ionValue, mountCash } from '../__tests__/mount-cash-register';
+import { click, expectSaysTheMoneyUnreadable, expectWaitsForTheYen, ionValue, mountCash } from '../__tests__/mount-cash-register';
 import OpenSessionModal from './OpenSessionModal.vue';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
@@ -122,5 +122,15 @@ describe('OpenSessionModal: before the business answers its money (hub#921)', ()
     await expectWaitsForTheYen(m, 'cash-register-open-submit', 'cash-register-open-balance');
     await click(m.inDoc('cash-register-open-submit'));
     expect(m.sent().map((call) => call.body)).toEqual([{ opening_balance: 1500, opening_notes: '' }]);
+  });
+});
+
+describe('OpenSessionModal: a business whose money cannot be read (hub#938)', () => {
+  it('says so with «Retry» instead of waiting in grey without a word; once the yen arrives «Open session» lights up', async () => {
+    const m = await mountCash(OpenSessionModal, { props: { open: true }, business: null });
+    await m.live();
+    await m.result(REGISTERS, page([]));
+    await ionValue(m.inDoc('cash-register-open-balance'), '1500', 'ionInput');
+    await expectSaysTheMoneyUnreadable(m, 'cash-register-open-submit');
   });
 });
