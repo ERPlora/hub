@@ -6,6 +6,8 @@ each order keeps its own currency (a record is never rewritten) and says the dec
 gives the forint none)."""
 
 import pytest
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from live.context import OperationContext, Scope
 from live.models import OutboxEvent
 
@@ -120,3 +122,39 @@ def test_a_cart_in_yen_counts_its_lines_in_whole_yen():
     make_item(cart, unit_price=150)
     read = run("cart_checkout.cart.get", {"cart_id": str(cart.id)})
     assert (read.currency, read.currency_decimals, read.items[0].unit_price) == ("JPY", 0, 150)
+
+
+def money_of_line(cart) -> set:
+    """(currency, currency_decimals) of ``cart``'s lines as every operation that gives a line back says them: its add,
+    its list, its read, its change and its cart's read (hub#915)."""
+    added = run(
+        "cart_checkout.item.add",
+        {"cart_id": str(cart.id), "product_ref": "p-1", "product_name": "Champú", "quantity": "2", "unit_price": 150},
+    ).item
+    listed = run("cart_checkout.item.list", {"cart_id": str(cart.id)}).rows
+    read = run("cart_checkout.item.get", {"item_id": str(added.id)})
+    changed = run("cart_checkout.item.update", {"item_id": str(added.id), "quantity": "3"}).item
+    in_cart = run("cart_checkout.cart.get", {"cart_id": str(cart.id)}).items
+    return {(line.currency, line.currency_decimals) for line in [added, *listed, read, changed, *in_cart]}
+
+
+@pytest.mark.parametrize(("currency", "decimals"), [("PLN", 2), ("JPY", 0), ("USD", 2)])
+def test_a_cart_s_line_says_its_cart_s_currency_and_its_decimals(currency, decimals):
+    # hub#915: a line's price and total are in its cart's currency, which may not be the business's: a line that did
+    # not say it was told in the business's (Automations, the assistant).
+    business_in("ES")
+    assert money_of_line(make_cart("sess_1", currency=currency)) == {(currency, decimals)}
+
+
+def test_the_list_of_a_cart_s_lines_reads_its_cart_once_however_many_lines_it_has():
+    # hub#915: each line says its cart's currency; the list reads it from the cart it already has, not once per line.
+    def reads_listing(lines: int) -> int:
+        cart = make_cart(f"sess_{Cart.objects.count()}", currency="PLN")
+        for number in range(lines):
+            make_item(cart, product_ref=f"p-{number}")
+        with CaptureQueriesContext(connection) as reads:
+            assert len(run("cart_checkout.item.list", {"cart_id": str(cart.id)}).rows) == lines
+        return len(reads)
+
+    reads_listing(1)  # The first read of an operation warms what every later one reuses.
+    assert reads_listing(1) == reads_listing(4)

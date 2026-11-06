@@ -13,7 +13,7 @@ from apps.pricing.models import PriceList
 from base import operations as base_operations
 from base.models import Hub
 
-from .conftest import B, ctx_for, make_customer, make_group, make_item, make_list, make_product
+from .conftest import B, ctx_for, make_customer, make_group, make_item, make_list, make_product, make_rule, make_service
 
 pytestmark = pytest.mark.django_db
 
@@ -191,12 +191,19 @@ def moved_general_list_with(ctx) -> str:
     return PriceList.objects.get(code="GEN").currency
 
 
+def rule_with(ctx) -> str:
+    """The currency a rule's amount per unit is in, as its read answers it (hub#915)."""
+    make_rule("FIFTY", rule_type="fixed", amount=50)
+    return run("pricing.rule.get", {"rule": "FIFTY"}, ctx).currency
+
+
 #: Each operation that asks the business's currency, and what it gives when the business charges in zlotys.
 IN_ZLOTYS = {
     "line": (line_with, (900, "GEN", "PLN")),
     "new-list": (new_list_with, "PLN"),
     "general-list": (general_list_with, ["ZLOTY"]),
     "moved-general-list": (moved_general_list_with, "PLN"),
+    "rule": (rule_with, "PLN"),
 }
 
 
@@ -212,3 +219,45 @@ def test_each_operation_takes_the_currency_base_answers(caller, platform_hub, se
     through, in_zlotys = IN_ZLOTYS[caller]
     assert through(ctx_for(scope=scope)) == in_zlotys
     assert asked and set(asked) == {scope}
+
+
+# The currency of what a price and a rule answer (hub#915): their amounts are said in it (Automations, the assistant)
+
+
+def rules_in(ctx=None, code: str = "FIFTY") -> set[str]:
+    """The currency every operation that gives a rule back answers beside its amount per unit."""
+    created = run("pricing.rule.create", {"code": code, "name": code, "rule_type": "fixed", "amount": 50}, ctx)
+    answered = [
+        created,
+        run("pricing.rule.update", {"rule": code, "amount": 60}, ctx),
+        run("pricing.rule.get", {"rule": code}, ctx),
+        *run("pricing.rule.list", {"code": code, "status": "all"}, ctx).rows,
+        run("pricing.rule.deactivate", {"rule": code}, ctx),
+        run("pricing.rule.activate", {"rule": code}, ctx),
+    ]
+    return {rule.currency for rule in answered}
+
+
+@pytest.mark.parametrize(("country", "currency"), [("PL", "PLN"), ("ES", "EUR")])
+def test_a_rule_s_amount_per_unit_is_in_the_business_s_currency(country, currency):
+    # A rule belongs to no list: its amount per unit is in the business's currency, as its form paints it.
+    business_in(country)
+    assert rules_in() == {currency}
+
+
+def test_each_hub_s_rules_answer_its_own_business_s_currency():
+    business_in("PL", "a")
+    business_in("ES", "b")
+    assert (rules_in(code="FIFTYA"), rules_in(ctx_for(scope=B), code="FIFTYB")) == ({"PLN"}, {"EUR"})
+
+
+def test_a_price_answers_the_currency_of_its_list_not_the_business_s():
+    # A list may be in another currency than the business's: its prices are in the list's.
+    business_in("ES")
+    make_list("USD", currency="USD")
+    make_service("Haircut", price=1800)
+    added = run("pricing.price_item.add", {"price_list": "USD", "service": "haircut", "price": 1500})
+    updated = run("pricing.price_item.update", {"id": str(added.id), "price": 1600})
+    listed = run("pricing.price_item.list", {"price_list": "USD"}).rows
+    read = run("pricing.price_item.get", {"id": str(added.id)})
+    assert {row.currency for row in [added, updated, *listed, read]} == {"USD"}
