@@ -2,7 +2,8 @@
 // A money field of the pricing forms (a price of a list, a rule's amount per unit; WORKBOOK
 // PRICING-F07, F10): what a person types or pastes («22,50», «1.234,56», «22,50 €»), rewritten in the page
 // format when they leave it, in the field's `money` (a list's prices, its currency; a rule's amount, the
-// business's): its code or its sign around the figure is read, another currency's is not. It holds the text;
+// business's): its code or its sign around the figure is read, another currency's is not; until that money is known,
+// leaving it keeps what was typed (it does not invent the decimals). It holds the text;
 // the form reads the cents with `parseMoney` when it saves. What is not an amount says so under the field once the person leaves it (or `showError`,
 // after a save attempt); the server's message for the field wins.
 import { IonInput } from '@ionic/vue';
@@ -47,6 +48,9 @@ const message = computed(() => props.errorText || ((left.value || props.showErro
 
 function onBlur(): void {
   left.value = true;
+  // Until the field's money is known (a rule's amount waits for the business), its decimals are unknown: what was typed
+  // stays, never «150» made «150.00» (hub#921).
+  if (!props.money) return;
   const normalised = normaliseMoneyText(text.value, locale.value, props.money);
   if (normalised !== text.value) text.value = normalised;
 }

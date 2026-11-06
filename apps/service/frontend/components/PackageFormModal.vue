@@ -3,7 +3,8 @@
 // (Percentage or Fixed amount) and its value, Closed price (an amount off and the closed price in the business's
 // currency, «Closed price (PLN)», with its decimals; service-business-currency), Validity (days) and Uses, each with the old
 // help, and «Services included»: a row per offered service (searched) with its Sessions, «Remove line»
-// and «Add service». «Create package» needs a name and a line. «Editing package — {name}» changes
+// and «Add service». «Create package» needs a name and a line, and waits in grey until the business has answered its
+// money (the closed price and the amount off are read in it; hub#921). «Editing package — {name}» changes
 // everything but the lines (shown, fixed) and sends only what changed; an emptied closed price,
 // validity or uses removes it (null). Refusals stay in the dialog, under their field.
 import { Combo, type ComboOption, FormModal, InlineFeedback } from '@erplora/ui/components';
@@ -126,8 +127,8 @@ const wholeOrNull = (value: string): number | null => {
   return /^\d+$/.test(trimmed) ? Number(trimmed) : (trimmed as unknown as number);
 };
 /** Minor units of a money field (empty = none); `undefined` when it is not an amount (the field says why). */
-const minor = (value: string): number | null | undefined => {
-  const read = parseMoney(value, money.value);
+const minor = (value: string, currency: Money): number | null | undefined => {
+  const read = parseMoney(value, currency);
   return read.ok ? read.cents : undefined;
 };
 
@@ -135,11 +136,12 @@ function setLine(index: number, part: Partial<Line>): void {
   form.value = { ...form.value, lines: form.value.lines.map((line, i) => (i === index ? { ...line, ...part } : line)) };
 }
 
-/** The money and discount of the form, or `null` when something typed is not an amount (it says so). */
-function amounts() {
+/** The money (in the business's `currency`) and discount of the form, or `null` when something typed is not an amount
+ *  (it says so). */
+function amounts(currency: Money) {
   const f = form.value;
-  const fixedPrice = minor(f.fixedPrice);
-  const amount = minor(f.amount);
+  const fixedPrice = minor(f.fixedPrice, currency);
+  const amount = minor(f.amount, currency);
   if (fixedPrice === undefined || amount === undefined || (f.discountType === 'percentage' && percentBp.value === null)) return null;
   return { fixedPrice, amount: amount ?? 0, percent: percentBp.value ?? 0 };
 }
@@ -173,8 +175,13 @@ function creationBody(read: NonNullable<ReturnType<typeof amounts>>): PackageIn 
 }
 
 async function save(): Promise<void> {
+  // No amount is read before the business answers its money: «1500» would be read with two decimals, whatever its
+  // currency counts (in yen, 150000; hub#921). Nor judged: the attempt counts only once the money is known, or the
+  // fields would call «¥1500» not an amount while the window waits.
+  const currency = money.value;
+  if (!currency) return;
   tried.value = true;
-  const read = amounts();
+  const read = amounts(currency);
   if (!read) return;
   try {
     if (props.pkg) await update.run(patch(props.pkg, read));
@@ -197,7 +204,7 @@ async function save(): Promise<void> {
     :submit-label="pkg ? $t('service.packages.form.save') : $t('service.packages.form.create')"
     :pending="pending"
     :error="error"
-    :submit-disabled="!form.name.trim() || (!pkg && completeLines.length === 0)"
+    :submit-disabled="!money || !form.name.trim() || (!pkg && completeLines.length === 0)"
     @submit="save"
   >
     <template #default="{ fieldErrors }">
