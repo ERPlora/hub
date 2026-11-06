@@ -16,7 +16,7 @@ from typing import Annotated, Generic, Literal, TypeVar
 from uuid import UUID
 
 from django.utils.translation import gettext_lazy as _
-from django.utils.translation import gettext_noop
+from django.utils.translation import gettext_noop, pgettext_lazy
 from ninja import Field, Schema
 from pydantic import ConfigDict, StringConstraints, field_validator, model_validator
 
@@ -36,7 +36,8 @@ MAX_LINES = 255
 MAX_MINUTES = 1440
 
 SAY_WHICH_SERVICE = _("Say which service: its id, or its name.")
-SAY_WHICH_CATEGORY = _("Say which category: its id, or its name.")
+# Its own context: said as its siblings are («su id o su nombre»), not as Inventory says it (hub#662).
+SAY_WHICH_CATEGORY = pgettext_lazy("service", "Say which category: its id, or its name.")
 SAY_WHICH_PACKAGE = _("Say which package: its id, or its name.")
 SAY_WHICH_MEMBER = _("Say which professional: their id, or their name.")
 SAY_WHICH_CUSTOMER = _(

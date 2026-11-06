@@ -301,6 +301,7 @@ msgstr "nota"
 msgid "voided at"
 msgstr "anulado el"
 
+msgctxt "service"
 msgid "voided by"
 msgstr "anulado por"
 
@@ -335,10 +336,10 @@ msgid "appointment"
 msgstr "cita"
 
 msgid "voucher session"
-msgstr "sesión de bono"
+msgstr "sesión del bono"
 
 msgid "voucher sessions"
-msgstr "sesiones de bono"
+msgstr "sesiones del bono"
 
 msgid "That service does not exist in this business."
 msgstr "Ese servicio no existe en este negocio."
@@ -351,6 +352,7 @@ msgid "That category does not exist in this business."
 msgstr "Esa categoría no existe en este negocio."
 
 #, python-format
+msgctxt "service"
 msgid "“%(said)s” matches several categories: %(names)s. Say which one."
 msgstr "«%(said)s» vale para varias categorías: %(names)s. Di cuál."
 
@@ -367,6 +369,7 @@ msgstr "Esa venta de bono no existe en este negocio."
 msgid "Say which service: its id, or its name."
 msgstr "Di qué servicio: su id o su nombre."
 
+msgctxt "service"
 msgid "Say which category: its id, or its name."
 msgstr "Di qué categoría: su id o su nombre."
 
@@ -521,7 +524,7 @@ msgid "Given back"
 msgstr "Devuelta"
 
 msgid "That voucher session does not exist in this business."
-msgstr "Esa sesión de bono no existe en este negocio."
+msgstr "Esa sesión del bono no existe en este negocio."
 
 msgid "That line already holds a session of a voucher."
 msgstr "Esa línea ya tiene reservada una sesión de un bono."

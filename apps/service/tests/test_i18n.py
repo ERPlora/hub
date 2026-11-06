@@ -185,6 +185,10 @@ def test_spanish_texts_of_the_workbook():
         assert str(services.SESSION_SETTLED) == (
             "Esa sesión del bono ya no se puede soltar: la venta está cobrada. Devolverla es una devolución."
         )
+        assert (
+            str(queries.SESSION_NOT_FOUND)
+            == "Esa sesión del bono no existe en este negocio."
+        )
         assert str(services.HOLD_LOST) % {"name": "Bono 5"} == (
             "La sesión reservada de «Bono 5» ya no está reservada (pasó su día o se soltó). Quita el bono "
             "de la línea y vuelve a aplicarlo."

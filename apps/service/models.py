@@ -18,6 +18,7 @@ from django.db.models import F, Q
 from django.db.models.functions import Lower
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import pgettext_lazy
 from live.models import UUIDModel
 
 ACTOR_MAX_LENGTH = 128
@@ -446,7 +447,8 @@ class Grant(UUIDModel):
     note = models.CharField(_("note"), max_length=500, blank=True)
     voided_at = models.DateTimeField(_("voided at"), null=True, blank=True)
     voided_by = models.CharField(
-        _("voided by"), max_length=ACTOR_MAX_LENGTH, blank=True
+        # Its own context: the voucher sold is masculine («anulado por»), a sale of Sales is not (hub#662).
+        pgettext_lazy("service", "voided by"), max_length=ACTOR_MAX_LENGTH, blank=True
     )
     void_reason = models.CharField(_("void reason"), max_length=500, blank=True)
     created_by = models.CharField(
