@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:f4bec4fd76e5319a7087ba64daf91b234458522961cb305ddcf6c18893df8f1c -->
+<!-- generated from WORKBOOK.md sha256:af17ccfbd18370c9724ef931998af2b1e5fe9797259458f8c2709587d904ae3a -->
 
 ## What it is for and who it is for
 
@@ -687,6 +687,7 @@ Steps:
    send one). Changing it does not touch the products that already exist.
 5. Tap "Save" (off until you change something): only what you changed is sent and "Settings saved."
    shows above the button.
+   What is changed while it is saving is not lost: it stays on screen, still to save (hub#914).
 In: the business's saved settings (one per business); if they were never saved, the factory ones apply.
 Out: the settings, which apply from the next movement. They only tell the open screens (the Dashboard and
 the lists refresh); no other app reacts.

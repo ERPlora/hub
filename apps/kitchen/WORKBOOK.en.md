@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:9742ebaa06a7f192f561a1bd0c898769351fd8e766f43e011d29189e3838199e -->
+<!-- generated from WORKBOOK.md sha256:59e88ef4c00ad158780529580e282dd71ecbae1b0ccf3dd43224177c3453e958 -->
 
 ## What it is for and who it is for
 
@@ -666,6 +666,7 @@ Steps:
    "Takeaway", "Delivery").
 2. "Save" can only be pressed when something changed: "Settings saved." shows and the open displays take
    them at once.
+   What is changed while it is saving is not lost: it stays on screen, still to save (hub#914).
 In: the values.
 Out: the settings (announces: settings changed). "The kitchen works from the screen" applies from the next
 charge: what was charged before is served by hand.

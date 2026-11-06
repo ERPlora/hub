@@ -408,6 +408,7 @@ Pasos:
 1. Abre **Servicios → Ajustes**.
 2. Cambia los campos y pulsa **Guardar**.
 3. Sale «Ajustes guardados.».
+   Lo que se cambia mientras se está guardando no se pierde: se queda en pantalla, por guardar (hub#914).
 Entra: los ajustes guardados (o los de fábrica).
 Sale: los ajustes (`service.settings.updated`). La duración, el margen (antes y después), la reserva
 online y la categoría fiscal por defecto los toma todo servicio nuevo que no los diga (formulario,

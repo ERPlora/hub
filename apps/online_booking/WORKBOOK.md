@@ -240,6 +240,7 @@ Pantalla: Ajustes
 Pasos:
 1. Cambia los campos de **Página pública** y de **Reglas de reserva** y pulsa **Guardar**: «Configuración
    guardada.». Se guarda solo lo que cambia, todo junto o nada.
+   Lo que se cambia mientras se está guardando no se pierde: se queda en pantalla, por guardar (hub#914).
 2. En **Servicios reservables online**, toca el interruptor de un servicio: se guarda al momento en
    Servicios.
 Entra: los ajustes guardados (o los de fábrica: página apagada, email no obligatorio, 3 reservas próximas por

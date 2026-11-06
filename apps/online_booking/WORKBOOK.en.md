@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:fe1c91c4472ba1521a3c7ea65fb953c884c535a9f2aedc4d23d7f599b4bba78b -->
+<!-- generated from WORKBOOK.md sha256:f70c4b4a5d692a78d07c7e878e18090413ef88a4292e1bc11f159201e0372dff -->
 
 ## What it is for and who it is for
 
@@ -225,6 +225,7 @@ Screen: Settings
 Steps:
 1. Change the fields of **Public page** and of **Booking rules** and press **Save**: "Settings
    saved.". Only what changes is saved, all together or nothing.
+   What is changed while it is saving is not lost: it stays on screen, still to save (hub#914).
 2. In **Services booked online**, touch a service's switch: it is saved at once in
    Services.
 In: the saved settings (or the out-of-the-box ones: page off, email not required, 3 upcoming bookings per

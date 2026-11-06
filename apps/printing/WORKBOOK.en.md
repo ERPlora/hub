@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:e527f0b07a8df0afb8e712c661a394b7fd4d521c1b4b7c88da864f88eac2bcf2 -->
+<!-- generated from WORKBOOK.md sha256:fe748e07b5753f07884c7c5a135a09c77b362ca6ad0df9a5401971a21835f681 -->
 
 ## What it is for and who it is for
 
@@ -330,6 +330,7 @@ Steps:
    copies" and, if you want, the printer of each role.
 3. Press "Save settings" (off until you change something). What you changed is saved; the rest stays
    as it was, and "Settings saved." shows above the button.
+   What is changed while it is saving is not lost: it stays on screen, still to save (hub#914).
 In: the business's decisions.
 Out: the print settings, a single row (announces: `printing.settings.updated`). Without saving,
 the factory ones always hold: receipt on checkout on, drawer off, one copy, no printer chosen.

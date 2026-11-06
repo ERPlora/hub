@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:1c5234bd6866e2aa1c7c177ef0017aaba893d2f74c8073af27d39aebd1e80db8 -->
+<!-- generated from WORKBOOK.md sha256:53ed27be3d0ef60d7f063a8d24a719bd5cd6c8e6410a308236389778f442328e -->
 
 ## What it is for and who it is for
 
@@ -555,6 +555,7 @@ Screen: Settings
 Steps:
 1. Open the Appointments **Settings** tab.
 2. Change the settings and tap **Save**: "Settings saved." Only what changes is saved.
+   What is changed while it is saving is not lost: it stays on screen, still to save (hub#914).
 In: the current Appointments settings.
 Out: `appointment.settings.updated`.
 If it fails: "The settings could not be saved." with each reason under its field, without losing what was

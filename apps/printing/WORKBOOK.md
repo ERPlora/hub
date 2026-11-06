@@ -347,6 +347,7 @@ Pasos:
    ticket» y, si quieres, la impresora de cada función.
 3. Pulsa «Guardar ajustes» (apagado hasta que cambias algo). Se guarda lo que cambiaste; lo demás
    queda como estaba, y sale «Ajustes guardados.» encima del botón.
+   Lo que se cambia mientras se está guardando no se pierde: se queda en pantalla, por guardar (hub#914).
 Entra: las decisiones del negocio.
 Sale: los ajustes de impresión, una sola fila (avisa: `printing.settings.updated`). Sin guardar
 nunca valen los de fábrica: tique al cobrar encendido, cajón apagado, una copia, sin impresora elegida.
