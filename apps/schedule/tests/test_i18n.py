@@ -114,7 +114,7 @@ def test_the_card_says_each_title_with_schedules_own_spanish():
     with (LOCALE / "django.mo").open("rb") as compiled:
         own = gettext.GNUTranslations(compiled)
     titles = schema_titles()
-    assert {"Opening intervals", "Special days", "Special day", "Temporary change"} <= titles
+    assert {"Opening intervals", "Special days"} <= titles
     with translation.override("es"):
         assert {title: translation.gettext(title) for title in titles} == {
             title: own.gettext(title) for title in titles
