@@ -106,7 +106,7 @@ def main_address(hub) -> str:
 
 
 def _kept(key: str, main: str) -> str | None:
-    """The page kept under ``key`` if it names ``main`` as its main address; one kept before the domain changed is not."""
+    """The page kept under ``key`` if it names ``main`` as its main address: never one kept before the domain changed."""
     kept = cache.get(key)
     return kept["html"] if kept is not None and kept["main"] == main else None
 
