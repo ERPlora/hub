@@ -40,7 +40,7 @@ from PIL import UnidentifiedImageError
 
 from apps.website import events, reviews
 from apps.website.models import ACTOR_MAX_LENGTH, Image, Site
-from apps.website.queries import draft, forget_cached, read_catalog, site_out
+from apps.website.queries import IMAGE_NOT_FOUND, draft, forget_cached, read_catalog, site_out
 from apps.website.schemas import (
     MAX_IMAGE_BYTES,
     Content,
@@ -63,7 +63,6 @@ PILLOW_FORMATS = {"image/jpeg": "JPEG", "image/png": "PNG", "image/webp": "WEBP"
 #: The parts of the content that hold one image (the gallery holds a list of them).
 IMAGE_FIELDS = (("topbar", "logo"), ("hero", "cover"), ("about", "image"))
 
-IMAGE_NOT_FOUND = _("This image was not uploaded to this business's website: upload it again.")
 NOT_BASE64 = _("The file did not arrive whole: choose it again.")
 EMPTY_FILE = _("The file is empty.")
 TOO_HEAVY = _("The image may weigh 5 MB at most.")
@@ -304,7 +303,14 @@ def upload_image(ctx: OperationContext, data: ImageUploadIn) -> dict:
     image, _created = Image.objects.get_or_create(
         key=key,
         hub_id=hub,
-        defaults={"sha256": sha, "content_type": data.content_type, "width": width, "height": height, "size": len(raw)},
+        defaults={
+            "sha256": sha,
+            "content_type": data.content_type,
+            "width": width,
+            "height": height,
+            "size": len(raw),
+            "filename": data.filename,
+        },
     )
     if not kept:
         store.save(key, ContentFile(raw))

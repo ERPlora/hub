@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:6a0e550ed7ba1f382520e20ef6129ca84138b01b747feb42662374eee30e903d -->
+<!-- generated from WORKBOOK.md sha256:ec9e5cad6b01c198eb1cbfb4a3fac20d25d55af80ee1ed1fd8de699ac360407b -->
 
 ## What it is for and who it is for
 
@@ -221,7 +221,8 @@ Steps:
    the photo out of the list). It saves as in WEBSITE-F01.
 In: a jpeg, png or webp file of up to 5 MB and 8000 pixels a side; its content is checked, not only its name.
 Out: the image kept in the business's file store under a name taken from its content (the same image twice is one
-file), served from the business's own address and kept a year by the browser. Notice `website.image.uploaded`.
+file), served from the business's own address and kept a year by the browser; the name of the file it was first
+uploaded with is kept too, which is how the assistant names it. Notice `website.image.uploaded`.
 If it fails: under the field: «The file did not arrive whole: choose it again.», «The file is empty.», «The image may
 weigh 5 MB at most.», «This file is not a PNG image.» (or JPEG, WEBP), «The image may be 8000 pixels a side at
 most.» or, if the image does not fit in your plan's space (the same one Files' files take), «There is no space left
@@ -394,6 +395,8 @@ speaks) and the API, with the same rules and the same permissions.
 | The draft, its publication status and the public address (can be followed live) | view | F01–F03, F07, F08 | `website.site.get` |
 | The draft painted as the public page (HTML, for the preview) | manage | F06 | `website.site.preview` |
 | The categories of Inventory or Services to choose from | manage | F05 | `website.catalog.categories` |
+| An uploaded image by the name of its file: what the assistant's card reads to name it (BASE-F97) | view | F04, F11 | `website.image.get` |
+| A category of Inventory or Services by its name: what the assistant's card reads to name it (BASE-F97) | manage | F05 | `website.category.get` |
 | The QR of the public address, in PNG or SVG | view | F09 | `website.qr.get` |
 | What is published, without the hidden sections (no session) | anyone | F10 | `website.public.site` |
 | The published catalog, read at that moment and with the prices in the asker's language and in the business's currency (no session) | anyone | F05, F10 | `website.public.catalog` |
@@ -421,7 +424,16 @@ to 8 pm» → it reads the draft, puts the five days with the interval `09:00`�
 rest as it was) and calls `website.site.save`; if she adds «and publish it», `website.site.publish`. Not assistant
 tools, on purpose: the preview (`website.site.preview`, an HTML page), the image upload (`website.image.upload`, a
 file in base64 up to 5 MB) and the QR (`website.qr.get`, an image in base64), which are used from the screen, nor the
-visitors' three public reads (`website.public.*`).
+visitors' three public reads (`website.public.*`), nor the two with which its card names an image or a category
+(`website.image.get` and `website.category.get`).
+
+Before saving, the assistant asks for confirmation with its card (BASE-F97), which names each thing as the editor
+names it, never by its id or its code: each image (the logo, the cover, the photo of About us and those of the
+gallery) by the name of the file it was uploaded with («logo-pepe.png»; one uploaded before that name was kept, by its
+format and size, «PNG 1200 × 800»), each category of the catalog by its name («Hairdressing»), the palette («Ocean»),
+the page background («Light», «Dark», «Auto»), what the catalog shows («Products», «Services») and the days of the
+opening hours («Monday»). What the person asking cannot see is left out: an image of another business, a category that
+is no longer there or of an app that is off.
 
 ### What it announces
 

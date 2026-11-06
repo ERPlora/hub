@@ -123,6 +123,12 @@ Clock = Annotated[str, StringConstraints(pattern=r"^([01][0-9]|2[0-3]):[0-5][0-9
 PlaceRef = Annotated[str, StringConstraints(strip_whitespace=True, max_length=500), AfterValidator(_place_ref)]
 
 
+#: The mark of an uploaded image: the assistant's card says it by the name of its file (``website.image.get``).
+AN_IMAGE = {"refers": {"read": "website.image.get", "by": "id", "name": "name"}}
+#: The mark of a category of the catalog: by its name, among Inventory's or Services' (``website.category.get``).
+A_CATEGORY = {"refers": {"read": "website.category.get", "by": "id", "name": "name"}}
+
+
 class Strict(Schema):
     """A part of the content: nothing beyond its fields."""
 
@@ -135,7 +141,7 @@ class Strict(Schema):
 class ImageRef(Strict):
     """An uploaded image (``website.image.upload``): its id; the server writes its URL on every save."""
 
-    id: UUID = Field(description="The image's id, as website.image.upload answered it.")
+    id: UUID = Field(description="The image's id, as website.image.upload answered it.", json_schema_extra=AN_IMAGE)
     url: str = Field("", max_length=300, description="Where the Hub serves it; written by the server.")
 
 
@@ -197,7 +203,7 @@ class CatalogSection(Strict):
     source: CatalogSource | None = Field(
         None, description="inventory (the products on sale) or service (the offered services); none = no catalog."
     )
-    category_ids: list[UUID] = Field(
+    category_ids: list[Annotated[UUID, Field(json_schema_extra=A_CATEGORY)]] = Field(
         default_factory=list,
         max_length=MAX_CATEGORIES,
         description="Only these categories of the source; empty = every category.",
@@ -388,6 +394,14 @@ class CategoriesIn(Schema):
     source: CatalogSource = Field(description="inventory or service.")
 
 
+class ImageIn(Schema):
+    id: UUID = Field(description="An image uploaded for the website.")
+
+
+class CategoryIn(Schema):
+    id: UUID = Field(description="A category of Inventory's products or of Services' services.")
+
+
 class QrIn(Schema):
     format: Literal["png", "svg"] = Field("png", description="png (to print) or svg (to scale).")
 
@@ -411,6 +425,14 @@ class SiteOut(Schema):
 class CategoryOut(Schema):
     id: UUID
     name: str
+
+
+class ImageNameOut(Schema):
+    id: UUID
+    name: str = Field(
+        description="The name of the file it was uploaded with; for an upload of before hub#679, its format and size "
+        "(«PNG 1200 × 800»)."
+    )
 
 
 class CategoriesOut(Schema):

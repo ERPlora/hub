@@ -236,7 +236,8 @@ Pasos:
 Entra: un archivo jpeg, png o webp de hasta 5 MB y 8000 píxeles por lado; se comprueba su contenido, no solo su
 nombre.
 Sale: la imagen guardada en el almacén de ficheros del negocio bajo un nombre sacado de su contenido (la misma imagen
-dos veces es un solo fichero), servida desde la propia dirección del negocio y guardada un año en el navegador. Aviso
+dos veces es un solo fichero), servida desde la propia dirección del negocio y guardada un año en el navegador; se
+guarda también el nombre del archivo con el que se subió la primera vez, que es como la nombra el asistente. Aviso
 `website.image.uploaded`.
 Si falla: bajo el campo: «El archivo no llegó entero: vuelve a elegirlo.», «El archivo está vacío.», «La imagen puede
 pesar 5 MB como mucho.», «Este archivo no es una imagen PNG.» (o JPEG, WEBP), «La imagen puede medir 8000 píxeles
@@ -411,6 +412,8 @@ las mismas reglas y los mismos permisos.
 | El borrador, su estado de publicación y la dirección pública (se sigue en vivo) | ver | F01–F03, F07, F08 | `website.site.get` |
 | El borrador pintado como la página pública (HTML, para la vista previa) | gestionar | F06 | `website.site.preview` |
 | Las categorías de Inventario o de Servicios para elegir | gestionar | F05 | `website.catalog.categories` |
+| Una imagen subida por el nombre de su archivo: lo que lee la tarjeta del asistente para nombrarla (BASE-F97) | ver | F04, F11 | `website.image.get` |
+| Una categoría de Inventario o de Servicios por su nombre: lo que lee la tarjeta del asistente para nombrarla (BASE-F97) | gestionar | F05 | `website.category.get` |
 | El QR de la dirección pública, en PNG o SVG | ver | F09 | `website.qr.get` |
 | Lo publicado, sin las secciones ocultas (sin sesión) | cualquiera | F10 | `website.public.site` |
 | El catálogo publicado, leído en ese momento y con los precios en el idioma de quien pregunta y en la moneda del negocio (sin sesión) | cualquiera | F05, F10 | `website.public.catalog` |
@@ -439,7 +442,16 @@ borrador, pone en `contact.hours` los cinco días con la franja `09:00`–`20:00
 `website.site.save`; si además dice «y publícala», `website.site.publish`. No son herramientas del asistente, a
 propósito: la vista previa (`website.site.preview`, una página HTML), la subida de imágenes (`website.image.upload`,
 un fichero en base64 de hasta 5 MB) y el QR (`website.qr.get`, una imagen en base64), que se usan desde la pantalla, ni
-las tres lecturas públicas de los visitantes (`website.public.*`).
+las tres lecturas públicas de los visitantes (`website.public.*`), ni las dos con las que su tarjeta nombra una imagen
+o una categoría (`website.image.get` y `website.category.get`).
+
+Antes de guardar, el asistente pide confirmar con su tarjeta (BASE-F97), que nombra cada cosa como la nombra el
+editor, nunca por su id ni por su código: cada imagen (el logotipo, la portada, la foto de Sobre nosotros y las de la
+galería) por el nombre del archivo con el que se subió («logo-pepe.png»; una subida de antes de guardarse ese nombre,
+por su formato y tamaño, «PNG 1200 × 800»), cada categoría del catálogo por su nombre («Peluquería»), la paleta
+(«Océano»), el fondo de la página («Claro», «Oscuro», «Automático»), lo que muestra el catálogo («Productos»,
+«Servicios») y los días del horario («Lunes»). Lo que quien pregunta no puede ver no sale: una imagen de otro negocio,
+una categoría que ya no está o de una app apagada.
 
 ### Lo que avisa
 
@@ -593,6 +605,20 @@ las tres lecturas públicas de los visitantes (`website.public.*`).
   los visitantes, sin sesión. Esas seis esperan al marcador `INTERNAL` y al check `live.E017` de la ronda 2026-10-22b
   (PLAN §30), que aún no existen en `packages/live`. Lo comprueba `tests/test_apps.py`, que también exige descripción
   en cada campo de `SaveIn`.
+- La tarjeta de confirmación del asistente (BASE-F97, hub#679) nombra cada registro de un guardado con las marcas
+  `refers` de `schemas.py`, leídas como quien pregunta: el `id` de toda `ImageRef` (`AN_IMAGE`: logotipo, portada,
+  foto de Sobre nosotros y fotos de la galería) con `website.image.get` (permiso ver), que responde el `filename` que
+  guarda `website.image.upload` desde la migración 0005 (la primera subida de esos bytes manda; una de antes, vacío,
+  sale por su formato y tamaño), y cada `category_ids` (`A_CATEGORY`) con `website.category.get` (permiso
+  gestionar), que la busca en las categorías de Inventario y de Servicios que estén activas, como
+  `website.catalog.categories`. Las dos son `INTERNAL`, sin ruta ni consulta viva (`tests/test_apps.py`,
+  `tests/test_api.py`). Las cuatro listas cerradas que viven dentro del JSON del sitio (`theme.palette`, `theme.mode`,
+  `content.catalog.source` y `content.contact.hours[].day`) no tienen campo de modelo con `choices`: las declara
+  `choices.py`, con contexto `website`, y `WebsiteConfig.choices` (`LiveAppConfig.choices` de `packages/live`) se las
+  da a la tarjeta; los días son los mismos que pinta la página pública (`render._day_names`). Las etiquetas son las
+  palabras del editor en `en` y `es` (`tests/test_choices.py`). Sin permiso, de otro negocio o que ya no está: el
+  registro queda fuera, nunca su id (`tests/test_assistant_card_records.py`); el trinquete de
+  `base/tests/test_assistant_card_values.py` impide que entre un dato sin marca o una lista sin etiqueta.
 - **Paletas** (`palettes.json` + `palettes.py`, ronda 2026-10-22): las ocho paletas, cada una con su juego claro y
   oscuro (principal, página, franjas, texto, enlaces y bordes) y el color secundario; el editor lee el mismo fichero.
   `tests/test_palettes.py` comprueba WCAG AA (4,5:1) en los dos modos para texto, texto atenuado, enlaces, botones y
