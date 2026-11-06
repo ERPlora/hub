@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:dbb74e718190308da2a5fee253e6318ff1a4713ae3e67fd2720b88bddcba1ad6 -->
+<!-- generated from WORKBOOK.md sha256:1b996b73b910f8ad8e8e3ebc06331f8cfc0bbc799e27019943d7fc1b4bd52588 -->
 
 ## What it is for and who it is for
 
@@ -911,8 +911,9 @@ number"): its conversation is created. An automation does not use this send but 
 creates a conversation: it only writes to the one that already exists with the exact international number (FLOW-F31,
 F23). A number written by hand belongs to the business's country unless it carries its prefix.
 In: the template (name and language), its variables, its header's file (if it carries a photo, a video or a document:
-its own or the chosen one), a message key and the conversation or the number. An automation only sends the ones that
-ask for nothing but their variables: those with a file in the header, with their own.
+its own or the chosen one), a message key and the conversation or the number. An automation sends the same ones the
+inbox knows how to fill in: one with a file in the header goes with the one its step **Send a message** chose
+(FLOW-F32) or, if it chose none, with its own; with neither, it does not go.
 Out: the message saved and handed over as in F32; notice `whatsapp_inbox.message.sent`.
 If it fails: a **Marketing** template is only sent to a customer with a card and with the marketing consent by
 WhatsApp given in Customers ("This customer has not agreed to receive marketing by WhatsApp."); a template not
