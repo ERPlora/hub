@@ -9,10 +9,25 @@ import { toast } from '@erplora/ui/shell';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { CustomerSnapshot } from '../../../../customer/frontend/components/CustomerSearch.vue';
-import { BYE, click, EMPLOYEE, errorFrame, flush, ionValue, MANAGER, type MountOptions, mountSale, resultFrame } from '../../__tests__/mount-sale';
+import {
+  business,
+  BYE,
+  click,
+  EMPLOYEE,
+  errorFrame,
+  expectWaitsForTheYen,
+  flush,
+  ionValue,
+  JAPANESE,
+  MANAGER,
+  type MountOptions,
+  mountSale,
+  resultFrame,
+} from '../../__tests__/mount-sale';
 import { RECOVERY_DELAY_MS } from '../../composables/checkout/useCheckout';
 import { plain } from '../../lib/format';
 import type { CompleteIn, PaymentMethodOut, PreviewOut, SaleOut, SettingsOut } from '../../operations';
+import CheckoutFoot from './CheckoutFoot.vue';
 import CheckoutPanel from './CheckoutPanel.vue';
 import CheckoutSide from './CheckoutSide.vue';
 import { previewLine } from './__tests__/vouchers';
@@ -102,6 +117,7 @@ interface Setup {
   preview?: PreviewOut | null;
   methods?: typeof METHODS | null;
   settings?: SettingsOut | null;
+  business?: MountOptions['business'];
 }
 
 async function setup(options: Setup = {}) {
@@ -109,6 +125,7 @@ async function setup(options: Setup = {}) {
     props: { orderId: 'o1', lineIds: [], orderVersion: 3, customer: null, staffId: null, ...options.props },
     locale: options.locale,
     session: options.session,
+    business: options.business,
   });
   await m.live();
   const subs = (op: string) => m.client.stream.subscriptions(op as never);
@@ -668,5 +685,34 @@ describe('CheckoutPanel: lines paid with a voucher (SALE-F27)', () => {
     s.replies({ '/api/sale/sales': [Response.json({ ...SALE, total: 0 })] });
     await click(s.confirm());
     expect(s.body()).toMatchObject({ order_id: 'o1', payments: [], customer_id: 'c9' });
+  });
+});
+
+describe('CheckoutPanel: before the business answers its money (hub#921)', () => {
+  it('the total waits and «Charge» is grey: nothing typed, nothing charged; once the yen arrives «1500» handed over is 1500', async () => {
+    const s = await setup({ business: null, preview: preview({ total: 1500 }) });
+    s.replies({ '/api/sale/sales': [Response.json(SALE)] });
+    expect(s.text('sale-checkout-total')).toBe('Working out the total…');
+    expect(s.find('sale-checkout-keypad-1').exists()).toBe(false);
+    await expectWaitsForTheYen(s, 'sale-checkout-confirm', s.charges, () => s.wrapper.findComponent(CheckoutFoot).vm.$emit('confirm'));
+    expect(s.text('sale-checkout-total')).toBe('¥1,500');
+    await s.type('1', '5', '0', '0');
+    await click(s.confirm());
+    expect(s.body().payments).toEqual([{ method_id: 'm-cash', tendered: 1500 }]);
+  });
+
+  it('a money that cannot be read: the error with «Retry» replaces «Working out the total…», and «Retry» asks again', async () => {
+    const s = await setup({ business: null, preview: preview({ total: 1500 }) });
+    s.net.lastStream().push(errorFrame(s.subId('base.business.get'), 'base.hub_busy'));
+    await flush();
+    expect(s.find('sale-checkout-read-error').text()).toContain('msg base.hub_busy');
+    expect([s.find('sale-checkout-total').exists(), s.confirm().disabled]).toEqual([false, true]);
+    await click(s.find('sale-checkout-retry').element);
+    expect(s.text('sale-checkout-total')).toBe('Working out the total…');
+    await s.reopen();
+    await s.push(PREVIEW_OP, preview({ total: 1500 }));
+    await s.result('base.business.get', business(JAPANESE));
+    expect(s.find('sale-checkout-read-error').exists()).toBe(false);
+    expect(s.text('sale-checkout-total')).toBe('¥1,500');
   });
 });

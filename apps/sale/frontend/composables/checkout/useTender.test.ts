@@ -4,6 +4,7 @@
 import { describe, expect, it } from 'vitest';
 import { effectScope, ref } from 'vue';
 
+import type { Money } from '../../lib/format';
 import type { PaymentMethodOut } from '../../operations';
 import { useTender } from './useTender';
 
@@ -24,7 +25,8 @@ function setup(total: number | undefined = 4250, cashLimit: number | null = 1000
   const methods = ref<PaymentMethodOut[]>([CASH, CARD]);
   const limit = ref(cashLimit);
   const scope = effectScope();
-  const tender = scope.run(() => useTender({ total: totalRef, methods, cashLimit: limit, decimals: () => decimals }))!;
+  const money: Money = { currency: decimals === 0 ? 'JPY' : 'EUR', decimals };
+  const tender = scope.run(() => useTender({ total: totalRef, methods, cashLimit: limit, money }))!;
   const type = (...keys: string[]) => keys.forEach((k) => tender.press(k));
   return { tender, totalRef, methods, limit, type };
 }
@@ -54,7 +56,7 @@ describe('useTender: one method', () => {
     const totalRef = ref<number | undefined>(50000);
     const scope = effectScope();
     const tender = scope.run(() =>
-      useTender({ total: totalRef, operationTotal: () => 120000, methods: [CASH, CARD], cashLimit: 100000, decimals: 2 }),
+      useTender({ total: totalRef, operationTotal: () => 120000, methods: [CASH, CARD], cashLimit: 100000, money: { currency: 'EUR', decimals: 2 } }),
     )!;
     expect(tender.cashOff.value).toBe(true);
     expect(tender.method.value?.id).toBe('card');
@@ -93,6 +95,13 @@ describe('useTender: split', () => {
     const { tender } = setup();
     tender.startSplit();
     expect([tender.splitting.value, tender.remaining.value]).toEqual([true, 4250]);
+  });
+
+  it('takes no leg while the payment is not split', () => {
+    const { tender, type } = setup();
+    type('5', '0', '0', '0');
+    tender.addLeg();
+    expect(tender.legs.value).toEqual([]);
   });
 
   it('a leg takes what was typed, then one with nothing typed covers the rest', () => {
@@ -178,5 +187,33 @@ describe('useTender: the business’s currency (flow business-currency)', () => 
     tender.addLeg();
     tender.editLeg(tender.legs.value[0].id);
     expect(tender.typed.value).toBe(1000);
+  });
+});
+
+describe('useTender: before the business answers its money (hub#921)', () => {
+  const YEN: Money = { currency: 'JPY', decimals: 0 };
+  /** The tender of a charge of 1500 yen whose business has not answered yet. */
+  function waiting() {
+    const money = ref<Money | undefined>(undefined);
+    const tender = effectScope().run(() => useTender({ total: 1500, methods: [CASH, CARD], cashLimit: null, money }))!;
+    ['1', '5', '0', '0'].forEach((k) => tender.press(k));
+    return { money, tender };
+  }
+
+  it('hands no payments up until it answers; then what was typed is read in its money', () => {
+    const { money, tender } = waiting();
+    expect(tender.payments()).toBeUndefined();
+    money.value = YEN;
+    expect(tender.payments()).toEqual([{ method_id: 'cash', tendered: 1500 }]);
+  });
+
+  it('takes no leg until it answers', () => {
+    const { money, tender } = waiting();
+    tender.startSplit();
+    tender.addLeg();
+    expect(tender.legs.value).toEqual([]);
+    money.value = YEN;
+    tender.addLeg();
+    expect(tender.legs.value.map(({ amount, tendered }) => [amount, tendered])).toEqual([[1500, 1500]]);
   });
 });

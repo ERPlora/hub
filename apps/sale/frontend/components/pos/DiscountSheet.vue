@@ -2,13 +2,15 @@
 // The discount sheet (SALE-F14): «Ticket discount» or «Discount on <item>». A percentage on the keypad
 // (never over 100); the ticket can switch to a fixed amount with the button of the business's currency (switching clears
 // what was typed; a check with only a fixed amount opens on it). «Apply −N %» / «Apply −<amount>»
-// hands one kind up (the other at 0); «Remove» hands both at 0. The page picks the door — the
+// hands one kind up (the other at 0); a fixed amount waits in grey for the business's money (hub#921: it is read in
+// it, never before it answers). «Remove» hands both at 0. The page picks the door — the
 // manager's above the business's cap — and a refusal is read here, over the buttons.
 import { IonButton, IonLabel, IonSegment, IonSegmentButton } from '@ionic/vue';
 import { computed, shallowRef, watch } from 'vue';
 
+import { useKeypadAmount } from '../../composables/pos/useKeypadAmount';
 import { useLocale, useT } from '../../composables/useT';
-import { centsFromAmount, currencySign, formatMoney, formatPercent, moneyDecimals, useBusinessMoney } from '../../lib/format';
+import { currencySign, formatPercent, moneyDecimals } from '../../lib/format';
 import PosNumpad from './PosNumpad.vue';
 import PosSheet from './PosSheet.vue';
 
@@ -27,10 +29,11 @@ const emit = defineEmits<{ apply: [discount: { percent: string; amount: number }
 
 const t = useT();
 const locale = useLocale();
-const business = useBusinessMoney();
 
 const mode = shallowRef<DiscountMode>('percent');
 const typed = shallowRef('');
+/** A fixed amount hands up `cents`, 0 until the business answers its money (so it waits in grey); `figure`, as typed. */
+const { business, cents, shown: figure } = useKeypadAmount(typed);
 const ticket = computed(() => props.name === null);
 
 watch(
@@ -48,8 +51,7 @@ watch(typed, (now, before) => {
 });
 
 const value = computed(() => typed.value.replace(/\.$/, '') || '0');
-const cents = computed(() => centsFromAmount(value.value, business.value) ?? 0);
-const shown = computed(() => (mode.value === 'percent' ? formatPercent(value.value, locale.value) : formatMoney(cents.value, locale.value, business.value)));
+const shown = computed(() => (mode.value === 'percent' ? formatPercent(value.value, locale.value) : figure.value));
 /** The amount button's sign: the business's currency («€», «zł»; gh:sales#380), «¤» until the business answers. */
 const currency = computed(() => currencySign(locale.value, business.value) || '¤');
 const ready = computed(() => (mode.value === 'percent' ? Number(value.value) > 0 : cents.value > 0));
