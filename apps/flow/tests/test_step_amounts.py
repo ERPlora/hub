@@ -9,6 +9,9 @@ cash movement's signed amount) carry it too, and the ratchet's net is the schema
 hub#915: a cart's line, a price of a list and a rule's amount per unit carry it as well, beside the currency each is in.
 hub#926: a charge preview's legal limits carry it too, in the euros the law writes them in whatever the business charges
 in: their mark names the datum beside them that says so (``currency_in``: ``limits_currency``), and the ratchet is zero.
+hub#941: an amount a step leaves inside another datum (``{{steps.<id>.item.unit_price}}``: the line a step adds to a
+cart, the cart after it, the invoice of a sale) is money too, in the currency that same datum answers, else its step's,
+else the business's; and the ratchet looks inside every datum a path names.
 """
 
 import datetime as dt
@@ -27,7 +30,8 @@ from ninja import Field, Schema
 from apps.cart_checkout.tests.conftest import make_cart
 from apps.cart_checkout.tests.conftest import make_item as make_cart_line
 from apps.flow.models import Flow, FlowRun, Question
-from apps.flow.queries import CURRENCY_IN, _money_paths, step_fields, words_for
+from apps.flow.queries import CURRENCY_IN, _money_paths, step_data, step_fields, words_for
+from apps.invoice.tests.conftest import ISSUER
 from apps.payment.tests.conftest import make_method
 from apps.pricing.tests.conftest import make_item as make_price
 from apps.pricing.tests.conftest import make_list, make_rule
@@ -148,10 +152,11 @@ def test_a_line_a_price_and_a_rule_leave_their_amounts_with_their_currency(opera
     assert step_fields(registry[operation]).get("currency", {}).get("type") == "string"
 
 
-def asked_after(read: str, params: dict, title: str) -> str:
-    """The question «Ask someone first» puts after a step that reads ``read`` with ``params``, in Spanish."""
+def asked_after(read: str, params: dict, title: str, kind: str = "query") -> str:
+    """The question «Ask someone first» puts after a step that reads ``read`` with ``params`` (or does it, a
+    ``command``), in Spanish."""
     steps = [
-        {"id": "s1", "kind": "query", "operation": read, "params": params},
+        {"id": "s1", "kind": kind, "operation": read, "params": params},
         {"id": "s2", "kind": "ask", "title": title},
     ]
     flow = make_flow(trigger_kind=Flow.Trigger.MANUAL, steps=steps, grants=[read], language="es")
@@ -219,16 +224,17 @@ def test_every_amount_in_a_currency_of_its_own_names_a_text_its_step_leaves():
     """An amount whose mark names the datum of its currency (``CURRENCY_IN``) is said in the currency that datum gives:
     a name its step does not leave, or no text, would leave it in no currency at all."""
     named = {
-        (op.name, name): prop[CURRENCY_IN]
+        (op.name, path): prop[CURRENCY_IN]
         for op in steps()
-        for name, prop in step_fields(op).items()
+        for path, prop in step_data(op).items()
         if CURRENCY_IN in prop
     }
     assert set(named) >= {(PREVIEW, "cash_limit"), (PREVIEW, "ticket_limit")}
-    for (operation, name), datum in named.items():
-        fields = step_fields(registry[operation])
-        assert fields[name].get("money") is True, (operation, name)
-        assert _type(fields.get(datum, {})) == "string", (operation, name, datum)
+    for (operation, path), datum in named.items():
+        data = step_data(registry[operation])
+        beside = ".".join([*path.split(".")[:-1], datum])
+        assert data[path].get("money") is True, (operation, path)
+        assert _type(data.get(beside, {})) == "string", (operation, path, beside)
 
 
 def test_an_amount_whose_own_currency_its_step_did_not_leave_is_said_as_its_figure():
@@ -237,6 +243,131 @@ def test_an_amount_whose_own_currency_its_step_did_not_leave_is_said_as_its_figu
     preview = [{"id": "s1", "kind": "query", "operation": PREVIEW}]
     say = words_for(preview, "es", A, {"steps": {"s1": {"cash_limit": 100000, "total": 1250}}})
     assert (say("steps.s1.cash_limit", 100000), say("steps.s1.total", 1250)) == ("100000", "12,50\xa0€")
+
+
+# ── An amount a step leaves inside another datum: a cart's line, the cart, an invoice (hub#941) ─────────────────────
+
+ADD = "cart_checkout.item.add"
+INVOICE_SALE = "invoice.invoice.create_from_sale"
+
+
+def test_a_step_leaves_the_amounts_inside_its_data_as_money():
+    """hub#941, its «How to reproduce»: the line a step adds to a cart (``item``), the cart after it (``cart``) and
+    the invoice of a sale (``invoice``) carry their marked amounts inside, and none was an amount to Automations."""
+    steps = [
+        {"id": "s1", "kind": "command", "operation": ADD},
+        {"id": "s2", "kind": "command", "operation": INVOICE_SALE},
+    ]
+    assert {
+        "steps.s1.item.unit_price",
+        "steps.s1.item.line_total",
+        "steps.s1.cart.total_amount",
+        "steps.s2.invoice.base_amount",
+        "steps.s2.invoice.tax_amount",
+        "steps.s2.invoice.total_amount",
+        "steps.s2.invoice.remaining",
+    } <= _money_paths(steps)
+
+
+def added_to_a_cart(currency: str, title: str) -> str:
+    """The question after a step that adds two units at 12.50 (in the cart's minor unit) to a cart in ``currency``."""
+    cart = make_cart("sess_941", currency=currency)
+    line = {"cart_id": str(cart.id), "product_ref": "p-1", "product_name": "Champú", "quantity": "2", "unit_price": 1250}
+    return asked_after(ADD, line, title, kind="command")
+
+
+LINE_AND_CART = "{{steps.s1.item.unit_price}} / {{steps.s1.item.line_total}} / {{steps.s1.cart.total_amount}}?"
+
+
+def test_the_question_after_adding_a_line_to_a_cart_says_its_amounts_as_money(clock):
+    """hub#941, its «How to reproduce»: «1250 / 2500 / 2500?»."""
+    clock(NOON)
+    assert added_to_a_cart("EUR", LINE_AND_CART) == "12,50\xa0€ / 25,00\xa0€ / 25,00\xa0€?"
+
+
+def test_an_amount_inside_a_datum_is_said_in_that_datum_s_currency_in_a_business_in_yen(clock):
+    """A cart in dollars of a business that charges in yen: its line and its total are dollars, the currency the cart
+    answers beside them — never the business's («1.250 JPY»)."""
+    clock(NOON)
+    Hub.objects.filter(slug=A.key).update(country="JP")
+    assert added_to_a_cart("USD", LINE_AND_CART) == "12,50\xa0US$ / 25,00\xa0US$ / 25,00\xa0US$?"
+
+
+def test_the_question_after_reading_a_sale_s_invoice_says_its_total_as_money(clock):
+    """hub#941: the invoice of a sale (``invoice.invoice.by_source``) comes inside ``invoice``, as «Invoice a sale»
+    leaves it; its total reached the question as «1250». An automation never issues one itself (``flow.high_risk``:
+    a fiscal record needs a person), so the invoice a question says is the one a read finds."""
+    clock(NOON)
+    run("invoice.issuer.update", ISSUER)
+    coffee = {"name": "Coffee", "sku": "COF", "price": 1250, "tax_category_key": "product.generic"}
+    run("inventory.product.create", coffee, system_context(A))
+    charged = {"idempotency_key": "flow-941", "lines": [{"product": "COF"}], "payments": [{"method": "card"}]}
+    sale = run("sale.sale.complete", charged)
+    title = asked_after(
+        "invoice.invoice.by_source",
+        {"sale_id": str(sale.id)},
+        "{{steps.s1.invoice.number}}: {{steps.s1.invoice.total_amount}}?",
+    )
+    assert title == "TICKET-2026-000001: 12,50\xa0€?"
+
+
+def test_an_amount_inside_a_datum_takes_its_currency_from_that_datum_else_from_its_step_else_the_business_s():
+    """The currency of an amount inside a datum is the one that same datum answers (a line in dollars); a datum that
+    answers none is in its step's, and a step that answers none in the business's — here, yen."""
+    Hub.objects.filter(slug=A.key).update(country="JP")
+    add = [{"id": "s1", "kind": "command", "operation": ADD}]
+    both = {"currency": "EUR", "item": {"currency": "USD", "unit_price": 1250}, "cart": {"total_amount": 2500}}
+    say = words_for(add, "es", A, {"steps": {"s1": both}})
+    assert (say("steps.s1.item.unit_price", 1250), say("steps.s1.cart.total_amount", 2500)) == (
+        "12,50\xa0US$",
+        "25,00\xa0€",
+    )
+    say = words_for(add, "es", A, {"steps": {"s1": {"cart": {"total_amount": 2500}}}})
+    assert say("steps.s1.cart.total_amount", 2500) == "2.500\xa0JPY"
+
+
+#: The amounts a step leaves inside another datum, by the operation that leaves them (hub#941): marked on their
+#: object's schema, so Automations says them as money in that object's currency.
+AMOUNTS_INSIDE = {
+    "cart_checkout.item.add": {"item.unit_price", "item.line_total", "cart.total_amount"},
+    "cart_checkout.item.update": {"item.unit_price", "item.line_total", "cart.total_amount"},
+    "invoice.invoice.by_source": {
+        "invoice.total_amount",
+        "invoice.remaining",
+        "invoice.rectifies.total_amount",
+        "invoice.substitutes.total_amount",
+        "invoice.substituted_by.total_amount",
+    },
+    "invoice.invoice.rectification_preview": {"original.total_amount", "original.remaining"},
+    "cash_register.session.get": {
+        f"summary.{name}"
+        for name in (
+            "opening_balance",
+            "total_sales",
+            "cash_sales",
+            "card_sales",
+            "other_sales",
+            "total_refunds",
+            "total_cash_in",
+            "total_cash_out",
+            "total_gifts",
+            "expected_cash",
+            "counted",
+            "difference",
+        )
+    },
+    "staff.member.mine": {"member.hourly_rate"},
+}
+
+
+@pytest.mark.parametrize("operation", sorted(AMOUNTS_INSIDE))
+def test_an_amount_inside_a_datum_of_a_step_is_marked(operation):
+    """hub#941: a till session's figures (``summary``), the invoices an invoice links to, the invoice a rectification
+    would rectify (``original``) and a member's hourly rate were no amounts inside their datum; the sales of each
+    method of a session said nothing of cents, so no net saw them."""
+    kind = registry[operation].kind
+    paths = _money_paths([{"id": "s1", "kind": kind, "operation": operation}])
+    assert {f"steps.s1.{path}" for path in AMOUNTS_INSIDE[operation]} <= paths
 
 
 # ── The ratchet: amounts a step leaves that nobody marks, by app ─────────────────────────────────────────────────────
@@ -255,7 +386,8 @@ AMOUNTS_BY_NAME: dict[str, frozenset[str]] = {"cash_register": frozenset({"signe
 
 #: The amounts a step leaves that no mark declares, by app: Automations says them as a bare figure. Only ever lower:
 #: an app that marks its own lowers its number here, and none comes in. None is left since a charge preview's legal
-#: limits carry their mark beside the euros they are in (hub#926).
+#: limits carry their mark beside the euros they are in (hub#926), and none inside a datum of a step since a till
+#: session's figures, an invoice's links and the invoice a rectification would rectify carry it too (hub#941).
 UNMARKED_STEP_AMOUNTS: dict[str, int] = {}
 
 
@@ -309,10 +441,12 @@ def steps() -> list[Operation]:
 
 
 def unmarked_amounts(op: Operation, money: dict[str, frozenset[str]]) -> list[str]:
+    """What a step of ``op`` leaves that looks like an amount and carries no mark, by its path below the step: on its
+    answer or inside an object of it (``summary.total_sales``), as a path names it (``step_data``)."""
     return [
-        name
-        for name, prop in step_fields(op).items()
-        if looks_like_an_amount(op.app_label, name, prop, money) and prop.get("money") is not True
+        path
+        for path, prop in step_data(op).items()
+        if looks_like_an_amount(op.app_label, path.rsplit(".", 1)[-1], prop, money) and prop.get("money") is not True
     ]
 
 
@@ -348,6 +482,23 @@ class PricedOut(Schema):
     quantity: int
     total_cents: int
     marked: int = Field(json_schema_extra={"money": True})
+
+
+class LinkOut(Schema):
+    total: int = Field(description="Its total, in cents.")
+    count: int
+
+
+class LinkedOut(Schema):
+    link: LinkOut | None
+    links: list[LinkOut]
+
+
+def test_the_net_sees_an_amount_inside_a_datum_of_a_step_but_not_inside_a_list():
+    """hub#941: an amount inside an object a step leaves (``link.total``) is one a path names, so the net sees it; one
+    inside a list is not, since no path names it."""
+    op = SimpleNamespace(app_label="invoice", kind="command", input=PriceIn, output=LinkedOut)
+    assert unmarked_amounts(op, money_names([op])) == ["link.total"]
 
 
 def test_the_net_sees_an_amount_by_its_twin_or_by_name_without_any_word():

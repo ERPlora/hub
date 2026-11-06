@@ -481,7 +481,7 @@ class MemberDetailOut(MemberOut):
 
 
 class MemberMineOut(MemberDetailOut):
-    hourly_rate: int = Field(description="Hourly rate in cents.")
+    hourly_rate: int = Field(description="Hourly rate in cents.", json_schema_extra={"money": True})
     commission_rate: Decimal = Field(description="Commission, in percent.")
 
 
