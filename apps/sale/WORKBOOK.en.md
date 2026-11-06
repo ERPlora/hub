@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:d85d0fc9b1b4aa8703701b8b9ba1f76b2d6ef6798a93196aae3d08a22f7e334e -->
+<!-- generated from WORKBOOK.md sha256:dfc420dafce2493beec28133396e98987de156c7b55d364beb8b38da198798d9 -->
 
 ## What it is for and who it is for
 
@@ -305,7 +305,8 @@ check closed. With Invoicing, its ticket (F2) numbered in the year's series in t
 category, rate, country, region and Taxes rule it was charged with.
 If it fails: while the business has not yet said its currency, the **Charge** sheet stays on "Working out
 the total…", with no keypad and "Charge" grey, because the total is painted and the amount tendered read in
-it (without it, "1500" yen tendered would be charged as 150,000). With no amount tendered the button does
+it (without it, "1500" yen tendered would be charged as 150,000); if the currency cannot be read, the notice
+with "Retry" shows in its place, as with any other read of the charge. With no amount tendered the button does
 not charge and "Enter the amount tendered on the
 keypad" is read above the keypad; too little, "The amount tendered does not cover the total" (on the button
 too, and a tap says it). An article without VAT shows

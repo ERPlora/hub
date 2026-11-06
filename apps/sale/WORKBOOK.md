@@ -319,7 +319,8 @@ cobro (INVOICE-F01): o los dos o ninguno. Ventas avisa de la venta cobrada: Inve
 el tipo, el país, la región y la regla de Impuestos con que se cobró.
 Si falla: mientras el negocio no haya dicho todavía su moneda, la hoja **Cobro** sigue en «Calculando el
 total…», sin teclado y con «Cobrar» en gris, porque el total se pinta y lo entregado se lee en ella (sin ella,
-«1500» yenes entregados se cobraría como 150 000). Sin importe entregado el botón no cobra y se lee encima del
+«1500» yenes entregados se cobraría como 150 000); si la moneda no se puede leer, sale el aviso con «Reintentar»
+en su lugar, como con cualquier otra lectura del cobro. Sin importe entregado el botón no cobra y se lee encima del
 teclado «Marca en el teclado el importe entregado»; corto, «Lo entregado no cubre el total» (también en el botón, y lo dice al tocarlo). Un artículo sin IVA sale marcado «Falta el IVA»
 y al tocarlo dice «No se puede vender: sin categoría fiscal. Falta configurar el IVA.»; uno agotado
 sale en gris con «Agotado» y al tocarlo dice «… está agotado.» (SALE-F07). Un rechazo al

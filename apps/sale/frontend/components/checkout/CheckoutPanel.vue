@@ -75,7 +75,10 @@ const whole = useLive('sale.checkout.preview', () => ({ order_id: props.orderId 
 const methodPage = useLive('sale.payment_method.list', { limit: METHODS_PAGE });
 const settings = useLive('sale.pos_settings.get', {});
 
-const reads = [preview, whole, methodPage, settings];
+/** The read behind `business` (the SDK shares the subscription): the total waits for it, so its failure is said too. */
+const businessRead = useLive('base.business.get', {});
+
+const reads = [preview, whole, methodPage, settings, businessRead];
 const readError = computed(() => reads.map((read) => read.error.value).find(Boolean) ?? null);
 const reconnecting = computed(() => reads.some((read) => read.status.value === 'reconnecting'));
 

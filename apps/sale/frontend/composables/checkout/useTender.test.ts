@@ -97,6 +97,13 @@ describe('useTender: split', () => {
     expect([tender.splitting.value, tender.remaining.value]).toEqual([true, 4250]);
   });
 
+  it('takes no leg while the payment is not split', () => {
+    const { tender, type } = setup();
+    type('5', '0', '0', '0');
+    tender.addLeg();
+    expect(tender.legs.value).toEqual([]);
+  });
+
   it('a leg takes what was typed, then one with nothing typed covers the rest', () => {
     const { tender, type } = setup();
     tender.startSplit();

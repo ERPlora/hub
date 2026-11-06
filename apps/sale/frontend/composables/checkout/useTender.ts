@@ -84,7 +84,7 @@ export function useTender<M extends TenderMethod>(options: UseTenderOptions<M>) 
   /** Takes the leg «Add this payment» shows, what was typed read in the business's money: none before it answers. */
   function addLeg(): void {
     const money = toValue(options.money);
-    const plan = money && planLeg(method.value, typedCents(text.value, money.decimals), remaining.value);
+    const plan = money && splitting.value ? planLeg(method.value, typedCents(text.value, money.decimals), remaining.value) : undefined;
     if (!plan || !method.value) return;
     legs.value = [...legs.value, { id: `leg-${++legSeq}`, method: method.value, ...plan }];
     text.value = '';

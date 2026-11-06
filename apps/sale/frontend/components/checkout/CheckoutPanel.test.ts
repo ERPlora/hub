@@ -10,6 +10,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { CustomerSnapshot } from '../../../../customer/frontend/components/CustomerSearch.vue';
 import {
+  business,
   BYE,
   click,
   EMPLOYEE,
@@ -17,6 +18,7 @@ import {
   expectWaitsForTheYen,
   flush,
   ionValue,
+  JAPANESE,
   MANAGER,
   type MountOptions,
   mountSale,
@@ -697,5 +699,20 @@ describe('CheckoutPanel: before the business answers its money (hub#921)', () =>
     await s.type('1', '5', '0', '0');
     await click(s.confirm());
     expect(s.body().payments).toEqual([{ method_id: 'm-cash', tendered: 1500 }]);
+  });
+
+  it('a money that cannot be read: the error with «Retry» replaces «Working out the total…», and «Retry» asks again', async () => {
+    const s = await setup({ business: null, preview: preview({ total: 1500 }) });
+    s.net.lastStream().push(errorFrame(s.subId('base.business.get'), 'base.hub_busy'));
+    await flush();
+    expect(s.find('sale-checkout-read-error').text()).toContain('msg base.hub_busy');
+    expect([s.find('sale-checkout-total').exists(), s.confirm().disabled]).toEqual([false, true]);
+    await click(s.find('sale-checkout-retry').element);
+    expect(s.text('sale-checkout-total')).toBe('Working out the total…');
+    await s.reopen();
+    await s.push(PREVIEW_OP, preview({ total: 1500 }));
+    await s.result('base.business.get', business(JAPANESE));
+    expect(s.find('sale-checkout-read-error').exists()).toBe(false);
+    expect(s.text('sale-checkout-total')).toBe('¥1,500');
   });
 });
