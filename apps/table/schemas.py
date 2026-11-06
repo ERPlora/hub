@@ -569,7 +569,8 @@ class SessionOut(Schema):
     )
     merged_into_id: UUID | None = Field(description="The check it was merged into.")
     paid_total: int | None = Field(
-        description="What its check of Sales charged, in minor units of its currency (none yet: null)."
+        description="What its check of Sales charged, in minor units of its currency (none yet: null).",
+        json_schema_extra={"money": True},
     )
     currency: str | None = Field(
         description="ISO 4217 currency its check was charged in: its sales', never rewritten (none yet: null)."

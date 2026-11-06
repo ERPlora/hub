@@ -379,7 +379,7 @@ class PaymentOut(Schema):
     method_id: UUID = Field(description="The id of the method it is paid from.")
     method_name: str = Field(description="The name of that method.")
     payment_date: dt.date = Field(description="The day of the payment.")
-    amount: int = Field(description="The amount in minor units of its currency.")
+    amount: int = Field(description="The amount in minor units of its currency.", json_schema_extra={"money": True})
     currency: str = Field(description="Its currency (ISO 4217).")
     currency_decimals: int = Field(
         description="The decimals of its currency as the server counts them (2 in EUR and HUF, 0 in JPY)."

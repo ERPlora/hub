@@ -700,9 +700,9 @@ class ProductOut(Schema):
     description: str = Field(description="Description.")
     product_type: ProductType = Field(description="physical or service.")
     price: int = Field(
-        description="Price in cents, per price_quantity of pricing_unit."
+        description="Price in cents, per price_quantity of pricing_unit.", json_schema_extra={"money": True}
     )
-    cost: int = Field(description="Cost in cents.")
+    cost: int = Field(description="Cost in cents.", json_schema_extra={"money": True})
     stock: Decimal = Field(description="Current stock, in its unit.")
     low_stock_threshold: Decimal = Field(description="Low-stock threshold.")
     unit: UnitCode = Field(description="Unit of measure.")
@@ -754,9 +754,9 @@ class SaleProductOut(Schema):
     sku: str = Field(description="SKU.")
     product_type: ProductType = Field(description="physical or service.")
     price: int = Field(
-        description="Price in cents, per price_quantity of pricing_unit."
+        description="Price in cents, per price_quantity of pricing_unit.", json_schema_extra={"money": True}
     )
-    cost: int = Field(description="Cost in cents.")
+    cost: int = Field(description="Cost in cents.", json_schema_extra={"money": True})
     tax_category_id: UUID | None = Field(description="Its tax category.")
     tax_category_key: str | None = Field(description="Key of its tax category.")
     needs_tax_setup: bool = Field(
@@ -838,7 +838,7 @@ class MovementOut(Schema):
         description="The reference as a person reads it: for a sale, void or refund, the number of its ticket or "
         "invoice (or the sale's own number), empty when Inventory never learnt it; else the reference itself."
     )
-    unit_cost: int | None = Field(description="Cost per unit in cents (receptions).")
+    unit_cost: int | None = Field(description="Cost per unit in cents (receptions).", json_schema_extra={"money": True})
     actor: str = Field(description="Who made it.")
     created_at: datetime = Field(description="When.")
 
@@ -855,7 +855,7 @@ class SummaryOut(Schema):
         description="Of them, without a cost: the value is partial."
     )
     stock_value: int = Field(
-        description="Σ cost × stock of the ones in stock, in cents."
+        description="Σ cost × stock of the ones in stock, in cents.", json_schema_extra={"money": True}
     )
     active_products: int = Field(description="Every active product, services included.")
 

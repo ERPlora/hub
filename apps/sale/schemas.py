@@ -875,7 +875,7 @@ class OrderOut(Schema):
     notes: str = Field(description="Notes.")
     appointment_id: UUID | None = Field(description="The appointment it charges.")
     discount_percent: Decimal = Field(description="Ticket discount in %.")
-    discount_amount: int = Field(description="Fixed ticket discount in cents.")
+    discount_amount: int = Field(description="Fixed ticket discount in cents.", json_schema_extra={"money": True})
     discount_approved: bool = Field(
         description="A manager approved a ticket discount over the cap."
     )
@@ -905,7 +905,7 @@ class OrderRow(Schema):
     id: UUID = Field(description="The check's id.")
     status: OrderStatus = Field(description="open, completed or voided.")
     label: str = Field(description="Title.")
-    provisional_total: int = Field(description="Provisional total in cents.")
+    provisional_total: int = Field(description="Provisional total in cents.", json_schema_extra={"money": True})
     lines_count: int = Field(description="Lines left to charge.")
     appointment_id: UUID | None = Field(description="The appointment it charges.")
     created_at: datetime = Field(description="When it was opened.")
@@ -1135,20 +1135,22 @@ class PreviewOut(Schema):
     )
     lines_count: int = Field(description="Lines valued.")
     tax_included: bool = Field(description="Prices include VAT.")
-    subtotal: int = Field(description="Taxable base in cents.")
-    tax_total: int = Field(description="Tax in cents.")
-    discount_amount: int = Field(description="Every discount given, in cents.")
+    subtotal: int = Field(description="Taxable base in cents.", json_schema_extra={"money": True})
+    tax_total: int = Field(description="Tax in cents.", json_schema_extra={"money": True})
+    discount_amount: int = Field(description="Every discount given, in cents.", json_schema_extra={"money": True})
     discount_percent: Decimal = Field(description="Ticket discount in %.")
     ticket_discount_amount: int = Field(
-        description="What the ticket discount (its percent and its fixed amount) takes off this charge, in cents."
+        description="What the ticket discount (its percent and its fixed amount) takes off this charge, in cents.",
+        json_schema_extra={"money": True},
     )
-    gift_total: int = Field(description="Comps at cost, in cents.")
-    total: int = Field(description="What would be charged, in cents.")
+    gift_total: int = Field(description="Comps at cost, in cents.", json_schema_extra={"money": True})
+    total: int = Field(description="What would be charged, in cents.", json_schema_extra={"money": True})
     breakdown: list[BreakdownOut] = Field(description="Base and tax by fiscal key.")
     lines: list[PreviewLineOut] = Field(description="Each line valued.")
     operation_total: int = Field(
         description="The whole operation the cash limit looks at, in cents: on a check charged in parts, what "
-        "it already charged plus all it has left (this charge included); otherwise the total."
+        "it already charged plus all it has left (this charge included); otherwise the total.",
+        json_schema_extra={"money": True},
     )
     cash_limit: int | None = Field(
         description="From this operation total on, no cash at all (Spain: 100000); empty = no limit."
@@ -1262,16 +1264,19 @@ class SaleOut(Schema):
     tax_included: bool = Field(description="Prices include VAT.")
     currency: str = Field(description="ISO 4217 currency it was charged in: the business's then, never rewritten.")
     currency_decimals: int = Field(description="The decimals of its currency as the server counts them (0 in JPY).")
-    subtotal: int = Field(description="Taxable base in cents.")
-    tax_total: int = Field(description="Tax in cents.")
+    subtotal: int = Field(description="Taxable base in cents.", json_schema_extra={"money": True})
+    tax_total: int = Field(description="Tax in cents.", json_schema_extra={"money": True})
     discount_percent: Decimal = Field(description="Ticket discount in %.")
-    discount_amount: int = Field(description="Every discount given, in cents.")
-    gift_total: int = Field(description="Comps at cost, in cents.")
-    total: int = Field(description="Total charged, in cents.")
-    tendered_total: int = Field(description="Handed over, in cents.")
-    change_total: int = Field(description="Change given, in cents.")
-    refunded_total: int = Field(description="Refunded so far, in cents.")
-    refundable_total: int = Field(description="What can still be refunded, in cents.")
+    discount_amount: int = Field(description="Every discount given, in cents.", json_schema_extra={"money": True})
+    gift_total: int = Field(description="Comps at cost, in cents.", json_schema_extra={"money": True})
+    total: int = Field(description="Total charged, in cents.", json_schema_extra={"money": True})
+    tendered_total: int = Field(description="Handed over, in cents.", json_schema_extra={"money": True})
+    change_total: int = Field(description="Change given, in cents.", json_schema_extra={"money": True})
+    refunded_total: int = Field(description="Refunded so far, in cents.", json_schema_extra={"money": True})
+    refundable_total: int = Field(
+        description="What can still be refunded, in cents.",
+        json_schema_extra={"money": True},
+    )
     sessions_to_return: int = Field(
         description="Lines paid with a voucher whose session has not come back yet."
     )
@@ -1397,10 +1402,10 @@ class SaleRow(Schema):
     staff_id: UUID | None = Field(description="Who served it.")
     currency: str = Field(description="ISO 4217 currency it was charged in.")
     currency_decimals: int = Field(description="The decimals of its currency as the server counts them (0 in JPY).")
-    total: int = Field(description="Total in cents.")
-    tax_total: int = Field(description="Tax in cents.")
-    refunded_total: int = Field(description="Refunded in cents.")
-    refundable_total: int = Field(description="Still refundable, in cents.")
+    total: int = Field(description="Total in cents.", json_schema_extra={"money": True})
+    tax_total: int = Field(description="Tax in cents.", json_schema_extra={"money": True})
+    refunded_total: int = Field(description="Refunded in cents.", json_schema_extra={"money": True})
+    refundable_total: int = Field(description="Still refundable, in cents.", json_schema_extra={"money": True})
     sessions_to_return: int = Field(
         description="Lines paid with a voucher whose session has not come back yet."
     )
@@ -1429,12 +1434,12 @@ class PeriodIn(Schema):
 
 class StatsOut(Schema):
     count: int = Field(description="Tickets charged (voided ones aside).")
-    total_revenue: int = Field(description="Revenue in cents, refunds taken off.")
-    avg_ticket: int = Field(description="Average ticket in cents.")
-    net_total: int = Field(description="Taxable base in cents.")
-    tax_total: int = Field(description="Tax in cents.")
-    discount_total: int = Field(description="Discounts given, in cents.")
-    refunded_total: int = Field(description="Refunded in cents.")
+    total_revenue: int = Field(description="Revenue in cents, refunds taken off.", json_schema_extra={"money": True})
+    avg_ticket: int = Field(description="Average ticket in cents.", json_schema_extra={"money": True})
+    net_total: int = Field(description="Taxable base in cents.", json_schema_extra={"money": True})
+    tax_total: int = Field(description="Tax in cents.", json_schema_extra={"money": True})
+    discount_total: int = Field(description="Discounts given, in cents.", json_schema_extra={"money": True})
+    refunded_total: int = Field(description="Refunded in cents.", json_schema_extra={"money": True})
     voided_count: int = Field(description="Sales voided.")
     tax_kind: TerritoryTaxKind | None = Field(
         description="The tax the period's sales were declared with, what its tax figure is named by: vat, igic "
@@ -1445,13 +1450,13 @@ class StatsOut(Schema):
 
 class TodayOut(Schema):
     day: date = Field(description="Today's business day.")
-    total: int = Field(description="Sold today, in cents.")
+    total: int = Field(description="Sold today, in cents.", json_schema_extra={"money": True})
     tickets: int = Field(description="Tickets today.")
 
 
 class DayTotal(Schema):
     day: date = Field(description="Business day.")
-    total: int = Field(description="Sold that day, in cents.")
+    total: int = Field(description="Sold that day, in cents.", json_schema_extra={"money": True})
 
 
 class LastDaysOut(Schema):
@@ -1481,26 +1486,28 @@ class VoucherLineOut(Schema):
 class StaffTotal(Schema):
     staff_id: UUID = Field(description="The member of Staff.")
     sales_count: int = Field(description="Sales where they served at least one line.")
-    gross_total: int = Field(description="What their lines charged, in cents.")
-    net_total: int = Field(description="Base of their lines, in cents.")
-    tax_total: int = Field(description="Tax of their lines, in cents.")
+    gross_total: int = Field(description="What their lines charged, in cents.", json_schema_extra={"money": True})
+    net_total: int = Field(description="Base of their lines, in cents.", json_schema_extra={"money": True})
+    tax_total: int = Field(description="Tax of their lines, in cents.", json_schema_extra={"money": True})
     refunded_total: int = Field(
-        description="What the refunds of those sales gave back on their lines, in cents."
+        description="What the refunds of those sales gave back on their lines, in cents.",
+        json_schema_extra={"money": True},
     )
     total_revenue: int = Field(
-        description="What their lines charged, refunds taken off, in cents."
+        description="What their lines charged, refunds taken off, in cents.", json_schema_extra={"money": True}
     )
     voucher_sold_total: int = Field(
         description="What of that paid for vouchers they sold, in cents: the money is the sale's, but it is no "
-        "production of theirs: it counts as each session is done."
+        "production of theirs: it counts as each session is done.", json_schema_extra={"money": True}
     )
     voucher_total: int = Field(
         description="What the voucher sessions they did are worth, those that came back taken off, in cents: the "
-        "voucher's price ÷ its sessions, fixed at each charge. No money of the period: it was paid when it was sold."
+        "voucher's price ÷ its sessions, fixed at each charge. No money of the period: it was paid when it was sold.",
+        json_schema_extra={"money": True},
     )
     production_total: int = Field(
         description="Their revenue without the vouchers they sold, plus the voucher sessions they did, in cents: "
-        "what their commission is on."
+        "what their commission is on.", json_schema_extra={"money": True}
     )
 
 
@@ -1561,7 +1568,7 @@ class RefundOut(Schema):
     already: bool = Field(description="True: this attempt had already been recorded.")
     refund_id: UUID = Field(description="The refund's id.")
     sale_id: UUID = Field(description="The sale.")
-    total: int = Field(description="Refunded in cents.")
+    total: int = Field(description="Refunded in cents.", json_schema_extra={"money": True})
     fully_refunded: bool = Field(
         description="Whether the sale is now refunded in full."
     )
@@ -1621,7 +1628,7 @@ class RefundOptionsOut(Schema):
 class RefundRow(Schema):
     id: UUID = Field(description="The refund's id.")
     sale_id: UUID = Field(description="The sale.")
-    total: int = Field(description="Refunded in cents.")
+    total: int = Field(description="Refunded in cents.", json_schema_extra={"money": True})
     reason: str = Field(description="Why.")
     note: str = Field(description="Note.")
     created_at: datetime = Field(description="When.")

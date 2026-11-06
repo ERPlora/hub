@@ -261,7 +261,10 @@ class CartOut(Schema):
     customer_name: str = Field(description="Its customer's name; may be empty.")
     status: CartStatus = Field(description="Where it is; an active cart past its expiry reads as expired.")
     total_items: Decimal = Field(description="The sum of its lines' quantities.")
-    total_amount: int = Field(description="The sum of its lines' totals, in minor units of its currency.")
+    total_amount: int = Field(
+        description="The sum of its lines' totals, in minor units of its currency.",
+        json_schema_extra={"money": True},
+    )
     currency: str = Field(description="Its currency (ISO 4217), kept from its creation: never rewritten.")
     currency_decimals: int = Field(description="The decimals of its currency as the server counts them (0 in JPY).")
     expires_at: dt.datetime | None = Field(description="When it expires; empty: never.")
@@ -459,7 +462,10 @@ class OrderOut(Schema):
     shipping_method: str = Field(description="How it is shipped; may be empty.")
     payment_method: str = Field(description="How the customer pays; may be empty.")
     status: OrderStatus = Field(description="Where it is: initiated, paid, failed or completed.")
-    total_amount: int = Field(description="The cart's total when it was initiated, in minor units of its currency.")
+    total_amount: int = Field(
+        description="The cart's total when it was initiated, in minor units of its currency.",
+        json_schema_extra={"money": True},
+    )
     currency: str = Field(description="Its currency (ISO 4217): its cart's, never rewritten.")
     currency_decimals: int = Field(description="The decimals of its currency as the server counts them (0 in JPY).")
     notes: str = Field(description="Its notes.")
