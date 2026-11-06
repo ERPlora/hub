@@ -18,19 +18,21 @@ from uuid import uuid7
 from zoneinfo import ZoneInfo
 
 import pytest
+from live.context import system_context
 from live.operations import Operation, registry
 from ninja import Field, Schema
 
 from apps.cart_checkout.tests.conftest import make_cart
 from apps.cart_checkout.tests.conftest import make_item as make_cart_line
 from apps.flow.models import Flow, FlowRun, Question
-from apps.flow.queries import _money_paths, step_fields
+from apps.flow.queries import CURRENCY_IN, _money_paths, step_fields, words_for
 from apps.payment.tests.conftest import make_method
 from apps.pricing.tests.conftest import make_item as make_price
 from apps.pricing.tests.conftest import make_list, make_rule
 from apps.service.tests.conftest import make_tax
+from base.models import Hub
 
-from .conftest import make_flow, run
+from .conftest import A, make_flow, run
 
 pytestmark = pytest.mark.django_db
 
@@ -184,6 +186,57 @@ def test_the_question_after_a_fixed_rule_says_its_amount_per_unit_as_money(clock
     assert title == "FIFTY: 0,50\xa0€?"
 
 
+# ── A charge preview's legal limits, in the euros the law writes them in (hub#926) ─────────────────────────────────
+
+PREVIEW = "sale.checkout.preview"
+
+
+def test_a_charge_preview_leaves_its_legal_limits_as_money():
+    """hub#926, its «How to reproduce»: the preview's cash and ticket limits were no amounts to Automations."""
+    paths = _money_paths([{"id": "s1", "kind": "query", "operation": PREVIEW}])
+    assert {"steps.s1.cash_limit", "steps.s1.ticket_limit"} <= paths
+
+
+def test_the_question_after_a_charge_preview_says_its_limits_in_euros_in_a_business_in_yen(clock):
+    """hub#926: Ley 7/2012 and RD 1619/2012 write the limits in euros; marked as money alone they would be said in the
+    business's yen («100.000 JPY»). The rest of the preview stays in the business's currency."""
+    clock(NOON)
+    Hub.objects.filter(slug=A.key).update(country="JP")
+    coffee = {"name": "Coffee", "sku": "COF", "price": 1250, "tax_category_key": "product.generic"}
+    run("inventory.product.create", coffee, system_context(A))
+    check = run("sale.order.open", {"lines": [{"product": "COF"}]}, system_context(A))
+    title = asked_after(
+        PREVIEW,
+        {"order_id": str(check.id)},
+        "Cash below {{steps.s1.cash_limit}}, ticket up to {{steps.s1.ticket_limit}}: {{steps.s1.total}}?",
+    )
+    assert title == "Cash below 1.000,00\xa0€, ticket up to 3.000,00\xa0€: 1.250\xa0JPY?"
+
+
+def test_every_amount_in_a_currency_of_its_own_names_a_text_its_step_leaves():
+    """An amount whose mark names the datum of its currency (``CURRENCY_IN``) is said in the currency that datum gives:
+    a name its step does not leave, or no text, would leave it in no currency at all."""
+    named = {
+        (op.name, name): prop[CURRENCY_IN]
+        for op in steps()
+        for name, prop in step_fields(op).items()
+        if CURRENCY_IN in prop
+    }
+    assert set(named) >= {(PREVIEW, "cash_limit"), (PREVIEW, "ticket_limit")}
+    for (operation, name), datum in named.items():
+        fields = step_fields(registry[operation])
+        assert fields[name].get("money") is True, (operation, name)
+        assert _type(fields.get(datum, {})) == "string", (operation, name, datum)
+
+
+def test_an_amount_whose_own_currency_its_step_did_not_leave_is_said_as_its_figure():
+    """A run whose preview left no currency of its limits (one recorded before it did) says the figure, never the
+    business's currency in its place."""
+    preview = [{"id": "s1", "kind": "query", "operation": PREVIEW}]
+    say = words_for(preview, "es", A, {"steps": {"s1": {"cash_limit": 100000, "total": 1250}}})
+    assert (say("steps.s1.cash_limit", 100000), say("steps.s1.total", 1250)) == ("100000", "12,50\xa0€")
+
+
 # ── The ratchet: amounts a step leaves that nobody marks, by app ─────────────────────────────────────────────────────
 
 #: How an amount says itself in this repo's schemas, as the assistant's ratchet reads it
@@ -195,17 +248,13 @@ AMOUNT_WORDS = re.compile(r"\bcents?\b|\bminor units?\b|\bcéntimos?\b", re.IGNO
 NO_AMOUNT = frozenset({"currency_decimals"})
 
 #: The amounts a step leaves whose words say nothing and whose app marks no other datum of their name, by app: no net
-#: of the schemas can see them, so they are named here (hub#923). A cash movement's ``signed_amount``; a charge
-#: preview's legal limits, which are in euros whatever the business's currency (``LIMITS_CURRENCY``, hub#926).
-AMOUNTS_BY_NAME: dict[str, frozenset[str]] = {
-    "cash_register": frozenset({"signed_amount"}),
-    "sale": frozenset({"cash_limit", "ticket_limit"}),
-}
+#: of the schemas can see them, so they are named here (hub#923). A cash movement's ``signed_amount``.
+AMOUNTS_BY_NAME: dict[str, frozenset[str]] = {"cash_register": frozenset({"signed_amount"})}
 
 #: The amounts a step leaves that no mark declares, by app: Automations says them as a bare figure. Only ever lower:
-#: an app that marks its own lowers its number here, and none comes in. A charge preview's limits are in euros, not in
-#: the business's currency (hub#926).
-UNMARKED_STEP_AMOUNTS: dict[str, int] = {"sale": 2}
+#: an app that marks its own lowers its number here, and none comes in. None is left since a charge preview's legal
+#: limits carry their mark beside the euros they are in (hub#926).
+UNMARKED_STEP_AMOUNTS: dict[str, int] = {}
 
 
 def money_names(operations: list[Operation]) -> dict[str, frozenset[str]]:

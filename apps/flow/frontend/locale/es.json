@@ -1890,6 +1890,7 @@
       "legal_name": "Razón social",
       "lifecycle_stage": "Etapa",
       "limit": "Límite",
+      "limits_currency": "Moneda de los límites",
       "line_amount": "Importe de la línea",
       "line_count": "Líneas",
       "line_id": "Línea",

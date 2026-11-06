@@ -1105,6 +1105,13 @@ YES = pgettext_lazy("datum", "Yes")
 NO = pgettext_lazy("datum", "No")
 
 
+#: The mark of an amount in a currency of its own, not the one its step answers: the name of the datum beside it, a text
+#: its step leaves, that gives that currency (ISO 4217) — a charge preview's legal limits, in the euros the law writes
+#: them in whatever the business charges in (``json_schema_extra={"money": True, "currency_in": "limits_currency"}``,
+#: hub#926), as a payment's amount travels with its currency.
+CURRENCY_IN = "currency_in"
+
+
 def _is_money(prop: dict) -> bool:
     """An amount, as its schema marks it (``json_schema_extra={"money": True}``): the mark the assistant's card reads
     (``live.assistant.MONEY``, BASE-F97). Neither a name in ``_cents`` nor the words of a description («in cents») make
@@ -1112,24 +1119,39 @@ def _is_money(prop: dict) -> bool:
     return prop.get(MONEY) is True
 
 
-def _money_paths(steps: list[dict]) -> frozenset[str]:
-    """The paths (``steps.<id>.<field>``) of the amounts the steps' actions and reads mark in what they leave
-    (``step_fields``: their output's schema, a read's first row). An event declares none."""
-    found: set[str] = set()
+#: The datum of a step's answer that gives the currency of its amounts (a payment in dollars), as BASE-F98 reads it.
+ANSWERED_CURRENCY = "currency"
+
+
+def _money_currencies(steps: list[dict]) -> dict[str, str]:
+    """The amounts the steps' actions and reads mark in what they leave (``step_fields``: their output's schema, a
+    read's first row), by path (``steps.<id>.<field>``), each with the datum of its step that gives its currency: the
+    one its mark names (``CURRENCY_IN``), else ``ANSWERED_CURRENCY``. An event declares none."""
+    found: dict[str, str] = {}
     for step in steps:
         op = registry.get(str(step.get("operation") or "")) if step.get("kind") in ("command", "query") else None
         if op is None:
             continue
-        found |= {f"steps.{step.get('id')}.{name}" for name, prop in step_fields(op).items() if _is_money(prop)}
-    return frozenset(found)
+        found |= {
+            f"steps.{step.get('id')}.{name}": prop.get(CURRENCY_IN) or ANSWERED_CURRENCY
+            for name, prop in step_fields(op).items()
+            if _is_money(prop)
+        }
+    return found
 
 
-def _answered_currency(path: str, data: dict) -> str | None:
-    """The currency the step that left the amount at ``path`` (``steps.<id>.<field>``) answers in ``data``: its
-    ``currency`` (a payment in dollars, an invoice in the one it was issued in), as the assistant's card says an amount
-    of a read (BASE-F98); ``None`` when it answers none."""
+def _money_paths(steps: list[dict]) -> frozenset[str]:
+    """The paths (``steps.<id>.<field>``) of the amounts the steps' actions and reads mark in what they leave."""
+    return frozenset(_money_currencies(steps))
+
+
+def _answered_currency(path: str, data: dict, datum: str) -> str | None:
+    """The currency the step that left the amount at ``path`` (``steps.<id>.<field>``) answers in ``data``: the
+    ``datum`` that gives it — its ``currency`` (a payment in dollars, an invoice in the one it was issued in), as the
+    assistant's card says an amount of a read (BASE-F98), or the one the amount's mark names (``CURRENCY_IN``) —;
+    ``None`` when it answers none."""
     step_id = path.split(".")[1]
-    currency = document.lookup(f"steps.{step_id}.currency", data)[1]
+    currency = document.lookup(f"steps.{step_id}.{datum}", data)[1]
     return currency if isinstance(currency, str) and currency else None
 
 
@@ -1161,10 +1183,15 @@ def words_for(steps: list[dict], language: str, scope: Scope, data: dict | None 
     """How a text a person reads — a question (FLOW-F28), a message to a customer (FLOW-F31) — says each datum it
     inserts, as the assistant's card says it (BASE-F97): a yes or no as «Yes»/«No», an ISO day, hour or instant as
     ``language`` writes it at the business's hour, and an amount the schema of the step that left it marks as money in
-    the currency that step answers in ``data`` (``_answered_currency``), else in the business's; anything else as it
-    is. An event declares no schema: a number it brings is never guessed as money."""
-    money = _money_paths(steps)
-    currency = functools.cache(lambda: _currency(scope))
+    the currency that step answers in ``data`` (``_answered_currency``), else in the business's — one in a currency of
+    its own (``CURRENCY_IN``), only in the one its datum gives —; anything else as it is. An event declares no schema:
+    a number it brings is never guessed as money."""
+    money = _money_currencies(steps)
+    business = functools.cache(lambda: _currency(scope))
+
+    def currency(path: str) -> str | None:
+        datum = money[path]
+        return _answered_currency(path, data or {}, datum) or (business() if datum == ANSWERED_CURRENCY else None)
 
     def say(path: str, value: Any) -> str:
         if isinstance(value, bool):
@@ -1172,7 +1199,7 @@ def words_for(steps: list[dict], language: str, scope: Scope, data: dict | None 
                 return str(YES if value else NO)
         if isinstance(value, str):
             return _moment_words(value, language) or value
-        if isinstance(value, int) and path in money and (code := _answered_currency(path, data or {}) or currency()):
+        if isinstance(value, int) and path in money and (code := currency(path)):
             return money_text(value, code, language=language)
         return str(value)
 
