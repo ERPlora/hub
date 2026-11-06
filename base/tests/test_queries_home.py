@@ -34,6 +34,8 @@ from base.schemas import (
     NoticeListOut,
     SetupStatusIn,
     SetupStatusOut,
+    SystemCardsIn,
+    SystemCardsOut,
     WidgetListIn,
     WidgetListOut,
 )
@@ -135,6 +137,7 @@ def step(key="catalog", operation="stock.catalog.status", **fields):
         ("base.widget.list", WidgetListIn, WidgetListOut),
         ("base.bell.counters", BellCountersIn, BellCountersOut),
         ("base.notice.list", NoticeListIn, NoticeListOut),
+        ("base.system.cards", SystemCardsIn, SystemCardsOut),
     ],
 )
 def test_declarations(name, input, output):
@@ -995,3 +998,53 @@ def test_it_says_which_notices_the_person_hears_even_with_nothing_to_tell(module
         "stock.added",
         "stock.secret",
     ]
+
+
+# --- base.system.cards (hub#683: the cards the apps on put in System › «Usage and plan») --------------------------
+
+
+def system_cards(context):
+    return get("base.system.cards")(context, SystemCardsIn()).model_dump(mode="json")["cards"]
+
+
+PRINTER = {"key": "printer", "component": "SystemPrinterCard", "permission": "stock.view"}
+
+
+def test_the_cards_of_the_apps_on_that_the_person_may_see(modules):
+    modules(module("stock", system_cards=[PRINTER, {"key": "drawer", "component": "DrawerCard"}]), module("sale"))
+
+    assert system_cards(ctx()) == [{"key": "stock.drawer", "app": "stock", "component": "DrawerCard"}]
+    assert system_cards(ctx("stock.view")) == [
+        {"key": "stock.printer", "app": "stock", "component": "SystemPrinterCard"},
+        {"key": "stock.drawer", "app": "stock", "component": "DrawerCard"},
+    ]
+
+
+def test_an_app_off_puts_no_card(modules):
+    modules(module("stock", system_cards=[PRINTER]), on=[])
+
+    assert system_cards(ctx("stock.view")) == []
+
+
+def test_each_business_sees_the_cards_of_its_own_apps(modules, monkeypatch):
+    modules(module("stock", system_cards=[PRINTER]))
+    monkeypatch.setattr("base.queries.active_apps", lambda scope: frozenset({"base", "stock"} if scope.key == "a" else {"base"}))
+
+    assert [card["key"] for card in system_cards(ctx("stock.view", scope=A))] == ["stock.printer"]
+    assert system_cards(ctx("stock.view", scope=B)) == []
+
+
+def test_a_module_out_of_the_store_puts_its_card_only_where_it_shows(modules, settings):
+    modules(module("demo", system_cards=[{"key": "w", "component": "W"}], listed=False))
+    assert [card["key"] for card in system_cards(ctx())] == ["demo.w"]
+
+    settings.SHOW_UNLISTED_MODULES = False
+    assert system_cards(ctx()) == []
+
+
+def test_the_cards_follow_an_app_turned_on_or_off():
+    from live.live_registry import live_registry
+
+    from base.events import APP_EVENTS, HUB_STATE_APPLIED
+
+    assert {HUB_STATE_APPLIED, *APP_EVENTS} <= set(live_registry.subscribable["base.system.cards"])

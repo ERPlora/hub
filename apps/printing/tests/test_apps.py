@@ -220,3 +220,18 @@ def test_the_hooks_query_is_re_run_on_their_events_and_their_icon_is_registered(
 def test_printing_brings_no_panels_to_the_home():
     # The old module declared none (its module.json has no `widgets`), nor did the old core for printing.
     assert config().widgets == []
+
+
+def test_its_card_of_system_is_your_printer_for_everybody_with_printing_and_base_checks_it_clean():
+    """hub#683: System › «Usage and plan» has the old hub's «Your printer» of «Resources» while Printing is on, painted by
+    the app's own component; every role sees Printing, so every role sees the card (base.E015 checks the declaration)."""
+    assert config().system_cards == [
+        {"key": "printer", "component": "SystemPrinterCard", "permission": "printing.view_settings"}
+    ]
+    assert (Path(config().path) / "frontend" / "components" / "SystemPrinterCard.vue").is_file()
+    assert all(
+        "printing.view_settings" in permissions_for_role([config()], role)
+        for role in ("hub_owner", "hub_admin", "hub_manager", "hub_employee")
+    )
+    assert home.system_card_errors([config()]) == []
+    assert [message.id for message in checks.run_checks(tags=["base"]) if message.id == "base.E015"] == []

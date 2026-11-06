@@ -71,6 +71,8 @@ def test_the_three_queries_and_their_events():
         # also when a failed event appears, is resent or discarded (its level changes).
         "base.system.status": [HUB_STATE_APPLIED],
         "base.event.list": sorted({HUB_STATE_APPLIED, *FAILED_EVENTS}),
+        # The cards of «Usage and plan» (hub#683): an app turned on or off, by the business or by the photo.
+        "base.system.cards": sorted({HUB_STATE_APPLIED, *APP_EVENTS}),
         # Files (APP-BASE-8): every write of the business's files, and the photo (the plan's space).
         "base.file.list": sorted({HUB_STATE_APPLIED, *FILE_EVENTS}),
     }
