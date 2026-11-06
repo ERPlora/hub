@@ -115,6 +115,9 @@ msgstr "alto"
 msgid "size"
 msgstr "tamaño"
 
+msgid "file name"
+msgstr "nombre del archivo"
+
 msgctxt "website"
 msgid "created at"
 msgstr "creada el"
@@ -127,6 +130,9 @@ msgstr "imágenes"
 
 msgid "This website is not published."
 msgstr "Esta página web no está publicada."
+
+msgid "This category is not in Inventory or Services."
+msgstr "Esta categoría no está en Inventario ni en Servicios."
 
 msgid "The website is not on in this business."
 msgstr "La página web no está activada en este negocio."
@@ -158,6 +164,58 @@ msgstr "Sábado"
 msgctxt "website"
 msgid "Sunday"
 msgstr "Domingo"
+
+msgctxt "website"
+msgid "Ocean"
+msgstr "Océano"
+
+msgctxt "website"
+msgid "Forest"
+msgstr "Bosque"
+
+msgctxt "website"
+msgid "Terracotta"
+msgstr "Terracota"
+
+msgctxt "website"
+msgid "Slate"
+msgstr "Pizarra"
+
+msgctxt "website"
+msgid "Rose"
+msgstr "Rosa"
+
+msgctxt "website"
+msgid "Sand"
+msgstr "Arena"
+
+msgctxt "website"
+msgid "Midnight"
+msgstr "Medianoche"
+
+msgctxt "website"
+msgid "Olive"
+msgstr "Oliva"
+
+msgctxt "website"
+msgid "Light"
+msgstr "Claro"
+
+msgctxt "website"
+msgid "Dark"
+msgstr "Oscuro"
+
+msgctxt "website"
+msgid "Auto"
+msgstr "Automático"
+
+msgctxt "website"
+msgid "Products"
+msgstr "Productos"
+
+msgctxt "website"
+msgid "Services"
+msgstr "Servicios"
 
 msgctxt "website price"
 msgid "Free"

@@ -1472,6 +1472,10 @@
         "unlinked": "esta app está vinculada a otro negocio",
         "outdated": "esta versión de la app de ERPlora no puede imprimir; actualízala"
       }
+    },
+    "money": {
+      "unreadable": "No se ha podido leer la moneda del negocio",
+      "retry": "Reintentar"
     }
   }
 }

@@ -37,7 +37,7 @@ from live.errors import AppInactive, NotFound
 from live.operations import INTERNAL, get, operation, registry
 
 from apps.website import reviews
-from apps.website.models import Site
+from apps.website.models import Image, Site
 from apps.website.qr import CONTENT_TYPES, public_url, qr_image
 from apps.website.render import BODY_SECTIONS, catalog_view, local_day, render_site, reviews_view
 from apps.website.schemas import (
@@ -46,7 +46,11 @@ from apps.website.schemas import (
     CatalogSection,
     CategoriesIn,
     CategoriesOut,
+    CategoryIn,
+    CategoryOut,
     Content,
+    ImageIn,
+    ImageNameOut,
     NoIn,
     PreviewOut,
     PublicSiteOut,
@@ -64,6 +68,8 @@ from base.throttle import RateLimited, allow, client_address
 #: The app's label: what ``base.relay.active_apps`` names when the module is on in a hub.
 WEBSITE = "website"
 NOT_PUBLISHED = _("This website is not published.")
+IMAGE_NOT_FOUND = _("This image was not uploaded to this business's website: upload it again.")
+CATEGORY_NOT_FOUND = _("This category is not in Inventory or Services.")
 MODULE_OFF = _("The website is not on in this business.")
 #: The public reads a visitor may make per hub and address in a window.
 PUBLIC_LIMIT = 60
@@ -237,6 +243,51 @@ def list_categories(ctx: OperationContext, data: CategoriesIn) -> dict:
     reader = replace(ctx, permissions=ctx.permissions | SOURCES[data.source])
     rows = _service_categories(reader) if data.source == "service" else _product_categories(reader)
     return {"categories": [{"id": row.id, "name": row.name} for row in rows]}
+
+
+# What the assistant's card reads to name a record a save keeps (hub#679): no tool, no route, nothing live.
+
+
+@operation(
+    "website.image.get",
+    kind="query",
+    permission="website.view",
+    input=ImageIn,
+    output=ImageNameOut,
+    expose_api=False,
+    ai=INTERNAL,
+)
+def get_image(ctx: OperationContext, data: ImageIn) -> dict:
+    """An image of this business's website by the name of its file; one uploaded before it was kept, by its format and
+    size («PNG 1200 × 800»)."""
+    image = Image.objects.filter(hub_id=hub_id(ctx.scope), id=data.id).first()
+    if image is None:
+        raise NotFound(str(IMAGE_NOT_FOUND), code="website.image_not_found")
+    kind = image.content_type.rpartition("/")[2].upper()
+    return {"id": image.id, "name": image.filename or f"{kind} {image.width} × {image.height}"}
+
+
+@operation(
+    "website.category.get",
+    kind="query",
+    permission="website.manage",
+    input=CategoryIn,
+    output=CategoryOut,
+    expose_api=False,
+    ai=INTERNAL,
+)
+def get_category(ctx: OperationContext, data: CategoryIn) -> dict:
+    """A category the catalog can show, by its name: among Inventory's or Services' (the ones on in the business), as
+    the editor lists them (``website.catalog.categories``)."""
+    for source in SOURCES:
+        if not _source_on(ctx.scope, source):
+            continue
+        reader = replace(ctx, permissions=ctx.permissions | SOURCES[source])
+        rows = _service_categories(reader) if source == "service" else _product_categories(reader)
+        found = next((row for row in rows if row.id == data.id), None)
+        if found is not None:
+            return {"id": found.id, "name": found.name}
+    raise NotFound(str(CATEGORY_NOT_FOUND), code="website.category_not_found")
 
 
 # The public reads
