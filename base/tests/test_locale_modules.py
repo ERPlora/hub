@@ -43,7 +43,6 @@ SHADOWED = {
     "tax": 1,
     "verifactu": 7,
     "website": 5,
-    "whatsapp_inbox": 3,
 }
 
 
