@@ -9,20 +9,12 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { h } from 'vue';
 
-import { flush, mountBase, tap } from '../__tests__/mount-base';
+import { flush, followPass, mountBase, passRefused, SIGNED, tap } from '../__tests__/mount-base';
 import PlanUpgradeLink from './PlanUpgradeLink.vue';
 
 const PLANS = 'http://localhost:8001/store/plans?business=0199a1b2-0000-7000-8000-000000000001';
-const SIGNED = 'http://localhost:8001/hub-pass/?pass=abc';
 const HUB = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const THE_PIECE = 'base/frontend/components/PlanUpgradeLink.vue';
-
-/** A new tab the browser hands back, to see where it is sent. */
-function newTab() {
-  const tab = { opener: {} as unknown, location: { href: 'about:blank' } };
-  vi.spyOn(window, 'open').mockReturnValue(tab as unknown as Window);
-  return tab;
-}
 
 /** The piece as its placer puts it: `url`, the attributes for the link and, when given, what it says. */
 function placed(attrs: Record<string, unknown>, says?: () => unknown) {
@@ -79,28 +71,16 @@ describe('PlanUpgradeLink', () => {
   });
 
   it('its click asks for a pass to the plan and opens it, already signed in on erplora.com', async () => {
-    const tab = newTab();
     const m = await mountBase(PlanUpgradeLink, { props: { url: PLANS }, onApi: () => Response.json({ url: SIGNED }) });
 
-    expect(tap(m.wrapper.element).defaultPrevented).toBe(true);
-    await flush();
-
-    expect(m.net.api.map((call) => JSON.parse(call.init.body as string))).toEqual([{ next: 'plan' }]);
-    expect(tab.location.href).toBe(SIGNED);
+    expect(await followPass(m, m.wrapper.element)).toEqual({ next: 'plan', to: SIGNED });
   });
 
   it('when the pass cannot be signed, the address it was given opens', async () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => {});
-    const tab = newTab();
-    const m = await mountBase(PlanUpgradeLink, {
-      props: { url: PLANS },
-      onApi: () => Response.json({ error: { code: 'base.saas_pass_needs_account', message: 'No.' } }, { status: 403 }),
-    });
+    const m = await mountBase(PlanUpgradeLink, { props: { url: PLANS }, onApi: passRefused });
 
-    tap(m.wrapper.element);
-    await flush();
-
-    expect(tab.location.href).toBe(PLANS);
+    expect(await followPass(m, m.wrapper.element)).toEqual({ next: 'plan', to: PLANS });
     expect(error).toHaveBeenCalled();
   });
 

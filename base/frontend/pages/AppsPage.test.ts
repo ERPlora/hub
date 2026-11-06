@@ -10,9 +10,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { sessionChanged } from '../lib/access';
 
-import { EMPLOYEE, errorFrame, flush, mountBase, OWNER, subId, tap } from '../__tests__/mount-base';
+import { EMPLOYEE, errorFrame, flush, followPass, mountBase, OWNER, passRefused, placedUpgrade, SIGNED, subId } from '../__tests__/mount-base';
 import type { AppList, AppRow } from '../operations';
-import PlanUpgradeLink from '../components/PlanUpgradeLink.vue';
 import AppsPage from './AppsPage.vue';
 
 const mocks = vi.hoisted(() => ({ confirm: vi.fn() }));
@@ -465,60 +464,36 @@ describe('AppsPage', () => {
       expect(refused(m).exists()).toBe(false);
     });
 
-    it('its «Upgrade plan» goes with the pass, already signed in on erplora.com', async () => {
-      const tab = { opener: {}, location: { href: 'about:blank' } };
-      const windowOpen = vi.spyOn(window, 'open').mockReturnValue(tab as unknown as Window);
-      const url = 'http://localhost:8001/hub-pass/?pass=abc';
+    /** The Apps store at the plan's limit, its notice out, with `pass` as what signing the pass answers. */
+    async function atTheLimit(pass: () => Response) {
       const limit = refusal(402, { code: 'base.app_limit_reached', message: 'server words', max_apps: 20, enabled: 20 });
-      const m = await open('/apps#all', {
-        onApi: (call) => (call.url.includes('/saas-pass') ? Response.json({ url }) : limit()),
-      });
+      const m = await open('/apps#all', { onApi: (call) => (call.url.includes('/saas-pass') ? pass() : limit()) });
       await m.result(m.call, 'base.app.list', { ...APPS, enabled: 20 });
       await m.wrapper.find('[data-testid="apps-row-flow-toggle"]').trigger('click');
       await flush();
+      return m;
+    }
 
-      tap(m.wrapper.find('[data-testid="apps-limit-upgrade"]').element);
-      await flush();
+    it('its «Upgrade plan» goes with the pass, already signed in on erplora.com', async () => {
+      const m = await atTheLimit(() => Response.json({ url: SIGNED }));
 
-      expect(JSON.parse(m.net.api.at(-1)!.init.body as string)).toEqual({ next: 'plan' });
-      expect(tab.location.href).toBe(url);
-      windowOpen.mockRestore();
+      expect(await followPass(m, m.wrapper.get('[data-testid="apps-limit-upgrade"]').element)).toEqual({ next: 'plan', to: SIGNED });
     });
 
     it('its «Upgrade plan» is the platform’s PlanUpgradeLink to the business’s plans, not a copy of its own', async () => {
-      const m = await open('/apps#all', {
-        onApi: refusal(402, { code: 'base.app_limit_reached', message: 'server words', max_apps: 20, enabled: 20 }),
+      const m = await atTheLimit(passRefused);
+      expect(placedUpgrade(m.wrapper.get('[data-testid="apps-limit"]'))).toEqual({
+        url: PLANS,
+        testid: 'apps-limit-upgrade',
+        says: 'Upgrade plan',
       });
-      await m.result(m.call, 'base.app.list', { ...APPS, enabled: 20 });
-      await m.wrapper.find('[data-testid="apps-row-flow-toggle"]').trigger('click');
-      await flush();
-      const piece = m.wrapper.get('[data-testid="apps-limit"]').findComponent(PlanUpgradeLink);
-      expect(piece.exists()).toBe(true);
-      expect(piece.props('url')).toBe(PLANS);
-      expect([piece.attributes('data-testid'), piece.text()]).toEqual(['apps-limit-upgrade', 'Upgrade plan']);
     });
 
     it('when the pass cannot be signed, its «Upgrade plan» opens the plans as usual', async () => {
       const error = vi.spyOn(console, 'error').mockImplementation(() => {});
-      const tab = { opener: {}, location: { href: 'about:blank' } };
-      const windowOpen = vi.spyOn(window, 'open').mockReturnValue(tab as unknown as Window);
-      const limit = refusal(402, { code: 'base.app_limit_reached', message: 'server words', max_apps: 20, enabled: 20 });
-      const m = await open('/apps#all', {
-        onApi: (call) =>
-          call.url.includes('/saas-pass')
-            ? Response.json({ error: { code: 'base.saas_pass_needs_account', message: 'No.' } }, { status: 403 })
-            : limit(),
-      });
-      await m.result(m.call, 'base.app.list', { ...APPS, enabled: 20 });
-      await m.wrapper.find('[data-testid="apps-row-flow-toggle"]').trigger('click');
-      await flush();
+      const m = await atTheLimit(passRefused);
 
-      tap(m.wrapper.find('[data-testid="apps-limit-upgrade"]').element);
-      await flush();
-
-      expect(tab.location.href).toBe(PLANS);
-      expect(error).toHaveBeenCalled();
-      windowOpen.mockRestore();
+      expect(await followPass(m, m.wrapper.get('[data-testid="apps-limit-upgrade"]').element)).toEqual({ next: 'plan', to: PLANS });
       error.mockRestore();
     });
 

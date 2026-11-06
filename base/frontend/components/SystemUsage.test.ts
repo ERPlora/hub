@@ -6,8 +6,7 @@ import { applySurface } from '@erplora/ui/shell';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { AssistantUsage, PlanMeter, PlanUsage } from '../operations';
-import { errorFrame, flush, mountBase, subId, tap } from '../__tests__/mount-base';
-import PlanUpgradeLink from './PlanUpgradeLink.vue';
+import { errorFrame, flush, followPass, mountBase, passRefused, placedUpgrade, SIGNED, subId } from '../__tests__/mount-base';
 import SystemUsage from './SystemUsage.vue';
 
 const OP = 'base.plan.usage';
@@ -261,48 +260,29 @@ describe('SystemUsage', () => {
 
     it('its «Upgrade plan» goes with the pass, already signed in on erplora.com', async () => {
       embed({ name: 'Bar', plan_url: PLAN_URL });
-      const tab = { opener: {}, location: { href: 'about:blank' } };
-      const windowOpen = vi.spyOn(window, 'open').mockReturnValue(tab as unknown as Window);
-      const url = 'http://localhost:8001/hub-pass/?pass=abc';
       const m = await open(figures(), {
-        onApi: (call) => Response.json(call.url.includes('/saas-pass') ? { url } : MESSAGES),
+        onApi: (call) => Response.json(call.url.includes('/saas-pass') ? { url: SIGNED } : MESSAGES),
       });
 
-      tap(m.part('upgrade').element);
-      await flush();
-
-      expect(JSON.parse(m.net.api.at(-1)!.init.body as string)).toEqual({ next: 'plan' });
-      expect(tab.location.href).toBe(url);
-      windowOpen.mockRestore();
+      expect(await followPass(m, m.part('upgrade').element)).toEqual({ next: 'plan', to: SIGNED });
     });
 
     it('its «Upgrade plan» is the platform’s PlanUpgradeLink to this business’s plan page, not a copy of its own', async () => {
       embed({ name: 'Bar', plan_url: PLAN_URL });
       const m = await open(figures());
-      const piece = m.wrapper.get('.system-usage-plan').findComponent(PlanUpgradeLink);
-      expect(piece.exists()).toBe(true);
-      expect(piece.props('url')).toBe(PLAN_URL);
-      expect([piece.attributes('data-testid'), piece.text()]).toEqual(['system-usage-upgrade', 'Upgrade plan']);
+      expect(placedUpgrade(m.wrapper.get('.system-usage-plan'))).toEqual({
+        url: PLAN_URL,
+        testid: 'system-usage-upgrade',
+        says: 'Upgrade plan',
+      });
     });
 
     it('when the pass cannot be signed, its «Upgrade plan» opens the plan page as usual', async () => {
       embed({ name: 'Bar', plan_url: PLAN_URL });
       const error = vi.spyOn(console, 'error').mockImplementation(() => {});
-      const tab = { opener: {}, location: { href: 'about:blank' } };
-      const windowOpen = vi.spyOn(window, 'open').mockReturnValue(tab as unknown as Window);
-      const m = await open(figures(), {
-        onApi: (call) =>
-          call.url.includes('/saas-pass')
-            ? Response.json({ error: { code: 'base.saas_pass_needs_account', message: 'No.' } }, { status: 403 })
-            : Response.json(MESSAGES),
-      });
+      const m = await open(figures(), { onApi: (call) => (call.url.includes('/saas-pass') ? passRefused() : Response.json(MESSAGES)) });
 
-      tap(m.part('upgrade').element);
-      await flush();
-
-      expect(tab.location.href).toBe(PLAN_URL);
-      expect(error).toHaveBeenCalled();
-      windowOpen.mockRestore();
+      expect(await followPass(m, m.part('upgrade').element)).toEqual({ next: 'plan', to: PLAN_URL });
       error.mockRestore();
     });
 
