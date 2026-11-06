@@ -228,9 +228,12 @@ def test_an_erased_conversation_and_what_it_held_are_left_out():
     """Erasing keeps the conversation's row without the customer's data: no screen shows it any more."""
     conversation = a_conversation()
     message = Message.objects.filter(conversation=conversation).get()
+    note = Note.objects.create(conversation=conversation, text="Prefers mornings")
+    assert shown("whatsapp_inbox.note.delete", {"id": str(note.id)}) == {"id": "Prefers mornings"}  # positive control
     Conversation.objects.filter(pk=conversation.pk).update(erased_at=NOW)
     assert shown("whatsapp_inbox.conversation.erase", {"id": str(conversation.id)}) == {}
     assert shown("whatsapp_inbox.message.retry", {"id": str(message.id)}) == {}
+    assert shown("whatsapp_inbox.note.delete", {"id": str(note.id)}) == {}
 
 
 @pytest.mark.django_db
