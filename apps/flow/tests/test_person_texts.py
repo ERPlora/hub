@@ -221,6 +221,16 @@ def test_a_whatsapp_to_a_customer_says_each_datum_in_words(chatting):
     assert body == "Paid: Sí. Your visit: 2 nov 2026, 10:00. Total: 120,50\xa0€."
 
 
+def test_a_whatsapp_to_a_customer_says_an_amount_in_the_currency_its_step_answers(chatting, monkeypatch):
+    # As the question (FLOW-F28): a total in dollars of a business in euros does not reach the customer as «120,50 €».
+    quoting(monkeypatch, PricedQuoteOut, {"title": "Cut", "total": 12050, "currency": "USD"})
+    notify = {"id": "s1", "kind": "command", "operation": NOTIFY, "params": {"phone": "input.phone", "text": "Total: {{steps.s0.total}}."}}
+    flow = make_flow(trigger_kind=Flow.Trigger.MANUAL, steps=[QUOTE_STEP, notify], grants=[QUOTE.name, NOTIFY], language="es")
+    done = run("flow.flow.run", {"id": str(flow.id), "input": INPUT})
+    assert done.status == FlowRun.Status.SUCCEEDED, done
+    assert Message.objects.get(direction="outbound").body == "Total: 120,50\xa0US$."
+
+
 def test_trying_a_whatsapp_says_it_as_it_will_go():
     notify = {"id": "s1", "kind": "command", "operation": NOTIFY, "params": {"phone": "input.phone", "text": "Paid: {{input.paid}}"}}
     [step] = tried([notify])

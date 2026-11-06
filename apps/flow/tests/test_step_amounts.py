@@ -2,8 +2,9 @@
 when the schema of that step's answer marks it so (``json_schema_extra={"money": True}``), as the assistant's card
 reads an amount (BASE-F97). Automations knew one only by its words — a name in ``_cents``, «in cents» in its
 description —, so the amount of a payment a step records («in minor units of its currency») reached «Waiting for your
-answer» as «1250». Every amount a step leaves now carries its mark (the ratchet below), and nothing Automations said as
-money by its words stops being so.
+answer» as «1250». Every amount a step leaves that says cents in its name or its description now carries its mark (the
+ratchet below, whose net is those words), and nothing Automations said as money by its words stops being so. An amount
+whose schema says nothing (a service's price, an invoice's total) is still unmarked and outside the ratchet (hub#923).
 """
 
 import datetime as dt

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:c44feb5c2feff77b5be4f92b6daee2d02a289118e85d315f20f35a6967abd4b2 -->
+<!-- generated from WORKBOOK.md sha256:790e5f8f25fc1610a1c84399065fe72edfac77b52a113a7188238e734a2c1690 -->
 
 ## What it is for and who it is for
 
@@ -410,8 +410,10 @@ Steps:
    the currency that step gives it in: a payment in dollars, in dollars ("12,50 US$"); if it gives none, in
    the business's ("120,50 €"). A number the notice brings comes out as it is, because the notice does not
    say whether it is money, and so do the price of a cart's line and the fixed discount of a price-list rule,
-   which do not say their currency yet (hub#915). What goes to another action, to another system or to an
-   "Only continue if…" carries each piece of data as it is.
+   which do not say their currency yet (hub#915), and the amounts their app does not mark as money yet: an
+   invoice's total, the price of a service or of a combo and the provisional total of a check (hub#923).
+   What goes to another action, to another system or to an "Only continue if…" carries each piece of data as
+   it is.
 In: the actions and queries of the active apps, the last real notice of that kind and what the previous
 steps leave. Data are named in the screen's language ("Sale number", "Customer phone") and with the word of the
 app they belong to ("Section", as in Sales & POS), never with their internal name.

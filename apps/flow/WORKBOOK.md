@@ -436,7 +436,9 @@ Pasos:
    lo da ese paso: un pago en dólares, en dólares («12,50 US$»); si no da ninguna, en la del negocio
    («120,50 €»). Un número que trae el aviso sale tal cual, porque el aviso no dice si es dinero, y también el
    precio de una línea de un carrito y el descuento fijo de una regla de tarifa, que aún no dicen su moneda
-   (hub#915). Lo que va a otra acción, a otro sistema o a un «Solo sigue si…» lleva cada dato tal cual.
+   (hub#915), y los importes que su app aún no marca como dinero: el total de una factura, el precio de un
+   servicio o de un menú y el total provisional de una cuenta (hub#923). Lo que va a otra acción, a otro
+   sistema o a un «Solo sigue si…» lleva cada dato tal cual.
 Entra: las acciones y consultas de las apps activas, el último aviso real de ese tipo y lo que dejan los
 pasos anteriores. Los datos se nombran en el idioma de la pantalla («Número de venta», «Teléfono del
 cliente») y con la palabra de la app que los tiene («Sección», como en Ventas / TPV), nunca con su
@@ -1404,9 +1406,11 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   (`json_schema_extra={"money": True}`, `live.assistant.MONEY`, la marca de la tarjeta de base) con
   `base.business.money_text` en la moneda que responde ese paso (su `currency`, `_answered_currency`, como la vista
   previa de BASE-F98) o, si no responde ninguna, en la del negocio. Ni un nombre en `_cents` ni las palabras de la
-  descripción («in cents») hacen un importe (hub#498): toda salida de un paso que lo es lleva la marca, y el trinquete
-  `UNMARKED_STEP_AMOUNTS` de `test_step_amounts.py` (solo baja; hoy la línea de carrito y la regla de tarifa, hub#915)
-  caza una nueva sin ella. Una hora sin segundos («21:00») ya la escribió su app para una
+  descripción («in cents») hacen un importe (hub#498): toda salida de un paso que dice céntimos en su nombre o en su
+  descripción lleva la marca, y el trinquete `UNMARKED_STEP_AMOUNTS` de `test_step_amounts.py` (solo baja; hoy la línea
+  de carrito y la regla de tarifa, hub#915) caza una nueva así sin ella. Las que no lo dicen (precios de Servicios y de
+  Menús, los totales de una factura, el total provisional de una cuenta) siguen sin marca y fuera de ese trinquete,
+  cuya red son esas palabras (hub#923). Una hora sin segundos («21:00») ya la escribió su app para una
   persona y se deja. Un aviso no declara esquema: su número sale tal cual (`test_person_texts.py`). Lo que va a una
   máquina — otra acción, «Llamar a otro sistema», condiciones, el encargo al asistente — no cambia. Mercado: HubSpot
   (los tokens salen con el formato de su tipo: fecha y moneda de la cuenta) y Mailchimp (formato de fecha de la
@@ -1761,7 +1765,8 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   no manda correos a clientes.
 - **Arreglos pendientes, abiertos como issues** (`migration-leftover`): siete textos en español con las
   palabras de otra app (hub#497); el precio de una línea de carrito o el descuento fijo de una regla de tarifa
-  que deja un paso sale en céntimos (hub#915); la tarjeta de confirmación del asistente llama «Registro» a la automatización o a la ejecución
+  que deja un paso sale en céntimos (hub#915), y también el total de una factura o el precio de un servicio o de
+  un menú (hub#923); la tarjeta de confirmación del asistente llama «Registro» a la automatización o a la ejecución
   (hub#499) y dice «N elementos» en los permisos de un flujo sin decir cuáles (hub#504, con `base`).
 - **«Necesita tu atención»** (eventos que no se entregaron): el reparto del worker ya entrega los avisos a esta
   app y, tras 8 intentos fallidos, da uno por perdido y lo deja anotado; la pantalla que los enseña y los vuelve a

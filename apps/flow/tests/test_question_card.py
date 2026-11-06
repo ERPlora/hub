@@ -55,8 +55,7 @@ class ChorePlanIn(Schema):
 
     title: str
     due_at: dt.datetime
-    # Marked as every amount is (hub#498): the shared rule still reads a name in _cents only until this one is (PLAN-HUB §50).
-    price_cents: int = Field(json_schema_extra={"money": True})
+    price_cents: int
     urgent: bool
     steps: list[ChoreStepIn]
     person: str = Field(json_schema_extra=names("base.person.detail", by="person"))
