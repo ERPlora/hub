@@ -136,7 +136,7 @@ describe('expectSaveWaitsForMoney: a window without FormModal (hub#921)', () => 
  *  with its own button (`sheet`), that places the platform's notice (`says`) or not; `lightsUp`: «Save» does not wait. */
 async function waitingFor(money: { kind: 'form' | 'sheet'; says: boolean; lightsUp?: boolean }) {
   const sent: unknown[] = [];
-  const Window = defineComponent({
+  const Window = {
     setup() {
       const known = useBusinessMoney();
       const grey = () => !known.value && !money.lightsUp;
@@ -149,7 +149,7 @@ async function waitingFor(money: { kind: 'form' | 'sheet'; says: boolean; lights
           ? h(FormModal, { open: true, title: 'New thing', testid: 'thing', submitDisabled: grey(), onSubmit: save }, () => notice())
           : h('div', [...notice(), h(IonButton, { 'data-testid': 'thing-submit', disabled: grey(), onClick: save }, () => 'Add')]);
     },
-  });
+  };
   const m = await mountBase(Window);
   await m.live();
   const settle = async () => {

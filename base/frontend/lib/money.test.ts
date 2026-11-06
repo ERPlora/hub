@@ -68,7 +68,7 @@ describe('useBusinessMoney', () => {
 });
 
 /** A window that waits for the money: what `useBusinessMoneyRead` says of it, and its «Retry». */
-const Reader = defineComponent({
+const Reader = {
   setup() {
     const read = useBusinessMoneyRead();
     return () =>
@@ -77,7 +77,7 @@ const Reader = defineComponent({
         h('button', { 'data-testid': 'retry', onClick: read.retry }),
       ]);
   },
-});
+};
 
 describe('useBusinessMoneyRead (hub#938)', () => {
   it("is the money and the read's error, and «retry» asks the server again; the answer clears the error", async () => {
@@ -97,13 +97,13 @@ describe('useBusinessMoneyRead (hub#938)', () => {
   });
 
   it('shares the one subscription of the tab with useBusinessMoney', async () => {
-    const Both = defineComponent({
+    const Both = {
       setup() {
         useBusinessMoney();
         useBusinessMoneyRead();
         return () => h('div');
       },
-    });
+    };
     const m = await mountBase(Both);
     await m.live();
     expect(m.client.stream.subscriptions('base.business.get')).toHaveLength(1);
