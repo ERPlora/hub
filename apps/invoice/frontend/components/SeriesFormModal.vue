@@ -6,7 +6,8 @@
 // and next number (it says why: the number is part of the VeriFactu chain); «Next number» is the one the
 // server will hand out. Saving runs `invoice.series.create`, or `invoice.series.update` with only what
 // changed, says so and closes; the table catches up by itself. A refusal stays in the window, under its
-// field when it is one until that field is corrected (FormModal's `fieldErrors`, hub#461).
+// field when it is one until that field is corrected (FormModal's `fieldErrors`, hub#461); each field carries the
+// command's name of its datum, so the window tells the corrected one even when another says the same words (hub#888).
 import { FormModal, InlineFeedback } from '@erplora/ui/components';
 import { useCommand } from '@erplora/ui/sdk';
 import { toastSuccess } from '@erplora/ui/shell';
@@ -151,6 +152,7 @@ async function save(): Promise<void> {
       <div class="invoice-series-form">
         <ion-input
           data-testid="invoice-series-code"
+          name="code"
           :label="$t('invoice.series.form.code')"
           label-placement="floating"
           fill="outline"
@@ -165,6 +167,7 @@ async function save(): Promise<void> {
         />
         <ion-input
           data-testid="invoice-series-name"
+          name="name"
           :label="$t('invoice.series.form.name')"
           label-placement="floating"
           fill="outline"
@@ -177,6 +180,7 @@ async function save(): Promise<void> {
         />
         <ion-select
           data-testid="invoice-series-type"
+          name="invoice_type"
           :label="$t('invoice.series.form.type')"
           label-placement="floating"
           fill="outline"
@@ -198,6 +202,7 @@ async function save(): Promise<void> {
         </ion-select>
         <ion-input
           data-testid="invoice-series-year"
+          name="year"
           :label="$t('invoice.series.form.year')"
           label-placement="floating"
           fill="outline"
@@ -211,6 +216,7 @@ async function save(): Promise<void> {
         />
         <ion-input
           data-testid="invoice-series-prefix"
+          name="prefix"
           :label="$t('invoice.series.form.prefix')"
           label-placement="floating"
           fill="outline"
@@ -224,6 +230,7 @@ async function save(): Promise<void> {
         />
         <ion-input
           data-testid="invoice-series-format"
+          name="format"
           :label="$t('invoice.series.form.format')"
           label-placement="floating"
           fill="outline"
@@ -237,6 +244,7 @@ async function save(): Promise<void> {
         />
         <ion-input
           data-testid="invoice-series-next-number"
+          name="next_number"
           :label="$t('invoice.series.form.nextNumber')"
           label-placement="floating"
           fill="outline"

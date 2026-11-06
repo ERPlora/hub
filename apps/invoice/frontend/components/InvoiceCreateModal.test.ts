@@ -197,6 +197,56 @@ describe('InvoiceCreateModal', () => {
     expect(taxId.errorText).toBe('That tax ID is not valid.');
   });
 
+  it('two lines whose rate is refused with the same words: the corrected line alone loses them (hub#888)', async () => {
+    const s = await setup();
+    await s.choose('TICKET', 'F2');
+    s.editor().vm.$emit('update:modelValue', [
+      { uid: 1, description: 'Course', quantity: '1', price: '10', taxRate: 'x' },
+      { uid: 2, description: 'Dye kit', quantity: '1', price: '5', taxRate: 'x' },
+    ]);
+    await s.wrapper.vm.$nextTick();
+    s.answer(422, {
+      error: {
+        code: 'invalid_payload',
+        message: 'Check the highlighted details.',
+        fields: { 'lines.0.tax_rate': 'Enter a number.', 'lines.1.tax_rate': 'Enter a number.' },
+      },
+    });
+    await click(s.submit());
+    const first = s.inDoc('invoice-line-1-tax-rate') as HTMLElement & { errorText?: string };
+    const second = s.inDoc('invoice-line-2-tax-rate') as HTMLElement & { errorText?: string };
+    expect([first.errorText, second.errorText]).toEqual(['Enter a number.', 'Enter a number.']);
+
+    first.dispatchEvent(new Event('input', { bubbles: true }));
+    await ionValue(first, '21', 'ionInput');
+    expect(first.errorText).toBeFalsy();
+    expect(first.classList.contains('ion-invalid')).toBe(false);
+    expect(second.errorText).toBe('Enter a number.');
+    expect(second.classList.contains('ion-invalid')).toBe(true);
+  });
+
+  it('the refused notes lose their message when corrected, though a line says the same words (hub#888)', async () => {
+    const s = await setup();
+    await s.choose('TICKET', 'F2');
+    await s.line('Course', '10');
+    s.answer(422, {
+      error: {
+        code: 'invalid_payload',
+        message: 'Check the highlighted details.',
+        fields: { notes: 'Enter a valid text.', 'lines.0.description': 'Enter a valid text.' },
+      },
+    });
+    await click(s.submit());
+    const notes = s.inDoc('invoice-create-notes') as HTMLElement & { errorText?: string };
+    const description = s.inDoc('invoice-line-1-description') as HTMLElement & { errorText?: string };
+    expect([notes.errorText, description.errorText]).toEqual(['Enter a valid text.', 'Enter a valid text.']);
+
+    notes.dispatchEvent(new Event('input', { bubbles: true }));
+    await ionValue(notes, 'Paid in cash', 'ionInput');
+    expect(notes.errorText).toBeFalsy();
+    expect(description.errorText).toBe('Enter a valid text.');
+  });
+
   it('follows what a typed line starts with: the territory’s tax (from Taxes) and its general rate', async () => {
     const s = await setup();
     expect(s.params(DEFAULTS)).toEqual([{}]);
