@@ -138,5 +138,8 @@ def test_the_check_lets_a_test_that_leaves_none_pass():
 
 
 def test_every_test_is_checked_once_its_fixtures_are_torn_down(request):
+    # A wrapper around pytest's own teardown, the one that undoes monkeypatch: it checks once that one is done. As a
+    # plain hook, pluggy would only build the generator and no test would ever be checked.
     teardowns = request.config.hook.pytest_runtest_teardown.get_hookimpls()
-    assert testing.database_block_left_as_found in [hook.function for hook in teardowns]
+    [check] = [hook for hook in teardowns if hook.function is testing.database_block_left_as_found]
+    assert check.wrapper
