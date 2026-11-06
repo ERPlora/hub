@@ -8,8 +8,8 @@
 // flow: FLOW-F01 FLOW-F29
 import { expect, test } from '@playwright/test';
 
-import { A, api, capture, psql, saveSessionForTheSweep, shown } from './helpers';
-import { manualFlow, onAutomations } from './flow-helpers';
+import { capture, psql, saveSessionForTheSweep, shown } from './helpers';
+import { askingFlow, onAutomations } from './flow-helpers';
 
 const KEY = 'hub-950-automations-loading';
 const TAG = 'E2E FlowLoading';
@@ -39,10 +39,7 @@ for (const viewport of VIEWPORTS) {
   test(`FLOW-F01 says «Loading…» above the gallery while the automations and the questions are read, at ${viewport.label}`, async ({ browser }) => {
     test.setTimeout(120_000);
     await onAutomations(browser, viewport, TAG, async ({ context, page, name }) => {
-      const flowId = await manualFlow(context, name, [{ id: 's1', kind: 'ask', title: `${name}?` }], []);
-      const ran = await api<{ status: string }>(context, A, 'POST', '/flow/flows/run', { id: flowId, input: {} });
-      expect(ran.status, JSON.stringify(ran.data)).toBe(200);
-      expect(ran.data.status).toBe('asking');
+      await askingFlow(context, name, [{ id: 's1', kind: 'ask', title: `${name}?` }]);
 
       // The business slow: the live stream opens only when let go.
       let letGo!: () => void;

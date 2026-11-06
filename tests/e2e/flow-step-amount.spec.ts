@@ -9,7 +9,7 @@
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, api, psql, saveSessionForTheSweep, settledCapture, shown } from './helpers';
-import { manualFlow, onAutomations } from './flow-helpers';
+import { askingFlow, onAutomations } from './flow-helpers';
 import { createProduct } from './inventory-helpers';
 import { VIEWPORTS } from './schedule-helpers';
 
@@ -51,10 +51,7 @@ async function askedSaying(
   shot: string,
 ): Promise<void> {
   const { context, page, name } = stage;
-  const flowId = await manualFlow(context, name, steps, grants);
-  const ran = await api<{ status: string }>(context, A, 'POST', '/flow/flows/run', { id: flowId, input: {} });
-  expect(ran.status, JSON.stringify(ran.data)).toBe(200);
-  expect(ran.data.status).toBe('asking');
+  await askingFlow(context, name, steps, grants);
 
   await page.goto('/flow/automations');
   const card = shown(page).locator('[data-testid=flow-inbox] article').filter({ hasText: name });
