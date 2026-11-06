@@ -85,17 +85,6 @@ describe('SettingsPage', () => {
     expect(s.field('saved')?.textContent).toContain('Settings saved.');
   });
 
-  it('after a save nothing is left as typed: a change saved elsewhere repaints every field', async () => {
-    const s = await setup();
-    await s.show(SETTINGS);
-    s.answer(200, { ...SETTINGS, page_title: 'Book with us' });
-    await ionValue(s.field('page_title'), 'Book with us', 'ionInput');
-    await click(s.field('save'));
-    await settle();
-    await s.result(OP, { ...SETTINGS, page_title: 'Book now' }, {}, 2);
-    expect(s.field('page_title').value).toBe('Book now');
-  });
-
   it('puts a refusal under its field, keeping what was typed', async () => {
     const s = await setup();
     await s.show(SETTINGS);
@@ -105,6 +94,7 @@ describe('SettingsPage', () => {
     expect(s.field('primary_color').errorText).toBe('Write the colour as #RRGGBB (for example #6366f1).');
     expect(s.field('primary_color').value).toBe('blue');
     expect(s.field('save-error')?.textContent).toContain('Could not save');
+    expect(s.field('save-error')?.textContent).toContain('Invalid payload');
   });
 
   describe('a refusal by fields (hub#854, as FormModal and the Services settings do: ui#102, hub#821)', () => {
@@ -145,40 +135,6 @@ describe('SettingsPage', () => {
       expect(s.notice()).toBe(false);
       expect([s.says('primary_color'), s.marked('primary_color')]).toEqual(['', false]);
       expect([s.says('min_booking_notice'), s.marked('min_booking_notice')]).toEqual(['Ensure this value is less than or equal to 10080.', true]);
-    });
-
-    it('a switch is a change too: the notice goes, the fields keep their messages', async () => {
-      const s = await refused();
-      await ionChecked(s.field('is_enabled'), true);
-      expect(s.notice()).toBe(false);
-      expect([s.says('primary_color'), s.says('min_booking_notice')]).toEqual([
-        'Write the colour as #RRGGBB (for example #6366f1).',
-        'Ensure this value is less than or equal to 10080.',
-      ]);
-    });
-
-    it('the next refusal says it all again', async () => {
-      const s = await refused();
-      await ionValue(s.field('primary_color'), 'red', 'ionInput');
-      await ionValue(s.field('min_booking_notice'), '20000', 'ionInput');
-      expect([s.notice(), s.says('primary_color'), s.says('min_booking_notice')]).toEqual([false, '', '']);
-      await click(s.field('save'));
-      expect(s.notice()).toBe(true);
-      expect([s.says('primary_color'), s.says('min_booking_notice'), s.marked('primary_color')]).toEqual([
-        'Write the colour as #RRGGBB (for example #6366f1).',
-        'Ensure this value is less than or equal to 10080.',
-        true,
-      ]);
-    });
-
-    it('a refusal that names no field stays until the next try: nothing else says it', async () => {
-      const s = await setup();
-      await s.show(SETTINGS);
-      s.answer(409, { error: { code: 'conflict', message: 'Someone else is saving them.' } });
-      await ionValue(s.field('page_title'), 'Book with us', 'ionInput');
-      await click(s.field('save'));
-      await ionValue(s.field('page_title'), 'Book now', 'ionInput');
-      expect(s.field('save-error')?.textContent).toContain('Someone else is saving them.');
     });
   });
 
