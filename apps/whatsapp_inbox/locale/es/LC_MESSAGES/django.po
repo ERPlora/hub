@@ -82,6 +82,7 @@ msgstr "mes de la cifra"
 msgid "version"
 msgstr "versión"
 
+msgctxt "whatsapp channel"
 msgid "synced at"
 msgstr "sincronizado el"
 
@@ -228,6 +229,7 @@ msgstr "dirección"
 msgid "origin"
 msgstr "origen"
 
+msgctxt "whatsapp message"
 msgid "source"
 msgstr "procedencia"
 
@@ -610,11 +612,16 @@ msgstr "botones"
 msgid "changes not yet at Meta"
 msgstr "cambios que aún no han llegado a Meta"
 
+msgctxt "whatsapp template"
 msgid "deleted at"
 msgstr "borrada el"
 
 msgid "deletion at Meta"
 msgstr "borrado en Meta"
+
+msgctxt "whatsapp template"
+msgid "synced at"
+msgstr "sincronizada el"
 
 msgid "erplora.com did not answer: Meta still has the template. Try again."
 msgstr "erplora.com no ha contestado: Meta aún tiene la plantilla. Inténtalo de nuevo."

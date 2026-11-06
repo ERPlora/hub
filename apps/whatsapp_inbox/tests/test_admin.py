@@ -126,9 +126,9 @@ def test_the_admin_in_spanish_says_the_inboxs_own_words(client, superuser):
     header = re.search(r'class="sortable column-synced_at">\s*<div class="text"><a [^>]*>([^<]*)</a>', templates)
     assert header and header.group(1) == "Sincronizada el"
     shown = page(f"/admin/whatsapp_inbox/template/{template.pk}/change/")
-    assert 'for="id_synced_at">Sincronizada el:</label>' in shown
+    assert "<legend>Sincronizada el:</legend>" in shown  # a date and a time: a fieldset, not a label
     assert "<label>Borrada el:</label>" in shown
-    assert 'for="id_synced_at">Sincronizado el:</label>' in page(f"/admin/whatsapp_inbox/channel/{channel.pk}/change/")
+    assert "<legend>Sincronizado el:</legend>" in page(f"/admin/whatsapp_inbox/channel/{channel.pk}/change/")
     for said in (messages, templates, shown):
         assert "liminado el" not in said
         assert "ecibido el" not in said
