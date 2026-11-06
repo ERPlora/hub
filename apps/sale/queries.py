@@ -1735,6 +1735,7 @@ def preview(ctx: OperationContext, params: PreviewIn) -> dict:
         "operation_total": operation_total(order, closes, valuation),
         "cash_limit": CASH_LIMIT.get(country),
         "ticket_limit": TICKET_LIMIT.get(country),
+        "limits_currency": LIMITS_CURRENCY,
     }
 
 

@@ -1129,6 +1129,11 @@ class PreviewLineOut(Schema):
     components: list[str] = Field(description="The dishes of a menu charged in one line.")
 
 
+#: The mark of a charge preview's legal limits: amounts in the currency the law writes them in, which the preview says
+#: beside them (``limits_currency``), never the business's (hub#926).
+IN_LIMITS_CURRENCY = {"money": True, "currency_in": "limits_currency"}
+
+
 class PreviewOut(Schema):
     order_id: UUID | None = Field(description="The check valued.")
     order_version: int | None = Field(
@@ -1154,10 +1159,17 @@ class PreviewOut(Schema):
         json_schema_extra={"money": True},
     )
     cash_limit: int | None = Field(
-        description="From this operation total on, no cash at all (Spain: 100000); empty = no limit."
+        description="From this operation total on, no cash at all, in cents of limits_currency (Spain: 100000, "
+        "1,000.00 EUR); empty = no limit.",
+        json_schema_extra=IN_LIMITS_CURRENCY,
     )
     ticket_limit: int | None = Field(
-        description="Above this total, only an invoice (Spain: 300000); empty = no limit."
+        description="Above this total, only an invoice, in cents of limits_currency (Spain: 300000, 3,000.00 EUR); "
+        "empty = no limit.",
+        json_schema_extra=IN_LIMITS_CURRENCY,
+    )
+    limits_currency: str = Field(
+        description="The currency (ISO 4217) the law writes both limits in, whatever the business charges in: EUR."
     )
 
 

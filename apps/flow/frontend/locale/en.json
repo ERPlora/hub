@@ -1890,6 +1890,7 @@
       "legal_name": "Legal name",
       "lifecycle_stage": "Lifecycle stage",
       "limit": "Limit",
+      "limits_currency": "Currency of the limits",
       "line_amount": "Line amount",
       "line_count": "Line count",
       "line_id": "Line",
