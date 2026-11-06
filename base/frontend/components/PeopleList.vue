@@ -8,7 +8,7 @@
 // page from the row (their PIN and badge). On a phone each person is a card. A list that cannot be read says so.
 // «Invite on erplora.com» leaves the Hub by `openExternalLink` (gh:hub#439: the installed app opens nothing on a `_blank`
 // link, its system browser does), never in the Google Play copy (`managementOffered`, as «Manage on erplora.com» at the
-// menu's foot, gh:hub#1897). «Upgrade plan» goes with the pass (BASE-F11, `useSaasPass`), already signed in.
+// menu's foot, gh:hub#1897). «Upgrade plan» is the platform's PlanUpgradeLink: it goes with the pass (BASE-F11).
 import { DataTable, type DataTableColumn, InlineFeedback, StatusPill } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
 import { HubIcon, openExternalLink, useSession, useSurface } from '@erplora/ui/shell';
@@ -19,8 +19,8 @@ import { type HubHome, readJsonBlock } from '../lib/home';
 import { useBaseI18n } from '../lib/i18n';
 import { managementOffered } from '../lib/management';
 import { accessKeys, roleKey } from '../lib/people';
-import { useSaasPass } from '../lib/saas-pass';
 import type { Person } from '../operations';
+import PlanUpgradeLink from './PlanUpgradeLink.vue';
 
 const { t, locale } = useBaseI18n();
 const router = useRouter();
@@ -31,7 +31,6 @@ const admin = computed(() => session.can('base.administer_hub'));
 const home = readJsonBlock<HubHome>('hub-home');
 const membersUrl = home?.members_url ?? '';
 const planUrl = home?.plan_url ?? '';
-const { openSaasPass } = useSaasPass();
 const offered = managementOffered();
 
 const { data, status, refresh } = useLive('base.person.list', {});
@@ -106,14 +105,11 @@ function open(row: Person): void {
         v-if="isWeb && planUrl"
         #actions
       >
-        <a
+        <PlanUpgradeLink
           class="people-upgrade"
           data-testid="people-upgrade"
-          :href="planUrl"
-          target="_blank"
-          rel="noopener"
-          @click="openSaasPass('plan', planUrl, $event)"
-        >{{ t('base.plan.upgrade') }}</a>
+          :url="planUrl"
+        />
       </template>
     </InlineFeedback>
     <p class="people-managed">

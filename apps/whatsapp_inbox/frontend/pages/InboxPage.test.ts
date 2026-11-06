@@ -268,6 +268,8 @@ describe('InboxPage: the channel notices (WHATSAPP_INBOX-F01, F02, F13)', () => 
       target: '_blank',
       rel: 'noopener',
     });
+    // Each notice puts the inbox's own words inside the platform's link (hub#853): this one too, not only the cap's.
+    expect(near.find('whatsapp-inbox-upgrade').text()).toBe('Upgrade plan');
     const employee = await setup({ session: EMPLOYEE }, { ...CONNECTED, monthly_usage: 120 });
     expect(employee.find('whatsapp-inbox-near-cap').text()).toContain('You have 30 of 150 WhatsApp messages of your plan left this month.');
     expect(employee.find('whatsapp-inbox-upgrade').exists()).toBe(false);
@@ -331,6 +333,7 @@ describe('InboxPage: the channel notices (WHATSAPP_INBOX-F01, F02, F13)', () => 
     expect(none.find('whatsapp-inbox-upgrade').text()).toBe('Mejorar el plan');
     const near = await setup({ locale: 'es' }, { ...CONNECTED, monthly_usage: 120 });
     expect(near.find('whatsapp-inbox-near-cap').text()).toContain('Te quedan 30 de 150 mensajes de WhatsApp de tu plan este mes.');
+    expect(near.find('whatsapp-inbox-upgrade').text()).toBe('Mejorar el plan');
     await s.result(LIST, PAGE);
     expect(s.prop('searchPlaceholder')).toBe('Filtrar contacto o teléfono…');
   });
