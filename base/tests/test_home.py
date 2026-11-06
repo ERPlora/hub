@@ -396,6 +396,7 @@ def components(tmp_path):
         ([{"key": "printer"}], 1),  # no component
         ([{"key": "printer", "component": "MissingCard"}], 1),  # no such file: the card would never mount
         ([{"key": "printer", "component": "../ThingsCard"}], 1),  # a name, never a path
+        ([{"key": "printer", "component": "../components/ThingsCard"}], 1),  # a file, but the SPA would never mount it
         ([{"key": "printer", "component": "ThingsCard", "permission": "other.view"}], 1),  # not the app's
         ([{"key": "printer", "component": "ThingsCard", "permision": "things.view"}], 1),  # a field misspelt
         ([{"key": "printer", "component": "ThingsCard"}, {"key": "printer", "component": "ThingsCard"}], 1),
