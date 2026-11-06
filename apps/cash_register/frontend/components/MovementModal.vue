@@ -4,13 +4,15 @@
 // the sign by the type), «Concept». From the screen the movement is always cash. An amount that is zero or
 // cannot be read is said under its field; the server's refusal (below zero, the session closed on another
 // device) is read in the window. «Register» waits in grey until the business has answered its money (the amount is read
-// in it; hub#921). Success says «Cash-in recorded (…)» or «Cash-out recorded (…)».
+// in it; hub#921), and says so with «Retry» if that read fails (hub#938). Success says «Cash-in recorded (…)» or
+// «Cash-out recorded (…)».
 import { FormModal, type FormModalError } from '@erplora/ui/components';
 import { useCommand } from '@erplora/ui/sdk';
 import { toastSuccess } from '@erplora/ui/shell';
 import { IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, shallowRef, watch } from 'vue';
 
+import BusinessMoneyError from '../../../../base/frontend/components/BusinessMoneyError.vue';
 import { useLocale, useT } from '../composables/useT';
 import { formatMoney, moneyRefusal, readAmount, useBusinessMoney } from '../lib/money';
 import { refusal } from '../lib/refusal';
@@ -82,6 +84,7 @@ async function confirm(): Promise<void> {
     @submit="confirm"
   >
     <div class="cash-movement">
+      <BusinessMoneyError />
       <ion-select
         data-testid="cash-register-movement-type"
         :label="$t('cash_register.movement.type')"

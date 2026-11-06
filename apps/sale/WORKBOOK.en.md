@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:44526d4af6ea2edc94c710b412b9e4f54db0372d787bc0d0511ce974c1219b3b -->
+<!-- generated from WORKBOOK.md sha256:637650d0a1071210f5746c212cf23da07bf2dee8b032174eb6d2cdd78ddc34f4 -->
 
 ## What it is for and who it is for
 
@@ -518,7 +518,8 @@ Out: a line with no catalog article, with its amount and its VAT category, which
 other.
 If it fails: "Add" cannot be pressed without an amount and a section, nor while the business has not yet
 said its currency, because the amount is read in it (without it, "1500" yen would go in as 150,000; what
-was typed stays and is read as soon as it arrives); with no sections or categories,
+was typed stays and is read as soon as it arrives). If the currency cannot be read, the sheet says so ("The business's currency could not be read", with the
+reason) and offers "Retry", which asks for it again; as soon as it arrives, "Add" lights up (hub#938). With no sections or categories,
 "There are no tax categories to choose from. Set up your VAT first, in Taxes.". If "Cancel" is pressed
 in "An approval is needed", the line does not go in and the sheet says "This needs a manager's
 approval.". Without the permission or the approval, the server refuses the line through any other route
@@ -665,7 +666,10 @@ Out: the discount on the check or on the line; when charging it is shared out am
 declared base and VAT already carry it discounted, and the sale keeps the discounted amount.
 If it fails: with "Allow discounts" off there are no buttons and the server refuses "This business does
 not allow discounts.". A fixed amount cannot be applied while the business has not yet said its currency,
-because it is read in it (without it, "1500" yen would take 150,000 off); a percentage does not wait for it. Above the maximum, if "Cancel" is pressed in "An approval is needed", the check
+because it is read in it (without it, "1500" yen would take 150,000 off); a percentage does not wait for it. With a
+fixed amount, if the currency cannot be read, the sheet says so ("The business's currency could not be read",
+with the reason) and offers "Retry", which asks for it again; as soon as it arrives, "Apply" lights up; with a
+percentage it does not show (hub#938). Above the maximum, if "Cancel" is pressed in "An approval is needed", the check
 stays as it was and "This needs a manager's approval." is read. An amount greater than the check cannot
 be applied. When charging a check, the discount goes on the check, never on the charge request: one that
 brings it is refused with "The discount of an open check is set on the check itself, not at the
@@ -1316,6 +1320,8 @@ no longer offered…"; an amount outside the service's minimum and maximum, "Tha
 service allows (<minimum> – <maximum>).". A booked price that does not match the appointment: "That is not the price the appointment
 booked for this service: it is cancelled, it is another customer's, it did not book this service or it
 booked it cheaper." (409 on its field). Without Services active, "Services" does not show in the strip.
+If the currency cannot be read, the sheet says so ("The business's currency could not be read", with the
+reason) and offers "Retry", which asks for it again; as soon as it arrives, "Add <amount>" and "Use <price>" light up (hub#938).
 Involved: SERVICE-F09, SERVICE-F03, SERVICE-F31, APPOINTMENT-F17
 
 ## What the verticals share

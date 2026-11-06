@@ -3,11 +3,12 @@
 // (never over 100); the ticket can switch to a fixed amount with the button of the business's currency (switching clears
 // what was typed; a check with only a fixed amount opens on it). «Apply −N %» / «Apply −<amount>»
 // hands one kind up (the other at 0); a fixed amount waits in grey for the business's money (hub#921: it is read in
-// it, never before it answers). «Remove» hands both at 0. The page picks the door — the
-// manager's above the business's cap — and a refusal is read here, over the buttons.
+// it, never before it answers, and if that read fails it says so with «Retry», hub#938). «Remove» hands both at 0. The
+// page picks the door — the manager's above the business's cap — and a refusal is read here, over the buttons.
 import { IonButton, IonLabel, IonSegment, IonSegmentButton } from '@ionic/vue';
 import { computed, shallowRef, watch } from 'vue';
 
+import BusinessMoneyError from '../../../../../base/frontend/components/BusinessMoneyError.vue';
 import { useKeypadAmount } from '../../composables/pos/useKeypadAmount';
 import { useLocale, useT } from '../../composables/useT';
 import { currencySign, formatPercent, moneyDecimals } from '../../lib/format';
@@ -104,6 +105,7 @@ function apply(): void {
     />
     <template #foot>
       <div class="pos-sheet-foot">
+        <BusinessMoneyError v-if="mode === 'amount'" />
         <p
           v-if="error"
           class="pos-sheet-error"

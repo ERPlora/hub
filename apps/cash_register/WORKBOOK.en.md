@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:d8d600de49a8a626caec5a1ff8cbf767a00dda42dfc7fb5313456431afd8be4d -->
+<!-- generated from WORKBOOK.md sha256:4e990e509aa2ae99da322dcbc71cd4620a162006442d0bb5e77fc89b6832be5a -->
 
 ## What it is for and who it is for
 
@@ -219,7 +219,8 @@ give the cash the drawer starts with." under the field; a deactivated drawer or 
 "That drawer is not available."; an unreadable amount ("This is not an amount. Type a figure, for example
 12.50."), a negative or an ambiguous one ("1,250") is stopped before sending. "Open session" is grey while
 the business has not yet said its currency, because the float is read in it (without it, "1500" yen would
-be saved as 150,000).
+be saved as 150,000). If the currency cannot be read, the window says so ("The business's currency could not be read", with the
+reason) and offers "Retry", which asks for it again; as soon as it arrives, "Open session" lights up (hub#938).
 Involved: CASH_REGISTER-F04, F09
 
 ### CASH_REGISTER-F04 Sell only with the cash register open
@@ -261,7 +262,9 @@ If it fails: "This cash-out would leave the drawer below zero and a negative bal
 the settings do not allow it; a zero, unreadable or negative amount is stopped before sending; the
 session closed on another device: "That cash session is closed: a closed session takes no new
 movements.". "Register" is grey while the business has not yet said its currency, because the amount is
-read in it (without it, "1500" yen would be saved as 150,000). A wrong movement is neither edited nor deleted: the opposite one is recorded with a concept
+read in it (without it, "1500" yen would be saved as 150,000). If the currency cannot be read, the window says so ("The business's currency could not be read", with the
+reason) and offers "Retry", which asks for it again; as soon as it arrives, "Register" lights up (hub#938).
+A wrong movement is neither edited nor deleted: the opposite one is recorded with a concept
 that says why.
 Involved: none
 
@@ -370,7 +373,8 @@ If it fails: "Type the counted cash to close the session." with the field empty 
 for it; the required count setting enforces it on the assistant and the API too). "Close session" is grey
 while the business has not yet said its currency, and the last closing count is not written in the field
 until then: the counted cash is written and read in it (without it, "1500" yen would be saved as 150,000
-and a count of 1500 yen would show as "15.00"). If another device
+and a count of 1500 yen would show as "15.00"). If the currency cannot be read, the window says so ("The business's currency could not be read", with the
+reason) and offers "Retry", which asks for it again; as soon as it arrives, "Close session" lights up (hub#938). If another device
 closed it before, "That cash session is closed: a closed session takes no new movements." (two closes at
 once: one closes, the other gets this notice). To the assistant, if the count is required and you do not
 say how much you counted, it asks for it with that same notice and no confirmation shows; if the
