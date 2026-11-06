@@ -4,7 +4,8 @@
 // that stays grey after the answer. A window without FormModal (the till's sheets and its charge sheet, hub#921) says its
 // own door past the grey button, or that its button is its only one. When the money cannot be read instead (hub#938), the
 // window says so with «Retry» — the platform's BusinessMoneyError, in a window with FormModal or in a sheet without it —
-// and the helper fails a window that waits without a word, or that lights «Save» up with no money to read in.
+// and the helper fails a window that waits without a word, that lights «Save» up with no money to read in, whose notice
+// has no «Retry» or one that does not ask the server again, and one that stays grey after the answer.
 import { FormModal } from '@erplora/ui/components';
 import { IonButton } from '@ionic/vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -132,15 +133,23 @@ describe('expectSaveWaitsForMoney: a window without FormModal (hub#921)', () => 
   });
 });
 
+/** A notice of the window's own instead of the platform's: an alert that never goes, without «Retry» (`mute`) or with
+ *  one that asks nothing (`deaf`). */
+function ownNotice(retry: 'mute' | 'deaf') {
+  const button = retry === 'deaf' ? [h('button', { 'data-testid': 'base-money-error-retry' }, 'Retry')] : [];
+  return h('div', { role: 'alert', 'data-testid': 'base-money-error' }, button);
+}
+
 /** A window whose «Save» waits for the business's real money (`useBusinessMoney`), with FormModal (`form`) or as a sheet
- *  with its own button (`sheet`), that places the platform's notice (`says`) or not; `lightsUp`: «Save» does not wait. */
-async function waitingFor(money: { kind: 'form' | 'sheet'; says: boolean; lightsUp?: boolean }) {
+ *  with its own button (`sheet`), that places the platform's notice (`says`), one of its own (`mute`, `deaf`) or none;
+ *  `lightsUp`: «Save» does not wait; `staysGrey`: nor does it light up once the business answers. */
+async function waitingFor(money: { kind: 'form' | 'sheet'; says: boolean | 'mute' | 'deaf'; lightsUp?: boolean; staysGrey?: boolean }) {
   const sent: unknown[] = [];
   const Window = {
     setup() {
       const known = useBusinessMoney();
-      const grey = () => !known.value && !money.lightsUp;
-      const notice = () => (money.says ? [h(BusinessMoneyError)] : []);
+      const grey = () => (!known.value && !money.lightsUp) || !!money.staysGrey;
+      const notice = () => (money.says === true ? [h(BusinessMoneyError)] : money.says ? [ownNotice(money.says)] : []);
       const save = (): void => {
         if (known.value) sent.push({ price: 1500 });
       };
@@ -184,5 +193,20 @@ describe('expectSaysMoneyUnreadable (hub#938)', () => {
   it('fails a window whose «Save» is not grey while the money cannot be read', async () => {
     const w = await waitingFor({ kind: 'form', says: true, lightsUp: true });
     await expect(expectSaysMoneyUnreadable(w.window, w.read)).rejects.toThrow(/grey/);
+  });
+
+  it('fails a window whose notice offers no «Retry»', async () => {
+    const w = await waitingFor({ kind: 'form', says: 'mute' });
+    await expect(expectSaysMoneyUnreadable(w.window, w.read)).rejects.toThrow(/«Retry» in that alert/);
+  });
+
+  it('fails a window whose «Retry» does not ask the server again', async () => {
+    const w = await waitingFor({ kind: 'sheet', says: 'deaf' });
+    await expect(expectSaysMoneyUnreadable(w.window, w.read)).rejects.toThrow(/asks the server again/);
+  });
+
+  it('fails a window whose «Save» stays grey once the business answers', async () => {
+    const w = await waitingFor({ kind: 'form', says: true, staysGrey: true });
+    await expect(expectSaysMoneyUnreadable(w.window, w.read)).rejects.toThrow(/once the business answers/);
   });
 });

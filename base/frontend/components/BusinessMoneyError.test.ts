@@ -2,11 +2,14 @@
 // money is known, the window says it could not be read — the server's reason and «Retry» — instead of waiting in grey
 // without a word. «Retry» asks the server again (the tab's stream reopens) and the notice goes while it asks; a new
 // failure brings it back and the answer takes it away. Once the money is known a later failure says nothing: no window
-// waits for it any longer. It is the one place that says it: every window that waits places it (CheckoutPanel aside,
-// which says every read of its own).
+// waits for it any longer. A window opened after the read had already failed (the page read the money on loading) says
+// it as well. It is the one place that says it: every window that waits places it (CheckoutPanel aside, which says every
+// read of its own).
 import { afterEach, describe, expect, it } from 'vitest';
+import { defineComponent, h, ref } from 'vue';
 
 import { business, errorFrame, flush, mountBase, subId } from '../__tests__/mount-base';
+import { useBusinessMoney } from '../lib/money';
 import BusinessMoneyError from './BusinessMoneyError.vue';
 
 afterEach(() => {
@@ -66,6 +69,29 @@ describe('BusinessMoneyError', () => {
     await s.result(s.call, 'base.business.get', business());
     await s.fail();
     expect(s.notice().exists()).toBe(false);
+  });
+
+  it('a window opened after the read had already failed says so too, and «Retry» asks again', async () => {
+    const open = ref(false);
+    // The page follows the money from its load; its window (and the notice in it) mounts later, on a tap.
+    const Page = defineComponent({
+      setup() {
+        useBusinessMoney();
+        return () => h('div', open.value ? [h(BusinessMoneyError)] : []);
+      },
+    });
+    const m = await mountBase(Page);
+    await m.live();
+    m.net.lastStream().push(errorFrame(subId(m.client, 'base.business.get'), 'base.hub_busy'));
+    await flush();
+    open.value = true;
+    await flush();
+    const notice = () => m.wrapper.find('[data-testid="base-money-error"]');
+    expect(notice().exists() && notice().text()).toContain('msg base.hub_busy');
+    const asked = m.net.streams.length;
+    await m.wrapper.find('[data-testid="base-money-error-retry"]').trigger('click');
+    await flush();
+    expect([m.net.streams.length - asked, notice().exists()]).toEqual([1, false]);
   });
 
   it('speaks Spanish', async () => {
