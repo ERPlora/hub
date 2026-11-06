@@ -2,10 +2,11 @@
 // quantities and percentages as decimal strings). One place turns them into text in the page's
 // language with `Intl.NumberFormat`, and the amounts a person types into cents: no page formats by hand.
 // Money is in the business's currency (flow business-currency), or a charged sale's own: the one the screen
-// passes, with the decimals the server counts; until it is known, a figure without a symbol, never the euro.
+// passes, with the decimals the server counts; until it is known, a dash: never the euro, nor a figure with two
+// decimals it may not have (hub#936: 1,500 yen painted «15.00»).
 import { describe, expect, it } from 'vitest';
 
-import { centsFromAmount, currencySign, formatDay, formatMoney, formatPercent, formatQuantity, keypadCents, moneyOf, plain } from './format';
+import { centsFromAmount, currencySign, formatDay, formatMoney, formatPercent, formatQuantity, keypadCents, moneyOf, plain, signedMoney } from './format';
 
 // The money as `base.business.get` (or a sale) says it: the currency and the decimals the server counts it in.
 const EUR = { currency: 'EUR', decimals: 2 };
@@ -54,18 +55,25 @@ describe('money of the business (flow business-currency)', () => {
     expect(spaced(formatMoney(123450, 'en', HUF))).toBe('Ft 1,234.50');
   });
 
-  it('until the money is known an amount is a figure without a sign, never the euro', () => {
-    expect(spaced(formatMoney(123456, 'es'))).toBe('1.234,56');
-    expect(formatMoney(15050, 'en')).toBe('150.50');
+  // hub#936: two decimals supposed painted 1,500 yen as «15.00» until the business answered.
+  it('until the money is known an amount is a dash, never a figure with decimals the currency may not have', () => {
+    expect(formatMoney(1500, 'es')).toBe('—');
+    expect(formatMoney(15050, 'en')).toBe('—');
     expect(formatMoney(null, 'en')).toBe('—');
+  });
+
+  it('an amount taken off or added carries its sign; until the money is known, the dash alone', () => {
+    expect(signedMoney('−', 500, 'en', JPY)).toBe('−¥500');
+    expect(spaced(signedMoney('+', 150, 'es', EUR))).toBe('+1,50 €');
+    expect(signedMoney('−', 500, 'en')).toBe('—');
   });
 
   it('a charged sale is painted with its own currency and decimals, as the server sent them', () => {
     expect(moneyOf({ currency: 'PLN', currency_decimals: 2 })).toEqual(PLN);
     expect(moneyOf({ currency: 'JPY', currency_decimals: 0 })).toEqual(JPY);
-    // A server that does not send it yet (a deploy half way): a figure without a sign, never a broken screen.
+    // A server that does not send it yet (a deploy half way): a dash, never a broken screen nor a guessed figure.
     expect(moneyOf({} as { currency: string; currency_decimals: number })).toBeUndefined();
-    expect(formatMoney(150, 'en', moneyOf({} as { currency: string; currency_decimals: number }))).toBe('1.50');
+    expect(formatMoney(150, 'en', moneyOf({} as { currency: string; currency_decimals: number }))).toBe('—');
   });
 
   it('the sign of the money alone, for the button that switches a discount to an amount (gh:sales#380)', () => {

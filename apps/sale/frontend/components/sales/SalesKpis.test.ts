@@ -7,7 +7,7 @@
 // figure that could not be read is not a zero), and a failure adds «Error loading metrics».
 import { describe, expect, it } from 'vitest';
 
-import { errorFrame, flush, mountSale, taxSettings } from '../../__tests__/mount-sale';
+import { business, errorFrame, flush, JAPANESE, mountSale, taxSettings } from '../../__tests__/mount-sale';
 import { plain } from '../../lib/format';
 import type { StatsOut } from '../../operations';
 import SalesKpis from './SalesKpis.vue';
@@ -68,6 +68,17 @@ describe('SalesKpis', () => {
       ['Voided', '3'],
     ]);
     expect(s.find('sales-kpis-error').exists()).toBe(false);
+  });
+
+  // hub#936: until the business says its money, the money cards say «—», never 12,500.50 for 1,250,050 yen.
+  it('the money figures wait for the business’s money; the counts do not', async () => {
+    const m = await mountSale(SalesKpis, { props: { bounds: {} }, locale: 'en', business: null });
+    await m.live();
+    await m.result('sale.sale.stats', STATS);
+    const values = () => KEYS.map((key) => plain(m.find(`sales-kpi-${key}`).text()));
+    expect(values()).toEqual(['1,234', '—', '—', '—', '—', '3']);
+    await m.result('base.business.get', business(JAPANESE));
+    expect(values()).toEqual(['1,234', '¥1,250,050', '¥1,013', '¥150,050', '¥2,500', '3']);
   });
 
   it('a failure shows «—» everywhere and «Error loading metrics»', async () => {
