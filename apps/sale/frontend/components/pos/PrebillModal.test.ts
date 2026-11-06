@@ -9,7 +9,8 @@ import { toastError, toastSuccess } from '@erplora/ui/shell';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { h, ref } from 'vue';
 
-import { click, errorFrame, mountSale, settle } from '../../__tests__/mount-sale';
+import type { Business } from '../../../../../base/frontend/operations';
+import { business, click, errorFrame, JAPANESE, mountSale, settle } from '../../__tests__/mount-sale';
 import { PrintRefused } from '../../../../../base/frontend/lib/print-paper';
 import { printPaper } from '../../lib/print';
 import { plain } from '../../lib/format';
@@ -57,14 +58,14 @@ const VALUED = preview({
 
 const BUSINESS = { sale_id: null, name: 'Casa Pepe S.L.', tax_id: 'B12345674', lines: ['Calle Mayor 1', 'Tel. 600 000 000'] };
 
-async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 'en', letterhead: unknown = BUSINESS) {
+async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 'en', letterhead: unknown = BUSINESS, money?: Business | null) {
   const open = ref(true);
   const m = await mountSale(
     {
       setup: () => () =>
         h(PrebillModal, { open: open.value, 'onUpdate:open': (v: boolean) => (open.value = v), order: CHECK, customerName: null, ...props }),
     },
-    { locale },
+    { locale, business: money },
   );
   await settle();
   await m.live();
@@ -169,6 +170,28 @@ describe('PrebillModal', () => {
     m.net.lastStream().push(errorFrame(m.subId('sale.letterhead.get'), 'internal_error'));
     await settle();
     expect(m.find('pos-prebill-error').exists()).toBe(true);
+    expect(m.find('pos-prebill-paper').exists()).toBe(false);
+  });
+
+  // hub#936: the paper is the business's money; before it answers, 2,700 yen would be printed «27.00».
+  it('waits for the business’s money: no paper to print without it, and then the yen', async () => {
+    const m = await setup({}, 'en', BUSINESS, null);
+    await m.result('sale.checkout.preview', VALUED);
+    expect(m.find('pos-prebill-loading').exists()).toBe(true);
+    expect(m.find('pos-prebill-paper').exists()).toBe(false);
+    expect((m.find('pos-prebill-print').element as HTMLElement & { disabled?: boolean }).disabled).toBe(true);
+    await m.result('base.business.get', business(JAPANESE));
+    expect(plain(m.find('pos-prebill-paper').find('.pos-bill__total').text())).toContain('¥2,700');
+    expect((m.find('pos-prebill-print').element as HTMLElement & { disabled?: boolean }).disabled).toBe(false);
+  });
+
+  it('a business’s money that cannot be read says so with «Retry», never a paper', async () => {
+    const m = await setup({}, 'en', BUSINESS, null);
+    await m.result('sale.checkout.preview', VALUED);
+    m.net.lastStream().push(errorFrame(m.subId('base.business.get'), 'internal_error'));
+    await settle();
+    expect(m.find('pos-prebill-error').exists()).toBe(true);
+    expect(m.find('pos-prebill-loading').exists()).toBe(false);
     expect(m.find('pos-prebill-paper').exists()).toBe(false);
   });
 
