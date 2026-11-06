@@ -34,7 +34,6 @@ SPANISH = Path("locale", "es", "LC_MESSAGES", "django.mo")
 #: module. Only ever lower: a module
 #: that gives such a text its own context (or the earlier wording) lowers its number here, and none comes in.
 SHADOWED = {
-    "appointment": 7,
     "flow": 7,
     "kitchen": 7,
     "modifier": 2,
