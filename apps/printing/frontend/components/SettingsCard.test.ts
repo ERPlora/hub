@@ -75,10 +75,11 @@ describe('SettingsCard', () => {
         body: { open_drawer_on_sale: true, receipt_copies: 2, kitchen_printer: null, receipt_printer: 't1' },
       },
     ]);
-    expect(toastSuccess).toHaveBeenCalledWith('Settings saved.');
+    expect(s.find('printing-settings-saved').text()).toBe('Settings saved.');
+    expect(toastSuccess).not.toHaveBeenCalled();
   });
 
-  it('a refused save says so with the server’s words', async () => {
+  it('a refused save says so with the server’s words, and under the role it names', async () => {
     const s = await setup();
     await s.result(OP, FACTORY);
     await s.result(PRINTERS, ACTIVE);
@@ -86,6 +87,23 @@ describe('SettingsCard', () => {
     s.answer(422, { error: { code: 'invalid_payload', message: 'That printer is inactive.', fields: { kitchen_printer: 'That printer is inactive.' } } });
     await click(s.inDoc('printing-settings-save'));
     expect(s.find('printing-settings-save-error').text()).toContain('That printer is inactive.');
+    expect(prop(s.field('kitchen_printer'), 'errorText')).toBe('That printer is inactive.');
+    expect(prop(s.field('bar_printer'), 'errorText')).toBeUndefined();
+  });
+
+  it('after a refused save, another printer for that role lifts its message and the notice; the next refusal says them again', async () => {
+    const s = await setup();
+    await s.result(OP, FACTORY);
+    await s.result(PRINTERS, ACTIVE);
+    s.answer(422, { error: { code: 'invalid_payload', message: 'That printer is inactive.', fields: { kitchen_printer: 'That printer is inactive.' } } });
+    const says = () => [prop(s.field('kitchen_printer'), 'errorText') ?? '', s.inDoc('printing-settings-save-error') !== null];
+    await ionValue(s.field('kitchen_printer'), 'k1');
+    await click(s.inDoc('printing-settings-save'));
+    expect(says()).toEqual(['That printer is inactive.', true]);
+    await ionValue(s.field('kitchen_printer'), 'k2');
+    expect(says()).toEqual(['', false]);
+    await click(s.inDoc('printing-settings-save'));
+    expect(says()).toEqual(['That printer is inactive.', true]);
   });
 
   it('the receipt’s texts are the till’s: the note, and the link while Sales is on', async () => {

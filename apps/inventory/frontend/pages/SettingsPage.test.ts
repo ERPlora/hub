@@ -75,17 +75,18 @@ describe('SettingsPage', () => {
     expect(s.testid('inventory-settings-allow-negative-help').text()).toContain('a sale lowers the stock even below zero');
   });
 
-  it('«Save» sends the three settings and says «Settings saved.»', async () => {
+  it('«Save» sends only what changed, the threshold as a number, and says «Settings saved.» above it', async () => {
     const s = await setup();
     await s.show(CONFIG);
     s.net.onApi(() => ok({ allow_sell_without_stock: true, low_stock_threshold: 6, track_stock: true }));
     await s.wrapper.findAllComponents(IonToggle)[0].setValue(true);
-    await s.wrapper.findComponent(IonInput).setValue('6');
+    await s.wrapper.findComponent(IonInput).setValue(' 6 ');
     await s.save();
     const [call] = s.calls('/api/inventory/config');
     expect(call.init.method).toBe('POST');
-    expect(s.body(call)).toEqual({ allow_sell_without_stock: true, low_stock_threshold: 6, track_stock: true });
-    expect(toasts.success).toHaveBeenCalledWith('Settings saved.');
+    expect(s.body(call)).toEqual({ allow_sell_without_stock: true, low_stock_threshold: 6 });
+    expect(s.testid('inventory-settings-saved').text()).toBe('Settings saved.');
+    expect(toasts.success).not.toHaveBeenCalled();
   });
 
   it('a refused save says «The settings could not be saved.» and paints a field message under its field', async () => {
@@ -100,11 +101,37 @@ describe('SettingsPage', () => {
     expect(toasts.success).not.toHaveBeenCalled();
   });
 
-  it('«Save» is off while the threshold is empty', async () => {
+  it('after a refused save, correcting the threshold lifts its message and the notice; the next refusal says them again', async () => {
     const s = await setup();
     await s.show(CONFIG);
+    s.net.onApi(() => refusal(422, 'invalid_payload', 'Invalid payload', { low_stock_threshold: 'Enter a whole number.' }));
+    const says = () => [(s.field('threshold').element as Control).errorText ?? '', s.testid('inventory-settings-save-error').exists()];
+    await s.wrapper.findComponent(IonInput).setValue('2.5');
+    await s.save();
+    expect(says()).toEqual(['Enter a whole number.', true]);
+    await s.wrapper.findComponent(IonInput).setValue('3');
+    expect(says()).toEqual(['', false]);
+    await s.save();
+    expect(says()).toEqual(['Enter a whole number.', true]);
+  });
+
+  it('«Save» is off until something changes', async () => {
+    const s = await setup();
+    await s.show(CONFIG);
+    const off = () => (s.testid('inventory-settings-save').element as Control).disabled;
+    expect(off()).toBe(true);
+    await s.wrapper.findAllComponents(IonToggle)[1].setValue(false);
+    expect(off()).toBe(false);
+  });
+
+  it('an emptied threshold is the server’s to refuse, under the field', async () => {
+    const s = await setup();
+    await s.show(CONFIG);
+    s.net.onApi(() => refusal(422, 'invalid_payload', 'Invalid payload', { low_stock_threshold: 'Enter a whole number.' }));
     await s.wrapper.findComponent(IonInput).setValue('');
-    expect((s.testid('inventory-settings-save').element as Control).disabled).toBe(true);
+    await s.save();
+    expect(s.body(s.calls('/api/inventory/config')[0])).toEqual({ low_stock_threshold: '' });
+    expect((s.field('threshold').element as Control).errorText).toBe('Enter a whole number.');
   });
 
   it('a new result does not overwrite what is being changed; untouched it follows the server', async () => {
