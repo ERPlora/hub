@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:d0f1d9db8fc9a749296c44e98fdfd696a61280b7dca502c6c64e367044a97ce6 -->
+<!-- generated from WORKBOOK.md sha256:faded2c3d449fc1abf10c9f1441d157baa6a4a3bfdb50a40208d6ba9f29fee83 -->
 
 ## What it is for and who it is for
 
@@ -1073,7 +1073,10 @@ Steps:
    and go into each query or action that carries them, over whatever the assistant sends for them or even if
    it sends nothing. That way, the WhatsApp reply only cancels or changes the reservation of whoever writes,
    even if it is asked for another person's. In an automation another app brings, also those its app fixed
-   after it was set up (FLOW-F36).
+   after it was set up (FLOW-F36). Here the assistant does not search the web, even though it can in the chat:
+   what it answers is kept in the run and in the history, and the search engine's terms do not allow keeping
+   its results, not even in part (FLOW-F39). It does have today's date and time and the exchange rate between
+   currencies, as in the chat.
 3. What the assistant looks up is done on the spot and nobody is asked; the history says "The assistant used
    "…".".
 4. What it wants to change:
@@ -1105,8 +1108,10 @@ Out: what it answered in the end, after the changes, for the steps after it and 
 first", also the person's last answer. What it looks up or changes notifies as if the automation did it.
 If it fails: what you have not granted it is not offered to it and, if it asks for it, it is not done; what
 the action refuses ("The assistant tried "…", which did not take it.") is told to the assistant so that it
-tells it. If a fixed piece of data is left empty in that run (the card was not found), that query or action
-is not done nor waits for a yes: the assistant knows, to tell it, and the history says "The assistant tried
+tells it. If it asks to search the web, nothing is searched: it is told that it cannot in an automation, so
+that it says so and answers without it (FLOW-F39). If a fixed piece of data is left empty in that run (the
+card was not found), that query or action is not done nor waits for a yes: the assistant knows, to tell it,
+and the history says "The assistant tried
 "…", but "…", fixed by this step, was empty: it was not done.". If it reaches the limit of turns without
 finishing, it stops: "The assistant took its … turns without finishing, so it stopped.". If erplora.com does
 not answer or fails, it tries three times in total (after one second and after three seconds) without
@@ -1127,7 +1132,9 @@ Screen: none
 Steps:
 1. Each time the step needs the assistant, the Hub calls erplora.com with the business's key, with no person
    in front, just like a chat turn that is not painted (on erplora.com, ASSISTANT-F13): there is no separate
-   door.
+   door. It only differs from the chat in that it does not search the web: the Hub keeps what it answers (in
+   the run and in the history, FLOW-F38) and the search engine's terms do not allow keeping its results, not
+   even in part, so erplora.com neither offers it to the assistant nor tells it about it.
 2. erplora.com spends the same messages of the month as the chat: the first turn of each step, one; the turns
    that bring back what it looked up or did within the next 15 minutes, none (after that time, for example
    after waiting for a person's yes, the turn counts one).
@@ -1138,7 +1145,9 @@ Out: the answer for the Hub and the business's spending of the month (`assistant
 erplora.com's side).
 If it fails: it says whether it is worth repeating: the provider down or an internal failure, yes; the
 month's messages used up, a business that does not work or a request that does not fit, no. Automations and
-the chat share the same allowance of the month.
+the chat share the same allowance of the month. If the assistant asks to search the web even though it is not
+offered, nothing is searched: it gets the reason back, to say it, without the Hub seeing anything and without
+spending anything of the business's searches.
 Involved: FLOW-F37, FLOW-F38
 
 ## Services: what goes in and what comes out
