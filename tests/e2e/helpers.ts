@@ -994,6 +994,21 @@ export function hubUserIdOf(email: string, hub = 'a'): string {
   return psql(`select id from base_hubuser where username in (${usernamesOf(email)})`, hub);
 }
 
+/** Takes the plan out of `a`'s photo while a spec runs, keeping the photo in its scratch table `backup` (next to the
+ * registry) for `restorePhotoFrom`: for a spec that signs in from more than one browser. With a plan in the photo
+ * (erplora.com's Free covers one device, as its seed or a run of the WhatsApp specs can leave it), every entry from
+ * another browser ends the sessions of the others on `a` (BASE-G57), and the next request of the first gets a 401. */
+export function dropPlanFromPhoto(backup: string): void {
+  psql(`drop table if exists ${backup}; create table ${backup} as select id, state from base_hub where slug = 'a'`);
+  psql("update base_hub set state = state - 'plan' where slug = 'a'");
+}
+
+/** `a`'s photo as `dropPlanFromPhoto` found it, and its scratch table `backup` dropped; nothing when it kept none. */
+export function restorePhotoFrom(backup: string): void {
+  if (psql(`select to_regclass('${backup}') is not null`) !== 't') return;
+  psql(`update base_hub h set state = b.state from ${backup} b where b.id = h.id; drop table ${backup}`);
+}
+
 /** Decodes the `s=` of a `/api/live` URL (base64url JSON) into its subscriptions. */
 export function decodeSubs(url: string): unknown[] {
   const s = new URL(url).searchParams.get('s') ?? '';

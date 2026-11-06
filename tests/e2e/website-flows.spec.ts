@@ -9,12 +9,31 @@
 // Google is never asked (Places is paid): the stack has no `GOOGLE_PLACES_API_KEY` (checked before the first test),
 // and WEBSITE-F12 shows the reviews from a last good answer written straight into the site's row. At the end the site
 // is offline again and its reviews gone: the other specs on hub `a` expect `/` to jump to the login.
+//
+// WEBSITE-F10 signs the owner in from a second browser, so `a` has no plan while the spec runs, whatever plan the
+// seed left in its photo (erplora.com's Free covers one device: that entry would end the session the rest of the spec
+// and its `afterAll` use, BASE-G57); its photo is put back at the end.
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, api, capture, horizontalOverflow, hostPage, HUB_DIR, MAIL_DIR, OWNER, psql, SAAS, settled, topbarApps } from './helpers';
+import {
+  A,
+  api,
+  capture,
+  dropPlanFromPhoto,
+  horizontalOverflow,
+  hostPage,
+  HUB_DIR,
+  MAIL_DIR,
+  OWNER,
+  psql,
+  restorePhotoFrom,
+  SAAS,
+  settled,
+  topbarApps,
+} from './helpers';
 import { readMailCode } from './mail';
 import { atRest, openSection, photo } from './website-helpers';
 
@@ -31,6 +50,8 @@ const HERO = 'Fresh bread every morning';
 const PHONE = '+34 600 123 456';
 /** Google's own example of a Place ID (Sydney's office): never asked here. */
 const PLACE_ID = 'ChIJN1t_tDeuEmsRUsoyG83frY4';
+/** Where `a`'s photo waits while the spec runs without its plan (`dropPlanFromPhoto`). */
+const PHOTO_BACKUP = 'e2e_backup_website_flows_photo';
 /** The site's row of hub `a`, by its id read from control's registry first: a statement on `a`'s tables cannot read it. */
 const siteRow = (): string => `hub_id = '${psql("select id from base_hub where slug = 'a'")}'`;
 
@@ -212,6 +233,7 @@ test.beforeAll(async ({ browser }) => {
   if (configured || process.env.GOOGLE_PLACES_API_KEY) {
     throw new Error('website-flows.spec.ts never asks Google: run it on a stack without GOOGLE_PLACES_API_KEY.');
   }
+  dropPlanFromPhoto(PHOTO_BACKUP);
   owner = await hostPage(browser, A, { next: '/website', viewport: WIDE });
   // The owner's session for the fleet's visual sweep of the editor (`ui-clip-sweep.sh --storage-state`), when asked.
   if (process.env.E2E_SAVE_STORAGE_STATE) await owner.context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
@@ -219,11 +241,15 @@ test.beforeAll(async ({ browser }) => {
 });
 
 test.afterAll(async () => {
-  if (!owner) return;
-  await saveSite(baseline());
-  await unpublishApi();
-  psql(`update website_site set reviews_snapshot = '{}'::jsonb where ${siteRow()}`);
-  await owner.context.close();
+  try {
+    if (!owner) return;
+    await saveSite(baseline());
+    await unpublishApi();
+    psql(`update website_site set reviews_snapshot = '{}'::jsonb where ${siteRow()}`);
+    await owner.context.close();
+  } finally {
+    restorePhotoFrom(PHOTO_BACKUP);
+  }
 });
 
 // flow: WEBSITE-F01
@@ -628,6 +654,9 @@ test('WEBSITE-F10: a visitor opens the address and gets the page in any design, 
   await entering.goto(`${A}/`);
   await topbarApps(entering).waitFor({ state: 'attached', timeout: 30_000 });
   await guest.close();
+  // That entry was the owner's second browser: the session the next tests (and the `afterAll`) use is still open.
+  const kept = await api(owner.context, A, 'GET', '/website/site');
+  expect(kept.status, `the owner's own session after the visitor's entry: ${JSON.stringify(kept.data)}`).toBe(200);
 });
 
 // flow: WEBSITE-F11
