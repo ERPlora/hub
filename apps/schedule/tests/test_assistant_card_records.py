@@ -67,6 +67,15 @@ def test_a_write_on_a_temporary_change_says_it_by_its_reason(write, language, ti
 
 
 @pytest.mark.django_db
+def test_among_several_the_card_says_the_one_the_write_names():
+    """Each id names its own record, never another of the list (the first, the last, the one of the same date)."""
+    days = [make_special_day("2026-01-06", "Reyes"), make_special_day("2026-12-25", "Navidad")]
+    changes = [make_override("2026-07-01", "2026-07-31", "Julio"), make_override("2026-08-01", "2026-08-31", "Agosto")]
+    assert [shown("schedule.special_day.delete", {"id": str(day.id)})["id"] for day in days] == ["Reyes", "Navidad"]
+    assert [shown("schedule.override.delete", {"id": str(change.id)})["id"] for change in changes] == ["Julio", "Agosto"]
+
+
+@pytest.mark.django_db
 def test_a_change_keeps_saying_the_record_beside_what_it_changes():
     """The name is the record's as it is now, before the write runs: a rename says the old name under «Special day»
     and the new one under its own datum."""
