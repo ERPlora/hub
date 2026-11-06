@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:d935afb37acb39080302b9bb3c851af66951d02f90df0ee3ff1388f1b8c8dcf4 -->
+<!-- generated from WORKBOOK.md sha256:6a9e2a4a405dc5c8ec66ea2ee72dbf72fc332ab1b2f916e2f433c6ca6b1412df -->
 
 ## What it is for and who it is for
 
@@ -2761,7 +2761,9 @@ Steps:
   3. **Log in** leads to the business's address on erplora.com: the app and the way in stay only there.
 In: a domain erplora.com has said is that business's.
 Out: the business's public website and its images, without cookies; nothing else: no app, no API, no way in. With a session
-of the business open in that browser it shows the same, because the session does not reach another domain.
+of the business open in that browser it shows the same, because the session does not reach another domain. The page
+tells search engines that its main address is the domain, also when it opens on its erplora.com address, which does not
+redirect (WEBSITE-F10).
 If it fails: a domain nobody connected opens nothing. If the business removes it, is cancelled or suspended, or has no
 published page, the domain says there is nothing there. A business being prepared or moved asks to come back in a moment.
 Involved: HUBS-F17, WEBSITE-F10

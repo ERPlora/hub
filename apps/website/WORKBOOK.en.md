@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:ec9e5cad6b01c198eb1cbfb4a3fac20d25d55af80ee1ed1fd8de699ac360407b -->
+<!-- generated from WORKBOOK.md sha256:b7bbfe6310d5b8f67ad7a5920e21b447556fbfbcdb36856c38b9160fb35ea6d2 -->
 
 ## What it is for and who it is for
 
@@ -333,7 +333,9 @@ Steps:
    app as always.
 In: the business's address.
 Out: the published page, with its own security policy (no user scripts: only the page's bundle), without cookies and
-kept a minute by the browser; the tab shows the logo or the name's initial.
+kept a minute by the browser; the tab shows the logo or the name's initial. The page tells search engines which is its
+main address: the business's own domain if it opens there (BASE-F110), also from this address, which does not redirect
+because it is still the team's way in; without an own domain, this one.
 If it fails: not published, taken offline or with the app off, the address leads to the team's sign-in; whoever
 makes more than 60 reads a minute from one connection waits a moment. On the business's own domain (BASE-F110) it is the
 same page: **Log in** leads to its address on erplora.com and, with no page to show, the domain says there is nothing there.
