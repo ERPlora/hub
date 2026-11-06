@@ -9,6 +9,9 @@ each dish of a menu, one derived from it: ``queries.dish_id``): a round the kitc
 the saved one share their ids. What was sent stays as it was sent: the station, its destination and its
 printer, the options chosen and the menu's header are frozen on each dish. Stations and tickets are deleted logically. Phase 1 has no tenancy: every scope shares these
 tables; phase 2 moves them to each hub's database.
+
+A label an app loaded before this one says in English too, but in Spanish with other words, goes through
+``pgettext_lazy`` with the ``kitchen`` context, so Spanish says the kitchen's word and not that app's (hub#659).
 """
 
 from django.db import models
@@ -16,6 +19,7 @@ from django.db.models import Q
 from django.db.models.functions import Lower
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import pgettext_lazy
 from live.models import UUIDModel
 
 ACTOR_MAX_LENGTH = 128
@@ -70,7 +74,7 @@ class ItemStatus(models.TextChoices):
     READY = "ready", _("Ready")
     SERVED = "served", _("Served")
     CANCELLED = "cancelled", _("Cancelled")
-    VOIDED = "voided", _("Voided")
+    VOIDED = "voided", pgettext_lazy("kitchen", "Voided")
 
 
 class LogAction(models.TextChoices):
@@ -132,7 +136,7 @@ class Station(Audited):
     #: A given printer of Printing, by its name; empty = the printer of the function.
     printer_name = models.CharField(_("printer"), max_length=100, blank=True)
     sort_order = models.PositiveIntegerField(_("position"), default=0)
-    is_active = models.BooleanField(_("active"), default=True)
+    is_active = models.BooleanField(pgettext_lazy("kitchen", "active"), default=True)
     is_deleted = models.BooleanField(_("deleted"), default=False)
     deleted_at = models.DateTimeField(_("deleted at"), null=True, blank=True)
 
@@ -336,7 +340,7 @@ class Ticket(Audited):
     waiter = models.CharField(_("waiter"), max_length=ACTOR_MAX_LENGTH, blank=True)
     #: When the round was fired (the clock of the card counts from here).
     received_at = models.DateTimeField(_("received at"))
-    started_at = models.DateTimeField(_("started at"), null=True, blank=True)
+    started_at = models.DateTimeField(pgettext_lazy("kitchen", "started at"), null=True, blank=True)
     ready_at = models.DateTimeField(_("ready at"), null=True, blank=True)
     served_at = models.DateTimeField(_("served at"), null=True, blank=True)
     cancelled_at = models.DateTimeField(_("cancelled at"), null=True, blank=True)
@@ -346,8 +350,8 @@ class Ticket(Audited):
     reprint_count = models.PositiveIntegerField(_("times reprinted"), default=0)
     #: Informative, in cents: the kitchen never charges.
     total = models.BigIntegerField(_("total"), default=0)
-    is_deleted = models.BooleanField(_("deleted"), default=False)
-    deleted_at = models.DateTimeField(_("deleted at"), null=True, blank=True)
+    is_deleted = models.BooleanField(pgettext_lazy("kitchen", "deleted"), default=False)
+    deleted_at = models.DateTimeField(pgettext_lazy("kitchen", "deleted at"), null=True, blank=True)
 
     class Meta:
         verbose_name = _("ticket")

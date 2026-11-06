@@ -18,7 +18,7 @@ msgstr ""
 "Plural-Forms: nplurals=3; plural=n == 1 ? 0 : n != 0 && n % 1000000 == 0 ? "
 "1 : 2;\n"
 
-#: apps.py:13 models.py:37
+#: apps.py:13 models.py:41
 msgid "Kitchen"
 msgstr "Cocina"
 
@@ -65,423 +65,436 @@ msgctxt "kitchen menu"
 msgid "History"
 msgstr "Historial"
 
-#: models.py:31
+#: models.py:35
 msgid "Screen and paper"
 msgstr "Pantalla y papel"
 
-#: models.py:32
+#: models.py:36
 msgid "Screen only"
 msgstr "Solo pantalla"
 
-#: models.py:33
+#: models.py:37
 msgid "Paper only"
 msgstr "Solo papel"
 
-#: models.py:38
+#: models.py:42
 msgid "Bar"
 msgstr "Barra"
 
-#: models.py:42
+#: models.py:46
 msgid "Dine in"
 msgstr "En sala"
 
-#: models.py:43
+#: models.py:47
 msgid "Takeaway"
 msgstr "Para llevar"
 
-#: models.py:44
+#: models.py:48
 msgid "Delivery"
 msgstr "A domicilio"
 
-#: models.py:48
+#: models.py:52
 msgid "Normal"
 msgstr "Normal"
 
-#: models.py:49 models.py:87
+#: models.py:53 models.py:91
 msgid "Rush"
 msgstr "Urgente"
 
-#: models.py:50
+#: models.py:54
 msgid "VIP"
 msgstr "VIP"
 
-#: models.py:54
+#: models.py:58
 msgid "Chime"
 msgstr "Campanilla"
 
-#: models.py:55
+#: models.py:59
 msgid "Bell"
 msgstr "Timbre"
 
-#: models.py:56
+#: models.py:60
 msgid "Buzzer"
 msgstr "Zumbador"
 
-#: models.py:60 models.py:68
+#: models.py:64 models.py:72
 msgid "To prepare"
 msgstr "Por preparar"
 
-#: models.py:61 models.py:69
+#: models.py:65 models.py:73
 msgid "Preparing"
 msgstr "En preparación"
 
-#: models.py:62 models.py:70 models.py:80
+#: models.py:66 models.py:74 models.py:84
 msgid "Ready"
 msgstr "Lista"
 
-#: models.py:63 models.py:71 models.py:84
+#: models.py:67 models.py:75 models.py:88
 msgid "Served"
 msgstr "Servida"
 
-#: models.py:64 models.py:72 models.py:86
+#: models.py:68 models.py:76 models.py:90
 msgid "Cancelled"
 msgstr "Cancelada"
 
-#: models.py:73
+#: models.py:77
+msgctxt "kitchen"
 msgid "Voided"
 msgstr "Anulado"
 
-#: models.py:77
+#: models.py:81
 msgid "Received"
 msgstr "Recibida"
 
-#: models.py:78
+#: models.py:82
 msgid "Created"
 msgstr "Creada"
 
-#: models.py:79
+#: models.py:83
 msgid "Fired"
 msgstr "Lanzada"
 
-#: models.py:81
+#: models.py:85
 msgid "Dish ready"
 msgstr "Plato listo"
 
-#: models.py:82
+#: models.py:86
 msgid "Dish recalled"
 msgstr "Plato recuperado"
 
-#: models.py:83
+#: models.py:87
 msgid "Dish voided"
 msgstr "Plato anulado"
 
-#: models.py:85
+#: models.py:89
 msgid "Recalled"
 msgstr "Recuperada"
 
-#: models.py:88
+#: models.py:92
 msgid "Rush removed"
 msgstr "Urgencia quitada"
 
-#: models.py:89
+#: models.py:93
 msgid "Reprinted"
 msgstr "Reimpresa"
 
-#: models.py:90
+#: models.py:94
 msgid "Deleted"
 msgstr "Borrada"
 
-#: models.py:101
+#: models.py:105
 msgid "created at"
 msgstr "creado el"
 
-#: models.py:103 models.py:252
+#: models.py:107 models.py:256
 msgid "updated at"
-msgstr "cambiado el"
+msgstr "actualizado el"
 
-#: models.py:105
+#: models.py:109
 msgid "created by"
 msgstr "creado por"
 
-#: models.py:108 models.py:254
+#: models.py:112 models.py:258
 msgid "updated by"
-msgstr "cambiado por"
+msgstr "actualizado por"
 
-#: models.py:118 models.py:405
+#: models.py:122 models.py:409
 msgid "name"
 msgstr "nombre"
 
-#: models.py:119
+#: models.py:123
 msgid "colour"
 msgstr "color"
 
-#: models.py:121 models.py:421
+#: models.py:125 models.py:425
 msgid "destination"
 msgstr "destino"
 
-#: models.py:127 models.py:427
+#: models.py:131 models.py:431
 msgid "printer function"
 msgstr "función de impresora"
 
-#: models.py:133 models.py:432
+#: models.py:137 models.py:436
 msgid "printer"
 msgstr "impresora"
 
-#: models.py:134 models.py:402
+#: models.py:138 models.py:406
 msgid "position"
 msgstr "posición"
 
-#: models.py:135
+#: models.py:139
+msgctxt "kitchen"
 msgid "active"
 msgstr "activa"
 
-#: models.py:136 models.py:349
+#: models.py:140
 msgid "deleted"
-msgstr "borrado"
+msgstr "eliminado"
 
-#: models.py:137 models.py:350
+#: models.py:141
 msgid "deleted at"
-msgstr "borrado el"
+msgstr "eliminado el"
 
-#: models.py:140 models.py:179 models.py:203 models.py:417 models.py:494
+#: models.py:144 models.py:183 models.py:207 models.py:421 models.py:498
 msgid "station"
 msgstr "estación"
 
-#: models.py:141
+#: models.py:145
 msgid "stations"
 msgstr "estaciones"
 
-#: models.py:173 models.py:403
+#: models.py:177 models.py:407
 msgid "product"
 msgstr "producto"
 
-#: models.py:183
+#: models.py:187
 msgid "product route"
 msgstr "enrutado de producto"
 
-#: models.py:184
+#: models.py:188
 msgid "product routes"
 msgstr "enrutados de producto"
 
-#: models.py:197 models.py:404
+#: models.py:201 models.py:408
 msgid "category"
 msgstr "categoría"
 
-#: models.py:207
+#: models.py:211
 msgid "category route"
 msgstr "enrutado de categoría"
 
-#: models.py:208
+#: models.py:212
 msgid "category routes"
 msgstr "enrutados de categoría"
 
-#: models.py:217
+#: models.py:221
 msgid "single row"
 msgstr "fila única"
 
-#: models.py:218
+#: models.py:222
 msgid "show timer"
 msgstr "mostrar cronómetro"
 
-#: models.py:220
+#: models.py:224
 msgid "amber warning (minutes)"
 msgstr "aviso ámbar (minutos)"
 
-#: models.py:223
+#: models.py:227
 msgid "red alert (minutes)"
 msgstr "aviso rojo (minutos)"
 
-#: models.py:225
+#: models.py:229
 msgid "colour semaphore"
 msgstr "semáforo de color"
 
-#: models.py:226
+#: models.py:230
 msgid "sound on a new ticket"
 msgstr "sonar al entrar una comanda"
 
-#: models.py:227
+#: models.py:231
 msgid "sound volume"
 msgstr "volumen del sonido"
 
-#: models.py:229
+#: models.py:233
 msgid "sound tone"
 msgstr "tono del sonido"
 
-#: models.py:235
+#: models.py:239
 msgid "print the pass when marked ready"
 msgstr "imprimir el pase al marcar listo"
 
-#: models.py:238
+#: models.py:242
 msgid "the kitchen works from the screen"
 msgstr "la cocina trabaja con la pantalla"
 
-#: models.py:242
+#: models.py:246
 msgid "screen mode changed at"
 msgstr "modo de pantalla cambiado el"
 
-#: models.py:245
+#: models.py:249
 msgid "default order type"
 msgstr "tipo de comanda por defecto"
 
-#: models.py:251
+#: models.py:255
 msgid "receiving since"
 msgstr "recibe desde"
 
-#: models.py:258 models.py:259
+#: models.py:262 models.py:263
 msgid "kitchen settings"
 msgstr "ajustes de cocina"
 
-#: models.py:303 models.py:320
+#: models.py:307 models.py:324
 msgid "day"
 msgstr "día"
 
-#: models.py:304
+#: models.py:308
 msgid "last number"
 msgstr "último número"
 
-#: models.py:307
+#: models.py:311
 msgid "day counter"
 msgstr "contador del día"
 
-#: models.py:308
+#: models.py:312
 msgid "day counters"
 msgstr "contadores del día"
 
-#: models.py:319
+#: models.py:323
 msgid "number"
 msgstr "número"
 
-#: models.py:321
+#: models.py:325
 msgid "number of the day"
 msgstr "número del día"
 
-#: models.py:323
+#: models.py:327
 msgid "check"
 msgstr "cuenta"
 
-#: models.py:324
+#: models.py:328
 msgid "round"
 msgstr "ronda"
 
-#: models.py:325
+#: models.py:329
 msgid "label"
 msgstr "etiqueta"
 
-#: models.py:327
+#: models.py:331
 msgid "type"
 msgstr "tipo"
 
-#: models.py:330
+#: models.py:334
 msgid "priority"
 msgstr "prioridad"
 
-#: models.py:333 models.py:434
+#: models.py:337 models.py:438
 msgid "status"
 msgstr "estado"
 
-#: models.py:335 models.py:498
+#: models.py:339 models.py:502
 msgid "notes"
 msgstr "notas"
 
-#: models.py:336
+#: models.py:340
 msgid "waiter"
 msgstr "camarero"
 
-#: models.py:338
+#: models.py:342
 msgid "received at"
 msgstr "recibida el"
 
-#: models.py:339
+#: models.py:343
+msgctxt "kitchen"
 msgid "started at"
 msgstr "empezada el"
 
-#: models.py:340 models.py:437
+#: models.py:344 models.py:441
 msgid "ready at"
 msgstr "lista el"
 
-#: models.py:341
+#: models.py:345
 msgid "served at"
 msgstr "servida el"
 
-#: models.py:342
+#: models.py:346
 msgid "cancelled at"
 msgstr "cancelada el"
 
-#: models.py:344
+#: models.py:348
 msgid "sent to paper at"
 msgstr "enviada a papel el"
 
-#: models.py:345
+#: models.py:349
 msgid "times rushed"
 msgstr "veces urgente"
 
-#: models.py:346
+#: models.py:350
 msgid "times reprinted"
 msgstr "veces reimpresa"
 
-#: models.py:348 models.py:439
+#: models.py:352 models.py:443
 msgid "total"
 msgstr "total"
 
-#: models.py:353 models.py:394 models.py:478
+#: models.py:353
+msgctxt "kitchen"
+msgid "deleted"
+msgstr "borrada"
+
+#: models.py:354
+msgctxt "kitchen"
+msgid "deleted at"
+msgstr "borrada el"
+
+#: models.py:357 models.py:398 models.py:482
 msgid "ticket"
 msgstr "comanda"
 
-#: models.py:354
+#: models.py:358
 msgid "tickets"
 msgstr "comandas"
 
-#: models.py:397
+#: models.py:401
 msgid "line of the check"
 msgstr "línea de la cuenta"
 
-#: models.py:399
+#: models.py:403
 msgid "dish of the menu"
 msgstr "plato del menú"
 
-#: models.py:401
+#: models.py:405
 msgid "menu"
 msgstr "menú"
 
-#: models.py:406
+#: models.py:410
 msgid "quantity"
 msgstr "cantidad"
 
-#: models.py:407
+#: models.py:411
 msgid "unit"
 msgstr "unidad"
 
-#: models.py:408
+#: models.py:412
 msgid "note"
 msgstr "nota"
 
-#: models.py:410
+#: models.py:414
 msgid "options"
 msgstr "opciones"
 
-#: models.py:419
+#: models.py:423
 msgid "station name"
 msgstr "nombre de la estación"
 
-#: models.py:436
+#: models.py:440
 msgid "void reason"
 msgstr "motivo de la anulación"
 
-#: models.py:442 models.py:486
+#: models.py:446 models.py:490
 msgid "dish"
 msgstr "plato"
 
-#: models.py:443
+#: models.py:447
 msgid "dishes"
 msgstr "platos"
 
-#: models.py:496
+#: models.py:500
 msgid "action"
 msgstr "acción"
 
-#: models.py:497
+#: models.py:501
 msgid "who"
 msgstr "quién"
 
-#: models.py:499
+#: models.py:503
 msgid "when"
 msgstr "cuándo"
 
-#: models.py:502
+#: models.py:506
 msgid "history entry"
 msgstr "entrada del historial"
 
-#: models.py:503
+#: models.py:507
 msgid "history"
 msgstr "historial"
 
