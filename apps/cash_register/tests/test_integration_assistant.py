@@ -16,14 +16,13 @@ from django.apps import apps
 from live.context import OperationContext, Scope
 from live.operations import get, registry
 
-from base import assistant
-from base.tenancy import context
-from base.tenancy.context import use_hub
-from base.tenancy.tests import hubs
-from base.tests.test_assistant import named_by_the_screen
-from base.tests.test_assistant_card_values import AN_ID
 from apps.cash_register.models import Session
 from apps.cash_register.tests.conftest import A, charge, ctx_for, open_session, run
+from base import assistant
+from base.tenancy.context import use_hub
+from base.tenancy.tests import hubs
+from base.tests.test_assistant import technical_names
+from base.tests.test_assistant_card_values import AN_ID
 
 pytestmark = pytest.mark.django_db
 
@@ -234,17 +233,9 @@ def cash_register_writes() -> list:
 def test_no_datum_of_a_write_of_cash_register_reaches_a_spanish_card_by_its_technical_name():
     """Every write of cash_register the assistant may ask for, with all its data: each datum by a name of its own in
     Spanish, never the title pydantic makes up from the field («Register Name»)."""
-    screen = named_by_the_screen()
     writes = cash_register_writes()
     assert len(writes) > 5  # positive control: the registry has cash_register's writes
-    technical: dict[str, list[str]] = {}
-    for op in writes:
-        props = op.input.model_json_schema().get("properties", {})
-        for field in assistant.card(op, dict.fromkeys(props, "x"), "es")["fields"]:
-            name, label = field["name"], field["label"]
-            if name not in screen and label == name.title().replace("_", " "):
-                technical.setdefault(op.name, []).append(name)
-    assert technical == {}
+    assert technical_names(writes) == {}
 
 
 @pytest.mark.parametrize("name", ["cash_register.register.update", "cash_register.session.open"])
@@ -561,14 +552,8 @@ def test_a_record_that_is_not_there_is_left_out_never_by_its_id():
             assert datum not in values(card) and no_id(card), name
 
 
-@pytest.fixture
-def no_fallback(monkeypatch):
-    """As production: without ``use_hub`` a hub's model fails, nothing falls back on the shared database."""
-    monkeypatch.setattr(context, "_test_fallback", None)
-
-
 @pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_a_session_or_drawer_of_hub_b_is_never_named_on_a_card_of_hub_a(hub_a, hub_b, no_fallback):
+def test_a_session_or_drawer_of_hub_b_is_never_named_on_a_card_of_hub_a(hub_a, hub_b, no_test_fallback):
     """The read runs in the hub the person asks in: hub B's session or drawer is nobody in hub A."""
     in_b = ctx_for(scope=Scope("host", hub_b.slug))
     with use_hub(hub_b):
