@@ -43,6 +43,8 @@ GROUP = gettext_noop("Group")
 OPTION = gettext_noop("Option")
 APPLIES_TO = gettext_noop("Applies to")
 OWN_TAX_CATEGORY = gettext_noop("Own tax category")
+#: The forms' name for it; the model's own, «kitchen name», is the Django admin's (hub#958).
+KITCHEN_TICKET_NAME = gettext_noop("Kitchen ticket name")
 
 # The assistant's card names the record a write acts on by these reads (base/assistant.py ``REFERS``), run as whoever
 # asks, never by its id: a group, a product and a category by their names; an option by its name and its group, because
@@ -184,7 +186,7 @@ class GroupIn(_Input):
         description="The group's name, unique in the business (e.g. «Sauces»)."
     )
     kitchen_name: KitchenName = Field(
-        "", description="Its name on the kitchen ticket; empty = the name."
+        "", title=KITCHEN_TICKET_NAME, description="Its name on the kitchen ticket; empty = the name."
     )
     min_choices: Choices = Field(
         0,
@@ -215,7 +217,7 @@ class GroupPatchIn(GroupRefIn):
 
     name: Name | None = Field(None, description="New name.")
     kitchen_name: KitchenName | None = Field(
-        None, description="New kitchen name; empty = the name."
+        None, title=KITCHEN_TICKET_NAME, description="New kitchen name; empty = the name."
     )
     min_choices: Choices | None = Field(
         None, description="New minimum; 1 or more makes it required."
@@ -276,6 +278,7 @@ class OptionIn(_OwningGroup):
     )
     kitchen_name: KitchenName = Field(
         "",
+        title=KITCHEN_TICKET_NAME,
         description="Its name on the kitchen ticket (e.g. «+CHEESE»); empty = the name.",
     )
     price_delta: Delta = Field(
@@ -301,7 +304,7 @@ class OptionPatchIn(OptionRefIn):
 
     name: Name | None = Field(None, description="New name.")
     kitchen_name: KitchenName | None = Field(
-        None, description="New kitchen name; empty = the name."
+        None, title=KITCHEN_TICKET_NAME, description="New kitchen name; empty = the name."
     )
     price_delta: Delta | None = Field(
         None, description="New supplement in cents (negative = a discount)."

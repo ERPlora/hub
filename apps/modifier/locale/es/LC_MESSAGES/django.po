@@ -183,5 +183,8 @@ msgstr "Grupo"
 msgid "Applies to"
 msgstr "Se aplica a"
 
+msgid "Kitchen ticket name"
+msgstr "Nombre en la comanda"
+
 msgid "Say which category: its id, or its name."
 msgstr "Di qué categoría: su id, o su nombre."
