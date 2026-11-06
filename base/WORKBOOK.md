@@ -2750,13 +2750,18 @@ Pasos:
   2. Se abre «Denunciar esta respuesta»: «Si esta respuesta del asistente te parece incorrecta o dañina, envíanosla y
      la revisaremos.», con «¿Qué le pasa?» («Es incorrecta», ya marcada; «Es dañina u ofensiva», «No hace lo que
      pedí» u «Otra cosa») y «Comentario (opcional)».
-  3. «Denunciar» la envía con la pregunta que la provocó; «Cancelar» no manda nada.
+  3. «Denunciar» la envía con la pregunta que la provocó y con si su turno trajo páginas de la web: el Hub lo dice al
+     cerrar cada ronda del turno (también la que se para en la tarjeta de un cambio o tras demasiados pasos, que no
+     trae ninguna), y el chat lo guarda con la respuesta; basta con que una ronda las trajera. «Cancelar» no manda nada.
   4. Sale «Gracias, hemos recibido tu denuncia.» y se cierra.
-Entra: la respuesta, la pregunta, el motivo y el comentario.
-Sale: la denuncia, para que el equipo de erplora.com la revise. Cualquier persona puede denunciar.
+Entra: la respuesta, la pregunta, el motivo, el comentario y si su turno trajo páginas de la web (si el chat no lo
+sabe, una respuesta de antes de la marca o una ronda que se paró escribiendo, no lo dice).
+Sale: la denuncia, para que el equipo de erplora.com la revise. Cualquier persona puede denunciar. Con la búsqueda
+en la web encendida, si la respuesta trajo páginas de la web o el chat no sabe de dónde vino, al equipo le llega todo
+menos la respuesta: los términos del buscador no dejan guardar sus resultados.
 Si falla: «No se pudo enviar la denuncia. Inténtalo de nuevo.», y la ventana sigue abierta con lo elegido y lo
 escrito.
-Implicados: ninguno
+Implicados: ASSISTANT-F23
 
 ### BASE-F106 El asistente sin conexión, con el servicio caído o sin plan
 <!-- origen: old-hub:HUB_SHELL-F199 -->

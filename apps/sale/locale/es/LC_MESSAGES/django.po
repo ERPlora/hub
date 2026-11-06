@@ -182,6 +182,7 @@ msgstr "nota rápida"
 msgid "quick notes"
 msgstr "notas rápidas"
 
+msgctxt "sale"
 msgid "Open"
 msgstr "Abierta"
 
@@ -255,7 +256,7 @@ msgid "service"
 msgstr "servicio"
 
 msgid "product category"
-msgstr "categoría de producto"
+msgstr "categoría del producto"
 
 msgid "unit"
 msgstr "unidad"
@@ -264,10 +265,10 @@ msgid "step"
 msgstr "escalón"
 
 msgid "price quantity"
-msgstr "cantidad del precio"
+msgstr "cantidad de precio"
 
 msgid "pricing unit"
-msgstr "unidad del precio"
+msgstr "unidad de precio"
 
 msgid "quantity"
 msgstr "cantidad"
@@ -377,6 +378,7 @@ msgstr "desglose de impuestos"
 msgid "payment"
 msgstr "pago"
 
+msgctxt "sale"
 msgid "voided at"
 msgstr "anulada el"
 
@@ -805,6 +807,7 @@ msgstr ""
 "No puedes ver esa cita: es de otra profesional o ya no existe. Cóbrala desde "
 "la profesional de la cita o al precio del catálogo."
 
+msgctxt "sale"
 msgid "options"
 msgstr "suplementos"
 

@@ -30,3 +30,12 @@ def po_entries(path: Path) -> dict[str | tuple[str, int], tuple[str, bool]]:
         else:
             entries[key] = (message.string, message.fuzzy)
     return entries
+
+
+def catalogue_key(text) -> str:
+    """How the compiled catalogue keys a lazy text (read in the source language, as the apps' tests read it): its
+    English, or ``context\\x04English`` for a ``pgettext_lazy`` — so a text that goes back to ``_()`` while its entry
+    keeps the context, or whose context has a typo, is missing from its catalogue: it would say another app's
+    Spanish."""
+    args = getattr(text, "_args", ())
+    return f"{args[0]}\x04{args[1]}" if len(args) == 2 else str(text)

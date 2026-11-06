@@ -1865,6 +1865,9 @@ class AssistantReportIn(Schema):
     comment: str = Field(default="", max_length=20_000)
     question: str = Field(default="", max_length=200_000)
     answer: str = Field(min_length=1, max_length=200_000)
+    #: Whether the answer's turn brought pages of the web (its ``done.web``): erplora.com then does not mail its text
+    #: (saas#287). None, a browser that does not know.
+    web: bool | None = None
 
 
 class AssistantReportOut(Schema):
