@@ -724,6 +724,7 @@ Pasos:
    mandan uno). Cambiarlo no toca los productos que ya existen.
 5. Pulsa «Guardar» (apagado hasta que cambias algo): se envía solo lo que cambiaste y sale «Ajustes
    guardados.» encima del botón.
+   Lo que se cambia mientras se está guardando no se pierde: se queda en pantalla, por guardar (hub#914).
 Entra: los ajustes guardados del negocio (uno por negocio); si nunca se guardaron, valen los de
 fábrica.
 Sale: los ajustes, que se aplican desde el siguiente movimiento. Solo avisan a las pantallas abiertas

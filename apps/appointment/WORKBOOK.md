@@ -568,6 +568,7 @@ Pantalla: Ajustes
 Pasos:
 1. Abre la pestaña **Ajustes** de Citas.
 2. Cambia los ajustes y pulsa **Guardar**: «Ajustes guardados.» Se guarda solo lo que cambia.
+   Lo que se cambia mientras se está guardando no se pierde: se queda en pantalla, por guardar (hub#914).
 Entra: los ajustes actuales de Citas.
 Sale: `appointment.settings.updated`.
 Si falla: «No se pudieron guardar los ajustes.» con cada motivo bajo su campo, sin perder lo escrito;

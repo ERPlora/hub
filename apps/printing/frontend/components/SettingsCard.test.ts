@@ -150,4 +150,28 @@ describe('SettingsCard', () => {
     expect(s.find('printing-settings-label-print_receipt_on_sale').text()).toBe('Imprimir ticket al cobrar');
     expect(s.inDoc('printing-settings-save')?.textContent?.trim()).toBe('Guardar ajustes');
   });
+
+  // hub#914: only what was sent is saved; what was changed while the save was on its way stays, still to send.
+  it('a change made while «Save settings» is on its way stays, and the next save sends only it', async () => {
+    const s = await setup();
+    await s.result(OP, FACTORY);
+    await s.result(PRINTERS, ACTIVE);
+    let release: (answer: Response) => void = () => {};
+    s.net.onApi(() => new Promise<Response>((resolve) => (release = resolve)));
+    await ionToggle(s.field('open_drawer_on_sale'), true);
+    await click(s.inDoc('printing-settings-save'));
+    await ionValue(s.field('receipt_copies'), 3);
+    release(Response.json({ ...FACTORY, open_drawer_on_sale: true }));
+    await flush();
+    await flush();
+    const save = s.inDoc('printing-settings-save');
+    expect([prop(s.field('open_drawer_on_sale'), 'checked'), prop(s.field('receipt_copies'), 'value'), prop(save, 'disabled')]).toEqual([true, 3, false]);
+    expect(s.inDoc('printing-settings-saved')).toBeNull();
+    // What was sent is the server's now: someone else's change repaints it; the copies stay as typed.
+    await s.result(OP, { ...FACTORY, open_drawer_on_sale: false }, {}, 2);
+    expect([prop(s.field('open_drawer_on_sale'), 'checked'), prop(s.field('receipt_copies'), 'value')]).toEqual([false, 3]);
+    s.answer(200, { ...FACTORY, receipt_copies: 3 });
+    await click(save);
+    expect(s.sent().map((call) => call.body)).toEqual([{ open_drawer_on_sale: true }, { receipt_copies: 3 }]);
+  });
 });

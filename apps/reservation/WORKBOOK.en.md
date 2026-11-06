@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:6db85099907e4a3867b10f2e175482bc13e8b8779f4e2736ab3d717dcb307edb -->
+<!-- generated from WORKBOOK.md sha256:ee365da32353aa8efb7027e0dd3a4058505ac57d1f53b596c51fe0a69eda7b69 -->
 
 ## What it is for and who it is for
 
@@ -224,6 +224,7 @@ Screen: Settings
 Steps:
 1. Change the minimum and maximum guests, the notice, the default duration, the required phone or email
    and the minutes to release a pending one. "Save".
+   What is changed while it is saving is not lost: it stays on screen, still to save (hub#914).
 2. The rules apply to new reservations and to changes; the ones already made are not touched.
 In: the rules.
 Out: the saved rules (announces: `reservation.settings.updated`).
