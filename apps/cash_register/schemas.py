@@ -499,7 +499,8 @@ class MovementRow(Schema):
     type: MovementType = Field(description="in, out, sale, refund or void.")
     amount: int = Field(description="Amount in cents, never negative.", json_schema_extra={"money": True})
     signed_amount: int = Field(
-        description="With its sign: out, refunds and voids are negative."
+        description="With its sign: out, refunds and voids are negative.",
+        json_schema_extra={"money": True, "signed": True},
     )
     method_type: MethodType = Field(
         description="cash, card, transfer or other: only cash is in the drawer."
