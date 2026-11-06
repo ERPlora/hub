@@ -135,7 +135,7 @@
   "printing-queue.spec.ts": 1,
   "prod-csp.spec.ts": 7,
   "reconnect.spec.ts": 2,
-  "reservation-book.spec.ts": 4,
+  "reservation-book.spec.ts": 3,
   "sale-approval.spec.ts": 3,
   "sale-backoffice.spec.ts": 3,
   "sale-business-currency.spec.ts": 5,

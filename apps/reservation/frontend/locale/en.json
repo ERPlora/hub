@@ -82,7 +82,8 @@
       "noResultsTitle": "No reservations match your search",
       "noResultsBody": "Try another name, phone or email, or clear the filters to see the day again.",
       "clearFilters": "Clear filters",
-      "unconfirmed": "Released: never confirmed"
+      "unconfirmed": "Released: never confirmed",
+      "cancelReason": "Reason: {reason}"
     },
     "actions": {
       "confirm": "Confirm",
