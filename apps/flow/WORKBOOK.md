@@ -432,9 +432,11 @@ Pasos:
    persona —la pregunta de «Preguntar antes a alguien» (FLOW-F28) y el mensaje a un cliente (FLOW-F31)— cada
    dato sale en palabras, en el idioma de quien guardó la automatización: un sí o un no como «Sí» o «No», una
    fecha y una hora como se escriben en ese idioma y a la hora del negocio («2 nov 2026, 10:00»), y un importe
-   que deja un paso anterior en la moneda del negocio («120,50 €»); un número que trae el aviso sale tal cual,
-   porque el aviso no dice si es dinero. Lo que va a otra acción, a otro sistema o a un «Solo sigue si…»
-   lleva cada dato tal cual.
+   que deja un paso anterior (el de un pago que acaba de registrar, el total de una venta) en la moneda en que
+   lo da ese paso: un pago en dólares, en dólares («12,50 US$»); si no da ninguna, en la del negocio
+   («120,50 €»). Un número que trae el aviso sale tal cual, porque el aviso no dice si es dinero, y también el
+   precio de una línea de un carrito y el descuento fijo de una regla de tarifa, que aún no dicen su moneda
+   (hub#915). Lo que va a otra acción, a otro sistema o a un «Solo sigue si…» lleva cada dato tal cual.
 Entra: las acciones y consultas de las apps activas, el último aviso real de ese tipo y lo que dejan los
 pasos anteriores. Los datos se nombran en el idioma de la pantalla («Número de venta», «Teléfono del
 cliente») y con la palabra de la app que los tiene («Sección», como en Ventas / TPV), nunca con su
@@ -1398,8 +1400,13 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   `PERSON_PARAMS` (`whatsapp_inbox.message.notify`: `text` y `template`, en `map_params`) —: un `bool` como «Sí»/«No»
   (`pgettext "datum"`), un día, una hora con segundos o un instante ISO (`base.home.moment`, a la hora del negocio)
   como CLDR en `flow.language` (en «Probar», el de quien prueba), y un `int` de una ruta `steps.<id>.<campo>` cuyo
-  esquema de salida lo declara en céntimos (`…_cents` o «in cents», la regla de la tarjeta de base) con
-  `base.business.money_text` en la moneda del negocio. Una hora sin segundos («21:00») ya la escribió su app para una
+  esquema de salida (`step_fields`: el de la acción, la primera fila de una consulta) lo marca como dinero
+  (`json_schema_extra={"money": True}`, `live.assistant.MONEY`, la marca de la tarjeta de base) con
+  `base.business.money_text` en la moneda que responde ese paso (su `currency`, `_answered_currency`, como la vista
+  previa de BASE-F98) o, si no responde ninguna, en la del negocio. Ni un nombre en `_cents` ni las palabras de la
+  descripción («in cents») hacen un importe (hub#498): toda salida de un paso que lo es lleva la marca, y el trinquete
+  `UNMARKED_STEP_AMOUNTS` de `test_step_amounts.py` (solo baja; hoy la línea de carrito y la regla de tarifa, hub#915)
+  caza una nueva sin ella. Una hora sin segundos («21:00») ya la escribió su app para una
   persona y se deja. Un aviso no declara esquema: su número sale tal cual (`test_person_texts.py`). Lo que va a una
   máquina — otra acción, «Llamar a otro sistema», condiciones, el encargo al asistente — no cambia. Mercado: HubSpot
   (los tokens salen con el formato de su tipo: fecha y moneda de la cuenta) y Mailchimp (formato de fecha de la
@@ -1753,8 +1760,8 @@ Los avisos llevan ids, nunca nombres ni contenidos.
 - **Mandar un correo a un cliente desde una automatización** (FLOW-F31 lo manda por WhatsApp): el Hub todavía
   no manda correos a clientes.
 - **Arreglos pendientes, abiertos como issues** (`migration-leftover`): siete textos en español con las
-  palabras de otra app (hub#497); la pregunta o la tarjeta de un paso que cobra no reconoce su importe como
-  dinero (hub#498); la tarjeta de confirmación del asistente llama «Registro» a la automatización o a la ejecución
+  palabras de otra app (hub#497); el precio de una línea de carrito o el descuento fijo de una regla de tarifa
+  que deja un paso sale en céntimos (hub#915); la tarjeta de confirmación del asistente llama «Registro» a la automatización o a la ejecución
   (hub#499) y dice «N elementos» en los permisos de un flujo sin decir cuáles (hub#504, con `base`).
 - **«Necesita tu atención»** (eventos que no se entregaron): el reparto del worker ya entrega los avisos a esta
   app y, tras 8 intentos fallidos, da uno por perdido y lo deja anotado; la pantalla que los enseña y los vuelve a

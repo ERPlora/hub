@@ -210,7 +210,7 @@ class BookingRow(Schema):
     end: dt.datetime
     duration_minutes: int
     status: Status
-    total: int = Field(description="The sum of its services' prices, in cents.")
+    total: int = Field(description="The sum of its services' prices, in cents.", json_schema_extra={"money": True})
     notes: str = Field(description="The customer's note.")
     booked_at: dt.datetime
     via_page: bool = Field(
@@ -379,7 +379,7 @@ class PublicServiceOut(Schema):
     description: str
     category: str = Field(description="Its category's name; empty without one.")
     price: int | None = Field(
-        description="In cents; empty when the business does not show prices."
+        description="In cents; empty when the business does not show prices.", json_schema_extra={"money": True}
     )
     duration_minutes: int | None = Field(
         description="Empty when the business does not show durations."

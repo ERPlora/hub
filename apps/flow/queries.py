@@ -31,6 +31,7 @@ from django.utils import timezone, translation
 from babel.dates import format_date, format_time, get_datetime_format
 from django.utils.translation import gettext_lazy as _
 from django.utils.translation import pgettext_lazy
+from live.assistant import MONEY
 from live.context import OperationContext, Scope
 from live.errors import Conflict, InvalidPayload, NotFound, OperationError, PermissionDenied
 from live.meta import LiveAppConfig, module_configs
@@ -256,17 +257,20 @@ def action_fields(op: Operation) -> list[dict]:
     return fields
 
 
+def step_fields(op: Operation) -> dict[str, dict]:
+    """The fields a step of ``op`` leaves for the next ones (``steps.<id>.<field>``), by name, with their schema: its
+    output's, a list's first row's."""
+    schema = op.output.model_json_schema()
+    properties = schema.get("properties", {})
+    if op.kind == "query" and "rows" in properties:
+        return _resolve_ref(properties["rows"].get("items", {}), schema.get("$defs", {})).get("properties", {})
+    return properties
+
+
 def action_outputs(op: Operation) -> list[str]:
     """What a step of ``op`` leaves for the next ones: its output's fields (a list's first row's), and
     ``found`` and ``count`` for a read."""
-    schema = op.output.model_json_schema()
-    defs = schema.get("$defs", {})
-    properties = schema.get("properties", {})
-    if op.kind == "query" and "rows" in properties:
-        properties = _resolve_ref(properties["rows"].get("items", {}), defs).get(
-            "properties", {}
-        )
-    names = list(properties)
+    names = list(step_fields(op))
     if op.kind == "query":
         names += [name for name in ("found", "count") if name not in names]
     return names
@@ -1101,26 +1105,32 @@ YES = pgettext_lazy("datum", "Yes")
 NO = pgettext_lazy("datum", "No")
 
 
-def _is_money(name: str, prop: dict) -> bool:
-    """An amount in cents, as its schema declares it: the rule of the assistant's card (base/assistant.py)."""
-    return name.endswith("_cents") or "in cents" in str(prop.get("description", "")).lower()
+def _is_money(prop: dict) -> bool:
+    """An amount, as its schema marks it (``json_schema_extra={"money": True}``): the mark the assistant's card reads
+    (``live.assistant.MONEY``, BASE-F97). Neither a name in ``_cents`` nor the words of a description («in cents») make
+    one (hub#498)."""
+    return prop.get(MONEY) is True
 
 
 def _money_paths(steps: list[dict]) -> frozenset[str]:
-    """The paths (``steps.<id>.<field>``) of the amounts in cents the steps' actions and reads declare they leave: their
-    output's schema (a read's first row). An event declares none."""
+    """The paths (``steps.<id>.<field>``) of the amounts the steps' actions and reads mark in what they leave
+    (``step_fields``: their output's schema, a read's first row). An event declares none."""
     found: set[str] = set()
     for step in steps:
         op = registry.get(str(step.get("operation") or "")) if step.get("kind") in ("command", "query") else None
         if op is None:
             continue
-        schema = op.output.model_json_schema()
-        defs = schema.get("$defs", {})
-        props = schema.get("properties", {})
-        if op.kind == "query" and "rows" in props:
-            props = _resolve_ref(props["rows"].get("items", {}), defs).get("properties", {})
-        found |= {f"steps.{step.get('id')}.{name}" for name, prop in props.items() if _is_money(name, prop)}
+        found |= {f"steps.{step.get('id')}.{name}" for name, prop in step_fields(op).items() if _is_money(prop)}
     return frozenset(found)
+
+
+def _answered_currency(path: str, data: dict) -> str | None:
+    """The currency the step that left the amount at ``path`` (``steps.<id>.<field>``) answers in ``data``: its
+    ``currency`` (a payment in dollars, an invoice in the one it was issued in), as the assistant's card says an amount
+    of a read (BASE-F98); ``None`` when it answers none."""
+    step_id = path.split(".")[1]
+    currency = document.lookup(f"steps.{step_id}.currency", data)[1]
+    return currency if isinstance(currency, str) and currency else None
 
 
 #: The hour JSON gives (``21:30:00``); one without its seconds (``21:00``) is how an app writes it for a person.
@@ -1147,12 +1157,12 @@ def _moment_words(text: str, language: str) -> str | None:
     return format_time(when.replace(tzinfo=None), "short", locale=locale)
 
 
-def words_for(steps: list[dict], language: str, scope: Scope) -> document.Say:
+def words_for(steps: list[dict], language: str, scope: Scope, data: dict | None = None) -> document.Say:
     """How a text a person reads — a question (FLOW-F28), a message to a customer (FLOW-F31) — says each datum it
     inserts, as the assistant's card says it (BASE-F97): a yes or no as «Yes»/«No», an ISO day, hour or instant as
-    ``language`` writes it at the business's hour, and an amount the step that left it declares in cents in the
-    business's currency; anything else as it is. An event declares no schema: a number it brings is never guessed as
-    money."""
+    ``language`` writes it at the business's hour, and an amount the schema of the step that left it marks as money in
+    the currency that step answers in ``data`` (``_answered_currency``), else in the business's; anything else as it
+    is. An event declares no schema: a number it brings is never guessed as money."""
     money = _money_paths(steps)
     currency = functools.cache(lambda: _currency(scope))
 
@@ -1162,8 +1172,8 @@ def words_for(steps: list[dict], language: str, scope: Scope) -> document.Say:
                 return str(YES if value else NO)
         if isinstance(value, str):
             return _moment_words(value, language) or value
-        if isinstance(value, int) and path in money and currency():
-            return money_text(value, currency(), language=language)
+        if isinstance(value, int) and path in money and (code := _answered_currency(path, data or {}) or currency()):
+            return money_text(value, code, language=language)
         return str(value)
 
     return say
@@ -1299,7 +1309,7 @@ def try_flow(ctx: OperationContext, data: TestIn) -> dict:
     stopped = bool(trigger_failed)
     operations = catalog_operations()
     # What a person would read is said as the person trying it reads it (who saves it, in their language).
-    say = words_for([step.model_dump() for step in tried.steps], ctx.language, ctx.scope)
+    say = words_for([step.model_dump() for step in tried.steps], ctx.language, ctx.scope, values)
     unknown_steps: set[str] = set()
     steps = []
     for step in tried.steps:

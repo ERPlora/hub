@@ -825,7 +825,7 @@ class InvoiceOut(InvoiceRowOut):
     substituted_by: InvoiceLinkOut | None
     rectifications: list[InvoiceLinkOut]
     remaining: int = Field(
-        description="What is left of it after its rectifications, cents."
+        description="What is left of it after its rectifications, cents.", json_schema_extra={"money": True}
     )
     paid_at: dt.datetime | None
     created_by: str
@@ -954,7 +954,10 @@ class RefundOut(Schema):
     id: UUID
     sale_id: UUID
     sale_number: str = Field(description="Number of the sale it gives back, as printed on its ticket.")
-    total: int = Field(description="What it gave back, in the minor unit of its currency.")
+    total: int = Field(
+        description="What it gave back, in the minor unit of its currency.",
+        json_schema_extra={"money": True},
+    )
     currency: str = Field(description="The sale's currency (ISO 4217).")
     currency_decimals: int = Field(description="The decimals of its currency (2 in EUR, 0 in JPY): its amounts' minor unit.")
     invoice_number: str = Field(description="Number of its rectifying invoice; empty while none is issued.")

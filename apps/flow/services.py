@@ -940,7 +940,7 @@ def _operation_step(
     if op is None or op.kind != step["kind"]:
         raise _own("flow.action_unavailable", name=name)
     step_ctx = _step_context(ctx, run, flow, op)
-    say = words_for(run.definition["steps"], flow.language, ctx.scope)
+    say = words_for(run.definition["steps"], flow.language, ctx.scope, data)
     values, _, _ = map_params(step.get("params", {}), data, say=say, person=PERSON_PARAMS.get(name, ()))
     try:
         payload = op.input.model_validate(
@@ -1525,7 +1525,7 @@ def _ask(ctx: OperationContext, run: FlowRun, flow: Flow, step: dict, data: dict
     question the run already asked at this step (a run resumed onto it) is not asked twice."""
     expires = now + dt.timedelta(hours=int(step.get("hours", 72)))
     # Its texts are read by a person: each datum in words, in the language of whoever saved the automation.
-    say = words_for(run.definition["steps"], flow.language, ctx.scope)
+    say = words_for(run.definition["steps"], flow.language, ctx.scope, data)
     question, _created = Question.objects.get_or_create(
         run=run,
         step_id=step["id"],

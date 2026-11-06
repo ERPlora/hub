@@ -124,7 +124,7 @@ class RecordRowOut(Schema):
     issuer_name: str = Field(description="Issuer's legal name.")
     issuer_nif: str = Field(description="Issuer's tax ID.")
     total_amount: int | None = Field(
-        description="Total in cents (none in a cancellation)."
+        description="Total in cents (none in a cancellation).", json_schema_extra={"money": True}
     )
     environment: EnvironmentCode = Field(
         description="testing or production: the AEAT it goes to."
@@ -178,8 +178,8 @@ class RecordOut(RecordRowOut):
     recipient_name: str = Field(description="Customer's name.")
     recipient_tax_id: str = Field(description="Customer's tax ID.")
     recipient_country: str = Field(description="Customer's country (ISO 3166-1).")
-    base_amount: int | None = Field(description="Taxable base in cents.")
-    tax_amount: int | None = Field(description="Tax in cents.")
+    base_amount: int | None = Field(description="Taxable base in cents.", json_schema_extra={"money": True})
+    tax_amount: int | None = Field(description="Tax in cents.", json_schema_extra={"money": True})
     previous_rejection: str = Field(
         description="RechazoPrevio: X when the AEAT holds no registration of the invoice, S when it holds one and "
         "a later correction was rejected (or an earlier cancellation), N for the usual correction; empty otherwise."

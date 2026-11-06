@@ -635,9 +635,9 @@ class ComponentOut(Schema):
 class CalculationOut(Schema):
     """Money in whole cents; the rest is the snapshot a sale line freezes, and the qualification."""
 
-    base: int = Field(description="The base, in cents.")
-    tax: int = Field(description="The tax, in cents.")
-    total: int = Field(description="Base plus tax, in cents.")
+    base: int = Field(description="The base, in cents.", json_schema_extra={"money": True})
+    tax: int = Field(description="The tax, in cents.", json_schema_extra={"money": True})
+    total: int = Field(description="Base plus tax, in cents.", json_schema_extra={"money": True})
     tax_category_key: str = Field(description="The key of the category.")
     tax_rate_pct: Decimal = Field(description="The combined rate in %.")
     tax_country_code: str = Field(description=COUNTRY)
