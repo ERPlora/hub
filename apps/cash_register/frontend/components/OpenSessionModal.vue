@@ -4,14 +4,15 @@
 // (empty is 0), «Notes». An amount that cannot be read is said under its field and nothing is sent. The
 // server numbers the session and keeps the rules (one open at a time, a float required): its refusal is
 // read inside the window, at its field. «Open session» waits in grey until the business has answered its money (the
-// float is read in it; hub#921). Success says «Session opened» and closes; the table and the «Open session» button
-// follow by themselves (live).
+// float is read in it; hub#921), and says so with «Retry» if that read fails (hub#938). Success says «Session opened»
+// and closes; the table and the «Open session» button follow by themselves (live).
 import { FormModal, type FormModalError } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { toastSuccess } from '@erplora/ui/shell';
 import { IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, shallowRef, watch } from 'vue';
 
+import BusinessMoneyError from '../../../../base/frontend/components/BusinessMoneyError.vue';
 import { useLocale, useT } from '../composables/useT';
 import { moneyDecimals, formatMoney, moneyFieldText, moneyRefusal, readAmount, useBusinessMoney } from '../lib/money';
 import { refusal } from '../lib/refusal';
@@ -93,6 +94,7 @@ async function confirm(): Promise<void> {
     @submit="confirm"
   >
     <div class="cash-open">
+      <BusinessMoneyError />
       <p
         v-if="unassigned"
         class="cash-open__hint"

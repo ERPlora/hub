@@ -2,14 +2,19 @@
 // up once the business answers, and catches each way a window can get it wrong: a «Save» that is not grey, a save that
 // reads past the grey button (a `submit` FormModal did not hold), a field that complains while it waits, and a «Save»
 // that stays grey after the answer. A window without FormModal (the till's sheets and its charge sheet, hub#921) says its
-// own door past the grey button, or that its button is its only one.
+// own door past the grey button, or that its button is its only one. When the money cannot be read instead (hub#938), the
+// window says so with «Retry» — the platform's BusinessMoneyError, in a window with FormModal or in a sheet without it —
+// and the helper fails a window that waits without a word, that lights «Save» up with no money to read in, whose notice
+// has no «Retry» or one that does not ask the server again, and one that stays grey after the answer.
 import { FormModal } from '@erplora/ui/components';
 import { IonButton } from '@ionic/vue';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { defineComponent, h, nextTick, ref } from 'vue';
 
-import { mountBase } from './mount-base';
-import { expectSaveWaitsForMoney } from './save-waits-for-money';
+import BusinessMoneyError from '../components/BusinessMoneyError.vue';
+import { useBusinessMoney } from '../lib/money';
+import { flush, mountBase } from './mount-base';
+import { expectSaveWaitsForMoney, expectSaysMoneyUnreadable, moneyReadOf } from './save-waits-for-money';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
   const { IonModalStub } = await import('../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
@@ -125,5 +130,83 @@ describe('expectSaveWaitsForMoney: a window without FormModal (hub#921)', () => 
   it('…and fails it unguarded', async () => {
     const w = await sheetThat({ button: 'holds', guarded: false });
     await expect(expectSaveWaitsForMoney({ ...w, submit: w.confirm }, w.answer)).rejects.toThrow(/150000/);
+  });
+});
+
+/** A notice of the window's own instead of the platform's: an alert that never goes, without «Retry» (`mute`) or with
+ *  one that asks nothing (`deaf`). */
+function ownNotice(retry: 'mute' | 'deaf') {
+  const button = retry === 'deaf' ? [h('button', { 'data-testid': 'base-money-error-retry' }, 'Retry')] : [];
+  return h('div', { role: 'alert', 'data-testid': 'base-money-error' }, button);
+}
+
+/** A window whose «Save» waits for the business's real money (`useBusinessMoney`), with FormModal (`form`) or as a sheet
+ *  with its own button (`sheet`), that places the platform's notice (`says`), one of its own (`mute`, `deaf`) or none;
+ *  `lightsUp`: «Save» does not wait; `staysGrey`: nor does it light up once the business answers. */
+async function waitingFor(money: { kind: 'form' | 'sheet'; says: boolean | 'mute' | 'deaf'; lightsUp?: boolean; staysGrey?: boolean }) {
+  const sent: unknown[] = [];
+  const Window = {
+    setup() {
+      const known = useBusinessMoney();
+      const grey = () => (!known.value && !money.lightsUp) || !!money.staysGrey;
+      const notice = () => (money.says === true ? [h(BusinessMoneyError)] : money.says ? [ownNotice(money.says)] : []);
+      const save = (): void => {
+        if (known.value) sent.push({ price: 1500 });
+      };
+      return () =>
+        money.kind === 'form'
+          ? h(FormModal, { open: true, title: 'New thing', testid: 'thing', submitDisabled: grey(), onSubmit: save }, () => notice())
+          : h('div', [...notice(), h(IonButton, { 'data-testid': 'thing-submit', disabled: grey(), onClick: save }, () => 'Add')]);
+    },
+  };
+  const m = await mountBase(Window);
+  await m.live();
+  const settle = async () => {
+    await flush();
+    await flush();
+  };
+  const window = {
+    wrapper: m.wrapper,
+    save: () => document.querySelector<Control>('[data-testid="thing-submit"]'),
+    amount: () => null,
+    sent: () => sent,
+    settle,
+  };
+  return { window, read: moneyReadOf(m) };
+}
+
+describe('expectSaysMoneyUnreadable (hub#938)', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it.each(['form', 'sheet'] as const)('passes a window (%s) that says the money could not be read, with «Retry», and lights up once it answers', async (kind) => {
+    const w = await waitingFor({ kind, says: true });
+    await expect(expectSaysMoneyUnreadable(w.window, w.read)).resolves.toBeUndefined();
+  });
+
+  it.each(['form', 'sheet'] as const)('fails a window (%s) that waits in grey without a word', async (kind) => {
+    const w = await waitingFor({ kind, says: false });
+    await expect(expectSaysMoneyUnreadable(w.window, w.read)).rejects.toThrow(/could not be read/);
+  });
+
+  it('fails a window whose «Save» is not grey while the money cannot be read', async () => {
+    const w = await waitingFor({ kind: 'form', says: true, lightsUp: true });
+    await expect(expectSaysMoneyUnreadable(w.window, w.read)).rejects.toThrow(/grey/);
+  });
+
+  it('fails a window whose notice offers no «Retry»', async () => {
+    const w = await waitingFor({ kind: 'form', says: 'mute' });
+    await expect(expectSaysMoneyUnreadable(w.window, w.read)).rejects.toThrow(/«Retry» in that alert/);
+  });
+
+  it('fails a window whose «Retry» does not ask the server again', async () => {
+    const w = await waitingFor({ kind: 'sheet', says: 'deaf' });
+    await expect(expectSaysMoneyUnreadable(w.window, w.read)).rejects.toThrow(/asks the server again/);
+  });
+
+  it('fails a window whose «Save» stays grey once the business answers', async () => {
+    const w = await waitingFor({ kind: 'form', says: true, staysGrey: true });
+    await expect(expectSaysMoneyUnreadable(w.window, w.read)).rejects.toThrow(/once the business answers/);
   });
 });

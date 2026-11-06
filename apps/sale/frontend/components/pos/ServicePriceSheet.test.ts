@@ -4,6 +4,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { business, click, expectWaitsForTheYen, JAPANESE, mountSale, settle } from '../../__tests__/mount-sale';
+import { expectWindowSaysMoneyUnreadable } from '../../../../../base/frontend/__tests__/save-waits-for-money';
 import { plain } from '../../lib/format';
 import { service } from './__tests__/fixtures';
 import PosNumpad from './PosNumpad.vue';
@@ -82,5 +83,13 @@ describe('ServicePriceSheet: before the business answers its money (hub#921)', (
     expect(amount(s)).toBe('6.500 ¥');
     await click(s.inDoc('pos-service-price-add'));
     expect(s.wrapper.emitted('add')).toEqual([[6500]]);
+  });
+});
+
+describe('ServicePriceSheet: a business whose money cannot be read (hub#938)', () => {
+  it('says so with «Retry» instead of waiting in grey without a word; once the yen arrives «Add» lights up', async () => {
+    const s = await setup({}, { business: null });
+    for (const key of ['1', '5', '0', '0']) await click(s.inDoc(`pos-key-${key}`));
+    await expectWindowSaysMoneyUnreadable(s, 'pos-service-price-add', () => s.wrapper.emitted('add') ?? []);
   });
 });

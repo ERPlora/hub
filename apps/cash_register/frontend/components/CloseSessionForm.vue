@@ -8,14 +8,15 @@
 // is off in this hub has nothing pending; a reading refused makes the review incomplete. The expected and
 // the difference follow what is typed. The counted cash is always asked for. With something pending the
 // first press warns, the second closes («Close anyway»): it warns, it never prevents. «Close session» waits in grey
-// until the business has answered its money, in which the count is written and read (hub#921). Success says the
-// three figures and tells the window.
+// until the business has answered its money, in which the count is written and read (hub#921), and says so with
+// «Retry» if that read fails (hub#938). Success says the three figures and tells the window.
 import { InlineFeedback } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { toastSuccess } from '@erplora/ui/shell';
 import { IonButton, IonInput, IonSpinner } from '@ionic/vue';
 import { computed, shallowRef, watch } from 'vue';
 
+import BusinessMoneyError from '../../../../base/frontend/components/BusinessMoneyError.vue';
 import { useLocale, useT } from '../composables/useT';
 import { formatMoney, formatSignedMoney, moneyFieldText, moneyRefusal, readAmount, useBusinessMoney } from '../lib/money';
 import { refusal } from '../lib/refusal';
@@ -162,6 +163,7 @@ defineExpose({ confirm });
       :value="notes"
       @ion-input="notes = String($event.detail.value ?? '')"
     />
+    <BusinessMoneyError />
     <InlineFeedback
       v-if="error"
       tone="danger"

@@ -23,3 +23,6 @@ export function business(fields: Partial<Business> = {}): Business {
 
 /** A business in Poland: it pays in złoty. */
 export const POLISH: Partial<Business> = { country: 'PL', country_name: 'Poland', currency: 'PLN', currency_label: 'PLN · Polish Zloty' };
+
+/** A business in Japan: its yen has no decimals, so «1500» read before it answers would be 150000. */
+export const IN_YEN: Partial<Business> = { country: 'JP', country_name: 'Japan', currency: 'JPY', currency_label: 'JPY · Japanese Yen', currency_decimals: 0 };

@@ -5,7 +5,7 @@ import { afterEach, describe, expect, expectTypeOf, it } from 'vitest';
 import { defineComponent, h } from 'vue';
 
 import { business, errorFrame, flush, mountBase, POLISH, subId } from '../__tests__/mount-base';
-import { formatMoney, useBusinessMoney } from './money';
+import { formatMoney, useBusinessMoney, useBusinessMoneyRead } from './money';
 
 /** `pieces` pieces of one screen, each asking for the business's currency. */
 const Probe = defineComponent({
@@ -64,5 +64,48 @@ describe('useBusinessMoney', () => {
     call.push(errorFrame(subId(m.client, 'base.business.get'), 'internal'));
     await flush();
     expect(read(m.wrapper)).toEqual([null]);
+  });
+});
+
+/** A window that waits for the money: what `useBusinessMoneyRead` says of it, and its «Retry». */
+const Reader = {
+  setup() {
+    const read = useBusinessMoneyRead();
+    return () =>
+      h('div', [
+        h('span', { 'data-testid': 'read' }, JSON.stringify({ money: read.money.value ?? null, error: read.error.value?.code ?? null })),
+        h('button', { 'data-testid': 'retry', onClick: read.retry }),
+      ]);
+  },
+};
+
+describe('useBusinessMoneyRead (hub#938)', () => {
+  it("is the money and the read's error, and «retry» asks the server again; the answer clears the error", async () => {
+    const m = await mountBase(Reader);
+    const call = await m.live();
+    const said = () => JSON.parse(m.wrapper.find('[data-testid="read"]').text());
+    expect(said()).toEqual({ money: null, error: null });
+    call.push(errorFrame(subId(m.client, 'base.business.get'), 'base.hub_busy'));
+    await flush();
+    expect(said()).toEqual({ money: null, error: 'base.hub_busy' });
+    const asked = m.net.streams.length;
+    await m.wrapper.find('[data-testid="retry"]').trigger('click');
+    await flush();
+    expect(m.net.streams.length).toBe(asked + 1);
+    await m.result(m.net.lastStream(), 'base.business.get', business(POLISH));
+    expect(said()).toEqual({ money: { currency: 'PLN', decimals: 2 }, error: null });
+  });
+
+  it('shares the one subscription of the tab with useBusinessMoney', async () => {
+    const Both = {
+      setup() {
+        useBusinessMoney();
+        useBusinessMoneyRead();
+        return () => h('div');
+      },
+    };
+    const m = await mountBase(Both);
+    await m.live();
+    expect(m.client.stream.subscriptions('base.business.get')).toHaveLength(1);
   });
 });

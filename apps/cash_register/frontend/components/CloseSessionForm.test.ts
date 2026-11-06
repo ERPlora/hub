@@ -9,6 +9,7 @@ import { toastSuccess } from '@erplora/ui/shell';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { business, click, errorFrame, flush, ionValue, JAPANESE, mountCash } from '../__tests__/mount-cash-register';
+import { expectWindowSaysMoneyUnreadable } from '../../../../base/frontend/__tests__/save-waits-for-money';
 import { plain } from '../lib/money';
 import CloseSessionForm from './CloseSessionForm.vue';
 
@@ -254,5 +255,14 @@ describe('CloseSessionForm: before the business answers its money (hub#921)', ()
     expect(difference()).toBe('—');
     await s.result('base.business.get', business(JAPANESE));
     expect(difference()).toBe('-¥100');
+  });
+});
+
+describe('CloseSessionForm: a business whose money cannot be read (hub#938)', () => {
+  it('says so with «Retry» instead of waiting in grey without a word; once the yen arrives «Close session» lights up', async () => {
+    const s = await setup('en', { business: null });
+    await s.ready(1500, []);
+    await ionValue(s.counted(), '1500', 'ionInput');
+    await expectWindowSaysMoneyUnreadable(s, 'cash-register-close-submit', s.sent);
   });
 });
