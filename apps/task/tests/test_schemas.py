@@ -10,9 +10,11 @@ from pydantic import ValidationError
 from apps.task.schemas import (
     AssignIn,
     CommentIn,
+    CommentListIn,
     PageIn,
     ProjectIn,
     ProjectPatchIn,
+    ProjectRefIn,
     SetStatusIn,
     TaskIn,
     TaskListIn,
@@ -76,6 +78,28 @@ def test_a_task_is_named_by_id_or_by_text():
     the_id = uuid.uuid7()
     assert TaskRefIn(id=the_id).id == the_id
     assert errors(TaskRefIn) == {"task": "value_error"}
+
+
+@pytest.mark.parametrize(
+    ("schema", "id_field", "text_field", "message"),
+    [
+        (TaskRefIn, "id", "task", "Say which task: its id, its number or its title."),
+        (ProjectRefIn, "id", "project", "Say which project: its id, its code or its name."),
+        (CommentListIn, "task_id", "task", "Say which task: its id, its number or its title."),
+        (CommentIn, "task_id", "task", "Say which task: its id, its number or its title."),
+    ],
+)
+def test_a_record_is_named_by_its_id_or_by_its_text_and_saying_neither_is_a_422_on_the_text(
+    schema, id_field, text_field, message
+):
+    extra = {"text": "On it"} if schema is CommentIn else {}
+    the_id = uuid.uuid7()
+    assert getattr(schema.model_validate({id_field: str(the_id), **extra}), id_field) == the_id
+    assert getattr(schema.model_validate({text_field: " Opening ", **extra}), text_field) == "Opening"
+    with pytest.raises(ValidationError) as caught:
+        schema.model_validate(extra)
+    assert [(error["loc"], error["type"]) for error in caught.value.errors()] == [((text_field,), "value_error")]
+    assert message in caught.value.errors()[0]["msg"]
 
 
 def test_a_status_change_names_one_of_the_five():
