@@ -947,9 +947,8 @@ Lo que se vio fallar y queda abierto al cerrar la app (2026-11-03), cada cosa co
 
 - **hub#527** — En un negocio de otro país, un teléfono escrito sin prefijo se guarda y se busca como español
   (cruza APPOINTMENT-F22).
-- **hub#631**, **hub#633**, **hub#635** y **hub#637** — textos: una traducción «fuzzy» que sale en inglés, siete
-  textos en español con las palabras de otra app, la tarjeta de confirmación del asistente que no dice qué
-  registro toca y la que nombra en inglés algunos datos («Confirm Overlap»).
+- **hub#635** y **hub#637** — textos: la tarjeta de confirmación del asistente que no dice qué registro toca y la
+  que nombra en inglés algunos datos («Confirm Overlap»).
 - Las peticiones de componentes de [`UI-REQUESTS.md`](UI-REQUESTS.md) (`Scheduler`, `DateField`/`TimeField`, tres
   iconos y el bloqueo de la baja en Personal): ninguna rompe un flujo.
 

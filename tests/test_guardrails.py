@@ -35,6 +35,9 @@ control), then run over ``base/`` and ``apps/`` (outside ``tests/``).
 (i) The tests read who is connected to a database in one place (``sessions_by_hand``): ``base/tenancy/tests/hubs.py``,
     which counts only clients' sessions. A count of its own also counts the server's processes on that database, an
     autovacuum worker among them, and falls now and then with nothing broken (hub#819).
+(j) A test double that answers each request in a thread of its own runs on ``base/tests/quiet_server.py``
+    (``threaded_servers``): ``ThreadingHTTPServer`` makes those threads daemon, and one printing that its client went
+    as the interpreter closes aborts it, code 134 after every test has passed (hub#840).
 
 Every ninja route bound to an operation is ``config/tests/test_api.py`` (``ensure_api_parity``);
 ``/admin/`` on a tenant's host → 404 is ``base/tests/test_middleware.py``.
@@ -1447,4 +1450,68 @@ def test_no_test_counts_the_sessions_on_a_database_by_hand():
     assert offenders == [], (
         "`pg_stat_activity` lists the server's own processes too: an autovacuum worker on the database makes such a "
         f"count fall now and then with nothing broken. Use hubs.client_sessions_on or hubs.assert_nobody_on: {offenders}"
+    )
+
+
+# ── (j) A test double that answers in threads runs on the quiet server (hub#840) ──────────────────────────────────────
+
+#: The threaded servers of the suite that are not on ``base/tests/quiet_server.py``, and why none of them leaves a
+#: request thread printing that its client went as the interpreter closes. A path without one any more leaves it.
+THREADED_SERVERS = {
+    "base/tests/quiet_server.py": "the quiet server itself",
+    "apps/flow/tests/local_https.py": "joins its request threads (daemon_threads = False) and keeps what they raise",
+    "apps/verifactu/tests/test_slow_gateway.py": "its client waits 45 s for an answer that comes in 6 s: none is cut",
+    "tests/test_guardrails.py": "names them in its controls",
+}
+THREADED_SERVER = re.compile(r"\bThreading\w*(?:Server|MixIn)\b|\bdaemon_threads\s*=\s*True\b")
+
+
+def threaded_servers(source: str) -> list[tuple[int, str]]:
+    """``(line, what)`` for every server that answers each request in a thread of its own: ``ThreadingHTTPServer`` and
+    its kin make those threads daemon by default. A server of one thread (``HTTPServer``) answers in the thread that
+    serves, which stopping it waits for: none outlives the test."""
+    return [(source.count("\n", 0, found.start()) + 1, found.group()) for found in THREADED_SERVER.finditer(source)]
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        'ThreadingHTTPServer(("127.0.0.1", 0), Handler)',
+        "class Mine(ThreadingHTTPServer):",
+        "from http.server import ThreadingHTTPServer as Server",
+        'socketserver.ThreadingTCPServer(("127.0.0.1", 0), Handler)',
+        "class Mine(socketserver.ThreadingMixIn, HTTPServer):",
+        "self._server.daemon_threads = True",
+    ],
+)
+def test_the_threaded_server_scanner_sees_every_way_of_one(source):
+    assert threaded_servers(f"x = 1\n{source}\n") == [(2, THREADED_SERVER.search(source).group())]
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        'QuietServer(("127.0.0.1", 0), Handler)',
+        'HTTPServer(("127.0.0.1", 0), Handler)',
+        "from http.server import BaseHTTPRequestHandler",
+        "    daemon_threads = False",
+    ],
+)
+def test_the_threaded_server_scanner_lets_other_servers_be(source):
+    assert threaded_servers(source) == []
+
+
+def test_a_double_that_answers_in_threads_runs_on_the_quiet_server():
+    files = suite_files(HUB_DIR)
+    # A walk gone blind, or an exception whose server moved, would let the check pass.
+    assert {PurePosixPath("base/tests/fake_gateway.py"), *map(PurePosixPath, THREADED_SERVERS)} <= set(files)
+    assert [path for path in THREADED_SERVERS if not threaded_servers((HUB_DIR / path).read_text())] == []
+
+    offenders = _offenders(
+        lambda path: [] if str(path) in THREADED_SERVERS else threaded_servers((HUB_DIR / path).read_text()), files
+    )
+
+    assert offenders == [], (
+        "a daemon request thread that prints its client went as the interpreter closes aborts it, code 134 after "
+        f"every test has passed: run the double on base.tests.quiet_server.QuietServer (hub#840): {offenders}"
     )

@@ -112,6 +112,44 @@ def test_spanish_texts_of_the_workbook():
         assert str(queries.APPOINTMENT_NOT_FOUND) == "Esa cita no existe en este negocio."
 
 
+def test_spanish_says_citas_own_words_not_an_earlier_apps():
+    """The labels Citas shares in English with an app loaded before it come out in Spanish with its own words, the
+    ones its screens and WORKBOOK say (hub#633): a series is «activa» (its «Activa» column), the history says «quién»
+    did each change, an appointment or a series is «borrada» (its verb is «borrar») and, being a «cita», «creada» and
+    «actualizada»; not Django's «activo», Clientes' «por» or «eliminado el», or the «creado» of the apps before it. A
+    block («bloqueo») keeps the masculine; and naming a professional or a service takes no comma before «o», as
+    Servicios and Ventas, which say the same English, already show."""
+    labels = {
+        f"{model.__name__}.{name}": model._meta.get_field(name).verbose_name
+        for model, names in (
+            (Recurring, ("is_active", "deleted_at", "created_at", "updated_at", "created_by")),
+            (Appointment, ("deleted_at", "created_at", "updated_at", "created_by", "updated_by")),
+            (History, ("actor",)),
+            (BlockedTime, ("created_at", "updated_at", "created_by")),
+        )
+        for name in names
+    }
+    with translation.override("es"):
+        assert {name: str(label) for name, label in labels.items()} == {
+            "Recurring.is_active": "activa",
+            "Recurring.deleted_at": "borrada el",
+            "Recurring.created_at": "creada el",
+            "Recurring.updated_at": "actualizada el",
+            "Recurring.created_by": "creada por",
+            "Appointment.deleted_at": "borrada el",
+            "Appointment.created_at": "creada el",
+            "Appointment.updated_at": "actualizada el",
+            "Appointment.created_by": "creada por",
+            "Appointment.updated_by": "actualizada por",
+            "History.actor": "quién",
+            "BlockedTime.created_at": "creado el",
+            "BlockedTime.updated_at": "actualizado el",
+            "BlockedTime.created_by": "creado por",
+        }
+        assert str(schemas.SAY_WHICH_STAFF) == "Di qué profesional: su id o su nombre."
+        assert str(schemas.SAY_WHICH_SERVICE) == "Di qué servicio: su id o su nombre."
+
+
 @pytest.mark.django_db
 def test_an_error_message_follows_the_language_of_the_request(client, make_user):
     client.force_login(make_user("boss", host="a", role="hub_admin"))
