@@ -6,7 +6,8 @@
 //   - INVENTORY-F08: a category picked in the form groups the product (the category counts it);
 //   - INVENTORY-F16: a sale charged by Sales and handed to Inventory as the relay does reads, and is found, by
 //     its number in Movements, with the time of day on a tablet;
-//   - INVENTORY-F19: the settings save and say so;
+//   - INVENTORY-F19: the settings save and say so; a refused threshold says why on top and under it, and both go
+//     as soon as it is corrected (hub#871);
 //   - INVENTORY-F20: an article set to «catalog only» shows «—» as its stock;
 //   - INVENTORY-F25: the sheet shows the SKU's barcode; «Print barcode» queues one label per press and says
 //     where it goes (no «Label» printer yet, then one; the ones the database already has are switched off
@@ -203,16 +204,28 @@ test('INVENTORY-F19: the settings save and say so', async ({ page, context }) =>
   const before = await api<{ low_stock_threshold: number }>(context, A, 'GET', '/inventory/config');
   expect(before.status).toBe(200);
   try {
-    const threshold = shown(page).locator('[data-testid=inventory-settings-threshold] input');
+    const field = shown(page).locator('[data-testid=inventory-settings-threshold]');
+    const threshold = field.locator('input');
+    const save = shown(page).locator('[data-testid=inventory-settings-save]');
+    const refused = shown(page).locator('[data-testid=inventory-settings-save-error]');
     await expect(threshold).toBeVisible();
+    // hub#871: a threshold with decimals is refused on top and under the field; correcting it lifts both.
+    await threshold.fill('2.5');
+    await save.click();
+    await expect(refused).toContainText(/The settings could not be saved\.|No se pudieron guardar los ajustes\./);
+    await expect(field.locator('.error-text')).toHaveText(/Enter a whole number\.|Introduce un número entero\./);
+    await expect(field).toHaveClass(/ion-invalid/);
     await threshold.fill('7');
+    await expect(refused).toBeHidden();
+    await expect(field).not.toHaveClass(/ion-invalid/);
+    await expect(field.locator('.error-text')).toBeHidden();
     await threshold.blur();
     // hub#2224: on a phone the threshold keeps a field's width, never one letter per line.
     await page.setViewportSize({ width: 390, height: 844 });
     expect((await threshold.boundingBox())!.width).toBeGreaterThan(200);
     await shootFlow(page, 'INVENTORY-F19');
-    await shown(page).locator('[data-testid=inventory-settings-save]').click();
-    await expect(page.locator('ion-toast')).toContainText(/Settings saved\.|Ajustes guardados\./);
+    await save.click();
+    await expect(shown(page).locator('[data-testid=inventory-settings-saved]')).toHaveText(/Settings saved\.|Ajustes guardados\./);
     const after = await api<{ low_stock_threshold: number }>(context, A, 'GET', '/inventory/config');
     expect(after.data.low_stock_threshold).toBe(7);
   } finally {
