@@ -111,8 +111,8 @@ def test_a_section_that_cannot_hide_is_a_422_on_its_field(admin_client):
 def test_a_wrong_email_is_refused_in_the_websites_own_words(admin_client):
     """The editor's error under the email field speaks as its others do and as the WORKBOOK says (WEBSITE-F01), not
     with Equipo's «Introduzca…» for the same English (hub#661)."""
-    content = {"contact": {"email": "not-an-email"}}
-    response = post(admin_client, "/website/site", {"template": "classic", "theme": {}, "content": content}, HTTP_ACCEPT_LANGUAGE="es")
+    draft = {"template": "classic", "theme": {}, "content": {"contact": {"email": "not-an-email"}}}
+    response = post(admin_client, "/website/site", draft, HTTP_ACCEPT_LANGUAGE="es")
     assert response.status_code == 422
     assert response.json()["error"]["fields"]["content.contact.email"] == "Escribe un correo electrónico válido."
 
