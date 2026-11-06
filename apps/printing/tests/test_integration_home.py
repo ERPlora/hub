@@ -1,10 +1,12 @@
-"""Printing on the Home (PLAN-HUB round 2026-10-21; FIX-PRINTING-SETUP-HOOKS): base's own queries bring the old hub's
+"""Printing on the Home (PLAN-HUB round 2026-10-21; FIX-PRINTING-SETUP-HOOKS) and in System (hub#683): base's own queries bring the old hub's
 core item «Set up your printer» (gh:hub#1948), recommended, pending until a device set up here reaches an active
 receipt printer, to whoever sets printers up; and the bell's «Nothing is printing “…”» (old-hub:HUB_SHELL-F63,
 gh:hub#800), one row per function with the jobs that have waited a minute and no device on can print (set up here and
 seen in the last 90 s, FIX-HUB-PRINTING-BELL-SILENT-WITH-DEVICE-OFF), to everybody with Printing, leading to the
 printers' state by function (gh:hub#2016). Every change of either records an event they are refreshed on, the bell
-reads the clock every 30 s for what time moves, and a change in hub B re-runs B's Home only.
+reads the clock every 30 s for what time moves, and a change in hub B re-runs B's Home only. And System › «Usage and
+plan» has its card «Your printer» (the old hub's of «Resources», HUB_SHELL-F137/F138) for everybody with Printing,
+while Printing is on in that business.
 
 base and printing run for real: the hooks come from PrintingConfig through base's own queries, as the person.
 """
@@ -27,7 +29,7 @@ from apps.printing.models import PrintDevice, PrintJob
 from apps.printing.tests.conftest import A, B, ctx_for, enqueue, printer, run
 from apps.printing.tests.test_services import SPARE_ID, TILL_ID, answer, on_device, register, take
 from base.permissions import VIEW_HOME
-from base.schemas import BellCountersIn, SetupStatusIn
+from base.schemas import BellCountersIn, SetupStatusIn, SystemCardsIn
 
 STEP = "printing.printer"
 WAIT = 1.0
@@ -382,3 +384,33 @@ def test_a_receipt_waiting_in_hub_b_re_runs_the_home_of_b_and_tells_a_nothing(li
     events = {event for _, payload in notes for event in payload["events"]}
     assert "base.bell.counters" in live_registry.affected(events)
     assert received(on_a, timeout=QUIET) == []
+
+
+# ── «Your printer» in System › «Usage and plan» (hub#683) ──────────────────────────────────────────────────────────
+
+YOUR_PRINTER = {"key": "printing.printer", "app": "printing", "component": "SystemPrinterCard"}
+
+
+def system_cards(ctx) -> list[dict]:
+    """Printing's cards of System › «Usage and plan» for the person of ``ctx``, as the SPA receives them."""
+    cards = get("base.system.cards")(ctx, SystemCardsIn()).model_dump(mode="json")["cards"]
+    return [card for card in cards if card["app"] == "printing"]
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("role", ["hub_owner", "hub_admin", "hub_manager", "hub_employee"])
+def test_everybody_with_printing_has_your_printer_in_system(role):
+    assert system_cards(ctx_for(role)) == [YOUR_PRINTER]
+
+
+@pytest.mark.django_db
+def test_without_a_permission_of_printing_there_is_no_card():
+    who_sees_the_home_only = dataclasses.replace(ctx_for("hub_employee"), permissions=frozenset({VIEW_HOME}))
+    assert system_cards(who_sees_the_home_only) == []
+
+
+@pytest.mark.django_db
+def test_with_printing_off_system_has_no_printer_card_and_the_other_business_keeps_it():
+    run("base.app.disable", {"app": "printing"}, dataclasses.replace(ctx_for(), permissions=frozenset({"*"})))
+    assert system_cards(ctx_for("hub_owner")) == []
+    assert system_cards(ctx_for("hub_owner", scope=B)) == [YOUR_PRINTER]

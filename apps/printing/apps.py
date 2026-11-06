@@ -91,6 +91,10 @@ class PrintingConfig(LiveAppConfig):
     # A job starts counting once it has waited a minute and a device stops counting 90 s after its last news: the
     # number moves with no event, so the bell reads it again every 30 s, the old bell's poll (print-alert.ts, POLL_MS).
     bell_refresh_every = {f"stalled_{usage}": 30 for usage in NOTHING_PRINTING}
+    # System › «Usage and plan» (hub#683): the old hub's card «Your printer» of «Resources» (HUB_SHELL-F137/F138), for
+    # everybody with Printing, while Printing is on: who prints, «Set up printing» and, in a browser, where to get the
+    # ERPlora app. base mounts frontend/components/SystemPrinterCard.vue (base.E015 checks the name at start).
+    system_cards = [{"key": "printer", "component": "SystemPrinterCard", "permission": "printing.view_settings"}]
     # The news that a device is there (the old hub's print_hosts::heartbeat): base's /ws/print runs it at the hello
     # and at every beat of a device that prints, as the device's user (base.E006).
     print_presence = "printing.device.seen"

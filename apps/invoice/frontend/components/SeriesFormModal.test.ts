@@ -169,6 +169,28 @@ describe('SeriesFormModal: creating', () => {
       expect(prop(s.field('code'), 'errorText')).toBe('Use letters and digits only.');
       expect(red(s, 'code')).toBe(true);
     });
+
+    it('year and next number refused with the same words: the corrected year alone loses them (hub#888)', async () => {
+      const s = await setup();
+      await ionValue(s.field('code'), 'FACT', 'ionInput');
+      await ionValue(s.field('year'), '', 'ionInput');
+      await ionValue(s.field('next-number'), '', 'ionInput');
+      s.answer(422, {
+        error: {
+          code: 'invalid_payload',
+          message: 'Check the highlighted details.',
+          fields: { year: 'Enter a whole number.', next_number: 'Enter a whole number.' },
+        },
+      });
+      await s.submit();
+      expect([red(s, 'year'), red(s, 'next-number')]).toEqual([true, true]);
+
+      await type(s, 'year', '2026');
+      expect(prop(s.field('year'), 'errorText')).toBeFalsy();
+      expect(red(s, 'year')).toBe(false);
+      expect(prop(s.field('next-number'), 'errorText')).toBe('Enter a whole number.');
+      expect(red(s, 'next-number')).toBe(true);
+    });
   });
 });
 

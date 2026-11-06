@@ -2,6 +2,7 @@
 //   - INVOICE-F12: the owner creates a series that continues another system's numbering (next number 7);
 //   - INVOICE-F13: edits its name; once it has numbered an invoice, prefix, format and next number are
 //     locked (the page says why, the server refuses them with 409).
+//   - hub#888: year and next number refused with the same words lose their marks one by one, as corrected.
 // What this file creates is deleted after it, and the hub's numbering is left as found.
 import { expect, type Page, test } from '@playwright/test';
 
@@ -75,6 +76,35 @@ test('INVOICE-F12 and F13: a series that continues at 7, renamed, and locked onc
   await code.locator('input').fill(CODE);
   await expect(code).not.toHaveClass(/ion-invalid/);
   await expect(code).not.toContainText(takes);
+  await expect(notice).toBeHidden();
+
+  // hub#888: year and next number left empty are refused with the same words; correcting the year takes the mark
+  // from the year alone, and the next number keeps its own until it is corrected too.
+  const yearField = form.locator('[data-testid=invoice-series-year]');
+  const nextField = form.locator('[data-testid=invoice-series-next-number]');
+  const whole = 'Enter a whole number.';
+  await yearField.locator('input').fill('');
+  await nextField.locator('input').fill('');
+  await form.locator('[data-testid=invoice-series-form-submit]').click();
+  await expect(yearField).toHaveClass(/ion-invalid/);
+  await expect(nextField).toHaveClass(/ion-invalid/);
+  await expect(yearField).toContainText(whole);
+  await expect(nextField).toContainText(whole);
+  await flowShots(page, 'INVOICE-F12-refused-same-words', async (p) => {
+    await expect(openDialog(p, 'invoice-series-form').locator('[data-testid=invoice-series-next-number]')).toContainText(whole);
+  });
+  await yearField.locator('input').fill(String(year));
+  await expect(yearField).not.toHaveClass(/ion-invalid/);
+  await expect(yearField).not.toContainText(whole);
+  await expect(nextField).toHaveClass(/ion-invalid/);
+  await expect(nextField).toContainText(whole);
+  await flowShots(page, 'INVOICE-F12-year-corrected', async (p) => {
+    const dialog = openDialog(p, 'invoice-series-form');
+    await expect(dialog.locator('[data-testid=invoice-series-year]')).not.toHaveClass(/ion-invalid/);
+    await expect(dialog.locator('[data-testid=invoice-series-next-number]')).toContainText(whole);
+  });
+  await nextField.locator('input').fill('7');
+  await expect(nextField).not.toHaveClass(/ion-invalid/);
   await expect(notice).toBeHidden();
   await flowShots(page, 'INVOICE-F12', async (p) => {
     await expect(openDialog(p, 'invoice-series-form')).toBeVisible();

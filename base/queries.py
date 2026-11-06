@@ -114,6 +114,8 @@ from base.schemas import (
     SessionMeOut,
     SetupStatusIn,
     SetupStatusOut,
+    SystemCardsIn,
+    SystemCardsOut,
     SystemStatusIn,
     SystemStatusOut,
     WidgetListIn,
@@ -320,6 +322,23 @@ def widget_list(ctx: OperationContext, data: WidgetListIn) -> dict:
         hub = Hub.objects.filter(slug=ctx.scope.key).first()
         configs = home.home_modules(active_apps(ctx.scope), demo_hub=bool(hub and hub.is_demo))
         return {"widgets": home.widgets(ctx, configs, hub.vertical if hub else "")}
+
+
+# Not an assistant tool: the cards of System, the screen's own layout (each card reads what it says by its app's queries).
+@operation(
+    "base.system.cards",
+    kind="query",
+    permission=VIEW_HOME,
+    input=SystemCardsIn,
+    output=SystemCardsOut,
+    ai=INTERNAL,
+)
+def system_cards(ctx: OperationContext, data: SystemCardsIn) -> dict:
+    """The cards the apps on put in System › «Usage and plan» that this person may see (hub#683): Printing's «Your
+    printer» while Printing is on, none while it is off."""
+    hub = Hub.objects.filter(slug=ctx.scope.key).first()
+    configs = home.home_modules(active_apps(ctx.scope), demo_hub=bool(hub and hub.is_demo))
+    return {"cards": home.system_cards(ctx, configs)}
 
 
 # Not an assistant tool: the bell's counters, the screen's own chrome.

@@ -125,6 +125,7 @@ async function issue(): Promise<void> {
         />
         <ion-input
           data-testid="invoice-create-notes"
+          name="notes"
           :label="$t('invoice.create.notes')"
           label-placement="floating"
           fill="outline"
