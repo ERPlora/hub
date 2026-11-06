@@ -428,9 +428,12 @@ Todo se puede pedir por las pantallas, el asistente (por voz o por texto, con la
 la API, con las mismas reglas y los mismos permisos. Un día de la semana se nombra por su número (0 =
 lunes) o por su nombre («lunes», «monday»); un día especial, por su id, su nombre o su fecha; un cambio
 temporal, por su id, su motivo o una fecha que cubra. Si un nombre vale para varios, se dice cuáles y se
-pide que elija (`schedule.ambiguous_reference`).
+pide que elija (`schedule.ambiguous_reference`). Antes de corregir o borrar un día especial o un cambio temporal, el
+asistente pide confirmar con su tarjeta (BASE-F97), que nombra el registro como lo nombran las pantallas, nunca por su
+id: el día especial por su nombre («Día especial: Navidad») y el cambio temporal por su motivo («Cambio temporal: Horario
+de verano»). Lo que quien pregunta no puede ver no sale.
 
-### Lo que ofrece: consultas (leen, no cambian nada; todas se pueden seguir en vivo)
+### Lo que ofrece: consultas (leen, no cambian nada; todas, salvo las dos de la tarjeta del asistente, se pueden seguir en vivo)
 
 | Qué da | Quién puede | Flujos | Servicio |
 |---|---|---|---|
@@ -440,6 +443,8 @@ pide que elija (`schedule.ambiguous_reference`).
 | Los ajustes y la zona horaria del negocio, y si la semana está confirmada (el paso «Confirma tu horario» del Inicio) | ver | F03, F08, F09 | `schedule.settings.get` |
 | ¿Está abierto en un momento? | ver | F10 | `schedule.business.is_open` |
 | El horario de cada día de un rango | ver | F11 | `schedule.hours.for_range` |
+| Un día especial por su id, con sus tramos: lo que lee la tarjeta del asistente para nombrarlo (BASE-F97); no es herramienta del asistente ni tiene ruta en la API | ver | F06, F13 | `schedule.special_day.get` |
+| Un cambio temporal por su id, con sus tramos: lo que lee la tarjeta del asistente para nombrarlo (BASE-F97); no es herramienta del asistente ni tiene ruta en la API | ver | F06, F13 | `schedule.override.get` |
 
 ### Lo que ofrece: acciones (cambian datos)
 
@@ -555,7 +560,18 @@ horario» de «Termina de configurar tu negocio» (SCHEDULE-F03).
   de 366 días, con un día sin fecha real o sin nombre, o con más de 100 tramos en un día.
 - Asistente: toda operación declara `ai={"description", "risk"}` (`risk` solo en las acciones; `high` en
   borrar un día especial o un cambio temporal, que no se deshace) y todo campo de entrada lleva
-  `description`; las mismas descripciones salen en el OpenAPI.
+  `description`; las mismas descripciones salen en el OpenAPI. Las dos excepciones son `schedule.special_day.get` y
+  `schedule.override.get`, lecturas internas (`ai=INTERNAL`, sin API): el modelo encuentra los días especiales y los
+  cambios temporales en sus listas.
+- La tarjeta de confirmación del asistente (BASE-F97, hub#675) nombra el registro que una escritura señala por su id
+  con las marcas `refers` de `schemas.py` (`A_SPECIAL_DAY`, `A_OVERRIDE`, en el `id` de `SpecialDayRefIn` y de
+  `OverrideRefIn`), leídas como quien pregunta: el día especial por su `name` con `schedule.special_day.get` y el
+  cambio temporal por su `reason` con `schedule.override.get`, como el diálogo «Eliminar» de las pantallas. Ese `id`
+  lleva su título («Día especial», «Cambio temporal»), nunca «Registro». Sin persona detrás, sin `schedule.view`, con
+  un id de otro negocio o de algo que ya no está, el registro queda fuera, nunca su id
+  (`tests/test_assistant_card_records.py`); el trinquete `UNNAMED_REFERENCES` de
+  `base/tests/test_assistant_card_values.py` impide que entre un dato sin marca. Horarios no tiene listas cerradas en
+  sus escrituras.
 - El admin de Django del Hub tiene **CRUD completo** sobre todos los modelos (ronda 12, PLAN §17), con
   los tramos como líneas de su día; ids y fechas de auditoría, de solo lectura. Una escritura cruda del
   admin no deja aviso.
@@ -584,10 +600,6 @@ horario» de «Termina de configurar tu negocio» (SCHEDULE-F03).
   de `MIGRATION.md` como `schedule:ui-time-date-fields`.
 - **«Abrir ajustes del hub»** desde Ajustes: el Hub aún no tiene ajustes de zona horaria a los que ir (la
   zona la manda el SaaS al dar de alta el hub; ver «Zona horaria» en «Para quien lo mantiene»).
-- **El asistente (chat y voz) y las llaves de API del negocio** son de la plataforma, que aún no los tiene:
-  Horarios ya declara cada operación para el asistente, con su descripción, y abre a las llaves la semana,
-  las listas, «¿abierto?» y el horario de un rango; mientras tanto, SCHEDULE-F07 y SCHEDULE-F10 se piden
-  por la API con la sesión.
 - **El icono de estrella** de la pestaña **Días especiales** (el del producto actual): `@erplora/ui` aún no lo
   tiene y se usa el de calendario (`UI-REQUESTS.md`; Servicios pide la misma estrella en
   `FIX-UI-SHELL-ICONS-SERVICE-TASK`), propuesto para `## 6` de `MIGRATION.md` como `schedule:ui-icons`.

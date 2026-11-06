@@ -15,7 +15,7 @@ from django.utils import formats, timezone, translation
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import Conflict, NotFound
-from live.operations import operation
+from live.operations import INTERNAL, operation
 
 from apps.schedule import engine
 from apps.schedule.models import (
@@ -29,16 +29,19 @@ from apps.schedule.models import (
     WeekDayInterval,
 )
 from apps.schedule.schemas import (
+    ByIdIn,
     HoursRangeIn,
     HoursRangeOut,
     IsOpenIn,
     IsOpenOut,
     NoParamsIn,
     OverrideListIn,
+    OverrideOut,
     OverridePage,
     PageIn,
     SettingsOut,
     SpecialDayListIn,
+    SpecialDayOut,
     SpecialDayPage,
     WeekOut,
 )
@@ -382,6 +385,32 @@ def list_overrides(ctx: OperationContext, params: OverrideListIn) -> dict:
     return _page(
         rows.order_by(*list_order(*OVERRIDE_SORTS[params.sort], descending=params.dir == "desc")), params, override_out
     )
+
+
+# Not assistant tools: what names a special day or a temporary change on the card of a write (``schemas.A_SPECIAL_DAY``,
+# ``A_OVERRIDE``), as their list shows them; the model finds them in their lists.
+@operation(
+    "schedule.special_day.get",
+    kind="query",
+    permission="schedule.view",
+    input=ByIdIn,
+    output=SpecialDayOut,
+    ai=INTERNAL,
+)
+def get_special_day(ctx: OperationContext, data: ByIdIn) -> dict:
+    return special_day_out(resolve_special_day(data.id, None))
+
+
+@operation(
+    "schedule.override.get",
+    kind="query",
+    permission="schedule.view",
+    input=ByIdIn,
+    output=OverrideOut,
+    ai=INTERNAL,
+)
+def get_override(ctx: OperationContext, data: ByIdIn) -> dict:
+    return override_out(resolve_override(data.id, None))
 
 
 @operation(
