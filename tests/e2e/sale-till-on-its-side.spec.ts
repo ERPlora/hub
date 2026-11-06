@@ -8,12 +8,11 @@
 // the page, the cart button in its corner, the foot in its two rows. What a run creates, its product `E2E-TILLSIDE-<run>`, its check and the
 // issuer of a hub that had none (with it, the strip goes as it does for a business with its data complete), is deleted
 // after it; hub `a`'s issuer is parked only for the runs with the strip.
-import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
+import { expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, capture, login, settled, shown } from './helpers';
-import { cleanInventory, type Product } from './inventory-helpers';
-import { cleanInvoices, ensureIssuer, parkIssuer, unparkIssuer } from './invoice-helpers';
-import { cleanSales, dishForTheTill, fingerOn, restoreDrawer, stamp, tillIn, tillIsPhone } from './sale-helpers';
+import { type Product } from './inventory-helpers';
+import { cleanTillAndIssuer, dishWithAnIssuer, fingerOn, stamp, TILL_LANGUAGES, tillIsPhone, tillUnderStrip } from './sale-helpers';
 
 const KEY = 'FIX-HUB-800-TILL-ON-ITS-SIDE';
 /** Hub `a`'s issuer, parked while a run needs the strip of a hub that cannot issue invoices yet. */
@@ -48,23 +47,10 @@ const LINE_PEEK = 30;
 let product: Product;
 
 test.beforeAll(async ({ browser }) => {
-  product = await dishForTheTill(browser, 'TILLSIDE', RUN);
-  // A business with its data complete has no strip; the runs with it park the issuer.
-  const context = await browser.newContext({ baseURL: A });
-  await login(await context.newPage(), A, '/sale/pos');
-  await ensureIssuer(context);
-  await context.close();
+  product = await dishWithAnIssuer(browser, 'TILLSIDE', RUN);
 });
 
-test.afterAll(() => {
-  try {
-    cleanSales();
-    cleanInventory();
-    cleanInvoices();
-  } finally {
-    restoreDrawer();
-  }
-});
+test.afterAll(cleanTillAndIssuer);
 
 /** The check's line, whose «+» a real tap reaches, however low the window: the quantity goes up by one. */
 async function tapTheLine(page: Page, where: string): Promise<void> {
@@ -384,61 +370,40 @@ test('SALE-F01: on a phone with a notch and a home bar, the drawer on its side k
   await context.close();
 });
 
-const LANGUAGES = [
-  { name: 'English', lang: 'en', locale: 'en-US' },
-  { name: 'Spanish', lang: 'es', locale: 'es-ES' },
-] as const;
-
 for (const strip of [true, false]) {
-  for (const { name, lang, locale } of LANGUAGES) {
+  for (const { name, lang, locale } of TILL_LANGUAGES) {
     test.describe(`SALE-F01: in ${name}, ${strip ? 'under the red strip' : 'without the strip'}, a phone on its side sells`, () => {
-      let context: BrowserContext;
-      let page: Page;
-
-      test.beforeAll(async ({ browser }) => {
-        if (strip) parkIssuer(PARKED);
-        context = await browser.newContext({ baseURL: A, locale, viewport: { width: 1440, height: 900 } });
-        page = await context.newPage();
-        await tillIn(page, context, lang);
-        const notice = shown(page).locator('[data-testid=blocking-strip]');
-        if (strip) await expect(notice, 'the strip of a hub that cannot issue invoices yet').toBeVisible();
-        else await expect(notice, 'a hub with its issuer has no strip').toBeHidden();
-      });
-
-      test.afterAll(async () => {
-        await context.close();
-        if (strip) unparkIssuer(PARKED);
-      });
+      const page = tillUnderStrip({ strip, parked: PARKED, locale, lang });
 
       test('568x320, a check with no lines yet', async () => {
-        await emptyCheckOnItsSide(page, `${lang} 568x320 ${strip ? 'with-strip' : 'no-strip'}`);
+        await emptyCheckOnItsSide(page(), `${lang} 568x320 ${strip ? 'with-strip' : 'no-strip'}`);
       });
 
       for (const size of strip ? ON_ITS_SIDE : [...ON_ITS_SIDE, UNDER_AN_ADDRESS_BAR]) {
         test(size.label, async () => {
-          await sellOnItsSide(page, size, strip, lang);
+          await sellOnItsSide(page(), size, strip, lang);
         });
       }
 
       if (strip) {
         test('the search, under the strip of the lowest phone', async () => {
-          await searchOnItsSide(page);
+          await searchOnItsSide(page());
         });
       }
 
       for (const size of UPRIGHT) {
         test(`${size.label} keeps its layout`, async () => {
-          await keepsItsLayout(page, size, `${lang} ${size.label} ${strip ? 'with-strip' : 'no-strip'}`);
+          await keepsItsLayout(page(), size, `${lang} ${size.label} ${strip ? 'with-strip' : 'no-strip'}`);
         });
       }
 
       if (!strip) {
         test('568x320, a check with a ticket discount', async () => {
-          await discountOnItsSide(page, `${lang} 568x320 no-strip`);
+          await discountOnItsSide(page(), `${lang} 568x320 no-strip`);
         });
 
         test(`${LOW_AND_WIDE.label}, the till fills the page`, async () => {
-          await fillsThePage(page, `${lang} ${LOW_AND_WIDE.label} no-strip`);
+          await fillsThePage(page(), `${lang} ${LOW_AND_WIDE.label} no-strip`);
         });
       }
     });

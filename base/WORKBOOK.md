@@ -122,7 +122,10 @@ ninguna vende nada.
 Encima de cualquier pantalla mientras falta un paso que impide facturar: «No se podrá emitir ningún
 tique ni factura hasta que configures esto:» y cada paso con «Configurar» (en la pantalla que lo configura,
 solo su nombre). En el «Resumen» del Inicio no sale (la lista dice lo mismo un poco más abajo); en
-«Actividad», sí.
+«Actividad», sí. Con la pantalla muy baja (el móvil tumbado: 500 px de alto o menos, el mismo corte del TPV) va en
+una sola línea, para dejar sitio a la pantalla: «Todavía no puedes facturar» y un solo «Configurar», que lleva al
+primer paso que se puede configurar desde ahí; sin la frase ni los nombres de los pasos, que se leen en vertical o en
+el Inicio. Si desde ahí no hay ninguno que configurar, solo el aviso.
 
 ### Apps
 Desde «Apps» en el menú lateral. Tres pestañas abajo: «Mis apps» (las apps que el negocio tiene en marcha),
@@ -433,7 +436,7 @@ Pasos:
   4. Un paso que solo vale para otro país, o que la persona no puede ver, no sale. Un paso cuya
      comprobación falla tampoco sale: nunca se da por hecho ni por pendiente lo que no se pudo comprobar.
   5. Mientras falta un paso «Necesario para facturar», la franja «Todavía no puedes facturar» sale encima
-     de las demás pantallas.
+     de las demás pantallas; con el móvil tumbado, en una sola línea con un «Configurar» (hub#838).
   6. Cuando otra persona completa un paso en otro dispositivo, la lista se pone al día sola.
 Entra: los pasos que declara cada app encendida, con su comprobación, su país, su permiso y su pantalla.
 Sale: nada guardado.
@@ -2882,7 +2885,9 @@ Implicados: HUBS-F17, WEBSITE-F10
   (`custom_domain`: minúsculas, sin puerto, sin punto final, en su forma ASCII; `null`, vacío o ausente, ninguno, porque la
   foto es entera), que lo guarda en `Hub.custom_domain`, y nunca se le pregunta por petición. Cada proceso guarda en memoria qué
   dominio es de quién y lo relee cada 30 s (al momento en el proceso que aplicó la foto): un host desconocido sigue siendo
-  el 400 de `CommonMiddleware` **sin una sola lectura**, y uno de los hosts del Hub ni pregunta. Un host conocido se
+  el 400 de `CommonMiddleware` **sin una sola lectura** y sin línea en el registro (hub#817: `django.security.DisallowedHost`
+  va a un `NullHandler` en `LOGGING`; el 400 queda en la línea de acceso de daphne y cualquier otro `django.security` sigue
+  en ERROR; `config/tests/test_security_logging.py`), y uno de los hosts del Hub ni pregunta. Un host conocido se
   responde en ese middleware, antes de `CommonMiddleware`, y no sigue por la cadena: `/` (la web, `base.public_home`),
   `/p/media/<su id>/` (sus imágenes públicas) y `/.well-known/erplora-hub` (la sonda del SaaS: `{"hub_id": …}`, sin lectura);
   cualquier otra ruta es 404 sin lectura, `/api` con su sobre, y nunca se lee la sesión. La página y sus imágenes releen la
