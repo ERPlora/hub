@@ -863,14 +863,14 @@ def test_the_yes_runs_the_write_with_its_attempt_keys_as_sent(monkeypatch):
 
 @pytest.mark.django_db
 def test_a_line_the_assistant_adds_twice_with_its_key_is_one_line():
-    """A real write: Demo's line, its card without its key; the yes adds it, and the same line again — a retry with
-    the same key — answers the line already there instead of adding another."""
+    """A real write: Demo's line, its card without its key (its item by its name, hub#670); the yes adds it, and the
+    same line again — a retry with the same key — answers the line already there instead of adding another."""
     from base.tests.test_services_assistant import run
 
     item = run("demo.item.create", name="Mesa 4")
     line = {"id": item["id"], "text": "Café", "qty": "1", "client_line_id": "0192f5a0-0000-7000-8000-000000000001"}
     asked = turn(call("demo.item.add_line", line))["confirm"]
-    assert values(asked) == {"text": "Café", "qty": "1"}
+    assert values(asked) == {"id": "Mesa 4", "text": "Café", "qty": "1"}
     for _ in range(2):
         plan = turn(call("demo.item.add_line", line), decision={"call_id": "c1", "accepted": True})
         assert plan["executed"][0]["outcome"] == "ok"

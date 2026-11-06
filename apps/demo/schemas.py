@@ -5,14 +5,23 @@ from decimal import Decimal
 from typing import Annotated, Generic, Literal, TypeVar
 from uuid import UUID
 
+from django.utils.translation import gettext_noop
 from ninja import Field, Schema
 from pydantic import StringConstraints
+
+from base.schemas import names
 
 T = TypeVar("T")
 
 Status = Literal["open", "done"]
 Name = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)]
 LineText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
+
+# What the assistant's card calls the item a write acts on (its Spanish in this app's catalog), as its screen calls one,
+# and the read it names that item by (base/assistant.py ``REFERS``), run as whoever asks, never by its id: by its name,
+# as the list and the «Delete» dialog say it.
+T_ITEM = gettext_noop("Item")
+AN_ITEM = names("demo.item.detail")
 
 
 # Pages: every list is paginated, limit ≤ 100.
@@ -39,7 +48,7 @@ class ItemListIn(PageIn):
 
 
 class ByIdIn(Schema):
-    id: UUID
+    id: UUID = Field(title=T_ITEM, json_schema_extra=AN_ITEM)
 
 
 class ItemStatsIn(Schema):
@@ -55,7 +64,7 @@ class ItemIn(Schema):
 class ItemPatchIn(Schema):
     """Only the fields sent are changed; ``null`` leaves a field as it is."""
 
-    id: UUID
+    id: UUID = Field(title=T_ITEM, json_schema_extra=AN_ITEM)
     name: Name | None = None
     status: Status | None = None
     note: str | None = None
@@ -64,7 +73,7 @@ class ItemPatchIn(Schema):
 class LineIn(Schema):
     """``id`` is the item's; ``client_line_id`` makes repeating the same line safe."""
 
-    id: UUID
+    id: UUID = Field(title=T_ITEM, json_schema_extra=AN_ITEM)
     text: LineText
     qty: Decimal = Field(gt=0, max_digits=10, decimal_places=3)
     client_line_id: UUID | None = Field(None, json_schema_extra={"attempt_key": True})
