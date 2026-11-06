@@ -87,6 +87,9 @@ def test_a_write_the_model_asked_for_comes_as_a_card_and_the_gateway_waits(clien
     assert got[0]["card"]["operation"] == "demo.item.create"
     assert got[0]["call"] == call
     assert (got[1]["pending"], got[1]["continuation"]) == ([call], "tok")
+    # A round that never reached the gateway brought no pages of the web (hub#870): without the word, the browser would
+    # not know where the whole answer came from (ui#105), and its report would reach support without its text.
+    assert got[1]["web"] is False
     assert gateway.requests == []
 
 
@@ -123,6 +126,7 @@ def test_after_too_many_rounds_it_stops_and_says_why(client, make_user, gateway)
     assert [frame["type"] for frame in got] == ["executed", "error", "done"]
     assert got[1]["code"] == "assistant.too_many_steps"
     assert got[-1]["append"][0]["tool_call_id"] == "r5"
+    assert got[-1]["web"] is False  # no pages: it never reached the gateway (hub#870)
     assert gateway.requests == []
 
 
@@ -163,6 +167,54 @@ def test_a_long_answer_can_be_reported_whole(client, make_user, gateway):
     report = {"message_id": "m1", "reason": "incorrect", "question": "¿?" * 3_000, "answer": answer}
     assert post(client, "/assistant/report", report).status_code == 200
     assert gateway.sent("/internal/assistant/report")[0].body["answer"] == answer
+
+
+# ── Whether the answer came from the web, end to end (hub#870, saas#287, BASE-F105) ────────────────────────────────
+
+
+def test_a_turn_that_searched_the_web_tells_the_browser_and_its_report_tells_erplora(client, make_user, gateway):
+    """The whole way of the mark through the Hub: the gateway's ``{type: web}`` closes the turn as ``done.web``, and the
+    report the browser sends back with it reaches erplora.com's door with it, which then does not mail the answer."""
+    client.force_login(make_user("ana", host="a", role="hub_employee"))
+    gateway.turn(
+        {"type": "web"},
+        {"type": "text_delta", "text": "El plazo acaba el 20 (aeat.es)."},
+        {"type": "response", "output": [], "usage": {}, "continuation": None},
+    )
+    got = frames(post(client, "/assistant/turn", {"messages": [{"role": "user", "content": "¿Cuándo acaba el plazo?"}]}))
+    assert [frame["type"] for frame in got] == ["text", "done"]
+    assert got[-1]["web"] is True
+    gateway.reply("/internal/assistant/report", status=202, json={"sent": True, "duplicate": False})
+    report = {"message_id": "m1", "reason": "incorrect", "question": "¿Cuándo acaba el plazo?", "answer": got[0]["text"]}
+    assert post(client, "/assistant/report", {**report, "web": got[-1]["web"]}).json() == {"sent": True, "duplicate": False}
+    seen = gateway.sent("/internal/assistant/report")[0]
+    assert seen.body["web"] is True
+    assert signed(seen)
+
+
+def test_a_turn_that_did_not_search_lets_support_read_its_report(client, make_user, gateway):
+    client.force_login(make_user("ana", host="a", role="hub_employee"))
+    gateway.turn({"type": "text_delta", "text": "Tienes 2."}, {"type": "response", "output": [], "usage": {}, "continuation": None})
+    done = frames(post(client, "/assistant/turn", {"messages": [ASK]}))[-1]
+    assert done["web"] is False
+    gateway.reply("/internal/assistant/report", status=202, json={"sent": True, "duplicate": False})
+    post(client, "/assistant/report", {"message_id": "m1", "reason": "other", "answer": "Tienes 2.", "web": done["web"]})
+    assert gateway.sent("/internal/assistant/report")[0].body["web"] is False
+
+
+def test_a_report_of_an_answer_kept_before_the_mark_leaves_the_web_out(client, make_user, gateway):
+    client.force_login(make_user("ana", host="a", role="hub_employee"))
+    gateway.reply("/internal/assistant/report", status=202, json={"sent": True, "duplicate": False})
+    post(client, "/assistant/report", {"message_id": "m1", "reason": "other", "answer": "x"})
+    assert "web" not in gateway.sent("/internal/assistant/report")[0].body
+
+
+def test_a_turn_the_gateway_refused_closes_saying_it_brought_no_pages(client, make_user, gateway):
+    client.force_login(make_user("ana", host="a", role="hub_employee"))
+    gateway.reply("/internal/assistant/chat/stream", status=503, json={"error": {"code": "assistant.no_model", "message": "x"}})
+    got = frames(post(client, "/assistant/turn", {"messages": [ASK]}))
+    assert [frame["type"] for frame in got] == ["error", "done"]
+    assert got[-1]["web"] is False
 
 
 # ── A write a manager may approve (BASE-G118, with APP-BASE-5's approvals): the chat asks as the screen does ────────

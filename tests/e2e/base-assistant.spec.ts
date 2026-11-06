@@ -1187,7 +1187,11 @@ test('BASE-G123 — «Report a problem» sends the answer with its question and 
   await page.setViewportSize({ width: 1440, height: 900 });
   const sent = page.waitForResponse((response) => response.url().endsWith('/api/assistant/report'));
   await dialog.locator('[data-testid="assistant-report-dialog-submit"]').click();
-  expect((await sent).status()).toBe(200);
+  const answered = await sent;
+  expect(answered.status()).toBe(200);
+  // flow: BASE-F105 (hub#870, saas#287) — the «Hola» turn brought no pages of the web: the Hub closes it saying so
+  // (`done.web`) and the chat sends it with the report, so erplora.com's support reads the answer even with its search on.
+  expect(answered.request().postDataJSON()).toMatchObject({ reason: 'harmful', question: 'Hola', web: false });
   await expect(page.locator('ion-toast')).toContainText('Thank you, we have received your report.');
   await expect(dialog).toBeHidden();
 });

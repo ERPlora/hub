@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:ae06cf98d09034c8e011b3eec1b3921976e896b2fa68d9692e44b48c54aad8cc -->
+<!-- generated from WORKBOOK.md sha256:d79249320853f47ab0b50f8a051218add6f5a5e3b7bab275f6ad66746f4b2eb0 -->
 
 ## What it is for and who it is for
 
@@ -2632,12 +2632,18 @@ Steps:
   2. "Report this answer" opens: "If this answer of the assistant looks wrong or harmful, send it to us and we will
      review it.", with "What is wrong with it?" ("It is wrong", already ticked; "It is harmful or offensive", "It did
      not do what I asked" or "Something else") and "Comment (optional)".
-  3. "Report" sends it with the question that led to it; "Cancel" sends nothing.
+  3. "Report" sends it with the question that led to it and with whether its turn brought pages of the web: the Hub
+     says so when it closes each round of the turn (also the one that stops at the card of a change or after too many
+     steps, which brings none), and the chat keeps it with the answer; one round that brought them is enough. "Cancel"
+     sends nothing.
   4. "Thank you, we have received your report." shows and it closes.
-In: the answer, the question, the reason and the comment.
-Out: the report, for erplora.com's team to review. Anyone can report.
+In: the answer, the question, the reason, the comment and whether its turn brought pages of the web (when the chat
+does not know, an answer from before the mark or a round stopped while writing, it does not say).
+Out: the report, for erplora.com's team to review. Anyone can report. With the web search turned on, if the answer
+brought pages of the web or the chat does not know where it came from, the team gets everything but the answer: the
+search engine's terms do not allow keeping its results.
 If it fails: "The report could not be sent. Try again.", and the window stays open with what was chosen and written.
-Involved: none
+Involved: ASSISTANT-F23
 
 ### BASE-F106 The assistant without a connection, with the service down or without a plan
 Status: done
