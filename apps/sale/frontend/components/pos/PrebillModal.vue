@@ -19,7 +19,7 @@ import { computed, shallowRef, useTemplateRef } from 'vue';
 import { useLocale, useT } from '../../composables/useT';
 import { taxRow } from '../../lib/breakdown';
 import { dishLabel } from '../../lib/comboChoice';
-import { formatMoney, formatQuantity, signedMoney, useBusinessMoney } from '../../lib/format';
+import { formatMoney, formatQuantity, useBusinessMoney } from '../../lib/format';
 import { printRefusal, withReason } from '../../../../../base/frontend/lib/print-paper';
 import { printPaper } from '../../lib/print';
 import type { OrderLineOut, OrderOut } from '../../operations';
@@ -218,7 +218,7 @@ async function queued(): Promise<boolean> {
             class="pos-bill__row pos-bill__discount"
           >
             <dt>{{ $t('sale.pos.docDiscount') }}</dt>
-            <dd>{{ signedMoney('−', valued.ticket_discount_amount, locale, businessMoney) }}</dd>
+            <dd>−{{ formatMoney(valued.ticket_discount_amount, locale, businessMoney) }}</dd>
           </div>
           <div class="pos-bill__row">
             <dt>{{ $t('sale.pos.docSubtotal') }}</dt>
