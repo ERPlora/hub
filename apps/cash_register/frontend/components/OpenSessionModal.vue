@@ -3,8 +3,9 @@
 // drawers (the only one is chosen alone; with several it is optional), «Opening float» as it is read
 // (empty is 0), «Notes». An amount that cannot be read is said under its field and nothing is sent. The
 // server numbers the session and keeps the rules (one open at a time, a float required): its refusal is
-// read inside the window, at its field. Success says «Session opened» and closes; the table and the
-// «Open session» button follow by themselves (live).
+// read inside the window, at its field. «Open session» waits in grey until the business has answered its money (the
+// float is read in it; hub#921). Success says «Session opened» and closes; the table and the «Open session» button
+// follow by themselves (live).
 import { FormModal, type FormModalError } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { toastSuccess } from '@erplora/ui/shell';
@@ -12,7 +13,7 @@ import { IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, shallowRef, watch } from 'vue';
 
 import { useLocale, useT } from '../composables/useT';
-import { moneyDecimals, formatMoney, moneyFieldText, moneyRefusal, readMoney, useBusinessMoney } from '../lib/money';
+import { moneyDecimals, formatMoney, moneyFieldText, moneyRefusal, readAmount, useBusinessMoney } from '../lib/money';
 import { refusal } from '../lib/refusal';
 import MoneyField from './MoneyField.vue';
 
@@ -57,8 +58,12 @@ const balanceError = computed(() => balanceRefusal.value ?? error.value?.fields?
 const unassigned = computed(() => (props.unassignedCash > 0 ? formatMoney(props.unassignedCash, locale.value, business.value) : ''));
 
 async function confirm(): Promise<void> {
-  const read = readMoney(balance.value, moneyDecimals(business.value), business.value?.currency);
-  balanceRefusal.value = moneyRefusal(read, t, locale.value, business.value);
+  // No float is read before the business answers its money: «1500» would be read with two decimals, whatever its
+  // currency counts (in yen, 150000; hub#921).
+  const money = business.value;
+  if (!money) return;
+  const read = readAmount(balance.value, money);
+  balanceRefusal.value = moneyRefusal(read, t, locale.value, money);
   if (!read.ok) return;
   try {
     await command.run({
@@ -83,6 +88,7 @@ async function confirm(): Promise<void> {
     :submit-label="$t('cash_register.open.submit')"
     :cancel-label="$t('cash_register.open.cancel')"
     :pending="command.pending.value"
+    :submit-disabled="!business"
     :error="error"
     @submit="confirm"
   >

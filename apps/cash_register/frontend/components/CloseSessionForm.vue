@@ -7,7 +7,8 @@
 // `kitchen.ticket.board`, KITCHEN-F31) and the prints that did not come out (Printing's queue). An app that
 // is off in this hub has nothing pending; a reading refused makes the review incomplete. The expected and
 // the difference follow what is typed. The counted cash is always asked for. With something pending the
-// first press warns, the second closes («Close anyway»): it warns, it never prevents. Success says the
+// first press warns, the second closes («Close anyway»): it warns, it never prevents. «Close session» waits in grey
+// until the business has answered its money, in which the count is written and read (hub#921). Success says the
 // three figures and tells the window.
 import { InlineFeedback } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
@@ -16,7 +17,7 @@ import { IonButton, IonInput, IonSpinner } from '@ionic/vue';
 import { computed, shallowRef, watch } from 'vue';
 
 import { useLocale, useT } from '../composables/useT';
-import { moneyDecimals, formatMoney, formatSignedMoney, moneyFieldText, moneyRefusal, readMoney, useBusinessMoney } from '../lib/money';
+import { formatMoney, formatSignedMoney, moneyFieldText, moneyRefusal, readAmount, useBusinessMoney } from '../lib/money';
 import { refusal } from '../lib/refusal';
 import MoneyField from './MoneyField.vue';
 import ShiftReview from './ShiftReview.vue';
@@ -40,12 +41,13 @@ const touched = shallowRef(false);
 const countedRefusal = shallowRef<string | null>(null);
 const acknowledged = shallowRef(false);
 
-// The last closing count seeds the field once, while the person has not typed anything.
+// The last closing count seeds the field while the person has not typed anything, written in the business's money
+// once it has answered (before it, 1500 yen would be written «15.00»; hub#921).
 watch(
-  () => counts.data.value?.rows,
-  (rows) => {
+  [() => counts.data.value?.rows, business],
+  ([rows, money]) => {
     const last = rows?.find((count) => count.type === 'closing');
-    if (last && !touched.value) counted.value = moneyFieldText(last.total, locale.value, moneyDecimals(business.value));
+    if (last && money && !touched.value) counted.value = moneyFieldText(last.total, locale.value, money.decimals);
   },
   { immediate: true },
 );
@@ -56,8 +58,9 @@ function type(value: string): void {
 }
 
 const expected = computed(() => detail.data.value?.summary.expected_cash ?? null);
-const read = computed(() => readMoney(counted.value, moneyDecimals(business.value), business.value?.currency));
-const difference = computed(() => (expected.value !== null && read.value.ok && read.value.cents !== null ? read.value.cents - expected.value : null));
+/** What is typed, read in the business's money; nothing until it has answered. */
+const read = computed(() => (business.value ? readAmount(counted.value, business.value) : null));
+const difference = computed(() => (expected.value !== null && read.value?.ok && read.value.cents !== null ? read.value.cents - expected.value : null));
 
 /** A reading of the review: answered, refused (the review is incomplete), off in this hub (nothing pending)
  *  or still on its way. */
@@ -91,8 +94,12 @@ const error = computed(() => refusal(command.error.value, t('cash_register.close
 const countedError = computed(() => countedRefusal.value ?? error.value?.fields?.closing_balance ?? null);
 
 async function confirm(): Promise<void> {
-  const value = read.value;
-  countedRefusal.value = value.ok ? (value.cents === null ? t('cash_register.close.countedRequired') : null) : moneyRefusal(value, t, locale.value, business.value);
+  // No count is read before the business answers its money: «1500» would be read with two decimals, whatever its
+  // currency counts (in yen, 150000; hub#921).
+  const money = business.value;
+  if (!money) return;
+  const value = readAmount(counted.value, money);
+  countedRefusal.value = value.ok ? (value.cents === null ? t('cash_register.close.countedRequired') : null) : moneyRefusal(value, t, locale.value, money);
   if (!value.ok || value.cents === null) return;
   if (pending.value && !acknowledged.value) {
     acknowledged.value = true;
@@ -107,9 +114,9 @@ async function confirm(): Promise<void> {
   void toastSuccess(
     t('cash_register.close.done', {
       number: closed.number,
-      expected: formatMoney(closed.expected_balance, locale.value, business.value),
-      counted: formatMoney(closed.closing_balance, locale.value, business.value),
-      difference: formatSignedMoney(closed.difference, locale.value, business.value),
+      expected: formatMoney(closed.expected_balance, locale.value, money),
+      counted: formatMoney(closed.closing_balance, locale.value, money),
+      difference: formatSignedMoney(closed.difference, locale.value, money),
     }),
   );
   emit('closed');
@@ -175,7 +182,7 @@ defineExpose({ confirm });
       <ion-button
         color="danger"
         data-testid="cash-register-close-submit"
-        :disabled="command.pending.value"
+        :disabled="command.pending.value || !business"
         @click="confirm"
       >
         <ion-spinner

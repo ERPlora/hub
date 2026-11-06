@@ -16,6 +16,7 @@ import {
   resultFrame,
   type StreamCall,
 } from '../../../../packages/ui/src/sdk/__tests__/live-harness';
+import { expectSaveWaitsForMoney } from '../../../../base/frontend/__tests__/save-waits-for-money';
 import type { Business } from '../../../../base/frontend/operations';
 import { OPERATION_ROUTES } from '../../../../frontend/generated/operation-routes';
 import baseEn from '../../../../base/frontend/locale/en.json';
@@ -86,6 +87,15 @@ export function business(fields: Partial<Business> = {}): Business {
 }
 
 export const POLISH: Partial<Business> = { country: 'PL', country_name: 'Poland', currency: 'PLN', currency_label: 'PLN · Polish Zloty' };
+
+/** A business in Japan: the yen has no minor units. */
+export const JAPANESE: Partial<Business> = {
+  country: 'JP',
+  country_name: 'Japan',
+  currency: 'JPY',
+  currency_label: 'JPY · Japanese Yen',
+  currency_decimals: 0,
+};
 
 export interface MountOptions {
   props?: Record<string, unknown>;
@@ -191,6 +201,14 @@ export async function mountCash(component: Component, options: MountOptions = {}
 /** Mounts `use` (a composable call) inside a component of the app's harness. */
 export function mountComposable(use: () => void, options: Omit<MountOptions, 'props'> = {}) {
   return mountCash(ComposableHost, { ...options, props: { use } });
+}
+
+/** A window of the drawer mounted with `business: null` waits for the business's money (hub#921,
+ *  `expectSaveWaitsForMoney`): pressing `save` sends nothing, it is grey and the `amount` field says nothing; then the
+ *  business answers in yen (no decimals: «1500» read before it would be sent as 150000) and `save` lights up. */
+export function expectWaitsForTheYen(m: Awaited<ReturnType<typeof mountCash>>, save: string, amount: string): Promise<void> {
+  const window = { wrapper: m.wrapper, save: () => m.inDoc(save), amount: () => m.inDoc(amount), sent: m.sent, settle };
+  return expectSaveWaitsForMoney(window, () => m.result('base.business.get', business(JAPANESE)));
 }
 
 /** Lets Vue render and a dialog's `didPresent` (next tick) land. */
