@@ -3453,8 +3453,11 @@ Implicados: HUBS-F17, WEBSITE-F10
   (`_Words.amount`: `{"kind": "money", "value": …, "money"?: …}`) y la pantalla lo escribe como el de arriba
   (`card.ts` del chat compartido, `isAmount` y `formatMoney` con `narrowSymbol`: un mismo símbolo en toda la tarjeta, «1,50 $» y
   no «1,50 US$» al lado; `money_text` queda para correos, PDF y avisos, donde «US$» desambigua); las palabras de su descripción no cuentan (FIX-HUB-BASE-ASSISTANT-MONEY-KNOWN-ONLY-BY-DESCRIPTION-WORDS:
-  «in minor units» y «in whole cents» dejaban un precio como «1500»; un nombre en `_cents` vale aún, mientras los
-  tests de Automatizaciones lo usan sin marca), `signed` exige la marca (`base.E005`) y las instrucciones del turno
+  «in minor units» y «in whole cents» dejaban un precio como «1500»), ni su nombre (hub#917: un `…_cents` sin la marca
+  no es un importe, arriba, dentro de un objeto o en una lista; lo fijan
+  `test_a_name_in_cents_alone_makes_no_amount_its_mark_does` y, en Automatizaciones,
+  `test_each_datum_of_the_change_comes_as_the_chat_card_says_it`), `signed` exige la marca (`base.E005`, también a un
+  `…_cents` sin ella: `test_a_preview_marks_signed_only_an_amount`) y las instrucciones del turno
   dicen al modelo que un dato marcado `"money": true` va en la unidad menor; lo comprueban
   `test_an_amount_its_schema_marks_is_money_whatever_its_words_at_any_depth`,
   `test_the_model_is_told_an_amount_by_its_mark_whatever_its_description_says`,
