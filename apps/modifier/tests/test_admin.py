@@ -88,6 +88,30 @@ def test_changelists_and_change_pages_render(client, superuser):
 
 
 @pytest.mark.django_db
+def test_a_group_and_an_option_read_modifiers_own_spanish_in_the_admin(
+    client, superuser
+):
+    """Support reading a group or an option in Spanish sees its kitchen name as «Nombre en la comanda», as the
+    Suplementos forms say it; not Menús' «Nombre de cocina» (hub#663)."""
+    group = ModifierGroup.objects.create(name="Salsas", kitchen_name="SALSA")
+    option = ModifierOption.objects.create(group=group, name="Alioli")
+    client.force_login(superuser)
+    for path in (
+        f"/admin/modifier/modifiergroup/{group.pk}/change/",
+        f"/admin/modifier/modifieroption/{option.pk}/change/",
+    ):
+        response = client.get(
+            path, HTTP_HOST="hubs.localhost", HTTP_ACCEPT_LANGUAGE="es"
+        )
+        page = response.content.decode()
+        assert response.status_code == 200, path
+        assert ("Nombre en la comanda" in page, "Nombre de cocina" in page) == (
+            True,
+            False,
+        ), path
+
+
+@pytest.mark.django_db
 def test_support_can_repair_a_group_through_the_admin(client, superuser):
     group = ModifierGroup.objects.create(name="Sacues")
     client.force_login(superuser)

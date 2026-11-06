@@ -9,7 +9,7 @@ from live.operations import registry
 
 from apps.modifier import queries, schemas, services
 from apps.modifier.models import ModifierGroup, ModifierLink, ModifierOption
-from base.tests.po import po_entries
+from base.tests.po import catalogue_key, po_entries
 
 LOCALE = Path(apps.get_app_config("modifier").path) / "locale" / "es" / "LC_MESSAGES"
 
@@ -45,7 +45,7 @@ def visible_texts() -> set[str]:
             and not field.primary_key
         ]
     with translation.override("en"):
-        return {str(text) for text in lazies} | schema_titles()
+        return {catalogue_key(text) for text in lazies} | schema_titles()
 
 
 def schema_titles() -> set[str]:
@@ -124,3 +124,26 @@ def test_spanish_texts_of_the_workbook():
             str(schemas.MAX_BELOW_MIN)
             == "El máximo no puede ser menor que el mínimo (0 = sin techo)."
         )
+
+
+def test_spanish_says_modifiers_own_words_not_an_earlier_apps():
+    """The texts modifier shares in English with an app loaded before it come out in Spanish with modifier's words
+    (hub#663): the kitchen name of a group and of an option is «nombre en la comanda», as the group and option forms
+    say it, not Menús' «nombre de cocina»; a tax category Taxes does not have is «Esa categoría fiscal…», said as
+    Inventario says it next to the same tax category field, the sense and the gender being the same."""
+    texts = {
+        "ModifierGroup.kitchen_name": ModifierGroup._meta.get_field(
+            "kitchen_name"
+        ).verbose_name,
+        "ModifierOption.kitchen_name": ModifierOption._meta.get_field(
+            "kitchen_name"
+        ).verbose_name,
+        "TAX_CATEGORY_UNKNOWN": services.TAX_CATEGORY_UNKNOWN,
+    }
+    with translation.override("es"):
+        said = {name: str(text) for name, text in texts.items()}
+    assert said == {
+        "ModifierGroup.kitchen_name": "nombre en la comanda",
+        "ModifierOption.kitchen_name": "nombre en la comanda",
+        "TAX_CATEGORY_UNKNOWN": "Esa categoría fiscal no existe en Impuestos.",
+    }
