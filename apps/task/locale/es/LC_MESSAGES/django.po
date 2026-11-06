@@ -111,6 +111,7 @@ msgstr "prioridad"
 msgid "assigned to"
 msgstr "asignada a"
 
+msgctxt "task"
 msgid "created by"
 msgstr "creada por"
 
@@ -122,6 +123,14 @@ msgstr "completada el"
 
 msgid "tags"
 msgstr "etiquetas"
+
+msgctxt "task"
+msgid "created at"
+msgstr "creada el"
+
+msgctxt "task"
+msgid "updated at"
+msgstr "actualizada el"
 
 msgid "task"
 msgstr "tarea"
