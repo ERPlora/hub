@@ -15,6 +15,10 @@ ENTRY = "frontend/main.ts"
 # Fails the test that leaves a database connection with a session setting changed (config/testing.py).
 session_settings_left_as_found = pytest.fixture(autouse=True)(testing.session_settings_left_as_found)
 
+# Fails the test that leaves a database connection with its own ensure_connection, which hides pytest-django's block
+# from the tests without the database after it, once its fixtures are torn down (config/testing.py, hub#822).
+pytest_runtest_teardown = testing.database_block_left_as_found
+
 
 @pytest.fixture(scope="session")
 def django_db_createdb(django_db_createdb, django_db_keepdb, django_db_modify_db_settings):
