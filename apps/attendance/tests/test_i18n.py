@@ -16,7 +16,7 @@ from live.operations import registry
 
 from apps.attendance import queries, schemas, services
 from apps.attendance.models import AttendanceSettings, Break, Correction, Record
-from base.tests.po import po_entries
+from base.tests.po import catalogue_key, po_entries
 
 LOCALE = Path(apps.get_app_config("attendance").path) / "locale" / "es" / "LC_MESSAGES"
 MODELS = (Record, Break, Correction, AttendanceSettings)
@@ -50,13 +50,7 @@ def visible_texts() -> set[str]:
     for choices in (Record.Status, Record.Source):
         lazies += list(choices.labels)
     with translation.override("en"):
-        return {source(text) for text in lazies} | schema_titles()
-
-
-def source(text) -> str:
-    """How the catalogue keys a lazy text: its English, or ``context\x04English`` for a ``pgettext_lazy``."""
-    args = getattr(text, "_args", ())
-    return f"{args[0]}\x04{args[1]}" if len(args) == 2 else str(text)
+        return {catalogue_key(text) for text in lazies} | schema_titles()
 
 
 def schema_titles() -> set[str]:

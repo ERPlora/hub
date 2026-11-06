@@ -13,7 +13,7 @@ from live.operations import registry
 
 from apps.printing import documents, models, queries, schemas, services
 from apps.printing.tests.conftest import RECEIPT
-from base.tests.po import po_entries
+from base.tests.po import catalogue_key, po_entries
 
 LOCALE = Path(apps.get_app_config("printing").path) / "locale" / "es" / "LC_MESSAGES"
 TEMPLATE = Path(apps.get_app_config("printing").path) / "templates" / "printing" / "test_page.html"
@@ -45,17 +45,9 @@ def visible_texts() -> set[str]:
         *models.PrintJob.Status.labels,
     ]
     with translation.override("en"):
-        texts = {source(text) for text in lazies}
+        texts = {catalogue_key(text) for text in lazies}
     texts |= set(re.findall(r'{% translate "([^"]+)" %}', TEMPLATE.read_text()))
     return texts | schema_titles()
-
-
-def source(text) -> str:
-    """How the catalog keys a lazy text: its English, or ``context\x04English`` for a ``pgettext_lazy`` (a text that
-    goes back to ``_()`` while its entry keeps the context is missing from the catalog: it would say another app's
-    Spanish)."""
-    args = getattr(text, "_args", ())
-    return f"{args[0]}\x04{args[1]}" if len(args) == 2 else str(text)
 
 
 def schema_titles() -> set[str]:
