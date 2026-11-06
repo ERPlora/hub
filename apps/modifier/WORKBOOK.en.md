@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:111b767314cccaaa7222b0c57689db66add06672a52c2329ea97930b5a1cdb5b -->
+<!-- generated from WORKBOOK.md sha256:876f7cc5eab543dfce1fb1c8379fb7962de56da2262622d60dd5123f5777c461 -->
 
 ## What it is for and who it is for
 
@@ -203,7 +203,9 @@ In: the group, name, kitchen ticket name, supplement, own tax category, order an
 default.
 Out: the option (announces: option created, changed or deleted). Deleting it takes it out of the
 catalogue: what was already ordered keeps its frozen copy, also on the kitchen ticket.
-If it fails: an empty name or one repeated in the group, a supplement that is not an amount, a tax
+If it fails: "Create" and "Save" are grey while the name is missing and while the business has not yet
+said its currency, because the supplement is read in it (without it, "150" yen would be saved as 15,000). An
+empty name or one repeated in the group, a supplement that is not an amount, a tax
 category that does not exist in Taxes or more default options than the maximum show next to their
 field. An option with its own tax category is charged on a separate line, which cannot be worth zero or
 less: "An option with its own tax category is billed on a line of its own: its supplement must be more

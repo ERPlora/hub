@@ -299,7 +299,9 @@ Sale: el producto, activo y enlazado a las categorías marcadas, en un solo paso
 entero o no se guarda nada. Si se dio stock inicial, queda en **Movimientos** como «Inicial».
 Inventario avisa a las demás apps de que hay un producto nuevo: Ventas lo ofrece en la rejilla del
 TPV y el paso «Tu catálogo» de la puesta en marcha queda hecho (INVENTORY-F28).
-Si falla: «Guardar» está apagado mientras falten Nombre, SKU o categoría fiscal. Sin categorías
+Si falla: «Guardar» está apagado mientras falten Nombre, SKU o categoría fiscal, y mientras el negocio no
+haya dicho todavía su moneda: el precio y el coste se leen en ella, y sin ella «1500» yenes se guardaría
+como 150 000. Sin categorías
 fiscales sale «Todavía no hay categorías fiscales. Créalas en Impuestos: un producto no se puede
 vender sin saber cómo tributa.». Un importe ilegible: «Esto no es un importe. Escribe una cifra,
 por ejemplo 12,50.» o «Este importe se puede leer de dos maneras…». Una cantidad que no encaja en
