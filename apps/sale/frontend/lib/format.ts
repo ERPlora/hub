@@ -92,6 +92,13 @@ export function centsFromAmount(value: string | number | null | undefined, money
   return Math.round(Number(text.replace(',', '.')) * 10 ** decimals);
 }
 
+/** What the till's keypad typed («1500», «12.5», «12.» while typing) in whole minor units of `money`; nothing typed,
+ *  or more decimals than the money has, is 0. The money is required: the till hands up no amount read before the
+ *  business has answered its money (hub#921: «1500» yen read with two decimals would go up as 150000). */
+export function keypadCents(typed: string, money: Money): number {
+  return centsFromAmount(typed.replace(/\.$/, ''), money) ?? 0;
+}
+
 /** A day as the reader writes it («14/11/2026», «11/14/2026»); nothing to show is «—». */
 export function formatDay(iso: string | null | undefined, locale: string): string {
   if (!iso) return '—';
