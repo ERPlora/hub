@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:8476716e2d188d1e068b5715b6b277ccb4aea9b0773436ebc636ca062eb76865 -->
+<!-- generated from WORKBOOK.md sha256:e9f6e928605899ef0ae4fb3c9667a1d8c4d3a888bea7c5774c55beb6b7fda5e9 -->
 
 ## What it is for and who it is for
 
@@ -406,9 +406,12 @@ Everything can be asked for through the screens, the assistant (by voice or by t
 whoever speaks) and the API, with the same rules and the same permissions. A weekday is named by its number
 (0 = Monday) or by its name ("lunes", "monday"); a special day, by its id, its name or its date; a temporary
 change, by its id, its reason or a date it covers. If a name fits several, it says which ones and asks to
-choose (`schedule.ambiguous_reference`).
+choose (`schedule.ambiguous_reference`). Before correcting or deleting a special day or a temporary change, the
+assistant asks for confirmation with its card (BASE-F97), which names the record as the screens name it, never by its
+id: the special day by its name ("Special day: Christmas") and the temporary change by its reason ("Temporary change:
+Summer hours"). What the person asking cannot see is left out.
 
-### What it offers: queries (they read and change nothing; all of them can be followed live)
+### What it offers: queries (they read and change nothing; all of them, except the assistant card's two, can be followed live)
 
 | What it gives | Who can | Flows | Service |
 |---|---|---|---|
@@ -418,6 +421,8 @@ choose (`schedule.ambiguous_reference`).
 | The settings and the business's time zone, and whether the week is confirmed (the "Confirm your opening hours" step of the Home) | view | F03, F08, F09 | `schedule.settings.get` |
 | Is it open at a moment? | view | F10 | `schedule.business.is_open` |
 | The hours of each day of a range | view | F11 | `schedule.hours.for_range` |
+| A special day by its id, with its intervals: what the assistant's card reads to name it (BASE-F97); not an assistant tool and no route in the API | view | F06, F13 | `schedule.special_day.get` |
+| A temporary change by its id, with its intervals: what the assistant's card reads to name it (BASE-F97); not an assistant tool and no route in the API | view | F06, F13 | `schedule.override.get` |
 
 ### What it offers: actions (they change data)
 

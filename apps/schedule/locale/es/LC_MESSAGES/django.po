@@ -192,6 +192,12 @@ msgstr "No hay horario semanal que confirmar."
 msgid "Opening intervals"
 msgstr "Tramos horarios"
 
+msgid "Special day"
+msgstr "Día especial"
+
+msgid "Temporary change"
+msgstr "Cambio temporal"
+
 msgid "Confirm your opening hours"
 msgstr "Confirma tu horario"
 

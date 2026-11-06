@@ -31,6 +31,7 @@ from apps.schedule.engine import (
     normalize,
     parse_when,
 )
+from base.schemas import names
 
 T = TypeVar("T")
 
@@ -89,6 +90,8 @@ D_SEARCH = "Free text to search."
 
 # How the assistant's card names a datum the models do not (its Spanish in this app's catalog), as the screens say it.
 T_INTERVALS = gettext_noop("Opening intervals")
+T_SPECIAL_DAY = gettext_noop("Special day")
+T_OVERRIDE = gettext_noop("Temporary change")
 D_DIRECTION = "Sort direction: asc or desc."
 D_SPECIAL_DAY_ID = (
     "The id of the special day; or say it by name or date in special_day."
@@ -98,6 +101,11 @@ D_OVERRIDE_ID = (
     "The id of the temporary change; or say it by reason or date in override."
 )
 D_OVERRIDE_REF = "The temporary change by its reason (Summer hours) or a date it covers (YYYY-MM-DD), when the id is not given."
+# The assistant's card names the record a write acts on by these reads (base/assistant.py ``REFERS``), run as whoever
+# asks, never by its id: a special day by its name and a temporary change by its reason, as the screens' «Delete»
+# dialog says them.
+A_SPECIAL_DAY = names("schedule.special_day.get")
+A_OVERRIDE = names("schedule.override.get", name=("reason",))
 
 # ── A day of the week, by number or by name ───────────────────────────────────────────────────
 
@@ -230,6 +238,10 @@ class DeletedOut(Schema):
     id: UUID
 
 
+class ByIdIn(Schema):
+    id: UUID = Field(description="The record's id.")
+
+
 def _not_before(field: str) -> Any:
     """A ``…_to`` / ``end_date`` field that may not come before ``field``."""
 
@@ -341,7 +353,9 @@ class SpecialDayIn(_CheckedIntervals, SpecialDayFields):
 class SpecialDayRefIn(Schema):
     model_config = ConfigDict(extra="forbid")
 
-    id: UUID | None = Field(None, description=D_SPECIAL_DAY_ID)
+    id: UUID | None = Field(
+        None, title=T_SPECIAL_DAY, description=D_SPECIAL_DAY_ID, json_schema_extra=A_SPECIAL_DAY
+    )
     special_day: Reference | None = Field(
         None, validate_default=True, description=D_SPECIAL_DAY_REF
     )
@@ -457,7 +471,9 @@ class OverrideIn(_CheckedIntervals, Schema):
 class OverrideRefIn(Schema):
     model_config = ConfigDict(extra="forbid")
 
-    id: UUID | None = Field(None, description=D_OVERRIDE_ID)
+    id: UUID | None = Field(
+        None, title=T_OVERRIDE, description=D_OVERRIDE_ID, json_schema_extra=A_OVERRIDE
+    )
     override: Reference | None = Field(
         None, validate_default=True, description=D_OVERRIDE_REF
     )
