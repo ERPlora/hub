@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { h, ref } from 'vue';
 
 import { click, expectWaitsForTheYen, mountSale, settle, taxSettings } from '../../__tests__/mount-sale';
+import { expectWindowSaysMoneyUnreadable } from '../../../../../base/frontend/__tests__/save-waits-for-money';
 import { plain } from '../../lib/format';
 import { page } from './__tests__/fixtures';
 import OpenPriceSheet from './OpenPriceSheet.vue';
@@ -99,15 +100,28 @@ describe('OpenPriceSheet', () => {
   });
 });
 
+/** The sheet with «1500» typed and a department chosen, `base.business.get` not answered (hub#921). */
+async function typedBeforeTheMoney() {
+  const m = await setup({}, 'en', { business: null });
+  await m.press('1', '5', '0', '0');
+  await m.result('sale.department.list', page([department]));
+  await click(m.find('pos-department-d1').element);
+  return m;
+}
+
 describe('OpenPriceSheet: before the business answers its money (hub#921)', () => {
   it('«Add» waits in grey and hands up no amount; once the yen arrives «1500» is 1500', async () => {
-    const m = await setup({}, 'en', { business: null });
-    await m.press('1', '5', '0', '0');
-    await m.result('sale.department.list', page([department]));
-    await click(m.find('pos-department-d1').element);
+    const m = await typedBeforeTheMoney();
     await expectWaitsForTheYen(m, 'pos-open-price-add', () => m.sheet().emitted('add') ?? []);
     expect(plain(m.find('pos-open-price-amount').text())).toBe('¥1,500');
     await click(m.add().element);
     expect(m.sheet().emitted('add')).toEqual([[{ unit_price: 1500, department_id: 'd1' }]]);
+  });
+});
+
+describe('OpenPriceSheet: a business whose money cannot be read (hub#938)', () => {
+  it('says so with «Retry» instead of waiting in grey without a word; once the yen arrives «Add» lights up', async () => {
+    const m = await typedBeforeTheMoney();
+    await expectWindowSaysMoneyUnreadable(m, 'pos-open-price-add', () => m.sheet().emitted('add') ?? []);
   });
 });

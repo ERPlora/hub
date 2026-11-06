@@ -1,12 +1,14 @@
 <script setup lang="ts">
 // The open-price sheet (SALE-F09): the amount typed on the keypad, big on top; «Section (VAT)» with
 // the business's departments (or Taxes' categories without any); «Add <amount>», which waits for both and for the
-// business's money (hub#921: the amount is read in it, never before it answers). It hands the line up in cents with
-// its department (or tax category); the server names the line after it and the page writes it. A refusal (the
-// permission, a department gone) is read here, over the button. Opens blank.
+// business's money (hub#921: the amount is read in it, never before it answers; if that read fails it says so with
+// «Retry», hub#938). It hands the line up in cents with its department (or tax category); the server names the line
+// after it and the page writes it. A refusal (the permission, a department gone) is read here, over the button. Opens
+// blank.
 import { IonButton } from '@ionic/vue';
 import { computed, shallowRef, watch } from 'vue';
 
+import BusinessMoneyError from '../../../../../base/frontend/components/BusinessMoneyError.vue';
 import type { OpenLineIn } from '../../operations';
 import { useTaxName } from '../../../../tax/frontend/composables/useTaxName';
 import { useKeypadAmount } from '../../composables/pos/useKeypadAmount';
@@ -68,6 +70,7 @@ function add(): void {
     <DepartmentPicker v-model="choice" />
     <template #foot>
       <div class="pos-sheet-foot">
+        <BusinessMoneyError />
         <p
           v-if="error"
           class="pos-sheet-error"

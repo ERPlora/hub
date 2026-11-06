@@ -2,12 +2,13 @@
 // The amount of a service without a fixed price (SALE-F38, SERVICE-F03: «From», «per hour», «Variable»,
 // «Free»): «Amount of <service>», the amount typed on the keypad, big on top, the service's price as
 // the suggestion («Use <price>», one tap types it) and «Add <amount>», which waits for an amount. Both wait in
-// grey for the business's money (hub#921: the amount is read and the price typed in it, never before it answers). It
-// hands the cents up; the server keeps them within the service's minimum and maximum, and its refusal
-// is read here, over the button. Opens blank.
+// grey for the business's money (hub#921: the amount is read and the price typed in it, never before it answers; if
+// that read fails it says so with «Retry», hub#938). It hands the cents up; the server keeps them within the service's
+// minimum and maximum, and its refusal is read here, over the button. Opens blank.
 import { IonButton } from '@ionic/vue';
 import { computed, shallowRef, watch } from 'vue';
 
+import BusinessMoneyError from '../../../../../base/frontend/components/BusinessMoneyError.vue';
 import type { ServiceSaleOut } from '../../../../service/frontend/operations';
 import { useKeypadAmount } from '../../composables/pos/useKeypadAmount';
 import { useLocale } from '../../composables/useT';
@@ -71,6 +72,7 @@ function add(): void {
     </ion-button>
     <template #foot>
       <div class="pos-sheet-foot">
+        <BusinessMoneyError />
         <p
           v-if="error"
           class="pos-sheet-error"
