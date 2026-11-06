@@ -326,7 +326,7 @@ def test_image_upload_stores_a_content_hashed_key_in_hub_files(hub_files):
     assert image.url == f"/p/media/{hub.id.hex}/website/img/{sha[:16]}.png"
     assert (image.width, image.height, image.size, image.content_type) == (4, 3, len(raw), "image/png")
     row = Image.objects.get(id=image.id)
-    assert (row.key, row.sha256) == (key, sha)
+    assert (row.key, row.sha256, row.filename) == (key, sha, "logo.png")
     assert [event.payload for event in events("website.image.uploaded")] == [{"id": str(image.id)}]
 
 
@@ -345,8 +345,10 @@ def test_an_upload_belongs_to_its_hub(hub_files):
 
 def test_the_same_image_twice_is_one_file_and_one_row(hub_files):
     raw = png_bytes()
-    assert upload(raw).id == upload(raw).id
+    assert upload(raw).id == upload(raw, filename="again.png").id
     assert Image.objects.count() == 1
+    # The name of its file is the one it was first uploaded with (hub#679: the assistant's card says it so).
+    assert Image.objects.get().filename == "logo.png"
 
 
 @pytest.mark.parametrize(

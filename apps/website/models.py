@@ -68,6 +68,9 @@ class Image(UUIDModel):
     width = models.PositiveIntegerField(_("width"))
     height = models.PositiveIntegerField(_("height"))
     size = models.PositiveIntegerField(_("size"))
+    # The name of the file it was first uploaded with (the same bytes again are the same image): what the assistant's
+    # card calls it (hub#679). Empty for an upload of before.
+    filename = models.CharField(_("file name"), max_length=200, blank=True, default="", db_default="")
     created_at = models.DateTimeField(pgettext_lazy("website", "created at"), auto_now_add=True)
 
     class Meta:
