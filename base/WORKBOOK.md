@@ -3289,11 +3289,16 @@ Implicados: HUBS-F17, WEBSITE-F10
   `base/frontend/lib/saas-pass.ts` (`useSaasPass`) es la segunda puerta de salida del Hub: abre `about:blank` dentro del
   clic (tras un `await` el navegador la bloquea), le quita `opener` y le pone la dirección al llegar; en la app instalada
   la saca por `openExternalLink`. Un error u 8 s sin respuesta (`SIGN_TIMEOUT_MS`: `client.api.call` no tiene tiempo
-  límite) abren la dirección de siempre, que sigue en el `href`. Lo usan `UpgradePlanLink`, `SystemUsage`, `PeopleList` y
-  `AppsPage` (`plan`), `ManageLink` (`business`), `PlanUpgradeLink` de la Bandeja de WhatsApp (`plan`) y `openPlan` de
+  límite) abren la dirección de siempre, que sigue en el `href`. Todo «Mejorar plan» con pase es una sola pieza,
+  `base/frontend/components/PlanUpgradeLink.vue` (`plan`; hub#853): recibe la dirección (`url`), dice «Mejorar plan» o lo
+  que su sitio le pone dentro, y quien la coloca decide si sale (solo en la web) y su clase y `data-testid`. La colocan
+  `UpgradePlanLink` (pie del menú, con su icono), `SystemUsage`, `PeopleList`, `AppsPage` y la Bandeja de WhatsApp
+  (`InboxPage`, `MessageComposer`, `ChannelSettings`, con su «Mejorar el plan»); su test prohíbe que un `.vue` vuelva a
+  escribir a mano `openSaasPass('plan', …)`. Además usan `useSaasPass` `ManageLink` (`business`) y `openPlan` de
   `lib/assistant-hub.ts`, que recibe el clic de «Mejorar plan» del panel de `@erplora/ui` (`plan`) y pasa el cliente del
   panel a `useSaasPass`, porque ese clic corre fuera del `setup` de un componente. Tests: `base/tests/test_saas_pass.py`,
-  `lib/saas-pass.test.ts`, `lib/assistant-hub.test.ts`, `frontend/external-links.test.ts`; e2e
+  `lib/saas-pass.test.ts`, `components/PlanUpgradeLink.test.ts`, `lib/assistant-hub.test.ts`,
+  `frontend/external-links.test.ts`; e2e
   `tests/e2e/base-chrome.spec.ts`, `tests/e2e/base-assistant.spec.ts` y `tests/e2e/whatsapp-inbox-plan-cap.spec.ts`.
 - `base/spa.py` incrusta en `hub-home` `access` (`credential`, `switch_user`, `idle_minutes`) y `preferences` (la
   apariencia propia); `plan_url` y `account_url` solo en una sesión abierta con la cuenta

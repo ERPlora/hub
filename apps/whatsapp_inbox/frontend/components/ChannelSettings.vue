@@ -24,9 +24,9 @@ import { useCommand, useLive } from '@erplora/ui/sdk';
 import { useSession, useSurface } from '@erplora/ui/shell';
 import { computed, ref } from 'vue';
 
+import PlanUpgradeLink from '../../../../base/frontend/components/PlanUpgradeLink.vue';
 import AutoReplyCards from './AutoReplyCards.vue';
 import NumberConnection from './NumberConnection.vue';
-import PlanUpgradeLink from './PlanUpgradeLink.vue';
 import TemplateFormModal from './TemplateFormModal.vue';
 
 import { useLiveList } from '../composables/useLiveList';
@@ -205,7 +205,9 @@ function onAction({ actionId, row }: { actionId: string; row: TemplateOut }): vo
         class="wa-settings__upgrade"
         data-testid="whatsapp-inbox-settings-upgrade"
         :url="channel.plans_url"
-      />
+      >
+        {{ $t('whatsapp_inbox.upgradePlan') }}
+      </PlanUpgradeLink>
     </section>
 
     <!-- «What do you use it for?» (F14–F18): only where an answer can book, so nobody else asks Automatizaciones. -->
