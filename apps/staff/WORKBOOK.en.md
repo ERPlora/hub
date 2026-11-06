@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:51a52eda1462d50596a1784e84f9c52ef3fc66e08f851f70d0bfb01d9920bda6 -->
+<!-- generated from WORKBOOK.md sha256:51d976baa12ca42c3e7e0610ffaaa9d6bd4fe27f768755609dc3fe1a61783b1c -->
 
 ## What it is for and who it is for
 
@@ -512,6 +512,7 @@ Steps:
 2. Change the start and the end in HH:MM (the end, after the start: a schedule's day does not cross
    midnight) and the break, from 0 (no break) to 480 minutes and shorter than the working day.
 3. Tap **Save**.
+   What is changed while it is saving is not lost: it stays on screen, still to save (hub#914).
 In: what was sent; the rest stays as it was.
 Out: the business's settings (`staff.settings.updated`), with the hours always in HH:MM. From that moment,
 a new schedule proposes that working day from Monday to Friday, with the break in the middle of the day

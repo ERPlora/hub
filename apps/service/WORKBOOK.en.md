@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:1944551ee9337ab6f59daece75a1bb3e8731a39b180505548a9268fcc4c2cc16 -->
+<!-- generated from WORKBOOK.md sha256:50fa31074c8804e2e075ce609c3d551f0f4e2c77d3eae2b0999f46ffaf7ce6db -->
 
 ## What it is for and who it is for
 
@@ -387,6 +387,7 @@ Steps:
 1. Open **Services → Settings**.
 2. Change the fields and tap **Save**.
 3. "Settings saved." shows.
+   What is changed while it is saving is not lost: it stays on screen, still to save (hub#914).
 In: the saved settings (or the factory ones).
 Out: the settings (`service.settings.updated`). The duration, the buffer (before and after), the online
 booking and the default tax category are taken by every new service that does not give them (form,

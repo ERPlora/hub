@@ -239,6 +239,7 @@ Pantalla: Ajustes
 Pasos:
 1. Cambia comensales mínimos y máximos, antelación, duración por defecto, teléfono o correo
    obligatorios y los minutos para liberar una pendiente. «Guardar».
+   Lo que se cambia mientras se está guardando no se pierde: se queda en pantalla, por guardar (hub#914).
 2. Las reglas valen para las reservas nuevas y para los cambios; las ya hechas no se tocan.
 Entra: las reglas.
 Sale: las reglas guardadas (avisa: `reservation.settings.updated`).
