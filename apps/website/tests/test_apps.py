@@ -63,6 +63,7 @@ def test_the_operations_of_the_app():
         "website.public.site",
         "website.public.catalog",
         "website.public.reviews",
+        *CARD_ONLY,
     }
     assert {name for name, op in operations.items() if op.kind == "command"} == {
         "website.site.save",
@@ -84,11 +85,17 @@ def test_the_public_operations_need_no_permission_and_the_rest_do():
     assert operations["website.qr.get"].permission == "website.view"
     for name in ("website.site.preview", "website.catalog.categories", "website.site.save", "website.site.publish", "website.site.unpublish", "website.image.upload"):
         assert operations[name].permission == "website.manage", name
+    # An image is read by whoever sees the site; a category, as the editor's own list of them, by who changes it.
+    assert operations["website.image.get"].permission == "website.view"
+    assert operations["website.category.get"].permission == "website.manage"
 
 
 #: What only the editor's screen calls, never the assistant: an HTML page (the preview), a file in base64 (an image's
 #: upload, the QR's PNG or SVG) and the anonymous reads of the visitors' page. The assistant reads and changes the site
 #: with the rest, as the person who asks (PLAN §14: every operation is a tool unless it cannot be one).
+#: What only the assistant's card reads, to name a record a save keeps (hub#679): an image by the name of its file, a
+#: category of the catalog by its name. No tool, no route, nothing live.
+CARD_ONLY = {"website.image.get", "website.category.get"}
 SCREEN_ONLY = {
     "website.site.preview",
     "website.image.upload",
@@ -96,6 +103,7 @@ SCREEN_ONLY = {
     "website.public.site",
     "website.public.catalog",
     "website.public.reviews",
+    *CARD_ONLY,
 }
 
 

@@ -35,6 +35,7 @@ from django.utils.timesince import timesince
 from django.utils.translation import gettext, ngettext, pgettext
 from live.markdown import render_markdown
 
+from apps.website.choices import DAY_LABELS
 from apps.website.palettes import BLACK, WHITE, mix, resolve, rgb
 from apps.website.schemas import DAYS, TEMPLATES, Content, Theme
 from base.business import money_text, zone_of
@@ -68,15 +69,7 @@ def _eyebrows() -> dict[str, str]:
 
 
 def _day_names() -> dict[str, str]:
-    return {
-        "mon": pgettext("website", "Monday"),
-        "tue": pgettext("website", "Tuesday"),
-        "wed": pgettext("website", "Wednesday"),
-        "thu": pgettext("website", "Thursday"),
-        "fri": pgettext("website", "Friday"),
-        "sat": pgettext("website", "Saturday"),
-        "sun": pgettext("website", "Sunday"),
-    }
+    return {day: str(label) for day, label in DAY_LABELS}
 
 
 def render_site(

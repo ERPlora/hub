@@ -9,6 +9,8 @@ from django.utils.translation import gettext_lazy as _
 from django.utils.translation import pgettext_lazy
 from live.meta import Category, LiveAppConfig, Nav
 
+from apps.website.choices import CHOICES
+
 
 class WebsiteConfig(LiveAppConfig):
     name = "apps.website"
@@ -47,3 +49,6 @@ class WebsiteConfig(LiveAppConfig):
     # Positional (id, label, icon, path): scripts/app-icons.mjs reads every line starting with `icon =` as the
     # module's own icon.
     navigation = [Nav("site", pgettext_lazy("app name", "Website"), "ion:globe-outline", "/website")]
+    # The closed lists kept inside the site's JSON (the palette, the background, the catalog's source, the days of the
+    # opening hours), by the word the editor shows: the assistant's card says each value by it (hub#679).
+    choices = CHOICES
