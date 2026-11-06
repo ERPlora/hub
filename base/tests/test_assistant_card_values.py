@@ -378,7 +378,6 @@ def test_no_list_of_texts_sent_as_they_are_is_named():
 UNNAMED_REFERENCES = {
     "appointment": 12,
     "combo": 25,
-    "customer": 22,
     "demo": 3,
     "inventory": 15,
     "invoice": 1,
@@ -528,6 +527,12 @@ TITLED_IN_SPANISH = {
     "base.failed_event.retry:id": "Evento caído",
     "base.import.undo:id": "Importación",
     "base.support.report:description": "¿Qué pasó?",
+    **{f"customer.customer.{action}:id": "Cliente" for action in (
+        "delete", "erase", "merge", "set_groups", "set_tags", "update",
+    )},
+    **{f"customer.field.{action}:id": "Campo personalizado" for action in ("delete", "update")},
+    **{f"customer.group.{action}:id": "Grupo" for action in ("delete", "update")},
+    **{f"customer.tag.{action}:id": "Etiqueta" for action in ("delete", "update")},
     **{f"modifier.group.{action}:id": "Grupo" for action in ("delete", "update")},
     "modifier.link.detach:id": "Se aplica a",
     **{f"modifier.option.{action}:id": "Opción" for action in ("delete", "update")},

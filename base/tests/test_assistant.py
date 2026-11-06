@@ -429,19 +429,29 @@ def named_by_the_screen() -> set[str]:
     return set(re.findall(r"'([a-z_]+)'", re.search(r"const FIELDS = \[(.*?)\];", source, re.S).group(1)))
 
 
+def technical_names(writes) -> dict[str, list[str]]:
+    """The data of ``writes`` a Spanish card calls by the title pydantic makes up from the field («Path», «Group Ids»),
+    by write, each sent with every datum it takes: none should be, but those the screen names itself."""
+    screen = named_by_the_screen()
+    technical: dict[str, list[str]] = {}
+    for op in writes:
+        props = op.input.model_json_schema().get("properties", {})
+        for field in assistant.card(op, dict.fromkeys(props, "x"), "es")["fields"]:
+            if field["name"] not in screen and field["label"] == field["name"].title().replace("_", " "):
+                technical.setdefault(op.name, []).append(field["name"])
+    return technical
+
+
 def test_no_datum_of_a_write_of_base_reaches_a_spanish_card_by_its_technical_name():
     """Every write of base itself: each datum by a name of its own in Spanish, never the title pydantic makes up from
     the field («Path», «Content Base64»). Base's half of the fix; each other app answers for its own."""
-    screen = named_by_the_screen()
-    assert {"id", "reason"} <= screen
-    technical: dict[str, list[str]] = {}
-    for op in registry.values():
-        if op.app_label == "base" and op.kind == "command" and assistant.is_tool(op):
-            props = op.input.model_json_schema().get("properties", {})
-            for field in assistant.card(op, dict.fromkeys(props, "x"), "es")["fields"]:
-                if field["name"] not in screen and field["label"] == field["name"].title().replace("_", " "):
-                    technical.setdefault(op.name, []).append(field["name"])
-    assert technical == {}
+    assert {"id", "reason"} <= named_by_the_screen()
+    writes = [
+        op
+        for op in registry.values()
+        if op.app_label == "base" and op.kind == "command" and assistant.is_tool(op)
+    ]
+    assert technical_names(writes) == {}
     moved = assistant.card(get("base.file.move"), {"path": "marzo.pdf", "to": "Facturas"}, "es")
     assert labels(moved) == ["Archivo o carpeta", "Mover a"]
 

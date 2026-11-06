@@ -31,6 +31,7 @@ from apps.customer.models import (
 from apps.customer.phones import DEFAULT_COUNTRY, candidates
 from apps.customer.schemas import (
     ActivityListIn,
+    ByIdIn,
     ActivityPage,
     ByPhoneIn,
     ConsentHistoryIn,
@@ -50,13 +51,16 @@ from apps.customer.schemas import (
     ExportOut,
     FieldListIn,
     FieldPage,
+    FieldRow,
     GroupListIn,
     GroupPage,
+    GroupRow,
     HealthDetailIn,
     HealthOut,
     OrderCustomerOut,
     OrderIn,
     OrderListIn,
+    OrderNamedOut,
     OrderPage,
     PageIn,
     PhoneMatchOut,
@@ -64,6 +68,7 @@ from apps.customer.schemas import (
     PurchasePage,
     TagListIn,
     TagPage,
+    TagRow,
 )
 from apps.customer.search import normalize, search_term
 from base import operations as platform
@@ -78,6 +83,7 @@ SEVERAL_CUSTOMERS_MATCH = _(
 GROUP_UNAVAILABLE = _("That group no longer exists.")
 TAG_UNAVAILABLE = _("That tag no longer exists.")
 FIELD_UNAVAILABLE = _("That field no longer exists.")
+SALES_UNAVAILABLE = _("Sales is not active in this business.")
 SEVERAL_MATCH = _("Several match “%(reference)s”: give the id.")
 
 CUSTOMER_UNAVAILABLE_CODE = "customer.customer_unavailable"
@@ -171,15 +177,20 @@ def find_customer(
     return customer
 
 
+def _by_id(rows: QuerySet, item_id: UUID, *, missing, code: str):
+    """The row of ``rows`` with ``item_id``; ``NotFound`` (``code``) when there is none."""
+    found = rows.filter(pk=item_id).first()
+    if found is None:
+        raise NotFound(missing, code=code)
+    return found
+
+
 def _find_named(
     model, item_id: UUID | None, name: str | None, *, missing, code: str, lock: bool
 ):
     rows = model.objects.select_for_update() if lock else model.objects.all()
     if item_id is not None:
-        found = rows.filter(pk=item_id).first()
-        if found is None:
-            raise NotFound(missing, code=code)
-        return found
+        return _by_id(rows, item_id, missing=missing, code=code)
     matches = list(rows.filter(name__iexact=(name or "").strip()))
     active = [row for row in matches if row.is_active]
     chosen = active or matches
@@ -500,6 +511,16 @@ def export_customers(ctx: OperationContext, params: CustomerExportIn) -> dict:
 # ── Groups, tags and custom fields ──────────────────────────────────────────────────────────────
 
 
+def _groups() -> QuerySet:
+    """The groups as their list shows them, with how many live cards are in each."""
+    return CustomerGroup.objects.annotate(customer_count=_customer_count("customers"))
+
+
+def _tags() -> QuerySet:
+    """The tags as their list shows them, with how many live cards have each."""
+    return CustomerTag.objects.annotate(customer_count=_customer_count("customers"))
+
+
 @operation(
     "customer.group.list",
     kind="query",
@@ -515,7 +536,7 @@ def export_customers(ctx: OperationContext, params: CustomerExportIn) -> dict:
     ),
 )
 def list_groups(ctx: OperationContext, params: GroupListIn) -> dict:
-    groups = CustomerGroup.objects.annotate(customer_count=_customer_count("customers"))
+    groups = _groups()
     if params.search:
         groups = groups.filter(
             Q(name__icontains=params.search) | Q(description__icontains=params.search)
@@ -547,7 +568,7 @@ def list_groups(ctx: OperationContext, params: GroupListIn) -> dict:
     ),
 )
 def list_tags(ctx: OperationContext, params: TagListIn) -> dict:
-    tags = CustomerTag.objects.annotate(customer_count=_customer_count("customers"))
+    tags = _tags()
     if params.search:
         tags = tags.filter(name__icontains=params.search)
     filters = {"is_active": params.is_active, "color": params.color}
@@ -585,6 +606,44 @@ def list_fields(ctx: OperationContext, params: FieldListIn) -> dict:
         **{lookup: value for lookup, value in filters.items() if value is not None}
     )
     return page(_ordered(fields, params.sort, params.descending), params)
+
+
+# Not assistant tools: what names a group, a tag or a custom field on the card of a write (``schemas.A_GROUP``,
+# ``A_TAG``, ``A_FIELD``), also one no longer active, which a change brings back; the model finds them in their lists.
+@operation(
+    "customer.group.detail",
+    kind="query",
+    permission="customer.view",
+    input=ByIdIn,
+    output=GroupRow,
+    ai=INTERNAL,
+)
+def group_detail(ctx: OperationContext, data: ByIdIn) -> CustomerGroup:
+    return _by_id(_groups(), data.id, missing=GROUP_UNAVAILABLE, code="customer.group_unavailable")
+
+
+@operation(
+    "customer.tag.detail",
+    kind="query",
+    permission="customer.view",
+    input=ByIdIn,
+    output=TagRow,
+    ai=INTERNAL,
+)
+def tag_detail(ctx: OperationContext, data: ByIdIn) -> CustomerTag:
+    return _by_id(_tags(), data.id, missing=TAG_UNAVAILABLE, code="customer.tag_unavailable")
+
+
+@operation(
+    "customer.field.detail",
+    kind="query",
+    permission="customer.view",
+    input=ByIdIn,
+    output=FieldRow,
+    ai=INTERNAL,
+)
+def field_detail(ctx: OperationContext, data: ByIdIn) -> CustomField:
+    return find_field(data.id, None)
 
 
 # ── A card's timeline, purchases, consent and orders ────────────────────────────────────────────
@@ -787,6 +846,27 @@ def list_orders(ctx: OperationContext, params: OrderListIn) -> dict:
     if params.search:
         links = links.filter(order_id__icontains=params.search.strip())
     return page(links.order_by("-linked_at", "-id"), params)
+
+
+#: Sales's read that names one of its records by its id (an open check by ``order_id``).
+SALES_NAMES = "sale.record.get"
+
+
+# Not an assistant tool: what names the open order on the card of ``customer.order.link`` (``schemas.A_ORDER``). The
+# order is Sales's, which Customers does not require: its name comes from Sales's own read, through the platform's one
+# door (BASE-F84), with that read's permission. Sales off or absent → 409 ``customer.sales_unavailable``.
+@operation(
+    "customer.order.get",
+    kind="query",
+    permission="customer.view",
+    input=OrderIn,
+    output=OrderNamedOut,
+    ai=INTERNAL,
+)
+def get_order(ctx: OperationContext, data: OrderIn) -> dict:
+    unavailable = Conflict(str(SALES_UNAVAILABLE), code="customer.sales_unavailable")
+    named = platform.call(ctx, SALES_NAMES, {"order_id": str(data.order_id)}, unavailable=unavailable)
+    return {"order_id": data.order_id, "name": named.name}
 
 
 
