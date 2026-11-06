@@ -2,18 +2,22 @@
 // The inventory settings (WORKBOOK «Ajustes», INVENTORY-F19), as the old shell generated them from the
 // module's settings schema: header «Inventory», «Allow selling without stock», «Low stock threshold»
 // (whole units) and «Track stock», each with what it really does, and «Save». The values are the
-// business's, live (`inventory.config.get`): untouched, the form follows them; once changed, a new
-// result never overwrites what is being written. A failed load says so with «Retry» and shows no
-// values (never the factory ones as the business's). If the person loses the permission with the tab
-// open (shift change) the fields lock, «Save» goes and the form says why.
-import { InlineFeedback } from '@erplora/ui/components';
+// business's, live (`inventory.config.get`). The form is every settings page's (`useSettingsForm` and
+// `SettingsFormFooter`, hub#867 and hub#897): a change saved elsewhere repaints every field the person has
+// not touched, «Save» sends only what was touched and changed (the threshold as a number when it is a
+// whole one; anything else goes as typed, for the server to refuse under the field), and a refusal says
+// itself as a FormModal does — the notice goes as soon as something changes, a field's message as soon as
+// that field does, and the next refusal says them again (hub#871). A failed load says so with «Retry» and
+// shows no values (never the factory ones as the business's). If the person loses the permission with the
+// tab open (shift change) the fields lock, «Save» goes and the form says why.
+import { InlineFeedback, SettingsFormFooter, useSettingsForm } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
-import { toastSuccess, useSession } from '@erplora/ui/shell';
+import { useSession } from '@erplora/ui/shell';
 import { IonButton, IonInput, IonNote, IonSpinner, IonToggle } from '@ionic/vue';
-import { computed, ref, watch } from 'vue';
+import { computed } from 'vue';
 
 import { useT } from '../composables/useT';
-import { errorFields } from '../lib/errors';
+import type { ConfigOut } from '../operations';
 
 interface Fields {
   allow_sell_without_stock: boolean;
@@ -23,54 +27,24 @@ interface Fields {
 
 const { t } = useT();
 const session = useSession();
-const canManage = computed(() => session.can('inventory.manage_settings'));
+const locked = computed(() => !session.can('inventory.manage_settings'));
 
 const { data: config, status, error, refresh } = useLive('inventory.config.get', {});
-const { run: update, pending, error: saveError } = useCommand('inventory.config.update');
+const settings = useSettingsForm(config, useCommand('inventory.config.update'), {
+  toForm,
+  numbers: ['low_stock_threshold'],
+});
+const { form, fieldErrors, set } = settings;
 
-const form = ref<Fields>();
-/** The server values the form started from. */
-const synced = ref<Fields>();
-const dirty = computed(() => !!form.value && JSON.stringify(form.value) !== JSON.stringify(synced.value));
-
-watch(
-  config,
-  (now) => {
-    if (!now) return;
-    const fields: Fields = {
-      allow_sell_without_stock: now.allow_sell_without_stock,
-      low_stock_threshold: String(now.low_stock_threshold),
-      track_stock: now.track_stock,
-    };
-    if (!dirty.value) form.value = { ...fields };
-    synced.value = fields;
-  },
-  { immediate: true },
-);
-
-const fields = computed(() => errorFields(saveError.value));
-const thresholdEmpty = computed(() => (form.value?.low_stock_threshold ?? '').trim() === '');
-const locked = computed(() => !canManage.value);
-
-function set<K extends keyof Fields>(key: K, value: Fields[K]): void {
-  if (form.value) form.value = { ...form.value, [key]: value };
+function toForm(now: ConfigOut): Fields {
+  return {
+    allow_sell_without_stock: now.allow_sell_without_stock,
+    low_stock_threshold: String(now.low_stock_threshold),
+    track_stock: now.track_stock,
+  };
 }
 
-async function save(): Promise<void> {
-  if (!form.value || locked.value || thresholdEmpty.value) return;
-  const sent = form.value;
-  try {
-    await update({
-      allow_sell_without_stock: sent.allow_sell_without_stock,
-      low_stock_threshold: Number(sent.low_stock_threshold.trim()),
-      track_stock: sent.track_stock,
-    });
-  } catch {
-    return; // `saveError` holds it and the form paints it.
-  }
-  synced.value = { ...sent };
-  void toastSuccess(t('inventory.settings.saved'));
-}
+const text = (value: unknown): string => (value === null || value === undefined ? '' : String(value));
 </script>
 
 <template>
@@ -109,7 +83,7 @@ async function save(): Promise<void> {
       class="inventory-settings__form"
       data-testid="inventory-settings-form"
       novalidate
-      @submit.prevent="save"
+      @submit.prevent="settings.save()"
     >
       <h2>{{ $t('inventory.settings.header') }}</h2>
       <InlineFeedback
@@ -118,14 +92,6 @@ async function save(): Promise<void> {
         data-testid="inventory-settings-no-permission"
       >
         {{ $t('inventory.settings.noPermission') }}
-      </InlineFeedback>
-      <InlineFeedback
-        v-if="saveError"
-        tone="danger"
-        data-testid="inventory-settings-save-error"
-        :heading="$t('inventory.settings.saveError')"
-      >
-        {{ saveError.message }}
       </InlineFeedback>
 
       <div class="inventory-settings__field">
@@ -156,9 +122,9 @@ async function save(): Promise<void> {
         fill="outline"
         mode="md"
         :disabled="locked"
-        :error-text="fields.low_stock_threshold"
-        :class="{ 'ion-invalid': !!fields.low_stock_threshold, 'ion-touched': !!fields.low_stock_threshold }"
-        @update:model-value="set('low_stock_threshold', $event === null || $event === undefined ? '' : String($event))"
+        :error-text="fieldErrors.low_stock_threshold"
+        :class="{ 'ion-invalid': !!fieldErrors.low_stock_threshold, 'ion-touched': !!fieldErrors.low_stock_threshold }"
+        @update:model-value="set('low_stock_threshold', text($event))"
       />
 
       <div class="inventory-settings__field">
@@ -174,14 +140,15 @@ async function save(): Promise<void> {
         <ion-note>{{ $t('inventory.settings.trackStockHelp') }}</ion-note>
       </div>
 
-      <ion-button
-        v-if="!locked"
-        type="submit"
-        data-testid="inventory-settings-save"
-        :disabled="pending || thresholdEmpty"
-      >
-        {{ pending ? $t('inventory.common.saving') : $t('inventory.common.save') }}
-      </ion-button>
+      <SettingsFormFooter
+        :settings="settings"
+        testid="inventory-settings"
+        :save-label="t('inventory.common.save')"
+        :saved-label="t('inventory.settings.saved')"
+        :error-heading="t('inventory.settings.saveError')"
+        :readonly="locked"
+        spinner
+      />
     </form>
   </div>
 </template>
@@ -211,9 +178,5 @@ async function save(): Promise<void> {
 
 .inventory-settings__field ion-note {
   font-size: 0.8rem;
-}
-
-.inventory-settings__form ion-button {
-  justify-self: end;
 }
 </style>
