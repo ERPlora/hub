@@ -87,6 +87,15 @@ export function business(fields: Partial<Business> = {}): Business {
 
 export const POLISH: Partial<Business> = { country: 'PL', country_name: 'Poland', currency: 'PLN', currency_label: 'PLN · Polish Zloty' };
 
+/** A business in Japan: the yen has no minor units. */
+export const JAPANESE: Partial<Business> = {
+  country: 'JP',
+  country_name: 'Japan',
+  currency: 'JPY',
+  currency_label: 'JPY · Japanese Yen',
+  currency_decimals: 0,
+};
+
 export interface MountOptions {
   props?: Record<string, unknown>;
   /** What `base.business.get` answers when the stream opens; `null`: it never answers (the currency unknown). */

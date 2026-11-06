@@ -5,7 +5,8 @@
 import { toastSuccess } from '@erplora/ui/shell';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { click, ionValue, mountCash } from '../__tests__/mount-cash-register';
+import { expectSaveWaitsForMoney } from '../../../../base/frontend/__tests__/save-waits-for-money';
+import { business, click, ionValue, JAPANESE, mountCash, settle } from '../__tests__/mount-cash-register';
 import { plain } from '../lib/money';
 import MovementModal from './MovementModal.vue';
 
@@ -22,8 +23,8 @@ beforeEach(() => vi.mocked(toastSuccess).mockClear());
 const prop = (el: Element | null, name: string): unknown => (el as unknown as Record<string, unknown>)[name];
 const SESSION = { id: 's1', number: 'S-261014-0001' };
 
-async function setup(locale: 'en' | 'es' = 'en') {
-  const m = await mountCash(MovementModal, { props: { open: true, session: SESSION }, locale });
+async function setup(locale: 'en' | 'es' = 'en', options: { business?: null } = {}) {
+  const m = await mountCash(MovementModal, { props: { open: true, session: SESSION }, locale, ...options });
   await m.live();
   const submit = () => click(m.inDoc('cash-register-movement-submit'));
   return { ...m, submit };
@@ -90,5 +91,25 @@ describe('MovementModal', () => {
     s.answer(201, { key: 'm1' });
     await s.submit();
     expect(plain(vi.mocked(toastSuccess).mock.calls[0][0])).toBe('Movimiento de entrada registrado (12,50 €)');
+  });
+});
+
+describe('MovementModal: before the business answers its money (hub#921)', () => {
+  it('«Register» waits in grey and reads no amount; once the yen arrives «1500» is 1500', async () => {
+    const s = await setup('en', { business: null });
+    await ionValue(s.inDoc('cash-register-movement-amount'), '1500', 'ionInput');
+    await ionValue(s.inDoc('cash-register-movement-concept'), 'Change', 'ionInput');
+    s.answer(201, { key: 'm1', type: 'in', amount: 1500 });
+    const window = {
+      wrapper: s.wrapper,
+      save: () => s.inDoc('cash-register-movement-submit'),
+      amount: () => s.inDoc('cash-register-movement-amount'),
+      sent: s.sent,
+      settle,
+    };
+    await expectSaveWaitsForMoney(window, () => s.result('base.business.get', business(JAPANESE)));
+    await s.submit();
+    expect(s.sent().map((call) => call.body)).toEqual([{ session_id: 's1', type: 'in', amount: 1500, description: 'Change' }]);
+    expect(plain(vi.mocked(toastSuccess).mock.calls[0][0])).toBe('Cash-in recorded (¥1,500)');
   });
 });

@@ -5,7 +5,8 @@
 import { toastSuccess } from '@erplora/ui/shell';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { click, ionValue, mountCash } from '../__tests__/mount-cash-register';
+import { expectSaveWaitsForMoney } from '../../../../base/frontend/__tests__/save-waits-for-money';
+import { business, click, ionValue, JAPANESE, mountCash, settle } from '../__tests__/mount-cash-register';
 import OpenSessionModal from './OpenSessionModal.vue';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
@@ -22,10 +23,11 @@ const prop = (el: Element | null, name: string): unknown => (el as unknown as Re
 const REGISTERS = 'cash_register.register.list';
 const page = (rows: unknown[]) => ({ rows, total: rows.length, limit: 100, offset: 0 });
 
-async function setup(options: { locale?: 'en' | 'es'; unassignedCash?: number } = {}) {
+async function setup(options: { locale?: 'en' | 'es'; unassignedCash?: number; business?: null } = {}) {
   const m = await mountCash(OpenSessionModal, {
     props: { open: true, unassignedCash: options.unassignedCash ?? 0 },
     locale: options.locale,
+    business: options.business,
   });
   await m.live();
   const submit = () => click(m.inDoc('cash-register-open-submit'));
@@ -109,5 +111,24 @@ describe('OpenSessionModal', () => {
     expect(s.inDoc('cash-register-open')?.getAttribute('aria-label')).toBe('Abrir sesión de caja');
     expect(prop(s.inDoc('cash-register-open-balance'), 'label')).toBe('Fondo de apertura');
     expect(s.inDoc('cash-register-open-submit')?.textContent?.trim()).toBe('Abrir sesión');
+  });
+});
+
+describe('OpenSessionModal: before the business answers its money (hub#921)', () => {
+  it('«Open session» waits in grey and reads no float; once the yen arrives «1500» is 1500', async () => {
+    const s = await setup({ business: null });
+    await s.result(REGISTERS, page([]));
+    await ionValue(s.inDoc('cash-register-open-balance'), '1500', 'ionInput');
+    s.answer(201, { id: 's1', number: 'S-261014-0001', status: 'open' });
+    const window = {
+      wrapper: s.wrapper,
+      save: () => s.inDoc('cash-register-open-submit'),
+      amount: () => s.inDoc('cash-register-open-balance'),
+      sent: s.sent,
+      settle,
+    };
+    await expectSaveWaitsForMoney(window, () => s.result('base.business.get', business(JAPANESE)));
+    await s.submit();
+    expect(s.sent().map((call) => call.body)).toEqual([{ opening_balance: 1500, opening_notes: '' }]);
   });
 });
