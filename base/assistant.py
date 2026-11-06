@@ -898,12 +898,19 @@ def usage(scope: Scope) -> dict:
     return {key: answer.get(key) for key in ("used", "limit", "resets_at", "demo")}
 
 
-def report(scope: Scope, *, message_id: str, reason: str, comment: str, question: str, answer: str) -> dict:
-    """Send erplora.com a bad answer of the assistant: ``{sent, duplicate}``."""
-    sent = _post(
-        REPORT_PATH,
-        {"hub": scope.key, "message_id": message_id, "reason": reason, "comment": comment, "question": question, "answer": answer},
-    )
+def report(
+    scope: Scope, *, message_id: str, reason: str, comment: str, question: str, answer: str, web: bool | None = None
+) -> dict:
+    """Send erplora.com a bad answer of the assistant: ``{sent, duplicate}``. ``web``: whether its turn brought pages of
+    the web (the turn's ``done.web``, kept by the browser), whose text erplora.com then does not mail (saas#287); left
+    out when the browser does not know, and erplora.com's safe default decides."""
+    payload = {
+        "hub": scope.key, "message_id": message_id, "reason": reason, "comment": comment, "question": question,
+        "answer": answer,
+    }
+    if web is not None:
+        payload["web"] = web
+    sent = _post(REPORT_PATH, payload)
     return {"sent": bool(sent.get("sent")), "duplicate": bool(sent.get("duplicate"))}
 
 
@@ -1031,8 +1038,10 @@ async def stream_turn(
     scope: Scope, *, messages: list[dict], tools: list[dict], instructions: str, continuation: str | None
 ) -> AsyncIterator[dict]:
     """A turn through the gateway, as the Hub's frames: ``text`` piece by piece, ``usage``, an ``error``, and ``done``
-    with what the browser keeps (``append``), the tools the model asked for (``pending``) and their ``continuation``.
-    A refusal of the gateway is a lone ``error``; a failure half way keeps what was said."""
+    with what the browser keeps (``append``), the tools the model asked for (``pending``), their ``continuation`` and
+    whether the turn brought pages of the web (``web``: the gateway's ``{type: web}``, also before a failure; the
+    browser sends it back with a report of the answer, saas#287). A refusal of the gateway is a lone ``error``; a
+    failure half way keeps what was said."""
     payload = {"hub": scope.key, "messages": messages, "instructions": instructions, "tools": tools}
     if continuation:
         payload["continuation"] = continuation
@@ -1040,7 +1049,7 @@ async def stream_turn(
     text: list[str] = []
     calls: list[dict] = []
     token: str | None = None
-    finished = failed = False
+    finished = failed = web = False
     try:
         async with httpx.AsyncClient(timeout=TURN_TIMEOUT) as client:
             async with client.stream("POST", url, content=body, headers=headers) as response:
@@ -1074,6 +1083,8 @@ async def stream_turn(
                         )
                     elif kind == "response":
                         token = frame.get("continuation") or None
+                    elif kind == "web":
+                        web = True
                     elif kind == "usage":
                         yield {"type": "usage", **{key: frame.get(key) for key in ("used", "limit", "resets_at", "demo")}}
                     elif kind == "error":
@@ -1097,24 +1108,30 @@ async def stream_turn(
         yield {"type": "error", "code": "assistant.cut", "retriable": True}
     said = "".join(text)
     if failed:
-        yield {"type": "done", "append": [_assistant_message(said, [])] if said else [], "pending": [], "continuation": None}
+        kept = [_assistant_message(said, [])] if said else []
+        yield {"type": "done", "append": kept, "pending": [], "continuation": None, "web": web}
         return
-    yield {"type": "done", "append": [_assistant_message(said, calls)], "pending": calls, "continuation": token}
+    yield {
+        "type": "done", "append": [_assistant_message(said, calls)], "pending": calls, "continuation": token, "web": web
+    }
 
 
 async def turn_frames(scope: Scope, plan: dict) -> AsyncIterator[bytes]:
     """The answer of ``base.assistant.turn`` (``plan``, the operation's output) as the panel reads it: what ran
     (``executed``), then the card of a write that waits (``confirm``), why it stops (``assistant.too_many_steps``) or
-    the gateway's turn; the closing ``done`` always carries the tools' results to keep before the model's message."""
+    the gateway's turn; the closing ``done`` always carries the tools' results to keep before the model's message, and
+    says ``web: false`` when the round never reached the gateway (no pages: without the word, the browser would not know
+    where the whole answer came from)."""
     for row in plan["executed"]:
         yield sse({"type": "executed", **row})
     if plan["confirm"] is not None:
         yield sse({"type": "confirm", "card": plan["confirm"], "call": plan["pending"][0]})
-        yield sse({"type": "done", "append": plan["append"], "pending": plan["pending"], "continuation": plan["continuation"]})
+        waits = {"append": plan["append"], "pending": plan["pending"], "continuation": plan["continuation"]}
+        yield sse({"type": "done", **waits, "web": False})
         return
     if plan["stop"]:
         yield sse({"type": "error", "code": plan["stop"]})
-        yield sse({"type": "done", "append": plan["append"], "pending": [], "continuation": None})
+        yield sse({"type": "done", "append": plan["append"], "pending": [], "continuation": None, "web": False})
         return
     closed = False
     async for frame in stream_turn(
@@ -1129,7 +1146,7 @@ async def turn_frames(scope: Scope, plan: dict) -> AsyncIterator[bytes]:
             frame = {**frame, "append": [*plan["append"], *frame["append"]]}
         yield sse(frame)
     if not closed:
-        yield sse({"type": "done", "append": plan["append"], "pending": [], "continuation": None})
+        yield sse({"type": "done", "append": plan["append"], "pending": [], "continuation": None, "web": False})
 
 
 def turn_response(request: Any, plan: dict) -> StreamingHttpResponse:

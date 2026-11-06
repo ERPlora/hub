@@ -486,6 +486,13 @@ def test_a_report_of_a_bad_answer(gateway):
     assert answer == {"sent": True, "duplicate": False}
 
 
+def test_a_report_says_whether_its_answer_came_from_the_web(gateway):
+    """hub#870 (saas#287): erplora.com does not mail an answer that may quote pages of the web; the browser says it."""
+    gateway.reply("/internal/assistant/report", status=202, json={"sent": True, "duplicate": False})
+    run("base.assistant.report", EMPLOYEE, message_id="m1", reason="incorrect", question="q", answer="a", web=True)
+    assert gateway.sent("/internal/assistant/report")[0].body["web"] is True
+
+
 def test_a_report_that_could_not_leave_says_so(gateway):
     gateway.reply("/internal/assistant/report", status=503, json={"error": {"code": "assistant.report_not_sent", "message": "x"}})
     with pytest.raises(OperationError) as caught:
