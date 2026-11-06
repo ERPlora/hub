@@ -51,6 +51,8 @@ from apps.whatsapp_inbox.models import Channel, Conversation, Message, Note, Tem
 from apps.whatsapp_inbox.notify_schemas import NotifyIn
 from apps.whatsapp_inbox.queries import (
     MESSAGE_NOT_FOUND,
+    NOTE_NOT_FOUND,
+    TEMPLATE_GONE,
     CAP_REACHED,
     HEADER_SAMPLE_MISSING_CODE,
     META_RATE_LIMITED,
@@ -167,7 +169,6 @@ TEMPLATE_NOT_SENDABLE = _(
 )
 MARKETING_CONSENT = _("This customer has not agreed to receive marketing by WhatsApp.")
 TEMPLATE_EXISTS = _("There is already a template “%(name)s” in that language.")
-TEMPLATE_GONE = _("That template no longer exists.")
 TEMPLATE_READ_ONLY = _("This template is changed in WhatsApp Manager: the Hub cannot change it.")
 TEMPLATE_IN_REVIEW = _("Meta is reviewing this template: wait for its verdict to change it.")
 TEMPLATE_SUBMITTING = _("This template is on its way to Meta: wait a moment.")
@@ -190,7 +191,6 @@ NOBODY_CALLED = _("Nobody in this business is called “%(reference)s”.")
 SEVERAL_CALLED = _("Several people match “%(reference)s”: choose one from the list.")
 NOT_IN_BUSINESS = _("That person does not work in this business.")
 NOT_A_PERSON = _("Only a person can be assigned a conversation.")
-NOTE_NOT_FOUND = _("That note no longer exists.")
 NOT_INTERNATIONAL = _(
     "“%(phone)s” is not a number in international format (+34600111222): nothing was sent, so that it never "
     "reaches the wrong person."

@@ -14,7 +14,7 @@ from django.db.models.functions import Coalesce, Lower, NullIf
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext, Scope
 from live.errors import Conflict, NotFound
-from live.operations import operation
+from live.operations import INTERNAL, operation
 
 from apps.customer.phones import DEFAULT_COUNTRY, InvalidPhone, candidates, to_e164
 from apps.customer.search import normalize
@@ -48,14 +48,18 @@ from apps.whatsapp_inbox.schemas import (
     MessagePage,
     MessageRefIn,
     NoteListIn,
+    NoteOut,
     NotePage,
+    NoteRefIn,
     NoticesIn,
     NoticesOut,
     PageIn,
     SummaryIn,
     SummaryOut,
     TemplateListIn,
+    TemplateNamedOut,
     TemplatePage,
+    TemplateRefIn,
     TemplateSampleOut,
     TemplateSampleRefIn,
 )
@@ -194,6 +198,8 @@ AWAITING_REPLY = Q(status=Conversation.Status.OPEN) & (
     Q(last_message_direction=Message.Direction.INBOUND) | Q(needs_attention=True)
 )
 MESSAGE_NOT_FOUND = _("That message no longer exists.")
+NOTE_NOT_FOUND = _("That note no longer exists.")
+TEMPLATE_GONE = _("That template no longer exists.")
 
 
 def _matching_ids(reference: str) -> list[UUID]:
@@ -687,6 +693,23 @@ def list_notes(ctx: OperationContext, params: NoteListIn) -> dict:
     return page(rows, params, lambda note: note_out(ctx, note, me))
 
 
+# Not an assistant tool: what names a note on the card of ``whatsapp_inbox.note.delete`` (``schemas.A_NOTE``), by its
+# text; the model finds the notes of a conversation in their list.
+@operation(
+    "whatsapp_inbox.note.get",
+    kind="query",
+    permission="whatsapp_inbox.view",
+    input=NoteRefIn,
+    output=NoteOut,
+    ai=INTERNAL,
+)
+def get_note(ctx: OperationContext, data: NoteRefIn) -> dict:
+    note = Note.objects.filter(pk=data.id, conversation__erased_at__isnull=True).first()
+    if note is None:
+        raise NotFound(str(NOTE_NOT_FOUND), code="whatsapp_inbox.note_not_found")
+    return note_out(ctx, note, actor_id(ctx))
+
+
 # ── Templates, channel and team ─────────────────────────────────────────────────────────────────
 
 
@@ -856,6 +879,24 @@ def list_templates(ctx: OperationContext, params: TemplateListIn) -> dict:
     if params.fillable is not None:
         rows = rows.filter(_FILLABLE if params.fillable else ~_FILLABLE)
     return page(rows.order_by("name", "language", "id"), params, template_out)
+
+
+# Not an assistant tool: what names a template on the card of its change, its deletion or its new hand-over to Meta
+# (``schemas.A_TEMPLATE``), as Settings lists it (also one deleted here that Meta still has); the model finds the
+# templates in their list. Whoever sends reads the templates, as their list.
+@operation(
+    "whatsapp_inbox.template.get",
+    kind="query",
+    permission="whatsapp_inbox.reply",
+    input=TemplateRefIn,
+    output=TemplateNamedOut,
+    ai=INTERNAL,
+)
+def get_template(ctx: OperationContext, data: TemplateRefIn) -> dict:
+    row = listed_templates(ctx.scope).filter(pk=data.id).first()
+    if row is None:
+        raise NotFound(str(TEMPLATE_GONE), code="whatsapp_inbox.template_not_found")
+    return {"id": row.id, "name": row.name, "language": row.language, "label": f"{row.name} ({row.language})"}
 
 
 @operation(

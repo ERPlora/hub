@@ -755,6 +755,16 @@ msgstr "Teléfono"
 msgid "Template"
 msgstr "Plantilla"
 
+# The record a write acts on, by its name on the card (hub#571)
+msgid "Conversation"
+msgstr "Conversación"
+
+msgid "Message"
+msgstr "Mensaje"
+
+msgid "Note"
+msgstr "Nota"
+
 msgid "Meta connection code"
 msgstr "Código de conexión de Meta"
 
