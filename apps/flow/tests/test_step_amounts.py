@@ -6,21 +6,28 @@ answer» as «1250». Every amount a step leaves that says cents in its name or 
 ratchet below), and nothing Automations said as money by its words stops being so. hub#923: the amounts whose words
 say nothing (a service's or a menu's price, an invoice's total, a check's provisional total, a voucher's amount, a
 cash movement's signed amount) carry it too, and the ratchet's net is the schemas themselves, not only those words.
+hub#915: a cart's line, a price of a list and a rule's amount per unit carry it as well, beside the currency each is in.
 """
 
 import datetime as dt
 import re
+from decimal import Decimal
 from types import SimpleNamespace
 from typing import Annotated
+from uuid import uuid7
 from zoneinfo import ZoneInfo
 
 import pytest
 from live.operations import Operation, registry
 from ninja import Field, Schema
 
+from apps.cart_checkout.tests.conftest import make_cart
+from apps.cart_checkout.tests.conftest import make_item as make_cart_line
 from apps.flow.models import Flow, FlowRun, Question
 from apps.flow.queries import _money_paths, step_fields
 from apps.payment.tests.conftest import make_method
+from apps.pricing.tests.conftest import make_item as make_price
+from apps.pricing.tests.conftest import make_list, make_rule
 from apps.service.tests.conftest import make_tax
 
 from .conftest import make_flow, run
@@ -107,6 +114,76 @@ def test_the_question_after_a_step_that_creates_a_service_says_its_price_as_mone
     assert Question.objects.get(run_id=ran.id).title == "Corte costs 121,00\xa0€?"
 
 
+#: The amounts of hub#915 a step leaves, by the operation that leaves them, and the currency it answers beside them:
+#: a cart's line in its cart's, a price in its list's, a rule's amount per unit in the business's (a rule belongs to
+#: no list). Marked without it, an amount in another currency would be said in the business's.
+AMOUNTS_IN_THEIR_CURRENCY = {
+    "cart_checkout.item.get": {"unit_price", "line_total"},
+    "cart_checkout.item.list": {"unit_price", "line_total"},
+    "pricing.price_item.add": {"base_price", "price"},
+    "pricing.price_item.update": {"base_price", "price"},
+    "pricing.price_item.list": {"base_price", "price"},
+    **{f"pricing.rule.{action}": {"amount"} for action in ("create", "update", "get", "list", "activate", "deactivate")},
+}
+
+
+def test_a_cart_line_and_a_price_list_rule_leave_their_amounts_as_money():
+    """hub#915, its «How to reproduce»: a read of a cart's line and of a rule left no amount as money."""
+    steps = [
+        {"id": "s1", "kind": "query", "operation": "cart_checkout.item.get"},
+        {"id": "s2", "kind": "query", "operation": "pricing.rule.get"},
+    ]
+    assert _money_paths(steps) == {"steps.s1.unit_price", "steps.s1.line_total", "steps.s2.amount"}
+
+
+@pytest.mark.parametrize("operation", sorted(AMOUNTS_IN_THEIR_CURRENCY))
+def test_a_line_a_price_and_a_rule_leave_their_amounts_with_their_currency(operation):
+    """hub#915: each amount is marked, and the step answers the currency it is in (``_answered_currency``)."""
+    paths = _money_paths([{"id": "s1", "kind": "command", "operation": operation}])
+    assert {f"steps.s1.{name}" for name in AMOUNTS_IN_THEIR_CURRENCY[operation]} <= paths
+    assert step_fields(registry[operation]).get("currency", {}).get("type") == "string"
+
+
+def asked_after(read: str, params: dict, title: str) -> str:
+    """The question «Ask someone first» puts after a step that reads ``read`` with ``params``, in Spanish."""
+    steps = [
+        {"id": "s1", "kind": "query", "operation": read, "params": params},
+        {"id": "s2", "kind": "ask", "title": title},
+    ]
+    flow = make_flow(trigger_kind=Flow.Trigger.MANUAL, steps=steps, grants=[read], language="es")
+    ran = run("flow.flow.run", {"id": str(flow.id), "input": {}})
+    assert ran.status == FlowRun.Status.ASKING, (ran.error_code, ran.error_message)
+    return Question.objects.get(run_id=ran.id).title
+
+
+@pytest.mark.parametrize(
+    ("currency", "said"),
+    [("EUR", ("12,50\xa0€", "25,00\xa0€")), ("USD", ("12,50\xa0US$", "25,00\xa0US$"))],
+    ids=["the business's", "dollars"],
+)
+def test_the_question_after_a_cart_s_line_says_its_amounts_in_its_cart_s_currency(clock, currency, said):
+    clock(NOON)
+    line = make_cart_line(make_cart("sess_915", currency=currency), unit_price=1250, quantity=Decimal("2"))
+    said_line = "{{steps.s1.unit_price}} × 2 = {{steps.s1.line_total}}?"
+    title = asked_after("cart_checkout.item.get", {"item_id": str(line.id)}, said_line)
+    assert title == f"{said[0]} × 2 = {said[1]}?"
+
+
+def test_the_question_after_a_price_of_a_list_in_dollars_says_it_in_dollars(clock):
+    clock(NOON)
+    vip = make_list("VIP", currency="USD")
+    make_price(vip, service_id=uuid7(), service_name="Corte", price=1250)
+    title = asked_after("pricing.price_item.list", {"price_list": "VIP"}, "{{steps.s1.name}}: {{steps.s1.price}}?")
+    assert title == "Corte: 12,50\xa0US$?"
+
+
+def test_the_question_after_a_fixed_rule_says_its_amount_per_unit_as_money(clock):
+    clock(NOON)
+    make_rule("FIFTY", rule_type="fixed", amount=50)
+    title = asked_after("pricing.rule.get", {"rule": "FIFTY"}, "{{steps.s1.code}}: {{steps.s1.amount}}?")
+    assert title == "FIFTY: 0,50\xa0€?"
+
+
 # ── The ratchet: amounts a step leaves that nobody marks, by app ─────────────────────────────────────────────────────
 
 #: How an amount says itself in this repo's schemas, as the assistant's ratchet reads it
@@ -126,10 +203,9 @@ AMOUNTS_BY_NAME: dict[str, frozenset[str]] = {
 }
 
 #: The amounts a step leaves that no mark declares, by app: Automations says them as a bare figure. Only ever lower:
-#: an app that marks its own lowers its number here, and none comes in. A cart's line and a price list's rule answer
-#: no currency of their own (their cart's, their list's), so marked they would be said in the business's (hub#915);
-#: a charge preview's limits are in euros, not in the business's currency (hub#926).
-UNMARKED_STEP_AMOUNTS: dict[str, int] = {"cart_checkout": 4, "pricing": 6, "sale": 2}
+#: an app that marks its own lowers its number here, and none comes in. A charge preview's limits are in euros, not in
+#: the business's currency (hub#926).
+UNMARKED_STEP_AMOUNTS: dict[str, int] = {"sale": 2}
 
 
 def money_names(operations: list[Operation]) -> dict[str, frozenset[str]]:
