@@ -195,7 +195,7 @@ def _named_currency(value: Any, props: dict, defs: dict, words: "_Words") -> tup
         if declared is True:
             return _currency_code(sent)
         if isinstance(declared, dict):
-            if not _sends_amount(value, {"properties": props}, defs, ""):
+            if not _sends_amount(value, {"properties": props}, defs):
                 return True, None
             _, code = _currency_code(_record_currency(sent, declared, words))
             return (True, code) if code else (False, None)
@@ -493,7 +493,7 @@ def _preview_problems(op: Operation, declared: Any) -> list[str]:
     problems += [
         f"marks {name} signed, but it is no amount marked money"
         for name, prop in shown.items()
-        if _is_signed(prop) and not (prop.get("type") == "integer" and _is_money(name, prop))
+        if _is_signed(prop) and not (prop.get("type") == "integer" and _is_money(prop))
     ]
     return problems
 
