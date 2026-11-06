@@ -72,3 +72,10 @@ def test_the_card_names_the_colour_of_a_station_never_by_its_technical_name():
     for name in ("kitchen.station.create", "kitchen.station.update"):
         assert labels(assistant.card(get(name), {"color": "#F97316"}, "es")) == ["Color de la estación"]
         assert labels(assistant.card(get(name), {"color": "#F97316"}, "en")) == ["Station colour"]
+
+
+def test_the_card_says_whether_a_station_is_active_as_its_screen_does():
+    """«Activa», the station's word on Estaciones, not Django's «Activo» (hub#659)."""
+    for name in ("kitchen.station.create", "kitchen.station.update"):
+        assert labels(assistant.card(get(name), {"is_active": False}, "es")) == ["Activa"]
+        assert labels(assistant.card(get(name), {"is_active": False}, "en")) == ["Active"]
