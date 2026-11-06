@@ -13,7 +13,7 @@ from django.apps import apps
 from live.operations import get, registry
 
 from base import assistant
-from base.tests.test_assistant import named_by_the_screen
+from base.tests.test_assistant import technical_names
 
 from .conftest import (
     add_line,
@@ -46,16 +46,9 @@ def table_writes() -> list:
 def test_no_datum_of_a_write_of_table_reaches_a_spanish_card_by_its_technical_name():
     """Every write of table the assistant may ask for, with all its data: each datum by a name of its own in
     Spanish, never the one pydantic makes up."""
-    screen = named_by_the_screen()
     writes = table_writes()
     assert len(writes) > 20  # positive control: the registry has table's writes
-    technical: dict[str, list[str]] = {}
-    for op in writes:
-        props = op.input.model_json_schema().get("properties", {})
-        for field in assistant.card(op, dict.fromkeys(props, "x"), "es")["fields"]:
-            if field["name"] not in screen and field["label"] == field["name"].title().replace("_", " "):
-                technical.setdefault(op.name, []).append(field["name"])
-    assert technical == {}
+    assert technical_names(writes) == {}
 
 
 def test_the_card_names_the_colour_of_a_zone_never_by_its_technical_name():
