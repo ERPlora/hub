@@ -127,6 +127,17 @@ def test_the_catalog_offers_what_a_step_leaves_inside_an_object_never_inside_a_l
         assert action.outputs[: len(queries.step_data(operations[name]))] == list(queries.step_data(operations[name])), name
 
 
+def test_what_a_step_leaves_is_read_from_one_build_of_its_schema(monkeypatch):
+    """The catalog walks some 500 operations on every read: what a step leaves, inside its objects too, comes from a
+    single build of its output's schema (a second one per operation cost the editor half a second more)."""
+    op = queries.ask_first_catalog()["cart_checkout.item.add"]
+    built = []
+    schema = op.output.model_json_schema
+    monkeypatch.setattr(op.output, "model_json_schema", lambda *args, **kwargs: built.append(1) or schema(*args, **kwargs))
+    assert "item.unit_price" in queries.action_outputs(op)
+    assert len(built) == 1
+
+
 def test_an_app_that_is_not_active_is_not_in_the_catalog(monkeypatch):
     active = {
         label: config
