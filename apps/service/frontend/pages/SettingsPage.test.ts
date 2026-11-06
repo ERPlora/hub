@@ -90,6 +90,7 @@ describe('SettingsPage', () => {
     expect(s.field('default_duration').errorText).toBe('Ensure this value is greater than or equal to 1.');
     const banner = s.wrapper.findAllComponents(InlineFeedback).find((b) => b.attributes('data-testid') === 'service-settings-save-error');
     expect(banner?.props('heading')).toBe('The settings could not be saved.');
+    expect(banner?.text()).toContain('Invalid payload');
   });
 
   describe('a refusal by fields (hub#821, as FormModal does: ui#88, ui#89)', () => {

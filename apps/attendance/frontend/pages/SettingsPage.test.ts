@@ -132,7 +132,7 @@ describe('SettingsPage (ATTENDANCE-F04)', () => {
 
   // The notice goes where the person tapped, under «Use my current location»: on a phone that button sits below
   // the fold, and the banner up top (which keeps the save's errors) went unseen.
-  it('a denied location says so under «Use my current location» and keeps what was typed', async () => {
+  it('a denied location says so under «Use my current location», keeps what was typed, and goes once a coordinate is typed', async () => {
     const { GeoError } = await import('../lib/geo');
     geo.getPosition.mockRejectedValueOnce(new GeoError('denied'));
     const s = await setup();
@@ -142,6 +142,8 @@ describe('SettingsPage (ATTENDANCE-F04)', () => {
     expect(notice.text()).toBe('Location access is denied. Allow location in this browser to read the workplace position, or type the coordinates.');
     expect(s.field('use-location').closest('section')?.contains(notice.element)).toBe(true);
     expect(s.find('attendance-settings-error').exists()).toBe(false);
+    await ionValue(s.field('workplace_lat'), '40.4', 'ionInput');
+    expect(s.find('attendance-settings-location-error').exists()).toBe(false);
   });
 
   it('a new tap on «Use my current location» lifts the last notice', async () => {
@@ -289,12 +291,15 @@ describe('SettingsPage (ATTENDANCE-F04)', () => {
     expect(s.field('auto_close_after_hours').value).toBe('20');
   });
 
-  it('an employee reads them, read-only, without Save', async () => {
+  it('an employee reads them, read-only, without Save: their form saves nothing', async () => {
     const s = await setup({ session: EMPLOYEE, data: { ...DEFAULTS, require_location: true, workplace_lat: 40.4, workplace_lng: -3.7, workplace_set: true } });
     expect(s.find('attendance-settings-read-only').text()).toContain('Only a manager or an administrator can change these settings.');
     expect([s.field('require_location').disabled, s.field('workplace_lat').disabled, s.field('auto_close_after_hours').disabled]).toEqual([true, true, true]);
     expect(s.find('attendance-settings-save').exists()).toBe(false);
     expect(s.find('attendance-settings-use-location').exists()).toBe(false);
+    await s.find('attendance-settings-form').trigger('submit');
+    await settle();
+    expect([s.sent(), s.find('attendance-settings-saved').exists()]).toEqual([[], false]);
   });
 
   it('speaks Spanish', async () => {

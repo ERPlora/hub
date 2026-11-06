@@ -94,6 +94,7 @@ describe('SettingsPage', () => {
     expect(s.field('primary_color').errorText).toBe('Write the colour as #RRGGBB (for example #6366f1).');
     expect(s.field('primary_color').value).toBe('blue');
     expect(s.field('save-error')?.textContent).toContain('Could not save');
+    expect(s.field('save-error')?.textContent).toContain('Invalid payload');
   });
 
   describe('a refusal by fields (hub#854, as FormModal and the Services settings do: ui#102, hub#821)', () => {

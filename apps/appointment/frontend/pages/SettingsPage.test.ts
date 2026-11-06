@@ -76,6 +76,7 @@ describe('SettingsPage', () => {
     await click(s.field('save'));
     expect(s.field('calendar_end_hour').errorText).toBe('The calendar has to end after it starts.');
     expect(s.field('save-error')?.textContent).toContain('The settings could not be saved.');
+    expect(s.field('save-error')?.textContent).toContain('Check the fields.');
   });
 
   describe('a refusal by fields (hub#854, as FormModal and the Services settings do: ui#102, hub#821)', () => {
