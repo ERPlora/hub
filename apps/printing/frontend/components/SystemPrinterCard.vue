@@ -38,7 +38,7 @@ const { downloads, offered } = useAppDownloads();
     >
       {{ t('printing.systemCard.intro') }}
     </p>
-    <div>
+    <div class="settings-card__actions">
       <IonButton
         fill="outline"
         data-testid="printing-system-card-setup"
@@ -61,6 +61,7 @@ const { downloads, offered } = useAppDownloads();
         {{ t('printing.systemCard.downloadIntro') }}
       </p>
       <div
+        class="settings-card__actions"
         role="group"
         :aria-label="t('printing.systemCard.downloadTitle')"
       >

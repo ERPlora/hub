@@ -6,6 +6,7 @@
 import { applySurface } from '@erplora/ui/shell';
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { embedHubHome, forgetHubHome } from '../../../../base/frontend/__tests__/hub-home';
 import { flush, mountPrinting } from '../__tests__/mount-printing';
 import SystemPrinterCard from './SystemPrinterCard.vue';
 
@@ -16,11 +17,7 @@ const DOWNLOADS = {
   android: `${SAAS}/app/download/android/`,
 };
 
-function embed(downloads: Record<string, string> | null) {
-  document.head.innerHTML = downloads
-    ? `<script id="hub-home" type="application/json">${JSON.stringify({ name: 'Bar', app_downloads: downloads })}</script>`
-    : '';
-}
+const embed = (downloads: Record<string, string> | null) => embedHubHome(downloads && { name: 'Bar', app_downloads: downloads });
 
 async function card(locale: 'en' | 'es' = 'en') {
   const m = await mountPrinting(SystemPrinterCard, { locale, path: '/system' });
@@ -28,10 +25,7 @@ async function card(locale: 'en' | 'es' = 'en') {
   return m;
 }
 
-afterEach(() => {
-  applySurface('web');
-  document.head.innerHTML = '';
-});
+afterEach(forgetHubHome);
 
 describe('SystemPrinterCard', () => {
   it('says who prints and leads to Printing', async () => {

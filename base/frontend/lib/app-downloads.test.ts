@@ -5,6 +5,7 @@
 import { applySurface } from '@erplora/ui/shell';
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { embedHubHome as embed, forgetHubHome } from '../__tests__/hub-home';
 import { useAppDownloads } from './app-downloads';
 
 const SAAS = 'http://localhost:8001';
@@ -14,16 +15,7 @@ const DOWNLOADS = {
   android: `${SAAS}/app/download/android/`,
 };
 
-function embed(block: object | null) {
-  document.head.innerHTML = block
-    ? `<script id="hub-home" type="application/json">${JSON.stringify(block)}</script>`
-    : '';
-}
-
-afterEach(() => {
-  applySurface('web');
-  document.head.innerHTML = '';
-});
+afterEach(forgetHubHome);
 
 describe('useAppDownloads', () => {
   it('on the web, the door of each system, Windows first', () => {
