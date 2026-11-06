@@ -1,6 +1,6 @@
 // The amount typed on the till's keypad (the open-price, discount and service-price sheets): what the sheet hands up,
 // in cents read only in the business's money (hub#921: «1500» yen read before it answers would go up as 150000), and
-// the figure it shows, a figure without a sign until the business answers.
+// the figure it shows, a dash until the business answers (hub#936: «1,500.00» for 1500 yen typed).
 import { describe, expect, it } from 'vitest';
 import { shallowRef } from 'vue';
 
@@ -20,7 +20,7 @@ async function setup(typedText: string) {
 describe('useKeypadAmount', () => {
   it('hands nothing up until the business answers its money; then «1500» is 1500 yen', async () => {
     const s = await setup('1500');
-    expect(s.read()).toEqual([0, '1,500.00']);
+    expect(s.read()).toEqual([0, '—']);
     await s.result('base.business.get', business(JAPANESE));
     expect(s.read()).toEqual([1500, '¥1,500']);
   });

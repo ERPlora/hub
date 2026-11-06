@@ -1,7 +1,8 @@
 // The amount typed on the till's keypad, in the business's money: the open-price, discount and service-price sheets.
 // `cents` is what the sheet hands up, read only once the business has answered its money and 0 until then, so the
 // sheet's button waits in grey (hub#921: «1500» yen read with two decimals would go up as 150000); `shown` is what was
-// typed, for the figure on top and the button's label (a figure without a sign until the business answers).
+// typed, for the figure on top and the button's label (a dash until the business answers: its decimals are not known
+// before, hub#936).
 //   const { business, cents, shown } = useKeypadAmount(typed);
 import { computed, type Ref } from 'vue';
 
