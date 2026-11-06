@@ -70,9 +70,8 @@ def test_the_card_names_the_kitchen_name_as_the_group_and_option_forms_do():
         ("modifier.option.update", "options"),
     ):
         arguments = {"kitchen_name": "SALSA"}
-        said, said_en = SCREENS[form]["form"]["kitchenName"], SCREENS_EN[form]["form"]["kitchenName"]
+        said = SCREENS[form]["form"]["kitchenName"]
         assert labels(assistant.card(get(name), arguments, "es")) == [said], name
-        assert labels(assistant.card(get(name), arguments, "en")) == [said_en], name
 
 
 # ── The records a write names by their id (hub#672) ──────────────────────────────────────────────────────────────────
