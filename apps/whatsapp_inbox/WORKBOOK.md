@@ -1755,7 +1755,6 @@ Resueltas en los planes, y fuera de esta lista:
 ### Lo que queda fuera
 
 - **Una traducción al español marcada «fuzzy» sale en inglés y el test de traducciones no lo ve**, hub#569.
-- **Tres textos salen en español con la palabra de Clientes o Facturación**, hub#570.
 - **La tarjeta de confirmación del asistente no dice qué registro toca una escritura**, hub#571.
 - **Los iconos de WhatsApp, Enviar y los adjuntos, y el hilo de chat compartido**: siguen pedidos a `@erplora/ui`
   ([`UI-REQUESTS.md`](UI-REQUESTS.md)).
