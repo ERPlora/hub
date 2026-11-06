@@ -534,7 +534,9 @@ ventas y las devoluciones, el código tiene que ser TICKET, FACT o RECT; con otr
 alta manual (si su tipo es F1 o F2).
 Si falla: un código vacío o con otra forma, un formato sin el año o sin marcador de secuencia, con un
 salto de línea, o un prefijo o formato con tildes o símbolos como º o ª, salen bajo su campo (el número
-es el `NumSerieFactura` de VeriFactu: solo ASCII imprimible); unos números que con la secuencia más ancha
+es el `NumSerieFactura` de VeriFactu: solo ASCII imprimible); el código con otra forma (`E2E-?`) dice qué
+admite, «Usa solo letras sin tilde, números, guiones (-) y guiones bajos (_), empezando por una letra o un
+número.», también al asistente, que no saca tarjeta (hub#872); unos números que con la secuencia más ancha
 pasarían de 60 caracteres, «Los números de esta serie no cabrían en 60 caracteres…» bajo el prefijo o el
 formato; un código que ya existe ese año, «Ya hay una serie con ese código ese año.». Cada campo
 rechazado, también el tipo de factura, se marca en rojo con su mensaje debajo y arriba sale «Revisa los

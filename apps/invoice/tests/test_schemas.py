@@ -237,6 +237,32 @@ def test_a_series_code_is_written_in_capitals():
     assert fields(refused.value) == {"code"}
 
 
+@pytest.mark.parametrize("wrong", ["E2E-?", "-A", "_A", "AÑO", "É1", "A B", "A.B", "A/B"])
+def test_a_series_code_of_another_shape_is_refused_with_its_own_message(wrong):
+    """hub#872: what a code takes, as the format of the number says its own (never pydantic's pattern)."""
+    with pytest.raises(ValidationError) as refused:
+        schemas.SeriesCreateIn.model_validate({"code": wrong, "invoice_type": "F1", "year": 2026})
+    [error] = refused.value.errors()
+    assert (error["loc"], error["type"], str(error["ctx"]["error"])) == (
+        ("code",),
+        "value_error",
+        str(schemas.SERIES_CODE_INVALID),
+    )
+
+
+@pytest.mark.parametrize("right", ["A", "9", "FACT", "E2E_1-B", "a-1", "X" * 20])
+def test_a_series_code_of_the_right_shape_is_taken(right):
+    """Positive control: letters (in any case), digits, hyphens and underscores, from a letter or a digit."""
+    data = schemas.SeriesCreateIn.model_validate({"code": right, "invoice_type": "F1", "year": 2026})
+    assert data.code == right.upper()
+
+
+def test_a_series_code_still_tells_its_shape_to_the_openapi_and_the_assistant():
+    """The code's own check (hub#872) keeps the shape in the JSON Schema the OpenAPI and the assistant's tool read."""
+    code = schemas.SeriesCreateIn.model_json_schema()["properties"]["code"]
+    assert (code["pattern"], code["minLength"], code["maxLength"]) == (r"^[A-Z0-9][A-Z0-9_-]*$", 1, 20)
+
+
 def test_a_series_format_needs_its_year_and_its_sequence():
     # Without the year, the series of the next year (born from this one) would repeat its numbers.
     for wrong in ("{prefix}-{year}", "{prefix}-{seq}"):

@@ -59,14 +59,22 @@ test('INVOICE-F12 and F13: a series that continues at 7, renamed, and locked onc
   await form.locator('[data-testid=invoice-series-next-number] input').fill('7');
 
   // hub#461: a code of another shape is marked under its field; correcting it takes the mark and the notice away.
+  // hub#872: what it says there is what a code takes, never the generic «Enter a valid value.».
   const code = form.locator('[data-testid=invoice-series-code]');
   const notice = form.locator('[data-testid=invoice-series-form-error]');
+  const takes = 'Use only letters without accents, digits, hyphens (-) and underscores (_), starting with a letter or a digit.';
   await code.locator('input').fill('E2E-?');
   await form.locator('[data-testid=invoice-series-form-submit]').click();
   await expect(code).toHaveClass(/ion-invalid/);
+  await expect(code).toContainText(takes);
+  await expect(code).not.toContainText('Enter a valid value.');
   await expect(notice).toBeVisible();
+  await flowShots(page, 'INVOICE-F12-refused', async (p) => {
+    await expect(openDialog(p, 'invoice-series-form').locator('[data-testid=invoice-series-code]')).toContainText(takes);
+  });
   await code.locator('input').fill(CODE);
   await expect(code).not.toHaveClass(/ion-invalid/);
+  await expect(code).not.toContainText(takes);
   await expect(notice).toBeHidden();
   await flowShots(page, 'INVOICE-F12', async (p) => {
     await expect(openDialog(p, 'invoice-series-form')).toBeVisible();
