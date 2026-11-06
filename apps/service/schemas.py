@@ -444,10 +444,10 @@ class ServiceOut(Schema):
     category_id: UUID | None
     category_name: str | None
     pricing_type: PricingType
-    price: int
-    min_price: int | None
-    max_price: int | None
-    cost: int
+    price: int = Field(json_schema_extra={"money": True})
+    min_price: int | None = Field(json_schema_extra={"money": True})
+    max_price: int | None = Field(json_schema_extra={"money": True})
+    cost: int = Field(json_schema_extra={"money": True})
     duration_minutes: int
     buffer_before: int
     buffer_after: int
@@ -484,9 +484,9 @@ class ServiceSaleOut(Schema):
     id: UUID
     name: str
     pricing_type: PricingType
-    price: int
-    min_price: int | None
-    max_price: int | None
+    price: int = Field(json_schema_extra={"money": True})
+    min_price: int | None = Field(json_schema_extra={"money": True})
+    max_price: int | None = Field(json_schema_extra={"money": True})
     duration_minutes: int
     buffer_before: int
     buffer_after: int
@@ -728,14 +728,15 @@ class AssignmentOut(Schema):
     member_id: UUID
     member_name: str
     custom_duration: int | None
-    custom_price: int | None
+    custom_price: int | None = Field(json_schema_extra={"money": True})
     is_primary: bool
     is_active: bool
     duration: int = Field(
         description="What it lasts with this professional: their own duration or the service's."
     )
     price: int = Field(
-        description="What it costs with this professional: their own price or the service's."
+        description="What it costs with this professional: their own price or the service's.",
+        json_schema_extra={"money": True},
     )
 
 
@@ -749,10 +750,10 @@ class EligibleOut(Schema):
     color: str
     booking_buffer: int
     custom_duration: int | None
-    custom_price: int | None
+    custom_price: int | None = Field(json_schema_extra={"money": True})
     is_primary: bool
     duration: int
-    price: int
+    price: int = Field(json_schema_extra={"money": True})
 
 
 class ReleasedOut(Schema):
@@ -887,8 +888,8 @@ class PackageOut(Schema):
     description: str
     discount_type: DiscountType
     discount_percent_bp: int
-    discount_amount: int
-    fixed_price: int | None
+    discount_amount: int = Field(json_schema_extra={"money": True})
+    fixed_price: int | None = Field(json_schema_extra={"money": True})
     validity_days: int | None
     max_uses: int | None
     is_active: bool
@@ -990,9 +991,9 @@ class GrantOut(Schema):
     granted_at: datetime
     source: GrantSource
     sale_id: UUID | None
-    amount: int
-    net_amount: int
-    tax_amount: int
+    amount: int = Field(json_schema_extra={"money": True})
+    net_amount: int = Field(json_schema_extra={"money": True})
+    tax_amount: int = Field(json_schema_extra={"money": True})
     note: str
     max_uses: int | None = Field(
         description="Sessions in all: the ones sold plus the adjustments; null = unlimited."
@@ -1030,7 +1031,7 @@ class OrphanOut(Schema):
     customer_id: UUID
     customer_deleted_at: datetime
     granted_at: datetime
-    amount: int
+    amount: int = Field(json_schema_extra={"money": True})
     remaining: int | None
     is_expired: bool
 

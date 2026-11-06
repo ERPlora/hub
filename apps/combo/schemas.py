@@ -505,7 +505,7 @@ class OptionOut(Schema):
         description="The product's catalogue price, in cents.",
         json_schema_extra={"money": True},
     )
-    price_delta: int
+    price_delta: int = Field(json_schema_extra={"money": True})
     is_available: bool
     sort_order: int
     status: Literal[
@@ -531,7 +531,7 @@ class ComboOut(Schema):
     id: UUID
     name: str
     kitchen_name: str
-    price: int
+    price: int = Field(json_schema_extra={"money": True})
     supply_kind: SupplyKind
     tax_category_key: str | None
     tax_category_name: str | None
@@ -602,7 +602,7 @@ class SaleComboOut(Schema):
     id: UUID
     name: str
     kitchen_name: str
-    price: int
+    price: int = Field(json_schema_extra={"money": True})
     supply_kind: SupplyKind
     sort_order: int
     image: str = Field(
@@ -646,7 +646,8 @@ class ResolvedOut(Schema):
     price: int = Field(description="Today's closed price, in cents.", json_schema_extra={"money": True})
     supplements: int = Field(description="The supplements of the picks, in cents.", json_schema_extra={"money": True})
     amount: int = Field(
-        description="What the menu charges: the amount ordered, or price plus supplements."
+        description="What the menu charges: the amount ordered, or price plus supplements.",
+        json_schema_extra={"money": True},
     )
     split: bool = Field(
         description="true: one sale line per component, each at its own tax category and amount."
