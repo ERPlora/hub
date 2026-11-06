@@ -88,6 +88,18 @@ CONVERSATION_REFERENCE = (
 # The assistant's card names a template header's file by this read (base/assistant.py ``REFERS``), run as whoever
 # asks, never by its id: by the name it was chosen with, as the template's sheet shows it. Whoever sends reads it.
 A_SAMPLE = names("whatsapp_inbox.template_sample.detail")
+# The same for the record a write acts on: a conversation as the inbox calls it, a message and a note by their text (a
+# message without one by its caption or its file name, as the inbox's list says it), a template by its name and its
+# language, as its sheet says it; a customer card by Customers' own read (the inbox requires Customers).
+A_CONVERSATION = names("whatsapp_inbox.conversation.detail", name=("display_name",))
+A_MESSAGE = names("whatsapp_inbox.message.get", name=("body", "media_caption", "media_filename", "template_name"))
+A_NOTE = names("whatsapp_inbox.note.get", name=("text",))
+A_TEMPLATE = names("whatsapp_inbox.template.get", name=("label",))
+A_CUSTOMER = names("customer.customer.detail")
+CONVERSATION = gettext_noop("Conversation")
+MESSAGE = gettext_noop("Message")
+NOTE = gettext_noop("Note")
+TEMPLATE = gettext_noop("Template")
 
 
 # ── Pages: every list is paginated, limit ≤ 100 ─────────────────────────────────────────────────
@@ -115,7 +127,9 @@ class Page(Schema, Generic[T]):
 class ConversationRefIn(Schema):
     """A conversation by its ``id`` or by its number or customer's name (``conversation``); the id wins."""
 
-    id: UUID | None = Field(None, description="The conversation's id.")
+    id: UUID | None = Field(
+        None, title=CONVERSATION, description="The conversation's id.", json_schema_extra=A_CONVERSATION
+    )
     conversation: Reference | None = Field(
         None, validate_default=True, description=CONVERSATION_REFERENCE
     )
@@ -343,7 +357,7 @@ class SetStatusIn(ConversationRefIn):
 
 class LinkCustomerIn(ConversationRefIn):
     customer_id: UUID | None = Field(
-        None, description="The id of the customer card to join it to."
+        None, description="The id of the customer card to join it to.", json_schema_extra=A_CUSTOMER
     )
     create: bool = Field(
         False,
@@ -468,7 +482,9 @@ class TemplateSendIn(Schema):
 
 
 class SendIn(Schema):
-    id: UUID | None = Field(None, description="The conversation's id.")
+    id: UUID | None = Field(
+        None, title=CONVERSATION, description="The conversation's id.", json_schema_extra=A_CONVERSATION
+    )
     to: _text(32) | None = Field(
         None,
         title=gettext_noop("Phone"),
@@ -479,7 +495,7 @@ class SendIn(Schema):
     )
     template: TemplateSendIn | None = Field(
         None,
-        title=gettext_noop("Template"),
+        title=TEMPLATE,
         description="An approved template; the only way to write after the 24-hour window.",
     )
     text: _text(4096) | None = Field(
@@ -618,7 +634,7 @@ class StatusOut(Schema):
 
 
 class MessageRefIn(Schema):
-    id: UUID = Field(description="The message's id.")
+    id: UUID = Field(title=MESSAGE, description="The message's id.", json_schema_extra=A_MESSAGE)
 
 
 class ClaimDeliveryOut(Schema):
@@ -705,7 +721,7 @@ class NoteAddIn(ConversationRefIn):
 
 
 class NoteRefIn(Schema):
-    id: UUID = Field(description="The note's id.")
+    id: UUID = Field(title=NOTE, description="The note's id.", json_schema_extra=A_NOTE)
 
 
 class NoteOut(Schema):
@@ -859,11 +875,15 @@ class TemplateCreateIn(TemplateWriteIn):
 
 
 class TemplateUpdateIn(TemplateWriteIn):
-    id: UUID = Field(description="The template's id in the Hub; its name and language do not change.")
+    id: UUID = Field(
+        title=TEMPLATE,
+        description="The template's id in the Hub; its name and language do not change.",
+        json_schema_extra=A_TEMPLATE,
+    )
 
 
 class TemplateRefIn(Schema):
-    id: UUID = Field(description="The template's id in the Hub.")
+    id: UUID = Field(title=TEMPLATE, description="The template's id in the Hub.", json_schema_extra=A_TEMPLATE)
 
 
 #: A 25 MB document in base64 is 34 952 536 characters; a little more still reads «too heavy» under its field.
@@ -981,6 +1001,15 @@ class TemplateOut(Schema):
 
 class TemplatePage(Page[TemplateOut]):
     pass
+
+
+class TemplateNamedOut(Schema):
+    """A template as its sheet names it: the same name may be in several languages."""
+
+    id: UUID = Field(description="The template's id in the Hub.")
+    name: str = Field(description="Its name at Meta.")
+    language: str = Field(description="Its language.")
+    label: str = Field(description="Its name and its language, as Settings › WhatsApp says it: «recordatorio (es)».")
 
 
 class SyncTemplateIn(Schema):
