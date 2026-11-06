@@ -15,6 +15,7 @@ and the column stays, always the same value. The images' keys and the cache keys
 from django.db import models
 from django.db.models import Q
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import pgettext, pgettext_lazy
 from live.models import UUIDModel
 
 ACTOR_MAX_LENGTH = 128
@@ -38,8 +39,10 @@ class Site(UUIDModel):
     #: Google's last good answer for the reviews section's place (``apps.website.reviews``): it stands in for the
     #: cache when it was flushed or Google fails, for 30 days at most.
     reviews_snapshot = models.JSONField(_("Google reviews"), default=dict, blank=True, db_default={})
-    updated_at = models.DateTimeField(_("updated at"), auto_now=True)
-    updated_by = models.CharField(_("updated by"), max_length=ACTOR_MAX_LENGTH, blank=True)
+    #: Said with the app's context, like ``created_at`` of ``Image``: the site and its images are feminine in Spanish
+    #: («actualizada el», like its «publicada el»), where Demo and Clientes, loaded before, say it masculine (hub#661).
+    updated_at = models.DateTimeField(pgettext_lazy("website", "updated at"), auto_now=True)
+    updated_by = models.CharField(pgettext_lazy("website", "updated by"), max_length=ACTOR_MAX_LENGTH, blank=True)
 
     class Meta:
         verbose_name = _("website")
@@ -51,7 +54,8 @@ class Site(UUIDModel):
         ]
 
     def __str__(self) -> str:
-        return str(_("Website"))
+        # Not plain gettext: Clientes, loaded before, says a customer's «Website» as «Web».
+        return pgettext("website", "Website")
 
 
 class Image(UUIDModel):
@@ -64,7 +68,7 @@ class Image(UUIDModel):
     width = models.PositiveIntegerField(_("width"))
     height = models.PositiveIntegerField(_("height"))
     size = models.PositiveIntegerField(_("size"))
-    created_at = models.DateTimeField(_("created at"), auto_now_add=True)
+    created_at = models.DateTimeField(pgettext_lazy("website", "created at"), auto_now_add=True)
 
     class Meta:
         verbose_name = _("image")
