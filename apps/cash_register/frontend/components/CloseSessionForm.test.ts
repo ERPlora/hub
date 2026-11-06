@@ -245,4 +245,14 @@ describe('CloseSessionForm: before the business answers its money (hub#921)', ()
     await s.result('base.business.get', business(JAPANESE));
     expect(prop(s.counted(), 'value')).toBe('1400');
   });
+
+  it('the difference says nothing while the count cannot be read in the business’s money: «—», then «-¥100», never 138500', async () => {
+    const s = await setup('en', { business: null });
+    await s.ready(1500, []);
+    await ionValue(s.counted(), '1400', 'ionInput');
+    const difference = () => plain(s.find('cash-register-close-expected').findAll('dd')[1].text());
+    expect(difference()).toBe('—');
+    await s.result('base.business.get', business(JAPANESE));
+    expect(difference()).toBe('-¥100');
+  });
 });
