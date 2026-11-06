@@ -936,7 +936,11 @@ Todo se puede pedir por las pantallas, el asistente (por voz o por texto, con la
 usa) y la API, con las mismas reglas y los mismos permisos. Las listas van por páginas de hasta 100 y
 todas tienen buscador. Para hablar con naturalidad, un cliente se puede nombrar por su id o por su
 nombre exacto, su teléfono o su email («añade una nota a Ana García»), y un grupo, una etiqueta o un
-campo, por su nombre; si dos fichas encajan, se pide el id, el teléfono o el email.
+campo, por su nombre; si dos fichas encajan, se pide el id, el teléfono o el email. Antes de cambiar nada, el
+asistente pide confirmar con su tarjeta (BASE-F97), que nombra cada registro como lo nombran las pantallas, nunca por
+su id: la ficha («Cliente: Ana García»), la ficha duplicada de una unión, los grupos y las etiquetas que se le ponen,
+el grupo, la etiqueta o el campo que se cambia o se elimina, por su nombre, y el pedido abierto como lo nombra Venta
+(su título o, sin él, su importe; con Venta apagada, no sale). Lo que quien pregunta no puede ver no sale.
 
 ### Lo que ofrece: consultas (leen, no cambian nada)
 
@@ -958,6 +962,10 @@ campo, por su nombre; si dos fichas encajan, se pide el id, el teléfono o el em
 | Qué cliente tiene un pedido | ver | F17, F19 | sí | `customer.order.customer` |
 | Los pedidos de una ficha (también para las API keys) | ver | F19 | sí | `customer.order.list` |
 | Los datos de salud de una ficha y su permiso (solo en pantalla) | ver | F32 | sí | `customer.health.detail` |
+| Un grupo por su id, también uno no activo: lo que lee la tarjeta del asistente para nombrarlo (BASE-F97) | ver | F06, F27 | no | `customer.group.detail` |
+| Una etiqueta por su id, también una no activa: lo que lee la tarjeta del asistente (BASE-F97) | ver | F06, F28 | no | `customer.tag.detail` |
+| Un campo personalizado por su id: lo que lee la tarjeta del asistente (BASE-F97) | ver | F04, F29 | no | `customer.field.detail` |
+| El nombre de un pedido abierto, como lo nombra Venta: lo que lee la tarjeta del asistente (BASE-F97) | ver (y ver las ventas, en Venta) | F19 | no | `customer.order.get` |
 
 ### Lo que ofrece: acciones (cambian datos)
 
@@ -1090,6 +1098,18 @@ asistente. Lo que en el producto actual tenía el perfil «Cajero» lo tiene aqu
   entre las 10 primeras del catálogo real del dueño, el encargado y el empleado. Todo campo de `schemas.py` lleva su
   descripción: son la herramienta del asistente. Las referencias humanas
   (nombre, teléfono, email) las resuelve `queries.find_customer`, solo entre fichas vivas.
+- La tarjeta de confirmación del asistente (BASE-F97) nombra cada registro que una escritura señala por su id con las
+  marcas `refers` de `schemas.py` (`A_CUSTOMER`, `A_GROUP`, `A_TAG`, `A_FIELD`, `A_ORDER`), leídas como quien
+  pregunta: la ficha con `customer.customer.detail` (solo las vivas, como sus pantallas) y el grupo, la etiqueta y el
+  campo con `customer.group.detail`, `customer.tag.detail` y `customer.field.detail`, lecturas internas
+  (`ai=INTERNAL`, sin API) porque el modelo los encuentra en sus listas. El pedido es de Venta, que no es requisito:
+  `customer.order.get` pide su nombre a `sale.record.get` por la puerta de la plataforma (`base.operations.call`,
+  BASE-F84), con el permiso de esa lectura; con Venta apagada o ausente responde 409 `customer.sales_unavailable` y la
+  tarjeta lo deja fuera, así que Clientes sigue sin depender de nadie. El id de una ficha, un grupo, una etiqueta o un
+  campo lleva su título («Cliente», «Grupo», «Etiqueta», «Campo personalizado»), nunca «Registro». Sin persona
+  detrás, sin permiso, con un id de otro negocio o de algo que ya no está, el registro queda fuera, nunca su id:
+  `tests/test_assistant_card_records.py`, y el trinquete `UNNAMED_REFERENCES` de
+  `base/tests/test_assistant_card_values.py` impide que entre un dato sin marca.
 - Búsqueda: cada ficha guarda `search_text` (nombre, email, teléfono, NIF y empresa en minúsculas y
   sin acentos), recalculado en `Customer.save()`; así no hace falta la extensión `unaccent`.
 - Estados de una ficha: viva (`deleted_at` vacío), eliminada (`deleted_at`), unida (`merged_into`) y
@@ -1218,7 +1238,6 @@ asistente. Lo que en el producto actual tenía el perfil «Cajero» lo tiene aqu
 
 ## Lo que queda fuera
 
-- **La tarjeta de confirmación del asistente no dice qué ficha toca una escritura**, hub#513.
 - **El país del negocio para un teléfono sin prefijo**: se lee siempre como de España (CUSTOMER-F10,
   F11), aunque la plataforma ya guarda el país de cada negocio. Cambiarlo solo en Clientes partiría
   las fichas: Clientes las guardaría con el prefijo del negocio y Citas, Ventas, Facturas, Servicios,

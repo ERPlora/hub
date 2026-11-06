@@ -24,6 +24,7 @@ from pydantic import (
 
 from apps.customer.models import Activity, Purchase
 from base.business import currency_decimals
+from base.schemas import names
 
 T = TypeVar("T")
 
@@ -49,6 +50,20 @@ GROUP = gettext_noop("Group")
 TAG = gettext_noop("Tag")
 GROUP_COLOR = gettext_noop("Group color")
 TAG_COLOR = gettext_noop("Tag color")
+CUSTOMER = gettext_noop("Customer")
+CUSTOM_FIELD = gettext_noop("Custom field")
+
+# The assistant's card names the record a write acts on by these reads (base/assistant.py ``REFERS``), run as whoever
+# asks, never by its id. An open order is Sales's, which Customers does not require: ``customer.order.get`` asks Sales
+# for its name, and without Sales the card leaves it out.
+A_CUSTOMER = names("customer.customer.detail")
+A_GROUP = names("customer.group.detail")
+A_TAG = names("customer.tag.detail")
+A_FIELD = names("customer.field.detail")
+A_ORDER = names("customer.order.get", by="order_id")
+#: A group or a tag of the card by its id, each named on the card.
+GroupId = Annotated[UUID, Field(json_schema_extra=A_GROUP)]
+TagId = Annotated[UUID, Field(json_schema_extra=A_TAG)]
 
 
 def _email(value: str) -> str:
@@ -166,7 +181,7 @@ CUSTOMER_REFERENCE = "The customer's exact name, phone or email, when the id is 
 class CustomerRefIn(Schema):
     """A card by its ``id`` or by its exact name, phone or email (``customer``); the id wins."""
 
-    id: UUID | None = Field(None, description="The customer's id.")
+    id: UUID | None = Field(None, title=CUSTOMER, description="The customer's id.", json_schema_extra=A_CUSTOMER)
     customer: Reference | None = Field(None, validate_default=True, description=CUSTOMER_REFERENCE)
 
     _named = field_validator("customer")(_named_unless("id", CUSTOMER_REF_MISSING))
@@ -175,14 +190,14 @@ class CustomerRefIn(Schema):
 class CustomerOfIn(Schema):
     """The card something belongs to: ``customer_id``, or its exact name, phone or email."""
 
-    customer_id: UUID | None = Field(None, description="The customer's id.")
+    customer_id: UUID | None = Field(None, description="The customer's id.", json_schema_extra=A_CUSTOMER)
     customer: Reference | None = Field(None, validate_default=True, description=CUSTOMER_REFERENCE)
 
     _named = field_validator("customer")(_named_unless("customer_id", CUSTOMER_REF_MISSING))
 
 
 class GroupRefIn(Schema):
-    id: UUID | None = Field(None, description="The group's id.")
+    id: UUID | None = Field(None, title=GROUP, description="The group's id.", json_schema_extra=A_GROUP)
     group: Reference | None = Field(
         None, validate_default=True, title=GROUP, description="The group's current name, when the id is not known."
     )
@@ -191,7 +206,7 @@ class GroupRefIn(Schema):
 
 
 class TagRefIn(Schema):
-    id: UUID | None = Field(None, description="The tag's id.")
+    id: UUID | None = Field(None, title=TAG, description="The tag's id.", json_schema_extra=A_TAG)
     tag: Reference | None = Field(
         None, validate_default=True, title=TAG, description="The tag's current name, when the id is not known."
     )
@@ -200,7 +215,7 @@ class TagRefIn(Schema):
 
 
 class FieldRefIn(Schema):
-    id: UUID | None = Field(None, description="The custom field's id.")
+    id: UUID | None = Field(None, title=CUSTOM_FIELD, description="The custom field's id.", json_schema_extra=A_FIELD)
     field: Reference | None = Field(
         None, validate_default=True, description="The custom field's current name, when the id is not known."
     )
@@ -336,7 +351,7 @@ class CustomerIn(Schema):
 
 
 class FieldValueIn(Schema):
-    field_id: UUID = Field(description="The custom field's id.")
+    field_id: UUID = Field(title=CUSTOM_FIELD, description="The custom field's id.", json_schema_extra=A_FIELD)
     value: _text(10000) = Field(
         description="The value as text: a number, a date YYYY-MM-DD, true/false, one of a select's options, "
         "or empty to clear it."
@@ -422,7 +437,7 @@ class ImportIn(Schema):
 
 
 class SetGroupsIn(CustomerRefIn):
-    group_ids: list[UUID] = Field(
+    group_ids: list[GroupId] = Field(
         [], max_length=200, title=GROUPS, description="The ids of the groups the customer is in."
     )
     groups: list[Reference] = Field(
@@ -431,7 +446,7 @@ class SetGroupsIn(CustomerRefIn):
 
 
 class SetTagsIn(CustomerRefIn):
-    tag_ids: list[UUID] = Field(
+    tag_ids: list[TagId] = Field(
         [], max_length=200, title=TAGS, description="The ids of the tags the customer has."
     )
     tags: list[Reference] = Field(
@@ -443,7 +458,10 @@ class MergeIn(CustomerRefIn):
     """``id``/``customer`` is the card that stays; ``absorbed_id``/``absorbed`` the duplicate."""
 
     absorbed_id: UUID | None = Field(
-        None, title=DUPLICATE_CUSTOMER, description="The duplicate's id: it is merged into the other card."
+        None,
+        title=DUPLICATE_CUSTOMER,
+        description="The duplicate's id: it is merged into the other card.",
+        json_schema_extra=A_CUSTOMER,
     )
     absorbed: Reference | None = Field(
         None,
@@ -568,9 +586,11 @@ class ConsentHistoryIn(CustomerOfIn, PageIn):
 
 
 class OrderLinkIn(Schema):
-    order_id: UUID = Field(title=gettext_noop("Open order"), description="The open order's id in the sale app.")
+    order_id: UUID = Field(
+        title=gettext_noop("Open order"), description="The open order's id in the sale app.", json_schema_extra=A_ORDER
+    )
     customer_id: UUID | None = Field(
-        None, description="The customer's id; without a customer the link is removed."
+        None, description="The customer's id; without a customer the link is removed.", json_schema_extra=A_CUSTOMER
     )
     customer: Reference | None = Field(
         None, description="The customer's exact name, phone or email."
@@ -644,6 +664,10 @@ class PurchaseVoidIn(Schema):
 
 
 # ── Groups, tags and custom fields: inputs ──────────────────────────────────────────────────────
+
+
+class ByIdIn(Schema):
+    id: UUID = Field(description="The record's id.")
 
 
 class GroupListIn(PageIn):
@@ -994,6 +1018,11 @@ class ConsentStateOut(Schema):
     rows: list[ConsentStateRow] = Field(
         description="The last decision per purpose and channel."
     )
+
+
+class OrderNamedOut(Schema):
+    order_id: UUID = Field(description="The order's id.")
+    name: str = Field(description="The order as Sales names it: its title or, with none, its amount.")
 
 
 class OrderCustomerOut(Schema):

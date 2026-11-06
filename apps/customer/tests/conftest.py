@@ -35,21 +35,27 @@ def english():
 
 
 def ctx_for(
-    role: str = "hub_admin", scope: Scope = A, actor: str = "tester"
+    role: str = "hub_admin",
+    scope: Scope = A,
+    actor: str = "tester",
+    permissions: set[str] | frozenset[str] | None = None,
+    language: str = "en",
 ) -> OperationContext:
     """The context a user with ``role`` on ``scope`` gets, as ``base.permissions`` computes it.
 
     Owner and admin get every permission every app declares; the other roles, what each app's
-    ``role_permissions`` gives them.
+    ``role_permissions`` gives them. ``permissions`` replaces the role's when a test needs a
+    combination no role has.
     """
-    configs = all_live_app_configs()
-    if role in FULL_ACCESS_ROLES:
-        permissions = frozenset(
-            permission for config in configs for permission in config.permissions
-        )
-    else:
-        permissions = permissions_for_role(configs, role)
-    return OperationContext(scope=scope, actor=actor, permissions=permissions)
+    if permissions is None:
+        configs = all_live_app_configs()
+        if role in FULL_ACCESS_ROLES:
+            permissions = frozenset(
+                permission for config in configs for permission in config.permissions
+            )
+        else:
+            permissions = permissions_for_role(configs, role)
+    return OperationContext(scope=scope, actor=actor, permissions=permissions, language=language)
 
 
 def run(
