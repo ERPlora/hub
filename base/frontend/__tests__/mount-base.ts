@@ -109,7 +109,7 @@ export async function followPass(m: { net: { api: ApiCall[] } }, link: Element):
 
 /** The «Upgrade plan» a screen places in `within`, as the person and the pass see it, when it is the platform's
  *  PlanUpgradeLink (BASE-F11); `null` when there is none, or only a copy of its click. */
-export function placedUpgrade(within: BaseWrapper<Node>): { url: string; testid?: string; says: string } | null {
+export function placedUpgrade(within: Pick<BaseWrapper<Node>, 'findComponent'>): { url: string; testid?: string; says: string } | null {
   const piece = within.findComponent(PlanUpgradeLink);
   if (!piece.exists()) return null;
   return { url: piece.props('url'), testid: piece.attributes('data-testid'), says: piece.text() };
