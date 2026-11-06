@@ -1,21 +1,21 @@
 <script setup lang="ts">
 // Services → Settings (WORKBOOK «Pantallas · Ajustes de Servicios»; SERVICE-F11): the old settings tab,
 // only for whoever may save them. The values come live (`service.settings.get`: the factory ones until
-// the business saves); a change saved elsewhere repaints every field the person has not touched, and
-// «Save» sends only the fields the person touched and changed (`service.settings.update`), so it never
-// undoes someone else's change. The default tax category is searched in Taxes; empty removes it. A
-// refusal says itself as a FormModal does (`useRefusal`, hub#821): its notice goes as soon as something
-// is changed, each field's message as soon as that field is, and the next refusal says it all again.
-import { Combo, type ComboOption, InlineFeedback, useRefusal } from '@erplora/ui/components';
+// the business saves). The form is every settings page's (`useSettingsForm`, hub#867): a change saved
+// elsewhere repaints every field the person has not touched, «Save» sends only the fields touched and
+// changed (`service.settings.update`), so it never undoes someone else's change, and a refusal says itself
+// as a FormModal does. The default tax category is searched in Taxes; empty removes it: the server knows it
+// by its key (`default_tax_category_key`), in what is sent and in a refusal.
+import { Combo, type ComboOption, InlineFeedback, useSettingsForm } from '@erplora/ui/components';
 import { useCommand, useLive, useLiveClient } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { IonButton, IonInput, IonSpinner, IonToggle } from '@ionic/vue';
-import { computed, ref, watch } from 'vue';
+import { computed } from 'vue';
 
 import PageNotices from '../components/PageNotices.vue';
 import { useLocale, useT } from '../composables/useT';
 import { searchTaxCategories } from '../lib/pickers';
-import type { SettingsIn, SettingsOut } from '../operations';
+import type { SettingsOut } from '../operations';
 import { serviceTabs } from '../tabs';
 
 const NUMBERS = ['default_duration', 'default_buffer_time'] as const;
@@ -29,8 +29,6 @@ const LABELS: Record<(typeof NUMBERS)[number] | (typeof SWITCHES)[number], strin
 };
 
 type Form = Record<(typeof NUMBERS)[number], string> & Record<(typeof SWITCHES)[number], boolean> & { tax: ComboOption | null };
-/** The name the server gives each field in a refusal, when it is not the form's own. */
-const REFUSED_AS: Partial<Record<keyof Form, string>> = { tax: 'default_tax_category_key' };
 
 const session = useSession();
 const t = useT();
@@ -40,15 +38,15 @@ const searchTaxes = computed(() => searchTaxCategories(client, t, locale.value))
 const canManage = computed(() => session.can('service.manage_settings'));
 
 const { data, status, error } = useLive('service.settings.get', {});
-const { run, pending, error: saveError } = useCommand('service.settings.update');
-const { fieldErrors, showsError, changed } = useRefusal(saveError);
-
-const form = ref<Form | null>(null);
-/** What the server has (the last result of the stream, or of a save). */
-const original = ref<Form | null>(null);
-/** The fields the person changed since the last save: only these are sent. */
-const touched = ref<ReadonlySet<keyof Form>>(new Set());
-const saved = ref(false);
+const { form, dirty, saved, pending, error: saveError, fieldErrors, showsError, set, save } = useSettingsForm(
+  data,
+  useCommand('service.settings.update'),
+  {
+    toForm,
+    numbers: NUMBERS,
+    server: { tax: { name: 'default_tax_category_key', value: (tax) => tax?.id ?? null } },
+  },
+);
 
 function toForm(settings: SettingsOut): Form {
   return {
@@ -63,66 +61,8 @@ function toForm(settings: SettingsOut): Form {
   };
 }
 
-/** The touched fields that differ from what the server has. */
-const changes = computed<SettingsIn>(() => {
-  const now = form.value;
-  const was = original.value;
-  if (!now || !was) return {};
-  const out: Record<string, unknown> = {};
-  for (const key of touched.value) {
-    if (key === 'tax') {
-      if ((now.tax?.id ?? null) !== (was.tax?.id ?? null)) out.default_tax_category_key = now.tax?.id ?? null;
-      continue;
-    }
-    const value = now[key];
-    const text = typeof value === 'string' ? value.trim() : value;
-    if (text === was[key]) continue;
-    out[key] = (NUMBERS as readonly string[]).includes(key) && /^\d+$/.test(String(text)) ? Number(text) : text;
-  }
-  return out as SettingsIn;
-});
-const dirty = computed(() => Object.keys(changes.value).length > 0);
-
-// What the server says repaints every field the person has not touched.
-watch(
-  data,
-  (settings) => {
-    if (!settings) return;
-    const fresh = toForm(settings);
-    const current = form.value;
-    original.value = fresh;
-    form.value = current
-      ? (Object.fromEntries(
-          Object.keys(fresh).map((key) => [key, touched.value.has(key as keyof Form) ? current[key as keyof Form] : fresh[key as keyof Form]]),
-        ) as Form)
-      : { ...fresh };
-  },
-  { immediate: true },
-);
-
-function set<K extends keyof Form>(field: K, value: Form[K]): void {
-  if (!form.value) return;
-  form.value = { ...form.value, [field]: value };
-  touched.value = new Set([...touched.value, field]);
-  saved.value = false;
-  changed(REFUSED_AS[field] ?? field);
-}
-
 const text = (value: unknown): string => (value === null || value === undefined ? '' : String(value));
 const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'ion-touched': !!message });
-
-async function save(): Promise<void> {
-  if (!dirty.value || pending.value) return;
-  try {
-    const answer = await run(changes.value);
-    original.value = toForm(answer);
-    form.value = toForm(answer);
-    touched.value = new Set();
-    saved.value = true;
-  } catch {
-    saved.value = false; // The page paints the error; what was typed stays.
-  }
-}
 </script>
 
 <template>
