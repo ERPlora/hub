@@ -134,11 +134,11 @@ function patch(current: ComboOut, full: ComboIn): ComboPatchIn {
 }
 
 async function save(): Promise<void> {
+  tried.value = true;
   // No price is read before the business answers its money: «1500» would be read with two decimals, whatever its
   // currency counts (in yen, 150000; hub#918).
   const business = money.value;
   if (!business) return;
-  tried.value = true;
   const price = parseMoney(form.value.price, { money: business });
   if (!price.ok || taxMissing.value) return;
   const full = body(price.cents ?? 0);

@@ -152,11 +152,11 @@ function patch(service: ServiceOut, price: number): ServicePatchIn {
 }
 
 async function save(): Promise<void> {
+  tried.value = true;
   // No price is read before the business answers its money: «1500» would be read with two decimals, whatever its
   // currency counts (in yen, 150000; hub#918).
   const business = money.value;
   if (!business) return;
-  tried.value = true;
   const f = form.value;
   const read = parseMoney(f.price, business);
   if (!read.ok || !f.tax) return;

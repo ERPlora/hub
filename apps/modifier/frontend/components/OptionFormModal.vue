@@ -122,11 +122,11 @@ function patch(option: OptionOut, cents: number): OptionPatchIn {
 }
 
 async function save(): Promise<void> {
+  tried.value = true;
   // No supplement is read before the business answers its money: «150» would be read with two decimals, whatever its
   // currency counts (in yen, 15000; hub#918).
   const business = money.value;
   if (!business) return;
-  tried.value = true;
   const read = parseMoney(form.value.price, business);
   if (!read.ok) return; // The field says why.
   const cents = read.cents ?? 0;

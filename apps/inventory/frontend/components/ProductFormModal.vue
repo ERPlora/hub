@@ -174,11 +174,11 @@ async function savePhoto(id: string): Promise<void> {
 }
 
 async function save(): Promise<void> {
+  tried.value = true;
   // No amount is read before the business answers its money: «1500» would be read with two decimals, whatever its
   // currency counts (in yen, 150000; hub#918).
   const money = business.value;
   if (!money) return;
-  tried.value = true;
   const values = read(money);
   if (!values || !complete.value) return;
   const now = form.value;
