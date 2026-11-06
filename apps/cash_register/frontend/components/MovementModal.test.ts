@@ -5,7 +5,7 @@
 import { toastSuccess } from '@erplora/ui/shell';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { click, ionValue, mountCash } from '../__tests__/mount-cash-register';
+import { click, expectWaitsForTheYen, ionValue, mountCash } from '../__tests__/mount-cash-register';
 import { plain } from '../lib/money';
 import MovementModal from './MovementModal.vue';
 
@@ -90,5 +90,19 @@ describe('MovementModal', () => {
     s.answer(201, { key: 'm1' });
     await s.submit();
     expect(plain(vi.mocked(toastSuccess).mock.calls[0][0])).toBe('Movimiento de entrada registrado (12,50 €)');
+  });
+});
+
+describe('MovementModal: before the business answers its money (hub#921)', () => {
+  it('«Register» waits in grey and reads no amount; once the yen arrives «1500» is 1500', async () => {
+    const m = await mountCash(MovementModal, { props: { open: true, session: SESSION }, business: null });
+    await m.live();
+    await ionValue(m.inDoc('cash-register-movement-amount'), '1500', 'ionInput');
+    await ionValue(m.inDoc('cash-register-movement-concept'), 'Change', 'ionInput');
+    m.answer(201, { key: 'm1', type: 'in', amount: 1500 });
+    await expectWaitsForTheYen(m, 'cash-register-movement-submit', 'cash-register-movement-amount');
+    await click(m.inDoc('cash-register-movement-submit'));
+    expect(m.sent().map((call) => call.body)).toEqual([{ session_id: 's1', type: 'in', amount: 1500, description: 'Change' }]);
+    expect(plain(vi.mocked(toastSuccess).mock.calls[0][0])).toBe('Cash-in recorded (¥1,500)');
   });
 });

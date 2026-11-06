@@ -3,7 +3,8 @@
 // from the safe; Cash out: a supplier paid, money to the bank), «Amount» always positive (the server gives
 // the sign by the type), «Concept». From the screen the movement is always cash. An amount that is zero or
 // cannot be read is said under its field; the server's refusal (below zero, the session closed on another
-// device) is read in the window. Success says «Cash-in recorded (…)» or «Cash-out recorded (…)».
+// device) is read in the window. «Register» waits in grey until the business has answered its money (the amount is read
+// in it; hub#921). Success says «Cash-in recorded (…)» or «Cash-out recorded (…)».
 import { FormModal, type FormModalError } from '@erplora/ui/components';
 import { useCommand } from '@erplora/ui/sdk';
 import { toastSuccess } from '@erplora/ui/shell';
@@ -11,7 +12,7 @@ import { IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, shallowRef, watch } from 'vue';
 
 import { useLocale, useT } from '../composables/useT';
-import { moneyDecimals, formatMoney, moneyRefusal, readMoney, useBusinessMoney } from '../lib/money';
+import { formatMoney, moneyRefusal, readAmount, useBusinessMoney } from '../lib/money';
 import { refusal } from '../lib/refusal';
 import type { ManualType } from '../operations';
 import MoneyField from './MoneyField.vue';
@@ -48,9 +49,12 @@ const amountError = computed(() => amountRefusal.value ?? error.value?.fields?.a
 
 async function confirm(): Promise<void> {
   const session = props.session;
-  if (!session) return;
-  const read = readMoney(amount.value, moneyDecimals(business.value), business.value?.currency);
-  amountRefusal.value = read.ok && !read.cents ? t('cash_register.money.zero') : moneyRefusal(read, t, locale.value, business.value);
+  // No amount is read before the business answers its money: «1500» would be read with two decimals, whatever its
+  // currency counts (in yen, 150000; hub#921).
+  const money = business.value;
+  if (!session || !money) return;
+  const read = readAmount(amount.value, money);
+  amountRefusal.value = read.ok && !read.cents ? t('cash_register.money.zero') : moneyRefusal(read, t, locale.value, money);
   if (!read.ok || !read.cents) return;
   const cents = read.cents;
   try {
@@ -59,7 +63,7 @@ async function confirm(): Promise<void> {
     return; // The window shows `command.error`.
   }
   const key = type.value === 'in' ? 'cash_register.movement.doneIn' : 'cash_register.movement.doneOut';
-  void toastSuccess(t(key, { amount: formatMoney(cents, locale.value, business.value) }));
+  void toastSuccess(t(key, { amount: formatMoney(cents, locale.value, money) }));
   open.value = false;
 }
 </script>
@@ -73,6 +77,7 @@ async function confirm(): Promise<void> {
     :submit-label="$t('cash_register.movement.submit')"
     :cancel-label="$t('cash_register.movement.cancel')"
     :pending="command.pending.value"
+    :submit-disabled="!business"
     :error="error"
     @submit="confirm"
   >
