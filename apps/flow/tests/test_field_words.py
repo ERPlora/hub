@@ -85,6 +85,8 @@ def test_every_field_an_action_asks_for_or_leaves_has_its_words():
         "customer__tag__detail",
         "customer__field__detail",
         "customer__order__get",
+        "whatsapp_inbox__note__get",
+        "whatsapp_inbox__template__get",
     ],
 )
 def test_a_read_that_names_a_record_on_the_assistants_card_has_a_name_of_its_own(action, language):

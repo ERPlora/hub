@@ -394,7 +394,6 @@ UNNAMED_REFERENCES = {
     "tax": 4,
     "verifactu": 6,
     "website": 5,
-    "whatsapp_inbox": 14,
 }
 
 #: The closed lists (``enum`` of text) of the assistant's writes with a value the models give no label — of their app,
@@ -403,6 +402,9 @@ UNLABELLED_LISTS = {
     "kitchen": 1,
     "tax": 5,
     "website": 4,
+    # The type of a template's button (template.create and .update): it lives in the JSON of its buttons, and no field
+    # of the models names its values to point a mark at. The card says the buttons by how many go, never by their codes
+    # (a line of two data: test_the_buttons_of_a_template_go_by_how_many_never_by_their_codes, hub#571).
     "whatsapp_inbox": 2,
 }
 
@@ -557,6 +559,14 @@ TITLED_IN_SPANISH = {
     )},
     **{f"table.table.{action}:id": "Mesa" for action in ("delete", "move", "update")},
     **{f"table.zone.{action}:id": "Zona" for action in ("delete", "update")},
+    **{f"whatsapp_inbox.conversation.{action}:id": "Conversación" for action in (
+        "assign", "erase", "flag", "link_customer", "mark_read", "set_status",
+    )},
+    "whatsapp_inbox.message.retry:id": "Mensaje",
+    "whatsapp_inbox.message.send:id": "Conversación",
+    "whatsapp_inbox.note.add:id": "Conversación",
+    "whatsapp_inbox.note.delete:id": "Nota",
+    **{f"whatsapp_inbox.template.{action}:id": "Plantilla" for action in ("delete", "retry", "update")},
 }
 
 
