@@ -7,6 +7,7 @@ and never added nor deleted; only the notes of a sale and of a refund can change
 its void or its refunds, as at the till. Ids and timestamps are shown, never typed.
 """
 
+import re
 from html.parser import HTMLParser
 
 import pytest
@@ -391,3 +392,42 @@ def test_the_hub_admin_changes_the_notes_of_a_charge_and_nothing_fiscal(
     assert fiscal(after) == before
     assert [fiscal(line) for line in after.lines.all()] == lines
     assert [fiscal(payment) for payment in after.payments.all()] == payments
+
+
+def test_the_admin_in_spanish_says_ventas_own_words(staff, product):
+    """The open checks' list filters and shows the «Abierta» ones (an open check is a «cuenta»), a line names what it
+    carries of Modifiers its «Suplementos» (SALE-F11) and a sale says when it was «Anulada el»: Ventas' words, not
+    the «Abierto», «Opciones» and «Anulado el» of Demo and Clientes, loaded before it with the same English. The
+    product data a line freezes reads as in Inventory (hub#560)."""
+    product()
+    check = run("sale.order.open", {"lines": [{"product": "COF"}]})
+    sold = charge("admin-es-0001")
+    spanish = {**HOST, "HTTP_ACCEPT_LANGUAGE": "es"}
+
+    def page(path: str) -> str:
+        response = staff.get(path, **spanish)
+        assert response.status_code == 200, path
+        return response.content.decode()
+
+    checks = page(changelist(Order))
+    assert '<details data-filter-title="estado"' in checks  # the page is in Spanish
+    assert re.search(r'status__exact=open"[^>]*>\s*Abierta\s*</a>', checks)  # the status's filter
+    assert '<td class="field-status">Abierta</td>' in checks
+    assert "Abierto<" not in checks
+
+    line = page(url(OrderLine.objects.get(order_id=check.id), "change"))
+    assert re.search(r'<label[^>]* for="id_modifiers"[^>]*>Suplementos:</label>', line)
+    for field, label in (
+        ("category_id", "Categoría del producto"),
+        ("price_quantity", "Cantidad de precio"),
+        ("pricing_unit", "Unidad de precio"),
+    ):
+        assert re.search(rf'<label[^>]* for="id_{field}"[^>]*>{label}:</label>', line), label  # «required» or not
+
+    sale = page(url(Sale.objects.get(pk=sold.id), "change"))
+    assert "<label>Anulada el:</label>" in sale  # read only
+    assert "<label>Anulado el:</label>" not in sale
+
+    charged_line = page(url(SaleLine.objects.get(sale_id=sold.id), "change"))
+    assert "<label>Suplementos:</label>" in charged_line
+    assert "<label>Opciones:</label>" not in charged_line

@@ -24,6 +24,7 @@ from django.db import models
 from django.db.models import F, Q
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import pgettext_lazy
 from live.models import UUIDModel
 
 QUANTITY = {"max_digits": 15, "decimal_places": 3}
@@ -211,7 +212,8 @@ class Order(UUIDModel):
     """An open check: mutable, its amounts provisional; charging it creates one or more sales."""
 
     class Status(models.TextChoices):
-        OPEN = "open", _("Open")
+        # Own context: an open check («cuenta») is «Abierta», not Demo's «Abierto» of the same English (hub#560).
+        OPEN = "open", pgettext_lazy("sale", "Open")
         COMPLETED = "completed", _("Completed")
         VOIDED = "voided", _("Voided")
 
@@ -354,9 +356,14 @@ class OrderLine(UUIDModel):
     # The options of Modifiers chosen for the line (SALE-F11), frozen as Modifiers valued them when it was
     # ordered: ``modifiers`` every pick in the order chosen (``unit_price`` already adds the ones taxed as the
     # dish), ``modifier_lines`` the ones of another tax category, charged on a child line of their own (their
-    # ``quantity`` is per unit of the dish), ``kitchen_text`` what the kitchen reads under the dish.
+    # ``quantity`` is per unit of the dish), ``kitchen_text`` what the kitchen reads under the dish. Own context, here
+    # and on the charged line: they are its «suplementos», not Clientes' «opciones» of the same English (hub#560).
     modifiers = models.JSONField(
-        _("options"), default=list, blank=True, db_default=[], encoder=DjangoJSONEncoder
+        pgettext_lazy("sale", "options"),
+        default=list,
+        blank=True,
+        db_default=[],
+        encoder=DjangoJSONEncoder,
     )
     modifier_lines = models.JSONField(
         _("options on a line of their own"),
@@ -537,7 +544,10 @@ class Sale(UUIDModel):
     payment_method_name = models.CharField(_("payment"), max_length=60, blank=True)
     idempotency_key = models.CharField(_("attempt key"), max_length=128, unique=True)
     notes = models.TextField(_("notes"), blank=True)
-    voided_at = models.DateTimeField(_("voided at"), null=True, blank=True)
+    # Own context: a sale is «anulada el» as it is «anulada por», not Clientes' «anulado el» (hub#560).
+    voided_at = models.DateTimeField(
+        pgettext_lazy("sale", "voided at"), null=True, blank=True
+    )
     voided_by = models.CharField(
         _("voided by"), max_length=ACTOR_MAX_LENGTH, blank=True
     )
@@ -649,7 +659,11 @@ class SaleLine(UUIDModel):
     # SALE-F11: the names of the options charged inside the line (the receipt prints them under it), and, on
     # the child line of an option of another tax category, the line of the dish it hangs from.
     modifiers = models.JSONField(
-        _("options"), default=list, blank=True, db_default=[], encoder=DjangoJSONEncoder
+        pgettext_lazy("sale", "options"),
+        default=list,
+        blank=True,
+        db_default=[],
+        encoder=DjangoJSONEncoder,
     )
     parent_line_id = models.UUIDField(
         _("line it hangs from"), null=True, blank=True
