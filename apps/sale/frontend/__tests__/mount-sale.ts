@@ -19,6 +19,7 @@ import {
   resultFrame,
   type StreamCall,
 } from '../../../../packages/ui/src/sdk/__tests__/live-harness';
+import { expectSaveWaitsForMoney } from '../../../../base/frontend/__tests__/save-waits-for-money';
 import { HUB_ASSISTANT } from '../../../../base/frontend/lib/assistant-hub';
 import baseEn from '../../../../base/frontend/locale/en.json';
 import baseEs from '../../../../base/frontend/locale/es.json';
@@ -230,6 +231,20 @@ export function taxSettings(tax_kind: TerritoryTaxKind): TaxSettingsOut {
 /** Mounts `use` (a composable call) inside a component of the sale app's harness. */
 export function mountComposable(use: () => void, options: Omit<MountOptions, 'props'> = {}) {
   return mountSale(ComposableHost, { ...options, props: { use } });
+}
+
+/** A piece of the till mounted with `business: null` waits for the business's money (hub#921, `expectSaveWaitsForMoney`):
+ *  pressing `confirm` hands nothing up (`handed`: what it emitted or sent) and it is grey; then the business answers in
+ *  yen (no decimals: «1500» read before it would go up as 150000) and `confirm` lights up. `submit`: its door past the
+ *  grey button — none for the till's sheets, whose click reaches their handler grey or not. */
+export function expectWaitsForTheYen(
+  m: Awaited<ReturnType<typeof mountSale>>,
+  confirm: string,
+  handed: () => unknown[],
+  submit: (() => unknown) | null = null,
+): Promise<void> {
+  const piece = { wrapper: m.wrapper, save: () => m.inDoc(confirm), amount: () => null, sent: handed, settle, submit };
+  return expectSaveWaitsForMoney(piece, () => m.result('base.business.get', business(JAPANESE)));
 }
 
 /** Lets Vue render and a dialog's `didPresent` (next tick) land. */

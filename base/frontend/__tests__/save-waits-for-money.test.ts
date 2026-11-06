@@ -1,8 +1,10 @@
 // The test helper of a window whose «Save» waits for the business's money (hub#918) passes a window that waits and lights
 // up once the business answers, and catches each way a window can get it wrong: a «Save» that is not grey, a save that
 // reads past the grey button (a `submit` FormModal did not hold), a field that complains while it waits, and a «Save»
-// that stays grey after the answer.
+// that stays grey after the answer. A window without FormModal (the till's sheets and its charge sheet, hub#921) says its
+// own door past the grey button, or that its button is its only one.
 import { FormModal } from '@erplora/ui/components';
+import { IonButton } from '@ionic/vue';
 import { describe, expect, it, vi } from 'vitest';
 import { defineComponent, h, nextTick, ref } from 'vue';
 
@@ -71,5 +73,57 @@ describe('expectSaveWaitsForMoney', () => {
   it('fails a window whose «Save» stays grey once the business answers', async () => {
     const w = await windowThat({ grey: true, guarded: true, staysGrey: true });
     await expect(expectSaveWaitsForMoney(w, w.answer)).rejects.toThrow(/once the business answered/);
+  });
+});
+
+/** A window without FormModal, its money not answered yet: its button grey until `answer()`. `button: 'reaches'` — a
+ *  click reaches its handler grey or not (the till's sheets), so only its own guard holds it; `'holds'` — the button
+ *  holds its own click while grey (the charge sheet's foot) and `confirm` is the door past it. Unguarded, it hands up
+ *  what it reads («1500» read with two decimals). */
+async function sheetThat(behaves: { button: 'reaches' | 'holds'; guarded: boolean }) {
+  const handed: unknown[] = [];
+  const answered = ref(false);
+  const confirm = (): void => {
+    if (!behaves.guarded || answered.value) handed.push({ unit_price: 150000 });
+  };
+  const press = (): void => {
+    if (behaves.button === 'reaches' || answered.value) confirm();
+  };
+  const m = await mountBase(() => h(IonButton, { 'data-testid': 'sheet-add', disabled: !answered.value, onClick: press }, () => 'Add'));
+  return {
+    confirm,
+    answer: async () => {
+      answered.value = true;
+      await nextTick();
+    },
+    wrapper: m.wrapper,
+    save: () => m.wrapper.find<Control>('[data-testid="sheet-add"]').element,
+    amount: () => null,
+    sent: () => handed,
+    settle: async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    },
+  };
+}
+
+describe('expectSaveWaitsForMoney: a window without FormModal (hub#921)', () => {
+  it('passes a sheet whose button is its only door (`submit: null`) when its own guard holds the click', async () => {
+    const w = await sheetThat({ button: 'reaches', guarded: true });
+    await expect(expectSaveWaitsForMoney({ ...w, submit: null }, w.answer)).resolves.toBeUndefined();
+  });
+
+  it('fails a sheet whose click reaches its handler and reads the amount past its grey button', async () => {
+    const w = await sheetThat({ button: 'reaches', guarded: false });
+    await expect(expectSaveWaitsForMoney({ ...w, submit: null }, w.answer)).rejects.toThrow(/150000/);
+  });
+
+  it('presses the door the window says (`submit`) past a button that holds itself: passes it guarded…', async () => {
+    const w = await sheetThat({ button: 'holds', guarded: true });
+    await expect(expectSaveWaitsForMoney({ ...w, submit: w.confirm }, w.answer)).resolves.toBeUndefined();
+  });
+
+  it('…and fails it unguarded', async () => {
+    const w = await sheetThat({ button: 'holds', guarded: false });
+    await expect(expectSaveWaitsForMoney({ ...w, submit: w.confirm }, w.answer)).rejects.toThrow(/150000/);
   });
 });

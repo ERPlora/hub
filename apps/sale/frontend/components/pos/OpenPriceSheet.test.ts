@@ -5,7 +5,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { h, ref } from 'vue';
 
-import { click, mountSale, settle, taxSettings } from '../../__tests__/mount-sale';
+import { click, expectWaitsForTheYen, mountSale, settle, taxSettings } from '../../__tests__/mount-sale';
 import { plain } from '../../lib/format';
 import { page } from './__tests__/fixtures';
 import OpenPriceSheet from './OpenPriceSheet.vue';
@@ -17,7 +17,7 @@ vi.mock('@ionic/vue', async (importOriginal) => {
 
 const department = { id: 'd1', name: 'Fruta', tax_category_key: 'food', tax_category_name: 'Food', tax_rate_pct: '4.00', sort_order: 0 };
 
-async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 'en') {
+async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 'en', options: { business?: null } = {}) {
   const open = ref(true);
   const extra = ref(props);
   const m = await mountSale(
@@ -25,7 +25,7 @@ async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 
       setup: () => () =>
         h(OpenPriceSheet, { open: open.value, 'onUpdate:open': (v: boolean) => (open.value = v), pending: false, error: null, ...extra.value }),
     },
-    { locale },
+    { locale, ...options },
   );
   await settle();
   await m.live();
@@ -96,5 +96,18 @@ describe('OpenPriceSheet', () => {
     m.open.value = true;
     await settle();
     expect(plain(m.find('pos-open-price-amount').text())).toBe('€0.00');
+  });
+});
+
+describe('OpenPriceSheet: before the business answers its money (hub#921)', () => {
+  it('«Add» waits in grey and hands up no amount; once the yen arrives «1500» is 1500', async () => {
+    const m = await setup({}, 'en', { business: null });
+    await m.press('1', '5', '0', '0');
+    await m.result('sale.department.list', page([department]));
+    await click(m.find('pos-department-d1').element);
+    await expectWaitsForTheYen(m, 'pos-open-price-add', () => m.sheet().emitted('add') ?? []);
+    expect(plain(m.find('pos-open-price-amount').text())).toBe('¥1,500');
+    await click(m.add().element);
+    expect(m.sheet().emitted('add')).toEqual([[{ unit_price: 1500, department_id: 'd1' }]]);
   });
 });
