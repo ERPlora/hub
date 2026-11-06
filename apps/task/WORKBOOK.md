@@ -521,7 +521,10 @@ cliente o a un compañero).
   `base/tests/test_assistant_card_values.py` impide que entre un dato sin marca. Tareas no tiene listas cerradas sin
   etiqueta en sus escrituras: el estado y la prioridad salen con las de sus modelos.
 - El admin de Django del Hub tiene **CRUD completo** sobre los cuatro modelos (ronda 12, PLAN §17); una
-  escritura cruda del admin no deja aviso.
+  escritura cruda del admin no deja aviso. En español nombra la tarea en femenino, como la hoja: **Creada por**,
+  **Creada el** y **Actualizada el** llevan el contexto `task` (`pgettext_lazy`), porque sin él saldrían el
+  «creado por» de Inventario y el masculino del proyecto; el proyecto y el comentario siguen en masculino
+  (`tests/test_admin.py`, `tests/test_i18n.py`).
 - Fase 1: el ámbito es la primera parte del Host y los datos se comparten entre `a` y `b`, como en
   `demo`; lo que sí se separa son los avisos en vivo.
 
