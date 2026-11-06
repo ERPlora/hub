@@ -37,7 +37,6 @@ SHADOWED = {
     "flow": 7,
     "modifier": 2,
     "online_booking": 1,
-    "service": 4,
     "task": 1,
     "tax": 1,
     "verifactu": 7,

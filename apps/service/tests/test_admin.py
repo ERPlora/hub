@@ -137,6 +137,26 @@ def test_changelists_and_change_pages_render(client, superuser):
 
 
 @pytest.mark.django_db
+def test_a_voucher_sold_reads_services_own_spanish_in_the_admin(client, superuser):
+    """Support reading a voucher sold in Spanish sees who voided it as «Anulado por», the voucher being masculine, and
+    its sessions as «Sesiones del bono», as Servicios says them; not Ventas' «Anulada por» nor «Sesiones de bono»
+    (hub#662)."""
+    cut = make_service("Haircut", tax=make_tax())
+    grant = make_grant(make_package("Bono 5", [cut], max_uses=5), make_customer("Lucía"))
+    make_redemption(grant, cut)
+    client.force_login(superuser)
+    response = client.get(
+        f"/admin/service/grant/{grant.pk}/change/",
+        HTTP_HOST="hubs.localhost",
+        HTTP_ACCEPT_LANGUAGE="es",
+    )
+    page = response.content.decode()
+    assert response.status_code == 200
+    assert ("Anulado por:" in page, "Sesiones del bono" in page) == (True, True)
+    assert ("Anulada por" in page, "Sesiones de bono" in page) == (False, False)
+
+
+@pytest.mark.django_db
 def test_support_can_repair_a_category_through_the_admin(client, superuser):
     category = Category.objects.create(name="Hiar")
     client.force_login(superuser)
