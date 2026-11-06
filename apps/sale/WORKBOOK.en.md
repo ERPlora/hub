@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:c678a92d3313ab3d4e65e74a6d2c56772c76cb8cb2450bc3786fd4a93cf14973 -->
+<!-- generated from WORKBOOK.md sha256:3fba8bbaf890f9cbef7bf6826c8fcaafec1147ecf9731f08f070da40b602ca90 -->
 
 ## What it is for and who it is for
 
@@ -794,6 +794,11 @@ Steps:
    the tabs and a line; on a lower phone, such as a 320×568 one with the red strip on top, they scroll with
    them, after the lines, and "Charge" stays in view. The same goes for the side column of a screen just as low,
    such as a 1024×600 tablet with the strip (hub#787).
+   In the side column, when the heading, the tabs and "Send order" leave no room for a whole line (a 1024×600
+   tablet on its side or a 1280×560 laptop without the strip; a 1024×700 or 1024×768 tablet, or a 1280×720
+   laptop, with it), the whole column scrolls, on both tabs, as the phone's drawer does, with "Send order" pinned
+   at the bottom: a line is brought up and read whole above the bar. Where the line fits, the heading and the
+   tabs stay in place and only the lines scroll (hub#820).
 3. On pressing "Charge" with something pending, it is sent to the kitchen first and then the charge
    opens: nobody pays for a dish that is not going to be made. The order's notice shows at the top here
    too, so the charge keypad (SALE-F01) can be tapped from the first moment. If the send fails, the
