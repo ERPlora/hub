@@ -51,10 +51,12 @@ class ChoreStepIn(Schema):
 
 
 class ChorePlanIn(Schema):
-    """A write with one datum of each kind the card says in words."""
+    """A write with one datum of each kind the card says in words. ``price`` is an amount by its schema's mark;
+    ``price_cents`` is named as one but carries no mark, so it is none (hub#917: only the mark says an amount)."""
 
     title: str
     due_at: dt.datetime
+    price: int = Field(json_schema_extra={"money": True})
     price_cents: int
     urgent: bool
     steps: list[ChoreStepIn]
@@ -76,6 +78,7 @@ PLAN = Operation(
 CHORE = {
     "title": "Call Ana",
     "due_at": "2026-11-02T10:00:00+01:00",
+    "price": 2500,
     "price_cents": 1500,
     "urgent": True,
     "steps": [{"title": "Dial"}, {"title": "Note it"}],
@@ -165,13 +168,15 @@ def test_each_datum_of_the_change_comes_as_the_chat_card_says_it(gateway, clock,
     assert values(row) == {
         "title": "Call Ana",
         "due_at": due,
+        "price": 2500,
         "price_cents": 1500,
         "urgent": True,
         "steps": [{"title": "Dial"}, {"title": "Note it"}],
         "person": "Eva Gil",
     }
     assert kinds(row) == {
-        "title": "text", "due_at": "text", "price_cents": "money", "urgent": "bool", "steps": "list", "person": "text",
+        "title": "text", "due_at": "text", "price": "money", "price_cents": "text", "urgent": "bool", "steps": "list",
+        "person": "text",
     }
     assert {field["name"]: field["label"] for field in row["fields"]}["title"] == label
     shown = json.dumps(row["fields"], ensure_ascii=False)
