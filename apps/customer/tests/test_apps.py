@@ -37,6 +37,11 @@ OPERATIONS = {
     "customer.consent.history": "customer.view",
     "customer.order.customer": "customer.view",
     "customer.order.list": "customer.view",
+    # what names a record on the assistant's card (hub#513)
+    "customer.group.detail": "customer.view",
+    "customer.tag.detail": "customer.view",
+    "customer.field.detail": "customer.view",
+    "customer.order.get": "customer.view",
     # commands
     "customer.customer.create": "customer.manage",
     "customer.customer.update": "customer.manage",
@@ -93,6 +98,14 @@ SYSTEM_ONLY = {
     "customer.purchase.record",
     "customer.purchase.void",
     "customer.purchase.refund",
+}
+#: What names a group, a tag, a custom field or an open order on the card of a write (hub#513): only the card reads
+#: them, the model finds those records in their lists.
+CARD_ONLY = {
+    "customer.group.detail",
+    "customer.tag.detail",
+    "customer.field.detail",
+    "customer.order.get",
 }
 
 
@@ -210,9 +223,10 @@ def test_the_system_only_permission_is_declared_by_no_app():
 
 def test_every_operation_tells_the_assistant_what_it_does():
     """Typed (``AI``), with what it does and how people ask for it in English and Spanish
-    (test_assistant_asks.py); the screen's health data and the sale's reactions are no tool (``INTERNAL``)."""
+    (test_assistant_asks.py); the screen's health data, the sale's reactions and what names a record on the card are no
+    tool (``INTERNAL``)."""
     for name, op in customer_operations().items():
-        if name in SCREEN_ONLY | SYSTEM_ONLY:
+        if name in SCREEN_ONLY | SYSTEM_ONLY | CARD_ONLY:
             assert op.ai is INTERNAL, name
             continue
         assert isinstance(op.ai, AI), name
@@ -222,7 +236,7 @@ def test_every_operation_tells_the_assistant_what_it_does():
 
 def test_commands_declare_their_risk_and_queries_do_not():
     for name, op in customer_operations().items():
-        if name in SCREEN_ONLY | SYSTEM_ONLY:
+        if name in SCREEN_ONLY | SYSTEM_ONLY | CARD_ONLY:
             continue
         if op.kind == "command":
             expected = "high" if name in HIGH_RISK else "normal"
