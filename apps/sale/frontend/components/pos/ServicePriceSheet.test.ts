@@ -72,7 +72,7 @@ describe('ServicePriceSheet: before the business answers its money (hub#921)', (
     const suggest = () => s.inDoc('pos-service-price-suggest') as HTMLElement & { disabled?: boolean };
     expect(suggest().disabled).toBe(true);
     await click(suggest());
-    expect(amount(s)).toBe('0,00');
+    expect(amount(s)).toBe('—');
     await s.result('base.business.get', business(JAPANESE));
     expect([suggest().disabled, amount(s)]).toEqual([false, '0 ¥']);
     await click(suggest());

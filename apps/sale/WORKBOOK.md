@@ -317,7 +317,10 @@ factura), y la cuenta cerrada. Con Facturación, su tique (F2) numerado en la se
 cobro (INVOICE-F01): o los dos o ninguno. Ventas avisa de la venta cobrada: Inventario baja el stock
 (INVENTORY-F21) y Clientes suma la compra a la ficha (CUSTOMER-F20). Cada línea guarda la categoría,
 el tipo, el país, la región y la regla de Impuestos con que se cobró.
-Si falla: mientras el negocio no haya dicho todavía su moneda, la hoja **Cobro** sigue en «Calculando el
+Si falla: mientras el negocio no haya dicho todavía su moneda, **Vender** no pinta ninguna cifra: el total, las
+líneas, las baldosas, la búsqueda, las cuentas abiertas y el botón flotante dicen «—», y el pie «Cobrar · —», como
+mientras llega el total, porque sin ella no se sabe cuántos decimales tiene (en yenes, «Cobrar · 15,00» para
+1.500 ¥; hub#936); en cuanto la dice, sale la cifra con su signo. La hoja **Cobro** sigue en «Calculando el
 total…», sin teclado y con «Cobrar» en gris, porque el total se pinta y lo entregado se lee en ella (sin ella,
 «1500» yenes entregados se cobraría como 150 000); si la moneda no se puede leer, sale el aviso con «Reintentar»
 en su lugar, como con cualquier otra lectura del cobro. Sin importe entregado el botón no cobra y se lee encima del
@@ -883,7 +886,10 @@ Pasos:
    diálogo del sistema, con la impresora o «Guardar como PDF»).
 Entra: la cuenta abierta y su total calculado por el servidor.
 Sale: un papel sin número fiscal; no consume numeración ni crea venta. Cada pulsación, una cuenta.
-Si falla: «No se pudo imprimir la cuenta». Si la app instalada no abre su pantalla de impresión, el aviso
+Si falla: mientras el negocio no haya dicho todavía su moneda, «Cuenta» sigue cargando y la impresora en gris: el
+papel lleva sus importes y nunca sale con una cifra supuesta (en yenes, 2.700 ¥ como «27,00»; hub#936); si la
+moneda no se puede leer, lo dice con «Reintentar», como si falla el cálculo de la cuenta.
+«No se pudo imprimir la cuenta». Si la app instalada no abre su pantalla de impresión, el aviso
 dice por qué tras dos puntos: «…: esta versión de la app de ERPlora no puede imprimir; actualízala», «…: el
 servicio de impresión del dispositivo no se abrió», «…: el documento está vacío o es demasiado grande para
 imprimirlo» o «…: esta app está vinculada a otro negocio».
@@ -1347,7 +1353,8 @@ Sale: una línea de servicio con el servicio, su precio congelado y la categorí
 no mueve stock.
 Si falla: en «Importe de <servicio>», «Añadir <importe>» y «Usar <precio>» esperan en gris mientras el
 negocio no haya dicho todavía su moneda, porque el importe se lee y el precio se escribe en ella (sin ella,
-«1500» yenes entraría como 150 000). Un servicio sin categoría fiscal sale «Falta el IVA» y no entra («No se
+«1500» yenes entraría como 150 000), y el precio no sale todavía: «Usar —», y en la baldosa «—» o «Desde —»
+(nunca «Desde 65,00» para 6.500 ¥; hub#936). Un servicio sin categoría fiscal sale «Falta el IVA» y no entra («No se
 puede vender: sin categoría fiscal. Falta configurar el IVA.»); ese aviso se va solo en cuanto el servicio tiene
 categoría, sin tocar nada más, y también al salir de **Vender**. Uno archivado, «Ese servicio ya no se
 ofrece…»; un importe fuera del mínimo y el máximo del servicio, «Ese importe está fuera de lo que admite
@@ -1720,7 +1727,8 @@ administrador y responsable, los mismos que anulan y devuelven).
   defecto (migración `0011`, sin datos); lo cobrado se pinta, se avisa (`money_text(cents, currency)`) y se imprime
   con la suya. `SaleOut`, `SaleRow` y `sale.refund.options` llevan `currency` y `currency_decimals` (los de
   `babel`, nunca los de Intl, que le da 0 al forinto); el TPV, `useBusinessMoney()` de `base`, y mientras el
-  negocio no contesta un importe va sin símbolo, nunca en euros. Los teclados (`PayKeypad`, `PosNumpad`)
+  negocio no contesta un importe es «—» (`formatMoney` sin moneda, y `signedMoney` para el que lleva signo),
+  nunca en euros ni con dos decimales supuestos (hub#936). Los teclados (`PayKeypad`, `PosNumpad`)
   desactivan la coma en una moneda sin decimales.
 - **El impuesto del territorio no es de Ventas** (TAX-F11; ronda 2026-10-17 de PLAN-HUB): lo publica solo
   `tax.settings.get` (`tax_kind`). Las pantallas lo nombran con `useTaxName()` de Impuestos

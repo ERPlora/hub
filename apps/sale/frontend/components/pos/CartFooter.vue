@@ -2,14 +2,15 @@
 // The foot of the check: the «Ticket discount» row when the check has one (its percentage and what it
 // takes off, as the server's preview says), «Total» — the preview's, a dash while it is on its way —,
 // the ticket-discount button (only where discounts are allowed), the printer («Print bill») and
-// «Charge · <total>». An empty check can do none of it. When something is missing (a required
+// «Charge · <total>»; while the business has not said its money, every amount is a dash, as while the total is on its
+// way (hub#936). An empty check can do none of it. When something is missing (a required
 // customer), Charge looks blocked and says why, but still takes the tap: the page answers it.
 import { HubIcon } from '@erplora/ui/shell';
 import { IonButton } from '@ionic/vue';
 import { computed } from 'vue';
 
 import { useLocale, useT } from '../../composables/useT';
-import { formatMoney, formatPercent, useBusinessMoney } from '../../lib/format';
+import { formatMoney, formatPercent, signedMoney, useBusinessMoney } from '../../lib/format';
 
 const props = defineProps<{
   hasLines: boolean;
@@ -46,7 +47,7 @@ const discountLabel = computed(() => {
       data-testid="pos-ticket-discount-row"
     >
       <span>{{ discountLabel }}</span>
-      <span>−{{ formatMoney(ticketDiscount, locale, business) }}</span>
+      <span>{{ signedMoney('−', ticketDiscount, locale, business) }}</span>
     </div>
     <div class="pos-foot__total">
       <span>{{ $t('sale.pos.total') }}</span>

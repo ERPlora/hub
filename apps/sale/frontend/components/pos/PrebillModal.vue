@@ -6,8 +6,10 @@
 // not an invoice…». No number, no QR, no payment: it consumes nothing. «Print» asks the printing queue
 // first (`sale.order.print_bill`, PRINTING-F09): queued, a toast names the printer; not queued (Printing
 // off, no receipt printer) or the queue out of reach, the device prints this very paper (`printPaper`: inside the
-// installed app, its print screen, hub#455); a failure says so, with the app's reason when it gives one. It values
-// the check while it is mounted: the page mounts it only while the bill is open.
+// installed app, its print screen, hub#455); a failure says so, with the app's reason when it gives one. Its amounts
+// are the business's money: no paper is painted or printed before the business says it, and a failure to read it
+// says so like the others (hub#936). It values the check while it is mounted: the page mounts it only while the bill
+// is open.
 import { formatDateTime } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { HubIcon, toastError, toastSuccess } from '@erplora/ui/shell';
@@ -17,7 +19,7 @@ import { computed, shallowRef, useTemplateRef } from 'vue';
 import { useLocale, useT } from '../../composables/useT';
 import { taxRow } from '../../lib/breakdown';
 import { dishLabel } from '../../lib/comboChoice';
-import { formatMoney, formatQuantity, useBusinessMoney } from '../../lib/format';
+import { formatMoney, formatQuantity, signedMoney, useBusinessMoney } from '../../lib/format';
 import { printRefusal, withReason } from '../../../../../base/frontend/lib/print-paper';
 import { printPaper } from '../../lib/print';
 import type { OrderLineOut, OrderOut } from '../../operations';
@@ -32,9 +34,13 @@ const paper = useTemplateRef<HTMLElement>('paper');
 
 const { data: valued, error, refresh } = useLive('sale.checkout.preview', () => ({ order_id: props.order.id }));
 const { data: letterhead, error: letterheadError } = useLive('sale.letterhead.get', {});
+/** The read behind `businessMoney` (the SDK shares the subscription): the paper waits for it, so its failure is said. */
+const { error: businessError } = useLive('base.business.get', {});
 
-/** A bill is printed whole or not at all: never without what it charges or without who charges it. */
-const failed = computed(() => (error.value && !valued.value) || (letterheadError.value && !letterhead.value));
+/** A bill is printed whole or not at all: never without what it charges, who charges it or the money it is in. */
+const failed = computed(
+  () => (error.value && !valued.value) || (letterheadError.value && !letterhead.value) || (businessError.value && !businessMoney.value),
+);
 const now = computed(() => formatDateTime(new Date(), locale.value));
 
 const amount = (line: OrderLineOut) =>
@@ -108,7 +114,7 @@ async function queued(): Promise<boolean> {
           <ion-button
             data-testid="pos-prebill-print"
             :aria-label="$t('sale.pos.print')"
-            :disabled="!valued || !letterhead || sending"
+            :disabled="!valued || !letterhead || !businessMoney || sending"
             @click="print"
           >
             <HubIcon
@@ -146,7 +152,7 @@ async function queued(): Promise<boolean> {
         </ion-button>
       </div>
       <div
-        v-else-if="!valued || !letterhead"
+        v-else-if="!valued || !letterhead || !businessMoney"
         class="pos-prebill__state"
         data-testid="pos-prebill-loading"
       >
@@ -212,7 +218,7 @@ async function queued(): Promise<boolean> {
             class="pos-bill__row pos-bill__discount"
           >
             <dt>{{ $t('sale.pos.docDiscount') }}</dt>
-            <dd>−{{ formatMoney(valued.ticket_discount_amount, locale, businessMoney) }}</dd>
+            <dd>{{ signedMoney('−', valued.ticket_discount_amount, locale, businessMoney) }}</dd>
           </div>
           <div class="pos-bill__row">
             <dt>{{ $t('sale.pos.docSubtotal') }}</dt>
