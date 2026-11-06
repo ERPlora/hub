@@ -8,8 +8,8 @@
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { A, api, login, psql, shot, shown } from './helpers';
-import { createProduct, type Product } from './inventory-helpers';
-import { cleanInvoices, issuedIds } from './invoice-helpers';
+import { cleanInventory, createProduct, type Product } from './inventory-helpers';
+import { cleanInvoices, ensureIssuer, issuedIds, parkIssuer, unparkIssuer } from './invoice-helpers';
 
 export const VIEWPORTS = [
   { label: '390', width: 390, height: 844 },
@@ -153,6 +153,76 @@ export async function tillIn(page: Page, context: BrowserContext, lang: string):
   await context.addCookies([{ name: 'django_language', value: lang, domain: new URL(A).hostname, path: '/' }]);
   await page.reload();
   await shown(page).locator('[data-testid=pos-till]').waitFor({ state: 'visible' });
+}
+
+/** The languages a till spec reads in: each one's name in the test's title, the Hub's language and the browser's locale. */
+export const TILL_LANGUAGES = [
+  { name: 'English', lang: 'en', locale: 'en-US' },
+  { name: 'Spanish', lang: 'es', locale: 'es-ES' },
+] as const;
+
+/** For the `beforeAll` of a spec that sells with and without the red strip of a hub that cannot issue invoices yet:
+ *  `dishForTheTill`, and hub `a` with an issuer, as a business with its data complete has (no strip). The runs with the
+ *  strip park it (`tillUnderStrip`); `cleanTillAndIssuer` deletes it if the spec set it up. */
+export async function dishWithAnIssuer(browser: Browser, label: string, run: string): Promise<Product> {
+  const dish = await dishForTheTill(browser, label, run);
+  const context = await browser.newContext({ baseURL: A });
+  await login(await context.newPage(), A, '/sale/pos');
+  await ensureIssuer(context);
+  await context.close();
+  return dish;
+}
+
+/** The `afterAll` of such a spec: its sales, its products and the issuer it set up go, and the cash register comes back
+ *  as it was. */
+export function cleanTillAndIssuer(): void {
+  try {
+    cleanSales();
+    cleanInventory();
+    cleanInvoices();
+  } finally {
+    restoreDrawer();
+  }
+}
+
+/** What `tillUnderStrip` opens: the till in `lang` (`locale`), under the red strip of a hub that cannot issue invoices yet
+ *  when `strip` (hub `a`'s issuer parked in the table `parked` meanwhile) or without it. */
+export interface TillUnderStrip {
+  strip: boolean;
+  parked: string;
+  locale: string;
+  lang: string;
+}
+
+/**
+ * For a `describe` of a spec that sells with and without the strip: its `beforeAll` opens the till at 1440x900 as
+ * `till` says (the strip there or not, checked) and runs `then` on it; its `afterAll` closes it and puts hub `a`'s
+ * issuer back, even if the till never opened. Returns the till's page, for the tests of that `describe`.
+ */
+export function tillUnderStrip(till: TillUnderStrip, then?: (page: Page) => Promise<void>): () => Page {
+  let context: BrowserContext | undefined;
+  let page: Page | undefined;
+  test.beforeAll(async ({ browser }) => {
+    if (till.strip) parkIssuer(till.parked);
+    context = await browser.newContext({ baseURL: A, locale: till.locale, viewport: { width: 1440, height: 900 } });
+    page = await context.newPage();
+    await tillIn(page, context, till.lang);
+    const notice = shown(page).locator('[data-testid=blocking-strip]');
+    if (till.strip) await expect(notice, 'the strip of a hub that cannot issue invoices yet').toBeVisible();
+    else await expect(notice, 'a hub with its issuer has no strip').toBeHidden();
+    if (then) await then(page);
+  });
+  test.afterAll(async () => {
+    try {
+      await context?.close();
+    } finally {
+      if (till.strip) unparkIssuer(till.parked);
+    }
+  });
+  return () => {
+    if (!page) throw new Error('tillUnderStrip(): the till is not open: its beforeAll failed');
+    return page;
+  };
 }
 
 /** The till in `lang`, with `dish` on a check of its own and that check on screen. */

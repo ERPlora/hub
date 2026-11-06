@@ -136,7 +136,8 @@ function park(): void {
       @close="checksOpen = false"
     />
     <!-- What sits between the bar and the foot. The side column keeps its heading and scrolls the lines; the phone's
-         drawer, and a column just as low, scroll it all as one, so «Charge» stays in view above the tab bar (hub#630). The
+         drawer, and a column too low for a whole line beside them (hub#820), scroll it all as one, so «Charge» stays in
+         view above the tab bar (hub#630). The
          send bar rides here too: outside, it took all of this when low, tabs and lines included (hub#787). -->
     <div class="pos-cart__scroll">
       <CartHeading
@@ -275,9 +276,12 @@ function park(): void {
   flex: 1 0 auto;
   overflow: visible;
 }
-/* A side column as low as that, under the red strip of a small tablet: the same, or the lines get 0 px and no way to
-   them (hub#787). The height is the one at which the send bar stops being pinned (KitchenSendBar). */
-@container pos-cart-middle (max-height: 13rem) {
+/* A side column too low for a whole line beside the heading (83 px), the tabs (64 with their words in two lines, and
+   their 8 px of margin) and the send bar (67): the same, or the lines get a slit, 0 px under the red strip of a small
+   tablet (hub#787) and 14 to 105 px on a tablet on its side or a laptop of 720 or 768 (hub#820). Measured: a line is
+   115 px, so 21rem is the most that still leaves it whole (337 px leave 115); the lowest column where it fits, 343 px,
+   keeps its heading and tabs in place. The send bar stays pinned down to 13rem (KitchenSendBar). */
+@container pos-cart-middle (max-height: 21rem) {
   .pos-cart__body {
     flex: 1 0 auto;
     overflow: visible;
