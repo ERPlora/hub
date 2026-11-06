@@ -6,13 +6,14 @@
 //     the Hub user or the hire date, and the pay only when it may see it and it changed;
 //   - money is typed in the business's currency and travels in its whole minor units (with its decimals:
 //     none in yen); the commission travels as typed.
-import { describe, expect, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 
 import type { CompensationOut, MemberDetailOut } from '../operations';
 import type { Money } from './format';
-import { blankMemberForm, createPayload, formFromRecord, patchPayload } from './memberForm';
+import { blankMemberForm, createPayload, formFromRecord, patchPayload, type SendOptions } from './memberForm';
 
 const YEN: Money = { currency: 'JPY', decimals: 0 };
+const EUR: Money = { currency: 'EUR', decimals: 2 };
 
 const DETAIL: MemberDetailOut = {
   id: 'm1',
@@ -75,7 +76,7 @@ describe('blankMemberForm', () => {
 describe('createPayload (New)', () => {
   it('sends the typed record, trimmed, with role and Hub user when chosen', () => {
     const form = { ...blankMemberForm(), first_name: ' Ana ', last_name: 'López', email: 'ana@example.com ', role_id: 'r1', user_id: '4', hire_date: '2024-02-01', booking_buffer: '15', color: '#aa3300' };
-    expect(createPayload(form, { pay: false })).toEqual({
+    expect(createPayload(form, { pay: false, money: EUR })).toEqual({
       first_name: 'Ana',
       last_name: 'López',
       email: 'ana@example.com',
@@ -93,7 +94,7 @@ describe('createPayload (New)', () => {
   });
 
   it('leaves out role, Hub user and hire date when not chosen', () => {
-    const payload = createPayload({ ...blankMemberForm(), first_name: 'A', last_name: 'B' }, { pay: false });
+    const payload = createPayload({ ...blankMemberForm(), first_name: 'A', last_name: 'B' }, { pay: false, money: EUR });
     expect(payload).not.toHaveProperty('role_id');
     expect(payload).not.toHaveProperty('user_id');
     expect(payload).not.toHaveProperty('hire_date');
@@ -101,8 +102,8 @@ describe('createPayload (New)', () => {
 
   it('sends the pay in cents only to whoever may see it', () => {
     const form = { ...blankMemberForm(), first_name: 'A', last_name: 'B', hourly_rate: '12,50', commission_rate: '7.5', notes: 'x' };
-    expect(createPayload(form, { pay: true })).toMatchObject({ hourly_rate: 1250, commission_rate: '7.5', notes: 'x' });
-    const without = createPayload(form, { pay: false });
+    expect(createPayload(form, { pay: true, money: EUR })).toMatchObject({ hourly_rate: 1250, commission_rate: '7.5', notes: 'x' });
+    const without = createPayload(form, { pay: false, money: EUR });
     for (const key of ['hourly_rate', 'commission_rate', 'notes']) expect(without).not.toHaveProperty(key);
   });
 
@@ -112,9 +113,15 @@ describe('createPayload (New)', () => {
     expect(createPayload(form, { pay: true, money: YEN })).toMatchObject({ hourly_rate: 1500 });
   });
 
+  // hub#921: the rate is read only in the business's money, so whoever sends must have it (vue-tsc holds the dialog to
+  // that): never «1500» yen read with two decimals, as 150000, because the business had not answered yet.
+  it('the business’s money is required to send: there is no reading without it', () => {
+    expectTypeOf<SendOptions['money']>().toEqualTypeOf<Money>();
+  });
+
   it('an empty commission is 0; a rate that is not a figure goes as typed for the server to refuse under it', () => {
     const form = { ...blankMemberForm(), first_name: 'A', last_name: 'B', hourly_rate: 'doce' };
-    expect(createPayload(form, { pay: true })).toMatchObject({ hourly_rate: 'doce', commission_rate: '0' });
+    expect(createPayload(form, { pay: true, money: EUR })).toMatchObject({ hourly_rate: 'doce', commission_rate: '0' });
   });
 });
 
@@ -161,28 +168,28 @@ describe('patchPayload (Edit sends only what changed)', () => {
   const original = formFromRecord(DETAIL, PAY, 'en');
 
   it('nothing changed: only the id', () => {
-    expect(patchPayload('m1', original, original, { pay: true })).toEqual({ id: 'm1' });
+    expect(patchPayload('m1', original, original, { pay: true, money: EUR })).toEqual({ id: 'm1' });
   });
 
   it('a changed text, status or toggle goes alone, trimmed', () => {
     const form = { ...original, phone: ' 611 ', status: 'on_leave' as const, is_bookable: false };
-    expect(patchPayload('m1', original, form, { pay: true })).toEqual({ id: 'm1', phone: '611', status: 'on_leave', is_bookable: false });
+    expect(patchPayload('m1', original, form, { pay: true, money: EUR })).toEqual({ id: 'm1', phone: '611', status: 'on_leave', is_bookable: false });
   });
 
   it('«No role», «No Hub access» and an emptied hire date clear them with null', () => {
     const form = { ...original, role_id: '', user_id: '', hire_date: '' };
-    expect(patchPayload('m1', original, form, { pay: false })).toEqual({ id: 'm1', role_id: null, user_id: null, hire_date: null });
+    expect(patchPayload('m1', original, form, { pay: false, money: EUR })).toEqual({ id: 'm1', role_id: null, user_id: null, hire_date: null });
   });
 
   it('a new Hub user goes as a number', () => {
-    expect(patchPayload('m1', original, { ...original, user_id: '9' }, { pay: false })).toEqual({ id: 'm1', user_id: '9' });
+    expect(patchPayload('m1', original, { ...original, user_id: '9' }, { pay: false, money: EUR })).toEqual({ id: 'm1', user_id: '9' });
   });
 
   it('the pay goes only when it may be seen and it changed; the same figure written another way is no change', () => {
     const form = { ...original, hourly_rate: '12.5', commission_rate: '15', notes: 'Afternoons now.' };
-    expect(patchPayload('m1', original, form, { pay: true })).toEqual({ id: 'm1', commission_rate: '15', notes: 'Afternoons now.' });
-    expect(patchPayload('m1', original, form, { pay: false })).toEqual({ id: 'm1' });
-    expect(patchPayload('m1', original, { ...original, hourly_rate: '13' }, { pay: true })).toEqual({ id: 'm1', hourly_rate: 1300 });
+    expect(patchPayload('m1', original, form, { pay: true, money: EUR })).toEqual({ id: 'm1', commission_rate: '15', notes: 'Afternoons now.' });
+    expect(patchPayload('m1', original, form, { pay: false, money: EUR })).toEqual({ id: 'm1' });
+    expect(patchPayload('m1', original, { ...original, hourly_rate: '13' }, { pay: true, money: EUR })).toEqual({ id: 'm1', hourly_rate: 1300 });
   });
 
   it('in yen the rate is compared and sent in yen', () => {

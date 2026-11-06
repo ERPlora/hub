@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:adf7f0842772b269772d97e7e798e1f9ec727eeef5b61b0adc46f57b90de2557 -->
+<!-- generated from WORKBOOK.md sha256:db46b5e07ff2b76e018d22d57eec0256bfaf7f55c66bcd7e09c0d183c7bef6dc -->
 
 ## What it is for and who it is for
 
@@ -421,7 +421,9 @@ uses up one of its "Uses".
 If it fails: with no service at all, "Add at least one service: a package with no lines cannot be
 redeemed."; a repeated service, an archived one or one that does not exist; an unreadable or negative
 amount, below its field; a name another live voucher already has, "There is already a package with that
-name. Pick another name.".
+name. Pick another name.". "Create package" (and "Save changes" when editing it, SERVICE-F13) is grey while
+the business has not yet said its currency, because the closed price and the discount are read in it
+(without it, "1500" yen would be saved as 150,000).
 Involved: SERVICE-F14, SERVICE-F22
 
 ### SERVICE-F13 Edit or delete a voucher

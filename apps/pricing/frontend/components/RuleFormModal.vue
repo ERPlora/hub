@@ -7,7 +7,8 @@
 // type with its value, a new scope with its target (the server empties the old ones). Refusals stay in
 // the dialog, under their field. The amount, and the catalog prices beside the products and services, are in
 // the business's currency (its country's; a bare figure until it answers, and then an untouched amount takes its
-// decimals).
+// decimals). «Create» and «Save» wait in grey until the business has answered its money (the amount is read in it;
+// hub#921).
 import { Combo, type ComboOption, FormModal } from '@erplora/ui/components';
 import { useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { IonButton, IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
@@ -15,7 +16,7 @@ import { computed, ref, watch } from 'vue';
 
 import { useLocale, useT } from '../composables/useT';
 import { useBusinessMoney } from '../lib/format';
-import { quantityFieldText, readDecimal } from '../lib/format';
+import { type Money, quantityFieldText, readDecimal } from '../lib/format';
 import { moneyFieldText, parseMoney } from '../lib/money';
 import { searchCategories, searchGroups, searchProducts, searchServices } from '../lib/pickers';
 import { groupName } from '../lib/rules';
@@ -156,27 +157,28 @@ const decimal = (value: string, places: number): string => readDecimal(value, pl
 /** A whole number as the server reads it; as typed when it is not one (the server says why). */
 const whole = (value: string): number => (/^\d+$/.test(value.trim()) ? Number(value.trim()) : (value.trim() as unknown as number));
 const day = (value: string): string | null => value.trim() || null;
-const cents = (value: string): number | null => {
-  const read = parseMoney(value, money.value);
+/** Minor units of an amount in the business's `currency`; `null` when it is not one (the field says why). */
+const cents = (value: string, currency: Money): number | null => {
+  const read = parseMoney(value, currency);
   return read.ok ? read.cents : null;
 };
 
-/** The value(s) of the form's type, as the server takes them. */
-function valueOf(f: Form): Partial<RuleIn> {
+/** The value(s) of the form's type, as the server takes them (an amount in the business's `currency`). */
+function valueOf(f: Form, currency: Money): Partial<RuleIn> {
   if (f.type === 'percent') return { percent: decimal(f.percent, 2) };
-  if (f.type === 'fixed') return { amount: cents(f.amount) ?? 0 };
+  if (f.type === 'fixed') return { amount: cents(f.amount, currency) ?? 0 };
   if (f.type === 'buy_x_get_y') return { buy_quantity: whole(f.buy), get_quantity: whole(f.get) };
   return { tiers: f.tiers.map((tier) => ({ min_quantity: decimal(tier.min, 3), percent: decimal(tier.percent, 2) })) };
 }
 
-/** The whole rule the form says, as the create takes it. */
-function body(f: Form): RuleIn {
+/** The whole rule the form says, as the create takes it (its amount in the business's `currency`). */
+function body(f: Form, currency: Money): RuleIn {
   const target = TARGETS[f.scope];
   return {
     code: f.code.trim(),
     name: f.name.trim(),
     rule_type: f.type,
-    ...valueOf(f),
+    ...valueOf(f, currency),
     applies_to: f.scope,
     ...(target ? { [target]: f.target?.id ?? null } : {}),
     customer_group_id: f.group?.id ?? null,
@@ -189,10 +191,14 @@ function body(f: Form): RuleIn {
 
 const filled = (value: string): boolean => value.trim() !== '';
 const ready = computed(() => {
+  // Nothing is ready before the business answers its money: «1500» would be read with two decimals, whatever its
+  // currency counts (in yen, 150000; hub#921).
+  const currency = money.value;
+  if (!currency) return false;
   const f = form.value;
   const valued = {
     percent: filled(f.percent),
-    fixed: (cents(f.amount) ?? 0) > 0,
+    fixed: (cents(f.amount, currency) ?? 0) > 0,
     buy_x_get_y: filled(f.buy) && filled(f.get),
     tiered: f.tiers.length > 0 && f.tiers.every((tier) => filled(tier.min) && filled(tier.percent)),
   }[f.type];
@@ -215,10 +221,11 @@ function removeTier(index: number): void {
   form.value = { ...form.value, tiers: form.value.tiers.filter((_, i) => i !== index) };
 }
 
-/** Only the keys whose value the form changed (a new type brings its value, a new scope its target). */
-function patch(rule: RuleOut): Record<string, unknown> {
-  const now = body(form.value) as unknown as Record<string, unknown>;
-  const before = body(fromRule(rule)) as unknown as Record<string, unknown>;
+/** Only the keys whose value the form changed (a new type brings its value, a new scope its target), its amounts in the
+ *  business's `currency`. */
+function patch(rule: RuleOut, currency: Money): Record<string, unknown> {
+  const now = body(form.value, currency) as unknown as Record<string, unknown>;
+  const before = body(fromRule(rule), currency) as unknown as Record<string, unknown>;
   const out: Record<string, unknown> = { id: rule.id };
   for (const [key, value] of Object.entries(now)) {
     if (JSON.stringify(value) !== JSON.stringify(before[key])) out[key] = value;
@@ -227,11 +234,15 @@ function patch(rule: RuleOut): Record<string, unknown> {
 }
 
 async function save(): Promise<void> {
+  // The attempt counts only once the business has answered its money: before that the amount is neither read nor
+  // judged, or its field would call «¥1500» not an amount while the window waits (hub#921).
+  const currency = money.value;
+  if (!currency) return;
   tried.value = true;
   if (!ready.value) return;
   try {
-    if (props.rule) await update.run(patch(props.rule));
-    else await creation.run(body(form.value));
+    if (props.rule) await update.run(patch(props.rule, currency));
+    else await creation.run(body(form.value, currency));
   } catch {
     return; // The dialog paints the error; what was typed stays.
   }

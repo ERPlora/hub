@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:14f75bf9b886fa3166f9d1fde55d4470ac25b68456ed1a911e04c51aa48e4a49 -->
+<!-- generated from WORKBOOK.md sha256:29e5168ef8e94e5258bd83a34bec2ed412955ee8dad35a940d4e1195d0334e4f -->
 
 ## What it is for and who it is for
 
@@ -359,7 +359,10 @@ In: the form.
 Out: the active rule and `pricing.rule.created`.
 If it fails: under its field: "A discount rule with that code already exists. Pick a different code.", a value that is missing or
 out of range for its type, repeated or unordered tiers, a category, a product or a service
-that does not exist, "Until" before "From".
+that does not exist, "Until" before "From". **Create** (and **Save** when editing it, PRICING-F11) is grey
+while the business has not yet said its currency, because the amount per unit is read in it (without it,
+"1500" yen would be saved as 150,000); until then, leaving the amount keeps it as typed, without inventing
+decimals for it.
 Involved: Inventory, Services, Customers
 
 ### PRICING-F11 Edit a rule
