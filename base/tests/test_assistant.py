@@ -915,25 +915,28 @@ class SignedNameOut(Schema):
     paid_cents: str = Field(description="What was paid, in cents, as written.", json_schema_extra={"signed": True})
     counted: int = Field(description="Counted − expected, in cents.", json_schema_extra={"signed": True})
     due_cents: int = Field(json_schema_extra={"signed": True})
+    written: str = Field(json_schema_extra={"signed": True, "money": True})
 
 
 def test_a_preview_marks_signed_only_an_amount(monkeypatch):
     """A sign means over or short: only an amount — a whole number its schema marks ``money`` — may be declared
-    signed, said at start like the rest. A text whose name says cents is no amount, nor a number whose description
-    says cents without the mark (FIX-HUB-BASE-ASSISTANT-MONEY-KNOWN-ONLY-BY-DESCRIPTION-WORDS), nor one whose name
-    does (hub#917: a ``…_cents`` without the mark)."""
+    signed, said at start like the rest. A text is no amount, whether its name says cents or its schema marks it
+    ``money`` (the mark alone is not enough: an amount is a whole number), nor a number whose description says cents
+    without the mark (FIX-HUB-BASE-ASSISTANT-MONEY-KNOWN-ONLY-BY-DESCRIPTION-WORDS), nor one whose name does (hub#917:
+    a ``…_cents`` without the mark)."""
     read = count_preview({}, SignedNameOut)
     monkeypatch.setitem(registry, read.name, read)
     monkeypatch.setitem(
         registry,
         SETTLE.name,
-        declaring({"operation": read.name, "fields": ["name", "total_cents", "paid_cents", "counted", "due_cents"]}),
+        declaring({"operation": read.name, "fields": ["name", "total_cents", "paid_cents", "counted", "due_cents", "written"]}),
     )
     [error] = preview_errors()
     assert "marks name signed, but it is no amount marked money" in error.msg
     assert "marks paid_cents signed, but it is no amount marked money" in error.msg
     assert "marks counted signed, but it is no amount marked money" in error.msg
     assert "marks due_cents signed, but it is no amount marked money" in error.msg
+    assert "marks written signed, but it is no amount marked money" in error.msg
     assert "total_cents" not in error.msg
 
 
