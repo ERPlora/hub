@@ -5,8 +5,7 @@
 import { toastSuccess } from '@erplora/ui/shell';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { expectSaveWaitsForMoney } from '../../../../base/frontend/__tests__/save-waits-for-money';
-import { business, click, ionValue, JAPANESE, mountCash, settle } from '../__tests__/mount-cash-register';
+import { click, expectWaitsForTheYen, ionValue, mountCash } from '../__tests__/mount-cash-register';
 import OpenSessionModal from './OpenSessionModal.vue';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
@@ -23,11 +22,10 @@ const prop = (el: Element | null, name: string): unknown => (el as unknown as Re
 const REGISTERS = 'cash_register.register.list';
 const page = (rows: unknown[]) => ({ rows, total: rows.length, limit: 100, offset: 0 });
 
-async function setup(options: { locale?: 'en' | 'es'; unassignedCash?: number; business?: null } = {}) {
+async function setup(options: { locale?: 'en' | 'es'; unassignedCash?: number } = {}) {
   const m = await mountCash(OpenSessionModal, {
     props: { open: true, unassignedCash: options.unassignedCash ?? 0 },
     locale: options.locale,
-    business: options.business,
   });
   await m.live();
   const submit = () => click(m.inDoc('cash-register-open-submit'));
@@ -116,19 +114,13 @@ describe('OpenSessionModal', () => {
 
 describe('OpenSessionModal: before the business answers its money (hub#921)', () => {
   it('«Open session» waits in grey and reads no float; once the yen arrives «1500» is 1500', async () => {
-    const s = await setup({ business: null });
-    await s.result(REGISTERS, page([]));
-    await ionValue(s.inDoc('cash-register-open-balance'), '1500', 'ionInput');
-    s.answer(201, { id: 's1', number: 'S-261014-0001', status: 'open' });
-    const window = {
-      wrapper: s.wrapper,
-      save: () => s.inDoc('cash-register-open-submit'),
-      amount: () => s.inDoc('cash-register-open-balance'),
-      sent: s.sent,
-      settle,
-    };
-    await expectSaveWaitsForMoney(window, () => s.result('base.business.get', business(JAPANESE)));
-    await s.submit();
-    expect(s.sent().map((call) => call.body)).toEqual([{ opening_balance: 1500, opening_notes: '' }]);
+    const m = await mountCash(OpenSessionModal, { props: { open: true }, business: null });
+    await m.live();
+    await m.result(REGISTERS, page([]));
+    await ionValue(m.inDoc('cash-register-open-balance'), '1500', 'ionInput');
+    m.answer(201, { id: 's1', number: 'S-261014-0001', status: 'open' });
+    await expectWaitsForTheYen(m, 'cash-register-open-submit', 'cash-register-open-balance');
+    await click(m.inDoc('cash-register-open-submit'));
+    expect(m.sent().map((call) => call.body)).toEqual([{ opening_balance: 1500, opening_notes: '' }]);
   });
 });
