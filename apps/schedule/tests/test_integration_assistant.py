@@ -99,6 +99,26 @@ def test_the_card_names_the_intervals_as_the_hours_form():
         assert labels(assistant.card(op, {"intervals": []}, "en")) == [SCREENS_EN["intervals"]["legend"]], name
 
 
+@pytest.mark.parametrize(
+    ("write", "list_"),
+    [
+        ("schedule.special_day.delete", "specialDays"),
+        ("schedule.special_day.update", "specialDays"),
+        ("schedule.override.delete", "overrides"),
+        ("schedule.override.update", "overrides"),
+    ],
+)
+def test_the_card_names_the_record_of_a_write_as_its_list_calls_one(named, write, list_):
+    """The special day or temporary change a write acts on, titled with the word its list on «Special days» calls one
+    of them, in each language («Día especial», «Override»): never «Registro» (hub#675)."""
+    op = get(write)
+    for screens, language in ((SCREENS, "es"), (SCREENS_EN, "en")):
+        one = screens[list_]["entity"]["one"]
+        assert labels(assistant.card(op, {"id": "0192f0b2-3333-7000-8000-000000000003"}, language)) == [
+            one[:1].upper() + one[1:]
+        ], (write, language)
+
+
 def test_the_card_names_the_special_days_of_a_bulk_as_their_tab():
     bulk = get("schedule.special_day.bulk_create")
     arguments = {"special_days": [{"date": "2026-12-25", "name": "Navidad"}]}

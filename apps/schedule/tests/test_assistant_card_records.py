@@ -57,7 +57,7 @@ def test_a_write_on_a_special_day_says_it_by_its_name(write, language, title):
 
 
 @pytest.mark.django_db
-@pytest.mark.parametrize(("language", "title"), [("en", "Temporary change"), ("es", "Cambio temporal")])
+@pytest.mark.parametrize(("language", "title"), [("en", "Override"), ("es", "Cambio temporal")])
 @pytest.mark.parametrize("write", ON_AN_OVERRIDE)
 def test_a_write_on_a_temporary_change_says_it_by_its_reason(write, language, title):
     """«schedule.override.delete:id», the datum the issue cites: «Cambio temporal: Horario de verano»."""

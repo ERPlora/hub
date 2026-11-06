@@ -91,7 +91,7 @@ D_SEARCH = "Free text to search."
 # How the assistant's card names a datum the models do not (its Spanish in this app's catalog), as the screens say it.
 T_INTERVALS = gettext_noop("Opening intervals")
 T_SPECIAL_DAY = gettext_noop("Special day")
-T_OVERRIDE = gettext_noop("Temporary change")
+T_OVERRIDE = gettext_noop("Override")
 D_DIRECTION = "Sort direction: asc or desc."
 D_SPECIAL_DAY_ID = (
     "The id of the special day; or say it by name or date in special_day."

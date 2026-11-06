@@ -195,7 +195,7 @@ msgstr "Tramos horarios"
 msgid "Special day"
 msgstr "Día especial"
 
-msgid "Temporary change"
+msgid "Override"
 msgstr "Cambio temporal"
 
 msgid "Confirm your opening hours"

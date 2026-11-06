@@ -20,7 +20,7 @@ const NEEDED = ['schedule'];
 /** What the screens call each record, by the language of the card. */
 const WORDS = {
   es: { specialDay: 'Día especial', override: 'Cambio temporal' },
-  en: { specialDay: 'Special day', override: 'Temporary change' },
+  en: { specialDay: 'Special day', override: 'Override' },
 };
 /** The word the card calls a record by when nothing titles it, in each language. */
 const GENERIC = { es: 'Registro', en: 'Record' };

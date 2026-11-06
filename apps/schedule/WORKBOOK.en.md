@@ -408,8 +408,8 @@ whoever speaks) and the API, with the same rules and the same permissions. A wee
 change, by its id, its reason or a date it covers. If a name fits several, it says which ones and asks to
 choose (`schedule.ambiguous_reference`). Before correcting or deleting a special day or a temporary change, the
 assistant asks for confirmation with its card (BASE-F97), which names the record as the screens name it, never by its
-id: the special day by its name ("Special day: Christmas") and the temporary change by its reason ("Temporary change:
-Summer hours"). What the person asking cannot see is left out.
+id: the special day by its name ("Special day: Christmas") and the temporary change by its reason ("Override: Summer
+hours"). What the person asking cannot see is left out.
 
 ### What it offers: queries (they read and change nothing; all of them, except the assistant card's two, can be followed live)
 
