@@ -6,6 +6,7 @@ from django.apps import apps
 from django.conf import settings
 from django.utils import translation
 from live.live_registry import live_registry
+from live.operations import INTERNAL
 from live.meta import (
     BellCounter,
     Category,
@@ -136,6 +137,9 @@ NOT_FOR_API_KEYS = {
     "whatsapp_inbox.template.claim_delete",
     "whatsapp_inbox.template.record_delete",
 }
+#: What names a note or a template on the card of a write (hub#571): only the card reads them, the model finds those
+#: records in their lists; no tool, no door of the API.
+CARD_ONLY = {"whatsapp_inbox.note.get", "whatsapp_inbox.template.get"}
 
 
 def test_every_operation_is_described_for_the_assistant_and_says_its_risk():
@@ -147,9 +151,13 @@ def test_every_operation_is_described_for_the_assistant_and_says_its_risk():
     # FLOW-F31 added message.notify, the narrow send an automation may be granted; WHATSAPP_INBOX-F09 the bell's
     # count and the device's notices; WHATSAPP_INBOX-F29 template_sample.upload, the file of a header; WHATSAPP_INBOX-F20
     # and F21 message.get and conversation.flag, what the automatic answers read and mark; template_sample.detail, the
-    # read the assistant's card names a header's file by (FIX-HUB-WHATSAPP-INBOX-ATTEMPT-KEYS-UNMARKED).
-    assert len(ops) == 48
+    # read the assistant's card names a header's file by (FIX-HUB-WHATSAPP-INBOX-ATTEMPT-KEYS-UNMARKED); note.get and
+    # template.get, what it names a note and a template by (hub#571).
+    assert len(ops) == 50
     for name, op in ops.items():
+        if name in CARD_ONLY:
+            assert op.ai is INTERNAL and op.expose_api is False, name
+            continue
         assert isinstance(op.ai, dict) and len(str(op.ai.get("description", ""))) > 20, name
         if op.kind == "command":
             assert op.ai.get("risk") == ("high" if name in HIGH_RISK else "normal"), name
