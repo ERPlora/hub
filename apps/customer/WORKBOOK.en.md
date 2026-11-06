@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:5066a9b20294fe2f27bb814928e63ec4432c2b3979a4e9b39844615141886e3e -->
+<!-- generated from WORKBOOK.md sha256:da583cb00987b3b57673bdd9eadd1698c72ff8f2e5a5e3d3370f3c117a402043 -->
 
 ## What it is for and who it is for
 
@@ -891,7 +891,11 @@ Everything can be asked for through the screens, the assistant (by voice or by t
 whoever uses it) and the API, with the same rules and the same permissions. Lists come in pages of up to
 100 and all of them have a search. To speak naturally, a customer can be named by their id or by their
 exact name, their phone or their email ("add a note to Ana García"), and a group, a tag or a field, by
-its name; if two cards fit, the id, the phone or the email is asked for.
+its name; if two cards fit, the id, the phone or the email is asked for. Before changing anything, the
+assistant asks for confirmation with its card (BASE-F97), which names each record as the screens name it, never by
+its id: the card ("Customer: Ana García"), the duplicate card of a merge, the groups and tags it is given, the group,
+tag or field being changed or deleted, by its name, and the open order as Sales names it (its title or, without one,
+its amount; with Sales off, it does not show). What the person asking cannot see does not show.
 
 ### What it offers: queries (they read, they change nothing)
 
@@ -913,6 +917,10 @@ its name; if two cards fit, the id, the phone or the email is asked for.
 | Which customer an order has | view | F17, F19 | yes | `customer.order.customer` |
 | A card's orders (also for API keys) | view | F19 | yes | `customer.order.list` |
 | A card's health data and its permission (on screen only) | view | F32 | yes | `customer.health.detail` |
+| A group by its id, also an inactive one: what the assistant's card reads to name it (BASE-F97) | view | F06, F27 | no | `customer.group.detail` |
+| A tag by its id, also an inactive one: what the assistant's card reads (BASE-F97) | view | F06, F28 | no | `customer.tag.detail` |
+| A custom field by its id: what the assistant's card reads (BASE-F97) | view | F04, F29 | no | `customer.field.detail` |
+| The name of an open order, as Sales names it: what the assistant's card reads (BASE-F97) | view (and view sales, in Sales) | F19 | no | `customer.order.get` |
 
 ### What it offers: actions (they change data)
 
