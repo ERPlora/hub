@@ -212,7 +212,8 @@ describe('MenuFormModal: in the business’s currency', () => {
     // Nor does a submit that gets past the grey button read the price: the form waits, saying nothing.
     s.wrapper.findComponent(FormModal).vm.$emit('submit');
     await settle();
-    expect([s.sent(), s.field('price').errorText]).toEqual([[], undefined]);
+    expect(s.sent()).toEqual([]);
+    expect(s.field('price').errorText).toBeUndefined();
     await s.result('base.business.get', business(JAPANESE));
     expect(s.save().disabled).toBe(false);
     await click(s.save());

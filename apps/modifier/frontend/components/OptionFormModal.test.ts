@@ -218,7 +218,8 @@ describe('OptionFormModal: the business answers after the form opened', () => {
     // Nor does a submit that gets past the grey button read the supplement: the form waits, saying nothing.
     s.wrapper.findComponent(FormModal).vm.$emit('submit');
     await settle();
-    expect([s.sent(), s.field('price_delta').errorText]).toEqual([[], undefined]);
+    expect(s.sent()).toEqual([]);
+    expect(s.field('price_delta').errorText).toBeUndefined();
     await s.result('base.business.get', business(JAPANESE));
     expect(s.save().disabled).toBe(false);
     await click(s.save());

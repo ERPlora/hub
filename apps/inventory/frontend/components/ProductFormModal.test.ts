@@ -350,7 +350,8 @@ describe('ProductFormModal: editing', () => {
       // Nor does a submit that gets past the grey button read the price: the form waits, saying nothing.
       s.wrapper.findComponent(FormModal).vm.$emit('submit');
       await flush();
-      expect([s.calls('/api/inventory/products'), s.el('inventory-product-price')?.errorText]).toEqual([[], undefined]);
+      expect(s.calls('/api/inventory/products')).toEqual([]);
+      expect(s.el('inventory-product-price')?.errorText).toBeUndefined();
       await s.answer(JAPANESE);
       expect(s.el('inventory-product-form-submit')?.disabled).toBe(false);
       await s.submit();
