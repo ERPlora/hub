@@ -226,7 +226,8 @@ Pasos:
 3. Escribe el Nombre, elige la Tarifa (viene **Precio fijo**), el Precio y la Duración (min). Elige
    una Categoría o deja «Sin categoría».
 4. Elige la Categoría fiscal (son las de Impuestos, por su nombre y su tipo; viene la de los Ajustes
-   si hay una). Sin ella **Crear servicio** no se puede pulsar.
+   si hay una). Sin ella **Crear servicio** no se puede pulsar; tampoco mientras el negocio no haya dicho
+   todavía su moneda, porque el precio se lee en ella (sin ella, «1500» yenes se guardaría como 150 000).
 5. Pulsa **Crear servicio**: el formulario se cierra y el servicio sale en la tabla como **Activo**.
 Entra: las categorías de Servicios y las categorías fiscales activas de Impuestos.
 Sale: el servicio en oferta y reservable (`service.service.created`); desde ese momento lo ven la

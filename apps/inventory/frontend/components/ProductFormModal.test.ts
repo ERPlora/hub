@@ -337,6 +337,22 @@ describe('ProductFormModal: editing', () => {
       expect(s.el('inventory-product-form-submit')?.disabled).toBe(false);
     });
 
+    it('«Save» waits in grey for the business’s money: «1500» is never sent read without it, then saved at 1500 yen (hub#918)', async () => {
+      const s = await setup({}, { business: null });
+      await s.type('inventory-product-name', 'Coffee');
+      await s.type('inventory-product-sku', 'CAF-1');
+      await s.type('inventory-product-price', '1500');
+      await s.choose('inventory-product-tax', 'product.generic');
+      s.net.onApi(() => ok(product({ price: 1500 }), 201));
+      await s.submit();
+      expect(s.calls('/api/inventory/products').map((call) => (s.body(call) as { price: number }).price)).toEqual([]);
+      expect(s.el('inventory-product-form-submit')?.disabled).toBe(true);
+      await s.answer(JAPANESE);
+      expect(s.el('inventory-product-form-submit')?.disabled).toBe(false);
+      await s.submit();
+      expect(s.calls('/api/inventory/products').map((call) => (s.body(call) as { price: number }).price)).toEqual([1500]);
+    });
+
     it('an untouched price and cost are rewritten from the product with the yen’s decimals, and «Save changes» sends neither', async () => {
       const s = await setup({ product: product({ price: 220, cost: 80 }) }, { business: null });
       expect([s.el('inventory-product-price')?.value, s.el('inventory-product-cost')?.value]).toEqual(['2.20', '0.80']);

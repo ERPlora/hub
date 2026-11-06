@@ -34,8 +34,10 @@ const SODA: OptionOut = {
   updated_at: '2026-10-15T10:00:00Z',
 };
 
-/** The form, opened; with `owner`, once the business (`base.business.get`) has answered. */
-async function setup(option: OptionOut | null = null, locale: 'en' | 'es' = 'en', owner?: Business) {
+/** The form, opened once the business (`base.business.get`) has answered `owner`: one in Spain, in euros, unless a test
+ *  says another. `null`: it has not answered and the stream is not open yet (the test opens it with `live()`); «Save»
+ *  waits for it (hub#918). */
+async function setup(option: OptionOut | null = null, locale: 'en' | 'es' = 'en', owner: Business | null = business()) {
   const m = await mountModifier(OptionFormModal, { props: { open: false, group: DRINKS, option }, locale });
   await m.wrapper.setProps({ 'onUpdate:open': (open: boolean) => m.wrapper.setProps({ open }) });
   if (owner) {
@@ -57,7 +59,7 @@ describe('OptionFormModal: New option', () => {
     expect(['name', 'kitchen_name', 'price_delta', 'sort_order'].map((name) => s.field(name).label)).toEqual([
       'Name',
       'Kitchen ticket name',
-      'Supplement',
+      'Supplement (EUR)',
       'Order',
     ]);
     expect(s.field('price_delta').helperText).toBe('Negative is a discount; empty or 0, free.');
@@ -167,7 +169,7 @@ describe('OptionFormModal: the business answers after the form opened', () => {
   const NOT_AMOUNT = 'This is not an amount. Type a figure, for example 1.50, or -0.50 for a discount.';
 
   it('an untouched supplement is rewritten from the option with the yen’s decimals, and «Save» keeps its scale', async () => {
-    const s = await setup({ ...SODA, price_delta: 150 });
+    const s = await setup({ ...SODA, price_delta: 150 }, 'en', null);
     expect(s.field('price_delta').value).toBe('1.50');
     await s.live();
     await s.result('base.business.get', business(JAPANESE));
@@ -180,7 +182,7 @@ describe('OptionFormModal: the business answers after the form opened', () => {
   });
 
   it('with three decimals an untouched supplement is rewritten in that scale, never saved ten times bigger', async () => {
-    const s = await setup({ ...SODA, price_delta: 1500 });
+    const s = await setup({ ...SODA, price_delta: 1500 }, 'en', null);
     expect(s.field('price_delta').value).toBe('15.00');
     await s.live();
     await s.result('base.business.get', business(KUWAITI));
@@ -192,7 +194,7 @@ describe('OptionFormModal: the business answers after the form opened', () => {
   });
 
   it('what the person already typed stays and is read in the business’s currency: «2,50» in Poland is 250 grosze', async () => {
-    const s = await setup();
+    const s = await setup(null, 'en', null);
     s.answer(201, SODA);
     await ionValue(s.field('name'), 'Bacon', 'ionInput');
     await ionValue(s.field('price_delta'), '2,50', 'ionInput');
@@ -203,8 +205,24 @@ describe('OptionFormModal: the business answers after the form opened', () => {
     expect((s.sent()[0].body as Record<string, unknown>).price_delta).toBe(250);
   });
 
+  it('«Save» waits in grey for the business’s money: «150» is never sent read without it, then saved at 150 yen (hub#918)', async () => {
+    const s = await setup(null, 'en', null);
+    await s.live();
+    expect(s.field('price_delta').label).toBe('Supplement');
+    s.answer(201, { ...SODA, price_delta: 150 });
+    await ionValue(s.field('name'), 'Bacon', 'ionInput');
+    await ionValue(s.field('price_delta'), '150', 'ionInput');
+    await click(s.save());
+    expect(s.sent().map((call) => (call.body as { price_delta: number }).price_delta)).toEqual([]);
+    expect(s.save().disabled).toBe(true);
+    await s.result('base.business.get', business(JAPANESE));
+    expect(s.save().disabled).toBe(false);
+    await click(s.save());
+    expect(s.sent().map((call) => (call.body as { price_delta: number }).price_delta)).toEqual([150]);
+  });
+
   it('what the person typed that the yen cannot read stays as typed: the field says so and nothing is sent', async () => {
-    const s = await setup({ ...SODA, price_delta: 150 });
+    const s = await setup({ ...SODA, price_delta: 150 }, 'en', null);
     await ionValue(s.field('price_delta'), '1,75', 'ionInput');
     await s.live();
     await s.result('base.business.get', business(JAPANESE));

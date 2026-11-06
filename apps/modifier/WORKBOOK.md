@@ -215,7 +215,9 @@ Entra: el grupo, nombre, nombre de comanda, suplemento, categoría fiscal propia
 defecto.
 Sale: la opción (avisa: opción creada, cambiada o borrada). Borrarla la retira del catálogo: lo ya
 pedido conserva su copia congelada, también en la comanda.
-Si falla: un nombre vacío o repetido en el grupo, un suplemento que no es un importe, una categoría
+Si falla: «Crear» y «Guardar» están en gris mientras falte el nombre y mientras el negocio no haya dicho
+todavía su moneda, porque el suplemento se lee en ella (sin ella, «150» yenes se guardaría como 15 000). Un
+nombre vacío o repetido en el grupo, un suplemento que no es un importe, una categoría
 fiscal que no existe en Impuestos o más opciones por defecto que el máximo salen junto a su campo. Una
 opción con categoría fiscal propia se cobra en una línea aparte, que no puede valer cero ni menos: «Una
 opción con su propia categoría fiscal se cobra en una línea aparte: su suplemento tiene que ser mayor

@@ -236,6 +236,21 @@ describe('ServiceFormModal: in the business currency (service-business-currency)
     expect(s.sent().map((call) => call.body)).toEqual([{ id: 's1', name: 'Cut and wash' }]);
   });
 
+  it('«Create service» waits in grey for the business’s money: «1500» is never sent read without it, then saved at 1500 yen (hub#918)', async () => {
+    const s = await setup(null, 'en', true, { business: null });
+    await s.result('service.settings.get', SETTINGS);
+    s.answer(201, CUT);
+    await ionValue(s.field('name'), 'Haircut', 'ionInput');
+    await ionValue(s.field('price'), '1500', 'ionInput');
+    await click(s.save());
+    expect(s.sent().map((call) => (call.body as { price: number }).price)).toEqual([]);
+    expect(s.save().disabled).toBe(true);
+    await s.result('base.business.get', business(JAPANESE));
+    expect(s.save().disabled).toBe(false);
+    await click(s.save());
+    expect(s.sent().map((call) => (call.body as { price: number }).price)).toEqual([1500]);
+  });
+
   it('what was typed before the business answered stays as typed and is read in its currency', async () => {
     const s = await setup(null, 'en', true, { business: null });
     await s.result('service.settings.get', SETTINGS);

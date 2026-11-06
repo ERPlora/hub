@@ -34,11 +34,11 @@ const MENU: ComboOut = {
   updated_at: '2026-10-15T10:00:00Z',
 };
 
-/** `answer`: what the business answers when the stream opens (`null`: it opens and the business does not answer
- *  yet); without it, the stream never opens. */
-async function setup(combo: ComboOut | null = null, locale: 'en' | 'es' = 'en', answer?: Business | null) {
+/** `answer`: what the business answers when the stream opens, one in Spain, in euros, unless a test says another
+ *  (`null`: it opens and the business does not answer yet; «Save» waits for it, hub#918). */
+async function setup(combo: ComboOut | null = null, locale: 'en' | 'es' = 'en', answer: Business | null = business()) {
   const m = await mountCombo(MenuFormModal, { props: { open: false, combo }, locale, business: answer });
-  if (answer !== undefined) await m.live();
+  await m.live();
   await m.wrapper.setProps({ 'onUpdate:open': (open: boolean) => m.wrapper.setProps({ open }) });
   await m.wrapper.setProps({ open: true });
   await settle();
@@ -55,7 +55,7 @@ describe('MenuFormModal: New menu', () => {
     expect([s.field('name').label, s.field('kitchen_name').label, s.field('price').label, s.field('supply_kind').label]).toEqual([
       'Name',
       'Kitchen name',
-      'Closed price',
+      'Closed price (EUR)',
       'How is it sold?',
     ]);
     expect(s.field('supply_kind').value).toBe('service');
@@ -149,7 +149,7 @@ describe('MenuFormModal: editing', () => {
   it('speaks Spanish', async () => {
     const s = await setup(MENU, 'es');
     expect(s.inDoc('combo-menu-form')?.getAttribute('aria-label')).toBe('Menú · Menu of the day');
-    expect([s.field('price').label, s.field('supply_kind').label]).toEqual(['Precio cerrado', '¿Cómo se vende?']);
+    expect([s.field('price').label, s.field('supply_kind').label]).toEqual(['Precio cerrado (EUR)', '¿Cómo se vende?']);
     expect(s.field('price').value).toBe('13,50');
   });
 });
@@ -197,6 +197,22 @@ describe('MenuFormModal: in the business’s currency', () => {
     await ionChecked(s.field('is_active'), false);
     await click(s.save());
     expect(s.sent()).toEqual([{ method: 'POST', path: '/api/combo/combos/update', query: {}, body: { id: 'm1', is_active: false } }]);
+  });
+
+  it('«Create menu» waits in grey for the business’s money: «1500» is never sent read without it, then saved at 1500 yen (hub#918)', async () => {
+    const s = await setup(null, 'en', null);
+    s.answer(201, { ...MENU, price: 1500, groups: [], sellable: false, blockers: [] });
+    await ionValue(s.field('name'), 'Menu of the day', 'ionInput');
+    await ionValue(s.field('price'), '1500', 'ionInput');
+    s.tax().vm.$emit('update:modelValue', { id: 'restaurant.food', label: 'Restaurant — food · 10%' });
+    await settle();
+    await click(s.save());
+    expect(s.sent().map((call) => (call.body as { price: number }).price)).toEqual([]);
+    expect(s.save().disabled).toBe(true);
+    await s.result('base.business.get', business(JAPANESE));
+    expect(s.save().disabled).toBe(false);
+    await click(s.save());
+    expect(s.sent().map((call) => (call.body as { price: number }).price)).toEqual([1500]);
   });
 
   it('what the person typed before the business answers stays as typed, and is read in its currency', async () => {

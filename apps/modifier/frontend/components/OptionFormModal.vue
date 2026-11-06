@@ -4,7 +4,8 @@
 // «Supplement» until the business answers; signed: negative is a discount; empty or 0, free), «Own tax category»
 // (searched in Taxes; empty = the dish's), «Chosen by default» and Order; Edit opens «Editing option —
 // {name}» and sends only what changed with `modifier.option.update` (an emptied tax category sends
-// `''`, the dish's again). A supplement that is not an amount is never sent; the server's refusals (a
+// `''`, the dish's again). «Create» / «Save» wait in grey until the business has answered its money (the supplement
+// is read in it; hub#918). A supplement that is not an amount is never sent; the server's refusals (a
 // taken name, too many defaults, an own line worth nothing) stay under their field.
 import { Combo, type ComboOption, FormModal } from '@erplora/ui/components';
 import { useCommand, useLiveClient } from '@erplora/ui/sdk';
@@ -121,8 +122,12 @@ function patch(option: OptionOut, cents: number): OptionPatchIn {
 }
 
 async function save(): Promise<void> {
+  // No supplement is read before the business answers its money: «150» would be read with two decimals, whatever its
+  // currency counts (in yen, 15000; hub#918).
+  const business = money.value;
+  if (!business) return;
   tried.value = true;
-  const read = parseMoney(form.value.price, money.value);
+  const read = parseMoney(form.value.price, business);
   if (!read.ok) return; // The field says why.
   const cents = read.cents ?? 0;
   try {
@@ -143,7 +148,7 @@ async function save(): Promise<void> {
     :submit-label="option ? $t('modifier.options.form.save') : $t('modifier.options.form.create')"
     :pending="pending"
     :error="error"
-    :submit-disabled="!form.name.trim()"
+    :submit-disabled="!money || !form.name.trim()"
     @submit="save"
   >
     <template #default="{ fieldErrors }">

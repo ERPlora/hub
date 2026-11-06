@@ -4,7 +4,8 @@
 // Price, «Cost (<currency>)», «Initial stock», «Low stock threshold» (empty = 10), EAN-13, Description, «Type»,
 // «Track stock for this item» (physical only; follows the hub until touched), «Unit of measure»,
 // «Tax category» (required, none chosen in advance) and «Categories» (when there are any; both search
-// the server, TaxCategorySelect and ProductCategoriesField), saved in one go. Editing: the SKU is locked, there is no initial stock nor type, and only what changed is sent
+// the server, TaxCategorySelect and ProductCategoriesField), saved in one go. «Save» waits in grey until the business
+// has answered its money (the price and the cost are read in it; hub#918). Editing: the SKU is locked, there is no initial stock nor type, and only what changed is sent
 // (the stock is never edited here: it is received or counted). Amounts and quantities are read as
 // the person typed them; a refusal stays in the dialog, each message under its field. «Photo» (INVENTORY-F30/F31, for
 // who may change products): a library image or a photo of its own, sent once the product is saved (`set_image`,
@@ -21,7 +22,7 @@ import { draftOf, type ImageDraft, useImageSave } from '../../../../base/fronten
 import { useT } from '../composables/useT';
 import type { Unit } from '../composables/useUnits';
 import { errorFields } from '../lib/errors';
-import { useBusinessMoney } from '../lib/format';
+import { type Money, useBusinessMoney } from '../lib/format';
 import { moneyFieldText, parseMoney } from '../lib/money';
 import { readQuantity } from '../lib/quantity';
 import MoneyInput from './MoneyInput.vue';
@@ -143,7 +144,7 @@ const title = computed(() =>
 );
 /** No tax category, or still the one Taxes deactivated (a «Not configured» product keeps it until changed). */
 const taxMissing = computed(() => !form.value.tax || (!!props.product?.needs_tax_setup && form.value.tax === original.value.tax));
-const complete = computed(() => !!form.value.name.trim() && !!form.value.sku.trim() && !taxMissing.value);
+const complete = computed(() => !!business.value && !!form.value.name.trim() && !!form.value.sku.trim() && !taxMissing.value);
 const tracksNow = computed(() => form.value.track ?? (props.product ? props.product.tracks_stock : props.hubTracksStock));
 const step = computed(() => props.units.find((unit) => unit.code === form.value.unit)?.increment);
 /** Each unit by the name the API gives it, which already carries its code («Unit (ud)»). */
@@ -157,10 +158,10 @@ function set<K extends keyof Fields>(key: K, value: Fields[K]): void {
 
 const text = (value: unknown): string => (value === null || value === undefined ? '' : String(value));
 
-/** The fields read as the API takes them, or `null` when an amount or a quantity cannot be read. */
-function read() {
-  const price = parseMoney(form.value.price, business.value);
-  const cost = parseMoney(form.value.cost, business.value);
+/** The fields read as the API takes them, in the business's `money`, or `null` when an amount or a quantity cannot be read. */
+function read(money: Money) {
+  const price = parseMoney(form.value.price, money);
+  const cost = parseMoney(form.value.cost, money);
   const initial = readQuantity(form.value.initialStock);
   const threshold = readQuantity(form.value.threshold);
   if (!price.ok || !cost.ok || !initial.ok || !threshold.ok) return null;
@@ -173,8 +174,12 @@ async function savePhoto(id: string): Promise<void> {
 }
 
 async function save(): Promise<void> {
+  // No amount is read before the business answers its money: «1500» would be read with two decimals, whatever its
+  // currency counts (in yen, 150000; hub#918).
+  const money = business.value;
+  if (!money) return;
   tried.value = true;
-  const values = read();
+  const values = read(money);
   if (!values || !complete.value) return;
   const now = form.value;
   let saved: { id: string };

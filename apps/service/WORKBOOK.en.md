@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:1944551ee9337ab6f59daece75a1bb3e8731a39b180505548a9268fcc4c2cc16 -->
+<!-- generated from WORKBOOK.md sha256:a1c4ce59f1cf5efef2039a928674c0263b826f1c5a40feb360f9d27f4eec604c -->
 
 ## What it is for and who it is for
 
@@ -212,7 +212,9 @@ Steps:
 3. Type the Name, choose the Pricing (**Fixed price** comes chosen), the Price and the Duration (min).
    Choose a Category or leave "No category".
 4. Choose the Tax category (they are the ones of Taxes, by their name and their rate; the one of the
-   Settings comes chosen if there is one). Without it **Create service** cannot be tapped.
+   Settings comes chosen if there is one). Without it **Create service** cannot be tapped; nor while the
+   business has not yet said its currency, because the price is read in it (without it, "1500" yen would be
+   saved as 150,000).
 5. Tap **Create service**: the form closes and the service shows in the table as **Active**.
 In: the categories of Services and the active tax categories of Taxes.
 Out: the service on offer and bookable (`service.service.created`); from that moment the agenda and the
