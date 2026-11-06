@@ -15,7 +15,8 @@ import { IonButton, IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
 import { useLocale, useT } from '../composables/useT';
-import { type Money, quantityFieldText, readDecimal, useBusinessMoney } from '../lib/format';
+import { useBusinessMoney } from '../lib/format';
+import { type Money, quantityFieldText, readDecimal } from '../lib/format';
 import { moneyFieldText, parseMoney } from '../lib/money';
 import { searchCategories, searchGroups, searchProducts, searchServices } from '../lib/pickers';
 import { groupName } from '../lib/rules';

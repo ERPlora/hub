@@ -53,15 +53,6 @@ describe('MoneyInput', () => {
     expect(input.attributes('data-testid')).toBe('price');
   });
 
-  it('hands the parent what is typed, and rewrites it in the page format on leaving', async () => {
-    const s = await setup({ money: EUR }, 'es');
-    await s.input().setValue('2.2');
-    expect(s.model.value).toBe('2.2');
-    await s.blur();
-    expect(s.model.value).toBe('2,20');
-    expect(s.errorText()).toBeUndefined();
-  });
-
   it('what is not an amount says so after leaving the field', async () => {
     const s = await setup();
     await s.input().setValue('abc');
@@ -124,5 +115,13 @@ describe('MoneyInput: the business’s money', () => {
     await s.wrapper.setProps({ money: { currency: 'JPY', decimals: 0 } });
     await s.blur();
     expect([s.model.value, s.errorText()]).toEqual(['150', undefined]);
+  });
+
+  it('once the money is known, hands the parent what is typed and rewrites it in the page format on leaving', async () => {
+    const s = await setup({ money: EUR }, 'es');
+    await s.input().setValue('2.2');
+    expect(s.model.value).toBe('2.2');
+    await s.blur();
+    expect([s.model.value, s.errorText()]).toEqual(['2,20', undefined]);
   });
 });

@@ -126,8 +126,7 @@ const wholeOrNull = (value: string): number | null => {
   if (!trimmed) return null;
   return /^\d+$/.test(trimmed) ? Number(trimmed) : (trimmed as unknown as number);
 };
-/** Minor units of a money field in the business's `currency` (empty = none); `undefined` when it is not an amount (the
- *  field says why). */
+/** Minor units of a money field (empty = none); `undefined` when it is not an amount (the field says why). */
 const minor = (value: string, currency: Money): number | null | undefined => {
   const read = parseMoney(value, currency);
   return read.ok ? read.cents : undefined;
