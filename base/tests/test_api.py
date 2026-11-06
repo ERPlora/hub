@@ -75,7 +75,7 @@ def test_the_list_of_an_owner_over_http(client, make_user, settings):
 
 
 def test_an_anonymous_visitor_gets_no_home(client):
-    for path in ("/api/home/setup", "/api/home/widgets", "/api/home/bell", "/api/home/notices"):
+    for path in ("/api/home/setup", "/api/home/widgets", "/api/home/bell", "/api/home/notices", "/api/system/cards"):
         response = client.get(path, HTTP_HOST="a.localhost:8000")
         assert response.status_code in (401, 403), path
 
@@ -109,6 +109,8 @@ def test_the_spas_route_map_names_every_base_route(settings):
         # An app whose tables could not be made, tried again (S3).
         ("POST", "/api/apps/retry", "base.app.retry"),
         ("GET", "/api/system/plan", "base.plan.usage"),
+        # The cards the apps on put in System › «Usage and plan» (hub#683).
+        ("GET", "/api/system/cards", "base.system.cards"),
         *DATA_ROUTES,
         # Business settings (APP-BASE-6).
         ("GET", "/api/business", "base.business.get"),

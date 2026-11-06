@@ -141,6 +141,12 @@ def test_the_shell_embeds_this_hub_s_name_and_where_its_plan_is_changed_on_the_s
         "preferences": {"theme_mode": "", "palette": ""},
         # Round 2026-11-04a: no server voice for the assistant unless ASSISTANT_SERVER_VOICE (base/tests/test_assistant_speak.py).
         "server_voice": False,
+        # hub#683: where erplora.com serves the ERPlora app of each system it publishes (PUBLIC-F24: no macOS), to anyone.
+        "app_downloads": {
+            "windows": f"{saas}/app/download/windows/",
+            "linux": f"{saas}/app/download/linux/",
+            "android": f"{saas}/app/download/android/",
+        },
     }
 
 
