@@ -11,8 +11,10 @@ from pathlib import Path
 
 import pytest
 from babel.messages.pofile import PoFileError
+from django.utils import translation
+from django.utils.translation import gettext_lazy, pgettext_lazy
 
-from base.tests.po import po_entries, po_messages
+from base.tests.po import catalogue_key, po_entries, po_messages
 
 ROOT = Path(__file__).resolve().parents[2]
 HEADER = 'msgid ""\nmsgstr ""\n"Language: es\\n"\n'
@@ -127,6 +129,23 @@ def test_the_same_text_with_and_without_a_context_are_two_entries(tmp_path):
         'msgctxt "status"\nmsgid "Active"\nmsgstr "Activa"\n',
     )
     assert po_entries(po) == {"Active": ("Activo", False), "status\x04Active": ("Activa", False)}
+
+
+def test_a_lazy_text_is_keyed_as_the_compiled_catalog_keys_it():
+    """A ``gettext_lazy`` text by its English, a ``pgettext_lazy`` one as ``context\\x04English``: a text that goes back
+    to ``_()`` while its entry keeps the context, or whose context has a typo, is missing from its catalogue (it would
+    say another app's Spanish, hub#560)."""
+    with translation.override("en"):
+        assert catalogue_key(gettext_lazy("Open")) == "Open"
+        assert catalogue_key(pgettext_lazy("sale", "Open")) == "sale\x04Open"
+        assert catalogue_key("Open") == "Open"
+
+
+def test_no_module_keys_a_lazy_text_by_itself():
+    """Five ``test_i18n.py`` kept the same key of a lazy text, each its own copy: every test asks ``base.tests.po``."""
+    tests = sorted((ROOT / "apps").glob("*/tests/*.py"))
+    assert len(tests) > 100
+    assert [str(path.relative_to(ROOT)) for path in tests if '"_args"' in path.read_text(encoding="utf-8")] == []
 
 
 def test_continuation_lines_and_escapes_are_read_as_the_compiled_catalog_says_them(tmp_path):
