@@ -437,10 +437,11 @@ Pasos:
    de caja, el precio y el total de una línea de un carrito, un precio de una tarifa, el descuento fijo de una
    regla de tarifa) en la moneda en que lo da ese paso: un pago en dólares, en dólares («12,50 US$»); una línea
    de un carrito, en la de su carrito; un precio de una tarifa, en la de su tarifa; el descuento fijo de una
-   regla, que no es de ninguna tarifa, en la del negocio; si no da ninguna, en la del negocio («120,50 €»). Un
-   número que trae el aviso sale tal cual, porque el aviso no dice si es dinero, y también el límite de pago en
-   efectivo o de ticket de la vista previa de un cobro, que la ley fija en euros (hub#926). Lo que va a otra
-   acción, a otro sistema o a un «Solo sigue si…» lleva cada dato tal cual.
+   regla, que no es de ninguna tarifa, en la del negocio; el límite de pago en efectivo o de ticket de la vista
+   previa de un cobro, en euros, la moneda en que la ley los fija, también en un negocio que cobra en otra
+   («1.000,00 €»); si no da ninguna, en la del negocio («120,50 €»). Un número que trae el aviso sale tal cual,
+   porque el aviso no dice si es dinero. Lo que va a otra acción, a otro sistema o a un «Solo sigue si…» lleva
+   cada dato tal cual.
 Entra: las acciones y consultas de las apps activas, el último aviso real de ese tipo y lo que dejan los
 pasos anteriores. Los datos se nombran en el idioma de la pantalla («Número de venta», «Teléfono del
 cliente») y con la palabra de la app que los tiene («Sección», como en Ventas / TPV), nunca con su
@@ -1413,9 +1414,13 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   el importe de un bono, el `signed_amount` de un movimiento de caja, con `signed`; hub#923), y las de una línea de
   carrito (`unit_price`, `line_total`) y de una regla de tarifa (`amount`), que responden su `currency` al lado —la de
   su carrito, con `currency_decimals`; la del negocio, porque una regla no es de ninguna tarifa—, como un precio de
-  tarifa responde la de su tarifa (`PriceItemOut.currency`, también en `add`, `update` y `list`; hub#915). El trinquete
-  `UNMARKED_STEP_AMOUNTS` de `test_step_amounts.py` (solo baja; hoy solo los límites de la vista previa de un cobro, en
-  euros, hub#926) caza una salida entera sin marca que dice céntimos en
+  tarifa responde la de su tarifa (`PriceItemOut.currency`, también en `add`, `update` y `list`; hub#915). Un importe
+  en una moneda propia, distinta de la que responde su paso, lleva en su marca el nombre del dato de al lado que la da
+  (`queries.CURRENCY_IN`, `json_schema_extra={"money": True, "currency_in": "<dato>"}`) y sale solo en esa moneda;
+  sin ese dato (una ejecución guardada antes de que su paso lo diera), con su cifra, nunca en la del negocio: los
+  límites de la vista previa de un cobro (`sale.checkout.preview`: `cash_limit` y `ticket_limit`), en los euros de la
+  ley que da `limits_currency` (hub#926). El trinquete
+  `UNMARKED_STEP_AMOUNTS` de `test_step_amounts.py` (solo baja; hoy en cero) caza una salida entera sin marca que dice céntimos en
   su nombre o su descripción, que se llama como un dato que su app ya marca como dinero en una entrada o una salida
   (también en la rama de un `Cents | None`) o que nombra `AMOUNTS_BY_NAME` (los importes sin gemelo marcado). Una
   hora sin segundos («21:00») ya la escribió su app para una
