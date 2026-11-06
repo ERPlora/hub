@@ -509,7 +509,7 @@ class CompensationOut(Schema):
     role_id: UUID | None
     role_name: str | None
     status: MemberStatus
-    hourly_rate: int = Field(description="Hourly rate in cents.")
+    hourly_rate: int = Field(description="Hourly rate in cents.", json_schema_extra={"money": True})
     commission_rate: Decimal = Field(description="Commission, in percent.")
     notes: str = Field(description="Private HR notes.")
 
@@ -545,9 +545,12 @@ class CommissionReportRow(Schema):
     commission_rate: Decimal = Field(description="Commission, in percent.")
     sold: int = Field(
         description="What they sold in the period, refunds and the vouchers they sold taken off and the value of the "
-        "voucher sessions they did added, in cents."
+        "voucher sessions they did added, in cents.", json_schema_extra={"money": True}
     )
-    commission: int = Field(description="sold x rate / 100, in cents, rounded half up once.")
+    commission: int = Field(
+        description="sold x rate / 100, in cents, rounded half up once.",
+        json_schema_extra={"money": True},
+    )
 
 
 class CommissionReportOut(Schema):

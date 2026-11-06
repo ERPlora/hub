@@ -385,9 +385,12 @@ class PriceItemOut(Schema):
     name: str = Field(description="The article's name.")
     sku: str | None = Field(description="The product's SKU; null for a service.")
     unit: str | None = Field(description="The product's unit (ud, kg…); null for a service.")
-    base_price: int | None = Field(description="The catalog's price in cents (Inventory); null for a service.")
+    base_price: int | None = Field(
+        description="The catalog's price in cents (Inventory); null for a service.",
+        json_schema_extra={"money": True},
+    )
     min_quantity: Decimal = Field(description=D_MIN_QUANTITY)
-    price: int = Field(description=D_PRICE)
+    price: int = Field(description=D_PRICE, json_schema_extra={"money": True})
     updated_at: dt.datetime = Field(description="Its last change.")
 
 
@@ -625,20 +628,29 @@ class ResolveOut(Schema):
     name: str = Field(description="The article's name.")
     quantity: Decimal = Field(description="The quantity of the line.")
     date: dt.date = Field(description="The business day the dates were read on.")
-    base_price: int = Field(description="The catalog's price in cents.")
-    unit_price: int = Field(description="The price the line takes, in cents: the list's, or the catalog's.")
+    base_price: int = Field(description="The catalog's price in cents.", json_schema_extra={"money": True})
+    unit_price: int = Field(
+        description="The price the line takes, in cents: the list's, or the catalog's.",
+        json_schema_extra={"money": True},
+    )
     price_list_id: UUID | None = Field(description="The list the price comes from; null = the catalog's.")
     price_list_code: str | None = Field(description="That list's code.")
     price_list_name: str | None = Field(description="That list's name.")
     tax_included: bool | None = Field(description="Whether that list's prices carry the tax; null = as the business sells.")
     currency: str = Field(description="The currency of the price.")
-    line_amount: int = Field(description="Price × quantity (in the unit of the price), in cents, half up.")
-    discount: int = Field(description="Cents the rule takes off the line; 0 without rule.")
+    line_amount: int = Field(
+        description="Price × quantity (in the unit of the price), in cents, half up.",
+        json_schema_extra={"money": True},
+    )
+    discount: int = Field(
+        description="Cents the rule takes off the line; 0 without rule.",
+        json_schema_extra={"money": True},
+    )
     rule_id: UUID | None = Field(description="The rule that gives the discount; null = none.")
     rule_code: str | None = Field(description="That rule's code.")
     rule_name: str | None = Field(description="That rule's name.")
     rule_type: RuleType | None = Field(description="That rule's type.")
-    total: int = Field(description="The line after the discount, in cents.")
+    total: int = Field(description="The line after the discount, in cents.", json_schema_extra={"money": True})
 
 
 # What a price or a rule points at in another app (the assistant's card names it by this read)

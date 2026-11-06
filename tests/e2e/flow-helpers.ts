@@ -49,6 +49,23 @@ export async function manualFlow(context: BrowserContext, name: string, steps: u
   return id;
 }
 
+/** Runs `body` as the owner on Automations at `viewport`, with a name for what it creates (`<tag> <size> <stamp>`),
+ *  and closes its context after, whatever happens. */
+export async function onAutomations(
+  browser: Browser,
+  viewport: { label: string; width: number; height: number },
+  tag: string,
+  body: (stage: { context: BrowserContext; page: Page; name: string }) => Promise<void>,
+): Promise<void> {
+  const name = `${tag} ${viewport.label} ${Date.now().toString(36)}`;
+  const { context, page } = await signedIn(browser, '/flow/automations', viewport);
+  try {
+    await body({ context, page, name });
+  } finally {
+    await context.close();
+  }
+}
+
 /** Python for a one-shot `manage.py shell` playing the worker's relay to flow (in `a`'s database: the e2e stack's worker relays nothing): the
  *  outbox event `FLOW_EVENT`, handed to flow's reaction as the relay does on every tick. What that reaction leaves
  *  for after its COMMIT (the call of FLOW-F27, the question to the assistant of FLOW-F38) goes to `base.outbound`'s

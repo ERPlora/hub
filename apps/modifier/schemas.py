@@ -448,7 +448,10 @@ class OptionOut(Schema):
     kitchen_name: str = Field(
         description="Name on the kitchen ticket; empty = the name."
     )
-    price_delta: int = Field(description="Supplement in cents; negative = a discount.")
+    price_delta: int = Field(
+        description="Supplement in cents; negative = a discount.",
+        json_schema_extra={"money": True},
+    )
     tax_category_key: str | None = Field(
         description="Key of its own tax category; null = the dish's."
     )
@@ -568,7 +571,8 @@ class ResolveOut(Schema):
         description="Each choice, valued, in the order it was chosen."
     )
     folded_delta: int = Field(
-        description="Cents to add to the line's unit price: the picks not on a line of their own."
+        description="Cents to add to the line's unit price: the picks not on a line of their own.",
+        json_schema_extra={"money": True},
     )
     own_lines: list[OwnLineOut] = Field(
         description="The child lines of the dish line: one per option that taxes differently, with its quantity "

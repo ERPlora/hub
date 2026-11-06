@@ -546,7 +546,7 @@ class AppointmentRow(Schema):
     source: Source
     services: list[LineOut]
     service_names: str = Field(description="The services' names, joined.")
-    total: int = Field(description="The sum of its services' prices, in cents.")
+    total: int = Field(description="The sum of its services' prices, in cents.", json_schema_extra={"money": True})
     booked_by_customer: bool
     sale_id: UUID | None = Field(
         description="The sale that charged it; empty = not charged."
