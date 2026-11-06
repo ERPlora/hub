@@ -1,20 +1,19 @@
 <script setup lang="ts">
 // Online booking → Settings (WORKBOOK «Ajustes»; ONLINE_BOOKING-F07), only for whoever may save them. The values
 // come live (`online_booking.settings.get`: the factory ones until the business saves, and the diary's booking
-// rules); a change saved elsewhere repaints every field the person has not touched, and «Save» sends only the
-// fields touched and changed (`online_booking.settings.update`: the page's and the diary's, all or nothing).
-// Below, the offered services with their «Online booking» switch, saved at once in Services.
-// A refusal says itself as a FormModal does (`useRefusal`, hub#854): its notice goes as soon as something is
-// changed, each field's message as soon as that field is, and the next refusal says it all again.
-import { EmptyState, InlineFeedback, useRefusal } from '@erplora/ui/components';
+// rules). The form is every settings page's (`useSettingsForm`, hub#867): a change saved elsewhere repaints
+// every field the person has not touched, «Save» sends only the fields touched and changed
+// (`online_booking.settings.update`: the page's and the diary's, all or nothing), and a refusal says itself as
+// a FormModal does. Below, the offered services with their «Online booking» switch, saved at once in Services.
+import { EmptyState, InlineFeedback, useSettingsForm } from '@erplora/ui/components';
 import { type ApiError, useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { IonButton, IonInput, IonSpinner, IonTextarea, IonToggle } from '@ionic/vue';
-import { computed, ref, watch } from 'vue';
+import { computed, ref } from 'vue';
 
 import PageNotices from '../components/PageNotices.vue';
 import { useT } from '../composables/useT';
-import type { SettingsIn, SettingsOut } from '../operations';
+import type { SettingsOut } from '../operations';
 import { onlineBookingTabs } from '../tabs';
 
 const TEXTS = ['page_title', 'primary_color', 'logo_url'] as const;
@@ -30,20 +29,17 @@ const STRINGS = [...TEXTS, ...LONG_TEXTS] as const;
 const SERVICE_WINDOW = 100;
 
 type Form = Record<(typeof STRINGS)[number] | (typeof NUMBERS)[number], string> & Record<(typeof SWITCHES)[number], boolean>;
-type Field = keyof Form;
 
 const session = useSession();
 const t = useT();
 const canManage = computed(() => session.can('online_booking.manage_settings'));
 
 const { data, status, error } = useLive('online_booking.settings.get', {});
-const { run, pending, error: saveError } = useCommand('online_booking.settings.update');
-const { fieldErrors, showsError, changed } = useRefusal(saveError);
-
-const form = ref<Form | null>(null);
-const original = ref<Form | null>(null);
-const touched = ref<ReadonlySet<Field>>(new Set());
-const saved = ref(false);
+const { form, dirty, saved, pending, error: saveError, fieldErrors, showsError, set, save } = useSettingsForm(
+  data,
+  useCommand('online_booking.settings.update'),
+  { toForm, numbers: NUMBERS },
+);
 
 function toForm(settings: SettingsOut): Form {
   return {
@@ -53,60 +49,8 @@ function toForm(settings: SettingsOut): Form {
   };
 }
 
-const changes = computed<SettingsIn>(() => {
-  const now = form.value;
-  const was = original.value;
-  if (!now || !was) return {};
-  const out: Record<string, unknown> = {};
-  for (const key of touched.value) {
-    const value = now[key];
-    const text = typeof value === 'string' ? value.trim() : value;
-    if (text === was[key]) continue;
-    out[key] = (NUMBERS as readonly string[]).includes(key) && typeof text === 'string' && /^\d+$/.test(text) ? Number(text) : text;
-  }
-  return out as SettingsIn;
-});
-const dirty = computed(() => Object.keys(changes.value).length > 0);
-
-watch(
-  data,
-  (settings) => {
-    if (!settings) return;
-    const fresh = toForm(settings);
-    const current = form.value;
-    original.value = fresh;
-    form.value = current
-      ? (Object.fromEntries(
-          (Object.keys(fresh) as Field[]).map((key) => [key, touched.value.has(key) ? current[key] : fresh[key]]),
-        ) as Form)
-      : { ...fresh };
-  },
-  { immediate: true },
-);
-
-function set<K extends Field>(field: K, value: Form[K]): void {
-  if (!form.value) return;
-  form.value = { ...form.value, [field]: value };
-  touched.value = new Set([...touched.value, field]);
-  saved.value = false;
-  changed(field);
-}
-
 const text = (value: unknown): string => (value === null || value === undefined ? '' : String(value));
 const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'ion-touched': !!message });
-
-async function save(): Promise<void> {
-  if (!dirty.value || pending.value) return;
-  try {
-    const answer = await run(changes.value);
-    original.value = toForm(answer);
-    form.value = toForm(answer);
-    touched.value = new Set();
-    saved.value = true;
-  } catch {
-    saved.value = false; // The page paints the error; what was typed stays.
-  }
-}
 
 // Services booked online (Services' own list and switch).
 const serviceSearch = ref('');
