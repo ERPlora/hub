@@ -722,12 +722,17 @@ Pasos:
 4. «Umbral de stock bajo» (de fábrica, 10, en unidades enteras): el umbral con el que nace un
    producto creado sin el suyo (solo pasa por el asistente o la API: el formulario y el CSV siempre
    mandan uno). Cambiarlo no toca los productos que ya existen.
-5. Pulsa «Guardar»: «Ajustes guardados.».
+5. Pulsa «Guardar» (apagado hasta que cambias algo): se envía solo lo que cambiaste y sale «Ajustes
+   guardados.» encima del botón.
 Entra: los ajustes guardados del negocio (uno por negocio); si nunca se guardaron, valen los de
 fábrica.
 Sale: los ajustes, que se aplican desde el siguiente movimiento. Solo avisan a las pantallas abiertas
 (el Panel y las listas se refrescan); ninguna otra app reacciona.
-Si falla: «No se pudieron guardar los ajustes.». Si con la pestaña abierta entra otra persona sin
+Si falla: «No se pudieron guardar los ajustes.» y el motivo debajo del campo (un umbral vacío o con
+decimales: «Introduce un número entero.»). Como en las ventanas de formulario, el aviso se quita en
+cuanto se cambia algo y el motivo de un campo en cuanto se corrige ese campo; los dos vuelven si el
+siguiente intento también se rechaza. Un rechazo sin campo se queda hasta el siguiente intento
+(hub#871). Si con la pestaña abierta entra otra persona sin
 el permiso (relevo de turno), los campos se bloquean, desaparece «Guardar» y sale «No tienes
 permiso para cambiar estos ajustes. Pídeselo a un administrador si lo necesitas.».
 Implicados: SALE-F01

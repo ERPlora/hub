@@ -2,32 +2,41 @@
 // The ticket settings (PRINTING-F06; the old «Ticket settings» zone): «Print receipt on checkout», «Open
 // drawer on checkout» and «Receipt copies» (1 to 3); then «Printer of each role»: per role, «The first
 // active one of this role» or one of its active printers. The note that the receipt's header and footer
-// are the till's, with «Open the receipt settings» while Sales is on. «Save settings» sends only what
-// changed and says «Settings saved.». The values are the business's, live (the factory ones until saved);
-// what is being written is never overwritten by the stream. A read that fails shows no values at all.
-// Whoever may not change them sees them blocked, with the reason, and no «Save settings».
-import { InlineFeedback } from '@erplora/ui/components';
+// are the till's, with «Open the receipt settings» while Sales is on. The values are the business's, live
+// (the factory ones until saved). The form is every settings page's (`useSettingsForm` and
+// `SettingsFormFooter`, hub#867 and hub#897): a change saved elsewhere repaints every field the person has
+// not touched, «Save settings» sends only what was touched and changed (a role back to automatic is
+// `null`) and says «Settings saved.», and a refusal says itself as a FormModal does — under the role it
+// names, the notice gone as soon as something changes and the role's message as soon as that role does,
+// both back with the next refusal (hub#871). A read that fails shows no values at all. Whoever may not
+// change them sees them blocked, with the reason, and no «Save settings».
+import { InlineFeedback, SettingsFormFooter, useSettingsForm } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
-import { HubIcon, toastSuccess, useSession } from '@erplora/ui/shell';
+import { HubIcon, useSession } from '@erplora/ui/shell';
 import { IonButton, IonCard, IonCardContent, IonItem, IonLabel, IonList, IonSelect, IonSelectOption, IonSpinner, IonToggle } from '@ionic/vue';
-import { computed, ref, shallowRef, watch } from 'vue';
+import { computed } from 'vue';
 import { RouterLink } from 'vue-router';
 
 import { useT } from '../composables/useT';
 import { refusal } from '../lib/refusal';
-import type { SettingsOut, SettingsPatchIn, Usage } from '../operations';
+import type { SettingsOut, Usage } from '../operations';
 
-const props = defineProps<{
+defineProps<{
   /** The person may change the settings (`printing.manage_settings`). */
   editable: boolean;
 }>();
 
 type SwitchKey = 'print_receipt_on_sale' | 'open_drawer_on_sale';
 type PrinterKey = `${Usage}_printer`;
+/** What the card holds: a role's printer is its id, or `''` for automatic. */
+type Fields = Record<SwitchKey, boolean> & { receipt_copies: number } & Record<PrinterKey, string>;
 
 const SWITCHES: readonly SwitchKey[] = ['print_receipt_on_sale', 'open_drawer_on_sale'];
 const COPIES = [1, 2, 3] as const;
 const USAGES: readonly Usage[] = ['receipt', 'kitchen', 'bar', 'label'];
+const printerKey = (usage: Usage): PrinterKey => `${usage}_printer`;
+/** Automatic is `null` on the server. */
+const AUTOMATIC = { value: (id: string) => id || null };
 
 const t = useT();
 const session = useSession();
@@ -36,69 +45,34 @@ const { status, error, refresh } = live;
 const printers = useLive('printing.printer.list', { is_active: true, limit: 100 });
 const update = useCommand('printing.settings.update');
 
-/** The business's values: the live ones, or what the last save answered until the stream catches up. */
-const server = shallowRef<SettingsOut>();
-watch(
+const settings = useSettingsForm(
   live.data,
-  (now) => {
-    if (now) server.value = now;
+  // The refusal as printing words it (`refusal`): a failure the server did not word says the card's sentence.
+  { run: update.run, pending: update.pending, error: computed(() => refusal(update.error.value, t('printing.settings.saveError'))) },
+  {
+    toForm,
+    server: Object.fromEntries(USAGES.map((usage) => [printerKey(usage), AUTOMATIC])),
   },
-  { immediate: true },
 );
+const { form, fieldErrors, set } = settings;
 
-/** What the person changed, field by field (a role's printer: its id, or `''` for automatic). */
-const edits = ref<Record<string, boolean | number | string>>({});
-
-function serverValue(key: string): boolean | number | string | undefined {
-  const current = server.value;
-  if (!current) return undefined;
-  if (key.endsWith('_printer')) return current[`${key}_id` as keyof SettingsOut] ?? '';
-  return current[key as keyof SettingsOut] as boolean | number;
-}
-
-function valueOf(key: string): boolean | number | string | undefined {
-  return key in edits.value ? edits.value[key] : serverValue(key);
-}
-
-function set(key: string, value: boolean | number | string): void {
-  edits.value = { ...edits.value, [key]: value };
+function toForm(now: SettingsOut): Fields {
+  return {
+    print_receipt_on_sale: now.print_receipt_on_sale,
+    open_drawer_on_sale: now.open_drawer_on_sale,
+    receipt_copies: now.receipt_copies,
+    ...(Object.fromEntries(USAGES.map((usage) => [printerKey(usage), now[`${usage}_printer_id`] ?? ''])) as Record<PrinterKey, string>),
+  };
 }
 
 function optionsFor(usage: Usage) {
   return (printers.data.value?.rows ?? []).filter((p) => p.usage === usage);
 }
 
-/** Only what differs from the business's values: the PATCH the server takes (automatic = null). */
-const changes = computed<SettingsPatchIn>(() => {
-  const out: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(edits.value)) {
-    if (value === serverValue(key)) continue;
-    out[key] = key.endsWith('_printer') && value === '' ? null : value;
-  }
-  return out as SettingsPatchIn;
-});
-const canSave = computed(() => props.editable && Object.keys(changes.value).length > 0 && !update.pending.value);
-const saveError = computed(() => refusal(update.error.value, t('printing.settings.saveError')));
 const saleOn = computed(() => (session.me.value?.apps ?? []).some((app) => app.label === 'sale' && app.state === 'on'));
-
-async function save(): Promise<void> {
-  if (!canSave.value) return;
-  const sent = edits.value;
-  let saved: SettingsOut;
-  try {
-    saved = await update.run(changes.value);
-  } catch {
-    return; // The card paints the refusal.
-  }
-  server.value = saved;
-  // What was saved is the server's now; what was written while the save was on its way stays.
-  edits.value = Object.fromEntries(Object.entries(edits.value).filter(([key, value]) => sent[key] !== value));
-  void toastSuccess(t('printing.settings.saved'));
-}
-
-const loading = computed(() => !server.value && status.value === 'loading');
-const failed = computed(() => !server.value && status.value === 'error');
-const printerKey = (usage: Usage): PrinterKey => `${usage}_printer`;
+const loading = computed(() => !form.value && status.value === 'loading');
+const failed = computed(() => !form.value && status.value === 'error');
+const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'ion-touched': !!message });
 </script>
 
 <template>
@@ -134,7 +108,7 @@ const printerKey = (usage: Usage): PrinterKey => `${usage}_printer`;
       </template>
     </InlineFeedback>
 
-    <template v-if="server">
+    <template v-if="form">
       <h2
         class="printing-settings__heading"
         data-testid="printing-settings-heading"
@@ -158,7 +132,7 @@ const printerKey = (usage: Usage): PrinterKey => `${usage}_printer`;
               <ion-toggle
                 slot="end"
                 :data-testid="`printing-setting-${key}`"
-                :checked="!!valueOf(key)"
+                :checked="form[key]"
                 :disabled="!editable"
                 :aria-label="$t(`printing.settings.fields.${key}`)"
                 @ion-change="set(key, !!$event.detail.checked)"
@@ -173,8 +147,10 @@ const printerKey = (usage: Usage): PrinterKey => `${usage}_printer`;
               fill="outline"
               mode="md"
               interface="popover"
-              :value="valueOf('receipt_copies')"
+              :value="form.receipt_copies"
               :disabled="!editable"
+              :error-text="fieldErrors.receipt_copies"
+              :class="invalid(fieldErrors.receipt_copies)"
               @ion-change="set('receipt_copies', Number($event.detail.value))"
             >
               <ion-select-option
@@ -220,8 +196,10 @@ const printerKey = (usage: Usage): PrinterKey => `${usage}_printer`;
               fill="outline"
               mode="md"
               interface="popover"
-              :value="valueOf(printerKey(usage))"
+              :value="form[printerKey(usage)]"
               :disabled="!editable"
+              :error-text="fieldErrors[printerKey(usage)]"
+              :class="invalid(fieldErrors[printerKey(usage)])"
               @ion-change="set(printerKey(usage), String($event.detail.value ?? ''))"
             >
               <ion-select-option value="">
@@ -239,16 +217,16 @@ const printerKey = (usage: Usage): PrinterKey => `${usage}_printer`;
         </ion-card-content>
       </ion-card>
 
-      <InlineFeedback
-        v-if="saveError"
-        tone="danger"
-        icon="alert-circle-outline"
-        data-testid="printing-settings-save-error"
-        :heading="$t('printing.settings.saveError')"
-      >
-        {{ saveError.message }}
-      </InlineFeedback>
-
+      <SettingsFormFooter
+        :settings="settings"
+        testid="printing-settings"
+        :save-label="t('printing.settings.save')"
+        :saved-label="t('printing.settings.saved')"
+        :error-heading="t('printing.settings.saveError')"
+        :readonly="!editable"
+        spinner
+        save-icon="lucide:save"
+      />
       <p
         v-if="!editable"
         class="printing-settings__read-only"
@@ -256,25 +234,6 @@ const printerKey = (usage: Usage): PrinterKey => `${usage}_printer`;
       >
         {{ $t('printing.settings.noPermission') }}
       </p>
-      <ion-button
-        v-else
-        expand="block"
-        data-testid="printing-settings-save"
-        :disabled="!canSave"
-        @click="save"
-      >
-        <ion-spinner
-          v-if="update.pending.value"
-          slot="start"
-          name="crescent"
-        />
-        <HubIcon
-          v-else
-          slot="start"
-          name="lucide:save"
-        />
-        {{ $t('printing.settings.save') }}
-      </ion-button>
     </template>
   </div>
 </template>
