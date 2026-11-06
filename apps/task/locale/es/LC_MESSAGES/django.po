@@ -200,3 +200,9 @@ msgstr "Asignada a"
 
 msgid "Assign to me"
 msgstr "Asignármela"
+
+msgid "Task"
+msgstr "Tarea"
+
+msgid "Project"
+msgstr "Proyecto"

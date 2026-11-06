@@ -389,7 +389,6 @@ UNNAMED_REFERENCES = {
     # reads none of them and base.E009 refuses a mark (hub#756). The one that came in, the sale's line (hub#769), is the
     # same datum as the sale beside it on service.grant.create: naming them is that issue's to decide.
     "service": 7,
-    "task": 15,
     "tax": 4,
     "verifactu": 6,
     "website": 5,
@@ -560,6 +559,8 @@ TITLED_IN_SPANISH = {
     )},
     **{f"table.table.{action}:id": "Mesa" for action in ("delete", "move", "update")},
     **{f"table.zone.{action}:id": "Zona" for action in ("delete", "update")},
+    **{f"task.project.{action}:id": "Proyecto" for action in ("delete", "update")},
+    **{f"task.task.{action}:id": "Tarea" for action in ("assign", "complete", "delete", "set_status", "update")},
     **{f"whatsapp_inbox.conversation.{action}:id": "Conversación" for action in (
         "assign", "erase", "flag", "link_customer", "mark_read", "set_status",
     )},

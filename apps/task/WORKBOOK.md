@@ -401,7 +401,11 @@ Todo se puede pedir por las pantallas, el asistente (por voz o por texto, con la
 habla) y la API, con las mismas reglas y los mismos permisos. Una tarea se nombra por su id, su número
 o su título; un proyecto por su id, su código o su nombre; una persona por su id o su nombre. Si un
 nombre vale para varias, se dice cuáles y se pide que elija (`task.ambiguous_task`,
-`task.ambiguous_project`, `staff.ambiguous_member`).
+`task.ambiguous_project`, `staff.ambiguous_member`). Antes de una escritura, el asistente pide confirmar con su
+tarjeta (BASE-F97), que nombra cada registro como lo nombran las pantallas, nunca por su id: la tarea por su título
+(«Tarea: Limpiar el almacén»), el proyecto por su nombre («Proyecto: Apertura del local») y la persona por su nombre
+completo («Asignada a: Ana López»). Lo que quien pregunta no puede ver no sale: el empleado no ve nombrada una tarea
+ajena, como no la ve en su lista.
 
 ### Lo que ofrece: consultas (leen, no cambian nada; todas se pueden seguir en vivo)
 
@@ -505,6 +509,17 @@ cliente o a un compañero).
   en esa misma zona (`useBusinessZone`), para que la pantalla y el filtro «Vencidas» no se contradigan.
 - Asistente: toda operación declara `ai={"description"…}` (`risk` solo en las acciones; `high` al
   borrar una tarea o un proyecto) y todo campo de entrada lleva `description`.
+- La tarjeta de confirmación del asistente (BASE-F97, hub#677) nombra el registro que una escritura señala por su id
+  con las marcas `refers` de `schemas.py`, leídas como quien pregunta con las lecturas por id que ya existen: la
+  tarea por su `title` con `task.task.detail` (`A_TASK`: el `id` de `TaskRefIn`, `parent_id` y el `task_id` de un
+  comentario), el proyecto por su `name` con `task.project.detail` (`A_PROJECT`: el `id` de `ProjectRefIn` y
+  `project_id`) y la persona por su `full_name` con `staff.member.detail` de Personal, que es de sus `requires`
+  (`A_MEMBER`: `assigned_to_id`, `member_id` y `owner_id`). El `id` de una tarea o de un proyecto lleva el título
+  con la palabra de su lista («Tarea», «Proyecto»), nunca «Registro». Sin persona detrás, sin `task.view` (o sin
+  `staff.view` para una persona), una tarea que el empleado no ve, un id de otro negocio o algo que ya no está: el
+  registro queda fuera, nunca su id (`tests/test_assistant_card_records.py`); el trinquete `UNNAMED_REFERENCES` de
+  `base/tests/test_assistant_card_values.py` impide que entre un dato sin marca. Tareas no tiene listas cerradas sin
+  etiqueta en sus escrituras: el estado y la prioridad salen con las de sus modelos.
 - El admin de Django del Hub tiene **CRUD completo** sobre los cuatro modelos (ronda 12, PLAN §17); una
   escritura cruda del admin no deja aviso.
 - Fase 1: el ámbito es la primera parte del Host y los datos se comparten entre `a` y `b`, como en
