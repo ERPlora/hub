@@ -212,6 +212,10 @@ describe('OptionFormModal: the business answers after the form opened', () => {
     s.answer(201, { ...SODA, price_delta: 150 });
     await ionValue(s.field('name'), 'Bacon', 'ionInput');
     await ionValue(s.field('price_delta'), '150', 'ionInput');
+    // Leaving the field invents no decimals: «150» stays «150», never «150.00» that the yen cannot read.
+    s.field('price_delta').dispatchEvent(new CustomEvent('ionBlur'));
+    await settle();
+    expect(s.field('price_delta').value).toBe('150');
     await click(s.save());
     expect(s.sent().map((call) => (call.body as { price_delta: number }).price_delta)).toEqual([]);
     expect(s.save().disabled).toBe(true);
