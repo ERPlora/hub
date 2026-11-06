@@ -162,6 +162,11 @@ def _named(value: str | None, info: ValidationInfo, id_field: str, message) -> s
     return value
 
 
+def _said_by(text_field: str, id_field: str, message):
+    """The validator of ``text_field`` in a schema that names a record by ``id_field`` or by that text."""
+    return field_validator(text_field)(lambda value, info: _named(value, info, id_field, message))
+
+
 class In(Schema):
     """Every input refuses a field it does not declare (a filter or a field that does not exist)."""
 
@@ -190,20 +195,14 @@ class TaskRefIn(In):
     id: UUID | None = Field(None, title=T_TASK, description=D_TASK_ID, json_schema_extra=A_TASK)
     task: Reference | None = Field(None, validate_default=True, description=D_TASK)
 
-    @field_validator("task")
-    @classmethod
-    def _task_named(cls, value: str | None, info: ValidationInfo) -> str | None:
-        return _named(value, info, "id", NO_TASK)
+    _task_named = _said_by("task", "id", NO_TASK)
 
 
 class ProjectRefIn(In):
     id: UUID | None = Field(None, title=T_PROJECT, description=D_PROJECT_ID, json_schema_extra=A_PROJECT)
     project: Reference | None = Field(None, validate_default=True, description=D_PROJECT)
 
-    @field_validator("project")
-    @classmethod
-    def _project_named(cls, value: str | None, info: ValidationInfo) -> str | None:
-        return _named(value, info, "id", NO_PROJECT)
+    _project_named = _said_by("project", "id", NO_PROJECT)
 
 
 class MemberReleaseIn(In):
@@ -353,10 +352,7 @@ class CommentListIn(PageIn):
     task_id: UUID | None = Field(None, description=D_TASK_ID)
     task: Reference | None = Field(None, validate_default=True, description=D_TASK)
 
-    @field_validator("task")
-    @classmethod
-    def _task_named(cls, value: str | None, info: ValidationInfo) -> str | None:
-        return _named(value, info, "task_id", NO_TASK)
+    _task_named = _said_by("task", "task_id", NO_TASK)
 
 
 class CommentIn(In):
@@ -364,10 +360,7 @@ class CommentIn(In):
     task: Reference | None = Field(None, validate_default=True, description=D_TASK)
     text: CommentText = Field(description="The comment (up to 5000 characters).")
 
-    @field_validator("task")
-    @classmethod
-    def _task_named(cls, value: str | None, info: ValidationInfo) -> str | None:
-        return _named(value, info, "task_id", NO_TASK)
+    _task_named = _said_by("task", "task_id", NO_TASK)
 
 
 # Projects

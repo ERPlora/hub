@@ -8,7 +8,7 @@
 // flow: TASK-F07 TASK-F10 TASK-F11 TASK-F14 BASE-F97
 import { type BrowserContext, expect, test } from '@playwright/test';
 
-import { AN_ID, cancel, cardSpec, datumOf, ownerIn, VIEWPORTS } from './assistant-card-helpers';
+import { AN_ID, cancel, cardSpec, datumOf, fieldsOf, ownerIn, VIEWPORTS } from './assistant-card-helpers';
 import { card, openPanel } from './assistant-real';
 import { A, api, capture, untilStill } from './helpers';
 import { cleanUp, named, post, TAG } from './task-helpers';
@@ -18,8 +18,8 @@ const NEEDED = ['staff', 'task'];
 
 /** What the screens call each record, by the language of the card. */
 const WORDS = {
-  es: { task: 'Tarea', project: 'Proyecto', assignee: 'Asignada a' },
-  en: { task: 'Task', project: 'Project', assignee: 'Assigned to' },
+  es: { task: 'Tarea', project: 'Proyecto', assignee: 'Asignada a', comment: 'Comentario' },
+  en: { task: 'Task', project: 'Project', assignee: 'Assigned to', comment: 'Comment' },
 };
 /** The word the card calls a record by when nothing titles it, in each language. */
 const GENERIC = { es: 'Registro', en: 'Record' };
@@ -70,10 +70,14 @@ for (const language of ['es', 'en'] as const) {
 
     // «Comenta en la tarea: hecho a medias», the case of the issue: a write that is not dangerous is said in one line;
     // the task by its title, beside the comment.
-    const commented = await datumOf(page, 'task__comment__add', { task_id: task.id, text: `${TAG} hecho a medias` }, 'task_id');
-    expect([commented.label, commented.value]).toEqual([words.task, task.title]);
+    const comment = `${TAG} hecho a medias`;
+    const commented = await fieldsOf(page, 'task__comment__add', { task_id: task.id, text: comment });
+    expect(commented.map((field) => [field.name, field.label, field.value])).toEqual([
+      ['task_id', words.task, task.title],
+      ['text', words.comment, comment],
+    ]);
     await expect(card(page)).toContainText(task.title);
-    await expect(card(page)).toContainText(`${TAG} hecho a medias`);
+    await expect(card(page)).toContainText(comment);
     await cancel(page);
 
     // «Asígnasela a Ana»: the person by their full name, as Staff names them.
