@@ -218,7 +218,8 @@ def list_row(price_list: PriceList) -> dict:
 
 
 def item_row(item: PriceItem) -> dict:
-    """A ``PriceItemOut``: a product's name, SKU, unit and catalog price, read from Inventory now."""
+    """A ``PriceItemOut``: a product's name, SKU, unit and catalog price, read from Inventory now, and the currency of
+    its list, the one its price is in."""
     product = item.product
     return {
         "id": item.id,
@@ -234,6 +235,7 @@ def item_row(item: PriceItem) -> dict:
         "base_price": product.price if product else None,
         "min_quantity": item.min_quantity,
         "price": item.price,
+        "currency": item.price_list.currency,
         "updated_at": item.updated_at,
     }
 
@@ -257,8 +259,9 @@ def _rules() -> QuerySet:
     return DiscountRule.objects.select_related("category", "product").annotate(customer_group_name=_group_name())
 
 
-def rule_row(rule: DiscountRule) -> dict:
-    """A ``RuleOut``; reads the names of what it applies to when the row lacks them."""
+def rule_row(rule: DiscountRule, currency: str) -> dict:
+    """A ``RuleOut``, its amount per unit in ``currency`` (the business's: a rule belongs to no list); reads the names
+    of what it applies to when the row lacks them."""
     if not hasattr(rule, "customer_group_name"):
         rule = _rules().get(pk=rule.pk)
     return {
@@ -268,6 +271,7 @@ def rule_row(rule: DiscountRule) -> dict:
         "rule_type": rule.rule_type,
         "percent": rule.percent,
         "amount": rule.amount,
+        "currency": currency,
         "buy_quantity": rule.buy_quantity,
         "get_quantity": rule.get_quantity,
         "tiers": [{"min_quantity": Decimal(t["min_quantity"]), "percent": Decimal(t["percent"])} for t in rule.tiers],
@@ -399,7 +403,7 @@ def get_price_item(ctx: OperationContext, data: PriceItemIdIn) -> dict:
     if item is None:
         raise NotFound(str(ITEM_NOT_FOUND), code="pricing.price_item_not_found")
     row = item_row(item)
-    return {**row, "currency": item.price_list.currency, "label": item_label(row, ctx.language)}
+    return {**row, "label": item_label(row, ctx.language)}
 
 
 # ── Rules ────────────────────────────────────────────────────────────────────────────────────────
@@ -431,7 +435,8 @@ def list_rules(ctx: OperationContext, params: RuleListIn) -> dict:
         if value:
             rows = rows.filter(**{column: value})
     rows = rows.order_by(*list_order(params.sort, Lower("code"), descending=params.dir == "desc", nulls_last=True))
-    return _page(rows, params, rule_row)
+    currency = platform.business_currency(ctx.scope)
+    return _page(rows, params, lambda rule: rule_row(rule, currency))
 
 
 @operation(
@@ -444,7 +449,7 @@ def list_rules(ctx: OperationContext, params: RuleListIn) -> dict:
     ai={"description": "Get one discount rule, active or not, by its id, its code or its name (e.g. «summer rule»)."},
 )
 def get_rule(ctx: OperationContext, data: RuleRefIn) -> dict:
-    return rule_row(find_rule(data.id, data.rule))
+    return rule_row(find_rule(data.id, data.rule), platform.business_currency(ctx.scope))
 
 
 # ── What a price or a rule points at in another app ──────────────────────────────────────────────

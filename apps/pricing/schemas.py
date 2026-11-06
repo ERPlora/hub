@@ -391,13 +391,13 @@ class PriceItemOut(Schema):
     )
     min_quantity: Decimal = Field(description=D_MIN_QUANTITY)
     price: int = Field(description=D_PRICE, json_schema_extra={"money": True})
+    currency: str = Field(description="The currency of its list, the one its price is in (ISO 4217).")
     updated_at: dt.datetime = Field(description="Its last change.")
 
 
 class PriceItemDetailOut(PriceItemOut):
-    """One price as the list shows it, with the currency of its list: the one its price is in."""
+    """One price as the list shows it, and how it is named outside its list."""
 
-    currency: str = Field(description="The currency of its list, the one its price is in (ISO 4217).")
     label: str = Field(
         description="How it is named outside its list, in the reader's language: its article, its list and, from a "
         "quantity on, that quantity (e.g. «Shampoo · VIP prices · from 10»)."
@@ -578,7 +578,13 @@ class RuleOut(Schema):
     name: str = Field(description=D_NAME)
     rule_type: RuleType = Field(description=D_RULE_TYPE)
     percent: Decimal | None = Field(description="percent: the percent taken off the line.")
-    amount: int | None = Field(description="fixed: cents taken off each unit of the price sold (each kg of an article priced per kg).")
+    amount: int | None = Field(
+        description="fixed: cents taken off each unit of the price sold (each kg of an article priced per kg).",
+        json_schema_extra={"money": True},
+    )
+    currency: str = Field(
+        description="The currency its amount per unit is in (ISO 4217): the business's, as a rule belongs to no list."
+    )
     buy_quantity: int | None = Field(description="buy_x_get_y: the units that are paid.")
     get_quantity: int | None = Field(description="buy_x_get_y: the units that are free.")
     tiers: list[TierOut] = Field(description="tiered: the tiers by rising quantity.")

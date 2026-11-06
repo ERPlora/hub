@@ -434,12 +434,13 @@ Pasos:
    fecha y una hora como se escriben en ese idioma y a la hora del negocio («2 nov 2026, 10:00»), y un importe
    que deja un paso anterior (el de un pago que acaba de registrar, el total de una venta o de una factura, el
    precio de un servicio o de un menú, el total provisional de una cuenta, el importe de un bono, un movimiento
-   de caja) en la moneda en que lo da ese paso: un pago en dólares, en dólares («12,50 US$»); si no da
-   ninguna, en la del negocio («120,50 €»). Un número que trae el aviso sale tal cual, porque el aviso no dice
-   si es dinero, y también el precio de una línea de un carrito y el descuento fijo de una regla de tarifa,
-   que aún no dicen su moneda (hub#915), y el límite de pago en efectivo o de ticket de la vista previa de un
-   cobro, que la ley fija en euros (hub#926). Lo que va a otra acción, a otro sistema o a un «Solo sigue si…»
-   lleva cada dato tal cual.
+   de caja, el precio y el total de una línea de un carrito, un precio de una tarifa, el descuento fijo de una
+   regla de tarifa) en la moneda en que lo da ese paso: un pago en dólares, en dólares («12,50 US$»); una línea
+   de un carrito, en la de su carrito; un precio de una tarifa, en la de su tarifa; el descuento fijo de una
+   regla, que no es de ninguna tarifa, en la del negocio; si no da ninguna, en la del negocio («120,50 €»). Un
+   número que trae el aviso sale tal cual, porque el aviso no dice si es dinero, y también el límite de pago en
+   efectivo o de ticket de la vista previa de un cobro, que la ley fija en euros (hub#926). Lo que va a otra
+   acción, a otro sistema o a un «Solo sigue si…» lleva cada dato tal cual.
 Entra: las acciones y consultas de las apps activas, el último aviso real de ese tipo y lo que dejan los
 pasos anteriores. Los datos se nombran en el idioma de la pantalla («Número de venta», «Teléfono del
 cliente») y con la palabra de la app que los tiene («Sección», como en Ventas / TPV), nunca con su
@@ -1409,9 +1410,12 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   previa de BASE-F98) o, si no responde ninguna, en la del negocio. Ni un nombre en `_cents` ni las palabras de la
   descripción («in cents») hacen un importe (hub#498): toda salida de un paso que es un importe lleva la marca, también
   las que no lo dicen (precios de Servicios y de Menús, los totales de una factura, el total provisional de una cuenta,
-  el importe de un bono, el `signed_amount` de un movimiento de caja, con `signed`; hub#923). El trinquete
-  `UNMARKED_STEP_AMOUNTS` de `test_step_amounts.py` (solo baja; hoy la línea de carrito y la regla de tarifa, hub#915,
-  y los límites de la vista previa de un cobro, en euros, hub#926) caza una salida entera sin marca que dice céntimos en
+  el importe de un bono, el `signed_amount` de un movimiento de caja, con `signed`; hub#923), y las de una línea de
+  carrito (`unit_price`, `line_total`) y de una regla de tarifa (`amount`), que responden su `currency` al lado —la de
+  su carrito, con `currency_decimals`; la del negocio, porque una regla no es de ninguna tarifa—, como un precio de
+  tarifa responde la de su tarifa (`PriceItemOut.currency`, también en `add`, `update` y `list`; hub#915). El trinquete
+  `UNMARKED_STEP_AMOUNTS` de `test_step_amounts.py` (solo baja; hoy solo los límites de la vista previa de un cobro, en
+  euros, hub#926) caza una salida entera sin marca que dice céntimos en
   su nombre o su descripción, que se llama como un dato que su app ya marca como dinero en una entrada o una salida
   (también en la rama de un `Cents | None`) o que nombra `AMOUNTS_BY_NAME` (los importes sin gemelo marcado). Una
   hora sin segundos («21:00») ya la escribió su app para una
@@ -1768,9 +1772,8 @@ Los avisos llevan ids, nunca nombres ni contenidos.
 - **Mandar un correo a un cliente desde una automatización** (FLOW-F31 lo manda por WhatsApp): el Hub todavía
   no manda correos a clientes.
 - **Arreglos pendientes, abiertos como issues** (`migration-leftover`): siete textos en español con las
-  palabras de otra app (hub#497); el precio de una línea de carrito o el descuento fijo de una regla de tarifa
-  que deja un paso sale en céntimos (hub#915), y también el límite de pago en efectivo o de ticket de la vista
-  previa de un cobro (hub#926); la tarjeta de confirmación del asistente llama «Registro» a la automatización o a la ejecución
+  palabras de otra app (hub#497); el límite de pago en efectivo o de ticket de la vista previa de un cobro que
+  deja un paso sale en céntimos (hub#926); la tarjeta de confirmación del asistente llama «Registro» a la automatización o a la ejecución
   (hub#499) y dice «N elementos» en los permisos de un flujo sin decir cuáles (hub#504, con `base`).
 - **«Necesita tu atención»** (eventos que no se entregaron): el reparto del worker ya entrega los avisos a esta
   app y, tras 8 intentos fallidos, da uno por perdido y lo deja anotado; la pantalla que los enseña y los vuelve a
