@@ -730,7 +730,7 @@ def template_fillable(row: Template) -> bool:
 
 
 def template_sendable(row: Template) -> bool:
-    """Whether it goes as it is, with nothing to choose: a file header only with its own file (an automation's)."""
+    """Whether it goes as it is, with nothing to choose: a file header only with its own file."""
     return template_fillable(row) and (row.header_format not in FILE_HEADERS or row.header_sample_id is not None)
 
 
