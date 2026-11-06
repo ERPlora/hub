@@ -13,6 +13,7 @@ import { toastSuccess } from '@erplora/ui/shell';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { defineComponent, h } from 'vue';
 
+import type { Business } from '../../../../base/frontend/operations';
 import { business, click, errorFrame, flush, ionValue, JAPANESE, mountInvoice, POLISH } from '../__tests__/mount-invoice';
 import InvoiceCreateModal from './InvoiceCreateModal.vue';
 import InvoiceLinesEditor from './InvoiceLinesEditor.vue';
@@ -45,7 +46,9 @@ const settingsOf = (tax: string) => ({ country_code: 'ES', region_code: REGIONS[
 const RECIPIENT = { customerId: null, name: 'Talleres Pérez SL', taxId: 'B12345674', address: 'Calle Luna 3', country: 'ES', idType: '' };
 const CREATED = { id: 'i9', number: 'FACT-2026-000009' };
 
-async function setup(locale: 'en' | 'es' = 'en') {
+/** The window open, its stream live and the business answered (`base.business.get`: in Spain, in euros, unless
+ *  `company` says another; `null` = not answered yet). */
+async function setup(locale: 'en' | 'es' = 'en', company: Partial<Business> | null = {}) {
   const m = await mountInvoice(InvoiceCreateModal, {
     props: { open: true },
     locale,
@@ -68,6 +71,7 @@ async function setup(locale: 'en' | 'es' = 'en') {
   const submit = () => m.inDoc('invoice-create-submit') as HTMLElement & { disabled: boolean };
   const editor = () => m.wrapper.findComponent(InvoiceLinesEditor);
   const call = await m.live();
+  if (company) await m.result('base.business.get', business(company));
   /** The business's territory (its tax, from Taxes) and the rate a typed line starts with there. */
   async function territory(tax: string, rate: string | null) {
     await m.result(SETTINGS, settingsOf(tax));
@@ -131,8 +135,7 @@ describe('InvoiceCreateModal', () => {
 
   it('reads each price in the business’s money: «12,50 zł» in Poland, «1.234» yen in Japan (flow business-currency)', async () => {
     for (const [country, typed, cents] of [[POLISH, '12,50 zł', 1250], [JAPANESE, '1.234', 1234]] as const) {
-      const s = await setup();
-      await s.result('base.business.get', business(country));
+      const s = await setup('en', country);
       await s.choose('TICKET', 'F2');
       await s.line('Course', typed);
       s.answer(201, CREATED);
@@ -141,6 +144,23 @@ describe('InvoiceCreateModal', () => {
       expect((s.sent()[0]?.body as { lines: { unit_price: number }[] }).lines[0].unit_price).toBe(cents);
       s.wrapper.unmount();
     }
+  });
+
+  it('reads no price before the business’s money answers: «Issue invoice» waits for it, then «12,50 zł» is issued in złoty (hub#907)', async () => {
+    const s = await setup('en', null);
+    await s.choose('TICKET', 'F2');
+    await s.line('Course', '12,50 zł');
+    // A click while the business has not answered: the price is not read yet (never «not an amount», never sent).
+    await click(s.submit());
+    expect(s.inDoc('invoice-create-error')?.textContent ?? '').not.toContain('not an amount');
+    expect(s.sent()).toEqual([]);
+    expect(s.submit().disabled).toBe(true);
+    await s.result('base.business.get', business(POLISH));
+    expect(s.submit().disabled).toBe(false);
+    s.answer(201, CREATED);
+    await click(s.submit());
+    expect(s.inDoc('invoice-create-error')).toBeNull();
+    expect((s.sent()[0]?.body as { lines: { unit_price: number }[] }).lines[0].unit_price).toBe(1250);
   });
 
   it('a price that is not an amount is said with its line, and nothing is sent', async () => {

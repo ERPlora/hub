@@ -153,8 +153,8 @@ cifra no cuentan, como en 12,50 zł) y el
 tipo, con el nombre del impuesto del territorio fiscal del negocio: «IVA %» (21 de entrada), «IGIC %» en
 Canarias o «IPSI %» en Ceuta y Melilla, que empiezan en el tipo general de su regla de Impuestos y vacíos
 si el territorio aún no tiene regla de su impuesto. «+ Línea» añade otra y la cruz la quita. «Emitir
-factura» (con una rueda que gira mientras va) está en gris hasta que cada línea tiene descripción, cantidad, precio
-y tipo. Un rechazo sale encima de los botones, por campo cuando es de un campo.
+factura» (con una rueda que gira mientras va) está en gris hasta que el negocio ha dicho su moneda y cada línea tiene
+descripción, cantidad, precio y tipo. Un rechazo sale encima de los botones, por campo cuando es de un campo.
 
 ### Series
 Menú **Facturación → Series** (solo con permiso de llevar las series). La entrada «Cada serie define
@@ -289,8 +289,9 @@ Pasos:
    de Impuestos (en Canarias, el de la regla de Canarias); si el territorio aún no tiene regla de su
    impuesto, está vacío: escríbelo tú. «+ Línea» añade otra, con el mismo tipo de entrada, y la cruz la
    quita.
-4. Pulsa «Emitir factura»; está en gris hasta que cada línea tiene descripción, cantidad, precio y tipo. La
-   ventana se cierra y la factura aparece en la lista con su número, «Emitida» y «Origen» «Alta manual».
+4. Pulsa «Emitir factura»; está en gris hasta que el negocio ha dicho su moneda (cada precio se lee en ella) y
+   cada línea tiene descripción, cantidad, precio y tipo. La ventana se cierra y la factura aparece en la lista
+   con su número, «Emitida» y «Origen» «Alta manual».
 Entra: lo que escribe la persona; el emisor configurado. Por la API o el asistente una línea puede
 llevar además la categoría fiscal de Impuestos: entonces su tipo y su calificación son los de la regla
 vigente hoy, no el tipo escrito. El tipo escrito es del impuesto del territorio fiscal del negocio
