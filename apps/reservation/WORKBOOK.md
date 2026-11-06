@@ -111,7 +111,8 @@ con cuántas reservas quedan «libres» o «Lleno»; o «No queda servicio hoy»
 «Cerrado este día»). «Hoy» es el del reloj del negocio, no el del dispositivo.
 
 Debajo, la tabla del día por hora: Fecha, Hora, Cliente, Teléfono (como en Clientes: el prefijo del país
-y las cifras en grupos), Pax, Mesa, Estado; buscador «Buscar cliente, teléfono o correo…» que busca en
+y las cifras en grupos), Pax, Mesa, Estado (una cancelada dice al lado por qué: «Motivo: …» con lo que se
+escribió, o «Liberada: nunca se confirmó»; uno largo, acortado con «…»); buscador «Buscar cliente, teléfono o correo…» que busca en
 **todo** el libro, también por las cifras del teléfono sin prefijo (resultados por día y hora);
 filtros por hora, comensales, mesa y estado; vista tabla o tarjetas. Acción principal **«Nueva
 reserva»** y, por fila, según su estado: «Confirmar», «Sentar», «Completar», «Cancelar», «No
@@ -125,7 +126,8 @@ del formulario, dentro del formulario.
 **Formulario de reserva** («Nueva reserva» / «Editar reserva»): Cliente (el buscador de Clientes, por
 nombre o teléfono, con «+ Nuevo cliente»), Nombre, Teléfono, Correo, Fecha, Hora, Comensales, Duración
 (minutos), Mesa (las libres a esa hora, con su aforo y su zona; las que no caben al grupo, avisadas),
-Origen (Teléfono, En el local), Notas del cliente y Notas internas.
+Origen (Teléfono, En el local), Notas del cliente y Notas internas. Una reserva ya sentada, completada,
+cancelada o no presentada solo cambia sus notas, y lo dice arriba; la cancelada, además, con su motivo entero.
 
 ### Lista de espera
 Menú **Reservas → Lista de espera**. Tabla, en el orden en que se apuntaron (por día y hora preferida):
@@ -357,6 +359,9 @@ Pantalla: Reservas (fila → «Cancelar»)
 Pasos:
 1. «Cancelar» en una reserva Pendiente o Confirmada; escribe el motivo si quieres y confirma.
 2. Pasa a Cancelada, deja su hueco libre y Mesas suelta su mesa (TABLE-F27).
+3. Junto a «Cancelada», la fila, la tarjeta del móvil y el formulario de la reserva dicen «Motivo: …» con lo
+   que se escribió, tal cual (uno largo, acortado con «…» en la fila y entero en el formulario); sin motivo,
+   solo «Cancelada».
 Entra: la reserva y el motivo.
 Sale: la reserva cancelada (avisa: `reservation.reservation.status_changed`).
 Si falla: desde otro estado: «Esta reserva está sentada: no se puede cancelar.».
@@ -425,7 +430,8 @@ Pasos:
 3. La pantalla de Reservas que ese negocio tiene abierta la pasa a Cancelada al momento, sin recargar; la de
    otro negocio no se entera.
 Entra: la hora.
-Sale: las reservas liberadas (avisa: `reservation.reservation.unconfirmed_released`, solo si liberó
+Sale: las reservas liberadas, que dicen «Liberada: nunca se confirmó» junto a «Cancelada» en la fila, la
+tarjeta del móvil y el formulario (avisa: `reservation.reservation.unconfirmed_released`, solo si liberó
 alguna).
 Si falla: una pasada que falla no cambia nada y la siguiente lo vuelve a intentar.
 Implicados: RESERVATION-F03
