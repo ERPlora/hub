@@ -4,8 +4,9 @@
 // place the app turns them into text (`Intl.NumberFormat`) and typed amounts into cents.
 // The money is the business's (`useBusinessMoney`: its country's currency and the decimals the server counts it in)
 // on the till, and a charged sale's own (`moneyOf`) on what it shows or prints: the screens pass it, and until it is
-// known an amount is a figure with two decimals and no sign, never the euro by default. Its decimals come from the
-// server, never from the browser's Intl (which gives none to the forint).
+// known an amount is a dash, never the euro by default nor a figure with two decimals the currency may not have
+// (hub#936: 1,500 yen painted «15.00»). Its decimals come from the server, never from the browser's Intl (which gives
+// none to the forint).
 
 import type { Money } from '../../../../base/frontend/lib/home';
 
@@ -37,26 +38,30 @@ const missing = (value: unknown) => value === null || value === undefined || val
 /** The decimals of `money` (2 in EUR and HUF, 0 in JPY): its minor unit; two while unknown. */
 export const moneyDecimals = (money?: Money): number => money?.decimals ?? NO_MONEY_DECIMALS;
 
-/** The money a charged sale is shown in: its own currency and decimals, as the server sent them; unknown (a figure
- *  without a sign) if a server half way through a deploy does not send them yet. */
+/** The money a charged sale is shown in: its own currency and decimals, as the server sent them; unknown (a dash) if a
+ *  server half way through a deploy does not send them yet. */
 export const moneyOf = (sale: { currency: string; currency_decimals: number }): Money | undefined =>
   sale.currency ? { currency: sale.currency, decimals: sale.currency_decimals } : undefined;
 
 // Grouped always: Spanish CLDR waits for five digits (minimumGroupingDigits 2) and would paint «1234,56 €»
 // here beside «1.234,56 €» in the other screens (hub#1090).
-function moneyOptions(money: Money | undefined, decimals: number): Intl.NumberFormatOptions {
+function moneyOptions({ currency, decimals }: Money): Intl.NumberFormatOptions {
   const digits = { minimumFractionDigits: decimals, maximumFractionDigits: decimals, useGrouping: 'always' } as const;
-  return money ? { style: 'currency', currency: money.currency, currencyDisplay: 'narrowSymbol', ...digits } : digits;
+  return { style: 'currency', currency, currencyDisplay: 'narrowSymbol', ...digits };
 }
 
-/** `cents` (minor units) as `money` in `locale` («€1,234.56», «1.234,56 zł», «¥5,003»; «1.234,56» while the
- *  money is unknown); nothing to show is «—». */
+/** `cents` (minor units) as `money` in `locale` («€1,234.56», «1.234,56 zł», «¥5,003»); nothing to show, or a money
+ *  still unknown, is «—»: its decimals are not known, and «15.00» for 1,500 yen is a wrong amount (hub#936). */
 export function formatMoney(cents: number | null | undefined, locale: string, money?: Money): string {
-  if (missing(cents)) return '—';
-  const decimals = moneyDecimals(money);
-  return formatter(locale, `money-${money?.currency ?? ''}-${decimals}`, moneyOptions(money, decimals)).format(
-    (cents as number) / 10 ** decimals,
+  if (missing(cents) || !money) return '—';
+  return formatter(locale, `money-${money.currency}-${money.decimals}`, moneyOptions(money)).format(
+    (cents as number) / 10 ** money.decimals,
   );
+}
+
+/** An amount taken off or added, with its `sign` («−€5.00», «+¥500»); while the money is unknown, the dash alone. */
+export function signedMoney(sign: '+' | '−', cents: number, locale: string, money?: Money): string {
+  return money ? `${sign}${formatMoney(cents, locale, money)}` : '—';
 }
 
 /** The sign of `money` alone, as a till there writes it («€», «zł», «¥»); nothing while it is unknown. */

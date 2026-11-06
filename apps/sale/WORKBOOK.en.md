@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:dfc420dafce2493beec28133396e98987de156c7b55d364beb8b38da198798d9 -->
+<!-- generated from WORKBOOK.md sha256:44526d4af6ea2edc94c710b412b9e4f54db0372d787bc0d0511ce974c1219b3b -->
 
 ## What it is for and who it is for
 
@@ -303,7 +303,10 @@ check closed. With Invoicing, its ticket (F2) numbered in the year's series in t
 (INVOICE-F01): both or neither. Sales announces the charged sale: Inventory lowers the stock
 (INVENTORY-F21) and Customers adds the purchase to the record (CUSTOMER-F20). Each line keeps the
 category, rate, country, region and Taxes rule it was charged with.
-If it fails: while the business has not yet said its currency, the **Charge** sheet stays on "Working out
+If it fails: while the business has not yet said its currency, **Sell** paints no figure: the total, the lines,
+the tiles, the search, the open checks and the floating button say "—", and the foot "Charge · —", as while the
+total is on its way, because without it the number of decimals is unknown (in yen, "Charge · 15.00" for ¥1,500;
+hub#936); as soon as it says it, the figure shows with its sign. The **Charge** sheet stays on "Working out
 the total…", with no keypad and "Charge" grey, because the total is painted and the amount tendered read in
 it (without it, "1500" yen tendered would be charged as 150,000); if the currency cannot be read, the notice
 with "Retry" shows in its place, as with any other read of the charge. With no amount tendered the button does
@@ -858,7 +861,10 @@ Steps:
    dialog, with the printer or "Save as PDF").
 In: the open check and its total worked out by the server.
 Out: a paper with no fiscal number; it uses up no numbering and creates no sale. Each press, one bill.
-If it fails: "Bill could not be printed". If the installed app does not open its print screen, the notice
+If it fails: while the business has not yet said its currency, "Bill" keeps loading and the printer stays grey:
+the paper carries its amounts and never goes out with a supposed figure (in yen, ¥2,700 as "27.00"; hub#936); if
+the currency cannot be read, it says so with "Retry", as when the bill cannot be worked out.
+"Bill could not be printed". If the installed app does not open its print screen, the notice
 says why after a colon: "…: this version of the ERPlora app cannot print; update it", "…: the device's print
 service did not open", "…: the document is empty or too large to print" or "…: this app is linked to
 another business".
@@ -1302,7 +1308,8 @@ Out: a service line with the service, its frozen price and the service's tax cat
 stock.
 If it fails: in "Amount of <service>", "Add <amount>" and "Use <price>" wait in grey while the business
 has not yet said its currency, because the amount is read and the price written in it (without it, "1500"
-yen would go in as 150,000). A service without a tax category shows "VAT missing" and does not go in
+yen would go in as 150,000), and the price does not show yet: "Use —", and on the tile "—" or "From —" (never
+"From 65.00" for ¥6,500; hub#936). A service without a tax category shows "VAT missing" and does not go in
 ("Cannot be sold: no tax category. VAT needs to be set up."); that notice goes away on its own as soon as the service has a
 category, without touching anything else, and also on leaving **Sell**. An archived one, "That service is
 no longer offered…"; an amount outside the service's minimum and maximum, "That amount is outside what the

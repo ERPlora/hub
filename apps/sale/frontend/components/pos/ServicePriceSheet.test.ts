@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { business, click, expectWaitsForTheYen, JAPANESE, mountSale, settle } from '../../__tests__/mount-sale';
 import { plain } from '../../lib/format';
 import { service } from './__tests__/fixtures';
+import PosNumpad from './PosNumpad.vue';
 import ServicePriceSheet from './ServicePriceSheet.vue';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
@@ -70,9 +71,11 @@ describe('ServicePriceSheet: before the business answers its money (hub#921)', (
   it('the suggestion waits too: a tap before the business answers types nothing, then it types the price in yen', async () => {
     const s = await setup({}, { business: null });
     const suggest = () => s.inDoc('pos-service-price-suggest') as HTMLElement & { disabled?: boolean };
+    // The figure on top is a dash until the business answers (hub#936) and cannot say what was typed: the keypad does.
+    const typed = () => s.wrapper.findComponent(PosNumpad).props('modelValue');
     expect(suggest().disabled).toBe(true);
     await click(suggest());
-    expect(amount(s)).toBe('0,00');
+    expect([amount(s), typed()]).toEqual(['—', '']);
     await s.result('base.business.get', business(JAPANESE));
     expect([suggest().disabled, amount(s)]).toEqual([false, '0 ¥']);
     await click(suggest());
