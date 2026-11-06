@@ -441,7 +441,9 @@ líneas consume uno de sus «Usos».
 Si falla: sin ningún servicio, «Añade al menos un servicio: un paquete sin líneas no se puede
 canjear.»; un servicio repetido, archivado o que no existe; un importe ilegible o negativo, debajo de
 su campo; un nombre que ya tiene otro bono vivo, «Ya hay un paquete con ese nombre. Elige otro
-nombre.».
+nombre.». «Crear paquete» (y «Guardar cambios» al editarlo, SERVICE-F13) está en gris mientras el negocio
+no haya dicho todavía su moneda, porque el precio cerrado y el descuento se leen en ella (sin ella,
+«1500» yenes se guardaría como 150 000).
 Implicados: SERVICE-F14, SERVICE-F22
 
 ### SERVICE-F13 Editar o eliminar un bono

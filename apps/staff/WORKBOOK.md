@@ -211,7 +211,9 @@ acceso a este negocio.» o la cuenta ya vinculada a otra ficha (STAFF-F03). Quie
 compensación no puede enviarla: «Se necesita el permiso «{permiso}».». Dos fichas con el mismo
 nombre, email o nº de empleado se aceptan. Desde el asistente, un rol que el negocio no tiene (o que se
 ha retirado) se comprueba antes de la tarjeta de confirmación: no sale tarjeta, el asistente dice que
-ese rol no está disponible y no se crea nada.
+ese rol no está disponible y no se crea nada. Guardar (también al editar, STAFF-F02) está en gris
+mientras el negocio no haya dicho todavía su moneda, porque la tarifa por hora se lee en ella (sin ella,
+«1500» yenes se guardaría como 150 000).
 Implicados: BASE-F97
 
 ### STAFF-F02 Editar la ficha de un profesional
