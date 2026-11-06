@@ -114,13 +114,13 @@ class Task(UUIDModel):
         blank=True,
         related_name="+",
         db_column="created_by_hub_user_id",
-        verbose_name=_("created by"),
+        verbose_name=pgettext_lazy("task", "created by"),
     )
     due_date = models.DateField(_("due date"), null=True, blank=True)
     completed_at = models.DateTimeField(_("completed at"), null=True, blank=True)
     tags = models.JSONField(_("tags"), default=list, blank=True)
-    created_at = models.DateTimeField(_("created at"), auto_now_add=True)
-    updated_at = models.DateTimeField(_("updated at"), auto_now=True)
+    created_at = models.DateTimeField(pgettext_lazy("task", "created at"), auto_now_add=True)
+    updated_at = models.DateTimeField(pgettext_lazy("task", "updated at"), auto_now=True)
 
     class Meta:
         verbose_name = _("task")

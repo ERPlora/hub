@@ -11,7 +11,7 @@ from live.operations import registry
 
 from apps.task import queries, schemas, services
 from apps.task.models import Comment, Project, Task, TaskCounter
-from base.tests.po import po_entries
+from base.tests.po import catalogue_key, po_entries
 
 LOCALE = Path(apps.get_app_config("task").path) / "locale" / "es" / "LC_MESSAGES"
 MODELS = (Project, Task, Comment, TaskCounter)
@@ -45,7 +45,7 @@ def visible_texts() -> set[str]:
     for choices in (Task.Status, Task.Priority):
         lazies += list(choices.labels)
     with translation.override("en"):
-        return {str(text) for text in lazies} | schema_titles()
+        return {catalogue_key(text) for text in lazies} | schema_titles()
 
 
 def schema_titles() -> set[str]:
@@ -69,8 +69,7 @@ def test_every_entry_has_a_spanish_translation():
 
 def test_every_visible_text_is_in_the_catalog():
     assert len(visible_texts()) > 40  # positive control: the collection found the app's texts
-    msgids = {key.split("\x04")[-1] for key in po_entries(LOCALE / "django.po")}
-    assert visible_texts() - msgids == set()
+    assert visible_texts() - set(po_entries(LOCALE / "django.po")) == set()
 
 
 def test_the_compiled_catalog_is_current():
@@ -110,6 +109,30 @@ def test_spanish_texts_are_the_old_modules():
         assert str(queries.TASK_NOT_FOUND) == "Esa tarea no existe en este negocio."
         assert str(queries.PROJECT_NOT_FOUND) == "Ese proyecto no existe en este negocio."
         assert str(services.TASK_ALREADY_CLOSED) == "Esa tarea ya está cerrada, así que se ha dejado como estaba."
+
+
+def test_a_task_s_labels_are_feminine_and_a_project_s_masculine():
+    """«Creada por», «Creada el» and «Actualizada el», as the sheet and the WORKBOOK say a task, with the task's own
+    context: Inventario's «creado por» would otherwise speak for it (hub#666), and the project's masculine «creado el»
+    is said by the same English."""
+    with translation.override("es"):
+        labels = {
+            model: {field.name: str(field.verbose_name) for field in model._meta.fields}
+            for model in MODELS
+        }
+    task = ("assigned_to", "created_by", "completed_at", "created_at", "updated_at")
+    assert {name: labels[Task][name] for name in task} == {
+        "assigned_to": "asignada a",
+        "created_by": "creada por",
+        "completed_at": "completada el",
+        "created_at": "creada el",
+        "updated_at": "actualizada el",
+    }
+    assert (labels[Project]["created_at"], labels[Project]["updated_at"], labels[Comment]["created_at"]) == (
+        "creado el",
+        "actualizado el",
+        "creado el",
+    )
 
 
 def test_placeholders_survive_the_translation():
