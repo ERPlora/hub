@@ -190,7 +190,9 @@ Pasos:
 Entra: nombre, nombre de cocina, precio, forma de venta, tipo de IVA, orden y «A la venta»; las
 categorías de IVA las lee de Impuestos.
 Sale: el menú (avisa: menú nuevo).
-Si falla: junto al campo: «El menú necesita un nombre.», «Un menú que se consume en el local
+Si falla: «Guardar» está en gris mientras falte el nombre y mientras el negocio no haya dicho todavía su
+moneda, porque el precio se lee en ella (sin ella, «1500» yenes se guardaría como 150 000). Junto al
+campo: «El menú necesita un nombre.», «Un menú que se consume en el local
 necesita su propio tipo de IVA: sin él no se puede facturar.», «El precio de un menú no puede ser
 negativo. Para abaratar una opción, ponle un suplemento negativo.», «Esto no es un importe. Escribe
 una cifra, por ejemplo 12,50.» (también con el símbolo de otra moneda: «13,50 €» en un negocio de

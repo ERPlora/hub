@@ -6,6 +6,7 @@
 import { Combo, InlineFeedback } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
+import { expectSaveWaitsForMoney } from '../../../../base/frontend/__tests__/save-waits-for-money';
 import type { ServiceOut, SettingsOut } from '../operations';
 import { business, click, ionValue, JAPANESE, type MountOptions, mountService, page, POLISH, settle } from '../__tests__/mount-service';
 import ServiceFormModal from './ServiceFormModal.vue';
@@ -236,14 +237,14 @@ describe('ServiceFormModal: in the business currency (service-business-currency)
     expect(s.sent().map((call) => call.body)).toEqual([{ id: 's1', name: 'Cut and wash' }]);
   });
 
-  it('what was typed before the business answered stays as typed and is read in its currency', async () => {
+  it('what was typed before the business answered is never read without it: «Create service» waits in grey, then «1500» is 1500 yen (hub#918)', async () => {
     const s = await setup(null, 'en', true, { business: null });
     await s.result('service.settings.get', SETTINGS);
     await ionValue(s.field('name'), 'Haircut', 'ionInput');
     await ionValue(s.field('price'), '1500', 'ionInput');
-    await s.result('base.business.get', business(JAPANESE));
-    expect(s.field('price').value).toBe('1500');
     s.answer(201, CUT);
+    await expectSaveWaitsForMoney({ ...s, amount: () => s.field('price'), settle }, () => s.result('base.business.get', business(JAPANESE)));
+    expect(s.field('price').value).toBe('1500');
     await click(s.save());
     expect(s.sent().map((call) => (call.body as { price: number }).price)).toEqual([1500]);
   });

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:6f0407f2fa7fa1a7cffd6b39272648b9805961ed263392e949a92b5e5e4f0157 -->
+<!-- generated from WORKBOOK.md sha256:0e2d707e1f47bd11b6c6e675fda3df186360ef7177febe6d48c81c8df56f991c -->
 
 ## What it is for and who it is for
 
@@ -175,7 +175,9 @@ Steps:
 In: name, kitchen name, price, way of selling, VAT category, order and "On sale"; it reads the VAT
 categories from Taxes.
 Out: the menu (announces: new menu).
-If it fails: next to the field: "The menu needs a name.", "A menu eaten in needs its own VAT category:
+If it fails: "Save" is grey while the name is missing and while the business has not yet said its
+currency, because the price is read in it (without it, "1500" yen would be saved as 150,000). Next to the
+field: "The menu needs a name.", "A menu eaten in needs its own VAT category:
 without it, it cannot be billed.", "A menu price cannot be below zero. To make a choice cheaper, give it
 a negative supplement instead.", "This is not an amount. Type a figure, for example 12.50." (also with
 another currency's sign: "€13.50" in a business in Poland) and the one about the two possible readings of an amount ("1.250"), which quotes what was typed. A VAT category that

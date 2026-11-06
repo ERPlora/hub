@@ -3,8 +3,8 @@
 // (PLN)» (in the business's currency, its country's, with its decimals; just «Closed price» until the business
 // answers), «How is it sold?» (both consequences always shown, the chosen one stressed: the merchant must not
 // discover it on an invoice), the VAT category (only eaten in; searched in Taxes), the order on the list
-// and «On sale». A menu eaten in without a VAT category, or an amount that is not one, is refused
-// before anything is sent. «Menu · {name}» sends only what changed. Refusals stay under their field. «Photo» (COMBO-F14,
+// and «On sale». «Save» waits in grey until the business has answered its money (the price is read in it;
+// hub#918). A menu eaten in without a VAT category, or an amount that is not one, is refused before anything is sent. «Menu · {name}» sends only what changed. Refusals stay under their field. «Photo» (COMBO-F14,
 // like an item's): a library image or a photo of its own, sent once the menu is saved (`set_image`, `upload_image`,
 // «Uploading photo…»); if the menu saved and the photo did not, the dialog says so with «Retry» (only the photo goes
 // again) and the menu keeps the photo it had.
@@ -135,7 +135,11 @@ function patch(current: ComboOut, full: ComboIn): ComboPatchIn {
 
 async function save(): Promise<void> {
   tried.value = true;
-  const price = parseMoney(form.value.price, { money: money.value });
+  // No price is read before the business answers its money: «1500» would be read with two decimals, whatever its
+  // currency counts (in yen, 150000; hub#918).
+  const business = money.value;
+  if (!business) return;
+  const price = parseMoney(form.value.price, { money: business });
   if (!price.ok || taxMissing.value) return;
   const full = body(price.cents ?? 0);
   let saved: { id: string };
@@ -167,7 +171,7 @@ function retryPhoto(): void {
     :submit-label="photo.uploading.value ? $t('base.imageField.uploading') : $t('combo.save')"
     :pending="pending"
     :error="error"
-    :submit-disabled="!form.name.trim() || !!photo.failure.value"
+    :submit-disabled="!money || !form.name.trim() || !!photo.failure.value"
     @submit="save"
   >
     <template #default="{ fieldErrors }">

@@ -1,7 +1,8 @@
 <script setup lang="ts">
 // The supplement field of the option form (MODIFIER-F04): what a person types or pastes («1,50», «-0,50»,
 // «1.234,56», «+1,00 zł»), rewritten in the page format when they leave it, in the business's `money` (its
-// code or its sign around the figure is read, another currency's is not; at most its decimals). It holds the
+// code or its sign around the figure is read, another currency's is not; at most its decimals); until the business
+// answers, leaving it keeps what was typed (it does not invent the decimals). It holds the
 // text; the form reads the signed minor units with `parseMoney` when it saves. What is not an amount says so under the field
 // once the person leaves it (or `showError`, after a save attempt); the server's message for the field
 // wins. A phone's decimal keyboard has no minus: the ± button at its end turns a supplement into a
@@ -55,6 +56,8 @@ function toggleSign(): void {
 
 function onBlur(): void {
   left.value = true;
+  // Until the business answers, its decimals are unknown: what was typed stays, never «150» made «150.00» (hub#918).
+  if (!props.money) return;
   const normalised = normaliseMoneyText(text.value, locale.value, props.money);
   if (normalised !== text.value) text.value = normalised;
 }
