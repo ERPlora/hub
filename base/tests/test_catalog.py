@@ -15,6 +15,7 @@ from types import SimpleNamespace
 
 import pytest
 from django.contrib.staticfiles import finders
+from django.utils.translation import pgettext_lazy
 from live.meta import Category
 
 from base.catalog import (
@@ -373,6 +374,28 @@ def test_a_name_that_is_the_same_in_both_languages_still_needs_its_msgstr(tmp_pa
     )
     [problem] = problems([module(tmp_path / "other", verbose_name="Demo")])
     assert problem.startswith("things: verbose_name:")
+
+
+def test_a_name_said_with_a_context_is_read_with_its_context(tmp_path):
+    """A module says its name with ``pgettext_lazy`` when an earlier app translates the same English otherwise (Página
+    web's «Website» against Clientes' «Web», hub#661): its catalogue keeps only that entry, which is the one the store
+    reads, as Django does."""
+    spanish = {key: value for key, value in SPANISH.items() if key != "Things"}
+    config = module(
+        tmp_path,
+        verbose_name=pgettext_lazy("app name", "Things"),
+        spanish={**spanish, "app name\x04Things": "Cosas"},
+    )
+    [entry] = build_registry([config], icons=ICONS)
+    assert (entry.name_en, entry.name_es) == ("Things", "Cosas")
+
+
+def test_a_plain_entry_does_not_speak_for_a_name_said_with_a_context(tmp_path):
+    # Django never falls back from a context to the plain entry: neither does the store, or a typo in the context
+    # would register a Spanish that no screen shows.
+    config = module(tmp_path, verbose_name=pgettext_lazy("app name", "Things"))
+    [problem] = problems([config])
+    assert problem.startswith("things: verbose_name:") and "'app name'" in problem
 
 
 def test_a_spanish_text_longer_than_its_column_fails(tmp_path):

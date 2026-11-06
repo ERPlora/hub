@@ -15,6 +15,7 @@ from uuid import UUID
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.core.validators import validate_email
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import pgettext_lazy
 from ninja import Field, Schema
 from pydantic import AfterValidator, ConfigDict, StringConstraints, field_validator, model_validator
 
@@ -54,7 +55,9 @@ ReviewsState = Literal["empty", "unavailable", "waiting", "failed", "ready"]
 
 NOT_HTTPS = _("Enter a link that starts with https://.")
 NOT_A_PHONE = _("Enter a phone number: digits, spaces and an optional + in front.")
-NOT_AN_EMAIL = _("Enter a valid email address.")
+#: Said with the app's context: Equipo, loaded before, says the same English as Django does («Introduzca…»), not as this
+#: editor speaks (hub#661).
+NOT_AN_EMAIL = pgettext_lazy("website", "Enter a valid email address.")
 SAME_TIMES = _("The opening and the closing time cannot be the same.")
 DAY_TWICE = _("Each day can only appear once.")
 NOT_A_PLACE = _("Paste the link of your business on Google Maps, or its Place ID.")

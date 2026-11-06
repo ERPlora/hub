@@ -41,7 +41,6 @@ SHADOWED = {
     "task": 1,
     "tax": 1,
     "verifactu": 7,
-    "website": 5,
 }
 
 
