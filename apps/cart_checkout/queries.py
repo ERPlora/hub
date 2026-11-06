@@ -174,7 +174,7 @@ def find_cart(
 
 def find_item(item_id: UUID, *, lock: bool = False) -> CartItem:
     """A line of a cart that is not deleted."""
-    found = CartItem.objects.filter(pk=item_id, cart__deleted_at__isnull=True)
+    found = CartItem.objects.select_related("cart").filter(pk=item_id, cart__deleted_at__isnull=True)
     item = (found.select_for_update(of=("self",)) if lock else found).first()
     if item is None:
         raise NotFound(str(ITEM_NOT_FOUND), code="cart_checkout.item_not_found")
@@ -215,6 +215,7 @@ def cart_row(cart: Cart) -> dict:
 
 
 def item_row(item: CartItem) -> dict:
+    """A line as the operations give it, with its cart's currency: the one its price and its total are in."""
     return {
         "id": item.id,
         "cart_id": item.cart_id,
@@ -224,6 +225,8 @@ def item_row(item: CartItem) -> dict:
         "quantity": item.quantity,
         "unit_price": item.unit_price,
         "line_total": item.line_total,
+        "currency": item.cart.currency,
+        "currency_decimals": currency_decimals(item.cart.currency),
         "variant_attributes": item.variant_attributes,
         "created_at": item.created_at,
         "updated_at": item.updated_at,
@@ -375,7 +378,7 @@ def get_cart(ctx: OperationContext, data: CartRefIn) -> dict:
 )
 def list_items(ctx: OperationContext, params: ItemListIn) -> dict:
     cart = find_cart(params.cart_id, params.session_token)
-    items = CartItem.objects.filter(cart=cart)
+    items = cart.items.all()  # Its lines know their cart (its currency): no read of it per line.
     if params.search and params.search.strip():
         text = params.search.strip()
         items = items.filter(

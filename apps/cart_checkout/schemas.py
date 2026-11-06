@@ -291,8 +291,14 @@ class ItemOut(Schema):
     product_name: str = Field(description="The product's name, as the caller gave it.")
     sku: str = Field(description="Its SKU; may be empty.")
     quantity: Decimal = Field(description="How many units.")
-    unit_price: int = Field(description="The price of one unit, in minor units of the cart's currency.")
-    line_total: int = Field(description="Quantity × price, rounded to the minor unit (half up).")
+    unit_price: int = Field(
+        description="The price of one unit, in minor units of the cart's currency.", json_schema_extra={"money": True}
+    )
+    line_total: int = Field(
+        description="Quantity × price, rounded to the minor unit (half up).", json_schema_extra={"money": True}
+    )
+    currency: str = Field(description="Its cart's currency (ISO 4217), the one its price and its total are in.")
+    currency_decimals: int = Field(description="The decimals of its currency as the server counts them (0 in JPY).")
     variant_attributes: dict[str, Any] = Field(description="Its variant (size, colour…).")
     created_at: dt.datetime = Field(description="When it was added.")
     updated_at: dt.datetime = Field(description="When it last changed.")
