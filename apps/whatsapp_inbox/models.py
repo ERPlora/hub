@@ -67,7 +67,7 @@ class Channel(UUIDModel):
     usage_month = models.CharField(_("month of the figure"), max_length=7, blank=True)
     # The SaaS's version of this state: an older push is ignored.
     version = models.BigIntegerField(_("version"), default=0)
-    synced_at = models.DateTimeField(_("synced at"), null=True, blank=True)
+    synced_at = models.DateTimeField(pgettext_lazy("whatsapp channel", "synced at"), null=True, blank=True)
     updated_at = models.DateTimeField(_("updated at"), auto_now=True)
 
     class Meta:
@@ -246,8 +246,9 @@ class Message(UUIDModel):
     origin = models.CharField(
         _("origin"), max_length=10, choices=Origin.choices, default=Origin.CUSTOMER
     )
+    # Where the message came from (live, or the history the connection brings): «origin» already says who sent it.
     source = models.CharField(
-        _("source"), max_length=10, choices=Source.choices, default=Source.LIVE
+        pgettext_lazy("whatsapp message", "source"), max_length=10, choices=Source.choices, default=Source.LIVE
     )
     # Meta's message type as it came (text, image, audio, video, document, sticker, location,
     # contacts, interactive, button, reaction, template, media_placeholder, unsupported…).
@@ -530,7 +531,7 @@ class Template(UUIDModel):
     variables = models.PositiveSmallIntegerField(_("variables"), default=0)
     rejected_reason = models.CharField(_("Meta's reason"), max_length=500, blank=True)
     meta_id = models.CharField(_("Meta id"), max_length=64, blank=True)
-    synced_at = models.DateTimeField(_("synced at"), null=True, blank=True)
+    synced_at = models.DateTimeField(pgettext_lazy("whatsapp template", "synced at"), null=True, blank=True)
     # An edit of a template Meta has, waiting for erplora.com to register it (category, header_format, header,
     # header_sample, body, body_examples, footer, buttons); empty when there is none.
     draft = models.JSONField(_("changes not yet at Meta"), null=True, blank=True)
@@ -544,7 +545,7 @@ class Template(UUIDModel):
     submit_error_code = models.CharField(_("error code"), max_length=64, blank=True)
     submit_error = models.CharField(_("error"), max_length=500, blank=True)
     submit_at = models.DateTimeField(_("handed over at"), null=True, blank=True)
-    deleted_at = models.DateTimeField(_("deleted at"), null=True, blank=True)
+    deleted_at = models.DateTimeField(pgettext_lazy("whatsapp template", "deleted at"), null=True, blank=True)
     delete_state = models.CharField(
         _("deletion at Meta"), max_length=10, choices=DeleteState.choices, default=DeleteState.NONE, blank=True
     )

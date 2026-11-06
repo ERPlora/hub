@@ -14,16 +14,11 @@ from live.operations import registry
 from apps.whatsapp_inbox import queries, schemas, services
 from apps.whatsapp_inbox.models import Channel, Conversation, Message, Note, Template
 from apps.whatsapp_inbox.tests.conftest import receive
-from base.tests.po import po_entries
+from base.tests.po import catalogue_key, po_entries
 
 LOCALE = (
     Path(apps.get_app_config("whatsapp_inbox").path) / "locale" / "es" / "LC_MESSAGES"
 )
-
-
-def msgids(path: Path) -> set[str]:
-    """The English sources of the catalog, without their contexts."""
-    return {key.split("\x04", 1)[-1] for key in po_entries(path)}
 
 
 def module_texts(module) -> list:
@@ -31,7 +26,8 @@ def module_texts(module) -> list:
 
 
 def visible_texts() -> set[str]:
-    """The English source of every lazy text the app shows (menu, store, admin, choices, errors)."""
+    """The catalogue key of every lazy text the app shows (menu, store, admin, choices, errors) — its English, with
+    its context in front for a ``pgettext_lazy`` — and the titles of its schemas."""
     config = apps.get_app_config("whatsapp_inbox")
     lazies = [
         config.verbose_name,
@@ -69,7 +65,7 @@ def visible_texts() -> set[str]:
     ):
         lazies += list(choices.labels)
     with override("en"):
-        return {str(text) for text in lazies} | schema_titles()
+        return {catalogue_key(text) for text in lazies} | schema_titles()
 
 
 def schema_titles() -> set[str]:
@@ -94,7 +90,12 @@ def test_every_entry_has_a_spanish_translation():
 
 
 def test_every_visible_text_is_in_the_catalog():
-    assert visible_texts() - msgids(LOCALE / "django.po") == set()
+    """By its whole key, context included: a text that goes back to ``_()`` while its entry keeps the context, or whose
+    context has a typo, is missing from the catalogue — on screen it says another app's Spanish (hub#639)."""
+    texts = visible_texts()
+    assert len(texts) > 200  # positive control: the collection found the app's texts...
+    assert len({key for key in texts if "\x04" in key}) >= 37  # ...and kept the context of its pgettext_lazy ones
+    assert texts - set(po_entries(LOCALE / "django.po")) == set()
 
 
 def test_the_compiled_catalog_is_current():
@@ -131,6 +132,30 @@ def test_spanish_texts():
             "con una plantilla aprobada."
         )
         assert str(queries.RECONNECT_NEEDED) == "El permiso de WhatsApp para tu número caducó: vuelve a conectarlo."
+
+
+def test_spanish_says_the_inboxs_own_words_not_an_earlier_apps():
+    """The labels the inbox shares in English with an app loaded before it come out in Spanish with its own words
+    (hub#570): where a message came from (live or its history) is its «procedencia», since «origen» already names who
+    sent it, not Clientes' «origen»; a template is «borrada el» and «sincronizada el» like it is «entregada el», not
+    Clientes' «eliminado el» nor Facturación's «recibido el»; the channel is «sincronizado el»."""
+    labels = {
+        "Message.origin": Message._meta.get_field("origin").verbose_name,
+        "Message.source": Message._meta.get_field("source").verbose_name,
+        "Template.submit_at": Template._meta.get_field("submit_at").verbose_name,
+        "Template.deleted_at": Template._meta.get_field("deleted_at").verbose_name,
+        "Template.synced_at": Template._meta.get_field("synced_at").verbose_name,
+        "Channel.synced_at": Channel._meta.get_field("synced_at").verbose_name,
+    }
+    with override("es"):
+        assert {name: str(label) for name, label in labels.items()} == {
+            "Message.origin": "origen",
+            "Message.source": "procedencia",
+            "Template.submit_at": "entregada el",
+            "Template.deleted_at": "borrada el",
+            "Template.synced_at": "sincronizada el",
+            "Channel.synced_at": "sincronizado el",
+        }
 
 
 @pytest.mark.django_db
