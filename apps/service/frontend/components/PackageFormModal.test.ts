@@ -191,18 +191,23 @@ describe('PackageFormModal: in the business currency (service-business-currency)
     expect(s.sent().map((call) => call.body)).toEqual([{ id: 'p1', max_uses: 10 }]);
   });
 
-  it('a closed price typed before the business answers is never read without it: «Create package» waits in grey, then «1500» is 1500 yen (hub#921)', async () => {
-    const s = await setup(null, 'en', { business: null });
-    await ionValue(s.field('name'), 'Bono', 'ionInput');
-    await ionValue(s.field('fixed_price'), '1500', 'ionInput');
-    s.lines()[0].vm.$emit('update:modelValue', { id: 's1', label: 'Cut' });
-    await settle();
-    s.answer(201, PACKAGE);
-    await expectSaveWaitsForMoney({ ...s, amount: () => s.field('fixed_price'), settle }, () => s.result('base.business.get', business(JAPANESE)));
-    expect(s.field('fixed_price').value).toBe('1500');
-    await click(s.save());
-    expect(s.sent().map((call) => (call.body as { fixed_price: number }).fixed_price)).toEqual([1500]);
-  });
+  // «1500» reads in any money, so alone it would not tell a guard put after the reading: «¥1500» is not an amount until
+  // the money is known, and the field must not say so while the window waits.
+  it.each(['1500', '¥1500'])(
+    'a closed price typed before the business answers is never read without it: «Create package» waits in grey and the field says nothing, then «%s» is 1500 yen (hub#921)',
+    async (typed) => {
+      const s = await setup(null, 'en', { business: null });
+      await ionValue(s.field('name'), 'Bono', 'ionInput');
+      await ionValue(s.field('fixed_price'), typed, 'ionInput');
+      s.lines()[0].vm.$emit('update:modelValue', { id: 's1', label: 'Cut' });
+      await settle();
+      s.answer(201, PACKAGE);
+      await expectSaveWaitsForMoney({ ...s, amount: () => s.field('fixed_price'), settle }, () => s.result('base.business.get', business(JAPANESE)));
+      expect([s.field('fixed_price').value, s.field('fixed_price').errorText]).toEqual([typed, undefined]);
+      await click(s.save());
+      expect(s.sent().map((call) => (call.body as { fixed_price: number }).fixed_price)).toEqual([1500]);
+    },
+  );
 
   it('editing, a closed price typed before the business answers stays as typed when it does and is read in yen (hub#921)', async () => {
     const s = await setup(PACKAGE, 'en', { business: null });
@@ -212,6 +217,17 @@ describe('PackageFormModal: in the business currency (service-business-currency)
     expect(s.field('fixed_price').value).toBe('1500');
     await click(s.save());
     expect(s.sent().map((call) => call.body)).toEqual([{ id: 'p1', fixed_price: 1500 }]);
+  });
+
+  it('editing, an amount off typed before the business answers stays as typed when it does and is read in yen', async () => {
+    const s = await setup(pkg({ discount_type: 'fixed', discount_percent_bp: 0, discount_amount: 500 }), 'en', { business: null });
+    expect(s.field('discount_amount').value).toBe('5.00');
+    await ionValue(s.field('discount_amount'), '700', 'ionInput');
+    await s.result('base.business.get', business(JAPANESE));
+    expect([s.field('discount_amount').value, s.field('fixed_price').value]).toEqual(['700', '9000']);
+    s.answer(200, PACKAGE);
+    await click(s.save());
+    expect(s.sent().map((call) => call.body)).toEqual([{ id: 'p1', discount_amount: 700 }]);
   });
 });
 

@@ -247,18 +247,23 @@ describe('RuleFormModal: the business answers after the form opened', () => {
     expect(s.field('amount').errorText).toBe(NOT_AMOUNT);
   });
 
-  it('an amount per unit typed before the business answers is never read without it: «Create» waits in grey, then «1500» is 1500 yen (hub#921)', async () => {
-    const s = await setup({});
-    await named(s, 'FIX', 'Yen off');
-    await ionValue(s.field('percent'), '10', 'ionInput');
-    expect(s.save().disabled).toBe(true);
-    await ionValue(s.field('rule_type'), 'fixed');
-    await ionValue(s.field('amount'), '1500', 'ionInput');
-    s.answer(201, rule({ ...FIXED, amount: 1500 }));
-    await s.live();
-    await expectSaveWaitsForMoney({ ...s, amount: () => s.field('amount'), settle }, () => s.result('base.business.get', business(JAPANESE)));
-    expect(s.field('amount').value).toBe('1500');
-    await click(s.save());
-    expect(s.sent().map((call) => (call.body as { amount: number }).amount)).toEqual([1500]);
-  });
+  // «1500» reads in any money, so alone it would not tell a guard put after the reading: «¥1500» is not an amount until
+  // the money is known, and the field must not say so while the window waits.
+  it.each(['1500', '¥1500'])(
+    'an amount per unit typed before the business answers is never read without it: «Create» waits in grey and the field says nothing, then «%s» is 1500 yen (hub#921)',
+    async (typed) => {
+      const s = await setup({});
+      await named(s, 'FIX', 'Yen off');
+      await ionValue(s.field('percent'), '10', 'ionInput');
+      expect(s.save().disabled).toBe(true);
+      await ionValue(s.field('rule_type'), 'fixed');
+      await ionValue(s.field('amount'), typed, 'ionInput');
+      s.answer(201, rule({ ...FIXED, amount: 1500 }));
+      await s.live();
+      await expectSaveWaitsForMoney({ ...s, amount: () => s.field('amount'), settle }, () => s.result('base.business.get', business(JAPANESE)));
+      expect([s.field('amount').value, s.field('amount').errorText]).toEqual([typed, undefined]);
+      await click(s.save());
+      expect(s.sent().map((call) => (call.body as { amount: number }).amount)).toEqual([1500]);
+    },
+  );
 });

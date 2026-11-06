@@ -234,9 +234,12 @@ function patch(rule: RuleOut, currency: Money): Record<string, unknown> {
 }
 
 async function save(): Promise<void> {
-  tried.value = true;
+  // The attempt counts only once the business has answered its money: before that the amount is neither read nor
+  // judged, or its field would call «¥1500» not an amount while the window waits (hub#921).
   const currency = money.value;
-  if (!currency || !ready.value) return;
+  if (!currency) return;
+  tried.value = true;
+  if (!ready.value) return;
   try {
     if (props.rule) await update.run(patch(props.rule, currency));
     else await creation.run(body(form.value, currency));

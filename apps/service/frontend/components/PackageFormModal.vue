@@ -175,11 +175,12 @@ function creationBody(read: NonNullable<ReturnType<typeof amounts>>): PackageIn 
 }
 
 async function save(): Promise<void> {
-  tried.value = true;
   // No amount is read before the business answers its money: «1500» would be read with two decimals, whatever its
-  // currency counts (in yen, 150000; hub#921).
+  // currency counts (in yen, 150000; hub#921). Nor judged: the attempt counts only once the money is known, or the
+  // fields would call «¥1500» not an amount while the window waits.
   const currency = money.value;
   if (!currency) return;
+  tried.value = true;
   const read = amounts(currency);
   if (!read) return;
   try {
