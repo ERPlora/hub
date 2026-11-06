@@ -1,4 +1,5 @@
-/* The cards of Settings › General of the way in (APP-BASE-3): «This device», «PIN pad» and «Devices». */
+/* The cards of Settings › General of the way in (APP-BASE-3): «This device», «PIN pad» and «Devices»; and the cards the
+ * apps put in System › «Usage and plan» (hub#683: Printing's «Your printer»). */
 .settings-card {
   box-sizing: border-box;
   padding: 20px;
@@ -56,4 +57,15 @@
 
 .settings-card ion-segment {
   max-width: 100%;
+}
+
+/* A row of a card's buttons: they wrap on a narrow screen, with room between them (hub#683, «Your printer»). */
+.settings-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.settings-card__actions ion-button {
+  margin: 0;
 }
