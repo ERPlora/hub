@@ -14,7 +14,7 @@ from live.operations import get, registry
 
 from apps.sale.tests.conftest import A, ctx_for, run
 from base import assistant
-from base.tests.test_assistant import named_by_the_screen
+from base.tests.test_assistant import technical_names
 
 FRONTEND = Path(apps.get_app_config("sale").path) / "frontend/locale"
 SCREENS = json.loads((FRONTEND / "es.json").read_text())["sale"]
@@ -32,16 +32,9 @@ def sale_writes() -> list:
 def test_no_datum_of_a_write_of_sale_reaches_a_spanish_card_by_its_technical_name():
     """Every write of sale the assistant may ask for, with all its data: each datum by a name of its own in Spanish,
     never the one pydantic makes up."""
-    screen = named_by_the_screen()
     writes = sale_writes()
     assert len(writes) > 30  # positive control: the registry has sale's writes
-    technical: dict[str, list[str]] = {}
-    for op in writes:
-        props = op.input.model_json_schema().get("properties", {})
-        for field in assistant.card(op, dict.fromkeys(props, "x"), "es")["fields"]:
-            if field["name"] not in screen and field["label"] == field["name"].title().replace("_", " "):
-                technical.setdefault(op.name, []).append(field["name"])
-    assert technical == {}
+    assert technical_names(writes) == {}
 
 
 def test_the_card_names_a_refunds_money_as_the_refund_screen_does():

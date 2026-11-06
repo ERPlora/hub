@@ -17,7 +17,7 @@ from live.operations import get, registry
 from base import assistant
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
-from base.tests.test_assistant import named_by_the_screen
+from base.tests.test_assistant import technical_names
 from base.tests.test_assistant_card_values import AN_ID, card_title
 
 from .conftest import ctx_for, make_item, make_list, make_product
@@ -42,16 +42,9 @@ def pricing_writes() -> list:
 def test_no_datum_of_a_write_of_pricing_reaches_a_spanish_card_by_its_technical_name():
     """Every write of pricing the assistant may ask for, with all its data: each datum by a name of its own in
     Spanish, never the one pydantic makes up."""
-    screen = named_by_the_screen()
     writes = pricing_writes()
     assert len(writes) > 10  # positive control: the registry has pricing's writes
-    technical: dict[str, list[str]] = {}
-    for op in writes:
-        props = op.input.model_json_schema().get("properties", {})
-        for field in assistant.card(op, dict.fromkeys(props, "x"), "es")["fields"]:
-            if field["name"] not in screen and field["label"] == field["name"].title().replace("_", " "):
-                technical.setdefault(op.name, []).append(field["name"])
-    assert technical == {}
+    assert technical_names(writes) == {}
 
 
 def test_the_card_names_the_customer_group_said_by_its_name_as_the_forms_do():
