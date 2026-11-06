@@ -140,6 +140,61 @@ describe('AutomationsPage: review 2026-10-15, item 5', () => {
   });
 });
 
+// hub#950: with the business slow, the page showed only the gallery while the automations, the questions and the
+// drafts were still being read, as if there were none: it says «Loading…» above the gallery until each has its
+// first answer (WORKBOOK «Estados de cada pantalla · Cargando»); a list that could not be read says so, with «Retry».
+describe('AutomationsPage: loading, empty and error of what sits above the gallery (hub#950)', () => {
+  const ABOVE = ['flow.flow.list', 'flow.question.list', 'flow.draft.list'] as const;
+  const EMPTY = { 'flow.flow.list': page([], 0, 100), 'flow.question.list': page([], 0), 'flow.draft.list': page([], 0) };
+  const MATCH = { 'flow.flow.list': { limit: 100 }, 'flow.question.list': {}, 'flow.draft.list': {} };
+
+  async function opened() {
+    const m = await mountFlow(AutomationsPage, { answers: { '/api/flow/catalog': [200, CATALOG] } });
+    await m.live();
+    await settle();
+    return m;
+  }
+  const loading = (m: Awaited<ReturnType<typeof opened>>) => m.find('flow-page-loading');
+  /** Whether `testid` comes before the gallery in the page. */
+  const aboveGallery = (m: Awaited<ReturnType<typeof opened>>, testid: string) =>
+    !!(m.find(testid).element.compareDocumentPosition(m.wrapper.findComponent(FlowGallery).element) & Node.DOCUMENT_POSITION_FOLLOWING);
+
+  it('says «Loading…» above the gallery once the catalog is in, while the rest is still being read', async () => {
+    const m = await opened();
+    expect(m.wrapper.findComponent(FlowGallery).props('catalog')).toEqual(CATALOG);
+    expect(loading(m).exists()).toBe(true);
+    expect(loading(m).text()).toBe('Loading…');
+    // Read out by a screen reader as the table's own «Loading…» is; the dots are decoration.
+    expect(loading(m).attributes('role')).toBe('status');
+    expect(loading(m).find('ion-spinner').attributes('aria-hidden')).toBe('true');
+    expect(aboveGallery(m, 'flow-page-loading')).toBe(true);
+  });
+
+  it.each(ABOVE)('still says «Loading…» while only %s has not answered, and stops when it does', async (late) => {
+    const m = await opened();
+    for (const op of ABOVE) if (op !== late) await m.result(op, EMPTY[op], MATCH[op]);
+    await settle();
+    expect(loading(m).exists()).toBe(true);
+    await m.result(late, EMPTY[late], MATCH[late]);
+    await settle();
+    expect(loading(m).exists()).toBe(false);
+    expect(m.wrapper.findComponent(FlowGallery).exists()).toBe(true);
+  });
+
+  it('a list that could not be read stops «Loading…» and says so in red with «Retry», above the gallery', async () => {
+    const m = await opened();
+    for (const op of ABOVE) if (op !== 'flow.flow.list') await m.result(op, EMPTY[op], MATCH[op]);
+    for (const sub of m.params('flow.flow.list')) {
+      m.net.lastStream().push(errorFrame(m.subId('flow.flow.list', sub), 'internal_error'));
+    }
+    await settle();
+    expect(loading(m).exists()).toBe(false);
+    expect((m.wrapper.findComponent(FlowList).element as HTMLElement).style.display).not.toBe('none');
+    expect(m.find('flow-list-retry').exists()).toBe(true);
+    expect(aboveGallery(m, 'flow-list-retry')).toBe(true);
+  });
+});
+
 describe('AutomationsPage: the ready-made automations the apps bring (FLOW-F33 to F36)', () => {
   it('a fix its app made never waits for the owner: nothing to press above «Your automations»', async () => {
     // FIX-HUB-FLOW-FACTORY-SAFETY-FIX-WAITS-FOR-THE-OWNERS-UPDATE: its app's condition already counts, so the old
