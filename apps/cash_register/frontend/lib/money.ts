@@ -144,6 +144,13 @@ export function readMoney(raw: string | number | null | undefined, decimals = 2,
   return { ok: false, reason: 'notAnAmount' };
 }
 
+/** What a person typed in a window's money field, read in the business's `money` — its decimals and its currency. The
+ *  money is required: a window reads nothing before the business answers (hub#921: «1500» yen read with two
+ *  decimals would be sent as 150000). */
+export function readAmount(raw: string, money: Money): MoneyRead {
+  return readMoney(raw, money.decimals, money.currency);
+}
+
 /** Why a money field cannot be sent, in the app's words; `null` when it is an amount or empty. */
 export function moneyRefusal(
   read: MoneyRead,

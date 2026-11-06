@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:df8a83bfc89c7619e05b8eb90bbb379b6cadfcb1a17e4aa2be4b1c1b62f7322c -->
+<!-- generated from WORKBOOK.md sha256:d8d600de49a8a626caec5a1ff8cbf767a00dda42dfc7fb5313456431afd8be4d -->
 
 ## What it is for and who it is for
 
@@ -217,7 +217,9 @@ business, whatever the drawer; if two devices open at once, only one opens and t
 notice); with the float required and the float empty or zero, "This business requires an opening float:
 give the cash the drawer starts with." under the field; a deactivated drawer or one that does not exist,
 "That drawer is not available."; an unreadable amount ("This is not an amount. Type a figure, for example
-12.50."), a negative or an ambiguous one ("1,250") is stopped before sending.
+12.50."), a negative or an ambiguous one ("1,250") is stopped before sending. "Open session" is grey while
+the business has not yet said its currency, because the float is read in it (without it, "1500" yen would
+be saved as 150,000).
 Involved: CASH_REGISTER-F04, F09
 
 ### CASH_REGISTER-F04 Sell only with the cash register open
@@ -258,7 +260,8 @@ sign is set by the system according to the type.
 If it fails: "This cash-out would leave the drawer below zero and a negative balance is not allowed." if
 the settings do not allow it; a zero, unreadable or negative amount is stopped before sending; the
 session closed on another device: "That cash session is closed: a closed session takes no new
-movements.". A wrong movement is neither edited nor deleted: the opposite one is recorded with a concept
+movements.". "Register" is grey while the business has not yet said its currency, because the amount is
+read in it (without it, "1500" yen would be saved as 150,000). A wrong movement is neither edited nor deleted: the opposite one is recorded with a concept
 that says why.
 Involved: none
 
@@ -364,7 +367,10 @@ cash; what is charged or recorded by card, transfer or other does not count), co
 `cash_register.session.closed`). The Sales lines of the shift are copied into the session: whatever
 happens afterwards (a void of a sale from yesterday) goes to the open shift, never to this one.
 If it fails: "Type the counted cash to close the session." with the field empty (the screen always asks
-for it; the required count setting enforces it on the assistant and the API too); if another device
+for it; the required count setting enforces it on the assistant and the API too). "Close session" is grey
+while the business has not yet said its currency, and the last closing count is not written in the field
+until then: the counted cash is written and read in it (without it, "1500" yen would be saved as 150,000
+and a count of 1500 yen would show as "15.00"). If another device
 closed it before, "That cash session is closed: a closed session takes no new movements." (two closes at
 once: one closes, the other gets this notice). To the assistant, if the count is required and you do not
 say how much you counted, it asks for it with that same notice and no confirmation shows; if the

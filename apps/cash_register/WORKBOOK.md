@@ -230,7 +230,9 @@ sea el cajón; si dos dispositivos abren a la vez, solo uno abre y el otro recib
 fondo obligatorio y el fondo vacío o a cero, «Este negocio exige fondo de apertura: indica el efectivo
 con el que empieza la caja.» bajo el campo; un cajón desactivado o que no existe, «Ese cajón no está
 disponible.»; un importe ilegible («Esto no es un importe. Escribe una cifra, por ejemplo 12,50.»),
-negativo o ambiguo («1.250») se para antes de enviar.
+negativo o ambiguo («1.250») se para antes de enviar. «Abrir sesión» está en gris mientras el negocio no
+haya dicho todavía su moneda, porque el fondo se lee en ella (sin ella, «1500» yenes se guardaría como
+150 000).
 Implicados: CASH_REGISTER-F04, F09
 
 ### CASH_REGISTER-F04 Vender solo con la caja abierta
@@ -273,6 +275,8 @@ pone el sistema según el tipo.
 Si falla: «Esta salida dejaría la caja en negativo y el saldo negativo no está permitido.» si los
 ajustes no lo permiten; un importe cero, ilegible o negativo se para antes de enviar; la sesión
 cerrada en otro dispositivo: «Esa caja está cerrada: una caja cerrada no acepta movimientos nuevos.».
+«Registrar» está en gris mientras el negocio no haya dicho todavía su moneda, porque el importe se lee
+en ella (sin ella, «1500» yenes se guardaría como 150 000).
 Un movimiento equivocado no se edita ni se borra: se apunta el contrario con un concepto que diga por
 qué.
 Implicados: ninguno
@@ -384,7 +388,10 @@ diferencia (contado − esperado: positiva sobra, negativa falta), a nombre de q
 `cash_register.session.closed`). Las líneas de Ventas del turno quedan copiadas en la sesión: lo que
 pase después (una anulación de ayer) va al turno abierto, nunca a este.
 Si falla: «Escribe el efectivo contado para cerrar la sesión.» con el campo vacío (la pantalla siempre
-lo pide; el ajuste de recuento obligatorio lo hace cumplir también al asistente y a la API); si otro
+lo pide; el ajuste de recuento obligatorio lo hace cumplir también al asistente y a la API). «Cerrar
+sesión» está en gris mientras el negocio no haya dicho todavía su moneda, y el último arqueo de cierre
+no se escribe en el campo hasta entonces: el contado se escribe y se lee en ella (sin ella, «1500» yenes
+se guardaría como 150 000 y el arqueo de 1500 yenes saldría como «15.00»). Si otro
 dispositivo la cerró antes, «Esa caja está cerrada: una caja cerrada no acepta movimientos nuevos.»
 (dos cierres a la vez: uno cierra, el otro recibe este aviso). Al asistente, si el recuento es
 obligatorio y no dices cuánto has contado, te lo pide con ese mismo aviso y no sale la confirmación; si
