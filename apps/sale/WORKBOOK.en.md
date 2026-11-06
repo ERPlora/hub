@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:3fba8bbaf890f9cbef7bf6826c8fcaafec1147ecf9731f08f070da40b602ca90 -->
+<!-- generated from WORKBOOK.md sha256:d85d0fc9b1b4aa8703701b8b9ba1f76b2d6ef6798a93196aae3d08a22f7e334e -->
 
 ## What it is for and who it is for
 
@@ -303,7 +303,10 @@ check closed. With Invoicing, its ticket (F2) numbered in the year's series in t
 (INVOICE-F01): both or neither. Sales announces the charged sale: Inventory lowers the stock
 (INVENTORY-F21) and Customers adds the purchase to the record (CUSTOMER-F20). Each line keeps the
 category, rate, country, region and Taxes rule it was charged with.
-If it fails: with no amount tendered the button does not charge and "Enter the amount tendered on the
+If it fails: while the business has not yet said its currency, the **Charge** sheet stays on "Working out
+the total…", with no keypad and "Charge" grey, because the total is painted and the amount tendered read in
+it (without it, "1500" yen tendered would be charged as 150,000). With no amount tendered the button does
+not charge and "Enter the amount tendered on the
 keypad" is read above the keypad; too little, "The amount tendered does not cover the total" (on the button
 too, and a tap says it). An article without VAT shows
 marked "VAT missing" and, when tapped, says "Cannot be sold: no tax category. VAT needs to be set up.";
@@ -509,7 +512,9 @@ Steps:
 In: the business's sections (SALE-F35) or, if there are none, Taxes' VAT categories.
 Out: a line with no catalog article, with its amount and its VAT category, which is charged like any
 other.
-If it fails: "Add" cannot be pressed without an amount and a section; with no sections or categories,
+If it fails: "Add" cannot be pressed without an amount and a section, nor while the business has not yet
+said its currency, because the amount is read in it (without it, "1500" yen would go in as 150,000; what
+was typed stays and is read as soon as it arrives); with no sections or categories,
 "There are no tax categories to choose from. Set up your VAT first, in Taxes.". If "Cancel" is pressed
 in "An approval is needed", the line does not go in and the sheet says "This needs a manager's
 approval.". Without the permission or the approval, the server refuses the line through any other route
@@ -655,7 +660,8 @@ In: "Allow discounts" and the maximum discount of the settings.
 Out: the discount on the check or on the line; when charging it is shared out among the lines, the
 declared base and VAT already carry it discounted, and the sale keeps the discounted amount.
 If it fails: with "Allow discounts" off there are no buttons and the server refuses "This business does
-not allow discounts.". Above the maximum, if "Cancel" is pressed in "An approval is needed", the check
+not allow discounts.". A fixed amount cannot be applied while the business has not yet said its currency,
+because it is read in it (without it, "1500" yen would take 150,000 off); a percentage does not wait for it. Above the maximum, if "Cancel" is pressed in "An approval is needed", the check
 stays as it was and "This needs a manager's approval." is read. An amount greater than the check cannot
 be applied. When charging a check, the discount goes on the check, never on the charge request: one that
 brings it is refused with "The discount of an open check is set on the check itself, not at the
@@ -1293,8 +1299,10 @@ booked, from Appointments (`appointment.appointment.get`); the refused service, 
 showing (`service.service.get`).
 Out: a service line with the service, its frozen price and the service's tax category; it moves no
 stock.
-If it fails: a service without a tax category shows "VAT missing" and does not go in ("Cannot be sold: no
-tax category. VAT needs to be set up."); that notice goes away on its own as soon as the service has a
+If it fails: in "Amount of <service>", "Add <amount>" and "Use <price>" wait in grey while the business
+has not yet said its currency, because the amount is read and the price written in it (without it, "1500"
+yen would go in as 150,000). A service without a tax category shows "VAT missing" and does not go in
+("Cannot be sold: no tax category. VAT needs to be set up."); that notice goes away on its own as soon as the service has a
 category, without touching anything else, and also on leaving **Sell**. An archived one, "That service is
 no longer offered…"; an amount outside the service's minimum and maximum, "That amount is outside what the
 service allows (<minimum> – <maximum>).". A booked price that does not match the appointment: "That is not the price the appointment

@@ -317,8 +317,10 @@ factura), y la cuenta cerrada. Con Facturación, su tique (F2) numerado en la se
 cobro (INVOICE-F01): o los dos o ninguno. Ventas avisa de la venta cobrada: Inventario baja el stock
 (INVENTORY-F21) y Clientes suma la compra a la ficha (CUSTOMER-F20). Cada línea guarda la categoría,
 el tipo, el país, la región y la regla de Impuestos con que se cobró.
-Si falla: sin importe entregado el botón no cobra y se lee encima del teclado «Marca en el teclado el
-importe entregado»; corto, «Lo entregado no cubre el total» (también en el botón, y lo dice al tocarlo). Un artículo sin IVA sale marcado «Falta el IVA»
+Si falla: mientras el negocio no haya dicho todavía su moneda, la hoja **Cobro** sigue en «Calculando el
+total…», sin teclado y con «Cobrar» en gris, porque el total se pinta y lo entregado se lee en ella (sin ella,
+«1500» yenes entregados se cobraría como 150 000). Sin importe entregado el botón no cobra y se lee encima del
+teclado «Marca en el teclado el importe entregado»; corto, «Lo entregado no cubre el total» (también en el botón, y lo dice al tocarlo). Un artículo sin IVA sale marcado «Falta el IVA»
 y al tocarlo dice «No se puede vender: sin categoría fiscal. Falta configurar el IVA.»; uno agotado
 sale en gris con «Agotado» y al tocarlo dice «… está agotado.» (SALE-F07). Un rechazo al
 cobrar se pinta en la hoja con su frase (p. ej. «Un producto del tique ya no está en el catálogo.
@@ -528,7 +530,9 @@ Pasos:
 Entra: las secciones del negocio (SALE-F35) o, si no hay, las categorías de IVA de Impuestos.
 Sale: una línea sin artículo de catálogo, con su importe y su categoría de IVA, que se cobra como
 cualquier otra.
-Si falla: «Añadir» no se puede pulsar sin importe y sección; sin secciones ni categorías, «No hay
+Si falla: «Añadir» no se puede pulsar sin importe y sección, ni mientras el negocio no haya dicho todavía
+su moneda, porque el importe se lee en ella (sin ella, «1500» yenes entraría como 150 000; lo tecleado se
+queda y se lee en cuanto llega); sin secciones ni categorías, «No hay
 categorías de IVA que elegir. Configura antes tus tipos de IVA, en Impuestos.». Si en «Hace falta una
 aprobación» se pulsa «Cancelar», la línea no entra y la hoja dice «Esto necesita la aprobación de un
 encargado.». Sin el permiso ni la aprobación, el servidor rechaza la línea por cualquier otra vía
@@ -675,7 +679,8 @@ Entra: «Permitir descuentos» y el descuento máximo de los ajustes.
 Sale: el descuento en la cuenta o en la línea; al cobrar se reparte entre las líneas, la base y el IVA
 declarados ya lo llevan descontado, y la venta guarda el importe descontado.
 Si falla: con «Permitir descuentos» apagado no hay botones y el servidor rechaza «Este negocio no
-permite descuentos.». Por encima del máximo, si en «Hace falta una aprobación» se pulsa «Cancelar», la
+permite descuentos.». Un importe fijo no se puede aplicar mientras el negocio no haya dicho todavía su
+moneda, porque se lee en ella (sin ella, «1500» yenes descontaría 150 000); un porcentaje no la espera. Por encima del máximo, si en «Hace falta una aprobación» se pulsa «Cancelar», la
 cuenta sigue como estaba y se lee «Esto necesita la aprobación de un encargado.». Un importe mayor
 que la cuenta no se puede aplicar. Al cobrar una cuenta, el descuento va en la cuenta, nunca en la
 petición del cobro: una que lo traiga se rechaza con «El descuento de una cuenta abierta se pone en la
@@ -1339,8 +1344,10 @@ reservó, de Citas (`appointment.appointment.get`); el servicio rechazado, mient
 vista (`service.service.get`).
 Sale: una línea de servicio con el servicio, su precio congelado y la categoría fiscal del servicio;
 no mueve stock.
-Si falla: un servicio sin categoría fiscal sale «Falta el IVA» y no entra («No se puede vender: sin
-categoría fiscal. Falta configurar el IVA.»); ese aviso se va solo en cuanto el servicio tiene
+Si falla: en «Importe de <servicio>», «Añadir <importe>» y «Usar <precio>» esperan en gris mientras el
+negocio no haya dicho todavía su moneda, porque el importe se lee y el precio se escribe en ella (sin ella,
+«1500» yenes entraría como 150 000). Un servicio sin categoría fiscal sale «Falta el IVA» y no entra («No se
+puede vender: sin categoría fiscal. Falta configurar el IVA.»); ese aviso se va solo en cuanto el servicio tiene
 categoría, sin tocar nada más, y también al salir de **Vender**. Uno archivado, «Ese servicio ya no se
 ofrece…»; un importe fuera del mínimo y el máximo del servicio, «Ese importe está fuera de lo que admite
 el servicio (<mínimo> – <máximo>).». Un precio reservado que no casa con la cita: «Ese no es el precio
