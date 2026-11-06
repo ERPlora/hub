@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:799ccad5a034bc71a2accfc79986b7f5690710050afdfe61d41b77332500de2e -->
+<!-- generated from WORKBOOK.md sha256:4c2c9c17f3a0708a3a1e8cc92d9305f07f14ae2ccc68a351f93460a02fd641c7 -->
 
 ## What it is for and who it is for
 
@@ -409,11 +409,15 @@ Steps:
    10:00"), and an amount a previous step leaves (that of a payment it has just recorded, the total of a sale
    or of an invoice, the price of a service or of a combo, the provisional total of a check, the amount of a
    voucher, a cash movement, the price and the total of a cart's line, a price of a price list, the fixed
-   discount of a price-list rule) in the currency that step gives it in: a payment in dollars, in dollars
-   ("12,50 US$"); a cart's line, in its cart's; a price of a price list, in its list's; the fixed discount of a
-   rule, which belongs to no price list, in the business's; the cash payment limit or the ticket limit of a
-   charge preview, in euros, the currency the law sets them in, also in a business that charges in another one
-   ("1.000,00 €"); if it gives none, in the business's ("120,50 €"). A number the notice brings comes out as it
+   discount of a price-list rule), also one the step leaves inside another piece of data (the price and the
+   total of the line just added to a cart and the cart's total after adding it, the total of a sale's invoice a
+   query reads, the figures of a till session), in the currency that step gives it in: a payment in dollars, in
+   dollars ("12,50 US$"); a cart's line, in its cart's; an amount inside another piece of data, in the one that
+   same piece of data gives (the line, the cart, the invoice: a line in dollars of a business that charges in
+   yen comes out in dollars) and, if it gives none, in the step's; a price of a price list, in its list's; the
+   fixed discount of a rule, which belongs to no price list, in the business's; the cash payment limit or the
+   ticket limit of a charge preview, in euros, the currency the law sets them in, also in a business that charges
+   in another one ("1.000,00 €"); if it gives none, in the business's ("120,50 €"). A number the notice brings comes out as it
    is, because the notice does not say whether it is money. What goes to another action, to another system or
    to an "Only continue if…" carries each piece of data as it is.
 In: the actions and queries of the active apps, the last real notice of that kind and what the previous

@@ -62,7 +62,8 @@ def test_the_card_names_the_own_tax_category_of_an_option_as_its_form_does():
 
 
 def test_the_card_names_the_kitchen_name_as_the_group_and_option_forms_do():
-    """What the kitchen ticket reads: the forms' «Nombre en la comanda», not Menús' «Nombre de cocina» (hub#663)."""
+    """What the kitchen ticket reads, in both languages: the forms' «Nombre en la comanda», not Menús' «Nombre de
+    cocina» (hub#663), and their «Kitchen ticket name», not the model's «Kitchen name» (hub#958)."""
     for name, form in (
         ("modifier.group.create", "groups"),
         ("modifier.group.update", "groups"),
@@ -70,8 +71,9 @@ def test_the_card_names_the_kitchen_name_as_the_group_and_option_forms_do():
         ("modifier.option.update", "options"),
     ):
         arguments = {"kitchen_name": "SALSA"}
-        said = SCREENS[form]["form"]["kitchenName"]
+        said, said_en = SCREENS[form]["form"]["kitchenName"], SCREENS_EN[form]["form"]["kitchenName"]
         assert labels(assistant.card(get(name), arguments, "es")) == [said], name
+        assert labels(assistant.card(get(name), arguments, "en")) == [said_en], name
 
 
 # ── The records a write names by their id (hub#672) ──────────────────────────────────────────────────────────────────
