@@ -75,6 +75,9 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await testid(page, 'printing-system-card-setup').click();
       await expect(page).toHaveURL(`${A}/printing/printers`);
     } finally {
+      // A run that falls between «off» and «on» still leaves Printing as it found it: the employee's and the Spanish
+      // tests below, and every spec after this file, count on it being on in `a`.
+      if (turnedOn.length === 0) await turnOnMissing(context, A, ['printing'], []);
       await turnOffTurnedOn(context, A, turnedOn);
       await context.close();
     }
