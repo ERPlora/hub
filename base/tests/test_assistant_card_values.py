@@ -559,6 +559,8 @@ TITLED_IN_SPANISH = {
     )},
     **{f"table.table.{action}:id": "Mesa" for action in ("delete", "move", "update")},
     **{f"table.zone.{action}:id": "Zona" for action in ("delete", "update")},
+    **{f"task.project.{action}:id": "Proyecto" for action in ("delete", "update")},
+    **{f"task.task.{action}:id": "Tarea" for action in ("assign", "complete", "delete", "set_status", "update")},
     **{f"whatsapp_inbox.conversation.{action}:id": "Conversación" for action in (
         "assign", "erase", "flag", "link_customer", "mark_read", "set_status",
     )},

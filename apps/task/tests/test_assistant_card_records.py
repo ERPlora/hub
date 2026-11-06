@@ -1,5 +1,5 @@
-"""FIX-HUB-TASK-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS (hub#677): the card of a write of Tasks says which task, project or
-person it acts on by its name, read as whoever asks, never by its id, and leaves it out when that person may not read
+"""FIX-HUB-TASK-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS (hub#677): the card of a write of Tasks says which task, project
+or person it acts on by its name, read as whoever asks, never by its id, and leaves it out when that person may not read
 it or it is not there. A task goes by its title (what the person says of it: «complete the task clean the store
 room»), a project by its name, as the screens' «Delete» dialog says it, and a person of the team by their full name, as
 Staff names them.
@@ -109,7 +109,8 @@ def test_among_several_the_card_says_the_one_the_write_names():
     for listed in (projects, list(reversed(projects))):
         assert [shown("task.project.delete", {"id": str(p.id)})["id"] for p in listed] == [p.name for p in listed]
     for listed in (people, list(reversed(people))):
-        said = [shown("task.task.assign", {"id": str(tasks[0].id), "member_id": str(m.id)})["member_id"] for m in listed]
+        arguments = [{"id": str(tasks[0].id), "member_id": str(member.id)} for member in listed]
+        said = [shown("task.task.assign", each)["member_id"] for each in arguments]
         assert said == [f"{m.first_name} {m.last_name}" for m in listed]
 
 
@@ -119,7 +120,8 @@ def test_a_change_keeps_saying_the_record_beside_what_it_changes():
     new one under its own datum; a project moved says the task, the project it goes to and nothing by an id."""
     task = make_task("Clean the store room")
     project = make_project("opening", "Opening")
-    said = shown("task.task.update", {"id": str(task.id), "title": "Tidy the store room", "project_id": str(project.id)})
+    arguments = {"id": str(task.id), "title": "Tidy the store room", "project_id": str(project.id)}
+    said = shown("task.task.update", arguments)
     assert said == {"id": "Clean the store room", "title": "Tidy the store room", "project_id": "Opening"}
     renamed = shown("task.project.update", {"id": str(project.id), "name": "Grand opening"})
     assert renamed == {"id": "Opening", "name": "Grand opening"}
@@ -129,7 +131,8 @@ def test_a_change_keeps_saying_the_record_beside_what_it_changes():
 def test_a_new_subtask_says_the_task_it_hangs_from_and_whom_it_goes_to():
     parent = make_task("Open the shop")
     ana = make_member("Ana", "López")
-    said = shown("task.task.create", {"title": "Order the chairs", "parent_id": str(parent.id), "assigned_to_id": str(ana.id)})
+    arguments = {"title": "Order the chairs", "parent_id": str(parent.id), "assigned_to_id": str(ana.id)}
+    said = shown("task.task.create", arguments)
     assert said == {"title": "Order the chairs", "parent_id": "Open the shop", "assigned_to_id": "Ana López"}
 
 
