@@ -197,33 +197,44 @@ describe('InvoiceCreateModal', () => {
     expect(taxId.errorText).toBe('That tax ID is not valid.');
   });
 
-  it('two lines whose rate is refused with the same words: the corrected line alone loses them (hub#888)', async () => {
-    const s = await setup();
-    await s.choose('TICKET', 'F2');
-    s.editor().vm.$emit('update:modelValue', [
-      { uid: 1, description: 'Course', quantity: '1', price: '10', taxRate: 'x' },
-      { uid: 2, description: 'Dye kit', quantity: '1', price: '5', taxRate: 'x' },
-    ]);
-    await s.wrapper.vm.$nextTick();
-    s.answer(422, {
-      error: {
-        code: 'invalid_payload',
-        message: 'Check the highlighted details.',
-        fields: { 'lines.0.tax_rate': 'Enter a number.', 'lines.1.tax_rate': 'Enter a number.' },
-      },
-    });
-    await click(s.submit());
-    const first = s.inDoc('invoice-line-1-tax-rate') as HTMLElement & { errorText?: string };
-    const second = s.inDoc('invoice-line-2-tax-rate') as HTMLElement & { errorText?: string };
-    expect([first.errorText, second.errorText]).toEqual(['Enter a number.', 'Enter a number.']);
+  // Every field of a line, not the rate alone: each is named by the key the server refuses it under
+  // (`lines.<index>.<the command's field>`), which the guardrail cannot check for a field that paints through a function.
+  it.each([
+    { field: 'description', key: 'description', typed: 'Evening course' },
+    { field: 'quantity', key: 'quantity', typed: '2' },
+    { field: 'price', key: 'unit_price', typed: '12' },
+    { field: 'tax-rate', key: 'tax_rate', typed: '21' },
+  ])(
+    'two lines whose $field is refused with the same words: the corrected line alone loses them (hub#888)',
+    async ({ field, key, typed }) => {
+      const s = await setup();
+      await s.choose('TICKET', 'F2');
+      s.editor().vm.$emit('update:modelValue', [
+        { uid: 1, description: 'Course', quantity: '1', price: '10', taxRate: 'x' },
+        { uid: 2, description: 'Dye kit', quantity: '1', price: '5', taxRate: 'x' },
+      ]);
+      await s.wrapper.vm.$nextTick();
+      s.answer(422, {
+        error: {
+          code: 'invalid_payload',
+          message: 'Check the highlighted details.',
+          fields: { [`lines.0.${key}`]: 'Enter a number.', [`lines.1.${key}`]: 'Enter a number.' },
+        },
+      });
+      await click(s.submit());
+      const first = s.inDoc(`invoice-line-1-${field}`) as HTMLElement & { errorText?: string; name?: string };
+      const second = s.inDoc(`invoice-line-2-${field}`) as HTMLElement & { errorText?: string; name?: string };
+      expect([first.errorText, second.errorText]).toEqual(['Enter a number.', 'Enter a number.']);
+      expect([first.name, second.name]).toEqual([`lines.0.${key}`, `lines.1.${key}`]);
 
-    first.dispatchEvent(new Event('input', { bubbles: true }));
-    await ionValue(first, '21', 'ionInput');
-    expect(first.errorText).toBeFalsy();
-    expect(first.classList.contains('ion-invalid')).toBe(false);
-    expect(second.errorText).toBe('Enter a number.');
-    expect(second.classList.contains('ion-invalid')).toBe(true);
-  });
+      first.dispatchEvent(new Event('input', { bubbles: true }));
+      await ionValue(first, typed, 'ionInput');
+      expect(first.errorText).toBeFalsy();
+      expect(first.classList.contains('ion-invalid')).toBe(false);
+      expect(second.errorText).toBe('Enter a number.');
+      expect(second.classList.contains('ion-invalid')).toBe(true);
+    },
+  );
 
   it('the refused notes lose their message when corrected, though a line says the same words (hub#888)', async () => {
     const s = await setup();
