@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:e34817c97e71f03aee3695d05efbc32973969441d4e0436a76777dbc6b13e517 -->
+<!-- generated from WORKBOOK.md sha256:0bdc3518a285afbe023df6e2b226976692cc1014d9d67fdd2610ec79cd0c1f20 -->
 
 ## What it is for and who it is for
 
@@ -683,11 +683,16 @@ Steps:
 4. "Low stock threshold" (out of the box, 10, in whole units): the threshold a product created without
    its own starts with (it only happens through the assistant or the API: the form and the CSV always
    send one). Changing it does not touch the products that already exist.
-5. Tap "Save": "Settings saved.".
+5. Tap "Save" (off until you change something): only what you changed is sent and "Settings saved."
+   shows above the button.
+   What is changed while it is saving is not lost: it stays on screen, still to save (hub#914).
 In: the business's saved settings (one per business); if they were never saved, the factory ones apply.
 Out: the settings, which apply from the next movement. They only tell the open screens (the Dashboard and
 the lists refresh); no other app reacts.
-If it fails: "The settings could not be saved.". If, with the tab open, another person without the
+If it fails: "The settings could not be saved." and the reason below the field (an empty threshold or one
+with decimals: "Enter a whole number."). As in the form windows, the notice goes as soon as something is
+changed and a field's reason as soon as that field is corrected; both come back if the next try is
+refused too. A refusal that names no field stays until the next try (hub#871). If, with the tab open, another person without the
 permission comes in (shift change), the fields lock, "Save" disappears and "You do not have permission
 to change these settings. Ask an administrator if you need it." shows.
 Involved: SALE-F01
