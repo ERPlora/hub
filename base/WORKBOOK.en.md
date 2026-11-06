@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:f5fbb9a563df0b0212dc27bb1b7902d44e832cd4e69c9ea20cbd5ddcb84229d7 -->
+<!-- generated from WORKBOOK.md sha256:ae06cf98d09034c8e011b3eec1b3921976e896b2fa68d9692e44b48c54aad8cc -->
 
 ## What it is for and who it is for
 
@@ -105,7 +105,11 @@ or the system's) and "Sign out". Both also show in the installed app: neither se
 ### The "You cannot issue invoices yet" strip
 Over any screen while a step that stops invoicing is missing: "No ticket or invoice can be issued until
 this is set up:" and each step with "Set up" (on the screen that sets it up, only its name). It does not
-show on the Home's "Summary" (the list says the same a little further down); on "Activity", it does.
+show on the Home's "Summary" (the list says the same a little further down); on "Activity", it does. On a
+very low screen (a phone on its side: 500 px high or less, the till's own cut) it is one line, to leave room for the
+screen: "You cannot issue invoices yet" and a single "Set up", which leads to the first step that can be set up from
+there; without the sentence or the steps' names, which read upright or on the Home. If there is none to set up from
+there, the warning alone.
 
 ### Apps
 From "Apps" in the side menu. Three tabs at the bottom: "My apps" (the apps the business has running), "Add
@@ -426,7 +430,7 @@ Steps:
      whose check fails does not show either: what could not be checked is never taken as done nor as
      pending.
   5. While a "Needed to invoice" step is missing, the "You cannot issue invoices yet" strip shows over the
-     other screens.
+     other screens; with the phone on its side, in one line with a single "Set up" (hub#838).
   6. When someone else completes a step on another device, the list updates by itself.
 In: the steps each app that is on declares, with their check, their country, their permission and their
 screen.
