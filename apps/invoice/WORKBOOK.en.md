@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:3465980343fa148cc30fbae248983099c355dc6ccc14e63955322c540f364265 -->
+<!-- generated from WORKBOOK.md sha256:ff856c53562496cff3573447ecc6385aec9193ad8b1dccb8faf0703b0cd36f0a -->
 
 ## What it is for and who it is for
 
@@ -141,8 +141,8 @@ currency and with its decimals; its symbol or its code around the figure do not 
 and the rate, with the name of the tax of the business's tax territory: "VAT %" (21 at first), "IGIC %"
 in the Canary Islands or "IPSI %" in Ceuta and Melilla, which start at the general rate of its rule in
 Taxes and are empty if the territory has no rule for its tax yet. "+ Line" adds another and the cross
-removes it. "Issue invoice" (with a spinning wheel while it goes) is grey until every line has a
-description, quantity, price and rate. A refusal shows above the buttons, per field when it is about a
+removes it. "Issue invoice" (with a spinning wheel while it goes) is grey until the business has told its
+currency and every line has a description, quantity, price and rate. A refusal shows above the buttons, per field when it is about a
 field.
 
 ### Series
@@ -273,8 +273,9 @@ Steps:
    starts at the general rate of its rule in Taxes (in the Canary Islands, that of the Canary Islands
    rule); if the territory has no rule for its tax yet, it is empty: type it yourself. "+ Line" adds
    another, with the same starting rate, and the cross removes it.
-4. Tap "Issue invoice"; it is grey until every line has a description, quantity, price and rate. The
-   window closes and the invoice appears in the list with its number, "Issued" and "Source" "Manual".
+4. Tap "Issue invoice"; it is grey until the business has told its currency (each price is read in it) and
+   every line has a description, quantity, price and rate. The window closes and the invoice appears in the
+   list with its number, "Issued" and "Source" "Manual".
 In: what the person types; the configured issuer. Through the API or the assistant a line can also carry
 the tax category of Taxes: then its rate and its qualification are those of the rule in force today, not
 the typed rate. The typed rate belongs to the tax of the business's tax territory (Taxes → Settings,
