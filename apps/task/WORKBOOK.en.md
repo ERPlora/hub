@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:b5467242c005c8a8e6eebb96dba253571929ae7e35903b08b1b49dca4309261a -->
+<!-- generated from WORKBOOK.md sha256:5b3202013ad1436153ffb75aa1fd36412de6ebabfbcbe4b4cbee44b71e789149 -->
 
 ## What it is for and who it is for
 
@@ -375,7 +375,11 @@ Everything can be asked for through the screens, the assistant (by voice or by t
 speaks) and the API, with the same rules and the same permissions. A task is named by its id, its number
 or its title; a project by its id, its code or its name; a person by their id or their name. If a
 name fits several, it says which and asks to choose (`task.ambiguous_task`,
-`task.ambiguous_project`, `staff.ambiguous_member`).
+`task.ambiguous_project`, `staff.ambiguous_member`). Before a write, the assistant asks for confirmation with its card
+(BASE-F97), which names each record as the screens name it, never by its id: the task by its title ("Task: Clean the
+store room"), the project by its name ("Project: Shop opening") and the person by their full name ("Assigned to: Ana
+López"). What the person asking cannot see is left out: an employee does not see another person's task named, as
+they do not see it in their list.
 
 ### What it offers: queries (they read and change nothing; all of them can be followed live)
 
