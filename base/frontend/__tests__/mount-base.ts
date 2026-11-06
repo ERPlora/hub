@@ -13,12 +13,13 @@ import {
 } from '@erplora/ui/shell';
 import { assistantMessages, configureAssistant } from '@erplora/ui/components';
 import { LIVE_CLIENT_KEY, type LiveClient, type OpName } from '@erplora/ui/sdk';
-import { mount } from '@vue/test-utils';
+import { type BaseWrapper, mount } from '@vue/test-utils';
 import { vi } from 'vitest';
 import { type Component, createApp, ref } from 'vue';
 import { createMemoryHistory, createRouter, type RouteLocationRaw, type Router, type RouteRecordRaw } from 'vue-router';
 
 import {
+  type ApiCall,
   type ApiHandler,
   createTestClient,
   flush,
@@ -26,6 +27,7 @@ import {
   type StreamCall,
 } from '../../../packages/ui/src/sdk/__tests__/live-harness';
 import { OPERATION_ROUTES } from '../../../frontend/generated/operation-routes';
+import PlanUpgradeLink from '../components/PlanUpgradeLink.vue';
 import { HUB_ASSISTANT } from '../lib/assistant-hub';
 import { forgetAppDistribution } from '../lib/management';
 import en from '../locale/en.json';
@@ -78,6 +80,39 @@ export function tap(element: Element): { defaultPrevented: boolean } {
     window.removeEventListener('click', last);
   }
   return seen;
+}
+
+/** What `base.saas_pass.create` signs in these tests (BASE-F11). */
+export const SIGNED = 'http://localhost:8001/hub-pass/?pass=abc';
+
+/** `base.saas_pass.create` refusing to sign (a session opened without the account): the usual address must open. */
+export function passRefused(): Response {
+  return Response.json({ error: { code: 'base.saas_pass_needs_account', message: 'No.' } }, { status: 403 });
+}
+
+/** Taps, in a browser, a link of the mounted `m` that goes with the pass to erplora.com (`useSaasPass`): what it asked
+ *  the pass for (`next`, none when it asked nothing) and where its new tab was sent (`to`): the signed address, or the
+ *  usual one when the pass could not be signed. */
+export async function followPass(m: { net: { api: ApiCall[] } }, link: Element): Promise<{ next?: string; to: string }> {
+  const tab = { opener: {} as unknown, location: { href: 'about:blank' } };
+  const open = vi.spyOn(window, 'open').mockReturnValue(tab as unknown as Window);
+  try {
+    tap(link);
+    await flush();
+    const pass = m.net.api.filter((call) => call.url.includes('/saas-pass')).at(-1);
+    const next = pass ? (JSON.parse(pass.init.body as string) as { next: string }).next : undefined;
+    return { next, to: tab.location.href };
+  } finally {
+    open.mockRestore();
+  }
+}
+
+/** The «Upgrade plan» a screen places in `within`, as the person and the pass see it, when it is the platform's
+ *  PlanUpgradeLink (BASE-F11); `null` when there is none, or only a copy of its click. */
+export function placedUpgrade(within: Pick<BaseWrapper<Node>, 'findComponent'>): { url: string; testid?: string; says: string } | null {
+  const piece = within.findComponent(PlanUpgradeLink);
+  if (!piece.exists()) return null;
+  return { url: piece.props('url'), testid: piece.attributes('data-testid'), says: piece.text() };
 }
 
 const BLANK = { template: '<div />' };
