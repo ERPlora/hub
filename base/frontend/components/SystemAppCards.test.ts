@@ -8,6 +8,15 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { errorFrame, flush, mountBase, subId } from '../__tests__/mount-base';
 import SystemAppCards from './SystemAppCards.vue';
 
+// A component whose chunk does not arrive (a deploy between the list and the load), as `Broken` of any app.
+vi.mock('../lib/app-components', async (importOriginal) => {
+  const real = await importOriginal<typeof import('../lib/app-components')>();
+  return {
+    appComponent: (app: string, name: string) =>
+      name === 'Broken' ? () => Promise.reject(new Error('the chunk did not arrive')) : real.appComponent(app, name),
+  };
+});
+
 const OP = 'base.system.cards';
 const STATS = { key: 'demo.stats', app: 'demo', component: 'ItemStats' };
 
@@ -50,6 +59,14 @@ describe('SystemAppCards', () => {
     await m.result(m.call, OP, { cards: [{ key: 'demo.nope', app: 'demo', component: 'Nope' }, STATS] });
     expect(cards(m)).toEqual(['system-app-card-demo.stats']);
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('demo.nope'));
+  });
+
+  it('leaves out a card whose component fails to load, and keeps the others', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const m = await setup();
+    await m.result(m.call, OP, { cards: [{ key: 'demo.broken', app: 'demo', component: 'Broken' }, STATS] });
+    await vi.waitFor(() => expect(cards(m)).toEqual(['system-app-card-demo.stats']));
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('demo.broken could not load'), expect.any(Error));
   });
 
   it('hides the cards when their list cannot be read', async () => {
