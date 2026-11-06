@@ -91,13 +91,13 @@ export async function expectSaysMoneyUnreadable(window: WaitingWindow, read: Mon
   await read.fail();
   await window.settle();
   expect(inWindow(window, NOTICE)?.getAttribute('role'), "an alert that says the business's money could not be read").toBe('alert');
-  expect(inWindow(window, RETRY), '«Retry» in that alert').not.toBeNull();
+  expect(!!inWindow(window, RETRY), '«Retry» in that alert').toBe(true);
   expect([window.save()?.disabled, window.sent()], '[«Save» grey, what was sent] while the money cannot be read').toEqual([true, []]);
   const asked = read.asked();
   inWindow(window, RETRY)?.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
   await window.settle();
-  expect([read.asked() - asked, inWindow(window, NOTICE)], '«Retry»: [asks the server again, the notice while it asks]').toEqual([1, null]);
+  expect([read.asked() - asked, !!inWindow(window, NOTICE)], '«Retry»: [asks the server again, the notice while it asks]').toEqual([1, false]);
   await read.answer();
   await window.settle();
-  expect([inWindow(window, NOTICE), window.save()?.disabled], 'once the business answers: [the notice, «Save» grey]').toEqual([null, false]);
+  expect([!!inWindow(window, NOTICE), window.save()?.disabled], 'once the business answers: [the notice, «Save» grey]').toEqual([false, false]);
 }
