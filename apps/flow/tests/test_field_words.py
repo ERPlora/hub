@@ -74,7 +74,19 @@ def test_every_field_an_action_asks_for_or_leaves_has_its_words():
 
 
 @pytest.mark.parametrize("language", ["en", "es"])
-@pytest.mark.parametrize("action", ["sale__record__get", "combo__option__get", "staff__role__detail", "staff__time_off__get"])
+@pytest.mark.parametrize(
+    "action",
+    [
+        "sale__record__get",
+        "combo__option__get",
+        "staff__role__detail",
+        "staff__time_off__get",
+        "customer__group__detail",
+        "customer__tag__detail",
+        "customer__field__detail",
+        "customer__order__get",
+    ],
+)
 def test_a_read_that_names_a_record_on_the_assistants_card_has_a_name_of_its_own(action, language):
     """The catalog offers every operation with a declared permission, these reads too: without a name of their own the
     editor composes one from their id («Get · Sales & POS (Record)»)."""

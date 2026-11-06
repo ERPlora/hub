@@ -158,12 +158,12 @@ describe('guardrail: every link of the Hub to another page goes by `openExternal
     const through = Object.fromEntries(found.filter((entry) => entry.through > 0).map((entry) => [entry.file, entry.through]));
     expect(through).toMatchObject({
       'base/frontend/components/ManageLink.vue': 1,
-      'base/frontend/components/PeopleList.vue': 2,
+      'base/frontend/components/PeopleList.vue': 1,
+      'base/frontend/components/PlanUpgradeLink.vue': 1,
       'base/frontend/components/RolesList.vue': 1,
       'base/frontend/components/settings/BusinessPanel.vue': 1,
       'base/frontend/pages/PersonPage.vue': 1,
-      'base/frontend/components/UpgradePlanLink.vue': 1,
-      'base/frontend/pages/AppsPage.vue': 2,
+      'base/frontend/pages/AppsPage.vue': 1,
       'base/frontend/pages/AppBlockedPage.vue': 1,
       'base/frontend/pages/LoginPage.vue': 1,
       'apps/invoice/frontend/components/VerifactuReceipt.vue': 1,

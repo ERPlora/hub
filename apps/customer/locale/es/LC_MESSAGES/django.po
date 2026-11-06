@@ -413,6 +413,9 @@ msgstr "Esa etiqueta ya no existe."
 msgid "That field no longer exists."
 msgstr "Ese campo ya no existe."
 
+msgid "Sales is not active in this business."
+msgstr "Ventas no está activa en este negocio."
+
 #, python-format
 msgid "Several match “%(reference)s”: give the id."
 msgstr "Varios coinciden con «%(reference)s»: indica el id."
@@ -555,6 +558,12 @@ msgstr "Autor"
 
 msgid "Open order"
 msgstr "Pedido abierto"
+
+msgid "Customer"
+msgstr "Cliente"
+
+msgid "Custom field"
+msgstr "Campo personalizado"
 
 msgid "Merge two customer cards"
 msgstr "Fusionar dos fichas de cliente"

@@ -4,7 +4,20 @@
 import { applySurface } from '@erplora/ui/shell';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { EMPLOYEE, errorFrame, flush, installedApp, leaveInstalledApp, mountBase, subId, tap } from '../__tests__/mount-base';
+import {
+  EMPLOYEE,
+  errorFrame,
+  flush,
+  followPass,
+  installedApp,
+  leaveInstalledApp,
+  mountBase,
+  passRefused,
+  placedUpgrade,
+  SIGNED,
+  subId,
+  tap,
+} from '../__tests__/mount-base';
 import type { Person, Seats } from '../operations';
 import PeopleList from './PeopleList.vue';
 
@@ -112,18 +125,31 @@ describe('PeopleList', () => {
 
   it('its «Upgrade plan» goes with the pass, already signed in on erplora.com', async () => {
     embed({ name: 'Bar', plan_url: PLAN_URL, members_url: MEMBERS_URL });
-    const tab = { opener: {}, location: { href: 'about:blank' } };
-    const open_ = vi.spyOn(window, 'open').mockReturnValue(tab as unknown as Window);
-    const url = 'http://localhost:8001/hub-pass/?pass=abc';
-    const m = await open({ onApi: () => Response.json({ url }) });
+    const m = await open({ onApi: () => Response.json({ url: SIGNED }) });
     await m.result(m.call, 'base.person.list', { people: PEOPLE, seats: { known: true, used: 3, limit: 3, full: true } });
 
-    tap(m.wrapper.get('a[data-testid="people-upgrade"]').element);
-    await flush();
+    expect(await followPass(m, m.wrapper.get('a[data-testid="people-upgrade"]').element)).toEqual({ next: 'plan', to: SIGNED });
+  });
 
-    expect(JSON.parse(m.net.api.at(-1)!.init.body as string)).toEqual({ next: 'plan' });
-    expect(tab.location.href).toBe(url);
-    open_.mockRestore();
+  it('its «Upgrade plan» is the platform’s PlanUpgradeLink to this business’s plan page, not a copy of its own', async () => {
+    embed({ name: 'Bar', plan_url: PLAN_URL, members_url: MEMBERS_URL });
+    const m = await open({ locale: 'es' });
+    await m.result(m.call, 'base.person.list', { people: PEOPLE, seats: { known: true, used: 3, limit: 3, full: true } });
+    expect(placedUpgrade(m.wrapper.get('[data-testid="people-full"]'))).toEqual({
+      url: PLAN_URL,
+      testid: 'people-upgrade',
+      says: 'Mejorar plan',
+    });
+  });
+
+  it('when the pass cannot be signed, its «Upgrade plan» opens the plan page as usual', async () => {
+    embed({ name: 'Bar', plan_url: PLAN_URL, members_url: MEMBERS_URL });
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const m = await open({ onApi: passRefused });
+    await m.result(m.call, 'base.person.list', { people: PEOPLE, seats: { known: true, used: 3, limit: 3, full: true } });
+
+    expect(await followPass(m, m.wrapper.get('a[data-testid="people-upgrade"]').element)).toEqual({ next: 'plan', to: PLAN_URL });
+    error.mockRestore();
   });
 
   it('«Upgrade plan» sells: never on the app surfaces', async () => {
