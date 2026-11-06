@@ -5,7 +5,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { h, ref } from 'vue';
 
-import { click, mountSale, settle } from '../../__tests__/mount-sale';
+import { click, expectWaitsForTheYen, mountSale, settle } from '../../__tests__/mount-sale';
 import { plain } from '../../lib/format';
 import DiscountSheet from './DiscountSheet.vue';
 
@@ -14,7 +14,7 @@ vi.mock('@ionic/vue', async (importOriginal) => {
   return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
 });
 
-async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 'en') {
+async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 'en', options: { business?: null } = {}) {
   const open = ref(true);
   const m = await mountSale(
     {
@@ -29,7 +29,7 @@ async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 
           ...props,
         }),
     },
-    { locale },
+    { locale, ...options },
   );
   await m.live();
   await settle();
@@ -106,5 +106,23 @@ describe('DiscountSheet: a line', () => {
   it('a refusal is read in the sheet', async () => {
     const m = await setup({ name: 'Steak', error: 'That discount is over what this business allows without the manager.' });
     expect(m.find('pos-discount-error').text()).toBe('That discount is over what this business allows without the manager.');
+  });
+});
+
+describe('DiscountSheet: before the business answers its money (hub#921)', () => {
+  it('a fixed amount waits in grey and hands up nothing; once the yen arrives «1500» is 1500', async () => {
+    const m = await setup({ amount: 500 }, 'en', { business: null });
+    await m.press('1', '5', '0', '0');
+    await expectWaitsForTheYen(m, 'pos-discount-apply', () => m.sheet().emitted('apply') ?? []);
+    expect(plain(m.find('pos-discount-value').text())).toBe('¥1,500');
+    await click(m.find('pos-discount-apply').element);
+    expect(m.sheet().emitted('apply')).toEqual([[{ percent: '0', amount: 1500 }]]);
+  });
+
+  it('a percentage reads no money: it does not wait for the business', async () => {
+    const m = await setup({}, 'en', { business: null });
+    await m.press('1', '0');
+    await click(m.find('pos-discount-apply').element);
+    expect(m.sheet().emitted('apply')).toEqual([[{ percent: '10', amount: 0 }]]);
   });
 });

@@ -5,7 +5,7 @@
 // passes, with the decimals the server counts; until it is known, a figure without a symbol, never the euro.
 import { describe, expect, it } from 'vitest';
 
-import { centsFromAmount, currencySign, formatDay, formatMoney, formatPercent, formatQuantity, moneyOf, plain } from './format';
+import { centsFromAmount, currencySign, formatDay, formatMoney, formatPercent, formatQuantity, keypadCents, moneyOf, plain } from './format';
 
 // The money as `base.business.get` (or a sale) says it: the currency and the decimals the server counts it in.
 const EUR = { currency: 'EUR', decimals: 2 };
@@ -122,5 +122,21 @@ describe('formatDay', () => {
     expect(formatDay('2026-11-14T10:00:00Z', 'es')).toBe('14/11/2026');
     expect(formatDay('2026-11-14T10:00:00Z', 'en')).toBe('11/14/2026');
     expect(formatDay(null, 'es')).toBe('—');
+  });
+});
+
+// hub#921: what the till's keypad typed is handed up only in the business's money, which its type asks for (never
+// «1500» yen read with two decimals as 150000 because the business had not answered yet).
+describe('keypadCents', () => {
+  it('reads what the keypad typed in the money’s decimals, a dot still being typed included', () => {
+    expect(keypadCents('1500', JPY)).toBe(1500);
+    expect(keypadCents('1500', EUR)).toBe(150000);
+    expect(keypadCents('12.5', EUR)).toBe(1250);
+    expect(keypadCents('12.', EUR)).toBe(1200);
+  });
+
+  it('nothing typed, or more decimals than the money has, is 0', () => {
+    expect(keypadCents('', EUR)).toBe(0);
+    expect(keypadCents('15.50', JPY)).toBe(0);
   });
 });

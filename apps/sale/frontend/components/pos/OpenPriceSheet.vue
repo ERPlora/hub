@@ -1,15 +1,16 @@
 <script setup lang="ts">
 // The open-price sheet (SALE-F09): the amount typed on the keypad, big on top; «Section (VAT)» with
-// the business's departments (or Taxes' categories without any); «Add <amount>», which waits for both.
-// It hands the line up in cents with its department (or tax category); the server names the line after
-// it and the page writes it. A refusal (the permission, a department gone) is read here, over the button. Opens blank.
+// the business's departments (or Taxes' categories without any); «Add <amount>», which waits for both and for the
+// business's money (hub#921: the amount is read in it, never before it answers). It hands the line up in cents with
+// its department (or tax category); the server names the line after it and the page writes it. A refusal (the
+// permission, a department gone) is read here, over the button. Opens blank.
 import { IonButton } from '@ionic/vue';
 import { computed, shallowRef, watch } from 'vue';
 
 import type { OpenLineIn } from '../../operations';
 import { useTaxName } from '../../../../tax/frontend/composables/useTaxName';
 import { useLocale } from '../../composables/useT';
-import { centsFromAmount, formatMoney, moneyDecimals, useBusinessMoney } from '../../lib/format';
+import { centsFromAmount, formatMoney, keypadCents, moneyDecimals, useBusinessMoney } from '../../lib/format';
 import DepartmentPicker, { type OpenPriceChoice } from './DepartmentPicker.vue';
 import PosNumpad from './PosNumpad.vue';
 import PosSheet from './PosSheet.vue';
@@ -30,8 +31,10 @@ watch(open, (isOpen) => {
   choice.value = null;
 });
 
-const cents = computed(() => centsFromAmount(typed.value.replace(/\.$/, ''), business.value) ?? 0);
-const amount = computed(() => formatMoney(cents.value, locale.value, business.value));
+/** What «Add» hands up, in cents of the business's money: 0 until the business answers it, so «Add» waits in grey. */
+const cents = computed(() => (business.value ? keypadCents(typed.value, business.value) : 0));
+/** What was typed, on top and on «Add»: a figure without a sign until the business answers its money. */
+const amount = computed(() => formatMoney(centsFromAmount(typed.value.replace(/\.$/, ''), business.value) ?? 0, locale.value, business.value));
 const ready = computed(() => cents.value > 0 && !!choice.value);
 
 function add(): void {
