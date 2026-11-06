@@ -21,7 +21,7 @@ from apps.service.models import (
     Service,
     ServiceSettings,
 )
-from base.tests.po import po_entries
+from base.tests.po import catalogue_key, po_entries
 
 LOCALE = Path(apps.get_app_config("service").path) / "locale" / "es" / "LC_MESSAGES"
 MODELS = (
@@ -87,7 +87,7 @@ def visible_texts() -> set[str]:
     ):
         lazies += list(choices.labels)
     with translation.override("en"):
-        return {str(text) for text in lazies} | schema_titles()
+        return {catalogue_key(text) for text in lazies} | schema_titles()
 
 
 def schema_titles() -> set[str]:
@@ -185,10 +185,40 @@ def test_spanish_texts_of_the_workbook():
         assert str(services.SESSION_SETTLED) == (
             "Esa sesión del bono ya no se puede soltar: la venta está cobrada. Devolverla es una devolución."
         )
+        assert (
+            str(queries.SESSION_NOT_FOUND)
+            == "Esa sesión del bono no existe en este negocio."
+        )
         assert str(services.HOLD_LOST) % {"name": "Bono 5"} == (
             "La sesión reservada de «Bono 5» ya no está reservada (pasó su día o se soltó). Quita el bono "
             "de la línea y vuelve a aplicarlo."
         )
+
+
+def test_spanish_says_services_own_words_not_an_earlier_apps():
+    """The texts service shares in English with an app loaded before it come out in Spanish with service's words
+    (hub#662): a voided voucher is «anulado por», as the voucher sold is masculine and its history says «Anulado por»,
+    not Ventas' «anulada por»; a category is asked for and said ambiguous as its siblings (service, package,
+    professional) are, «su id o su nombre» and «vale para varias», not Inventario's «su id, o su nombre» and «coincide
+    con varias»; a session is «sesión del bono», as service's own titles and WORKBOOK say it, in the singular and in the
+    plural."""
+    texts = {
+        "Grant.voided_by": Grant._meta.get_field("voided_by").verbose_name,
+        "Redemption": Redemption._meta.verbose_name,
+        "Redemption plural": Redemption._meta.verbose_name_plural,
+        "SAY_WHICH_CATEGORY": schemas.SAY_WHICH_CATEGORY,
+        "CATEGORY_AMBIGUOUS": queries.CATEGORY_AMBIGUOUS,
+    }
+    with translation.override("es"):
+        said = {name: str(text) for name, text in texts.items()}
+    said["CATEGORY_AMBIGUOUS"] %= {"said": "Pelo", "names": "Pelo corto, Pelo largo"}
+    assert said == {
+        "Grant.voided_by": "anulado por",
+        "Redemption": "sesión del bono",
+        "Redemption plural": "sesiones del bono",
+        "SAY_WHICH_CATEGORY": "Di qué categoría: su id o su nombre.",
+        "CATEGORY_AMBIGUOUS": "«Pelo» vale para varias categorías: Pelo corto, Pelo largo. Di cuál.",
+    }
 
 
 @pytest.mark.django_db

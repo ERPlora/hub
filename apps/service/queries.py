@@ -34,6 +34,7 @@ from django.db.models import (
 from django.db.models.functions import Coalesce
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import pgettext_lazy
 from live.context import OperationContext, Scope
 from live.errors import Conflict, NotFound
 from live.operations import operation
@@ -102,8 +103,9 @@ from base.ordering import list_order_for
 SERVICE_NOT_FOUND = _("That service does not exist in this business.")
 SERVICE_AMBIGUOUS = _("“%(said)s” matches several services: %(names)s. Say which one.")
 CATEGORY_NOT_FOUND = _("That category does not exist in this business.")
-CATEGORY_AMBIGUOUS = _(
-    "“%(said)s” matches several categories: %(names)s. Say which one."
+# Its own context: said as its siblings are («vale para varios»), not as Inventory says it (hub#662).
+CATEGORY_AMBIGUOUS = pgettext_lazy(
+    "service", "“%(said)s” matches several categories: %(names)s. Say which one."
 )
 ASSIGNMENT_NOT_FOUND = _("That assignment does not exist in this business.")
 SESSION_NOT_FOUND = _("That voucher session does not exist in this business.")
