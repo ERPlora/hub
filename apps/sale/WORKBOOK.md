@@ -1964,9 +1964,8 @@ administrador y responsable, los mismos que anulan y devuelven).
   en el IVA del tique; el producto la aplazó tras el MVP (pm#100). Mientras, la propina en efectivo se anota
   en Caja como «Entrada» (CASH_REGISTER-F05). Issue hub#562.
 - **Fallos vistos que quedan como issue** (`migration-leftover`): hub#558 (dos pruebas del precio libre
-  del TPV fallan por tiempo con la máquina cargada) y hub#560 (seis textos en español salen con las
-  palabras de otra app). Y, en la cadena de arreglos de Ventas, hub#442: el aviso de agotado se queda en el
-  TPV tras volver a poner el artículo a la venta (F07).
+  del TPV fallan por tiempo con la máquina cargada). Y, en la cadena de arreglos de Ventas, hub#442: el
+  aviso de agotado se queda en el TPV tras volver a poner el artículo a la venta (F07).
 
 ### Dudas abiertas
 

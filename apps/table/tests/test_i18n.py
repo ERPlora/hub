@@ -18,6 +18,7 @@ from apps.table.models import (
     TableSettings,
     Zone,
 )
+from base.tests.po import catalogue_key as source
 from base.tests.po import po_entries
 
 LOCALE = Path(apps.get_app_config("table").path) / "locale" / "es" / "LC_MESSAGES"
@@ -66,14 +67,6 @@ def visible_texts() -> set[str]:
         lazies += list(choices.labels)
     with translation.override("en"):
         return {source(text) for text in lazies} | {"Table %(number)s"} | schema_titles()
-
-
-def source(text) -> str:
-    """How the catalog keys a lazy text: its English, or ``context\x04English`` for a ``pgettext_lazy`` (a text that
-    goes back to ``_()`` while its entry keeps the context is missing from the catalog: it would say another app's
-    Spanish)."""
-    args = getattr(text, "_args", ())
-    return f"{args[0]}\x04{args[1]}" if len(args) == 2 else str(text)
 
 
 def schema_titles() -> set[str]:

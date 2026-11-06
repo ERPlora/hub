@@ -11,6 +11,7 @@ from django.utils.functional import Promise
 from live.operations import registry
 
 from apps.cash_register import models, queries, schemas, services
+from base.tests.po import catalogue_key as source
 from base.tests.po import po_entries
 
 LOCALE = (
@@ -72,12 +73,6 @@ def schema_titles() -> set[str]:
                     if title and title != name.title().replace("_", " "):
                         titles.add(title)
     return titles
-
-
-def source(text) -> str:
-    """How the catalog keys a lazy text: its English, or ``context\x04English`` for a ``pgettext_lazy``."""
-    args = getattr(text, "_args", ())
-    return f"{args[0]}\x04{args[1]}" if len(args) == 2 else str(text)
 
 
 def test_every_entry_has_a_spanish_translation():
