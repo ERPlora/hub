@@ -1720,7 +1720,10 @@ administrador y responsable, los mismos que anulan y devuelven).
   desde 1.000 € (100.000 céntimos), también repartido y también en una cuenta cobrada por partes (la
   operación es la cuenta entera: lo ya cobrado más lo que le queda, `operation_total` de la previsión); tique hasta 3.000 € con IVA (300.000), por
   encima solo factura. Son de la ley española y van en euros (`queries.LIMITS_CURRENCY`, también en sus
-  avisos): `CASH_LIMIT` y `TICKET_LIMIT` solo tienen `ES`, y un negocio de otro país no lleva ninguno.
+  avisos): `CASH_LIMIT` y `TICKET_LIMIT` solo tienen `ES`, y un negocio de otro país no lleva ninguno. La vista previa
+  (`PreviewOut`) lo dice a su lado, `limits_currency`, y marca los dos como dinero en esa moneda
+  (`IN_LIMITS_CURRENCY`: `money` y `currency_in`), para que quien los lea (Automatizaciones, FLOW-F11) no los tome por
+  la moneda del negocio (hub#926).
 - **Moneda** (FIX-HUB-SALE-CHARGES-IN-EUR-WHATEVER-THE-COUNTRY, como Caja, Facturas e Inventario en hub#273): la del
   negocio la da `base.business.get` desde el registro de este hub (la de su país, APP-BASE-6), nunca preguntando a
   erplora.com, y Ventas la pregunta a `base` como Inventario, Facturas y Tarifas:

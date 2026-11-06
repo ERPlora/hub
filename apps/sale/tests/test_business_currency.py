@@ -165,6 +165,14 @@ def test_a_service_s_range_is_said_in_the_business_s_currency(db):
     assert "¥5,000" in refusal.value.message and "¥9,000" in refusal.value.message
 
 
+def test_the_preview_says_its_legal_limits_are_in_euros_whatever_the_business_charges_in(coffee):
+    # hub#926: the law writes them in euros; the preview says so beside them, as a payment says its currency beside its
+    # amount, so whoever reads them (Automations, the assistant) never takes them for yen.
+    business_in("JP")
+    preview = run("sale.checkout.preview", {"lines": [{"product": "COF"}]})
+    assert (preview.cash_limit, preview.ticket_limit, preview.limits_currency) == (100000, 300000, "EUR")
+
+
 def test_the_cash_limit_of_spain_is_still_said_in_euros(product):
     # Ley 7/2012 writes it in euros: a business of Spain is told «1.000,00 €» whatever language it reads.
     business_in("ES")

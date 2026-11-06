@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:485c9fd37cc10f4104b427ef5a4e416e9b23bb32018fc9d49c361d4685c892f0 -->
+<!-- generated from WORKBOOK.md sha256:799ccad5a034bc71a2accfc79986b7f5690710050afdfe61d41b77332500de2e -->
 
 ## What it is for and who it is for
 
@@ -411,11 +411,11 @@ Steps:
    voucher, a cash movement, the price and the total of a cart's line, a price of a price list, the fixed
    discount of a price-list rule) in the currency that step gives it in: a payment in dollars, in dollars
    ("12,50 US$"); a cart's line, in its cart's; a price of a price list, in its list's; the fixed discount of a
-   rule, which belongs to no price list, in the business's; if it gives none, in the business's ("120,50 €").
-   A number the notice brings comes out as it is, because the notice does not say whether it is money, and so
-   does the cash payment limit or the ticket limit of a charge preview, which the law sets in euros (hub#926).
-   What goes to another action, to another system or to an "Only continue if…" carries each piece of data as
-   it is.
+   rule, which belongs to no price list, in the business's; the cash payment limit or the ticket limit of a
+   charge preview, in euros, the currency the law sets them in, also in a business that charges in another one
+   ("1.000,00 €"); if it gives none, in the business's ("120,50 €"). A number the notice brings comes out as it
+   is, because the notice does not say whether it is money. What goes to another action, to another system or
+   to an "Only continue if…" carries each piece of data as it is.
 In: the actions and queries of the active apps, the last real notice of that kind and what the previous
 steps leave. Data are named in the screen's language ("Sale number", "Customer phone") and with the word of the
 app they belong to ("Section", as in Sales & POS), never with their internal name.
