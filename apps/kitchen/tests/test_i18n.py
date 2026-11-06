@@ -28,7 +28,7 @@ from apps.kitchen.models import (
     TicketItem,
     TicketStatus,
 )
-from base.tests.po import po_entries
+from base.tests.po import catalogue_key, po_entries
 
 LOCALE = Path(apps.get_app_config("kitchen").path) / "locale" / "es" / "LC_MESSAGES"
 MODELS = (
@@ -84,7 +84,7 @@ def visible_texts() -> set[str]:
     for choices in CHOICES:
         lazies += list(choices.labels)
     with translation.override("en"):
-        return {str(text) for text in lazies} | schema_titles()
+        return {catalogue_key(text) for text in lazies} | schema_titles()
 
 
 def schema_titles() -> set[str]:
@@ -109,8 +109,12 @@ def test_every_entry_has_a_spanish_translation():
 
 
 def test_every_visible_text_is_in_the_catalog():
-    entries = {key.split("\x04")[-1] for key in po_entries(LOCALE / "django.po")}
-    assert visible_texts() - entries == set()
+    """By its whole key, context included: a text that goes back to ``_()`` while its entry keeps the context, or whose
+    context has a typo, is missing from the catalogue — on screen it says another app's Spanish (hub#659)."""
+    texts = visible_texts()
+    assert len(texts) > 140  # positive control: the collection found the app's texts...
+    assert len({key for key in texts if "\x04" in key}) >= 6  # ...and kept the context of its pgettext_lazy ones
+    assert texts - set(po_entries(LOCALE / "django.po")) == set()
 
 
 def test_the_compiled_catalog_is_current():
@@ -165,6 +169,41 @@ def test_spanish_texts_of_the_workbook():
             "A domicilio",
         ]
         assert [str(label) for label in Priority.labels] == ["Normal", "Urgente", "VIP"]
+
+
+def test_spanish_says_the_kitchens_own_words_not_an_earlier_apps():
+    """The labels the kitchen shares in English with an app loaded before it come out in Spanish with the kitchen's
+    words (hub#659): a voided dish is «Anulado», not Clientes' «Anulada»; a station is «activa», not Django's «activo»;
+    a ticket is «empezada el» like it is «recibida el» and «servida el», not Asistencia's «empezó a las», and a ticket
+    taken off is «borrada» as its History says, not Inventario's «eliminado». A station taken off is «eliminado» as its
+    screen says («Eliminar estación»), and who last changed a row reads «actualizado» like everywhere: the same words."""
+    labels = {
+        "ItemStatus.VOIDED": ItemStatus.VOIDED.label,
+        "Station.is_active": Station._meta.get_field("is_active").verbose_name,
+        "Station.is_deleted": Station._meta.get_field("is_deleted").verbose_name,
+        "Station.deleted_at": Station._meta.get_field("deleted_at").verbose_name,
+        "Ticket.started_at": Ticket._meta.get_field("started_at").verbose_name,
+        "Ticket.is_deleted": Ticket._meta.get_field("is_deleted").verbose_name,
+        "Ticket.deleted_at": Ticket._meta.get_field("deleted_at").verbose_name,
+        "Ticket.updated_at": Ticket._meta.get_field("updated_at").verbose_name,
+        "Ticket.updated_by": Ticket._meta.get_field("updated_by").verbose_name,
+        "KitchenSettings.updated_at": KitchenSettings._meta.get_field("updated_at").verbose_name,
+        "KitchenSettings.updated_by": KitchenSettings._meta.get_field("updated_by").verbose_name,
+    }
+    with translation.override("es"):
+        assert {name: str(label) for name, label in labels.items()} == {
+            "ItemStatus.VOIDED": "Anulado",
+            "Station.is_active": "activa",
+            "Station.is_deleted": "eliminado",
+            "Station.deleted_at": "eliminado el",
+            "Ticket.started_at": "empezada el",
+            "Ticket.is_deleted": "borrada",
+            "Ticket.deleted_at": "borrada el",
+            "Ticket.updated_at": "actualizado el",
+            "Ticket.updated_by": "actualizado por",
+            "KitchenSettings.updated_at": "actualizado el",
+            "KitchenSettings.updated_by": "actualizado por",
+        }
 
 
 @pytest.mark.django_db
