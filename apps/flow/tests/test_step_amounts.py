@@ -30,7 +30,7 @@ from ninja import Field, Schema
 from apps.cart_checkout.tests.conftest import make_cart
 from apps.cart_checkout.tests.conftest import make_item as make_cart_line
 from apps.flow.models import Flow, FlowRun, Question
-from apps.flow.queries import CURRENCY_IN, _money_paths, step_data, step_fields, words_for
+from apps.flow.queries import CURRENCY_IN, _currency_data, _money_paths, step_data, step_fields, words_for
 from apps.invoice.tests.conftest import ISSUER
 from apps.payment.tests.conftest import make_method
 from apps.pricing.tests.conftest import make_item as make_price
@@ -326,6 +326,19 @@ def test_an_amount_inside_a_datum_takes_its_currency_from_that_datum_else_from_i
     assert say("steps.s1.cart.total_amount", 2500) == "2.500\xa0JPY"
 
 
+def test_the_currency_of_an_amount_is_looked_for_from_its_own_datum_outwards():
+    """The currency of an invoice's link is its link's, then its invoice's, then its step's, then the business's
+    (``None``); one in a currency of its own, only the datum its mark names beside it, at any depth."""
+    assert _currency_data("steps.s1.invoice.rectifies.total_amount", {"money": True}) == (
+        "steps.s1.invoice.rectifies.currency",
+        "steps.s1.invoice.currency",
+        "steps.s1.currency",
+        None,
+    )
+    own = {"money": True, CURRENCY_IN: "limits_currency"}
+    assert _currency_data("steps.s1.preview.cash_limit", own) == ("steps.s1.preview.limits_currency",)
+
+
 #: The amounts a step leaves inside another datum, by the operation that leaves them (hub#941): marked on their
 #: object's schema, so Automations says them as money in that object's currency.
 AMOUNTS_INSIDE = {
@@ -499,6 +512,21 @@ def test_the_net_sees_an_amount_inside_a_datum_of_a_step_but_not_inside_a_list()
     inside a list is not, since no path names it."""
     op = SimpleNamespace(app_label="invoice", kind="command", input=PriceIn, output=LinkedOut)
     assert unmarked_amounts(op, money_names([op])) == ["link.total"]
+
+
+class NodeOut(Schema):
+    name: str
+    parent: "NodeOut | None" = None
+
+
+class TreeOut(Schema):
+    node: NodeOut
+
+
+def test_a_datum_that_holds_one_of_its_own_kind_is_walked_once():
+    """A datum that holds another of its own kind (a category and its parent) names its own data once, never forever."""
+    op = SimpleNamespace(app_label="inventory", kind="query", input=PriceIn, output=TreeOut)
+    assert list(step_data(op)) == ["node", "node.name", "node.parent"]
 
 
 def test_the_net_sees_an_amount_by_its_twin_or_by_name_without_any_word():
