@@ -427,8 +427,11 @@ Pasos:
    - **Esperar**: «Cuánto» y la unidad (minutos, horas o días), contado desde el paso anterior; de un
      minuto a 30 días.
 3. En cada valor, **Insertar un dato** abre «¿Qué dato?», con los datos del aviso y un ejemplo real del
-   negocio al lado (el último aviso de ese tipo), y los datos que dejan los pasos anteriores; se elige,
-   no se escribe. Un dato elegido se ve como una pastilla; el resto del valor es texto. En lo que lee una
+   negocio al lado (el último aviso de ese tipo), y los datos que dejan los pasos anteriores: los de primer nivel
+   y también los que un paso deja dentro de otro dato, justo debajo de ese dato y con su nombre delante («1. Añadir
+   algo a un carrito › Elemento › Precio unitario», «… › Carrito › Importe total», el número y el total de la
+   factura de una venta), nunca los que van dentro de una lista; se elige, no se escribe. Un dato elegido se ve como una
+   pastilla; el resto del valor es texto. En lo que lee una
    persona —la pregunta de «Preguntar antes a alguien» (FLOW-F28) y el mensaje a un cliente (FLOW-F31)— cada
    dato sale en palabras, en el idioma de quien guardó la automatización: un sí o un no como «Sí» o «No», una
    fecha y una hora como se escriben en ese idioma y a la hora del negocio («2 nov 2026, 10:00»), y un importe
@@ -1235,7 +1238,7 @@ preguntas; una pregunta hecha a otro rol) no sale en la tarjeta.
 | Una ejecución, con las palabras con que se nombra (su automatización y cuándo empezó) | ver | F24 | `flow.run.get` |
 | Los borradores pendientes del asistente (en vivo) | ver | F18, F19 | `flow.draft.list` |
 | Un borrador del asistente, esté pendiente, usado o descartado | ver | F18, F19 | `flow.draft.get` |
-| Los avisos y las acciones de las apps activas, con los datos que pide cada acción | ver | F10, F11 | `flow.catalog.read` |
+| Los avisos y las acciones de las apps activas, con los datos que pide cada acción y los que deja (también los de dentro de un objeto) | ver | F10, F11 | `flow.catalog.read` |
 | El último aviso real de un tipo, con sus datos | gestionar | F11, F13 | `flow.event.sample` |
 | Lo que haría una automatización con el último aviso real, sin ejecutar nada | gestionar | F13 | `flow.flow.test` |
 | Cuántas automatizaciones de un aviso pueden hacer una acción, cuántas encendidas y cuántas a medias | ver | F20 | `flow.flow.status` |

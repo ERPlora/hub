@@ -901,7 +901,11 @@ class CatalogActionOut(Schema):
     app_name: str
     description: str
     fields: list[FieldOut]
-    outputs: list[str]
+    outputs: list[str] = Field(
+        description="What a step of it leaves for the later ones, by its path below the step (`steps.<id>.<path>`): "
+        "its fields, each object among them followed by what it holds (`item`, `item.unit_price`), never what is inside "
+        "a list; and a read's `found` and `count`."
+    )
     #: Whether «Ask the assistant» may use it (its ``ai=`` offers it to the assistant).
     assistant: bool = False
     #: Whether it needs a person's yes first: only an «Ask the assistant» step with «Ask me first» may use it.
