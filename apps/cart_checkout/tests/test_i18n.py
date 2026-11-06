@@ -11,7 +11,7 @@ from live.operations import registry
 from apps.cart_checkout import admin as cart_admin
 from apps.cart_checkout import queries, schemas, services
 from apps.cart_checkout.models import Cart, CartItem, Order, OrderCounter
-from base.tests.po import po_entries
+from base.tests.po import catalogue_key, po_entries
 
 LOCALE = Path(apps.get_app_config("cart_checkout").path) / "locale" / "es" / "LC_MESSAGES"
 MODELS = (Cart, CartItem, Order, OrderCounter)
@@ -23,8 +23,8 @@ def lazy_constants(module) -> list:
 
 
 def visible_texts() -> set[str]:
-    """The English source of every lazy text the app shows (menu, store, admin, choices, messages) and the titles of
-    its schemas."""
+    """The catalogue key of every lazy text the app shows (menu, store, admin, choices, messages) — its English, with
+    its context in front for a ``pgettext_lazy`` — and the titles of its schemas."""
     config = apps.get_app_config("cart_checkout")
     lazies = [config.verbose_name, config.summary, config.description, *(nav.label for nav in config.navigation)]
     lazies += lazy_constants(queries) + lazy_constants(services) + lazy_constants(schemas) + lazy_constants(cart_admin)
@@ -37,7 +37,7 @@ def visible_texts() -> set[str]:
         ]
     lazies += list(Cart.Status.labels) + list(Order.Status.labels)
     with translation.override("en"):
-        return {str(text) for text in lazies} | schema_titles()
+        return {catalogue_key(text) for text in lazies} | schema_titles()
 
 
 def schema_titles() -> set[str]:
@@ -61,9 +61,12 @@ def test_every_entry_has_a_spanish_translation():
 
 
 def test_every_visible_text_is_in_the_catalog():
-    assert len(visible_texts()) > 60  # positive control: the collection found the app's texts
-    msgids = {key.split("\x04")[-1] for key in po_entries(LOCALE / "django.po")}
-    assert visible_texts() - msgids == set()
+    """By its whole key, context included: a text that goes back to ``_()`` while its entry keeps the context, or whose
+    context has a typo, is missing from the catalogue — on screen it says another app's Spanish (hub#652)."""
+    texts = visible_texts()
+    assert len(texts) > 60  # positive control: the collection found the app's texts...
+    assert len({key for key in texts if "\x04" in key}) >= 18  # ...and kept the context of its pgettext_lazy ones
+    assert texts - set(po_entries(LOCALE / "django.po")) == set()
 
 
 def test_the_compiled_catalog_is_current():
