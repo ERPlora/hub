@@ -575,6 +575,14 @@ msgstr ""
 "{seq:01d}…{seq:09d}), y cabe en una línea de 60 caracteres sin tildes ni "
 "símbolos como º o ª."
 
+#: schemas.py:67
+msgid ""
+"Use only letters without accents, digits, hyphens (-) and underscores (_), "
+"starting with a letter or a digit."
+msgstr ""
+"Usa solo letras sin tilde, números, guiones (-) y guiones bajos (_), "
+"empezando por una letra o un número."
+
 #: schemas.py:63
 msgid ""
 "The prefix is written without accents or symbols such as º or ª (letters, "

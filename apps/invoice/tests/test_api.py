@@ -233,6 +233,25 @@ def test_a_refused_tax_id_says_what_to_do_and_why_in_the_requests_language(admin
 
 
 @pytest.mark.django_db
+def test_a_series_code_of_another_shape_says_what_a_code_takes_in_the_requests_language(admin_client):
+    """hub#872 (INVOICE-F12): «E2E-?» under the Code field says what a code takes, never «Enter a valid value.»."""
+    wrong = {"code": "E2E-?", "name": "Online", "invoice_type": "F1", "year": 2026}
+
+    english = post(admin_client, "/invoice/series", wrong)
+    spanish = post(admin_client, "/invoice/series", wrong, HTTP_ACCEPT_LANGUAGE="es")
+
+    assert (english.status_code, spanish.status_code) == (422, 422)
+    assert english.json()["error"]["fields"] == {
+        "code": "Use only letters without accents, digits, hyphens (-) and underscores (_), starting with a letter or "
+        "a digit."
+    }
+    assert spanish.json()["error"]["fields"] == {
+        "code": "Usa solo letras sin tilde, números, guiones (-) y guiones bajos (_), empezando por una letra o un "
+        "número."
+    }
+
+
+@pytest.mark.django_db
 def test_a_409_carries_its_domain_code_in_the_requests_language(admin_client):
     response = post(
         admin_client,
