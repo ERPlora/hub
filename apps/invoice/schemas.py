@@ -786,9 +786,9 @@ class InvoiceRowOut(Schema):
     issued_at: dt.datetime
     customer_name: str
     customer_tax_id: str
-    base_amount: int
-    tax_amount: int
-    total_amount: int
+    base_amount: int = Field(json_schema_extra={"money": True})
+    tax_amount: int = Field(json_schema_extra={"money": True})
+    total_amount: int = Field(json_schema_extra={"money": True})
     currency: str
     currency_decimals: int = Field(description="The decimals of its currency (2 in EUR, 0 in JPY): its amounts' minor unit.")
     status: str
