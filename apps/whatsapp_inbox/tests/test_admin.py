@@ -4,6 +4,8 @@ Messages are read only, received and sent alike: they are what WhatsApp carried,
 corrected by erasing the conversation's data, never by editing it. Deleting stays for the staff.
 """
 
+import re
+
 import pytest
 from django.contrib import admin
 from django.contrib.auth import get_user_model
@@ -98,3 +100,35 @@ def test_the_templates_say_whose_business_they_are():
     assert "host" in templates.list_filter
     assert "host" in templates.search_fields
     assert "host" in templates.readonly_fields
+
+
+@pytest.mark.django_db
+def test_the_admin_in_spanish_says_the_inboxs_own_words(client, superuser):
+    """The messages' list filters by «origen» (who sent it) and by «procedencia» (live or its history), two filters
+    with two names; a template says when it was «Sincronizada el» and «Borrada el», and the channel «Sincronizado el»:
+    the inbox's words, not the «origen» and «eliminado el» of Clientes nor the «recibido el» of Facturación, loaded
+    before it with the same English (hub#570)."""
+    receive("wamid.1")
+    template = Template.objects.create(host="a", name="recordatorio", language="es", synced_at=NOW, deleted_at=NOW)
+    channel = Channel.objects.create(synced_at=NOW)
+    client.force_login(superuser)
+
+    def page(path: str) -> str:
+        response = client.get(path, HTTP_HOST="hubs.localhost", HTTP_ACCEPT_LANGUAGE="es")
+        assert response.status_code == 200, path
+        return response.content.decode()
+
+    messages = page("/admin/whatsapp_inbox/message/")
+    assert '<details data-filter-title="dirección"' in messages  # the page is in Spanish
+    assert messages.count('<details data-filter-title="origen"') == 1  # who sent it
+    assert '<details data-filter-title="procedencia"' in messages  # live or its history
+    templates = page("/admin/whatsapp_inbox/template/")
+    header = re.search(r'class="sortable column-synced_at">\s*<div class="text"><a [^>]*>([^<]*)</a>', templates)
+    assert header and header.group(1) == "Sincronizada el"
+    shown = page(f"/admin/whatsapp_inbox/template/{template.pk}/change/")
+    assert "<legend>Sincronizada el:</legend>" in shown  # a date and a time: a fieldset, not a label
+    assert "<label>Borrada el:</label>" in shown
+    assert "<legend>Sincronizado el:</legend>" in page(f"/admin/whatsapp_inbox/channel/{channel.pk}/change/")
+    for said in (messages, templates, shown):
+        assert "liminado el" not in said
+        assert "ecibido el" not in said
