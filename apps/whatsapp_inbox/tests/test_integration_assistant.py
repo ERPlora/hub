@@ -18,22 +18,30 @@ from apps.whatsapp_inbox.tests.conftest import B, ctx_for
 from apps.whatsapp_inbox.tests.test_template_header_file import PDF, upload
 from apps.whatsapp_inbox.tests.test_template_header_file import hub_files  # noqa: F401 - fixture
 from base import assistant
-from base.tests.test_assistant import named_by_the_screen
+from base.tests.test_assistant import named_by_the_screen, technical_names
 
 APP = Path(apps.get_app_config("whatsapp_inbox").path)
 SCREENS = json.loads((APP / "frontend/locale/es.json").read_text())["whatsapp_inbox"]
 SCREENS_EN = json.loads((APP / "frontend/locale/en.json").read_text())["whatsapp_inbox"]
 
-#: The writes of the WhatsApp inbox the assistant calls, by name.
-TOOLS = sorted(
-    name
-    for name, op in registry.items()
-    if op.app_label == "whatsapp_inbox" and op.kind == "command" and assistant.is_tool(op)
-)
-
 
 def labels(card: dict) -> list[str]:
     return [field["label"] for field in card["fields"]]
+
+
+@pytest.fixture
+def named(monkeypatch):
+    """Every record a write names by its id comes out named, as a person who may read it sees it: this test is about
+    what the card calls each datum, and a record nobody names is left out of it (hub#571)."""
+    monkeypatch.setattr(assistant, "_reference", lambda value, prop, words: "Ana")
+
+
+def whatsapp_inbox_writes() -> list:
+    return [
+        op
+        for op in registry.values()
+        if op.app_label == "whatsapp_inbox" and op.kind == "command" and assistant.is_tool(op)
+    ]
 
 
 def named_by_whatsapp_inbox(op, name: str, title: str | None) -> bool:
@@ -50,20 +58,27 @@ def named_by_whatsapp_inbox(op, name: str, title: str | None) -> bool:
     )
 
 
-def test_no_datum_of_a_write_of_whatsapp_inbox_reaches_a_spanish_card_by_its_technical_name():
+def test_no_datum_of_a_write_of_whatsapp_inbox_reaches_a_spanish_card_by_its_technical_name(named):
     """Every write of whatsapp_inbox the assistant may ask for, with all its data: each datum by a name of its own in
-    Spanish, never the one pydantic makes up. By where the name comes from, not by the word."""
+    Spanish, never the one pydantic makes up."""
+    writes = whatsapp_inbox_writes()
+    assert len(writes) >= 10  # positive control: the registry has whatsapp_inbox's writes (not the platform's own)
+    assert technical_names(writes) == {}
+
+
+def test_no_datum_of_a_write_of_whatsapp_inbox_borrows_its_name_from_another_apps_catalog(named):
+    """``technical_names`` sees only a title nobody translates; one that another app's catalog happens to translate
+    («Template», which base's catalog also calls «Plantilla») passes it and is still no name of the WhatsApp inbox: it
+    changes if that app's text changes. So each datum is also named by whatsapp_inbox itself (kept in hub#571)."""
     screen = named_by_the_screen()
-    assert len(TOOLS) >= 10  # positive control: the registry has whatsapp_inbox's writes (not the platform's own)
-    technical: dict[str, list[str]] = {}
-    for name in TOOLS:
-        op = get(name)
+    borrowed: dict[str, list[str]] = {}
+    for op in whatsapp_inbox_writes():
         props = assistant._schema(op).get("properties", {})
         for field in assistant.card(op, dict.fromkeys(props, "x"), "es")["fields"]:
             datum = field["name"]
             if datum not in screen and not named_by_whatsapp_inbox(op, datum, props[datum].get("title")):
-                technical.setdefault(name, []).append(datum)
-    assert technical == {}
+                borrowed.setdefault(op.name, []).append(datum)
+    assert borrowed == {}
 
 
 @pytest.mark.django_db

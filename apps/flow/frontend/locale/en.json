@@ -1311,7 +1311,9 @@
       "whatsapp_inbox__message__list": "Read the messages of a WhatsApp conversation",
       "whatsapp_inbox__note__add": "Write a note on a WhatsApp conversation",
       "whatsapp_inbox__note__list": "Read the notes of a WhatsApp conversation",
+      "whatsapp_inbox__note__get": "Read a note of a WhatsApp conversation",
       "whatsapp_inbox__template__list": "Look for WhatsApp templates",
+      "whatsapp_inbox__template__get": "Read a WhatsApp template",
       "whatsapp_inbox__message__notify": "Send a WhatsApp to a customer"
     },
     "facts": {
