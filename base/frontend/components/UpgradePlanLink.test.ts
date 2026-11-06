@@ -5,6 +5,7 @@ import { applySurface } from '@erplora/ui/shell';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { flush, mountBase, tap } from '../__tests__/mount-base';
+import PlanUpgradeLink from './PlanUpgradeLink.vue';
 import UpgradePlanLink from './UpgradePlanLink.vue';
 
 const PLAN_URL = 'http://localhost:8001/store/plans?business=0199a1b2-0000-7000-8000-000000000001';
@@ -46,6 +47,31 @@ describe('UpgradePlanLink', () => {
 
     expect(JSON.parse(m.net.api[0].init.body as string)).toEqual({ next: 'plan' });
     expect(tab.location.href).toBe(url);
+  });
+
+  it("is the platform's PlanUpgradeLink to this hub's plan page, not a copy of its own", async () => {
+    embed({ name: 'Bar', plan_url: PLAN_URL });
+    const m = await mountBase(UpgradePlanLink);
+    const piece = m.wrapper.findComponent(PlanUpgradeLink);
+    expect(piece.exists()).toBe(true);
+    expect(piece.props('url')).toBe(PLAN_URL);
+    expect(piece.attributes('data-testid')).toBe('upgrade-plan');
+  });
+
+  it('when the pass cannot be signed, it opens the plan page as usual', async () => {
+    embed({ name: 'Bar', plan_url: PLAN_URL });
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const tab = { opener: {}, location: { href: 'about:blank' } };
+    vi.spyOn(window, 'open').mockReturnValue(tab as unknown as Window);
+    const m = await mountBase(UpgradePlanLink, {
+      onApi: () => Response.json({ error: { code: 'base.saas_pass_needs_account', message: 'No.' } }, { status: 403 }),
+    });
+
+    tap(m.wrapper.get('a[data-testid="upgrade-plan"]').element);
+    await flush();
+
+    expect(tab.location.href).toBe(PLAN_URL);
+    expect(error).toHaveBeenCalled();
   });
 
   it("on the rail keeps only its icon, as the menu's other labels, and still says where it goes", async () => {

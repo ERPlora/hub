@@ -12,6 +12,7 @@ import { sessionChanged } from '../lib/access';
 
 import { EMPLOYEE, errorFrame, flush, mountBase, OWNER, subId, tap } from '../__tests__/mount-base';
 import type { AppList, AppRow } from '../operations';
+import PlanUpgradeLink from '../components/PlanUpgradeLink.vue';
 import AppsPage from './AppsPage.vue';
 
 const mocks = vi.hoisted(() => ({ confirm: vi.fn() }));
@@ -482,6 +483,43 @@ describe('AppsPage', () => {
       expect(JSON.parse(m.net.api.at(-1)!.init.body as string)).toEqual({ next: 'plan' });
       expect(tab.location.href).toBe(url);
       windowOpen.mockRestore();
+    });
+
+    it('its «Upgrade plan» is the platform’s PlanUpgradeLink to the business’s plans, not a copy of its own', async () => {
+      const m = await open('/apps#all', {
+        onApi: refusal(402, { code: 'base.app_limit_reached', message: 'server words', max_apps: 20, enabled: 20 }),
+      });
+      await m.result(m.call, 'base.app.list', { ...APPS, enabled: 20 });
+      await m.wrapper.find('[data-testid="apps-row-flow-toggle"]').trigger('click');
+      await flush();
+      const piece = m.wrapper.get('[data-testid="apps-limit"]').findComponent(PlanUpgradeLink);
+      expect(piece.exists()).toBe(true);
+      expect(piece.props('url')).toBe(PLANS);
+      expect([piece.attributes('data-testid'), piece.text()]).toEqual(['apps-limit-upgrade', 'Upgrade plan']);
+    });
+
+    it('when the pass cannot be signed, its «Upgrade plan» opens the plans as usual', async () => {
+      const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const tab = { opener: {}, location: { href: 'about:blank' } };
+      const windowOpen = vi.spyOn(window, 'open').mockReturnValue(tab as unknown as Window);
+      const limit = refusal(402, { code: 'base.app_limit_reached', message: 'server words', max_apps: 20, enabled: 20 });
+      const m = await open('/apps#all', {
+        onApi: (call) =>
+          call.url.includes('/saas-pass')
+            ? Response.json({ error: { code: 'base.saas_pass_needs_account', message: 'No.' } }, { status: 403 })
+            : limit(),
+      });
+      await m.result(m.call, 'base.app.list', { ...APPS, enabled: 20 });
+      await m.wrapper.find('[data-testid="apps-row-flow-toggle"]').trigger('click');
+      await flush();
+
+      tap(m.wrapper.find('[data-testid="apps-limit-upgrade"]').element);
+      await flush();
+
+      expect(tab.location.href).toBe(PLANS);
+      expect(error).toHaveBeenCalled();
+      windowOpen.mockRestore();
+      error.mockRestore();
     });
 
     it('in Spanish, and inside the installed app without the link', async () => {

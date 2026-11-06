@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { EMPLOYEE, errorFrame, flush, installedApp, leaveInstalledApp, mountBase, subId, tap } from '../__tests__/mount-base';
 import type { Person, Seats } from '../operations';
 import PeopleList from './PeopleList.vue';
+import PlanUpgradeLink from './PlanUpgradeLink.vue';
 
 const MEMBERS_URL = 'http://localhost:8001/businesses/0199a1b2-0000-7000-8000-000000000001/members';
 const PLAN_URL = 'http://localhost:8001/store/plans?business=0199a1b2-0000-7000-8000-000000000001';
@@ -124,6 +125,35 @@ describe('PeopleList', () => {
     expect(JSON.parse(m.net.api.at(-1)!.init.body as string)).toEqual({ next: 'plan' });
     expect(tab.location.href).toBe(url);
     open_.mockRestore();
+  });
+
+  it('its «Upgrade plan» is the platform’s PlanUpgradeLink to this business’s plan page, not a copy of its own', async () => {
+    embed({ name: 'Bar', plan_url: PLAN_URL, members_url: MEMBERS_URL });
+    const m = await open({ locale: 'es' });
+    await m.result(m.call, 'base.person.list', { people: PEOPLE, seats: { known: true, used: 3, limit: 3, full: true } });
+    const piece = m.wrapper.get('[data-testid="people-full"]').findComponent(PlanUpgradeLink);
+    expect(piece.exists()).toBe(true);
+    expect(piece.props('url')).toBe(PLAN_URL);
+    expect([piece.attributes('data-testid'), piece.text()]).toEqual(['people-upgrade', 'Mejorar plan']);
+  });
+
+  it('when the pass cannot be signed, its «Upgrade plan» opens the plan page as usual', async () => {
+    embed({ name: 'Bar', plan_url: PLAN_URL, members_url: MEMBERS_URL });
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const tab = { opener: {}, location: { href: 'about:blank' } };
+    const open_ = vi.spyOn(window, 'open').mockReturnValue(tab as unknown as Window);
+    const m = await open({
+      onApi: () => Response.json({ error: { code: 'base.saas_pass_needs_account', message: 'No.' } }, { status: 403 }),
+    });
+    await m.result(m.call, 'base.person.list', { people: PEOPLE, seats: { known: true, used: 3, limit: 3, full: true } });
+
+    tap(m.wrapper.get('a[data-testid="people-upgrade"]').element);
+    await flush();
+
+    expect(tab.location.href).toBe(PLAN_URL);
+    expect(error).toHaveBeenCalled();
+    open_.mockRestore();
+    error.mockRestore();
   });
 
   it('«Upgrade plan» sells: never on the app surfaces', async () => {
