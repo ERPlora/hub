@@ -15,7 +15,7 @@ from live.operations import get, registry
 from base import assistant
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
-from base.tests.test_assistant import named_by_the_screen
+from base.tests.test_assistant import technical_names
 from base.tests.test_assistant_card_values import AN_ID, unnamed
 
 from .conftest import GENERIC, ctx_for, run
@@ -40,16 +40,9 @@ def modifier_writes() -> list:
 def test_no_datum_of_a_write_of_modifier_reaches_a_spanish_card_by_its_technical_name():
     """Every write of modifier the assistant may ask for, with all its data: each datum by a name of its own in
     Spanish, never the one pydantic makes up."""
-    screen = named_by_the_screen()
     writes = modifier_writes()
     assert len(writes) >= 8  # positive control: the registry has modifier's writes (not the platform's own)
-    technical: dict[str, list[str]] = {}
-    for op in writes:
-        props = op.input.model_json_schema().get("properties", {})
-        for field in assistant.card(op, dict.fromkeys(props, "x"), "es")["fields"]:
-            if field["name"] not in screen and field["label"] == field["name"].title().replace("_", " "):
-                technical.setdefault(op.name, []).append(field["name"])
-    assert technical == {}
+    assert technical_names(writes) == {}
 
 
 def test_the_card_names_the_option_said_by_its_name_as_the_group_sheet_does():
