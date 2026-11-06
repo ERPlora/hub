@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:68a8f4962634bea157331c8d8b86ba36f187e40840a7049a8c3ad334bff9ae35 -->
+<!-- generated from WORKBOOK.md sha256:6eaaa876bc8154222534dd35d6edd87d71dc77411d7315273ca4d35f30fe8b4c -->
 
 ## What it is for and who it is for
 
@@ -191,6 +191,7 @@ settings." with "Retry"; when saving, "Could not save the settings." with the re
 | PRINTING-F18 | Take the paper out: the device picks up and confirms the jobs | common | done |
 | PRINTING-F19 | See the state of a printer | common | done |
 | PRINTING-F20 | How long the hub keeps the print jobs | common | done |
+| PRINTING-F21 | See in System who prints and where to get the ERPlora app | common | partial — it does not say whether the printer answers right now (hub#573) |
 
 ### PRINTING-F01 See how printing is going
 Status: done
@@ -615,6 +616,32 @@ how many). Asking for the same document again afterwards puts it back in the que
 If it fails: if one hour cannot clean up, the next one does; a job is never deleted before its
 time.
 Involved: PRINTING-F01, PRINTING-F14
+
+### PRINTING-F21 See in System who prints and where to get the ERPlora app
+Status: partial — it does not say whether the printer answers right now ("Printer ready", "Printer not connected" or
+"We could not check the printer"): Printing has no such read yet, the same one the Home's health row asks for
+(hub#573)
+Actor: owner, administrator, manager, employee
+Screen: System · Usage and plan
+Steps:
+1. With Printing on in the business, **System → Usage and plan** has, below what the business uses, the card
+   **Your printer**: "Receipts, kitchen orders and labels are printed by the ERPlora app on the device next to the
+   printer.". Anyone who sees Printing sees it, also whoever cannot see what the business uses. With Printing off
+   there is no card: a business that does not print sees none of this.
+2. "Set up printing" opens **Printing → Printers** (PRINTING-F01).
+3. In a browser, below, "Download the ERPlora app" with "The ERPlora app is what talks to your printers, the cash
+   drawer and the scanners. Choose your system to continue." and one button per system: **Windows** (the one that
+   stands out), **Linux** and **Android**. There is no macOS: erplora.com publishes none.
+4. Each button opens, outside the hub, the download erplora.com serves at that moment: the store if its listing is
+   published or the latest installer; Android, always Google Play (erplora.com's PUBLIC-F24).
+5. With the app installed, they set it up to print from that device (PRINTING-F18). Inside the app there is no
+   download block: it would be the app offering itself.
+In: whether Printing is on in the business, the person's permissions and erplora.com's addresses.
+Out: nothing saved.
+If it fails: if which cards apply cannot be read, none shows (never that of an app that is off) and the rest of the
+tab says its own; without erplora.com's addresses the download buttons do not show (never a button that leads
+nowhere).
+Involved: BASE-F39, PRINTING-F18
 
 ## Services: what goes in and what comes out
 

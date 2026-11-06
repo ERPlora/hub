@@ -50,6 +50,8 @@ export interface HubHome {
   manage_url?: string;
   /** Whether erplora.com reads the assistant's answers aloud in its voices (`ASSISTANT_SERVER_VOICE`, round 2026-11-04a). */
   server_voice?: boolean;
+  /** erplora.com's door to the ERPlora app of each system it publishes (hub#683; `lib/app-downloads.ts`). */
+  app_downloads?: Record<string, string>;
 }
 
 // ── «Finish setting up your business» (BASE-G22, BASE-G130, BASE-G164) ────────────────────────────────────

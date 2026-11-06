@@ -369,6 +369,20 @@ class WidgetListOut(Schema):
     widgets: list[WidgetOut]
 
 
+class SystemCardsIn(Schema):
+    """No input: the cards the apps on in this hub put in System › «Usage and plan» for this person (hub#683)."""
+
+
+class SystemCardOut(Schema):
+    key: str = Field(description="«<app>.<card>».")
+    app: str
+    component: str = Field(description="The Vue component of the app's frontend/components/ that paints it, without .vue.")
+
+
+class SystemCardsOut(Schema):
+    cards: list[SystemCardOut]
+
+
 class BellCountersIn(Schema):
     """No input: the counters above zero this person may see in this hub."""
 

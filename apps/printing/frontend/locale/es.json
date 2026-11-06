@@ -272,6 +272,19 @@
     "host": {
       "drawerFailed": "El cajón no se ha abierto: comprueba que «{printer}» está encendida y conectada.",
       "drawerFailedUnnamed": "El cajón no se ha abierto: comprueba que su impresora está encendida y conectada."
+    },
+    "systemCard": {
+      "title": "Tu impresora",
+      "intro": "Los tiques, las comandas y las etiquetas los imprime la app de ERPlora del dispositivo que está junto a la impresora.",
+      "setup": "Configurar la impresión",
+      "downloadTitle": "Descargar la app de ERPlora",
+      "downloadIntro": "La app de ERPlora es la que habla con tus impresoras, el cajón y los escáneres. Elige tu sistema para continuar.",
+      "downloadLabel": "Descargar la app de ERPlora para {platform}",
+      "platform": {
+        "windows": "Windows",
+        "linux": "Linux",
+        "android": "Android"
+      }
     }
   }
 }

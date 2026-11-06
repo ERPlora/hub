@@ -192,6 +192,11 @@ async def business_get(request):
 # ── System (APP-BASE-7) ────────────────────────────────────────────────────────────────────────────────────────
 
 
+@bind(router, "base.system.cards", "/system/cards")
+async def system_cards(request):
+    return await run_operation(request, queries.system_cards)
+
+
 @bind(router, "base.system.status", "/system/status")
 async def system_status(request):
     return await run_operation(request, queries.system_status)

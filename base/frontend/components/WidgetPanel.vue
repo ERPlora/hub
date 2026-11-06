@@ -14,17 +14,15 @@
 import { type OpName, useLive, useLiveClient } from '@erplora/ui/sdk';
 import { HubIcon } from '@erplora/ui/shell';
 import { IonSkeletonText } from '@ionic/vue';
-import { type Component, computed, defineAsyncComponent, onMounted, onUnmounted, ref, type Ref, shallowRef } from 'vue';
+import { computed, defineAsyncComponent, onMounted, onUnmounted, ref, type Ref, shallowRef } from 'vue';
 
 import type { WidgetDef } from '../operations';
+import { appComponent } from '../lib/app-components';
 import { widgetView } from '../lib/home';
 import { useBaseI18n } from '../lib/i18n';
 import { useBusinessMoney } from '../lib/money';
 
 const props = defineProps<{ widget: WidgetDef }>();
-
-/** Every app's components, loaded on demand: a panel names one by its file name. */
-const COMPONENTS = import.meta.glob<{ default: Component }>('../../../apps/*/frontend/components/*.vue');
 
 const { locale } = useBaseI18n();
 const client = useLiveClient();
@@ -62,9 +60,7 @@ function askedOnce(op: OpName): Source {
 }
 
 const componentFailed = ref(false);
-const loader = props.widget.component
-  ? COMPONENTS[`../../../apps/${props.widget.app}/frontend/components/${props.widget.component}.vue`]
-  : undefined;
+const loader = props.widget.component ? appComponent(props.widget.app, props.widget.component) : undefined;
 const custom = loader
   ? defineAsyncComponent({
       loader,

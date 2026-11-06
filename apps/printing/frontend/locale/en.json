@@ -272,6 +272,19 @@
     "host": {
       "drawerFailed": "The cash drawer did not open: check that “{printer}” is on and connected.",
       "drawerFailedUnnamed": "The cash drawer did not open: check that its printer is on and connected."
+    },
+    "systemCard": {
+      "title": "Your printer",
+      "intro": "Receipts, kitchen orders and labels are printed by the ERPlora app on the device next to the printer.",
+      "setup": "Set up printing",
+      "downloadTitle": "Download the ERPlora app",
+      "downloadIntro": "The ERPlora app is what talks to your printers, the cash drawer and the scanners. Choose your system to continue.",
+      "downloadLabel": "Download the ERPlora app for {platform}",
+      "platform": {
+        "windows": "Windows",
+        "linux": "Linux",
+        "android": "Android"
+      }
     }
   }
 }
