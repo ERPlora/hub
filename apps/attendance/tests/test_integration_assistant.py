@@ -19,7 +19,7 @@ from live.operations import get, registry
 from apps.attendance.models import Record
 from apps.staff.models import Member
 from base import assistant
-from base.tests.test_assistant import named_by_the_screen
+from base.tests.test_assistant import technical_names
 from base.tests.test_assistant_card_values import AN_ID
 
 from .conftest import ctx_for, make_member, utc
@@ -45,19 +45,12 @@ def attendance_writes() -> list:
 def test_no_datum_of_a_write_of_attendance_reaches_a_spanish_card_by_its_technical_name():
     """Every write of attendance the assistant may ask for, with all its data: each datum by a name of its own in
     Spanish, never the one pydantic makes up."""
-    screen = named_by_the_screen()
     writes = attendance_writes()
     # Positive control: the registry has attendance's writes, the ones that send a position among them.
     assert {"attendance.record.clock_in", "attendance.record.clock_out", "attendance.settings.update"} <= {
         op.name for op in writes
     }
-    technical: dict[str, list[str]] = {}
-    for op in writes:
-        props = op.input.model_json_schema().get("properties", {})
-        for field in assistant.card(op, dict.fromkeys(props, "x"), "es")["fields"]:
-            if field["name"] not in screen and field["label"] == field["name"].title().replace("_", " "):
-                technical.setdefault(op.name, []).append(field["name"])
-    assert technical == {}
+    assert technical_names(writes) == {}
 
 
 def test_the_card_names_the_position_of_a_clock_in_as_the_settings_screen_does():
