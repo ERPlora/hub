@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:8094d274f1be1b6a6771da30fe1bd8aa16a78a25702374de5cf3b99cd6181210 -->
+<!-- generated from WORKBOOK.md sha256:485c9fd37cc10f4104b427ef5a4e416e9b23bb32018fc9d49c361d4685c892f0 -->
 
 ## What it is for and who it is for
 
@@ -408,12 +408,14 @@ Steps:
    "No", a date and a time as they are written in that language and at the business's time ("2 Nov 2026,
    10:00"), and an amount a previous step leaves (that of a payment it has just recorded, the total of a sale
    or of an invoice, the price of a service or of a combo, the provisional total of a check, the amount of a
-   voucher, a cash movement) in the currency that step gives it in: a payment in dollars, in dollars
-   ("12,50 US$"); if it gives none, in the business's ("120,50 €"). A number the notice brings comes out as it
-   is, because the notice does not say whether it is money, and so do the price of a cart's line and the fixed
-   discount of a price-list rule, which do not say their currency yet (hub#915), and the cash payment limit
-   or the ticket limit of a charge preview, which the law sets in euros (hub#926). What goes to another
-   action, to another system or to an "Only continue if…" carries each piece of data as it is.
+   voucher, a cash movement, the price and the total of a cart's line, a price of a price list, the fixed
+   discount of a price-list rule) in the currency that step gives it in: a payment in dollars, in dollars
+   ("12,50 US$"); a cart's line, in its cart's; a price of a price list, in its list's; the fixed discount of a
+   rule, which belongs to no price list, in the business's; if it gives none, in the business's ("120,50 €").
+   A number the notice brings comes out as it is, because the notice does not say whether it is money, and so
+   does the cash payment limit or the ticket limit of a charge preview, which the law sets in euros (hub#926).
+   What goes to another action, to another system or to an "Only continue if…" carries each piece of data as
+   it is.
 In: the actions and queries of the active apps, the last real notice of that kind and what the previous
 steps leave. Data are named in the screen's language ("Sale number", "Customer phone") and with the word of the
 app they belong to ("Section", as in Sales & POS), never with their internal name.

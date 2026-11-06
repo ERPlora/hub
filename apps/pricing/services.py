@@ -611,7 +611,7 @@ def create_rule(ctx: OperationContext, data: RuleIn) -> dict:
     rule.customer_group_id = _group_id(data.customer_group_id, data.customer_group)
     _save_rule(rule)
     record_event(ctx, events.RULE_CREATED, {"id": str(rule.id), "code": rule.code})
-    return rule_row(rule)
+    return rule_row(rule, platform.business_currency(ctx.scope))
 
 
 _TARGET_KEYS = {key for _field, id_key, text_key in SCOPE_TARGETS.values() for key in (id_key, text_key)}
@@ -673,7 +673,7 @@ def update_rule(ctx: OperationContext, data: RulePatchIn) -> dict:
         rule.updated_by = _actor(ctx)
         _save_rule(rule)
         record_event(ctx, events.RULE_UPDATED, {"id": str(rule.id)})
-    return rule_row(rule)
+    return rule_row(rule, platform.business_currency(ctx.scope))
 
 
 def _switch_rule(ctx: OperationContext, data: RuleRefIn, active: bool) -> dict:
@@ -694,7 +694,7 @@ def _switch_rule(ctx: OperationContext, data: RuleRefIn, active: bool) -> dict:
     rule.updated_by = _actor(ctx)
     rule.save(update_fields=["is_active", "updated_by", "updated_at"])
     record_event(ctx, events.RULE_ACTIVATED if active else events.RULE_DEACTIVATED, {"id": str(rule.id)})
-    return rule_row(rule)
+    return rule_row(rule, platform.business_currency(ctx.scope))
 
 
 @operation(
