@@ -14,7 +14,7 @@ from django.utils import timezone, translation
 from live.context import OperationContext, Scope, system_context
 from live.operations import get, registry
 
-from apps.invoice import queries
+from apps.invoice import queries, schemas
 from apps.invoice.models import Invoice, InvoiceSeries, InvoiceType
 from apps.invoice.tests.conftest import ISSUER, ctx_for, run
 from base import assistant
@@ -672,3 +672,26 @@ def test_whoever_may_run_a_write_reads_the_record_its_card_names():
     # run every one of the 11.
     assert checked == 7 + 11 * 3
     assert unread == []
+
+
+# ── A series asked for with a code of another shape (hub#872, INVOICE-F12) ──────────────────────────────────────────
+
+
+@pytest.mark.django_db
+def test_a_series_with_a_code_of_another_shape_gets_no_card_and_the_model_hears_what_a_code_takes():
+    """The code is checked before the card, as the screen checks it: no card for data the operation refuses, and the
+    model hears, in the person's language, what a code takes (letters, digits, hyphens and underscores), never
+    pydantic's pattern."""
+    wrong = {"code": "E2E-?", "name": "Online", "invoice_type": "F1", "year": 2026}
+    with translation.override("es"):
+        plan = turn(call("invoice.series.create", wrong))
+        why = str(schemas.SERIES_CODE_INVALID)
+    assert plan["confirm"] is None
+    assert [(row["name"], row["outcome"], row["code"]) for row in plan["executed"]] == [
+        ("invoice.series.create", "error", "invalid_payload")
+    ]
+    error = json.loads(plan["append"][0]["content"])["error"]
+    assert (error["code"], set(error["fields"])) == ("invalid_payload", {"code"})
+    assert error["fields"]["code"].endswith(why)
+    assert why.startswith("Usa solo letras sin tilde")
+    assert not InvoiceSeries.objects.filter(code="E2E-?").exists()

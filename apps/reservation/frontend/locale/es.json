@@ -82,7 +82,8 @@
       "noResultsTitle": "Ninguna reserva coincide con la búsqueda",
       "noResultsBody": "Prueba con otro nombre, teléfono o correo, o limpia los filtros para volver al día.",
       "clearFilters": "Limpiar filtros",
-      "unconfirmed": "Liberada: nunca se confirmó"
+      "unconfirmed": "Liberada: nunca se confirmó",
+      "cancelReason": "Motivo: {reason}"
     },
     "actions": {
       "confirm": "Confirmar",

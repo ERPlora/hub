@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:0515d3709925bf18513909abfcf080a763438e07468dcf67713ca33f88ad884a -->
+<!-- generated from WORKBOOK.md sha256:3087d76603c79244ad45f5364f629a3d7cc5ef55e9d44739f0383c459b66a6a0 -->
 
 ## What it is for and who it is for
 
@@ -102,7 +102,8 @@ with how many reservations are "left" or "Full"; or "No more service today", "No
 "Closed this day"). "Today" is the one of the business's clock, not the device's.
 
 Below, the day's table by time: Date, Time, Guest, Phone (as in Customers: the country prefix and the
-digits in groups), Party, Table, Status; search box "Search guest, phone or email…" that searches the
+digits in groups), Party, Table, Status (a cancelled one says why next to it: "Reason: …" with what was
+typed, or "Released: never confirmed"; a long one, shortened with "…"); search box "Search guest, phone or email…" that searches the
 **whole** book, also by the digits of the phone without the prefix (results by day and time); filters by
 time, guests, table and status; table or cards view. Main action **"New reservation"** and, per row,
 according to its status: "Confirm", "Seat", "Complete", "Cancel", "No-show", "Edit" and "Delete" (the
@@ -116,7 +117,9 @@ inside the form.
 **Reservation form** ("New reservation" / "Edit reservation"): Customer (the Customers search box, by
 name or phone, with "+ New customer"), Guest (the name), Phone, Email, Date, Time, Party, Duration (min),
 Table (the free ones at that time, with their capacity and their zone; the ones that do not fit the party,
-flagged), Booked through (Phone, In person), Guest notes and Internal notes.
+flagged), Booked through (Phone, In person), Guest notes and Internal notes. A reservation already seated,
+completed, cancelled or not shown only changes its notes, and says so on top; a cancelled one, also with its
+whole reason.
 
 ### Waitlist
 Menu **Reservations → Waitlist**. Table, in the order in which they were added (by day and preferred
@@ -336,6 +339,9 @@ Screen: Reservations (row → "Cancel")
 Steps:
 1. "Cancel" on a Pending or Confirmed reservation; type the reason if you want and confirm.
 2. It becomes Cancelled, frees its place and Tables releases its table (TABLE-F27).
+3. Next to "Cancelled", the row, the phone's card and the reservation form say "Reason: …" with what was
+   typed, as typed (a long one, shortened with "…" in the row and whole in the form); without a reason,
+   only "Cancelled".
 In: the reservation and the reason.
 Out: the cancelled reservation (announces: `reservation.reservation.status_changed`).
 If it fails: from another status: "This reservation is seated: it cannot be cancelled.".
@@ -404,8 +410,9 @@ Steps:
 3. The Reservations screen that business has open turns them Cancelled at once, without reloading; another
    business's screen hears nothing.
 In: the time.
-Out: the released reservations (announces: `reservation.reservation.unconfirmed_released`, only if it
-released any).
+Out: the released reservations, which say "Released: never confirmed" next to "Cancelled" in the row, the
+phone's card and the form (announces: `reservation.reservation.unconfirmed_released`, only if it released
+any).
 If it fails: a pass that fails changes nothing and the next one tries again.
 Involved: RESERVATION-F03
 

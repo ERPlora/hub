@@ -1,10 +1,12 @@
 // What a reservation row offers by its status — the server's steps (services.py STEPS): confirm a pending
 // one; seat a pending or confirmed one; complete a seated one; cancel or mark a no-show a pending or
 // confirmed one; edit always (once finished, only its notes: the server says so); delete always (the
-// admin). The colour of each status; the next slot of the day the bar shows; the opening hours in a line.
+// admin). The colour of each status and why a cancelled one was cancelled; the next slot of the day the bar
+// shows; the opening hours in a line.
 import type { StatusPillTone } from '@erplora/ui/components';
 
-import type { DayOut, ReservationStatus, SlotLoadOut, SpanOut } from '../operations';
+import type { Translate } from '../composables/useT';
+import type { DayOut, ReservationOut, ReservationStatus, SlotLoadOut, SpanOut } from '../operations';
 
 export type RowAction = 'confirm' | 'seat' | 'complete' | 'cancel' | 'no_show' | 'edit' | 'delete';
 
@@ -35,6 +37,31 @@ const TONES: Record<ReservationStatus, StatusPillTone> = {
 
 export function statusTone(status: string): StatusPillTone {
   return TONES[status as ReservationStatus] ?? 'neutral';
+}
+
+/** The reason the book's own release leaves (services.py `UNCONFIRMED`): the screen translates it. */
+const UNCONFIRMED = 'unconfirmed';
+
+/**
+ * Why a cancelled reservation was cancelled (RESERVATION-F09, F13), as the row, the card and the booking
+ * panel say it: what the staff typed, as typed («Reason: Plans changed»), or the release of a pending one
+ * nobody confirmed («Released: never confirmed»). Empty for any other status or without a reason.
+ */
+export function cancellationNote(row: Pick<ReservationOut, 'status' | 'cancellation_reason'>, t: Translate): string {
+  const reason = row.cancellation_reason.trim();
+  if (row.status !== 'cancelled' || !reason) return '';
+  return reason === UNCONFIRMED ? t('reservation.list.unconfirmed') : t('reservation.list.cancelReason', { reason });
+}
+
+/** The room a reason has in the row and the card: about three lines of the Status cell. */
+const NOTE_ROOM = 60;
+
+/** `note` shortened to the room of a row, at a word, ending in «…» (the panel and the row's title keep it whole). */
+export function shortNote(note: string): string {
+  if (note.length <= NOTE_ROOM) return note;
+  const cut = note.slice(0, NOTE_ROOM - 1);
+  const word = cut.lastIndexOf(' ');
+  return `${(word > NOTE_ROOM / 2 ? cut.slice(0, word) : cut).trimEnd()}…`;
 }
 
 /** What the day bar says about the next slot. `open`/`full` carry the slot. */
