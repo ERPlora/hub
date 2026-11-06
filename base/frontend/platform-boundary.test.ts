@@ -1,8 +1,9 @@
 // base is the platform (CLAUDE.md «Apps»): always installed and with no `requires`, so its frontend never imports
 // a module's code (a type, a component, an operation). Such an import ties the Home to an app a hub may not have:
 // «Activity» reads Sales by the operation's name (`sale.sale.list`) and keeps its own type of the row.
-// The one door into `apps/` is the extension point of the Home hooks (PLAN-HUB, round 2026-10-21): `WidgetPanel.vue`
-// loads the component a module declares for its widget with `import.meta.glob`, so base never names a module.
+// The one door into `apps/` is the extension point of the hooks (PLAN-HUB, round 2026-10-21; hub#683): `lib/app-components.ts`
+// loads the component a module declares for its panel of the Home or its card of System with `import.meta.glob`, so base
+// never names a module.
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -13,9 +14,9 @@ import { describe, expect, it } from 'vitest';
 const BASE_FRONTEND = dirname(fileURLToPath(import.meta.url));
 const APPS_DIR = resolve(BASE_FRONTEND, '..', '..', 'apps');
 
-/** The declared extension point (the widgets of the Home): the only reach of base/frontend into apps/. */
+/** The declared extension point (the panels of the Home, the cards of System): the only reach of base/frontend into apps/. */
 const ALLOWED_GLOBS: readonly { file: string; pattern: string }[] = [
-  { file: 'components/WidgetPanel.vue', pattern: '../../../apps/*/frontend/components/*.vue' },
+  { file: 'lib/app-components.ts', pattern: '../../../apps/*/frontend/components/*.vue' },
 ];
 
 /** Every way a source names another file: import (also `import type` and multi-line), re-export, bare and dynamic import. */
@@ -60,7 +61,7 @@ function sources(): string[] {
 }
 
 describe('guardrail: base/frontend imports no module', () => {
-  it('sees every way of naming a module, and lets the packages, base and the widgets door through', () => {
+  it('sees every way of naming a module, and lets the packages, base and the components door through', () => {
     const planted = [
       "import type { SaleRow } from '../../../apps/sale/frontend/operations';",
       "import SalePanel from '../../../apps/sale/frontend/components/SalePanel.vue';",
@@ -75,23 +76,24 @@ describe('guardrail: base/frontend imports no module', () => {
       "const widgets = import.meta.glob<{ default: Component }>('../../../apps/*/frontend/components/*.vue');",
     ].join('\n');
 
-    expect(appImports('components/WidgetPanel.vue', planted)).toEqual([
-      'components/WidgetPanel.vue: ../../../apps/sale/frontend/operations',
-      'components/WidgetPanel.vue: ../../../apps/sale/frontend/components/SalePanel.vue',
-      'components/WidgetPanel.vue: ../../../apps/sale/frontend/lib/totals',
-      'components/WidgetPanel.vue: ../../../apps/sale/frontend/styles.css',
-      'components/WidgetPanel.vue: ../../../apps/sale/frontend/operations',
-      'components/WidgetPanel.vue: ../../../apps/sale/frontend/lib/totals',
-      'components/WidgetPanel.vue: ../../../apps/sale/frontend/pages/SalesPage.vue',
-      'components/WidgetPanel.vue: import.meta.glob ../../../apps/*/frontend/pages/*.vue',
+    expect(appImports('lib/app-components.ts', planted)).toEqual([
+      'lib/app-components.ts: ../../../apps/sale/frontend/operations',
+      'lib/app-components.ts: ../../../apps/sale/frontend/components/SalePanel.vue',
+      'lib/app-components.ts: ../../../apps/sale/frontend/lib/totals',
+      'lib/app-components.ts: ../../../apps/sale/frontend/styles.css',
+      'lib/app-components.ts: ../../../apps/sale/frontend/operations',
+      'lib/app-components.ts: ../../../apps/sale/frontend/lib/totals',
+      'lib/app-components.ts: ../../../apps/sale/frontend/pages/SalesPage.vue',
+      'lib/app-components.ts: import.meta.glob ../../../apps/*/frontend/pages/*.vue',
     ]);
-    // The widgets door is WidgetPanel's alone: the same glob anywhere else is a reach into the modules.
-    expect(appImports('components/HomeActivity.vue', planted)).toContain(
-      'components/HomeActivity.vue: import.meta.glob ../../../apps/*/frontend/components/*.vue',
-    );
+    // The components door is lib/app-components.ts's alone: the same glob anywhere else (the panel or the cards that
+    // mount what it loads included) is a reach into the modules.
+    for (const file of ['components/HomeActivity.vue', 'components/WidgetPanel.vue', 'components/SystemAppCards.vue']) {
+      expect(appImports(file, planted)).toContain(`${file}: import.meta.glob ../../../apps/*/frontend/components/*.vue`);
+    }
   });
 
-  it('no source of base/frontend imports from apps/ (the widgets door aside)', () => {
+  it('no source of base/frontend imports from apps/ (the components door aside)', () => {
     const files = sources();
     expect(files).toContain('components/HomeActivity.vue');
     expect(files.flatMap((file) => appImports(file, readFileSync(join(BASE_FRONTEND, file), 'utf8')))).toEqual([]);

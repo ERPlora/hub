@@ -27,7 +27,9 @@ afterEach(() => {
 
 describe('useAppDownloads', () => {
   it('on the web, the door of each system, Windows first', () => {
-    embed({ name: 'Bar', plan_url: '', account_url: '', app_downloads: { android: DOWNLOADS.android, ...DOWNLOADS } });
+    // In whatever order the block lists them.
+    const { windows, linux, android } = DOWNLOADS;
+    embed({ name: 'Bar', plan_url: '', account_url: '', app_downloads: { android, linux, windows } });
     const app = useAppDownloads();
     expect(app.downloads).toEqual([
       { platform: 'windows', url: DOWNLOADS.windows },
