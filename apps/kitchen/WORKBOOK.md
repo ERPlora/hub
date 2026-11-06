@@ -707,6 +707,7 @@ Pasos:
    domicilio»).
 2. «Guardar» solo se puede pulsar cuando algo cambió: sale «Ajustes guardados.» y las pantallas
    abiertas los toman al momento.
+   Lo que se cambia mientras se está guardando no se pierde: se queda en pantalla, por guardar (hub#914).
 Entra: los valores.
 Sale: los ajustes (avisa: ajustes cambiados). «La cocina trabaja con la pantalla» vale desde el
 siguiente cobro: lo cobrado antes se sirve a mano.

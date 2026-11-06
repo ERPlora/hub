@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:95589fcc6f35848d9fb273ea55b88564ac6ffb012fa46835632acf990d04de5b -->
+<!-- generated from WORKBOOK.md sha256:83041994b081d39749ab6067626e9b26248623e068f3446daeb2f52870cce247 -->
 
 ## What it is for and who it is for
 
@@ -201,6 +201,7 @@ Steps:
    in and you see the accuracy read. You can also type them by hand.
 4. In "Flag for review after (hours)" put from 1 to 24 hours (12 if you leave it).
 5. Tap "Save" and you see "Settings saved.". Only what changed is sent.
+   What is changed while it is saving is not lost: it stays on screen, still to save (hub#914).
 In: nothing from other apps; without saved settings, the default values show.
 Out: the settings that Clock in (ATTENDANCE-F03) and the working-day review (ATTENDANCE-F05) read; the
 settings changed notice.

@@ -361,6 +361,7 @@ Pasos:
 2. Pon «Aviso ámbar (minutos)» y «Aviso rojo (minutos)» (de 1 a 600; el rojo no puede ser menor que el
    ámbar).
 3. Pulsa «Guardar».
+   Lo que se cambia mientras se está guardando no se pierde: se queda en pantalla, por guardar (hub#914).
 4. Desmarcado, tocar una mesa libre la sienta con su aforo (con los comensales de la reserva si está
    Reservada). En **Sesiones**, el tiempo de una cuenta abierta se pone ámbar y rojo a partir de esos
    minutos. Sin guardar nunca: se pregunta, 60 y 90 minutos.

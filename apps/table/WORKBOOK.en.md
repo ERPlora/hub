@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:9df43f7f627bc1f19a595a0b66ca8023b9ef7c221fbee03016dbde86e3df9943 -->
+<!-- generated from WORKBOOK.md sha256:cc6a21f4e7f4d9733d5239f5db7bca47b2de1f87ce845f4c49f7b2e30cf1f705 -->
 
 ## What it is for and who it is for
 
@@ -347,6 +347,7 @@ Steps:
 2. Set "Amber warning (minutes)" and "Red warning (minutes)" (from 1 to 600; the red one cannot be lower
    than the amber one).
 3. Tap "Save".
+   What is changed while it is saving is not lost: it stays on screen, still to save (hub#914).
 4. Unticked, tapping a free table seats it with its capacity (with the booking's guests if it is
    Reserved). In **Sessions**, the time of an open check turns amber and red from those minutes. Without
    ever saving: it asks, 60 and 90 minutes.

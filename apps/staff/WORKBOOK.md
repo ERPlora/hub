@@ -550,6 +550,7 @@ Pasos:
 2. Cambia el inicio y el fin en HH:MM (el fin, después del inicio: un día de horario no cruza la
    medianoche) y el descanso, de 0 (sin descanso) a 480 minutos y más corto que la jornada.
 3. Pulsa **Guardar**.
+   Lo que se cambia mientras se está guardando no se pierde: se queda en pantalla, por guardar (hub#914).
 Entra: lo enviado; lo demás se queda como estaba.
 Sale: los ajustes del negocio (`staff.settings.updated`), con las horas siempre en HH:MM. Desde ese
 momento, un horario nuevo propone esa jornada de lunes a viernes, con el descanso en mitad del día

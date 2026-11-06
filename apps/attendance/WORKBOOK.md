@@ -214,6 +214,7 @@ Pasos:
    la precisión leída. También puede escribirlas a mano.
 4. En «Marcar a revisar tras (horas)» pone de 1 a 24 horas (12 si no lo toca).
 5. Pulsa «Guardar» y ve «Ajustes guardados.». Solo se envía lo que cambió.
+   Lo que se cambia mientras se está guardando no se pierde: se queda en pantalla, por guardar (hub#914).
 Entra: nada de otras apps; sin ajustes guardados se ven los valores por defecto.
 Sale: los ajustes que leen Fichar (ATTENDANCE-F03) y la revisión de jornadas (ATTENDANCE-F05); el
 aviso de ajustes cambiados.
