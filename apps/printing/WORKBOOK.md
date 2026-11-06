@@ -166,7 +166,8 @@ impresoras activas. La nota «El encabezado y el pie del tique forman parte de l
 que es de donde sale el tique.» con el enlace «Abrir los ajustes del tique» (si Ventas está encendida). «Guardar ajustes» guarda lo que
 cambió y dice «Ajustes guardados.». Quien no puede cambiarlos los ve bloqueados con «No tienes permiso
 para cambiar estos ajustes.». Cargando: «Cargando ajustes…». Error: «No se pudieron cargar los
-ajustes.» con «Reintentar»; al guardar, «No se pudieron guardar los ajustes.» con el motivo.
+ajustes.» con «Reintentar»; al guardar, «No se pudieron guardar los ajustes.» con el motivo, también
+debajo de la función cuya impresora rechaza (PRINTING-F06).
 
 ## Estados de cada pantalla
 
@@ -343,12 +344,17 @@ Pasos:
 1. Abre **Impresión → Ajustes**.
 2. Enciende o apaga «Imprimir ticket al cobrar» y «Abrir cajón al cobrar», elige las «Copias del
    ticket» y, si quieres, la impresora de cada función.
-3. Pulsa «Guardar ajustes». Se guarda lo que cambiaste; lo demás queda como estaba.
+3. Pulsa «Guardar ajustes» (apagado hasta que cambias algo). Se guarda lo que cambiaste; lo demás
+   queda como estaba, y sale «Ajustes guardados.» encima del botón.
 Entra: las decisiones del negocio.
 Sale: los ajustes de impresión, una sola fila (avisa: `printing.settings.updated`). Sin guardar
 nunca valen los de fábrica: tique al cobrar encendido, cajón apagado, una copia, sin impresora elegida.
-Si falla: «No se pudieron guardar los ajustes.» con el motivo. Si la lectura falla, la pantalla no
-enseña valores y ofrece «Reintentar». Sin permiso, bloqueados y sin «Guardar ajustes».
+Si falla: «No se pudieron guardar los ajustes.» con el motivo; si nombra la impresora de una función
+(desactivada, borrada o pasada a otra función mientras se elegía), el motivo sale también debajo de esa
+función. Como en las ventanas de formulario, el aviso se quita en cuanto se cambia algo y el motivo de
+una función en cuanto se elige otra impresora para ella; los dos vuelven si el siguiente intento también
+se rechaza. Un rechazo sin campo se queda hasta el siguiente intento (hub#871). Si la lectura falla, la
+pantalla no enseña valores y ofrece «Reintentar». Sin permiso, bloqueados y sin «Guardar ajustes».
 Implicados: PRINTING-F07, PRINTING-F13
 
 ### PRINTING-F07 Imprimir el tique al cobrar

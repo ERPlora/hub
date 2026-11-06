@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:68a8f4962634bea157331c8d8b86ba36f187e40840a7049a8c3ad334bff9ae35 -->
+<!-- generated from WORKBOOK.md sha256:30bee1da7a172a692223e571d600b8fa6aafdaf4f05c3b6d5ca52ab383912b73 -->
 
 ## What it is for and who it is for
 
@@ -154,7 +154,8 @@ active printers. The note "The receipt header and footer are part of your till s
 where the ticket is printed from." with the link "Open the receipt settings" (if Sales is switched on). "Save settings" saves what
 changed and says "Settings saved.". Whoever cannot change them sees them locked with "You do not have permission
 to change these settings.". Loading: "Loading settings…". Error: "Could not load the
-settings." with "Retry"; when saving, "Could not save the settings." with the reason.
+settings." with "Retry"; when saving, "Could not save the settings." with the reason, also below the
+role whose printer it refuses (PRINTING-F06).
 
 ## States of each screen
 
@@ -326,11 +327,16 @@ Steps:
 1. Open **Printing → Settings**.
 2. Switch "Print receipt on checkout" and "Open drawer on checkout" on or off, choose the "Receipt
    copies" and, if you want, the printer of each role.
-3. Press "Save settings". What you changed is saved; the rest stays as it was.
+3. Press "Save settings" (off until you change something). What you changed is saved; the rest stays
+   as it was, and "Settings saved." shows above the button.
 In: the business's decisions.
 Out: the print settings, a single row (announces: `printing.settings.updated`). Without saving,
 the factory ones always hold: receipt on checkout on, drawer off, one copy, no printer chosen.
-If it fails: "Could not save the settings." with the reason. If the read fails, the screen does not
+If it fails: "Could not save the settings." with the reason; if it names a role's printer (deactivated,
+deleted or moved to another role while it was being chosen), the reason also shows below that role. As
+in the form windows, the notice goes as soon as something is changed and a role's reason as soon as
+another printer is chosen for it; both come back if the next try is refused too. A refusal that names no
+field stays until the next try (hub#871). If the read fails, the screen does not
 show values and offers "Retry". Without permission, locked and without "Save settings".
 Involved: PRINTING-F07, PRINTING-F13
 
