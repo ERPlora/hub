@@ -845,6 +845,9 @@ export interface AssistantReportInput {
   comment?: string;
   question?: string;
   answer: string;
+  /** Whether its turn brought pages of the web (the turn's `done.web`); left out when the chat does not know
+   *  (saas#287). */
+  web?: boolean;
 }
 
 declare module '@erplora/ui/sdk' {

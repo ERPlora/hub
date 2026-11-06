@@ -1358,8 +1358,15 @@ def test_a_refusal_of_the_gateway_is_one_of_ours(gateway, status, code, expected
     assert (error["type"], error["code"]) == ("error", expected)
 
 
-def test_a_provider_that_fails_half_way_keeps_what_was_said(gateway):
+#: A turn that brought pages of the web says so before the text that uses them (hub#870): what was said before a failure
+#: may quote them, so the mark stays.
+SEARCHED = pytest.mark.parametrize("searched", [False, True], ids=["no-web", "web"])
+
+
+@SEARCHED
+def test_a_provider_that_fails_half_way_keeps_what_was_said(gateway, searched):
     gateway.turn(
+        *([{"type": "web"}] if searched else []),
         {"type": "text_delta", "text": "Tienes"},
         {"type": "error", "code": "assistant.provider_unavailable", "message": "x", "retriable": True},
     )
@@ -1367,16 +1374,71 @@ def test_a_provider_that_fails_half_way_keeps_what_was_said(gateway):
     assert [frame["type"] for frame in frames] == ["text", "error", "done"]
     assert frames[1] == {"type": "error", "code": "assistant.provider_failed", "retriable": True}
     assert frames[-1]["append"] == [{"role": "assistant", "content": "Tienes"}]
+    assert frames[-1]["web"] is searched
 
 
-def test_a_connection_that_dies_half_way_is_said(gateway):
-    gateway.turn({"type": "text_delta", "text": "Tienes"}, {"type": "text_delta", "text": " 3"}, cut_after=1)
+@SEARCHED
+def test_a_connection_that_dies_half_way_is_said(gateway, searched):
+    web = [{"type": "web"}] if searched else []
+    gateway.turn(*web, {"type": "text_delta", "text": "Tienes"}, {"type": "text_delta", "text": " 3"}, cut_after=len(web) + 1)
     frames = frames_of(**TURN)
     assert [frame["type"] for frame in frames] == ["text", "error", "done"]
     assert frames[1]["code"] == "assistant.cut"
+    assert frames[-1]["web"] is searched
 
 
 def test_a_gateway_out_of_reach_is_said(settings):
     settings.SAAS_INTERNAL_URL = "http://127.0.0.1:9"
     error = frames_of(**TURN)[-1]
     assert (error["type"], error["code"]) == ("error", "assistant.unreachable")
+
+
+# ── Whether a turn brought pages of the web, for the report of its answer (hub#870, saas#287, BASE-F105) ─────────────
+
+
+def test_a_turn_that_brought_pages_of_the_web_says_so_when_it_closes(gateway):
+    """The gateway's ``{type: web}`` comes before the text that uses the pages: the browser keeps it with the answer
+    (``done.web``) and sends it back with a report, whose text erplora.com then does not mail (Brave's terms)."""
+    gateway.turn(
+        {"type": "web"},
+        {"type": "text_delta", "text": "Según la AEAT, "},
+        {"type": "text_delta", "text": "el plazo acaba el 20."},
+        {"type": "response", "output": [], "usage": {}, "continuation": None},
+    )
+    frames = frames_of(**TURN)
+    assert [frame["type"] for frame in frames] == ["text", "text", "done"]
+    assert frames[-1]["web"] is True
+
+
+def test_a_turn_without_pages_of_the_web_says_it_brought_none(gateway):
+    """A ``false`` the Hub says, not one it leaves out: without it, a search turned on keeps every answer's text from
+    support, also the ones that never searched."""
+    gateway.turn({"type": "text_delta", "text": "Hola"}, {"type": "response", "output": [], "usage": {}, "continuation": None})
+    assert frames_of(**TURN)[-1]["web"] is False
+
+
+def test_the_tools_it_asks_for_after_searching_still_say_the_pages(gateway):
+    """A search, then a tool of the Hub: the mark closes the round that waits for the tool (the browser keeps it across
+    the continuation, ui#105)."""
+    call = {"type": "function_call", "name": "demo__item__list", "call_id": "c1", "arguments": "{}"}
+    gateway.turn({"type": "web"}, call, {"type": "response", "output": [call], "usage": {}, "continuation": "tok"})
+    done = frames_of(**TURN)[-1]
+    assert (done["pending"][0]["call_id"], done["continuation"], done["web"]) == ("c1", "tok", True)
+
+
+def test_a_report_says_whether_its_answer_came_from_the_web(gateway):
+    gateway.reply("/internal/assistant/report", status=202, json={"sent": True, "duplicate": False})
+    gateway.reply("/internal/assistant/report", status=202, json={"sent": True, "duplicate": False})
+    assistant.report(A, message_id="m1", reason="incorrect", comment="", question="¿Plazo?", answer="El 20", web=True)
+    assistant.report(A, message_id="m2", reason="incorrect", comment="", question="Hola", answer="Hola", web=False)
+    first, second = gateway.sent("/internal/assistant/report")
+    assert (first.body["web"], second.body["web"]) == (True, False)
+    assert signed(first) and signed(second)
+
+
+def test_a_report_that_does_not_know_leaves_the_web_out(gateway):
+    """An answer kept before the mark existed: erplora.com's safe default decides (no text while its search is on), never
+    a ``false`` the Hub made up."""
+    gateway.reply("/internal/assistant/report", status=202, json={"sent": True, "duplicate": False})
+    assistant.report(A, message_id="m1", reason="other", comment="", question="", answer="x", web=None)
+    assert "web" not in gateway.sent("/internal/assistant/report")[0].body

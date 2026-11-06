@@ -11,7 +11,7 @@ from django.utils.functional import Promise
 from live.operations import registry
 
 from apps.sale import models, pricing, queries, schemas, services
-from base.tests.po import po_entries
+from base.tests.po import catalogue_key, po_entries
 
 LOCALE = Path(apps.get_app_config("sale").path) / "locale" / "es" / "LC_MESSAGES"
 
@@ -52,7 +52,7 @@ def visible_texts() -> set[str]:
         *models.Sale.Status.labels,
     ]
     with translation.override("en"):
-        return {str(text) for text in lazies} | schema_titles()
+        return {catalogue_key(text) for text in lazies} | schema_titles()
 
 
 def schema_titles() -> set[str]:
@@ -117,6 +117,45 @@ def test_spanish_texts():
         assert str(schemas.SAY_WHICH_DEPARTMENT_ROW) == (
             "Di qué sección: su id o su nombre."
         )
+
+
+def test_spanish_says_ventas_own_words_not_an_earlier_apps():
+    """The labels Ventas shares in English with an app loaded before it come out in Spanish with its own words
+    (hub#560): an open check is «Abierta» like a «Completada» or «Anulada» one, not Demo's «Abierto»; what a line
+    carries of Modifiers is its «suplementos» (SALE-F11, and «suplementos en línea propia» beside it), not Clientes'
+    «opciones»; a sale is «anulada el» like it is «anulada por», not Clientes' «anulado el»."""
+    labels = {
+        "Order.status=open": models.Order.Status.OPEN.label,
+        "OrderLine.modifiers": models.OrderLine._meta.get_field("modifiers").verbose_name,
+        "SaleLine.modifiers": models.SaleLine._meta.get_field("modifiers").verbose_name,
+        "Sale.voided_at": models.Sale._meta.get_field("voided_at").verbose_name,
+    }
+    with translation.override("es"):
+        assert {name: str(label) for name, label in labels.items()} == {
+            "Order.status=open": "Abierta",
+            "OrderLine.modifiers": "suplementos",
+            "SaleLine.modifiers": "suplementos",
+            "Sale.voided_at": "anulada el",
+        }
+
+
+def test_a_line_names_the_product_data_it_freezes_as_inventory_names_them():
+    """A line keeps a frozen copy of its product's category and of the quantity and unit its price refers to: the same
+    data as Inventory's product, said with Inventory's words in Ventas' own catalogue too, so Spanish reads them alike
+    whichever app is loaded first (hub#560: Ventas said «categoría de producto», «cantidad del precio» and «unidad del
+    precio» while the screen showed Inventory's)."""
+    own = {msgid: msgstr for msgid, (msgstr, _) in po_entries(LOCALE / "django.po").items()}
+    said = {
+        "product category": "categoría del producto",
+        "price quantity": "cantidad de precio",
+        "pricing unit": "unidad de precio",
+    }
+    assert {msgid: own.get(msgid) for msgid in said} == said
+    fields = {"category_id": "product category", "price_quantity": "price quantity", "pricing_unit": "pricing unit"}
+    with translation.override("es"):
+        for model in (models.OrderLine, models.SaleLine):
+            shown = {name: str(model._meta.get_field(name).verbose_name) for name in fields}
+            assert shown == {name: said[msgid] for name, msgid in fields.items()}, model.__name__
 
 
 @pytest.mark.django_db
