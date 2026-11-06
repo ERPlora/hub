@@ -5,8 +5,9 @@ comes with its own (``Template.header_sample``), which may be changed; one made 
 file is one of the business's kept files (``whatsapp_inbox.template_sample.upload``), of the header's kind; the message
 names it (``Message.header_sample``) and its hand-over to erplora.com (door 5, after the COMMIT, the file read from the
 store with no connection held) carries it in base64, so erplora.com uploads it to the number and sends the template
-with it. A retry carries the same file with the same key. An automation sends what it can fill alone: a template with
-its own file, never one that asks for it. Meta not answering is said as Meta's (gh:hub#2731).
+with it. A retry carries the same file with the same key. An automation (``message.notify``) sends the same templates
+the inbox fills: one with a file header goes with the file its step «Send a message» chose (FLOW-F32), else with its
+own, and with neither it does not leave. Meta not answering is said as Meta's (gh:hub#2731).
 """
 
 import base64
@@ -117,7 +118,7 @@ def test_a_photo_template_from_whatsapp_manager_is_offered_to_send_asking_for_it
 
     [row] = run("whatsapp_inbox.template.list", {"fillable": True}).rows
     assert (row.name, row.editable, row.header_format, row.header_sample) == (MANAGER_PHOTO, False, "IMAGE", None)
-    assert run("whatsapp_inbox.template.list", {"sendable": True}).rows == [], "an automation cannot choose its file"
+    assert run("whatsapp_inbox.template.list", {"sendable": True}).rows == [], "it asks for its file: never as it is"
 
 
 @respx.mock
@@ -249,7 +250,26 @@ def test_an_automation_sends_a_template_made_here_with_its_own_photo(delivered):
     assert base64.b64decode(door_5(route)["template"]["header_sample"]["content_base64"]) == JPEG
 
 
-def test_an_automation_cannot_send_one_that_asks_for_its_file():
+@respx.mock
+def test_an_automation_sends_one_from_whatsapp_manager_with_the_file_its_step_chose(delivered):
+    """FLOW-F32: the step «Send a message» offers the fillable templates and keeps the file chosen in the editor."""
+    c = from_manager()
+    chosen = upload(OTHER_JPEG, name="carta-otono.jpg")
+    route = answering()
+
+    out = delivered(
+        lambda: run(
+            "whatsapp_inbox.message.notify",
+            {"phone": c.phone, "template": {"name": MANAGER_PHOTO, "variables": ["Ana"], "header_sample": str(chosen.id)}},
+        )
+    )
+
+    sent = door_5(route)["template"]["header_sample"]
+    assert (sent["name"], base64.b64decode(sent["content_base64"])) == ("carta-otono.jpg", OTHER_JPEG)
+    assert stored(out).header_sample_id == chosen.id
+
+
+def test_an_automation_cannot_send_one_that_asks_for_its_file_when_its_step_chose_none():
     c = from_manager()
 
     with pytest.raises(InvalidPayload) as refused:
