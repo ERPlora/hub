@@ -6,6 +6,7 @@
 import { Combo, InlineFeedback } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
+import { expectSaveWaitsForMoney } from '../../../../base/frontend/__tests__/save-waits-for-money';
 import { business, click, ionValue, JAPANESE, type MountOptions, mountService, POLISH, settle } from '../__tests__/mount-service';
 import { PACKAGE, pkg } from '../__tests__/package';
 import PackageFormModal from './PackageFormModal.vue';
@@ -188,6 +189,29 @@ describe('PackageFormModal: in the business currency (service-business-currency)
     await ionValue(s.field('max_uses'), '10', 'ionInput');
     await click(s.save());
     expect(s.sent().map((call) => call.body)).toEqual([{ id: 'p1', max_uses: 10 }]);
+  });
+
+  it('a closed price typed before the business answers is never read without it: «Create package» waits in grey, then «1500» is 1500 yen (hub#921)', async () => {
+    const s = await setup(null, 'en', { business: null });
+    await ionValue(s.field('name'), 'Bono', 'ionInput');
+    await ionValue(s.field('fixed_price'), '1500', 'ionInput');
+    s.lines()[0].vm.$emit('update:modelValue', { id: 's1', label: 'Cut' });
+    await settle();
+    s.answer(201, PACKAGE);
+    await expectSaveWaitsForMoney({ ...s, amount: () => s.field('fixed_price'), settle }, () => s.result('base.business.get', business(JAPANESE)));
+    expect(s.field('fixed_price').value).toBe('1500');
+    await click(s.save());
+    expect(s.sent().map((call) => (call.body as { fixed_price: number }).fixed_price)).toEqual([1500]);
+  });
+
+  it('editing, a closed price typed before the business answers stays as typed when it does and is read in yen (hub#921)', async () => {
+    const s = await setup(PACKAGE, 'en', { business: null });
+    await ionValue(s.field('fixed_price'), '1500', 'ionInput');
+    s.answer(200, pkg({ fixed_price: 1500 }));
+    await expectSaveWaitsForMoney({ ...s, amount: () => s.field('fixed_price'), settle }, () => s.result('base.business.get', business(JAPANESE)));
+    expect(s.field('fixed_price').value).toBe('1500');
+    await click(s.save());
+    expect(s.sent().map((call) => call.body)).toEqual([{ id: 'p1', fixed_price: 1500 }]);
   });
 });
 

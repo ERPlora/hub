@@ -6,6 +6,8 @@
 import { Combo } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
+import { expectSaveWaitsForMoney } from '../../../../base/frontend/__tests__/save-waits-for-money';
+import type { Business } from '../../../../base/frontend/operations';
 import { business, JAPANESE, KUWAITI, POLISH, rule } from '../__tests__/fixtures';
 import { click, ionValue, mountPricing, settle } from '../__tests__/mount-pricing';
 import RuleFormModal from './RuleFormModal.vue';
@@ -17,11 +19,16 @@ vi.mock('@ionic/vue', async (importOriginal) => {
 
 type Control = HTMLElement & { label?: string; value?: unknown; errorText?: string; disabled?: boolean };
 
-async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 'en') {
+/** The form opened; the business answers its money in Spain unless `money` says another (`null`: it has not answered). */
+async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 'en', money: Partial<Business> | null = {}) {
   const m = await mountPricing(RuleFormModal, { props: { open: false, rule: null, ...props }, locale });
   await m.wrapper.setProps({ 'onUpdate:open': (open: boolean) => m.wrapper.setProps({ open }) });
   await m.wrapper.setProps({ open: true });
   await settle();
+  if (money) {
+    await m.live();
+    await m.result('base.business.get', business(money));
+  }
   const field = (name: string) => m.inDoc(`pricing-rule-form-${name}`) as Control;
   const save = () => m.inDoc('pricing-rule-form-submit') as Control;
   const combo = (testid: string) =>
@@ -134,9 +141,7 @@ describe('RuleFormModal', () => {
   });
 
   it('an amount per unit is typed in the business’s currency: in Poland «0,50 zł», never a euro one', async () => {
-    const s = await setup();
-    await s.live();
-    await s.result('base.business.get', business(POLISH));
+    const s = await setup({}, 'en', POLISH);
     s.answer(201, rule());
     await named(s, 'FIX', 'Fifty off');
     await ionValue(s.field('rule_type'), 'fixed');
@@ -188,7 +193,7 @@ describe('RuleFormModal: the business answers after the form opened', () => {
   const FIXED = { rule_type: 'fixed' as const, percent: null };
 
   it('an untouched amount per unit is rewritten from the rule with the yen’s decimals, and «Save» keeps its scale', async () => {
-    const s = await setup({ rule: rule({ ...FIXED, amount: 150 }) });
+    const s = await setup({ rule: rule({ ...FIXED, amount: 150 }) }, 'en', null);
     expect(s.field('amount').value).toBe('1.50');
     await s.live();
     await s.result('base.business.get', business(JAPANESE));
@@ -200,7 +205,7 @@ describe('RuleFormModal: the business answers after the form opened', () => {
   });
 
   it('with three decimals an untouched amount per unit is rewritten in that scale, never saved ten times bigger', async () => {
-    const s = await setup({ rule: rule({ ...FIXED, amount: 1500 }) });
+    const s = await setup({ rule: rule({ ...FIXED, amount: 1500 }) }, 'en', null);
     expect(s.field('amount').value).toBe('15.00');
     await s.live();
     await s.result('base.business.get', business(KUWAITI));
@@ -212,7 +217,7 @@ describe('RuleFormModal: the business answers after the form opened', () => {
   });
 
   it('what the person already typed stays and is read in the business’s currency: «2,50» in Poland is 250 grosze', async () => {
-    const s = await setup();
+    const s = await setup({}, 'en', null);
     s.answer(201, rule());
     await named(s, 'FIX', 'Fifty off');
     await ionValue(s.field('rule_type'), 'fixed');
@@ -225,7 +230,7 @@ describe('RuleFormModal: the business answers after the form opened', () => {
   });
 
   it('what the person typed that the yen cannot read stays as typed: «Save» waits, nothing is sent (never a 0) and the field says why', async () => {
-    const s = await setup({ rule: rule({ ...FIXED, amount: 150 }) });
+    const s = await setup({ rule: rule({ ...FIXED, amount: 150 }) }, 'en', null);
     await ionValue(s.field('amount'), '1,75', 'ionInput');
     await s.live();
     await s.result('base.business.get', business(JAPANESE));
@@ -237,5 +242,20 @@ describe('RuleFormModal: the business answers after the form opened', () => {
     await settle();
     expect(s.field('amount').value).toBe('1,75');
     expect(s.field('amount').errorText).toBe(NOT_AMOUNT);
+  });
+
+  it('an amount per unit typed before the business answers is never read without it: «Create» waits in grey, then «1500» is 1500 yen (hub#921)', async () => {
+    const s = await setup({}, 'en', null);
+    await named(s, 'FIX', 'Yen off');
+    await ionValue(s.field('percent'), '10', 'ionInput');
+    expect(s.save().disabled).toBe(true);
+    await ionValue(s.field('rule_type'), 'fixed');
+    await ionValue(s.field('amount'), '1500', 'ionInput');
+    s.answer(201, rule({ ...FIXED, amount: 1500 }));
+    await s.live();
+    await expectSaveWaitsForMoney({ ...s, amount: () => s.field('amount'), settle }, () => s.result('base.business.get', business(JAPANESE)));
+    expect(s.field('amount').value).toBe('1500');
+    await click(s.save());
+    expect(s.sent().map((call) => (call.body as { amount: number }).amount)).toEqual([1500]);
   });
 });

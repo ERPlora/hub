@@ -13,6 +13,7 @@ import MoneyInput from './MoneyInput.vue';
 type Control = HTMLElement & { errorText?: string };
 
 const PLN = { currency: 'PLN', decimals: 2 };
+const EUR = { currency: 'EUR', decimals: 2 };
 
 async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 'en') {
   const model = { value: (props.modelValue as string) ?? '' };
@@ -53,7 +54,7 @@ describe('MoneyInput', () => {
   });
 
   it('hands the parent what is typed, and rewrites it in the page format on leaving', async () => {
-    const s = await setup({}, 'es');
+    const s = await setup({ money: EUR }, 'es');
     await s.input().setValue('2.2');
     expect(s.model.value).toBe('2.2');
     await s.blur();
@@ -108,5 +109,20 @@ describe('MoneyInput', () => {
   it('speaks Spanish', async () => {
     const s = await setup({ modelValue: 'x', showError: true }, 'es');
     expect(s.errorText()).toBe('Esto no es un importe. Escribe una cifra, por ejemplo 12,50.');
+  });
+});
+
+// hub#921: a rule's amount is in the business's money, whose decimals are unknown until it answers: leaving the field
+// before that keeps what was typed, so a «150» left before the yen arrives is still 150 (never «150.00», which the yen
+// cannot read).
+describe('MoneyInput: the business’s money', () => {
+  it('until the money is known, leaving keeps what was typed: no decimals invented', async () => {
+    const s = await setup();
+    await s.input().setValue('150');
+    await s.blur();
+    expect([s.model.value, s.errorText()]).toEqual(['150', undefined]);
+    await s.wrapper.setProps({ money: { currency: 'JPY', decimals: 0 } });
+    await s.blur();
+    expect([s.model.value, s.errorText()]).toEqual(['150', undefined]);
   });
 });
