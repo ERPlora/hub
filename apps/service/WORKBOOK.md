@@ -228,6 +228,8 @@ Pasos:
 4. Elige la Categoría fiscal (son las de Impuestos, por su nombre y su tipo; viene la de los Ajustes
    si hay una). Sin ella **Crear servicio** no se puede pulsar; tampoco mientras el negocio no haya dicho
    todavía su moneda, porque el precio se lee en ella (sin ella, «1500» yenes se guardaría como 150 000).
+   Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
+   motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, **Crear servicio** se enciende (hub#938).
 5. Pulsa **Crear servicio**: el formulario se cierra y el servicio sale en la tabla como **Activo**.
 Entra: las categorías de Servicios y las categorías fiscales activas de Impuestos.
 Sale: el servicio en oferta y reservable (`service.service.created`); desde ese momento lo ven la
@@ -443,7 +445,8 @@ canjear.»; un servicio repetido, archivado o que no existe; un importe ilegible
 su campo; un nombre que ya tiene otro bono vivo, «Ya hay un paquete con ese nombre. Elige otro
 nombre.». «Crear paquete» (y «Guardar cambios» al editarlo, SERVICE-F13) está en gris mientras el negocio
 no haya dicho todavía su moneda, porque el precio cerrado y el descuento se leen en ella (sin ella,
-«1500» yenes se guardaría como 150 000).
+«1500» yenes se guardaría como 150 000). Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
+motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, el botón se enciende (hub#938).
 Implicados: SERVICE-F14, SERVICE-F22
 
 ### SERVICE-F13 Editar o eliminar un bono

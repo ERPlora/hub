@@ -191,7 +191,8 @@ Entra: nombre, nombre de cocina, precio, forma de venta, tipo de IVA, orden y «
 categorías de IVA las lee de Impuestos.
 Sale: el menú (avisa: menú nuevo).
 Si falla: «Guardar» está en gris mientras falte el nombre y mientras el negocio no haya dicho todavía su
-moneda, porque el precio se lee en ella (sin ella, «1500» yenes se guardaría como 150 000). Junto al
+moneda, porque el precio se lee en ella (sin ella, «1500» yenes se guardaría como 150 000). Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
+motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, «Guardar» se enciende (hub#938). Junto al
 campo: «El menú necesita un nombre.», «Un menú que se consume en el local
 necesita su propio tipo de IVA: sin él no se puede facturar.», «El precio de un menú no puede ser
 negativo. Para abaratar una opción, ponle un suplemento negativo.», «Esto no es un importe. Escribe

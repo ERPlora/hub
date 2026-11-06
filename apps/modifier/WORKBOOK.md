@@ -216,7 +216,8 @@ defecto.
 Sale: la opción (avisa: opción creada, cambiada o borrada). Borrarla la retira del catálogo: lo ya
 pedido conserva su copia congelada, también en la comanda.
 Si falla: «Crear» y «Guardar» están en gris mientras falte el nombre y mientras el negocio no haya dicho
-todavía su moneda, porque el suplemento se lee en ella (sin ella, «150» yenes se guardaría como 15 000). Un
+todavía su moneda, porque el suplemento se lee en ella (sin ella, «150» yenes se guardaría como 15 000). Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
+motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, el botón se enciende (hub#938). Un
 nombre vacío o repetido en el grupo, un suplemento que no es un importe, una categoría
 fiscal que no existe en Impuestos o más opciones por defecto que el máximo salen junto a su campo. Una
 opción con categoría fiscal propia se cobra en una línea aparte, que no puede valer cero ni menos: «Una

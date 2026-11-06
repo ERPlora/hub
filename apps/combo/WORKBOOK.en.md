@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:0e2d707e1f47bd11b6c6e675fda3df186360ef7177febe6d48c81c8df56f991c -->
+<!-- generated from WORKBOOK.md sha256:8071d6289cc0aa1fa4ab4805c98d743e4fed107dd8b6ed8e00481252cd96ed75 -->
 
 ## What it is for and who it is for
 
@@ -176,7 +176,8 @@ In: name, kitchen name, price, way of selling, VAT category, order and "On sale"
 categories from Taxes.
 Out: the menu (announces: new menu).
 If it fails: "Save" is grey while the name is missing and while the business has not yet said its
-currency, because the price is read in it (without it, "1500" yen would be saved as 150,000). Next to the
+currency, because the price is read in it (without it, "1500" yen would be saved as 150,000). If the currency cannot be read, the window says so ("The business's currency could not be read", with the
+reason) and offers "Retry", which asks for it again; as soon as it arrives, "Save" lights up (hub#938). Next to the
 field: "The menu needs a name.", "A menu eaten in needs its own VAT category:
 without it, it cannot be billed.", "A menu price cannot be below zero. To make a choice cheaper, give it
 a negative supplement instead.", "This is not an amount. Type a figure, for example 12.50." (also with

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:af17ccfbd18370c9724ef931998af2b1e5fe9797259458f8c2709587d904ae3a -->
+<!-- generated from WORKBOOK.md sha256:6d09672c91c24774be390bc9269ee994bb6196ef7a2c77509db9c4a4b768fea8 -->
 
 ## What it is for and who it is for
 
@@ -285,7 +285,8 @@ Inventory tells the other apps there is a new product: Sales offers it on the ti
 setup step "Your catalog" is done (INVENTORY-F28).
 If it fails: "Save" is off while Name, SKU or tax category are missing, and while the business has not
 yet said its currency: the price and the cost are read in it, and without it "1500" yen would be saved
-as 150,000. With no tax categories it says
+as 150,000. If the currency cannot be read, the window says so ("The business's currency could not be read", with the
+reason) and offers "Retry", which asks for it again; as soon as it arrives, "Save" lights up (hub#938). With no tax categories it says
 "There are no tax categories yet. Create them in Taxes: a product cannot be sold until it is known how
 it is taxed.". An unreadable amount: "This is not an amount. Type a figure, for example 12.50." or
 "This amount can be read in two ways…". A quantity that does not fit the unit: "The quantity does not
