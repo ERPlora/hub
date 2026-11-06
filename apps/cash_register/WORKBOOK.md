@@ -232,7 +232,8 @@ con el que empieza la caja.» bajo el campo; un cajón desactivado o que no exis
 disponible.»; un importe ilegible («Esto no es un importe. Escribe una cifra, por ejemplo 12,50.»),
 negativo o ambiguo («1.250») se para antes de enviar. «Abrir sesión» está en gris mientras el negocio no
 haya dicho todavía su moneda, porque el fondo se lee en ella (sin ella, «1500» yenes se guardaría como
-150 000).
+150 000). Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
+motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, «Abrir sesión» se enciende (hub#938).
 Implicados: CASH_REGISTER-F04, F09
 
 ### CASH_REGISTER-F04 Vender solo con la caja abierta
@@ -276,7 +277,8 @@ Si falla: «Esta salida dejaría la caja en negativo y el saldo negativo no est�
 ajustes no lo permiten; un importe cero, ilegible o negativo se para antes de enviar; la sesión
 cerrada en otro dispositivo: «Esa caja está cerrada: una caja cerrada no acepta movimientos nuevos.».
 «Registrar» está en gris mientras el negocio no haya dicho todavía su moneda, porque el importe se lee
-en ella (sin ella, «1500» yenes se guardaría como 150 000).
+en ella (sin ella, «1500» yenes se guardaría como 150 000). Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
+motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, «Registrar» se enciende (hub#938).
 Un movimiento equivocado no se edita ni se borra: se apunta el contrario con un concepto que diga por
 qué.
 Implicados: ninguno
@@ -391,7 +393,8 @@ Si falla: «Escribe el efectivo contado para cerrar la sesión.» con el campo v
 lo pide; el ajuste de recuento obligatorio lo hace cumplir también al asistente y a la API). «Cerrar
 sesión» está en gris mientras el negocio no haya dicho todavía su moneda, y el último arqueo de cierre
 no se escribe en el campo hasta entonces: el contado se escribe y se lee en ella (sin ella, «1500» yenes
-se guardaría como 150 000 y el arqueo de 1500 yenes saldría como «15.00»). Si otro
+se guardaría como 150 000 y el arqueo de 1500 yenes saldría como «15.00»). Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
+motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, «Cerrar sesión» se enciende (hub#938). Si otro
 dispositivo la cerró antes, «Esa caja está cerrada: una caja cerrada no acepta movimientos nuevos.»
 (dos cierres a la vez: uno cierra, el otro recibe este aviso). Al asistente, si el recuento es
 obligatorio y no dices cuánto has contado, te lo pide con ese mismo aviso y no sale la confirmación; si

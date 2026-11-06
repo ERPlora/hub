@@ -536,7 +536,8 @@ Sale: una línea sin artículo de catálogo, con su importe y su categoría de I
 cualquier otra.
 Si falla: «Añadir» no se puede pulsar sin importe y sección, ni mientras el negocio no haya dicho todavía
 su moneda, porque el importe se lee en ella (sin ella, «1500» yenes entraría como 150 000; lo tecleado se
-queda y se lee en cuanto llega); sin secciones ni categorías, «No hay
+queda y se lee en cuanto llega). Si la moneda no se puede leer, la hoja lo dice («No se ha podido leer la moneda del negocio», con el motivo)
+y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, «Añadir» se enciende (hub#938). Sin secciones ni categorías, «No hay
 categorías de IVA que elegir. Configura antes tus tipos de IVA, en Impuestos.». Si en «Hace falta una
 aprobación» se pulsa «Cancelar», la línea no entra y la hoja dice «Esto necesita la aprobación de un
 encargado.». Sin el permiso ni la aprobación, el servidor rechaza la línea por cualquier otra vía
@@ -684,7 +685,10 @@ Sale: el descuento en la cuenta o en la línea; al cobrar se reparte entre las l
 declarados ya lo llevan descontado, y la venta guarda el importe descontado.
 Si falla: con «Permitir descuentos» apagado no hay botones y el servidor rechaza «Este negocio no
 permite descuentos.». Un importe fijo no se puede aplicar mientras el negocio no haya dicho todavía su
-moneda, porque se lee en ella (sin ella, «1500» yenes descontaría 150 000); un porcentaje no la espera. Por encima del máximo, si en «Hace falta una aprobación» se pulsa «Cancelar», la
+moneda, porque se lee en ella (sin ella, «1500» yenes descontaría 150 000); un porcentaje no la espera. Con un
+importe fijo, si la moneda no se puede leer, la hoja lo dice («No se ha podido leer la moneda del negocio», con el
+motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, «Aplicar» se enciende; en porcentaje no sale
+(hub#938). Por encima del máximo, si en «Hace falta una aprobación» se pulsa «Cancelar», la
 cuenta sigue como estaba y se lee «Esto necesita la aprobación de un encargado.». Un importe mayor
 que la cuenta no se puede aplicar. Al cobrar una cuenta, el descuento va en la cuenta, nunca en la
 petición del cobro: una que lo traiga se rechaza con «El descuento de una cuenta abierta se pone en la
@@ -1361,6 +1365,8 @@ ofrece…»; un importe fuera del mínimo y el máximo del servicio, «Ese impor
 el servicio (<mínimo> – <máximo>).». Un precio reservado que no casa con la cita: «Ese no es el precio
 que reservó la cita para este servicio: está cancelada, es de otra clienta, no reservó este servicio o
 lo reservó más barato.» (409 en su campo). Sin Servicios activa, «Servicios» no sale en la tira.
+Si la moneda no se puede leer, la hoja lo dice («No se ha podido leer la moneda del negocio», con el motivo)
+y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, «Añadir <importe>» y «Usar <precio>» se encienden (hub#938).
 Implicados: SERVICE-F09, SERVICE-F03, SERVICE-F31, APPOINTMENT-F17
 
 ## Qué comparten los verticales
