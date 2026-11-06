@@ -11,7 +11,8 @@ from django.utils.functional import Promise
 from live.operations import registry
 
 from apps.cash_register import models, queries, schemas, services
-from base.tests.po import catalogue_key, po_entries
+from base.tests.po import catalogue_key as source
+from base.tests.po import po_entries
 
 LOCALE = (
     Path(apps.get_app_config("cash_register").path) / "locale" / "es" / "LC_MESSAGES"
@@ -51,7 +52,7 @@ def visible_texts() -> set[str]:
         *(label for _, label, _ in services.REPORT_LINES),
     ]
     with translation.override("en"):
-        return {catalogue_key(text) for text in lazies} | schema_titles()
+        return {source(text) for text in lazies} | schema_titles()
 
 
 def schema_titles() -> set[str]:

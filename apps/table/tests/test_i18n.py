@@ -18,7 +18,8 @@ from apps.table.models import (
     TableSettings,
     Zone,
 )
-from base.tests.po import catalogue_key, po_entries
+from base.tests.po import catalogue_key as source
+from base.tests.po import po_entries
 
 LOCALE = Path(apps.get_app_config("table").path) / "locale" / "es" / "LC_MESSAGES"
 MODELS = (TableSettings, Zone, Table, TableSession, SessionMove, Hold)
@@ -65,7 +66,7 @@ def visible_texts() -> set[str]:
     ):
         lazies += list(choices.labels)
     with translation.override("en"):
-        return {catalogue_key(text) for text in lazies} | {"Table %(number)s"} | schema_titles()
+        return {source(text) for text in lazies} | {"Table %(number)s"} | schema_titles()
 
 
 def schema_titles() -> set[str]:

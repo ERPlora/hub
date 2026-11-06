@@ -13,7 +13,8 @@ from live.operations import registry
 
 from apps.printing import documents, models, queries, schemas, services
 from apps.printing.tests.conftest import RECEIPT
-from base.tests.po import catalogue_key, po_entries
+from base.tests.po import catalogue_key as source
+from base.tests.po import po_entries
 
 LOCALE = Path(apps.get_app_config("printing").path) / "locale" / "es" / "LC_MESSAGES"
 TEMPLATE = Path(apps.get_app_config("printing").path) / "templates" / "printing" / "test_page.html"
@@ -45,7 +46,7 @@ def visible_texts() -> set[str]:
         *models.PrintJob.Status.labels,
     ]
     with translation.override("en"):
-        texts = {catalogue_key(text) for text in lazies}
+        texts = {source(text) for text in lazies}
     texts |= set(re.findall(r'{% translate "([^"]+)" %}', TEMPLATE.read_text()))
     return texts | schema_titles()
 

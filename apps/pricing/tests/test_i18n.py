@@ -11,7 +11,8 @@ from live.operations import registry
 
 from apps.pricing import queries, schemas, services
 from apps.pricing.models import DiscountRule, PriceItem, PriceList
-from base.tests.po import catalogue_key, po_entries
+from base.tests.po import catalogue_key as source
+from base.tests.po import po_entries
 
 LOCALE = Path(apps.get_app_config("pricing").path) / "locale" / "es" / "LC_MESSAGES"
 MODELS = (PriceList, PriceItem, DiscountRule)
@@ -45,7 +46,7 @@ def visible_texts() -> set[str]:
     for choices in (DiscountRule.Type, DiscountRule.Scope):
         lazies += list(choices.labels)
     with translation.override("en"):
-        return {catalogue_key(text) for text in lazies} | schema_titles()
+        return {source(text) for text in lazies} | schema_titles()
 
 
 def schema_titles() -> set[str]:
