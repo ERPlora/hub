@@ -181,6 +181,23 @@ describe('AutomationsPage: loading, empty and error of what sits above the galle
     expect(m.wrapper.findComponent(FlowGallery).exists()).toBe(true);
   });
 
+  it('says «Loading…» while the catalog is read again after «Retry», with the rest already in', async () => {
+    const m = await mountFlow(AutomationsPage, { answers: { '/api/flow/catalog': [500, { error: { code: 'internal_error', message: 'Internal error' } }] } });
+    await m.live();
+    await settle();
+    for (const op of ABOVE) await m.result(op, EMPTY[op], MATCH[op]);
+    await settle();
+    expect(loading(m).exists()).toBe(false);
+    let answer!: (response: Response) => void;
+    m.net.onApi(() => new Promise<Response>((resolve) => (answer = resolve)));
+    await click(m.find('flow-catalog-retry').element);
+    expect(loading(m).exists()).toBe(true);
+    answer(Response.json(CATALOG));
+    await settle();
+    expect(loading(m).exists()).toBe(false);
+    expect(m.wrapper.findComponent(FlowGallery).props('catalog')).toEqual(CATALOG);
+  });
+
   it('a list that could not be read stops «Loading…» and says so in red with «Retry», above the gallery', async () => {
     const m = await opened();
     for (const op of ABOVE) if (op !== 'flow.flow.list') await m.result(op, EMPTY[op], MATCH[op]);
