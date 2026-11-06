@@ -2,20 +2,19 @@
 // Staff → Settings (WORKBOOK «Pantallas · Ajustes de Personal»; STAFF-F22): the default working day that
 // a new schedule proposes (STAFF-F13), only for whoever may save it; the old tab's other eight settings
 // changed nothing and are retired (FIX-STAFF-SETTINGS-ORPHANS). The values come live (`staff.settings.get`: the proposed ones until the
-// business saves): a change saved elsewhere repaints every field the person has not touched, and «Save»
-// sends only the fields the person touched and changed (`staff.settings.update`), so it never undoes
-// someone else's change. The server judges the ranges and the day: its 422 goes under each field. A read that fails
+// business saves). The form is every settings page's (`useSettingsForm`, hub#867): a change saved elsewhere
+// repaints every field the person has not touched, «Save» sends only the fields touched and changed
+// (`staff.settings.update`), so it never undoes someone else's change, and a refusal says itself as a
+// FormModal does. The server judges the ranges and the day: its 422 goes under each field. A read that fails
 // before any value came says so with «Retry» and shows no form: nothing unread is ever offered to save.
-// A refusal says itself as a FormModal does (`useRefusal`, hub#854): its notice goes as soon as something is
-// changed, each field's message as soon as that field is, and the next refusal says it all again.
-import { InlineFeedback, useRefusal } from '@erplora/ui/components';
+import { InlineFeedback, useSettingsForm } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { IonButton, IonInput, IonSpinner } from '@ionic/vue';
-import { computed, ref, watch } from 'vue';
+import { computed } from 'vue';
 
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
-import type { SettingsIn, SettingsOut } from '../operations';
+import type { SettingsOut } from '../operations';
 import { staffTabs } from '../tabs';
 
 const TIMES = ['default_work_start', 'default_work_end'] as const;
@@ -33,17 +32,13 @@ const canManage = computed(() => session.can('staff.manage_settings'));
 const canSeePay = computed(() => session.can('staff.view_compensation'));
 
 const { data, status, error, refresh } = useLive('staff.settings.get', {});
-const { run, pending, error: saveError } = useCommand('staff.settings.update');
-const { fieldErrors, showsError, changed } = useRefusal(saveError);
-
-const form = ref<Form | null>(null);
+const { form, dirty, saved, pending, error: saveError, fieldErrors, showsError, set, save } = useSettingsForm(
+  data,
+  useCommand('staff.settings.update'),
+  { toForm, numbers: NUMBERS },
+);
 /** The read failed before any value came (not a block): there is nothing to show or save, only «Retry». */
 const loadFailed = computed(() => !form.value && status.value === 'error' && !!error.value && !blockingError(error.value));
-/** What the server has (the last result of the stream, or of a save). */
-const original = ref<Form | null>(null);
-/** The fields the person typed in or switched since the last save: only these are sent. */
-const touched = ref<ReadonlySet<keyof Form>>(new Set());
-const saved = ref(false);
 
 function toForm(settings: SettingsOut): Form {
   return {
@@ -53,59 +48,8 @@ function toForm(settings: SettingsOut): Form {
   };
 }
 
-/** The touched fields that differ from what the server has. */
-const changes = computed<SettingsIn>(() => {
-  const now = form.value;
-  const was = original.value;
-  if (!now || !was) return {};
-  const out: Record<string, unknown> = {};
-  for (const key of touched.value) {
-    const text = now[key].trim();
-    if (text === was[key]) continue;
-    out[key] = (NUMBERS as readonly string[]).includes(key) && /^\d+$/.test(text) ? Number(text) : text;
-  }
-  return out as SettingsIn;
-});
-const dirty = computed(() => Object.keys(changes.value).length > 0);
-
-// What the server says repaints every field the person has not touched.
-watch(
-  data,
-  (settings) => {
-    if (!settings) return;
-    const fresh = toForm(settings);
-    const current = form.value;
-    original.value = fresh;
-    form.value = current
-      ? (Object.fromEntries(Object.keys(fresh).map((key) => [key, touched.value.has(key as keyof Form) ? current[key as keyof Form] : fresh[key as keyof Form]])) as Form)
-      : { ...fresh };
-  },
-  { immediate: true },
-);
-
-function set(field: keyof Form, value: string): void {
-  if (!form.value) return;
-  form.value = { ...form.value, [field]: value };
-  touched.value = new Set([...touched.value, field]);
-  saved.value = false;
-  changed(field);
-}
-
 const text = (value: unknown): string => (value === null || value === undefined ? '' : String(value));
 const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'ion-touched': !!message });
-
-async function save(): Promise<void> {
-  if (!dirty.value || pending.value) return;
-  try {
-    const answer = await run(changes.value);
-    original.value = toForm(answer);
-    form.value = toForm(answer);
-    touched.value = new Set();
-    saved.value = true;
-  } catch {
-    saved.value = false; // The page paints the error; what was typed stays.
-  }
-}
 </script>
 
 <template>

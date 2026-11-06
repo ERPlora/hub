@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:4334c66484db081ba3063e2af9d162f3cf8f924411311fe517c8bbec65ef27d1 -->
+<!-- generated from WORKBOOK.md sha256:0515d3709925bf18513909abfcf080a763438e07468dcf67713ca33f88ad884a -->
 
 ## What it is for and who it is for
 
@@ -221,7 +221,9 @@ Steps:
 2. The rules apply to new reservations and to changes; the ones already made are not touched.
 In: the rules.
 Out: the saved rules (announces: `reservation.settings.updated`).
-If it fails: minimum guests greater than the maximum: the field says so.
+If it fails: minimum guests greater than the maximum: the field says so. As in the form windows, the notice
+goes as soon as something is changed and a field's reason as soon as that field is corrected; both come back if
+the next try is refused too. A refusal that names no field stays until the next try (hub#873).
 Involved: RESERVATION-F06, RESERVATION-F13, RESERVATION-F17
 
 ### RESERVATION-F04 Choose whether reservations confirm themselves
