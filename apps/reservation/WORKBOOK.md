@@ -69,6 +69,9 @@ dudas abiertas del producto actual se resolvieron así; la investigación, con s
   llena la puede llenar a sabiendas: el sistema avisa y pide «Reservar igualmente».
 - **Mesa reservada desde una hora antes** (duda 8, decidida por Mesas, TABLE-F25): antes la mesa sigue
   libre y enseña «Ana · 21:00».
+- **La pendiente que nadie confirma se libera cuando pasa su plazo, sea del día que sea** (duda 9): el
+  plazo se cuenta desde la hora de la reserva, así que la de las 23:55 se libera pasada la medianoche,
+  aunque su día ya sea ayer.
 
 ## Antes de empezar
 
@@ -426,7 +429,8 @@ Pantalla: Reservas (la lista del día, abierta: la ve sin recargar)
 Pasos:
 1. Cada cuarto de hora, en cada negocio, las reservas que siguen Pendientes pasados los minutos de los
    ajustes (15) desde su hora se cancelan con el motivo «Liberada: nunca se confirmó» y dejan su hueco libre.
-2. Las confirmadas, sentadas y las de otros días no se tocan.
+2. Las confirmadas, las sentadas y las de días que aún no han llegado no se tocan. Una pendiente de un día
+   anterior se libera igual: la de las 23:55 se libera a las 00:15, aunque su día ya sea ayer.
 3. La pantalla de Reservas que ese negocio tiene abierta la pasa a Cancelada al momento, sin recargar; la de
    otro negocio no se entera.
 Entra: la hora.
@@ -943,7 +947,7 @@ la que solo se le autorizó reservar.
 
 ### Dudas abiertas
 
-Resueltas en esta versión (por mercado, «Referencia adoptada»): 1, 2, 3, 4, 5, 6, 7 y 8. Sigue fuera
+Resueltas en esta versión (por mercado, «Referencia adoptada»): 1, 2, 3, 4, 5, 6, 7, 8 y 9. Sigue fuera
 del MVP: asignación automática y mesas unidas (5). El aviso por WhatsApp (F19) ya sale.
 
 ### Paridad con el producto actual
@@ -1110,3 +1114,27 @@ llegada, sin avisos (no hay mensajería): la cola con espera estimada queda fuer
 
 **Gana:** las reglas en línea solo atan a la reserva en línea; el personal las pasa con un aviso
 visible; nunca una hora pasada.
+
+### Duda 9 — ¿La liberación de las pendientes alcanza a las de días anteriores?
+
+Hecha el 2026-11-06 (hub#878). Ninguna ayuda pública dice qué pasa con la pendiente de ayer en concreto;
+lo que dicen es cómo caduca una pendiente. La de TheFork Manager y la de Toast Tables no documentan una
+liberación automática.
+
+| Producto | Cómo lo resuelve | Fuente |
+|---|---|---|
+| resOS | Cancela sola la que no se reconfirma en un plazo; la cancelada sigue a la vista | https://resos.com/feature/booking-confirmation/ |
+| Resy | El local cancela la que no se confirma antes de una hora fijada desde la reserva | https://resy.com/cities/new-york-ny/venues/lartusi-ny |
+| SevenRooms | Libera el hueco cuando el cliente no responde en un plazo (guía de terceros; la ayuda es privada) | https://theprimeads.com/sevenrooms-restaurant-guide/ |
+| VikRestaurants | Toda pendiente caducada se da por quitada, sin mirar el día | https://extensionsforjoomla.com/help/knowledge-base/vik-restaurants/configuration/restaurant/reservations-are-not-removed-automatically |
+| Mangomint | La cita no completada a tiempo se cancela sola y sale del calendario a las 24 h | https://www.mangomint.com/learn/what-happens-after-an-express-booking-link-is-sent |
+| BMI Leisure | La reserva incompleta se borra pasado el tiempo que se configura | https://devblog.bmileisure.com/support/support-booking/pending-reservation-cancellation/amp/ |
+| Airbnb | La solicitud sin respuesta caduca a las 24 horas | https://www.airbnb.com/help/article/315 |
+| Square Appointments | La solicitud sigue pendiente hasta que se acepta o se rechaza; no caduca sola | https://squareup.com/help/us/en/article/8444-accept-or-decline-appointments |
+| Tablein | La pendiente sigue así hasta que el local la acepta o la rechaza | https://help.tablein.com/reservation-confirmation |
+
+**Gana:** una pendiente caduca por el tiempo, no por el día en que cae: siete de nueve la cancelan o la
+liberan al vencer su plazo y ninguna deja fuera las de días anteriores; Square y Tablein no liberan
+ninguna sola. Es lo que ya hacía el producto actual («nunca toca las Confirmadas ni las futuras»).
+**Por qué no «solo las de hoy»:** la reserva de las 23:55 vence pasada la medianoche y se quedaría
+Pendiente para siempre, igual que cualquiera que dejara una noche sin pasada; ningún producto lo hace.

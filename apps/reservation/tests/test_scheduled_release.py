@@ -2,7 +2,8 @@
 ``base.scheduler`` every quarter of an hour, as the system, on the suite's scope (the worker's pass over the hubs
 with a database of their own runs it on each hub's: ``test_scheduled_release_per_hub.py``). A pending reservation whose time passed more than the window (15 minutes) is cancelled as
 «unconfirmed» with one event that says how many; one still inside its window, a confirmed one and one of
-tomorrow stay as they were; the next quarter, with nothing new, releases nothing and says nothing.
+tomorrow stay as they were; the next quarter, with nothing new, releases nothing and says nothing. A pending one
+of a day already gone is released too: the one at 23:55, whose window ends after midnight, goes at 00:15.
 """
 
 import datetime as dt
@@ -14,7 +15,7 @@ from apps.reservation import events
 from apps.reservation.models import Reservation
 from base import scheduler
 
-from .conftest import NOW, TODAY, make_reservation, pin_clock
+from .conftest import NOW, TODAY, TOMORROW, make_reservation, pin_clock
 
 pytestmark = pytest.mark.django_db
 
@@ -24,15 +25,21 @@ STARTED = NOW + dt.timedelta(minutes=1)
 DUE = NOW + dt.timedelta(minutes=15)
 
 
-@pytest.fixture
-def worker(settings, monkeypatch):
-    """The worker's scope and Reservations' task, scheduled as the worker does at 12:01 in Madrid."""
+def schedule(settings, monkeypatch, started: dt.datetime):
+    """The worker's scope and Reservations' task, scheduled as the worker does at ``started``; returns what
+    moves the clock."""
     settings.WORKER_SCOPE_SLUG = "a"
     # Inside the test's transaction a released connection could not be opened again.
     monkeypatch.setattr(scheduler, "close_old_connections", lambda: None)
-    pin_clock(monkeypatch, STARTED)
-    scheduler.sync(STARTED, declared=[task for task in scheduler.tasks() if task.app_label == "reservation"])
+    pin_clock(monkeypatch, started)
+    scheduler.sync(started, declared=[task for task in scheduler.tasks() if task.app_label == "reservation"])
     return lambda instant: pin_clock(monkeypatch, instant)
+
+
+@pytest.fixture
+def worker(settings, monkeypatch):
+    """The worker scheduled at 12:01 in Madrid."""
+    return schedule(settings, monkeypatch, STARTED)
 
 
 def released_events() -> list[dict]:
@@ -78,3 +85,23 @@ def test_the_worker_releases_the_pending_ones_nobody_confirmed_every_quarter_of_
     worker(last)
     assert scheduler.run_due(last) == [TASK]
     assert len(released_events()) == 2
+
+
+def test_a_pending_one_of_a_day_already_gone_is_released_too(settings, monkeypatch):
+    # 23:55 plus the 15 minutes is 00:10 of the next day: by then its day is yesterday's, and it goes all the same.
+    late = make_reservation(date=TODAY, time="23:55")
+    next_night = make_reservation(date=TOMORROW, time="23:55")
+    # The worker schedules the task at 23:46 in Madrid (21:46 UTC); midnight there is 22:00 UTC.
+    midnight = dt.datetime(2026, 10, 14, 22, 0, tzinfo=dt.UTC)
+    worker = schedule(settings, monkeypatch, midnight - dt.timedelta(minutes=14))
+
+    worker(midnight)
+    assert scheduler.run_due(midnight) == [TASK]
+    assert state(late) == ("pending", "")
+
+    quarter_past = midnight + dt.timedelta(minutes=15)
+    worker(quarter_past)
+    assert scheduler.run_due(quarter_past) == [TASK]
+    assert state(late) == ("cancelled", "unconfirmed")
+    assert state(next_night) == ("pending", "")
+    assert released_events() == [{"count": 1}]
