@@ -228,12 +228,14 @@ msgid "active"
 msgstr "activa"
 
 #: models.py:140
+msgctxt "kitchen station"
 msgid "deleted"
-msgstr "eliminado"
+msgstr "eliminada"
 
 #: models.py:141
+msgctxt "kitchen station"
 msgid "deleted at"
-msgstr "eliminado el"
+msgstr "eliminada el"
 
 #: models.py:144 models.py:183 models.py:207 models.py:421 models.py:498
 msgid "station"

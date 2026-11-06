@@ -175,8 +175,9 @@ def test_spanish_says_the_kitchens_own_words_not_an_earlier_apps():
     """The labels the kitchen shares in English with an app loaded before it come out in Spanish with the kitchen's
     words (hub#659): a voided dish is «Anulado», not Clientes' «Anulada»; a station is «activa», not Django's «activo»;
     a ticket is «empezada el» like it is «recibida el» and «servida el», not Asistencia's «empezó a las», and a ticket
-    taken off is «borrada» as its History says, not Inventario's «eliminado». A station taken off is «eliminado» as its
-    screen says («Eliminar estación»), and who last changed a row reads «actualizado» like everywhere: the same words."""
+    taken off is «borrada» as its History says, not Inventario's «eliminado». A station taken off is «eliminada», as the
+    WORKBOOK says it («estación eliminada») and as it is «activa», not Inventario's masculine «eliminado»; who last
+    changed a row reads «actualizado» like everywhere: the same words."""
     labels = {
         "ItemStatus.VOIDED": ItemStatus.VOIDED.label,
         "Station.is_active": Station._meta.get_field("is_active").verbose_name,
@@ -194,8 +195,8 @@ def test_spanish_says_the_kitchens_own_words_not_an_earlier_apps():
         assert {name: str(label) for name, label in labels.items()} == {
             "ItemStatus.VOIDED": "Anulado",
             "Station.is_active": "activa",
-            "Station.is_deleted": "eliminado",
-            "Station.deleted_at": "eliminado el",
+            "Station.is_deleted": "eliminada",
+            "Station.deleted_at": "eliminada el",
             "Ticket.started_at": "empezada el",
             "Ticket.is_deleted": "borrada",
             "Ticket.deleted_at": "borrada el",

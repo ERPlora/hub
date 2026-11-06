@@ -10,8 +10,8 @@ the saved one share their ids. What was sent stays as it was sent: the station, 
 printer, the options chosen and the menu's header are frozen on each dish. Stations and tickets are deleted logically. Phase 1 has no tenancy: every scope shares these
 tables; phase 2 moves them to each hub's database.
 
-A label an app loaded before this one says in English too, but in Spanish with other words, goes through
-``pgettext_lazy`` with the ``kitchen`` context, so Spanish says the kitchen's word and not that app's (hub#659).
+A label an app loaded before this one says in English too, but in Spanish with other words, goes through ``pgettext_lazy``
+with the ``kitchen`` context (``kitchen station`` where a station's word is not a ticket's), so Spanish says the kitchen's word, not that app's (hub#659).
 """
 
 from django.db import models
@@ -137,8 +137,8 @@ class Station(Audited):
     printer_name = models.CharField(_("printer"), max_length=100, blank=True)
     sort_order = models.PositiveIntegerField(_("position"), default=0)
     is_active = models.BooleanField(pgettext_lazy("kitchen", "active"), default=True)
-    is_deleted = models.BooleanField(_("deleted"), default=False)
-    deleted_at = models.DateTimeField(_("deleted at"), null=True, blank=True)
+    is_deleted = models.BooleanField(pgettext_lazy("kitchen station", "deleted"), default=False)
+    deleted_at = models.DateTimeField(pgettext_lazy("kitchen station", "deleted at"), null=True, blank=True)
 
     class Meta:
         verbose_name = _("station")
