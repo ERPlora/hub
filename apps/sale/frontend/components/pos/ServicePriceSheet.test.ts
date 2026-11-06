@@ -3,7 +3,7 @@
 // server keeps it within the service's minimum and maximum: its refusal is read over the button.
 import { describe, expect, it, vi } from 'vitest';
 
-import { click, mountSale, settle } from '../../__tests__/mount-sale';
+import { business, click, expectWaitsForTheYen, JAPANESE, mountSale, settle } from '../../__tests__/mount-sale';
 import { plain } from '../../lib/format';
 import { service } from './__tests__/fixtures';
 import ServicePriceSheet from './ServicePriceSheet.vue';
@@ -15,10 +15,11 @@ vi.mock('@ionic/vue', async (importOriginal) => {
 
 const COLOUR = service({ id: 'sv2', name: 'Color', pricing_type: 'from', price: 6500, min_price: 4000, max_price: 9000 });
 
-async function setup(props: Record<string, unknown> = {}) {
+async function setup(props: Record<string, unknown> = {}, options: { business?: null } = {}) {
   const m = await mountSale(ServicePriceSheet, {
     props: { open: true, service: COLOUR, pending: false, error: null, ...props },
     locale: 'es',
+    ...options,
   });
   await m.live();
   await settle();
@@ -51,5 +52,32 @@ describe('ServicePriceSheet', () => {
   it('reads the server’s refusal over the button', async () => {
     const s = await setup({ error: 'Ese importe está fuera de lo que admite el servicio (40.00 € – 90.00 €).' });
     expect(s.inDoc('pos-service-price-error')?.textContent).toContain('fuera de lo que admite');
+  });
+});
+
+describe('ServicePriceSheet: before the business answers its money (hub#921)', () => {
+  const amount = (s: Awaited<ReturnType<typeof setup>>) => plain(s.inDoc('pos-service-price-amount')?.textContent ?? '');
+
+  it('«Add» waits in grey and hands up no amount; once the yen arrives «1500» is 1500', async () => {
+    const s = await setup({}, { business: null });
+    for (const key of ['1', '5', '0', '0']) await click(s.inDoc(`pos-key-${key}`));
+    await expectWaitsForTheYen(s, 'pos-service-price-add', () => s.wrapper.emitted('add') ?? []);
+    expect(amount(s)).toBe('1.500 ¥');
+    await click(s.inDoc('pos-service-price-add'));
+    expect(s.wrapper.emitted('add')).toEqual([[1500]]);
+  });
+
+  it('the suggestion waits too: a tap before the business answers types nothing, then it types the price in yen', async () => {
+    const s = await setup({}, { business: null });
+    const suggest = () => s.inDoc('pos-service-price-suggest') as HTMLElement & { disabled?: boolean };
+    expect(suggest().disabled).toBe(true);
+    await click(suggest());
+    expect(amount(s)).toBe('0,00');
+    await s.result('base.business.get', business(JAPANESE));
+    expect([suggest().disabled, amount(s)]).toEqual([false, '0 ¥']);
+    await click(suggest());
+    expect(amount(s)).toBe('6.500 ¥');
+    await click(s.inDoc('pos-service-price-add'));
+    expect(s.wrapper.emitted('add')).toEqual([[6500]]);
   });
 });
