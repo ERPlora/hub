@@ -108,6 +108,16 @@ def test_a_section_that_cannot_hide_is_a_422_on_its_field(admin_client):
 
 
 @pytest.mark.django_db
+def test_a_wrong_email_is_refused_in_the_websites_own_words(admin_client):
+    """The editor's error under the email field speaks as its others do and as the WORKBOOK says (WEBSITE-F01), not
+    with Equipo's «Introduzca…» for the same English (hub#661)."""
+    draft = {"template": "classic", "theme": {}, "content": {"contact": {"email": "not-an-email"}}}
+    response = post(admin_client, "/website/site", draft, HTTP_ACCEPT_LANGUAGE="es")
+    assert response.status_code == 422
+    assert response.json()["error"]["fields"]["content.contact.email"] == "Escribe un correo electrónico válido."
+
+
+@pytest.mark.django_db
 @pytest.mark.usefixtures("website_manifest")
 def test_preview_needs_website_manage_and_allows_framing_by_the_spa(admin_client, client, make_user):
     post(admin_client, "/website/site", {"template": "bold", "theme": {}, "content": full_content()})

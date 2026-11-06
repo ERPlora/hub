@@ -11,7 +11,8 @@ from django.utils import translation
 
 from apps.website import queries, schemas, services
 from apps.website.models import Image, Site
-from base.tests.po import po_entries
+from base.catalog import build_registry
+from base.tests.po import catalogue_key, po_entries
 
 APP = Path(apps.get_app_config("website").path)
 LOCALE = APP / "locale" / "es" / "LC_MESSAGES"
@@ -47,7 +48,7 @@ def visible_texts() -> set[str]:
         schemas.NOT_A_PLACE,
     ]
     with translation.override("en"):
-        return {str(text) for text in lazies}
+        return {catalogue_key(text) for text in lazies}
 
 
 def template_texts() -> set[str]:
@@ -65,8 +66,12 @@ def test_every_entry_has_a_spanish_translation():
 
 
 def test_every_visible_text_and_every_template_text_is_in_the_catalog():
+    """By its whole key, context included: a text that goes back to ``_()`` while its entry keeps the context, or whose
+    context has a typo, is missing from the catalogue — on screen it says another app's Spanish (hub#661)."""
     known = set(po_entries(LOCALE / "django.po"))
-    assert visible_texts() - known == set()
+    texts = visible_texts()
+    assert len({key for key in texts if "\x04" in key}) >= 5  # positive control: the contexts were kept
+    assert texts - known == set()
     assert template_texts() and template_texts() - known == set()
 
 
@@ -77,11 +82,34 @@ def test_the_compiled_catalog_is_current():
     assert {key: value for key, value in catalog.items() if key} == po
 
 
-def test_the_store_reads_the_name_without_a_context():
-    # base.catalog looks the module's name up in this catalogue as plain gettext (register_apps).
-    with (LOCALE / "django.mo").open("rb") as compiled:
-        catalog = gettext.GNUTranslations(compiled)
-    assert catalog.gettext("Website") == "Página web"
+def test_the_store_reads_the_name_with_its_context():
+    """base.catalog reads the module's name in this catalogue as Django does, with its ``app name`` context: a plain
+    «Website» entry would be Spanish only for the store, and the merged catalogue gives Clientes' «Web» to it."""
+    [entry] = build_registry([apps.get_app_config("website")])
+    assert (entry.name_en, entry.name_es) == ("Website", "Página web")
+    assert "Website" not in po_entries(LOCALE / "django.po")
+
+
+def test_spanish_says_the_websites_own_words_not_an_earlier_apps():
+    """The texts Página web shares in English with an app loaded before it come out in Spanish with its own words
+    (hub#661): the site and its images are feminine, «actualizada el», «actualizada por» and «creada el» like its
+    «publicada el», not Demo's or Clientes' masculine; its form errors speak as its others do and as its WORKBOOK says
+    («Escribe un correo electrónico válido.»), not Equipo's «Introduzca…»; and a site is «Página web», not Clientes'
+    «Web»."""
+    labels = {
+        "Site.updated_at": Site._meta.get_field("updated_at").verbose_name,
+        "Site.updated_by": Site._meta.get_field("updated_by").verbose_name,
+        "Image.created_at": Image._meta.get_field("created_at").verbose_name,
+        "NOT_AN_EMAIL": schemas.NOT_AN_EMAIL,
+    }
+    with translation.override("es"):
+        assert {name: str(label) for name, label in labels.items()} | {"Site": str(Site())} == {
+            "Site.updated_at": "actualizada el",
+            "Site.updated_by": "actualizada por",
+            "Image.created_at": "creada el",
+            "NOT_AN_EMAIL": "Escribe un correo electrónico válido.",
+            "Site": "Página web",
+        }
 
 
 def test_spanish_texts():
