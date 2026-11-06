@@ -9,8 +9,8 @@ import { computed, shallowRef, watch } from 'vue';
 
 import type { OpenLineIn } from '../../operations';
 import { useTaxName } from '../../../../tax/frontend/composables/useTaxName';
-import { useLocale } from '../../composables/useT';
-import { centsFromAmount, formatMoney, keypadCents, moneyDecimals, useBusinessMoney } from '../../lib/format';
+import { useKeypadAmount } from '../../composables/pos/useKeypadAmount';
+import { moneyDecimals } from '../../lib/format';
 import DepartmentPicker, { type OpenPriceChoice } from './DepartmentPicker.vue';
 import PosNumpad from './PosNumpad.vue';
 import PosSheet from './PosSheet.vue';
@@ -19,10 +19,10 @@ defineProps<{ pending: boolean; error: string | null }>();
 const open = defineModel<boolean>('open', { default: false });
 const emit = defineEmits<{ add: [line: Pick<OpenLineIn, 'unit_price' | 'department_id' | 'tax_category_key'>] }>();
 
-const locale = useLocale();
-const business = useBusinessMoney();
 const taxName = useTaxName();
 const typed = shallowRef('');
+/** «Add» hands up `cents`, 0 until the business answers its money (so it waits in grey); `amount` is the figure. */
+const { business, cents, shown: amount } = useKeypadAmount(typed);
 const choice = shallowRef<OpenPriceChoice | null>(null);
 
 watch(open, (isOpen) => {
@@ -31,10 +31,6 @@ watch(open, (isOpen) => {
   choice.value = null;
 });
 
-/** What «Add» hands up, in cents of the business's money: 0 until the business answers it, so «Add» waits in grey. */
-const cents = computed(() => (business.value ? keypadCents(typed.value, business.value) : 0));
-/** What was typed, on top and on «Add»: a figure without a sign until the business answers its money. */
-const amount = computed(() => formatMoney(centsFromAmount(typed.value.replace(/\.$/, ''), business.value) ?? 0, locale.value, business.value));
 const ready = computed(() => cents.value > 0 && !!choice.value);
 
 function add(): void {

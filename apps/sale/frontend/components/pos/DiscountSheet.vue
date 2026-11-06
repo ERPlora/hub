@@ -8,8 +8,9 @@
 import { IonButton, IonLabel, IonSegment, IonSegmentButton } from '@ionic/vue';
 import { computed, shallowRef, watch } from 'vue';
 
+import { useKeypadAmount } from '../../composables/pos/useKeypadAmount';
 import { useLocale, useT } from '../../composables/useT';
-import { centsFromAmount, currencySign, formatMoney, formatPercent, keypadCents, moneyDecimals, useBusinessMoney } from '../../lib/format';
+import { currencySign, formatPercent, moneyDecimals } from '../../lib/format';
 import PosNumpad from './PosNumpad.vue';
 import PosSheet from './PosSheet.vue';
 
@@ -28,10 +29,11 @@ const emit = defineEmits<{ apply: [discount: { percent: string; amount: number }
 
 const t = useT();
 const locale = useLocale();
-const business = useBusinessMoney();
 
 const mode = shallowRef<DiscountMode>('percent');
 const typed = shallowRef('');
+/** A fixed amount hands up `cents`, 0 until the business answers its money (so it waits in grey); `figure`, as typed. */
+const { business, cents, shown: figure } = useKeypadAmount(typed);
 const ticket = computed(() => props.name === null);
 
 watch(
@@ -49,14 +51,7 @@ watch(typed, (now, before) => {
 });
 
 const value = computed(() => typed.value.replace(/\.$/, '') || '0');
-/** The fixed amount handed up, in cents of the business's money: 0 until the business answers it, so it waits in grey. */
-const cents = computed(() => (business.value ? keypadCents(typed.value, business.value) : 0));
-/** What was typed, on top and on «Apply»: a fixed amount is a figure without a sign until the business answers. */
-const shown = computed(() =>
-  mode.value === 'percent'
-    ? formatPercent(value.value, locale.value)
-    : formatMoney(centsFromAmount(value.value, business.value) ?? 0, locale.value, business.value),
-);
+const shown = computed(() => (mode.value === 'percent' ? formatPercent(value.value, locale.value) : figure.value));
 /** The amount button's sign: the business's currency («€», «zł»; gh:sales#380), «¤» until the business answers. */
 const currency = computed(() => currencySign(locale.value, business.value) || '¤');
 const ready = computed(() => (mode.value === 'percent' ? Number(value.value) > 0 : cents.value > 0));

@@ -9,8 +9,9 @@ import { IonButton } from '@ionic/vue';
 import { computed, shallowRef, watch } from 'vue';
 
 import type { ServiceSaleOut } from '../../../../service/frontend/operations';
+import { useKeypadAmount } from '../../composables/pos/useKeypadAmount';
 import { useLocale } from '../../composables/useT';
-import { centsFromAmount, formatMoney, keypadCents, moneyDecimals, useBusinessMoney } from '../../lib/format';
+import { formatMoney, moneyDecimals } from '../../lib/format';
 import PosNumpad from './PosNumpad.vue';
 import PosSheet from './PosSheet.vue';
 
@@ -19,15 +20,12 @@ const open = defineModel<boolean>('open', { default: false });
 const emit = defineEmits<{ add: [cents: number] }>();
 
 const locale = useLocale();
-const business = useBusinessMoney();
 const typed = shallowRef('');
+/** «Add» hands up `cents`, 0 until the business answers its money (so it waits in grey); `amount` is the figure. */
+const { business, cents, shown: amount } = useKeypadAmount(typed);
 
 watch(open, (isOpen) => isOpen && (typed.value = ''), { immediate: true });
 
-/** What «Add» hands up, in cents of the business's money: 0 until the business answers it, so «Add» waits in grey. */
-const cents = computed(() => (business.value ? keypadCents(typed.value, business.value) : 0));
-/** What was typed, on top and on «Add»: a figure without a sign until the business answers its money. */
-const amount = computed(() => formatMoney(centsFromAmount(typed.value.replace(/\.$/, ''), business.value) ?? 0, locale.value, business.value));
 const suggestion = computed(() => formatMoney(props.service?.price ?? 0, locale.value, business.value));
 
 /** Types the service's price, in the business's money's decimals: not before it answers («15.00» for 1500 yen would
