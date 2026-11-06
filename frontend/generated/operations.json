@@ -99,6 +99,10 @@
     "method": "get",
     "path": "/api/settings/data/dumps/link"
   },
+  "base.system.cards": {
+    "method": "get",
+    "path": "/api/system/cards"
+  },
   "base.system.status": {
     "method": "get",
     "path": "/api/system/status"

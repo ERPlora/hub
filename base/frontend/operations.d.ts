@@ -62,6 +62,15 @@ export interface WidgetDef {
   live: boolean;
 }
 
+/** `base.SystemCardOut`: a card an app on puts in System › «Usage and plan» for this person (hub#683). */
+export interface SystemCardDef {
+  /** «<app>.<card>». */
+  key: string;
+  app: string;
+  /** The Vue component of the app's frontend/components/ that paints it, without «.vue». */
+  component: string;
+}
+
 /** `base.BellCounterOut`. */
 export interface BellCounter {
   /** «<app>.<counter>», or «base.failed_events». */
@@ -863,6 +872,7 @@ declare module '@erplora/ui/sdk' {
     'base.app.get': { input: AppRefIn; output: AppRef };
     'base.app.retry': { input: AppChangeIn; output: AppChange };
     'base.plan.usage': { input: NoInput; output: PlanUsage };
+    'base.system.cards': { input: NoInput; output: { cards: SystemCardDef[] } };
     // ── Data (APP-BASE-2) ──
     'base.blueprint.list': { input: NoInput; output: { templates: Template[]; empty: boolean } };
     'base.blueprint.inspect': { input: BlueprintSource; output: BlueprintSummary };

@@ -203,6 +203,7 @@ ajustes.» con «Reintentar»; al guardar, «No se pudieron guardar los ajustes.
 | PRINTING-F18 | Sacar el papel: el dispositivo recoge y confirma los trabajos | común | hecho |
 | PRINTING-F19 | Ver el estado de una impresora | común | hecho |
 | PRINTING-F20 | Cuánto tiempo guarda el hub los trabajos de impresión | común | hecho |
+| PRINTING-F21 | Ver en Sistema quién imprime y dónde bajar la app de ERPlora | común | parcial — no dice si la impresora responde ahora (hub#573) |
 
 ### PRINTING-F01 Ver cómo va la impresión
 <!-- origen: wf:restaurante-dia#rec_restaurante-f16 old-hub:HUB_SHELL-F27 old-hub:HUB_SHELL-F60 old-hub:HUB_SHELL-F63 old-hub:HUB_SHELL-F75 old-hub:HUB-F201 old-hub:HUB-F202 old-hub:HUB-F203 old:printing/workflow/impresoras.md#printing-f01 -->
@@ -647,6 +648,33 @@ Si falla: si una hora no puede limpiar, lo hace la siguiente; un trabajo nunca s
 plazo.
 Implicados: PRINTING-F01, PRINTING-F14
 
+### PRINTING-F21 Ver en Sistema quién imprime y dónde bajar la app de ERPlora
+<!-- origen: old-hub:HUB_SHELL-F137 old-hub:HUB_SHELL-F138 -->
+Estado: parcial — no dice si la impresora responde ahora («Impresora lista», «Impresora sin conectar» o «No hemos
+podido comprobar la impresora»): Impresión no tiene todavía esa lectura, la misma que pide la fila de salud del
+Inicio (hub#573)
+Actor: propietario, administrador, responsable, empleado
+Pantalla: Sistema · Uso y plan
+Pasos:
+1. Con Impresión encendida en el negocio, **Sistema → Uso y plan** tiene, debajo de lo que usa el negocio, la
+   tarjeta **Tu impresora**: «Los tiques, las comandas y las etiquetas los imprime la app de ERPlora del dispositivo
+   que está junto a la impresora.». La ve cualquiera que vea Impresión, también quien no puede ver el uso del negocio.
+   Con Impresión apagada no hay tarjeta: un negocio que no imprime no ve nada de esto.
+2. «Configurar la impresión» abre **Impresión → Impresoras** (PRINTING-F01).
+3. En un navegador, debajo, «Descargar la app de ERPlora» con «La app de ERPlora es la que habla con tus impresoras,
+   el cajón y los escáneres. Elige tu sistema para continuar.» y un botón por sistema: **Windows** (el destacado),
+   **Linux** y **Android**. No hay macOS: erplora.com no publica ninguno.
+4. Cada botón abre, fuera del hub, la descarga que sirve erplora.com en ese momento: la tienda si su ficha está
+   publicada o el último instalador; Android, siempre Google Play (PUBLIC-F24 de erplora.com).
+5. Con la app instalada, la da de alta para imprimir desde ese dispositivo (PRINTING-F18). Dentro de la app no hay
+   bloque de descarga: sería la app ofreciéndose a sí misma.
+Entra: si Impresión está encendida en el negocio, los permisos de la persona y las direcciones de erplora.com.
+Sale: nada guardado.
+Si falla: si no se puede leer qué tarjetas tocan, no sale ninguna (nunca la de una app apagada) y el resto de la
+pestaña dice lo suyo; sin las direcciones de erplora.com no salen los botones de descarga (nunca un botón que no
+lleva a ningún sitio).
+Implicados: BASE-F39, PRINTING-F18
+
 ## Servicios: lo que entra y lo que sale
 
 Las demás apps y el asistente usan Impresión por estas operaciones, por su nombre; nunca sus tablas.
@@ -848,6 +876,14 @@ canal llama a sus operaciones con el contexto de la sesión del dispositivo:
    `printing.host.drawerFailed` (con el nombre de la impresora de la fila) y deja la línea `[print-host]` en la
    consola. Tests: `frontend/components/PrintHost.test.ts`, los de `packages/ui` (`print-channel`, `device-printer`,
    `print-host`) y la e2e `tests/e2e/printing-ws-client.spec.ts` contra el `/ws/print` real.
+
+**La tarjeta de Sistema** (hub#683, PRINTING-F21). `PrintingConfig.system_cards` declara «printer», que pinta
+`frontend/components/SystemPrinterCard.vue`, con `printing.view_settings` (`base.E015`); `base.system.cards` la lista
+solo con Impresión encendida y `SystemAppCards.vue` de `base` la monta bajo «Uso y plan». No lee nada de Impresión: las
+descargas salen de `hub-home.app_downloads` (`base/spa.py`) por `useAppDownloads` de `base`, solo en un navegador, y
+cada botón sale por `openExternalLink`. Cuando Impresión tenga la lectura de si la caja responde (hub#573), la tarjeta
+la enseña. Tests: `tests/test_apps.py`, `tests/test_integration_home.py` y
+`frontend/components/SystemPrinterCard.test.ts`.
 
 **Lo que se pide a cada app** (no se toca desde aquí):
 

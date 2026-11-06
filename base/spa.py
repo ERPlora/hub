@@ -45,6 +45,9 @@ from base.permissions import OPEN_MANAGEMENT
 SESSION_ME_ID = "session-me"
 HUB_HOME_ID = "hub-home"
 WIDGET_LIST_ID = "widget-list"
+#: The systems erplora.com publishes the ERPlora app for (PUBLIC-F24: no macOS, nothing is signed for it), in the order
+#: they are offered: the till's own first.
+APP_PLATFORMS = ("windows", "linux", "android")
 #: A path whose last segment has an extension names a file, and no route of the SPA looks like one (its parameters
 #: are ids). It is the fallback rule of connect-history-api-fallback and of ASP.NET Core's ``{*path:nonfile}``. With a
 #: trailing slash too: else ``APPEND_SLASH`` would send ``/robots.txt`` to ``/robots.txt/``, and that to the shell.
@@ -102,6 +105,9 @@ def _shell(request: HttpRequest) -> HttpResponse:
             "preferences": queries.appearance_of(request.user),
             # The assistant's server voice (round 2026-11-04a): without it, the panel reads with the device's voice.
             "server_voice": settings.ASSISTANT_SERVER_VOICE,
+            # hub#683: the ERPlora app of each system erplora.com publishes, always its latest build (PUBLIC-F24); public
+            # pages, so for anyone, whatever the way in.
+            "app_downloads": {platform: saas_url(f"/app/download/{platform}/") for platform in APP_PLATFORMS},
         }
         widgets = _widgets(request)
         if widgets is not None:

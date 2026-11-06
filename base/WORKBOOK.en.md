@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:d79249320853f47ab0b50f8a051218add6f5a5e3b7bab275f6ad66746f4b2eb0 -->
+<!-- generated from WORKBOOK.md sha256:d935afb37acb39080302b9bb3c851af66951d02f90df0ee3ff1388f1b8c8dcf4 -->
 
 ## What it is for and who it is for
 
@@ -1232,10 +1232,15 @@ Steps:
      it, "Usage and plan" opens. In "Usage and plan" they read "Only the owner or an administrator can see how much the
      hub is using." and in "Failed events", "Only the owner or an administrator can see the failed events.", with
      no "Retry".
-In: the person's role in the business; whoever does not run it is never asked for anything the hub would refuse.
+  5. At the end of "Usage and plan", anyone sees the cards the apps on in the business put there and that the person
+     may see, each with its own: Printing's is "Your printer" (PRINTING-F21). An app that is off puts none; turning it
+     on or off makes its card appear or go without reloading.
+In: the person's role in the business; whoever does not run it is never asked for anything the hub would refuse. The
+cards, from the apps that are on.
 Out: nothing saved.
-If it fails: each tab says its own (BASE-F40 to BASE-F43).
-Involved: BASE-F40
+If it fails: each tab says its own (BASE-F40 to BASE-F43). If which cards apply cannot be read, none shows and the rest
+of the tab goes on; a card that does not load is left out and the others show.
+Involved: BASE-F40, PRINTING-F21
 
 ### BASE-F40 See what the business uses and whether to upgrade the plan
 Status: done
