@@ -19,11 +19,6 @@ msgctxt "app name"
 msgid "Online booking"
 msgstr "Reservas online"
 
-# The app's name as the store reads it (base.catalog looks the plain msgid up in this catalogue). In the
-# merged catalogue of the running Hub, Citas comes first and keeps «Reserva online» for a booking's origin.
-msgid "Online booking"
-msgstr "Reservas online"
-
 msgid ""
 "Let customers book themselves online, and confirm or cancel their bookings "
 "from one inbox."
