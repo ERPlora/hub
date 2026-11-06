@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:1b996b73b910f8ad8e8e3ebc06331f8cfc0bbc799e27019943d7fc1b4bd52588 -->
+<!-- generated from WORKBOOK.md sha256:65a71461ab1eeeaa9569b6edc42ef614ed011e637360ae6049517e9287e4f081 -->
 
 ## What it is for and who it is for
 
@@ -1018,6 +1018,8 @@ Involved: erplora.com; Appointments and Reservations, when they notify by WhatsA
 | `whatsapp_inbox.note.list` | A conversation's internal notes |
 | `whatsapp_inbox.template.list` | The templates (filters by status, category, language, name and whether they can be sent), with their way to Meta |
 | `whatsapp_inbox.template_sample.detail` | A header's file by its id, as it was returned when saved (name, photo, video or document and size); only the asking business's |
+| `whatsapp_inbox.note.get` | An internal note by its id, with its text: what the assistant's card reads to name it (BASE-F97); no tool of the assistant and no route in the API |
+| `whatsapp_inbox.template.get` | A template of the business by its id with its name and its language ("recordatorio (es)"), also one deleted here that Meta still has: what the assistant's card reads to name it (BASE-F97); no tool of the assistant and no route in the API |
 | `whatsapp_inbox.channel.get` | The number's status and the month's usage |
 | `whatsapp_inbox.agent.list` | The business's people a conversation can be assigned to |
 
@@ -1082,7 +1084,11 @@ They carry identifiers, never a number, a name or a text of the conversation.
   `message.received` (F38). The automatic answer "WhatsApp → table booked" (F24) starts on `message.received`, reads
   the message with `message.get` and marks the conversation with `conversation.flag` (F20).
 - The **assistant**: every operation, with human references ("answer Ana", "assign Ana's conversation to Luis", "send
-  the reminder template to the number I dictate", "create a reminder template").
+  the reminder template to the number I dictate", "create a reminder template"), except the two reads of its card
+  (`note.get`, `template.get`). Before changing anything it asks to confirm with its card (BASE-F97), which names each
+  record as the screens name it, never by its id: the conversation as the inbox calls it ("Conversation: Ana López"),
+  the card joined to it, the message retried and the note deleted by their text, and the template by its name and its
+  language ("Template: recordatorio (es)"). What the person asking cannot see is left out.
 
 ### Who can do what
 

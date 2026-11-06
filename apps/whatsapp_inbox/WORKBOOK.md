@@ -1086,6 +1086,8 @@ Implicados: erplora.com; Citas y Reservas, cuando avisen por WhatsApp
 | `whatsapp_inbox.note.list` | Las notas internas de una conversación |
 | `whatsapp_inbox.template.list` | Las plantillas (filtros de estado, categoría, idioma, nombre y si se pueden enviar), con su camino a Meta |
 | `whatsapp_inbox.template_sample.detail` | El archivo de una cabecera por su id, como lo devolvió al guardarlo (nombre, foto, vídeo o documento y tamaño); solo el del negocio que pregunta |
+| `whatsapp_inbox.note.get` | Una nota interna por su id, con su texto: lo que lee la tarjeta del asistente para nombrarla (BASE-F97); no es herramienta del asistente ni tiene ruta en la API |
+| `whatsapp_inbox.template.get` | Una plantilla del negocio por su id con su nombre y su idioma («recordatorio (es)»), también una borrada aquí que Meta aún tiene: lo que lee la tarjeta del asistente para nombrarla (BASE-F97); no es herramienta del asistente ni tiene ruta en la API |
 | `whatsapp_inbox.channel.get` | El estado del número y el consumo del mes |
 | `whatsapp_inbox.agent.list` | Las personas del negocio a las que se puede asignar una conversación |
 
@@ -1151,7 +1153,11 @@ Llevan identificadores, nunca un número, un nombre ni un texto de la conversaci
   `message.received`, lee el mensaje con `message.get` y marca la conversación con `conversation.flag` (F20).
 - El **asistente**: todas las operaciones, con referencias humanas («responde a Ana», «asigna la
   conversación de Ana a Luis», «envía la plantilla recordatorio al número que te dicto», «crea una
-  plantilla de recordatorio»).
+  plantilla de recordatorio»), salvo las dos lecturas de su tarjeta (`note.get`, `template.get`). Antes de
+  cambiar nada pide confirmar con su tarjeta (BASE-F97), que nombra cada registro como lo nombran las
+  pantallas, nunca por su id: la conversación como la llama la bandeja («Conversación: Ana López»), la ficha
+  que se le une, el mensaje que se reintenta y la nota que se borra por su texto, y la plantilla por su
+  nombre y su idioma («Plantilla: recordatorio (es)»). Lo que quien pregunta no puede ver no sale.
 
 ### Quién puede qué
 
@@ -1330,6 +1336,19 @@ corrigen borrando los datos de la conversación, nunca editando), con borrado pa
   de `A_SAMPLE` en `schemas.py`) hecha como quien pregunta; uno de otro negocio, o la tarjeta de una
   automatización sin persona delante, lo deja fuera, nunca por su id
   (FIX-HUB-WHATSAPP-INBOX-ATTEMPT-KEYS-UNMARKED; `tests/test_integration_assistant.py`).
+- **La misma tarjeta nombra el registro que toca cada escritura** (hub#571) con las marcas `refers` de
+  `schemas.py`, leídas como quien pregunta: la conversación (`A_CONVERSATION`, el `id` de
+  `ConversationRefIn` y de `SendIn`) por su `display_name` con `conversation.detail`; la ficha que se une
+  (`A_CUSTOMER`) con `customer.customer.detail` de Clientes, que es requisito; el mensaje que se reintenta
+  (`A_MESSAGE`) con `message.get`, por su texto, si no su pie, su archivo o su plantilla; la nota que se
+  borra (`A_NOTE`) con `note.get`, y la plantilla que se cambia, se borra o se reintenta (`A_TEMPLATE`) con
+  `template.get`, como la lista Ajustes (también una borrada aquí que Meta aún tiene). `note.get` y
+  `template.get` son lecturas internas (`ai=INTERNAL`, sin API): el modelo encuentra notas y plantillas en
+  sus listas. Cada `id` lleva su título (Conversación, Mensaje, Nota, Plantilla). Lo que no existe, es de
+  una conversación borrada, de otro negocio, o lo que quien pregunta no puede leer se queda fuera, nunca por
+  su id (`tests/test_assistant_card_records.py`). El tipo de un botón de plantilla (`buttons[].type`) no
+  tiene etiqueta: vive en el JSON de `Template.buttons`, sin campo de modelo que la dé, y la tarjeta dice
+  los botones por cuántos son, nunca por su código.
 - La ventana de 24 h se cuenta desde el último mensaje **del cliente** (`last_inbound_at`), en el
   servidor; fuera de ella, `message.send` con texto da 409 `whatsapp_inbox.window_closed`. Sin
   `SAAS_INTERNAL_URL`, sin número conectado o con el mes gastado no se guarda nada (409
