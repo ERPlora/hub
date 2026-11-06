@@ -384,7 +384,6 @@ UNNAMED_REFERENCES = {
     "kitchen": 23,
     "online_booking": 7,
     "payment": 8,
-    "schedule": 4,
     # The sale and the appointment a voucher or a session came from, the line of a sale that charged a voucher, the line
     # of an order that holds a session and the reference of a return: data of apps Services does not require, so it
     # reads none of them and base.E009 refuses a mark (hub#756). The one that came in, the sale's line (hub#769), is the
@@ -543,6 +542,8 @@ TITLED_IN_SPANISH = {
     **{f"pricing.rule.{action}:id": "Regla de descuento" for action in ("activate", "deactivate", "update")},
     **{f"sale.department.{action}:id": "Sección" for action in ("delete", "update")},
     **{f"sale.quick_note.{action}:id": "Nota rápida" for action in ("delete", "update")},
+    **{f"schedule.override.{action}:id": "Cambio temporal" for action in ("delete", "update")},
+    **{f"schedule.special_day.{action}:id": "Día especial" for action in ("delete", "update")},
     **{f"service.assignment.{action}:id": "Profesional del servicio" for action in ("remove", "update")},
     **{f"service.category.{action}:id": "Categoría" for action in ("delete", "update")},
     **{f"service.grant.{action}:id": "Bono vendido" for action in ("adjust", "redeem", "void")},

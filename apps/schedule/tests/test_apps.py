@@ -8,7 +8,7 @@ from django.conf import settings
 from django.utils import translation
 from live.live_registry import live_registry
 from live.meta import Category, LiveAppConfig, Nav, SetupCheck, SetupStep, module_configs, permissions_for_role
-from live.operations import registry
+from live.operations import INTERNAL, registry
 
 from apps.schedule import events
 from apps.schedule import queries, services  # noqa: F401  (importing them registers the operations)
@@ -29,7 +29,12 @@ QUERIES = {
     "schedule.settings.get",
     "schedule.business.is_open",
     "schedule.hours.for_range",
+    "schedule.special_day.get",
+    "schedule.override.get",
 }
+#: What names a special day or a temporary change on the card of a write (hub#675): only the card reads them, the model
+#: finds those records in their lists; no tool, no door of the API.
+CARD_ONLY = {"schedule.special_day.get", "schedule.override.get"}
 COMMANDS = {
     "schedule.week.set_day",
     "schedule.week.confirm",
@@ -141,6 +146,9 @@ def test_the_operations_of_the_app():
 
 def test_every_operation_tells_the_assistant_what_it_does():
     for name, op in schedule_operations().items():
+        if name in CARD_ONLY:
+            assert op.ai is INTERNAL and op.expose_api is False, name
+            continue
         assert isinstance(op.ai, dict), name
         assert str(op.ai.get("description", "")).strip(), name
         if op.kind == "command":
@@ -153,7 +161,7 @@ def test_the_high_risk_commands():
     assert {
         name
         for name, op in schedule_operations().items()
-        if op.ai.get("risk") == "high"
+        if op.kind == "command" and op.ai.get("risk") == "high"
     } == HIGH_RISK
 
 
