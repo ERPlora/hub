@@ -501,7 +501,10 @@ class OptionOut(Schema):
     product_id: UUID
     product_name: str
     sku: str
-    catalog_price: int = Field(description="The product's catalogue price, in cents.")
+    catalog_price: int = Field(
+        description="The product's catalogue price, in cents.",
+        json_schema_extra={"money": True},
+    )
     price_delta: int
     is_available: bool
     sort_order: int
@@ -640,8 +643,8 @@ class ResolvedOut(Schema):
     name: str
     kitchen_name: str
     supply_kind: SupplyKind
-    price: int = Field(description="Today's closed price, in cents.")
-    supplements: int = Field(description="The supplements of the picks, in cents.")
+    price: int = Field(description="Today's closed price, in cents.", json_schema_extra={"money": True})
+    supplements: int = Field(description="The supplements of the picks, in cents.", json_schema_extra={"money": True})
     amount: int = Field(
         description="What the menu charges: the amount ordered, or price plus supplements."
     )

@@ -1303,7 +1303,7 @@ class SessionOut(Schema):
     value: int | None = Field(
         description="What the session is worth, VAT included, in cents (minor units of the business's currency): "
         "what is left of the voucher's price ÷ the sessions it has left, fixed when delivered; null until then and "
-        "on an unlimited voucher."
+        "on an unlimited voucher.", json_schema_extra={"money": True}
     )
 
 

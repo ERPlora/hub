@@ -842,7 +842,7 @@ class CustomerRow(Schema):
     source: Source = Field(description=SOURCE)
     is_active: bool = Field(description="Whether the customer counts as active.")
     total_purchases: int = Field(description="How many purchases they made.")
-    total_spent: int = Field(description="How much they spent, in cents.")
+    total_spent: int = Field(description="How much they spent, in cents.", json_schema_extra={"money": True})
     last_purchase_at: datetime | None = Field(description="When they last bought.")
 
 
@@ -907,7 +907,7 @@ class CustomerStatsOut(Schema):
     total: int = Field(description="How many customers there are.")
     active: int = Field(description="How many of them are active.")
     vip: int = Field(description="How many are at the vip stage.")
-    total_revenue: int = Field(description="What they spent altogether, in cents.")
+    total_revenue: int = Field(description="What they spent altogether, in cents.", json_schema_extra={"money": True})
 
 
 class PhoneMatch(Schema):
@@ -1045,7 +1045,10 @@ class PurchaseRow(Schema):
     id: UUID = Field(description="The entry's id.")
     customer_id: UUID = Field(description="The customer's id.")
     sale_id: UUID | None = Field(description="The sale's id; empty for a manual entry.")
-    amount: int = Field(description="The amount, in cents; negative on a refund line.")
+    amount: int = Field(
+        description="The amount, in cents; negative on a refund line.",
+        json_schema_extra={"money": True},
+    )
     currency: str = Field(description="The currency.")
     currency_decimals: int | None = Field(
         description="The decimals of its currency as the server counts them (0 in JPY); empty without a currency."
@@ -1069,9 +1072,9 @@ class DivergenceRow(Schema):
     id: UUID = Field(description="The customer's id.")
     name: str = Field(description="Name.")
     total_purchases: int = Field(description="Purchases on the card.")
-    total_spent: int = Field(description="Spent on the card, in cents.")
+    total_spent: int = Field(description="Spent on the card, in cents.", json_schema_extra={"money": True})
     ledger_purchases: int = Field(description="Paid purchases in its history.")
-    ledger_spent: int = Field(description="Paid amount in its history, in cents.")
+    ledger_spent: int = Field(description="Paid amount in its history, in cents.", json_schema_extra={"money": True})
 
 
 DivergencePage = Page[DivergenceRow]

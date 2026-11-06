@@ -257,7 +257,7 @@ class TicketOut(Schema):
     cancelled_at: dt.datetime | None = Field(description="When it was cancelled.")
     rush_count: int = Field(description="How many times it was rushed.")
     total: int = Field(
-        description="Informative total in cents (the kitchen never charges)."
+        description="Informative total in cents (the kitchen never charges).", json_schema_extra={"money": True}
     )
     saved: bool = Field(
         description="False for a round of Sales the kitchen shows but has not saved yet."
@@ -342,7 +342,7 @@ class TicketRowOut(Schema):
     items_count: int = Field(
         description="How many dishes still count (not voided nor cancelled)."
     )
-    total: int = Field(description="Informative total in cents.")
+    total: int = Field(description="Informative total in cents.", json_schema_extra={"money": True})
     received_at: dt.datetime = Field(description="When it was sent.")
     order_id: UUID | None = Field(description="The check of Sales it came from.")
     saved: bool = Field(description="False for a round the kitchen has not saved yet.")
