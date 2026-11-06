@@ -105,14 +105,18 @@ describe('SettingsPage', () => {
     const s = await setup();
     await s.show(CONFIG);
     s.net.onApi(() => refusal(422, 'invalid_payload', 'Invalid payload', { low_stock_threshold: 'Enter a whole number.' }));
-    const says = () => [(s.field('threshold').element as Control).errorText ?? '', s.testid('inventory-settings-save-error').exists()];
+    const says = () => [
+      (s.field('threshold').element as Control).errorText ?? '',
+      s.field('threshold').classes('ion-invalid'),
+      s.testid('inventory-settings-save-error').exists(),
+    ];
     await s.wrapper.findComponent(IonInput).setValue('2.5');
     await s.save();
-    expect(says()).toEqual(['Enter a whole number.', true]);
+    expect(says()).toEqual(['Enter a whole number.', true, true]);
     await s.wrapper.findComponent(IonInput).setValue('3');
-    expect(says()).toEqual(['', false]);
+    expect(says()).toEqual(['', false, false]);
     await s.save();
-    expect(says()).toEqual(['Enter a whole number.', true]);
+    expect(says()).toEqual(['Enter a whole number.', true, true]);
   });
 
   it('«Save» is off until something changes', async () => {

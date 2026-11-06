@@ -3,7 +3,7 @@
 // one of its active printers —, the note that the receipt's texts are the till's (with the link when Sales
 // is on) and «Save settings», which sends only what changed. A read that fails shows no values; whoever may
 // not change them sees them blocked, without «Save settings».
-import { toastSuccess } from '@erplora/ui/shell';
+import { resolveIcon, toastSuccess } from '@erplora/ui/shell';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ADMIN, click, errorFrame, flush, ionToggle, ionValue, mountPrinting } from '../__tests__/mount-printing';
@@ -61,6 +61,7 @@ describe('SettingsCard', () => {
     await s.result(OP, { ...FACTORY, kitchen_printer_id: 'k2' });
     await s.result(PRINTERS, ACTIVE);
     expect(prop(s.inDoc('printing-settings-save'), 'disabled')).toBe(true);
+    expect(prop(s.inDoc('printing-settings-save')?.querySelector('ion-icon[slot="start"]') ?? null, 'icon')).toBe(resolveIcon('lucide:save'));
     await ionToggle(s.field('open_drawer_on_sale'), true);
     await ionValue(s.field('receipt_copies'), 2);
     await ionValue(s.field('kitchen_printer'), '');
@@ -104,6 +105,16 @@ describe('SettingsCard', () => {
     expect(says()).toEqual(['', false]);
     await click(s.inDoc('printing-settings-save'));
     expect(says()).toEqual(['That printer is inactive.', true]);
+  });
+
+  it('a failure the server did not word says the card’s sentence, never the server’s', async () => {
+    const s = await setup();
+    await s.result(OP, FACTORY);
+    await ionToggle(s.field('open_drawer_on_sale'), true);
+    s.answer(500, { error: { code: 'internal_error', message: 'Internal server error: boom' } });
+    await click(s.inDoc('printing-settings-save'));
+    expect(s.find('printing-settings-save-error').text()).toContain('Could not save the settings.');
+    expect(s.find('printing-settings-save-error').text()).not.toContain('boom');
   });
 
   it('the receipt’s texts are the till’s: the note, and the link while Sales is on', async () => {
