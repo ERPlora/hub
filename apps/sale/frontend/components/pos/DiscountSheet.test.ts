@@ -14,7 +14,10 @@ vi.mock('@ionic/vue', async (importOriginal) => {
   return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
 });
 
-async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 'en', options: { business?: null } = {}) {
+/** How the sheet is mounted: `business: null`, `base.business.get` never answers (its money unknown, hub#921). */
+type Options = { business?: null };
+
+async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 'en', options: Options = {}) {
   const open = ref(true);
   const m = await mountSale(
     {
