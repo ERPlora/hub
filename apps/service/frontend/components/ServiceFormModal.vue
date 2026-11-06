@@ -3,8 +3,8 @@
 // (Fixed price by default), «Price (PLN)» (in the business's currency, its country's, with its decimals; just
 // «Price» until the business answers; service-business-currency), Duration (min; empty = the settings'), Category (searched; empty =
 // «No category») and Tax category (searched in Taxes; the settings' default comes chosen; no empty
-// option). «Create service» needs a name and a tax category; with no tax category in Taxes at all it
-// says where to make them. A row opens «Editing service — {name}»: «Save changes» sends only what
+// option). «Create service» needs a name and a tax category, and waits in grey until the business has answered its
+// money (the price is read in it; hub#918); with no tax category in Taxes at all it says where to make them. A row opens «Editing service — {name}»: «Save changes» sends only what
 // changed (no category = `category_id: null`), and below the form who performs the service. «Photo» (SERVICE-F34/F35,
 // for who may edit services): a library image (Hair and Beauty first) or a photo of its own, sent once the service is
 // saved (`set_image`, `upload_image`, «Uploading photo…»); if the service saved and the photo did not, the form says so
@@ -153,8 +153,12 @@ function patch(service: ServiceOut, price: number): ServicePatchIn {
 
 async function save(): Promise<void> {
   tried.value = true;
+  // No price is read before the business answers its money: «1500» would be read with two decimals, whatever its
+  // currency counts (in yen, 150000; hub#918).
+  const business = money.value;
+  if (!business) return;
   const f = form.value;
-  const read = parseMoney(f.price, money.value);
+  const read = parseMoney(f.price, business);
   if (!read.ok || !f.tax) return;
   const price = read.cents ?? 0;
   let saved: { id: string };
@@ -194,7 +198,7 @@ function retryPhoto(): void {
     :submit-label="photo.uploading.value ? $t('base.imageField.uploading') : service ? $t('service.services.form.save') : $t('service.services.form.create')"
     :pending="pending"
     :error="error"
-    :submit-disabled="!form.name.trim() || !form.tax || (!service && noTaxes) || !!photo.failure.value"
+    :submit-disabled="!money || !form.name.trim() || !form.tax || (!service && noTaxes) || !!photo.failure.value"
     @submit="save"
   >
     <template #default="{ fieldErrors }">

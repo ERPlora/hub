@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:0bdc3518a285afbe023df6e2b226976692cc1014d9d67fdd2610ec79cd0c1f20 -->
+<!-- generated from WORKBOOK.md sha256:af17ccfbd18370c9724ef931998af2b1e5fe9797259458f8c2709587d904ae3a -->
 
 ## What it is for and who it is for
 
@@ -283,7 +283,9 @@ Out: the product, active and linked to the ticked categories, in a single step: 
 whole or nothing is saved. If initial stock was given, it stays in **Movements** as "Initial".
 Inventory tells the other apps there is a new product: Sales offers it on the till's grid and the
 setup step "Your catalog" is done (INVENTORY-F28).
-If it fails: "Save" is off while Name, SKU or tax category are missing. With no tax categories it says
+If it fails: "Save" is off while Name, SKU or tax category are missing, and while the business has not
+yet said its currency: the price and the cost are read in it, and without it "1500" yen would be saved
+as 150,000. With no tax categories it says
 "There are no tax categories yet. Create them in Taxes: a product cannot be sold until it is known how
 it is taxed.". An unreadable amount: "This is not an amount. Type a figure, for example 12.50." or
 "This amount can be read in two ways…". A quantity that does not fit the unit: "The quantity does not
