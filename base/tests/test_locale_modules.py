@@ -38,7 +38,6 @@ SHADOWED = {
     "kitchen": 7,
     "modifier": 2,
     "online_booking": 1,
-    "sale": 6,
     "service": 4,
     "task": 1,
     "tax": 1,
