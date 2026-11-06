@@ -39,6 +39,7 @@ from django.core.files.storage import FileSystemStorage
 from django.db import DatabaseError, connections, transaction
 from django.db.models import Max
 from django.utils import timezone, translation
+from django.utils.translation import pgettext_lazy
 from live.markdown import IMAGE_EXTENSIONS, render_markdown
 from live.meta import all_live_app_configs, module_configs
 from live.shared_catalog import DOC_LANGUAGES
@@ -383,6 +384,18 @@ class _MissingTranslation(gettext.NullTranslations):
     def gettext(self, message):
         return None
 
+    def pgettext(self, context, message):
+        return None
+
+
+#: What ``pgettext_lazy`` returns: every call shares the class, which keeps ``(context, message)`` in ``_args``.
+_CONTEXTED = type(pgettext_lazy("", ""))
+
+
+def _context(text) -> str | None:
+    """The context ``text`` is said with when it is a ``pgettext_lazy`` (``None`` for any other text)."""
+    return text._args[0] if isinstance(text, _CONTEXTED) else None
+
 
 def _spanish_catalog(config) -> gettext.NullTranslations | None:
     path = Path(config.path) / SPANISH_CATALOG
@@ -397,7 +410,8 @@ def _spanish_catalog(config) -> gettext.NullTranslations | None:
 def _texts(config, problems: list[str]) -> dict[str, str]:
     """``name_en``, ``name_es``, ``summary_*`` and ``description_*``: English is the source (the
     ``gettext_lazy`` of the ``LiveAppConfig``), Spanish its msgstr in the app's own compiled
-    catalogue, required even when both read the same."""
+    catalogue, required even when both read the same. A text said with ``pgettext_lazy`` is read
+    with its context, as Django reads it: never from the plain entry (hub#661)."""
     catalog = _spanish_catalog(config)
     texts = {}
     for attribute, column in (
@@ -405,12 +419,20 @@ def _texts(config, problems: list[str]) -> dict[str, str]:
         ("summary", "summary"),
         ("description", "description"),
     ):
+        text = getattr(config, attribute)
+        context = _context(text)
         with translation.override("en"):
-            english = str(getattr(config, attribute))
-        spanish = catalog.gettext(english) if catalog is not None and english else None
+            english = str(text)
+        if catalog is None or not english:
+            spanish = None
+        elif context is None:
+            spanish = catalog.gettext(english)
+        else:
+            spanish = catalog.pgettext(context, english)
         if not spanish:
+            said = f"{english!r}" if context is None else f"{english!r} (context {context!r})"
             problems.append(
-                f"{config.label}: {attribute}: no Spanish msgstr for {english!r} in "
+                f"{config.label}: {attribute}: no Spanish msgstr for {said} in "
                 f"apps/{config.label}/{SPANISH_CATALOG}: add it to django.po and run compilemessages."
             )
             continue

@@ -81,6 +81,6 @@ def test_the_admin_in_spanish_says_the_websites_own_words(client, superuser):
     page, listing = change.content.decode(), images.content.decode()
     assert "<label>Publicada el:</label>" in page  # the page is in Spanish: a label the site already says alone
     assert "<label>Actualizada el:</label>" in page and "<label>Actualizada por:</label>" in page
-    assert "&rsaquo; Página web" in page  # the breadcrumb names the site
+    assert '<li aria-current="page">Página web</li>' in page and "<h2>Página web</h2>" in page  # the site's name
     assert ">Creada el</a>" in listing  # the images' column
-    assert "Actualizado" not in page and "&rsaquo; Web\n" not in page and "Creado el" not in listing
+    assert "Actualizado" not in page and "<h2>Web</h2>" not in page and "Creado el" not in listing
