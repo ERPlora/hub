@@ -53,19 +53,8 @@ describe('SettingsPage', () => {
     expect(s.field('saved')?.textContent).toContain('Settings saved.');
   });
 
-  it('a refusal goes under its field', async () => {
-    const s = await setup();
-    await s.show(settingsOut());
-    const message = 'The minimum guests cannot be more than the maximum.';
-    s.answer(422, { error: { code: 'invalid_payload', message, fields: { min_party_size: message } } });
-    await ionValue(s.field('min_party_size'), '30', 'ionInput');
-    await click(s.field('save'));
-    expect(s.field('min_party_size').errorText).toBe(message);
-    expect(s.field('save-error')?.textContent).toContain(message);
-  });
-
   // RESERVATION-F03 «Si falla» (hub#873), as in the other settings pages: a change takes the notice away and
-  // correcting a field takes its own message away, nobody else's; the next refusal says it all again.
+  // correcting a field takes its own message away, nobody else's.
   it('correcting the refused field takes its message and the notice away, and nobody else’s', async () => {
     const s = await setup();
     await s.show(settingsOut());
@@ -76,6 +65,17 @@ describe('SettingsPage', () => {
     await ionValue(s.field('min_party_size'), '2', 'ionInput');
     const says = (name: string) => [s.field(name).errorText ?? '', s.field(name).classList.contains('ion-invalid')];
     expect([says('min_party_size'), says('max_advance_days'), s.field('save-error') !== null]).toEqual([['', false], [refused.max_advance_days, true], false]);
+  });
+
+  it('a refusal goes under its field', async () => {
+    const s = await setup();
+    await s.show(settingsOut());
+    const message = 'The minimum guests cannot be more than the maximum.';
+    s.answer(422, { error: { code: 'invalid_payload', message, fields: { min_party_size: message } } });
+    await ionValue(s.field('min_party_size'), '30', 'ionInput');
+    await click(s.field('save'));
+    expect(s.field('min_party_size').errorText).toBe(message);
+    expect(s.field('save-error')?.textContent).toContain(message);
   });
 
   it('whoever may not save them is told so', async () => {

@@ -93,19 +93,19 @@ function judge(now: Form): Partial<Record<keyof Form, string>> | null {
 /** A change also takes away what «Use my current location» last said. */
 function set<K extends keyof Form>(field: K, value: Form[K]): void {
   if (!form.value) return;
-  problem.value = '';
   settingsForm.set(field, value);
-}
-
-/** Only whoever may change them saves (no one else has the button). */
-async function save(): Promise<void> {
-  if (canEdit.value) await settingsForm.save();
+  problem.value = '';
 }
 
 const text = (value: unknown): string => (value === null || value === undefined ? '' : String(value));
 const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'ion-touched': !!message });
 
 const workplaceMissing = computed(() => !!form.value?.require_location && (!form.value.workplace_lat.trim() || !form.value.workplace_lng.trim()));
+
+/** Only whoever may change them saves (no one else has the button). */
+async function save(): Promise<void> {
+  if (canEdit.value) await settingsForm.save();
+}
 
 async function useMyLocation(): Promise<void> {
   if (locating.value || !canEdit.value) return;
