@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:3087d76603c79244ad45f5364f629a3d7cc5ef55e9d44739f0383c459b66a6a0 -->
+<!-- generated from WORKBOOK.md sha256:6db85099907e4a3867b10f2e175482bc13e8b8779f4e2736ab3d717dcb307edb -->
 
 ## What it is for and who it is for
 
@@ -59,6 +59,9 @@ sources, is in "Market research", at the end of this manual.
   slot knowingly: the system warns and asks "Book anyway".
 - **Table reserved from one hour before** (question 8, decided by Tables, TABLE-F25): before that the
   table stays free and shows "Ana · 21:00".
+- **The pending one nobody confirms is released when its time is up, whatever day it is** (question 9):
+  the window counts from the reservation's time, so the one at 23:55 is released after midnight, although its
+  day is already yesterday.
 
 ## Before you start
 
@@ -406,7 +409,9 @@ Steps:
 1. Every quarter of an hour, in each business, the reservations still Pending once the minutes of the
    settings (15) have passed since their time are cancelled with the reason "Released: never confirmed" and
    free their place.
-2. The confirmed ones, the seated ones and those of other days are not touched.
+2. The confirmed ones, the seated ones and those of days still to come are not touched. A pending one of an
+   earlier day is released all the same: the one at 23:55 is released at 00:15, although its day is already
+   yesterday.
 3. The Reservations screen that business has open turns them Cancelled at once, without reloading; another
    business's screen hears nothing.
 In: the time.

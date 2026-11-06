@@ -24,8 +24,8 @@ import { useRoute, useRouter } from 'vue-router';
 
 import ConversationPanel from '../components/ConversationPanel.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
+import PlanUpgradeLink from '../../../../base/frontend/components/PlanUpgradeLink.vue';
 import { useBusinessZone } from '../../../../base/frontend/lib/zone';
-import PlanUpgradeLink from '../components/PlanUpgradeLink.vue';
 import { useLiveList } from '../composables/useLiveList';
 import { useServerTable } from '../composables/useServerTable';
 import { useLocale, useT } from '../composables/useT';
@@ -228,7 +228,9 @@ const columns = computed<DataTableColumn<ConversationOut>[]>(() => [
             class="wa-inbox__link"
             data-testid="whatsapp-inbox-upgrade"
             :url="upgradeUrl"
-          />
+          >
+            {{ $t('whatsapp_inbox.upgradePlan') }}
+          </PlanUpgradeLink>
         </template>
       </InlineFeedback>
       <InlineFeedback
@@ -245,7 +247,9 @@ const columns = computed<DataTableColumn<ConversationOut>[]>(() => [
             class="wa-inbox__link"
             data-testid="whatsapp-inbox-upgrade"
             :url="upgradeUrl"
-          />
+          >
+            {{ $t('whatsapp_inbox.upgradePlan') }}
+          </PlanUpgradeLink>
         </template>
       </InlineFeedback>
       <InlineFeedback
