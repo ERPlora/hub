@@ -9,6 +9,7 @@
 import { Combo, type ComboOption } from '@erplora/ui/components';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { expectSaveWaitsForMoney } from '../../../../base/frontend/__tests__/save-waits-for-money';
 import type { Business } from '../../../../base/frontend/operations';
 import {
   business,
@@ -374,9 +375,17 @@ describe('ProductFormModal: editing', () => {
     it('a new price typed before is kept as typed and read in the yen; the untouched cost is still rewritten', async () => {
       const s = await setup({ product: product({ price: 220, cost: 80 }) }, { business: null });
       await s.type('inventory-product-price', '300');
-      await s.answer(JAPANESE);
-      expect([s.el('inventory-product-price')?.value, s.el('inventory-product-cost')?.value]).toEqual(['300', '80']);
+      // hub#918: until the yen arrives «Save changes» waits in grey and nothing reads the price (never 300 as 30000).
       s.net.onApi(() => ok(product({ price: 300 })));
+      const window = {
+        wrapper: s.wrapper,
+        save: () => s.el('inventory-product-form-submit'),
+        amount: () => s.el('inventory-product-price'),
+        sent: () => s.calls('/api/inventory/products/update'),
+        settle: flush,
+      };
+      await expectSaveWaitsForMoney(window, () => s.answer(JAPANESE));
+      expect([s.el('inventory-product-price')?.value, s.el('inventory-product-cost')?.value]).toEqual(['300', '80']);
       await s.submit();
       expect(s.sent('/api/inventory/products/update')).toEqual({ id: 'p1', price: 300 });
     });
