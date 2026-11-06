@@ -1070,6 +1070,33 @@ def test_words_alone_make_no_amount_its_mark_does():
     assert [(field["name"], field["kind"]) for field in card["fields"]] == [("price", "text"), ("rate", "text")]
 
 
+class CentsLineIn(Schema):
+    text: str
+    unit_cents: int
+
+
+class NamedCentsIn(Schema):
+    total_cents: int
+    line: CentsLineIn | None = None
+    lines: list[CentsLineIn] = []
+
+
+@pytest.mark.django_db
+def test_a_name_in_cents_alone_makes_no_amount_its_mark_does():
+    """hub#917: a whole number named ``…_cents`` was money by its name while its schema carried no mark, so a new
+    datum named so that is no amount would reach the card as money in the business's currency. Only the mark says an
+    amount now (PLAN-HUB §50), on top and inside an object or a list: the rest stays as sent."""
+    Hub.objects.update_or_create(slug="a", defaults={"name": "Bar A", "country": "ES"})
+    arguments = {"total_cents": 1500, "line": {"text": "Café", "unit_cents": 150}, "lines": [{"text": "Té", "unit_cents": 1200}]}
+    card = assistant.card(priced(NamedCentsIn), arguments, "es", ctx=ctx(language="es"))
+    shown = {field["name"]: (field["kind"], field["value"]) for field in card["fields"]}
+    assert shown == {
+        "total_cents": ("text", 1500),
+        "line": ("object", {"text": "Café", "unit_cents": 150}),
+        "lines": ("list", [{"text": "Té", "unit_cents": 1200}]),
+    }
+
+
 class DueOut(Schema):
     due: int = Field(description="What is left to pay.", json_schema_extra=MONEY)
     note: str = ""

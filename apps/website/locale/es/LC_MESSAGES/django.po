@@ -79,9 +79,11 @@ msgstr "publicada el"
 msgid "live"
 msgstr "en línea"
 
+msgctxt "website"
 msgid "updated at"
 msgstr "actualizada el"
 
+msgctxt "website"
 msgid "updated by"
 msgstr "actualizada por"
 
@@ -91,6 +93,7 @@ msgstr "página web"
 msgid "websites"
 msgstr "páginas web"
 
+msgctxt "website"
 msgid "Website"
 msgstr "Página web"
 
@@ -112,6 +115,7 @@ msgstr "alto"
 msgid "size"
 msgstr "tamaño"
 
+msgctxt "website"
 msgid "created at"
 msgstr "creada el"
 
@@ -195,6 +199,7 @@ msgstr "Escribe un enlace que empiece por https://."
 msgid "Enter a phone number: digits, spaces and an optional + in front."
 msgstr "Escribe un teléfono: números, espacios y, si quieres, un + delante."
 
+msgctxt "website"
 msgid "Enter a valid email address."
 msgstr "Escribe un correo electrónico válido."
 
