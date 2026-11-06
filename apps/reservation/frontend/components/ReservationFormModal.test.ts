@@ -4,12 +4,13 @@
 // notes; «Reserve» books it. A full slot asks first («Book anyway»); a refusal goes on top, a bad field
 // under it, and what was typed stays. «Edit reservation» sends only what changed (or `no_table`), and a
 // finished reservation only changes its notes.
-import { Combo, ConfirmDialog } from '@erplora/ui/components';
+import { Combo, ConfirmDialog, InlineFeedback } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
 import CustomerSearch from '../../../customer/frontend/components/CustomerSearch.vue';
 import { click, ionValue, mountReservation, settle } from '../__tests__/mount-reservation';
 import { freeTable, reservationRow } from '../__tests__/rows';
+import en from '../locale/en.json';
 import ReservationFormModal from './ReservationFormModal.vue';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
@@ -223,5 +224,39 @@ describe('ReservationFormModal: Edit reservation', () => {
   it('speaks Spanish', async () => {
     const s = await setup({}, 'es');
     expect([s.field('guest_name').label, s.field('party_size').label, s.submit().textContent?.trim()]).toEqual(['Cliente', 'Pax', 'Reservar']);
+  });
+});
+
+// RESERVATION-F09 and F13 (hub#862): opening a cancelled reservation says why it was cancelled, on top of
+// «only its notes can change» — what the staff typed, as typed, or the book's release, translated.
+describe('ReservationFormModal: why it was cancelled (RESERVATION-F09, F13)', () => {
+  type Setup = Awaited<ReturnType<typeof setup>>;
+  const banner = (s: Setup) =>
+    s.wrapper.findAllComponents(InlineFeedback).find((c) => c.attributes('data-testid') === 'reservation-form-notes-only');
+
+  it('says what the staff typed, as typed', async () => {
+    const s = await setup({ reservation: reservationRow({ status: 'cancelled', cancellation_reason: 'Plans changed' }) });
+    const reason = en.reservation.list.cancelReason.replace('{reason}', 'Plans changed');
+    expect(banner(s)?.props('heading')).toBe(reason);
+    expect(s.inDoc('reservation-form-notes-only')?.textContent).toContain(reason);
+  });
+
+  it('says the book released it because nobody confirmed it (the code `unconfirmed`, translated)', async () => {
+    const s = await setup({ reservation: reservationRow({ status: 'cancelled', cancellation_reason: 'unconfirmed' }) }, 'es');
+    // The Spanish words themselves, not the catalogue read back: a message left in English would pass that.
+    expect(banner(s)?.props('heading')).toBe('Liberada: nunca se confirmó');
+    expect(s.inDoc('reservation-form-notes-only')?.textContent).toContain('Liberada: nunca se confirmó');
+  });
+
+  it('says nothing more without a reason, or when it is not cancelled', async () => {
+    for (const reservation of [
+      reservationRow({ status: 'cancelled', cancellation_reason: '' }),
+      reservationRow({ status: 'no_show', cancellation_reason: 'Plans changed' }),
+    ]) {
+      const s = await setup({ reservation });
+      expect(banner(s)?.exists()).toBe(true);
+      expect(banner(s)?.props('heading')).toBeUndefined();
+      s.wrapper.unmount();
+    }
   });
 });

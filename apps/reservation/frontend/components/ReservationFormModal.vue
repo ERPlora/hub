@@ -6,7 +6,8 @@
 // party first (`reservation.availability.tables`) —, where it was booked and the notes. A full slot asks
 // first («Book anyway», `overbook`, never for online bookings); a refusal goes on top, a bad field under
 // it, and what was typed stays. «Edit reservation» sends only what changed (`no_table` to leave it without
-// one); once seated, completed, cancelled or not shown, only its notes change, as the server says.
+// one); once seated, completed, cancelled or not shown, only its notes change, as the server says — and a
+// cancelled one says why on top (F09, F13).
 import { Combo, type ComboOption, ConfirmDialog, FormModal, InlineFeedback } from '@erplora/ui/components';
 import { type ApiError, useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { IonInput, IonLabel, IonSegment, IonSegmentButton, IonTextarea } from '@ionic/vue';
@@ -15,6 +16,7 @@ import { computed, ref, watch } from 'vue';
 import CustomerSearch, { type CustomerSnapshot } from '../../../customer/frontend/components/CustomerSearch.vue';
 import { useT } from '../composables/useT';
 import { hhmm } from '../lib/clock';
+import { cancellationNote } from '../lib/states';
 import type { BookingSource, FreeTableOut, ReservationIn, ReservationOut, ReservationPatchIn } from '../operations';
 
 const props = defineProps<{
@@ -210,6 +212,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
           v-if="notesOnly && reservation"
           tone="info"
           data-testid="reservation-form-notes-only"
+          :heading="cancellationNote(reservation, t) || undefined"
         >
           {{ $t('reservation.form.notesOnly', { status: t(`reservation.status.${reservation.status}`).toLowerCase() }) }}
         </InlineFeedback>
