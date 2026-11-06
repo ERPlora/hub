@@ -378,7 +378,10 @@ Entra: el formulario.
 Sale: la regla activa y `pricing.rule.created`.
 Si falla: debajo de su campo: «Ya existe una regla con ese código. Elige otro.», un valor que falta o
 fuera de rango para su tipo, tramos repetidos o desordenados, una categoría, un producto o un servicio
-que no existe, «Hasta» antes que «Desde».
+que no existe, «Hasta» antes que «Desde». **Crear** (y **Guardar** al editarla, PRICING-F11) está en gris
+mientras el negocio no haya dicho todavía su moneda, porque el importe por unidad se lee en ella (sin
+ella, «1500» yenes se guardaría como 150 000); hasta entonces, salir del importe lo deja como se
+escribió, sin inventarle decimales.
 Implicados: Inventario, Servicios, Clientes
 
 ### PRICING-F11 Editar una regla

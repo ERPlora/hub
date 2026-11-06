@@ -11,6 +11,7 @@
 import { Combo, type ComboOption } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
+import { expectSaveWaitsForMoney } from '../../../../base/frontend/__tests__/save-waits-for-money';
 import type { MemberOut, RoleOut } from '../operations';
 import {
   BUSINESS,
@@ -73,12 +74,12 @@ const ROUTES = {
 
 async function setup(
   member: MemberOut | null = null,
-  options: MountOptions & { routes?: Record<string, [number, unknown]>; business?: Parameters<typeof business>[0] } = {},
+  options: MountOptions & { routes?: Record<string, [number, unknown]>; business?: Parameters<typeof business>[0] | null } = {},
 ) {
   const m = await mountStaff(MemberFormModal, { props: { open: false, member }, ...options });
   m.answerBy({ ...ROUTES, ...options.routes });
-  // The business answered before the dialog opens (`options.business`).
-  if (options.business) {
+  // The business answered before the dialog opens: in Spain unless `options.business` says another; `null`, not yet.
+  if (options.business !== null) {
     await m.live();
     await m.result(BUSINESS, business(options.business));
   }
@@ -398,7 +399,7 @@ describe('MemberFormModal: the business\'s currency (staff-business-currency)', 
   }
 
   it('a business in Poland types the rate in złoty: «zł» at the end of the field, never «€»', async () => {
-    const s = await setup(ROW, { locale: 'es' });
+    const s = await setup(ROW, { locale: 'es', business: null });
     await answer(s, POLISH);
     expect(symbol(s)).toBe('zł');
     expect(s.field('hourly_rate').value).toBe('12,50');
@@ -408,19 +409,19 @@ describe('MemberFormModal: the business\'s currency (staff-business-currency)', 
   });
 
   it('a business in Spain still types it in euros', async () => {
-    const s = await setup(null);
+    const s = await setup(null, { business: null });
     await answer(s, {});
     expect(symbol(s)).toBe('€');
   });
 
   it('until the business answers, the field shows no symbol, never «€»', async () => {
-    const s = await setup(null);
+    const s = await setup(null, { business: null });
     expect(symbol(s)).toBeNull();
   });
 
   // gh:staff#64: in yen what is typed is yen: «1500» is 1500, not 150000.
   it('a business in Japan types whole yen: «1500» goes as 1500', async () => {
-    const s = await setup(null);
+    const s = await setup(null, { business: null });
     await answer(s, JAPANESE);
     expect(symbol(s)).toBe('¥');
     await ionValue(s.field('first_name'), 'Bea', 'ionInput');
@@ -431,7 +432,7 @@ describe('MemberFormModal: the business\'s currency (staff-business-currency)', 
   });
 
   it('a rate read before the business answers is rewritten in its decimals when it does, and saving it unchanged sends nothing', async () => {
-    const s = await setup(ROW, { routes: YEN_PAY });
+    const s = await setup(ROW, { routes: YEN_PAY, business: null });
     expect(s.field('hourly_rate').value).toBe('15.00');
     await answer(s, JAPANESE);
     expect(s.field('hourly_rate').value).toBe('1500');
@@ -447,14 +448,26 @@ describe('MemberFormModal: the business\'s currency (staff-business-currency)', 
   });
 
   it('a rate typed before the business answers stays as typed and is read in its currency when saving', async () => {
-    const s = await setup(ROW, { routes: YEN_PAY });
+    const s = await setup(ROW, { routes: YEN_PAY, business: null });
     await ionValue(s.field('hourly_rate'), '1600', 'ionInput');
     await answer(s, JAPANESE);
     expect(s.field('hourly_rate').value).toBe('1600');
     await click(s.save());
     expect(s.posts().map((c) => c.body)).toEqual([{ id: 'm1', hourly_rate: 1600 }]);
   });
+
+  it('a rate typed in a new record before the business answers is never read without it: Save waits in grey, then «1500» is 1500 yen (hub#921)', async () => {
+    const s = await setup(null, { business: null });
+    await ionValue(s.field('first_name'), 'Bea', 'ionInput');
+    await ionValue(s.field('last_name'), 'Ruiz', 'ionInput');
+    await ionValue(s.field('hourly_rate'), '1500', 'ionInput');
+    await expectSaveWaitsForMoney({ ...s, sent: s.posts, amount: () => s.field('hourly_rate'), settle }, () => answer(s, JAPANESE));
+    expect(s.field('hourly_rate').value).toBe('1500');
+    await click(s.save());
+    expect(s.posts().map((c) => (c.body as { hourly_rate: number }).hourly_rate)).toEqual([1500]);
+  });
 });
+
 
 describe('MemberFormModal: who may open it', () => {
   it('an employee never gets here (no «+», no row to open), and reads no account', async () => {
