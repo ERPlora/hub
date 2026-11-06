@@ -14,7 +14,8 @@ import type { LiveClient } from '@erplora/ui/sdk';
 import type { VueWrapper } from '@vue/test-utils';
 import { expect } from 'vitest';
 
-import { errorFrame } from '../../../packages/ui/src/sdk/__tests__/live-harness';
+import { errorFrame, flush, resultFrame } from '../../../packages/ui/src/sdk/__tests__/live-harness';
+import { business, IN_YEN } from './business';
 
 type Control = HTMLElement & { disabled?: boolean; errorText?: string };
 
@@ -54,7 +55,7 @@ export interface MoneyRead {
   fail: () => Promise<unknown>;
   /** How many times the tab has asked the server so far (the stream's opens): «Retry» asks once more. */
   asked: () => number;
-  /** The business answers its money, on the stream «Retry» opened. */
+  /** The business answers its money (in yen), on the stream «Retry» opened. */
   answer: () => Promise<unknown>;
 }
 
@@ -64,18 +65,42 @@ export interface LiveHarness {
   net: { streams: readonly unknown[]; lastStream: () => { push: (text: string) => void } };
 }
 
-/** The read of the money of the tab `m` streams: it fails with `base.hub_busy` on the newest stream, and `answer` is
- *  the app's own (`m.result('base.business.get', …)`). */
-export function moneyReadOf(m: LiveHarness, answer: () => Promise<unknown>): MoneyRead {
+/** The read of the money of the tab `m` streams: it fails with `base.hub_busy` and the business answers in yen, each on
+ *  the newest stream. */
+export function moneyReadOf(m: LiveHarness): MoneyRead {
+  const subscription = (): string => {
+    const sub = m.client.stream.subscriptions('base.business.get')[0];
+    if (!sub) throw new Error('the window does not follow the business’s money');
+    return sub.id;
+  };
   return {
     fail: async () => {
-      const sub = m.client.stream.subscriptions('base.business.get')[0];
-      if (!sub) throw new Error('the window does not follow the business’s money');
-      m.net.lastStream().push(errorFrame(sub.id, 'base.hub_busy'));
+      m.net.lastStream().push(errorFrame(subscription(), 'base.hub_busy'));
+      await flush();
     },
     asked: () => m.net.streams.length,
-    answer,
+    answer: async () => {
+      m.net.lastStream().push(resultFrame(subscription(), business(IN_YEN), 1));
+      await flush();
+    },
   };
+}
+
+/** An app's mounted window (`mountCash`, `mountSale`…): its live harness, its wrapper and its hooks by testid. */
+export interface MountedWindow extends LiveHarness {
+  wrapper: VueWrapper;
+  inDoc: (testid: string) => HTMLElement | null;
+}
+
+/** `expectSaysMoneyUnreadable` on an app's window mounted with `business: null`: `save` is its «Save» (its testid) and
+ *  `sent` what it has sent or handed up. */
+export function expectWindowSaysMoneyUnreadable(m: MountedWindow, save: string, sent: () => unknown[]): Promise<void> {
+  const settle = async (): Promise<void> => {
+    await flush();
+    await flush();
+  };
+  const window = { wrapper: m.wrapper, save: () => m.inDoc(save), amount: () => null, sent, settle };
+  return expectSaysMoneyUnreadable(window, moneyReadOf(m));
 }
 
 const NOTICE = '[data-testid="base-money-error"]';

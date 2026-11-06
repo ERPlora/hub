@@ -8,7 +8,8 @@
 import { toastSuccess } from '@erplora/ui/shell';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { business, click, errorFrame, expectSaysTheMoneyUnreadable, flush, ionValue, JAPANESE, mountCash } from '../__tests__/mount-cash-register';
+import { business, click, errorFrame, flush, ionValue, JAPANESE, mountCash } from '../__tests__/mount-cash-register';
+import { expectWindowSaysMoneyUnreadable } from '../../../../base/frontend/__tests__/save-waits-for-money';
 import { plain } from '../lib/money';
 import CloseSessionForm from './CloseSessionForm.vue';
 
@@ -262,6 +263,6 @@ describe('CloseSessionForm: a business whose money cannot be read (hub#938)', ()
     const s = await setup('en', { business: null });
     await s.ready(1500, []);
     await ionValue(s.counted(), '1500', 'ionInput');
-    await expectSaysTheMoneyUnreadable(s, 'cash-register-close-submit');
+    await expectWindowSaysMoneyUnreadable(s, 'cash-register-close-submit', s.sent);
   });
 });

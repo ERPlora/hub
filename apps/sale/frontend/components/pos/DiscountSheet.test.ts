@@ -5,7 +5,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { h, ref } from 'vue';
 
-import { click, errorFrame, expectSaysTheMoneyUnreadable, expectWaitsForTheYen, mountSale, settle } from '../../__tests__/mount-sale';
+import { click, errorFrame, expectWaitsForTheYen, mountSale, settle } from '../../__tests__/mount-sale';
+import { expectWindowSaysMoneyUnreadable } from '../../../../../base/frontend/__tests__/save-waits-for-money';
 import { plain } from '../../lib/format';
 import DiscountSheet from './DiscountSheet.vue';
 
@@ -134,7 +135,7 @@ describe('DiscountSheet: a business whose money cannot be read (hub#938)', () =>
   it('a fixed amount says so with «Retry» instead of waiting in grey without a word; once the yen arrives it lights up', async () => {
     const m = await setup({ amount: 500 }, 'en', { business: null });
     await m.press('1', '5', '0', '0');
-    await expectSaysTheMoneyUnreadable(m, 'pos-discount-apply', () => m.sheet().emitted('apply') ?? []);
+    await expectWindowSaysMoneyUnreadable(m, 'pos-discount-apply', () => m.sheet().emitted('apply') ?? []);
   });
 
   it('a percentage reads no money: the failure says nothing there and it still applies', async () => {

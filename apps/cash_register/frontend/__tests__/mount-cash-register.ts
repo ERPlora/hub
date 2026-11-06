@@ -16,11 +16,7 @@ import {
   resultFrame,
   type StreamCall,
 } from '../../../../packages/ui/src/sdk/__tests__/live-harness';
-import {
-  expectSaveWaitsForMoney,
-  expectSaysMoneyUnreadable,
-  moneyReadOf,
-} from '../../../../base/frontend/__tests__/save-waits-for-money';
+import { expectSaveWaitsForMoney } from '../../../../base/frontend/__tests__/save-waits-for-money';
 import type { Business } from '../../../../base/frontend/operations';
 import { OPERATION_ROUTES } from '../../../../frontend/generated/operation-routes';
 import baseEn from '../../../../base/frontend/locale/en.json';
@@ -213,13 +209,6 @@ export function mountComposable(use: () => void, options: Omit<MountOptions, 'pr
 export function expectWaitsForTheYen(m: Awaited<ReturnType<typeof mountCash>>, save: string, amount: string): Promise<void> {
   const window = { wrapper: m.wrapper, save: () => m.inDoc(save), amount: () => m.inDoc(amount), sent: m.sent, settle };
   return expectSaveWaitsForMoney(window, () => m.result('base.business.get', business(JAPANESE)));
-}
-
-/** The business's money cannot be read (hub#938): the window says so with «Retry», «Save» still grey and nothing sent;
- *  «Retry» asks again and, once the yen arrives, «Save» lights up. */
-export function expectSaysTheMoneyUnreadable(m: Awaited<ReturnType<typeof mountCash>>, save: string): Promise<void> {
-  const window = { wrapper: m.wrapper, save: () => m.inDoc(save), amount: () => null, sent: m.sent, settle };
-  return expectSaysMoneyUnreadable(window, moneyReadOf(m, () => m.result('base.business.get', business(JAPANESE))));
 }
 
 /** Lets Vue render and a dialog's `didPresent` (next tick) land. */

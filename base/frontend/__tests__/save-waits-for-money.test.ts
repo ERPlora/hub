@@ -12,7 +12,7 @@ import { defineComponent, h, nextTick, ref } from 'vue';
 
 import BusinessMoneyError from '../components/BusinessMoneyError.vue';
 import { useBusinessMoney } from '../lib/money';
-import { business, flush, mountBase, resultFrame, subId } from './mount-base';
+import { flush, mountBase } from './mount-base';
 import { expectSaveWaitsForMoney, expectSaysMoneyUnreadable, moneyReadOf } from './save-waits-for-money';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
@@ -163,11 +163,7 @@ async function waitingFor(money: { kind: 'form' | 'sheet'; says: boolean; lights
     sent: () => sent,
     settle,
   };
-  const read = moneyReadOf(m, async () => {
-    m.net.lastStream().push(resultFrame(subId(m.client, 'base.business.get'), business(), 1));
-    await settle();
-  });
-  return { window, read };
+  return { window, read: moneyReadOf(m) };
 }
 
 describe('expectSaysMoneyUnreadable (hub#938)', () => {

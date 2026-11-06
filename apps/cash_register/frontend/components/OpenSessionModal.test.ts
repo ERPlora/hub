@@ -5,7 +5,8 @@
 import { toastSuccess } from '@erplora/ui/shell';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { click, expectSaysTheMoneyUnreadable, expectWaitsForTheYen, ionValue, mountCash } from '../__tests__/mount-cash-register';
+import { click, expectWaitsForTheYen, ionValue, mountCash } from '../__tests__/mount-cash-register';
+import { expectWindowSaysMoneyUnreadable } from '../../../../base/frontend/__tests__/save-waits-for-money';
 import OpenSessionModal from './OpenSessionModal.vue';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
@@ -112,12 +113,18 @@ describe('OpenSessionModal', () => {
   });
 });
 
+/** The window open with no drawer and «1500» typed as the float, `base.business.get` not answered (hub#921). */
+async function floatTypedBeforeTheMoney() {
+  const m = await mountCash(OpenSessionModal, { props: { open: true }, business: null });
+  await m.live();
+  await m.result(REGISTERS, page([]));
+  await ionValue(m.inDoc('cash-register-open-balance'), '1500', 'ionInput');
+  return m;
+}
+
 describe('OpenSessionModal: before the business answers its money (hub#921)', () => {
   it('«Open session» waits in grey and reads no float; once the yen arrives «1500» is 1500', async () => {
-    const m = await mountCash(OpenSessionModal, { props: { open: true }, business: null });
-    await m.live();
-    await m.result(REGISTERS, page([]));
-    await ionValue(m.inDoc('cash-register-open-balance'), '1500', 'ionInput');
+    const m = await floatTypedBeforeTheMoney();
     m.answer(201, { id: 's1', number: 'S-261014-0001', status: 'open' });
     await expectWaitsForTheYen(m, 'cash-register-open-submit', 'cash-register-open-balance');
     await click(m.inDoc('cash-register-open-submit'));
@@ -127,10 +134,7 @@ describe('OpenSessionModal: before the business answers its money (hub#921)', ()
 
 describe('OpenSessionModal: a business whose money cannot be read (hub#938)', () => {
   it('says so with «Retry» instead of waiting in grey without a word; once the yen arrives «Open session» lights up', async () => {
-    const m = await mountCash(OpenSessionModal, { props: { open: true }, business: null });
-    await m.live();
-    await m.result(REGISTERS, page([]));
-    await ionValue(m.inDoc('cash-register-open-balance'), '1500', 'ionInput');
-    await expectSaysTheMoneyUnreadable(m, 'cash-register-open-submit');
+    const m = await floatTypedBeforeTheMoney();
+    await expectWindowSaysMoneyUnreadable(m, 'cash-register-open-submit', m.sent);
   });
 });

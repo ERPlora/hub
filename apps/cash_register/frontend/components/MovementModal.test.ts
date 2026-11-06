@@ -5,7 +5,8 @@
 import { toastSuccess } from '@erplora/ui/shell';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { click, expectSaysTheMoneyUnreadable, expectWaitsForTheYen, ionValue, mountCash } from '../__tests__/mount-cash-register';
+import { click, expectWaitsForTheYen, ionValue, mountCash } from '../__tests__/mount-cash-register';
+import { expectWindowSaysMoneyUnreadable } from '../../../../base/frontend/__tests__/save-waits-for-money';
 import { plain } from '../lib/money';
 import MovementModal from './MovementModal.vue';
 
@@ -113,6 +114,6 @@ describe('MovementModal: a business whose money cannot be read (hub#938)', () =>
     await m.live();
     await ionValue(m.inDoc('cash-register-movement-amount'), '1500', 'ionInput');
     await ionValue(m.inDoc('cash-register-movement-concept'), 'Bread', 'ionInput');
-    await expectSaysTheMoneyUnreadable(m, 'cash-register-movement-submit');
+    await expectWindowSaysMoneyUnreadable(m, 'cash-register-movement-submit', m.sent);
   });
 });

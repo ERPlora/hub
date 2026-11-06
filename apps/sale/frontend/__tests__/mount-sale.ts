@@ -19,11 +19,7 @@ import {
   resultFrame,
   type StreamCall,
 } from '../../../../packages/ui/src/sdk/__tests__/live-harness';
-import {
-  expectSaveWaitsForMoney,
-  expectSaysMoneyUnreadable,
-  moneyReadOf,
-} from '../../../../base/frontend/__tests__/save-waits-for-money';
+import { expectSaveWaitsForMoney } from '../../../../base/frontend/__tests__/save-waits-for-money';
 import { HUB_ASSISTANT } from '../../../../base/frontend/lib/assistant-hub';
 import baseEn from '../../../../base/frontend/locale/en.json';
 import baseEs from '../../../../base/frontend/locale/es.json';
@@ -249,14 +245,6 @@ export function expectWaitsForTheYen(
 ): Promise<void> {
   const piece = { wrapper: m.wrapper, save: () => m.inDoc(confirm), amount: () => null, sent: handed, settle, submit };
   return expectSaveWaitsForMoney(piece, () => m.result('base.business.get', business(JAPANESE)));
-}
-
-/** A piece of the till mounted with `business: null` whose money cannot be read (hub#938, `expectSaysMoneyUnreadable`):
- *  it says so with «Retry», `confirm` grey and nothing handed up; «Retry» asks again and, once the yen arrives, `confirm`
- *  lights up. */
-export function expectSaysTheMoneyUnreadable(m: Awaited<ReturnType<typeof mountSale>>, confirm: string, handed: () => unknown[]): Promise<void> {
-  const piece = { wrapper: m.wrapper, save: () => m.inDoc(confirm), amount: () => null, sent: handed, settle };
-  return expectSaysMoneyUnreadable(piece, moneyReadOf(m, () => m.result('base.business.get', business(JAPANESE))));
 }
 
 /** Lets Vue render and a dialog's `didPresent` (next tick) land. */
