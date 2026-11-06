@@ -1283,10 +1283,15 @@ Pasos:
   4. Quien no es propietario ni administrador ve tres: «Registros» no existe para él y, si la pide, se abre «Uso y
      plan». En «Uso y plan» lee «Solo el dueño o un administrador puede ver cuánto está usando el hub.» y en
      «Eventos caídos», «Solo el dueño o un administrador puede ver los eventos caídos.», sin «Reintentar».
-Entra: el papel de la persona en el negocio; a quien no lo administra no se le pide nada que el hub le negaría.
+  5. Al final de «Uso y plan», cualquiera ve las tarjetas que ponen ahí las apps encendidas en el negocio y que la
+     persona puede ver, cada una con lo suyo: la de Impresión es «Tu impresora» (PRINTING-F21). Una app apagada no pone
+     la suya; al encenderla o apagarla, la tarjeta aparece o se va sin recargar.
+Entra: el papel de la persona en el negocio; a quien no lo administra no se le pide nada que el hub le negaría. Las
+tarjetas, de las apps encendidas.
 Sale: nada guardado.
-Si falla: cada pestaña dice lo suyo (BASE-F40 a BASE-F43).
-Implicados: BASE-F40
+Si falla: cada pestaña dice lo suyo (BASE-F40 a BASE-F43). Si no se puede leer qué tarjetas tocan, no sale ninguna y el
+resto de la pestaña sigue; una tarjeta que no carga se queda fuera y las demás salen.
+Implicados: BASE-F40, PRINTING-F21
 
 ### BASE-F40 Ver lo que usa el negocio y si tiene que ampliar el plan
 <!-- origen: old-hub:HUB_SHELL-F136 -->
@@ -2947,7 +2952,18 @@ Implicados: HUBS-F17, WEBSITE-F10
   que es una orden de la propia app, con `device`, y que solo una app la declara. Sin declarar, el socket no avisa a
   nadie. Tests: `base/tests/test_ws_print.py` (sección «The device's presence»).
 - Un panel con `operation` viva (está en un `live.py`) se sigue con `useLive`; si no, se pide una vez
-  (`live` en `WidgetOut`). Un panel con `component` monta `apps/<app>/frontend/components/<Nombre>.vue`.
+  (`live` en `WidgetOut`). Un panel con `component` monta `apps/<app>/frontend/components/<Nombre>.vue`, que carga
+  `frontend/lib/app-components.ts`, la única puerta de `base/frontend` hacia `apps/` (`platform-boundary.test.ts`).
+- Tarjetas de Sistema (hub#683, BASE-F39): una app declara en su `LiveAppConfig` `system_cards`, una lista de
+  `{"key", "component"}` y, si no la ve todo el mundo, `"permission"`. `base.E015` (`base/home.py`) comprueba al arrancar
+  que cada clave es única, que el componente es un nombre (nunca una ruta) con su fichero en
+  `apps/<app>/frontend/components/` y que el permiso es de la app. `base.system.cards` (viva: la foto y
+  encender o apagar una app la re-ejecutan; `GET /api/system/cards`) lista las de las apps encendidas que la persona
+  puede ver, y `SystemAppCards.vue` las monta al final de «Uso y plan», también para quien no administra el negocio.
+  Lo que dice una tarjeta es de su app. Las puertas de erplora.com a la app de ERPlora de cada sistema
+  (`/app/download/<windows|linux|android>/`) van en `hub-home.app_downloads` (`base/spa.py`) para cualquier sesión, y
+  `lib/app-downloads.ts` las ofrece solo en un navegador. Tests: `test_home.py`, `test_queries_home.py`, `test_spa.py`,
+  `SystemAppCards.test.ts` y `app-downloads.test.ts`.
 - Un panel `chart` cuyas etiquetas son días (`YYYY-MM-DD`: día civil de negocio, sin zona) los nombra con
   `Intl` en UTC, nunca con `new Date(<día>)` en la zona del navegador (`isoDay` y `formatDay` de
   `base/frontend/lib/home.ts`): una semana, por su día de la semana corto (`vie`); una serie más larga, por su
