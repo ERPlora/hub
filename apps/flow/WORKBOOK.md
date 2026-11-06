@@ -1127,6 +1127,9 @@ Pasos:
    acción que los lleva, por encima de lo que el asistente mande para ellos o aunque no los mande. Así, la
    respuesta por WhatsApp solo anula o cambia la reserva de quien escribe, aunque le pidan la de otra persona. En
    una automatización que trae otra app, también los que su app fijó después de montarla (FLOW-F36).
+   Aquí el asistente no busca en la web, aunque en el chat pueda: lo que contesta se guarda en la ejecución y en
+   el historial, y los términos del buscador no dejan guardar sus resultados, ni en parte (FLOW-F39). Sí tiene la
+   fecha y la hora de hoy y el tipo de cambio entre monedas, como en el chat.
 3. Lo que el asistente consulta se hace en el acto y no se le pregunta a nadie; el historial dice «El asistente
    ha usado «…».».
 4. Lo que quiere cambiar:
@@ -1155,7 +1158,9 @@ Sale: lo que contestó al final, después de los cambios, para los pasos de desp
 lo pregunte», además, la última respuesta de la persona. Lo que consulta o cambia avisa como si lo hiciera la
 automatización.
 Si falla: lo que no le has concedido no se le ofrece y, si lo pide, no se hace; lo que la acción rechaza
-(«El asistente ha intentado «…», que no lo ha aceptado.») se lo dice al asistente para que lo cuente. Si un dato
+(«El asistente ha intentado «…», que no lo ha aceptado.») se lo dice al asistente para que lo cuente. Si pide
+buscar en la web, no se busca: se le dice que en una automatización no puede, para que lo diga y conteste sin
+ello (FLOW-F39). Si un dato
 fijo queda vacío en esa ejecución (no se encontró la ficha), esa consulta o acción no se hace ni espera un sí: el
 asistente lo sabe, para contarlo, y el historial dice «El asistente ha intentado «…», pero «…», que fija este paso,
 estaba vacío: no se ha hecho.». Si llega
@@ -1179,6 +1184,9 @@ Pantalla: ninguna
 Pasos:
 1. Cada vez que el paso necesita al asistente, el Hub llama a erplora.com con la llave del negocio, sin persona
    delante, igual que un turno del chat que no se pinta (en erplora.com, ASSISTANT-F13): no hay una puerta aparte.
+   Solo se distingue del chat en que no busca en la web: el Hub guarda lo que contesta (en la ejecución y en el
+   historial, FLOW-F38) y los términos del buscador no dejan guardar sus resultados, ni en parte, así que
+   erplora.com no se lo ofrece al asistente ni le habla de ello.
 2. erplora.com gasta los mismos mensajes del mes que el chat: la primera vuelta de cada paso, uno; las vueltas que
    le devuelven lo que consultó o hizo en los 15 minutos siguientes, ninguno (pasado ese tiempo, por ejemplo tras
    esperar el sí de una persona, la vuelta cuenta uno).
@@ -1188,7 +1196,8 @@ Sale: la respuesta para el Hub y el gasto del mes del negocio (`assistant.messag
 erplora.com).
 Si falla: dice si vale la pena repetir: el proveedor caído o un fallo interno, sí; los mensajes del mes acabados,
 un negocio que no funciona o una petición que no cuadra, no. Las automatizaciones y el chat comparten el mismo
-cupo del mes.
+cupo del mes. Si el asistente pide buscar en la web aunque no se le ofrezca, no se busca: recibe el motivo, para
+decirlo, sin que el Hub vea nada ni se gaste nada de las búsquedas del negocio.
 Implicados: FLOW-F37, FLOW-F38
 
 ## Servicios: lo que entra y lo que sale
@@ -1645,6 +1654,9 @@ Los avisos llevan ids, nunca nombres ni contenidos.
 - **No automatiza lo que necesita a una persona delante**: anular o devolver una venta, borrar los datos
   de un cliente, enviar o anular registros en Hacienda… no salen en la lista de acciones. Las únicas excepciones son
   anular una reserva y anular una cita con «Que me lo pregunte», tras el sí de quien puede anularla (FLOW-F37, F38).
+- **El paso del asistente no busca en la web**, aunque el chat pueda: lo que contesta se guarda en la ejecución
+  y en el historial, y los términos del buscador no dejan guardar sus resultados (FLOW-F38, F39; en erplora.com,
+  ASSISTANT-F13).
 - **No ejecuta en pausa**: para eso está Probar.
 - **No reintenta sola** una ejecución que falló: se reanuda a mano desde el paso que falló (FLOW-F24).
 
