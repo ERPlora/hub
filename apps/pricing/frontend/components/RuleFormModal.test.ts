@@ -6,6 +6,8 @@
 import { Combo } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
+import { expectSaveWaitsForMoney } from '../../../../base/frontend/__tests__/save-waits-for-money';
+import type { Business } from '../../../../base/frontend/operations';
 import { business, JAPANESE, KUWAITI, POLISH, rule } from '../__tests__/fixtures';
 import { click, ionValue, mountPricing, settle } from '../__tests__/mount-pricing';
 import RuleFormModal from './RuleFormModal.vue';
@@ -33,6 +35,14 @@ async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 
   return { ...m, field, save, combo, pick };
 }
 
+/** The form opened and the business answered its money: in Spain unless `money` says another. */
+async function setupAnswered(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 'en', money: Partial<Business> = {}) {
+  const s = await setup(props, locale);
+  await s.live();
+  await s.result('base.business.get', business(money));
+  return s;
+}
+
 async function named(s: Awaited<ReturnType<typeof setup>>, code = 'TEN', name = 'Ten off') {
   await ionValue(s.field('code'), code, 'ionInput');
   await ionValue(s.field('name'), name, 'ionInput');
@@ -40,7 +50,7 @@ async function named(s: Awaited<ReturnType<typeof setup>>, code = 'TEN', name = 
 
 describe('RuleFormModal', () => {
   it('asks for a percent by default, for everything, every customer, with priority 100', async () => {
-    const s = await setup();
+    const s = await setupAnswered();
     expect(s.inDoc('pricing-rule-form')?.getAttribute('aria-label')).toBe('New discount rule');
     expect([s.field('rule_type').value, s.field('applies_to').value, s.field('priority').value]).toEqual(['percent', 'all', '100']);
     expect(s.field('percent').label).toBe('Percent (%)');
@@ -56,7 +66,7 @@ describe('RuleFormModal', () => {
   });
 
   it('creates a percent rule on a category for a customer group', async () => {
-    const s = await setup();
+    const s = await setupAnswered();
     s.answer(201, rule());
     await named(s, 'COL', 'Colour 10');
     await ionValue(s.field('percent'), '10', 'ionInput');
@@ -93,7 +103,7 @@ describe('RuleFormModal', () => {
   });
 
   it('an amount per unit, buy X get Y and tiers carry their own values', async () => {
-    const s = await setup();
+    const s = await setupAnswered();
     s.answer(201, rule());
     await named(s, 'FIX', 'Fifty off');
     await ionValue(s.field('rule_type'), 'fixed');
@@ -103,7 +113,7 @@ describe('RuleFormModal', () => {
     expect(s.sent()[0].body).toMatchObject({ rule_type: 'fixed', amount: 50 });
     expect(s.sent()[0].body).not.toHaveProperty('percent');
 
-    const b = await setup();
+    const b = await setupAnswered();
     b.answer(201, rule());
     await named(b, 'BOGO', '2x1');
     await ionValue(b.field('rule_type'), 'buy_x_get_y');
@@ -114,7 +124,7 @@ describe('RuleFormModal', () => {
     await click(b.save());
     expect(b.sent()[0].body).toMatchObject({ rule_type: 'buy_x_get_y', buy_quantity: 2, get_quantity: 1, applies_to: 'service', service_id: 's1' });
 
-    const v = await setup();
+    const v = await setupAnswered();
     v.answer(201, rule());
     await named(v, 'VOL', 'Volume');
     await ionValue(v.field('rule_type'), 'tiered');
@@ -134,9 +144,7 @@ describe('RuleFormModal', () => {
   });
 
   it('an amount per unit is typed in the business’s currency: in Poland «0,50 zł», never a euro one', async () => {
-    const s = await setup();
-    await s.live();
-    await s.result('base.business.get', business(POLISH));
+    const s = await setupAnswered({}, 'en', POLISH);
     s.answer(201, rule());
     await named(s, 'FIX', 'Fifty off');
     await ionValue(s.field('rule_type'), 'fixed');
@@ -148,7 +156,7 @@ describe('RuleFormModal', () => {
   });
 
   it('a refusal is said under its field and what was typed stays', async () => {
-    const s = await setup();
+    const s = await setupAnswered();
     const message = 'A discount rule with that code already exists. Pick a different code.';
     s.answer(409, { error: { code: 'pricing.duplicate_code', message, fields: { code: message } } });
     await named(s);
@@ -159,7 +167,7 @@ describe('RuleFormModal', () => {
   });
 
   it('edits a rule sending only what changed, its new type with its value', async () => {
-    const s = await setup({ rule: rule({ applies_to: 'product', product_id: 'p1', product_name: 'Shampoo', min_quantity: '2.000' }) });
+    const s = await setupAnswered({ rule: rule({ applies_to: 'product', product_id: 'p1', product_name: 'Shampoo', min_quantity: '2.000' }) });
     expect(s.inDoc('pricing-rule-form')?.getAttribute('aria-label')).toBe('Editing rule — Ten off');
     expect([s.field('percent').value, s.field('min_quantity').value]).toEqual(['10', '2']);
     expect(s.combo('target').props('modelValue')).toEqual({ id: 'p1', label: 'Shampoo' });
@@ -168,7 +176,7 @@ describe('RuleFormModal', () => {
     await click(s.save());
     expect(s.sent()).toEqual([{ method: 'POST', path: '/api/pricing/rules/update', query: {}, body: { id: 'r1', name: 'Ten off shampoo' } }]);
 
-    const f = await setup({ rule: rule() });
+    const f = await setupAnswered({ rule: rule() });
     f.answer(200, rule());
     await ionValue(f.field('rule_type'), 'fixed');
     await ionValue(f.field('amount'), '1', 'ionInput');
@@ -177,7 +185,7 @@ describe('RuleFormModal', () => {
   });
 
   it('speaks Spanish', async () => {
-    const s = await setup({}, 'es');
+    const s = await setupAnswered({}, 'es');
     expect(s.inDoc('pricing-rule-form')?.getAttribute('aria-label')).toBe('Nueva regla de descuento');
     expect([s.field('percent').label, s.field('applies_to').label]).toEqual(['Porcentaje (%)', 'Se aplica a']);
   });
@@ -212,7 +220,7 @@ describe('RuleFormModal: the business answers after the form opened', () => {
   });
 
   it('what the person already typed stays and is read in the business’s currency: «2,50» in Poland is 250 grosze', async () => {
-    const s = await setup();
+    const s = await setup({});
     s.answer(201, rule());
     await named(s, 'FIX', 'Fifty off');
     await ionValue(s.field('rule_type'), 'fixed');
@@ -238,4 +246,24 @@ describe('RuleFormModal: the business answers after the form opened', () => {
     expect(s.field('amount').value).toBe('1,75');
     expect(s.field('amount').errorText).toBe(NOT_AMOUNT);
   });
+
+  // «1500» reads in any money, so alone it would not tell a guard put after the reading: «¥1500» is not an amount until
+  // the money is known, and the field must not say so while the window waits.
+  it.each(['1500', '¥1500'])(
+    'an amount per unit typed before the business answers is never read without it: «Create» waits in grey and the field says nothing, then «%s» is 1500 yen (hub#921)',
+    async (typed) => {
+      const s = await setup({});
+      await named(s, 'FIX', 'Yen off');
+      await ionValue(s.field('percent'), '10', 'ionInput');
+      expect(s.save().disabled).toBe(true);
+      await ionValue(s.field('rule_type'), 'fixed');
+      await ionValue(s.field('amount'), typed, 'ionInput');
+      s.answer(201, rule({ ...FIXED, amount: 1500 }));
+      await s.live();
+      await expectSaveWaitsForMoney({ ...s, amount: () => s.field('amount'), settle }, () => s.result('base.business.get', business(JAPANESE)));
+      expect([s.field('amount').value, s.field('amount').errorText]).toEqual([typed, undefined]);
+      await click(s.save());
+      expect(s.sent().map((call) => (call.body as { amount: number }).amount)).toEqual([1500]);
+    },
+  );
 });

@@ -9,8 +9,8 @@
 // The server judges: its 422 goes under each field, a 409 on top; the dialog keeps what was typed.
 // The hourly rate is typed in the business's currency (its country's, with the decimals the server counts:
 // staff-business-currency), its symbol at the end of the field; until the business answers, two decimals and no
-// symbol. If it answers with the dialog open, the rate as loaded is rewritten in its decimals and what was
-// typed is read in it when saving.
+// symbol, and Save waits in grey (the rate is read in its money; hub#921). If it answers with the dialog open, the rate
+// as loaded is rewritten in its decimals and what was typed is read in it when saving.
 import { Combo, type ComboOption, FormModal, InlineFeedback } from '@erplora/ui/components';
 import { ApiError, useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { useSession } from '@erplora/ui/shell';
@@ -180,7 +180,11 @@ const text = (value: unknown): string => (value === null || value === undefined 
 const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'ion-touched': !!message });
 
 async function save(): Promise<void> {
-  const options = { pay: canPay.value, money: money.value };
+  // No rate is read before the business answers its money: «1500» would be read with two decimals, whatever its
+  // currency counts (in yen, 150000; hub#921).
+  const currency = money.value;
+  if (!currency) return;
+  const options = { pay: canPay.value, money: currency };
   try {
     if (props.member) await update.run(patchPayload(props.member.id, original.value, form.value, options));
     else await creation.run(createPayload(form.value, options));
@@ -198,7 +202,7 @@ async function save(): Promise<void> {
     :title="title"
     :pending="pending"
     :error="error"
-    :submit-disabled="!complete || loading || !!loadError"
+    :submit-disabled="!money || !complete || loading || !!loadError"
     @submit="save"
   >
     <template #default="{ fieldErrors }">

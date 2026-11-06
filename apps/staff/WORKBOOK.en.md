@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:51d976baa12ca42c3e7e0610ffaaa9d6bd4fe27f768755609dc3fe1a61783b1c -->
+<!-- generated from WORKBOOK.md sha256:25b59af10bd6e114c97a0deaa1e9427570d59dccb2d260ddfd5207eef418723c -->
 
 ## What it is for and who it is for
 
@@ -196,7 +196,8 @@ access to this business." or the account already linked to another record (STAFF
 the pay cannot send it: "Permission “{permission}” is required.". Two records with the same name, email or
 employee ID are accepted. From the assistant, a role the business does not have (or that has been retired)
 is checked before the confirmation card: no card shows, the assistant says that role is not available and
-nothing is created.
+nothing is created. Save (also when editing, STAFF-F02) is grey while the business has not yet said its
+currency, because the hourly rate is read in it (without it, "1500" yen would be saved as 150,000).
 Involved: BASE-F97
 
 ### STAFF-F02 Edit a professional's record
