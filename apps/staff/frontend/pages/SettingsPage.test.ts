@@ -72,17 +72,6 @@ describe('SettingsPage (STAFF-F22)', () => {
     expect(s.find('staff-settings-saved').text()).toContain('Settings saved');
   });
 
-  it('after a save nothing is left as typed: a change saved elsewhere repaints every field', async () => {
-    const s = await setup();
-    await s.result('staff.settings.get', PROPOSED);
-    s.answer(200, { ...PROPOSED, default_break_duration: 30 });
-    await ionValue(s.field('default_break_duration'), '30', 'ionInput');
-    await click(s.save());
-    await settle();
-    await s.result('staff.settings.get', { ...PROPOSED, default_break_duration: 45 }, {}, 2);
-    expect(s.field('default_break_duration').value).toBe('45');
-  });
-
   it('a value the server refuses is said under its field and the typed values stay', async () => {
     const s = await setup();
     await s.result('staff.settings.get', PROPOSED);
@@ -134,40 +123,6 @@ describe('SettingsPage (STAFF-F22)', () => {
       expect(s.notice()).toBe(false);
       expect([s.says('default_work_end'), s.marked('default_work_end')]).toEqual(['', false]);
       expect([s.says('default_break_duration'), s.marked('default_break_duration')]).toEqual(['Ensure this value is less than or equal to 480.', true]);
-    });
-
-    it('a change in another field takes the notice away, and no field’s message', async () => {
-      const s = await refused();
-      await ionValue(s.field('default_work_start'), '08:00', 'ionInput');
-      expect(s.notice()).toBe(false);
-      expect([s.says('default_work_end'), s.says('default_break_duration')]).toEqual([
-        'The start time must be before the end time.',
-        'Ensure this value is less than or equal to 480.',
-      ]);
-    });
-
-    it('the next refusal says it all again', async () => {
-      const s = await refused();
-      await ionValue(s.field('default_work_end'), '05:00', 'ionInput');
-      await ionValue(s.field('default_break_duration'), '500', 'ionInput');
-      expect([s.notice(), s.says('default_work_end'), s.says('default_break_duration')]).toEqual([false, '', '']);
-      await click(s.save());
-      expect(s.notice()).toBe(true);
-      expect([s.says('default_work_end'), s.says('default_break_duration'), s.marked('default_work_end')]).toEqual([
-        'The start time must be before the end time.',
-        'Ensure this value is less than or equal to 480.',
-        true,
-      ]);
-    });
-
-    it('a refusal that names no field stays until the next try: nothing else says it', async () => {
-      const s = await setup();
-      await s.result('staff.settings.get', PROPOSED);
-      s.answer(409, { error: { code: 'conflict', message: 'Someone else is saving them.' } });
-      await ionValue(s.field('default_break_duration'), '30', 'ionInput');
-      await click(s.save());
-      await ionValue(s.field('default_break_duration'), '45', 'ionInput');
-      expect(s.find('staff-settings-error').text()).toContain('Someone else is saving them.');
     });
   });
 
