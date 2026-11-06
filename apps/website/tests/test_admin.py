@@ -62,3 +62,25 @@ def test_the_staff_see_whose_hub_each_row_is():
     for model in MODELS:
         model_admin = admin.site._registry[model]
         assert "hub_id" in model_admin.list_display and "hub_id" in model_admin.fields, model
+
+
+@pytest.mark.django_db
+def test_the_admin_in_spanish_says_the_websites_own_words(client, superuser):
+    """The staff read the site and its images in Página web's words (hub#661): the site is «Página web» and feminine
+    («Actualizada el», «Actualizada por», like its «Publicada el»), an image «Creada el»; not Clientes' «Web» nor Demo's
+    and Clientes' masculine."""
+    site = Site.objects.create(hub_id=uuid.uuid7(), updated_by="ana")
+    Image.objects.create(
+        hub_id=site.hub_id, key="a/logo.png", sha256="0" * 64, content_type="image/png", width=1, height=1, size=1
+    )
+    client.force_login(superuser)
+    spanish = {"HTTP_HOST": "hubs.localhost", "HTTP_ACCEPT_LANGUAGE": "es"}
+    change = client.get(f"/admin/website/site/{site.pk}/change/", **spanish)
+    images = client.get("/admin/website/image/", **spanish)
+    assert (change.status_code, images.status_code) == (200, 200)
+    page, listing = change.content.decode(), images.content.decode()
+    assert "<label>Publicada el:</label>" in page  # the page is in Spanish: a label the site already says alone
+    assert "<label>Actualizada el:</label>" in page and "<label>Actualizada por:</label>" in page
+    assert "&rsaquo; Página web" in page  # the breadcrumb names the site
+    assert ">Creada el</a>" in listing  # the images' column
+    assert "Actualizado" not in page and "&rsaquo; Web\n" not in page and "Creado el" not in listing
