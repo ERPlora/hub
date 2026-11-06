@@ -6,7 +6,7 @@
 // category are missing; amounts and quantities are read as typed; an edit sends only what changed;
 // a refusal stays in the dialog under its field. «Tax category» and «Categories» are `Combo` fields of
 // @erplora/ui that search the server (TaxCategorySelect, ProductCategoriesField).
-import { Combo, type ComboOption } from '@erplora/ui/components';
+import { Combo, type ComboOption, FormModal } from '@erplora/ui/components';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { Business } from '../../../../base/frontend/operations';
@@ -347,6 +347,10 @@ describe('ProductFormModal: editing', () => {
       await s.submit();
       expect(s.calls('/api/inventory/products').map((call) => (s.body(call) as { price: number }).price)).toEqual([]);
       expect(s.el('inventory-product-form-submit')?.disabled).toBe(true);
+      // Nor does a submit that gets past the grey button read the price: the form waits, saying nothing.
+      s.wrapper.findComponent(FormModal).vm.$emit('submit');
+      await flush();
+      expect([s.calls('/api/inventory/products'), s.el('inventory-product-price')?.errorText]).toEqual([[], undefined]);
       await s.answer(JAPANESE);
       expect(s.el('inventory-product-form-submit')?.disabled).toBe(false);
       await s.submit();

@@ -4,7 +4,7 @@
 // sale» (ticked). A menu eaten in without a VAT category is refused before it is sent. Editing sends
 // only what changed. Refusals stay in the dialog, under their field. The closed price is in the business's currency
 // («Closed price (PLN)», with its decimals); just «Closed price» while the business has not answered.
-import { Combo } from '@erplora/ui/components';
+import { Combo, FormModal } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { Business } from '../../../../base/frontend/operations';
@@ -209,6 +209,10 @@ describe('MenuFormModal: in the business’s currency', () => {
     await click(s.save());
     expect(s.sent().map((call) => (call.body as { price: number }).price)).toEqual([]);
     expect(s.save().disabled).toBe(true);
+    // Nor does a submit that gets past the grey button read the price: the form waits, saying nothing.
+    s.wrapper.findComponent(FormModal).vm.$emit('submit');
+    await settle();
+    expect([s.sent(), s.field('price').errorText]).toEqual([[], undefined]);
     await s.result('base.business.get', business(JAPANESE));
     expect(s.save().disabled).toBe(false);
     await click(s.save());

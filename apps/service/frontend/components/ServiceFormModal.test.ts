@@ -3,7 +3,7 @@
 // with «Create service», which cannot be pressed without a name and a tax category; with no tax
 // category in Taxes at all it says where to make them. A row opens «Editing service — {name}» with
 // «Save changes», which sends only what changed, and below it who performs the service.
-import { Combo, InlineFeedback } from '@erplora/ui/components';
+import { Combo, FormModal, InlineFeedback } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { ServiceOut, SettingsOut } from '../operations';
@@ -245,6 +245,10 @@ describe('ServiceFormModal: in the business currency (service-business-currency)
     await click(s.save());
     expect(s.sent().map((call) => (call.body as { price: number }).price)).toEqual([]);
     expect(s.save().disabled).toBe(true);
+    // Nor does a submit that gets past the grey button read the price: the form waits, saying nothing.
+    s.wrapper.findComponent(FormModal).vm.$emit('submit');
+    await settle();
+    expect([s.sent(), s.field('price').errorText]).toEqual([[], undefined]);
     await s.result('base.business.get', business(JAPANESE));
     expect(s.save().disabled).toBe(false);
     await click(s.save());
