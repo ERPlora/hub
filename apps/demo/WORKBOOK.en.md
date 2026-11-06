@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:edd64b15355bb1bc8f51bdada980e951fa70defa18a8e8e67992b886edea663f -->
+<!-- generated from WORKBOOK.md sha256:913d961424a0709605ecd70a0c3b3f2797d9ab738c939df90e49d6452f4b16ef -->
 
 ## What it is for and who it is for
 
@@ -195,7 +195,9 @@ Involved: none
 ## Services: what goes in and what comes out
 
 Everything can be requested through the screens, the assistant (phase 2) and the API, with the same
-rules and the same permissions.
+rules and the same permissions. Before changing or deleting an item or adding a line to it, the assistant asks for
+confirmation with its card (BASE-F97), which names the item as the screens name it, never by its id: by its name
+("Item: Mesa 4"), and the status by its word ("Open", "Done"). What the person asking cannot see is left out.
 
 ### What it offers: queries (they read and change nothing; all of them can be followed live)
 
