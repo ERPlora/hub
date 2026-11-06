@@ -7,6 +7,8 @@ ratchet below), and nothing Automations said as money by its words stops being s
 say nothing (a service's or a menu's price, an invoice's total, a check's provisional total, a voucher's amount, a
 cash movement's signed amount) carry it too, and the ratchet's net is the schemas themselves, not only those words.
 hub#915: a cart's line, a price of a list and a rule's amount per unit carry it as well, beside the currency each is in.
+hub#926: a charge preview's legal limits carry it too, in the euros the law writes them in whatever the business charges
+in: their mark names the datum beside them that says so (``currency_in``: ``limits_currency``), and the ratchet is zero.
 """
 
 import datetime as dt

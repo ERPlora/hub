@@ -18,6 +18,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 from django.utils import timezone
+from live.context import system_context
 from live.models import OutboxEvent
 from live.operations import Operation, registry
 from ninja import Field, Schema
@@ -26,6 +27,7 @@ from apps.flow.models import Flow, FlowRun, Question
 from apps.task.models import Task
 from apps.whatsapp_inbox.models import Message
 from apps.whatsapp_inbox.tests.conftest import connect, receive
+from base.models import Hub
 
 from .conftest import A, ctx_for, make_flow, run
 
@@ -34,6 +36,7 @@ pytestmark = pytest.mark.django_db
 MADRID = ZoneInfo("Europe/Madrid")
 NOON = dt.datetime(2026, 10, 15, 12, 0, tzinfo=MADRID)
 NOTIFY = "whatsapp_inbox.message.notify"
+PREVIEW = "sale.checkout.preview"
 #: What a run brings: a yes or no, an instant, a day, an hour, an undeclared number and a phone.
 INPUT = {
     "name": "Ana",
@@ -229,6 +232,22 @@ def test_a_whatsapp_to_a_customer_says_an_amount_in_the_currency_its_step_answer
     done = run("flow.flow.run", {"id": str(flow.id), "input": INPUT})
     assert done.status == FlowRun.Status.SUCCEEDED, done
     assert Message.objects.get(direction="outbound").body == "Total: 120,50\xa0US$."
+
+
+def test_a_whatsapp_to_a_customer_says_a_charge_s_legal_limit_in_euros_in_a_business_in_yen(chatting):
+    # hub#926: as the question (FLOW-F28), a charge preview's cash limit reaches the customer in the euros the law
+    # writes it in, never as «100000» nor in the business's yen; its total, in yen.
+    Hub.objects.filter(slug=A.key).update(country="JP")
+    coffee = {"name": "Coffee", "sku": "COF", "price": 1250, "tax_category_key": "product.generic"}
+    run("inventory.product.create", coffee, system_context(A))
+    check = run("sale.order.open", {"lines": [{"product": "COF"}]}, system_context(A))
+    preview = {"id": "s0", "kind": "query", "operation": PREVIEW, "params": {"order_id": str(check.id)}}
+    text = "No cash from {{steps.s0.cash_limit}}. Total: {{steps.s0.total}}."
+    notify = {"id": "s1", "kind": "command", "operation": NOTIFY, "params": {"phone": "input.phone", "text": text}}
+    flow = make_flow(trigger_kind=Flow.Trigger.MANUAL, steps=[preview, notify], grants=[PREVIEW, NOTIFY], language="es")
+    done = run("flow.flow.run", {"id": str(flow.id), "input": INPUT})
+    assert done.status == FlowRun.Status.SUCCEEDED, (done.error_code, done.error_message)
+    assert Message.objects.get(direction="outbound").body == "No cash from 1.000,00\xa0€. Total: 1.250\xa0JPY."
 
 
 def test_trying_a_whatsapp_says_it_as_it_will_go():
