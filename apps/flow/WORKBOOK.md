@@ -436,11 +436,15 @@ Pasos:
    que deja un paso anterior (el de un pago que acaba de registrar, el total de una venta o de una factura, el
    precio de un servicio o de un menú, el total provisional de una cuenta, el importe de un bono, un movimiento
    de caja, el precio y el total de una línea de un carrito, un precio de una tarifa, el descuento fijo de una
-   regla de tarifa) en la moneda en que lo da ese paso: un pago en dólares, en dólares («12,50 US$»); una línea
-   de un carrito, en la de su carrito; un precio de una tarifa, en la de su tarifa; el descuento fijo de una
-   regla, que no es de ninguna tarifa, en la del negocio; el límite de pago en efectivo o de ticket de la vista
-   previa de un cobro, en euros, la moneda en que la ley los fija, también en un negocio que cobra en otra
-   («1.000,00 €»); si no da ninguna, en la del negocio («120,50 €»). Un número que trae el aviso sale tal cual,
+   regla de tarifa), también el que el paso deja dentro de otro dato (el precio y el total de la línea recién
+   añadida a un carrito y el total del carrito tras añadirla, el total de la factura de una venta que lee una
+   consulta, las cifras de una sesión de caja), en la moneda en que lo da ese paso: un pago en dólares, en
+   dólares («12,50 US$»); una línea de un carrito, en la de su carrito; un importe dentro de otro dato, en la que
+   da ese mismo dato (la línea, el carrito, la factura: una línea en dólares de un negocio que cobra en yenes
+   sale en dólares) y, si no da ninguna, en la del paso; un precio de una tarifa, en la de su tarifa; el
+   descuento fijo de una regla, que no es de ninguna tarifa, en la del negocio; el límite de pago en efectivo o
+   de ticket de la vista previa de un cobro, en euros, la moneda en que la ley los fija, también en un negocio
+   que cobra en otra («1.000,00 €»); si no da ninguna, en la del negocio («120,50 €»). Un número que trae el aviso sale tal cual,
    porque el aviso no dice si es dinero. Lo que va a otra acción, a otro sistema o a un «Solo sigue si…» lleva
    cada dato tal cual.
 Entra: las acciones y consultas de las apps activas, el último aviso real de ese tipo y lo que dejan los

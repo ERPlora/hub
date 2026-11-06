@@ -310,25 +310,41 @@ SessionPage = Page[SessionRow]
 
 class SessionSummary(Schema):
     movement_count: int = Field(description="Lines of the session.")
-    opening_balance: int = Field(description="Opening float, in cents.")
-    total_sales: int | None = Field(description="Sales of every payment method, in cents (empty when hidden).")
-    cash_sales: int | None = Field(description="Sales in cash (empty when hidden).")
-    card_sales: int | None = Field(description="Sales by card (empty when hidden).")
-    other_sales: int | None = Field(
-        description="Sales by transfer or other methods (empty when hidden)."
+    opening_balance: int = Field(description="Opening float, in cents.", json_schema_extra={"money": True})
+    total_sales: int | None = Field(
+        description="Sales of every payment method, in cents (empty when hidden).",
+        json_schema_extra={"money": True},
     )
-    total_refunds: int | None = Field(description="Refunds and voids, every method, in cents (empty when hidden).")
-    total_cash_in: int | None = Field(description="Money brought in by hand, in cents (empty when hidden).")
-    total_cash_out: int | None = Field(description="Money taken out by hand, in cents (empty when hidden).")
+    cash_sales: int | None = Field(description="Sales in cash (empty when hidden).", json_schema_extra={"money": True})
+    card_sales: int | None = Field(description="Sales by card (empty when hidden).", json_schema_extra={"money": True})
+    other_sales: int | None = Field(
+        description="Sales by transfer or other methods (empty when hidden).", json_schema_extra={"money": True}
+    )
+    total_refunds: int | None = Field(
+        description="Refunds and voids, every method, in cents (empty when hidden).",
+        json_schema_extra={"money": True},
+    )
+    total_cash_in: int | None = Field(
+        description="Money brought in by hand, in cents (empty when hidden).",
+        json_schema_extra={"money": True},
+    )
+    total_cash_out: int | None = Field(
+        description="Money taken out by hand, in cents (empty when hidden).",
+        json_schema_extra={"money": True},
+    )
     total_gifts: int | None = Field(
-        description="Comps of the shift at cost, in cents, not cash (empty when hidden)."
+        description="Comps of the shift at cost, in cents, not cash (empty when hidden).",
+        json_schema_extra={"money": True},
     )
     expected_cash: int | None = Field(
-        description="Expected cash, in cents (empty when hidden)."
+        description="Expected cash, in cents (empty when hidden).", json_schema_extra={"money": True}
     )
-    counted: int | None = Field(description="Counted cash, in cents (closed sessions).")
+    counted: int | None = Field(
+        description="Counted cash, in cents (closed sessions).",
+        json_schema_extra={"money": True},
+    )
     difference: int | None = Field(
-        description="Counted − expected, in cents (closed sessions)."
+        description="Counted − expected, in cents (closed sessions).", json_schema_extra={"money": True}
     )
 
 
