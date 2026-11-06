@@ -1,8 +1,9 @@
 // The «Close session · S-…» window around its body (CloseSessionForm), which only exists — and only reads —
-// while the window is open. A closed session closes the window; «Cancel» too.
+// while the window is open. A closed session closes the window; «Cancel» too. «Close session» waits in grey until the
+// business has answered its money (hub#921).
 import { describe, expect, it, vi } from 'vitest';
 
-import { flush, mountCash } from '../__tests__/mount-cash-register';
+import { expectWaitsForTheYen, flush, ionValue, mountCash } from '../__tests__/mount-cash-register';
 import CloseSessionForm from './CloseSessionForm.vue';
 import CloseSessionModal from './CloseSessionModal.vue';
 
@@ -33,5 +34,21 @@ describe('CloseSessionModal', () => {
     m.wrapper.findComponent(CloseSessionForm).vm.$emit('cancel');
     await flush();
     expect(m.wrapper.emitted('update:open')?.at(-1)).toEqual([false]);
+  });
+});
+
+describe('CloseSessionModal: before the business answers its money (hub#921)', () => {
+  // What is closed once the yen arrives (1500, never 150000) is CloseSessionForm's test.
+  it('«Close session» waits in grey and reads no count until the business answers', async () => {
+    const m = await mountCash(CloseSessionModal, { props: { open: true, session: SESSION }, business: null });
+    await m.live();
+    const page = (rows: unknown[]) => ({ rows, total: rows.length, limit: 20, offset: 0 });
+    await m.result('cash_register.session.get', { id: 's1', number: 'S-261014-0001', status: 'open', summary: { expected_cash: 1500 } });
+    await m.result('cash_register.count.list', page([]));
+    await m.result('sale.order.list', page([]));
+    await m.result('kitchen.ticket.board', { cooking: [], ready: [], cooking_count: 0, ready_count: 0, stations: [], truncated: false });
+    await m.result('printing.job.summary', { usages: [], pending: 0, sent: 0, failed: 0 });
+    await ionValue(m.inDoc('cash-register-close-counted'), '1500', 'ionInput');
+    await expectWaitsForTheYen(m, 'cash-register-close-submit', 'cash-register-close-counted');
   });
 });

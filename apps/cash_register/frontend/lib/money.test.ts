@@ -4,7 +4,7 @@
 // (flow business-currency): the one the screen passes, and until it is known a figure without a symbol, never the euro.
 import { describe, expect, it } from 'vitest';
 
-import { formatFace, formatMoney, formatSignedMoney, moneyFieldText, moneyRefusal, plain, readMoney } from './money';
+import { formatFace, formatMoney, formatSignedMoney, moneyFieldText, moneyRefusal, plain, readAmount, readMoney } from './money';
 
 // The business's money as `base.business.get` says it: the currency and the decimals the server counts it in.
 const EUR = { currency: 'EUR', decimals: 2 };
@@ -156,5 +156,16 @@ describe('money of the business (flow business-currency)', () => {
     expect(readMoney('PLN 7', 2, 'PLN')).toEqual({ ok: true, cents: 700 });
     expect(readMoney('150 €', 2, 'PLN')).toEqual({ ok: false, reason: 'notAnAmount' });
     expect(readMoney('150 €')).toEqual({ ok: false, reason: 'notAnAmount' });
+  });
+
+  // hub#921: a window reads what was typed only in the business's money, which its type asks for (never «1500» yen as
+  // 150000 because the business had not answered yet).
+  it('reads what was typed in the business’s money: its decimals and its currency', () => {
+    expect(readAmount('1500', JPY)).toEqual({ ok: true, cents: 1500 });
+    expect(readAmount('1500', EUR)).toEqual({ ok: true, cents: 150000 });
+    expect(readAmount('0,515', KWD)).toEqual({ ok: true, cents: 515 });
+    expect(readAmount('150,50 zł', PLN)).toEqual({ ok: true, cents: 15050 });
+    expect(readAmount('150 €', PLN)).toEqual({ ok: false, reason: 'notAnAmount' });
+    expect(readAmount('', JPY)).toEqual({ ok: true, cents: null });
   });
 });

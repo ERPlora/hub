@@ -8,7 +8,7 @@
 import { toastSuccess } from '@erplora/ui/shell';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { click, errorFrame, flush, ionValue, mountCash } from '../__tests__/mount-cash-register';
+import { business, click, errorFrame, flush, ionValue, JAPANESE, mountCash } from '../__tests__/mount-cash-register';
 import { plain } from '../lib/money';
 import CloseSessionForm from './CloseSessionForm.vue';
 
@@ -45,8 +45,8 @@ const queue = (usages: ReturnType<typeof usage>[] = []) => ({
   failed: usages.reduce((sum, row) => sum + row.failed, 0),
 });
 
-async function setup(locale: 'en' | 'es' = 'en') {
-  const m = await mountCash(CloseSessionForm, { props: { session: SESSION }, locale });
+async function setup(locale: 'en' | 'es' = 'en', options: { business?: null } = {}) {
+  const m = await mountCash(CloseSessionForm, { props: { session: SESSION }, locale, ...options });
   await m.live();
   const counted = () => m.inDoc('cash-register-close-counted');
   const submit = () => click(m.inDoc('cash-register-close-submit'));
@@ -222,5 +222,37 @@ describe('CloseSessionForm', () => {
     expect(prop(s.counted(), 'label')).toBe('Efectivo contado');
     expect(s.inDoc('cash-register-close-submit')?.textContent?.trim()).toBe('Cerrar sesión');
     expect(plain(s.find('cash-register-close-expected').text())).toContain('101,50 €');
+  });
+});
+
+describe('CloseSessionForm: before the business answers its money (hub#921)', () => {
+  it('the last closing count is written in the business’s money, not before it answers: «1500» yen, never «15.00»', async () => {
+    const s = await setup('en', { business: null });
+    await s.ready(1500, [{ id: 'c1', type: 'closing', total: 1500 }]);
+    expect(prop(s.counted(), 'value')).toBe('');
+    await s.result('base.business.get', business(JAPANESE));
+    expect(prop(s.counted(), 'value')).toBe('1500');
+    s.answer(200, { id: 's1', number: 'S-261014-0001', status: 'closed', expected_balance: 1500, closing_balance: 1500, difference: 0 });
+    await s.submit();
+    expect(s.sent().map((call) => call.body)).toEqual([{ session_id: 's1', closing_balance: 1500, closing_notes: '' }]);
+  });
+
+  it('what the person typed before the business answered stays as typed', async () => {
+    const s = await setup('en', { business: null });
+    await s.ready(1500, []);
+    await ionValue(s.counted(), '1400', 'ionInput');
+    await s.result(COUNTS, counts([{ id: 'c1', type: 'closing', total: 1500 }]), {}, 2);
+    await s.result('base.business.get', business(JAPANESE));
+    expect(prop(s.counted(), 'value')).toBe('1400');
+  });
+
+  it('the difference says nothing while the count cannot be read in the business’s money: «—», then «-¥100», never 138500', async () => {
+    const s = await setup('en', { business: null });
+    await s.ready(1500, []);
+    await ionValue(s.counted(), '1400', 'ionInput');
+    const difference = () => plain(s.find('cash-register-close-expected').findAll('dd')[1].text());
+    expect(difference()).toBe('—');
+    await s.result('base.business.get', business(JAPANESE));
+    expect(difference()).toBe('-¥100');
   });
 });
