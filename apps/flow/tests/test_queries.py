@@ -107,6 +107,26 @@ def test_the_catalog_offers_the_actions_and_reads_a_person_can_be_granted():
     assert not any(name.startswith("flow.") for name in actions)
 
 
+def test_the_catalog_offers_what_a_step_leaves_inside_an_object_never_inside_a_list():
+    """FLOW-F11, hub#963: «Insert a datum» offers, besides a step's first level, what it leaves inside an object of it,
+    by the path the engine resolves (``step_data``): the price and total of the line a step adds to a cart and the
+    cart's total after it, the number and total of a sale's invoice; never a datum inside a list, which no path
+    names."""
+    actions = {action.name: action for action in run("flow.catalog.read").actions}
+    added = actions["cart_checkout.item.add"].outputs
+    assert {"item", "removed", "cart", "item.unit_price", "item.line_total", "cart.total_amount"} <= set(added)
+    # An object comes before what it holds: the picker reads «Item», then «Item › Unit price».
+    assert added.index("item") < added.index("item.unit_price") < added.index("removed")
+    invoice = actions["invoice.invoice.by_source"].outputs
+    assert {"found", "count", "invoice", "invoice.number", "invoice.total_amount", "invoice.rectifies.total_amount"} <= set(invoice)
+    assert "invoice.lines" in invoice
+    assert not [path for path in invoice if path.startswith(("invoice.lines.", "invoice.tax_breakdown."))]
+    # The same paths the engine resolves, for every action and read: nothing walked twice.
+    operations = queries.ask_first_catalog()
+    for name, action in actions.items():
+        assert action.outputs[: len(queries.step_data(operations[name]))] == list(queries.step_data(operations[name])), name
+
+
 def test_an_app_that_is_not_active_is_not_in_the_catalog(monkeypatch):
     active = {
         label: config

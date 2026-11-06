@@ -290,9 +290,10 @@ def step_data(op: Operation) -> dict[str, dict]:
 
 
 def action_outputs(op: Operation) -> list[str]:
-    """What a step of ``op`` leaves for the next ones: its output's fields (a list's first row's), and
-    ``found`` and ``count`` for a read."""
-    names = list(step_fields(op))
+    """What a step of ``op`` leaves for the next ones, by the path the engine resolves below the step (``step_data``):
+    its output's fields (a list's first row's), each object among them followed by what it holds (``item``,
+    ``item.unit_price``), never inside a list; and ``found`` and ``count`` for a read."""
+    names = list(step_data(op))
     if op.kind == "query":
         names += [name for name in ("found", "count") if name not in names]
     return names
