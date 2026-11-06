@@ -14,6 +14,7 @@ from django.db import models
 from django.db.models import F, Q
 from django.db.models.functions import Lower
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import pgettext_lazy
 from live.models import UUIDModel
 
 ACTOR_MAX_LENGTH = 128
@@ -29,9 +30,10 @@ class ModifierGroup(UUIDModel):
     """A reusable group of choices («Sauces», «Doneness»), shared by every product or category it hangs from."""
 
     name = models.CharField(_("name"), max_length=NAME_MAX_LENGTH)
-    # The kitchen ticket's name, other than the commercial one (Toast's rule); empty = the name.
+    # The kitchen ticket's name, other than the commercial one (Toast's rule); empty = the name. Its own context: the
+    # forms say «Nombre en la comanda», Menús' menu says «nombre de cocina» (hub#663).
     kitchen_name = models.CharField(
-        _("kitchen name"), max_length=NAME_MAX_LENGTH, blank=True
+        pgettext_lazy("modifier", "kitchen name"), max_length=NAME_MAX_LENGTH, blank=True
     )
     # 1 or more IS required; 0 = optional.
     min_choices = models.PositiveSmallIntegerField(_("minimum choices"), default=0)
@@ -81,7 +83,7 @@ class ModifierOption(UUIDModel):
     )
     name = models.CharField(_("name"), max_length=NAME_MAX_LENGTH)
     kitchen_name = models.CharField(
-        _("kitchen name"), max_length=NAME_MAX_LENGTH, blank=True
+        pgettext_lazy("modifier", "kitchen name"), max_length=NAME_MAX_LENGTH, blank=True
     )
     # Cents; may be negative (a discount) or zero (free).
     price_delta = models.BigIntegerField(_("supplement"), default=0)

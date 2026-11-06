@@ -26,6 +26,7 @@ msgstr "Suplementos guarda las elecciones que acompañan a lo que vendes: el pun
 msgid "name"
 msgstr "nombre"
 
+msgctxt "modifier"
 msgid "kitchen name"
 msgstr "nombre en la comanda"
 
@@ -158,7 +159,7 @@ msgid "A group holds at most %(max)s options."
 msgstr "Un grupo admite como mucho %(max)s opciones."
 
 msgid "This tax category does not exist in Taxes."
-msgstr "Esta categoría fiscal no existe en Impuestos."
+msgstr "Esa categoría fiscal no existe en Impuestos."
 
 msgid "An option with its own tax category is billed on a line of its own: its supplement must be more than zero."
 msgstr "Una opción con su propia categoría fiscal se cobra en una línea aparte: su suplemento tiene que ser mayor que cero."
