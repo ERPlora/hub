@@ -74,8 +74,8 @@ def named(monkeypatch):
 @pytest.mark.django_db
 @pytest.mark.parametrize(("write", "datum"), ON_AN_ITEM)
 def test_a_write_on_an_item_says_it_by_its_name(write, datum):
-    """The case the issue names, «demo.item.delete:id»: «Item: Mesa 4», never its id."""
-    item = Item.objects.create(name="Mesa 4")
+    """The case the issue names, «demo.item.delete:id»: «Item: Mesa 4», never its id nor its note."""
+    item = Item.objects.create(name="Mesa 4", note="By the window")
     assert shown(write, {datum: str(item.id)})[datum] == "Mesa 4"
 
 
