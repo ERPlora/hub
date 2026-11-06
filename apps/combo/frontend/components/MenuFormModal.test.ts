@@ -4,11 +4,12 @@
 // sale» (ticked). A menu eaten in without a VAT category is refused before it is sent. Editing sends
 // only what changed. Refusals stay in the dialog, under their field. The closed price is in the business's currency
 // («Closed price (PLN)», with its decimals); just «Closed price» while the business has not answered.
-import { Combo, FormModal } from '@erplora/ui/components';
+import { Combo } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { Business } from '../../../../base/frontend/operations';
 import type { ComboOut } from '../operations';
+import { expectSaveWaitsForMoney } from '../../../../base/frontend/__tests__/save-waits-for-money';
 import { business, click, ionChecked, ionValue, JAPANESE, mountCombo, POLISH, settle } from '../__tests__/mount-combo';
 import MenuFormModal from './MenuFormModal.vue';
 
@@ -38,8 +39,8 @@ const MENU: ComboOut = {
  *  (`null`: it opens and the business does not answer yet; «Save» waits for it, hub#918). */
 async function setup(combo: ComboOut | null = null, locale: 'en' | 'es' = 'en', answer: Business | null = business()) {
   const m = await mountCombo(MenuFormModal, { props: { open: false, combo }, locale, business: answer });
-  await m.live();
   await m.wrapper.setProps({ 'onUpdate:open': (open: boolean) => m.wrapper.setProps({ open }) });
+  await m.live();
   await m.wrapper.setProps({ open: true });
   await settle();
   const field = (name: string) => m.inDoc(`combo-menu-form-${name}`) as Control;
@@ -199,33 +200,12 @@ describe('MenuFormModal: in the business’s currency', () => {
     expect(s.sent()).toEqual([{ method: 'POST', path: '/api/combo/combos/update', query: {}, body: { id: 'm1', is_active: false } }]);
   });
 
-  it('«Create menu» waits in grey for the business’s money: «1500» is never sent read without it, then saved at 1500 yen (hub#918)', async () => {
-    const s = await setup(null, 'en', null);
-    s.answer(201, { ...MENU, price: 1500, groups: [], sellable: false, blockers: [] });
-    await ionValue(s.field('name'), 'Menu of the day', 'ionInput');
-    await ionValue(s.field('price'), '1500', 'ionInput');
-    s.tax().vm.$emit('update:modelValue', { id: 'restaurant.food', label: 'Restaurant — food · 10%' });
-    await settle();
-    await click(s.save());
-    expect(s.sent().map((call) => (call.body as { price: number }).price)).toEqual([]);
-    expect(s.save().disabled).toBe(true);
-    // Nor does a submit that gets past the grey button read the price: the form waits, saying nothing.
-    s.wrapper.findComponent(FormModal).vm.$emit('submit');
-    await settle();
-    expect(s.sent()).toEqual([]);
-    expect(s.field('price').errorText).toBeUndefined();
-    await s.result('base.business.get', business(JAPANESE));
-    expect(s.save().disabled).toBe(false);
-    await click(s.save());
-    expect(s.sent().map((call) => (call.body as { price: number }).price)).toEqual([1500]);
-  });
-
-  it('what the person typed before the business answers stays as typed, and is read in its currency', async () => {
+  it('what the person typed before the business answers is never read without it: «Save» waits in grey, then «1500» is 1500 yen (hub#918)', async () => {
     const s = await setup(MENU, 'en', null);
     await ionValue(s.field('price'), '1500', 'ionInput');
-    await s.result('base.business.get', business(JAPANESE));
-    expect(s.field('price').value).toBe('1500');
     s.answer(200, { ...MENU, price: 1500, groups: [], sellable: true, blockers: [] });
+    await expectSaveWaitsForMoney({ ...s, amount: () => s.field('price'), settle }, () => s.result('base.business.get', business(JAPANESE)));
+    expect(s.field('price').value).toBe('1500');
     await click(s.save());
     expect(s.sent()).toEqual([{ method: 'POST', path: '/api/combo/combos/update', query: {}, body: { id: 'm1', price: 1500 } }]);
   });

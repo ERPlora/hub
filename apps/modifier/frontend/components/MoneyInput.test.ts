@@ -12,9 +12,6 @@ import MoneyInput from './MoneyInput.vue';
 
 type Control = HTMLElement & { errorText?: string };
 
-/** A business in Spain: the field rewrites in the page format once the business has answered its money. */
-const EUROS = { currency: 'EUR', decimals: 2 };
-
 async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 'en') {
   const model = { value: (props.modelValue as string) ?? '' };
   const m = await mountModifier(MoneyInput, {
@@ -51,15 +48,6 @@ describe('MoneyInput', () => {
       'text',
     ]);
     expect(input.attributes('data-testid')).toBe('price');
-  });
-
-  it('hands the parent what is typed, and rewrites it in the page format on leaving', async () => {
-    const s = await setup({ money: EUROS }, 'es');
-    await s.input().setValue('2.2');
-    expect(s.model.value).toBe('2.2');
-    await s.blur();
-    expect(s.model.value).toBe('2,20');
-    expect(s.errorText()).toBeUndefined();
   });
 
   it('what is not an amount says so after leaving the field', async () => {
@@ -104,27 +92,9 @@ describe('MoneyInput', () => {
     expect([s.model.value, s.errorText() || 'no message']).toEqual(['150', 'no message']);
   });
 
-  it('before the business answers, leaving the field keeps what was typed: no decimals the currency may not have (hub#918)', async () => {
-    const s = await setup();
-    await s.input().setValue('150');
-    await s.blur();
-    expect(s.model.value).toBe('150');
-    await s.wrapper.setProps({ money: { currency: 'JPY', decimals: 0 } });
-    expect(s.errorText()).toBeUndefined();
-    await s.blur();
-    expect(s.model.value).toBe('150');
-  });
-
   it("the server's message for the field wins", async () => {
     const s = await setup({ modelValue: '12', errorText: 'Ensure this value is less than or equal to 9999999999999' });
     expect(s.errorText()).toBe('Ensure this value is less than or equal to 9999999999999');
-  });
-
-  it('a discount is an amount: it keeps its sign', async () => {
-    const s = await setup({ money: EUROS }, 'es');
-    await s.input().setValue('-0.5');
-    await s.blur();
-    expect([s.model.value, s.errorText()]).toEqual(['-0,50', undefined]);
   });
 
   it('a ± button turns a supplement into a discount and back: a phone\'s decimal keyboard has no minus', async () => {
@@ -150,5 +120,29 @@ describe('MoneyInput', () => {
   it('speaks Spanish', async () => {
     const s = await setup({ modelValue: 'x', showError: true }, 'es');
     expect(s.errorText()).toBe('Esto no es un importe. Escribe una cifra, por ejemplo 1,50, o -0,50 para descontar.');
+  });
+});
+
+// hub#918: the decimals are the business's currency's, so the field rewrites what was typed only once the business has
+// answered; until then it keeps it as typed, and a «150» left before the yen arrives is still 150.
+describe('MoneyInput: the business’s money', () => {
+  it('hands the parent what is typed and, until the business answers, keeps it on leaving: no decimals invented', async () => {
+    const s = await setup({}, 'es');
+    await s.input().setValue('150');
+    await s.blur();
+    expect([s.model.value, s.errorText()]).toEqual(['150', undefined]);
+    await s.wrapper.setProps({ money: { currency: 'JPY', decimals: 0 } });
+    await s.blur();
+    expect([s.model.value, s.errorText()]).toEqual(['150', undefined]);
+  });
+
+  it('once it answers in euros, leaving rewrites in the page format, a discount with its sign', async () => {
+    const s = await setup({ money: { currency: 'EUR', decimals: 2 } }, 'es');
+    await s.input().setValue('2.2');
+    await s.blur();
+    expect([s.model.value, s.errorText()]).toEqual(['2,20', undefined]);
+    await s.input().setValue('-0.5');
+    await s.blur();
+    expect([s.model.value, s.errorText()]).toEqual(['-0,50', undefined]);
   });
 });

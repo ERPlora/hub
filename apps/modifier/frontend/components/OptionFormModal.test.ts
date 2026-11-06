@@ -3,11 +3,12 @@
 // default» and Order, with «Create»; Edit opens «Editing option — {name}» with «Save», which sends only
 // what changed (an emptied tax category gives the dish's back). A supplement that is not an amount is
 // never sent; the server's refusals go under their field.
-import { Combo, FormModal } from '@erplora/ui/components';
+import { Combo } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { Business } from '../../../../base/frontend/operations';
 import type { GroupOut, OptionOut } from '../operations';
+import { expectSaveWaitsForMoney } from '../../../../base/frontend/__tests__/save-waits-for-money';
 import { business, click, ionChecked, ionValue, JAPANESE, KUWAITI, mountModifier, POLISH, settle } from '../__tests__/mount-modifier';
 import OptionFormModal from './OptionFormModal.vue';
 
@@ -216,16 +217,7 @@ describe('OptionFormModal: the business answers after the form opened', () => {
     s.field('price_delta').dispatchEvent(new CustomEvent('ionBlur'));
     await settle();
     expect(s.field('price_delta').value).toBe('150');
-    await click(s.save());
-    expect(s.sent().map((call) => (call.body as { price_delta: number }).price_delta)).toEqual([]);
-    expect(s.save().disabled).toBe(true);
-    // Nor does a submit that gets past the grey button read the supplement: the form waits, saying nothing.
-    s.wrapper.findComponent(FormModal).vm.$emit('submit');
-    await settle();
-    expect(s.sent()).toEqual([]);
-    expect(s.field('price_delta').errorText).toBeUndefined();
-    await s.result('base.business.get', business(JAPANESE));
-    expect(s.save().disabled).toBe(false);
+    await expectSaveWaitsForMoney({ ...s, amount: () => s.field('price_delta'), settle }, () => s.result('base.business.get', business(JAPANESE)));
     await click(s.save());
     expect(s.sent().map((call) => (call.body as { price_delta: number }).price_delta)).toEqual([150]);
   });

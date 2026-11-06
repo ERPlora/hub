@@ -6,9 +6,10 @@
 // category are missing; amounts and quantities are read as typed; an edit sends only what changed;
 // a refusal stays in the dialog under its field. «Tax category» and «Categories» are `Combo` fields of
 // @erplora/ui that search the server (TaxCategorySelect, ProductCategoriesField).
-import { Combo, type ComboOption, FormModal } from '@erplora/ui/components';
+import { Combo, type ComboOption } from '@erplora/ui/components';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { expectSaveWaitsForMoney } from '../../../../base/frontend/__tests__/save-waits-for-money';
 import type { Business } from '../../../../base/frontend/operations';
 import {
   business,
@@ -337,27 +338,6 @@ describe('ProductFormModal: editing', () => {
       expect(s.el('inventory-product-form-submit')?.disabled).toBe(false);
     });
 
-    it('«Save» waits in grey for the business’s money: «1500» is never sent read without it, then saved at 1500 yen (hub#918)', async () => {
-      const s = await setup({}, { business: null });
-      await s.type('inventory-product-name', 'Coffee');
-      await s.type('inventory-product-sku', 'CAF-1');
-      await s.type('inventory-product-price', '1500');
-      await s.choose('inventory-product-tax', 'product.generic');
-      s.net.onApi(() => ok(product({ price: 1500 }), 201));
-      await s.submit();
-      expect(s.calls('/api/inventory/products').map((call) => (s.body(call) as { price: number }).price)).toEqual([]);
-      expect(s.el('inventory-product-form-submit')?.disabled).toBe(true);
-      // Nor does a submit that gets past the grey button read the price: the form waits, saying nothing.
-      s.wrapper.findComponent(FormModal).vm.$emit('submit');
-      await flush();
-      expect(s.calls('/api/inventory/products')).toEqual([]);
-      expect(s.el('inventory-product-price')?.errorText).toBeUndefined();
-      await s.answer(JAPANESE);
-      expect(s.el('inventory-product-form-submit')?.disabled).toBe(false);
-      await s.submit();
-      expect(s.calls('/api/inventory/products').map((call) => (s.body(call) as { price: number }).price)).toEqual([1500]);
-    });
-
     it('an untouched price and cost are rewritten from the product with the yen’s decimals, and «Save changes» sends neither', async () => {
       const s = await setup({ product: product({ price: 220, cost: 80 }) }, { business: null });
       expect([s.el('inventory-product-price')?.value, s.el('inventory-product-cost')?.value]).toEqual(['2.20', '0.80']);
@@ -395,9 +375,17 @@ describe('ProductFormModal: editing', () => {
     it('a new price typed before is kept as typed and read in the yen; the untouched cost is still rewritten', async () => {
       const s = await setup({ product: product({ price: 220, cost: 80 }) }, { business: null });
       await s.type('inventory-product-price', '300');
-      await s.answer(JAPANESE);
-      expect([s.el('inventory-product-price')?.value, s.el('inventory-product-cost')?.value]).toEqual(['300', '80']);
+      // hub#918: until the yen arrives «Save changes» waits in grey and nothing reads the price (never 300 as 30000).
       s.net.onApi(() => ok(product({ price: 300 })));
+      const window = {
+        wrapper: s.wrapper,
+        save: () => s.el('inventory-product-form-submit'),
+        amount: () => s.el('inventory-product-price'),
+        sent: () => s.calls('/api/inventory/products/update'),
+        settle: flush,
+      };
+      await expectSaveWaitsForMoney(window, () => s.answer(JAPANESE));
+      expect([s.el('inventory-product-price')?.value, s.el('inventory-product-cost')?.value]).toEqual(['300', '80']);
       await s.submit();
       expect(s.sent('/api/inventory/products/update')).toEqual({ id: 'p1', price: 300 });
     });

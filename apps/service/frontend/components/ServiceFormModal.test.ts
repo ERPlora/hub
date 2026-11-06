@@ -3,9 +3,10 @@
 // with «Create service», which cannot be pressed without a name and a tax category; with no tax
 // category in Taxes at all it says where to make them. A row opens «Editing service — {name}» with
 // «Save changes», which sends only what changed, and below it who performs the service.
-import { Combo, FormModal, InlineFeedback } from '@erplora/ui/components';
+import { Combo, InlineFeedback } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
+import { expectSaveWaitsForMoney } from '../../../../base/frontend/__tests__/save-waits-for-money';
 import type { ServiceOut, SettingsOut } from '../operations';
 import { business, click, ionValue, JAPANESE, type MountOptions, mountService, page, POLISH, settle } from '../__tests__/mount-service';
 import ServiceFormModal from './ServiceFormModal.vue';
@@ -236,34 +237,14 @@ describe('ServiceFormModal: in the business currency (service-business-currency)
     expect(s.sent().map((call) => call.body)).toEqual([{ id: 's1', name: 'Cut and wash' }]);
   });
 
-  it('«Create service» waits in grey for the business’s money: «1500» is never sent read without it, then saved at 1500 yen (hub#918)', async () => {
+  it('what was typed before the business answered is never read without it: «Create service» waits in grey, then «1500» is 1500 yen (hub#918)', async () => {
     const s = await setup(null, 'en', true, { business: null });
     await s.result('service.settings.get', SETTINGS);
+    await ionValue(s.field('name'), 'Haircut', 'ionInput');
+    await ionValue(s.field('price'), '1500', 'ionInput');
     s.answer(201, CUT);
-    await ionValue(s.field('name'), 'Haircut', 'ionInput');
-    await ionValue(s.field('price'), '1500', 'ionInput');
-    await click(s.save());
-    expect(s.sent().map((call) => (call.body as { price: number }).price)).toEqual([]);
-    expect(s.save().disabled).toBe(true);
-    // Nor does a submit that gets past the grey button read the price: the form waits, saying nothing.
-    s.wrapper.findComponent(FormModal).vm.$emit('submit');
-    await settle();
-    expect(s.sent()).toEqual([]);
-    expect(s.field('price').errorText).toBeUndefined();
-    await s.result('base.business.get', business(JAPANESE));
-    expect(s.save().disabled).toBe(false);
-    await click(s.save());
-    expect(s.sent().map((call) => (call.body as { price: number }).price)).toEqual([1500]);
-  });
-
-  it('what was typed before the business answered stays as typed and is read in its currency', async () => {
-    const s = await setup(null, 'en', true, { business: null });
-    await s.result('service.settings.get', SETTINGS);
-    await ionValue(s.field('name'), 'Haircut', 'ionInput');
-    await ionValue(s.field('price'), '1500', 'ionInput');
-    await s.result('base.business.get', business(JAPANESE));
+    await expectSaveWaitsForMoney({ ...s, amount: () => s.field('price'), settle }, () => s.result('base.business.get', business(JAPANESE)));
     expect(s.field('price').value).toBe('1500');
-    s.answer(201, CUT);
     await click(s.save());
     expect(s.sent().map((call) => (call.body as { price: number }).price)).toEqual([1500]);
   });
