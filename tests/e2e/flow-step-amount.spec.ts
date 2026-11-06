@@ -6,7 +6,7 @@
 // writes them in, which the preview says beside them (`limits_currency`), and its total in the business's currency.
 // Everything created here is named «E2E FlowAmount …» and removed before and after.
 // flow: FLOW-F28 FLOW-F11
-import { expect, test } from '@playwright/test';
+import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, api, psql, saveSessionForTheSweep, settledCapture, shown } from './helpers';
 import { manualFlow, onAutomations } from './flow-helpers';
@@ -41,6 +41,32 @@ function cleanUp(): void {
 test.beforeAll(cleanUp);
 test.afterAll(cleanUp);
 
+/** Runs the manual automation `name` with `steps` (granted `grants`) until it asks, checks on Automations that its
+ *  question says `said`, captures it as `shot` and answers no, which takes its card away. */
+async function askedSaying(
+  stage: { context: BrowserContext; page: Page; name: string },
+  steps: unknown[],
+  grants: string[],
+  said: string,
+  shot: string,
+): Promise<void> {
+  const { context, page, name } = stage;
+  const flowId = await manualFlow(context, name, steps, grants);
+  const ran = await api<{ status: string }>(context, A, 'POST', '/flow/flows/run', { id: flowId, input: {} });
+  expect(ran.status, JSON.stringify(ran.data)).toBe(200);
+  expect(ran.data.status).toBe('asking');
+
+  await page.goto('/flow/automations');
+  const card = shown(page).locator('[data-testid=flow-inbox] article').filter({ hasText: name });
+  await expect(card.locator('[data-testid^=flow-question-title-]')).toHaveText(said);
+  await card.scrollIntoViewIfNeeded();
+  await settledCapture(page, shot);
+  await saveSessionForTheSweep(context);
+
+  await card.locator('[data-testid^=flow-question-reject-]').click();
+  await expect(card).toHaveCount(0);
+}
+
 for (const viewport of VIEWPORTS) {
   test(`FLOW-F28 the amount of a payment a step records is said as money in its question, at ${viewport.label}`, async ({ browser }) => {
     test.setTimeout(120_000);
@@ -52,21 +78,8 @@ for (const viewport of VIEWPORTS) {
         { id: 's1', kind: 'command', operation: RECORD, params: payment },
         { id: 's2', kind: 'ask', title: 'Paid {{steps.s1.amount}} to {{steps.s1.beneficiary_name}}?' },
       ];
-      const flowId = await manualFlow(context, name, steps, [RECORD]);
-      const ran = await api<{ status: string }>(context, A, 'POST', '/flow/flows/run', { id: flowId, input: {} });
-      expect(ran.status, JSON.stringify(ran.data)).toBe(200);
-      expect(ran.data.status).toBe('asking');
-
-      await page.goto('/flow/automations');
-      const card = shown(page).locator('[data-testid=flow-inbox] article').filter({ hasText: name });
       // Before: «Paid 1250 to Proveedor Norte SL?».
-      await expect(card.locator('[data-testid^=flow-question-title-]')).toHaveText('Paid €12.50 to Proveedor Norte SL?');
-      await card.scrollIntoViewIfNeeded();
-      await settledCapture(page, `${KEY}-${viewport.label}`);
-      await saveSessionForTheSweep(context);
-
-      await card.locator('[data-testid^=flow-question-reject-]').click();
-      await expect(card).toHaveCount(0);
+      await askedSaying({ context, page, name }, steps, [RECORD], 'Paid €12.50 to Proveedor Norte SL?', `${KEY}-${viewport.label}`);
     });
   });
 }
@@ -83,20 +96,9 @@ for (const viewport of VIEWPORTS) {
         { id: 's1', kind: 'query', operation: PREVIEW, params: { order_id: check.data.id } },
         { id: 's2', kind: 'ask', title: 'No cash from {{steps.s1.cash_limit}}, ticket up to {{steps.s1.ticket_limit}}: {{steps.s1.total}}?' },
       ];
-      const flowId = await manualFlow(context, name, steps, [PREVIEW]);
-      const ran = await api<{ status: string }>(context, A, 'POST', '/flow/flows/run', { id: flowId, input: {} });
-      expect(ran.status, JSON.stringify(ran.data)).toBe(200);
-      expect(ran.data.status).toBe('asking');
-
-      await page.goto('/flow/automations');
-      const card = shown(page).locator('[data-testid=flow-inbox] article').filter({ hasText: name });
       // Before: «No cash from 100000, ticket up to 300000: €12.50?».
-      await expect(card.locator('[data-testid^=flow-question-title-]')).toHaveText('No cash from €1,000.00, ticket up to €3,000.00: €12.50?');
-      await card.scrollIntoViewIfNeeded();
-      await settledCapture(page, `${KEY}-limits-${viewport.label}`);
-
-      await card.locator('[data-testid^=flow-question-reject-]').click();
-      await expect(card).toHaveCount(0);
+      const said = 'No cash from €1,000.00, ticket up to €3,000.00: €12.50?';
+      await askedSaying({ context, page, name }, steps, [PREVIEW], said, `${KEY}-limits-${viewport.label}`);
     });
   });
 }
