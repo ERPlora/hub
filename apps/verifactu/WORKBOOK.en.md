@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:6cc15c59135f6d993161cbbb8956d913d496dc4d29c972705afce9046ece9c66 -->
+<!-- generated from WORKBOOK.md sha256:9de4abc037aa355811067c47ad725c4acd573a75baf533bae750e78e36b52dab -->
 
 ## What it is for and who it is for
 
@@ -69,7 +69,9 @@ Here the reference is not a competitor: it is the AEAT's rules.
   sets up VeriFactu sees it. In production (VERIFACTU-F08), if the route is lost (the authorisation is revoked, or
   the certificate expires or is removed), it carries "Needed to invoice" and the strip "You cannot invoice yet" shows
   above the other screens, because every new sale is refused; the whole team sees it, and whoever does not set up
-  VeriFactu is told "An administrator has to set this up.".
+  VeriFactu is told "An administrator has to set this up.". Only a business in Spain is asked; one without a
+  country (a demo) counts as Spain, and one from another country never sees it, neither in testing nor in production
+  (hub#682).
 - **The software producer's data** (ERPlora) go fixed in every record (its responsible declaration declares them),
   also "Serves several taxpayers", always "S" (contradiction 7, closed).
 
@@ -247,7 +249,7 @@ Screen notices: the result of each action in a strip on top (green if it went we
 | VERIFACTU-F35 | Ask the AEAT whether it already has a queue record | done — in the record's detail, in the Hub's admin and through the API |
 
 ### VERIFACTU-F01 Activate VeriFactu
-Status: done — turning the app on in the Hub is activating it (activation per hub arrives with phase 2); outside Spain, Apps does not offer it and the hub refuses it (`can_enable`, hub#694), and one already on records and sends nothing (FIX-HUB-VERIFACTU-ON-FOR-A-BUSINESS-OUTSIDE-SPAIN)
+Status: done — turning the app on in the Hub is activating it (activation per hub arrives with phase 2); outside Spain, Apps does not offer it and the hub refuses it (`can_enable`, hub#694), one already on records and sends nothing (FIX-HUB-VERIFACTU-ON-FOR-A-BUSINESS-OUTSIDE-SPAIN) and the Home does not ask it to "Set up VeriFactu" (hub#682)
 Actor: administrator
 Screen: Hub: Apps
 Steps:
@@ -261,6 +263,9 @@ Steps:
 4. If it was already on in a business from another country, it does nothing and can be turned off: invoices go out without a record or QR, **VeriFactu → Settings** and **VeriFactu → Configuration**
    say on top "VeriFactu is only for businesses in Spain." without offering anything that leads to the AEAT, and
    whatever asks to record or send something answers the same.
+   "Finish setting up your business", on the Home, does not ask it to "Set up VeriFactu" nor does the strip "You
+   cannot invoice yet" show because of it; a business without a country (a demo) counts as Spain and does see it
+   (hub#682).
 In: nothing but the order.
 Out: the app active; no switch of its own.
 If it fails: the Hub's apps page says so.

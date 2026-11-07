@@ -31,6 +31,9 @@ from base.tenancy.context import current_hub
 
 #: The currency of a business without a country (a demo): ERPlora's market.
 DEFAULT_CURRENCY = "EUR"
+#: ERPlora's market (ISO 3166-1 alpha-2): the country of a business without one (a demo, ERPlora's own hub without its
+#: row) for every rule by country (:func:`country_or_market`).
+MARKET_COUNTRY = "ES"
 #: Changes of currency newer than the CLDR that Babel ships: country → (currency, since). Bulgaria adopted the euro on
 #: 1 January 2026; Babel 2.18 still gives the lev with no end.
 ADOPTED_SINCE: dict[str, tuple[str, dt.date]] = {"BG": ("EUR", dt.date(2026, 1, 1))}
@@ -57,6 +60,13 @@ def zone_name(zone: dt.tzinfo | None = None) -> str:
     """The IANA name of ``zone``, by default the business's: what a screen shows and what the browser reads."""
     zone = zone or business_zone()
     return getattr(zone, "key", str(zone))
+
+
+def country_or_market(country: str) -> str:
+    """The country (ISO 3166-1 alpha-2, upper-case) a business with ``country`` is in for every rule by country: its
+    own, or ERPlora's market (:data:`MARKET_COUNTRY`, Spain) without one, as a demo is (hub#682). The one reading of
+    it: the Home's national steps (``base.home.applies_to_country``) and VeriFactu's «only in Spain» ask it here."""
+    return country.strip().upper() or MARKET_COUNTRY
 
 
 def currency_of(country: str, *, today: dt.date | None = None) -> str:

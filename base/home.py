@@ -54,7 +54,7 @@ from live.live_registry import live_registry
 from live.meta import DeviceNotice, LiveAppConfig, SetupCheck, all_live_app_configs, module_configs
 from live.operations import UnknownOperation, get
 
-from base.business import business_zone
+from base.business import business_zone, country_or_market
 
 logger = logging.getLogger(__name__)
 
@@ -158,9 +158,13 @@ def is_configured(row: Mapping[str, Any] | None, checks: Sequence[SetupCheck]) -
 
 
 def applies_to_country(countries: Sequence[str], hub_country: str) -> bool:
+    """Whether a step for ``countries`` (none: every one) is for a hub of ``hub_country``. A hub without a country (a
+    demo, ERPlora's own) is in ERPlora's market, Spain (``base.business.country_or_market``, hub#682): it is told the
+    Spanish steps, as VeriFactu counts it, and no other country's."""
     if not countries:
         return True
-    return bool(hub_country) and any(country.strip().upper() == hub_country.upper() for country in countries)
+    country = country_or_market(hub_country)
+    return any(declared.strip().upper() == country for declared in countries)
 
 
 def may_be_legal(key: str) -> bool:

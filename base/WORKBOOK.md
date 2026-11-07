@@ -433,8 +433,10 @@ Pasos:
      también los hechos, en el orden que fijan las apps.
   3. Los de la plataforma son «Tus apps» (encender al menos una app de negocio) y «Tu equipo» (añadir a
      las personas que usarán el TPV); el resto los trae cada app encendida.
-  4. Un paso que solo vale para otro país, o que la persona no puede ver, no sale. Un paso cuya
-     comprobación falla tampoco sale: nunca se da por hecho ni por pendiente lo que no se pudo comprobar.
+  4. Un paso que solo vale para otro país, o que la persona no puede ver, no sale. Un negocio sin país (una
+     demo, el de ERPlora) cuenta como España, el mercado de ERPlora: ve los pasos de España y ninguno de otro país
+     (hub#682). Un paso cuya comprobación falla tampoco sale: nunca se da por hecho ni por pendiente lo que no se
+     pudo comprobar.
   5. Mientras falta un paso «Necesario para facturar», la franja «Todavía no puedes facturar» sale encima
      de las demás pantallas; con el móvil tumbado, en una sola línea con un «Configurar» (hub#838).
   6. Cuando otra persona completa un paso en otro dispositivo, la lista se pone al día sola.
@@ -2931,6 +2933,11 @@ Implicados: HUBS-F17, WEBSITE-F10
   (`Widget`) y `bell` (`BellCounter`), dataclasses de `live.meta` comprobadas por `live.checks`
   (E009–E016). Cada consulta que nombran es un `kind="query"` de la propia app; base la ejecuta como la
   persona (`run_hook`).
+- País: un paso con `countries` solo sale en un hub de esos países (`home.applies_to_country`); el país del hub
+  se lee con `base.business.country_or_market`, la única lectura de la plataforma: sin país (una demo, el hub de
+  ERPlora sin fila) es `MARKET_COUNTRY`, España, el mercado de ERPlora, como lo cuenta VeriFactu
+  (`queries.outside_spain` la usa). Invierte la regla del hub viejo («un hub sin país no recibe pasos
+  nacionales»), hub#682.
 - Nivel: ⛔ `legal` para `LEGAL_STEPS` (`invoice.business_identity`) y, donde la primera fila de su propia
   consulta dice que el hub presenta en producción, para `LEGAL_IN_PRODUCTION` (`verifactu.sending_route`, con
   `environment` de `verifactu.config.get`: sin vía lista en producción se rechaza toda venta; en pruebas se vende
