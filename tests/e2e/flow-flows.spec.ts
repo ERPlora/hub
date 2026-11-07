@@ -397,6 +397,28 @@ async function search(page: Page, testid: string, query: string): Promise<Locato
   return page.locator(`[data-testid^=${testid}-option-]`);
 }
 
+/** FLOW-F10: opens «Cuando pase esto…» of the editor on «Pasa algo», with «Elige qué pasa» ready. */
+async function onSomethingHappens(page: Page, editor: Locator): Promise<void> {
+  await editor.locator('[data-testid=flow-trigger-open]').click();
+  await choose(page, 'flow-trigger-kind', 'Pasa algo');
+}
+
+/** In the list of the `Combo` `testid`, `never` finds nothing and `query` finds each of `options`, by its id and with its
+ *  words: an app's own word goes into Automations, never another one. */
+async function goesByItsWords(
+  page: Page,
+  testid: string,
+  never: string,
+  query: string,
+  options: Array<[string, string]>,
+): Promise<void> {
+  await expect(await search(page, testid, never)).toHaveCount(0);
+  await search(page, testid, query);
+  for (const [option, words] of options) {
+    await expect(page.locator(`[data-testid="${testid}-option-${option}"]`)).toContainText(words);
+  }
+}
+
 for (const viewport of VIEWPORTS) {
   test(`FLOW-F10 y FLOW-F11: the triggers and steps of Payments say its own words in Spanish at ${viewport.label}`, async ({ browser }) => {
     await inSpanishEditor(browser, viewport, async (page, editor) => {
@@ -460,23 +482,14 @@ for (const viewport of VIEWPORTS) {
     await inSpanishEditor(browser, viewport, async (page, editor) => {
 
       // FLOW-F10: «Elige qué pasa».
-      await editor.locator('[data-testid=flow-trigger-open]').click();
-      await choose(page, 'flow-trigger-kind', 'Pasa algo');
-      await expect(await search(page, 'flow-trigger-event', 'departamento')).toHaveCount(0);
-      await search(page, 'flow-trigger-event', 'sección de ventas');
-      for (const [event, words] of SALE_SECTION_EVENTS) {
-        await expect(page.locator(`[data-testid="flow-trigger-event-option-${event}"]`)).toContainText(words);
-      }
+      await onSomethingHappens(page, editor);
+      await goesByItsWords(page, 'flow-trigger-event', 'departamento', 'sección de ventas', SALE_SECTION_EVENTS);
       await page.locator('[data-testid="flow-trigger-event-option-sale.department.created"]').click();
       await expect(editor.locator('[data-testid=flow-trigger-open]')).toContainText('Cuando se crea una sección de ventas');
 
       // FLOW-F11: «Qué hacer», «Qué consultar» and the datum the step asks for.
       await editor.locator('[data-testid=flow-editor-add-command]').click();
-      await expect(await search(page, 'flow-step-action-s1', 'departamento')).toHaveCount(0);
-      await search(page, 'flow-step-action-s1', 'sección de ventas');
-      for (const [action, words] of SALE_SECTION_COMMANDS) {
-        await expect(page.locator(`[data-testid="flow-step-action-s1-option-${action}"]`)).toContainText(words);
-      }
+      await goesByItsWords(page, 'flow-step-action-s1', 'departamento', 'sección de ventas', SALE_SECTION_COMMANDS);
       await noHorizontalScroll(page, viewport.label);
       await capture(page, `FIX-FLOW-SALE-SECTION-WORD-steps-${viewport.label}`);
       await page.locator('[data-testid="flow-step-action-s1-option-sale.department.update"]').click();
@@ -487,6 +500,49 @@ for (const viewport of VIEWPORTS) {
       await expect(page.locator('[data-testid="flow-step-action-s2-option-sale.department.list"]')).toContainText(
         'Buscar secciones de ventas',
       );
+    });
+  });
+}
+
+// flow: FLOW-F10 FLOW-F11 · hub#934 — in Spanish, what the «Cambios temporales» list of Schedule holds is a «cambio
+// temporal» here too: in what starts an automation, in what a step does or reads and in the datum it asks for, never an
+// «excepción». Nothing is saved. Each width leaves its capture of the steps' list.
+const SCHEDULE_OVERRIDE_EVENTS: Array<[string, string]> = [
+  ['schedule.override.created', 'se crea un cambio temporal'],
+  ['schedule.override.deleted', 'se borra un cambio temporal'],
+  ['schedule.override.updated', 'se edita un cambio temporal'],
+];
+const SCHEDULE_OVERRIDE_COMMANDS: Array<[string, string]> = [
+  ['schedule.override.create', 'Crear un cambio temporal'],
+  ['schedule.override.update', 'Editar un cambio temporal'],
+];
+const SCHEDULE_OVERRIDE_QUERIES: Array<[string, string]> = [
+  ['schedule.override.list', 'Buscar cambios temporales'],
+  ['schedule.override.get', 'Leer un cambio temporal'],
+];
+
+for (const viewport of VIEWPORTS) {
+  test(`FLOW-F10 y FLOW-F11: a temporary change of Schedule goes by that word in Spanish at ${viewport.label}`, async ({ browser }) => {
+    await inSpanishEditor(browser, viewport, async (page, editor) => {
+
+      // FLOW-F10: «Elige qué pasa», and the summary of the trigger's card.
+      await onSomethingHappens(page, editor);
+      await goesByItsWords(page, 'flow-trigger-event', 'excepción', 'cambio temporal', SCHEDULE_OVERRIDE_EVENTS);
+      await page.locator('[data-testid="flow-trigger-event-option-schedule.override.created"]').click();
+      await expect(editor.locator('[data-testid=flow-trigger-open]')).toContainText('Cuando se crea un cambio temporal');
+      await noHorizontalScroll(page, viewport.label);
+      await capture(page, `FIX-FLOW-SCHEDULE-OVERRIDE-WORD-trigger-${viewport.label}`);
+
+      // FLOW-F11: «Qué hacer», the datum the step asks for and «Qué consultar».
+      await editor.locator('[data-testid=flow-editor-add-command]').click();
+      await goesByItsWords(page, 'flow-step-action-s1', 'excepción', 'cambio temporal', SCHEDULE_OVERRIDE_COMMANDS);
+      await noHorizontalScroll(page, viewport.label);
+      await capture(page, `FIX-FLOW-SCHEDULE-OVERRIDE-WORD-steps-${viewport.label}`);
+      await page.locator('[data-testid="flow-step-action-s1-option-schedule.override.update"]').click();
+      await choose(page, 'flow-step-addinfo-s1', 'Cambio temporal');
+      await expect(editor.locator('[data-testid=flow-step-param-s1-override]')).toContainText('Cambio temporal');
+      await editor.locator('[data-testid=flow-editor-add-query]').click();
+      await goesByItsWords(page, 'flow-step-action-s2', 'excepción', 'temporal', SCHEDULE_OVERRIDE_QUERIES);
     });
   });
 }
