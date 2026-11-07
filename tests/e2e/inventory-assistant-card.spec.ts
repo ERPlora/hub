@@ -8,7 +8,7 @@
 // flow: INVENTORY-F04 INVENTORY-F07 INVENTORY-F08 INVENTORY-F13 BASE-F97
 import { type BrowserContext, expect, test } from '@playwright/test';
 
-import { AN_ID, cancel, cardSpec, datumOf, fieldsOf, ownerIn, VIEWPORTS } from './assistant-card-helpers';
+import { cancel, cardSpec, datumOf, fieldsOf, ownerIn, VIEWPORTS } from './assistant-card-helpers';
 import { card, openPanel } from './assistant-real';
 import { A, api, capture, untilStill } from './helpers';
 import { cleanInventory, createProduct, stamp } from './inventory-helpers';
@@ -29,7 +29,7 @@ cardSpec(NEEDED, cleanInventory);
 /** A category and a product in it, through the app's own API. */
 async function aCatalog(context: BrowserContext) {
   const tag = stamp();
-  const created = await api<{ id: string; name: string }>(context, A, 'POST', '/inventory/categories', {
+  const created = await api<{ id: string; name: string; slug: string }>(context, A, 'POST', '/inventory/categories', {
     name: `E2E Bebidas ${tag}`,
     slug: `e2e-drinks-${tag.toLowerCase()}`,
   });
@@ -93,14 +93,15 @@ for (const language of ['es', 'en'] as const) {
     await expect(card(page)).not.toContainText(product.sku);
     await cancel(page);
 
-    // «Borra la categoría Bebidas», a dangerous write: the category by its name, titled as the screens call one.
+    // «Borra la categoría Bebidas», a dangerous write: the category by its name (never its slug), titled as the screens
+    // call one. No id on any card: `fieldsOf` checks each one.
     const removed = await datumOf(page, 'inventory__category__delete', { id: category.id });
     expect([removed.label, removed.value]).toEqual([words.category, category.name]);
     for (const vp of VIEWPORTS) {
       await page.setViewportSize({ width: vp.width, height: vp.height });
       await expect(card(page)).toContainText(`${words.category}: ${category.name}`);
       await expect(card(page)).not.toContainText(GENERIC[language]);
-      await expect(card(page)).not.toContainText(AN_ID);
+      await expect(card(page)).not.toContainText(category.slug);
       await untilStill(page);
       await capture(page, `hub-526-category-${language}-${vp.label}`);
     }
