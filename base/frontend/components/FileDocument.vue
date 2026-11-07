@@ -80,6 +80,20 @@ const DocumentBody = () => props.nodes.map(draw);
   font-size: 1.0625rem;
 }
 
+/* The shell's reset takes the markers off every list: a document's lists keep theirs. */
+.file-document :deep(ul),
+.file-document :deep(ol) {
+  padding-inline-start: 1.5rem;
+}
+
+.file-document :deep(ul) {
+  list-style: disc;
+}
+
+.file-document :deep(ol) {
+  list-style: decimal;
+}
+
 .file-document :deep(table) {
   border-collapse: collapse;
   margin-block: 0.75rem;
