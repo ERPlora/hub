@@ -67,6 +67,18 @@ export function cellText(value: SheetCell, locale: string, words: { yes: string;
   return value;
 }
 
+/** A JSON's tree opens its first levels (the root and what it holds); deeper ones fold. */
+export const JSON_OPEN_DEPTH = 2;
+/** The entries an opened branch of a JSON's tree draws; it says how many more there are. */
+export const JSON_TREE_ENTRIES = 500;
+
+/** A table of the preview: a CSV, a TSV or a sheet of a spreadsheet, its cells as text, cut to its first rows. */
+export interface PreviewSheet {
+  name: string;
+  rows: string[][];
+  cut: boolean;
+}
+
 /** The rows of a sheet the preview shows (the header among them), and whether it has more. */
 export function sheetRows<T>(rows: readonly T[]): { rows: T[]; cut: boolean } {
   return { rows: rows.slice(0, TABLE_PREVIEW_ROWS), cut: rows.length > TABLE_PREVIEW_ROWS };
