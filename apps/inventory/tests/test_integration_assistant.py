@@ -10,7 +10,7 @@ from django.apps import apps
 from live.operations import get, registry
 
 from base import assistant
-from base.tests.test_assistant import named_by_the_screen
+from base.tests.test_assistant import named_by_the_screen, technical_names
 
 FRONTEND = Path(apps.get_app_config("inventory").path) / "frontend/locale"
 SCREENS = json.loads((FRONTEND / "es.json").read_text())["inventory"]
@@ -50,6 +50,16 @@ def test_no_datum_of_a_write_of_inventory_reaches_a_spanish_card_by_its_technica
             elif name not in screen and label == name.title().replace("_", " "):
                 technical.setdefault(op.name, []).append(name)
     assert technical == {}
+
+
+def test_base_sees_only_the_data_spanish_spells_like_the_code():
+    """Base's sweep (``technical_names``) cannot tell «Slug» or «Color» from a title pydantic makes up: those two of
+    the category's writes, and nothing else, which the test above holds to the screen's word (hub#526). The exact set,
+    so a datum that loses its title shows here too."""
+    assert technical_names(inventory_writes()) == {
+        "inventory.category.create": ["slug", "color"],
+        "inventory.category.update": ["slug", "color"],
+    }
 
 
 def test_the_card_names_a_new_products_data_as_its_form_does():

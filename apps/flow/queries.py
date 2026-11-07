@@ -260,7 +260,11 @@ def action_fields(op: Operation) -> list[dict]:
 def step_fields(op: Operation) -> dict[str, dict]:
     """The fields a step of ``op`` leaves for the next ones (``steps.<id>.<field>``), by name, with their schema: its
     output's, a list's first row's."""
-    schema = op.output.model_json_schema()
+    return _step_fields(op, op.output.model_json_schema())
+
+
+def _step_fields(op: Operation, schema: dict) -> dict[str, dict]:
+    """``step_fields`` from ``schema``, ``op``'s output's already built."""
     properties = schema.get("properties", {})
     if op.kind == "query" and "rows" in properties:
         return _resolve_ref(properties["rows"].get("items", {}), schema.get("$defs", {})).get("properties", {})
@@ -272,7 +276,8 @@ def step_data(op: Operation) -> dict[str, dict]:
     its schema: the fields ``step_fields`` gives and, at any depth, those of an object among them — the line a step
     adds to a cart (``item.unit_price``), the invoice of a sale (``invoice.total_amount``) —; never inside a list,
     which no path names."""
-    defs = op.output.model_json_schema().get("$defs", {})
+    schema = op.output.model_json_schema()
+    defs = schema.get("$defs", {})
     found: dict[str, dict] = {}
 
     def walk(fields: dict, prefix: str, seen: frozenset[str]) -> None:
@@ -285,14 +290,15 @@ def step_data(op: Operation) -> dict[str, dict]:
                 if inner and ref not in seen:
                     walk(inner, f"{path}.", seen | {ref} if ref else seen)
 
-    walk(step_fields(op), "", frozenset())
+    walk(_step_fields(op, schema), "", frozenset())
     return found
 
 
 def action_outputs(op: Operation) -> list[str]:
-    """What a step of ``op`` leaves for the next ones: its output's fields (a list's first row's), and
-    ``found`` and ``count`` for a read."""
-    names = list(step_fields(op))
+    """What a step of ``op`` leaves for the next ones, by the path the engine resolves below the step (``step_data``):
+    its output's fields (a list's first row's), each object among them followed by what it holds (``item``,
+    ``item.unit_price``), never inside a list; and ``found`` and ``count`` for a read."""
+    names = list(step_data(op))
     if op.kind == "query":
         names += [name for name in ("found", "count") if name not in names]
     return names

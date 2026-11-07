@@ -384,6 +384,8 @@ export interface CatalogActionOut {
   app_name: string;
   description: string;
   fields: FieldOut[];
+  /** What a step of it leaves, by its path below the step: its fields, each object followed by what it holds
+   *  (`item`, `item.unit_price`), never inside a list; a read's `found` and `count`. */
   outputs: string[];
   /** Whether «Ask the assistant» may use it (absent: it may not). */
   assistant?: boolean;

@@ -17,7 +17,7 @@ from live.meta import (
     module_configs,
     permissions_for_role,
 )
-from live.operations import registry
+from live.operations import INTERNAL, registry
 
 from apps.inventory import events as E
 from base import home
@@ -99,13 +99,21 @@ def test_navigation_opens_the_inventory_with_an_iconify_icon():
     assert entry.icon == "ion:cube-outline"
 
 
+#: The reads that only name a record on the assistant's card (hub#526): no tool, no route.
+CARD_ONLY = {"inventory.category.get"}
+
+
 def test_every_operation_is_a_tool_of_the_assistant():
     # The assistant uses the app by voice and text with the user's own session: the operation's
     # permission is its only door. A command says its risk; a read has none.
     operations = [op for name, op in registry.items() if name.startswith("inventory.")]
-    # 31 + the product's image (INVENTORY-F30, F31): set_image, upload_image, suggest_image.
-    assert len(operations) == 34
+    # 31 + the product's image (INVENTORY-F30, F31): set_image, upload_image, suggest_image; + the category the
+    # assistant's card names (hub#526).
+    assert len(operations) == 35
     for op in operations:
+        if op.name in CARD_ONLY:
+            assert op.ai is INTERNAL and op.expose_api is False, op.name
+            continue
         assert isinstance(op.ai, dict) and op.ai.get("description"), op.name
         expected = {"description", "risk"} if op.kind == "command" else {"description"}
         assert set(op.ai) == expected, op.name
