@@ -13,9 +13,10 @@ from live.operations import registry
 from apps.tax import admin as tax_admin
 from apps.tax import queries, schemas, services
 from apps.tax.models import SYSTEM_CATEGORY_LABELS, WHOLE_COUNTRY, TaxAlias, TaxCategory, TaxRule, TaxSettings
-from base.tests.po import po_entries
+from base.tests.po import catalogue_key, po_entries
 
 LOCALE = Path(apps.get_app_config("tax").path) / "locale" / "es" / "LC_MESSAGES"
+SCREENS = Path(apps.get_app_config("tax").path) / "frontend" / "locale" / "es.json"
 
 
 MESSAGES = [
@@ -68,7 +69,7 @@ def visible_texts() -> set[str]:
         ]
     lazies += [*TaxRule.TaxType.labels, *TaxRule.OperationClass.labels, *TaxAlias.Source.labels]
     with translation.override("en"):
-        return {str(text) for text in lazies} | schema_titles()
+        return {catalogue_key(text) for text in lazies} | schema_titles()
 
 
 def schema_titles() -> set[str]:
@@ -123,6 +124,29 @@ def test_spanish_texts():
         assert str(queries.NO_RATE) == "Ninguna regla fiscal se aplica a esta categoría en este país."
         assert str(services.RULE_ALREADY_ACTIVE) == "Esa regla ya está activa."
         assert str(apps.get_app_config("tax").verbose_name) == "Impuestos"
+
+
+def test_each_model_says_active_and_when_in_its_own_gender():
+    """A tax category and a tax rule are feminine — «activa», «creada el», «actualizada el» —, an alias masculine
+    — «activo», «creado el», «actualizado el» —, as the screens' columns say them; not auth's «activo» for all
+    three, which comes first in ``INSTALLED_APPS`` (hub#667)."""
+    screens = json.loads(SCREENS.read_text(encoding="utf-8"))["tax"]
+    with translation.override("es"):
+        said = {
+            model: [str(model._meta.get_field(name).verbose_name) for name in ("is_active", "created_at", "updated_at")]
+            for model in (TaxCategory, TaxRule, TaxAlias)
+        }
+    assert said == {
+        TaxCategory: ["activa", "creada el", "actualizada el"],
+        TaxRule: ["activa", "creada el", "actualizada el"],
+        TaxAlias: ["activo", "creado el", "actualizado el"],
+    }
+    columns = {screen: screens[screen]["columns"]["active"] for screen in ("categories", "rules", "aliases")}
+    assert columns == {
+        "categories": said[TaxCategory][0].capitalize(),
+        "rules": said[TaxRule][0].capitalize(),
+        "aliases": said[TaxAlias][0].capitalize(),
+    }
 
 
 @pytest.mark.django_db
