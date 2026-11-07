@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:f70c4b4a5d692a78d07c7e878e18090413ef88a4292e1bc11f159201e0372dff -->
+<!-- generated from WORKBOOK.md sha256:e93c92d1f2ca2470e7e951da39014be8a013be94659c54dff311bced5565f9ac -->
 
 ## What it is for and who it is for
 
@@ -18,6 +18,11 @@ Who uses it:
 - The **owner** and the **administrator**: besides, they delete them and set up the booking page.
 - The **assistant** (by voice or by text, with the session of the person speaking) does the same: "confirm
   Ana's booking for tomorrow", "which online bookings are pending?", "cancel booking APT-20261016-0003".
+  Before an action it asks to confirm with its card (BASE-F97), which names each record as the diary names
+  it, never by its identifier: the booking by its customer, its day, its time and its professional
+  ("Booking: Lucía Pérez · Tuesday, March 5, 2030 · 10:00 · Ana López"), as the inbox does in "Cancel …'s
+  booking?"; the services and the professional of a booking from the page, by their names. What the person
+  asking cannot see, or what no longer exists, is left out.
 
 ## Reference adopted
 

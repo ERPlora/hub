@@ -378,7 +378,6 @@ def test_no_list_of_texts_sent_as_they_are_is_named():
 UNNAMED_REFERENCES = {
     "appointment": 12,
     "invoice": 1,
-    "online_booking": 7,
     "payment": 8,
     # The sale and the appointment a voucher or a session came from, the line of a sale that charged a voucher, the line
     # of an order that holds a session and the reference of a return: data of apps Services does not require, so it
@@ -538,6 +537,10 @@ TITLED_IN_SPANISH = {
     **{f"modifier.group.{action}:id": "Grupo" for action in ("delete", "update")},
     "modifier.link.detach:id": "Se aplica a",
     **{f"modifier.option.{action}:id": "Opción" for action in ("delete", "update")},
+    **{
+        f"online_booking.booking.{action}:id": "Reserva"
+        for action in ("cancel", "complete", "confirm", "delete", "no_show")
+    },
     **{f"pricing.price_item.{action}:id": "Precio" for action in ("remove", "update")},
     **{f"pricing.price_list.{action}:id": "Tarifa" for action in ("activate", "deactivate", "set_default", "update")},
     **{f"pricing.rule.{action}:id": "Regla de descuento" for action in ("activate", "deactivate", "update")},

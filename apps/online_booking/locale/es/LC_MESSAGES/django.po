@@ -223,6 +223,9 @@ msgid "Leaves you the task, so no online booking goes unseen."
 msgstr "Te deja la tarea, para que ninguna reserva por internet pase sin verse."
 
 # How the assistant's card names the data of online_booking's writes (titles of the schemas), as its screens do.
+msgid "Booking"
+msgstr "Reserva"
+
 msgid "No."
 msgstr "Nº"
 

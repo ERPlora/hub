@@ -7,12 +7,14 @@ as its screens (the bookings list, the booking page's settings and its preview) 
 
 import gettext
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
 from django.apps import apps
 from live.operations import get, registry
 
+from apps.online_booking.tests.conftest import ctx_for
 from base import assistant
 from base.tests.test_assistant import named_by_the_screen
 
@@ -98,14 +100,17 @@ def test_the_card_names_a_booking_by_its_number_or_its_customer_as_the_bookings_
         assert labels(assistant.card(get(name), arguments, "en")) == columns_en
 
 
-def test_the_card_names_a_booking_from_the_page_as_the_page_asks_for_it():
+def test_the_card_names_a_booking_from_the_page_as_the_page_asks_for_it(salon):
     """The customer's booking, with the words of the booking page (its preview): its services and its professional;
-    when, by its day and time. Her name, mobile, email and note the card's screen names itself, as every app's."""
+    when, by its day and time. Her name, mobile, email and note the card's screen names itself, as every app's. The
+    services and the professional are real ones: the card says a record it can read, and leaves out one it cannot."""
     book = get("online_booking.public.book")
-    arguments = {"service_ids": ["x"], "staff_id": "x", "start": "2030-03-05 10:00"}
+    arguments = {"service_ids": [str(salon.cut.id)], "staff_id": str(salon.ana.id), "start": "2030-03-05 10:00"}
     page, page_en = SCREENS["preview"], SCREENS_EN["preview"]
-    assert labels(assistant.card(book, arguments, "es")) == [page["services"], page["professional"], "Día y hora"]
-    assert labels(assistant.card(book, arguments, "en")) == [page_en["services"], page_en["professional"], "Day and time"]
+    in_spanish = labels(assistant.card(book, arguments, "es", replace(ctx_for(), language="es")))
+    assert in_spanish == [page["services"], page["professional"], "Día y hora"]
+    in_english = labels(assistant.card(book, arguments, "en", ctx_for()))
+    assert in_english == [page_en["services"], page_en["professional"], "Day and time"]
     assert {"name", "phone", "email", "notes"} <= named_by_the_screen()
 
 
