@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:b7bbfe6310d5b8f67ad7a5920e21b447556fbfbcdb36856c38b9160fb35ea6d2 -->
+<!-- generated from WORKBOOK.md sha256:b279f1b1cf33ad563c5948f38d9ef7e8e4d341e71de853ca57130e96b11ff16a -->
 
 ## What it is for and who it is for
 
@@ -56,7 +56,9 @@ switches between the two.
   colour with the photo tinted in it, huge capitals and strong buttons). All four suit a restaurant, a salon, a shop
   or a service.
 - **Colours**: eight palettes as cards showing their colours on the light and the dark page, the chosen one
-  highlighted: **Ocean**, **Forest**, **Terracotta**, **Slate**, **Rose**, **Sand**, **Midnight** and **Olive**. Under
+  highlighted: **Ocean**, **Forest**, **Terracotta**, **Slate**, **Rose**, **Sand**, **Midnight** and **Olive**; up to
+  three to a row, and two when a name would not fit whole that way (a 375 px phone): a name is never split inside a
+  word. Under
   them, two colour fields (**Main colour** and **Second colour**) with the chosen palette's: changing them makes the
   palette yours, and **Reset colours** then appears and gives the palette's own back. Choosing another palette shows
   its own (the changes to the previous one are dropped). Each palette has a light and a dark version and reads well in
