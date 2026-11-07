@@ -6,74 +6,50 @@ from pathlib import Path
 
 from django.apps import apps
 from django.utils import translation
-from live.operations import registry
 
 from apps.cart_checkout import admin as cart_admin
 from apps.cart_checkout import queries, schemas, services
 from apps.cart_checkout.models import Cart, CartItem, Order, OrderCounter
-from base.tests.po import catalogue_key, po_entries
+from base.tests.po import (
+    catalogue_key,
+    compiled_differences,
+    config_texts,
+    missing_from_catalogue,
+    model_texts,
+    module_texts,
+    operation_titles,
+    po_entries,
+    untranslated,
+)
 
 LOCALE = Path(apps.get_app_config("cart_checkout").path) / "locale" / "es" / "LC_MESSAGES"
 MODELS = (Cart, CartItem, Order, OrderCounter)
-
-
-def lazy_constants(module) -> list:
-    """Every module-level lazy text (``_("…")``) of ``module``."""
-    return [value for value in vars(module).values() if type(value).__name__ == "__proxy__"]
 
 
 def visible_texts() -> set[str]:
     """The catalogue key of every lazy text the app shows (menu, store, admin, choices, messages) — its English, with
     its context in front for a ``pgettext_lazy`` — and the titles of its schemas."""
     config = apps.get_app_config("cart_checkout")
-    lazies = [config.verbose_name, config.summary, config.description, *(nav.label for nav in config.navigation)]
-    lazies += lazy_constants(queries) + lazy_constants(services) + lazy_constants(schemas) + lazy_constants(cart_admin)
-    for model in MODELS:
-        lazies += [model._meta.verbose_name, model._meta.verbose_name_plural]
-        lazies += [
-            field.verbose_name
-            for field in model._meta.get_fields()
-            if hasattr(field, "verbose_name") and not field.auto_created and not field.primary_key
-        ]
+    lazies = [*config_texts(config)]
+    lazies += module_texts(queries, services, schemas, cart_admin)
+    lazies += model_texts(MODELS)
     lazies += list(Cart.Status.labels) + list(Order.Status.labels)
     with translation.override("en"):
-        return {catalogue_key(text) for text in lazies} | schema_titles()
-
-
-def schema_titles() -> set[str]:
-    """The titles cart_checkout's operations give their input data (``gettext_noop``): the assistant's card names each
-    datum by them, so each one needs its Spanish. Only the ones cart_checkout wrote: pydantic leaves ``title`` empty
-    otherwise."""
-    return {
-        field.title
-        for op in registry.values()
-        if op.app_label == "cart_checkout"
-        for field in op.input.model_fields.values()
-        if field.title
-    }
+        return {catalogue_key(text) for text in lazies} | operation_titles("cart_checkout")
 
 
 def test_every_entry_has_a_spanish_translation():
-    entries = po_entries(LOCALE / "django.po")
-    assert entries
-    untranslated = [msgid for msgid, (msgstr, fuzzy) in entries.items() if not msgstr or fuzzy]
-    assert untranslated == []
+    assert untranslated(LOCALE / "django.po") == []
 
 
 def test_every_visible_text_is_in_the_catalog():
     """By its whole key, context included: a text that goes back to ``_()`` while its entry keeps the context, or whose
     context has a typo, is missing from the catalogue — on screen it says another app's Spanish (hub#652)."""
-    texts = visible_texts()
-    assert len(texts) > 60  # positive control: the collection found the app's texts...
-    assert len({key for key in texts if "\x04" in key}) >= 18  # ...and kept the context of its pgettext_lazy ones
-    assert texts - set(po_entries(LOCALE / "django.po")) == set()
+    assert missing_from_catalogue(visible_texts(), LOCALE / "django.po", more_than=60, with_context=18) == set()
 
 
 def test_the_compiled_catalog_is_current():
-    with (LOCALE / "django.mo").open("rb") as compiled:
-        catalog = gettext.GNUTranslations(compiled)._catalog
-    po = {msgid: msgstr for msgid, (msgstr, _) in po_entries(LOCALE / "django.po").items()}
-    assert {msgid: msgstr for msgid, msgstr in catalog.items() if msgid} == po
+    assert compiled_differences(LOCALE) == {}
 
 
 def test_the_card_says_each_title_with_cart_checkouts_own_spanish():
@@ -81,7 +57,7 @@ def test_the_card_says_each_title_with_cart_checkouts_own_spanish():
     Spanish, so cart_checkout's own entry would be dead text: they have to say the same."""
     with (LOCALE / "django.mo").open("rb") as compiled:
         own = gettext.GNUTranslations(compiled)
-    titles = schema_titles()
+    titles = operation_titles("cart_checkout")
     assert {"Customer", "Cart line", "Order"} <= titles
     with translation.override("es"):
         assert {title: translation.gettext(title) for title in titles} == {

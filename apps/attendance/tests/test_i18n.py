@@ -1,7 +1,6 @@
 """Every visible text of the attendance app has its Spanish translation, compiled and current, and the
 short labels carry a context so another app's catalogue never translates them its own way."""
 
-import gettext
 import json
 import re
 from pathlib import Path
@@ -9,82 +8,52 @@ from pathlib import Path
 import pytest
 from django.apps import apps
 from django.utils import translation
-from django.utils.functional import Promise
 from django.utils.translation import gettext_lazy
 from live.meta import Nav
-from live.operations import registry
 
 from apps.attendance import queries, schemas, services
 from apps.attendance.models import AttendanceSettings, Break, Correction, Record
 from base.tests.po import catalogue_key as source
-from base.tests.po import po_entries
+from base.tests.po import (
+    compiled_differences,
+    config_texts,
+    missing_from_catalogue,
+    model_texts,
+    module_texts,
+    operation_titles,
+    po_entries,
+    untranslated,
+)
 
 LOCALE = Path(apps.get_app_config("attendance").path) / "locale" / "es" / "LC_MESSAGES"
 MODELS = (Record, Break, Correction, AttendanceSettings)
-
-
-def module_texts(module) -> list[Promise]:
-    """The lazy texts a module declares at its top (error and validation messages)."""
-    return [value for value in vars(module).values() if isinstance(value, Promise)]
 
 
 def visible_texts() -> set[str]:
     """The catalogue key of every lazy text the app shows (menu, store, admin, choices, messages)."""
     config = apps.get_app_config("attendance")
     lazies = [
-        config.verbose_name,
-        config.summary,
-        config.description,
-        *(nav.label for nav in config.navigation),
+        *config_texts(config),
         *(panel.title for panel in config.widgets),
-        *module_texts(queries),
-        *module_texts(services),
-        *module_texts(schemas),
+        *module_texts(queries, services, schemas),
     ]
-    for model in MODELS:
-        lazies += [model._meta.verbose_name, model._meta.verbose_name_plural]
-        lazies += [
-            field.verbose_name
-            for field in model._meta.get_fields()
-            if hasattr(field, "verbose_name") and not field.auto_created and not field.primary_key
-        ]
+    lazies += model_texts(MODELS)
     for choices in (Record.Status, Record.Source):
         lazies += list(choices.labels)
     with translation.override("en"):
-        return {source(text) for text in lazies} | schema_titles()
-
-
-def schema_titles() -> set[str]:
-    """The titles attendance's operations give their input data (``gettext_noop``): the assistant's card names each
-    datum by them, so each one needs its Spanish. Only the ones attendance wrote: pydantic leaves ``title`` empty
-    otherwise."""
-    return {
-        field.title
-        for op in registry.values()
-        if op.app_label == "attendance"
-        for field in op.input.model_fields.values()
-        if field.title
-    }
-
-
-def untranslated(entries: dict[str, tuple[str, bool]]) -> list[str]:
-    """The keys gettext shows in English: no ``msgstr``, or a ``#, fuzzy`` one it skips."""
-    return [key for key, (msgstr, fuzzy) in entries.items() if not msgstr or fuzzy]
+        return {source(text) for text in lazies} | operation_titles("attendance")
 
 
 def test_every_entry_has_a_spanish_translation():
-    entries = po_entries(LOCALE / "django.po")
-    assert entries
-    assert untranslated(entries) == []
+    assert untranslated(LOCALE / "django.po") == []
 
 
 def missing_from_catalog() -> set[str]:
     """The visible texts the catalogue has no entry for, each compared by its whole key."""
-    return visible_texts() - set(po_entries(LOCALE / "django.po"))
+    return missing_from_catalogue(visible_texts(), LOCALE / "django.po", more_than=60, with_context=9)
 
 
 def test_every_visible_text_is_in_the_catalog():
-    assert len(visible_texts()) > 60  # positive control: the collection found the app's texts
     assert missing_from_catalog() == set()
 
 
@@ -100,10 +69,7 @@ def test_a_text_that_loses_its_context_is_missing_from_the_catalog(monkeypatch):
 
 
 def test_the_compiled_catalog_is_current():
-    with (LOCALE / "django.mo").open("rb") as compiled:
-        catalog = gettext.GNUTranslations(compiled)._catalog
-    po = {msgid: msgstr for msgid, (msgstr, _) in po_entries(LOCALE / "django.po").items()}
-    assert {msgid: msgstr for msgid, msgstr in catalog.items() if msgid} == po
+    assert compiled_differences(LOCALE) == {}
 
 
 def test_placeholders_survive_the_translation():
