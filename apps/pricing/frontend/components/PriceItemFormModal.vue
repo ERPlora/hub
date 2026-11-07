@@ -46,6 +46,11 @@ const title = computed(() =>
 
 const form = ref<Form>({ kind: 'product', article: null, quantity: '1', price: '' });
 const tried = ref(false);
+/** The price as the server takes it, in minor units of the list's money; `null` while it is none (the field says why). */
+const cents = computed(() => {
+  const read = parseMoney(form.value.price, { money: money.value });
+  return read.ok ? read.cents : null;
+});
 
 watch(
   () => [open.value, props.item?.id] as const,
@@ -64,10 +69,6 @@ watch(
 
 const text = (value: unknown): string => (value === null || value === undefined ? '' : String(value));
 const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'ion-touched': !!message });
-const cents = computed(() => {
-  const read = parseMoney(form.value.price, { money: money.value });
-  return read.ok ? read.cents : null;
-});
 /** What the quantity field holds as the server reads it; as typed when unreadable (the server says why). */
 const quantity = computed(() => readDecimal(form.value.quantity, 3) ?? form.value.quantity.trim());
 const ready = computed(() => cents.value !== null && (props.item !== null || form.value.article !== null));
