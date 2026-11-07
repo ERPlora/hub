@@ -352,6 +352,7 @@ msgid "invoice number"
 msgstr "número de factura"
 
 #: models.py:254 models.py:611
+msgctxt "verifactu record"
 msgid "issue date"
 msgstr "fecha de expedición"
 
@@ -364,6 +365,7 @@ msgid "invoice type"
 msgstr "tipo de factura"
 
 #: models.py:258
+msgctxt "verifactu record"
 msgid "rectification kind"
 msgstr "tipo de rectificativa"
 
@@ -396,6 +398,7 @@ msgid "customer document type"
 msgstr "tipo de documento del cliente"
 
 #: models.py:279
+msgctxt "verifactu record"
 msgid "tax breakdown"
 msgstr "desglose"
 
@@ -404,6 +407,7 @@ msgid "taxable base"
 msgstr "base imponible"
 
 #: models.py:282
+msgctxt "verifactu record"
 msgid "tax"
 msgstr "cuota"
 
@@ -412,6 +416,7 @@ msgid "total"
 msgstr "total"
 
 #: models.py:285
+msgctxt "verifactu record"
 msgid "correction"
 msgstr "subsanación"
 
@@ -664,6 +669,7 @@ msgid "actor"
 msgstr "quién"
 
 #: models.py:506
+msgctxt "verifactu event"
 msgid "event"
 msgstr "evento"
 
@@ -964,6 +970,7 @@ msgid "The certificate does not allow client authentication, so it cannot connec
 msgstr "El certificado no permite la autenticación de cliente, así que no puede conectar con la AEAT."
 
 #: models.py
+msgctxt "verifactu business status"
 msgid "Active"
 msgstr "Activa"
 
