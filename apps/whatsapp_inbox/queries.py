@@ -16,7 +16,8 @@ from live.context import OperationContext, Scope
 from live.errors import Conflict, NotFound
 from live.operations import INTERNAL, operation
 
-from apps.customer.phones import DEFAULT_COUNTRY, InvalidPhone, candidates, to_e164
+from apps.customer.phones import InvalidPhone, candidates, to_e164
+from apps.customer.queries import business_country
 from apps.customer.search import normalize
 from apps.whatsapp_inbox import clock, gateway, samples
 from apps.whatsapp_inbox.models import (
@@ -140,15 +141,10 @@ _PHONE_TEXT = re.compile(r"^[\d\s+().\-/]+$")
 PLANS_PATH = f"{SAAS_PANEL_PATH}/store/plans"
 
 
-def business_country(ctx: OperationContext | None = None) -> str:
-    """The country a number without prefix belongs to. Phase 1 has no settings per business: Spain."""
-    return DEFAULT_COUNTRY
-
-
-def e164(raw: str, ctx: OperationContext | None = None, *, from_whatsapp: bool = False) -> str:
+def e164(raw: str, ctx: OperationContext, *, from_whatsapp: bool = False) -> str:
     """``raw`` as the conversation's key (E.164). WhatsApp's bare digits are international; a number a
-    person typed is national unless it says its country (gh:whatsapp_inbox#279: ``600222333`` is Spain's,
-    never +60's).
+    person typed is one of the business's country unless it says its own, as Customers reads a card's phone
+    (gh:whatsapp_inbox#279: in a Spanish business ``600222333`` is Spain's, never +60's; hub#527).
 
     Raises ``InvalidPhone`` when it is no number.
     """
@@ -202,14 +198,14 @@ NOTE_NOT_FOUND = _("That note no longer exists.")
 TEMPLATE_GONE = _("That template no longer exists.")
 
 
-def _matching_ids(reference: str) -> list[UUID]:
+def _matching_ids(ctx: OperationContext, reference: str) -> list[UUID]:
     """The live conversations ``reference`` names (at most two: one is enough to answer).
 
     A number (any format) is compared as a number. A name is compared as people say it (``name_key``:
     no case, accents, emoji or extra spaces), to the WhatsApp name and to the live card's name.
     """
     text = reference.strip()
-    numbers = candidates(text, business_country()) if _PHONE_TEXT.match(text) else set()
+    numbers = candidates(text, business_country(ctx)) if _PHONE_TEXT.match(text) else set()
     rows = live_conversations()
     if numbers:
         return list(rows.filter(phone__in=numbers).values_list("id", flat=True)[:2])
@@ -232,6 +228,7 @@ def _matching_ids(reference: str) -> list[UUID]:
 
 
 def find_conversation(
+    ctx: OperationContext,
     conversation_id: UUID | None,
     reference: str | None = None,
     *,
@@ -242,7 +239,7 @@ def find_conversation(
     names. ``lock`` locks its row until the end of the command; ``live=False`` also finds an erased one,
     by its id only. ``NotFound`` when there is none, ``Conflict`` when the reference fits several."""
     if conversation_id is None:
-        ids = _matching_ids(reference or "")
+        ids = _matching_ids(ctx, reference or "")
         if not ids:
             raise NotFound(
                 NO_CONVERSATION_MATCHES % {"reference": reference},
@@ -485,7 +482,7 @@ def list_conversations(ctx: OperationContext, params: ConversationListIn) -> dic
     },
 )
 def conversation_get(ctx: OperationContext, data: ConversationRefIn) -> dict:
-    return conversation_detail(ctx, find_conversation(data.id, data.conversation))
+    return conversation_detail(ctx, find_conversation(ctx, data.id, data.conversation))
 
 
 @operation(
@@ -610,7 +607,7 @@ def notices(ctx: OperationContext, data: NoticesIn) -> dict:
     },
 )
 def list_messages(ctx: OperationContext, params: MessageListIn) -> dict:
-    conversation = find_conversation(params.id, params.conversation)
+    conversation = find_conversation(ctx, params.id, params.conversation)
     rows = (
         Message.objects.filter(conversation=conversation)
         .select_related("sent_by")
@@ -687,7 +684,7 @@ def last_offered(message: Message) -> str:
     },
 )
 def list_notes(ctx: OperationContext, params: NoteListIn) -> dict:
-    conversation = find_conversation(params.id, params.conversation)
+    conversation = find_conversation(ctx, params.id, params.conversation)
     rows = Note.objects.filter(conversation=conversation).order_by("-created_at", "-id")
     me = actor_id(ctx)
     return page(rows, params, lambda note: note_out(ctx, note, me))

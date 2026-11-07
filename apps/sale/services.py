@@ -1800,7 +1800,7 @@ def set_appointment(ctx: OperationContext, data: OrderSetAppointmentIn) -> dict:
 # ── Charging ─────────────────────────────────────────────────────────────────────────────────────
 
 
-def _customer_details(data: CompleteIn) -> tuple:
+def _customer_details(ctx: OperationContext, data: CompleteIn) -> tuple:
     """``(card, name, tax id, address, country)`` of the sale's customer: what was sent, else the card's.
     The name is the fiscal one, as Invoicing reads a card: its company when it has one (the NombreRazon
     that goes with the company's tax ID), else the person. The card is locked before the check, as Customers'
@@ -1808,7 +1808,7 @@ def _customer_details(data: CompleteIn) -> tuple:
     gone (404), and one that comes after waits for the charge and finds the sale that protects the card."""
     card = None
     if data.customer_id is not None or data.customer:
-        card = find_customer(data.customer_id, data.customer, lock=True)
+        card = find_customer(ctx, data.customer_id, data.customer, lock=True)
     name = data.customer_name or ((card.company_name or card.name) if card else "")
     tax_id = data.customer_tax_id or (card.tax_id if card else "")
     if data.customer_address:
@@ -2171,7 +2171,7 @@ def _complete(ctx: OperationContext, data: CompleteIn, *, over_limit: bool) -> d
         return answer
     settings = current_settings()
     card, customer_name, customer_tax_id, customer_address, customer_country = (
-        _customer_details(data)
+        _customer_details(ctx, data)
     )
 
     if data.order_id is not None:

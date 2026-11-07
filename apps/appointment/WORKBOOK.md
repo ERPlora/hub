@@ -946,8 +946,6 @@ agenda tuya que enseñar.».
 
 Lo que se vio fallar y queda abierto al cerrar la app (2026-11-03), cada cosa con su issue (`migration-leftover`):
 
-- **hub#527** — En un negocio de otro país, un teléfono escrito sin prefijo se guarda y se busca como español
-  (cruza APPOINTMENT-F22).
 - **hub#635** y **hub#637** — textos: la tarjeta de confirmación del asistente que no dice qué registro toca y la
   que nombra en inglés algunos datos («Confirm Overlap»).
 - Las peticiones de componentes de [`UI-REQUESTS.md`](UI-REQUESTS.md) (`Scheduler`, `DateField`/`TimeField`, tres
