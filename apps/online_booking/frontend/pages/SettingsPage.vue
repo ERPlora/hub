@@ -5,10 +5,10 @@
 // every field the person has not touched, «Save» sends only the fields touched and changed
 // (`online_booking.settings.update`: the page's and the diary's, all or nothing), and a refusal says itself as
 // a FormModal does. Below, the offered services with their «Online booking» switch, saved at once in Services.
-import { EmptyState, InlineFeedback, useSettingsForm } from '@erplora/ui/components';
+import { EmptyState, InlineFeedback, SettingsFormFooter, useSettingsForm } from '@erplora/ui/components';
 import { type ApiError, useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
-import { IonButton, IonInput, IonSpinner, IonTextarea, IonToggle } from '@ionic/vue';
+import { IonInput, IonSpinner, IonTextarea, IonToggle } from '@ionic/vue';
 import { computed, ref } from 'vue';
 
 import PageNotices from '../components/PageNotices.vue';
@@ -35,11 +35,12 @@ const t = useT();
 const canManage = computed(() => session.can('online_booking.manage_settings'));
 
 const { data, status, error } = useLive('online_booking.settings.get', {});
-const { form, dirty, saved, pending, error: saveError, fieldErrors, showsError, set, save } = useSettingsForm(
+const settingsForm = useSettingsForm(
   data,
   useCommand('online_booking.settings.update'),
   { toForm, numbers: NUMBERS },
 );
+const { form, fieldErrors, set } = settingsForm;
 
 function toForm(settings: SettingsOut): Form {
   return {
@@ -112,7 +113,7 @@ async function toggleService(event: Event, id: string, online: boolean): Promise
         v-else-if="form"
         class="ob-settings"
         data-testid="ob-settings"
-        @submit.prevent="save"
+        @submit.prevent="settingsForm.save()"
       >
         <h2 class="ob-settings__title">
           {{ $t('online_booking.settings.title') }}
@@ -222,29 +223,13 @@ async function toggleService(event: Event, id: string, online: boolean): Promise
           {{ t(`online_booking.settings.fields.${field}`) }}
         </ion-toggle>
 
-        <InlineFeedback
-          v-if="showsError"
-          tone="danger"
-          data-testid="ob-settings-save-error"
-          :heading="$t('online_booking.settings.saveError')"
-        >
-          {{ saveError?.message }}
-        </InlineFeedback>
-        <InlineFeedback
-          v-if="saved"
-          tone="success"
-          data-testid="ob-settings-saved"
-        >
-          {{ $t('online_booking.settings.saved') }}
-        </InlineFeedback>
-        <ion-button
-          type="submit"
-          data-testid="ob-settings-save"
-          :disabled="!dirty || pending"
-          @click="save"
-        >
-          {{ $t('online_booking.settings.save') }}
-        </ion-button>
+        <SettingsFormFooter
+          :settings="settingsForm"
+          testid="ob-settings"
+          :save-label="$t('online_booking.settings.save')"
+          :saved-label="$t('online_booking.settings.saved')"
+          :error-heading="$t('online_booking.settings.saveError')"
+        />
       </form>
 
       <section
