@@ -1,6 +1,5 @@
 """Every visible text of the appointment app has its Spanish translation, compiled and current."""
 
-import gettext
 import json
 from pathlib import Path
 
@@ -20,42 +19,30 @@ from apps.appointment.models import (
     RecurringService,
     Settings,
 )
-from base.tests.po import po_entries
+from base.tests.po import (
+    catalogue_key,
+    compiled_differences,
+    config_texts,
+    missing_from_catalogue,
+    model_texts,
+    module_texts,
+    untranslated,
+)
 
 LOCALE = Path(apps.get_app_config("appointment").path) / "locale" / "es" / "LC_MESSAGES"
 MODELS = (Settings, Counter, Recurring, RecurringService, Appointment, AppointmentService, History, BlockedTime)
-
-
-def module_texts(module) -> list[Promise]:
-    """The lazy texts a module declares at its top, alone or as the values of a dict."""
-    found = []
-    for value in vars(module).values():
-        items = value.values() if isinstance(value, dict) else (value,)
-        found += [item for item in items if isinstance(item, Promise)]
-    return found
 
 
 def visible_texts() -> set[str]:
     """The English source of every lazy text the app shows (menu, store, admin, choices, messages)."""
     config = apps.get_app_config("appointment")
     lazies = [
-        config.verbose_name,
-        config.summary,
-        config.description,
-        *(nav.label for nav in config.navigation),
+        *config_texts(config),
         *(counter.label for counter in config.bell),
         *(text for notice in config.notices for text in (*notice.title, *notice.body) if isinstance(text, Promise)),
-        *module_texts(queries),
-        *module_texts(services),
-        *module_texts(schemas),
+        *module_texts(queries, services, schemas),
     ]
-    for model in MODELS:
-        lazies += [model._meta.verbose_name, model._meta.verbose_name_plural]
-        lazies += [
-            field.verbose_name
-            for field in model._meta.get_fields()
-            if hasattr(field, "verbose_name") and not field.auto_created and not field.primary_key
-        ]
+    lazies += model_texts(MODELS)
     for choices in (
         Appointment.Status,
         Appointment.Source,
@@ -65,27 +52,21 @@ def visible_texts() -> set[str]:
     ):
         lazies += list(choices.labels)
     with translation.override("en"):
-        return {str(text) for text in lazies}
+        return {catalogue_key(text) for text in lazies}
 
 
 def test_every_entry_has_a_spanish_translation():
-    entries = po_entries(LOCALE / "django.po")
-    assert entries
-    untranslated = [msgid for msgid, (msgstr, fuzzy) in entries.items() if not msgstr or fuzzy]
-    assert untranslated == []
+    assert untranslated(LOCALE / "django.po") == []
 
 
 def test_every_visible_text_is_in_the_catalog():
-    assert len(visible_texts()) > 100  # positive control: the collection found the app's texts
-    msgids = {key.split("\x04")[-1] for key in po_entries(LOCALE / "django.po")}
-    assert visible_texts() - msgids == set()
+    """Each text of Citas by its whole key, context included (hub#975): a ``pgettext_lazy`` that goes
+    back to ``_()``, or whose context has a typo, is missing from the catalogue, and Spanish says it in English."""
+    assert missing_from_catalogue(visible_texts(), LOCALE / "django.po", more_than=130, with_context=11) == set()
 
 
 def test_the_compiled_catalog_is_current():
-    with (LOCALE / "django.mo").open("rb") as compiled:
-        catalog = gettext.GNUTranslations(compiled)._catalog
-    po = {msgid: msgstr for msgid, (msgstr, _) in po_entries(LOCALE / "django.po").items()}
-    assert {msgid: msgstr for msgid, msgstr in catalog.items() if msgid} == po
+    assert compiled_differences(LOCALE) == {}
 
 
 def test_spanish_texts_of_the_workbook():

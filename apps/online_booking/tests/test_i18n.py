@@ -7,24 +7,22 @@ from pathlib import Path
 import pytest
 from django.apps import apps
 from django.utils import translation
-from django.utils.functional import Promise
-from live.operations import registry
 
 from apps.online_booking import queries, schemas, services
 from apps.online_booking.models import Booking, Settings
-from base.tests.po import catalogue_key, po_entries
+from base.tests.po import (
+    catalogue_key,
+    compiled_differences,
+    config_texts,
+    missing_from_catalogue,
+    model_texts,
+    module_texts,
+    operation_titles,
+    untranslated,
+)
 
 LOCALE = Path(apps.get_app_config("online_booking").path) / "locale" / "es" / "LC_MESSAGES"
 MODELS = (Settings, Booking)
-
-
-def module_texts(module) -> list[Promise]:
-    """The lazy texts a module declares at its top, alone or as the values of a dict."""
-    found = []
-    for value in vars(module).values():
-        items = value.values() if isinstance(value, dict) else (value,)
-        found += [item for item in items if isinstance(item, Promise)]
-    return found
 
 
 def visible_texts() -> set[str]:
@@ -32,55 +30,26 @@ def visible_texts() -> set[str]:
     schemas."""
     config = apps.get_app_config("online_booking")
     lazies = [
-        config.verbose_name,
-        config.summary,
-        config.description,
-        *(nav.label for nav in config.navigation),
-        *module_texts(queries),
-        *module_texts(services),
-        *module_texts(schemas),
+        *config_texts(config),
+        *module_texts(queries, services, schemas),
     ]
-    for model in MODELS:
-        lazies += [model._meta.verbose_name, model._meta.verbose_name_plural]
-        lazies += [
-            field.verbose_name
-            for field in model._meta.get_fields()
-            if hasattr(field, "verbose_name") and not field.auto_created and not field.primary_key
-        ]
+    lazies += model_texts(MODELS)
     with translation.override("en"):
-        return {catalogue_key(text) for text in lazies} | schema_titles()
-
-
-def schema_titles() -> set[str]:
-    """The titles online_booking's operations give their input data (``gettext_noop``): the assistant's card names
-    each datum by them, so each one needs its Spanish. Only the ones online_booking wrote: pydantic leaves ``title``
-    empty otherwise."""
-    return {
-        field.title
-        for op in registry.values()
-        if op.app_label == "online_booking"
-        for field in op.input.model_fields.values()
-        if field.title
-    }
+        return {catalogue_key(text) for text in lazies} | operation_titles("online_booking")
 
 
 def test_every_entry_has_a_spanish_translation():
-    entries = po_entries(LOCALE / "django.po")
-    assert entries
-    untranslated = [msgid for msgid, (msgstr, fuzzy) in entries.items() if not msgstr or fuzzy]
-    assert untranslated == []
+    assert untranslated(LOCALE / "django.po") == []
 
 
 def test_every_visible_text_is_in_the_catalog():
-    assert len(visible_texts()) > 40  # positive control: the collection found the app's texts
-    assert visible_texts() - set(po_entries(LOCALE / "django.po")) == set()
+    """Each text of Reservas online by its whole key, context included: a ``pgettext_lazy`` that goes back to
+    ``_()``, or whose context has a typo, is missing from the catalogue, and Spanish says it in English (hub#975)."""
+    assert missing_from_catalogue(visible_texts(), LOCALE / "django.po", more_than=45, with_context=1) == set()
 
 
 def test_the_compiled_catalog_is_current():
-    with (LOCALE / "django.mo").open("rb") as compiled:
-        catalog = gettext.GNUTranslations(compiled)._catalog
-    po = {msgid: msgstr for msgid, (msgstr, _) in po_entries(LOCALE / "django.po").items()}
-    assert {msgid: msgstr for msgid, msgstr in catalog.items() if msgid} == po
+    assert compiled_differences(LOCALE) == {}
 
 
 def test_the_card_says_each_title_with_online_bookings_own_spanish():
@@ -88,7 +57,7 @@ def test_the_card_says_each_title_with_online_bookings_own_spanish():
     with that app's Spanish, so online_booking's own entry would be dead text: they have to say the same."""
     with (LOCALE / "django.mo").open("rb") as compiled:
         own = gettext.GNUTranslations(compiled)
-    titles = schema_titles()
+    titles = operation_titles("online_booking")
     assert {"Customer", "Services", "Slot interval (minutes)"} <= titles
     with translation.override("es"):
         assert {title: translation.gettext(title) for title in titles} == {
