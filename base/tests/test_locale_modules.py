@@ -32,7 +32,7 @@ SPANISH = Path("locale", "es", "LC_MESSAGES", "django.mo")
 
 #: The messages each module says (in its catalogue or only in its code) and Spanish shows in another app's words, by
 #: module. Only ever lower: a module that gave such a text its own context (or the earlier wording) left this count,
-#: and none comes in. Empty since VeriFactu's left (hub#591): a case here is a new one.
+#: and none comes in. Empty since the last module left it (hub#591): a case here is a new one.
 SHADOWED: dict[str, int] = {}
 
 
