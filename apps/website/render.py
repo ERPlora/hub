@@ -86,6 +86,7 @@ def render_site(
     today: str | None = None,
     reviews: dict | None = None,
     hub_address: str = "",
+    canonical: str = "",
 ) -> str:
     """The page of ``template`` with ``theme`` and ``content`` in ``lang``, for the hub whose slug is ``hub``.
 
@@ -94,6 +95,8 @@ def render_site(
     ``reviews`` is Google's answer for the reviews section's place (``apps.website.reviews``), or ``None``.
     ``hub_address`` is the business's own address (``https://<slug>.<domain>/``) when the page is painted for its own
     domain (``public_home``), where neither ``/auth`` nor ``/api`` is: «Log in» goes there and nothing refreshes.
+    ``canonical`` is the page's main address, which its head tells search engines (``rel="canonical"``,
+    ``public_home``, hub#818); without one, as in the preview, it names none.
     ``request`` is accepted for symmetry with Django's renderers and never used: the HTML must not depend on who
     asked. Raises ``ValueError`` for an unknown template or an invalid theme or content.
     """
@@ -111,6 +114,7 @@ def render_site(
             "preview": preview,
             "login_url": f"{hub_address}{LOGIN_PATH}" if hub_address else f"/{LOGIN_PATH}",
             "static": bool(hub_address),
+            "canonical": canonical,
             "theme": _theme(valid_theme),
             "site_name": site_name,
             # The letter on the header's gradient when there is no cover.
