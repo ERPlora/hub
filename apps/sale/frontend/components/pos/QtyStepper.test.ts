@@ -31,6 +31,8 @@ describe('QtyStepper', () => {
 
   it('plus and minus ask one unit more or less; minus from one asks zero (the line goes)', async () => {
     const m = await setup({ quantity: '1.000' });
+    expect(m.find('pos-qty-plus').element.tagName.toLowerCase()).toBe('ion-button');
+    expect(m.find('pos-qty-minus').element.tagName.toLowerCase()).toBe('ion-button');
     await click(m.find('pos-qty-plus').element);
     await click(m.find('pos-qty-minus').element);
     expect(m.wrapper.emitted('change')).toEqual([['2'], ['0']]);
@@ -74,7 +76,7 @@ describe('QtyStepper', () => {
 
   it('can be locked while a write is in flight', async () => {
     const m = await setup({ disabled: true });
-    expect(m.find('pos-qty-plus').attributes('disabled')).toBeDefined();
-    expect(m.find('pos-qty-minus').attributes('disabled')).toBeDefined();
+    expect((m.find('pos-qty-plus').element as HTMLElement & { disabled?: boolean }).disabled).toBe(true);
+    expect((m.find('pos-qty-minus').element as HTMLElement & { disabled?: boolean }).disabled).toBe(true);
   });
 });

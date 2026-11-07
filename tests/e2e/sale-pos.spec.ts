@@ -214,7 +214,7 @@ test('full screen: the whole page goes full screen and the checkout sheet opens 
   await login(page, A, '/sale/pos');
   await tillReady(page);
   await shown(page).locator('[data-testid=pos-screen-menu]').click();
-  await shown(page).locator('[data-testid=pos-fullscreen]').click();
+  await page.locator('ion-popover [data-testid=pos-fullscreen]').click();
   // The page itself, not a piece of it: the sheets live in the app's root, outside the till.
   await expect.poll(() => page.evaluate(() => document.fullscreenElement === document.documentElement)).toBe(true);
   try {

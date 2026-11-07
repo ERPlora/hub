@@ -106,7 +106,8 @@ const discountLabel = computed(() => {
 <style scoped>
 .pos-foot {
   padding: 0.62rem 0.72rem 0.7rem;
-  border-top: 1px solid var(--ion-border-color, #e6e3db);
+  background: var(--ion-card-background);
+  border-top: 1px solid var(--ep-border);
 }
 .pos-foot__discount {
   display: flex;
@@ -125,6 +126,7 @@ const discountLabel = computed(() => {
 }
 .pos-foot__total b {
   font-size: 1.55rem;
+  font-variant-numeric: tabular-nums;
   color: var(--ion-text-color, #1c1b18);
 }
 .pos-foot__actions {
@@ -134,7 +136,7 @@ const discountLabel = computed(() => {
 .pos-foot__square {
   flex: none;
   width: 3.25rem;
-  min-height: 3rem;
+  min-height: var(--ep-touch-min);
   margin: 0;
 }
 .pos-foot__square--warning {
@@ -143,11 +145,13 @@ const discountLabel = computed(() => {
 }
 .pos-charge {
   flex: 1;
-  min-height: 3rem;
+  min-height: var(--ep-touch-min);
   margin: 0;
   font-size: 0.98rem;
   font-weight: 700;
   text-transform: none;
+  --border-radius: 12px;
+  --box-shadow: var(--ep-shadow-sm);
 }
 .pos-charge--blocked {
   --background: var(--ion-color-medium, #92949c);

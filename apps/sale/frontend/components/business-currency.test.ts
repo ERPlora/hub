@@ -205,7 +205,7 @@ const PIECES: {
     piece: 'a menu’s tile',
     component: ComboTiles,
     seed: (m) => m.result('combo.combo.for_sale', page([MENU])),
-    read: (m) => text(m.find('pos-menu-m1').find('.pos-menu__price').element),
+    read: (m) => text(m.find('pos-menu-m1').find('.pos-tile__price').element),
     after: '¥1,500',
   },
   {

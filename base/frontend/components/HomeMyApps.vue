@@ -189,11 +189,21 @@ function opened(id: string): void {
   text-align: center;
   text-decoration: none;
   cursor: pointer;
+  transition: background-color var(--ep-transition), box-shadow var(--ep-transition), transform var(--ep-transition);
 }
 
 .my-app:hover,
 .my-app:focus-visible {
   background: color-mix(in oklab, var(--ion-color-primary) 8%, transparent);
+}
+
+.my-app:focus-visible {
+  outline: none;
+  box-shadow: var(--ep-focus-ring);
+}
+
+.my-app:active {
+  transform: scale(var(--ep-press-scale));
 }
 
 .my-app--waiting {
@@ -211,12 +221,29 @@ function opened(id: string): void {
 }
 
 .my-app-icon {
-  font-size: 24px;
-  color: var(--ion-color-primary);
+  box-sizing: content-box;
+  width: 22px;
+  height: 22px;
+  padding: 8px;
+  font-size: 22px;
+  color: var(--ep-primary-text);
+  background: var(--ep-primary-tint);
+  border-radius: 12px;
 }
 
 .my-app--add .my-app-icon {
   color: var(--ion-color-medium);
+  background: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .my-app {
+    transition: none;
+  }
+
+  .my-app:active {
+    transform: none;
+  }
 }
 
 .my-app-name {

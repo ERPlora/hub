@@ -3,6 +3,7 @@
 // cart while the check is empty; with items, a pill with the total the server works out and a badge
 // with how many. Its name says both («Open cart, 3 items, total €12.50»). It opens the cart drawer.
 import { HubIcon } from '@erplora/ui/shell';
+import { IonBadge, IonFab, IonFabButton } from '@ionic/vue';
 import { computed } from 'vue';
 
 import { useLocale, useT } from '../../composables/useT';
@@ -24,28 +25,35 @@ const label = computed(() => {
 </script>
 
 <template>
-  <button
-    type="button"
+  <ion-fab
     class="pos-fab"
-    data-testid="pos-cart-fab"
-    aria-controls="pos-cart-drawer"
-    :aria-expanded="expanded ? 'true' : 'false'"
-    :aria-label="label"
-    :data-has-items="count > 0 ? 'true' : undefined"
-    @click="emit('open')"
+    horizontal="end"
+    vertical="bottom"
   >
-    <HubIcon name="ion:cart-outline" />
-    <template v-if="count > 0">
+    <ion-fab-button
+      class="pos-fab__button"
+      data-testid="pos-cart-fab"
+      aria-controls="pos-cart-drawer"
+      :aria-expanded="expanded ? 'true' : 'false'"
+      :aria-label="label"
+      :data-has-items="count > 0 ? 'true' : undefined"
+      @click="emit('open')"
+    >
+      <HubIcon name="ion:cart-outline" />
       <span
+        v-if="count > 0"
         class="pos-fab__total"
         data-testid="pos-cart-fab-total"
       >{{ totalText }}</span>
-      <span
+      <ion-badge
+        v-if="count > 0"
         class="pos-fab__count"
         data-testid="pos-cart-fab-count"
-      >{{ count }}</span>
-    </template>
-  </button>
+      >
+        {{ count }}
+      </ion-badge>
+    </ion-fab-button>
+  </ion-fab>
 </template>
 
 <style scoped>
@@ -54,22 +62,22 @@ const label = computed(() => {
   right: 1rem;
   bottom: 1rem;
   z-index: 10;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.45rem;
+  display: block;
+  margin: 0;
+}
+.pos-fab__button {
   min-width: 3.6rem;
   height: 3.6rem;
   margin: 0;
-  padding: 0 1rem;
-  font: inherit;
   font-size: 1.5rem;
-  color: var(--ion-color-primary-contrast, #fff);
-  background: var(--ion-color-primary, #0091ce);
-  border: none;
-  border-radius: 999px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
-  cursor: pointer;
+  --border-radius: 999px;
+  --box-shadow: var(--ep-shadow-pop);
+  --overflow: visible;
+}
+.pos-fab__button::part(native) {
+  display: inline-flex;
+  gap: 0.45rem;
+  padding: 0 1rem;
 }
 .pos-fab__total {
   font-size: 1rem;
@@ -84,11 +92,9 @@ const label = computed(() => {
   height: 1.3rem;
   padding: 0 0.3rem;
   font-size: 0.72rem;
-  font-weight: 800;
   line-height: 1.3rem;
-  color: var(--ion-color-primary, #0091ce);
-  background: #fff;
-  border: 1px solid var(--ion-color-primary, #0091ce);
-  border-radius: 999px;
+  color: var(--ion-color-primary);
+  background: var(--ion-card-background);
+  border: 1px solid var(--ion-color-primary);
 }
 </style>

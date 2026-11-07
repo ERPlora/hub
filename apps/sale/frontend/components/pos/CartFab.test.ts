@@ -16,6 +16,7 @@ describe('CartFab', () => {
   it('with an empty check it is only the cart, «Open cart»', async () => {
     const m = await setup({}, 'es');
     const fab = m.find('pos-cart-fab');
+    expect(fab.element.tagName.toLowerCase()).toBe('ion-fab-button');
     expect(fab.attributes('aria-label')).toBe('Abrir carrito');
     expect(fab.attributes('aria-controls')).toBe('pos-cart-drawer');
     expect(fab.attributes('aria-expanded')).toBe('false');

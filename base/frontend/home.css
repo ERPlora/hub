@@ -2,9 +2,10 @@
 .home-card {
   margin: 0 0 16px;
   padding: 16px 18px;
-  border: 1px solid var(--ion-color-step-150, #e4e7ec);
+  border: 1px solid var(--ep-border, var(--ion-color-step-150, #e4e7ec));
   border-radius: var(--ep-radius-lg, 16px);
   background: var(--ion-card-background, var(--ion-background-color, #fff));
+  box-shadow: var(--ep-shadow-xs);
 }
 
 .home-card-title {

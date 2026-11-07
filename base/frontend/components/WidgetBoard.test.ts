@@ -106,6 +106,7 @@ describe('WidgetBoard', () => {
     const s = await setup('es');
     await s.show(CATALOGUE);
     expect(accessibleName(s.wrapper.get('[data-testid="widgets-customize"]').element)).toBe('Personalizar panel');
+    expect(s.wrapper.get('[data-testid="widgets-customize"]').text()).toBe('Personalizar panel');
     await s.customize();
     expect(s.allInDoc('widgets-active-item').map((el) => el.dataset.key)).toEqual(['a.one', 'b.three']);
     expect(s.allInDoc('widgets-available-item').map((el) => el.dataset.key)).toEqual(['a.two']);
