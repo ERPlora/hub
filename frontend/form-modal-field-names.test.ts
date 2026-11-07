@@ -251,6 +251,19 @@ function unnamedByFile(): Record<string, number> {
   return counts;
 }
 
+/** What `found` (fields unnamed by file, `unnamedByFile()`) says against `list` (`STILL_UNNAMED`): `over`, the files with
+ *  more unnamed fields than the list allows (a new field without its name); `stale`, the entries the tree no longer
+ *  matches exactly (a file that named some fields keeps its old number, or left the list). */
+function offTheList(found: Record<string, number>, list: Record<string, number>): { over: string[]; stale: string[] } {
+  const over = Object.entries(found)
+    .filter(([file, count]) => count > (list[file] ?? 0))
+    .map(([file]) => file);
+  const stale = Object.entries(list)
+    .filter(([file, count]) => (found[file] ?? 0) !== count)
+    .map(([file, count]) => `${file}: ${found[file] ?? 0} unnamed, the list says ${count}`);
+  return { over, stale };
+}
+
 // ── Positive and negative controls ──────────────────────────────────────────────────────────────────────────────────
 
 /** A window in a test: `fields` inside FormModal's default slot. */
@@ -338,6 +351,16 @@ describe('guardrail: every field of a FormModal window that paints its refusal c
     expect(scanOf(files)).toEqual(["apps/x/frontend/components/XFormModal.vue:7: <Lines> takes the window's refusal and this guard cannot read it"]);
   });
 
+  it('tells the files over their number (new unnamed fields) and the stale numbers (fields named, list not lowered)', () => {
+    const list = { 'a.vue': 2, 'b.vue': 1 };
+    expect(offTheList({ 'a.vue': 2, 'b.vue': 1 }, list)).toEqual({ over: [], stale: [] });
+    expect(offTheList({ 'a.vue': 3, 'c.vue': 1 }, list)).toEqual({
+      over: ['a.vue', 'c.vue'],
+      stale: ['a.vue: 3 unnamed, the list says 2', 'b.vue: 0 unnamed, the list says 1'],
+    });
+    expect(offTheList({ 'a.vue': 1, 'b.vue': 1 }, list)).toEqual({ over: [], stale: ['a.vue: 1 unnamed, the list says 2'] });
+  });
+
   it('reads the real windows: it finds the windows of the hub and the fields they paint the refusal on', () => {
     const reaches = [...SOURCES.entries()].flatMap(([file, source]) => windows(read(source)?.nodes ?? []).map(() => file));
     expect(reaches.length).toBeGreaterThan(40);
@@ -349,20 +372,12 @@ describe('guardrail: every field of a FormModal window that paints its refusal c
 
 describe('the hub’s FormModal windows name the fields they paint the refusal on (hub#888)', () => {
   it('no file leaves more fields unnamed than the list says: a new field carries name="<k>"', () => {
-    const over = new Set(
-      Object.entries(unnamedByFile())
-        .filter(([file, count]) => count > (STILL_UNNAMED[file] ?? 0))
-        .map(([file]) => file),
-    );
+    const over = new Set(offTheList(unnamedByFile(), STILL_UNNAMED).over);
     expect(unnamedInTheHub().filter((field) => over.has(fileOf(field)))).toEqual([]);
   });
 
   it('the list only goes down: a file that names more of its fields lowers its number, a fixed one leaves', () => {
-    const found = unnamedByFile();
-    const stale = Object.entries(STILL_UNNAMED)
-      .filter(([file, count]) => (found[file] ?? 0) !== count)
-      .map(([file, count]) => `${file}: ${found[file] ?? 0} unnamed, the list says ${count}`);
-    expect(stale).toEqual([]);
+    expect(offTheList(unnamedByFile(), STILL_UNNAMED).stale).toEqual([]);
   });
 
   it('the list holds files of the hub with fields left, in order', () => {
