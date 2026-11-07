@@ -11,7 +11,7 @@ import { join } from 'node:path';
 
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, HUB_DIR, horizontalOverflow, login, shot, untilStill } from './helpers';
+import { A, capture, HUB_DIR, horizontalOverflow, login, untilStill } from './helpers';
 
 const KEY = 'FIX-HUB-WEBSITE-PALETTE-NAMES-WHOLE';
 /** Each width and how many palette cards go in a row there. */
@@ -22,11 +22,15 @@ const SIZES = [
 ] as const;
 const LANGUAGES = ['es', 'en'] as const;
 
-/** The palettes' names as the editor writes them in `lang` (`website.palette.<id>` of the app's catalogue). */
+const WEBSITE_DIR = join(HUB_DIR, 'apps', 'website');
+/** The eight palettes, by id (`palettes.json`, what the picker lists). */
+const PALETTE_IDS = Object.keys(JSON.parse(readFileSync(join(WEBSITE_DIR, 'palettes.json'), 'utf8')));
+
+/** Each palette's name as the editor writes it in `lang` (`website.palette.<id>` of the app's catalogue), by id. */
 function paletteNames(lang: (typeof LANGUAGES)[number]): Record<string, string> {
-  const catalogue = JSON.parse(readFileSync(join(HUB_DIR, 'apps', 'website', 'frontend', 'locale', `${lang}.json`), 'utf8'));
-  const { label: _label, hint: _hint, reset: _reset, ...names } = catalogue.website.palette as Record<string, string>;
-  return names;
+  const catalogue = JSON.parse(readFileSync(join(WEBSITE_DIR, 'frontend', 'locale', `${lang}.json`), 'utf8'));
+  const names = catalogue.website.palette as Record<string, string>;
+  return Object.fromEntries(PALETTE_IDS.map((id) => [id, names[id]]));
 }
 
 /** The owner on `a` with the Hub in `lang`, on the website's editor. */
@@ -98,8 +102,9 @@ for (const lang of LANGUAGES) {
           expect.soft(card.past, `${where}: «${card.name}» stays inside its card`).toBeLessThanOrEqual(0);
         }
         expect.soft(await horizontalOverflow(page), `${where}: no sideways scroll`).toBeLessThanOrEqual(0);
-        await cards.first().scrollIntoViewIfNeeded();
-        await page.screenshot({ path: shot(`${KEY}-${lang}-${size.width}`) });
+        // The capture frames the last row, where «Medianoche» goes.
+        await cards.last().scrollIntoViewIfNeeded();
+        await capture(page, `${KEY}-${lang}-${size.width}`);
       }
     } finally {
       await context.close();
