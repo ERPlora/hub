@@ -981,6 +981,7 @@
       "demo__item__update": "Change a demo item",
       "inventory__category__create": "Create a product category",
       "inventory__category__export": "Export the product categories",
+      "inventory__category__get": "Read a product category",
       "inventory__category__list": "Look for product categories",
       "inventory__category__update": "Change a product category",
       "inventory__config__get": "Read the inventory settings",

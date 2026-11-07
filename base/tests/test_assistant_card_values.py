@@ -378,7 +378,6 @@ def test_no_list_of_texts_sent_as_they_are_is_named():
 UNNAMED_REFERENCES = {
     "appointment": 12,
     "combo": 25,
-    "inventory": 15,
     "invoice": 1,
     "kitchen": 23,
     "online_booking": 7,
@@ -531,6 +530,10 @@ TITLED_IN_SPANISH = {
     **{f"customer.group.{action}:id": "Grupo" for action in ("delete", "update")},
     **{f"customer.tag.{action}:id": "Etiqueta" for action in ("delete", "update")},
     **{f"demo.item.{action}:id": "Elemento" for action in ("add_line", "delete", "update")},
+    **{f"inventory.category.{action}:id": "Categoría" for action in ("delete", "update")},
+    **{f"inventory.product.{action}:id": "Producto" for action in (
+        "delete", "print_label", "set_image", "set_sold_out", "update",
+    )},
     **{f"modifier.group.{action}:id": "Grupo" for action in ("delete", "update")},
     "modifier.link.detach:id": "Se aplica a",
     **{f"modifier.option.{action}:id": "Opción" for action in ("delete", "update")},
