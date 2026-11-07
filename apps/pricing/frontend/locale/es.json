@@ -15,11 +15,6 @@
       "appInactive": "Esta app no está activa en este negocio",
       "retry": "Reintentar"
     },
-    "money": {
-      "notAmount": "Esto no es un importe. Escribe una cifra, por ejemplo 12,50.",
-      "negative": "Este importe no puede ser negativo.",
-      "ambiguous": "Este importe se puede leer de dos maneras: «{typed}» tanto puede ser {grouped} como {decimal}. Escribe los decimales para que no haya duda."
-    },
     "state": { "active": "Activa", "inactive": "Inactiva" },
     "status": { "active": "Activas", "inactive": "Inactivas" },
     "taxBasis": { "business": "Según el negocio", "included": "Impuesto incluido", "excluded": "Impuesto no incluido" },

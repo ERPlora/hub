@@ -7,7 +7,7 @@
 // `''`, the dish's again). «Create» / «Save» wait in grey until the business has answered its money (the supplement
 // is read in it; hub#918). A supplement that is not an amount is never sent; the server's refusals (a
 // taken name, too many defaults, an own line worth nothing) stay under their field.
-import { Combo, type ComboOption, FormModal } from '@erplora/ui/components';
+import { Combo, type ComboOption, FormModal, MoneyInput, moneyFieldText, parseMoney } from '@erplora/ui/components';
 import { useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { IonInput, IonToggle } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
@@ -15,10 +15,8 @@ import { computed, ref, watch } from 'vue';
 import BusinessMoneyError from '../../../../base/frontend/components/BusinessMoneyError.vue';
 import { useLocale, useT } from '../composables/useT';
 import { useBusinessMoney } from '../lib/format';
-import { moneyFieldText, parseMoney } from '../lib/money';
 import { searchTaxCategories } from '../lib/pickers';
 import type { GroupOut, OptionIn, OptionOut, OptionPatchIn } from '../operations';
-import MoneyInput from './MoneyInput.vue';
 
 const props = defineProps<{
   /** The group the option belongs to. */
@@ -128,7 +126,7 @@ async function save(): Promise<void> {
   // currency counts (in yen, 15000; hub#918).
   const business = money.value;
   if (!business) return;
-  const read = parseMoney(form.value.price, business);
+  const read = parseMoney(form.value.price, { money: business, signed: true });
   if (!read.ok) return; // The field says why.
   const cents = read.cents ?? 0;
   try {
@@ -181,6 +179,7 @@ async function save(): Promise<void> {
         />
         <MoneyInput
           v-model="form.price"
+          signed
           testid="modifier-option-form-price_delta"
           :label="money ? $t('modifier.options.form.priceIn', { currency: money.currency }) : $t('modifier.options.form.price')"
           :money="money"

@@ -267,6 +267,27 @@ describe('RuleFormModal: the business answers after the form opened', () => {
       expect(s.sent().map((call) => (call.body as { amount: number }).amount)).toEqual([1500]);
     },
   );
+
+  // hub#945: an amount typed with its sign cannot be read before the money is known; leaving the field while the window
+  // waits must not call it «not an amount». Once the business answers, it is read in its money.
+  it.each([
+    ['¥1500', JAPANESE, 1500],
+    ['12,50 zł', POLISH, 1250],
+  ] as const)('«%s» left before the business says its currency is neither rewritten nor marked, then read in it (hub#945)', async (typed, money, amount) => {
+    const s = await setup({});
+    await named(s, 'FIX', 'Sign off');
+    await ionValue(s.field('rule_type'), 'fixed');
+    await ionValue(s.field('amount'), typed, 'ionInput');
+    s.field('amount').dispatchEvent(new CustomEvent('ionBlur'));
+    await settle();
+    const whileWaiting = [s.field('amount').value, s.field('amount').errorText || undefined];
+    s.answer(201, rule({ ...FIXED, amount }));
+    await s.live();
+    await s.result('base.business.get', business(money));
+    expect({ whileWaiting, onceAnswered: s.field('amount').errorText || undefined }).toEqual({ whileWaiting: [typed, undefined], onceAnswered: undefined });
+    await click(s.save());
+    expect(s.sent().map((call) => (call.body as { amount: number }).amount)).toEqual([amount]);
+  });
 });
 
 // A percent rule for everything (the form as it opens). What it applies to and the customer group are Combos

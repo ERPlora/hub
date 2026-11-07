@@ -10,12 +10,6 @@ import type { Money } from '../../../../base/frontend/lib/home';
 export type { Money };
 export { useBusinessMoney } from '../../../../base/frontend/lib/money';
 
-/** The decimals of an amount while the currency is unknown. */
-const UNKNOWN_DECIMALS = 2;
-
-/** The decimals of an amount in `money`; two while it is unknown. */
-export const moneyDecimals = (money?: Money): number => money?.decimals ?? UNKNOWN_DECIMALS;
-
 /** A supplement in `money` with its sign («+1,00 zł», «-0,50 zł»; «+1,00» while it is unknown); `free` for 0. */
 export function formatDelta(cents: number, locale: string, free: string, money?: Money): string {
   if (cents === 0) return free;

@@ -381,7 +381,8 @@ fuera de rango para su tipo, tramos repetidos o desordenados, una categoría, un
 que no existe, «Hasta» antes que «Desde». **Crear** (y **Guardar** al editarla, PRICING-F11) está en gris
 mientras el negocio no haya dicho todavía su moneda, porque el importe por unidad se lee en ella (sin
 ella, «1500» yenes se guardaría como 150 000); hasta entonces, salir del importe lo deja como se
-escribió, sin inventarle decimales. Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
+escribió, sin inventarle decimales ni juzgarlo: «¥1500» o «12,50 zł» no salen en rojo como «Esto no es un
+importe», y en cuanto llega la moneda se leen en ella (hub#945). Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
 motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, **Crear** (o **Guardar**) se enciende (hub#938).
 Implicados: Inventario, Servicios, Clientes
 
@@ -694,7 +695,8 @@ Ventas **no** requiere Tarifas y Tarifas no toca Ventas. Lo que se pide a Ventas
   escrituras con `useCommand`; formularios con `FormModal`, confirmaciones con `ConfirmDialog` y
   buscadores con `Combo` (productos y categorías de Inventario, servicios de Servicios, grupos de
   Clientes, por sus consultas).
-- Importes con `MoneyInput` (lo que teclea una persona, en céntimos) y el formato del idioma (`Intl`),
+- Importes con el `MoneyInput` de `@erplora/ui`, el campo de importe común a todas las apps (lo que teclea
+  una persona, en céntimos de la moneda que recibe: la de la tarifa o la del negocio; hub#924), y el formato del idioma (`Intl`),
   con los millares agrupados desde cuatro cifras también en español («1.234,56 €»; el CLDR espera a cinco:
   hub#1090), como Cobro en línea.
 - Icono: `ion:pricetags-outline` (registrado); el `pricetag` del producto actual espera en

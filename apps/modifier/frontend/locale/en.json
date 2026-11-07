@@ -24,11 +24,6 @@
       "max": "max. {max}",
       "repeat": "repeats"
     },
-    "money": {
-      "notAmount": "This is not an amount. Type a figure, for example 1.50, or -0.50 for a discount.",
-      "ambiguous": "This amount can be read in two ways: «{typed}» could be {grouped} or {decimal}. Write the decimals so there is no doubt.",
-      "sign": "Change the sign: negative is a discount"
-    },
     "groups": {
       "search": "Search…",
       "new": "New group",

@@ -232,6 +232,26 @@ describe('OptionFormModal: the business answers after the form opened', () => {
     expect(s.sent()).toEqual([]);
     expect(s.field('price_delta').errorText).toBe(NOT_AMOUNT);
   });
+
+  // hub#945: a supplement typed with its sign cannot be read before the money is known; leaving the field while the
+  // window waits must not call it «not an amount». Once the business answers, it is read in its money.
+  it.each([
+    ['¥150', JAPANESE, 150],
+    ['-0,50 zł', POLISH, -50],
+  ] as const)('«%s» left before the business says its currency is neither rewritten nor marked, then read in it (hub#945)', async (typed, money, delta) => {
+    const s = await setup(null, 'en', null);
+    await s.live();
+    await ionValue(s.field('name'), 'Bacon', 'ionInput');
+    await ionValue(s.field('price_delta'), typed, 'ionInput');
+    s.field('price_delta').dispatchEvent(new CustomEvent('ionBlur'));
+    await settle();
+    const whileWaiting = [s.field('price_delta').value, s.field('price_delta').errorText || undefined];
+    s.answer(201, { ...SODA, price_delta: delta });
+    await s.result('base.business.get', business(money));
+    expect({ whileWaiting, onceAnswered: s.field('price_delta').errorText || undefined }).toEqual({ whileWaiting: [typed, undefined], onceAnswered: undefined });
+    await click(s.save());
+    expect(s.sent().map((call) => (call.body as { price_delta: number }).price_delta)).toEqual([delta]);
+  });
 });
 
 describe('OptionFormModal: Editing option — {name}', () => {
