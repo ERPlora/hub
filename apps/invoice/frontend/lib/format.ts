@@ -3,11 +3,13 @@
 // Until `@erplora/ui/components/format` has money and number formatters (UI-REQUESTS.md), this is the one
 // place the app turns them into text (`Intl`) and amounts into cents. Money is in the invoice's own currency (the
 // business's when it was issued), with the decimals the server counts it in (`currency_decimals`; the browser's
-// Intl gives the forint none): without one, a figure without a symbol, never the euro by default.
+// Intl gives the forint none): without one, a figure without a symbol, never the euro by default. A quantity is
+// written with the platform's `formatQuantity` («2.000» → «2», «1500.000» → «1.500»), as every screen writes it.
 import type { Money } from '../../../../base/frontend/lib/home';
 
 export type { Money };
 export { useBusinessMoney } from '../../../../base/frontend/lib/money';
+export { formatQuantity } from '@erplora/ui/components';
 
 const FALLBACK_LOCALE = 'en';
 const NO_MONEY_DECIMALS = 2;
@@ -74,11 +76,6 @@ export function formatUnitPrice(cents: string | number | null | undefined, local
 export function formatPercent(value: string | number | null | undefined, locale: string): string {
   if (missing(value)) return '—';
   return numberFormat(locale, 'percent', { style: 'percent', maximumFractionDigits: 2 }).format(Number(value) / 100);
-}
-
-/** A quantity with the decimals it has («2.000» → «2», «0.532» → «0,532»), its sign included. */
-export function formatQuantity(value: string | number, locale: string): string {
-  return numberFormat(locale, 'quantity', { maximumFractionDigits: 3 }).format(Number(value));
 }
 
 /** A rate of the server as a person types it («7.00» → «7», «9.50» → «9,5» in Spanish); none is blank. */

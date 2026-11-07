@@ -19,7 +19,7 @@ import { computed, shallowRef, useTemplateRef } from 'vue';
 import { useLocale, useT } from '../../composables/useT';
 import { taxRow } from '../../lib/breakdown';
 import { dishLabel } from '../../lib/comboChoice';
-import { formatMoney, formatQuantity, useBusinessMoney } from '../../lib/format';
+import { formatMoney, quantityWithUnit, useBusinessMoney } from '../../lib/format';
 import { printRefusal, withReason } from '../../../../../base/frontend/lib/print-paper';
 import { printPaper } from '../../lib/print';
 import type { OrderLineOut, OrderOut } from '../../operations';
@@ -44,7 +44,7 @@ const failed = computed(
 const now = computed(() => formatDateTime(new Date(), locale.value));
 
 const amount = (line: OrderLineOut) =>
-  `${formatQuantity(line.quantity, line.unit, locale.value)} × ${formatMoney(line.unit_price, locale.value, businessMoney.value)}`;
+  `${quantityWithUnit(line.quantity, line.unit, locale.value)} × ${formatMoney(line.unit_price, locale.value, businessMoney.value)}`;
 
 /** The kinds of tax the bill names in the reader's language; a component with its own name keeps it. */
 const TAX_KINDS = new Set(['vat', 'surcharge', 'igic', 'ipsi']);

@@ -34,6 +34,11 @@ describe('formatQuantity', () => {
     expect(formatQuantity('0.500', 'es')).toBe('0,5');
     expect(formatQuantity('1.250', 'en')).toBe('1.25');
   });
+
+  // hub#974: the screen and the ticket write what the till sent as the till writes it.
+  it('writes a large order grouped from four digits on', () => {
+    expect([formatQuantity('1500.000', 'es'), formatQuantity(1500, 'en')]).toEqual(['1.500', '1,500']);
+  });
 });
 
 describe('formatMoney', () => {

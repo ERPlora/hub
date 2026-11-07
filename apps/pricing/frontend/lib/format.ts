@@ -4,11 +4,13 @@
 // amount in the business's (`useBusinessMoney`, the platform's: its country's currency with the decimals the
 // server counts it in, never the browser's Intl, which gives none to the forint). Until the business answers an
 // amount is a figure without a symbol, never the euro by default. A day is a calendar day (`YYYY-MM-DD`), painted
-// as it is whatever the device's time zone.
+// as it is whatever the device's time zone. A quantity is written with the platform's `formatQuantity` («10.000» →
+// «10», «1500.000» → «1.500»), as every screen writes it; its field shows it ungrouped, as typed.
 import type { Money } from '../../../../base/frontend/lib/home';
 
 export type { Money };
 export { useBusinessMoney } from '../../../../base/frontend/lib/money';
+export { formatQuantity } from '@erplora/ui/components';
 
 type Translate = (key: string, named?: Record<string, unknown>) => string;
 
@@ -57,11 +59,6 @@ export function formatMoney(cents: number, locale: string, money?: Money): strin
     ? { style: 'currency', currency: money.currency, currencyDisplay: 'narrowSymbol', ...digits }
     : digits;
   return numberFormat(locale, `money:${money?.currency ?? ''}:${decimals}`, options).format(cents / 10 ** decimals);
-}
-
-/** A quantity as the server sends it («10.000») without its trailing zeros, in `locale`. */
-export function formatQuantity(value: string | number, locale: string): string {
-  return numberFormat(locale, 'quantity', { maximumFractionDigits: 3 }).format(Number(value));
 }
 
 /** A percent as the server sends it («12.50»), with up to two decimals, in `locale` («12,5 %»). */

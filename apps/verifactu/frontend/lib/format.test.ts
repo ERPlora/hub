@@ -4,7 +4,7 @@
 // hand.
 import { describe, expect, it } from 'vitest';
 
-import { centsFromEuros, formatDate, formatMoney, formatPercent, formatQuantity, formatUnitPrice, plain } from './format';
+import { centsFromEuros, formatDate, formatMoney, formatPercent, formatUnitPrice, plain } from './format';
 
 /** Intl puts a narrow no-break space before «€» and «%» in Spanish: compared as a plain space. */
 const spaced = (text: string) => plain(text);
@@ -55,14 +55,6 @@ describe('formatPercent', () => {
     expect(formatPercent('21.00', 'en')).toBe('21%');
     expect(spaced(formatPercent('5.20', 'es'))).toBe('5,2 %');
     expect(formatPercent(null, 'en')).toBe('—');
-  });
-});
-
-describe('formatQuantity', () => {
-  it('paints a quantity with only the decimals it has, and its sign', () => {
-    expect(formatQuantity('2.000', 'en')).toBe('2');
-    expect(formatQuantity('0.532', 'es')).toBe('0,532');
-    expect(formatQuantity('-1.000', 'en')).toBe('-1');
   });
 });
 

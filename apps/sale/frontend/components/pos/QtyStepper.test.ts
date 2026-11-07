@@ -47,6 +47,18 @@ describe('QtyStepper', () => {
     expect(m.wrapper.emitted('change')).toEqual([['0.532']]);
   });
 
+  // hub#974: the line writes «1.500» as every screen does, but the field holds what a person types and edits: ungrouped,
+  // as a till's quantity field (Square, Shopify POS) and a typed figure on every screen of the Hub («1.500» typed in
+  // Spanish would read one and a half).
+  it('shows a quantity of four digits ungrouped, as typed, and sends a typed one as is', async () => {
+    const m = await setup({ quantity: '1500.000' }, 'es');
+    expect(m.field().value).toBe('1500');
+    const weight = await setup({ quantity: '1250.500', unit: 'kg' }, 'es');
+    expect(weight.field().value).toBe('1250,5');
+    await type(m.field(), '2500');
+    expect(m.wrapper.emitted('change')).toEqual([['2500']]);
+  });
+
   it('something that is not a quantity puts the field back and asks nothing', async () => {
     const m = await setup();
     await type(m.field(), 'abc');

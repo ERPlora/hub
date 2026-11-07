@@ -65,6 +65,11 @@ describe('format', () => {
     expect(formatQuantity('1234.250', 'en')).toBe('1,234.25');
   });
 
+  // hub#974: a tier's minimum quantity reads as the till writes the line it applies to.
+  it('groups a minimum quantity of four digits in Spanish too', () => {
+    expect(formatQuantity('1500.000', 'es')).toBe('1.500');
+  });
+
   it('paints a percent with up to two decimals', () => {
     expect(formatPercent('12.50', 'es')).toBe('12,5\u00a0%');
     expect(formatPercent('10', 'en')).toBe('10%');

@@ -94,7 +94,8 @@ describe('SalesKpis', () => {
     const s = await setup(undefined, 'es');
     await s.result('sale.sale.stats', STATS);
     expect(s.cards()).toEqual([
-      ['Tickets', '1234'],
+      // hub#974: a count of four digits is grouped as the amounts beside it («1.234», never «1234»).
+      ['Tickets', '1.234'],
       ['Ingresos', '12.500,50 €'],
       ['Ticket medio', '10,13 €'],
       ['IVA', '1.500,50 €'],

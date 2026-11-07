@@ -18,7 +18,7 @@ import { computed } from 'vue';
 import { useLocale, useT } from '../../composables/useT';
 import { taxRow } from '../../lib/breakdown';
 import { dishLabel } from '../../lib/comboChoice';
-import { formatMoney, formatQuantity, moneyOf } from '../../lib/format';
+import { formatMoney, moneyOf, quantityWithUnit } from '../../lib/format';
 import type { LetterheadOut, SaleOut, SettingsOut } from '../../operations';
 import type { FiscalRecord } from './FiscalRecordFollower.vue';
 
@@ -72,7 +72,7 @@ const lines = computed(() =>
     // A menu in one line prints each of its dishes on a line of its own under it (hub#1165).
     dishes: line.combo_id && !isDishPart(line) ? line.components.map(dishLabel) : [],
     options: line.modifiers.join(', '),
-    detail: `${formatQuantity(line.quantity, line.unit, locale.value)} × ${money(line.unit_price)}`,
+    detail: `${quantityWithUnit(line.quantity, line.unit, locale.value)} × ${money(line.unit_price)}`,
     note: line.notes.trim(),
     voucher: line.paid_by_voucher ? t('sale.document.paidWithVoucher', { name: line.voucher_name }) : '',
     amount: money(line.line_total),
