@@ -260,7 +260,7 @@ def _with_service(text: str) -> Exists:
     )
 
 
-def _person(text: str) -> Q:
+def _person(ctx: OperationContext, text: str) -> Q:
     """The appointments whose customer is ``text``: part of her name (with or without accents), her phone or
     her email."""
     if "@" in text:
@@ -268,15 +268,15 @@ def _person(text: str) -> Q:
     found = Q(customer_name__icontains=text) | Q(
         customer__search_text__contains=normalize(text)
     )
-    numbers = candidates(text, business_country())
+    numbers = candidates(text, business_country(ctx))
     return found | Q(customer_phone__in=numbers) if numbers else found
 
 
-def _searched(rows: QuerySet, text: str) -> QuerySet:
+def _searched(ctx: OperationContext, rows: QuerySet, text: str) -> QuerySet:
     digits = "".join(char for char in text if char.isdigit())
     found = (
         Q(number__icontains=text)
-        | _person(text)
+        | _person(ctx, text)
         | Q(customer_email__icontains=text)
         | Q(staff_name__icontains=text)
         | _with_service(text)
@@ -312,11 +312,11 @@ SORT_COLUMNS = {
 def list_bookings(ctx: OperationContext, params: BookingListIn) -> dict:
     rows = _with_page(online(ctx))
     if params.search:
-        rows = _searched(rows, params.search)
+        rows = _searched(ctx, rows, params.search)
     if params.number:
         rows = rows.filter(number__icontains=params.number)
     if params.customer_name:
-        rows = rows.filter(_person(params.customer_name))
+        rows = rows.filter(_person(ctx, params.customer_name))
     if params.service:
         rows = rows.filter(_with_service(params.service))
     if params.staff_name:
@@ -364,7 +364,7 @@ def find_booking(ctx: OperationContext, ref: BookingRefIn) -> Appointment:
                 str(BOOKING_NOT_FOUND), code="online_booking.booking_not_found"
             )
         return found
-    rows = rows.filter(_person(ref.customer))
+    rows = rows.filter(_person(ctx, ref.customer))
     if ref.date is not None:
         start, end = day_bounds(ref.date, ref.date)
         rows = rows.filter(start__gte=start, start__lt=end)

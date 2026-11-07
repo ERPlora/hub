@@ -400,7 +400,7 @@ def create_customer(ctx: OperationContext, data: CustomerIn) -> dict:
     ),
 )
 def update_customer(ctx: OperationContext, data: CustomerPatchIn) -> dict:
-    customer = find_customer(data.id, data.customer, lock=True)
+    customer = find_customer(ctx, data.id, data.customer, lock=True)
     sent = {
         field: value
         for field, value in data.model_dump(
@@ -597,7 +597,7 @@ def _set_members(
     ),
 )
 def set_groups(ctx: OperationContext, data: SetGroupsIn) -> dict:
-    customer = find_customer(data.id, data.customer, lock=True)
+    customer = find_customer(ctx, data.id, data.customer, lock=True)
     ids = _named_ids(
         CustomerGroup,
         data.group_ids,
@@ -625,7 +625,7 @@ def set_groups(ctx: OperationContext, data: SetGroupsIn) -> dict:
     ),
 )
 def set_tags(ctx: OperationContext, data: SetTagsIn) -> dict:
-    customer = find_customer(data.id, data.customer, lock=True)
+    customer = find_customer(ctx, data.id, data.customer, lock=True)
     ids = _named_ids(
         CustomerTag,
         data.tag_ids,
@@ -655,7 +655,7 @@ def set_tags(ctx: OperationContext, data: SetTagsIn) -> dict:
     ),
 )
 def delete_customer(ctx: OperationContext, data: CustomerRefIn) -> dict:
-    customer = find_customer(data.id, data.customer, lock=True, live=False)
+    customer = find_customer(ctx, data.id, data.customer, lock=True, live=False)
     if customer.deleted_at is None:
         customer.deleted_at = timezone.now()
         customer.is_active = False
@@ -682,8 +682,8 @@ def delete_customer(ctx: OperationContext, data: CustomerRefIn) -> dict:
     ),
 )
 def merge_customers(ctx: OperationContext, data: MergeIn) -> dict:
-    survivor_id = find_customer(data.id, data.customer).id
-    absorbed_id = find_customer(data.absorbed_id, data.absorbed).id
+    survivor_id = find_customer(ctx, data.id, data.customer).id
+    absorbed_id = find_customer(ctx, data.absorbed_id, data.absorbed).id
     if survivor_id == absorbed_id:
         raise InvalidPayload(
             SAME_CUSTOMER,
@@ -804,7 +804,7 @@ def _merge_health(survivor: Customer, absorbed: Customer) -> None:
     ),
 )
 def erase_customer(ctx: OperationContext, data: EraseIn) -> dict:
-    customer = find_customer(data.id, data.customer, lock=True, live=False)
+    customer = find_customer(ctx, data.id, data.customer, lock=True, live=False)
     # The same person's duplicates merged into this card keep their own data (CUSTOMER-F13):
     # erasing the person erases them too, however deep the chain, all locked in this transaction.
     cards, pending = [customer], [customer.id]
@@ -880,7 +880,7 @@ def _erase_card(ctx: OperationContext, customer: Customer, reason: str) -> None:
     ),
 )
 def add_note(ctx: OperationContext, data: NoteIn) -> Activity:
-    customer = find_customer(data.customer_id, data.customer, lock=True)
+    customer = find_customer(ctx, data.customer_id, data.customer, lock=True)
     entry = Activity.objects.create(
         customer=customer,
         kind=Activity.Kind.NOTE_ADDED,
@@ -918,7 +918,7 @@ def add_note(ctx: OperationContext, data: NoteIn) -> Activity:
     ),
 )
 def add_activity(ctx: OperationContext, data: ActivityIn) -> Activity:
-    customer = find_customer(data.customer_id, data.customer, lock=True)
+    customer = find_customer(ctx, data.customer_id, data.customer, lock=True)
     entry = Activity.objects.create(
         customer=customer,
         kind=data.kind,
@@ -953,7 +953,7 @@ def _contact_point(customer: Customer, channel: str) -> str:
 
 
 def _record_consent(ctx: OperationContext, data, state: str) -> Consent:
-    customer = find_customer(data.customer_id, data.customer, lock=True)
+    customer = find_customer(ctx, data.customer_id, data.customer, lock=True)
     now = timezone.now()
     occurred_at = data.occurred_at or now
     if occurred_at > now + CLOCK_SKEW:
@@ -1118,7 +1118,7 @@ def _health_fact(
     ai=INTERNAL,
 )
 def grant_health(ctx: OperationContext, data: HealthGrantIn) -> dict:
-    customer = find_customer(data.customer_id, data.customer, lock=True)
+    customer = find_customer(ctx, data.customer_id, data.customer, lock=True)
     _health_fact(ctx, data, customer, Consent.State.GRANTED)
     return load_health(customer)
 
@@ -1133,7 +1133,7 @@ def grant_health(ctx: OperationContext, data: HealthGrantIn) -> dict:
     ai=INTERNAL,
 )
 def withdraw_health(ctx: OperationContext, data: HealthWithdrawIn) -> dict:
-    customer = find_customer(data.customer_id, data.customer, lock=True)
+    customer = find_customer(ctx, data.customer_id, data.customer, lock=True)
     _health_fact(ctx, data, customer, Consent.State.WITHDRAWN)
     # Withdrawing the only ground to keep them erases them in the same step (GDPR arts. 7.3, 17.1.b).
     HealthRecord.objects.filter(customer=customer).delete()
@@ -1150,7 +1150,7 @@ def withdraw_health(ctx: OperationContext, data: HealthWithdrawIn) -> dict:
     ai=INTERNAL,
 )
 def update_health(ctx: OperationContext, data: HealthIn) -> dict:
-    customer = find_customer(data.customer_id, data.customer, lock=True)
+    customer = find_customer(ctx, data.customer_id, data.customer, lock=True)
     fact = health_consent(customer)
     if fact is None or fact.state != Consent.State.GRANTED:
         raise Conflict(HEALTH_CONSENT_REQUIRED, code="customer.health_consent_required")
@@ -1216,7 +1216,7 @@ def link_order(ctx: OperationContext, data: OrderLinkIn) -> dict:
     unlinking = data.customer_id is None and not (data.customer or "").strip()
     # The card before the link, the order a merge takes them in (cards, then what hangs from them).
     customer = (
-        None if unlinking else find_customer(data.customer_id, data.customer, lock=True)
+        None if unlinking else find_customer(ctx, data.customer_id, data.customer, lock=True)
     )
     link = OrderLink.objects.select_for_update().filter(order_id=data.order_id).first()
     if customer is None:

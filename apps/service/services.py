@@ -1113,7 +1113,7 @@ def create_grant(ctx: OperationContext, data: GrantIn) -> dict:
     package = find_package(data.package_id, data.package, hold=True)
     if not package.is_active:
         raise NotFound(str(PACKAGE_NOT_FOUND), code="service.package_not_found")
-    customer = find_customer(data.customer_id, data.customer, lock=True)
+    customer = find_customer(ctx, data.customer_id, data.customer, lock=True)
     # A voucher given away charged nothing: no line has anything to leave out.
     sold_on = (
         _tell_sales(
