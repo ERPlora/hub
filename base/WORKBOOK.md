@@ -382,7 +382,7 @@ En la pantalla Archivos:
 | BASE-F71 | Quitar de golpe los dispositivos que nadie usa | hecho |
 | BASE-F72 | Ver los archivos del negocio | hecho |
 | BASE-F73 | Subir archivos y crear carpetas | hecho |
-| BASE-F74 | Previsualizar y descargar un archivo | descartado |
+| BASE-F74 | Previsualizar y descargar un archivo | hecho |
 | BASE-F75 | Mover y renombrar un archivo o una carpeta | hecho |
 | BASE-F76 | Borrar un archivo o una carpeta | hecho |
 | BASE-F77 | Llegar al tope de personas del plan | hecho |
@@ -2021,7 +2021,7 @@ Implicados: BASE-F40
 
 ### BASE-F74 Previsualizar y descargar un archivo
 <!-- origen: old-hub:HUB_SHELL-F132 -->
-Estado: descartado — las hojas de Excel (xlsx) y los documentos de Word (docx) dicen «Sin vista previa» y se descargan, y un archivo de datos (.json) se ve ordenado pero sin plegar; el visor del hub viejo los enseñaba (hub#578)
+Estado: hecho
 Actor: propietario, administrador, responsable, empleado
 Pantalla: Archivos
 Pasos:
@@ -2029,17 +2029,33 @@ Pasos:
      «Descargar» y «Cerrar».
   2. Enseña imágenes (enteras en el visor, nunca más grandes que el original, con «Ampliar» y «Reducir»), PDF (las
      primeras 30 páginas; si es más largo, «Mostrando las primeras {shown} de {total} páginas. Descarga el archivo
-     para leerlo entero.»), texto, registros y código, CSV y TSV como tabla, archivos de datos (.json) ordenados, audio y vídeo. De un texto
-     muy largo, «Mostrando el principio del archivo. Descárgalo para leerlo entero.»; de una tabla de más de 500
-     filas, «Mostrando las primeras {shown} filas. Descarga el archivo para verlas todas.».
-  3. Cualquier otro tipo: «Sin vista previa» con «Este tipo de archivo no se puede mostrar aquí. Descárgalo para
-     abrirlo con una aplicación de tu dispositivo.».
-  4. «Descargar», en el visor o en el ⋮, guarda el archivo con su nombre.
+     para leerlo entero.»), texto, registros y código, CSV y TSV como tabla, audio y vídeo. De un texto muy largo,
+     «Mostrando el principio del archivo. Descárgalo para leerlo entero.»; de una tabla de más de 500 filas,
+     «Mostrando las primeras {shown} filas. Descarga el archivo para verlas todas.».
+  3. Un archivo de datos (.json) se ve como un árbol que se pliega y se despliega por partes, como el visor de JSON de
+     los navegadores: los dos primeros niveles abiertos y cada objeto o lista con lo que tiene («6 campos»,
+     «2 elementos»); de una rama abierta con más de 500 entradas, «{count} más. Descarga el archivo para verlos
+     todos.». Uno que no es JSON válido se ve tal cual, con «Este archivo no es un JSON válido: se muestra tal cual.».
+  4. Una hoja de Excel (.xlsx o .xlsm) se ve como tabla, con una pestaña por hoja si tiene varias, como Excel: la
+     primera fila de cabecera, los números y las fechas como los enseña la hoja, en el idioma de la persona, y las
+     primeras 500 filas de cada hoja (con el mismo aviso); una hoja vacía, «Esta hoja está vacía.». Sus macros nunca
+     se ejecutan.
+  5. Un documento de Word (.docx) se ve como texto con su formato básico: títulos, negrita, cursiva, subrayado,
+     listas, tablas, sus propias imágenes y enlaces (que se abren aparte); uno sin texto, «Este documento no tiene
+     texto.». Nada del documento se ejecuta: ni código ni enlaces que no sean a una web o a un correo.
+  6. Cualquier otro tipo (los .xls y .doc antiguos, presentaciones…): «Sin vista previa» con «Este tipo de archivo no
+     se puede mostrar aquí. Descárgalo para abrirlo con una aplicación de tu dispositivo.».
+  7. «Descargar», en el visor o en el ⋮, guarda el archivo con su nombre.
 Entra: el archivo, que el hub lee de su almacén con la sesión de la persona; el navegador nunca va al almacén y el
-archivo no queda guardado en ninguna caché.
+archivo no queda guardado en ninguna caché. La hoja y el documento se leen en el propio navegador.
 Sale: nada guardado.
 Si falla: «No se pudo abrir el archivo» con «No llegó el contenido del archivo. Revisa la conexión e inténtalo de
-nuevo.», nunca un visor en blanco; si no se pudo descargar, «No se pudo descargar «{name}»: {reason}».
+nuevo.», nunca un visor en blanco; si llegó pero no se pudo leer (dañado o guardado en otro formato), «No se pudo leer
+el archivo» con «Puede que esté dañado o guardado en otro formato. Descárgalo para abrirlo con una aplicación de tu
+dispositivo.»; una hoja o un documento de más de 10 MB (o que al abrirlo ocuparía demasiado) ni se trae:
+«Demasiado grande para la vista previa» con «La vista previa abre archivos de hasta 10 MB. Descárgalo para abrirlo
+con una aplicación de tu dispositivo.». «Descargar» sigue siempre arriba. Si no se pudo descargar, «No se pudo
+descargar «{name}»: {reason}».
 Implicados: ninguno
 
 ### BASE-F75 Mover y renombrar un archivo o una carpeta
@@ -3736,7 +3752,7 @@ Implicados: HUBS-F17, WEBSITE-F10
 
 Al cerrar la app (2026-11-01) ninguno de sus flujos quedó a medias: los que no entran están `descartado`, cada uno
 con su issue, y llegan con ella. Después llegaron BASE-F21 y BASE-F22 (hub#601), BASE-F37 y BASE-G157 (hub#580), BASE-F40
-(hub#603) y BASE-F11 (hub#716).
+(hub#603), BASE-F11 (hub#716) y BASE-F74 (hub#578).
 
 - **Avisar por correo al dueño cuando debe ampliar (BASE-F40)**: el mercado lo da por supuesto, pero lo manda erplora.com
   (ronda 2026-11-01f de PLAN-HUB y PLAN-SAAS §28) y lleva su flujo y su issue allí.
@@ -3745,7 +3761,6 @@ con su issue, y llegan con ella. Después llegaron BASE-F21 y BASE-F22 (hub#601)
 - **La fila de salud del Inicio (BASE-F02)**, hub#573: un punto de extensión más en `LiveAppConfig` y su uso en
   Impresión y la Bandeja de WhatsApp.
 - **Las notas de cada versión (BASE-F41)**, hub#576.
-- **La vista previa de .xlsx y .docx y el .json plegable (BASE-F74)**, hub#578.
 - **Los roles que trae una app (BASE-F82)**, hub#579, con la contradicción entre PLAN-HUB §3 (`RoleActivation`) y
   los cuatro roles de PLAN §22 sin resolver.
 - **La cola de PgBouncer de cada negocio en CloudWatch**, hub#572, y **la tarjeta del asistente que enseña los ids de

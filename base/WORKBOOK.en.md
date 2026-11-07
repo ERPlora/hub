@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:1d3ca417473443783cc131be0e0b40c5a798a90791a152f154aee25d4fc4239e -->
+<!-- generated from WORKBOOK.md sha256:b6bdeaca53d766f54db5a917fd328f1a625061dac5b304173b922d1111354e3f -->
 
 ## What it is for and who it is for
 
@@ -375,7 +375,7 @@ On the Employees screens and the API documentation:
 | BASE-F71 | Remove at once the devices nobody uses | done |
 | BASE-F72 | See the business's files | done |
 | BASE-F73 | Upload files and make folders | done |
-| BASE-F74 | Preview and download a file | discarded |
+| BASE-F74 | Preview and download a file | done |
 | BASE-F75 | Move and rename a file or a folder | done |
 | BASE-F76 | Delete a file or a folder | done |
 | BASE-F77 | Reach the plan's limit of people | done |
@@ -1933,7 +1933,7 @@ administrator can change the files.".
 Involved: BASE-F40
 
 ### BASE-F74 Preview and download a file
-Status: discarded — Excel sheets (xlsx) and Word documents (docx) say "No preview" and are downloaded, and a data file (.json) is shown sorted but cannot be folded; the old hub's viewer showed them (hub#578)
+Status: done
 Actor: owner, administrator, manager, employee
 Screen: Files
 Steps:
@@ -1941,17 +1941,31 @@ Steps:
      "Close".
   2. It shows images (whole in the viewer, never larger than the original, with "Zoom in" and "Zoom out"), PDFs (the
      first 30 pages; if it is longer, "Showing the first {shown} of {total} pages. Download the file to read it
-     all."), text, logs and code, CSV and TSV as a table, data files (.json) tidied, audio and video. Of a very long
-     text, "Showing the beginning of the file. Download it to read it all."; of a table of more than 500 rows,
-     "Showing the first {shown} rows. Download the file to see them all.".
-  3. Any other type: "No preview" with "This type of file can't be shown here. Download it to open it with an app on
-     your device.".
-  4. "Download", in the viewer or in the ⋮, saves the file with its name.
+     all."), text, logs and code, CSV and TSV as a table, audio and video. Of a very long text, "Showing the beginning
+     of the file. Download it to read it all."; of a table of more than 500 rows, "Showing the first {shown} rows.
+     Download the file to see them all.".
+  3. A data file (.json) is shown as a tree that folds and unfolds by parts, like the browsers' JSON viewer: the first
+     two levels open and each object or list with what it holds ("6 fields", "2 items"); of an open branch with more
+     than 500 entries, "{count} more. Download the file to see them all.". One that is not valid JSON is shown as it
+     is, with "This file is not valid JSON: it is shown as it is.".
+  4. An Excel sheet (.xlsx or .xlsm) is shown as a table, with one tab per sheet if it has several, like Excel: the
+     first row as the header, numbers and dates as the sheet shows them, in the person's language, and the first 500
+     rows of each sheet (with the same notice); an empty sheet, "This sheet is empty.". Its macros never run.
+  5. A Word document (.docx) is shown as text with its basic formatting: headings, bold, italics, underline, lists,
+     tables, its own images and links (which open apart); one with no text, "This document has no text.". Nothing in
+     the document runs: neither code nor links that are not to a website or an email.
+  6. Any other type (the old .xls and .doc, presentations…): "No preview" with "This type of file can't be shown
+     here. Download it to open it with an app on your device.".
+  7. "Download", in the viewer or in the ⋮, saves the file with its name.
 In: the file, which the hub reads from its store with the person's session; the browser never goes to the store and
-the file is not kept in any cache.
+the file is not kept in any cache. The sheet and the document are read in the browser itself.
 Out: nothing saved.
 If it fails: "The file could not be opened" with "The file's content did not arrive. Check the connection and try
-again.", never a blank viewer; if it could not be downloaded, "Could not download “{name}”: {reason}".
+again.", never a blank viewer; if it arrived but could not be read (damaged or saved in another format), "The file
+could not be read" with "It may be damaged or saved in another format. Download it to open it with an app on your
+device."; a sheet or a document over 10 MB (or one that would take too much once opened) is not even fetched: "Too
+large to preview" with "The preview opens files of up to 10 MB. Download it to open it with an app on your device.".
+"Download" is always at the top. If it could not be downloaded, "Could not download “{name}”: {reason}".
 Involved: none
 
 ### BASE-F75 Move and rename a file or a folder
