@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:b823696b7b08eba5589b815992290b4478486f445598e7092164d5e14282a3bc -->
+<!-- generated from WORKBOOK.md sha256:d086ea86ad129efa5c84f9eabc80f6a21787a0073e6dabbdd6958cfd318c0d18 -->
 
 ## What it is for and who it is for
 
@@ -1037,7 +1037,9 @@ Steps:
      "This app is off in your business: nothing of it will load." and one this business does not have, "This
      business does not have this app: nothing of it will load.". A template's
      customers stay out: "Personal data: it loads only from a backup.". What the Hub never loads (people,
-     PINs, fiscal data) shows in "Never loaded here".
+     PINs, fiscal data) shows in "Never loaded here". No template of the catalogue brings VeriFactu, in Spain
+     either: it is not in the review and the load does not turn it on, because it binds the business to the AEAT
+     and the owner turns it on from Apps (VERIFACTU-F01).
   3. Untick the apps not wanted and tap "Import" ("Importing…"), or "Choose another" to go back.
   4. When it ends, the report shows (BASE-F32). What the business already had stays as it was: nothing is
      duplicated nor overwritten. If an app of the template is still being set up (BASE-F22), its part comes in by
@@ -1053,7 +1055,7 @@ load in your business: none of its apps can be turned on here.". An app that cou
 plan's limit of apps, an app the plan does not include) stays off, loads nothing and the report says why;
 the rest loads. A file is not kept: if one of its apps is still being set up, its row says "It is being set up for
 this business. Upload the file again in a minute to bring its data.".
-Involved: BASE-F22, INVENTORY-F12
+Involved: BASE-F22, INVENTORY-F12, VERIFACTU-F01
 
 ### BASE-F32 Read the import report
 Status: done
@@ -1217,7 +1219,7 @@ Steps:
      the template solved and the panels refresh. The same after loading a template or a file from "Data and
      backups".
 In: the templates and whether the business is still empty.
-Out: what the template brings, as in BASE-F31 (`base.blueprint.imported`).
+Out: what the template brings, as in BASE-F31 (`base.blueprint.imported`): VeriFactu stays off (VERIFACTU-F01).
 If it fails: if not everything went in, "Not everything went in" with "These did not go in: {apps}." (or
 "Something else did not go in.") and "See the report"; if an app could not be set up, "An app could not be set up
 yet" with "It keeps trying by itself and its data will load when it works: {apps}. In the report you can try again
@@ -1226,7 +1228,7 @@ be opened" with "Nothing has changed in your business: {reason}" and "Try again"
 "The setup did not finish" with "Part of it may be in already. Check it in Settings › Data before trying
 again." and "See the report", with no retry. If the templates cannot be read, "The templates to start with
 could not be loaded." with "Retry" and "Not now".
-Involved: BASE-F01, INVENTORY-F12
+Involved: BASE-F01, INVENTORY-F12, VERIFACTU-F01
 
 ### BASE-F39 Open System and move between its tabs
 Status: done

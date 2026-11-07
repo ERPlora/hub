@@ -6,7 +6,7 @@
 // and Inventory are the real ones. Nothing is saved: the products the edit needs are made through the API and removed.
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, login, shot, shown } from './helpers';
+import { A, capture, login, shown } from './helpers';
 import {
   cleanInventory,
   createProduct,
@@ -66,7 +66,7 @@ for (const vp of VIEWPORTS) {
     await expect(asked.locator('.ep-form-modal__submit')).toHaveText(/^\s*(Discard changes|Descartar cambios)\s*$/);
     await expect(form).toBeVisible();
     await expect(page).toHaveURL(`${A}/inventory/products`);
-    await page.screenshot({ path: shot(`INVENTORY-F01-back-asks-${vp.label}`) });
+    await capture(page, `INVENTORY-F01-back-asks-${vp.label}`);
 
     // A second Back closes the question, as Back closes any window on top: the person keeps editing.
     await pressBack(page);
@@ -134,7 +134,7 @@ test('INVENTORY-F02 390: Back on «Editing product» closes it as opened; with a
   const asked = question(page);
   await expect(asked).toBeVisible();
   await expect(form).toBeVisible();
-  await page.screenshot({ path: shot('INVENTORY-F02-back-asks-390') });
+  await capture(page, 'INVENTORY-F02-back-asks-390');
   await asked.locator('.ep-form-modal__submit').click();
   await expect(form).toBeHidden();
   await expect(page).toHaveURL(`${A}/inventory/products`);

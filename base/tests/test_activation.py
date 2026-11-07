@@ -53,9 +53,11 @@ def test_every_module_on_has_17_roots_of_27_on_main():
     ]  # fmt: skip
 
 
-@pytest.mark.parametrize(("vertical", "modules", "chosen"), [("restaurant", 21, 13), ("hair_salon", 19, 10)])
+@pytest.mark.parametrize(("vertical", "modules", "chosen"), [("restaurant", 20, 13), ("hair_salon", 18, 10)])
 def test_a_vertical_template_counts_only_its_roots_as_chosen(vertical, modules, chosen):
-    """PLAN §32 point 2: the restaurant's template has 21 modules and 13 roots; the hair salon's, 19 and 10."""
+    """PLAN §32 point 2: the restaurant's template has 20 modules and 13 roots; the hair salon's, 18 and 10 (one module
+    fewer each since VeriFactu is in no template, PLAN-HUB round 2026-11-07, hub#998: Invoicing is a root in its
+    place)."""
     graph = activation.module_graph()
     apps = template_apps(vertical)
     template = activation.template(apps, graph)

@@ -33,7 +33,9 @@ class VerifactuConfig(LiveAppConfig):
         "Records, queue, audit events and the chain's recovery are all here, in the test environment until you go "
         "live."
     )
-    verticals = ["hair_salon", "restaurant"]
+    # In no template (PLAN-HUB round 2026-11-07, hub#998): it binds the business to the AEAT until the end of the
+    # calendar year and never goes off once on (VERIFACTU-F32), so its owner turns it on from Apps, never a template.
+    verticals = []
     # Mandatory in Spain (hub#997, PLAN-HUB round 2026-11-07): the Home asks whoever runs a business there to turn it on
     # while it is off (base.home.mandatory_steps). The platform never turns it on by itself: it binds the business to
     # the AEAT until the end of the calendar year and needs its authorisation, so its owner does, from Apps.

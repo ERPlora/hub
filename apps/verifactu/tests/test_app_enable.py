@@ -6,6 +6,10 @@ outside Spain it is 409 ``base.app_vetoed`` with the reason in the reader's lang
 ``base.app.list`` says so beforehand. A business in Spain, or without a country (a demo, in ERPlora's market), turns it
 on. One already on outside Spain stays as it is and can go off (``test_app_disable``). Each hub reads its own business's
 country.
+
+A template of the catalogue never turns it on, in Spain either (PLAN-HUB round 2026-11-07, hub#998): VeriFactu binds the
+business to the AEAT until the end of the calendar year and never goes off once on (VERIFACTU-F32), so its owner turns it
+on, from Apps.
 """
 
 import pytest
@@ -18,10 +22,11 @@ from live.operations import get
 from apps.verifactu.queries import VERIFACTU
 from apps.verifactu.tests.conftest import A, business_in
 from base import activation, events, services
-from base.catalog import template_apps
+from base import blueprint
 from base.models import AppActivation
 from base.tenancy import context
 from base.tenancy.tests import hubs
+from base.tests.test_services_data import born, call, load, modules_on  # noqa: F401 (fixtures)
 
 ONLY_IN_SPAIN = "VeriFactu is only for businesses in Spain."
 ONLY_IN_SPAIN_ES = "VeriFactu solo es para negocios de España."
@@ -138,32 +143,24 @@ def test_a_blueprint_outside_spain_leaves_it_off_with_the_reason_and_turns_on_th
 
 
 @pytest.mark.django_db
-@pytest.mark.parametrize("vertical", ["hair_salon", "restaurant"])
-def test_a_vertical_template_outside_spain_loads_without_verifactu_and_says_why(vertical):
-    """A hub is born with every app off and a template turns its vertical's on through ``base.app.enable``: outside
-    Spain only VeriFactu stays off, with its reason; everything else the vertical brings goes on, what it needed too."""
-    listed = template_apps(vertical)
-    assert VERIFACTU in listed
-    business_in("PL")
-    verifactu_off()
+@pytest.mark.parametrize("key", [seed.key for seed in blueprint.catalog()])
+def test_a_template_in_spain_leaves_verifactu_off_for_the_home_to_ask_and_turns_on_the_rest(born, load, key):  # noqa: F811
+    """The review does not announce it and the load leaves it off, so «Finish setting up your business» asks its owner
+    to turn it on (hub#997); everything else the template lists goes on, what VeriFactu needs included (hub#998)."""
+    business_in("ES", slug="c")
 
-    refused = services._turn_on_listed(admin(), listed, set())
+    review = call(born, "base.blueprint.inspect", template=key)
+    loaded = load(born, template=key)
 
-    assert refused == {VERIFACTU: ONLY_IN_SPAIN}
-    states = activation.states_of(A)
-    assert not states[VERIFACTU].wanted
-    assert [app for app in listed if app != VERIFACTU and not states[app].on] == []
-
-
-@pytest.mark.django_db
-@pytest.mark.parametrize("vertical", ["hair_salon", "restaurant"])
-def test_a_vertical_template_in_spain_turns_verifactu_on(vertical):
-    listed = template_apps(vertical)
-    business_in("ES")
-    verifactu_off()
-
-    assert services._turn_on_listed(admin(), listed, set()) == {}
-    assert activation.states_of(A)[VERIFACTU].on
+    on = modules_on()
+    turns_on = {app.id for app in review.apps if app.status == "turns_on"}
+    assert VERIFACTU not in {app.id for app in review.apps}
+    assert VERIFACTU not in on
+    assert not activation.states_of(Scope("host", "c"))[VERIFACTU].wanted
+    assert set(apps.get_app_config(VERIFACTU).requires) <= turns_on <= on
+    assert loaded.status == "complete"
+    checklist = {item.key: item.state for item in call(born, "base.setup.status").items}
+    assert checklist[f"base.mandatory.{VERIFACTU}"] == "pending"
 
 
 @pytest.mark.django_db(databases=hubs.HUB_DATABASES)
