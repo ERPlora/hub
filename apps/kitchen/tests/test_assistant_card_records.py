@@ -366,12 +366,13 @@ def test_the_dishes_are_left_out_for_whoever_may_not_see_the_tickets_and_a_line_
     lines = {"items": [{"order_item_id": str(kitchen.line.id)}]}
     assert shown("kitchen.item.bump", dishes)["item_ids"] == ["Tortilla"]  # positive control
     assert shown("kitchen.ticket.receive", lines)["items"] == [{"order_item_id": "Hamburguesa"}]  # positive control
-    for write, arguments, permission in (
-        ("kitchen.item.bump", dishes, "kitchen.view_ticket"),
-        ("kitchen.ticket.receive", lines, "sale.view_sale"),
+    for write, arguments, permission, name in (
+        ("kitchen.item.bump", dishes, "kitchen.view_ticket", "Tortilla"),
+        ("kitchen.ticket.receive", lines, "sale.view_sale", "Hamburguesa"),
     ):
         said = shown(write, arguments, ctx=without(permission))
         assert no_id(said), write
+        assert name not in str(said), write
 
 
 @pytest.mark.django_db
@@ -384,8 +385,8 @@ def test_what_does_not_exist_is_left_out(write, datum):
 
 @pytest.mark.django_db
 def test_a_dish_that_does_not_exist_is_left_out():
-    said = shown("kitchen.item.bump", {"item_ids": [A_MISSING_ID]})
-    assert no_id(said)
+    """The list still says how many it carries; the dish it cannot name is none of them."""
+    assert shown("kitchen.item.bump", {"item_ids": [A_MISSING_ID]}) == {"item_ids": [None]}
 
 
 @pytest.mark.django_db
@@ -401,7 +402,7 @@ def test_a_record_removed_meanwhile_is_left_out():
     run("kitchen.station.delete", {"station_id": station})
     assert shown("kitchen.ticket.serve", {"ticket_id": ticket}) == {}
     assert shown("kitchen.station.delete", {"station_id": station}) == {}
-    assert no_id(shown("kitchen.item.bump", {"item_ids": dish}))
+    assert shown("kitchen.item.bump", {"item_ids": dish}) == {"item_ids": [None]}
 
 
 @pytest.mark.django_db
