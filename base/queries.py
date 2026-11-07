@@ -258,17 +258,21 @@ def demo_get(ctx: OperationContext, data: DemoSlugIn) -> dict[str, Any]:
     ),
 )
 def setup_status(ctx: OperationContext, data: SetupStatusIn) -> dict:
-    """The old hub's ``hub.setup.status``: the platform's steps (``base.apps``, ``base.team``) and the modules'."""
+    """The old hub's ``hub.setup.status``: the platform's steps (``base.apps``, ``base.mandatory.<app>``, ``base.team``)
+    and the modules'."""
     with translation.override(ctx.language):
         hub = Hub.objects.filter(slug=ctx.scope.key).first()
         on = active_apps(ctx.scope)
-        modules = home.home_modules(on, demo_hub=bool(hub and hub.is_demo))
-        items = _platform_steps(ctx, on) + home.module_steps(ctx, modules, hub.country if hub else "")
+        demo_hub = bool(hub and hub.is_demo)
+        country = hub.country if hub else ""
+        modules = home.home_modules(on, demo_hub=demo_hub)
+        items = _platform_steps(ctx, on, country, demo_hub) + home.module_steps(ctx, modules, country)
         return home.document(items)
 
 
-def _platform_steps(ctx: OperationContext, on: frozenset[str]) -> list[dict]:
-    """«Your apps» (some business app on) and «Your team» (more than one active person), for who runs the hub."""
+def _platform_steps(ctx: OperationContext, on: frozenset[str], country: str, demo_hub: bool) -> list[dict]:
+    """«Your apps» (some business app on), «Turn on <app>» for each app mandatory in the business's ``country`` that is
+    off (hub#997) and «Your team» (more than one active person), for who runs the hub: who turns apps on and off."""
     if not ctx.has(ADMINISTER_HUB):
         return []
     business_apps = home.business_apps()
@@ -291,6 +295,7 @@ def _platform_steps(ctx: OperationContext, on: frozenset[str]) -> list[dict]:
             route="/apps",
             order=10,
         ),
+        *home.mandatory_steps(home.shown_modules(demo_hub=demo_hub), on, country),
         home.item(
             "base.team",
             "base",

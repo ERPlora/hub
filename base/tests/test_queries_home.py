@@ -215,6 +215,74 @@ def test_whoever_cannot_administer_the_hub_gets_no_platform_step(modules):
     assert setup_status(ctx()) == {"total": 0, "pending": 0, "unavailable": 0, "blocking_pending": 0, "items": []}
 
 
+# --- base.setup.status: the apps a business must have on in its country (hub#997) -----------------------------------
+
+
+def fiscal(countries=("ES",), **more):
+    """A stand-in app mandatory in ``countries`` (or ``"all"``), declared as its ``LiveAppConfig`` would."""
+    declared = {"countries": countries if countries == "all" else list(countries), "platform_turns_on": False}
+    return module("fiscal", mandatory=declared, icon="ion:shield-checkmark-outline", **more)
+
+
+def test_a_mandatory_app_off_in_the_businesss_country_is_an_important_step_until_it_is_on(modules, make_user):
+    make_user("ana", host="a", role=Membership.Role.OWNER)
+    modules(module("sale"), fiscal(), on=["sale"])
+
+    document = setup_status(ctx(ADMIN))
+
+    assert keys(document) == ["base.apps", "base.mandatory.fiscal", "base.team"]
+    step = by_key(document)["base.mandatory.fiscal"]
+    assert {k: step[k] for k in ("app", "state", "level", "required", "actionable", "route", "icon", "title")} == {
+        "app": "base",
+        "state": "pending",
+        "level": "functional",
+        "required": True,
+        "actionable": True,
+        "route": "/apps#all",
+        "icon": "ion:shield-checkmark-outline",
+        "title": "Turn on Fiscal",
+    }
+    assert (document["pending"], document["blocking_pending"]) == (2, 0)
+
+    modules(module("sale"), fiscal(), on=["sale", "fiscal"])
+    assert "base.mandatory.fiscal" not in keys(setup_status(ctx(ADMIN)))
+
+
+def test_a_mandatory_app_is_asked_for_only_in_its_countries_each_hub_by_its_own(modules):
+    modules(module("sale"), fiscal(), on=["sale"])
+    Hub.objects.filter(slug="a").update(country="PL")
+
+    assert "base.mandatory.fiscal" not in keys(setup_status(ctx(ADMIN)))
+    # B has no country: it is in ERPlora's market, Spain (hub#682).
+    assert "base.mandatory.fiscal" in keys(setup_status(ctx(ADMIN, scope=B)))
+
+    modules(module("sale"), fiscal("all"), on=["sale"])
+    assert "base.mandatory.fiscal" in keys(setup_status(ctx(ADMIN)))
+
+
+def test_a_mandatory_app_says_it_in_the_persons_language(modules):
+    modules(module("sale"), fiscal(name=gettext_lazy("Taxes")), on=["sale"])
+    Hub.objects.filter(slug="a").update(country="FR")
+    modules(module("sale"), fiscal("all", name=gettext_lazy("Taxes")), on=["sale"])
+
+    step = by_key(setup_status(ctx(ADMIN, language="es")))["base.mandatory.fiscal"]
+
+    assert (step["title"], step["description"]) == ("Activa Impuestos", "Es obligatoria para los negocios de Francia.")
+
+
+def test_only_whoever_turns_apps_on_is_asked_to_turn_a_mandatory_one_on(modules):
+    modules(module("sale"), fiscal(), on=["sale"])
+
+    assert keys(setup_status(ctx())) == []
+
+
+def test_an_app_out_of_the_store_is_never_asked_for_on_a_customers_hub(modules, settings):
+    modules(module("sale"), fiscal(listed=False), on=["sale"])
+    settings.SHOW_UNLISTED_MODULES = False
+
+    assert "base.mandatory.fiscal" not in keys(setup_status(ctx(ADMIN)))
+
+
 # --- base.setup.status: the modules' steps ---------------------------------------------------------------
 
 

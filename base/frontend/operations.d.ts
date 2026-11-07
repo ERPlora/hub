@@ -6,7 +6,8 @@ type NoInput = Record<string, never>;
 
 /** `base.SetupItemOut`: one step of «Finish setting up your business». */
 export interface SetupItem {
-  /** «<app>.<step>»: «base.apps», «base.team» or a module's own step. */
+  /** «<app>.<step>»: «base.apps», «base.mandatory.<app>» (turn on an app mandatory in the business's country),
+   *  «base.team» or a module's own step. */
   key: string;
   app: string;
   /** «unavailable»: ours, not the person's task. */

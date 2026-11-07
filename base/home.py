@@ -28,6 +28,11 @@ The cards of System › «Usage and plan» (hub#683, the old hub's «Your printe
 mounts each one, as a panel with a ``component`` of its own; ``base.E015`` checks the declarations at start
 (:func:`system_card_errors`). What a card says is its app's: base never learns what is in it.
 
+An app also says where a business must have it on (hub#997, PLAN-HUB round 2026-11-07): ``mandatory`` on its
+``LiveAppConfig``, the countries (or ``"all"``) and whether the platform turns it on by itself. While it is off in a
+business of one of them, the list carries a step of the platform that asks to turn it on (:func:`mandatory_steps`);
+``base.E016`` checks the declarations at start (:func:`mandatory_errors`). Base names no app: each says it.
+
 The device's notices (PLAN-HUB round 2026-10-23, ``notices``; ``base.notice.list``) run the same way: every row of
 a notice's query that passes its ``when`` is told, with the texts filled in from the row in the person's language
 (:func:`device_notices`); the shell tells each one once on the device, with the installed app's system notice.
@@ -46,15 +51,16 @@ from typing import Any
 
 from django.conf import settings
 from django.core import checks
-from django.utils import timezone
+from django.utils import timezone, translation
 from django.utils.functional import Promise
+from django.utils.translation import gettext
 from live.context import OperationContext, system_context
 from live.errors import PermissionDenied
 from live.live_registry import live_registry
 from live.meta import DeviceNotice, LiveAppConfig, SetupCheck, all_live_app_configs, module_configs
 from live.operations import UnknownOperation, get
 
-from base.business import business_zone, country_or_market
+from base.business import business_zone, country_name, country_or_market
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +95,18 @@ COMPONENT_NAME = re.compile(r"[A-Z][A-Za-z0-9]*")
 #: The shortest of those periods: the old hub's bell asked every 30 s, and a shorter one would make every open screen
 #: of the business a poller of its hub.
 MIN_BELL_REFRESH_SECONDS = 30
+#: Where an app declares the countries where a business must have it on (:func:`mandatory_steps`, hub#997): its
+#: ``countries`` (:data:`EVERY_COUNTRY`, or the ISO 3166-1 alpha-2 codes) and whether the platform turns it on by itself
+#: at sign-up (``platform_turns_on``: never one that binds the business to a tax authority).
+MANDATORY_ATTRIBUTE = "mandatory"
+MANDATORY_FIELDS = frozenset({"countries", "platform_turns_on"})
+#: The ``countries`` of an app mandatory wherever the business is.
+EVERY_COUNTRY = "all"
+COUNTRY_CODE = re.compile(r"[A-Z]{2}")
+#: Where the step that asks to turn a mandatory app on goes: right after «Your apps» (10), before any app's own step.
+MANDATORY_ORDER = 15
+#: Apps, on «Add apps»: the tab where an app off is (the default one lists the business's own).
+CATALOGUE_ROUTE = "/apps#all"
 
 
 def shown_modules(*, demo_hub: bool = False) -> list[LiveAppConfig]:
@@ -299,6 +317,40 @@ def module_steps(ctx: OperationContext, configs: Iterable[LiveAppConfig], hub_co
                 )
             )
     return items
+
+
+def mandatory_in(config: LiveAppConfig, hub_country: str) -> bool:
+    """Whether a business of ``hub_country`` must have ``config``'s app on, as the app declares it in
+    :data:`MANDATORY_ATTRIBUTE`; a business without a country is in ERPlora's market, Spain (:func:`applies_to_country`)."""
+    declared = getattr(config, MANDATORY_ATTRIBUTE, None)
+    if not isinstance(declared, Mapping):
+        return False
+    countries = declared.get("countries")
+    return countries == EVERY_COUNTRY or bool(countries) and applies_to_country(countries, hub_country)
+
+
+def mandatory_steps(configs: Iterable[LiveAppConfig], on: frozenset[str], hub_country: str) -> list[dict]:
+    """A step of the platform for each app of ``configs`` a business of ``hub_country`` must have on and does not (hub#997):
+    important, it leads to Apps and goes once the app is on, when the app's own steps follow. Base names no app: each
+    one says where it is mandatory (:data:`MANDATORY_ATTRIBUTE`). The texts in the language active now."""
+    country = country_name(country_or_market(hub_country), translation.get_language())
+    return [
+        item(
+            f"base.mandatory.{config.label}",
+            "base",
+            state=STATE_PENDING,
+            required=True,
+            level=level_of(f"base.mandatory.{config.label}", True),
+            actionable=True,
+            title=gettext("Turn on %(app)s") % {"app": config.verbose_name},
+            description=gettext("It is mandatory for businesses in %(country)s.") % {"country": country},
+            icon=getattr(config, "icon", "") or DEFAULT_STEP_ICON,
+            route=CATALOGUE_ROUTE,
+            order=MANDATORY_ORDER,
+        )
+        for config in configs
+        if config.label not in on and mandatory_in(config, hub_country)
+    ]
 
 
 def item(key: str, app: str, **fields: Any) -> dict:
@@ -645,3 +697,50 @@ def system_card_errors(configs: Iterable[LiveAppConfig]) -> list[checks.CheckMes
 @checks.register("base")
 def check_system_cards(app_configs: Any, **kwargs: Any) -> list[checks.CheckMessage]:
     return system_card_errors(all_live_app_configs())
+
+
+def mandatory_problems(declared: Any) -> list[str]:
+    """What is wrong with an app's :data:`MANDATORY_ATTRIBUTE`."""
+    if not isinstance(declared, Mapping):
+        return [f"is {declared!r}, not a mapping"]
+    problems = [f"has {field!r}, which it does not take" for field in sorted(set(declared) - MANDATORY_FIELDS)]
+    countries = declared.get("countries")
+    if countries != EVERY_COUNTRY:
+        if not isinstance(countries, list | tuple) or not countries:
+            problems.append(f"says countries {countries!r}, neither {EVERY_COUNTRY!r} nor a list of country codes")
+        else:
+            problems += [
+                f"names {code!r}, which is no upper-case ISO 3166-1 alpha-2 code"
+                for code in countries
+                if not isinstance(code, str) or not COUNTRY_CODE.fullmatch(code)
+            ]
+            if len(set(countries)) != len(countries):
+                problems.append(f"names a country twice in {countries!r}")
+    if not isinstance(declared.get("platform_turns_on"), bool):
+        problems.append("does not say whether the platform turns it on by itself (platform_turns_on: True or False)")
+    return problems
+
+
+def mandatory_errors(configs: Iterable[LiveAppConfig]) -> list[checks.CheckMessage]:
+    """``base.E016``: ``mandatory`` says the countries (``"all"`` or their codes, never an empty list, which would read as
+    «nowhere» or «everywhere») and whether the platform turns the app on by itself: a slip would ask every business for
+    an app, or none."""
+    hint = (
+        f'Declare {MANDATORY_ATTRIBUTE} = {{"countries": "{EVERY_COUNTRY}" or ["ES", …], "platform_turns_on": True or '
+        "False} on the LiveAppConfig of the module."
+    )
+    errors = []
+    for config in configs:
+        declared = getattr(config, MANDATORY_ATTRIBUTE, None)
+        if declared is None:
+            continue
+        errors += [
+            checks.Error(f"{config.label}'s {MANDATORY_ATTRIBUTE} {problem}.", hint=hint, obj=config, id="base.E016")
+            for problem in mandatory_problems(declared)
+        ]
+    return errors
+
+
+@checks.register("base")
+def check_mandatory_apps(app_configs: Any, **kwargs: Any) -> list[checks.CheckMessage]:
+    return mandatory_errors(all_live_app_configs())
