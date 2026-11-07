@@ -26,9 +26,12 @@ vi.mock('@ionic/vue', async (importOriginal) => {
   return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
 });
 
-function item(name: string, preview: FileItem['preview'], content_type = 'text/plain', size = 10): FileItem {
-  return { path: `Facturas/${name}`, name, size, modified: null, content_type, preview };
+function item(name: string, preview: FileItem['preview'], content_type = 'text/plain'): FileItem {
+  return { path: `Facturas/${name}`, name, size: 10, modified: null, content_type, preview };
 }
+
+/** `file`, heavier than the preview reads. */
+const heavy = (file: FileItem): FileItem => ({ ...file, size: OFFICE_PREVIEW_MAX_BYTES + 1 });
 
 const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 const DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
@@ -177,13 +180,13 @@ describe('FilePreview', () => {
   });
 
   it('one heavier than the preview reads is not even fetched: «too large», with the download', async () => {
-    await show(item('enorme.xlsx', '', XLSX, OFFICE_PREVIEW_MAX_BYTES + 1), 'es');
+    await show(heavy(item('enorme.xlsx', '', XLSX)), 'es');
     await flush();
     expect(fetchFile).not.toHaveBeenCalled();
     expect(inDoc('file-preview-too-large')?.textContent).toContain('Demasiado grande para la vista previa');
     expect(inDoc('file-preview-too-large')?.textContent).toContain('10 MB');
     document.body.innerHTML = '';
-    await show(item('enorme.docx', '', DOCX, OFFICE_PREVIEW_MAX_BYTES + 1));
+    await show(heavy(item('enorme.docx', '', DOCX)));
     await flush();
     expect(inDoc('file-preview-too-large')?.textContent).toContain('up to 10 MB');
   });

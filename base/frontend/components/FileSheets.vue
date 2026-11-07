@@ -8,6 +8,7 @@ import { computed, ref, watch } from 'vue';
 
 import { type PreviewSheet, TABLE_PREVIEW_ROWS } from '../lib/files';
 import { useBaseI18n } from '../lib/i18n';
+import '../file-viewers.css';
 
 const props = defineProps<{ sheets: readonly PreviewSheet[] }>();
 
@@ -99,45 +100,3 @@ function pick(event: CustomEvent<{ value?: string | number }>): void {
   </div>
 </template>
 
-<style scoped>
-.file-sheets {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  align-self: stretch;
-  min-width: 0;
-}
-
-.file-sheets-tabs {
-  align-self: flex-start;
-  max-width: 100%;
-}
-
-.file-sheets-muted {
-  margin: 0;
-  color: var(--ion-color-medium-shade, #555);
-  font-size: 0.875rem;
-}
-
-.file-sheets-wrap {
-  overflow: auto;
-}
-
-.file-sheets-table {
-  border-collapse: collapse;
-  font-size: 0.875rem;
-}
-
-.file-sheets-table th,
-.file-sheets-table td {
-  padding: 6px 10px;
-  border: 1px solid var(--ep-border-color, var(--ion-color-light-shade, #d7d8da));
-  text-align: start;
-  white-space: nowrap;
-}
-
-.file-sheets-table th {
-  background: var(--ion-color-light, #f4f5f8);
-  font-weight: 600;
-}
-</style>

@@ -8,6 +8,7 @@ import { computed, ref } from 'vue';
 
 import { JSON_OPEN_DEPTH, JSON_TREE_ENTRIES } from '../lib/files';
 import { useBaseI18n } from '../lib/i18n';
+import '../file-viewers.css';
 
 defineOptions({ name: 'FileJsonTree' });
 
@@ -93,50 +94,3 @@ function toggled(event: Event): void {
   </div>
 </template>
 
-<style scoped>
-.file-json-branch,
-.file-json-leaf {
-  font-family: var(--ep-font-mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
-  font-size: 0.8125rem;
-  line-height: 1.6;
-  overflow-wrap: anywhere;
-}
-
-.file-json-summary {
-  cursor: pointer;
-}
-
-.file-json-entries {
-  padding-inline-start: 1.25rem;
-  border-inline-start: 1px solid var(--ep-border-color, var(--ion-color-light-shade, #d7d8da));
-  margin-inline-start: 0.3rem;
-}
-
-.file-json-leaf {
-  padding-inline-start: 1rem;
-}
-
-.file-json-key {
-  color: var(--ion-color-primary-shade, #3171e0);
-}
-
-.file-json-count,
-.file-json-more {
-  color: var(--ion-color-medium-shade, #555);
-}
-
-.file-json-more {
-  margin: 0;
-  padding-inline-start: 1rem;
-}
-
-.file-json-leaf--string {
-  color: var(--ion-color-success-shade, #2a8a4b);
-}
-
-.file-json-leaf--number,
-.file-json-leaf--boolean,
-.file-json-leaf--null {
-  color: var(--ion-color-tertiary-shade, #4f4fd6);
-}
-</style>
