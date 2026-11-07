@@ -6,7 +6,7 @@
 import { Combo, InlineFeedback } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
-import { expectSaveWaitsForMoney } from '../../../../base/frontend/__tests__/save-waits-for-money';
+import { expectSaveWaitsForMoney, expectWindowSaysMoneyUnreadable } from '../../../../base/frontend/__tests__/save-waits-for-money';
 import { business, click, ionValue, JAPANESE, type MountOptions, mountService, POLISH, settle } from '../__tests__/mount-service';
 import { PACKAGE, pkg } from '../__tests__/package';
 import PackageFormModal from './PackageFormModal.vue';
@@ -263,5 +263,16 @@ describe('PackageFormModal: Editing package — {name}', () => {
     expect(s.field('discount_percent').value).toBe('10,5');
     // No word shouts in the help: «compra» as the old panel said it, not «COMPRA».
     expect(s.field('validity_days').helperText).toBe('Días canjeables desde la compra; vacío = no caduca.');
+  });
+});
+
+// hub#938 (SERVICE-F12, F13): if the business's money cannot be read, the form says so with «Retry» instead of waiting in
+// grey without a word, also when it opens after the read had failed (the page read the money on loading).
+describe('PackageFormModal: a business whose money cannot be read (hub#938)', () => {
+  it.each([false, true])('says so with «Retry»; once the yen arrives «Save» lights up (opened after the failure: %s)', async (late) => {
+    const m = await mountService(PackageFormModal, { props: { open: !late, pkg: PACKAGE }, path: '/service/packages', business: null });
+    await m.live();
+    const opens = late ? () => m.wrapper.setProps({ open: true }) : undefined;
+    await expectWindowSaysMoneyUnreadable(m, 'service-package-form-submit', m.sent, opens);
   });
 });
