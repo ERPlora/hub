@@ -19,7 +19,7 @@ import { crc32, deflateSync } from 'node:zlib';
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { formatSize } from '../../base/frontend/lib/files';
-import { A, api, B, EMPLOYEE, horizontalOverflow, hostPage, psql, shot, shown, untilStill } from './helpers';
+import { A, api, B, capture, EMPLOYEE, horizontalOverflow, hostPage, psql, shot, shown, untilStill } from './helpers';
 
 /** The real files of the preview's unit tests (hub#578): a JSON, an .xlsx of two sheets and a .docx written by an
  *  office suite, whose text carries `<script>` and `onerror` as words. */
@@ -418,8 +418,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await expect(json).not.toContainText('Café solo');
       await json.locator('[data-testid="file-json-summary"]', { hasText: '0:' }).click();
       await expect(json).toContainText('"Café solo"');
-      await untilStill(page);
-      await page.screenshot({ path: shot(`APP-BASE-8-BASE-F74-json-${width}`) });
+      await capture(page, `APP-BASE-8-BASE-F74-json-${width}`);
       await preview.locator('[data-testid="file-preview-close"]').click();
       await expect(preview).toBeHidden();
 
@@ -428,8 +427,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       const table = preview.locator('[data-testid="file-preview-table"]');
       await expect(table).toContainText('Café solo');
       await expect(preview.locator('[data-testid="file-preview-sheet-tab"]')).toHaveText(['Ventas', 'Notas']);
-      await untilStill(page);
-      await page.screenshot({ path: shot(`APP-BASE-8-BASE-F74-xlsx-${width}`) });
+      await capture(page, `APP-BASE-8-BASE-F74-xlsx-${width}`);
       await preview.locator('[data-testid="file-preview-sheet-tab"]', { hasText: 'Notas' }).click();
       await expect(table).toContainText('Cerrar la caja a las 23:00');
       await preview.locator('[data-testid="file-preview-close"]').click();
@@ -446,8 +444,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await expect(document).toContainText('<script>alert(1)</script>');
       expect(await document.locator('script, [onerror], img').count()).toBe(0);
       await expect(document.locator('a')).toHaveAttribute('href', 'https://erplora.com/');
-      await untilStill(page);
-      await page.screenshot({ path: shot(`APP-BASE-8-BASE-F74-docx-${width}`) });
+      await capture(page, `APP-BASE-8-BASE-F74-docx-${width}`);
       expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0);
       expect(dialogs).toEqual([]);
     } finally {
