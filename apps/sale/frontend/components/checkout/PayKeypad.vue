@@ -3,6 +3,7 @@
 // C. It only sends the key pressed ('.' for the separator, whatever the page language shows); what the
 // keys build is the tender's (lib/checkout/tender.ts). No quick amounts: removed on purpose (2026-07-19). A currency
 // without decimals (the yen; flow business-currency) has the separator off, as the till's own keypad (PosNumpad).
+import { decimalMark } from '@erplora/ui/components';
 import { computed } from 'vue';
 
 import { useLocale } from '../../composables/useT';
@@ -13,13 +14,7 @@ const emit = defineEmits<{ key: [key: string] }>();
 const locale = useLocale();
 
 /** The separator a person of this language types: «.» in English, «,» in Spanish. */
-const separator = computed(() => {
-  try {
-    return new Intl.NumberFormat(locale.value).formatToParts(1.5).find((part) => part.type === 'decimal')?.value ?? '.';
-  } catch {
-    return '.';
-  }
-});
+const separator = computed(() => decimalMark(locale.value));
 
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', 'C'] as const;
 const KEY_ID: Record<string, string> = { '.': 'dot', C: 'clear' };

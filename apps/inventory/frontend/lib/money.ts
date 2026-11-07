@@ -5,7 +5,9 @@
 // 1,25 €: it is not guessed, the field says so. On leaving the field it is rewritten in the page format. The
 // money is the business's (`useBusinessMoney`, with the server's decimals); while it is unknown, two decimals and no
 // symbol to take away.
-import { decimalMark, type Money, moneyDecimals } from './format';
+import { decimalMark } from '@erplora/ui/components';
+
+import { type Money, moneyDecimals } from './format';
 
 export type MoneyRead =
   | { ok: true; cents: number | null }

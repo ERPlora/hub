@@ -6,7 +6,7 @@
 import { describe, expect, it } from 'vitest';
 
 import * as format from './format';
-import { decimalMark, formatDay, formatMoney, localDay, paymentMoney, STATUS_TONE } from './format';
+import { formatDay, formatMoney, localDay, paymentMoney, STATUS_TONE } from './format';
 
 const nbsp = (text: string) => text.replace(/[\u00a0\u202f]/g, ' ');
 const EUR = { currency: 'EUR', decimals: 2 };
@@ -72,12 +72,6 @@ describe('localDay', () => {
   it('is the device’s own day as YYYY-MM-DD (what «New payment» starts with), never the UTC one', () => {
     expect(localDay(new Date(2026, 9, 14, 0, 30))).toBe('2026-10-14');
     expect(localDay(new Date(2026, 0, 5, 23, 59))).toBe('2026-01-05');
-  });
-});
-
-describe('decimalMark', () => {
-  it('is the page language’s', () => {
-    expect([decimalMark('es'), decimalMark('en')]).toEqual([',', '.']);
   });
 });
 

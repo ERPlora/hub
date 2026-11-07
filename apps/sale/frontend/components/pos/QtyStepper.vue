@@ -6,6 +6,7 @@
 // as a person types it: ungrouped («1500», where the line writes «1.500» with the platform's `formatQuantity`), as a
 // till's quantity field does (hub#974). The signs are glyphs: `ion:remove-outline` is not registered yet
 // (UI-REQUESTS.md, «POS»).
+import { decimalMark } from '@erplora/ui/components';
 import { computed, useTemplateRef, watch } from 'vue';
 
 import { useLocale } from '../../composables/useT';
@@ -17,7 +18,7 @@ const locale = useLocale();
 const field = useTemplateRef<HTMLInputElement>('field');
 
 /** The locale's decimal separator, as typed («,» in Spanish). */
-const separator = computed(() => new Intl.NumberFormat(locale.value).formatToParts(1.5).find((part) => part.type === 'decimal')?.value ?? '.');
+const separator = computed(() => decimalMark(locale.value));
 /** The quantity as typed: the server's decimal («1500.000») without its trailing zeros, the locale's mark, ungrouped. */
 const shown = computed(() => String(Number(props.quantity)).replace('.', separator.value));
 

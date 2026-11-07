@@ -16,18 +16,6 @@ const UNKNOWN_DECIMALS = 2;
 /** The decimals of an amount in `money`; two while it is unknown. */
 export const moneyDecimals = (money?: Money): number => money?.decimals ?? UNKNOWN_DECIMALS;
 
-const decimalMarks = new Map<string, string>();
-
-/** The decimal mark of `locale` («,» in Spanish, «.» in English). */
-export function decimalMark(locale: string): string {
-  let found = decimalMarks.get(locale);
-  if (!found) {
-    found = new Intl.NumberFormat(locale).formatToParts(1.5).find((part) => part.type === 'decimal')?.value ?? '.';
-    decimalMarks.set(locale, found);
-  }
-  return found;
-}
-
 /** A supplement in `money` with its sign («+1,00 zł», «-0,50 zł»; «+1,00» while it is unknown); `free` for 0. */
 export function formatDelta(cents: number, locale: string, free: string, money?: Money): string {
   if (cents === 0) return free;

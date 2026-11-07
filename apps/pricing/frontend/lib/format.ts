@@ -6,6 +6,8 @@
 // amount is a figure without a symbol, never the euro by default. A day is a calendar day (`YYYY-MM-DD`), painted
 // as it is whatever the device's time zone. A quantity is written with the platform's `formatQuantity` («10.000» →
 // «10», «1500.000» → «1.500»), as every screen writes it; its field shows it ungrouped, as typed.
+import { decimalMark } from '@erplora/ui/components';
+
 import type { Money } from '../../../../base/frontend/lib/home';
 
 export type { Money };
@@ -28,17 +30,6 @@ export const moneyDecimals = (money?: Money): number => money?.decimals ?? LIST_
 
 const formats = new Map<string, Intl.NumberFormat>();
 const days = new Map<string, Intl.DateTimeFormat>();
-const decimalMarks = new Map<string, string>();
-
-/** The decimal mark of `locale` («,» in Spanish, «.» in English). */
-export function decimalMark(locale: string): string {
-  let found = decimalMarks.get(locale);
-  if (!found) {
-    found = new Intl.NumberFormat(locale).formatToParts(1.5).find((part) => part.type === 'decimal')?.value ?? '.';
-    decimalMarks.set(locale, found);
-  }
-  return found;
-}
 
 function numberFormat(locale: string, key: string, options: Intl.NumberFormatOptions): Intl.NumberFormat {
   const cacheKey = `${locale}|${key}`;

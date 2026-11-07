@@ -4,7 +4,7 @@
 // default), a discount in basis points as the language writes a percentage, and a day.
 import { describe, expect, it } from 'vitest';
 
-import { decimalMark, formatDate, formatMoney, formatPercentBp, type Money, moneyDecimals, percentFieldText, readPercentBp } from './format';
+import { formatDate, formatMoney, formatPercentBp, type Money, moneyDecimals, percentFieldText, readPercentBp } from './format';
 
 const plain = (text: string) => text.replace(/[  ]/g, ' ');
 
@@ -51,13 +51,6 @@ describe('formatMoney', () => {
 describe('moneyDecimals', () => {
   it('is the business currency’s, two while it is unknown', () => {
     expect([moneyDecimals(PLN), moneyDecimals(JPY), moneyDecimals(undefined)]).toEqual([2, 0, 2]);
-  });
-});
-
-describe('decimalMark', () => {
-  it('is the comma in Spanish and the point in English', () => {
-    expect(decimalMark('es')).toBe(',');
-    expect(decimalMark('en')).toBe('.');
   });
 });
 

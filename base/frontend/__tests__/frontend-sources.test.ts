@@ -8,7 +8,7 @@ import { dirname, join } from 'node:path';
 import ts from 'typescript';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { bare, findingsByApp, frontendSources, hubFrontends, scriptBlocks } from './frontend-sources';
+import { bare, findingsByApp, frontendSources, hubFrontends, linesWhere, scriptBlocks } from './frontend-sources';
 
 describe('scriptBlocks', () => {
   it('gives a .ts whole, from its first line', () => {
@@ -43,6 +43,32 @@ describe('bare', () => {
     );
     expect(ts.isNumericLiteral(bare(first)) && bare(first).getText(file)).toBe('3');
     expect(bare(second)).toBe(second);
+  });
+});
+
+describe('linesWhere', () => {
+  const isTwo = (node: ts.Node): boolean => ts.isNumericLiteral(node) && node.text === '2';
+
+  it('gives the line of each node that holds in a .ts, once per node', () => {
+    expect(linesWhere('const a = 1;\nconst b = 2;\nconst c = [2, 2];', 'format.ts', isTwo)).toEqual([2, 3, 3]);
+  });
+
+  it('reads only the <script> blocks of a .vue, each node at its own line of the file', () => {
+    const component = [
+      '<template>{{ 2 }}</template>',
+      '<script lang="ts">',
+      'export const a = 2;',
+      '</script>',
+      '<script setup lang="ts">',
+      'const b: number = 1;',
+      'const c = 2;',
+      '</script>',
+    ].join('\n');
+    expect(linesWhere(component, 'Total.vue', isTwo)).toEqual([3, 7]);
+  });
+
+  it('gives nothing when no node holds', () => {
+    expect(linesWhere('const a = 1;', 'format.ts', isTwo)).toEqual([]);
   });
 });
 
