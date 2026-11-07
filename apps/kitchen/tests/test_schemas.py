@@ -69,6 +69,13 @@ def test_a_received_round_never_drops_a_word_it_does_not_know(said, priority):
     assert (data.priority, data.channel, data.round_no) == (priority, "dine_in", 2)
 
 
+def test_a_received_round_that_says_no_priority_nor_channel_is_normal_and_dine_in():
+    """The assistant may ask for a round by its check alone (hub#671): what it does not say is the default the ticket
+    knows, never an empty priority the reading before would have made «normal»."""
+    data = schemas.TicketReceiveIn.model_validate({"order_id": str(uuid.uuid7()), "round_no": 1})
+    assert (data.priority, data.channel) == ("normal", "dine_in")
+
+
 def test_a_hand_made_ticket_has_one_dish_at_least_each_named():
     item = {"name": "Staff meal", "quantity": "2"}
     data = schemas.TicketCreateIn.model_validate({"items": [item]})

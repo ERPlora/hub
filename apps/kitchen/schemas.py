@@ -21,6 +21,8 @@ from django.utils.translation import gettext_noop
 from ninja import Field, Schema
 from pydantic import ConfigDict, StringConstraints, field_validator, model_validator
 
+from base.schemas import names
+
 T = TypeVar("T")
 
 #: The most dishes a ticket made by hand takes.
@@ -36,6 +38,21 @@ ADD_A_DISH = _("Add at least one dish.")
 TICKET_TYPE = gettext_noop("Ticket type")
 DISHES = gettext_noop("Dishes")
 STATION_COLOUR = gettext_noop("Station colour")
+
+# The assistant's card names the record a write acts on by these reads (base/assistant.py ``REFERS``), run as whoever
+# asks, never by its id: a ticket by its number, as the «Cancel ticket …?» dialog and its sheet say it; a dish and a
+# station by their names, as the board and the stations' «Delete …?» dialog say them; a product and a category of
+# Inventory by their names, as Inventory says them; a check of Sales by its title (else its amount) and a line of it by
+# its dish, as Sales says them.
+A_TICKET = names("kitchen.ticket.get", by="ticket_id", name=("number",))
+A_DISH = names("kitchen.item.get")
+A_STATION = names("kitchen.station.get", by="station_id")
+A_PRODUCT = names("inventory.product.get")
+A_CATEGORY = names("inventory.category.get")
+A_CHECK = names("sale.record.get", by="order_id")
+A_CHECK_LINE = names("sale.record.get", by="line_id")
+#: The type of a round is the ticket's: the card says it by its label («Para llevar»), never by its code.
+OF_ORDER_TYPE = {"choices_of": "order_type"}
 
 TicketStatus = Literal["pending", "preparing", "ready", "served", "cancelled"]
 ItemStatus = Literal["pending", "preparing", "ready", "served", "cancelled", "voided"]
@@ -145,7 +162,7 @@ class DeletedOut(Schema):
 
 
 class TicketRefIn(In):
-    ticket_id: UUID | None = Field(None, description="The ticket's id.")
+    ticket_id: UUID | None = Field(None, description="The ticket's id.", json_schema_extra=A_TICKET)
     ticket: Said | None = Field(
         None,
         description="The ticket as a person says it: its number («12», «#0012», «20261014-0012») or its label "
@@ -158,8 +175,12 @@ class TicketRefIn(In):
         return self
 
 
+class ItemRefIn(In):
+    id: UUID = Field(description="The dish's id, as its ticket gives it.")
+
+
 class StationRefIn(In):
-    station_id: UUID | None = Field(None, description="The station's id.")
+    station_id: UUID | None = Field(None, description="The station's id.", json_schema_extra=A_STATION)
     station: Said | None = Field(
         None, description="The station's name («grill»), when its id is not known."
     )
@@ -363,14 +384,17 @@ class TicketsOut(Schema):
 
 class TicketSendIn(In):
     order_id: UUID = Field(
-        description="The open check whose pending lines go to the kitchen."
+        description="The open check whose pending lines go to the kitchen.", json_schema_extra=A_CHECK
     )
     label: Label = Field(
         "",
         description="What the kitchen reads as the check's name (Table 4); empty: the check's title.",
     )
     channel: OrderType = Field(
-        "dine_in", title=TICKET_TYPE, description="dine_in, takeaway or delivery."
+        "dine_in",
+        title=TICKET_TYPE,
+        description="dine_in, takeaway or delivery.",
+        json_schema_extra=OF_ORDER_TYPE,
     )
     priority: Literal["normal", "rush"] = Field(
         "normal", description="rush sends it urgent."
@@ -386,22 +410,25 @@ _CHANNELS = {"dine_in", "takeaway", "delivery"}
 
 
 class ReceivedItemIn(Reaction):
-    order_item_id: UUID = Field(description="The line of Sales sent.")
+    order_item_id: UUID = Field(description="The line of Sales sent.", json_schema_extra=A_CHECK_LINE)
 
 
 class TicketReceiveIn(Reaction):
     """``sale.order.fired`` as Sales sends it (its WORKBOOK «Lo que avisa»)."""
 
-    order_id: UUID = Field(description="The check the round was fired from.")
+    order_id: UUID = Field(description="The check the round was fired from.", json_schema_extra=A_CHECK)
     round_no: int = Field(ge=1, description="The round fired.")
     label: str = Field("", description="What the kitchen reads as the check's name.")
-    channel: str = Field(
+    # A closed list, so the card says each by its label: what Sales sends is read before (``_channel``, ``_priority``),
+    # and anything else still becomes dine_in and normal, never a refusal.
+    channel: OrderType = Field(
         "dine_in",
         title=TICKET_TYPE,
         description="dine_in, takeaway or delivery; anything else is dine_in.",
+        json_schema_extra=OF_ORDER_TYPE,
     )
-    priority: str = Field(
-        "", description="urgent or rush (rush), vip; anything else is normal."
+    priority: Priority = Field(
+        "normal", description="urgent or rush (rush), vip; anything else is normal."
     )
     waiter: str = Field("", description="Who sent it.")
     items: list[ReceivedItemIn] = Field(
@@ -452,7 +479,7 @@ class SyncOut(Schema):
 
 
 class ManualItemIn(In):
-    product_id: UUID | None = Field(None, description="A product of the catalogue.")
+    product_id: UUID | None = Field(None, description="A product of the catalogue.", json_schema_extra=A_PRODUCT)
     product: Said | None = Field(
         None, description="A product of the catalogue by its name."
     )
@@ -498,7 +525,7 @@ class TicketRushIn(TicketRefIn):
 
 
 class ItemBumpIn(TicketRefIn):
-    item_ids: list[UUID] = Field(
+    item_ids: list[Annotated[UUID, Field(json_schema_extra=A_DISH)]] = Field(
         default_factory=list,
         title=DISHES,
         description="The dishes; empty: every dish of the ticket in the station's scope.",
@@ -601,11 +628,11 @@ RoutingPage = Page[RouteOut]
 
 
 class _Target(In):
-    product_id: UUID | None = Field(None, description="A product of Inventory.")
+    product_id: UUID | None = Field(None, description="A product of Inventory.", json_schema_extra=A_PRODUCT)
     product: Said | None = Field(
         None, description="A product of Inventory by its name."
     )
-    category_id: UUID | None = Field(None, description="A category of Inventory.")
+    category_id: UUID | None = Field(None, description="A category of Inventory.", json_schema_extra=A_CATEGORY)
     category: Said | None = Field(
         None, description="A category of Inventory by its name."
     )
@@ -620,7 +647,7 @@ class _Target(In):
 
 
 class RoutingSetIn(_Target):
-    station_id: UUID | None = Field(None, description="The station it goes to.")
+    station_id: UUID | None = Field(None, description="The station it goes to.", json_schema_extra=A_STATION)
     station: Said | None = Field(None, description="The station by its name.")
 
     @model_validator(mode="after")

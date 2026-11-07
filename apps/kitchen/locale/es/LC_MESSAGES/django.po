@@ -515,6 +515,10 @@ msgstr ""
 msgid "That station does not exist in this business."
 msgstr "Esa estación no existe en este negocio."
 
+#: queries.py:82
+msgid "That dish is on no kitchen ticket of this business."
+msgstr "Ese plato no está en ninguna comanda de este negocio."
+
 #: queries.py:74
 #, python-format
 msgid "“%(said)s” matches several stations: %(names)s. Say which one."
