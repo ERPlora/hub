@@ -180,6 +180,19 @@ def test_a_record_opens_read_only_and_is_never_saved(client, staff, issuer):
     assert Record.objects.get(pk=sealed.pk).status == "pending"
 
 
+def test_a_record_page_in_spanish_says_the_aeats_words(client, staff, issuer):
+    """hub#591: the record's labels are VeriFactu's, the AEAT's, never those of an app installed before it that says
+    the same English (invoice's «fecha de emisión» and «tipo de rectificación», sale's «desglose de impuestos» and
+    «impuesto», attendance's «corrección»)."""
+    sealed = record()
+    client.force_login(staff)
+    response = client.get(f"{RECORDS}{sealed.pk}/change/", HTTP_HOST=PLATFORM, HTTP_ACCEPT_LANGUAGE="es")
+    assert response.status_code == 200
+    html = response.content.decode()
+    words = ["Fecha de expedición", "Tipo de rectificativa", "Desglose", "Cuota", "Subsanación"]
+    assert [word for word in words if f">{word}:</label>" in html] == words
+
+
 def test_the_record_page_shows_every_field_once_and_why_it_waits(request_of):
     fields = flatten_fieldsets(model_admin(RecordAdmin, Record).get_fieldsets(request_of()))
     assert sorted(fields) == sorted(
