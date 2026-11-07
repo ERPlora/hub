@@ -1,7 +1,8 @@
 // Files (APP-BASE-8; the old hub's `lib/media.ts` and `file-preview.ts`): what the screen works out by itself. The
 // server (`base.file.*`, `base/files.py`) decides and refuses; here, sizes as people read them, the tree flattened for
 // the narrow selector and «Move to…», where the screen goes after a rename, a move or a delete of the folder it shows,
-// the search of the open folder, a CSV for the preview, and the sentence of each refusal the server gives (hub#1776).
+// the search of the open folder, a CSV for the preview, the viewer of a spreadsheet and of a Word document (hub#578),
+// and the sentence of each refusal the server gives (hub#1776).
 
 /** The heaviest file the server takes (`base.files.MAX_FILE_BYTES`): refused here before sending 33 MB of base64. */
 export const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
@@ -9,13 +10,67 @@ export const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 export const PDF_PAGES = 30;
 /** The characters of a text the preview shows; a longer one says so. */
 export const TEXT_PREVIEW_CHARS = 1_000_000;
-/** The rows of a CSV the preview shows. */
+/** The rows of a CSV, or of each sheet of a spreadsheet, the preview shows. */
 export const TABLE_PREVIEW_ROWS = 500;
+/** The heaviest spreadsheet or Word document the preview reads: a bigger one says so and offers the download, never a
+ *  tab frozen while it reads in the page's own thread. */
+export const OFFICE_PREVIEW_MAX_BYTES = 10 * 1024 * 1024;
+/** What a spreadsheet or a Word document may unpack to (its XML; a zip packs it some tenfold): past it, a file that
+ *  would freeze the tab (or a zip bomb) is «too large» before a cell is read. */
+export const OFFICE_UNPACKED_MAX_BYTES = 100 * 1024 * 1024;
 /** The longest name of a new folder (`base.files.MAX_FOLDER_NAME`) and of a name (255 bytes on the server). */
 export const MAX_FOLDER_NAME = 100;
 export const MAX_NAME = 255;
 
 export type FilePreview = 'image' | 'pdf' | 'text' | 'table' | 'json' | 'audio' | 'video' | '';
+/** How the preview shows a file: the server's kind, or a spreadsheet or a Word document, which it serves as bytes. */
+export type FileViewer = FilePreview | 'sheet' | 'document';
+
+/** A file the preview will not read because it is too big for it. */
+export class PreviewTooLarge extends Error {
+  constructor() {
+    super('files: too large to preview');
+    this.name = 'PreviewTooLarge';
+  }
+}
+
+/** The types (`base.files.SERVED`) of the spreadsheets and Word documents the preview reads: the formats of Office
+ *  since 2007, XML in a zip. Their old binary ones (.xls, .doc) and the rest are downloaded. */
+const OFFICE_VIEWERS: Readonly<Record<string, FileViewer>> = {
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'sheet',
+  'application/vnd.ms-excel.sheet.macroEnabled.12': 'sheet',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'document',
+};
+
+/** How the preview shows `file`, from the kind and the type the server gives it. */
+export function viewerOf(file: { preview: FilePreview; content_type: string }): FileViewer {
+  return file.preview || OFFICE_VIEWERS[file.content_type] || '';
+}
+
+/** A cell of a spreadsheet as `read-excel-file` gives it. */
+export type SheetCell = string | number | boolean | Date | null;
+
+/** A cell as the sheet shows it: a number in the person's language but never grouped (a postcode, an id), rounded as
+ *  Excel rounds its floats; a date as a day, in UTC as the sheet stores it, with its time only when it has one; a
+ *  yes/no in the person's words (`words`); a text as it is. */
+export function cellText(value: SheetCell, locale: string, words: { yes: string; no: string }): string {
+  if (value === null) return '';
+  if (typeof value === 'boolean') return value ? words.yes : words.no;
+  if (typeof value === 'number') {
+    return new Intl.NumberFormat(locale, { useGrouping: false, maximumSignificantDigits: 15 }).format(value);
+  }
+  if (value instanceof Date) {
+    const day = { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' } as const;
+    const timed = value.getUTCHours() || value.getUTCMinutes() || value.getUTCSeconds();
+    return new Intl.DateTimeFormat(locale, timed ? { ...day, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' } : day).format(value);
+  }
+  return value;
+}
+
+/** The rows of a sheet the preview shows (the header among them), and whether it has more. */
+export function sheetRows<T>(rows: readonly T[]): { rows: T[]; cut: boolean } {
+  return { rows: rows.slice(0, TABLE_PREVIEW_ROWS), cut: rows.length > TABLE_PREVIEW_ROWS };
+}
 
 export interface FolderNode {
   path: string;
