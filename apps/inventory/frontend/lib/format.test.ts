@@ -1,7 +1,8 @@
 // How the inventory screens paint money, counts, quantities and tax rates, all with the page
 // language's own number format (Intl): money of the business from cents, counts grouped as the language groups them,
-// quantities exact and ungrouped without trailing zeros (as the server's CSV writes them: 2,5 · 3 ·
-// 0,532), a movement's quantity with its sign, and a rate as the language writes a percentage.
+// quantities exact without trailing zeros and grouped as every screen of the Hub groups them (2,5 · 3 · 0,532 ·
+// 12.345, the platform's formatQuantity), a movement's quantity with its sign, and a rate as the language writes a
+// percentage.
 import { describe, expect, it } from 'vitest';
 
 import { formatCount, formatMoney, formatPercent, formatQuantity, formatShortDateTime, formatSignedQuantity } from './format';
@@ -39,14 +40,20 @@ describe('formatMoney', () => {
 });
 
 describe('formatQuantity', () => {
-  it('is exact: no trailing zeros, the language decimal mark, never grouped', () => {
+  it('is exact: no trailing zeros, the language decimal mark', () => {
     expect(formatQuantity('2.500', 'es')).toBe('2,5');
     expect(formatQuantity('2.500', 'en')).toBe('2.5');
     expect(formatQuantity('3.000', 'es')).toBe('3');
     expect(formatQuantity('0.532', 'es')).toBe('0,532');
-    expect(formatQuantity('12345.000', 'es')).toBe('12345');
     expect(formatQuantity('-4.250', 'es')).toBe('-4,25');
     expect(formatQuantity(7, 'en')).toBe('7');
+  });
+
+  // hub#974: a stock of 12500 read «12500» here and «12.500» on the till; it is written as every screen writes it.
+  it('groups the thousands from four digits on, as the till and the invoice do', () => {
+    expect(formatQuantity('12345.000', 'es')).toBe('12.345');
+    expect(formatQuantity('1500.000', 'es')).toBe('1.500');
+    expect(formatQuantity('1500.000', 'en')).toBe('1,500');
   });
 
   it('never invents a figure from what is not one', () => {
@@ -60,6 +67,8 @@ describe('formatSignedQuantity', () => {
     expect(formatSignedQuantity('2.000', 'es')).toBe('+2');
     expect(formatSignedQuantity('-1.500', 'es')).toBe('-1,5');
     expect(formatSignedQuantity('0.000', 'es')).toBe('0');
+    expect(formatSignedQuantity('1500.000', 'es')).toBe('+1.500');
+    expect(formatSignedQuantity('-2500.000', 'es')).toBe('-2.500');
   });
 });
 

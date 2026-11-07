@@ -19,7 +19,7 @@ from live.outbox import channel_for
 
 from apps.verifactu import certificates
 from apps.verifactu.models import OwnCertificate
-from apps.verifactu.tests.conftest import A, B, b64, ctx_for, make_p12, manual, run
+from apps.verifactu.tests.conftest import A, B, b64, business_in, ctx_for, make_p12, manual, run
 from base.schemas import SetupStatusIn, WidgetListIn
 
 STEP = "verifactu.sending_route"
@@ -196,6 +196,33 @@ def test_in_testing_a_revoked_authorisation_stops_nothing(issuer):
     assert run("verifactu.config.get").issue_blocker is None
     assert wall(ctx_for("hub_owner")) == (("functional", "pending", True), 0)
     assert wall(ctx_for("hub_employee")) == (None, 0)
+
+
+# ── Only for a business in Spain (hub#682) ─────────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(("country", "told"), [("PL", False), ("FR", False), ("ES", True), ("", True)])
+def test_the_step_is_only_for_a_business_in_spain(issuer, country, told):
+    """VeriFactu is Spanish law: a business erplora.com registered in another country is never asked to set it up; one
+    without a country (a demo, ERPlora's own hub) is in ERPlora's market, Spain, as the app itself counts it."""
+    business_in(country)
+
+    assert (STEP in steps(ctx_for("hub_owner"))) is told
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(("country", "walled"), [("PL", False), ("ES", True), ("", True)])
+def test_in_production_the_wall_is_only_for_a_business_in_spain(issuer, opened, country, walled):
+    """A business that went live in Spain and lost its way is walled; registered in another country, VeriFactu seals
+    and sends nothing (``outside_spain``), so the Home neither walls its sales nor counts it on the strip."""
+    live_by_erplora()
+    photo(2, "revoked")
+    business_in(country)
+
+    for role, actionable in (("hub_owner", True), ("hub_employee", False)):
+        told = (("legal", "pending", actionable), 1) if walled else (None, 0)
+        assert wall(ctx_for(role)) == told
 
 
 @pytest.mark.django_db

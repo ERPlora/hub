@@ -6,6 +6,8 @@
 // two decimals, never the euro by default. A calendar date (`YYYY-MM-DD`: a hire date, an absence, a
 // schedule's validity) is a day, not an instant: painted in UTC so it never moves a day. A time is the
 // business's wall clock: `HH:MM:SS` on the wire, `HH:MM` on screen and in a time field.
+import { decimalMark } from '@erplora/ui/components';
+
 import type { Money } from '../../../../base/frontend/lib/home';
 
 export type { Money };
@@ -19,10 +21,6 @@ const dateFormats = new Map<string, Intl.DateTimeFormat>();
 
 /** The decimals of an amount in `money`; two while it is unknown. */
 const moneyDecimals = (money?: Money): number => money?.decimals ?? UNKNOWN_DECIMALS;
-
-function decimalMark(locale: string): string {
-  return new Intl.NumberFormat(locale).formatToParts(1.5).find((part) => part.type === 'decimal')?.value ?? '.';
-}
 
 /** The symbol of `money` a till of that country prints («€», «zł», «¥»); `''` while it is unknown. */
 export function currencySymbol(locale: string, money?: Money): string {

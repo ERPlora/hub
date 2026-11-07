@@ -213,7 +213,7 @@ def test_the_system_alone_receives_the_accounts_photo():
 def test_the_homes_step_is_the_old_set_up_verifactu_on_the_way_to_production():
     """«Set up VeriFactu»: done once the chosen way could carry the records to the AEAT of production (ERPlora's with
     the signed authorisation approved, or the business's own valid certificate), read from the configuration's own
-    query; whoever configures VeriFactu sets it up in Configuration."""
+    query; whoever configures VeriFactu sets it up in Configuration. Only a business in Spain is asked (hub#682)."""
     (step,) = verifactu().setup
     assert isinstance(step, SetupStep)
     assert (
@@ -234,7 +234,7 @@ def test_the_homes_step_is_the_old_set_up_verifactu_on_the_way_to_production():
         "/verifactu/config",
         "verifactu.configure",
         "ion:shield-checkmark-outline",
-        [],
+        ["ES"],
         None,
     )
     assert "route_ready_for_production" in registry_output("verifactu.config.get")

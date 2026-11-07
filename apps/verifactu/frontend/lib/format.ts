@@ -1,7 +1,8 @@
 // Numbers and days of the VeriFactu screens: the server keeps money in signed cents, quantities and rates as
 // decimal strings and days as `YYYY-MM-DD`; a person reads them in the page's language and types euros.
 // Until `@erplora/ui/components/format` has money and number formatters (UI-REQUESTS.md), this is the one
-// place the app turns them into text (`Intl`) and euros into cents.
+// place the app turns them into text (`Intl`) and euros into cents. No screen of the app writes a quantity: where
+// one is shown, it is the platform's `formatQuantity` of `@erplora/ui/components` (hub#974).
 
 const CURRENCY = 'EUR';
 const FALLBACK_LOCALE = 'en';
@@ -59,11 +60,6 @@ export function formatUnitPrice(cents: string | number | null | undefined, local
 export function formatPercent(value: string | number | null | undefined, locale: string): string {
   if (missing(value)) return '—';
   return numberFormat(locale, 'percent', { style: 'percent', maximumFractionDigits: 2 }).format(Number(value) / 100);
-}
-
-/** A quantity with the decimals it has («2.000» → «2», «0.532» → «0,532»), its sign included. */
-export function formatQuantity(value: string | number, locale: string): string {
-  return numberFormat(locale, 'quantity', { maximumFractionDigits: 3 }).format(Number(value));
 }
 
 /** A calendar day («2026-09-29» → «29/9/2026» in Spanish), built from its parts and formatted in UTC so no

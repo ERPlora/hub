@@ -31,7 +31,7 @@ from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import Conflict, NotFound
-from live.operations import operation
+from live.operations import INTERNAL, operation
 
 from apps.kitchen.models import (
     CategoryRoute,
@@ -52,6 +52,8 @@ from apps.kitchen.schemas import (
     BoardIn,
     BoardOut,
     ByOrderIn,
+    ItemOut,
+    ItemRefIn,
     LogListIn,
     LogPage,
     NoIn,
@@ -59,7 +61,9 @@ from apps.kitchen.schemas import (
     RoutingPage,
     SettingsOut,
     StationListIn,
+    StationOut,
     StationPage,
+    StationRefIn,
     TicketListIn,
     TicketOut,
     TicketPage,
@@ -75,6 +79,7 @@ TICKET_AMBIGUOUS = _(
     "“%(said)s” matches several tickets: %(names)s. Say which one by its number."
 )
 STATION_NOT_FOUND = _("That station does not exist in this business.")
+DISH_NOT_FOUND = _("That dish is on no kitchen ticket of this business.")
 STATION_AMBIGUOUS = _("“%(said)s” matches several stations: %(names)s. Say which one.")
 
 IN_FLIGHT = (TicketStatus.PENDING, TicketStatus.PREPARING, TicketStatus.READY)
@@ -1185,6 +1190,38 @@ def get_ticket(ctx: OperationContext, params: TicketRefIn) -> dict:
     return ticket_out(find_ticket_view(params, current_settings()))
 
 
+def find_dish(item_id: UUID, settings: KitchenSettings) -> ItemView:
+    """A dish by its id: of a saved ticket, or of a round not saved yet (the board shows it already and its dishes keep
+    their ids once saved), as Sales left it."""
+    ticket_id = (
+        TicketItem.objects.filter(pk=item_id, ticket__is_deleted=False)
+        .values_list("ticket_id", flat=True)
+        .first()
+    )
+    if ticket_id is not None:
+        views = saved_views(Ticket.objects.filter(pk=ticket_id).prefetch_related("items"))
+    else:
+        views = unsaved_views(settings)
+    holder = next((view for view in views if any(item.id == item_id for item in view.items)), None)
+    if holder is None:
+        raise NotFound(str(DISH_NOT_FOUND), code="kitchen.item_not_found")
+    return next(item for item in effective(holder, settings)[0].items if item.id == item_id)
+
+
+@operation(
+    "kitchen.item.get",
+    kind="query",
+    permission="kitchen.view_ticket",
+    input=ItemRefIn,
+    output=ItemOut,
+    ai=INTERNAL,
+)
+def get_item(ctx: OperationContext, params: ItemRefIn) -> dict:
+    """One dish by its id, for the assistant's card (``schemas.A_DISH``): the screens and the model read the dishes with
+    their ticket, so it is no tool of the assistant nor a route of the API."""
+    return item_out(find_dish(params.id, current_settings()), station_map())
+
+
 @operation(
     "kitchen.ticket.by_order",
     kind="query",
@@ -1289,6 +1326,25 @@ def list_stations(ctx: OperationContext, params: StationListIn) -> dict:
         "limit": params.limit,
         "offset": params.offset,
     }
+
+
+@operation(
+    "kitchen.station.get",
+    kind="query",
+    permission="kitchen.view_ticket",
+    input=StationRefIn,
+    output=StationOut,
+    ai=INTERNAL,
+)
+def get_station(ctx: OperationContext, params: StationRefIn) -> dict:
+    """One station by its id or its name, for the assistant's card (``schemas.A_STATION``): the screens and the model read
+    the stations from their list, so it is no tool of the assistant nor a route of the API."""
+    station = find_station(params.station_id, params.station)
+    routes = (
+        ProductRoute.objects.filter(station=station, product__is_deleted=False).count()
+        + CategoryRoute.objects.filter(station=station, category__is_deleted=False).count()
+    )
+    return station_row(station, in_progress_by_station(current_settings()).get(station.id, 0), routes)
 
 
 @operation(

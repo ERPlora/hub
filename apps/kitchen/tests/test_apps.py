@@ -93,14 +93,23 @@ def test_navigation_is_the_four_sections_of_the_old_module_with_registered_icons
     ]
 
 
+#: The reads that are no assistant tool: what names a station and a dish on the assistant's card (hub#671); the
+#: model reads the stations from their list and the dishes with their ticket.
+INTERNAL_READS = {"kitchen.station.get", "kitchen.item.get"}
+
+
 def test_every_operation_is_a_tool_of_the_assistant():
     # The assistant uses the app by voice and text with the user's own session: the operation's
     # permission is its only door. A command says its risk; a read has none.
-    from live.operations import registry
+    from live.operations import INTERNAL, registry
 
     operations = [op for name, op in registry.items() if name.startswith("kitchen.")]
-    assert len(operations) == 29
+    assert len(operations) == 31
+    assert {op.name for op in operations if op.ai is INTERNAL} == INTERNAL_READS
     for op in operations:
+        if op.name in INTERNAL_READS:
+            assert (op.kind, op.expose_api) == ("query", False), op.name
+            continue
         assert isinstance(op.ai, dict) and op.ai.get("description"), op.name
         expected = {"description", "risk"} if op.kind == "command" else {"description"}
         assert set(op.ai) == expected, op.name

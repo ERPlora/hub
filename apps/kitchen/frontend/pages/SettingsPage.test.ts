@@ -6,6 +6,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { SETTINGS } from '../__tests__/kitchen';
+import { pressEnter } from '../../../../base/frontend/__tests__/settings-form';
 import { click, EMPLOYEE, errorFrame, flush, ionChecked, ionValue, type MountOptions, mountKitchen } from '../__tests__/mount-kitchen';
 import SettingsPage from './SettingsPage.vue';
 
@@ -55,6 +56,10 @@ describe('SettingsPage', () => {
       { method: 'POST', path: '/api/kitchen/settings', query: {}, body: { print_pass: true, warning_minutes: 10, sound_tone: 'buzzer' } },
     ]);
     expect(s.field('saved')?.textContent).toContain('Settings saved.');
+    // Enter in a field submits the form (Ionic puts a hidden submit button in it): the same save as «Save».
+    await ionValue(s.field('critical_minutes'), '40', 'ionInput');
+    await pressEnter(s.inDoc('kitchen-settings'));
+    expect(s.sent().at(-1)?.body).toEqual({ critical_minutes: 40 });
   });
 
   it('a refusal goes under its field', async () => {
@@ -65,6 +70,7 @@ describe('SettingsPage', () => {
     await ionValue(s.field('warning_minutes'), '40', 'ionInput');
     await click(s.field('save'));
     expect(s.field('warning_minutes').errorText).toBe(message);
+    expect(s.field('save-error')?.textContent).toContain('Could not save the settings.');
     expect(s.field('save-error')?.textContent).toContain(message);
   });
 

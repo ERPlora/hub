@@ -4,7 +4,6 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  decimalMark,
   formatDate,
   formatMoney,
   formatPercent,
@@ -55,14 +54,15 @@ describe('format', () => {
     expect(formatMoney(123456, 'en', EUR)).toBe('€1,234.56');
   });
 
-  it('knows the decimal mark of the page language', () => {
-    expect([decimalMark('es'), decimalMark('en')]).toEqual([',', '.']);
-  });
-
   it('paints a quantity without its trailing zeros', () => {
     expect(formatQuantity('10.000', 'es')).toBe('10');
     expect(formatQuantity('0.500', 'es')).toBe('0,5');
     expect(formatQuantity('1234.250', 'en')).toBe('1,234.25');
+  });
+
+  // hub#974: a tier's minimum quantity reads as the till writes the line it applies to.
+  it('groups a minimum quantity of four digits in Spanish too', () => {
+    expect(formatQuantity('1500.000', 'es')).toBe('1.500');
   });
 
   it('paints a percent with up to two decimals', () => {

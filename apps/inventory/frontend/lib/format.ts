@@ -3,42 +3,33 @@
 // (`useBusinessMoney`: its country's currency and the decimals the server counts it in, never the browser's: Intl
 // gives the forint none), written with the platform's `formatMoney`: its thousands grouped from four digits on, as
 // every screen writes them; while it is unknown, a figure without a symbol, never the euro by default. Quantities are
-// exact decimals from the API («2.500», at most three decimals): painted ungrouped and without trailing zeros, as
-// the server's CSV writes them (queries.quantity_text).
+// exact decimals from the API («2.500», at most three decimals), written with the platform's `formatQuantity`: without
+// trailing zeros and grouped from four digits on («12.500»), as the till and the invoice write them (hub#974).
+import { formatQuantity } from '@erplora/ui/components';
+
 import type { Money } from '../../../../base/frontend/lib/home';
 
 export type { Money };
 export { formatMoney, useBusinessMoney } from '../../../../base/frontend/lib/money';
+export { formatQuantity };
 
 const NO_MONEY_DECIMALS = 2;
 
 const formats = new Map<string, Intl.NumberFormat>();
-const decimalMarks = new Map<string, string>();
 
 /** The decimals of `money` (2 in EUR and HUF, 0 in JPY): its minor unit; two while unknown. */
 export const moneyDecimals = (money?: Money): number => money?.decimals ?? NO_MONEY_DECIMALS;
 
-function numberFormat(locale: string, kind: 'count' | 'quantity' | 'percent'): Intl.NumberFormat {
+function numberFormat(locale: string, kind: 'count' | 'percent'): Intl.NumberFormat {
   const key = `${locale}|${kind}`;
   let found = formats.get(key);
   if (!found) {
     const options: Record<typeof kind, Intl.NumberFormatOptions> = {
       count: {},
-      quantity: { maximumFractionDigits: 3, useGrouping: false },
       percent: { style: 'percent', maximumFractionDigits: 2 },
     };
     found = new Intl.NumberFormat(locale, options[kind]);
     formats.set(key, found);
-  }
-  return found;
-}
-
-/** The decimal mark of `locale` («,» in Spanish, «.» in English). */
-export function decimalMark(locale: string): string {
-  let found = decimalMarks.get(locale);
-  if (!found) {
-    found = new Intl.NumberFormat(locale).formatToParts(1.5).find((part) => part.type === 'decimal')?.value ?? '.';
-    decimalMarks.set(locale, found);
   }
   return found;
 }
@@ -48,15 +39,7 @@ export function formatCount(value: number, locale: string): string {
   return numberFormat(locale, 'count').format(value);
 }
 
-/** An exact decimal as the person reads it: «2.500» → «2,5» (es), «3.000» → «3»; a non-figure as it came. */
-export function formatQuantity(value: string | number, locale: string): string {
-  const text = String(value).trim();
-  if (!/^-?\d+(\.\d+)?$/.test(text)) return text;
-  // `+ 0` turns a negative zero («-0.000») into 0.
-  return numberFormat(locale, 'quantity').format(Number(text) + 0);
-}
-
-/** A movement's quantity with its sign: «+2» in, «-1,5» out, «0». */
+/** A movement's quantity with its sign: «+2» in, «-1,5» out, «0», «+1.500». */
 export function formatSignedQuantity(value: string | number, locale: string): string {
   const painted = formatQuantity(value, locale);
   return /^\d/.test(painted) && painted !== '0' ? `+${painted}` : painted;

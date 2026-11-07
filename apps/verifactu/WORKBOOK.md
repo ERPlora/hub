@@ -79,7 +79,9 @@ Aquí la referencia no es un competidor: es la norma de la AEAT.
   venta: en pruebas se vende igual) y solo lo ve quien configura VeriFactu. En producción (VERIFACTU-F08), si la vía
   se pierde (se revoca la autorización, o el certificado caduca o se quita), lleva «Necesario para facturar» y sale
   la franja «Todavía no puedes facturar» encima de las demás pantallas, porque cada venta nueva se rechaza; lo ve
-  todo el equipo, y a quien no configura VeriFactu le dice «Esto lo tiene que configurar un administrador.».
+  todo el equipo, y a quien no configura VeriFactu le dice «Esto lo tiene que configurar un administrador.». Solo
+  se lo pide a un negocio de España; uno sin país (una demo) cuenta como España, y uno de otro país no lo ve nunca,
+  ni en pruebas ni en producción (hub#682).
 - **Los datos del productor del software** (ERPlora) van fijos en cada registro (los declara su declaración
   responsable), también «Da servicio a varios obligados», siempre «S» (contradicción 7, cerrada).
 
@@ -263,7 +265,7 @@ Avisos de la pantalla: el resultado de cada acción en una franja arriba (verde 
 
 ### VERIFACTU-F01 Activar VeriFactu
 <!-- origen: old-hub:HUB-F300 old:verifactu/workflow/configuracion.md#verifactu-f01 -->
-Estado: hecho — encender la app en el Hub es activarla (la activación por hub llega con la fase 2); fuera de España, Apps no la ofrece y el hub la niega (`can_enable`, hub#694), y una ya encendida no registra ni envía nada (FIX-HUB-VERIFACTU-ON-FOR-A-BUSINESS-OUTSIDE-SPAIN)
+Estado: hecho — encender la app en el Hub es activarla (la activación por hub llega con la fase 2); fuera de España, Apps no la ofrece y el hub la niega (`can_enable`, hub#694), una ya encendida no registra ni envía nada (FIX-HUB-VERIFACTU-ON-FOR-A-BUSINESS-OUTSIDE-SPAIN) y el Inicio no le pide «Configura VeriFactu» (hub#682)
 Actor: administrador
 Pantalla: Hub: Apps
 Pasos:
@@ -276,6 +278,8 @@ Pasos:
    lo demás y queda completa, sin «Reintentar», diciendo por qué VeriFactu se queda fuera.
 4. Si ya estaba encendida en un negocio de otro país, no hace nada y se puede desactivar: las facturas salen sin registro ni QR, **VeriFactu → Ajustes** y **VeriFactu → Configuración** dicen
    arriba «VeriFactu solo es para negocios de España.» sin ofrecer nada que lleve a la AEAT, y lo que pida registrar o enviar algo contesta lo mismo.
+   «Termina de configurar tu negocio», en el Inicio, no le pide «Configura VeriFactu» ni la franja «Todavía no puedes
+   facturar» sale por ella; un negocio sin país (una demo) cuenta como España y sí lo ve (hub#682).
 Entra: nada más que la orden.
 Sale: la app activa; sin interruptor propio.
 Si falla: lo dice la página de apps del Hub.
@@ -1133,7 +1137,9 @@ para facturar» donde `environment` de su fila es `production`, por `LEGAL_IN_PR
 es de `base`), sobre `verifactu.config.get` con `route_ready_for_production` (`not _route_sending_problem(config,
 production, scope)`: vía propia con certificado vigente que este servidor abre, o vía ERPlora con el otorgamiento
 aprobado; la exención del hub de ERPlora incluida; lo que le falte al servidor no cuenta, no es tarea del negocio),
-permiso `verifactu.configure`, ruta `/verifactu/config`, `refresh_on` `verifactu.config.changed`. **Paneles** (permiso
+permiso `verifactu.configure`, ruta `/verifactu/config`, `refresh_on` `verifactu.config.changed`, `countries`
+`(SPAIN,)` (`apps.py`; hub#682: un negocio de otro país no lo ve, ni su muro en producción; uno sin país cuenta como
+España por `base.business.country_or_market`, que también lee `queries.outside_spain`: una sola regla). **Paneles** (permiso
 `verifactu.view_record`, `refresh_on` = lo que `live.py` re-ejecuta): `pending` (kpi de
 `verifactu.stats.compliance_summary.pending_count`, de serie), `contingency` (stat de `contingency_summary`,
 `queued_count` y `severity`), `by_status` (bar-list de `records_by_status`) y `events` (componente
@@ -1479,10 +1485,10 @@ Las cerradas quedan tachadas con su motivo; las abiertas dicen dónde siguen.
    ronda 2026-10-22b): PLAN §30 deja el interruptor en vivo fijo cuando se **envía** la primera factura a la AEAT;
    `verifactu.config.back_to_testing` ya se niega (409 `verifactu.production_has_records`) en cuanto hay un registro
    **sellado** en producción (VERIFACTU-F09, Decisión 9), más estricto que la regla.
-13. **Un hub sin país** — **sigue abierta, va con FIX-VERIFACTU-SETUP-STEP-SHOWN-OUTSIDE-SPAIN** (`hub:base,verifactu`):
-   esta app cuenta un hub sin país (demos, el hub de ERPlora) como España, el mercado de ERPlora
-   (`queries.business_country`, Decisión 15); `base.home.applies_to_country` hace lo contrario («un hub sin país no
-   recibe pasos nacionales», como el hub viejo). La ronda que la zanje es de `base`.
+13. **Un hub sin país** — **cerrada por hub#682**: esta app cuenta un hub sin país (demos, el hub de ERPlora) como
+   España, el mercado de ERPlora (`queries.business_country`, Decisión 15), y `base.home.applies_to_country` ya hace
+   lo mismo: las dos leen el país con `base.business.country_or_market` (sin país, `MARKET_COUNTRY`, España). Invierte
+   la regla del hub viejo («un hub sin país no recibe pasos nacionales»); la ronda de PLAN-HUB va propuesta en la PR.
 
 ### Decisiones (dudas abiertas del producto actual)
 
@@ -1625,9 +1631,8 @@ Del bloque fiscal del 2026-10-15 (el resto, en PLAN-HUB §8, «Bloque fiscal: lo
 
 Al cerrar la app (CLOSE-VERIFACTU, 2026-10-27), lo que sigue en la cola fuera de su carril:
 
-- **El paso «Configura VeriFactu» del Inicio fuera de España** (FIX-VERIFACTU-SETUP-STEP-SHOWN-OUTSIDE-SPAIN,
-  `hub:base,verifactu`): un negocio de otro país aún lo ve en «Termina de configurar tu negocio»; el arreglo limpio
-  necesita `base` (un hub sin país, contradicción 13).
+- ~~**El paso «Configura VeriFactu» del Inicio fuera de España**~~ (FIX-VERIFACTU-SETUP-STEP-SHOWN-OUTSIDE-SPAIN) —
+  **cerrada** por hub#682: `countries=(SPAIN,)` en el paso y un hub sin país como España en `base` (contradicción 13).
 - ~~**Que Apps no deje encender VeriFactu fuera de España**~~ (FIX-HUB-APPS-ENABLE-REFUSED-OUTSIDE-ITS-COUNTRY) —
   **cerrada** por hub#694: el gancho `can_enable` de la plataforma (Decisión 15).
 - ~~**La autorización en pruebas**~~ (FIX-FISCAL-TESTING-AUTHORISATION-CONTRADICTION) — **cerrada el 2026-11-03**

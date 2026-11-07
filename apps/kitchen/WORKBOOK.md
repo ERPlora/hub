@@ -32,6 +32,14 @@ Cocina no sabe qué es una mesa ni un cliente: recibe una **etiqueta** («Mesa 4
 tarjeta dice el tipo: «En sala», «Para llevar», «A domicilio») que pinta e imprime tal cual. No cobra,
 no descuenta stock y no lleva recetas.
 
+Lo que se hace en sus pantallas se puede pedir también al asistente (por voz o por texto, con los permisos de quien
+habla). Antes de una acción, el asistente pide confirmar con su tarjeta (BASE-F97), que nombra cada registro como lo
+nombran las pantallas, nunca por su identificador: la comanda por su número («Comanda: 20261014-0012»), los platos uno
+a uno por su nombre («Platos: Hamburguesa, Tortilla»), la estación por su nombre («Estación: Plancha»), el producto y
+la categoría por su nombre, la cuenta del TPV por su título («Cuenta: Terraza 2») y cada línea de la ronda por su
+plato; el tipo de comanda y su prioridad, con sus palabras («Para llevar», «Urgente»). Lo que quien pregunta no puede
+ver, o lo que ya no existe, no sale.
+
 ## Referencia adoptada
 
 ERPlora no inventa flujos: adopta los que el mercado ya probó (contrastados en el producto actual el
@@ -818,6 +826,8 @@ Implicados: CASH_REGISTER-F08, CASH_REGISTER-F09, KITCHEN-F10, KITCHEN-F13
 | Una comanda por id, número o etiqueta («la mesa 4») | ver comandas | F21 | `kitchen.ticket.get` |
 | Las comandas de una cuenta de Ventas | ver comandas | F19 | `kitchen.ticket.by_order` |
 | Las estaciones, con lo que tienen en curso | ver comandas | F01–F03 | `kitchen.station.list` |
+| Una estación por su id o su nombre: lo que lee la tarjeta del asistente para nombrarla (BASE-F97); no es herramienta del asistente ni tiene ruta en la API | ver comandas | F02, F03, F04 | `kitchen.station.get` |
+| Un plato de una comanda por su id, guardada o recién enviada: lo que lee la tarjeta del asistente para nombrarlo (BASE-F97); no es herramienta del asistente ni tiene ruta en la API | ver comandas | F11, F12 | `kitchen.item.get` |
 | El enrutado de productos y categorías | ver comandas | F04 | `kitchen.routing.list` |
 | Los ajustes (los de fábrica si nunca se guardaron) | ver comandas | F26 | `kitchen.settings.get` |
 | El historial | ver el historial | F25 | `kitchen.log.list` |
@@ -930,7 +940,7 @@ que no tiene ningún papel: solo el sistema (`*`).
   fila de ajustes con la hora desde la que Cocina recibe, con reverso; `0003_ticket_printed_at`;
   `0004_item_options_and_menu`, los suplementos y el menú de cada plato), `schemas.py`, `queries.py`,
   `services.py`, `events.py`, `live.py`, `api.py` (27 rutas: todas las operaciones salvo `receive` y
-  `sync`, que son del sistema), `admin.py`, `locale/`, `frontend/` y un `tests/test_<fichero>.py` por
+  `sync`, que son del sistema, y las dos lecturas internas de la tarjeta del asistente), `admin.py`, `locale/`, `frontend/` y un `tests/test_<fichero>.py` por
   fichero, más `test_integration_sale.py`, `test_integration_inventory.py`, `test_integration_combo.py`,
   `test_integration_modifier.py` y `test_concurrency.py` con las apps reales.
 - **`requires = ["sale", "inventory"]`**. El enrutado apunta a `inventory.Product` y
@@ -986,6 +996,27 @@ que no tiene ningún papel: solo el sistema (`*`).
 - **Estación eliminada**: no se encuentra ni por id ni por nombre (`kitchen.station_not_found`) y ya no
   sale entre los botones; la pantalla que la recordaba vuelve a «Todas» en vez de quedarse vacía para
   siempre (eliminarla exige que no tenga platos por hacer ni enrutado, F03).
+- **Tarjeta de confirmación del asistente** (BASE-F97, hub#671): nombra el registro que una escritura señala por su
+  id con las marcas `refers` de `schemas.py`, leídas como quien pregunta: la comanda por su `number` con
+  `kitchen.ticket.get` (`A_TICKET`: el `ticket_id` de `TicketRefIn`, en todas las escrituras de comandas y platos),
+  cada plato por su `name` con `kitchen.item.get` (`A_DISH`: cada elemento de `item_ids`; lo busca en su comanda
+  guardada y, si aún no lo está, en las rondas por recibir), la estación por su `name` con `kitchen.station.get`
+  (`A_STATION`: el `station_id` de `StationRefIn` y de `RoutingSetIn`), el producto y la categoría por su `name` con
+  `inventory.product.get` e `inventory.category.get` (`A_PRODUCT`, `A_CATEGORY`), y la cuenta y cada línea de la
+  ronda con `sale.record.get` (`A_CHECK`: el `order_id` de `send` y `receive`, por su título o, sin él, su importe;
+  `A_CHECK_LINE`: el `order_item_id` de cada línea, por su plato). Los títulos ya salen con la palabra de las
+  pantallas por el `verbose_name` de la clave del modelo («Comanda», «Estación», «Cuenta», «Producto», «Categoría»)
+  y por `DISHES` («Platos»). El tipo de `send` y `receive` lleva `choices_of: order_type` (`OF_ORDER_TYPE`) y la
+  prioridad de `receive` es la lista cerrada de la comanda: la tarjeta los dice con las etiquetas de `Ticket`
+  («Para llevar», «Urgente»). Lo que Ventas manda se sigue leyendo antes (`_channel`, `_priority`): una palabra
+  desconocida cae a «En sala» y «Normal», y una ronda pedida sin prioridad queda «Normal» (antes llegaba vacía y
+  rompía la restricción `kitchen_ticket_priority`). Sin persona detrás, sin `kitchen.view_ticket`,
+  `inventory.view_product`, `inventory.view_category` o `sale.view_sale`, con un id de otro negocio o de algo
+  borrado, el registro queda fuera, nunca su id (`tests/test_assistant_card_records.py`); el trinquete de
+  `base/tests/test_assistant_card_values.py` impide que entre un dato sin marca o una lista sin etiqueta. Las dos
+  lecturas nuevas son internas (`ai=INTERNAL`, sin ruta ni consulta viva: el modelo lee las estaciones en su lista
+  y los platos con su comanda) y tienen su nombre en el catálogo de Automatizaciones. En el navegador,
+  `tests/e2e/kitchen-assistant-card.spec.ts` (la tarjeta en español e inglés, en tres tamaños), que borra lo suyo.
 - **Zona horaria**: la del hub (`base.business.business_zone`): día del número y horas del Historial.
 - **Millares**: los importes agrupan los millares también con cuatro cifras («1.234,56 €»; `formatMoney` de
   `@erplora/ui/components`, con `useGrouping: 'always'`, porque el CLDR del español espera a cinco: hub#655).

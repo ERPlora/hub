@@ -13,7 +13,7 @@ import { computed } from 'vue';
 import type { OrderLineOut } from '../../operations';
 import { useLocale, useT } from '../../composables/useT';
 import { dishLabel } from '../../lib/comboChoice';
-import { formatMoney, formatPercent, formatQuantity, useBusinessMoney } from '../../lib/format';
+import { formatMoney, formatPercent, formatQuantity, quantityWithUnit, useBusinessMoney } from '../../lib/format';
 import QtyStepper from './QtyStepper.vue';
 
 const props = defineProps<{
@@ -48,10 +48,10 @@ const discounted = computed(() => Number(props.line.discount_percent) > 0);
 const price = computed(() => {
   const money = formatMoney(props.line.unit_price, locale.value, business.value);
   if (props.line.pricing_unit === 'ud') return money;
-  const per = Number(props.line.price_quantity) === 1 ? props.line.pricing_unit : formatQuantity(props.line.price_quantity, props.line.pricing_unit, locale.value);
+  const per = Number(props.line.price_quantity) === 1 ? props.line.pricing_unit : quantityWithUnit(props.line.price_quantity, props.line.pricing_unit, locale.value);
   return `${money} / ${per}`;
 });
-const quantity = computed(() => formatQuantity(props.line.quantity, 'ud', locale.value));
+const quantity = computed(() => formatQuantity(props.line.quantity, locale.value));
 const staffLabel = computed(() => props.staffName ?? t('sale.pos.staffAssigned'));
 
 function onRow(): void {
