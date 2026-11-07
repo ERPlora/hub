@@ -91,6 +91,7 @@ async function save(): Promise<void> {
         <div class="schedule-exception-form__pair">
           <ion-input
             data-testid="schedule-override-form-start_date"
+            name="start_date"
             type="date"
             :value="startDate"
             :label="$t('schedule.overrides.form.from')"
@@ -103,6 +104,7 @@ async function save(): Promise<void> {
           />
           <ion-input
             data-testid="schedule-override-form-end_date"
+            name="end_date"
             type="date"
             :value="endDate"
             :label="$t('schedule.overrides.form.to')"
@@ -116,6 +118,7 @@ async function save(): Promise<void> {
         </div>
         <ion-input
           data-testid="schedule-override-form-reason"
+          name="reason"
           :value="reason"
           :label="$t('schedule.overrides.form.reason')"
           label-placement="floating"

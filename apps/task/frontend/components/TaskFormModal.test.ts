@@ -6,6 +6,7 @@
 import { Combo } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
+import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import type { TaskOut } from '../operations';
 import { click, ionValue, mountTask, settle } from '../__tests__/mount-task';
 import TaskFormModal from './TaskFormModal.vue';
@@ -169,4 +170,15 @@ describe('TaskFormModal: Editing task — {number}', () => {
       'Sin proyecto',
     ]);
   });
+});
+
+describe('TaskFormModal: fields refused with the same words (hub#888)', () => {
+  // A new task's fields, each refused under its own key. Assigned to and Project are Combos, which hub#888 leaves for
+  // @erplora/ui: a Combo does not hand its name to the field FormModal reads.
+  itTellsTheCorrectedFieldApart(['title', 'description', 'priority', 'due_date', 'tags'], async (locale, refusal) => {
+    const s = await setup(null, locale);
+    await ionValue(s.field('title'), 'Mop', 'ionInput');
+    s.answer(422, refusal);
+    return { field: s.field, send: () => click(s.save()), settle };
+  }, 'priority');
 });

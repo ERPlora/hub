@@ -226,6 +226,7 @@ async function save(): Promise<void> {
       >
         <ion-input
           data-testid="staff-member-form-first_name"
+          name="first_name"
           data-field
           :value="form.first_name"
           :label="$t('staff.members.form.firstName')"
@@ -240,6 +241,7 @@ async function save(): Promise<void> {
         />
         <ion-input
           data-testid="staff-member-form-last_name"
+          name="last_name"
           data-field
           :value="form.last_name"
           :label="$t('staff.members.form.lastName')"
@@ -254,6 +256,7 @@ async function save(): Promise<void> {
         />
         <ion-input
           data-testid="staff-member-form-email"
+          name="email"
           data-field
           type="email"
           :value="form.email"
@@ -268,6 +271,7 @@ async function save(): Promise<void> {
         />
         <ion-input
           data-testid="staff-member-form-phone"
+          name="phone"
           data-field
           type="tel"
           :value="form.phone"
@@ -282,6 +286,7 @@ async function save(): Promise<void> {
         />
         <ion-input
           data-testid="staff-member-form-employee_number"
+          name="employee_number"
           data-field
           :value="form.employee_number"
           :label="$t('staff.members.form.employeeNumber')"
@@ -326,6 +331,7 @@ async function save(): Promise<void> {
           <ion-select
             v-if="editing"
             data-testid="staff-member-form-status"
+            name="status"
             data-field
             :value="form.status"
             :label="$t('staff.members.form.status')"
@@ -357,6 +363,7 @@ async function save(): Promise<void> {
           </ion-toggle>
           <ion-input
             data-testid="staff-member-form-booking_buffer"
+            name="booking_buffer"
             data-field
             type="number"
             inputmode="numeric"
@@ -373,6 +380,7 @@ async function save(): Promise<void> {
           />
           <ion-input
             data-testid="staff-member-form-hire_date"
+            name="hire_date"
             data-field
             type="date"
             :value="form.hire_date"
@@ -386,6 +394,7 @@ async function save(): Promise<void> {
           />
           <ion-input
             data-testid="staff-member-form-color"
+            name="color"
             data-field
             :value="form.color"
             :label="$t('staff.members.form.color')"
@@ -411,6 +420,7 @@ async function save(): Promise<void> {
           </ion-input>
           <ion-input
             data-testid="staff-member-form-specialties"
+            name="specialties"
             data-field
             :value="form.specialties"
             :label="$t('staff.members.form.specialties')"
@@ -423,6 +433,7 @@ async function save(): Promise<void> {
           />
           <ion-textarea
             data-testid="staff-member-form-bio"
+            name="bio"
             data-field
             class="staff-form__wide"
             :value="form.bio"
@@ -444,6 +455,7 @@ async function save(): Promise<void> {
         >
           <ion-input
             data-testid="staff-member-form-hourly_rate"
+            name="hourly_rate"
             data-field
             inputmode="decimal"
             :value="form.hourly_rate"
@@ -466,6 +478,7 @@ async function save(): Promise<void> {
           </ion-input>
           <ion-input
             data-testid="staff-member-form-commission_rate"
+            name="commission_rate"
             data-field
             type="number"
             inputmode="decimal"
@@ -483,6 +496,7 @@ async function save(): Promise<void> {
           />
           <ion-textarea
             data-testid="staff-member-form-notes"
+            name="notes"
             data-field
             class="staff-form__wide"
             :value="form.notes"
