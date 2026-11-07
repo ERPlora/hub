@@ -31,11 +31,9 @@ from base.tests.test_locale_platform import PLATFORM, catalogue
 SPANISH = Path("locale", "es", "LC_MESSAGES", "django.mo")
 
 #: The messages each module says (in its catalogue or only in its code) and Spanish shows in another app's words, by
-#: module. Only ever lower: a module
-#: that gives such a text its own context (or the earlier wording) lowers its number here, and none comes in.
-SHADOWED = {
-    "verifactu": 7,
-}
+#: module. Only ever lower: a module that gave such a text its own context (or the earlier wording) left this count,
+#: and none comes in. Empty since VeriFactu's left (hub#591): a case here is a new one.
+SHADOWED: dict[str, int] = {}
 
 
 def spoken() -> list[tuple[str, str, str, str, str]]:
