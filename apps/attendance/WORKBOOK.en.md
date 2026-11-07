@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:83041994b081d39749ab6067626e9b26248623e068f3446daeb2f52870cce247 -->
+<!-- generated from WORKBOOK.md sha256:516ec5f1afaf979effc32acf23f745e373ddb3343edc4624b5a633538dc3e531 -->
 
 ## What it is for and who it is for
 
@@ -291,8 +291,9 @@ working day of this person." (touching is not overlapping: a working day can sta
 previous one ended); "That person already has another open working day: this one cannot be reopened.";
 a future time, "The time cannot be in the future."; without a reason, "Write a reason of at least 3
 characters.". If the business's time zone cannot be read, "The business's time zone could not be read, so this
-correction cannot be saved yet. Reload the page to try again.", with the button off. A refused correction
-changes nothing and leaves no trace. "Correct" only shows to whoever can correct.
+correction cannot be saved yet. Reload the page to try again.", with the button off. Each reason of a field
+shows under it and goes away as soon as that field is corrected, even if another one says the same
+(hub#888). A refused correction changes nothing and leaves no trace. "Correct" only shows to whoever can correct.
 Involved: ATTENDANCE-F05, ATTENDANCE-F09, ATTENDANCE-F11
 
 ### ATTENDANCE-F09 See who changed a working day, when and why

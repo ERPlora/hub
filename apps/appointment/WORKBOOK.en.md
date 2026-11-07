@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:53ed27be3d0ef60d7f063a8d24a719bd5cd6c8e6410a308236389778f442328e -->
+<!-- generated from WORKBOOK.md sha256:21e16bd9a7a00dc6bd284ebf7a500e4ccf2ae5d812532ed3fe26885fa008ee5b -->
 
 ## What it is for and who it is for
 
@@ -137,7 +137,7 @@ first).
 |---|---|
 | Loading | "Loading…" while the first result arrives; under Services and Professional, "Loading services…" / "Loading professionals…". |
 | Empty | "No appointments for this day.", "No repeating appointments yet."; with no bookable professionals, "No bookable professionals yet."; in the new appointment, "There are no bookable services yet. Add them in Services.". |
-| Error | The notice of the table or the grid with "Retry". A refusal of a form shows inside the form, each reason under its field, without losing what was typed; a conflict (409) shows above the button and in a notice. |
+| Error | The notice of the table or the grid with "Retry". A refusal of a form shows inside the form, each reason under its field, without losing what was typed, and each refused field loses its reason as soon as that field is corrected, even if another one says the same (hub#888); the pickers (**Services** and **Professional**) not yet: if they say the same as another field, they stay marked until the next save. A conflict (409) shows above the button and in a notice. |
 | Reconnecting | What is painted stays; a strip warns "Reconnecting…". |
 | App inactive | "This app is not active in this business". |
 | No permission | What they cannot do does not appear; if it arrives through another door, "You do not have permission". |
