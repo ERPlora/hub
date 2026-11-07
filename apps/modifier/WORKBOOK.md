@@ -216,7 +216,9 @@ defecto.
 Sale: la opción (avisa: opción creada, cambiada o borrada). Borrarla la retira del catálogo: lo ya
 pedido conserva su copia congelada, también en la comanda.
 Si falla: «Crear» y «Guardar» están en gris mientras falte el nombre y mientras el negocio no haya dicho
-todavía su moneda, porque el suplemento se lee en ella (sin ella, «150» yenes se guardaría como 15 000). Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
+todavía su moneda, porque el suplemento se lee en ella (sin ella, «150» yenes se guardaría como 15 000); hasta
+entonces, salir del suplemento lo deja como se escribió, sin inventarle decimales ni juzgarlo: «¥150» o «-0,50 zł» no
+salen en rojo como «Esto no es un importe», y en cuanto llega la moneda se leen en ella (hub#945). Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
 motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, el botón se enciende (hub#938). Un
 nombre vacío o repetido en el grupo, un suplemento que no es un importe, una categoría
 fiscal que no existe en Impuestos o más opciones por defecto que el máximo salen junto a su campo. Una
@@ -496,7 +498,7 @@ cajero del producto actual es un empleado.
 
 - **Páginas** (`frontend/`): `pages/GroupsPage.vue` (la tabla, `useLiveList` en ventanas de hasta 100),
   `components/GroupSheet.vue` (la hoja: `modifier.group.get` vivo y dos `useSheetList` de 20 en 20),
-  `GroupFormModal`, `OptionFormModal` (con `MoneyInput` con signo y el `Combo` de Impuestos),
+  `GroupFormModal`, `OptionFormModal` (con el `MoneyInput` de `@erplora/ui` con signo, `signed`, y el `Combo` de Impuestos),
   `LinkFormModal` (Producto o Categoría, `Combo` sobre las listas de Inventario), `PageNotices`; las
   búsquedas de los `Combo` llaman a las operaciones de Inventario e Impuestos (`lib/pickers.ts`), nunca
   a sus modelos. Icono: `lucide:sliders-horizontal` (el `options-outline` de antes, pedido en

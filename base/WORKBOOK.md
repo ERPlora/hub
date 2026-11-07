@@ -1073,7 +1073,9 @@ Pasos:
      plan no incluye, dice «Esta app está desactivada en tu negocio: no se cargará nada suyo.» y una que este
      negocio no tiene, «Este negocio no tiene esta app: no se cargará nada suyo.». Los clientes de
      una plantilla se quedan fuera: «Datos personales: solo se cargan desde una copia de seguridad.». Lo que
-     el Hub nunca carga (personas, PIN, datos fiscales) sale en «Nunca se carga aquí».
+     el Hub nunca carga (personas, PIN, datos fiscales) sale en «Nunca se carga aquí». Ninguna plantilla del
+     catálogo trae VeriFactu, tampoco en España: no sale en la revisión y la carga no la activa, porque ata el negocio
+     a la AEAT y la activa el dueño desde Apps (VERIFACTU-F01).
   3. Desmarca las apps que no quiera y pulsa «Importar» («Importando…»), o «Elegir otro» para volver.
   4. Al terminar sale el informe (BASE-F32). Lo que ya había en el negocio se queda como estaba: no se
      duplica ni se sobrescribe. Si una app de la plantilla aún se está preparando (BASE-F22), lo suyo entra solo en
@@ -1089,7 +1091,7 @@ puede cargarse en tu negocio: ninguna de sus apps se puede activar aquí.». Una
 tope de apps del plan, una app que el plan no incluye) se queda desactivada, no carga nada y el informe dice
 por qué; el resto se carga. Un fichero no se guarda: si una de sus apps aún se está preparando, su fila dice «Se está
 preparando para este negocio. Vuelve a subir el archivo dentro de un minuto para traer sus datos.».
-Implicados: BASE-F22, INVENTORY-F12
+Implicados: BASE-F22, INVENTORY-F12, VERIFACTU-F01
 
 ### BASE-F32 Leer el informe de la importación
 <!-- origen: old-hub:HUB_SHELL-F178 -->
@@ -1268,7 +1270,8 @@ Pasos:
      que resolvió la plantilla y los paneles se refrescan. Igual tras cargar una plantilla o un fichero desde
      «Datos y copias».
 Entra: las plantillas y si el negocio todavía está vacío.
-Sale: lo que trae la plantilla, como en BASE-F31 (`base.blueprint.imported`).
+Sale: lo que trae la plantilla, como en BASE-F31 (`base.blueprint.imported`): VeriFactu se queda desactivada
+(VERIFACTU-F01).
 Si falla: si no entró todo, «No todo ha entrado» con «Estas no han entrado: {apps}.» (o «Hay algo más que
 no ha entrado.») y «Ver el informe»; si una app no se ha podido preparar, «Una app aún no se ha podido preparar» con
 «Se sigue intentando sola y sus datos se cargarán cuando lo consiga: {apps}. En el informe puedes reintentarlo
@@ -1277,7 +1280,7 @@ cambiado nada en tu negocio: {reason}» e «Intentar otra vez»; si se cortó a 
 terminado» con «Puede que parte ya esté dentro. Compruébalo en Ajustes › Datos antes de volver a
 intentarlo.» y «Ver el informe», sin reintento. Si las plantillas no se pueden leer, «No se han podido
 cargar las plantillas para empezar.» con «Reintentar» y «Ahora no».
-Implicados: BASE-F01, INVENTORY-F12
+Implicados: BASE-F01, INVENTORY-F12, VERIFACTU-F01
 
 ### BASE-F39 Abrir Sistema y moverse por sus pestañas
 <!-- origen: old-hub:HUB_SHELL-F135 -->

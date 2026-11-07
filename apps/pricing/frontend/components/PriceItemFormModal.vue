@@ -4,17 +4,15 @@
 // person does); «Add» needs an article and a price. A row's Edit opens «Editing price — {name}» with its
 // quantity and price, and «Save» sends only what changed. Refusals stay in the dialog, under their field.
 // The price is typed in the list's `currency`; the catalog prices beside the articles, in the business's.
-import { Combo, type ComboOption, FormModal } from '@erplora/ui/components';
+import { Combo, type ComboOption, FormModal, MoneyInput, moneyFieldText, parseMoney } from '@erplora/ui/components';
 import { useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { IonInput, IonLabel, IonSegment, IonSegmentButton } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
 import { useLocale, useT } from '../composables/useT';
 import { listMoney, quantityFieldText, readDecimal, useBusinessMoney } from '../lib/format';
-import { moneyFieldText, parseMoney } from '../lib/money';
 import { searchProducts, searchServices } from '../lib/pickers';
 import type { Kind, PriceItemIn, PriceItemOut, PriceItemPatchIn } from '../operations';
-import MoneyInput from './MoneyInput.vue';
 
 const props = withDefaults(defineProps<{ priceListId: string; currency?: string; item?: PriceItemOut | null }>(), {
   currency: undefined,
@@ -48,6 +46,11 @@ const title = computed(() =>
 
 const form = ref<Form>({ kind: 'product', article: null, quantity: '1', price: '' });
 const tried = ref(false);
+/** The price as the server takes it, in minor units of the list's money; `null` while it is none (the field says why). */
+const cents = computed(() => {
+  const read = parseMoney(form.value.price, { money: money.value });
+  return read.ok ? read.cents : null;
+});
 
 watch(
   () => [open.value, props.item?.id] as const,
@@ -66,10 +69,6 @@ watch(
 
 const text = (value: unknown): string => (value === null || value === undefined ? '' : String(value));
 const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'ion-touched': !!message });
-const cents = computed(() => {
-  const read = parseMoney(form.value.price, money.value);
-  return read.ok ? read.cents : null;
-});
 /** What the quantity field holds as the server reads it; as typed when unreadable (the server says why). */
 const quantity = computed(() => readDecimal(form.value.quantity, 3) ?? form.value.quantity.trim());
 const ready = computed(() => cents.value !== null && (props.item !== null || form.value.article !== null));

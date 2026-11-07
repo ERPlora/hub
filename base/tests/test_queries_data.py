@@ -174,13 +174,15 @@ def test_inspecting_a_file_says_what_it_brings_and_what_never_travels(owner):
 
 @pytest.mark.parametrize(("country", "verifactu"), [("PL", "inactive"), ("ES", "turns_on")])
 def test_the_review_does_not_promise_an_app_that_will_not_go_on_here(born, country, verifactu):
-    """hub#694: outside Spain the load will leave VeriFactu off, so what it says beforehand is that, not «turns on»."""
+    """hub#694: outside Spain the load will leave VeriFactu off, so what it says beforehand is that, not «turns on».
+    A file that lists it (no template of the catalogue does, hub#998)."""
     Hub.objects.filter(slug="c").update(country=country)
+    file = a_file(purpose="template", apps=("table", "verifactu"))
 
-    statuses = {app.id: app.status for app in call(born, "base.blueprint.inspect", template="restaurant.es").apps}
+    statuses = {app.id: app.status for app in call(born, "base.blueprint.inspect", file_base64=file).apps}
 
     assert statuses["verifactu"] == verifactu
-    assert statuses["invoice"] == "turns_on"
+    assert statuses["table"] == "turns_on"
 
 
 def test_an_app_off_the_blueprint_lists_is_said_to_turn_on_and_one_it_does_not_list_stays_off(born):

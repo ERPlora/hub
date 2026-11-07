@@ -27,9 +27,10 @@ sustituto en la misma PR del puntero.
 
 ## Componentes compartidos
 
-- **Lector de importes con signo** (`lib/money.ts` + `components/MoneyInput.vue`, con su botón ±): el mismo de
-  Servicios, Inventario y Menús. Cada app lleva hoy su copia porque una app no importa el código de otra;
-  debería vivir en `@erplora/ui/components` como `MoneyInput` con la prop `signed`. Al llegar, se borra la copia.
+- **Lector de importes con signo**: llegó (hub#924, parte 1): `OptionFormModal` usa el `MoneyInput` de
+  `@erplora/ui/components` con la prop `signed` y su botón ±, y lee con `parseMoney(text, { money, signed: true })`;
+  la copia de la app (`lib/money.ts` + `components/MoneyInput.vue`) se borró. Servicios, Inventario y Menús lo
+  adoptan en la parte 2.
 - **`useLiveList` / `useServerTable` / `useT`** (`frontend/composables/`): copias de las de Impuestos, como en el
   resto de apps; mismo destino (`@erplora/ui/sdk`). `useSheetList` (las listas de la hoja, de 20 en 20) va con la
   hoja con secciones de arriba.

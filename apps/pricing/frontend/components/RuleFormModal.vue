@@ -9,7 +9,7 @@
 // the business's currency (its country's; a bare figure until it answers, and then an untouched amount takes its
 // decimals). «Create» and «Save» wait in grey until the business has answered its money (the amount is read in it;
 // hub#921); if that read fails, the dialog says so with «Retry» (hub#938).
-import { Combo, type ComboOption, FormModal } from '@erplora/ui/components';
+import { Combo, type ComboOption, FormModal, MoneyInput, moneyFieldText, parseMoney } from '@erplora/ui/components';
 import { useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { IonButton, IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
@@ -18,11 +18,9 @@ import BusinessMoneyError from '../../../../base/frontend/components/BusinessMon
 import { useLocale, useT } from '../composables/useT';
 import { useBusinessMoney } from '../lib/format';
 import { type Money, quantityFieldText, readDecimal } from '../lib/format';
-import { moneyFieldText, parseMoney } from '../lib/money';
 import { searchCategories, searchGroups, searchProducts, searchServices } from '../lib/pickers';
 import { groupName } from '../lib/rules';
 import type { RuleIn, RuleOut, RuleScope, RuleType } from '../operations';
-import MoneyInput from './MoneyInput.vue';
 
 const TYPES: readonly RuleType[] = ['percent', 'fixed', 'buy_x_get_y', 'tiered'];
 const SCOPES: readonly RuleScope[] = ['all', 'products', 'services', 'category', 'product', 'service'];
@@ -160,7 +158,7 @@ const whole = (value: string): number => (/^\d+$/.test(value.trim()) ? Number(va
 const day = (value: string): string | null => value.trim() || null;
 /** Minor units of an amount in the business's `currency`; `null` when it is not one (the field says why). */
 const cents = (value: string, currency: Money): number | null => {
-  const read = parseMoney(value, currency);
+  const read = parseMoney(value, { money: currency });
   return read.ok ? read.cents : null;
 };
 
