@@ -6,7 +6,9 @@
 // 1.250 zł or 1,25 zł: it is not guessed, the field says so. A price is never negative; a supplement may be
 // (`signed`), a cheaper substitution. On leaving the field it is rewritten in the page format. (The reader of
 // the service, inventory and modifier forms, with the sign: an app never imports another's code.)
-import { decimalMark, type Money, moneyDecimals } from './format';
+import { decimalMark } from '@erplora/ui/components';
+
+import { type Money, moneyDecimals } from './format';
 
 export type MoneyRead =
   | { ok: true; cents: number | null }

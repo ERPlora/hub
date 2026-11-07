@@ -5,7 +5,7 @@
 // «Required (min. N)», plus « · max. N» and « · repeats».
 import { describe, expect, it } from 'vitest';
 
-import { choiceRule, decimalMark, formatDelta, type Money, moneyDecimals } from './format';
+import { choiceRule, formatDelta, type Money, moneyDecimals } from './format';
 
 const EN: Record<string, string> = {
   'modifier.rule.optional': 'Optional',
@@ -53,10 +53,6 @@ describe('format', () => {
 
   it('the decimals of an amount: the currency’s, two while it is unknown', () => {
     expect([moneyDecimals(JPY), moneyDecimals(PLN), moneyDecimals()]).toEqual([0, 2, 2]);
-  });
-
-  it('knows the decimal mark of each language', () => {
-    expect([decimalMark('es'), decimalMark('en')]).toEqual([',', '.']);
   });
 
   it('reads a group rule as the old Choice column', () => {
