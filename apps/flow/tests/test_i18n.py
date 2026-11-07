@@ -86,3 +86,37 @@ def test_spanish_texts_are_the_old_modules():
 def test_placeholders_survive_the_translation():
     for msgid, (msgstr, _) in po_entries(LOCALE / "django.po").items():
         assert sorted(re.findall(r"%\(\w+\)s", msgid)) == sorted(re.findall(r"%\(\w+\)s", msgstr)), msgid
+
+
+def test_each_record_says_its_dates_and_authors_with_flows_own_words():
+    """«Automatización», «ejecución» and «pregunta» are feminine and «borrador» and «secreto» masculine; an app installed
+    before flow that says the same English («created at» in demo, «started at» in attendance, «step» in sale) spoke for
+    flow's own Spanish (hub#497)."""
+    said = {
+        Flow: ("created_at", "created_by", "updated_at", "updated_by", "deleted_at"),
+        FlowRun: ("started_at",),
+        Question: ("step_id",),
+        Draft: ("created_at", "created_by"),
+        Secret: ("created_at", "created_by", "updated_at", "updated_by"),
+    }
+    with translation.override("es"):
+        labels = {
+            f"{model.__name__}.{name}": str(model._meta.get_field(name).verbose_name)
+            for model, names in said.items()
+            for name in names
+        }
+    assert labels == {
+        "Flow.created_at": "creada el",
+        "Flow.created_by": "creada por",
+        "Flow.updated_at": "cambiada el",
+        "Flow.updated_by": "cambiada por",
+        "Flow.deleted_at": "borrada el",
+        "FlowRun.started_at": "empezó el",
+        "Question.step_id": "paso",
+        "Draft.created_at": "creado el",
+        "Draft.created_by": "creado por",
+        "Secret.created_at": "creado el",
+        "Secret.created_by": "creado por",
+        "Secret.updated_at": "actualizado el",
+        "Secret.updated_by": "actualizado por",
+    }
