@@ -47,6 +47,19 @@ REPEATED_ID = _("Each one goes once in the list.")
 # How the Menus screens name the data the models do not (the assistant's card names each datum by its title).
 VAT_CATEGORY = gettext_noop("VAT category")
 NEW_PRODUCT = gettext_noop("New product")
+# What the assistant's card calls the record a write acts on by its id (its Spanish in this app's catalog), as the
+# screens call one («Withdraw this menu?», «Course · Starters»), never «Record».
+T_MENU = gettext_noop("Menu")
+T_COURSE = gettext_noop("Course")
+T_CHOICE = gettext_noop("Choice")
+
+# The assistant's card names the record a write acts on by these reads (base/assistant.py ``REFERS``), run as whoever
+# asks, never by its id: a menu and a course by their name and a choice by its product's, as the builder's «Withdraw»
+# and «Remove» dialogs say them; a product of Inventory by its name, as Inventory's screens say it.
+A_MENU = names("combo.combo.get")
+A_COURSE = names("combo.group.get")
+A_CHOICE = names("combo.option.get", name=("product_name",))
+A_PRODUCT = names("inventory.product.get")
 
 #: Ninety-nine billion euros in cents: far above any price, inside a bigint (Inventory's bound).
 MAX_CENTS = 9_999_999_999_999
@@ -84,12 +97,20 @@ Picks = Annotated[int, Field(ge=0, le=MAX_PICKS)]
 Order = Annotated[int, Field(ge=0, le=MAX_ORDER)]
 SupplyKind = Literal["service", "goods"]
 Direction = Literal["asc", "desc"]
-GroupIds = Annotated[
-    list[UUID], Field(min_length=1, max_length=MAX_GROUPS), AfterValidator(_unique)
-]
-OptionIds = Annotated[
-    list[UUID], Field(min_length=1, max_length=MAX_OPTIONS), AfterValidator(_unique)
-]
+
+
+def _ids(mark: dict, most: int):
+    """Records by their ids, each one once: the assistant's card names each one as ``mark`` says."""
+    return Annotated[
+        list[Annotated[UUID, Field(json_schema_extra=mark)]],
+        Field(min_length=1, max_length=most),
+        AfterValidator(_unique),
+    ]
+
+
+GroupIds = _ids(A_COURSE, MAX_GROUPS)
+OptionIds = _ids(A_CHOICE, MAX_OPTIONS)
+ProductIds = _ids(A_PRODUCT, MAX_OPTIONS)
 
 # Field descriptions shared by several schemas (the assistant reads them).
 D_COMBO_ID = "The menu's id. Give it, or its name in `combo`."
@@ -159,7 +180,7 @@ class Page(Schema, Generic[T]):
 
 
 class ComboRefIn(In):
-    id: UUID | None = Field(None, description=D_COMBO_ID)
+    id: UUID | None = Field(None, title=T_MENU, description=D_COMBO_ID, json_schema_extra=A_MENU)
     combo: Reference | None = Field(None, description=D_COMBO)
 
     @model_validator(mode="after")
@@ -175,7 +196,6 @@ AN_IMAGE = names("base.catalog_image.get", by="reference", name=("title",))
 
 
 class ComboImageIn(ComboRefIn):
-    id: UUID | None = Field(None, description=D_COMBO_ID, json_schema_extra=names("combo.combo.get"))
     image: Annotated[str, StringConstraints(strip_whitespace=True, max_length=200)] = Field(
         title=gettext_noop("Image"),
         description="The image the menu shows: an image of the shared library by its reference, "
@@ -198,14 +218,14 @@ class ComboImageSuggestIn(ComboRefIn):
 class _ComboOfIn(In):
     """The menu something belongs to, by id or by name."""
 
-    combo_id: UUID | None = Field(None, description=D_COMBO_ID)
+    combo_id: UUID | None = Field(None, description=D_COMBO_ID, json_schema_extra=A_MENU)
     combo: Reference | None = Field(None, description=D_COMBO)
 
 
 class _GroupOfIn(_ComboOfIn):
     """The course something belongs to: its id, or its name with its menu."""
 
-    group_id: UUID | None = Field(None, description=D_GROUP_ID)
+    group_id: UUID | None = Field(None, description=D_GROUP_ID, json_schema_extra=A_COURSE)
     group: Reference | None = Field(None, description=D_GROUP)
 
     def _group_named(self) -> None:
@@ -216,7 +236,7 @@ class _GroupOfIn(_ComboOfIn):
 
 
 class GroupRefIn(_ComboOfIn):
-    id: UUID | None = Field(None, description=D_GROUP_ID)
+    id: UUID | None = Field(None, title=T_COURSE, description=D_GROUP_ID, json_schema_extra=A_COURSE)
     group: Reference | None = Field(None, description=D_GROUP)
 
     @model_validator(mode="after")
@@ -230,10 +250,15 @@ class GroupRefIn(_ComboOfIn):
 
 class OptionRefIn(_ComboOfIn):
     id: UUID | None = Field(
-        None, description="The choice's id. Give it, or its product with its menu."
+        None,
+        title=T_CHOICE,
+        description="The choice's id. Give it, or its product with its menu.",
+        json_schema_extra=A_CHOICE,
     )
     group_id: UUID | None = Field(
-        None, description="The course of the choice, when the product is in several."
+        None,
+        description="The course of the choice, when the product is in several.",
+        json_schema_extra=A_COURSE,
     )
     group: Reference | None = Field(None, description=D_GROUP)
     product: Reference | None = Field(
@@ -362,7 +387,7 @@ class GroupReorderIn(ComboRefIn):
 
 
 class OptionIn(_GroupOfIn):
-    product_id: UUID | None = Field(None, description=D_PRODUCT_ID)
+    product_id: UUID | None = Field(None, description=D_PRODUCT_ID, json_schema_extra=A_PRODUCT)
     product: Reference | None = Field(None, description=D_PRODUCT)
     price_delta: Delta = Field(0, description=D_DELTA)
     is_available: bool = Field(
@@ -377,7 +402,7 @@ class OptionIn(_GroupOfIn):
 
 
 class OptionBulkIn(_GroupOfIn):
-    product_ids: OptionIds = Field(
+    product_ids: ProductIds = Field(
         title=gettext_noop("Products"),
         description="The products to add, by id, in the order they go in (no supplement).",
     )
@@ -395,6 +420,7 @@ class OptionPatchIn(OptionRefIn):
         None,
         title=NEW_PRODUCT,
         description="Id of the product that replaces the current one.",
+        json_schema_extra=A_PRODUCT,
     )
     new_product: Reference | None = Field(
         None,

@@ -17,7 +17,7 @@ from collections import OrderedDict
 from typing import Any
 from uuid import UUID
 
-from django.db.models import Count, Prefetch, Q, QuerySet
+from django.db.models import Count, Prefetch, Q, QuerySet, prefetch_related_objects
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext, Scope
 from live.errors import Conflict, NotFound
@@ -32,6 +32,8 @@ from apps.combo.schemas import (
     ComboPage,
     ComboRefIn,
     ForSaleIn,
+    GroupOut,
+    GroupRefIn,
     OptionOut,
     OptionRefIn,
     ResolvedOut,
@@ -270,13 +272,18 @@ def offer_status(option: ChoiceOption, targets: frozenset[str]) -> str:
     return "offered"
 
 
-def with_tree(combos: QuerySet[Combo]) -> QuerySet[Combo]:
-    """Menus with their category, courses and choices (each with its product) in their order."""
+def _options() -> Prefetch:
+    """A course's choices, each with its product, in their order."""
     options = ChoiceOption.objects.select_related("product__tax_category").order_by(
         "sort_order", "id"
     )
+    return Prefetch("options", queryset=options)
+
+
+def with_tree(combos: QuerySet[Combo]) -> QuerySet[Combo]:
+    """Menus with their category, courses and choices (each with its product) in their order."""
     groups = ChoiceGroup.objects.order_by("sort_order", "name", "id").prefetch_related(
-        Prefetch("options", queryset=options)
+        _options()
     )
     return combos.select_related("tax_category").prefetch_related(
         Prefetch("groups", queryset=groups)
@@ -482,6 +489,22 @@ def get_option(ctx: OperationContext, data: OptionRefIn) -> dict:
         data.id, combo_id=data.combo_id, combo=data.combo, group_id=data.group_id, group=data.group, product=data.product
     )
     return option_row(option, takeaway_targets())
+
+
+@operation(
+    "combo.group.get",
+    kind="query",
+    permission="combo.view",
+    input=GroupRefIn,
+    output=GroupOut,
+    ai=INTERNAL,
+)
+def get_group(ctx: OperationContext, data: GroupRefIn) -> dict:
+    """One course of a menu with its choices: what names a course on the assistant's card (``schemas.A_COURSE``); the
+    model reads the courses with their menu."""
+    group = find_group(data.id, data.combo_id, data.combo, data.group)
+    prefetch_related_objects([group], _options())
+    return group_row(group, takeaway_targets())
 
 
 @operation(

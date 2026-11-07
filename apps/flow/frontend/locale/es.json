@@ -935,6 +935,7 @@
       "combo__combo__list": "Buscar menús",
       "combo__combo__resolve": "Calcular el precio de un menú",
       "combo__group__create": "Añadir un plato a un menú",
+      "combo__group__get": "Leer un plato de un menú",
       "combo__group__reorder": "Reordenar los platos de un menú",
       "combo__group__update": "Cambiar un plato de un menú",
       "combo__option__bulk_create": "Añadir varias opciones a un menú",
