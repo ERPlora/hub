@@ -500,7 +500,12 @@ Todo se puede pedir por las pantallas, el asistente (por voz o por texto, con la
 habla) y la API, con las mismas reglas y permisos. Un menú se nombra por su id o por su nombre; un plato
 por su id o por su nombre dentro del menú; un producto por su id, su SKU o su nombre. Si un nombre vale
 para varios, se dice cuáles y se pide que elija (`combo.combo_ambiguous`, `combo.group_ambiguous`,
-`combo.option_ambiguous`, `inventory.product_ambiguous`).
+`combo.option_ambiguous`, `inventory.product_ambiguous`). Antes de una acción, el asistente pide confirmar con su
+tarjeta (BASE-F97), que nombra cada registro como lo nombran las pantallas, nunca por su identificador: el menú por su
+nombre («Menú: Menú del día»), el plato por su nombre («Plato: Primeros»), la elección por el nombre de su producto
+(«Elección: Lentejas»), el producto por su nombre («Producto nuevo: Sopa») y, al ordenar platos o elecciones o al
+añadir varios productos, cada uno por su nombre y en el orden enviado («Platos: Segundos, Primeros»). Lo que quien
+pregunta no puede ver, o lo que ya no existe, no sale.
 
 ### Lo que ofrece: consultas (leen, no cambian nada)
 
@@ -508,7 +513,8 @@ para varios, se dice cuáles y se pide que elija (`combo.combo_ambiguous`, `comb
 |---|---|---|---|
 | Los menús, con búsqueda, filtros y orden, en páginas de hasta 100 (en vivo) | ver | F01 | `combo.combo.list` |
 | Un menú con sus platos y sus elecciones, si sale en el TPV y por qué no (en vivo) | ver | F05, F06, F12 | `combo.combo.get` |
-| Una elección de un menú, por su id: solo para nombrar el plato en la tarjeta del asistente (SALE-F20) | ver | F07 | `combo.option.get` |
+| Una elección de un menú, por su id: solo para nombrar el plato en la tarjeta del asistente (SALE-F20, BASE-F97) | ver | F06, F07 | `combo.option.get` |
+| Un plato de un menú con sus elecciones, por su id o por su nombre dentro del menú: lo que lee la tarjeta del asistente para nombrarlo (BASE-F97); no es herramienta del asistente ni tiene ruta en la API | ver | F05, F06 | `combo.group.get` |
 | El catálogo de menús del TPV: los que se pueden vender, con sus platos y sus elecciones disponibles (en vivo) | ver | F07 | `combo.combo.for_sale` |
 | La línea de un menú con lo elegido: importe, componentes y reparto fiscal | ver | F08, F09, F10, F11 | `combo.combo.resolve` |
 | Hasta cinco imágenes de la librería para la foto de un menú, por su nombre; no pone ninguna | ver | F14 | `combo.combo.suggest_image` |
@@ -659,7 +665,23 @@ vende, y si Menús no está activo el TPV no ofrece menús.
   enteros en céntimos.
 - Asistente: toda operación declara `ai={"description"…}` (`risk` en las acciones; `high` al retirar
   un menú, un plato o una elección, y al cambiar un menú, porque puede cambiar cómo se factura: el riesgo
-  es por operación, no por campo) y todo campo de entrada lleva `description`.
+  es por operación, no por campo) y todo campo de entrada lleva `description`. Salvo dos lecturas internas
+  (`ai=INTERNAL`, sin API) que solo nombran un registro en la tarjeta del asistente: `combo.option.get` (hub#561) y
+  `combo.group.get` (hub#669); el modelo lee los platos y las elecciones con su menú.
+- **Tarjeta de confirmación del asistente** (BASE-F97, hub#669): nombra el registro que una escritura señala por su
+  id con las marcas `refers` de `schemas.py`, leídas como quien pregunta: el menú por su `name` con
+  `combo.combo.get` (`A_MENU`: el `id` de `ComboRefIn` y el `combo_id` de `_ComboOfIn`), el plato por su `name` con
+  `combo.group.get` (`A_COURSE`: el `id` de `GroupRefIn`, el `group_id` de `_GroupOfIn` y de `OptionRefIn` y cada
+  elemento de `group_ids`), la elección por el `product_name` de `combo.option.get` (`A_CHOICE`: el `id` de
+  `OptionRefIn` y cada elemento de `option_ids`) y el producto por su `name` con `inventory.product.get`
+  (`A_PRODUCT`: `product_id`, `new_product_id` y cada elemento de `product_ids`). El `id` lleva el título con la
+  palabra de las pantallas («Menú», «Plato», «Elección»; `T_MENU`, `T_COURSE`, `T_CHOICE`, con su español en el
+  catálogo de la app), nunca «Registro»; `combo_id`, `group_id` y `product_id` ya salen así por el `verbose_name`
+  de la clave del modelo. Sin persona detrás, sin `combo.view` o `inventory.view_product`, con un id de otro negocio
+  o de algo retirado, el registro queda fuera, nunca su id (`tests/test_assistant_card_records.py`); el trinquete
+  `UNNAMED_REFERENCES` de `base/tests/test_assistant_card_values.py` impide que entre un dato sin marca. Las listas
+  cerradas de sus escrituras (cómo se vende el menú) ya llevan su etiqueta en `en` + `es` por los `choices` del
+  modelo.
 - El admin de Django del Hub tiene **CRUD completo** sobre los tres modelos (ronda 12, PLAN §17); una
   escritura cruda del admin no deja aviso.
 - Fase 1: el ámbito es la primera parte del Host y los datos se comparten entre `a` y `b`, como en
@@ -667,7 +689,8 @@ vende, y si Menús no está activo el TPV no ofrece menús.
 - En el navegador: `tests/e2e/combo-menus.spec.ts` (oculto, con Inventario e Impuestos de verdad), que
   borra lo suyo (`E2E Combo …`, `E2E-CMB-…`) antes y después, y `tests/e2e/combo-till.spec.ts` (el TPV de
   Ventas, Cocina e Inventario de verdad y un paso del relay: COMBO-F07–F11), que borra `e2e Combo …` y
-  `E2E-CMT-…`.
+  `E2E-CMT-…`; y `tests/e2e/combo-assistant-card.spec.ts` (la tarjeta del asistente en español e inglés, en tres
+  tamaños), que borra lo suyo (`E2E …`) antes y después.
 
 ## Cómo son las páginas (para quien lo mantiene)
 

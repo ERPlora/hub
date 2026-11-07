@@ -935,6 +935,7 @@
       "combo__combo__list": "Look for set menus",
       "combo__combo__resolve": "Work out a set menu's price",
       "combo__group__create": "Add a course to a set menu",
+      "combo__group__get": "Read a course of a set menu",
       "combo__group__reorder": "Reorder the courses of a set menu",
       "combo__group__update": "Change a course of a set menu",
       "combo__option__bulk_create": "Add several choices to a set menu",
