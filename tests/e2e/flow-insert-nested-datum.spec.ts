@@ -3,7 +3,7 @@
 // to a cart › Item › Unit price»); before, only «Item», «Cart» and «Removed», whole. What it inserts is a path the
 // engine resolves (hub#961), so the question the automation asks says that price as money. Opened before the editor
 // has its catalog of actions, «Which data?» says «Loading…» and shows those data as soon as the catalog comes in,
-// without being closed and opened again (hub#969).
+// without being closed and opened again (hub#969); one that could not be read is said inside it, with «Retry».
 // Everything created here is named «E2E FlowNested …» and removed before and after.
 // flow: FLOW-F11 FLOW-F28
 import { expect, test } from '@playwright/test';
@@ -87,6 +87,30 @@ for (const viewport of VIEWPORTS) {
       expect(ran.status, JSON.stringify(ran.data)).toBe(200);
       expect(ran.data.status).toBe('asking');
       await questionSays({ context, page, name }, 'Line price: €12.50', `${KEY}-question-${viewport.label}`);
+    });
+  });
+
+  test(`FLOW-F11 «Which data?» says the catalog could not be read, with «Retry», and then offers what step 1 left, at ${viewport.label}`, async ({ browser }) => {
+    test.setTimeout(120_000);
+    await onAutomations(browser, viewport, TAG, async ({ context, page, name }) => {
+      const steps = [await addToANewCart(context, `${SESSION}-retry-${viewport.label}`), { id: 's2', kind: 'ask', title: 'Line price' }];
+      const flowId = await manualFlow(context, name, steps, [ADD]);
+      const failed = { error: { code: 'internal_error', message: 'Internal error' } };
+      await page.route('**/api/flow/catalog', (route) => route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify(failed) }));
+      await page.goto(`/flow/automations/${flowId}`);
+      const editor = shown(page);
+      await editor.locator('[data-testid=flow-step-open-s2]').click();
+      await editor.locator('[data-testid=flow-ask-title-s2-insert]').click();
+      const picker = page.locator('ion-modal[data-testid=flow-picker]');
+      // In red inside the dialog, which covers the editor's own notice; never «There is no data to insert here yet».
+      await expect(picker.locator('[data-testid=flow-picker-error]')).toContainText('What automations can use here could not be read.');
+      await expect(picker.locator('[data-testid=flow-picker-error]')).not.toContainText('Internal error');
+      await expect(picker.locator('[data-testid=flow-picker-none]')).toHaveCount(0);
+      await capture(page, `${KEY}-picker-error-${viewport.label}`);
+      await page.unroute('**/api/flow/catalog');
+      await picker.locator('[data-testid=flow-picker-retry]').click();
+      await expect(picker.locator('[data-testid="flow-picker-steps.s1.item.unit_price"]')).toHaveText('1. Add something to a cart › Item › Unit price');
+      await expect(picker.locator('[data-testid=flow-picker-error]')).toHaveCount(0);
     });
   });
 }
