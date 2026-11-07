@@ -66,7 +66,8 @@ Debajo, el editor y la vista previa. En un ordenador, uno al lado del otro; en u
   (barra oscura, cabecera a todo el ancho en el color principal, con la foto teñida de ese color, mayúsculas enormes y
   botones fuertes). Las cuatro sirven para un restaurante, una peluquería, una tienda o un servicio.
 - **Colores**: ocho paletas en tarjetas con sus colores sobre el fondo claro y el oscuro, la elegida resaltada:
-  **Océano**, **Bosque**, **Terracota**, **Pizarra**, **Rosa**, **Arena**, **Medianoche** y **Oliva**. Debajo, dos
+  **Océano**, **Bosque**, **Terracota**, **Pizarra**, **Rosa**, **Arena**, **Medianoche** y **Oliva**; hasta tres por
+  fila, y dos cuando así no cabe el nombre entero (un móvil de 375 px): el nombre nunca se parte a mitad de palabra. Debajo, dos
   campos de color (**Color principal** y **Color secundario**) con los de la paleta elegida: cambiarlos hace tuya la
   paleta, y entonces aparece **Restablecer colores**, que vuelve a los de la paleta. Elegir otra paleta muestra los
   suyos (los cambios de la anterior se descartan). Cada paleta trae su versión clara y oscura y se lee bien en las dos
