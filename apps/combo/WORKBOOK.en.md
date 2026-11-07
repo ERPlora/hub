@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:0e2d707e1f47bd11b6c6e675fda3df186360ef7177febe6d48c81c8df56f991c -->
+<!-- generated from WORKBOOK.md sha256:123107d3da1a402cdf3edb98ad22557a7c699d9ddf9a58e5f880e9396de2368b -->
 
 ## What it is for and who it is for
 
@@ -475,7 +475,12 @@ Everything can be asked for through the screens, the assistant (by voice or by t
 whoever speaks) and the API, with the same rules and permissions. A menu is named by its id or by its name; a
 course by its id or by its name within the menu; a product by its id, its SKU or its name. If a name
 fits several, it says which ones and asks to choose (`combo.combo_ambiguous`, `combo.group_ambiguous`,
-`combo.option_ambiguous`, `inventory.product_ambiguous`).
+`combo.option_ambiguous`, `inventory.product_ambiguous`). Before an action, the assistant asks for confirmation with
+its card (BASE-F97), which names each record as the screens name it, never by its identifier: the menu by its name
+("Menu: Menu of the day"), the course by its name ("Course: Starters"), the choice by its product's name ("Choice:
+Lentils"), the product by its name ("New product: Soup") and, when reordering courses or choices or adding several
+products, each one by its name and in the order sent ("Courses: Mains, Starters"). What the person asking cannot see,
+or what no longer exists, is left out.
 
 ### What it offers: queries (they read, they change nothing)
 
@@ -483,7 +488,8 @@ fits several, it says which ones and asks to choose (`combo.combo_ambiguous`, `c
 |---|---|---|---|
 | The menus, with search, filters and order, in pages of up to 100 (live) | view | F01 | `combo.combo.list` |
 | A menu with its courses and its choices, whether it is on the till and why not (live) | view | F05, F06, F12 | `combo.combo.get` |
-| A choice of a menu, by its id: only to name the dish on the assistant's card (SALE-F20) | view | F07 | `combo.option.get` |
+| A choice of a menu, by its id: only to name the dish on the assistant's card (SALE-F20, BASE-F97) | view | F06, F07 | `combo.option.get` |
+| A course of a menu with its choices, by its id or by its name within the menu: what the assistant's card reads to name it (BASE-F97); it is not an assistant tool and has no API route | view | F05, F06 | `combo.group.get` |
 | The till's menu catalogue: the ones that can be sold, with their courses and their available choices (live) | view | F07 | `combo.combo.for_sale` |
 | The line of a menu with what was chosen: amount, components and tax split | view | F08, F09, F10, F11 | `combo.combo.resolve` |
 | Up to five images of the library for a menu's photo, by its name; it sets none | view | F14 | `combo.combo.suggest_image` |
