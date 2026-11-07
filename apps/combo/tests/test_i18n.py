@@ -11,7 +11,7 @@ from live.operations import registry
 
 from apps.combo import queries, schemas, services
 from apps.combo.models import ChoiceGroup, ChoiceOption, Combo
-from base.tests.po import po_entries
+from base.tests.po import catalogue_key, po_entries
 
 LOCALE = Path(apps.get_app_config("combo").path) / "locale" / "es" / "LC_MESSAGES"
 MODELS = (Combo, ChoiceGroup, ChoiceOption)
@@ -44,7 +44,7 @@ def visible_texts() -> set[str]:
             if hasattr(field, "verbose_name") and not field.auto_created and not field.primary_key
         ]
     with translation.override("en"):
-        return {str(text) for text in lazies} | schema_titles()
+        return {catalogue_key(text) for text in lazies} | schema_titles()
 
 
 def schema_titles() -> set[str]:
@@ -67,9 +67,13 @@ def test_every_entry_has_a_spanish_translation():
 
 
 def test_every_visible_text_is_in_the_catalog():
-    assert len(visible_texts()) > 60  # positive control: the collection found the app's texts
-    msgids = {key.split("\x04")[-1] for key in po_entries(LOCALE / "django.po")}
-    assert visible_texts() - msgids == set()
+    """Each text is looked up as the compiled catalogue keys it, context included: a ``pgettext_lazy`` that goes back
+    to ``_()``, or whose context has a typo, is missing from the catalogue and Spanish says it in English or in
+    another app's words (hub#975)."""
+    texts = visible_texts()
+    assert len(texts) > 60  # positive control: the collection found the app's texts...
+    assert len({key for key in texts if "\x04" in key}) >= 1  # ...and kept the context of its pgettext_lazy ones
+    assert texts - set(po_entries(LOCALE / "django.po")) == set()
 
 
 def test_the_compiled_catalog_is_current():
