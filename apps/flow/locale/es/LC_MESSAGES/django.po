@@ -77,17 +77,34 @@ msgid "search text"
 msgstr "texto de búsqueda"
 
 msgid "created by"
+msgstr "creado por"
+
+msgid "updated by"
+msgstr "actualizado por"
+
+msgid "created at"
+msgstr "creado el"
+
+msgid "updated at"
+msgstr "actualizado el"
+
+msgctxt "automation"
+msgid "created by"
 msgstr "creada por"
 
+msgctxt "automation"
 msgid "updated by"
 msgstr "cambiada por"
 
+msgctxt "automation"
 msgid "created at"
 msgstr "creada el"
 
+msgctxt "automation"
 msgid "updated at"
 msgstr "cambiada el"
 
+msgctxt "automation"
 msgid "deleted at"
 msgstr "borrada el"
 
@@ -160,6 +177,7 @@ msgstr "sigue el"
 msgid "chain"
 msgstr "cadena"
 
+msgctxt "run"
 msgid "started at"
 msgstr "empezó el"
 
@@ -478,6 +496,7 @@ msgstr "pregunta"
 msgid "questions"
 msgstr "preguntas"
 
+msgctxt "automation"
 msgid "step"
 msgstr "paso"
 

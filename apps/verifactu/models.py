@@ -66,7 +66,7 @@ class Config(UUIDModel):
         REVOKED = "revoked", _("Revoked")
 
     class HubStatus(models.TextChoices):
-        ACTIVE = "active", _("Active")
+        ACTIVE = "active", pgettext_lazy("verifactu business status", "Active")
         PAST_DUE = "past_due", _("Payment pending")
         SUSPENDED = "suspended", _("Suspended")
 
@@ -289,11 +289,11 @@ class Record(UUIDModel):
     )
     # The invoice's figures as declared: a copy, never edited.
     invoice_number = models.CharField(_("invoice number"), max_length=NUMBER_MAX_LENGTH)
-    issue_date = models.DateField(_("issue date"))
+    issue_date = models.DateField(pgettext_lazy("verifactu record", "issue date"))
     operation_date = models.DateField(_("operation date"), null=True, blank=True)
     invoice_type = models.CharField(_("invoice type"), max_length=2, blank=True)
     rectification_kind = models.CharField(
-        _("rectification kind"), max_length=1, blank=True
+        pgettext_lazy("verifactu record", "rectification kind"), max_length=1, blank=True
     )
     # [{"issuer_nif", "number", "issue_date"}]
     rectified = models.JSONField(
@@ -314,13 +314,13 @@ class Record(UUIDModel):
         _("customer document type"), max_length=2, blank=True
     )
     tax_breakdown = models.JSONField(
-        _("tax breakdown"), default=list, blank=True, encoder=DjangoJSONEncoder
+        pgettext_lazy("verifactu record", "tax breakdown"), default=list, blank=True, encoder=DjangoJSONEncoder
     )
     base_amount = models.BigIntegerField(_("taxable base"), null=True, blank=True)
-    tax_amount = models.BigIntegerField(_("tax"), null=True, blank=True)
+    tax_amount = models.BigIntegerField(pgettext_lazy("verifactu record", "tax"), null=True, blank=True)
     total_amount = models.BigIntegerField(_("total"), null=True, blank=True)
     # Subsanación (VERIFACTU-F24) and the anulación's target (VERIFACTU-F30).
-    correction = models.BooleanField(_("correction"), default=False)
+    correction = models.BooleanField(pgettext_lazy("verifactu record", "correction"), default=False)
     previous_rejection = models.CharField(
         _("previous rejection"), max_length=1, blank=True
     )
@@ -577,7 +577,7 @@ class Event(UUIDModel):
     actor = models.CharField(_("actor"), max_length=ACTOR_MAX_LENGTH, blank=True)
 
     class Meta:
-        verbose_name = _("event")
+        verbose_name = pgettext_lazy("verifactu event", "event")
         verbose_name_plural = _("events")
         ordering = ["-created_at", "-id"]
         indexes = [
@@ -711,7 +711,7 @@ class AeatRecord(UUIDModel):
         _("environment"), max_length=10, choices=Environment.choices
     )
     invoice_number = models.CharField(_("invoice number"), max_length=NUMBER_MAX_LENGTH)
-    issue_date = models.DateField(_("issue date"), null=True, blank=True)
+    issue_date = models.DateField(pgettext_lazy("verifactu record", "issue date"), null=True, blank=True)
     fingerprint = models.CharField(
         _("fingerprint"), max_length=FINGERPRINT_LENGTH, blank=True
     )

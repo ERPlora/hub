@@ -46,6 +46,7 @@ async function save(): Promise<void> {
       <div class="task-project-form">
         <ion-input
           data-testid="task-project-form-code"
+          name="code"
           :value="form.code"
           :label="$t('task.projects.form.code')"
           :placeholder="$t('task.projects.form.codePlaceholder')"
@@ -59,6 +60,7 @@ async function save(): Promise<void> {
         />
         <ion-input
           data-testid="task-project-form-name"
+          name="name"
           :value="form.name"
           :label="$t('task.projects.form.name')"
           label-placement="floating"
@@ -71,6 +73,7 @@ async function save(): Promise<void> {
         />
         <ion-input
           data-testid="task-project-form-color"
+          name="color"
           :value="form.color"
           :label="$t('task.projects.form.color')"
           :placeholder="$t('task.projects.form.colorPlaceholder')"

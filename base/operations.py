@@ -11,7 +11,8 @@ An empty ``HUB_BASE_DOMAIN`` takes the Host's first label wherever it is. The pl
 is no hub either; :func:`is_platform_host` tells it apart so ``base.middleware`` serves it the admin.
 Actor = the session's user; permissions from ``base.permissions``. :func:`hub_id`, :func:`is_demo_hub` and
 :func:`is_platform_hub` are what the apps ask about a hub's registry (``base.registry``; a module never reads it), and
-:func:`business_currency` the currency its business charges in (``base.business.get``, read as the platform). An app
+:func:`business_currency` the currency its business charges in and :func:`business_country` the country it is in
+(``base.business.get``, read as the platform). An app
 runs another app's operation with :func:`call`, and says with :func:`allow_idle_wait` that its transaction waits for
 an answer from outside.
 This is the only piece phase 2 replaces (scope = ``use_hub``): from S1, :meth:`HubContextBuilder.enter` gives a live
@@ -39,6 +40,7 @@ from base import meter
 from base import registry
 from base.api_keys import KeyCaller
 from base.approvals import Approved, consequence_context
+from base.business import country_or_market
 from base.permissions import permissions_for, reload_user
 from base.tenancy import connections as tenancy_connections
 from base.tenancy.context import HUB_SCOPE_KIND, use_hub
@@ -103,6 +105,16 @@ def business_currency(scope: Scope) -> str:
     silent euro. The one question every app that charges asks (BASE-F50)."""
     read = get_operation(BUSINESS)
     return read(system_context(scope), read.input()).currency
+
+
+def business_country(scope: Scope) -> str:
+    """The country (ISO 3166-1 alpha-2) ``scope``'s business is in for every rule by country an app reads, such as the
+    country of a phone written without prefix (CUSTOMER-F11): ``base.business.get``'s, read as the platform as
+    :func:`business_currency` reads the currency, through base's one reading of a business without one
+    (``base.business.country_or_market``: ERPlora's market, Spain). ERPlora's own hub answers its issuer's country. A
+    scope that is no hub's has none: the operation's ``NotFound``, never a silent Spain."""
+    read = get_operation(BUSINESS)
+    return country_or_market(read(system_context(scope), read.input()).country)
 
 
 def allow_idle_wait(seconds: int) -> None:

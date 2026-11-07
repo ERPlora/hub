@@ -529,10 +529,10 @@ def _of_article(article: Article) -> Q:
     return Q(service_id=article.service_id)
 
 
-def _customer_groups(data: ResolveIn) -> list[UUID]:
+def _customer_groups(ctx: OperationContext, data: ResolveIn) -> list[UUID]:
     if data.customer_id is None and data.customer is None:
         return []
-    customer = find_customer(data.customer_id, data.customer)
+    customer = find_customer(ctx, data.customer_id, data.customer)
     return list(customer.groups.filter(is_active=True).values_list("id", flat=True))
 
 
@@ -628,7 +628,7 @@ def resolve_line(ctx: OperationContext, data: ResolveIn) -> dict:
     """The price of a line (a ``ResolveOut``): the list's or the catalog's, and the best rule's discount."""
     on = business_day(data.when)
     article = article_of(ctx, data)
-    groups = _customer_groups(data)
+    groups = _customer_groups(ctx, data)
     currency = platform.business_currency(ctx.scope)
     lists = candidate_lists(data, on, groups, currency)
     item, price_list = best_list_price(article, data.quantity, lists)

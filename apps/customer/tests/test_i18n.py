@@ -7,21 +7,23 @@ from pathlib import Path
 import pytest
 from django.apps import apps
 from django.utils import translation
-from django.utils.functional import Promise
 from live.errors import InvalidPayload
-from live.operations import registry
 
 from apps.customer import models, queries, schemas, services
-from base.tests.po import po_entries
+from base.tests.po import (
+    compiled_differences,
+    config_texts,
+    missing_from_catalogue,
+    mo_entries,
+    model_texts,
+    module_texts,
+    operation_titles,
+    untranslated,
+)
 
 from .conftest import run
 
 LOCALE = Path(apps.get_app_config("customer").path) / "locale" / "es" / "LC_MESSAGES"
-
-
-def lazy_texts_of(module) -> list[Promise]:
-    """Every module-level lazy text: the messages an operation can send."""
-    return [value for value in vars(module).values() if isinstance(value, Promise)]
 
 
 def visible_texts() -> set[str]:
@@ -29,24 +31,10 @@ def visible_texts() -> set[str]:
     its schemas."""
     config = apps.get_app_config("customer")
     lazies = [
-        config.verbose_name,
-        config.summary,
-        config.description,
-        *(nav.label for nav in config.navigation),
-        *lazy_texts_of(schemas),
-        *lazy_texts_of(queries),
-        *lazy_texts_of(services),
+        *config_texts(config),
+        *module_texts(schemas, queries, services),
     ]
-    for model in config.get_models():
-        lazies += [model._meta.verbose_name, model._meta.verbose_name_plural]
-        # The primary key comes from live.models.UUIDModel: its name is Django's default.
-        lazies += [
-            field.verbose_name
-            for field in model._meta.get_fields()
-            if hasattr(field, "verbose_name")
-            and not field.auto_created
-            and not field.primary_key
-        ]
+    lazies += model_texts(config.get_models())
     for choices in (
         models.Customer.Stage,
         models.Customer.Source,
@@ -61,42 +49,21 @@ def visible_texts() -> set[str]:
     ):
         lazies += list(choices.labels)
     with translation.override("en"):
-        return {str(text) for text in lazies} | schema_titles()
-
-
-def schema_titles() -> set[str]:
-    """The titles customer's operations give their input data (``gettext_noop``): the assistant's card names each
-    datum by them, so each one needs its Spanish. Only the ones customer wrote: pydantic leaves ``title`` empty
-    otherwise."""
-    return {
-        field.title
-        for op in registry.values()
-        if op.app_label == "customer"
-        for field in op.input.model_fields.values()
-        if field.title
-    }
+        return {str(text) for text in lazies} | operation_titles("customer")
 
 
 def test_every_entry_has_a_spanish_translation():
-    entries = po_entries(LOCALE / "django.po")
-    assert entries
-    untranslated = [
-        msgid for msgid, (msgstr, fuzzy) in entries.items() if not msgstr or fuzzy
-    ]
-    assert untranslated == []
+    assert untranslated(LOCALE / "django.po") == []
 
 
 def test_every_visible_text_is_in_the_catalog():
-    assert visible_texts() - set(po_entries(LOCALE / "django.po")) == set()
+    """Each text of Clientes by its whole key, context included: a ``pgettext_lazy`` that goes back to ``_()``, or
+    whose context has a typo, is missing from the catalogue, and Spanish says it in English (hub#975)."""
+    assert missing_from_catalogue(visible_texts(), LOCALE / "django.po", more_than=150, with_context=0) == set()
 
 
 def test_the_compiled_catalog_is_current():
-    with (LOCALE / "django.mo").open("rb") as compiled:
-        catalog = gettext.GNUTranslations(compiled)._catalog
-    po = {
-        msgid: msgstr for msgid, (msgstr, _) in po_entries(LOCALE / "django.po").items()
-    }
-    assert {msgid: msgstr for msgid, msgstr in catalog.items() if msgid} == po
+    assert compiled_differences(LOCALE) == {}
 
 
 def test_the_card_says_each_title_with_customers_own_spanish():
@@ -104,7 +71,7 @@ def test_the_card_says_each_title_with_customers_own_spanish():
     whichever app Django merges last: if it is not customer's, customer's own entry is dead text (hub#323)."""
     with (LOCALE / "django.mo").open("rb") as compiled:
         own = gettext.GNUTranslations(compiled)
-    titles = schema_titles()
+    titles = operation_titles("customer")
     assert {"Duplicate customer", "Groups", "Note"} <= titles
     with translation.override("es"):
         assert {title: translation.gettext(title) for title in titles} == {
@@ -153,9 +120,7 @@ def test_an_error_message_follows_the_language_of_the_request(client, make_user)
 
 def compiled(path: Path) -> dict[str, str]:
     """The singular entries of a compiled catalogue, as Django reads them (the header left out)."""
-    with path.open("rb") as catalogue:
-        entries = gettext.GNUTranslations(catalogue)._catalog
-    return {key: text for key, text in entries.items() if isinstance(key, str) and key}
+    return {key: text for key, text in mo_entries(path).items() if isinstance(key, str)}
 
 
 def test_what_an_earlier_app_also_translates_says_the_same_here():

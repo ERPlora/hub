@@ -121,6 +121,7 @@ async function save(): Promise<void> {
         />
         <ion-select
           data-testid="staff-time-off-form-leave_type"
+          name="leave_type"
           :value="form.leave_type"
           :label="$t('staff.timeOff.form.type')"
           label-placement="floating"
@@ -142,6 +143,7 @@ async function save(): Promise<void> {
         <div class="staff-time-off-form__pair">
           <ion-input
             data-testid="staff-time-off-form-start_date"
+            name="start_date"
             type="date"
             :value="form.start_date"
             :label="$t('staff.timeOff.form.startDate')"
@@ -154,6 +156,7 @@ async function save(): Promise<void> {
           />
           <ion-input
             data-testid="staff-time-off-form-end_date"
+            name="end_date"
             type="date"
             :value="form.end_date"
             :label="$t('staff.timeOff.form.endDate')"
@@ -180,6 +183,7 @@ async function save(): Promise<void> {
         >
           <ion-input
             data-testid="staff-time-off-form-start_time"
+            name="start_time"
             type="time"
             :value="form.start_time"
             :label="$t('staff.timeOff.form.startTime')"
@@ -192,6 +196,7 @@ async function save(): Promise<void> {
           />
           <ion-input
             data-testid="staff-time-off-form-end_time"
+            name="end_time"
             type="time"
             :value="form.end_time"
             :label="$t('staff.timeOff.form.endTime')"
@@ -205,6 +210,7 @@ async function save(): Promise<void> {
         </div>
         <ion-textarea
           data-testid="staff-time-off-form-reason"
+          name="reason"
           :value="form.reason"
           :label="$t('staff.timeOff.form.reason')"
           label-placement="floating"

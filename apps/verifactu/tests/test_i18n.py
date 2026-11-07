@@ -1,13 +1,11 @@
 """Every visible text of the verifactu app has its Spanish translation, compiled and current."""
 
-import gettext
 import json
 from pathlib import Path
 
 import pytest
 from django.apps import apps
 from django.utils import translation
-from live.operations import registry
 
 from apps.verifactu import admin as verifactu_admin
 from apps.verifactu import models, queries, schemas, services
@@ -23,33 +21,25 @@ from apps.verifactu.models import (
     Record,
     SendControl,
 )
-from base.tests.po import po_entries
+from base.tests.po import (
+    catalogue_key,
+    compiled_differences,
+    config_texts,
+    missing_from_catalogue,
+    model_texts,
+    module_texts,
+    operation_titles,
+    untranslated,
+)
 
 APP = Path(apps.get_app_config("verifactu").path)
 LOCALE = APP / "locale" / "es" / "LC_MESSAGES"
 
 
-def messages_of(module) -> list:
-    lazies = [
-        value
-        for name, value in vars(module).items()
-        if name.isupper() and type(value).__name__ == "__proxy__"
-    ]
-    for name, value in vars(module).items():
-        if name.isupper() and isinstance(value, dict):
-            lazies += [
-                item for item in value.values() if type(item).__name__ == "__proxy__"
-            ]
-    return lazies
-
-
 def visible_texts() -> set[str]:
     config = apps.get_app_config("verifactu")
     lazies = [
-        config.verbose_name,
-        config.summary,
-        config.description,
-        *(nav.label for nav in config.navigation),
+        *config_texts(config),
         # The Home's step of «Finish setting up your business» and its panels (FIX-VERIFACTU-SETUP-HOOKS).
         *(text for step in config.setup for text in (step.title, step.description)),
         *(panel.title for panel in config.widgets),
@@ -61,68 +51,36 @@ def visible_texts() -> set[str]:
             for value in panel.options.values()
             if type(value).__name__ == "__proxy__"
         ),
-        *messages_of(queries),
-        *messages_of(schemas),
-        *messages_of(services),
-        *messages_of(models),
-        *messages_of(verifactu_admin),
+        *module_texts(queries, schemas, services, models, verifactu_admin),
         *EVENT_MESSAGES.values(),
         *WAIT_REASONS.values(),
         *Environment.labels,
         *Config.Route.labels,
         *Config.Representation.labels,
+        *Config.HubStatus.labels,
         *Record.Type.labels,
         *Record.Status.labels,
         *Event.Kind.labels,
         *Event.Severity.labels,
         *OwnCertificate.Kind.labels,
     ]
-    for model in (Config, Chain, SendControl, Record, Event, AeatRecord, OwnCertificate):
-        lazies += [model._meta.verbose_name, model._meta.verbose_name_plural]
-        lazies += [
-            field.verbose_name
-            for field in model._meta.get_fields()
-            if hasattr(field, "verbose_name")
-            and not field.auto_created
-            and not field.primary_key
-        ]
+    lazies += model_texts((Config, Chain, SendControl, Record, Event, AeatRecord, OwnCertificate))
     with translation.override("en"):
-        return {str(text) for text in lazies} | schema_titles()
-
-
-def schema_titles() -> set[str]:
-    """The titles verifactu's operations give their input data (``gettext_noop``): the assistant's card names each
-    datum by them, so each one needs its Spanish. A title pydantic makes up from the field is not one."""
-    titles = set()
-    for op in registry.values():
-        if op.app_label == "verifactu":
-            for name, prop in op.input.model_json_schema().get("properties", {}).items():
-                title = prop.get("title")
-                if title and title != name.title().replace("_", " "):
-                    titles.add(title)
-    return titles
+        return {catalogue_key(text) for text in lazies} | operation_titles("verifactu")
 
 
 def test_every_entry_has_a_spanish_translation():
-    entries = po_entries(LOCALE / "django.po")
-    assert entries
-    assert [
-        msgid for msgid, (msgstr, fuzzy) in entries.items() if not msgstr or fuzzy
-    ] == []
+    assert untranslated(LOCALE / "django.po") == []
 
 
 def test_every_visible_text_is_in_the_catalog():
-    catalog = {key.split("\x04")[-1] for key in po_entries(LOCALE / "django.po")}
-    assert visible_texts() - catalog == set()
+    """Each text of VeriFactu by its whole key, context included (hub#975): a ``pgettext_lazy`` that goes
+    back to ``_()``, or whose context has a typo, is missing from the catalogue, and Spanish says it in English."""
+    assert missing_from_catalogue(visible_texts(), LOCALE / "django.po", more_than=200, with_context=12) == set()
 
 
 def test_the_compiled_catalog_is_current():
-    with (LOCALE / "django.mo").open("rb") as compiled:
-        catalog = gettext.GNUTranslations(compiled)._catalog
-    po = {
-        msgid: msgstr for msgid, (msgstr, _) in po_entries(LOCALE / "django.po").items()
-    }
-    assert {msgid: msgstr for msgid, msgstr in catalog.items() if msgid} == po
+    assert compiled_differences(LOCALE) == {}
 
 
 def test_spanish_texts():
@@ -132,6 +90,35 @@ def test_spanish_texts():
         assert str(Record.Type.ANULACION.label) == "Anulación"
         assert str(Environment.TESTING.label) == "Pruebas (AEAT de pruebas)"
         assert str(services.NOT_IN_QUEUE).startswith("Este registro no está en la cola")
+
+
+def test_verifactu_says_its_fields_with_the_aeats_words():
+    """VeriFactu's Spanish is the AEAT's («subsanación», «fecha de expedición», «cuota»…, as its screens say), and the
+    business's status is the account's («Activa», like «Suspendida»). An app installed before it that says the same
+    English («Active» in customer, «correction» in attendance, «event» in flow, «issue date» and «rectification kind»
+    in invoice, «tax» and «tax breakdown» in sale) spoke for it (hub#591)."""
+    fields = {
+        Record: ("issue_date", "rectification_kind", "tax_breakdown", "tax_amount", "correction"),
+        AeatRecord: ("issue_date",),
+    }
+    with translation.override("es"):
+        labels = {
+            f"{model.__name__}.{name}": str(model._meta.get_field(name).verbose_name)
+            for model, names in fields.items()
+            for name in names
+        }
+        labels["Event"] = str(Event._meta.verbose_name)
+        labels["Config.HubStatus.ACTIVE"] = str(Config.HubStatus.ACTIVE.label)
+    assert labels == {
+        "Record.issue_date": "fecha de expedición",
+        "Record.rectification_kind": "tipo de rectificativa",
+        "Record.tax_breakdown": "desglose",
+        "Record.tax_amount": "cuota",
+        "Record.correction": "subsanación",
+        "AeatRecord.issue_date": "fecha de expedición",
+        "Event": "evento",
+        "Config.HubStatus.ACTIVE": "Activa",
+    }
 
 
 @pytest.mark.django_db

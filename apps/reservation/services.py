@@ -366,7 +366,7 @@ def _folded(text: str) -> str:
 CARD_SOURCES = {"phone": "phone", "in_person": "walk_in", "whatsapp": "whatsapp", "online": "website"}
 
 
-def chosen_card(customer_id, customer_said: str | None) -> Customer | None:
+def chosen_card(ctx: OperationContext, customer_id, customer_said: str | None) -> Customer | None:
     """The card the caller chose (by id, or by name, phone or email), or ``None``.
 
     A card a write links is locked when it is found, as Customers' writes and the Hub admin's «Delete» of a card
@@ -374,7 +374,19 @@ def chosen_card(customer_id, customer_said: str | None) -> Customer | None:
     the write and finds the row that protects the card."""
     if customer_id is None and not customer_said:
         return None
-    return find_customer(customer_id, customer_said, lock=True)
+    return find_customer(ctx, customer_id, customer_said, lock=True)
+
+
+def _guest_contact(ctx: OperationContext, data, typed: str) -> tuple[Customer | None, str, str, str]:
+    """The card the caller chose (``chosen_card``) and the guest's name, phone and email: what was typed, else the
+    card's."""
+    card = chosen_card(ctx, data.customer_id, data.customer)
+    return (
+        card,
+        data.guest_name or (card.name if card else ""),
+        typed or (card.phone if card else ""),
+        data.guest_email or (card.email if card else ""),
+    )
 
 
 def typed_phone(ctx: OperationContext, raw: str | None) -> str:
@@ -402,7 +414,7 @@ def card_for_phone(
         match = next(
             (row for row in matches if _folded(row.name) == wanted), matches[0]
         )
-        return find_customer(match.id, None, lock=True)  # locked, as ``chosen_card``
+        return find_customer(ctx, match.id, None, lock=True)  # locked, as ``chosen_card``
     try:
         created = call_app(
             keeper,
@@ -444,10 +456,7 @@ def _loaded(ctx: OperationContext, reservation: Reservation) -> dict:
 def create_reservation(ctx: OperationContext, data: ReservationIn) -> dict:
     typed = typed_phone(ctx, data.guest_phone)
     settings = lock_book()
-    card = chosen_card(data.customer_id, data.customer)
-    name = data.guest_name or (card.name if card else "")
-    phone = typed or (card.phone if card else "")
-    email = data.guest_email or (card.email if card else "")
+    card, name, phone, email = _guest_contact(ctx, data, typed)
     table = choose_table(data.table_id, data.table, data.zone)
     minutes = data.duration_minutes or settings.default_duration_minutes
     # The card before the gate: a phone Customers refuses is said first, never after «Book anyway?». A
@@ -1042,10 +1051,7 @@ def delete_blocked(ctx: OperationContext, data: BlockedDateRefIn) -> dict:
 def create_entry(ctx: OperationContext, data: WaitlistIn) -> dict:
     # No contact is required (market, duda 7): the phone is only for calling back.
     typed = typed_phone(ctx, data.guest_phone)
-    card = chosen_card(data.customer_id, data.customer)
-    name = data.guest_name or (card.name if card else "")
-    phone = typed or (card.phone if card else "")
-    email = data.guest_email or (card.email if card else "")
+    card, name, phone, email = _guest_contact(ctx, data, typed)
     if card is None and phone:
         card = card_for_phone(ctx, name, phone, email, "walk_in")
         phone = card.phone or phone

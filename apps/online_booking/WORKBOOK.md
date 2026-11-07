@@ -28,6 +28,11 @@ Quién la usa:
 - El **propietario** y el **administrador**: además las borran y configuran la página de reservas.
 - El **asistente** (por voz o por texto, con la sesión de quien habla) hace lo mismo: «confirma la reserva
   de Ana de mañana», «¿qué reservas online hay pendientes?», «cancela la reserva APT-20261016-0003».
+  Antes de una acción pide confirmar con su tarjeta (BASE-F97), que nombra cada registro como lo nombra la
+  agenda, nunca por su identificador: la reserva por su clienta, su día, su hora y su profesional («Reserva:
+  Lucía Pérez · martes, 5 de marzo de 2030 · 10:00 · Ana López»), como la bandeja en «¿Cancelar la reserva
+  de …?»; los servicios y el profesional de una reserva de la página, por su nombre. Lo que quien pregunta
+  no puede ver, o lo que ya no existe, no sale.
 
 ## Referencia adoptada
 
@@ -426,6 +431,14 @@ El resto de hechos (confirmada, cancelada, completada, no presentada, borrada) s
   `tests/test_relay.py` las prueba de punta a punta con el bucle real del worker y el aviso real de Clientes.
   Sus dos avisos no los escucha ninguna app salvo Automatizaciones, que se apunta a todos (`"*"` en
   `apps/flow/events.py`); lo que hace con ellos es de FLOW-F21, que sigue `parcial`.
+- **Tarjeta de confirmación del asistente** (BASE-F97, hub#673): nombra el registro que una escritura señala
+  por su id con las marcas `refers` de Citas (`AN_APPOINTMENT`, `A_SERVICE`, `A_MEMBER` de
+  `apps/appointment/schemas.py`), leídas como quien pregunta: la reserva (el `id` de `BookingRefIn`, en
+  confirmar, completar, no presentada, cancelar y borrar) por su `label` con `appointment.appointment.get`,
+  titulada «Reserva» como la lista; cada servicio de `service_ids` por su nombre con `service.service.get`, y
+  el profesional (`staff_id`) por su nombre completo con `staff.member.detail`, en `public.book`. Sin el
+  permiso de ver la agenda, o con la reserva borrada o de otro negocio, la tarjeta la deja fuera. Ninguna
+  escritura lleva listas cerradas.
 
 ### Contrato con la página pública (para `base`)
 

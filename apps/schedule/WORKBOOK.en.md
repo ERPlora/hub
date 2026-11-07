@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:e9f6e928605899ef0ae4fb3c9667a1d8c4d3a888bea7c5774c55beb6b7fda5e9 -->
+<!-- generated from WORKBOOK.md sha256:ed7e4fafe33c2393503cc61c56c3f546acf589c673b4e81130c9afd35fab08e6 -->
 
 ## What it is for and who it is for
 
@@ -134,7 +134,7 @@ able to change it and without **Save**.
 |---|---|
 | Loading | "Loading…" while the first result arrives; the week is not painted until the settings are there too (otherwise it would be sorted wrong). |
 | Empty | "No special days." or "No overrides."; with a search or a filter, "No results". The week always has seven rows. |
-| Error | The table's notice with "Retry", which says which one did not load ("The opening hours could not be loaded.", "The special days could not be loaded.", "The overrides could not be loaded." or "The settings could not be loaded.") and then the cause. A form's refusal shows inside the form, without losing what was typed; a row action's (delete, confirm the week, save the settings), above the table or the form. With the settings unread, **Week starts** is not shown, so as not to save a value that has not been read. |
+| Error | The table's notice with "Retry", which says which one did not load ("The opening hours could not be loaded.", "The special days could not be loaded.", "The overrides could not be loaded." or "The settings could not be loaded.") and then the cause. A form's refusal shows inside the form, without losing what was typed, and each refused field (date, name, reason, notes) says its reason under it and loses it as soon as that field is corrected, even if another one says the same (hub#888); a row action's (delete, confirm the week, save the settings), above the table or the form. With the settings unread, **Week starts** is not shown, so as not to save a value that has not been read. |
 | Reconnecting | What is painted stays; a strip warns "Reconnecting…". |
 | App inactive | "This app is not active in this business". |
 | No permission | What they cannot do does not show; if they arrive through another door, "You do not have permission". |
