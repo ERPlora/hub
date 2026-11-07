@@ -20,6 +20,7 @@ from django.core.validators import RegexValidator
 from django.db import models
 from django.db.models import F, Q
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import pgettext_lazy
 from live.models import UUIDModel
 
 #: The shape of a category key: lowercase, starting with a letter; letters, digits, dots and underscores.
@@ -85,9 +86,10 @@ class TaxCategory(UUIDModel):
     # A factory category (migration 0002); the ones the business creates are its own.
     is_system = models.BooleanField(_("system"), default=False)
     # As in the current product: the lists show the active ones; no operation archives one yet.
-    is_active = models.BooleanField(_("active"), default=True)
-    created_at = models.DateTimeField(_("created at"), auto_now_add=True)
-    updated_at = models.DateTimeField(_("updated at"), auto_now=True)
+    # A category is feminine in Spanish («activa», «creada el»): its own context, not auth's «activo».
+    is_active = models.BooleanField(pgettext_lazy("tax", "active"), default=True)
+    created_at = models.DateTimeField(pgettext_lazy("tax", "created at"), auto_now_add=True)
+    updated_at = models.DateTimeField(pgettext_lazy("tax", "updated at"), auto_now=True)
 
     class Meta:
         verbose_name = _("tax category")
@@ -175,9 +177,10 @@ class TaxRule(UUIDModel):
     # Inclusive; empty = since always / for ever.
     valid_from = models.DateField(_("valid from"), null=True, blank=True)
     valid_to = models.DateField(_("valid to"), null=True, blank=True)
-    is_active = models.BooleanField(_("active"), default=True)
-    created_at = models.DateTimeField(_("created at"), auto_now_add=True)
-    updated_at = models.DateTimeField(_("updated at"), auto_now=True)
+    # A rule is feminine too («activa», «creada el»), as the category.
+    is_active = models.BooleanField(pgettext_lazy("tax", "active"), default=True)
+    created_at = models.DateTimeField(pgettext_lazy("tax", "created at"), auto_now_add=True)
+    updated_at = models.DateTimeField(pgettext_lazy("tax", "updated at"), auto_now=True)
 
     class Meta:
         verbose_name = _("tax rule")
@@ -252,7 +255,8 @@ class TaxAlias(UUIDModel):
     source = models.CharField(
         _("source"), max_length=8, choices=Source.choices, default=Source.LEARNED
     )
-    # As in the current product: the lists and the importer read the active ones.
+    # As in the current product: the lists and the importer read the active ones. An alias is masculine
+    # («activo», «creado el»): the same words as the apps before, so no context of its own.
     is_active = models.BooleanField(_("active"), default=True)
     created_at = models.DateTimeField(_("created at"), auto_now_add=True)
     updated_at = models.DateTimeField(_("updated at"), auto_now=True)
