@@ -8,6 +8,7 @@
 import { Combo, ConfirmDialog, StatusPill } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
+import { expectSaveWaitsForMoney } from '../../../../base/frontend/__tests__/save-waits-for-money';
 import { business, click, EMPLOYEE, ionValue, JAPANESE, type MountOptions, mountCombo, page, POLISH, settle } from '../__tests__/mount-combo';
 import type { GroupOut, OptionOut } from '../operations';
 import BulkAddModal from './BulkAddModal.vue';
@@ -272,6 +273,21 @@ describe('CourseCard: in the business’s currency', () => {
     expect(s.el('combo-course-g1-delta').value).toBe('200');
     await click(s.el('combo-course-g1-save'));
     expect(s.posts()).toEqual([]);
+  });
+
+  // hub#946 (COMBO-F06): the supplement is read in the business's money, never before it answers: «1500» would be read
+  // with two decimals and saved as 150000 yen. «Add choice» waits in grey (a click on it reaches nothing either, and the
+  // field says nothing meanwhile, also with the yen's symbol), then the supplement is 1500 yen.
+  it.each(['1500', '¥1500'])('a supplement «%s» typed before the business answers: «Add choice» waits in grey, then 1500 yen (hub#946)', async (typed) => {
+    const s = await setup(COURSE, { business: null });
+    s.answer(201, option({ id: 'o9' }));
+    s.picker().vm.$emit('update:modelValue', { id: 'p9', label: 'Sole' });
+    await settle();
+    await ionValue(s.el('combo-course-g1-delta'), typed, 'ionInput');
+    const window = { wrapper: s.wrapper, save: () => s.el('combo-course-g1-save'), amount: () => s.el('combo-course-g1-delta'), sent: s.posts, settle, submit: null };
+    await expectSaveWaitsForMoney(window, () => s.result('base.business.get', business(JAPANESE)));
+    await click(s.el('combo-course-g1-save'));
+    expect(s.posts()).toEqual([{ method: 'POST', path: '/api/combo/options', query: {}, body: { group_id: 'g1', product_id: 'p9', price_delta: 1500 } }]);
   });
 
   it('what the person typed before the business answers stays as typed, and is read in its currency', async () => {

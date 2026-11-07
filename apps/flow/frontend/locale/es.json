@@ -1730,6 +1730,7 @@
       "expires_to": "Caduca hasta",
       "factor_den": "Divisor del factor",
       "factor_num": "Multiplicador del factor",
+      "factory_rules": "Reglas de fábrica",
       "failed": "Fallido",
       "failed_at": "Fecha del fallo",
       "failure_reason": "Motivo del fallo",

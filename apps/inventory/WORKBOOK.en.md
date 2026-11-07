@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:30df42037cc78ef6927180d23d04c7ce80cb3f3ce11fa50bcb227a6742faca85 -->
+<!-- generated from WORKBOOK.md sha256:bd36f4b5cef97e21c9614432b3c00078d72714a333a4a480a0e75387ab8e25a5 -->
 
 ## What it is for and who it is for
 
@@ -552,7 +552,11 @@ Out: the stock goes up and the "Reception" movement stays with quantity, balance
 one, the delivery note. If a cost was typed, it becomes the product's cost. It applies even if the item
 has no stock control. If an item with control goes above its threshold, it tells of the crossing
 (INVENTORY-F18). Inventory tells that the stock changed.
-If it fails: "Record receipt" is off without a quantity. "The quantity does not respect the step allowed
+If it fails: "Record receipt" is off without a quantity, and while the business has not yet said its
+currency: the cost is read in it, and without it "1500" yen would be saved as 150,000. If the currency
+cannot be read, the window says so ("The business's currency could not be read", with the reason) and
+offers "Retry", which asks for it again; as soon as it arrives, "Record receipt" lights up (hub#946). The
+count and the write-off read no amounts: they do not wait for it. "The quantity does not respect the step allowed
 for this unit", an unreadable cost ("This is not an amount…") or the reason of any other refusal show
 inside the window. A service is not received: it has no button, and through the assistant or the API it
 is refused with "A service has no stock.". A goods receipt with a line without a product, with a product

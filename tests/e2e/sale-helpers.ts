@@ -110,6 +110,30 @@ export async function openTillCart(page: Page): Promise<void> {
   await expect(till).toHaveClass(/pos-till--cart-open/);
 }
 
+/** On the till (`/sale/pos`, already open), `product` found by its SKU in the search and put in the cart, as a cashier
+ *  sells it. */
+export async function addToTill(page: Page, product: { id: string; sku: string }): Promise<void> {
+  await shown(page).locator('[data-testid=pos-till]').waitFor({ state: 'visible' });
+  await shown(page).locator('[data-testid=pos-search-trigger]').click();
+  const search = page.locator('[data-testid=pos-search]');
+  await search.locator('input').fill(product.sku);
+  await search.locator(`[data-testid=pos-search-${product.id}]`).click();
+}
+
+/** On the till, `product` added (`addToTill`) and «Charge» pressed while no tax rule prices it (TAX-F11, TAX-F19): no
+ *  total, and the checkout says why with nothing to confirm. The refusal, for its screenshots. */
+export async function chargeRefused(page: Page, product: Product): Promise<Locator> {
+  await addToTill(page, product);
+  await expect(shown(page).locator('[data-testid=pos-total]')).toHaveText('—');
+  await shown(page).locator('[data-testid=pos-charge]').click();
+  const sheet = page.locator('[data-testid=sale-checkout-modal]');
+  await expect(sheet).toBeVisible();
+  const refusal = sheet.locator('[data-testid=sale-checkout-read-error]');
+  await expect(refusal).toContainText(`«${product.name}» cannot be charged: no tax rule applies to its tax category`);
+  await expect(sheet.locator('[data-testid=sale-checkout-confirm]')).toHaveAttribute('aria-disabled', 'true');
+  return refusal;
+}
+
 /** The sizes where a notice of the till is read: the fleet's three and the lowest phone. */
 const NOTICE_SIZES = [
   { label: '1440x900', width: 1440, height: 900 },

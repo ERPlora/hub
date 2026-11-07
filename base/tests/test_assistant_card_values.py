@@ -378,7 +378,6 @@ def test_no_list_of_texts_sent_as_they_are_is_named():
 UNNAMED_REFERENCES = {
     "appointment": 12,
     "invoice": 1,
-    "payment": 8,
     # The sale and the appointment a voucher or a session came from, the line of a sale that charged a voucher, the line
     # of an order that holds a session and the reference of a return: data of apps Services does not require, so it
     # reads none of them and base.E009 refuses a mark (hub#756). The one that came in, the sale's line (hub#769), is the
@@ -539,6 +538,8 @@ TITLED_IN_SPANISH = {
         f"online_booking.booking.{action}:id": "Reserva"
         for action in ("cancel", "complete", "confirm", "delete", "no_show")
     },
+    **{f"payment.method.{action}:id": "Método" for action in ("activate", "deactivate", "update")},
+    **{f"payment.payment.{action}:id": "Pago" for action in ("approve", "cancel", "mark_completed", "mark_sent")},
     **{f"pricing.price_item.{action}:id": "Precio" for action in ("remove", "update")},
     **{f"pricing.price_list.{action}:id": "Tarifa" for action in ("activate", "deactivate", "set_default", "update")},
     **{f"pricing.rule.{action}:id": "Regla de descuento" for action in ("activate", "deactivate", "update")},

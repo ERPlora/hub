@@ -7,7 +7,9 @@
 // their own minutes and price, changes those (empty = the service's), marks the main service with the
 // empty star of a row, switches one off or removes it. Changes come
 // back through the stream; a refusal is said above the list. Until the list arrives it says it is
-// loading; a list that cannot be read says so, with the reason and «Retry».
+// loading; a list that cannot be read says so, with the reason and «Retry». «Assign» and a row's «Save» wait in grey
+// until the business answers its money, the one an own price is read in (hub#946); «Editing service» says it, with
+// «Retry», if that read fails.
 import { Combo, type ComboOption, InlineFeedback } from '@erplora/ui/components';
 import { type ApiError, useCommand, useLive, useLiveClient } from '@erplora/ui/sdk';
 import { HubIcon } from '@erplora/ui/shell';
@@ -97,11 +99,6 @@ const minutes = (value: string): number | null => {
   if (!trimmed) return null;
   return /^\d+$/.test(trimmed) ? Number(trimmed) : (trimmed as unknown as number);
 };
-/** Cents of a price field (empty = none); `undefined` when it is not an amount (the field says why). */
-const cents = (value: string): number | null | undefined => {
-  const read = parseMoney(value, money.value);
-  return read.ok ? read.cents : undefined;
-};
 
 async function act(run: () => Promise<unknown>, error: () => ApiError | null): Promise<boolean> {
   failure.value = null;
@@ -114,28 +111,34 @@ async function act(run: () => Promise<unknown>, error: () => ApiError | null): P
   }
 }
 
+// An own price is never read before the business answers its money: «1500» would be read with two decimals, whatever
+// its currency counts (in yen, 150000; hub#946). One that is not an amount is not sent (the field says why).
 async function addPerson(): Promise<void> {
+  const currency = money.value;
   const { member, minutes: typed, price } = newcomer.value;
-  const custom = cents(price);
-  if (!member || custom === undefined) return;
+  if (!currency || !member) return;
+  const custom = parseMoney(price, currency);
+  if (!custom.ok) return;
   const body = {
     service_id: props.serviceId,
     member_id: member.id,
     ...(typed.trim() ? { custom_duration: minutes(typed) } : {}),
-    ...(custom !== null ? { custom_price: custom } : {}),
+    ...(custom.cents !== null ? { custom_price: custom.cents } : {}),
   };
   if (await act(() => assign.run(body), () => assign.error.value)) newcomer.value = { member: null, minutes: '', price: '' };
 }
 
 async function saveOwn(row: AssignmentOut): Promise<void> {
+  const currency = money.value;
+  if (!currency) return;
   const draft = drafts.value[row.id];
-  const custom = cents(draft.price);
-  if (custom === undefined) return;
-  const own = ownOf(row, money.value);
+  const custom = parseMoney(draft.price, currency);
+  if (!custom.ok) return;
+  const own = ownOf(row, currency);
   const body = {
     id: row.id,
     ...(draft.minutes.trim() !== own.minutes ? { custom_duration: minutes(draft.minutes) } : {}),
-    ...(draft.price.trim() !== own.price ? { custom_price: custom } : {}),
+    ...(draft.price.trim() !== own.price ? { custom_price: custom.cents } : {}),
   };
   if (await act(() => update.run(body), () => update.error.value)) drafts.value = { ...drafts.value, [row.id]: draft };
 }
@@ -261,7 +264,7 @@ const setDraft = (id: string, part: Partial<Draft>) => {
             :data-testid="`service-professionals-save-${row.id}`"
             size="small"
             fill="outline"
-            :disabled="!changed(row) || update.pending.value"
+            :disabled="!money || !changed(row) || update.pending.value"
             @click="saveOwn(row)"
           >
             {{ $t('service.professionals.save') }}
@@ -317,7 +320,7 @@ const setDraft = (id: string, part: Partial<Draft>) => {
       />
       <ion-button
         data-testid="service-professionals-assign"
-        :disabled="!newcomer.member || assign.pending.value"
+        :disabled="!money || !newcomer.member || assign.pending.value"
         @click="addPerson"
       >
         {{ $t('service.professionals.assign') }}
