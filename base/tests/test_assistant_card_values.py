@@ -384,14 +384,12 @@ UNNAMED_REFERENCES = {
     # reads none of them and base.E009 refuses a mark (hub#756). The one that came in, the sale's line (hub#769), is the
     # same datum as the sale beside it on service.grant.create: naming them is that issue's to decide.
     "service": 7,
-    "tax": 4,
     "verifactu": 6,
 }
 
 #: The closed lists (``enum`` of text) of the assistant's writes with a value the models give no label — of their app,
 #: or those their ``choices_of`` mark names —, by app: their card says that value as sent. Only ever lower, as above.
 UNLABELLED_LISTS = {
-    "tax": 5,
     # The type of a template's button (template.create and .update): it lives in the JSON of its buttons, and no field
     # of the models names its values to point a mark at. The card says the buttons by how many go, never by their codes
     # (a line of two data: test_the_buttons_of_a_template_go_by_how_many_never_by_their_codes, hub#571).
@@ -566,6 +564,7 @@ TITLED_IN_SPANISH = {
     **{f"table.zone.{action}:id": "Zona" for action in ("delete", "update")},
     **{f"task.project.{action}:id": "Proyecto" for action in ("delete", "update")},
     **{f"task.task.{action}:id": "Tarea" for action in ("assign", "complete", "delete", "set_status", "update")},
+    **{f"tax.rule.{action}:id": "Regla" for action in ("activate", "deactivate", "end")},
     **{f"whatsapp_inbox.conversation.{action}:id": "Conversación" for action in (
         "assign", "erase", "flag", "link_customer", "mark_read", "set_status",
     )},
