@@ -11,7 +11,7 @@
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
-import { bare, findingsByApp, hubFrontends, scriptBlocks } from './__tests__/frontend-sources';
+import { bare, findingsByApp, hubFrontends, linesWhere } from './__tests__/frontend-sources';
 
 const LEARN_IT_FROM_THE_PLATFORM =
   "take the typed decimal mark from decimalMark of @erplora/ui/components (the platform's one way to learn it)";
@@ -46,17 +46,7 @@ function ownDecimalMark(node: ts.Node): boolean {
 
 /** The lines of `text` (a `.ts`, or a `.vue` whose `<script>` blocks are read) with a decimal mark of its own. */
 export function ownDecimalMarks(text: string, name: string): number[] {
-  if (!/decimal/.test(text)) return [];
-  return scriptBlocks(text, name).flatMap(({ code, offset }) => {
-    const file = ts.createSourceFile(name.endsWith('.vue') ? `${name}.ts` : name, code, ts.ScriptTarget.Latest, true);
-    const lines: number[] = [];
-    const visit = (node: ts.Node): void => {
-      if (ownDecimalMark(node)) lines.push(file.getLineAndCharacterOfPosition(node.getStart(file)).line + 1 + offset);
-      ts.forEachChild(node, visit);
-    };
-    visit(file);
-    return lines;
-  });
+  return /decimal/.test(text) ? linesWhere(text, name, ownDecimalMark) : [];
 }
 
 describe('guardrail: the Hub learns the typed decimal mark from the platform (base-decimal-mark-one-way)', () => {
