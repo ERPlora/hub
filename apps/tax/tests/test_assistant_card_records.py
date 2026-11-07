@@ -193,6 +193,17 @@ def test_a_write_says_the_country_by_its_name_never_its_code(write, datum, langu
     assert {field["name"]: field["value"] for field in card["fields"]}[datum] == expected
 
 
+
+@pytest.mark.parametrize(("language", "expected"), [("en", ["Germany", "France"]), ("es", ["Alemania", "Francia"])])
+def test_a_batch_of_rules_says_the_country_of_each_one_by_its_name(language, expected):
+    """«Create these two rules»: each line of the batch carries its country by its name, in the order sent."""
+    rules = [
+        {"country_code": "DE", "tax_category_key": "cerveza", "rate_pct": "19"},
+        {"country_code": "FR", "tax_category_key": "vino", "rate_pct": "20"},
+    ]
+    (field,) = assistant.card(get("tax.rule.bulk_create"), {"rules": rules}, language)["fields"]
+    assert [line["country_code"] for line in field["value"]] == expected
+
 # ── What is not theirs to read, or no longer there ────────────────────────────────────────────────────────────────────
 
 

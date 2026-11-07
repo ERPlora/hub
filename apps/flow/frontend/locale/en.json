@@ -1283,6 +1283,7 @@
       "tax__category__get": "Read a tax category",
       "tax__category__list": "Look for tax categories",
       "tax__rate__calculate": "Work out a tax",
+      "tax__rule__get": "Read a tax rule",
       "tax__rule__countries": "Look for the countries with tax rules",
       "tax__rule__list": "Look for tax rules",
       "tax__rule__parent_candidates": "Look for the rules a tax rule can hang from",

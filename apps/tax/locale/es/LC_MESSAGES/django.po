@@ -29,6 +29,9 @@ msgstr "Categorías"
 msgid "Rules"
 msgstr "Reglas"
 
+msgid "Rule"
+msgstr "Regla"
+
 msgid "Aliases"
 msgstr "Alias"
 
