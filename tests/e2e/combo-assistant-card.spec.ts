@@ -12,6 +12,7 @@ import { cancel, cardSpec, datumOf, fieldsOf, ownerIn, VIEWPORTS } from './assis
 import { card, openPanel } from './assistant-real';
 import { A, api, capture, psql, untilStill } from './helpers';
 import { createProduct, stamp } from './inventory-helpers';
+import { post } from './service-helpers';
 
 /** A business is born with every app off; Menus and combos requires Inventory and Taxes. */
 const NEEDED = ['tax', 'inventory', 'combo'];
@@ -41,27 +42,21 @@ function cleanUp(): void {
 
 cardSpec(NEEDED, cleanUp);
 
-async function made<T>(context: BrowserContext, path: string, body: Record<string, unknown>): Promise<T> {
-  const res = await api<T>(context, A, 'POST', path, body);
-  expect(res.status, `${path} ${JSON.stringify(res.data)}`).toBe(201);
-  return res.data;
-}
-
 /** A menu eaten in with two courses, the lentils in the first one, and the soup that may replace them, through the
  *  apps' own APIs. */
 async function aMenu(context: BrowserContext) {
   const tag = stamp();
   const lentils = await createProduct(context, { name: `${TAG} Lentejas ${tag}`, sku: `E2E-TJ-LEN-${tag}` });
   const soup = await createProduct(context, { name: `${TAG} Sopa ${tag}`, sku: `E2E-TJ-SOP-${tag}` });
-  const menu = await made<{ id: string; name: string; kitchen_name: string }>(context, '/combo/combos', {
+  const menu = await post<{ id: string; name: string; kitchen_name: string }>(context, '/combo/combos', {
     name: `${TAG} Menú del día ${tag}`,
     kitchen_name: `COCINA ${tag}`,
     price: 1350,
     tax_category_key: 'restaurant.food',
   });
-  const starters = await made<{ id: string; name: string }>(context, '/combo/groups', { combo_id: menu.id, name: 'Primeros' });
-  const mains = await made<{ id: string; name: string }>(context, '/combo/groups', { combo_id: menu.id, name: 'Segundos' });
-  const choice = await made<{ id: string }>(context, '/combo/options', { group_id: starters.id, product_id: lentils.id });
+  const starters = await post<{ id: string; name: string }>(context, '/combo/groups', { combo_id: menu.id, name: 'Primeros' });
+  const mains = await post<{ id: string; name: string }>(context, '/combo/groups', { combo_id: menu.id, name: 'Segundos' });
+  const choice = await post<{ id: string }>(context, '/combo/options', { group_id: starters.id, product_id: lentils.id });
   return { lentils, soup, menu, starters, mains, choice };
 }
 
