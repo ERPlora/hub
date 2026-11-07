@@ -1287,7 +1287,9 @@ Pasos:
 Entra: las categorías de IVA de Impuestos.
 Sale: la sección (nombre, categoría de IVA, posición). Lo ya vendido conserva el nombre y el IVA
 con que se cobró.
-Si falla: una categoría de IVA que no existe se rechaza junto a su campo. Una sección que otro ya
+Si falla: una categoría de IVA que no existe se rechaza junto a su campo. Cada campo rechazado pierde su
+motivo en cuanto se corrige —«IVA que cobra», al elegir otra categoría—, aunque otro diga lo mismo
+(hub#888). Una sección que otro ya
 borró: «Esa sección ya no está en este negocio. Recarga la lista y vuelve a intentarlo.».
 Por el asistente: su tarjeta de confirmación dice la sección por su nombre, nunca por un identificador; una que ya no está no sale en la tarjeta (BASE-F97).
 Implicados: TAX-F01, BASE-F97
@@ -1307,7 +1309,8 @@ Pasos:
 Entra: nada de otras apps.
 Sale: la nota rápida. Borrarla deja de ofrecerla; las notas ya escritas conservan su texto.
 Si falla: «No se ha podido guardar la nota rápida.»; una nota que ya no existe: «Esa nota rápida ya
-no está en este negocio. Recarga la lista y vuelve a intentarlo.».
+no está en este negocio. Recarga la lista y vuelve a intentarlo.». El rechazo de un campo sale bajo él y
+se quita en cuanto se corrige ese campo, aunque otro diga lo mismo (hub#888).
 Implicados: ninguno
 
 ### SALE-F37 Añadir un medio de pago (Bizum, transferencia…)
