@@ -56,7 +56,15 @@ async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 
   const field = (name: string) => m.inDoc(`series-form-${name}`) as Control;
   const submit = () => m.inDoc('series-form-submit') as Control;
   const combo = (testid: string) => m.wrapper.findAllComponents(Combo).find((c) => c.props('testid') === testid)!;
-  return { ...m, field, submit, combo };
+  /** A new series' customer (Lucía), service (Haircut) and professional (Ana), as a person picks them. */
+  async function pickWhoAndWhat() {
+    m.wrapper.findComponent(CustomerSearch).vm.$emit('update:modelValue', { customer_id: 'c1', customer_name: 'Lucía Pérez', customer_tax_id: '', customer_address: '', customer_country: '' });
+    await (combo('series-form-service-add').props('search') as (q: string) => Promise<unknown>)('');
+    combo('series-form-service-add').vm.$emit('update:modelValue', { id: 'cut', label: 'Haircut' });
+    combo('series-form-staff').vm.$emit('update:modelValue', { id: 's1', label: 'Ana López' });
+    await settle();
+  }
+  return { ...m, field, submit, combo, pickWhoAndWhat };
 }
 
 describe('SeriesFormModal: New repeating appointment', () => {
@@ -86,11 +94,7 @@ describe('SeriesFormModal: New repeating appointment', () => {
       'Ends on (optional)',
       'Number of appointments (optional)',
     ]);
-    s.wrapper.findComponent(CustomerSearch).vm.$emit('update:modelValue', { customer_id: 'c1', customer_name: 'Lucía Pérez', customer_tax_id: '', customer_address: '', customer_country: '' });
-    await (s.combo('series-form-service-add').props('search') as (q: string) => Promise<unknown>)('');
-    s.combo('series-form-service-add').vm.$emit('update:modelValue', { id: 'cut', label: 'Haircut' });
-    s.combo('series-form-staff').vm.$emit('update:modelValue', { id: 's1', label: 'Ana López' });
-    await settle();
+    await s.pickWhoAndWhat();
     await ionValue(s.field('weekday'), 2);
     await ionValue(s.field('start_date'), '2026-10-19', 'ionInput');
     await ionValue(s.field('time'), '11:00', 'ionInput');
@@ -174,11 +178,7 @@ describe('SeriesFormModal: fields refused with the same words (hub#888)', () => 
   describe('a new series', () => {
     itTellsTheCorrectedFieldApart(['start_date', 'time', 'duration_minutes', 'end_date', 'max_occurrences'], async (locale, refusal) => {
       const s = await setup({}, locale);
-      s.wrapper.findComponent(CustomerSearch).vm.$emit('update:modelValue', { customer_id: 'c1', customer_name: 'Lucía Pérez', customer_tax_id: '', customer_address: '', customer_country: '' });
-      await (s.combo('series-form-service-add').props('search') as (q: string) => Promise<unknown>)('');
-      s.combo('series-form-service-add').vm.$emit('update:modelValue', { id: 'cut', label: 'Haircut' });
-      s.combo('series-form-staff').vm.$emit('update:modelValue', { id: 's1', label: 'Ana López' });
-      await settle();
+      await s.pickWhoAndWhat();
       await ionValue(s.field('start_date'), '2026-10-19', 'ionInput');
       await ionValue(s.field('time'), '11:00', 'ionInput');
       s.answer(422, refusal);

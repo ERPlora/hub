@@ -11,6 +11,7 @@ import { computed, ref, watch } from 'vue';
 import { useT } from '../../composables/useT';
 import type { QuickNoteOut } from '../../operations';
 import { refusal } from '../../lib/refusal';
+import PositionField from './PositionField.vue';
 
 const props = defineProps<{
   /** The note to edit; `null` adds a new one. */
@@ -94,21 +95,12 @@ async function save(): Promise<void> {
           :class="invalid(fieldErrors.text)"
           @ion-input="text = String($event.detail.value ?? '')"
         />
-        <ion-input
+        <PositionField
+          v-model="order"
           data-testid="sale-quick-note-form-order"
-          :value="order"
-          type="number"
-          inputmode="numeric"
-          min="0"
-          step="1"
-          :label="$t('sale.quickNotes.columns.sortOrder')"
-          label-placement="floating"
-          fill="outline"
-          mode="md"
           name="sort_order"
+          :label="$t('sale.quickNotes.columns.sortOrder')"
           :error-text="fieldErrors.sort_order"
-          :class="invalid(fieldErrors.sort_order)"
-          @ion-input="order = String($event.detail.value ?? '')"
         />
       </div>
     </template>
