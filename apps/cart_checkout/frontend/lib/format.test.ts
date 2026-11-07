@@ -69,7 +69,13 @@ describe('formatQuantity', () => {
     expect(formatQuantity('2.000', 'en')).toBe('2');
     expect(formatQuantity('0.500', 'en')).toBe('0.5');
     expect(formatQuantity('0.500', 'es')).toBe('0,5');
-    expect(formatQuantity('1234.250', 'es')).toBe('1234,25');
+  });
+
+  // hub#974: a cart's items are counted as the till and the stock count them: thousands grouped from four digits on.
+  it('groups the thousands from four digits on, in every language', () => {
+    expect(formatQuantity('1234.250', 'es')).toBe('1.234,25');
+    expect(formatQuantity('12500.000', 'es')).toBe('12.500');
+    expect(formatQuantity(1500, 'en')).toBe('1,500');
   });
 
   it('gives back what is not a number untouched', () => {

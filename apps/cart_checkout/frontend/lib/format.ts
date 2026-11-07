@@ -5,7 +5,8 @@
 // cart or an order in its own currency (a record is never rewritten), what a person types in the business's
 // (`useBusinessMoney`, the platform's: its country's; flow cart-checkout-business-currency). Until the business
 // answers an amount is a figure without a symbol, never the euro by default. A quantity is a decimal string from
-// the server (`"2.500"`), painted without decorative zeros.
+// the server (`"2.500"`), written with the platform's `formatQuantity`: without decorative zeros and grouped from four
+// digits on («1.500»), as the till and the stock write it (hub#974).
 import type { StatusPillTone } from '@erplora/ui/components';
 
 import type { Money } from '../../../../base/frontend/lib/home';
@@ -13,12 +14,12 @@ import type { CartStatus, OrderStatus } from '../operations';
 
 export type { Money };
 export { useBusinessMoney } from '../../../../base/frontend/lib/money';
+export { formatQuantity } from '@erplora/ui/components';
 
 /** The decimals of an amount while its currency is unknown. */
 const UNKNOWN_DECIMALS = 2;
 
 const money = new Map<string, Intl.NumberFormat>();
-const quantities = new Map<string, Intl.NumberFormat>();
 
 function moneyFormat(locale: string, of: Money | undefined, symbol = true): Intl.NumberFormat {
   const decimals = of?.decimals ?? UNKNOWN_DECIMALS;
@@ -49,18 +50,6 @@ export function recordMoney(record: { currency: string; currency_decimals: numbe
 export function amountExample(locale: string, of?: Money): string {
   const decimals = of?.decimals ?? UNKNOWN_DECIMALS;
   return moneyFormat(locale, of, false).format(decimals === 0 ? 12 : 12.5);
-}
-
-/** A quantity in `locale`, without decorative zeros («2», «0,5»); anything else as is. */
-export function formatQuantity(value: string | number, locale: string): string {
-  const number = Number(value);
-  if (value === '' || Number.isNaN(number)) return String(value);
-  let found = quantities.get(locale);
-  if (!found) {
-    found = new Intl.NumberFormat(locale, { maximumFractionDigits: 3, useGrouping: false });
-    quantities.set(locale, found);
-  }
-  return found.format(number);
 }
 
 /** Far above any total, still exact in a double. */

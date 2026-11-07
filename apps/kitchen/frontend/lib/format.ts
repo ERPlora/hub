@@ -3,12 +3,14 @@
 // The money is the business's (`useBusinessMoney`, the platform's: its country's currency and the decimals the server
 // counts it in), written with the platform's `formatMoney`: its thousands grouped from four digits on, as every screen
 // writes them; until it is known an amount is a figure without a symbol, never the euro by default. Its decimals come
-// from the server, never from the browser's Intl (which gives none to the forint).
+// from the server, never from the browser's Intl (which gives none to the forint). A quantity is written with the
+// platform's `formatQuantity` («2.000» → «2», «1500.000» → «1.500»), as the till that sent it writes it.
 import type { Money } from '../../../../base/frontend/lib/home';
 import type { SettingsOut } from '../operations';
 
 export type { Money };
 export { formatMoney, useBusinessMoney } from '../../../../base/frontend/lib/money';
+export { formatQuantity } from '@erplora/ui/components';
 
 export type Semaphore = 'ok' | 'warning' | 'critical' | 'off';
 
@@ -28,11 +30,6 @@ export function semaphore(elapsedMs: number, settings: Pick<SettingsOut, 'color_
   if (minutes >= settings.critical_minutes) return 'critical';
   if (minutes >= settings.warning_minutes) return 'warning';
   return 'ok';
-}
-
-/** A quantity as a cook reads it: `2`, `0,5` (the server sends `"2.000"`). */
-export function formatQuantity(quantity: string | number, locale: string): string {
-  return new Intl.NumberFormat(locale, { maximumFractionDigits: 3 }).format(Number(quantity));
 }
 
 /** A moment, short date and time, in the business's zone; empty for none. */

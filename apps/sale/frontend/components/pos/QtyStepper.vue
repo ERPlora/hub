@@ -2,8 +2,10 @@
 // The quantity selector of a cart line: minus, the field and plus. It only says what was asked
 // (`change`, as the server reads a decimal: «0.532»); the line keeps showing what the server keeps, so
 // a refused quantity puts the field back by itself. Minus from one asks zero: the page removes the
-// line. A product sold by weight or time types its quantity («0,532») and shows its unit. The signs are
-// glyphs: `ion:remove-outline` is not registered yet (UI-REQUESTS.md, «POS»).
+// line. A product sold by weight or time types its quantity («0,532») and shows its unit. The field holds the figure
+// as a person types it: ungrouped («1500», where the line writes «1.500» with the platform's `formatQuantity`), as a
+// till's quantity field does (hub#974). The signs are glyphs: `ion:remove-outline` is not registered yet
+// (UI-REQUESTS.md, «POS»).
 import { computed, useTemplateRef, watch } from 'vue';
 
 import { useLocale } from '../../composables/useT';
@@ -14,10 +16,10 @@ const emit = defineEmits<{ change: [quantity: string] }>();
 const locale = useLocale();
 const field = useTemplateRef<HTMLInputElement>('field');
 
-const number = computed(() => new Intl.NumberFormat(locale.value, { maximumFractionDigits: 3, useGrouping: false }));
-const shown = computed(() => number.value.format(Number(props.quantity)));
 /** The locale's decimal separator, as typed («,» in Spanish). */
-const separator = computed(() => number.value.formatToParts(1.5).find((part) => part.type === 'decimal')?.value ?? '.');
+const separator = computed(() => new Intl.NumberFormat(locale.value).formatToParts(1.5).find((part) => part.type === 'decimal')?.value ?? '.');
+/** The quantity as typed: the server's decimal («1500.000») without its trailing zeros, the locale's mark, ungrouped. */
+const shown = computed(() => String(Number(props.quantity)).replace('.', separator.value));
 
 function reset(): void {
   if (field.value) field.value.value = shown.value;

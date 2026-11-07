@@ -6,7 +6,19 @@
 // decimals it may not have (hub#936: 1,500 yen painted «15.00»).
 import { describe, expect, it } from 'vitest';
 
-import { centsFromAmount, currencySign, formatDay, formatMoney, formatPercent, formatQuantity, keypadCents, moneyOf, plain, signedMoney } from './format';
+import {
+  centsFromAmount,
+  currencySign,
+  formatDay,
+  formatMoney,
+  formatPercent,
+  formatQuantity,
+  keypadCents,
+  moneyOf,
+  plain,
+  quantityWithUnit,
+  signedMoney,
+} from './format';
 
 // The money as `base.business.get` (or a sale) says it: the currency and the decimals the server counts it in.
 const EUR = { currency: 'EUR', decimals: 2 };
@@ -94,10 +106,25 @@ describe('formatPercent', () => {
 });
 
 describe('formatQuantity', () => {
+  // hub#974: the till wrote «12.500» but «1500», the stock «12500»; every screen now writes it the platform's way.
+  it('writes a quantity with only the decimals it has, its thousands grouped from four digits on', () => {
+    expect(formatQuantity('2.000', 'en')).toBe('2');
+    expect(formatQuantity('1500.000', 'es')).toBe('1.500');
+    expect(formatQuantity('12500.000', 'es')).toBe('12.500');
+  });
+});
+
+describe('quantityWithUnit', () => {
   it('paints a quantity with only the decimals it has, and its unit unless it is units', () => {
-    expect(formatQuantity('2.000', 'ud', 'en')).toBe('2');
-    expect(formatQuantity('0.532', 'kg', 'es')).toBe('0,532 kg');
-    expect(formatQuantity('1.500', 'h', 'en')).toBe('1.5 h');
+    expect(quantityWithUnit('2.000', 'ud', 'en')).toBe('2');
+    expect(quantityWithUnit('0.532', 'kg', 'es')).toBe('0,532 kg');
+    expect(quantityWithUnit('1.500', 'h', 'en')).toBe('1.5 h');
+    expect(quantityWithUnit('2', '', 'en')).toBe('2');
+  });
+
+  it('groups a quantity of four digits as every screen does, with or without its unit', () => {
+    expect(quantityWithUnit('1500.000', 'ud', 'es')).toBe('1.500');
+    expect(quantityWithUnit('1250.500', 'kg', 'es')).toBe('1.250,5 kg');
   });
 });
 

@@ -38,7 +38,7 @@ const dishes = computed(() =>
     id: item.id,
     status: item.status,
     voided: item.status === 'voided',
-    text: `${formatQuantity(item.quantity, '', locale.value)}× ${item.name}`,
+    text: `${formatQuantity(item.quantity, locale.value)}× ${item.name}`,
   })),
 );
 </script>
