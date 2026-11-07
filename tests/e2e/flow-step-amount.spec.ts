@@ -10,8 +10,8 @@
 // flow: FLOW-F28 FLOW-F11
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
-import { A, api, psql, saveSessionForTheSweep, settledCapture, shown } from './helpers';
-import { askingFlow, onAutomations } from './flow-helpers';
+import { A, api, psql } from './helpers';
+import { addToANewCart, askingFlow, onAutomations, questionSays } from './flow-helpers';
 import { createProduct } from './inventory-helpers';
 import { VIEWPORTS } from './schedule-helpers';
 
@@ -60,15 +60,7 @@ async function askedSaying(
   const { context, page, name } = stage;
   await askingFlow(context, name, steps, grants);
 
-  await page.goto('/flow/automations');
-  const card = shown(page).locator('[data-testid=flow-inbox] article').filter({ hasText: name });
-  await expect(card.locator('[data-testid^=flow-question-title-]')).toHaveText(said);
-  await card.scrollIntoViewIfNeeded();
-  await settledCapture(page, shot);
-  await saveSessionForTheSweep(context);
-
-  await card.locator('[data-testid^=flow-question-reject-]').click();
-  await expect(card).toHaveCount(0);
+  await questionSays({ context, page, name }, said, shot);
 }
 
 for (const viewport of VIEWPORTS) {
@@ -111,12 +103,8 @@ for (const viewport of VIEWPORTS) {
   test(`FLOW-F28 the amounts inside the line a step adds to a cart are said as money in its question, at ${viewport.label}`, async ({ browser }) => {
     test.setTimeout(120_000);
     await onAutomations(browser, viewport, TAG, async ({ context, page, name }) => {
-      const session = `${SESSION}-${viewport.label}-${Date.now().toString(36)}`;
-      const cart = await api<{ id: string }>(context, A, 'POST', '/cart_checkout/carts', { session_token: session });
-      expect(cart.status, JSON.stringify(cart.data)).toBe(201);
-      const line = { session_token: session, product_ref: 'p-1', product_name: 'Champú', quantity: '2', unit_price: 1250 };
       const steps = [
-        { id: 's1', kind: 'command', operation: ADD, params: line },
+        await addToANewCart(context, `${SESSION}-${viewport.label}`),
         { id: 's2', kind: 'ask', title: '{{steps.s1.item.unit_price}} / {{steps.s1.item.line_total}} / {{steps.s1.cart.total_amount}}?' },
       ];
       // Before: «1250 / 2500 / 2500?».
