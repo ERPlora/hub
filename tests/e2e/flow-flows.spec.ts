@@ -495,17 +495,17 @@ for (const viewport of VIEWPORTS) {
 // temporal» here too: in what starts an automation, in what a step does or reads and in the datum it asks for, never an
 // «excepción». Nothing is saved. Each width leaves its capture of the steps' list.
 const SCHEDULE_OVERRIDE_EVENTS: Array<[string, string]> = [
-  ['schedule.override.created', 'se crea un cambio temporal del horario'],
-  ['schedule.override.deleted', 'se borra un cambio temporal del horario'],
-  ['schedule.override.updated', 'se edita un cambio temporal del horario'],
+  ['schedule.override.created', 'se crea un cambio temporal'],
+  ['schedule.override.deleted', 'se borra un cambio temporal'],
+  ['schedule.override.updated', 'se edita un cambio temporal'],
 ];
 const SCHEDULE_OVERRIDE_COMMANDS: Array<[string, string]> = [
-  ['schedule.override.create', 'Crear un cambio temporal del horario'],
-  ['schedule.override.update', 'Editar un cambio temporal del horario'],
+  ['schedule.override.create', 'Crear un cambio temporal'],
+  ['schedule.override.update', 'Editar un cambio temporal'],
 ];
 const SCHEDULE_OVERRIDE_QUERIES: Array<[string, string]> = [
-  ['schedule.override.list', 'Buscar cambios temporales del horario'],
-  ['schedule.override.get', 'Leer un cambio temporal del horario'],
+  ['schedule.override.list', 'Buscar cambios temporales'],
+  ['schedule.override.get', 'Leer un cambio temporal'],
 ];
 
 for (const viewport of VIEWPORTS) {
@@ -521,7 +521,9 @@ for (const viewport of VIEWPORTS) {
         await expect(page.locator(`[data-testid="flow-trigger-event-option-${event}"]`)).toContainText(words);
       }
       await page.locator('[data-testid="flow-trigger-event-option-schedule.override.created"]').click();
-      await expect(editor.locator('[data-testid=flow-trigger-open]')).toContainText('Cuando se crea un cambio temporal del horario');
+      await expect(editor.locator('[data-testid=flow-trigger-open]')).toContainText('Cuando se crea un cambio temporal');
+      await noHorizontalScroll(page, viewport.label);
+      await capture(page, `FIX-FLOW-SCHEDULE-OVERRIDE-WORD-trigger-${viewport.label}`);
 
       // FLOW-F11: «Qué hacer», «Qué consultar» and the datum the step asks for.
       await editor.locator('[data-testid=flow-editor-add-command]').click();
