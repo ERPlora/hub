@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:6a9e2a4a405dc5c8ec66ea2ee72dbf72fc332ab1b2f916e2f433c6ca6b1412df -->
+<!-- generated from WORKBOOK.md sha256:7ce9faa65d7820e34ad701a79843e5df241539eb6d1ee0d4ec1f6640d02b45ec -->
 
 ## What it is for and who it is for
 
@@ -2414,8 +2414,13 @@ Steps:
      2026, 10:00 AM"); a list of lines that carry only their record, such as the services of an appointment, the same
      way, by the name of each ("Services: Haircut, Colour"; one that cannot be named counts among the "more"), also
      when the assistant sends a service by its name because it does not know which one it is ("Services: Colour"; when
-     it sends the service and a name as well, it says the service that is booked); and any other, such as the lines of
-     a sale (with their quantity and price) or a list of codes, by how many items it carries; and a datum that groups others, such as a WhatsApp template, by its values, without the name of each one ("Template:
+     it sends the service and a name as well, it says the service that is booked); a list of lines that carry their
+     record and, beside it, only figures — those of a goods receipt (product and quantity) or the services of a voucher
+     (service and sessions) —, by the name of the record followed by its figures, the quantity as it is written in the
+     person's language and an amount as money ("Products: Red wine · 6, Beer · 2.5"; "Services included: Haircut · 5,
+     Colour · 3"; when a line cannot be named, the list says how many it carries: it would read as a bare figure); and
+     any other, such as a line with two records (the employee and the product of a sale), one with a text of its own or
+     a list of codes, by how many items it carries; and a datum that groups others, such as a WhatsApp template, by its values, without the name of each one ("Template:
      cita_recordatorio · es · Ana, 10:00"; of a till count, the notes and coins counted remain: "50: 2"). A date and a
      time show as they are written in the person's language and at the business's hour ("Nov 2, 2026, 10:00 AM"; a day
      alone, "Nov 2, 2026"; a time alone, "9:30 PM"); a value of a closed list, with the name its app gives it ("Front
