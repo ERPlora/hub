@@ -57,6 +57,7 @@ def visible_texts() -> set[str]:
         *Environment.labels,
         *Config.Route.labels,
         *Config.Representation.labels,
+        *Config.HubStatus.labels,
         *Record.Type.labels,
         *Record.Status.labels,
         *Event.Kind.labels,
@@ -75,7 +76,7 @@ def test_every_entry_has_a_spanish_translation():
 def test_every_visible_text_is_in_the_catalog():
     """Each text of VeriFactu by its whole key, context included (hub#975): a ``pgettext_lazy`` that goes
     back to ``_()``, or whose context has a typo, is missing from the catalogue, and Spanish says it in English."""
-    assert missing_from_catalogue(visible_texts(), LOCALE / "django.po", more_than=200, with_context=5) == set()
+    assert missing_from_catalogue(visible_texts(), LOCALE / "django.po", more_than=200, with_context=12) == set()
 
 
 def test_the_compiled_catalog_is_current():
@@ -89,6 +90,35 @@ def test_spanish_texts():
         assert str(Record.Type.ANULACION.label) == "Anulación"
         assert str(Environment.TESTING.label) == "Pruebas (AEAT de pruebas)"
         assert str(services.NOT_IN_QUEUE).startswith("Este registro no está en la cola")
+
+
+def test_verifactu_says_its_fields_with_the_aeats_words():
+    """VeriFactu's Spanish is the AEAT's («subsanación», «fecha de expedición», «cuota»…, as its screens say), and the
+    business's status is the account's («Activa», like «Suspendida»). An app installed before it that says the same
+    English («Active» in customer, «correction» in attendance, «event» in flow, «issue date» and «rectification kind»
+    in invoice, «tax» and «tax breakdown» in sale) spoke for it (hub#591)."""
+    fields = {
+        Record: ("issue_date", "rectification_kind", "tax_breakdown", "tax_amount", "correction"),
+        AeatRecord: ("issue_date",),
+    }
+    with translation.override("es"):
+        labels = {
+            f"{model.__name__}.{name}": str(model._meta.get_field(name).verbose_name)
+            for model, names in fields.items()
+            for name in names
+        }
+        labels["Event"] = str(Event._meta.verbose_name)
+        labels["Config.HubStatus.ACTIVE"] = str(Config.HubStatus.ACTIVE.label)
+    assert labels == {
+        "Record.issue_date": "fecha de expedición",
+        "Record.rectification_kind": "tipo de rectificativa",
+        "Record.tax_breakdown": "desglose",
+        "Record.tax_amount": "cuota",
+        "Record.correction": "subsanación",
+        "AeatRecord.issue_date": "fecha de expedición",
+        "Event": "evento",
+        "Config.HubStatus.ACTIVE": "Activa",
+    }
 
 
 @pytest.mark.django_db
