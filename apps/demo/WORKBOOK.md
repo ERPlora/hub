@@ -209,7 +209,9 @@ Implicados: ninguno
 ## Servicios: lo que entra y lo que sale
 
 Todo se puede pedir por las pantallas, el asistente (fase 2) y la API, con las mismas reglas y los
-mismos permisos.
+mismos permisos. Antes de cambiar o borrar un elemento o de añadirle una línea, el asistente pide confirmar con su
+tarjeta (BASE-F97), que nombra el elemento como lo nombran las pantallas, nunca por su id: por su nombre
+(«Elemento: Mesa 4»), y el estado con su palabra («Abierto», «Hecho»). Lo que quien pregunta no puede ver no sale.
 
 ### Lo que ofrece: consultas (leen, no cambian nada; todas se pueden seguir en vivo)
 
@@ -277,6 +279,14 @@ papel en ningún negocio.
   aviso. `permission_denied` se titula «No tienes permiso».
 - Cada operación es una herramienta del asistente: `ai=` con su descripción y, en las acciones, su
   `risk` (`high` solo para borrar un elemento, que se lleva sus líneas y no se deshace).
+- La tarjeta de confirmación del asistente (BASE-F97, hub#670) nombra el elemento que una escritura señala por su id
+  con la marca `refers` de `schemas.py` (`AN_ITEM`, en el `id` de `ByIdIn`, `ItemPatchIn` y `LineIn`), leída como
+  quien pregunta con `demo.item.detail`: el elemento por su `name`, como la lista y el diálogo «Eliminar». Ese `id`
+  lleva el título de su pantalla (`T_ITEM`: «Elemento», «Item»), nunca «Registro». Sin persona detrás, sin `demo.view`,
+  con un id de otro negocio o de algo que ya no está, el elemento queda fuera, nunca su id
+  (`tests/test_assistant_card_records.py`); el trinquete `UNNAMED_REFERENCES` de
+  `base/tests/test_assistant_card_values.py` impide que entre un dato sin marca. El estado, la única lista cerrada de
+  sus escrituras, sale con las etiquetas de `Item.Status` en cada idioma.
 - La lista nunca pide más de 100 filas (`PAGE_MAX`, el `le=100` de `ItemListIn`): «Cargar más» crece
   hasta ese tope y, con más elementos, el `DataTable` pagina también en el móvil (`maxWindow`).
 - El administrador de Django tiene CRUD sobre los elementos y sus líneas (en línea), como el de las
