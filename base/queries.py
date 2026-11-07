@@ -489,7 +489,7 @@ def app_list(ctx: OperationContext, data: AppListIn) -> dict:
                 {
                     "id": config.label,
                     "name": str(config.verbose_name),
-                    "icon": _shell_icon(config),
+                    "icon": home.shell_icon(config),
                     "category": config.category,
                     "category_label": str(Category(config.category).label),
                     "summary": str(config.summary),
@@ -628,13 +628,6 @@ def activation_next_at(host: str) -> dt.datetime | None:
     if waiting.filter(state=activation.CREATING, next_attempt_at__isnull=True).exists():
         return timezone.now()
     return waiting.aggregate(next=Min("next_attempt_at"))["next"]
-
-
-def _shell_icon(config: Any) -> str:
-    """The icon the shell paints for a module: its first menu entry's, as the launcher and «My apps»; without a menu,
-    the shell's own for an app. The module's ``icon`` is the store's, baked apart (``base.catalog``): HubIcon refuses
-    a name the shell has not registered."""
-    return config.navigation[0].icon if config.navigation else "ion:apps-outline"
 
 
 def _first_screen(ctx: OperationContext, config: Any) -> str | None:

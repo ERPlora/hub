@@ -60,7 +60,7 @@ def test_a_business_of_spain_with_it_off_is_asked_to_turn_it_on_and_one_of_polan
             "level": "functional",
             "actionable": True,
             "route": "/apps#all",
-            "icon": "ion:shield-checkmark-outline",
+            "icon": "ion:list-outline",  # as «My apps» paints VeriFactu: its first menu entry's
         }
         assert (step["title"], step["description"]) == (
             "Activa VeriFactu",

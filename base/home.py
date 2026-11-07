@@ -319,6 +319,13 @@ def module_steps(ctx: OperationContext, configs: Iterable[LiveAppConfig], hub_co
     return items
 
 
+def shell_icon(config: LiveAppConfig) -> str:
+    """The icon the shell paints for a module: its first menu entry's, as the launcher and «My apps»; without a menu,
+    the shell's own for an app. The module's ``icon`` is the store's, baked apart (``base.catalog``): HubIcon refuses
+    a name the shell has not registered."""
+    return config.navigation[0].icon if config.navigation else "ion:apps-outline"
+
+
 def mandatory_in(config: LiveAppConfig, hub_country: str) -> bool:
     """Whether a business of ``hub_country`` must have ``config``'s app on, as the app declares it in
     :data:`MANDATORY_ATTRIBUTE`; a business without a country is in ERPlora's market, Spain (:func:`applies_to_country`)."""
@@ -344,7 +351,7 @@ def mandatory_steps(configs: Iterable[LiveAppConfig], on: frozenset[str], hub_co
             actionable=True,
             title=gettext("Turn on %(app)s") % {"app": config.verbose_name},
             description=gettext("It is mandatory for businesses in %(country)s.") % {"country": country},
-            icon=getattr(config, "icon", "") or DEFAULT_STEP_ICON,
+            icon=shell_icon(config),
             route=CATALOGUE_ROUTE,
             order=MANDATORY_ORDER,
         )

@@ -19,7 +19,7 @@ from django.utils.translation import gettext_lazy
 from live.assistant import description
 from live.context import OperationContext, Scope
 from live.errors import NotFound
-from live.meta import BellCounter, DeviceNotice, SetupCheck, SetupStep, Widget
+from live.meta import BellCounter, DeviceNotice, Nav, SetupCheck, SetupStep, Widget
 from live.operations import Operation, get, registry
 from live.outbox import channel_for
 from live.models import OutboxEvent
@@ -221,7 +221,8 @@ def test_whoever_cannot_administer_the_hub_gets_no_platform_step(modules):
 def fiscal(countries=("ES",), **more):
     """A stand-in app mandatory in ``countries`` (or ``"all"``), declared as its ``LiveAppConfig`` would."""
     declared = {"countries": countries if countries == "all" else list(countries), "platform_turns_on": False}
-    return module("fiscal", mandatory=declared, icon="ion:shield-checkmark-outline", **more)
+    navigation = [Nav("records", "Records", "ion:list-outline", "/fiscal/records")]
+    return module("fiscal", mandatory=declared, icon="ion:calculator-outline", navigation=navigation, **more)
 
 
 def test_a_mandatory_app_off_in_the_businesss_country_is_an_important_step_until_it_is_on(modules, make_user):
@@ -239,7 +240,7 @@ def test_a_mandatory_app_off_in_the_businesss_country_is_an_important_step_until
         "required": True,
         "actionable": True,
         "route": "/apps#all",
-        "icon": "ion:shield-checkmark-outline",
+        "icon": "ion:list-outline",
         "title": "Turn on Fiscal",
     }
     assert (document["pending"], document["blocking_pending"]) == (2, 0)

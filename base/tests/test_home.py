@@ -429,9 +429,13 @@ def test_the_check_of_the_cards_runs_with_the_others(monkeypatch):
 
 
 def obliged(label="fiscal", countries=("PT",), platform_turns_on=False, **more):
-    """A stand-in app that declares where it is mandatory, as tax and verifactu do; base never names a real one."""
+    """A stand-in app that declares where it is mandatory, as tax and verifactu do; base never names a real one. Its
+    store icon is not the shell's: the shell paints an app with its first menu entry's."""
+    from live.meta import Nav
+
     declared = {"countries": countries if countries == "all" else list(countries), "platform_turns_on": platform_turns_on}
-    return SimpleNamespace(label=label, verbose_name=label.capitalize(), icon="ion:shield-outline", mandatory=declared, **more)
+    more.setdefault("navigation", [Nav("records", "Records", "ion:list-outline", f"/{label}/records")])
+    return SimpleNamespace(label=label, verbose_name=label.capitalize(), icon="ion:calculator-outline", mandatory=declared, **more)
 
 
 @pytest.mark.parametrize(
@@ -472,7 +476,7 @@ def test_a_mandatory_app_off_is_a_step_of_the_platform_to_turn_it_on():
             "actionable": True,
             "title": "Turn on Fiscal",
             "description": "It is mandatory for businesses in Portugal.",
-            "icon": "ion:shield-outline",
+            "icon": "ion:list-outline",
             "route": "/apps#all",
             "order": 15,
         }
@@ -504,11 +508,11 @@ def test_the_step_goes_once_the_app_is_on_and_never_comes_for_another_country():
     assert home.mandatory_steps(apps, on=frozenset({"fiscal", "ledger"}), hub_country="PT") == []
 
 
-def test_an_app_without_its_own_icon_gets_the_steps_one():
-    app = obliged()
-    app.icon = ""
-
-    assert home.mandatory_steps([app], on=frozenset(), hub_country="PT")[0]["icon"] == home.DEFAULT_STEP_ICON
+def test_the_step_has_the_icon_the_shell_paints_for_the_app_never_its_store_one():
+    """The store's icon is baked apart, and HubIcon refuses a name the shell has not registered: the step paints the
+    app as «My apps» and the launcher do, by its first menu entry, or the shell's own for an app without a menu."""
+    assert home.mandatory_steps([obliged()], on=frozenset(), hub_country="PT")[0]["icon"] == "ion:list-outline"
+    assert home.mandatory_steps([obliged(navigation=[])], on=frozenset(), hub_country="PT")[0]["icon"] == "ion:apps-outline"
 
 
 @pytest.mark.parametrize(

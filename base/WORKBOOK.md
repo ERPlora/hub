@@ -3010,7 +3010,8 @@ Implicados: HUBS-F17, WEBSITE-F10
   con la AEAT). `base.E016` (`base/home.py`) comprueba al arrancar la forma: `"all"` o códigos ISO 3166-1 alfa-2 en
   mayúsculas sin repetir (nunca una lista vacía, que leería «en ninguno» o «en todos») y `platform_turns_on`
   booleano. `base` la lee con `getattr` sin nombrar ninguna app: `home.mandatory_steps` da un paso `base.mandatory.<app>`
-  (nivel `functional`, orden 15, ruta `/apps#all`, el icono de la app) por cada una obligatoria en el país del negocio
+  (nivel `functional`, orden 15, ruta `/apps#all`, el icono con que el shell pinta la app: el de su primera entrada de
+  menú, `home.shell_icon`, nunca el de la tienda, que `HubIcon` rechazaría) por cada una obligatoria en el país del negocio
   (`country_or_market`: sin país, España) que no está encendida, solo a quien tiene `base.administer_hub`, dentro de
   `base.setup.status`, que ya se re-ejecuta al encender o apagar una app (`APP_EVENTS`). Mientras se crean sus tablas
   (`creating`) el paso sigue: todavía no está encendida. `platform_turns_on` lo leerá el alta (hub#997, parte 3). Tests:
