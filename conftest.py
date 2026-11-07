@@ -312,6 +312,26 @@ def hub_b(request, hub_databases):
     yield from _hub_with_its_database(request, hubs.HUB_B_ID, "tenant-b", hub_databases.b)
 
 
+def pytest_collection_modifyitems(items):
+    """A test whose ``django_db`` mark names a hub's alias (``hubs.HUB_DATABASES``) gets ``hub_databases``, which
+    registers those aliases, set up before pytest-django's ``_django_db_marker`` makes the test case out of the mark.
+
+    Without it, a test that asks for neither ``hub_a``, ``hub_b`` nor ``hub_databases`` only passed after another test
+    of its process had made them: run alone, pytest-django refused an alias missing from the settings (hub#1007)."""
+    from pytest_django.fixtures import validate_django_db
+
+    from base.tenancy.tests import hubs
+
+    aliases = {hubs.HUB_A_ALIAS, hubs.HUB_B_ALIAS}
+    for item in items:
+        marker = item.get_closest_marker("django_db")
+        if marker is None or "hub_databases" in item.fixturenames:
+            continue
+        _transaction, _reset_sequences, databases, *_ = validate_django_db(marker)
+        if databases and databases != "__all__" and aliases & set(databases):
+            item.fixturenames.insert(item.fixturenames.index("_django_db_marker"), "hub_databases")
+
+
 @pytest.fixture(autouse=True)
 def custom_domains_forgotten():
     """A test's own domains are rolled back with it: each test's first question reads the map (``base.custom_domains``)."""

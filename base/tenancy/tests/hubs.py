@@ -37,6 +37,7 @@ HUB_A_ID = uuid.UUID("01a16000-0000-7000-8000-00000000000a")
 HUB_B_ID = uuid.UUID("01a16000-0000-7000-8000-00000000000b")
 #: Their aliases (``base.tenancy.connections.hub_alias``), registered for the whole session once built, so a test can
 #: name them: ``pytest.mark.django_db(databases=HUB_DATABASES)`` wraps them in its transaction as it does ``default``.
+#: Naming them is enough: the root conftest gets such a test ``hub_databases`` (``pytest_collection_modifyitems``).
 HUB_A_ALIAS = f"hub_{HUB_A_ID.hex}"
 HUB_B_ALIAS = f"hub_{HUB_B_ID.hex}"
 HUB_DATABASES = ("default", HUB_A_ALIAS, HUB_B_ALIAS)
