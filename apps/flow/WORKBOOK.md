@@ -150,10 +150,10 @@ automatizaciones** regresa (FLOW-F08).
 
 | Estado | Qué se ve |
 |---|---|
-| Cargando | «Cargando…» encima de la galería hasta que llegan las preguntas, los borradores y la lista; la lista, con su indicador; el editor, «Cargando…» |
+| Cargando | «Cargando…» encima de la galería hasta que llegan las preguntas, los borradores y la lista; la lista, con su indicador; el editor, «Cargando…»; «¿Qué dato?», «Cargando…» hasta que llegan las acciones de las apps, y entonces los datos de los pasos anteriores, sin cerrarla |
 | Vacío | Sin automatizaciones, solo la galería; sin pasos, «Todavía no hay pasos…»; sin ejecuciones, «Todavía no se ha ejecutado.» |
 | Sin resultados | «Aquí no hay nada que encaje con eso.» y **Volver a verlas todas** |
-| Error | El mensaje en rojo encima, con **Reintentar** en la lista; un fallo al guardar, encender, copiar o borrar dice qué no encaja y no cambia nada; si no se puede leer lo que pueden usar las automatizaciones (avisos y acciones), «No se ha podido leer lo que pueden usar aquí las automatizaciones.» con **Reintentar** |
+| Error | El mensaje en rojo encima, con **Reintentar** en la lista; un fallo al guardar, encender, copiar o borrar dice qué no encaja y no cambia nada; si no se puede leer lo que pueden usar las automatizaciones (avisos y acciones), «No se ha podido leer lo que pueden usar aquí las automatizaciones.» con **Reintentar**, también dentro de «¿Qué dato?» |
 | Reconectando | «Reconectando…» mientras vuelve el directo; lo pintado se queda |
 | Sin permiso | «No tienes permiso» en lugar de la pantalla |
 | App inactiva | «Esta app no está activa en este negocio» |
@@ -453,7 +453,10 @@ cliente») y con la palabra de la app que los tiene («Sección», como en Venta
 nombre interno.
 Sale: los pasos, al **Guardar**. Cada acción o consulta que se nombra pasa a pedir su permiso (FLOW-F12).
 Si falla: el servidor rechaza al guardar una acción o una consulta que no existe en el negocio, un dato
-de un paso que no va antes, una condición vacía o una espera fuera de rango, junto al paso.
+de un paso que no va antes, una condición vacía o una espera fuera de rango, junto al paso. Si «¿Qué dato?» se
+abre antes de que lleguen las acciones de las apps (nada más entrar en el editor), dice «Cargando…» y, en cuanto
+llegan, enseña los datos de los pasos anteriores sin cerrarla; nunca «Todavía no hay datos que insertar aquí» con un
+paso delante. Si no se pueden leer, lo dice dentro, en rojo, con **Reintentar**.
 Implicados: FLOW-F12, FLOW-F13, FLOW-F16
 
 ### FLOW-F12 Conceder y retirar los permisos
