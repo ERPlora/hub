@@ -47,6 +47,9 @@ describe('NewFlowPage', () => {
   it('the assistant’s draft of the link, paused', async () => {
     const m = await setup('/flow/automations/new?draft=d1');
     expect(m.params('flow.draft.list')).toEqual([{ limit: 100 }]);
+    // Until the draft is in, «Loading…» read out as a status, the one LoadingNote of flow (hub#969).
+    expect(m.find('flow-new-loading').text()).toBe('Loading…');
+    expect(m.find('flow-new-loading').attributes('role')).toBe('status');
     await m.result('flow.draft.list', page([DRAFT], 1, 100));
     const editor = m.wrapper.findComponent(FlowEditor);
     expect(editor.props('draft')).toEqual(DRAFT);
