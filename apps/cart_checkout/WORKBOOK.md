@@ -94,7 +94,7 @@ del flujo CART_CHECKOUT-F08.
 |---|---|
 | Cargando | «Cargando…» mientras llega el primer resultado. |
 | Vacío | «Sin carritos.» o «Sin pedidos.»; con búsqueda o filtro, «Sin resultados». |
-| Error | El aviso de la tabla con «Reintentar». Un rechazo de un formulario sale dentro del formulario, cada motivo debajo de su campo, sin perder lo tecleado; el de una acción de fila, encima de la tabla. |
+| Error | El aviso de la tabla con «Reintentar». Un rechazo de un formulario sale dentro del formulario, cada motivo debajo de su campo, sin perder lo tecleado, y cada campo rechazado pierde su motivo en cuanto se corrige ese campo, aunque otro diga lo mismo (hub#888); el de una acción de fila, encima de la tabla. |
 | Reconectando | Lo pintado se queda; una franja avisa «Reconectando…». |
 | App inactiva | «Esta app no está activa en este negocio». |
 | Sin permiso | No aparece lo que no puede hacer; si llega por otra puerta, «No tienes permiso». |
