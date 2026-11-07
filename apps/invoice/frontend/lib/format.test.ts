@@ -71,6 +71,12 @@ describe('formatQuantity', () => {
     expect(formatQuantity('0.532', 'es')).toBe('0,532');
     expect(formatQuantity('-1.000', 'en')).toBe('-1');
   });
+
+  // hub#974: an invoice line writes its quantity as the till, the stock and the assistant's card do.
+  it('groups the thousands from four digits on, as every screen of the Hub', () => {
+    expect(formatQuantity('1500.000', 'es')).toBe('1.500');
+    expect(formatQuantity('-12500.000', 'en')).toBe('-12,500');
+  });
 });
 
 describe('typedRate', () => {
