@@ -11,7 +11,14 @@ from live.operations import registry
 
 from apps.combo import queries, schemas, services
 from apps.combo.models import ChoiceGroup, ChoiceOption, Combo
-from base.tests.po import catalogue_key, missing_from_catalogue, po_entries
+from base.tests.po import (
+    catalogue_key,
+    compiled_differences,
+    missing_from_catalogue,
+    model_texts,
+    po_entries,
+    untranslated,
+)
 
 LOCALE = Path(apps.get_app_config("combo").path) / "locale" / "es" / "LC_MESSAGES"
 MODELS = (Combo, ChoiceGroup, ChoiceOption)
@@ -36,13 +43,7 @@ def visible_texts() -> set[str]:
         *module_texts(schemas),
         *Combo.SupplyKind.labels,
     ]
-    for model in MODELS:
-        lazies += [model._meta.verbose_name, model._meta.verbose_name_plural]
-        lazies += [
-            field.verbose_name
-            for field in model._meta.get_fields()
-            if hasattr(field, "verbose_name") and not field.auto_created and not field.primary_key
-        ]
+    lazies += model_texts(MODELS)
     with translation.override("en"):
         return {catalogue_key(text) for text in lazies} | schema_titles()
 
@@ -60,10 +61,7 @@ def schema_titles() -> set[str]:
 
 
 def test_every_entry_has_a_spanish_translation():
-    entries = po_entries(LOCALE / "django.po")
-    assert entries
-    untranslated = [msgid for msgid, (msgstr, fuzzy) in entries.items() if not msgstr or fuzzy]
-    assert untranslated == []
+    assert untranslated(LOCALE / "django.po") == []
 
 
 def test_every_visible_text_is_in_the_catalog():
@@ -73,10 +71,7 @@ def test_every_visible_text_is_in_the_catalog():
 
 
 def test_the_compiled_catalog_is_current():
-    with (LOCALE / "django.mo").open("rb") as compiled:
-        catalog = gettext.GNUTranslations(compiled)._catalog
-    po = {msgid: msgstr for msgid, (msgstr, _) in po_entries(LOCALE / "django.po").items()}
-    assert {msgid: msgstr for msgid, msgstr in catalog.items() if msgid} == po
+    assert compiled_differences(LOCALE) == {}
 
 
 def test_the_card_says_each_title_with_combos_own_spanish():

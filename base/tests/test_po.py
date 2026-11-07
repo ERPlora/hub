@@ -10,11 +10,21 @@ from importlib import import_module
 from pathlib import Path
 
 import pytest
-from babel.messages.pofile import PoFileError
+from babel.messages.mofile import write_mo
+from babel.messages.pofile import PoFileError, read_po
 from django.utils import translation
 from django.utils.translation import gettext_lazy, pgettext_lazy
 
-from base.tests.po import catalogue_key, missing_from_catalogue, po_entries, po_messages
+from base.tests.po import (
+    catalogue_key,
+    compiled_differences,
+    missing_from_catalogue,
+    mo_entries,
+    model_texts,
+    po_entries,
+    po_messages,
+    untranslated,
+)
 
 ROOT = Path(__file__).resolve().parents[2]
 HEADER = 'msgid ""\nmsgstr ""\n"Language: es\\n"\n'
@@ -178,15 +188,120 @@ def test_a_collection_that_found_too_little_fails_instead_of_passing_blind(tmp_p
         missing_from_catalogue(found, statuses_po(tmp_path), more_than=more_than, with_context=with_context)
 
 
-def test_no_catalogue_test_drops_the_context_of_a_key():
-    """Eight ``test_i18n.py`` compared the catalogue's keys without their context (``split("\\x04")``) and stayed green
-    when a ``pgettext_lazy`` lost its context or had a typo in it (hub#975): every test asks ``missing_from_catalogue``
-    or compares whole keys."""
+def test_a_model_shows_its_names_and_the_names_of_its_own_fields():
+    """What the admin and the assistant's card say of a model: its two names and the names of the fields it declares,
+    not the primary key nor the reverse relation Django adds (``Item.lines``)."""
+    from apps.demo.models import Item
+
+    with translation.override("en"):
+        assert sorted(map(str, model_texts([Item]))) == sorted(
+            ["item", "items", "name", "status", "note", "created at", "updated at"]
+        )
+
+
+def test_an_entry_without_its_spanish_or_marked_fuzzy_is_untranslated(tmp_path):
+    """gettext shows both in English: an empty ``msgstr``, and a ``#, fuzzy`` one, which it skips."""
+    po = write_po(
+        tmp_path,
+        f'{HEADER}\nmsgid "Open"\nmsgstr "Abierto"\n\nmsgid "Done"\nmsgstr ""\n\n'
+        '#, fuzzy\nmsgctxt "status"\nmsgid "Closed"\nmsgstr "Cerrado"\n',
+    )
+    assert untranslated(po) == ["Done", "status\x04Closed"]
+
+
+def test_a_catalogue_without_entries_fails_instead_of_passing(tmp_path):
+    """Positive control: with no entries there would be nothing untranslated, and the guard would pass blind."""
+    with pytest.raises(AssertionError, match="no entries"):
+        untranslated(write_po(tmp_path, HEADER))
+
+
+def test_the_compiled_catalogue_says_what_the_po_says(tmp_path):
+    """An entry edited, added or removed after the last ``compilemessages`` shows its old Spanish (or none): each one is
+    a difference, with what the ``.po`` and the ``.mo`` say."""
+    po = write_po(tmp_path, f'{HEADER}\nmsgid "Open"\nmsgstr "Abierto"\n\nmsgid "Done"\nmsgstr "Hecho"\n')
+    with po.open(encoding="utf-8") as source, (tmp_path / "django.mo").open("wb") as compiled:
+        write_mo(compiled, read_po(source))
+    assert compiled_differences(tmp_path) == {}
+
+    write_po(tmp_path, f'{HEADER}\nmsgid "Open"\nmsgstr "Abierta"\n\nmsgid "New"\nmsgstr "Nuevo"\n')
+    assert compiled_differences(tmp_path) == {
+        "Open": ("Abierta", "Abierto"),
+        "New": ("Nuevo", None),
+        "Done": (None, "Hecho"),
+    }
+
+
+def test_a_compiled_catalogue_is_read_as_django_reads_it(tmp_path):
+    """The entries of a ``.mo`` by the keys gettext gives them, its header left out."""
+    po = write_po(tmp_path, f'{HEADER}\nmsgid "Open"\nmsgstr "Abierto"\n\nmsgctxt "status"\nmsgid "Open"\nmsgstr "Abierta"\n')
+    with po.open(encoding="utf-8") as source, (tmp_path / "django.mo").open("wb") as compiled:
+        write_mo(compiled, read_po(source))
+    assert mo_entries(tmp_path / "django.mo") == {"Open": "Abierto", "status\x04Open": "Abierta"}
+
+
+def copies_of_the_skeleton(source: str) -> set[str]:
+    """Which piece of the catalogue tests ``base.tests.po`` shares a module writes out itself: the names of its models
+    (``model_texts``), the untranslated entries (``untranslated``), the ``.mo`` against the ``.po``
+    (``compiled_differences``), or a key whose context it drops (``missing_from_catalogue`` compares whole keys)."""
+    found = set()
+    for node in ast.walk(ast.parse(source)):
+        if isinstance(node, ast.Attribute) and node.attr == "_catalog":
+            found.add("compiled_differences")
+        elif isinstance(node, ast.Name) and node.id == "fuzzy":
+            found.add("untranslated")
+        elif isinstance(node, (ast.List, ast.Tuple, ast.Set)) and any(
+            isinstance(item, ast.Attribute)
+            and item.attr == "verbose_name_plural"
+            and getattr(item.value, "attr", None) == "_meta"
+            for item in node.elts
+        ):
+            found.add("model_texts")
+        elif (
+            isinstance(node, ast.Subscript)
+            and isinstance(node.value, ast.Call)
+            and getattr(node.value.func, "attr", None) in {"split", "rsplit", "partition", "rpartition"}
+            and any(isinstance(arg, ast.Constant) and arg.value == "\x04" for arg in node.value.args)
+        ):
+            found.add("missing_from_catalogue")
+    return found
+
+
+@pytest.mark.parametrize(
+    ("source", "expected"),
+    [
+        pytest.param("catalog = GNUTranslations(compiled)._catalog\n", {"compiled_differences"}, id="mo-by-hand"),
+        pytest.param(
+            "bad = [key for key, (msgstr, fuzzy) in entries.items() if not msgstr or fuzzy]\n",
+            {"untranslated"},
+            id="untranslated-by-hand",
+        ),
+        pytest.param(
+            "lazies += [model._meta.verbose_name, model._meta.verbose_name_plural]\n", {"model_texts"}, id="names"
+        ),
+        pytest.param('ids = {key.split("\\x04")[-1] for key in keys}\n', {"missing_from_catalogue"}, id="split"),
+        pytest.param("ids = {key.rsplit('\\x04', 1)[-1] for key in keys}\n", {"missing_from_catalogue"}, id="rsplit"),
+        pytest.param('ids = {key.partition("\\x04")[2] for key in keys}\n', {"missing_from_catalogue"}, id="partition"),
+        pytest.param('context, msgid = key.split("\\x04", 1)\n', set(), id="keeps-both-halves"),
+        pytest.param('assert len({key for key in texts if "\\x04" in key}) >= 5\n', set(), id="counts-contexts"),
+        pytest.param('assert str(Item._meta.verbose_name_plural) == "artículos"\n', set(), id="one-name"),
+    ],
+)
+def test_the_check_tells_a_copy_of_the_skeleton_from_a_test_of_its_own(source, expected):
+    assert copies_of_the_skeleton(source) == expected
+
+
+def test_no_catalogue_test_copies_what_base_tests_po_shares():
+    """The 27 ``test_i18n.py`` wrote the same pieces out, each its own copy, and each fix went copy by copy: eight kept
+    comparing keys without their context after the rest had moved (hub#975, hub#985). Every test asks
+    ``base.tests.po``."""
     tests = sorted((ROOT / "apps").glob("*/tests/*.py"))
     assert len(tests) > 100
-    assert [
-        str(path.relative_to(ROOT)) for path in tests if 'split("\\x04")' in path.read_text(encoding="utf-8")
-    ] == []
+    copies = {
+        str(path.relative_to(ROOT)): sorted(pieces)
+        for path in tests
+        if (pieces := copies_of_the_skeleton(path.read_text(encoding="utf-8")))
+    }
+    assert copies == {}
 
 
 def test_continuation_lines_and_escapes_are_read_as_the_compiled_catalog_says_them(tmp_path):

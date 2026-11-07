@@ -1,6 +1,5 @@
 """Every visible text of the inventory app has its Spanish translation, compiled and current."""
 
-import gettext
 import json
 import uuid
 from pathlib import Path
@@ -14,7 +13,7 @@ from live.operations import registry
 
 from apps.inventory import queries, schemas, services
 from apps.inventory.models import Category, Product, ProductCategory, RefundStock, SaleStock, Settings, StockMovement, Unit
-from base.tests.po import po_entries
+from base.tests.po import compiled_differences, model_texts, po_entries, untranslated
 
 LOCALE = Path(apps.get_app_config("inventory").path) / "locale" / "es" / "LC_MESSAGES"
 
@@ -37,14 +36,7 @@ def visible_texts() -> set[str]:
     lazies += [text for step in config.setup for text in (step.title, step.description)]
     lazies += [panel.title for panel in config.widgets]
     lazies += lazy_constants(queries) + lazy_constants(services) + lazy_constants(schemas)
-    for model in (Settings, Category, Product, ProductCategory, StockMovement, SaleStock, RefundStock):
-        lazies += [model._meta.verbose_name, model._meta.verbose_name_plural]
-        # The primary key comes from live.models.UUIDModel; a reverse relation has no text of this app.
-        lazies += [
-            field.verbose_name
-            for field in model._meta.get_fields()
-            if hasattr(field, "verbose_name") and not field.auto_created and not field.primary_key
-        ]
+    lazies += model_texts((Settings, Category, Product, ProductCategory, StockMovement, SaleStock, RefundStock))
     for choices in (Unit, Product.Type, StockMovement.Type, SaleStock.State):
         lazies += list(choices.labels)
     with translation.override("en"):
@@ -65,10 +57,7 @@ def schema_titles() -> set[str]:
 
 
 def test_every_entry_has_a_spanish_translation():
-    entries = po_entries(LOCALE / "django.po")
-    assert entries
-    untranslated = [msgid for msgid, (msgstr, fuzzy) in entries.items() if not msgstr or fuzzy]
-    assert untranslated == []
+    assert untranslated(LOCALE / "django.po") == []
 
 
 def test_every_visible_text_is_in_the_catalog():
@@ -76,10 +65,7 @@ def test_every_visible_text_is_in_the_catalog():
 
 
 def test_the_compiled_catalog_is_current():
-    with (LOCALE / "django.mo").open("rb") as compiled:
-        catalog = gettext.GNUTranslations(compiled)._catalog
-    po = {msgid: msgstr for msgid, (msgstr, _) in po_entries(LOCALE / "django.po").items()}
-    assert {msgid: msgstr for msgid, msgstr in catalog.items() if msgid} == po
+    assert compiled_differences(LOCALE) == {}
 
 
 def test_spanish_texts_of_the_workbook():

@@ -1,7 +1,6 @@
 """Every visible text of the website app has its Spanish translation, compiled and current: the store's texts, the
 models, the errors and the public page's chrome (``{% translate %}`` in its templates)."""
 
-import gettext
 import re
 from pathlib import Path
 
@@ -12,7 +11,7 @@ from django.utils import translation
 from apps.website import queries, schemas, services
 from apps.website.models import Image, Site
 from base.catalog import build_registry
-from base.tests.po import catalogue_key, po_entries
+from base.tests.po import catalogue_key, compiled_differences, model_texts, po_entries, untranslated
 
 APP = Path(apps.get_app_config("website").path)
 LOCALE = APP / "locale" / "es" / "LC_MESSAGES"
@@ -23,13 +22,7 @@ _TRANSLATE = re.compile(r'{%\s*translate\s+"([^"]+)"(?:\s+context\s+"([^"]+)")?\
 def visible_texts() -> set[str]:
     config = apps.get_app_config("website")
     lazies = [config.verbose_name, config.summary, config.description, *(nav.label for nav in config.navigation)]
-    for model in (Site, Image):
-        lazies += [model._meta.verbose_name, model._meta.verbose_name_plural]
-        lazies += [
-            field.verbose_name
-            for field in model._meta.get_fields()
-            if hasattr(field, "verbose_name") and not field.auto_created and not field.primary_key
-        ]
+    lazies += model_texts((Site, Image))
     lazies += list(Site.Template.labels)
     lazies += [
         queries.NOT_PUBLISHED,
@@ -60,9 +53,7 @@ def template_texts() -> set[str]:
 
 
 def test_every_entry_has_a_spanish_translation():
-    entries = po_entries(LOCALE / "django.po")
-    assert entries
-    assert [key for key, (msgstr, fuzzy) in entries.items() if not msgstr or fuzzy] == []
+    assert untranslated(LOCALE / "django.po") == []
 
 
 def test_every_visible_text_and_every_template_text_is_in_the_catalog():
@@ -76,10 +67,7 @@ def test_every_visible_text_and_every_template_text_is_in_the_catalog():
 
 
 def test_the_compiled_catalog_is_current():
-    with (LOCALE / "django.mo").open("rb") as compiled:
-        catalog = gettext.GNUTranslations(compiled)._catalog
-    po = {key: msgstr for key, (msgstr, _) in po_entries(LOCALE / "django.po").items()}
-    assert {key: value for key, value in catalog.items() if key} == po
+    assert compiled_differences(LOCALE) == {}
 
 
 def test_the_store_reads_the_name_with_its_context():

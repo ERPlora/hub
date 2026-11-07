@@ -4,6 +4,8 @@ The parsing is Babel's, a dependency already; this only gives its messages the k
 what those tests compare them with. Its behaviour is tested in ``base/tests/test_po.py``.
 """
 
+import gettext
+from collections.abc import Iterable
 from pathlib import Path
 
 from babel.messages.catalog import Message
@@ -30,6 +32,44 @@ def po_entries(path: Path) -> dict[str | tuple[str, int], tuple[str, bool]]:
         else:
             entries[key] = (message.string, message.fuzzy)
     return entries
+
+
+def untranslated(po: Path) -> list[str | tuple[str, int]]:
+    """The keys of ``po`` gettext shows in English: no ``msgstr``, or a ``#, fuzzy`` one it skips. A catalogue without
+    entries fails, since there would be nothing to check."""
+    entries = po_entries(po)
+    if not entries:
+        raise AssertionError(f"{po} has no entries")
+    return [key for key, (msgstr, fuzzy) in entries.items() if not msgstr or fuzzy]
+
+
+def mo_entries(path: Path) -> dict[str | tuple[str, int], str]:
+    """``key → text`` of a compiled catalogue, as Django reads it (the same keys as ``po_entries``), its header left
+    out."""
+    with path.open("rb") as compiled:
+        return {key: text for key, text in gettext.GNUTranslations(compiled)._catalog.items() if key}
+
+
+def compiled_differences(locale: Path) -> dict:
+    """What ``django.mo`` in ``locale`` says differently from its ``django.po``, as ``key → (po, mo)`` (``None`` where
+    one lacks the entry): a catalogue edited and not compiled again shows its old Spanish."""
+    mo = mo_entries(locale / "django.mo")
+    po = {key: msgstr for key, (msgstr, _fuzzy) in po_entries(locale / "django.po").items()}
+    return {key: (po.get(key), mo.get(key)) for key in po.keys() | mo.keys() if po.get(key) != mo.get(key)}
+
+
+def model_texts(models: Iterable) -> list:
+    """The names each model shows (singular and plural) and those of the fields it declares: what the admin and the
+    assistant's card say. The primary key and the relations Django adds on its own are not among them."""
+    texts = []
+    for model in models:
+        texts += [model._meta.verbose_name, model._meta.verbose_name_plural]
+        texts += [
+            field.verbose_name
+            for field in model._meta.get_fields()
+            if hasattr(field, "verbose_name") and not field.auto_created and not field.primary_key
+        ]
+    return texts
 
 
 def catalogue_key(text) -> str:

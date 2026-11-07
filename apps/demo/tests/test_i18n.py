@@ -1,6 +1,5 @@
 """Every visible text of the demo app has its Spanish translation, compiled and current."""
 
-import gettext
 import json
 import uuid
 from pathlib import Path
@@ -11,7 +10,7 @@ from django.utils import translation
 
 from apps.demo import queries, services
 from apps.demo.models import Item, ItemLine
-from base.tests.po import po_entries
+from base.tests.po import compiled_differences, model_texts, po_entries, untranslated
 
 LOCALE = Path(apps.get_app_config("demo").path) / "locale" / "es" / "LC_MESSAGES"
 
@@ -28,24 +27,14 @@ def visible_texts() -> set[str]:
         queries.ITEM_NOT_FOUND,
         services.ITEM_DONE,
     ]
-    for model in (Item, ItemLine):
-        lazies += [model._meta.verbose_name, model._meta.verbose_name_plural]
-        # The primary key comes from live.models.UUIDModel: its name is Django's default, not a text of this app.
-        lazies += [
-            field.verbose_name
-            for field in model._meta.get_fields()
-            if hasattr(field, "verbose_name") and not field.auto_created and not field.primary_key
-        ]
+    lazies += model_texts((Item, ItemLine))
     lazies += list(Item.Status.labels)
     with translation.override("en"):
         return {str(text) for text in lazies}
 
 
 def test_every_entry_has_a_spanish_translation():
-    entries = po_entries(LOCALE / "django.po")
-    assert entries
-    untranslated = [msgid for msgid, (msgstr, fuzzy) in entries.items() if not msgstr or fuzzy]
-    assert untranslated == []
+    assert untranslated(LOCALE / "django.po") == []
 
 
 def test_every_visible_text_is_in_the_catalog():
@@ -53,10 +42,7 @@ def test_every_visible_text_is_in_the_catalog():
 
 
 def test_the_compiled_catalog_is_current():
-    with (LOCALE / "django.mo").open("rb") as compiled:
-        catalog = gettext.GNUTranslations(compiled)._catalog
-    po = {msgid: msgstr for msgid, (msgstr, _) in po_entries(LOCALE / "django.po").items()}
-    assert {msgid: msgstr for msgid, msgstr in catalog.items() if msgid} == po
+    assert compiled_differences(LOCALE) == {}
 
 
 def test_spanish_texts():

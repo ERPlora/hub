@@ -1,6 +1,5 @@
 """Every visible text of the kitchen app has its Spanish translation, compiled and current."""
 
-import gettext
 import json
 from pathlib import Path
 
@@ -28,7 +27,7 @@ from apps.kitchen.models import (
     TicketItem,
     TicketStatus,
 )
-from base.tests.po import catalogue_key, po_entries
+from base.tests.po import catalogue_key, compiled_differences, model_texts, po_entries, untranslated
 
 LOCALE = Path(apps.get_app_config("kitchen").path) / "locale" / "es" / "LC_MESSAGES"
 MODELS = (
@@ -72,15 +71,7 @@ def visible_texts() -> set[str]:
     lazies += (
         lazy_constants(queries) + lazy_constants(services) + lazy_constants(schemas)
     )
-    for model in MODELS:
-        lazies += [model._meta.verbose_name, model._meta.verbose_name_plural]
-        lazies += [
-            field.verbose_name
-            for field in model._meta.get_fields()
-            if hasattr(field, "verbose_name")
-            and not field.auto_created
-            and not field.primary_key
-        ]
+    lazies += model_texts(MODELS)
     for choices in CHOICES:
         lazies += list(choices.labels)
     with translation.override("en"):
@@ -101,11 +92,7 @@ def schema_titles() -> set[str]:
 
 
 def test_every_entry_has_a_spanish_translation():
-    entries = po_entries(LOCALE / "django.po")
-    assert entries
-    assert [
-        msgid for msgid, (msgstr, fuzzy) in entries.items() if not msgstr or fuzzy
-    ] == []
+    assert untranslated(LOCALE / "django.po") == []
 
 
 def test_every_visible_text_is_in_the_catalog():
@@ -118,12 +105,7 @@ def test_every_visible_text_is_in_the_catalog():
 
 
 def test_the_compiled_catalog_is_current():
-    with (LOCALE / "django.mo").open("rb") as compiled:
-        catalog = gettext.GNUTranslations(compiled)._catalog
-    po = {
-        msgid: msgstr for msgid, (msgstr, _) in po_entries(LOCALE / "django.po").items()
-    }
-    assert {msgid: msgstr for msgid, msgstr in catalog.items() if msgid} == po
+    assert compiled_differences(LOCALE) == {}
 
 
 def test_spanish_texts_of_the_workbook():
