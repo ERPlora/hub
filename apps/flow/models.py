@@ -58,12 +58,12 @@ class Flow(UUIDModel):
     language = models.CharField(_("language"), max_length=8, default="en")
     # Name, event and the operations of its steps: what the list's search looks in.
     search_text = models.TextField(_("search text"), blank=True, default="")
-    created_by = models.CharField(_("created by"), max_length=128, blank=True)
-    updated_by = models.CharField(_("updated by"), max_length=128, blank=True)
-    created_at = models.DateTimeField(_("created at"), auto_now_add=True)
-    updated_at = models.DateTimeField(_("updated at"), auto_now=True)
+    created_by = models.CharField(pgettext_lazy("automation", "created by"), max_length=128, blank=True)
+    updated_by = models.CharField(pgettext_lazy("automation", "updated by"), max_length=128, blank=True)
+    created_at = models.DateTimeField(pgettext_lazy("automation", "created at"), auto_now_add=True)
+    updated_at = models.DateTimeField(pgettext_lazy("automation", "updated at"), auto_now=True)
     # Deleted automations stop at once and keep their history.
-    deleted_at = models.DateTimeField(_("deleted at"), null=True, blank=True)
+    deleted_at = models.DateTimeField(pgettext_lazy("automation", "deleted at"), null=True, blank=True)
     # The factory recipe it was built from (``<app>/<id>``, FLOW-F33); empty for the owner's own.
     recipe = models.CharField(_("factory recipe"), max_length=RECIPE_MAX_LENGTH, blank=True, default="")
     # The fingerprint of that recipe when it was built or restored: a newer one is «New version».
@@ -149,7 +149,7 @@ class FlowRun(UUIDModel):
     # The automations whose steps caused the event that started this one (loop guard).
     chain = models.JSONField(_("chain"), default=list, blank=True)
     started_by = models.CharField(_("started by"), max_length=128, blank=True)
-    started_at = models.DateTimeField(_("started at"), default=timezone.now)
+    started_at = models.DateTimeField(pgettext_lazy("run", "started at"), default=timezone.now)
     finished_at = models.DateTimeField(_("finished at"), null=True, blank=True)
 
     class Meta:
@@ -278,7 +278,7 @@ class Question(UUIDModel):
 
     run = models.ForeignKey(FlowRun, on_delete=models.CASCADE, related_name="questions", verbose_name=_("run"))
     flow = models.ForeignKey(Flow, on_delete=models.CASCADE, related_name="+", verbose_name=_("automation"))
-    step_id = models.CharField(_("step"), max_length=32)
+    step_id = models.CharField(pgettext_lazy("automation", "step"), max_length=32)
     title = models.CharField(_("question"), max_length=300)
     details = models.TextField(_("details"), blank=True, default="")
     role = models.CharField(_("asked of"), max_length=16, blank=True, default="")
