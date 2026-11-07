@@ -762,18 +762,21 @@ def test_the_seeded_spanish_baseline_configures_a_spanish_business():
         "country_code": "ES",
         "matching_rules": 11,
         "configured": True,
+        "factory_rules": True,
     }
-    # Without a stated country, every active root rule counts: no false «you are missing your taxes».
+    # Without a stated country, the business's (hub#996): Spain, for one without a country registered.
     assert status().model_dump() == {
-        "country_code": None,
+        "country_code": "ES",
         "matching_rules": 11,
         "configured": True,
+        "factory_rules": True,
     }
-    # A French business carrying only the Spanish rules is not configured.
+    # A French business carrying only the Spanish rules is not configured, and France brings no rules of its own.
     assert status(country_code="fr").model_dump() == {
         "country_code": "FR",
         "matching_rules": 0,
         "configured": False,
+        "factory_rules": False,
     }
 
 
@@ -796,9 +799,11 @@ def test_what_counts_as_configured(no_seed):
     # A country without a rule in force is not configured: the till could not price a sale there.
     portugal = status(country_code="PT")
     assert (portugal.matching_rules, portugal.configured) == (0, False)
-    # Without the business's country, any country's rule counts.
-    anywhere = status()
-    assert (anywhere.matching_rules, anywhere.configured) == (3, True)
+    # Without a stated country, the business's own (Spain here, with no country registered): another country's
+    # rule never counts (hub#996).
+    rule(category("product.z"), "23", country="PT")
+    business = status()
+    assert (business.country_code, business.matching_rules, business.configured) == ("ES", 3, True)
 
 
 def test_nothing_in_force_is_not_configured(no_seed):
