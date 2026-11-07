@@ -6,45 +6,35 @@ from pathlib import Path
 
 from django.apps import apps
 from django.utils import translation
-from live.operations import registry
 
 from apps.cart_checkout import admin as cart_admin
 from apps.cart_checkout import queries, schemas, services
 from apps.cart_checkout.models import Cart, CartItem, Order, OrderCounter
-from base.tests.po import catalogue_key, compiled_differences, model_texts, po_entries, untranslated
+from base.tests.po import (
+    catalogue_key,
+    compiled_differences,
+    config_texts,
+    model_texts,
+    module_texts,
+    operation_titles,
+    po_entries,
+    untranslated,
+)
 
 LOCALE = Path(apps.get_app_config("cart_checkout").path) / "locale" / "es" / "LC_MESSAGES"
 MODELS = (Cart, CartItem, Order, OrderCounter)
-
-
-def lazy_constants(module) -> list:
-    """Every module-level lazy text (``_("…")``) of ``module``."""
-    return [value for value in vars(module).values() if type(value).__name__ == "__proxy__"]
 
 
 def visible_texts() -> set[str]:
     """The catalogue key of every lazy text the app shows (menu, store, admin, choices, messages) — its English, with
     its context in front for a ``pgettext_lazy`` — and the titles of its schemas."""
     config = apps.get_app_config("cart_checkout")
-    lazies = [config.verbose_name, config.summary, config.description, *(nav.label for nav in config.navigation)]
-    lazies += lazy_constants(queries) + lazy_constants(services) + lazy_constants(schemas) + lazy_constants(cart_admin)
+    lazies = [*config_texts(config)]
+    lazies += module_texts(queries, services, schemas, cart_admin)
     lazies += model_texts(MODELS)
     lazies += list(Cart.Status.labels) + list(Order.Status.labels)
     with translation.override("en"):
-        return {catalogue_key(text) for text in lazies} | schema_titles()
-
-
-def schema_titles() -> set[str]:
-    """The titles cart_checkout's operations give their input data (``gettext_noop``): the assistant's card names each
-    datum by them, so each one needs its Spanish. Only the ones cart_checkout wrote: pydantic leaves ``title`` empty
-    otherwise."""
-    return {
-        field.title
-        for op in registry.values()
-        if op.app_label == "cart_checkout"
-        for field in op.input.model_fields.values()
-        if field.title
-    }
+        return {catalogue_key(text) for text in lazies} | operation_titles("cart_checkout")
 
 
 def test_every_entry_has_a_spanish_translation():
@@ -69,7 +59,7 @@ def test_the_card_says_each_title_with_cart_checkouts_own_spanish():
     Spanish, so cart_checkout's own entry would be dead text: they have to say the same."""
     with (LOCALE / "django.mo").open("rb") as compiled:
         own = gettext.GNUTranslations(compiled)
-    titles = schema_titles()
+    titles = operation_titles("cart_checkout")
     assert {"Customer", "Cart line", "Order"} <= titles
     with translation.override("es"):
         assert {title: translation.gettext(title) for title in titles} == {

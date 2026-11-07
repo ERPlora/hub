@@ -8,8 +8,6 @@ from pathlib import Path
 import pytest
 from django.apps import apps
 from django.utils import translation
-from django.utils.functional import Promise
-from live.operations import registry
 
 from apps.staff import queries, schemas, services
 from apps.staff.models import (
@@ -23,8 +21,11 @@ from apps.staff.models import (
 from base.tests.po import (
     catalogue_key,
     compiled_differences,
+    config_texts,
     missing_from_catalogue,
     model_texts,
+    module_texts,
+    operation_titles,
     po_entries,
     untranslated,
 )
@@ -33,42 +34,19 @@ LOCALE = Path(apps.get_app_config("staff").path) / "locale" / "es" / "LC_MESSAGE
 MODELS = (Role, Member, Schedule, ScheduleDay, TimeOff, StaffSettings)
 
 
-def module_texts(module) -> list[Promise]:
-    """The lazy texts a module declares at its top (error and validation messages)."""
-    return [value for value in vars(module).values() if isinstance(value, Promise)]
-
-
 def visible_texts() -> set[str]:
     """The English source of every lazy text the app shows (menu, store, admin, choices, messages)."""
     config = apps.get_app_config("staff")
     lazies = [
-        config.verbose_name,
-        config.summary,
-        config.description,
-        *(nav.label for nav in config.navigation),
+        *config_texts(config),
         *(widget.title for widget in config.widgets),
-        *module_texts(queries),
-        *module_texts(services),
-        *module_texts(schemas),
+        *module_texts(queries, services, schemas),
     ]
     lazies += model_texts(MODELS)
     for choices in (Member.Status, TimeOff.LeaveType, TimeOff.Status):
         lazies += list(choices.labels)
     with translation.override("en"):
-        return {catalogue_key(text) for text in lazies} | schema_titles()
-
-
-def schema_titles() -> set[str]:
-    """The titles staff's operations give their input data (``gettext_noop``): the assistant's card names each datum
-    by them, so each one needs its Spanish. A title pydantic makes up from the field is not one."""
-    titles = set()
-    for op in registry.values():
-        if op.app_label == "staff":
-            for name, prop in op.input.model_json_schema().get("properties", {}).items():
-                title = prop.get("title")
-                if title and title != name.title().replace("_", " "):
-                    titles.add(title)
-    return titles
+        return {catalogue_key(text) for text in lazies} | operation_titles("staff")
 
 
 def test_every_entry_has_a_spanish_translation():

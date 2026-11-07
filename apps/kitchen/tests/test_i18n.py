@@ -6,7 +6,6 @@ from pathlib import Path
 import pytest
 from django.apps import apps
 from django.utils import translation
-from live.operations import registry
 
 from apps.kitchen import queries, schemas, services
 from apps.kitchen.models import (
@@ -27,7 +26,16 @@ from apps.kitchen.models import (
     TicketItem,
     TicketStatus,
 )
-from base.tests.po import catalogue_key, compiled_differences, model_texts, po_entries, untranslated
+from base.tests.po import (
+    catalogue_key,
+    compiled_differences,
+    config_texts,
+    model_texts,
+    module_texts,
+    operation_titles,
+    po_entries,
+    untranslated,
+)
 
 LOCALE = Path(apps.get_app_config("kitchen").path) / "locale" / "es" / "LC_MESSAGES"
 MODELS = (
@@ -52,43 +60,19 @@ CHOICES = (
 )
 
 
-def lazy_constants(module) -> list:
-    return [
-        value for value in vars(module).values() if type(value).__name__ == "__proxy__"
-    ]
-
-
 def visible_texts() -> set[str]:
     """The English source of every lazy text the app shows (menu, store, admin, choices, messages, paper) and the
     titles of its schemas."""
     config = apps.get_app_config("kitchen")
     lazies = [
-        config.verbose_name,
-        config.summary,
-        config.description,
-        *(nav.label for nav in config.navigation),
+        *config_texts(config),
     ]
-    lazies += (
-        lazy_constants(queries) + lazy_constants(services) + lazy_constants(schemas)
-    )
+    lazies += module_texts(queries, services, schemas)
     lazies += model_texts(MODELS)
     for choices in CHOICES:
         lazies += list(choices.labels)
     with translation.override("en"):
-        return {catalogue_key(text) for text in lazies} | schema_titles()
-
-
-def schema_titles() -> set[str]:
-    """The titles kitchen's operations give their input data (``gettext_noop``): the assistant's card names each
-    datum by them, so each one needs its Spanish. Only the ones kitchen wrote: pydantic leaves ``title`` empty
-    otherwise."""
-    return {
-        field.title
-        for op in registry.values()
-        if op.app_label == "kitchen"
-        for field in op.input.model_fields.values()
-        if field.title
-    }
+        return {catalogue_key(text) for text in lazies} | operation_titles("kitchen")
 
 
 def test_every_entry_has_a_spanish_translation():

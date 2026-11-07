@@ -10,7 +10,7 @@ from django.utils import translation
 
 from apps.demo import queries, services
 from apps.demo.models import Item, ItemLine
-from base.tests.po import compiled_differences, model_texts, po_entries, untranslated
+from base.tests.po import compiled_differences, config_texts, missing_from_catalogue, model_texts, untranslated
 
 LOCALE = Path(apps.get_app_config("demo").path) / "locale" / "es" / "LC_MESSAGES"
 
@@ -19,11 +19,8 @@ def visible_texts() -> set[str]:
     """The English source of every lazy text the app shows (menu, admin, choices, error messages)."""
     config = apps.get_app_config("demo")
     lazies = [
-        config.verbose_name,
         # The public store's texts (round 16): register_apps writes them in en and es.
-        config.summary,
-        config.description,
-        *(nav.label for nav in config.navigation),
+        *config_texts(config),
         queries.ITEM_NOT_FOUND,
         services.ITEM_DONE,
     ]
@@ -38,7 +35,9 @@ def test_every_entry_has_a_spanish_translation():
 
 
 def test_every_visible_text_is_in_the_catalog():
-    assert visible_texts() - set(po_entries(LOCALE / "django.po")) == set()
+    """Each text of Demo by its whole key, context included: a ``pgettext_lazy`` that goes back to ``_()``, or
+    whose context has a typo, is missing from the catalogue, and Spanish says it in English (hub#975)."""
+    assert missing_from_catalogue(visible_texts(), LOCALE / "django.po", more_than=15, with_context=0) == set()
 
 
 def test_the_compiled_catalog_is_current():

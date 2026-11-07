@@ -21,7 +21,16 @@ from apps.invoice.models import (
 )
 from apps.invoice.tests.conftest import ctx_for, run
 from base import assistant
-from base.tests.po import catalogue_key, compiled_differences, missing_from_catalogue, model_texts, untranslated
+from base.tests.po import (
+    catalogue_key,
+    compiled_differences,
+    config_texts,
+    missing_from_catalogue,
+    model_texts,
+    module_texts,
+    operation_titles,
+    untranslated,
+)
 
 APP = Path(apps.get_app_config("invoice").path)
 LOCALE = APP / "locale" / "es" / "LC_MESSAGES"
@@ -29,35 +38,14 @@ TEMPLATE = APP / "templates" / "invoice" / "invoice.html"
 SCREENS = json.loads((APP / "frontend" / "locale" / "es.json").read_text(encoding="utf-8"))["invoice"]
 
 
-def messages_of(module) -> list:
-    """Every lazy text a module keeps at its top level (its error messages, its labels)."""
-    lazies = [
-        value
-        for name, value in vars(module).items()
-        if name.isupper() and type(value).__name__ == "__proxy__"
-    ]
-    for name, value in vars(module).items():
-        if name.isupper() and isinstance(value, dict):
-            lazies += [
-                item for item in value.values() if type(item).__name__ == "__proxy__"
-            ]
-    return lazies
-
-
 def visible_texts() -> set[str]:
     """The English source of every lazy text the app shows (menu, store, Home, admin, choices, errors, paper)."""
     config = apps.get_app_config("invoice")
     lazies = [
-        config.verbose_name,
-        config.summary,
-        config.description,
-        *(nav.label for nav in config.navigation),
+        *config_texts(config),
         # The Home's steps (FIX-INVOICE-SETUP-HOOKS): base paints them in the reader's language.
         *(text for step in config.setup for text in (step.title, step.description)),
-        *messages_of(queries),
-        *messages_of(schemas),
-        *messages_of(services),
-        *messages_of(platform),
+        *module_texts(queries, schemas, services, platform),
         *(label for _english, label in FACTORY_SERIES_NAMES.values()),
         *(
             v.message
@@ -76,21 +64,8 @@ def visible_texts() -> set[str]:
         return (
             {catalogue_key(text) for text in lazies}
             | set(re.findall(r'{% translate "([^"]+)" %}', template))
-            | schema_titles()
+            | operation_titles("invoice")
         )
-
-
-def schema_titles() -> set[str]:
-    """The titles invoice's operations give their input data (``gettext_noop``): the assistant's card names each datum
-    by them, so each one needs its Spanish. A title pydantic makes up from the field is not one."""
-    titles = set()
-    for op in registry.values():
-        if op.app_label == "invoice":
-            for name, prop in op.input.model_json_schema().get("properties", {}).items():
-                title = prop.get("title")
-                if title and title != name.title().replace("_", " "):
-                    titles.add(title)
-    return titles
 
 
 def test_every_entry_has_a_spanish_translation():

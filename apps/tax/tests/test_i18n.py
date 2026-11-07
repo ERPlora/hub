@@ -8,12 +8,19 @@ import pytest
 from django.apps import apps
 from django.core.validators import RegexValidator
 from django.utils import translation
-from live.operations import registry
 
 from apps.tax import admin as tax_admin
 from apps.tax import queries, schemas, services
 from apps.tax.models import SYSTEM_CATEGORY_LABELS, WHOLE_COUNTRY, TaxAlias, TaxCategory, TaxRule, TaxSettings
-from base.tests.po import catalogue_key, compiled_differences, model_texts, po_entries, untranslated
+from base.tests.po import (
+    catalogue_key,
+    compiled_differences,
+    config_texts,
+    missing_from_catalogue,
+    model_texts,
+    operation_titles,
+    untranslated,
+)
 
 LOCALE = Path(apps.get_app_config("tax").path) / "locale" / "es" / "LC_MESSAGES"
 SCREENS = Path(apps.get_app_config("tax").path) / "frontend" / "locale" / "es.json"
@@ -48,10 +55,7 @@ def visible_texts() -> set[str]:
     its schemas."""
     config = apps.get_app_config("tax")
     lazies = [
-        config.verbose_name,
-        config.summary,
-        config.description,
-        *(nav.label for nav in config.navigation),
+        *config_texts(config),
         # The Home's step (FIX-TAX-SETUP-HOOKS).
         *(text for step in config.setup for text in (step.title, step.description)),
         *MESSAGES,
@@ -62,19 +66,7 @@ def visible_texts() -> set[str]:
     lazies += model_texts((TaxCategory, TaxRule, TaxAlias, TaxSettings))
     lazies += [*TaxRule.TaxType.labels, *TaxRule.OperationClass.labels, *TaxAlias.Source.labels]
     with translation.override("en"):
-        return {catalogue_key(text) for text in lazies} | schema_titles()
-
-
-def schema_titles() -> set[str]:
-    """The titles tax's operations give their input data (``gettext_noop``): the assistant's card names each datum
-    by them, so each one needs its Spanish. Only the ones tax wrote: pydantic leaves ``title`` empty otherwise."""
-    return {
-        field.title
-        for op in registry.values()
-        if op.app_label == "tax"
-        for field in op.input.model_fields.values()
-        if field.title
-    }
+        return {catalogue_key(text) for text in lazies} | operation_titles("tax")
 
 
 def test_every_entry_has_a_spanish_translation():
@@ -82,7 +74,9 @@ def test_every_entry_has_a_spanish_translation():
 
 
 def test_every_visible_text_is_in_the_catalog():
-    assert visible_texts() - set(po_entries(LOCALE / "django.po")) == set()
+    """Each text of Impuestos by its whole key, context included: a ``pgettext_lazy`` that goes back to ``_()``, or
+    whose context has a typo, is missing from the catalogue, and Spanish says it in English (hub#975)."""
+    assert missing_from_catalogue(visible_texts(), LOCALE / "django.po", more_than=75, with_context=2) == set()
 
 
 def test_the_compiled_catalog_is_current():
@@ -95,7 +89,7 @@ def test_the_card_says_each_title_with_taxs_own_spanish():
     on the order of the apps."""
     with (LOCALE / "django.mo").open("rb") as compiled:
         own = gettext.GNUTranslations(compiled)
-    titles = schema_titles()
+    titles = operation_titles("tax")
     assert "Category" in titles
     with translation.override("es"):
         assert {title: translation.gettext(title) for title in titles} == {

@@ -8,8 +8,6 @@ from pathlib import Path
 import pytest
 from django.apps import apps
 from django.utils import translation
-from django.utils.functional import Promise
-from live.operations import registry
 
 from apps.schedule import models, queries, schemas, services
 from apps.schedule.models import (
@@ -24,8 +22,11 @@ from apps.schedule.models import (
 from base.tests.po import (
     catalogue_key,
     compiled_differences,
+    config_texts,
     missing_from_catalogue,
     model_texts,
+    module_texts,
+    operation_titles,
     po_entries,
     untranslated,
 )
@@ -42,43 +43,20 @@ MODELS = (
 )
 
 
-def module_texts(module) -> list[Promise]:
-    """The lazy texts a module declares at its top (error and validation messages)."""
-    return [value for value in vars(module).values() if isinstance(value, Promise)]
-
-
 def visible_texts() -> set[str]:
     """The English source of every lazy text the app shows (menu, store, admin, messages, day names) and the titles
     of its schemas."""
     config = apps.get_app_config("schedule")
     lazies = [
-        config.verbose_name,
-        config.summary,
-        config.description,
-        *(nav.label for nav in config.navigation),
+        *config_texts(config),
         # The Home's step (FIX-SCHEDULE-SETUP-HOOKS).
         *(text for step in config.setup for text in (step.title, step.description)),
         *models.WEEKDAY_NAMES,
-        *module_texts(queries),
-        *module_texts(services),
-        *module_texts(schemas),
+        *module_texts(queries, services, schemas),
     ]
     lazies += model_texts(MODELS)
     with translation.override("en"):
-        return {catalogue_key(text) for text in lazies} | schema_titles()
-
-
-def schema_titles() -> set[str]:
-    """The titles schedule's operations give their input data (``gettext_noop``): the assistant's card names each
-    datum by them, so each one needs its Spanish. Only the ones schedule wrote: pydantic leaves ``title`` empty
-    otherwise."""
-    return {
-        field.title
-        for op in registry.values()
-        if op.app_label == "schedule"
-        for field in op.input.model_fields.values()
-        if field.title
-    }
+        return {catalogue_key(text) for text in lazies} | operation_titles("schedule")
 
 
 def test_every_entry_has_a_spanish_translation():
@@ -101,7 +79,7 @@ def test_the_card_says_each_title_with_schedules_own_spanish():
     apps."""
     with (LOCALE / "django.mo").open("rb") as compiled:
         own = gettext.GNUTranslations(compiled)
-    titles = schema_titles()
+    titles = operation_titles("schedule")
     assert {"Opening intervals", "Special days"} <= titles
     with translation.override("es"):
         assert {title: translation.gettext(title) for title in titles} == {

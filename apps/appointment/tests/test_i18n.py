@@ -19,34 +19,28 @@ from apps.appointment.models import (
     RecurringService,
     Settings,
 )
-from base.tests.po import catalogue_key, compiled_differences, missing_from_catalogue, model_texts, untranslated
+from base.tests.po import (
+    catalogue_key,
+    compiled_differences,
+    config_texts,
+    missing_from_catalogue,
+    model_texts,
+    module_texts,
+    untranslated,
+)
 
 LOCALE = Path(apps.get_app_config("appointment").path) / "locale" / "es" / "LC_MESSAGES"
 MODELS = (Settings, Counter, Recurring, RecurringService, Appointment, AppointmentService, History, BlockedTime)
-
-
-def module_texts(module) -> list[Promise]:
-    """The lazy texts a module declares at its top, alone or as the values of a dict."""
-    found = []
-    for value in vars(module).values():
-        items = value.values() if isinstance(value, dict) else (value,)
-        found += [item for item in items if isinstance(item, Promise)]
-    return found
 
 
 def visible_texts() -> set[str]:
     """The English source of every lazy text the app shows (menu, store, admin, choices, messages)."""
     config = apps.get_app_config("appointment")
     lazies = [
-        config.verbose_name,
-        config.summary,
-        config.description,
-        *(nav.label for nav in config.navigation),
+        *config_texts(config),
         *(counter.label for counter in config.bell),
         *(text for notice in config.notices for text in (*notice.title, *notice.body) if isinstance(text, Promise)),
-        *module_texts(queries),
-        *module_texts(services),
-        *module_texts(schemas),
+        *module_texts(queries, services, schemas),
     ]
     lazies += model_texts(MODELS)
     for choices in (

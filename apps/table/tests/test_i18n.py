@@ -7,7 +7,6 @@ from pathlib import Path
 import pytest
 from django.apps import apps
 from django.utils import translation
-from live.operations import registry
 
 from apps.table import queries, schemas, services
 from apps.table.models import (
@@ -19,17 +18,18 @@ from apps.table.models import (
     Zone,
 )
 from base.tests.po import catalogue_key as source
-from base.tests.po import compiled_differences, model_texts, po_entries, untranslated
+from base.tests.po import (
+    compiled_differences,
+    config_texts,
+    model_texts,
+    module_texts,
+    operation_titles,
+    po_entries,
+    untranslated,
+)
 
 LOCALE = Path(apps.get_app_config("table").path) / "locale" / "es" / "LC_MESSAGES"
 MODELS = (TableSettings, Zone, Table, TableSession, SessionMove, Hold)
-
-
-def lazy_constants(module) -> list:
-    """Every module-level lazy text (``_("…")``) of ``module``."""
-    return [
-        value for value in vars(module).values() if type(value).__name__ == "__proxy__"
-    ]
 
 
 def visible_texts() -> set[str]:
@@ -37,15 +37,10 @@ def visible_texts() -> set[str]:
     of its schemas."""
     config = apps.get_app_config("table")
     lazies = [
-        config.verbose_name,
-        config.summary,
-        config.description,
-        *(nav.label for nav in config.navigation),
+        *config_texts(config),
         *(text for step in config.setup for text in (step.title, step.description)),
     ]
-    lazies += (
-        lazy_constants(queries) + lazy_constants(services) + lazy_constants(schemas)
-    )
+    lazies += module_texts(queries, services, schemas)
     lazies += model_texts(MODELS)
     for choices in (
         Zone.Color,
@@ -58,19 +53,7 @@ def visible_texts() -> set[str]:
     ):
         lazies += list(choices.labels)
     with translation.override("en"):
-        return {source(text) for text in lazies} | {"Table %(number)s"} | schema_titles()
-
-
-def schema_titles() -> set[str]:
-    """The titles table's operations give their input data (``gettext_noop``): the assistant's card names each datum
-    by them, so each one needs its Spanish. Only the ones table wrote: pydantic leaves ``title`` empty otherwise."""
-    return {
-        field.title
-        for op in registry.values()
-        if op.app_label == "table"
-        for field in op.input.model_fields.values()
-        if field.title
-    }
+        return {source(text) for text in lazies} | {"Table %(number)s"} | operation_titles("table")
 
 
 def test_every_entry_has_a_spanish_translation():
@@ -101,7 +84,7 @@ def test_the_card_says_each_title_with_tables_own_spanish():
     that app's Spanish, so table's own entry would be dead text: they have to say the same."""
     with (LOCALE / "django.mo").open("rb") as compiled:
         own = gettext.GNUTranslations(compiled)
-    titles = schema_titles()
+    titles = operation_titles("table")
     assert {"Into check", "Lines to move"} <= titles
     with translation.override("es"):
         assert {title: translation.gettext(title) for title in titles} == {

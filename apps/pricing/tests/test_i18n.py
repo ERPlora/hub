@@ -5,21 +5,22 @@ from pathlib import Path
 
 from django.apps import apps
 from django.utils import translation
-from django.utils.functional import Promise
-from live.operations import registry
 
 from apps.pricing import queries, schemas, services
 from apps.pricing.models import DiscountRule, PriceItem, PriceList
 from base.tests.po import catalogue_key as source
-from base.tests.po import compiled_differences, model_texts, po_entries, untranslated
+from base.tests.po import (
+    compiled_differences,
+    config_texts,
+    model_texts,
+    module_texts,
+    operation_titles,
+    po_entries,
+    untranslated,
+)
 
 LOCALE = Path(apps.get_app_config("pricing").path) / "locale" / "es" / "LC_MESSAGES"
 MODELS = (PriceList, PriceItem, DiscountRule)
-
-
-def module_texts(module) -> list[Promise]:
-    """The lazy texts a module declares at its top (error and validation messages)."""
-    return [value for value in vars(module).values() if isinstance(value, Promise)]
 
 
 def visible_texts() -> set[str]:
@@ -27,31 +28,14 @@ def visible_texts() -> set[str]:
     its schemas."""
     config = apps.get_app_config("pricing")
     lazies = [
-        config.verbose_name,
-        config.summary,
-        config.description,
-        *(nav.label for nav in config.navigation),
-        *module_texts(queries),
-        *module_texts(services),
-        *module_texts(schemas),
+        *config_texts(config),
+        *module_texts(queries, services, schemas),
     ]
     lazies += model_texts(MODELS)
     for choices in (DiscountRule.Type, DiscountRule.Scope):
         lazies += list(choices.labels)
     with translation.override("en"):
-        return {source(text) for text in lazies} | schema_titles()
-
-
-def schema_titles() -> set[str]:
-    """The titles pricing's operations give their input data (``gettext_noop``): the assistant's card names each datum
-    by them, so each one needs its Spanish. Only the ones pricing wrote: pydantic leaves ``title`` empty otherwise."""
-    return {
-        field.title
-        for op in registry.values()
-        if op.app_label == "pricing"
-        for field in op.input.model_fields.values()
-        if field.title
-    }
+        return {source(text) for text in lazies} | operation_titles("pricing")
 
 
 def test_every_entry_has_a_spanish_translation():

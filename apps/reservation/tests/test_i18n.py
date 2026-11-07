@@ -7,7 +7,6 @@ from pathlib import Path
 import pytest
 from django.apps import apps
 from django.utils import translation
-from live.operations import registry
 
 from apps.reservation import queries, schemas, services
 from apps.reservation.models import (
@@ -17,17 +16,19 @@ from apps.reservation.models import (
     TimeSlot,
     WaitlistEntry,
 )
-from base.tests.po import catalogue_key, compiled_differences, model_texts, po_entries, untranslated
+from base.tests.po import (
+    catalogue_key,
+    compiled_differences,
+    config_texts,
+    model_texts,
+    module_texts,
+    operation_titles,
+    po_entries,
+    untranslated,
+)
 
 LOCALE = Path(apps.get_app_config("reservation").path) / "locale" / "es" / "LC_MESSAGES"
 MODELS = (Settings, TimeSlot, BlockedDate, Reservation, WaitlistEntry)
-
-
-def lazy_constants(module) -> list:
-    """Every module-level lazy text (``_("…")``) of ``module``."""
-    return [
-        value for value in vars(module).values() if type(value).__name__ == "__proxy__"
-    ]
 
 
 def visible_texts() -> set[str]:
@@ -35,32 +36,16 @@ def visible_texts() -> set[str]:
     its schemas."""
     config = apps.get_app_config("reservation")
     lazies = [
-        config.verbose_name,
-        config.summary,
-        config.description,
-        *(nav.label for nav in config.navigation),
+        *config_texts(config),
     ]
-    lazies += lazy_constants(queries) + lazy_constants(services) + lazy_constants(schemas)
+    lazies += module_texts(queries, services, schemas)
     lazies += [message for message, _field in services.REFUSALS.values()]
     lazies += list(services.TARGET_WORDS.values())
     lazies += model_texts(MODELS)
     for choices in (Reservation.Status, Reservation.Source):
         lazies += list(choices.labels)
     with translation.override("en"):
-        return {catalogue_key(text) for text in lazies} | {"Reservation settings"} | schema_titles()
-
-
-def schema_titles() -> set[str]:
-    """The titles reservation's operations give their input data (``gettext_noop``): the assistant's card names each
-    datum by them, so each one needs its Spanish. Only the ones reservation wrote: pydantic leaves ``title`` empty
-    otherwise."""
-    return {
-        field.title
-        for op in registry.values()
-        if op.app_label == "reservation"
-        for field in op.input.model_fields.values()
-        if field.title
-    }
+        return {catalogue_key(text) for text in lazies} | {"Reservation settings"} | operation_titles("reservation")
 
 
 def test_every_entry_has_a_spanish_translation():
@@ -95,7 +80,7 @@ def test_the_card_says_each_title_with_reservations_own_spanish():
     that app's Spanish, so reservation's own entry would be dead text: they have to say the same (hub#323)."""
     with (LOCALE / "django.mo").open("rb") as compiled:
         own = gettext.GNUTranslations(compiled)
-    titles = schema_titles()
+    titles = operation_titles("reservation")
     assert {"Date", "Duplicate customer", "Book anyway"} <= titles
     with translation.override("es"):
         assert {title: translation.gettext(title) for title in titles} == {

@@ -11,7 +11,7 @@ from django.utils import translation
 from apps.website import queries, schemas, services
 from apps.website.models import Image, Site
 from base.catalog import build_registry
-from base.tests.po import catalogue_key, compiled_differences, model_texts, po_entries, untranslated
+from base.tests.po import catalogue_key, compiled_differences, config_texts, model_texts, po_entries, untranslated
 
 APP = Path(apps.get_app_config("website").path)
 LOCALE = APP / "locale" / "es" / "LC_MESSAGES"
@@ -21,7 +21,7 @@ _TRANSLATE = re.compile(r'{%\s*translate\s+"([^"]+)"(?:\s+context\s+"([^"]+)")?\
 
 def visible_texts() -> set[str]:
     config = apps.get_app_config("website")
-    lazies = [config.verbose_name, config.summary, config.description, *(nav.label for nav in config.navigation)]
+    lazies = [*config_texts(config)]
     lazies += model_texts((Site, Image))
     lazies += list(Site.Template.labels)
     lazies += [

@@ -9,20 +9,24 @@ from django.apps import apps
 from django.utils.functional import Promise
 from django.utils.translation import gettext as gettext_
 from django.utils.translation import override
-from live.operations import registry
 
 from apps.whatsapp_inbox import queries, schemas, services
 from apps.whatsapp_inbox.models import Channel, Conversation, Message, Note, Template
 from apps.whatsapp_inbox.tests.conftest import receive
-from base.tests.po import catalogue_key, compiled_differences, model_texts, po_entries, untranslated
+from base.tests.po import (
+    catalogue_key,
+    compiled_differences,
+    config_texts,
+    model_texts,
+    module_texts,
+    operation_titles,
+    po_entries,
+    untranslated,
+)
 
 LOCALE = (
     Path(apps.get_app_config("whatsapp_inbox").path) / "locale" / "es" / "LC_MESSAGES"
 )
-
-
-def module_texts(module) -> list:
-    return [value for value in vars(module).values() if isinstance(value, Promise)]
 
 
 def visible_texts() -> set[str]:
@@ -30,16 +34,11 @@ def visible_texts() -> set[str]:
     its context in front for a ``pgettext_lazy`` — and the titles of its schemas."""
     config = apps.get_app_config("whatsapp_inbox")
     lazies = [
-        config.verbose_name,
-        config.summary,
-        config.description,
-        *(nav.label for nav in config.navigation),
+        *config_texts(config),
         # The Home's bell and the device's notices (WHATSAPP_INBOX-F09).
         *(counter.label for counter in config.bell),
         *(text for notice in config.notices for text in (*notice.title, *notice.body) if isinstance(text, Promise)),
-        *module_texts(schemas),
-        *module_texts(queries),
-        *module_texts(services),
+        *module_texts(schemas, queries, services),
     ]
     lazies += model_texts((Channel, Conversation, Message, Note, Template))
     for choices in (
@@ -57,20 +56,7 @@ def visible_texts() -> set[str]:
     ):
         lazies += list(choices.labels)
     with override("en"):
-        return {catalogue_key(text) for text in lazies} | schema_titles()
-
-
-def schema_titles() -> set[str]:
-    """The titles the inbox's operations give their input data (``gettext_noop``): the assistant's card names each
-    datum by them, so each one needs its Spanish. Only the ones whatsapp_inbox wrote: pydantic leaves ``title``
-    empty otherwise."""
-    return {
-        field.title
-        for op in registry.values()
-        if op.app_label == "whatsapp_inbox"
-        for field in op.input.model_fields.values()
-        if field.title
-    }
+        return {catalogue_key(text) for text in lazies} | operation_titles("whatsapp_inbox")
 
 
 def test_every_entry_has_a_spanish_translation():
@@ -95,7 +81,7 @@ def test_the_card_says_each_title_with_whatsapp_inboxs_own_spanish():
     Spanish, so the inbox's own entry would be dead text: they have to say the same."""
     with (LOCALE / "django.mo").open("rb") as compiled:
         own = gettext.GNUTranslations(compiled)
-    titles = schema_titles()
+    titles = operation_titles("whatsapp_inbox")
     assert {"Assigned to", "Template", "WhatsApp Business account"} <= titles
     with override("es"):
         assert {title: gettext_(title) for title in titles} == {title: own.gettext(title) for title in titles}

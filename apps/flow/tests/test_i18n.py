@@ -6,16 +6,17 @@ from pathlib import Path
 
 from django.apps import apps
 from django.utils import translation
-from django.utils.functional import Promise
-from live.operations import registry
 
 from apps.flow import queries, recipes, schemas, services
 from apps.flow.models import Draft, Flow, FlowRun, Question, Secret
 from base.tests.po import (
     catalogue_key,
     compiled_differences,
+    config_texts,
     missing_from_catalogue,
     model_texts,
+    module_texts,
+    operation_titles,
     po_entries,
     untranslated,
 )
@@ -24,42 +25,19 @@ LOCALE = Path(apps.get_app_config("flow").path) / "locale" / "es" / "LC_MESSAGES
 MODELS = (Flow, FlowRun, Draft, Secret, Question)
 
 
-def module_texts(module) -> list[Promise]:
-    """The lazy texts a module declares at its top (error and validation messages)."""
-    return [value for value in vars(module).values() if isinstance(value, Promise)]
-
-
 def visible_texts() -> set[str]:
     """The English source of every lazy text the app shows (menu, store, admin, choices, messages) and the titles of
     its schemas."""
     config = apps.get_app_config("flow")
     lazies = [
-        config.verbose_name,
-        config.summary,
-        config.description,
-        *(nav.label for nav in config.navigation),
-        *module_texts(queries),
-        *module_texts(services),
-        *module_texts(schemas),
-        *module_texts(recipes),
+        *config_texts(config),
+        *module_texts(queries, services, schemas, recipes),
     ]
     lazies += model_texts(MODELS)
     for choices in (Flow.Trigger, FlowRun.Status, Draft.Status, Question.Status):
         lazies += list(choices.labels)
     with translation.override("en"):
-        return {catalogue_key(text) for text in lazies} | schema_titles()
-
-
-def schema_titles() -> set[str]:
-    """The titles flow's operations give their input data (``gettext_noop``): the assistant's card names each datum
-    by them, so each one needs its Spanish. Only the ones flow wrote: pydantic leaves ``title`` empty otherwise."""
-    return {
-        field.title
-        for op in registry.values()
-        if op.app_label == "flow"
-        for field in op.input.model_fields.values()
-        if field.title
-    }
+        return {catalogue_key(text) for text in lazies} | operation_titles("flow")
 
 
 def test_every_entry_has_a_spanish_translation():
@@ -81,7 +59,7 @@ def test_the_card_says_each_title_with_flows_own_spanish():
     app's Spanish, so flow's own entry would be dead text: they have to say the same (hub#323)."""
     with (LOCALE / "django.mo").open("rb") as compiled:
         own = gettext.GNUTranslations(compiled)
-    titles = schema_titles()
+    titles = operation_titles("flow")
     assert {"Permissions", "Starts with", "Actor"} <= titles
     with translation.override("es"):
         assert {title: translation.gettext(title) for title in titles} == {

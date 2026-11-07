@@ -4,12 +4,16 @@ The parsing is Babel's, a dependency already; this only gives its messages the k
 what those tests compare them with. Its behaviour is tested in ``base/tests/test_po.py``.
 """
 
+import ast
 import gettext
+import inspect
 from collections.abc import Iterable
 from pathlib import Path
 
 from babel.messages.catalog import Message
 from babel.messages.pofile import read_po
+from django.utils.functional import Promise
+from live.operations import registry
 
 
 def po_messages(path: Path, *, strict: bool = True) -> list[Message]:
@@ -56,6 +60,50 @@ def compiled_differences(locale: Path) -> dict:
     mo = mo_entries(locale / "django.mo")
     po = {key: msgstr for key, (msgstr, _fuzzy) in po_entries(locale / "django.po").items()}
     return {key: (po.get(key), mo.get(key)) for key in po.keys() | mo.keys() if po.get(key) != mo.get(key)}
+
+
+def config_texts(config) -> list:
+    """What the store and the menu say of an app: its name, summary and description, and the label of each entry of
+    its menu."""
+    return [config.verbose_name, config.summary, config.description, *(nav.label for nav in config.navigation)]
+
+
+def module_texts(*modules) -> list:
+    """The lazy texts each module keeps at its top, alone, in a tuple or as the values of a dict (a pair of a code and
+    its message too): its messages, its labels and its headers. What it imports is another module's, and its own test
+    checks it."""
+    texts = []
+    for module in modules:
+        imported = {
+            (alias.asname or alias.name).split(".")[0]
+            for node in ast.parse(inspect.getsource(module)).body
+            if isinstance(node, (ast.Import, ast.ImportFrom))
+            for alias in node.names
+        }
+        for name, value in vars(module).items():
+            if name in imported:
+                continue
+            items = value.values() if isinstance(value, dict) else value if isinstance(value, tuple) else (value,)
+            for item in items:
+                texts += [leaf for leaf in (item if isinstance(item, tuple) else (item,)) if isinstance(leaf, Promise)]
+    return texts
+
+
+def operation_titles(label: str) -> set[str]:
+    """The titles the operations of app ``label`` give their input data (``gettext_noop``), and the data of the answer a
+    write's preview shows (BASE-F98): the assistant's card names each datum by them, so each one needs its Spanish.
+    Only the ones the app wrote: pydantic leaves ``title`` empty otherwise."""
+    titles = set()
+    for op in registry.values():
+        if op.app_label != label:
+            continue
+        fields = list(op.input.model_fields.values())
+        preview = op.ai.get("preview") if isinstance(op.ai, dict) else None
+        if preview:
+            answer = registry[preview["operation"]].output.model_fields
+            fields += [answer[name] for name in preview["fields"]]
+        titles |= {field.title for field in fields if field.title}
+    return titles
 
 
 def model_texts(models: Iterable) -> list:

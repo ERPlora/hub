@@ -7,11 +7,18 @@ import pytest
 from django.apps import apps
 from django.utils import translation
 from django.utils.functional import Promise
-from live.operations import registry
 
 from apps.cash_register import models, queries, schemas, services
 from base.tests.po import catalogue_key as source
-from base.tests.po import compiled_differences, model_texts, po_entries, untranslated
+from base.tests.po import (
+    compiled_differences,
+    config_texts,
+    missing_from_catalogue,
+    model_texts,
+    module_texts,
+    operation_titles,
+    untranslated,
+)
 
 LOCALE = (
     Path(apps.get_app_config("cash_register").path) / "locale" / "es" / "LC_MESSAGES"
@@ -22,18 +29,12 @@ def visible_texts() -> set[str]:
     """The English source of every lazy text the app shows: menu, store, admin, choices and messages."""
     config = apps.get_app_config("cash_register")
     lazies = [
-        config.verbose_name,
-        config.summary,
-        config.description,
-        *(nav.label for nav in config.navigation),
+        *config_texts(config),
     ]
     # The Home's step and panels (gh:cash_register#123: the old picker spoke Spanish to an English reader).
     lazies += [text for step in config.setup for text in (step.title, step.description)]
     lazies += [panel.title for panel in config.widgets]
-    for module in (queries, services, schemas, models):
-        lazies += [
-            value for value in vars(module).values() if isinstance(value, Promise)
-        ]
+    lazies += module_texts(queries, services, schemas, models)
     lazies += [text for text in model_texts(config.get_models()) if isinstance(text, Promise)]
     lazies += [
         *models.Session.Status.labels,
@@ -42,27 +43,7 @@ def visible_texts() -> set[str]:
         *(label for _, label, _ in services.REPORT_LINES),
     ]
     with translation.override("en"):
-        return {source(text) for text in lazies} | schema_titles()
-
-
-def schema_titles() -> set[str]:
-    """The titles cash_register's operations give their input data, and the data of the answer a write's preview shows
-    (BASE-F98): the assistant's card names each datum by them, so each one needs its Spanish. A title pydantic makes up
-    from the field is not one."""
-    titles = set()
-    for op in registry.values():
-        if op.app_label == "cash_register":
-            shown = [op.input.model_json_schema().get("properties", {})]
-            preview = (op.ai or {}).get("preview") if isinstance(op.ai, dict) else None
-            if preview:
-                answer = registry[preview["operation"]].output.model_json_schema().get("properties", {})
-                shown.append({name: answer[name] for name in preview["fields"]})
-            for props in shown:
-                for name, prop in props.items():
-                    title = prop.get("title")
-                    if title and title != name.title().replace("_", " "):
-                        titles.add(title)
-    return titles
+        return {source(text) for text in lazies} | operation_titles("cash_register")
 
 
 def test_every_entry_has_a_spanish_translation():
@@ -70,7 +51,9 @@ def test_every_entry_has_a_spanish_translation():
 
 
 def test_every_visible_text_is_in_the_catalog():
-    assert visible_texts() - set(po_entries(LOCALE / "django.po")) == set()
+    """Each text of Caja by its whole key, context included: a ``pgettext_lazy`` that goes back to ``_()``, or
+    whose context has a typo, is missing from the catalogue, and Spanish says it in English (hub#975)."""
+    assert missing_from_catalogue(visible_texts(), LOCALE / "django.po", more_than=90, with_context=13) == set()
 
 
 def test_the_compiled_catalog_is_current():

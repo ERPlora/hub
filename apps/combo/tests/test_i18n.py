@@ -6,16 +6,17 @@ from pathlib import Path
 
 from django.apps import apps
 from django.utils import translation
-from django.utils.functional import Promise
-from live.operations import registry
 
 from apps.combo import queries, schemas, services
 from apps.combo.models import ChoiceGroup, ChoiceOption, Combo
 from base.tests.po import (
     catalogue_key,
     compiled_differences,
+    config_texts,
     missing_from_catalogue,
     model_texts,
+    module_texts,
+    operation_titles,
     po_entries,
     untranslated,
 )
@@ -24,40 +25,18 @@ LOCALE = Path(apps.get_app_config("combo").path) / "locale" / "es" / "LC_MESSAGE
 MODELS = (Combo, ChoiceGroup, ChoiceOption)
 
 
-def module_texts(module) -> list[Promise]:
-    """The lazy texts a module declares at its top (error and validation messages)."""
-    return [value for value in vars(module).values() if isinstance(value, Promise)]
-
-
 def visible_texts() -> set[str]:
     """The English source of every lazy text the app shows (menu, store, admin, choices, messages) and the titles of
     its schemas."""
     config = apps.get_app_config("combo")
     lazies = [
-        config.verbose_name,
-        config.summary,
-        config.description,
-        *(nav.label for nav in config.navigation),
-        *module_texts(queries),
-        *module_texts(services),
-        *module_texts(schemas),
+        *config_texts(config),
+        *module_texts(queries, services, schemas),
         *Combo.SupplyKind.labels,
     ]
     lazies += model_texts(MODELS)
     with translation.override("en"):
-        return {catalogue_key(text) for text in lazies} | schema_titles()
-
-
-def schema_titles() -> set[str]:
-    """The titles combo's operations give their input data (``gettext_noop``): the assistant's card names each datum
-    by them, so each one needs its Spanish. Only the ones combo wrote: pydantic leaves ``title`` empty otherwise."""
-    return {
-        field.title
-        for op in registry.values()
-        if op.app_label == "combo"
-        for field in op.input.model_fields.values()
-        if field.title
-    }
+        return {catalogue_key(text) for text in lazies} | operation_titles("combo")
 
 
 def test_every_entry_has_a_spanish_translation():
@@ -79,7 +58,7 @@ def test_the_card_says_each_title_with_combos_own_spanish():
     app's Spanish, so combo's own entry would be dead text: they have to say the same."""
     with (LOCALE / "django.mo").open("rb") as compiled:
         own = gettext.GNUTranslations(compiled)
-    titles = schema_titles()
+    titles = operation_titles("combo")
     assert {"Products", "SKU"} <= titles
     with translation.override("es"):
         assert {title: translation.gettext(title) for title in titles} == {

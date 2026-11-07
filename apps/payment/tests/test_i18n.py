@@ -9,31 +9,27 @@ from django.utils import translation
 
 from apps.payment import queries, schemas, services
 from apps.payment.models import Payment, PaymentCounter, PaymentMethod
-from base.tests.po import catalogue_key, compiled_differences, missing_from_catalogue, model_texts, untranslated
+from base.tests.po import (
+    catalogue_key,
+    compiled_differences,
+    config_texts,
+    missing_from_catalogue,
+    model_texts,
+    module_texts,
+    untranslated,
+)
 
 LOCALE = Path(apps.get_app_config("payment").path) / "locale" / "es" / "LC_MESSAGES"
 MODELS = (PaymentMethod, Payment, PaymentCounter)
-
-
-def lazy_constants(module) -> list:
-    """Every module-level lazy text (``_("…")``) of ``module``."""
-    return [
-        value for value in vars(module).values() if type(value).__name__ == "__proxy__"
-    ]
 
 
 def visible_texts() -> set[str]:
     """The English source of every lazy text the app shows (menu, store, admin, choices, messages)."""
     config = apps.get_app_config("payment")
     lazies = [
-        config.verbose_name,
-        config.summary,
-        config.description,
-        *(nav.label for nav in config.navigation),
+        *config_texts(config),
     ]
-    lazies += (
-        lazy_constants(queries) + lazy_constants(services) + lazy_constants(schemas)
-    )
+    lazies += module_texts(queries, services, schemas)
     lazies += model_texts(MODELS)
     lazies += list(PaymentMethod.Type.labels) + list(Payment.Status.labels)
     with translation.override("en"):

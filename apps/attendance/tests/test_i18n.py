@@ -8,56 +8,39 @@ from pathlib import Path
 import pytest
 from django.apps import apps
 from django.utils import translation
-from django.utils.functional import Promise
 from django.utils.translation import gettext_lazy
 from live.meta import Nav
-from live.operations import registry
 
 from apps.attendance import queries, schemas, services
 from apps.attendance.models import AttendanceSettings, Break, Correction, Record
 from base.tests.po import catalogue_key as source
-from base.tests.po import compiled_differences, model_texts, po_entries, untranslated
+from base.tests.po import (
+    compiled_differences,
+    config_texts,
+    model_texts,
+    module_texts,
+    operation_titles,
+    po_entries,
+    untranslated,
+)
 
 LOCALE = Path(apps.get_app_config("attendance").path) / "locale" / "es" / "LC_MESSAGES"
 MODELS = (Record, Break, Correction, AttendanceSettings)
-
-
-def module_texts(module) -> list[Promise]:
-    """The lazy texts a module declares at its top (error and validation messages)."""
-    return [value for value in vars(module).values() if isinstance(value, Promise)]
 
 
 def visible_texts() -> set[str]:
     """The catalogue key of every lazy text the app shows (menu, store, admin, choices, messages)."""
     config = apps.get_app_config("attendance")
     lazies = [
-        config.verbose_name,
-        config.summary,
-        config.description,
-        *(nav.label for nav in config.navigation),
+        *config_texts(config),
         *(panel.title for panel in config.widgets),
-        *module_texts(queries),
-        *module_texts(services),
-        *module_texts(schemas),
+        *module_texts(queries, services, schemas),
     ]
     lazies += model_texts(MODELS)
     for choices in (Record.Status, Record.Source):
         lazies += list(choices.labels)
     with translation.override("en"):
-        return {source(text) for text in lazies} | schema_titles()
-
-
-def schema_titles() -> set[str]:
-    """The titles attendance's operations give their input data (``gettext_noop``): the assistant's card names each
-    datum by them, so each one needs its Spanish. Only the ones attendance wrote: pydantic leaves ``title`` empty
-    otherwise."""
-    return {
-        field.title
-        for op in registry.values()
-        if op.app_label == "attendance"
-        for field in op.input.model_fields.values()
-        if field.title
-    }
+        return {source(text) for text in lazies} | operation_titles("attendance")
 
 
 def test_every_entry_has_a_spanish_translation():
