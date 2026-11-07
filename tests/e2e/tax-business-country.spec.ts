@@ -7,7 +7,7 @@
 // `HUB-996-refusal-<width>.png`). What the run makes is deleted after it, and `a` goes back to its own country.
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { A, login, registerBusinessIn, registrationOf, type Registration, shot, shown } from './helpers';
+import { A, capture, login, registerBusinessIn, registrationOf, type Registration, shown } from './helpers';
 import { cleanInventory, createProduct, type Product } from './inventory-helpers';
 import { snapshotSeries } from './invoice-helpers';
 import { chargeRefused, cleanSales, drawerOff, newestSaleOf, restoreDrawer, stamp } from './sale-helpers';
@@ -62,7 +62,7 @@ async function seenAtEachSize(page: Page, target: Locator, name: string): Promis
     await page.setViewportSize({ width: vp.width, height: vp.height });
     await expect(target, `${name} at ${vp.label}`).toBeInViewport();
     await expect.poll(() => horizontalOverflow(page), `${name} at ${vp.label}: sideways scroll`).toBeLessThanOrEqual(1);
-    await page.screenshot({ path: shot(`${KEY}-${name}-${vp.label}`) });
+    await capture(page, `${KEY}-${name}-${vp.label}`);
   }
 }
 
