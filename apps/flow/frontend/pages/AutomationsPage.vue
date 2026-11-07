@@ -14,21 +14,21 @@
 // On a phone «New automation» is its «+» alone, named by `aria-label`: with its words it took the bar and
 // left the title as «A…» (FIX-HUB-FLOW-AUTOMATIONS-TITLE-CUT-ON-PHONE; Material's top app bar, iOS's navigation
 // bars). From a tablet on, its icon and its words.
-import { InlineFeedback } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
 import { AppPage, HubIcon, useSession } from '@erplora/ui/shell';
-import { IonButton, IonSpinner } from '@ionic/vue';
+import { IonButton } from '@ionic/vue';
 import { computed, onBeforeUnmount, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
+import CatalogError from '../components/CatalogError.vue';
 import DraftTray from '../components/DraftTray.vue';
 import FlowList from '../components/FlowList.vue';
 import FlowGallery from '../components/FlowGallery.vue';
+import LoadingNote from '../components/LoadingNote.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import QuestionInbox from '../components/QuestionInbox.vue';
 import { useCatalog } from '../composables/useCatalog';
 import { provideBusinessClock } from '../composables/usePhrasing';
-import { wording } from '../lib/refusal';
 import type { FlowOut } from '../operations';
 
 provideBusinessClock();
@@ -134,32 +134,15 @@ function openFlow(flow: FlowOut, tab?: string): void {
         @open="openFlow($event)"
         @ready="listReady = true"
       />
-      <InlineFeedback
+      <CatalogError
         v-if="catalogError"
-        tone="danger"
-        data-testid="flow-catalog-error"
-      >
-        {{ $t('flow.catalogError') }} {{ wording(catalogError, '') }}
-        <IonButton
-          size="small"
-          fill="clear"
-          data-testid="flow-catalog-retry"
-          @click="reloadCatalog()"
-        >
-          {{ $t('flow.live.retry') }}
-        </IonButton>
-      </InlineFeedback>
-      <div
+        :error="catalogError"
+        @retry="reloadCatalog()"
+      />
+      <LoadingNote
         v-if="loading"
-        class="flow-page__loading"
-        role="status"
         data-testid="flow-page-loading"
-      >
-        <IonSpinner
-          name="dots"
-          aria-hidden="true"
-        /> {{ $t('flow.loading') }}
-      </div>
+      />
       <FlowGallery
         :catalog="catalog"
         :flows="flows"
@@ -177,11 +160,5 @@ function openFlow(flow: FlowOut, tab?: string): void {
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
-}
-.flow-page__loading {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  color: var(--ep-muted, var(--ion-color-medium));
 }
 </style>
