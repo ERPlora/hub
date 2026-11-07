@@ -6,6 +6,7 @@
 import { Combo } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
+import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import type { Business } from '../../../../base/frontend/operations';
 import { business, POLISH, priceList } from '../__tests__/fixtures';
 import { click, ionChecked, ionValue, mountPricing, settle } from '../__tests__/mount-pricing';
@@ -197,4 +198,24 @@ describe('PriceListFormModal', () => {
     expect(s.inDoc('pricing-list-form')?.getAttribute('aria-label')).toBe('Nueva tarifa');
     expect([s.field('currency').label, s.field('tax').label]).toEqual(['Divisa', 'Impuesto']);
   });
+});
+
+// The customer group is a Combo (@erplora/ui), which does not hand a name to its field yet: left out here.
+describe('PriceListFormModal: fields refused with the same words (hub#888)', () => {
+  /** Each field of the window by the key the server refuses it under. */
+  const TESTID: Record<string, string> = {
+    code: 'code',
+    name: 'name',
+    currency: 'currency',
+    tax_included: 'tax',
+    valid_from: 'valid_from',
+    valid_until: 'valid_until',
+  };
+  itTellsTheCorrectedFieldApart(Object.keys(TESTID), async (locale, refusal) => {
+    const s = await setup({}, locale);
+    await ionValue(s.field('code'), 'VIP', 'ionInput');
+    await ionValue(s.field('name'), 'VIP members', 'ionInput');
+    s.answer(422, refusal);
+    return { field: (key) => s.field(TESTID[key]), send: () => click(s.save()), settle };
+  }, 'tax_included');
 });

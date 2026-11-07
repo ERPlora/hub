@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:b8a6c4bd9e6ded6893c022ec3a5ede909afe10073bdef2a50a07e48bf4e78767 -->
+<!-- generated from WORKBOOK.md sha256:d3b98ffbc55a17ff5be655cd16a1806d184f5eae9e42bab25fc65e8f96639897 -->
 
 ## What it is for and who it is for
 
@@ -86,7 +86,7 @@ born from the flow CART_CHECKOUT-F08.
 |---|---|
 | Loading | "Loading…" while the first result arrives. |
 | Empty | "No carts." or "No orders."; with a search or a filter, "No results". |
-| Error | The table's notice with "Retry". A refusal of a form shows inside the form, each reason under its field, without losing what was typed; that of a row action, above the table. |
+| Error | The table's notice with "Retry". A refusal of a form shows inside the form, each reason under its field, without losing what was typed, and each refused field loses its reason as soon as that field is corrected, even if another one says the same (hub#888); that of a row action, above the table. |
 | Reconnecting | What is drawn stays; a strip warns "Reconnecting…". |
 | App inactive | "This app is not active in this business". |
 | No permission | What they cannot do does not show; if they get there another way, "You do not have permission". |

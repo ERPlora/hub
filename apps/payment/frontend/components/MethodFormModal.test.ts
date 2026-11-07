@@ -3,6 +3,7 @@
 // name another method has (409) goes under Name, and what was typed stays.
 import { describe, expect, it, vi } from 'vitest';
 
+import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import type { MethodOut } from '../operations';
 import { click, ionValue, mountPayment, settle } from '../__tests__/mount-payment';
 import MethodFormModal from './MethodFormModal.vue';
@@ -125,5 +126,16 @@ describe('MethodFormModal: Editing method — {name}', () => {
     expect(s.inDoc('payment-method-form')?.getAttribute('aria-label')).toBe('Editando método — BBVA account');
     expect([s.field('name').label, s.field('type').label, s.field('account').label]).toEqual(['Nombre', 'Tipo', 'Cuenta']);
     expect(s.save().textContent).toContain('Guardar');
+  });
+});
+
+describe('MethodFormModal: fields refused with the same words (hub#888)', () => {
+  /** Each field of the window by the key the server refuses it under. */
+  const TESTID: Record<string, string> = { name: 'name', method_type: 'type', bank_account_ref: 'account' };
+  itTellsTheCorrectedFieldApart(Object.keys(TESTID), async (locale, refusal) => {
+    const s = await setup(null, locale);
+    await ionValue(s.field('name'), 'Cash drawer', 'ionInput');
+    s.answer(422, refusal);
+    return { field: (key) => s.field(TESTID[key]), send: () => click(s.save()), settle };
   });
 });

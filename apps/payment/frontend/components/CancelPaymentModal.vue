@@ -62,6 +62,7 @@ async function save(): Promise<void> {
     <template #default="{ fieldErrors }">
       <ion-textarea
         data-testid="payment-cancel-reason"
+        name="reason"
         :value="reason"
         :label="$t('payment.payments.cancelForm.reason')"
         label-placement="floating"
