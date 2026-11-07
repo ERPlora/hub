@@ -79,7 +79,7 @@ Configuración inicial, paso a paso:
 ## Pantallas
 
 Impuestos se abre desde el menú **Impuestos** y tiene cuatro pestañas en la barra de abajo:
-**Categorías**, **Reglas**, **Alias** y **Ajustes**. Mientras ningún tipo esté vigente, las tres primeras llevan arriba el
+**Categorías**, **Reglas**, **Alias** y **Ajustes**. Mientras ningún tipo del país del negocio esté vigente, las tres primeras llevan arriba el
 aviso «Tus impuestos» para quien puede gestionarlos, el mismo paso que trae el Inicio en «Termina de configurar tu
 negocio» (TAX-F17). Todas siguen el permiso de quien mira: con solo consulta
 sale el aviso «Puedes consultar las reglas fiscales pero no modificarlas.», desaparece el botón **+** y,
@@ -112,8 +112,10 @@ panel de alta (Alias, Categoría, Origen —«Aprendido» de entrada—, «Añad
 ### Ajustes
 «Territorio fiscal del negocio»: el «País» del negocio, solo de lectura («Es el país de tu cuenta de
 ERPlora.»), y el desplegable «Territorio fiscal» con «Todo el país (IVA)», «Canarias (IGIC)», «Ceuta
-(IPSI)» y «Melilla (IPSI)», con su explicación debajo, y «Guardar» («Territorio fiscal guardado.»).
-Quien solo consulta impuestos ve el territorio sin poder cambiarlo («Puedes ver el territorio fiscal,
+(IPSI)» y «Melilla (IPSI)», con su explicación debajo, y «Guardar» («Territorio fiscal guardado.»). Los
+territorios son solo de España: en un negocio de otro país el desplegable solo trae «Todo el país (IVA)» y
+la explicación dice «Portugal no tiene territorios con impuestos propios: cada categoría se cobra con la regla
+de todo el país, que se crea en Reglas.», con el nombre de su país. Quien solo consulta impuestos ve el territorio sin poder cambiarlo («Puedes ver el territorio fiscal,
 pero no cambiarlo.»). Es la pantalla de TAX-F11.
 
 ## Estados de cada pantalla

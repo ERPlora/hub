@@ -176,6 +176,7 @@
       "countryHelp": "Es el país de tu cuenta de ERPlora.",
       "region": "Territorio fiscal",
       "regionHelp": "Canarias cobra IGIC y Ceuta y Melilla, IPSI. Cada categoría se cobra con la regla de tu territorio: crea una por categoría en Reglas. Mientras no la tenga, el TPV no puede cobrarla; el IVA nacional no se aplica allí.",
+      "noRegionsHelp": "{country} no tiene territorios con impuestos propios: cada categoría se cobra con la regla de todo el país, que se crea en Reglas.",
       "regions": {
         "wholeCountry": "Todo el país (IVA)",
         "canaryIslands": "Canarias (IGIC)",

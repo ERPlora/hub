@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:4506e261aade84d63ea50e2aea56a9aadd2a6b1a36205d05471df61a8182a7e0 -->
+<!-- generated from WORKBOOK.md sha256:1f1a191e73615b3b46000161d020d89a2b0b7da5f14861f5462a49508a1144b3 -->
 
 ## What it is for and who it is for
 
@@ -71,7 +71,7 @@ Initial setup, step by step:
 ## Screens
 
 Taxes opens from the **Taxes** menu and has four tabs in the bottom bar: **Categories**, **Rules**,
-**Aliases** and **Settings**. While no rate is in force, the first three carry the "Your taxes" notice at the
+**Aliases** and **Settings**. While no rate of the business's country is in force, the first three carry the "Your taxes" notice at the
 top for whoever can manage them, the same step the Home brings in "Finish setting up your business" (TAX-F17).
 All of them follow the permission of whoever looks: with view
 only, the notice "You can view the tax rules but not change them." shows, the **+** button disappears and,
@@ -104,8 +104,10 @@ filters for Alias, Category and Source and sorting by any column. A **+** button
 ### Settings
 "Your business's tax region": the business's "Country", read only ("It is the country of your ERPlora
 account."), and the "Tax region" dropdown with "Whole country (VAT)", "Canary Islands (IGIC)", "Ceuta
-(IPSI)" and "Melilla (IPSI)", with its explanation below, and "Save" ("Tax region saved."). Whoever only
-views taxes sees the region without being able to change it ("You can see the tax region but not change
+(IPSI)" and "Melilla (IPSI)", with its explanation below, and "Save" ("Tax region saved."). The regions are
+only Spain's: in a business of another country the dropdown only brings "Whole country (VAT)" and the
+explanation says "Portugal has no tax territories of its own: each category is charged with the rule of the
+whole country, which you create in Rules.", with the name of its country. Whoever only views taxes sees the region without being able to change it ("You can see the tax region but not change
 it."). It is the screen of TAX-F11.
 
 ## States of each screen
