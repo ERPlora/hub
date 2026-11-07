@@ -129,6 +129,15 @@ describe('events and actions in words', () => {
     expect(pathLabel('steps.s1.number', steps, CATALOG, phrasing())).toBe('1. Create a task › Number');
     expect(pathLabel('steps.s9.id', steps, CATALOG, phrasing())).toBe('steps.s9.id');
   });
+
+  it('a datum a step leaves inside another says the object it is in, in both languages (FLOW-F11, hub#963)', () => {
+    const steps: Step[] = [{ id: 's1', kind: 'command', operation: 'cart_checkout.item.add', params: {} }];
+    expect(pathLabel('steps.s1.item.unit_price', steps, CATALOG, phrasing())).toBe('1. Add something to a cart › Item › Unit price');
+    expect(pathLabel('steps.s1.cart.total_amount', steps, CATALOG, phrasing('es'))).toBe('1. Añadir algo a un carrito › Carrito › Importe total');
+    // A table's reservation of today, the object its data sit in, is a noun: never «to hold» («Retener»).
+    const table: Step[] = [{ id: 's1', kind: 'query', operation: 'table.table.get', params: {}, result: 'first' }];
+    expect(pathLabel('steps.s1.hold.erased', table, CATALOG, phrasing('es'))).toBe('1. Leer una mesa › Reserva › Cliente borrado');
+  });
 });
 
 describe('the trigger', () => {

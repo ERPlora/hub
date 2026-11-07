@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:7679095ceb69fd9b0a05d7b36eaa819b3631e28cca4f27f93d39a961a5c4be37 -->
+<!-- generated from WORKBOOK.md sha256:2f1b08e5fb6406dbaee5e85392a4ef4335d06af53699fe9dcead67a4ddf6f39f -->
 
 ## What it is for and who it is for
 
@@ -402,8 +402,11 @@ Steps:
    - **Wait**: "How long" and the unit (minutes, hours or days), counted from the previous step; from one
      minute to 30 days.
 3. In each value, **Insert data** opens "Which data?", with the notice's data and a real example from the
-   business beside it (the last notice of that kind), and the data the previous steps leave; it is chosen,
-   not typed. A chosen piece of data shows as a pill; the rest of the value is text. In what a person reads
+   business beside it (the last notice of that kind), and the data the previous steps leave: the first-level
+   ones and also those a step leaves inside another piece of data, right below that piece of data and with its
+   name in front ("1. Add something to a cart › Item › Unit price", "… › Cart › Total amount", the number and
+   the total of a sale's invoice), never those inside a list; it is chosen, not typed. A chosen piece of data shows as a pill; the
+   rest of the value is text. In what a person reads
    —the question of "Ask someone first" (FLOW-F28) and the message to a customer (FLOW-F31)— each piece of
    data comes out in words, in the language of whoever saved the automation: a yes or a no as "Yes" or
    "No", a date and a time as they are written in that language and at the business's time ("2 Nov 2026,
@@ -1186,7 +1189,7 @@ question asked of another role) does not show on the card.
 | A run, with the words it is named with (its automation and when it started) | see | F24 | `flow.run.get` |
 | The assistant's pending drafts (live) | see | F18, F19 | `flow.draft.list` |
 | An assistant's draft, whether pending, used or discarded | see | F18, F19 | `flow.draft.get` |
-| The notices and actions of the active apps, with the data each action asks for | see | F10, F11 | `flow.catalog.read` |
+| The notices and actions of the active apps, with the data each action asks for and the data it leaves (also those inside an object) | see | F10, F11 | `flow.catalog.read` |
 | The last real notice of a kind, with its data | manage | F11, F13 | `flow.event.sample` |
 | What an automation would do with the last real notice, without running anything | manage | F13 | `flow.flow.test` |
 | How many automations of a notice can do an action, how many are on and how many are half set up | see | F20 | `flow.flow.status` |
