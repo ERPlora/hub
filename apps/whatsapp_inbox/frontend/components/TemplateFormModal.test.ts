@@ -474,4 +474,19 @@ describe('TemplateFormModal: fields refused with the same words (hub#888)', () =
     await ionValue(second, 'sábado', 'ionInput');
     expect(KEYS.filter((key) => s.fieldOf(key).errorText)).toEqual(['name', 'header', 'body', 'footer']);
   });
+
+  // The window only starts the refusal over (`edited`) for a field the refusal names; a keystroke in a field it does
+  // not name is told by FormModal alone, by that field's name, so a name that is another field's key takes that
+  // field's mark. Real case: a text numbered {{1}}, {{3}} is refused under `body` alone (the examples are not read)
+  // and the person types in an example: the text must stay marked.
+  it.each(KEYS)('%s, typed in while the refusal does not name it, takes no other field’s mark', async (key) => {
+    const others = KEYS.filter((other) => other !== key);
+    const s = await refused('en', refusedWithTheSameWords(others));
+    await s.send();
+    expect(others.map((other) => s.fieldOf(other).errorText)).toEqual(others.map(() => SAME_WORDS));
+    const typed = s.fieldOf(key);
+    typed.dispatchEvent(new Event('input', { bubbles: true }));
+    await ionValue(typed, `${String(typed.value ?? '')}x`, 'ionInput');
+    expect(KEYS.filter((other) => s.fieldOf(other).errorText)).toEqual(others);
+  });
 });
