@@ -4,12 +4,15 @@
 // leaves them all marked. The window's test answers «Save» with `refusedWithTheSameWords(keys)`; the helper presses it,
 // checks every field says those same words (else it would prove nothing), corrects one as a person does — a keystroke
 // in a text field (the native `input` bubbling out of it, then Ionic's `ionInput`), a choice in a picker (`ionChange`) —
-// and says only that field lost its words. A field without its name, or named after another key, fails it. For the
-// tests of every app with such a window, like `save-waits-for-money.ts`: free of side effects.
-import { expect } from 'vitest';
+// and says only that field lost its words. A field without its name, or named after another key, fails it. A window's
+// test declares its cases with `itTellsTheCorrectedFieldApart`: one per field, and one in Spanish. For the tests of
+// every app with such a window, like `save-waits-for-money.ts`: free of side effects.
+import { expect, it } from 'vitest';
 
 /** The words the server refuses every field with, in a test that does not give its own. */
 export const SAME_WORDS = 'Check this field.';
+/** The same, in Spanish. */
+export const SAME_WORDS_ES = 'Revisa este campo.';
 
 /** The server's refusal of `keys`, every one with the same `words`, as a window's test answers «Save» with it. */
 export function refusedWithTheSameWords(keys: readonly string[], words = SAME_WORDS) {
@@ -66,4 +69,18 @@ export async function expectTheCorrectedFieldAloneLosesItsMark(window: RefusedWi
   ).toBe(true);
   await correct(window, corrected);
   expect(saying(window, keys), `the fields still saying the refusal once "${corrected}" is corrected`).toEqual(keys.filter((key) => key !== corrected));
+}
+
+/** The window of a test, opened in `locale`, whose «Save» the server answers with `refusal` (`refusedWithTheSameWords`). */
+export type OpenRefused = (locale: 'en' | 'es', refusal: ReturnType<typeof refusedWithTheSameWords>) => Promise<RefusedWindow>;
+
+/** A window's cases: each field of `keys`, refused with the same words as the others and then corrected, alone loses
+ *  them; and `spanish` (the first key unless said) does the same in a window in Spanish, refused in Spanish. */
+export function itTellsTheCorrectedFieldApart(keys: readonly string[], open: OpenRefused, spanish = keys[0]): void {
+  it.each(keys)('%s, corrected, alone loses the words every field was refused with', async (key) => {
+    await expectTheCorrectedFieldAloneLosesItsMark(await open('en', refusedWithTheSameWords(keys)), keys, key);
+  });
+  it(`in Spanish too: the corrected ${spanish} alone loses «${SAME_WORDS_ES}»`, async () => {
+    await expectTheCorrectedFieldAloneLosesItsMark(await open('es', refusedWithTheSameWords(keys, SAME_WORDS_ES)), keys, spanish);
+  });
 }

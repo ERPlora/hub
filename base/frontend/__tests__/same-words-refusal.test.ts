@@ -9,7 +9,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { defineComponent, h, nextTick, ref } from 'vue';
 
 import { flush, mountBase } from './mount-base';
-import { expectTheCorrectedFieldAloneLosesItsMark, refusedWithTheSameWords, SAME_WORDS } from './same-words-refusal';
+import { expectTheCorrectedFieldAloneLosesItsMark, itTellsTheCorrectedFieldApart, refusedWithTheSameWords, SAME_WORDS } from './same-words-refusal';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
   const { IonModalStub } = await import('../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
@@ -95,4 +95,8 @@ describe('expectTheCorrectedFieldAloneLosesItsMark (hub#888)', () => {
     });
     expect(refusedWithTheSameWords(['a'], 'Revisa este campo.').error.fields).toEqual({ a: 'Revisa este campo.' });
   });
+});
+
+describe('itTellsTheCorrectedFieldApart (hub#888): the cases it declares pass a window whose fields carry their names', () => {
+  itTellsTheCorrectedFieldApart(KEYS, (_locale, refusal) => windowNaming(NAMED, refusal.error), 'kind');
 });

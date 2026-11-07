@@ -12,7 +12,7 @@ import { Combo, type ComboOption } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
 import { expectSaveWaitsForMoney } from '../../../../base/frontend/__tests__/save-waits-for-money';
-import { expectTheCorrectedFieldAloneLosesItsMark, refusedWithTheSameWords } from '../../../../base/frontend/__tests__/same-words-refusal';
+import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import type { MemberOut, RoleOut } from '../operations';
 import {
   BUSINESS,
@@ -478,26 +478,16 @@ describe('MemberFormModal: who may open it', () => {
 });
 
 describe('MemberFormModal: fields refused with the same words (hub#888)', () => {
-  /** The fields of a new record, each refused under its own key (Role and Hub user are Combos, which hub#888 leaves for
-   *  @erplora/ui: a Combo does not hand its name to the field FormModal reads). */
+  // A new record's fields, each refused under its own key. Role and Hub user are Combos, which hub#888 leaves for
+  // @erplora/ui: a Combo does not hand its name to the field FormModal reads.
   const KEYS = ['first_name', 'last_name', 'email', 'phone', 'employee_number', 'booking_buffer', 'hire_date', 'color', 'specialties', 'bio', 'hourly_rate', 'commission_rate', 'notes'];
-
-  /** «New», its names typed, and «Save» refused with the same `words` under every field. */
-  async function refused(locale: 'en' | 'es' = 'en', words?: string) {
-    const s = await setup(null, { locale, routes: { '/api/staff/members': [422, refusedWithTheSameWords(KEYS, words)] } });
+  itTellsTheCorrectedFieldApart(KEYS, async (locale, refusal) => {
+    const s = await setup(null, { locale, routes: { '/api/staff/members': [422, refusal] } });
     const send = async () => {
       await ionValue(s.field('first_name'), 'Bea', 'ionInput');
       await ionValue(s.field('last_name'), 'Ruiz', 'ionInput');
       await click(s.save());
     };
     return { field: s.field, send, settle };
-  }
-
-  it.each(KEYS)('%s, corrected, alone loses the words every field was refused with', async (key) => {
-    await expectTheCorrectedFieldAloneLosesItsMark(await refused(), KEYS, key);
-  });
-
-  it('in Spanish too: the corrected last name alone loses «Revisa este campo.»', async () => {
-    await expectTheCorrectedFieldAloneLosesItsMark(await refused('es', 'Revisa este campo.'), KEYS, 'last_name');
-  });
+  }, 'last_name');
 });

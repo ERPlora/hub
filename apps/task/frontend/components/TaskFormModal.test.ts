@@ -6,7 +6,7 @@
 import { Combo } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
-import { expectTheCorrectedFieldAloneLosesItsMark, refusedWithTheSameWords } from '../../../../base/frontend/__tests__/same-words-refusal';
+import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import type { TaskOut } from '../operations';
 import { click, ionValue, mountTask, settle } from '../__tests__/mount-task';
 import TaskFormModal from './TaskFormModal.vue';
@@ -173,26 +173,12 @@ describe('TaskFormModal: Editing task — {number}', () => {
 });
 
 describe('TaskFormModal: fields refused with the same words (hub#888)', () => {
-  /** The fields of a new task, each refused under its own key (Assigned to and Project are Combos, which hub#888 leaves
-   *  for @erplora/ui: a Combo does not hand its name to the field FormModal reads). */
-  const KEYS = ['title', 'description', 'priority', 'due_date', 'tags'];
-
-  /** «New task», its title typed, and «Create task» refused with the same `words` under every field. */
-  async function refused(locale: 'en' | 'es' = 'en', words?: string) {
+  // A new task's fields, each refused under its own key. Assigned to and Project are Combos, which hub#888 leaves for
+  // @erplora/ui: a Combo does not hand its name to the field FormModal reads.
+  itTellsTheCorrectedFieldApart(['title', 'description', 'priority', 'due_date', 'tags'], async (locale, refusal) => {
     const s = await setup(null, locale);
-    const send = async () => {
-      await ionValue(s.field('title'), 'Mop', 'ionInput');
-      s.answer(422, refusedWithTheSameWords(KEYS, words));
-      await click(s.save());
-    };
-    return { field: s.field, send, settle };
-  }
-
-  it.each(KEYS)('%s, corrected, alone loses the words every field was refused with', async (key) => {
-    await expectTheCorrectedFieldAloneLosesItsMark(await refused(), KEYS, key);
-  });
-
-  it('in Spanish too: the corrected priority alone loses «Revisa este campo.»', async () => {
-    await expectTheCorrectedFieldAloneLosesItsMark(await refused('es', 'Revisa este campo.'), KEYS, 'priority');
-  });
+    await ionValue(s.field('title'), 'Mop', 'ionInput');
+    s.answer(422, refusal);
+    return { field: s.field, send: () => click(s.save()), settle };
+  }, 'priority');
 });
