@@ -4,6 +4,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { SettingsOut } from '../operations';
+import { pressEnter } from '../../../../base/frontend/__tests__/settings-form';
 import { click, EMPLOYEE, ionChecked, ionValue, type MountOptions, mountAppointment, settle } from '../__tests__/mount-appointment';
 import SettingsPage from './SettingsPage.vue';
 
@@ -43,7 +44,7 @@ describe('SettingsPage', () => {
     ]);
     expect([s.field('calendar_start_hour').value, s.field('auto_confirm_online').checked]).toEqual(['8', true]);
     expect(s.field('auto_confirm_online').textContent).toBe('Confirm bookings made by the customer automatically');
-    expect(s.field('save').disabled).toBe(true);
+    expect([s.field('save').textContent?.trim(), s.field('save').disabled]).toEqual(['Save', true]);
   });
 
   // As the old settings: each switch says what it does first and sits at the end of its row.
@@ -66,6 +67,10 @@ describe('SettingsPage', () => {
     ]);
     await settle();
     expect(s.field('saved')?.textContent).toContain('Settings saved.');
+    // Enter in a field submits the form (Ionic puts a hidden submit button in it): the same save as «Save».
+    await ionValue(s.field('default_duration'), '45', 'ionInput');
+    await pressEnter(s.inDoc('appointment-settings'));
+    expect(s.sent().at(-1)?.body).toEqual({ default_duration: 45 });
   });
 
   it('puts a refusal under its field', async () => {
