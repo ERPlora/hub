@@ -33,7 +33,9 @@ class VerifactuConfig(LiveAppConfig):
         "Records, queue, audit events and the chain's recovery are all here, in the test environment until you go "
         "live."
     )
-    verticals = ["hair_salon", "restaurant"]
+    # In no template (PLAN-HUB round 2026-11-07, hub#998): it binds the business to the AEAT until the end of the
+    # calendar year and never goes off once on (VERIFACTU-F32), so its owner turns it on from Apps, never a template.
+    verticals = []
     # A record is born from an issued invoice, read from its row (a foreign key).
     requires = ["invoice"]
     default_auto_field = "django.db.models.BigAutoField"

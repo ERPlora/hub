@@ -548,19 +548,19 @@ def test_an_app_already_on_is_left_as_it_is(owner, load):
     assert total(owner, "inventory.product.list") == 16
 
 
-def test_a_business_outside_spain_gets_no_verifactu_from_a_template_and_the_load_is_complete(born, load):
-    """VeriFactu does not go on outside Spain (VERIFACTU-F01, hub#694): the template asks through the same
-    ``base.app.enable`` as Apps and is told no. Nothing of it was lost and no retry would change that, so the load is
-    complete, and it says why VeriFactu stays out."""
+def test_a_business_outside_spain_gets_no_verifactu_from_a_blueprint_and_the_load_is_complete(born, load):
+    """VeriFactu does not go on outside Spain (VERIFACTU-F01, hub#694): a file that lists it (no template of the
+    catalogue does, hub#998) asks through the same ``base.app.enable`` as Apps and is told no. Nothing of it was lost
+    and no retry would change that, so the load is complete, and it says why VeriFactu stays out."""
     Hub.objects.filter(slug="c").update(country="PL")
 
-    loaded = load(born, template="restaurant.es")
+    loaded = load(born, file_base64=a_file(apps=("table", "verifactu")))
 
     verifactu = next(app for app in loaded.report.apps if app.id == "verifactu")
     assert verifactu.status == "inactive"
     assert verifactu.reason == enable_refusal(born)
     assert "verifactu" not in modules_on()
-    assert "invoice" in modules_on()
+    assert "table" in modules_on()
     assert loaded.status == "complete"
 
 
