@@ -1119,7 +1119,11 @@ tarjeta de confirmación («un clic» o «escribe para confirmar», según el ri
 Por el asistente (también por voz) y por la API, un producto se nombra por su SKU o por su nombre, y una
 categoría por su nombre, además de por su identificador: «da de baja 2 botellas de vino tinto» basta. Si
 el nombre casa con varios, Inventario no elige: dice cuáles son y pregunta cuál. Toda lista se puede
-buscar y va por páginas de hasta 100.
+buscar y va por páginas de hasta 100. Antes de una acción, el asistente pide confirmar con su tarjeta (BASE-F97), que
+nombra cada registro como lo nombran las pantallas, nunca por su identificador: el producto por su nombre
+(«Producto: Vino tinto»), la categoría por su nombre («Categoría: Bebidas»), las categorías de un producto una a una
+(«Categorías: Bebidas, Vinos») y cada línea de una recepción con su producto y su cantidad. Lo que quien pregunta no
+puede ver, o lo que ya no existe, no sale.
 
 ### Lo que ofrece: consultas (leen, no cambian nada)
 
@@ -1131,6 +1135,7 @@ buscar y va por páginas de hasta 100.
 | Los productos en su umbral o por debajo, del que menos tiene al que más | ver productos | F17 | `inventory.product.list_low_stock` |
 | Qué categorías tiene cada producto activo | ver productos | F08, F27 | `inventory.product_category.list` |
 | Las categorías, con cuántos productos activos tiene cada una (agotados incluidos, lo que enseña el TPV) | ver categorías | F06, F27 | `inventory.category.list` |
+| Una categoría por su id o su nombre: lo que lee la tarjeta del asistente para nombrarla (BASE-F97); no es herramienta del asistente ni tiene ruta en la API | ver categorías | F06, F07, F08 | `inventory.category.get` |
 | El libro de movimientos: fecha, producto, tipo, cantidad, saldo, motivo, referencia y quién lo hizo | ver stock | F16 | `inventory.movement.list` |
 | Las cifras del panel: productos seguidos, en stock, agotados, en stock bajo, valor a coste y número de productos activos | ver productos | F17, F28 | `inventory.stock.get_summary` |
 | Las unidades de medida con su escalón | ver productos | F26 | `inventory.unit.list` |
@@ -1239,7 +1244,20 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
   Las páginas (`frontend/`) son las del módulo viejo: Panel, Productos, Movimientos, Categorías y Ajustes.
 - **31 operaciones** (12 consultas y 19 acciones), todas con `ai` (descripción y, en las acciones,
   riesgo: `high` para eliminar e importar) y con `expose_api` salvo las tres reacciones a Ventas. Las
-  rutas no llevan parámetros: el producto o la categoría viajan en la entrada.
+  rutas no llevan parámetros: el producto o la categoría viajan en la entrada. Después llegaron las tres de la
+  foto (F30, F31) y `inventory.category.get`, lectura interna (`ai=INTERNAL`, sin API): solo nombra la categoría en
+  la tarjeta del asistente; el modelo encuentra las categorías en su lista.
+- **Tarjeta de confirmación del asistente** (BASE-F97, hub#526): nombra el registro que una escritura señala por su
+  id con las marcas `refers` de `schemas.py`, leídas como quien pregunta: el producto por su `name` con
+  `inventory.product.get` (`A_PRODUCT`: el `id` de `ProductRefIn` y el `product_id` de `_ProductLineRef`, también en
+  cada línea de una recepción) y la categoría por su `name` con `inventory.category.get` (`A_CATEGORY`: el `id` de
+  `CategoryRefIn`, el `category_id` de `ProductCategoryIn` y cada elemento de `category_ids`). El dato lleva el título
+  con la palabra de las pantallas («Producto», «Categoría»; `T_PRODUCT`, `T_CATEGORY`, con su español en el catálogo
+  de la app), nunca «Registro». Sin persona detrás, sin `inventory.view_product` o `inventory.view_category`, con un
+  id de otro negocio o de algo eliminado, el registro queda fuera, nunca su id (`tests/test_assistant_card_records.py`);
+  el trinquete `UNNAMED_REFERENCES` de `base/tests/test_assistant_card_values.py` impide que entre un dato sin marca.
+  Las listas cerradas de sus escrituras (unidad, tipo de producto) ya llevan su etiqueta en `en` + `es` por los
+  `choices` de sus modelos.
 - **Requiere `tax`**: producto y categoría tienen FK a `tax.TaxCategory` (`PROTECT`, sin acceso inverso).
   «Sin configurar» (`needs_tax_setup`) = sin categoría fiscal o con una que Impuestos desactivó. Toda
   puerta rechaza una clave inexistente o inactiva. La importación de categorías lee el texto fiscal con
@@ -1532,7 +1550,6 @@ Las hace cumplir la app por cualquier puerta (pantalla, asistente, API).
 
 ## Lo que queda fuera
 
-- **La tarjeta de confirmación del asistente no dice qué registro toca una escritura**, hub#526.
 - Las peticiones a `@erplora/ui` de `UI-REQUESTS.md` (iconos, `KpiCard`, `Combo` múltiple, importar y
   exportar CSV y panel lateral del `DataTable`, formateadores, `useI18n` y ayudas de test): ninguna rompe
   un flujo, cada una tiene su sustituto en uso y su clave `inventory:ui-…` en el registro de la migración.
