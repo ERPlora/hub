@@ -4,6 +4,7 @@
 // said under From, an end before the start (422) under To.
 import { describe, expect, it, vi } from 'vitest';
 
+import { expectTheCorrectedFieldAloneLosesItsMark, refusedWithTheSameWords } from '../../../../base/frontend/__tests__/same-words-refusal';
 import type { OverrideOut } from '../operations';
 import { click, ionValue, mountSchedule, settle } from '../__tests__/mount-schedule';
 import OverrideFormModal from './OverrideFormModal.vue';
@@ -115,5 +116,28 @@ describe('OverrideFormModal (SCHEDULE-F05, F13)', () => {
       'Motivo',
       'Añadir cambio temporal',
     ]);
+  });
+});
+
+describe('OverrideFormModal: fields refused with the same words (hub#888)', () => {
+  const KEYS = ['start_date', 'end_date', 'reason'];
+
+  /** «New override», filled in, and «Add override» refused with the same `words` under every field. */
+  async function refused(locale: 'en' | 'es' = 'en', words?: string) {
+    const s = await setup(null, locale);
+    const send = async () => {
+      await s.fill({ start_date: '2026-08-01', end_date: '2026-08-15', reason: 'Holidays' });
+      s.answer(422, refusedWithTheSameWords(KEYS, words));
+      await click(s.submit());
+    };
+    return { field: s.field, send, settle };
+  }
+
+  it.each(KEYS)('%s, corrected, alone loses the words every field was refused with', async (key) => {
+    await expectTheCorrectedFieldAloneLosesItsMark(await refused(), KEYS, key);
+  });
+
+  it('in Spanish too: the corrected end alone loses «Revisa este campo.»', async () => {
+    await expectTheCorrectedFieldAloneLosesItsMark(await refused('es', 'Revisa este campo.'), KEYS, 'end_date');
   });
 });
