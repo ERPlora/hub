@@ -213,7 +213,8 @@ nombre, email o nº de empleado se aceptan. Desde el asistente, un rol que el ne
 ha retirado) se comprueba antes de la tarjeta de confirmación: no sale tarjeta, el asistente dice que
 ese rol no está disponible y no se crea nada. Guardar (también al editar, STAFF-F02) está en gris
 mientras el negocio no haya dicho todavía su moneda, porque la tarifa por hora se lee en ella (sin ella,
-«1500» yenes se guardaría como 150 000).
+«1500» yenes se guardaría como 150 000). Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
+motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, Guardar se enciende (hub#938).
 Implicados: BASE-F97
 
 ### STAFF-F02 Editar la ficha de un profesional

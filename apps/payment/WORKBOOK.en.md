@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:408157ad8065b2225074065d804fc63393f531a40c7470ea90cf29ad59bbae5a -->
+<!-- generated from WORKBOOK.md sha256:cdf05b2dac40e6dea3aa3295db11036d16c71f44913eed566c3768361a1b584a -->
 
 ## What it is for and who it is for
 
@@ -147,7 +147,9 @@ Steps:
    recorded only once.
 In: the form's data; the business's currency, its country's (a payment that does not say its currency is
 recorded in it, also through the assistant or the API). While the app does not know the business's
-currency yet, the field says "Amount" and "Record payment" waits. Through the assistant or the API, the
+currency yet, the field says "Amount" and "Record payment" waits. If the currency cannot be read, the window says so ("The business's currency could not be read", with the
+reason) and offers "Retry", which asks for it again; as soon as it arrives, "Record payment" lights up (hub#938).
+Through the assistant or the API, the
 method is given by its id or by its name, the amount goes in the currency's minor unit (cents in euros)
 and, if wanted, an attempt key: repeating the same call with the same key answers the payment already
 recorded instead of recording another.
