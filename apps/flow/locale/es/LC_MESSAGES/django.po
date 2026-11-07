@@ -545,11 +545,17 @@ msgstr "Sus pasos usan permisos que no pide: %(names)s."
 msgid "Starts with"
 msgstr "Arranca con"
 
+msgid "Automation"
+msgstr "Automatización"
+
 msgid "Draft"
 msgstr "Borrador"
 
 msgid "Permissions"
 msgstr "Permisos"
+
+msgid "Automation run"
+msgstr "Ejecución"
 
 msgid "How it ended"
 msgstr "Cómo terminó"
@@ -577,6 +583,9 @@ msgstr "Quién lo hizo"
 
 msgid "Value"
 msgstr "Valor"
+
+msgid "Question"
+msgstr "Pregunta"
 
 msgid "Answer"
 msgstr "Respuesta"

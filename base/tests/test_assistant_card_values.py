@@ -531,6 +531,11 @@ TITLED_IN_SPANISH = {
     **{f"customer.group.{action}:id": "Grupo" for action in ("delete", "update")},
     **{f"customer.tag.{action}:id": "Etiqueta" for action in ("delete", "update")},
     **{f"demo.item.{action}:id": "Elemento" for action in ("add_line", "delete", "update")},
+    **{f"flow.flow.{action}:id": "Automatización" for action in (
+        "delete", "duplicate", "grant", "run", "set_enabled", "update",
+    )},
+    "flow.question.answer:id": "Pregunta",
+    "flow.run.retry:id": "Ejecución",
     **{f"inventory.category.{action}:id": "Categoría" for action in ("delete", "update")},
     **{f"inventory.product.{action}:id": "Producto" for action in (
         "delete", "print_label", "set_image", "set_sold_out", "update",
@@ -603,13 +608,13 @@ def test_every_datum_the_screen_knows_that_a_write_titles_is_called_by_its_title
     assert not {title for title in titles.values() if title.lower() in {"id", "ids"} or "_" in title}
 
 
-def test_every_dangerous_write_of_the_platform_titles_the_record_it_names():
-    """The record a dangerous write of the platform acts on is called as its screen calls it, in the person's language
-    («Dispositivo: Barra», «Evento caído: …»), never «Registro»: its schema titles it, and a catalog says that title in
-    Spanish. One that does not comes in here (FIX-HUB-BASE-ASSISTANT-DANGER-CARD-CALLS-THE-RECORD-BY-ITS-FIELD-NAME)."""
+def test_every_dangerous_write_of_the_platform_and_flow_titles_the_record_it_names():
+    """The record a dangerous write of the platform or Automations acts on is called as its screen calls it, in the
+    person's language («Dispositivo: Barra», «Automatización: Bienvenida»), never «Registro»: its schema titles it,
+    and a catalog says that title in Spanish. One that does not comes in here."""
     untitled = []
     for op in writes():
-        if op.app_label != "base" or assistant.risk(op) != "high":
+        if op.app_label not in {"base", "flow"} or assistant.risk(op) != "high":
             continue
         props = op.input.model_json_schema().get("properties", {})
         with translation.override("es"):
