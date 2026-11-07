@@ -24,6 +24,7 @@ from live.operations import operation
 from apps.invoice.models import Invoice, Issuer
 from base import activation
 from base import operations as platform
+from base.business import country_or_market
 from apps.verifactu import (
     certificates,
     chain,
@@ -32,6 +33,7 @@ from apps.verifactu import (
     producer,
     representation,
 )
+from apps.verifactu.apps import SPAIN
 from apps.verifactu.models import (
     AeatRecord,
     Chain,
@@ -83,9 +85,6 @@ UNREGISTERED = "hub_unregistered"
 EXPIRY_WARNING_DAYS = 30
 RECORD_EVENTS_SHOWN = 20
 VIEW = "verifactu.view_record"
-#: VeriFactu binds the taxpayers of Spain alone (RD 1007/2023, Orden HAC/1177/2024); the Canary Islands, Ceuta and
-#: Melilla are regions of ES (the tax territory of PLAN-HUB, round 2026-10-17), not other countries.
-SPAIN = "ES"
 #: The wait of every record of a business outside Spain: none of them is ever sent.
 OUTSIDE_SPAIN = "outside_spain"
 ONLY_IN_SPAIN = _("VeriFactu is only for businesses in Spain.")
@@ -112,9 +111,9 @@ def business_country(scope: Scope | None) -> str:
 
 def outside_spain(scope: Scope | None) -> bool:
     """Whether ``scope``'s business was registered in a country other than Spain: VeriFactu is not for it, so nothing
-    of it is sealed nor sent, as if the app were off (FIX-HUB-VERIFACTU-ON-FOR-A-BUSINESS-OUTSIDE-SPAIN)."""
-    country = business_country(scope).strip().upper()
-    return bool(country) and country != SPAIN
+    of it is sealed nor sent, as if the app were off (FIX-HUB-VERIFACTU-ON-FOR-A-BUSINESS-OUTSIDE-SPAIN). One without
+    a country is in ERPlora's market, Spain: base's one reading of it (``base.business.country_or_market``, hub#682)."""
+    return country_or_market(business_country(scope)) != SPAIN
 
 
 def refuse_outside_spain(ctx: OperationContext) -> None:

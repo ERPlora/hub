@@ -35,6 +35,16 @@ def test_without_a_country_it_knows_the_currency_is_the_euro(country):
     assert business.currency_of(country, today=TODAY) == "EUR"
 
 
+@pytest.mark.parametrize(
+    ("country", "read"),
+    [("ES", "ES"), ("PL", "PL"), ("pl", "PL"), (" PT ", "PT"), ("", "ES"), ("  ", "ES")],
+)
+def test_a_business_without_a_country_is_in_erploras_market_spain(country, read):
+    """hub#682: a demo, or ERPlora's own hub without its row, is in ERPlora's market, Spain, for every rule by country
+    (the Home's national steps, VeriFactu); a business with one is in its own, whatever its case."""
+    assert business.country_or_market(country) == read
+
+
 def test_a_currency_that_has_no_cents_says_so():
     assert (business.currency_decimals("EUR"), business.currency_decimals("HUF"), business.currency_decimals("JPY")) == (
         2,
