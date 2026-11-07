@@ -7,8 +7,8 @@
 import { expect, test } from '@playwright/test';
 
 import { VIEWPORTS } from './assistant-card-helpers';
-import { manualFlow, onAutomations } from './flow-helpers';
-import { A, api, capture, psql, saveSessionForTheSweep, settledCapture, shown } from './helpers';
+import { addToANewCart, manualFlow, onAutomations, questionSays } from './flow-helpers';
+import { A, api, capture, psql, shown } from './helpers';
 
 const KEY = 'FLOW-F11-insert-nested-datum';
 const TAG = 'E2E FlowNested';
@@ -37,14 +37,7 @@ for (const viewport of VIEWPORTS) {
   test(`FLOW-F11 «Insert a datum» offers the price of the line a step adds to a cart, and the question says it as money, at ${viewport.label}`, async ({ browser }) => {
     test.setTimeout(150_000);
     await onAutomations(browser, viewport, TAG, async ({ context, page, name }) => {
-      const session = `${SESSION}-${viewport.label}-${Date.now().toString(36)}`;
-      const cart = await api<{ id: string }>(context, A, 'POST', '/cart_checkout/carts', { session_token: session });
-      expect(cart.status, JSON.stringify(cart.data)).toBe(201);
-      const line = { session_token: session, product_ref: 'p-1', product_name: 'Champú', quantity: '2', unit_price: 1250 };
-      const steps = [
-        { id: 's1', kind: 'command', operation: ADD, params: line },
-        { id: 's2', kind: 'ask', title: 'Line price' },
-      ];
+      const steps = [await addToANewCart(context, `${SESSION}-${viewport.label}`), { id: 's2', kind: 'ask', title: 'Line price' }];
       const flowId = await manualFlow(context, name, steps, [ADD]);
 
       // The question's title: «Insert a datum» → what the first step left inside the line it added.
@@ -86,14 +79,7 @@ for (const viewport of VIEWPORTS) {
       const ran = await api<{ status: string }>(context, A, 'POST', '/flow/flows/run', { id: flowId, input: {} });
       expect(ran.status, JSON.stringify(ran.data)).toBe(200);
       expect(ran.data.status).toBe('asking');
-      await page.goto('/flow/automations');
-      const card = shown(page).locator('[data-testid=flow-inbox] article').filter({ hasText: name });
-      await expect(card.locator('[data-testid^=flow-question-title-]')).toHaveText('Line price: €12.50');
-      await card.scrollIntoViewIfNeeded();
-      await settledCapture(page, `${KEY}-question-${viewport.label}`);
-      await saveSessionForTheSweep(context);
-      await card.locator('[data-testid^=flow-question-reject-]').click();
-      await expect(card).toHaveCount(0);
+      await questionSays({ context, page, name }, 'Line price: €12.50', `${KEY}-question-${viewport.label}`);
     });
   });
 }

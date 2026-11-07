@@ -5,7 +5,7 @@ import { execFileSync } from 'node:child_process';
 
 import { type Browser, type BrowserContext, expect, type Page } from '@playwright/test';
 
-import { A, api, type Credentials, HUB_DIR, login, OWNER, psql, shown } from './helpers';
+import { A, api, type Credentials, HUB_DIR, login, OWNER, psql, saveSessionForTheSweep, settledCapture, shown } from './helpers';
 import { OUTBOUND_AT_ONCE } from './whatsapp-helpers';
 
 export async function signedIn(
@@ -99,4 +99,29 @@ export function workerCalls(flowId: string): void {
     encoding: 'utf8',
     env: { ...process.env, FLOW_EVENT: parkedEvent(flowId) },
   });
+}
+
+/** The first step of an automation that adds a line to a cart of its own (`<prefix>-<stamp>`, made here): two of a
+ *  product at 12.50, so the line's total and the cart's after it are 25.00 (`cart_checkout.item.add`). */
+export async function addToANewCart(context: BrowserContext, prefix: string): Promise<{ id: string; kind: 'command'; operation: string; params: Record<string, unknown> }> {
+  const session = `${prefix}-${Date.now().toString(36)}`;
+  const cart = await api<{ id: string }>(context, A, 'POST', '/cart_checkout/carts', { session_token: session });
+  expect(cart.status, JSON.stringify(cart.data)).toBe(201);
+  const line = { session_token: session, product_ref: 'p-1', product_name: 'Champú', quantity: '2', unit_price: 1250 };
+  return { id: 's1', kind: 'command', operation: 'cart_checkout.item.add', params: line };
+}
+
+/** On Automations, the question of the automation `name` says `said` in «Waiting for your answer»: captured as `shot`
+ *  (the session saved for the visual sweep), then answered no, which takes its card away. */
+export async function questionSays(stage: { context: BrowserContext; page: Page; name: string }, said: string, shot: string): Promise<void> {
+  const { context, page, name } = stage;
+  await page.goto('/flow/automations');
+  const card = shown(page).locator('[data-testid=flow-inbox] article').filter({ hasText: name });
+  await expect(card.locator('[data-testid^=flow-question-title-]')).toHaveText(said);
+  await card.scrollIntoViewIfNeeded();
+  await settledCapture(page, shot);
+  await saveSessionForTheSweep(context);
+
+  await card.locator('[data-testid^=flow-question-reject-]').click();
+  await expect(card).toHaveCount(0);
 }
