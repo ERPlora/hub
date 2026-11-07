@@ -26,19 +26,14 @@ const STILL_UNNAMED: Record<string, number> = {
   'apps/appointment/frontend/components/AppointmentFormModal.vue': 6,
   'apps/appointment/frontend/components/SeriesFormModal.vue': 8,
   'apps/attendance/frontend/components/CorrectionModal.vue': 3,
-  'apps/cart_checkout/frontend/components/CartFormModal.vue': 3,
-  'apps/cart_checkout/frontend/components/FailOrderModal.vue': 1,
   'apps/combo/frontend/components/MenuFormModal.vue': 5,
   'apps/kitchen/frontend/components/StationFormModal.vue': 2,
   'apps/kitchen/frontend/components/TicketFormModal.vue': 1,
   'apps/modifier/frontend/components/GroupFormModal.vue': 5,
   'apps/modifier/frontend/components/OptionFormModal.vue': 5,
-  'apps/payment/frontend/components/CancelPaymentModal.vue': 1,
-  'apps/payment/frontend/components/MethodFormModal.vue': 3,
-  'apps/payment/frontend/components/PaymentFormModal.vue': 7,
-  'apps/pricing/frontend/components/PriceItemFormModal.vue': 3,
-  'apps/pricing/frontend/components/PriceListFormModal.vue': 7,
-  'apps/pricing/frontend/components/RuleFormModal.vue': 16,
+  'apps/pricing/frontend/components/PriceItemFormModal.vue': 1, // Product or service: a Combo
+  'apps/pricing/frontend/components/PriceListFormModal.vue': 1, // Customer group: a Combo
+  'apps/pricing/frontend/components/RuleFormModal.vue': 2, // What it applies to and Customer group: Combos
   'apps/reservation/frontend/components/BlockedDateFormModal.vue': 3,
   'apps/reservation/frontend/components/ReservationFormModal.vue': 10,
   'apps/reservation/frontend/components/SlotFormModal.vue': 4,

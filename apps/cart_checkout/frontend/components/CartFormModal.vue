@@ -68,6 +68,7 @@ async function save(): Promise<void> {
       <div class="cart-checkout-cart-form">
         <ion-input
           data-testid="cart-checkout-cart-form-session"
+          name="session_token"
           :value="form.session"
           :label="$t('cart_checkout.carts.form.session')"
           :placeholder="$t('cart_checkout.carts.form.sessionPlaceholder')"
@@ -82,6 +83,7 @@ async function save(): Promise<void> {
         />
         <ion-input
           data-testid="cart-checkout-cart-form-email"
+          name="customer_email"
           :value="form.email"
           type="email"
           inputmode="email"
@@ -97,6 +99,7 @@ async function save(): Promise<void> {
         />
         <ion-input
           data-testid="cart-checkout-cart-form-name"
+          name="customer_name"
           :value="form.name"
           :label="$t('cart_checkout.carts.form.name')"
           :placeholder="$t('cart_checkout.carts.form.namePlaceholder')"

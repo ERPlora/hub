@@ -5,6 +5,7 @@
 import { Combo } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
+import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import { priceItem } from '../__tests__/fixtures';
 import { click, ionValue, mountPricing, settle } from '../__tests__/mount-pricing';
 import PriceItemFormModal from './PriceItemFormModal.vue';
@@ -107,4 +108,16 @@ describe('PriceItemFormModal', () => {
     expect(s.inDoc('pricing-item-form')?.getAttribute('aria-label')).toBe('Nuevo precio');
     expect(s.field('min_quantity').label).toBe('Desde la cantidad');
   });
+});
+
+// The product or service is a Combo (@erplora/ui), which does not hand a name to its field yet: left out here.
+describe('PriceItemFormModal: fields refused with the same words (hub#888)', () => {
+  itTellsTheCorrectedFieldApart(['min_quantity', 'price'], async (locale, refusal) => {
+    const s = await setup({}, locale);
+    s.article().vm.$emit('update:modelValue', { id: 'p1', label: 'Shampoo' });
+    await settle();
+    await ionValue(s.field('price'), '12', 'ionInput');
+    s.answer(422, refusal);
+    return { field: s.field, send: () => click(s.save()), settle };
+  }, 'price');
 });

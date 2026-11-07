@@ -173,7 +173,7 @@ por Artículo, Desde y Precio; filtro por Tipo, con el embudo; 50 por página.
 |---|---|
 | Cargando | «Cargando…» mientras llega el primer resultado. |
 | Vacío | «Sin listas de precios.», «Sin reglas de descuento.» o «Esta tarifa aún no tiene precios.»; con búsqueda o filtro, «Sin resultados». |
-| Error | El aviso de la tabla con «Reintentar». El rechazo de un formulario sale dentro del formulario y debajo de su campo, sin perder lo tecleado; el de una confirmación, dentro de la confirmación. |
+| Error | El aviso de la tabla con «Reintentar». El rechazo de un formulario sale dentro del formulario y debajo de su campo, sin perder lo tecleado, y cada campo rechazado pierde su motivo en cuanto se corrige ese campo, aunque otro diga lo mismo (hub#888); los buscadores (el **Producto** o **Servicio** de un precio, a qué se aplica una regla y el **Grupo de clientes**) todavía no: si dicen lo mismo que otro campo, siguen marcados hasta volver a guardar. El de una confirmación, dentro de la confirmación. |
 | Reconectando | Lo pintado se queda; una franja avisa «Reconectando…». |
 | App inactiva | «Esta app no está activa en este negocio». |
 | Sin permiso | No aparece lo que no puede hacer; si llega por otra puerta, «No tienes permiso». |

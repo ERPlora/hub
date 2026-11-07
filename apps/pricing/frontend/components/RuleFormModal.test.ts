@@ -6,6 +6,7 @@
 import { Combo } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
+import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import { expectSaveWaitsForMoney } from '../../../../base/frontend/__tests__/save-waits-for-money';
 import type { Business } from '../../../../base/frontend/operations';
 import { business, JAPANESE, KUWAITI, POLISH, rule } from '../__tests__/fixtures';
@@ -266,4 +267,17 @@ describe('RuleFormModal: the business answers after the form opened', () => {
       expect(s.sent().map((call) => (call.body as { amount: number }).amount)).toEqual([1500]);
     },
   );
+});
+
+// A percent rule for everything (the form as it opens). What it applies to and the customer group are Combos
+// (@erplora/ui), which do not hand a name to their field yet: left out here.
+describe('RuleFormModal: fields refused with the same words (hub#888)', () => {
+  const KEYS = ['code', 'name', 'rule_type', 'percent', 'applies_to', 'min_quantity', 'priority', 'valid_from', 'valid_until'];
+  itTellsTheCorrectedFieldApart(KEYS, async (locale, refusal) => {
+    const s = await setupAnswered({}, locale);
+    await named(s);
+    await ionValue(s.field('percent'), '10', 'ionInput');
+    s.answer(422, refusal);
+    return { field: s.field, send: () => click(s.save()), settle };
+  }, 'percent');
 });

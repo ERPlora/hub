@@ -160,6 +160,7 @@ async function save(): Promise<void> {
       <div class="pricing-form">
         <ion-input
           data-testid="pricing-list-form-code"
+          name="code"
           :value="form.code"
           :label="$t('pricing.lists.form.code')"
           label-placement="floating"
@@ -172,6 +173,7 @@ async function save(): Promise<void> {
         />
         <ion-input
           data-testid="pricing-list-form-name"
+          name="name"
           :value="form.name"
           :label="$t('pricing.lists.form.name')"
           label-placement="floating"
@@ -185,6 +187,7 @@ async function save(): Promise<void> {
         <div class="pricing-form__row">
           <ion-input
             data-testid="pricing-list-form-currency"
+            name="currency"
             :value="form.currency"
             :label="$t('pricing.lists.form.currency')"
             label-placement="floating"
@@ -198,6 +201,7 @@ async function save(): Promise<void> {
           />
           <ion-select
             data-testid="pricing-list-form-tax"
+            name="tax_included"
             :value="form.basis"
             :label="$t('pricing.lists.form.tax')"
             label-placement="floating"
@@ -229,6 +233,7 @@ async function save(): Promise<void> {
         <div class="pricing-form__row">
           <ion-input
             data-testid="pricing-list-form-valid_from"
+            name="valid_from"
             type="date"
             :value="form.validFrom"
             :label="$t('pricing.lists.form.validFrom')"
@@ -241,6 +246,7 @@ async function save(): Promise<void> {
           />
           <ion-input
             data-testid="pricing-list-form-valid_until"
+            name="valid_until"
             type="date"
             :value="form.validUntil"
             :label="$t('pricing.lists.form.validUntil')"
