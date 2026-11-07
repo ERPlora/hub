@@ -33,6 +33,12 @@ Quién la usa:
 - El **propietario**, el **administrador** y el **responsable** crean categorías, reglas y alias, ponen
   fecha de fin a una regla y la desactivan o reactivan.
 - El **empleado** solo consulta y calcula.
+- El **asistente** (por voz o por texto, con la sesión de quien habla) hace lo mismo: «desactiva la regla
+  de la cerveza en Alemania», «pon fin al tipo reducido el 31 de diciembre». Antes de una acción pide
+  confirmar con su tarjeta (BASE-F97), que nombra cada regla como la distingue la lista de Reglas, nunca
+  por su identificador: por su categoría, la etiqueta de un componente, su país (y su región) y su tipo
+  («Regla: Cervezas artesanas · España · 10 %»); y cada país por su nombre («País: Alemania»), nunca por su
+  código. Lo que quien pregunta no puede ver, o lo que ya no existe, no sale.
 
 No decide el precio, no emite facturas ni habla con la AEAT, y no guarda el país del negocio.
 
@@ -560,6 +566,7 @@ reactivarla, la última desactivada).
 | Cuántas reglas raíz aplican hoy en el país del negocio y si los impuestos están configurados (el aviso y el paso «Tus impuestos» del Inicio) | ver | F17 | `tax.rule.status` |
 | Las reglas raíz de las que puede colgar un componente en un país, región y categoría: las mismas que acepta el alta (también una raíz que empieza en el futuro; una sin impuesto, solo para un componente al 0 %) | ver | F06 | `tax.rule.parent_candidates` |
 | Los países en los que el negocio tiene reglas (todas, activas o desactivadas), para el filtro País | ver | F03, F11 | `tax.rule.countries` |
+| Una regla por su id, activa o desactivada, con su nombre (categoría · país · tipo): lo que lee la tarjeta del asistente para nombrarla (BASE-F97); no es herramienta del asistente ni tiene ruta en la API | ver | F06, F07, F08 | `tax.rule.get` |
 | Los alias, con búsqueda, filtros (categoría, origen) y páginas | ver | F13, F15 | `tax.alias.list` |
 | La categoría que corresponde a un texto de fuera, y por qué casó | ver | F15 | `tax.alias.resolve` |
 | El impuesto de un importe: base, cuota, total, tipo, calificación y desglose | ver | F18, F19 | `tax.rate.calculate` |
@@ -717,6 +724,22 @@ cajero del producto actual es un empleado.
   `verbose_name` del modelo; el que ningún modelo nombra (`tax_category_key`) lleva un `title` en inglés con
   `gettext_noop` y su español en el catálogo de Impuestos, la palabra de las pantallas («Categoría»). Lo
   vigila `tests/test_integration_assistant.py`, que recorre todas las escrituras `tax.*` del registro.
+- **Tarjeta de confirmación del asistente** (BASE-F97, hub#678): nombra la regla que una escritura señala por su id
+  con la marca `refers` de `schemas.py` (`A_RULE`), leída como quien pregunta con `tax.rule.get`, lectura interna
+  (`ai=INTERNAL`, sin API ni consulta viva): solo nombra la regla en la tarjeta; el modelo encuentra las reglas en
+  su lista. Su `label` dice la categoría (su nombre en el idioma de quien pregunta), la etiqueta de un componente, el
+  país por su nombre (y la región por su código, como la columna Región) y el tipo como lo escribe ese idioma
+  («Cervezas artesanas · España (ES-CN) · 7 %»). La llevan el `id` de `RuleRefIn` (activar, desactivar y poner fin),
+  titulado «Regla» como la lista (`T_RULE`, con su español en el catálogo de la app), y el `parent_id` de `RuleIn`
+  (el alta de un componente), que ya sale «Regla raíz» por el `verbose_name` de `TaxRule.parent`. Una regla
+  desactivada se sigue nombrando (para reactivarla). Sin persona detrás, sin `tax.view`, con un id de otro negocio o
+  de una regla que no existe, queda fuera, nunca su id (`tests/test_assistant_card_records.py`).
+- **Países en la tarjeta**: `country_code` es una lista cerrada (los 249 códigos ISO 3166-1) que ningún campo del
+  modelo etiqueta; `choices.py` la declara (`TaxConfig.choices`) con el nombre de cada país en el idioma de quien
+  lee (CLDR por `base.business.country_name`, el mismo que enseña el selector de País de la pantalla con
+  `Intl.DisplayNames`), en las escrituras de reglas y en cada línea del lote (`tests/test_choices.py`). El
+  trinquete de `base/tests/test_assistant_card_values.py` (`UNNAMED_REFERENCES`, `UNLABELLED_LISTS`) impide que
+  entre un dato sin marca o una lista sin etiquetas.
 - **País y región** salen de `pycountry` (ISO 3166-1 y 3166-2), no de una lista copiada.
 - **Decisión de mercado: «Tus impuestos» (TAX-F17) en las pantallas de Impuestos**: el mercado avisa de
   los tipos que faltan en una lista de primeros pasos del inicio (Square, Odoo, Lightspeed, Business

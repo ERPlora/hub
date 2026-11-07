@@ -1283,6 +1283,7 @@
       "tax__category__get": "Leer una categoría de impuesto",
       "tax__category__list": "Buscar categorías de impuesto",
       "tax__rate__calculate": "Calcular un impuesto",
+      "tax__rule__get": "Leer una regla de impuesto",
       "tax__rule__countries": "Buscar los países con reglas de impuesto",
       "tax__rule__list": "Buscar reglas de impuesto",
       "tax__rule__parent_candidates": "Buscar las reglas de las que puede colgar una regla",
