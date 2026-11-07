@@ -81,6 +81,14 @@ export function itTellsTheCorrectedFieldApart(keys: readonly string[], open: Ope
     await expectTheCorrectedFieldAloneLosesItsMark(await open('en', refusedWithTheSameWords(keys)), keys, key);
   });
   it(`in Spanish too: the corrected ${spanish} alone loses «${SAME_WORDS_ES}»`, async () => {
-    await expectTheCorrectedFieldAloneLosesItsMark(await open('es', refusedWithTheSameWords(keys, SAME_WORDS_ES)), keys, spanish);
+    const window = await open('es', refusedWithTheSameWords(keys, SAME_WORDS_ES));
+    expectTheWindowSpeaksSpanish(window, spanish);
+    await expectTheCorrectedFieldAloneLosesItsMark(window, keys, spanish);
   });
+}
+
+/** The window holding the field of `key` speaks Spanish: FormModal's «Cancel» says «Cancelar». */
+export function expectTheWindowSpeaksSpanish(window: RefusedWindow, key: string): void {
+  const cancel = window.field(key)?.closest('.ep-form-modal')?.querySelector('.ep-form-modal__cancel');
+  expect(cancel?.textContent?.trim(), 'the window’s «Cancel», in Spanish').toBe('Cancelar');
 }

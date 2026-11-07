@@ -9,7 +9,13 @@ import { describe, expect, it, vi } from 'vitest';
 import { defineComponent, h, nextTick, ref } from 'vue';
 
 import { flush, mountBase } from './mount-base';
-import { expectTheCorrectedFieldAloneLosesItsMark, itTellsTheCorrectedFieldApart, refusedWithTheSameWords, SAME_WORDS } from './same-words-refusal';
+import {
+  expectTheCorrectedFieldAloneLosesItsMark,
+  expectTheWindowSpeaksSpanish,
+  itTellsTheCorrectedFieldApart,
+  refusedWithTheSameWords,
+  SAME_WORDS,
+} from './same-words-refusal';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
   const { IonModalStub } = await import('../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
@@ -19,9 +25,15 @@ vi.mock('@ionic/vue', async (importOriginal) => {
 const KEYS = ['title', 'notes', 'kind'] as const;
 
 /** A window with a field per key — `title` an ion-input, `notes` an ion-textarea, `kind` an ion-select — whose «Save»
- *  is refused with `refusal`; each field carries the name `names` gives it (none when it gives none). */
-async function windowNaming(names: Partial<Record<(typeof KEYS)[number], string>>, refusal: FormModalError = refusedWithTheSameWords(KEYS).error) {
+ *  is refused with `refusal`; each field carries the name `names` gives it (none when it gives none), and what each
+ *  field hears is written down (`heard`: `<key>:<event>`). */
+async function windowNaming(
+  names: Partial<Record<(typeof KEYS)[number], string>>,
+  refusal: FormModalError = refusedWithTheSameWords(KEYS).error,
+  locale: 'en' | 'es' = 'en',
+) {
   const error = ref<FormModalError | null>(null);
+  const heard: string[] = [];
   const Window = defineComponent({
     setup() {
       const field = (key: (typeof KEYS)[number], errorText: string | undefined) => ({
@@ -29,6 +41,9 @@ async function windowNaming(names: Partial<Record<(typeof KEYS)[number], string>
         name: names[key],
         errorText,
         class: errorText ? 'ion-invalid ion-touched' : undefined,
+        onInput: () => heard.push(`${key}:input`),
+        onIonInput: () => heard.push(`${key}:ionInput`),
+        onIonChange: () => heard.push(`${key}:ionChange`),
       });
       return () =>
         h(
@@ -44,7 +59,7 @@ async function windowNaming(names: Partial<Record<(typeof KEYS)[number], string>
         );
     },
   });
-  const m = await mountBase(Window);
+  const m = await mountBase(Window, { locale });
   const settle = async () => {
     await nextTick();
     await flush();
@@ -58,6 +73,8 @@ async function windowNaming(names: Partial<Record<(typeof KEYS)[number], string>
       await settle();
     },
     settle,
+    heard: () => heard,
+    unmount: () => m.wrapper.unmount(),
   };
 }
 
@@ -89,6 +106,17 @@ describe('expectTheCorrectedFieldAloneLosesItsMark (hub#888)', () => {
     await expect(expectTheCorrectedFieldAloneLosesItsMark(w, KEYS, 'title')).rejects.toThrow(/the same words/);
   });
 
+  it('corrects as a person does: typing in a text field (its native input, then ionInput), choosing in a picker (ionChange)', async () => {
+    const heard: string[][] = [];
+    for (const key of KEYS) {
+      const w = await windowNaming(NAMED);
+      await expectTheCorrectedFieldAloneLosesItsMark(w, KEYS, key);
+      heard.push([...w.heard()]);
+      w.unmount();
+    }
+    expect(heard).toEqual([['title:input', 'title:ionInput'], ['notes:input', 'notes:ionInput'], ['kind:ionChange']]);
+  });
+
   it('builds the refusal the server sends: every key with the same words, in English or in the words it is given', () => {
     expect(refusedWithTheSameWords(['a', 'b'])).toEqual({
       error: { code: 'invalid_payload', message: 'Check the highlighted details.', fields: { a: SAME_WORDS, b: SAME_WORDS } },
@@ -98,5 +126,17 @@ describe('expectTheCorrectedFieldAloneLosesItsMark (hub#888)', () => {
 });
 
 describe('itTellsTheCorrectedFieldApart (hub#888): the cases it declares pass a window whose fields carry their names', () => {
-  itTellsTheCorrectedFieldApart(KEYS, (_locale, refusal) => windowNaming(NAMED, refusal.error), 'kind');
+  itTellsTheCorrectedFieldApart(KEYS, (locale, refusal) => windowNaming(NAMED, refusal.error, locale), 'kind');
+});
+
+describe('expectTheWindowSpeaksSpanish (hub#888): the Spanish case is a window in Spanish', () => {
+  it('passes a window opened in Spanish', async () => {
+    const w = await windowNaming(NAMED, undefined, 'es');
+    expect(() => expectTheWindowSpeaksSpanish(w, 'title')).not.toThrow();
+  });
+
+  it('fails a window opened in English', async () => {
+    const w = await windowNaming(NAMED, undefined, 'en');
+    expect(() => expectTheWindowSpeaksSpanish(w, 'title')).toThrow(/Cancel/);
+  });
 });
