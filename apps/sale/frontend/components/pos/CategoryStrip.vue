@@ -5,7 +5,7 @@
 // the windows already asked come with «More…». With the services of Services (SALE-F38), «Services»
 // follows «All» with its count (`services`).
 import { syncTabbarOverflow } from '@erplora/ui/shell';
-import { IonLabel, IonSegment, IonSegmentButton } from '@ionic/vue';
+import { IonButton, IonLabel, IonSegment, IonSegmentButton } from '@ionic/vue';
 import { onBeforeUnmount, onMounted, useTemplateRef } from 'vue';
 
 import type { CategoryOut } from '../../../../inventory/frontend/operations';
@@ -109,15 +109,15 @@ onBeforeUnmount(() => resize?.disconnect());
       </ion-label>
     </ion-segment-button>
   </ion-segment>
-  <button
+  <ion-button
     v-if="hasMore"
-    type="button"
+    fill="outline"
     class="pos-cats__more"
     data-testid="pos-category-more"
     @click="emit('loadMore')"
   >
     {{ $t('sale.pos.more') }}
-  </button>
+  </ion-button>
 </template>
 
 <style scoped>
@@ -199,15 +199,12 @@ onBeforeUnmount(() => resize?.disconnect());
 .pos-cats__more {
   flex: none;
   min-height: 3.65rem;
-  padding: 0 0.8rem;
-  font: inherit;
+  margin: 0;
   font-size: 0.85rem;
   font-weight: 600;
-  color: var(--ion-color-primary, #0091ce);
-  background: var(--ion-card-background, var(--ion-background-color, #fff));
-  border: 1px solid var(--ion-border-color, #e6e3db);
-  border-radius: 12px;
-  cursor: pointer;
+  --color: var(--ion-color-primary);
+  --background: var(--ion-card-background);
+  --border-radius: 12px;
 }
 @media (min-width: 821px) and (max-width: 1100px) {
   .pos-cat {

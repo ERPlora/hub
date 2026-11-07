@@ -3,6 +3,7 @@
 // an amount in major units with the dot («12.50»): never more decimals than allowed, never two
 // separators nor leading zeros, never longer than `maxLength`. The sheet turns it into cents.
 import { decimalMark } from '@erplora/ui/components';
+import { IonButton } from '@ionic/vue';
 import { computed } from 'vue';
 
 import { useLocale } from '../../composables/useT';
@@ -37,10 +38,10 @@ const label = (key: Key) => (key === 'dot' ? separator.value : key === 'clear' ?
 
 <template>
   <div class="pos-numpad">
-    <button
+    <ion-button
       v-for="key in KEYS"
       :key="key"
-      type="button"
+      fill="outline"
       class="pos-numpad__key"
       :data-testid="`pos-key-${key}`"
       :aria-label="key === 'clear' ? $t('sale.pos.numpadClear') : undefined"
@@ -48,7 +49,7 @@ const label = (key: Key) => (key === 'dot' ? separator.value : key === 'clear' ?
       @click="press(key)"
     >
       {{ label(key) }}
-    </button>
+    </ion-button>
   </div>
 </template>
 
@@ -61,20 +62,15 @@ const label = (key: Key) => (key === 'dot' ? separator.value : key === 'clear' ?
 }
 .pos-numpad__key {
   min-height: 3.1rem;
-  font: inherit;
+  margin: 0;
   font-size: 1.15rem;
   font-weight: 700;
-  color: var(--ion-text-color, #1c1b18);
-  background: var(--ion-card-background, var(--ion-color-light, #f2f1ed));
-  border: 1px solid var(--ion-border-color, #e6e3db);
-  border-radius: 10px;
-  cursor: pointer;
+  --border-radius: 10px;
 }
 .pos-numpad__key:active {
   transform: scale(0.97);
 }
 .pos-numpad__key:disabled {
   opacity: 0.4;
-  cursor: default;
 }
 </style>

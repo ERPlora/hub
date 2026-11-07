@@ -42,10 +42,10 @@ describe('ServiceSearchResults', () => {
     expect(row.find('.pos-search__note').text()).toBe('No se puede vender: sin categoría fiscal. Falta configurar el IVA.');
   });
 
-  it('a row is a native button, so one without VAT keeps its aria-disabled in the browser (an ion-item drops it)', async () => {
+  it('a row is an Ionic button, so one without VAT keeps its aria-disabled in the browser', async () => {
     const m = await setup();
     await m.result(OP, page([service({ id: 'sv1' }), service({ id: 'sv2', needs_tax_setup: true })]));
-    expect(['sv1', 'sv2'].map((id) => m.find(`pos-search-service-${id}`).element.tagName)).toEqual(['BUTTON', 'BUTTON']);
+    expect(['sv1', 'sv2'].map((id) => m.find(`pos-search-service-${id}`).element.tagName)).toEqual(['ION-BUTTON', 'ION-BUTTON']);
     expect(['sv1', 'sv2'].map((id) => m.find(`pos-search-service-${id}`).attributes('aria-disabled'))).toEqual([undefined, 'true']);
   });
 

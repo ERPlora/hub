@@ -10,7 +10,7 @@
 // with the next live result.
 import { useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { HubIcon, useSession } from '@erplora/ui/shell';
-import { IonButton } from '@ionic/vue';
+import { IonButton, IonItem, IonList } from '@ionic/vue';
 import { computed, onBeforeUnmount, shallowRef } from 'vue';
 
 import { useLiveWindows } from '../../composables/useLiveWindows';
@@ -86,7 +86,7 @@ const meta = (row: OrderRow) => {
     data-testid="pos-checks-backdrop"
     @click="emit('close')"
   />
-  <div
+  <ion-list
     class="pos-checks"
     role="dialog"
     :aria-label="$t('sale.pos.parkedTickets')"
@@ -122,22 +122,24 @@ const meta = (row: OrderRow) => {
     <p class="pos-checks__hint">
       <strong>{{ $t('sale.pos.parkedTickets') }}</strong><br>{{ $t('sale.pos.openChecksHint') }}
     </p>
-    <div
+    <ion-item
       v-for="row in rows"
       :key="row.id"
       class="pos-checks__item"
+      lines="none"
     >
-      <button
-        type="button"
+      <ion-button
+        fill="clear"
         class="pos-checks__row"
         :data-testid="`pos-parked-${row.id}`"
         @click="emit('resume', row)"
       >
         <span class="pos-checks__name">{{ row.label || formatMoney(row.provisional_total, locale, business) }}</span>
         <span class="pos-checks__meta">{{ meta(row) }}</span>
-      </button>
+      </ion-button>
       <ion-button
         v-if="canDelete"
+        slot="end"
         fill="clear"
         class="pos-checks__delete"
         :data-testid="`pos-parked-${row.id}-delete`"
@@ -157,7 +159,7 @@ const meta = (row: OrderRow) => {
       >
         {{ $t('sale.pos.deleteCheckConfirm') }}
       </p>
-    </div>
+    </ion-item>
     <p
       v-if="checks.status.value !== 'loading' && !rows.length"
       class="pos-checks__hint pos-checks__hint--center"
@@ -175,7 +177,7 @@ const meta = (row: OrderRow) => {
     >
       {{ $t('sale.pos.loadMore') }}
     </ion-button>
-  </div>
+  </ion-list>
 </template>
 
 <style scoped>
@@ -230,18 +232,24 @@ const meta = (row: OrderRow) => {
   border-radius: 10px;
 }
 .pos-checks__row {
-  display: flex;
   flex: 1;
+  margin: 0;
+  font: inherit;
+  text-align: left;
+  text-transform: none;
+  --color: var(--ion-text-color);
+  --background: transparent;
+  --padding-start: 0;
+  --padding-end: 0;
+}
+.pos-checks__row::part(native) {
+  display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 0.1rem;
+  width: 100%;
   padding: 0.3rem 0;
-  font: inherit;
   text-align: left;
-  color: var(--ion-text-color, #1c1b18);
-  background: none;
-  border: none;
-  cursor: pointer;
 }
 .pos-checks__name {
   font-size: 0.9rem;

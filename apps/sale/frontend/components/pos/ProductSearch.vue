@@ -4,8 +4,7 @@
 // whole catalogue (sold out too, SALE-F07), 20 at a time. A row shows the name, the SKU (or «Sold out», or
 // why it cannot be sold) and the price; a tap hands the product up, where the same rules as a tile apply. With the services of Services
 // (SALE-F38, `withServices`), the services it finds come after them (`pickService`). Mounted only while
-// open. A row's tap and its aria-disabled live on a native button inside the ion-item: an ion-item rewrites
-// its own aria-disabled from its `disabled`, which would swallow the tap.
+// open. A row is an Ionic button whose aria-disabled still takes the tap, so the catalogue can explain it.
 import { useLive } from '@erplora/ui/sdk';
 import { HubIcon } from '@erplora/ui/shell';
 import { IonButton, IonItem, IonList, IonSearchbar, IonSpinner } from '@ionic/vue';
@@ -110,8 +109,8 @@ useSearchbarName(bar, () => t('sale.pos.searchPlaceholder'));
         v-for="item in rows"
         :key="item.id"
       >
-        <button
-          type="button"
+        <ion-button
+          fill="clear"
           class="pos-search__row"
           :data-testid="`pos-search-${item.id}`"
           :aria-disabled="item.is_sold_out || item.needs_tax_setup ? 'true' : undefined"
@@ -125,7 +124,7 @@ useSearchbarName(bar, () => t('sale.pos.searchPlaceholder'));
             >{{ note(item) }}</span>
           </span>
           <span class="pos-search__price">{{ formatMoney(item.price, locale, business) }}</span>
-        </button>
+        </ion-button>
       </ion-item>
     </ion-list>
     <ServiceSearchResults
@@ -168,23 +167,28 @@ useSearchbarName(bar, () => t('sale.pos.searchPlaceholder'));
   border-radius: 10px;
 }
 .pos-search__row {
+  width: 100%;
+  min-height: 2.75rem;
+  margin: 0;
+  font: inherit;
+  text-align: left;
+  text-transform: none;
+  --color: var(--ion-text-color);
+  --background: transparent;
+  --border-radius: 10px;
+  --padding-start: 1rem;
+  --padding-end: 1rem;
+}
+.pos-search__row::part(native) {
   display: flex;
   align-items: center;
   gap: 0.75rem;
   width: 100%;
-  min-height: 2.75rem;
-  margin: 0;
   padding: 0.625rem 1rem;
-  font: inherit;
   text-align: left;
-  color: inherit;
-  background: none;
-  border: 0;
-  border-radius: 10px;
-  cursor: pointer;
 }
 .pos-search__row:active {
-  background: var(--ion-color-step-100, rgba(0, 0, 0, 0.06));
+  --background: var(--ion-color-step-100);
 }
 .pos-search__row[aria-disabled='true'] {
   opacity: 0.8;
