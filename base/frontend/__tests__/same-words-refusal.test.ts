@@ -11,7 +11,7 @@ import { defineComponent, h, nextTick, ref } from 'vue';
 import { flush, mountBase } from './mount-base';
 import {
   expectTheCorrectedFieldAloneLosesItsMark,
-  expectTheWindowSpeaksSpanish,
+  expectTheSameInSpanish,
   itTellsTheCorrectedFieldApart,
   refusedWithTheSameWords,
   SAME_WORDS,
@@ -129,14 +129,16 @@ describe('itTellsTheCorrectedFieldApart (hub#888): the cases it declares pass a 
   itTellsTheCorrectedFieldApart(KEYS, (locale, refusal) => windowNaming(NAMED, refusal.error, locale), 'kind');
 });
 
-describe('expectTheWindowSpeaksSpanish (hub#888): the Spanish case is a window in Spanish', () => {
+describe('expectTheSameInSpanish (hub#888): the Spanish case is a window in Spanish', () => {
   it('passes a window opened in Spanish', async () => {
-    const w = await windowNaming(NAMED, undefined, 'es');
-    expect(() => expectTheWindowSpeaksSpanish(w, 'title')).not.toThrow();
+    await expect(expectTheSameInSpanish((locale, refusal) => windowNaming(NAMED, refusal.error, locale), KEYS, 'title')).resolves.toBeUndefined();
   });
 
-  it('fails a window opened in English', async () => {
-    const w = await windowNaming(NAMED, undefined, 'en');
-    expect(() => expectTheWindowSpeaksSpanish(w, 'title')).toThrow(/Cancel/);
+  it('fails a window that opens in English when asked for Spanish', async () => {
+    await expect(expectTheSameInSpanish((_locale, refusal) => windowNaming(NAMED, refusal.error, 'en'), KEYS, 'title')).rejects.toThrow(/Cancel/);
+  });
+
+  it('fails a window in Spanish whose corrected field carries no name', async () => {
+    await expect(expectTheSameInSpanish((locale, refusal) => windowNaming({ ...NAMED, title: undefined }, refusal.error, locale), KEYS, 'title')).rejects.toThrow(/"title"/);
   });
 });
