@@ -323,10 +323,6 @@ async function toggleService(event: Event, id: string, online: boolean): Promise
   max-width: 560px;
   margin-bottom: 24px;
 }
-/* The switch's long label wraps (ion-toggle keeps it on one line): the same defect Attendance had (hub#94). */
-.ob-settings ion-toggle::part(label) {
-  white-space: normal;
-}
 .ob-settings__title {
   font-size: 1.1rem;
   margin: 0;
