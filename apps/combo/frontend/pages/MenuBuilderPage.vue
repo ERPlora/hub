@@ -6,13 +6,16 @@
 // why. Then «Courses»: a card per course in the order the till asks them (the handle and the arrows save
 // the whole order at once; «Withdraw» asks first), and «Add a course», which edits the course whose
 // «Edit details» was pressed. Every change comes back through the stream; a menu withdrawn meanwhile
-// (here or on another device) leaves only «This menu no longer exists» with «All menus» in it.
+// (here or on another device) leaves only «This menu no longer exists» with «All menus» in it. Each course's
+// «Add choice» waits for the business's money (its supplement is read in it, hub#946): if that read fails, the page
+// says it once, above the courses, with «Retry», to whoever manages the menu.
 import { ConfirmDialog, InlineFeedback } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, HubIcon, useSession } from '@erplora/ui/shell';
 import { IonButton, IonReorderGroup } from '@ionic/vue';
 import { computed, ref } from 'vue';
 
+import BusinessMoneyError from '../../../../base/frontend/components/BusinessMoneyError.vue';
 import CourseCard from '../components/CourseCard.vue';
 import CourseForm from '../components/CourseForm.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
@@ -176,6 +179,7 @@ async function confirmRemove(): Promise<void> {
         >
           {{ reorder.error.value.message }}
         </InlineFeedback>
+        <BusinessMoneyError v-if="canManage" />
       </template>
 
       <section

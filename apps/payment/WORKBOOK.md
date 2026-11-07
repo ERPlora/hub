@@ -28,6 +28,11 @@ Quién la usa:
 - El **empleado**: solo mira la lista de pagos y la de métodos.
 - El **responsable**, el **administrador** y el **propietario**: además registran pagos, los marcan
   como enviados y completados, los aprueban y los cancelan, y gestionan los métodos de pago.
+- El **asistente** (por voz o por texto, con la sesión de quien habla) hace lo mismo. Antes de una
+  acción pide confirmar con su tarjeta (BASE-F97), que nombra cada registro como lo nombran las
+  pantallas, nunca por su identificador: el pago por su referencia («Pago: PAY-20261014-0003»), como
+  «Cancelar pago — PAY-20261014-0003», y el método por su nombre («Método: Cuenta BBVA»), como
+  «Editando método — Cuenta BBVA». Lo que quien pregunta no puede ver, o lo que ya no existe, no sale.
 
 ## Referencia adoptada
 
@@ -160,7 +165,9 @@ Pasos:
    registra una sola vez.
 Entra: los datos del formulario; la moneda del negocio, la de su país (un pago que no dice su moneda se
 registra en ella, también por el asistente o la API). Mientras la app no sabe todavía la moneda del
-negocio, el campo dice «Importe» y «Registrar pago» espera. Por el asistente o la API, el método se dice
+negocio, el campo dice «Importe» y «Registrar pago» espera. Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
+motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, «Registrar pago» se enciende (hub#938).
+Por el asistente o la API, el método se dice
 por su id o por su nombre, el importe va en la unidad menor de la moneda (céntimos en euros) y, si se
 quiere, una clave del intento: repetir la misma llamada con la misma clave responde el pago ya registrado
 en vez de registrar otro.
@@ -426,6 +433,14 @@ pago» (el asistente del producto actual ya corría ese riesgo) y ata Pagos a Ve
   que lo contiene; varios → 409 `payment.method_ambiguous` con sus nombres); un pago por su referencia.
 - Asistente: toda operación declara `ai` con `description` y `risk` (`high` en aprobar, enviar,
   completar y cancelar) y todo campo de entrada su `description`. `expose_api=True` en todas.
+- **Tarjeta de confirmación del asistente** (BASE-F97, hub#674): nombra el registro que una escritura
+  señala por su id con las marcas `refers` de `schemas.py` (`A_METHOD`, `A_PAYMENT`), leídas como quien
+  pregunta y con su permiso (`payment.view_payment`): el método (el `id` de `MethodRefIn`, en editar,
+  desactivar y activar, y el `method_id` de un pago nuevo) por su nombre con `payment.method.get`; el pago
+  (el `id` de `PaymentRefIn`, en aprobar, enviar, completar y cancelar) por su referencia con
+  `payment.payment.get`. El id se titula con la palabra de su lista («Método», «Pago»). Sin ese permiso, o
+  con el registro inexistente o de otro negocio, la tarjeta lo deja fuera. La única lista cerrada de una
+  escritura, el tipo de método, sale con la etiqueta del formulario en cada idioma («Transferencia»).
 - El admin de Django del Hub tiene **CRUD completo** sobre los tres modelos (ronda 12, PLAN §17); una
   escritura del admin no pasa por las reglas ni deja aviso.
 

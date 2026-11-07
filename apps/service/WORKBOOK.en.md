@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:d23bcc4f71083846927ce403692d4058dcf19d00084554b3dab17d719b0b178e -->
+<!-- generated from WORKBOOK.md sha256:82d0c78cf41435e2834278d28f30261021d09773cb1467bdd0a9f24fd7ca8cc4 -->
 
 ## What it is for and who it is for
 
@@ -785,7 +785,11 @@ the professionals of a service and to take their own duration and price, and Sal
 price (SALE-F38). Assigning the same person again (assistant or API) changes their minutes and their
 price; their main service only changes if it is said.
 If it fails: inside the section, "That staff member does not exist in this business.", a name that fits
-several (the list to choose from) or the amount unreadable or negative. While the list arrives it shows
+several (the list to choose from) or the amount unreadable or negative. **Assign** is off while the
+business has not yet said its currency: the own price is read in it, and without it "1500" yen would be
+saved as 150,000; if it cannot be read, "Editing service" says so at the top ("The business's currency
+could not be read", with the reason) and offers "Retry"; as soon as it arrives, **Assign** lights up
+(hub#946). While the list arrives it shows
 "Loading…"; if it cannot be read, "The professionals could not be loaded." with the reason and
 "Retry", never "Nobody assigned yet".
 Involved: STAFF-F01, SALE-F38
@@ -806,7 +810,8 @@ Steps:
 In: the assignment.
 Out: the change (`service.assignment.updated`, `service.assignment.removed`). A person leaving in Staff
 removes them from every service they performed.
-If it fails: "That assignment does not exist in this business.".
+If it fails: "That assignment does not exist in this business.". **Save** waits, off, for the business's
+currency, like **Assign** (SERVICE-F31): the own price is read in it (hub#946).
 Involved: SERVICE-F31, SERVICE-F33, STAFF-F06
 
 ### SERVICE-F33 Know who can perform a service

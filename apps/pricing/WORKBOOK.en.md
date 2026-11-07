@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:3b92a56011a2e450affe10d0df29e788cd9b6a9e93a7b514c09e3ae500609486 -->
+<!-- generated from WORKBOOK.md sha256:7acbf9e2493f21f36643d91f0429d99afcfdc8ccafdf8f6de2e8ec0b13dfb7d1 -->
 
 ## What it is for and who it is for
 
@@ -362,7 +362,8 @@ out of range for its type, repeated or unordered tiers, a category, a product or
 that does not exist, "Until" before "From". **Create** (and **Save** when editing it, PRICING-F11) is grey
 while the business has not yet said its currency, because the amount per unit is read in it (without it,
 "1500" yen would be saved as 150,000); until then, leaving the amount keeps it as typed, without inventing
-decimals for it.
+decimals for it. If the currency cannot be read, the window says so ("The business's currency could not be read", with the
+reason) and offers "Retry", which asks for it again; as soon as it arrives, **Create** (or **Save**) lights up (hub#938).
 Involved: Inventory, Services, Customers
 
 ### PRICING-F11 Edit a rule

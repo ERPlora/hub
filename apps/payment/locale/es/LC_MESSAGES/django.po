@@ -266,3 +266,10 @@ msgstr "cancelado por"
 msgctxt "payment"
 msgid "cancelled at"
 msgstr "cancelado el"
+
+# How the assistant's card names the record a write of payment acts on (titles of the schemas), as its lists call one.
+msgid "Method"
+msgstr "Método"
+
+msgid "Payment"
+msgstr "Pago"

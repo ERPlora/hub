@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:c486eebcc8df1bb70ae3fdba74dccc725cb1b99baaf77f21e7656801bc84d3e8 -->
+<!-- generated from WORKBOOK.md sha256:cf2699e44f60c208db8cb19a641b4232bd652a3a621116797b56a583c0fb8d66 -->
 
 ## What it is for and who it is for
 
@@ -269,7 +269,11 @@ If it fails: "Pick a catalogue product first.", "This course already offers that
 be picked twice, switch on «the same option may be picked more than once».", "“{product}” is
 deactivated in Inventory: activate it before putting it in a menu.", "Only a product sold and priced
 by the unit can be a menu choice; “{product}” is sold by {unit}.", "A course holds
-40 choices at most." and the amount warnings. "Add several" with nothing ticked: "Tick at least one
+40 choices at most." and the amount warnings. "Add choice" (and "Save" when editing) is off while the
+business has not yet said its currency: the supplement is read in it, and without it "1500" yen would be
+saved as 150,000. If the currency cannot be read, the builder says so once, above the courses ("The
+business's currency could not be read", with the reason), and offers "Retry", which asks for it again; as
+soon as it arrives, the button lights up (hub#946). "Add several" with nothing ticked: "Tick at least one
 product first."; a search or a category with no products: "No products match.". If the
 catalogue does not load, the search box says so with "Retry". A product that does not exist yet is
 created first in Inventory: the search box finds it as soon as it is saved.

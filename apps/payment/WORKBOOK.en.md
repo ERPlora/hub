@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:408157ad8065b2225074065d804fc63393f531a40c7470ea90cf29ad59bbae5a -->
+<!-- generated from WORKBOOK.md sha256:ae30e16a91c7e84db8ee00d6cfd27245f02389a04b6704009876564ef836bacf -->
 
 ## What it is for and who it is for
 
@@ -18,6 +18,12 @@ Who uses it:
 - The **employee**: only looks at the list of payments and the list of methods.
 - The **manager**, the **administrator** and the **owner**: also record payments, mark them as sent and
   as completed, approve and cancel them, and manage the payment methods.
+- The **assistant** (by voice or by text, with the session of whoever speaks) does the same. Before an
+  action it asks to confirm with its card (BASE-F97), which names each record as the screens name it,
+  never by its identifier: the payment by its reference ("Payment: PAY-20261014-0003"), as
+  "Cancel payment — PAY-20261014-0003", and the method by its name ("Method: BBVA account"), as
+  "Editing method — BBVA account". What the person asking may not see, or what no longer exists, is
+  left out.
 
 ## Reference adopted
 
@@ -147,7 +153,9 @@ Steps:
    recorded only once.
 In: the form's data; the business's currency, its country's (a payment that does not say its currency is
 recorded in it, also through the assistant or the API). While the app does not know the business's
-currency yet, the field says "Amount" and "Record payment" waits. Through the assistant or the API, the
+currency yet, the field says "Amount" and "Record payment" waits. If the currency cannot be read, the window says so ("The business's currency could not be read", with the
+reason) and offers "Retry", which asks for it again; as soon as it arrives, "Record payment" lights up (hub#938).
+Through the assistant or the API, the
 method is given by its id or by its name, the amount goes in the currency's minor unit (cents in euros)
 and, if wanted, an attempt key: repeating the same call with the same key answers the payment already
 recorded instead of recording another.
