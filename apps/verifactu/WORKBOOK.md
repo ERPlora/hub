@@ -82,6 +82,10 @@ Aquí la referencia no es un competidor: es la norma de la AEAT.
   todo el equipo, y a quien no configura VeriFactu le dice «Esto lo tiene que configurar un administrador.». Solo
   se lo pide a un negocio de España; uno sin país (una demo) cuenta como España, y uno de otro país no lo ve nunca,
   ni en pruebas ni en producción (hub#682).
+- **Es obligatoria en España.** Mientras está desactivada en un negocio de España (o sin país, como una demo),
+  «Termina de configurar tu negocio» pide a quien lo administra «Activa VeriFactu» («Importante»), con «Configurar»
+  que lleva a **Apps**; en cuanto la activa, ese paso se va y llega «Configura VeriFactu». Nunca se activa sola:
+  ata al negocio con la AEAT hasta el fin del año natural, así que la activa el dueño (BASE-F01, hub#997).
 - **Los datos del productor del software** (ERPlora) van fijos en cada registro (los declara su declaración
   responsable), también «Da servicio a varios obligados», siempre «S» (contradicción 7, cerrada).
 
@@ -282,8 +286,9 @@ Pasos:
    facturar» sale por ella; un negocio sin país (una demo) cuenta como España y sí lo ve (hub#682).
 5. Ninguna plantilla la enciende, tampoco en España: ni «Empieza con un negocio como el tuyo» del Inicio ni «Usar
    plantilla» de **Ajustes → Datos y copias** la nombran en «Revisa lo que trae» ni la activan. Cargan todo lo demás del
-   sector, Facturación incluida, y VeriFactu sigue «Desactivada» en Apps, con «Activar», hasta que el dueño la enciende
-   él: le ata a la AEAT hasta el fin del año natural y ya no se apaga (VERIFACTU-F32).
+   sector, Facturación incluida, y VeriFactu sigue «Desactivada» en Apps, con «Activar», y «Termina de configurar tu
+   negocio» pide «Activa VeriFactu» hasta que el dueño la enciende él: le ata a la AEAT hasta el fin del año natural y
+   ya no se apaga (VERIFACTU-F32).
 Entra: nada más que la orden.
 Sale: la app activa; sin interruptor propio.
 Si falla: lo dice la página de apps del Hub.

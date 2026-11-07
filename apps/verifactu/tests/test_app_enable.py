@@ -144,9 +144,9 @@ def test_a_blueprint_outside_spain_leaves_it_off_with_the_reason_and_turns_on_th
 
 @pytest.mark.django_db
 @pytest.mark.parametrize("key", [seed.key for seed in blueprint.catalog()])
-def test_a_template_in_spain_leaves_verifactu_off_and_turns_on_the_rest(born, load, key):  # noqa: F811
-    """The review does not announce it and the load leaves it off; everything else the template lists goes on, what
-    VeriFactu needs included (hub#998)."""
+def test_a_template_in_spain_leaves_verifactu_off_for_the_home_to_ask_and_turns_on_the_rest(born, load, key):  # noqa: F811
+    """The review does not announce it and the load leaves it off, so «Finish setting up your business» asks its owner
+    to turn it on (hub#997); everything else the template lists goes on, what VeriFactu needs included (hub#998)."""
     business_in("ES", slug="c")
 
     review = call(born, "base.blueprint.inspect", template=key)
@@ -159,6 +159,8 @@ def test_a_template_in_spain_leaves_verifactu_off_and_turns_on_the_rest(born, lo
     assert not activation.states_of(Scope("host", "c"))[VERIFACTU].wanted
     assert set(apps.get_app_config(VERIFACTU).requires) <= turns_on <= on
     assert loaded.status == "complete"
+    checklist = {item.key: item.state for item in call(born, "base.setup.status").items}
+    assert checklist[f"base.mandatory.{VERIFACTU}"] == "pending"
 
 
 @pytest.mark.django_db(databases=hubs.HUB_DATABASES)

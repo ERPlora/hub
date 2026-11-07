@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:7f43688ef7c9542199d052cd20225fc57e91e07e1eee7d98a56520ede27e0d4d -->
+<!-- generated from WORKBOOK.md sha256:19e525498afa85556210316996c96274495b131dd041a1c81c6e5ad4ae6fae7f -->
 
 ## What it is for and who it is for
 
@@ -72,6 +72,11 @@ Here the reference is not a competitor: it is the AEAT's rules.
   VeriFactu is told "An administrator has to set this up.". Only a business in Spain is asked; one without a
   country (a demo) counts as Spain, and one from another country never sees it, neither in testing nor in production
   (hub#682).
+- **It is mandatory in Spain.** While it is off in a business in Spain (or without a country, such as a demo),
+  "Finish setting up your business" asks whoever runs it to "Turn on VeriFactu" ("Important"), with "Set up"
+  leading to **Apps**; as soon as they turn it on, that step goes and "Set up VeriFactu" comes. It never turns on by
+  itself: it binds the business to the AEAT until the end of the calendar year, so the owner turns it on (BASE-F01,
+  hub#997).
 - **The software producer's data** (ERPlora) go fixed in every record (its responsible declaration declares them),
   also "Serves several taxpayers", always "S" (contradiction 7, closed).
 
@@ -269,8 +274,9 @@ Steps:
    (hub#682).
 5. No template turns it on, in Spain either: neither the Home's "Start with a business like yours" nor "Use template"
    in **Settings → Data and backups** names it in "Review what it brings" or turns it on. They load everything else of
-   the sector, Invoicing included, and VeriFactu stays "Off" in Apps, with "Turn on", until the owner turns it on
-   themselves: it binds them to the AEAT until the end of the calendar year and no longer goes off (VERIFACTU-F32).
+   the sector, Invoicing included, and VeriFactu stays "Off" in Apps, with "Turn on", and "Finish setting up your
+   business" asks to "Turn on VeriFactu" until the owner turns it on themselves: it binds them to the AEAT until the end
+   of the calendar year and no longer goes off (VERIFACTU-F32).
 In: nothing but the order.
 Out: the app active; no switch of its own.
 If it fails: the Hub's apps page says so.

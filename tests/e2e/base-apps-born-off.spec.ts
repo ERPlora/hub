@@ -13,8 +13,9 @@
 // template» reviews the restaurant's without VeriFactu (Invoicing and Kitchen «turn on»), the load goes in whole and
 // VeriFactu stays «Off» in Apps with nothing refusing it, for its owner to turn on (captures `APPS-BORN-OFF-spain-…`).
 // flow: BASE-G131 BASE-G67 BASE-F31 VERIFACTU-F01
-import { type BrowserContext, expect, type Page, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 
+import { bounceTasks } from './app-rows-helpers';
 import {
   A,
   api,
@@ -55,15 +56,6 @@ async function snap(page: Page, step: string, width: number): Promise<void> {
   const overflow = await horizontalOverflow(page);
   expect(overflow, `${step} at ${width}: no sideways scroll`).toBeLessThanOrEqual(0);
   await page.screenshot({ path: shot(`APPS-BORN-OFF-${step}-${width}`) });
-}
-
-/** Tasks turned `first` and then `then` through Apps (`/api/apps/<enable|disable>`): a change the Hub forgets its
- * cache of the apps off for, at its COMMIT, leaving the rest as it was (Tasks needs only Staff). */
-async function bounceTasks(context: BrowserContext, first: 'enable' | 'disable', then: 'enable' | 'disable'): Promise<void> {
-  for (const action of [first, then]) {
-    const answer = await api(context, A, 'POST', `/apps/${action}`, { app: 'task' });
-    expect(answer.status, `Tasks: ${action} ${JSON.stringify(answer.data)}`).toBe(200);
-  }
 }
 
 test.describe.configure({ mode: 'serial' });
