@@ -1,0 +1,162 @@
+/* Files › the preview's viewers (hub#578, BASE-F74): a JSON's tree (`FileJsonTree`), a table per sheet (`FileSheets`)
+ * and a Word document's text (`FileDocument`). Each class is the viewer's own (`file-json-*`, `file-sheets-*`,
+ * `file-document*`). */
+
+/* FileJsonTree */
+.file-json-branch,
+.file-json-leaf {
+  font-family: var(--ep-font-mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.file-json-summary {
+  cursor: pointer;
+}
+
+.file-json-entries {
+  padding-inline-start: 1.25rem;
+  border-inline-start: 1px solid var(--ep-border-color, var(--ion-color-light-shade, #d7d8da));
+  margin-inline-start: 0.3rem;
+}
+
+.file-json-leaf {
+  padding-inline-start: 1rem;
+}
+
+.file-json-key {
+  color: var(--ion-color-primary-shade, #3171e0);
+}
+
+.file-json-count,
+.file-json-more {
+  color: var(--ion-color-medium-shade, #555);
+}
+
+.file-json-more {
+  margin: 0;
+  padding-inline-start: 1rem;
+}
+
+.file-json-leaf--string {
+  color: var(--ion-color-success-shade, #2a8a4b);
+}
+
+.file-json-leaf--number,
+.file-json-leaf--boolean,
+.file-json-leaf--null {
+  color: var(--ion-color-tertiary-shade, #4f4fd6);
+}
+
+/* FileSheets */
+.file-sheets {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-self: stretch;
+  min-width: 0;
+}
+
+.file-sheets-tabs {
+  align-self: flex-start;
+  max-width: 100%;
+}
+
+.file-sheets-muted {
+  margin: 0;
+  color: var(--ion-color-medium-shade, #555);
+  font-size: 0.875rem;
+}
+
+.file-sheets-wrap {
+  overflow: auto;
+}
+
+.file-sheets-table {
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.file-sheets-table th,
+.file-sheets-table td {
+  padding: 6px 10px;
+  border: 1px solid var(--ep-border-color, var(--ion-color-light-shade, #d7d8da));
+  text-align: start;
+  white-space: nowrap;
+}
+
+.file-sheets-table th {
+  background: var(--ion-color-light, #f4f5f8);
+  font-weight: 600;
+}
+
+/* FileDocument */
+.file-document {
+  align-self: stretch;
+  max-width: 48rem;
+  margin-inline: auto;
+  width: 100%;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.file-document-empty {
+  margin: 0;
+  color: var(--ion-color-medium-shade, #555);
+  font-size: 0.875rem;
+}
+
+.file-document h1 {
+  font-size: 1.5rem;
+}
+
+.file-document h2 {
+  font-size: 1.25rem;
+}
+
+.file-document h3,
+.file-document h4,
+.file-document h5,
+.file-document h6 {
+  font-size: 1.0625rem;
+}
+
+/* The shell's reset takes the markers off every list: a document's lists keep theirs. */
+.file-document ul,
+.file-document ol {
+  padding-inline-start: 1.5rem;
+}
+
+.file-document ul {
+  list-style: disc;
+}
+
+.file-document ol {
+  list-style: decimal;
+}
+
+.file-document table {
+  border-collapse: collapse;
+  margin-block: 0.75rem;
+  max-width: 100%;
+  overflow-x: auto;
+  display: block;
+}
+
+.file-document td,
+.file-document th {
+  padding: 4px 8px;
+  border: 1px solid var(--ep-border-color, var(--ion-color-light-shade, #d7d8da));
+  vertical-align: top;
+}
+
+.file-document td p,
+.file-document th p {
+  margin: 0;
+}
+
+.file-document img {
+  max-width: 100%;
+  height: auto;
+}

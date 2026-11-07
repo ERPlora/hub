@@ -3,10 +3,15 @@
 // from the hub's own address; a PDF, a text, a CSV or a JSON is fetched through the SDK (same origin, the session) and
 // drawn here. Any other type says «No preview» and offers the download. A failure to bring or draw it reads «The file
 // could not be opened», never a blank viewer.
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { fetchFile } from '@erplora/ui/sdk';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { flush, mountBase } from '../__tests__/mount-base';
+import { OFFICE_PREVIEW_MAX_BYTES } from '../lib/files';
 import type { FileItem } from '../operations';
 import FilePreview from './FilePreview.vue';
 
@@ -24,6 +29,14 @@ vi.mock('@ionic/vue', async (importOriginal) => {
 function item(name: string, preview: FileItem['preview'], content_type = 'text/plain'): FileItem {
   return { path: `Facturas/${name}`, name, size: 10, modified: null, content_type, preview };
 }
+
+/** `file`, heavier than the preview reads. */
+const heavy = (file: FileItem): FileItem => ({ ...file, size: OFFICE_PREVIEW_MAX_BYTES + 1 });
+
+const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+const DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+const sample = (name: string) => readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', '__tests__', 'files', name));
+const arrives = (bytes: BlobPart, name: string) => vi.mocked(fetchFile).mockResolvedValue({ blob: new Blob([bytes]), name });
 
 async function show(file: FileItem, locale: 'en' | 'es' = 'en') {
   const m = await mountBase(FilePreview, { props: { file, open: true }, locale });
@@ -105,21 +118,81 @@ describe('FilePreview', () => {
     expect(text?.querySelector('b')).toBeNull();
   });
 
-  it('shows a CSV as a table and a JSON tidied', async () => {
+  it('shows a CSV as a table', async () => {
     vi.mocked(fetchFile).mockResolvedValue({ blob: new Blob(['producto,precio\n"Café, solo",1.20']), name: 'v.csv' });
     await show(item('ventas.csv', 'table'));
     await flush();
     const cells = [...(inDoc('file-preview-table')?.querySelectorAll('th, td') ?? [])].map((cell) => cell.textContent);
     expect(cells).toEqual(['producto', 'precio', 'Café, solo', '1.20']);
-    document.body.innerHTML = '';
-    vi.mocked(fetchFile).mockResolvedValue({ blob: new Blob(['{"a":[1,2]}']), name: 'datos.json' });
+  });
+
+  // hub#578: a JSON folds by parts, a spreadsheet is a table per sheet and a Word document its formatted text.
+  it('shows a JSON as a tree that folds; a broken one as it is, saying so', async () => {
+    arrives('{"a":[1,2]}', 'datos.json');
     await show(item('datos.json', 'json'));
     await flush();
-    expect(inDoc('file-preview-text')?.textContent).toBe('{\n  "a": [\n    1,\n    2\n  ]\n}');
+    expect(inDoc('file-preview-json')?.querySelectorAll('details')).toHaveLength(2);
+    expect(inDoc('file-preview-json')?.textContent?.replace(/\s+/g, ' ')).toContain('a: [ ] 2 items');
+    expect(inDoc('file-preview-json-broken')).toBeNull();
+    document.body.innerHTML = '';
+    arrives('{"a":', 'roto.json');
+    await show(item('roto.json', 'json'), 'es');
+    await flush();
+    expect(inDoc('file-preview-text')?.textContent).toBe('{"a":');
+    expect(inDoc('file-preview-json-broken')?.textContent).toContain('no es un JSON válido');
+  });
+
+  it('shows a real .xlsx as a table per sheet, its cells as the sheet shows them', async () => {
+    arrives(sample('sample.xlsx'), 'ventas.xlsx');
+    await show(item('ventas.xlsx', '', XLSX), 'es');
+    await flush();
+    await vi.waitFor(() => expect(inDoc('file-preview-table')).not.toBeNull());
+    const cells = [...(inDoc('file-preview-table')?.querySelectorAll('th, td') ?? [])].map((cell) => cell.textContent);
+    expect(cells.slice(0, 8)).toEqual(['Producto', 'Precio', 'Fecha', 'Pagado', 'Café solo', '1,2', '03/11/2026', '1']);
+    expect([...document.querySelectorAll('[data-testid="file-preview-sheet-tab"]')].map((tab) => tab.textContent?.trim())).toEqual(['Ventas', 'Notas']);
+    expect(inDoc('file-preview-none')).toBeNull();
+  });
+
+  it('shows a real .docx as its formatted text, and nothing of it runs', async () => {
+    arrives(sample('sample.docx'), 'informe.docx');
+    await show(item('informe.docx', '', DOCX));
+    await flush();
+    await vi.waitFor(() => expect(inDoc('file-preview-document')).not.toBeNull());
+    expect(inDoc('file-preview-document')?.querySelector('h1')?.textContent).toBe('Informe de noviembre');
+    expect(document.querySelector('[data-testid="file-preview"] script, [data-testid="file-preview"] [onerror]')).toBeNull();
+    expect(inDoc('file-preview-document')?.textContent).toContain('<script>alert(1)</script>');
+  });
+
+  it('a spreadsheet or a document that cannot be read says so (damaged), with the download', async () => {
+    arrives(new Uint8Array([80, 75, 3, 4, 9, 9, 9]), 'roto.xlsx');
+    await show(item('roto.xlsx', '', XLSX), 'es');
+    await flush();
+    await vi.waitFor(() => expect(inDoc('file-preview-damaged')).not.toBeNull());
+    expect(inDoc('file-preview-damaged')?.textContent).toContain('No se pudo leer el archivo');
+    expect(inDoc('file-preview-damaged')?.textContent).toContain('Descárgalo');
+    expect(inDoc('file-preview-error')).toBeNull();
+    expect(inDoc('file-preview-download')).not.toBeNull();
+    document.body.innerHTML = '';
+    arrives(sample('sample.xlsx'), 'informe.docx');
+    await show(item('informe.docx', '', DOCX));
+    await flush();
+    await vi.waitFor(() => expect(inDoc('file-preview-damaged')?.textContent).toContain('The file could not be read'));
+  });
+
+  it('one heavier than the preview reads is not even fetched: «too large», with the download', async () => {
+    await show(heavy(item('enorme.xlsx', '', XLSX)), 'es');
+    await flush();
+    expect(fetchFile).not.toHaveBeenCalled();
+    expect(inDoc('file-preview-too-large')?.textContent).toContain('Demasiado grande para la vista previa');
+    expect(inDoc('file-preview-too-large')?.textContent).toContain('10 MB');
+    document.body.innerHTML = '';
+    await show(heavy(item('enorme.docx', '', DOCX)));
+    await flush();
+    expect(inDoc('file-preview-too-large')?.textContent).toContain('up to 10 MB');
   });
 
   it('a type it cannot show says so and offers the download, in the person’s language', async () => {
-    await show(item('hoja.xlsx', '', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'), 'es');
+    await show(item('hoja.xls', '', 'application/vnd.ms-excel'), 'es');
     expect(inDoc('file-preview-none')?.textContent).toContain('Sin vista previa');
     expect(inDoc('file-preview-none')?.textContent).toContain('Descárgalo para abrirlo');
     expect(fetchFile).not.toHaveBeenCalled();
