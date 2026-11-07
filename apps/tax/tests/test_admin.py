@@ -34,6 +34,17 @@ def superuser(db):
     return get_user_model().objects.create_superuser(username="root", password="pw", email="root@example.com")
 
 
+@pytest.fixture
+def shipped(db):
+    """A factory category, its Spanish rule with a surcharge under it, and a factory alias."""
+    generic = TaxCategory.objects.get(key="product.generic")
+    root = TaxRule.objects.get(category=generic, country_code="ES")
+    TaxRule.objects.create(
+        category=generic, country_code="ES", rate_pct=Decimal("5.2"), parent=root, component_label="Recargo"
+    )
+    return generic, root, TaxAlias.objects.get(alias="beer")
+
+
 def request_by(user):
     request = RequestFactory().get("/admin/")
     request.user = user
@@ -61,13 +72,8 @@ def test_full_crud_for_the_staff(superuser):
 
 
 @pytest.mark.django_db
-def test_the_pages_render(client, superuser):
-    generic = TaxCategory.objects.get(key="product.generic")
-    root = TaxRule.objects.get(category=generic, country_code="ES")
-    TaxRule.objects.create(
-        category=generic, country_code="ES", rate_pct=Decimal("5.2"), parent=root, component_label="Recargo"
-    )
-    beer = TaxAlias.objects.get(alias="beer")
+def test_the_pages_render(client, superuser, shipped):
+    generic, root, beer = shipped
     client.force_login(superuser)
 
     # The admin lives only on the platform host (PLAN §18.1.3).
@@ -91,16 +97,11 @@ def test_the_pages_render(client, superuser):
 
 
 @pytest.mark.django_db
-def test_support_reads_each_models_own_active_in_spanish(client, superuser):
+def test_support_reads_each_models_own_active_in_spanish(client, superuser, shipped):
     """Support reading Impuestos in Spanish sees a category and a rule «Activa» — in the form, the list's column and
     filter, and the components' table under a rule — and when they were made «Creada el»; an alias «Activo»,
     «Creado el». Not auth's «Activo» for all three (hub#667)."""
-    generic = TaxCategory.objects.get(key="product.generic")
-    root = TaxRule.objects.get(category=generic, country_code="ES")
-    TaxRule.objects.create(
-        category=generic, country_code="ES", rate_pct=Decimal("5.2"), parent=root, component_label="Recargo"
-    )
-    beer = TaxAlias.objects.get(alias="beer")
+    generic, root, beer = shipped
     client.force_login(superuser)
 
     def page(path: str) -> str:

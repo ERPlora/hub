@@ -67,7 +67,20 @@ SYSTEM_CATEGORY_LABELS: dict[str, Label] = {
 }
 
 
-class TaxCategory(UUIDModel):
+class Audited(UUIDModel):
+    """Whether a tax category or a tax rule is in use, and when it was created and last changed. Both are feminine in
+    Spanish — «activa», «creada el», «actualizada el» —: their own context, not auth's «activo» nor the «creado el»
+    other apps say for the same English (hub#667). An alias is masculine and keeps the plain words."""
+
+    is_active = models.BooleanField(pgettext_lazy("tax", "active"), default=True)
+    created_at = models.DateTimeField(pgettext_lazy("tax", "created at"), auto_now_add=True)
+    updated_at = models.DateTimeField(pgettext_lazy("tax", "updated at"), auto_now=True)
+
+    class Meta:
+        abstract = True
+
+
+class TaxCategory(Audited):
     key = models.CharField(
         _("key"),
         max_length=CATEGORY_KEY_MAX_LENGTH,
@@ -85,11 +98,7 @@ class TaxCategory(UUIDModel):
     description = models.TextField(_("description"), blank=True)
     # A factory category (migration 0002); the ones the business creates are its own.
     is_system = models.BooleanField(_("system"), default=False)
-    # As in the current product: the lists show the active ones; no operation archives one yet.
-    # A category is feminine in Spanish («activa», «creada el»): its own context, not auth's «activo».
-    is_active = models.BooleanField(pgettext_lazy("tax", "active"), default=True)
-    created_at = models.DateTimeField(pgettext_lazy("tax", "created at"), auto_now_add=True)
-    updated_at = models.DateTimeField(pgettext_lazy("tax", "updated at"), auto_now=True)
+    # is_active (Audited), as in the current product: the lists show the active ones; no operation archives one yet.
 
     class Meta:
         verbose_name = _("tax category")
@@ -117,7 +126,7 @@ class TaxCategory(UUIDModel):
         )
 
 
-class TaxRule(UUIDModel):
+class TaxRule(Audited):
     class TaxType(models.TextChoices):
         VAT = "vat", _("VAT")
         IGIC = "igic", _("IGIC (Canary Islands)")
@@ -177,10 +186,6 @@ class TaxRule(UUIDModel):
     # Inclusive; empty = since always / for ever.
     valid_from = models.DateField(_("valid from"), null=True, blank=True)
     valid_to = models.DateField(_("valid to"), null=True, blank=True)
-    # A rule is feminine too («activa», «creada el»), as the category.
-    is_active = models.BooleanField(pgettext_lazy("tax", "active"), default=True)
-    created_at = models.DateTimeField(pgettext_lazy("tax", "created at"), auto_now_add=True)
-    updated_at = models.DateTimeField(pgettext_lazy("tax", "updated at"), auto_now=True)
 
     class Meta:
         verbose_name = _("tax rule")
