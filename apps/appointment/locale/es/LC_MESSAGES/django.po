@@ -609,3 +609,24 @@ msgstr "Te deja la tarea, para que te acuerdes de ofrecer ese hueco."
 
 msgid "Appointment"
 msgstr "Cita"
+
+msgid "Book even if it overlaps"
+msgstr "Reservar aunque se solape"
+
+msgid "Dates and times"
+msgstr "Fechas y horas"
+
+msgid "Asked by the customer"
+msgstr "Lo pide la clienta"
+
+msgid "Applies from"
+msgstr "Se aplica desde"
+
+msgid "Book from"
+msgstr "Reservar desde"
+
+msgid "Book up to"
+msgstr "Reservar hasta"
+
+msgid "Duplicate customer"
+msgstr "Ficha duplicada"

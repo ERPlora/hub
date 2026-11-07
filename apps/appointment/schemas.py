@@ -224,6 +224,8 @@ D_SERVICES = (
     "The services, in order (e.g. a cut then a colour), each by its id or its name."
 )
 D_CONFIRM_OVERLAP = "True only after the person saw the overlapping appointments and chose to book anyway (front desk only)."
+#: How the assistant's card names the data no model of Citas names (hub#637): never the title pydantic makes up.
+BOOK_EVEN_IF_IT_OVERLAPS = gettext_noop("Book even if it overlaps")
 
 
 # ── Appointments: writes ───────────────────────────────────────────────────────────────────────
@@ -249,7 +251,7 @@ class AppointmentCreateIn(CustomerOf):
         "counter",
         description="How it was booked: counter or phone (the team), online or whatsapp (the customer herself).",
     )
-    confirm_overlap: bool = Field(False, description=D_CONFIRM_OVERLAP)
+    confirm_overlap: bool = Field(False, title=BOOK_EVEN_IF_IT_OVERLAPS, description=D_CONFIRM_OVERLAP)
 
     @field_validator("staff")
     @classmethod
@@ -271,6 +273,7 @@ class BulkCreateIn(CustomerOf):
         None, validate_default=True, description="The professional's name."
     )
     starts: list[dt.datetime] = Field(
+        title=gettext_noop("Dates and times"),
         min_length=1,
         max_length=MAX_BATCH,
         description="Every start to book (1 to 50), as in a single booking.",
@@ -279,7 +282,7 @@ class BulkCreateIn(CustomerOf):
     notes: Note = Field(
         "", description="Notes the customer may see, on every appointment."
     )
-    confirm_overlap: bool = Field(False, description=D_CONFIRM_OVERLAP)
+    confirm_overlap: bool = Field(False, title=BOOK_EVEN_IF_IT_OVERLAPS, description=D_CONFIRM_OVERLAP)
 
     @field_validator("staff")
     @classmethod
@@ -298,6 +301,7 @@ class BulkCreateIn(CustomerOf):
 class ForCustomer(In):
     on_behalf_of_customer: bool = Field(
         False,
+        title=gettext_noop("Asked by the customer"),
         description="True when the customer herself asks (WhatsApp, online): her ownership and the policy apply.",
     )
     customer_id: UUID | None = Field(
@@ -334,7 +338,7 @@ class RescheduleIn(AppointmentRefIn, ForCustomer):
         None, description="The new services; empty keeps them."
     )
     reason: Reason = Field("", description="Why it moves (kept in its history).")
-    confirm_overlap: bool = Field(False, description=D_CONFIRM_OVERLAP)
+    confirm_overlap: bool = Field(False, title=BOOK_EVEN_IF_IT_OVERLAPS, description=D_CONFIRM_OVERLAP)
 
     @model_validator(mode="after")
     def _something(self):
@@ -367,7 +371,7 @@ class UpdateIn(AppointmentRefIn):
     staff_id: UUID | None = Field(None, description="The new professional's id.")
     staff: Said | None = Field(None, description="The new professional's name.")
     services: OptionalServices = Field(None, description="The new services.")
-    confirm_overlap: bool = Field(False, description=D_CONFIRM_OVERLAP)
+    confirm_overlap: bool = Field(False, title=BOOK_EVEN_IF_IT_OVERLAPS, description=D_CONFIRM_OVERLAP)
 
     @model_validator(mode="after")
     def _something(self):
@@ -849,7 +853,8 @@ class RecurringGetIn(RecurringRefIn):
 class RecurringUpdateIn(In):
     id: UUID = Field(description="The repeating appointment's id.")
     from_date: dt.date = Field(
-        description="The occurrence from which the change applies (this and all following)."
+        title=gettext_noop("Applies from"),
+        description="The occurrence from which the change applies (this and all following).",
     )
     frequency: Frequency | None = Field(None, description="The new repetition.")
     day_of_week: int | None = Field(
@@ -879,10 +884,14 @@ class RecurringUpdateIn(In):
 class MaterializeIn(In):
     id: UUID = Field(description="The repeating appointment's id.")
     from_date: dt.date | None = Field(
-        None, description="Book from this date (the next_from of a previous run)."
+        None,
+        title=gettext_noop("Book from"),
+        description="Book from this date (the next_from of a previous run).",
     )
     to_date: dt.date | None = Field(
-        None, description="Book up to this date (the to of a previous run)."
+        None,
+        title=gettext_noop("Book up to"),
+        description="Book up to this date (the to of a previous run).",
     )
 
 
@@ -1057,7 +1066,7 @@ class Payload(Schema):
 
 class MergedIn(Payload):
     id: UUID = Field(description="The customer's card that stays.")
-    absorbed_id: UUID = Field(description="The card merged into it.")
+    absorbed_id: UUID = Field(title=gettext_noop("Duplicate customer"), description="The card merged into it.")
 
 
 class CustomerEventIn(Payload):
