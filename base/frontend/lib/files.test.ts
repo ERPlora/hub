@@ -10,9 +10,11 @@ import { describe, expect, it } from 'vitest';
 
 import en from '../locale/en.json';
 import es from '../locale/es.json';
+import type { FileItem } from '../operations';
 import {
   afterDelete,
   afterMove,
+  cellText,
   childrenOf,
   type FolderNode,
   flatFolders,
@@ -27,8 +29,11 @@ import {
   rawUrl,
   REFUSAL_KEYS,
   refusalKey,
+  sheetRows,
   splitName,
+  TABLE_PREVIEW_ROWS,
   tooLarge,
+  viewerOf,
 } from './files';
 
 const TREE: FolderNode[] = [
@@ -198,5 +203,58 @@ describe('joinSentences', () => {
     expect(joinSentences(['', '  Archivos subidos.  ', '¿Seguro?', 'Espera…', ''])).toBe('Archivos subidos. ¿Seguro? Espera…');
     expect(joinSentences(['Line one\nline two'])).toBe('Line one line two.');
     expect(joinSentences([])).toBe('');
+  });
+});
+
+// hub#578 (BASE-F74): a spreadsheet and a Word document are read here too. The server serves them as bytes, with no
+// preview of its own (`base/files.py`, `SERVED`); the screen knows them by the type the server gives them.
+describe('the viewer of a file', () => {
+  const file = (preview: FileItem['preview'], content_type: string) => ({ preview, content_type });
+
+  it('is a spreadsheet for an .xlsx (or .xlsm) and a document for a .docx, by the type the server gives them', () => {
+    expect(viewerOf(file('', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'))).toBe('sheet');
+    expect(viewerOf(file('', 'application/vnd.ms-excel.sheet.macroEnabled.12'))).toBe('sheet');
+    expect(viewerOf(file('', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'))).toBe('document');
+  });
+
+  it('is the server’s for everything else, and none for the old binary formats it cannot read', () => {
+    expect(viewerOf(file('json', 'text/plain'))).toBe('json');
+    expect(viewerOf(file('pdf', 'application/pdf'))).toBe('pdf');
+    expect(viewerOf(file('', 'application/vnd.ms-excel'))).toBe('');
+    expect(viewerOf(file('', 'application/msword'))).toBe('');
+    expect(viewerOf(file('', 'application/vnd.openxmlformats-officedocument.presentationml.presentation'))).toBe('');
+  });
+});
+
+describe('a cell of a spreadsheet', () => {
+  const words = { yes: 'TRUE', no: 'FALSE' };
+
+  it('reads as the sheet shows it: a number in the person’s language, never grouped (a postcode stays 28001)', () => {
+    expect(cellText(1.2, 'es', words)).toBe('1,2');
+    expect(cellText(1.2, 'en', words)).toBe('1.2');
+    expect(cellText(28001, 'es', words)).toBe('28001');
+    // The float a sheet stores for 0.1 + 0.2 reads as Excel shows it.
+    expect(cellText(0.1 + 0.2, 'en', words)).toBe('0.3');
+  });
+
+  it('a date as a day (in UTC, as the sheet stores it), with its time only when it has one', () => {
+    expect(cellText(new Date('2026-11-03T00:00:00Z'), 'es', words)).toBe('03/11/2026');
+    expect(cellText(new Date('2026-11-03T00:00:00Z'), 'en', words)).toBe('11/03/2026');
+    expect(cellText(new Date('2026-11-03T21:30:00Z'), 'es', words)).toBe('03/11/2026, 21:30');
+  });
+
+  it('a yes/no in the person’s words, a text as it is (never markup) and an empty cell as nothing', () => {
+    expect(cellText(true, 'es', { yes: 'VERDADERO', no: 'FALSO' })).toBe('VERDADERO');
+    expect(cellText(false, 'en', words)).toBe('FALSE');
+    expect(cellText('<b>Café</b>', 'es', words)).toBe('<b>Café</b>');
+    expect(cellText(null, 'es', words)).toBe('');
+  });
+});
+
+describe('the rows of a sheet', () => {
+  it('shows the first rows (the header among them) and says when there are more', () => {
+    const rows = Array.from({ length: TABLE_PREVIEW_ROWS + 1 }, (_, index) => [String(index)]);
+    expect(sheetRows(rows)).toEqual({ rows: rows.slice(0, TABLE_PREVIEW_ROWS), cut: true });
+    expect(sheetRows(rows.slice(0, TABLE_PREVIEW_ROWS))).toEqual({ rows: rows.slice(0, TABLE_PREVIEW_ROWS), cut: false });
   });
 });
