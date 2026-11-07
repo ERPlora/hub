@@ -431,6 +431,12 @@ msgstr "Filas del fichero"
 msgid "Tax rate"
 msgstr "Tipo de IVA / Impuesto"
 
+msgid "Product"
+msgstr "Producto"
+
+msgid "Category"
+msgstr "Categoría"
+
 msgid "Sold out"
 msgstr "Agotado"
 
