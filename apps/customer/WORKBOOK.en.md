@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:da583cb00987b3b57673bdd9eadd1698c72ff8f2e5a5e3d3370f3c117a402043 -->
+<!-- generated from WORKBOOK.md sha256:c34a76e11fc00f495b4657e0de1b55d204f70744c6dd3484d30368997b79ae08 -->
 
 ## What it is for and who it is for
 
@@ -31,8 +31,8 @@ Who uses it:
 ERPlora does not invent flows: it adopts the ones the market has already proven.
 
 - **Phones in the international E.164 format** (ITU-T), with Google's **libphonenumber** rules: a number
-  without prefix is read in the business's country, as the reference POS systems do; ERPlora today always
-  reads it in Spain (CUSTOMER-F11, hub#527).
+  without prefix is read in the business's country, as the reference POS systems do (CUSTOMER-F11,
+  hub#527).
 - **Adding a card** like Odoo, Shopify, Square, Toast, Lightspeed, Fresha and Holded: only the name is
   required; phone, email and tax ID in sight and the rest one tap away.
 - **Merging duplicate cards** like Square, Shopify, Odoo, Fresha, Lightspeed and Mindbody: one card
@@ -56,9 +56,9 @@ ERPlora does not invent flows: it adopts the ones the market has already proven.
 1. Turn on **Customers** on the business's apps page. It needs no other app. With **Sales & POS** the
    search appears at the till and purchases are recorded by themselves; with **Appointments**, the
    visit history on the card; with the **WhatsApp inbox**, recognition by phone.
-2. The country assumed for a phone written without prefix is today **Spain**, even if the business has
-   another country in Settings → Business: a phone from another country is written with its prefix
-   (`+48…`) (CUSTOMER-F11).
+2. A phone written without prefix is one of the business's country (the one in Settings → Business;
+   Spain if it has none): a phone from another country is written with its prefix (`+48…`)
+   (CUSTOMER-F11).
 3. If segmenting is needed, create the groups, the tags (CUSTOMER-F27, F28) and the business's own
    fields (CUSTOMER-F29). Mark as required only the essential ones: they are demanded every time the
    full card is saved (not when it is added).
@@ -412,7 +412,7 @@ Steps:
    one has it (with spaces or dashes, with `0034` or `+34` in front, or with another country's prefix and
    the national zero in brackets).
 2. On saving, libphonenumber's rules are read: with the prefix it carries or, if it carries none, in the
-   business's country (today always Spain, see "Before you start"); out go spaces, dashes, dots, slashes,
+   business's country (Spain if it has none, see "Before you start"); out go spaces, dashes, dots, slashes,
    brackets and the national zero (also in brackets after the prefix). Italy and the other countries that
    keep the `0` after the prefix keep it. The number has to be a valid number of its country (its
    numbering, not only its length). It is stored with its prefix and the digits together (`+34` and the

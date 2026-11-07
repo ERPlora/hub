@@ -1097,7 +1097,7 @@ def list_grants(ctx: OperationContext, params: GrantListIn) -> dict:
             )
         )
     if params.customer_id or params.customer:
-        card = find_customer(params.customer_id, params.customer, live=False)
+        card = find_customer(ctx, params.customer_id, params.customer, live=False)
         # A card merged into this one (Customers keeps the chain one level deep) still shows its
         # vouchers until the reaction to customer.customer.merged moves them.
         sold = sold.filter(Q(customer=card) | Q(customer__merged_into=card))
@@ -1301,7 +1301,7 @@ def redeem_refusal(grant: Grant, state: Balance, service: Service | None) -> str
     },
 )
 def tender_options(ctx: OperationContext, params: TenderOptionsIn) -> dict:
-    card = find_customer(params.customer_id, params.customer, live=False)
+    card = find_customer(ctx, params.customer_id, params.customer, live=False)
     service = find_service(params.service_id, params.service)
     now = timezone.now()
     started = (

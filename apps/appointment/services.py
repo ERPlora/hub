@@ -261,11 +261,22 @@ def _lock_members(*members: Member | None) -> None:
         )
 
 
-def _locked_card(data):
+def _locked_card(ctx: OperationContext, data):
     """The customer's card a booking or a series is for, locked as Customers' writes and the Hub admin's
     «Delete» of a card take it: a deletion under way is waited for and the card is gone (404), and one that
     comes after waits for the booking and finds the row that protects the card."""
-    return find_customer(data.customer_id, data.customer, lock=True)
+    return find_customer(ctx, data.customer_id, data.customer, lock=True)
+
+
+def _booking_basis(ctx: OperationContext, data) -> tuple:
+    """What a booking and a batch of bookings start from: the customer's card (locked, ``_locked_card``), the
+    professional who performs the services, their lines and the minutes (the ones sent, else the services')."""
+    customer = _locked_card(ctx, data)
+    services = resolve_services(data.services)
+    member = _member_for_booking(ctx, data.staff_id, data.staff, services)
+    lines = lines_for(member, services)
+    minutes = data.duration_minutes or sum(line["duration_minutes"] for line in lines)
+    return customer, member, lines, minutes
 
 
 def lock_appointments(ids) -> list[UUID]:
@@ -456,11 +467,7 @@ def _member_for_booking(
     },
 )
 def create_appointment(ctx: OperationContext, data: AppointmentCreateIn) -> dict:
-    customer = _locked_card(data)
-    services = resolve_services(data.services)
-    member = _member_for_booking(ctx, data.staff_id, data.staff, services)
-    lines = lines_for(member, services)
-    minutes = data.duration_minutes or sum(line["duration_minutes"] for line in lines)
+    customer, member, lines, minutes = _booking_basis(ctx, data)
     start = read_moment(data.start, "start")
     by_customer = data.source in CUSTOMER_SOURCES
     _judge(
@@ -501,11 +508,7 @@ def create_appointment(ctx: OperationContext, data: AppointmentCreateIn) -> dict
     },
 )
 def bulk_create(ctx: OperationContext, data: BulkCreateIn) -> dict:
-    customer = _locked_card(data)
-    services = resolve_services(data.services)
-    member = _member_for_booking(ctx, data.staff_id, data.staff, services)
-    lines = lines_for(member, services)
-    minutes = data.duration_minutes or sum(line["duration_minutes"] for line in lines)
+    customer, member, lines, minutes = _booking_basis(ctx, data)
     starts = sorted(read_moment(value, "starts") for value in data.starts)
     zone = business_zone()
     agenda = load_agenda(
@@ -567,7 +570,7 @@ def _acting_for_customer(ctx: OperationContext, appointment: Appointment, data) 
     way whoever writes it down may change it (acting for her never widens their own permissions)."""
     by_customer = bool(data.on_behalf_of_customer)
     if by_customer:
-        asking = find_customer(data.customer_id, data.customer)
+        asking = find_customer(ctx, data.customer_id, data.customer)
         if asking.id != appointment.customer_id:
             raise NotFound(
                 str(APPOINTMENT_NOT_FOUND), code="appointment.appointment_not_found"
@@ -1340,7 +1343,7 @@ def _materialize_out(series: Recurring, report: dict) -> dict:
     },
 )
 def create_series(ctx: OperationContext, data: RecurringCreateIn) -> dict:
-    customer = _locked_card(data)
+    customer = _locked_card(ctx, data)
     services = resolve_services(data.services)
     member = _member_for_booking(ctx, data.staff_id, data.staff, services)
     minutes = data.duration_minutes or sum(

@@ -923,7 +923,7 @@ def _rendered(body: str, variables: list[str]) -> str:
 def _target(ctx: OperationContext, data: SendIn) -> tuple[Conversation | None, str]:
     """The conversation the message goes to (locked) and its number; ``None`` for a number never written to."""
     if data.id is not None or data.conversation:
-        conversation = find_conversation(data.id, data.conversation, lock=True)
+        conversation = find_conversation(ctx, data.id, data.conversation, lock=True)
         return conversation, conversation.phone
     try:
         phone = e164(data.to or "", ctx)
@@ -1380,7 +1380,7 @@ def resume_deliveries(ctx: OperationContext, data: ResumeIn) -> dict:
     },
 )
 def mark_read(ctx: OperationContext, data: ConversationRefIn) -> dict:
-    conversation = find_conversation(data.id, data.conversation, lock=True)
+    conversation = find_conversation(ctx, data.id, data.conversation, lock=True)
     if conversation.unread_count:
         conversation.unread_count = 0
         _save(conversation, "unread_count")
@@ -1448,7 +1448,7 @@ def _assignee(ctx: OperationContext, data: AssignIn) -> HubUser | None:
     },
 )
 def assign(ctx: OperationContext, data: AssignIn) -> dict:
-    conversation = find_conversation(data.id, data.conversation, lock=True)
+    conversation = find_conversation(ctx, data.id, data.conversation, lock=True)
     person = _assignee(ctx, data)
     me = actor_id(ctx)
     target = person.pk if person is not None else None
@@ -1495,7 +1495,7 @@ def assign(ctx: OperationContext, data: AssignIn) -> dict:
     },
 )
 def set_status(ctx: OperationContext, data: SetStatusIn) -> dict:
-    conversation = find_conversation(data.id, data.conversation, lock=True)
+    conversation = find_conversation(ctx, data.id, data.conversation, lock=True)
     if conversation.status != data.status:
         conversation.status = data.status
         conversation.needs_attention = False
@@ -1523,7 +1523,7 @@ def set_status(ctx: OperationContext, data: SetStatusIn) -> dict:
     },
 )
 def flag(ctx: OperationContext, data: ConversationRefIn) -> dict:
-    conversation = find_conversation(data.id, data.conversation, lock=True)
+    conversation = find_conversation(ctx, data.id, data.conversation, lock=True)
     if conversation.status != Conversation.Status.OPEN:
         return {"id": conversation.id, "flagged": False}
     if not conversation.needs_attention:
@@ -1550,8 +1550,8 @@ def link_customer(ctx: OperationContext, data: LinkCustomerIn) -> dict:
     # The card chosen before the conversation (``_locked_cards_of``): one the Hub admin deletes is waited for and gone.
     chosen = None
     if not (data.unlink or data.create):
-        chosen = find_customer(data.customer_id, data.customer, lock=True)
-    conversation = find_conversation(data.id, data.conversation, lock=True)
+        chosen = find_customer(ctx, data.customer_id, data.customer, lock=True)
+    conversation = find_conversation(ctx, data.id, data.conversation, lock=True)
     if data.unlink:
         card = None
     elif data.create:
@@ -1703,7 +1703,7 @@ def record_erasure(ctx: OperationContext, data: RecordErasureIn) -> dict:
 )
 def erase(ctx: OperationContext, data: ConversationRefIn) -> dict:
     conversation = find_conversation(
-        data.id, data.conversation, lock=True, live=data.id is None
+        ctx, data.id, data.conversation, lock=True, live=data.id is None
     )
     _erase(ctx, conversation)
     return {"id": conversation.id}
@@ -1725,7 +1725,7 @@ def erase(ctx: OperationContext, data: ConversationRefIn) -> dict:
     },
 )
 def add_note(ctx: OperationContext, data: NoteAddIn) -> dict:
-    conversation = find_conversation(data.id, data.conversation)
+    conversation = find_conversation(ctx, data.id, data.conversation)
     author = acting_hub_user(ctx)
     note = Note.objects.create(
         conversation=conversation,
