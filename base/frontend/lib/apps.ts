@@ -92,8 +92,14 @@ export function turnsOnWith(app: AppRow, apps: readonly AppRow[]): string[] {
   );
 }
 
+/** Kept on whatever goes off: one on that the business's country requires (`mandatory`, hub#997); one being set up, or
+ *  that could not be, binds nothing yet — the server's `base.activation.mandatory_on`. */
+function keptOn(row: AppRow): boolean {
+  return row.mandatory && row.state === 'on';
+}
+
 /** The names of what turning `app` off also turns off: what came along with it (on, not chosen) that no app left on
- *  needs any more — the server's rule (`base.activation.disabling`), for the dialog. */
+ *  needs any more, never one kept on (`keptOn`) — the server's rule (`base.activation.disabling`), for the dialog. */
 export function goesOffWith(app: AppRow, apps: readonly AppRow[]): string[] {
   const byId = new Map(apps.map((row) => [row.id, row]));
   const off = new Set([app.id]);
@@ -102,7 +108,7 @@ export function goesOffWith(app: AppRow, apps: readonly AppRow[]): string[] {
     changed = false;
     for (const id of app.requires) {
       const row = byId.get(id);
-      if (!row || off.has(id) || !isWanted(row) || row.chosen) continue;
+      if (!row || off.has(id) || !isWanted(row) || row.chosen || keptOn(row)) continue;
       if (row.required_by.every((other) => off.has(other))) {
         off.add(id);
         changed = true;

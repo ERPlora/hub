@@ -463,12 +463,19 @@ class AppOut(Schema):
     requires: list[str]
     required_by: list[str]
     #: Why turning it on (off) or off (on) is refused, in the reader's language: an app's own ``can_enable`` or
-    #: ``can_disable``, and the apps it depends on (hub#618, hub#694); ``None``: nothing refuses it.
+    #: ``can_disable``, base's for one the business's country requires on, and the apps it depends on (hub#618,
+    #: hub#694, hub#997); ``None``: nothing refuses it.
     refusal: str | None
+    #: The business's country requires it on, as the app declares it (``mandatory``, hub#997): «Mandatory in …», on or
+    #: off; once on there, it never goes off.
+    mandatory: bool
 
 
 class AppListOut(Schema):
     apps: list[AppOut]
+    #: The business's country by its name in the reader's language (a business without one is in Spain): what
+    #: «Mandatory in …» says.
+    country_name: str
     #: erplora.com's Store of this business's modules, where a paid one is bought (never inside the Hub).
     store_url: str
     #: erplora.com's plans of this business, where a higher limit is bought.

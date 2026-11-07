@@ -146,6 +146,7 @@
       "open": "Abrir",
       "buy": "Mejorar plan",
       "buyWhere": "Se contrata en erplora.com, desde tu cuenta de ERPlora.",
+      "mandatory": "Obligatoria en {country}",
       "entity": {
         "one": "app",
         "many": "apps"

@@ -45,6 +45,7 @@ function app(id: string, fields: Partial<AppRow> = {}): AppRow {
     requires: [],
     required_by: [],
     refusal: null,
+    mandatory: false,
     ...fields,
   };
 }
@@ -55,7 +56,14 @@ const INVOICE = app('invoice', { name: 'Invoicing', requires: ['tax'], category:
 const REPORTS = app('reports', { name: 'Reports', path: null, category: 'organization', category_label: 'Organization' });
 const STOCK = app('stock', { name: 'Stock', premium: true, right: 'missing', state: 'blocked', path: null, category: 'catalog', category_label: 'Catalog and stock' });
 const PLANS = 'https://erplora.com/store/plans?business=h1';
-const LIST: AppList = { apps: [TAX, INVOICE, REPORTS, STOCK], store_url: STORE, plan_url: PLANS, max_apps: null, enabled: 3 };
+const LIST: AppList = {
+  apps: [TAX, INVOICE, REPORTS, STOCK],
+  country_name: 'Spain',
+  store_url: STORE,
+  plan_url: PLANS,
+  max_apps: null,
+  enabled: 3,
+};
 
 async function open(path = '/apps', options: Parameters<typeof mountBase>[1] = {}) {
   const m = await mountBase(AppsPage, { path, routes: ['/apps', '/tax/home', '/invoice/home'], ...options });
@@ -309,6 +317,7 @@ describe('AppsPage', () => {
     const BOOKING = app('booking', { name: 'Bookings', state: 'off', chosen: false, path: null, requires: ['schedule'] });
     const APPS: AppList = {
       apps: [SALE, CUSTOMER, TASK, FLOW, SCHEDULE, BOOKING, STOCK],
+      country_name: 'Spain',
       store_url: STORE,
       plan_url: PLANS,
       max_apps: 20,
@@ -584,6 +593,67 @@ describe('AppsPage', () => {
       });
     });
 
+    describe('what the business’s country requires on (hub#997)', () => {
+      const MANDATORY_HERE = 'Taxes is mandatory for businesses in Spain: it can’t be turned off.';
+      const row = (m: Awaited<ReturnType<typeof open>>, id: string) => m.wrapper.find(`[data-testid="apps-row"][data-id="${id}"]`);
+      const label = (m: Awaited<ReturnType<typeof open>>, id: string) => row(m, id).find('[data-testid="apps-mandatory"]');
+      const TAX_ON = app('tax', { name: 'Taxes', chosen: false, required_by: ['sale'], mandatory: true, refusal: MANDATORY_HERE });
+      const SALE_ = app('sale', { name: 'Sales', requires: ['customer', 'tax'] });
+      const CUSTOMER_ = app('customer', { name: 'Customers', chosen: false, required_by: ['sale'] });
+      const VERIFACTU_OFF = app('verifactu', { name: 'VeriFactu', state: 'off', chosen: false, path: null, mandatory: true });
+      const MINE: AppList = { ...APPS, apps: [SALE_, TAX_ON, CUSTOMER_, VERIFACTU_OFF] };
+
+      it('«My apps» says it is mandatory in the business’s country, offers no «Turn off» and says why', async () => {
+        const m = await open('/apps');
+        await m.result(m.call, 'base.app.list', MINE);
+
+        expect(label(m, 'tax').text()).toBe('Mandatory in Spain');
+        expect(row(m, 'tax').find('[data-testid="apps-state"]').text()).toBe('Active');
+        expect(row(m, 'tax').find('[data-testid="apps-refusal"]').text()).toBe(MANDATORY_HERE);
+        expect(m.wrapper.find('[data-testid="apps-row-tax-toggle"]').exists()).toBe(false);
+        // Another app goes on as ever, with no label.
+        expect(label(m, 'sale').exists()).toBe(false);
+        expect(m.wrapper.find('[data-testid="apps-row-sale-toggle"]').text()).toContain('Turn off');
+      });
+
+      it('one off is labelled too in «Add apps», still «Off» and offered to turn on', async () => {
+        const m = await open('/apps#all');
+        await m.result(m.call, 'base.app.list', MINE);
+
+        expect(label(m, 'verifactu').text()).toBe('Mandatory in Spain');
+        expect(row(m, 'verifactu').find('[data-testid="apps-state"]').text()).toBe('Off');
+        expect(m.wrapper.find('[data-testid="apps-row-verifactu-toggle"]').text()).toContain('Turn on');
+      });
+
+      it('«Turn off» the app it came with never names it among what goes off with it', async () => {
+        mocks.confirm.mockResolvedValue(false);
+        const m = await open('/apps');
+        await m.result(m.call, 'base.app.list', MINE);
+
+        await m.wrapper.find('[data-testid="apps-row-sale-toggle"]').trigger('click');
+        await flush();
+
+        const asked = mocks.confirm.mock.calls[0][0];
+        expect(asked.message).toContain('Customers');
+        expect(asked.message).not.toContain('Taxes');
+      });
+
+      it('in Spanish, with the country by its Spanish name', async () => {
+        const m = await open('/apps', { locale: 'es' });
+        await m.result(m.call, 'base.app.list', { ...MINE, country_name: 'España' });
+
+        expect(label(m, 'tax').text()).toBe('Obligatoria en España');
+      });
+
+      it('whoever does not run the business reads the label too, not the reason', async () => {
+        const m = await open('/apps', { session: EMPLOYEE });
+        await m.result(m.call, 'base.app.list', MINE);
+
+        expect(label(m, 'tax').text()).toBe('Mandatory in Spain');
+        expect(row(m, 'tax').find('[data-testid="apps-refusal"]').exists()).toBe(false);
+      });
+    });
+
     it('who does not run the business turns nothing on or off', async () => {
       const m = await open('/apps#all', { session: EMPLOYEE });
       await m.result(m.call, 'base.app.list', APPS);
@@ -625,7 +695,7 @@ describe('AppsPage', () => {
     const FLOW_CREATING = { ...FLOW, state: 'creating' as const, chosen: true };
     const FLOW_FAILED = { ...FLOW, state: 'failed' as const, chosen: true };
     const TASK = app('task', { name: 'Tasks' });
-    const listOf = (...apps: AppRow[]): AppList => ({ apps, store_url: STORE, plan_url: PLANS, max_apps: 20, enabled: 1 });
+    const listOf = (...apps: AppRow[]): AppList => ({ apps, country_name: 'Spain', store_url: STORE, plan_url: PLANS, max_apps: 20, enabled: 1 });
     const posted = (m: Awaited<ReturnType<typeof open>>) =>
       m.net.api.map((c) => [c.url, JSON.parse(String(c.init.body ?? '{}')) as Record<string, unknown>]);
     const pill = (m: Awaited<ReturnType<typeof open>>, id: string) =>

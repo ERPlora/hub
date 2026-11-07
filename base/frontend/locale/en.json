@@ -146,6 +146,7 @@
       "open": "Open",
       "buy": "Upgrade plan",
       "buyWhere": "Subscribed to on erplora.com, from your ERPlora account.",
+      "mandatory": "Mandatory in {country}",
       "entity": {
         "one": "app",
         "many": "apps"

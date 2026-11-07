@@ -178,13 +178,14 @@ def test_one_being_created_is_turned_off_at_once_and_stays_off_when_its_tables_a
 
 @own
 def test_one_an_app_being_created_needs_cannot_go_off(hub_a):
+    # Customers, not Taxes: Taxes never goes off once on, whoever needs it (mandatory everywhere, hub#997).
     given(hub_a, sale="creating*", tax="on", customer="on", created=["tax", "customer"])
 
     with pytest.raises(Conflict) as refused:
-        run(hub_a, "base.app.disable", "tax")
+        run(hub_a, "base.app.disable", "customer")
 
     assert refused.value.code == "base.app_required"
-    assert rows_of(hub_a)["tax"] == (ON, False)
+    assert rows_of(hub_a)["customer"] == (ON, False)
 
 
 @own

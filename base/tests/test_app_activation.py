@@ -28,6 +28,8 @@ from base.entitlement import EntitlementBlocked
 from base.models import AppActivation, Hub
 from base.schemas import AppChangeIn, AppChangeOut
 from base.tenancy import inventory
+from base.tenancy.context import use_hub
+from base.tenancy.tests import hubs
 
 A = Scope("host", "a")
 B = Scope("host", "b")
@@ -709,6 +711,115 @@ def test_an_app_without_a_reason_lets_it_go(monkeypatch):
     set_rows(task="on*", staff="on")
     disable("task")
     assert rows()["task"] == Activation(OFF, False)
+
+
+@pytest.mark.django_db
+def test_one_that_refuses_itself_says_its_own_reason_before_that_of_an_app_that_needs_it(monkeypatch):
+    """Its own reason is the one that holds: turning the other off would still leave it refusing (hub#997: Taxes, which
+    VeriFactu needs in Spain, says that it is mandatory, not that VeriFactu needs it)."""
+    monkeypatch.setattr(apps.get_app_config("task"), "can_disable", lambda ctx: "Tasks are open.", raising=False)
+    monkeypatch.setattr(apps.get_app_config("staff"), "can_disable", lambda ctx: "Staff is busy.", raising=False)
+    set_rows(task="on*", staff="on")
+
+    assert by_id(app_list())["staff"]["refusal"] == "Staff is busy."
+    with pytest.raises(Conflict) as refused:
+        disable("staff")
+    assert (refused.value.envelope()["error"]["app"], refused.value.message) == ("staff", "Staff is busy.")
+
+
+# ── An app the business must have on in its country (hub#997, PLAN-HUB round 2026-11-07, BASE-F25) ──────────────
+# Taxes says it is mandatory everywhere (apps/tax/apps.py) and has no reason of its own to refuse: base's. The local
+# hub ``a`` has no country: it is in Spain.
+
+MANDATORY_HERE = "Taxes is mandatory for businesses in Spain: it can't be turned off."
+
+
+@pytest.mark.django_db
+def test_one_the_business_must_have_on_is_refused_with_409_and_stays_on():
+    set_rows(tax="on*")
+
+    with pytest.raises(Conflict) as refused:
+        disable("tax")
+
+    error = refused.value.envelope()["error"]
+    assert (refused.value.status, error["code"], error["app"]) == (409, "base.app_vetoed", "tax")
+    assert refused.value.message == MANDATORY_HERE
+    assert rows()["tax"] == Activation(ON, True)
+    assert recorded(events.APP_DISABLED) == []
+
+
+@pytest.mark.django_db
+def test_its_refusal_names_the_business_country_in_the_language_of_who_asks():
+    Hub.objects.filter(slug="a").update(country="PL")
+    set_rows(tax="on*")
+
+    with pytest.raises(Conflict) as refused:
+        disable("tax", context=ctx(language="es"))
+
+    assert refused.value.message == "Impuestos es obligatoria para los negocios de Polonia: no se puede desactivar."
+    assert by_id(app_list(language="es"))["tax"]["refusal"] == refused.value.message
+
+
+@pytest.mark.django_db
+def test_while_an_app_on_needs_it_it_says_it_is_mandatory_not_which_to_turn_off_first():
+    """«Turn off Sales first» would be a dead end: Sales goes off, and Taxes still stays on."""
+    set_rows(sale="on*", tax="on", customer="on")
+
+    with pytest.raises(Conflict) as refused:
+        disable("tax")
+
+    error = refused.value.envelope()["error"]
+    assert (error["code"], error["app"], refused.value.message) == ("base.app_vetoed", "tax", MANDATORY_HERE)
+    assert "required_by" not in error
+    assert rows()["tax"] == Activation(ON, False)
+
+
+@pytest.mark.django_db
+def test_turning_off_the_app_it_came_with_leaves_it_on():
+    """The cascade of BASE-F23 skips it: Customers goes off with Sales, Taxes stays on (not chosen: it never counts
+    against the plan's limit)."""
+    set_rows(sale="on*", tax="on", customer="on")
+
+    assert by_id(app_list())["sale"]["refusal"] is None
+    answer = disable("sale")
+
+    assert answer["along"] == [{"id": "customer", "name": "Customers"}]
+    assert rows()["tax"] == Activation(ON, False)
+    assert {label: rows()[label].state for label in ("sale", "customer")} == {"sale": OFF, "customer": OFF}
+    assert recorded(events.APP_DISABLED) == [("a", {"app": "sale", "along": ["customer"]})]
+
+
+@pytest.mark.django_db
+def test_one_mandatory_only_in_another_country_goes_off_here(monkeypatch):
+    monkeypatch.setattr(
+        apps.get_app_config("task"), "mandatory", {"countries": ["PL"], "platform_turns_on": False}, raising=False
+    )
+    set_rows(task="on*", staff="on")
+
+    assert by_id(app_list())["task"]["refusal"] is None
+    disable("task")
+
+    assert rows()["task"] == Activation(OFF, False)
+
+
+@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
+def test_each_hub_keeps_on_what_its_own_business_country_requires(hub_a, hub_b, no_test_fallback, monkeypatch):
+    """Two businesses with their own databases: Tasks, mandatory in Poland only, stays on in A's (Poland) and goes off
+    in B's (Spain); neither reads the other's country."""
+    monkeypatch.setattr(
+        apps.get_app_config("task"), "mandatory", {"countries": ["PL"], "platform_turns_on": False}, raising=False
+    )
+    Hub.objects.filter(slug=hub_a.slug).update(country="PL")
+    Hub.objects.filter(slug=hub_b.slug).update(country="ES")
+    of_a, of_b = Scope("host", hub_a.slug), Scope("host", hub_b.slug)
+
+    with use_hub(hub_a), pytest.raises(Conflict) as refused:
+        disable("task", context=ctx(scope=of_a))
+    assert refused.value.message == "Tasks is mandatory for businesses in Poland: it can't be turned off."
+    with use_hub(hub_b):
+        assert disable("task", context=ctx(scope=of_b))["state"] == "off"
+    with use_hub(hub_a):
+        assert activation.states_of(of_a)["task"].on
 
 
 # ── What an app refuses, said beforehand (hub#618, hub#619, hub#694) ─────────────────────────────────────────────
