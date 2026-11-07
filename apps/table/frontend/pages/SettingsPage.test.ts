@@ -4,6 +4,7 @@
 // says «Settings saved.»; a refusal goes under its field.
 import { describe, expect, it } from 'vitest';
 
+import { pressEnter } from '../../../../base/frontend/__tests__/settings-form';
 import { click, flush, ionChecked, ionValue, MANAGER, type MountOptions, mountTable } from '../__tests__/mount-table';
 import { SETTINGS } from '../__tests__/tables';
 import SettingsPage from './SettingsPage.vue';
@@ -45,6 +46,10 @@ describe('SettingsPage', () => {
       { method: 'POST', path: '/api/table/settings', query: {}, body: { prompt_guests_on_seat: false, timer_warning_minutes: 45 } },
     ]);
     expect(s.field('saved')?.textContent).toContain('Settings saved.');
+    // Enter in a field submits the form (Ionic puts a hidden submit button in it): the same save as «Save».
+    await ionValue(s.field('timer_critical_minutes'), '100', 'ionInput');
+    await pressEnter(s.inDoc('table-settings'));
+    expect(s.sent().at(-1)?.body).toEqual({ timer_critical_minutes: 100 });
   });
 
   it('a refusal goes under its field', async () => {
@@ -55,6 +60,7 @@ describe('SettingsPage', () => {
     await ionValue(s.field('timer_warning_minutes'), '120', 'ionInput');
     await click(s.field('save'));
     expect(s.field('timer_critical_minutes').errorText).toBe('The red warning cannot come before the amber one.');
+    expect(s.field('save-error')?.textContent).toContain('Could not save the settings');
     expect(s.field('save-error')?.textContent).toContain('The red warning cannot come before the amber one.');
   });
 

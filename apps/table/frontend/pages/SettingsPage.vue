@@ -5,10 +5,10 @@
 // elsewhere repaints every field the person has not touched, «Save» sends only the fields touched and changed
 // (`table.settings.update`), so it never undoes someone else's change, and a refusal (the red before the
 // amber) says itself as a FormModal does, under its field.
-import { InlineFeedback, useSettingsForm } from '@erplora/ui/components';
+import { InlineFeedback, SettingsFormFooter, useSettingsForm } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
-import { IonButton, IonInput, IonSpinner, IonToggle } from '@ionic/vue';
+import { IonInput, IonSpinner, IonToggle } from '@ionic/vue';
 import { computed } from 'vue';
 
 import PageNotices from '../components/PageNotices.vue';
@@ -29,11 +29,12 @@ const t = useT();
 const canManage = computed(() => session.can('table.manage_settings'));
 
 const { data, status, error } = useLive('table.settings.get', {});
-const { form, dirty, saved, pending, error: saveError, fieldErrors, showsError, set, save } = useSettingsForm(
+const settingsForm = useSettingsForm(
   data,
   useCommand('table.settings.update'),
   { toForm, numbers: NUMBERS },
 );
+const { form, fieldErrors, set } = settingsForm;
 
 function toForm(settings: SettingsOut): Form {
   return {
@@ -86,7 +87,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
         v-else
         class="table-settings"
         data-testid="table-settings"
-        @submit.prevent="save"
+        @submit.prevent="settingsForm.save()"
       >
         <h2 class="table-settings__title">
           {{ $t('table.settings.title') }}
@@ -123,29 +124,13 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
           :class="invalid(fieldErrors[field])"
           @ion-input="set(field, text($event.detail.value))"
         />
-        <InlineFeedback
-          v-if="showsError"
-          tone="danger"
-          data-testid="table-settings-save-error"
-          :heading="$t('table.settings.saveError')"
-        >
-          {{ saveError?.message }}
-        </InlineFeedback>
-        <InlineFeedback
-          v-if="saved"
-          tone="success"
-          data-testid="table-settings-saved"
-        >
-          {{ $t('table.settings.saved') }}
-        </InlineFeedback>
-        <ion-button
-          type="submit"
-          data-testid="table-settings-save"
-          :disabled="!dirty || pending"
-          @click="save"
-        >
-          {{ $t('table.settings.save') }}
-        </ion-button>
+        <SettingsFormFooter
+          :settings="settingsForm"
+          testid="table-settings"
+          :save-label="$t('table.settings.save')"
+          :saved-label="$t('table.settings.saved')"
+          :error-heading="$t('table.settings.saveError')"
+        />
       </form>
     </template>
   </AppPage>

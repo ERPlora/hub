@@ -586,8 +586,9 @@ Los avisos nunca llevan la posición ni el motivo de una corrección (datos pers
 - Ajustes envía solo los campos que la persona tocó y cambió; lo que la pantalla juzga mal antes de
   enviar va bajo su campo, como el 422 del servidor, y la etiqueta larga del interruptor parte línea
   para que el formulario quepa en un móvil. Lo que falla al leer la ubicación sale bajo «Usar mi ubicación
-  actual» (`attendance-settings-location-error`), no en la franja de arriba, que en un móvil queda fuera de la
-  vista desde el botón; la franja solo lleva el error al guardar. Con la ubicación denegada, `nativeBridge()` de
+  actual» (`attendance-settings-location-error`), no junto a «Guardar», que en un móvil queda fuera de la
+  vista desde el botón; el error al guardar y «Ajustes guardados» van encima de «Guardar», en el pie común
+  de Ajustes (`SettingsFormFooter` de `@erplora/ui`, hub#897). Con la ubicación denegada, `nativeBridge()` de
   `@erplora/ui/shell` elige el aviso: en la app instalada, `attendance.settings.locationDeniedInApp` (los
   ajustes del dispositivo), como la tecla «Hablar» del TPV (SALE-F01). Tests: `SettingsPage.test.ts` y la
   e2e `tests/e2e/attendance-settings-location.spec.ts` (la ubicación sin conceder, en un fichero propio:

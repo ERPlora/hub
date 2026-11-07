@@ -5,6 +5,7 @@ import { Combo, InlineFeedback } from '@erplora/ui/components';
 import { describe, expect, it } from 'vitest';
 
 import type { SettingsOut } from '../operations';
+import { pressEnter } from '../../../../base/frontend/__tests__/settings-form';
 import { click, ionChecked, ionValue, MANAGER, type MountOptions, mountService, settle } from '../__tests__/mount-service';
 import SettingsPage from './SettingsPage.vue';
 
@@ -68,6 +69,10 @@ describe('SettingsPage', () => {
       },
     ]);
     expect(s.field('saved')?.textContent).toContain('Settings saved.');
+    // Enter in a field submits the form (Ionic puts a hidden submit button in it): the same save as «Save».
+    await ionValue(s.field('default_buffer_time'), '10', 'ionInput');
+    await pressEnter(s.inDoc('service-settings'));
+    expect(s.sent().at(-1)?.body).toEqual({ default_buffer_time: 10 });
   });
 
   // The server knows the default tax category by its key (`default_tax_category_key`), not as the choice on screen.

@@ -6,6 +6,7 @@
 import { describe, expect, it } from 'vitest';
 
 import type { SettingsOut } from '../operations';
+import { pressEnter } from '../../../../base/frontend/__tests__/settings-form';
 import { click, errorFrame, flush, ionChecked, ionValue, MANAGER, type MountOptions, mountOnlineBooking, page, settle } from '../__tests__/mount-online-booking';
 import SettingsPage from './SettingsPage.vue';
 
@@ -83,6 +84,10 @@ describe('SettingsPage', () => {
     ]);
     await settle();
     expect(s.field('saved')?.textContent).toContain('Settings saved.');
+    // Enter in a field submits the form (Ionic puts a hidden submit button in it): the same save as «Save».
+    await ionValue(s.field('slot_interval'), '30', 'ionInput');
+    await pressEnter(s.inDoc('ob-settings'));
+    expect(s.sent().at(-1)?.body).toEqual({ slot_interval: 30 });
   });
 
   it('puts a refusal under its field, keeping what was typed', async () => {

@@ -8,10 +8,10 @@
 // touched, «Save» sends only the fields touched and changed (`reservation.settings.update`), and a refusal
 // says itself as a FormModal does: its notice goes as soon as something is changed, each field's message as
 // soon as that field is (hub#873), and the next refusal says it all again.
-import { InlineFeedback, useSettingsForm } from '@erplora/ui/components';
+import { InlineFeedback, SettingsFormFooter, useSettingsForm } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
-import { IonButton, IonInput, IonSpinner, IonToggle } from '@ionic/vue';
+import { IonInput, IonSpinner, IonToggle } from '@ionic/vue';
 import { computed } from 'vue';
 
 import PageNotices from '../components/PageNotices.vue';
@@ -43,11 +43,12 @@ const t = useT();
 const canManage = computed(() => session.can('reservation.manage_settings'));
 
 const { data, status, error } = useLive('reservation.settings.get', {});
-const { form, dirty, saved, pending, error: saveError, fieldErrors, showsError, set, save } = useSettingsForm(
+const settingsForm = useSettingsForm(
   data,
   useCommand('reservation.settings.update'),
   { toForm, numbers: [...STAFF_NUMBERS, ...GUEST_NUMBERS] },
 );
+const { form, fieldErrors, set } = settingsForm;
 
 function toForm(settings: SettingsOut): Form {
   return {
@@ -106,7 +107,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
         v-else
         class="reservation-settings"
         data-testid="reservation-settings"
-        @submit.prevent="save"
+        @submit.prevent="settingsForm.save()"
       >
         <h2 class="reservation-settings__title">
           {{ $t('reservation.settings.title') }}
@@ -169,29 +170,13 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
           :class="invalid(fieldErrors[field])"
           @ion-input="set(field, text($event.detail.value))"
         />
-        <InlineFeedback
-          v-if="showsError"
-          tone="danger"
-          data-testid="reservation-settings-save-error"
-          :heading="$t('reservation.settings.saveError')"
-        >
-          {{ saveError?.message }}
-        </InlineFeedback>
-        <InlineFeedback
-          v-if="saved"
-          tone="success"
-          data-testid="reservation-settings-saved"
-        >
-          {{ $t('reservation.settings.saved') }}
-        </InlineFeedback>
-        <ion-button
-          type="submit"
-          data-testid="reservation-settings-save"
-          :disabled="!dirty || pending"
-          @click="save"
-        >
-          {{ $t('reservation.settings.save') }}
-        </ion-button>
+        <SettingsFormFooter
+          :settings="settingsForm"
+          testid="reservation-settings"
+          :save-label="$t('reservation.settings.save')"
+          :saved-label="$t('reservation.settings.saved')"
+          :error-heading="$t('reservation.settings.saveError')"
+        />
       </form>
     </template>
   </AppPage>

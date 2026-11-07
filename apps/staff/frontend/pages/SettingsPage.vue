@@ -7,7 +7,7 @@
 // (`staff.settings.update`), so it never undoes someone else's change, and a refusal says itself as a
 // FormModal does. The server judges the ranges and the day: its 422 goes under each field. A read that fails
 // before any value came says so with «Retry» and shows no form: nothing unread is ever offered to save.
-import { InlineFeedback, useSettingsForm } from '@erplora/ui/components';
+import { InlineFeedback, SettingsFormFooter, useSettingsForm } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { IonButton, IonInput, IonSpinner } from '@ionic/vue';
@@ -32,11 +32,12 @@ const canManage = computed(() => session.can('staff.manage_settings'));
 const canSeePay = computed(() => session.can('staff.view_compensation'));
 
 const { data, status, error, refresh } = useLive('staff.settings.get', {});
-const { form, dirty, saved, pending, error: saveError, fieldErrors, showsError, set, save } = useSettingsForm(
+const settingsForm = useSettingsForm(
   data,
   useCommand('staff.settings.update'),
   { toForm, numbers: NUMBERS },
 );
+const { form, fieldErrors, set } = settingsForm;
 /** The read failed before any value came (not a block): there is nothing to show or save, only «Retry». */
 const loadFailed = computed(() => !form.value && status.value === 'error' && !!error.value && !blockingError(error.value));
 
@@ -105,22 +106,8 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
         v-else-if="form"
         class="staff-settings"
         data-testid="staff-settings-form"
-        @submit.prevent="save"
+        @submit.prevent="settingsForm.save()"
       >
-        <InlineFeedback
-          v-if="showsError"
-          tone="danger"
-          data-testid="staff-settings-error"
-        >
-          {{ saveError?.message }}
-        </InlineFeedback>
-        <InlineFeedback
-          v-if="saved"
-          tone="success"
-          data-testid="staff-settings-saved"
-        >
-          {{ $t('staff.settings.saved') }}
-        </InlineFeedback>
         <section class="staff-settings__section">
           <h2 data-testid="staff-settings-workday">
             {{ $t('staff.settings.workday') }}
@@ -167,20 +154,13 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
             />
           </div>
         </section>
-        <div class="staff-settings__actions">
-          <ion-button
-            data-testid="staff-settings-save"
-            :disabled="!dirty || pending"
-            @click="save"
-          >
-            <ion-spinner
-              v-if="pending"
-              slot="start"
-              name="crescent"
-            />
-            {{ $t('staff.save') }}
-          </ion-button>
-        </div>
+        <SettingsFormFooter
+          :settings="settingsForm"
+          testid="staff-settings"
+          :save-label="$t('staff.save')"
+          :saved-label="$t('staff.settings.saved')"
+          spinner
+        />
       </form>
     </template>
   </AppPage>
@@ -204,10 +184,6 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
   gap: 14px;
-}
-.staff-settings__actions {
-  display: flex;
-  justify-content: flex-end;
 }
 .staff-settings__loading {
   display: flex;
