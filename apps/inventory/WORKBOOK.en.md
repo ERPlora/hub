@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:af17ccfbd18370c9724ef931998af2b1e5fe9797259458f8c2709587d904ae3a -->
+<!-- generated from WORKBOOK.md sha256:f0fec8918e7257acc5386e3486e3e2a6eb380520c8eca52571cb2985e406abf5 -->
 
 ## What it is for and who it is for
 
@@ -1060,7 +1060,11 @@ tap" or "type to confirm", according to the risk).
 Through the assistant (also by voice) and through the API, a product is named by its SKU or by its name,
 and a category by its name, as well as by its identifier: "write off 2 bottles of red wine" is enough. If
 the name matches several, Inventory does not choose: it says which ones they are and asks which one.
-Every list can be searched and goes in pages of up to 100.
+Every list can be searched and goes in pages of up to 100. Before an action, the assistant asks for confirmation with
+its card (BASE-F97), which names each record as the screens name it, never by its identifier: the product by its name
+("Product: Red wine"), the category by its name ("Category: Drinks"), a product's categories one by one ("Categories:
+Drinks, Wines") and each line of a goods receipt with its product and its quantity. What the person asking cannot see,
+or what no longer exists, is left out.
 
 ### What it offers: queries (they read, they change nothing)
 
@@ -1072,6 +1076,7 @@ Every list can be searched and goes in pages of up to 100.
 | The products at their threshold or below, from the one with least to the one with most | view products | F17 | `inventory.product.list_low_stock` |
 | Which categories each active product has | view products | F08, F27 | `inventory.product_category.list` |
 | The categories, with how many active products each one has (sold-out ones included, what the till shows) | view categories | F06, F27 | `inventory.category.list` |
+| One category by its id or its name: what the assistant's card reads to name it (BASE-F97); it is not an assistant tool and has no API route | view categories | F06, F07, F08 | `inventory.category.get` |
 | The ledger of movements: date, product, type, quantity, balance, reason, reference and who made it | view stock | F16 | `inventory.movement.list` |
 | The dashboard's figures: tracked products, in stock, sold out, in low stock, value at cost and number of active products | view products | F17, F28 | `inventory.stock.get_summary` |
 | The units of measure with their step | view products | F26 | `inventory.unit.list` |
