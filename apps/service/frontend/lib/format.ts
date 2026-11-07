@@ -19,7 +19,6 @@ export const moneyDecimals = (money?: Money): number => money?.decimals ?? UNKNO
 
 const formats = new Map<string, Intl.NumberFormat>();
 const days = new Map<string, Intl.DateTimeFormat>();
-const decimalMarks = new Map<string, string>();
 
 function numberFormat(locale: string, kind: 'percent' | 'plain'): Intl.NumberFormat {
   const key = `${locale}|${kind}`;
@@ -31,16 +30,6 @@ function numberFormat(locale: string, kind: 'percent' | 'plain'): Intl.NumberFor
     };
     found = new Intl.NumberFormat(locale, options[kind]);
     formats.set(key, found);
-  }
-  return found;
-}
-
-/** The decimal mark of `locale` («,» in Spanish, «.» in English). */
-export function decimalMark(locale: string): string {
-  let found = decimalMarks.get(locale);
-  if (!found) {
-    found = new Intl.NumberFormat(locale).formatToParts(1.5).find((part) => part.type === 'decimal')?.value ?? '.';
-    decimalMarks.set(locale, found);
   }
   return found;
 }

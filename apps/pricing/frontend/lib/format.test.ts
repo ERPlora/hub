@@ -4,7 +4,6 @@
 import { describe, expect, it } from 'vitest';
 
 import {
-  decimalMark,
   formatDate,
   formatMoney,
   formatPercent,
@@ -53,10 +52,6 @@ describe('format', () => {
     expect(formatMoney(123456, 'es', EUR)).toBe('1.234,56 €');
     expect(formatMoney(1234567, 'es', EUR)).toBe('12.345,67 €');
     expect(formatMoney(123456, 'en', EUR)).toBe('€1,234.56');
-  });
-
-  it('knows the decimal mark of the page language', () => {
-    expect([decimalMark('es'), decimalMark('en')]).toEqual([',', '.']);
   });
 
   it('paints a quantity without its trailing zeros', () => {

@@ -1,7 +1,8 @@
-// What the guardrails over the Hub's frontends read (money-grouping, quantity-format): the frontends (base's, each
-// app's and, when asked, the shared `ui`), their sources (`.ts` and `.vue`, without tests, their helpers, declarations
-// or builds), the code of each (a `.vue`, its `<script>` blocks at their own lines) and what a guard finds in them, as
-// `<path>:<line>` by app; and `bare`, which the guards that parse the code (TypeScript's AST) read an expression with.
+// What the guardrails over the Hub's frontends read (money-grouping, quantity-format, decimal-mark): the frontends
+// (base's, each app's and, when asked, the shared `ui`), their sources (`.ts` and `.vue`, without tests, their helpers,
+// declarations or builds), the code of each (a `.vue`, its `<script>` blocks at their own lines) and what a guard finds
+// in them, as `<path>:<line>` by app; and, for the guards that parse the code (TypeScript's AST), `linesWhere`, the
+// lines of the nodes a guard looks for, and `bare`, which they read an expression with.
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -39,6 +40,21 @@ export function scriptBlocks(text: string, name: string): ScriptBlock[] {
     code: match[1],
     offset: text.slice(0, (match.index ?? 0) + match[0].indexOf(match[1])).split('\n').length - 1,
   }));
+}
+
+/** The lines of `text` (the file `name`: a `.ts`, or a `.vue` whose `<script>` blocks are read) of each node of its code
+ *  `holds` is true of, at their own lines of the file. */
+export function linesWhere(text: string, name: string, holds: (node: ts.Node) => boolean): number[] {
+  return scriptBlocks(text, name).flatMap(({ code, offset }) => {
+    const file = ts.createSourceFile(name.endsWith('.vue') ? `${name}.ts` : name, code, ts.ScriptTarget.Latest, true);
+    const lines: number[] = [];
+    const visit = (node: ts.Node): void => {
+      if (holds(node)) lines.push(file.getLineAndCharacterOfPosition(node.getStart(file)).line + 1 + offset);
+      ts.forEachChild(node, visit);
+    };
+    visit(file);
+    return lines;
+  });
 }
 
 /** The sources under `dir`: `.ts` and `.vue`, without tests, their helpers, declarations or builds. */

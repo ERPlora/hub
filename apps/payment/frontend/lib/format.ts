@@ -18,7 +18,6 @@ const NO_MONEY_DECIMALS = 2;
 
 const money = new Map<string, Intl.NumberFormat>();
 const days = new Map<string, Intl.DateTimeFormat>();
-const decimalMarks = new Map<string, string>();
 
 /** The decimals of `value` (2 in EUR and HUF, 0 in JPY): its minor unit; two while unknown. */
 export const moneyDecimals = (value?: Money): number => value?.decimals ?? NO_MONEY_DECIMALS;
@@ -49,16 +48,6 @@ export function formatMoney(minor: number, locale: string, value?: Money): strin
 /** The money of a payment: the currency it was recorded in, with the decimals the server says for it. */
 export function paymentMoney(payment: Pick<PaymentOut, 'currency' | 'currency_decimals'>): Money {
   return { currency: payment.currency, decimals: payment.currency_decimals };
-}
-
-/** The decimal mark of `locale` («,» in Spanish, «.» in English). */
-export function decimalMark(locale: string): string {
-  let found = decimalMarks.get(locale);
-  if (!found) {
-    found = new Intl.NumberFormat(locale).formatToParts(1.5).find((part) => part.type === 'decimal')?.value ?? '.';
-    decimalMarks.set(locale, found);
-  }
-  return found;
 }
 
 /** A calendar day (or the date half of a moment) as `locale` writes it («13/07/2026»); anything else as is. */
