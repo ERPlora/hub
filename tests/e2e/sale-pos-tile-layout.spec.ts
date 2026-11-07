@@ -69,3 +69,27 @@ for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 
     }
   });
 }
+
+
+test('the mobile cart button grows around its total and keeps the count readable', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await login(page, A, '/sale/pos');
+  await shown(page).locator('[data-testid^=pos-product-]').first().click();
+  const fab = shown(page).locator('[data-testid=pos-cart-fab]');
+  await expect(fab).toBeVisible();
+  await expect(fab.locator('[data-testid=pos-cart-fab-total]')).toContainText(/1[.,]50/);
+  await expect(fab.locator('[data-testid=pos-cart-fab-count]')).toHaveText('1');
+  const boxes = await fab.evaluate((el) => {
+    const box = (selector: string) => {
+      const rect = el.querySelector(selector)?.getBoundingClientRect();
+      return rect ? { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom } : undefined;
+    };
+    const rect = el.getBoundingClientRect();
+    const button = { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom };
+    return { button, total: box('[data-testid=pos-cart-fab-total]'), count: box('[data-testid=pos-cart-fab-count]') };
+  });
+  expect(boxes.total!.right).toBeLessThanOrEqual(boxes.button!.right - 8);
+  expect(boxes.count!.right).toBeLessThanOrEqual(boxes.button!.right + 8);
+  expect(boxes.count!.bottom).toBeLessThanOrEqual(boxes.button!.top + 16);
+  await capture(page, 'poc-fab-mobile');
+});

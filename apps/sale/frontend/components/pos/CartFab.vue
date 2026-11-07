@@ -32,6 +32,7 @@ const label = computed(() => {
   >
     <ion-fab-button
       class="pos-fab__button"
+      :style="{ width: count > 0 ? 'max-content' : undefined, minWidth: count > 0 ? '8rem' : undefined }"
       data-testid="pos-cart-fab"
       aria-controls="pos-cart-drawer"
       :aria-expanded="expanded ? 'true' : 'false'"
@@ -66,6 +67,7 @@ const label = computed(() => {
   margin: 0;
 }
 .pos-fab__button {
+  width: max-content !important;
   min-width: 3.6rem;
   height: 3.6rem;
   margin: 0;
@@ -77,6 +79,8 @@ const label = computed(() => {
 .pos-fab__button::part(native) {
   display: inline-flex;
   gap: 0.45rem;
+  width: max-content !important;
+  min-width: 3.6rem;
   padding: 0 1rem;
 }
 .pos-fab__total {
@@ -88,6 +92,9 @@ const label = computed(() => {
   position: absolute;
   top: -0.35rem;
   right: -0.25rem;
+  z-index: 1;
+  display: grid;
+  place-items: center;
   min-width: 1.3rem;
   height: 1.3rem;
   padding: 0 0.3rem;
