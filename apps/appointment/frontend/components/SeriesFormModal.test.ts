@@ -6,6 +6,7 @@
 import { Combo } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
+import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import CustomerSearch from '../../../customer/frontend/components/CustomerSearch.vue';
 import type { RecurringOut } from '../operations';
 import { click, ionValue, mountAppointment, page, settle } from '../__tests__/mount-appointment';
@@ -55,7 +56,15 @@ async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 
   const field = (name: string) => m.inDoc(`series-form-${name}`) as Control;
   const submit = () => m.inDoc('series-form-submit') as Control;
   const combo = (testid: string) => m.wrapper.findAllComponents(Combo).find((c) => c.props('testid') === testid)!;
-  return { ...m, field, submit, combo };
+  /** A new series' customer (Lucía), service (Haircut) and professional (Ana), as a person picks them. */
+  async function pickWhoAndWhat() {
+    m.wrapper.findComponent(CustomerSearch).vm.$emit('update:modelValue', { customer_id: 'c1', customer_name: 'Lucía Pérez', customer_tax_id: '', customer_address: '', customer_country: '' });
+    await (combo('series-form-service-add').props('search') as (q: string) => Promise<unknown>)('');
+    combo('series-form-service-add').vm.$emit('update:modelValue', { id: 'cut', label: 'Haircut' });
+    combo('series-form-staff').vm.$emit('update:modelValue', { id: 's1', label: 'Ana López' });
+    await settle();
+  }
+  return { ...m, field, submit, combo, pickWhoAndWhat };
 }
 
 describe('SeriesFormModal: New repeating appointment', () => {
@@ -85,11 +94,7 @@ describe('SeriesFormModal: New repeating appointment', () => {
       'Ends on (optional)',
       'Number of appointments (optional)',
     ]);
-    s.wrapper.findComponent(CustomerSearch).vm.$emit('update:modelValue', { customer_id: 'c1', customer_name: 'Lucía Pérez', customer_tax_id: '', customer_address: '', customer_country: '' });
-    await (s.combo('series-form-service-add').props('search') as (q: string) => Promise<unknown>)('');
-    s.combo('series-form-service-add').vm.$emit('update:modelValue', { id: 'cut', label: 'Haircut' });
-    s.combo('series-form-staff').vm.$emit('update:modelValue', { id: 's1', label: 'Ana López' });
-    await settle();
+    await s.pickWhoAndWhat();
     await ionValue(s.field('weekday'), 2);
     await ionValue(s.field('start_date'), '2026-10-19', 'ionInput');
     await ionValue(s.field('time'), '11:00', 'ionInput');
@@ -164,5 +169,29 @@ describe('SeriesFormModal: Edit repeating appointment', () => {
     const s = await setup({ series: SERIES }, 'es');
     expect(s.inDoc('series-form')?.getAttribute('aria-label')).toBe('Editar cita periódica');
     expect(s.field('from_date').label).toBe('Desde');
+  });
+});
+
+describe('SeriesFormModal: fields refused with the same words (hub#888)', () => {
+  // Each field refused under its own key. Services and Professional are Combos (Services through ServicesField),
+  // which hub#888 leaves for @erplora/ui: a Combo does not hand its name to the field FormModal reads.
+  describe('a new series', () => {
+    itTellsTheCorrectedFieldApart(['start_date', 'time', 'duration_minutes', 'end_date', 'max_occurrences'], async (locale, refusal) => {
+      const s = await setup({}, locale);
+      await s.pickWhoAndWhat();
+      await ionValue(s.field('start_date'), '2026-10-19', 'ionInput');
+      await ionValue(s.field('time'), '11:00', 'ionInput');
+      s.answer(422, refusal);
+      return { field: (key) => s.field(key === 'duration_minutes' ? 'minutes' : key), send: () => click(s.submit()), settle };
+    }, 'end_date');
+  });
+
+  describe('a series edited from a date', () => {
+    itTellsTheCorrectedFieldApart(['from_date', 'time'], async (locale, refusal) => {
+      const s = await setup({ series: SERIES, fromDate: '2026-11-02' }, locale);
+      await ionValue(s.field('time'), '12:30', 'ionInput');
+      s.answer(422, refusal);
+      return { field: s.field, send: () => click(s.submit()), settle };
+    });
   });
 });

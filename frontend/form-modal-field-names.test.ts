@@ -23,12 +23,10 @@ const HUB_DIR = join(dirname(fileURLToPath(import.meta.url)), '..');
  *  the `name` property of the field, not the attribute. Those fields stay counted here until Combo hands its name to
  *  its ion-input. */
 const STILL_UNNAMED: Record<string, number> = {
-  'apps/appointment/frontend/components/AppointmentFormModal.vue': 6,
-  'apps/appointment/frontend/components/SeriesFormModal.vue': 8,
-  'apps/attendance/frontend/components/CorrectionModal.vue': 3,
+  'apps/appointment/frontend/components/AppointmentFormModal.vue': 2, // Services (ServicesField, around a Combo) and Professional: Combos
+  'apps/appointment/frontend/components/SeriesFormModal.vue': 2, // Services (ServicesField, around a Combo) and Professional: Combos
   'apps/combo/frontend/components/MenuFormModal.vue': 5,
-  'apps/kitchen/frontend/components/StationFormModal.vue': 2,
-  'apps/kitchen/frontend/components/TicketFormModal.vue': 1,
+  'apps/kitchen/frontend/components/TicketFormModal.vue': 1, // A dish's Product: a Combo
   'apps/modifier/frontend/components/GroupFormModal.vue': 5,
   'apps/modifier/frontend/components/OptionFormModal.vue': 5,
   'apps/pricing/frontend/components/PriceItemFormModal.vue': 1, // Product or service: a Combo
@@ -38,8 +36,6 @@ const STILL_UNNAMED: Record<string, number> = {
   'apps/reservation/frontend/components/ReservationFormModal.vue': 10,
   'apps/reservation/frontend/components/SlotFormModal.vue': 4,
   'apps/reservation/frontend/components/WaitlistFormModal.vue': 5,
-  'apps/sale/frontend/components/backoffice/DepartmentFormModal.vue': 3,
-  'apps/sale/frontend/components/backoffice/QuickNoteFormModal.vue': 2,
   'apps/service/frontend/components/CategoryFormModal.vue': 3,
   'apps/service/frontend/components/GrantAdjustModal.vue': 3,
   'apps/service/frontend/components/GrantVoidModal.vue': 1,
@@ -54,7 +50,6 @@ const STILL_UNNAMED: Record<string, number> = {
   'apps/tax/frontend/components/CategoryCreateModal.vue': 3,
   'apps/tax/frontend/components/RuleCreateModal.vue': 12,
   'apps/tax/frontend/components/RuleEndModal.vue': 1,
-  'apps/whatsapp_inbox/frontend/components/TemplateFormModal.vue': 5,
 };
 
 // ── Reading a template ──────────────────────────────────────────────────────────────────────────────────────────────

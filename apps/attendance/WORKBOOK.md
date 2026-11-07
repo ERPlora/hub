@@ -310,7 +310,8 @@ que acabó la anterior); «Esa persona ya tiene otra jornada abierta: no se pued
 hora futura, «La hora no puede ser futura.»; sin motivo, «Escribe un motivo de al menos 3 caracteres.». Si no se
 puede leer la zona horaria del negocio, «No se ha podido leer la zona horaria del negocio y esta corrección aún no
 se puede guardar. Recarga la página para volver a intentarlo.», con el botón desactivado.
-Una corrección rechazada no cambia nada ni deja rastro. «Corregir» solo aparece a quien puede
+Cada motivo de un campo sale bajo él y se quita en cuanto se corrige ese campo, aunque otro diga lo mismo
+(hub#888). Una corrección rechazada no cambia nada ni deja rastro. «Corregir» solo aparece a quien puede
 corregir.
 Implicados: ATTENDANCE-F05, ATTENDANCE-F09, ATTENDANCE-F11
 

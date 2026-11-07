@@ -9,6 +9,7 @@
 import { Combo, ConfirmDialog } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
+import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import CustomerSearch from '../../../customer/frontend/components/CustomerSearch.vue';
 import type { AppointmentOut } from '../operations';
 import { business, click, ionValue, mountAppointment, page, POLISH, settle } from '../__tests__/mount-appointment';
@@ -475,4 +476,17 @@ describe('AppointmentFormModal: a new customer without leaving the agenda (CUSTO
     expectChoicesKept(s);
     expect(s.submit().disabled).toBe(false);
   });
+});
+
+describe('AppointmentFormModal: fields refused with the same words (hub#888)', () => {
+  // A new appointment's fields, each refused under its own key; the time says the refusal of `start`. Services and
+  // Professional are Combos (Services through ServicesField), which hub#888 leaves for @erplora/ui: a Combo does not
+  // hand its name to the field FormModal reads.
+  const FIELD_OF: Record<string, string> = { start: 'time' };
+  itTellsTheCorrectedFieldApart(['start', 'minutes', 'notes', 'internal_notes'], async (locale, refusal) => {
+    const s = await setup({}, locale);
+    await fillNew(s);
+    s.answer(422, refusal);
+    return { field: (key) => s.field(FIELD_OF[key] ?? key), send: () => click(s.submit()), settle };
+  }, 'minutes');
 });

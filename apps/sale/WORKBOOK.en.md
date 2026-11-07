@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:637650d0a1071210f5746c212cf23da07bf2dee8b032174eb6d2cdd78ddc34f4 -->
+<!-- generated from WORKBOOK.md sha256:2b524cc151871470b214d6ecaac5ba5c8a84d714a2f012e513d9be82d2124bcb -->
 
 ## What it is for and who it is for
 
@@ -1246,7 +1246,9 @@ Steps:
 In: Taxes' VAT categories.
 Out: the section (name, VAT category, position). What was already sold keeps the name and the VAT it was
 charged with.
-If it fails: a VAT category that does not exist is refused next to its field. A section someone else
+If it fails: a VAT category that does not exist is refused next to its field. Each refused field loses its
+reason as soon as it is corrected ("VAT charged", by choosing another category), even if another one says
+the same (hub#888). A section someone else
 already deleted: "That section is no longer in this business. Reload the list and try again.".
 Through the assistant: its confirmation card says the section by its name, never by an id; one that is no longer there stays off the card (BASE-F97).
 Involved: TAX-F01, BASE-F97
@@ -1264,7 +1266,8 @@ Steps:
 In: nothing from other apps.
 Out: the quick note. Deleting it stops offering it; notes already written keep their text.
 If it fails: "The quick note could not be saved."; a note that no longer exists: "That quick note is no
-longer in this business. Reload the list and try again.".
+longer in this business. Reload the list and try again.". The refusal of a field shows under it and goes
+away as soon as that field is corrected, even if another one says the same (hub#888).
 Involved: none
 
 ### SALE-F37 Add a payment method (Bizum, bank transfer…)

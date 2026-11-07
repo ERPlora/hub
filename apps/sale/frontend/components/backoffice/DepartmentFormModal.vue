@@ -17,6 +17,7 @@ import { refusal } from '../../lib/refusal';
 import { taxLabel } from '../../lib/taxLabel';
 import type { DepartmentOut } from '../../operations';
 import TaxCategoryPicker from '../TaxCategoryPicker.vue';
+import PositionField from './PositionField.vue';
 
 const props = defineProps<{
   /** The department to edit; `null` adds a new one. */
@@ -119,6 +120,7 @@ async function save(): Promise<void> {
           fill="outline"
           mode="md"
           :maxlength="60"
+          name="name"
           :error-text="fieldErrors.name"
           :class="invalid(fieldErrors.name)"
           @ion-input="name = String($event.detail.value ?? '')"
@@ -130,22 +132,15 @@ async function save(): Promise<void> {
           :placeholder="$t('sale.departments.form.taxPlaceholder', { tax: taxName })"
           testid="sale-department-form-tax"
           :chosen-label="currentTax"
+          name="tax_category_key"
           :error-text="taxMissing ? $t('sale.departments.taxCategoryMissing', { tax: taxName }) : fieldErrors.tax_category_key"
         />
-        <ion-input
+        <PositionField
+          v-model="order"
           data-testid="sale-department-form-order"
-          :value="order"
-          type="number"
-          inputmode="numeric"
-          min="0"
-          step="1"
+          name="sort_order"
           :label="$t('sale.departments.columns.sortOrder')"
-          label-placement="floating"
-          fill="outline"
-          mode="md"
           :error-text="fieldErrors.sort_order"
-          :class="invalid(fieldErrors.sort_order)"
-          @ion-input="order = String($event.detail.value ?? '')"
         />
       </div>
     </template>

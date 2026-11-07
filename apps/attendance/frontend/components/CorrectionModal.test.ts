@@ -5,6 +5,7 @@
 // business's wall clock. The server's refusal (an overlap, a second open day) stays in the dialog.
 import { describe, expect, it, vi } from 'vitest';
 
+import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import { click, errorFrame, ionValue, mountAttendance, settle } from '../__tests__/mount-attendance';
 import type { RecordOut } from '../operations';
 import CorrectionModal from './CorrectionModal.vue';
@@ -177,4 +178,15 @@ describe('CorrectionModal (ATTENDANCE-F08)', () => {
     expect(s.field('clock_out').label).toBe('Salida (vacía = sigue abierta)');
     expect(s.save().textContent?.trim()).toBe('Guardar corrección');
   });
+});
+
+describe('CorrectionModal: fields refused with the same words (hub#888)', () => {
+  // Each time and the reason refused by the server under their own keys (`clock_in_at`, `clock_out_at`, `reason`).
+  const FIELD_OF: Record<string, string> = { clock_in_at: 'clock_in', clock_out_at: 'clock_out' };
+  itTellsTheCorrectedFieldApart(['clock_in_at', 'clock_out_at', 'reason'], async (locale, refusal) => {
+    const s = await setup(DAY, locale);
+    await ionValue(s.field('reason'), 'Forgot to clock out', 'ionInput');
+    s.answerBy({ '/api/attendance/records/correct': [422, refusal] });
+    return { field: (key) => s.field(FIELD_OF[key] ?? key), send: () => click(s.save()), settle };
+  }, 'clock_out_at');
 });

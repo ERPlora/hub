@@ -6,6 +6,7 @@
 // language never change, and the category only while Meta has not approved it. A refusal stays in the dialog.
 import { describe, expect, it, vi } from 'vitest';
 
+import { itTellsTheCorrectedFieldApart, refusedWithTheSameWords, SAME_WORDS } from '../../../../base/frontend/__tests__/same-words-refusal';
 import { click, flush, ionValue, mountInbox, settle } from '../__tests__/mount-inbox';
 import type { TemplateOut } from '../operations';
 import TemplateFormModal from './TemplateFormModal.vue';
@@ -433,5 +434,59 @@ describe('TemplateFormModal: a header with a file (WHATSAPP_INBOX-F29)', () => {
     expect(s.field('header-file-rules').textContent).toContain('PDF, hasta 25 MB');
     expect(s.field('header-file-choose').textContent).toContain('Elegir archivo');
     expect(s.field('header-file-empty').textContent).toContain('Ningún archivo elegido');
+  });
+});
+
+describe('TemplateFormModal: fields refused with the same words (hub#888)', () => {
+  const KEYS = ['name', 'header', 'body', 'body_examples', 'footer'];
+  /** The examples are one field, `body_examples`: the first example says its refusal. */
+  const FIELD_OF: Record<string, string> = { body_examples: 'example-1' };
+  /** «New template» with two variables and their examples, «Send to Meta for review» answered with `refusal`. */
+  async function refused(locale: 'en' | 'es', refusal: ReturnType<typeof refusedWithTheSameWords>) {
+    const s = await setup(null, locale);
+    await s.type('name', 'recordatorio');
+    await s.type('header', 'Tu cita');
+    await s.type('body', 'Hola {{1}}, te esperamos el {{2}}.');
+    await s.type('example-1', 'Ana');
+    await s.type('example-2', 'viernes');
+    await s.type('footer', 'Peluquería Ana');
+    s.answer(422, refusal);
+    const send = async () => {
+      await click(s.submit());
+      await flush();
+    };
+    return { ...s, fieldOf: (key: string) => s.field(FIELD_OF[key] ?? key), send };
+  }
+
+  itTellsTheCorrectedFieldApart(KEYS, async (locale, refusal) => {
+    const s = await refused(locale, refusal);
+    return { field: s.fieldOf, send: s.send, settle };
+  }, 'body_examples');
+
+  // Meta refuses the examples as a whole (one missing, one too many): the mark sits on the first, and correcting any
+  // of them takes it away.
+  it('the examples are one field: correcting the second takes the mark off the first, and only that one', async () => {
+    const s = await refused('en', refusedWithTheSameWords(KEYS));
+    await s.send();
+    expect(KEYS.map((key) => s.fieldOf(key).errorText)).toEqual(KEYS.map(() => SAME_WORDS));
+    const second = s.field('example-2');
+    second.dispatchEvent(new Event('input', { bubbles: true }));
+    await ionValue(second, 'sábado', 'ionInput');
+    expect(KEYS.filter((key) => s.fieldOf(key).errorText)).toEqual(['name', 'header', 'body', 'footer']);
+  });
+
+  // The window only starts the refusal over (`edited`) for a field the refusal names; a keystroke in a field it does
+  // not name is told by FormModal alone, by that field's name, so a name that is another field's key takes that
+  // field's mark. Real case: a text numbered {{1}}, {{3}} is refused under `body` alone (the examples are not read)
+  // and the person types in an example: the text must stay marked.
+  it.each(KEYS)('%s, typed in while the refusal does not name it, takes no other field’s mark', async (key) => {
+    const others = KEYS.filter((other) => other !== key);
+    const s = await refused('en', refusedWithTheSameWords(others));
+    await s.send();
+    expect(others.map((other) => s.fieldOf(other).errorText)).toEqual(others.map(() => SAME_WORDS));
+    const typed = s.fieldOf(key);
+    typed.dispatchEvent(new Event('input', { bubbles: true }));
+    await ionValue(typed, `${String(typed.value ?? '')}x`, 'ionInput');
+    expect(KEYS.filter((other) => s.fieldOf(other).errorText)).toEqual(others);
   });
 });
