@@ -378,7 +378,6 @@ def test_no_list_of_texts_sent_as_they_are_is_named():
 UNNAMED_REFERENCES = {
     "appointment": 12,
     "invoice": 1,
-    "online_booking": 7,
     "payment": 8,
     # The sale and the appointment a voucher or a session came from, the line of a sale that charged a voucher, the line
     # of an order that holds a session and the reference of a return: data of apps Services does not require, so it
