@@ -75,12 +75,13 @@ export async function expectTheCorrectedFieldAloneLosesItsMark(window: RefusedWi
 export type OpenRefused = (locale: 'en' | 'es', refusal: ReturnType<typeof refusedWithTheSameWords>) => Promise<RefusedWindow>;
 
 /** A window's cases: each field of `keys`, refused with the same words as the others and then corrected, alone loses
- *  them; and `spanish` (the first key unless said) does the same in a window in Spanish, refused in Spanish. */
-export function itTellsTheCorrectedFieldApart(keys: readonly string[], open: OpenRefused, spanish = keys[0]): void {
-  it.each(keys)('%s, corrected, alone loses the words every field was refused with', async (key) => {
+ *  them; and `spanish` (the first key unless said) does the same in a window in Spanish, refused in Spanish. `test`
+ *  declares them (`it`; this helper's own test passes `it.fails` with a window that gets it wrong). */
+export function itTellsTheCorrectedFieldApart(keys: readonly string[], open: OpenRefused, spanish = keys[0], test: typeof it = it): void {
+  test.each(keys)('%s, corrected, alone loses the words every field was refused with', async (key) => {
     await expectTheCorrectedFieldAloneLosesItsMark(await open('en', refusedWithTheSameWords(keys)), keys, key);
   });
-  it(`in Spanish too: the corrected ${spanish} alone loses «${SAME_WORDS_ES}»`, async () => {
+  test(`in Spanish too: the corrected ${spanish} alone loses «${SAME_WORDS_ES}»`, async () => {
     await expectTheSameInSpanish(open, keys, spanish);
   });
 }

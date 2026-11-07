@@ -129,6 +129,10 @@ describe('itTellsTheCorrectedFieldApart (hub#888): the cases it declares pass a 
   itTellsTheCorrectedFieldApart(KEYS, (locale, refusal) => windowNaming(NAMED, refusal.error, locale), 'kind');
 });
 
+describe('itTellsTheCorrectedFieldApart (hub#888): every case it declares fails a window whose fields carry no name', () => {
+  itTellsTheCorrectedFieldApart(KEYS, (locale, refusal) => windowNaming({}, refusal.error, locale), 'kind', it.fails as typeof it);
+});
+
 describe('expectTheSameInSpanish (hub#888): the Spanish case is a window in Spanish', () => {
   it('passes a window opened in Spanish', async () => {
     await expect(expectTheSameInSpanish((locale, refusal) => windowNaming(NAMED, refusal.error, locale), KEYS, 'title')).resolves.toBeUndefined();
