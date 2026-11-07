@@ -350,7 +350,9 @@ Pasos:
    siempre.
 Entra: la dirección del negocio.
 Sale: la página publicada, con su propia política de seguridad (sin scripts del usuario: solo el paquete de la
-página), sin cookies y guardada un minuto en el navegador; la pestaña lleva el logotipo o la inicial del nombre.
+página), sin cookies y guardada un minuto en el navegador; la pestaña lleva el logotipo o la inicial del nombre. La
+página le dice al buscador cuál es su dirección principal: el dominio propio del negocio si se abre en él (BASE-F110),
+también desde esta dirección, que no redirige porque sigue siendo la entrada del equipo; sin dominio propio, esta.
 Si falla: sin publicar, desconectada o con la app apagada, la dirección lleva al acceso del equipo; quien hace más de
 60 lecturas por minuto desde una misma conexión espera un momento. Por el dominio propio del negocio (BASE-F110) es la
 misma página: **Entrar** lleva a su dirección de erplora.com y, sin página que enseñar, el dominio dice que no hay nada ahí.
@@ -491,6 +493,13 @@ una categoría que ya no está o de una app apagada.
   `reviews.ts` sin pedir nada, su catálogo se lee al pintarla (`queries.live_catalog`, nunca la instantánea de la
   publicación) y se guarda un minuto, lo que la API guarda ese catálogo, en vez de una hora; su CSP no lleva `report-uri`,
   porque `/csp-report/` tampoco está. Sin página que enseñar, 404.
+- **La dirección principal** (hub#818, `public_home.main_address`): las dos direcciones llevan en el `<head>` un
+  `<link rel="canonical">` absoluto a `https://<dominio>/` mientras la puerta abre la web en ese dominio
+  (`base.custom_domains.served_on`: el de la fila del negocio, si el mapa se lo da a él; uno que nombran dos negocios no
+  es de nadie), y si no a `https://<slug>.<dominio del Hub>/`. Sin redirección, como el dominio integrado de Squarespace:
+  la dirección de erplora.com sigue siendo la entrada del equipo. La página se guarda con la dirección que nombra
+  (`{"main": …, "html": …}`) y se vuelve a pintar si ya no es la de ahora, así que un cambio de dominio no espera a que
+  caduque; las claves y `forget_cached` no cambian. La vista previa no nombra ninguna (`render_site(canonical="")`).
 - **La barra y el pie de las cuatro plantillas** son componentes (`templates/website/_topbar.html`, `_footer.html`, y sus
   piezas `_footer_columns.html` y `_credit.html`, que usa también `minimal`, con otro marco): cada plantilla dice sus clases en
   una línea y el enlace **Entrar** (`login_url`) se escribe en dos sitios, la barra y el pie, nunca en cuatro ficheros.
