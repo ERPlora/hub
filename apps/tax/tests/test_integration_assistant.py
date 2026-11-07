@@ -12,7 +12,7 @@ from django.apps import apps
 from live.operations import get, registry
 
 from base import assistant
-from base.tests.test_assistant import named_by_the_screen
+from base.tests.test_assistant import named_by_the_screen, technical_names
 
 APP = Path(apps.get_app_config("tax").path)
 SCREENS = json.loads((APP / "frontend/locale/es.json").read_text())["tax"]
@@ -58,6 +58,14 @@ def test_no_datum_of_a_write_of_tax_reaches_a_spanish_card_by_its_technical_name
             if datum not in screen and not named_by_tax(op, datum, props[datum].get("title")):
                 technical.setdefault(name, []).append(datum)
     assert technical == {}
+
+
+def test_no_write_of_tax_goes_by_the_title_pydantic_makes_up_but_a_word_spanish_writes_alike():
+    """The platform's check (``technical_names``, hub#892), beside tax's own above, which is stronger: it also refuses a
+    word another app's catalog lends. «Alias» is the same word in Spanish, as the Aliases screen's column says it: the
+    one datum it finds, and exactly that one."""
+    assert SCREENS["aliases"]["columns"]["alias"] == "Alias"
+    assert technical_names([get(name) for name in TOOLS]) == {"tax.alias.create": ["alias"]}
 
 
 def test_the_card_names_the_category_of_a_write_as_the_rules_and_aliases_screens():

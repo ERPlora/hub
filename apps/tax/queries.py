@@ -18,6 +18,7 @@ from dataclasses import dataclass, field
 from decimal import ROUND_HALF_UP, Decimal
 from uuid import UUID
 
+from babel.numbers import format_percent
 from django.conf import settings
 from django.db.models import Case, CharField, F, Q, QuerySet, Value, When
 from django.db.models.functions import Coalesce
@@ -25,7 +26,7 @@ from django.utils import timezone, translation
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import Conflict, InvalidPayload, NotFound
-from live.operations import operation
+from live.operations import INTERNAL, operation
 
 from apps.tax.models import SYSTEM_CATEGORY_LABELS, TaxAlias, TaxCategory, TaxRule, TaxSettings
 from apps.tax.schemas import (
@@ -45,7 +46,9 @@ from apps.tax.schemas import (
     CategoryPage,
     RuleCountriesIn,
     RuleCountriesOut,
+    RuleGetIn,
     RuleListIn,
+    RuleNamedOut,
     RulePage,
     RuleParentIn,
     RuleStatusIn,
@@ -55,7 +58,7 @@ from apps.tax.schemas import (
     normalize_text,
 )
 from base import operations as platform
-from base.business import country_or_market
+from base.business import babel_locale, country_name, country_or_market
 from base.ordering import list_order
 
 CATEGORY_NOT_FOUND = _("This tax category does not exist.")
@@ -505,6 +508,35 @@ def rule_row(rule: TaxRule) -> dict:
 def load_rule(rule_id: UUID) -> TaxRule | None:
     """A rule with its category. Not an operation: ``services.py`` returns it after a write."""
     return TaxRule.objects.select_related("category").filter(pk=rule_id).first()
+
+
+def rule_label(rule: TaxRule) -> str:
+    """How a person names ``rule``, in the active language: its category, a component's label, its country (and its
+    region) and its rate, as the Rules screen tells one from another («Cervezas · España (ES-CN) · 7 %»)."""
+    language = translation.get_language()
+    place = country_name(rule.country_code, language)
+    if rule.region_code:
+        place = f"{place} ({rule.region_code})"
+    rate = format_percent(rule.rate_pct.normalize() / _HUNDRED, locale=babel_locale(language), decimal_quantization=False)
+    return " · ".join(part for part in (rule.category.display_name, rule.component_label, place, rate) if part)
+
+
+@operation(
+    "tax.rule.get",
+    kind="query",
+    permission="tax.view",
+    input=RuleGetIn,
+    output=RuleNamedOut,
+    ai=INTERNAL,
+)
+def get_rule(ctx: OperationContext, params: RuleGetIn) -> dict:
+    """One rule, active or deactivated, with its name: what names a rule on the assistant's card (``schemas.A_RULE``);
+    the model and the screens read the rules by their list."""
+    rule = load_rule(params.id)
+    if rule is None:
+        raise NotFound(RULE_NOT_FOUND)
+    with translation.override(ctx.language):
+        return {**rule_row(rule), "label": rule_label(rule)}
 
 
 #: By category, country and region; a component right after its root (the screen's default).

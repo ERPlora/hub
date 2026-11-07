@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:1f1a191e73615b3b46000161d020d89a2b0b7da5f14861f5462a49508a1144b3 -->
+<!-- generated from WORKBOOK.md sha256:dc72cb9389bd038ea8adf2d73530c7c68635c520c4862774468af5893ece2f40 -->
 
 ## What it is for and who it is for
 
@@ -22,6 +22,12 @@ Who uses it:
 - The **owner**, the **administrator** and the **manager** create categories, rules and aliases, set an end
   date on a rule and deactivate or restore it.
 - The **employee** only looks and calculates.
+- The **assistant** (by voice or by text, with the session of whoever speaks) does the same: "deactivate the beer
+  rule in Germany", "end the reduced rate on 31 December". Before an action it asks for confirmation with its card
+  (BASE-F97), which names each rule as the Rules list tells it apart, never by its identifier: by its category, a
+  component's label, its country (and its region) and its rate ("Rule: Craft beers · Spain · 10%"); and each
+  country by its name ("Country: Germany"), never by its code. What the person asking cannot see, or what no longer
+  exists, is left out.
 
 It does not decide the price, does not issue invoices or talk to the AEAT, and does not keep the business's
 country.
@@ -536,6 +542,7 @@ the last deactivated one).
 | How many root rules apply today in the business's country and whether taxes are set up (the notice and the step "Your taxes" of the Home) | view | F17 | `tax.rule.status` |
 | The root rules a component can hang from in a country, region and category: the same ones the creation accepts (also a root that starts in the future; one without tax, only for a component at 0 %) | view | F06 | `tax.rule.parent_candidates` |
 | The countries in which the business has rules (all, active or deactivated), for the Country filter | view | F03, F11 | `tax.rule.countries` |
+| A rule by its id, active or deactivated, with its name (category · country · rate): what the assistant's card reads to name it (BASE-F97); it is no tool of the assistant and has no route in the API | view | F06, F07, F08 | `tax.rule.get` |
 | The aliases, with search, filters (category, source) and pages | view | F13, F15 | `tax.alias.list` |
 | The category that matches an outside text, and why it matched | view | F15 | `tax.alias.resolve` |
 | The tax of an amount: base, tax, total, rate, qualification and breakdown | view | F18, F19 | `tax.rate.calculate` |
