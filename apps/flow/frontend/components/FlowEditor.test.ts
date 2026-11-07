@@ -401,6 +401,16 @@ describe('FlowEditor: «Which data?» while the catalog is being read (hub#969)'
     return s.wrapper.findComponent(FieldPicker);
   }
 
+  /** The held catalog comes in: the picker, still open, stops loading and offers what step 1 leaves. */
+  async function catalogComesIn(s: Awaited<ReturnType<typeof setup>>, catalog: ReturnType<typeof held>, picker: Awaited<ReturnType<typeof pickInStep2>>) {
+    catalog.answer(Response.json(CATALOG));
+    await settle();
+    expect(picker.props('open')).toBe(true);
+    expect(s.find('flow-picker-loading').exists()).toBe(false);
+    expect(s.find('flow-picker-none').exists()).toBe(false);
+    expect(s.find('flow-picker-steps.s1.number').text()).toContain('1. Create a task › Number');
+  }
+
   it('says «Loading…», never that there is nothing, and shows what step 1 leaves once the catalog is in, still open', async () => {
     const catalog = held();
     const s = await setup({ flow: TWO, initial: fromFlow(TWO) }, { '/api/flow/catalog': catalog.reply });
@@ -412,12 +422,7 @@ describe('FlowEditor: «Which data?» while the catalog is being read (hub#969)'
     expect(s.find('flow-picker-loading').find('ion-spinner').attributes('aria-hidden')).toBe('true');
     expect(s.find('flow-picker-none').exists()).toBe(false);
 
-    catalog.answer(Response.json(CATALOG));
-    await settle();
-    expect(picker.props('open')).toBe(true);
-    expect(s.find('flow-picker-loading').exists()).toBe(false);
-    expect(s.find('flow-picker-none').exists()).toBe(false);
-    expect(s.find('flow-picker-steps.s1.number').text()).toContain('1. Create a task › Number');
+    await catalogComesIn(s, catalog, picker);
     expect(picker.props('choices').map((choice: { path: string }) => choice.path)).toEqual([
       'input.total',
       'input.customer_name',
@@ -439,11 +444,7 @@ describe('FlowEditor: «Which data?» while the catalog is being read (hub#969)'
     await click(s.find('flow-picker-retry').element);
     expect(s.find('flow-picker-error').exists()).toBe(false);
     expect(s.find('flow-picker-loading').text()).toBe('Loading…');
-    catalog.answer(Response.json(CATALOG));
-    await settle();
-    expect(picker.props('open')).toBe(true);
-    expect(s.find('flow-picker-loading').exists()).toBe(false);
-    expect(s.find('flow-picker-steps.s1.number').exists()).toBe(true);
+    await catalogComesIn(s, catalog, picker);
   });
 
   it('opened on a call, the secrets that come in later are offered too, still open (FLOW-F27)', async () => {

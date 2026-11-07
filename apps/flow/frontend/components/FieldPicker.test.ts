@@ -5,8 +5,7 @@
 import { ApiError } from '@erplora/ui/sdk';
 import { describe, expect, it, vi } from 'vitest';
 
-import type { CatalogOut, Step } from '../operations';
-import { click, mountFlow, settle } from '../__tests__/mount-flow';
+import { click, mountFlow, settle, TASK_CATALOG, TASK_STEPS } from '../__tests__/mount-flow';
 import FieldPicker from './FieldPicker.vue';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
@@ -14,11 +13,8 @@ vi.mock('@ionic/vue', async (importOriginal) => {
   return { ...(await importOriginal<typeof import('@ionic/vue')>()), IonModal: IonModalStub };
 });
 
-const CATALOG = { events: [], actions: [{ name: 'task.task.create', kind: 'command', app: 'task', app_name: 'Tasks', description: '', fields: [], outputs: ['number'] }] } as unknown as CatalogOut;
-const STEPS: Step[] = [{ id: 's1', kind: 'command', operation: 'task.task.create', params: {} }];
-
 async function setup(choices: unknown[], more: Record<string, unknown> = {}) {
-  const m = await mountFlow(FieldPicker, { props: { open: true, choices, steps: STEPS, catalog: CATALOG, ...more } });
+  const m = await mountFlow(FieldPicker, { props: { open: true, choices, steps: TASK_STEPS, catalog: TASK_CATALOG, ...more } });
   await settle();
   return m;
 }

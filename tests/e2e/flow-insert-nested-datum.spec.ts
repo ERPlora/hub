@@ -6,7 +6,7 @@
 // without being closed and opened again (hub#969); one that could not be read is said inside it, with «Retry».
 // Everything created here is named «E2E FlowNested …» and removed before and after.
 // flow: FLOW-F11 FLOW-F28
-import { expect, test } from '@playwright/test';
+import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { VIEWPORTS } from './assistant-card-helpers';
 import { addToANewCart, manualFlow, onAutomations, questionSays } from './flow-helpers';
@@ -32,6 +32,21 @@ function cleanUp(): void {
   );
 }
 
+/** A manual automation `name` whose step 1 adds a line to a new cart and step 2 asks about it, granted. Its id. */
+async function lineThenAsk(context: BrowserContext, name: string, session: string): Promise<string> {
+  const steps = [await addToANewCart(context, session), { id: 's2', kind: 'ask', title: 'Line price' }];
+  return manualFlow(context, name, steps, [ADD]);
+}
+
+/** Opens the automation `flowId` and, in the title of its question, «Insert a datum»: the editor and «Which data?». */
+async function insertInTheQuestion(page: Page, flowId: string): Promise<{ editor: Locator; picker: Locator }> {
+  await page.goto(`/flow/automations/${flowId}`);
+  const editor = shown(page);
+  await editor.locator('[data-testid=flow-step-open-s2]').click();
+  await editor.locator('[data-testid=flow-ask-title-s2-insert]').click();
+  return { editor, picker: page.locator('ion-modal[data-testid=flow-picker]') };
+}
+
 test.beforeAll(cleanUp);
 test.afterAll(cleanUp);
 
@@ -39,8 +54,7 @@ for (const viewport of VIEWPORTS) {
   test(`FLOW-F11 «Insert a datum» offers the price of the line a step adds to a cart, and the question says it as money, at ${viewport.label}`, async ({ browser }) => {
     test.setTimeout(150_000);
     await onAutomations(browser, viewport, TAG, async ({ context, page, name }) => {
-      const steps = [await addToANewCart(context, `${SESSION}-${viewport.label}`), { id: 's2', kind: 'ask', title: 'Line price' }];
-      const flowId = await manualFlow(context, name, steps, [ADD]);
+      const flowId = await lineThenAsk(context, name, `${SESSION}-${viewport.label}`);
 
       // The question's title: «Insert a datum» → what the first step left inside the line it added. Pressed right after
       // entering, before the catalog of actions is in (held here until the picker is open; on a local stack it takes
@@ -51,11 +65,7 @@ for (const viewport of VIEWPORTS) {
         await catalogHeld;
         await route.continue();
       });
-      await page.goto(`/flow/automations/${flowId}`);
-      const editor = shown(page);
-      await editor.locator('[data-testid=flow-step-open-s2]').click();
-      await editor.locator('[data-testid=flow-ask-title-s2-insert]').click();
-      const picker = page.locator('ion-modal[data-testid=flow-picker]');
+      const { editor, picker } = await insertInTheQuestion(page, flowId);
       const price = picker.locator('[data-testid="flow-picker-steps.s1.item.unit_price"]');
       await expect(picker).toBeVisible();
       await expect(picker.locator('[data-testid=flow-picker-loading]')).toHaveText('Loading…');
@@ -93,15 +103,10 @@ for (const viewport of VIEWPORTS) {
   test(`FLOW-F11 «Which data?» says the catalog could not be read, with «Retry», and then offers what step 1 left, at ${viewport.label}`, async ({ browser }) => {
     test.setTimeout(120_000);
     await onAutomations(browser, viewport, TAG, async ({ context, page, name }) => {
-      const steps = [await addToANewCart(context, `${SESSION}-retry-${viewport.label}`), { id: 's2', kind: 'ask', title: 'Line price' }];
-      const flowId = await manualFlow(context, name, steps, [ADD]);
+      const flowId = await lineThenAsk(context, name, `${SESSION}-retry-${viewport.label}`);
       const failed = { error: { code: 'internal_error', message: 'Internal error' } };
       await page.route('**/api/flow/catalog', (route) => route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify(failed) }));
-      await page.goto(`/flow/automations/${flowId}`);
-      const editor = shown(page);
-      await editor.locator('[data-testid=flow-step-open-s2]').click();
-      await editor.locator('[data-testid=flow-ask-title-s2-insert]').click();
-      const picker = page.locator('ion-modal[data-testid=flow-picker]');
+      const { picker } = await insertInTheQuestion(page, flowId);
       // In red inside the dialog, which covers the editor's own notice; never «There is no data to insert here yet».
       await expect(picker.locator('[data-testid=flow-picker-error]')).toContainText('What automations can use here could not be read.');
       await expect(picker.locator('[data-testid=flow-picker-error]')).not.toContainText('Internal error');
