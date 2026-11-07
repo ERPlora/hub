@@ -238,7 +238,8 @@ Pasos:
    curso: 0».
 Entra: lo que escribe quien la crea.
 Sale: la estación (avisa: estación creada).
-Si falla: el rechazo sale dentro del panel. Un nombre que ya tiene otra estación viva se rechaza
+Si falla: el rechazo sale dentro del panel; el motivo de un campo, debajo de él, y se quita en cuanto se
+corrige ese campo, aunque otro diga lo mismo (hub#888). Un nombre que ya tiene otra estación viva se rechaza
 («Ya hay una estación con ese nombre. Elige otro nombre.»); el de una eliminada vuelve a estar libre.
 Quien no puede gestionar estaciones no ve el botón.
 Implicados: KITCHEN-F02, KITCHEN-F03, KITCHEN-F04, KITCHEN-F08, PRINTING-F04
@@ -256,7 +257,8 @@ Entra: la estación y lo que cambia.
 Sale: la estación cambiada (avisa: estación cambiada). Desactivarla hace que los platos que se envíen
 después busquen la estación de su categoría y, si no hay, salgan «Sin estación». Lo ya enviado no cambia
 de estación ni de destino; el nombre y el color que pinta la pantalla sí son los vivos.
-Si falla: dentro del formulario. Un nombre repetido se rechaza; guardar una estación que otro
+Si falla: dentro del formulario, cada motivo bajo su campo hasta que se corrige ese campo, aunque otro
+diga lo mismo (hub#888). Un nombre repetido se rechaza; guardar una estación que otro
 dispositivo acaba de eliminar dice que ya no existe.
 Implicados: KITCHEN-F01, KITCHEN-F04, KITCHEN-F10, PRINTING-F04
 

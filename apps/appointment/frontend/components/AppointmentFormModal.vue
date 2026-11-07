@@ -403,6 +403,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
             fill="outline"
             mode="md"
             :disabled="charged"
+            name="start"
             :error-text="fieldErrors.start"
             :class="invalid(fieldErrors.start)"
             @ion-input="time = text($event.detail.value)"
@@ -418,6 +419,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
             fill="outline"
             mode="md"
             :disabled="charged"
+            name="minutes"
             :error-text="fieldErrors.minutes"
             :class="invalid(fieldErrors.minutes)"
             @ion-input="typeMinutes(text($event.detail.value))"
@@ -449,6 +451,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
           mode="md"
           :auto-grow="true"
           :maxlength="2000"
+          name="notes"
           :error-text="fieldErrors.notes"
           @ion-input="notes = text($event.detail.value)"
         />
@@ -461,6 +464,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
           mode="md"
           :auto-grow="true"
           :maxlength="2000"
+          name="internal_notes"
           :error-text="fieldErrors.internal_notes"
           @ion-input="internalNotes = text($event.detail.value)"
         />
