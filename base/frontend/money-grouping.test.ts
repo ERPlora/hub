@@ -15,20 +15,11 @@
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
-import { findingsByApp, hubFrontends, scriptBlocks } from './__tests__/frontend-sources';
+import { bare, findingsByApp, hubFrontends, scriptBlocks } from './__tests__/frontend-sources';
 
 const GROUP_THE_AMOUNT =
   'write the amount with formatMoney of @erplora/ui/components (the platform\'s one way to write an amount), or ' +
   "give the format useGrouping: 'always'";
-
-/** `node` without the parentheses, `as` and `satisfies` around it. */
-function bare(node: ts.Expression): ts.Expression {
-  let current = node;
-  while (ts.isParenthesizedExpression(current) || ts.isAsExpression(current) || ts.isSatisfiesExpression(current)) {
-    current = current.expression;
-  }
-  return current;
-}
 
 /** Whether `object` sets `name` to the string `value` (`style: 'currency'`, `useGrouping: 'always' as const`). */
 function says(object: ts.ObjectLiteralExpression, name: string, value: string): boolean {

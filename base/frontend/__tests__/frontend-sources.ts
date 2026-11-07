@@ -1,10 +1,12 @@
 // What the guardrails over the Hub's frontends read (money-grouping, quantity-format): the frontends (base's, each
 // app's and, when asked, the shared `ui`), their sources (`.ts` and `.vue`, without tests, their helpers, declarations
 // or builds), the code of each (a `.vue`, its `<script>` blocks at their own lines) and what a guard finds in them, as
-// `<path>:<line>` by app.
+// `<path>:<line>` by app; and `bare`, which the guards that parse the code (TypeScript's AST) read an expression with.
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import ts from 'typescript';
 
 /** The hub's root: base/frontend/__tests__ is three levels down. */
 export const HUB = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
@@ -19,6 +21,15 @@ export interface Frontend {
 export interface ScriptBlock {
   code: string;
   offset: number;
+}
+
+/** `node` without the parentheses, `as` and `satisfies` around it. */
+export function bare(node: ts.Expression): ts.Expression {
+  let current = node;
+  while (ts.isParenthesizedExpression(current) || ts.isAsExpression(current) || ts.isSatisfiesExpression(current)) {
+    current = current.expression;
+  }
+  return current;
 }
 
 /** The code of `text` (the file `name`): a `.ts` whole; a `.vue`, each `<script>` block. */

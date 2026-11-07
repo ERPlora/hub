@@ -12,7 +12,7 @@
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
-import { findingsByApp, hubFrontends, scriptBlocks } from './__tests__/frontend-sources';
+import { bare, findingsByApp, hubFrontends, scriptBlocks } from './__tests__/frontend-sources';
 
 const WRITE_IT_WITH_THE_PLATFORM =
   'write the quantity with formatQuantity of @erplora/ui/components (the platform\'s one way to write a quantity), ' +
@@ -21,15 +21,6 @@ const WRITE_IT_WITH_THE_PLATFORM =
 /** The name of a property or a declaration, when it is written as one (`maximumFractionDigits`, `'maximumFractionDigits'`). */
 function nameOf(name: ts.Node | undefined): string | undefined {
   return name && (ts.isIdentifier(name) || ts.isStringLiteral(name)) ? name.text : undefined;
-}
-
-/** `node` without the parentheses, `as` and `satisfies` around it. */
-function bare(node: ts.Expression): ts.Expression {
-  let current = node;
-  while (ts.isParenthesizedExpression(current) || ts.isAsExpression(current) || ts.isSatisfiesExpression(current)) {
-    current = current.expression;
-  }
-  return current;
 }
 
 /** Whether `node` writes a quantity of its own: three decimals at most, or a `formatQuantity` declared here. */

@@ -4,9 +4,9 @@
 // own paper and the assistant's card write it. The till's quantity field holds what a person types and edits: «1500»,
 // ungrouped, as a till's quantity field does (PLAN-HUB: what is typed is not grouped). At 1440; the fleet's sweep
 // shoots the three sizes. What this file creates is deleted after it.
-import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 
-import { A, login, psql, shot, shown } from './helpers';
+import { A, capture, login, psql, saveSessionForTheSweep, shown, signedInSpanish } from './helpers';
 import { cleanInventory, createProduct, type Product, productRow, productsReady, searchProducts } from './inventory-helpers';
 import { ensureIssuer, snapshotSeries } from './invoice-helpers';
 import { chargeByApi, checkWithDish, cleanSales, drawerOff, restoreDrawer, stamp } from './sale-helpers';
@@ -52,38 +52,26 @@ test.afterAll(() => {
   }
 });
 
-/** The owner on `a` in Spanish, on `next`: the Hub's language cookie, as the sign-in sets it from the account. */
-async function spanishOwner(browser: Browser, next: string): Promise<{ context: BrowserContext; page: Page }> {
-  const context = await browser.newContext({ baseURL: A, viewport: VIEWPORT, locale: 'es-ES' });
-  const page = await context.newPage();
-  await login(page, A, next);
-  await context.addCookies([{ name: 'django_language', value: 'es', domain: new URL(A).hostname, path: '/' }]);
-  await page.goto(`${A}${next}`);
-  await expect(page.locator('html')).toHaveAttribute('lang', /^es/);
-  // The owner's Spanish session for the fleet's visual sweep (`ui-clip-sweep.sh --storage-state`), when asked.
-  if (process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
-  return { context, page };
-}
-
 test('hub#974: Inventory writes a stock of 12500 as «12.500», as every screen groups a quantity', async ({ browser }) => {
-  const { context, page } = await spanishOwner(browser, '/inventory/products');
+  const { context, page } = await signedInSpanish(browser, VIEWPORT, '/inventory/products');
   try {
+    await saveSessionForTheSweep(context);
     await productsReady(page);
     await searchProducts(page, STOCK_SKU);
     await expect(productRow(page, STOCK_SKU).locator('[data-testid=inventory-product-stock]')).toHaveText('12.500');
-    await page.screenshot({ path: shot(`${KEY}-inventory-1440`) });
+    await capture(page, `${KEY}-inventory-1440`);
   } finally {
     await context.close();
   }
 });
 
 test('hub#974: the ticket of 1500 units writes «1.500» on its line', async ({ browser }) => {
-  const { context, page } = await spanishOwner(browser, `/invoice/invoices/${ticketId}`);
+  const { context, page } = await signedInSpanish(browser, VIEWPORT, `/invoice/invoices/${ticketId}`);
   try {
     const line = shown(page).locator('[data-testid=invoice-line-row]').filter({ hasText: `E2E Qty Sold ${RUN}` });
     // Its cells: number, description, quantity, unit price…
     await expect(line.locator('td').nth(2)).toHaveText('1.500');
-    await page.screenshot({ path: shot(`${KEY}-invoice-1440`) });
+    await capture(page, `${KEY}-invoice-1440`);
   } finally {
     await context.close();
   }
@@ -102,7 +90,7 @@ test('hub#974: the till’s quantity field takes 1500 as typed and keeps it ungr
     // The server keeps it: the line's total is 1500 × 0,03 €.
     await expect(line).toContainText(/45,00\s€/);
     await expect(field).toHaveValue('1500');
-    await page.screenshot({ path: shot(`${KEY}-till-1440`) });
+    await capture(page, `${KEY}-till-1440`);
   } finally {
     await context.close();
   }

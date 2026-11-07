@@ -5,9 +5,10 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
+import ts from 'typescript';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { findingsByApp, frontendSources, hubFrontends, scriptBlocks } from './frontend-sources';
+import { bare, findingsByApp, frontendSources, hubFrontends, scriptBlocks } from './frontend-sources';
 
 describe('scriptBlocks', () => {
   it('gives a .ts whole, from its first line', () => {
@@ -31,6 +32,17 @@ describe('scriptBlocks', () => {
 
   it('gives a .vue without a script nothing', () => {
     expect(scriptBlocks('<template><p>hola</p></template>', 'Plain.vue')).toEqual([]);
+  });
+});
+
+describe('bare', () => {
+  it('sees through the parentheses, `as` and `satisfies` around an expression', () => {
+    const file = ts.createSourceFile('x.ts', "const a = ((3 as const) satisfies number);\nconst b = 'always';", ts.ScriptTarget.Latest, true);
+    const [first, second] = file.statements.map(
+      (statement) => (statement as ts.VariableStatement).declarationList.declarations[0].initializer as ts.Expression,
+    );
+    expect(ts.isNumericLiteral(bare(first)) && bare(first).getText(file)).toBe('3');
+    expect(bare(second)).toBe(second);
   });
 });
 
