@@ -312,8 +312,9 @@ def copies_of_the_skeleton(source: str, *, catalogue_test: bool = False) -> set[
     """Which piece of the catalogue tests ``base.tests.po`` shares a module writes out itself: the names of its models
     (``model_texts``), the untranslated entries (``untranslated``), the ``.mo`` against the ``.po``
     (``compiled_differences``), or a key whose context it drops (``missing_from_catalogue`` compares whole keys). In a
-    ``test_i18n.py``, also the texts of the app (``config_texts``), of its modules (``module_texts``) and the titles of
-    its operations (``operation_titles``), which other tests read for their own reasons."""
+    ``test_i18n.py``, also the texts of the app (``config_texts``), of its modules (``module_texts``), the titles of
+    its operations (``operation_titles``), which other tests read for their own reasons, and a comparison against the
+    catalogue written out (``texts - set(po_entries(…))``) with its positive controls copied next to it."""
     found = set()
     for node in ast.walk(ast.parse(source)):
         if catalogue_test and isinstance(node, ast.Attribute) and isinstance(node.value, ast.Name):
@@ -323,6 +324,15 @@ def copies_of_the_skeleton(source: str, *, catalogue_test: bool = False) -> set[
                 found.add("operation_titles")
         if catalogue_test and isinstance(node, ast.Call) and getattr(node.func, "id", None) == "vars":
             found.add("module_texts")
+        if (
+            catalogue_test
+            and isinstance(node, ast.BinOp)
+            and isinstance(node.op, ast.Sub)
+            and isinstance(node.right, ast.Call)
+            and getattr(node.right.func, "id", None) == "set"
+            and any(getattr(getattr(arg, "func", None), "id", None) == "po_entries" for arg in node.right.args)
+        ):
+            found.add("missing_from_catalogue")
         if isinstance(node, ast.Attribute) and node.attr == "_catalog":
             found.add("compiled_differences")
         elif isinstance(node, ast.Name) and node.id == "fuzzy":
@@ -374,6 +384,11 @@ def test_the_check_tells_a_copy_of_the_skeleton_from_a_test_of_its_own(source, e
         pytest.param("lazies = [config.verbose_name, config.summary]\n", {"config_texts"}, id="app-texts"),
         pytest.param("found = [v for v in vars(module).values()]\n", {"module_texts"}, id="module-texts"),
         pytest.param('titles = {f.title for op in ops if op.app_label == "demo"}\n', {"operation_titles"}, id="titles"),
+        pytest.param(
+            'assert texts - set(po_entries(LOCALE / "django.po")) == set()\n',
+            {"missing_from_catalogue"},
+            id="by-hand-against-the-catalogue",
+        ),
     ],
 )
 def test_a_catalogue_test_also_asks_for_the_texts_other_tests_read_for_their_own_reasons(source, expected):

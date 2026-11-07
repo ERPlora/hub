@@ -14,6 +14,7 @@ from base.tests.po import (
     catalogue_key,
     compiled_differences,
     config_texts,
+    missing_from_catalogue,
     model_texts,
     module_texts,
     operation_titles,
@@ -44,10 +45,7 @@ def test_every_entry_has_a_spanish_translation():
 def test_every_visible_text_is_in_the_catalog():
     """By its whole key, context included: a text that goes back to ``_()`` while its entry keeps the context, or whose
     context has a typo, is missing from the catalogue — on screen it says another app's Spanish (hub#652)."""
-    texts = visible_texts()
-    assert len(texts) > 60  # positive control: the collection found the app's texts...
-    assert len({key for key in texts if "\x04" in key}) >= 18  # ...and kept the context of its pgettext_lazy ones
-    assert texts - set(po_entries(LOCALE / "django.po")) == set()
+    assert missing_from_catalogue(visible_texts(), LOCALE / "django.po", more_than=60, with_context=18) == set()
 
 
 def test_the_compiled_catalog_is_current():

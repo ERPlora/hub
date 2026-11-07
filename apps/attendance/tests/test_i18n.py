@@ -17,6 +17,7 @@ from base.tests.po import catalogue_key as source
 from base.tests.po import (
     compiled_differences,
     config_texts,
+    missing_from_catalogue,
     model_texts,
     module_texts,
     operation_titles,
@@ -49,11 +50,10 @@ def test_every_entry_has_a_spanish_translation():
 
 def missing_from_catalog() -> set[str]:
     """The visible texts the catalogue has no entry for, each compared by its whole key."""
-    return visible_texts() - set(po_entries(LOCALE / "django.po"))
+    return missing_from_catalogue(visible_texts(), LOCALE / "django.po", more_than=60, with_context=9)
 
 
 def test_every_visible_text_is_in_the_catalog():
-    assert len(visible_texts()) > 60  # positive control: the collection found the app's texts
     assert missing_from_catalog() == set()
 
 

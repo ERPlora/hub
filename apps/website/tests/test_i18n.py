@@ -11,7 +11,15 @@ from django.utils import translation
 from apps.website import queries, schemas, services
 from apps.website.models import Image, Site
 from base.catalog import build_registry
-from base.tests.po import catalogue_key, compiled_differences, config_texts, model_texts, po_entries, untranslated
+from base.tests.po import (
+    catalogue_key,
+    compiled_differences,
+    config_texts,
+    missing_from_catalogue,
+    model_texts,
+    po_entries,
+    untranslated,
+)
 
 APP = Path(apps.get_app_config("website").path)
 LOCALE = APP / "locale" / "es" / "LC_MESSAGES"
@@ -59,11 +67,8 @@ def test_every_entry_has_a_spanish_translation():
 def test_every_visible_text_and_every_template_text_is_in_the_catalog():
     """By its whole key, context included: a text that goes back to ``_()`` while its entry keeps the context, or whose
     context has a typo, is missing from the catalogue — on screen it says another app's Spanish (hub#661)."""
-    known = set(po_entries(LOCALE / "django.po"))
-    texts = visible_texts()
-    assert len({key for key in texts if "\x04" in key}) >= 5  # positive control: the contexts were kept
-    assert texts - known == set()
-    assert template_texts() and template_texts() - known == set()
+    assert missing_from_catalogue(visible_texts(), LOCALE / "django.po", more_than=40, with_context=5) == set()
+    assert missing_from_catalogue(template_texts(), LOCALE / "django.po", more_than=0, with_context=0) == set()
 
 
 def test_the_compiled_catalog_is_current():
