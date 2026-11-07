@@ -128,6 +128,7 @@ async function save(): Promise<void> {
       <div class="task-form">
         <ion-input
           data-testid="task-form-title"
+          name="title"
           :value="form.title"
           :label="$t('task.form.title')"
           :placeholder="$t('task.form.titlePlaceholder')"
@@ -141,6 +142,7 @@ async function save(): Promise<void> {
         />
         <ion-textarea
           data-testid="task-form-description"
+          name="description"
           :value="form.description"
           :label="$t('task.form.description')"
           label-placement="floating"
@@ -155,6 +157,7 @@ async function save(): Promise<void> {
         />
         <ion-select
           data-testid="task-form-priority"
+          name="priority"
           :value="form.priority"
           :label="$t('task.form.priority')"
           label-placement="floating"
@@ -174,6 +177,7 @@ async function save(): Promise<void> {
         </ion-select>
         <ion-input
           data-testid="task-form-due_date"
+          name="due_date"
           type="date"
           :value="form.due"
           :label="$t('task.form.due')"
@@ -205,6 +209,7 @@ async function save(): Promise<void> {
         />
         <ion-input
           data-testid="task-form-tags"
+          name="tags"
           :value="form.tags"
           :label="$t('task.form.tags')"
           :helper-text="$t('task.form.tagsHelper')"

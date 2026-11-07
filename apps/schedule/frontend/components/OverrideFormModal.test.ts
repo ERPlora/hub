@@ -4,6 +4,7 @@
 // said under From, an end before the start (422) under To.
 import { describe, expect, it, vi } from 'vitest';
 
+import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import type { OverrideOut } from '../operations';
 import { click, ionValue, mountSchedule, settle } from '../__tests__/mount-schedule';
 import OverrideFormModal from './OverrideFormModal.vue';
@@ -116,4 +117,13 @@ describe('OverrideFormModal (SCHEDULE-F05, F13)', () => {
       'Añadir cambio temporal',
     ]);
   });
+});
+
+describe('OverrideFormModal: fields refused with the same words (hub#888)', () => {
+  itTellsTheCorrectedFieldApart(['start_date', 'end_date', 'reason'], async (locale, refusal) => {
+    const s = await setup(null, locale);
+    await s.fill({ start_date: '2026-08-01', end_date: '2026-08-15', reason: 'Holidays' });
+    s.answer(422, refusal);
+    return { field: s.field, send: () => click(s.submit()), settle };
+  }, 'end_date');
 });
