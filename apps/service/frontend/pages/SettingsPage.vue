@@ -6,10 +6,10 @@
 // changed (`service.settings.update`), so it never undoes someone else's change, and a refusal says itself
 // as a FormModal does. The default tax category is searched in Taxes; empty removes it: the server knows it
 // by its key (`default_tax_category_key`), in what is sent and in a refusal.
-import { Combo, type ComboOption, InlineFeedback, useSettingsForm } from '@erplora/ui/components';
+import { Combo, type ComboOption, InlineFeedback, SettingsFormFooter, useSettingsForm } from '@erplora/ui/components';
 import { useCommand, useLive, useLiveClient } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
-import { IonButton, IonInput, IonSpinner, IonToggle } from '@ionic/vue';
+import { IonInput, IonSpinner, IonToggle } from '@ionic/vue';
 import { computed } from 'vue';
 
 import PageNotices from '../components/PageNotices.vue';
@@ -38,7 +38,7 @@ const searchTaxes = computed(() => searchTaxCategories(client, t, locale.value))
 const canManage = computed(() => session.can('service.manage_settings'));
 
 const { data, status, error } = useLive('service.settings.get', {});
-const { form, dirty, saved, pending, error: saveError, fieldErrors, showsError, set, save } = useSettingsForm(
+const settingsForm = useSettingsForm(
   data,
   useCommand('service.settings.update'),
   {
@@ -47,6 +47,7 @@ const { form, dirty, saved, pending, error: saveError, fieldErrors, showsError, 
     server: { tax: { name: 'default_tax_category_key', value: (tax) => tax?.id ?? null } },
   },
 );
+const { form, fieldErrors, set } = settingsForm;
 
 function toForm(settings: SettingsOut): Form {
   return {
@@ -104,7 +105,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
         v-else
         class="service-settings"
         data-testid="service-settings"
-        @submit.prevent="save"
+        @submit.prevent="settingsForm.save()"
       >
         <h2 class="service-settings__title">
           {{ $t('service.settings.title') }}
@@ -144,29 +145,13 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
         >
           {{ t(LABELS[field]) }}
         </ion-toggle>
-        <InlineFeedback
-          v-if="showsError"
-          tone="danger"
-          data-testid="service-settings-save-error"
-          :heading="$t('service.settings.saveError')"
-        >
-          {{ saveError?.message }}
-        </InlineFeedback>
-        <InlineFeedback
-          v-if="saved"
-          tone="success"
-          data-testid="service-settings-saved"
-        >
-          {{ $t('service.settings.saved') }}
-        </InlineFeedback>
-        <ion-button
-          type="submit"
-          data-testid="service-settings-save"
-          :disabled="!dirty || pending"
-          @click="save"
-        >
-          {{ $t('service.settings.save') }}
-        </ion-button>
+        <SettingsFormFooter
+          :settings="settingsForm"
+          testid="service-settings"
+          :save-label="$t('service.settings.save')"
+          :saved-label="$t('service.settings.saved')"
+          :error-heading="$t('service.settings.saveError')"
+        />
       </form>
     </template>
   </AppPage>

@@ -9,7 +9,7 @@
 // screen can judge it judges first and the server's 422 goes under each field. Whoever may not save reads them.
 // The form is every settings page's (`useSettingsForm`, hub#867): a refusal says itself as a FormModal does,
 // and the workplace's two coordinates are one value: changing either sends both and lifts both messages.
-import { InlineFeedback, useSettingsForm } from '@erplora/ui/components';
+import { InlineFeedback, SettingsFormFooter, useSettingsForm } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, HubIcon, nativeBridge, useSession } from '@erplora/ui/shell';
 import { IonButton, IonInput, IonSelect, IonSelectOption, IonSpinner, IonToggle } from '@ionic/vue';
@@ -52,7 +52,7 @@ const settingsForm = useSettingsForm(data, useCommand('attendance.settings.updat
   together: [['workplace_lat', 'workplace_lng']],
   judge,
 });
-const { form, saved, pending, error: saveError, fieldErrors, showsError } = settingsForm;
+const { form, fieldErrors } = settingsForm;
 const blocked = computed(() => blockingError(error.value));
 
 const problem = ref('');
@@ -182,20 +182,6 @@ async function useMyLocation(): Promise<void> {
         >
           {{ $t('attendance.settings.readOnly') }}
         </InlineFeedback>
-        <InlineFeedback
-          v-if="showsError"
-          tone="danger"
-          data-testid="attendance-settings-error"
-        >
-          {{ saveError?.message }}
-        </InlineFeedback>
-        <InlineFeedback
-          v-if="saved"
-          tone="success"
-          data-testid="attendance-settings-saved"
-        >
-          {{ $t('attendance.settings.saved') }}
-        </InlineFeedback>
         <ion-toggle
           data-testid="attendance-settings-require_location"
           label-placement="start"
@@ -295,7 +281,7 @@ async function useMyLocation(): Promise<void> {
               data-testid="attendance-settings-accuracy"
             >{{ $t('attendance.settings.accuracy', { accuracy }) }}</span>
           </div>
-          <!-- Under the button that read it: on a phone the banner up top is out of sight from here. -->
+          <!-- Under the button that read it: on a phone the save's notices, by «Save», are out of sight from here. -->
           <InlineFeedback
             v-if="problem"
             class="attendance-settings__location-error"
@@ -330,28 +316,16 @@ async function useMyLocation(): Promise<void> {
           :class="invalid(fieldErrors.auto_close_after_hours)"
           @ion-input="set('auto_close_after_hours', text($event.detail.value))"
         />
-        <div
-          v-if="canEdit"
-          class="attendance-settings__actions"
-        >
-          <ion-button
-            data-testid="attendance-settings-save"
-            :disabled="pending"
-            @click="save"
-          >
-            <ion-spinner
-              v-if="pending"
-              slot="start"
-              name="crescent"
-            />
-            <HubIcon
-              v-else
-              slot="start"
-              name="lucide:save"
-            />
-            {{ $t('attendance.settings.save') }}
-          </ion-button>
-        </div>
+        <SettingsFormFooter
+          :settings="settingsForm"
+          testid="attendance-settings"
+          :save-label="$t('attendance.settings.save')"
+          :saved-label="$t('attendance.settings.saved')"
+          :readonly="!canEdit"
+          allow-unchanged
+          spinner
+          save-icon="lucide:save"
+        />
       </form>
     </template>
   </AppPage>
@@ -394,10 +368,6 @@ async function useMyLocation(): Promise<void> {
 }
 .attendance-settings__location-error {
   margin-top: 12px;
-}
-.attendance-settings__actions {
-  display: flex;
-  justify-content: flex-end;
 }
 .attendance-settings__loading {
   display: flex;

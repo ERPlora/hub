@@ -5,6 +5,7 @@
 // touched and changed and says «Settings saved.»; a refusal goes under its field.
 import { describe, expect, it } from 'vitest';
 
+import { pressEnter } from '../../../../base/frontend/__tests__/settings-form';
 import { click, EMPLOYEE, ionChecked, ionValue, type MountOptions, mountReservation } from '../__tests__/mount-reservation';
 import { settingsOut } from '../__tests__/rows';
 import SettingsPage from './SettingsPage.vue';
@@ -51,6 +52,10 @@ describe('SettingsPage', () => {
     await click(s.field('save'));
     expect(s.sent()).toEqual([{ method: 'POST', path: '/api/reservation/settings', query: {}, body: { auto_confirm: true, max_party_size: 12 } }]);
     expect(s.field('saved')?.textContent).toContain('Settings saved.');
+    // Enter in a field submits the form (Ionic puts a hidden submit button in it): the same save as «Save».
+    await ionValue(s.field('min_party_size'), '2', 'ionInput');
+    await pressEnter(s.inDoc('reservation-settings'));
+    expect(s.sent().at(-1)?.body).toEqual({ min_party_size: 2 });
   });
 
   // RESERVATION-F03 «Si falla» (hub#873), as in the other settings pages: a change takes the notice away and
@@ -75,6 +80,7 @@ describe('SettingsPage', () => {
     await ionValue(s.field('min_party_size'), '30', 'ionInput');
     await click(s.field('save'));
     expect(s.field('min_party_size').errorText).toBe(message);
+    expect(s.field('save-error')?.textContent).toContain('Could not save the settings');
     expect(s.field('save-error')?.textContent).toContain(message);
   });
 

@@ -7,6 +7,7 @@
 import { AppPage } from '@erplora/ui/shell';
 import { describe, expect, it } from 'vitest';
 
+import { between, pressEnter, refusalMarks } from '../../../../base/frontend/__tests__/settings-form';
 import type { SettingsOut } from '../operations';
 import { click, EMPLOYEE, errorFrame, flush, ionValue, type MountOptions, mountStaff, settle } from '../__tests__/mount-staff';
 import SettingsPage from './SettingsPage.vue';
@@ -58,7 +59,9 @@ describe('SettingsPage (STAFF-F22)', () => {
     expect(s.save().disabled).toBe(true);
   });
 
-  it('«Save» sends only what changed and says it is saved', async () => {
+  // As every settings page and FormModal (hub#897): what a save says is said where the person tapped «Save»; and Enter in
+  // a field submits the form (Ionic puts a hidden submit button in it), the same save.
+  it('«Save» sends only what changed and says it is saved right above it; Enter in a field saves too', async () => {
     const s = await setup();
     await s.result('staff.settings.get', PROPOSED);
     s.answer(200, { ...PROPOSED, default_work_end: '20:00', default_break_duration: 30 });
@@ -70,9 +73,28 @@ describe('SettingsPage (STAFF-F22)', () => {
       { method: 'POST', path: '/api/staff/settings', query: {}, body: { default_work_end: '20:00', default_break_duration: 30 } },
     ]);
     expect(s.find('staff-settings-saved').text()).toContain('Settings saved');
+    expect(between(s.field('default_break_duration'), s.find('staff-settings-saved').element, s.save())).toBe(true);
+    await ionValue(s.field('default_work_start'), '08:00', 'ionInput');
+    await pressEnter(s.find('staff-settings-form').element);
+    expect(s.sent().at(-1)?.body).toEqual({ default_work_start: '08:00' });
   });
 
-  it('a value the server refuses is said under its field and the typed values stay', async () => {
+  it('while saving, «Save» spins and is off; once saved, it stops', async () => {
+    const s = await setup();
+    await s.result('staff.settings.get', PROPOSED);
+    let answer!: (response: Response) => void;
+    s.net.onApi(() => new Promise<Response>((resolve) => (answer = resolve)));
+    await ionValue(s.field('default_break_duration'), '30', 'ionInput');
+    await click(s.save());
+    const spins = () => !!s.save().querySelector('ion-spinner');
+    expect([s.save().disabled, spins()]).toEqual([true, true]);
+    answer(Response.json({ ...PROPOSED, default_break_duration: 30 }));
+    await flush();
+    await flush();
+    expect([spins(), s.find('staff-settings-saved').exists()]).toEqual([false, true]);
+  });
+
+  it('a value the server refuses is said under its field, the typed values stay and the notice sits right above «Save»', async () => {
     const s = await setup();
     await s.result('staff.settings.get', PROPOSED);
     s.answer(422, {
@@ -82,7 +104,8 @@ describe('SettingsPage (STAFF-F22)', () => {
     await click(s.save());
     expect(s.field('default_work_end').errorText).toBe('The start time must be before the end time.');
     expect(s.field('default_work_end').value).toBe('06:00');
-    expect(s.find('staff-settings-error').text()).toContain('The start time must be before the end time.');
+    expect(s.find('staff-settings-save-error').text()).toContain('The start time must be before the end time.');
+    expect(between(s.field('default_break_duration'), s.find('staff-settings-save-error').element, s.save())).toBe(true);
   });
 
   describe('a refusal by fields (hub#854, as FormModal and the Services settings do: ui#102, hub#821)', () => {
@@ -105,11 +128,7 @@ describe('SettingsPage (STAFF-F22)', () => {
       await ionValue(s.field('default_work_end'), '06:00', 'ionInput');
       await ionValue(s.field('default_break_duration'), '600', 'ionInput');
       await click(s.save());
-      /** Whether the red notice is on screen. */
-      const notice = () => s.find('staff-settings-error').exists();
-      const says = (name: string) => s.field(name).errorText ?? '';
-      const marked = (name: string) => s.field(name).classList.contains('ion-invalid');
-      return { ...s, notice, says, marked };
+      return { ...s, ...refusalMarks(s.field, () => s.find('staff-settings-save-error').exists()) };
     }
 
     it('the notice goes as soon as something is changed, and a field’s message as soon as that field is', async () => {

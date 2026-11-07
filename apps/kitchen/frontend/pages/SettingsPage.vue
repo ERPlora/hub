@@ -5,7 +5,7 @@
 // elsewhere repaints every field the person has not touched, «Save» sends only the fields touched and changed
 // (`kitchen.settings.update`), so it never undoes someone else's change, and a refusal says itself as a
 // FormModal does, under its field. «Test sound» rings the tone and volume on screen.
-import { InlineFeedback, useSettingsForm } from '@erplora/ui/components';
+import { InlineFeedback, SettingsFormFooter, useSettingsForm } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
 import { IonButton, IonInput, IonSelect, IonSelectOption, IonSpinner, IonToggle } from '@ionic/vue';
@@ -43,11 +43,12 @@ const { data, status, error, refresh } = useLive('kitchen.settings.get', {});
 const loadFailed = computed(
   () => status.value === 'error' && !!error.value && error.value.code !== 'app_inactive' && error.value.code !== 'permission_denied',
 );
-const { form, dirty, saved, pending, error: saveError, fieldErrors, showsError, set, save } = useSettingsForm(
+const settingsForm = useSettingsForm(
   data,
   useCommand('kitchen.settings.update'),
   { toForm, numbers: NUMBERS },
 );
+const { form, fieldErrors, set } = settingsForm;
 const chime = new Chime();
 
 function toForm(settings: SettingsOut): Form {
@@ -120,7 +121,7 @@ function testSound(): void {
         v-else-if="form"
         class="kitchen-settings"
         data-testid="kitchen-settings"
-        @submit.prevent="save"
+        @submit.prevent="settingsForm.save()"
       >
         <h2 class="kitchen-settings__title">
           {{ $t('kitchen.settings.title') }}
@@ -208,29 +209,13 @@ function testSound(): void {
             {{ t(`kitchen.orderType.${type}`) }}
           </ion-select-option>
         </ion-select>
-        <InlineFeedback
-          v-if="showsError"
-          tone="danger"
-          data-testid="kitchen-settings-save-error"
-          :heading="$t('kitchen.settings.saveError')"
-        >
-          {{ saveError?.message }}
-        </InlineFeedback>
-        <InlineFeedback
-          v-if="saved"
-          tone="success"
-          data-testid="kitchen-settings-saved"
-        >
-          {{ $t('kitchen.settings.saved') }}
-        </InlineFeedback>
-        <ion-button
-          type="submit"
-          data-testid="kitchen-settings-save"
-          :disabled="!dirty || pending"
-          @click="save"
-        >
-          {{ $t('kitchen.settings.save') }}
-        </ion-button>
+        <SettingsFormFooter
+          :settings="settingsForm"
+          testid="kitchen-settings"
+          :save-label="$t('kitchen.settings.save')"
+          :saved-label="$t('kitchen.settings.saved')"
+          :error-heading="$t('kitchen.settings.saveError')"
+        />
       </form>
     </template>
   </AppPage>

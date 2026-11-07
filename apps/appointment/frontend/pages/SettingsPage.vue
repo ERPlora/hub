@@ -5,10 +5,10 @@
 // repaints every field the person has not touched, «Save» sends only the fields touched and changed
 // (`appointment.settings.update`), so it never undoes someone else's change, and a refusal says itself as a
 // FormModal does. «Send reminders» is not here: the old module saved it and sent nothing.
-import { InlineFeedback, useSettingsForm } from '@erplora/ui/components';
+import { InlineFeedback, SettingsFormFooter, useSettingsForm } from '@erplora/ui/components';
 import { useCommand, useLive } from '@erplora/ui/sdk';
 import { AppPage, useSession } from '@erplora/ui/shell';
-import { IonButton, IonInput, IonSpinner, IonToggle } from '@ionic/vue';
+import { IonInput, IonSpinner, IonToggle } from '@ionic/vue';
 import { computed } from 'vue';
 
 import PageNotices from '../components/PageNotices.vue';
@@ -35,11 +35,12 @@ const t = useT();
 const canManage = computed(() => session.can('appointment.manage_settings'));
 
 const { data, status, error } = useLive('appointment.settings.get', {});
-const { form, dirty, saved, pending, error: saveError, fieldErrors, showsError, set, save } = useSettingsForm(
+const settingsForm = useSettingsForm(
   data,
   useCommand('appointment.settings.update'),
   { toForm, numbers: NUMBERS },
 );
+const { form, fieldErrors, set } = settingsForm;
 
 function toForm(settings: SettingsOut): Form {
   return {
@@ -91,7 +92,7 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
         v-else
         class="appointment-settings"
         data-testid="appointment-settings"
-        @submit.prevent="save"
+        @submit.prevent="settingsForm.save()"
       >
         <h2 class="appointment-settings__title">
           {{ $t('appointment.settings.title') }}
@@ -125,29 +126,13 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
         >
           {{ t(`appointment.settings.fields.${field}`) }}
         </ion-toggle>
-        <InlineFeedback
-          v-if="showsError"
-          tone="danger"
-          data-testid="appointment-settings-save-error"
-          :heading="$t('appointment.settings.saveError')"
-        >
-          {{ saveError?.message }}
-        </InlineFeedback>
-        <InlineFeedback
-          v-if="saved"
-          tone="success"
-          data-testid="appointment-settings-saved"
-        >
-          {{ $t('appointment.settings.saved') }}
-        </InlineFeedback>
-        <ion-button
-          type="submit"
-          data-testid="appointment-settings-save"
-          :disabled="!dirty || pending"
-          @click="save"
-        >
-          {{ $t('appointment.settings.save') }}
-        </ion-button>
+        <SettingsFormFooter
+          :settings="settingsForm"
+          testid="appointment-settings"
+          :save-label="$t('appointment.settings.save')"
+          :saved-label="$t('appointment.settings.saved')"
+          :error-heading="$t('appointment.settings.saveError')"
+        />
       </form>
     </template>
   </AppPage>

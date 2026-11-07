@@ -258,6 +258,17 @@ def test_receiving_a_round_the_kitchen_already_saved_gives_it_what_the_send_said
     )
 
 
+def test_receiving_a_round_that_says_no_priority_leaves_its_ticket_normal(clock, product):
+    """The round asked for by its check and its number alone (the assistant, hub#671): a normal ticket, never one with
+    an empty priority the board cannot sort nor the card say."""
+    order = open_check("Table 4")
+    add_line(order.id, product("Burger"))
+    fired = fire(order.id)
+    data = {"order_id": str(order.id), "round_no": fired.round_no}
+    assert run("kitchen.ticket.receive", data, system_context(A)).ticket.priority == "normal"
+    assert Ticket.objects.get().priority == "normal"
+
+
 def test_a_round_of_services_only_opens_nothing(clock, product):
     order = open_check("Table 4")
     add_line(

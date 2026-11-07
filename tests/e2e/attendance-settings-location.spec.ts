@@ -24,7 +24,7 @@ async function deny(page: Page, notice: string): Promise<void> {
   await expect(shownNotice).toHaveText(notice);
   // Where the person tapped: on a phone the button sits below the fold, so a notice up top went unseen.
   await expect(shownNotice).toBeInViewport();
-  await expect(view.locator('[data-testid=attendance-settings-error]')).toHaveCount(0);
+  await expect(view.locator('[data-testid=attendance-settings-save-error]')).toHaveCount(0);
   await expect(lat).toHaveValue('40.4');
   await expect(view.locator('[data-testid=attendance-settings-workplace_lng] input')).toHaveValue('');
   await expect(view.locator('[data-testid=attendance-settings-accuracy]')).toHaveCount(0);
