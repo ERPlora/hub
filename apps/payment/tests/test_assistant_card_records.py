@@ -259,7 +259,8 @@ def test_the_record_a_write_names_is_titled_with_the_screens_word_in_each_langua
                               ("method_id", books.drawer)):
             if datum in props:
                 field = fields_of(op.name, {datum: str(record.id)}, language).get(datum, {})
-                titles[f"{op.name}:{datum}"] = (field.get("label"), field.get("titled"), no_id(field.get("value")))
+                titled = bool(field.get("titled"))  # the card leaves the key out of a datum its app gives no title
+                titles[f"{op.name}:{datum}"] = (field.get("label"), titled, no_id(field.get("value")))
     method, payment = one(language, "methods"), one(language, "payments")
     assert titles == {
         **{f"{write}:id": (method, True, True) for write in ON_A_METHOD},
