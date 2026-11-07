@@ -275,9 +275,9 @@ def _refuse_field(message, code: str, field: str) -> None:
     raise InvalidPayload(str(message), code=code, fields={field: str(message)})
 
 
-def _mobile(raw: str) -> str:
+def _mobile(ctx: OperationContext, raw: str) -> str:
     try:
-        return to_e164(raw, business_country())
+        return to_e164(raw, business_country(ctx))
     except InvalidPhone:
         _refuse_field(PHONE_INVALID, "online_booking.phone_invalid", "phone")
 
@@ -309,7 +309,7 @@ def _card_for(ctx: OperationContext, name: str, phone: str, email: str) -> Custo
         cards[0] if cards else None,
     )
     if card is not None:
-        return find_customer(card.id, None, lock=True)
+        return find_customer(ctx, card.id, None, lock=True)
     create = get("customer.customer.create")
     created = create(
         ctx, CustomerIn(name=name, phone=phone, email=email, source="website")
@@ -386,7 +386,7 @@ def public_book(ctx: OperationContext, data: PublicBookIn) -> dict:
     services = services_to_book(data.service_ids)
     member = chosen_member(own, data.staff_id, services)
     _check_form(own, data)
-    phone = _mobile(data.phone)
+    phone = _mobile(ctx, data.phone)
     visitor = visitor_key(ctx)
     _check_limits(visitor)
     card = _card_for(acting, data.name, phone, data.email)

@@ -673,7 +673,7 @@ def _put_customer(ctx: OperationContext, order_id: UUID, customer_id: UUID | Non
     reply says so with its empty customer."""
     try:
         with atomic():
-            customer = find_customer(customer_id, said)
+            customer = find_customer(ctx, customer_id, said)
             call_app(ctx, "customer.order.link", {"order_id": str(order_id), "customer_id": str(customer.pk)})
     except OperationError as refusal:
         logger.info("table: seated without the customer (%s)", refusal.code)

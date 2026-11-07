@@ -7,7 +7,7 @@
 // in): the screens pass it, and until it is known an amount is a figure with two decimals and no symbol, never the
 // euro by default. Its decimals come from the server, never from the browser's Intl (which gives none to the forint).
 
-import { formatMoney as writeMoney } from '@erplora/ui/components';
+import { decimalMark, formatMoney as writeMoney } from '@erplora/ui/components';
 
 import type { Money } from '../../../../base/frontend/lib/home';
 
@@ -68,8 +68,7 @@ export function formatSignedMoney(cents: number | null | undefined, locale: stri
 
 /** Minor units as a money field holds them: ungrouped, with the reader's decimal sign («1250,50»). */
 export function moneyFieldText(cents: number, locale: string, decimals = 2): string {
-  const sign = formatter(locale, 'decimal-sign', { minimumFractionDigits: 1 }).formatToParts(1.5).find((part) => part.type === 'decimal')?.value ?? '.';
-  return (cents / 10 ** decimals).toFixed(decimals).replace('.', sign);
+  return (cents / 10 ** decimals).toFixed(decimals).replace('.', decimalMark(locale));
 }
 
 /** The text with Intl's no-break spaces as plain ones (what a test or a search compares). */

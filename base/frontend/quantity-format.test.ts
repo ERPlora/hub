@@ -12,7 +12,7 @@
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
-import { bare, findingsByApp, hubFrontends, scriptBlocks } from './__tests__/frontend-sources';
+import { bare, findingsByApp, hubFrontends, linesWhere } from './__tests__/frontend-sources';
 
 const WRITE_IT_WITH_THE_PLATFORM =
   'write the quantity with formatQuantity of @erplora/ui/components (the platform\'s one way to write a quantity), ' +
@@ -35,17 +35,7 @@ function ownQuantityFormat(node: ts.Node): boolean {
 
 /** The lines of `text` (a `.ts`, or a `.vue` whose `<script>` blocks are read) with a quantity formatter of its own. */
 export function ownQuantityFormats(text: string, name: string): number[] {
-  if (!/maximumFractionDigits|formatQuantity/.test(text)) return [];
-  return scriptBlocks(text, name).flatMap(({ code, offset }) => {
-    const file = ts.createSourceFile(name.endsWith('.vue') ? `${name}.ts` : name, code, ts.ScriptTarget.Latest, true);
-    const lines: number[] = [];
-    const visit = (node: ts.Node): void => {
-      if (ownQuantityFormat(node)) lines.push(file.getLineAndCharacterOfPosition(node.getStart(file)).line + 1 + offset);
-      ts.forEachChild(node, visit);
-    };
-    visit(file);
-    return lines;
-  });
+  return /maximumFractionDigits|formatQuantity/.test(text) ? linesWhere(text, name, ownQuantityFormat) : [];
 }
 
 describe('guardrail: every quantity of the Hub is written by the platform (base-quantity-one-format)', () => {

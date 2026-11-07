@@ -1,6 +1,5 @@
 """Every visible text of the sale app has its Spanish translation, compiled and current."""
 
-import gettext
 import json
 from pathlib import Path
 
@@ -8,10 +7,19 @@ import pytest
 from django.apps import apps
 from django.utils import translation
 from django.utils.functional import Promise
-from live.operations import registry
 
 from apps.sale import models, pricing, queries, schemas, services
-from base.tests.po import catalogue_key, po_entries
+from base.tests.po import (
+    catalogue_key,
+    compiled_differences,
+    config_texts,
+    missing_from_catalogue,
+    model_texts,
+    module_texts,
+    operation_titles,
+    po_entries,
+    untranslated,
+)
 
 LOCALE = Path(apps.get_app_config("sale").path) / "locale" / "es" / "LC_MESSAGES"
 
@@ -21,29 +29,14 @@ def visible_texts() -> set[str]:
     (with their figures), admin, choices and messages."""
     config = apps.get_app_config("sale")
     lazies = [
-        config.verbose_name,
-        config.summary,
-        config.description,
-        *(nav.label for nav in config.navigation),
+        *config_texts(config),
         *(widget.title for widget in config.widgets),
         *config.approvals.values(),
         *(sentence for sentences in getattr(config, "approval_figures", {}).values() for sentence in sentences),
     ]
-    for module in (queries, services, pricing, schemas, models):
-        lazies += [
-            value for value in vars(module).values() if isinstance(value, Promise)
-        ]
+    lazies += module_texts(queries, services, pricing, schemas, models)
     lazies += list(models.FACTORY_METHOD_NAMES.values())
-    for model in apps.get_app_config("sale").get_models():
-        lazies += [model._meta.verbose_name, model._meta.verbose_name_plural]
-        lazies += [
-            field.verbose_name
-            for field in model._meta.get_fields()
-            if hasattr(field, "verbose_name")
-            and not field.auto_created
-            and not field.primary_key
-            and isinstance(field.verbose_name, Promise)
-        ]
+    lazies += [text for text in model_texts(apps.get_app_config("sale").get_models()) if isinstance(text, Promise)]
     lazies += [
         *models.PaymentMethod.Type.labels,
         *models.Settings.DocumentType.labels,
@@ -52,40 +45,21 @@ def visible_texts() -> set[str]:
         *models.Sale.Status.labels,
     ]
     with translation.override("en"):
-        return {catalogue_key(text) for text in lazies} | schema_titles()
-
-
-def schema_titles() -> set[str]:
-    """The titles sale's operations give their input data (``gettext_noop``): the assistant's card names each datum
-    by them, so each one needs its Spanish. Only the ones sale wrote: pydantic leaves ``title`` empty otherwise."""
-    return {
-        field.title
-        for op in registry.values()
-        if op.app_label == "sale"
-        for field in op.input.model_fields.values()
-        if field.title
-    }
+        return {catalogue_key(text) for text in lazies} | operation_titles("sale")
 
 
 def test_every_entry_has_a_spanish_translation():
-    entries = po_entries(LOCALE / "django.po")
-    assert entries
-    assert [
-        msgid for msgid, (msgstr, fuzzy) in entries.items() if not msgstr or fuzzy
-    ] == []
+    assert untranslated(LOCALE / "django.po") == []
 
 
 def test_every_visible_text_is_in_the_catalog():
-    assert visible_texts() - set(po_entries(LOCALE / "django.po")) == set()
+    """Each text of Ventas / TPV by its whole key, context included: a ``pgettext_lazy`` that goes back to ``_()``, or
+    whose context has a typo, is missing from the catalogue, and Spanish says it in English (hub#975)."""
+    assert missing_from_catalogue(visible_texts(), LOCALE / "django.po", more_than=250, with_context=2) == set()
 
 
 def test_the_compiled_catalog_is_current():
-    with (LOCALE / "django.mo").open("rb") as compiled:
-        catalog = gettext.GNUTranslations(compiled)._catalog
-    po = {
-        msgid: msgstr for msgid, (msgstr, _) in po_entries(LOCALE / "django.po").items()
-    }
-    assert {msgid: msgstr for msgid, msgstr in catalog.items() if msgid} == po
+    assert compiled_differences(LOCALE) == {}
 
 
 def test_spanish_texts():

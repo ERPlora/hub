@@ -16,7 +16,6 @@ export { formatQuantity };
 const NO_MONEY_DECIMALS = 2;
 
 const formats = new Map<string, Intl.NumberFormat>();
-const decimalMarks = new Map<string, string>();
 
 /** The decimals of `money` (2 in EUR and HUF, 0 in JPY): its minor unit; two while unknown. */
 export const moneyDecimals = (money?: Money): number => money?.decimals ?? NO_MONEY_DECIMALS;
@@ -31,16 +30,6 @@ function numberFormat(locale: string, kind: 'count' | 'percent'): Intl.NumberFor
     };
     found = new Intl.NumberFormat(locale, options[kind]);
     formats.set(key, found);
-  }
-  return found;
-}
-
-/** The decimal mark of `locale` («,» in Spanish, «.» in English). */
-export function decimalMark(locale: string): string {
-  let found = decimalMarks.get(locale);
-  if (!found) {
-    found = new Intl.NumberFormat(locale).formatToParts(1.5).find((part) => part.type === 'decimal')?.value ?? '.';
-    decimalMarks.set(locale, found);
   }
   return found;
 }

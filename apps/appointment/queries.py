@@ -487,6 +487,7 @@ def appointment_history(ctx: OperationContext, data: HistoryIn) -> dict:
 )
 def list_for_customer(ctx: OperationContext, params: ForCustomerIn) -> dict:
     customer = find_customer(
+        ctx,
         params.customer_id, params.customer, live=params.customer_id is None
     )
     rows = (
