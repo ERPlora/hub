@@ -6,7 +6,9 @@
 // says it cannot be negative; one mark followed by three digits («1.250») can be 1.250 € or 1,25 €: it is not
 // guessed, the field says so. On leaving the field it is rewritten in the page format. (The same reader as the
 // service and inventory forms; an app never imports another's code.)
-import { decimalMark, type Money, moneyDecimals } from './format';
+import { decimalMark } from '@erplora/ui/components';
+
+import { type Money, moneyDecimals } from './format';
 
 export type MoneyRead =
   | { ok: true; cents: number | null }

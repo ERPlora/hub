@@ -2,6 +2,7 @@
 // The till's keypad: 3 columns, 1…9, the decimal key (in the reader's language), 0 and clear. It types
 // an amount in major units with the dot («12.50»): never more decimals than allowed, never two
 // separators nor leading zeros, never longer than `maxLength`. The sheet turns it into cents.
+import { decimalMark } from '@erplora/ui/components';
 import { computed } from 'vue';
 
 import { useLocale } from '../../composables/useT';
@@ -10,9 +11,7 @@ const props = withDefaults(defineProps<{ decimals?: number; maxLength?: number }
 const value = defineModel<string>({ required: true });
 
 const locale = useLocale();
-const separator = computed(
-  () => new Intl.NumberFormat(locale.value).formatToParts(1.5).find((part) => part.type === 'decimal')?.value ?? '.',
-);
+const separator = computed(() => decimalMark(locale.value));
 
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'dot', '0', 'clear'] as const;
 type Key = (typeof KEYS)[number];

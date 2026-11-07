@@ -4,7 +4,7 @@
 // by default.
 import { describe, expect, it } from 'vitest';
 
-import { decimalMark, formatDelta, formatMoney, type Money, moneyDecimals } from './format';
+import { formatDelta, formatMoney, type Money, moneyDecimals } from './format';
 
 const plain = (text: string) => text.replace(/[\u00a0\u202f]/g, ' ');
 
@@ -68,11 +68,5 @@ describe('formatDelta', () => {
 describe('moneyDecimals', () => {
   it('is the business currency’s, two while it is unknown', () => {
     expect([moneyDecimals(PLN), moneyDecimals(JPY), moneyDecimals(undefined)]).toEqual([2, 0, 2]);
-  });
-});
-
-describe('decimalMark', () => {
-  it('is the comma in Spanish and the point in English', () => {
-    expect([decimalMark('es'), decimalMark('en')]).toEqual([',', '.']);
   });
 });
