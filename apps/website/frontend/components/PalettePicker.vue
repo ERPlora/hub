@@ -130,10 +130,14 @@ function reset(): void {
 </template>
 
 <style scoped>
+/* Three cards to a row at most, and as many as fit the picker's own width, none narrower than 7rem: the longest name
+   («Medianoche», about 84 px in a 14 px semibold) plus the card's border and padding, with room for a wider system
+   font. A narrower card broke that word in the middle (hub#993: 81 px for the name at 375 px, in Spanish). */
 .wp-picker {
+  --wp-gap: 10px;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(max(7rem, calc((100% - 2 * var(--wp-gap)) / 3)), 1fr));
+  gap: var(--wp-gap);
 }
 .wp-card {
   display: flex;
@@ -201,10 +205,5 @@ function reset(): void {
 .wp-name {
   font-size: 0.875rem;
   font-weight: 600;
-}
-@media (max-width: 360px) {
-  .wp-picker {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }
 </style>
