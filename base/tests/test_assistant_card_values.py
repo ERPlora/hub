@@ -537,6 +537,10 @@ TITLED_IN_SPANISH = {
     **{f"modifier.group.{action}:id": "Grupo" for action in ("delete", "update")},
     "modifier.link.detach:id": "Se aplica a",
     **{f"modifier.option.{action}:id": "Opción" for action in ("delete", "update")},
+    **{
+        f"online_booking.booking.{action}:id": "Reserva"
+        for action in ("cancel", "complete", "confirm", "delete", "no_show")
+    },
     **{f"pricing.price_item.{action}:id": "Precio" for action in ("remove", "update")},
     **{f"pricing.price_list.{action}:id": "Tarifa" for action in ("activate", "deactivate", "set_default", "update")},
     **{f"pricing.rule.{action}:id": "Regla de descuento" for action in ("activate", "deactivate", "update")},
