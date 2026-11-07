@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:8f1029494e82f0451edfad2229b5005841fecfa37a285f0e50ebe9b64ba94a49 -->
+<!-- generated from WORKBOOK.md sha256:aa638d7d3203902bc829fefe1697a9055f6f7571b827886ac866dc1e4dfd105c -->
 
 ## What it is for and who it is for
 
@@ -224,7 +224,9 @@ Steps:
    progress: 0".
 In: what whoever creates it writes.
 Out: the station (announces: station created).
-If it fails: the rejection shows inside the panel. A name that another live station already has is rejected
+If it fails: the rejection shows inside the panel; the reason of a field, under it, and it goes away as soon
+as that field is corrected, even if another one says the same (hub#888). A name that another live station
+already has is rejected
 ("There is already a station with that name. Choose a different name."); the name of a deleted one is free
 again. Whoever cannot manage stations does not see the button.
 Involved: KITCHEN-F02, KITCHEN-F03, KITCHEN-F04, KITCHEN-F08, PRINTING-F04
@@ -242,7 +244,8 @@ Out: the changed station (announces: station changed). Switching it off makes th
 look for the station of their category and, if there is none, come out under "No station". What was
 already sent does not change station or destination; the name and colour the display paints are the live
 ones.
-If it fails: inside the form. A repeated name is rejected; saving a station that another device has just
+If it fails: inside the form, each reason under its field until that field is corrected, even if another
+one says the same (hub#888). A repeated name is rejected; saving a station that another device has just
 deleted says it no longer exists.
 Involved: KITCHEN-F01, KITCHEN-F04, KITCHEN-F10, PRINTING-F04
 

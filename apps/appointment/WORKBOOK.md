@@ -144,7 +144,7 @@ la más reciente primero, con servicios, profesional, estado y notas (la interna
 |---|---|
 | Cargando | «Cargando…» mientras llega el primer resultado; bajo Servicios y Profesional, «Cargando servicios…» / «Cargando profesionales…». |
 | Vacío | «Sin citas para este día.», «Todavía no hay citas periódicas.»; sin profesionales reservables, «Aún no hay profesionales reservables.»; en el alta, «Todavía no hay servicios reservables. Dalos de alta en Servicios.». |
-| Error | El aviso de la tabla o de la rejilla con «Reintentar». Un rechazo de un formulario sale dentro del formulario, cada motivo bajo su campo, sin perder lo tecleado; un conflicto (409) sale encima del botón y en un aviso. |
+| Error | El aviso de la tabla o de la rejilla con «Reintentar». Un rechazo de un formulario sale dentro del formulario, cada motivo bajo su campo, sin perder lo tecleado, y cada campo rechazado pierde su motivo en cuanto se corrige ese campo, aunque otro diga lo mismo (hub#888); los buscadores (**Servicios** y **Profesional**) todavía no: si dicen lo mismo que otro campo, siguen marcados hasta volver a guardar. Un conflicto (409) sale encima del botón y en un aviso. |
 | Reconectando | Lo pintado se queda; una franja avisa «Reconectando…». |
 | App inactiva | «Esta app no está activa en este negocio». |
 | Sin permiso | No aparece lo que no puede hacer; si llega por otra puerta, «No tienes permiso». |

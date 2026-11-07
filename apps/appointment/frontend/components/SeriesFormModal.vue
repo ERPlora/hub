@@ -236,6 +236,7 @@ const text = (value: unknown): string => (value === null || value === undefined 
           label-placement="floating"
           fill="outline"
           mode="md"
+          name="from_date"
           :error-text="fieldErrors.from_date"
           @ion-input="from = text($event.detail.value)"
         />
@@ -291,6 +292,7 @@ const text = (value: unknown): string => (value === null || value === undefined 
             label-placement="floating"
             fill="outline"
             mode="md"
+            name="start_date"
             :error-text="fieldErrors.start_date"
             @ion-input="startDate = text($event.detail.value)"
           />
@@ -302,6 +304,7 @@ const text = (value: unknown): string => (value === null || value === undefined 
             label-placement="floating"
             fill="outline"
             mode="md"
+            name="time"
             :error-text="fieldErrors.time"
             @ion-input="time = text($event.detail.value)"
           />
@@ -315,6 +318,7 @@ const text = (value: unknown): string => (value === null || value === undefined 
             label-placement="floating"
             fill="outline"
             mode="md"
+            name="duration_minutes"
             :error-text="fieldErrors.duration_minutes"
             @ion-input="(minutes = text($event.detail.value)), (minutesTouched = true)"
           />
@@ -326,6 +330,7 @@ const text = (value: unknown): string => (value === null || value === undefined 
             label-placement="floating"
             fill="outline"
             mode="md"
+            name="end_date"
             :error-text="fieldErrors.end_date"
             @ion-input="endDate = text($event.detail.value)"
           />
@@ -340,6 +345,7 @@ const text = (value: unknown): string => (value === null || value === undefined 
             label-placement="floating"
             fill="outline"
             mode="md"
+            name="max_occurrences"
             :error-text="fieldErrors.max_occurrences"
             @ion-input="occurrences = text($event.detail.value)"
           />

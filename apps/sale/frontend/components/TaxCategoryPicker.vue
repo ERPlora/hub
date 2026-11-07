@@ -5,7 +5,8 @@
 // the live `tax.category.list` (50 at a time, searched on the server, the pattern Ionic recommends for
 // long lists); each choice reads «Name · rate» with the rate the server says it charges today. Under the
 // field, the old screen's notices: no category to choose, or a failed read with «Retry». The texts name
-// the business territory's tax («VAT», «IGIC», «IPSI»: `useTaxName`).
+// the business territory's tax («VAT», «IGIC», «IPSI»: `useTaxName`). In a form window the field goes by its
+// `name`, and a choice is heard as a keystroke in it: the window takes the mark off it alone (hub#888).
 import { InlineFeedback } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
 import { HubIcon } from '@erplora/ui/shell';
@@ -43,11 +44,14 @@ const props = withDefaults(
     /** The label of the chosen category when it is not among the choices on screen (an edit). */
     chosenLabel?: string;
     errorText?: string;
+    /** The field's name in its form (the server's key, `tax_category_key`): a form window tells by it which
+     *  refused field a person corrected. */
+    name?: string;
     /** Hooks: `<testid>` (the field), `-modal`, `-search`, `-option` (`data-value`), `-loading`,
      *  `-empty`, `-more`, `-none`, `-error`, `-retry`, `-close`. */
     testid: string;
   }>(),
-  { placeholder: undefined, chosenLabel: undefined, errorText: undefined },
+  { placeholder: undefined, chosenLabel: undefined, errorText: undefined, name: undefined },
 );
 
 /** The chosen category's key. */
@@ -61,6 +65,7 @@ const taxName = useTaxName();
 /** The territory's tax, for the texts that name it. */
 const named = computed(() => ({ tax: taxName.value }));
 useSearchbarName(useTemplateRef('bar'), () => t('sale.common.taxPicker.search', named.value));
+const field = useTemplateRef<InstanceType<typeof IonInput>>('field');
 
 const open = ref(false);
 const typed = ref('');
@@ -117,6 +122,8 @@ function choose(option: { value: string; label: string }): void {
   picked.value = option.label;
   value.value = option.value;
   open.value = false;
+  // Nothing is typed in the field: the form around it hears the choice from it, as from any field.
+  (field.value?.$el as HTMLElement | undefined)?.dispatchEvent(new Event('input', { bubbles: true }));
 }
 
 const invalid = computed(() => ({ 'ion-invalid': !!props.errorText, 'ion-touched': !!props.errorText }));
@@ -125,8 +132,10 @@ const invalid = computed(() => ({ 'ion-invalid': !!props.errorText, 'ion-touched
 <template>
   <div class="sale-tax-picker">
     <ion-input
+      ref="field"
       class="sale-tax-picker__field"
       :data-testid="testid"
+      :name="name"
       :value="shown"
       :label="label"
       :placeholder="placeholder"
