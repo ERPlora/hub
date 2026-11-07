@@ -2,8 +2,9 @@
 // The SaaS names the domain in the photo, signed as it sends it; the browser reaches it through the ALB's stand-in (its
 // resolver sends `www.minegocio.test` to the stack), so this is what a visitor gets: the published page with its bundle,
 // its menu on a phone and its images, no call to `/api`, «Log in» on the business's own address, and a 404 on the app, the
-// login, the API and `/internal` even with a session of the business in the browser. A host the Hub does not know is the
-// 400 it always was, and a domain given up joins it. Hub `a`'s photo and its site are put back after, also when a test
+// login, the API and `/internal` even with a session of the business in the browser. Both addresses tell search engines
+// the domain is the main one, without a redirect (hub#818). A host the Hub does not know is the 400 it always was, and a
+// domain given up joins it. Hub `a`'s photo and its site are put back after, also when a test
 // fails: the other specs expect `/` of `a` to jump to the login.
 import { type Browser, type BrowserContext, expect, type Page, test } from '@playwright/test';
 
@@ -133,6 +134,19 @@ test(`${KEY}: «Log in» leaves the domain for the business's own address, where
   await own.context.close();
 });
 
+test(`${KEY}: both addresses tell search engines the domain is the main one, and neither redirects (hub#818)`, async ({ browser }) => {
+  const { context, page } = await visitor(browser, WIDE);
+  for (const address of [ON_DOMAIN, A]) {
+    const response = await page.goto(address);
+    expect(response?.status(), address).toBe(200);
+    expect(response?.request().redirectedFrom(), address).toBeNull();
+    await expect(page.getByRole('heading', { name: TITLE })).toBeVisible();
+    await expect(page.locator('link[rel="canonical"]'), address).toHaveCount(1);
+    await expect(page.locator('head link[rel="canonical"]'), address).toHaveAttribute('href', `https://${DOMAIN}/`);
+  }
+  await context.close();
+});
+
 test(`${KEY}: the app, the login, the API and /internal are not on the domain, even with a session of the business`, async () => {
   if (!owner) throw new Error('beforeAll did not run');
   // `owner` has its session on `a`: the same browser, on the domain, is a visitor.
@@ -166,6 +180,8 @@ test(`${KEY}: a domain given up stops serving`, async ({ browser }) => {
   const own = await visitor(browser, WIDE);
   await own.page.goto(A);
   await expect(own.page.getByRole('heading', { name: TITLE })).toBeVisible();
+  // The page it kept while the domain was its main address names its own address now (hub#818).
+  await expect(own.page.locator('head link[rel="canonical"]')).toHaveAttribute('href', 'https://a.localhost/');
   await own.context.close();
   await pushPhoto(DOMAIN);
 });

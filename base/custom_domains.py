@@ -45,6 +45,13 @@ def hub_of(domain: str) -> uuid.UUID | None:
     return _known.get(domain)
 
 
+def served_on(hub) -> str:
+    """The own domain the door opens ``hub``'s website on now, or ``""``: the one its row names, while the map gives
+    it to ``hub`` (a domain two businesses name is nobody's). What its page names as its main address (hub#818)."""
+    domain = hub.custom_domain
+    return domain if domain and hub_of(domain) == hub.id else ""
+
+
 def forget() -> None:
     """The next question reads the map again, in this process."""
     global _next_read

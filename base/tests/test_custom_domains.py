@@ -494,6 +494,42 @@ class TestTheMap:
         assert len(calls) == 2
 
 
+class TestTheDomainItIsServedOn:
+    """``served_on``: the own domain the door opens a business's website on now, which its page names as its main
+    address (``apps.website.public_home``, hub#818)."""
+
+    def test_the_domain_its_row_names_while_the_map_gives_it_to_the_business(self, client, acme):
+        assert custom_domains.served_on(acme) == DOMAIN
+
+    def test_none_for_a_business_without_one(self, client, acme):
+        Hub.objects.filter(pk=acme.pk).update(custom_domain="")
+        custom_domains.forget()
+        assert custom_domains.served_on(Hub.objects.get(pk=acme.pk)) == ""
+
+    def test_none_for_the_row_that_gave_it_up_even_before_the_map_is_read_again(self, client, acme):
+        assert custom_domains.hub_of(DOMAIN) == acme.id
+        acme.custom_domain = ""
+        assert custom_domains.served_on(acme) == ""
+
+    def test_none_while_two_businesses_name_it(self, client, acme, django_capture_on_commit_callbacks):
+        # Its move between businesses: the door opens it to neither, so neither page names it.
+        other_id = "0199c4b0-0000-7000-8000-000000000002"
+        Hub.objects.create(id=other_id, slug="other", status="ready")
+        with django_capture_on_commit_callbacks(execute=True):
+            assert photo(client, hub_id=other_id, custom_domain=DOMAIN).json()["applied"] is True
+        assert custom_domains.served_on(acme) == ""
+        assert custom_domains.served_on(Hub.objects.get(pk=other_id)) == ""
+
+    def test_none_for_a_row_read_before_the_domain_went_to_another_business(self, client, acme):
+        other_id = "0199c4b0-0000-7000-8000-000000000002"
+        Hub.objects.create(id=other_id, slug="other", status="ready", custom_domain=DOMAIN)
+        Hub.objects.filter(pk=acme.pk).update(custom_domain="")
+        custom_domains.forget()
+        # The door would open the other business's website there, never this one's.
+        assert custom_domains.served_on(acme) == ""
+        assert custom_domains.served_on(Hub.objects.get(pk=other_id)) == DOMAIN
+
+
 def test_the_door_of_the_domain_is_the_gate_right_before_the_host_is_refused(settings):
     # Before CommonMiddleware, whose get_host() is the 400; after the session's and the language's, which read nothing.
     order = settings.MIDDLEWARE
