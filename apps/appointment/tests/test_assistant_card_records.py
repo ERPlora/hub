@@ -22,7 +22,7 @@ from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
 from base.tests.test_assistant_card_values import AN_ID, list_field
 
-from .conftest import A, MONDAY, at, ctx_for, make_appointment, make_block, make_salon, make_series
+from .conftest import A, MONDAY, at, ctx_for, make_appointment, make_block, make_salon, make_series, run
 
 A_MISSING_ID = "0192f0b2-3333-7000-8000-000000000003"
 
@@ -342,7 +342,23 @@ def test_a_record_of_another_business_is_left_out(hub_a, hub_b):
         assert "staff_id" not in shown("appointment.blocked_time.create", on_the_member, ctx=in_b)
 
 
-# ── The read that names a block ───────────────────────────────────────────────────────────────────────────────────────
+# ── The reads that name a series and a block ──────────────────────────────────────────────────────────────────────────
+
+
+@pytest.mark.django_db
+def test_a_series_is_named_in_the_language_of_whoever_reads_it_whatever_the_one_active(salon):
+    """The model and the API read a series too (``appointment.recurring.get``): its name is in the caller's language,
+    not in the one the server happens to have active (English here)."""
+    diary = make_diary(salon)
+    spanish = run("appointment.recurring.get", {"id": str(diary.series.id)}, language="es")
+    assert spanish.label == "Lucía Pérez · Cada semana · Lunes · 10:00"
+
+
+@pytest.mark.django_db
+def test_a_block_is_named_in_the_language_of_whoever_reads_it_whatever_the_one_active(salon):
+    diary = make_diary(salon)
+    spanish = run("appointment.blocked_time.get", {"id": str(diary.holiday.id)}, language="es")
+    assert spanish.label == f"Local holiday · {day_label(MONDAY + dt.timedelta(days=1), 'es')}"
 
 
 def test_the_read_that_names_a_block_is_no_tool_nor_route():

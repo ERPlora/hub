@@ -1205,14 +1205,11 @@ def list_series(ctx: OperationContext, params: RecurringListIn) -> dict:
     )
 
 
-#: The repetitions that go by the week: their name says the weekday.
-BY_THE_WEEK = (Recurring.Frequency.WEEKLY, Recurring.Frequency.BIWEEKLY)
-
-
 def series_label(series: Recurring) -> str:
     """How a person names ``series`` in the active language, as each card of the series list is titled: its customer
-    (nothing once her data were erased), its repetition, its weekday when it goes by the week, and its hour."""
-    weekday = WEEKDAYS[series.day_of_week] if series.frequency in BY_THE_WEEK and series.day_of_week is not None else ""
+    (nothing once her data were erased), its repetition, its weekday (only a weekly or biweekly one keeps one) and its
+    hour."""
+    weekday = "" if series.day_of_week is None else WEEKDAYS[series.day_of_week]
     parts = (series.customer_name, series.get_frequency_display(), capfirst(weekday), f"{series.time:%H:%M}")
     return " · ".join(str(part) for part in parts if part)
 
