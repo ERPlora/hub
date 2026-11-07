@@ -99,13 +99,6 @@ const minutes = (value: string): number | null => {
   if (!trimmed) return null;
   return /^\d+$/.test(trimmed) ? Number(trimmed) : (trimmed as unknown as number);
 };
-/** Cents of a price field in the business's `currency` (empty = none); `undefined` when it is not an amount (the field
- *  says why). Never read before the business answers its money: «1500» would be read with two decimals, whatever its
- *  currency counts (in yen, 150000; hub#946). */
-const cents = (value: string, currency: Money): number | null | undefined => {
-  const read = parseMoney(value, currency);
-  return read.ok ? read.cents : undefined;
-};
 
 async function act(run: () => Promise<unknown>, error: () => ApiError | null): Promise<boolean> {
   failure.value = null;
@@ -118,17 +111,19 @@ async function act(run: () => Promise<unknown>, error: () => ApiError | null): P
   }
 }
 
+// An own price is never read before the business answers its money: «1500» would be read with two decimals, whatever
+// its currency counts (in yen, 150000; hub#946). One that is not an amount is not sent (the field says why).
 async function addPerson(): Promise<void> {
   const currency = money.value;
   const { member, minutes: typed, price } = newcomer.value;
   if (!currency || !member) return;
-  const custom = cents(price, currency);
-  if (custom === undefined) return;
+  const custom = parseMoney(price, currency);
+  if (!custom.ok) return;
   const body = {
     service_id: props.serviceId,
     member_id: member.id,
     ...(typed.trim() ? { custom_duration: minutes(typed) } : {}),
-    ...(custom !== null ? { custom_price: custom } : {}),
+    ...(custom.cents !== null ? { custom_price: custom.cents } : {}),
   };
   if (await act(() => assign.run(body), () => assign.error.value)) newcomer.value = { member: null, minutes: '', price: '' };
 }
@@ -137,13 +132,13 @@ async function saveOwn(row: AssignmentOut): Promise<void> {
   const currency = money.value;
   if (!currency) return;
   const draft = drafts.value[row.id];
-  const custom = cents(draft.price, currency);
-  if (custom === undefined) return;
+  const custom = parseMoney(draft.price, currency);
+  if (!custom.ok) return;
   const own = ownOf(row, currency);
   const body = {
     id: row.id,
     ...(draft.minutes.trim() !== own.minutes ? { custom_duration: minutes(draft.minutes) } : {}),
-    ...(draft.price.trim() !== own.price ? { custom_price: custom } : {}),
+    ...(draft.price.trim() !== own.price ? { custom_price: custom.cents } : {}),
   };
   if (await act(() => update.run(body), () => update.error.value)) drafts.value = { ...drafts.value, [row.id]: draft };
 }
