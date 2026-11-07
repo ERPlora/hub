@@ -136,17 +136,29 @@ def test_a_session_with_a_marked_test_makes_its_database_once(session_name, tmp_
     assert _databases_of(session) == set()
 
 
-def test_a_lone_test_that_names_the_hubs_aliases_in_its_mark_reaches_their_databases(session_name, tmp_path):
-    session, report, log = session_name(), tmp_path / "report.json", tmp_path / "session.log"
+def test_a_lone_test_that_names_a_hub_s_alias_in_its_mark_reaches_its_database(session_name, tmp_path):
+    # Alone, no earlier test of the session made the hubs' databases (hub#1007): pytest-django refused the alias. One
+    # session per hub, at once: in a session, the first test that gets them has both aliases for the rest.
+    sessions = {hub: session_name() for hub in ("a", "b")}
 
-    # Alone, no earlier test of the session made the hubs' databases (hub#1007): pytest-django refused the aliases.
-    _assert_passed({log: _start(session, "test_marked_with_the_hubs_aliases_alone", log, SESSION_PROBE_REPORT=str(report))})
+    _assert_passed(
+        {
+            tmp_path / f"{hub}.log": _start(
+                session,
+                f"test_marked_with_a_hub_s_alias_alone[{hub}]",
+                tmp_path / f"{hub}.log",
+                SESSION_PROBE_REPORT=str(tmp_path / f"{hub}.json"),
+            )
+            for hub, session in sessions.items()
+        }
+    )
 
-    assert json.loads(report.read_text()) == {
-        "a": names.hub_db_name(session, hubs.HUB_A_ID),
-        "b": names.hub_db_name(session, hubs.HUB_B_ID),
+    assert {hub: json.loads((tmp_path / f"{hub}.json").read_text()) for hub in sessions} == {
+        "a": names.hub_db_name(sessions["a"], hubs.HUB_A_ID),
+        "b": names.hub_db_name(sessions["b"], hubs.HUB_B_ID),
     }
-    assert _databases_of(session) == set()
+    assert _databases_of(sessions["a"]) == set()
+    assert _databases_of(sessions["b"]) == set()
 
 
 def test_the_hubs_databases_refuse_any_other_control_database_before_reaching_the_server(monkeypatch):

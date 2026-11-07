@@ -44,13 +44,17 @@ def test_marked_and_asking_for_the_test_database(django_db_setup):
     """What pytest-django makes the test database for by itself."""
 
 
-@pytest.mark.django_db(databases=hubs.HUB_DATABASES)
-def test_marked_with_the_hubs_aliases_alone():
-    """Names the hubs' aliases in its mark and asks for no fixture that makes them, as ``base/tests/test_shell.py``'s
-    did (hub#1007): what each alias reaches, by asking its server."""
-    reached = {}
-    for key, alias in (("a", hubs.HUB_A_ALIAS), ("b", hubs.HUB_B_ALIAS)):
-        with connections[alias].cursor() as cursor:
-            cursor.execute("SELECT current_database()")
-            reached[key] = cursor.fetchone()[0]
+@pytest.mark.parametrize(
+    "alias",
+    [
+        pytest.param(hubs.HUB_A_ALIAS, marks=pytest.mark.django_db(databases=("default", hubs.HUB_A_ALIAS)), id="a"),
+        pytest.param(hubs.HUB_B_ALIAS, marks=pytest.mark.django_db(databases=("default", hubs.HUB_B_ALIAS)), id="b"),
+    ],
+)
+def test_marked_with_a_hub_s_alias_alone(alias):
+    """Names a hub's alias in its mark and asks for no fixture that makes it, as ``base/tests/test_shell.py``'s did
+    with ``hubs.HUB_DATABASES`` (hub#1007): what the alias reaches, by asking its server."""
+    with connections[alias].cursor() as cursor:
+        cursor.execute("SELECT current_database()")
+        reached = cursor.fetchone()[0]
     Path(os.environ["SESSION_PROBE_REPORT"]).write_text(json.dumps(reached))
