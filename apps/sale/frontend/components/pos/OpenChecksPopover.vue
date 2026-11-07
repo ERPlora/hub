@@ -134,8 +134,10 @@ const meta = (row: OrderRow) => {
         :data-testid="`pos-parked-${row.id}`"
         @click="emit('resume', row)"
       >
-        <span class="pos-checks__name">{{ row.label || formatMoney(row.provisional_total, locale, business) }}</span>
-        <span class="pos-checks__meta">{{ meta(row) }}</span>
+        <span class="pos-checks__text">
+          <span class="pos-checks__name">{{ row.label || formatMoney(row.provisional_total, locale, business) }}</span>
+          <span class="pos-checks__meta">{{ meta(row) }}</span>
+        </span>
       </ion-button>
       <ion-button
         v-if="canDelete"
@@ -243,13 +245,15 @@ const meta = (row: OrderRow) => {
   --padding-end: 0;
 }
 .pos-checks__row::part(native) {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.1rem;
+  display: block;
   width: 100%;
   padding: 0.3rem 0;
   text-align: left;
+}
+.pos-checks__text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
 }
 .pos-checks__name {
   font-size: 0.9rem;
