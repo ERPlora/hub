@@ -7,7 +7,8 @@
 // question the section hides, unless it is all the page shows (`alone`). The change the assistant wants
 // (FLOW-F38) says its action first, right under the title, as the server names it for the reader («Cancel a
 // reservation»), and lists each datum it would send as its card in the chat says it (BASE-F97 step 2, base's
-// `fieldLines`): in words, an amount in the business's currency, the empty ones left out.
+// `fieldLines`): in words, an amount in the business's currency, the empty ones left out. Its first answer (or
+// failure) is told to the page, which says «Loading…» above the gallery until then (hub#950).
 import { fieldLines, InlineFeedback } from '@erplora/ui/components';
 import { type ApiError, useCommand, useLive } from '@erplora/ui/sdk';
 import { toastSuccess } from '@erplora/ui/shell';
@@ -16,16 +17,19 @@ import { computed, ref } from 'vue';
 
 import { useBusinessMoney } from '../../../../base/frontend/lib/money';
 import { useBusinessZone } from '../../../../base/frontend/lib/zone';
+import { useFirstAnswer } from '../composables/useFirstAnswer';
 import { useLocale, useT } from '../composables/useT';
 import { formatDate } from '../lib/phrasing';
 import { wording } from '../lib/refusal';
 import type { QuestionOut } from '../operations';
 
 const props = defineProps<{ /** It is all the page shows: it says when there is nothing. */ alone?: boolean }>();
+const emit = defineEmits<{ ready: [] }>();
 
 const t = useT();
 const locale = useLocale();
 const questions = useLive('flow.question.list', {});
+useFirstAnswer(questions, () => emit('ready'));
 const answer = useCommand('flow.question.answer');
 const rows = computed(() => questions.data.value?.rows ?? []);
 const loadError = computed(() => (questions.error.value ? wording(questions.error.value, t('flow.errors.read')) : ''));
