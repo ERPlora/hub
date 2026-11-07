@@ -9,7 +9,8 @@
 // The server judges: its 422 goes under each field, a 409 on top; the dialog keeps what was typed.
 // The hourly rate is typed in the business's currency (its country's, with the decimals the server counts:
 // staff-business-currency), its symbol at the end of the field; until the business answers, two decimals and no
-// symbol, and Save waits in grey (the rate is read in its money; hub#921). If it answers with the dialog open, the rate
+// symbol, and Save waits in grey (the rate is read in its money; hub#921); if that read fails, the dialog says so with «Retry»
+// (hub#938). If it answers with the dialog open, the rate
 // as loaded is rewritten in its decimals and what was typed is read in it when saving.
 import { Combo, type ComboOption, FormModal, InlineFeedback } from '@erplora/ui/components';
 import { ApiError, useCommand, useLiveClient } from '@erplora/ui/sdk';
@@ -17,6 +18,7 @@ import { useSession } from '@erplora/ui/shell';
 import { IonInput, IonSelect, IonSelectOption, IonText, IonTextarea, IonToggle } from '@ionic/vue';
 import { computed, ref, shallowRef, watch } from 'vue';
 
+import BusinessMoneyError from '../../../../base/frontend/components/BusinessMoneyError.vue';
 import { useLocale, useT } from '../composables/useT';
 import { MEMBER_STATUSES } from '../lib/enums';
 import { currencySymbol, moneyText, useBusinessMoney } from '../lib/format';
@@ -206,6 +208,7 @@ async function save(): Promise<void> {
     @submit="save"
   >
     <template #default="{ fieldErrors }">
+      <BusinessMoneyError />
       <InlineFeedback
         v-if="loadError"
         tone="danger"

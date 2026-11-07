@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:f67db954b1a71e938f75cd7b8f96896b94c9d43589f30089b73415325a644225 -->
+<!-- generated from WORKBOOK.md sha256:e31f3f759a190f74e8d6828fa400457120fcf9bd48659171ebc08625c37240df -->
 
 ## What it is for and who it is for
 
@@ -197,7 +197,8 @@ the pay cannot send it: "Permission “{permission}” is required.". Two record
 employee ID are accepted. From the assistant, a role the business does not have (or that has been retired)
 is checked before the confirmation card: no card shows, the assistant says that role is not available and
 nothing is created. Save (also when editing, STAFF-F02) is grey while the business has not yet said its
-currency, because the hourly rate is read in it (without it, "1500" yen would be saved as 150,000).
+currency, because the hourly rate is read in it (without it, "1500" yen would be saved as 150,000). If the currency cannot be read, the window says so ("The business's currency could not be read", with the
+reason) and offers "Retry", which asks for it again; as soon as it arrives, Save lights up (hub#938).
 Involved: BASE-F97
 
 ### STAFF-F02 Edit a professional's record

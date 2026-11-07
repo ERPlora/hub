@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:ff856c53562496cff3573447ecc6385aec9193ad8b1dccb8faf0703b0cd36f0a -->
+<!-- generated from WORKBOOK.md sha256:e7dc5fe7f0290dd173b938a498dcbd3e6cde4389541434f4e894112140687292 -->
 
 ## What it is for and who it is for
 
@@ -294,7 +294,8 @@ customer's card fills it, and the tax ID's when the country or the document type
 that only points at fields as soon as anything is changed, and both come back if the next try is refused
 too. If the tax territory cannot be read, the rate is called "Tax %", comes empty and warns "Could not
 read the business’s tax territory: type the rate of each line."; the invoice is issued anyway, with the
-territory's tax.
+territory's tax. If the currency cannot be read, the window says so ("The business's currency could not be read", with the
+reason) and offers "Retry", which asks for it again; as soon as it arrives, "Issue invoice" lights up (hub#938).
 Involved: TAX-F18, CUSTOMER-F17, TAX-F11
 
 ### INVOICE-F04 The customer asks for the full invoice of their ticket

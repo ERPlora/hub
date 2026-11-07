@@ -11,7 +11,7 @@
 import { Combo, type ComboOption } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
-import { expectSaveWaitsForMoney } from '../../../../base/frontend/__tests__/save-waits-for-money';
+import { expectSaveWaitsForMoney, expectWindowSaysMoneyUnreadable } from '../../../../base/frontend/__tests__/save-waits-for-money';
 import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import type { MemberOut, RoleOut } from '../operations';
 import {
@@ -490,4 +490,16 @@ describe('MemberFormModal: fields refused with the same words (hub#888)', () => 
     };
     return { field: s.field, send, settle };
   }, 'last_name');
+});
+
+// hub#938 (STAFF-F02): if the business's money cannot be read, the record says so with «Retry» instead of waiting in grey
+// without a word, also when it opens after the read had failed (the page read the money on loading).
+describe('MemberFormModal: a business whose money cannot be read (hub#938)', () => {
+  it.each([false, true])('says so with «Retry»; once the yen arrives «Save» lights up (opened after the failure: %s)', async (late) => {
+    const m = await mountStaff(MemberFormModal, { props: { open: !late, member: ROW }, answers: ROUTES });
+    await m.live();
+    const opens = late ? () => m.wrapper.setProps({ open: true }) : undefined;
+    const posts = () => m.sent().filter((call) => call.method === 'POST');
+    await expectWindowSaysMoneyUnreadable(m, 'staff-member-form-submit', posts, opens);
+  });
 });
