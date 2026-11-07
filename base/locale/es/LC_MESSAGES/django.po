@@ -304,6 +304,16 @@ msgstr "Tus apps"
 msgid "Turn on at least one business app so your till has something to sell."
 msgstr "Activa al menos una app de negocio para que el TPV tenga algo que vender."
 
+#: home.py
+#, python-format
+msgid "Turn on %(app)s"
+msgstr "Activa %(app)s"
+
+#: home.py
+#, python-format
+msgid "It is mandatory for businesses in %(country)s."
+msgstr "Es obligatoria para los negocios de %(country)s."
+
 #: queries.py:179 tests/test_queries_home.py:361
 msgid "Your team"
 msgstr "Tu equipo"

@@ -29,6 +29,10 @@ class TaxConfig(LiveAppConfig):
     )
     # Every hair salon and every restaurant turns it on at sign-up: no sale is priced without it.
     verticals = ["hair_salon", "restaurant"]
+    # Mandatory wherever the business is: no sale is priced without it (hub#997, PLAN-HUB round 2026-11-07). The Home
+    # asks whoever runs a business to turn it on while it is off (base.home.mandatory_steps), and the platform may turn
+    # it on by itself at sign-up: it binds the business to no authority.
+    mandatory = {"countries": "all", "platform_turns_on": True}
     default_auto_field = "django.db.models.BigAutoField"
     permissions = ["tax.view", "tax.manage"]
     # The countries a rule is set for, by their names (hub#678): no field of the models labels them, so the

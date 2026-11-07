@@ -258,17 +258,21 @@ def demo_get(ctx: OperationContext, data: DemoSlugIn) -> dict[str, Any]:
     ),
 )
 def setup_status(ctx: OperationContext, data: SetupStatusIn) -> dict:
-    """The old hub's ``hub.setup.status``: the platform's steps (``base.apps``, ``base.team``) and the modules'."""
+    """The old hub's ``hub.setup.status``: the platform's steps (``base.apps``, ``base.mandatory.<app>``, ``base.team``)
+    and the modules'."""
     with translation.override(ctx.language):
         hub = Hub.objects.filter(slug=ctx.scope.key).first()
         on = active_apps(ctx.scope)
-        modules = home.home_modules(on, demo_hub=bool(hub and hub.is_demo))
-        items = _platform_steps(ctx, on) + home.module_steps(ctx, modules, hub.country if hub else "")
+        demo_hub = bool(hub and hub.is_demo)
+        country = hub.country if hub else ""
+        modules = home.home_modules(on, demo_hub=demo_hub)
+        items = _platform_steps(ctx, on, country, demo_hub) + home.module_steps(ctx, modules, country)
         return home.document(items)
 
 
-def _platform_steps(ctx: OperationContext, on: frozenset[str]) -> list[dict]:
-    """«Your apps» (some business app on) and «Your team» (more than one active person), for who runs the hub."""
+def _platform_steps(ctx: OperationContext, on: frozenset[str], country: str, demo_hub: bool) -> list[dict]:
+    """«Your apps» (some business app on), «Turn on <app>» for each app mandatory in the business's ``country`` that is
+    off (hub#997) and «Your team» (more than one active person), for who runs the hub: who turns apps on and off."""
     if not ctx.has(ADMINISTER_HUB):
         return []
     business_apps = home.business_apps()
@@ -291,6 +295,7 @@ def _platform_steps(ctx: OperationContext, on: frozenset[str]) -> list[dict]:
             route="/apps",
             order=10,
         ),
+        *home.mandatory_steps(home.shown_modules(demo_hub=demo_hub), on, country),
         home.item(
             "base.team",
             "base",
@@ -484,7 +489,7 @@ def app_list(ctx: OperationContext, data: AppListIn) -> dict:
                 {
                     "id": config.label,
                     "name": str(config.verbose_name),
-                    "icon": _shell_icon(config),
+                    "icon": home.shell_icon(config),
                     "category": config.category,
                     "category_label": str(Category(config.category).label),
                     "summary": str(config.summary),
@@ -623,13 +628,6 @@ def activation_next_at(host: str) -> dt.datetime | None:
     if waiting.filter(state=activation.CREATING, next_attempt_at__isnull=True).exists():
         return timezone.now()
     return waiting.aggregate(next=Min("next_attempt_at"))["next"]
-
-
-def _shell_icon(config: Any) -> str:
-    """The icon the shell paints for a module: its first menu entry's, as the launcher and «My apps»; without a menu,
-    the shell's own for an app. The module's ``icon`` is the store's, baked apart (``base.catalog``): HubIcon refuses
-    a name the shell has not registered."""
-    return config.navigation[0].icon if config.navigation else "ion:apps-outline"
 
 
 def _first_screen(ctx: OperationContext, config: Any) -> str | None:
