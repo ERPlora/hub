@@ -167,13 +167,10 @@ def test_a_schedule_override_goes_by_the_word_schedule_gives_it(language):
     actions = {key.removeprefix(prefix): text for key, text in flow["actions"].items() if key.startswith(prefix)}
     events = {key.removeprefix(prefix): text for key, text in flow["events"].items() if key.startswith(prefix)}
 
-    assert {action: text.count(many if action == "list" else one) for action, text in actions.items()} == {
-        "create": 1,
-        "list": 1,
-        "get": 1,
-        "update": 1,
-    }
-    assert {event: text.count(one) for event, text in events.items()} == {"created": 1, "updated": 1, "deleted": 1}
+    assert {"create", "list", "get", "update"} <= actions.keys()
+    assert {"created", "updated", "deleted"} <= events.keys()
+    assert {action: text.count(many if action == "list" else one) for action, text in actions.items()} == dict.fromkeys(actions, 1)
+    assert {event: text.count(one) for event, text in events.items()} == dict.fromkeys(events, 1)
     assert flow["fields"]["override"] == one.capitalize()
     assert [
         key
