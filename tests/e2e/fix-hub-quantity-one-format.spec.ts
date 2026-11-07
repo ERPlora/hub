@@ -90,6 +90,8 @@ test('hub#974: the till’s quantity field takes 1500 as typed and keeps it ungr
     // The server keeps it: the line's total is 1500 × 0,03 €.
     await expect(line).toContainText(/45,00\s€/);
     await expect(field).toHaveValue('1500');
+    // And the check's total, once the server's preview of it arrives (a dash while it is on its way).
+    await expect(shown(page).locator('[data-testid=pos-total]')).toHaveText(/45,00\s€/);
     await capture(page, `${KEY}-till-1440`);
   } finally {
     await context.close();
