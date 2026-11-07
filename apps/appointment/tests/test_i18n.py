@@ -36,7 +36,8 @@ MODELS = (Settings, Counter, Recurring, RecurringService, Appointment, Appointme
 
 
 def visible_texts() -> set[str]:
-    """The English source of every lazy text the app shows (menu, store, admin, choices, messages)."""
+    """The English source of every lazy text the app shows (menu, store, admin, choices, messages) and the titles of
+    its schemas, which name a datum on the assistant's card (hub#635)."""
     config = apps.get_app_config("appointment")
     lazies = [
         *config_texts(config),
@@ -95,6 +96,9 @@ def test_the_card_says_each_title_with_the_spanish_of_the_workbook():
     with translation.override("es"):
         assert {title: translation.gettext(title) for title in operation_titles("appointment")} == {
             "Appointment": "Cita",
+            "Appointments": "Citas",
+            "Repeating appointment": "Cita periódica",
+            "Blocked period": "Bloqueo",
             "Book even if it overlaps": "Reservar aunque se solape",
             "Dates and times": "Fechas y horas",
             "Asked by the customer": "Lo pide la clienta",
