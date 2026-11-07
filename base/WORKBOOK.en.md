@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:b6bdeaca53d766f54db5a917fd328f1a625061dac5b304173b922d1111354e3f -->
+<!-- generated from WORKBOOK.md sha256:13feb0d60b76988350e1ff6389a58c0a3b6e4c6c0a0e5104aa8a59ef4d5b8ec9 -->
 
 ## What it is for and who it is for
 
@@ -23,8 +23,8 @@ The Home is the first thing anyone in the business sees on coming in. At a glanc
 Who uses it:
 
 - The **owner** and the **administrator** see everything and are the ones who can complete the
-  platform's steps ("Your apps", "Your team"), and in the bell they see the notices between apps that were
-  not delivered.
+  platform's steps ("Your apps", "Turn on …" for each app mandatory in their country, "Your team"), and in the bell
+  they see the notices between apps that were not delivered.
 - The **manager** and the **employee** see their apps, the steps that are theirs, the panels they may
   see and the activity. A step that only an administrator can complete is shown to them too, so they know
   why invoicing is not possible, but without a button.
@@ -426,20 +426,26 @@ Steps:
      too, in the order the apps set.
   3. The platform's are "Your apps" (turn on at least one business app) and "Your team" (add the people
      who will use the till); the rest come from each app that is on.
-  4. A step that only applies to another country, or that the person may not see, does not show. A business
+  4. Besides, for each app mandatory in the business's country that is off, an "Important" step of the
+     platform: "Turn on VeriFactu" with "It is mandatory for businesses in Spain." (VeriFactu, in Spain) or
+     "Turn on Taxes" with the business's country (Taxes, in every one). Only whoever runs the business sees it,
+     since they are the one who turns apps on; "Set up" leads to **Apps**, to "Add apps". As soon as they turn it
+     on, the step goes by itself and the app's own steps come ("Set up VeriFactu", "Your taxes"). A business of
+     another country does not see VeriFactu's (hub#997).
+  5. A step that only applies to another country, or that the person may not see, does not show. A business
      without a country (a demo, ERPlora's own) counts as Spain, ERPlora's market: it sees Spain's steps and none
      of another country (hub#682). A step whose check fails does not show either: what could not be checked is
      never taken as done nor as pending.
-  5. While a "Needed to invoice" step is missing, the "You cannot issue invoices yet" strip shows over the
+  6. While a "Needed to invoice" step is missing, the "You cannot issue invoices yet" strip shows over the
      other screens; with the phone on its side, in one line with a single "Set up" (hub#838).
-  6. When someone else completes a step on another device, the list updates by itself.
+  7. When someone else completes a step on another device, or turns an app on, the list updates by itself.
 In: the steps each app that is on declares, with their check, their country, their permission and their
-screen.
+screen; and the countries where each app says it is mandatory.
 Out: nothing saved.
 If it fails: "Could not load what is left to set up" with "Retry". A step that is on us (there is no
 business app to turn on) shows as "Not available yet" with "This one is on us: there is nothing on your
 side to do yet. We are on it.".
-Involved: INVENTORY-F28
+Involved: INVENTORY-F28, BASE-F24, VERIFACTU-F01, TAX-F17
 
 ### BASE-F02 See the business at a glance on coming in
 Status: discarded — the hub's health row (the printer and WhatsApp, with a link to System) needs each app to say how its own part is doing, and that touches Printing and the WhatsApp Inbox; today the bell already warns when nobody is printing (hub#573)

@@ -34,6 +34,10 @@ class VerifactuConfig(LiveAppConfig):
         "live."
     )
     verticals = ["hair_salon", "restaurant"]
+    # Mandatory in Spain (hub#997, PLAN-HUB round 2026-11-07): the Home asks whoever runs a business there to turn it on
+    # while it is off (base.home.mandatory_steps). The platform never turns it on by itself: it binds the business to
+    # the AEAT until the end of the calendar year and needs its authorisation, so its owner does, from Apps.
+    mandatory = {"countries": [SPAIN], "platform_turns_on": False}
     # A record is born from an issued invoice, read from its row (a foreign key).
     requires = ["invoice"]
     default_auto_field = "django.db.models.BigAutoField"

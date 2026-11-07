@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:dc72cb9389bd038ea8adf2d73530c7c68635c520c4862774468af5893ece2f40 -->
+<!-- generated from WORKBOOK.md sha256:aa7f5a72300a5b9021c2cd26f9ff00cdc2e00be9e5040576a6dbc406bba71fa4 -->
 
 ## What it is for and who it is for
 
@@ -51,6 +51,9 @@ country.
   from the factory (TAX-F16). With that a Spanish business can sell without touching anything.
 - Turning on Inventory, Services, Sales, Invoicing, Menus and combos or Modifiers turns on Taxes with them,
   and Taxes cannot be turned off while any of them is on.
+- **It is mandatory in every country**: without it nothing is charged. While it is off, "Finish setting up your
+  business" on the Home asks whoever runs the business to "Turn on Taxes" ("Important"), with "Set up" leading to
+  **Apps**; as soon as they turn it on, that step goes and "Your taxes" comes (BASE-F01, hub#997).
 - **The business's country and tax region**: the country is the one chosen when the business was signed up
   on erplora.com, and it is not changed here (a business without a country, such as a demo, is in Spain); the
   tax region —the whole country, or the Canary Islands, Ceuta or Melilla in Spain— is chosen in **Taxes →

@@ -82,6 +82,10 @@ Aquí la referencia no es un competidor: es la norma de la AEAT.
   todo el equipo, y a quien no configura VeriFactu le dice «Esto lo tiene que configurar un administrador.». Solo
   se lo pide a un negocio de España; uno sin país (una demo) cuenta como España, y uno de otro país no lo ve nunca,
   ni en pruebas ni en producción (hub#682).
+- **Es obligatoria en España.** Mientras está desactivada en un negocio de España (o sin país, como una demo),
+  «Termina de configurar tu negocio» pide a quien lo administra «Activa VeriFactu» («Importante»), con «Configurar»
+  que lleva a **Apps**; en cuanto la activa, ese paso se va y llega «Configura VeriFactu». Nunca se activa sola:
+  ata al negocio con la AEAT hasta el fin del año natural, así que la activa el dueño (BASE-F01, hub#997).
 - **Los datos del productor del software** (ERPlora) van fijos en cada registro (los declara su declaración
   responsable), también «Da servicio a varios obligados», siempre «S» (contradicción 7, cerrada).
 
