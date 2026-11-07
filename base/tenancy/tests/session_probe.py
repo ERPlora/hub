@@ -58,3 +58,10 @@ def test_marked_with_a_hub_s_alias_alone(alias):
         cursor.execute("SELECT current_database()")
         reached = cursor.fetchone()[0]
     Path(os.environ["SESSION_PROBE_REPORT"]).write_text(json.dumps(reached))
+
+
+@pytest.mark.django_db(databases=("default",))
+def test_marked_with_no_hub_s_alias_alone():
+    """Names its databases in its mark, none of them a hub's: which of the hubs' aliases it finds registered."""
+    registered = sorted({hubs.HUB_A_ALIAS, hubs.HUB_B_ALIAS} & set(connections.settings))
+    Path(os.environ["SESSION_PROBE_REPORT"]).write_text(json.dumps(registered))

@@ -161,6 +161,19 @@ def test_a_lone_test_that_names_a_hub_s_alias_in_its_mark_reaches_its_database(s
     assert _databases_of(sessions["b"]) == set()
 
 
+def test_a_lone_test_that_names_no_hub_s_alias_in_its_mark_gets_no_hub_database(session_name, tmp_path):
+    # Only a test whose mark names a hub's alias gets hub_databases (hub#1007): any other marked test would make the
+    # template and both hubs' databases in every process that runs it.
+    session, log, report = session_name(), tmp_path / "session.log", tmp_path / "report.json"
+
+    _assert_passed(
+        {log: _start(session, "test_marked_with_no_hub_s_alias_alone", log, SESSION_PROBE_REPORT=str(report))}
+    )
+
+    assert json.loads(report.read_text()) == []
+    assert _databases_of(session) == set()
+
+
 def test_the_hubs_databases_refuse_any_other_control_database_before_reaching_the_server(monkeypatch):
     monkeypatch.setitem(connections.settings[DEFAULT_DB_ALIAS], "NAME", "hub")
     monkeypatch.setattr(hubs, "_maintenance", lambda *args: pytest.fail("the server was reached"))
