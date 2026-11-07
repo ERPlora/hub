@@ -165,6 +165,7 @@
     "setup": {
       "heading": "Tus impuestos",
       "message": "Configura los tipos de IVA del país en el que vendes para que el TPV pueda calcular el precio de una venta.",
+      "ownRules": "{country} no trae sus tipos de impuesto de fábrica: crea en Reglas el tipo de cada categoría que vendes para que el TPV pueda calcular el precio de una venta.",
       "action": "Configurar"
     },
     "settings": {

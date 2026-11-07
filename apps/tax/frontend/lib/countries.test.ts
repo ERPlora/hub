@@ -3,7 +3,7 @@
 // form and the filter offer only what the server will take and typing «ES» finds Spain.
 import { describe, expect, it } from 'vitest';
 
-import { COUNTRY_CODES, countryChoices, countryLabel, countryOptions } from './countries';
+import { COUNTRY_CODES, countryChoices, countryLabel, countryName, countryOptions } from './countries';
 
 describe('COUNTRY_CODES: the 249 codes the server accepts', () => {
   it('are the 249 officially assigned ISO 3166-1 alpha-2 codes, sorted and unique', () => {
@@ -48,6 +48,14 @@ describe('countryLabel: one code as the reader reads it', () => {
     expect(countryLabel('PT', 'en')).toBe('Portugal (PT)');
     expect(countryLabel('PT', 'es')).toBe('Portugal (PT)');
     expect(countryLabel('ZZ', 'en')).toBe('ZZ');
+  });
+});
+
+describe('countryName: a country as a sentence names it («Portugal brings no…»)', () => {
+  it('names a known code in the reader\'s language, without its code, and keeps an unknown one as it came', () => {
+    expect(countryName('PT', 'en')).toBe('Portugal');
+    expect(countryName('DE', 'es')).toBe('Alemania');
+    expect(countryName('ZZ', 'en')).toBe('ZZ');
   });
 });
 

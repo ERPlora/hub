@@ -165,6 +165,7 @@
     "setup": {
       "heading": "Your taxes",
       "message": "Set up the VAT rates of the country you sell in so the till can price a sale.",
+      "ownRules": "{country} does not come with its tax rates ready: create in Rules the rate of each category you sell so the till can price a sale.",
       "action": "Set up"
     },
     "settings": {
