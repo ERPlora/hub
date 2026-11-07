@@ -159,7 +159,8 @@ Cada sección pinta su propio «Cargando…» y su error con reintento.
 Pestaña **Ajustes** (solo quien puede cambiarlos). Comensales mínimos y máximos, antelación mínima
 (horas, para internet y WhatsApp), días máximos de antelación, duración por defecto, confirmar solas
 las reservas nuevas, teléfono obligatorio, correo obligatorio y minutos tras la hora para liberar una
-pendiente. «Guardar».
+pendiente. «Guardar». En el móvil cabe entera, en español y en inglés: la frase larga de un interruptor parte
+en dos líneas y «Guardar» se ve completo al final (hub#906).
 
 ## Estados de cada pantalla
 

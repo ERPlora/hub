@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:cc6a21f4e7f4d9733d5239f5db7bca47b2de1f87ce845f4c49f7b2e30cf1f705 -->
+<!-- generated from WORKBOOK.md sha256:77a34f2c6c00ccb31295593d157e17f363d48ddeac6cb07e357061c7f2439d4f -->
 
 ## What it is for and who it is for
 
@@ -156,7 +156,8 @@ with its decimals), never in euros if the business charges in another.
 ### Settings
 Menu **Tables → Settings**: "Ask for the guests when seating a table", "Amber warning (minutes)" and
 "Red warning (minutes)", and "Save". Only whoever can change them sees it (by default, the owner and the
-administrator).
+administrator). On a phone it fits whole, in Spanish and in English: the switch's long sentence breaks onto two
+lines and "Save" shows complete at the end (hub#866).
 
 ## States of each screen
 

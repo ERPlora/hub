@@ -167,7 +167,8 @@ país, con sus decimales), nunca en euros si el negocio cobra en otra.
 ### Ajustes
 Menú **Mesas → Ajustes**: «Preguntar los comensales al sentar una mesa», «Aviso ámbar (minutos)» y
 «Aviso rojo (minutos)», y «Guardar». Solo la ve quien puede cambiarlos (de fábrica, el propietario y el
-administrador).
+administrador). En el móvil cabe entera, en español y en inglés: la frase larga del interruptor parte en dos
+líneas y «Guardar» se ve completo al final (hub#866).
 
 ## Estados de cada pantalla
 
