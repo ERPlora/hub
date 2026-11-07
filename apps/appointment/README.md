@@ -84,8 +84,8 @@ CI=1 pnpm e2e tests/e2e/appointment-charge.spec.ts
 
 - **hub#527** — En un negocio de otro país, un teléfono escrito sin prefijo se guarda y se busca como español.
 - **hub#632** — Los importes de cuatro cifras salen sin separador de millares.
-- **hub#631**, **hub#633**, **hub#635** y **hub#637** — una traducción «fuzzy» en inglés, siete textos en español
-  con las palabras de otra app y dos fallos de la tarjeta de confirmación del asistente.
+- **hub#631**, **hub#633** y **hub#635** — una traducción «fuzzy» en inglés, siete textos en español con las
+  palabras de otra app y la tarjeta de confirmación del asistente, que no dice qué registro toca.
 - Lo que no hace a propósito (recordatorios, pantalla de bloqueos, reserva pública, depósitos, lista de espera,
   calendario externo…): «Lo que queda fuera» y «Lo que NO hace, a propósito» del WORKBOOK.
 - Las peticiones de [`UI-REQUESTS.md`](UI-REQUESTS.md).
