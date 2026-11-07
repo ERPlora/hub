@@ -5,7 +5,8 @@
 // «Track stock for this item» (physical only; follows the hub until touched), «Unit of measure»,
 // «Tax category» (required, none chosen in advance) and «Categories» (when there are any; both search
 // the server, TaxCategorySelect and ProductCategoriesField), saved in one go. «Save» waits in grey until the business
-// has answered its money (the price and the cost are read in it; hub#918). Editing: the SKU is locked, there is no initial stock nor type, and only what changed is sent
+// has answered its money (the price and the cost are read in it; hub#918), and says so with «Retry» if that read fails
+// (hub#938). Editing: the SKU is locked, there is no initial stock nor type, and only what changed is sent
 // (the stock is never edited here: it is received or counted). Amounts and quantities are read as
 // the person typed them; a refusal stays in the dialog, each message under its field. «Photo» (INVENTORY-F30/F31, for
 // who may change products): a library image or a photo of its own, sent once the product is saved (`set_image`,
@@ -17,6 +18,7 @@ import { useSession } from '@erplora/ui/shell';
 import { IonButton, IonCheckbox, IonInput, IonNote, IonSelect, IonSelectOption, IonTextarea } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import BusinessMoneyError from '../../../../base/frontend/components/BusinessMoneyError.vue';
 import ImageField from '../../../../base/frontend/components/ImageField.vue';
 import { draftOf, type ImageDraft, useImageSave } from '../../../../base/frontend/lib/item-image';
 import { useT } from '../composables/useT';
@@ -243,6 +245,7 @@ function retryPhoto(): void {
     @submit="save"
   >
     <div class="product-form">
+      <BusinessMoneyError />
       <InlineFeedback
         v-if="photo.failure.value"
         tone="warning"

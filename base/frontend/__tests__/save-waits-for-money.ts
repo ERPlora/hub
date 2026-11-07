@@ -7,7 +7,7 @@
 // says its own door past the grey button (`submit`), or `null` when its button is its only one. When the read of the
 // money fails instead (`expectSaysMoneyUnreadable`, hub#938), the window says so — the platform's BusinessMoneyError,
 // an alert with «Retry» — with «Save» still grey and nothing sent; «Retry» asks the server again and the notice goes,
-// and once the business answers «Save» lights up. For the tests of every app with such a window (Product, Service,
+// and once the business answers «Save» lights up; a window opened after the read had failed says it too. For the tests of every app with such a window (Product, Service,
 // Menu, Option, the drawer's, the till's), like `business.ts`: free of side effects.
 import { FormModal } from '@erplora/ui/components';
 import type { LiveClient } from '@erplora/ui/sdk';
@@ -93,14 +93,19 @@ export interface MountedWindow extends LiveHarness {
 }
 
 /** `expectSaysMoneyUnreadable` on an app's window mounted with `business: null`: `save` is its «Save» (its testid) and
- *  `sent` what it has sent or handed up. */
-export function expectWindowSaysMoneyUnreadable(m: MountedWindow, save: string, sent: () => unknown[]): Promise<void> {
+ *  `sent` what it has sent or handed up; `opens`, for a window mounted closed, opens it after the read fails. */
+export function expectWindowSaysMoneyUnreadable(
+  m: MountedWindow,
+  save: string,
+  sent: () => unknown[],
+  opens?: () => Promise<unknown>,
+): Promise<void> {
   const settle = async (): Promise<void> => {
     await flush();
     await flush();
   };
   const window = { wrapper: m.wrapper, save: () => m.inDoc(save), amount: () => null, sent, settle };
-  return expectSaysMoneyUnreadable(window, moneyReadOf(m));
+  return expectSaysMoneyUnreadable(window, moneyReadOf(m), opens);
 }
 
 const NOTICE = '[data-testid="base-money-error"]';
@@ -112,9 +117,16 @@ function inWindow(window: WaitingWindow, selector: string): HTMLElement | null {
   return (found.exists() ? found.element : document.querySelector(selector)) as HTMLElement | null;
 }
 
-export async function expectSaysMoneyUnreadable(window: WaitingWindow, read: MoneyRead): Promise<void> {
+/** `opens`: the window is closed when the read fails and opens after it, as it happens (the page read the money on
+ *  loading, the person taps later): it says it all the same. */
+export async function expectSaysMoneyUnreadable(window: WaitingWindow, read: MoneyRead, opens?: () => Promise<unknown>): Promise<void> {
   await read.fail();
   await window.settle();
+  if (opens) {
+    expect(!!window.save(), 'the window still closed when the read fails').toBe(false);
+    await opens();
+    await window.settle();
+  }
   expect(inWindow(window, NOTICE)?.getAttribute('role'), "an alert that says the business's money could not be read").toBe('alert');
   expect(!!inWindow(window, RETRY), '«Retry» in that alert').toBe(true);
   expect([window.save()?.disabled, window.sent()], '[«Save» grey, what was sent] while the money cannot be read').toEqual([true, []]);
