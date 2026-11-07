@@ -55,6 +55,15 @@ async function setup(rows: RunOut[], failed = 0, total = rows.length) {
 }
 
 describe('HistoryPanel', () => {
+  it('says «Loading…» as a status until the first runs are in, with the one LoadingNote of flow (hub#969)', async () => {
+    const m = await mountFlow(HistoryPanel, { props: { flowId: 'f1', steps: STEPS, catalog: CATALOG } });
+    await m.live();
+    expect(m.find('flow-history-loading').text()).toBe('Loading…');
+    expect(m.find('flow-history-loading').attributes('role')).toBe('status');
+    await m.result(OP, { rows: [], total: 0, limit: 20, offset: 0, failed: 0 });
+    expect(m.find('flow-history-loading').exists()).toBe(false);
+  });
+
   it('follows the runs of the automation, twenty at a time', async () => {
     const m = await setup([]);
     expect(m.params(OP)).toEqual([{ flow_id: 'f1', limit: 20, offset: 0 }]);
