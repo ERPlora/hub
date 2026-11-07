@@ -1171,7 +1171,28 @@
         },
         "pdfPages": "Showing the first {shown} of {total} pages. Download the file to read it all.",
         "textCut": "Showing the beginning of the file. Download it to read it all.",
-        "tableCut": "Showing the first {shown} rows. Download the file to see them all."
+        "tableCut": "Showing the first {shown} rows. Download the file to see them all.",
+        "damaged": {
+          "heading": "The file could not be read",
+          "body": "It may be damaged or saved in another format. Download it to open it with an app on your device."
+        },
+        "tooLarge": {
+          "heading": "Too large to preview",
+          "body": "The preview opens files of up to {size}. Download it to open it with an app on your device."
+        },
+        "sheets": "Sheets",
+        "sheetEmpty": "This sheet is empty.",
+        "documentEmpty": "This document has no text.",
+        "yes": "TRUE",
+        "no": "FALSE",
+        "json": {
+          "oneItem": "1 item",
+          "items": "{count} items",
+          "oneField": "1 field",
+          "fields": "{count} fields",
+          "more": "{count} more. Download the file to see them all.",
+          "broken": "This file is not valid JSON: it is shown as it is."
+        }
       },
       "refusal": {
         "invalidName": "That name is not valid. Use a name without slashes or lone dots.",

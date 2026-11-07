@@ -1171,7 +1171,28 @@
         },
         "pdfPages": "Mostrando las primeras {shown} de {total} páginas. Descarga el archivo para leerlo entero.",
         "textCut": "Mostrando el principio del archivo. Descárgalo para leerlo entero.",
-        "tableCut": "Mostrando las primeras {shown} filas. Descarga el archivo para verlas todas."
+        "tableCut": "Mostrando las primeras {shown} filas. Descarga el archivo para verlas todas.",
+        "damaged": {
+          "heading": "No se pudo leer el archivo",
+          "body": "Puede que esté dañado o guardado en otro formato. Descárgalo para abrirlo con una aplicación de tu dispositivo."
+        },
+        "tooLarge": {
+          "heading": "Demasiado grande para la vista previa",
+          "body": "La vista previa abre archivos de hasta {size}. Descárgalo para abrirlo con una aplicación de tu dispositivo."
+        },
+        "sheets": "Hojas",
+        "sheetEmpty": "Esta hoja está vacía.",
+        "documentEmpty": "Este documento no tiene texto.",
+        "yes": "VERDADERO",
+        "no": "FALSO",
+        "json": {
+          "oneItem": "1 elemento",
+          "items": "{count} elementos",
+          "oneField": "1 campo",
+          "fields": "{count} campos",
+          "more": "{count} más. Descarga el archivo para verlos todos.",
+          "broken": "Este archivo no es un JSON válido: se muestra tal cual."
+        }
       },
       "refusal": {
         "invalidName": "Ese nombre no es válido. Usa un nombre sin barras ni puntos sueltos.",

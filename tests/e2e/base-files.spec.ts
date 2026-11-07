@@ -11,12 +11,21 @@
 // through the product's own operations. «Space» also counts what the apps keep in the hub's store (the website's
 // images of an earlier spec), which no test of Files empties: each reads it first and expects it on screen.
 // flow: BASE-G82 BASE-G83 BASE-G84 BASE-G85 BASE-G86
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { crc32, deflateSync } from 'node:zlib';
 
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { formatSize } from '../../base/frontend/lib/files';
-import { A, api, B, EMPLOYEE, horizontalOverflow, hostPage, psql, shot, shown, untilStill } from './helpers';
+import { A, api, B, capture, EMPLOYEE, horizontalOverflow, hostPage, psql, shot, shown, untilStill } from './helpers';
+
+/** The real files of the preview's unit tests (hub#578): a JSON, an .xlsx of two sheets and a .docx written by an
+ *  office suite, whose text carries `<script>` and `onerror` as words. */
+const SAMPLE = (name: string) => readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'base', 'frontend', '__tests__', 'files', name));
+const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+const DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
 const VIEWPORTS = {
   390: { width: 390, height: 844 },
@@ -379,6 +388,65 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       expect(raw.headers()['content-disposition']).toBe("attachment; filename*=UTF-8''notes.txt");
       expect(raw.headers()['content-security-policy']).toContain('sandbox');
       expect(await raw.text()).toBe(NOTE);
+    } finally {
+      await wipe(context, A).catch(() => undefined);
+      await context.close();
+    }
+  });
+
+  test(`BASE-F74 — a JSON folds, a spreadsheet is a table per sheet, a Word document its text at ${width}`, async ({ browser }) => {
+    const { context, page } = await hostPage(browser, A, { viewport, next: '/files' });
+    const dialogs: string[] = [];
+    page.on('dialog', (dialog) => {
+      dialogs.push(dialog.message());
+      void dialog.dismiss();
+    });
+    try {
+      await wipe(context, A);
+      await upload(page, [
+        { name: 'data.json', mimeType: 'application/json', buffer: SAMPLE('sample.json') },
+        { name: 'sales.xlsx', mimeType: XLSX, buffer: SAMPLE('sample.xlsx') },
+        { name: 'report.docx', mimeType: DOCX, buffer: SAMPLE('sample.docx') },
+      ]);
+      await expect(item(page, 'report.docx')).toBeVisible();
+      const preview = page.locator('[data-testid="file-preview"]').last();
+
+      // A JSON, as a tree: its first levels open, a product folded until it is tapped.
+      await act(page, 'data.json', 'open');
+      const json = preview.locator('[data-testid="file-preview-json"]');
+      await expect(json).toContainText('products:');
+      await expect(json).not.toContainText('Café solo');
+      await json.locator('[data-testid="file-json-summary"]', { hasText: '0:' }).click();
+      await expect(json).toContainText('"Café solo"');
+      await capture(page, `APP-BASE-8-BASE-F74-json-${width}`);
+      await preview.locator('[data-testid="file-preview-close"]').click();
+      await expect(preview).toBeHidden();
+
+      // A spreadsheet: a table per sheet, one tab each.
+      await act(page, 'sales.xlsx', 'open');
+      const table = preview.locator('[data-testid="file-preview-table"]');
+      await expect(table).toContainText('Café solo');
+      await expect(preview.locator('[data-testid="file-preview-sheet-tab"]')).toHaveText(['Ventas', 'Notas']);
+      await capture(page, `APP-BASE-8-BASE-F74-xlsx-${width}`);
+      await preview.locator('[data-testid="file-preview-sheet-tab"]', { hasText: 'Notas' }).click();
+      await expect(table).toContainText('Cerrar la caja a las 23:00');
+      await preview.locator('[data-testid="file-preview-close"]').click();
+      await expect(preview).toBeHidden();
+
+      // A Word document: its formatted text, and nothing of it runs (its `<script>` and `onerror` are words).
+      await act(page, 'report.docx', 'open');
+      const document = preview.locator('[data-testid="file-preview-document"]');
+      await expect(document.locator('h1')).toHaveText('Informe de noviembre');
+      await expect(document.locator('ul li')).toHaveText(['Pedir café', 'Revisar la cámara']);
+      // Its lists keep their markers (the shell's reset takes them off every other list).
+      expect(await document.locator('ul').evaluate((list) => getComputedStyle(list).listStyleType)).toBe('disc');
+      expect(await document.locator('ol').evaluate((list) => getComputedStyle(list).listStyleType)).toBe('decimal');
+      await expect(document).toContainText('<script>alert(1)</script>');
+      expect(await document.locator('script, [onerror], img').count()).toBe(0);
+      await expect(document.locator('a')).toHaveAttribute('href', 'https://erplora.com/');
+      await capture(page, `APP-BASE-8-BASE-F74-docx-${width}`);
+      expect(await horizontalOverflow(page)).toBeLessThanOrEqual(0);
+      expect(dialogs).toEqual([]);
     } finally {
       await wipe(context, A).catch(() => undefined);
       await context.close();
