@@ -9,6 +9,7 @@ import { ConfirmDialog, InlineFeedback } from '@erplora/ui/components';
 import { AppPage } from '@erplora/ui/shell';
 import { describe, expect, it, vi } from 'vitest';
 
+import { expectWindowSaysMoneyUnreadable } from '../../../../base/frontend/__tests__/save-waits-for-money';
 import { business, EMPLOYEE, errorFrame, flush, type MountOptions, mountCombo, POLISH } from '../__tests__/mount-combo';
 import CourseCard from '../components/CourseCard.vue';
 import CourseForm from '../components/CourseForm.vue';
@@ -221,5 +222,29 @@ describe('MenuBuilderPage', () => {
     expect(s.inDoc('combo-builder-back')?.textContent).toContain('Todos los menús');
     expect(s.inDoc('combo-builder-gone')?.textContent).toContain('Este menú ya no existe');
     expect(s.inDoc('combo-builder-gone')?.textContent).toContain('Se ha retirado, quizá desde otro dispositivo.');
+  });
+});
+
+// hub#946 (COMBO-F06): if the business's money cannot be read, the builder says so once, above the courses, with «Retry»,
+// instead of leaving each course's «Add choice» grey without a word; also when the menu arrives after the read had failed.
+describe('MenuBuilderPage: a business whose money cannot be read (hub#946)', () => {
+  it.each([false, true])('says so with «Retry»; once the yen arrives «Add choice» lights up (the menu arrives after the failure: %s)', async (late) => {
+    const s = await setup({ business: null });
+    if (!late) await s.show(MENU);
+    const opens = late ? () => s.show(MENU) : undefined;
+    await expectWindowSaysMoneyUnreadable(s, 'combo-course-g1-save', s.posts, opens);
+  });
+
+  it('says it once whatever the courses, and not to whoever only reads the menu', async () => {
+    const s = await setup({ business: null });
+    await s.show(MENU);
+    s.net.lastStream().push(errorFrame(s.subId('base.business.get'), 'base.hub_busy'));
+    await flush();
+    expect(s.wrapper.findAll('[data-testid="base-money-error"]')).toHaveLength(1);
+    const reader = await setup({ business: null, session: EMPLOYEE });
+    await reader.show(MENU);
+    reader.net.lastStream().push(errorFrame(reader.subId('base.business.get'), 'base.hub_busy'));
+    await flush();
+    expect(reader.inDoc('base-money-error')).toBeNull();
   });
 });

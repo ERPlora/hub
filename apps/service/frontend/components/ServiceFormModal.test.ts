@@ -381,3 +381,27 @@ describe('ServiceFormModal: a business whose money cannot be read (hub#938)', ()
     await expectWindowSaysMoneyUnreadable(m, 'service-form-submit', m.sent, opens);
   });
 });
+
+// hub#946 (SERVICE-F31, F32): «Professionals who do it» reads its own prices in the business's money too. If it cannot be
+// read, the window's notice says so and «Assign» waits in grey with the form's «Save» until the yen arrives.
+describe('ServiceFormModal: «Professionals who do it» while the money cannot be read (hub#946)', () => {
+  it.each([false, true])('«Assign» waits in grey under the notice; once the yen arrives it lights up (opened after the failure: %s)', async (late) => {
+    const m = await mountService(ServiceFormModal, { props: { open: !late, service: CUT, canChange: true }, business: null });
+    await m.live();
+    /** «Assign» waits for someone picked too: Carla is, so only the money keeps it grey. */
+    const pick = async () => {
+      m.wrapper.findAllComponents(Combo).find((c) => c.props('testid') === 'service-professionals-member')!.vm.$emit('update:modelValue', { id: 'm9', label: 'Carla' });
+      await settle();
+    };
+    if (!late) await pick();
+    const opens = late
+      ? async () => {
+          await m.wrapper.setProps({ open: true });
+          await settle();
+          await pick();
+        }
+      : undefined;
+    const assigned = () => m.sent().filter((call) => call.path.startsWith('/api/service/assignments'));
+    await expectWindowSaysMoneyUnreadable(m, 'service-professionals-assign', assigned, opens);
+  });
+});
