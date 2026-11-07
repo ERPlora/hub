@@ -2530,8 +2530,13 @@ Pasos:
      su registro, como los servicios de una cita, igual, por el nombre de cada uno («Servicios: Corte de pelo, Tinte»;
      uno que no se puede nombrar cuenta entre los «más»), también cuando el asistente manda un servicio por su nombre
      porque no sabe cuál es («Servicios: Tinte»; si manda el servicio y además un nombre, dice el servicio que se
-     reserva); y cualquier otra, como las líneas de una venta (con su cantidad y su precio) o una lista de códigos, por
-     cuántos elementos lleva; y un dato que agrupa otros, como la plantilla de un WhatsApp, por sus
+     reserva); una lista de líneas que llevan su registro y, al lado, solo cifras —las de una recepción de mercancía
+     (producto y cantidad) o los servicios de un bono (servicio y sesiones)—, por el nombre del registro seguido de sus
+     cifras, la cantidad como se escribe en el idioma de la persona y un importe como dinero («Productos: Vino tinto · 6;
+     Cerveza · 2,5»; «Servicios incluidos: Corte · 5, Tinte · 3»; si una línea no se puede nombrar, la lista dice
+     cuántas lleva: se leería como una cifra suelta); y cualquier otra, como una línea con dos registros (el empleado y
+     el producto de una venta), una con un texto propio o una lista de códigos, por cuántos elementos lleva; y un dato
+     que agrupa otros, como la plantilla de un WhatsApp, por sus
      valores, sin el nombre de cada uno («Plantilla: cita_recordatorio · es · Ana, 10:00»; del recuento de una caja
      quedan los billetes y monedas contados: «50: 2»). Una fecha y una hora salen como se escriben en el idioma
      de la persona y a la hora del negocio («2 nov 2026, 10:00»; un día solo, «2 nov 2026»; una hora sola,

@@ -16,10 +16,11 @@ import { cleanInventory, createProduct, stamp } from './inventory-helpers';
 /** A business is born with every app off; Inventory requires Taxes. */
 const NEEDED = ['tax', 'inventory'];
 
-/** What the screens call each record, by the language of the card. */
+/** What the screens call each record, by the language of the card; a quantity as each language writes it, and the
+ *  count the card said instead of a receipt's lines (hub#970). */
 const WORDS = {
-  es: { product: 'Producto', category: 'Categoría', products: 'Productos' },
-  en: { product: 'Product', category: 'Category', products: 'Products' },
+  es: { product: 'Producto', category: 'Categoría', products: 'Productos', twoAndAHalf: '2,5', oneItem: '1 elemento' },
+  en: { product: 'Product', category: 'Category', products: 'Products', twoAndAHalf: '2.5', oneItem: '1 item' },
 };
 /** The word the card calls a record by when nothing titles it, in each language. */
 const GENERIC = { es: 'Registro', en: 'Record' };
@@ -81,16 +82,33 @@ for (const language of ['es', 'en'] as const) {
     await expect(card(page)).toContainText(category.name);
     await cancel(page);
 
-    // «Recibe 6 de vino tinto»: the server sends each line of the receipt with its product by its name, and the screen
-    // shows no id (`fieldsOf`). A line of two data the screen still says by how many there are: hub#970.
+    // «Recibe 6 de vino tinto y 2,5 de cerveza», a write that is not dangerous, said in one line: the server sends each
+    // line of the receipt with its product by its name and marks the list said in words, so the screen says each line
+    // by its product and its quantity as the person writes one («E2E Vino tinto … · 6», «2,5» in Spanish), never
+    // «1 elemento» (hub#970), in every size; no id (`fieldsOf`).
+    const tag = stamp();
+    const beer = await createProduct(context, { name: `E2E Cerveza ${tag}`, sku: `E2E-CZ-${tag}` });
     const received = await datumOf(
       page,
       'inventory__stock__receive',
-      { items: [{ product_id: product.id, qty: '6' }] },
+      { items: [{ product_id: product.id, qty: '6' }, { product_id: beer.id, qty: '2.5' }] },
       'items',
     );
-    expect([received.label, received.value]).toEqual([words.products, [{ product_id: product.name, qty: '6' }]]);
-    await expect(card(page)).not.toContainText(product.sku);
+    expect([received.label, received.value, received.named]).toEqual([
+      words.products,
+      [{ product_id: product.name, qty: '6' }, { product_id: beer.name, qty: '2.5' }],
+      true,
+    ]);
+    for (const vp of VIEWPORTS) {
+      await page.setViewportSize({ width: vp.width, height: vp.height });
+      await expect(card(page)).toContainText(`${product.name} · 6`);
+      await expect(card(page)).toContainText(`${beer.name} · ${words.twoAndAHalf}`);
+      await expect(card(page)).not.toContainText(words.oneItem);
+      await expect(card(page)).not.toContainText(product.sku);
+      await untilStill(page);
+      await capture(page, `hub-970-receipt-${language}-${vp.label}`);
+    }
+    await page.setViewportSize({ width: 1440, height: 900 });
     await cancel(page);
 
     // «Borra la categoría Bebidas», a dangerous write: the category by its name (never its slug), titled as the screens
