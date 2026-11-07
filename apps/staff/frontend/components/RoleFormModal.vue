@@ -94,6 +94,7 @@ async function save(): Promise<void> {
       <div class="staff-role-form">
         <ion-input
           data-testid="staff-role-form-name"
+          name="name"
           :value="form.name"
           :label="$t('staff.roles.form.name')"
           label-placement="floating"
@@ -106,6 +107,7 @@ async function save(): Promise<void> {
         />
         <ion-input
           data-testid="staff-role-form-description"
+          name="description"
           :value="form.description"
           :label="$t('staff.roles.form.description')"
           label-placement="floating"
@@ -118,6 +120,7 @@ async function save(): Promise<void> {
         />
         <ion-input
           data-testid="staff-role-form-color"
+          name="color"
           :value="form.color"
           :label="$t('staff.roles.form.color')"
           :placeholder="$t('staff.roles.form.colorPlaceholder')"
@@ -143,6 +146,7 @@ async function save(): Promise<void> {
         <template v-if="role">
           <ion-input
             data-testid="staff-role-form-order"
+            name="order"
             type="number"
             inputmode="numeric"
             min="0"

@@ -100,6 +100,7 @@ async function save(): Promise<void> {
       <div class="schedule-exception-form">
         <ion-input
           data-testid="schedule-special-day-form-date"
+          name="date"
           type="date"
           :value="date"
           :label="$t('schedule.specialDays.form.date')"
@@ -112,6 +113,7 @@ async function save(): Promise<void> {
         />
         <ion-input
           data-testid="schedule-special-day-form-name"
+          name="name"
           :value="name"
           :label="$t('schedule.specialDays.form.name')"
           :placeholder="$t('schedule.specialDays.form.namePlaceholder')"
@@ -157,6 +159,7 @@ async function save(): Promise<void> {
         </ion-checkbox>
         <ion-input
           data-testid="schedule-special-day-form-notes"
+          name="notes"
           :value="notes"
           :label="$t('schedule.specialDays.form.notes')"
           label-placement="floating"

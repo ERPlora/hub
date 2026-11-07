@@ -20,7 +20,7 @@ const KEYS = ['title', 'notes', 'kind'] as const;
 
 /** A window with a field per key — `title` an ion-input, `notes` an ion-textarea, `kind` an ion-select — whose «Save»
  *  is refused with `refusal`; each field carries the name `names` gives it (none when it gives none). */
-async function windowNaming(names: Partial<Record<(typeof KEYS)[number], string>>, refusal = refusedWithTheSameWords(KEYS).error) {
+async function windowNaming(names: Partial<Record<(typeof KEYS)[number], string>>, refusal: FormModalError = refusedWithTheSameWords(KEYS).error) {
   const error = ref<FormModalError | null>(null);
   const Window = defineComponent({
     setup() {

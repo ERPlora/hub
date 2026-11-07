@@ -138,7 +138,7 @@ la crea dentro del proyecto.
 |---|---|
 | Cargando | «Cargando…» mientras llega el primer resultado. |
 | Vacío | «Sin tareas.», «Sin tareas abiertas asignadas a ti.», «Sin subtareas.», «Sin comentarios.», «Sin proyectos.» o «Este proyecto aún no tiene tareas.»; con búsqueda o filtro, «Sin resultados». |
-| Error | El aviso de la tabla con «Reintentar». El rechazo de un formulario sale dentro del formulario, sin perder lo tecleado; el de una acción de fila, encima de la tabla; el de la hoja, dentro de la hoja. |
+| Error | El aviso de la tabla con «Reintentar». El rechazo de un formulario sale dentro del formulario, sin perder lo tecleado, y cada campo rechazado dice su motivo debajo y lo pierde en cuanto se corrige ese campo, aunque otro diga lo mismo (hub#888); **Asignada a** y **Proyecto**, que son buscadores, todavía no: si dicen lo mismo que otro campo, siguen marcados hasta volver a guardar. El de una acción de fila sale encima de la tabla; el de la hoja, dentro de la hoja. |
 | Reconectando | Lo pintado se queda; una franja avisa «Reconectando…». |
 | App inactiva | «Esta app no está activa en este negocio». |
 | Sin permiso | No aparece lo que no puede hacer; si llega por otra puerta, «No tienes permiso». |

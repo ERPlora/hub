@@ -18,7 +18,10 @@ import { parse } from 'vue/compiler-sfc';
 /** The root of the hub: the paths below are relative to it. */
 const HUB_DIR = join(dirname(fileURLToPath(import.meta.url)), '..');
 
-/** What is left of the fields without their name, by file: it only goes down. */
+/** What is left of the fields without their name, by file: it only goes down. COMBO: a `name` on `<Combo>` would pass
+ *  this guard and fix nothing: Combo (@erplora/ui) does not declare the prop and its root is a div, and FormModal reads
+ *  the `name` property of the field, not the attribute. Those fields stay counted here until Combo hands its name to
+ *  its ion-input. */
 const STILL_UNNAMED: Record<string, number> = {
   'apps/appointment/frontend/components/AppointmentFormModal.vue': 6,
   'apps/appointment/frontend/components/SeriesFormModal.vue': 8,
@@ -42,22 +45,16 @@ const STILL_UNNAMED: Record<string, number> = {
   'apps/reservation/frontend/components/WaitlistFormModal.vue': 5,
   'apps/sale/frontend/components/backoffice/DepartmentFormModal.vue': 3,
   'apps/sale/frontend/components/backoffice/QuickNoteFormModal.vue': 2,
-  'apps/schedule/frontend/components/OverrideFormModal.vue': 3,
-  'apps/schedule/frontend/components/SpecialDayFormModal.vue': 3,
   'apps/service/frontend/components/CategoryFormModal.vue': 3,
   'apps/service/frontend/components/GrantAdjustModal.vue': 3,
   'apps/service/frontend/components/GrantVoidModal.vue': 1,
   'apps/service/frontend/components/PackageFormModal.vue': 8,
   'apps/service/frontend/components/ServiceFormModal.vue': 6,
-  'apps/staff/frontend/components/MemberFormModal.vue': 16,
-  'apps/staff/frontend/components/RoleFormModal.vue': 4,
-  'apps/staff/frontend/components/ScheduleFormModal.vue': 3,
-  'apps/staff/frontend/components/TerminateDialog.vue': 2,
-  'apps/staff/frontend/components/TimeOffFormModal.vue': 7,
+  'apps/staff/frontend/components/MemberFormModal.vue': 2, // Role and Hub user: Combos (see COMBO above)
+  'apps/staff/frontend/components/TimeOffFormModal.vue': 1, // Team member: a Combo
   'apps/table/frontend/components/TableFormModal.vue': 3,
   'apps/table/frontend/components/ZoneFormModal.vue': 3,
-  'apps/task/frontend/components/ProjectFormModal.vue': 3,
-  'apps/task/frontend/components/TaskFormModal.vue': 7,
+  'apps/task/frontend/components/TaskFormModal.vue': 2, // Assigned to and Project: Combos
   'apps/tax/frontend/components/AliasCreateModal.vue': 3,
   'apps/tax/frontend/components/CategoryCreateModal.vue': 3,
   'apps/tax/frontend/components/RuleCreateModal.vue': 12,

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:25b59af10bd6e114c97a0deaa1e9427570d59dccb2d260ddfd5207eef418723c -->
+<!-- generated from WORKBOOK.md sha256:f67db954b1a71e938f75cd7b8f96896b94c9d43589f30089b73415325a644225 -->
 
 ## What it is for and who it is for
 
@@ -140,7 +140,7 @@ above the Time Off one and the "Members" column of Roles (STAFF-F20 and STAFF-F2
 |---|---|
 | Loading | "Loading…" while the first result arrives; each figure shows "…". |
 | Empty | "No staff members.", "No roles defined.", "No time-off requests." or "This member has no schedules yet."; with a search or a filter, "No results". "Today’s time off" with nobody: "Nobody is away today."; on the **Home**, a panel with nothing to show says "No data". Commissions with nobody who can earn one: "No one on the team can earn a commission yet."; without Sales in the business, "Commissions come from the sales" and "Turn on Sales to see what each professional earned.", without a list. |
-| Error | The table's notice with "Retry"; in Settings, "The settings could not be loaded" with "Retry" and no form. The figures say "The figures could not be loaded" and "Today’s time off", "Who is away today could not be loaded", and the table keeps working; on the **Home**, the panel that cannot be read says "Unavailable" and the others go on. A refusal of a form shows inside the form, without losing what was typed; that of a row action, above the table. |
+| Error | The table's notice with "Retry"; in Settings, "The settings could not be loaded" with "Retry" and no form. The figures say "The figures could not be loaded" and "Today’s time off", "Who is away today could not be loaded", and the table keeps working; on the **Home**, the panel that cannot be read says "Unavailable" and the others go on. A refusal of a form shows inside the form, without losing what was typed, and each refused field says its reason under it and loses it as soon as that field is corrected, even if another one says the same (hub#888); **Role**, **Hub user** and the **Member** of a time off, which are search pickers, not yet: if they say the same as another field, they stay marked until the next save. The refusal of a row action shows above the table. |
 | Reconnecting | What is painted stays; a strip warns "Reconnecting…". |
 | App inactive | "This app is not active in this business". |
 | No permission | What they cannot do does not show; if it arrives through another door, "You do not have permission". |
