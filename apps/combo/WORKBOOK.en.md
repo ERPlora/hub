@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:123107d3da1a402cdf3edb98ad22557a7c699d9ddf9a58e5f880e9396de2368b -->
+<!-- generated from WORKBOOK.md sha256:cf2699e44f60c208db8cb19a641b4232bd652a3a621116797b56a583c0fb8d66 -->
 
 ## What it is for and who it is for
 
@@ -176,7 +176,8 @@ In: name, kitchen name, price, way of selling, VAT category, order and "On sale"
 categories from Taxes.
 Out: the menu (announces: new menu).
 If it fails: "Save" is grey while the name is missing and while the business has not yet said its
-currency, because the price is read in it (without it, "1500" yen would be saved as 150,000). Next to the
+currency, because the price is read in it (without it, "1500" yen would be saved as 150,000). If the currency cannot be read, the window says so ("The business's currency could not be read", with the
+reason) and offers "Retry", which asks for it again; as soon as it arrives, "Save" lights up (hub#938). Next to the
 field: "The menu needs a name.", "A menu eaten in needs its own VAT category:
 without it, it cannot be billed.", "A menu price cannot be below zero. To make a choice cheaper, give it
 a negative supplement instead.", "This is not an amount. Type a figure, for example 12.50." (also with
@@ -268,7 +269,11 @@ If it fails: "Pick a catalogue product first.", "This course already offers that
 be picked twice, switch on «the same option may be picked more than once».", "“{product}” is
 deactivated in Inventory: activate it before putting it in a menu.", "Only a product sold and priced
 by the unit can be a menu choice; “{product}” is sold by {unit}.", "A course holds
-40 choices at most." and the amount warnings. "Add several" with nothing ticked: "Tick at least one
+40 choices at most." and the amount warnings. "Add choice" (and "Save" when editing) is off while the
+business has not yet said its currency: the supplement is read in it, and without it "1500" yen would be
+saved as 150,000. If the currency cannot be read, the builder says so once, above the courses ("The
+business's currency could not be read", with the reason), and offers "Retry", which asks for it again; as
+soon as it arrives, the button lights up (hub#946). "Add several" with nothing ticked: "Tick at least one
 product first."; a search or a category with no products: "No products match.". If the
 catalogue does not load, the search box says so with "Retry". A product that does not exist yet is
 created first in Inventory: the search box finds it as soon as it is saved.

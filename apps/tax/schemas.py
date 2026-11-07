@@ -29,17 +29,15 @@ from pydantic import (
     model_validator,
 )
 
+from apps.tax.choices import COUNTRY_CODES
 from apps.tax.models import CATEGORY_KEY_MAX_LENGTH, CATEGORY_KEY_RE, TaxAlias, TaxRule
+from base.schemas import names
 
 T = TypeVar("T")
-
-#: The 249 officially assigned ISO 3166-1 alpha-2 codes (no ZZ, EU or XK).
-COUNTRY_CODES: tuple[str, ...] = tuple(
-    sorted(country.alpha_2 for country in pycountry.countries)
-)
-#: The business's country: Spain until the Hub receives the one the business chose in its ERPlora account
-#: (the SaaS's registry, phase 2), as the tax engine of the current product did.
-DEFAULT_COUNTRY = "ES"
+#: The countries the factory catalogue brings rules for (TAX-F16, migration 0002): Spain, and no other. A business of
+#: another country has them in its database too, but they never apply to it: it creates its own in Rules (hub#996);
+#: no rate of another country is planted without a reviewed source, since a made-up one would be declared.
+FACTORY_COUNTRIES: frozenset[str] = frozenset({"ES"})
 #: The tax family of each region with taxes of its own (TAX-F11): the Canary Islands charge IGIC, Ceuta and
 #: Melilla IPSI; any other place, its country's VAT. What a line with no category or rule is declared with.
 REGION_TAX_KINDS: dict[str, str] = {
@@ -141,6 +139,12 @@ REGION = "Region inside the country, ISO 3166-2 (ES-CN Canary Islands, ES-CE Ceu
 CATEGORY_REF = "The tax category: its key (product.generic), its name (Restaurant — food) or an alias (beer)."
 #: How the assistant's card names the category a write refers to, as the Rules and Aliases screens do.
 CATEGORY = gettext_noop("Category")
+#: What the assistant's card calls the rule a write acts on by its id (its Spanish in this app's catalog), as the Rules
+#: list calls one, never «Record».
+T_RULE = gettext_noop("Rule")
+#: The assistant's card names the rule a write acts on by this read (base/assistant.py ``REFERS``), run as whoever asks,
+#: never by its id: by its category, its country and its rate (``RuleNamedOut.label``).
+A_RULE = names("tax.rule.get", name=("label",))
 SEARCH = "Free text to search."
 DIRECTION = "Sort direction: asc or desc."
 TAX_TYPE = "Tax family: vat, igic (Canary Islands), ipsi (Ceuta and Melilla), surcharge, sales_tax, withholding, excise or import_duty."
@@ -317,7 +321,7 @@ class RuleCountriesIn(Schema):
 
 class RuleStatusIn(Schema):
     country_code: OptionalCountry = Field(
-        None, description=COUNTRY + " The business's; empty = any country counts."
+        None, description=COUNTRY + " Empty: the business's own, the one erplora.com registered (Spain without one)."
     )
 
 
@@ -375,6 +379,7 @@ class RuleIn(RuleFields):
     parent_id: UUID | None = Field(
         None,
         description="The root rule this one is a component of (same country, region and category).",
+        json_schema_extra=A_RULE,
     )
     component_label: OptionalComponentLabel = Field(
         None,
@@ -403,7 +408,7 @@ class RuleRefIn(_RegionOfTheCountry, Schema):
     the most recent deactivated root rule of that slot.
     """
 
-    id: UUID | None = Field(None, description="The rule's id.")
+    id: UUID | None = Field(None, title=T_RULE, description="The rule's id.", json_schema_extra=A_RULE)
     country_code: OptionalCountry = Field(
         None, description=COUNTRY + " With the category, instead of the id."
     )
@@ -417,6 +422,10 @@ class RuleRefIn(_RegionOfTheCountry, Schema):
         if self.id is None and not (self.country_code and self.tax_category_key):
             raise ValueError(str(WHICH_RULE))
         return self
+
+
+class RuleGetIn(Schema):
+    id: UUID = Field(description="The rule's id.")
 
 
 class RuleEndIn(RuleRefIn):
@@ -577,17 +586,28 @@ class RuleOut(Schema):
 RulePage = Page[RuleOut]
 
 
+class RuleNamedOut(RuleOut):
+    label: str = Field(
+        description="How a person names the rule, in the reader's language: its category, a component's label, its "
+        "country (and region) and its rate (Restaurant — food · Spain · 10%)."
+    )
+
+
 class RuleBulkOut(Schema):
     rules: list[RuleOut] = Field(description="The rules created, in the order sent.")
 
 
 class RuleStatusOut(Schema):
-    country_code: str | None = Field(description="The country asked; empty = any.")
+    country_code: str = Field(description="The country counted: the one asked, or the business's.")
     matching_rules: int = Field(
-        description="Active root rules in force today in that country."
+        description="Active root rules in force today in that country (another country's never count)."
     )
     configured: bool = Field(
         description="True when at least one applies: the till can price a sale."
+    )
+    factory_rules: bool = Field(
+        description="True when Taxes brings that country's rules ready (only Spain's); otherwise the business "
+        "creates its own in Rules."
     )
 
 

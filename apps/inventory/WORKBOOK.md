@@ -301,7 +301,8 @@ Inventario avisa a las demás apps de que hay un producto nuevo: Ventas lo ofrec
 TPV y el paso «Tu catálogo» de la puesta en marcha queda hecho (INVENTORY-F28).
 Si falla: «Guardar» está apagado mientras falten Nombre, SKU o categoría fiscal, y mientras el negocio no
 haya dicho todavía su moneda: el precio y el coste se leen en ella, y sin ella «1500» yenes se guardaría
-como 150 000. Sin categorías
+como 150 000. Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
+motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, «Guardar» se enciende (hub#938). Sin categorías
 fiscales sale «Todavía no hay categorías fiscales. Créalas en Impuestos: un producto no se puede
 vender sin saber cómo tributa.». Un importe ilegible: «Esto no es un importe. Escribe una cifra,
 por ejemplo 12,50.» o «Este importe se puede leer de dos maneras…». Una cantidad que no encaja en
@@ -582,7 +583,11 @@ Sale: el stock sube y queda el movimiento «Recepción» con cantidad, saldo, co
 albarán. Si se escribió coste, pasa a ser el coste del producto. Se aplica aunque el artículo no
 lleve control de stock. Si un artículo con control sube por encima de su umbral, avisa del cruce
 (INVENTORY-F18). Inventario avisa de que el stock cambió.
-Si falla: «Registrar recepción» está apagado sin cantidad. «La cantidad no respeta el incremento
+Si falla: «Registrar recepción» está apagado sin cantidad, y mientras el negocio no haya dicho todavía su
+moneda: el coste se lee en ella, y sin ella «1500» yenes se guardaría como 150 000. Si la moneda no se
+puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el motivo) y ofrece
+«Reintentar», que la vuelve a pedir; en cuanto llega, «Registrar recepción» se enciende (hub#946). El
+recuento y la baja no leen importes: no la esperan. «La cantidad no respeta el incremento
 permitido para esta unidad», un coste ilegible («Esto no es un importe…») o el motivo de
 cualquier otro rechazo salen dentro de la ventana. Un servicio no se recibe: no tiene el botón, y por el
 asistente o la API se rechaza con «Un servicio no lleva stock.». Una recepción con una línea sin

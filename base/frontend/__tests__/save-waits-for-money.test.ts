@@ -5,14 +5,17 @@
 // own door past the grey button, or that its button is its only one. When the money cannot be read instead (hub#938), the
 // window says so with «Retry» — the platform's BusinessMoneyError, in a window with FormModal or in a sheet without it —
 // and the helper fails a window that waits without a word, that lights «Save» up with no money to read in, whose notice
-// has no «Retry» or one that does not ask the server again, and one that stays grey after the answer.
+// has no «Retry» or one that does not ask the server again, and one that stays grey after the answer. A window opened
+// after the read had already failed (the page read the money on loading, the person taps later) says it as well: the
+// helper fails one whose notice only says a failure that comes with it open, and one said to open late that was open
+// all along.
 import { FormModal } from '@erplora/ui/components';
 import { IonButton } from '@ionic/vue';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { defineComponent, h, nextTick, ref } from 'vue';
+import { defineComponent, h, nextTick, ref, shallowRef, watch } from 'vue';
 
 import BusinessMoneyError from '../components/BusinessMoneyError.vue';
-import { useBusinessMoney } from '../lib/money';
+import { useBusinessMoney, useBusinessMoneyRead } from '../lib/money';
 import { flush, mountBase } from './mount-base';
 import { expectSaveWaitsForMoney, expectSaysMoneyUnreadable, moneyReadOf } from './save-waits-for-money';
 
@@ -141,21 +144,36 @@ function ownNotice(retry: 'mute' | 'deaf') {
 }
 
 /** A window whose «Save» waits for the business's real money (`useBusinessMoney`), with FormModal (`form`) or as a sheet
- *  with its own button (`sheet`), that places the platform's notice (`says`), one of its own (`mute`, `deaf`) or none;
- *  `lightsUp`: «Save» does not wait; `staysGrey`: nor does it light up once the business answers. */
-async function waitingFor(money: { kind: 'form' | 'sheet'; says: boolean | 'mute' | 'deaf'; lightsUp?: boolean; staysGrey?: boolean }) {
+ *  with its own button (`sheet`), that places the platform's notice (`says`), one of its own (`mute`, `deaf`), the
+ *  platform's only for a failure that comes while it is open (`fresh`) or none; `lightsUp`: «Save» does not wait;
+ *  `staysGrey`: nor does it light up once the business answers; `closed`: the form is closed until `open()`. */
+async function waitingFor(money: {
+  kind: 'form' | 'sheet';
+  says: boolean | 'mute' | 'deaf' | 'fresh';
+  lightsUp?: boolean;
+  staysGrey?: boolean;
+  closed?: boolean;
+}) {
   const sent: unknown[] = [];
+  const opened = ref(!money.closed);
   const Window = {
     setup() {
       const known = useBusinessMoney();
       const grey = () => (!known.value && !money.lightsUp) || !!money.staysGrey;
-      const notice = () => (money.says === true ? [h(BusinessMoneyError)] : money.says ? [ownNotice(money.says)] : []);
+      const { error } = useBusinessMoneyRead();
+      const failedOpen = shallowRef(false);
+      watch(error, (failure) => (failedOpen.value = !!failure && opened.value));
+      const says = () => (money.says === 'fresh' ? failedOpen.value : money.says);
+      const notice = () => {
+        const placed = says();
+        return placed === true ? [h(BusinessMoneyError)] : placed ? [ownNotice(placed)] : [];
+      };
       const save = (): void => {
         if (known.value) sent.push({ price: 1500 });
       };
       return () =>
         money.kind === 'form'
-          ? h(FormModal, { open: true, title: 'New thing', testid: 'thing', submitDisabled: grey(), onSubmit: save }, () => notice())
+          ? h(FormModal, { open: opened.value, title: 'New thing', testid: 'thing', submitDisabled: grey(), onSubmit: save }, () => notice())
           : h('div', [...notice(), h(IonButton, { 'data-testid': 'thing-submit', disabled: grey(), onClick: save }, () => 'Add')]);
     },
   };
@@ -172,7 +190,11 @@ async function waitingFor(money: { kind: 'form' | 'sheet'; says: boolean | 'mute
     sent: () => sent,
     settle,
   };
-  return { window, read: moneyReadOf(m) };
+  const open = async (): Promise<void> => {
+    opened.value = true;
+    await nextTick();
+  };
+  return { window, read: moneyReadOf(m), open };
 }
 
 describe('expectSaysMoneyUnreadable (hub#938)', () => {
@@ -208,5 +230,23 @@ describe('expectSaysMoneyUnreadable (hub#938)', () => {
   it('fails a window whose «Save» stays grey once the business answers', async () => {
     const w = await waitingFor({ kind: 'form', says: true, staysGrey: true });
     await expect(expectSaysMoneyUnreadable(w.window, w.read)).rejects.toThrow(/once the business answers/);
+  });
+
+  it('passes a window opened after the read had already failed (`opens`) that says so, with «Retry»', async () => {
+    const w = await waitingFor({ kind: 'form', says: true, closed: true });
+    await expect(expectSaysMoneyUnreadable(w.window, w.read, w.open)).resolves.toBeUndefined();
+  });
+
+  it('fails a window whose notice says a failure that comes with it open but not one from before it opened', async () => {
+    const open = await waitingFor({ kind: 'form', says: 'fresh' });
+    await expect(expectSaysMoneyUnreadable(open.window, open.read)).resolves.toBeUndefined();
+    document.body.innerHTML = '';
+    const late = await waitingFor({ kind: 'form', says: 'fresh', closed: true });
+    await expect(expectSaysMoneyUnreadable(late.window, late.read, late.open)).rejects.toThrow(/could not be read/);
+  });
+
+  it('fails a window said to open after the failure (`opens`) that was open all along', async () => {
+    const w = await waitingFor({ kind: 'form', says: true });
+    await expect(expectSaysMoneyUnreadable(w.window, w.read, w.open)).rejects.toThrow(/still closed/);
   });
 });

@@ -8,6 +8,7 @@ country: the same ``NotFound`` as the operation, never a silent Spain. Each hub 
 """
 
 import pytest
+from django.conf import settings
 from django.test import override_settings
 from django.utils import translation
 from live.context import OperationContext, Scope
@@ -15,8 +16,10 @@ from live.errors import NotFound, PermissionDenied
 from live.operations import get
 
 from base.models import Hub
-from base.operations import business_country
+from base.operations import business_country, current_business_country
 from base.schemas import BusinessIn
+from base.tenancy.context import use_control, use_hub
+from base.tenancy.tests.hubs import HUB_DATABASES
 
 pytestmark = pytest.mark.django_db
 
@@ -70,3 +73,31 @@ def test_it_reads_as_the_platform_whatever_the_caller_may_see(hubs):
     with pytest.raises(PermissionDenied):
         get("base.business.get")(clerk, BusinessIn())
     assert business_country(clerk.scope) == "PL"
+
+
+# ── The business at work, for a reading with no scope at hand (hub#996) ─────────────────────────────────────────────
+# Taxes resolves a rate deep inside Sales and Invoices, where no context is passed down: it asks for the country of the
+# business whose database is at work (``use_hub``), read by the same rule as above, never a second source.
+
+
+@pytest.mark.django_db(databases=HUB_DATABASES)
+def test_the_business_at_work_is_in_its_own_country_never_another_hub_s(hub_a, hub_b, no_test_fallback):
+    Hub.objects.filter(pk=hub_a.pk).update(country="PT")
+    Hub.objects.filter(pk=hub_b.pk).update(country="PL")
+    with use_hub(hub_a):
+        assert current_business_country() == "PT"
+    with use_hub(hub_b):
+        assert current_business_country() == "PL"
+    Hub.objects.filter(pk=hub_b.pk).update(country="")
+    with use_hub(hub_b):
+        assert current_business_country() == "ES"
+
+
+def test_erplora_s_own_hub_at_work_is_in_its_issuer_s_country():
+    with use_hub(Hub(slug=settings.PLATFORM_HUB_SLUG)), override_settings(PLATFORM_ISSUER_COUNTRY="GB"):
+        assert current_business_country() == "GB"
+
+
+def test_where_no_business_is_at_work_it_is_erplora_s_market(no_test_fallback):
+    with use_control():
+        assert current_business_country() == "ES"

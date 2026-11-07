@@ -9,6 +9,7 @@ import { Combo, InlineFeedback } from '@erplora/ui/components';
 import { HubIcon } from '@erplora/ui/shell';
 import { describe, expect, it } from 'vitest';
 
+import { expectSaveWaitsForMoney } from '../../../../base/frontend/__tests__/save-waits-for-money';
 import type { AssignmentOut } from '../operations';
 import type { Business } from '../../../../base/frontend/operations';
 import { business, click, errorFrame, flush, ionChecked, ionValue, JAPANESE, mountService, page, POLISH } from '../__tests__/mount-service';
@@ -77,6 +78,41 @@ describe('ServiceProfessionals: in the business currency (service-business-curre
     await s.result('base.business.get', business(JAPANESE));
     expect(s.el('service-professionals-price-a2').value).toBe('2500');
     expect(s.el('service-professionals-save-a2').disabled).toBe(true);
+  });
+});
+
+// hub#946 (SERVICE-F31, F32): an own price is read in the business's money, never before it answers: «1500» would be read
+// with two decimals and saved as 150000 yen. «Assign» and a row's «Save» wait in grey (a click on them reaches nothing
+// either), then the own price is 1500 yen.
+describe('ServiceProfessionals: an own price typed before the business answers (hub#946)', () => {
+  const window = (s: Awaited<ReturnType<typeof setup>>, save: string, amount: string) => ({
+    wrapper: s.wrapper,
+    save: () => s.el(save),
+    amount: () => s.el(amount),
+    sent: () => s.sent(),
+    settle: flush,
+    submit: null,
+  });
+
+  it.each(['1500', '¥1500'])('assigning someone at «%s»: «Assign» waits in grey, then 1500 yen', async (typed) => {
+    const s = await setup({ business: null });
+    await s.show(page([]));
+    s.answer(201, ROWS[0]);
+    s.member().vm.$emit('update:modelValue', { id: 'm9', label: 'Carla' });
+    await ionValue(s.el('service-professionals-price'), typed, 'ionInput');
+    await expectSaveWaitsForMoney(window(s, 'service-professionals-assign', 'service-professionals-price'), () => s.result('base.business.get', business(JAPANESE)));
+    await click(s.el('service-professionals-assign'));
+    expect(s.sent().map((call) => call.body)).toEqual([{ service_id: 's1', member_id: 'm9', custom_price: 1500 }]);
+  });
+
+  it('changing someone’s own price to «1500»: their «Save» waits in grey, then 1500 yen', async () => {
+    const s = await setup({ business: null });
+    await s.show(page([row('a2', { custom_price: 2500, price: 2500 })]));
+    s.answer(200, row('a2', { custom_price: 1500, price: 1500 }));
+    await ionValue(s.el('service-professionals-price-a2'), '1500', 'ionInput');
+    await expectSaveWaitsForMoney(window(s, 'service-professionals-save-a2', 'service-professionals-price-a2'), () => s.result('base.business.get', business(JAPANESE)));
+    await click(s.el('service-professionals-save-a2'));
+    expect(s.sent().map((call) => call.body)).toEqual([{ id: 'a2', custom_price: 1500 }]);
   });
 });
 

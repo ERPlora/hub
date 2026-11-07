@@ -180,9 +180,12 @@ export interface RuleBulkOut {
 }
 
 export interface RuleStatusOut {
-  country_code: string | null;
+  /** The country counted: the one asked, or the business's. */
+  country_code: string;
   matching_rules: number;
   configured: boolean;
+  /** Whether Taxes brings that country's rules ready (only Spain's, TAX-F16). */
+  factory_rules: boolean;
 }
 
 // ── Aliases ────────────────────────────────────────────────────────────────────────────────────

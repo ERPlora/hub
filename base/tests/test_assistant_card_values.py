@@ -378,20 +378,17 @@ def test_no_list_of_texts_sent_as_they_are_is_named():
 UNNAMED_REFERENCES = {
     "appointment": 12,
     "invoice": 1,
-    "payment": 8,
     # The sale and the appointment a voucher or a session came from, the line of a sale that charged a voucher, the line
     # of an order that holds a session and the reference of a return: data of apps Services does not require, so it
     # reads none of them and base.E009 refuses a mark (hub#756). The one that came in, the sale's line (hub#769), is the
     # same datum as the sale beside it on service.grant.create: naming them is that issue's to decide.
     "service": 7,
-    "tax": 4,
     "verifactu": 6,
 }
 
 #: The closed lists (``enum`` of text) of the assistant's writes with a value the models give no label — of their app,
 #: or those their ``choices_of`` mark names —, by app: their card says that value as sent. Only ever lower, as above.
 UNLABELLED_LISTS = {
-    "tax": 5,
     # The type of a template's button (template.create and .update): it lives in the JSON of its buttons, and no field
     # of the models names its values to point a mark at. The card says the buttons by how many go, never by their codes
     # (a line of two data: test_the_buttons_of_a_template_go_by_how_many_never_by_their_codes, hub#571).
@@ -541,6 +538,8 @@ TITLED_IN_SPANISH = {
         f"online_booking.booking.{action}:id": "Reserva"
         for action in ("cancel", "complete", "confirm", "delete", "no_show")
     },
+    **{f"payment.method.{action}:id": "Método" for action in ("activate", "deactivate", "update")},
+    **{f"payment.payment.{action}:id": "Pago" for action in ("approve", "cancel", "mark_completed", "mark_sent")},
     **{f"pricing.price_item.{action}:id": "Precio" for action in ("remove", "update")},
     **{f"pricing.price_list.{action}:id": "Tarifa" for action in ("activate", "deactivate", "set_default", "update")},
     **{f"pricing.rule.{action}:id": "Regla de descuento" for action in ("activate", "deactivate", "update")},
@@ -566,6 +565,7 @@ TITLED_IN_SPANISH = {
     **{f"table.zone.{action}:id": "Zona" for action in ("delete", "update")},
     **{f"task.project.{action}:id": "Proyecto" for action in ("delete", "update")},
     **{f"task.task.{action}:id": "Tarea" for action in ("assign", "complete", "delete", "set_status", "update")},
+    **{f"tax.rule.{action}:id": "Regla" for action in ("activate", "deactivate", "end")},
     **{f"whatsapp_inbox.conversation.{action}:id": "Conversación" for action in (
         "assign", "erase", "flag", "link_customer", "mark_read", "set_status",
     )},

@@ -228,6 +228,8 @@ Pasos:
 4. Elige la Categoría fiscal (son las de Impuestos, por su nombre y su tipo; viene la de los Ajustes
    si hay una). Sin ella **Crear servicio** no se puede pulsar; tampoco mientras el negocio no haya dicho
    todavía su moneda, porque el precio se lee en ella (sin ella, «1500» yenes se guardaría como 150 000).
+   Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
+   motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, **Crear servicio** se enciende (hub#938).
 5. Pulsa **Crear servicio**: el formulario se cierra y el servicio sale en la tabla como **Activo**.
 Entra: las categorías de Servicios y las categorías fiscales activas de Impuestos.
 Sale: el servicio en oferta y reservable (`service.service.created`); desde ese momento lo ven la
@@ -443,7 +445,8 @@ canjear.»; un servicio repetido, archivado o que no existe; un importe ilegible
 su campo; un nombre que ya tiene otro bono vivo, «Ya hay un paquete con ese nombre. Elige otro
 nombre.». «Crear paquete» (y «Guardar cambios» al editarlo, SERVICE-F13) está en gris mientras el negocio
 no haya dicho todavía su moneda, porque el precio cerrado y el descuento se leen en ella (sin ella,
-«1500» yenes se guardaría como 150 000).
+«1500» yenes se guardaría como 150 000). Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
+motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, el botón se enciende (hub#938).
 Implicados: SERVICE-F14, SERVICE-F22
 
 ### SERVICE-F13 Editar o eliminar un bono
@@ -814,7 +817,11 @@ los profesionales de un servicio y tomar su duración y su precio propios, y Ven
 propio (SALE-F38). Asignar otra vez a la misma persona (asistente o API) cambia sus minutos y su precio;
 su servicio principal solo cambia si se dice.
 Si falla: dentro de la sección, «Ese miembro del personal no existe en este negocio.», un nombre que
-vale para varios (la lista para elegir) o el importe ilegible o negativo. Mientras llega la lista sale
+vale para varios (la lista para elegir) o el importe ilegible o negativo. **Asignar** está apagado
+mientras el negocio no haya dicho todavía su moneda: el precio propio se lee en ella, y sin ella «1500»
+yenes se guardaría como 150 000; si no se puede leer, «Editando servicio» lo dice arriba («No se ha podido
+leer la moneda del negocio», con el motivo) y ofrece «Reintentar»; en cuanto llega, **Asignar** se
+enciende (hub#946). Mientras llega la lista sale
 «Cargando…»; si no se puede leer, «No se han podido cargar los profesionales.» con el motivo y
 «Reintentar», nunca «Nadie asignado todavía».
 Implicados: STAFF-F01, SALE-F38
@@ -836,7 +843,8 @@ Pasos:
 Entra: la asignación.
 Sale: el cambio (`service.assignment.updated`, `service.assignment.removed`). Dar de baja a una
 persona en Personal la quita de todos los servicios que hacía.
-Si falla: «Esa asignación no existe en este negocio.».
+Si falla: «Esa asignación no existe en este negocio.». **Guardar** espera apagado a la moneda del
+negocio, como **Asignar** (SERVICE-F31): el precio propio se lee en ella (hub#946).
 Implicados: SERVICE-F31, SERVICE-F33, STAFF-F06
 
 ### SERVICE-F33 Saber quién puede hacer un servicio

@@ -18,6 +18,7 @@ from dataclasses import dataclass, field
 from decimal import ROUND_HALF_UP, Decimal
 from uuid import UUID
 
+from babel.numbers import format_percent
 from django.conf import settings
 from django.db.models import Case, CharField, F, Q, QuerySet, Value, When
 from django.db.models.functions import Coalesce
@@ -25,11 +26,11 @@ from django.utils import timezone, translation
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext
 from live.errors import Conflict, InvalidPayload, NotFound
-from live.operations import operation
+from live.operations import INTERNAL, operation
 
 from apps.tax.models import SYSTEM_CATEGORY_LABELS, TaxAlias, TaxCategory, TaxRule, TaxSettings
 from apps.tax.schemas import (
-    DEFAULT_COUNTRY,
+    FACTORY_COUNTRIES,
     REGION_OF_ANOTHER_COUNTRY,
     REGION_TAX_KINDS,
     TAX_REGIONS,
@@ -45,7 +46,9 @@ from apps.tax.schemas import (
     CategoryPage,
     RuleCountriesIn,
     RuleCountriesOut,
+    RuleGetIn,
     RuleListIn,
+    RuleNamedOut,
     RulePage,
     RuleParentIn,
     RuleStatusIn,
@@ -54,6 +57,8 @@ from apps.tax.schemas import (
     TaxSettingsOut,
     normalize_text,
 )
+from base import operations as platform
+from base.business import babel_locale, country_name, country_or_market
 from base.ordering import list_order
 
 CATEGORY_NOT_FOUND = _("This tax category does not exist.")
@@ -188,10 +193,14 @@ def _components(root: TaxRule, on: dt.date) -> list[TaxRule]:
 
 def business_jurisdiction() -> tuple[str, str | None]:
     """The business's ``(COUNTRY, REGION or None)``: the one source every calculation that names no country
-    reads (sales, invoice, the API; TAX-F11). The country is Spain until the Hub receives the business's
-    from its ERPlora account; the region is the one it keeps in Taxes' settings."""
+    reads (sales, invoice, the API; TAX-F11). The country is the one erplora.com registered for the business at
+    work, Spain without one (a demo, ERPlora's own hub), read as Customers and VeriFactu read it (hub#996): a
+    country without rules of its own is refused, never charged Spain's. The region is the one it keeps in Taxes'
+    settings, and only while it is one of that country's tax territories."""
+    country = platform.current_business_country()
     settings = TaxSettings.objects.first()
-    return DEFAULT_COUNTRY, (settings.region_code or None) if settings else None
+    region = (settings.region_code or None) if settings else None
+    return country, region if region in TAX_REGIONS.get(country, ()) else None
 
 
 def _jurisdiction(country_code: str | None, region_code: str | None) -> tuple[str, str | None]:
@@ -217,7 +226,7 @@ def own_tax_kind(country_code: str, region_code: str | None) -> str | None:
 def tax_kind_of(country_code: str | None, region_code: str | None) -> str:
     """The tax family of a territory (TAX-F11): IGIC in the Canary Islands, IPSI in Ceuta and Melilla, VAT
     anywhere else. What a line with no category or rule is declared with (``Impuesto`` 03, 02 or 01)."""
-    country, region = _jurisdiction(country_code or DEFAULT_COUNTRY, region_code)
+    country, region = _jurisdiction(country_or_market(country_code or ""), region_code)
     return own_tax_kind(country, region) or DEFAULT_TAX_KIND
 
 
@@ -501,6 +510,35 @@ def load_rule(rule_id: UUID) -> TaxRule | None:
     return TaxRule.objects.select_related("category").filter(pk=rule_id).first()
 
 
+def rule_label(rule: TaxRule) -> str:
+    """How a person names ``rule``, in the active language: its category, a component's label, its country (and its
+    region) and its rate, as the Rules screen tells one from another («Cervezas · España (ES-CN) · 7 %»)."""
+    language = translation.get_language()
+    place = country_name(rule.country_code, language)
+    if rule.region_code:
+        place = f"{place} ({rule.region_code})"
+    rate = format_percent(rule.rate_pct.normalize() / _HUNDRED, locale=babel_locale(language), decimal_quantization=False)
+    return " · ".join(part for part in (rule.category.display_name, rule.component_label, place, rate) if part)
+
+
+@operation(
+    "tax.rule.get",
+    kind="query",
+    permission="tax.view",
+    input=RuleGetIn,
+    output=RuleNamedOut,
+    ai=INTERNAL,
+)
+def get_rule(ctx: OperationContext, params: RuleGetIn) -> dict:
+    """One rule, active or deactivated, with its name: what names a rule on the assistant's card (``schemas.A_RULE``);
+    the model and the screens read the rules by their list."""
+    rule = load_rule(params.id)
+    if rule is None:
+        raise NotFound(RULE_NOT_FOUND)
+    with translation.override(ctx.language):
+        return {**rule_row(rule), "label": rule_label(rule)}
+
+
 #: By category, country and region; a component right after its root (the screen's default).
 _GROUPED = (
     "category__key",
@@ -583,21 +621,27 @@ def list_rules(ctx: OperationContext, params: RuleListIn) -> dict:
     input=RuleStatusIn,
     output=RuleStatusOut,
     ai={
-        "description": "Whether the business's taxes are configured: how many active root tax rules in force "
-        "today match its country. Zero means the till cannot price what the business sells."
+        "description": "Whether the business's taxes are configured: how many active root tax rules of its country "
+        "(or of the one named) are in force today, and whether Taxes brings that country's rules ready (only "
+        "Spain's). Zero means the till cannot price what the business sells until it creates them in Rules."
     },
 )
 def rule_status(ctx: OperationContext, params: RuleStatusIn) -> dict:
-    """Whether the business can price a sale today: an active root rule in force in its country.
+    """Whether the business can price a sale today: an active root rule in force in its country (TAX-F17).
 
-    Any qualification and any tax family count (an exempt physiotherapist, a Canary business). Without
-    a country, every active root rule counts: no false «you are missing your taxes».
+    Any qualification and any tax family count (an exempt physiotherapist, a Canary business). Only that
+    country's: a business of another country also keeps Spain's factory rules, which never price its sales
+    (hub#996), so they never tell it its taxes are set up.
     """
+    country = params.country_code or business_jurisdiction()[0]
     rules = _in_force(TaxRule.objects.filter(parent__isnull=True, is_active=True), business_today())
-    if params.country_code:
-        rules = rules.filter(country_code=params.country_code)
-    matching = rules.count()
-    return {"country_code": params.country_code, "matching_rules": matching, "configured": matching > 0}
+    matching = rules.filter(country_code=country).count()
+    return {
+        "country_code": country,
+        "matching_rules": matching,
+        "configured": matching > 0,
+        "factory_rules": country in FACTORY_COUNTRIES,
+    }
 
 
 def parent_candidates(
@@ -765,8 +809,8 @@ def resolve_alias(ctx: OperationContext, params: AliasResolveIn) -> dict:
 
 
 def settings_row(settings: TaxSettings | None) -> dict:
-    country, _region = business_jurisdiction()
-    region = (settings.region_code or None) if settings else None
+    """What applies: a region kept that is not one of the business's country's counts as none (TAX-F11)."""
+    country, region = business_jurisdiction()
     return {
         "country_code": country,
         "region_code": region,

@@ -6,8 +6,8 @@
 // notice with «Go to Methods»). The amount is read as a person writes it (`parseMoney`), in the business's currency
 // and with its decimals (the field says which: «Amount (PLN)»); the server records the payment in that currency
 // (the old payments#35). Until the business answers, «Record payment» waits: what was typed is read in its currency
-// then, never guessed (hub#325). One that is not an amount, or is 0, is refused under the field before asking the
-// server. The server's refusals stay
+// then, never guessed (hub#325); if that read fails, the window says so with «Retry» (hub#938). One that is not an
+// amount, or is 0, is refused under the field before asking the server. The server's refusals stay
 // in the form, under their field, with what was typed (the old pm#513). The attempt key is born with
 // each opening and travels on every send of it: a retry after a lost answer records one payment, never
 // two (the old payments#8); the next «New payment» is another attempt.
@@ -17,6 +17,7 @@ import { IonButton, IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 
+import BusinessMoneyError from '../../../../base/frontend/components/BusinessMoneyError.vue';
 import { useT } from '../composables/useT';
 import { localDay, useBusinessMoney } from '../lib/format';
 import { parseMoney } from '../lib/money';
@@ -128,6 +129,7 @@ function goToMethods(): void {
   >
     <template #default="{ fieldErrors }">
       <div class="payment-form">
+        <BusinessMoneyError />
         <InlineFeedback
           v-if="failed"
           tone="danger"

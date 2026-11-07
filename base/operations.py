@@ -12,7 +12,7 @@ is no hub either; :func:`is_platform_host` tells it apart so ``base.middleware``
 Actor = the session's user; permissions from ``base.permissions``. :func:`hub_id`, :func:`is_demo_hub` and
 :func:`is_platform_hub` are what the apps ask about a hub's registry (``base.registry``; a module never reads it), and
 :func:`business_currency` the currency its business charges in and :func:`business_country` the country it is in
-(``base.business.get``, read as the platform). An app
+(``base.business.get``, read as the platform; :func:`current_business_country` for the business at work). An app
 runs another app's operation with :func:`call`, and says with :func:`allow_idle_wait` that its transaction waits for
 an answer from outside.
 This is the only piece phase 2 replaces (scope = ``use_hub``): from S1, :meth:`HubContextBuilder.enter` gives a live
@@ -43,7 +43,7 @@ from base.approvals import Approved, consequence_context
 from base.business import country_or_market
 from base.permissions import permissions_for, reload_user
 from base.tenancy import connections as tenancy_connections
-from base.tenancy.context import HUB_SCOPE_KIND, use_hub
+from base.tenancy.context import HUB_SCOPE_KIND, current_hub, use_hub
 from base.tenancy.identity import HubIdentityMismatch
 
 
@@ -115,6 +115,18 @@ def business_country(scope: Scope) -> str:
     scope that is no hub's has none: the operation's ``NotFound``, never a silent Spain."""
     read = get_operation(BUSINESS)
     return country_or_market(read(system_context(scope), read.input()).country)
+
+
+def current_business_country() -> str:
+    """The country (ISO 3166-1 alpha-2) of the business at work, the hub whose database the active context opened
+    (``use_hub``), as :func:`business_country` reads it: for a reading with no scope at hand, such as Taxes' jurisdiction
+    deep inside a sale (TAX-F11, hub#996), as ``base.business.business_zone`` tells its clock. Where no business is at
+    work (the platform's context), ERPlora's market, Spain, as a business without a country
+    (``base.business.country_or_market``)."""
+    hub = current_hub()
+    if hub is None:
+        return country_or_market("")
+    return business_country(Scope(HUB_SCOPE_KIND, hub.slug))
 
 
 def allow_idle_wait(seconds: int) -> None:

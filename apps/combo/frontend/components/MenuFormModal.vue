@@ -4,7 +4,7 @@
 // answers), «How is it sold?» (both consequences always shown, the chosen one stressed: the merchant must not
 // discover it on an invoice), the VAT category (only eaten in; searched in Taxes), the order on the list
 // and «On sale». «Save» waits in grey until the business has answered its money (the price is read in it;
-// hub#918). A menu eaten in without a VAT category, or an amount that is not one, is refused before anything is sent. «Menu · {name}» sends only what changed. Refusals stay under their field. «Photo» (COMBO-F14,
+// hub#918), and says so with «Retry» if that read fails (hub#938). A menu eaten in without a VAT category, or an amount that is not one, is refused before anything is sent. «Menu · {name}» sends only what changed. Refusals stay under their field. «Photo» (COMBO-F14,
 // like an item's): a library image or a photo of its own, sent once the menu is saved (`set_image`, `upload_image`,
 // «Uploading photo…»); if the menu saved and the photo did not, the dialog says so with «Retry» (only the photo goes
 // again) and the menu keeps the photo it had.
@@ -13,6 +13,7 @@ import { useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { IonButton, IonCheckbox, IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import BusinessMoneyError from '../../../../base/frontend/components/BusinessMoneyError.vue';
 import ImageField from '../../../../base/frontend/components/ImageField.vue';
 import { draftOf, type ImageDraft, useImageSave } from '../../../../base/frontend/lib/item-image';
 import { useLocale, useT } from '../composables/useT';
@@ -176,6 +177,7 @@ function retryPhoto(): void {
   >
     <template #default="{ fieldErrors }">
       <div class="combo-menu-form">
+        <BusinessMoneyError />
         <InlineFeedback
           v-if="photo.failure.value"
           tone="warning"

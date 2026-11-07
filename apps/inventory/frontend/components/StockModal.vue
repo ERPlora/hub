@@ -6,12 +6,15 @@
 //     the difference), «Reason (required)» → `inventory.stock.count`;
 //   - write_off: the quantity and its reason → `inventory.stock.write_off`.
 // The action is off until it can be taken, with the note of what is missing; quantities go in the
-// product's unit (its step stated); a refusal stays in the dialog under its field.
+// product's unit (its step stated); a refusal stays in the dialog under its field. A receipt reads its unit cost in the
+// business's money: «Record receipt» waits in grey until the business answers it, and says so with «Retry» if that
+// read fails (hub#946); a count or a write-off reads no amount and never waits.
 import { FormModal } from '@erplora/ui/components';
 import { type OutputOf, useCommand } from '@erplora/ui/sdk';
 import { IonInput, IonItem, IonLabel, IonList, IonNote } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import BusinessMoneyError from '../../../../base/frontend/components/BusinessMoneyError.vue';
 import { useT } from '../composables/useT';
 import type { Unit } from '../composables/useUnits';
 import { errorFields } from '../lib/errors';
@@ -85,8 +88,14 @@ const needs = computed(() => {
   return '';
 });
 const ready = computed(() => !!qty.value.trim() && (!needsReason.value || !!reason.value.trim()));
+/** A receipt's unit cost is read in the business's money: until it answers, «Record receipt» waits (hub#946). */
+const waitsForMoney = computed(() => props.kind === 'receive' && !business.value);
 
 async function save(): Promise<void> {
+  // No unit cost is read before the business answers its money: «1500» would be read with two decimals, whatever its
+  // currency counts (in yen, 150000; hub#946). Nor judged: the attempt counts only once the money is known, or the
+  // field would call «¥1500» not an amount while the dialog waits.
+  if (waitsForMoney.value) return;
   tried.value = true;
   const product = props.product;
   const quantity = read.value;
@@ -115,10 +124,11 @@ async function save(): Promise<void> {
     :submit-label="$t(texts.submit)"
     :pending="pending"
     :error="error"
-    :submit-disabled="!ready"
+    :submit-disabled="!ready || waitsForMoney"
     @submit="save"
   >
     <div class="stock-form">
+      <BusinessMoneyError v-if="kind === 'receive'" />
       <ion-list lines="full">
         <ion-item data-testid="inventory-stock-current">
           <ion-label>{{ $t('inventory.stock.current') }}</ion-label>

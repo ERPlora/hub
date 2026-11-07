@@ -6,7 +6,8 @@
 // its general rate (`invoice.invoice.line_defaults`); both followed live (TAX-F11): «VAT %» and 21 on the
 // peninsula, «IGIC %» in the Canary Islands, «IPSI %» in Ceuta and Melilla, blank when the territory has no
 // rule of its own tax; a plain «Tax %» while the territory's tax is not known. «Issue invoice» stays grey until the
-// business has answered its money (each price is read in it), every line has a description, a quantity, a price
+// business has answered its money (each price is read in it; if that read fails the window says so with «Retry»,
+// hub#938), every line has a description, a quantity, a price
 // and a rate and, for an invoice series (F1), until the recipient is complete; a price that is not an amount is
 // said with its line before anything is sent.
 // It runs `invoice.invoice.create` (the server computes the tax, closed once per rate, and numbers it),
@@ -19,6 +20,7 @@ import { toastSuccess } from '@erplora/ui/shell';
 import { IonInput } from '@ionic/vue';
 import { computed, shallowRef, watch } from 'vue';
 
+import BusinessMoneyError from '../../../../base/frontend/components/BusinessMoneyError.vue';
 import { useTaxKind } from '../../../tax/frontend/composables/useTaxName';
 import { useLocale, useT } from '../composables/useT';
 import { typedRate, useBusinessMoney } from '../lib/format';
@@ -121,6 +123,7 @@ async function issue(): Promise<void> {
   >
     <template #default="{ fieldErrors }">
       <div class="invoice-create__fields">
+        <BusinessMoneyError />
         <SeriesSelect
           v-model="seriesCode"
           v-model:invoice-type="invoiceType"

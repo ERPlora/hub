@@ -77,6 +77,11 @@ export function countryLabel(code: string, locale: string): string {
   return labelOf(code, regionNames(locale));
 }
 
+/** One code as a sentence names it («Portugal»), without its code; a code outside the list stays as it came. */
+export function countryName(code: string, locale: string): string {
+  return (KNOWN.has(code) ? regionNames(locale)?.of(code) : undefined) ?? code;
+}
+
 /** Some codes (those a business has rules for) as a filter offers them: named, sorted by name, once. */
 export function countryChoices(codes: Iterable<string>, locale: string): CountryOption[] {
   const names = regionNames(locale);

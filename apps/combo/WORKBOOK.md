@@ -191,7 +191,8 @@ Entra: nombre, nombre de cocina, precio, forma de venta, tipo de IVA, orden y «
 categorías de IVA las lee de Impuestos.
 Sale: el menú (avisa: menú nuevo).
 Si falla: «Guardar» está en gris mientras falte el nombre y mientras el negocio no haya dicho todavía su
-moneda, porque el precio se lee en ella (sin ella, «1500» yenes se guardaría como 150 000). Junto al
+moneda, porque el precio se lee en ella (sin ella, «1500» yenes se guardaría como 150 000). Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
+motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, «Guardar» se enciende (hub#938). Junto al
 campo: «El menú necesita un nombre.», «Un menú que se consume en el local
 necesita su propio tipo de IVA: sin él no se puede facturar.», «El precio de un menú no puede ser
 negativo. Para abaratar una opción, ponle un suplemento negativo.», «Esto no es un importe. Escribe
@@ -286,7 +287,11 @@ pueda elegir dos veces, activa «se puede elegir la misma opción más de una ve
 desactivado en Inventario: actívalo antes de ponerlo en un menú.», «Solo un producto que se vende y se
 cobra por unidades puede ser una elección de menú; «{producto}» se vende por {unidad}.», «Un plato admite
 como mucho 40 elecciones.» y los avisos de
-importe. «Añadir varios» sin nada marcado: «Marca al menos un producto.»; una búsqueda o una categoría
+importe. «Añadir elección» (y «Guardar» al editar) está apagado mientras el negocio no haya dicho todavía
+su moneda: el suplemento se lee en ella, y sin ella «1500» yenes se guardaría como 150 000. Si la moneda no
+se puede leer, el constructor lo dice una vez, encima de los platos («No se ha podido leer la moneda del
+negocio», con el motivo), y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, el botón se
+enciende (hub#946). «Añadir varios» sin nada marcado: «Marca al menos un producto.»; una búsqueda o una categoría
 sin productos: «Ningún producto coincide.». Si el catálogo no carga, el buscador lo dice con
 «Reintentar». Un producto que aún no existe se crea antes en Inventario: el buscador lo encuentra en
 cuanto se guarda.

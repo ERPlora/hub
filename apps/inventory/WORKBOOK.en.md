@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:6001c78e0c2aa06430082d7f3b1955d5d99814c8d5c09d07ee38aee05277e66e -->
+<!-- generated from WORKBOOK.md sha256:bd36f4b5cef97e21c9614432b3c00078d72714a333a4a480a0e75387ab8e25a5 -->
 
 ## What it is for and who it is for
 
@@ -285,7 +285,8 @@ Inventory tells the other apps there is a new product: Sales offers it on the ti
 setup step "Your catalog" is done (INVENTORY-F28).
 If it fails: "Save" is off while Name, SKU or tax category are missing, and while the business has not
 yet said its currency: the price and the cost are read in it, and without it "1500" yen would be saved
-as 150,000. With no tax categories it says
+as 150,000. If the currency cannot be read, the window says so ("The business's currency could not be read", with the
+reason) and offers "Retry", which asks for it again; as soon as it arrives, "Save" lights up (hub#938). With no tax categories it says
 "There are no tax categories yet. Create them in Taxes: a product cannot be sold until it is known how
 it is taxed.". An unreadable amount: "This is not an amount. Type a figure, for example 12.50." or
 "This amount can be read in two ways…". A quantity that does not fit the unit: "The quantity does not
@@ -551,7 +552,11 @@ Out: the stock goes up and the "Reception" movement stays with quantity, balance
 one, the delivery note. If a cost was typed, it becomes the product's cost. It applies even if the item
 has no stock control. If an item with control goes above its threshold, it tells of the crossing
 (INVENTORY-F18). Inventory tells that the stock changed.
-If it fails: "Record receipt" is off without a quantity. "The quantity does not respect the step allowed
+If it fails: "Record receipt" is off without a quantity, and while the business has not yet said its
+currency: the cost is read in it, and without it "1500" yen would be saved as 150,000. If the currency
+cannot be read, the window says so ("The business's currency could not be read", with the reason) and
+offers "Retry", which asks for it again; as soon as it arrives, "Record receipt" lights up (hub#946). The
+count and the write-off read no amounts: they do not wait for it. "The quantity does not respect the step allowed
 for this unit", an unreadable cost ("This is not an amount…") or the reason of any other refusal show
 inside the window. A service is not received: it has no button, and through the assistant or the API it
 is refused with "A service has no stock.". A goods receipt with a line without a product, with a product

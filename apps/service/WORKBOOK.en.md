@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:db46b5e07ff2b76e018d22d57eec0256bfaf7f55c66bcd7e09c0d183c7bef6dc -->
+<!-- generated from WORKBOOK.md sha256:82d0c78cf41435e2834278d28f30261021d09773cb1467bdd0a9f24fd7ca8cc4 -->
 
 ## What it is for and who it is for
 
@@ -214,7 +214,8 @@ Steps:
 4. Choose the Tax category (they are the ones of Taxes, by their name and their rate; the one of the
    Settings comes chosen if there is one). Without it **Create service** cannot be tapped; nor while the
    business has not yet said its currency, because the price is read in it (without it, "1500" yen would be
-   saved as 150,000).
+   saved as 150,000). If the currency cannot be read, the window says so ("The business's currency could not be read", with the
+   reason) and offers "Retry", which asks for it again; as soon as it arrives, **Create service** lights up (hub#938).
 5. Tap **Create service**: the form closes and the service shows in the table as **Active**.
 In: the categories of Services and the active tax categories of Taxes.
 Out: the service on offer and bookable (`service.service.created`); from that moment the agenda and the
@@ -423,7 +424,8 @@ redeemed."; a repeated service, an archived one or one that does not exist; an u
 amount, below its field; a name another live voucher already has, "There is already a package with that
 name. Pick another name.". "Create package" (and "Save changes" when editing it, SERVICE-F13) is grey while
 the business has not yet said its currency, because the closed price and the discount are read in it
-(without it, "1500" yen would be saved as 150,000).
+(without it, "1500" yen would be saved as 150,000). If the currency cannot be read, the window says so ("The business's currency could not be read", with the
+reason) and offers "Retry", which asks for it again; as soon as it arrives, the button lights up (hub#938).
 Involved: SERVICE-F14, SERVICE-F22
 
 ### SERVICE-F13 Edit or delete a voucher
@@ -783,7 +785,11 @@ the professionals of a service and to take their own duration and price, and Sal
 price (SALE-F38). Assigning the same person again (assistant or API) changes their minutes and their
 price; their main service only changes if it is said.
 If it fails: inside the section, "That staff member does not exist in this business.", a name that fits
-several (the list to choose from) or the amount unreadable or negative. While the list arrives it shows
+several (the list to choose from) or the amount unreadable or negative. **Assign** is off while the
+business has not yet said its currency: the own price is read in it, and without it "1500" yen would be
+saved as 150,000; if it cannot be read, "Editing service" says so at the top ("The business's currency
+could not be read", with the reason) and offers "Retry"; as soon as it arrives, **Assign** lights up
+(hub#946). While the list arrives it shows
 "Loading…"; if it cannot be read, "The professionals could not be loaded." with the reason and
 "Retry", never "Nobody assigned yet".
 Involved: STAFF-F01, SALE-F38
@@ -804,7 +810,8 @@ Steps:
 In: the assignment.
 Out: the change (`service.assignment.updated`, `service.assignment.removed`). A person leaving in Staff
 removes them from every service they performed.
-If it fails: "That assignment does not exist in this business.".
+If it fails: "That assignment does not exist in this business.". **Save** waits, off, for the business's
+currency, like **Assign** (SERVICE-F31): the own price is read in it (hub#946).
 Involved: SERVICE-F31, SERVICE-F33, STAFF-F06
 
 ### SERVICE-F33 Know who can perform a service

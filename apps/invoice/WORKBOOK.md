@@ -310,7 +310,8 @@ rellena la tarjeta de un cliente, y el del NIF si cambia el país o el tipo de d
 solo señala campos en cuanto se cambia algo, y los dos vuelven si el siguiente intento también se
 rechaza. Si no se puede leer el territorio fiscal, el tipo se llama «Imp. %», sale vacío y avisa «No se
 pudo leer el territorio fiscal del negocio: escribe el tipo de cada línea.»; la factura se emite igual,
-con el impuesto del territorio.
+con el impuesto del territorio. Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
+motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, «Emitir factura» se enciende (hub#938).
 Implicados: TAX-F18, CUSTOMER-F17, TAX-F11
 
 ### INVOICE-F04 El cliente pide la factura completa de su tique

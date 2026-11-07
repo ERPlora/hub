@@ -13,6 +13,7 @@ import { toastSuccess } from '@erplora/ui/shell';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { defineComponent, h } from 'vue';
 
+import { expectWindowSaysMoneyUnreadable } from '../../../../base/frontend/__tests__/save-waits-for-money';
 import type { Business } from '../../../../base/frontend/operations';
 import { business, click, errorFrame, flush, ionValue, JAPANESE, mountInvoice, POLISH } from '../__tests__/mount-invoice';
 import InvoiceCreateModal from './InvoiceCreateModal.vue';
@@ -46,11 +47,11 @@ const settingsOf = (tax: string) => ({ country_code: 'ES', region_code: REGIONS[
 const RECIPIENT = { customerId: null, name: 'Talleres Pérez SL', taxId: 'B12345674', address: 'Calle Luna 3', country: 'ES', idType: '' };
 const CREATED = { id: 'i9', number: 'FACT-2026-000009' };
 
-/** The window open, its stream live and the business answered (`base.business.get`: in Spain, in euros, unless
- *  `company` says another; `null` = not answered yet). */
-async function setup(locale: 'en' | 'es' = 'en', company: Partial<Business> | null = {}) {
+/** The window open (unless `open` is false: the page mounts it closed), its stream live and the business answered
+ *  (`base.business.get`: in Spain, in euros, unless `company` says another; `null` = not answered yet). */
+async function setup(locale: 'en' | 'es' = 'en', company: Partial<Business> | null = {}, open = true) {
   const m = await mountInvoice(InvoiceCreateModal, {
-    props: { open: true },
+    props: { open },
     locale,
     stubs: { SeriesSelect: SeriesSelectStub, CustomerSearch: CustomerSearchStub },
   });
@@ -347,5 +348,24 @@ describe('InvoiceCreateModal', () => {
     const s = await setup('es');
     expect(s.inDoc('invoice-create')?.getAttribute('aria-label')).toBe('Nueva factura manual');
     expect(s.submit().textContent?.trim()).toBe('Emitir factura');
+  });
+});
+
+// hub#938 (INVOICE-F03): if the business's money cannot be read, «New manual invoice» says so with «Retry» instead of
+// waiting in grey without a word, also when it opens after the read had failed (the page read the money on loading).
+describe('InvoiceCreateModal: a business whose money cannot be read (hub#938)', () => {
+  it.each([false, true])('says so with «Retry»; once the yen arrives «Issue invoice» lights up (opened after the failure: %s)', async (late) => {
+    const s = await setup('en', null, !late);
+    // Each opening starts from blank lines: they are written once open.
+    async function fill() {
+      await s.choose('TICKET', 'F2');
+      await s.line('Course', '1500');
+    }
+    async function opens() {
+      await s.wrapper.setProps({ open: true });
+      await fill();
+    }
+    if (!late) await fill();
+    await expectWindowSaysMoneyUnreadable(s, 'invoice-create-submit', s.sent, late ? opens : undefined);
   });
 });

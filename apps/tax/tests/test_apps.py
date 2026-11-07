@@ -8,7 +8,7 @@ from django.conf import settings
 from django.utils import translation
 from live.live_registry import live_registry
 from live.meta import Category, LiveAppConfig, Nav, SetupCheck, SetupStep, module_configs, permissions_for_role
-from live.operations import registry
+from live.operations import INTERNAL, registry
 
 from apps.tax import events as E
 from base import home
@@ -85,12 +85,21 @@ def test_navigation_is_the_four_tabs_with_iconify_icons():
     ]
 
 
+#: The reads that are no assistant tool: what names a rule on the assistant's card (hub#678); the model reads the rules
+#: by their list.
+INTERNAL_READS = {"tax.rule.get"}
+
+
 def test_every_operation_is_described_for_the_assistant():
     # The assistant uses the app by voice and text with the user's own session: it sees every
     # operation, and a write says how risky it is (high: fiscal, bulk).
     ops = {name: op for name, op in registry.items() if name.startswith("tax.")}
-    assert len(ops) == 18
+    assert len(ops) == 19
+    assert {name for name, op in ops.items() if op.ai is INTERNAL} == INTERNAL_READS
     for name, op in ops.items():
+        if name in INTERNAL_READS:
+            assert (op.kind, op.expose_api) == ("query", False), name
+            continue
         assert isinstance(op.ai, dict) and str(op.ai.get("description", "")).strip(), (
             name
         )

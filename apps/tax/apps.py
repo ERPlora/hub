@@ -4,6 +4,7 @@ and the aliases the CSV importer of inventory recognises (WORKBOOK.md)."""
 from django.utils.translation import gettext_lazy as _
 from live.meta import Category, LiveAppConfig, Nav, SetupCheck, SetupStep
 
+from apps.tax.choices import CHOICES
 from apps.tax.events import RULE_IN_FORCE_EVENTS
 
 
@@ -30,6 +31,9 @@ class TaxConfig(LiveAppConfig):
     verticals = ["hair_salon", "restaurant"]
     default_auto_field = "django.db.models.BigAutoField"
     permissions = ["tax.view", "tax.manage"]
+    # The countries a rule is set for, by their names (hub#678): no field of the models labels them, so the
+    # assistant's card would say their ISO codes.
+    choices = CHOICES
     # Keys are the customer roles as the SaaS sends them (``hub_`` prefix included). Viewing
     # includes calculating; the old cashier role is an employee.
     role_permissions = {

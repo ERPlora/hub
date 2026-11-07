@@ -8,12 +8,13 @@
 // the dialog, under their field. The amount, and the catalog prices beside the products and services, are in
 // the business's currency (its country's; a bare figure until it answers, and then an untouched amount takes its
 // decimals). «Create» and «Save» wait in grey until the business has answered its money (the amount is read in it;
-// hub#921).
+// hub#921); if that read fails, the dialog says so with «Retry» (hub#938).
 import { Combo, type ComboOption, FormModal } from '@erplora/ui/components';
 import { useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { IonButton, IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import BusinessMoneyError from '../../../../base/frontend/components/BusinessMoneyError.vue';
 import { useLocale, useT } from '../composables/useT';
 import { useBusinessMoney } from '../lib/format';
 import { type Money, quantityFieldText, readDecimal } from '../lib/format';
@@ -263,6 +264,7 @@ async function save(): Promise<void> {
   >
     <template #default="{ fieldErrors }">
       <div class="pricing-form">
+        <BusinessMoneyError />
         <div class="pricing-form__row">
           <ion-input
             data-testid="pricing-rule-form-code"
