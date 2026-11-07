@@ -301,7 +301,8 @@ Inventario avisa a las demás apps de que hay un producto nuevo: Ventas lo ofrec
 TPV y el paso «Tu catálogo» de la puesta en marcha queda hecho (INVENTORY-F28).
 Si falla: «Guardar» está apagado mientras falten Nombre, SKU o categoría fiscal, y mientras el negocio no
 haya dicho todavía su moneda: el precio y el coste se leen en ella, y sin ella «1500» yenes se guardaría
-como 150 000. Sin categorías
+como 150 000. Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
+motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, «Guardar» se enciende (hub#938). Sin categorías
 fiscales sale «Todavía no hay categorías fiscales. Créalas en Impuestos: un producto no se puede
 vender sin saber cómo tributa.». Un importe ilegible: «Esto no es un importe. Escribe una cifra,
 por ejemplo 12,50.» o «Este importe se puede leer de dos maneras…». Una cantidad que no encaja en

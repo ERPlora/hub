@@ -12,6 +12,7 @@ import { useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { IonInput, IonToggle } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import BusinessMoneyError from '../../../../base/frontend/components/BusinessMoneyError.vue';
 import { useLocale, useT } from '../composables/useT';
 import { useBusinessMoney } from '../lib/format';
 import { moneyFieldText, parseMoney } from '../lib/money';
@@ -153,6 +154,7 @@ async function save(): Promise<void> {
   >
     <template #default="{ fieldErrors }">
       <div class="modifier-form">
+        <BusinessMoneyError />
         <ion-input
           data-testid="modifier-option-form-name"
           :value="form.name"

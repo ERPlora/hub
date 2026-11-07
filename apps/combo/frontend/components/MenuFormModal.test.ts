@@ -9,7 +9,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { Business } from '../../../../base/frontend/operations';
 import type { ComboOut } from '../operations';
-import { expectSaveWaitsForMoney } from '../../../../base/frontend/__tests__/save-waits-for-money';
+import { expectSaveWaitsForMoney, expectWindowSaysMoneyUnreadable } from '../../../../base/frontend/__tests__/save-waits-for-money';
 import { business, click, ionChecked, ionValue, JAPANESE, mountCombo, POLISH, settle } from '../__tests__/mount-combo';
 import MenuFormModal from './MenuFormModal.vue';
 
@@ -302,5 +302,16 @@ describe('MenuFormModal: photo', () => {
     await settle();
     expect(s.inDoc('combo-menu-form-image-preview')?.querySelector('img')).toBeNull();
     expect(s.inDoc('combo-menu-form-image-preview')?.textContent?.trim()).toBe('KM');
+  });
+});
+
+// hub#938 (COMBO-F02, F03): if the business's money cannot be read, the form says so with «Retry» instead of waiting in grey
+// without a word, also when it opens after the read had failed (the page read the money on loading).
+describe('MenuFormModal: a business whose money cannot be read (hub#938)', () => {
+  it.each([false, true])('says so with «Retry»; once the yen arrives «Save» lights up (opened after the failure: %s)', async (late) => {
+    const m = await mountCombo(MenuFormModal, { props: { open: !late, combo: MENU }, business: null });
+    await m.live();
+    const opens = late ? () => m.wrapper.setProps({ open: true }) : undefined;
+    await expectWindowSaysMoneyUnreadable(m, 'combo-menu-form-submit', m.sent, opens);
   });
 });
