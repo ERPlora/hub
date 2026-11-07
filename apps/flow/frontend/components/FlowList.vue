@@ -19,6 +19,7 @@ import { toastInfo, toastSuccess } from '@erplora/ui/shell';
 import { IonButton, IonSelect, IonSelectOption, IonToggle } from '@ionic/vue';
 import { computed, ref, shallowRef, watch } from 'vue';
 
+import { useFirstAnswer } from '../composables/useFirstAnswer';
 import { useLiveList } from '../composables/useLiveList';
 import { usePhrasing } from '../composables/usePhrasing';
 import { wording } from '../lib/refusal';
@@ -49,17 +50,7 @@ const query = computed<Omit<FlowListIn, 'limit' | 'offset'>>(() => ({
 const { data: result, status, error: listError, refresh } = useLiveList('flow.flow.list', () => query.value, () => table.windows.value);
 table.followResult(result);
 // Its first page (or failure) is painted: the page opens a linked card of the gallery below only then.
-let told = false;
-watch(
-  () => result.value ?? listError.value,
-  (answer) => {
-    if (answer && !told) {
-      told = true;
-      emit('ready');
-    }
-  },
-  { immediate: true },
-);
+useFirstAnswer({ data: result, error: listError }, () => emit('ready'));
 
 const selected = ref<string[]>([]);
 const error = shallowRef<ApiError | null>(null);

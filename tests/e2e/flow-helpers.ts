@@ -49,6 +49,16 @@ export async function manualFlow(context: BrowserContext, name: string, steps: u
   return id;
 }
 
+/** A manual automation made with `steps` (granted `grants`) and run by hand until it asks: its question waits in
+ *  «Waiting for your answer». Its id. */
+export async function askingFlow(context: BrowserContext, name: string, steps: unknown[], grants: string[] = []): Promise<string> {
+  const id = await manualFlow(context, name, steps, grants);
+  const ran = await api<{ status: string }>(context, A, 'POST', '/flow/flows/run', { id, input: {} });
+  expect(ran.status, JSON.stringify(ran.data)).toBe(200);
+  expect(ran.data.status).toBe('asking');
+  return id;
+}
+
 /** Runs `body` as the owner on Automations at `viewport`, with a name for what it creates (`<tag> <size> <stamp>`),
  *  and closes its context after, whatever happens. */
 export async function onAutomations(

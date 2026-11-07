@@ -150,7 +150,7 @@ automatizaciones** regresa (FLOW-F08).
 
 | Estado | Qué se ve |
 |---|---|
-| Cargando | La lista con su indicador; el editor, «Cargando…» |
+| Cargando | «Cargando…» encima de la galería hasta que llegan las preguntas, los borradores y la lista; la lista, con su indicador; el editor, «Cargando…» |
 | Vacío | Sin automatizaciones, solo la galería; sin pasos, «Todavía no hay pasos…»; sin ejecuciones, «Todavía no se ha ejecutado.» |
 | Sin resultados | «Aquí no hay nada que encaje con eso.» y **Volver a verlas todas** |
 | Error | El mensaje en rojo encima, con **Reintentar** en la lista; un fallo al guardar, encender, copiar o borrar dice qué no encaja y no cambia nada; si no se puede leer lo que pueden usar las automatizaciones (avisos y acciones), «No se ha podido leer lo que pueden usar aquí las automatizaciones.» con **Reintentar** |
@@ -209,7 +209,8 @@ Actor: propietario, administrador
 Pantalla: Automatizaciones
 Pasos:
 1. Abre **Automatizaciones** en el menú.
-2. Salen los borradores del asistente (si hay), tus automatizaciones (si hay) y la galería.
+2. Salen los borradores del asistente (si hay), tus automatizaciones (si hay) y la galería. Mientras se
+   leen, «Cargando…» encima de la galería, nunca la galería sola como si no hubiera nada.
 Entra: la sesión.
 Sale: nada guardado.
 Si falla: sin permiso, «No tienes permiso»; con la app apagada, «Esta app no está activa en este

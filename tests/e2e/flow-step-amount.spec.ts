@@ -11,7 +11,7 @@
 import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 
 import { A, api, psql } from './helpers';
-import { addToANewCart, manualFlow, onAutomations, questionSays } from './flow-helpers';
+import { addToANewCart, askingFlow, onAutomations, questionSays } from './flow-helpers';
 import { createProduct } from './inventory-helpers';
 import { VIEWPORTS } from './schedule-helpers';
 
@@ -58,10 +58,7 @@ async function askedSaying(
   shot: string,
 ): Promise<void> {
   const { context, page, name } = stage;
-  const flowId = await manualFlow(context, name, steps, grants);
-  const ran = await api<{ status: string }>(context, A, 'POST', '/flow/flows/run', { id: flowId, input: {} });
-  expect(ran.status, JSON.stringify(ran.data)).toBe(200);
-  expect(ran.data.status).toBe('asking');
+  await askingFlow(context, name, steps, grants);
 
   await questionSays({ context, page, name }, said, shot);
 }
