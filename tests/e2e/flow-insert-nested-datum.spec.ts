@@ -1,10 +1,12 @@
 // «Insert a datum» offers what a step leaves inside another datum (hub#963): after «Add something to a cart», the price
 // and total of the line it adds and the cart's total after it, each named with the object it is in («1. Add something
 // to a cart › Item › Unit price»); before, only «Item», «Cart» and «Removed», whole. What it inserts is a path the
-// engine resolves (hub#961), so the question the automation asks says that price as money.
+// engine resolves (hub#961), so the question the automation asks says that price as money. Opened before the editor
+// has its catalog of actions, «Which data?» says «Loading…» and shows those data as soon as the catalog comes in,
+// without being closed and opened again (hub#969); one that could not be read is said inside it, with «Retry».
 // Everything created here is named «E2E FlowNested …» and removed before and after.
 // flow: FLOW-F11 FLOW-F28
-import { expect, test } from '@playwright/test';
+import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { VIEWPORTS } from './assistant-card-helpers';
 import { addToANewCart, manualFlow, onAutomations, questionSays } from './flow-helpers';
@@ -30,6 +32,21 @@ function cleanUp(): void {
   );
 }
 
+/** A manual automation `name` whose step 1 adds a line to a new cart and step 2 asks about it, granted. Its id. */
+async function lineThenAsk(context: BrowserContext, name: string, session: string): Promise<string> {
+  const steps = [await addToANewCart(context, session), { id: 's2', kind: 'ask', title: 'Line price' }];
+  return manualFlow(context, name, steps, [ADD]);
+}
+
+/** Opens the automation `flowId` and, in the title of its question, «Insert a datum»: the editor and «Which data?». */
+async function insertInTheQuestion(page: Page, flowId: string): Promise<{ editor: Locator; picker: Locator }> {
+  await page.goto(`/flow/automations/${flowId}`);
+  const editor = shown(page);
+  await editor.locator('[data-testid=flow-step-open-s2]').click();
+  await editor.locator('[data-testid=flow-ask-title-s2-insert]').click();
+  return { editor, picker: page.locator('ion-modal[data-testid=flow-picker]') };
+}
+
 test.beforeAll(cleanUp);
 test.afterAll(cleanUp);
 
@@ -37,27 +54,27 @@ for (const viewport of VIEWPORTS) {
   test(`FLOW-F11 «Insert a datum» offers the price of the line a step adds to a cart, and the question says it as money, at ${viewport.label}`, async ({ browser }) => {
     test.setTimeout(150_000);
     await onAutomations(browser, viewport, TAG, async ({ context, page, name }) => {
-      const steps = [await addToANewCart(context, `${SESSION}-${viewport.label}`), { id: 's2', kind: 'ask', title: 'Line price' }];
-      const flowId = await manualFlow(context, name, steps, [ADD]);
+      const flowId = await lineThenAsk(context, name, `${SESSION}-${viewport.label}`);
 
-      // The question's title: «Insert a datum» → what the first step left inside the line it added.
-      await page.goto(`/flow/automations/${flowId}`);
-      const editor = shown(page);
-      await editor.locator('[data-testid=flow-step-open-s2]').click();
-      const picker = page.locator('ion-modal[data-testid=flow-picker]');
+      // The question's title: «Insert a datum» → what the first step left inside the line it added. Pressed right after
+      // entering, before the catalog of actions is in (held here until the picker is open; on a local stack it takes
+      // 1.5–3 s): «Loading…», never «There is no data to insert here yet», and the data once it comes in (hub#969).
+      let releaseCatalog!: () => void;
+      const catalogHeld = new Promise<void>((resolve) => (releaseCatalog = resolve));
+      await page.route('**/api/flow/catalog', async (route) => {
+        await catalogHeld;
+        await route.continue();
+      });
+      const { editor, picker } = await insertInTheQuestion(page, flowId);
       const price = picker.locator('[data-testid="flow-picker-steps.s1.item.unit_price"]');
-      // Opened before the editor has its catalog of actions, the picker says there is nothing to insert and stays so
-      // until it is opened again (hub#969): opened again, as a person does.
-      await expect(async () => {
-        if (await picker.isVisible()) {
-          await picker.locator('[data-testid=flow-picker-close]').click();
-          await expect(picker).toBeHidden();
-        }
-        await editor.locator('[data-testid=flow-ask-title-s2-insert]').click();
-        await expect(picker).toBeVisible();
-        await expect(price).toBeVisible({ timeout: 1_000 });
-      }).toPass({ timeout: 30_000 });
+      await expect(picker).toBeVisible();
+      await expect(picker.locator('[data-testid=flow-picker-loading]')).toHaveText('Loading…');
+      await expect(picker.locator('[data-testid=flow-picker-none]')).toHaveCount(0);
+      await capture(page, `${KEY}-picker-loading-${viewport.label}`);
+      releaseCatalog();
       await expect(price).toHaveText('1. Add something to a cart › Item › Unit price');
+      await expect(picker.locator('[data-testid=flow-picker-loading]')).toHaveCount(0);
+      await page.unroute('**/api/flow/catalog');
       await expect(picker.locator('[data-testid="flow-picker-steps.s1.item.line_total"]')).toHaveText('1. Add something to a cart › Item › Line total');
       await expect(picker.locator('[data-testid="flow-picker-steps.s1.cart.total_amount"]')).toHaveText('1. Add something to a cart › Cart › Total amount');
       // The first level stays: the line and the cart whole.
@@ -80,6 +97,25 @@ for (const viewport of VIEWPORTS) {
       expect(ran.status, JSON.stringify(ran.data)).toBe(200);
       expect(ran.data.status).toBe('asking');
       await questionSays({ context, page, name }, 'Line price: €12.50', `${KEY}-question-${viewport.label}`);
+    });
+  });
+
+  test(`FLOW-F11 «Which data?» says the catalog could not be read, with «Retry», and then offers what step 1 left, at ${viewport.label}`, async ({ browser }) => {
+    test.setTimeout(120_000);
+    await onAutomations(browser, viewport, TAG, async ({ context, page, name }) => {
+      const flowId = await lineThenAsk(context, name, `${SESSION}-retry-${viewport.label}`);
+      const failed = { error: { code: 'internal_error', message: 'Internal error' } };
+      await page.route('**/api/flow/catalog', (route) => route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify(failed) }));
+      const { picker } = await insertInTheQuestion(page, flowId);
+      // In red inside the dialog, which covers the editor's own notice; never «There is no data to insert here yet».
+      await expect(picker.locator('[data-testid=flow-picker-error]')).toContainText('What automations can use here could not be read.');
+      await expect(picker.locator('[data-testid=flow-picker-error]')).not.toContainText('Internal error');
+      await expect(picker.locator('[data-testid=flow-picker-none]')).toHaveCount(0);
+      await capture(page, `${KEY}-picker-error-${viewport.label}`);
+      await page.unroute('**/api/flow/catalog');
+      await picker.locator('[data-testid=flow-picker-retry]').click();
+      await expect(picker.locator('[data-testid="flow-picker-steps.s1.item.unit_price"]')).toHaveText('1. Add something to a cart › Item › Unit price');
+      await expect(picker.locator('[data-testid=flow-picker-error]')).toHaveCount(0);
     });
   });
 }

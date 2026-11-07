@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:2f1b08e5fb6406dbaee5e85392a4ef4335d06af53699fe9dcead67a4ddf6f39f -->
+<!-- generated from WORKBOOK.md sha256:46f34076ae46149f0d5534f11f07b05abab3288fec69994910febeea9a38ae39 -->
 
 ## What it is for and who it is for
 
@@ -137,10 +137,10 @@ know whether it worked" and "What it cannot do yet". **Back to the automations**
 
 | State | What is seen |
 |---|---|
-| Loading | "Loading…" above the gallery until the questions, the drafts and the list arrive; the list, with its indicator; the editor, "Loading…" |
+| Loading | "Loading…" above the gallery until the questions, the drafts and the list arrive; the list, with its indicator; the editor, "Loading…"; "Which data?", "Loading…" until the actions of the apps arrive, and then the data of the previous steps, without closing it |
 | Empty | With no automations, only the gallery; with no steps, "No steps yet…"; with no runs, "It has not run yet." |
 | No results | "Nothing here matches that." and **Show them all again** |
-| Error | The message in red above, with **Retry** in the list; a failure to save, turn on, copy or delete says what does not fit and changes nothing; if what automations can use (notices and actions) cannot be read, "What automations can use here could not be read." with **Retry** |
+| Error | The message in red above, with **Retry** in the list; a failure to save, turn on, copy or delete says what does not fit and changes nothing; if what automations can use (notices and actions) cannot be read, "What automations can use here could not be read." with **Retry**, also inside "Which data?" |
 | Reconnecting | "Reconnecting…" while the live feed comes back; what is painted stays |
 | No permission | "You do not have permission" instead of the screen |
 | App inactive | "This app is not active in this business" |
@@ -430,7 +430,10 @@ app they belong to ("Section", as in Sales & POS), never with their internal nam
 Out: the steps, on **Save**. Each action or query that is named starts asking for its permission
 (FLOW-F12).
 If it fails: the server refuses on saving an action or a query that does not exist in the business, data of
-a step that does not come before, an empty condition or a wait out of range, next to the step.
+a step that does not come before, an empty condition or a wait out of range, next to the step. If "Which data?"
+opens before the actions of the apps arrive (right after entering the editor), it says "Loading…" and, as soon as
+they arrive, shows the data of the previous steps without closing it; never "There is no data to insert here yet"
+with a step before it. If they cannot be read, it says so inside, in red, with **Retry**.
 Involved: FLOW-F12, FLOW-F13, FLOW-F16
 
 ### FLOW-F12 Grant and withdraw the permissions
