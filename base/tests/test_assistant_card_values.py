@@ -378,7 +378,6 @@ def test_no_list_of_texts_sent_as_they_are_is_named():
 UNNAMED_REFERENCES = {
     "appointment": 12,
     "invoice": 1,
-    "kitchen": 23,
     "online_booking": 7,
     "payment": 8,
     # The sale and the appointment a voucher or a session came from, the line of a sale that charged a voucher, the line
@@ -393,7 +392,6 @@ UNNAMED_REFERENCES = {
 #: The closed lists (``enum`` of text) of the assistant's writes with a value the models give no label — of their app,
 #: or those their ``choices_of`` mark names —, by app: their card says that value as sent. Only ever lower, as above.
 UNLABELLED_LISTS = {
-    "kitchen": 1,
     "tax": 5,
     # The type of a template's button (template.create and .update): it lives in the JSON of its buttons, and no field
     # of the models names its values to point a mark at. The card says the buttons by how many go, never by their codes

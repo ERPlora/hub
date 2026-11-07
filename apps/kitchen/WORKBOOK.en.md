@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:59e88ef4c00ad158780529580e282dd71ecbae1b0ccf3dd43224177c3453e958 -->
+<!-- generated from WORKBOOK.md sha256:8f1029494e82f0451edfad2229b5005841fecfa37a285f0e50ebe9b64ba94a49 -->
 
 ## What it is for and who it is for
 
@@ -18,6 +18,14 @@ Who uses it:
 Kitchen does not know what a table or a customer is: it receives a **label** ("Table 4"; without a label,
 the card says the type: "Dine in", "Takeaway", "Delivery") that it paints and prints as it is. It does not
 charge, does not lower stock and does not keep recipes.
+
+What is done on its screens can also be asked of the assistant (by voice or by text, with the permissions of whoever
+speaks). Before an action, the assistant asks to confirm with its card (BASE-F97), which names each record as the
+screens name it, never by its identifier: the ticket by its number ("Ticket: 20261014-0012"), the dishes one by one by
+their name ("Dishes: Hamburguesa, Tortilla"), the station by its name ("Station: Plancha"), the product and the
+category by their name, the till's check by its title ("Check: Terraza 2") and each line of the round by its dish; the
+ticket type and its priority, in their words ("Takeaway", "Rush"). What whoever asks may not see, or what no longer
+exists, does not show.
 
 ## Adopted reference
 
