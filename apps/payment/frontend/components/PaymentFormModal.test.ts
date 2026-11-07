@@ -9,6 +9,7 @@
 import { InlineFeedback } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
+import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import type { Business } from '../../../../base/frontend/operations';
 import { localDay } from '../lib/format';
 import type { MethodOut, PaymentOut } from '../operations';
@@ -245,4 +246,28 @@ describe('PaymentFormModal', () => {
       expect((s.sent()[0].body as { amount: number }).amount).toBe(150);
     });
   });
+});
+
+describe('PaymentFormModal: fields refused with the same words (hub#888)', () => {
+  /** Each field of the window by the key the server refuses it under. */
+  const TESTID: Record<string, string> = {
+    method_id: 'method',
+    payment_date: 'date',
+    amount: 'amount',
+    beneficiary_name: 'beneficiary',
+    concept: 'concept',
+    beneficiary_iban: 'iban',
+    supplier_invoice_ref: 'invoice',
+  };
+  itTellsTheCorrectedFieldApart(
+    Object.keys(TESTID),
+    async (locale, refusal) => {
+      const s = await setup(locale);
+      await s.result(METHODS, page([BANK, CASH]));
+      await s.fill();
+      s.answer(422, refusal);
+      return { field: (key) => s.field(TESTID[key]), send: () => click(s.save()), settle };
+    },
+    'amount',
+  );
 });

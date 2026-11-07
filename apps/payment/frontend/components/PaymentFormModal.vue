@@ -164,6 +164,7 @@ function goToMethods(): void {
         </InlineFeedback>
         <ion-select
           data-testid="payment-form-method"
+          name="method_id"
           :value="form.methodId"
           :label="$t('payment.payments.form.method')"
           :placeholder="loading ? $t('payment.loading') : $t('payment.payments.form.methodPlaceholder')"
@@ -186,6 +187,7 @@ function goToMethods(): void {
         </ion-select>
         <ion-input
           data-testid="payment-form-date"
+          name="payment_date"
           type="date"
           :value="form.date"
           :label="$t('payment.payments.form.date')"
@@ -199,6 +201,7 @@ function goToMethods(): void {
         />
         <MoneyInput
           testid="payment-form-amount"
+          name="amount"
           :model-value="form.amount"
           :label="money ? t('payment.payments.form.amountIn', { currency: money.currency }) : t('payment.payments.form.amount')"
           :error-text="amountError(fieldErrors)"
@@ -207,6 +210,7 @@ function goToMethods(): void {
         />
         <ion-input
           data-testid="payment-form-beneficiary"
+          name="beneficiary_name"
           :value="form.beneficiary"
           :label="$t('payment.payments.form.beneficiary')"
           label-placement="floating"
@@ -219,6 +223,7 @@ function goToMethods(): void {
         />
         <ion-input
           data-testid="payment-form-concept"
+          name="concept"
           :value="form.concept"
           :label="$t('payment.payments.form.concept')"
           label-placement="floating"
@@ -231,6 +236,7 @@ function goToMethods(): void {
         />
         <ion-input
           data-testid="payment-form-iban"
+          name="beneficiary_iban"
           :value="form.iban"
           :label="$t('payment.payments.form.iban')"
           label-placement="floating"
@@ -244,6 +250,7 @@ function goToMethods(): void {
         />
         <ion-input
           data-testid="payment-form-invoice"
+          name="supplier_invoice_ref"
           :value="form.invoice"
           :label="$t('payment.payments.form.invoice')"
           label-placement="floating"

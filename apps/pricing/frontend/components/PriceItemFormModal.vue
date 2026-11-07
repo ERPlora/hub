@@ -145,6 +145,7 @@ async function save(): Promise<void> {
         </template>
         <ion-input
           data-testid="pricing-item-form-min_quantity"
+          name="min_quantity"
           inputmode="decimal"
           :value="form.quantity"
           :label="$t('pricing.items.form.minQuantity')"
@@ -158,6 +159,7 @@ async function save(): Promise<void> {
         />
         <MoneyInput
           testid="pricing-item-form-price"
+          name="price"
           :model-value="form.price"
           :money="money"
           :label="t('pricing.items.form.price')"
