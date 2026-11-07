@@ -141,7 +141,9 @@ describe('StockModal: a business whose money cannot be read (hub#946)', () => {
     const inDoc = (testid: string) => document.querySelector<HTMLElement & { value?: unknown }>(`[data-testid="${testid}"]`);
     /** «Record receipt» waits for a quantity too: one is typed, so only the money keeps it grey. */
     const typeQuantity = async () => {
-      inDoc('inventory-stock-qty')!.dispatchEvent(new CustomEvent('ionInput', { detail: { value: '3' } }));
+      const field = inDoc('inventory-stock-qty')!;
+      field.value = '3';
+      field.dispatchEvent(new CustomEvent('ionInput', { detail: { value: '3' } }));
       await flush();
     };
     if (!late) await typeQuantity();

@@ -7,7 +7,9 @@
 // their own minutes and price, changes those (empty = the service's), marks the main service with the
 // empty star of a row, switches one off or removes it. Changes come
 // back through the stream; a refusal is said above the list. Until the list arrives it says it is
-// loading; a list that cannot be read says so, with the reason and «Retry».
+// loading; a list that cannot be read says so, with the reason and «Retry». «Assign» and a row's «Save» wait in grey
+// until the business answers its money, the one an own price is read in (hub#946); «Editing service» says it, with
+// «Retry», if that read fails.
 import { Combo, type ComboOption, InlineFeedback } from '@erplora/ui/components';
 import { type ApiError, useCommand, useLive, useLiveClient } from '@erplora/ui/sdk';
 import { HubIcon } from '@erplora/ui/shell';
@@ -97,9 +99,11 @@ const minutes = (value: string): number | null => {
   if (!trimmed) return null;
   return /^\d+$/.test(trimmed) ? Number(trimmed) : (trimmed as unknown as number);
 };
-/** Cents of a price field (empty = none); `undefined` when it is not an amount (the field says why). */
-const cents = (value: string): number | null | undefined => {
-  const read = parseMoney(value, money.value);
+/** Cents of a price field in the business's `currency` (empty = none); `undefined` when it is not an amount (the field
+ *  says why). Never read before the business answers its money: «1500» would be read with two decimals, whatever its
+ *  currency counts (in yen, 150000; hub#946). */
+const cents = (value: string, currency: Money): number | null | undefined => {
+  const read = parseMoney(value, currency);
   return read.ok ? read.cents : undefined;
 };
 
@@ -115,9 +119,11 @@ async function act(run: () => Promise<unknown>, error: () => ApiError | null): P
 }
 
 async function addPerson(): Promise<void> {
+  const currency = money.value;
   const { member, minutes: typed, price } = newcomer.value;
-  const custom = cents(price);
-  if (!member || custom === undefined) return;
+  if (!currency || !member) return;
+  const custom = cents(price, currency);
+  if (custom === undefined) return;
   const body = {
     service_id: props.serviceId,
     member_id: member.id,
@@ -128,10 +134,12 @@ async function addPerson(): Promise<void> {
 }
 
 async function saveOwn(row: AssignmentOut): Promise<void> {
+  const currency = money.value;
+  if (!currency) return;
   const draft = drafts.value[row.id];
-  const custom = cents(draft.price);
+  const custom = cents(draft.price, currency);
   if (custom === undefined) return;
-  const own = ownOf(row, money.value);
+  const own = ownOf(row, currency);
   const body = {
     id: row.id,
     ...(draft.minutes.trim() !== own.minutes ? { custom_duration: minutes(draft.minutes) } : {}),
@@ -261,7 +269,7 @@ const setDraft = (id: string, part: Partial<Draft>) => {
             :data-testid="`service-professionals-save-${row.id}`"
             size="small"
             fill="outline"
-            :disabled="!changed(row) || update.pending.value"
+            :disabled="!money || !changed(row) || update.pending.value"
             @click="saveOwn(row)"
           >
             {{ $t('service.professionals.save') }}
@@ -317,7 +325,7 @@ const setDraft = (id: string, part: Partial<Draft>) => {
       />
       <ion-button
         data-testid="service-professionals-assign"
-        :disabled="!newcomer.member || assign.pending.value"
+        :disabled="!money || !newcomer.member || assign.pending.value"
         @click="addPerson"
       >
         {{ $t('service.professionals.assign') }}
