@@ -152,6 +152,32 @@ def test_a_sales_department_goes_by_the_word_sales_gives_it(language):
     assert [key for key, text in flow_texts(flow).items() if "department" in text.lower() or "departament" in text.lower()] == []
 
 
+@pytest.mark.parametrize("language", ["en", "es"])
+def test_a_schedule_override_goes_by_the_word_the_schedule_app_gives_it(language):
+    """Schedules lists and forms an ``overrides`` record as a «cambio temporal» / «override», so whoever builds an
+    automation has to recognize it by that same word. It is read from the Schedules catalog: if Schedules changes its
+    word, these texts follow. The keys stay, they are the operations' and events' names."""
+    schedule = json.loads(
+        (Path(apps.get_app_config("schedule").path) / "frontend" / "locale" / f"{language}.json").read_text(encoding="utf-8")
+    )
+    one, many = (schedule["schedule"]["overrides"]["entity"][size] for size in ("one", "many"))
+    flow = json.loads((LOCALE / f"{language}.json").read_text(encoding="utf-8"))["flow"]
+
+    assert {action: flow["actions"][f"schedule__override__{action}"].count(one) for action in ("create", "update", "get")} == {
+        "create": 1,
+        "update": 1,
+        "get": 1,
+    }
+    assert flow["actions"]["schedule__override__list"].count(many) == 1
+    assert {event: flow["events"][f"schedule__override__{event}"].count(one) for event in ("created", "updated", "deleted")} == {
+        "created": 1,
+        "updated": 1,
+        "deleted": 1,
+    }
+    assert flow["fields"]["override"] == one.capitalize()
+    assert [key for key, text in flow_texts(flow).items() if "excepci" in text.lower() or "exception" in text.lower()] == []
+
+
 # --- What the events bring ------------------------------------------------------------------------
 
 _FUNCTIONS = (ast.FunctionDef, ast.AsyncFunctionDef)
