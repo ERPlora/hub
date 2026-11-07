@@ -8,6 +8,9 @@
 // on top; a manager or an employee, who may only answer what automations ask, sees only it (and nothing
 // else of the app is asked for them: no list, no catalog). Above the list, the ready-made automations set up
 // with a fault their app already fixed, with «Update it» (FLOW-F36).
+// Until the questions, the drafts and the list have their first answer, «Loading…» above the gallery: with the
+// business slow, the gallery alone looked as if there were none (hub#950). A list that could not be read shows,
+// with its message and «Retry».
 // On a phone «New automation» is its «+» alone, named by `aria-label`: with its words it took the bar and
 // left the title as «A…» (FIX-HUB-FLOW-AUTOMATIONS-TITLE-CUT-ON-PHONE; Material's top app bar, iOS's navigation
 // bars). From a tablet on, its icon and its words.
@@ -35,7 +38,7 @@ const session = useSession();
 const onlyAnswers = !session.can('flow.view') && session.can('flow.answer');
 const shelf = onlyAnswers ? null : useCatalog();
 const catalog = computed(() => shelf?.catalog.value ?? null);
-const loading = computed(() => shelf?.loading.value ?? false);
+const catalogLoading = computed(() => shelf?.loading.value ?? false);
 const catalogError = computed(() => shelf?.error.value ?? null);
 const reloadCatalog = (): void => void shelf?.reload();
 // Every automation of the business, for the gallery's marks and the list's count (a business has far
@@ -44,12 +47,17 @@ const all = onlyAnswers ? null : useLive('flow.flow.list', { limit: 100 });
 const flows = computed(() => all?.data.value?.rows ?? []);
 const total = computed(() => all?.data.value?.total ?? 0);
 const blocked = computed(() => !all || blockingError(all.error.value));
+// Hidden while there is none; shown when it could not be read, with its error and «Retry».
+const listShown = computed(() => total.value > 0 || !!all?.error.value);
 // A link's card opens once what is above the gallery has its first answer — the drafts, and the list
 // when there is one —: opened earlier, the list would push it out of view (FLOW-F05).
 const draftsReady = ref(false);
 const listReady = ref(false);
+const questionsReady = ref(false);
+const listAnswered = computed(() => !!(all?.data.value || all?.error.value));
+const loading = computed(() => catalogLoading.value || !questionsReady.value || !draftsReady.value || !listAnswered.value);
 const aboveReady = computed(
-  () => draftsReady.value && !!(all?.data.value || all?.error.value) && (total.value === 0 || listReady.value),
+  () => draftsReady.value && listAnswered.value && (total.value === 0 || listReady.value),
 );
 const openCard = computed(() =>
   aboveReady.value && typeof route.query.template === 'string' ? route.query.template : null,
@@ -112,12 +120,15 @@ function openFlow(flow: FlowOut, tab?: string): void {
       v-if="!blocked"
       class="flow-page"
     >
-      <QuestionInbox :alone="false" />
+      <QuestionInbox
+        :alone="false"
+        @ready="questionsReady = true"
+      />
       <DraftTray @ready="draftsReady = true" />
       <!-- Mounted with the page and only hidden while there is none: its subscription goes on the page's one stream,
            instead of arriving with the count and reopening it. -->
       <FlowList
-        v-show="total > 0"
+        v-show="listShown"
         :catalog="catalog"
         :all-total="total"
         @open="openFlow($event)"
@@ -141,8 +152,13 @@ function openFlow(flow: FlowOut, tab?: string): void {
       <div
         v-if="loading"
         class="flow-page__loading"
+        role="status"
+        data-testid="flow-page-loading"
       >
-        <IonSpinner name="dots" /> {{ $t('flow.loading') }}
+        <IonSpinner
+          name="dots"
+          aria-hidden="true"
+        /> {{ $t('flow.loading') }}
       </div>
       <FlowGallery
         :catalog="catalog"

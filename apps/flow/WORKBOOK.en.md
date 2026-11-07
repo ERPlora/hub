@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:4c2c9c17f3a0708a3a1e8cc92d9305f07f14ae2ccc68a351f93460a02fd641c7 -->
+<!-- generated from WORKBOOK.md sha256:7679095ceb69fd9b0a05d7b36eaa819b3631e28cca4f27f93d39a961a5c4be37 -->
 
 ## What it is for and who it is for
 
@@ -137,7 +137,7 @@ know whether it worked" and "What it cannot do yet". **Back to the automations**
 
 | State | What is seen |
 |---|---|
-| Loading | The list with its indicator; the editor, "Loading…" |
+| Loading | "Loading…" above the gallery until the questions, the drafts and the list arrive; the list, with its indicator; the editor, "Loading…" |
 | Empty | With no automations, only the gallery; with no steps, "No steps yet…"; with no runs, "It has not run yet." |
 | No results | "Nothing here matches that." and **Show them all again** |
 | Error | The message in red above, with **Retry** in the list; a failure to save, turn on, copy or delete says what does not fit and changes nothing; if what automations can use (notices and actions) cannot be read, "What automations can use here could not be read." with **Retry** |
@@ -195,7 +195,8 @@ Actor: owner, administrator
 Screen: Automations
 Steps:
 1. Open **Automations** in the menu.
-2. The assistant's drafts (if any), your automations (if any) and the gallery show up.
+2. The assistant's drafts (if any), your automations (if any) and the gallery show up. While they are
+   read, "Loading…" above the gallery, never the gallery alone as if there were none.
 In: the session.
 Out: nothing saved.
 If it fails: without permission, "You do not have permission"; with the app off, "This app is not active in
