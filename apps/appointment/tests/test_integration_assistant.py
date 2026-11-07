@@ -19,9 +19,11 @@ from base import assistant
 from base.tenancy import context
 from base.tenancy.context import use_hub
 from base.tenancy.tests import hubs
+from base.tests.test_assistant import technical_names
 from base.tests.test_assistant_card_values import AN_ID, list_field
 
 from .conftest import make_service
+from .test_i18n import own_catalogue
 
 #: The writes of Citas the assistant runs whose data carry the services of a booking, each a line of its own.
 BOOKS_SERVICES = {
@@ -189,3 +191,49 @@ def test_a_service_of_another_business_is_never_named(hub_a, hub_b, no_fallback)
         ours = make_service("Corte de pelo")
         shown = services_of("appointment.appointment.create", [ours.id, theirs.id], person(hub_a, "es"))
     assert shown["value"] == [{"service_id": "Corte de pelo"}, {}]
+
+
+def appointment_writes() -> list:
+    """Every write of Citas, a tool of the assistant or not: a reaction to another app may become one."""
+    return [op for op in registry.values() if op.app_label == "appointment" and op.kind == "command"]
+
+
+def test_no_datum_of_a_write_of_appointment_reaches_a_spanish_card_by_its_technical_name():
+    """hub#637: in Spanish, the card said «Confirm Overlap», «Starts», «On Behalf Of Customer», «From Date», «To Date»
+    and «Absorbed Id», the titles pydantic makes up from data no model of Citas names. Each write, with all its data:
+    each datum by a name of its own, never that one (base's half is hub#258)."""
+    writes = appointment_writes()
+    assert len(writes) >= 25  # positive control: the registry has Citas's writes, the reactions among them
+    assert technical_names(writes) == {}
+
+
+#: The data of Citas's writes no model of it names (hub#637): each one is named by the title its schema gives it.
+TITLED = [
+    ("appointment.appointment.bulk_create", "confirm_overlap"),
+    ("appointment.appointment.bulk_create", "starts"),
+    ("appointment.appointment.cancel", "on_behalf_of_customer"),
+    ("appointment.appointment.create", "confirm_overlap"),
+    ("appointment.appointment.reschedule", "confirm_overlap"),
+    ("appointment.appointment.reschedule", "on_behalf_of_customer"),
+    ("appointment.appointment.update", "confirm_overlap"),
+    ("appointment.customer.reassign", "absorbed_id"),
+    ("appointment.recurring.materialize", "from_date"),
+    ("appointment.recurring.materialize", "to_date"),
+    ("appointment.recurring.update", "from_date"),
+]
+
+
+@pytest.mark.parametrize(("write", "datum"), TITLED)
+def test_the_card_names_a_datum_no_model_names_by_its_title_in_the_persons_language(write, datum):
+    """The title its schema gives the datum, in English as written and in Spanish as Citas's own catalogue says it:
+    neither the one pydantic makes up nor another app's words for it."""
+    op = get(write)
+    title = op.input.model_fields[datum].title
+    assert title and title != assistant._generated_title(datum)
+    said = {
+        language: [field["label"] for field in assistant.card(op, {datum: "x"}, language)["fields"]]
+        for language in ("es", "en")
+    }
+    spanish = own_catalogue().gettext(title)
+    assert spanish != title  # Citas's catalogue says it in Spanish
+    assert said == {"es": [spanish], "en": [title]}

@@ -1,5 +1,6 @@
 """Every visible text of the appointment app has its Spanish translation, compiled and current."""
 
+import gettext
 import json
 from pathlib import Path
 
@@ -26,6 +27,7 @@ from base.tests.po import (
     missing_from_catalogue,
     model_texts,
     module_texts,
+    operation_titles,
     untranslated,
 )
 
@@ -52,7 +54,13 @@ def visible_texts() -> set[str]:
     ):
         lazies += list(choices.labels)
     with translation.override("en"):
-        return {catalogue_key(text) for text in lazies}
+        return {catalogue_key(text) for text in lazies} | operation_titles("appointment")
+
+
+def own_catalogue() -> gettext.GNUTranslations:
+    """Citas's own compiled Spanish catalogue, read alone: not merged with the other apps' ones."""
+    with (LOCALE / "django.mo").open("rb") as compiled:
+        return gettext.GNUTranslations(compiled)
 
 
 def test_every_entry_has_a_spanish_translation():
@@ -67,6 +75,16 @@ def test_every_visible_text_is_in_the_catalog():
 
 def test_the_compiled_catalog_is_current():
     assert compiled_differences(LOCALE) == {}
+
+
+def test_the_card_says_each_title_with_citas_own_spanish():
+    """The assistant's card names a datum by the title its schema gives it, said through every app's catalogue: one an
+    app installed before Citas also writes, with other Spanish, would win and leave Citas's entry dead (hub#637)."""
+    own = own_catalogue()
+    titles = operation_titles("appointment")
+    assert {"Book even if it overlaps", "Duplicate customer"} <= titles  # positive control: Citas's titles are read
+    with translation.override("es"):
+        assert {title: translation.gettext(title) for title in titles} == {title: own.gettext(title) for title in titles}
 
 
 def test_spanish_texts_of_the_workbook():
