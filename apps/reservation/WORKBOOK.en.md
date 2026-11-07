@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:ee365da32353aa8efb7027e0dd3a4058505ac57d1f53b596c51fe0a69eda7b69 -->
+<!-- generated from WORKBOOK.md sha256:65b796982fe118e21e868d99303cb779d157744e31e7db947fa025d442fd5bf3 -->
 
 ## What it is for and who it is for
 
@@ -147,7 +147,9 @@ Each section paints its own "Loading…" and its error with retry.
 ### Settings
 Tab **Settings** (only for whoever can change them). Minimum and maximum guests, minimum notice (hours,
 for online and WhatsApp), maximum days ahead, default duration, confirm new reservations automatically,
-phone required, email required and the minutes after the time to release a pending one. "Save".
+phone required, email required and the minutes after the time to release a pending one. "Save". On a phone it
+fits whole, in Spanish and in English: a switch's long sentence breaks onto two lines and "Save" shows complete at
+the end (hub#906).
 
 ## States of each screen
 
