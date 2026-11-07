@@ -15,11 +15,12 @@ QUERIES = {
     "combo.combo.resolve",
     # The menu's image (COMBO-F14).
     "combo.combo.suggest_image",
-    # What names a dish on the assistant's card (hub#561): the model reads them with their menu.
+    # What names a dish (hub#561) and a course (hub#669) on the assistant's card: the model reads them with their menu.
     "combo.option.get",
+    "combo.group.get",
 }
 #: The reads that are no assistant tool.
-INTERNAL_READS = {"combo.option.get"}
+INTERNAL_READS = {"combo.option.get", "combo.group.get"}
 COMMANDS = {
     "combo.combo.create",
     "combo.combo.update",

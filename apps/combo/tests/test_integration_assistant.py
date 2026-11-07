@@ -62,8 +62,10 @@ def test_the_card_names_the_products_added_at_once_to_a_course():
     assert labels(assistant.card(bulk, arguments, "en")) == ["Course", "Products"]
 
 
-def test_the_card_names_the_product_that_replaces_a_choice_apart_from_the_one_it_replaces():
-    """Changing the lentils of the starters for the soup: «Producto» is the choice's own, never the one that comes in."""
+def test_the_card_names_the_product_that_replaces_a_choice_apart_from_the_one_it_replaces(monkeypatch):
+    """Changing the lentils of the starters for the soup: «Producto» is the choice's own, never the one that comes in.
+    The new product's id names it by its name (hub#669): read as a person, here substituted, or the card leaves it out."""
+    monkeypatch.setattr(assistant, "_reference", lambda value, prop, words: "Sopa")
     update = get("combo.option.update")
     arguments = {"product": "Lentejas", "new_product_id": "x", "new_product": "Sopa"}
     assert labels(assistant.card(update, arguments, "es")) == ["Producto", "Producto nuevo", "Producto nuevo"]
