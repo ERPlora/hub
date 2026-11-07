@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:408157ad8065b2225074065d804fc63393f531a40c7470ea90cf29ad59bbae5a -->
+<!-- generated from WORKBOOK.md sha256:da59ffe201649af907ba49f192c374b5246794e163ad34bfb7fb9bee78db2fb1 -->
 
 ## What it is for and who it is for
 
@@ -18,6 +18,12 @@ Who uses it:
 - The **employee**: only looks at the list of payments and the list of methods.
 - The **manager**, the **administrator** and the **owner**: also record payments, mark them as sent and
   as completed, approve and cancel them, and manage the payment methods.
+- The **assistant** (by voice or by text, with the session of whoever speaks) does the same. Before an
+  action it asks to confirm with its card (BASE-F97), which names each record as the screens name it,
+  never by its identifier: the payment by its reference ("Payment: PAY-20261014-0003"), as
+  "Cancel payment — PAY-20261014-0003", and the method by its name ("Method: BBVA account"), as
+  "Editing method — BBVA account". What the person asking may not see, or what no longer exists, is
+  left out.
 
 ## Reference adopted
 
