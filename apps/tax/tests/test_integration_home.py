@@ -1,6 +1,6 @@
 """Taxes on the Home (PLAN-HUB round 2026-10-21; FIX-TAX-SETUP-HOOKS): base's own query brings the old module's item
-«Your taxes» (module.json `setup`, taxes#19), important, pending while no active root rule of any country applies
-today (TAX-F17, the query the notice of the tax screens reads), to whoever manages taxes, leading to the rules. Every
+«Your taxes» (module.json `setup`, taxes#19), important, pending while no active root rule of the business's country applies
+today (TAX-F17, hub#996; the query the notice of the tax screens reads), to whoever manages taxes, leading to the rules. Every
 change of it records an event it is refreshed on, and a change in hub B re-runs B's Home only; with Taxes off the Home
 does not ask.
 
@@ -108,8 +108,12 @@ def test_the_factory_spanish_rules_tick_it():
 
 
 @pytest.mark.django_db
-def test_one_root_rule_in_force_today_ticks_it_whatever_its_country_or_class(generic):
-    rule(generic, country_code="PT", rate_pct=Decimal("0"), operation_class="exempt")
+def test_one_root_rule_of_the_business_s_country_in_force_today_ticks_it_whatever_its_class(generic):
+    # Only the business's country counts (hub#996): Spain here, with no country registered. A rule of another country
+    # would never price its sales.
+    rule(generic, country_code="PT", rate_pct=Decimal("23"))
+    assert step()["state"] == "pending"
+    rule(generic, rate_pct=Decimal("0"), operation_class="exempt")
     assert step()["state"] == "done"
 
 
@@ -164,7 +168,7 @@ def create_one(category, existing):
 def create_many(category, existing):
     run(
         "tax.rule.bulk_create",
-        {"rules": [{"country_code": "PT", "tax_category_key": CATEGORY, "rate_pct": "23"}]},
+        {"rules": [{"country_code": "ES", "tax_category_key": CATEGORY, "rate_pct": "10"}]},
     )
 
 

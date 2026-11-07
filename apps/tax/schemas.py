@@ -34,9 +34,10 @@ from apps.tax.models import CATEGORY_KEY_MAX_LENGTH, CATEGORY_KEY_RE, TaxAlias, 
 from base.schemas import names
 
 T = TypeVar("T")
-#: The business's country: Spain until the Hub receives the one the business chose in its ERPlora account
-#: (the SaaS's registry, phase 2), as the tax engine of the current product did.
-DEFAULT_COUNTRY = "ES"
+#: The countries the factory catalogue brings rules for (TAX-F16, migration 0002): Spain, and no other. A business of
+#: another country has them in its database too, but they never apply to it: it creates its own in Rules (hub#996);
+#: no rate of another country is planted without a reviewed source, since a made-up one would be declared.
+FACTORY_COUNTRIES: frozenset[str] = frozenset({"ES"})
 #: The tax family of each region with taxes of its own (TAX-F11): the Canary Islands charge IGIC, Ceuta and
 #: Melilla IPSI; any other place, its country's VAT. What a line with no category or rule is declared with.
 REGION_TAX_KINDS: dict[str, str] = {
@@ -320,7 +321,7 @@ class RuleCountriesIn(Schema):
 
 class RuleStatusIn(Schema):
     country_code: OptionalCountry = Field(
-        None, description=COUNTRY + " The business's; empty = any country counts."
+        None, description=COUNTRY + " Empty: the business's own, the one erplora.com registered (Spain without one)."
     )
 
 
@@ -597,12 +598,16 @@ class RuleBulkOut(Schema):
 
 
 class RuleStatusOut(Schema):
-    country_code: str | None = Field(description="The country asked; empty = any.")
+    country_code: str = Field(description="The country counted: the one asked, or the business's.")
     matching_rules: int = Field(
-        description="Active root rules in force today in that country."
+        description="Active root rules in force today in that country (another country's never count)."
     )
     configured: bool = Field(
         description="True when at least one applies: the till can price a sale."
+    )
+    factory_rules: bool = Field(
+        description="True when Taxes brings that country's rules ready (only Spain's); otherwise the business "
+        "creates its own in Rules."
     )
 
 
