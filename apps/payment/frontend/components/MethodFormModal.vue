@@ -123,6 +123,7 @@ async function save(): Promise<void> {
       <div class="payment-method-form">
         <ion-input
           data-testid="payment-method-form-name"
+          name="name"
           :value="form.name"
           :label="$t('payment.methods.form.name')"
           label-placement="floating"
@@ -135,6 +136,7 @@ async function save(): Promise<void> {
         />
         <ion-select
           data-testid="payment-method-form-type"
+          name="method_type"
           :value="form.type"
           :label="$t('payment.methods.form.type')"
           label-placement="floating"
@@ -154,6 +156,7 @@ async function save(): Promise<void> {
         </ion-select>
         <ion-input
           data-testid="payment-method-form-account"
+          name="bank_account_ref"
           :value="form.account"
           :disabled="loading"
           :label="$t('payment.methods.form.account')"

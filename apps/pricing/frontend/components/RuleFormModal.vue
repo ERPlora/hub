@@ -266,6 +266,7 @@ async function save(): Promise<void> {
         <div class="pricing-form__row">
           <ion-input
             data-testid="pricing-rule-form-code"
+            name="code"
             :value="form.code"
             :label="$t('pricing.rules.form.code')"
             label-placement="floating"
@@ -278,6 +279,7 @@ async function save(): Promise<void> {
           />
           <ion-input
             data-testid="pricing-rule-form-name"
+            name="name"
             :value="form.name"
             :label="$t('pricing.rules.form.name')"
             label-placement="floating"
@@ -291,6 +293,7 @@ async function save(): Promise<void> {
         </div>
         <ion-select
           data-testid="pricing-rule-form-rule_type"
+          name="rule_type"
           :value="form.type"
           :label="$t('pricing.rules.form.type')"
           label-placement="floating"
@@ -311,6 +314,7 @@ async function save(): Promise<void> {
         <ion-input
           v-if="form.type === 'percent'"
           data-testid="pricing-rule-form-percent"
+          name="percent"
           inputmode="decimal"
           :value="form.percent"
           :label="$t('pricing.rules.form.percent')"
@@ -324,6 +328,7 @@ async function save(): Promise<void> {
         <MoneyInput
           v-else-if="form.type === 'fixed'"
           testid="pricing-rule-form-amount"
+          name="amount"
           :model-value="form.amount"
           :money="money"
           :label="t('pricing.rules.form.amount')"
@@ -337,6 +342,7 @@ async function save(): Promise<void> {
         >
           <ion-input
             data-testid="pricing-rule-form-buy_quantity"
+            name="buy_quantity"
             type="number"
             inputmode="numeric"
             min="1"
@@ -351,6 +357,7 @@ async function save(): Promise<void> {
           />
           <ion-input
             data-testid="pricing-rule-form-get_quantity"
+            name="get_quantity"
             type="number"
             inputmode="numeric"
             min="1"
@@ -377,6 +384,7 @@ async function save(): Promise<void> {
           >
             <ion-input
               :data-testid="`pricing-rule-form-tier-${index}-min_quantity`"
+              :name="`tiers.${index}.min_quantity`"
               inputmode="decimal"
               :value="tier.min"
               :label="$t('pricing.rules.form.tierFrom')"
@@ -389,6 +397,7 @@ async function save(): Promise<void> {
             />
             <ion-input
               :data-testid="`pricing-rule-form-tier-${index}-percent`"
+              :name="`tiers.${index}.percent`"
               inputmode="decimal"
               :value="tier.percent"
               :label="$t('pricing.rules.form.tierPercent')"
@@ -427,6 +436,7 @@ async function save(): Promise<void> {
         </fieldset>
         <ion-select
           data-testid="pricing-rule-form-applies_to"
+          name="applies_to"
           :value="form.scope"
           :label="$t('pricing.rules.form.appliesTo')"
           label-placement="floating"
@@ -468,6 +478,7 @@ async function save(): Promise<void> {
         <div class="pricing-form__row">
           <ion-input
             data-testid="pricing-rule-form-min_quantity"
+            name="min_quantity"
             inputmode="decimal"
             :value="form.minQuantity"
             :label="$t('pricing.rules.form.minQuantity')"
@@ -481,6 +492,7 @@ async function save(): Promise<void> {
           />
           <ion-input
             data-testid="pricing-rule-form-priority"
+            name="priority"
             type="number"
             inputmode="numeric"
             min="0"
@@ -498,6 +510,7 @@ async function save(): Promise<void> {
         <div class="pricing-form__row">
           <ion-input
             data-testid="pricing-rule-form-valid_from"
+            name="valid_from"
             type="date"
             :value="form.validFrom"
             :label="$t('pricing.rules.form.validFrom')"
@@ -510,6 +523,7 @@ async function save(): Promise<void> {
           />
           <ion-input
             data-testid="pricing-rule-form-valid_until"
+            name="valid_until"
             type="date"
             :value="form.validUntil"
             :label="$t('pricing.rules.form.validUntil')"

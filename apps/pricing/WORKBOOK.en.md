@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:29e5168ef8e94e5258bd83a34bec2ed412955ee8dad35a940d4e1195d0334e4f -->
+<!-- generated from WORKBOOK.md sha256:3b92a56011a2e450affe10d0df29e788cd9b6a9e93a7b514c09e3ae500609486 -->
 
 ## What it is for and who it is for
 
@@ -163,7 +163,7 @@ by Item, From and Price; filtered by Type, with the funnel; 50 per page.
 |---|---|
 | Loading | "Loading…" while the first result arrives. |
 | Empty | "No price lists.", "No discount rules." or "This price list has no prices yet."; with a search or a filter, "No results". |
-| Error | The table's notice with "Retry". A form's refusal shows inside the form and under its field, without losing what was typed; a confirmation's, inside the confirmation. |
+| Error | The table's notice with "Retry". A form's refusal shows inside the form and under its field, without losing what was typed, and each refused field loses its reason as soon as that field is corrected, even if another one says the same (hub#888); the pickers (a price's **Product** or **Service**, what a rule applies to and the **Customer group**) not yet: if they say the same as another field, they stay marked until saving again. A confirmation's, inside the confirmation. |
 | Reconnecting | What is painted stays; a strip says "Reconnecting…". |
 | App inactive | "This app is not active in this business". |
 | No permission | What they cannot do does not show; if they get there through another door, "You do not have permission". |
