@@ -118,7 +118,6 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
           v-for="field in SWITCHES"
           :key="field"
           :data-testid="`appointment-settings-${field}`"
-          class="appointment-settings__switch"
           label-placement="start"
           justify="space-between"
           :checked="form[field]"
@@ -145,9 +144,6 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
   grid-template-columns: minmax(0, 1fr);
   gap: 14px;
   max-width: 560px;
-}
-.appointment-settings__switch::part(label) {
-  white-space: normal;
 }
 .appointment-settings__title {
   font-size: 1.1rem;
