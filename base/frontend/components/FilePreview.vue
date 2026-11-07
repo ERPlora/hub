@@ -2,30 +2,61 @@
 // Files › the preview (BASE-G84; the old hub's FilePreviewModal, HUB_SHELL-F132): a large viewer inside the hub with
 // the file's name as its title, «Download» and «Close», and «Zoom in»/«Zoom out» on images and PDFs. Images, audio
 // and video load from the hub's own address (`/api/files/raw`, with the session; never the bucket's); a PDF, a text,
-// a CSV/TSV or a JSON is fetched through the SDK and drawn here: a PDF with pdf.js (its first 30 pages), a text as
-// text (never as markup), a CSV as a table, a JSON tidied. Any other type (a spreadsheet, a Word document) says «No
-// preview» and offers the download. A failure to bring or to draw it reads «The file could not be opened».
+// a CSV/TSV, a JSON, a spreadsheet (.xlsx) or a Word document (.docx) is fetched through the SDK and drawn here: a PDF
+// with pdf.js (its first 30 pages), a text as text (never as markup), a CSV and each sheet of a spreadsheet as a table
+// (`FileSheets`), a JSON as a tree that folds (`FileJsonTree`; a broken one as it is), a Word document as its formatted
+// text (`FileDocument`, never HTML painted) — hub#578. Any other type (an old .xls or .doc, a presentation) says «No
+// preview» and offers the download. A failure to bring it reads «The file could not be opened»; one to read it (damaged,
+// or another format) «The file could not be read»; a spreadsheet or document over `OFFICE_PREVIEW_MAX_BYTES` (or one
+// that unpacks to too much) «Too large to preview», never fetched. The header's «Download» is always there.
 import { InlineFeedback } from '@erplora/ui/components';
 import { fetchFile } from '@erplora/ui/sdk';
 import { HubIcon } from '@erplora/ui/shell';
 import { IonButton, IonModal } from '@ionic/vue';
 import { computed, nextTick, ref, shallowRef, useTemplateRef, watch } from 'vue';
 
-import { extensionOf, parseTable, PDF_PAGES, rawUrl, TABLE_PREVIEW_ROWS, TEXT_PREVIEW_CHARS } from '../lib/files';
+import {
+  cellText,
+  extensionOf,
+  formatSize,
+  OFFICE_PREVIEW_MAX_BYTES,
+  parseTable,
+  PDF_PAGES,
+  type PreviewSheet,
+  PreviewTooLarge,
+  rawUrl,
+  sheetRows,
+  TABLE_PREVIEW_ROWS,
+  TEXT_PREVIEW_CHARS,
+  viewerOf,
+} from '../lib/files';
 import { useBaseI18n } from '../lib/i18n';
+import { type DocumentNode, readDocument, readSheets } from '../lib/office';
 import { renderPdf } from '../lib/pdf';
 import type { FileItem } from '../operations';
+import FileDocument from './FileDocument.vue';
+import FileJsonTree from './FileJsonTree.vue';
+import FileSheets from './FileSheets.vue';
 
 const props = defineProps<{ file: FileItem | null; open: boolean }>();
 const emit = defineEmits<{ close: []; download: [] }>();
 
-const { t } = useBaseI18n();
+const { t, locale } = useBaseI18n();
 
-type State = 'loading' | 'ready' | 'error';
+/** `error`: the file did not arrive; `damaged`: it arrived and could not be read; `tooLarge`: not read, too big. */
+type State = 'loading' | 'ready' | 'error' | 'damaged' | 'tooLarge';
+/** What the preview fetches and draws itself (the rest loads from its address, or is not shown). */
+const FETCHED = ['pdf', 'text', 'table', 'json', 'sheet', 'document'];
+/** What it reads with a library in the page, and refuses past `OFFICE_PREVIEW_MAX_BYTES`. */
+const OFFICE = ['sheet', 'document'];
 const state = ref<State>('loading');
 const text = ref('');
 const cut = ref(false);
-const rows = ref<string[][]>([]);
+const sheets = shallowRef<PreviewSheet[]>([]);
+/** The JSON read, or `null` while none (or a broken one, shown as text). */
+const json = shallowRef<{ value: unknown } | null>(null);
+const brokenJson = ref(false);
+const documentNodes = shallowRef<DocumentNode[]>([]);
 const pdfPages = shallowRef<HTMLCanvasElement[]>([]);
 const pdfTotal = ref(0);
 const zoom = ref(100);
@@ -35,7 +66,8 @@ const pdfHost = useTemplateRef<HTMLElement>('pdfHost');
 /** The file this load is for: a later one wins, an earlier answer is dropped. */
 let loading = 0;
 
-const kind = computed(() => props.file?.preview ?? '');
+const kind = computed(() => (props.file ? viewerOf(props.file) : ''));
+const maxOffice = computed(() => formatSize(OFFICE_PREVIEW_MAX_BYTES, locale.value));
 const inlineUrl = computed(() => (props.file ? rawUrl(props.file.path, true) : ''));
 const zoomable = computed(() => kind.value === 'image' || kind.value === 'pdf');
 
@@ -44,52 +76,85 @@ async function load(file: FileItem): Promise<void> {
   state.value = 'loading';
   text.value = '';
   cut.value = false;
-  rows.value = [];
+  sheets.value = [];
+  json.value = null;
+  brokenJson.value = false;
+  documentNodes.value = [];
   pdfPages.value = [];
   zoom.value = 100;
   natural.value = null;
-  if (!['pdf', 'text', 'table', 'json'].includes(file.preview)) {
+  const viewer = viewerOf(file);
+  if (!FETCHED.includes(viewer)) {
     state.value = 'ready';
     return;
   }
+  if (OFFICE.includes(viewer) && file.size > OFFICE_PREVIEW_MAX_BYTES) {
+    state.value = 'tooLarge';
+    return;
+  }
+  let blob: Blob;
   try {
-    const { blob } = await fetchFile(rawUrl(file.path, true), file.content_type);
-    if (mine !== loading) return;
-    if (file.preview === 'pdf') {
-      const drawn = await renderPdf(new Uint8Array(await blob.arrayBuffer()));
-      if (mine !== loading) return;
-      pdfPages.value = drawn.pages;
-      pdfTotal.value = drawn.total;
-      cut.value = drawn.total > PDF_PAGES;
-    } else {
-      const content = await blob.text();
-      if (mine !== loading) return;
-      if (file.preview === 'table') {
-        const separator = extensionOf(file.name) === 'tsv' ? '\t' : ',';
-        rows.value = parseTable(content, separator, TABLE_PREVIEW_ROWS + 1);
-        cut.value = rows.value.length > TABLE_PREVIEW_ROWS;
-        rows.value = rows.value.slice(0, TABLE_PREVIEW_ROWS);
-      } else {
-        text.value = file.preview === 'json' ? tidyJson(content) : content;
-        cut.value = text.value.length > TEXT_PREVIEW_CHARS;
-        text.value = text.value.slice(0, TEXT_PREVIEW_CHARS);
-      }
-    }
-    state.value = 'ready';
+    ({ blob } = await fetchFile(rawUrl(file.path, true), file.content_type));
   } catch (error) {
     if (mine !== loading) return;
     console.error('files: the preview could not be opened', error);
     state.value = 'error';
+    return;
+  }
+  if (mine !== loading) return;
+  try {
+    await draw(viewer, file, blob, mine);
+    if (mine === loading) state.value = 'ready';
+  } catch (error) {
+    if (mine !== loading) return;
+    console.error('files: the preview could not read the file', error);
+    state.value = error instanceof PreviewTooLarge ? 'tooLarge' : 'damaged';
   }
 }
 
-/** A JSON with two-space indents; a broken one, as it is. */
-function tidyJson(content: string): string {
-  try {
-    return JSON.stringify(JSON.parse(content), null, 2);
-  } catch {
-    return content;
+/** Reads `blob` as `viewer` shows it, unless a later file took over (`mine`). */
+async function draw(viewer: string, file: FileItem, blob: Blob, mine: number): Promise<void> {
+  if (viewer === 'pdf' || OFFICE.includes(viewer)) {
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    if (viewer === 'pdf') {
+      const drawn = await renderPdf(bytes);
+      if (mine !== loading) return;
+      pdfPages.value = drawn.pages;
+      pdfTotal.value = drawn.total;
+      cut.value = drawn.total > PDF_PAGES;
+    } else if (viewer === 'sheet') {
+      const words = { yes: t('base.files.preview.yes'), no: t('base.files.preview.no') };
+      const read = await readSheets(bytes);
+      if (mine !== loading) return;
+      sheets.value = read.map((sheet) => {
+        const shown = sheetRows(sheet.rows);
+        return { name: sheet.name, cut: shown.cut, rows: shown.rows.map((row) => row.map((cell) => cellText(cell, locale.value, words))) };
+      });
+    } else {
+      const nodes = await readDocument(bytes);
+      if (mine !== loading) return;
+      documentNodes.value = nodes;
+    }
+    return;
   }
+  const content = await blob.text();
+  if (mine !== loading) return;
+  if (viewer === 'table') {
+    const separator = extensionOf(file.name) === 'tsv' ? '\t' : ',';
+    sheets.value = [{ name: file.name, ...sheetRows(parseTable(content, separator, TABLE_PREVIEW_ROWS + 1)) }];
+    return;
+  }
+  if (viewer === 'json') {
+    try {
+      json.value = { value: JSON.parse(content) as unknown };
+      return;
+    } catch {
+      // A broken JSON is shown as it is, saying so.
+      brokenJson.value = true;
+    }
+  }
+  cut.value = content.length > TEXT_PREVIEW_CHARS;
+  text.value = content.slice(0, TEXT_PREVIEW_CHARS);
 }
 
 watch(
@@ -210,6 +275,22 @@ function mediaFailed(): void {
         >
           {{ t('base.files.preview.error.body') }}
         </InlineFeedback>
+        <InlineFeedback
+          v-else-if="state === 'damaged'"
+          tone="danger"
+          data-testid="file-preview-damaged"
+          :heading="t('base.files.preview.damaged.heading')"
+        >
+          {{ t('base.files.preview.damaged.body') }}
+        </InlineFeedback>
+        <InlineFeedback
+          v-else-if="state === 'tooLarge'"
+          tone="info"
+          data-testid="file-preview-too-large"
+          :heading="t('base.files.preview.tooLarge.heading')"
+        >
+          {{ t('base.files.preview.tooLarge.body', { size: maxOffice }) }}
+        </InlineFeedback>
         <template v-else>
           <InlineFeedback
             v-if="!kind"
@@ -254,10 +335,15 @@ function mediaFailed(): void {
               {{
                 kind === 'pdf'
                   ? t('base.files.preview.pdfPages', { shown: PDF_PAGES, total: pdfTotal })
-                  : kind === 'table'
-                    ? t('base.files.preview.tableCut', { shown: TABLE_PREVIEW_ROWS })
-                    : t('base.files.preview.textCut')
+                  : t('base.files.preview.textCut')
               }}
+            </p>
+            <p
+              v-if="brokenJson"
+              class="file-preview-muted"
+              data-testid="file-preview-json-broken"
+            >
+              {{ t('base.files.preview.json.broken') }}
             </p>
             <div
               v-if="kind === 'pdf'"
@@ -266,39 +352,21 @@ function mediaFailed(): void {
               data-testid="file-preview-pdf"
               :style="pdfScaled"
             />
+            <FileSheets
+              v-else-if="kind === 'table' || kind === 'sheet'"
+              :sheets="sheets"
+            />
             <div
-              v-else-if="kind === 'table'"
-              class="file-preview-table-wrap"
+              v-else-if="json"
+              class="file-preview-text"
+              data-testid="file-preview-json"
             >
-              <table
-                class="file-preview-table"
-                data-testid="file-preview-table"
-              >
-                <thead v-if="rows.length">
-                  <tr>
-                    <th
-                      v-for="(cell, index) in rows[0]"
-                      :key="index"
-                    >
-                      {{ cell }}
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr
-                    v-for="(row, index) in rows.slice(1)"
-                    :key="index"
-                  >
-                    <td
-                      v-for="(cell, column) in row"
-                      :key="column"
-                    >
-                      {{ cell }}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+              <FileJsonTree :value="json.value" />
             </div>
+            <FileDocument
+              v-else-if="kind === 'document'"
+              :nodes="documentNodes"
+            />
             <pre
               v-else
               class="file-preview-text"
@@ -389,29 +457,6 @@ function mediaFailed(): void {
   width: 100%;
   height: auto;
   box-shadow: 0 1px 4px rgb(0 0 0 / 18%);
-}
-
-.file-preview-table-wrap {
-  align-self: stretch;
-  overflow: auto;
-}
-
-.file-preview-table {
-  border-collapse: collapse;
-  font-size: 0.875rem;
-}
-
-.file-preview-table th,
-.file-preview-table td {
-  padding: 6px 10px;
-  border: 1px solid var(--ep-border-color, var(--ion-color-light-shade, #d7d8da));
-  text-align: start;
-  white-space: nowrap;
-}
-
-.file-preview-table th {
-  background: var(--ion-color-light, #f4f5f8);
-  font-weight: 600;
 }
 
 .file-preview-text {

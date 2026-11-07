@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:1123e24f3d0b2e9f7afa89c1b1bcda6d248d8aa73f2bf0d4ff14f81193aa3906 -->
+<!-- generated from WORKBOOK.md sha256:408157ad8065b2225074065d804fc63393f531a40c7470ea90cf29ad59bbae5a -->
 
 ## What it is for and who it is for
 
@@ -91,7 +91,7 @@ or **Activate**.
 |---|---|
 | Loading | "Loading…" while the first result arrives. |
 | Empty | "No payments." or "No payment methods."; with a search or a filter, "No results". |
-| Error | The table's notice with "Retry". A refusal of the form shows inside the form, each reason under its field, without losing what was typed; that of a row action, above the table. |
+| Error | The table's notice with "Retry". A refusal of the form shows inside the form, each reason under its field, without losing what was typed, and each refused field loses its reason as soon as that field is corrected, even if another one says the same (hub#888); that of a row action, above the table. |
 | Reconnecting | What is painted stays; a strip warns "Reconnecting…". |
 | App inactive | "This app is not active in this business". |
 | No permission | What they cannot do does not show; if they arrive through another door, "You do not have permission". |
