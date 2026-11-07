@@ -4,7 +4,7 @@
 // «Price» until the business answers; service-business-currency), Duration (min; empty = the settings'), Category (searched; empty =
 // «No category») and Tax category (searched in Taxes; the settings' default comes chosen; no empty
 // option). «Create service» needs a name and a tax category, and waits in grey until the business has answered its
-// money (the price is read in it; hub#918); with no tax category in Taxes at all it says where to make them. A row opens «Editing service — {name}»: «Save changes» sends only what
+// money (the price is read in it; hub#918), saying so with «Retry» if that read fails (hub#938); with no tax category in Taxes at all it says where to make them. A row opens «Editing service — {name}»: «Save changes» sends only what
 // changed (no category = `category_id: null`), and below the form who performs the service. «Photo» (SERVICE-F34/F35,
 // for who may edit services): a library image (Hair and Beauty first) or a photo of its own, sent once the service is
 // saved (`set_image`, `upload_image`, «Uploading photo…»); if the service saved and the photo did not, the form says so
@@ -14,6 +14,7 @@ import { useCommand, useLive, useLiveClient } from '@erplora/ui/sdk';
 import { IonButton, IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import BusinessMoneyError from '../../../../base/frontend/components/BusinessMoneyError.vue';
 import ImageField from '../../../../base/frontend/components/ImageField.vue';
 import { draftOf, type ImageDraft, useImageSave } from '../../../../base/frontend/lib/item-image';
 import { useLocale, useT } from '../composables/useT';
@@ -203,6 +204,7 @@ function retryPhoto(): void {
   >
     <template #default="{ fieldErrors }">
       <div class="service-form">
+        <BusinessMoneyError />
         <InlineFeedback
           v-if="photo.failure.value"
           tone="warning"

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:db46b5e07ff2b76e018d22d57eec0256bfaf7f55c66bcd7e09c0d183c7bef6dc -->
+<!-- generated from WORKBOOK.md sha256:d23bcc4f71083846927ce403692d4058dcf19d00084554b3dab17d719b0b178e -->
 
 ## What it is for and who it is for
 
@@ -214,7 +214,8 @@ Steps:
 4. Choose the Tax category (they are the ones of Taxes, by their name and their rate; the one of the
    Settings comes chosen if there is one). Without it **Create service** cannot be tapped; nor while the
    business has not yet said its currency, because the price is read in it (without it, "1500" yen would be
-   saved as 150,000).
+   saved as 150,000). If the currency cannot be read, the window says so ("The business's currency could not be read", with the
+   reason) and offers "Retry", which asks for it again; as soon as it arrives, **Create service** lights up (hub#938).
 5. Tap **Create service**: the form closes and the service shows in the table as **Active**.
 In: the categories of Services and the active tax categories of Taxes.
 Out: the service on offer and bookable (`service.service.created`); from that moment the agenda and the
@@ -423,7 +424,8 @@ redeemed."; a repeated service, an archived one or one that does not exist; an u
 amount, below its field; a name another live voucher already has, "There is already a package with that
 name. Pick another name.". "Create package" (and "Save changes" when editing it, SERVICE-F13) is grey while
 the business has not yet said its currency, because the closed price and the discount are read in it
-(without it, "1500" yen would be saved as 150,000).
+(without it, "1500" yen would be saved as 150,000). If the currency cannot be read, the window says so ("The business's currency could not be read", with the
+reason) and offers "Retry", which asks for it again; as soon as it arrives, the button lights up (hub#938).
 Involved: SERVICE-F14, SERVICE-F22
 
 ### SERVICE-F13 Edit or delete a voucher

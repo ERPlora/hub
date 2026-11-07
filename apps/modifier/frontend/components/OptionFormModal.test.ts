@@ -8,7 +8,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { Business } from '../../../../base/frontend/operations';
 import type { GroupOut, OptionOut } from '../operations';
-import { expectSaveWaitsForMoney } from '../../../../base/frontend/__tests__/save-waits-for-money';
+import { expectSaveWaitsForMoney, expectWindowSaysMoneyUnreadable } from '../../../../base/frontend/__tests__/save-waits-for-money';
 import { business, click, ionChecked, ionValue, JAPANESE, KUWAITI, mountModifier, POLISH, settle } from '../__tests__/mount-modifier';
 import OptionFormModal from './OptionFormModal.vue';
 
@@ -255,5 +255,16 @@ describe('OptionFormModal: Editing option — {name}', () => {
     expect(s.inDoc('modifier-option-form')?.getAttribute('aria-label')).toBe('Editando opción — Soda');
     expect(s.field('price_delta').value).toBe('2,50');
     expect(s.field('is_default').textContent).toContain('Elegida por defecto');
+  });
+});
+
+// hub#938 (MODIFIER-F04): if the business's money cannot be read, the form says so with «Retry» instead of waiting in
+// grey without a word, also when it opens after the read had failed (the page read the money on loading).
+describe('OptionFormModal: a business whose money cannot be read (hub#938)', () => {
+  it.each([false, true])('says so with «Retry»; once the yen arrives «Save» lights up (opened after the failure: %s)', async (late) => {
+    const m = await mountModifier(OptionFormModal, { props: { open: !late, group: DRINKS, option: SODA } });
+    await m.live();
+    const opens = late ? () => m.wrapper.setProps({ open: true }) : undefined;
+    await expectWindowSaysMoneyUnreadable(m, 'modifier-option-form-submit', m.sent, opens);
   });
 });

@@ -6,7 +6,7 @@
 import { Combo, InlineFeedback } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
-import { expectSaveWaitsForMoney } from '../../../../base/frontend/__tests__/save-waits-for-money';
+import { expectSaveWaitsForMoney, expectWindowSaysMoneyUnreadable } from '../../../../base/frontend/__tests__/save-waits-for-money';
 import type { ServiceOut, SettingsOut } from '../operations';
 import { business, click, ionValue, JAPANESE, type MountOptions, mountService, page, POLISH, settle } from '../__tests__/mount-service';
 import ServiceFormModal from './ServiceFormModal.vue';
@@ -368,5 +368,16 @@ describe('ServiceFormModal: photo', () => {
     await settle();
     expect(s.inDoc('service-form-image-preview')?.querySelector('img')).toBeNull();
     expect(s.inDoc('service-form-image-preview')?.textContent?.trim()).toBe('BT');
+  });
+});
+
+// hub#938 (SERVICE-F01, F02): if the business's money cannot be read, the form says so with «Retry» instead of waiting in
+// grey without a word, also when it opens after the read had failed (the page read the money on loading).
+describe('ServiceFormModal: a business whose money cannot be read (hub#938)', () => {
+  it.each([false, true])('says so with «Retry»; once the yen arrives «Save» lights up (opened after the failure: %s)', async (late) => {
+    const m = await mountService(ServiceFormModal, { props: { open: !late, service: CUT, canChange: true }, business: null });
+    await m.live();
+    const opens = late ? () => m.wrapper.setProps({ open: true }) : undefined;
+    await expectWindowSaysMoneyUnreadable(m, 'service-form-submit', m.sent, opens);
   });
 });

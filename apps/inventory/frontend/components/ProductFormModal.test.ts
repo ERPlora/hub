@@ -9,7 +9,7 @@
 import { Combo, type ComboOption } from '@erplora/ui/components';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { expectSaveWaitsForMoney } from '../../../../base/frontend/__tests__/save-waits-for-money';
+import { expectSaveWaitsForMoney, expectWindowSaysMoneyUnreadable } from '../../../../base/frontend/__tests__/save-waits-for-money';
 import type { Business } from '../../../../base/frontend/operations';
 import {
   business,
@@ -538,5 +538,18 @@ describe('ProductFormModal: photo', () => {
     await flush();
     expect(s.el('inventory-product-image-preview')?.querySelector('img')).toBeNull();
     expect(s.el('inventory-product-image-preview')?.textContent?.trim()).toBe('GT');
+  });
+});
+
+// hub#938 (INVENTORY-F01, F02): if the business's money cannot be read, the form says so with «Retry» instead of waiting in
+// grey without a word, also when it opens after the read had failed (the page read the money on loading).
+describe('ProductFormModal: a business whose money cannot be read (hub#938)', () => {
+  it.each([false, true])('says so with «Retry»; once the yen arrives «Save changes» lights up (opened after the failure: %s)', async (late) => {
+    const props = { open: !late, product: product(), units: UNITS.rows };
+    const m = await mountInventory(ProductFormModal, { props, attach: true, business: null, api: searches(CATEGORIES) });
+    await m.live();
+    const inDoc = (testid: string) => document.querySelector<HTMLElement>(`[data-testid="${testid}"]`);
+    const opens = late ? () => m.wrapper.setProps({ open: true }) : undefined;
+    await expectWindowSaysMoneyUnreadable({ ...m, inDoc }, 'inventory-product-form-submit', () => m.calls('/api/inventory/products/update'), opens);
   });
 });

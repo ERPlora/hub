@@ -4,7 +4,8 @@
 // currency, «Closed price (PLN)», with its decimals; service-business-currency), Validity (days) and Uses, each with the old
 // help, and «Services included»: a row per offered service (searched) with its Sessions, «Remove line»
 // and «Add service». «Create package» needs a name and a line, and waits in grey until the business has answered its
-// money (the closed price and the amount off are read in it; hub#921). «Editing package — {name}» changes
+// money (the closed price and the amount off are read in it; hub#921), saying so with «Retry» if that read fails
+// (hub#938). «Editing package — {name}» changes
 // everything but the lines (shown, fixed) and sends only what changed; an emptied closed price,
 // validity or uses removes it (null). Refusals stay in the dialog, under their field.
 import { Combo, type ComboOption, FormModal, InlineFeedback } from '@erplora/ui/components';
@@ -12,6 +13,7 @@ import { useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { IonButton, IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import BusinessMoneyError from '../../../../base/frontend/components/BusinessMoneyError.vue';
 import { useLocale, useT } from '../composables/useT';
 import { type Money, percentFieldText, readPercentBp, useBusinessMoney } from '../lib/format';
 import { moneyFieldText, parseMoney } from '../lib/money';
@@ -209,6 +211,7 @@ async function save(): Promise<void> {
   >
     <template #default="{ fieldErrors }">
       <div class="service-package-form">
+        <BusinessMoneyError />
         <ion-input
           data-testid="service-package-form-name"
           :value="form.name"
