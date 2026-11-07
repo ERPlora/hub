@@ -23,6 +23,7 @@ from pydantic import (
     model_validator,
 )
 
+from apps.appointment.schemas import A_MEMBER, A_SERVICE, AN_APPOINTMENT
 from apps.customer.schemas import Email
 
 T = TypeVar("T")
@@ -39,6 +40,12 @@ END_BEFORE_START = _("The end cannot be before the start.")
 NOT_A_COLOUR = _("Write the colour as #RRGGBB (for example #6366f1).")
 NOT_AN_ADDRESS = _("Write a web address that starts with http:// or https://.")
 SAME_SERVICE_TWICE = _("Each service only once.")
+
+# The assistant's card names the record a write acts on as the diary (Citas) names it, read as whoever asks and never
+# by its id (base/assistant.py ``REFERS``): a booking is an appointment of it, so it goes by its customer, day, hour and
+# professional, as the inbox's «Cancel …'s booking (…)?» dialog says it; a service and a professional, by their names.
+#: The word the bookings list calls one («Reserva»).
+T_BOOKING = gettext_noop("Booking")
 
 Status = Literal[
     "pending", "confirmed", "in_progress", "completed", "cancelled", "no_show"
@@ -156,7 +163,10 @@ class BookingListIn(In):
 
 class BookingRefIn(In):
     id: UUID | None = Field(
-        None, description="The booking's id (its appointment's id)."
+        None,
+        title=T_BOOKING,
+        description="The booking's id (its appointment's id).",
+        json_schema_extra=AN_APPOINTMENT,
     )
     number: _text(24, 1) | None = Field(
         None,
@@ -393,7 +403,11 @@ class PublicServicePage(Page[PublicServiceOut]):
     pass
 
 
-ServiceIds = Annotated[list[UUID], Field(min_length=1, max_length=MAX_SERVICES)]
+#: Each service by its name on the card.
+ServiceIds = Annotated[
+    list[Annotated[UUID, Field(json_schema_extra=A_SERVICE)]],
+    Field(min_length=1, max_length=MAX_SERVICES),
+]
 
 
 def _different(value: list[UUID]) -> list[UUID]:
@@ -438,6 +452,7 @@ class PublicBookIn(In):
         None,
         title=gettext_noop("Professional"),
         description="The professional chosen; empty = anybody free then.",
+        json_schema_extra=A_MEMBER,
     )
     start: dt.datetime = Field(
         title=gettext_noop("Day and time"),
