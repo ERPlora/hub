@@ -1,6 +1,5 @@
 """Every visible text of the inventory app has its Spanish translation, compiled and current."""
 
-import gettext
 import json
 import uuid
 from pathlib import Path
@@ -10,76 +9,49 @@ from django.apps import apps
 from django.utils import translation
 
 from live.meta import Category as AppCategory
-from live.operations import registry
 
 from apps.inventory import queries, schemas, services
 from apps.inventory.models import Category, Product, ProductCategory, RefundStock, SaleStock, Settings, StockMovement, Unit
-from base.tests.po import po_entries
+from base.tests.po import (
+    compiled_differences,
+    config_texts,
+    missing_from_catalogue,
+    model_texts,
+    module_texts,
+    operation_titles,
+    untranslated,
+)
 
 LOCALE = Path(apps.get_app_config("inventory").path) / "locale" / "es" / "LC_MESSAGES"
-
-
-def lazy_constants(module) -> list:
-    """Every module-level lazy text (``_("…")``) of ``module``, alone or in a tuple."""
-    lazies = []
-    for value in vars(module).values():
-        for item in value if isinstance(value, tuple) else (value,):
-            if type(item).__name__ == "__proxy__":
-                lazies.append(item)
-    return lazies
 
 
 def visible_texts() -> set[str]:
     """The English source of every lazy text the app shows (menu, store, admin, choices, messages, CSV)."""
     config = apps.get_app_config("inventory")
-    lazies = [config.verbose_name, config.summary, config.description, *(nav.label for nav in config.navigation)]
+    lazies = [*config_texts(config)]
     # The Home's step and panels (gh:hub#868: the old checklist spoke English to a Spanish reader).
     lazies += [text for step in config.setup for text in (step.title, step.description)]
     lazies += [panel.title for panel in config.widgets]
-    lazies += lazy_constants(queries) + lazy_constants(services) + lazy_constants(schemas)
-    for model in (Settings, Category, Product, ProductCategory, StockMovement, SaleStock, RefundStock):
-        lazies += [model._meta.verbose_name, model._meta.verbose_name_plural]
-        # The primary key comes from live.models.UUIDModel; a reverse relation has no text of this app.
-        lazies += [
-            field.verbose_name
-            for field in model._meta.get_fields()
-            if hasattr(field, "verbose_name") and not field.auto_created and not field.primary_key
-        ]
+    lazies += module_texts(queries, services, schemas)
+    lazies += model_texts((Settings, Category, Product, ProductCategory, StockMovement, SaleStock, RefundStock))
     for choices in (Unit, Product.Type, StockMovement.Type, SaleStock.State):
         lazies += list(choices.labels)
     with translation.override("en"):
-        return {str(text) for text in lazies} | schema_titles()
-
-
-def schema_titles() -> set[str]:
-    """The titles inventory's operations give their input data (``gettext_noop``): the assistant's card names each
-    datum by them, so each one needs its Spanish. A title pydantic makes up from the field is not one."""
-    titles = set()
-    for op in registry.values():
-        if op.app_label == "inventory":
-            for name, prop in op.input.model_json_schema().get("properties", {}).items():
-                title = prop.get("title")
-                if title and title != name.title().replace("_", " "):
-                    titles.add(title)
-    return titles
+        return {str(text) for text in lazies} | operation_titles("inventory")
 
 
 def test_every_entry_has_a_spanish_translation():
-    entries = po_entries(LOCALE / "django.po")
-    assert entries
-    untranslated = [msgid for msgid, (msgstr, fuzzy) in entries.items() if not msgstr or fuzzy]
-    assert untranslated == []
+    assert untranslated(LOCALE / "django.po") == []
 
 
 def test_every_visible_text_is_in_the_catalog():
-    assert visible_texts() - set(po_entries(LOCALE / "django.po")) == set()
+    """Each text of Inventario by its whole key, context included: a ``pgettext_lazy`` that goes back to ``_()``, or
+    whose context has a typo, is missing from the catalogue, and Spanish says it in English (hub#975)."""
+    assert missing_from_catalogue(visible_texts(), LOCALE / "django.po", more_than=110, with_context=0) == set()
 
 
 def test_the_compiled_catalog_is_current():
-    with (LOCALE / "django.mo").open("rb") as compiled:
-        catalog = gettext.GNUTranslations(compiled)._catalog
-    po = {msgid: msgstr for msgid, (msgstr, _) in po_entries(LOCALE / "django.po").items()}
-    assert {msgid: msgstr for msgid, msgstr in catalog.items() if msgid} == po
+    assert compiled_differences(LOCALE) == {}
 
 
 def test_spanish_texts_of_the_workbook():
