@@ -23,10 +23,16 @@ import baseEs from '../../../../base/frontend/locale/es.json';
 import { OPERATION_ROUTES } from '../../../../frontend/generated/operation-routes';
 import en from '../locale/en.json';
 import es from '../locale/es.json';
+import type { CatalogOut, Step } from '../operations';
 
 fillHappyDomGaps();
 
 export { BYE, errorFrame, flush, HELLO, resultFrame } from '../../../../packages/ui/src/sdk/__tests__/live-harness';
+
+/** A catalog with one action, Tasks' «Create a task», which leaves its «Number». */
+export const TASK_CATALOG = { events: [], actions: [{ name: 'task.task.create', kind: 'command', app: 'task', app_name: 'Tasks', description: '', fields: [], outputs: ['number'] }] } as unknown as CatalogOut;
+/** One step that creates a task: what a later value names as «1. Create a task › …». */
+export const TASK_STEPS: Step[] = [{ id: 's1', kind: 'command', operation: 'task.task.create', params: {} }];
 
 /** Owner or admin: `flow.*` (apps.py `role_permissions`). */
 export const OWNER: SessionMe = {
@@ -47,8 +53,11 @@ export interface MountOptions {
   session?: SessionMe;
   stubs?: Record<string, Component | boolean>;
   /** API answers by path, in place before the component mounts (what it reads when it opens). */
-  answers?: Record<string, [number, unknown]>;
+  answers?: Answers;
 }
+
+/** An answer by path: a status and a body, or a reply the test holds and sends when it wants (a slow read). */
+export type Answers = Record<string, [number, unknown] | (() => Promise<Response>)>;
 
 type Params = Record<string, unknown>;
 
@@ -131,7 +140,7 @@ export async function mountFlow(component: Component, options: MountOptions = {}
   }
 
   /** Answers each API call by its path (a call not listed gets a 404 envelope). */
-  function answerBy(routes: Record<string, [number, unknown]>): void {
+  function answerBy(routes: Answers): void {
     answerPaths(harness, routes);
   }
 
@@ -148,10 +157,12 @@ export async function mountFlow(component: Component, options: MountOptions = {}
 }
 
 /** Answers each API call of `harness` by its path (a call not listed gets a 404 envelope). */
-function answerPaths(harness: ReturnType<typeof createTestClient>, routes: Record<string, [number, unknown]>): void {
+function answerPaths(harness: ReturnType<typeof createTestClient>, routes: Answers): void {
   harness.net.onApi(({ url }) => {
     const path = new URL(url, 'http://a.localhost').pathname;
-    const [status, body] = routes[path] ?? [404, { error: { code: 'not_found', message: 'Not found' } }];
+    const route = routes[path] ?? [404, { error: { code: 'not_found', message: 'Not found' } }];
+    if (typeof route === 'function') return route();
+    const [status, body] = route;
     return Response.json(body, { status });
   });
 }

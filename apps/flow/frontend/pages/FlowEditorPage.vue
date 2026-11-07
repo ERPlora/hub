@@ -5,11 +5,12 @@
 import { InlineFeedback } from '@erplora/ui/components';
 import { useLive } from '@erplora/ui/sdk';
 import { AppPage } from '@erplora/ui/shell';
-import { IonButton, IonSpinner } from '@ionic/vue';
+import { IonButton } from '@ionic/vue';
 import { computed, ref, shallowRef, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 import FlowEditor from '../components/FlowEditor.vue';
+import LoadingNote from '../components/LoadingNote.vue';
 import PageNotices, { blockingError } from '../components/PageNotices.vue';
 import { useLeaveGuard } from '../composables/useLeaveGuard';
 import { provideBusinessClock } from '../composables/usePhrasing';
@@ -66,13 +67,10 @@ const title = computed(() => flow.value?.name || t('flow.unnamed'));
         {{ $t('flow.guide.back') }}
       </IonButton>
     </div>
-    <div
+    <LoadingNote
       v-else-if="!initial && !blocked"
-      class="flow-editor-page__loading"
       data-testid="flow-editor-loading"
-    >
-      <IonSpinner name="dots" /> {{ $t('flow.loading') }}
-    </div>
+    />
     <FlowEditor
       v-else-if="initial && !blocked"
       :flow="flow"
@@ -85,12 +83,3 @@ const title = computed(() => flow.value?.name || t('flow.unnamed'));
     />
   </AppPage>
 </template>
-
-<style scoped>
-.flow-editor-page__loading {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  color: var(--ep-muted, var(--ion-color-medium));
-}
-</style>

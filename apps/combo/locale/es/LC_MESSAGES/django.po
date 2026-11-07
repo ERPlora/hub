@@ -377,6 +377,15 @@ msgstr "Producto nuevo"
 msgid "Choices"
 msgstr "Elecciones"
 
+msgid "Menu"
+msgstr "Menú"
+
+msgid "Course"
+msgstr "Plato"
+
+msgid "Choice"
+msgstr "Elección"
+
 msgid "SKU"
 msgstr "SKU"
 

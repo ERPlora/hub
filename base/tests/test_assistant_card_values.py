@@ -377,7 +377,6 @@ def test_no_list_of_texts_sent_as_they_are_is_named():
 #: number here, and none comes in.
 UNNAMED_REFERENCES = {
     "appointment": 12,
-    "combo": 25,
     "invoice": 1,
     "kitchen": 23,
     "online_booking": 7,
@@ -523,6 +522,10 @@ TITLED_IN_SPANISH = {
     "base.failed_event.retry:id": "Evento caído",
     "base.import.undo:id": "Importación",
     "base.support.report:description": "¿Qué pasó?",
+    **{f"combo.combo.{action}:id": "Menú" for action in ("delete", "set_image", "update")},
+    **{f"combo.group.{action}:id": "Plato" for action in ("delete", "update")},
+    "combo.group.reorder:id": "Menú",
+    **{f"combo.option.{action}:id": "Elección" for action in ("delete", "update")},
     **{f"customer.customer.{action}:id": "Cliente" for action in (
         "delete", "erase", "merge", "set_groups", "set_tags", "update",
     )},
