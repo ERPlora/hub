@@ -160,7 +160,9 @@ Pasos:
    registra una sola vez.
 Entra: los datos del formulario; la moneda del negocio, la de su país (un pago que no dice su moneda se
 registra en ella, también por el asistente o la API). Mientras la app no sabe todavía la moneda del
-negocio, el campo dice «Importe» y «Registrar pago» espera. Por el asistente o la API, el método se dice
+negocio, el campo dice «Importe» y «Registrar pago» espera. Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
+motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, «Registrar pago» se enciende (hub#938).
+Por el asistente o la API, el método se dice
 por su id o por su nombre, el importe va en la unidad menor de la moneda (céntimos en euros) y, si se
 quiere, una clave del intento: repetir la misma llamada con la misma clave responde el pago ya registrado
 en vez de registrar otro.

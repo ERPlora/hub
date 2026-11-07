@@ -7,7 +7,7 @@ import { Combo } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
 import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
-import { expectSaveWaitsForMoney } from '../../../../base/frontend/__tests__/save-waits-for-money';
+import { expectSaveWaitsForMoney, expectWindowSaysMoneyUnreadable } from '../../../../base/frontend/__tests__/save-waits-for-money';
 import type { Business } from '../../../../base/frontend/operations';
 import { business, JAPANESE, KUWAITI, POLISH, rule } from '../__tests__/fixtures';
 import { click, ionValue, mountPricing, settle } from '../__tests__/mount-pricing';
@@ -280,4 +280,16 @@ describe('RuleFormModal: fields refused with the same words (hub#888)', () => {
     s.answer(422, refusal);
     return { field: s.field, send: () => click(s.save()), settle };
   }, 'percent');
+});
+
+// hub#938 (PRICING-F11): if the business's money cannot be read, the rule says so with «Retry» instead of waiting in grey
+// without a word, also when it opens after the read had failed (the page read the money on loading).
+describe('RuleFormModal: a business whose money cannot be read (hub#938)', () => {
+  it.each([false, true])('says so with «Retry»; once the yen arrives «Save» lights up (opened after the failure: %s)', async (late) => {
+    const fixed = rule({ rule_type: 'fixed', percent: null, amount: 1500 });
+    const m = await mountPricing(RuleFormModal, { props: { open: !late, rule: fixed } });
+    await m.live();
+    const opens = late ? () => m.wrapper.setProps({ open: true }) : undefined;
+    await expectWindowSaysMoneyUnreadable(m, 'pricing-rule-form-submit', m.sent, opens);
+  });
 });

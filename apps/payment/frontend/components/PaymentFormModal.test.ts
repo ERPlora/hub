@@ -10,6 +10,7 @@ import { InlineFeedback } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
 import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
+import { expectWindowSaysMoneyUnreadable } from '../../../../base/frontend/__tests__/save-waits-for-money';
 import type { Business } from '../../../../base/frontend/operations';
 import { localDay } from '../lib/format';
 import type { MethodOut, PaymentOut } from '../operations';
@@ -38,10 +39,11 @@ const CASH = method('m2', 'Cash drawer');
 const CREATED = { id: 'p1', reference: 'PAY-20261014-0001' } as PaymentOut;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
-async function setup(locale: 'en' | 'es' = 'en', shop: Business | null = business()) {
+/** «New payment» on its page, opened unless `opened` is false (the page mounts it closed), its stream live. */
+async function setup(locale: 'en' | 'es' = 'en', shop: Business | null = business(), opened = true) {
   const m = await mountPayment(PaymentFormModal, { props: { open: false }, locale, session: RECORDER, business: shop });
   await m.wrapper.setProps({ 'onUpdate:open': (open: boolean) => m.wrapper.setProps({ open }) });
-  await m.wrapper.setProps({ open: true });
+  if (opened) await m.wrapper.setProps({ open: true });
   await settle();
   await m.live();
   const field = (name: string) => m.inDoc(`payment-form-${name}`) as Control;
@@ -270,4 +272,24 @@ describe('PaymentFormModal: fields refused with the same words (hub#888)', () =>
     },
     'amount',
   );
+});
+
+// hub#938 (PAYMENT-F02): if the business's money cannot be read, «New payment» says so with «Retry» instead of waiting
+// in grey without a word, also when it opens after the read had failed (the page read the money on loading).
+describe('PaymentFormModal: a business whose money cannot be read (hub#938)', () => {
+  it.each([false, true])('says so with «Retry»; once the yen arrives «Record payment» lights up (opened after the failure: %s)', async (late) => {
+    const s = await setup('en', null, !late);
+    // Each opening starts from a blank form: it is filled once open.
+    async function fill() {
+      await s.result(METHODS, page([BANK]));
+      await s.fill('1500');
+    }
+    async function opens() {
+      await s.wrapper.setProps({ open: true });
+      await settle();
+      await fill();
+    }
+    if (!late) await fill();
+    await expectWindowSaysMoneyUnreadable(s, 'payment-form-submit', s.sent, late ? opens : undefined);
+  });
 });

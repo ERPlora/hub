@@ -381,7 +381,8 @@ fuera de rango para su tipo, tramos repetidos o desordenados, una categoría, un
 que no existe, «Hasta» antes que «Desde». **Crear** (y **Guardar** al editarla, PRICING-F11) está en gris
 mientras el negocio no haya dicho todavía su moneda, porque el importe por unidad se lee en ella (sin
 ella, «1500» yenes se guardaría como 150 000); hasta entonces, salir del importe lo deja como se
-escribió, sin inventarle decimales.
+escribió, sin inventarle decimales. Si la moneda no se puede leer, la ventana lo dice («No se ha podido leer la moneda del negocio», con el
+motivo) y ofrece «Reintentar», que la vuelve a pedir; en cuanto llega, **Crear** (o **Guardar**) se enciende (hub#938).
 Implicados: Inventario, Servicios, Clientes
 
 ### PRICING-F11 Editar una regla
