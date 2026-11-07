@@ -40,7 +40,11 @@ const label = computed(() => {
       :data-has-items="count > 0 ? 'true' : undefined"
       @click="emit('open')"
     >
-      <HubIcon name="ion:cart-outline" />
+      <HubIcon
+        class="pos-fab__icon"
+        name="ion:cart-outline"
+        aria-hidden="true"
+      />
       <span
         v-if="count > 0"
         class="pos-fab__total"
@@ -82,6 +86,13 @@ const label = computed(() => {
   width: max-content !important;
   min-width: 3.6rem;
   padding: 0 1rem;
+}
+.pos-fab__icon {
+  flex: none;
+  width: 1.5rem;
+  height: 1.5rem;
+  font-size: 1.5rem;
+  color: var(--ion-color-primary-contrast);
 }
 .pos-fab__total {
   font-size: 1rem;
