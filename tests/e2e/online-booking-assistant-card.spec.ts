@@ -11,7 +11,7 @@ import { type BrowserContext, expect, test } from '@playwright/test';
 
 import { cancel, cardSpec, datumOf, fieldsOf, ownerIn, VIEWPORTS } from './assistant-card-helpers';
 import { card, openPanel } from './assistant-real';
-import { aMonday, salonCleanUp } from './appointment-helpers';
+import { aMonday, openForACut, salonCleanUp } from './appointment-helpers';
 import { A, api, capture, psql } from './helpers';
 import { post } from './service-helpers';
 
@@ -55,20 +55,7 @@ async function aSalon(context: BrowserContext): Promise<Salon> {
     name: `${TAG} Lucía`,
     phone: `6${String(Date.now()).slice(-8)}`,
   });
-  const service = await post<Salon['service']>(context, '/service/services', {
-    name: `${TAG} Corte`,
-    price: 2000,
-    duration_minutes: 30,
-    tax_category_key: 'service.generic',
-  });
-  const member = await post<Salon['member']>(context, '/staff/members', { first_name: `${TAG} Ana`, last_name: 'López' });
-  await post(context, '/service/assignments/assign', { service_id: service.id, member_id: member.id }, 200);
-  await post(context, '/schedule/special_days', {
-    date: DAY,
-    name: `${TAG} Abierto`,
-    is_closed: false,
-    intervals: [{ open_time: '09:00', close_time: '18:00' }],
-  });
+  const { service, member } = await openForACut(context, TAG, DAY);
   const booking = await post<Salon['booking']>(context, '/appointment/appointments', {
     customer_id: customer.id,
     services: [{ service_id: service.id }],

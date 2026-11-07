@@ -10,7 +10,7 @@
 // flow: APPOINTMENT-F11 APPOINTMENT-F15 APPOINTMENT-F16 APPOINTMENT-F21 BASE-F97
 import { type BrowserContext, expect, test } from '@playwright/test';
 
-import { aMonday, salonCleanUp } from './appointment-helpers';
+import { aMonday, openForACut, salonCleanUp } from './appointment-helpers';
 import { AN_ID, cancel, cardSpec, datumOf, ownerIn, VIEWPORTS } from './assistant-card-helpers';
 import { card, openPanel } from './assistant-real';
 import { A, api, capture, psql } from './helpers';
@@ -43,7 +43,7 @@ function cleanUp(): void {
   );
 }
 
-cardSpec(['customer', 'service', 'staff', 'schedule', 'appointment'], cleanUp);
+cardSpec(['tax', 'staff', 'customer', 'schedule', 'service', 'appointment'], cleanUp);
 
 interface Diary {
   customer: { id: string; name: string };
@@ -61,21 +61,8 @@ async function aDiary(context: BrowserContext, language: string): Promise<Diary>
     name: `${TAG} Lucía ${language}`,
     phone: `6${String(Date.now()).slice(-8)}`,
   });
-  const service = await post<{ id: string }>(context, '/service/services', {
-    name: `${TAG} Corte`,
-    price: 2000,
-    duration_minutes: 30,
-    tax_category_key: 'service.generic',
-  });
-  const member = await post<Diary['member']>(context, '/staff/members', { first_name: `${TAG} Ana`, last_name: language });
+  const { service, member } = await openForACut(context, TAG, DAY, language);
   const other = await post<Diary['other']>(context, '/staff/members', { first_name: `${TAG} Bea`, last_name: language });
-  await post(context, '/service/assignments/assign', { service_id: service.id, member_id: member.id }, 200);
-  await post(context, '/schedule/special_days', {
-    date: DAY,
-    name: `${TAG} Abierto`,
-    is_closed: false,
-    intervals: [{ open_time: '09:00', close_time: '18:00' }],
-  });
   const appointment = await post<Diary['appointment']>(context, '/appointment/appointments', {
     customer_id: customer.id,
     services: [{ service_id: service.id }],
