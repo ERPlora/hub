@@ -7,7 +7,8 @@
 // «Available», edit (keeps its place) and remove (after its confirmation). Below, the product picker,
 // «Supplement (PLN)» (it may be negative), «Add choice» and «Add several». A refusal is said in the course. Every
 // amount is in the business's currency, its country's, with its decimals; a bare figure (and just «Supplement»)
-// until the business answers, never a euro.
+// until the business answers, never a euro. «Add choice» / «Save» wait in grey until then: the supplement is read in
+// that currency (hub#946); the builder's page says it, with «Retry», if the business's money cannot be read.
 import { Combo, type ComboOption, ConfirmDialog, InlineFeedback, StatusPill } from '@erplora/ui/components';
 import { type ApiError, useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { HubIcon, useSession } from '@erplora/ui/shell';
@@ -159,6 +160,11 @@ const courseError = computed(() => {
 });
 
 async function save(): Promise<void> {
+  // No supplement is read before the business answers its money: «1500» would be read with two decimals, whatever its
+  // currency counts (in yen, 150000; hub#946). Nor judged: the attempt counts only once the money is known, or the
+  // field would call «¥1500» not an amount while the course waits.
+  const currency = money.value;
+  if (!currency) return;
   tried.value = true;
   reason.value = '';
   if (!article.value) {
@@ -170,7 +176,7 @@ async function save(): Promise<void> {
     reason.value = t('combo.choices.duplicate');
     return;
   }
-  const read = parseMoney(delta.value, { signed: true, money: money.value });
+  const read = parseMoney(delta.value, { signed: true, money: currency });
   if (!read.ok) return;
   const price = read.cents ?? 0;
   try {
@@ -401,7 +407,7 @@ async function save(): Promise<void> {
           <ion-button
             size="small"
             :data-testid="`${prefix}-save`"
-            :disabled="create.pending.value || update.pending.value"
+            :disabled="!money || create.pending.value || update.pending.value"
             @click="save"
           >
             {{ editing ? $t('combo.save') : $t('combo.choices.add') }}

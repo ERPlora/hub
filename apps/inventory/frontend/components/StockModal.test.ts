@@ -8,8 +8,9 @@
 // Quantities in the product's unit and its step; a refusal stays in the dialog under its field.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { expectSaveWaitsForMoney, expectWindowSaysMoneyUnreadable } from '../../../../base/frontend/__tests__/save-waits-for-money';
 import type { Business } from '../../../../base/frontend/operations';
-import { business, flush, mountInventory, ok, product, refusal, UNITS } from '../__tests__/mount-inventory';
+import { business, errorFrame, flush, mountInventory, ok, product, refusal, subId, UNITS } from '../__tests__/mount-inventory';
 import StockModal from './StockModal.vue';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
@@ -94,6 +95,26 @@ describe('StockModal: goods receipt', () => {
     expect(s.sent('/api/inventory/stock/receive')).toEqual({ items: [{ product_id: 'p1', qty: '3', unit_cost: 150 }] });
   });
 
+  // hub#946 (INVENTORY-F13): the unit cost is read in the business's money, never before it answers: «1500» would be
+  // read with two decimals and recorded as 150000 yen. «Record receipt» waits in grey (a submit past it too, and the
+  // cost field says nothing meanwhile, also with the yen's symbol), then the cost is 1500 yen.
+  it.each(['1500', '¥1500'])('a unit cost «%s» typed before the business answers: «Record receipt» waits in grey, then 1500 yen (hub#946)', async (typed) => {
+    const s = await setup('receive', {}, 'en', null);
+    s.net.onApi(() => ok({ rows: [product({ stock: '8.000' })] }));
+    await s.type('inventory-stock-qty', '3');
+    await s.type('inventory-stock-cost', typed);
+    const window = {
+      wrapper: s.wrapper,
+      save: () => s.el('inventory-stock-form-submit'),
+      amount: () => s.el('inventory-stock-cost'),
+      sent: () => s.calls('/api/inventory/stock/receive'),
+      settle: flush,
+    };
+    await expectSaveWaitsForMoney(window, () => s.result(s.call, 'base.business.get', business({ currency: 'JPY', currency_decimals: 0 })));
+    await s.submit();
+    expect(s.sent('/api/inventory/stock/receive')).toEqual({ items: [{ product_id: 'p1', qty: '3', unit_cost: 1500 }] });
+  });
+
   it("a quantity off the unit's step says so under the quantity and stays", async () => {
     const s = await setup('receive', { product: product({ unit: 'kg' }) });
     const message = 'The quantity does not respect the step allowed for this unit: use multiples of 0,001 kg.';
@@ -107,6 +128,45 @@ describe('StockModal: goods receipt', () => {
     await s.submit();
     expect(s.el('inventory-stock-qty')?.errorText).toBe(message);
     expect(s.wrapper.emitted('update:open')).toBeUndefined();
+  });
+});
+
+// hub#946 (INVENTORY-F13): if the business's money cannot be read, a receipt says so with «Retry» instead of waiting in
+// grey without a word, also when it opens after the read had failed (the page read the money on loading).
+describe('StockModal: a business whose money cannot be read (hub#946)', () => {
+  it.each([false, true])('a receipt says so with «Retry»; once the yen arrives «Record receipt» lights up (opened after the failure: %s)', async (late) => {
+    const props = { open: !late, kind: 'receive', product: product({ stock: '5.000' }), units: UNITS.rows };
+    const m = await mountInventory(StockModal, { props, attach: true, business: null });
+    await m.live();
+    const inDoc = (testid: string) => document.querySelector<HTMLElement & { value?: unknown }>(`[data-testid="${testid}"]`);
+    /** «Record receipt» waits for a quantity too: one is typed, so only the money keeps it grey. */
+    const typeQuantity = async () => {
+      const field = inDoc('inventory-stock-qty')!;
+      field.value = '3';
+      field.dispatchEvent(new CustomEvent('ionInput', { detail: { value: '3' } }));
+      await flush();
+    };
+    if (!late) await typeQuantity();
+    const opens = late
+      ? async () => {
+          await m.wrapper.setProps({ open: true });
+          await flush();
+          await typeQuantity();
+        }
+      : undefined;
+    await expectWindowSaysMoneyUnreadable({ ...m, inDoc }, 'inventory-stock-form-submit', () => m.calls('/api/inventory/stock/receive'), opens);
+  });
+
+  it.each(['count', 'write_off'] as const)('a %s reads no amount: it neither waits for the money nor says it', async (kind) => {
+    const s = await setup(kind, {}, 'en', null);
+    await s.type('inventory-stock-qty', '4');
+    await s.type('inventory-stock-reason', 'Broken bottle');
+    s.net.lastStream().push(errorFrame(subId(s.client, 'base.business.get'), 'base.hub_busy'));
+    await flush();
+    expect([s.el('inventory-stock-form-submit')?.disabled, s.el('base-money-error')]).toEqual([false, null]);
+    s.net.onApi(() => ok(product({ stock: '4.000' })));
+    await s.submit();
+    expect(s.calls(`/api/inventory/stock/${kind}`)).toHaveLength(1);
   });
 });
 
