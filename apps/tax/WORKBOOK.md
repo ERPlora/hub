@@ -103,7 +103,7 @@ Régimen, Vigente desde, Vigente hasta, «Regla raíz (componente de)», «Etiqu
 «Añadir»). Acciones de fila: «Poner fecha de fin» y «Desactivar»; en una desactivada, «Reactivar».
 
 ### Alias
-Tabla con Alias, Categoría, Origen («De fábrica» o «Aprendido») y Activa. Buscador «Buscar alias o
+Tabla con Alias, Categoría, Origen («De fábrica» o «Aprendido») y Activo. Buscador «Buscar alias o
 categoría…», filtros de Alias, Categoría y Origen y orden por cualquier columna. Botón **+** con el
 panel de alta (Alias, Categoría, Origen —«Aprendido» de entrada—, «Añadir»).
 

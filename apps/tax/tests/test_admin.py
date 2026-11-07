@@ -34,6 +34,17 @@ def superuser(db):
     return get_user_model().objects.create_superuser(username="root", password="pw", email="root@example.com")
 
 
+@pytest.fixture
+def shipped(db):
+    """A factory category, its Spanish rule with a surcharge under it, and a factory alias."""
+    generic = TaxCategory.objects.get(key="product.generic")
+    root = TaxRule.objects.get(category=generic, country_code="ES")
+    TaxRule.objects.create(
+        category=generic, country_code="ES", rate_pct=Decimal("5.2"), parent=root, component_label="Recargo"
+    )
+    return generic, root, TaxAlias.objects.get(alias="beer")
+
+
 def request_by(user):
     request = RequestFactory().get("/admin/")
     request.user = user
@@ -61,13 +72,8 @@ def test_full_crud_for_the_staff(superuser):
 
 
 @pytest.mark.django_db
-def test_the_pages_render(client, superuser):
-    generic = TaxCategory.objects.get(key="product.generic")
-    root = TaxRule.objects.get(category=generic, country_code="ES")
-    TaxRule.objects.create(
-        category=generic, country_code="ES", rate_pct=Decimal("5.2"), parent=root, component_label="Recargo"
-    )
-    beer = TaxAlias.objects.get(alias="beer")
+def test_the_pages_render(client, superuser, shipped):
+    generic, root, beer = shipped
     client.force_login(superuser)
 
     # The admin lives only on the platform host (PLAN §18.1.3).
@@ -88,6 +94,34 @@ def test_the_pages_render(client, superuser):
         response = client.get(path, HTTP_HOST="hubs.localhost")
         assert response.status_code == 200, path
         assert content in response.content, path
+
+
+@pytest.mark.django_db
+def test_support_reads_each_models_own_active_in_spanish(client, superuser, shipped):
+    """Support reading Impuestos in Spanish sees a category and a rule «Activa» — in the form, the list's column and
+    filter, and the components' table under a rule — and when they were made «Creada el»; an alias «Activo»,
+    «Creado el». Not auth's «Activo» for all three (hub#667)."""
+    generic, root, beer = shipped
+    client.force_login(superuser)
+
+    def page(path: str) -> str:
+        return client.get(path, HTTP_HOST="hubs.localhost", HTTP_ACCEPT_LANGUAGE="es").content.decode()
+
+    feminine = ('for="id_is_active">Activa</label>', ">Creada el:</label>", ">Actualizada el:</label>")
+    category = page(f"/admin/tax/taxcategory/{generic.pk}/change/")
+    rule = page(f"/admin/tax/taxrule/{root.pk}/change/")
+    alias = page(f"/admin/tax/taxalias/{beer.pk}/change/")
+    assert [text in category for text in feminine] == [True, True, True]
+    assert [text in rule for text in feminine] == [True, True, True]
+    # The components' table: its column says the rule's word.
+    assert 'column-is_active">Activa' in rule
+    assert [text in alias for text in ('for="id_is_active">Activo</label>', ">Creado el:</label>")] == [True, True]
+    assert ">Activo<" not in category + rule and ">Activa<" not in alias
+    for path in ("/admin/tax/taxcategory/", "/admin/tax/taxrule/"):
+        listing = page(path)
+        assert ("Por activa" in listing, ">Activa</a>" in listing, "Por activo" in listing) == (True, True, False), path
+    aliases = page("/admin/tax/taxalias/")
+    assert ("Por activo" in aliases, ">Activo</a>" in aliases) == (True, True)
 
 
 @pytest.mark.django_db
