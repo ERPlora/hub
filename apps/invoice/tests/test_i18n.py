@@ -22,7 +22,7 @@ from apps.invoice.models import (
 )
 from apps.invoice.tests.conftest import ctx_for, run
 from base import assistant
-from base.tests.po import catalogue_key, po_entries
+from base.tests.po import catalogue_key, missing_from_catalogue, po_entries
 
 APP = Path(apps.get_app_config("invoice").path)
 LOCALE = APP / "locale" / "es" / "LC_MESSAGES"
@@ -111,13 +111,9 @@ def test_every_entry_has_a_spanish_translation():
 
 
 def test_every_visible_text_is_in_the_catalog():
-    """Each text is looked up as the compiled catalogue keys it, context included: a ``pgettext_lazy`` that goes back
-    to ``_()``, or whose context has a typo, is missing from the catalogue and Spanish says it in English or in
-    another app's words (hub#975)."""
-    texts = visible_texts()
-    assert len(texts) > 150  # positive control: the collection found the app's texts...
-    assert len({key for key in texts if "\x04" in key}) >= 9  # ...and kept the context of its pgettext_lazy ones
-    assert texts - set(po_entries(LOCALE / "django.po")) == set()
+    """Each text of Facturación by its whole key, context included (hub#975): a ``pgettext_lazy`` that goes
+    back to ``_()``, or whose context has a typo, is missing from the catalogue, and Spanish says it in English."""
+    assert missing_from_catalogue(visible_texts(), LOCALE / "django.po", more_than=150, with_context=9) == set()
 
 
 def test_the_compiled_catalog_is_current():

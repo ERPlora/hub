@@ -39,3 +39,17 @@ def catalogue_key(text) -> str:
     Spanish."""
     args = getattr(text, "_args", ())
     return f"{args[0]}\x04{args[1]}" if len(args) == 2 else str(text)
+
+
+def missing_from_catalogue(texts: set[str], po: Path, *, more_than: int, with_context: int) -> set[str]:
+    """The keys of ``texts`` (each ``catalogue_key``) that the catalogue ``po`` lacks: what the business would read in
+    English, or in another app's words. First the positive control: the collection found the app's texts (more than
+    ``more_than``) and kept the context of its ``pgettext_lazy`` ones (at least ``with_context``), since one read with
+    ``str()`` loses its context and the comparison would pass blind (hub#975)."""
+    contexts = sum("\x04" in key for key in texts)
+    if len(texts) <= more_than or contexts < with_context:
+        raise AssertionError(
+            f"the collection found {len(texts)} texts, {contexts} with a context: "
+            f"expected more than {more_than}, and at least {with_context} with a context"
+        )
+    return texts - set(po_entries(po))

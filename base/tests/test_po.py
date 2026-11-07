@@ -14,7 +14,7 @@ from babel.messages.pofile import PoFileError
 from django.utils import translation
 from django.utils.translation import gettext_lazy, pgettext_lazy
 
-from base.tests.po import catalogue_key, po_entries, po_messages
+from base.tests.po import catalogue_key, missing_from_catalogue, po_entries, po_messages
 
 ROOT = Path(__file__).resolve().parents[2]
 HEADER = 'msgid ""\nmsgstr ""\n"Language: es\\n"\n'
@@ -146,6 +146,47 @@ def test_no_module_keys_a_lazy_text_by_itself():
     tests = sorted((ROOT / "apps").glob("*/tests/*.py"))
     assert len(tests) > 100
     assert [str(path.relative_to(ROOT)) for path in tests if '"_args"' in path.read_text(encoding="utf-8")] == []
+
+
+def statuses_po(tmp_path: Path) -> Path:
+    """A catalogue with one text under a context and one without."""
+    return write_po(
+        tmp_path,
+        f'{HEADER}\nmsgctxt "blocked time type"\nmsgid "Other"\nmsgstr "Otro"\n\nmsgid "Holiday"\nmsgstr "Festivo"\n',
+    )
+
+
+def test_a_text_is_looked_up_in_its_catalogue_by_its_whole_key(tmp_path):
+    """A context with a typo, a ``pgettext_lazy`` that lost its context, or one whose entry has none: each is missing,
+    and on screen it says the English (hub#975)."""
+    po = statuses_po(tmp_path)
+    found = {"blocked time type\x04Other", "Holiday"}
+    assert missing_from_catalogue(found, po, more_than=1, with_context=1) == set()
+    for key in ("blocked time types\x04Other", "Other", "blocked time type\x04Holiday"):
+        assert missing_from_catalogue(found | {key}, po, more_than=1, with_context=1) == {key}
+
+
+@pytest.mark.parametrize(
+    ("more_than", "with_context"),
+    [pytest.param(2, 1, id="too-few-texts"), pytest.param(1, 2, id="too-few-contexts")],
+)
+def test_a_collection_that_found_too_little_fails_instead_of_passing_blind(tmp_path, more_than, with_context):
+    """Positive control: a collection that missed the app's texts, or read them with ``str()`` and so lost their
+    contexts, would find nothing missing and pass — so it fails, saying what it found."""
+    found = {"blocked time type\x04Other", "Holiday"}
+    with pytest.raises(AssertionError, match="found 2 texts, 1 with a context"):
+        missing_from_catalogue(found, statuses_po(tmp_path), more_than=more_than, with_context=with_context)
+
+
+def test_no_catalogue_test_drops_the_context_of_a_key():
+    """Eight ``test_i18n.py`` compared the catalogue's keys without their context (``split("\\x04")``) and stayed green
+    when a ``pgettext_lazy`` lost its context or had a typo in it (hub#975): every test asks ``missing_from_catalogue``
+    or compares whole keys."""
+    tests = sorted((ROOT / "apps").glob("*/tests/*.py"))
+    assert len(tests) > 100
+    assert [
+        str(path.relative_to(ROOT)) for path in tests if 'split("\\x04")' in path.read_text(encoding="utf-8")
+    ] == []
 
 
 def test_continuation_lines_and_escapes_are_read_as_the_compiled_catalog_says_them(tmp_path):
