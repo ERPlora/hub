@@ -216,9 +216,7 @@ class CategoryRefIn(Schema):
 class _ProductLineRef(Schema):
     """A product named by ``product_id`` or by its SKU or name (``product``)."""
 
-    product_id: UUID | None = Field(
-        None, title=T_PRODUCT, description="The product's id.", json_schema_extra=A_PRODUCT
-    )
+    product_id: UUID | None = Field(None, description="The product's id.", json_schema_extra=A_PRODUCT)
     product: Said | None = Field(
         None,
         description="The product's SKU or name, when its id is not known (e.g. said aloud).",
@@ -530,9 +528,7 @@ class ProductImportIn(Schema):
 
 
 class ProductCategoryIn(_ProductLineRef):
-    category_id: UUID | None = Field(
-        None, title=T_CATEGORY, description="The category's id.", json_schema_extra=A_CATEGORY
-    )
+    category_id: UUID | None = Field(None, description="The category's id.", json_schema_extra=A_CATEGORY)
     category: Said | None = Field(
         None, description="The category's name or slug, when its id is not known."
     )

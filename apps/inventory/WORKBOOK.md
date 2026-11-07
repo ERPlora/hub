@@ -1251,9 +1251,10 @@ Lo que sigue es para quien cambia la app; quien la usa puede parar aquí.
   id con las marcas `refers` de `schemas.py`, leídas como quien pregunta: el producto por su `name` con
   `inventory.product.get` (`A_PRODUCT`: el `id` de `ProductRefIn` y el `product_id` de `_ProductLineRef`, también en
   cada línea de una recepción) y la categoría por su `name` con `inventory.category.get` (`A_CATEGORY`: el `id` de
-  `CategoryRefIn`, el `category_id` de `ProductCategoryIn` y cada elemento de `category_ids`). El dato lleva el título
+  `CategoryRefIn`, el `category_id` de `ProductCategoryIn` y cada elemento de `category_ids`). El `id` lleva el título
   con la palabra de las pantallas («Producto», «Categoría»; `T_PRODUCT`, `T_CATEGORY`, con su español en el catálogo
-  de la app), nunca «Registro». Sin persona detrás, sin `inventory.view_product` o `inventory.view_category`, con un
+  de la app), nunca «Registro»; `product_id` y `category_id` ya salen así por el `verbose_name` de la clave del modelo
+  (`StockMovement.product`, `ProductCategory.category`). Sin persona detrás, sin `inventory.view_product` o `inventory.view_category`, con un
   id de otro negocio o de algo eliminado, el registro queda fuera, nunca su id (`tests/test_assistant_card_records.py`);
   el trinquete `UNNAMED_REFERENCES` de `base/tests/test_assistant_card_values.py` impide que entre un dato sin marca.
   Las listas cerradas de sus escrituras (unidad, tipo de producto) ya llevan su etiqueta en `en` + `es` por los
