@@ -54,13 +54,15 @@ No decide el precio, no emite facturas ni habla con la AEAT, y no guarda el paí
   España** (TAX-F16). Con eso un negocio español puede vender sin tocar nada.
 - Activar Inventario, Servicios, Ventas, Facturación, Menús y combos o Suplementos activa Impuestos con
   ellas, e Impuestos no se puede desactivar mientras alguna de ellas esté activa.
-- **País y territorio fiscal del negocio**: el país es el de la cuenta de ERPlora del negocio (en la fase 1,
-  España para todos); el territorio fiscal —todo el país, Canarias, Ceuta o Melilla— se elige en
-  **Impuestos → Ajustes** (TAX-F11). Ventas, Facturación, las pantallas y el asistente calculan con los
-  dos mientras no se pregunte por otro país.
-- Las reglas de fábrica son solo de España. Un negocio de otro país (cuando la cuenta de ERPlora lo traiga)
-  tendrá que crear las suyas (TAX-F04); ni el aviso «Tus impuestos» ni el paso del Inicio (TAX-F17) lo
-  detectan todavía, porque cuentan las reglas de cualquier país.
+- **País y territorio fiscal del negocio**: el país es el que se eligió al dar de alta el negocio en
+  erplora.com, y no se cambia aquí (un negocio sin país, como una demo, está en España); el territorio
+  fiscal —todo el país, o Canarias, Ceuta o Melilla en España— se elige en **Impuestos → Ajustes**
+  (TAX-F11). Ventas, Facturación, las pantallas y el asistente calculan con los dos mientras no se pregunte
+  por otro país.
+- Las reglas de fábrica son solo de España. Un negocio de otro país también las tiene, pero nunca se le
+  aplican: hasta que crea las suyas en Reglas (TAX-F04, TAX-F12), el TPV y las facturas no cobran nada de lo
+  que vende, y el aviso «Tus impuestos» y el paso del Inicio (TAX-F17) le dicen que su país no trae tipos de
+  fábrica.
 - **«Hoy» es la hora de Madrid** en la fase 1: Impuestos todavía no usa la zona horaria del negocio.
   El día en que cambia un tipo (TAX-F07) empieza a medianoche de Madrid; en Canarias (TAX-F11), una
   hora antes de su medianoche. Cuando use la del negocio, «hoy» será el suyo.
@@ -474,23 +476,27 @@ Estado: hecho
 Actor: propietario, administrador, responsable
 Pantalla: Inicio, Categorías, Reglas y Alias
 Pasos:
-1. En el **Inicio**, mientras ninguna regla raíz activa esté vigente hoy, «Termina de configurar tu negocio»
-   trae «Tus impuestos» («Configura los tipos de IVA del país en el que vendes para que el TPV pueda calcular
+1. En el **Inicio**, mientras ninguna regla raíz activa del país del negocio esté vigente hoy, «Termina de
+   configurar tu negocio» trae «Tus impuestos» («Configura los tipos de IVA del país en el que vendes para que el TPV pueda calcular
    el precio de una venta.»), «Importante», a quien puede gestionar impuestos. «Configurar» lleva a la
    pestaña **Reglas** de Impuestos.
 2. Abre **Impuestos**: mientras tanto, arriba de Categorías, Reglas y Alias sale el mismo aviso «Tus
-   impuestos», solo para quien puede gestionar impuestos.
+   impuestos», solo para quien puede gestionar impuestos. En un país del que Impuestos no trae reglas de
+   fábrica (todos menos España) dice, en su lugar, «Portugal no trae sus tipos de impuesto de fábrica: crea en
+   Reglas el tipo de cada categoría que vendes para que el TPV pueda calcular el precio de una venta.», con el
+   nombre de su país.
 3. Pulsa «Configurar»: lleva a la pestaña Reglas, donde se crea la que falta con **+** (TAX-F04). En
    Reglas el aviso no lleva botón.
-4. En cuanto una regla raíz activa está vigente hoy, el aviso desaparece solo y el paso del Inicio queda
-   «Hecho» sin recargar.
-Entra: las reglas de cualquier país (ni el aviso ni el paso miran todavía el del negocio).
+4. En cuanto una regla raíz activa del país del negocio está vigente hoy, el aviso desaparece solo y el paso
+   del Inicio queda «Hecho» sin recargar.
+Entra: las reglas del país del negocio, el que se eligió al darlo de alta en erplora.com (España, sin país).
+Las de otro país no cuentan: un negocio de Portugal también tiene las de España de fábrica y no le sirven.
 Sale: cuántas reglas aplican hoy y si los impuestos están configurados. No bloquea vender por sí mismo. Si
 la última regla vigente termina (TAX-F07) o se desactiva (TAX-F08), el paso del Inicio vuelve a pendiente
 solo, y al reactivarla (TAX-F08) o crear otra (TAX-F04, TAX-F12) vuelve a «Hecho». Cambiar el territorio
 fiscal (TAX-F11) no lo mueve.
-Si falla: basta una sola regla de cualquier categoría para darlo por hecho. Hoy cuenta las reglas de
-cualquier país y de cualquier territorio: un negocio de Canarias sin ninguna regla de IGIC no ve el aviso,
+Si falla: basta una sola regla del país del negocio, de cualquier categoría, para darlo por hecho. Cuenta
+las de cualquier territorio del país: un negocio de Canarias sin ninguna regla de IGIC no ve el aviso,
 aunque el TPV le explica el motivo al cobrar y la ayuda de Ajustes lo dice (TAX-F11). Una regla exenta o
 de IGIC también cuenta: un negocio que solo vende servicios exentos está bien configurado.
 Implicados: BASE-F01
@@ -506,15 +512,15 @@ Pasos:
 2. Se obtiene la base, la cuota, el total, el tipo combinado, la calificación, la regla aplicada y el
    desglose por componente.
 Entra: importe en céntimos, categoría, país (de entrada, el del negocio con su territorio fiscal,
-TAX-F11), región y fecha (de entrada, hoy; en la fase 1, hoy en Madrid). Si se dice un país, se
+TAX-F11: el que se eligió al darlo de alta en erplora.com, España sin país), región y fecha (de entrada, hoy; en la fase 1, hoy en Madrid). Si se dice un país, se
 calcula en ese país y en la región que se diga, sin el territorio del negocio.
 Sale: solo la respuesta; no guarda nada ni avisa. Sin el impuesto incluido, la cuota de cada componente
 es base × tipo redondeada al céntimo, la mitad hacia arriba. Con el impuesto incluido, la base es el
 importe ÷ (1 + tipo combinado) redondeada y la cuota es lo que resta, así que lo cobrado no se mueve un
 céntimo (el último componente absorbe el ajuste). Es el mismo cálculo con el que Ventas cierra el tique
 y Facturación cuadra la cuota.
-Si falla: sin regla aplicable, «Ninguna regla fiscal se aplica a esta categoría en este país.»; nunca
-se cobra un 0 % supuesto, salvo que quien pregunta lo pida expresamente (y entonces, con el impuesto
+Si falla: sin regla aplicable, «Ninguna regla fiscal se aplica a esta categoría en este país.», también
+en un país sin reglas propias: nunca se cobra con las de España; nunca se cobra un 0 % supuesto, salvo que quien pregunta lo pida expresamente (y entonces, con el impuesto
 de su territorio: IGIC en Canarias, IPSI en Ceuta y Melilla). Sin importe o sin categoría,
 debajo de su campo. Si las reglas no se pueden leer, el cálculo se detiene sin adivinar.
 Implicados: INVOICE-F01, INVOICE-F03, SALE-F01, SALE-F09
@@ -532,7 +538,8 @@ Pasos:
    categorías para elegirlas, por el nombre en el idioma de quien mira y con su tipo vigente.
 Entra: lo que ya está guardado en Reglas y Categorías.
 Sale: lo que la línea de venta congela: categoría, tipo combinado, país, región y regla. Una línea con
-categoría y sin regla se rechaza, nunca cae al 0 %: el TPV dice «… no se puede cobrar: ninguna regla
+categoría y sin regla del país del negocio se rechaza (en un negocio de otro país, las reglas de España no
+se aplican nunca), nunca cae al 0 %: el TPV dice «… no se puede cobrar: ninguna regla
 fiscal se aplica aquí a su categoría fiscal …» y la factura, «Ninguna regla fiscal se aplica hoy a la
 categoría fiscal …» (TAX-F11). Qué hacer con una línea sin categoría es cosa de Ventas.
 Si falla: el cajero no cobra con un tipo supuesto.
@@ -661,9 +668,12 @@ cajero del producto actual es un empleado.
 - **País y región en cualquier caso**: `resolve_tax` y `calculate_tax` los pasan a mayúsculas, porque
   Ventas y Facturación los llaman sin pasar por los esquemas.
 - **La jurisdicción del negocio, una sola fuente** (TAX-F11, pm#629 VF-17): `queries.business_jurisdiction()`
-  da `(país, región)`: el país es `DEFAULT_COUNTRY` (`ES`) hasta que el Hub reciba el de la cuenta del SaaS
-  (registro de la fase 2; el SaaS lo bloquea cuando el negocio está listo) y la región es la fila única
-  `TaxSettings` (`tax_settings_single_row`; vacía = todo el país). `resolve_tax`, `calculate_tax`,
+  da `(país, región)`: el país es el que erplora.com registró para el negocio activo
+  (`base.operations.current_business_country`: el de `base.business.get` del hub del contexto, `use_hub`, por
+  `base.business.country_or_market`, la misma regla que Clientes y VeriFactu; España sin país; hub#996) y la
+  región es la fila única `TaxSettings` (`tax_settings_single_row`; vacía = todo el país), solo si es uno de
+  los `TAX_REGIONS` de ese país (una guardada de otro país no cuenta). Las reglas de fábrica de España
+  (`FACTORY_COUNTRIES`) siguen en la BD de un negocio de otro país y no se le aplican nunca. `resolve_tax`, `calculate_tax`,
   `tax.rate.calculate` y `tax.category.list` la usan cuando no se nombra país; nombrar un país pide ese
   país solo, con la región que se diga. Una región de otro país que el que toca es 422 en `region_code`,
   nunca el tipo nacional en silencio. `tax.settings.update` solo admite los territorios con impuestos
@@ -729,7 +739,10 @@ cajero del producto actual es un empleado.
   `configured` (el mismo campo que lee el aviso; el viejo miraba `matching_rules`, que es lo mismo), orden 20,
   `required` (nivel «Importante»), permiso `tax.manage`, ruta `/tax/rules` y `refresh_on`
   `events.RULE_IN_FORCE_EVENTS` (regla creada, una o varias; terminada; desactivada; reactivada). El cambio de
-  territorio (`tax.settings.updated`) no entra: el paso cuenta reglas de cualquier país y región. Una regla con
+  territorio (`tax.settings.updated`) no entra: el paso cuenta las reglas del país del negocio, de cualquier
+  región. `tax.rule.status` sin país cuenta las del país del negocio (con uno, las de ese) y devuelve
+  `factory_rules` (`FACTORY_COUNTRIES`, solo España), con el que `SetupNotice.vue` dice que el país no trae
+  tipos de fábrica (`tax.setup.ownRules`); el paso del Inicio no cambia de texto. Una regla con
   fecha de inicio futura que empieza a regir no emite evento: el Inicio la ve al volver a abrirse, como el aviso.
   El título y la descripción son los del aviso (el viejo decía `Set the VAT rates for the country you sell in,
   so the till can price a sale.`), con su español en `locale/`. Sin paneles ni campana: el módulo viejo no los
@@ -737,19 +750,17 @@ cajero del producto actual es un empleado.
 - **Decisión de mercado: el territorio fiscal del negocio (TAX-F11)**: vive en Impuestos, en la pestaña
   **Ajustes**, como el «país fiscal» de Odoo en los ajustes de Contabilidad y el régimen IGIC de Holded o Sage
   en los de impuestos; Square, Shopify y Toast lo sacan de la dirección del local. El país no se edita aquí:
-  es el de la cuenta del SaaS, que lo bloquea cuando el negocio está listo, y llega al Hub con su registro
-  (fase 2); hasta entonces, España. Ventas y Facturación leen los dos de la misma fuente (pm#629, VF-17).
+  es el de la cuenta del SaaS, que lo bloquea cuando el negocio está listo, y llega al Hub con su registro;
+  Impuestos lo lee desde hub#996 (ronda 2026-11-07 de `PLAN-HUB.md`). Ventas y Facturación leen los dos de la
+  misma fuente (pm#629, VF-17).
 
 ## Lo que queda fuera
 
-- **Que «Tus impuestos» mire el país y el territorio del negocio**: `SetupNotice.vue` y el paso del Inicio
-  piden `tax.rule.status` sin país, así que cuenta las reglas raíz de cualquier país y territorio; un negocio de
-  Canarias, Ceuta o Melilla con solo las reglas de fábrica (IVA) no ve el aviso, aunque el TPV no le deja
-  cobrar esas categorías y le dice por qué. Es comportamiento nuevo: aplazado de la migración (ronda
-  FIX-TAX-REGION-NATIONAL-FALLBACK de `PLAN-HUB.md`).
-- **El país del negocio**: es `DEFAULT_COUNTRY` (`ES`) hasta que el Hub reciba el de la cuenta del SaaS con
-  el registro de la fase 2 (`PUT /internal/hubs/{id}` → `control.Hub`); no se edita en el Hub (BASE-G97
-  sigue `no hecho` por eso).
+- **Que «Tus impuestos» mire el territorio del negocio**: desde hub#996 cuenta solo las reglas del país del
+  negocio, pero de cualquier territorio; un negocio de Canarias, Ceuta o Melilla con solo las reglas de fábrica
+  (IVA) no ve el aviso, aunque el TPV no le deja cobrar esas categorías y le dice por qué. Es comportamiento
+  nuevo: aplazado de la migración (ronda FIX-TAX-REGION-NATIONAL-FALLBACK de `PLAN-HUB.md`;
+  `tax:setup-notice-territory` en `MIGRATION.md`).
 - **«Hoy» en la zona del negocio**: en la fase 1 es el de Madrid (`settings.TIME_ZONE`), también en
   Canarias, donde un cambio de tipo empieza una hora antes de su medianoche (la zona horaria del negocio en
   dos fuentes es una contradicción señalada en la ronda CLOSE-SCHEDULE de `PLAN-HUB.md`). No se mueve sola: la vista

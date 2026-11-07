@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:2b8295354fc75033e3b8199240bb08a55fe9a30eba544a25f3fab6c5fbd94689 -->
+<!-- generated from WORKBOOK.md sha256:4506e261aade84d63ea50e2aea56a9aadd2a6b1a36205d05471df61a8182a7e0 -->
 
 ## What it is for and who it is for
 
@@ -45,13 +45,15 @@ country.
   from the factory (TAX-F16). With that a Spanish business can sell without touching anything.
 - Turning on Inventory, Services, Sales, Invoicing, Menus and combos or Modifiers turns on Taxes with them,
   and Taxes cannot be turned off while any of them is on.
-- **The business's country and tax region**: the country is the one of the business's ERPlora account (in
-  phase 1, Spain for everybody); the tax region —the whole country, the Canary Islands, Ceuta or Melilla— is
-  chosen in **Taxes → Settings** (TAX-F11). Sales, Invoicing, the screens and the assistant calculate with
-  both as long as no other country is asked for.
-- The factory rules are only Spain's. A business of another country (when the ERPlora account brings it)
-  will have to create its own (TAX-F04); neither the "Your taxes" notice nor the step of the Home (TAX-F17)
-  detect it yet, because they count the rules of any country.
+- **The business's country and tax region**: the country is the one chosen when the business was signed up
+  on erplora.com, and it is not changed here (a business without a country, such as a demo, is in Spain); the
+  tax region —the whole country, or the Canary Islands, Ceuta or Melilla in Spain— is chosen in **Taxes →
+  Settings** (TAX-F11). Sales, Invoicing, the screens and the assistant calculate with both as long as no
+  other country is asked for.
+- The factory rules are only Spain's. A business of another country has them too, but they never apply to
+  it: until it creates its own in Rules (TAX-F04, TAX-F12), the till and the invoices charge nothing it
+  sells, and the "Your taxes" notice and the step of the Home (TAX-F17) tell it that its country brings no
+  factory rates.
 - **"Today" is Madrid time** in phase 1: Taxes does not use the business's time zone yet. The day a rate
   changes (TAX-F07) starts at midnight in Madrid; in the Canary Islands (TAX-F11), one hour before their
   midnight. When it uses the business's, "today" will be its own.
@@ -443,22 +445,27 @@ Status: done
 Actor: owner, administrator, manager
 Screen: Home, Categories, Rules and Aliases
 Steps:
-1. On the **Home**, while no active root rule is in force today, "Finish setting up your business" brings
-   "Your taxes" ("Set up the VAT rates of the country you sell in so the till can price a sale."),
+1. On the **Home**, while no active root rule of the business's country is in force today, "Finish setting
+   up your business" brings "Your taxes" ("Set up the VAT rates of the country you sell in so the till can price a sale."),
    "Important", to whoever can manage taxes. "Set up" takes you to the **Rules** tab of Taxes.
 2. Open **Taxes**: meanwhile, at the top of Categories, Rules and Aliases the same "Your taxes" notice
-   shows, only for whoever can manage taxes.
+   shows, only for whoever can manage taxes. In a country Taxes brings no factory rules for (all but Spain)
+   it says instead "Portugal does not come with its tax rates ready: create in Rules the rate of each
+   category you sell so the till can price a sale.", with the name of its country.
 3. Tap "Set up": it takes you to the Rules tab, where the missing one is created with **+** (TAX-F04). In
    Rules the notice carries no button.
-4. As soon as an active root rule is in force today, the notice disappears by itself and the step of the
-   Home is "Done" without a reload.
-In: the rules of any country (neither the notice nor the step look at the business's yet).
+4. As soon as an active root rule of the business's country is in force today, the notice disappears by
+   itself and the step of the Home is "Done" without a reload.
+In: the rules of the business's country, the one chosen when it was signed up on erplora.com (Spain, without
+a country). Another country's do not count: a business in Portugal also has Spain's from the factory and
+they are no use to it.
 Out: how many rules apply today and whether taxes are set up. It does not block selling by itself. If the
 last rule in force ends (TAX-F07) or is deactivated (TAX-F08), the step of the Home goes back to pending by
 itself, and restoring it (TAX-F08) or creating another one (TAX-F04, TAX-F12) makes it "Done" again.
 Changing the tax region (TAX-F11) does not move it.
-If it fails: a single rule of any category is enough to consider it done. Today it counts the rules of any
-country and of any region: a Canary Islands business without any IGIC rule does not see the notice,
+If it fails: a single rule of the business's country, of any category, is enough to consider it done. It
+counts those of any region of the country: a Canary Islands business without any IGIC rule does not see the
+notice,
 although the till explains the reason when charging and the help of Settings says so (TAX-F11). An exempt or
 IGIC rule also counts: a business that only sells exempt services is properly set up.
 Involved: BASE-F01
@@ -472,16 +479,16 @@ Steps:
    amount already carries the tax are given.
 2. The base, the tax amount, the total, the combined rate, the qualification, the applied rule and the
    breakdown by component are obtained.
-In: amount in cents, category, country (at first, the business's with its tax region, TAX-F11), region and
-date (at first, today; in phase 1, today in Madrid). If a country is given, it calculates in that country
+In: amount in cents, category, country (at first, the business's with its tax region, TAX-F11: the one
+chosen when it was signed up on erplora.com, Spain without a country), region and date (at first, today; in phase 1, today in Madrid). If a country is given, it calculates in that country
 and in the region given, without the business's region.
 Out: only the answer; it saves nothing and announces nothing. Without the tax included, each component's
 tax is base × rate rounded to the cent, half up. With the tax included, the base is the amount ÷ (1 +
 combined rate) rounded and the tax is what is left, so what is charged does not move a cent (the last
 component absorbs the adjustment). It is the same calculation with which Sales closes the ticket and
 Invoicing squares the tax.
-If it fails: without an applicable rule, "No tax rule applies to this category in this country."; a guessed
-0 % is never charged, unless whoever asks requests it explicitly (and then, with the tax of their region:
+If it fails: without an applicable rule, "No tax rule applies to this category in this country.", also in a
+country without rules of its own: it is never charged with Spain's; a guessed 0 % is never charged, unless whoever asks requests it explicitly (and then, with the tax of their region:
 IGIC in the Canary Islands, IPSI in Ceuta and Melilla). Without an amount or without a category, below its
 field. If the rules cannot be read, the calculation stops without guessing.
 Involved: INVOICE-F01, INVOICE-F03, SALE-F01, SALE-F09
@@ -498,7 +505,8 @@ Steps:
    to choose them, by the name in the language of whoever looks and with their rate in force.
 In: what is already saved in Rules and Categories.
 Out: what the sale line freezes: category, combined rate, country, region and rule. A line with a category
-and without a rule is refused, it never falls to 0 %: the till says "… cannot be charged: no tax rule
+and without a rule of the business's country is refused (in a business of another country, Spain's rules
+never apply), it never falls to 0 %: the till says "… cannot be charged: no tax rule
 applies to its tax category … here." and the invoice, "No tax rule applies today to the tax category …"
 (TAX-F11). What to do with a line without a category is up to Sales.
 If it fails: the cashier does not charge with a guessed rate.
