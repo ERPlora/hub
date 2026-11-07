@@ -6,7 +6,9 @@
 // Steps — the trigger card, the column of steps (ordered with the finger, `ion-reorder-group`) and the
 // four buttons to add —, Try it, Permissions and History. The server's refusals show next to their
 // step, which opens. «Insert data» opens the one picker with what the last real event brought and
-// what the earlier steps leave. The page holds the route: this component says when it is dirty.
+// what the earlier steps leave, derived from what the editor knows: the catalog or the secrets that come in while it
+// is open show at once, and until the catalog is in it says «Loading…» (hub#969). The page holds the route: this
+// component says when it is dirty.
 import { InlineFeedback, StatusPill, useConfirm } from '@erplora/ui/components';
 import { type ApiError, useCommand, useLive, useLiveClient } from '@erplora/ui/sdk';
 import { HubIcon, toastSuccess } from '@erplora/ui/shell';
@@ -35,6 +37,7 @@ import {
 } from '../lib/document';
 import { statePill } from '../lib/phrasing';
 import type { DraftOut, FlowOut, Step, StepKind, Trigger } from '../operations';
+import CatalogError from './CatalogError.vue';
 import FieldPicker from './FieldPicker.vue';
 import HistoryPanel from './HistoryPanel.vue';
 import PermissionsPanel from './PermissionsPanel.vue';
@@ -59,7 +62,7 @@ const emit = defineEmits<{ saved: [flow: FlowOut]; back: []; dirty: [dirty: bool
 const client = useLiveClient();
 const phrasing = usePhrasing();
 const { confirm } = useConfirm();
-const { catalog, error: catalogError, reload: reloadCatalog } = useCatalog();
+const { catalog, error: catalogError, loading: catalogLoading, reload: reloadCatalog } = useCatalog();
 const create = useCommand('flow.flow.create');
 const update = useCommand('flow.flow.update');
 const runNow = useCommand('flow.flow.run');
@@ -149,7 +152,14 @@ onScopeDispose(() => secretsScope?.stop());
 
 // ── The picker: one for the whole editor ──
 const pickerOpen = ref(false);
-const pickerChoices = ref<DataChoice[]>([]);
+/** Whose picker it is: step `index`, and whether it is for a call's values. */
+const picking = ref<{ index: number; call: boolean } | null>(null);
+/** Never a copy taken when it opens: what comes in while it is open (the catalog, the secrets) shows at once (hub#969). */
+const pickerChoices = computed<DataChoice[]>(() => {
+  if (!picking.value) return [];
+  const { index, call } = picking.value;
+  return call ? [...choicesFor(index), ...callChoices(secretNames.value)] : choicesFor(index);
+});
 let answerPick: ((path: string | null) => void) | null = null;
 
 /** The picker of step `index`; a call's values (`call`) may insert the secrets and the call's key too. */
@@ -158,7 +168,7 @@ function pickFor(index: number, call = false): () => Promise<string | null> {
     new Promise((resolve) => {
       answerPick?.(null);
       answerPick = resolve;
-      pickerChoices.value = call ? [...choicesFor(index), ...callChoices(secretNames.value)] : choicesFor(index);
+      picking.value = { index, call };
       pickerOpen.value = true;
     });
 }
@@ -351,21 +361,11 @@ const saving = computed(() => create.pending.value || update.pending.value || sw
     </IonSegment>
 
     <div class="flow-editor__body">
-      <InlineFeedback
+      <CatalogError
         v-if="catalogError"
-        tone="danger"
-        data-testid="flow-catalog-error"
-      >
-        {{ $t('flow.catalogError') }} {{ wording(catalogError, '') }}
-        <IonButton
-          size="small"
-          fill="clear"
-          data-testid="flow-catalog-retry"
-          @click="reloadCatalog()"
-        >
-          {{ $t('flow.live.retry') }}
-        </IonButton>
-      </InlineFeedback>
+        :error="catalogError"
+        @retry="reloadCatalog()"
+      />
       <InlineFeedback
         v-if="problem"
         tone="danger"
@@ -514,8 +514,11 @@ const saving = computed(() => create.pending.value || update.pending.value || sw
       :choices="pickerChoices"
       :steps="doc.steps"
       :catalog="catalog"
+      :loading="catalogLoading"
+      :error="catalogError"
       @pick="onPick"
       @update:open="onPickerOpen"
+      @retry="reloadCatalog()"
     />
   </div>
 </template>
