@@ -87,3 +87,27 @@ def test_the_pages_render_on_the_platform_host(client, superuser):
         response = client.get(url, HTTP_HOST="hubs.localhost")
         assert response.status_code == 200, url
         assert text in response.content, url
+
+
+@pytest.mark.django_db
+def test_a_task_reads_tasks_own_spanish_in_the_admin(client, superuser):
+    """Support reading a task in Spanish sees who created it as «Creada por», and when, as «Creada el» and «Actualizada
+    el», the task being feminine as the sheet and the WORKBOOK say it; not Inventario's «Creado por» nor the project's
+    «Creado el» (hub#666). A project keeps its masculine «Creado el»."""
+    task = make_task("Buy towels", project=make_project())
+    client.force_login(superuser)
+    page = client.get(
+        f"/admin/task/task/{task.pk}/change/", HTTP_HOST="hubs.localhost", HTTP_ACCEPT_LANGUAGE="es"
+    ).content.decode()
+    # A label of a row with two fields is <label class="inline" …>: the text is what is read.
+    assert [label in page for label in (">Creada por:</label>", ">Creada el:</label>", ">Actualizada el:</label>")] == [
+        True,
+        True,
+        True,
+    ]
+    # The comments' table under it says its own masculine «Creado el», the comment's.
+    assert ("Creado por" in page, ">Creado el:</label>" in page, "Actualizado el" in page) == (False, False, False)
+    project = client.get(
+        f"/admin/task/project/{task.project.pk}/change/", HTTP_HOST="hubs.localhost", HTTP_ACCEPT_LANGUAGE="es"
+    ).content.decode()
+    assert ">Creado el:</label>" in project
