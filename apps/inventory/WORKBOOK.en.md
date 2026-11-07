@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:8c68313e6ebc22241205ed73e618e93ae7dceb608700325de630969a16f14a10 -->
+<!-- generated from WORKBOOK.md sha256:30df42037cc78ef6927180d23d04c7ce80cb3f3ce11fa50bcb227a6742faca85 -->
 
 ## What it is for and who it is for
 
@@ -1064,7 +1064,8 @@ the name matches several, Inventory does not choose: it says which ones they are
 Every list can be searched and goes in pages of up to 100. Before an action, the assistant asks for confirmation with
 its card (BASE-F97), which names each record as the screens name it, never by its identifier: the product by its name
 ("Product: Red wine"), the category by its name ("Category: Drinks"), a product's categories one by one ("Categories:
-Drinks, Wines") and each line of a goods receipt with its product and its quantity. What the person asking cannot see,
+Drinks, Wines") and each line of a goods receipt with its product and its quantity ("Receive in Inventory: Red wine ·
+6, Beer · 2.5"). What the person asking cannot see,
 or what no longer exists, is left out.
 
 ### What it offers: queries (they read, they change nothing)

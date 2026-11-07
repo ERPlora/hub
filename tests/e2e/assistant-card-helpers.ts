@@ -70,7 +70,9 @@ export async function ask(page: Page, text: string): Promise<void> {
   await expect(answers(page)).toHaveCount(before + 1);
 }
 
-export type SentCard = { fields: { name: string; label: string; value: unknown }[] };
+/** A card as the server sends it: each datum by its label and in words, a list `named` when the screen says its items
+ *  (live.assistant.NAMED). */
+export type SentCard = { fields: { name: string; label: string; value: unknown; named?: boolean }[] };
 
 /** The card of the confirm frame of a turn's answer (`text/event-stream`: one `data: <JSON>` per frame), if any. */
 export function confirmedCard(stream: string): SentCard | undefined {
@@ -102,7 +104,7 @@ export async function datumOf(
   tool: string,
   data: Record<string, unknown>,
   name = 'id',
-): Promise<{ label: string; value: unknown }> {
+): Promise<SentCard['fields'][number]> {
   const fields = await fieldsOf(page, tool, data);
   const field = fields.find((one) => one.name === name);
   expect(field, `the card of ${tool} names no ${name}: ${JSON.stringify(fields)}`).toBeDefined();

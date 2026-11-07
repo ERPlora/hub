@@ -1123,7 +1123,8 @@ el nombre casa con varios, Inventario no elige: dice cuáles son y pregunta cuá
 buscar y va por páginas de hasta 100. Antes de una acción, el asistente pide confirmar con su tarjeta (BASE-F97), que
 nombra cada registro como lo nombran las pantallas, nunca por su identificador: el producto por su nombre
 («Producto: Vino tinto»), la categoría por su nombre («Categoría: Bebidas»), las categorías de un producto una a una
-(«Categorías: Bebidas, Vinos») y cada línea de una recepción con su producto y su cantidad. Lo que quien pregunta no
+(«Categorías: Bebidas, Vinos») y cada línea de una recepción con su producto y su cantidad («Recibir en Inventario:
+Vino tinto · 6; Cerveza · 2,5»). Lo que quien pregunta no
 puede ver, o lo que ya no existe, no sale.
 
 ### Lo que ofrece: consultas (leen, no cambian nada)
