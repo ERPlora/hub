@@ -491,6 +491,60 @@ for (const viewport of VIEWPORTS) {
   });
 }
 
+// flow: FLOW-F10 FLOW-F11 · hub#934 — in Spanish, what the «Cambios temporales» list of Schedule holds is a «cambio
+// temporal» here too: in what starts an automation, in what a step does or reads and in the datum it asks for, never an
+// «excepción». Nothing is saved. Each width leaves its capture of the steps' list.
+const SCHEDULE_OVERRIDE_EVENTS: Array<[string, string]> = [
+  ['schedule.override.created', 'se crea un cambio temporal del horario'],
+  ['schedule.override.deleted', 'se borra un cambio temporal del horario'],
+  ['schedule.override.updated', 'se edita un cambio temporal del horario'],
+];
+const SCHEDULE_OVERRIDE_COMMANDS: Array<[string, string]> = [
+  ['schedule.override.create', 'Crear un cambio temporal del horario'],
+  ['schedule.override.update', 'Editar un cambio temporal del horario'],
+];
+const SCHEDULE_OVERRIDE_QUERIES: Array<[string, string]> = [
+  ['schedule.override.list', 'Buscar cambios temporales del horario'],
+  ['schedule.override.get', 'Leer un cambio temporal del horario'],
+];
+
+for (const viewport of VIEWPORTS) {
+  test(`FLOW-F10 y FLOW-F11: a temporary change of Schedule goes by that word in Spanish at ${viewport.label}`, async ({ browser }) => {
+    await inSpanishEditor(browser, viewport, async (page, editor) => {
+
+      // FLOW-F10: «Elige qué pasa».
+      await editor.locator('[data-testid=flow-trigger-open]').click();
+      await choose(page, 'flow-trigger-kind', 'Pasa algo');
+      await expect(await search(page, 'flow-trigger-event', 'excepción')).toHaveCount(0);
+      await search(page, 'flow-trigger-event', 'cambio temporal');
+      for (const [event, words] of SCHEDULE_OVERRIDE_EVENTS) {
+        await expect(page.locator(`[data-testid="flow-trigger-event-option-${event}"]`)).toContainText(words);
+      }
+      await page.locator('[data-testid="flow-trigger-event-option-schedule.override.created"]').click();
+      await expect(editor.locator('[data-testid=flow-trigger-open]')).toContainText('Cuando se crea un cambio temporal del horario');
+
+      // FLOW-F11: «Qué hacer», «Qué consultar» and the datum the step asks for.
+      await editor.locator('[data-testid=flow-editor-add-command]').click();
+      await expect(await search(page, 'flow-step-action-s1', 'excepción')).toHaveCount(0);
+      await search(page, 'flow-step-action-s1', 'cambio temporal');
+      for (const [action, words] of SCHEDULE_OVERRIDE_COMMANDS) {
+        await expect(page.locator(`[data-testid="flow-step-action-s1-option-${action}"]`)).toContainText(words);
+      }
+      await noHorizontalScroll(page, viewport.label);
+      await capture(page, `FIX-FLOW-SCHEDULE-OVERRIDE-WORD-steps-${viewport.label}`);
+      await page.locator('[data-testid="flow-step-action-s1-option-schedule.override.update"]').click();
+      await choose(page, 'flow-step-addinfo-s1', 'Cambio temporal');
+      await expect(editor.locator('[data-testid=flow-step-param-s1-override]')).toContainText('Cambio temporal');
+      await editor.locator('[data-testid=flow-editor-add-query]').click();
+      await expect(await search(page, 'flow-step-action-s2', 'excepción')).toHaveCount(0);
+      await search(page, 'flow-step-action-s2', 'temporal');
+      for (const [query, words] of SCHEDULE_OVERRIDE_QUERIES) {
+        await expect(page.locator(`[data-testid="flow-step-action-s2-option-${query}"]`)).toContainText(words);
+      }
+    });
+  });
+}
+
 // flow: FLOW-F11 · FIX-HUB-FLOW-EDITOR-FIELD-LABELS-ENGLISH — in Spanish, what a read of an appointment leaves is named in
 // Spanish in «Dato» and in «¿Qué dato?» («Fecha de inicio, en texto»: the day Appointments leaves ready to say), never by
 // its internal name made readable («Start date label»). Nothing is saved.

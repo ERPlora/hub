@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:46f34076ae46149f0d5534f11f07b05abab3288fec69994910febeea9a38ae39 -->
+<!-- generated from WORKBOOK.md sha256:3dc542f2f346102c4dd7f16907811b7b0008373c2f9607239bc8401c24ddf04f -->
 
 ## What it is for and who it is for
 
@@ -363,8 +363,9 @@ Screen: Automation editor
 Steps:
 1. Tap the "When this happens…" card and choose:
    - **Something happens**: in "Choose what happens", the notices of the business's active apps, said in
-     words ("a sale is charged", "a customer card is created", "an appointment is marked as a no-show"…) and
-     with a search box. Below, **Only when…**: conditions on the notice's data ("the total is greater than
+     words ("a sale is charged", "a customer card is created", "an appointment is marked as a no-show"…), with
+     the word of the app they belong to ("an opening hours override is created", as in Schedule) and with a
+     search box. Below, **Only when…**: conditions on the notice's data ("the total is greater than
      10000"); without them it starts with every notice, on its own (FLOW-F21).
    - **On a schedule**: "How often" (every day, every week, every month), the day of the week or of the
      month when it applies, and the time, in the business's time. A day of the month that does not exist
@@ -426,7 +427,8 @@ Steps:
    to an "Only continue if…" carries each piece of data as it is.
 In: the actions and queries of the active apps, the last real notice of that kind and what the previous
 steps leave. Data are named in the screen's language ("Sale number", "Customer phone") and with the word of the
-app they belong to ("Section", as in Sales & POS), never with their internal name.
+app they belong to ("Section", as in Sales & POS; "Override", as in Schedule), never with their internal name;
+so are the actions and the queries ("Create an opening hours override", never an "exception").
 Out: the steps, on **Save**. Each action or query that is named starts asking for its permission
 (FLOW-F12).
 If it fails: the server refuses on saving an action or a query that does not exist in the business, data of

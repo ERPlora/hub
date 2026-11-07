@@ -152,6 +152,36 @@ def test_a_sales_department_goes_by_the_word_sales_gives_it(language):
     assert [key for key, text in flow_texts(flow).items() if "department" in text.lower() or "departament" in text.lower()] == []
 
 
+@pytest.mark.parametrize("language", ["en", "es"])
+def test_a_schedule_override_goes_by_the_word_schedule_gives_it(language):
+    """Schedule shows a ``schedule.override`` as a temporary change (its «Temporary changes» list, «New temporary change»),
+    never as an exception, so whoever builds an automation has to recognize it by that same word. It is read from the
+    Schedule catalog: if Schedule changes its word, these texts follow. The keys stay, they are the operations' and events'
+    names, and an action or event of an override added later has to say it too."""
+    schedule = json.loads(
+        (Path(apps.get_app_config("schedule").path) / "frontend" / "locale" / f"{language}.json").read_text(encoding="utf-8")
+    )
+    one, many = (schedule["schedule"]["overrides"]["entity"][size] for size in ("one", "many"))
+    flow = json.loads((LOCALE / f"{language}.json").read_text(encoding="utf-8"))["flow"]
+    prefix = "schedule__override__"
+    actions = {key.removeprefix(prefix): text for key, text in flow["actions"].items() if key.startswith(prefix)}
+    events = {key.removeprefix(prefix): text for key, text in flow["events"].items() if key.startswith(prefix)}
+
+    assert {action: text.count(many if action == "list" else one) for action, text in actions.items()} == {
+        "create": 1,
+        "list": 1,
+        "get": 1,
+        "update": 1,
+    }
+    assert {event: text.count(one) for event, text in events.items()} == {"created": 1, "updated": 1, "deleted": 1}
+    assert flow["fields"]["override"] == one.capitalize()
+    assert [
+        key
+        for key, text in flow_texts(flow).items()
+        if "override" in key and ("excepci" in text.lower() or "exception" in text.lower())
+    ] == []
+
+
 # --- What the events bring ------------------------------------------------------------------------
 
 _FUNCTIONS = (ast.FunctionDef, ast.AsyncFunctionDef)
