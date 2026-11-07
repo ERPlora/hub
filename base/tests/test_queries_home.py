@@ -440,12 +440,26 @@ def test_only_base_names_the_steps_that_are_walls_in_production(modules, declare
 
 def test_a_national_step_shows_only_in_a_hub_of_its_country(modules, declare):
     declare("stock.catalog.status", {"n": 1})
+    modules(module("stock", setup=[step(countries=["PT"])]))
+    assert keys(setup_status(ctx())) == []  # the hub has no country: it is in ERPlora's market, Spain
+
+    Hub.objects.filter(slug="a").update(country="PT")
+    assert keys(setup_status(ctx())) == ["stock.catalog"]
+    assert keys(setup_status(ctx(scope=B))) == []
+
+
+def test_a_step_for_spain_shows_in_a_hub_without_a_country_and_not_in_another_country(modules, declare):
+    """hub#682: a hub without a country (a demo, ERPlora's own) is in ERPlora's market, Spain, as VeriFactu counts it."""
+    declare("stock.catalog.status", {"n": 1})
     modules(module("stock", setup=[step(countries=["ES"])]))
-    assert keys(setup_status(ctx())) == []  # the hub has no country
+    assert keys(setup_status(ctx())) == ["stock.catalog"]
+
+    Hub.objects.filter(slug="a").update(country="PL")
+    assert keys(setup_status(ctx())) == []
+    assert keys(setup_status(ctx(scope=B))) == ["stock.catalog"]  # B has no country
 
     Hub.objects.filter(slug="a").update(country="ES")
     assert keys(setup_status(ctx())) == ["stock.catalog"]
-    assert keys(setup_status(ctx(scope=B))) == []
 
 
 def test_a_module_off_in_the_scope_brings_no_step(modules, declare):

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:7ce9faa65d7820e34ad701a79843e5df241539eb6d1ee0d4ec1f6640d02b45ec -->
+<!-- generated from WORKBOOK.md sha256:1d3ca417473443783cc131be0e0b40c5a798a90791a152f154aee25d4fc4239e -->
 
 ## What it is for and who it is for
 
@@ -426,9 +426,10 @@ Steps:
      too, in the order the apps set.
   3. The platform's are "Your apps" (turn on at least one business app) and "Your team" (add the people
      who will use the till); the rest come from each app that is on.
-  4. A step that only applies to another country, or that the person may not see, does not show. A step
-     whose check fails does not show either: what could not be checked is never taken as done nor as
-     pending.
+  4. A step that only applies to another country, or that the person may not see, does not show. A business
+     without a country (a demo, ERPlora's own) counts as Spain, ERPlora's market: it sees Spain's steps and none
+     of another country (hub#682). A step whose check fails does not show either: what could not be checked is
+     never taken as done nor as pending.
   5. While a "Needed to invoice" step is missing, the "You cannot issue invoices yet" strip shows over the
      other screens; with the phone on its side, in one line with a single "Set up" (hub#838).
   6. When someone else completes a step on another device, the list updates by itself.

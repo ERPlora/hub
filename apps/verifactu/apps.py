@@ -8,6 +8,9 @@ from live.meta import Category, LiveAppConfig, Nav, SetupCheck, SetupStep, Widge
 from apps.verifactu import events as E
 
 VIEW = "verifactu.view_record"
+#: VeriFactu binds the taxpayers of Spain alone (RD 1007/2023, Orden HAC/1177/2024); the Canary Islands, Ceuta and
+#: Melilla are regions of ES (the tax territory of PLAN-HUB, round 2026-10-17), not other countries.
+SPAIN = "ES"
 
 
 class VerifactuConfig(LiveAppConfig):
@@ -73,7 +76,10 @@ class VerifactuConfig(LiveAppConfig):
     # `bell`). The step is done once the chosen way could carry the records to the AEAT of production (VERIFACTU-F08,
     # no plan gating it: PLAN §30), which is what the business has to do. Its level is base's: functional in testing,
     # which files without it while the till sells (gh:hub#1726); ⛔ legal where the hub files in production, which
-    # refuses every sale without it (``base.home.LEGAL_IN_PRODUCTION``, on the row's ``environment``). The panels read the queries of the old ones, each
+    # refuses every sale without it (``base.home.LEGAL_IN_PRODUCTION``, on the row's ``environment``). Only a business in
+    # Spain is asked (hub#682): outside it VeriFactu seals and sends nothing (``queries.outside_spain``), and a hub
+    # without a country (a demo, ERPlora's own) is in Spain, base's reading (``base.business.country_or_market``).
+    # The panels read the queries of the old ones, each
     # refreshed by the events live.py re-runs it on; the latest events are a component of the app, which names each
     # event's type in the reader's language (gh:verifactu#139). Registered icons only: the old
     # `stats-chart-outline` waits in UI-REQUESTS.md.
@@ -91,6 +97,7 @@ class VerifactuConfig(LiveAppConfig):
             route="/verifactu/config",
             permission="verifactu.configure",
             required=True,
+            countries=(SPAIN,),
             refresh_on=[E.CONFIG_CHANGED],
         )
     ]

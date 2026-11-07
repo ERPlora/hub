@@ -110,7 +110,10 @@ def test_configured_needs_a_row_and_every_condition():
         ([" ES "], "es", True),
         (["ES", "PT"], "PT", True),
         (["ES"], "FR", False),
-        (["ES"], "", False),  # a hub without a country gets no national step
+        # hub#682: a hub without a country (a demo, ERPlora's own) is in ERPlora's market, Spain
+        (["ES"], "", True),
+        (["es"], "", True),
+        (["PT"], "", False),
     ],
 )
 def test_a_step_applies_to_its_countries(countries, hub_country, applies):
