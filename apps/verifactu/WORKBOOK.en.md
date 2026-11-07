@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:9de4abc037aa355811067c47ad725c4acd573a75baf533bae750e78e36b52dab -->
+<!-- generated from WORKBOOK.md sha256:f316ff7fcf596dae65757e4dcaac6b619b611cdd6282d836f7c34599f55090c5 -->
 
 ## What it is for and who it is for
 
@@ -72,6 +72,11 @@ Here the reference is not a competitor: it is the AEAT's rules.
   VeriFactu is told "An administrator has to set this up.". Only a business in Spain is asked; one without a
   country (a demo) counts as Spain, and one from another country never sees it, neither in testing nor in production
   (hub#682).
+- **It is mandatory in Spain.** While it is off in a business in Spain (or without a country, such as a demo),
+  "Finish setting up your business" asks whoever runs it to "Turn on VeriFactu" ("Important"), with "Set up"
+  leading to **Apps**; as soon as they turn it on, that step goes and "Set up VeriFactu" comes. It never turns on by
+  itself: it binds the business to the AEAT until the end of the calendar year, so the owner turns it on (BASE-F01,
+  hub#997).
 - **The software producer's data** (ERPlora) go fixed in every record (its responsible declaration declares them),
   also "Serves several taxpayers", always "S" (contradiction 7, closed).
 

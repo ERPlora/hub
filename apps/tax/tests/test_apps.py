@@ -185,3 +185,33 @@ def test_the_steps_icon_is_registered():
 def test_taxes_brings_no_panels_and_no_bell_rows_to_the_home():
     # The old module declared neither (its module.json has `widgets` and `bell` null).
     assert (tax().widgets, tax().bell) == ([], [])
+
+
+def test_taxes_is_mandatory_in_every_country_and_the_platform_may_turn_it_on():
+    """hub#997 (PLAN-HUB round 2026-11-07): no sale is priced without it, in any country, and turning it on binds the
+    business to nobody, so the platform may turn it on by itself at sign-up."""
+    assert tax().mandatory == {"countries": "all", "platform_turns_on": True}
+
+
+def test_while_taxes_is_off_whoever_runs_a_business_of_any_country_is_asked_to_turn_it_on():
+    for country, named in (("PL", "Poland"), ("JP", "Japan"), ("", "Spain")):
+        with translation.override("en"):
+            (step,) = home.mandatory_steps([tax()], on=frozenset(), hub_country=country)
+        assert (step["key"], step["title"], step["description"]) == (
+            "base.mandatory.tax",
+            "Turn on Taxes",
+            f"It is mandatory for businesses in {named}.",
+        )
+    with translation.override("es"):
+        (step,) = home.mandatory_steps([tax()], on=frozenset(), hub_country="PT")
+    assert (step["title"], step["description"]) == ("Activa Impuestos", "Es obligatoria para los negocios de Portugal.")
+    assert home.mandatory_steps([tax()], on=frozenset({"tax"}), hub_country="PT") == []
+
+
+def test_the_step_that_asks_to_turn_taxes_on_paints_an_icon_the_shell_has():
+    """Its store icon (``calculator-outline``) is baked apart and the shell has not registered it: HubIcon would refuse
+    it. The step paints Taxes as «My apps» does."""
+    (step,) = home.mandatory_steps([tax()], on=frozenset(), hub_country="ES")
+    registry = Path(settings.BASE_DIR, "packages/ui/src/shell/icons.ts").read_text()
+    assert step["icon"] == tax().navigation[0].icon
+    assert f"'{step['icon'].removeprefix('ion:')}'" in registry

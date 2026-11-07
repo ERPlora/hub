@@ -318,7 +318,10 @@ class SetupStatusIn(Schema):
 
 
 class SetupItemOut(Schema):
-    key: str = Field(description="«<app>.<step>»: «base.apps», «base.team» or a module's own step.")
+    key: str = Field(
+        description="«<app>.<step>»: «base.apps», «base.mandatory.<app>» (turn on an app mandatory in the business's "
+        "country), «base.team» or a module's own step."
+    )
     app: str = Field(description="The app that declares the step («base» for the platform's).")
     state: Literal["done", "pending", "unavailable"] = Field(
         description="«unavailable»: ours, not the person's task (nothing could be turned on)."

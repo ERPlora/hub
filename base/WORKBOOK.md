@@ -36,7 +36,8 @@ El Inicio es lo primero que ve cualquier persona del negocio al entrar. De un vi
 Quién lo usa:
 
 - El **propietario** y el **administrador** ven todo y son quienes pueden resolver los pasos de la
-  plataforma («Tus apps», «Tu equipo»), y en la campana ven los avisos entre apps que no se entregaron.
+  plataforma («Tus apps», «Activa …» de cada app obligatoria en su país, «Tu equipo»), y en la campana ven los
+  avisos entre apps que no se entregaron.
 - El **responsable** y el **empleado** ven sus apps, los pasos que les tocan, los paneles que pueden ver
   y la actividad. Un paso que solo puede resolver un administrador también lo ven, para saber por qué no se
   puede facturar, pero sin botón.
@@ -433,19 +434,26 @@ Pasos:
      también los hechos, en el orden que fijan las apps.
   3. Los de la plataforma son «Tus apps» (encender al menos una app de negocio) y «Tu equipo» (añadir a
      las personas que usarán el TPV); el resto los trae cada app encendida.
-  4. Un paso que solo vale para otro país, o que la persona no puede ver, no sale. Un negocio sin país (una
+  4. Además, por cada app obligatoria en el país del negocio que está desactivada, un paso «Importante» de la
+     plataforma: «Activa VeriFactu» con «Es obligatoria para los negocios de España.» (VeriFactu, en España) o
+     «Activa Impuestos» con el país del negocio (Impuestos, en todos). Solo lo ve quien administra el negocio, que
+     es quien activa apps; «Configurar» lleva a **Apps**, a «Añadir apps». En cuanto la activa, el paso se va solo
+     y llegan los de la propia app («Configura VeriFactu», «Tus impuestos»). Un negocio de otro país no ve el de
+     VeriFactu (hub#997).
+  5. Un paso que solo vale para otro país, o que la persona no puede ver, no sale. Un negocio sin país (una
      demo, el de ERPlora) cuenta como España, el mercado de ERPlora: ve los pasos de España y ninguno de otro país
      (hub#682). Un paso cuya comprobación falla tampoco sale: nunca se da por hecho ni por pendiente lo que no se
      pudo comprobar.
-  5. Mientras falta un paso «Necesario para facturar», la franja «Todavía no puedes facturar» sale encima
+  6. Mientras falta un paso «Necesario para facturar», la franja «Todavía no puedes facturar» sale encima
      de las demás pantallas; con el móvil tumbado, en una sola línea con un «Configurar» (hub#838).
-  6. Cuando otra persona completa un paso en otro dispositivo, la lista se pone al día sola.
-Entra: los pasos que declara cada app encendida, con su comprobación, su país, su permiso y su pantalla.
+  7. Cuando otra persona completa un paso en otro dispositivo, o activa una app, la lista se pone al día sola.
+Entra: los pasos que declara cada app encendida, con su comprobación, su país, su permiso y su pantalla; y los
+países donde cada app dice que es obligatoria.
 Sale: nada guardado.
 Si falla: «No se ha podido cargar lo que te falta por configurar» con «Reintentar». Un paso que es cosa
 nuestra (no hay ninguna app de negocio que encender) sale como «Todavía no disponible» con «Esto es cosa
 nuestra: por tu parte no hay nada que hacer aún. Estamos en ello.».
-Implicados: INVENTORY-F28
+Implicados: INVENTORY-F28, BASE-F24, VERIFACTU-F01, TAX-F17
 
 ### BASE-F02 Ver el negocio de un vistazo al entrar
 <!-- origen: old-hub:HUB_SHELL-F25 -->
@@ -2996,6 +3004,19 @@ Implicados: HUBS-F17, WEBSITE-F10
   (`/app/download/<windows|linux|android>/`) van en `hub-home.app_downloads` (`base/spa.py`) para cualquier sesión, y
   `lib/app-downloads.ts` las ofrece solo en un navegador. Tests: `test_home.py`, `test_queries_home.py`, `test_spa.py`,
   `SystemAppCards.test.ts` y `app-downloads.test.ts`.
+- Apps obligatorias por país (hub#997, PLAN-HUB ronda 2026-11-07, BASE-F01): una app declara en su `LiveAppConfig`
+  `mandatory = {"countries": "all" | ["ES", …], "platform_turns_on": bool}`: dónde tiene que estar encendida y si la
+  plataforma puede encenderla sola al alta (Impuestos: `"all"`, sí; VeriFactu: `["ES"]`, nunca, porque ata al negocio
+  con la AEAT). `base.E016` (`base/home.py`) comprueba al arrancar la forma: `"all"` o códigos ISO 3166-1 alfa-2 en
+  mayúsculas sin repetir (nunca una lista vacía, que leería «en ninguno» o «en todos») y `platform_turns_on`
+  booleano. `base` la lee con `getattr` sin nombrar ninguna app: `home.mandatory_steps` da un paso `base.mandatory.<app>`
+  (nivel `functional`, orden 15, ruta `/apps#all`, el icono con que el shell pinta la app: el de su primera entrada de
+  menú, `home.shell_icon`, nunca el de la tienda, que `HubIcon` rechazaría) por cada una obligatoria en el país del negocio
+  (`country_or_market`: sin país, España) que no está encendida, solo a quien tiene `base.administer_hub`, dentro de
+  `base.setup.status`, que ya se re-ejecuta al encender o apagar una app (`APP_EVENTS`). Mientras se crean sus tablas
+  (`creating`) el paso sigue: todavía no está encendida. `platform_turns_on` lo leerá el alta (hub#997, parte 3). Tests:
+  `test_home.py` y `test_queries_home.py` (con apps de paja), `apps/verifactu/tests/test_mandatory_in_spain.py` (dos
+  hubs reales) y `apps/tax/tests/test_apps.py`.
 - Un panel `chart` cuyas etiquetas son días (`YYYY-MM-DD`: día civil de negocio, sin zona) los nombra con
   `Intl` en UTC, nunca con `new Date(<día>)` en la zona del navegador (`isoDay` y `formatDay` de
   `base/frontend/lib/home.ts`): una semana, por su día de la semana corto (`vie`); una serie más larga, por su
