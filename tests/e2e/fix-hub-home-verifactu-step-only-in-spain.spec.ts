@@ -12,15 +12,14 @@ import { expect, type Page, test } from '@playwright/test';
 
 import {
   A,
+  capture,
   horizontalOverflow,
   registerBusinessIn,
   type Registration,
   registrationOf,
   saveSessionForTheSweep,
-  shot,
   signedInSpanish,
   testid,
-  untilStill,
 } from './helpers';
 import { keepVerifactu, putVerifactuBack, revokedIn } from './verifactu-helpers';
 
@@ -88,9 +87,8 @@ for (const size of SIZES) {
         // Folded, the ⛔ go first: the capture shows the wall where it applies, and its absence in Poland.
         if (told) await expect(step(page).locator('[data-testid="setup-pill"]')).toHaveText('Necesario para facturar');
         await checklist(page).scrollIntoViewIfNeeded();
-        await untilStill(page);
         expect(await horizontalOverflow(page), `no sideways scroll at ${size.label}`).toBeLessThanOrEqual(0);
-        await page.screenshot({ path: shot(`${KEY}-${label}-${size.label}`) });
+        await capture(page, `${KEY}-${label}-${size.label}`);
 
         await unfolded(page);
         totals[label] = await counted(page);
