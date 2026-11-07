@@ -2882,7 +2882,9 @@ Pasos:
   3. **Entrar** lleva a la dirección del negocio en erplora.com: la app y la entrada siguen solo allí.
 Entra: un dominio que erplora.com ha dicho que es de ese negocio.
 Sale: la web pública del negocio y sus imágenes, sin cookies; nada más: ni la app, ni la API, ni el acceso. Con la sesión
-del negocio abierta en ese navegador se ve lo mismo, porque la sesión no llega a otro dominio.
+del negocio abierta en ese navegador se ve lo mismo, porque la sesión no llega a otro dominio. La página le dice al
+buscador que su dirección principal es el dominio, también cuando se abre por la dirección de erplora.com, que no
+redirige (WEBSITE-F10).
 Si falla: un dominio que nadie ha conectado no abre nada. Si el negocio lo quita, se da de baja o está suspendido, o no
 tiene una página publicada, el dominio dice que no hay nada ahí. Un negocio que se está preparando o mudando pide volver
 en un momento.
@@ -2905,7 +2907,9 @@ Implicados: HUBS-F17, WEBSITE-F10
   una fila vieja devolvería el alias a un servidor anterior a una mudanza; esa lectura se hace una vez, y la página lee lo
   mismo que en su dirección. Un dominio que nombran dos negocios (se está moviendo entre ellos: sus dos fotos llegan en
   cualquier orden) no es de nadie hasta que el que lo deja manda la suya: se avisa con `base.custom_domain_taken`, no se
-  rechaza ninguna foto y nunca se sirve la web equivocada.
+  rechaza ninguna foto y nunca se sirve la web equivocada. `custom_domains.served_on(hub)` dice en qué dominio abre la
+  puerta la web de un negocio ahora (el de su fila, si el mapa se lo da a él), y es lo que su página nombra como
+  dirección principal (WEBSITE-F10, hub#818).
 - **Orden de una lista** (`base/ordering.py`, regla hub#2355 del producto viejo): `list_order(*columnas, descending=…,
   nulls_last=…)` devuelve lo que necesita `order_by`, con todas las columnas y después el `id` en la dirección de la
   lista: la descendente es la ascendente leída al revés, empates incluidos, y las páginas ni repiten ni pierden filas.

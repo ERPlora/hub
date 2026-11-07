@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:799ccad5a034bc71a2accfc79986b7f5690710050afdfe61d41b77332500de2e -->
+<!-- generated from WORKBOOK.md sha256:2f1b08e5fb6406dbaee5e85392a4ef4335d06af53699fe9dcead67a4ddf6f39f -->
 
 ## What it is for and who it is for
 
@@ -137,7 +137,7 @@ know whether it worked" and "What it cannot do yet". **Back to the automations**
 
 | State | What is seen |
 |---|---|
-| Loading | The list with its indicator; the editor, "Loading…" |
+| Loading | "Loading…" above the gallery until the questions, the drafts and the list arrive; the list, with its indicator; the editor, "Loading…" |
 | Empty | With no automations, only the gallery; with no steps, "No steps yet…"; with no runs, "It has not run yet." |
 | No results | "Nothing here matches that." and **Show them all again** |
 | Error | The message in red above, with **Retry** in the list; a failure to save, turn on, copy or delete says what does not fit and changes nothing; if what automations can use (notices and actions) cannot be read, "What automations can use here could not be read." with **Retry** |
@@ -195,7 +195,8 @@ Actor: owner, administrator
 Screen: Automations
 Steps:
 1. Open **Automations** in the menu.
-2. The assistant's drafts (if any), your automations (if any) and the gallery show up.
+2. The assistant's drafts (if any), your automations (if any) and the gallery show up. While they are
+   read, "Loading…" above the gallery, never the gallery alone as if there were none.
 In: the session.
 Out: nothing saved.
 If it fails: without permission, "You do not have permission"; with the app off, "This app is not active in
@@ -401,19 +402,26 @@ Steps:
    - **Wait**: "How long" and the unit (minutes, hours or days), counted from the previous step; from one
      minute to 30 days.
 3. In each value, **Insert data** opens "Which data?", with the notice's data and a real example from the
-   business beside it (the last notice of that kind), and the data the previous steps leave; it is chosen,
-   not typed. A chosen piece of data shows as a pill; the rest of the value is text. In what a person reads
+   business beside it (the last notice of that kind), and the data the previous steps leave: the first-level
+   ones and also those a step leaves inside another piece of data, right below that piece of data and with its
+   name in front ("1. Add something to a cart › Item › Unit price", "… › Cart › Total amount", the number and
+   the total of a sale's invoice), never those inside a list; it is chosen, not typed. A chosen piece of data shows as a pill; the
+   rest of the value is text. In what a person reads
    —the question of "Ask someone first" (FLOW-F28) and the message to a customer (FLOW-F31)— each piece of
    data comes out in words, in the language of whoever saved the automation: a yes or a no as "Yes" or
    "No", a date and a time as they are written in that language and at the business's time ("2 Nov 2026,
    10:00"), and an amount a previous step leaves (that of a payment it has just recorded, the total of a sale
    or of an invoice, the price of a service or of a combo, the provisional total of a check, the amount of a
    voucher, a cash movement, the price and the total of a cart's line, a price of a price list, the fixed
-   discount of a price-list rule) in the currency that step gives it in: a payment in dollars, in dollars
-   ("12,50 US$"); a cart's line, in its cart's; a price of a price list, in its list's; the fixed discount of a
-   rule, which belongs to no price list, in the business's; the cash payment limit or the ticket limit of a
-   charge preview, in euros, the currency the law sets them in, also in a business that charges in another one
-   ("1.000,00 €"); if it gives none, in the business's ("120,50 €"). A number the notice brings comes out as it
+   discount of a price-list rule), also one the step leaves inside another piece of data (the price and the
+   total of the line just added to a cart and the cart's total after adding it, the total of a sale's invoice a
+   query reads, the figures of a till session), in the currency that step gives it in: a payment in dollars, in
+   dollars ("12,50 US$"); a cart's line, in its cart's; an amount inside another piece of data, in the one that
+   same piece of data gives (the line, the cart, the invoice: a line in dollars of a business that charges in
+   yen comes out in dollars) and, if it gives none, in the step's; a price of a price list, in its list's; the
+   fixed discount of a rule, which belongs to no price list, in the business's; the cash payment limit or the
+   ticket limit of a charge preview, in euros, the currency the law sets them in, also in a business that charges
+   in another one ("1.000,00 €"); if it gives none, in the business's ("120,50 €"). A number the notice brings comes out as it
    is, because the notice does not say whether it is money. What goes to another action, to another system or
    to an "Only continue if…" carries each piece of data as it is.
 In: the actions and queries of the active apps, the last real notice of that kind and what the previous
@@ -1181,7 +1189,7 @@ question asked of another role) does not show on the card.
 | A run, with the words it is named with (its automation and when it started) | see | F24 | `flow.run.get` |
 | The assistant's pending drafts (live) | see | F18, F19 | `flow.draft.list` |
 | An assistant's draft, whether pending, used or discarded | see | F18, F19 | `flow.draft.get` |
-| The notices and actions of the active apps, with the data each action asks for | see | F10, F11 | `flow.catalog.read` |
+| The notices and actions of the active apps, with the data each action asks for and the data it leaves (also those inside an object) | see | F10, F11 | `flow.catalog.read` |
 | The last real notice of a kind, with its data | manage | F11, F13 | `flow.event.sample` |
 | What an automation would do with the last real notice, without running anything | manage | F13 | `flow.flow.test` |
 | How many automations of a notice can do an action, how many are on and how many are half set up | see | F20 | `flow.flow.status` |

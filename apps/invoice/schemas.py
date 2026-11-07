@@ -773,7 +773,7 @@ class InvoiceLinkOut(Schema):
     invoice_type: str
     status: str
     issue_date: dt.date
-    total_amount: int
+    total_amount: int = Field(json_schema_extra={"money": True})
 
 
 class InvoiceRowOut(Schema):
@@ -854,10 +854,11 @@ class RectifiedOut(Schema):
     invoice_type: str = Field(description="Its type: F1, F2 ticket or F3.")
     issue_date: dt.date = Field(description="Its issue date.")
     customer_name: str = Field(description="Its recipient; empty on a ticket without one.")
-    total_amount: int = Field(description="Its total, in cents.")
+    total_amount: int = Field(description="Its total, in cents.", json_schema_extra={"money": True})
     remaining: int = Field(
         description="What is left of it before this rectification, in cents (less than its total after a partial "
-        "rectification by differences)."
+        "rectification by differences).",
+        json_schema_extra={"money": True},
     )
 
 

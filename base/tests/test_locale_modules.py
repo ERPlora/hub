@@ -35,9 +35,6 @@ SPANISH = Path("locale", "es", "LC_MESSAGES", "django.mo")
 #: that gives such a text its own context (or the earlier wording) lowers its number here, and none comes in.
 SHADOWED = {
     "flow": 7,
-    "online_booking": 1,
-    "task": 1,
-    "tax": 1,
     "verifactu": 7,
 }
 

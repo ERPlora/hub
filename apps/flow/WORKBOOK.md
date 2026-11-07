@@ -150,7 +150,7 @@ automatizaciones** regresa (FLOW-F08).
 
 | Estado | Qué se ve |
 |---|---|
-| Cargando | La lista con su indicador; el editor, «Cargando…» |
+| Cargando | «Cargando…» encima de la galería hasta que llegan las preguntas, los borradores y la lista; la lista, con su indicador; el editor, «Cargando…» |
 | Vacío | Sin automatizaciones, solo la galería; sin pasos, «Todavía no hay pasos…»; sin ejecuciones, «Todavía no se ha ejecutado.» |
 | Sin resultados | «Aquí no hay nada que encaje con eso.» y **Volver a verlas todas** |
 | Error | El mensaje en rojo encima, con **Reintentar** en la lista; un fallo al guardar, encender, copiar o borrar dice qué no encaja y no cambia nada; si no se puede leer lo que pueden usar las automatizaciones (avisos y acciones), «No se ha podido leer lo que pueden usar aquí las automatizaciones.» con **Reintentar** |
@@ -209,7 +209,8 @@ Actor: propietario, administrador
 Pantalla: Automatizaciones
 Pasos:
 1. Abre **Automatizaciones** en el menú.
-2. Salen los borradores del asistente (si hay), tus automatizaciones (si hay) y la galería.
+2. Salen los borradores del asistente (si hay), tus automatizaciones (si hay) y la galería. Mientras se
+   leen, «Cargando…» encima de la galería, nunca la galería sola como si no hubiera nada.
 Entra: la sesión.
 Sale: nada guardado.
 Si falla: sin permiso, «No tienes permiso»; con la app apagada, «Esta app no está activa en este
@@ -427,19 +428,26 @@ Pasos:
    - **Esperar**: «Cuánto» y la unidad (minutos, horas o días), contado desde el paso anterior; de un
      minuto a 30 días.
 3. En cada valor, **Insertar un dato** abre «¿Qué dato?», con los datos del aviso y un ejemplo real del
-   negocio al lado (el último aviso de ese tipo), y los datos que dejan los pasos anteriores; se elige,
-   no se escribe. Un dato elegido se ve como una pastilla; el resto del valor es texto. En lo que lee una
+   negocio al lado (el último aviso de ese tipo), y los datos que dejan los pasos anteriores: los de primer nivel
+   y también los que un paso deja dentro de otro dato, justo debajo de ese dato y con su nombre delante («1. Añadir
+   algo a un carrito › Elemento › Precio unitario», «… › Carrito › Importe total», el número y el total de la
+   factura de una venta), nunca los que van dentro de una lista; se elige, no se escribe. Un dato elegido se ve como una
+   pastilla; el resto del valor es texto. En lo que lee una
    persona —la pregunta de «Preguntar antes a alguien» (FLOW-F28) y el mensaje a un cliente (FLOW-F31)— cada
    dato sale en palabras, en el idioma de quien guardó la automatización: un sí o un no como «Sí» o «No», una
    fecha y una hora como se escriben en ese idioma y a la hora del negocio («2 nov 2026, 10:00»), y un importe
    que deja un paso anterior (el de un pago que acaba de registrar, el total de una venta o de una factura, el
    precio de un servicio o de un menú, el total provisional de una cuenta, el importe de un bono, un movimiento
    de caja, el precio y el total de una línea de un carrito, un precio de una tarifa, el descuento fijo de una
-   regla de tarifa) en la moneda en que lo da ese paso: un pago en dólares, en dólares («12,50 US$»); una línea
-   de un carrito, en la de su carrito; un precio de una tarifa, en la de su tarifa; el descuento fijo de una
-   regla, que no es de ninguna tarifa, en la del negocio; el límite de pago en efectivo o de ticket de la vista
-   previa de un cobro, en euros, la moneda en que la ley los fija, también en un negocio que cobra en otra
-   («1.000,00 €»); si no da ninguna, en la del negocio («120,50 €»). Un número que trae el aviso sale tal cual,
+   regla de tarifa), también el que el paso deja dentro de otro dato (el precio y el total de la línea recién
+   añadida a un carrito y el total del carrito tras añadirla, el total de la factura de una venta que lee una
+   consulta, las cifras de una sesión de caja), en la moneda en que lo da ese paso: un pago en dólares, en
+   dólares («12,50 US$»); una línea de un carrito, en la de su carrito; un importe dentro de otro dato, en la que
+   da ese mismo dato (la línea, el carrito, la factura: una línea en dólares de un negocio que cobra en yenes
+   sale en dólares) y, si no da ninguna, en la del paso; un precio de una tarifa, en la de su tarifa; el
+   descuento fijo de una regla, que no es de ninguna tarifa, en la del negocio; el límite de pago en efectivo o
+   de ticket de la vista previa de un cobro, en euros, la moneda en que la ley los fija, también en un negocio
+   que cobra en otra («1.000,00 €»); si no da ninguna, en la del negocio («120,50 €»). Un número que trae el aviso sale tal cual,
    porque el aviso no dice si es dinero. Lo que va a otra acción, a otro sistema o a un «Solo sigue si…» lleva
    cada dato tal cual.
 Entra: las acciones y consultas de las apps activas, el último aviso real de ese tipo y lo que dejan los
@@ -1231,7 +1239,7 @@ preguntas; una pregunta hecha a otro rol) no sale en la tarjeta.
 | Una ejecución, con las palabras con que se nombra (su automatización y cuándo empezó) | ver | F24 | `flow.run.get` |
 | Los borradores pendientes del asistente (en vivo) | ver | F18, F19 | `flow.draft.list` |
 | Un borrador del asistente, esté pendiente, usado o descartado | ver | F18, F19 | `flow.draft.get` |
-| Los avisos y las acciones de las apps activas, con los datos que pide cada acción | ver | F10, F11 | `flow.catalog.read` |
+| Los avisos y las acciones de las apps activas, con los datos que pide cada acción y los que deja (también los de dentro de un objeto) | ver | F10, F11 | `flow.catalog.read` |
 | El último aviso real de un tipo, con sus datos | gestionar | F11, F13 | `flow.event.sample` |
 | Lo que haría una automatización con el último aviso real, sin ejecutar nada | gestionar | F13 | `flow.flow.test` |
 | Cuántas automatizaciones de un aviso pueden hacer una acción, cuántas encendidas y cuántas a medias | ver | F20 | `flow.flow.status` |

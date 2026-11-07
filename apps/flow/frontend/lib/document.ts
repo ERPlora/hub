@@ -272,7 +272,8 @@ function flatten(value: unknown, prefix: string, out: DataChoice[]): void {
 }
 
 /** What step `index` can insert: the fields the event brought (from a real one) and what the earlier
- *  actions and reads leave (from the catalog). A list is never offered: a path cannot index it. */
+ *  actions and reads leave (from the catalog: also what they leave inside an object, `item.unit_price`, right after
+ *  it). What is inside a list is never offered: a path cannot index it. */
 export function dataChoices(steps: readonly Step[], index: number, sample: Record<string, unknown> | null | undefined, catalog: CatalogOut | null | undefined): DataChoice[] {
   const out: DataChoice[] = [];
   flatten(sample ?? {}, 'input', out);

@@ -51,6 +51,7 @@ def render(
     today=None,
     reviews=DEFAULT,
     currency="EUR",
+    canonical="",
 ) -> str:
     # A business in Spain (its prices in euros) unless a test says otherwise.
     return render_site(
@@ -64,6 +65,7 @@ def render(
         preview=preview,
         today=today,
         reviews=google_reviews() if reviews is DEFAULT else reviews,
+        canonical=canonical,
     )
 
 
@@ -314,6 +316,25 @@ def test_the_preview_is_marked_and_kept_out_of_search_engines():
     assert "data-ep-preview" in preview and '<meta name="robots" content="noindex">' in preview
     public = render()
     assert "data-ep-preview" not in public and "noindex" not in public
+
+
+#: The address a page names as its main one, as ``public_home`` gives it (hub#818).
+MAIN = "https://www.minegocio.es/"
+CANONICAL = re.compile(r'<link rel="canonical" href="([^"]*)">')
+
+
+@pytest.mark.parametrize("template", TEMPLATES)
+def test_the_page_names_its_main_address_once_in_its_head(template):
+    html = render(template, canonical=MAIN)
+    head, body = html.split("</head>", 1)
+    assert CANONICAL.findall(head) == [MAIN]
+    assert 'rel="canonical"' not in body
+
+
+def test_a_page_given_no_main_address_names_none():
+    # The editor's preview is no address of the business: it is kept out of search engines instead.
+    assert 'rel="canonical"' not in render(preview=True)
+    assert 'rel="canonical"' not in render()
 
 
 def test_an_empty_draft_still_renders_with_the_hubs_name_and_log_in():

@@ -37,7 +37,7 @@ from django.utils import translation
 from django.utils.translation import gettext_lazy as _
 from live.context import OperationContext, Scope
 from live.errors import Conflict, NotFound
-from live.operations import operation
+from live.operations import INTERNAL, operation
 
 from apps.inventory.models import (
     UNIT_SPECS,
@@ -52,7 +52,9 @@ from apps.inventory.models import (
 from apps.inventory.schemas import (
     CategoryFiltersIn,
     CategoryListIn,
+    CategoryOut,
     CategoryPage,
+    CategoryRefIn,
     ConfigGetIn,
     ConfigOut,
     ExportOut,
@@ -482,6 +484,23 @@ def list_categories(ctx: OperationContext, params: CategoryListIn) -> dict:
     if params.ids is not None:
         categories = categories.filter(id__in=params.ids)
     return _page(_filter_categories(categories, params), params, _category_row)
+
+
+# Not an assistant tool: what names a category on the card of a write (``schemas.A_CATEGORY``), as the screens show it;
+# the model finds a category in its list.
+@operation(
+    "inventory.category.get",
+    kind="query",
+    permission="inventory.view_category",
+    input=CategoryRefIn,
+    output=CategoryOut,
+    ai=INTERNAL,
+)
+def get_category(ctx: OperationContext, data: CategoryRefIn) -> dict:
+    row = load_category(find_category(data.id, data.category).pk)
+    if row is None:  # deleted between the two reads
+        raise NotFound(str(CATEGORY_NOT_FOUND))
+    return row
 
 
 def _filter_categories(categories, params: CategoryFiltersIn):

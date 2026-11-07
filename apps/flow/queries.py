@@ -260,17 +260,45 @@ def action_fields(op: Operation) -> list[dict]:
 def step_fields(op: Operation) -> dict[str, dict]:
     """The fields a step of ``op`` leaves for the next ones (``steps.<id>.<field>``), by name, with their schema: its
     output's, a list's first row's."""
-    schema = op.output.model_json_schema()
+    return _step_fields(op, op.output.model_json_schema())
+
+
+def _step_fields(op: Operation, schema: dict) -> dict[str, dict]:
+    """``step_fields`` from ``schema``, ``op``'s output's already built."""
     properties = schema.get("properties", {})
     if op.kind == "query" and "rows" in properties:
         return _resolve_ref(properties["rows"].get("items", {}), schema.get("$defs", {})).get("properties", {})
     return properties
 
 
+def step_data(op: Operation) -> dict[str, dict]:
+    """Every datum a step of ``op`` leaves that a path names (``steps.<id>.<path>``), by its path below the step, with
+    its schema: the fields ``step_fields`` gives and, at any depth, those of an object among them — the line a step
+    adds to a cart (``item.unit_price``), the invoice of a sale (``invoice.total_amount``) —; never inside a list,
+    which no path names."""
+    schema = op.output.model_json_schema()
+    defs = schema.get("$defs", {})
+    found: dict[str, dict] = {}
+
+    def walk(fields: dict, prefix: str, seen: frozenset[str]) -> None:
+        for name, prop in fields.items():
+            path = f"{prefix}{name}"
+            found[path] = prop
+            for branch in (prop, *prop.get("anyOf", [])):
+                ref = branch.get("$ref")
+                inner = _resolve_ref(branch, defs).get("properties")
+                if inner and ref not in seen:
+                    walk(inner, f"{path}.", seen | {ref} if ref else seen)
+
+    walk(_step_fields(op, schema), "", frozenset())
+    return found
+
+
 def action_outputs(op: Operation) -> list[str]:
-    """What a step of ``op`` leaves for the next ones: its output's fields (a list's first row's), and
-    ``found`` and ``count`` for a read."""
-    names = list(step_fields(op))
+    """What a step of ``op`` leaves for the next ones, by the path the engine resolves below the step (``step_data``):
+    its output's fields (a list's first row's), each object among them followed by what it holds (``item``,
+    ``item.unit_price``), never inside a list; and ``found`` and ``count`` for a read."""
+    names = list(step_data(op))
     if op.kind == "query":
         names += [name for name in ("found", "count") if name not in names]
     return names
@@ -1123,35 +1151,45 @@ def _is_money(prop: dict) -> bool:
 ANSWERED_CURRENCY = "currency"
 
 
-def _money_currencies(steps: list[dict]) -> dict[str, str]:
-    """The amounts the steps' actions and reads mark in what they leave (``step_fields``: their output's schema, a
-    read's first row), by path (``steps.<id>.<field>``), each with the datum of its step that gives its currency: the
-    one its mark names (``CURRENCY_IN``), else ``ANSWERED_CURRENCY``. An event declares none."""
-    found: dict[str, str] = {}
+def _money_currencies(steps: list[dict]) -> dict[str, tuple[str | None, ...]]:
+    """The amounts the steps' actions and reads mark in what they leave (``step_data``: their output's schema, a
+    read's first row, and the objects inside), by path (``steps.<id>.<field>``, ``steps.<id>.item.unit_price``), each
+    with the paths of the data that give its currency, nearest first (``_currency_data``). An event declares none."""
+    found: dict[str, tuple[str | None, ...]] = {}
     for step in steps:
         op = registry.get(str(step.get("operation") or "")) if step.get("kind") in ("command", "query") else None
         if op is None:
             continue
-        found |= {
-            f"steps.{step.get('id')}.{name}": prop.get(CURRENCY_IN) or ANSWERED_CURRENCY
-            for name, prop in step_fields(op).items()
-            if _is_money(prop)
-        }
+        for name, prop in step_data(op).items():
+            if _is_money(prop):
+                path = f"steps.{step.get('id')}.{name}"
+                found[path] = _currency_data(path, prop)
     return found
 
 
+def _currency_data(path: str, prop: dict) -> tuple[str | None, ...]:
+    """The paths of the data that give the currency of the amount at ``path``, nearest first: the one its mark names
+    beside it (``CURRENCY_IN``), alone; else the ``ANSWERED_CURRENCY`` of the object that holds it (a cart's line in
+    dollars), then of each one around it up to its step's answer, and ``None`` last: the business's — as the
+    assistant's card says an amount nested in an object (BASE-F97)."""
+    holders = path.split(".")[:-1]
+    if own := prop.get(CURRENCY_IN):
+        return (".".join([*holders, own]),)
+    around = (".".join([*holders[:depth], ANSWERED_CURRENCY]) for depth in range(len(holders), 1, -1))
+    return (*around, None)
+
+
 def _money_paths(steps: list[dict]) -> frozenset[str]:
-    """The paths (``steps.<id>.<field>``) of the amounts the steps' actions and reads mark in what they leave."""
+    """The paths (``steps.<id>.<field>``, ``steps.<id>.item.unit_price``) of the amounts the steps' actions and reads
+    mark in what they leave."""
     return frozenset(_money_currencies(steps))
 
 
-def _answered_currency(path: str, data: dict, datum: str) -> str | None:
-    """The currency the step that left the amount at ``path`` (``steps.<id>.<field>``) answers in ``data``: the
-    ``datum`` that gives it — its ``currency`` (a payment in dollars, an invoice in the one it was issued in), as the
-    assistant's card says an amount of a read (BASE-F98), or the one the amount's mark names (``CURRENCY_IN``) —;
-    ``None`` when it answers none."""
-    step_id = path.split(".")[1]
-    currency = document.lookup(f"steps.{step_id}.{datum}", data)[1]
+def _answered_currency(data: dict, datum: str) -> str | None:
+    """The currency the datum at ``datum`` answers in ``data`` — a ``currency`` (a payment in dollars, an invoice in the
+    one it was issued in), as the assistant's card says an amount of a read (BASE-F98), or the one an amount's mark
+    names (``CURRENCY_IN``) —; ``None`` when there is none."""
+    currency = document.lookup(datum, data)[1]
     return currency if isinstance(currency, str) and currency else None
 
 
@@ -1182,16 +1220,19 @@ def _moment_words(text: str, language: str) -> str | None:
 def words_for(steps: list[dict], language: str, scope: Scope, data: dict | None = None) -> document.Say:
     """How a text a person reads — a question (FLOW-F28), a message to a customer (FLOW-F31) — says each datum it
     inserts, as the assistant's card says it (BASE-F97): a yes or no as «Yes»/«No», an ISO day, hour or instant as
-    ``language`` writes it at the business's hour, and an amount the schema of the step that left it marks as money in
-    the currency that step answers in ``data`` (``_answered_currency``), else in the business's — one in a currency of
-    its own (``CURRENCY_IN``), only in the one its datum gives —; anything else as it is. An event declares no schema:
-    a number it brings is never guessed as money."""
+    ``language`` writes it at the business's hour, and an amount the schema of the step that left it marks as money —
+    on its answer or inside an object of it — in the currency the object that holds it answers in ``data``, else its
+    step, else the business (``_currency_data``) — one in a currency of its own (``CURRENCY_IN``), only in the one its
+    datum gives —; anything else as it is. An event declares no schema: a number it brings is never guessed as
+    money."""
     money = _money_currencies(steps)
     business = functools.cache(lambda: _currency(scope))
 
     def currency(path: str) -> str | None:
-        datum = money[path]
-        return _answered_currency(path, data or {}, datum) or (business() if datum == ANSWERED_CURRENCY else None)
+        for datum in money[path]:
+            if code := (business() if datum is None else _answered_currency(data or {}, datum)):
+                return code
+        return None
 
     def say(path: str, value: Any) -> str:
         if isinstance(value, bool):

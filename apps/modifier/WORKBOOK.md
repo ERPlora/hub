@@ -470,7 +470,9 @@ cajero del producto actual es un empleado.
   nombra llevan además un `title` en inglés con su `es` en el catálogo de la app (`option` «Opción»,
   `tax_category_key` «Categoría fiscal propia», el nombre del formulario de opción): así los nombra la
   tarjeta de confirmación del asistente, nunca por el título que pydantic inventa del campo
-  (`tests/test_integration_assistant.py`). `expose_api` en las nueve consultas.
+  (`tests/test_integration_assistant.py`). `kitchen_name` también lleva el suyo, «Kitchen ticket name» /
+  «Nombre en la comanda», el de los formularios de grupo y opción: el modelo lo llama «kitchen name», que solo
+  queda para el admin de Django (hub#958). `expose_api` en las nueve consultas.
 - **La tarjeta de confirmación del asistente** (BASE-F97) nombra cada registro que una escritura señala por su id con
   las marcas `refers` de `schemas.py` (`A_GROUP`, `AN_OPTION`, `A_LINK`, `A_PRODUCT`, `A_CATEGORY`), leídas como quien
   pregunta: el grupo, el producto y la categoría por su nombre, la opción por su nombre y su grupo, porque dos grupos

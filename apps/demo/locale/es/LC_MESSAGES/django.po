@@ -4,7 +4,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: hub-next demo\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-28 07:39+0100\n"
+"POT-Creation-Date: 2026-11-06 22:45+0100\n"
 "PO-Revision-Date: 2026-10-13 23:05+0200\n"
 "Last-Translator: ERPlora\n"
 "Language-Team: Spanish\n"
@@ -132,6 +132,10 @@ msgstr "líneas"
 #: queries.py:15
 msgid "This item no longer exists."
 msgstr "Este elemento ya no existe."
+
+#: schemas.py:23
+msgid "Item"
+msgstr "Elemento"
 
 #: services.py:21
 msgid "This item is closed: open it to add lines."

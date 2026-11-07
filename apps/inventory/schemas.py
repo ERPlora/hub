@@ -36,6 +36,10 @@ CATEGORIES = gettext_noop("Categories")
 FILE_ROWS = gettext_noop("File rows")
 #: The category form's own name for its tax category.
 TAX_RATE = gettext_noop("Tax rate")
+# What the assistant's card calls the record a write acts on by its id (its Spanish in this app's catalog), as the
+# screens call one («Delete product», «New category»), never «Record».
+T_PRODUCT = gettext_noop("Product")
+T_CATEGORY = gettext_noop("Category")
 
 UnitCode = Literal["ud", "kg", "g", "t", "l", "ml", "min", "h"]
 ProductType = Literal["physical", "service"]
@@ -121,6 +125,11 @@ Said = _text(200, 1)
 #: A raw CSV cell, as typed in the file.
 Cell = _text(500)
 
+# The assistant's card names the record a write acts on by these reads (base/assistant.py ``REFERS``), run as whoever
+# asks, never by its id: a product and a category by their name, as the screens' «Delete» dialogs and forms say them.
+A_PRODUCT = names("inventory.product.get")
+A_CATEGORY = names("inventory.category.get")
+
 
 # Pages: every list is paginated, limit ≤ 100.
 
@@ -145,7 +154,7 @@ class Page(Schema, Generic[T]):
 
 
 class ProductRefIn(Schema):
-    id: UUID | None = Field(None, description="The product's id.")
+    id: UUID | None = Field(None, title=T_PRODUCT, description="The product's id.", json_schema_extra=A_PRODUCT)
     product: Said | None = Field(
         None,
         description="The product's SKU or name, when its id is not known (e.g. said aloud).",
@@ -172,7 +181,6 @@ AN_IMAGE = names("base.catalog_image.get", by="reference", name=("title",))
 
 
 class ProductImageIn(ProductRefIn):
-    id: UUID | None = Field(None, description="The product's id.", json_schema_extra=names("inventory.product.get"))
     image: Annotated[str, StringConstraints(strip_whitespace=True, max_length=200)] = Field(
         title=gettext_noop("Image"),
         description="The image the product shows: an image of the shared library by its reference, "
@@ -193,7 +201,7 @@ class ProductImageSuggestIn(ProductRefIn):
 
 
 class CategoryRefIn(Schema):
-    id: UUID | None = Field(None, description="The category's id.")
+    id: UUID | None = Field(None, title=T_CATEGORY, description="The category's id.", json_schema_extra=A_CATEGORY)
     category: Said | None = Field(
         None, description="The category's name or slug, when its id is not known."
     )
@@ -208,7 +216,7 @@ class CategoryRefIn(Schema):
 class _ProductLineRef(Schema):
     """A product named by ``product_id`` or by its SKU or name (``product``)."""
 
-    product_id: UUID | None = Field(None, description="The product's id.")
+    product_id: UUID | None = Field(None, description="The product's id.", json_schema_extra=A_PRODUCT)
     product: Said | None = Field(
         None,
         description="The product's SKU or name, when its id is not known (e.g. said aloud).",
@@ -426,7 +434,7 @@ class ProductIn(Schema):
         None,
         description="Whether its stock is tracked; null follows the business's setting.",
     )
-    category_ids: list[UUID] = Field(
+    category_ids: list[Annotated[UUID, Field(json_schema_extra=A_CATEGORY)]] = Field(
         default_factory=list,
         max_length=MAX_BATCH,
         title=CATEGORIES,
@@ -470,7 +478,7 @@ class ProductPatchIn(ProductRefIn):
     track_stock: bool | None = Field(
         None, description="Track (true) or stop tracking (false) its stock."
     )
-    category_ids: list[UUID] | None = Field(
+    category_ids: list[Annotated[UUID, Field(json_schema_extra=A_CATEGORY)]] | None = Field(
         None,
         max_length=MAX_BATCH,
         title=CATEGORIES,
@@ -520,7 +528,7 @@ class ProductImportIn(Schema):
 
 
 class ProductCategoryIn(_ProductLineRef):
-    category_id: UUID | None = Field(None, description="The category's id.")
+    category_id: UUID | None = Field(None, description="The category's id.", json_schema_extra=A_CATEGORY)
     category: Said | None = Field(
         None, description="The category's name or slug, when its id is not known."
     )
