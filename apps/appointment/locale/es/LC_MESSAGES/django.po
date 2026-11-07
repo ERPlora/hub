@@ -617,7 +617,7 @@ msgid "Dates and times"
 msgstr "Fechas y horas"
 
 msgid "Asked by the customer"
-msgstr "Lo pide el cliente"
+msgstr "Lo pide la clienta"
 
 msgid "Applies from"
 msgstr "Se aplica desde"

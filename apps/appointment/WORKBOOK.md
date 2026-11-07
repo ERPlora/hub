@@ -880,10 +880,11 @@ agenda tuya que enseñar.».
   «Cita»; quien no puede leerla no ve el dato. Vale para la tarjeta del chat y para «Esperan tu respuesta».
 - **Cómo se nombra cada dato en una tarjeta** (hub#637): un dato que ningún modelo de Citas nombra lleva su `title`
   en `schemas.py`, con su `es` en `locale/`: «Reservar aunque se solape» (`confirm_overlap`), «Fechas y horas»
-  (`starts`), «Lo pide el cliente» (`on_behalf_of_customer`), «Se aplica desde» (`from_date` al editar una serie),
+  (`starts`), «Lo pide la clienta» (`on_behalf_of_customer`), «Se aplica desde» (`from_date` al editar una serie),
   «Reservar desde» y «Reservar hasta» (al reservar sus citas) y «Ficha duplicada» (`absorbed_id`), nunca el título que
   pydantic inventa («Confirm Overlap»). `tests/test_integration_assistant.py` barre todas las escrituras, también las
-  reacciones, y `tests/test_i18n.py` comprueba que la tarjeta dice el español de Citas y no el de otra app.
+  reacciones, y `tests/test_i18n.py` comprueba que la tarjeta dice estos nombres, cada uno con español propio de Citas
+  y no el de otra app.
 - **Solapes con bloqueo**: reservar, mover y editar bloquean antes la ficha del profesional
   (`resolve_member(lock=True)`, por id en orden fijo cuando son dos), así que dos reservas del mismo
   profesional a la vez se esperan y la segunda ve la primera (`tests/test_concurrency.py`). Con los

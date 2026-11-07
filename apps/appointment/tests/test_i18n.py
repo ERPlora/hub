@@ -83,8 +83,26 @@ def test_the_card_says_each_title_with_citas_own_spanish():
     own = own_catalogue()
     titles = operation_titles("appointment")
     assert {"Book even if it overlaps", "Duplicate customer"} <= titles  # positive control: Citas's titles are read
+    # Each title has Spanish of its own: with its entry gone, both sides below would say the English and agree.
+    assert sorted(title for title in titles if own.gettext(title) == title) == []
     with translation.override("es"):
         assert {title: translation.gettext(title) for title in titles} == {title: own.gettext(title) for title in titles}
+
+
+def test_the_card_says_each_title_with_the_spanish_of_the_workbook():
+    """The names the WORKBOOK gives the data of the assistant's card (an appointment is «Cita»; the data no model of
+    Citas names, hub#637), with its own words: the one who asks is «la clienta», as its screens and messages say."""
+    with translation.override("es"):
+        assert {title: translation.gettext(title) for title in operation_titles("appointment")} == {
+            "Appointment": "Cita",
+            "Book even if it overlaps": "Reservar aunque se solape",
+            "Dates and times": "Fechas y horas",
+            "Asked by the customer": "Lo pide la clienta",
+            "Applies from": "Se aplica desde",
+            "Book from": "Reservar desde",
+            "Book up to": "Reservar hasta",
+            "Duplicate customer": "Ficha duplicada",
+        }
 
 
 def test_spanish_texts_of_the_workbook():
