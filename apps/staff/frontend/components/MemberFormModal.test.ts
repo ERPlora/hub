@@ -12,6 +12,7 @@ import { Combo, type ComboOption } from '@erplora/ui/components';
 import { describe, expect, it, vi } from 'vitest';
 
 import { expectSaveWaitsForMoney } from '../../../../base/frontend/__tests__/save-waits-for-money';
+import { itTellsTheCorrectedFieldApart } from '../../../../base/frontend/__tests__/same-words-refusal';
 import type { MemberOut, RoleOut } from '../operations';
 import {
   BUSINESS,
@@ -474,4 +475,19 @@ describe('MemberFormModal: who may open it', () => {
     const s = await setup(null, { session: EMPLOYEE });
     expect(s.sent().some((c) => c.path === '/api/staff/accounts')).toBe(false);
   });
+});
+
+describe('MemberFormModal: fields refused with the same words (hub#888)', () => {
+  // A new record's fields, each refused under its own key. Role and Hub user are Combos, which hub#888 leaves for
+  // @erplora/ui: a Combo does not hand its name to the field FormModal reads.
+  const KEYS = ['first_name', 'last_name', 'email', 'phone', 'employee_number', 'booking_buffer', 'hire_date', 'color', 'specialties', 'bio', 'hourly_rate', 'commission_rate', 'notes'];
+  itTellsTheCorrectedFieldApart(KEYS, async (locale, refusal) => {
+    const s = await setup(null, { locale, routes: { '/api/staff/members': [422, refusal] } });
+    const send = async () => {
+      await ionValue(s.field('first_name'), 'Bea', 'ionInput');
+      await ionValue(s.field('last_name'), 'Ruiz', 'ionInput');
+      await click(s.save());
+    };
+    return { field: s.field, send, settle };
+  }, 'last_name');
 });

@@ -116,6 +116,7 @@ const HOURS = [
       <div class="staff-schedule-form">
         <ion-input
           data-testid="staff-schedule-form-name"
+          name="name"
           :value="form.name"
           :label="$t('staff.schedules.form.name')"
           :placeholder="$t('staff.schedules.form.namePlaceholder')"
@@ -130,6 +131,7 @@ const HOURS = [
         <div class="staff-schedule-form__pair">
           <ion-input
             data-testid="staff-schedule-form-effective_from"
+            name="effective_from"
             type="date"
             :value="form.effective_from"
             :label="$t('staff.schedules.form.effectiveFrom')"
@@ -142,6 +144,7 @@ const HOURS = [
           />
           <ion-input
             data-testid="staff-schedule-form-effective_until"
+            name="effective_until"
             type="date"
             :value="form.effective_until"
             :label="$t('staff.schedules.form.effectiveUntil')"

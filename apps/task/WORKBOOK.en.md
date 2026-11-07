@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:5b3202013ad1436153ffb75aa1fd36412de6ebabfbcbe4b4cbee44b71e789149 -->
+<!-- generated from WORKBOOK.md sha256:cc32a2c6e641576276c0555859cf950d89b10e7d8a413c2a2949e26136c489af -->
 
 ## What it is for and who it is for
 
@@ -127,7 +127,7 @@ creates it inside the project.
 |---|---|
 | Loading | "Loading…" while the first result arrives. |
 | Empty | "No tasks.", "No open tasks assigned to you.", "No subtasks.", "No comments.", "No projects." or "No tasks in this project yet."; with a search or a filter, "No results". |
-| Error | The table's notice with "Retry". A form's refusal shows inside the form, without losing what was typed; a row action's, above the table; the sheet's, inside the sheet. |
+| Error | The table's notice with "Retry". A form's refusal shows inside the form, without losing what was typed, and each refused field says its reason under it and loses it as soon as that field is corrected, even if another one says the same (hub#888); **Assigned to** and **Project**, which are search pickers, not yet: if they say the same as another field, they stay marked until the next save. A row action's shows above the table; the sheet's, inside the sheet. |
 | Reconnecting | What is painted stays; a strip warns "Reconnecting…". |
 | App inactive | "This app is not active in this business". |
 | No permission | What they cannot do does not show; if they arrive through another door, "You do not have permission". |

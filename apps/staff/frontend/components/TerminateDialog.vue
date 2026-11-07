@@ -69,6 +69,7 @@ async function terminate(): Promise<void> {
         </p>
         <ion-input
           data-testid="staff-member-terminate-termination_date"
+          name="termination_date"
           type="date"
           :value="lastDay"
           :label="$t('staff.members.terminate.date')"
@@ -81,6 +82,7 @@ async function terminate(): Promise<void> {
         />
         <ion-textarea
           data-testid="staff-member-terminate-reason"
+          name="reason"
           :value="reason"
           :label="$t('staff.members.terminate.reason')"
           label-placement="floating"
