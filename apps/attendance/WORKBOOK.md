@@ -235,7 +235,8 @@ lugar de trabajo o escribe las coordenadas.»); quien no es responsable ve los a
 las ventanas de formulario, el aviso se quita en cuanto se cambia algo y el motivo de un campo en cuanto se
 corrige ese campo (las coordenadas, como el par que son: corregir una quita el motivo de las dos); los dos
 vuelven si el siguiente intento también se rechaza. Un rechazo sin campo se queda hasta el siguiente intento
-(hub#854).
+(hub#854). Pulsar «Guardar» sin nada que enviar también es un intento: dice «Ajustes guardados.» y quita el
+aviso rojo y los motivos de los campos del rechazo anterior, que no vuelven hasta el siguiente rechazo (hub#894).
 Implicados: ATTENDANCE-F03, ATTENDANCE-F05
 
 ### ATTENDANCE-F05 Marcar para revisar una jornada que nadie cerró

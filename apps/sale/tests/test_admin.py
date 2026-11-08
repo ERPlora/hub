@@ -2,13 +2,15 @@
 
 The open tables (payment methods, settings, departments, quick notes, open checks and their lines) keep
 full CRUD. What was charged is a fiscal document (PLAN-HUB §3.2, round 2026-10-20): sales, their lines and
-payments, the day's counter that numbers them, and refunds with their lines and payments are shown whole
-and never added nor deleted; only the notes of a sale and of a refund can change. A charge is corrected by
-its void or its refunds, as at the till. Ids and timestamps are shown, never typed.
+payments, the day's counter that numbers them, refunds with their lines and payments, and the voucher
+sessions done outside the till that count in a production are shown whole and never added nor deleted; only
+the notes of a sale and of a refund can change. A charge is corrected by its void or its refunds, as at the
+till. Ids and timestamps are shown, never typed.
 """
 
 import re
 from html.parser import HTMLParser
+from uuid import uuid7
 
 import pytest
 from django.contrib import admin
@@ -30,11 +32,12 @@ from apps.sale.models import (
     SaleLine,
     SalePayment,
     Settings,
+    VoucherSession,
 )
 from apps.sale.tests.conftest import run
 
 OPEN = [PaymentMethod, Settings, Department, QuickNote, Order, OrderLine]
-CHARGED = [Sale, SaleLine, SalePayment, SaleCounter, Refund, RefundPayment, RefundLine]
+CHARGED = [Sale, SaleLine, SalePayment, SaleCounter, Refund, RefundPayment, RefundLine, VoucherSession]
 MODELS = OPEN + CHARGED
 
 HOST = {"HTTP_HOST": "hubs.localhost", "HTTP_ACCEPT_LANGUAGE": "en"}
@@ -73,8 +76,8 @@ def charge(key: str, quantity: str = "1"):
 
 @pytest.fixture
 def charged(product):
-    """A coffee charged and two more charged with one of them refunded: a row in every table of what was
-    charged."""
+    """A coffee charged and two more charged with one of them refunded, and a voucher's session done outside the till:
+    a row in every table of what was charged."""
     product()
     charge("admin-plain-0001")
     refunded = charge("admin-refunded-0001", quantity="2")
@@ -87,6 +90,7 @@ def charged(product):
             "lines": [{"line_id": str(refunded.lines[0].id), "quantity": "1"}],
         },
     )
+    run("sale.voucher_session.record", {"session_id": str(uuid7()), "staff_id": str(uuid7()), "value": 3333})
 
 
 def a_row(model):
