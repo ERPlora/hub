@@ -6,11 +6,13 @@
 //
 // It needs the SaaS with the demo door and its HUB_INTERNAL_URL on this stack's Hub (README of this folder,
 // «La demo»): the SaaS calls the Hub's /internal/demos itself, so a SaaS pointed at another Hub's port creates
-// the demo there and this run never finds it.
+// the demo there and this run never finds it. And its limit of new demos per address raised, as the README's recipe
+// starts it (`DEMO_SPAWN_RATELIMIT`, demo-door.ts): every run starts two from 127.0.0.1, and it lets 3 an hour.
 import { execFileSync } from 'node:child_process';
 
 import { expect, type Locator, type Page, test } from '@playwright/test';
 
+import { doorOutcome, noDemoBecause } from './demo-door';
 import { api, collectProblems, createViaPage, HUB_DIR, listReady, rowNames, SAAS, shot, shown, turnOn, uniqueName } from './helpers';
 import { STACK } from './stack';
 
@@ -46,10 +48,13 @@ function jumpInto(slug: string): RegExp {
 const DEMO_READY_MS = 15_000;
 
 /** «Try the demo» on the door, then the jump through the demo's /auth/login and callback: its slug, once its shell
- *  is up. */
+ *  is up. A door that answers with an outcome instead (`?state=throttled`…) fails the run at once saying which, not
+ *  as a demo that never got ready (hub#1048). */
 async function startDemo(page: Page): Promise<string> {
   await page.getByTestId('demo-start').click();
-  await page.waitForURL(DEMO_HOST, { timeout: DEMO_READY_MS });
+  await page.waitForURL((url) => DEMO_HOST.test(url.href) || doorOutcome(url.href, DOOR) !== null, { timeout: DEMO_READY_MS });
+  const refused = doorOutcome(page.url(), DOOR);
+  if (refused) throw new Error(noDemoBecause(refused));
   await shown(page).locator('[data-testid=topbar-apps]').waitFor({ state: 'attached', timeout: DEMO_READY_MS });
   const slug = DEMO_HOST.exec(page.url())?.[1];
   if (!slug) throw new Error(`not on a demo host: ${page.url()}`);
