@@ -109,6 +109,8 @@ export function cleanUp(): void {
       `delete from appointment_appointment where id in (${appointments})`,
       `delete from schedule_specialdayinterval where special_day_id in (select id from schedule_specialday where name like '${TAG}%')`,
       `delete from schedule_specialday where name like '${TAG}%'`,
+      // Sales' copy of a session spent outside the checkout (SERVICE-F21) would keep counting in a production.
+      `delete from sale_vouchersession where session_id in (select id from service_redemption where grant_id in (${grants}))`,
       `delete from service_redemption where grant_id in (${grants})`,
       `delete from service_grantadjustment where grant_id in (${grants})`,
       `delete from service_grant where package_id in (${packages}) or customer_id in (${customers})`,
