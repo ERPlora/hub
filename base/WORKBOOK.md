@@ -1569,7 +1569,8 @@ Pasos:
      (una demo) va en euros.
   3. En el Inicio, los importes de los paneles (como «Ventas últimos 7 días») y de «Actividad» van en esa moneda,
      con su símbolo y sus decimales, como los imprime una caja de ese país: «zł» en un negocio de Polonia, «€» en
-     uno de España. Mientras el negocio no ha contestado, el importe sale sin símbolo, nunca en otra moneda.
+     uno de España. Mientras el negocio no ha contestado, el importe sale como «—», nunca en otra moneda ni con
+     decimales supuestos.
   4. Las apps que enseñan precios o importes van en esa misma moneda, también Citas (el precio de cada servicio
      al reservar y el «Total» de la cita) y la vista previa de Reserva online (hub#577).
 Entra: el país del negocio.

@@ -76,8 +76,8 @@ Los importes (el precio de un servicio y el de cada profesional, el precio cerra
 de un bono, lo pagado por un bono) van en **la moneda del negocio**, la de su país, la que dice **Ajustes →
 Negocio** (euros en España, złoty en Polonia, yenes en Japón), con sus decimales (el yen no tiene), escritos
 con coma o punto: «1500» es un precio de 1500 yenes en Japón y de 1.500,00 € en España, y Ventas lo cobra igual.
-Mientras el negocio no contesta, un importe sale como una cifra sin símbolo, nunca en euros. Los ejemplos de
-este documento son de un negocio de España, en euros.
+Mientras el negocio no contesta, un importe sale como «—», nunca en euros ni con decimales supuestos. Los ejemplos
+de este documento son de un negocio de España, en euros.
 
 ## Pantallas
 
