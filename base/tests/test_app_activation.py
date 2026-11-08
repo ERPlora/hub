@@ -790,6 +790,19 @@ def test_turning_off_the_app_it_came_with_leaves_it_on():
 
 
 @pytest.mark.django_db
+def test_turning_off_the_app_it_came_with_never_asks_it(monkeypatch):
+    """Only what would go off is asked whether it refuses: Taxes stays on, so its hook is not run."""
+    asked = []
+    monkeypatch.setattr(apps.get_app_config("tax"), "can_disable", lambda ctx: asked.append(ctx.scope), raising=False)
+    set_rows(sale="on*", tax="on", customer="on")
+
+    disable("sale")
+
+    assert asked == []
+    assert rows()["tax"] == Activation(ON, False)
+
+
+@pytest.mark.django_db
 def test_one_mandatory_only_in_another_country_goes_off_here(monkeypatch):
     monkeypatch.setattr(
         apps.get_app_config("task"), "mandatory", {"countries": ["PL"], "platform_turns_on": False}, raising=False
