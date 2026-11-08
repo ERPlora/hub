@@ -9,6 +9,8 @@ import { useCommand } from '@erplora/ui/sdk';
 import { IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 import { useT } from '../composables/useT';
 import { blankRows, type IntervalRow, payloadOf, rowsOf } from '../lib/intervals';
 import type { OverrideOut } from '../operations';
@@ -73,6 +75,12 @@ async function save(): Promise<void> {
   }
   open.value = false;
 }
+
+useUnsavedFormOnOpen(
+  'schedule-override-form',
+  () => ({ startDate: startDate.value, endDate: endDate.value, reason: reason.value, closed: closed.value, rows: rows.value }),
+  open,
+);
 </script>
 
 <template>

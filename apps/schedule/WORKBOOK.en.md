@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:ed7e4fafe33c2393503cc61c56c3f546acf589c673b4e81130c9afd35fab08e6 -->
+<!-- generated from WORKBOOK.md sha256:747d2f77d52b2494c0fca3e4b8f238b0b7eccd65c4ce326f66ec9b06da1bfe59 -->
 
 ## What it is for and who it is for
 
@@ -138,6 +138,13 @@ able to change it and without **Save**.
 | Reconnecting | What is painted stays; a strip warns "Reconnecting…". |
 | App inactive | "This app is not active in this business". |
 | No permission | What they cannot do does not show; if they arrive through another door, "You do not have permission". |
+
+## Unsaved changes on Android
+
+In "Edit hours" of a day, "New special day", "New override" and their correction ("Edit · …"), the phone's Back
+button asks "Discard changes?" when something typed or chosen has not been saved: "Keep editing" keeps it and
+"Discard changes" closes the window without saving. With the window as it opened, Back closes it without asking
+(BASE-F05).
 
 ## Flows
 
