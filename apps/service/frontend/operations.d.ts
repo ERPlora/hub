@@ -525,6 +525,9 @@ export interface AdjustCheckOut {
 export interface RedeemIn extends ByIdIn {
   service_id?: string | null;
   service?: string | null;
+  /** The professional (Staff) who did it: its value counts in their production (SALE-F28). */
+  member_id?: string | null;
+  member?: string | null;
   appointment_id?: string | null;
   sale_id?: string | null;
   note?: string;
@@ -547,6 +550,8 @@ export interface RedemptionOut {
   grant_id: string;
   service_id: string | null;
   service_name: string | null;
+  member_id: string | null;
+  member_name: string | null;
   redeemed_at: string;
   remaining: number | null;
 }
