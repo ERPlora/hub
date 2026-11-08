@@ -9,6 +9,8 @@ import { useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { IonInput, IonSelect, IonSelectOption, IonTextarea, IonToggle } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 import { useT } from '../composables/useT';
 import { LEAVE_TYPES } from '../lib/enums';
 import { asCombo, memberSearch } from '../lib/pickers';
@@ -20,6 +22,8 @@ const props = defineProps<{
 }>();
 
 const open = defineModel<boolean>('open', { default: false });
+
+useUnsavedFormOnOpen('staff-time-off-form', () => form.value, open);
 
 interface TimeOffForm {
   member_id: string;
@@ -107,7 +111,9 @@ async function save(): Promise<void> {
     @submit="save"
   >
     <template #default="{ fieldErrors }">
-      <div class="staff-time-off-form">
+      <div
+        class="staff-time-off-form"
+      >
         <Combo
           v-if="forAnyone"
           testid="staff-time-off-form-member_id"

@@ -10,6 +10,8 @@ import { HubIcon } from '@erplora/ui/shell';
 import { IonButton, IonInput, IonSelect, IonSelectOption, IonTextarea } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 import { useT } from '../composables/useT';
 import { searchProducts } from '../lib/pickers';
 import type { ManualItemIn, OrderType, TicketOut } from '../operations';
@@ -17,6 +19,8 @@ import type { ManualItemIn, OrderType, TicketOut } from '../operations';
 const props = withDefaults(defineProps<{ defaultType?: OrderType }>(), { defaultType: 'dine_in' });
 
 const open = defineModel<boolean>('open', { default: false });
+
+useUnsavedFormOnOpen('kitchen-ticket-form', () => ({ type: type.value, label: label.value, notes: notes.value, dishes: dishes.value.map(({ product, name, quantity, notes }) => ({ product, name, quantity, notes })) }), open);
 const emit = defineEmits<{ saved: [ticket: TicketOut] }>();
 
 const TYPES: readonly OrderType[] = ['dine_in', 'takeaway', 'delivery'];
@@ -122,7 +126,9 @@ async function save(): Promise<void> {
     @submit="save"
   >
     <template #default="{ fieldErrors }">
-      <div class="kitchen-ticket-form">
+      <div
+        class="kitchen-ticket-form"
+      >
         <ion-select
           data-testid="kitchen-ticket-form-type"
           :value="type"

@@ -80,3 +80,15 @@ describe('WaitlistFormModal', () => {
     expect(s.field('guest_phone').errorText).toBe('Teléfono no válido');
   });
 });
+
+describe('WaitlistFormModal: Android Back with unsaved changes (hub#1020, BASE-F05)', () => {
+  it('as opened closes; a change asks; restored as opened closes again', async () => {
+    const s = await setup();
+    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormOnAndroidBack({
+      overlay: () => s.inDoc('reservation-waitlist-form'),
+      change: () => ionValue(s.field('guest_name'), 'Luis', 'ionInput'),
+      restore: () => ionValue(s.field('guest_name'), '', 'ionInput'),
+    });
+  });
+});

@@ -469,7 +469,6 @@ describe('MemberFormModal: the business\'s currency (staff-business-currency)', 
   });
 });
 
-
 describe('MemberFormModal: who may open it', () => {
   it('an employee never gets here (no «+», no row to open), and reads no account', async () => {
     const s = await setup(null, { session: EMPLOYEE });
@@ -501,5 +500,17 @@ describe('MemberFormModal: a business whose money cannot be read (hub#938)', () 
     const opens = late ? () => m.wrapper.setProps({ open: true }) : undefined;
     const posts = () => m.sent().filter((call) => call.method === 'POST');
     await expectWindowSaysMoneyUnreadable(m, 'staff-member-form-submit', posts, opens);
+  });
+});
+
+describe('MemberFormModal: Android Back with unsaved changes (hub#1020, BASE-F05)', () => {
+  it('as opened closes; a change asks; restored as opened closes again', async () => {
+    const s = await setup();
+    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormOnAndroidBack({
+      overlay: () => s.inDoc('staff-member-form'),
+      change: () => ionValue(s.field('first_name'), 'Ana', 'ionInput'),
+      restore: () => ionValue(s.field('first_name'), '', 'ionInput'),
+    });
   });
 });

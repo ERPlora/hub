@@ -178,3 +178,15 @@ describe('QuickNoteFormModal: fields refused with the same words (hub#888)', () 
     return { field: (key) => s.field(key === 'sort_order' ? 'order' : key), send: () => click(s.submit()), settle };
   }, 'sort_order');
 });
+
+describe('QuickNoteFormModal: Android Back with unsaved changes (hub#1020, BASE-F05)', () => {
+  it('as opened closes; a change asks; restored as opened closes again', async () => {
+    const s = await setup();
+    const { expectUnsavedFormOnAndroidBack } = await import('../../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormOnAndroidBack({
+      overlay: () => s.inDoc('sale-quick-note-form'),
+      change: () => s.type('text', 'no ice'),
+      restore: () => s.type('text', ''),
+    });
+  });
+});

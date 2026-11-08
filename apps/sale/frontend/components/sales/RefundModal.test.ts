@@ -4,7 +4,7 @@ import { FormModal } from '@erplora/ui/components';
 import { toastError } from '@erplora/ui/shell';
 import { describe, expect, it, vi } from 'vitest';
 
-import { flush, mountSale } from '../../__tests__/mount-sale';
+import { flush, ionValue, mountSale } from '../../__tests__/mount-sale';
 import type { SaleRow } from '../../operations';
 import RefundForm from './RefundForm.vue';
 import RefundModal from './RefundModal.vue';
@@ -20,6 +20,18 @@ vi.mock('@erplora/ui/shell', async (importOriginal) => ({
 }));
 
 const SALE = { id: 's1', number: '20261014-0007' } as SaleRow;
+const REFUND_OPTIONS = {
+  sale_id: 's1',
+  number: '20261014-0007',
+  status: 'completed',
+  currency: 'EUR',
+  currency_decimals: 2,
+  total: 100,
+  refunded_total: 0,
+  refundable_total: 100,
+  tenders: [{ payment_id: 'p1', position: 1, method_id: 'm1', method_name: 'Cash', method_type: 'cash', charged: 100, refunded: 0, remaining: 100, refundable: true, reason: '' }],
+  lines: [],
+};
 
 async function setup(open = true, locale: 'en' | 'es' = 'en') {
   const m = await mountSale(RefundModal, { props: { open, sale: SALE }, locale });
@@ -49,18 +61,7 @@ describe('RefundModal', () => {
 
   it('Enter in a field asks the body to refund (it answers with what is missing)', async () => {
     const s = await setup();
-    await s.result('sale.refund.options', {
-      sale_id: 's1',
-      number: '20261014-0007',
-      status: 'completed',
-      currency: 'EUR',
-      currency_decimals: 2,
-      total: 100,
-      refunded_total: 0,
-      refundable_total: 100,
-      tenders: [{ payment_id: 'p1', position: 1, method_id: 'm1', method_name: 'Cash', method_type: 'cash', charged: 100, refunded: 0, remaining: 100, refundable: true, reason: '' }],
-      lines: [],
-    });
+    await s.result('sale.refund.options', REFUND_OPTIONS);
     s.wrapper.findComponent(FormModal).vm.$emit('submit');
     await flush();
     expect(toastError).toHaveBeenCalledWith('A refund needs a reason.');
@@ -69,5 +70,18 @@ describe('RefundModal', () => {
   it('speaks Spanish', async () => {
     const s = await setup(true, 'es');
     expect(s.inDoc('sale-refund')?.getAttribute('aria-label')).toBe('Devolver la venta 20261014-0007');
+  });
+});
+
+describe('RefundModal: Android Back with unsaved changes (hub#1020, BASE-F05)', () => {
+  it('as opened closes; a change asks; restored as opened closes again', async () => {
+    const s = await setup();
+    await s.result('sale.refund.options', REFUND_OPTIONS);
+    const { expectUnsavedFormOnAndroidBack } = await import('../../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormOnAndroidBack({
+      overlay: () => s.inDoc('sale-refund'),
+      change: () => ionValue(s.inDoc('refund-reason'), 'Mistake', 'ionInput'),
+      restore: () => ionValue(s.inDoc('refund-reason'), '', 'ionInput'),
+    });
   });
 });

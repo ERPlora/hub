@@ -11,6 +11,8 @@ import { useCommand } from '@erplora/ui/sdk';
 import { IonButton, IonInput, IonSelect, IonSelectOption, IonToggle } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 import { useT } from '../composables/useT';
 import type { TableOut, TablePatchIn, TableShape, ZoneOut } from '../operations';
 
@@ -27,6 +29,8 @@ const props = withDefaults(
 );
 
 const open = defineModel<boolean>('open', { default: false });
+
+useUnsavedFormOnOpen('table-form', () => form.value, open);
 
 const SHAPES: readonly TableShape[] = ['square', 'round', 'rectangle'];
 const NO_ZONE = '';
@@ -143,7 +147,9 @@ async function remove(): Promise<void> {
     @submit="save"
   >
     <template #default="{ fieldErrors }">
-      <div class="table-form">
+      <div
+        class="table-form"
+      >
         <div class="table-form__pair">
           <ion-input
             data-testid="table-form-number"

@@ -101,3 +101,15 @@ describe('CategoryFormModal: Editing category — {name}', () => {
     expect(s.parent().props('placeholder')).toBe('Sin padre (raíz)');
   });
 });
+
+describe('CategoryFormModal: Android Back with unsaved changes (hub#1020, BASE-F05)', () => {
+  it('as opened closes; a change asks; restored as opened closes again', async () => {
+    const s = await setup();
+    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormOnAndroidBack({
+      overlay: () => s.inDoc('service-category-form'),
+      change: () => ionValue(s.field('name'), 'Colour', 'ionInput'),
+      restore: () => ionValue(s.field('name'), '', 'ionInput'),
+    });
+  });
+});

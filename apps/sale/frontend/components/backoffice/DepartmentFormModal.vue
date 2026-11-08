@@ -11,6 +11,7 @@ import { useCommand } from '@erplora/ui/sdk';
 import { IonInput } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../../base/frontend/lib/unsaved-changes';
 import { useTaxName } from '../../../../tax/frontend/composables/useTaxName';
 import { useLocale, useT } from '../../composables/useT';
 import { refusal } from '../../lib/refusal';
@@ -25,6 +26,7 @@ const props = defineProps<{
 }>();
 
 const open = defineModel<boolean>('open', { default: false });
+
 
 const t = useT();
 const taxName = useTaxName();
@@ -96,6 +98,8 @@ async function save(): Promise<void> {
   }
   open.value = false;
 }
+
+useUnsavedFormOnOpen('sale-department-form', () => ({ name: name.value, taxKey: taxKey.value, order: order.value }), open);
 </script>
 
 <template>

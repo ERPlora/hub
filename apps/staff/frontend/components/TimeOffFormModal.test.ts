@@ -185,3 +185,15 @@ describe('TimeOffFormModal: ask for one’s own (STAFF-F24)', () => {
     expect([s.field('start_date').label, s.field('is_full_day').textContent?.trim(), s.field('reason').label]).toEqual(['Desde', 'Día completo', 'Motivo']);
   });
 });
+
+describe('TimeOffFormModal: Android Back with unsaved changes (hub#1020, BASE-F05)', () => {
+  it('as opened closes; a change asks; restored as opened closes again', async () => {
+    const s = await setup('request');
+    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormOnAndroidBack({
+      overlay: () => s.inDoc('staff-time-off-form'),
+      change: () => ionValue(s.field('reason'), 'Family trip', 'ionInput'),
+      restore: () => ionValue(s.field('reason'), '', 'ionInput'),
+    });
+  });
+});

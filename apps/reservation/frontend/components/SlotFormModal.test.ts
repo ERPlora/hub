@@ -55,3 +55,15 @@ describe('SlotFormModal', () => {
     expect(s.field('start_time').errorText).toBe(message);
   });
 });
+
+describe('SlotFormModal: Android Back with unsaved changes (hub#1020, BASE-F05)', () => {
+  it('as opened closes; a change asks; restored as opened closes again', async () => {
+    const s = await setup();
+    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormOnAndroidBack({
+      overlay: () => s.inDoc('reservation-slot-form'),
+      change: () => ionValue(s.field('start_time'), '20:00', 'ionInput'),
+      restore: () => ionValue(s.field('start_time'), '', 'ionInput'),
+    });
+  });
+});

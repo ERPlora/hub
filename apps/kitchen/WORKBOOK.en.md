@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:fd2a2a0825446e5fb92d0dff24051704e1dc63f88ca5fcf2e978feed2a4f6459 -->
+<!-- generated from WORKBOOK.md sha256:3ca2007efbba0b3c9022057a1f8a6a3e897ddd44c39aed987615ab1380d539bf -->
 
 ## What it is for and who it is for
 
@@ -174,6 +174,12 @@ form with the field marked.
 | Stations | table skeleton | "No stations." | the table's + Retry |
 | History | table skeleton | "No recent kitchen activity." | the table's + Retry |
 | Settings | "Loading settings…" | — | "Could not load the settings." + Retry |
+
+## Unsaved changes on Android
+
+In this app's create and edit windows, the phone's Back button asks "Discard changes?" when something typed
+or chosen has not been saved: "Keep editing" keeps it and "Discard changes" closes the window without saving.
+With the window as it opened, Back closes it without asking (BASE-F05).
 
 ## Flows
 

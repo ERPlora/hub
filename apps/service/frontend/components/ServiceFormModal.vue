@@ -14,6 +14,8 @@ import { useCommand, useLive, useLiveClient } from '@erplora/ui/sdk';
 import { IonButton, IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import { useUnsavedForm } from '../../../../base/frontend/lib/unsaved-changes';
+
 import BusinessMoneyError from '../../../../base/frontend/components/BusinessMoneyError.vue';
 import ImageField from '../../../../base/frontend/components/ImageField.vue';
 import { draftOf, type ImageDraft, useImageSave } from '../../../../base/frontend/lib/item-image';
@@ -40,6 +42,8 @@ const props = withDefaults(
 );
 
 const open = defineModel<boolean>('open', { default: false });
+
+useUnsavedForm('service-form', () => ({ form: open.value ? form.value : original.value, image: image.value }), () => ({ form: original.value, image: draftOf(props.service) }));
 
 interface Form {
   name: string;
@@ -100,6 +104,8 @@ function fromService(service: ServiceOut): Form {
     tax: service.tax_category_key ? { id: service.tax_category_key, label: service.tax_category_name ?? service.tax_category_key } : null,
   };
 }
+
+const original = computed<Form>(() => (props.service ? fromService(props.service) : { ...blank(), tax: defaultTax() }));
 
 watch(
   () => [open.value, props.service?.id] as const,
@@ -203,7 +209,9 @@ function retryPhoto(): void {
     @submit="save"
   >
     <template #default="{ fieldErrors }">
-      <div class="service-form">
+      <div
+        class="service-form"
+      >
         <BusinessMoneyError />
         <InlineFeedback
           v-if="photo.failure.value"

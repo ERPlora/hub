@@ -8,6 +8,8 @@ import { useCommand } from '@erplora/ui/sdk';
 import { IonInput, IonTextarea } from '@ionic/vue';
 import { ref, watch } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 import type { MemberOut, TerminateIn } from '../operations';
 
 const props = defineProps<{
@@ -16,6 +18,8 @@ const props = defineProps<{
 }>();
 
 const open = defineModel<boolean>('open', { default: false });
+
+useUnsavedFormOnOpen('staff-member-terminate', () => ({ lastDay: lastDay.value, reason: reason.value }), open);
 
 const lastDay = ref('');
 const reason = ref('');
@@ -60,7 +64,9 @@ async function terminate(): Promise<void> {
     @submit="terminate"
   >
     <template #default="{ fieldErrors }">
-      <div class="staff-terminate">
+      <div
+        class="staff-terminate"
+      >
         <p
           class="staff-terminate__message"
           data-testid="staff-member-terminate-message"

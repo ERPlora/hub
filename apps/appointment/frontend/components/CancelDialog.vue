@@ -8,6 +8,8 @@ import { useCommand } from '@erplora/ui/sdk';
 import { IonTextarea } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 import { useLocale, useT } from '../composables/useT';
 import { dayOf, formatDay, formatTime, timeOf } from '../lib/clock';
 import { customerLabel } from '../lib/states';
@@ -15,6 +17,8 @@ import type { AppointmentRow } from '../operations';
 
 const props = defineProps<{ appointment: AppointmentRow | null }>();
 const open = defineModel<boolean>('open', { default: false });
+
+useUnsavedFormOnOpen('appointment-cancel', () => reason.value, open);
 
 const t = useT();
 const locale = useLocale();
@@ -59,7 +63,9 @@ async function confirm(): Promise<void> {
     :error="cancel.error.value"
     @submit="confirm"
   >
-    <p>{{ message }}</p>
+    <p>
+      {{ message }}
+    </p>
     <ion-textarea
       data-testid="appointment-cancel-reason"
       :value="reason"
