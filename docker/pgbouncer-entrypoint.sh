@@ -69,6 +69,14 @@ if [[ $trace -eq 1 ]]; then set -x; fi
 # lives under /tmp (PLAN-DB says /run/pgbouncer, which the non-root user of the image cannot
 # write). log_stats keeps its default: the line it writes every minute carries the average wait for
 # a server connection, the only sign of a saturated pool without a metrics exporter.
+#
+# Writer change (PLAN-DB round 2026-11-04e, hub#1052). After a Blue/Green switchover or a failover
+# the writer's name resolves to another server, and AWS asks that no DNS cache outlives five
+# seconds: past that, writes keep going to the old writer, which is read-only by then. pgbouncer
+# ignores the record's own TTL and keeps an answer for dns_max_ttl and a failed lookup for
+# dns_nxdomain_ttl, 15 s each by default. After a failed server login it refuses every client
+# without dialling again for server_login_retry, 15 s by default too. Fixed here, not task
+# settings: they follow from how Aurora changes writer, not from the size of a task.
 config="$config_dir/pgbouncer.ini"
 cat > "$config" <<INI
 [databases]
@@ -89,6 +97,7 @@ max_db_connections=$max_db_connections
 max_user_connections=$PGBOUNCER_MAX_USER_CONNECTIONS
 server_idle_timeout=$server_idle_timeout
 dns_max_ttl=5
+dns_nxdomain_ttl=5
 server_login_retry=2
 autodb_idle_timeout=300
 query_wait_timeout=10
