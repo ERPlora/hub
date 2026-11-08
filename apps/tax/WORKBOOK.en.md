@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:8a01aa27392c09f76d0ff3e8365b16d126408bc1c5ee01e08564189f50ce3246 -->
+<!-- generated from WORKBOOK.md sha256:64c404bbfa7b2386c84480db040e0e9f42799c31ad2ac89b242ef4dd5d23a206 -->
 
 ## What it is for and who it is for
 
@@ -132,6 +132,12 @@ it."). It is the screen of TAX-F11.
 | No rates in force | For whoever can manage, the "Your taxes" notice with "Set up" (TAX-F17). |
 | App inactive (`app_inactive`) | "This app is not active in this business". |
 | No permission | What they cannot do does not appear; if they arrive by another door, "You do not have permission". |
+
+## Unsaved changes on Android
+
+In "New tax category", "New category alias", "New tax rule" and "End this tax rule", the phone's Back button asks
+"Discard changes?" when something typed or chosen has not been saved: "Keep editing" keeps it and "Discard changes"
+closes the window without saving. With the window as it opened, Back closes it without asking (BASE-F05).
 
 ## Flows
 

@@ -21,6 +21,7 @@ import { IonInput } from '@ionic/vue';
 import { computed, shallowRef, watch } from 'vue';
 
 import BusinessMoneyError from '../../../../base/frontend/components/BusinessMoneyError.vue';
+import { useUnsavedForm } from '../../../../base/frontend/lib/unsaved-changes';
 import { useTaxKind } from '../../../tax/frontend/composables/useTaxName';
 import { useLocale, useT } from '../composables/useT';
 import { typedRate, useBusinessMoney } from '../lib/format';
@@ -70,6 +71,26 @@ watch(
 watch(defaultRate, (now, before) => {
   lines.value = lines.value.map((line) => (line.taxRate === before ? { ...line, taxRate: now } : line));
 });
+
+/** The series the window opened with; the first one the select picks for it, if it had none. */
+const openedSeries = shallowRef('');
+watch(
+  open,
+  (now) => {
+    if (now) openedSeries.value = seriesCode.value;
+  },
+  { immediate: true },
+);
+watch(seriesCode, (code) => {
+  if (!openedSeries.value) openedSeries.value = code;
+});
+/** The window always opens blank, its line at the territory's rate (which may arrive after it opened). */
+const opened = () => ({ series: openedSeries.value, recipient: recipientFrom(null), notes: '', lines: [blankLine(1, defaultRate.value)] });
+useUnsavedForm(
+  'invoice-create',
+  () => (open.value ? { series: seriesCode.value, recipient: recipient.value, notes: notes.value, lines: lines.value } : opened()),
+  opened,
+);
 
 /** An invoice (F1) names its recipient whole; a ticket (F2) may name nobody. */
 const needsRecipient = computed(() => invoiceType.value !== 'F2');
