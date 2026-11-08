@@ -85,10 +85,13 @@ test('the mobile cart button grows around its total and keeps the count readable
       return rect ? { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom } : undefined;
     };
     const rect = el.getBoundingClientRect();
+    const nativeRect = el.shadowRoot?.querySelector('button')?.getBoundingClientRect();
     const button = { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom };
-    return { button, total: box('[data-testid=pos-cart-fab-total]'), count: box('[data-testid=pos-cart-fab-count]') };
+    const native = nativeRect ? { right: nativeRect.right } : undefined;
+    return { button, native, total: box('[data-testid=pos-cart-fab-total]'), count: box('[data-testid=pos-cart-fab-count]') };
   });
   expect(boxes.total!.right).toBeLessThanOrEqual(boxes.button!.right - 8);
+  expect(boxes.total!.right).toBeLessThanOrEqual(boxes.native!.right - 8);
   expect(boxes.count!.right).toBeLessThanOrEqual(boxes.button!.right + 8);
   expect(boxes.count!.bottom).toBeLessThanOrEqual(boxes.button!.top + 16);
   await capture(page, 'poc-fab-mobile');

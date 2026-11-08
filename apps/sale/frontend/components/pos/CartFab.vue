@@ -83,8 +83,8 @@ const label = computed(() => {
 .pos-fab__button::part(native) {
   display: inline-flex;
   gap: 0.45rem;
-  width: max-content !important;
-  min-width: 3.6rem;
+  width: 100% !important;
+  min-width: 0;
   padding: 0 1rem;
 }
 .pos-fab__icon {
