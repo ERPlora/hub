@@ -140,3 +140,15 @@ describe('PrinterModal', () => {
     expect(prop(s.field('address'), 'errorText')).toBe(message);
   });
 });
+
+describe('PrinterModal: Android Back with unsaved changes (hub#1020, BASE-F05)', () => {
+  it('as opened closes; a change asks; restored as opened closes again', async () => {
+    const s = await setup();
+    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormOnAndroidBack({
+      overlay: () => s.inDoc('printing-printer'),
+      change: () => ionValue(s.field('address'), '192.168.1.50', 'ionInput'),
+      restore: () => ionValue(s.field('address'), '', 'ionInput'),
+    });
+  });
+});

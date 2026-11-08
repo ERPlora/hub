@@ -155,6 +155,12 @@ categoría de una plantilla que ha rechazado.»).
 | Ajustes | indicador | «Sin plantillas.» | el motivo + **Reintentar** | igual que la bandeja |
 | Plantilla (hoja) | el botón final ocupado mientras guarda | — | el motivo debajo de su campo, o arriba el que da el Hub | solo propietario y administrador la abren |
 
+## Cambios sin guardar en Android
+
+En «Nueva plantilla», «Editar plantilla» y «Enviar una plantilla», el botón atrás del móvil pregunta «¿Descartar
+los cambios?» cuando hay algo escrito o elegido sin guardar: «Seguir editando» conserva lo tecleado y «Descartar
+cambios» cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra sin preguntar (BASE-F05).
+
 ## Flujos
 
 | ID | Flujo | Estado | Vertical |

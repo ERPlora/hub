@@ -6,6 +6,8 @@ import { useCommand } from '@erplora/ui/sdk';
 import { IonInput } from '@ionic/vue';
 import { ref, watch } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 const open = defineModel<boolean>('open', { default: false });
 
 const creation = useCommand('task.project.create');
@@ -29,6 +31,8 @@ async function save(): Promise<void> {
   }
   open.value = false;
 }
+
+useUnsavedFormOnOpen('task-project-form', form, open);
 </script>
 
 <template>
