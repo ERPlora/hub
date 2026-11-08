@@ -222,3 +222,15 @@ describe('TicketFormModal', () => {
     expect(f.field('add-dish').textContent?.trim()).toBe('Añadir plato');
   });
 });
+
+describe('TicketFormModal: Android Back with unsaved changes (hub#1020, BASE-F05)', () => {
+  it('as opened closes; a change asks; restored as opened closes again', async () => {
+    const f = await form();
+    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormOnAndroidBack({
+      overlay: () => f.inDoc('kitchen-ticket-form'),
+      change: () => ionValue(f.field('label'), 'Staff', 'ionInput'),
+      restore: () => ionValue(f.field('label'), '', 'ionInput'),
+    });
+  });
+});

@@ -160,6 +160,12 @@ El componente `CustomerSearch` de Clientes (Venta lo importa por su ruta, de los
 | Sin permiso | No aparece lo que no puede hacer; si llega por otra puerta, «No tienes permiso». |
 | Ficha que ya no está | «Este cliente ya no está disponible.» (eliminada, unida a otra o con los datos borrados). |
 
+## Cambios sin guardar en Android
+
+En las ventanas de alta y edición de esta app, el botón atrás del móvil pregunta «¿Descartar los cambios?»
+cuando hay algo escrito o elegido sin guardar: «Seguir editando» conserva lo tecleado y «Descartar cambios»
+cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra sin preguntar (BASE-F05).
+
 ## Flujos
 
 | ID | Flujo | Estado | Vertical |

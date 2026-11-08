@@ -9,12 +9,16 @@ import { useCommand } from '@erplora/ui/sdk';
 import { IonInput, IonLabel, IonSegment, IonSegmentButton, IonTextarea } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 import { useLocale, useT } from '../composables/useT';
 import { formatDate } from '../lib/format';
 import type { GrantOut } from '../operations';
 
 const props = defineProps<{ grant: GrantOut | null }>();
 const open = defineModel<boolean>('open', { default: false });
+
+useUnsavedFormOnOpen('service-grant-adjust', () => ({ direction: direction.value, uses: uses.value, days: days.value, reason: reason.value }), open);
 
 const t = useT();
 const locale = useLocale();
@@ -92,7 +96,9 @@ async function confirm(): Promise<void> {
     @submit="confirm"
   >
     <template #default="{ fieldErrors }">
-      <div class="service-grant-adjust">
+      <div
+        class="service-grant-adjust"
+      >
         <p data-testid="service-grant-adjust-message">
           {{ t('service.adjust.message', { customer }) }}
         </p>

@@ -8,6 +8,8 @@ import { useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { IonSegment, IonSegmentButton, IonLabel, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 import { useT } from '../composables/useT';
 import { searchCategories, searchProducts } from '../lib/pickers';
 import type { RouteOut, StationOut } from '../operations';
@@ -22,6 +24,8 @@ const props = withDefaults(
 );
 
 const open = defineModel<boolean>('open', { default: false });
+
+useUnsavedFormOnOpen('kitchen-route-form', () => ({ stationId: stationId.value, kind: kind.value, target: target.value }), open);
 const emit = defineEmits<{ saved: [route: RouteOut] }>();
 
 type Kind = 'product' | 'category';

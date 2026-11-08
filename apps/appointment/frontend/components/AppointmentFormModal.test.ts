@@ -490,3 +490,15 @@ describe('AppointmentFormModal: fields refused with the same words (hub#888)', (
     return { field: (key) => s.field(FIELD_OF[key] ?? key), send: () => click(s.submit()), settle };
   }, 'minutes');
 });
+
+describe('AppointmentFormModal: Android Back with unsaved changes (hub#1020, BASE-F05)', () => {
+  it('as opened closes; a change asks; restored as opened closes again', async () => {
+    const s = await setup();
+    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormOnAndroidBack({
+      overlay: () => s.inDoc('appointment-form'),
+      change: () => ionValue(s.field('time'), '10:00', 'ionInput'),
+      restore: () => ionValue(s.field('time'), '', 'ionInput'),
+    });
+  });
+});

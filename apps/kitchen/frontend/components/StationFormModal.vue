@@ -8,6 +8,8 @@ import { useCommand } from '@erplora/ui/sdk';
 import { IonInput, IonSelect, IonSelectOption, IonToggle } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 import { useT } from '../composables/useT';
 import type { Destination, PrinterUsage, StationOut, StationPatchIn } from '../operations';
 
@@ -17,6 +19,8 @@ const props = defineProps<{
 }>();
 
 const open = defineModel<boolean>('open', { default: false });
+
+useUnsavedFormOnOpen('kitchen-station-form', () => form.value, open);
 const emit = defineEmits<{ saved: [station: StationOut] }>();
 
 /** The palette of the old module's chips; the first is the factory colour. */
@@ -113,7 +117,9 @@ async function save(): Promise<void> {
     @submit="save"
   >
     <template #default="{ fieldErrors }">
-      <div class="kitchen-station-form">
+      <div
+        class="kitchen-station-form"
+      >
         <ion-input
           data-testid="kitchen-station-form-name"
           :value="form.name"

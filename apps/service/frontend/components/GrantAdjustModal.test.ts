@@ -90,3 +90,15 @@ describe('GrantAdjustModal', () => {
     expect(s.el('service-grant-adjust-uses').label).toBe('Sesiones que se añaden');
   });
 });
+
+describe('GrantAdjustModal: Android Back with unsaved changes (hub#1020, BASE-F05)', () => {
+  it('as opened closes; a change asks; restored as opened closes again', async () => {
+    const s = await setup();
+    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormOnAndroidBack({
+      overlay: () => s.inDoc('service-grant-adjust'),
+      change: () => ionValue(s.el('service-grant-adjust-reason'), 'Gift', 'ionInput'),
+      restore: () => ionValue(s.el('service-grant-adjust-reason'), '', 'ionInput'),
+    });
+  });
+});

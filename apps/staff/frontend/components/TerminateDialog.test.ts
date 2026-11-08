@@ -72,3 +72,15 @@ describe('TerminateDialog (STAFF-F06)', () => {
     ]);
   });
 });
+
+describe('TerminateDialog: Android Back with unsaved changes (hub#1020, BASE-F05)', () => {
+  it('as opened closes; a change asks; restored as opened closes again', async () => {
+    const s = await setup();
+    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormOnAndroidBack({
+      overlay: () => s.inDoc('staff-member-terminate'),
+      change: () => ionValue(s.reason(), 'Moves abroad', 'ionInput'),
+      restore: () => ionValue(s.reason(), '', 'ionInput'),
+    });
+  });
+});

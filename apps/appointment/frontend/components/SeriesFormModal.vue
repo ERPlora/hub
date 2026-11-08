@@ -11,6 +11,8 @@ import { useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 import CustomerSearch, { type CustomerSnapshot } from '../../../customer/frontend/components/CustomerSearch.vue';
 import { useT } from '../composables/useT';
 import { eligibleStaff, ownTerms, type ServiceFacts } from '../lib/pickers';
@@ -38,6 +40,8 @@ const emit = defineEmits<{
 }>();
 const open = defineModel<boolean>('open', { default: false });
 
+useUnsavedFormOnOpen('series-form', () => ({ customer: customer.value, services: services.value, staff: staff.value, frequency: frequency.value, weekday: weekday.value, startDate: startDate.value, from: from.value, time: time.value, minutes: minutesTouched.value ? minutes.value : openedMinutes.value, endDate: endDate.value, occurrences: occurrences.value }), open);
+
 const t = useT();
 const client = useLiveClient();
 const facts = new Map<string, ServiceFacts>();
@@ -52,6 +56,7 @@ const from = ref('');
 const time = ref('');
 const minutes = ref('');
 const minutesTouched = ref(false);
+const openedMinutes = ref('');
 const endDate = ref('');
 const occurrences = ref('');
 
@@ -88,6 +93,7 @@ function reset(): void {
     from.value = props.fromDate ?? (series.start_date > props.businessToday ? series.start_date : props.businessToday);
     time.value = hhmm(series.time);
     minutes.value = String(series.duration_minutes);
+    openedMinutes.value = minutes.value;
     endDate.value = series.end_date ?? '';
     occurrences.value = series.max_occurrences ? String(series.max_occurrences) : '';
     return;
@@ -102,6 +108,7 @@ function reset(): void {
   minutes.value = '';
   endDate.value = '';
   occurrences.value = '';
+  openedMinutes.value = '';
 }
 
 watch(
@@ -198,7 +205,9 @@ const text = (value: unknown): string => (value === null || value === undefined 
     @submit="save"
   >
     <template #default="{ fieldErrors }">
-      <div class="series-form">
+      <div
+        class="series-form"
+      >
         <p
           v-if="series"
           class="series-form__who"

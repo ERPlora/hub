@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:c34a76e11fc00f495b4657e0de1b55d204f70744c6dd3484d30368997b79ae08 -->
+<!-- generated from WORKBOOK.md sha256:82e68b91b44926e794111e03d7d3d384839590d22e9dee3cceb57c366ad190ad -->
 
 ## What it is for and who it is for
 
@@ -146,6 +146,12 @@ components).
 | App inactive | "This app is not active in this business". |
 | No permission | What they cannot do does not appear; if they come in by another door, "You do not have permission". |
 | Card that is no longer there | "This customer is no longer available." (deleted, merged into another or with its data erased). |
+
+## Unsaved changes on Android
+
+In this app's create and edit windows, the phone's Back button asks "Discard changes?" when something typed
+or chosen has not been saved: "Keep editing" keeps it and "Discard changes" closes the window without saving.
+With the window as it opened, Back closes it without asking (BASE-F05).
 
 ## Flows
 

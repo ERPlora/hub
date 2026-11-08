@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:54fd029a53f3306949cec862e423454d8bcecf1b3702058ce3c794236fabf8d1 -->
+<!-- generated from WORKBOOK.md sha256:0c1c3fc733a820dc6a422e6626f4b97eeea39649f0a18d3df8aaf859e8939536 -->
 
 ## What it is for and who it is for
 
@@ -225,6 +225,12 @@ permission to change these settings. Ask an administrator if you need to.".
 | App inactive (`app_inactive`) | "This app is not active in this business". |
 | Speaking (Sell) | The "Speak" key, red, says "Stop" and "Listening…" shows underneath; on stopping, "Transcribing…". A notice says what fails: no voice, "Nothing was heard. Try again closer to the microphone."; with the microphone denied, "Microphone access is blocked. Allow it in your browser to speak." (in the installed app, which has no browser, "Microphone access is blocked. Allow it in your device settings to speak."); too long, "The recording is too long: say something shorter."; if it cannot be transcribed, "The audio could not be transcribed. Try again."; offline, "No connection: talking to the assistant needs the internet.". |
 | No permission | What they cannot do does not show; if it arrives through another door, "You do not have permission". What a manager can approve with their PIN (voiding and refunding a sale, voiding a sent line, deleting a check with something ordered, the open price and discounts above the maximum) does show and, when pressed, asks "An approval is needed". |
+
+## Unsaved changes on Android
+
+In this app's create and edit windows, the phone's Back button asks "Discard changes?" when something typed
+or chosen has not been saved: "Keep editing" keeps it and "Discard changes" closes the window without saving.
+With the window as it opened, Back closes it without asking (BASE-F05).
 
 ## Flows
 

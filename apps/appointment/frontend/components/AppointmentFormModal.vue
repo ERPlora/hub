@@ -15,6 +15,8 @@ import { type ApiError, useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { IonButton, IonInput, IonTextarea } from '@ionic/vue';
 import { computed, ref, shallowRef, watch } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 import CustomerSearch, { type CustomerSnapshot } from '../../../customer/frontend/components/CustomerSearch.vue';
 import { useLocale, useT } from '../composables/useT';
 import { dayOf, timeOf, wallInput } from '../lib/clock';
@@ -50,6 +52,8 @@ const props = withDefaults(
 const emit = defineEmits<{ saved: [appointment: AppointmentOut]; outcome: [text: string] }>();
 const open = defineModel<boolean>('open', { default: false });
 
+useUnsavedFormOnOpen('appointment-form', () => ({ customer: customer.value, services: services.value, staff: staff.value, day: day.value, time: time.value, minutes: minutesTouched.value ? minutes.value : openedMinutes.value, notes: notes.value, internalNotes: internalNotes.value }), open);
+
 const t = useT();
 const locale = useLocale();
 const client = useLiveClient();
@@ -67,6 +71,7 @@ const day = ref('');
 const time = ref('');
 const minutes = ref('');
 const minutesTouched = ref(false);
+const openedMinutes = ref('');
 const notes = ref('');
 const internalNotes = ref('');
 const staffWarning = ref(false);
@@ -112,6 +117,7 @@ function reset(): void {
     day.value = dayOf(booked.start);
     time.value = timeOf(booked.start);
     minutes.value = String(booked.duration_minutes);
+    openedMinutes.value = minutes.value;
     notes.value = booked.notes;
     internalNotes.value = booked.internal_notes;
     return;
@@ -127,6 +133,7 @@ function reset(): void {
   day.value = preset?.day ?? props.businessNow.slice(0, 10);
   time.value = preset?.time ?? '';
   minutes.value = '';
+  openedMinutes.value = '';
   notes.value = '';
   internalNotes.value = '';
 }
@@ -317,7 +324,9 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
     @submit="save()"
   >
     <template #default="{ fieldErrors }">
-      <div class="appointment-form">
+      <div
+        class="appointment-form"
+      >
         <p
           v-if="editing"
           class="appointment-form__hint"

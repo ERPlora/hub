@@ -11,6 +11,8 @@ import { useCommand, useLive } from '@erplora/ui/sdk';
 import { IonCheckbox, IonInput } from '@ionic/vue';
 import { computed, ref, shallowRef, watch } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 import { useT } from '../composables/useT';
 import {
   blankScheduleForm,
@@ -37,6 +39,8 @@ const props = withDefaults(
 );
 
 const open = defineModel<boolean>('open', { default: false });
+
+useUnsavedFormOnOpen('staff-schedule-form', () => form.value, open);
 
 const t = useT();
 /** The business's default working day (Staff › Settings, STAFF-F22): what a new week proposes. */
@@ -113,7 +117,9 @@ const HOURS = [
     @submit="save"
   >
     <template #default="{ fieldErrors }">
-      <div class="staff-schedule-form">
+      <div
+        class="staff-schedule-form"
+      >
         <ion-input
           data-testid="staff-schedule-form-name"
           name="name"

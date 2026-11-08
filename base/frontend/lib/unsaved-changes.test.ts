@@ -10,7 +10,7 @@ import { defineComponent, h, ref } from 'vue';
 
 import { flush, mountBase } from '../__tests__/mount-base';
 import { unsavedChangesIn } from './system-back';
-import { useUnsavedChanges } from './unsaved-changes';
+import { useUnsavedChanges, useUnsavedForm, useUnsavedFormOnOpen } from './unsaved-changes';
 
 vi.mock('@ionic/vue', async (importOriginal) => {
   const { IonModalStub } = await import('../../../packages/ui/src/components/FormModal/__tests__/ionModalStub');
@@ -108,5 +108,68 @@ describe('hub#1015 — useUnsavedChanges: a window with something typed holds th
     s.wrapper.unmount();
 
     expect(unsavedChangesIn(s.overlay)).toBeUndefined();
+  });
+});
+
+describe('hub#1020 — useUnsavedForm: the current fields against those the window opened with', () => {
+  it('is clean as opened, notices nested edits and is clean again when restored or re-based', async () => {
+    const shown = shownWindow();
+    const current = ref({ name: '', tags: [] as string[], nested: { position: '0' } });
+    const original = ref({ name: '', tags: [] as string[], nested: { position: '0' } });
+    // eslint-disable-next-line vue/one-component-per-file
+    const Window = defineComponent({
+      setup() {
+        useUnsavedForm(() => shown.fields, current, original);
+        return () => h('p');
+      },
+    });
+    const m = await mountBase(Window);
+    expect(unsavedChangesIn(shown.overlay)).toBeUndefined();
+
+    current.value = { ...current.value, tags: ['food'], nested: { position: '2' } };
+    await flush();
+    expect(unsavedChangesIn(shown.overlay)).toBeDefined();
+
+    current.value = { name: '', tags: [], nested: { position: '0' } };
+    await flush();
+    expect(unsavedChangesIn(shown.overlay)).toBeUndefined();
+
+    current.value = { ...current.value, name: 'Butchery' };
+    original.value = { ...original.value, name: 'Butchery' };
+    await flush();
+    expect(unsavedChangesIn(shown.overlay)).toBeUndefined();
+    m.wrapper.unmount();
+  });
+
+  it('on open snapshots the reset fields, ignores a closed window and starts clean again on reopening', async () => {
+    const shown = shownWindow();
+    const open = ref(false);
+    const current = ref({ name: '' });
+    // eslint-disable-next-line vue/one-component-per-file
+    const Window = defineComponent({
+      setup() {
+        useUnsavedFormOnOpen(() => shown.fields, current, open);
+        return () => h('p');
+      },
+    });
+    const m = await mountBase(Window);
+    current.value = { name: 'Butchery' };
+    open.value = true;
+    await flush();
+    expect(unsavedChangesIn(shown.overlay)).toBeUndefined();
+
+    current.value = { name: 'Fish' };
+    await flush();
+    expect(unsavedChangesIn(shown.overlay)).toBeDefined();
+
+    open.value = false;
+    await flush();
+    expect(unsavedChangesIn(shown.overlay)).toBeUndefined();
+
+    current.value = { name: '' };
+    open.value = true;
+    await flush();
+    expect(unsavedChangesIn(shown.overlay)).toBeUndefined();
+    m.wrapper.unmount();
   });
 });

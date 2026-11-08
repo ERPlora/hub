@@ -8,6 +8,8 @@ import { useCommand } from '@erplora/ui/sdk';
 import { IonInput, IonText, IonToggle } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 import { useT } from '../composables/useT';
 import type { RoleIn, RoleOut, RolePatchIn } from '../operations';
 
@@ -17,6 +19,8 @@ const props = defineProps<{
 }>();
 
 const open = defineModel<boolean>('open', { default: false });
+
+useUnsavedFormOnOpen('staff-role-form', () => form.value, open);
 
 interface RoleForm {
   name: string;
@@ -91,7 +95,9 @@ async function save(): Promise<void> {
     @submit="save"
   >
     <template #default="{ fieldErrors }">
-      <div class="staff-role-form">
+      <div
+        class="staff-role-form"
+      >
         <ion-input
           data-testid="staff-role-form-name"
           name="name"

@@ -6,12 +6,16 @@
 import { FormModal } from '@erplora/ui/components';
 import { useTemplateRef } from 'vue';
 
+import { useUnsavedChanges } from '../../../../../base/frontend/lib/unsaved-changes';
+
 import type { SaleRow } from '../../operations';
 import RefundForm from './RefundForm.vue';
 
 defineProps<{ sale: Pick<SaleRow, 'id' | 'number'> | null }>();
 
 const open = defineModel<boolean>('open', { required: true });
+
+useUnsavedChanges('sale-refund', () => form.value?.unsaved ?? false);
 const emit = defineEmits<{ refunded: [] }>();
 
 const form = useTemplateRef<InstanceType<typeof RefundForm>>('form');

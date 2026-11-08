@@ -188,6 +188,12 @@ campo marcado.
 | Historial | esqueleto de la tabla | «Sin actividad reciente en cocina.» | el de la tabla + Reintentar |
 | Ajustes | «Cargando ajustes…» | — | «No se pudieron cargar los ajustes.» + Reintentar |
 
+## Cambios sin guardar en Android
+
+En las ventanas de alta y edición de esta app, el botón atrás del móvil pregunta «¿Descartar los cambios?»
+cuando hay algo escrito o elegido sin guardar: «Seguir editando» conserva lo tecleado y «Descartar cambios»
+cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra sin preguntar (BASE-F05).
+
 ## Flujos
 
 | ID | Flujo | Estado |
