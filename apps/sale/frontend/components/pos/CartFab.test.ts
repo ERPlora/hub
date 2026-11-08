@@ -2,6 +2,8 @@
 // check is empty; with items, a pill with the server's total and how many, and a name that says both.
 import { describe, expect, it } from 'vitest';
 
+import { HubIcon } from '@erplora/ui/shell';
+
 import { click, mountSale } from '../../__tests__/mount-sale';
 import { plain } from '../../lib/format';
 import CartFab from './CartFab.vue';
@@ -16,6 +18,9 @@ describe('CartFab', () => {
   it('with an empty check it is only the cart, «Open cart»', async () => {
     const m = await setup({}, 'es');
     const fab = m.find('pos-cart-fab');
+    expect(fab.element.tagName.toLowerCase()).toBe('ion-fab-button');
+    expect(fab.findComponent(HubIcon).props('name')).toBe('ion:cart-outline');
+    expect(fab.find('.pos-fab__icon').exists()).toBe(true);
     expect(fab.attributes('aria-label')).toBe('Abrir carrito');
     expect(fab.attributes('aria-controls')).toBe('pos-cart-drawer');
     expect(fab.attributes('aria-expanded')).toBe('false');

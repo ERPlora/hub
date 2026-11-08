@@ -863,9 +863,10 @@ onBeforeUnmount(() => {
   height: 100%;
   overflow: hidden;
   overflow: clip;
-  background: var(--ion-background-color, #fff);
-  border: 1px solid var(--ion-border-color, #e6e3db);
-  border-radius: 16px;
+  background: var(--ep-surface-muted);
+  border: 1px solid var(--ep-border);
+  border-radius: var(--ep-radius-lg);
+  box-shadow: var(--ep-shadow-sm);
 }
 /* One row pinned to the box's height, so the grid scrolls inside its column and the cart's foot stays. */
 .pos-till__body {

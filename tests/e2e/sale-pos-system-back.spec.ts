@@ -32,7 +32,7 @@ for (const vp of VIEWPORTS) {
     await tillInsideTheApp(page);
     const trigger = shown(page).locator('[data-testid=pos-screen-menu]');
     await trigger.click();
-    await expect(shown(page).locator('[data-testid=pos-fullscreen]')).toBeVisible();
+    await expect(page.locator('ion-popover [data-testid=pos-fullscreen]')).toBeVisible();
 
     await pressBack(page);
     await expect(page).toHaveURL(`${A}/sale/pos`);

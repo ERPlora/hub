@@ -152,6 +152,7 @@ describe('SpeakKey: who sees it', () => {
   it('shows «Hablar» with the microphone to whoever may use the assistant on a device that records', async () => {
     const k = await key();
     expect(k.button().exists()).toBe(true);
+    expect(k.button().element.tagName.toLowerCase()).toBe('ion-button');
     expect(k.button().text()).toBe('Hablar');
     expect(k.button().attributes('aria-pressed')).toBe('false');
     // The assistant composer's own microphone.
@@ -206,11 +207,11 @@ describe('SpeakKey: dictating into the assistant', () => {
     await k.press();
     await k.press();
     expect(k.find('pos-speak-status').text()).toBe('Transcribiendo…');
-    expect(k.button().attributes('disabled')).toBeDefined();
+    expect((k.button().element as HTMLElement & { disabled?: boolean }).disabled).toBe(true);
     finish(Response.json({ text: 'dos cafés', language: 'es' }));
     await settle();
     expect(assistant.state.draft).toBe('dos cafés');
-    expect(k.button().attributes('disabled')).toBeUndefined();
+    expect((k.button().element as HTMLElement & { disabled?: boolean }).disabled).toBe(false);
   });
 
   it('an empty dictation is a toast: the box and the panel stay as they were', async () => {

@@ -319,9 +319,10 @@ const chosenBar = computed(() => {
   gap: 8px;
   min-width: 0;
   padding: 14px 16px;
-  border: 1px solid var(--ion-color-step-150, #e4e7ec);
+  border: 1px solid var(--ep-border, var(--ion-color-step-150, #e4e7ec));
   border-radius: var(--ep-radius-lg, 16px);
   background: var(--ion-card-background, var(--ion-background-color, #fff));
+  box-shadow: var(--ep-shadow-xs);
 }
 
 .widget-head {
@@ -331,8 +332,14 @@ const chosenBar = computed(() => {
 }
 
 .widget-icon {
+  box-sizing: content-box;
+  width: 18px;
+  height: 18px;
+  padding: 6px;
   font-size: 18px;
-  color: var(--ion-color-primary);
+  color: var(--ep-primary-text);
+  background: var(--ep-primary-tint);
+  border-radius: 9px;
 }
 
 .widget-title {
@@ -346,6 +353,7 @@ const chosenBar = computed(() => {
   margin: 0;
   font-size: 1.75rem;
   font-weight: 700;
+  font-variant-numeric: tabular-nums;
   line-height: 1.1;
 }
 

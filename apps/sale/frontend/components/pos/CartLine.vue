@@ -8,6 +8,7 @@
 // and ⊗ to take it off (which gives the session back). Tapping the line itself (never its buttons) marks
 // it. Nothing here works money out.
 import { HubIcon } from '@erplora/ui/shell';
+import { IonButton } from '@ionic/vue';
 import { computed } from 'vue';
 
 import type { OrderLineOut } from '../../operations';
@@ -67,9 +68,9 @@ function onRow(): void {
     :data-product-id="line.product_id ?? undefined"
     @click="onRow"
   >
-    <button
+    <ion-button
       v-if="markable"
-      type="button"
+      fill="clear"
       class="pos-line__mark"
       :data-testid="`pos-line-${line.id}-mark`"
       :aria-pressed="marked ? 'true' : 'false'"
@@ -84,7 +85,7 @@ function onRow(): void {
         v-else
         class="pos-line__ring"
       />
-    </button>
+    </ion-button>
     <div class="pos-line__label">
       <h3>
         <span
@@ -130,9 +131,9 @@ function onRow(): void {
       >
         <HubIcon name="ion:chatbubbles-outline" />{{ line.notes }}
       </p>
-      <button
+      <ion-button
         v-if="line.staff_id"
-        type="button"
+        fill="clear"
         class="pos-line__staff"
         :data-testid="`pos-line-${line.id}-staff`"
         :title="$t('sale.pos.lineStaffPickerTitle')"
@@ -141,7 +142,7 @@ function onRow(): void {
         @click.stop="emit('staff')"
       >
         <HubIcon name="ion:person-circle-outline" />{{ staffLabel }}
-      </button>
+      </ion-button>
     </div>
     <div class="pos-line__end">
       <span
@@ -150,8 +151,8 @@ function onRow(): void {
       >{{ formatMoney(line.line_total, locale, business) }}</span>
       <template v-if="fired">
         <span class="pos-line__actions">
-          <button
-            type="button"
+          <ion-button
+            fill="clear"
             class="pos-line__icon pos-line__icon--danger"
             :data-testid="`pos-line-${line.id}-void`"
             :title="$t('sale.pos.voidLine')"
@@ -159,14 +160,14 @@ function onRow(): void {
             @click.stop="emit('void')"
           >
             <HubIcon name="ion:close-circle-outline" />
-          </button>
+          </ion-button>
           <span class="pos-line__qty">×{{ quantity }}</span>
         </span>
       </template>
       <template v-else-if="covered">
         <span class="pos-line__actions">
-          <button
-            type="button"
+          <ion-button
+            fill="clear"
             class="pos-line__icon"
             :class="{ 'pos-line__icon--primary': !!line.notes }"
             :data-testid="`pos-line-${line.id}-note`"
@@ -175,9 +176,9 @@ function onRow(): void {
             @click.stop="emit('note')"
           >
             <HubIcon name="ion:chatbubbles-outline" />
-          </button>
-          <button
-            type="button"
+          </ion-button>
+          <ion-button
+            fill="clear"
             class="pos-line__icon pos-line__icon--danger"
             :data-testid="`pos-line-${line.id}-remove`"
             :title="$t('sale.pos.removeLine')"
@@ -186,14 +187,14 @@ function onRow(): void {
             @click.stop="emit('quantity', '0')"
           >
             <HubIcon name="ion:close-circle-outline" />
-          </button>
+          </ion-button>
         </span>
       </template>
       <template v-else>
         <span class="pos-line__actions">
-          <button
+          <ion-button
             v-if="allowDiscounts"
-            type="button"
+            fill="clear"
             class="pos-line__icon"
             :class="{ 'pos-line__icon--warning': discounted }"
             :data-testid="`pos-line-${line.id}-discount`"
@@ -202,9 +203,9 @@ function onRow(): void {
             @click.stop="emit('discount')"
           >
             <HubIcon :name="discounted ? 'ion:pricetag' : 'ion:pricetag-outline'" />
-          </button>
-          <button
-            type="button"
+          </ion-button>
+          <ion-button
+            fill="clear"
             class="pos-line__icon"
             :class="{ 'pos-line__icon--primary': !!line.notes }"
             :data-testid="`pos-line-${line.id}-note`"
@@ -213,9 +214,9 @@ function onRow(): void {
             @click.stop="emit('note')"
           >
             <HubIcon name="ion:chatbubbles-outline" />
-          </button>
-          <button
-            type="button"
+          </ion-button>
+          <ion-button
+            fill="clear"
             class="pos-line__icon"
             :class="{ 'pos-line__icon--success': line.is_gift }"
             :data-testid="`pos-line-${line.id}-gift`"
@@ -225,7 +226,7 @@ function onRow(): void {
             @click.stop="emit('gift')"
           >
             <HubIcon :name="line.is_gift ? 'ion:gift' : 'ion:gift-outline'" />
-          </button>
+          </ion-button>
         </span>
         <QtyStepper
           :quantity="line.quantity"
@@ -255,18 +256,14 @@ function onRow(): void {
   border-color: var(--ion-color-primary, #0091ce);
 }
 .pos-line__mark {
-  display: inline-flex;
   flex: none;
-  align-items: center;
-  justify-content: center;
-  width: 1.6rem;
-  height: 1.6rem;
-  padding: 0;
+  width: 2.75rem;
+  height: 2.75rem;
+  margin: 0;
   font-size: 1.35rem;
-  color: var(--ion-color-primary, #0091ce);
-  background: none;
-  border: none;
-  cursor: pointer;
+  --color: var(--ion-color-primary);
+  --padding-start: 0;
+  --padding-end: 0;
 }
 .pos-line__ring {
   width: 1.1rem;
@@ -343,17 +340,12 @@ function onRow(): void {
   margin-top: 0.1rem;
 }
 .pos-line__staff {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  margin-top: 0.2rem;
-  padding: 0;
-  font: inherit;
+  min-height: 2.5rem;
+  margin: 0.2rem 0 0;
   font-size: 0.85rem;
-  color: var(--ion-color-medium, #8b897f);
-  background: none;
-  border: none;
-  cursor: pointer;
+  --color: var(--ion-color-medium);
+  --padding-start: 0;
+  --padding-end: 0.4rem;
 }
 .pos-line__staff:disabled {
   cursor: default;
@@ -379,33 +371,29 @@ function onRow(): void {
   gap: 0.1rem;
 }
 .pos-line__icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2rem;
-  height: 2rem;
-  padding: 0;
+  width: 2.75rem;
+  height: 2.75rem;
+  margin: 0;
   font-size: 1.1rem;
-  color: var(--ion-color-medium, #8b897f);
-  background: none;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
+  --color: var(--ion-color-medium);
+  --border-radius: 8px;
+  --padding-start: 0;
+  --padding-end: 0;
 }
 .pos-line__icon:hover {
-  background: var(--ion-color-light, #f2f1ed);
+  --background: var(--ep-surface-muted);
 }
 .pos-line__icon--warning {
-  color: var(--ion-color-warning-shade, #e0ac08);
+  --color: var(--ion-color-warning-shade);
 }
 .pos-line__icon--primary {
-  color: var(--ion-color-primary, #0091ce);
+  --color: var(--ion-color-primary);
 }
 .pos-line__icon--success {
-  color: var(--ion-color-success, #2dd55b);
+  --color: var(--ion-color-success);
 }
 .pos-line__icon--danger {
-  color: var(--ion-color-danger, #c5000f);
+  --color: var(--ion-color-danger);
 }
 .pos-line__qty {
   font-weight: 700;

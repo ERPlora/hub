@@ -9,6 +9,7 @@
 // check opens on offers it too (hub#1017); a send goes up (`send`, with its rush). With
 // the right to see Kitchen's tickets (`kitchenTickets`), «Tickets · N» rides beside the head of what was sent
 // (KITCHEN-F19, F20). Android's Back closes the open dropdown.
+import { IonLabel, IonSegment, IonSegmentButton } from '@ionic/vue';
 import { computed, shallowRef, watch } from 'vue';
 
 import { useSystemBack } from '../../composables/pos/useSystemBack';
@@ -96,6 +97,11 @@ const roundLabel = computed(() => {
   return count === 1 ? t('sale.pos.kitchen.roundTabPendingOne') : t('sale.pos.kitchen.roundTabPending', { count });
 });
 
+function onTabChange(event: CustomEvent<{ value?: string | number }>): void {
+  const next = String(event.detail.value ?? '');
+  if (next === 'check' || next === 'round') tab.value = next;
+}
+
 function resume(row: OrderRow): void {
   checksOpen.value = false;
   emit('resume', row);
@@ -152,40 +158,37 @@ function park(): void {
         @staff="emit('staff')"
         @ask-customer="emit('askCustomer')"
       />
-      <div
+      <ion-segment
         v-if="kitchen"
         class="pos-cart__tabs"
-        role="tablist"
+        :value="tab"
         data-testid="pos-cart-tabs"
+        @ion-change="onTabChange"
       >
-        <button
-          type="button"
-          role="tab"
+        <ion-segment-button
+          value="check"
           class="pos-cart__tab"
           :aria-selected="tab === 'check' ? 'true' : 'false'"
           data-testid="pos-cart-tab-check"
-          @click="tab = 'check'"
         >
-          {{ t('sale.pos.kitchen.accountTab') }}
-        </button>
-        <button
-          type="button"
-          role="tab"
+          <ion-label>{{ t('sale.pos.kitchen.accountTab') }}</ion-label>
+        </ion-segment-button>
+        <ion-segment-button
+          value="round"
           class="pos-cart__tab"
           :aria-selected="tab === 'round' ? 'true' : 'false'"
           :aria-label="roundLabel"
           data-testid="pos-cart-tab-round"
-          @click="tab = 'round'"
         >
-          {{ t('sale.pos.kitchen.roundTab') }}
+          <ion-label>{{ t('sale.pos.kitchen.roundTab') }}</ion-label>
           <span
             v-if="pending.length"
             class="pos-cart__badge"
             aria-hidden="true"
             data-testid="pos-cart-tab-round-badge"
           >{{ pending.length }}</span>
-        </button>
-      </div>
+        </ion-segment-button>
+      </ion-segment>
       <div class="pos-cart__body">
         <p
           v-if="roundMode && pending.length"
@@ -255,8 +258,8 @@ function park(): void {
   flex-direction: column;
   min-width: 0;
   min-height: 0;
-  background: var(--ion-background-color, #fff);
-  border-left: 1px solid var(--ion-border-color, #e6e3db);
+  background: var(--ion-card-background);
+  border-left: 1px solid var(--ep-border);
 }
 /* A scroll container: its automatic minimum height is 0, so it gives way to the bar and the foot. It is also what the
    send bar measures to know whether it can stay pinned (KitchenSendBar, hub#787). */
@@ -294,29 +297,23 @@ function park(): void {
   gap: 0.25rem;
   margin: 0 0.75rem 0.5rem;
   padding: 0.25rem;
-  background: var(--ion-color-light, #f4f3ef);
+  background: var(--ep-surface-muted);
   border-radius: 12px;
 }
 .pos-cart__tab {
-  display: inline-flex;
   min-width: 0;
   min-height: 2.5rem;
-  align-items: center;
-  justify-content: center;
-  gap: 0.4rem;
-  padding: 0.25rem 0.5rem;
-  font: inherit;
   font-weight: 600;
-  color: var(--ion-color-medium-shade, #636469);
-  background: transparent;
-  border: 0;
-  border-radius: 9px;
-  cursor: pointer;
-}
-.pos-cart__tab[aria-selected='true'] {
-  color: var(--ion-text-color, #1c1b18);
-  background: var(--ion-background-color, #fff);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+  text-transform: none;
+  --background: transparent;
+  --background-checked: var(--ion-card-background);
+  --color: var(--ion-color-medium-shade);
+  --color-checked: var(--ep-primary-text);
+  --border-radius: 9px;
+  --indicator-color: transparent;
+  --indicator-box-shadow: var(--ep-shadow-xs);
+  --padding-start: 0.5rem;
+  --padding-end: 0.5rem;
 }
 .pos-cart__badge {
   min-width: 1.35rem;

@@ -1,11 +1,20 @@
 // The ⋮ screen menu at the end of the category strip (WORKBOOK «Vender»): «Full screen» / «Exit full
 // screen», the browser's own, for the whole page (the sheets live in the app's root); not there at all
 // where the device cannot do it. Android's Back on the installed app closes it, as Escape does (base's `erplora:back`).
+import { defineComponent } from 'vue';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { SHELL_BACK_EVENT } from '../../../../../base/frontend/lib/system-back';
 import { click, mountSale } from '../../__tests__/mount-sale';
 import ScreenMenu from './ScreenMenu.vue';
+
+const PopoverStub = defineComponent({
+  name: 'IonPopover',
+  props: { isOpen: Boolean, event: { type: null, default: undefined } },
+  emits: ['didDismiss'],
+  template: '<div v-if="isOpen" data-stub="ion-popover"><slot /></div>',
+});
+const stubs = { IonPopover: PopoverStub };
 
 const screen = vi.hoisted(() => ({
   capable: true,
@@ -45,32 +54,42 @@ describe('ScreenMenu', () => {
     expect(m.find('pos-screen-menu').exists()).toBe(false);
   });
 
+  it('uses Ionic for the trigger, popover and action', async () => {
+    const m = await mountSale(ScreenMenu, { stubs });
+    const trigger = m.find('pos-screen-menu');
+    expect(trigger.element.tagName.toLowerCase()).toBe('ion-button');
+    await click(trigger.element);
+    expect(m.find('pos-screen-menu-list').element.tagName.toLowerCase()).toBe('ion-list');
+    expect(m.find('pos-fullscreen').element.tagName.toLowerCase()).toBe('ion-item');
+  });
+
   it('⋮ opens the menu with «Full screen», which asks the browser for the page and closes the menu', async () => {
-    const m = await mountSale(ScreenMenu, { locale: 'es' });
+    const m = await mountSale(ScreenMenu, { locale: 'es', stubs });
     const trigger = m.find('pos-screen-menu');
     expect(trigger.attributes('aria-label')).toBe('Pantalla');
     expect(trigger.attributes('aria-expanded')).toBe('false');
     await click(trigger.element);
     expect(trigger.attributes('aria-expanded')).toBe('true');
     const item = m.find('pos-fullscreen');
-    expect(item.text()).toBe('Pantalla completa');
+    expect(item.get('ion-label').element.innerHTML.trim()).toBe('Pantalla completa');
     await click(item.element);
     expect(screen.toggle).toHaveBeenCalledExactlyOnceWith();
     expect(m.find('pos-fullscreen').exists()).toBe(false);
   });
 
   it('follows the real state (Esc and F11 included): on full screen the item says «Exit full screen»', async () => {
-    const m = await mountSale(ScreenMenu, {});
+    const m = await mountSale(ScreenMenu, { stubs });
     screen.active = true;
     screen.listeners.forEach((listener) => listener());
     await click(m.find('pos-screen-menu').element);
-    expect(m.find('pos-fullscreen').text()).toBe('Exit full screen');
+    expect(m.find('pos-fullscreen').get('ion-label').element.innerHTML.trim()).toBe('Exit full screen');
   });
 
-  it('closes on a tap outside and on Escape', async () => {
-    const m = await mountSale(ScreenMenu, {});
+  it('closes when Ionic dismisses the popover and on Escape', async () => {
+    const m = await mountSale(ScreenMenu, { stubs });
     await click(m.find('pos-screen-menu').element);
-    await click(m.find('pos-screen-menu-scrim').element);
+    m.wrapper.findComponent(PopoverStub).vm.$emit('didDismiss');
+    await m.wrapper.vm.$nextTick();
     expect(m.find('pos-fullscreen').exists()).toBe(false);
     await click(m.find('pos-screen-menu').element);
     m.find('pos-screen-menu-list').element.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
@@ -79,7 +98,7 @@ describe('ScreenMenu', () => {
   });
 
   it('Android’s Back closes the open menu and the till stays; with the menu closed Back is the shell’s', async () => {
-    const m = await mountSale(ScreenMenu, {});
+    const m = await mountSale(ScreenMenu, { stubs });
     expect(pressBack()).toBe(false);
     await click(m.find('pos-screen-menu').element);
     expect(pressBack()).toBe(true);
@@ -90,7 +109,7 @@ describe('ScreenMenu', () => {
   });
 
   it('a menu that leaves the screen open no longer answers Back', async () => {
-    const m = await mountSale(ScreenMenu, {});
+    const m = await mountSale(ScreenMenu, { stubs });
     await click(m.find('pos-screen-menu').element);
     m.wrapper.unmount();
     expect(pressBack()).toBe(false);

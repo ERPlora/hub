@@ -21,7 +21,7 @@ async function setup(props: Record<string, unknown> = {}, locale: 'en' | 'es' = 
 describe('PosNumpad', () => {
   it('has the keys 1…9, the decimal key in the reader’s language, 0 and clear', async () => {
     const m = await setup({}, 'es');
-    const keys = m.wrapper.findAll('button').map((b) => b.text());
+    const keys = m.wrapper.findAll('ion-button').map((b) => b.text());
     expect(keys).toEqual(['1', '2', '3', '4', '5', '6', '7', '8', '9', ',', '0', 'C']);
     expect(m.find('pos-key-clear').attributes('aria-label')).toBe('Borrar');
   });

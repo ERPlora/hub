@@ -5,6 +5,7 @@
 // tap opens the picker), «Customer required» when the business demands one and there is none (a tap
 // asks for it), and «Check without table or customer» when there is nothing to show.
 import { HubIcon } from '@erplora/ui/shell';
+import { IonButton, IonChip } from '@ionic/vue';
 import { computed, useTemplateRef } from 'vue';
 
 import { useT } from '../../composables/useT';
@@ -55,34 +56,36 @@ function edit(): void {
         @change="onChange"
         @keydown.enter="($event.target as HTMLInputElement).blur()"
       >
-      <button
-        type="button"
+      <ion-button
+        fill="clear"
         class="pos-heading__edit"
         data-testid="pos-check-title-edit"
         :title="$t('sale.pos.editCheckTitle')"
         :aria-label="$t('sale.pos.editCheckTitle')"
         @click="edit"
       >
-        <HubIcon name="ion:create-outline" />
-      </button>
+        <HubIcon
+          slot="icon-only"
+          name="ion:create-outline"
+        />
+      </ion-button>
     </div>
     <div class="pos-heading__context">
-      <span
+      <ion-chip
         v-if="tableNumber"
         class="pos-chip"
         data-testid="pos-table-chip"
       >
         <HubIcon name="ion:grid-outline" />{{ $t('sale.pos.table.chip', { number: tableNumber }) }}
-      </span>
-      <span
+      </ion-chip>
+      <ion-chip
         v-if="customerName"
         class="pos-chip"
         data-testid="pos-customer-chip"
       >
         <HubIcon name="ion:person-outline" />{{ customerName }}
-      </span>
-      <button
-        type="button"
+      </ion-chip>
+      <ion-chip
         class="pos-chip pos-chip--button"
         data-testid="pos-staff-chip"
         :title="$t('sale.pos.staffPickerTitle')"
@@ -90,10 +93,9 @@ function edit(): void {
         @click="emit('staff')"
       >
         <HubIcon name="ion:person-circle-outline" />{{ served }}
-      </button>
-      <button
+      </ion-chip>
+      <ion-chip
         v-if="needsCustomer"
-        type="button"
         class="pos-chip pos-chip--button pos-chip--warning"
         data-testid="pos-needs-customer"
         :title="$t('sale.pos.customerRequiredCharge')"
@@ -101,7 +103,7 @@ function edit(): void {
         @click="emit('askCustomer')"
       >
         <HubIcon name="ion:person-add-outline" />{{ $t('sale.pos.customerRequiredShort') }}
-      </button>
+      </ion-chip>
       <span
         v-if="!tableNumber && !customerName && !needsCustomer"
         class="pos-heading__empty"
@@ -114,7 +116,7 @@ function edit(): void {
 <style scoped>
 .pos-heading {
   padding: 0.62rem 0.8rem;
-  border-bottom: 1px solid var(--ion-border-color, #e6e3db);
+  border-bottom: 1px solid var(--ep-border);
 }
 .pos-heading__title {
   display: flex;
@@ -128,25 +130,18 @@ function edit(): void {
   font: inherit;
   font-size: 1rem;
   font-weight: 750;
-  color: var(--ion-text-color, #1c1b18);
+  color: var(--ion-text-color);
   background: transparent;
   border: none;
   outline: none;
 }
 .pos-heading__edit {
-  display: inline-flex;
   flex: none;
-  align-items: center;
-  justify-content: center;
-  width: 2rem;
-  height: 2rem;
-  padding: 0;
+  width: 2.5rem;
+  height: 2.5rem;
+  margin: 0;
   font-size: 1.05rem;
-  color: var(--ion-color-medium, #8b897f);
-  background: none;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
+  --color: var(--ion-color-medium);
 }
 .pos-heading__context {
   display: flex;
@@ -156,29 +151,25 @@ function edit(): void {
   margin-top: 0.35rem;
 }
 .pos-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  height: 1.55rem;
-  padding: 0 0.55rem;
-  font: inherit;
+  min-height: 1.75rem;
+  margin: 0;
   font-size: 0.68rem;
   font-weight: 600;
-  color: var(--ion-text-color, #1c1b18);
-  background: var(--ion-color-light, #f2f1ed);
-  border: 1px solid var(--ion-border-color, #e6e3db);
-  border-radius: 999px;
+  color: var(--ion-text-color);
+  background: var(--ep-surface-muted);
+  border: 1px solid var(--ep-border);
 }
 .pos-chip--button {
   cursor: pointer;
 }
 .pos-chip--warning {
   font-weight: 700;
-  background: color-mix(in srgb, var(--ion-color-warning, #ffc409) 18%, transparent);
-  border-color: var(--ion-color-warning, #ffc409);
+  color: var(--ep-warning-text);
+  background: var(--ep-warning-tint);
+  border-color: var(--ion-color-warning);
 }
 .pos-heading__empty {
   font-size: 0.72rem;
-  color: var(--ion-color-medium, #8b897f);
+  color: var(--ion-color-medium);
 }
 </style>

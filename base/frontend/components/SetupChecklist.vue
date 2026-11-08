@@ -266,8 +266,14 @@ function note(item: SetupItem): string {
 }
 
 .setup-row-icon {
-  font-size: 20px;
-  color: var(--ion-color-medium);
+  box-sizing: content-box;
+  width: 18px;
+  height: 18px;
+  padding: 7px;
+  font-size: 18px;
+  color: var(--ep-primary-text);
+  background: var(--ep-primary-tint);
+  border-radius: 10px;
 }
 
 .setup-row-title {

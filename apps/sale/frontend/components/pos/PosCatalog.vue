@@ -186,9 +186,9 @@ watch(
           :services-count="servicesCount"
           @load-more="categories.loadMore()"
         />
-        <button
+        <ion-button
           v-if="showProducts"
-          type="button"
+          fill="outline"
           class="pos-catalog__search"
           data-testid="pos-search-trigger"
           :aria-label="$t('sale.pos.search')"
@@ -196,8 +196,11 @@ watch(
           :aria-pressed="searching ? 'true' : 'false'"
           @click="searching = !searching"
         >
-          <HubIcon name="ion:search-outline" />
-        </button>
+          <HubIcon
+            slot="icon-only"
+            name="ion:search-outline"
+          />
+        </ion-button>
       </template>
       <span
         v-else
@@ -293,21 +296,18 @@ watch(
   flex: 1;
 }
 .pos-catalog__search {
-  display: inline-flex;
   flex: none;
-  align-items: center;
-  justify-content: center;
   width: 3rem;
   height: 3.65rem;
+  margin: 0;
   font-size: 1.25rem;
-  color: var(--ion-color-primary, #0091ce);
-  background: var(--ion-card-background, var(--ion-background-color, #fff));
-  border: 1px solid var(--ion-border-color, #e6e3db);
-  border-radius: 12px;
-  cursor: pointer;
+  --color: var(--ion-color-primary);
+  --background: var(--ion-card-background);
+  --border-radius: 12px;
 }
 .pos-catalog__search[aria-pressed='true'] {
-  border-color: var(--ion-color-primary, #0091ce);
+  --border-color: var(--ion-color-primary);
+  --background: var(--ep-primary-tint);
 }
 @media (max-width: 820px) {
   .pos-catalog {

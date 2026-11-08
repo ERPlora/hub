@@ -10,7 +10,7 @@
 // leaving); the key says each reason with its own text and keeps the offline guard the dictation does not have.
 import { ASSISTANT_ICONS, browserVoice, type DictationProblem, useDictation, type VoiceEnv } from '@erplora/ui/components';
 import { toast, useSession } from '@erplora/ui/shell';
-import { IonIcon, IonSpinner } from '@ionic/vue';
+import { IonButton, IonIcon, IonSpinner } from '@ionic/vue';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 
 import { useT } from '../../composables/useT';
@@ -58,8 +58,8 @@ onBeforeUnmount(() => {
     v-if="shown"
     class="pos-speak"
   >
-    <button
-      type="button"
+    <ion-button
+      fill="outline"
       class="pos-speak__key"
       :class="{ 'pos-speak__key--on': recording }"
       data-testid="pos-speak"
@@ -81,7 +81,7 @@ onBeforeUnmount(() => {
         aria-hidden="true"
       />
       <span class="pos-speak__label">{{ recording ? t('sale.pos.speak.stop') : t('sale.pos.speak.label') }}</span>
-    </button>
+    </ion-button>
     <div
       class="pos-speak__live"
       role="status"
@@ -107,23 +107,23 @@ onBeforeUnmount(() => {
   flex: none;
 }
 .pos-speak__key {
+  min-width: 3.4rem;
+  height: 3.65rem;
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1;
+  --color: var(--ion-color-primary);
+  --background: var(--ion-card-background);
+  --border-radius: 12px;
+}
+.pos-speak__key::part(native) {
   display: inline-flex;
   flex-direction: column;
   gap: 0.2rem;
   align-items: center;
   justify-content: center;
-  min-width: 3.4rem;
-  height: 3.65rem;
   padding: 0 0.45rem;
-  font: inherit;
-  font-size: 0.72rem;
-  font-weight: 600;
-  line-height: 1;
-  color: var(--ion-color-primary, #0091ce);
-  background: var(--ion-card-background, var(--ion-background-color, #fff));
-  border: 1px solid var(--ion-border-color, #e6e3db);
-  border-radius: 12px;
-  cursor: pointer;
 }
 .pos-speak__icon {
   width: 1.25rem;
@@ -131,12 +131,12 @@ onBeforeUnmount(() => {
   font-size: 1.25rem;
 }
 .pos-speak__key--on {
-  color: var(--ion-color-danger-contrast, #fff);
-  background: var(--ion-color-danger, #c5000f);
-  border-color: var(--ion-color-danger, #c5000f);
+  --color: var(--ion-color-danger-contrast);
+  --background: var(--ion-color-danger);
+  --border-color: var(--ion-color-danger);
 }
 .pos-speak__key[aria-disabled='true'] {
-  color: var(--ion-color-medium, #8b897f);
+  --color: var(--ion-color-medium);
   cursor: not-allowed;
   opacity: 0.6;
 }

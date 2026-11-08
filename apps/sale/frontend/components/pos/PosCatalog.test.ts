@@ -459,7 +459,7 @@ describe('PosCatalog: the menus of Menus (SALE-F12)', () => {
     const s = await setup({ showCombos: true });
     await s.result(MENUS, page([MENU]));
     await s.result(PRODUCTS, page([product()]), GRID);
-    const tiles = s.wrapper.findAll('.pos-grid > button').map((tile) => tile.attributes('data-testid'));
+    const tiles = s.wrapper.findAll('.pos-grid > ion-button').map((tile) => tile.attributes('data-testid'));
     expect(tiles.slice(0, 2)).toEqual(['pos-menu-m1', 'pos-product-p1']);
   });
 

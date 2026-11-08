@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { h, ref } from 'vue';
 
 import { SHELL_BACK_EVENT } from '../../../../../base/frontend/lib/system-back';
-import { click, mountSale, settle } from '../../__tests__/mount-sale';
+import { click, ionValue, mountSale, settle } from '../../__tests__/mount-sale';
 import { line, order, settings } from './__tests__/fixtures';
 import CartFooter from './CartFooter.vue';
 import CartHeading from './CartHeading.vue';
@@ -181,7 +181,7 @@ describe('PosCart: «Check» and «Current order» with Kitchen (SALE-F20)', () 
 
   it('«Current order» shows only what is pending, with the send bar; a send goes up with its rush', async () => {
     const m = await setup({ kitchen: true, order: WITH_ROUND }, 'es');
-    await click(m.find('pos-cart-tab-round').element);
+    await ionValue(m.find('pos-cart-tabs').element, 'round');
     expect(m.find('pos-cart-tab-round').attributes('aria-selected')).toBe('true');
     expect(m.wrapper.findComponent(CartLines).props('lines').map((l: { id: string }) => l.id)).toEqual(['l1', 'l2']);
     expect(m.find('pos-cart-round-hint').text()).toContain('Revisa cantidades');
@@ -231,7 +231,7 @@ describe('PosCart: «Check» and «Current order» with Kitchen (SALE-F20)', () 
       { setup: () => () => h(PosCart, props({ kitchen: true, order: shown.value })) },
       { locale: 'en' },
     );
-    await click(m.find('pos-cart-tab-round').element);
+    await ionValue(m.find('pos-cart-tabs').element, 'round');
     shown.value = order({ id: 'o9', lines: [line({ id: 'l1' })] });
     await settle();
     expect(m.find('pos-cart-tab-round').attributes('aria-selected')).toBe('true');
@@ -252,7 +252,7 @@ describe('PosCart: «Check» and «Current order» with Kitchen (SALE-F20)', () 
     // …the bar and the foot (with «Charge») never do.
     expect(scroll.findComponent(CartToolbar).exists()).toBe(false);
     expect(scroll.findComponent(CartFooter).exists()).toBe(false);
-    await click(m.find('pos-cart-tab-round').element);
+    await ionValue(m.find('pos-cart-tabs').element, 'round');
     // «Send order» rides with them: outside, on a low phone it ate all of what scrolls, tabs and lines (hub#787).
     expect(scroll.find('[data-testid="pos-kitchen-send"]').exists()).toBe(true);
     // The phone's drawer scrolls the whole middle; the side column keeps its heading and scrolls the lines.
@@ -264,7 +264,7 @@ describe('PosCart: «Check» and «Current order» with Kitchen (SALE-F20)', () 
   it('with everything sent «Current order» says so and offers no send', async () => {
     const m = await setup({ kitchen: true, order: order({ lines: [SENT] }) }, 'es');
     expect(m.find('pos-cart-tab-round').attributes('aria-label')).toBe('Comanda actual');
-    await click(m.find('pos-cart-tab-round').element);
+    await ionValue(m.find('pos-cart-tabs').element, 'round');
     expect(m.find('pos-cart-round-empty').text()).toContain('Todo está enviado');
     expect(m.find('pos-kitchen-send').exists()).toBe(false);
   });

@@ -2,16 +2,15 @@
 // The services the till's search finds (SALE-F38): Services' offered services whose name holds what is
 // typed (`service.service.list_for_sale`, live, 20 at a time), under «Services», after the products. A
 // row shows the name, the duration (or why it cannot be sold) and the price; a tap hands the service
-// up, where the same rules as a tile apply. Mounted only when the till sells services. As in the product
-// search, a row's tap and its aria-disabled live on a native button inside the ion-item (an ion-item rewrites
-// its own aria-disabled).
+// up, where the same rules as a tile apply. Mounted only when the till sells services.
 import { useLive } from '@erplora/ui/sdk';
-import { IonItem, IonList, IonListHeader } from '@ionic/vue';
-import { computed } from 'vue';
+import { IonButton, IonItem, IonList, IonListHeader } from '@ionic/vue';
+import { computed, onMounted, onUpdated, useTemplateRef } from 'vue';
 
 import type { ServiceSaleOut } from '../../../../service/frontend/operations';
 import { useTaxName } from '../../../../tax/frontend/composables/useTaxName';
 import { useLocale } from '../../composables/useT';
+import { syncAriaDisabled } from '../../lib/ariaDisabled';
 import { formatMoney, useBusinessMoney } from '../../lib/format';
 
 const props = defineProps<{ term: string }>();
@@ -22,11 +21,16 @@ const business = useBusinessMoney();
 const taxName = useTaxName();
 const { data } = useLive('service.service.list_for_sale', () => ({ search: props.term, limit: 20, offset: 0 }));
 const rows = computed(() => data.value?.rows ?? []);
+const list = useTemplateRef<{ $el: HTMLElement }>('list');
+const syncDisabled = () => syncAriaDisabled(list.value?.$el);
+onMounted(syncDisabled);
+onUpdated(syncDisabled);
 </script>
 
 <template>
   <ion-list
     v-if="rows.length"
+    ref="list"
     class="pos-search__list"
   >
     <ion-list-header data-testid="pos-search-services-title">
@@ -36,11 +40,12 @@ const rows = computed(() => data.value?.rows ?? []);
       v-for="item in rows"
       :key="item.id"
     >
-      <button
-        type="button"
+      <ion-button
+        fill="clear"
         class="pos-search__row"
         :data-testid="`pos-search-service-${item.id}`"
         :aria-disabled="item.needs_tax_setup ? 'true' : undefined"
+        :data-aria-disabled="String(item.needs_tax_setup)"
         @click="emit('pick', item)"
       >
         <span class="pos-search__text">
@@ -51,7 +56,7 @@ const rows = computed(() => data.value?.rows ?? []);
           >{{ item.needs_tax_setup ? $t('sale.pos.notSellableNoTaxCategory', { tax: taxName }) : $t('sale.pos.serviceMinutes', { minutes: item.duration_minutes }) }}</span>
         </span>
         <span class="pos-search__price">{{ formatMoney(item.price, locale, business) }}</span>
-      </button>
+      </ion-button>
     </ion-item>
   </ion-list>
 </template>
@@ -74,25 +79,30 @@ const rows = computed(() => data.value?.rows ?? []);
   border-radius: 10px;
 }
 .pos-search__row {
+  width: 100%;
+  min-height: 2.75rem;
+  margin: 0;
+  font: inherit;
+  text-align: left;
+  text-transform: none;
+  --color: var(--ion-text-color);
+  --background: transparent;
+  --border-radius: 10px;
+  --padding-start: 1rem;
+  --padding-end: 1rem;
+}
+.pos-search__row::part(native) {
   display: flex;
   align-items: center;
   gap: 0.75rem;
   width: 100%;
-  min-height: 2.75rem;
-  margin: 0;
   padding: 0.625rem 1rem;
-  font: inherit;
   text-align: left;
-  color: inherit;
-  background: none;
-  border: 0;
-  border-radius: 10px;
-  cursor: pointer;
 }
 .pos-search__row:active {
-  background: var(--ion-color-step-100, rgba(0, 0, 0, 0.06));
+  --background: var(--ion-color-step-100);
 }
-.pos-search__row[aria-disabled='true'] {
+.pos-search__row[data-aria-disabled='true'] {
   opacity: 0.8;
   cursor: not-allowed;
 }
