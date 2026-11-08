@@ -230,3 +230,28 @@ describe('TaskSheet', () => {
     expect(s.wrapper.findAllComponents(StatusPill)[0].props('label')).toBe('En curso');
   });
 });
+
+
+describe('TaskSheet: Android Back with unsaved changes (hub#1046, BASE-F05)', () => {
+  it('as opened closes; a change asks; restored as opened closes again', async () => {
+    const s = await setup();
+    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormOnAndroidBack({
+      overlay: () => s.inDoc('task-sheet'),
+      change: () => ionValue(s.el('task-sheet-new-comment'), 'Half done', 'ionInput'),
+      restore: () => ionValue(s.el('task-sheet-new-comment'), '', 'ionInput'),
+    });
+  });
+
+  it('closing after discarding clears the half-written comment and subtask', async () => {
+    const s = await setup();
+    await ionValue(s.el('task-sheet-new-comment'), 'Half done', 'ionInput');
+    await ionValue(s.el('task-sheet-new-subtask'), 'Buy bleach', 'ionInput');
+    await s.wrapper.setProps({ open: false });
+    await settle();
+    await s.wrapper.setProps({ open: true });
+    await settle();
+    expect(s.el('task-sheet-new-comment').value).toBe('');
+    expect(s.el('task-sheet-new-subtask').value).toBe('');
+  });
+});
