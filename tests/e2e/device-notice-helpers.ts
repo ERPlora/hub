@@ -2,11 +2,16 @@
 // run in Playwright: only this edge is simulated; the Hub, SaaS, live stream and database stay real.
 import { expect, type Page } from '@playwright/test';
 
-/** Every native command is recorded; the notification tap listener and the device's memory are kept. */
+/**
+ * Every native command is recorded; the notification tap listener, the app's «a tap waits» listeners, the tap the
+ * app keeps for the page and the device's memory are kept.
+ */
 export function nativeApp(): void {
   const win = window as unknown as Record<string, unknown>;
   win.__asked = [];
   win.__told = 0;
+  win.__kept = null;
+  win.__waits = [];
   const setItem = Storage.prototype.setItem;
   Storage.prototype.setItem = function (key: string, value: string) {
     if (key === 'erplora.notices.told') win.__told = (win.__told as number) + 1;
@@ -16,12 +21,23 @@ export function nativeApp(): void {
     core: {
       invoke: async (command: string, args?: unknown) => {
         (win.__asked as unknown[]).push([command, args ?? null]);
-        return null;
+        if (command !== 'erplora_take_notice_tap') return null;
+        // The kept tap is handed over once, like the app's `take_notice_tap`.
+        const kept = win.__kept;
+        win.__kept = null;
+        return kept;
       },
-      // The notice's tap is the `notification` plugin's; the shell also holds the `app` plugin's Back button (BASE-F05).
+      // The `notification` plugin's report of a tap; the shell also holds the `app` plugin's Back button (BASE-F05).
       addPluginListener: async (plugin: string, _event: string, cb: (payload: unknown) => void) => {
         if (plugin === 'notification') win.__tap = cb;
         return { unregister: async () => {} };
+      },
+    },
+    event: {
+      // The app's event that a tap waits to be claimed (`erplora://notice-tapped`).
+      listen: async (event: string, cb: () => void) => {
+        if (event === 'erplora://notice-tapped') (win.__waits as (() => void)[]).push(cb);
+        return () => {};
       },
     },
   };
@@ -59,11 +75,25 @@ export async function expectNoRepeatOnReload(page: Page): Promise<void> {
   expect(await notified(page)).toEqual([]);
 }
 
-/** The native plugin's tap, as Android delivers it. */
+/**
+ * A tap on notice `id`, as the Android app delivers it (hub#1039): the `notification` plugin's own report says
+ * neither the number nor the screen (it never stores the notice on the tap), so the app keeps the tap with the
+ * screen it wrote down when the notice went out and tells the page one waits; the page claims it.
+ */
 export async function tapNotification(page: Page, id: number): Promise<void> {
-  await page.evaluate(
-    (notificationId) =>
-      (window as unknown as { __tap: (payload: unknown) => void }).__tap({ notification: { id: notificationId } }),
-    id,
-  );
+  await page.evaluate((notificationId) => {
+    const win = window as unknown as {
+      __tap?: (payload: unknown) => void;
+      __asked: [string, unknown][];
+      __kept: unknown;
+      __waits: (() => void)[];
+    };
+    win.__tap?.({ actionId: 'tap' });
+    const sent = win.__asked.find(
+      ([command, args]) => command === 'erplora_notify' && (args as { id?: unknown }).id === notificationId,
+    );
+    const path = (sent?.[1] as { path?: string | null } | undefined)?.path ?? null;
+    win.__kept = { notification: { id: notificationId, extra: { path } } };
+    win.__waits.forEach((wait) => wait());
+  }, id);
 }
