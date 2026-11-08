@@ -8,7 +8,7 @@ import pytest
 from django.apps import apps
 from django.utils import translation
 
-from apps.website import queries, schemas, services
+from apps.website import choices, queries, schemas, services
 from apps.website.models import Image, Site
 from base.catalog import build_registry
 from base.tests.po import (
@@ -31,6 +31,17 @@ def visible_texts() -> set[str]:
     config = apps.get_app_config("website")
     lazies = [*config_texts(config)]
     lazies += model_texts((Site, Image))
+    lazies += list(choices.SECTION_LABELS.values())
+    lazies += [
+        services.SUMMARY,
+        services.DESIGN_CHANGED,
+        services.THEME_CHANGED,
+        services.CUSTOM_COLOURS,
+        services.CONTENT_CHANGED,
+        services.SECTION_HIDDEN,
+        services.SECTION_SHOWN,
+        services.NO_CHANGES,
+    ]
     lazies += list(Site.Template.labels)
     lazies += [
         queries.NOT_PUBLISHED,

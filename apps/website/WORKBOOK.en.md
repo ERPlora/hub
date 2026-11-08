@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:b279f1b1cf33ad563c5948f38d9ef7e8e4d341e71de853ca57130e96b11ff16a -->
+<!-- generated from WORKBOOK.md sha256:0e5ce66f509bff1bc5fc09be66420e74920e8b31a1578fd3949e33119665f78b -->
 
 ## What it is for and who it is for
 
@@ -431,13 +431,11 @@ file in base64 up to 5 MB) and the QR (`website.qr.get`, an image in base64), wh
 visitors' three public reads (`website.public.*`), nor the two with which its card names an image or a category
 (`website.image.get` and `website.category.get`).
 
-Before saving, the assistant asks for confirmation with its card (BASE-F97), which names each thing as the editor
-names it, never by its id or its code: each image (the logo, the cover, the photo of About us and those of the
-gallery) by the name of the file it was uploaded with («logo-pepe.png»; one uploaded before that name was kept, by its
-format and size, «PNG 1200 × 800»), each category of the catalog by its name («Hairdressing»), the palette («Ocean»),
-the page background («Light», «Dark», «Auto»), what the catalog shows («Products», «Services») and the days of the
-opening hours («Monday»). What the person asking cannot see is left out: an image of another business, a category that
-is no longer there or of an app that is off.
+Before saving, the assistant asks for confirmation with its card (BASE-F97), which sums up what changes in the
+editor's words, never dumping the whole website or its codes: the design («Modern»), the theme (the «Forest» palette,
+custom colours if any and the «Dark» background), each section hidden or shown again («Gallery: hidden») and, by their
+names, the other sections whose content changes («Content: Header, Contact»). If the draft does not change, it says
+«No changes».
 
 ### What it announces
 

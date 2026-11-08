@@ -3,7 +3,8 @@ it keeps — the logo, the cover, the photo of «About us», each photo of the g
 uploaded, and each category of the catalog by its name, read as whoever asks, never by its id; one this person may not
 read or that is not there is left out. Each value of a closed list of the theme or the content (the palette, the page's
 background, what the catalog shows, the days of the opening hours) is said by the word the editor shows
-(``test_choices``), never by its code.
+(``test_choices``), never by its code. The detailed fields keep that contract underneath hub#693's visible summary of
+what changed (design, theme, sections and content), tested here in both languages.
 """
 
 import gettext
@@ -21,7 +22,7 @@ from apps.website.schemas import PALETTE_IDS
 from apps.website.tests.conftest import B, ctx_for, full_content
 from apps.website.tests.test_choices import editor_words
 from apps.website.tests.test_queries import products_catalog, services_catalog, source_off  # noqa: F401 (fixtures)
-from apps.website.tests.test_services import png_bytes, upload
+from apps.website.tests.test_services import png_bytes, save as save_draft, upload
 from base import assistant
 from base.tests.test_assistant import technical_names
 from base.tests.test_assistant_card_values import AN_ID
@@ -43,7 +44,12 @@ def a_save(content: dict | None = None, palette: str = "ocean", mode: str = "aut
 
 def said(arguments: dict, language: str = "en", ctx=None) -> dict:
     """Each datum of the card of the save, in words."""
-    card = assistant.card(get(SAVE), arguments, language, ctx or ctx_for())
+    card = assistant._card_details(get(SAVE), arguments, language, ctx or ctx_for())
+    return {field["name"]: field["value"] for field in card["fields"]}
+
+
+def summary(arguments: dict, language: str = "en") -> dict:
+    card = assistant.card(get(SAVE), arguments, language, ctx_for())
     return {field["name"]: field["value"] for field in card["fields"]}
 
 
@@ -174,7 +180,7 @@ def test_no_datum_of_a_write_of_the_website_reaches_a_spanish_card_by_its_techni
     and unpublish send none."""
     assert [op.name for op in website_writes()] == [SAVE, "website.site.publish", "website.site.unpublish"]
     assert technical_names(website_writes()) == {}
-    card = assistant.card(get(SAVE), a_save(), "es", ctx_for())
+    card = assistant._card_details(get(SAVE), a_save(), "es", ctx_for())
     assert [field["label"] for field in card["fields"]] == ["Plantilla", "Tema", "Contenido"]
 
 
@@ -182,9 +188,55 @@ def test_each_datum_of_the_save_is_titled_by_the_website_s_own_catalog_not_anoth
     """The predicate ``technical_names()`` cannot see (hub#927's review): «template» is translated by base and the
     WhatsApp inbox too, so a title the website forgot would still reach a Spanish card. Each one is in its own."""
     own = gettext.translation("django", localedir=Path(settings.BASE_DIR) / "apps/website/locale", languages=["es"])
-    card = assistant.card(get(SAVE), a_save(), "es", ctx_for())
+    card = assistant._card_details(get(SAVE), a_save(), "es", ctx_for())
     for field in card["fields"]:
         with translation.override("en"):
             msgid = str(Site._meta.get_field(field["name"]).verbose_name)
         assert own.gettext(msgid) != msgid, field["name"]
         assert field["label"] == capfirst(own.gettext(msgid)), field["name"]
+
+
+# ── The whole draft, said as the changes the person can judge (hub#693) ─────────────────────────────────────────────
+
+
+@pytest.mark.parametrize(
+    ("language", "expected"),
+    [
+        ("en", "Design: Modern · Theme: Forest · Custom colours · Dark · Gallery: hidden"),
+        ("es", "Diseño: Moderna · Tema: Bosque · Colores propios · Oscuro · Galería: se oculta"),
+    ],
+)
+def test_the_save_card_names_the_design_theme_and_section_it_hides(language, expected):
+    save_draft()
+    arguments = a_save(full_content(gallery={"hidden": True}), palette="forest", mode="dark")
+    arguments["template"] = "modern"
+    arguments["theme"]["custom"] = {"primary": "#112233", "accent": "#445566"}
+
+    assert summary(arguments, language) == {"summary": expected}
+
+
+@pytest.mark.parametrize(("language", "expected"), [("en", "Gallery: shown"), ("es", "Galería: se muestra")])
+def test_the_save_card_names_the_section_it_shows_again(language, expected):
+    save_draft(full_content(gallery={"hidden": True}))
+
+    assert summary(a_save(), language) == {"summary": expected}
+
+
+@pytest.mark.parametrize(
+    ("language", "expected"), [("en", "Content: Header, Contact"), ("es", "Contenido: Cabecera, Contacto")]
+)
+def test_the_save_card_names_changed_sections_without_dumping_their_values(language, expected):
+    save_draft()
+    content = full_content(
+        hero={"title": "A new title"},
+        contact={"phone": "+34 911 111 111"},
+    )
+
+    assert summary(a_save(content), language) == {"summary": expected}
+
+
+@pytest.mark.parametrize(("language", "expected"), [("en", "No changes"), ("es", "Sin cambios")])
+def test_the_save_card_says_when_the_draft_did_not_change(language, expected):
+    save_draft()
+
+    assert summary(a_save(), language) == {"summary": expected}

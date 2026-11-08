@@ -12,7 +12,7 @@ from django.apps import apps
 from django.conf import settings
 from django.utils import translation
 
-from apps.website.choices import CHOICES, DAY_LABELS
+from apps.website.choices import CHOICES, DAY_LABELS, SECTION_LABELS
 from apps.website.schemas import CATALOG_SOURCES, DAYS, MODES, PALETTE_IDS
 
 #: The editor's own words, by language.
@@ -54,6 +54,13 @@ def test_each_value_is_said_with_the_word_the_editor_shows(language):
     with translation.override(language):
         said = {name: {value: str(label) for value, label in labels} for name, labels in CHOICES.items()}
     assert said == editor_words(language)
+
+
+@pytest.mark.parametrize("language", ["en", "es"])
+def test_each_section_is_said_with_the_word_the_editor_shows(language):
+    with translation.override(language):
+        said = {name: str(label) for name, label in SECTION_LABELS.items()}
+    assert said == {name: EDITOR[language]["sections"][name] for name in SECTION_LABELS}
 
 
 def test_the_public_page_says_the_days_with_the_same_labels():

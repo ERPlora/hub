@@ -206,6 +206,66 @@ def test_a_normal_write_asks_a_click_and_shows_what_it_will_send():
     assert fields["note"]["kind"] == "empty"
 
 
+class SummaryIn(Schema):
+    name: str
+
+
+SUMMARY_OPERATION = Operation(
+    name="demo.item.summarize",
+    kind="command",
+    permission="demo.manage",
+    input=SummaryIn,
+    output=SummaryIn,
+    expose_api=False,
+    ai={"description": "A write whose app sums up its data."},
+    fn=lambda ctx, data: data,
+)
+
+
+def test_a_summary_is_not_called_without_a_person_and_the_card_keeps_its_details(monkeypatch):
+    def forbidden(ctx, arguments, fields):
+        raise AssertionError("a summary must not run without a person")
+
+    monkeypatch.setitem(SUMMARY_OPERATION.ai, "summary", forbidden)
+    fields = assistant.card(SUMMARY_OPERATION, {"name": "Mesa 4"}, "es")["fields"]
+    assert [(field["name"], field["label"], field["value"]) for field in fields] == [("name", "Nombre", "Mesa 4")]
+
+
+def test_a_summary_replaces_the_details_with_exactly_what_it_returns_as_the_person(monkeypatch):
+    seen = {}
+    expected = [{"name": "summary", "label": "Resumen", "kind": "text", "value": "Solo esto"}]
+
+    def summarize(context, arguments, fields):
+        seen.update(context=context, arguments=arguments, fields=fields)
+        return expected
+
+    monkeypatch.setitem(SUMMARY_OPERATION.ai, "summary", summarize)
+    arguments = {"name": "Mesa 4"}
+    person = ctx(language="es")
+    card = assistant.card(SUMMARY_OPERATION, arguments, "es", person)
+    assert seen["context"] is person
+    assert seen["arguments"] is arguments
+    assert [(field["name"], field["label"], field["value"]) for field in seen["fields"]] == [("name", "Nombre", "Mesa 4")]
+    assert card["fields"] == expected
+
+
+def test_a_summary_that_is_not_callable_is_ignored(monkeypatch):
+    monkeypatch.setitem(SUMMARY_OPERATION.ai, "summary", "not callable")
+    fields = assistant.card(SUMMARY_OPERATION, {"name": "Mesa 4"}, "es", ctx(language="es"))["fields"]
+    assert [(field["name"], field["label"], field["value"]) for field in fields] == [("name", "Nombre", "Mesa 4")]
+
+
+def test_a_summary_runs_in_the_requested_language(monkeypatch):
+    def summarize(context, arguments, fields):
+        return [{"name": "summary", "label": "Resumen", "kind": "text", "value": translation.gettext("Name")}]
+
+    monkeypatch.setitem(SUMMARY_OPERATION.ai, "summary", summarize)
+    with translation.override("en"):
+        fields = assistant.card(SUMMARY_OPERATION, {"name": "Mesa 4"}, "es", ctx(language="en"))["fields"]
+        assert translation.gettext("Name") == "Name"
+    assert [field["value"] for field in fields] == ["Nombre"]
+
+
 def test_an_amount_in_cents_is_marked_as_money_for_the_card():
     card = assistant.card(get("service.service.create"), {"name": "Corte", "price": 1500}, "es")
     price = next(field for field in card["fields"] if field["name"] == "price")
