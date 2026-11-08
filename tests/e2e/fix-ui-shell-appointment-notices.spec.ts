@@ -7,8 +7,15 @@
 // app's bridge is simulated at the edge (`window.__TAURI__`, which records what it is asked); Hub, SaaS, live
 // stream and database are the real ones. In each of the three sizes, on a day of its own; what it creates is
 // «E2E Apn …», removed before and after.
-import { type BrowserContext, expect, type Page, test } from '@playwright/test';
+import { type BrowserContext, expect, test } from '@playwright/test';
 
+import {
+  expectNoRepeatOnReload,
+  nativeApp,
+  notified,
+  startDeviceNotices,
+  tapNotification,
+} from './device-notice-helpers';
 import { psql, shot, shown } from './helpers';
 import { FLOW_VIEWPORTS, ownerPage, post, settled } from './service-helpers';
 
@@ -47,51 +54,6 @@ function cleanUp(): void {
 
 test.beforeAll(cleanUp);
 test.afterAll(cleanUp);
-
-/**
- * The installed app's bridge, at the edge: every command it is asked is kept in `window.__asked`, the plugin's tap
- * listener in `window.__tap`, and each write of the device's memory of notices counts in `window.__told` (the door
- * writes it every time it reads a live result). Any other command answers nothing, as on a computer.
- */
-function nativeApp(): void {
-  const win = window as unknown as Record<string, unknown>;
-  win.__asked = [];
-  win.__told = 0;
-  const setItem = Storage.prototype.setItem;
-  Storage.prototype.setItem = function (key: string, value: string) {
-    if (key === 'erplora.notices.told') win.__told = (win.__told as number) + 1;
-    return setItem.call(this, key, value);
-  };
-  win.__TAURI__ = {
-    core: {
-      invoke: async (command: string, args?: unknown) => {
-        (win.__asked as unknown[]).push([command, args ?? null]);
-        return null;
-      },
-      // The notice's tap is the `notification` plugin's; the shell also holds the `app` plugin's Back button (BASE-F05).
-      addPluginListener: async (plugin: string, _event: string, cb: (payload: unknown) => void) => {
-        if (plugin === 'notification') win.__tap = cb;
-        return { unregister: async () => {} };
-      },
-    },
-  };
-}
-
-interface Notified {
-  title: string;
-  body: string;
-  id: number;
-  path: string | null;
-}
-
-const notified = (page: Page): Promise<Notified[]> =>
-  page.evaluate(() =>
-    ((window as unknown as { __asked: [string, unknown][] }).__asked ?? [])
-      .filter(([command]) => command === 'erplora_notify')
-      .map(([, args]) => args as Notified),
-  );
-
-const toldWrites = (page: Page): Promise<number> => page.evaluate(() => (window as unknown as { __told: number }).__told);
 
 interface Cast {
   customer: { id: string; name: string };
@@ -143,12 +105,8 @@ FLOW_VIEWPORTS.forEach(({ label, width, height }, index) => {
     const { context, page } = await ownerPage(browser, '/appointment/agenda', { width, height });
     try {
       const who = await cast(context, label, day);
-      // The installed app from now on; its first day only learns what is already there.
       await context.addInitScript(nativeApp);
-      await page.reload();
-      await expect(page.locator('[data-testid=device-notices]')).toBeAttached();
-      await expect.poll(() => toldWrites(page)).toBeGreaterThan(0);
-      expect(await notified(page)).toEqual([]);
+      await startDeviceNotices(page);
 
       // The front desk's booking: nobody is told (who booked it knows). Then the customer's own, by WhatsApp.
       await book(context, who, `${day}T09:00`, 'counter');
@@ -165,16 +123,13 @@ FLOW_VIEWPORTS.forEach(({ label, width, height }, index) => {
       expect(psql(`select source from appointment_appointment where id = '${theirs.id}'`)).toBe('whatsapp');
 
       // A tap on it opens the agenda on that day, where the booking is.
-      await page.evaluate((id) => (window as unknown as { __tap: (payload: unknown) => void }).__tap({ notification: { id } }), notice.id);
+      await tapNotification(page, notice.id);
       await expect(page).toHaveURL(new RegExp(`/appointment/agenda\\?date=${day}$`));
       await expect(shown(page).locator(`[data-testid=appointment-list-row][data-id="${theirs.id}"]`).first()).toBeVisible();
       await settled(page);
       await page.screenshot({ path: shot(`FIX-UI-SHELL-BELL-APPOINTMENT-NOTICES-${label}`), fullPage: false });
 
-      // A reload brings the last 24 hours back: told already on this device, so nothing rings again.
-      await page.reload();
-      await expect.poll(() => toldWrites(page)).toBeGreaterThan(0);
-      expect(await notified(page)).toEqual([]);
+      await expectNoRepeatOnReload(page);
     } finally {
       await context.close();
     }

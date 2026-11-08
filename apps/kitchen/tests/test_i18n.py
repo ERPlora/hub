@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 from django.apps import apps
 from django.utils import translation
+from django.utils.functional import Promise
 
 from apps.kitchen import queries, schemas, services
 from apps.kitchen.models import (
@@ -66,6 +67,12 @@ def visible_texts() -> set[str]:
     config = apps.get_app_config("kitchen")
     lazies = [
         *config_texts(config),
+        *(
+            text
+            for notice in config.notices
+            for text in (*notice.title, *notice.body)
+            if isinstance(text, Promise)
+        ),
     ]
     lazies += module_texts(queries, services, schemas)
     lazies += model_texts(MODELS)

@@ -93,6 +93,26 @@ def test_navigation_is_the_four_sections_of_the_old_module_with_registered_icons
     ]
 
 
+def test_every_new_ticket_has_a_device_notice_that_opens_the_kitchen_display():
+    from live.meta import DeviceNotice
+
+    [notice] = kitchen().notices
+    assert isinstance(notice, DeviceNotice)
+    assert (notice.key, notice.operation) == ("received", "kitchen.ticket.notices")
+    assert [str(text) for text in notice.title] == [
+        "New kitchen ticket · {label}",
+        "New kitchen ticket · {number}",
+    ]
+    assert [str(text) for text in notice.body] == ["{dish_names}", "Waiter: {waiter}"]
+    assert notice.route == "/kitchen/display"
+    assert notice.permission == "kitchen.view_ticket"
+    assert notice.refresh_on == [
+        "kitchen.ticket.received",
+        "kitchen.ticket.created",
+        "sale.order.fired",
+    ]
+
+
 #: The reads that are no assistant tool: what names a station and a dish on the assistant's card (hub#671); the
 #: model reads the stations from their list and the dishes with their ticket.
 INTERNAL_READS = {"kitchen.station.get", "kitchen.item.get"}
@@ -104,7 +124,7 @@ def test_every_operation_is_a_tool_of_the_assistant():
     from live.operations import INTERNAL, registry
 
     operations = [op for name, op in registry.items() if name.startswith("kitchen.")]
-    assert len(operations) == 31
+    assert len(operations) == 32
     assert {op.name for op in operations if op.ai is INTERNAL} == INTERNAL_READS
     for op in operations:
         if op.name in INTERNAL_READS:
