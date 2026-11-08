@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:32dd5ba3ef9a08030a50bbf298f53633d6b008346929b49cca937d2e6cb14082 -->
+<!-- generated from WORKBOOK.md sha256:4d4b9902abc2724c247372bef8584f91d8ceeb1f8a5868dae69c3b7f0928e3c4 -->
 
 ## What it is for and who it is for
 
@@ -527,7 +527,7 @@ any button), in a fresh load of the page, which already brings the new version; 
 the server does not answer (offline or on a flaky network), the person stays where they were and a notice says
 "Could not open <app>. Check the connection and try again." ("that page" when the screen is not an app's), with
 "Retry", which tries again and opens it as soon as the server answers.
-Involved: INVENTORY-F01, INVENTORY-F02, SALE-F35, TABLE-F01, KITCHEN-F01, CUSTOMER-F01, RESERVATION-F06, APPOINTMENT-F01, STAFF-F01, SERVICE-F01, INVOICE-F03, PRINTING-F03, SCHEDULE-F02, TASK-F01, TAX-F02, WHATSAPP_INBOX-F29, BASE-F86
+Involved: INVENTORY-F01, INVENTORY-F02, SALE-F35, TABLE-F01, KITCHEN-F01, CUSTOMER-F01, RESERVATION-F06, APPOINTMENT-F01, STAFF-F01, SERVICE-F01, INVOICE-F03, PRINTING-F03, SCHEDULE-F04, TASK-F01, TAX-F02, WHATSAPP_INBOX-F29, BASE-F86
 
 ### BASE-F06 See the apps' panels on the Home
 Status: done

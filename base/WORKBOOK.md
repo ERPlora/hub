@@ -541,7 +541,7 @@ trae la versión nueva; nunca se queda el toque sin hacer nada. Si el servidor n
 inestable), la persona se queda donde estaba y un aviso dice «No se ha podido abrir <app>. Comprueba la conexión e
 inténtalo de nuevo.» («esa página» si la pantalla no es de una app), con «Reintentar», que vuelve a probar y la abre
 en cuanto el servidor responde.
-Implicados: INVENTORY-F01, INVENTORY-F02, SALE-F35, TABLE-F01, KITCHEN-F01, CUSTOMER-F01, RESERVATION-F06, APPOINTMENT-F01, STAFF-F01, SERVICE-F01, INVOICE-F03, PRINTING-F03, SCHEDULE-F02, TASK-F01, TAX-F02, WHATSAPP_INBOX-F29, BASE-F86
+Implicados: INVENTORY-F01, INVENTORY-F02, SALE-F35, TABLE-F01, KITCHEN-F01, CUSTOMER-F01, RESERVATION-F06, APPOINTMENT-F01, STAFF-F01, SERVICE-F01, INVOICE-F03, PRINTING-F03, SCHEDULE-F04, TASK-F01, TAX-F02, WHATSAPP_INBOX-F29, BASE-F86
 
 ### BASE-F06 Ver los paneles de las apps en Inicio
 <!-- origen: old-hub:HUB_SHELL-F33 -->

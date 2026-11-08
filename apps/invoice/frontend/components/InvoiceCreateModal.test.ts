@@ -371,7 +371,7 @@ describe('InvoiceCreateModal: a business whose money cannot be read (hub#938)', 
 });
 
 describe('InvoiceCreateModal: Android Back with unsaved changes (hub#1020, BASE-F05)', () => {
-  it('as opened closes, also once the default rate arrives; a change asks; restored as opened closes again', async () => {
+  it('as opened closes, also once the default rate arrives; notes or a line written ask; restored as opened closes again', async () => {
     const s = await setup();
     await s.territory('vat', '21.00');
     const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
@@ -379,6 +379,11 @@ describe('InvoiceCreateModal: Android Back with unsaved changes (hub#1020, BASE-
       overlay: () => s.inDoc('invoice-create'),
       change: () => ionValue(s.inDoc('invoice-create-notes'), 'Paid by transfer', 'ionInput'),
       restore: () => ionValue(s.inDoc('invoice-create-notes'), '', 'ionInput'),
+    });
+    await expectUnsavedFormOnAndroidBack({
+      overlay: () => s.inDoc('invoice-create'),
+      change: () => s.line('Course', '100', '1', '21'),
+      restore: () => s.line('', '', '1', '21'),
     });
   });
 
@@ -390,17 +395,6 @@ describe('InvoiceCreateModal: Android Back with unsaved changes (hub#1020, BASE-
       overlay: () => s.inDoc('invoice-create'),
       change: () => s.choose('TICKET', 'F2'),
       restore: () => s.choose('FACT', 'F1'),
-    });
-  });
-
-  it('a line written asks', async () => {
-    const s = await setup();
-    await s.territory('vat', '21.00');
-    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
-    await expectUnsavedFormOnAndroidBack({
-      overlay: () => s.inDoc('invoice-create'),
-      change: () => s.line('Course', '100', '1', '21'),
-      restore: () => s.line('', '', '1', '21'),
     });
   });
 });
