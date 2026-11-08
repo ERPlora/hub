@@ -245,3 +245,15 @@ describe('TemplateSendModal: a header with a file (WHATSAPP_INBOX-F33)', () => {
   });
 });
 
+
+describe('TemplateSendModal: Android Back with unsaved changes (hub#1020, BASE-F05)', () => {
+  it('as opened closes; a chosen template asks; none chosen again closes', async () => {
+    const s = await setup();
+    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormOnAndroidBack({
+      overlay: () => s.inDoc('whatsapp-inbox-template-form'),
+      change: () => s.pick('t1'),
+      restore: () => s.pick(''),
+    });
+  });
+});

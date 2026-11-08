@@ -141,6 +141,13 @@ pero no cambiarlo.»). Es la pantalla de TAX-F11.
 | App inactiva (`app_inactive`) | «Esta app no está activa en este negocio». |
 | Sin permiso | No aparece lo que no puede hacer; si llega por otra puerta, «No tienes permiso». |
 
+## Cambios sin guardar en Android
+
+En «Nueva categoría fiscal», «Nuevo alias de categoría», «Nueva regla fiscal» y «Fecha de fin de la regla», el
+botón atrás del móvil pregunta «¿Descartar los cambios?» cuando hay algo escrito o elegido sin guardar: «Seguir
+editando» conserva lo tecleado y «Descartar cambios» cierra la ventana sin guardarlo. Con la ventana como se abrió,
+atrás la cierra sin preguntar (BASE-F05).
+
 ## Flujos
 
 | ID | Flujo | Estado |

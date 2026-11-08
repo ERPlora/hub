@@ -238,7 +238,7 @@ const columns = computed<DataTableColumn<ConversationOut>[]>(() => [
         tone="warning"
         data-testid="whatsapp-inbox-near-cap"
       >
-        {{ $t('whatsapp_inbox.inbox.nearCap', { left: left.left, limit: left.limit }) }}
+        {{ $t('whatsapp_inbox.inbox.nearCap', { left: left.left, limit: left.limit }, left.left) }}
         <template
           v-if="upgradeUrl"
           #actions

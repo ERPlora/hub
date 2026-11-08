@@ -25,6 +25,7 @@ import { IonButton, IonCheckbox, IonInput } from '@ionic/vue';
 import { computed, onBeforeUnmount, ref } from 'vue';
 
 import { useBaseI18n } from '../lib/i18n';
+import { useUnsavedFormOnOpen } from '../lib/unsaved-changes';
 import type { ApiKeyInput, ApiKeyMode, ApiKeyRow, ApiKind } from '../operations';
 
 const MODES: readonly ApiKeyMode[] = ['full', 'read', 'write', 'per_app'];
@@ -117,12 +118,19 @@ function tick(app: string, kind: ApiKind, on: boolean): void {
   form.value = { ...form.value, scopes: { ...form.value.scopes, [app]: KINDS.filter((each) => kinds.has(each)) } };
 }
 
+/** The apps with a box ticked: a box ticked and unticked again is no change. */
+const tickedScopes = () => Object.fromEntries(Object.entries(form.value.scopes).filter(([, kinds]) => kinds.length > 0));
+
+useUnsavedFormOnOpen(
+  'api-key-form',
+  () => ({ name: form.value.name, rate: rateText.value, mode: form.value.mode, scopes: tickedScopes() }),
+  creating,
+);
+
 async function submitCreate(): Promise<void> {
   if (!canCreate.value || create.pending.value) return;
   createError.value = null;
-  const scopes = form.value.mode === 'per_app'
-    ? Object.fromEntries(Object.entries(form.value.scopes).filter(([, kinds]) => kinds.length > 0))
-    : {};
+  const scopes = form.value.mode === 'per_app' ? tickedScopes() : {};
   try {
     const answer = await create.run({ ...form.value, name: form.value.name.trim(), rate_per_minute: Number(rateText.value), scopes });
     creating.value = false;
