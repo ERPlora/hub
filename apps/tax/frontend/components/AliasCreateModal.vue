@@ -8,6 +8,8 @@ import { useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 import { categoryCombo } from '../lib/pickers';
 import type { AliasSource } from '../operations';
 
@@ -54,6 +56,8 @@ async function save(): Promise<void> {
 function cancel(): void {
   reset();
 }
+
+useUnsavedFormOnOpen('tax-alias-form', form, open);
 </script>
 
 <template>

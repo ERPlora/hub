@@ -10,6 +10,8 @@ import { useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 import { useLocale } from '../composables/useT';
 import { countryOptions } from '../lib/countries';
 import { categoryCombo } from '../lib/pickers';
@@ -130,6 +132,8 @@ async function save(): Promise<void> {
 function cancel(): void {
   reset();
 }
+
+useUnsavedFormOnOpen('tax-rule-form', form, open);
 </script>
 
 <template>
