@@ -171,6 +171,16 @@ export async function dishForTheTill(browser: Browser, label: string, run: strin
   return dish;
 }
 
+/** For a spec that seats a table (SALE-F19, SALE-F20): the zone `zone` and its table `number`, for four, through Tables'
+ *  operations, in a context already signed in to hub `a`. Whoever calls it deletes them after the run. */
+export async function zoneWithTable(context: BrowserContext, zone: string, number: string): Promise<{ zoneId: string; tableId: string }> {
+  const created = await api<{ id: string }>(context, A, 'POST', '/table/zones', { name: zone });
+  expect(created.status, `zone ${JSON.stringify(created.data)}`).toBe(201);
+  const table = await api<{ id: string }>(context, A, 'POST', '/table/tables', { zone_id: created.data.id, number, capacity: 4 });
+  expect(table.status, `table ${JSON.stringify(table.data)}`).toBe(201);
+  return { zoneId: created.data.id, tableId: table.data.id };
+}
+
 /** The till on screen in `lang` (the Hub's language cookie, which the sign-in has just set from the account). */
 export async function tillIn(page: Page, context: BrowserContext, lang: string): Promise<void> {
   await login(page, A, '/sale/pos');

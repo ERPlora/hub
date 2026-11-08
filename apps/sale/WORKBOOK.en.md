@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:2b524cc151871470b214d6ecaac5ba5c8a84d714a2f012e513d9be82d2124bcb -->
+<!-- generated from WORKBOOK.md sha256:54fd029a53f3306949cec862e423454d8bcecf1b3702058ce3c794236fabf8d1 -->
 
 ## What it is for and who it is for
 
@@ -798,9 +798,12 @@ Screen: Sell, An approval is needed
 Steps:
 1. With Kitchen active, the check has two tabs: "Check", with all its lines, and "Current order", with
    what is still to be sent; the tab says how many items are waiting ("Current order, 2 items to send").
-   With nothing pending, "Everything is sent".
-2. In "Current order", review quantities and who serves and press "Send order (N)". For it to go out as
-   a rush, first arm the flame next to it: the button changes to "Send RUSH (N)". "Order N sent to the
+   With nothing pending, "Everything is sent". While something is waiting, both tabs carry "Send order (N)"
+   pinned above the total and "Charge": "Check" too, the tab a check opens on (on pressing "Charge" on a
+   table in Tables, on switching checks or on opening the app again), on its side and upright (hub#1017).
+2. Review quantities and who serves ("Current order" leaves only what is pending) and press "Send order
+   (N)" from either tab. For it to go out as a rush, first arm the flame next to it: the button changes to
+   "Send RUSH (N)". "Order N sent to the
    kitchen." shows at the top of the screen, so "Charge" (SALE-F01) can be pressed without waiting for it
    to go; the lines are marked with their round ("Order N") and the time sent, and the flame disarms. A
    double send never sends anything twice.
