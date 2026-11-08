@@ -5,11 +5,11 @@ runs what a transaction leaves for after its COMMIT right there, in that loop: a
 (a «Call another system» step, up to 30 s; «Ask the assistant», minutes) held every other delivery, of every hub,
 until it answered, and a call the tick sent again held the scheduled tasks. ``after_commit(fn, *args)`` is the one way
 an app makes such I/O: after the COMMIT of the running operation (never after a rollback), ``fn(*args)`` goes to a
-few threads of the process's own, in the database context of the operation that asked (its ``use_hub``, or phase 1's
-shared database), and the loop goes on at once. A job for another business than the operation's (``scope``: a row of
-another business in phase 1's shared tables, the inbox's «Retry») runs where that business's operations run, and
-never in another hub's database (``context.current_for``;
-FIX-HUB-BASE-OUTBOUND-JOB-OF-ANOTHER-BUSINESS-HUB-CONTEXT-MISMATCH).
+few threads of the process's own, in the database context of the operation that asked (its ``use_hub``, or
+``use_control``), and the loop goes on at once. A job said to be for another business than the operation's (``scope``)
+stays in that context too and never reaches another hub's database (``context.current_for``;
+FIX-HUB-BASE-OUTBOUND-JOB-OF-ANOTHER-BUSINESS-HUB-CONTEXT-MISMATCH): since S5 a hub's database holds its own rows only,
+so ``scope`` is left from the tables phase 1 shared (the inbox's «Retry»; hub#1053).
 
 - **Recovered by its app**: a job may be lost (its queue is full, the worker stops, the process dies), so ``fn`` is
   only work its app finds again by itself: a claim with a lease, and a sweep that sends again what nobody claimed or
@@ -172,9 +172,9 @@ def after_commit(fn: Callable[..., Any], *args: Hashable, scope: Scope | None = 
     """Run ``fn(*args)`` after the COMMIT of the running operation, in a thread of the pool and in this operation's
     database context; nothing after a rollback. ``args`` say which job it is (ids: hashable, logged on a failure).
 
-    ``scope``: the business the job works for, when it may not be this operation's (a row of another business in
-    phase 1's shared tables): the job runs where that business's operations run, never in another hub's database
-    (``base.tenancy.context.current_for``)."""
+    ``scope``: the business the job works for, when it may not be this operation's. Since S5 it changes nothing: the
+    job runs in this operation's context, where another hub's operation is refused, and never in another hub's database
+    (``base.tenancy.context.current_for``); it is left from the tables phase 1 shared (hub#1053)."""
     job = Job(fn, args, context.current() if scope is None else context.current_for(scope))
     hash(job.key)
     on_commit(partial(_submit, job), robust=True)

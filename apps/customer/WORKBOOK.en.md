@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:82e68b91b44926e794111e03d7d3d384839590d22e9dee3cceb57c366ad190ad -->
+<!-- generated from WORKBOOK.md sha256:48a974dd2b67f7f73ba25d9b783747c01afb0b1e716c2dbaadcdefe08d418afe -->
 
 ## What it is for and who it is for
 
@@ -67,10 +67,8 @@ ERPlora does not invent flows: it adopts the ones the market has already proven.
 5. Check at the till that the card shows in the search and that the sale is charged with it
    (CUSTOMER-F17).
 
-⚠️ The business is the first part of the address (`a.localhost:8000` is business `a`). While the
-businesses live in the shared database of the beginning, **they share the cards**; what is already kept
-apart is the live notice. Each business gets its own database, and with it its cards, as the platform
-gives it one.
+The business is the first part of the address (`a.localhost:8000` is business `a`), and each business
+has its own database: its cards are seen by that business alone.
 
 ## Screens
 

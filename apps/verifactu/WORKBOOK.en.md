@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:19e525498afa85556210316996c96274495b131dd041a1c81c6e5ad4ae6fae7f -->
+<!-- generated from WORKBOOK.md sha256:d75a6a75aa0a9741098afbd3d2f1b64a3a4af0e0c976015c9e71a80b4dba848d -->
 
 ## What it is for and who it is for
 
@@ -217,7 +217,7 @@ Screen notices: the result of each action in a strip on top (green if it went we
 
 | ID | Flow | Status |
 |---|---|---|
-| VERIFACTU-F01 | Activate VeriFactu | done — turning the app on in the Hub is activating it (activation per hub arrives with phase 2); outside Spain, Apps does not offer it and the hub refuses it (`can_enable`, hub#694), and one already on records and sends nothing (FIX-HUB-VERIFACTU-ON-FOR-A-BUSINESS-OUTSIDE-SPAIN) |
+| VERIFACTU-F01 | Activate VeriFactu | done — turning the app on in the Hub is activating it, in that business; outside Spain, Apps does not offer it and the hub refuses it (`can_enable`, hub#694), and one already on records and sends nothing (FIX-HUB-VERIFACTU-ON-FOR-A-BUSINESS-OUTSIDE-SPAIN) |
 | VERIFACTU-F02 | Upload the business's own certificate | done — in the Hub; encrypted in the hub's DB with `FISCAL_CERTIFICATE_KEY` |
 | VERIFACTU-F03 | Remove the own certificate | done — in the Hub |
 | VERIFACTU-F04 | Choose who files: my certificate or ERPlora | done |
@@ -254,7 +254,7 @@ Screen notices: the result of each action in a strip on top (green if it went we
 | VERIFACTU-F35 | Ask the AEAT whether it already has a queue record | done — in the record's detail, in the Hub's admin and through the API |
 
 ### VERIFACTU-F01 Activate VeriFactu
-Status: done — turning the app on in the Hub is activating it (activation per hub arrives with phase 2); outside Spain, Apps does not offer it and the hub refuses it (`can_enable`, hub#694), one already on records and sends nothing (FIX-HUB-VERIFACTU-ON-FOR-A-BUSINESS-OUTSIDE-SPAIN) and the Home does not ask it to "Set up VeriFactu" (hub#682); no template turns it on, in Spain either: the owner turns it on (hub#998)
+Status: done — turning the app on in the Hub is activating it, in that business; outside Spain, Apps does not offer it and the hub refuses it (`can_enable`, hub#694), one already on records and sends nothing (FIX-HUB-VERIFACTU-ON-FOR-A-BUSINESS-OUTSIDE-SPAIN) and the Home does not ask it to "Set up VeriFactu" (hub#682); no template turns it on, in Spain either: the owner turns it on (hub#998)
 Actor: administrator
 Screen: Hub: Apps
 Steps:
