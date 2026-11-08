@@ -82,7 +82,7 @@ async function use(template: Template): Promise<void> {
 <template>
   <section
     v-if="shown"
-    class="home-card blueprint-card"
+    class="home-card blueprint-card ep-surface"
     data-testid="blueprint-card"
   >
     <h2 class="home-card-title">

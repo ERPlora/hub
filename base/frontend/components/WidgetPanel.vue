@@ -120,7 +120,7 @@ const chosenBar = computed(() => {
 
 <template>
   <article
-    class="widget"
+    class="widget ep-surface"
     :class="`widget--${widget.size}`"
     :data-key="widget.key"
     data-testid="widget"
@@ -129,7 +129,7 @@ const chosenBar = computed(() => {
     <header class="widget-head">
       <HubIcon
         v-if="widget.icon"
-        class="widget-icon"
+        class="widget-icon ep-icon-tile ep-icon-tile--sm"
         :name="widget.icon"
       />
       <h3
@@ -319,27 +319,12 @@ const chosenBar = computed(() => {
   gap: 8px;
   min-width: 0;
   padding: 14px 16px;
-  border: 1px solid var(--ep-border, var(--ion-color-step-150, #e4e7ec));
-  border-radius: var(--ep-radius-lg, 16px);
-  background: var(--ion-card-background, var(--ion-background-color, #fff));
-  box-shadow: var(--ep-shadow-xs);
 }
 
 .widget-head {
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-.widget-icon {
-  box-sizing: content-box;
-  width: 18px;
-  height: 18px;
-  padding: 6px;
-  font-size: 18px;
-  color: var(--ep-primary-text);
-  background: var(--ep-primary-tint);
-  border-radius: 9px;
 }
 
 .widget-title {

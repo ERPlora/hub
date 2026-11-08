@@ -62,7 +62,7 @@ function note(item: SetupItem): string {
 <template>
   <section
     v-if="loading"
-    class="home-card setup-card"
+    class="home-card setup-card ep-surface"
     data-testid="setup-card"
     aria-busy="true"
   >
@@ -99,7 +99,7 @@ function note(item: SetupItem): string {
 
   <section
     v-else-if="!view.empty"
-    class="home-card setup-card"
+    class="home-card setup-card ep-surface"
     data-testid="setup-card"
     aria-busy="false"
   >
