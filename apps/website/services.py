@@ -1,7 +1,8 @@
 """Write operations of the website app: one operation = one transaction, with its event in the outbox.
 
 - ``website.site.save`` keeps the draft (template, theme, content); the images it names must be uploads of this hub,
-  and their URLs are written here, never taken from the client.
+  and their URLs are written here, never taken from the client. Its assistant card sums up the changes against the
+  saved draft (``_save_summary``), never the whole site's loose values.
 - ``website.site.publish`` copies the draft to what visitors see, with the catalog's snapshot, under a new version,
   and puts it online; after the COMMIT the previous version's cached page goes.
 - ``website.site.unpublish`` takes it offline (``/`` jumps to the login again); publishing again goes on from the
@@ -31,6 +32,7 @@ from django.core.files.base import ContentFile
 from django.core.files.storage import storages
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+from django.utils.translation import pgettext_lazy
 from live.context import OperationContext, Scope
 from live.errors import InvalidPayload
 from live.operations import INTERNAL, on_commit, operation
@@ -39,8 +41,9 @@ from PIL import Image as PILImage
 from PIL import UnidentifiedImageError
 
 from apps.website import events, reviews
+from apps.website.choices import SECTION_LABELS
 from apps.website.models import ACTOR_MAX_LENGTH, Image, Site
-from apps.website.queries import IMAGE_NOT_FOUND, draft, forget_cached, read_catalog, site_out
+from apps.website.queries import IMAGE_NOT_FOUND, current_site, draft, forget_cached, read_catalog, site_out
 from apps.website.schemas import (
     MAX_IMAGE_BYTES,
     Content,
@@ -107,6 +110,56 @@ def _with_image_urls(hub: uuid.UUID, content: Content) -> Content:
     return content
 
 
+SUMMARY = pgettext_lazy("assistant card", "Summary")
+DESIGN_CHANGED = pgettext_lazy("assistant card", "Design: %(template)s")
+THEME_CHANGED = pgettext_lazy("assistant card", "Theme: %(theme)s")
+CUSTOM_COLOURS = pgettext_lazy("assistant card", "Custom colours")
+CONTENT_CHANGED = pgettext_lazy("assistant card", "Content: %(sections)s")
+SECTION_HIDDEN = pgettext_lazy("assistant card", "%(section)s: hidden")
+SECTION_SHOWN = pgettext_lazy("assistant card", "%(section)s: shown")
+NO_CHANGES = pgettext_lazy("assistant card", "No changes")
+
+
+def _save_summary(ctx: OperationContext, arguments: dict, fields: list[dict]) -> list[dict]:
+    before = draft(current_site(hub_id(ctx.scope)))
+    sent = SaveIn.model_validate(arguments).model_dump(mode="json")
+    by_name = {field["name"]: field for field in fields}
+    parts = []
+    if before["template"] != sent["template"]:
+        parts.append(str(DESIGN_CHANGED) % {"template": by_name["template"]["value"]})
+    if before["theme"] != sent["theme"]:
+        theme = by_name["theme"]["value"]
+        values = [theme["palette"]]
+        if sent["theme"]["custom"] is not None:
+            values.append(str(CUSTOM_COLOURS))
+        values.append(theme["mode"])
+        parts.append(str(THEME_CHANGED) % {"theme": " · ".join(values)})
+    changed = []
+    for name in Content.model_fields:
+        previous_section = before["content"][name]
+        sent_section = sent["content"][name]
+        if previous_section == sent_section:
+            continue
+        label = str(SECTION_LABELS[name])
+        if "hidden" in sent_section and previous_section.get("hidden") != sent_section["hidden"]:
+            message = SECTION_HIDDEN if sent_section["hidden"] else SECTION_SHOWN
+            parts.append(str(message) % {"section": label})
+        previous_values = {key: value for key, value in previous_section.items() if key != "hidden"}
+        sent_values = {key: value for key, value in sent_section.items() if key != "hidden"}
+        if previous_values != sent_values:
+            changed.append(label)
+    if changed:
+        parts.append(str(CONTENT_CHANGED) % {"sections": ", ".join(changed)})
+    return [
+        {
+            "name": "summary",
+            "label": str(SUMMARY),
+            "kind": "text",
+            "value": " · ".join(parts) if parts else str(NO_CHANGES),
+        }
+    ]
+
+
 @operation(
     "website.site.save",
     kind="command",
@@ -127,6 +180,7 @@ def _with_image_urls(hub: uuid.UUID, content: Content) -> Content:
         "https:// map link) and the footer's line; about, catalog, gallery, reviews, contact and location can be "
         "hidden. Visitors see it only once it is published.",
         "risk": "normal",
+        "summary": _save_summary,
     },
 )
 def save_site(ctx: OperationContext, data: SaveIn) -> dict:
