@@ -1685,6 +1685,7 @@
       "discount_type": "Discount type",
       "display_description": "Display description",
       "display_name": "Display name",
+      "dish_names": "Dishes",
       "document": "Document",
       "document_type": "Document type",
       "documents_pending": "Documents pending",
