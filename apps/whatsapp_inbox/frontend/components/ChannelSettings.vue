@@ -197,7 +197,7 @@ function onAction({ actionId, row }: { actionId: string; row: TemplateOut }): vo
           class="wa-settings__warning"
           data-testid="whatsapp-inbox-settings-near-cap"
         >
-          {{ $t('whatsapp_inbox.settings.nearCap', { left: left.left, limit: left.limit }) }}
+          {{ $t('whatsapp_inbox.settings.nearCap', { left: left.left, limit: left.limit }, left.left) }}
         </p>
       </template>
       <PlanUpgradeLink

@@ -40,11 +40,9 @@ el «registro que ya no existe» de Odoo.
 
 - Hace falta entrar con una cuenta que tenga papel en ese negocio. Demo no tiene entrada propia: sin
   sesión, lleva a la entrada de ERPlora, que vuelve al negocio ya con su papel.
-- En la fase 1 el negocio es la **primera parte de la dirección** (el negocio `a` y el negocio `b`). En
-  la fase 2 cada negocio tendrá sus propios datos.
-- ⚠️ En la fase 1 los dos negocios **comparten los elementos**. Lo que sí se separa ya es el **aviso
-  en vivo**: guardar en `a` solo refresca las pantallas abiertas en `a`. Las de `b` ven el cambio al
-  recargar o con el siguiente aviso de `b`.
+- El negocio es la **primera parte de la dirección** (el negocio `a` y el negocio `b`), y cada negocio
+  tiene sus propios datos: los elementos de `a` no salen en `b`, y guardar en `a` solo refresca las
+  pantallas abiertas en `a`.
 
 ## Pantallas
 
@@ -208,7 +206,7 @@ Implicados: ninguno
 
 ## Servicios: lo que entra y lo que sale
 
-Todo se puede pedir por las pantallas, el asistente (fase 2) y la API, con las mismas reglas y los
+Todo se puede pedir por las pantallas, el asistente y la API, con las mismas reglas y los
 mismos permisos. Antes de cambiar o borrar un elemento o de añadirle una línea, el asistente pide confirmar con su
 tarjeta (BASE-F97), que nombra el elemento como lo nombran las pantallas, nunca por su id: por su nombre
 («Elemento: Mesa 4»), y el estado con su palabra («Abierto», «Hecho»). Lo que quien pregunta no puede ver no sale.
@@ -305,9 +303,10 @@ papel en ningún negocio.
   papeles de plataforma (superusuario y grupo `support`) solo llegan al Hub por la audiencia
   `hub-admin` (el admin del Hub en `hubs`), sobre una copia local propia del staff, `saas-staff:<id>`,
   separada de la copia de cliente `saas:<id>` y sin papel en ningún hub.
-- Fase 1: el ámbito es la primera parte del Host y los datos se comparten entre `a` y `b` (una sola
-  base de datos, sin tenencia); la fase 2 cambia solo `base/operations.py` (ámbito = hub, una BD por
-  hub).
+- Tenencia: el ámbito es la primera parte del Host y cada negocio tiene su propia BD (desde el corte S5,
+  hub#602): `base` entra en la del hub (`use_hub`) y esta app no hace nada propio para separarlos. Solo los
+  tests escritos antes de la tenencia guardan `a` y `b` en la misma BD de test (`base/tenancy/tests/legacy.py`,
+  hasta hub#611); `two-orgs-isolated` mide la separación de verdad.
 - Pruebas por flujo: `tests/e2e/demo-flows.spec.ts` recorre DEMO-F01 a F06 en 390, 834 y 1440 (capturas
   `APP-DEMO-<flujo>-<ancho>`) y la lista con más de 100 elementos (`APP-DEMO-CLOSE-DEMO-*`); las medidas finas siguen en `two-tabs-live`, `optimistic-add-line`,
   `two-orgs-isolated`, `reconnect`, `delete-item`, `create-edit-pages`, `edit-keeps-text`,
@@ -318,4 +317,3 @@ papel en ningún negocio.
 
 - No tiene precios, impuestos ni nada fiscal: no es una app de negocio.
 - No borra ni reordena líneas: con añadir basta para enseñar el patrón optimista.
-- No separa los datos de `a` y `b` en la fase 1 (llega con la tenencia de la fase 2).

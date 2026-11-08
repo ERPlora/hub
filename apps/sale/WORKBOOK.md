@@ -1075,8 +1075,13 @@ uno le queda por devolver tras las devoluciones anteriores, así que nadie baja 
 cuenta en el día de su venta y se reparte al céntimo: con lo que nadie atendió, suma los «Ingresos» del
 periodo. Además, lo que valen las **sesiones de bono** que hizo cada profesional (SALE-F27, SERVICE-F24),
 fijado al cobrar cada una; una sesión de un bono sin límite, que no tiene entre qué dividir, cuenta el
-precio de su línea. No es dinero del periodo (el bono se pagó al venderlo), así que no está en los
-«Ingresos». La sesión que vuelve, por devolución o anulando la venta, deja de contar. Lo que una línea pagó
+precio de su línea. También cuentan las que se gastan **fuera del cobro** diciendo quién las hizo
+(SERVICE-F21): no tienen línea, así que Servicios se las dice a Ventas al gastarlas y Ventas guarda aparte lo que
+valen, en el día del negocio del cobro (el de una venta cobrada en ese momento); una profesional que solo hizo
+esas sesiones sale con 0 ventas y 0 € de dinero. Una sesión del cobro está en su línea y nunca aparte, así que
+ninguna cuenta dos veces, y las dos siguen contando aunque Servicios se apague. No es dinero del periodo (el
+bono se pagó al venderlo), así que no está en los «Ingresos». La sesión que vuelve, por devolución o anulando
+la venta, deja de contar. Lo que una línea pagó
 por un **bono vendido** (Servicios lo dice al concederlo, SERVICE-F14) sigue en «Ingresos», pero no es
 producción de quien lo vendió, sin pasar nunca de lo que a esa línea le queda tras las devoluciones. La
 **producción**, sobre la que va la comisión, es lo que queda sin esos bonos más las sesiones: un bono de
@@ -1089,7 +1094,7 @@ no tiene permiso de informes ve la tabla, sin las cifras. Un total que no es un 
 un importe, como 12,50» bajo su campo, y una fecha final anterior a la inicial, «La fecha final no
 puede ser anterior a la inicial.»; ninguno de los dos filtra y manda el periodo. En el Inicio, un panel
 de un día sin ventas dice 0, y uno que no se puede leer, «No disponible».
-Implicados: STAFF-F21, BASE-F06, BASE-F07, BASE-F08, SALE-F27, SERVICE-F24
+Implicados: STAFF-F21, BASE-F06, BASE-F07, BASE-F08, SALE-F27, SERVICE-F21, SERVICE-F24
 
 ### SALE-F29 Ver y reimprimir el documento de una venta
 <!-- origen: fi:hub/app-web#print-on-sale-auto-impresion-del-ticket-al-cerrar-venta old-hub:HUB_SHELL-F70 fi:modules/sales#query-sales-get fi:modules/sales#query-sales-lines old:sales/workflow/historial-y-correcciones.md#sales-f29 wf:cadena-fiscal#rec_fiscal-f07 -->
@@ -1476,6 +1481,7 @@ secciones, las notas rápidas y lo devolvible se pueden seguir en vivo.
 | Venta devuelta | Devolver | La venta, la devolución, el importe, el motivo, si queda devuelta del todo, los cobros y las líneas devueltas | `sale.sale.refunded` |
 | Ventas re-apuntadas | Unir fichas | La ficha que queda y la absorbida | `sale.sale.reassigned` |
 | Una línea pagó un bono, o ya no | Servicios concede o anula un bono diciendo su venta | La venta y la línea | `sale.sale.voucher_line_changed` |
+| Una sesión de bono hecha fuera del cobro | Servicios gasta una sesión diciendo quién la hizo | La sesión y la profesional | `sale.voucher_session.recorded` |
 | Venta con su documento | Un documento que no se pudo emitir en el cobro, la anulación o la devolución se emite después (reintento del cobro, «Emitir ahora» o la reacción de Facturación) | La venta, el documento, su número, la devolución (`refund_id`) o si es el de la anulación (`void`); uno por documento | `sale.sale.invoiced` |
 | Cuenta abierta | Abrir o dividir | La cuenta | `sale.order.opened` |
 | Cuenta cambiada | Cualquier cambio de líneas, descuentos o título | La cuenta | `sale.order.changed` |
@@ -1529,7 +1535,7 @@ secciones, las notas rápidas y lo devolvible se pueden seguir en vivo.
 |---|---|---|
 | Inventario | Baja el stock al cobrarse una venta, lo repone al anularse y repone lo que vuelve en una devolución | `sale.sale.completed`, `sale.sale.voided`, `sale.sale.refunded` |
 | Clientes | Suma la compra a la ficha, la resta al anularse y resta lo devuelto | `sale.sale.completed`, `sale.sale.voided`, `sale.sale.refunded` |
-| Servicios | No reacciona a avisos: Ventas llama a sus operaciones de sesiones al montar, cobrar, anular y devolver | `service.session.*` |
+| Servicios | No reacciona a avisos: Ventas llama a sus operaciones de sesiones al montar, cobrar, anular y devolver; Servicios le dice qué línea pagó un bono y quién hizo una sesión gastada fuera del cobro, por sus operaciones internas | `service.session.*`, `sale.sale.voucher_sold`, `.voucher_unsold`, `sale.voucher_session.record` |
 | Facturación | Ventas le pide el documento en el mismo cobro, anulación o devolución; sus reacciones a los avisos lo emiten si entonces no pudo (INVOICE-F06) y lee la venta, sus líneas y sus devoluciones (la requiere) | `sale.sale.completed`, `sale.sale.voided`, `sale.sale.refunded` |
 | Caja | No reacciona a avisos: lee las ventas, anulaciones y devoluciones de cada turno (la requiere); Ventas le pregunta si la caja está abierta | `Sale`, `Refund`, `sale.order.list` |
 | Citas | Marca cobrada la cita de una venta y lo deshace al anularla; abre la cuenta de una cita (`sale.order.open`) y la lleva al TPV por su dirección | `sale.sale.created_from_appointment`, `sale.sale.voided` |
@@ -1567,7 +1573,9 @@ Lo que toca la sesión de un bono pide además el permiso de Servicios, porque e
 mueve con la sesión de quien vende: pagar una línea con bono, deshacerlo, quitar, anular o cobrar una
 línea pagada con bono, «Gastar sesiones» (`service.redeem_package`, lo tienen los cuatro papeles); anular
 o devolver una venta con sesiones, «Devolver sesiones de bono» (`service.return_session`: propietario,
-administrador y responsable, los mismos que anulan y devuelven).
+administrador y responsable, los mismos que anulan y devuelven). Al revés, decir quién hizo una sesión gastada
+fuera del cobro (SERVICE-F21) pide «Montar la cuenta» (`sale.add_sale`, los cuatro papeles), como decir de quién
+es una línea.
 
 ## Para quien lo mantiene
 
@@ -1607,8 +1615,9 @@ administrador y responsable, los mismos que anulan y devuelven).
   congelado, unidad, ronda de cocina, venta que la cobró, anulación); `Sale` (cabecera fiscal:
   número, día del negocio, importes, documento, cliente, clave de intento), `SaleLine` (copia fiscal:
   categoría, tipo, país, región y regla de Impuestos), `SalePayment`, `SaleCounter` (uno por día del
-  negocio); `Refund`, `RefundPayment`, `RefundLine`; `PaymentMethod`, `Settings` (una fila),
-  `Department`, `QuickNote` (borrado lógico).
+  negocio); `Refund`, `RefundPayment`, `RefundLine`; `VoucherSession` (una sesión de bono hecha fuera del cobro,
+  SERVICE-F21: la sesión de Servicios, única, la profesional, el día del negocio y lo que vale; como lo cobrado,
+  nunca se edita ni se borra); `PaymentMethod`, `Settings` (una fila), `Department`, `QuickNote` (borrado lógico).
 - **Un solo camino de cobro**: todo cobro sale de una cuenta. Una venta de mostrador (líneas sueltas
   por el asistente o la API) abre por dentro una cuenta con esas líneas, con las mismas reglas de
   precio, y la cobra en la misma transacción.
@@ -1858,6 +1867,13 @@ administrador y responsable, los mismos que anulan y devuelven).
   autorizó un descuento por encima del máximo o una línea anulada (`discount_approved_by`, `voided_by` de
   la línea) es el responsable que aprobó (`authoriser`, con `base.approvals.approval_of`); la venta anulada guarda quién la anuló y el
   registro de aprobaciones, quién la aprobó.
+- **Dónde lee Ventas una sesión gastada fuera del cobro** (SALE-F28, SERVICE-F21, hub#770): Ventas la guarda en su
+  propia tabla (`VoucherSession`) cuando Servicios se la dice (`sale.voucher_session.record`, `ai=INTERNAL`, sin
+  `requires` nuevo), igual que copia en la línea lo que vale la del cobro (`SaleLine.voucher_value`, hub#783). No la
+  lee de Servicios al pedir las cifras: así la producción de un periodo no cambia si Servicios se apaga (como la del
+  cobro, `test_a_session_keeps_counting_with_services_off`) y el informe no pide permisos de Servicios. El día es el
+  del cobro (`apps.tax.queries.business_today`), el mismo reloj que el de una venta, que hub#772 mueve entero. Una
+  sesión nunca está en las dos: la del cobro no pasa por `service.grant.redeem`.
 
 ### Cambios frente al producto actual
 
@@ -1958,6 +1974,9 @@ administrador y responsable, los mismos que anulan y devuelven).
 39. **La moneda sale del país del negocio** (el hub viejo la fijaba en su configuración, y sales#380: el botón
     del descuento en importe pintaba siempre «€»): el TPV, Ventas, el tique y las devoluciones van en la moneda
     del negocio o en la de su venta, con sus decimales (el yen sin céntimos, también en el teclado).
+40. **La sesión de bono gastada fuera del cobro cuenta en la producción de quien la hizo** (hub#770; el producto
+    actual no la contaba para nadie): Ventas la guarda aparte, porque no tiene línea, como guarda en la línea la del
+    cobro.
 
 ### Lo que NO hace, a propósito
 

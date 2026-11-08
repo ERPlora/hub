@@ -27,6 +27,7 @@ from apps.sale.models import (
     SaleLine,
     SalePayment,
     Settings,
+    VoucherSession,
 )
 from apps.sale.services import lock_orders, lock_rows
 
@@ -292,3 +293,9 @@ class RefundPaymentAdmin(ChargedAdmin):
 @admin.register(RefundLine)
 class RefundLineAdmin(ChargedAdmin):
     list_display = ("refund", "sale_line", "quantity")
+
+
+@admin.register(VoucherSession)
+class VoucherSessionAdmin(ChargedAdmin):
+    list_display = ("business_day", "staff_id", "value", "session_id")
+    search_fields = ("session_id", "staff_id")

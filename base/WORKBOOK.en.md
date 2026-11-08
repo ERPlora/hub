@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:9c49fd7060d294f67a6c51d0794a3ee3dcebf17dd71f8c2e2ba39deb8fc9bd1d -->
+<!-- generated from WORKBOOK.md sha256:41e9b2ac41ac47cb9d7ac009ab09597fbf22ffc31d2a73d41d2aab448fd19519 -->
 
 ## What it is for and who it is for
 
@@ -2218,9 +2218,7 @@ Steps:
 In: the name, the pace and what it may do.
 Out: the key, of which the business keeps only what lets it be recognised. Event `base.api_key.created`.
 If it fails: "The API key could not be created.", "Choose at least one app and what the key may do on it.", "That
-app does not publish what the key would do on it." or "It could not be copied to the clipboard.". A business that
-still shares its database with others (those signed up before every business was born with its own) has no "New API
-key" (BASE-F89).
+app does not publish what the key would do on it." or "It could not be copied to the clipboard.".
 Involved: BASE-F89, BASE-F90
 
 ### BASE-F87 Rotate an API key
@@ -2264,9 +2262,7 @@ Steps:
 In: the business's keys.
 Out: nothing saved. It updates by itself when one is created, rotated or revoked.
 If it fails: "Your API keys could not be loaded." with "Retry"; with none, "No API keys yet. Create one so that
-another system can read or write your business's data.". A business that still shares its database with others
-cannot have keys, because a key of its own could open another's data: instead, "Not available yet" and "API keys are
-not available yet in this business." show, until it moves to its own.
+another system can read or write your business's data.".
 Involved: BASE-F86, BASE-F87, BASE-F88
 
 ### BASE-F90 Read the API documentation
