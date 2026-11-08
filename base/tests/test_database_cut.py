@@ -121,7 +121,9 @@ class Refused:
 
 @pytest.fixture(autouse=True)
 def quick_limit(settings, hub_a, hub_b):
-    settings.LIVE = {**settings.LIVE, "database_cut": {**settings.LIVE["database_cut"], "wait_seconds": LIMIT_SECONDS}}
+    """The project's own setting with a short limit; never one the project does not ask for."""
+    if (cut := settings.LIVE.get("database_cut")) is not None:
+        settings.LIVE = {**settings.LIVE, "database_cut": {**cut, "wait_seconds": LIMIT_SECONDS}}
     yield
     # Before the tables are emptied: no business's database left read only, no connection this test cut.
     for hub in (hub_a, hub_b):
@@ -339,9 +341,9 @@ def test_a_wait_holds_no_place_of_the_business_plan(boss, hub_a, waits):
     with _in(hub_a, hubs.HUB_A_ALIAS, Refused(hub_a.db_name)):
         response = _create(boss, hub_a, ITEMS, {"name": "Once"})
 
-    assert response.status_code == 201, response.content
     assert waits, "the save waited for the database"
     assert all(places == {"a": 0, "b": 0} for places in waits), waits
+    assert response.status_code == 201, response.content
 
 
 def test_a_cut_in_one_business_repeats_in_its_own_database_only(boss, hub_a, hub_b, waits):
@@ -366,7 +368,8 @@ def test_a_cut_in_one_business_repeats_in_its_own_database_only(boss, hub_a, hub
 
 def test_a_call_of_the_saas_gets_its_503_at_once(hub_a, settings):
     """``/internal`` is the SaaS's, which tries again on its own: it waits for nobody, with ``Retry-After`` all the same."""
-    settings.LIVE = {**settings.LIVE, "database_cut": {**settings.LIVE["database_cut"], "wait_seconds": 5}}
+    if (cut := settings.LIVE.get("database_cut")) is not None:
+        settings.LIVE = {**settings.LIVE, "database_cut": {**cut, "wait_seconds": 5}}
     started = time.monotonic()
 
     with connections["default"].execute_wrapper(CutOn("base_hub", times=None)):
