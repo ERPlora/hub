@@ -12,7 +12,7 @@ import { execSync } from 'node:child_process';
 
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { type Provider, startProvider } from './assistant-provider';
+import { NOT_DONE, type Provider, startProvider } from './assistant-provider';
 import { A, api, capture, compactBar, login, psql, REPO_DIR, shown, turnOffTurnedOn, turnOnMissing, untilStill } from './helpers';
 import { STACK } from './stack';
 
@@ -181,7 +181,7 @@ test('table-assistant-card — in Spanish taking a table to another zone names t
   }
   await page.setViewportSize({ width: 1440, height: 900 });
   await decide(page, 'cancel');
-  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
+  await expect(lastAnswer(page)).toContainText(NOT_DONE.es);
   expect((await tableNow(context, five.id)).zone_id).toBe(terrace);
   if (process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
   await context.close();
@@ -200,8 +200,7 @@ test('table-assistant-card — in English transferring a check names the check b
   await expect(card(page)).toContainText(`Destination table: 2 (${ROOM})`);
   for (const id of [seated.data.id, two.id]) await expect(card(page)).not.toContainText(id);
   await decide(page, 'cancel');
-  // The e2e's provider answers a cancelled write in one language only (assistant-provider.ts).
-  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
+  await expect(lastAnswer(page)).toContainText(NOT_DONE.en);
   const after = await api<Check>(context, A, 'GET', `/table/sessions/detail?id=${seated.data.id}`);
   expect([after.data.table_id, after.data.status]).toEqual([five.id, 'open']);
   await context.close();

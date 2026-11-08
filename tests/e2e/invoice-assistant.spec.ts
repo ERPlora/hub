@@ -20,7 +20,7 @@ import { execSync } from 'node:child_process';
 
 import { type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
-import { type Provider, startProvider } from './assistant-provider';
+import { CANNOT_RECTIFY, DONE, NOT_DONE, type Provider, startProvider } from './assistant-provider';
 import { A, api, capture, compactBar, login, psql, registerBusinessIn, registrationOf, REPO_DIR, shot, shown, untilStill } from './helpers';
 import { cleanInvoices, ensureIssuer, type InvoiceOut, invoiceOf, issuedIds, snapshotSeries } from './invoice-helpers';
 import { stamp } from './sale-helpers';
@@ -214,7 +214,7 @@ test('INVOICE-F08 — «rectify invoice <number> because the price was wrong»: 
 
   // «Cancel»: nothing is issued and the original stays issued.
   await decide(page, 'cancel');
-  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
+  await expect(lastAnswer(page)).toContainText(NOT_DONE.en);
   await expect(receipts(page).last()).toHaveText('Not done, cancelled: Rectify in Invoicing');
   const cancelled = await invoiceOf(context, invoice.id);
   expect([cancelled.status, cancelled.rectifications]).toEqual(['issued', []]);
@@ -233,7 +233,7 @@ test('INVOICE-F08 — «rectify invoice <number> because the price was wrong»: 
   await card(page).locator('[data-testid="assistant-confirm-input"] input').fill('confirm');
   await expect(submit).toBeEnabled();
   await decide(page, 'submit');
-  await expect(lastAnswer(page)).toContainText('Hecho.');
+  await expect(lastAnswer(page)).toContainText(DONE.en);
   await expect(receipts(page).last()).toHaveText('Done: Rectify in Invoicing');
   const after = await invoiceOf(context, invoice.id);
   expect(after.status).toBe('cancelled');
@@ -434,7 +434,7 @@ test('INVOICE-F08 — asked to rectify a rectifying invoice, the assistant says 
 
   await openPanel(page);
   await ask(page, asked(rectifying));
-  await expect(lastAnswer(page)).toContainText('No se puede rectificar:');
+  await expect(lastAnswer(page)).toContainText(CANNOT_RECTIFY.en);
   await expect(lastAnswer(page)).toContainText('A rectifying invoice cannot be rectified.');
   await expect(card(page)).toBeHidden();
   expect(toldPreview()).toMatchObject({ error: { code: 'invoice.cannot_rectify_rectification' } });
