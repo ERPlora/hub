@@ -523,9 +523,12 @@ Pasos:
      «Atrás». La hoja empieza por «Inicio», que vuelve al Inicio, y sigue con las apps; tocar una la abre.
      «Inicio» está ahí aunque la lista aún cargue, esté vacía o no se haya podido leer.
   6. En la aplicación de Android, el botón atrás del móvil cierra primero lo que haya abierto encima (una
-     ventana, una hoja o el menú); una ventana que no se puede cerrar así se queda. Sin nada abierto, en una
-     ficha o un alta hace lo mismo que «Atrás»; en la pantalla principal de una app vuelve al Inicio,
-     también si se llegó a ella por un enlace; y en el Inicio deja la aplicación en segundo plano.
+     ventana, una hoja o el menú); una ventana que no se puede cerrar así se queda, y una que guarda algo
+     escrito sin guardar y lo pide (hoy, el alta y la edición de producto de Inventario) pregunta antes
+     «¿Descartar los cambios?»: «Seguir editando», o atrás otra vez, la deja como estaba, y «Descartar
+     cambios» la cierra (hub#1015). Sin nada abierto, en una ficha o un alta hace lo mismo que «Atrás»; en
+     la pantalla principal de una app vuelve al Inicio, también si se llegó a ella por un enlace; y en el
+     Inicio deja la aplicación en segundo plano.
 Entra: las apps del menú de la persona (las mismas del botón «Mis apps» de la barra).
 Sale: cuántas veces se abre cada app en este navegador (solo para ordenar).
 Si falla: mientras carga, baldosas grises y «Cargando tus apps…» para el lector de pantalla. Sin apps:
@@ -538,7 +541,7 @@ trae la versión nueva; nunca se queda el toque sin hacer nada. Si el servidor n
 inestable), la persona se queda donde estaba y un aviso dice «No se ha podido abrir <app>. Comprueba la conexión e
 inténtalo de nuevo.» («esa página» si la pantalla no es de una app), con «Reintentar», que vuelve a probar y la abre
 en cuanto el servidor responde.
-Implicados: ninguno
+Implicados: INVENTORY-F01, INVENTORY-F02
 
 ### BASE-F06 Ver los paneles de las apps en Inicio
 <!-- origen: old-hub:HUB_SHELL-F33 -->
@@ -3646,6 +3649,11 @@ Implicados: HUBS-F17, WEBSITE-F10
   `tests/e2e/base-assistant.spec.ts` contra un SaaS de verdad con su pasarela y el proveedor falso
   `tests/e2e/assistant-provider.ts` (un servidor HTTP en 127.0.0.1 que habla la API de OpenAI; receta en
   `tests/e2e/README.md`, «El asistente»): ningún test llega a un proveedor real.
+- **Resumen propio de una escritura** (hub#693): `ai["summary"]` es un callable
+  `(ctx, arguments, fields) -> list[dict]`; `base.assistant.card` lo ejecuta solo con `ctx`, como esa persona y bajo
+  `translation.override(language)`, con `fields` ya en ese idioma, y pone exactamente los campos que devuelve. Sin
+  `ctx` o sin callable, deja el detalle normal. `website.site.save` es el primer uso; su contrato está en
+  `base/tests/test_assistant.py`.
 
 - Personas y permisos (APP-BASE-5): las personas son `Membership` (control) más la foto de erplora.com
   (`hub.state["members"]`, `plan.max_users`); invitar, cambiar el rol y quitar son de erplora.com (HUBS-F24…F29):

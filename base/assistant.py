@@ -16,7 +16,8 @@ The mechanics that do not depend on the gateway are ``live.assistant``'s, shared
   its id; an amount in the currency the write names (``CURRENCY``) or the business's —; ``risk="high"`` asks to type
   a word in the person's language (``CONFIRM_WORD``) or, over records named by ``ids``, how many. Its preview
   (``preview``) says the amounts of its read in the currency it answers. A platform action is named by the screen
-  where the person would do it (``screen``, ``app_name``).
+  where the person would do it (``screen``, ``app_name``). An operation may replace the detailed fields with its own
+  summary (``ai={"summary": …}``), computed as the person and in their language.
 - **The gateway**: every door is a signed POST (``base.signing``, the secret of every ``/internal`` call) naming this
   business by its host (``scope.key``); the browser never talks to it. ``stream_turn`` relays a turn as the Hub's own
   frames (``text``, ``usage``, ``error``, ``done``); its refusals become one of ours (``assistant.quota_exceeded``,
@@ -320,11 +321,23 @@ def _names(declared: dict) -> list:
     return [name] if isinstance(name, str) else name if isinstance(name, list) else []
 
 
+def _card_details(op: Operation, arguments: dict, language: str, ctx: OperationContext | None = None) -> dict:
+    return shared.card(op, arguments, language, _Words(op, language, ctx))
+
+
 def card(op: Operation, arguments: dict, language: str, ctx: OperationContext | None = None) -> dict:
     """What the person sees before ``op`` runs with ``arguments`` (``live.assistant.card``), in the Hub's words: a
     moment at the business's hour, a record by its name read as ``ctx``'s person, an amount in the currency the write
-    names (``CURRENCY``) or the business's; its app by its name, a platform action by its screen (``app_name``)."""
-    return shared.card(op, arguments, language, _Words(op, language, ctx))
+    names (``CURRENCY``) or the business's; its app by its name, a platform action by its screen (``app_name``).
+    With ``ctx`` and a callable ``ai["summary"]``, its fields are exactly what that callable returns; it receives
+    ``(ctx, arguments, fields) -> list[dict]``, with the detailed fields already in ``language``, and runs in it too."""
+    shown = _card_details(op, arguments, language, ctx)
+    summary = op.ai.get("summary") if isinstance(op.ai, dict) else None
+    if ctx is None or not callable(summary):
+        return shown
+    with translation.override(language):
+        shown["fields"] = summary(ctx, arguments, shown["fields"])
+    return shown
 
 
 def active_apps_label(label: str) -> LiveAppConfig | None:

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:d39730621ec70ab526e8d45066d60bb7349b2627004c30860e157ec1d2755581 -->
+<!-- generated from WORKBOOK.md sha256:38085300184a57748b625cb8c03189c3687d4f8f2895d2518ab15cec90df0069 -->
 
 ## What it is for and who it is for
 
@@ -510,9 +510,12 @@ Steps:
      with "Home", which goes back to the Home, and goes on with the apps; tapping one opens it. "Home" is
      there even while the list loads, when it is empty or when it could not be read.
   6. In the Android app, the phone's back button first closes whatever is open on top (a window, a sheet
-     or the menu); a window that cannot be closed that way stays. With nothing open, on a record or a new
-     one it does the same as "Back"; on the main screen of an app it goes back to the Home, also when that
-     screen was reached through a link; and on the Home it sends the app to the background.
+     or the menu); a window that cannot be closed that way stays, and one that holds something typed and
+     not saved and asks for it (today, creating and editing a product in Inventory) asks first "Discard
+     changes?": "Keep editing", or back again, leaves it as it was, and "Discard changes" closes it
+     (hub#1015). With nothing open, on a record or a new one it does the same as "Back"; on the main screen
+     of an app it goes back to the Home, also when that screen was reached through a link; and on the Home
+     it sends the app to the background.
 In: the apps of the person's menu (the same as the bar's "My apps" button).
 Out: how many times each app is opened in this browser (only to order them).
 If it fails: while loading, grey tiles and "Loading your apps…" for the screen reader. Without apps:
@@ -524,7 +527,7 @@ any button), in a fresh load of the page, which already brings the new version; 
 the server does not answer (offline or on a flaky network), the person stays where they were and a notice says
 "Could not open <app>. Check the connection and try again." ("that page" when the screen is not an app's), with
 "Retry", which tries again and opens it as soon as the server answers.
-Involved: none
+Involved: INVENTORY-F01, INVENTORY-F02
 
 ### BASE-F06 See the apps' panels on the Home
 Status: done

@@ -582,6 +582,14 @@ TITLED_IN_SPANISH = {
     **{f"pricing.price_item.{action}:id": "Precio" for action in ("remove", "update")},
     **{f"pricing.price_list.{action}:id": "Tarifa" for action in ("activate", "deactivate", "set_default", "update")},
     **{f"pricing.rule.{action}:id": "Regla de descuento" for action in ("activate", "deactivate", "update")},
+    "reservation.blocked_date.delete:id": "Fecha bloqueada",
+    **{f"reservation.reservation.{action}:id": "Reserva" for action in (
+        "cancel", "complete", "confirm", "delete", "no_show", "seat", "update",
+    )},
+    "reservation.time_slot.delete:id": "Franja",
+    **{f"reservation.waitlist.{action}:id": "Entrada de la lista de espera" for action in (
+        "convert", "delete", "update",
+    )},
     **{f"sale.department.{action}:id": "Sección" for action in ("delete", "update")},
     **{f"sale.quick_note.{action}:id": "Nota rápida" for action in ("delete", "update")},
     **{f"schedule.override.{action}:id": "Cambio temporal" for action in ("delete", "update")},
@@ -638,14 +646,17 @@ def test_every_datum_the_screen_knows_that_a_write_titles_is_called_by_its_title
     assert not {title for title in titles.values() if title.lower() in {"id", "ids"} or "_" in title}
 
 
-def test_every_dangerous_write_of_the_platform_and_flow_titles_the_record_it_names():
-    """The record a dangerous write of the platform or Automations acts on is called as its screen calls it, in the
-    person's language («Dispositivo: Barra», «Automatización: Bienvenida»), never «Registro»: its schema titles it,
-    and a catalog says that title in Spanish. One that does not comes in here."""
+def test_every_dangerous_write_of_the_platform_flow_and_reservation_titles_the_record_it_names():
+    """The record a dangerous write of the platform, Automations or Reservations acts on is called as its screen calls
+    it, in the person's language («Dispositivo: Barra», «Automatización: Bienvenida», «Reserva: Ana…»), never
+    «Registro»: its schema titles it, and a catalog says that title in Spanish. One that does not comes in here
+    (hub#428, hub#499 and hub#549)."""
     untitled = []
+    checked = []
     for op in writes():
-        if op.app_label not in {"base", "flow"} or assistant.risk(op) != "high":
+        if op.app_label not in {"base", "flow", "reservation"} or assistant.risk(op) != "high":
             continue
+        checked.append(op.name)
         props = op.input.model_json_schema().get("properties", {})
         with translation.override("es"):
             untitled += [
@@ -653,6 +664,14 @@ def test_every_dangerous_write_of_the_platform_and_flow_titles_the_record_it_nam
                 for name in ("id", "ids")
                 if name in props and assistant._own_title(name, props[name].get("title")) is None
             ]
+    assert {
+        "reservation.reservation.delete",
+        "reservation.reservation.no_show",
+        "reservation.reservation.cancel",
+        "reservation.time_slot.delete",
+        "reservation.blocked_date.delete",
+        "reservation.waitlist.delete",
+    } <= set(checked)
     assert untitled == []
 
 

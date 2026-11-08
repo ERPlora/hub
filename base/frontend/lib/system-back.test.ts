@@ -8,7 +8,8 @@
 //
 // The contract pinned here:
 //   1. `closeTopmostLayer`: a presented Ionic overlay is dismissed (role `backdrop`, as Ionic's own hardware back); one
-//      that cannot be dismissed HOLDS the press; inline-hidden overlays and toasts do not count; then an open
+//      that cannot be dismissed HOLDS the press, and so does a window with unsaved changes, which asks first and
+//      closes only on «Discard changes» (hub#1015); inline-hidden overlays and toasts do not count; then an open
 //      `ion-menu`; then the mounted app, through the cancelable `erplora:back` (`preventDefault()` = "I closed one");
 //   2. `installSystemBackButton`, with nothing open: on a detail view the screen's own Back (the topbar's: history
 //      inside the app, else its `backHref`); on the root of an app, Home, with history behind or not (a screen of an
@@ -17,7 +18,14 @@
 //   4. the listener goes when the page goes (Tauri keeps listeners across page loads) or when the shell lets go.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { type BackOutcome, closeTopmostLayer, installSystemBackButton, screenBack, SHELL_BACK_EVENT } from './system-back';
+import {
+  type BackOutcome,
+  closeTopmostLayer,
+  holdUnsavedChanges,
+  installSystemBackButton,
+  screenBack,
+  SHELL_BACK_EVENT,
+} from './system-back';
 
 type FakeOverlay = HTMLElement & { overlayIndex: number; backdropDismiss?: boolean; dismiss: ReturnType<typeof vi.fn> };
 
@@ -144,6 +152,115 @@ describe('gh:hub#1906 — closeTopmostLayer', () => {
       await expect(closeTopmostLayer(document, window)).resolves.toBe('none');
     } finally {
       window.removeEventListener(SHELL_BACK_EVENT, onBack);
+    }
+  });
+});
+
+/** A window's fields inside `overlay`, signed up as holding what the person typed (dirty or not) until it lets go. */
+function unsavedWindow(overlay: HTMLElement, opts: { dirty?: boolean; answer?: boolean } = {}) {
+  const fields = overlay.appendChild(document.createElement('div'));
+  const state = { dirty: opts.dirty ?? true };
+  const confirmDiscard = vi.fn(async () => opts.answer ?? false);
+  const letGo = holdUnsavedChanges({ inside: () => (fields.isConnected ? fields : null), dirty: () => state.dirty, confirmDiscard });
+  return { fields, state, confirmDiscard, letGo };
+}
+
+describe('hub#1015 — a window with unsaved changes asks before Back throws them away', () => {
+  const windows: (() => void)[] = [];
+  const signUp = (...args: Parameters<typeof unsavedWindow>) => {
+    const w = unsavedWindow(...args);
+    windows.push(w.letGo);
+    return w;
+  };
+  afterEach(() => windows.splice(0).forEach((letGo) => letGo()));
+
+  it('holds the press and asks; «Keep editing» leaves the window open', async () => {
+    const modal = presentOverlay('ion-modal');
+    const form = signUp(modal, { answer: false });
+
+    await expect(closeTopmostLayer(document, window)).resolves.toBe('held');
+    expect(form.confirmDiscard).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => expect(form.confirmDiscard.mock.results[0]?.value).resolves.toBe(false));
+    expect(modal.dismiss).not.toHaveBeenCalled();
+  });
+
+  it('«Discard changes» closes the window as Back would have (role `backdrop`)', async () => {
+    const modal = presentOverlay('ion-modal');
+    signUp(modal, { answer: true });
+
+    await expect(closeTopmostLayer(document, window)).resolves.toBe('held');
+    await vi.waitFor(() => expect(modal.dismiss).toHaveBeenCalledWith(undefined, 'backdrop'));
+  });
+
+  it('with nothing typed it closes at once, without asking', async () => {
+    const modal = presentOverlay('ion-modal');
+    const form = signUp(modal, { dirty: false });
+
+    await expect(closeTopmostLayer(document, window)).resolves.toBe('closed');
+    expect(modal.dismiss).toHaveBeenCalledWith(undefined, 'backdrop');
+    expect(form.confirmDiscard).not.toHaveBeenCalled();
+  });
+
+  it('what is typed is read on the press: put back as it was, Back closes without asking', async () => {
+    const modal = presentOverlay('ion-modal');
+    const form = signUp(modal);
+    form.state.dirty = false;
+
+    await expect(closeTopmostLayer(document, window)).resolves.toBe('closed');
+    expect(form.confirmDiscard).not.toHaveBeenCalled();
+  });
+
+  it('a list or a picker opened on top of the window closes first, without asking', async () => {
+    const modal = presentOverlay('ion-modal');
+    const form = signUp(modal);
+    const picker = presentOverlay('ion-popover');
+
+    await expect(closeTopmostLayer(document, window)).resolves.toBe('closed');
+    expect(picker.dismiss).toHaveBeenCalledTimes(1);
+    expect(form.confirmDiscard).not.toHaveBeenCalled();
+    expect(modal.dismiss).not.toHaveBeenCalled();
+  });
+
+  it('a window under another one does not take its Back: the one on top closes', async () => {
+    const below = presentOverlay('ion-modal');
+    const form = signUp(below);
+    const top = presentOverlay('ion-modal');
+
+    await expect(closeTopmostLayer(document, window)).resolves.toBe('closed');
+    expect(top.dismiss).toHaveBeenCalledWith(undefined, 'backdrop');
+    expect(form.confirmDiscard).not.toHaveBeenCalled();
+  });
+
+  it('a window that let go (closed, gone) asks nothing any more', async () => {
+    const modal = presentOverlay('ion-modal');
+    const form = unsavedWindow(modal);
+    form.letGo();
+
+    await expect(closeTopmostLayer(document, window)).resolves.toBe('closed');
+    expect(form.confirmDiscard).not.toHaveBeenCalled();
+  });
+
+  it('a window that cannot be closed (saving) holds the press without asking', async () => {
+    const modal = presentOverlay('ion-modal', { backdropDismiss: false });
+    const form = signUp(modal);
+
+    await expect(closeTopmostLayer(document, window)).resolves.toBe('held');
+    expect(form.confirmDiscard).not.toHaveBeenCalled();
+    expect(modal.dismiss).not.toHaveBeenCalled();
+  });
+
+  it('a question that could not be asked leaves the window open and says why in the console', async () => {
+    const modal = presentOverlay('ion-modal');
+    const form = signUp(modal);
+    const failure = new Error('no dialog');
+    form.confirmDiscard.mockRejectedValueOnce(failure);
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    try {
+      await expect(closeTopmostLayer(document, window)).resolves.toBe('held');
+      await vi.waitFor(() => expect(logged).toHaveBeenCalledWith('base: could not ask whether to discard the changes', failure));
+      expect(modal.dismiss).not.toHaveBeenCalled();
+    } finally {
+      logged.mockRestore();
     }
   });
 });
