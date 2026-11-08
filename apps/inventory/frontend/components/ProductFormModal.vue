@@ -11,16 +11,19 @@
 // the person typed them; a refusal stays in the dialog, each message under its field. «Photo» (INVENTORY-F30/F31, for
 // who may change products): a library image or a photo of its own, sent once the product is saved (`set_image`,
 // `upload_image`, «Uploading photo…»); if the product saved and the photo did not, the dialog says so with «Retry»
-// (only the photo goes again) and the product keeps the photo it had.
+// (only the photo goes again) and the product keeps the photo it had. On the installed app, Android's Back on the dialog
+// with something typed and not saved asks «Discard changes?» («Keep editing» / «Discard changes») instead of closing it
+// (hub#1015, `useUnsavedChanges` of base); as it opened, Back closes it.
 import { FormModal, InlineFeedback } from '@erplora/ui/components';
 import { type InputOf, type OutputOf, useCommand } from '@erplora/ui/sdk';
 import { useSession } from '@erplora/ui/shell';
 import { IonButton, IonCheckbox, IonInput, IonNote, IonSelect, IonSelectOption, IonTextarea } from '@ionic/vue';
-import { computed, ref, watch } from 'vue';
+import { computed, ref, useTemplateRef, watch } from 'vue';
 
 import BusinessMoneyError from '../../../../base/frontend/components/BusinessMoneyError.vue';
 import ImageField from '../../../../base/frontend/components/ImageField.vue';
-import { draftOf, type ImageDraft, useImageSave } from '../../../../base/frontend/lib/item-image';
+import { draftOf, type ImageDraft, imageStep, useImageSave } from '../../../../base/frontend/lib/item-image';
+import { useUnsavedChanges } from '../../../../base/frontend/lib/unsaved-changes';
 import { useT } from '../composables/useT';
 import type { Unit } from '../composables/useUnits';
 import { errorFields } from '../lib/errors';
@@ -154,6 +157,17 @@ const unitOptions = computed(() =>
   props.units.length ? props.units.map((unit) => ({ code: unit.code, label: unit.name })) : [{ code: form.value.unit, label: form.value.unit }],
 );
 
+/** Something typed or chosen, the photo included, that is not saved: on the installed app Android's Back asks before it
+ *  throws that away (hub#1015); as it opened, Back closes it. Read against what it opened with, which follows the
+ *  business's currency (the watch above), so a price only rewritten in it is not a change. */
+const unsaved = computed(() => {
+  const now = form.value;
+  const was = original.value;
+  const changed = (Object.keys(now) as (keyof Fields)[]).some((key) => String(now[key]) !== String(was[key]));
+  return changed || imageStep(props.product?.image ?? '', image.value).kind !== 'none';
+});
+useUnsavedChanges(useTemplateRef<HTMLElement>('fields'), unsaved);
+
 function set<K extends keyof Fields>(key: K, value: Fields[K]): void {
   form.value = { ...form.value, [key]: value };
 }
@@ -244,7 +258,10 @@ function retryPhoto(): void {
     :submit-disabled="!complete || !!photo.failure.value"
     @submit="save"
   >
-    <div class="product-form">
+    <div
+      ref="fields"
+      class="product-form"
+    >
       <BusinessMoneyError />
       <InlineFeedback
         v-if="photo.failure.value"

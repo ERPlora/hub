@@ -448,13 +448,11 @@ un fichero en base64 de hasta 5 MB) y el QR (`website.qr.get`, una imagen en bas
 las tres lecturas públicas de los visitantes (`website.public.*`), ni las dos con las que su tarjeta nombra una imagen
 o una categoría (`website.image.get` y `website.category.get`).
 
-Antes de guardar, el asistente pide confirmar con su tarjeta (BASE-F97), que nombra cada cosa como la nombra el
-editor, nunca por su id ni por su código: cada imagen (el logotipo, la portada, la foto de Sobre nosotros y las de la
-galería) por el nombre del archivo con el que se subió («logo-pepe.png»; una subida de antes de guardarse ese nombre,
-por su formato y tamaño, «PNG 1200 × 800»), cada categoría del catálogo por su nombre («Peluquería»), la paleta
-(«Océano»), el fondo de la página («Claro», «Oscuro», «Automático»), lo que muestra el catálogo («Productos»,
-«Servicios») y los días del horario («Lunes»). Lo que quien pregunta no puede ver no sale: una imagen de otro negocio,
-una categoría que ya no está o de una app apagada.
+Antes de guardar, el asistente pide confirmar con su tarjeta (BASE-F97), que resume lo que cambia con las palabras del
+editor, nunca volcando la web entera ni sus códigos: el diseño («Moderna»), el tema (la paleta «Bosque», los colores
+propios si los hay y el fondo «Oscuro»), cada sección que se oculta o se muestra («Galería: se oculta») y, por sus
+nombres, las demás secciones cuyo contenido cambia («Contenido: Cabecera, Contacto»). Si el borrador no cambia, dice
+«Sin cambios».
 
 ### Lo que avisa
 
@@ -615,20 +613,15 @@ una categoría que ya no está o de una app apagada.
   los visitantes, sin sesión. Esas seis esperan al marcador `INTERNAL` y al check `live.E017` de la ronda 2026-10-22b
   (PLAN §30), que aún no existen en `packages/live`. Lo comprueba `tests/test_apps.py`, que también exige descripción
   en cada campo de `SaveIn`.
-- La tarjeta de confirmación del asistente (BASE-F97, hub#679) nombra cada registro de un guardado con las marcas
-  `refers` de `schemas.py`, leídas como quien pregunta: el `id` de toda `ImageRef` (`AN_IMAGE`: logotipo, portada,
-  foto de Sobre nosotros y fotos de la galería) con `website.image.get` (permiso ver), que responde el `filename` que
-  guarda `website.image.upload` desde la migración 0005 (la primera subida de esos bytes manda; una de antes, vacío,
-  sale por su formato y tamaño), y cada `category_ids` (`A_CATEGORY`) con `website.category.get` (permiso
-  gestionar), que la busca en las categorías de Inventario y de Servicios que estén activas, como
-  `website.catalog.categories`. Las dos son `INTERNAL`, sin ruta ni consulta viva (`tests/test_apps.py`,
-  `tests/test_api.py`). Las cuatro listas cerradas que viven dentro del JSON del sitio (`theme.palette`, `theme.mode`,
-  `content.catalog.source` y `content.contact.hours[].day`) no tienen campo de modelo con `choices`: las declara
-  `choices.py`, con contexto `website`, y `WebsiteConfig.choices` (`LiveAppConfig.choices` de `packages/live`) se las
-  da a la tarjeta; los días son los mismos que pinta la página pública (`render._day_names`). Las etiquetas son las
-  palabras del editor en `en` y `es` (`tests/test_choices.py`). Sin permiso, de otro negocio o que ya no está: el
-  registro queda fuera, nunca su id (`tests/test_assistant_card_records.py`); el trinquete de
-  `base/tests/test_assistant_card_values.py` impide que entre un dato sin marca o una lista sin etiqueta.
+- La tarjeta de confirmación del asistente (BASE-F97, hub#679 y hub#693): `base.assistant._card_details` traduce el
+  detalle con las marcas `refers` de `schemas.py`, leídas como quien pregunta (cada imagen por `website.image.get` y
+  cada categoría por `website.category.get`, las dos `INTERNAL`, sin ruta ni consulta viva) y las listas cerradas de
+  `choices.py` (`WebsiteConfig.choices`). Después, el `summary` que `website.site.save` declara en su `ai=`
+  (`services._save_summary`) lo sustituye por una sola línea que compara el borrador enviado con el guardado: diseño,
+  tema, secciones que se ocultan o se muestran y nombres de las demás secciones cambiadas. `SECTION_LABELS` de
+  `choices.py` da esos nombres con las palabras del editor en `en` y `es` (`tests/test_choices.py`). Sin permiso, de
+  otro negocio o que ya no está: el registro queda fuera, nunca su id (`tests/test_assistant_card_records.py`); el
+  trinquete de `base/tests/test_assistant_card_values.py` impide que entre un dato sin marca o una lista sin etiqueta.
 - **Paletas** (`palettes.json` + `palettes.py`, ronda 2026-10-22): las ocho paletas, cada una con su juego claro y
   oscuro (principal, página, franjas, texto, enlaces y bordes) y el color secundario; el editor lee el mismo fichero.
   `tests/test_palettes.py` comprueba WCAG AA (4,5:1) en los dos modos para texto, texto atenuado, enlaces, botones y

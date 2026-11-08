@@ -1498,6 +1498,12 @@
     "money": {
       "unreadable": "The business's currency could not be read",
       "retry": "Retry"
+    },
+    "unsavedChanges": {
+      "title": "Discard changes?",
+      "message": "What you typed in this window has not been saved.",
+      "keep": "Keep editing",
+      "discard": "Discard changes"
     }
   }
 }

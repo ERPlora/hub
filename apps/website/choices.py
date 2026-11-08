@@ -1,8 +1,9 @@
 """The labels of the closed lists the website keeps inside its JSON, where no field of its models holds them: the palette
 and the background of the theme, what the catalog shows and the days of the opening hours (``schemas``). The app
 declares them (``WebsiteConfig.choices``) so the assistant's card says each value by the word the editor shows, never
-by its code; the public page says the days with the same ones (``render``). Each with the website's own context: a word
-another app translates its way never reaches them (hub#661).
+by its code; the public page says the days with the same ones (``render``). ``SECTION_LABELS`` names each section in
+the save card's summary. Each with the website's own context: a word another app translates its way never reaches them
+(hub#661).
 """
 
 from django.utils.translation import pgettext_lazy
@@ -35,6 +36,17 @@ DAY_LABELS = (
     ("sat", pgettext_lazy("website", "Saturday")),
     ("sun", pgettext_lazy("website", "Sunday")),
 )
+SECTION_LABELS = {
+    "topbar": pgettext_lazy("assistant card", "Top bar"),
+    "hero": pgettext_lazy("assistant card", "Header"),
+    "about": pgettext_lazy("assistant card", "About us"),
+    "catalog": pgettext_lazy("assistant card", "Catalog"),
+    "gallery": pgettext_lazy("assistant card", "Gallery"),
+    "reviews": pgettext_lazy("assistant card", "Google reviews"),
+    "contact": pgettext_lazy("assistant card", "Contact"),
+    "location": pgettext_lazy("assistant card", "Location"),
+    "footer": pgettext_lazy("assistant card", "Footer"),
+}
 
 #: Each closed list by the name of its datum in the schemas, as ``LiveAppConfig.choices`` takes them.
 CHOICES = {"palette": PALETTE_LABELS, "mode": MODE_LABELS, "source": SOURCE_LABELS, "day": DAY_LABELS}
