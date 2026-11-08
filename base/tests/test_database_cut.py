@@ -284,7 +284,7 @@ def test_a_page_that_stays_cut_says_come_back_in_the_language_of_the_visitor(hub
         message = DatabaseCut(repeatable=True).message
     assert response.status_code == 503, response.content
     assert int(response["Retry-After"]) > 0
-    assert "base/hub_maintenance.html" in [template.name for template in response.templates]
+    assert "base/database_cut.html" in [template.name for template in response.templates]
     assert message in response.content.decode()
 
 

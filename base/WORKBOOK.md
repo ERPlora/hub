@@ -2972,8 +2972,8 @@ llegar la respuesta. Recarga la página en unos segundos para verlo.» (`databas
 consulta que tarda demasiado, un fallo del programa) sigue siendo el error de siempre. Las llamadas de erplora.com a
 `/internal` y `/readyz` reciben su 503 al momento, sin esperar: erplora.com reintenta por su cuenta, y `/readyz` tiene
 que decir que la base no está antes de que sus sondas se cansen.
-Implicados: ACCOUNTS-F50 (su gemelo de erplora.com), Demo (sus cambios se repiten), la página de un negocio que se muda
-de servidor (la misma página, con su propio texto); hub#831, hub#1051 y hub#1052
+Implicados: ACCOUNTS-F50 (su gemelo de erplora.com), Demo (sus cambios se repiten), las demás páginas de espera del Hub
+(un negocio que se prepara o se muda de servidor: el mismo aspecto); hub#831, hub#1051 y hub#1052
 
 ## Para quien lo mantiene
 

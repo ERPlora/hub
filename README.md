@@ -79,8 +79,11 @@ corte y qué se repite, en el README de `packages/live`):
 - **`repeatable=True`** solo lo lleva un comando que no toca nada más que su base; hoy, los de Demo, la app de referencia
   (las demás apps, en hub#1051). Nunca uno que cobra, numera, genera un QR, envía a la AEAT o llama a un tercero.
 - **Pasado el tope, o si no se puede repetir:** 503 con `Retry-After`, nunca un 500 (`base.database_cut.server_error`, el
-  `handler500`): el sobre para la API, y para el navegador `base/hub_maintenance.html`, que se recarga sola. Al abrir la
+  `handler500`): el sobre para la API, y para el navegador `base/database_cut.html`, que se recarga sola. Al abrir la
   base del negocio, el 503 es el de siempre, `base.hub_unavailable`, pero después de esperar.
+- **Páginas de puerta:** todas (preparando, de baja, en mudanza, suspendido, volver a entrar, demasiados intentos, el salto
+  a la entrada y el corte) extienden un solo layout, `base/gate.html`, con la marca en `base/_gate_brand.html`; cada una
+  dice solo su título, su cabecera y su texto (`base/tests/test_gate_pages.py` lo exige).
 - **Sin espera:** `/internal/` (el SaaS reintenta por su cuenta) y `/readyz`. El pool de control lleva `check`: nunca
   entrega una conexión que el servidor cortó mientras esperaba en él.
 - En la suite, el tope es 1 s (`config/settings_pytest.py`); `base/tests/test_database_cut.py` corta de verdad, con

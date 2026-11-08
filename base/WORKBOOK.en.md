@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:48bb8ea3c966ffcf3d2ed87eac25f17cac9e8dc3fa3f4bd2eaba9bd3581df09d -->
+<!-- generated from WORKBOOK.md sha256:3de8c8a8f93ffa736166abf2e3e07a08a4084851ee0c4dcfb16575ed6e17743d -->
 
 ## What it is for and who it is for
 
@@ -2844,5 +2844,5 @@ the answer arrived. Reload the page in a few seconds to see it.» (`database_ans
 takes too long, a fault of the program) stays the error it always was. erplora.com's calls to `/internal` and `/readyz`
 get their 503 at once, without waiting: erplora.com tries again on its own, and `/readyz` has to say the database is gone
 before its probes give up.
-Involved: ACCOUNTS-F50 (its twin on erplora.com), Demo (its changes repeat), the page of a business moving to another
-server (the same page, with its own text); hub#831, hub#1051 and hub#1052
+Involved: ACCOUNTS-F50 (its twin on erplora.com), Demo (its changes repeat), the Hub's other waiting pages (a business
+being prepared or moving to another server: the same look); hub#831, hub#1051 and hub#1052
