@@ -334,6 +334,8 @@ export interface RecurringDetailOut extends RecurringOut {
   next_date: string | null;
   upcoming: number;
   charged: number;
+  /** How a person names it, as the series list titles one (customer · repetition · weekday · hour). */
+  label: string;
 }
 
 export interface RecurringListIn extends PageIn {

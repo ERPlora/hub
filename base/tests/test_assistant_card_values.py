@@ -406,7 +406,6 @@ def test_no_list_of_texts_sent_as_they_are_is_named():
 #: them out. An attempt key (``attempt_key``) is no reference. Only ever lower: an app that marks its own lowers its
 #: number here, and none comes in.
 UNNAMED_REFERENCES = {
-    "appointment": 12,
     "invoice": 1,
     # The sale and the appointment a voucher or a session came from, the line of a sale that charged a voucher, the line
     # of an order that holds a session and the reference of a return: data of apps Services does not require, so it
@@ -538,6 +537,11 @@ TITLED_IN_SPANISH = {
     **{f"appointment.appointment.{action}:id": "Cita" for action in (
         "cancel", "charge", "complete", "confirm", "delete", "mark_no_show", "reschedule", "start", "update",
     )},
+    "appointment.appointment.bulk_delete:ids": "Citas",
+    "appointment.blocked_time.delete:id": "Bloqueo",
+    **{f"appointment.recurring.{action}:id": "Cita periódica" for action in (
+        "activate", "deactivate", "delete", "materialize", "update",
+    )},
     "attendance.record.close_for_terminated:id": "Persona",
     "base.api_key.revoke:id": "Clave de API",
     "base.device.remove:id": "Dispositivo",
@@ -557,6 +561,11 @@ TITLED_IN_SPANISH = {
     **{f"customer.group.{action}:id": "Grupo" for action in ("delete", "update")},
     **{f"customer.tag.{action}:id": "Etiqueta" for action in ("delete", "update")},
     **{f"demo.item.{action}:id": "Elemento" for action in ("add_line", "delete", "update")},
+    **{f"flow.flow.{action}:id": "Automatización" for action in (
+        "delete", "duplicate", "grant", "run", "set_enabled", "update",
+    )},
+    "flow.question.answer:id": "Pregunta",
+    "flow.run.retry:id": "Ejecución",
     **{f"inventory.category.{action}:id": "Categoría" for action in ("delete", "update")},
     **{f"inventory.product.{action}:id": "Producto" for action in (
         "delete", "print_label", "set_image", "set_sold_out", "update",
@@ -629,13 +638,13 @@ def test_every_datum_the_screen_knows_that_a_write_titles_is_called_by_its_title
     assert not {title for title in titles.values() if title.lower() in {"id", "ids"} or "_" in title}
 
 
-def test_every_dangerous_write_of_the_platform_titles_the_record_it_names():
-    """The record a dangerous write of the platform acts on is called as its screen calls it, in the person's language
-    («Dispositivo: Barra», «Evento caído: …»), never «Registro»: its schema titles it, and a catalog says that title in
-    Spanish. One that does not comes in here (FIX-HUB-BASE-ASSISTANT-DANGER-CARD-CALLS-THE-RECORD-BY-ITS-FIELD-NAME)."""
+def test_every_dangerous_write_of_the_platform_and_flow_titles_the_record_it_names():
+    """The record a dangerous write of the platform or Automations acts on is called as its screen calls it, in the
+    person's language («Dispositivo: Barra», «Automatización: Bienvenida»), never «Registro»: its schema titles it,
+    and a catalog says that title in Spanish. One that does not comes in here."""
     untitled = []
     for op in writes():
-        if op.app_label != "base" or assistant.risk(op) != "high":
+        if op.app_label not in {"base", "flow"} or assistant.risk(op) != "high":
             continue
         props = op.input.model_json_schema().get("properties", {})
         with translation.override("es"):
