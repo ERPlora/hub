@@ -283,6 +283,16 @@ describe('InboxPage: the channel notices (WHATSAPP_INBOX-F01, F02, F13)', () => 
     expect(near.find('whatsapp-inbox-near-cap').exists()).toBe(false);
   });
 
+  it.each([
+    ['es', 149, 'Te queda 1 de 150 mensajes de WhatsApp de tu plan este mes.'],
+    ['es', 120, 'Te quedan 30 de 150 mensajes de WhatsApp de tu plan este mes.'],
+    ['en', 149, 'You have 1 of 150 WhatsApp messages of your plan left this month.'],
+    ['en', 120, 'You have 30 of 150 WhatsApp messages of your plan left this month.'],
+  ] as const)('in %s, near the cap with %i sent: the singular for one message left, the plural from two (hub#1044)', async (locale, used, said) => {
+    const near = await setup({ locale }, { ...CONNECTED, monthly_usage: used });
+    expect(near.find('whatsapp-inbox-near-cap').text()).toContain(said);
+  });
+
   it('a plan without WhatsApp messages says so above the list, «Upgrade plan» for whoever configures (ADR-0474: 0 = none)', async () => {
     const none = { ...CONNECTED, monthly_limit: 0, monthly_usage: 0, cap_reached: true };
     const s = await setup({}, none);

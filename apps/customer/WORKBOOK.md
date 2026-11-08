@@ -80,10 +80,8 @@ ERPlora no inventa flujos: adopta los que el mercado ya probó.
 5. Comprobar en el TPV que la ficha sale en el buscador y que la venta se cobra con ella
    (CUSTOMER-F17).
 
-⚠️ El negocio es la primera parte de la dirección (`a.localhost:8000` es el negocio `a`). Mientras
-los negocios viven en la base de datos compartida del principio, **comparten las fichas**; lo que ya
-se separa es el aviso en vivo. Cada negocio pasa a tener su propia base de datos, y con ella sus
-fichas, a medida que la plataforma se la da.
+El negocio es la primera parte de la dirección (`a.localhost:8000` es el negocio `a`), y cada negocio
+tiene su propia base de datos: sus fichas solo las ve ese negocio.
 
 ## Pantallas
 

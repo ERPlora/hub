@@ -56,6 +56,7 @@ from apps.sale.models import (
     SaleLine,
     SalePayment,
     Settings,
+    VoucherSession,
     sale_number,
 )
 from apps.sale.queries import (
@@ -119,6 +120,8 @@ from apps.sale.queries import (
 )
 from apps.sale.schemas import (
     VoucherLineOut,
+    VoucherSessionIn,
+    VoucherSessionOut,
     VoucherSoldIn,
     VoucherUnsoldIn,
     COUNTRY_CODE,
@@ -170,6 +173,7 @@ from apps.sale.schemas import (
     SplitLineOut,
     VoidIn,
 )
+from apps.tax.queries import business_today
 
 #: Units one line may be split into (a voucher covers one line of one unit).
 MAX_LINE_SPLIT = 50
@@ -2472,6 +2476,37 @@ def voucher_unsold(ctx: OperationContext, data: VoucherUnsoldIn) -> dict:
     SaleLine.objects.filter(pk=line.pk).update(voucher_sold_amount=max(line.voucher_sold_amount - data.amount, 0))
     record_event(ctx, events.SALE_VOUCHER_LINE_CHANGED, {"sale_id": str(line.sale_id), "line_id": str(line.id)})
     return {"sale_id": line.sale_id, "line_id": line.id}
+
+
+@operation(
+    "sale.voucher_session.record",
+    kind="command",
+    permission="sale.add_sale",
+    input=VoucherSessionIn,
+    output=VoucherSessionOut,
+    ai=INTERNAL,
+)
+def record_voucher_session(ctx: OperationContext, data: VoucherSessionIn) -> dict:
+    """Services' step when a session of a voucher is spent outside the till saying who did it (SERVICE-F21): no line
+    carries it, so what it is worth counts in her production on today's business day (SALE-F28), the till's: the day a
+    sale charged at that moment would count on (hub#771). Whoever may sell may say who did a service, as on a line.
+    The same session told again counts once: the first telling stays."""
+    session, created = VoucherSession.objects.get_or_create(
+        session_id=data.session_id,
+        defaults={"staff_id": data.staff_id, "business_day": business_today(), "value": data.value},
+    )
+    if created:
+        record_event(
+            ctx,
+            events.VOUCHER_SESSION_RECORDED,
+            {"session_id": str(session.session_id), "staff_id": str(session.staff_id)},
+        )
+    return {
+        "session_id": session.session_id,
+        "staff_id": session.staff_id,
+        "business_day": session.business_day,
+        "value": session.value,
+    }
 
 
 def _voucher_value(line: OrderLine, session_values: dict) -> int:

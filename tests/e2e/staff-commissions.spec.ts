@@ -6,13 +6,14 @@
 // Seen at 390×844, 834×1112 and 1440×900 (`.artifacts/FIX-STAFF-COMMISSION-SCREEN-<width>.png`). An
 // employee has no Commissions tab, the page tells them «You do not have permission» and the API refuses.
 // A session of a voucher (SALE-F27) charges nothing and still counts for who did it, at its value (hub#685);
-// whoever sold the voucher counts nothing for it (hub#769).
+// whoever sold the voucher counts nothing for it (hub#769). One spent outside the checkout saying who did it counts
+// for her too, and the screen repaints by itself when another is spent (SERVICE-F21, hub#770).
 // Setup goes through the apps' own APIs (Staff, Inventory, Sales); what the run creates is named «E2E…»
 // and removed after it (and before, if a run died half-way).
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { cleanUp as cleanCustomers, createCard, e2eName } from './customer-helpers';
-import { A, api, type Credentials, EMPLOYEE, login, psql, shot, shown } from './helpers';
+import { A, api, capture, type Credentials, EMPLOYEE, login, psql, saveSessionForTheSweep, shot, shown } from './helpers';
 import { cleanInventory, createProduct } from './inventory-helpers';
 import { snapshotSeries } from './invoice-helpers';
 import { chargeByApi, cleanSales, type SaleOut, stamp } from './sale-helpers';
@@ -211,6 +212,55 @@ test('STAFF-F21 (paso 3: la comisión del día): an employee has no Commissions 
     await expect(shown(page).locator('[data-testid=staff-commissions-forbidden]')).toContainText('You do not have permission');
     const refused = await api<{ error?: { code: string } }>(context, A, 'GET', '/staff/commissions/report');
     expect([refused.status, refused.data.error?.code]).toEqual([403, 'permission_denied']);
+  } finally {
+    await context.close();
+  }
+});
+
+test('STAFF-F21 (paso 3: la comisión del día): a session spent outside the checkout saying who did it counts for her, painted live', async ({ browser }) => {
+  // flow: SERVICE-F21, SALE-F28: the reproduction of hub#770 on the screen («Ana» did it, her production goes up).
+  test.setTimeout(180_000);
+  const { context, page } = await signedIn(browser, '/staff/commissions');
+  try {
+    const ana = await member(context, 'Ana', '15');
+    const cut = await post<{ id: string }>(context, '/service/services', { name: named('Corte'), price: 2500, tax_category_key: 'service.generic' });
+    const lucia = await createCard(context, { name: e2eName('Lucía') });
+    const voucher = await post<{ id: string }>(context, '/service/packages', { name: named('Bono 3'), max_uses: 3, items: [{ service_id: cut.id }] });
+    // Charged at the till at an open price by nobody in particular, and granted saying that sale.
+    const sold = await chargeByApi(context, {
+      open_lines: [{ name: 'e2e Bono', unit_price: 10000, tax_category_key: 'service.generic' }],
+      payments: CARD,
+    });
+    const grant = await post<{ id: string }>(context, '/service/grants', { package_id: voucher.id, customer_id: lucia.id, amount: 10000, sale_id: sold.id });
+    const spent = await post<{ member_id: string; member_name: string; remaining: number }>(
+      context,
+      '/service/grants/redeem',
+      { id: grant.id, service_id: cut.id, member_id: ana.id },
+      200,
+    );
+    expect(spent).toMatchObject({ member_id: ana.id, member_name: ana.full_name, remaining: 2 });
+    // The server: 100.00 € in 3 sessions, the first 33.33 €, at 15 % = 4.9995 → 5.00 €.
+    expect(await reported(context, ana.id)).toMatchObject({ sold: 3333, commission: 500 });
+
+    await page.goto(`${A}/staff/commissions`);
+    await expect(rowOf(page, ana.id)).toContainText('€33.33');
+    await expect(rowOf(page, ana.id)).toContainText('€5.00');
+
+    // Another session outside the checkout reaches the screen by itself: 33.33 + 33.34 = 66.67 €, at 15 % = 10.00 €.
+    await post(context, '/service/grants/redeem', { id: grant.id, member_id: ana.id }, 200);
+    await expect(rowOf(page, ana.id)).toContainText('€66.67');
+    await expect(rowOf(page, ana.id)).toContainText('€10.00');
+    await saveSessionForTheSweep(context);
+
+    for (const viewport of VIEWPORTS) {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      await expect(async () => {
+        await rowOf(page, ana.id).scrollIntoViewIfNeeded({ timeout: 2000 });
+        await expect(rowOf(page, ana.id)).toBeInViewport({ timeout: 1000 });
+      }, `Ana at ${viewport.label}`).toPass();
+      await expect(rowOf(page, ana.id)).toContainText('€66.67');
+      await capture(page, `HUB-770-COMMISSIONS-OFF-TILL-${viewport.label}`);
+    }
   } finally {
     await context.close();
   }

@@ -231,7 +231,7 @@ Avisos de la pantalla: el resultado de cada acción en una franja arriba (verde 
 
 | ID | Flujo | Estado |
 |---|---|---|
-| VERIFACTU-F01 | Activar VeriFactu | hecho — encender la app en el Hub es activarla (la activación por hub llega con la fase 2); fuera de España, Apps no la ofrece y el hub la niega (`can_enable`, hub#694), y una ya encendida no registra ni envía nada (FIX-HUB-VERIFACTU-ON-FOR-A-BUSINESS-OUTSIDE-SPAIN) |
+| VERIFACTU-F01 | Activar VeriFactu | hecho — encender la app en el Hub es activarla, en ese negocio; fuera de España, Apps no la ofrece y el hub la niega (`can_enable`, hub#694), y una ya encendida no registra ni envía nada (FIX-HUB-VERIFACTU-ON-FOR-A-BUSINESS-OUTSIDE-SPAIN) |
 | VERIFACTU-F02 | Subir el certificado propio del negocio | hecho — en el Hub; cifrado en la BD del hub con `FISCAL_CERTIFICATE_KEY` |
 | VERIFACTU-F03 | Quitar el certificado propio | hecho — en el Hub |
 | VERIFACTU-F04 | Elegir quién remite: mi certificado o ERPlora | hecho |
@@ -269,7 +269,7 @@ Avisos de la pantalla: el resultado de cada acción en una franja arriba (verde 
 
 ### VERIFACTU-F01 Activar VeriFactu
 <!-- origen: old-hub:HUB-F300 old:verifactu/workflow/configuracion.md#verifactu-f01 -->
-Estado: hecho — encender la app en el Hub es activarla (la activación por hub llega con la fase 2); fuera de España, Apps no la ofrece y el hub la niega (`can_enable`, hub#694), una ya encendida no registra ni envía nada (FIX-HUB-VERIFACTU-ON-FOR-A-BUSINESS-OUTSIDE-SPAIN) y el Inicio no le pide «Configura VeriFactu» (hub#682); ninguna plantilla la enciende, tampoco en España: la activa el dueño (hub#998)
+Estado: hecho — encender la app en el Hub es activarla, en ese negocio; fuera de España, Apps no la ofrece y el hub la niega (`can_enable`, hub#694), una ya encendida no registra ni envía nada (FIX-HUB-VERIFACTU-ON-FOR-A-BUSINESS-OUTSIDE-SPAIN) y el Inicio no le pide «Configura VeriFactu» (hub#682); ninguna plantilla la enciende, tampoco en España: la activa el dueño (hub#998)
 Actor: administrador
 Pantalla: Hub: Apps
 Pasos:
@@ -1294,7 +1294,7 @@ app: gh:verifactu#139). Tests: `test_apps.py` (declaración, textos `en` + `es`,
   del contrato (ronda 2026-10-22b, PLAN §30: VeriFactu en Gratis): mientras un SaaS anterior lo siga mandando, se
   acepta y no se lee, y su columna (`Config.live_paid`) se queda sin lectura ni escritura hasta que un paso de
   contracción la borre.
-  La recibe `base/internal.py` (fase 1, sin registro de hubs): firma HMAC v1 o v2 (la v2, si viene, decide sola),
+  La recibe `base/internal.py`: firma HMAC v1 o v2 (la v2, si viene, decide sola),
   ±300 s, `INTERNAL_SHARED_SECRET` y, en una rotación, `INTERNAL_SHARED_SECRET_PREVIOUS`; sin firma, `401
   internal.unsigned`. Nombra su hub por `slug` (`422 internal.slug_invalid`); un `hub_id` distinto del de la ruta,
   `422 internal.hub_mismatch`; fuera de contrato, `422 internal.payload_invalid`. Aplica el bloque `verifactu` y el
@@ -1339,7 +1339,7 @@ app: gh:verifactu#139). Tests: `test_apps.py` (declaración, textos `en` + `es`,
   igual (`fiscal_gateway`, 409).
 - **Hub de demostración** (PLAN-SAAS §3.5; `base.Hub.is_demo`, que lee `base.operations.is_demo_hub`): nunca pasa a
   producción (`go_live` → 409 `verifactu.go_live_forbidden`) y todo lo que sella va a la AEAT de pruebas
-  (`queries.effective_environment`), aunque en la fase 1 comparta tablas con un negocio que ya está en producción.
+  (`queries.effective_environment`), diga lo que diga su configuración.
 
 ### La cola y el envío
 
@@ -1640,8 +1640,9 @@ Del bloque fiscal del 2026-10-15 (el resto, en PLAN-HUB §8, «Bloque fiscal: lo
 - **Subsanar y anular en producción sin ruta**: no se rechazan (no son cobros) y esperan en la cola.
 - **Arrastrar y soltar los ficheros** (certificado y otorgamiento): falta el componente de subida en
   `@erplora/ui`; hoy, un botón y el nombre del fichero.
-- **`create_platform_hub` solo cuando haya una BD por hub** (fase 2): en la fase 1 hay una sola BD y su emisor
-  sería el de todos los hosts; el comando se niega si ya hay otro emisor.
+- ~~**`create_platform_hub` solo cuando haya una BD por hub**~~ — **cerrada** por el corte S5 (hub#602): el comando da
+  al hub de plataforma su fila del registro y su BD, como un alta, y su emisor solo está en ella; se sigue negando
+  si ya hay otro emisor. Que ERPlora emita sus facturas desde él es hub#502.
 - **OSS**: la factura de plataforma no lleva el aviso «VAT included — customer VAT number could not be verified»
   del PDF antiguo cuando el NIF-IVA del cliente no se pudo verificar.
 
@@ -1655,9 +1656,10 @@ Al cerrar la app (CLOSE-VERIFACTU, 2026-10-27), lo que sigue en la cola fuera de
   (saas#210, contradicción 11): la pasarela ya no pide el otorgamiento en pruebas, y el registro de pruebas de un
   negocio sin otorgamiento aprobado, que desde hub#454 llega a la pasarela como ese negocio, se presenta a la AEAT de
   pruebas en vez de esperar con `representation_not_approved`.
-- **El NIF de ERPlora tecleado por un negocio en la BD compartida** (fase 1, hasta una BD por hub): la pasada del hub
-  de ERPlora no distingue ese emisor del de ERPlora y lo presenta como `erplora` (saas#2524); cuando cada hub tenga su
-  BD (tenencia), la pasada de cada uno corre en el ámbito de su negocio y presenta con su slug.
+- ~~**El NIF de ERPlora tecleado por un negocio en la BD compartida**~~ — **cerrada** por el corte S5 (hub#602): la
+  pasada de cada negocio corre en su BD y en su ámbito (`base.worker`), así que presenta con su slug
+  (`queries.presenter`) y nunca como `erplora` (saas#2524). La rama de `presenter` para el registro de otro negocio en
+  el hub de plataforma solo la alcanza el respaldo de los tests (hub#1053).
 - **Contracción de `live_paid`** (`## 6` del registro de migración): la columna `Config.live_paid` (migración
   `0003_live_paid`) sigue sin lectura ni escritura y `ConfigSyncIn` acepta e ignora el campo hasta que ningún SaaS
   desplegado lo mande (expand/contract, hub#205 y saas#108).
