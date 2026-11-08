@@ -227,6 +227,12 @@ fueran los del negocio.
 | App inactiva | «Esta app no está activa en este negocio» en lugar de las cifras y de la tabla. |
 | Sin permiso | No aparece lo que no puede hacer (ni **+**, ni importar o exportar, ni las acciones de stock, ni el interruptor: «Sí»/«No»); Ajustes no sale y su dirección dice «Esta página no existe»; si pierde el permiso con Ajustes abierto, los campos se bloquean con «No tienes permiso para cambiar estos ajustes. Pídeselo a un administrador si lo necesitas.». |
 
+## Cambios sin guardar en Android
+
+En las ventanas de categoría y de movimientos de stock (recibir, recuento y merma), el botón atrás del móvil pregunta «¿Descartar los cambios?»
+cuando hay algo escrito o elegido sin guardar: «Seguir editando» conserva lo tecleado y «Descartar cambios»
+cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra sin preguntar (BASE-F05); el alta y la edición de producto preguntan igual (INVENTORY-F01, INVENTORY-F02).
+
 ## Flujos
 
 | ID | Flujo | Estado |

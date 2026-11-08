@@ -100,6 +100,12 @@ en solo lectura con «Solo un responsable o un administrador puede cambiar estos
 En las tres páginas: «Reconectando…» mientras el directo se recupera (lo pintado se queda), «Esta app
 no está activa en este negocio» si se apaga y «No tienes permiso» si el papel no llega.
 
+## Cambios sin guardar en Android
+
+En la ventana «Corregir jornada», el botón atrás del móvil pregunta «¿Descartar los cambios?»
+cuando hay algo escrito o elegido sin guardar: «Seguir editando» conserva lo tecleado y «Descartar cambios»
+cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra sin preguntar (BASE-F05); una hora que se reescribe sola en la zona del negocio no cuenta como cambio.
+
 ## Flujos
 
 | Flujo | Qué | Vertical | Estado |
