@@ -403,7 +403,9 @@ Entra: los avisos de las apps activas.
 Sale: el disparador, al **Guardar**.
 Si falla: un aviso que no existe en el negocio, un horario sin hora o una fecha pasada los rechaza el
 servidor al guardar, junto al campo. La fecha solo se mira si cambia: una automatización «Una vez» que ya
-se disparó se puede renombrar o pausar.
+se disparó se puede renombrar o pausar. Si la app de un aviso ya guardado se apaga después, la
+automatización se conserva como estaba; mientras esté apagada no empieza con avisos nuevos de esa app. Al
+volver a encenderla, sus avisos vuelven a poder arrancarla.
 Implicados: FLOW-F21, FLOW-F22, FLOW-F15
 
 ### FLOW-F11 Añadir, ordenar y rellenar los pasos
@@ -462,8 +464,11 @@ Si falla: el servidor rechaza al guardar una acción o una consulta que no exist
 de un paso que no va antes, una condición vacía o una espera fuera de rango, junto al paso. Si «¿Qué dato?» se
 abre antes de que lleguen las acciones de las apps (nada más entrar en el editor), dice «Cargando…» y, en cuanto
 llegan, enseña los datos de los pasos anteriores sin cerrarla; nunca «Todavía no hay datos que insertar aquí» con un
-paso delante. Si no se pueden leer, lo dice dentro, en rojo, con **Reintentar**.
-Implicados: FLOW-F12, FLOW-F13, FLOW-F16
+paso delante. Si no se pueden leer, lo dice dentro, en rojo, con **Reintentar**. Si una ejecución llega a
+una acción o consulta cuya app se apagó después de guardar la automatización, se para y Historial dice que
+esa acción ya no está disponible; la automatización y lo que hicieron los pasos anteriores se conservan.
+Tras volver a encender la app, **Reanudar desde el paso que falló** la continúa desde ahí (FLOW-F24).
+Implicados: FLOW-F12, FLOW-F13, FLOW-F16, FLOW-F24
 
 ### FLOW-F12 Conceder y retirar los permisos
 <!-- origen: old-hub:HUB-F98 old:flows/workflow/editor.md#flows-f19 -->
@@ -1375,8 +1380,11 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   toda operación con `ai.risk == "high"` (anular, devolver, borrar, enviar a Hacienda, `go_live`…) o que
   se hace en persona (`ai.in_person`: sentar a una reserva en la puerta, `reservation.reservation.seat`,
   revisión 2026-10-30; ningún sistema del mercado sienta por una automatización) queda fuera y se rechaza
-  al guardar, al conceder y al ejecutar con el código `flow.high_risk` (revisión 2026-10-15). «Activas» son hoy las instaladas (`queries.active_apps`), no las encendidas en el negocio:
-  el catálogo ofrece también lo de una app apagada (hub#1054).
+  al guardar, al conceder y al ejecutar con el código `flow.high_risk` (revisión 2026-10-15). «Activas» son las
+  que `base.relay.active_apps(ctx.scope)` resuelve con los derechos del SaaS y `base.activation.off_apps`, la
+  misma lectura que usa el relay y la guarda de operaciones; `queries.active_apps` solo descarta `flow` y
+  devuelve sus configuraciones. Una acción de una app apagada después de guardarla deja la ejecución en
+  `flow.action_unavailable`, sin borrar la automatización; se reanuda tras encenderla (hub#1054).
 - **La excepción «Que me lo pregunte»** (revisión 2026-10-30, FIX-HUB-FLOW-ASK-ME-FIRST-CANNOT-GRANT-A-CANCELLATION):
   `queries.ASK_FIRST` (`reservation.reservation.cancel` y, desde hub#634, `appointment.appointment.cancel`; nunca lo
   que se hace en persona, `asks_first`)

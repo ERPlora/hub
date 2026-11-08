@@ -415,7 +415,7 @@ def test_the_table_answer_turned_on_before_its_app_left_out_old_messages_never_a
 
 
 def app_name(label: str) -> str:
-    return str(queries.active_apps()[label].verbose_name)
+    return str(queries.active_apps(A)[label].verbose_name)
 
 
 def refused(flow_id: str, change: dict) -> InvalidPayload:

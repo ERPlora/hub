@@ -164,7 +164,7 @@ def test_what_is_done_in_person_stays_out_even_were_it_listed_to_ask_first(monke
     with pytest.raises(InvalidPayload) as refused:
         run("flow.flow.create", document(assistant(tools=["reservation.reservation.seat"])))
     assert refused.value.code == "flow.high_risk"
-    assert "reservation.reservation.seat" not in queries.ask_first_catalog()
+    assert "reservation.reservation.seat" not in queries.ask_first_catalog(A)
 
 
 def test_a_recipe_whose_assistant_asks_first_to_cancel_is_offered_and_turned_on(monkeypatch):
@@ -177,9 +177,9 @@ def test_a_recipe_whose_assistant_asks_first_to_cancel_is_offered_and_turned_on(
         "steps": [assistant()],
         "grants": {CANCEL: "Cancels the table after your yes."},
     }
-    reservation = queries.active_apps()["reservation"]
-    monkeypatch.setattr(recipes, "declarations", lambda: [(reservation, declared)])
-    offered, set_aside = recipes.shelf()
+    reservation = queries.active_apps(A)["reservation"]
+    monkeypatch.setattr(recipes, "declarations", lambda _scope: [(reservation, declared)])
+    offered, set_aside = recipes.shelf(A)
     assert ([recipe.ref for recipe in offered], set_aside) == (["reservation/cancel_by_message"], [])
     done = run("flow.recipe.enable", {"recipe": "reservation/cancel_by_message"})
     assert done.created is True

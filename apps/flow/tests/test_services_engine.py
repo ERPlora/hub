@@ -296,18 +296,26 @@ def test_an_action_that_says_no_stops_the_run_with_its_own_words():
     assert "project" in run_.log[0]["error"]["fields"]
 
 
-def test_an_action_whose_app_is_gone_is_unavailable(monkeypatch):
-    from apps.flow import queries
+def test_an_action_whose_app_is_gone_is_unavailable(django_capture_on_commit_callbacks):
+    make_flow(trigger_event="task.task.created")
+    run("base.app.disable", {"app": "task"})
+    deliver("task.task.created")
+    stopped = FlowRun.objects.get()
+    assert (stopped.status, stopped.error_code) == (
+        FlowRun.Status.FAILED,
+        "flow.action_unavailable",
+    )
+    assert Task.objects.count() == 0
 
-    make_flow()
-    active = {
-        label: config
-        for label, config in queries.active_apps().items()
-        if label != "task"
-    }
-    monkeypatch.setattr(queries, "active_apps", lambda: active)
-    deliver()
-    assert FlowRun.objects.get().error_code == "flow.action_unavailable"
+    with django_capture_on_commit_callbacks(execute=True):
+        run("base.app.enable", {"app": "task"})
+    resumed = run("flow.run.retry", {"id": str(stopped.id)})
+    assert (resumed.status, resumed.error_code, resumed.error_message) == (
+        FlowRun.Status.SUCCEEDED,
+        "",
+        "",
+    )
+    assert Task.objects.count() == 1
 
 
 def test_an_unexpected_failure_of_a_step_is_kept_and_visible(monkeypatch, caplog):
