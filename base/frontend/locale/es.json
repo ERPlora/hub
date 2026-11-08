@@ -1497,6 +1497,12 @@
     "money": {
       "unreadable": "No se ha podido leer la moneda del negocio",
       "retry": "Reintentar"
+    },
+    "unsavedChanges": {
+      "title": "¿Descartar los cambios?",
+      "message": "Lo que has escrito en esta ventana no se ha guardado.",
+      "keep": "Seguir editando",
+      "discard": "Descartar cambios"
     }
   }
 }

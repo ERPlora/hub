@@ -293,6 +293,11 @@ Pasos:
    una: cada una sale debajo del campo, con su botón para quitarla.
 6. Pulsa «Guardar» («Guardando…»). El panel se cierra y el producto sale en la tabla con Estado
    «Sí».
+7. En la aplicación de Android, el botón atrás del móvil con algo escrito o elegido sin guardar (la foto
+   también) no cierra el panel: pregunta «¿Descartar los cambios?» («Lo que has escrito en esta ventana no
+   se ha guardado.»). «Seguir editando», o atrás otra vez, deja el panel con lo escrito; «Descartar
+   cambios» lo cierra sin guardar nada. Con el panel como se abrió, atrás lo cierra sin preguntar
+   (hub#1015).
 Entra: las categorías fiscales y su tipo, de Impuestos; las unidades de medida y las categorías de
 producto, de Inventario.
 Sale: el producto, activo y enlazado a las categorías marcadas, en un solo paso: o se guarda
@@ -310,7 +315,7 @@ la unidad: «La cantidad no respeta el incremento permitido para esta unidad». 
 otro producto vivo: «Ese SKU ya existe en el catálogo»; un EAN-13 repetido: «Ese EAN-13 ya lo tiene
 otro producto del catálogo». Una categoría fiscal que ya no está en Impuestos se rechaza, también si
 llega por el asistente o la API. Todo rechazo sale dentro del panel y no se guarda nada.
-Implicados: SALE-F01, TAX-F01, TAX-F19
+Implicados: SALE-F01, TAX-F01, TAX-F19, BASE-F05
 
 ### INVENTORY-F02 Editar un producto
 <!-- origen: fi:modules/inventory#command-inventory-products-update fi:modules/inventory#query-inventory-products-get old:inventory/workflow/catalogo.md#inventory-f02 -->
@@ -323,7 +328,9 @@ Pasos:
 2. Cambia lo que haga falta. El SKU está bloqueado («El SKU es la identidad del producto: no se
    edita»). El stock no se edita aquí: se recibe (INVENTORY-F13) o se cuenta (INVENTORY-F14). El
    «Tipo» y el «Stock inicial» no salen.
-3. Pulsa «Guardar cambios». «Cancelar edición» o cerrar el panel lo deja como estaba.
+3. Pulsa «Guardar cambios». «Cancelar edición» o cerrar el panel lo deja como estaba. En la aplicación de
+   Android, el botón atrás con un cambio sin guardar pregunta antes, como en el alta (INVENTORY-F01, paso 7);
+   sin cambios, cierra el panel.
 4. La fila enseña los datos nuevos.
 Entra: el producto tal como está guardado; las categorías fiscales, de Impuestos; las unidades y
 las categorías de producto.
@@ -333,7 +340,7 @@ ahora: una cuenta abierta conserva el precio de cuando se pidió (lo decide Vent
 Si falla: los mismos rechazos que el alta (INVENTORY-F01), dentro del panel, y no se guarda nada.
 La categoría fiscal no se puede vaciar: el campo no tiene opción vacía. La unidad de un producto con stock no se cambia: «No se puede cambiar la unidad de
 un producto con stock. Cuenta su stock a cero y cámbiala después.».
-Implicados: SALE-F01, TAX-F01, TAX-F19
+Implicados: SALE-F01, TAX-F01, TAX-F19, BASE-F05
 
 ### INVENTORY-F03 Activar y desactivar un producto
 <!-- origen: wf:restaurante-dia#rec_restaurante-f03 old:inventory/workflow/catalogo.md#inventory-f03 -->
