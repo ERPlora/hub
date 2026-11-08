@@ -149,7 +149,12 @@ Lo que no puede comprobar el e2e, y lo pide la receta:
   cae con «429 · Too many attempts» en el login o en la 11.ª alta de la hora (10 por hora y dirección). Cada cuenta
   conserva su propio límite, y el freno de saltos al hub (`HUB_LOGIN_RATELIMIT`, arriba) no cambia. El e2e no lo puede
   comprobar: la marca vive en el entorno del proceso del SaaS, el SaaS no la dice por ninguna ruta y probarla gastaría
-  los intentos que protege.
+  los intentos que protege. Con ella va **`DEMO_SPAWN_RATELIMIT=100/h`**, el tope de demos nuevas por dirección, que
+  la marca no toca: el SaaS deja 3 por hora (`config/settings.py` del SaaS; producción se queda así) y cada pasada de
+  `demo.spec.ts` abre dos desde `127.0.0.1`, así que la segunda pasada de la hora se quedaba esperando la demo y caía
+  con la espera agotada (hub#1048). Sin Valkey, la cuenta vive en la memoria de ese `runserver` y solo se borra al
+  reiniciarlo. Si falta, `demo.spec.ts` cae diciendo `state=throttled` y esta variable; `demo-door.test.ts` exige que
+  todo `runserver` del SaaS de este README la lleve.
 - **Una pila por checkout**: dos Vite del mismo checkout comparten `node_modules/.vite` y se rompen el uno al
   otro al optimizar dependencias (la página se queda en blanco). Cada pila sale de su worktree.
 - **Las cuentas de demo, sembradas con los ids que el Hub dio a `a` y `b`**: el SaaS empuja la foto de un negocio a
@@ -181,7 +186,7 @@ env DB_NAME=saas_e2e_8031 HUB_INTERNAL_URL=http://127.0.0.1:8030 uv run python t
   $(docker compose exec -T postgres psql -U hub -d hub_e2e_8030 -At -c "select id from base_hub where slug in ('a', 'b') order by slug")
 env DB_NAME=saas_e2e_8031 VITE_DEV_PORT=5204 HUB_CALLBACK_TEMPLATE='http://{slug}.localhost:8030/auth/callback' \
   HUB_ADMIN_CALLBACK_URL='http://hubs.localhost:8030/auth/callback' HUB_INTERNAL_URL=http://localhost:8030 \
-  EMAIL_FILE_PATH="$PWD/.mail-8031" E2E_RELAX_LOGIN_RATE_LIMIT=True \
+  EMAIL_FILE_PATH="$PWD/.mail-8031" E2E_RELAX_LOGIN_RATE_LIMIT=True DEMO_SPAWN_RATELIMIT=100/h \
   uv run python manage.py runserver 127.0.0.1:8031   # su propio Vite en 5204 (saas#38); nunca --novite sobre el Vite de otro árbol
 # 3. El Hub de la pila y la e2e, desde su worktree (en otra terminal, con COMPOSE_FILE y las variables de 1 exportadas)
 cd <hub-wt>
@@ -207,6 +212,12 @@ specs no piden:
   su `HUB_INTERNAL_URL` en el Hub de esta pila (la receta de arriba la lleva): el SaaS crea la demo
   llamando él mismo a `/internal/demos`; apuntado a otro puerto, la crea en otro Hub y esta ejecución no la ve.
 - El mismo `INTERNAL_SHARED_SECRET` en los dos (en local, el valor por defecto de ambos).
+
+Y, como toda spec, el SaaS arrancado como dice la receta, también con `DEMO_SPAWN_RATELIMIT=100/h` (arriba, «Sus límites
+por dirección subidos»): cada pasada abre dos demos desde `127.0.0.1` y, con el tope de 3 por hora del SaaS, la segunda
+pasada de la hora no encuentra su demo. Cuando la puerta contesta a «Try the demo» con `/demo/?state=<resultado>` en vez
+de abrir la demo (`throttled`, `full`, `unavailable`…), la spec cae al momento diciendo ese resultado
+(`demo-door.ts`) y, con `throttled`, esa variable, en vez de agotar los 15 s de espera de la demo.
 
 ```bash
 CI=1 pnpm e2e tests/e2e/demo.spec.ts   # con las variables de la receta exportadas
@@ -237,7 +248,8 @@ escribe una clave real. Pide tres cosas al SaaS de la pila:
 env DB_NAME=saas_e2e_8871 VITE_DEV_PORT=6071 ASSISTANT_SERVICE_PROVIDER=e2e-local \
   HUB_CALLBACK_TEMPLATE='http://{slug}.localhost:8870/auth/callback' \
   HUB_ADMIN_CALLBACK_URL='http://hubs.localhost:8870/auth/callback' HUB_INTERNAL_URL=http://localhost:8870 \
-  EMAIL_FILE_PATH="$PWD/.mail-8871" E2E_RELAX_LOGIN_RATE_LIMIT=True uv run python manage.py runserver 127.0.0.1:8871
+  EMAIL_FILE_PATH="$PWD/.mail-8871" E2E_RELAX_LOGIN_RATE_LIMIT=True DEMO_SPAWN_RATELIMIT=100/h \
+  uv run python manage.py runserver 127.0.0.1:8871
 # La spec, con las variables de «Varias ejecuciones a la vez» exportadas (Hub en 8870):
 CI=1 pnpm e2e tests/e2e/base-assistant.spec.ts --workers=1
 ```
@@ -403,7 +415,7 @@ env $(node <hub-wt>/tests/e2e/whatsapp-graph.ts 8030 http://localhost:8031) \
   DB_NAME=saas_e2e_8031 VITE_DEV_PORT=5204 ASSISTANT_SERVICE_PROVIDER=e2e-local \
   HUB_CALLBACK_TEMPLATE='http://{slug}.localhost:8030/auth/callback' \
   HUB_ADMIN_CALLBACK_URL='http://hubs.localhost:8030/auth/callback' \
-  EMAIL_FILE_PATH="$PWD/.mail-8031" E2E_RELAX_LOGIN_RATE_LIMIT=True \
+  EMAIL_FILE_PATH="$PWD/.mail-8031" E2E_RELAX_LOGIN_RATE_LIMIT=True DEMO_SPAWN_RATELIMIT=100/h \
   uv run python manage.py runserver 127.0.0.1:8031
 # Las specs, desde <hub-wt>, con las variables de «Varias ejecuciones a la vez» exportadas y el checkout del SaaS:
 export E2E_SAAS_DIR=<saas-wt>
