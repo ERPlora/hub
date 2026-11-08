@@ -503,19 +503,20 @@ nombres, las demás secciones cuyo contenido cambia («Contenido: Cabecera, Cont
   piezas `_footer_columns.html` y `_credit.html`, que usa también `minimal`, con otro marco): cada plantilla dice sus clases en
   una línea y el enlace **Entrar** (`login_url`) se escribe en dos sitios, la barra y el pie, nunca en cuatro ficheros.
 
-- **Una fila por hub (andamiaje de la fase 1, PLAN §29)**: hasta la fase 2 las tablas las comparten todos los hubs,
+- **Una fila por hub (andamiaje de la fase 1, PLAN §29)**: en la fase 1 las tablas las compartían todos los hubs,
   así que `Site` e `Image` llevan `hub_id` (el `Hub.id` del registro, `base.operations.hub_id`; sin clave foránea,
-  porque en la fase 2 el registro vive en la BD de control). `Site.hub_id` es único: un hub tiene una sola web. Toda
+  porque el registro vive en la BD de control). `Site.hub_id` es único: un hub tiene una sola web. Toda
   operación lee y escribe solo la fila del hub de la petición (guardar, publicar, desconectar, subir, previsualizar,
   leer), y `/` y la API pública solo enseñan la web publicada de su propio hub: lo que publica un hub nunca sale en
   otro, y el equipo de un hub no lee ni cambia la web de otro. La primera escritura de un hub crea su fila
   (`get_or_create` y después `select_for_update`): dos primeras escrituras a la vez no fallan, la segunda espera a la
-  primera. En la fase 2 cada BD de hub guarda su única fila y la columna se queda, siempre con el mismo valor. Las
+  primera. Desde el corte S5 (hub#602) cada BD de hub guarda su única fila y la columna se queda, siempre con el
+  mismo valor; retirarla del estado es hub#689. Las
   claves del almacén (`hub-<id>/website/img/…`) y de la caché (`website:home:{<slug>}:…`) también llevan el hub. La e2e
   desconecta la página al terminar para no dejar `/` de `a` con ella (las demás e2e esperan el salto al login).
 - **El catálogo, solo de una app activa** (APP-WEBSITE, 2026-10-22): `queries._source_on` pregunta a
-  `base.relay.active_apps` (la misma pregunta que la guarda de lo público), no a `apps.is_installed`: en la fase 1 toda
-  app instalada está activa, y en la fase 2 una app apagada en el hub no tiene sus tablas creadas. Con la fuente
+  `base.relay.active_apps` (la misma pregunta que la guarda de lo público), no a `apps.is_installed`: una
+  app instalada puede estar apagada en el negocio (BASE-F23), y una que nunca encendió no tiene sus tablas. Con la fuente
   apagada, `read_catalog` y `website.catalog.categories` devuelven vacío, nunca un error, y el editor lista la fuente
   guardada sin dejar elegirla, con la nota `fields.sourceOff*` (`WebsitePage.test.ts`, «a catalog saved from an app
   that is off…»).
@@ -524,7 +525,7 @@ nombres, las demás secciones cuyo contenido cambia («Contenido: Cabecera, Cont
   `/favicon.ico` al hub, que es la SPA de `base` y le dejaba una cookie `csrftoken` al visitante: la página dejaba de
   ser «sin cookies» (lo cazó `website-flows.spec.ts`, WEBSITE-F10).
 - **Una sola guarda para lo público**: `/` (`public_home.is_published`) y la API pública (`website.public.*`) pasan por
-  `queries._live`: el módulo encendido en el hub (en la fase 1, toda app instalada, `base.relay.active_apps`; con él
+  `queries._live`: el módulo encendido en el hub (`base.relay.active_apps`; con él
   apagado la API responde 404 `app_inactive` y `/` salta al login) y una publicación en línea de ese hub (si no,
   404 `website.not_published`).
 - Anatomía completa: `apps.py`, `models.py`, `schemas.py`, `render.py`, `csp.py`, `public_home.py`, `storage.py`,
@@ -697,8 +698,8 @@ nombres, las demás secciones cuyo contenido cambia («Contenido: Cabecera, Cont
     web sigue indexable. Detalle en «Para quien lo mantiene» de `base/WORKBOOK.md`.
   - `FIX-UI-IMAGEUPLOAD-THUMBNAIL-TOUCHES-TEXT` (`packages/ui`), en la cola: en `ImageUpload` la miniatura y su
     texto se tocan, sin hueco, en los tres tamaños (logotipo, portada, Sobre nosotros y galería).
-- **La fuente del catálogo apagada no se ve en la e2e**: en la fase 1 toda app instalada está activa, así que ese caso
-  de WEBSITE-F05 lo cubren pytest (servidor) y Vitest (editor), no Playwright.
+- **La fuente del catálogo apagada no se ve en la e2e**: ese caso de WEBSITE-F05 lo cubren pytest (servidor) y
+  Vitest (editor), no Playwright.
 
 ## Lo que NO hace, a propósito
 
@@ -715,7 +716,6 @@ nombres, las demás secciones cuyo contenido cambia («Contenido: Cabecera, Cont
   inicial). Sin la clave de Google en el servidor no se pregunta nada.
 - La firma «© <año> ERPlora» del pie no se quita ni se cambia: el nombre y los datos legales del negocio van en la
   línea del pie.
-- La activación real del módulo por negocio (`AppActivation`) llega en la fase 2.
 
 ## Cómo son las páginas (para quien lo mantiene)
 

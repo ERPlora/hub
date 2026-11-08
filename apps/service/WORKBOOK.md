@@ -1196,10 +1196,11 @@ cajero del producto actual es un empleado: lo que tenía (ver, gastar y conceder
   persona detrás, sin permiso o con un id de otro negocio, el registro queda fuera, nunca su id (hub#676).
 - El admin de Django del Hub tiene **CRUD completo** sobre todos los modelos (ronda 12, PLAN §17);
   una escritura cruda del admin no pasa por las reglas ni deja aviso, salvo la del árbol de categorías.
-- Fase 1: el ámbito es la primera parte del Host y los datos se comparten entre `a` y `b`, como en
-  `demo`; lo que sí se separa son los avisos en vivo. Todas las apps están encendidas en todos los
-  negocios (`base.relay.active_apps`): los rechazos por «Servicios no activa» de F24, F26 y F27 solo los
-  ven los tests hasta que un negocio pueda apagarla (fase 2).
+- Tenencia: el ámbito es la primera parte del Host y cada negocio tiene su propia BD (desde el corte S5,
+  hub#602): los datos de `a` no se ven en `b`. Solo los tests escritos antes de la tenencia guardan `a` y `b`
+  en la misma BD de test (`base/tenancy/tests/legacy.py`, hasta hub#611). Cada negocio enciende y apaga sus
+  apps (BASE-F23, BASE-F24; `base.relay.active_apps`): los rechazos por «Servicios no activa» de F24, F26 y F27
+  los ve un negocio que apaga Servicios y sigue cobrando en Ventas, que no la tiene en sus `requires`.
 - Quién lee el catálogo, contado por sus llamadas (`rg '"service\.' apps`): Citas
   (`service.service.list_for_sale`, `service.assignment.eligible` y los modelos, que requiere), Ventas
   (las de «Contrato con Ventas», sin requerirla), Reservas online (`service.service.list` y `.update` en sus
