@@ -9,6 +9,7 @@ import { type Locator, type Page, expect, test } from '@playwright/test';
 
 import { customersReady } from './customer-helpers';
 import { A, createItem, HUB_DIR, listReady, login, openApps, record, shot, shown, topbarApps, uniqueName } from './helpers';
+import { insideTheApp, leftTheApp, pressBack } from './system-back-helpers';
 
 const VIEWPORTS = [
   { label: '390', width: 390, height: 844 },
@@ -251,44 +252,7 @@ for (const vp of VIEWPORTS) {
 // flow: BASE-F05 · gh:hub#1906 — Android's Back button. Tauri does not run in Playwright: the installed app's bridge is
 // simulated at the edge (`window.__TAURI__`, which records what it is asked and keeps the listener the shell registers
 // on the `app` plugin's `back-button`, what Tauri's `onBackButtonPress` listens to); a press calls that listener, as the
-// app does. Hub, SaaS and the screens are the real ones.
-
-type BackBridge = { asked: string[]; listeners: ((payload: unknown) => Promise<void>)[] };
-
-/** From the next page load on, the page runs inside the installed app (after the login, which is the SaaS's page). */
-async function insideTheApp(page: Page): Promise<void> {
-  await page.addInitScript(() => {
-    const bridge: BackBridge = { asked: [], listeners: [] };
-    const win = window as unknown as { __TAURI__: unknown; __back: BackBridge };
-    win.__back = bridge;
-    win.__TAURI__ = {
-      core: {
-        invoke: async (command: string) => {
-          bridge.asked.push(command);
-          return null;
-        },
-        addPluginListener: async (plugin: string, event: string, listener: (payload: unknown) => Promise<void>) => {
-          if (plugin === 'app' && event === 'back-button') bridge.listeners.push(listener);
-          return {
-            unregister: async () => {
-              bridge.listeners = bridge.listeners.filter((kept) => kept !== listener);
-            },
-          };
-        },
-      },
-    };
-  });
-}
-
-/** One press of the Back button, on the one listener the shell holds. */
-async function pressBack(page: Page): Promise<void> {
-  const held = () => page.evaluate(() => (window as unknown as { __back: BackBridge }).__back.listeners.length);
-  await expect.poll(held, { message: 'the shell holds the Back button' }).toBe(1);
-  await page.evaluate(() => (window as unknown as { __back: BackBridge }).__back.listeners[0]({ canGoBack: false }));
-}
-
-const leftTheApp = (page: Page): Promise<boolean> =>
-  page.evaluate(() => (window as unknown as { __back: BackBridge }).__back.asked.includes('plugin:erplora-android|leave_app'));
+// app does (system-back-helpers.ts). Hub, SaaS and the screens are the real ones.
 
 test('BASE-F05 gh:hub#1906: Back on the root of an app opened cold goes Home, and only Home leaves the app', async ({ page }) => {
   await login(page, A);
