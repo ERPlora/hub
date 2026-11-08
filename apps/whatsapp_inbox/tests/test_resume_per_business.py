@@ -1,9 +1,11 @@
 """What is handed to erplora.com again goes for its own business (review of hub#151).
 
-Phase 1 shares the tables: a message the Hub sends and a number it asks erplora.com to forget keep the business that
-made them (``Message.host``, ``Conversation.erase_host``, 0007). The worker's ``delivery.resume`` (one fixed scope,
-``WORKER_SCOPE_SLUG``, base/scheduler.py), «Retry» on a message and erasing an erased number again hand each over for
-that business (doors 5 and 6), never for the worker's nor for whoever asks from the shared inbox. A row made before
+Phase 1 shared the tables, so a message the Hub sends and a number it asks erplora.com to forget keep the business
+that made them (``Message.host``, ``Conversation.erase_host``, 0007). Since S5 each business has its own database; these
+tests run under the suite's fallback, which still keeps ``a`` and ``b`` in one (``base/tenancy/tests/legacy.py``), and
+pin what those columns do there until they go (hub#1053). The worker's ``delivery.resume`` on the suite's fixed scope
+(``WORKER_SCOPE_SLUG``, base/scheduler.py), «Retry» on a message and erasing an erased number again hand each over for
+that business (doors 5 and 6), never for the worker's nor for whoever asks from that one database. A row made before
 0007 has no business recorded and goes as the scope that asks, as it did. Asked from a request of another business
 (its own ``use_hub``), it goes at once too, where that business's operations run, never in the asker's context.
 """
@@ -87,7 +89,7 @@ def hubs_at(route) -> list[str]:
 @respx.mock
 @pytest.mark.parametrize(("recorded", "goes_for"), [("a", "a"), ("", "b")], ids=["its-business", "before-0007"])
 def test_retry_hands_a_message_over_for_the_business_that_sent_it(django_capture_on_commit_callbacks, recorded, goes_for):
-    """b's employee retries, from the shared inbox, a reply a sent that has not left: erplora.com sends it for a (from
+    """b's employee retries, from the one database, a reply a sent that has not left: erplora.com sends it for a (from
     a's number), never for b; a message sent before 0007 (no business recorded) is retried as the one who asks."""
     connected(A, "+34910000000")
     connected(B, "+34910000001")
@@ -113,7 +115,7 @@ def test_retry_hands_a_message_over_for_the_business_that_sent_it(django_capture
 def test_erasing_an_erased_number_again_asks_erplora_to_forget_it_for_the_business_that_erased_it(
     django_capture_on_commit_callbacks, recorded, goes_for
 ):
-    """a erased a number and erplora.com was never asked to forget it; b erases it again from the shared inbox (by its
+    """a erased a number and erplora.com was never asked to forget it; b erases it again from the one database (by its
     id): erplora.com is asked to forget it for a, never for b; an erasure from before 0007 goes as the one who asks."""
     conversation = opened(A, "34600111333")
     run("whatsapp_inbox.conversation.erase", {"id": str(conversation.id)}, ctx_for(scope=A))  # pending at erplora.com

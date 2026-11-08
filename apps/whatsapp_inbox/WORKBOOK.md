@@ -950,7 +950,7 @@ erplora.com no tiene conectado el número del negocio, lo dice el Hub con sus pa
 conectado: conecta el número en Ajustes para enviar.»), nunca como motivo de Meta.
 Si erplora.com no contesta, no confirma o pide ir más despacio, la burbuja dice «No enviado» con
 **Reintentar**, que lo entrega otra vez con la misma clave: nunca sale dos veces. Sale siempre por el número
-del negocio que lo envió, aunque lo reintente otro desde la bandeja compartida de la fase 1.
+del negocio, lo reintente quien lo reintente.
 Implicados: erplora.com, Meta
 
 ### WHATSAPP_INBOX-F33 Enviar una plantilla
@@ -1185,12 +1185,13 @@ Las operaciones del sistema piden `whatsapp_inbox.receive`, que ningún rol tien
   número y nombre, tope y consumo del mes (`monthly_limit`, `monthly_usage`, `usage_month` `AAAA-MM`; 0 = el
   plan no incluye ninguno, nunca sin límite, y antes de la primera foto, `synced_at` vacío, no se supone
   tope: `Channel.cap_reached`) y la
-  `version` de la última foto de erplora.com **de ese negocio** (una igual o más vieja se ignora). **Fase 1
-  sin tenencia:** las tablas son compartidas, así que la fila lleva el negocio en `host` (la primera etiqueta
-  de su host, como `base.Membership`; única) y cada operación lee y escribe solo la del `Scope` de su
-  contexto: la foto de `b` nunca pisa el número de `a` (desde la migración `0005`, reversible). En la fase
-  2 vive una sola en la BD de cada hub. Solo la escribe lo que dice erplora.com: su foto y su respuesta al
-  conectar o desconectar desde Ajustes.
+  `version` de la última foto de erplora.com **de ese negocio** (una igual o más vieja se ignora). Cada negocio
+  tiene su BD (desde el corte S5, hub#602) y su fila en ella. La fila lleva además el negocio en `host` (la primera
+  etiqueta de su host, como `base.Membership`; única, desde la migración `0005`, reversible), de cuando las tablas
+  eran compartidas: cada operación lee y escribe solo la del `Scope` de su contexto, y bajo el respaldo de los tests
+  (`base/tenancy/tests/legacy.py`), que guarda `a` y `b` en la misma BD, la foto de `b` nunca pisa el número de `a`.
+  Retirar `host` es hub#1053. Solo la escribe lo que dice erplora.com: su foto y su respuesta al conectar o
+  desconectar desde Ajustes.
 - `Conversation`: número E.164 (`phone`, único entre las no borradas), nombre de WhatsApp y su forma
   para buscar (`contact_search`: sin mayúsculas, tildes, emojis ni espacios de más), ficha
   (`customer`, FK a `customer.Customer`; una ficha eliminada cuenta como ninguna), asignada
@@ -1206,14 +1207,14 @@ Las operaciones del sistema piden `whatsapp_inbox.receive`, que ningún rol tien
   `delivered` → `read`, o `failed`) con el código del último intento o de Meta (`error_code`) y, solo en un
   rechazo que el Hub no nombra, el motivo tal como llegó (`error_message`; ver «Un motivo se dice…»),
   `wa_message_id` (único; vacío mientras no ha salido), `client_message_id` (la clave del envío, única,
-  obligatoria), el negocio que lo envió desde el Hub (`host`, fase 1, desde la migración `0007`; vacío en lo que
-  llega), plantilla usada y sus variables, quién lo envió, hora en que se dijo, objeto de Meta
-  (`payload`), `reply_to` (el `wa_message_id` al que contesta o reacciona) y `reply_id` (la opción
-  tocada: el identificador que el negocio puso en el botón, F38). Una reacción es un mensaje de tipo
+  obligatoria), el negocio que lo envió desde el Hub (`host`, de cuando las tablas eran compartidas, desde la
+  migración `0007`; vacío en lo que llega; hub#1053), plantilla usada y sus variables, quién lo envió, hora en que
+  se dijo, objeto de Meta (`payload`), `reply_to` (el `wa_message_id` al que contesta o reacciona) y `reply_id`
+  (la opción tocada: el identificador que el negocio puso en el botón, F38). Una reacción es un mensaje de tipo
   `reaction` cuyo `reply_to` es el mensaje al que responde: no suma en «Sin leer» ni pasa a último
   mensaje.
 - `Note`: texto, autor y hora.
-- `Template` (de cada negocio): el negocio en `host` (fase 1, como `Channel`; desde la migración `0006`,
+- `Template` (de cada negocio): el negocio en `host` (como `Channel`, hub#1053; desde la migración `0006`,
   reversible: las copias de antes quedan sin negocio, solo en el admin, y la foto de cada negocio trae de Meta
   las suyas), nombre + idioma (únicos por negocio entre las no borradas), categoría, estado en Meta (`DRAFT` mientras
   Meta nunca la tuvo, `APPROVED`, `PENDING`, `REJECTED`, `PAUSED`, `DISABLED`, `DELETED`), cabecera
@@ -1402,8 +1403,8 @@ antigüedad en la fase 1: si se decide un plazo, será un ajuste con su tarea.
 **Firma** de toda llamada, en los dos sentidos (la de todo `/internal`, `base.auth.sign`): cabeceras
 `X-Erplora-Timestamp` (segundos Unix) y `X-Erplora-Signature` = HMAC-SHA256 en hexadecimal de
 `f"{timestamp}.{cuerpo}"` con `INTERNAL_SHARED_SECRET`; quien recibe rechaza (401) una firma mala o una
-marca de tiempo a más de 300 s. Cuerpo JSON UTF-8. `hub` = el slug del negocio en la fase 1 (el
-`Hub.id` en la fase 2). Ejemplo de cabeceras:
+marca de tiempo a más de 300 s. Cuerpo JSON UTF-8. `hub` = el slug del negocio (el Hub lo busca en su registro,
+`base.registry.hub_by_slug`). Ejemplo de cabeceras:
 
 ```http
 POST /internal/whatsapp/inbound HTTP/1.1
@@ -1615,8 +1616,8 @@ abierta sin su SDK; si no la manda, la puerta 11 tendría que sacar la cuenta de
 ### Contrato con `base`
 
 - Monta las puertas 1–3 en `/internal/whatsapp/` (no publicadas en el ALB; hecho desde hub#127,
-  `base/internal.py`): comprueba la firma y la marca de tiempo, resuelve el negocio por `hub` (fase 1:
-  `Scope("host", hub)`; fase 2: `use_hub`), comprueba que la app está activa (si no, 404 `app_inactive`) y
+  `base/internal.py`): comprueba la firma y la marca de tiempo, resuelve el negocio por `hub` (su slug: entra en su
+  BD con `use_hub` y corre como `Scope("host", hub)`), comprueba que la app está activa (si no, 404 `app_inactive`) y
   ejecuta la operación con `system_context(scope)`, devolviendo su salida o el sobre de errores con su
   estado HTTP (422 para un cuerpo que no vale).
 - Al recibir la foto de estado con la clave `whatsapp` (puerta 4), se la pasa a
@@ -1736,13 +1737,13 @@ el **Aprobar** se comprueba la cita de verdad) y en la e2e `tests/e2e/appointmen
   crea)»), pero Reservas, ya en el Hub, le crea una de origen WhatsApp si su teléfono no tiene
   (RESERVATION-F17, probado en sus tests). F24 sigue a Reservas, que es quien escribe la reserva; la respuesta de
   citas también la crea (F21, CUSTOMER-F26).
-- Modo compartido de la tenencia (PLAN-DB, S1; hoy, todos los negocios de producción): las conversaciones de `a` y
-  `b` comparten tablas (solo los avisos vivos van por hub), como en todas las apps; un negocio con BD propia (los que
-  nacen desde la tenencia S2a, hub#471) no comparte nada. El número y las plantillas ya no: `Channel` y `Template` son
-  de cada negocio (ver «Modelo»), porque la foto de `b` pisaba el número de `a` y su lista de Meta dejaba
-  «Borradas en WhatsApp Manager» las plantillas de `a`; y el mensaje que sale del Hub y el número que se
-  pide olvidar guardan su negocio, porque el worker los retomaba con el suyo y «Reintentar» o volver a
-  borrar desde otro negocio los entregaban con el de quien lo pedía.
+- ~~Modo compartido de la tenencia (PLAN-DB, S1)~~ — **resuelta** por el corte S5 (hub#602): cada negocio tiene su
+  BD y no comparte nada. Mientras lo hubo, las conversaciones de `a` y `b` compartían tablas y por eso `Channel` y
+  `Template` llevan su negocio en `host` (la foto de `b` pisaba el número de `a` y su lista de Meta dejaba
+  «Borradas en WhatsApp Manager» las plantillas de `a`), y el mensaje que sale del Hub y el número que se pide
+  olvidar guardan el suyo (el worker los retomaba con el suyo y «Reintentar» o volver a borrar desde otro negocio
+  los entregaban con el de quien lo pedía). Retirar esas columnas es hub#1053, que antes comprueba que ninguna BD
+  guarda filas de otro negocio (las que pudo copiar el modo `copy-all` del corte).
 
 Resueltas en los planes, y fuera de esta lista:
 

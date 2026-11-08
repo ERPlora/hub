@@ -2320,9 +2320,7 @@ Pasos:
 Entra: el nombre, el ritmo y lo que puede hacer.
 Sale: la llave, de la que el negocio solo guarda lo que permite reconocerla. Evento `base.api_key.created`.
 Si falla: «No se pudo crear la API key.», «Elige al menos una app y qué puede hacer la key en ella.», «Esa app no
-publica lo que la key haría en ella.» o «No se pudo copiar al portapapeles.». Un negocio que todavía comparte su base
-de datos con otros (los dados de alta antes de que cada negocio naciera con la suya) no tiene «Nueva API key»
-(BASE-F89).
+publica lo que la key haría en ella.» o «No se pudo copiar al portapapeles.».
 Implicados: BASE-F89, BASE-F90
 
 ### BASE-F87 Rotar una llave de API
@@ -2369,9 +2367,7 @@ Pasos:
 Entra: las llaves del negocio.
 Sale: nada guardado. Se pone al día sola al crear, rotar o revocar una.
 Si falla: «No se pudieron cargar tus API keys.» con «Reintentar»; sin ninguna, «Aún no hay API keys. Crea una para
-que un sistema externo pueda leer o escribir datos de tu negocio.». Un negocio que todavía comparte su base de datos
-con otros no puede tener llaves, porque una llave suya podría abrir los datos de otro: en su lugar sale «Todavía no
-disponible» y «Las API keys todavía no están disponibles en este negocio.», hasta que pase a la suya.
+que un sistema externo pueda leer o escribir datos de tu negocio.».
 Implicados: BASE-F86, BASE-F87, BASE-F88
 
 ### BASE-F90 Consultar la documentación de la API
@@ -3161,8 +3157,10 @@ Implicados: HUBS-F17, WEBSITE-F10
   encender por sus datos. `base.import.list` se re-ejecuta también con `APP_EVENTS`, y `ImportPanel` y
   `BlueprintCardPending` siguen esa lista. Tests: `base/tests/test_blueprint_waits_for_apps.py`, con dos BD reales y el
   worker de verdad; e2e `tests/e2e/base-template-waits-for-apps.spec.ts`.
-- Fase 1: los negocios comparten base de datos, así que `base.hub.reset` sin `dry_run` responde 409
-  `base.reset_shared_database` (`available: false` en el plan) y «vacío» mira las filas de todos.
+- Un negocio sin BD propia (`hub.db_name` vacío) recibe de `base.hub.reset` sin `dry_run` un 409
+  `base.reset_shared_database` (`available: false` en el plan). Desde el corte S5 (hub#602) ninguno de
+  producción está así: solo lo alcanza el respaldo de los tests escritos antes de la tenencia
+  (`base/tenancy/tests/legacy.py`), y la rama se va con él (hub#611).
 - Frontend: `base/frontend/pages/SettingsPage.vue` (`/settings`, pestaña en el hash `#data`; `/import` y `/export`
   del viejo llevan aquí), `components/data/*` y `lib/data.ts`; la tarjeta `components/BlueprintCard.vue` («Ahora
   no» en `localStorage["hub-blueprint-card-dismissed"]`). Tests: `base/tests/test_blueprint.py`,
@@ -3689,7 +3687,8 @@ Implicados: HUBS-F17, WEBSITE-F10
   operación `expose_api`; la llave recibe el permiso de esa operación y nada más, con su ritmo por minuto y el freno
   por dirección (`KEY_ADDRESS_LIMIT`). Solo con `hub.db_name` (BD propia), que desde el corte (S5) tienen todos: sin
   ella, `base.api_key.*` responde 409 `base.api_keys_unavailable` y un `Bearer` no entra (test A≠B en
-  `base/tests/test_api_keys.py`).
+  `base/tests/test_api_keys.py`); esa rama, y el «Todavía no disponible» de sus pantallas, solo la alcanza el
+  respaldo de los tests (hub#1053).
 - Aprobación con PIN de un responsable: una app nombra sus órdenes aprobables en su `LiveAppConfig`
   (`approvals = {"sale.sale.void": _("Void a sale")}`; una consulta nunca, ni una orden `database=False`, que no abre
   transacción en la que gastar el pase: `base.E004` lo dice al arrancar). `base/approvals.py` pone su puerta

@@ -1375,8 +1375,8 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   toda operación con `ai.risk == "high"` (anular, devolver, borrar, enviar a Hacienda, `go_live`…) o que
   se hace en persona (`ai.in_person`: sentar a una reserva en la puerta, `reservation.reservation.seat`,
   revisión 2026-10-30; ningún sistema del mercado sienta por una automatización) queda fuera y se rechaza
-  al guardar, al conceder y al ejecutar con el código `flow.high_risk` (revisión 2026-10-15). En la fase 1 «activas» son las instaladas (como `base.session.me`); la fase 2 lo cambia por
-  la foto del SaaS en `queries.active_apps`.
+  al guardar, al conceder y al ejecutar con el código `flow.high_risk` (revisión 2026-10-15). «Activas» son hoy las instaladas (`queries.active_apps`), no las encendidas en el negocio:
+  el catálogo ofrece también lo de una app apagada (hub#1054).
 - **La excepción «Que me lo pregunte»** (revisión 2026-10-30, FIX-HUB-FLOW-ASK-ME-FIRST-CANNOT-GRANT-A-CANCELLATION):
   `queries.ASK_FIRST` (`reservation.reservation.cancel` y, desde hub#634, `appointment.appointment.cancel`; nunca lo
   que se hace en persona, `asks_first`)
@@ -1554,8 +1554,8 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   y guardar da `flow.secrets_key_missing`. El valor entra como `SecretStr` (un 422 nunca lo repite), solo se
   abre al hacer la llamada y se tapa (`vault.mask`) en todo lo que se guarda o se enseña de ella: log,
   errores, lo que respondió y **Probar**. Ni la API, ni `live.py`, ni el admin (solo ver el nombre y borrar)
-  lo devuelven. En la fase 1, como toda tabla de `flow`, los secretos se comparten entre los negocios de
-  la misma base de datos hasta la BD por hub de la fase 2.
+  lo devuelven. Como toda tabla de `flow`, los secretos están en la BD del negocio (desde el corte S5,
+  hub#602): ningún otro negocio los ve.
 - **Llamadas** (`http.py`, FLOW-F27): solo `https` con el nombre del servidor escrito a mano (es el permiso,
   `http:https://host`); el nombre se resuelve **una** vez, se rechaza toda dirección que no sea pública
   (privada, del propio equipo, de enlace local —metadatos de la nube—, multicast o reservada) y se conecta
@@ -1784,9 +1784,9 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   confirmarlo» porque `create`/`update` ya no llevan el interruptor y `set_enabled`, `grant`, `run` y
   `delete` son `risk: "high"` (el asistente confirma antes).
 - **`@operation` no aplicaba la app activa** en la fase 1: el catálogo de esta app filtra por las apps
-  instaladas y el motor comprueba que la operación sigue en él al ejecutar. Resuelta: la plataforma ya
-  rechaza la operación de una app apagada en el negocio («app_inactive», `base.entitlement.operation_database`), y
-  el filtro de esta app se queda como primera barrera del catálogo.
+  instaladas y el motor comprueba que la operación sigue en él al ejecutar. Resuelta en la plataforma: rechaza
+  la operación de una app apagada en el negocio («app_inactive», `base.entitlement.operation_database`). El
+  catálogo sigue filtrando por las instaladas, no por las encendidas en el negocio (hub#1054).
 
 ## Qué queda fuera
 

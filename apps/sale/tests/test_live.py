@@ -95,3 +95,11 @@ def test_a_line_that_paid_for_a_voucher_re_runs_who_it_counts_for_and_no_money_f
     assert "sale.sale.voucher_line_changed" in queries["sale.sale.by_staff"]
     for money in ("sale.sale.stats", "sale.sale.today", "sale.sale.last_7_days"):
         assert "sale.sale.voucher_line_changed" not in queries[money]
+
+
+def test_a_session_spent_outside_the_till_re_runs_who_it_counts_for_and_no_money_figure():
+    # SALE-F28, SERVICE-F21: a session no line carries moves no money either.
+    queries = sale_queries()
+    assert "sale.voucher_session.recorded" in queries["sale.sale.by_staff"]
+    for money in ("sale.sale.stats", "sale.sale.today", "sale.sale.last_7_days"):
+        assert "sale.voucher_session.recorded" not in queries[money]

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:0c1c3fc733a820dc6a422e6626f4b97eeea39649f0a18d3df8aaf859e8939536 -->
+<!-- generated from WORKBOOK.md sha256:33f637f712074aa4bef58863ac42bde80ac6fff1a29b2f297bd6cca25f3839d8 -->
 
 ## What it is for and who it is for
 
@@ -1045,9 +1045,13 @@ sale according to what each one has left to refund after the earlier refunds, so
 Each refund counts on its sale's day and is shared out to the cent: with what nobody served, it adds up
 to the period's "Revenue". On top of that, what the **voucher sessions** each professional did are worth
 (SALE-F27, SERVICE-F24), fixed as each one is charged; a session of a voucher with no limit, which has
-nothing to divide by, counts the price of its line. It is not money of the period (the voucher was paid
-when it was sold), so it is not in "Revenue". A session that comes back, by a refund or by voiding the sale,
-stops counting. What a line paid for a **voucher sold** (Services says so when granting it, SERVICE-F14) stays in
+nothing to divide by, counts the price of its line. The ones spent **outside the checkout** saying who did them
+count too (SERVICE-F21): they have no line, so Services tells Sales when they are spent and Sales keeps apart what
+they are worth, on the checkout's business day (that of a sale charged at that moment); a professional who only did
+those sessions shows 0 sales and €0 of money. A session of the checkout is on its line and never apart, so none
+counts twice, and both keep counting even if Services is switched off. It is not money of the period (the voucher
+was paid when it was sold), so it is not in "Revenue". A session that comes back, by a refund or by voiding the
+sale, stops counting. What a line paid for a **voucher sold** (Services says so when granting it, SERVICE-F14) stays in
 "Revenue", but it is no production of whoever sold it, never going over what that line has left after refunds.
 Their **production**, which the commission goes on, is what is left without those vouchers plus the sessions: a
 voucher of 100.00 € in 3 sessions, sold by A and done by B, gives 0 to A and 100.00 € to B, and adds up to the
@@ -1059,7 +1063,7 @@ table, without the figures. A total that is not an amount says "Type an amount, 
 field, and an end date before the start one, "The end date cannot be before the start date."; neither of
 them filters and the period rules. On Home, a panel for a day with no sales says 0, and one that cannot
 be read, "Unavailable".
-Involved: STAFF-F21, BASE-F06, BASE-F07, BASE-F08, SALE-F27, SERVICE-F24
+Involved: STAFF-F21, BASE-F06, BASE-F07, BASE-F08, SALE-F27, SERVICE-F21, SERVICE-F24
 
 ### SALE-F29 See and reprint a sale's document
 Status: done
@@ -1430,6 +1434,7 @@ the quick notes and what is refundable can be followed live.
 | Sale refunded | Refund | The sale, the refund, the amount, the reason, whether it is left fully refunded, the payments and the refunded lines | `sale.sale.refunded` |
 | Sales re-pointed | Merge records | The record that stays and the absorbed one | `sale.sale.reassigned` |
 | A line paid for a voucher, or no longer | Services grants or voids a voucher saying its sale | The sale and the line | `sale.sale.voucher_line_changed` |
+| A voucher session done outside the checkout | Services spends a session saying who did it | The session and the professional | `sale.voucher_session.recorded` |
 | Sale with its document | A document that could not be issued in the charge, the void or the refund is issued later (the charge's retry, "Issue now" or Invoicing's reaction) | The sale, the document, its number, the refund (`refund_id`) or whether it is the void's (`void`); one per document | `sale.sale.invoiced` |
 | Check opened | Open or split | The check | `sale.order.opened` |
 | Check changed | Any change of lines, discounts or title | The check | `sale.order.changed` |
@@ -1483,7 +1488,7 @@ the quick notes and what is refundable can be followed live.
 |---|---|---|
 | Inventory | Lowers the stock when a sale is charged, puts it back when it is voided and puts back what goes back in a refund | `sale.sale.completed`, `sale.sale.voided`, `sale.sale.refunded` |
 | Customers | Adds the purchase to the record, takes it off when it is voided and takes off what was refunded | `sale.sale.completed`, `sale.sale.voided`, `sale.sale.refunded` |
-| Services | Does not react to notices: Sales calls its session operations when building, charging, voiding and refunding | `service.session.*` |
+| Services | Does not react to notices: Sales calls its session operations when building, charging, voiding and refunding; Services tells it which line paid for a voucher and who did a session spent outside the checkout, through its internal operations | `service.session.*`, `sale.sale.voucher_sold`, `.voucher_unsold`, `sale.voucher_session.record` |
 | Invoicing | Sales asks it for the document in the same charge, void or refund; its reactions to the notices issue it if it could not then (INVOICE-F06) and it reads the sale, its lines and its refunds (it requires it) | `sale.sale.completed`, `sale.sale.voided`, `sale.sale.refunded` |
 | Cash register | Does not react to notices: it reads the sales, voids and refunds of each shift (it requires it); Sales asks it whether the cash register is open | `Sale`, `Refund`, `sale.order.list` |
 | Appointments | Marks a sale's appointment as charged and undoes it when it is voided; opens an appointment's check (`sale.order.open`) and takes it to the POS through its address | `sale.sale.created_from_appointment`, `sale.sale.voided` |
@@ -1521,4 +1526,6 @@ What touches a voucher's session also asks for Services' permission, because it 
 it with the session of whoever sells: paying a line with a voucher, undoing it, removing, voiding or
 charging a line paid with a voucher, "Spend sessions" (`service.redeem_package`, all four roles have it);
 voiding or refunding a sale with sessions, "Give voucher sessions back" (`service.return_session`: owner,
-administrator and manager, the same who void and refund).
+administrator and manager, the same who void and refund). The other way round, saying who did a session spent
+outside the checkout (SERVICE-F21) asks for "Build the check" (`sale.add_sale`, all four roles), like saying whose a
+line is.

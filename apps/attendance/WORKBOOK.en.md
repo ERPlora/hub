@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:ac41a7f76cae891be5a1bb503b29569fb44d998fee535d66b5382f8fbb6c2a2a -->
+<!-- generated from WORKBOOK.md sha256:4ecdc0c7a463a8841e5a2b2194092eb255f8bb42bd3badec169050c1d95c50f8 -->
 
 ## What it is for and who it is for
 
@@ -221,7 +221,9 @@ your device settings to read the workplace position, or type the coordinates.");
 manager sees the settings read-only. As in the form windows, the notice goes as soon as something is changed
 and a field's reason as soon as that field is corrected (the coordinates, as the pair they are: correcting one
 takes both reasons away); both come back if the next try is refused too. A refusal that names no field stays
-until the next try (hub#854).
+until the next try (hub#854). Tapping "Save" with nothing to send is a try too: it says "Settings saved." and
+takes away the red notice and the fields' reasons of the last refusal, which do not come back until the next
+refusal (hub#894).
 Involved: ATTENDANCE-F03, ATTENDANCE-F05
 
 ### ATTENDANCE-F05 Flag for review a working day nobody closed

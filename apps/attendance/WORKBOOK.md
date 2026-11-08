@@ -235,7 +235,8 @@ lugar de trabajo o escribe las coordenadas.»); quien no es responsable ve los a
 las ventanas de formulario, el aviso se quita en cuanto se cambia algo y el motivo de un campo en cuanto se
 corrige ese campo (las coordenadas, como el par que son: corregir una quita el motivo de las dos); los dos
 vuelven si el siguiente intento también se rechaza. Un rechazo sin campo se queda hasta el siguiente intento
-(hub#854).
+(hub#854). Pulsar «Guardar» sin nada que enviar también es un intento: dice «Ajustes guardados.» y quita el
+aviso rojo y los motivos de los campos del rechazo anterior, que no vuelven hasta el siguiente rechazo (hub#894).
 Implicados: ATTENDANCE-F03, ATTENDANCE-F05
 
 ### ATTENDANCE-F05 Marcar para revisar una jornada que nadie cerró
@@ -555,9 +556,10 @@ Los avisos nunca llevan la posición ni el motivo de una corrección (datos pers
   en **solo lectura** (salvo la nota interna de la jornada), sin alta ni borrado: una hora solo cambia
   con `attendance.record.correct`, que deja rastro. Contradice el «CRUD completo sobre todas sus
   tablas» del admin; lo impone el art. 34.9 ET, como en `invoice` lo impone el RD 1619/2012.
-- Fase 1: el ámbito es la primera parte del Host y los datos se comparten entre `a` y `b`; lo que sí se
-  separa son los avisos en vivo. El PIN y el modo de cada dispositivo (compartido o personal) son de
-  `base` (BASE-F55, BASE-F62): Control horario solo lee el modo.
+- Tenencia: el ámbito es la primera parte del Host y cada negocio tiene su propia BD (desde el corte S5,
+  hub#602): los datos de `a` no se ven en `b`. Solo los tests escritos antes de la tenencia guardan `a` y `b`
+  en la misma BD de test (`base/tenancy/tests/legacy.py`, hasta hub#611). El PIN y el modo de cada dispositivo
+  (compartido o personal) son de `base` (BASE-F55, BASE-F62): Control horario solo lee el modo.
 
 ## Lo que queda fuera
 
