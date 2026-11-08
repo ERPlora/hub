@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:cab70e5f006de080fd2d6fa0376944c7ef145ef1a6f1cfee35e077e521485a0a -->
+<!-- generated from WORKBOOK.md sha256:32dd5ba3ef9a08030a50bbf298f53633d6b008346929b49cca937d2e6cb14082 -->
 
 ## What it is for and who it is for
 
@@ -511,7 +511,7 @@ Steps:
      there even while the list loads, when it is empty or when it could not be read.
   6. In the Android app, the phone's back button first closes whatever is open on top (a window, a sheet
      or the menu); a window that cannot be closed that way stays, and one that holds something typed and
-     not saved and asks for it (when creating and editing a product in Inventory and in the create and edit windows of Sales, Tables, Kitchen, Customers, Reservations, Appointments, Staff and Services) asks first "Discard
+     not saved and asks for it (when creating and editing a product in Inventory and in the create and edit windows of Sales, Tables, Kitchen, Customers, Reservations, Appointments, Staff, Services, Invoicing, Printing, Schedule, Tasks, Taxes and the WhatsApp Inbox, and in "New API key") asks first "Discard
      changes?": "Keep editing", or back again, leaves it as it was, and "Discard changes" closes it
      (hub#1015, hub#1020). With nothing open, on a record or a new one it does the same as "Back"; on the main screen
      of an app it goes back to the Home, also when that screen was reached through a link; and on the Home
@@ -527,7 +527,7 @@ any button), in a fresh load of the page, which already brings the new version; 
 the server does not answer (offline or on a flaky network), the person stays where they were and a notice says
 "Could not open <app>. Check the connection and try again." ("that page" when the screen is not an app's), with
 "Retry", which tries again and opens it as soon as the server answers.
-Involved: INVENTORY-F01, INVENTORY-F02, SALE-F35, TABLE-F01, KITCHEN-F01, CUSTOMER-F01, RESERVATION-F06, APPOINTMENT-F01, STAFF-F01, SERVICE-F01
+Involved: INVENTORY-F01, INVENTORY-F02, SALE-F35, TABLE-F01, KITCHEN-F01, CUSTOMER-F01, RESERVATION-F06, APPOINTMENT-F01, STAFF-F01, SERVICE-F01, INVOICE-F03, PRINTING-F03, SCHEDULE-F02, TASK-F01, TAX-F02, WHATSAPP_INBOX-F29, BASE-F86
 
 ### BASE-F06 See the apps' panels on the Home
 Status: done

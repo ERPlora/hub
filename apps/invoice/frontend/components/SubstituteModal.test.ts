@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { defineComponent, h } from 'vue';
 
 import { click, ionValue, mountInvoice, settle } from '../__tests__/mount-invoice';
+import { type Recipient, recipientFrom } from '../lib/recipient';
 import RecipientFields from './RecipientFields.vue';
 import SubstituteModal from './SubstituteModal.vue';
 
@@ -28,7 +29,7 @@ const ISSUED = { issued: true, already: false, invoice: { id: 'f3', number: 'FAC
 
 async function setup(locale: 'en' | 'es' = 'en') {
   const m = await mountInvoice(SubstituteModal, { props: { open: true, ticket: TICKET }, locale, stubs: { CustomerSearch: CustomerSearchStub } });
-  const fill = async (recipient = COMPLETE) => {
+  const fill = async (recipient: Recipient | typeof COMPLETE = COMPLETE) => {
     m.wrapper.findComponent(RecipientFields).vm.$emit('update:modelValue', recipient);
     await m.wrapper.vm.$nextTick();
   };
@@ -156,12 +157,11 @@ describe('SubstituteModal', () => {
 describe('SubstituteModal: Android Back with unsaved changes (hub#1020, BASE-F05)', () => {
   it('as opened closes; a recipient written asks; emptied again closes', async () => {
     const s = await setup();
-    const blank = s.wrapper.findComponent(RecipientFields).props('modelValue');
     const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
     await expectUnsavedFormOnAndroidBack({
       overlay: () => s.inDoc('invoice-substitute'),
       change: () => s.fill(),
-      restore: () => s.fill(blank),
+      restore: () => s.fill(recipientFrom(null)),
     });
   });
 });

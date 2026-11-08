@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:65a71461ab1eeeaa9569b6edc42ef614ed011e637360ae6049517e9287e4f081 -->
+<!-- generated from WORKBOOK.md sha256:ef084a8ebb3efac505d95728b0f367211c874f748406ecdc5751b860864957ac -->
 
 ## What it is for and who it is for
 
@@ -134,6 +134,12 @@ touched ("Meta only lets you change the category of a template it rejected.").
 | Conversation panel | "Loading…" | "No messages yet." | "Could not load the conversation" | — |
 | Settings | indicator | "No templates." | the reason + **Retry** | same as the inbox |
 | Template (sheet) | the final button busy while it saves | — | the reason under its field, or at the top the one the Hub gives | only the owner and the administrator open it |
+
+## Unsaved changes on Android
+
+In "New template", "Edit template" and "Send a template", the phone's Back button asks "Discard changes?" when
+something typed or chosen has not been saved: "Keep editing" keeps it and "Discard changes" closes the window
+without saving. With the window as it opened, Back closes it without asking (BASE-F05).
 
 ## Flows
 

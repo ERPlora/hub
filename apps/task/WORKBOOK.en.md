@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:cc32a2c6e641576276c0555859cf950d89b10e7d8a413c2a2949e26136c489af -->
+<!-- generated from WORKBOOK.md sha256:95d60235dd11bc1329ee413aa3c9af3ccb898a68e9ad2685121212d6ecad7b09 -->
 
 ## What it is for and who it is for
 
@@ -131,6 +131,12 @@ creates it inside the project.
 | Reconnecting | What is painted stays; a strip warns "Reconnecting…". |
 | App inactive | "This app is not active in this business". |
 | No permission | What they cannot do does not show; if they arrive through another door, "You do not have permission". |
+
+## Unsaved changes on Android
+
+In "New task", "Editing task" and "New project", the phone's Back button asks "Discard changes?" when something
+typed or chosen has not been saved: "Keep editing" keeps it and "Discard changes" closes the window without saving.
+With the window as it opened, Back closes it without asking (BASE-F05).
 
 ## Flows
 
