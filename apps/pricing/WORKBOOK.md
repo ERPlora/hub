@@ -179,6 +179,12 @@ por Artículo, Desde y Precio; filtro por Tipo, con el embudo; 50 por página.
 | Sin permiso | No aparece lo que no puede hacer; si llega por otra puerta, «No tienes permiso». |
 | Tarifa que no existe | El detalle dice «Esta tarifa no existe» con **Volver**. |
 
+## Cambios sin guardar en Android
+
+En las ventanas de alta y edición de esta app, el botón atrás del móvil pregunta «¿Descartar los cambios?»
+cuando hay algo escrito o elegido sin guardar: «Seguir editando» conserva lo tecleado y «Descartar cambios»
+cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra sin preguntar (BASE-F05); la moneda que se propone sola y el importe que se reescribe en la del negocio no cuentan como cambio.
+
 ## Flujos
 
 | ID | Flujo | Estado |

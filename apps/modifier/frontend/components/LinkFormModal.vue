@@ -8,6 +8,8 @@ import { useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { IonLabel, IonSegment, IonSegmentButton } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 import { useT } from '../composables/useT';
 import { searchCategories, searchProducts } from '../lib/pickers';
 import type { GroupOut, TargetKind } from '../operations';
@@ -54,6 +56,9 @@ async function save(): Promise<void> {
   }
   open.value = false;
 }
+
+// The kind only says where to search: what would be applied is the product or category picked.
+useUnsavedFormOnOpen('modifier-link-form', () => target.value?.id ?? null, open);
 </script>
 
 <template>

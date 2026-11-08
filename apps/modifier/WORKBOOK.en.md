@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:38465a819f1eeb548244def45d351ac4ec75862392ada8faaf60c0eeea68b513 -->
+<!-- generated from WORKBOOK.md sha256:0a0540af0cbe5663d43533d9573287c682dbc768e76bfc6032c9aeb86f529493 -->
 
 ## What it is for and who it is for
 
@@ -114,6 +114,12 @@ Title "Group — {name}" and its rule. Two sections:
 | Reconnecting | What is painted stays; a strip warns "Reconnecting…" until the connection comes back. |
 | App inactive (`app_inactive`) | "This app is not active in this business". |
 | No permission | What they cannot do does not appear; if they arrive through another door, "You do not have permission". |
+
+## Unsaved changes on Android
+
+In this app's create and edit windows, the phone's Back button asks "Discard changes?" when something typed
+or chosen has not been saved: "Keep editing" keeps it and "Discard changes" closes the window without saving.
+With the window as it opened, Back closes it without asking (BASE-F05); a supplement rewritten by itself in the business's currency is no change.
 
 ## Flows
 

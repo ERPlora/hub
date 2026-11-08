@@ -10,6 +10,8 @@ import { toastSuccess } from '@erplora/ui/shell';
 import { IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref, shallowRef, watch } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 import { useLocale, useT } from '../composables/useT';
 import { countTotal, pieces } from '../lib/count';
 import { formatFace, formatMoney, moneyRefusal, readMoney } from '../lib/money';
@@ -91,6 +93,18 @@ async function confirm(): Promise<void> {
   open.value = false;
   emit('counted', { type: kind, total: sent });
 }
+
+// A box emptied again counts nothing: it is as the window opened.
+useUnsavedFormOnOpen(
+  'cash-register-count',
+  () => ({
+    type: type.value,
+    notes: notes.value,
+    typedTotal: typedTotal.value,
+    boxes: Object.entries(boxes.value).filter(([, typed]) => typed !== ''),
+  }),
+  open,
+);
 </script>
 
 <template>
