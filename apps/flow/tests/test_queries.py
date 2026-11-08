@@ -34,6 +34,18 @@ def outbox(name: str, payload: dict, scope=A, **fields) -> OutboxEvent:
 # The catalog: only what the active apps declare, never a made-up name
 
 
+@pytest.mark.parametrize(("language", "label"), [("es", "Crear una tarea"), ("en", "Create a task")])
+def test_an_operation_is_named_as_the_history_names_it(language, label):
+    """The card of a grant says each permission by this label, never by its operation name (hub#504)."""
+    named = run("flow.operation.get", {"operation": "task.task.create"}, ctx=ctx_for(language=language))
+    assert named.model_dump() == {"operation": "task.task.create", "label": label}
+
+
+def test_an_operation_that_is_not_registered_has_no_name():
+    with pytest.raises(NotFound):
+        run("flow.operation.get", {"operation": "ghost.thing.missing"})
+
+
 def test_the_catalog_lists_the_events_of_the_active_apps_but_its_own():
     catalog = run("flow.catalog.read")
     names = {event.name for event in catalog.events}

@@ -772,7 +772,7 @@ class BlueprintSummaryOut(Schema):
 
 
 class BlueprintImportIn(BlueprintSourceIn):
-    apps: list[str] | None = Field(
+    apps: list[Annotated[str, Field(json_schema_extra=names("base.app.get", by="app"))]] | None = Field(
         None,
         max_length=200,
         title=gettext_noop("Apps to load"),

@@ -5,10 +5,11 @@ import pytest
 from django.apps import apps
 from django.utils import translation
 from live.meta import Category, LiveAppConfig, Nav, module_configs, permissions_for_role
-from live.operations import registry
+from live.operations import INTERNAL, registry
 
 PERMISSIONS = ["flow.view", "flow.manage", "flow.answer", "flow.answer_manager"]
 QUERIES = {
+    "flow.operation.get",
     "flow.flow.list",
     "flow.flow.detail",
     "flow.flow.status",
@@ -84,6 +85,8 @@ SYSTEM = {
     "flow.run.record_assistant",
     "flow.question.expire_due",
 }
+# Only the card of a grant reads it: no route, API key or assistant tool.
+CARD_ONLY = {"flow.operation.get"}
 
 
 def flow_app():
@@ -199,6 +202,9 @@ def test_the_operations_of_the_app(flow_operations):
 
 def test_every_operation_tells_the_assistant_what_it_does(flow_operations):
     for name, op in flow_operations.items():
+        if name in CARD_ONLY:
+            assert op.ai is INTERNAL and op.expose_api is False, name
+            continue
         assert isinstance(op.ai, dict), name
         assert str(op.ai.get("description", "")).strip(), name
         expected = {"description", "risk"} if op.kind == "command" else {"description"}
@@ -209,7 +215,7 @@ def test_every_operation_tells_the_assistant_what_it_does(flow_operations):
 
 def test_the_high_risk_commands(flow_operations):
     assert {
-        name for name, op in flow_operations.items() if op.ai.get("risk") == "high"
+        name for name, op in flow_operations.items() if isinstance(op.ai, dict) and op.ai.get("risk") == "high"
     } == HIGH_RISK
 
 

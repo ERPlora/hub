@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:f62b3e02e28a45fbda784d0eb4ecbd01bcc9484a09b86ea3f938f8cff12aef0d -->
+<!-- generated from WORKBOOK.md sha256:05676f9f39ccc381bbcc7d74c78390abf24f711c05bfa764c8d4165f0952c5fd -->
 
 ## What it is for and who it is for
 
@@ -2448,7 +2448,9 @@ Steps:
      no sign when it balances); a yes or a no, as "Yes" or "No"; a list that its app (the server) names, by its items
      one after another ("Printers: Till, Kitchen"; past four, the first three and how many more: "Till, Kitchen, Bar and
      2 more"; when an item carries a comma, such as a date, separated by semicolons: "Nov 2, 2026, 10:00 AM; Nov 9,
-     2026, 10:00 AM"); a list of lines that carry only their record, such as the services of an appointment, the same
+     2026, 10:00 AM"); the permissions granted to an automation, by each action as its History names it ("Permissions:
+     Create a task, Create a customer"), and the apps a template loads, by their name ("Apps to load: Sales & POS,
+     Invoicing"); a list of lines that carry only their record, such as the services of an appointment, the same
      way, by the name of each ("Services: Haircut, Colour"; one that cannot be named counts among the "more"), also
      when the assistant sends a service by its name because it does not know which one it is ("Services: Colour"; when
      it sends the service and a name as well, it says the service that is booked); a list of lines that carry their
