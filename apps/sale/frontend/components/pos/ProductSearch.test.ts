@@ -67,11 +67,11 @@ describe('ProductSearch', () => {
     expect(m.wrapper.emitted('pick')).toEqual([[soldOut]]);
   });
 
-  it('a row is an Ionic button, so a blocked one keeps its aria-disabled in the browser', async () => {
+  it('a row is an Ionic button whose native control receives its unavailable state', async () => {
     const m = await setup();
     await m.result(OP, page([product({ id: 'p1' }), product({ id: 'p2', needs_tax_setup: true }), product({ id: 'p3', is_sold_out: true })]));
     expect(['p1', 'p2', 'p3'].map((id) => m.find(`pos-search-${id}`).element.tagName)).toEqual(['ION-BUTTON', 'ION-BUTTON', 'ION-BUTTON']);
-    expect(['p1', 'p2', 'p3'].map((id) => m.find(`pos-search-${id}`).attributes('aria-disabled'))).toEqual([undefined, 'true', 'true']);
+    expect(['p1', 'p2', 'p3'].map((id) => m.find(`pos-search-${id}`).attributes('data-aria-disabled'))).toEqual(['false', 'true', 'true']);
   });
 
   it('in Ceuta or Melilla a match without its tax names the IPSI', async () => {

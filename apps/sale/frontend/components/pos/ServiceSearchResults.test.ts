@@ -42,11 +42,11 @@ describe('ServiceSearchResults', () => {
     expect(row.find('.pos-search__note').text()).toBe('No se puede vender: sin categoría fiscal. Falta configurar el IVA.');
   });
 
-  it('a row is an Ionic button, so one without VAT keeps its aria-disabled in the browser', async () => {
+  it('a row is an Ionic button whose native control receives its unavailable state', async () => {
     const m = await setup();
     await m.result(OP, page([service({ id: 'sv1' }), service({ id: 'sv2', needs_tax_setup: true })]));
     expect(['sv1', 'sv2'].map((id) => m.find(`pos-search-service-${id}`).element.tagName)).toEqual(['ION-BUTTON', 'ION-BUTTON']);
-    expect(['sv1', 'sv2'].map((id) => m.find(`pos-search-service-${id}`).attributes('aria-disabled'))).toEqual([undefined, 'true']);
+    expect(['sv1', 'sv2'].map((id) => m.find(`pos-search-service-${id}`).attributes('data-aria-disabled'))).toEqual(['false', 'true']);
   });
 
   it('in the Canary Islands a service without its tax names the IGIC', async () => {

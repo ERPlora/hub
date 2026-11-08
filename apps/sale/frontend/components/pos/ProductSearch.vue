@@ -4,17 +4,19 @@
 // whole catalogue (sold out too, SALE-F07), 20 at a time. A row shows the name, the SKU (or «Sold out», or
 // why it cannot be sold) and the price; a tap hands the product up, where the same rules as a tile apply. With the services of Services
 // (SALE-F38, `withServices`), the services it finds come after them (`pickService`). Mounted only while
-// open. A row is an Ionic button whose aria-disabled still takes the tap, so the catalogue can explain it.
+// open. A row is an Ionic button whose native control announces unavailability without swallowing the
+// tap, so the catalogue can explain it.
 import { useLive } from '@erplora/ui/sdk';
 import { HubIcon } from '@erplora/ui/shell';
 import { IonButton, IonItem, IonList, IonSearchbar, IonSpinner } from '@ionic/vue';
-import { computed, onMounted, shallowRef, useTemplateRef } from 'vue';
+import { computed, onMounted, onUpdated, shallowRef, useTemplateRef } from 'vue';
 
 import type { ProductOut } from '../../../../inventory/frontend/operations';
 import type { ServiceSaleOut } from '../../../../service/frontend/operations';
 import { useTaxName } from '../../../../tax/frontend/composables/useTaxName';
 import { useSearchbarName } from '../../composables/useSearchbarName';
 import { useLocale, useT } from '../../composables/useT';
+import { syncAriaDisabled } from '../../lib/ariaDisabled';
 import { formatMoney, useBusinessMoney } from '../../lib/format';
 import ServiceSearchResults from './ServiceSearchResults.vue';
 
@@ -36,6 +38,10 @@ const { data, status, error } = useLive('inventory.product.list', () => ({
 }));
 
 const rows = computed(() => data.value?.rows ?? []);
+const search = useTemplateRef<HTMLElement>('search');
+const syncDisabled = () => syncAriaDisabled(search.value);
+onMounted(syncDisabled);
+onUpdated(syncDisabled);
 
 /** Under the name: «Sold out», why it cannot be sold, or its SKU. */
 function note(item: ProductOut): string {
@@ -54,6 +60,7 @@ useSearchbarName(bar, () => t('sale.pos.searchPlaceholder'));
 
 <template>
   <div
+    ref="search"
     class="pos-search"
     role="dialog"
     :aria-label="$t('sale.pos.search')"
@@ -114,6 +121,7 @@ useSearchbarName(bar, () => t('sale.pos.searchPlaceholder'));
           class="pos-search__row"
           :data-testid="`pos-search-${item.id}`"
           :aria-disabled="item.is_sold_out || item.needs_tax_setup ? 'true' : undefined"
+          :data-aria-disabled="String(item.is_sold_out || item.needs_tax_setup)"
           @click="emit('pick', item)"
         >
           <span class="pos-search__text">
@@ -190,7 +198,7 @@ useSearchbarName(bar, () => t('sale.pos.searchPlaceholder'));
 .pos-search__row:active {
   --background: var(--ion-color-step-100);
 }
-.pos-search__row[aria-disabled='true'] {
+.pos-search__row[data-aria-disabled='true'] {
   opacity: 0.8;
   cursor: not-allowed;
 }

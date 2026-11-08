@@ -5,11 +5,12 @@
 // up, where the same rules as a tile apply. Mounted only when the till sells services.
 import { useLive } from '@erplora/ui/sdk';
 import { IonButton, IonItem, IonList, IonListHeader } from '@ionic/vue';
-import { computed } from 'vue';
+import { computed, onMounted, onUpdated, useTemplateRef } from 'vue';
 
 import type { ServiceSaleOut } from '../../../../service/frontend/operations';
 import { useTaxName } from '../../../../tax/frontend/composables/useTaxName';
 import { useLocale } from '../../composables/useT';
+import { syncAriaDisabled } from '../../lib/ariaDisabled';
 import { formatMoney, useBusinessMoney } from '../../lib/format';
 
 const props = defineProps<{ term: string }>();
@@ -20,11 +21,16 @@ const business = useBusinessMoney();
 const taxName = useTaxName();
 const { data } = useLive('service.service.list_for_sale', () => ({ search: props.term, limit: 20, offset: 0 }));
 const rows = computed(() => data.value?.rows ?? []);
+const list = useTemplateRef<{ $el: HTMLElement }>('list');
+const syncDisabled = () => syncAriaDisabled(list.value?.$el);
+onMounted(syncDisabled);
+onUpdated(syncDisabled);
 </script>
 
 <template>
   <ion-list
     v-if="rows.length"
+    ref="list"
     class="pos-search__list"
   >
     <ion-list-header data-testid="pos-search-services-title">
@@ -39,6 +45,7 @@ const rows = computed(() => data.value?.rows ?? []);
         class="pos-search__row"
         :data-testid="`pos-search-service-${item.id}`"
         :aria-disabled="item.needs_tax_setup ? 'true' : undefined"
+        :data-aria-disabled="String(item.needs_tax_setup)"
         @click="emit('pick', item)"
       >
         <span class="pos-search__text">
@@ -95,7 +102,7 @@ const rows = computed(() => data.value?.rows ?? []);
 .pos-search__row:active {
   --background: var(--ion-color-step-100);
 }
-.pos-search__row[aria-disabled='true'] {
+.pos-search__row[data-aria-disabled='true'] {
   opacity: 0.8;
   cursor: not-allowed;
 }
