@@ -444,6 +444,10 @@ msgstr "Estamos preparando tu negocio"
 msgid "This business is under maintenance"
 msgstr "Este negocio está en mantenimiento"
 
+#: database_cut.py
+msgid "We will be back soon"
+msgstr "Volvemos enseguida"
+
 msgid "It takes a few minutes. This page refreshes by itself."
 msgstr "Tarda unos minutos. Esta página se actualiza sola."
 

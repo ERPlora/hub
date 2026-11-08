@@ -93,6 +93,7 @@ from django.utils.deprecation import MiddlewareMixin
 from django.utils.translation import gettext
 from django.views.defaults import page_not_found
 from live.api_errors import DEFAULT_API_PREFIX
+from live.database_cut import cut_of, marked
 from live.errors import NotFound
 
 from base import custom_domains, meter, public_home, registry
@@ -226,7 +227,7 @@ def _not_found(request: HttpRequest) -> HttpResponse:
 def _refuse(request: HttpRequest, hub: Hub, refusal: registry.Refusal) -> HttpResponse:
     """The registry's refusal: its envelope, or its page for a browser (gone, being prepared, under maintenance,
     suspended)."""
-    if _wants_envelope(request):
+    if wants_envelope(request):
         response = _envelope(refusal.status, refusal.code, refusal.message)
     elif refusal.code == registry.HUB_GONE:
         back = saas_url(DEMO_ENDED_PATH if hub.is_demo else LAUNCH_PATH)
@@ -249,7 +250,7 @@ def _is_api(request: HttpRequest) -> bool:
     return request.path_info.startswith(api_prefix)
 
 
-def _wants_envelope(request: HttpRequest) -> bool:
+def wants_envelope(request: HttpRequest) -> bool:
     """The API, and any call that does not ask for a page, gets the JSON envelope; a browser gets the page."""
     return _is_api(request) or "text/html" not in request.headers.get("Accept", "")
 
@@ -410,7 +411,7 @@ class HubDatabaseMiddleware:
     def _not_created(request: HttpRequest, refused: tenancy_context.AppNotCreated) -> HttpResponse:
         """404 ``app_inactive``: the envelope; the admin's page, its index with what it says; another page, the index
         itself included (going back to it would be a loop), its message."""
-        if _wants_envelope(request):
+        if wants_envelope(request):
             return _envelope(refused.status, refused.code, refused.message)
         if getattr(request, "platform_host", False) and request.path_info != _route("admin:index"):
             from django.contrib import messages
@@ -424,7 +425,7 @@ class HubDatabaseMiddleware:
         """503 ``base.hub_busy``: the envelope, or the message for a page; come back in a moment (``Retry-After``). It has
         reached a client, so it counts (``HubBusy.reached_client``)."""
         busy.reached_client()
-        if _wants_envelope(request):
+        if wants_envelope(request):
             response = _envelope(busy.status, busy.code, busy.message)
         else:
             response = HttpResponse(busy.message, status=busy.status, content_type="text/plain; charset=utf-8")
@@ -453,7 +454,10 @@ class HubDatabaseMiddleware:
         refusal = registry.unavailable()
         response = _envelope(refusal.status, refusal.code, refusal.message)
         response["Retry-After"] = str(PREPARING_RETRY_AFTER_SECONDS)
-        return response
+        # A cut of the database (live.database_cut, BASE-F111) is the same 503, marked: nothing ran yet, so the request
+        # waits for it and runs again while its limit lasts.
+        cut = cut_of(error, request)
+        return response if cut is None else marked(response, cut)
 
 
 def _count_the_request(request: HttpRequest) -> None:

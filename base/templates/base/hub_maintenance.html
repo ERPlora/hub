@@ -2,15 +2,17 @@
 {% get_current_language as LANGUAGE_CODE %}<html lang="{{ LANGUAGE_CODE }}">
 {% comment %}
 503 of a hub whose database is moving to another cluster (base.middleware; control.hub.move), with Retry-After: it
-refreshes itself until the hub answers again. Rendered without the request: no context processors, no database, no
-scripts nor inline styles (strict CSP, no nonce): its look is base/gate.css, a static file.
+refreshes itself until the hub answers again. Also of a cut of the database (base.database_cut, BASE-F111), which says
+its own `title` and `message`. Rendered without the request: no context processors, no database, no scripts nor inline
+styles (strict CSP, no nonce): its look is base/gate.css, a static file.
 {% endcomment %}
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex">
   <meta http-equiv="refresh" content="10">
-  <title>{% translate "This business is under maintenance" %}</title>
+  {% translate "This business is under maintenance" as maintenance %}
+  <title>{{ title|default:maintenance }}</title>
   <link rel="stylesheet" href="{% static 'base/gate.css' %}">
 </head>
 <body>
@@ -18,8 +20,8 @@ scripts nor inline styles (strict CSP, no nonce): its look is base/gate.css, a s
     <div class="ep-gate__brand">
       <img class="ep-gate__logo" src="{% static 'base/img/logo.png' %}" alt="" width="28" height="28"><span>ERPlora</span>
     </div>
-    <h1>{% translate "This business is under maintenance" %}</h1>
-    <p>{% translate "It takes a few minutes. This page refreshes by itself." %}</p>
+    <h1>{{ title|default:maintenance }}</h1>
+    <p>{% if message %}{{ message }}{% else %}{% translate "It takes a few minutes. This page refreshes by itself." %}{% endif %}</p>
   </main>
 </body>
 </html>
