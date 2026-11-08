@@ -115,7 +115,8 @@ test('a demo from the SaaS door: empty hub as «Demo», something made, ended no
   await page.waitForURL(`${DOOR}?state=expired`);
   await doorSays(page, 'expired');
   await expect(page.getByTestId('demo-start')).toBeVisible();
-  await expect(backToMyDemo(page)).toHaveCount(0);
+  // Nothing on it offers the ended demo back, whatever draws the offer: a link, or a button that is not one.
+  await expect(page.getByText('Back to my demo', { exact: true })).toHaveCount(0);
   await page.screenshot({ path: shot('demo-03-door-expired') });
   await page.goto(DOOR);
   await doorSays(page, 'idle');
