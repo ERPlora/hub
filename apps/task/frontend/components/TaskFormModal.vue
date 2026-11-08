@@ -11,6 +11,8 @@ import { useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { IonInput, IonSelect, IonSelectOption, IonTextarea } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import { useUnsavedForm } from '../../../../base/frontend/lib/unsaved-changes';
+
 import { useT } from '../composables/useT';
 import { parseTags, tagsText } from '../lib/format';
 import { searchMembers, searchProjects } from '../lib/pickers';
@@ -111,6 +113,8 @@ async function save(): Promise<void> {
   }
   open.value = false;
 }
+
+useUnsavedForm('task-form', () => (open.value ? form.value : original.value), original);
 </script>
 
 <template>

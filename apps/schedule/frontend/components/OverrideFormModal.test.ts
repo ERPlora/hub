@@ -127,3 +127,25 @@ describe('OverrideFormModal: fields refused with the same words (hub#888)', () =
     return { field: s.field, send: () => click(s.submit()), settle };
   }, 'end_date');
 });
+
+describe('OverrideFormModal: Android Back with unsaved changes (hub#1020, BASE-F05)', () => {
+  it('new: as opened closes; a change asks; restored as opened closes again', async () => {
+    const s = await setup();
+    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormOnAndroidBack({
+      overlay: () => s.inDoc('schedule-override-form'),
+      change: () => s.fill({ reason: 'Holidays' }),
+      restore: () => s.fill({ reason: '' }),
+    });
+  });
+
+  it('correcting: as loaded closes; a change asks; restored as loaded closes again', async () => {
+    const s = await setup(SUMMER);
+    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormOnAndroidBack({
+      overlay: () => s.inDoc('schedule-override-form'),
+      change: () => s.fill({ reason: 'Short summer' }),
+      restore: () => s.fill({ reason: SUMMER.reason }),
+    });
+  });
+});

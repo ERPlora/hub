@@ -182,3 +182,25 @@ describe('TaskFormModal: fields refused with the same words (hub#888)', () => {
     return { field: s.field, send: () => click(s.save()), settle };
   }, 'priority');
 });
+
+describe('TaskFormModal: Android Back with unsaved changes (hub#1020, BASE-F05)', () => {
+  it('new task: as opened closes; a change asks; restored as opened closes again', async () => {
+    const s = await setup();
+    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormOnAndroidBack({
+      overlay: () => s.inDoc('task-form'),
+      change: () => ionValue(s.field('title'), 'Count the till', 'ionInput'),
+      restore: () => ionValue(s.field('title'), '', 'ionInput'),
+    });
+  });
+
+  it('editing: the task as loaded closes; a change asks; restored as loaded closes again', async () => {
+    const s = await setup(TASK);
+    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormOnAndroidBack({
+      overlay: () => s.inDoc('task-form'),
+      change: () => ionValue(s.field('title'), 'Clean the cellar', 'ionInput'),
+      restore: () => ionValue(s.field('title'), TASK.title, 'ionInput'),
+    });
+  });
+});
