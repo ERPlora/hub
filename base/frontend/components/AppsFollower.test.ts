@@ -37,11 +37,12 @@ function row(id: string, state: AppRow['state'] = 'on'): AppRow {
     requires: [],
     required_by: [],
     refusal: null,
+    mandatory: false,
   };
 }
 
 function list(...apps: AppRow[]): AppList {
-  return { apps, store_url: '', plan_url: '', max_apps: null, enabled: apps.length };
+  return { apps, country_name: 'Spain', store_url: '', plan_url: '', max_apps: null, enabled: apps.length };
 }
 
 function session(states: Record<string, 'on' | 'off'>): SessionMe {

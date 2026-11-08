@@ -453,7 +453,7 @@ Sale: nada guardado.
 Si falla: «No se ha podido cargar lo que te falta por configurar» con «Reintentar». Un paso que es cosa
 nuestra (no hay ninguna app de negocio que encender) sale como «Todavía no disponible» con «Esto es cosa
 nuestra: por tu parte no hay nada que hacer aún. Estamos en ello.».
-Implicados: INVENTORY-F28, BASE-F24, VERIFACTU-F01, TAX-F17
+Implicados: INVENTORY-F28, BASE-F24, BASE-F25, VERIFACTU-F01, TAX-F17
 
 ### BASE-F02 Ver el negocio de un vistazo al entrar
 <!-- origen: old-hub:HUB_SHELL-F25 -->
@@ -726,7 +726,9 @@ Pasos:
   1. Pulsa «Apps» en el menú lateral. Se abre en la pestaña «Mis apps»; «Añadir apps» y «De pago» tienen
      también su dirección, que se puede enlazar.
   2. Mientras llega la lista: «Cargando tus apps…». Después, una fila (o una tarjeta, a elegir) por cada app que
-     el negocio tiene en marcha, con su icono y su nombre, su «Categoría» y su «Estado» («Activa»).
+     el negocio tiene en marcha, con su icono y su nombre, su «Categoría» y su «Estado» («Activa»). Una app que el
+     país del negocio exige lleva además, junto a su estado, «Obligatoria en España» (o el país del negocio): Impuestos
+     en todos, VeriFactu en España (hub#997).
   3. Busca en «Buscar en tus apps…» (nombre, descripción o categoría), filtra por categoría con el embudo,
      ordena o elige columnas.
   4. Cuando el negocio contrata una app en erplora.com o deja de tenerla, la lista se pone al día sola, sin
@@ -761,7 +763,8 @@ Pasos:
   1. En Apps, pulsa «Añadir apps» (todas las apps de ERPlora) o «De pago» (solo las que se contratan aparte).
   2. Mientras llega: «Cargando el catálogo…». Después, una fila por app con «App», «Categoría», «Descripción»,
      «Precio», «Viene con» y «Estado» («Instalada» o «Necesita suscripción»), con los nombres y las
-     descripciones en el idioma de quien mira.
+     descripciones en el idioma de quien mira. Una app que el país del negocio exige lleva «Obligatoria en España» (o
+     el país del negocio) junto a su estado, también desactivada: así se ve cuál falta por activar (hub#997).
   3. Busca en «Buscar apps para añadir…» (en «De pago», «Buscar apps de pago…») por nombre, descripción o
      categoría, y filtra por categoría o por estado.
 Entra: las apps que trae el hub y lo que el negocio tiene contratado en erplora.com.
@@ -904,7 +907,8 @@ Pasos:
   1. En «Mis apps», quien administra pulsa «Desactivar» en la fila de una app.
   2. Le pregunta siempre, con el nombre de la app: «¿Desactivar Reservas?» — «Sale del menú de todos en este
      negocio. No se borra nada: al volver a activarla, tiene sus datos.». Si con ella se van otras que llegaron solo
-     por ella, las nombra: «Mesas se desactiva con ella: solo la necesitaba Reservas.».
+     por ella, las nombra: «Mesas se desactiva con ella: solo la necesitaba Reservas.». Nunca se va con ella una app
+     que el país del negocio exige: al desactivar Ventas, Impuestos se queda activa y no se nombra (hub#997).
   3. Confirma con «Desactivar»: «Reservas está desactivada. También se ha desactivado: Mesas.». Las dos salen de
      «Mis apps» y, sin recargar, del menú de todos los dispositivos del negocio; sus pantallas dicen que la app no
      está disponible (BASE-F26) y el contador de arriba resta una.
@@ -954,16 +958,21 @@ Pasos:
   2. Tampoco lo ofrecen las apps que esa necesita, que no se pueden desactivar antes, y cada una dice por cuál:
      «Facturación no se puede desactivar: hace falta para VeriFactu. VeriFactu no se puede desactivar una vez
      activada: la ley obliga a que tus facturas sigan llegando a la AEAT.».
-  3. Quien administra pulsa «Desactivar» en una app que otra en marcha necesita y que sí se puede desactivar (por
+  3. Una app activa que el país del negocio exige («Obligatoria en España», BASE-F14) tampoco lo ofrece, y dice por
+     qué: «Impuestos es obligatoria para los negocios de España: no se puede desactivar.». Lo dice ella misma aunque
+     otra app la necesite, porque desactivar esa otra no cambiaría nada; una app con motivo propio (VeriFactu) dice
+     el suyo. Mientras se está activando, o si no se pudo activar, todavía se puede dejar (hub#997).
+  4. Quien administra pulsa «Desactivar» en una app que otra en marcha necesita y que sí se puede desactivar (por
      ejemplo, «Mesas» mientras «Reservas» está activada). El hub no cambia nada: encima de la tabla sale «No se ha
      cambiado nada» con lo que hay que hacer antes, «Desactiva antes Reservas.» (sin preguntar).
-  4. El aviso se queda hasta que se cierra o se activa o desactiva otra app; la app sigue «Activa».
-Entra: las apps en marcha que la necesitan, o el motivo de la app que se niega.
+  5. El aviso se queda hasta que se cierra o se activa o desactiva otra app; la app sigue «Activa».
+Entra: las apps en marcha que la necesitan, el motivo de la app que se niega, o el país del negocio y las apps que
+exige.
 Sale: nada.
 Si falla: si aun así se pide por el asistente o por la API, el hub contesta el mismo motivo y no cambia nada. Sin
 motivo propio de la app, el mismo aviso dice que no se ha podido cambiar, con el nombre de la app y lo que ha
 contestado el hub.
-Implicados: VERIFACTU-F32
+Implicados: VERIFACTU-F32, BASE-F01
 
 ### BASE-F26 Entender por qué una app no se abre
 <!-- origen: old-hub:HUB_SHELL-F41 -->
@@ -3026,6 +3035,18 @@ Implicados: HUBS-F17, WEBSITE-F10
   (`creating`) el paso sigue: todavía no está encendida. `platform_turns_on` lo leerá el alta (hub#997, parte 3). Tests:
   `test_home.py` y `test_queries_home.py` (con apps de paja), `apps/verifactu/tests/test_mandatory_in_spain.py` (dos
   hubs reales) y `apps/tax/tests/test_apps.py`.
+  Una vez encendida no se apaga en ese país (hub#997, parte 2; BASE-F14, F16, F23 y F25): `activation.mandatory_on`
+  da las obligatorias del país que están `on` (no `creating` ni `failed`, que aún no atan y se pueden dejar), que
+  `activation.disabling` nunca apaga en cascada (ni lo que necesitan: siguen queriéndolo) y a las que
+  `activation.refusals` da el motivo de `base` (`MANDATORY_OFF`, con el nombre de la app y el del país en el idioma
+  de quien pregunta) cuando la app no da uno propio (VeriFactu da el suyo, VERIFACTU-F32). `base.app.disable` y
+  `base.app.list` leen el país de la fila del negocio (`Hub.country`); `queries.app_off_refusal` pone el motivo
+  propio de la app por delante del de las que la necesitan, porque desactivarlas no la apagaría. `base.app.list` trae
+  `mandatory` por app y `country_name` (CLDR, `business.country_name`), y Apps pinta «Obligatoria en {país}» con un
+  `StatusPill` de `@erplora/ui` junto al estado; `lib/apps.ts` `goesOffWith` deja fuera la obligatoria encendida,
+  como el servidor. Tests: `test_activation.py` (las reglas), `test_app_activation.py` (409, cascada y dos hubs
+  reales), `test_queries_apps.py`, `apps/verifactu/tests/test_app_disable.py`, `lib/apps.test.ts`,
+  `pages/AppsPage.test.ts` y la e2e `tests/e2e/base-app-activation.spec.ts`.
 - Un panel `chart` cuyas etiquetas son días (`YYYY-MM-DD`: día civil de negocio, sin zona) los nombra con
   `Intl` en UTC, nunca con `new Date(<día>)` en la zona del navegador (`isoDay` y `formatDay` de
   `base/frontend/lib/home.ts`): una semana, por su día de la semana corto (`vie`); una serie más larga, por su

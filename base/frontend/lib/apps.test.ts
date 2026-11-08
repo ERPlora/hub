@@ -36,6 +36,7 @@ function app(id: string, fields: Partial<AppRow> = {}): AppRow {
     requires: [],
     required_by: [],
     refusal: null,
+    mandatory: false,
     ...fields,
   };
 }
@@ -145,6 +146,14 @@ describe('turning an app on or off (PLAN-HUB §9)', () => {
     const invoice = app('invoice', { name: 'Invoicing', requires: ['customer', 'sale', 'tax'] });
     const needed = [SALE, { ...TAX_, required_by: ['invoice', 'sale'] }, { ...CUSTOMER_, required_by: ['invoice', 'sale'] }, invoice];
     expect(goesOffWith(invoice, needed)).toEqual([]);
+  });
+
+  it('never names one the business’s country requires on: it stays on, as the server keeps it (hub#997)', () => {
+    const mandatoryTax = { ...TAX_, mandatory: true };
+    expect(goesOffWith(SALE, [SALE, mandatoryTax, CUSTOMER_, TASK])).toEqual(['Customers']);
+    // One that could not be set up binds nothing yet: it goes with the app it came with.
+    const failedTax = { ...TAX_, mandatory: true, state: 'failed' as const };
+    expect(goesOffWith(SALE, [SALE, failedTax, CUSTOMER_, TASK])).toEqual(['Customers', 'Taxes']);
   });
 
   it('names the apps to turn off first: the chosen ones on that need it, else every one that does', () => {

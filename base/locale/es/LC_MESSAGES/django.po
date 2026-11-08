@@ -314,6 +314,11 @@ msgstr "Activa %(app)s"
 msgid "It is mandatory for businesses in %(country)s."
 msgstr "Es obligatoria para los negocios de %(country)s."
 
+#: activation.py
+#, python-format
+msgid "%(app)s is mandatory for businesses in %(country)s: it can't be turned off."
+msgstr "%(app)s es obligatoria para los negocios de %(country)s: no se puede desactivar."
+
 #: queries.py:179 tests/test_queries_home.py:361
 msgid "Your team"
 msgstr "Tu equipo"

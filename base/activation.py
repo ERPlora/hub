@@ -49,9 +49,11 @@ from typing import Any
 from django.conf import settings
 from django.core.cache import cache
 from django.utils import translation
+from django.utils.translation import gettext_lazy
 from live.context import Scope
 from live.meta import module_configs
 
+from base.business import country_name, country_or_market
 from base.tenancy.context import HUB_SCOPE_KIND
 
 logger = logging.getLogger(__name__)
@@ -86,6 +88,9 @@ _changing: ContextVar[frozenset[str]] = ContextVar("base_activation_changing", d
 #: The hooks a module refuses by (:func:`refusals`): to go off, and to go on.
 CAN_DISABLE = "can_disable"
 CAN_ENABLE = "can_enable"
+#: Base's own reason not to turn off a module the business must have on in its country (:func:`mandatory_on`,
+#: hub#997), when the module gives none of its own.
+MANDATORY_OFF = gettext_lazy("%(app)s is mandatory for businesses in %(country)s: it can't be turned off.")
 
 #: ``{label: what it requires}``, a module's direct ``requires`` (acyclic: ``live.checks``).
 Graph = Mapping[str, Iterable[str]]
@@ -186,17 +191,21 @@ def enabling(label: str, current: Mapping[str, Activation], graph: Graph) -> dic
     return changes
 
 
-def disabling(label: str, current: Mapping[str, Activation], graph: Graph) -> dict[str, Activation]:
+def disabling(
+    label: str, current: Mapping[str, Activation], graph: Graph, kept: Iterable[str] = ()
+) -> dict[str, Activation]:
     """What turning ``label`` off changes: it, and what came along with it (on, not chosen) that no module left on
-    needs any more; ``{}`` when it is off. ``ValueError`` when a module on needs it: check :func:`required_by` first.
-    A module being created (or that failed) is wanted on: it goes off as one on does, its tables kept."""
+    needs any more, but those of ``kept`` (:func:`mandatory_on`), which stay on; ``{}`` when it is off. ``ValueError``
+    when a module on needs it: check :func:`required_by` first. A module being created (or that failed) is wanted on:
+    it goes off as one on does, its tables kept."""
     if not current[label].wanted:
         return {}
     needed_by = required_by(label, current, graph)
     if needed_by:
         raise ValueError(f"{label!r} is needed by {', '.join(needed_by)}: they go off first.")
     off = {label}
-    brought = needs([label], graph)
+    # One kept on stays wanted, and so does what it needs: ``staying`` below keeps it all.
+    brought = needs([label], graph) - set(kept)
     changed = True
     while changed:
         changed = False
@@ -210,11 +219,11 @@ def disabling(label: str, current: Mapping[str, Activation], graph: Graph) -> di
     return {other: OFF_ROW for other in [label, *sorted(off - {label})]}
 
 
-def keeping_on(label: str, current: Mapping[str, Activation], graph: Graph) -> list[str]:
+def keeping_on(label: str, current: Mapping[str, Activation], graph: Graph, kept: Iterable[str] = ()) -> list[str]:
     """Whose refusal to go off keeps ``label`` on: the modules wanted on that need it (they would have to go off first)
-    and itself; with none, itself and what would go off along with it."""
+    and itself; with none, itself and what would go off along with it (never one of ``kept``: :func:`disabling`)."""
     needed = required_by(label, current, graph)
-    return [*needed, label] if needed else list(disabling(label, current, graph))
+    return [*needed, label] if needed else list(disabling(label, current, graph, kept))
 
 
 def chosen_on(current: Mapping[str, Activation], *, among: Iterable[str] | None = None) -> int:
@@ -235,21 +244,46 @@ def plan_limit(photo: Any) -> int | None:
     return limit
 
 
+def mandatory_on(current: Mapping[str, Activation], country: str, configs: Iterable[Any] | None = None) -> frozenset[str]:
+    """The modules on in ``current`` that a business of ``country`` must have on (hub#997), as each says in its
+    ``mandatory`` (``base.home.mandatory_in``; without a country, Spain): they never go off there, by themselves
+    (:func:`refusals`) nor along with another (:func:`disabling`). One being set up, or that could not be, binds
+    nothing yet: it can still be given up on."""
+    from base.home import mandatory_in  # base.home reads the modules' declarations; this module is imported earlier
+
+    return frozenset(
+        config.label
+        for config in (module_configs() if configs is None else configs)
+        if config.label in current and current[config.label].on and mandatory_in(config, country)
+    )
+
+
 def refusals(
-    labels: Iterable[str], *, ctx: Any, hook: str = CAN_DISABLE, configs: Iterable[Any] | None = None
+    labels: Iterable[str],
+    *,
+    ctx: Any,
+    hook: str = CAN_DISABLE,
+    configs: Iterable[Any] | None = None,
+    kept: Iterable[str] = (),
+    country: str = "",
 ) -> dict[str, str]:
     """``{label: its reason}`` of those of ``labels`` whose ``hook`` (:data:`CAN_DISABLE`, :data:`CAN_ENABLE`) gives one,
     in the order of ``labels``. Each hook runs once, in the language of who asks: its reason is said in it, whatever the
-    process runs in."""
+    process runs in. To go off, one of ``kept`` (:func:`mandatory_on` of a business of ``country``) without a reason of
+    its own gives base's (:data:`MANDATORY_OFF`)."""
     by_label = {config.label: config for config in (module_configs() if configs is None else configs)}
     language = getattr(ctx, "language", None)
+    kept = set(kept) if hook == CAN_DISABLE else set()
     said: dict[str, str] = {}
     for label in labels:
         ask = getattr(by_label.get(label), hook, None)
-        if not callable(ask):
-            continue
         with translation.override(language) if language else nullcontext():
-            reason = ask(ctx)
+            reason = ask(ctx) if callable(ask) else None
+            if not (isinstance(reason, str) and reason.strip()) and label in kept:
+                reason = MANDATORY_OFF % {
+                    "app": by_label[label].verbose_name,
+                    "country": country_name(country_or_market(country), translation.get_language()),
+                }
         if isinstance(reason, str) and reason.strip():
             said[label] = reason.strip()
     return said

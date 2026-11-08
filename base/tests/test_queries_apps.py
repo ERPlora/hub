@@ -90,6 +90,30 @@ def test_names_and_categories_in_the_language_of_who_asks():
     )
 
 
+def test_each_app_says_whether_the_business_must_have_it_on_in_its_country():
+    """hub#997: Apps says «Mandatory in {country}» of what the business's country requires (each app declares it:
+    Taxes everywhere, VeriFactu in Spain), on or off; ``a`` has no country, so it is in Spain."""
+    document = app_list()
+    mandatory = {row["id"] for row in document["apps"] if row["mandatory"]}
+    assert mandatory == {"tax", "verifactu"}
+    assert document["country_name"] == "Spain"
+    assert app_list(language="es")["country_name"] == "España"
+
+    Hub.objects.filter(slug="a").update(country="PL")
+    document = app_list(language="es")
+    assert {row["id"] for row in document["apps"] if row["mandatory"]} == {"tax"}
+    assert document["country_name"] == "Polonia"
+
+
+def test_each_business_reads_its_own_country():
+    Hub.objects.filter(slug="a").update(country="PL")
+    Hub.objects.filter(slug="b").update(country="ES")
+    assert (by_id(app_list())["verifactu"]["mandatory"], by_id(app_list(scope=B))["verifactu"]["mandatory"]) == (
+        False,
+        True,
+    )
+
+
 def test_open_leads_to_the_first_screen_of_the_app_for_who_may_see_it():
     """BASE-G68: «Open» only where the person has a screen to open; no permission of the app, no «Open»."""
     with_permission = by_id(app_list("demo.view"))["demo"]

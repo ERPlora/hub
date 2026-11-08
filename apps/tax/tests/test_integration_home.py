@@ -27,7 +27,6 @@ from apps.tax.tests.conftest import A, B
 from base import activation
 from base.models import AppActivation
 from base.schemas import SetupStatusIn
-from base.services import AppRequired
 
 STEP = "tax.rules"
 CATEGORY = "product.generic"
@@ -138,25 +137,18 @@ def test_whoever_manages_taxes_is_told_and_who_only_reads_them_is_not(generic):
     assert step(person("hub_employee")) is None
 
 
-ADMINISTRATOR = OperationContext(scope=A, actor="ana", permissions=frozenset({"*"}))
-
-
-def turn_off(app: str) -> None:
-    """Turns ``app`` off in hub A, after every module on that needs it (base refuses the other way round)."""
-    try:
-        run("base.app.disable", {"app": app}, ADMINISTRATOR)
-    except AppRequired as refusal:
-        for other in refusal.required_by:
-            turn_off(other)
-        run("base.app.disable", {"app": app}, ADMINISTRATOR)
+def never_turned_on() -> None:
+    """Hub A as a business that has turned no app on yet (born with every app off: round 2026-10-27). Once on, Taxes
+    never goes off (mandatory in every country, hub#997), so only such a business has it off."""
+    AppActivation.objects.filter(host=A.key).update(state=activation.OFF, chosen=False)
+    activation.forget(A.key)
 
 
 @pytest.mark.django_db
 def test_with_taxes_off_the_home_does_not_ask_for_its_rates(generic):
-    # base brings only the steps of the modules on in the scope: Taxes off (after the apps that need it), no step.
-    # VeriFactu needs Taxes and never goes off once on in Spain (VERIFACTU-F32): a business with Taxes off never had it.
-    AppActivation.objects.filter(host=A.key, app="verifactu").update(state=activation.OFF, chosen=False)
-    turn_off("tax")
+    # base brings only the steps of the modules on in the scope: Taxes off, no step of its own (the Home asks to turn
+    # it on instead: base.mandatory.tax, base/tests/test_queries_home.py).
+    never_turned_on()
     assert step() is None
     assert step(person(scope=B))["state"] == "pending"
 

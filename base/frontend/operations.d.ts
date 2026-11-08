@@ -131,11 +131,15 @@ export interface AppRow {
   required_by: string[];
   /** Why turning it on (when off) or off (when on) is refused, in the reader's language: neither is offered. */
   refusal: string | null;
+  /** The business's country requires it on (hub#997): «Mandatory in {country}»; once on, it never goes off there. */
+  mandatory: boolean;
 }
 
 /** `base.AppListOut`. */
 export interface AppList {
   apps: AppRow[];
+  /** The business's country by its name in the reader's language (without one, Spain): what «Mandatory in …» says. */
+  country_name: string;
   /** erplora.com's Store of this business's modules. */
   store_url: string;
   /** erplora.com's plans of this business, where a higher limit of apps is bought. */

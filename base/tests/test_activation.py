@@ -250,6 +250,91 @@ def test_an_app_may_refuse_to_go_on_by_its_own_hook():
     assert activation.refusals(["task", "verifactu"], **asked) == {"verifactu": "only in Spain"}
 
 
+# ── What a business must have on in its country (hub#997, PLAN-HUB round 2026-11-07) ─────────────────────────────
+# An app says where it is mandatory (``mandatory`` on its LiveAppConfig, ``base.home.mandatory_in``). Once on in a
+# business of one of those countries it never goes off there: base refuses it, with a reason of its own when the app
+# gives none, and turning off another app it came along with leaves it on.
+
+
+class Declared:
+    """A module that says where a business must have it on, and maybe a reason of its own not to go off."""
+
+    def __init__(self, label, name, countries=None, veto=None):
+        self.label = label
+        self.verbose_name = name
+        if countries is not None:
+            self.mandatory = {"countries": countries, "platform_turns_on": False}
+        if veto is not None:
+            self.can_disable = veto
+
+
+DECLARED = [Declared("tax", "Taxes", "all"), Declared("verifactu", "VeriFactu", ["ES"]), Declared("task", "Tasks")]
+
+
+@pytest.mark.parametrize(
+    ("country", "kept"),
+    [("PL", {"tax"}), ("ES", {"tax", "verifactu"}), ("es", {"tax", "verifactu"}), ("", {"tax", "verifactu"})],
+)
+def test_the_apps_a_business_must_keep_on_are_those_on_mandatory_in_its_country(country, kept):
+    """Without a country (a demo) a business is in Spain; one off is not kept on: it is asked for on the Home."""
+    current = states(tax="on", verifactu="on*", task="on*", invoice="on", sale="on", customer="on")
+    assert activation.mandatory_on(current, country, DECLARED) == kept
+    assert activation.mandatory_on(states(task="on*"), country, DECLARED) == set()
+
+
+@pytest.mark.parametrize("state", ["creating", "failed"])
+def test_one_whose_tables_are_not_made_yet_is_not_kept_on(state):
+    """Only an app on binds: one being set up, or that could not be, can still be given up on (BASE-F23)."""
+    current = {label: Activation(OFF, False) for label in GRAPH} | {"tax": Activation(state, True)}
+    assert activation.mandatory_on(current, "ES", DECLARED) == set()
+
+
+def test_one_kept_on_never_goes_off_along_with_the_app_it_came_with():
+    current = states(sale="on*", tax="on", customer="on")
+    assert activation.disabling("sale", current, GRAPH, kept={"tax"}) == {
+        "sale": Activation(OFF, False),
+        "customer": Activation(OFF, False),
+    }
+    assert activation.keeping_on("sale", current, GRAPH, kept={"tax"}) == ["sale", "customer"]
+    # Nor down a chain: what it needs that came along with it stays on with it.
+    current = states(verifactu="on*", invoice="on", sale="on", tax="on", customer="on")
+    assert set(activation.disabling("verifactu", current, GRAPH, kept={"sale"})) == {"verifactu", "invoice"}
+
+
+class Asker:
+    """Who asks, in ``language``: what ``refusals`` reads of the operation's context."""
+
+    def __init__(self, language="en"):
+        self.language = language
+
+
+def test_one_kept_on_says_base_s_reason_in_the_language_of_who_asks():
+    asked = {"configs": DECLARED, "kept": {"tax"}, "country": "PL"}
+    assert activation.refusals(["tax", "task"], ctx=Asker(), **asked) == {
+        "tax": "Taxes is mandatory for businesses in Poland: it can't be turned off."
+    }
+    assert activation.refusals(["tax"], ctx=Asker("es"), **asked) == {
+        "tax": "Taxes es obligatoria para los negocios de Polonia: no se puede desactivar."
+    }
+
+
+def test_without_a_country_base_s_reason_names_spain():
+    assert activation.refusals(["tax"], ctx=Asker(), configs=DECLARED, kept={"tax"}, country="") == {
+        "tax": "Taxes is mandatory for businesses in Spain: it can't be turned off."
+    }
+
+
+def test_the_app_s_own_reason_comes_before_base_s():
+    configs = [Declared("verifactu", "VeriFactu", ["ES"], veto=lambda ctx: "never once on")]
+    asked = {"ctx": Asker(), "configs": configs, "kept": {"verifactu"}, "country": "ES"}
+    assert activation.refusals(["verifactu"], **asked) == {"verifactu": "never once on"}
+
+
+def test_base_s_reason_is_only_to_go_off():
+    asked = {"ctx": Asker(), "configs": DECLARED, "kept": {"tax"}, "country": "ES", "hook": activation.CAN_ENABLE}
+    assert activation.refusals(["tax"], **asked) == {}
+
+
 # ── Its tables being made (S3; PLAN-DB §7): «creating» and «failed» ───────────────────────────────────────────────
 # In a hub with its own database an app's tables are made the first time it is turned on: meanwhile it is
 # ``creating``, and ``failed`` if making them failed (tried again). Both are wanted on: the closure by ``requires``, the

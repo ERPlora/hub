@@ -417,12 +417,19 @@ def notice_list(ctx: OperationContext, data: NoticeListIn) -> dict:
 
 
 def app_off_refusal(
-    ctx: OperationContext, label: str, current: Mapping[str, activation.Activation], graph: activation.Graph, said: Mapping[str, str]
+    ctx: OperationContext,
+    label: str,
+    current: Mapping[str, activation.Activation],
+    graph: activation.Graph,
+    said: Mapping[str, str],
+    kept: Iterable[str] = (),
 ) -> tuple[str, str] | None:
     """Why ``label`` can't go off because an app refuses, as ``(who refuses, what the person reads)``, from ``said``
-    (``base.activation.refusals``); ``None`` when none of those it depends on does. One an app on needs says that app's
-    reason, never «turn it off first», which nobody can do while it refuses (hub#619)."""
-    who = next((other for other in activation.keeping_on(label, current, graph) if other in said), None)
+    (``base.activation.refusals``); ``None`` when none of those it depends on does. Its own reason first: it holds
+    whatever the others do (hub#997). One an app on needs says that app's reason, never «turn it off first», which
+    nobody can do while it refuses (hub#619). ``kept`` never goes off along with it (``activation.mandatory_on``)."""
+    keeping = activation.keeping_on(label, current, graph, kept)
+    who = label if label in said else next((other for other in keeping if other in said), None)
     if who is None:
         return None
     if who not in activation.required_by(label, current, graph):
@@ -462,6 +469,9 @@ def app_list(ctx: OperationContext, data: AppListIn) -> dict:
     graph = activation.module_graph()
     current = activation.states_of(ctx.scope)
     needs = {config.label: entitlement.requires_of(config.label) for config in configs}
+    # What the business's country requires on (hub#997): «Mandatory in …», and never off.
+    country = hub.country if hub else ""
+    kept = activation.mandatory_on(current, country)
 
     def state(label: str) -> str:
         if label in blocked:
@@ -469,7 +479,9 @@ def app_list(ctx: OperationContext, data: AppListIn) -> dict:
         return current[label].state if current[label].wanted else "off"
 
     # Each hook once for the whole list: a row asking its own would read the business's country once per row.
-    wont_go_off = activation.refusals([label for label, row in current.items() if row.wanted], ctx=ctx)
+    wont_go_off = activation.refusals(
+        [label for label, row in current.items() if row.wanted], ctx=ctx, kept=kept, country=country
+    )
     wont_go_on = activation.refusals(
         [label for label, row in current.items() if not row.on], ctx=ctx, hook=activation.CAN_ENABLE
     )
@@ -478,7 +490,7 @@ def app_list(ctx: OperationContext, data: AppListIn) -> dict:
         if label in blocked:
             return None
         if current[label].wanted:
-            refused = app_off_refusal(ctx, label, current, graph, wont_go_off)
+            refused = app_off_refusal(ctx, label, current, graph, wont_go_off, kept)
             return refused[1] if refused else None
         coming = activation.enabling(label, current, graph)
         return next((wont_go_on[other] for other in coming if other in wont_go_on), None)
@@ -503,9 +515,11 @@ def app_list(ctx: OperationContext, data: AppListIn) -> dict:
                         label for label in activation.required_by(config.label, current, graph) if label in shown
                     ],
                     "refusal": refusal(config.label),
+                    "mandatory": home.mandatory_in(config, country),
                 }
                 for config in configs
             ],
+            "country_name": business.country_name(business.country_or_market(country), ctx.language),
             "store_url": saas_url(f"{SAAS_PANEL_PATH}/store/modules?business={hub.id}") if hub is not None else "",
             "plan_url": saas_url(f"{SAAS_PANEL_PATH}/store/plans?business={hub.id}") if hub is not None and not demo else "",
             "max_apps": app_limit(hub),
