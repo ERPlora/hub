@@ -36,7 +36,7 @@ from live.context import OperationContext, Scope
 from live.errors import Conflict, InvalidPayload, NotFound, OperationError, PermissionDenied
 from live.meta import LiveAppConfig, module_configs
 from live.models import OutboxEvent
-from live.operations import Operation, operation, registry
+from live.operations import INTERNAL, Operation, operation, registry
 
 from apps.flow import document, recipes, vault
 from base import assistant as hub_assistant
@@ -54,6 +54,8 @@ from apps.flow.schemas import (
     FlowListIn,
     FlowOut,
     FlowRefIn,
+    OperationNameOut,
+    OperationRefIn,
     Page,
     QuestionListIn,
     QuestionOut,
@@ -854,6 +856,22 @@ def action_label(op: Operation, language: str) -> str:
     _app, entity, verb = ([*op.name.split(".", 2), "", ""])[:3]
     verb_word = words["verbs"].get(verb) or verb.replace("_", " ")
     return f"{verb_word} · {hub_assistant.app_name(op)} ({entity.replace('_', ' ')})"
+
+
+@operation(
+    "flow.operation.get",
+    kind="query",
+    permission=VIEW,
+    input=OperationRefIn,
+    output=OperationNameOut,
+    ai=INTERNAL,
+)
+def operation_name(ctx: OperationContext, data: OperationRefIn) -> dict:
+    """The label of a permission on a grant's card, as the History names that operation; no route and no assistant tool."""
+    op = registry.get(data.operation)
+    if op is None:
+        raise NotFound(str(UNKNOWN_ACTION) % {"name": data.operation})
+    return {"operation": op.name, "label": action_label(op, ctx.language)}
 
 
 def say(reason: dict, said: str = "") -> str:

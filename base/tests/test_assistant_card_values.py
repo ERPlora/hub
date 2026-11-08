@@ -325,15 +325,45 @@ def list_field(card: dict, name: str) -> dict:
     return next(field for field in card["fields"] if field["name"] == name)
 
 
-def test_a_list_of_codes_nobody_names_reaches_its_card_unnamed_so_it_says_how_many():
-    """FIX-HUB-PRINTING-ASSISTANT-CARD-LEAVES-OUT-ITS-RECORDS (ui#48's revisers): with the screen saying every list by its
-    items, a dangerous grant said «Permisos: sale.sale.create, invoice.invoice.issue» and a blueprint «Apps que se cargan:
-    sale, invoice». The server sends both as they are, never ``named``: the screen says how many they carry."""
-    grant = assistant.card(get("flow.flow.grant"), {"operations": ["sale.sale.create", "invoice.invoice.issue"]}, "es")
-    blueprint = assistant.card(get("base.blueprint.import"), {"apps": ["sale", "invoice"]}, "es")
-    for card, name in ((grant, "operations"), (blueprint, "apps")):
-        assert list_field(card, name)["kind"] == "list"
-        assert NAMED not in list_field(card, name), name
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("language", "expected"),
+    [("es", ["Crear una tarea", "Crear un cliente"]), ("en", ["Create a task", "Create a customer"])],
+)
+def test_the_permissions_of_a_grant_are_named_item_by_item(language, expected):
+    """hub#504: who confirms a grant reads what each permission lets the automation do, as the History names it."""
+    card = assistant.card(
+        get("flow.flow.grant"),
+        {"operations": ["task.task.create", "customer.customer.create"]},
+        language,
+        ctx=ctx({"*"}, language=language),
+    )
+    shown = list_field(card, "operations")
+    assert (shown["kind"], shown["value"], shown.get(NAMED)) == ("list", expected, True)
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(("language", "expected"), [("es", ["Ventas / TPV", "Facturación"]), ("en", ["Sales & POS", "Invoicing"])])
+def test_the_apps_of_a_blueprint_are_named_item_by_item(language, expected):
+    """hub#504: who confirms a template reads which apps it loads, by their name, never by their id."""
+    card = assistant.card(
+        get("base.blueprint.import"), {"apps": ["sale", "invoice"]}, language, ctx=ctx({"*"}, language=language)
+    )
+    shown = list_field(card, "apps")
+    assert (shown["kind"], shown["value"], shown.get(NAMED)) == ("list", expected, True)
+
+
+@pytest.mark.django_db
+def test_a_list_with_a_value_nobody_can_name_says_the_rest_and_counts_it():
+    """A stale permission or app is left out, never shown by its code: the screen says the rest and counts it among the more."""
+    grant = assistant.card(
+        get("flow.flow.grant"), {"operations": ["task.task.create", "ghost.thing.missing"]}, "es", ctx=ctx({"*"})
+    )
+    blueprint = assistant.card(get("base.blueprint.import"), {"apps": ["sale", "ghost"]}, "es", ctx=ctx({"*"}))
+    assert list_field(grant, "operations")["value"] == ["Crear una tarea", None]
+    assert list_field(blueprint, "apps")["value"] == ["Ventas / TPV", None]
+    assert list_field(grant, "operations")[NAMED] is True
+    assert list_field(blueprint, "apps")[NAMED] is True
 
 
 def text_lists() -> dict[str, list[str]]:
@@ -348,7 +378,7 @@ def text_lists() -> dict[str, list[str]]:
             if prop.get("type") != "array":
                 continue
             items = assistant._resolved(prop.get("items", {}), defs)
-            if items.get("type") == "string" and not {"enum", "format", REFERS} & items.keys():
+            if items.get("type") == "string" and not {"enum", "format", REFERS} & {*prop.keys(), *items.keys()}:
                 found.setdefault(op.name, []).append(name)
     return found
 
@@ -357,7 +387,7 @@ def test_no_list_of_texts_sent_as_they_are_is_named():
     """Every one of them, codes or a person's own words: as sent, so never said item by item as if the server had named
     it. A list the server says in words is (positive control: a series of visits, said as moments)."""
     found = text_lists()
-    assert {"flow.flow.grant", "base.blueprint.import"} <= found.keys()
+    assert "flow.draft.propose" in found
     named = [
         f"{write}:{name}"
         for write, names in found.items()
