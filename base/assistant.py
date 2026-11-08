@@ -328,7 +328,9 @@ def _card_details(op: Operation, arguments: dict, language: str, ctx: OperationC
 def card(op: Operation, arguments: dict, language: str, ctx: OperationContext | None = None) -> dict:
     """What the person sees before ``op`` runs with ``arguments`` (``live.assistant.card``), in the Hub's words: a
     moment at the business's hour, a record by its name read as ``ctx``'s person, an amount in the currency the write
-    names (``CURRENCY``) or the business's; its app by its name, a platform action by its screen (``app_name``)."""
+    names (``CURRENCY``) or the business's; its app by its name, a platform action by its screen (``app_name``).
+    With ``ctx`` and a callable ``ai["summary"]``, its fields are exactly what that callable returns; it receives
+    ``(ctx, arguments, fields) -> list[dict]``, with the detailed fields already in ``language``, and runs in it too."""
     shown = _card_details(op, arguments, language, ctx)
     summary = op.ai.get("summary") if isinstance(op.ai, dict) else None
     if ctx is None or not callable(summary):

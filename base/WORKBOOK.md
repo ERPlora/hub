@@ -3643,6 +3643,11 @@ Implicados: HUBS-F17, WEBSITE-F10
   `tests/e2e/base-assistant.spec.ts` contra un SaaS de verdad con su pasarela y el proveedor falso
   `tests/e2e/assistant-provider.ts` (un servidor HTTP en 127.0.0.1 que habla la API de OpenAI; receta en
   `tests/e2e/README.md`, «El asistente»): ningún test llega a un proveedor real.
+- **Resumen propio de una escritura** (hub#693): `ai["summary"]` es un callable
+  `(ctx, arguments, fields) -> list[dict]`; `base.assistant.card` lo ejecuta solo con `ctx`, como esa persona y bajo
+  `translation.override(language)`, con `fields` ya en ese idioma, y pone exactamente los campos que devuelve. Sin
+  `ctx` o sin callable, deja el detalle normal. `website.site.save` es el primer uso; su contrato está en
+  `base/tests/test_assistant.py`.
 
 - Personas y permisos (APP-BASE-5): las personas son `Membership` (control) más la foto de erplora.com
   (`hub.state["members"]`, `plan.max_users`); invitar, cambiar el rol y quitar son de erplora.com (HUBS-F24…F29):
