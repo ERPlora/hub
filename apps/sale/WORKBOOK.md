@@ -823,9 +823,13 @@ Pantalla: Vender, Hace falta una aprobación
 Pasos:
 1. Con Cocina activa, la cuenta tiene dos pestañas: «Cuenta», con todas sus líneas, y «Comanda actual»,
    con lo que falta por enviar; la pestaña dice cuántos artículos esperan («Comanda actual, 2 artículos por
-   enviar»). Sin nada pendiente, «Todo está enviado».
-2. En «Comanda actual», revisa cantidades y quién atiende y pulsa «Enviar comanda (N)». Para que salga
-   urgente, arma antes la llama de su lado: el botón pasa a «Enviar URGENTE (N)». Sale arriba de la pantalla
+   enviar»). Sin nada pendiente, «Todo está enviado». Mientras algo espera, las dos pestañas llevan «Enviar
+   comanda (N)» fija encima del total y de «Cobrar»: también «Cuenta», con la que se abre una cuenta (al pulsar
+   «Cobrar» en una mesa de Mesas, al cambiar de cuenta o al volver a abrir la app), en horizontal y en vertical
+   (hub#1017).
+2. Revisa cantidades y quién atiende («Comanda actual» deja solo lo pendiente) y pulsa «Enviar comanda (N)»
+   desde cualquiera de las dos pestañas. Para que salga urgente, arma antes la llama de su lado: el botón pasa
+   a «Enviar URGENTE (N)». Sale arriba de la pantalla
    «Comanda N enviada a cocina.», para poder pulsar «Cobrar» (SALE-F01) sin esperar a que se vaya; las líneas
    quedan marcadas con su ronda («Comanda N») y la hora de envío, y la llama se desarma. Un doble envío no
    manda nada dos veces.

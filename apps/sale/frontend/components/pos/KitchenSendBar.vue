@@ -1,5 +1,6 @@
 <script setup lang="ts">
-// The send bar of «Current order» (SALE-F20; Kitchen's KITCHEN-F18): «Send order (N)» and, beside it, the rush
+// The send bar of the check, on «Check» and «Current order» while something waits (SALE-F20, hub#1017; Kitchen's
+// KITCHEN-F18): «Send order (N)» and, beside it, the rush
 // flame. Armed, the button says «Send RUSH (N)» and the round goes urgent; a send disarms it. The page sends
 // (`send`, with whether it is a rush) through Kitchen. It stays pinned at the bottom of what scrolls in the check
 // (PosCart's `pos-cart-middle`) while that leaves room for the tabs and a line; lower, it scrolls with them (hub#787).
