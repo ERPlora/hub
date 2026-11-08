@@ -152,3 +152,16 @@ describe('SubstituteModal', () => {
     expect(s.submitButton()?.textContent?.trim()).toBe('Emitir factura completa');
   });
 });
+
+describe('SubstituteModal: Android Back with unsaved changes (hub#1020, BASE-F05)', () => {
+  it('as opened closes; a recipient written asks; emptied again closes', async () => {
+    const s = await setup();
+    const blank = s.wrapper.findComponent(RecipientFields).props('modelValue');
+    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormOnAndroidBack({
+      overlay: () => s.inDoc('invoice-substitute'),
+      change: () => s.fill(),
+      restore: () => s.fill(blank),
+    });
+  });
+});

@@ -10,6 +10,8 @@ import { useCommand } from '@erplora/ui/sdk';
 import { IonCheckbox, IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 import { useT } from '../composables/useT';
 import { blankRows, type IntervalRow, payloadOf, rowsOf } from '../lib/intervals';
 import type { SpecialDayOut } from '../operations';
@@ -83,6 +85,12 @@ async function save(): Promise<void> {
   }
   open.value = false;
 }
+
+useUnsavedFormOnOpen(
+  'schedule-special-day-form',
+  () => ({ date: date.value, name: name.value, closed: closed.value, rows: rows.value, recurring: recurring.value, notes: notes.value }),
+  open,
+);
 </script>
 
 <template>

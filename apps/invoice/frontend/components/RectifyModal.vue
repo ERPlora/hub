@@ -10,6 +10,8 @@ import { useCommand } from '@erplora/ui/sdk';
 import { IonButton, IonSelect, IonSelectOption, IonTextarea } from '@ionic/vue';
 import { computed, shallowRef, watch } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 import { useT } from '../composables/useT';
 import { isSimplified } from '../lib/invoice';
 import { refusal } from '../lib/refusal';
@@ -85,6 +87,9 @@ async function issue(): Promise<void> {
     emit('rectified', answer.invoice);
   }
 }
+
+// Once the rectifying invoice is issued the window only shows it: nothing typed is left unsaved.
+useUnsavedFormOnOpen('invoice-rectify', () => ({ reason: reason.value, type: type.value }), () => open.value && !done.value);
 </script>
 
 <template>

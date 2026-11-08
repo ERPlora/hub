@@ -7,6 +7,8 @@ import { useCommand } from '@erplora/ui/sdk';
 import { IonInput } from '@ionic/vue';
 import { computed, ref } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 const open = defineModel<boolean>('open', { default: false });
 
 const blank = () => ({ key: '', name: '', description: '' });
@@ -35,6 +37,8 @@ function cancel(): void {
   form.value = blank();
   error.value = null;
 }
+
+useUnsavedFormOnOpen('tax-category-form', form, open);
 </script>
 
 <template>

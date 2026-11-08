@@ -106,3 +106,25 @@ describe('DeviceModal', () => {
     expect(s.wrapper.emitted('update:open')).toBeUndefined();
   });
 });
+
+describe('DeviceModal: Android Back with unsaved changes (hub#1020, BASE-F05)', () => {
+  it('as opened closes; a printer ticked asks; unticked again closes', async () => {
+    const s = await setup();
+    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormOnAndroidBack({
+      overlay: () => s.inDoc('printing-device'),
+      change: () => ionToggle(s.field('printer-p1'), true),
+      restore: () => ionToggle(s.field('printer-p1'), false),
+    });
+  });
+
+  it('editing: as loaded closes; a renamed device asks; the old name again closes', async () => {
+    const s = await setup(COUNTER);
+    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormOnAndroidBack({
+      overlay: () => s.inDoc('printing-device'),
+      change: () => ionValue(s.field('name'), 'Back counter', 'ionInput'),
+      restore: () => ionValue(s.field('name'), COUNTER.name, 'ionInput'),
+    });
+  });
+});
