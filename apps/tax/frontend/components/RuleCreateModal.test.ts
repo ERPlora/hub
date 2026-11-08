@@ -315,3 +315,15 @@ describe('RuleCreateModal speaks Spanish', () => {
     expect(s.add().textContent?.trim()).toBe('Añadir');
   });
 });
+
+describe('RuleCreateModal: Android Back with unsaved changes (hub#1020, BASE-F05)', () => {
+  it('as opened closes; a change asks; restored as opened closes again', async () => {
+    const s = await setup();
+    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormOnAndroidBack({
+      overlay: () => s.inDoc('tax-rule-form'),
+      change: () => s.type('component_label', 'Recargo'),
+      restore: () => s.type('component_label', ''),
+    });
+  });
+});

@@ -159,3 +159,15 @@ describe('SpecialDayFormModal (SCHEDULE-F04, F13)', () => {
     expect([s.field('date').label, s.field('name').placeholder, s.submit().textContent?.trim()]).toEqual(['Fecha', 'Nombre (p. ej. Navidad)', 'Añadir día']);
   });
 });
+
+describe('SpecialDayFormModal: Android Back with unsaved changes (hub#1020, BASE-F05)', () => {
+  it('as opened closes; a change asks; restored as opened closes again', async () => {
+    const s = await setup();
+    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormOnAndroidBack({
+      overlay: () => s.inDoc('schedule-special-day-form'),
+      change: () => ionValue(s.field('name'), 'Christmas', 'ionInput'),
+      restore: () => ionValue(s.field('name'), '', 'ionInput'),
+    });
+  });
+});

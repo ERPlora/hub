@@ -10,6 +10,8 @@ import { useCommand } from '@erplora/ui/sdk';
 import { IonCheckbox, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 import { useT } from '../composables/useT';
 import { ALL_DAY, type IntervalRow, isAllDay, payloadOf, rowsOf } from '../lib/intervals';
 import type { WeekDayOut } from '../operations';
@@ -70,6 +72,8 @@ async function save(): Promise<void> {
   }
   open.value = false;
 }
+
+useUnsavedFormOnOpen('schedule-day-form', () => ({ weekday: weekday.value, closed: closed.value, rows: rows.value }), open);
 </script>
 
 <template>

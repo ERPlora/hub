@@ -234,3 +234,33 @@ describe('ApiKeysPanel', () => {
     expect(document.body.textContent).toContain('That key was revoked: it never works again.');
   });
 });
+
+describe('ApiKeysPanel: Android Back with unsaved changes in «New API key» (hub#1020, BASE-F05, BASE-F86)', () => {
+  it('as opened closes; a name or a box ticked asks; restored as opened closes again', async () => {
+    const m = await open();
+    await m.result(m.call, 'base.api_key.list', LIST);
+    await m.wrapper.get('[data-testid="api-keys-new"]').trigger('click');
+    await flush();
+    const { expectUnsavedFormOnAndroidBack } = await import('../__tests__/unsaved-form');
+    const tickRead = async (checked: boolean) => {
+      (byTestId('api-key-form-cart_checkout-read') as HTMLElement).dispatchEvent(new CustomEvent('ionChange', { detail: { checked } }));
+      await flush();
+    };
+    await expectUnsavedFormOnAndroidBack({
+      overlay: () => byTestId('api-key-form'),
+      change: async () => {
+        type(byTestId('api-key-form-name')!, 'Tienda');
+        await flush();
+      },
+      restore: async () => {
+        type(byTestId('api-key-form-name')!, '');
+        await flush();
+      },
+    });
+    await expectUnsavedFormOnAndroidBack({
+      overlay: () => byTestId('api-key-form'),
+      change: () => tickRead(true),
+      restore: () => tickRead(false),
+    });
+  });
+});
