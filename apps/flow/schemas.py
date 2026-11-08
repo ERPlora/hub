@@ -567,8 +567,23 @@ class EnabledIn(FlowRefIn):
     enabled: bool = Field(description="true: turn it on; false: pause it.")
 
 
+class OperationRefIn(In):
+    operation: str = Field(max_length=96, description="The operation to name, by its registered name.")
+
+
+class OperationNameOut(Schema):
+    operation: str
+    label: str
+
+
 class GrantIn(FlowRefIn):
-    operations: list[Annotated[str, StringConstraints(max_length=96)]] = Field(
+    operations: list[
+        Annotated[
+            str,
+            StringConstraints(max_length=96),
+            Field(json_schema_extra=names("flow.operation.get", by="operation", name=("label",))),
+        ]
+    ] = Field(
         max_length=100,
         title=gettext_noop("Permissions"),
         description="The whole list of actions and reads it may run, by name; what is not here is withdrawn.",
