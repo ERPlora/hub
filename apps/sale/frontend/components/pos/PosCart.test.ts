@@ -189,6 +189,31 @@ describe('PosCart: «Check» and «Current order» with Kitchen (SALE-F20)', () 
     expect(m.cart().emitted('send')).toEqual([[false]]);
   });
 
+  it('«Check», the tab a check opens on, offers «Send order (N)» while something waits; a send goes up from there (hub#1017)', async () => {
+    const m = await setup({ kitchen: true, order: WITH_ROUND }, 'es');
+    expect(m.find('pos-cart-tab-check').attributes('aria-selected')).toBe('true');
+    expect(m.find('pos-kitchen-send').text()).toContain('Enviar comanda (2)');
+    await click(m.find('pos-kitchen-send').element);
+    expect(m.cart().emitted('send')).toEqual([[false]]);
+    // It is the same bar on both tabs, and it goes with nothing left to send or without Kitchen.
+    await click(m.find('pos-cart-tab-round').element);
+    expect(m.find('pos-kitchen-send').text()).toContain('Enviar comanda (2)');
+    for (const over of [{ order: order({ lines: [SENT] }) }, { kitchen: false }]) {
+      const none = await setup({ kitchen: true, order: WITH_ROUND, ...over });
+      expect(none.find('pos-kitchen-send').exists(), JSON.stringify(Object.keys(over))).toBe(false);
+    }
+  });
+
+  it('another check on screen, or the till opened anew on one, starts on «Check» with «Send order (N)» in it (hub#1017)', async () => {
+    const shown = ref<ReturnType<typeof order> | null>(order({ id: 'o9', lines: [line({ id: 'l1' })] }));
+    const m = await mountSale({ setup: () => () => h(PosCart, props({ kitchen: true, order: shown.value })) }, { locale: 'en' });
+    await click(m.find('pos-cart-tab-round').element);
+    shown.value = order({ id: 'o10', lines: [line({ id: 'l2' }), line({ id: 'l3', product_id: 'p3' })] });
+    await settle();
+    expect(m.find('pos-cart-tab-check').attributes('aria-selected')).toBe('true');
+    expect(m.find('pos-kitchen-send').text()).toContain('Send order (2)');
+  });
+
   it('«Tickets · N» follows the check’s kitchen tickets in the head of what it sent, only when they can be seen (KITCHEN-F19)', async () => {
     const m = await setup({ kitchen: true, kitchenTickets: true, order: WITH_ROUND });
     const tickets = m.wrapper.findComponent(KitchenTickets);

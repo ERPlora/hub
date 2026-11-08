@@ -4,8 +4,9 @@
 // the heading (title and chips), the lines (they scroll; in the phone's drawer the heading scrolls with them, hub#630)
 // and the foot (always in view). It paints what
 // the page knows of the check and asks for everything; the page writes (`useTill`). With Kitchen (SALE-F20,
-// `kitchen`), the tabs «Check» and «Current order»: the second one shows only what is pending, says how many
-// items wait (also to a screen reader) and carries the send bar; a send goes up (`send`, with its rush). With
+// `kitchen`), the tabs «Check» and «Current order»: the second one shows only what is pending and says how many
+// items wait (also to a screen reader); while something waits, both carry the send bar above the foot, so the tab a
+// check opens on offers it too (hub#1017); a send goes up (`send`, with its rush). With
 // the right to see Kitchen's tickets (`kitchenTickets`), «Tickets · N» rides beside the head of what was sent
 // (KITCHEN-F19, F20). Android's Back closes the open dropdown.
 import { computed, shallowRef, watch } from 'vue';
@@ -226,7 +227,7 @@ function park(): void {
         </CartLines>
       </div>
       <KitchenSendBar
-        v-if="roundMode && pending.length"
+        v-if="kitchen && pending.length"
         :pending="pending.length"
         :busy="busy"
         @send="emit('send', $event)"
