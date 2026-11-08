@@ -44,7 +44,7 @@ function opened(id: string): void {
 
 <template>
   <section
-    class="home-card my-apps"
+    class="home-card my-apps ep-surface"
     data-testid="home-my-apps"
     :aria-busy="loading"
   >
@@ -110,7 +110,7 @@ function opened(id: string): void {
             @click="opened(app.id)"
           >
             <HubIcon
-              class="my-app-icon"
+              class="my-app-icon ep-icon-tile"
               :name="app.icon"
             />
             <span class="my-app-name">{{ app.name }}</span>
@@ -122,7 +122,7 @@ function opened(id: string): void {
             data-testid="home-my-app"
           >
             <HubIcon
-              class="my-app-icon"
+              class="my-app-icon ep-icon-tile"
               :name="app.icon"
             />
             <span class="my-app-name">{{ app.name }}</span>
@@ -137,7 +137,7 @@ function opened(id: string): void {
             @click="expanded = true"
           >
             <HubIcon
-              class="my-app-icon"
+              class="my-app-icon ep-icon-tile"
               name="ion:grid-outline"
             />
             <span class="my-app-name">{{ $t('base.apps.viewAll') }}</span>
@@ -150,7 +150,7 @@ function opened(id: string): void {
             data-testid="home-my-apps-add"
           >
             <HubIcon
-              class="my-app-icon"
+              class="my-app-icon ep-icon-tile"
               name="ion:add-outline"
             />
             <span class="my-app-name">{{ $t('base.apps.add') }}</span>
@@ -218,17 +218,6 @@ function opened(id: string): void {
 .my-app--add {
   border: 1px dashed var(--ion-color-step-250, #d0d5dd);
   color: var(--ion-color-medium);
-}
-
-.my-app-icon {
-  box-sizing: content-box;
-  width: 22px;
-  height: 22px;
-  padding: 8px;
-  font-size: 22px;
-  color: var(--ep-primary-text);
-  background: var(--ep-primary-tint);
-  border-radius: 12px;
 }
 
 .my-app--add .my-app-icon {

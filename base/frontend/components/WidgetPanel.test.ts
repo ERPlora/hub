@@ -42,6 +42,8 @@ describe('WidgetPanel', () => {
     const m = await panel();
     expect(m.wrapper.get('[data-testid="widget-title"]').text()).toBe('Open items');
     expect(m.wrapper.getComponent(HubIcon).props('name')).toBe('ion:flask-outline');
+    expect(m.wrapper.get('.widget').classes()).toContain('ep-surface');
+    expect(m.wrapper.get('.widget-icon').classes()).toContain('ep-icon-tile--sm');
   });
 
   it('follows a live operation with its params and repaints each new result, never emptied meanwhile', async () => {
