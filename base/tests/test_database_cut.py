@@ -29,6 +29,7 @@ from psycopg import sql
 
 from apps.demo.models import Item
 from apps.task.models import Task
+from base import middleware
 from base.models import Membership
 from base.tenancy import context, identity, limits
 from base.tenancy.tests import hubs
@@ -286,6 +287,22 @@ def test_a_page_that_stays_cut_says_come_back_in_the_language_of_the_visitor(hub
     assert int(response["Retry-After"]) > 0
     assert "base/database_cut.html" in [template.name for template in response.templates]
     assert message in response.content.decode()
+
+
+def test_a_request_that_waits_counts_as_one_request_of_the_business(boss, hub_a, monkeypatch):
+    """The person who asks is read from control once the business was resolved and counted (``SaasLoginRequiredMiddleware``):
+    a cut there repeats the whole request (``DatabaseCutMiddleware``), and the business's meter (``base.meter``, BASE-F40)
+    counts it once, as the one request the person made, not one per try."""
+    counted: list = []
+    monkeypatch.setattr(middleware.meter, "count_request", counted.append)
+    cut = CutOn("auth_user")
+
+    with connections["default"].execute_wrapper(cut):
+        response = boss.get(ITEMS, HTTP_HOST=_host(hub_a))
+
+    assert response.status_code == 200, response.content
+    assert cut.done == 1
+    assert counted == [hub_a.pk]
 
 
 # --- Writes -----------------------------------------------------------------------------------------------------------

@@ -464,9 +464,11 @@ class HubDatabaseMiddleware:
 def _count_the_request(request: HttpRequest) -> None:
     """One more request of the business whose host it came to (``base.meter``, BASE-F40): the platform's host, ``/internal``
     and the open paths have no ``request.hub``, and ``HealthCheckMiddleware`` and WhiteNoise answered before; a demo is not
-    measured."""
+    measured. Once per request: a cut of the database runs the same request again (``live.database_cut``, BASE-F111), and
+    its tries are not more requests of the business."""
     hub = getattr(request, "hub", None)
-    if hub is not None and not hub.is_demo:
+    if hub is not None and not hub.is_demo and not getattr(request, "_counted_by_meter", False):
+        request._counted_by_meter = True
         meter.count_request(hub.pk)
 
 
