@@ -405,8 +405,20 @@ msgstr "Envía overbook como true para reservar igualmente esta franja llena."
 msgid "Guest"
 msgstr "Cliente"
 
+msgid "Reservation"
+msgstr "Reserva"
+
 msgid "Reservation date"
 msgstr "Fecha de la reserva"
+
+msgid "Time slot"
+msgstr "Franja"
+
+msgid "Blocked date"
+msgstr "Fecha bloqueada"
+
+msgid "Waitlist entry"
+msgstr "Entrada de la lista de espera"
 
 msgid "Date"
 msgstr "Fecha"

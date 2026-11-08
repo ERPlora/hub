@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:65b796982fe118e21e868d99303cb779d157744e31e7db947fa025d442fd5bf3 -->
+<!-- generated from WORKBOOK.md sha256:5808f663ef758056034ca0e3260a6a5ec920ec4bfc2a60d432c2d32918596366 -->
 
 ## What it is for and who it is for
 
@@ -624,8 +624,10 @@ record as the Reservations screens name it, never by its code: a reservation, by
 its time ("Ana García · 15 Oct 2026 · 21:00"; without a name, by its phone; with the customer's data
 erased, by the day and the time); a waitlist entry, the same; a slot, by its weekday and its hours
 ("Thursday · 20:00–23:30"); a blocked date, by its day and, if it is not the whole day, its hours; the
-customer, by the name of their card, and the table, by its number. A record that whoever confirms cannot
-see (for example, the card of a customer, without permission to see customers) does not show on the card.
+customer, by the name of their card, and the table, by its number. For a dangerous action, the label says
+what it is: "Reservation", "Time slot", "Blocked date" or "Waitlist entry", never "Record". A record that
+whoever confirms cannot see (for example, the card of a customer, without permission to see customers)
+does not show on the card.
 
 ### What it offers: queries (they read and change nothing)
 
