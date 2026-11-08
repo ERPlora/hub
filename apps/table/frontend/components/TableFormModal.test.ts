@@ -105,3 +105,15 @@ describe('TableFormModal · new', () => {
     expect(f.closed()).toBe(true);
   });
 });
+
+describe('TableFormModal: Android Back with unsaved changes (hub#1020, BASE-F05)', () => {
+  it('as opened closes; a change asks; restored as opened closes again', async () => {
+    const f = await form(null);
+    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormOnAndroidBack({
+      overlay: () => f.inDoc('table-form'),
+      change: () => ionValue(f.field('number'), '7', 'ionInput'),
+      restore: () => ionValue(f.field('number'), '', 'ionInput'),
+    });
+  });
+});

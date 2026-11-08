@@ -18,6 +18,8 @@ import { useSession } from '@erplora/ui/shell';
 import { IonInput, IonSelect, IonSelectOption, IonText, IonTextarea, IonToggle } from '@ionic/vue';
 import { computed, ref, shallowRef, watch } from 'vue';
 
+import { useUnsavedForm } from '../../../../base/frontend/lib/unsaved-changes';
+
 import BusinessMoneyError from '../../../../base/frontend/components/BusinessMoneyError.vue';
 import { useLocale, useT } from '../composables/useT';
 import { MEMBER_STATUSES } from '../lib/enums';
@@ -32,6 +34,8 @@ const props = defineProps<{
 }>();
 
 const open = defineModel<boolean>('open', { default: false });
+
+useUnsavedForm('staff-member-form', () => open.value ? form.value : original.value, () => original.value);
 
 const t = useT();
 const locale = useLocale();

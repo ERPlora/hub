@@ -83,3 +83,15 @@ describe('RouteFormModal', () => {
     expect(f.field('submit').textContent?.trim()).toBe('Guardar enrutado');
   });
 });
+
+describe('RouteFormModal: Android Back with unsaved changes (hub#1020, BASE-F05)', () => {
+  it('as opened closes; a change asks; restored as opened closes again', async () => {
+    const f = await form({ station: 'st-grill' });
+    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormOnAndroidBack({
+      overlay: () => f.inDoc('kitchen-route-form'),
+      change: () => ionValue(f.field('station'), 'st-bar'),
+      restore: () => ionValue(f.field('station'), 'st-grill'),
+    });
+  });
+});

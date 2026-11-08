@@ -173,6 +173,12 @@ en dos líneas y «Guardar» se ve completo al final (hub#906).
 
 Mientras se recupera la conexión en vivo, «Reconectando…» encima, sin borrar lo pintado.
 
+## Cambios sin guardar en Android
+
+En las ventanas de alta y edición de esta app, el botón atrás del móvil pregunta «¿Descartar los cambios?»
+cuando hay algo escrito o elegido sin guardar: «Seguir editando» conserva lo tecleado y «Descartar cambios»
+cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra sin preguntar (BASE-F05).
+
 ## Flujos
 
 | ID | Flujo | Estado |

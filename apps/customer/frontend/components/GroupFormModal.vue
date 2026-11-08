@@ -10,6 +10,8 @@ import { toastSuccess } from '@erplora/ui/shell';
 import { IonCheckbox, IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 import { refusalFields, refusalOutsideFields } from '../lib/apiErrors';
 import { colorOptions } from '../lib/colors';
 import { withApproval } from '../../../../base/frontend/lib/approval';
@@ -17,6 +19,7 @@ import { useCustomerI18n } from '../lib/useCustomerI18n';
 import type { GroupRow } from '../operations';
 
 const open = defineModel<boolean>('open', { default: false });
+
 const props = defineProps<{ group: GroupRow | null }>();
 
 const { t } = useCustomerI18n();
@@ -73,6 +76,8 @@ async function save(): Promise<void> {
   open.value = false;
   void toastSuccess(t(props.group ? 'customer.groups.updated' : 'customer.groups.created'));
 }
+
+useUnsavedFormOnOpen('customer-group-form', () => ({ name: name.value, description: description.value, color: color.value, order: order.value, active: active.value }), open);
 </script>
 
 <template>

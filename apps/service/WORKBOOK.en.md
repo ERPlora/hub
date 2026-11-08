@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:82d0c78cf41435e2834278d28f30261021d09773cb1467bdd0a9f24fd7ca8cc4 -->
+<!-- generated from WORKBOOK.md sha256:11cf88a51a4bbacd74f1f02605ffe060254ee36b3f7f81deada14bb9f4f9bd4c -->
 
 ## What it is for and who it is for
 
@@ -159,6 +159,12 @@ Saved: "Settings saved.".
 | No permission | What they cannot do does not show; if they arrive by another door, "You do not have permission". |
 
 Amounts, durations and dates show in the format of the language of whoever is looking.
+
+## Unsaved changes on Android
+
+In this app's create and edit windows, the phone's Back button asks "Discard changes?" when something typed
+or chosen has not been saved: "Keep editing" keeps it and "Discard changes" closes the window without saving.
+With the window as it opened, Back closes it without asking (BASE-F05).
 
 ## Flows
 

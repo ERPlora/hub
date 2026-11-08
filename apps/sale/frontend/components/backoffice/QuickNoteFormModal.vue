@@ -8,6 +8,8 @@ import { useCommand } from '@erplora/ui/sdk';
 import { IonInput } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../../base/frontend/lib/unsaved-changes';
+
 import { useT } from '../../composables/useT';
 import type { QuickNoteOut } from '../../operations';
 import { refusal } from '../../lib/refusal';
@@ -19,6 +21,7 @@ const props = defineProps<{
 }>();
 
 const open = defineModel<boolean>('open', { default: false });
+
 
 const t = useT();
 const create = useCommand('sale.quick_note.create');
@@ -67,6 +70,8 @@ async function save(): Promise<void> {
   }
   open.value = false;
 }
+
+useUnsavedFormOnOpen('sale-quick-note-form', () => ({ text: text.value, order: order.value }), open);
 </script>
 
 <template>
@@ -81,7 +86,9 @@ async function save(): Promise<void> {
     @submit="save"
   >
     <template #default="{ fieldErrors }">
-      <div class="sale-backoffice-form">
+      <div
+        class="sale-backoffice-form"
+      >
         <ion-input
           data-testid="sale-quick-note-form-text"
           :value="text"

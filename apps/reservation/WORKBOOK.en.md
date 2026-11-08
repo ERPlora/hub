@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:5808f663ef758056034ca0e3260a6a5ec920ec4bfc2a60d432c2d32918596366 -->
+<!-- generated from WORKBOOK.md sha256:acf500fca0bdc481a246a3d4ffd7f5aebd8163e8ba6c9558d52ef539a9d23025 -->
 
 ## What it is for and who it is for
 
@@ -161,6 +161,12 @@ the end (hub#906).
 | Settings | "Loading…" | — | message + "Retry" | notice | notice |
 
 While the live connection is recovered, "Reconnecting…" on top, without erasing what is painted.
+
+## Unsaved changes on Android
+
+In this app's create and edit windows, the phone's Back button asks "Discard changes?" when something typed
+or chosen has not been saved: "Keep editing" keeps it and "Discard changes" closes the window without saving.
+With the window as it opened, Back closes it without asking (BASE-F05).
 
 ## Flows
 

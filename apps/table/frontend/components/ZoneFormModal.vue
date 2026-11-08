@@ -11,6 +11,8 @@ import { useCommand } from '@erplora/ui/sdk';
 import { IonButton, IonInput, IonSelect, IonSelectOption, IonToggle } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 import { useT } from '../composables/useT';
 import type { ZoneColor, ZoneOut, ZonePatchIn } from '../operations';
 import ZoneDeleteDialog from './ZoneDeleteDialog.vue';
@@ -26,6 +28,8 @@ const props = withDefaults(
 );
 
 const open = defineModel<boolean>('open', { default: false });
+
+useUnsavedFormOnOpen('table-zone-form', () => form.value, open);
 const emit = defineEmits<{ saved: [zone: ZoneOut] }>();
 
 const COLORS: readonly ZoneColor[] = ['primary', 'secondary', 'tertiary', 'success', 'warning', 'danger', 'medium'];
@@ -110,6 +114,7 @@ async function save(): Promise<void> {
   open.value = false;
 }
 
+
 </script>
 
 <template>
@@ -123,7 +128,9 @@ async function save(): Promise<void> {
     @submit="save"
   >
     <template #default="{ fieldErrors }">
-      <div class="table-zone-form">
+      <div
+        class="table-zone-form"
+      >
         <ion-input
           data-testid="table-zone-form-name"
           :value="form.name"

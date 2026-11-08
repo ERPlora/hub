@@ -159,6 +159,12 @@ la más reciente primero, con servicios, profesional, estado y notas (la interna
 
 Fechas, horas e importes salen con el formato del idioma de quien mira y en el reloj del negocio.
 
+## Cambios sin guardar en Android
+
+En las ventanas de alta y edición de esta app, el botón atrás del móvil pregunta «¿Descartar los cambios?»
+cuando hay algo escrito o elegido sin guardar: «Seguir editando» conserva lo tecleado y «Descartar cambios»
+cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra sin preguntar (BASE-F05).
+
 ## Flujos
 
 | ID | Flujo | Estado |

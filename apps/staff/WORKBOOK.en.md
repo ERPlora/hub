@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:e31f3f759a190f74e8d6828fa400457120fcf9bd48659171ebc08625c37240df -->
+<!-- generated from WORKBOOK.md sha256:6c0aa9e5bdc463396a60f119dbf5a3b64ecb0edf3de1cb6aff6dc2bdec7706fa -->
 
 ## What it is for and who it is for
 
@@ -144,6 +144,12 @@ above the Time Off one and the "Members" column of Roles (STAFF-F20 and STAFF-F2
 | Reconnecting | What is painted stays; a strip warns "Reconnecting…". |
 | App inactive | "This app is not active in this business". |
 | No permission | What they cannot do does not show; if it arrives through another door, "You do not have permission". |
+
+## Unsaved changes on Android
+
+In this app's create and edit windows, the phone's Back button asks "Discard changes?" when something typed
+or chosen has not been saved: "Keep editing" keeps it and "Discard changes" closes the window without saving.
+With the window as it opened, Back closes it without asking (BASE-F05).
 
 ## Flows
 

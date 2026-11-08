@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:2295f6542de5792d4e906e101f848162e564721dd27d0a32e62c97b7654c03a9 -->
+<!-- generated from WORKBOOK.md sha256:4f1ad97f45976caa99ae0f28fdadd9fd48a018a061ea0bdbc38378d0d1c4d3b2 -->
 
 ## What it is for and who it is for
 
@@ -152,6 +152,12 @@ first).
 
 Dates, times and amounts show in the format of the language of whoever is looking and on the business
 clock.
+
+## Unsaved changes on Android
+
+In this app's create and edit windows, the phone's Back button asks "Discard changes?" when something typed
+or chosen has not been saved: "Keep editing" keeps it and "Discard changes" closes the window without saving.
+With the window as it opened, Back closes it without asking (BASE-F05).
 
 ## Flows
 

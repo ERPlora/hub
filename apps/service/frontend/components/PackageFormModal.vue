@@ -13,6 +13,8 @@ import { useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { IonButton, IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import { useUnsavedForm } from '../../../../base/frontend/lib/unsaved-changes';
+
 import BusinessMoneyError from '../../../../base/frontend/components/BusinessMoneyError.vue';
 import { useLocale, useT } from '../composables/useT';
 import { type Money, percentFieldText, readPercentBp, useBusinessMoney } from '../lib/format';
@@ -26,6 +28,8 @@ const props = defineProps<{
   pkg: PackageOut | null;
 }>();
 const open = defineModel<boolean>('open', { default: false });
+
+useUnsavedForm('service-package-form', () => open.value ? comparable(form.value) : original.value, () => original.value);
 
 interface Line {
   key: number;
@@ -81,7 +85,12 @@ function fromPackage(current: PackageOut | null): Form {
   };
 }
 
+function comparable(current: Form) {
+  return { ...current, lines: current.lines.map(({ service, sessions }) => ({ service, sessions })) };
+}
+
 const form = ref<Form>(fromPackage(null));
+const original = computed(() => comparable(fromPackage(props.pkg)));
 const tried = ref(false);
 
 watch(
@@ -210,7 +219,9 @@ async function save(): Promise<void> {
     @submit="save"
   >
     <template #default="{ fieldErrors }">
-      <div class="service-package-form">
+      <div
+        class="service-package-form"
+      >
         <BusinessMoneyError />
         <ion-input
           data-testid="service-package-form-name"

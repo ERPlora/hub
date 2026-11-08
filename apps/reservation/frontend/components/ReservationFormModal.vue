@@ -13,6 +13,8 @@ import { type ApiError, useCommand, useLiveClient } from '@erplora/ui/sdk';
 import { IonInput, IonLabel, IonSegment, IonSegmentButton, IonTextarea } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 import CustomerSearch, { type CustomerSnapshot } from '../../../customer/frontend/components/CustomerSearch.vue';
 import { useT } from '../composables/useT';
 import { hhmm } from '../lib/clock';
@@ -27,6 +29,8 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ saved: [reservation: ReservationOut] }>();
 const open = defineModel<boolean>('open', { default: false });
+
+useUnsavedFormOnOpen('reservation-form', () => ({ customer: customer.value, name: name.value, phone: phone.value, email: email.value, date: date.value, time: time.value, party: party.value, duration: duration.value, table: table.value, source: source.value, notes: notes.value, internalNotes: internalNotes.value }), open);
 
 const t = useT();
 const client = useLiveClient();
@@ -207,7 +211,9 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
     @submit="save()"
   >
     <template #default="{ fieldErrors }">
-      <div class="reservation-form">
+      <div
+        class="reservation-form"
+      >
         <InlineFeedback
           v-if="notesOnly && reservation"
           tone="info"

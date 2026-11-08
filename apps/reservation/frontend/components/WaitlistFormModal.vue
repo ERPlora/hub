@@ -8,6 +8,8 @@ import { type ApiError, useCommand } from '@erplora/ui/sdk';
 import { IonInput, IonTextarea } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 import CustomerSearch, { type CustomerSnapshot } from '../../../customer/frontend/components/CustomerSearch.vue';
 import { hhmm } from '../lib/clock';
 import type { WaitlistOut } from '../operations';
@@ -15,6 +17,8 @@ import type { WaitlistOut } from '../operations';
 const props = defineProps<{ day: string }>();
 const emit = defineEmits<{ saved: [entry: WaitlistOut] }>();
 const open = defineModel<boolean>('open', { default: false });
+
+useUnsavedFormOnOpen('reservation-waitlist-form', () => ({ customer: customer.value, name: name.value, phone: phone.value, date: date.value, time: time.value, party: party.value, notes: notes.value }), open);
 
 const create = useCommand('reservation.waitlist.create');
 const customer = ref<CustomerSnapshot | null>(null);
@@ -84,7 +88,9 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
     @submit="save"
   >
     <template #default="{ fieldErrors }">
-      <div class="reservation-waitlist-form">
+      <div
+        class="reservation-waitlist-form"
+      >
         <div class="reservation-waitlist-form__customer">
           <span class="reservation-waitlist-form__label">{{ $t('reservation.form.customer') }}</span>
           <CustomerSearch v-model="customer" />

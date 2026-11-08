@@ -12,6 +12,8 @@ import { toastSuccess } from '@erplora/ui/shell';
 import { IonTextarea } from '@ionic/vue';
 import { computed, shallowRef, watch } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../../base/frontend/lib/unsaved-changes';
+
 import { useT } from '../../composables/useT';
 import { withApproval } from '../../lib/approval';
 import { refusal } from '../../lib/refusal';
@@ -20,6 +22,7 @@ import type { SaleRow } from '../../operations';
 const props = defineProps<{ sale: Pick<SaleRow, 'id' | 'number'> | null }>();
 
 const open = defineModel<boolean>('open', { required: true });
+
 const emit = defineEmits<{ voided: [] }>();
 
 const t = useT();
@@ -58,6 +61,8 @@ async function confirm(): Promise<void> {
   open.value = false;
   emit('voided');
 }
+
+useUnsavedFormOnOpen('sale-void', () => reason.value, open);
 </script>
 
 <template>

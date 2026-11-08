@@ -136,3 +136,15 @@ describe('FieldFormModal with a manager’s approval (BASE-F84)', () => {
     expect(toastSuccess).toHaveBeenCalledWith('Field updated');
   });
 });
+
+describe('FieldFormModal: Android Back with unsaved changes (hub#1020, BASE-F05)', () => {
+  it('as opened closes; a change asks; restored as opened closes again', async () => {
+    const s = await setup();
+    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormOnAndroidBack({
+      overlay: () => s.el('customer-field-form'),
+      change: () => s.type('customer-field-form-name', 'Dye'),
+      restore: () => s.type('customer-field-form-name', ''),
+    });
+  });
+});

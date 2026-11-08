@@ -92,3 +92,15 @@ describe('StationFormModal: fields refused with the same words (hub#888)', () =>
     return { field: f.field, send: () => click(f.field('submit')), settle };
   }, 'printer_name');
 });
+
+describe('StationFormModal: Android Back with unsaved changes (hub#1020, BASE-F05)', () => {
+  it('as opened closes; a change asks; restored as opened closes again', async () => {
+    const f = await form(null);
+    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormOnAndroidBack({
+      overlay: () => f.inDoc('kitchen-station-form'),
+      change: () => ionValue(f.field('name'), 'Bar', 'ionInput'),
+      restore: () => ionValue(f.field('name'), '', 'ionInput'),
+    });
+  });
+});

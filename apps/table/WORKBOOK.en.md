@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:77a34f2c6c00ccb31295593d157e17f363d48ddeac6cb07e357061c7f2439d4f -->
+<!-- generated from WORKBOOK.md sha256:fcb835d25e4be398df9612676e233b2da17b0a890114efc2b41fc63219163ffa -->
 
 ## What it is for and who it is for
 
@@ -171,6 +171,12 @@ lines and "Save" shows complete at the end (hub#866).
 
 In all of them: "Reconnecting…" while the live connection is recovered (what is drawn stays), "This app
 is not active in this business" and "You do not have permission".
+
+## Unsaved changes on Android
+
+In this app's create and edit windows, the phone's Back button asks "Discard changes?" when something typed
+or chosen has not been saved: "Keep editing" keeps it and "Discard changes" closes the window without saving.
+With the window as it opened, Back closes it without asking (BASE-F05).
 
 ## Flows
 

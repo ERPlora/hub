@@ -8,8 +8,12 @@ import { useCommand } from '@erplora/ui/sdk';
 import { IonButton, IonInput } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 const props = defineProps<{ zoneId: string | null }>();
 const open = defineModel<boolean>('open', { default: false });
+
+useUnsavedFormOnOpen('table-add', () => ({ zoneName: zoneName.value, number: number.value }), open);
 const emit = defineEmits<{ zone: [id: string] }>();
 
 const zoneName = ref('');

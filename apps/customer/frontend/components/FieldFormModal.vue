@@ -10,12 +10,15 @@ import { toastSuccess } from '@erplora/ui/shell';
 import { IonCheckbox, IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 import { refusalFields, refusalOutsideFields } from '../lib/apiErrors';
 import { withApproval } from '../../../../base/frontend/lib/approval';
 import { useCustomerI18n } from '../lib/useCustomerI18n';
 import type { CustomFieldType, FieldRow } from '../operations';
 
 const open = defineModel<boolean>('open', { default: false });
+
 const props = defineProps<{ field: FieldRow | null }>();
 
 const TYPES: CustomFieldType[] = ['text', 'number', 'date', 'boolean', 'select', 'textarea'];
@@ -82,6 +85,8 @@ async function save(): Promise<void> {
   open.value = false;
   void toastSuccess(t(props.field ? 'customer.fields.updated' : 'customer.fields.created'));
 }
+
+useUnsavedFormOnOpen('customer-field-form', () => ({ name: name.value, fieldType: fieldType.value, options: options.value, order: order.value, required: required.value, active: active.value }), open);
 </script>
 
 <template>

@@ -7,11 +7,15 @@ import { type ApiError, useCommand } from '@erplora/ui/sdk';
 import { IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 import { useT } from '../composables/useT';
 import { WEEKDAYS } from '../lib/weekdays';
 
 const props = defineProps<{ weekday: number }>();
 const open = defineModel<boolean>('open', { default: false });
+
+useUnsavedFormOnOpen('reservation-slot-form', () => ({ day: day.value, start: start.value, end: end.value, max: max.value, maxCovers: maxCovers.value }), open);
 
 const t = useT();
 const create = useCommand('reservation.time_slot.create');
@@ -72,7 +76,9 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
     @submit="save"
   >
     <template #default="{ fieldErrors }">
-      <div class="reservation-slot-form">
+      <div
+        class="reservation-slot-form"
+      >
         <ion-select
           data-testid="reservation-slot-form-day_of_week"
           :value="day"

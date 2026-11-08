@@ -7,10 +7,14 @@ import { type ApiError, useCommand } from '@erplora/ui/sdk';
 import { IonInput, IonToggle } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 import type { BlockedDateIn } from '../operations';
 
 const props = defineProps<{ day: string }>();
 const open = defineModel<boolean>('open', { default: false });
+
+useUnsavedFormOnOpen('reservation-blocked-form', () => ({ date: date.value, reason: reason.value, wholeDay: wholeDay.value, from: from.value, until: until.value }), open);
 
 const create = useCommand('reservation.blocked_date.create');
 const date = ref('');
@@ -68,7 +72,9 @@ const invalid = (message: string | undefined) => ({ 'ion-invalid': !!message, 'i
     @submit="save"
   >
     <template #default="{ fieldErrors }">
-      <div class="reservation-blocked-form">
+      <div
+        class="reservation-blocked-form"
+      >
         <ion-input
           data-testid="reservation-blocked-form-date"
           type="date"
