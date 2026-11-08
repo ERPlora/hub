@@ -4782,9 +4782,9 @@ def _unchanged(hub: Hub | None, label: str, row: activation.Activation) -> dict:
     ai={
         "description": "Turns off one of this business's apps (by its name as the person says it, or its id): it "
         "leaves everyone's menu and its screens stop opening; the apps that came along only with it go off too. Nothing "
-        "is deleted: turned on again, it has its data. Refused while another app on needs it, when the business's "
-        "country requires the app on (or one that would go off with it), when the app itself says why not yet or when "
-        "the name fits several apps (ask which one). already=true: it was off already.",
+        "is deleted: turned on again, it has its data; an app the business's country requires stays on. Refused while "
+        "another app on needs it, when the business's country requires the app on, when the app itself says why not "
+        "yet or when the name fits several apps (ask which one). already=true: it was off already.",
         "risk": "high",
         "check": "base.app.get",
         "asks": {
