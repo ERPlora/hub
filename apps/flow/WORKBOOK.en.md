@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:fc42a47843c6ce3066fa9f763925988070504d3f06ab970819fdbd2e716757b7 -->
+<!-- generated from WORKBOOK.md sha256:efecd79748b8aa5b5643439785049df0ae9b8f6b6e66061697ab69615ebda80d -->
 
 ## What it is for and who it is for
 
@@ -233,7 +233,7 @@ Steps:
 3. Turning on one that lacks permissions warns: "On, but it still lacks the permissions it asks for: it will
    do nothing until you allow them in its Permissions tab."
 In: the automation (by voice, by its name: "turn on the welcome automation"). Before turning it on or
-pausing it, the assistant's card names it by its name ("Welcome"), never by its code.
+pausing it, the assistant's card names it "Automation: Welcome", by its name and never by its code.
 Out: on or paused (`flow.flow.enabled`, `flow.flow.paused`). When paused it stops starting; a run that is
 waiting is cancelled when it wakes up if it is still paused (if it is turned on again before, it carries
 on). A schedule that is turned on counts from that moment: it does not make up for what happened while it
@@ -300,8 +300,8 @@ Steps:
 1. In the row, press **Make a copy**.
 2. "Copy of …" (or "Copy of … (2)") appears in the list, paused, and the notice "Copied, and the copy is
    paused. It has none of the original's permissions: allow what it needs before turning it on.".
-In: the automation being copied (by voice, by its name; the assistant's card names it by its name, never by
-its code).
+In: the automation being copied (by voice, by its name; the assistant's card names it "Automation: …", by
+its name and never by its code).
 Out: a new automation with the same steps, paused, without permissions and without history
 (`flow.flow.created`).
 If it fails: the message in red at the top; nothing is created.
@@ -315,7 +315,7 @@ Steps:
 1. In the row, press **Delete**.
 2. Confirm: "Delete "…"? This cannot be undone. Its history stays." with **Yes, delete it** or **Leave it**.
 In: the automation being deleted (by voice, by its name, and always with the confirmation: the assistant's
-card names it by its name, never by its code).
+card names it "Automation: …", by its name and never by its code).
 Out: the automation stops starting at once and leaves the list; what was waiting is cancelled at once; its
 history is kept (`flow.flow.deleted`).
 If it fails: the message in red at the top; the row stays.
@@ -448,8 +448,8 @@ Steps:
    shows as "Waiting for your permission"; what is granted, "Allowed" with **Withdraw**. With unsaved
    changes it warns: "Save it first: what you allow is what is saved.".
 3. Press **Allow everything it needs**: "Permissions updated." appears.
-In: the saved steps and the permissions it has (by voice, the assistant's card names the automation by its
-name, never by its code).
+In: the saved steps and the permissions it has (by voice, the assistant's card names the automation
+"Automation: …", by its name and never by its code).
 Out: the automation's full list of permissions (`flow.flow.granted`). Before the first save there is
 nothing to allow: the tab says so and asks to save.
 If it fails: if the list names something that does not exist in the business, or something that needs a
@@ -522,8 +522,8 @@ Steps:
 2. Confirm: "Run it now? It will really do what its steps say." with **Yes, run it** or **Cancel**.
 3. "Run. See it in History." appears; if it stopped by an error, "It ran and stopped by an error: …" in
    red; if it was left waiting, "It ran and is waiting…".
-In: the automation (by voice: "run the weekly review now"; the assistant's card names it by its name,
-never by its code).
+In: the automation (by voice: "run the weekly review now"; the assistant's card names it "Automation: …",
+by its name and never by its code).
 Out: a real run, with all its effects (`flow.run.started`, `flow.run.finished`). Without the data of a
 notice, what it reads from the notice comes out empty.
 If it fails: paused, "This automation is paused: turn it on to run it."; unsaved, the button does not show;
@@ -684,8 +684,8 @@ Steps:
    by an error again: …" next to the run, which can be resumed again. Its steps keep "Resumed here, from the
    step that had failed".
 In: the run stopped by an error (by voice, by its reference: "resume the welcome one that failed"). The
-assistant's card names it as History does, with its automation in front: "Welcome · 15 Oct 2026, 21:00",
-never by its code.
+assistant's card names it "Automation run: Welcome · 15 Oct 2026, 21:00", as History does and with its
+automation in front, never by its code.
 Out: the same run carries on at the step that failed, without repeating those that already took effect and
 with the steps it started with, even if the automation changed afterwards (`flow.run.resumed`,
 `flow.run.finished`). A run stopped by an error keeps what its steps left **7 days** so that it can be
@@ -841,7 +841,7 @@ Steps:
 3. Press **Approve** or **No**. "Approved: the automation carries on." or "Answered no." appears and the card
    leaves the tray.
 In: the decision and the note (by voice: "approve Ana's refund"), with who answers from their session. The
-assistant's card names the question by what it asks, never by its code.
+assistant's card names the question "Question: …", by what it asks and never by its code.
 Out: the answer with who, when and the note (`flow.question.answered`). A yes carries on with the next steps,
 which can read "Approved", "Note" and "Answered by"; a no does what the step says: it stops the run
 ("Cancelled: Marta answered no to "…"."; in a change by the assistant, "…" is its action, "Cancel a

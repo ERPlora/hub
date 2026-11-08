@@ -999,7 +999,7 @@ test('FLOW-F03 — pausing an automation, the card names it; resuming a run, its
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
     await expect(card(page)).toContainText('Cambiar en Automatizaciones. Revisa cada dato antes de seguir.');
-    await expect(card(page)).toContainText(`Registro: ${name}`);
+    await expect(card(page)).toContainText(`Automatización: ${name}`);
     await expect(card(page)).toContainText('Encendida: No');
     await expect(card(page)).not.toContainText(flow.id);
     await captureConfirmation(page, `${KEY}-${vp.label}`);
@@ -1012,7 +1012,7 @@ test('FLOW-F03 — pausing an automation, the card names it; resuming a run, its
   for (const vp of VIEWPORTS) {
     await page.setViewportSize({ width: vp.width, height: vp.height });
     await expect(card(page)).toContainText('Reintentar en Automatizaciones. Revisa cada dato antes de seguir.');
-    await expect(card(page)).toContainText(`Registro: ${label}`);
+    await expect(card(page)).toContainText(`Ejecución: ${label}`);
     await expect(card(page)).not.toContainText(ran.data.id);
     await captureConfirmation(page, `${KEY}-run-${vp.label}`);
   }
