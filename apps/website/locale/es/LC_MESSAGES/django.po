@@ -407,3 +407,93 @@ msgstr "Pega el enlace de tu negocio en Google Maps, o su Place ID."
 
 msgid "Google reviews"
 msgstr "Reseñas de Google"
+
+#: choices.py:39
+msgctxt "assistant card"
+msgid "Top bar"
+msgstr "Barra superior"
+
+#: choices.py:40
+msgctxt "assistant card"
+msgid "Header"
+msgstr "Cabecera"
+
+#: choices.py:41
+msgctxt "assistant card"
+msgid "About us"
+msgstr "Sobre nosotros"
+
+#: choices.py:42
+msgctxt "assistant card"
+msgid "Catalog"
+msgstr "Catálogo"
+
+#: choices.py:43
+msgctxt "assistant card"
+msgid "Gallery"
+msgstr "Galería"
+
+#: choices.py:44
+msgctxt "assistant card"
+msgid "Google reviews"
+msgstr "Reseñas de Google"
+
+#: choices.py:45
+msgctxt "assistant card"
+msgid "Contact"
+msgstr "Contacto"
+
+#: choices.py:46
+msgctxt "assistant card"
+msgid "Location"
+msgstr "Ubicación"
+
+#: choices.py:47
+msgctxt "assistant card"
+msgid "Footer"
+msgstr "Pie de página"
+
+#: services.py:112
+msgctxt "assistant card"
+msgid "Summary"
+msgstr "Resumen"
+
+#: services.py:113
+#, python-format
+msgctxt "assistant card"
+msgid "Design: %(template)s"
+msgstr "Diseño: %(template)s"
+
+#: services.py:114
+#, python-format
+msgctxt "assistant card"
+msgid "Theme: %(theme)s"
+msgstr "Tema: %(theme)s"
+
+#: services.py:115
+msgctxt "assistant card"
+msgid "Custom colours"
+msgstr "Colores propios"
+
+#: services.py:116
+#, python-format
+msgctxt "assistant card"
+msgid "Content: %(sections)s"
+msgstr "Contenido: %(sections)s"
+
+#: services.py:117
+#, python-format
+msgctxt "assistant card"
+msgid "%(section)s: hidden"
+msgstr "%(section)s: se oculta"
+
+#: services.py:118
+#, python-format
+msgctxt "assistant card"
+msgid "%(section)s: shown"
+msgstr "%(section)s: se muestra"
+
+#: services.py:119
+msgctxt "assistant card"
+msgid "No changes"
+msgstr "Sin cambios"

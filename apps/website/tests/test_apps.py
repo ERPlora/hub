@@ -123,6 +123,8 @@ def test_the_assistant_gets_every_operation_but_the_screen_only_ones():
         assert isinstance(op.ai, dict), name
         assert len(str(op.ai.get("description", "")).strip()) > 20, name
         expected = {"description", "risk"} if op.kind == "command" else {"description"}
+        if name == "website.site.save":
+            expected.add("summary")
         assert set(op.ai) == expected, name
         if op.kind == "command":
             assert op.ai["risk"] in {"normal", "high"}, name
