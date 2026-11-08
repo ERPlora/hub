@@ -61,7 +61,8 @@ its database context: ``use_hub(request.hub)`` on a hub's host; on the platform 
 (``/admin/hub/<slug>/``) or, with none, control (a page of a hub's model there goes back to the index, asking to
 choose a business); nothing for ``/internal`` and the open paths, whose code opens its own. A hub's database that says
 it is another hub (``base.tenancy.identity``) answers 503 (``base.hub_unavailable``), serves nothing and raises an
-alarm; one that cannot be reached now answers the same 503 with ``Retry-After`` and a warning; a business without its
+alarm; one that cannot be reached now answers the same 503 with ``Retry-After`` and a warning, after waiting for it when
+it is a cut of the database (``live.database_cut``, BASE-F111: marked, so the request runs again); a business without its
 own database yet (phase 1's, before its cut: S5) answers 503 ``base.hub_maintenance``, as one being moved. A hub
 whose every place in this process is taken (its plan's transactions at once, ``base.tenancy.limits``) answers 503
 ``base.hub_busy`` with ``Retry-After``, whether that happens while checking its database, in
@@ -434,8 +435,8 @@ class HubDatabaseMiddleware:
 
     @staticmethod
     def _unavailable(request: HttpRequest, error: Exception) -> HttpResponse:
-        """503: a database that is not its hub's (an alarm), one that cannot be reached now (it passes), or a business
-        without its own yet (its cut is to come)."""
+        """503: a database that is not its hub's (an alarm), one that cannot be reached now (it passes; a cut of the database
+        is waited for first), or a business without its own yet (its cut is to come)."""
         hub = getattr(request, "hub", None)
         if isinstance(error, tenancy_context.HubWithoutDatabase):
             logger.warning("base.hub_without_database: %s; nothing is served until its cut.", error)

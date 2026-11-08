@@ -62,8 +62,29 @@ En las tres, en este orden: sin `hub`, 422 `internal.payload_invalid`; el negoci
 la app apagada en él, 404 `app_inactive` (erplora.com guarda el mensaje y reintenta), leída en la BD del propio negocio
 (ya dentro de su hub: el host por el que entra el SaaS no abre ninguno); si esa BD falla ahora, 503
 `base.hub_unavailable`, con su línea en el log (`base.hub_unreachable`, o `base.hub_unavailable` si la BD dice ser de
-otro hub), y erplora.com también reintenta; un cuerpo fuera de contrato, 422 con `fields`; y el sobre de cualquier otra
-negativa de la operación, tal cual.
+otro hub), y erplora.com también reintenta; un corte de la base dentro de la operación, su 503 de `live.database_cut`
+(`database_unavailable` o `database_outcome_unknown`) con `Retry-After` y sin esperar (BASE-F111), y erplora.com
+reintenta igual; un cuerpo fuera de contrato, 422 con `fields`; y el sobre de cualquier otra negativa de la operación,
+tal cual.
+
+## Un corte de la base de datos (BASE-F111)
+
+Un reinicio del escritor, un mantenimiento de AWS o el cambio de Blue/Green cortan la base unos segundos (PLAN-DB, ronda
+2026-11-04e, punto 5). El Hub enciende `live.database_cut` (`LIVE["database_cut"]` en `config/settings.py`; qué es un
+corte y qué se repite, en el README de `packages/live`):
+
+- **Espera** hasta `DB_CUT_WAIT_SECONDS` (20 s por defecto, muy por debajo de los 120 s del balanceador) y repite sola una
+  lectura, lo que no llegó a empezar (abrir la base del negocio, leer quién pregunta) y un comando `repeatable=True` cortado
+  antes de su COMMIT. La espera es fuera de la transacción: no retiene la plaza del plan del negocio (`base.tenancy.limits`).
+- **`repeatable=True`** solo lo lleva un comando que no toca nada más que su base; hoy, los de Demo, la app de referencia
+  (las demás apps, en hub#1051). Nunca uno que cobra, numera, genera un QR, envía a la AEAT o llama a un tercero.
+- **Pasado el tope, o si no se puede repetir:** 503 con `Retry-After`, nunca un 500 (`base.database_cut.server_error`, el
+  `handler500`): el sobre para la API, y para el navegador `base/hub_maintenance.html`, que se recarga sola. Al abrir la
+  base del negocio, el 503 es el de siempre, `base.hub_unavailable`, pero después de esperar.
+- **Sin espera:** `/internal/` (el SaaS reintenta por su cuenta) y `/readyz`. El pool de control lleva `check`: nunca
+  entrega una conexión que el servidor cortó mientras esperaba en él.
+- En la suite, el tope es 1 s (`config/settings_pytest.py`); `base/tests/test_database_cut.py` corta de verdad, con
+  `pg_terminate_backend` y la base del negocio en solo lectura.
 
 ## Tenencia: una BD por hub (fase 1, tajadas S1–S3)
 
