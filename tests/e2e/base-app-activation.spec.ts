@@ -25,6 +25,7 @@ import {
   A,
   api,
   appRow,
+  capture,
   horizontalOverflow,
   HUB_DIR,
   hostPage,
@@ -489,7 +490,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await expect(appRow(page, 'tax').locator('[data-testid="apps-refusal"]')).toHaveText(mandatory);
       await expect(testid(page, 'apps-row-tax-toggle')).toHaveCount(0);
       await snap(page, 'mandatory', width);
-      await page.screenshot({ path: shot(`FIX-HUB-997-MANDATORY-MINE-${width}`) });
+      await capture(page, `FIX-HUB-997-MANDATORY-MINE-${width}`);
       // The server says the same if asked anyway, and nothing is written.
       const direct = await api<{ error: { code: string; message: string; app: string } }>(context, A, 'POST', '/apps/disable', { app: 'tax' });
       expect(direct.status).toBe(409);
@@ -516,7 +517,7 @@ for (const [label, viewport] of Object.entries(VIEWPORTS)) {
       await expect(appRow(page, 'verifactu').locator('[data-testid="apps-state"]')).toHaveText('Desactivada');
       await expect(testid(page, 'apps-row-verifactu-toggle')).toContainText('Activar');
       await snap(page, 'mandatory-off', width);
-      await page.screenshot({ path: shot(`FIX-HUB-997-MANDATORY-ALL-${width}`) });
+      await capture(page, `FIX-HUB-997-MANDATORY-ALL-${width}`);
     } finally {
       await context.close();
     }
