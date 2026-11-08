@@ -1222,6 +1222,8 @@ def test_a_session_told_twice_counts_once(lucia):
         run("sale.voucher_session.record", {"session_id": str(session), "staff_id": str(ana), "value": 3333})
     assert by_staff()[ana].voucher_total == 3333
     assert VoucherSession.objects.count() == 1
+    # The second telling changed nothing: nothing to repaint.
+    assert OutboxEvent.objects.filter(name="sale.voucher_session.recorded").count() == 1
 
 
 def test_who_may_not_sell_may_not_say_who_did_a_session():
