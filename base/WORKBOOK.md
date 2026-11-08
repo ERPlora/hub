@@ -3790,8 +3790,7 @@ con su issue, y llegan con ella. Después llegaron BASE-F21 y BASE-F22 (hub#601)
 - **Las notas de cada versión (BASE-F41)**, hub#576.
 - **Los roles que trae una app (BASE-F82)**, hub#579, con la contradicción entre PLAN-HUB §3 (`RoleActivation`) y
   los cuatro roles de PLAN §22 sin resolver.
-- **La cola de PgBouncer de cada negocio en CloudWatch**, hub#572, y **la tarjeta del asistente que enseña los ids de
-  las apps de una plantilla** (`base.blueprint.import`), hub#504 (también de Automatizaciones).
+- **La cola de PgBouncer de cada negocio en CloudWatch**, hub#572.
 - **Peticiones a `@erplora/ui`** que siguen abiertas: [`UI-REQUESTS.md`](UI-REQUESTS.md) (los iconos de documento de
   Archivos, los del cuadro del asistente y `useI18n` en el shell).
 

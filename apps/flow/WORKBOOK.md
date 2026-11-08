@@ -1791,7 +1791,7 @@ Los avisos llevan ids, nunca nombres ni contenidos.
   no manda correos a clientes.
 - **Arreglos pendientes, abiertos como issues** (`migration-leftover`): el límite de pago en efectivo o de ticket
   de la vista previa de un cobro que deja un paso sale en céntimos (hub#926); la tarjeta de confirmación del asistente llama «Registro» a la automatización o a la ejecución
-  (hub#499) y dice «N elementos» en los permisos de un flujo sin decir cuáles (hub#504, con `base`).
+  (hub#499).
 - **«Necesita tu atención»** (eventos que no se entregaron): el reparto del worker ya entrega los avisos a esta
   app y, tras 8 intentos fallidos, da uno por perdido y lo deja anotado; la pantalla que los enseña y los vuelve a
   intentar es la administración de los avisos (PLAN-HUB bloque 7), de la plataforma, y todavía no existe.
