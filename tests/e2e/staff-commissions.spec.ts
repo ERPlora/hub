@@ -13,7 +13,7 @@
 import { type Browser, type BrowserContext, expect, type Locator, type Page, test } from '@playwright/test';
 
 import { cleanUp as cleanCustomers, createCard, e2eName } from './customer-helpers';
-import { A, api, type Credentials, EMPLOYEE, login, psql, saveSessionForTheSweep, shot, shown } from './helpers';
+import { A, api, capture, type Credentials, EMPLOYEE, login, psql, saveSessionForTheSweep, shot, shown } from './helpers';
 import { cleanInventory, createProduct } from './inventory-helpers';
 import { snapshotSeries } from './invoice-helpers';
 import { chargeByApi, cleanSales, type SaleOut, stamp } from './sale-helpers';
@@ -259,7 +259,7 @@ test('STAFF-F21 (paso 3: la comisión del día): a session spent outside the che
         await expect(rowOf(page, ana.id)).toBeInViewport({ timeout: 1000 });
       }, `Ana at ${viewport.label}`).toPass();
       await expect(rowOf(page, ana.id)).toContainText('€66.67');
-      await page.screenshot({ path: shot(`HUB-770-COMMISSIONS-OFF-TILL-${viewport.label}`) });
+      await capture(page, `HUB-770-COMMISSIONS-OFF-TILL-${viewport.label}`);
     }
   } finally {
     await context.close();
