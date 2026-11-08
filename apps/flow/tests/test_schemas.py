@@ -413,3 +413,18 @@ def test_an_assistant_step_never_hands_a_secret_to_the_assistant():
 def test_what_the_assistant_answered_is_read_by_the_steps_after_it():
     later = COMMAND | {"id": "s2", "params": {"title": "{{steps.s1.text}}"}}
     assert schemas.CreateIn.model_validate({"steps": [ASSISTANT, later]}).steps[1].params == {"title": "{{steps.s1.text}}"}
+
+
+@pytest.mark.parametrize(
+    ("schema", "title"),
+    [
+        (schemas.FlowRefIn, "Automation"),
+        (schemas.GrantIn, "Automation"),
+        (schemas.RunIn, "Automation"),
+        (schemas.EnabledIn, "Automation"),
+        (schemas.AnswerIn, "Question"),
+        (schemas.RunRefIn, "Automation run"),
+    ],
+)
+def test_a_dangerous_write_titles_the_record_it_names(schema, title):
+    assert schema.model_fields["id"].title == title
