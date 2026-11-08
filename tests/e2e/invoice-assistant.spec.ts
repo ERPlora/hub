@@ -175,11 +175,11 @@ test('INVOICE-F08 — «rectify invoice <number> because the price was wrong»: 
   const preview = lastAnswer(page);
   await expect(preview.locator('strong').first()).toHaveText(invoice.number);
   await expect(preview).toContainText(`e2e Talleres ${RUN}`);
-  await expect(preview).toContainText('Tipo: R1');
-  await expect(preview).toContainText(`Motivo: ${REASON}`);
-  await expect(preview).toContainText(`Número: ${expected.next_number} (el siguiente de la serie RECT; se asigna al emitirla)`);
+  await expect(preview).toContainText('Type: R1');
+  await expect(preview).toContainText(`Reason: ${REASON}`);
+  await expect(preview).toContainText(`Number: ${expected.next_number} (the next one of series RECT; it is assigned when issued)`);
   await expect(preview).toContainText(`Base: ${euros(-10000)}`);
-  await expect(preview).toContainText(`Impuestos: ${euros(-2100)}`);
+  await expect(preview).toContainText(`Taxes: ${euros(-2100)}`);
   await expect(preview).toContainText(`Total: ${euros(-12100)}`);
   // The preview was the Hub's own reading, sent to the model as it is: never a figure the model made up.
   expect(toldPreview()).toMatchObject({
