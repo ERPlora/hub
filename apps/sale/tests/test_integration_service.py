@@ -1122,6 +1122,23 @@ def professional(first_name: str, ctx=None):
     return run("staff.member.create", {"first_name": first_name, "last_name": "López"}, ctx).id
 
 
+def voucher_of_100_in(ctx, *, seller=None):
+    """In the business of ``ctx``: a haircut of 25.00, Lucía and a voucher of 3 sessions of it, charged at the till for
+    100.00 (by ``seller``) and granted saying that sale. Its service, its owner, the voucher sold and the sale."""
+    cut = run("service.service.create", {"name": "Haircut", "price": 2500, "tax_category_key": "service.generic"}, ctx)
+    owner = run("customer.customer.create", {"name": "Lucía Pérez"}, ctx)
+    package = run(
+        "service.package.create", {"name": "Bono de 100", "max_uses": 3, "items": [{"service_id": str(cut.id)}]}, ctx
+    )
+    sold = charged_open("value-b-0000", ("Bono de 100", 10000, seller), ctx=ctx)
+    grant = run(
+        "service.grant.create",
+        {"package_id": str(package.id), "customer_id": str(owner.id), "amount": 10000, "sale_id": str(sold.id)},
+        ctx,
+    )
+    return cut, owner, grant, sold
+
+
 def redeem(grant, *, member=None, service=None, ctx=None):
     """One session of ``grant`` spent outside the till (the assistant, the API), saying who did it."""
     return run(
@@ -1238,23 +1255,7 @@ def test_with_sales_off_the_session_is_spent_and_says_who_did_it_all_the_same(ha
 def test_a_session_outside_the_till_in_one_business_counts_nothing_in_another(hub_a, hub_b):
     in_a, in_b = ctx_for(scope=Scope("host", hub_a.slug)), ctx_for(scope=Scope("host", hub_b.slug))
     with use_hub(hub_b):
-        cut = run(
-            "service.service.create",
-            {"name": "Haircut", "price": 2500, "tax_category_key": "service.generic"},
-            in_b,
-        )
-        owner = run("customer.customer.create", {"name": "Lucía Pérez"}, in_b)
-        package = run(
-            "service.package.create",
-            {"name": "Bono de 100", "max_uses": 3, "items": [{"service_id": str(cut.id)}]},
-            in_b,
-        )
-        sold = charged_open("value-b-0000", ("Bono de 100", 10000, None), ctx=in_b)
-        grant = run(
-            "service.grant.create",
-            {"package_id": str(package.id), "customer_id": str(owner.id), "amount": 10000, "sale_id": str(sold.id)},
-            in_b,
-        )
+        _cut, _owner, grant, _sold = voucher_of_100_in(in_b)
         ana = professional("Ana", in_b)
         redeem(grant, member=ana, ctx=in_b)
         # Positive control: it counts, in its own business.
@@ -1272,23 +1273,7 @@ def test_a_session_in_one_business_counts_nothing_in_another(hub_a, hub_b):
     in_a, in_b = ctx_for(scope=Scope("host", hub_a.slug)), ctx_for(scope=Scope("host", hub_b.slug))
     ana, seller = uuid7(), uuid7()
     with use_hub(hub_b):
-        cut = run(
-            "service.service.create",
-            {"name": "Haircut", "price": 2500, "tax_category_key": "service.generic"},
-            in_b,
-        )
-        owner = run("customer.customer.create", {"name": "Lucía Pérez"}, in_b)
-        package = run(
-            "service.package.create",
-            {"name": "Bono de 100", "max_uses": 3, "items": [{"service_id": str(cut.id)}]},
-            in_b,
-        )
-        sold = charged_open("value-b-0000", ("Bono de 100", 10000, seller), ctx=in_b)
-        grant = run(
-            "service.grant.create",
-            {"package_id": str(package.id), "customer_id": str(owner.id), "amount": 10000, "sale_id": str(sold.id)},
-            in_b,
-        )
+        cut, owner, grant, sold = voucher_of_100_in(in_b, seller=seller)
         spend_session(grant, cut, owner, "value-b-0001", staff=ana, ctx=in_b)
         # Positive control: they count, in their own business.
         rows = {row.staff_id: row for row in run("sale.sale.by_staff", {}, in_b).rows}
