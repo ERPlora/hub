@@ -36,6 +36,7 @@ def test_the_events_of_the_workbook():
         "SALE_REASSIGNED": "sale.sale.reassigned",
         "SALE_INVOICED": "sale.sale.invoiced",
         "SALE_VOUCHER_LINE_CHANGED": "sale.sale.voucher_line_changed",
+        "VOUCHER_SESSION_RECORDED": "sale.voucher_session.recorded",
         "ORDER_OPENED": "sale.order.opened",
         "ORDER_CHANGED": "sale.order.changed",
         "ORDER_FIRED": "sale.order.fired",

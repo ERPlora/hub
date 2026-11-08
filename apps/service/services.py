@@ -1229,8 +1229,10 @@ def adjust_grant(ctx: OperationContext, data: AdjustIn) -> dict:
     output=RedemptionOut,
     expose_api=True,
     ai={
-        "description": "Spend one session of a voucher sold (outside the till), optionally on a service it covers and "
-        "linked to an appointment or a sale. Refused when voided, expired or without sessions left.",
+        "description": "Spend one session of a voucher sold (outside the till), optionally on a service it covers, "
+        "saying the professional who did it (its value counts in their production and commission; without one it "
+        "counts for nobody), and linked to an appointment or a sale. Refused when voided, expired or without sessions "
+        "left.",
         "risk": "normal",
     },
 )
@@ -1240,6 +1242,7 @@ def redeem(ctx: OperationContext, data: RedeemIn) -> dict:
         if (data.service_id or data.service)
         else None
     )
+    member = resolve_member(data.member_id, data.member) if (data.member_id or data.member) else None
     lock_grant(data.id)
     grant = find_grant(data.id)
     state = balance(grant)
@@ -1250,12 +1253,19 @@ def redeem(ctx: OperationContext, data: RedeemIn) -> dict:
     session = Redemption.objects.create(
         grant=grant,
         service=service,
+        member=member,
         appointment_id=data.appointment_id,
         sale_id=data.sale_id,
         note=data.note,
         actor=_actor(ctx),
         value=session_value(grant.id),
     )
+    if member is not None:
+        _tell_sales(
+            ctx,
+            "sale.voucher_session.record",
+            {"session_id": session.id, "staff_id": member.id, "value": _worth(session, service, member)},
+        )
     record_event(
         ctx,
         events.GRANT_REDEEMED,
@@ -1270,9 +1280,27 @@ def redeem(ctx: OperationContext, data: RedeemIn) -> dict:
         "grant_id": grant.id,
         "service_id": service.id if service else None,
         "service_name": service.name if service else None,
+        "member_id": member.id if member else None,
+        "member_name": member.full_name if member else None,
         "redeemed_at": session.redeemed_at,
         "remaining": None if state.remaining is None else state.remaining - 1,
     }
+
+
+def _worth(session: Redemption, service: Service | None, member: Member) -> int:
+    """What a session spent outside the till is worth to who did it (SALE-F28): its value (SERVICE-F24). An unlimited
+    voucher has no sessions to divide its price by: as the till counts it, at the price of its line, the price the
+    professional charges for the service (their own, else the service's); without the service said, nothing."""
+    if session.value is not None:
+        return session.value
+    if service is None:
+        return 0
+    own = (
+        Assignment.objects.filter(service=service, member=member, is_active=True)
+        .values_list("custom_price", flat=True)
+        .first()
+    )
+    return service.price if own is None else own
 
 
 @operation(

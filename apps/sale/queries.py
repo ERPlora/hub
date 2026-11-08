@@ -48,6 +48,7 @@ from apps.sale.models import (
     SaleLine,
     SalePayment,
     Settings,
+    VoucherSession,
 )
 from apps.sale.schemas import (
     BusinessDayOut,
@@ -2257,11 +2258,19 @@ def by_staff(ctx: OperationContext, params: PeriodIn) -> dict:
         )
     )
     refunded, voucher_sold_back = _refunded_by_staff(params)
+    # The sessions spent outside the till (SERVICE-F21) are on no line: they count apart, each once.
+    off_till = dict(
+        _period(VoucherSession.objects.order_by(), params)
+        .values("staff_id")
+        .annotate(worth=Sum("value"))
+        .values_list("staff_id", "worth")
+    )
     totals = []
     for row in rows:
         given_back = refunded.get(row["served_by"], 0)
         revenue = row["gross"] - given_back
         voucher_sold = row["voucher_sold"] - voucher_sold_back.get(row["served_by"], 0)
+        sessions = row["sessions"] + off_till.pop(row["served_by"], 0)
         totals.append(
             {
                 "staff_id": row["served_by"],
@@ -2272,12 +2281,26 @@ def by_staff(ctx: OperationContext, params: PeriodIn) -> dict:
                 "refunded_total": given_back,
                 "total_revenue": revenue,
                 "voucher_sold_total": voucher_sold,
-                "voucher_total": row["sessions"],
-                "production_total": revenue - voucher_sold + row["sessions"],
+                "voucher_total": sessions,
+                "production_total": revenue - voucher_sold + sessions,
             }
         )
+    for staff_id, sessions in off_till.items():
+        totals.append({"staff_id": staff_id, **NO_MONEY, "voucher_total": sessions, "production_total": sessions})
     totals.sort(key=lambda total: (-total["production_total"], total["staff_id"]))
     return {"rows": totals}
+
+
+#: The money figures of a professional who only did sessions outside the till: no line of the period is hers.
+NO_MONEY = {
+    "sales_count": 0,
+    "gross_total": 0,
+    "net_total": 0,
+    "tax_total": 0,
+    "refunded_total": 0,
+    "total_revenue": 0,
+    "voucher_sold_total": 0,
+}
 
 
 def _refunded_by_staff(params: PeriodIn) -> tuple[dict[UUID, int], dict[UUID, int]]:

@@ -939,6 +939,38 @@ def test_redeem_a_session_of_a_service_the_voucher_covers(tax):
     }
 
 
+def test_a_session_spent_outside_the_till_says_who_did_it(tax):
+    # flow: SERVICE-F21 (hub#770): by name, as the assistant says it, or by id, as the API does.
+    cut = make_service("Cut", tax=tax)
+    ana, bea = make_member("Ana", "López"), make_member("Bea", "Ruiz")
+    grant = make_grant(make_package("Bono", [cut], max_uses=3), make_customer())
+    by_name = run(
+        "service.grant.redeem", {"id": str(grant.id), "member": "Ana"}, role="hub_employee"
+    )
+    by_id = run("service.grant.redeem", {"id": str(grant.id), "member_id": str(bea.id)})
+    nobody = run("service.grant.redeem", {"id": str(grant.id)})
+    assert [
+        (Redemption.objects.get(pk=out.id).member_id, out.member_id, out.member_name)
+        for out in (by_name, by_id, nobody)
+    ] == [(ana.id, ana.id, "Ana López"), (bea.id, bea.id, "Bea Ruiz"), (None, None, None)]
+
+
+def test_a_session_for_a_professional_who_is_not_in_the_team_is_not_spent(tax):
+    cut = make_service("Cut", tax=tax)
+    gone = make_member("Eva", "Gil", status="terminated")
+    make_member("Ana", "López"), make_member("Ana", "Ruiz")
+    grant = make_grant(make_package("Bono", [cut], max_uses=3), make_customer())
+    for said, refusal in (
+        ({"member_id": str(uuid.uuid7())}, NotFound),
+        ({"member_id": str(gone.id)}, NotFound),
+        ({"member": "Ana"}, Conflict),
+    ):
+        with pytest.raises(refusal):
+            run("service.grant.redeem", {"id": str(grant.id), **said})
+    assert not Redemption.objects.exists()
+    assert events() == []
+
+
 def test_a_session_is_refused_with_the_real_reason(tax):
     cut, shampoo = make_service("Cut", tax=tax), make_service("Shampoo", tax=tax)
     package = make_package("Bono", [cut], max_uses=1, validity_days=30)

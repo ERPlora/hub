@@ -828,9 +828,6 @@ El cajero del producto actual ya no existe como papel: lo que veía (el director
   `staff_staffsettings` hasta el paso contract (expand/contract, PLAN-DB), con su migración reversible,
   una vez desplegado hub#177; va a `## 6` de `MIGRATION.md`. Al borrarlas, `apps/flow/tests/test_i18n.py`
   (recorre las columnas de cada modelo) dirá qué entradas del catálogo de Automatizaciones sobran.
-- **Lo que Comisiones aún no cuenta** (STAFF-F21), las dos de otras apps y en la cola: una venta cobrada
-  con «Atiende yo» no se atribuye a nadie (`FIX-SALE-SERVED-BY-ME-NOT-ATTRIBUTED`) y la sesión de un
-  bono vale 0 € para quien la hace (`FIX-SERVICE-VOUCHER-SESSION-STAFF-VALUE`).
 - **Comisiones en el menú**: es una pestaña de Personal para quien ve la compensación, no una entrada de
   menú, porque una entrada no puede depender de un permiso (`live.meta.Nav`, «Cómo son las páginas»).
   El producto actual no tenía la pantalla.

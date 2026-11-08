@@ -722,6 +722,15 @@ msgstr "valor de la sesión del bono"
 msgid "paid for vouchers"
 msgstr "pagado en bonos"
 
+msgid "done by"
+msgstr "hecha por"
+
+msgid "voucher session done outside the till"
+msgstr "sesión de un bono hecha fuera del cobro"
+
+msgid "voucher sessions done outside the till"
+msgstr "sesiones de los bonos hechas fuera del cobro"
+
 msgid "That line is not in that sale."
 msgstr "Esa línea no es de esa venta."
 
