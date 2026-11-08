@@ -315,3 +315,29 @@ describe('MenuFormModal: a business whose money cannot be read (hub#938)', () =>
     await expectWindowSaysMoneyUnreadable(m, 'combo-menu-form-submit', m.sent, opens);
   });
 });
+
+describe('MenuFormModal: Android Back with unsaved changes (hub#1031, BASE-F05)', () => {
+  it('editing: as opened closes; a change asks; restored as opened closes again', async () => {
+    const s = await setup(MENU);
+    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormOnAndroidBack({
+      overlay: () => s.inDoc('combo-menu-form'),
+      change: () => ionValue(s.field('name'), 'Kids menu', 'ionInput'),
+      restore: () => ionValue(s.field('name'), MENU.name, 'ionInput'),
+    });
+  });
+
+  it("the business's money answering after it opened rewrites the price, and that is no change", async () => {
+    const s = await setup(MENU, 'en', null);
+    const { unsavedChangesIn } = await import('../../../../base/frontend/lib/system-back');
+    const overlay = s.inDoc('combo-menu-form')!;
+    const before = s.field('price').value;
+    expect(unsavedChangesIn(overlay)).toBeUndefined();
+    await s.result('base.business.get', business(JAPANESE));
+    await settle();
+    expect(s.field('price').value).not.toBe(before);
+    expect(unsavedChangesIn(overlay)).toBeUndefined();
+    await ionValue(s.field('price'), '1500', 'ionInput');
+    expect(unsavedChangesIn(overlay)).toBeDefined();
+  });
+});

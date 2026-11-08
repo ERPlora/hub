@@ -190,3 +190,28 @@ describe('CorrectionModal: fields refused with the same words (hub#888)', () => 
     return { field: (key) => s.field(FIELD_OF[key] ?? key), send: () => click(s.save()), settle };
   }, 'clock_out_at');
 });
+
+describe('CorrectionModal: Android Back with unsaved changes (hub#1031, BASE-F05)', () => {
+  it('as opened closes; a change asks; restored as opened closes again', async () => {
+    const s = await setup();
+    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormOnAndroidBack({
+      overlay: () => s.inDoc('attendance-correct'),
+      change: () => ionValue(s.field('reason'), 'Forgot to clock out', 'ionInput'),
+      restore: () => ionValue(s.field('reason'), '', 'ionInput'),
+    });
+  });
+
+  it("a time changed by hand asks; the business's clock answering after it opened does not", async () => {
+    const s = await setup(DAY, 'en', null);
+    const { unsavedChangesIn } = await import('../../../../base/frontend/lib/system-back');
+    const overlay = s.inDoc('attendance-correct')!;
+    expect(unsavedChangesIn(overlay)).toBeUndefined();
+    await s.result('base.business.get', { timezone: 'Atlantic/Canary' });
+    await settle();
+    expect(s.field('clock_in').value).toBe('2026-10-05T08:02');
+    expect(unsavedChangesIn(overlay)).toBeUndefined();
+    await ionValue(s.field('clock_in'), '2026-10-05T08:30', 'ionInput');
+    expect(unsavedChangesIn(overlay)).toBeDefined();
+  });
+});

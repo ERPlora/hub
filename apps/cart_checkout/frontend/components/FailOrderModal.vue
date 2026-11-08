@@ -7,6 +7,7 @@ import { FormModal } from '@erplora/ui/components';
 import { useCommand } from '@erplora/ui/sdk';
 import { IonTextarea } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
 
 import { useT } from '../composables/useT';
 import type { OrderOut } from '../operations';
@@ -42,6 +43,8 @@ async function save(): Promise<void> {
   }
   open.value = false;
 }
+
+useUnsavedFormOnOpen('cart-checkout-fail', reason, open);
 </script>
 
 <template>

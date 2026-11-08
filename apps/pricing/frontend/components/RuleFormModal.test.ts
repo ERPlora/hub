@@ -314,3 +314,29 @@ describe('RuleFormModal: a business whose money cannot be read (hub#938)', () =>
     await expectWindowSaysMoneyUnreadable(m, 'pricing-rule-form-submit', m.sent, opens);
   });
 });
+
+describe('RuleFormModal: Android Back with unsaved changes (hub#1031, BASE-F05)', () => {
+  it('editing: as opened closes; a change asks; restored as opened closes again', async () => {
+    const s = await setupAnswered({ rule: rule() });
+    const name = s.field('name').value as string;
+    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormOnAndroidBack({
+      overlay: () => s.inDoc('pricing-rule-form'),
+      change: () => ionValue(s.field('name'), 'Ten yen off', 'ionInput'),
+      restore: () => ionValue(s.field('name'), name, 'ionInput'),
+    });
+  });
+
+  it("the business's money answering after it opened rewrites the amount, and that is no change", async () => {
+    const s = await setup({ rule: rule({ rule_type: 'fixed', percent: null, amount: 150 }) });
+    const { unsavedChangesIn } = await import('../../../../base/frontend/lib/system-back');
+    const overlay = s.inDoc('pricing-rule-form')!;
+    expect(unsavedChangesIn(overlay)).toBeUndefined();
+    await s.live();
+    await s.result('base.business.get', business(JAPANESE));
+    expect(s.field('amount').value).toBe('150');
+    expect(unsavedChangesIn(overlay)).toBeUndefined();
+    await ionValue(s.field('amount'), '200', 'ionInput');
+    expect(unsavedChangesIn(overlay)).toBeDefined();
+  });
+});

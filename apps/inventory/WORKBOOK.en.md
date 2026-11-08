@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:319a9e44052a5f86222b07c2573304c823cacef0dff8a931666625a4c0c735f6 -->
+<!-- generated from WORKBOOK.md sha256:f052b6763967616da6f18a0000454235aa7e248b0fde29886ce953d0eb9b8800 -->
 
 ## What it is for and who it is for
 
@@ -211,6 +211,12 @@ settings could not be loaded." with "Retry", never the factory values as if they
 | Reconnecting | What is painted stays; a strip warns "Reconnecting…" until the connection comes back. |
 | App inactive | "This app is not active in this business" instead of the figures and the table. |
 | No permission | What it cannot do does not appear (neither **+**, nor import or export, nor the stock actions, nor the switch: "Yes"/"No"); Settings does not show and its address says "This page does not exist"; if it loses the permission with Settings open, the fields lock with "You do not have permission to change these settings. Ask an administrator if you need it.". |
+
+## Unsaved changes on Android
+
+In the category and stock movement windows (receive, count and write-off), the phone's Back button asks "Discard changes?" when something typed
+or chosen has not been saved: "Keep editing" keeps it and "Discard changes" closes the window without saving.
+With the window as it opened, Back closes it without asking (BASE-F05); creating and editing a product ask the same (INVENTORY-F01, INVENTORY-F02).
 
 ## Flows
 

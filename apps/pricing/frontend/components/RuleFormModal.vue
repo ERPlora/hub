@@ -15,6 +15,7 @@ import { IonButton, IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
 
 import BusinessMoneyError from '../../../../base/frontend/components/BusinessMoneyError.vue';
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
 import { useLocale, useT } from '../composables/useT';
 import { useBusinessMoney } from '../lib/format';
 import { type Money, quantityFieldText, readDecimal } from '../lib/format';
@@ -247,6 +248,16 @@ async function save(): Promise<void> {
   }
   open.value = false;
 }
+
+// An untouched amount follows the business's money when it answers after the window opened: that is no change.
+useUnsavedFormOnOpen(
+  'pricing-rule-form',
+  () => {
+    const stored = moneyFieldText(props.rule?.amount ?? null, locale.value, money.value);
+    return { ...form.value, amount: form.value.amount === stored ? null : form.value.amount };
+  },
+  open,
+);
 </script>
 
 <template>

@@ -102,6 +102,12 @@ del flujo CART_CHECKOUT-F08.
 Importes con el formato del idioma de quien mira y en la moneda de cada fila, con los decimales de esa
 moneda (el yen no tiene céntimos); cantidades sin ceros de adorno («2», «0,5»).
 
+## Cambios sin guardar en Android
+
+En las ventanas de alta y edición de esta app, el botón atrás del móvil pregunta «¿Descartar los cambios?»
+cuando hay algo escrito o elegido sin guardar: «Seguir editando» conserva lo tecleado y «Descartar cambios»
+cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra sin preguntar (BASE-F05).
+
 ## Flujos
 
 | ID | Flujo | Estado |

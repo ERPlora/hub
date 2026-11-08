@@ -16,6 +16,7 @@ import { computed, ref, watch } from 'vue';
 import BusinessMoneyError from '../../../../base/frontend/components/BusinessMoneyError.vue';
 import ImageField from '../../../../base/frontend/components/ImageField.vue';
 import { draftOf, type ImageDraft, useImageSave } from '../../../../base/frontend/lib/item-image';
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
 import { useLocale, useT } from '../composables/useT';
 import { useBusinessMoney } from '../lib/format';
 import { moneyFieldText, parseMoney } from '../lib/money';
@@ -162,6 +163,16 @@ function retryPhoto(): void {
   const failed = photo.failure.value;
   if (failed) void savePhoto(failed.id);
 }
+
+// An untouched price follows the business's money when it answers after the window opened: that is no change.
+useUnsavedFormOnOpen(
+  'combo-menu-form',
+  () => {
+    const stored = props.combo ? moneyFieldText(props.combo.price, locale.value, money.value) : '';
+    return { ...form.value, price: form.value.price === stored ? null : form.value.price, image: image.value };
+  },
+  open,
+);
 </script>
 
 <template>

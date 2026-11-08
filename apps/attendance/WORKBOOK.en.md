@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:516ec5f1afaf979effc32acf23f745e373ddb3343edc4624b5a633538dc3e531 -->
+<!-- generated from WORKBOOK.md sha256:ac41a7f76cae891be5a1bb503b29569fb44d998fee535d66b5382f8fbb6c2a2a -->
 
 ## What it is for and who it is for
 
@@ -92,6 +92,12 @@ everyone else sees it read-only with "Only a manager or an administrator can cha
 On all three pages: "Reconnecting…" while the live connection recovers (what is painted stays), "This
 app is not active in this business" if it is turned off and "You do not have permission" if the role
 does not reach.
+
+## Unsaved changes on Android
+
+In the "Correct working day" window, the phone's Back button asks "Discard changes?" when something typed
+or chosen has not been saved: "Keep editing" keeps it and "Discard changes" closes the window without saving.
+With the window as it opened, Back closes it without asking (BASE-F05); a time rewritten by itself in the business's time zone is no change.
 
 ## Flows
 
