@@ -13,6 +13,7 @@ import { IonInput, IonSelect, IonSelectOption } from '@ionic/vue';
 import { computed, shallowRef, watch } from 'vue';
 
 import BusinessMoneyError from '../../../../base/frontend/components/BusinessMoneyError.vue';
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
 import { useLocale, useT } from '../composables/useT';
 import { formatMoney, moneyRefusal, readAmount, useBusinessMoney } from '../lib/money';
 import { refusal } from '../lib/refusal';
@@ -68,6 +69,8 @@ async function confirm(): Promise<void> {
   void toastSuccess(t(key, { amount: formatMoney(cents, locale.value, money) }));
   open.value = false;
 }
+
+useUnsavedFormOnOpen('cash-register-movement', () => ({ type: type.value, amount: amount.value, concept: concept.value }), open);
 </script>
 
 <template>

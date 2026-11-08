@@ -288,3 +288,28 @@ describe('OptionFormModal: a business whose money cannot be read (hub#938)', () 
     await expectWindowSaysMoneyUnreadable(m, 'modifier-option-form-submit', m.sent, opens);
   });
 });
+
+describe('OptionFormModal: Android Back with unsaved changes (hub#1031, BASE-F05)', () => {
+  it('editing: as opened closes; a change asks; restored as opened closes again', async () => {
+    const s = await setup(SODA);
+    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormOnAndroidBack({
+      overlay: () => s.inDoc('modifier-option-form'),
+      change: () => ionValue(s.field('name'), 'Cola', 'ionInput'),
+      restore: () => ionValue(s.field('name'), SODA.name, 'ionInput'),
+    });
+  });
+
+  it("the business's money answering after it opened rewrites the supplement, and that is no change", async () => {
+    const s = await setup({ ...SODA, price_delta: 150 }, 'en', null);
+    const { unsavedChangesIn } = await import('../../../../base/frontend/lib/system-back');
+    const overlay = s.inDoc('modifier-option-form')!;
+    expect(unsavedChangesIn(overlay)).toBeUndefined();
+    await s.live();
+    await s.result('base.business.get', business(JAPANESE));
+    expect(s.field('price_delta').value).toBe('150');
+    expect(unsavedChangesIn(overlay)).toBeUndefined();
+    await ionValue(s.field('price_delta'), '200', 'ionInput');
+    expect(unsavedChangesIn(overlay)).toBeDefined();
+  });
+});

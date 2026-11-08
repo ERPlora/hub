@@ -140,6 +140,12 @@ cambios: así el negocio se queda con los de fábrica.
 | App inactiva | «Caja no está activa en este negocio.» en lugar de la lista. |
 | Sin permiso | No aparece lo que no puede hacer («Abrir sesión», «Movimiento», «Arqueo», «Cerrar», «Guardar»); si llega por otra puerta, «No tienes permiso». |
 
+## Cambios sin guardar en Android
+
+En las ventanas de esta app (cajón, apertura, movimiento, arqueo y cierre de sesión), el botón atrás del móvil pregunta «¿Descartar los cambios?»
+cuando hay algo escrito o elegido sin guardar: «Seguir editando» conserva lo tecleado y «Descartar cambios»
+cierra la ventana sin guardarlo. Con la ventana como se abrió, atrás la cierra sin preguntar (BASE-F05); el cajón que se elige solo y el efectivo que el cierre propone del último arqueo no cuentan como cambio.
+
 ## Flujos
 
 | ID | Flujo | Vertical | Estado |

@@ -242,3 +242,15 @@ describe('StockModal', () => {
     expect(s.el('inventory-stock-form-submit')?.textContent?.trim()).toBe('Aplicar recuento');
   });
 });
+
+describe('StockModal: Android Back with unsaved changes (hub#1031, BASE-F05)', () => {
+  it.each(['receive', 'count', 'write_off'] as const)('%s: as opened closes; a change asks; restored as opened closes again', async (kind) => {
+    const s = await setup(kind);
+    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormOnAndroidBack({
+      overlay: () => s.el('inventory-stock-form'),
+      change: () => s.type('inventory-stock-qty', '3'),
+      restore: () => s.type('inventory-stock-qty', ''),
+    });
+  });
+});

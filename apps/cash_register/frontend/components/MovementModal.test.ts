@@ -117,3 +117,15 @@ describe('MovementModal: a business whose money cannot be read (hub#938)', () =>
     await expectWindowSaysMoneyUnreadable(m, 'cash-register-movement-submit', m.sent);
   });
 });
+
+describe('MovementModal: Android Back with unsaved changes (hub#1031, BASE-F05)', () => {
+  it('as opened closes; a change asks; restored as opened closes again', async () => {
+    const s = await setup();
+    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormOnAndroidBack({
+      overlay: () => s.inDoc('cash-register-movement'),
+      change: () => ionValue(s.inDoc('cash-register-movement-concept'), 'Change for the till', 'ionInput'),
+      restore: () => ionValue(s.inDoc('cash-register-movement-concept'), '', 'ionInput'),
+    });
+  });
+});
