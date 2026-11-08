@@ -129,3 +129,16 @@ describe('CountModal', () => {
     expect(s.wrapper.emitted('counted')).toBeUndefined();
   });
 });
+
+describe('CountModal: Android Back with unsaved changes (hub#1031, BASE-F05)', () => {
+  it('as opened closes; a counted box asks; emptied again closes again', async () => {
+    const s = await setup();
+    await s.result(CURRENCY, EUR);
+    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormOnAndroidBack({
+      overlay: () => s.inDoc('cash-register-count'),
+      change: () => ionValue(s.box('50'), '2', 'ionInput'),
+      restore: () => ionValue(s.box('50'), '', 'ionInput'),
+    });
+  });
+});

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:4e990e509aa2ae99da322dcbc71cd4620a162006442d0bb5e77fc89b6832be5a -->
+<!-- generated from WORKBOOK.md sha256:5b8615537a03db301b0c2b167a79923b4395e9e2b31702103d98a49e98003888 -->
 
 ## What it is for and who it is for
 
@@ -129,6 +129,12 @@ changes: that way the business keeps the default ones.
 | Reconnecting | What is drawn stays; a strip warns "Reconnecting…" until the connection is back. |
 | App inactive | "Cash register is not active in this business." instead of the list. |
 | No permission | What they cannot do does not show ("Open session", "Movement", "Count", "Close", "Save"); if they get there another way, "You do not have permission". |
+
+## Unsaved changes on Android
+
+In this app's windows (drawer, opening, movement, count and closing a session), the phone's Back button asks "Discard changes?" when something typed
+or chosen has not been saved: "Keep editing" keeps it and "Discard changes" closes the window without saving.
+With the window as it opened, Back closes it without asking (BASE-F05); the drawer chosen by itself and the cash the closing proposes from the last count are no change.
 
 ## Flows
 

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:d3b98ffbc55a17ff5be655cd16a1806d184f5eae9e42bab25fc65e8f96639897 -->
+<!-- generated from WORKBOOK.md sha256:87ac41d2e5acdb80944ccdffd29ee3c2cd592f7fa1977fba122a349ce2e4617a -->
 
 ## What it is for and who it is for
 
@@ -93,6 +93,12 @@ born from the flow CART_CHECKOUT-F08.
 
 Amounts in the format of the language of whoever looks and in the currency of each row, with that
 currency's decimals (the yen has no cents); quantities without decorative zeros ("2", "0.5").
+
+## Unsaved changes on Android
+
+In this app's create and edit windows, the phone's Back button asks "Discard changes?" when something typed
+or chosen has not been saved: "Keep editing" keeps it and "Discard changes" closes the window without saving.
+With the window as it opened, Back closes it without asking (BASE-F05).
 
 ## Flows
 

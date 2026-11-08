@@ -219,3 +219,29 @@ describe('PriceListFormModal: fields refused with the same words (hub#888)', () 
     return { field: (key) => s.field(TESTID[key]), send: () => click(s.save()), settle };
   }, 'tax_included');
 });
+
+describe('PriceListFormModal: Android Back with unsaved changes (hub#1031, BASE-F05)', () => {
+  it('editing: as opened closes; a change asks; restored as opened closes again', async () => {
+    const s = await setup({ priceList: priceList() });
+    const name = s.field('name').value as string;
+    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormOnAndroidBack({
+      overlay: () => s.inDoc('pricing-list-form'),
+      change: () => ionValue(s.field('name'), 'Staff prices', 'ionInput'),
+      restore: () => ionValue(s.field('name'), name, 'ionInput'),
+    });
+  });
+
+  it("a new list: the business's currency proposed after it opened is no change; another one asks", async () => {
+    const s = await setup({}, 'en', null);
+    const { unsavedChangesIn } = await import('../../../../base/frontend/lib/system-back');
+    const overlay = s.inDoc('pricing-list-form')!;
+    expect(unsavedChangesIn(overlay)).toBeUndefined();
+    await s.result('base.business.get', business(POLISH));
+    await settle();
+    expect(s.field('currency').value).toBe('PLN');
+    expect(unsavedChangesIn(overlay)).toBeUndefined();
+    await ionValue(s.field('currency'), 'EUR', 'ionInput');
+    expect(unsavedChangesIn(overlay)).toBeDefined();
+  });
+});

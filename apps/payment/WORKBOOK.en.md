@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:ae30e16a91c7e84db8ee00d6cfd27245f02389a04b6704009876564ef836bacf -->
+<!-- generated from WORKBOOK.md sha256:64bd06a5b8e65258759c76235b9efe8c1c5877d48217d861bec5784ef66cf7f4 -->
 
 ## What it is for and who it is for
 
@@ -104,6 +104,12 @@ or **Activate**.
 
 Amounts and dates show in the format of the language of whoever looks; the amount, in the payment's
 currency.
+
+## Unsaved changes on Android
+
+In this app's create and edit windows, the phone's Back button asks "Discard changes?" when something typed
+or chosen has not been saved: "Keep editing" keeps it and "Discard changes" closes the window without saving.
+With the window as it opened, Back closes it without asking (BASE-F05); the whole account read when editing a method is no change.
 
 ## Flows
 

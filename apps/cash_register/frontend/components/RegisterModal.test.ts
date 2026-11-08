@@ -59,3 +59,15 @@ describe('RegisterModal', () => {
     expect(prop(s.name(), 'errorText')).toBe('There is already a drawer with that name.');
   });
 });
+
+describe('RegisterModal: Android Back with unsaved changes (hub#1031, BASE-F05)', () => {
+  it('renaming: as opened closes; a change asks; restored as opened closes again', async () => {
+    const s = await setup({ id: 'r1', name: 'Bar' });
+    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormOnAndroidBack({
+      overlay: () => s.inDoc('cash-register-register'),
+      change: () => ionValue(s.name(), 'Terrace', 'ionInput'),
+      restore: () => ionValue(s.name(), 'Bar', 'ionInput'),
+    });
+  });
+});

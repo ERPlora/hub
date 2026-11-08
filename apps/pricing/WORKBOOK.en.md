@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:be0ea4f772ef9c191e224cce5c560b8e01630d19e1eab85fe60a8aac2ae817aa -->
+<!-- generated from WORKBOOK.md sha256:05f5c993af8fd850d106488ee0f347f9edc7970d03ae5a992e373a648f4a824e -->
 
 ## What it is for and who it is for
 
@@ -168,6 +168,12 @@ by Item, From and Price; filtered by Type, with the funnel; 50 per page.
 | App inactive | "This app is not active in this business". |
 | No permission | What they cannot do does not show; if they get there through another door, "You do not have permission". |
 | Price list that does not exist | The detail says "This price list does not exist" with **Back**. |
+
+## Unsaved changes on Android
+
+In this app's create and edit windows, the phone's Back button asks "Discard changes?" when something typed
+or chosen has not been saved: "Keep editing" keeps it and "Discard changes" closes the window without saving.
+With the window as it opened, Back closes it without asking (BASE-F05); the currency proposed by itself and an amount rewritten in the business's are no change.
 
 ## Flows
 
