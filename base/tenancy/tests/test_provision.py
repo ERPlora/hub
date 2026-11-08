@@ -497,6 +497,52 @@ def test_a_failed_hub_made_due_early_for_something_else_waits_for_its_retry(regi
     assert HubDue.objects.get(pk=hub.pk).due_at == later
 
 
+def test_a_sign_up_while_frozen_waits_and_is_made_on_the_worker_s_first_tick_after_the_freeze_is_lifted(
+    registry, monkeypatch, told
+):
+    """hub#930 (PLAN-DB round 2026-11-04e, «Congelar»): the staff freezes the platform for a database upgrade; a
+    business that signs up meanwhile is kept waiting, its database not made, and the worker makes it on its own on the
+    first tick after the freeze is lifted. Every other pass of the tick is left out: their own tests are
+    ``base/tests/test_worker.py``'s."""
+    from live.context import system_context
+
+    from base import catalog, worker
+    from base.catalog import RegisterResult
+    from base.registry import REGISTRY_SCOPE
+    from control.schemas import FreezeIn
+    from control.services import freeze_set
+
+    platform = system_context(REGISTRY_SCOPE)
+    monkeypatch.setattr(catalog, "register_apps", lambda: RegisterResult(0, 0, 0, True))
+    for name in ("_relay", "_hubs", "_activations", "_reap"):
+        monkeypatch.setattr(worker, name, lambda now: None)
+    hub = registry.hub()
+    HubDue.mark_due(hub)
+    with use_control():
+        freeze_set(platform, FreezeIn(frozen=True, reason="Aurora upgrade"))
+    seen: list[str] = []
+    stop = threading.Event()
+
+    def wait(seconds: float) -> bool:
+        seen.append(fresh(hub).status)
+        if len(seen) == 1:
+            with use_control():
+                freeze_set(platform, FreezeIn(frozen=False))
+        else:
+            stop.set()
+        return stop.is_set()
+
+    try:
+        assert worker.run(stop, tick_seconds=0, wait=wait) == 0
+    finally:
+        with use_control():
+            freeze_set(platform, FreezeIn(frozen=False))
+
+    assert seen == ["requested", "ready"]
+    assert hub.db_name in databases()
+    assert told == [hub.pk]
+
+
 def test_its_seeding_runs_inside_its_own_database(registry, monkeypatch, told):
     hub = registry.hub()
     seeded = []

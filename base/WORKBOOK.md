@@ -895,7 +895,8 @@ Pasos:
      {app}».
 Entra: cómo va la activación.
 Sale: la app en marcha en este negocio (`base.app.enabled`).
-Si falla: BASE-F21.
+Si falla: BASE-F21. Mientras el personal de ERPlora tiene congelada la plataforma por una subida de la base de datos
+(unos minutos, hub#930), la app sigue «Activándose…» y termina sola en cuanto se descongela.
 Implicados: BASE-F31, BASE-F32
 
 ### BASE-F23 Desactivar una app
@@ -1829,7 +1830,9 @@ Pasos:
 Entra: el estado del negocio que le pasa erplora.com.
 Sale: nada guardado.
 Si falla: una dirección que no es de ningún negocio no existe; un negocio dado de baja dice «Este hub ya no está
-disponible.».
+disponible.». Mientras el personal de ERPlora tiene congelada la plataforma por una subida de la base de datos
+(unos minutos, hub#930), el negocio espera a prepararse: la página sigue en «Estamos preparando tu negocio» y entra
+sola en cuanto se descongela y termina.
 Implicados: ninguno
 
 ### BASE-F64 Cambiar mis datos, foto, idioma y apariencia
