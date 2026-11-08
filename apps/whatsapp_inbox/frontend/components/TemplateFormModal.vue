@@ -16,6 +16,8 @@ import { HubIcon } from '@erplora/ui/shell';
 import { IonButton, IonInput, IonSelect, IonSelectOption, IonSpinner, IonTextarea } from '@ionic/vue';
 import { computed, ref, shallowRef, watch } from 'vue';
 
+import { useUnsavedFormOnOpen } from '../../../../base/frontend/lib/unsaved-changes';
+
 import { useLocale, useT } from '../composables/useT';
 import { acceptsSample, fileToBase64, formatSize, SAMPLE_RULES } from '../lib/files';
 import type {
@@ -321,6 +323,8 @@ async function save(): Promise<void> {
   }
   open.value = false;
 }
+
+useUnsavedFormOnOpen(ID, form, open);
 </script>
 
 <template>

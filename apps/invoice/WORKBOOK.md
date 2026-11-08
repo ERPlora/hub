@@ -184,6 +184,14 @@ ninguna factura.»; si lo mandó la cuenta de ERPlora, «Datos recibidos de tu c
 | App inactiva (`app_inactive`) | «Esta app no está activa en este negocio». |
 | Sin permiso | No aparece lo que no puede hacer; si llega por otra puerta, «No tienes permiso». |
 
+## Cambios sin guardar en Android
+
+En «Nueva factura manual», «Rectificar», «Nueva serie de numeración», «Editar serie» y «Factura completa del
+ticket», el botón atrás del móvil pregunta «¿Descartar los cambios?» cuando hay algo escrito o elegido sin guardar:
+«Seguir editando» conserva lo tecleado y «Descartar cambios» cierra la ventana sin guardarlo. Con la ventana como
+se abrió, atrás la cierra sin preguntar; la serie que la ventana elige sola al abrirse y el tipo que llega del
+territorio no cuentan como cambio, ni una rectificativa ya emitida: atrás cierra su resultado (BASE-F05).
+
 ## Flujos
 
 | ID | Flujo | Estado |

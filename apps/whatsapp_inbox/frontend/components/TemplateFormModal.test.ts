@@ -490,3 +490,26 @@ describe('TemplateFormModal: fields refused with the same words (hub#888)', () =
     expect(KEYS.filter((other) => s.fieldOf(other).errorText)).toEqual(others);
   });
 });
+
+describe('TemplateFormModal: Android Back with unsaved changes (hub#1020, BASE-F05)', () => {
+  it('new: as opened closes; a change asks; restored as opened closes again', async () => {
+    const s = await setup();
+    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormOnAndroidBack({
+      overlay: () => s.inDoc(ID),
+      change: () => s.type('name', 'aviso_cita'),
+      restore: () => s.type('name', ''),
+    });
+  });
+
+  it('editing: the template as loaded closes; a change asks; restored as loaded closes again', async () => {
+    const template = approved();
+    const s = await setup(template);
+    const { expectUnsavedFormOnAndroidBack } = await import('../../../../base/frontend/__tests__/unsaved-form');
+    await expectUnsavedFormOnAndroidBack({
+      overlay: () => s.inDoc(ID),
+      change: () => s.type('footer', 'Salón Aurora'),
+      restore: () => s.type('footer', template.footer),
+    });
+  });
+});

@@ -1,4 +1,4 @@
-<!-- generated from WORKBOOK.md sha256:e7dc5fe7f0290dd173b938a498dcbd3e6cde4389541434f4e894112140687292 -->
+<!-- generated from WORKBOOK.md sha256:e513a072dd893cd4f7a8759de620af0e020bfe2fb529ee97ea2534df3080422a -->
 
 ## What it is for and who it is for
 
@@ -171,6 +171,14 @@ administrator change it; the rest see it without being able to edit.
 | Reconnecting | What is painted stays; a banner warns "Reconnecting…". |
 | App inactive (`app_inactive`) | "This app is not active in this business". |
 | No permission | What they cannot do does not appear; if they arrive through another door, "You do not have permission". |
+
+## Unsaved changes on Android
+
+In "New manual invoice", "Rectify", "New numbering series", "Edit series" and "Full invoice of ticket", the phone's
+Back button asks "Discard changes?" when something typed or chosen has not been saved: "Keep editing" keeps it and
+"Discard changes" closes the window without saving. With the window as it opened, Back closes it without asking;
+the series the window picks by itself on opening and the rate that comes from the territory are no change, nor is a
+rectifying invoice already issued: Back closes its result (BASE-F05).
 
 ## Flows
 
