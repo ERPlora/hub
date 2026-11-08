@@ -181,7 +181,7 @@ test('table-assistant-card — in Spanish taking a table to another zone names t
   }
   await page.setViewportSize({ width: 1440, height: 900 });
   await decide(page, 'cancel');
-  await expect(lastAnswer(page)).toContainText(NOT_DONE.es);
+  await expect(lastAnswer(page)).toContainText('No lo he hecho.');
   expect((await tableNow(context, five.id)).zone_id).toBe(terrace);
   if (process.env.E2E_SAVE_STORAGE_STATE) await context.storageState({ path: process.env.E2E_SAVE_STORAGE_STATE });
   await context.close();

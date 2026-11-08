@@ -37,6 +37,37 @@ const toolOf = (frames: unknown[]) => {
 };
 const user = (content: string) => ({ role: 'user', content });
 
+/** The Hub's system message of a turn whose person reads `name` (base/assistant.py `instructions`: «Answer in <the
+ *  name of their language>, …»), as erplora.com's gateway forwards it, its own rules after it. */
+const system = (name: string) => ({
+  role: 'system',
+  content: `You are the assistant of the business «E2E» in ERPlora, its point of sale and management app.\nAnswer in ${name}, short and plain, as a colleague who knows the app.\n\n- Only help with this business and with using ERPlora.`,
+});
+const IN = { en: system('English'), es: system('Spanish') } as const;
+const requested = (name: string) => ({ role: 'assistant', content: '', tool_calls: [{ function: { name } }] });
+const NOT_CONFIRMED = { role: 'tool', content: '{"error": {"code": "base.assistant_not_confirmed", "message": "Not confirmed."}}' };
+const SUMMARY = {
+  number: 'S-1',
+  closing_balance: 25000,
+  expected_balance: 23000,
+  difference: 2000,
+  expected_hidden: false,
+  pending: { open_checks: 0, open_check_labels: [], unserved: 0, unserved_labels: [], prints: 0, print_usages: [], incomplete: false },
+};
+const PREVIEW = {
+  original: { number: 'F-1', issue_date: '2026-10-26', customer_name: 'Talleres Pérez SL', total_amount: 12100, remaining: 12100 },
+  invoice_type: 'R1',
+  reason: 'el precio estaba mal',
+  series_code: 'RECT',
+  next_number: 'RECT-2026-000001',
+  issue_date: '2026-10-27',
+  whole: true,
+  base_amount: -10000,
+  tax_amount: -2100,
+  total_amount: -12100,
+  lines: [{ description: 'Corte', quantity: '-1.000', total_amount: -12100 }],
+};
+
 describe('answerTo', () => {
   it('a question without a marker: the greeting, streamed in pieces, ending in «stop»', () => {
     const answer = answerTo([user('hola')]);
@@ -190,19 +221,7 @@ describe('answerTo', () => {
       name: 'invoice__invoice__rectification_preview',
       arguments: '{"number":"FACT-2026-000003","reason":"el precio estaba mal"}',
     });
-    const preview = {
-      original: { number: 'FACT-2026-000003', issue_date: '2026-10-26', customer_name: 'Talleres Pérez SL', total_amount: 12100, remaining: 12100 },
-      invoice_type: 'R1',
-      reason: 'el precio estaba mal',
-      series_code: 'RECT',
-      next_number: 'RECT-2026-000001',
-      issue_date: '2026-10-27',
-      whole: true,
-      base_amount: -10000,
-      tax_amount: -2100,
-      total_amount: -12100,
-      lines: [{ description: 'Corte', quantity: '-1.000', tax_rate: '21.00', base_amount: -10000, total_amount: -12100 }],
-    };
+    const preview = { ...PREVIEW, original: { ...PREVIEW.original, number: 'FACT-2026-000003' } };
     const read = [question, asked('invoice__invoice__rectification_preview'), { role: 'tool', content: JSON.stringify(preview) }];
     const rectify = answerTo(read);
     // The preview is said before the card, in the same answer that asks to rectify exactly the invoice it named.
@@ -229,19 +248,7 @@ describe('answerTo', () => {
   });
 
   it('the rectification preview as the model says it in Spanish: the original, the type, the reason, the next number, the amounts and what was left', () => {
-    const whole = {
-      original: { number: 'F-1', issue_date: '2026-10-26', customer_name: 'Talleres Pérez SL', total_amount: 12100, remaining: 12100 },
-      invoice_type: 'R1',
-      reason: 'el precio estaba mal',
-      series_code: 'RECT',
-      next_number: 'RECT-2026-000001',
-      issue_date: '2026-10-27',
-      whole: true,
-      base_amount: -10000,
-      tax_amount: -2100,
-      total_amount: -12100,
-      lines: [{ description: 'Corte', quantity: '-1.000', tax_rate: '21.00', base_amount: -10000, total_amount: -12100 }],
-    };
+    const whole = PREVIEW;
     expect(rectifyPreview(whole, 'es')).toBe(
       [
         'Vas a rectificar la factura **F-1** del 26/10/2026 (Talleres Pérez SL) con esta rectificativa:',
@@ -267,37 +274,6 @@ describe('answerTo', () => {
     expect(textOf(answerTo([{ role: 'user', content: parts }]).frames)).toBe(FORMAT_ANSWER.en);
   });
 });
-
-/** The Hub's system message of a turn whose person reads `name` (base/assistant.py `instructions`: «Answer in <the
- *  name of their language>, …»), as erplora.com's gateway forwards it, its own rules after it. */
-const system = (name: string) => ({
-  role: 'system',
-  content: `You are the assistant of the business «E2E» in ERPlora, its point of sale and management app.\nAnswer in ${name}, short and plain, as a colleague who knows the app.\n\n- Only help with this business and with using ERPlora.`,
-});
-const IN = { en: system('English'), es: system('Spanish') } as const;
-const requested = (name: string) => ({ role: 'assistant', content: '', tool_calls: [{ function: { name } }] });
-const NOT_CONFIRMED = { role: 'tool', content: '{"error": {"code": "base.assistant_not_confirmed", "message": "Not confirmed."}}' };
-const SUMMARY = {
-  number: 'S-1',
-  closing_balance: 25000,
-  expected_balance: 23000,
-  difference: 2000,
-  expected_hidden: false,
-  pending: { open_checks: 0, open_check_labels: [], unserved: 0, unserved_labels: [], prints: 0, print_usages: [], incomplete: false },
-};
-const PREVIEW = {
-  original: { number: 'F-1', issue_date: '2026-10-26', customer_name: 'Talleres Pérez SL', total_amount: 12100, remaining: 12100 },
-  invoice_type: 'R1',
-  reason: 'el precio estaba mal',
-  series_code: 'RECT',
-  next_number: 'RECT-2026-000001',
-  issue_date: '2026-10-27',
-  whole: true,
-  base_amount: -10000,
-  tax_amount: -2100,
-  total_amount: -12100,
-  lines: [{ description: 'Corte', quantity: '-1.000', total_amount: -12100 }],
-};
 
 describe('answerTo — in the language of the request (hub#1025)', () => {
   it('reads the language the Hub asks for; without one, or with one it does not speak, English (the source)', () => {
